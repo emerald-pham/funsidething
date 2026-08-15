@@ -4,6 +4,22 @@
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>Chain Scanner · ranked FVP</title>
+<script>
+/* =====================================================================
+   CLOUD SYNC CONFIG
+   Paste your Firebase web-app config below to sync across devices.
+   Leave the PASTE_ values alone to run local-only (localStorage).
+   These values are public by design; your data is protected by the
+   Firestore security rule, which allows a signed-in user to touch
+   only their own users/{uid} document.
+   ===================================================================== */
+window.FIREBASE_CONFIG = {
+  apiKey:     "AIzaSyD0EZmTSq5ssCkPQWj_9bbVeJL-yemecNo",
+  authDomain: "chain-scanner.firebaseapp.com",
+  projectId:  "chain-scanner",
+  appId:      "1:523754731255:web:b98eb657bc9986c04e85f2"
+};
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@1,6..72,400;1,6..72,500&family=Spline+Sans:wght@400;500;600;700&family=Spline+Sans+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -39,6 +55,11 @@ textarea{width:100%;font-family:var(--font-mono);font-size:12px}
 .topbtns{margin-left:auto;display:flex;gap:4px}
 .ghost{color:var(--mut);border:1px solid transparent;border-radius:8px;padding:5px 9px;font-size:13px}
 .ghost:hover{background:#fff;border-color:var(--line);color:var(--ink)}
+.syncbtn{font-size:12px;border:1px solid var(--line);border-radius:99px;padding:4px 10px;color:var(--mut);background:#fff;white-space:nowrap}
+.syncbtn:hover{color:var(--chain-deep);border-color:var(--chain-deep)}
+.syncbtn.ok{color:var(--good);border-color:#bfe6c9}
+.syncbtn.err{color:var(--danger);border-color:#f4c2c3}
+.syncbtn.busy{color:var(--chain-deep);border-color:#ddd7fb}
 .passbar{display:flex;align-items:center;gap:10px;margin-top:10px}
 .ptrack{flex:1;height:8px;border-radius:99px;background:#e6e8f0;overflow:hidden}
 .ptrack i{display:block;height:100%;width:0%;background:var(--good);border-radius:99px;transition:width .25s ease}
@@ -188,6 +209,7 @@ textarea{width:100%;font-family:var(--font-mono);font-size:12px}
         <span class="sub">ranked FVP — dot, compare, execute</span>
       </div>
       <div class="topbtns">
+        <button id="syncBtn" class="syncbtn" data-act="sync" hidden></button>
         <button class="ghost" data-act="undo" title="Undo last action (u)">↺ undo</button>
         <button class="ghost" data-act="help" title="Quick start">?</button>
         <button class="ghost" data-act="settings" title="Settings, contexts, import/export">⚙</button>
@@ -347,7 +369,7 @@ function defaultState(){
     chain: [], considered: {}, candidateId: null,
     interventionActive:false, interventionP:0, snooze:0,
     mode:"scan", decisionsMs:[], presentedAt:0,
-    listOpen:false, ctxOpen:true,
+    listOpen:false, ctxOpen:true, updatedAt:0,
     settings:{ horizonMin:60, thresholdPct:25, samples:250 }
   };
 }
@@ -381,6 +403,8 @@ function localStorageOK(){
   }catch(e){ return false; }
 }
 function save(){
+  state.updatedAt = Date.now();
+  cloudPush();
   if(saveTimer) clearTimeout(saveTimer);
   saveTimer = setTimeout(async ()=>{
     if(!storageOK) return;
@@ -392,6 +416,51 @@ function save(){
     try{ await window.storage.set(STORE_KEY, JSON.stringify(state)); }catch(e){ /* keep in memory */ }
   }, 350);
 }
+
+/* ---------- cloud sync glue (no-ops until Firebase is configured) ----------
+   Deliberately NOT a live listener: a realtime push from another device
+   mid-scan would swap the benchmark card under your hand. Instead we
+   reconcile on load and whenever the tab regains focus. Last write wins,
+   arbitrated by state.updatedAt. */
+let cloudTimer = null, lastPushed = "";
+function cloudReady(){ const CS = window.CloudSync; return !!(CS && CS.ready && CS.user); }
+function cloudPush(){
+  if(!cloudReady()) return;
+  if(cloudTimer) clearTimeout(cloudTimer);
+  cloudTimer = setTimeout(()=>{
+    const payload = JSON.stringify(state);
+    if(payload === lastPushed) return;      // nothing actually changed
+    lastPushed = payload;
+    window.CloudSync.push(payload, state.updatedAt || Date.now());
+  }, 2000);                                  // slow enough not to burn a write per keystroke
+}
+async function cloudPull(){
+  if(!cloudReady()) return;
+  const remote = await window.CloudSync.pull();
+  const lt = state.updatedAt || 0;
+  if(!remote || !remote.payload){            // empty cloud — seed it from this device
+    if(state.tasks.length){ lastPushed = ""; cloudPush(); }
+    return;
+  }
+  const rt = remote.updatedAt || 0;
+  if(rt > lt){
+    try{
+      const st = JSON.parse(remote.payload);
+      if(!st || !Array.isArray(st.tasks)) return;
+      pushUndo();                            // remote adoption is undoable
+      state = st;
+      lastPushed = remote.payload;
+      if(!state.settings) state.settings = {horizonMin:60,thresholdPct:25,samples:250};
+      recomputeRanks(); ensureCandidate(); render();
+      if(useLocal){ try{ localStorage.setItem(STORE_KEY, remote.payload); }catch(e){} }
+    }catch(e){ /* corrupt remote — leave local alone */ }
+  }else if(lt > rt){
+    lastPushed = ""; cloudPush();            // this device is ahead
+  }
+}
+window.addEventListener("cloudsync", ()=>{ renderSync(); cloudPull(); });
+window.addEventListener("focus", cloudPull);
+document.addEventListener("visibilitychange", ()=>{ if(!document.hidden) cloudPull(); });
 function pushUndo(){
   undoStack.push(JSON.stringify(state));
   if(undoStack.length > 30) undoStack.shift();
@@ -603,7 +672,23 @@ function topKlabel(id){ const st = rankCache.get(id); return st ? "top-"+st.topK
 /* ================================================================
    RENDER
    ================================================================ */
-function render(){ renderPass(); renderCtx(); renderScan(); renderList(); }
+function render(){ renderPass(); renderCtx(); renderScan(); renderList(); renderSync(); }
+
+function renderSync(){
+  const el = document.getElementById("syncBtn");
+  if(!el) return;
+  const CS = window.CloudSync;
+  if(!CS || !CS.configured){ el.hidden = true; return; }   // not set up — stay invisible
+  el.hidden = false;
+  const s = CS.status;
+  el.className = "syncbtn" + (s==="ok" ? " ok" : s==="syncing" ? " busy" : s==="error" ? " err" : "");
+  el.textContent = s==="ok" ? "\u2601 synced"
+                 : s==="syncing" ? "\u2601 syncing\u2026"
+                 : s==="error" ? "\u2601 sync error"
+                 : "\u2601 sign in";
+  el.title = CS.user ? ("Synced as " + CS.user + " \u2014 click to sign out")
+                     : "Sign in with Google to sync this list across your devices";
+}
 
 function renderPass(){
   const elig = eligibleTasks();
@@ -853,7 +938,12 @@ function openSettings(){
     + '<div class="mbtns"><button class="btn subtle" data-act="import-md">Import tasks</button></div>'
     + '<h3>Backup</h3>'
     + '<div class="kv"><span class="statusdot" style="background:'+(storageOK?"var(--good)":"var(--no)")+'"></span>'
-    + (storageOK ? (useLocal ? "Saving automatically in this browser\u2019s local storage \u2014 this device only." : "Saving automatically in this artifact\u2019s storage.") : "Persistent storage unavailable here — export to keep your data.")+'</div>'
+    + (storageOK ? (useLocal ? "Saving automatically in this browser\u2019s local storage." : "Saving automatically in this artifact\u2019s storage.") : "Persistent storage unavailable here — export to keep your data.")+'</div>'
+    + '<div class="kv" style="margin-top:6px"><span class="statusdot" style="background:'+(cloudReady()?"var(--good)":"var(--mut)")+'"></span>'
+    + (!window.CloudSync || !window.CloudSync.configured
+        ? "Cloud sync not configured \u2014 this device only."
+        : cloudReady() ? ("Cloud sync on, as " + esc(window.CloudSync.user) + ". Reconciles on load and when you switch back to this tab.")
+        : "Cloud sync configured \u2014 sign in from the header to link this device.")+'</div>'
     + '<div class="mbtns"><button class="btn subtle" data-act="export-json">Export JSON</button>'
     + '<button class="btn subtle" data-act="import-json">Import JSON</button>'
     + '<button class="btn danger" data-act="wipe" style="margin-left:auto">Reset everything</button></div>'
@@ -986,6 +1076,12 @@ function onAction(act, el){
       }
       break;
     }
+    case "sync": {
+      const CS = window.CloudSync;
+      if(!CS || !CS.configured) break;
+      if(CS.user) CS.signOut(); else CS.signIn();
+      break;
+    }
     case "undo": undo(); break;
     case "mback": break; // handled in click listener
   }
@@ -1034,6 +1130,73 @@ document.addEventListener("keydown", e=>{
   ensureCandidate();
   render();
 })();
+</script>
+<script type="module">
+/* =====================================================================
+   Cloud sync backend — Firebase Auth (Google) + Firestore.
+   Exposes window.CloudSync and fires a "cloudsync" event on any change.
+   Loads nothing at all until FIREBASE_CONFIG is filled in, so the app
+   stays fully functional (and dependency-free) when it isn't.
+   ===================================================================== */
+const CFG = window.FIREBASE_CONFIG || {};
+const configured = !!(CFG.apiKey && CFG.apiKey.indexOf("PASTE") !== 0);
+const CS = window.CloudSync = {
+  configured, ready:false, user:null, status: configured ? "signed-out" : "off",
+  signIn(){}, signOut(){}, async pull(){ return null; }, async push(){}
+};
+const ping = ()=> window.dispatchEvent(new CustomEvent("cloudsync"));
+
+if(configured){
+  try{
+    const V = "https://www.gstatic.com/firebasejs/10.12.2/";
+    const [appMod, A, F] = await Promise.all([
+      import(V+"firebase-app.js"),
+      import(V+"firebase-auth.js"),
+      import(V+"firebase-firestore.js")
+    ]);
+    const app  = appMod.initializeApp(CFG);
+    const auth = A.getAuth(app);
+    const db   = F.getFirestore(app);
+    await A.setPersistence(auth, A.browserLocalPersistence);
+
+    const ref = ()=> F.doc(db, "users", auth.currentUser.uid);
+
+    CS.signIn = ()=>{
+      CS.status = "syncing"; ping();
+      A.signInWithPopup(auth, new A.GoogleAuthProvider())
+       .catch(()=>{ CS.status = "error"; ping(); });
+    };
+    CS.signOut = ()=> A.signOut(auth);
+
+    CS.pull = async ()=>{
+      if(!auth.currentUser) return null;
+      CS.status = "syncing"; ping();
+      try{
+        const snap = await F.getDoc(ref());
+        CS.status = "ok"; ping();
+        return snap.exists() ? snap.data() : null;
+      }catch(e){ CS.status = "error"; ping(); return null; }
+    };
+    CS.push = async (payload, updatedAt)=>{
+      if(!auth.currentUser) return;
+      CS.status = "syncing"; ping();
+      try{
+        await F.setDoc(ref(), { payload, updatedAt });
+        CS.status = "ok"; ping();
+      }catch(e){ CS.status = "error"; ping(); }
+    };
+
+    A.onAuthStateChanged(auth, u=>{
+      CS.user   = u ? (u.email || u.uid) : null;
+      CS.status = u ? "ok" : "signed-out";
+      CS.ready  = true;
+      ping();
+    });
+  }catch(e){
+    CS.configured = false; CS.status = "error"; ping();
+  }
+}
+ping();
 </script>
 </body>
 </html>
