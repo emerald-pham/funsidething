@@ -94,8 +94,10 @@ textarea{width:100%;font-family:var(--font-mono);font-size:12px}
 .bench a{text-decoration-color:rgba(255,255,255,.6)}
 .cand{background:var(--cand-bg);border:1.5px solid var(--cand-line);color:var(--cand-ink)}
 .cand a{color:#8a6800}
-.dot{width:20px;height:20px;border-radius:50%;background:#fff;color:var(--good);display:inline-flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;flex:none;box-shadow:0 1px 2px rgba(0,0,0,.15)}
-.ckbox{width:19px;height:19px;flex:none;accent-color:var(--good);cursor:pointer}
+.dot{width:14px;height:14px;border-radius:50%;background:#fff;flex:none;box-shadow:0 1px 2px rgba(0,0,0,.15)}
+.ckbox{appearance:none;-webkit-appearance:none;width:19px;height:19px;flex:none;cursor:pointer;border-radius:50%;border:2px solid currentColor;background:transparent;position:relative}
+.ckbox:checked{background:var(--good);border-color:var(--good)}
+.ckbox:checked::after{content:"";position:absolute;left:50%;top:44%;width:5px;height:9px;border:solid #fff;border-width:0 2px 2px 0;transform:translate(-50%,-50%) rotate(45deg)}
 .donepick{display:flex;align-items:center;gap:6px;cursor:pointer;font-size:11.5px;font-weight:700;opacity:.85;flex:none}
 .donepick:hover{opacity:1}
 .chiprow{display:flex;gap:6px;margin-left:auto;flex:none;align-items:center}
@@ -122,7 +124,7 @@ textarea{width:100%;font-family:var(--font-mono);font-size:12px}
 .qline{font-family:var(--font-q);font-style:italic;font-size:19px;margin:16px 2px 12px;color:var(--ink)}
 .qline .until{white-space:nowrap}
 .decide{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
-.decide .keyhint{font-size:10px;opacity:.7;font-weight:500;margin-left:5px}
+.keyhint{font-size:10px;opacity:.7;font-weight:500;margin-left:5px}
 .sparkbox{display:flex;align-items:center;gap:8px;margin-left:auto}
 .spark{display:block}
 .spark path.area{fill:rgba(106,85,224,.15)}
@@ -161,11 +163,18 @@ textarea{width:100%;font-family:var(--font-mono);font-size:12px}
 .tmain .skipped{flex:none;color:var(--mut);font-size:11px;border:1px solid var(--line);border-radius:6px;padding:1px 6px}
 .addrow{display:flex;gap:8px;padding:12px 14px;border-top:1px solid var(--line);background:#fafbfe}
 .addrow input{flex:1;min-width:0}
-.donewrap{border-top:1px solid var(--line);padding:8px 14px;font-size:13px;color:var(--mut)}
-.donewrap summary{cursor:pointer}
-.donewrap .drow{display:flex;gap:8px;align-items:center;padding:4px 0}
-.donewrap .dt{text-decoration:line-through;opacity:.75}
-.restore{font-size:12px;text-decoration:underline;color:var(--mut)}
+.histwrap{padding:0;overflow:hidden;margin-top:14px}
+.histwrap .chead{width:100%;text-align:left;padding:10px 14px;font-weight:600;font-size:13.5px;background:#fafbfe;border-bottom:1px solid transparent}
+.histwrap.open .chead{border-bottom-color:var(--line)}
+.histwrap .chead .n{color:var(--mut);font-weight:500}
+.histbody{padding:2px 14px;max-height:40vh;overflow-y:auto}
+.histempty{padding:4px 0 14px;color:var(--mut);font-size:13px}
+.drow{display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid #f5f6fa;font-size:13px}
+.drow:last-child{border-bottom:none}
+.dt{text-decoration:line-through;opacity:.75;flex:1;overflow-wrap:anywhere;color:var(--ink)}
+.dwhen{color:var(--mut);font-size:11px;flex:none}
+.restore{font-size:12px;text-decoration:underline;color:var(--mut);flex:none}
+.histfoot{padding:4px 14px 12px}
 .foot{margin-top:22px;text-align:center;font-size:12px;color:var(--mut)}
 .foot a{color:var(--mut)}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:#fff;
@@ -244,7 +253,9 @@ textarea{width:100%;font-family:var(--font-mono);font-size:12px}
     </div>
   </section>
 
-  <footer class="foot">After Mark Forster's <a href="https://blog.beeminder.com/forster/" target="_blank" rel="noopener">Final Version Perfected</a> · rank posteriors à la <a href="https://alltom.com/pages/spawelo/" target="_blank" rel="noopener">spawelo</a> · keys: <span class="mono">y / n / c / u</span></footer>
+  <section class="panel histwrap" id="histPanel"></section>
+
+  <footer class="foot">After Mark Forster's <a href="https://blog.beeminder.com/forster/" target="_blank" rel="noopener">Final Version Perfected</a> · rank posteriors à la <a href="https://alltom.com/pages/spawelo/" target="_blank" rel="noopener">spawelo</a> · keys: <span class="mono">y / n / c / d / ⌫ / u</span></footer>
 </div>
 <div id="modalRoot"></div>
 
@@ -391,7 +402,7 @@ function defaultState(){
     chain: [], considered: {}, candidateId: null,
     interventionActive:false, interventionP:0, snooze:0,
     mode:"scan", decisionsMs:[], presentedAt:0,
-    listOpen:false, ctxOpen:true, updatedAt:0,
+    listOpen:false, ctxOpen:true, histOpen:false, updatedAt:0,
     settings:{ horizonMin:60, thresholdPct:25, samples:250 }
   };
 }
@@ -458,6 +469,17 @@ function cloudPush(){
     window.CloudSync.push(payload, state.updatedAt || Date.now());
   }, 2000);                                  // slow enough not to burn a write per keystroke
 }
+/* Bypasses the debounce above for moments that shouldn't wait — dotting a
+   task onto the chain, or deleting one. Cancels any pending debounced push
+   and sends the current state right now instead. */
+function cloudPushNow(){
+  if(!cloudReady()) return;
+  if(cloudTimer){ clearTimeout(cloudTimer); cloudTimer = null; }
+  const payload = JSON.stringify(state);
+  if(payload === lastPushed) return;      // nothing actually changed
+  lastPushed = payload;
+  window.CloudSync.push(payload, state.updatedAt || Date.now());
+}
 async function cloudPull(){
   if(!cloudReady()) return;
   const remote = await window.CloudSync.pull();
@@ -475,6 +497,7 @@ async function cloudPull(){
       state = st;
       lastPushed = remote.payload;
       if(!state.settings) state.settings = {horizonMin:60,thresholdPct:25,samples:250};
+      if(state.histOpen===undefined) state.histOpen=false;
       recomputeRanks(); ensureCandidate(); render();
       if(useLocal){ try{ localStorage.setItem(STORE_KEY, remote.payload); }catch(e){} }
     }catch(e){ /* corrupt remote — leave local alone */ }
@@ -573,7 +596,7 @@ function decide(kind){ // 'yes' | 'no' | 'cant' | 'cand-done'
   state.candidateId = null;
   if(kind==="yes" || kind==="no" || kind==="cand-done") recomputeRanks();
   maybeIntervene();
-  commit();
+  commit(true, kind==="yes");   // dotting (yes) syncs to the cloud right away
 }
 function completeTask(t){
   t.lastDoneAt = Date.now();
@@ -606,6 +629,16 @@ function dislodge(){
   state.considered[b.id] = "dislodged";
   state.interventionActive = false;
   commit();
+}
+function deleteTask(id){ // removes a task entirely — from the list, the chain, everywhere
+  if(!id) return;
+  pushUndo();
+  state.tasks = state.tasks.filter(t=>t.id!==id);
+  state.chain = state.chain.filter(c=>c!==id);
+  delete state.considered[id];
+  if(state.candidateId===id) state.candidateId=null;
+  recomputeRanks();
+  commit(true, true);           // deletions sync to the cloud right away
 }
 function newPass(push){
   if(push!==false) pushUndo();
@@ -704,7 +737,7 @@ function addTask(title, dot){
   state.tasks.push(t);
   if(dot){ state.chain.push(t.id); state.interventionActive=false; }
   recomputeRanks();
-  commit();
+  commit(true, !!dot);          // "Add & dot" syncs to the cloud right away
   return t;
 }
 function toggleContext(id){
@@ -721,9 +754,10 @@ function revealTask(id){
     if(row){ row.scrollIntoView({block:"center",behavior:"smooth"}); row.classList.remove("flash"); void row.offsetWidth; row.classList.add("flash"); }
   });
 }
-function commit(doSave){
+function commit(doSave, immediateSync){
   ensureCandidate();
   if(doSave!==false) save();
+  if(immediateSync) cloudPushNow();
   render();
 }
 
@@ -743,6 +777,15 @@ function untilClock(){
   const d = new Date(Date.now() + state.settings.horizonMin*60000);
   let h = d.getHours(); const ap = h>=12 ? "PM" : "AM"; h = ((h+11)%12)+1;
   return h + ":" + String(d.getMinutes()).padStart(2,"0") + " " + ap;
+}
+function fmtWhen(ts){ // short "when this was completed" label for the history panel
+  if(!ts) return "";
+  const d = new Date(ts);
+  const diffDays = Math.round((new Date(d.getFullYear(),d.getMonth(),d.getDate()) - isoToDate(todayISO(0))) / 86400000);
+  if(diffDays===0) return "today";
+  if(diffDays===-1) return "yesterday";
+  if(diffDays>-7) return WD[d.getDay()];
+  return WD[d.getDay()] + " " + (d.getMonth()+1) + "/" + d.getDate();
 }
 function sparkSVG(id, w, hgt){
   w = w||84; hgt = hgt||20;
@@ -779,7 +822,7 @@ function topKlabel(id){ const st = rankCache.get(id); return st ? "top-"+st.topK
 /* ================================================================
    RENDER
    ================================================================ */
-function render(){ renderPass(); renderCtx(); renderScan(); renderList(); renderSync(); }
+function render(){ renderPass(); renderCtx(); renderScan(); renderList(); renderHistory(); renderSync(); }
 
 function renderSync(){
   const el = document.getElementById("syncBtn");
@@ -864,15 +907,15 @@ function renderScan(){
   // benchmark card
   if(b){
     html += '<div class="cardrow"><div class="card bench">'
-         + '<label class="donepick" title="Done — cross it off"><input class="ckbox" type="checkbox" data-act="bench-done" aria-label="Mark benchmark done"/> Done</label>'
-         + '<span class="dot" aria-hidden="true">✓</span>'
+         + '<label class="donepick" title="Done — cross it off (d)"><input class="ckbox" type="checkbox" data-act="bench-done" aria-label="Mark benchmark done"/> Done<span class="keyhint">d</span></label>'
+         + '<span class="dot" aria-hidden="true" title="Dotted — head of the chain"></span>'
          + '<span class="title">'+titleHTML(b)+'</span>'
          + '<span class="chiprow">'+chipHTML(b)+'</span></div>'
          + '<div class="siderail">'
          + '<button class="reveal" data-act="reveal" data-id="'+b.id+'">Reveal</button>'
          + '<button class="sidesm" data-act="worked" title="Started it, crossing it off, back to the bottom of the list (rule 7)">worked on it ↻</button>'
          + '<button class="btn dislodge" data-act="dislodge" title="Remove from the chain without completing">Dislodge</button>'
-         + '<button class="btn del-sm" data-act="delete-task" data-id="'+b.id+'" title="Delete this task entirely">Delete</button>'
+         + '<button class="btn del-sm" data-act="delete-task" data-id="'+b.id+'" title="Delete this task entirely (Delete key)">Delete<span class="keyhint">⌫</span></button>'
          + '</div></div>';
   }
 
@@ -907,11 +950,11 @@ function renderScan(){
     const cand = taskById(state.candidateId);
     if(cand){
       html += '<div class="cardrow"><div class="card cand">'
-           + '<label class="donepick" title="Did it just now — cross it off"><input class="ckbox" type="checkbox" data-act="cand-done" aria-label="Did this just now"/> Done</label>'
+           + '<label class="donepick" title="Did it just now — cross it off (d)"><input class="ckbox" type="checkbox" data-act="cand-done" aria-label="Did this just now"/> Done<span class="keyhint">d</span></label>'
            + '<span class="title">'+titleHTML(cand)+'</span>'
            + '<span class="chiprow">'+chipHTML(cand)+'</span></div>'
            + '<div class="siderail"><button class="reveal" data-act="reveal" data-id="'+cand.id+'">Reveal</button>'
-           + '<button class="btn del-sm" data-act="delete-task" data-id="'+cand.id+'" title="Delete this task entirely">Delete</button></div></div>';
+           + '<button class="btn del-sm" data-act="delete-task" data-id="'+cand.id+'" title="Delete this task entirely (Delete key)">Delete<span class="keyhint">⌫</span></button></div></div>';
       const q = b
         ? 'Would I rather have spent the next hour (until <span class="until">'+untilClock()+'</span>) doing this?'
         : 'No chain yet — would I want to spend the next hour (until <span class="until">'+untilClock()+'</span>) on this?';
@@ -962,15 +1005,27 @@ function renderList(){
          + (consid && consid!=="done" ? '<span class="skipped">'+(consid==="no"?"no":consid==="cant"?"can\u2019t":consid)+'</span>' : '')
          + '</div></div>';
   }
-  const done = state.tasks.filter(t=>t.done).sort((a,b)=>(b.completedAt||0)-(a.completedAt||0));
-  if(done.length){
-    html += '<details class="donewrap"><summary>Completed ('+done.length+')</summary>';
-    for(const t of done.slice(0,50)){
-      html += '<div class="drow"><span class="dt">'+esc(t.title)+'</span><button class="restore" data-act="restore" data-id="'+t.id+'">restore</button></div>';
-    }
-    html += '</details>';
-  }
   body.innerHTML = html || '<div class="emptystate">No open tasks.</div>';
+}
+
+function renderHistory(){
+  const el = document.getElementById("histPanel");
+  if(!el) return;
+  const done = state.tasks.filter(t=>t.done).sort((a,b)=>(b.completedAt||0)-(a.completedAt||0));
+  el.classList.toggle("open", state.histOpen);
+  let html = '<button class="chead" data-act="toggle-hist">'+(state.histOpen?"▼":"▶")+' History <span class="n">('+done.length+' done)</span></button>';
+  if(state.histOpen){
+    if(!done.length){
+      html += '<div class="histempty">Nothing crossed off yet.</div>';
+    }else{
+      html += '<div class="histbody">';
+      for(const t of done.slice(0,50)){
+        html += '<div class="drow"><span class="dt">'+esc(t.title)+'</span><span class="dwhen mono">'+fmtWhen(t.completedAt)+'</span><button class="restore" data-act="restore" data-id="'+t.id+'">restore</button></div>';
+      }
+      html += '</div><div class="histfoot"><button class="btn subtle" data-act="clear-done">Clear history</button></div>';
+    }
+  }
+  el.innerHTML = html;
 }
 
 /* ================================================================
@@ -1000,7 +1055,7 @@ function openHelp(){
     + 'The <b>sparkline</b> is each task\u2019s likelihood distribution over rank — left-biased means likely to be picked. '
     + '<b>top-K</b> is the smallest K (≥2) with P(rank ≤ K) ≥ 1 − 1/K: a stopping stat for "if I\u2019ll only do K tasks today, is this plausibly one of them?" '
     + 'And when the odds of finding anything better collapse, the scanner interrupts your clicking and tells you to go work.</p>'
-    + '<p class="kv">Keys: <b>y</b> / <b>n</b> / <b>c</b> to decide, <b>u</b> to undo.</p></div>'
+    + '<p class="kv">Keys: <b>y</b> / <b>n</b> / <b>c</b> to decide, <b>d</b> to mark whatever\u2019s showing done, <b>Delete</b> to remove it entirely, <b>u</b> to undo.</p></div>'
   );
 }
 function openEdit(id){
@@ -1045,8 +1100,8 @@ function openSettings(){
     + '<div class="mgr"><input id="newCtxName" type="text" placeholder="New context…"/><button class="btn subtle" data-act="add-ctx-named">Add</button></div>'
     + '<h3>Pass</h3><div class="mbtns"><button class="btn subtle" data-act="new-pass">Reset pass (clear skips)</button></div>'
     + '<h3>Housekeeping</h3>'
-    + '<div class="kv">'+(doneCount ? (doneCount+' completed task'+(doneCount===1?'':'s')+' still stored (kept around so "restore" works).') : 'No completed tasks stored right now.')+'</div>'
-    + (doneCount ? '<div class="mbtns"><button class="btn subtle" data-act="clear-done">Clear completed tasks</button></div>' : '')
+    + '<div class="kv">'+(doneCount ? (doneCount+' completed task'+(doneCount===1?'':'s')+' sitting in the History panel (kept around so "restore" works).') : 'No completed tasks stored right now.')+'</div>'
+    + (doneCount ? '<div class="mbtns"><button class="btn subtle" data-act="clear-done">Clear history</button></div>' : '')
     + '<h3>Bulk import</h3>'
     + '<div class="kv">Paste a list \u2014 numbered (<span class="mono">1.</span> <span class="mono">1)</span> <span class="mono">1 -</span>), bulleted (<span class="mono">-</span> <span class="mono">*</span> <span class="mono">\u2022</span>), Obsidian checkboxes, or just one task per line. '
     + 'Markdown links become clickable, <span class="mono">- [x]</span> items and headings are skipped, and anything already on your list won\u2019t be added twice.<br>'
@@ -1088,6 +1143,7 @@ function onAction(act, el){
     case "new-pass": newPass(); closeModal(); break;
     case "toggle-list": state.listOpen=!state.listOpen; render(); save(); break;
     case "toggle-ctx": state.ctxOpen=!state.ctxOpen; render(); save(); break;
+    case "toggle-hist": state.histOpen=!state.histOpen; render(); save(); break;
     case "add": {
       const inp=document.getElementById("addInput");
       if(/\r?\n/.test(inp.value)){                      // a whole list got in here
@@ -1130,15 +1186,7 @@ function onAction(act, el){
       t.ctx=[...document.querySelectorAll("[data-editctx]")].filter(x=>x.checked).map(x=>x.dataset.editctx);
       closeModal(); commit(); break;
     }
-    case "delete-task": {
-      pushUndo();
-      const id=el.dataset.id;
-      state.tasks=state.tasks.filter(t=>t.id!==id);
-      state.chain=state.chain.filter(c=>c!==id);
-      delete state.considered[id];
-      if(state.candidateId===id) state.candidateId=null;
-      recomputeRanks(); closeModal(); commit(); break;
-    }
+    case "delete-task": deleteTask(el.dataset.id); closeModal(); break;
     case "restore": {
       const t=taskById(el.dataset.id); if(!t) break;
       pushUndo(); t.done=false; t.completedAt=null; t.lastDoneAt=null;
@@ -1231,11 +1279,25 @@ document.addEventListener("keydown", e=>{
   }
   if(document.querySelector(".mback")){ if(e.key==="Escape") closeModal(); return; }
   const k=e.key.toLowerCase();
-  if(k==="y"&&!state.interventionActive&&state.candidateId) decide("yes");
+  if(k==="y"&&!state.interventionActive&&state.candidateId) decide("yes");                  // dot it
   else if(k==="n"&&!state.interventionActive&&state.candidateId) decide("no");
   else if(k==="c"&&!state.interventionActive&&state.candidateId) decide("cant");
+  else if(k==="d") hotkeyDone();                                                             // cross off whatever's showing
+  else if(e.key==="Delete"||e.key==="Backspace"){ e.preventDefault(); hotkeyDelete(); }       // remove it entirely
   else if(k==="u") undo();
 });
+
+/* "Done" and "Delete" act on the candidate you're deciding on, if one's showing;
+   otherwise they fall back to the benchmark at the head of the chain. */
+function hotkeyDone(){
+  if(!state.interventionActive && state.mode==="scan" && state.candidateId){ decide("cand-done"); return; }
+  benchDone();
+}
+function hotkeyDelete(){
+  if(!state.interventionActive && state.mode==="scan" && state.candidateId){ deleteTask(state.candidateId); return; }
+  const b = benchmark();
+  if(b) deleteTask(b.id);
+}
 
 /* ================================================================
    BOOT
@@ -1244,6 +1306,7 @@ document.addEventListener("keydown", e=>{
   const loaded = await loadState();
   state = loaded || defaultState();
   if(!state.settings) state.settings = {horizonMin:60,thresholdPct:25,samples:250};
+  if(state.histOpen===undefined) state.histOpen=false;
   recomputeRanks();
   ensureCandidate();
   render();
