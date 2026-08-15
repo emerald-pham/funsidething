@@ -96,6 +96,8 @@ textarea{width:100%;font-family:var(--font-mono);font-size:12px}
 .cand a{color:#8a6800}
 .dot{width:20px;height:20px;border-radius:50%;background:#fff;color:var(--good);display:inline-flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;flex:none;box-shadow:0 1px 2px rgba(0,0,0,.15)}
 .ckbox{width:19px;height:19px;flex:none;accent-color:var(--good);cursor:pointer}
+.donepick{display:flex;align-items:center;gap:6px;cursor:pointer;font-size:11.5px;font-weight:700;opacity:.85;flex:none}
+.donepick:hover{opacity:1}
 .chiprow{display:flex;gap:6px;margin-left:auto;flex:none;align-items:center}
 .chip{font-size:11px;font-weight:700;border-radius:6px;padding:2px 7px;letter-spacing:.02em}
 .chip.due-today{background:var(--no);color:#fff}
@@ -111,6 +113,7 @@ textarea{width:100%;font-family:var(--font-mono);font-size:12px}
 .btn{border-radius:8px;padding:8px 16px;font-weight:700;font-size:14px;color:#fff;box-shadow:0 1px 2px rgba(20,24,48,.15)}
 .btn:active{transform:translateY(1px)}
 .btn.dislodge{background:var(--danger);padding:6px 12px;font-size:13px}
+.btn.del-sm{background:var(--danger);padding:6px 12px;font-size:13px}
 .btn.yes{background:var(--yes)}
 .btn.no{background:var(--no)}
 .btn.cant{background:var(--cant)}
@@ -359,6 +362,7 @@ function safeUrl(u){
 
 let state = null;
 let rankCache = new Map();     // id -> {hist,cdf,topK,n}
+let sparkCache = new Map();    // id:WxH -> memoized sparkline SVG string; cleared whenever rankCache changes
 let undoStack = [];
 let saveTimer = null;
 let storageOK = false;
@@ -427,11 +431,13 @@ function save(){
   saveTimer = setTimeout(async ()=>{
     if(!storageOK) return;
     if(useLocal){
-      try{ localStorage.setItem(STORE_KEY, JSON.stringify(state)); }catch(e){ /* quota — keep in memory */ }
+      try{ localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
+      catch(e){ toast("Couldn't save — local storage might be full."); }
       return;
     }
     if(!window.storage) return;
-    try{ await window.storage.set(STORE_KEY, JSON.stringify(state)); }catch(e){ /* keep in memory */ }
+    try{ await window.storage.set(STORE_KEY, JSON.stringify(state)); }
+    catch(e){ toast("Couldn't save just now — will retry on your next change."); }
   }, 350);
 }
 
@@ -515,6 +521,7 @@ function decisionsPerMinute(){
 }
 function recomputeRanks(){
   rankCache = rankStats(openTasks().map(t=>({id:t.id, mu:t.mu, sigma:t.sigma})), state.settings.samples);
+  sparkCache.clear();
 }
 function ensureCandidate(){
   if(state.mode !== "scan" || state.interventionActive) return;
@@ -607,6 +614,14 @@ function newPass(push){
   state.interventionActive = false;
   state.candidateId = null;
   if(push!==false) commit();
+}
+function clearCompleted(){ // completed tasks otherwise live in state.tasks forever
+  const n = state.tasks.filter(t=>t.done).length;
+  if(!n) return;
+  if(!confirm("Permanently remove "+n+" completed task"+(n===1?"":"s")+"? You can still undo with \u21ba right after.")) return;
+  pushUndo();
+  state.tasks = state.tasks.filter(t=>!t.done);
+  commit();
 }
 function rescanSkipped(){ // clear only the no/can't marks, keep 'done'
   pushUndo();
@@ -731,24 +746,33 @@ function untilClock(){
 }
 function sparkSVG(id, w, hgt){
   w = w||84; hgt = hgt||20;
+  const key = id+":"+w+"x"+hgt;
+  const cached = sparkCache.get(key);
+  if(cached !== undefined) return cached;
   const st = rankCache.get(id);
-  if(!st) return '<svg class="spark" width="'+w+'" height="'+hgt+'" viewBox="0 0 '+w+' '+hgt+'"></svg>';
-  const n = st.n, hist = st.hist;
-  const B = Math.max(2, Math.min(n, 44));
-  const bins = new Float32Array(B);
-  for(let r=0;r<n;r++) bins[Math.min(B-1, Math.floor(r*B/n))] += hist[r];
-  const sm = new Float32Array(B);
-  for(let i=0;i<B;i++) sm[i] = (bins[i-1]||0)*0.25 + bins[i]*0.5 + (bins[i+1]||0)*0.25;
-  let max = 1e-9; for(let i=0;i<B;i++) if(sm[i]>max) max=sm[i];
-  const pts = [];
-  for(let i=0;i<B;i++){
-    const x = (B===1) ? 0 : i/(B-1)*w;
-    const y = hgt-1 - (sm[i]/max)*(hgt-3);
-    pts.push(x.toFixed(1)+","+y.toFixed(1));
+  let svg;
+  if(!st){
+    svg = '<svg class="spark" width="'+w+'" height="'+hgt+'" viewBox="0 0 '+w+' '+hgt+'"></svg>';
+  }else{
+    const n = st.n, hist = st.hist;
+    const B = Math.max(2, Math.min(n, 44));
+    const bins = new Float32Array(B);
+    for(let r=0;r<n;r++) bins[Math.min(B-1, Math.floor(r*B/n))] += hist[r];
+    const sm = new Float32Array(B);
+    for(let i=0;i<B;i++) sm[i] = (bins[i-1]||0)*0.25 + bins[i]*0.5 + (bins[i+1]||0)*0.25;
+    let max = 1e-9; for(let i=0;i<B;i++) if(sm[i]>max) max=sm[i];
+    const pts = [];
+    for(let i=0;i<B;i++){
+      const x = (B===1) ? 0 : i/(B-1)*w;
+      const y = hgt-1 - (sm[i]/max)*(hgt-3);
+      pts.push(x.toFixed(1)+","+y.toFixed(1));
+    }
+    const line = "M"+pts.join(" L");
+    const area = line + " L"+w+","+(hgt-0.5)+" L0,"+(hgt-0.5)+" Z";
+    svg = '<svg class="spark" width="'+w+'" height="'+hgt+'" viewBox="0 0 '+w+' '+hgt+'" aria-hidden="true"><path class="area" d="'+area+'"/><path class="line" d="'+line+'"/></svg>';
   }
-  const line = "M"+pts.join(" L");
-  const area = line + " L"+w+","+(hgt-0.5)+" L0,"+(hgt-0.5)+" Z";
-  return '<svg class="spark" width="'+w+'" height="'+hgt+'" viewBox="0 0 '+w+' '+hgt+'" aria-hidden="true"><path class="area" d="'+area+'"/><path class="line" d="'+line+'"/></svg>';
+  sparkCache.set(key, svg);
+  return svg;
 }
 function topKlabel(id){ const st = rankCache.get(id); return st ? "top-"+st.topK : ""; }
 
@@ -840,7 +864,7 @@ function renderScan(){
   // benchmark card
   if(b){
     html += '<div class="cardrow"><div class="card bench">'
-         + '<input class="ckbox" type="checkbox" data-act="bench-done" aria-label="Mark benchmark done" title="Done — cross it off"/>'
+         + '<label class="donepick" title="Done — cross it off"><input class="ckbox" type="checkbox" data-act="bench-done" aria-label="Mark benchmark done"/> Done</label>'
          + '<span class="dot" aria-hidden="true">✓</span>'
          + '<span class="title">'+titleHTML(b)+'</span>'
          + '<span class="chiprow">'+chipHTML(b)+'</span></div>'
@@ -848,6 +872,7 @@ function renderScan(){
          + '<button class="reveal" data-act="reveal" data-id="'+b.id+'">Reveal</button>'
          + '<button class="sidesm" data-act="worked" title="Started it, crossing it off, back to the bottom of the list (rule 7)">worked on it ↻</button>'
          + '<button class="btn dislodge" data-act="dislodge" title="Remove from the chain without completing">Dislodge</button>'
+         + '<button class="btn del-sm" data-act="delete-task" data-id="'+b.id+'" title="Delete this task entirely">Delete</button>'
          + '</div></div>';
   }
 
@@ -882,10 +907,11 @@ function renderScan(){
     const cand = taskById(state.candidateId);
     if(cand){
       html += '<div class="cardrow"><div class="card cand">'
-           + '<input class="ckbox" type="checkbox" data-act="cand-done" aria-label="Did this just now" title="Did it just now — cross it off"/>'
+           + '<label class="donepick" title="Did it just now — cross it off"><input class="ckbox" type="checkbox" data-act="cand-done" aria-label="Did this just now"/> Done</label>'
            + '<span class="title">'+titleHTML(cand)+'</span>'
            + '<span class="chiprow">'+chipHTML(cand)+'</span></div>'
-           + '<div class="siderail"><button class="reveal" data-act="reveal" data-id="'+cand.id+'">Reveal</button></div></div>';
+           + '<div class="siderail"><button class="reveal" data-act="reveal" data-id="'+cand.id+'">Reveal</button>'
+           + '<button class="btn del-sm" data-act="delete-task" data-id="'+cand.id+'" title="Delete this task entirely">Delete</button></div></div>';
       const q = b
         ? 'Would I rather have spent the next hour (until <span class="until">'+untilClock()+'</span>) doing this?'
         : 'No chain yet — would I want to spend the next hour (until <span class="until">'+untilClock()+'</span>) on this?';
@@ -999,6 +1025,7 @@ function openEdit(id){
 }
 function openSettings(){
   const s = state.settings;
+  const doneCount = state.tasks.filter(t=>t.done).length;
   let ctxMgr = "";
   for(const c of state.contexts){
     ctxMgr += '<div class="mgr"><input type="checkbox" data-mgrctx="'+c.id+'"'+(c.active?" checked":"")+' title="active"/>'
@@ -1017,6 +1044,9 @@ function openSettings(){
     + '<h3>Contexts</h3>'+ctxMgr
     + '<div class="mgr"><input id="newCtxName" type="text" placeholder="New context…"/><button class="btn subtle" data-act="add-ctx-named">Add</button></div>'
     + '<h3>Pass</h3><div class="mbtns"><button class="btn subtle" data-act="new-pass">Reset pass (clear skips)</button></div>'
+    + '<h3>Housekeeping</h3>'
+    + '<div class="kv">'+(doneCount ? (doneCount+' completed task'+(doneCount===1?'':'s')+' still stored (kept around so "restore" works).') : 'No completed tasks stored right now.')+'</div>'
+    + (doneCount ? '<div class="mbtns"><button class="btn subtle" data-act="clear-done">Clear completed tasks</button></div>' : '')
     + '<h3>Bulk import</h3>'
     + '<div class="kv">Paste a list \u2014 numbered (<span class="mono">1.</span> <span class="mono">1)</span> <span class="mono">1 -</span>), bulleted (<span class="mono">-</span> <span class="mono">*</span> <span class="mono">\u2022</span>), Obsidian checkboxes, or just one task per line. '
     + 'Markdown links become clickable, <span class="mono">- [x]</span> items and headings are skipped, and anything already on your list won\u2019t be added twice.<br>'
@@ -1054,6 +1084,7 @@ function onAction(act, el){
     case "start-working": pushUndo(); state.interventionActive=false; state.mode="work"; commit(); break;
     case "resume-scan": pushUndo(); state.mode="scan"; state.snooze=6; commit(); break;
     case "rescan": rescanSkipped(); break;
+    case "clear-done": clearCompleted(); openSettings(); break;
     case "new-pass": newPass(); closeModal(); break;
     case "toggle-list": state.listOpen=!state.listOpen; render(); save(); break;
     case "toggle-ctx": state.ctxOpen=!state.ctxOpen; render(); save(); break;
