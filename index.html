@@ -21,6 +21,7 @@ window.FIREBASE_CONFIG = {
 };
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@1,6..72,400;1,6..72,500&family=Spline+Sans:wght@400;500;600;700&family=Spline+Sans+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -622,6 +623,9 @@ function benchDone(){
   pushUndo();
   completeTask(b);
   state.chain.pop();
+  state.mode = "work";   // checking off a task that's already in the queue means: stop suggesting new
+                          // candidates, I'm executing now. (Finishing a *suggested* candidate via cand-done
+                          // does NOT do this — that's still part of scanning, not working the queue.)
   if(state.chain.length===0) newPass(false);
   recomputeRanks();
   state.interventionActive = false;
@@ -927,6 +931,7 @@ function renderScan(){
          + '<div class="siderail">'
          + '<button class="reveal" data-act="reveal" data-id="'+b.id+'">Reveal</button>'
          + '<button class="sidesm" data-act="worked" title="Started it, crossing it off, back to the bottom of the list (rule 7)">worked on it ↻</button>'
+         + (state.mode==="scan" ? '<button class="sidesm" data-act="start-working" title="Stop suggesting new candidates — just work through what\u2019s already dotted">done adding for now</button>' : '')
          + '<button class="btn dislodge" data-act="dislodge" title="Remove from the chain without completing">Dislodge</button>'
          + '<button class="btn del-sm" data-act="delete-task" data-id="'+b.id+'" title="Delete this task entirely (Delete key)">Delete<span class="keyhint">⌫</span></button>'
          + '</div></div>';
@@ -941,7 +946,7 @@ function renderScan(){
          + '<button class="btn subtle" data-act="start-working">No — work the chain</button></div></div>';
   }
   else if(state.mode==="work"){
-    html += '<div class="notice"><div class="big">Scanning paused — do the chain from the newest dot up.</div>'
+    html += '<div class="notice"><div class="big">'+(b ? "Scanning paused — do the chain from the newest dot up." : "Queue\u2019s empty \u2014 resume scanning whenever you\u2019re ready.")+'</div>'
          + '<div class="row"><button class="btn subtle" data-act="resume-scan">Resume scanning</button>'
          + (Object.keys(state.considered).length ? '<button class="btn subtle" data-act="rescan">Rescan skipped tasks</button>' : '')
          + '</div></div>';
@@ -991,7 +996,8 @@ function renderList(){
   document.getElementById("listCount").textContent = "("+open.length+")";
   document.getElementById("listCaret").textContent = state.listOpen ? "▾" : "▸";
   const body = document.getElementById("listBody");
-  body.hidden = !state.listOpen;
+  const savedScroll = body.scrollTop;   // every commit() rebuilds this from scratch — without this, any
+  body.hidden = !state.listOpen;        // unrelated action (dotting, toggling a context) snaps it to the top
   if(!state.listOpen){ body.innerHTML=""; return; }
 
   const rows = [...open].sort((a,b)=>{
@@ -1019,11 +1025,14 @@ function renderList(){
          + '</div></div>';
   }
   body.innerHTML = html || '<div class="emptystate">No open tasks.</div>';
+  body.scrollTop = savedScroll;
 }
 
 function renderHistory(){
   const el = document.getElementById("histPanel");
   if(!el) return;
+  const prevBody = document.getElementById("histBody");  // this div is destroyed and rebuilt every render() —
+  const savedScroll = prevBody ? prevBody.scrollTop : 0;  // re-find it after, by id, since the old reference is gone
   const done = state.tasks.filter(t=>t.done).sort((a,b)=>(b.completedAt||0)-(a.completedAt||0));
   el.classList.toggle("open", state.histOpen);
   let html = '<button class="chead" data-act="toggle-hist">'+(state.histOpen?"▼":"▶")+' History <span class="n">('+done.length+' done)</span></button>';
@@ -1031,7 +1040,7 @@ function renderHistory(){
     if(!done.length){
       html += '<div class="histempty">Nothing crossed off yet.</div>';
     }else{
-      html += '<div class="histbody">';
+      html += '<div class="histbody" id="histBody">';
       for(const t of done.slice(0,50)){
         html += '<div class="drow"><span class="dt">'+esc(t.title)+'</span><span class="dwhen mono">'+fmtWhen(t.completedAt)+'</span><button class="restore" data-act="restore" data-id="'+t.id+'">restore</button></div>';
       }
@@ -1039,6 +1048,8 @@ function renderHistory(){
     }
   }
   el.innerHTML = html;
+  const newBody = document.getElementById("histBody");
+  if(newBody) newBody.scrollTop = savedScroll;
 }
 
 /* ================================================================
@@ -1061,6 +1072,7 @@ function openHelp(){
     + '<li>Do the dotted chain from the bottom (newest) to the top.</li>'
     + '<li>Either finish a task and cross it off, or use <i>worked on it ↻</i> to cross it off and send it back to the bottom.</li>'
     + '<li>Urgent task? <b>Add &amp; dot</b> puts it straight on the chain so it\u2019s done first.</li>'
+    + '<li>Once you\u2019ve dotted something, crossing a queued task off (or tapping <b>done adding for now</b>) stops new suggestions until you resume.</li>'
     + '</ol>'
     + '<h3>What the machinery does</h3>'
     + '<p class="kv">Every Yes/No is a pairwise match; each task keeps a <b>strength posterior</b> (a bell curve, not a number). '
