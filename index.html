@@ -457,7 +457,7 @@ function save(){
    mid-scan would swap the benchmark card under your hand. Instead we
    reconcile on load and whenever the tab regains focus. Last write wins,
    arbitrated by state.updatedAt. */
-let cloudTimer = null, lastPushed = "";
+let cloudTimer = null, lastPushed = "", pulling = false;
 function cloudReady(){ const CS = window.CloudSync; return !!(CS && CS.ready && CS.user); }
 function cloudPush(){
   if(!cloudReady()) return;
@@ -480,32 +480,45 @@ function cloudPushNow(){
   lastPushed = payload;
   window.CloudSync.push(payload, state.updatedAt || Date.now());
 }
+/* BUG FIX: CS.push/CS.pull each ping() (fire the "cloudsync" event) *before*
+   their own await — once when they start ("syncing") and once when they
+   finish ("ok"/"error"). The old listener below called cloudPull() on every
+   single one of those pings, including ones fired *by cloudPull's own call
+   into CS.pull* — a synchronous, unbounded feedback loop that recurses until
+   the call stack overflows. The `pulling` guard collapses any pull that
+   starts while one is already in flight; the event listener (further down)
+   no longer triggers a pull at all, only a UI refresh. */
 async function cloudPull(){
-  if(!cloudReady()) return;
-  const remote = await window.CloudSync.pull();
-  const lt = state.updatedAt || 0;
-  if(!remote || !remote.payload){            // empty cloud — seed it from this device
-    if(state.tasks.length){ lastPushed = ""; cloudPush(); }
-    return;
-  }
-  const rt = remote.updatedAt || 0;
-  if(rt > lt){
-    try{
-      const st = JSON.parse(remote.payload);
-      if(!st || !Array.isArray(st.tasks)) return;
-      pushUndo();                            // remote adoption is undoable
-      state = st;
-      lastPushed = remote.payload;
-      if(!state.settings) state.settings = {horizonMin:60,thresholdPct:25,samples:250};
-      if(state.histOpen===undefined) state.histOpen=false;
-      recomputeRanks(); ensureCandidate(); render();
-      if(useLocal){ try{ localStorage.setItem(STORE_KEY, remote.payload); }catch(e){} }
-    }catch(e){ /* corrupt remote — leave local alone */ }
-  }else if(lt > rt){
-    lastPushed = ""; cloudPush();            // this device is ahead
+  if(!cloudReady() || pulling) return;
+  pulling = true;
+  try{
+    const remote = await window.CloudSync.pull();
+    const lt = state.updatedAt || 0;
+    if(!remote || !remote.payload){            // empty cloud — seed it from this device
+      if(state.tasks.length){ lastPushed = ""; cloudPush(); }
+      return;
+    }
+    const rt = remote.updatedAt || 0;
+    if(rt > lt){
+      try{
+        const st = JSON.parse(remote.payload);
+        if(!st || !Array.isArray(st.tasks)) return;
+        pushUndo();                            // remote adoption is undoable
+        state = st;
+        lastPushed = remote.payload;
+        if(!state.settings) state.settings = {horizonMin:60,thresholdPct:25,samples:250};
+        if(state.histOpen===undefined) state.histOpen=false;
+        recomputeRanks(); ensureCandidate(); render();
+        if(useLocal){ try{ localStorage.setItem(STORE_KEY, remote.payload); }catch(e){} }
+      }catch(e){ /* corrupt remote — leave local alone */ }
+    }else if(lt > rt){
+      lastPushed = ""; cloudPush();            // this device is ahead
+    }
+  } finally {
+    pulling = false;
   }
 }
-window.addEventListener("cloudsync", ()=>{ renderSync(); cloudPull(); });
+window.addEventListener("cloudsync", renderSync);   // just the status badge — pulling happens below, not here
 window.addEventListener("focus", cloudPull);
 document.addEventListener("visibilitychange", ()=>{ if(!document.hidden) cloudPull(); });
 function pushUndo(){
@@ -1372,6 +1385,7 @@ if(configured){
       CS.status = u ? "ok" : "signed-out";
       CS.ready  = true;
       ping();
+      if(u && window.cloudPull) window.cloudPull();   // reconcile once, right after signing in / session restore
     });
   }catch(e){
     CS.configured = false; CS.status = "error"; ping();
