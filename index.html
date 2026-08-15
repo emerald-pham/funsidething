@@ -165,6 +165,12 @@ textarea{width:100%;font-family:var(--font-mono);font-size:12px}
 .restore{font-size:12px;text-decoration:underline;color:var(--mut)}
 .foot{margin-top:22px;text-align:center;font-size:12px;color:var(--mut)}
 .foot a{color:var(--mut)}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:#fff;
+  font-size:13.5px;padding:9px 16px;border-radius:99px;box-shadow:0 6px 20px rgba(20,24,48,.28);z-index:80;
+  opacity:0;transition:opacity .18s ease,transform .18s ease;pointer-events:none}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(-4px)}
+#importMsg{font-size:13px;color:var(--good);margin-top:6px;min-height:18px}
+#importMsg.warn{color:var(--no)}
 
 /* ---------- modal ---------- */
 .mback{position:fixed;inset:0;background:rgba(28,26,50,.42);display:flex;align-items:flex-start;justify-content:center;padding:5vh 14px;z-index:50}
@@ -229,7 +235,7 @@ textarea{width:100%;font-family:var(--font-mono);font-size:12px}
     <button class="lhead" data-act="toggle-list"><span id="listCaret">▸</span> All tasks <span id="listCount" class="mono"></span></button>
     <div id="listBody" hidden></div>
     <div class="addrow">
-      <input id="addInput" type="text" placeholder="Add a task to the bottom of the list…" aria-label="New task title"/>
+      <input id="addInput" type="text" placeholder="Add a task — or paste a whole numbered list…" aria-label="New task title, or paste a list to bulk import"/>
       <button class="btn subtle" data-act="add">Add</button>
       <button class="btn urgent" data-act="add-dot" title="Urgent — add it with a dot so it's done first (rule 8)">Add &amp; dot</button>
     </div>
@@ -338,6 +344,18 @@ const STORE_KEY = "fvp:chain-scanner:v1";
 let _uidc = 0;
 const uid = ()=> "t" + Date.now().toString(36) + (_uidc++).toString(36);
 const esc = s => String(s??"").replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+/* Only ever store/render navigable URLs. Blocks javascript:, data:, vbscript:
+   and friends, which would otherwise run in this origin when clicked. */
+function safeUrl(u){
+  u = String(u==null ? "" : u).trim();
+  if(!u) return null;
+  if(/[\u0000-\u001f]/.test(u)) return null;              // control chars used to smuggle schemes
+  if(/^(https?:|mailto:)/i.test(u)) return u;
+  if(/^[a-z][a-z0-9+.-]*:/i.test(u)) return null;          // any other explicit scheme → reject
+  if(/^\/\//.test(u)) return "https:" + u;                 // protocol-relative
+  return null;                                             // bare/relative → not useful here
+}
 
 let state = null;
 let rankCache = new Map();     // id -> {hist,cdf,topK,n}
@@ -598,6 +616,71 @@ function rescanSkipped(){ // clear only the no/can't marks, keep 'done'
   state.mode="scan"; state.interventionActive=false; state.snooze = 6;
   commit();
 }
+/* ---------- bulk list parsing ----------
+   Accepts basically any list a human would paste: numbered (1. / 1) / 1] / 1: / 1 -),
+   bulleted (- * + • – —), Obsidian checkboxes, markdown links, bare URLs, or plain lines. */
+function parseTaskList(text){
+  const rows = [];
+  for(const raw of String(text||"").split(/\r?\n/)){
+    let line = raw.trim();
+    if(!line) continue;
+    if(/^[-*+•]?\s*\[[xX]\]/.test(line)) continue;        // already-done checkbox
+    if(/^#{1,6}\s/.test(line)) continue;                   // markdown heading
+    if(/^([-=_*])\1{2,}$/.test(line)) continue;             // --- horizontal rule
+    // strip ONE leading marker, in the order a real list nests them
+    line = line.replace(/^[-*+•–—]\s+/, "");                // bullet
+    line = line.replace(/^\d+\s*[.)\]:]\s+/, "");          // 1.  1)  1]  1:
+    line = line.replace(/^\d+\s*[-–—]\s+/, "");            // 1 - task
+    line = line.replace(/^\[\s?\]\s*/, "");                // bare [ ] checkbox
+    line = line.trim();
+    if(!line) continue;
+    let url = null, title = line;
+    const md = line.match(/^\[([^\]]+)\]\(([^)]+)\)\s*(.*)$/);
+    if(md){ title = (md[1] + " " + (md[3]||"")).trim(); url = safeUrl(md[2]); }
+    else {
+      const bare = line.match(/^(https?:\/\/\S+)\s+(.+)$/);   // URL then title
+      if(bare){ url = safeUrl(bare[1]); title = bare[2].trim(); }
+    }
+    if(title) rows.push({title, url});
+  }
+  return rows;
+}
+/* Adds a parsed list, skipping anything that duplicates an existing open task
+   or an earlier line in the same paste. Returns {added, skipped}. */
+function importList(text){
+  const rows = parseTaskList(text);
+  if(!rows.length) return {added:0, skipped:0};
+  const norm = t => t.toLowerCase().replace(/\s+/g," ").trim();
+  const seen = new Set(openTasks().map(t => norm(t.title)));
+  let added = 0, skipped = 0;
+  pushUndo();
+  for(const r of rows){
+    const k = norm(r.title);
+    if(seen.has(k)){ skipped++; continue; }
+    seen.add(k);
+    state.tasks.push({ id:uid(), title:r.title, url:r.url, due:null, evergreen:false, recur:null, ctx:[],
+      mu:PRIOR_MU, sigma:PRIOR_SIGMA, done:false, createdAt:Date.now(), completedAt:null, lastDoneAt:null });
+    added++;
+  }
+  if(added){ recomputeRanks(); commit(); } else { undoStack.pop(); }
+  return {added, skipped};
+}
+function importSummary(added, skipped){
+  if(!added && !skipped) return "Nothing to import \u2014 no task lines found.";
+  let msg = added + " task" + (added===1?"":"s") + " added";
+  if(skipped) msg += ", " + skipped + " duplicate" + (skipped===1?"":"s") + " skipped";
+  return msg + ".";
+}
+let toastTimer = null;
+function toast(msg){
+  let el = document.getElementById("toast");
+  if(!el){ el = document.createElement("div"); el.id = "toast"; el.className = "toast"; document.body.appendChild(el); }
+  el.textContent = msg;
+  requestAnimationFrame(()=> el.classList.add("show"));
+  if(toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=> el.classList.remove("show"), 2600);
+}
+
 function addTask(title, dot){
   title = (title||"").trim(); if(!title) return null;
   pushUndo();
@@ -722,7 +805,8 @@ function chipHTML(t){
   return out;
 }
 function titleHTML(t){
-  return t.url ? '<a href="'+esc(t.url)+'" target="_blank" rel="noopener">'+esc(t.title)+'</a>' : esc(t.title);
+  const u = safeUrl(t.url);
+  return u ? '<a href="'+esc(u)+'" target="_blank" rel="noopener noreferrer">'+esc(t.title)+'</a>' : esc(t.title);
 }
 
 function renderScan(){
@@ -733,6 +817,7 @@ function renderScan(){
       + '<strong>Nothing on the list yet.</strong><br><br>'
       + 'Type your tasks into the box below, one at a time \u2014 whatever\u2019s on your mind, in any order. '
       + 'Five or six is plenty to start.<br><br>'
+      + 'Got a list already? Paste the whole thing into that box \u2014 numbered, bulleted, or one per line \u2014 and it\u2019ll import in one go.<br><br>'
       + 'Once they\u2019re in, this space starts asking you one question at a time about which one you\u2019d rather do.'
       + '<div style="margin-top:16px"><button class="btn subtle" data-act="help">How this works</button></div>'
       + '</div>';
@@ -846,7 +931,7 @@ function renderList(){
          + '<div class="tmain">'
          + (inChain.has(t.id) ? '<span class="inchain" title="In the chain">●</span>' : '')
          + '<button class="tt" data-act="edit" data-id="'+t.id+'">'+esc(t.title)+'</button>'
-         + (t.url ? '<a class="ext" href="'+esc(t.url)+'" target="_blank" rel="noopener" title="Open link">↗</a>' : '')
+         + (safeUrl(t.url) ? '<a class="ext" href="'+esc(safeUrl(t.url))+'" target="_blank" rel="noopener noreferrer" title="Open link">↗</a>' : '')
          + chipHTML(t)
          + (consid && consid!=="done" ? '<span class="skipped">'+(consid==="no"?"no":consid==="cant"?"can\u2019t":consid)+'</span>' : '')
          + '</div></div>';
@@ -932,9 +1017,12 @@ function openSettings(){
     + '<h3>Contexts</h3>'+ctxMgr
     + '<div class="mgr"><input id="newCtxName" type="text" placeholder="New context…"/><button class="btn subtle" data-act="add-ctx-named">Add</button></div>'
     + '<h3>Pass</h3><div class="mbtns"><button class="btn subtle" data-act="new-pass">Reset pass (clear skips)</button></div>'
-    + '<h3>Import from Markdown</h3>'
-    + '<div class="kv">Paste an Obsidian-style list — lines like <span class="mono">- [ ] task</span> or <span class="mono">- [title](url)</span>. Checked items are skipped.</div>'
-    + '<textarea id="mdImport" rows="4" placeholder="- [ ] Write the next scene&#10;- [Fix the sink](https://…)"></textarea>'
+    + '<h3>Bulk import</h3>'
+    + '<div class="kv">Paste a list \u2014 numbered (<span class="mono">1.</span> <span class="mono">1)</span> <span class="mono">1 -</span>), bulleted (<span class="mono">-</span> <span class="mono">*</span> <span class="mono">\u2022</span>), Obsidian checkboxes, or just one task per line. '
+    + 'Markdown links become clickable, <span class="mono">- [x]</span> items and headings are skipped, and anything already on your list won\u2019t be added twice.<br>'
+    + 'You can also paste a list straight into the add box at the bottom of the page.</div>'
+    + '<textarea id="mdImport" rows="6" placeholder="1. Write the next Carmine scene&#10;2. Fix the sink&#10;3. [Renew the car tag](https://\u2026)&#10;4. Email the union rep"></textarea>'
+    + '<div id="importMsg"></div>'
     + '<div class="mbtns"><button class="btn subtle" data-act="import-md">Import tasks</button></div>'
     + '<h3>Backup</h3>'
     + '<div class="kv"><span class="statusdot" style="background:'+(storageOK?"var(--good)":"var(--no)")+'"></span>'
@@ -971,7 +1059,10 @@ function onAction(act, el){
     case "toggle-ctx": state.ctxOpen=!state.ctxOpen; render(); save(); break;
     case "add": {
       const inp=document.getElementById("addInput");
-      if(addTask(inp.value,false)) inp.value="";
+      if(/\r?\n/.test(inp.value)){                      // a whole list got in here
+        const {added, skipped} = importList(inp.value);
+        if(added || skipped){ inp.value=""; toast(importSummary(added, skipped)); }
+      }else if(addTask(inp.value,false)){ inp.value=""; }
       inp.focus(); break;
     }
     case "add-dot": {
@@ -1001,7 +1092,7 @@ function onAction(act, el){
       const t=taskById(el.dataset.id); if(!t) break;
       pushUndo();
       t.title=document.getElementById("etTitle").value.trim()||t.title;
-      const u=document.getElementById("etUrl").value.trim(); t.url=u||null;
+      t.url = safeUrl(document.getElementById("etUrl").value);
       const d=document.getElementById("etDue").value; t.due=d||null;
       t.evergreen=document.getElementById("etEver").checked;
       t.recur=document.getElementById("etDaily").checked?"daily":null;
@@ -1035,24 +1126,10 @@ function onAction(act, el){
     case "close-modal": closeModal(); break;
     case "import-md": {
       const box=document.getElementById("mdImport"); if(!box) break;
-      const lines=box.value.split(/\r?\n/);
-      let added=0; pushUndo();
-      for(let line of lines){
-        line=line.trim();
-        if(!line) continue;
-        if(/^[-*+]\s*\[x\]/i.test(line)) continue;              // completed → skip
-        line=line.replace(/^[-*+]\s*(\[\s?\]\s*)?/, "");        // strip bullet + empty checkbox
-        if(!line) continue;
-        let url=null, title=line;
-        const m=line.match(/^\[([^\]]+)\]\(([^)]+)\)\s*(.*)$/);
-        if(m){ title=(m[1]+" "+(m[3]||"")).trim(); url=m[2]; }
-        const t={id:uid(),title,url,due:null,evergreen:false,recur:null,ctx:[],mu:PRIOR_MU,sigma:PRIOR_SIGMA,done:false,createdAt:Date.now(),completedAt:null,lastDoneAt:null};
-        state.tasks.push(t); added++;
-      }
-      recomputeRanks(); commit();
-      const kv=box.closest(".modal");
-      if(kv) box.value=""; 
-      alert(added+" task"+(added===1?"":"s")+" imported.");
+      const {added, skipped} = importList(box.value);
+      const msg=document.getElementById("importMsg");
+      if(msg){ msg.textContent = importSummary(added, skipped); msg.classList.toggle("warn", !added); }
+      if(added) box.value="";
       break;
     }
     case "export-json": {
@@ -1104,6 +1181,16 @@ document.addEventListener("change", e=>{
   if(el.matches('[data-act="cand-done"]')){ if(el.checked) decide("cand-done"); return; }
   if(el.matches("[data-mgrctx]")){ const c=state.contexts.find(c=>c.id===el.dataset.mgrctx); if(c){ pushUndo(); c.active=el.checked; commit(); } return; }
   if(el.matches("[data-mgrname]")){ const c=state.contexts.find(c=>c.id===el.dataset.mgrname); if(c && el.value.trim()){ pushUndo(); c.name=el.value.trim(); commit(); } return; }
+});
+document.addEventListener("paste", e=>{
+  const t = e.target;
+  if(!t || t.id !== "addInput") return;
+  const cd = e.clipboardData || window.clipboardData;
+  const txt = cd ? cd.getData("text") : "";
+  if(!txt || !/\r?\n/.test(txt.trim())) return;      // single line — let it paste normally
+  e.preventDefault();
+  const {added, skipped} = importList(txt);
+  if(added || skipped){ t.value = ""; toast(importSummary(added, skipped)); }
 });
 document.addEventListener("keydown", e=>{
   const t = e.target;
