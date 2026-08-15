@@ -1,0 +1,1039 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Chain Scanner · ranked FVP</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@1,6..72,400;1,6..72,500&family=Spline+Sans:wght@400;500;600;700&family=Spline+Sans+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f5f6fa; --panel:#ffffff; --ink:#242a3a; --mut:#6d7488; --line:#e5e7f0;
+  --chain:#8f7bf0; --chain-deep:#6a55e0; --chain-ink:#ffffff;
+  --cand-bg:#fff8e2; --cand-line:#e9c34d; --cand-ink:#7a5c00;
+  --yes:#2f9e48; --no:#f0930f; --cant:#57677a; --danger:#e5484d;
+  --good:#27b04e; --chip:#f0f1f7;
+  --font-ui:"Spline Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --font-q:"Newsreader",Georgia,"Times New Roman",serif;
+  --font-mono:"Spline Sans Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font:15px/1.45 var(--font-ui);-webkit-font-smoothing:antialiased}
+.wrap{max-width:700px;margin:0 auto;padding:14px 14px 60px}
+button{font:inherit;color:inherit;background:none;border:none;padding:0;cursor:pointer}
+button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible,a:focus-visible{outline:2px solid var(--chain-deep);outline-offset:2px;border-radius:4px}
+a{color:var(--chain-deep)}
+input[type=text],input[type=url],input[type=number],input[type=date],textarea,select{
+  font:inherit;color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:8px;padding:7px 10px}
+textarea{width:100%;font-family:var(--font-mono);font-size:12px}
+.mono{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+[hidden]{display:none!important}
+
+/* ---------- header ---------- */
+.top{margin-bottom:12px}
+.brand{display:flex;align-items:center;gap:10px}
+.mark{color:var(--chain-deep);font-size:20px;line-height:1}
+.titles h1{font-size:17px;margin:0;font-weight:700;letter-spacing:.01em}
+.titles .sub{font-size:12px;color:var(--mut)}
+.topbtns{margin-left:auto;display:flex;gap:4px}
+.ghost{color:var(--mut);border:1px solid transparent;border-radius:8px;padding:5px 9px;font-size:13px}
+.ghost:hover{background:#fff;border-color:var(--line);color:var(--ink)}
+.passbar{display:flex;align-items:center;gap:10px;margin-top:10px}
+.ptrack{flex:1;height:8px;border-radius:99px;background:#e6e8f0;overflow:hidden}
+.ptrack i{display:block;height:100%;width:0%;background:var(--good);border-radius:99px;transition:width .25s ease}
+.plabel{font-size:12px;color:var(--mut);min-width:52px;text-align:right}
+
+/* ---------- panels ---------- */
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:0 1px 2px rgba(20,24,48,.04)}
+.ctx{padding:0;margin-bottom:14px;overflow:hidden}
+.ctx .chead{width:100%;text-align:left;padding:10px 14px;font-weight:600;font-size:13.5px;background:#fafbfe;border-bottom:1px solid transparent}
+.ctx.open .chead{border-bottom-color:var(--line)}
+.ctx .chead .n{color:var(--mut);font-weight:500}
+.ctxgrid{display:flex;flex-wrap:wrap;gap:2px 18px;padding:12px 14px}
+.ctxitem{display:flex;align-items:center;gap:7px;padding:4px 0;font-size:14px}
+.ctxitem input{accent-color:var(--chain-deep);width:16px;height:16px}
+.ctxitem.off{color:var(--mut)}
+.ctxadd{color:var(--mut);font-size:13px;padding:4px 8px;border:1px dashed var(--line);border-radius:8px;align-self:center}
+.ctxadd:hover{color:var(--chain-deep);border-color:var(--chain-deep)}
+
+/* ---------- scan stage ---------- */
+#scan{margin-bottom:16px}
+.crumbs{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:2px 2px 10px;font-size:12.5px;color:var(--mut)}
+.crumbs .lbl{font-weight:600}
+.crumb{background:#eceafd;color:var(--chain-deep);border:1px solid #ddd7fb;border-radius:99px;padding:2px 10px;max-width:190px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.crumb:hover{background:#e0dcfb}
+.crumbs .arrow{color:#b9b3e8}
+
+.cardrow{display:flex;gap:12px;align-items:flex-start;margin-bottom:10px}
+.card{flex:1;border-radius:12px;padding:13px 15px;display:flex;align-items:center;gap:11px;min-height:52px}
+.card .title{font-weight:600;font-size:15.5px;overflow-wrap:anywhere}
+.card a{color:inherit}
+.bench{background:linear-gradient(180deg,var(--chain) 0%,var(--chain-deep) 140%);color:var(--chain-ink);box-shadow:0 3px 10px rgba(106,85,224,.28)}
+.bench a{text-decoration-color:rgba(255,255,255,.6)}
+.cand{background:var(--cand-bg);border:1.5px solid var(--cand-line);color:var(--cand-ink)}
+.cand a{color:#8a6800}
+.dot{width:20px;height:20px;border-radius:50%;background:#fff;color:var(--good);display:inline-flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;flex:none;box-shadow:0 1px 2px rgba(0,0,0,.15)}
+.ckbox{width:19px;height:19px;flex:none;accent-color:var(--good);cursor:pointer}
+.chiprow{display:flex;gap:6px;margin-left:auto;flex:none;align-items:center}
+.chip{font-size:11px;font-weight:700;border-radius:6px;padding:2px 7px;letter-spacing:.02em}
+.chip.due-today{background:var(--no);color:#fff}
+.chip.due-overdue{background:var(--danger);color:#fff}
+.chip.due-tomorrow{background:#ffe1b0;color:#8a5b00}
+.chip.due-later{background:var(--chip);color:var(--mut)}
+.chip.ever{background:transparent;color:inherit;opacity:.75;font-weight:500;font-style:italic;padding:0}
+.siderail{display:flex;flex-direction:column;gap:7px;align-items:flex-end;flex:none;padding-top:2px;min-width:86px}
+.reveal{font-size:12.5px;color:var(--ink);text-decoration:underline;background:none}
+.reveal:hover{color:var(--chain-deep)}
+.sidesm{font-size:12px;color:var(--mut);text-decoration:underline dotted}
+.sidesm:hover{color:var(--ink)}
+.btn{border-radius:8px;padding:8px 16px;font-weight:700;font-size:14px;color:#fff;box-shadow:0 1px 2px rgba(20,24,48,.15)}
+.btn:active{transform:translateY(1px)}
+.btn.dislodge{background:var(--danger);padding:6px 12px;font-size:13px}
+.btn.yes{background:var(--yes)}
+.btn.no{background:var(--no)}
+.btn.cant{background:var(--cant)}
+.btn.subtle{background:#fff;color:var(--ink);border:1px solid var(--line);box-shadow:none;font-weight:600}
+.btn.urgent{background:var(--chain-deep)}
+.qline{font-family:var(--font-q);font-style:italic;font-size:19px;margin:16px 2px 12px;color:var(--ink)}
+.qline .until{white-space:nowrap}
+.decide{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.decide .keyhint{font-size:10px;opacity:.7;font-weight:500;margin-left:5px}
+.sparkbox{display:flex;align-items:center;gap:8px;margin-left:auto}
+.spark{display:block}
+.spark path.area{fill:rgba(106,85,224,.15)}
+.spark path.line{fill:none;stroke:var(--chain-deep);stroke-width:1.5}
+.topkchip{font-size:11.5px;color:var(--mut)}
+.iconbtn{border:1px solid var(--line);background:#fff;border-radius:7px;width:30px;height:30px;display:inline-flex;align-items:center;justify-content:center;color:var(--mut);font-size:14px}
+.iconbtn:hover{color:var(--chain-deep);border-color:var(--chain-deep)}
+
+.notice{border:1px solid var(--line);background:#fff;border-radius:12px;padding:14px 16px;margin-top:6px}
+.notice .big{font-size:15.5px;font-weight:600;margin-bottom:10px}
+.notice.intervene .big{font-weight:600}
+.notice .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.notice .quiet{color:var(--mut);font-size:13px}
+.emptystate{text-align:center;color:var(--mut);padding:34px 10px;font-size:14.5px}
+
+/* ---------- list ---------- */
+.listwrap{padding:0;overflow:hidden}
+.lhead{width:100%;text-align:left;padding:11px 14px;font-weight:600;font-size:13.5px;background:#fafbfe;border-bottom:1px solid transparent}
+.lhead .mono{color:var(--mut);font-weight:500}
+#listBody{border-top:1px solid var(--line);max-height:60vh;overflow-y:auto}
+.trow{display:grid;grid-template-columns:88px 118px 1fr;gap:12px;align-items:center;padding:8px 14px;border-bottom:1px solid #f0f1f7}
+.trow:last-child{border-bottom:none}
+.trow.flash{animation:flash 1.6s ease}
+@keyframes flash{0%{background:#fff3c4}100%{background:transparent}}
+.trow .spark{opacity:.9}
+.tk{display:flex;flex-direction:column;gap:2px}
+.tk .tkl{font-size:10.5px;color:var(--mut);font-family:var(--font-mono)}
+.tk .tkbar{height:7px;border-radius:99px;background:#e3e5ee;overflow:hidden}
+.tk .tkbar i{display:block;height:100%;background:var(--chain-deep);border-radius:99px}
+.tmain{display:flex;align-items:center;gap:8px;min-width:0}
+.tmain .tt{font-size:14.5px;text-align:left;overflow-wrap:anywhere}
+.tmain .tt:hover{color:var(--chain-deep)}
+.tmain a.ext{font-size:12px;text-decoration:none;flex:none}
+.tmain .chip{flex:none}
+.tmain .inchain{flex:none;color:var(--chain-deep);font-size:13px}
+.tmain .skipped{flex:none;color:var(--mut);font-size:11px;border:1px solid var(--line);border-radius:6px;padding:1px 6px}
+.addrow{display:flex;gap:8px;padding:12px 14px;border-top:1px solid var(--line);background:#fafbfe}
+.addrow input{flex:1;min-width:0}
+.donewrap{border-top:1px solid var(--line);padding:8px 14px;font-size:13px;color:var(--mut)}
+.donewrap summary{cursor:pointer}
+.donewrap .drow{display:flex;gap:8px;align-items:center;padding:4px 0}
+.donewrap .dt{text-decoration:line-through;opacity:.75}
+.restore{font-size:12px;text-decoration:underline;color:var(--mut)}
+.foot{margin-top:22px;text-align:center;font-size:12px;color:var(--mut)}
+.foot a{color:var(--mut)}
+
+/* ---------- modal ---------- */
+.mback{position:fixed;inset:0;background:rgba(28,26,50,.42);display:flex;align-items:flex-start;justify-content:center;padding:5vh 14px;z-index:50}
+.modal{background:#fff;border-radius:14px;max-width:560px;width:100%;max-height:88vh;overflow-y:auto;padding:20px 22px;box-shadow:0 18px 50px rgba(20,20,50,.35)}
+.modal h2{margin:0 0 4px;font-size:17px}
+.modal h3{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);margin:22px 0 8px}
+.modal .mtop{display:flex;align-items:center}
+.modal .x{margin-left:auto;color:var(--mut);font-size:18px;padding:2px 8px}
+.frow{display:flex;gap:10px;align-items:center;margin:9px 0;flex-wrap:wrap}
+.frow label{min-width:96px;font-size:13.5px;color:var(--mut)}
+.frow input[type=text],.frow input[type=url]{flex:1;min-width:180px}
+.ctxpick{display:flex;flex-wrap:wrap;gap:4px 14px;margin:6px 0}
+.ctxpick label{display:flex;gap:6px;align-items:center;font-size:13.5px;min-width:0}
+.mbtns{display:flex;gap:9px;margin-top:18px;flex-wrap:wrap}
+.btn.danger{background:var(--danger)}
+.btn.primary{background:var(--chain-deep)}
+.mgr{display:flex;gap:8px;align-items:center;margin:5px 0}
+.mgr input[type=text]{flex:1}
+.help ol{padding-left:20px;line-height:1.65}
+.help li{margin:4px 0}
+.kv{font-size:13.5px;color:var(--mut);line-height:1.6}
+.kv b{color:var(--ink)}
+.statusdot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}
+
+@media (max-width:560px){
+  .trow{grid-template-columns:70px 92px 1fr;gap:8px;padding:8px 10px}
+  .siderail{min-width:72px}
+  .qline{font-size:17px}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation:none!important;transition:none!important}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <span class="mark" aria-hidden="true">◉</span>
+      <div class="titles">
+        <h1>Chain Scanner</h1>
+        <span class="sub">ranked FVP — dot, compare, execute</span>
+      </div>
+      <div class="topbtns">
+        <button class="ghost" data-act="undo" title="Undo last action (u)">↺ undo</button>
+        <button class="ghost" data-act="help" title="Quick start">?</button>
+        <button class="ghost" data-act="settings" title="Settings, contexts, import/export">⚙</button>
+      </div>
+    </div>
+    <div class="passbar" title="How far down the list this pass has gone">
+      <div class="ptrack"><i id="passFill"></i></div>
+      <span id="passLabel" class="plabel mono"></span>
+    </div>
+  </header>
+
+  <section class="panel ctx open" id="ctxPanel"></section>
+
+  <main id="scan" aria-live="polite"></main>
+
+  <section class="panel listwrap" id="listWrap">
+    <button class="lhead" data-act="toggle-list"><span id="listCaret">▸</span> All tasks <span id="listCount" class="mono"></span></button>
+    <div id="listBody" hidden></div>
+    <div class="addrow">
+      <input id="addInput" type="text" placeholder="Add a task to the bottom of the list…" aria-label="New task title"/>
+      <button class="btn subtle" data-act="add">Add</button>
+      <button class="btn urgent" data-act="add-dot" title="Urgent — add it with a dot so it's done first (rule 8)">Add &amp; dot</button>
+    </div>
+  </section>
+
+  <footer class="foot">After Mark Forster's <a href="http://markforster.squarespace.com/blog/2015/5/21/the-final-version-perfected-fvp.html" target="_blank" rel="noopener">Final Version Perfected</a> · rank posteriors à la <a href="https://alltom.com/pages/spawelo/" target="_blank" rel="noopener">spawelo</a> · keys: <span class="mono">y / n / c / u</span></footer>
+</div>
+<div id="modalRoot"></div>
+
+<script>
+"use strict";
+/* ================================================================
+   ENGINE — strength posteriors, rank distributions, stopping stats
+   ================================================================ */
+/*ENGINE-START*/
+const BETA = 25/6;          // performance noise (TrueSkill-style)
+const TAU  = 0.10;          // dynamics: keeps old ratings a little plastic
+const PRIOR_MU = 25, PRIOR_SIGMA = 25/3;
+const SIGMA_FLOOR = 0.8;
+
+let _spare = null;
+function gauss(){ // Box–Muller with spare
+  if(_spare !== null){ const s=_spare; _spare=null; return s; }
+  let u=0,v=0; while(u===0)u=Math.random(); while(v===0)v=Math.random();
+  const m=Math.sqrt(-2*Math.log(u));
+  _spare = m*Math.sin(2*Math.PI*v);
+  return m*Math.cos(2*Math.PI*v);
+}
+function phi(x){ return Math.exp(-x*x/2)/Math.sqrt(2*Math.PI); }
+function Phi(x){ // Zelen & Severo approximation
+  const t = 1/(1+0.2316419*Math.abs(x));
+  const d = phi(x);
+  const p = d*t*(0.319381530 + t*(-0.356563782 + t*(1.781477937 + t*(-1.821255978 + t*1.330274429))));
+  return x >= 0 ? 1-p : p;
+}
+function truncGaussVW(t){ // v and w for the win update
+  const denom = Phi(t);
+  if(denom < 1e-9){ const v = -t; return {v, w:1}; }
+  const v = phi(t)/denom;
+  return {v, w: v*(v+t)};
+}
+// winner/loser are {mu, sigma}; mutates both
+function updatePair(winner, loser){
+  winner.sigma = Math.sqrt(winner.sigma*winner.sigma + TAU*TAU);
+  loser.sigma  = Math.sqrt(loser.sigma*loser.sigma + TAU*TAU);
+  const c = Math.sqrt(2*BETA*BETA + winner.sigma**2 + loser.sigma**2);
+  const {v, w} = truncGaussVW((winner.mu - loser.mu)/c);
+  winner.mu += (winner.sigma**2/c)*v;
+  loser.mu  -= (loser.sigma**2/c)*v;
+  winner.sigma = Math.sqrt(Math.max(SIGMA_FLOOR**2, winner.sigma**2*(1-(winner.sigma**2/(c*c))*w)));
+  loser.sigma  = Math.sqrt(Math.max(SIGMA_FLOOR**2, loser.sigma**2 *(1-(loser.sigma**2 /(c*c))*w)));
+}
+function pBeats(a, b){ // P(a preferred over b) — match-outcome scale
+  return Phi((a.mu - b.mu)/Math.sqrt(2*BETA*BETA + a.sigma**2 + b.sigma**2));
+}
+const PRED_NOISE = 1.5; // a single "would I rather?" judgment is far less noisy than a match
+function pJudged(a, b){ // P(you'd answer Yes for a over b)
+  return Phi((a.mu - b.mu)/Math.sqrt(2*PRED_NOISE*PRED_NOISE + a.sigma**2 + b.sigma**2));
+}
+/* Monte-Carlo rank distributions over a set of items with {id, mu, sigma}.
+   Returns Map id -> {hist:Float32Array(n) of P(rank=i+1), cdf, topK, n} */
+function rankStats(items, S){
+  const n = items.length;
+  const out = new Map();
+  if(n === 0) return out;
+  S = S || 250;
+  const hists = items.map(()=> new Float32Array(n));
+  const idx = new Array(n); const score = new Float64Array(n);
+  for(let s=0; s<S; s++){
+    for(let i=0;i<n;i++){ score[i] = items[i].mu + items[i].sigma*gauss(); idx[i]=i; }
+    idx.sort((a,b)=> score[b]-score[a]);
+    for(let r=0;r<n;r++) hists[idx[r]][r]++;
+  }
+  for(let i=0;i<n;i++){
+    const h = hists[i]; const cdf = new Float32Array(n); let acc=0;
+    for(let r=0;r<n;r++){ h[r]/=S; acc+=h[r]; cdf[r]=Math.min(1,acc); }
+    // "arcane" stopping stat: smallest K (≥2) with P(rank ≤ K) ≥ 1 − 1/K
+    let topK = n;
+    if(n === 1){ topK = 1; }
+    else { for(let k=2;k<=n;k++){ if(cdf[k-1] >= 1 - 1/k){ topK = k; break; } } }
+    out.set(items[i].id, {hist:h, cdf, topK, n});
+  }
+  return out;
+}
+// Thompson sampling: draw one plausible strength per item, take the max
+function thompsonPick(items){
+  let best=null, bv=-Infinity;
+  for(const it of items){ const v = it.mu + it.sigma*gauss(); if(v>bv){ bv=v; best=it; } }
+  return best;
+}
+/* Chance that at least one of the next `perMin` candidates beats the benchmark */
+function chanceBetterSoon(bench, pool, perMin){
+  if(!pool.length) return 0;
+  const M = Math.max(1, Math.min(pool.length, Math.round(perMin)));
+  const ps = pool.map(c=> pJudged(c, bench)).sort((a,b)=> b-a).slice(0, M);
+  let none = 1; for(const p of ps) none *= (1-p);
+  return 1-none;
+}
+function median(arr){ if(!arr.length) return NaN; const s=[...arr].sort((a,b)=>a-b); const m=s.length>>1; return s.length%2 ? s[m] : (s[m-1]+s[m])/2; }
+/*ENGINE-END*/
+
+/* ================================================================
+   APP STATE
+   ================================================================ */
+const STORE_KEY = "fvp:chain-scanner:v1";
+let _uidc = 0;
+const uid = ()=> "t" + Date.now().toString(36) + (_uidc++).toString(36);
+const esc = s => String(s??"").replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+let state = null;
+let rankCache = new Map();     // id -> {hist,cdf,topK,n}
+let undoStack = [];
+let saveTimer = null;
+let storageOK = false;
+let useLocal  = false;   // true when running as a plain web page (localStorage)
+
+function todayISO(offsetDays){
+  const d = new Date(); d.setDate(d.getDate() + (offsetDays||0));
+  return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
+}
+function isoToDate(iso){ const [y,m,d] = iso.split("-").map(Number); return new Date(y, m-1, d); }
+function sameLocalDay(ts, now){ if(!ts) return false; const a=new Date(ts), b=new Date(now); return a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate(); }
+
+function defaultState(){
+  const C = (id,name,active)=>({id,name,active});
+  const contexts = [
+    C("c_home","At home",true), C("c_laptop","Have my laptop",true), C("c_car","Have the car",true),
+    C("c_work","At work",true), C("c_quiet","Quiet house",true), C("c_errand","Out running errands",true)
+  ];
+  const T = (title,opts)=> Object.assign({
+    id: uid(), title, url:null, due:null, evergreen:false, recur:null, ctx:[],
+    mu: PRIOR_MU, sigma: PRIOR_SIGMA, done:false, createdAt:Date.now(), completedAt:null, lastDoneAt:null
+  }, opts||{});
+  const tasks = [];   // start empty — add your own, or paste your Obsidian list in Settings
+  return {
+    v:1, tasks, contexts,
+    chain: [], considered: {}, candidateId: null,
+    interventionActive:false, interventionP:0, snooze:0,
+    mode:"scan", decisionsMs:[], presentedAt:0,
+    listOpen:false, ctxOpen:true,
+    settings:{ horizonMin:60, thresholdPct:25, samples:250 }
+  };
+}
+
+/* ---------- persistence (artifact key-value storage; falls back to memory) ---------- */
+async function loadState(){
+  if(typeof window !== "undefined" && window.storage && window.storage.get){
+    try{
+      const r = await window.storage.get(STORE_KEY);
+      if(r && r.value){ storageOK = true; return JSON.parse(r.value); }
+      storageOK = true; // storage works, just empty
+    }catch(e){
+      // key missing throws — probe whether storage itself works
+      try{ await window.storage.set(STORE_KEY+":probe","1"); storageOK = true; }catch(_){ storageOK = false; }
+    }
+  }
+  if(!storageOK && localStorageOK()){   // plain web page (e.g. GitHub Pages)
+    useLocal = true; storageOK = true;
+    try{
+      const raw = localStorage.getItem(STORE_KEY);
+      if(raw) return JSON.parse(raw);
+    }catch(e){ /* corrupt payload — start fresh */ }
+  }
+  return null;
+}
+function localStorageOK(){
+  try{
+    const k = STORE_KEY + ":probe";
+    localStorage.setItem(k, "1"); localStorage.removeItem(k);
+    return true;
+  }catch(e){ return false; }
+}
+function save(){
+  if(saveTimer) clearTimeout(saveTimer);
+  saveTimer = setTimeout(async ()=>{
+    if(!storageOK) return;
+    if(useLocal){
+      try{ localStorage.setItem(STORE_KEY, JSON.stringify(state)); }catch(e){ /* quota — keep in memory */ }
+      return;
+    }
+    if(!window.storage) return;
+    try{ await window.storage.set(STORE_KEY, JSON.stringify(state)); }catch(e){ /* keep in memory */ }
+  }, 350);
+}
+function pushUndo(){
+  undoStack.push(JSON.stringify(state));
+  if(undoStack.length > 30) undoStack.shift();
+}
+function undo(){
+  if(!undoStack.length) return;
+  state = JSON.parse(undoStack.pop());
+  recomputeRanks(); commit(false);
+}
+
+/* ---------- derived helpers ---------- */
+const taskById = id => state.tasks.find(t=>t.id===id) || null;
+const openTasks = ()=> state.tasks.filter(t=>!t.done);
+function activeCtxSet(){ const s=new Set(); for(const c of state.contexts) if(c.active) s.add(c.id); return s; }
+function isEligible(t, act){
+  if(t.done) return false;
+  const now = Date.now();
+  if(t.recur==="daily" && sameLocalDay(t.lastDoneAt, now)) return false;          // done today, comes back tomorrow
+  if(t.evergreen && t.lastDoneAt && (now - t.lastDoneAt) < 90*60*1000) return false; // evergreen rest
+  act = act || activeCtxSet();
+  for(const c of t.ctx){ if(state.contexts.some(x=>x.id===c) && !act.has(c)) return false; }
+  return true;
+}
+function eligibleTasks(){ const act=activeCtxSet(); return state.tasks.filter(t=>isEligible(t,act)); }
+function benchmark(){ return state.chain.length ? taskById(state.chain[state.chain.length-1]) : null; }
+function pool(){ // eligible, not in chain, not yet considered this pass
+  const inChain = new Set(state.chain);
+  return eligibleTasks().filter(t => !inChain.has(t.id) && !(t.id in state.considered));
+}
+function decisionsPerMinute(){
+  const m = median(state.decisionsMs);
+  const sec = isNaN(m) ? 6 : Math.min(30, Math.max(2, m/1000));
+  return 60/sec;
+}
+function recomputeRanks(){
+  rankCache = rankStats(openTasks().map(t=>({id:t.id, mu:t.mu, sigma:t.sigma})), state.settings.samples);
+}
+function ensureCandidate(){
+  if(state.mode !== "scan" || state.interventionActive) return;
+  const p = pool();
+  const cur = state.candidateId ? taskById(state.candidateId) : null;
+  const valid = cur && p.some(t=>t.id===cur.id);
+  if(!valid){
+    const pick = thompsonPick(p);
+    state.candidateId = pick ? pick.id : null;
+    state.presentedAt = Date.now();
+  }
+}
+function maybeIntervene(){
+  if(state.mode!=="scan") return;
+  const b = benchmark(); if(!b) return;
+  const p = pool(); if(!p.length) return;
+  if(state.snooze > 0){ state.snooze--; return; }
+  const chance = chanceBetterSoon(b, p, decisionsPerMinute());
+  if(chance < state.settings.thresholdPct/100){
+    state.interventionActive = true;
+    state.interventionP = chance;
+    state.candidateId = null;
+  }
+}
+
+/* ---------- mutations ---------- */
+function recordDecisionTime(){
+  if(!state.presentedAt) return;
+  const dt = Date.now() - state.presentedAt;
+  if(dt > 300 && dt < 120000){ state.decisionsMs.push(dt); if(state.decisionsMs.length>20) state.decisionsMs.shift(); }
+}
+function decide(kind){ // 'yes' | 'no' | 'cant' | 'cand-done'
+  const cand = taskById(state.candidateId); if(!cand) return;
+  pushUndo(); recordDecisionTime();
+  const b = benchmark();
+  if(kind==="yes"){
+    if(b) updatePair(cand, b);            // "I'd rather do this" → candidate outranks benchmark
+    state.chain.push(cand.id);
+    delete state.considered[cand.id];
+  }else if(kind==="no"){
+    if(b) updatePair(b, cand);            // benchmark wins the comparison
+    state.considered[cand.id] = "no";
+  }else if(kind==="cant"){
+    state.considered[cand.id] = "cant";   // rejected without a rank signal
+  }else if(kind==="cand-done"){
+    if(b) updatePair(cand, b);            // doing it right now beats the benchmark
+    completeTask(cand);
+  }
+  state.candidateId = null;
+  if(kind==="yes" || kind==="no" || kind==="cand-done") recomputeRanks();
+  maybeIntervene();
+  commit();
+}
+function completeTask(t){
+  t.lastDoneAt = Date.now();
+  if(t.recur==="daily"){ t.due = todayISO(1); state.considered[t.id]="done"; }
+  else if(t.evergreen){ state.considered[t.id]="done"; }
+  else { t.done = true; t.completedAt = Date.now(); delete state.considered[t.id]; }
+}
+function benchDone(){
+  const b = benchmark(); if(!b) return;
+  pushUndo();
+  completeTask(b);
+  state.chain.pop();
+  if(state.chain.length===0) newPass(false);
+  recomputeRanks();
+  state.interventionActive = false;
+  commit();
+}
+function workedOn(){ // Forster rule 7: worked on it, cross off, re-add at the bottom
+  const b = benchmark(); if(!b) return;
+  pushUndo();
+  state.chain.pop();
+  state.considered[b.id] = "worked";
+  state.interventionActive = false;
+  commit();
+}
+function dislodge(){
+  const b = benchmark(); if(!b) return;
+  pushUndo();
+  state.chain.pop();
+  state.considered[b.id] = "dislodged";
+  state.interventionActive = false;
+  commit();
+}
+function newPass(push){
+  if(push!==false) pushUndo();
+  state.considered = {};
+  state.snooze = 0;
+  state.interventionActive = false;
+  state.candidateId = null;
+  if(push!==false) commit();
+}
+function rescanSkipped(){ // clear only the no/can't marks, keep 'done'
+  pushUndo();
+  for(const [id,v] of Object.entries(state.considered)){
+    if(v==="no"||v==="cant"||v==="dislodged"||v==="worked") delete state.considered[id];
+  }
+  state.mode="scan"; state.interventionActive=false; state.snooze = 6;
+  commit();
+}
+function addTask(title, dot){
+  title = (title||"").trim(); if(!title) return null;
+  pushUndo();
+  const t = { id:uid(), title, url:null, due:null, evergreen:false, recur:null, ctx:[],
+              mu:PRIOR_MU, sigma:PRIOR_SIGMA, done:false, createdAt:Date.now(), completedAt:null, lastDoneAt:null };
+  state.tasks.push(t);
+  if(dot){ state.chain.push(t.id); state.interventionActive=false; }
+  recomputeRanks();
+  commit();
+  return t;
+}
+function toggleContext(id){
+  pushUndo();
+  const c = state.contexts.find(c=>c.id===id); if(!c) return;
+  c.active = !c.active;
+  commit();
+}
+function revealTask(id){
+  state.listOpen = true;
+  render();
+  requestAnimationFrame(()=>{
+    const row = document.querySelector('[data-row="'+id+'"]');
+    if(row){ row.scrollIntoView({block:"center",behavior:"smooth"}); row.classList.remove("flash"); void row.offsetWidth; row.classList.add("flash"); }
+  });
+}
+function commit(doSave){
+  ensureCandidate();
+  if(doSave!==false) save();
+  render();
+}
+
+/* ---------- formatting ---------- */
+const WD = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+function dueInfo(iso){
+  if(!iso) return null;
+  const d = isoToDate(iso); const t0 = isoToDate(todayISO(0));
+  const diff = Math.round((d - t0)/86400000);
+  const wd = WD[d.getDay()];
+  if(diff < 0)  return {cls:"due-overdue", txt:"overdue · "+wd};
+  if(diff === 0)return {cls:"due-today",   txt:wd+" · today"};
+  if(diff === 1)return {cls:"due-tomorrow",txt:wd+" · tomorrow"};
+  return {cls:"due-later", txt:wd+" "+(d.getMonth()+1)+"/"+d.getDate()};
+}
+function untilClock(){
+  const d = new Date(Date.now() + state.settings.horizonMin*60000);
+  let h = d.getHours(); const ap = h>=12 ? "PM" : "AM"; h = ((h+11)%12)+1;
+  return h + ":" + String(d.getMinutes()).padStart(2,"0") + " " + ap;
+}
+function sparkSVG(id, w, hgt){
+  w = w||84; hgt = hgt||20;
+  const st = rankCache.get(id);
+  if(!st) return '<svg class="spark" width="'+w+'" height="'+hgt+'" viewBox="0 0 '+w+' '+hgt+'"></svg>';
+  const n = st.n, hist = st.hist;
+  const B = Math.max(2, Math.min(n, 44));
+  const bins = new Float32Array(B);
+  for(let r=0;r<n;r++) bins[Math.min(B-1, Math.floor(r*B/n))] += hist[r];
+  const sm = new Float32Array(B);
+  for(let i=0;i<B;i++) sm[i] = (bins[i-1]||0)*0.25 + bins[i]*0.5 + (bins[i+1]||0)*0.25;
+  let max = 1e-9; for(let i=0;i<B;i++) if(sm[i]>max) max=sm[i];
+  const pts = [];
+  for(let i=0;i<B;i++){
+    const x = (B===1) ? 0 : i/(B-1)*w;
+    const y = hgt-1 - (sm[i]/max)*(hgt-3);
+    pts.push(x.toFixed(1)+","+y.toFixed(1));
+  }
+  const line = "M"+pts.join(" L");
+  const area = line + " L"+w+","+(hgt-0.5)+" L0,"+(hgt-0.5)+" Z";
+  return '<svg class="spark" width="'+w+'" height="'+hgt+'" viewBox="0 0 '+w+' '+hgt+'" aria-hidden="true"><path class="area" d="'+area+'"/><path class="line" d="'+line+'"/></svg>';
+}
+function topKlabel(id){ const st = rankCache.get(id); return st ? "top-"+st.topK : ""; }
+
+/* ================================================================
+   RENDER
+   ================================================================ */
+function render(){ renderPass(); renderCtx(); renderScan(); renderList(); }
+
+function renderPass(){
+  const elig = eligibleTasks();
+  const scanned = elig.filter(t => state.chain.includes(t.id) || (t.id in state.considered)).length;
+  const pct = elig.length ? Math.round(scanned/elig.length*100) : 0;
+  document.getElementById("passFill").style.width = pct+"%";
+  document.getElementById("passLabel").textContent = scanned + "/" + elig.length;
+}
+
+function renderCtx(){
+  const el = document.getElementById("ctxPanel");
+  const a = state.contexts.filter(c=>c.active).length, i = state.contexts.length - a;
+  el.classList.toggle("open", state.ctxOpen);
+  let html = '<button class="chead" data-act="toggle-ctx">'+(state.ctxOpen?"▼":"▶")+' Contexts <span class="n">('+a+' active, '+i+' inactive)</span></button>';
+  if(state.ctxOpen){
+    html += '<div class="ctxgrid">';
+    for(const c of state.contexts){
+      html += '<label class="ctxitem'+(c.active?"":" off")+'"><input type="checkbox" data-ctx="'+c.id+'"'+(c.active?" checked":"")+'/> '+esc(c.name)+'</label>';
+    }
+    html += '<button class="ctxadd" data-act="add-ctx">＋ context</button></div>';
+  }
+  el.innerHTML = html;
+}
+
+function chipHTML(t){
+  let out = "";
+  const d = dueInfo(t.due);
+  if(d) out += '<span class="chip '+d.cls+'">🗓 '+d.txt+'</span>';
+  if(t.recur==="daily") out += '<span class="chip ever">↻ daily</span>';
+  else if(t.evergreen) out += '<span class="chip ever">(evergreen)</span>';
+  return out;
+}
+function titleHTML(t){
+  return t.url ? '<a href="'+esc(t.url)+'" target="_blank" rel="noopener">'+esc(t.title)+'</a>' : esc(t.title);
+}
+
+function renderScan(){
+  const el = document.getElementById("scan");
+  const open = openTasks();
+  if(!open.length){
+    el.innerHTML = '<div class="panel emptystate">'
+      + '<strong>Nothing on the list yet.</strong><br><br>'
+      + 'Type your tasks into the box below, one at a time \u2014 whatever\u2019s on your mind, in any order. '
+      + 'Five or six is plenty to start.<br><br>'
+      + 'Once they\u2019re in, this space starts asking you one question at a time about which one you\u2019d rather do.'
+      + '<div style="margin-top:16px"><button class="btn subtle" data-act="help">How this works</button></div>'
+      + '</div>';
+    return;
+  }
+  let html = "";
+  const b = benchmark();
+
+  // chain crumbs (everything dotted before the benchmark)
+  if(state.chain.length > 1){
+    html += '<div class="crumbs"><span class="lbl">Chain · '+state.chain.length+' dots:</span>';
+    state.chain.slice(0,-1).forEach((id,i)=>{
+      const t = taskById(id); if(!t) return;
+      if(i>0) html += '<span class="arrow">→</span>';
+      html += '<button class="crumb" data-act="reveal" data-id="'+id+'" title="'+esc(t.title)+'">'+esc(t.title)+'</button>';
+    });
+    html += '<span class="arrow">→</span><span class="lbl" style="color:var(--chain-deep)">this ↓</span></div>';
+  }
+
+  // benchmark card
+  if(b){
+    html += '<div class="cardrow"><div class="card bench">'
+         + '<input class="ckbox" type="checkbox" data-act="bench-done" aria-label="Mark benchmark done" title="Done — cross it off"/>'
+         + '<span class="dot" aria-hidden="true">✓</span>'
+         + '<span class="title">'+titleHTML(b)+'</span>'
+         + '<span class="chiprow">'+chipHTML(b)+'</span></div>'
+         + '<div class="siderail">'
+         + '<button class="reveal" data-act="reveal" data-id="'+b.id+'">Reveal</button>'
+         + '<button class="sidesm" data-act="worked" title="Started it, crossing it off, back to the bottom of the list (rule 7)">worked on it ↻</button>'
+         + '<button class="btn dislodge" data-act="dislodge" title="Remove from the chain without completing">Dislodge</button>'
+         + '</div></div>';
+  }
+
+  const p = pool();
+
+  if(state.interventionActive && b){
+    html += '<div class="notice intervene">'
+         + '<div class="big">Only '+Math.round(state.interventionP*100)+'% chance of finding a better task within 1 minute. Continue?</div>'
+         + '<div class="row"><button class="btn yes" data-act="continue-scan">Yes</button>'
+         + '<button class="btn subtle" data-act="start-working">No — work the chain</button></div></div>';
+  }
+  else if(state.mode==="work"){
+    html += '<div class="notice"><div class="big">Scanning paused — do the chain from the newest dot up.</div>'
+         + '<div class="row"><button class="btn subtle" data-act="resume-scan">Resume scanning</button>'
+         + (Object.keys(state.considered).length ? '<button class="btn subtle" data-act="rescan">Rescan skipped tasks</button>' : '')
+         + '</div></div>';
+  }
+  else if(!p.length){
+    if(b){
+      html += '<div class="notice"><div class="big">End of the list. Work the chain from the newest dot up — that\u2019s the purple one.</div>'
+           + '<div class="row">'
+           + (Object.entries(state.considered).some(([,v])=>v==="no"||v==="cant"||v==="dislodged"||v==="worked") ? '<button class="btn subtle" data-act="rescan">Rescan skipped tasks</button>' : '')
+           + '<button class="btn subtle" data-act="new-pass">Start a fresh pass</button>'
+           + '<span class="quiet">New tasks and context changes join the scan automatically.</span></div></div>';
+    }else{
+      html += '<div class="notice"><div class="big">Nothing eligible to scan.</div>'
+           + '<div class="row"><span class="quiet">Switch some contexts on, add a task, or start a fresh pass.</span>'
+           + '<button class="btn subtle" data-act="new-pass">Start a fresh pass</button></div></div>';
+    }
+  }
+  else {
+    const cand = taskById(state.candidateId);
+    if(cand){
+      html += '<div class="cardrow"><div class="card cand">'
+           + '<input class="ckbox" type="checkbox" data-act="cand-done" aria-label="Did this just now" title="Did it just now — cross it off"/>'
+           + '<span class="title">'+titleHTML(cand)+'</span>'
+           + '<span class="chiprow">'+chipHTML(cand)+'</span></div>'
+           + '<div class="siderail"><button class="reveal" data-act="reveal" data-id="'+cand.id+'">Reveal</button></div></div>';
+      const q = b
+        ? 'Would I rather have spent the next hour (until <span class="until">'+untilClock()+'</span>) doing this?'
+        : 'No chain yet — would I want to spend the next hour (until <span class="until">'+untilClock()+'</span>) on this?';
+      html += '<div class="qline">'+q+'</div>';
+      html += '<div class="decide">'
+           + '<button class="btn yes" data-act="yes">'+(b?"Yes":"Dot it")+'<span class="keyhint">y</span></button>'
+           + '<button class="btn no" data-act="no">No<span class="keyhint">n</span></button>'
+           + '<button class="btn cant" data-act="cant">Can\u2019t<span class="keyhint">c</span></button>'
+           + '<span class="sparkbox">'+sparkSVG(cand.id,84,20)
+           + '<span class="topkchip mono">'+topKlabel(cand.id)+'</span>'
+           + '<button class="iconbtn" data-act="toggle-list" title="Show the full ranked list">▦</button></span>'
+           + '</div>';
+    }
+  }
+  el.innerHTML = html;
+}
+
+function renderList(){
+  const open = openTasks();
+  const act = activeCtxSet();
+  document.getElementById("listCount").textContent = "("+open.length+")";
+  document.getElementById("listCaret").textContent = state.listOpen ? "▾" : "▸";
+  const body = document.getElementById("listBody");
+  body.hidden = !state.listOpen;
+  if(!state.listOpen){ body.innerHTML=""; return; }
+
+  const rows = [...open].sort((a,b)=>{
+    const ka = rankCache.get(a.id), kb = rankCache.get(b.id);
+    const ta = ka?ka.topK:1e9, tb = kb?kb.topK:1e9;
+    if(ta!==tb) return ta-tb;
+    return b.mu - a.mu;
+  });
+  const inChain = new Set(state.chain);
+  let html = "";
+  for(const t of rows){
+    const st = rankCache.get(t.id);
+    const fill = st ? Math.max(2, Math.round(st.topK/st.n*100)) : 2;
+    const consid = state.considered[t.id];
+    const dim = !isEligible(t, act);
+    html += '<div class="trow" data-row="'+t.id+'" style="'+(dim?"opacity:.45":"")+'">'
+         + sparkSVG(t.id, 88, 22)
+         + '<div class="tk"><span class="tkl">'+(st?("top-"+st.topK):"—")+'</span><div class="tkbar"><i style="width:'+fill+'%"></i></div></div>'
+         + '<div class="tmain">'
+         + (inChain.has(t.id) ? '<span class="inchain" title="In the chain">●</span>' : '')
+         + '<button class="tt" data-act="edit" data-id="'+t.id+'">'+esc(t.title)+'</button>'
+         + (t.url ? '<a class="ext" href="'+esc(t.url)+'" target="_blank" rel="noopener" title="Open link">↗</a>' : '')
+         + chipHTML(t)
+         + (consid && consid!=="done" ? '<span class="skipped">'+(consid==="no"?"no":consid==="cant"?"can\u2019t":consid)+'</span>' : '')
+         + '</div></div>';
+  }
+  const done = state.tasks.filter(t=>t.done).sort((a,b)=>(b.completedAt||0)-(a.completedAt||0));
+  if(done.length){
+    html += '<details class="donewrap"><summary>Completed ('+done.length+')</summary>';
+    for(const t of done.slice(0,50)){
+      html += '<div class="drow"><span class="dt">'+esc(t.title)+'</span><button class="restore" data-act="restore" data-id="'+t.id+'">restore</button></div>';
+    }
+    html += '</details>';
+  }
+  body.innerHTML = html || '<div class="emptystate">No open tasks.</div>';
+}
+
+/* ================================================================
+   MODALS
+   ================================================================ */
+function closeModal(){ document.getElementById("modalRoot").innerHTML=""; }
+function modalShell(inner){
+  document.getElementById("modalRoot").innerHTML =
+    '<div class="mback" data-act="mback"><div class="modal" role="dialog" aria-modal="true">'+inner+'</div></div>';
+}
+function openHelp(){
+  modalShell(
+    '<div class="mtop"><h2>Quick start</h2><button class="x" data-act="close-modal" aria-label="Close">✕</button></div>'
+    + '<div class="help"><ol>'
+    + '<li>Add tasks to the bottom of your list as you think of them.</li>'
+    + '<li>When ready to work, the scanner deals you a first task — <b>dot it</b> if you\u2019d take it.</li>'
+    + '<li>It keeps dealing candidates. For each: do you <i>want</i> to do it before the purple benchmark?</li>'
+    + '<li><b>Yes</b> dots it — it becomes the new benchmark on the chain.</li>'
+    + '<li><b>No</b> skips it (and nudges its rank down). <b>Can\u2019t</b> skips it with no rank signal.</li>'
+    + '<li>Do the dotted chain from the bottom (newest) to the top.</li>'
+    + '<li>Either finish a task and cross it off, or use <i>worked on it ↻</i> to cross it off and send it back to the bottom.</li>'
+    + '<li>Urgent task? <b>Add &amp; dot</b> puts it straight on the chain so it\u2019s done first.</li>'
+    + '</ol>'
+    + '<h3>What the machinery does</h3>'
+    + '<p class="kv">Every Yes/No is a pairwise match; each task keeps a <b>strength posterior</b> (a bell curve, not a number). '
+    + 'Candidates are dealt by sampling those posteriors, so likely picks come early and new tasks still get a look. '
+    + 'The <b>sparkline</b> is each task\u2019s likelihood distribution over rank — left-biased means likely to be picked. '
+    + '<b>top-K</b> is the smallest K (≥2) with P(rank ≤ K) ≥ 1 − 1/K: a stopping stat for "if I\u2019ll only do K tasks today, is this plausibly one of them?" '
+    + 'And when the odds of finding anything better collapse, the scanner interrupts your clicking and tells you to go work.</p>'
+    + '<p class="kv">Keys: <b>y</b> / <b>n</b> / <b>c</b> to decide, <b>u</b> to undo.</p></div>'
+  );
+}
+function openEdit(id){
+  const t = taskById(id); if(!t) return;
+  let ctxHtml = "";
+  for(const c of state.contexts){
+    ctxHtml += '<label><input type="checkbox" data-editctx="'+c.id+'"'+(t.ctx.includes(c.id)?" checked":"")+'/> '+esc(c.name)+'</label>';
+  }
+  modalShell(
+    '<div class="mtop"><h2>Edit task</h2><button class="x" data-act="close-modal" aria-label="Close">✕</button></div>'
+    + '<div class="frow"><label for="etTitle">Title</label><input id="etTitle" type="text" value="'+esc(t.title)+'"/></div>'
+    + '<div class="frow"><label for="etUrl">Link</label><input id="etUrl" type="url" placeholder="https://…" value="'+esc(t.url||"")+'"/></div>'
+    + '<div class="frow"><label for="etDue">Due</label><input id="etDue" type="date" value="'+esc(t.due||"")+'"/>'
+    + '<label style="min-width:0"><input id="etEver" type="checkbox"'+(t.evergreen?" checked":"")+'/> evergreen</label>'
+    + '<label style="min-width:0"><input id="etDaily" type="checkbox"'+(t.recur==="daily"?" checked":"")+'/> repeats daily</label></div>'
+    + '<h3>Needs these contexts</h3><div class="ctxpick">'+ctxHtml+'</div>'
+    + '<div class="kv">strength ≈ <b class="mono">'+t.mu.toFixed(1)+'</b> ± '+t.sigma.toFixed(1)+' · '+topKlabel(t.id)+'</div>'
+    + '<div class="mbtns"><button class="btn primary" data-act="save-edit" data-id="'+t.id+'">Save</button>'
+    + '<button class="btn subtle" data-act="close-modal">Cancel</button>'
+    + '<button class="btn danger" data-act="delete-task" data-id="'+t.id+'" style="margin-left:auto">Delete</button></div>'
+  );
+}
+function openSettings(){
+  const s = state.settings;
+  let ctxMgr = "";
+  for(const c of state.contexts){
+    ctxMgr += '<div class="mgr"><input type="checkbox" data-mgrctx="'+c.id+'"'+(c.active?" checked":"")+' title="active"/>'
+           + '<input type="text" data-mgrname="'+c.id+'" value="'+esc(c.name)+'"/>'
+           + '<button class="ghost" data-act="del-ctx" data-id="'+c.id+'" title="Delete context">✕</button></div>';
+  }
+  modalShell(
+    '<div class="mtop"><h2>Settings</h2><button class="x" data-act="close-modal" aria-label="Close">✕</button></div>'
+    + '<div class="frow"><label for="stHorizon">Horizon (min)</label><input id="stHorizon" type="number" min="5" max="480" value="'+s.horizonMin+'" style="width:90px"/>'
+    + '<span class="kv">the "next hour" in the question</span></div>'
+    + '<div class="frow"><label for="stThresh">Interrupt below</label><input id="stThresh" type="number" min="1" max="90" value="'+s.thresholdPct+'" style="width:90px"/>'
+    + '<span class="kv">% chance of a better task within 1 min</span></div>'
+    + '<div class="frow"><label for="stSamples">MC samples</label><input id="stSamples" type="number" min="50" max="2000" step="50" value="'+s.samples+'" style="width:90px"/>'
+    + '<span class="kv">more = smoother sparklines</span></div>'
+    + '<div class="mbtns"><button class="btn primary" data-act="save-settings">Save settings</button></div>'
+    + '<h3>Contexts</h3>'+ctxMgr
+    + '<div class="mgr"><input id="newCtxName" type="text" placeholder="New context…"/><button class="btn subtle" data-act="add-ctx-named">Add</button></div>'
+    + '<h3>Pass</h3><div class="mbtns"><button class="btn subtle" data-act="new-pass">Reset pass (clear skips)</button></div>'
+    + '<h3>Import from Markdown</h3>'
+    + '<div class="kv">Paste an Obsidian-style list — lines like <span class="mono">- [ ] task</span> or <span class="mono">- [title](url)</span>. Checked items are skipped.</div>'
+    + '<textarea id="mdImport" rows="4" placeholder="- [ ] Write the next scene&#10;- [Fix the sink](https://…)"></textarea>'
+    + '<div class="mbtns"><button class="btn subtle" data-act="import-md">Import tasks</button></div>'
+    + '<h3>Backup</h3>'
+    + '<div class="kv"><span class="statusdot" style="background:'+(storageOK?"var(--good)":"var(--no)")+'"></span>'
+    + (storageOK ? (useLocal ? "Saving automatically in this browser\u2019s local storage \u2014 this device only." : "Saving automatically in this artifact\u2019s storage.") : "Persistent storage unavailable here — export to keep your data.")+'</div>'
+    + '<div class="mbtns"><button class="btn subtle" data-act="export-json">Export JSON</button>'
+    + '<button class="btn subtle" data-act="import-json">Import JSON</button>'
+    + '<button class="btn danger" data-act="wipe" style="margin-left:auto">Reset everything</button></div>'
+    + '<textarea id="jsonBox" rows="5" placeholder="Exported JSON appears here; paste here to import."></textarea>'
+  );
+}
+
+/* ================================================================
+   EVENTS
+   ================================================================ */
+function onAction(act, el){
+  switch(act){
+    case "yes": case "no": case "cant": decide(act); break;
+    case "cand-done": decide("cand-done"); break;
+    case "bench-done": benchDone(); break;
+    case "dislodge": dislodge(); break;
+    case "worked": workedOn(); break;
+    case "reveal": revealTask(el.dataset.id); break;
+    case "continue-scan": pushUndo(); state.interventionActive=false; state.snooze=12; commit(); break;
+    case "start-working": pushUndo(); state.interventionActive=false; state.mode="work"; commit(); break;
+    case "resume-scan": pushUndo(); state.mode="scan"; state.snooze=6; commit(); break;
+    case "rescan": rescanSkipped(); break;
+    case "new-pass": newPass(); closeModal(); break;
+    case "toggle-list": state.listOpen=!state.listOpen; render(); save(); break;
+    case "toggle-ctx": state.ctxOpen=!state.ctxOpen; render(); save(); break;
+    case "add": {
+      const inp=document.getElementById("addInput");
+      if(addTask(inp.value,false)) inp.value="";
+      inp.focus(); break;
+    }
+    case "add-dot": {
+      const inp=document.getElementById("addInput");
+      if(addTask(inp.value,true)) inp.value="";
+      inp.focus(); break;
+    }
+    case "add-ctx": {
+      const name = prompt("New context name:");
+      if(name && name.trim()){ pushUndo(); state.contexts.push({id:uid(),name:name.trim(),active:true}); commit(); }
+      break;
+    }
+    case "add-ctx-named": {
+      const box=document.getElementById("newCtxName");
+      if(box && box.value.trim()){ pushUndo(); state.contexts.push({id:uid(),name:box.value.trim(),active:true}); commit(); openSettings(); }
+      break;
+    }
+    case "del-ctx": {
+      pushUndo();
+      const id=el.dataset.id;
+      state.contexts = state.contexts.filter(c=>c.id!==id);
+      for(const t of state.tasks) t.ctx = t.ctx.filter(c=>c!==id);
+      commit(); openSettings(); break;
+    }
+    case "edit": openEdit(el.dataset.id); break;
+    case "save-edit": {
+      const t=taskById(el.dataset.id); if(!t) break;
+      pushUndo();
+      t.title=document.getElementById("etTitle").value.trim()||t.title;
+      const u=document.getElementById("etUrl").value.trim(); t.url=u||null;
+      const d=document.getElementById("etDue").value; t.due=d||null;
+      t.evergreen=document.getElementById("etEver").checked;
+      t.recur=document.getElementById("etDaily").checked?"daily":null;
+      t.ctx=[...document.querySelectorAll("[data-editctx]")].filter(x=>x.checked).map(x=>x.dataset.editctx);
+      closeModal(); commit(); break;
+    }
+    case "delete-task": {
+      pushUndo();
+      const id=el.dataset.id;
+      state.tasks=state.tasks.filter(t=>t.id!==id);
+      state.chain=state.chain.filter(c=>c!==id);
+      delete state.considered[id];
+      if(state.candidateId===id) state.candidateId=null;
+      recomputeRanks(); closeModal(); commit(); break;
+    }
+    case "restore": {
+      const t=taskById(el.dataset.id); if(!t) break;
+      pushUndo(); t.done=false; t.completedAt=null; t.lastDoneAt=null;
+      recomputeRanks(); commit(); break;
+    }
+    case "settings": openSettings(); break;
+    case "save-settings": {
+      pushUndo();
+      const s=state.settings;
+      s.horizonMin=Math.max(5,Math.min(480,parseInt(document.getElementById("stHorizon").value)||60));
+      s.thresholdPct=Math.max(1,Math.min(90,parseInt(document.getElementById("stThresh").value)||25));
+      s.samples=Math.max(50,Math.min(2000,parseInt(document.getElementById("stSamples").value)||250));
+      recomputeRanks(); closeModal(); commit(); break;
+    }
+    case "help": openHelp(); break;
+    case "close-modal": closeModal(); break;
+    case "import-md": {
+      const box=document.getElementById("mdImport"); if(!box) break;
+      const lines=box.value.split(/\r?\n/);
+      let added=0; pushUndo();
+      for(let line of lines){
+        line=line.trim();
+        if(!line) continue;
+        if(/^[-*+]\s*\[x\]/i.test(line)) continue;              // completed → skip
+        line=line.replace(/^[-*+]\s*(\[\s?\]\s*)?/, "");        // strip bullet + empty checkbox
+        if(!line) continue;
+        let url=null, title=line;
+        const m=line.match(/^\[([^\]]+)\]\(([^)]+)\)\s*(.*)$/);
+        if(m){ title=(m[1]+" "+(m[3]||"")).trim(); url=m[2]; }
+        const t={id:uid(),title,url,due:null,evergreen:false,recur:null,ctx:[],mu:PRIOR_MU,sigma:PRIOR_SIGMA,done:false,createdAt:Date.now(),completedAt:null,lastDoneAt:null};
+        state.tasks.push(t); added++;
+      }
+      recomputeRanks(); commit();
+      const kv=box.closest(".modal");
+      if(kv) box.value=""; 
+      alert(added+" task"+(added===1?"":"s")+" imported.");
+      break;
+    }
+    case "export-json": {
+      const box=document.getElementById("jsonBox");
+      box.value=JSON.stringify(state);
+      box.focus(); box.select();
+      break;
+    }
+    case "import-json": {
+      const box=document.getElementById("jsonBox");
+      try{
+        const st=JSON.parse(box.value);
+        if(!st||!Array.isArray(st.tasks)) throw new Error("bad");
+        pushUndo(); state=st; recomputeRanks(); closeModal(); commit();
+      }catch(e){ alert("That didn\u2019t parse as exported state."); }
+      break;
+    }
+    case "wipe": {
+      if(confirm("Delete every task and start over from an empty list?")){
+        pushUndo(); state=defaultState(); recomputeRanks(); closeModal(); commit();
+      }
+      break;
+    }
+    case "undo": undo(); break;
+    case "mback": break; // handled in click listener
+  }
+}
+
+document.addEventListener("click", e=>{
+  const back = e.target.classList && e.target.classList.contains("mback");
+  if(back){ closeModal(); return; }
+  const el = e.target.closest("[data-act]");
+  if(!el) return;
+  const act = el.dataset.act;
+  if(act==="bench-done"||act==="cand-done") return; // handled on change
+  onAction(act, el);
+});
+document.addEventListener("change", e=>{
+  const el = e.target;
+  if(!el || !el.matches) return;
+  if(el.matches("[data-ctx]")){ toggleContext(el.dataset.ctx); return; }
+  if(el.matches('[data-act="bench-done"]')){ if(el.checked) benchDone(); return; }
+  if(el.matches('[data-act="cand-done"]')){ if(el.checked) decide("cand-done"); return; }
+  if(el.matches("[data-mgrctx]")){ const c=state.contexts.find(c=>c.id===el.dataset.mgrctx); if(c){ pushUndo(); c.active=el.checked; commit(); } return; }
+  if(el.matches("[data-mgrname]")){ const c=state.contexts.find(c=>c.id===el.dataset.mgrname); if(c && el.value.trim()){ pushUndo(); c.name=el.value.trim(); commit(); } return; }
+});
+document.addEventListener("keydown", e=>{
+  const t = e.target;
+  if(t && t.matches && t.matches("input,textarea,select")){
+    if(e.key==="Enter" && t.id==="addInput"){ onAction("add", t); }
+    return;
+  }
+  if(document.querySelector(".mback")){ if(e.key==="Escape") closeModal(); return; }
+  const k=e.key.toLowerCase();
+  if(k==="y"&&!state.interventionActive&&state.candidateId) decide("yes");
+  else if(k==="n"&&!state.interventionActive&&state.candidateId) decide("no");
+  else if(k==="c"&&!state.interventionActive&&state.candidateId) decide("cant");
+  else if(k==="u") undo();
+});
+
+/* ================================================================
+   BOOT
+   ================================================================ */
+(async function init(){
+  const loaded = await loadState();
+  state = loaded || defaultState();
+  if(!state.settings) state.settings = {horizonMin:60,thresholdPct:25,samples:250};
+  recomputeRanks();
+  ensureCandidate();
+  render();
+})();
+</script>
+</body>
+</html>
