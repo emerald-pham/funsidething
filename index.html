@@ -400,7 +400,7 @@ function defaultState(){
   const tasks = [];   // start empty — add your own, or paste your Obsidian list in Settings
   return {
     v:1, tasks, contexts,
-    chain: [], considered: {}, candidateId: null,
+    chain: [], considered: {}, cantAt: {}, candidateId: null,
     interventionActive:false, interventionP:0, snooze:0,
     mode:"scan", decisionsMs:[], presentedAt:0,
     listOpen:false, ctxOpen:true, histOpen:false, updatedAt:0,
@@ -509,6 +509,7 @@ async function cloudPull(){
         lastPushed = remote.payload;
         if(!state.settings) state.settings = {horizonMin:60,thresholdPct:25,samples:250};
         if(state.histOpen===undefined) state.histOpen=false;
+        if(!state.cantAt) state.cantAt = {};
         recomputeRanks(); ensureCandidate(); render();
         if(useLocal){ try{ localStorage.setItem(STORE_KEY, remote.payload); }catch(e){} }
       }catch(e){ /* corrupt remote — leave local alone */ }
@@ -547,6 +548,23 @@ function isEligible(t, act){
 }
 function eligibleTasks(){ const act=activeCtxSet(); return state.tasks.filter(t=>isEligible(t,act)); }
 function benchmark(){ return state.chain.length ? taskById(state.chain[state.chain.length-1]) : null; }
+function expireCants(){ // a "can't" mark is bulletproof until the horizon elapses, then it clears itself
+  const now = Date.now();
+  const horizonMs = state.settings.horizonMin * 60000;
+  for(const [id,v] of Object.entries(state.considered)){
+    if(v==="cant" && state.cantAt[id] && (now - state.cantAt[id]) >= horizonMs){
+      delete state.considered[id];
+      delete state.cantAt[id];
+    }
+  }
+}
+function skippedLabel(id, consid){ // list-view badge text — a can't mark shows how long it's still bulletproof for
+  if(consid!=="cant") return consid==="no" ? "no" : consid;
+  const at = state.cantAt[id];
+  if(!at) return "can\u2019t";
+  const leftMin = Math.ceil((state.settings.horizonMin*60000 - (Date.now()-at)) / 60000);
+  return leftMin > 0 ? ("can\u2019t \u00b7 "+leftMin+"m") : "can\u2019t";
+}
 function pool(){ // eligible, not in chain, not yet considered this pass
   const inChain = new Set(state.chain);
   return eligibleTasks().filter(t => !inChain.has(t.id) && !(t.id in state.considered));
@@ -561,6 +579,7 @@ function recomputeRanks(){
   sparkCache.clear();
 }
 function ensureCandidate(){
+  expireCants();   // let any "can't" marks whose horizon has passed quietly rejoin the pool first
   if(state.mode !== "scan" || state.interventionActive) return;
   const p = pool();
   const cur = state.candidateId ? taskById(state.candidateId) : null;
@@ -598,11 +617,13 @@ function decide(kind){ // 'yes' | 'no' | 'cant' | 'cand-done'
     if(b) updatePair(cand, b);            // "I'd rather do this" → candidate outranks benchmark
     state.chain.push(cand.id);
     delete state.considered[cand.id];
+    delete state.cantAt[cand.id];
   }else if(kind==="no"){
     if(b) updatePair(b, cand);            // benchmark wins the comparison
     state.considered[cand.id] = "no";
   }else if(kind==="cant"){
     state.considered[cand.id] = "cant";   // rejected without a rank signal
+    state.cantAt[cand.id] = Date.now();   // bulletproof until the horizon elapses — see expireCants()
   }else if(kind==="cand-done"){
     if(b) updatePair(cand, b);            // doing it right now beats the benchmark
     completeTask(cand);
@@ -653,13 +674,18 @@ function deleteTask(id){ // removes a task entirely — from the list, the chain
   state.tasks = state.tasks.filter(t=>t.id!==id);
   state.chain = state.chain.filter(c=>c!==id);
   delete state.considered[id];
+  delete state.cantAt[id];
   if(state.candidateId===id) state.candidateId=null;
   recomputeRanks();
   commit(true, true);           // deletions sync to the cloud right away
 }
 function newPass(push){
   if(push!==false) pushUndo();
-  state.considered = {};
+  expireCants();   // drop any "can't" marks that had already outlived the horizon on their own
+  for(const [id,v] of Object.entries(state.considered)){
+    if(v==="cant") continue;   // still-fresh can't marks are bulletproof — they survive a new pass
+    delete state.considered[id];
+  }
   state.snooze = 0;
   state.interventionActive = false;
   state.candidateId = null;
@@ -673,10 +699,10 @@ function clearCompleted(){ // completed tasks otherwise live in state.tasks fore
   state.tasks = state.tasks.filter(t=>!t.done);
   commit();
 }
-function rescanSkipped(){ // clear only the no/can't marks, keep 'done'
+function rescanSkipped(){ // clear only the no/can't marks, keep 'done' — an explicit override, ignores the can't timer on purpose
   pushUndo();
   for(const [id,v] of Object.entries(state.considered)){
-    if(v==="no"||v==="cant"||v==="dislodged"||v==="worked") delete state.considered[id];
+    if(v==="no"||v==="cant"||v==="dislodged"||v==="worked"){ delete state.considered[id]; delete state.cantAt[id]; }
   }
   state.mode="scan"; state.interventionActive=false; state.snooze = 6;
   commit();
@@ -980,7 +1006,7 @@ function renderScan(){
       html += '<div class="decide">'
            + '<button class="btn yes" data-act="yes">'+(b?"Yes":"Dot it")+'<span class="keyhint">y</span></button>'
            + '<button class="btn no" data-act="no">No<span class="keyhint">n</span></button>'
-           + '<button class="btn cant" data-act="cant">Can\u2019t<span class="keyhint">c</span></button>'
+           + '<button class="btn cant" data-act="cant" title="Skip it for the Horizon window, even if the chain empties out before then">Can\u2019t<span class="keyhint">c</span></button>'
            + '<span class="sparkbox">'+sparkSVG(cand.id,84,20)
            + '<span class="topkchip mono">'+topKlabel(cand.id)+'</span>'
            + '<button class="iconbtn" data-act="toggle-list" title="Show the full ranked list">▦</button></span>'
@@ -1021,7 +1047,7 @@ function renderList(){
          + '<button class="tt" data-act="edit" data-id="'+t.id+'">'+esc(t.title)+'</button>'
          + (safeUrl(t.url) ? '<a class="ext" href="'+esc(safeUrl(t.url))+'" target="_blank" rel="noopener noreferrer" title="Open link">↗</a>' : '')
          + chipHTML(t)
-         + (consid && consid!=="done" ? '<span class="skipped">'+(consid==="no"?"no":consid==="cant"?"can\u2019t":consid)+'</span>' : '')
+         + (consid && consid!=="done" ? '<span class="skipped">'+skippedLabel(t.id, consid)+'</span>' : '')
          + '</div></div>';
   }
   body.innerHTML = html || '<div class="emptystate">No open tasks.</div>';
@@ -1115,7 +1141,7 @@ function openSettings(){
   modalShell(
     '<div class="mtop"><h2>Settings</h2><button class="x" data-act="close-modal" aria-label="Close">✕</button></div>'
     + '<div class="frow"><label for="stHorizon">Horizon (min)</label><input id="stHorizon" type="number" min="5" max="480" value="'+s.horizonMin+'" style="width:90px"/>'
-    + '<span class="kv">the "next hour" in the question</span></div>'
+    + '<span class="kv">the "next hour" in the question — also how long a Can\u2019t sticks before it\u2019s reconsidered</span></div>'
     + '<div class="frow"><label for="stThresh">Interrupt below</label><input id="stThresh" type="number" min="1" max="90" value="'+s.thresholdPct+'" style="width:90px"/>'
     + '<span class="kv">% chance of a better task within 1 min</span></div>'
     + '<div class="frow"><label for="stSamples">MC samples</label><input id="stSamples" type="number" min="50" max="2000" step="50" value="'+s.samples+'" style="width:90px"/>'
@@ -1332,6 +1358,7 @@ function hotkeyDelete(){
   state = loaded || defaultState();
   if(!state.settings) state.settings = {horizonMin:60,thresholdPct:25,samples:250};
   if(state.histOpen===undefined) state.histOpen=false;
+  if(!state.cantAt) state.cantAt = {};
   recomputeRanks();
   ensureCandidate();
   render();

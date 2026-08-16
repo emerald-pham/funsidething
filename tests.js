@@ -139,7 +139,12 @@ async function loadApp({ seed, cloudSyncFactory } = {}) {
     document: shim.document,
     localStorage: shim.localStorage,
     console,
-    Date, JSON,
+    JSON,
+    // NOTE: deliberately NOT injecting the outer process's `Date` here — it's
+    // passed by reference, so overriding Date.now on it (for time-travel
+    // tests) would leak into the whole Node process. Leave Date unset and the
+    // vm context auto-provisions its own separate, safely-overridable Date;
+    // see setFakeTime() below, which overrides it via in-context code only.
     CustomEvent: class CustomEvent { constructor(type, opts) { this.type = type; Object.assign(this, opts || {}); } },
     setTimeout: (fn, ms, ...a) => { const t = setTimeout(fn, ms, ...a); t.unref?.(); return t; },
     clearTimeout,
@@ -164,6 +169,15 @@ async function loadApp({ seed, cloudSyncFactory } = {}) {
   vm.runInContext("this.esc = esc;", sandbox);
   await flush(); // let the boot IIFE's `await loadState()` resolve before returning
   return { ctx: sandbox, shim };
+}
+
+// Overrides Date.now() *inside one vm context only*, via in-context code —
+// never touches the outer process's real Date, so it can't leak across tests.
+function setFakeTime(sandbox, ts) {
+  vm.runInContext(`Date.now = () => ${ts};`, sandbox);
+}
+function realNow(sandbox) {
+  return vm.runInContext("Date.now()", sandbox);
 }
 
 test("app harness: boots cleanly with an empty state", async () => {
@@ -299,7 +313,7 @@ test("clearCompleted: removes done tasks when confirm() is accepted, leaves them
     const shim = makeDomShim();
     const sandbox = {
       window: shim.window, document: shim.document, localStorage: shim.localStorage,
-      console, Date, JSON, CustomEvent: class {}, setTimeout, clearTimeout,
+      console, JSON, CustomEvent: class {}, setTimeout, clearTimeout,
       requestAnimationFrame: (fn) => setTimeout(fn, 0),
       confirm: () => false, alert: () => {}, prompt: () => null,
     };
@@ -708,4 +722,131 @@ test("REGRESSION: sync status labels all stay short enough for the fixed-width b
     const text = shim.elements.get("syncBtn").textContent;
     assert.ok([...text].length <= MAX_LEN, `"${text}" (status=${status}) is ${[...text].length} chars, over the ${MAX_LEN}-char budget the fixed width assumes`);
   }
+});
+
+/* ---------- "can't" is bulletproof for the Horizon window ----------
+   Bug: newPass() (triggered whenever the chain empties, e.g. via benchDone())
+   used to wipe state.considered wholesale, silently un-can't-ing everything
+   regardless of how recently it was marked. Fix: a can't mark now carries a
+   timestamp (state.cantAt) and survives newPass() until state.settings.horizonMin
+   minutes have actually elapsed; expireCants() then clears it on its own. */
+
+test("cant is timestamped and excludes the task from the pool immediately", async () => {
+  const { ctx } = await loadApp({ seed: 30 });
+  ctx.addTask("Task A", false);
+  ctx.addTask("Task B", false);
+  const cand = ctx.state.candidateId;
+  ctx.decide("cant");
+  assert.equal(ctx.state.considered[cand], "cant");
+  assert.ok(typeof ctx.state.cantAt[cand] === "number", "cantAt should record when it was marked");
+  assert.notEqual(ctx.state.candidateId, cand, "a can't task should not stay the offered candidate");
+});
+
+test("BUG FIX: a fresh can't mark survives the chain emptying out (newPass), regardless of elapsed time being ~0", async () => {
+  const { ctx } = await loadApp({ seed: 31 });
+  ctx.addTask("Only queued task", true); // dotted — this is what empties the chain
+  ctx.addTask("Said can't to this one", false);
+  const cantId = ctx.state.candidateId;
+  ctx.decide("cant"); // mark can't on Task B — this should now be bulletproof
+
+  ctx.benchDone(); // completes the queued task, chain -> empty -> triggers newPass()
+
+  assert.equal(ctx.state.chain.length, 0);
+  assert.equal(ctx.state.considered[cantId], "cant", "the can't mark must survive newPass() while still fresh");
+  assert.ok(!ctx.state.tasks.every(t => t.id !== cantId) , "sanity: task still exists");
+});
+
+test("a can't mark that has genuinely outlived the Horizon window IS cleared by newPass()", async () => {
+  const { ctx } = await loadApp({ seed: 32 });
+  ctx.state.settings.horizonMin = 10; // shrink the window so the test doesn't need huge offsets
+  ctx.addTask("Only queued task", true);
+  ctx.addTask("Old can't", false);
+  const cantId = ctx.state.candidateId;
+
+  const t0 = realNow(ctx);
+  setFakeTime(ctx, t0);
+  ctx.decide("cant");
+  assert.equal(ctx.state.considered[cantId], "cant");
+
+  setFakeTime(ctx, t0 + 11 * 60000); // 11 minutes later — past the 10-minute horizon
+  ctx.benchDone(); // -> newPass()
+
+  assert.equal(ctx.state.considered[cantId], undefined, "an expired can't mark should be dropped, not preserved forever");
+  assert.equal(ctx.state.cantAt[cantId], undefined, "its timestamp should be cleaned up too");
+});
+
+test("a can't mark automatically expires mid-session (no newPass needed) once the Horizon elapses", async () => {
+  const { ctx } = await loadApp({ seed: 33 });
+  ctx.state.settings.horizonMin = 15;
+  ctx.addTask("Task A", false);
+  ctx.addTask("Said can't", false);
+  const cantId = ctx.state.candidateId;
+
+  const t0 = realNow(ctx);
+  setFakeTime(ctx, t0);
+  ctx.decide("cant");
+  assert.ok(!ctx.pool().some((t) => t.id === cantId), "should be excluded from the pool right after being marked");
+
+  setFakeTime(ctx, t0 + 5 * 60000); // still within the window
+  assert.ok(!ctx.pool().some((t) => t.id === cantId), "still excluded well within the horizon");
+
+  setFakeTime(ctx, t0 + 16 * 60000); // past the window now
+  ctx.ensureCandidate(); // any normal app action re-checks expiry, not just newPass
+  assert.ok(ctx.pool().some((t) => t.id === cantId), "should rejoin the pool once the horizon has elapsed");
+  assert.equal(ctx.state.considered[cantId], undefined);
+});
+
+test("changing the Horizon setting immediately affects how much longer an existing can't mark is bulletproof for", async () => {
+  const { ctx } = await loadApp({ seed: 34 });
+  ctx.state.settings.horizonMin = 60;
+  ctx.addTask("Task A", false);
+  ctx.addTask("Said can't", false);
+  const cantId = ctx.state.candidateId;
+  const t0 = realNow(ctx);
+  setFakeTime(ctx, t0);
+  ctx.decide("cant");
+
+  setFakeTime(ctx, t0 + 20 * 60000); // 20 min later, well within a 60-min horizon
+  ctx.state.settings.horizonMin = 15; // shrink the horizon below the elapsed time
+  ctx.ensureCandidate();
+  assert.equal(ctx.state.considered[cantId], undefined, "shrinking the horizon below elapsed time should expire it on next check");
+});
+
+test("rescanSkipped() remains a deliberate manual override — clears can't immediately regardless of the timer", async () => {
+  const { ctx } = await loadApp({ seed: 35 });
+  ctx.addTask("Task A", false);
+  ctx.addTask("Said can't", false);
+  const cantId = ctx.state.candidateId;
+  ctx.decide("cant"); // freshly marked, nowhere near expiry
+
+  ctx.rescanSkipped();
+  assert.equal(ctx.state.considered[cantId], undefined, "an explicit rescan should still override the timer on purpose");
+  assert.equal(ctx.state.cantAt[cantId], undefined);
+});
+
+test("deleteTask cleans up cantAt too, so no orphaned timestamps linger", async () => {
+  const { ctx } = await loadApp({ seed: 36 });
+  ctx.addTask("Task A", false);
+  ctx.addTask("Said can't", false);
+  const cantId = ctx.state.candidateId;
+  ctx.decide("cant");
+  assert.ok(ctx.state.cantAt[cantId]);
+  ctx.deleteTask(cantId);
+  assert.equal(ctx.state.cantAt[cantId], undefined);
+});
+
+test("UI: the list badge shows remaining cooldown minutes for an active can't mark", async () => {
+  const { ctx } = await loadApp({ seed: 37 });
+  ctx.state.settings.horizonMin = 60;
+  ctx.addTask("Task A", false);
+  ctx.addTask("Said can't", false);
+  const t0 = realNow(ctx);
+  setFakeTime(ctx, t0);
+  ctx.decide("cant");
+
+  setFakeTime(ctx, t0 + 10 * 60000); // 10 minutes in, ~50 left
+  ctx.state.listOpen = true;
+  ctx.render();
+  const listHtml = ctx.document.getElementById("listBody").innerHTML;
+  assert.match(listHtml, /class="skipped">can.t \u00b7 50m<\/span>/, `expected a "can't · 50m" badge in: ${listHtml}`);
 });
