@@ -689,3 +689,23 @@ test("REGRESSION: a focus-triggered pull racing a push settles with a small, bou
   // a small handful of real calls rather than dozens/hundreds/a crash.
   assert.ok(trackedCalls.length < 10, `expected a bounded number of real network calls, got ${trackedCalls.length}: ${trackedCalls.join(",")}`);
 });
+
+/* ---------- regression: sync button must stay a consistent size ----------
+   The button has a fixed CSS width (88px) sized for short, similar-length
+   labels. This doesn't check pixels (no real layout engine here), but it
+   pins the actual label lengths so nobody can silently push a long string
+   back into renderSync() without also revisiting the CSS width. */
+test("REGRESSION: sync status labels all stay short enough for the fixed-width badge", async () => {
+  const { ctx, shim } = await loadApp();
+  const CS = { configured: true, ready: true, user: "a@b.com", status: "ok" };
+  shim.window.CloudSync = CS;
+  const el = shim.elements.get("syncBtn") || (ctx.document ?? shim.document).getElementById("syncBtn");
+
+  const MAX_LEN = 10; // codepoints, cloud glyph included — matches the 88px budget
+  for (const status of ["ok", "syncing", "error", "signed-out"]) {
+    CS.status = status;
+    ctx.renderSync();
+    const text = shim.elements.get("syncBtn").textContent;
+    assert.ok([...text].length <= MAX_LEN, `"${text}" (status=${status}) is ${[...text].length} chars, over the ${MAX_LEN}-char budget the fixed width assumes`);
+  }
+});

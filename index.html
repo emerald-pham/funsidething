@@ -56,7 +56,7 @@ textarea{width:100%;font-family:var(--font-mono);font-size:12px}
 .topbtns{margin-left:auto;display:flex;gap:4px}
 .ghost{color:var(--mut);border:1px solid transparent;border-radius:8px;padding:5px 9px;font-size:13px}
 .ghost:hover{background:#fff;border-color:var(--line);color:var(--ink)}
-.syncbtn{font-size:12px;border:1px solid var(--line);border-radius:99px;padding:4px 10px;color:var(--mut);background:#fff;white-space:nowrap}
+.syncbtn{font-size:12px;border:1px solid var(--line);border-radius:99px;padding:4px 10px;color:var(--mut);background:#fff;white-space:nowrap;width:88px;display:inline-flex;align-items:center;justify-content:center;overflow:hidden;text-overflow:ellipsis;box-sizing:border-box}
 .syncbtn:hover{color:var(--chain-deep);border-color:var(--chain-deep)}
 .syncbtn.ok{color:var(--good);border-color:#bfe6c9}
 .syncbtn.err{color:var(--danger);border-color:#f4c2c3}
@@ -850,8 +850,8 @@ function renderSync(){
   const s = CS.status;
   el.className = "syncbtn" + (s==="ok" ? " ok" : s==="syncing" ? " busy" : s==="error" ? " err" : "");
   el.textContent = s==="ok" ? "\u2601 synced"
-                 : s==="syncing" ? "\u2601 syncing\u2026"
-                 : s==="error" ? "\u2601 sync error"
+                 : s==="syncing" ? "\u2601 syncing"
+                 : s==="error" ? "\u2601 error"
                  : "\u2601 sign in";
   el.title = CS.user ? ("Synced as " + CS.user + " \u2014 click to sign out")
                      : "Sign in with Google to sync this list across your devices";
