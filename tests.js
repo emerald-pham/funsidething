@@ -1035,3 +1035,110 @@ test("REGRESSION: .ckbox has no custom appearance override — it renders as a n
   // no leftover custom :checked pseudo-element rules from the old circular design
   assert.ok(!/\.ckbox:checked::after/.test(html), "custom checked-state pseudo-element should have been removed");
 });
+
+/* ---------- audit: "cant" marks missing their start timestamp ----------
+   Bug: expireCants()'s expiry check required state.cantAt[id] to be truthy
+   before it would even consider expiring an entry. A "cant" mark with no
+   timestamp — e.g. one set before cantAt existed, or reintroduced via an
+   older JSON import or a cloud sync from a device on an older version —
+   would therefore never expire: permanently stuck, exactly the opposite of
+   "bulletproof for a bounded duration." Fix: expireCants() now backfills a
+   fresh timestamp for any orphaned "cant" it finds, and also sweeps the
+   reverse case (a leftover timestamp with no matching "cant" mark). */
+
+test("AUDIT: a pre-existing can't mark with no cantAt timestamp gets one backfilled instead of staying permanently stuck", async () => {
+  const { ctx } = await loadApp({ seed: 70 });
+  ctx.addTask("Task A", false);
+  ctx.addTask("Orphaned can't", false);
+  const orphanId = ctx.state.tasks.find((t) => t.title === "Orphaned can't").id;
+
+  // Simulate data from before cantAt existed (or an old JSON import): the
+  // "cant" mark is present, but with no matching timestamp.
+  ctx.state.considered[orphanId] = "cant";
+  assert.equal(ctx.state.cantAt[orphanId], undefined, "sanity: no timestamp yet");
+
+  ctx.ensureCandidate(); // runs expireCants() as its first step
+  assert.equal(ctx.state.considered[orphanId], "cant", "should NOT be silently un-cant'd by the audit");
+  assert.ok(typeof ctx.state.cantAt[orphanId] === "number", "a fresh timestamp should have been backfilled");
+});
+
+test("AUDIT: a backfilled can't mark expires normally afterward, on its own schedule", async () => {
+  const { ctx } = await loadApp({ seed: 71 });
+  ctx.state.settings.cantMin = 10;
+  ctx.addTask("Task A", false);
+  ctx.addTask("Orphaned can't", false);
+  const orphanId = ctx.state.tasks.find((t) => t.title === "Orphaned can't").id;
+  ctx.state.considered[orphanId] = "cant"; // no timestamp — simulating old data
+
+  const t0 = realNow(ctx);
+  setFakeTime(ctx, t0);
+  ctx.ensureCandidate(); // backfills cantAt[orphanId] = t0
+  assert.equal(ctx.state.cantAt[orphanId], t0);
+
+  setFakeTime(ctx, t0 + 5 * 60000); // 5 min later, within the fresh 10-min window
+  ctx.ensureCandidate();
+  assert.equal(ctx.state.considered[orphanId], "cant", "still bulletproof within its freshly-backfilled window");
+
+  setFakeTime(ctx, t0 + 11 * 60000); // past the freshly-backfilled window
+  ctx.ensureCandidate();
+  assert.equal(ctx.state.considered[orphanId], undefined, "should expire normally once its (backfilled) window elapses");
+});
+
+test("AUDIT: does not disturb can't marks that already have a valid timestamp", async () => {
+  const { ctx } = await loadApp({ seed: 72 });
+  ctx.state.settings.cantMin = 60;
+  ctx.addTask("Task A", false);
+  ctx.addTask("Task B", false);
+  const cand = ctx.state.candidateId;
+  const t0 = realNow(ctx);
+  setFakeTime(ctx, t0);
+  ctx.decide("cant"); // sets considered + cantAt together, normally
+
+  ctx.ensureCandidate(); // audit runs again — should be a no-op for a healthy entry
+  assert.equal(ctx.state.cantAt[cand], t0, "an already-correct timestamp should not be overwritten");
+});
+
+test("AUDIT (reverse): an orphaned cantAt timestamp with no matching can't mark is cleaned up", async () => {
+  const { ctx } = await loadApp({ seed: 73 });
+  ctx.addTask("Task A", false);
+  const t = ctx.state.tasks[0];
+  ctx.state.cantAt[t.id] = Date.now(); // leftover timestamp, no considered["cant"] entry at all
+
+  ctx.ensureCandidate();
+  assert.equal(ctx.state.cantAt[t.id], undefined, "an orphaned timestamp with no matching can't mark should be swept");
+});
+
+test("AUDIT (reverse): a timestamp left behind after a mark changed to something other than 'cant' is cleaned up", async () => {
+  const { ctx } = await loadApp({ seed: 74 });
+  ctx.addTask("Task A", false);
+  const t = ctx.state.tasks[0];
+  ctx.state.considered[t.id] = "no";       // e.g. some other path changed the status
+  ctx.state.cantAt[t.id] = Date.now();     // but its old cantAt timestamp was left behind
+
+  ctx.ensureCandidate();
+  assert.equal(ctx.state.considered[t.id], "no", "the non-cant status itself should be untouched");
+  assert.equal(ctx.state.cantAt[t.id], undefined, "its stale cantAt should be cleaned up since it's no longer a can't");
+});
+
+test("AUDIT: repairs multiple orphaned can't marks in a single pass, without disturbing unrelated entries", async () => {
+  const { ctx } = await loadApp({ seed: 75 });
+  ctx.state.settings.cantMin = 30;
+  for (const title of ["A", "B", "C", "D"]) ctx.addTask(title, false);
+  const ids = Object.fromEntries(ctx.state.tasks.map((t) => [t.title, t.id]));
+
+  ctx.state.considered[ids.A] = "cant";  // orphaned — no timestamp
+  ctx.state.considered[ids.B] = "cant";  // orphaned — no timestamp
+  ctx.state.considered[ids.C] = "no";    // healthy, unrelated — should be untouched
+  const t0 = realNow(ctx);
+  setFakeTime(ctx, t0);
+  ctx.state.considered[ids.D] = "cant";
+  ctx.state.cantAt[ids.D] = t0;          // healthy, already has a timestamp
+
+  ctx.ensureCandidate();
+
+  assert.equal(ctx.state.cantAt[ids.A], t0, "A should be backfilled to the current time");
+  assert.equal(ctx.state.cantAt[ids.B], t0, "B should be backfilled to the current time");
+  assert.equal(ctx.state.considered[ids.C], "no", "unrelated 'no' entry should be untouched");
+  assert.equal(ctx.state.cantAt[ids.C], undefined, "C never had a cantAt and shouldn't get one");
+  assert.equal(ctx.state.cantAt[ids.D], t0, "D's existing valid timestamp should be left alone");
+});

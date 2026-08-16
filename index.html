@@ -560,10 +560,24 @@ function expireCants(){ // a "can't" mark is bulletproof until cantMin elapses, 
   const now = Date.now();
   const cantMs = state.settings.cantMin * 60000;
   for(const [id,v] of Object.entries(state.considered)){
-    if(v==="cant" && state.cantAt[id] && (now - state.cantAt[id]) >= cantMs){
+    if(v!=="cant") continue;
+    if(!state.cantAt[id]){
+      // AUDIT: a "cant" with no start date — e.g. set before cantAt existed,
+      // or reintroduced via an older JSON import or a cloud sync from a device
+      // on an older version. Without this it can never expire (the check below
+      // requires a timestamp to compare against). Backfill one now so it gets
+      // a normal, bounded window from this point forward instead of being
+      // permanently stuck.
+      state.cantAt[id] = now;
+      continue;
+    }
+    if((now - state.cantAt[id]) >= cantMs){
       delete state.considered[id];
       delete state.cantAt[id];
     }
+  }
+  for(const id of Object.keys(state.cantAt)){        // AUDIT (reverse): a leftover timestamp with no
+    if(state.considered[id] !== "cant") delete state.cantAt[id];   // matching "cant" mark shouldn't linger forever
   }
 }
 function skippedLabel(id, consid){ // list-view badge text — a can't mark shows how long it's still bulletproof for
