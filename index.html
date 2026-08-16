@@ -96,9 +96,7 @@ textarea{width:100%;font-family:var(--font-mono);font-size:12px}
 .cand{background:var(--cand-bg);border:1.5px solid var(--cand-line);color:var(--cand-ink)}
 .cand a{color:#8a6800}
 .dot{width:14px;height:14px;border-radius:50%;background:#fff;flex:none;box-shadow:0 1px 2px rgba(0,0,0,.15)}
-.ckbox{appearance:none;-webkit-appearance:none;width:19px;height:19px;flex:none;cursor:pointer;border-radius:50%;border:2px solid currentColor;background:transparent;position:relative}
-.ckbox:checked{background:var(--good);border-color:var(--good)}
-.ckbox:checked::after{content:"";position:absolute;left:50%;top:44%;width:5px;height:9px;border:solid #fff;border-width:0 2px 2px 0;transform:translate(-50%,-50%) rotate(45deg)}
+.ckbox{width:19px;height:19px;flex:none;accent-color:var(--good);cursor:pointer}
 .donepick{display:flex;align-items:center;gap:6px;cursor:pointer;font-size:11.5px;font-weight:700;opacity:.85;flex:none}
 .donepick:hover{opacity:1}
 .chiprow{display:flex;gap:6px;margin-left:auto;flex:none;align-items:center}
@@ -162,8 +160,13 @@ textarea{width:100%;font-family:var(--font-mono);font-size:12px}
 .tmain .chip{flex:none}
 .tmain .inchain{flex:none;color:var(--chain-deep);font-size:13px}
 .tmain .skipped{flex:none;color:var(--mut);font-size:11px;border:1px solid var(--line);border-radius:6px;padding:1px 6px}
-.addrow{display:flex;gap:8px;padding:12px 14px;border-top:1px solid var(--line);background:#fafbfe}
-.addrow input{flex:1;min-width:0}
+.addrow{display:flex;flex-direction:column;gap:8px;padding:12px 14px;border-top:1px solid var(--line);background:#fafbfe}
+.addline{display:flex;gap:8px}
+.addline input{flex:1;min-width:0}
+.qctx{display:flex;flex-wrap:wrap;gap:6px}
+.qctx:empty{display:none}
+.qctxchip{font-size:12px;font-weight:600;border:1px solid var(--line);border-radius:99px;padding:3px 10px;color:var(--mut);background:#fff;cursor:pointer}
+.qctxchip.on{background:var(--chain-deep);color:#fff;border-color:var(--chain-deep)}
 .histwrap{padding:0;overflow:hidden;margin-top:14px}
 .histwrap .chead{width:100%;text-align:left;padding:10px 14px;font-weight:600;font-size:13.5px;background:#fafbfe;border-bottom:1px solid transparent}
 .histwrap.open .chead{border-bottom-color:var(--line)}
@@ -248,9 +251,12 @@ textarea{width:100%;font-family:var(--font-mono);font-size:12px}
     <button class="lhead" data-act="toggle-list"><span id="listCaret">▸</span> All tasks <span id="listCount" class="mono"></span></button>
     <div id="listBody" hidden></div>
     <div class="addrow">
-      <input id="addInput" type="text" placeholder="Add a task — or paste a whole numbered list…" aria-label="New task title, or paste a list to bulk import"/>
-      <button class="btn subtle" data-act="add">Add</button>
-      <button class="btn urgent" data-act="add-dot" title="Urgent — add it with a dot so it's done first (rule 8)">Add &amp; dot</button>
+      <div class="qctx" id="quickCtxRow"></div>
+      <div class="addline">
+        <input id="addInput" type="text" placeholder="Add a task — or paste a whole numbered list…" aria-label="New task title, or paste a list to bulk import"/>
+        <button class="btn subtle" data-act="add">Add</button>
+        <button class="btn urgent" data-act="add-dot" title="Urgent — add it with a dot so it's done first (rule 8)">Add &amp; dot</button>
+      </div>
     </div>
   </section>
 
@@ -376,6 +382,7 @@ let state = null;
 let rankCache = new Map();     // id -> {hist,cdf,topK,n}
 let sparkCache = new Map();    // id:WxH -> memoized sparkline SVG string; cleared whenever rankCache changes
 let undoStack = [];
+let quickAddCtx = [];          // context ids currently picked in the quick-add bar — UI-only, sticky across adds, not synced
 let saveTimer = null;
 let storageOK = false;
 let useLocal  = false;   // true when running as a plain web page (localStorage)
@@ -404,7 +411,7 @@ function defaultState(){
     interventionActive:false, interventionP:0, snooze:0,
     mode:"scan", decisionsMs:[], presentedAt:0,
     listOpen:false, ctxOpen:true, histOpen:false, updatedAt:0,
-    settings:{ horizonMin:60, thresholdPct:25, samples:250 }
+    settings:{ horizonMin:60, thresholdPct:25, samples:250, cantMin:30 }
   };
 }
 
@@ -507,7 +514,8 @@ async function cloudPull(){
         pushUndo();                            // remote adoption is undoable
         state = st;
         lastPushed = remote.payload;
-        if(!state.settings) state.settings = {horizonMin:60,thresholdPct:25,samples:250};
+        if(!state.settings) state.settings = {horizonMin:60,thresholdPct:25,samples:250,cantMin:30};
+        if(state.settings.cantMin===undefined) state.settings.cantMin=30;
         if(state.histOpen===undefined) state.histOpen=false;
         if(!state.cantAt) state.cantAt = {};
         recomputeRanks(); ensureCandidate(); render();
@@ -548,11 +556,11 @@ function isEligible(t, act){
 }
 function eligibleTasks(){ const act=activeCtxSet(); return state.tasks.filter(t=>isEligible(t,act)); }
 function benchmark(){ return state.chain.length ? taskById(state.chain[state.chain.length-1]) : null; }
-function expireCants(){ // a "can't" mark is bulletproof until the horizon elapses, then it clears itself
+function expireCants(){ // a "can't" mark is bulletproof until cantMin elapses, then it clears itself
   const now = Date.now();
-  const horizonMs = state.settings.horizonMin * 60000;
+  const cantMs = state.settings.cantMin * 60000;
   for(const [id,v] of Object.entries(state.considered)){
-    if(v==="cant" && state.cantAt[id] && (now - state.cantAt[id]) >= horizonMs){
+    if(v==="cant" && state.cantAt[id] && (now - state.cantAt[id]) >= cantMs){
       delete state.considered[id];
       delete state.cantAt[id];
     }
@@ -562,7 +570,7 @@ function skippedLabel(id, consid){ // list-view badge text — a can't mark show
   if(consid!=="cant") return consid==="no" ? "no" : consid;
   const at = state.cantAt[id];
   if(!at) return "can\u2019t";
-  const leftMin = Math.ceil((state.settings.horizonMin*60000 - (Date.now()-at)) / 60000);
+  const leftMin = Math.ceil((state.settings.cantMin*60000 - (Date.now()-at)) / 60000);
   return leftMin > 0 ? ("can\u2019t \u00b7 "+leftMin+"m") : "can\u2019t";
 }
 function pool(){ // eligible, not in chain, not yet considered this pass
@@ -738,18 +746,19 @@ function parseTaskList(text){
 }
 /* Adds a parsed list, skipping anything that duplicates an existing open task
    or an earlier line in the same paste. Returns {added, skipped}. */
-function importList(text){
+function importList(text, ctx){
   const rows = parseTaskList(text);
   if(!rows.length) return {added:0, skipped:0};
   const norm = t => t.toLowerCase().replace(/\s+/g," ").trim();
   const seen = new Set(openTasks().map(t => norm(t.title)));
+  const c = Array.isArray(ctx) ? ctx.slice() : [];
   let added = 0, skipped = 0;
   pushUndo();
   for(const r of rows){
     const k = norm(r.title);
     if(seen.has(k)){ skipped++; continue; }
     seen.add(k);
-    state.tasks.push({ id:uid(), title:r.title, url:r.url, due:null, evergreen:false, recur:null, ctx:[],
+    state.tasks.push({ id:uid(), title:r.title, url:r.url, due:null, evergreen:false, recur:null, ctx:c.slice(),
       mu:PRIOR_MU, sigma:PRIOR_SIGMA, done:false, createdAt:Date.now(), completedAt:null, lastDoneAt:null });
     added++;
   }
@@ -772,10 +781,10 @@ function toast(msg){
   toastTimer = setTimeout(()=> el.classList.remove("show"), 2600);
 }
 
-function addTask(title, dot){
+function addTask(title, dot, ctx){
   title = (title||"").trim(); if(!title) return null;
   pushUndo();
-  const t = { id:uid(), title, url:null, due:null, evergreen:false, recur:null, ctx:[],
+  const t = { id:uid(), title, url:null, due:null, evergreen:false, recur:null, ctx: Array.isArray(ctx) ? ctx.slice() : [],
               mu:PRIOR_MU, sigma:PRIOR_SIGMA, done:false, createdAt:Date.now(), completedAt:null, lastDoneAt:null };
   state.tasks.push(t);
   if(dot){ state.chain.push(t.id); state.interventionActive=false; }
@@ -865,7 +874,7 @@ function topKlabel(id){ const st = rankCache.get(id); return st ? "top-"+st.topK
 /* ================================================================
    RENDER
    ================================================================ */
-function render(){ renderPass(); renderCtx(); renderScan(); renderList(); renderHistory(); renderSync(); }
+function render(){ renderPass(); renderCtx(); renderScan(); renderList(); renderHistory(); renderQuickCtx(); renderSync(); }
 
 function renderSync(){
   const el = document.getElementById("syncBtn");
@@ -904,6 +913,14 @@ function renderCtx(){
     html += '<button class="ctxadd" data-act="add-ctx">＋ context</button></div>';
   }
   el.innerHTML = html;
+}
+function renderQuickCtx(){ // the context chips above the quick-add bar — tag what you're typing before you type it
+  const el = document.getElementById("quickCtxRow");
+  if(!el) return;
+  quickAddCtx = quickAddCtx.filter(id => state.contexts.some(c=>c.id===id));  // drop ids for deleted contexts
+  el.innerHTML = state.contexts.map(c =>
+    '<button type="button" class="qctxchip'+(quickAddCtx.includes(c.id)?" on":"")+'" data-act="qctx" data-id="'+c.id+'">'+esc(c.name)+'</button>'
+  ).join("");
 }
 
 function chipHTML(t){
@@ -1006,7 +1023,7 @@ function renderScan(){
       html += '<div class="decide">'
            + '<button class="btn yes" data-act="yes">'+(b?"Yes":"Dot it")+'<span class="keyhint">y</span></button>'
            + '<button class="btn no" data-act="no">No<span class="keyhint">n</span></button>'
-           + '<button class="btn cant" data-act="cant" title="Skip it for the Horizon window, even if the chain empties out before then">Can\u2019t<span class="keyhint">c</span></button>'
+           + '<button class="btn cant" data-act="cant" title="Skip it for a while, even if the chain empties out before then \u2014 see Settings">Can\u2019t<span class="keyhint">c</span></button>'
            + '<span class="sparkbox">'+sparkSVG(cand.id,84,20)
            + '<span class="topkchip mono">'+topKlabel(cand.id)+'</span>'
            + '<button class="iconbtn" data-act="toggle-list" title="Show the full ranked list">▦</button></span>'
@@ -1098,6 +1115,7 @@ function openHelp(){
     + '<li>Do the dotted chain from the bottom (newest) to the top.</li>'
     + '<li>Either finish a task and cross it off, or use <i>worked on it ↻</i> to cross it off and send it back to the bottom.</li>'
     + '<li>Urgent task? <b>Add &amp; dot</b> puts it straight on the chain so it\u2019s done first.</li>'
+    + '<li>Tap a context chip above the add bar to tag what you\u2019re about to add \u2014 it stays picked for the next few too.</li>'
     + '<li>Once you\u2019ve dotted something, crossing a queued task off (or tapping <b>done adding for now</b>) stops new suggestions until you resume.</li>'
     + '</ol>'
     + '<h3>What the machinery does</h3>'
@@ -1141,7 +1159,9 @@ function openSettings(){
   modalShell(
     '<div class="mtop"><h2>Settings</h2><button class="x" data-act="close-modal" aria-label="Close">✕</button></div>'
     + '<div class="frow"><label for="stHorizon">Horizon (min)</label><input id="stHorizon" type="number" min="5" max="480" value="'+s.horizonMin+'" style="width:90px"/>'
-    + '<span class="kv">the "next hour" in the question — also how long a Can\u2019t sticks before it\u2019s reconsidered</span></div>'
+    + '<span class="kv">the "next hour" in the question</span></div>'
+    + '<div class="frow"><label for="stCantMin">Can\u2019t sticks for (min)</label><input id="stCantMin" type="number" min="5" max="480" value="'+s.cantMin+'" style="width:90px"/>'
+    + '<span class="kv">how long a Can\u2019t holds before it\u2019s reconsidered</span></div>'
     + '<div class="frow"><label for="stThresh">Interrupt below</label><input id="stThresh" type="number" min="1" max="90" value="'+s.thresholdPct+'" style="width:90px"/>'
     + '<span class="kv">% chance of a better task within 1 min</span></div>'
     + '<div class="frow"><label for="stSamples">MC samples</label><input id="stSamples" type="number" min="50" max="2000" step="50" value="'+s.samples+'" style="width:90px"/>'
@@ -1180,6 +1200,13 @@ function openSettings(){
    ================================================================ */
 function onAction(act, el){
   switch(act){
+    case "qctx": {
+      const id = el.dataset.id;
+      const i = quickAddCtx.indexOf(id);
+      if(i>=0) quickAddCtx.splice(i,1); else quickAddCtx.push(id);
+      renderQuickCtx();   // ephemeral, UI-only selection — no state mutation, no commit()/save() needed
+      break;
+    }
     case "yes": case "no": case "cant": decide(act); break;
     case "cand-done": decide("cand-done"); break;
     case "bench-done": benchDone(); break;
@@ -1198,14 +1225,14 @@ function onAction(act, el){
     case "add": {
       const inp=document.getElementById("addInput");
       if(/\r?\n/.test(inp.value)){                      // a whole list got in here
-        const {added, skipped} = importList(inp.value);
+        const {added, skipped} = importList(inp.value, quickAddCtx);
         if(added || skipped){ inp.value=""; toast(importSummary(added, skipped)); }
-      }else if(addTask(inp.value,false)){ inp.value=""; }
+      }else if(addTask(inp.value,false,quickAddCtx)){ inp.value=""; }
       inp.focus(); break;
     }
     case "add-dot": {
       const inp=document.getElementById("addInput");
-      if(addTask(inp.value,true)) inp.value="";
+      if(addTask(inp.value,true,quickAddCtx)) inp.value="";
       inp.focus(); break;
     }
     case "add-ctx": {
@@ -1248,6 +1275,7 @@ function onAction(act, el){
       pushUndo();
       const s=state.settings;
       s.horizonMin=Math.max(5,Math.min(480,parseInt(document.getElementById("stHorizon").value)||60));
+      s.cantMin=Math.max(5,Math.min(480,parseInt(document.getElementById("stCantMin").value)||30));
       s.thresholdPct=Math.max(1,Math.min(90,parseInt(document.getElementById("stThresh").value)||25));
       s.samples=Math.max(50,Math.min(2000,parseInt(document.getElementById("stSamples").value)||250));
       recomputeRanks(); closeModal(); commit(); break;
@@ -1319,7 +1347,7 @@ document.addEventListener("paste", e=>{
   const txt = cd ? cd.getData("text") : "";
   if(!txt || !/\r?\n/.test(txt.trim())) return;      // single line — let it paste normally
   e.preventDefault();
-  const {added, skipped} = importList(txt);
+  const {added, skipped} = importList(txt, quickAddCtx);
   if(added || skipped){ t.value = ""; toast(importSummary(added, skipped)); }
 });
 document.addEventListener("keydown", e=>{
@@ -1356,7 +1384,8 @@ function hotkeyDelete(){
 (async function init(){
   const loaded = await loadState();
   state = loaded || defaultState();
-  if(!state.settings) state.settings = {horizonMin:60,thresholdPct:25,samples:250};
+  if(!state.settings) state.settings = {horizonMin:60,thresholdPct:25,samples:250,cantMin:30};
+  if(state.settings.cantMin===undefined) state.settings.cantMin=30;
   if(state.histOpen===undefined) state.histOpen=false;
   if(!state.cantAt) state.cantAt = {};
   recomputeRanks();

@@ -724,11 +724,11 @@ test("REGRESSION: sync status labels all stay short enough for the fixed-width b
   }
 });
 
-/* ---------- "can't" is bulletproof for the Horizon window ----------
+/* ---------- "can't" is bulletproof for its own configurable duration ----------
    Bug: newPass() (triggered whenever the chain empties, e.g. via benchDone())
    used to wipe state.considered wholesale, silently un-can't-ing everything
    regardless of how recently it was marked. Fix: a can't mark now carries a
-   timestamp (state.cantAt) and survives newPass() until state.settings.horizonMin
+   timestamp (state.cantAt) and survives newPass() until state.settings.cantMin
    minutes have actually elapsed; expireCants() then clears it on its own. */
 
 test("cant is timestamped and excludes the task from the pool immediately", async () => {
@@ -756,9 +756,9 @@ test("BUG FIX: a fresh can't mark survives the chain emptying out (newPass), reg
   assert.ok(!ctx.state.tasks.every(t => t.id !== cantId) , "sanity: task still exists");
 });
 
-test("a can't mark that has genuinely outlived the Horizon window IS cleared by newPass()", async () => {
+test("a can't mark that has genuinely outlived cantMin IS cleared by newPass()", async () => {
   const { ctx } = await loadApp({ seed: 32 });
-  ctx.state.settings.horizonMin = 10; // shrink the window so the test doesn't need huge offsets
+  ctx.state.settings.cantMin = 10; // shrink the window so the test doesn't need huge offsets
   ctx.addTask("Only queued task", true);
   ctx.addTask("Old can't", false);
   const cantId = ctx.state.candidateId;
@@ -768,16 +768,16 @@ test("a can't mark that has genuinely outlived the Horizon window IS cleared by 
   ctx.decide("cant");
   assert.equal(ctx.state.considered[cantId], "cant");
 
-  setFakeTime(ctx, t0 + 11 * 60000); // 11 minutes later — past the 10-minute horizon
+  setFakeTime(ctx, t0 + 11 * 60000); // 11 minutes later — past the 10-minute cantMin
   ctx.benchDone(); // -> newPass()
 
   assert.equal(ctx.state.considered[cantId], undefined, "an expired can't mark should be dropped, not preserved forever");
   assert.equal(ctx.state.cantAt[cantId], undefined, "its timestamp should be cleaned up too");
 });
 
-test("a can't mark automatically expires mid-session (no newPass needed) once the Horizon elapses", async () => {
+test("a can't mark automatically expires mid-session (no newPass needed) once cantMin elapses", async () => {
   const { ctx } = await loadApp({ seed: 33 });
-  ctx.state.settings.horizonMin = 15;
+  ctx.state.settings.cantMin = 15;
   ctx.addTask("Task A", false);
   ctx.addTask("Said can't", false);
   const cantId = ctx.state.candidateId;
@@ -788,17 +788,17 @@ test("a can't mark automatically expires mid-session (no newPass needed) once th
   assert.ok(!ctx.pool().some((t) => t.id === cantId), "should be excluded from the pool right after being marked");
 
   setFakeTime(ctx, t0 + 5 * 60000); // still within the window
-  assert.ok(!ctx.pool().some((t) => t.id === cantId), "still excluded well within the horizon");
+  assert.ok(!ctx.pool().some((t) => t.id === cantId), "still excluded well within cantMin");
 
   setFakeTime(ctx, t0 + 16 * 60000); // past the window now
   ctx.ensureCandidate(); // any normal app action re-checks expiry, not just newPass
-  assert.ok(ctx.pool().some((t) => t.id === cantId), "should rejoin the pool once the horizon has elapsed");
+  assert.ok(ctx.pool().some((t) => t.id === cantId), "should rejoin the pool once cantMin has elapsed");
   assert.equal(ctx.state.considered[cantId], undefined);
 });
 
-test("changing the Horizon setting immediately affects how much longer an existing can't mark is bulletproof for", async () => {
+test("changing cantMin immediately affects how much longer an existing can't mark is bulletproof for", async () => {
   const { ctx } = await loadApp({ seed: 34 });
-  ctx.state.settings.horizonMin = 60;
+  ctx.state.settings.cantMin = 60;
   ctx.addTask("Task A", false);
   ctx.addTask("Said can't", false);
   const cantId = ctx.state.candidateId;
@@ -806,10 +806,10 @@ test("changing the Horizon setting immediately affects how much longer an existi
   setFakeTime(ctx, t0);
   ctx.decide("cant");
 
-  setFakeTime(ctx, t0 + 20 * 60000); // 20 min later, well within a 60-min horizon
-  ctx.state.settings.horizonMin = 15; // shrink the horizon below the elapsed time
+  setFakeTime(ctx, t0 + 20 * 60000); // 20 min later, well within a 60-min cantMin
+  ctx.state.settings.cantMin = 15; // shrink cantMin below the elapsed time
   ctx.ensureCandidate();
-  assert.equal(ctx.state.considered[cantId], undefined, "shrinking the horizon below elapsed time should expire it on next check");
+  assert.equal(ctx.state.considered[cantId], undefined, "shrinking cantMin below elapsed time should expire it on next check");
 });
 
 test("rescanSkipped() remains a deliberate manual override — clears can't immediately regardless of the timer", async () => {
@@ -837,7 +837,7 @@ test("deleteTask cleans up cantAt too, so no orphaned timestamps linger", async 
 
 test("UI: the list badge shows remaining cooldown minutes for an active can't mark", async () => {
   const { ctx } = await loadApp({ seed: 37 });
-  ctx.state.settings.horizonMin = 60;
+  ctx.state.settings.cantMin = 60;
   ctx.addTask("Task A", false);
   ctx.addTask("Said can't", false);
   const t0 = realNow(ctx);
@@ -849,4 +849,189 @@ test("UI: the list badge shows remaining cooldown minutes for an active can't ma
   ctx.render();
   const listHtml = ctx.document.getElementById("listBody").innerHTML;
   assert.match(listHtml, /class="skipped">can.t \u00b7 50m<\/span>/, `expected a "can't · 50m" badge in: ${listHtml}`);
+});
+
+/* ---------- cantMin settings validation ---------- */
+
+function setInput(ctx, id, value) {
+  ctx.document.getElementById(id).value = String(value);
+}
+
+test("save-settings: cantMin is read, clamped [5,480], and persisted independently of horizonMin", async () => {
+  const { ctx } = await loadApp({ seed: 50 });
+  setInput(ctx, "stHorizon", 90);
+  setInput(ctx, "stCantMin", 12);
+  setInput(ctx, "stThresh", 20);
+  setInput(ctx, "stSamples", 300);
+  ctx.onAction("save-settings", {});
+  assert.equal(ctx.state.settings.horizonMin, 90);
+  assert.equal(ctx.state.settings.cantMin, 12);
+});
+
+test("save-settings: cantMin below 5 clamps up to 5, above 480 clamps down to 480", async () => {
+  const { ctx } = await loadApp({ seed: 51 });
+  setInput(ctx, "stHorizon", 60);
+  setInput(ctx, "stCantMin", 2); // non-zero (0 is falsy and hits the ||default fallback instead, same as horizonMin)
+  setInput(ctx, "stThresh", 25);
+  setInput(ctx, "stSamples", 250);
+  ctx.onAction("save-settings", {});
+  assert.equal(ctx.state.settings.cantMin, 5);
+
+  setInput(ctx, "stCantMin", 9999);
+  ctx.onAction("save-settings", {});
+  assert.equal(ctx.state.settings.cantMin, 480);
+});
+
+test("save-settings: a blank/non-numeric cantMin falls back to 30, not to horizonMin's default", async () => {
+  const { ctx } = await loadApp({ seed: 52 });
+  setInput(ctx, "stHorizon", 60);
+  setInput(ctx, "stCantMin", "");
+  setInput(ctx, "stThresh", 25);
+  setInput(ctx, "stSamples", 250);
+  ctx.onAction("save-settings", {});
+  assert.equal(ctx.state.settings.cantMin, 30);
+});
+
+test("save-settings: a literal 0 is falsy and falls back to the default rather than clamping to the minimum (shared quirk with horizonMin/thresholdPct)", async () => {
+  const { ctx } = await loadApp({ seed: 53 });
+  setInput(ctx, "stHorizon", 0);
+  setInput(ctx, "stCantMin", 0);
+  setInput(ctx, "stThresh", 25);
+  setInput(ctx, "stSamples", 250);
+  ctx.onAction("save-settings", {});
+  assert.equal(ctx.state.settings.horizonMin, 60, "0 hits the existing ||60 fallback, not Math.max(5,...)");
+  assert.equal(ctx.state.settings.cantMin, 30, "0 hits the ||30 fallback the same way, for consistency");
+});
+
+/* ---------- quick-add context picker ---------- */
+
+test("quick-add: selecting a context chip tags newly added tasks with it", async () => {
+  const { ctx } = await loadApp({ seed: 60 });
+  const home = { id: "ctx_home_t", name: "At home", active: true };
+  ctx.state.contexts.push(home);
+
+  ctx.onAction("qctx", { dataset: { id: home.id } });
+  setInput(ctx, "addInput", "Water the plants");
+  ctx.onAction("add", {});
+
+  const t = ctx.state.tasks.find((x) => x.title === "Water the plants");
+  assert.ok(t, "task should have been added");
+  assert.deepEqual([...t.ctx], [home.id]);
+});
+
+test("quick-add: the picked context is sticky across multiple adds, not cleared after one", async () => {
+  const { ctx } = await loadApp({ seed: 61 });
+  const home = { id: "ctx_home_t2", name: "At home", active: true };
+  ctx.state.contexts.push(home);
+  ctx.onAction("qctx", { dataset: { id: home.id } });
+
+  setInput(ctx, "addInput", "Task one");
+  ctx.onAction("add", {});
+  setInput(ctx, "addInput", "Task two");
+  ctx.onAction("add", {});
+
+  const t1 = ctx.state.tasks.find((x) => x.title === "Task one");
+  const t2 = ctx.state.tasks.find((x) => x.title === "Task two");
+  assert.deepEqual([...t1.ctx], [home.id]);
+  assert.deepEqual([...t2.ctx], [home.id], "selection should still be active for the second add");
+});
+
+test("quick-add: tapping a selected chip again deselects it", async () => {
+  const { ctx } = await loadApp({ seed: 62 });
+  const home = { id: "ctx_home_t3", name: "At home", active: true };
+  ctx.state.contexts.push(home);
+  ctx.onAction("qctx", { dataset: { id: home.id } }); // select
+  ctx.onAction("qctx", { dataset: { id: home.id } }); // deselect
+
+  setInput(ctx, "addInput", "Untagged task");
+  ctx.onAction("add", {});
+  const t = ctx.state.tasks.find((x) => x.title === "Untagged task");
+  assert.equal(t.ctx.length, 0);
+});
+
+test("quick-add: multiple selected chips all apply to the new task", async () => {
+  const { ctx } = await loadApp({ seed: 63 });
+  const home = { id: "ctx_home_t4", name: "At home", active: true };
+  const laptop = { id: "ctx_laptop_t4", name: "At laptop", active: true };
+  ctx.state.contexts.push(home, laptop);
+  ctx.onAction("qctx", { dataset: { id: home.id } });
+  ctx.onAction("qctx", { dataset: { id: laptop.id } });
+
+  setInput(ctx, "addInput", "Multi-context task");
+  ctx.onAction("add", {});
+  const t = ctx.state.tasks.find((x) => x.title === "Multi-context task");
+  assert.equal(t.ctx.length, 2);
+  assert.ok(t.ctx.includes(home.id) && t.ctx.includes(laptop.id));
+});
+
+test("quick-add: 'Add & dot' also tags with the selected context", async () => {
+  const { ctx } = await loadApp({ seed: 64 });
+  const home = { id: "ctx_home_t5", name: "At home", active: true };
+  ctx.state.contexts.push(home);
+  ctx.onAction("qctx", { dataset: { id: home.id } });
+
+  setInput(ctx, "addInput", "Urgent tagged task");
+  ctx.onAction("add-dot", {});
+  const t = ctx.state.tasks.find((x) => x.title === "Urgent tagged task");
+  assert.deepEqual([...t.ctx], [home.id]);
+  assert.ok(ctx.state.chain.includes(t.id));
+});
+
+test("quick-add: pasting/typing a multi-line list through the bar tags every resulting task", async () => {
+  const { ctx } = await loadApp({ seed: 65 });
+  const errand = { id: "ctx_errand_t6", name: "Errands", active: true };
+  ctx.state.contexts.push(errand);
+  ctx.onAction("qctx", { dataset: { id: errand.id } });
+
+  setInput(ctx, "addInput", "1. Buy milk\n2. Return package");
+  ctx.onAction("add", {});
+
+  const milk = ctx.state.tasks.find((x) => x.title === "Buy milk");
+  const pkg = ctx.state.tasks.find((x) => x.title === "Return package");
+  assert.deepEqual([...milk.ctx], [errand.id]);
+  assert.deepEqual([...pkg.ctx], [errand.id]);
+});
+
+test("quick-add context selection does NOT leak into the separate Settings \u2192 Import flow", async () => {
+  const { ctx } = await loadApp({ seed: 66 });
+  const home = { id: "ctx_home_t7", name: "At home", active: true };
+  ctx.state.contexts.push(home);
+  ctx.onAction("qctx", { dataset: { id: home.id } });
+
+  setInput(ctx, "mdImport", "1. From the settings importer");
+  ctx.onAction("import-md", {});
+
+  const t = ctx.state.tasks.find((x) => x.title === "From the settings importer");
+  assert.ok(t, "task should still be added via the settings importer");
+  assert.equal(t.ctx.length, 0, "the settings-modal import must not pick up the quick-add chip selection");
+});
+
+test("quick-add: deleting a selected context removes it from the picker without crashing a subsequent add", async () => {
+  const { ctx } = await loadApp({ seed: 67 });
+  const home = { id: "ctx_home_t8", name: "At home", active: true };
+  ctx.state.contexts.push(home);
+  ctx.onAction("qctx", { dataset: { id: home.id } });
+
+  ctx.onAction("del-ctx", { dataset: { id: home.id } }); // deletes the context entirely
+  ctx.render(); // renderQuickCtx() prunes stale selections against the current context list
+
+  setInput(ctx, "addInput", "Task after context deletion");
+  ctx.onAction("add", {});
+  const t = ctx.state.tasks.find((x) => x.title === "Task after context deletion");
+  assert.ok(t, "add should still work cleanly");
+  assert.equal(t.ctx.length, 0, "a deleted context's id should not linger on new tasks");
+});
+
+/* ---------- regression: the Done control is a plain checkbox, not a custom circle ----------
+   No real layout engine here, so this checks the CSS source directly rather
+   than rendered pixels — enough to catch someone silently reintroducing the
+   custom appearance:none circular style this was explicitly reverted from. */
+test("REGRESSION: .ckbox has no custom appearance override — it renders as a native checkbox", () => {
+  const m = html.match(/\.ckbox\{[^}]*\}/);
+  assert.ok(m, ".ckbox rule should exist");
+  const rule = m[0];
+  assert.ok(!/appearance\s*:\s*none/.test(rule), `.ckbox should not override appearance — found in: ${rule}`);
+  assert.ok(!/border-radius\s*:\s*50%/.test(rule), `.ckbox should not be forced circular — found in: ${rule}`);
+  // no leftover custom :checked pseudo-element rules from the old circular design
+  assert.ok(!/\.ckbox:checked::after/.test(html), "custom checked-state pseudo-element should have been removed");
 });
