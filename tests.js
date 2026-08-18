@@ -214,23 +214,27 @@ test("decide('yes'): dots the candidate, clears it, and a new candidate is picke
   ctx.addTask("Task A", false);
   ctx.addTask("Task B", false);
   ctx.addTask("Task C", false);
+  ctx.decide("can");            // start the chain first — yes/no need a benchmark to compare against
   const firstCandidate = ctx.state.candidateId;
-  assert.ok(firstCandidate, "a candidate should be presented once tasks exist");
+  assert.ok(firstCandidate, "a ranked candidate should be presented once the chain has started");
 
   ctx.decide("yes");
-  assert.equal(ctx.state.chain.length, 1);
-  assert.equal(ctx.state.chain[0], firstCandidate, "the dotted task should be the one that was showing");
+  assert.equal(ctx.state.chain.length, 2);
+  assert.equal(ctx.state.chain[1], firstCandidate, "the dotted task should be the one that was showing");
   assert.notEqual(ctx.state.candidateId, firstCandidate, "a fresh candidate should replace the dotted one");
-  assert.ok(ctx.state.candidateId, "a new candidate should be offered (2 tasks remain in the pool)");
+  assert.ok(ctx.state.candidateId, "a new candidate should be offered (1 task remains in the pool)");
 });
 
 test("decide('no') and decide('cant'): candidate is marked considered, NOT added to the chain", async () => {
   const { ctx } = await loadApp({ seed: 2 });
   ctx.addTask("Task A", false);
   ctx.addTask("Task B", false);
+  ctx.addTask("Task C", false);
+  ctx.decide("can");            // establish a benchmark so 'no' is a valid comparison
+  const chainLen = ctx.state.chain.length;
   const cand = ctx.state.candidateId;
   ctx.decide("no");
-  assert.equal(ctx.state.chain.length, 0);
+  assert.equal(ctx.state.chain.length, chainLen, "'no' must not extend the chain");
   assert.equal(ctx.state.considered[cand], "no");
 });
 
@@ -271,7 +275,7 @@ test("undo: reverses the most recent mutation (dotting a task)", async () => {
   const { ctx } = await loadApp({ seed: 5 });
   ctx.addTask("Task A", false);
   ctx.addTask("Task B", false);
-  ctx.decide("yes");
+  ctx.decide("can");
   assert.equal(ctx.state.chain.length, 1);
   ctx.undo();
   assert.equal(ctx.state.chain.length, 0);
@@ -672,7 +676,7 @@ test("REGRESSION: dotting a task (immediate cloud sync) does not trigger a runaw
   ctx.addTask("Task A", false);
   ctx.addTask("Task B", false);
 
-  ctx.decide("yes"); // immediate-sync path (cloudPushNow) — pings before its own await too
+  ctx.decide("can"); // chain-start dot, immediate-sync path (cloudPushNow) — pings before its own await too
 
   await new Promise((r) => setTimeout(r, 200)); // let every fake network call and its chained pings settle
 
@@ -694,7 +698,7 @@ test("REGRESSION: a focus-triggered pull racing a push settles with a small, bou
   ctx.addTask("Task A", false);
   ctx.addTask("Task B", false);
 
-  ctx.decide("yes");         // fires an immediate push (and, via ping, a legitimate pull attempt)
+  ctx.decide("can");         // fires an immediate push (and, via ping, a legitimate pull attempt)
   ctx.cloudPull();           // simulates a focus/visibilitychange-triggered pull landing at the same time
 
   await new Promise((r) => setTimeout(r, 200));
@@ -1141,4 +1145,189 @@ test("AUDIT: repairs multiple orphaned can't marks in a single pass, without dis
   assert.equal(ctx.state.considered[ids.C], "no", "unrelated 'no' entry should be untouched");
   assert.equal(ctx.state.cantAt[ids.C], undefined, "C never had a cantAt and shouldn't get one");
   assert.equal(ctx.state.cantAt[ids.D], t0, "D's existing valid timestamp should be left alone");
+});
+
+/* ---------- chain start: oldest-first, can/can't only, no rank signal ----------
+   Starting a chain has no benchmark, so a ranked pick and a Yes/No comparison
+   are both meaningless. Instead the oldest outstanding task is presented and
+   answered Can / Can't (Done and Delete stay available) until one gets dotted;
+   that first dot moves no ranks. After that, normal ranked scanning resumes. */
+
+function addTaskAged(ctx, title, ageMs) { // add a task with a backdated createdAt
+  const t = ctx.addTask(title, false);
+  ctx.state.tasks.find((x) => x.id === t.id).createdAt = Date.now() - ageMs;
+  return t;
+}
+// The shown candidate is deliberately sticky — it won't swap out just because
+// another task was added. Force a fresh pick to exercise the selection logic.
+function repick(ctx) {
+  ctx.state.candidateId = null;
+  ctx.ensureCandidate();
+}
+
+test("chain start: presents the OLDEST outstanding task, not a ranked pick", async () => {
+  const { ctx } = await loadApp({ seed: 80 });
+  addTaskAged(ctx, "Newest", 1000);
+  addTaskAged(ctx, "Oldest", 900000);
+  addTaskAged(ctx, "Middle", 50000);
+  repick(ctx);
+
+  const shown = ctx.state.tasks.find((t) => t.id === ctx.state.candidateId);
+  assert.equal(shown.title, "Oldest");
+});
+
+test("chain start: a strong rank does NOT jump the queue ahead of the oldest task", async () => {
+  const { ctx } = await loadApp({ seed: 81 });
+  addTaskAged(ctx, "Oldest but weak", 900000);
+  const strong = addTaskAged(ctx, "Newer but top-ranked", 1000);
+  const st = ctx.state.tasks.find((t) => t.id === strong.id);
+  st.mu = 500; st.sigma = 0.5;   // overwhelmingly the highest-ranked task
+  ctx.recomputeRanks();
+  ctx.state.candidateId = null;
+  ctx.ensureCandidate();
+
+  const shown = ctx.state.tasks.find((t) => t.id === ctx.state.candidateId);
+  assert.equal(shown.title, "Oldest but weak", "ranking must not influence the chain-start pick");
+});
+
+test("chain start: 'can' dots the task and starts the chain", async () => {
+  const { ctx } = await loadApp({ seed: 82 });
+  addTaskAged(ctx, "Newer", 1000);          // added first but younger
+  addTaskAged(ctx, "Oldest", 900000);
+  repick(ctx);
+  const first = ctx.state.candidateId;
+  assert.equal(ctx.state.tasks.find((t) => t.id === first).title, "Oldest");
+
+  ctx.decide("can");
+  assert.equal(ctx.state.chain.length, 1);
+  assert.equal(ctx.state.chain[0], first);
+});
+
+test("chain start: the first dot moves NO ranks (mu/sigma untouched for every task)", async () => {
+  const { ctx } = await loadApp({ seed: 83 });
+  addTaskAged(ctx, "Oldest", 900000);
+  addTaskAged(ctx, "Newer", 1000);
+  const before = ctx.state.tasks.map((t) => ({ id: t.id, mu: t.mu, sigma: t.sigma }));
+
+  ctx.decide("can");
+
+  for (const snap of before) {
+    const now = ctx.state.tasks.find((t) => t.id === snap.id);
+    assert.equal(now.mu, snap.mu, `mu for ${now.title} should be unchanged by the first dot`);
+    assert.equal(now.sigma, snap.sigma, `sigma for ${now.title} should be unchanged by the first dot`);
+  }
+});
+
+test("chain start: 'can't' moves on to the NEXT oldest task", async () => {
+  const { ctx } = await loadApp({ seed: 84 });
+  addTaskAged(ctx, "Newest", 1000);           // added first, but youngest — must be shown last
+  addTaskAged(ctx, "Second oldest", 500000);
+  addTaskAged(ctx, "First oldest", 900000);
+  repick(ctx);
+
+  assert.equal(ctx.state.tasks.find((t) => t.id === ctx.state.candidateId).title, "First oldest");
+  ctx.decide("cant");
+  assert.equal(ctx.state.tasks.find((t) => t.id === ctx.state.candidateId).title, "Second oldest");
+  ctx.decide("cant");
+  assert.equal(ctx.state.tasks.find((t) => t.id === ctx.state.candidateId).title, "Newest");
+  assert.equal(ctx.state.chain.length, 0, "saying can't repeatedly should never start a chain");
+});
+
+test("chain start: 'yes' and 'no' are rejected outright — no chain change, no considered mark", async () => {
+  const { ctx } = await loadApp({ seed: 85 });
+  addTaskAged(ctx, "Oldest", 900000);
+  addTaskAged(ctx, "Newer", 1000);
+  const cand = ctx.state.candidateId;
+
+  ctx.decide("yes");
+  assert.equal(ctx.state.chain.length, 0, "'yes' must not dot anything at chain start");
+  assert.equal(ctx.state.candidateId, cand, "the same task should still be showing");
+
+  ctx.decide("no");
+  assert.equal(ctx.state.considered[cand], undefined, "'no' must not mark the task considered at chain start");
+  assert.equal(ctx.state.candidateId, cand, "the same task should still be showing");
+});
+
+test("chain start: Done still works on the first task and does not start a chain", async () => {
+  const { ctx } = await loadApp({ seed: 86 });
+  addTaskAged(ctx, "Oldest", 900000);
+  addTaskAged(ctx, "Newer", 1000);
+  const cand = ctx.state.candidateId;
+
+  ctx.decide("cand-done");
+  assert.equal(ctx.state.tasks.find((t) => t.id === cand).done, true);
+  assert.equal(ctx.state.chain.length, 0);
+});
+
+test("chain start: Delete still works on the first task, and the next oldest comes up", async () => {
+  const { ctx } = await loadApp({ seed: 87 });
+  addTaskAged(ctx, "Oldest", 900000);
+  addTaskAged(ctx, "Second oldest", 500000);
+  const cand = ctx.state.candidateId;
+
+  ctx.deleteTask(cand);
+  assert.equal(ctx.state.tasks.some((t) => t.id === cand), false);
+  assert.equal(ctx.state.tasks.find((t) => t.id === ctx.state.candidateId).title, "Second oldest");
+});
+
+test("after the first dot, scanning hands back to the normal ranked picker", async () => {
+  const { ctx } = await loadApp({ seed: 88 });
+  addTaskAged(ctx, "Oldest", 900000);
+  addTaskAged(ctx, "Second oldest", 800000);
+  const strong = addTaskAged(ctx, "Newest but top-ranked", 1000);
+  const st = ctx.state.tasks.find((t) => t.id === strong.id);
+  st.mu = 500; st.sigma = 0.5;
+  ctx.recomputeRanks();
+
+  ctx.decide("can"); // dots "Oldest", chain now has a benchmark
+
+  const shown = ctx.state.tasks.find((t) => t.id === ctx.state.candidateId);
+  assert.equal(shown.title, "Newest but top-ranked", "ranked picking should resume once a benchmark exists");
+});
+
+test("emptying the chain returns to oldest-first chain-start behavior", async () => {
+  const { ctx } = await loadApp({ seed: 89 });
+  addTaskAged(ctx, "Oldest", 900000);
+  addTaskAged(ctx, "Second oldest", 800000);
+  const strong = addTaskAged(ctx, "Newest but top-ranked", 1000);
+  const st = ctx.state.tasks.find((t) => t.id === strong.id);
+  st.mu = 500; st.sigma = 0.5;
+  ctx.recomputeRanks();
+
+  ctx.decide("can");   // dots "Oldest"
+  ctx.benchDone();     // completes it, chain empties, mode -> "work"
+  ctx.onAction("resume-scan", {});
+  assert.equal(ctx.state.chain.length, 0);
+
+  const shown = ctx.state.tasks.find((t) => t.id === ctx.state.candidateId);
+  assert.equal(shown.title, "Second oldest", "back to oldest-first now that the chain is empty again");
+});
+
+test("UI: chain start shows Can / Can't but NOT Yes / No", async () => {
+  const { ctx, shim } = await loadApp({ seed: 90 });
+  addTaskAged(ctx, "Oldest", 900000);
+  addTaskAged(ctx, "Newer", 1000);
+  ctx.render();
+  const scanHtml = shim.elements.get("scan").innerHTML;
+
+  assert.match(scanHtml, /data-act="can"/, "the Can button should be present at chain start");
+  assert.match(scanHtml, /data-act="cant"/, "the Can't button should be present at chain start");
+  assert.ok(!/data-act="yes"/.test(scanHtml), "Yes must not be offered at chain start");
+  assert.ok(!/data-act="no"/.test(scanHtml), "No must not be offered at chain start");
+  assert.match(scanHtml, /data-act="cand-done"/, "Done should still be available");
+  assert.match(scanHtml, /data-act="delete-task"/, "Delete should still be available");
+});
+
+test("UI: once a chain exists, Yes / No come back and the bare Can button goes away", async () => {
+  const { ctx, shim } = await loadApp({ seed: 91 });
+  addTaskAged(ctx, "Oldest", 900000);
+  addTaskAged(ctx, "Newer", 1000);
+  addTaskAged(ctx, "Third", 500);
+  ctx.decide("can");
+  ctx.render();
+  const scanHtml = shim.elements.get("scan").innerHTML;
+
+  assert.match(scanHtml, /data-act="yes"/, "Yes should be offered once there's a benchmark");
+  assert.match(scanHtml, /data-act="no"/, "No should be offered once there's a benchmark");
+  assert.ok(!/data-act="can"[^t]/.test(scanHtml), "the chain-start Can button should be gone");
 });
