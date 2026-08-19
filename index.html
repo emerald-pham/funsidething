@@ -5,6 +5,20 @@
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>Chain Scanner · ranked FVP</title>
 <script>
+/*THEME-BOOT-START*/
+/* Runs before first paint. Reads the device-local paint hint left by
+   writeThemeHint() and pins the palette, so an explicit light/dark choice
+   never flashes the other one while the synced state loads. No hint means
+   no attribute, which leaves color-scheme: light dark following the OS. */
+(function(){
+  try{
+    var t = localStorage.getItem("fvp:chain-scanner:theme");
+    if(t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
+  }catch(e){}
+})();
+/*THEME-BOOT-END*/
+</script>
+<script>
 /* =====================================================================
    CLOUD SYNC CONFIG
    Paste your Firebase web-app config below to sync across devices.
@@ -25,24 +39,39 @@ window.FIREBASE_CONFIG = {
 <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@1,6..72,400;1,6..72,500&family=Spline+Sans:wght@400;500;600;700&family=Spline+Sans+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
-  --bg:#f5f6fa; --panel:#ffffff; --ink:#242a3a; --mut:#6d7488; --line:#e5e7f0;
-  --chain:#8f7bf0; --chain-deep:#6a55e0; --chain-ink:#ffffff;
-  --cand-bg:#fff8e2; --cand-line:#e9c34d; --cand-ink:#7a5c00;
-  --yes:#2f9e48; --no:#f0930f; --cant:#57677a; --danger:#e5484d;
-  --good:#27b04e; --chip:#f0f1f7;
+  /* Every token carries both values. Which one resolves is decided by the
+     used value of color-scheme below — so night mode needs no JS at all,
+     and follows the OS the instant it changes. */
+  color-scheme: light dark;
+  --bg:light-dark(#f5f6fa,#12141b); --panel:light-dark(#ffffff,#1a1d26);
+  --ink:light-dark(#242a3a,#e3e6f0); --mut:light-dark(#666d80,#9198ad);
+  --line:light-dark(#e5e7f0,#2c3140);
+  --chain:light-dark(#8f7bf0,#8f7bf0); --chain-deep:light-dark(#6a55e0,#6a55e0);
+  --accent:light-dark(#5b46d6,#ab9ef9);   /* links & icons: text, never a fill */
+  --chain-ink:light-dark(#ffffff,#ffffff);   /* sits on the purple card in both themes */
+  --cand-bg:light-dark(#fff8e2,#302814); --cand-line:light-dark(#e9c34d,#7d6528);
+  --cand-ink:light-dark(#7a5c00,#f2dda3);
+  --yes:light-dark(#2f9e48,#35a94d); --no:light-dark(#f0930f,#e08a12);
+  --cant:light-dark(#57677a,#5f7085); --danger:light-dark(#e5484d,#e0484d);
+  --good:light-dark(#27b04e,#2fb257); --chip:light-dark(#f0f1f7,#262b38);
+  /* surfaces that used to be hardcoded white or near-white */
+  --surface:light-dark(#ffffff,#232733); --subtle:light-dark(#fafbfe,#171a22);
+  --track:light-dark(#e6e8f0,#2c3140); --rowline:light-dark(#f0f1f7,#242935);
   --font-ui:"Spline Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
   --font-q:"Newsreader",Georgia,"Times New Roman",serif;
   --font-mono:"Spline Sans Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
 }
+:root[data-theme="light"]{color-scheme:light}
+:root[data-theme="dark"]{color-scheme:dark}
 *{box-sizing:border-box}
 html,body{margin:0;padding:0}
 body{background:var(--bg);color:var(--ink);font:15px/1.45 var(--font-ui);-webkit-font-smoothing:antialiased}
 .wrap{max-width:700px;margin:0 auto;padding:14px 14px 60px}
 button{font:inherit;color:inherit;background:none;border:none;padding:0;cursor:pointer}
-button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible,a:focus-visible{outline:2px solid var(--chain-deep);outline-offset:2px;border-radius:4px}
-a{color:var(--chain-deep)}
+button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+a{color:var(--accent)}
 input[type=text],input[type=url],input[type=number],input[type=date],textarea,select{
-  font:inherit;color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:8px;padding:7px 10px}
+  font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:7px 10px}
 textarea{width:100%;font-family:var(--font-mono);font-size:12px}
 .mono{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
 [hidden]{display:none!important}
@@ -50,26 +79,26 @@ textarea{width:100%;font-family:var(--font-mono);font-size:12px}
 /* ---------- header ---------- */
 .top{margin-bottom:12px}
 .brand{display:flex;align-items:center;gap:10px}
-.mark{color:var(--chain-deep);font-size:20px;line-height:1}
+.mark{color:var(--accent);font-size:20px;line-height:1}
 .titles h1{font-size:17px;margin:0;font-weight:700;letter-spacing:.01em}
 .titles .sub{font-size:12px;color:var(--mut)}
 .topbtns{margin-left:auto;display:flex;gap:4px}
 .ghost{color:var(--mut);border:1px solid transparent;border-radius:8px;padding:5px 9px;font-size:13px}
-.ghost:hover{background:#fff;border-color:var(--line);color:var(--ink)}
-.syncbtn{font-size:12px;border:1px solid var(--line);border-radius:99px;padding:4px 10px;color:var(--mut);background:#fff;white-space:nowrap;width:88px;display:inline-flex;align-items:center;justify-content:center;overflow:hidden;text-overflow:ellipsis;box-sizing:border-box}
-.syncbtn:hover{color:var(--chain-deep);border-color:var(--chain-deep)}
-.syncbtn.ok{color:var(--good);border-color:#bfe6c9}
-.syncbtn.err{color:var(--danger);border-color:#f4c2c3}
-.syncbtn.busy{color:var(--chain-deep);border-color:#ddd7fb}
+.ghost:hover{background:var(--surface);border-color:var(--line);color:var(--ink)}
+.syncbtn{font-size:12px;border:1px solid var(--line);border-radius:99px;padding:4px 10px;color:var(--mut);background:var(--surface);white-space:nowrap;width:88px;display:inline-flex;align-items:center;justify-content:center;overflow:hidden;text-overflow:ellipsis;box-sizing:border-box}
+.syncbtn:hover{color:var(--accent);border-color:var(--accent)}
+.syncbtn.ok{color:var(--good);border-color:light-dark(#bfe6c9,#2c5a3b)}
+.syncbtn.err{color:var(--danger);border-color:light-dark(#f4c2c3,#6b3235)}
+.syncbtn.busy{color:var(--accent);border-color:light-dark(#ddd7fb,#3a3268)}
 .passbar{display:flex;align-items:center;gap:10px;margin-top:10px}
-.ptrack{flex:1;height:8px;border-radius:99px;background:#e6e8f0;overflow:hidden}
+.ptrack{flex:1;height:8px;border-radius:99px;background:var(--track);overflow:hidden}
 .ptrack i{display:block;height:100%;width:0%;background:var(--good);border-radius:99px;transition:width .25s ease}
 .plabel{font-size:12px;color:var(--mut);min-width:52px;text-align:right}
 
 /* ---------- panels ---------- */
 .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:0 1px 2px rgba(20,24,48,.04)}
 .ctx{padding:0;margin-bottom:14px;overflow:hidden}
-.ctx .chead{width:100%;text-align:left;padding:10px 14px;font-weight:600;font-size:13.5px;background:#fafbfe;border-bottom:1px solid transparent}
+.ctx .chead{width:100%;text-align:left;padding:10px 14px;font-weight:600;font-size:13.5px;background:var(--subtle);border-bottom:1px solid transparent}
 .ctx.open .chead{border-bottom-color:var(--line)}
 .ctx .chead .n{color:var(--mut);font-weight:500}
 .ctxgrid{display:flex;flex-wrap:wrap;gap:2px 18px;padding:12px 14px}
@@ -77,15 +106,15 @@ textarea{width:100%;font-family:var(--font-mono);font-size:12px}
 .ctxitem input{accent-color:var(--chain-deep);width:16px;height:16px}
 .ctxitem.off{color:var(--mut)}
 .ctxadd{color:var(--mut);font-size:13px;padding:4px 8px;border:1px dashed var(--line);border-radius:8px;align-self:center}
-.ctxadd:hover{color:var(--chain-deep);border-color:var(--chain-deep)}
+.ctxadd:hover{color:var(--accent);border-color:var(--accent)}
 
 /* ---------- scan stage ---------- */
 #scan{margin-bottom:16px}
 .crumbs{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:2px 2px 10px;font-size:12.5px;color:var(--mut)}
 .crumbs .lbl{font-weight:600}
-.crumb{background:#eceafd;color:var(--chain-deep);border:1px solid #ddd7fb;border-radius:99px;padding:2px 10px;max-width:190px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.crumb:hover{background:#e0dcfb}
-.crumbs .arrow{color:#b9b3e8}
+.crumb{background:light-dark(#eceafd,#272247);color:var(--accent);border:1px solid light-dark(#ddd7fb,#3a3268);border-radius:99px;padding:2px 10px;max-width:190px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.crumb:hover{background:light-dark(#e0dcfb,#322a58)}
+.crumbs .arrow{color:light-dark(#b9b3e8,#5f5796)}
 
 .cardrow{display:flex;gap:12px;align-items:flex-start;margin-bottom:10px}
 .card{flex:1;border-radius:12px;padding:13px 15px;display:flex;align-items:center;gap:11px;min-height:52px}
@@ -94,8 +123,8 @@ textarea{width:100%;font-family:var(--font-mono);font-size:12px}
 .bench{background:linear-gradient(180deg,var(--chain) 0%,var(--chain-deep) 140%);color:var(--chain-ink);box-shadow:0 3px 10px rgba(106,85,224,.28)}
 .bench a{text-decoration-color:rgba(255,255,255,.6)}
 .cand{background:var(--cand-bg);border:1.5px solid var(--cand-line);color:var(--cand-ink)}
-.cand a{color:#8a6800}
-.dot{width:14px;height:14px;border-radius:50%;background:#fff;flex:none;box-shadow:0 1px 2px rgba(0,0,0,.15)}
+.cand a{color:light-dark(#8a6800,#e8ce8e)}
+.dot{width:14px;height:14px;border-radius:50%;background:var(--chain-ink);flex:none;box-shadow:0 1px 2px rgba(0,0,0,.15)}
 .ckbox{width:19px;height:19px;flex:none;accent-color:var(--good);cursor:pointer}
 .donepick{display:flex;align-items:center;gap:6px;cursor:pointer;font-size:11.5px;font-weight:700;opacity:.85;flex:none}
 .donepick:hover{opacity:1}
@@ -103,12 +132,12 @@ textarea{width:100%;font-family:var(--font-mono);font-size:12px}
 .chip{font-size:11px;font-weight:700;border-radius:6px;padding:2px 7px;letter-spacing:.02em}
 .chip.due-today{background:var(--no);color:#fff}
 .chip.due-overdue{background:var(--danger);color:#fff}
-.chip.due-tomorrow{background:#ffe1b0;color:#8a5b00}
+.chip.due-tomorrow{background:light-dark(#ffe1b0,#5c4413);color:light-dark(#8a5b00,#ffd699)}
 .chip.due-later{background:var(--chip);color:var(--mut)}
 .chip.ever{background:transparent;color:inherit;opacity:.75;font-weight:500;font-style:italic;padding:0}
 .siderail{display:flex;flex-direction:column;gap:7px;align-items:flex-end;flex:none;padding-top:2px;min-width:86px}
 .reveal{font-size:12.5px;color:var(--ink);text-decoration:underline;background:none}
-.reveal:hover{color:var(--chain-deep)}
+.reveal:hover{color:var(--accent)}
 .sidesm{font-size:12px;color:var(--mut);text-decoration:underline dotted}
 .sidesm:hover{color:var(--ink)}
 .btn{border-radius:8px;padding:8px 16px;font-weight:700;font-size:14px;color:#fff;box-shadow:0 1px 2px rgba(20,24,48,.15)}
@@ -118,7 +147,7 @@ textarea{width:100%;font-family:var(--font-mono);font-size:12px}
 .btn.yes{background:var(--yes)}
 .btn.no{background:var(--no)}
 .btn.cant{background:var(--cant)}
-.btn.subtle{background:#fff;color:var(--ink);border:1px solid var(--line);box-shadow:none;font-weight:600}
+.btn.subtle{background:var(--surface);color:var(--ink);border:1px solid var(--line);box-shadow:none;font-weight:600}
 .btn.urgent{background:var(--chain-deep)}
 .qline{font-family:var(--font-q);font-style:italic;font-size:19px;margin:16px 2px 12px;color:var(--ink)}
 .qline .until{white-space:nowrap}
@@ -126,13 +155,13 @@ textarea{width:100%;font-family:var(--font-mono);font-size:12px}
 .keyhint{font-size:10px;opacity:.7;font-weight:500;margin-left:5px}
 .sparkbox{display:flex;align-items:center;gap:8px;margin-left:auto}
 .spark{display:block}
-.spark path.area{fill:rgba(106,85,224,.15)}
-.spark path.line{fill:none;stroke:var(--chain-deep);stroke-width:1.5}
+.spark path.area{fill:light-dark(rgba(106,85,224,.15),rgba(157,139,245,.22))}
+.spark path.line{fill:none;stroke:var(--accent);stroke-width:1.5}
 .topkchip{font-size:11.5px;color:var(--mut)}
-.iconbtn{border:1px solid var(--line);background:#fff;border-radius:7px;width:30px;height:30px;display:inline-flex;align-items:center;justify-content:center;color:var(--mut);font-size:14px}
-.iconbtn:hover{color:var(--chain-deep);border-color:var(--chain-deep)}
+.iconbtn{border:1px solid var(--line);background:var(--surface);border-radius:7px;width:30px;height:30px;display:inline-flex;align-items:center;justify-content:center;color:var(--mut);font-size:14px}
+.iconbtn:hover{color:var(--accent);border-color:var(--accent)}
 
-.notice{border:1px solid var(--line);background:#fff;border-radius:12px;padding:14px 16px;margin-top:6px}
+.notice{border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:14px 16px;margin-top:6px}
 .notice .big{font-size:15.5px;font-weight:600;margin-bottom:10px}
 .notice.intervene .big{font-weight:600}
 .notice .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
@@ -141,47 +170,51 @@ textarea{width:100%;font-family:var(--font-mono);font-size:12px}
 
 /* ---------- list ---------- */
 .listwrap{padding:0;overflow:hidden}
-.lhead{width:100%;text-align:left;padding:11px 14px;font-weight:600;font-size:13.5px;background:#fafbfe;border-bottom:1px solid transparent}
+.lhead{width:100%;text-align:left;padding:11px 14px;font-weight:600;font-size:13.5px;background:var(--subtle);border-bottom:1px solid transparent}
 .lhead .mono{color:var(--mut);font-weight:500}
 #listBody{border-top:1px solid var(--line);max-height:60vh;overflow-y:auto}
-.trow{display:grid;grid-template-columns:88px 118px 1fr;gap:12px;align-items:center;padding:8px 14px;border-bottom:1px solid #f0f1f7}
+.trow{display:grid;grid-template-columns:88px 118px 1fr;gap:12px;align-items:center;padding:8px 14px;border-bottom:1px solid var(--rowline)}
 .trow:last-child{border-bottom:none}
 .trow.flash{animation:flash 1.6s ease}
-@keyframes flash{0%{background:#fff3c4}100%{background:transparent}}
+@keyframes flash{0%{background:light-dark(#fff3c4,#3a3318)}100%{background:transparent}}
 .trow .spark{opacity:.9}
 .tk{display:flex;flex-direction:column;gap:2px}
 .tk .tkl{font-size:10.5px;color:var(--mut);font-family:var(--font-mono)}
-.tk .tkbar{height:7px;border-radius:99px;background:#e3e5ee;overflow:hidden}
+.tk .tkbar{height:7px;border-radius:99px;background:var(--track);overflow:hidden}
 .tk .tkbar i{display:block;height:100%;background:var(--chain-deep);border-radius:99px}
 .tmain{display:flex;align-items:center;gap:8px;min-width:0}
 .tmain .tt{font-size:14.5px;text-align:left;overflow-wrap:anywhere}
-.tmain .tt:hover{color:var(--chain-deep)}
+.tmain .tt:hover{color:var(--accent)}
 .tmain a.ext{font-size:12px;text-decoration:none;flex:none}
 .tmain .chip{flex:none}
-.tmain .inchain{flex:none;color:var(--chain-deep);font-size:13px}
+.tmain .inchain{flex:none;color:var(--accent);font-size:13px}
 .tmain .skipped{flex:none;color:var(--mut);font-size:11px;border:1px solid var(--line);border-radius:6px;padding:1px 6px}
-.addrow{display:flex;flex-direction:column;gap:8px;padding:12px 14px;border-top:1px solid var(--line);background:#fafbfe}
+.addrow{display:flex;flex-direction:column;gap:8px;padding:12px 14px;border-top:1px solid var(--line);background:var(--subtle)}
 .addline{display:flex;gap:8px}
 .addline input{flex:1;min-width:0}
 .qctx{display:flex;flex-wrap:wrap;gap:6px}
 .qctx:empty{display:none}
-.qctxchip{font-size:12px;font-weight:600;border:1px solid var(--line);border-radius:99px;padding:3px 10px;color:var(--mut);background:#fff;cursor:pointer}
+.qctxchip{font-size:12px;font-weight:600;border:1px solid var(--line);border-radius:99px;padding:3px 10px;color:var(--mut);background:var(--surface);cursor:pointer}
 .qctxchip.on{background:var(--chain-deep);color:#fff;border-color:var(--chain-deep)}
 .histwrap{padding:0;overflow:hidden;margin-top:14px}
-.histwrap .chead{width:100%;text-align:left;padding:10px 14px;font-weight:600;font-size:13.5px;background:#fafbfe;border-bottom:1px solid transparent}
+.histwrap .chead{width:100%;text-align:left;padding:10px 14px;font-weight:600;font-size:13.5px;background:var(--subtle);border-bottom:1px solid transparent}
 .histwrap.open .chead{border-bottom-color:var(--line)}
 .histwrap .chead .n{color:var(--mut);font-weight:500}
 .histbody{padding:2px 14px;max-height:40vh;overflow-y:auto}
 .histempty{padding:4px 0 14px;color:var(--mut);font-size:13px}
-.drow{display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid #f5f6fa;font-size:13px}
+.drow{display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--rowline);font-size:13px}
 .drow:last-child{border-bottom:none}
 .dt{text-decoration:line-through;opacity:.75;flex:1;overflow-wrap:anywhere;color:var(--ink)}
 .dwhen{color:var(--mut);font-size:11px;flex:none}
 .restore{font-size:12px;text-decoration:underline;color:var(--mut);flex:none}
 .histfoot{padding:4px 14px 12px}
 .foot{margin-top:22px;text-align:center;font-size:12px;color:var(--mut)}
+.themerow{margin-top:12px}
+.themebtn{border:1px solid var(--line);background:var(--surface);color:var(--mut);
+  border-radius:99px;padding:7px 16px;font-size:12.5px;font-weight:600;min-height:34px}
+.themebtn:hover{color:var(--accent);border-color:var(--accent)}
 .foot a{color:var(--mut)}
-.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:#fff;
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:light-dark(#242a3a,#333a4a);color:light-dark(#ffffff,#e6e8f0);
   font-size:13.5px;padding:9px 16px;border-radius:99px;box-shadow:0 6px 20px rgba(20,24,48,.28);z-index:80;
   opacity:0;transition:opacity .18s ease,transform .18s ease;pointer-events:none}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(-4px)}
@@ -190,7 +223,7 @@ textarea{width:100%;font-family:var(--font-mono);font-size:12px}
 
 /* ---------- modal ---------- */
 .mback{position:fixed;inset:0;background:rgba(28,26,50,.42);display:flex;align-items:flex-start;justify-content:center;padding:5vh 14px;z-index:50}
-.modal{background:#fff;border-radius:14px;max-width:560px;width:100%;max-height:88vh;overflow-y:auto;padding:20px 22px;box-shadow:0 18px 50px rgba(20,20,50,.35)}
+.modal{background:light-dark(#ffffff,#1e222c);border-radius:14px;max-width:560px;width:100%;max-height:88vh;overflow-y:auto;padding:20px 22px;box-shadow:0 18px 50px rgba(20,20,50,.35)}
 .modal h2{margin:0 0 4px;font-size:17px}
 .modal h3{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);margin:22px 0 8px}
 .modal .mtop{display:flex;align-items:center}
@@ -262,7 +295,7 @@ textarea{width:100%;font-family:var(--font-mono);font-size:12px}
 
   <section class="panel histwrap" id="histPanel"></section>
 
-  <footer class="foot">After Mark Forster's <a href="https://blog.beeminder.com/forster/" target="_blank" rel="noopener">Final Version Perfected</a> · rank posteriors à la <a href="https://alltom.com/pages/spawelo/" target="_blank" rel="noopener">spawelo</a> · keys: <span class="mono">y / n / c / d / ⌫ / u</span></footer>
+  <footer class="foot">After Mark Forster's <a href="https://blog.beeminder.com/forster/" target="_blank" rel="noopener">Final Version Perfected</a> · rank posteriors following <a href="https://alltom.com/pages/spawelo/" target="_blank" rel="noopener">spawelo</a> · keys: <span class="mono">y / n / c / d / ⌫ / u</span><div class="themerow"><button id="themeBtn" class="themebtn" data-act="cycle-theme"></button></div></footer>
 </div>
 <div id="modalRoot"></div>
 
@@ -362,6 +395,7 @@ function median(arr){ if(!arr.length) return NaN; const s=[...arr].sort((a,b)=>a
    APP STATE
    ================================================================ */
 const STORE_KEY = "fvp:chain-scanner:v1";
+const THEME_HINT_KEY = "fvp:chain-scanner:theme";   // paint-time cache only; see writeThemeHint()
 let _uidc = 0;
 const uid = ()=> "t" + Date.now().toString(36) + (_uidc++).toString(36);
 const esc = s => String(s??"").replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -411,8 +445,58 @@ function defaultState(){
     interventionActive:false, interventionP:0, snooze:0,
     mode:"scan", decisionsMs:[], presentedAt:0,
     listOpen:false, ctxOpen:true, histOpen:false, updatedAt:0,
-    settings:{ horizonMin:60, thresholdPct:25, samples:250, cantMin:30 }
+    settings:{ horizonMin:60, thresholdPct:25, samples:250, cantMin:30, theme:"system" }
   };
+}
+
+/* ---------- night mode ----------
+   Three preferences: "system" (default), "light", "dark". The preference is
+   part of state.settings, so it rides the cloud sync across devices. */
+const DARK_QUERY = "(prefers-color-scheme: dark)";
+
+function normalizeTheme(v){ return (v==="light"||v==="dark") ? v : "system"; }
+
+function prefersDarkOS(){
+  try{ return !!(window.matchMedia && window.matchMedia(DARK_QUERY).matches); }
+  catch(e){ return false; }   // no matchMedia (old browser, bare JS host) — assume light
+}
+
+function themePref(){ return normalizeTheme(state && state.settings && state.settings.theme); }
+
+function resolvedTheme(){
+  const pref = themePref();
+  return pref === "system" ? (prefersDarkOS() ? "dark" : "light") : pref;
+}
+
+/* An explicit choice becomes an attribute on <html>, which pins color-scheme
+   and therefore every light-dark() token. "system" removes the attribute so
+   the bare `color-scheme: light dark` takes over — that is what makes the
+   palette follow the OS live, with no JS in the loop at all. */
+function applyTheme(){
+  const root = document && document.documentElement;
+  if(!root) return;
+  const pref = themePref();
+  if(pref === "system") root.removeAttribute("data-theme");
+  else root.setAttribute("data-theme", pref);
+  writeThemeHint(pref);
+}
+
+/* The preference lives in synced state, which loads asynchronously — too late
+   to stop a flash of the wrong palette. So mirror it into localStorage, which
+   the boot script in <head> can read synchronously. Device-local on purpose,
+   and cleared for "system" so a stale hint can never outvote the OS. */
+function writeThemeHint(pref){
+  try{
+    if(pref === "light" || pref === "dark") localStorage.setItem(THEME_HINT_KEY, pref);
+    else localStorage.removeItem(THEME_HINT_KEY);
+  }catch(e){ /* storage blocked — we just lose the anti-flash, not the theme */ }
+}
+
+function setTheme(v){
+  state.settings.theme = normalizeTheme(v);
+  applyTheme();
+  save();      // bumps updatedAt, so the choice pushes to your other devices
+  render();
 }
 
 /* ---------- persistence (artifact key-value storage; falls back to memory) ---------- */
@@ -516,6 +600,8 @@ async function cloudPull(){
         lastPushed = remote.payload;
         if(!state.settings) state.settings = {horizonMin:60,thresholdPct:25,samples:250,cantMin:30};
         if(state.settings.cantMin===undefined) state.settings.cantMin=30;
+        state.settings.theme = normalizeTheme(state.settings.theme);
+        applyTheme();
         if(state.histOpen===undefined) state.histOpen=false;
         if(!state.cantAt) state.cantAt = {};
         recomputeRanks(); ensureCandidate(); render();
@@ -904,7 +990,32 @@ function topKlabel(id){ const st = rankCache.get(id); return st ? "top-"+st.topK
 /* ================================================================
    RENDER
    ================================================================ */
-function render(){ renderPass(); renderCtx(); renderScan(); renderList(); renderHistory(); renderQuickCtx(); renderSync(); }
+function render(){ renderPass(); renderCtx(); renderScan(); renderList(); renderHistory(); renderQuickCtx(); renderSync(); renderTheme(); }
+
+/* One tap cycles Auto -> Light -> Dark -> Auto. The label says which state
+   you are in, and Auto also says what it currently resolves to, so a change
+   in the OS setting is visible here and not just in the colours. */
+const THEME_CYCLE = { system:"light", light:"dark", dark:"system" };
+const THEME_FACE  = { system:"\u25d0 Auto", light:"\u2600 Light", dark:"\u263e Dark" };
+function nextTheme(){ return THEME_CYCLE[themePref()]; }
+function renderTheme(){
+  const el = document.getElementById("themeBtn");
+  if(!el) return;
+  const pref = themePref();
+  el.textContent = pref === "system" ? THEME_FACE.system + " (" + resolvedTheme() + ")" : THEME_FACE[pref];
+  el.setAttribute("aria-label", "Appearance: " + pref + ". Tap to switch to " + nextTheme() + ".");
+  el.setAttribute("title", "Appearance: " + pref + ". Tap to switch to " + nextTheme() + ".");
+}
+
+/* The colours follow the OS on their own through color-scheme; this listener
+   exists so the Auto label repaints too when you flip the system setting. */
+function watchOSTheme(){
+  try{
+    const mq = window.matchMedia && window.matchMedia(DARK_QUERY);
+    if(!mq || !mq.addEventListener) return;
+    mq.addEventListener("change", ()=>{ if(themePref()==="system") renderTheme(); });
+  }catch(e){ /* no matchMedia here — nothing to react to */ }
+}
 
 function renderSync(){
   const el = document.getElementById("syncBtn");
@@ -940,7 +1051,7 @@ function renderCtx(){
     for(const c of state.contexts){
       html += '<label class="ctxitem'+(c.active?"":" off")+'"><input type="checkbox" data-ctx="'+c.id+'"'+(c.active?" checked":"")+'/> '+esc(c.name)+'</label>';
     }
-    html += '<button class="ctxadd" data-act="add-ctx">＋ context</button></div>';
+    html += '<button class="ctxadd" data-act="add-ctx">+ context</button></div>';
   }
   el.innerHTML = html;
 }
@@ -1303,6 +1414,7 @@ function onAction(act, el){
       pushUndo(); t.done=false; t.completedAt=null; t.lastDoneAt=null;
       recomputeRanks(); commit(); break;
     }
+    case "cycle-theme": setTheme(nextTheme()); break;
     case "settings": openSettings(); break;
     case "save-settings": {
       pushUndo();
@@ -1419,10 +1531,13 @@ function hotkeyDelete(){
   state = loaded || defaultState();
   if(!state.settings) state.settings = {horizonMin:60,thresholdPct:25,samples:250,cantMin:30};
   if(state.settings.cantMin===undefined) state.settings.cantMin=30;
+  state.settings.theme = normalizeTheme(state.settings.theme);   // absent or corrupt -> "system"
+  applyTheme();
   if(state.histOpen===undefined) state.histOpen=false;
   if(!state.cantAt) state.cantAt = {};
   recomputeRanks();
   ensureCandidate();
+  watchOSTheme();
   render();
 })();
 </script>

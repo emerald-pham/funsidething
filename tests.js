@@ -87,16 +87,25 @@ function makeFakeElement() {
     addEventListener() {}, removeEventListener() {},
     focus() {}, select() {}, click() {},
     querySelector() { return null; }, querySelectorAll() { return []; },
-    getAttribute() { return null; }, setAttribute() {},
+    // Attributes are really stored now (they used to be no-op stubs) so that
+    // <html data-theme="..."> can be asserted on. getAttribute still returns
+    // null for anything never set, which is what the old stub always did.
+    _attrs: new Map(),
+    getAttribute(k) { return this._attrs.has(k) ? this._attrs.get(k) : null; },
+    setAttribute(k, v) { this._attrs.set(k, String(v)); },
+    removeAttribute(k) { this._attrs.delete(k); },
+    hasAttribute(k) { return this._attrs.has(k); },
     appendChild() {}, scrollIntoView() {},
   };
   return el;
 }
 
-function makeDomShim() {
+function makeDomShim({ prefersDark = false } = {}) {
   const elements = new Map();
   const winListeners = {};
   const localStorageMap = new Map();
+
+  const documentElement = makeFakeElement();
 
   const document = {
     getElementById(id) {
@@ -109,12 +118,31 @@ function makeDomShim() {
     removeEventListener() {},
     createElement() { return makeFakeElement(); },
     body: { appendChild() {} },
+    documentElement,
   };
   const localStorage = {
     getItem(k) { return localStorageMap.has(k) ? localStorageMap.get(k) : null; },
     setItem(k, v) { localStorageMap.set(k, String(v)); },
     removeItem(k) { localStorageMap.delete(k); },
   };
+  // A minimal MediaQueryList good enough for prefers-color-scheme. `setDark`
+  // flips the OS preference and notifies listeners the way a real browser does
+  // when you change the system appearance while the page is open.
+  const mqlListeners = [];
+  const mql = {
+    media: "(prefers-color-scheme: dark)",
+    matches: prefersDark,
+    addEventListener(evt, fn) { if (evt === "change") mqlListeners.push(fn); },
+    removeEventListener(evt, fn) {
+      const i = mqlListeners.indexOf(fn);
+      if (i >= 0) mqlListeners.splice(i, 1);
+    },
+  };
+  function setDark(v) {
+    mql.matches = !!v;
+    for (const fn of [...mqlListeners]) fn({ matches: mql.matches, media: mql.media });
+  }
+
   const window = {
     addEventListener(evt, fn) { (winListeners[evt] ||= []).push(fn); },
     removeEventListener() {},
@@ -122,17 +150,24 @@ function makeDomShim() {
       for (const fn of (winListeners[evt.type] || [])) fn(evt);
       return true;
     },
+    matchMedia(q) {
+      // Only the color-scheme query is modelled; anything else reports no match.
+      if (String(q).includes("prefers-color-scheme: dark")) return mql;
+      return { media: String(q), matches: false, addEventListener() {}, removeEventListener() {} };
+    },
     localStorage,
     CloudSync: undefined,
   };
   window.window = window;
-  return { document, window, localStorage, elements, winListeners };
+  return { document, window, localStorage, elements, winListeners, documentElement, setDark, mqlListeners };
 }
 
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
-async function loadApp({ seed, cloudSyncFactory } = {}) {
-  const shim = makeDomShim();
+async function loadApp({ seed, cloudSyncFactory, prefersDark = false, noMatchMedia = false, seedStorage } = {}) {
+  const shim = makeDomShim({ prefersDark });
+  if (noMatchMedia) delete shim.window.matchMedia;   // old browser / bare JS host
+  if (seedStorage) for (const [k, v] of Object.entries(seedStorage)) shim.localStorage.setItem(k, v);
   if (cloudSyncFactory) shim.window.CloudSync = cloudSyncFactory(shim.window);
   const sandbox = {
     window: shim.window,
@@ -1330,4 +1365,497 @@ test("UI: once a chain exists, Yes / No come back and the bare Can button goes a
   assert.match(scanHtml, /data-act="yes"/, "Yes should be offered once there's a benchmark");
   assert.match(scanHtml, /data-act="no"/, "No should be offered once there's a benchmark");
   assert.ok(!/data-act="can"[^t]/.test(scanHtml), "the chain-start Can button should be gone");
+});
+
+/* =====================================================================
+   NIGHT MODE — Unit 1: preference model & resolution
+   ===================================================================== */
+const STORE_KEY = "fvp:chain-scanner:v1";
+
+test("theme: a fresh state defaults the preference to 'system'", async () => {
+  const { ctx } = await loadApp();
+  assert.equal(ctx.state.settings.theme, "system");
+});
+
+test("theme: state saved before night mode existed migrates to 'system' on boot", async () => {
+  const legacy = {
+    v: 1, tasks: [], contexts: [], chain: [], considered: {}, cantAt: {}, candidateId: null,
+    interventionActive: false, interventionP: 0, snooze: 0, mode: "scan", decisionsMs: [],
+    presentedAt: 0, listOpen: false, ctxOpen: true, histOpen: false, updatedAt: 0,
+    settings: { horizonMin: 60, thresholdPct: 25, samples: 250, cantMin: 30 }, // no theme key
+  };
+  const { ctx } = await loadApp({ seedStorage: { [STORE_KEY]: JSON.stringify(legacy) } });
+  assert.equal(ctx.state.settings.theme, "system");
+});
+
+test("theme: a corrupt stored preference is repaired to 'system' on boot", async () => {
+  const bad = {
+    v: 1, tasks: [], contexts: [], chain: [], considered: {}, cantAt: {}, candidateId: null,
+    interventionActive: false, interventionP: 0, snooze: 0, mode: "scan", decisionsMs: [],
+    presentedAt: 0, listOpen: false, ctxOpen: true, histOpen: false, updatedAt: 0,
+    settings: { horizonMin: 60, thresholdPct: 25, samples: 250, cantMin: 30, theme: "banana" },
+  };
+  const { ctx } = await loadApp({ seedStorage: { [STORE_KEY]: JSON.stringify(bad) } });
+  assert.equal(ctx.state.settings.theme, "system");
+});
+
+test("setTheme: accepts each of the three valid preferences", async () => {
+  const { ctx } = await loadApp();
+  ctx.setTheme("dark");
+  assert.equal(ctx.state.settings.theme, "dark");
+  ctx.setTheme("light");
+  assert.equal(ctx.state.settings.theme, "light");
+  ctx.setTheme("system");
+  assert.equal(ctx.state.settings.theme, "system");
+});
+
+test("setTheme: an unrecognised value falls back to 'system' rather than sticking", async () => {
+  const { ctx } = await loadApp();
+  ctx.setTheme("dark");
+  ctx.setTheme("banana");
+  assert.equal(ctx.state.settings.theme, "system");
+});
+
+test("resolvedTheme: with preference 'system', follows the OS reporting dark", async () => {
+  const { ctx } = await loadApp({ prefersDark: true });
+  assert.equal(ctx.state.settings.theme, "system");
+  assert.equal(ctx.resolvedTheme(), "dark");
+});
+
+test("resolvedTheme: with preference 'system', follows the OS reporting light", async () => {
+  const { ctx } = await loadApp({ prefersDark: false });
+  assert.equal(ctx.resolvedTheme(), "light");
+});
+
+test("resolvedTheme: an explicit preference overrides the OS in both directions", async () => {
+  const { ctx: darkOS } = await loadApp({ prefersDark: true });
+  darkOS.setTheme("light");
+  assert.equal(darkOS.resolvedTheme(), "light", "explicit light must win over a dark OS");
+
+  const { ctx: lightOS } = await loadApp({ prefersDark: false });
+  lightOS.setTheme("dark");
+  assert.equal(lightOS.resolvedTheme(), "dark", "explicit dark must win over a light OS");
+});
+
+test("resolvedTheme: an environment with no matchMedia resolves light instead of throwing", async () => {
+  const { ctx } = await loadApp({ noMatchMedia: true });
+  assert.equal(ctx.resolvedTheme(), "light");
+});
+
+/* =====================================================================
+   NIGHT MODE — Unit 2: DOM application, persistence, anti-flash boot
+   ===================================================================== */
+const THEME_HINT_KEY = "fvp:chain-scanner:theme";
+
+// The synchronous <head> script that paints before first frame, sliced out of
+// index.html the same way the engine is, so it's tested as shipped. Sliced
+// lazily: at module load a missing marker would take down the whole file.
+const themeBootSrc = () => slice(html, "/*THEME-BOOT-START*/", "/*THEME-BOOT-END*/");
+
+function runThemeBoot({ hint, throwingStorage = false } = {}) {
+  const root = makeFakeElement();
+  const store = new Map();
+  if (hint !== undefined) store.set(THEME_HINT_KEY, hint);
+  const sandbox = {
+    document: { documentElement: root },
+    localStorage: throwingStorage
+      ? { getItem() { throw new Error("storage blocked"); } }
+      : { getItem(k) { return store.has(k) ? store.get(k) : null; } },
+  };
+  vm.createContext(sandbox);
+  vm.runInContext(themeBootSrc(), sandbox, { filename: "index.html#theme-boot" });
+  return root;
+}
+
+test("applyTheme: an explicit dark preference puts data-theme=dark on the root element", async () => {
+  const { ctx, shim } = await loadApp();
+  ctx.setTheme("dark");
+  assert.equal(shim.documentElement.getAttribute("data-theme"), "dark");
+});
+
+test("applyTheme: an explicit light preference puts data-theme=light on the root element", async () => {
+  const { ctx, shim } = await loadApp({ prefersDark: true });
+  ctx.setTheme("light");
+  assert.equal(shim.documentElement.getAttribute("data-theme"), "light");
+});
+
+test("applyTheme: the 'system' preference removes data-theme so CSS follows the OS unaided", async () => {
+  const { ctx, shim } = await loadApp();
+  ctx.setTheme("dark");
+  assert.equal(shim.documentElement.getAttribute("data-theme"), "dark");
+  ctx.setTheme("system");
+  assert.equal(shim.documentElement.getAttribute("data-theme"), null,
+    "no attribute means color-scheme: light dark governs, which is what makes it reactive");
+});
+
+test("setTheme: marks the state dirty so the choice syncs to other devices", async () => {
+  const { ctx } = await loadApp();
+  const before = ctx.state.updatedAt;
+  ctx.setTheme("dark");
+  assert.ok(ctx.state.updatedAt > before, "updatedAt must advance or the sync will not push");
+});
+
+test("setTheme: writes the paint hint for explicit preferences", async () => {
+  const { ctx, shim } = await loadApp();
+  ctx.setTheme("dark");
+  assert.equal(shim.localStorage.getItem(THEME_HINT_KEY), "dark");
+  ctx.setTheme("light");
+  assert.equal(shim.localStorage.getItem(THEME_HINT_KEY), "light");
+});
+
+test("setTheme: clears the paint hint for 'system' so a stale hint cannot outvote the OS", async () => {
+  const { ctx, shim } = await loadApp();
+  ctx.setTheme("dark");
+  ctx.setTheme("system");
+  assert.equal(shim.localStorage.getItem(THEME_HINT_KEY), null);
+});
+
+test("boot: a synced dark preference is applied to the root element on load", async () => {
+  const stored = {
+    v: 1, tasks: [], contexts: [], chain: [], considered: {}, cantAt: {}, candidateId: null,
+    interventionActive: false, interventionP: 0, snooze: 0, mode: "scan", decisionsMs: [],
+    presentedAt: 0, listOpen: false, ctxOpen: true, histOpen: false, updatedAt: 0,
+    settings: { horizonMin: 60, thresholdPct: 25, samples: 250, cantMin: 30, theme: "dark" },
+  };
+  const { shim } = await loadApp({ seedStorage: { [STORE_KEY]: JSON.stringify(stored) } });
+  assert.equal(shim.documentElement.getAttribute("data-theme"), "dark");
+});
+
+test("applyTheme: a host with no documentElement is a safe no-op", async () => {
+  const shim = makeDomShim();
+  delete shim.document.documentElement;
+  const sandbox = {
+    window: shim.window, document: shim.document, localStorage: shim.localStorage,
+    console, JSON,
+    CustomEvent: class CustomEvent { constructor(type, opts) { this.type = type; Object.assign(this, opts || {}); } },
+    setTimeout: (fn, ms, ...a) => { const t = setTimeout(fn, ms, ...a); t.unref?.(); return t; },
+    clearTimeout, requestAnimationFrame: (fn) => setTimeout(fn, 0),
+    confirm: () => true, alert: () => {}, prompt: () => null,
+  };
+  vm.createContext(sandbox);
+  vm.runInContext(appSrc, sandbox, { filename: "index.html#app" });
+  await flush();
+  assert.doesNotThrow(() => sandbox.setTheme("dark"));
+});
+
+test("cloudPull: adopting a remote state applies that device's theme locally", async () => {
+  const remoteState = {
+    v: 1, tasks: [], contexts: [], chain: [], considered: {}, cantAt: {}, candidateId: null,
+    interventionActive: false, interventionP: 0, snooze: 0, mode: "scan", decisionsMs: [],
+    presentedAt: 0, listOpen: false, ctxOpen: true, histOpen: false, updatedAt: Date.now() + 100000,
+    settings: { horizonMin: 60, thresholdPct: 25, samples: 250, cantMin: 30, theme: "dark" },
+  };
+  const { ctx, shim } = await loadApp({
+    cloudSyncFactory: () => ({
+      configured: true, ready: true, user: "e@example.com", status: "on",
+      signIn() {}, signOut() {},
+      async pull() { return { updatedAt: remoteState.updatedAt, payload: JSON.stringify(remoteState) }; },
+      async push() {},
+    }),
+  });
+  assert.equal(shim.documentElement.getAttribute("data-theme"), null, "starts on system");
+  await ctx.cloudPull();
+  assert.equal(ctx.state.settings.theme, "dark");
+  assert.equal(shim.documentElement.getAttribute("data-theme"), "dark",
+    "a theme arriving from another device must repaint, not just sit in state");
+});
+
+test("theme boot script: a 'dark' hint paints before the app loads", () => {
+  assert.equal(runThemeBoot({ hint: "dark" }).getAttribute("data-theme"), "dark");
+});
+
+test("theme boot script: a 'light' hint paints before the app loads", () => {
+  assert.equal(runThemeBoot({ hint: "light" }).getAttribute("data-theme"), "light");
+});
+
+test("theme boot script: no hint leaves the OS in charge", () => {
+  assert.equal(runThemeBoot().getAttribute("data-theme"), null);
+});
+
+test("theme boot script: a junk hint is ignored rather than written through", () => {
+  assert.equal(runThemeBoot({ hint: "banana" }).getAttribute("data-theme"), null);
+  assert.equal(runThemeBoot({ hint: "system" }).getAttribute("data-theme"), null);
+});
+
+test("theme boot script: blocked localStorage does not throw and does not block the page", () => {
+  assert.doesNotThrow(() => runThemeBoot({ throwingStorage: true }));
+});
+
+/* =====================================================================
+   NIGHT MODE — Unit 3: the one-tap footer control & live OS reactivity
+   ===================================================================== */
+const themeBtnText = (shim) => shim.elements.get("themeBtn").textContent;
+
+test("footer control: the page ships a tappable theme button wired to cycle-theme", () => {
+  const footer = html.slice(html.indexOf('<footer'), html.indexOf('</footer>'));
+  assert.match(footer, /data-act="cycle-theme"/, "the control must live in the footer, not the header");
+  assert.match(footer, /id="themeBtn"/);
+});
+
+test("footer control: on 'system' the label names Auto and the theme it currently resolves to", async () => {
+  const { ctx, shim } = await loadApp({ prefersDark: true });
+  ctx.render();
+  assert.match(themeBtnText(shim), /Auto/i);
+  assert.match(themeBtnText(shim), /dark/i, "Auto should show what it is resolving to right now");
+});
+
+test("footer control: an explicit preference labels itself Light or Dark", async () => {
+  const { ctx, shim } = await loadApp();
+  ctx.setTheme("light");
+  assert.match(themeBtnText(shim), /Light/i);
+  assert.ok(!/Auto/i.test(themeBtnText(shim)), "an explicit choice must not still read as Auto");
+  ctx.setTheme("dark");
+  assert.match(themeBtnText(shim), /Dark/i);
+});
+
+test("cycle-theme: one tap moves system -> light -> dark and wraps back to system", async () => {
+  const { ctx } = await loadApp();
+  assert.equal(ctx.state.settings.theme, "system");
+  ctx.onAction("cycle-theme", {});
+  assert.equal(ctx.state.settings.theme, "light");
+  ctx.onAction("cycle-theme", {});
+  assert.equal(ctx.state.settings.theme, "dark");
+  ctx.onAction("cycle-theme", {});
+  assert.equal(ctx.state.settings.theme, "system", "the cycle must wrap, or Auto becomes unreachable");
+});
+
+test("cycle-theme: tapping repaints the root element as it goes", async () => {
+  const { ctx, shim } = await loadApp();
+  ctx.onAction("cycle-theme", {});
+  assert.equal(shim.documentElement.getAttribute("data-theme"), "light");
+  ctx.onAction("cycle-theme", {});
+  assert.equal(shim.documentElement.getAttribute("data-theme"), "dark");
+  ctx.onAction("cycle-theme", {});
+  assert.equal(shim.documentElement.getAttribute("data-theme"), null);
+});
+
+test("footer control: carries an accessible label naming the next state, not just an icon", async () => {
+  const { ctx, shim } = await loadApp();
+  ctx.render();
+  const btn = shim.elements.get("themeBtn");
+  const label = btn.getAttribute("aria-label") || btn.getAttribute("title") || "";
+  assert.ok(label.length > 0, "an icon-and-word button still needs a description for screen readers");
+  assert.match(label, /light/i, "from Auto the next tap is Light, so say so");
+});
+
+test("reactivity: the app subscribes to the OS colour-scheme query at boot", async () => {
+  const { shim } = await loadApp();
+  assert.ok(shim.mqlListeners.length > 0, "without a subscription nothing can react to the OS flipping");
+});
+
+test("reactivity: flipping the OS while on Auto updates the label live", async () => {
+  const { ctx, shim } = await loadApp({ prefersDark: false });
+  ctx.render();
+  assert.match(themeBtnText(shim), /light/i);
+  shim.setDark(true);
+  assert.match(themeBtnText(shim), /dark/i, "Auto must track the OS without a reload");
+  shim.setDark(false);
+  assert.match(themeBtnText(shim), /light/i, "and track it back again");
+});
+
+test("reactivity: flipping the OS while pinned to an explicit theme changes nothing", async () => {
+  const { ctx, shim } = await loadApp({ prefersDark: false });
+  ctx.setTheme("light");
+  const before = themeBtnText(shim);
+  shim.setDark(true);
+  assert.equal(themeBtnText(shim), before, "an explicit choice must not be overridden by the OS");
+  assert.equal(shim.documentElement.getAttribute("data-theme"), "light");
+  assert.equal(ctx.resolvedTheme(), "light");
+});
+
+test("reactivity: booting without matchMedia wires up nothing and does not throw", async () => {
+  const { ctx, shim } = await loadApp({ noMatchMedia: true });
+  assert.doesNotThrow(() => ctx.render());
+  assert.match(themeBtnText(shim), /Auto/i);
+});
+
+/* =====================================================================
+   NIGHT MODE — Unit 4: the palette itself
+   A dark mode is only as good as its least-converted colour. This guard
+   walks every declaration in <style> and fails on any background, border,
+   fill or accent that is still a hardcoded literal, which is how a stray
+   white input box survives into a dark theme.
+   ===================================================================== */
+const styleSrc = slice(html, "<style>", "</style>").replace(/\/\*[\s\S]*?\*\//g, "");
+
+const COLOR_RE = /#[0-9a-fA-F]{3,8}\b|\brgba?\([^)]*\)/g;
+const WHITE_RE = /^(#fff|#ffffff|rgba?\(\s*255\s*,\s*255\s*,\s*255[^)]*\))$/i;
+// Properties whose colour is decorative or sits on a saturated fill, so it is
+// genuinely the same in both themes.
+const INVARIANT_PROPS = new Set(["box-shadow", "text-decoration-color"]);
+// Deliberate, reviewed exceptions. Each must justify itself.
+const ALLOWED_DECLS = new Set([
+  "background:rgba(28,26,50,.42)",   // modal scrim — dark over both themes by design
+]);
+
+function declarations() {
+  const out = [];
+  for (const [, body] of styleSrc.matchAll(/\{([^{}]*)\}/g)) {
+    for (const chunk of body.split(";")) {
+      const i = chunk.indexOf(":");
+      if (i === -1) continue;
+      const prop = chunk.slice(0, i).trim().toLowerCase();
+      const value = chunk.slice(i + 1).trim();
+      if (prop && value) out.push({ prop, value, text: prop + ":" + value.replace(/\s+/g, " ") });
+    }
+  }
+  return out;
+}
+
+// Pulls the arguments out of every light-dark(...) in a value. Needs real
+// paren balancing, not a regex: light-dark(rgba(...),rgba(...)) is legal and a
+// lazy /\(([^)]*)\)/ would stop at the inner rgba's closing paren.
+function lightDarkArgs(value) {
+  const TAG = "light-dark(";
+  const out = [];
+  let i = 0;
+  while ((i = value.indexOf(TAG, i)) !== -1) {
+    let depth = 0, j = i + TAG.length - 1;
+    for (; j < value.length; j++) {
+      if (value[j] === "(") depth++;
+      else if (value[j] === ")" && --depth === 0) break;
+    }
+    out.push(value.slice(i + TAG.length, j));
+    i = j + 1;
+  }
+  return out.join(",");
+}
+
+function offendingDeclarations() {
+  const bad = [];
+  for (const d of declarations()) {
+    const literals = d.value.match(COLOR_RE);
+    if (!literals) continue;
+    if (INVARIANT_PROPS.has(d.prop)) continue;
+    if (ALLOWED_DECLS.has(d.text.replace(/\s/g, ""))) continue;
+    if (d.prop === "color" && literals.every((l) => WHITE_RE.test(l))) continue; // white on a saturated fill
+    // Everything else must route its literals through light-dark().
+    const insideLightDark = lightDarkArgs(d.value);
+    const escaped = literals.filter((l) => !insideLightDark.includes(l));
+    if (escaped.length) bad.push(`${d.text}   [escaped: ${escaped.join(", ")}]`);
+  }
+  return bad;
+}
+
+test("palette: :root opts into both schemes so the OS drives light-dark() unaided", () => {
+  const root = styleSrc.slice(styleSrc.indexOf(":root{"), styleSrc.indexOf("}", styleSrc.indexOf(":root{")));
+  assert.match(root.replace(/\s/g, ""), /color-scheme:lightdark/,
+    "without this declaration light-dark() has nothing to resolve against");
+});
+
+test("palette: an explicit preference pins color-scheme in both directions", () => {
+  const flat = styleSrc.replace(/\s/g, "");
+  assert.match(flat, /\[data-theme="dark"\][^{]*\{[^}]*color-scheme:dark/);
+  assert.match(flat, /\[data-theme="light"\][^{]*\{[^}]*color-scheme:light/);
+});
+
+test("palette: no background, border, fill or accent escapes light-dark()", () => {
+  const bad = offendingDeclarations();
+  assert.deepEqual(bad, [], `unconverted colours would render wrong in dark mode:\n  ${bad.join("\n  ")}`);
+});
+
+test("palette: the footer theme button is styled rather than inheriting bare button reset", () => {
+  assert.match(styleSrc, /\.themebtn\s*\{/);
+  assert.match(styleSrc, /\.themerow\s*\{/);
+});
+
+/* =====================================================================
+   NIGHT MODE — Unit 5: the app's copy is English
+   Checks characters, not words: anything outside plain ASCII must be a
+   deliberate typographic mark or an icon glyph. \uXXXX escapes are decoded
+   first, so writing foreign text the long way round is caught too.
+   ===================================================================== */
+const ALLOWED_NON_ASCII = new Set([
+  "\u2014", "\u2013", "\u2026", "\u00b7", "\u2022",           // dashes, ellipsis, dots
+  "\u2265", "\u2264", "\u2212", "\u00b1", "\u2248",           // maths
+  "\u2192", "\u2193", "\u2197", "\u21ba", "\u21bb", "\u232b", // arrows & keycaps
+  "\u2715", "\u2699", "\u25c9", "\u25a6", "\u{1f5d3}",        // icons
+  "\u25b6", "\u25b8", "\u25be", "\u25bc", "\u25cf",           // carets & bullets
+  "\u25d0", "\u2600", "\u263e",                               // night-mode faces
+  "\u2019",                                                   // English apostrophe ("Can't")
+  "\u2601",                                                   // cloud-sync icon
+]);
+
+function decodeEscapes(src) {
+  return src
+    .replace(/\\u\{([0-9a-fA-F]+)\}/g, (_, h) => String.fromCodePoint(parseInt(h, 16)))
+    .replace(/\\u([0-9a-fA-F]{4})/g, (_, h) => String.fromCharCode(parseInt(h, 16)));
+}
+
+test("copy: every non-ASCII character in the app is a permitted typographic or icon glyph", () => {
+  const found = new Map();
+  for (const ch of decodeEscapes(html)) {
+    if (ch.codePointAt(0) > 127 && !ALLOWED_NON_ASCII.has(ch)) {
+      found.set(ch, (found.get(ch) || 0) + 1);
+    }
+  }
+  const report = [...found].map(([c, n]) => `U+${c.codePointAt(0).toString(16).toUpperCase()} ${JSON.stringify(c)} x${n}`);
+  assert.deepEqual(report, [], `non-English or non-standard characters in the app:\n  ${report.join("\n  ")}`);
+});
+
+test("copy: the footer credit reads as English rather than a French idiom", () => {
+  const footer = html.slice(html.indexOf("<footer"), html.indexOf("</footer>"));
+  assert.ok(!/\u00e0 la/i.test(footer), "'a la' is French; say it in English");
+  assert.match(footer, /spawelo/, "the credit itself must survive the rewording");
+});
+
+test("copy: the add-context button uses a plain ASCII plus, not a fullwidth one", () => {
+  assert.match(html, /">\+ context</, "U+FF0B is a CJK-width form and renders oddly in a Latin UI");
+});
+
+/* =====================================================================
+   NIGHT MODE — Unit 6: both palettes stay readable
+   Dark mode is easy to ship and hard to ship legibly. These compute real
+   WCAG contrast ratios from the tokens, in both themes, so a palette
+   tweak cannot quietly push text under the line.
+   ===================================================================== */
+function themeTokens() {
+  const rootBlock = styleSrc.slice(styleSrc.indexOf(":root{"), styleSrc.indexOf("*{box-sizing"));
+  const light = {}, dark = {};
+  for (const m of rootBlock.matchAll(/(--[a-z-]+)\s*:\s*light-dark\(\s*([^,]+?)\s*,\s*([^)]+?)\s*\)/g)) {
+    light[m[1]] = m[2];
+    dark[m[1]] = m[3];
+  }
+  return { light, dark };
+}
+
+function channel(c) { c /= 255; return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); }
+function luminance(hex) {
+  let h = hex.replace("#", "");
+  if (h.length === 3) h = [...h].map((c) => c + c).join("");
+  const [r, g, b] = [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16));
+  return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
+}
+function contrast(a, b) {
+  const [la, lb] = [luminance(a), luminance(b)];
+  return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+}
+
+// [description, foreground token, background token, minimum ratio]
+const CONTRAST_PAIRS = [
+  ["body text on the page",        "--ink",       "--bg",         4.5],
+  ["body text on a panel",         "--ink",       "--panel",      4.5],
+  ["muted secondary text",         "--mut",       "--bg",         4.5],
+  ["links and accents",            "--accent",    "--bg",         4.5],
+  ["white ink, top of chain card", "--chain-ink", "--chain",      3.0],
+  ["white ink, foot of chain card","--chain-ink", "--chain-deep", 3.0],
+  ["candidate card text",          "--cand-ink",  "--cand-bg",    4.5],
+];
+
+for (const [what, fg, bg, min] of CONTRAST_PAIRS) {
+  for (const theme of ["light", "dark"]) {
+    test(`contrast (${theme}): ${what} clears ${min}:1`, () => {
+      const tokens = themeTokens()[theme];
+      assert.ok(tokens[fg], `${fg} must be defined as a light-dark() pair`);
+      assert.ok(tokens[bg], `${bg} must be defined as a light-dark() pair`);
+      const ratio = contrast(tokens[fg], tokens[bg]);
+      assert.ok(ratio >= min,
+        `${fg} on ${bg} in ${theme} is ${ratio.toFixed(2)}:1, below the ${min}:1 floor`);
+    });
+  }
+}
+
+test("contrast: the accent token is used for link text rather than the card-fill token", () => {
+  assert.match(styleSrc, /\na\{color:var\(--accent\)\}/,
+    "a fill tuned to sit under white ink is too dark to double as link text");
 });
