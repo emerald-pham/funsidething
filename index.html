@@ -290,7 +290,7 @@ textarea{width:100%;font-family:var(--font-mono);font-size:12px}
       <div class="addline">
         <input id="addInput" type="text" placeholder="Add a task — or paste a whole numbered list…" aria-label="New task title, or paste a list to bulk import"/>
         <button class="btn subtle" data-act="add">Add</button>
-        <button class="btn urgent" data-act="add-dot" title="Urgent — add it with a dot so it's done first (rule 8)">Add &amp; dot</button>
+        <button id="addDotBtn" class="btn urgent" data-act="add-dot" title="Urgent — add it with a dot so it's done first (rule 8)">Add &amp; dot</button>
       </div>
     </div>
   </section>
@@ -1026,7 +1026,12 @@ function topKlabel(id){ const st = rankCache.get(id); return st ? "top-"+st.topK
 /* ================================================================
    RENDER
    ================================================================ */
-function render(){ renderPass(); renderCtx(); renderScan(); renderList(); renderHistory(); renderQuickCtx(); renderSync(); renderTheme(); }
+function render(){ renderPass(); renderCtx(); renderScan(); renderList(); renderHistory(); renderQuickCtx(); renderAddRow(); renderSync(); renderTheme(); }
+
+// "Add & dot" cuts straight onto the top of the chain — only meaningful before
+// a chain exists. Once one's running, that button hides; plain "Add" (into the
+// pool) still works either way.
+function renderAddRow(){ document.getElementById("addDotBtn").hidden = state.chain.length > 0; }
 
 /* One tap cycles Auto -> Light -> Dark -> Auto. The label says which state
    you are in, and Auto also says what it currently resolves to, so a change

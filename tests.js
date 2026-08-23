@@ -1155,6 +1155,35 @@ test("quick-add: 'Add & dot' also tags with the selected context", async () => {
   assert.ok(ctx.state.chain.includes(t.id));
 });
 
+/* ---------- "Add & dot" hides once a chain is active ----------
+   Rule 8 urgency (dotting straight from the quick-add bar) only makes sense
+   before a chain exists — once one's running, cutting a new task onto the
+   TOP of it from the add bar bypasses the scan/compare flow entirely. Plain
+   "Add" (into the pool) stays available regardless. */
+
+test("Add & dot is visible when no chain is active", async () => {
+  const { ctx, shim } = await loadApp({ seed: 66 });
+  assert.equal(ctx.state.chain.length, 0, "precondition: no chain yet");
+  assert.equal(shim.elements.get("addDotBtn").hidden, false);
+});
+
+test("Add & dot hides once a chain is active", async () => {
+  const { ctx, shim } = await loadApp({ seed: 67 });
+  ctx.addTask("Task A", true); // dots it, starting the chain
+  assert.ok(ctx.state.chain.length > 0, "precondition: chain is active");
+  assert.equal(shim.elements.get("addDotBtn").hidden, true);
+});
+
+test("Add & dot reappears once the chain empties back out", async () => {
+  const { ctx, shim } = await loadApp({ seed: 68 });
+  const t = ctx.addTask("Task A", true);
+  assert.equal(shim.elements.get("addDotBtn").hidden, true, "precondition: hidden while chained");
+
+  ctx.doneTask(t.id); // completing the only dot empties the chain
+  assert.equal(ctx.state.chain.length, 0);
+  assert.equal(shim.elements.get("addDotBtn").hidden, false);
+});
+
 test("quick-add: pasting/typing a multi-line list through the bar tags every resulting task", async () => {
   const { ctx } = await loadApp({ seed: 65 });
   const errand = { id: "ctx_errand_t6", name: "Errands", active: true };
