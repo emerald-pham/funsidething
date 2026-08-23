@@ -1995,6 +1995,134 @@ test("done-task: the edit and the completion are ONE undo step", async () => {
    ===================================================================== */
 
 // Characterization test — the benchmark-card path must keep working unchanged.
+/* =====================================================================
+   CAN'T ON THE BENCHMARK
+   Dislodge takes a dotted task off the chain for good (for this pass).
+   Can't takes it off too, but timestamps the mark so expireCants() puts it
+   back on its own once the "Can't sticks for" window passes — the point being
+   that circumstances change, and this task was refused for circumstance, not
+   for worth. Neither touches rank: no "would I rather?" was answered.
+   ===================================================================== */
+
+test("benchCant: takes the benchmark off the chain and marks it 'cant' with a timestamp", async () => {
+  const { ctx } = await loadApp({ seed: 240 });
+  const t = ctx.addTask("Dotted task", true);
+  ctx.benchCant();
+
+  assert.equal(ctx.state.chain.includes(t.id), false, "it comes off the chain like a dislodge");
+  assert.equal(ctx.state.considered[t.id], "cant");
+  assert.ok(ctx.state.cantAt[t.id], "the timestamp is what lets it come back on its own");
+  assert.equal(ctx.state.tasks.find((x) => x.id === t.id).done, false, "it is not completed");
+});
+
+test("benchCant: applies NO strength signal — it's a circumstance, not a comparison", async () => {
+  const { ctx } = await loadApp({ seed: 241 });
+  ctx.addTask("Dotted task", true);
+  ctx.addTask("Other task", false);
+  const before = ctx.state.tasks.map((x) => ({ id: x.id, mu: x.mu, sigma: x.sigma }));
+
+  ctx.benchCant();
+  const after = ctx.state.tasks.map((x) => ({ id: x.id, mu: x.mu, sigma: x.sigma }));
+  assert.deepEqual(after, before, "no rank should move — that's the whole point versus Yes/No");
+});
+
+test("benchCant: the mark expires once cantMin passes, putting the task back in the scan", async () => {
+  const { ctx } = await loadApp({ seed: 242 });
+  ctx.state.settings.cantMin = 10;
+  const t = ctx.addTask("Dotted task", true);
+  ctx.addTask("Filler", false);
+
+  const t0 = realNow(ctx);
+  setFakeTime(ctx, t0);
+  ctx.benchCant();
+  assert.ok(!ctx.pool().some((x) => x.id === t.id), "excluded right after being marked");
+
+  setFakeTime(ctx, t0 + 5 * 60000);
+  assert.ok(!ctx.pool().some((x) => x.id === t.id), "still excluded within the window");
+
+  setFakeTime(ctx, t0 + 11 * 60000);
+  ctx.ensureCandidate();   // any normal action re-checks expiry
+  assert.ok(ctx.pool().some((x) => x.id === t.id), "back in the scan once the situation has had time to change");
+  assert.equal(ctx.state.considered[t.id], undefined);
+});
+
+// The contrast that motivates having both actions.
+test("dislodge: by contrast, does NOT expire — it stays skipped for the pass", async () => {
+  const { ctx } = await loadApp({ seed: 243 });
+  ctx.state.settings.cantMin = 10;
+  const t = ctx.addTask("Dotted task", true);
+  ctx.addTask("Filler", false);
+
+  const t0 = realNow(ctx);
+  setFakeTime(ctx, t0);
+  ctx.dislodge();
+  assert.equal(ctx.state.considered[t.id], "dislodged");
+  assert.equal(ctx.state.cantAt[t.id], undefined, "a dislodge carries no expiry timestamp");
+
+  setFakeTime(ctx, t0 + 60 * 60000);   // an hour later, far past any cantMin
+  ctx.ensureCandidate();
+  assert.equal(ctx.state.considered[t.id], "dislodged", "it should still be skipped");
+});
+
+test("benchCant: clears the intervention prompt, like dislodge does", async () => {
+  const { ctx } = await loadApp({ seed: 244 });
+  ctx.addTask("Dotted task", true);
+  ctx.state.interventionActive = true;
+  ctx.benchCant();
+  assert.equal(ctx.state.interventionActive, false);
+});
+
+test("benchCant: a no-op when the chain is empty", async () => {
+  const { ctx } = await loadApp({ seed: 245 });
+  ctx.addTask("Undotted", false);
+  assert.equal(ctx.state.chain.length, 0, "precondition: no benchmark");
+
+  ctx.benchCant();
+  assert.deepEqual(Object.keys(ctx.state.considered), [], "nothing should get marked");
+});
+
+test("benchCant: undo restores the dot and clears the mark", async () => {
+  const { ctx } = await loadApp({ seed: 246 });
+  const t = ctx.addTask("Dotted task", true);
+  ctx.benchCant();
+  assert.equal(ctx.state.considered[t.id], "cant", "precondition: it was marked");
+
+  ctx.undo();
+  assert.deepEqual([...ctx.state.chain], [t.id], "the dot comes back");
+  assert.equal(t.id in ctx.state.considered, false);
+  assert.equal(t.id in ctx.state.cantAt, false, "no orphaned timestamp left behind");
+});
+
+test("UI: the benchmark card offers Can't alongside Dislodge", async () => {
+  const { ctx, shim } = await loadApp({ seed: 247 });
+  ctx.addTask("Dotted task", true);
+  ctx.render();
+  const scanHtml = shim.elements.get("scan").innerHTML;
+
+  assert.match(scanHtml, /data-act="bench-cant"/, `expected a bench-cant button in: ${scanHtml}`);
+  assert.match(scanHtml, /data-act="dislodge"/, "Dislodge stays — they're different promises");
+});
+
+test("UI: the bench-cant action is wired up through onAction", async () => {
+  const { ctx } = await loadApp({ seed: 248 });
+  const t = ctx.addTask("Dotted task", true);
+
+  ctx.onAction("bench-cant", { dataset: {} });
+  assert.equal(ctx.state.considered[t.id], "cant");
+  assert.equal(ctx.state.chain.includes(t.id), false);
+});
+
+test("UI: a benchmark marked Can't shows its countdown in the task list", async () => {
+  const { ctx, shim } = await loadApp({ seed: 249 });
+  ctx.state.settings.cantMin = 30;
+  ctx.addTask("Dotted task", true);
+  ctx.state.listOpen = true;
+
+  ctx.benchCant();
+  const listHtml = shim.elements.get("listBody").innerHTML;
+  assert.match(listHtml, /can’t · \d+m/, `expected a countdown badge in: ${listHtml}`);
+});
+
 test("workedOn: crosses the benchmark off the chain and marks it 'worked'", async () => {
   const { ctx } = await loadApp({ seed: 230 });
   const t = ctx.addTask("Dotted task", true);

@@ -144,6 +144,7 @@ textarea{width:100%;font-family:var(--font-mono);font-size:12px}
 .btn:active{transform:translateY(1px)}
 .btn.dislodge{background:var(--danger);padding:6px 12px;font-size:13px}
 .btn.worked{background:var(--cant);padding:6px 12px;font-size:13px}
+.btn.cant-sm{background:var(--cant);padding:6px 12px;font-size:13px}
 .btn.del-sm{background:var(--danger);padding:6px 12px;font-size:13px}
 .btn.yes{background:var(--yes)}
 .btn.no{background:var(--no)}
@@ -821,6 +822,19 @@ function dislodge(){
   state.interventionActive = false;
   commit();
 }
+/* Dislodge's time-boxed sibling. Same move — off the chain, no rank signal,
+   since refusing on circumstance answers no "would I rather?" — but the mark
+   is stamped, so expireCants() returns it to the scan once cantMin passes.
+   Dislodge says "not this pass"; this says "not right now, ask me later". */
+function benchCant(){
+  const b = benchmark(); if(!b) return;
+  pushUndo();
+  state.chain.pop();
+  state.considered[b.id] = "cant";
+  state.cantAt[b.id] = Date.now();
+  state.interventionActive = false;
+  commit();
+}
 /* Reads whatever is currently in the edit pane's inputs onto the task. Shared by
    Save, Done, and Worked on it — those two save before they act, so a title you
    retyped on your way out isn't lost, and a box you just ticked (evergreen)
@@ -1180,7 +1194,8 @@ function renderScan(){
          + '<button class="editlink" data-act="edit" data-id="'+b.id+'">Edit</button>'
          + '<button class="btn worked" data-act="worked" title="Started it, crossing it off, back to the bottom of the list (rule 7, w)">Worked on it<span class="keyhint">w</span></button>'
          + (state.mode==="scan" ? '<button class="sidesm" data-act="start-working" title="Stop suggesting new candidates — just work through what\u2019s already dotted">done adding for now</button>' : '')
-         + '<button class="btn dislodge" data-act="dislodge" title="Remove from the chain without completing">Dislodge</button>'
+         + '<button class="btn cant-sm" data-act="bench-cant" title="Can’t do it right now — off the chain, and back in the scan on its own once your Can’t window passes (Settings)">Can’t</button>'
+         + '<button class="btn dislodge" data-act="dislodge" title="Remove from the chain for the rest of this pass, without completing">Dislodge</button>'
          + '<button class="btn del-sm" data-act="delete-task" data-id="'+b.id+'" title="Delete this task entirely (Delete key)">Delete<span class="keyhint">⌫</span></button>'
          + '</div></div>';
   }
@@ -1321,6 +1336,7 @@ function openHelp(){
     + '<li><b>Yes</b> dots it — it becomes the new benchmark on the chain.</li>'
     + '<li><b>No</b> skips it (and nudges its rank down). <b>Can\u2019t</b> skips it with no rank signal.</li>'
     + '<li>Do the dotted chain from the bottom (newest) to the top.</li>'
+    + '<li>Can’t get to a dotted one after all? <b>Can’t</b> takes it off the chain and puts it back in the scan by itself once your Can’t window passes; <b>Dislodge</b> takes it off for the rest of the pass. Neither moves its rank.</li>'
     + '<li>Either finish a task and cross it off, or use <b>↻ Worked on it</b> to cross it off and send it back to the bottom. Both are also in the edit pane, for any task.</li>'
     + '<li>Urgent task? <b>Add &amp; dot</b> puts it straight on the chain so it\u2019s done first.</li>'
     + '<li>Tap a context chip above the add bar to tag what you\u2019re about to add \u2014 it stays picked for the next few too.</li>'
@@ -1425,6 +1441,7 @@ function onAction(act, el){
     case "can": case "yes": case "no": case "cant": decide(act); break;
     case "cand-done": decide("cand-done"); break;
     case "bench-done": benchDone(); break;
+    case "bench-cant": benchCant(); break;
     case "dislodge": dislodge(); break;
     case "worked": workedOn(); break;
     case "reveal": revealTask(el.dataset.id); break;
