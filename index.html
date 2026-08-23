@@ -296,7 +296,7 @@ textarea{width:100%;font-family:var(--font-mono);font-size:12px}
 
   <section class="panel histwrap" id="histPanel"></section>
 
-  <footer class="foot">After Mark Forster's <a href="https://blog.beeminder.com/forster/" target="_blank" rel="noopener">Final Version Perfected</a> · rank posteriors following <a href="https://alltom.com/pages/spawelo/" target="_blank" rel="noopener">spawelo</a> · keys: <span class="mono">y / n / c / d / ⌫ / u</span><div class="themerow"><button id="themeBtn" class="themebtn" data-act="cycle-theme"></button></div></footer>
+  <footer class="foot">After Mark Forster's <a href="https://blog.beeminder.com/forster/" target="_blank" rel="noopener">Final Version Perfected</a> · rank posteriors following <a href="https://alltom.com/pages/spawelo/" target="_blank" rel="noopener">spawelo</a> · keys: <span class="mono">y / n / c / d / w / ⌫ / u</span><div class="themerow"><button id="themeBtn" class="themebtn" data-act="cycle-theme"></button></div></footer>
 </div>
 <div id="modalRoot"></div>
 
@@ -1147,7 +1147,7 @@ function renderScan(){
          + '<span class="chiprow">'+chipHTML(b)+'</span></div>'
          + '<div class="siderail">'
          + '<button class="reveal" data-act="reveal" data-id="'+b.id+'">Reveal</button>'
-         + '<button class="sidesm" data-act="worked" title="Started it, crossing it off, back to the bottom of the list (rule 7)">worked on it ↻</button>'
+         + '<button class="sidesm" data-act="worked" title="Started it, crossing it off, back to the bottom of the list (rule 7, w)">worked on it ↻<span class="keyhint">w</span></button>'
          + (state.mode==="scan" ? '<button class="sidesm" data-act="start-working" title="Stop suggesting new candidates — just work through what\u2019s already dotted">done adding for now</button>' : '')
          + '<button class="btn dislodge" data-act="dislodge" title="Remove from the chain without completing">Dislodge</button>'
          + '<button class="btn del-sm" data-act="delete-task" data-id="'+b.id+'" title="Delete this task entirely (Delete key)">Delete<span class="keyhint">⌫</span></button>'
@@ -1543,6 +1543,7 @@ document.addEventListener("keydown", e=>{
   else if(k==="n"&&!state.interventionActive&&state.candidateId) decide("no");                     // no-op at chain start
   else if(k==="c"&&!state.interventionActive&&state.candidateId) decide("cant");
   else if(k==="d") hotkeyDone();                                                             // cross off whatever's showing
+  else if(k==="w") workedOn();                                                               // worked on it — cross off, back to the bottom
   else if(e.key==="Delete"||e.key==="Backspace"){ e.preventDefault(); hotkeyDelete(); }       // remove it entirely
   else if(k==="u") undo();
 });
