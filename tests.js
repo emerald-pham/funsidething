@@ -1368,6 +1368,269 @@ test("UI: once a chain exists, Yes / No come back and the bare Can button goes a
 });
 
 /* =====================================================================
+   MARKING A TASK DONE FROM THE EDIT PANE
+   The edit modal could rename, re-context, or delete a task, but not cross it
+   off — completion was only reachable from the benchmark card, the candidate
+   card, or the `d` key. doneTask(id) closes that gap for any task, anywhere.
+   Deliberately NOT a mode change: unlike benchDone(), crossing something off
+   from the edit pane says nothing about whether you're still scanning.
+   ===================================================================== */
+
+test("doneTask: completes a plain open task and drops it out of the open list", async () => {
+  const { ctx } = await loadApp({ seed: 200 });
+  const t = ctx.addTask("Write the next Carmine scene", false);
+  ctx.doneTask(t.id);
+  const task = ctx.state.tasks.find((x) => x.id === t.id);
+  assert.equal(task.done, true);
+  assert.ok(task.completedAt, "completedAt should be stamped");
+  assert.equal(ctx.state.tasks.filter((x) => !x.done).length, 0);
+});
+
+test("doneTask: a dotted task leaves the chain, and scanning mode is left alone", async () => {
+  const { ctx } = await loadApp({ seed: 201 });
+  const t = ctx.addTask("Dotted task", true);
+  ctx.addTask("Other task", false);
+  assert.equal(ctx.state.chain.length, 1);
+
+  ctx.doneTask(t.id);
+  assert.equal(ctx.state.chain.includes(t.id), false, "a completed task must not stay dotted");
+  assert.equal(ctx.state.mode, "scan", "the edit pane says nothing about whether you're done scanning");
+});
+
+test("doneTask: a MID-chain task is removed without disturbing the benchmark", async () => {
+  const { ctx } = await loadApp({ seed: 202 });
+  const first = ctx.addTask("First dot", true);
+  const second = ctx.addTask("Second dot", true);
+  assert.equal(ctx.benchmark().id, second.id);
+
+  ctx.doneTask(first.id);
+  assert.deepEqual([...ctx.state.chain], [second.id]);
+  assert.equal(ctx.benchmark().id, second.id, "the head of the chain shouldn't move");
+});
+
+test("doneTask: completing the current candidate clears it and a fresh one is dealt", async () => {
+  const { ctx } = await loadApp({ seed: 203 });
+  addTaskAged(ctx, "Task A", 900000);
+  addTaskAged(ctx, "Task B", 600000);
+  addTaskAged(ctx, "Task C", 300000);
+  const cand = ctx.state.candidateId;
+  assert.ok(cand);
+
+  ctx.doneTask(cand);
+  assert.notEqual(ctx.state.candidateId, cand);
+  assert.ok(ctx.state.candidateId, "two tasks remain in the pool, so one should be offered");
+});
+
+test("doneTask: applies NO strength signal — no comparison was made", async () => {
+  const { ctx } = await loadApp({ seed: 204 });
+  ctx.addTask("Benchmark", true);
+  const t = ctx.addTask("Crossed off from the edit pane", false);
+  const before = ctx.state.tasks.map((x) => ({ id: x.id, mu: x.mu, sigma: x.sigma }));
+
+  ctx.doneTask(t.id);
+  const after = ctx.state.tasks.map((x) => ({ id: x.id, mu: x.mu, sigma: x.sigma }));
+  assert.deepEqual(after, before, "unlike cand-done, this must not score a win over the benchmark");
+});
+
+test("doneTask: a daily task stays open, comes due tomorrow, and is ineligible for the rest of today", async () => {
+  const { ctx } = await loadApp({ seed: 205 });
+  const t = ctx.addTask("Daily walk", false);
+  ctx.state.tasks.find((x) => x.id === t.id).recur = "daily";
+
+  ctx.doneTask(t.id);
+  const task = ctx.state.tasks.find((x) => x.id === t.id);
+  assert.equal(task.done, false, "a daily task is never permanently done");
+  assert.equal(task.due, ctx.todayISO(1));
+  assert.equal(ctx.state.considered[t.id], "done");
+  assert.equal(ctx.isEligible(task, ctx.activeCtxSet()), false);
+});
+
+test("doneTask: an evergreen task stays open and starts its rest window", async () => {
+  const { ctx } = await loadApp({ seed: 206 });
+  const t = ctx.addTask("Tidy the desk", false);
+  ctx.state.tasks.find((x) => x.id === t.id).evergreen = true;
+
+  ctx.doneTask(t.id);
+  const task = ctx.state.tasks.find((x) => x.id === t.id);
+  assert.equal(task.done, false);
+  assert.ok(task.lastDoneAt, "lastDoneAt drives the 90-minute evergreen rest");
+  assert.equal(ctx.isEligible(task, ctx.activeCtxSet()), false);
+});
+
+test("doneTask: clears any considered mark and its can't timestamp", async () => {
+  const { ctx } = await loadApp({ seed: 207 });
+  const t = ctx.addTask("Task A", false);
+  ctx.addTask("Task B", false);
+  ctx.state.considered[t.id] = "cant";
+  ctx.state.cantAt[t.id] = realNow(ctx);
+
+  ctx.doneTask(t.id);
+  assert.equal(t.id in ctx.state.considered, false);
+  assert.equal(t.id in ctx.state.cantAt, false, "no orphaned can't timestamp should linger");
+});
+
+test("doneTask: undo puts the task back, dot and all", async () => {
+  const { ctx } = await loadApp({ seed: 208 });
+  const t = ctx.addTask("Dotted task", true);
+  ctx.doneTask(t.id);
+  assert.equal(ctx.state.tasks.find((x) => x.id === t.id).done, true);
+
+  ctx.undo();
+  const task = ctx.state.tasks.find((x) => x.id === t.id);
+  assert.equal(task.done, false);
+  assert.equal(task.completedAt, null);
+  assert.deepEqual([...ctx.state.chain], [t.id], "undo should restore the dot too");
+});
+
+test("doneTask: an unknown, null, or undefined id is a safe no-op", async () => {
+  const { ctx } = await loadApp({ seed: 209 });
+  ctx.addTask("Task A", false);
+  ctx.doneTask("no-such-id");
+  ctx.doneTask(null);
+  ctx.doneTask(undefined);
+  assert.equal(ctx.state.tasks.filter((x) => !x.done).length, 1);
+  assert.equal(ctx.state.tasks.filter((x) => x.done).length, 0);
+});
+
+test("doneTask: crossing off the last dot empties the chain and the scan restarts oldest-first", async () => {
+  const { ctx } = await loadApp({ seed: 210 });
+  const oldest = addTaskAged(ctx, "Oldest outstanding", 900000);
+  addTaskAged(ctx, "Newer", 300000);
+  const dot = addTaskAged(ctx, "The only dot", 100000);
+  ctx.state.chain = [dot.id];
+  ctx.state.candidateId = null;
+
+  ctx.doneTask(dot.id);
+  assert.deepEqual([...ctx.state.chain], [], "the chain should be empty again");
+  assert.equal(ctx.state.mode, "scan");
+  assert.equal(ctx.state.candidateId, oldest.id, "with no benchmark, chain start deals the oldest outstanding");
+});
+
+test("UI: the edit pane renders a Done button carrying that task's id", async () => {
+  const { ctx, shim } = await loadApp({ seed: 211 });
+  const t = ctx.addTask("Task A", false);
+  ctx.openEdit(t.id);
+  const html = shim.elements.get("modalRoot").innerHTML;
+  assert.match(html, /data-act="done-task"/, `expected a done-task button in: ${html}`);
+  assert.match(html, new RegExp(`data-act="done-task" data-id="${t.id}"`));
+});
+
+test("UI: the done-task action completes the task and closes the pane", async () => {
+  const { ctx, shim } = await loadApp({ seed: 212 });
+  const t = ctx.addTask("Task A", false);
+  ctx.openEdit(t.id);
+  assert.notEqual(shim.elements.get("modalRoot").innerHTML, "");
+
+  ctx.onAction("done-task", { dataset: { id: t.id } });
+  assert.equal(ctx.state.tasks.find((x) => x.id === t.id).done, true);
+  assert.equal(shim.elements.get("modalRoot").innerHTML, "", "the modal should close behind it");
+  assert.match(shim.elements.get("histPanel").innerHTML, /1 done/, "it should show up in History");
+});
+
+/* ---------- Done saves the pane's fields first ----------
+   Delete throws unsaved edits away; Done doesn't. Retitle a task and cross it
+   off in one motion and the completed task carries the new title. The two
+   halves share a single undo snapshot, so one `u` reverses both. */
+
+function fillEditPane(ctx, shim, { title, url, due, evergreen, daily, ctxIds } = {}) {
+  const g = (id) => ctx.document.getElementById(id);
+  g("etTitle").value = title ?? "";
+  g("etUrl").value = url ?? "";
+  g("etDue").value = due ?? "";
+  g("etEver").checked = !!evergreen;
+  g("etDaily").checked = !!daily;
+  const picks = (ctxIds || []).map((id) => ({ checked: true, dataset: { editctx: id } }));
+  shim.document.querySelectorAll = (sel) => (sel === "[data-editctx]" ? picks : []);
+}
+
+// Characterization test — this one passes BEFORE the refactor as well as after.
+// Its job is to go red if pulling the field-reading into a shared helper breaks
+// the Save path, which nothing else currently covers.
+test("save-edit: still applies title, link, due, daily, and contexts, then closes the pane", async () => {
+  const { ctx, shim } = await loadApp({ seed: 213 });
+  const t = ctx.addTask("Old title", false);
+  ctx.openEdit(t.id);
+  fillEditPane(ctx, shim, { title: "New title", url: "https://example.com/x", due: "2026-09-01", daily: true, ctxIds: ["c_home"] });
+
+  ctx.onAction("save-edit", { dataset: { id: t.id } });
+  const task = ctx.state.tasks.find((x) => x.id === t.id);
+  assert.equal(task.title, "New title");
+  assert.equal(task.url, "https://example.com/x");
+  assert.equal(task.due, "2026-09-01");
+  assert.equal(task.recur, "daily");
+  assert.deepEqual([...task.ctx], ["c_home"]);
+  assert.equal(shim.elements.get("modalRoot").innerHTML, "");
+});
+
+test("done-task: saves the title you just typed before crossing it off", async () => {
+  const { ctx, shim } = await loadApp({ seed: 214 });
+  const t = ctx.addTask("Old title", false);
+  ctx.openEdit(t.id);
+  fillEditPane(ctx, shim, { title: "Renamed on the way out" });
+
+  ctx.onAction("done-task", { dataset: { id: t.id } });
+  const task = ctx.state.tasks.find((x) => x.id === t.id);
+  assert.equal(task.title, "Renamed on the way out", "Done must not discard the edit");
+  assert.equal(task.done, true);
+});
+
+test("done-task: saves link, due date, and contexts too", async () => {
+  const { ctx, shim } = await loadApp({ seed: 215 });
+  const t = ctx.addTask("Task A", false);
+  ctx.openEdit(t.id);
+  fillEditPane(ctx, shim, { url: "https://example.com/receipt", due: "2026-09-02", ctxIds: ["c_home", "c_laptop"] });
+
+  ctx.onAction("done-task", { dataset: { id: t.id } });
+  const task = ctx.state.tasks.find((x) => x.id === t.id);
+  assert.equal(task.url, "https://example.com/receipt");
+  assert.equal(task.due, "2026-09-02");
+  assert.deepEqual([...task.ctx], ["c_home", "c_laptop"]);
+});
+
+test("done-task: ticking 'repeats daily' in the pane makes it complete AS a daily", async () => {
+  const { ctx, shim } = await loadApp({ seed: 216 });
+  const t = ctx.addTask("Daily walk", false);
+  ctx.openEdit(t.id);
+  fillEditPane(ctx, shim, { daily: true });
+
+  ctx.onAction("done-task", { dataset: { id: t.id } });
+  const task = ctx.state.tasks.find((x) => x.id === t.id);
+  assert.equal(task.recur, "daily");
+  assert.equal(task.done, false, "the field you just ticked decides HOW it completes");
+  assert.equal(task.due, ctx.todayISO(1));
+  assert.equal(ctx.state.considered[t.id], "done");
+});
+
+test("done-task: the edit and the completion are ONE undo step", async () => {
+  const { ctx, shim } = await loadApp({ seed: 217 });
+  const t = ctx.addTask("Old title", false);
+  ctx.openEdit(t.id);
+  fillEditPane(ctx, shim, { title: "New title" });
+  ctx.onAction("done-task", { dataset: { id: t.id } });
+  const saved = ctx.state.tasks.find((x) => x.id === t.id);
+  assert.equal(saved.title, "New title", "precondition: the edit was saved on the way out");
+  assert.equal(saved.done, true, "precondition: and the task was completed");
+
+  ctx.undo();
+  const task = ctx.state.tasks.find((x) => x.id === t.id);
+  assert.equal(task.done, false, "one undo should reverse the completion");
+  assert.equal(task.title, "Old title", "...and the edit that rode along with it");
+});
+
+// Characterization test — Cancel's throw-it-away behavior is unchanged.
+test("close-modal: Cancel still throws unsaved edits away", async () => {
+  const { ctx, shim } = await loadApp({ seed: 218 });
+  const t = ctx.addTask("Old title", false);
+  ctx.openEdit(t.id);
+  fillEditPane(ctx, shim, { title: "Typed but never saved" });
+
+  ctx.onAction("close-modal", { dataset: {} });
+  assert.equal(ctx.state.tasks.find((x) => x.id === t.id).title, "Old title");
+  assert.equal(shim.elements.get("modalRoot").innerHTML, "");
+});
+
+
+/* =====================================================================
    NIGHT MODE — Unit 1: preference model & resolution
    ===================================================================== */
 const STORE_KEY = "fvp:chain-scanner:v1";
@@ -1770,6 +2033,7 @@ const ALLOWED_NON_ASCII = new Set([
   "\u2265", "\u2264", "\u2212", "\u00b1", "\u2248",           // maths
   "\u2192", "\u2193", "\u2197", "\u21ba", "\u21bb", "\u232b", // arrows & keycaps
   "\u2715", "\u2699", "\u25c9", "\u25a6", "\u{1f5d3}",        // icons
+  "\u2713",                                                  // check mark, Done in the edit pane
   "\u25b6", "\u25b8", "\u25be", "\u25bc", "\u25cf",           // carets & bullets
   "\u25d0", "\u2600", "\u263e",                               // night-mode faces
   "\u2019",                                                   // English apostrophe ("Can't")
@@ -1854,6 +2118,23 @@ for (const [what, fg, bg, min] of CONTRAST_PAIRS) {
     });
   }
 }
+
+// The Done button is a solid green fill carrying a white 14px bold label, which
+// is not "large text" — so it has to clear the same 3:1 floor as the chain card.
+// Read the token out of the rule rather than naming one here, so recolouring the
+// button to something illegible goes red instead of quietly shipping.
+test("contrast: white ink on the Done button fill clears 3:1 in both themes", () => {
+  const m = styleSrc.match(/\.btn\.done\{background:var\((--[a-z-]+)\)\}/);
+  assert.ok(m, "the Done button should be filled with a theme token");
+  const token = m[1];
+  for (const theme of ["light", "dark"]) {
+    const tokens = themeTokens()[theme];
+    assert.ok(tokens[token], `${token} must be defined as a light-dark() pair`);
+    const ratio = contrast(tokens["--chain-ink"], tokens[token]);
+    assert.ok(ratio >= 3.0,
+      `white on ${token} in ${theme} is ${ratio.toFixed(2)}:1, below the 3:1 floor`);
+  }
+});
 
 test("contrast: the accent token is used for link text rather than the card-fill token", () => {
   assert.match(styleSrc, /\na\{color:var\(--accent\)\}/,

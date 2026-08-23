@@ -235,6 +235,7 @@ textarea{width:100%;font-family:var(--font-mono);font-size:12px}
 .ctxpick label{display:flex;gap:6px;align-items:center;font-size:13.5px;min-width:0}
 .mbtns{display:flex;gap:9px;margin-top:18px;flex-wrap:wrap}
 .btn.danger{background:var(--danger)}
+.btn.done{background:var(--yes)}
 .btn.primary{background:var(--chain-deep)}
 .mgr{display:flex;gap:8px;align-items:center;margin:5px 0}
 .mgr input[type=text]{flex:1}
@@ -792,6 +793,34 @@ function dislodge(){
   state.interventionActive = false;
   commit();
 }
+/* Reads whatever is currently in the edit pane's inputs onto the task. Shared by
+   Save and by Done — Done saves before it crosses off, so a title you retyped on
+   your way out isn't lost, and a box you just ticked (daily, evergreen) decides
+   HOW it completes. Returns false if the pane isn't open. */
+function applyEditFields(t){
+  const title = document.getElementById("etTitle");
+  if(!t || !title) return false;
+  t.title = title.value.trim() || t.title;
+  t.url = safeUrl(document.getElementById("etUrl").value);
+  const d = document.getElementById("etDue").value; t.due = d || null;
+  t.evergreen = !!document.getElementById("etEver").checked;
+  t.recur = document.getElementById("etDaily").checked ? "daily" : null;
+  t.ctx = [...document.querySelectorAll("[data-editctx]")].filter(x=>x.checked).map(x=>x.dataset.editctx);
+  return true;
+}
+function doneTask(id, push){ // cross any task off from the edit pane, dotted or not, wherever it sits
+  const t = taskById(id); if(!t) return;
+  if(push!==false) pushUndo();   // false when the caller already snapshotted — see the done-task action
+  completeTask(t);
+  state.chain = state.chain.filter(c=>c!==id);   // a completed task must never stay dotted
+  delete state.cantAt[id];
+  if(state.candidateId===id) state.candidateId=null;
+  // No mode change and no updatePair on purpose: crossing something off from the
+  // edit pane says nothing about whether you're still scanning, and no "would I
+  // rather?" comparison was ever answered, so there's no rank signal to record.
+  recomputeRanks();
+  commit();
+}
 function deleteTask(id){ // removes a task entirely — from the list, the chain, everywhere
   if(!id) return;
   pushUndo();
@@ -1287,6 +1316,7 @@ function openEdit(id){
     + '<h3>Needs these contexts</h3><div class="ctxpick">'+ctxHtml+'</div>'
     + '<div class="kv">strength ≈ <b class="mono">'+t.mu.toFixed(1)+'</b> ± '+t.sigma.toFixed(1)+' · '+topKlabel(t.id)+'</div>'
     + '<div class="mbtns"><button class="btn primary" data-act="save-edit" data-id="'+t.id+'">Save</button>'
+    + '<button class="btn done" data-act="done-task" data-id="'+t.id+'" title="Cross it off \u2014 completes the task and closes this pane">\u2713 Done</button>'
     + '<button class="btn subtle" data-act="close-modal">Cancel</button>'
     + '<button class="btn danger" data-act="delete-task" data-id="'+t.id+'" style="margin-left:auto">Delete</button></div>'
   );
@@ -1400,13 +1430,15 @@ function onAction(act, el){
     case "save-edit": {
       const t=taskById(el.dataset.id); if(!t) break;
       pushUndo();
-      t.title=document.getElementById("etTitle").value.trim()||t.title;
-      t.url = safeUrl(document.getElementById("etUrl").value);
-      const d=document.getElementById("etDue").value; t.due=d||null;
-      t.evergreen=document.getElementById("etEver").checked;
-      t.recur=document.getElementById("etDaily").checked?"daily":null;
-      t.ctx=[...document.querySelectorAll("[data-editctx]")].filter(x=>x.checked).map(x=>x.dataset.editctx);
+      applyEditFields(t);
       closeModal(); commit(); break;
+    }
+    case "done-task": {
+      const t=taskById(el.dataset.id); if(!t) break;
+      pushUndo();                 // one snapshot covers the save AND the completion,
+      applyEditFields(t);         // so a single undo reverses the whole gesture
+      doneTask(t.id, false);
+      closeModal(); break;
     }
     case "delete-task": deleteTask(el.dataset.id); closeModal(); break;
     case "restore": {
