@@ -619,14 +619,19 @@ test("parseTaskList: a javascript: URL inside a markdown link is stripped by saf
   assert.equal(rows[0].url, null);
 });
 
-test("todayISO / sameLocalDay: offsets and day-boundary comparisons", async () => {
+test("todayISO: renders an ISO date and honours day offsets", async () => {
   const { ctx } = await loadApp();
-  const today = ctx.todayISO(0);
-  assert.match(today, /^\d{4}-\d{2}-\d{2}$/);
-  const now = Date.now();
-  assert.equal(ctx.sameLocalDay(now, now), true);
-  assert.equal(ctx.sameLocalDay(now - 25 * 3600 * 1000 * 2, now), false);
-  assert.equal(ctx.sameLocalDay(null, now), false);
+  assert.match(ctx.todayISO(0), /^\d{4}-\d{2}-\d{2}$/);
+  assert.match(ctx.todayISO(1), /^\d{4}-\d{2}-\d{2}$/);
+  assert.notEqual(ctx.todayISO(1), ctx.todayISO(0));
+  assert.notEqual(ctx.todayISO(-1), ctx.todayISO(0));
+});
+
+// sameLocalDay() went out with "repeats daily" — the daily eligibility gate was
+// its only caller. This guards against it drifting back in unused.
+test("sameLocalDay: removed along with the daily recurrence it existed for", async () => {
+  const { ctx } = await loadApp();
+  assert.equal(typeof ctx.sameLocalDay, "undefined");
 });
 
 test("dueInfo: classifies overdue / today / tomorrow / later", async () => {
@@ -1589,6 +1594,36 @@ test("UI: the chain breadcrumb still reveals-in-list (untouched by the Edit swap
   assert.match(scanHtml, />First dot</, "the crumb shows the task's own title, not the word Edit");
 });
 
+/* ---------- benchmark card: no redundant dot, full-size "Worked on it" ----------
+   The card already reads as the benchmark (purple fill, "Done" checkbox, its
+   position in the layout), so the little filled circle beside the title was
+   saying nothing the card didn't already say. "Worked on it" was a small
+   underlined text link next to full-size Dislodge/Delete buttons despite being
+   an equally consequential action; it's now a peer-sized button. */
+
+test("UI: the benchmark card no longer renders the redundant dot circle", async () => {
+  const { ctx, shim } = await loadApp({ seed: 96 });
+  ctx.addTask("Dotted task", true);
+  ctx.render();
+  const scanHtml = shim.elements.get("scan").innerHTML;
+
+  assert.ok(!/class="dot"/.test(scanHtml), `the dot span should be gone from: ${scanHtml}`);
+  assert.match(scanHtml, /data-act="bench-done"/, "the Done checkbox must survive");
+  assert.match(scanHtml, />Dotted task</, "and so must the title");
+});
+
+test("UI: 'Worked on it' renders as a full-size button, like Dislodge and Delete", async () => {
+  const { ctx, shim } = await loadApp({ seed: 97 });
+  ctx.addTask("Dotted task", true);
+  ctx.render();
+  const scanHtml = shim.elements.get("scan").innerHTML;
+
+  assert.match(scanHtml, /class="btn worked" data-act="worked"/,
+    "it should carry the same .btn sizing as its neighbours");
+  assert.ok(!/class="sidesm" data-act="worked"/.test(scanHtml),
+    "the old small text-link styling should be gone");
+});
+
 /* =====================================================================
    MARKING A TASK DONE FROM THE EDIT PANE
    The edit modal could rename, re-context, or delete a task, but not cross it
@@ -1654,17 +1689,79 @@ test("doneTask: applies NO strength signal — no comparison was made", async ()
   assert.deepEqual(after, before, "unlike cand-done, this must not score a win over the benchmark");
 });
 
-test("doneTask: a daily task stays open, comes due tomorrow, and is ineligible for the rest of today", async () => {
+/* ---------- "repeats daily" is gone ----------
+   The recurrence feature was removed. A task carrying a legacy recur:"daily"
+   (from storage written by an older version, or a cloud sync from a device
+   still on one) must degrade to an ordinary task rather than keep any of the
+   old special-casing: no eligibility gate, no due-date bump on completion,
+   no chip. Evergreen is a separate feature and stays. */
+
+test("legacy recur:'daily' no longer gates eligibility", async () => {
   const { ctx } = await loadApp({ seed: 205 });
+  const t = ctx.addTask("Daily walk", false);
+  const task = ctx.state.tasks.find((x) => x.id === t.id);
+  task.recur = "daily";
+  task.lastDoneAt = realNow(ctx);   // "already done today" — used to make it ineligible
+
+  assert.equal(ctx.isEligible(task, ctx.activeCtxSet()), true,
+    "the daily gate is gone, so a legacy daily task scans like any other");
+});
+
+test("doneTask: a legacy daily task now completes permanently, with no due-date bump", async () => {
+  const { ctx } = await loadApp({ seed: 219 });
   const t = ctx.addTask("Daily walk", false);
   ctx.state.tasks.find((x) => x.id === t.id).recur = "daily";
 
   ctx.doneTask(t.id);
   const task = ctx.state.tasks.find((x) => x.id === t.id);
-  assert.equal(task.done, false, "a daily task is never permanently done");
-  assert.equal(task.due, ctx.todayISO(1));
-  assert.equal(ctx.state.considered[t.id], "done");
-  assert.equal(ctx.isEligible(task, ctx.activeCtxSet()), false);
+  assert.equal(task.done, true, "it should cross off for good like any other task");
+  assert.equal(task.due, null, "no tomorrow-bump — that was the daily behaviour");
+  assert.equal(t.id in ctx.state.considered, false);
+});
+
+test("chipHTML: a legacy daily task renders no daily chip", async () => {
+  const { ctx } = await loadApp({ seed: 220 });
+  const t = ctx.addTask("Daily walk", false);
+  const task = ctx.state.tasks.find((x) => x.id === t.id);
+  task.recur = "daily";
+  assert.doesNotMatch(ctx.chipHTML(task), /daily/i);
+});
+
+test("addTask: new tasks carry no recur field at all", async () => {
+  const { ctx } = await loadApp({ seed: 221 });
+  const t = ctx.addTask("Task A", false);
+  assert.equal("recur" in ctx.state.tasks.find((x) => x.id === t.id), false);
+});
+
+test("UI: the edit pane no longer offers a 'repeats daily' checkbox", async () => {
+  const { ctx, shim } = await loadApp({ seed: 222 });
+  const t = ctx.addTask("Task A", false);
+  ctx.openEdit(t.id);
+  const html = shim.elements.get("modalRoot").innerHTML;
+  assert.ok(!/id="etDaily"/.test(html), `the daily checkbox should be gone from: ${html}`);
+  assert.doesNotMatch(html, /repeats daily/i);
+});
+
+test("boot: a stored task carrying legacy recur:'daily' has the dead field stripped on load", async () => {
+  const stored = {
+    v: 1, tasks: [{
+      id: "legacy1", title: "Daily walk", url: null, due: "2026-01-01", startsAt: null,
+      evergreen: false, recur: "daily", ctx: [], mu: 25, sigma: 8.33,
+      done: false, createdAt: 1, completedAt: null, lastDoneAt: null,
+    }],
+    contexts: [], chain: [], considered: {}, cantAt: {}, candidateId: null,
+    interventionActive: false, interventionP: 0, snooze: 0,
+    mode: "scan", decisionsMs: [], presentedAt: 0,
+    listOpen: false, ctxOpen: true, histOpen: false, updatedAt: 5,
+    settings: { horizonMin: 60, thresholdPct: 25, samples: 250, cantMin: 30, theme: "system" },
+  };
+  const { ctx } = await loadApp({ seed: 223, seedStorage: { "fvp:chain-scanner:v1": JSON.stringify(stored) } });
+
+  const task = ctx.state.tasks.find((x) => x.id === "legacy1");
+  assert.ok(task, "precondition: the stored task loaded");
+  assert.equal("recur" in task, false, "the removed feature's flag should not ride along in exports/sync");
+  assert.equal(task.title, "Daily walk", "nothing else about the task changes");
+  assert.equal(task.due, "2026-01-01");
 });
 
 test("doneTask: an evergreen task stays open and starts its rest window", async () => {
@@ -1754,14 +1851,13 @@ test("UI: the done-task action completes the task and closes the pane", async ()
    off in one motion and the completed task carries the new title. The two
    halves share a single undo snapshot, so one `u` reverses both. */
 
-function fillEditPane(ctx, shim, { title, url, due, start, evergreen, daily, ctxIds } = {}) {
+function fillEditPane(ctx, shim, { title, url, due, start, evergreen, ctxIds } = {}) {
   const g = (id) => ctx.document.getElementById(id);
   g("etTitle").value = title ?? "";
   g("etUrl").value = url ?? "";
   g("etDue").value = due ?? "";
   g("etStart").value = start ?? "";
   g("etEver").checked = !!evergreen;
-  g("etDaily").checked = !!daily;
   const picks = (ctxIds || []).map((id) => ({ checked: true, dataset: { editctx: id } }));
   shim.document.querySelectorAll = (sel) => (sel === "[data-editctx]" ? picks : []);
 }
@@ -1817,18 +1913,18 @@ test("done-task: also saves the start date before completing", async () => {
 // Characterization test — this one passes BEFORE the refactor as well as after.
 // Its job is to go red if pulling the field-reading into a shared helper breaks
 // the Save path, which nothing else currently covers.
-test("save-edit: still applies title, link, due, daily, and contexts, then closes the pane", async () => {
+test("save-edit: still applies title, link, due, evergreen, and contexts, then closes the pane", async () => {
   const { ctx, shim } = await loadApp({ seed: 213 });
   const t = ctx.addTask("Old title", false);
   ctx.openEdit(t.id);
-  fillEditPane(ctx, shim, { title: "New title", url: "https://example.com/x", due: "2026-09-01", daily: true, ctxIds: ["c_home"] });
+  fillEditPane(ctx, shim, { title: "New title", url: "https://example.com/x", due: "2026-09-01", evergreen: true, ctxIds: ["c_home"] });
 
   ctx.onAction("save-edit", { dataset: { id: t.id } });
   const task = ctx.state.tasks.find((x) => x.id === t.id);
   assert.equal(task.title, "New title");
   assert.equal(task.url, "https://example.com/x");
   assert.equal(task.due, "2026-09-01");
-  assert.equal(task.recur, "daily");
+  assert.equal(task.evergreen, true);
   assert.deepEqual([...task.ctx], ["c_home"]);
   assert.equal(shim.elements.get("modalRoot").innerHTML, "");
 });
@@ -1858,17 +1954,17 @@ test("done-task: saves link, due date, and contexts too", async () => {
   assert.deepEqual([...task.ctx], ["c_home", "c_laptop"]);
 });
 
-test("done-task: ticking 'repeats daily' in the pane makes it complete AS a daily", async () => {
+test("done-task: ticking 'evergreen' in the pane makes it complete AS an evergreen", async () => {
   const { ctx, shim } = await loadApp({ seed: 216 });
-  const t = ctx.addTask("Daily walk", false);
+  const t = ctx.addTask("Tidy the desk", false);
   ctx.openEdit(t.id);
-  fillEditPane(ctx, shim, { daily: true });
+  fillEditPane(ctx, shim, { evergreen: true });
 
   ctx.onAction("done-task", { dataset: { id: t.id } });
   const task = ctx.state.tasks.find((x) => x.id === t.id);
-  assert.equal(task.recur, "daily");
+  assert.equal(task.evergreen, true);
   assert.equal(task.done, false, "the field you just ticked decides HOW it completes");
-  assert.equal(task.due, ctx.todayISO(1));
+  assert.ok(task.lastDoneAt, "it starts its rest window instead of crossing off for good");
   assert.equal(ctx.state.considered[t.id], "done");
 });
 
@@ -1886,6 +1982,136 @@ test("done-task: the edit and the completion are ONE undo step", async () => {
   const task = ctx.state.tasks.find((x) => x.id === t.id);
   assert.equal(task.done, false, "one undo should reverse the completion");
   assert.equal(task.title, "Old title", "...and the edit that rode along with it");
+});
+
+/* =====================================================================
+   "WORKED ON IT" FROM THE EDIT PANE
+   Forster rule 7 — you started it, so cross it off and send it back to the
+   bottom of the list. It was only reachable for the task at the head of the
+   chain (the benchmark card's button). workedOnTask(id) generalizes it to any
+   task, anywhere, mirroring what doneTask(id) already did for completion.
+   Like Done, it saves the pane's fields on the way out and shares one undo
+   snapshot with them.
+   ===================================================================== */
+
+// Characterization test — the benchmark-card path must keep working unchanged.
+test("workedOn: crosses the benchmark off the chain and marks it 'worked'", async () => {
+  const { ctx } = await loadApp({ seed: 230 });
+  const t = ctx.addTask("Dotted task", true);
+  ctx.workedOn();
+
+  assert.equal(ctx.state.chain.includes(t.id), false, "it comes off the chain");
+  assert.equal(ctx.state.considered[t.id], "worked");
+  assert.equal(ctx.state.tasks.find((x) => x.id === t.id).done, false, "worked on it is not done");
+});
+
+test("UI: the edit pane renders a 'Worked on it' button carrying that task's id", async () => {
+  const { ctx, shim } = await loadApp({ seed: 231 });
+  const t = ctx.addTask("Task A", false);
+  ctx.openEdit(t.id);
+  const html = shim.elements.get("modalRoot").innerHTML;
+
+  assert.match(html, new RegExp(`data-act="worked-task" data-id="${t.id}"`), `expected in: ${html}`);
+  assert.match(html, /Worked on it/);
+});
+
+test("worked-task: marks the task 'worked' and closes the pane, without completing it", async () => {
+  const { ctx, shim } = await loadApp({ seed: 232 });
+  const t = ctx.addTask("Task A", false);
+  ctx.addTask("Task B", false);
+  ctx.openEdit(t.id);
+
+  ctx.onAction("worked-task", { dataset: { id: t.id } });
+  assert.equal(ctx.state.considered[t.id], "worked");
+  assert.equal(ctx.state.tasks.find((x) => x.id === t.id).done, false, "it must not cross off for good");
+  assert.equal(shim.elements.get("modalRoot").innerHTML, "", "the modal should close behind it");
+});
+
+test("worked-task: removes the task from the chain wherever it sits, not just the head", async () => {
+  const { ctx } = await loadApp({ seed: 233 });
+  const buried = ctx.addTask("Buried dot", true);
+  const head = ctx.addTask("Head dot", true);
+  assert.deepEqual([...ctx.state.chain], [buried.id, head.id], "precondition: buried is under the head");
+
+  ctx.openEdit(buried.id);
+  ctx.onAction("worked-task", { dataset: { id: buried.id } });
+  assert.deepEqual([...ctx.state.chain], [head.id], "only the worked task leaves the chain");
+});
+
+test("worked-task: saves the fields you just edited before marking it worked", async () => {
+  const { ctx, shim } = await loadApp({ seed: 234 });
+  const t = ctx.addTask("Old title", false);
+  ctx.openEdit(t.id);
+  fillEditPane(ctx, shim, { title: "Renamed on the way out", due: "2026-09-03" });
+
+  ctx.onAction("worked-task", { dataset: { id: t.id } });
+  const task = ctx.state.tasks.find((x) => x.id === t.id);
+  assert.equal(task.title, "Renamed on the way out", "Worked on it must not discard the edit");
+  assert.equal(task.due, "2026-09-03");
+  assert.equal(ctx.state.considered[t.id], "worked");
+});
+
+test("worked-task: the edit and the mark are ONE undo step", async () => {
+  const { ctx, shim } = await loadApp({ seed: 235 });
+  const t = ctx.addTask("Old title", true);
+  ctx.openEdit(t.id);
+  fillEditPane(ctx, shim, { title: "New title" });
+  ctx.onAction("worked-task", { dataset: { id: t.id } });
+  assert.equal(ctx.state.considered[t.id], "worked", "precondition: it was marked");
+
+  ctx.undo();
+  const task = ctx.state.tasks.find((x) => x.id === t.id);
+  assert.equal(task.title, "Old title", "one undo reverses the edit...");
+  assert.equal(t.id in ctx.state.considered, false, "...and the mark that rode along with it");
+  assert.deepEqual([...ctx.state.chain], [t.id], "...and restores the dot");
+});
+
+test("worked-task: clears the candidate slot and any can't timestamp", async () => {
+  const { ctx } = await loadApp({ seed: 236 });
+  const t = ctx.addTask("Task A", false);
+  ctx.addTask("Task B", false);
+  ctx.state.candidateId = t.id;
+  ctx.state.cantAt[t.id] = realNow(ctx);
+
+  ctx.openEdit(t.id);
+  ctx.onAction("worked-task", { dataset: { id: t.id } });
+  assert.notEqual(ctx.state.candidateId, t.id, "the worked task must not stay on offer");
+  assert.equal(t.id in ctx.state.cantAt, false, "no orphaned can't timestamp should linger");
+});
+
+test("workedOnTask: an unknown, null, or undefined id is a safe no-op", async () => {
+  const { ctx } = await loadApp({ seed: 237 });
+  ctx.addTask("Task A", false);
+  ctx.workedOnTask("no-such-id");
+  ctx.workedOnTask(null);
+  ctx.workedOnTask(undefined);
+  assert.equal(ctx.state.tasks.filter((x) => !x.done).length, 1);
+  assert.deepEqual(Object.keys(ctx.state.considered), []);
+});
+
+/* ---------- edit pane decluttering ---------- */
+
+test("UI: the Starts hint reads in parentheses", async () => {
+  const { ctx, shim } = await loadApp({ seed: 238 });
+  const t = ctx.addTask("Task A", false);
+  ctx.openEdit(t.id);
+  assert.match(shim.elements.get("modalRoot").innerHTML, /\(not eligible for the queue until this date\)/);
+});
+
+test("UI: the edit pane splits form actions from task actions into two button rows", async () => {
+  const { ctx, shim } = await loadApp({ seed: 239 });
+  const t = ctx.addTask("Task A", false);
+  ctx.openEdit(t.id);
+  const html = shim.elements.get("modalRoot").innerHTML;
+
+  const rows = html.match(/<div class="mbtns[^"]*">[\s\S]*?<\/div>/g) || [];
+  assert.equal(rows.length, 2, `expected two button rows, got ${rows.length} in: ${html}`);
+  assert.match(rows[0], /data-act="save-edit"/, "row 1 is the form actions");
+  assert.match(rows[0], /data-act="close-modal"/);
+  assert.ok(!/data-act="delete-task"/.test(rows[0]), "Delete must not sit beside Save");
+  assert.match(rows[1], /data-act="done-task"/, "row 2 is what to do with the task itself");
+  assert.match(rows[1], /data-act="worked-task"/);
+  assert.match(rows[1], /data-act="delete-task"/);
 });
 
 // Characterization test — Cancel's throw-it-away behavior is unchanged.
@@ -2397,6 +2623,19 @@ for (const [what, fg, bg, min] of CONTRAST_PAIRS) {
 test("contrast: white ink on the Done button fill clears 3:1 in both themes", () => {
   const m = styleSrc.match(/\.btn\.done\{background:var\((--[a-z-]+)\)\}/);
   assert.ok(m, "the Done button should be filled with a theme token");
+  const token = m[1];
+  for (const theme of ["light", "dark"]) {
+    const tokens = themeTokens()[theme];
+    assert.ok(tokens[token], `${token} must be defined as a light-dark() pair`);
+    const ratio = contrast(tokens["--chain-ink"], tokens[token]);
+    assert.ok(ratio >= 3.0,
+      `white on ${token} in ${theme} is ${ratio.toFixed(2)}:1, below the 3:1 floor`);
+  }
+});
+
+test("contrast: white ink on the 'Worked on it' button fill clears 3:1 in both themes", () => {
+  const m = styleSrc.match(/\.btn\.worked\{background:var\((--[a-z-]+)\)/);
+  assert.ok(m, "the Worked on it button should be filled with a theme token");
   const token = m[1];
   for (const theme of ["light", "dark"]) {
     const tokens = themeTokens()[theme];

@@ -124,7 +124,6 @@ textarea{width:100%;font-family:var(--font-mono);font-size:12px}
 .bench a{text-decoration-color:rgba(255,255,255,.6)}
 .cand{background:var(--cand-bg);border:1.5px solid var(--cand-line);color:var(--cand-ink)}
 .cand a{color:light-dark(#8a6800,#e8ce8e)}
-.dot{width:14px;height:14px;border-radius:50%;background:var(--chain-ink);flex:none;box-shadow:0 1px 2px rgba(0,0,0,.15)}
 .ckbox{width:19px;height:19px;flex:none;accent-color:var(--good);cursor:pointer}
 .donepick{display:flex;align-items:center;gap:6px;cursor:pointer;font-size:11.5px;font-weight:700;opacity:.85;flex:none}
 .donepick:hover{opacity:1}
@@ -144,6 +143,7 @@ textarea{width:100%;font-family:var(--font-mono);font-size:12px}
 .btn{border-radius:8px;padding:8px 16px;font-weight:700;font-size:14px;color:#fff;box-shadow:0 1px 2px rgba(20,24,48,.15)}
 .btn:active{transform:translateY(1px)}
 .btn.dislodge{background:var(--danger);padding:6px 12px;font-size:13px}
+.btn.worked{background:var(--cant);padding:6px 12px;font-size:13px}
 .btn.del-sm{background:var(--danger);padding:6px 12px;font-size:13px}
 .btn.yes{background:var(--yes)}
 .btn.no{background:var(--no)}
@@ -234,7 +234,9 @@ textarea{width:100%;font-family:var(--font-mono);font-size:12px}
 .frow input[type=text],.frow input[type=url]{flex:1;min-width:180px}
 .ctxpick{display:flex;flex-wrap:wrap;gap:4px 14px;margin:6px 0}
 .ctxpick label{display:flex;gap:6px;align-items:center;font-size:13.5px;min-width:0}
-.mbtns{display:flex;gap:9px;margin-top:18px;flex-wrap:wrap}
+.mbtns{display:flex;gap:9px;margin-top:18px;flex-wrap:wrap;align-items:center}
+.mbtns.taskacts{margin-top:10px;padding-top:12px;border-top:1px solid var(--line)}
+.cbox{display:flex;gap:6px;align-items:center;min-width:0}
 .btn.danger{background:var(--danger)}
 .btn.done{background:var(--yes)}
 .btn.primary{background:var(--chain-deep)}
@@ -250,6 +252,15 @@ textarea{width:100%;font-family:var(--font-mono);font-size:12px}
   .trow{grid-template-columns:70px 92px 1fr;gap:8px;padding:8px 10px}
   .siderail{min-width:72px}
   .qline{font-size:17px}
+  /* Edit pane on a phone: stack every field label above a full-width control
+     instead of cramming them onto one line, and give the actions real
+     thumb-sized targets that share the row evenly rather than wrapping ragged. */
+  .modal{padding:16px 14px}
+  .frow{flex-direction:column;align-items:stretch;gap:5px;margin:12px 0}
+  .frow label{min-width:0}
+  .frow input[type=text],.frow input[type=url],.frow input[type=date]{width:100%;min-width:0}
+  .frow .cbox{flex-direction:row;align-items:center;min-height:32px}
+  .mbtns .btn{flex:1 1 auto;min-height:44px;margin-left:0!important}
 }
 @media (prefers-reduced-motion:reduce){
   *{animation:none!important;transition:none!important}
@@ -428,7 +439,10 @@ function todayISO(offsetDays){
   return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
 }
 function isoToDate(iso){ const [y,m,d] = iso.split("-").map(Number); return new Date(y, m-1, d); }
-function sameLocalDay(ts, now){ if(!ts) return false; const a=new Date(ts), b=new Date(now); return a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate(); }
+/* "repeats daily" was removed. Nothing reads t.recur any more, but a stored or
+   synced task can still be carrying one — strip it on the way in so it doesn't
+   ride along in exports and cloud payloads forever. */
+function dropRemovedFields(st){ for(const t of (st && st.tasks) || []) delete t.recur; }
 
 function defaultState(){
   const C = (id,name,active)=>({id,name,active});
@@ -437,7 +451,7 @@ function defaultState(){
     C("c_work","At work",true), C("c_quiet","Quiet house",true), C("c_errand","Out running errands",true)
   ];
   const T = (title,opts)=> Object.assign({
-    id: uid(), title, url:null, due:null, evergreen:false, recur:null, ctx:[],
+    id: uid(), title, url:null, due:null, evergreen:false, ctx:[],
     mu: PRIOR_MU, sigma: PRIOR_SIGMA, done:false, createdAt:Date.now(), completedAt:null, lastDoneAt:null
   }, opts||{});
   const tasks = [];   // start empty — add your own, or paste your Obsidian list in Settings
@@ -600,6 +614,7 @@ async function cloudPull(){
         pushUndo();                            // remote adoption is undoable
         state = st;
         lastPushed = remote.payload;
+        dropRemovedFields(state);
         if(!state.settings) state.settings = {horizonMin:60,thresholdPct:25,samples:250,cantMin:30};
         if(state.settings.cantMin===undefined) state.settings.cantMin=30;
         state.settings.theme = normalizeTheme(state.settings.theme);
@@ -640,7 +655,6 @@ function activeCtxSet(){ const s=new Set(); for(const c of state.contexts) if(c.
 function isEligible(t, act){
   if(t.done) return false;
   const now = Date.now();
-  if(t.recur==="daily" && sameLocalDay(t.lastDoneAt, now)) return false;          // done today, comes back tomorrow
   if(t.evergreen && t.lastDoneAt && (now - t.lastDoneAt) < 90*60*1000) return false; // evergreen rest
   if(t.startsAt && isoToDate(t.startsAt) > isoToDate(todayISO(0))) return false;  // not started yet — can't be queued
   act = act || activeCtxSet();
@@ -766,8 +780,7 @@ function decide(kind){ // 'can' | 'yes' | 'no' | 'cant' | 'cand-done'
 }
 function completeTask(t){
   t.lastDoneAt = Date.now();
-  if(t.recur==="daily"){ t.due = todayISO(1); state.considered[t.id]="done"; }
-  else if(t.evergreen){ state.considered[t.id]="done"; }
+  if(t.evergreen){ state.considered[t.id]="done"; }
   else { t.done = true; t.completedAt = Date.now(); delete state.considered[t.id]; }
 }
 function benchDone(){
@@ -785,9 +798,18 @@ function benchDone(){
 }
 function workedOn(){ // Forster rule 7: worked on it, cross off, re-add at the bottom
   const b = benchmark(); if(!b) return;
-  pushUndo();
-  state.chain.pop();
-  state.considered[b.id] = "worked";
+  workedOnTask(b.id);
+}
+/* Rule 7 for any task, dotted or not, wherever it sits — the edit pane's button
+   as well as the benchmark card's. Like doneTask(), no mode change and no
+   updatePair: no "would I rather?" was answered, so there's no rank signal. */
+function workedOnTask(id, push){
+  const t = taskById(id); if(!t) return;
+  if(push!==false) pushUndo();   // false when the caller already snapshotted — see the worked-task action
+  state.chain = state.chain.filter(c=>c!==id);
+  state.considered[id] = "worked";
+  delete state.cantAt[id];
+  if(state.candidateId===id) state.candidateId=null;
   state.interventionActive = false;
   commit();
 }
@@ -800,9 +822,9 @@ function dislodge(){
   commit();
 }
 /* Reads whatever is currently in the edit pane's inputs onto the task. Shared by
-   Save and by Done — Done saves before it crosses off, so a title you retyped on
-   your way out isn't lost, and a box you just ticked (daily, evergreen) decides
-   HOW it completes. Returns false if the pane isn't open. */
+   Save, Done, and Worked on it — those two save before they act, so a title you
+   retyped on your way out isn't lost, and a box you just ticked (evergreen)
+   decides HOW it completes. Returns false if the pane isn't open. */
 function applyEditFields(t){
   const title = document.getElementById("etTitle");
   if(!t || !title) return false;
@@ -811,7 +833,6 @@ function applyEditFields(t){
   const d = document.getElementById("etDue").value; t.due = d || null;
   const sd = document.getElementById("etStart").value; t.startsAt = sd || null;
   t.evergreen = !!document.getElementById("etEver").checked;
-  t.recur = document.getElementById("etDaily").checked ? "daily" : null;
   t.ctx = [...document.querySelectorAll("[data-editctx]")].filter(x=>x.checked).map(x=>x.dataset.editctx);
   return true;
 }
@@ -910,7 +931,7 @@ function importList(text, ctx){
     const k = norm(r.title);
     if(seen.has(k)){ skipped++; continue; }
     seen.add(k);
-    state.tasks.push({ id:uid(), title:r.title, url:r.url, due:null, startsAt:null, evergreen:false, recur:null, ctx:c.slice(),
+    state.tasks.push({ id:uid(), title:r.title, url:r.url, due:null, startsAt:null, evergreen:false, ctx:c.slice(),
       mu:PRIOR_MU, sigma:PRIOR_SIGMA, done:false, createdAt:Date.now(), completedAt:null, lastDoneAt:null });
     added++;
   }
@@ -936,7 +957,7 @@ function toast(msg){
 function addTask(title, dot, ctx){
   title = (title||"").trim(); if(!title) return null;
   pushUndo();
-  const t = { id:uid(), title, url:null, due:null, startsAt:null, evergreen:false, recur:null, ctx: Array.isArray(ctx) ? ctx.slice() : [],
+  const t = { id:uid(), title, url:null, due:null, startsAt:null, evergreen:false, ctx: Array.isArray(ctx) ? ctx.slice() : [],
               mu:PRIOR_MU, sigma:PRIOR_SIGMA, done:false, createdAt:Date.now(), completedAt:null, lastDoneAt:null };
   state.tasks.push(t);
   if(dot){ state.chain.push(t.id); state.interventionActive=false; }
@@ -1113,8 +1134,7 @@ function chipHTML(t){
     const sd = isoToDate(t.startsAt);
     out += '<span class="chip notstarted">🗓 not started · '+(sd.getMonth()+1)+'/'+sd.getDate()+'</span>';
   }
-  if(t.recur==="daily") out += '<span class="chip ever">↻ daily</span>';
-  else if(t.evergreen) out += '<span class="chip ever">(evergreen)</span>';
+  if(t.evergreen) out += '<span class="chip ever">(evergreen)</span>';
   return out;
 }
 function titleHTML(t){
@@ -1154,12 +1174,11 @@ function renderScan(){
   if(b){
     html += '<div class="cardrow"><div class="card bench">'
          + '<label class="donepick" title="Done — cross it off (d)"><input class="ckbox" type="checkbox" data-act="bench-done" aria-label="Mark benchmark done"/> Done<span class="keyhint">d</span></label>'
-         + '<span class="dot" aria-hidden="true" title="Dotted — head of the chain"></span>'
          + '<span class="title">'+titleHTML(b)+'</span>'
          + '<span class="chiprow">'+chipHTML(b)+'</span></div>'
          + '<div class="siderail">'
          + '<button class="editlink" data-act="edit" data-id="'+b.id+'">Edit</button>'
-         + '<button class="sidesm" data-act="worked" title="Started it, crossing it off, back to the bottom of the list (rule 7, w)">worked on it ↻<span class="keyhint">w</span></button>'
+         + '<button class="btn worked" data-act="worked" title="Started it, crossing it off, back to the bottom of the list (rule 7, w)">Worked on it<span class="keyhint">w</span></button>'
          + (state.mode==="scan" ? '<button class="sidesm" data-act="start-working" title="Stop suggesting new candidates — just work through what\u2019s already dotted">done adding for now</button>' : '')
          + '<button class="btn dislodge" data-act="dislodge" title="Remove from the chain without completing">Dislodge</button>'
          + '<button class="btn del-sm" data-act="delete-task" data-id="'+b.id+'" title="Delete this task entirely (Delete key)">Delete<span class="keyhint">⌫</span></button>'
@@ -1302,7 +1321,7 @@ function openHelp(){
     + '<li><b>Yes</b> dots it — it becomes the new benchmark on the chain.</li>'
     + '<li><b>No</b> skips it (and nudges its rank down). <b>Can\u2019t</b> skips it with no rank signal.</li>'
     + '<li>Do the dotted chain from the bottom (newest) to the top.</li>'
-    + '<li>Either finish a task and cross it off, or use <i>worked on it ↻</i> to cross it off and send it back to the bottom.</li>'
+    + '<li>Either finish a task and cross it off, or use <b>↻ Worked on it</b> to cross it off and send it back to the bottom. Both are also in the edit pane, for any task.</li>'
     + '<li>Urgent task? <b>Add &amp; dot</b> puts it straight on the chain so it\u2019s done first.</li>'
     + '<li>Tap a context chip above the add bar to tag what you\u2019re about to add \u2014 it stays picked for the next few too.</li>'
     + '<li>Once you\u2019ve dotted something, crossing a queued task off (or tapping <b>done adding for now</b>) stops new suggestions until you resume.</li>'
@@ -1327,15 +1346,19 @@ function openEdit(id){
     + '<div class="frow"><label for="etTitle">Title</label><input id="etTitle" type="text" value="'+esc(t.title)+'"/></div>'
     + '<div class="frow"><label for="etUrl">Link</label><input id="etUrl" type="url" placeholder="https://…" value="'+esc(t.url||"")+'"/></div>'
     + '<div class="frow"><label for="etDue">Due</label><input id="etDue" type="date" value="'+esc(t.due||"")+'"/>'
-    + '<label style="min-width:0"><input id="etEver" type="checkbox"'+(t.evergreen?" checked":"")+'/> evergreen</label>'
-    + '<label style="min-width:0"><input id="etDaily" type="checkbox"'+(t.recur==="daily"?" checked":"")+'/> repeats daily</label></div>'
+    + '<label class="cbox"><input id="etEver" type="checkbox"'+(t.evergreen?" checked":"")+'/> evergreen</label></div>'
     + '<div class="frow"><label for="etStart">Starts</label><input id="etStart" type="date" value="'+esc(t.startsAt||"")+'"/>'
-    + '<span class="kv">not eligible for the queue until this date</span></div>'
+    + '<span class="kv">(not eligible for the queue until this date)</span></div>'
     + '<h3>Needs these contexts</h3><div class="ctxpick">'+ctxHtml+'</div>'
     + '<div class="kv">strength ≈ <b class="mono">'+t.mu.toFixed(1)+'</b> ± '+t.sigma.toFixed(1)+' · '+topKlabel(t.id)+'</div>'
+    // Two rows on purpose: what to do with the FORM, then what to do with the
+    // TASK. Keeps Delete away from Save, and gives five actions somewhere sane
+    // to wrap on a phone instead of one ragged pile.
     + '<div class="mbtns"><button class="btn primary" data-act="save-edit" data-id="'+t.id+'">Save</button>'
+    + '<button class="btn subtle" data-act="close-modal">Cancel</button></div>'
+    + '<div class="mbtns taskacts">'
     + '<button class="btn done" data-act="done-task" data-id="'+t.id+'" title="Cross it off \u2014 completes the task and closes this pane">\u2713 Done</button>'
-    + '<button class="btn subtle" data-act="close-modal">Cancel</button>'
+    + '<button class="btn worked" data-act="worked-task" data-id="'+t.id+'" title="Started it \u2014 cross it off and send it back to the bottom of the list (rule 7)">\u21bb Worked on it</button>'
     + '<button class="btn danger" data-act="delete-task" data-id="'+t.id+'" style="margin-left:auto">Delete</button></div>'
   );
 }
@@ -1456,6 +1479,13 @@ function onAction(act, el){
       pushUndo();                 // one snapshot covers the save AND the completion,
       applyEditFields(t);         // so a single undo reverses the whole gesture
       doneTask(t.id, false);
+      closeModal(); break;
+    }
+    case "worked-task": {
+      const t=taskById(el.dataset.id); if(!t) break;
+      pushUndo();                 // same one-snapshot deal as done-task above
+      applyEditFields(t);
+      workedOnTask(t.id, false);
       closeModal(); break;
     }
     case "delete-task": deleteTask(el.dataset.id); closeModal(); break;
@@ -1580,6 +1610,7 @@ function hotkeyDelete(){
 (async function init(){
   const loaded = await loadState();
   state = loaded || defaultState();
+  dropRemovedFields(state);
   if(!state.settings) state.settings = {horizonMin:60,thresholdPct:25,samples:250,cantMin:30};
   if(state.settings.cantMin===undefined) state.settings.cantMin=30;
   state.settings.theme = normalizeTheme(state.settings.theme);   // absent or corrupt -> "system"
