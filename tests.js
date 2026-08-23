@@ -244,6 +244,18 @@ test("addTask: blank/whitespace-only titles are rejected", async () => {
   assert.equal(ctx.state.tasks.length, 0);
 });
 
+test("addTask: new tasks default startsAt to null", async () => {
+  const { ctx } = await loadApp();
+  const t = ctx.addTask("Task A", false);
+  assert.equal(ctx.state.tasks.find((x) => x.id === t.id).startsAt, null);
+});
+
+test("importList: new tasks default startsAt to null", async () => {
+  const { ctx } = await loadApp();
+  ctx.importList("1. Task A");
+  assert.equal(ctx.state.tasks[0].startsAt, null);
+});
+
 test("decide('yes'): dots the candidate, clears it, and a new candidate is picked from the remaining pool", async () => {
   const { ctx } = await loadApp({ seed: 1 });
   ctx.addTask("Task A", false);
@@ -368,6 +380,70 @@ test("toggleContext: turning off a required context makes a task ineligible and 
 
   ctx.toggleContext(homeCtxId); // turn OFF "At home"
   assert.equal(ctx.isEligible(task, ctx.activeCtxSet()), false);
+});
+
+/* ---------- start date: a future-dated task can't enter the queue ----------
+   A task can carry a startsAt (ISO date, same shape as due). Until that date
+   occurs, it's excluded from the pool/candidate scan — so "Can"/"Yes" can
+   never dot it into the chain — but every other function (edit, delete,
+   Done from the edit pane) still works on it normally. */
+
+test("isEligible: a task with a future startsAt is ineligible", async () => {
+  const { ctx } = await loadApp({ seed: 300 });
+  const t = ctx.addTask("Future task", false);
+  const task = ctx.state.tasks.find((x) => x.id === t.id);
+  task.startsAt = ctx.todayISO(3);
+  assert.equal(ctx.isEligible(task, ctx.activeCtxSet()), false);
+});
+
+test("isEligible: a task whose startsAt is today is eligible — the start date has occurred", async () => {
+  const { ctx } = await loadApp({ seed: 301 });
+  const t = ctx.addTask("Starts today", false);
+  const task = ctx.state.tasks.find((x) => x.id === t.id);
+  task.startsAt = ctx.todayISO(0);
+  assert.equal(ctx.isEligible(task, ctx.activeCtxSet()), true);
+});
+
+test("isEligible: a task whose startsAt is in the past is eligible", async () => {
+  const { ctx } = await loadApp({ seed: 302 });
+  const t = ctx.addTask("Started already", false);
+  const task = ctx.state.tasks.find((x) => x.id === t.id);
+  task.startsAt = ctx.todayISO(-5);
+  assert.equal(ctx.isEligible(task, ctx.activeCtxSet()), true);
+});
+
+test("isEligible: no startsAt at all leaves eligibility untouched (back-compat with saved tasks)", async () => {
+  const { ctx } = await loadApp({ seed: 303 });
+  const t = ctx.addTask("No start date", false);
+  const task = ctx.state.tasks.find((x) => x.id === t.id);
+  assert.equal(task.startsAt, null, "precondition: new tasks default startsAt to null");
+  assert.equal(ctx.isEligible(task, ctx.activeCtxSet()), true);
+});
+
+test("a future-start task is excluded from the pool and can never be dotted into the chain", async () => {
+  const { ctx } = await loadApp({ seed: 304 });
+  const soon = ctx.addTask("Ready now", false);
+  const future = ctx.addTask("Starts next week", false);
+  ctx.state.tasks.find((x) => x.id === future.id).startsAt = ctx.todayISO(7);
+
+  const poolIds = [...ctx.pool()].map((x) => x.id);
+  assert.deepEqual(poolIds, [soon.id], "the future-start task must be excluded from the pool");
+
+  ctx.state.candidateId = null; // force a fresh pick
+  ctx.ensureCandidate();
+  assert.equal(ctx.state.candidateId, soon.id);
+
+  ctx.decide("can");
+  assert.deepEqual([...ctx.state.chain], [soon.id]);
+  assert.equal(ctx.state.chain.includes(future.id), false, "the future-start task must never enter the chain");
+});
+
+test("doneTask: completes a future-start task directly from the edit pane, bypassing the queue gate", async () => {
+  const { ctx } = await loadApp({ seed: 313 });
+  const t = ctx.addTask("Future task", false);
+  ctx.state.tasks.find((x) => x.id === t.id).startsAt = ctx.todayISO(10);
+  ctx.doneTask(t.id);
+  assert.equal(ctx.state.tasks.find((x) => x.id === t.id).done, true, "Done must still work regardless of startsAt");
 });
 
 test("importList: dedupes against existing open tasks (case/whitespace-insensitive)", async () => {
@@ -560,6 +636,29 @@ test("dueInfo: classifies overdue / today / tomorrow / later", async () => {
   assert.equal(ctx.dueInfo(ctx.todayISO(0)).cls, "due-today");
   assert.equal(ctx.dueInfo(ctx.todayISO(1)).cls, "due-tomorrow");
   assert.equal(ctx.dueInfo(ctx.todayISO(5)).cls, "due-later");
+});
+
+test("chipHTML: shows a 'not started' chip while startsAt is in the future", async () => {
+  const { ctx } = await loadApp({ seed: 305 });
+  const t = ctx.addTask("Future task", false);
+  const task = ctx.state.tasks.find((x) => x.id === t.id);
+  task.startsAt = ctx.todayISO(4);
+  assert.match(ctx.chipHTML(task), /not started/i);
+});
+
+test("chipHTML: no 'not started' chip once the start date has arrived", async () => {
+  const { ctx } = await loadApp({ seed: 306 });
+  const t = ctx.addTask("Starts today", false);
+  const task = ctx.state.tasks.find((x) => x.id === t.id);
+  task.startsAt = ctx.todayISO(0);
+  assert.doesNotMatch(ctx.chipHTML(task), /not started/i);
+});
+
+test("chipHTML: no 'not started' chip when startsAt is unset", async () => {
+  const { ctx } = await loadApp({ seed: 307 });
+  const t = ctx.addTask("No start date", false);
+  const task = ctx.state.tasks.find((x) => x.id === t.id);
+  assert.doesNotMatch(ctx.chipHTML(task), /not started/i);
 });
 
 test("fmtWhen: today / yesterday / this-week / older labels", async () => {
@@ -1572,16 +1671,65 @@ test("UI: the done-task action completes the task and closes the pane", async ()
    off in one motion and the completed task carries the new title. The two
    halves share a single undo snapshot, so one `u` reverses both. */
 
-function fillEditPane(ctx, shim, { title, url, due, evergreen, daily, ctxIds } = {}) {
+function fillEditPane(ctx, shim, { title, url, due, start, evergreen, daily, ctxIds } = {}) {
   const g = (id) => ctx.document.getElementById(id);
   g("etTitle").value = title ?? "";
   g("etUrl").value = url ?? "";
   g("etDue").value = due ?? "";
+  g("etStart").value = start ?? "";
   g("etEver").checked = !!evergreen;
   g("etDaily").checked = !!daily;
   const picks = (ctxIds || []).map((id) => ({ checked: true, dataset: { editctx: id } }));
   shim.document.querySelectorAll = (sel) => (sel === "[data-editctx]" ? picks : []);
 }
+
+test("UI: the edit pane renders a Starts date input pre-filled with the task's startsAt", async () => {
+  const { ctx, shim } = await loadApp({ seed: 308 });
+  const t = ctx.addTask("Task A", false);
+  ctx.state.tasks.find((x) => x.id === t.id).startsAt = "2026-09-10";
+  ctx.openEdit(t.id);
+  const html = shim.elements.get("modalRoot").innerHTML;
+  assert.match(html, /id="etStart"/, `expected a Starts input in: ${html}`);
+  assert.match(html, /id="etStart"[^>]*value="2026-09-10"/);
+});
+
+test("UI: the edit pane's Starts input is empty when no startsAt is set", async () => {
+  const { ctx, shim } = await loadApp({ seed: 309 });
+  const t = ctx.addTask("Task A", false);
+  ctx.openEdit(t.id);
+  const html = shim.elements.get("modalRoot").innerHTML;
+  assert.match(html, /id="etStart"[^>]*value=""/);
+});
+
+test("save-edit: also applies the start date", async () => {
+  const { ctx, shim } = await loadApp({ seed: 310 });
+  const t = ctx.addTask("Task A", false);
+  ctx.openEdit(t.id);
+  fillEditPane(ctx, shim, { title: "Task A", start: "2026-10-01" });
+  ctx.onAction("save-edit", { dataset: { id: t.id } });
+  assert.equal(ctx.state.tasks.find((x) => x.id === t.id).startsAt, "2026-10-01");
+});
+
+test("save-edit: clearing the Starts field sets startsAt back to null", async () => {
+  const { ctx, shim } = await loadApp({ seed: 311 });
+  const t = ctx.addTask("Task A", false);
+  ctx.state.tasks.find((x) => x.id === t.id).startsAt = "2026-10-01";
+  ctx.openEdit(t.id);
+  fillEditPane(ctx, shim, { title: "Task A", start: "" });
+  ctx.onAction("save-edit", { dataset: { id: t.id } });
+  assert.equal(ctx.state.tasks.find((x) => x.id === t.id).startsAt, null);
+});
+
+test("done-task: also saves the start date before completing", async () => {
+  const { ctx, shim } = await loadApp({ seed: 312 });
+  const t = ctx.addTask("Task A", false);
+  ctx.openEdit(t.id);
+  fillEditPane(ctx, shim, { title: "Task A", start: "2026-11-05" });
+  ctx.onAction("done-task", { dataset: { id: t.id } });
+  const task = ctx.state.tasks.find((x) => x.id === t.id);
+  assert.equal(task.startsAt, "2026-11-05");
+  assert.equal(task.done, true);
+});
 
 // Characterization test — this one passes BEFORE the refactor as well as after.
 // Its job is to go red if pulling the field-reading into a shared helper breaks

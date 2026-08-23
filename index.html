@@ -135,6 +135,7 @@ textarea{width:100%;font-family:var(--font-mono);font-size:12px}
 .chip.due-tomorrow{background:light-dark(#ffe1b0,#5c4413);color:light-dark(#8a5b00,#ffd699)}
 .chip.due-later{background:var(--chip);color:var(--mut)}
 .chip.ever{background:transparent;color:inherit;opacity:.75;font-weight:500;font-style:italic;padding:0}
+.chip.notstarted{background:transparent;color:var(--mut);opacity:.85;font-weight:600;border:1px dashed var(--line)}
 .siderail{display:flex;flex-direction:column;gap:7px;align-items:flex-end;flex:none;padding-top:2px;min-width:86px}
 .reveal{font-size:12.5px;color:var(--ink);text-decoration:underline;background:none}
 .reveal:hover{color:var(--accent)}
@@ -641,6 +642,7 @@ function isEligible(t, act){
   const now = Date.now();
   if(t.recur==="daily" && sameLocalDay(t.lastDoneAt, now)) return false;          // done today, comes back tomorrow
   if(t.evergreen && t.lastDoneAt && (now - t.lastDoneAt) < 90*60*1000) return false; // evergreen rest
+  if(t.startsAt && isoToDate(t.startsAt) > isoToDate(todayISO(0))) return false;  // not started yet — can't be queued
   act = act || activeCtxSet();
   for(const c of t.ctx){ if(state.contexts.some(x=>x.id===c) && !act.has(c)) return false; }
   return true;
@@ -807,6 +809,7 @@ function applyEditFields(t){
   t.title = title.value.trim() || t.title;
   t.url = safeUrl(document.getElementById("etUrl").value);
   const d = document.getElementById("etDue").value; t.due = d || null;
+  const sd = document.getElementById("etStart").value; t.startsAt = sd || null;
   t.evergreen = !!document.getElementById("etEver").checked;
   t.recur = document.getElementById("etDaily").checked ? "daily" : null;
   t.ctx = [...document.querySelectorAll("[data-editctx]")].filter(x=>x.checked).map(x=>x.dataset.editctx);
@@ -907,7 +910,7 @@ function importList(text, ctx){
     const k = norm(r.title);
     if(seen.has(k)){ skipped++; continue; }
     seen.add(k);
-    state.tasks.push({ id:uid(), title:r.title, url:r.url, due:null, evergreen:false, recur:null, ctx:c.slice(),
+    state.tasks.push({ id:uid(), title:r.title, url:r.url, due:null, startsAt:null, evergreen:false, recur:null, ctx:c.slice(),
       mu:PRIOR_MU, sigma:PRIOR_SIGMA, done:false, createdAt:Date.now(), completedAt:null, lastDoneAt:null });
     added++;
   }
@@ -933,7 +936,7 @@ function toast(msg){
 function addTask(title, dot, ctx){
   title = (title||"").trim(); if(!title) return null;
   pushUndo();
-  const t = { id:uid(), title, url:null, due:null, evergreen:false, recur:null, ctx: Array.isArray(ctx) ? ctx.slice() : [],
+  const t = { id:uid(), title, url:null, due:null, startsAt:null, evergreen:false, recur:null, ctx: Array.isArray(ctx) ? ctx.slice() : [],
               mu:PRIOR_MU, sigma:PRIOR_SIGMA, done:false, createdAt:Date.now(), completedAt:null, lastDoneAt:null };
   state.tasks.push(t);
   if(dot){ state.chain.push(t.id); state.interventionActive=false; }
@@ -1101,6 +1104,10 @@ function chipHTML(t){
   let out = "";
   const d = dueInfo(t.due);
   if(d) out += '<span class="chip '+d.cls+'">🗓 '+d.txt+'</span>';
+  if(t.startsAt && isoToDate(t.startsAt) > isoToDate(todayISO(0))){
+    const sd = isoToDate(t.startsAt);
+    out += '<span class="chip notstarted">🗓 not started · '+(sd.getMonth()+1)+'/'+sd.getDate()+'</span>';
+  }
   if(t.recur==="daily") out += '<span class="chip ever">↻ daily</span>';
   else if(t.evergreen) out += '<span class="chip ever">(evergreen)</span>';
   return out;
@@ -1317,6 +1324,8 @@ function openEdit(id){
     + '<div class="frow"><label for="etDue">Due</label><input id="etDue" type="date" value="'+esc(t.due||"")+'"/>'
     + '<label style="min-width:0"><input id="etEver" type="checkbox"'+(t.evergreen?" checked":"")+'/> evergreen</label>'
     + '<label style="min-width:0"><input id="etDaily" type="checkbox"'+(t.recur==="daily"?" checked":"")+'/> repeats daily</label></div>'
+    + '<div class="frow"><label for="etStart">Starts</label><input id="etStart" type="date" value="'+esc(t.startsAt||"")+'"/>'
+    + '<span class="kv">not eligible for the queue until this date</span></div>'
     + '<h3>Needs these contexts</h3><div class="ctxpick">'+ctxHtml+'</div>'
     + '<div class="kv">strength ≈ <b class="mono">'+t.mu.toFixed(1)+'</b> ± '+t.sigma.toFixed(1)+' · '+topKlabel(t.id)+'</div>'
     + '<div class="mbtns"><button class="btn primary" data-act="save-edit" data-id="'+t.id+'">Save</button>'
