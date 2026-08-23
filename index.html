@@ -625,7 +625,11 @@ function pushUndo(){
 function undo(){
   if(!undoStack.length) return;
   state = JSON.parse(undoStack.pop());
-  recomputeRanks(); commit(false);
+  // A full commit, not commit(false): taking something back is itself a write.
+  // It has to reach storage or a reload resurrects what you just undid, and it
+  // has to re-stamp updatedAt or the snapshot's stale timestamp loses the next
+  // cloud reconcile to the very state it was meant to overrule.
+  recomputeRanks(); commit();
 }
 
 /* ---------- derived helpers ---------- */
