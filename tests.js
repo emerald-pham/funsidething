@@ -87,25 +87,16 @@ function makeFakeElement() {
     addEventListener() {}, removeEventListener() {},
     focus() {}, select() {}, click() {},
     querySelector() { return null; }, querySelectorAll() { return []; },
-    // Attributes are really stored now (they used to be no-op stubs) so that
-    // <html data-theme="..."> can be asserted on. getAttribute still returns
-    // null for anything never set, which is what the old stub always did.
-    _attrs: new Map(),
-    getAttribute(k) { return this._attrs.has(k) ? this._attrs.get(k) : null; },
-    setAttribute(k, v) { this._attrs.set(k, String(v)); },
-    removeAttribute(k) { this._attrs.delete(k); },
-    hasAttribute(k) { return this._attrs.has(k); },
+    getAttribute() { return null; }, setAttribute() {},
     appendChild() {}, scrollIntoView() {},
   };
   return el;
 }
 
-function makeDomShim({ prefersDark = false } = {}) {
+function makeDomShim() {
   const elements = new Map();
   const winListeners = {};
   const localStorageMap = new Map();
-
-  const documentElement = makeFakeElement();
 
   const document = {
     getElementById(id) {
@@ -118,31 +109,12 @@ function makeDomShim({ prefersDark = false } = {}) {
     removeEventListener() {},
     createElement() { return makeFakeElement(); },
     body: { appendChild() {} },
-    documentElement,
   };
   const localStorage = {
     getItem(k) { return localStorageMap.has(k) ? localStorageMap.get(k) : null; },
     setItem(k, v) { localStorageMap.set(k, String(v)); },
     removeItem(k) { localStorageMap.delete(k); },
   };
-  // A minimal MediaQueryList good enough for prefers-color-scheme. `setDark`
-  // flips the OS preference and notifies listeners the way a real browser does
-  // when you change the system appearance while the page is open.
-  const mqlListeners = [];
-  const mql = {
-    media: "(prefers-color-scheme: dark)",
-    matches: prefersDark,
-    addEventListener(evt, fn) { if (evt === "change") mqlListeners.push(fn); },
-    removeEventListener(evt, fn) {
-      const i = mqlListeners.indexOf(fn);
-      if (i >= 0) mqlListeners.splice(i, 1);
-    },
-  };
-  function setDark(v) {
-    mql.matches = !!v;
-    for (const fn of [...mqlListeners]) fn({ matches: mql.matches, media: mql.media });
-  }
-
   const window = {
     addEventListener(evt, fn) { (winListeners[evt] ||= []).push(fn); },
     removeEventListener() {},
@@ -150,24 +122,17 @@ function makeDomShim({ prefersDark = false } = {}) {
       for (const fn of (winListeners[evt.type] || [])) fn(evt);
       return true;
     },
-    matchMedia(q) {
-      // Only the color-scheme query is modelled; anything else reports no match.
-      if (String(q).includes("prefers-color-scheme: dark")) return mql;
-      return { media: String(q), matches: false, addEventListener() {}, removeEventListener() {} };
-    },
     localStorage,
     CloudSync: undefined,
   };
   window.window = window;
-  return { document, window, localStorage, elements, winListeners, documentElement, setDark, mqlListeners };
+  return { document, window, localStorage, elements, winListeners };
 }
 
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
-async function loadApp({ seed, cloudSyncFactory, prefersDark = false, noMatchMedia = false, seedStorage } = {}) {
-  const shim = makeDomShim({ prefersDark });
-  if (noMatchMedia) delete shim.window.matchMedia;   // old browser / bare JS host
-  if (seedStorage) for (const [k, v] of Object.entries(seedStorage)) shim.localStorage.setItem(k, v);
+async function loadApp({ seed, cloudSyncFactory } = {}) {
+  const shim = makeDomShim();
   if (cloudSyncFactory) shim.window.CloudSync = cloudSyncFactory(shim.window);
   const sandbox = {
     window: shim.window,
@@ -249,27 +214,23 @@ test("decide('yes'): dots the candidate, clears it, and a new candidate is picke
   ctx.addTask("Task A", false);
   ctx.addTask("Task B", false);
   ctx.addTask("Task C", false);
-  ctx.decide("can");            // start the chain first — yes/no need a benchmark to compare against
   const firstCandidate = ctx.state.candidateId;
-  assert.ok(firstCandidate, "a ranked candidate should be presented once the chain has started");
+  assert.ok(firstCandidate, "a candidate should be presented once tasks exist");
 
   ctx.decide("yes");
-  assert.equal(ctx.state.chain.length, 2);
-  assert.equal(ctx.state.chain[1], firstCandidate, "the dotted task should be the one that was showing");
+  assert.equal(ctx.state.chain.length, 1);
+  assert.equal(ctx.state.chain[0], firstCandidate, "the dotted task should be the one that was showing");
   assert.notEqual(ctx.state.candidateId, firstCandidate, "a fresh candidate should replace the dotted one");
-  assert.ok(ctx.state.candidateId, "a new candidate should be offered (1 task remains in the pool)");
+  assert.ok(ctx.state.candidateId, "a new candidate should be offered (2 tasks remain in the pool)");
 });
 
 test("decide('no') and decide('cant'): candidate is marked considered, NOT added to the chain", async () => {
   const { ctx } = await loadApp({ seed: 2 });
   ctx.addTask("Task A", false);
   ctx.addTask("Task B", false);
-  ctx.addTask("Task C", false);
-  ctx.decide("can");            // establish a benchmark so 'no' is a valid comparison
-  const chainLen = ctx.state.chain.length;
   const cand = ctx.state.candidateId;
   ctx.decide("no");
-  assert.equal(ctx.state.chain.length, chainLen, "'no' must not extend the chain");
+  assert.equal(ctx.state.chain.length, 0);
   assert.equal(ctx.state.considered[cand], "no");
 });
 
@@ -310,7 +271,7 @@ test("undo: reverses the most recent mutation (dotting a task)", async () => {
   const { ctx } = await loadApp({ seed: 5 });
   ctx.addTask("Task A", false);
   ctx.addTask("Task B", false);
-  ctx.decide("can");
+  ctx.decide("yes");
   assert.equal(ctx.state.chain.length, 1);
   ctx.undo();
   assert.equal(ctx.state.chain.length, 0);
@@ -711,7 +672,7 @@ test("REGRESSION: dotting a task (immediate cloud sync) does not trigger a runaw
   ctx.addTask("Task A", false);
   ctx.addTask("Task B", false);
 
-  ctx.decide("can"); // chain-start dot, immediate-sync path (cloudPushNow) — pings before its own await too
+  ctx.decide("yes"); // immediate-sync path (cloudPushNow) — pings before its own await too
 
   await new Promise((r) => setTimeout(r, 200)); // let every fake network call and its chained pings settle
 
@@ -733,7 +694,7 @@ test("REGRESSION: a focus-triggered pull racing a push settles with a small, bou
   ctx.addTask("Task A", false);
   ctx.addTask("Task B", false);
 
-  ctx.decide("can");         // fires an immediate push (and, via ping, a legitimate pull attempt)
+  ctx.decide("yes");         // fires an immediate push (and, via ping, a legitimate pull attempt)
   ctx.cloudPull();           // simulates a focus/visibilitychange-triggered pull landing at the same time
 
   await new Promise((r) => setTimeout(r, 200));
@@ -763,11 +724,11 @@ test("REGRESSION: sync status labels all stay short enough for the fixed-width b
   }
 });
 
-/* ---------- "can't" is bulletproof for its own configurable duration ----------
+/* ---------- "can't" is bulletproof for the Horizon window ----------
    Bug: newPass() (triggered whenever the chain empties, e.g. via benchDone())
    used to wipe state.considered wholesale, silently un-can't-ing everything
    regardless of how recently it was marked. Fix: a can't mark now carries a
-   timestamp (state.cantAt) and survives newPass() until state.settings.cantMin
+   timestamp (state.cantAt) and survives newPass() until state.settings.horizonMin
    minutes have actually elapsed; expireCants() then clears it on its own. */
 
 test("cant is timestamped and excludes the task from the pool immediately", async () => {
@@ -795,9 +756,9 @@ test("BUG FIX: a fresh can't mark survives the chain emptying out (newPass), reg
   assert.ok(!ctx.state.tasks.every(t => t.id !== cantId) , "sanity: task still exists");
 });
 
-test("a can't mark that has genuinely outlived cantMin IS cleared by newPass()", async () => {
+test("a can't mark that has genuinely outlived the Horizon window IS cleared by newPass()", async () => {
   const { ctx } = await loadApp({ seed: 32 });
-  ctx.state.settings.cantMin = 10; // shrink the window so the test doesn't need huge offsets
+  ctx.state.settings.horizonMin = 10; // shrink the window so the test doesn't need huge offsets
   ctx.addTask("Only queued task", true);
   ctx.addTask("Old can't", false);
   const cantId = ctx.state.candidateId;
@@ -807,16 +768,16 @@ test("a can't mark that has genuinely outlived cantMin IS cleared by newPass()",
   ctx.decide("cant");
   assert.equal(ctx.state.considered[cantId], "cant");
 
-  setFakeTime(ctx, t0 + 11 * 60000); // 11 minutes later — past the 10-minute cantMin
+  setFakeTime(ctx, t0 + 11 * 60000); // 11 minutes later — past the 10-minute horizon
   ctx.benchDone(); // -> newPass()
 
   assert.equal(ctx.state.considered[cantId], undefined, "an expired can't mark should be dropped, not preserved forever");
   assert.equal(ctx.state.cantAt[cantId], undefined, "its timestamp should be cleaned up too");
 });
 
-test("a can't mark automatically expires mid-session (no newPass needed) once cantMin elapses", async () => {
+test("a can't mark automatically expires mid-session (no newPass needed) once the Horizon elapses", async () => {
   const { ctx } = await loadApp({ seed: 33 });
-  ctx.state.settings.cantMin = 15;
+  ctx.state.settings.horizonMin = 15;
   ctx.addTask("Task A", false);
   ctx.addTask("Said can't", false);
   const cantId = ctx.state.candidateId;
@@ -827,17 +788,17 @@ test("a can't mark automatically expires mid-session (no newPass needed) once ca
   assert.ok(!ctx.pool().some((t) => t.id === cantId), "should be excluded from the pool right after being marked");
 
   setFakeTime(ctx, t0 + 5 * 60000); // still within the window
-  assert.ok(!ctx.pool().some((t) => t.id === cantId), "still excluded well within cantMin");
+  assert.ok(!ctx.pool().some((t) => t.id === cantId), "still excluded well within the horizon");
 
   setFakeTime(ctx, t0 + 16 * 60000); // past the window now
   ctx.ensureCandidate(); // any normal app action re-checks expiry, not just newPass
-  assert.ok(ctx.pool().some((t) => t.id === cantId), "should rejoin the pool once cantMin has elapsed");
+  assert.ok(ctx.pool().some((t) => t.id === cantId), "should rejoin the pool once the horizon has elapsed");
   assert.equal(ctx.state.considered[cantId], undefined);
 });
 
-test("changing cantMin immediately affects how much longer an existing can't mark is bulletproof for", async () => {
+test("changing the Horizon setting immediately affects how much longer an existing can't mark is bulletproof for", async () => {
   const { ctx } = await loadApp({ seed: 34 });
-  ctx.state.settings.cantMin = 60;
+  ctx.state.settings.horizonMin = 60;
   ctx.addTask("Task A", false);
   ctx.addTask("Said can't", false);
   const cantId = ctx.state.candidateId;
@@ -845,10 +806,10 @@ test("changing cantMin immediately affects how much longer an existing can't mar
   setFakeTime(ctx, t0);
   ctx.decide("cant");
 
-  setFakeTime(ctx, t0 + 20 * 60000); // 20 min later, well within a 60-min cantMin
-  ctx.state.settings.cantMin = 15; // shrink cantMin below the elapsed time
+  setFakeTime(ctx, t0 + 20 * 60000); // 20 min later, well within a 60-min horizon
+  ctx.state.settings.horizonMin = 15; // shrink the horizon below the elapsed time
   ctx.ensureCandidate();
-  assert.equal(ctx.state.considered[cantId], undefined, "shrinking cantMin below elapsed time should expire it on next check");
+  assert.equal(ctx.state.considered[cantId], undefined, "shrinking the horizon below elapsed time should expire it on next check");
 });
 
 test("rescanSkipped() remains a deliberate manual override — clears can't immediately regardless of the timer", async () => {
@@ -876,7 +837,7 @@ test("deleteTask cleans up cantAt too, so no orphaned timestamps linger", async 
 
 test("UI: the list badge shows remaining cooldown minutes for an active can't mark", async () => {
   const { ctx } = await loadApp({ seed: 37 });
-  ctx.state.settings.cantMin = 60;
+  ctx.state.settings.horizonMin = 60;
   ctx.addTask("Task A", false);
   ctx.addTask("Said can't", false);
   const t0 = realNow(ctx);
@@ -890,972 +851,247 @@ test("UI: the list badge shows remaining cooldown minutes for an active can't ma
   assert.match(listHtml, /class="skipped">can.t \u00b7 50m<\/span>/, `expected a "can't · 50m" badge in: ${listHtml}`);
 });
 
-/* ---------- cantMin settings validation ---------- */
+/* ---------- marking a task done from the Edit task pane ----------
+   The edit modal could rename, re-context, or delete a task, but not cross it
+   off — completion was only reachable from the benchmark card, the candidate
+   card, or the `d` key. doneTask(id) closes that gap for any task, anywhere.
+   Deliberately NOT a mode change: unlike benchDone(), crossing something off
+   from the edit pane says nothing about whether you're still scanning. */
 
-function setInput(ctx, id, value) {
-  ctx.document.getElementById(id).value = String(value);
-}
-
-test("save-settings: cantMin is read, clamped [5,480], and persisted independently of horizonMin", async () => {
-  const { ctx } = await loadApp({ seed: 50 });
-  setInput(ctx, "stHorizon", 90);
-  setInput(ctx, "stCantMin", 12);
-  setInput(ctx, "stThresh", 20);
-  setInput(ctx, "stSamples", 300);
-  ctx.onAction("save-settings", {});
-  assert.equal(ctx.state.settings.horizonMin, 90);
-  assert.equal(ctx.state.settings.cantMin, 12);
+test("doneTask: completes a plain open task and drops it out of the open list", async () => {
+  const { ctx } = await loadApp({ seed: 20 });
+  const t = ctx.addTask("Write the next Carmine scene", false);
+  ctx.doneTask(t.id);
+  const task = ctx.state.tasks.find((x) => x.id === t.id);
+  assert.equal(task.done, true);
+  assert.ok(task.completedAt, "completedAt should be stamped");
+  assert.equal(ctx.state.tasks.filter((x) => !x.done).length, 0);
 });
 
-test("save-settings: cantMin below 5 clamps up to 5, above 480 clamps down to 480", async () => {
-  const { ctx } = await loadApp({ seed: 51 });
-  setInput(ctx, "stHorizon", 60);
-  setInput(ctx, "stCantMin", 2); // non-zero (0 is falsy and hits the ||default fallback instead, same as horizonMin)
-  setInput(ctx, "stThresh", 25);
-  setInput(ctx, "stSamples", 250);
-  ctx.onAction("save-settings", {});
-  assert.equal(ctx.state.settings.cantMin, 5);
+test("doneTask: a dotted task leaves the chain, and scanning mode is left alone", async () => {
+  const { ctx } = await loadApp({ seed: 21 });
+  const t = ctx.addTask("Dotted task", true);
+  ctx.addTask("Other task", false);
+  assert.equal(ctx.state.chain.length, 1);
 
-  setInput(ctx, "stCantMin", 9999);
-  ctx.onAction("save-settings", {});
-  assert.equal(ctx.state.settings.cantMin, 480);
+  ctx.doneTask(t.id);
+  assert.equal(ctx.state.chain.includes(t.id), false, "a completed task must not stay dotted");
+  assert.equal(ctx.state.mode, "scan", "the edit pane says nothing about whether you're done scanning");
 });
 
-test("save-settings: a blank/non-numeric cantMin falls back to 30, not to horizonMin's default", async () => {
-  const { ctx } = await loadApp({ seed: 52 });
-  setInput(ctx, "stHorizon", 60);
-  setInput(ctx, "stCantMin", "");
-  setInput(ctx, "stThresh", 25);
-  setInput(ctx, "stSamples", 250);
-  ctx.onAction("save-settings", {});
-  assert.equal(ctx.state.settings.cantMin, 30);
+test("doneTask: a MID-chain task is removed without disturbing the benchmark", async () => {
+  const { ctx } = await loadApp({ seed: 22 });
+  const first = ctx.addTask("First dot", true);
+  const second = ctx.addTask("Second dot", true);
+  assert.equal(ctx.benchmark().id, second.id);
+
+  ctx.doneTask(first.id);
+  assert.deepEqual([...ctx.state.chain], [second.id]);
+  assert.equal(ctx.benchmark().id, second.id, "the head of the chain shouldn't move");
 });
 
-test("save-settings: a literal 0 is falsy and falls back to the default rather than clamping to the minimum (shared quirk with horizonMin/thresholdPct)", async () => {
-  const { ctx } = await loadApp({ seed: 53 });
-  setInput(ctx, "stHorizon", 0);
-  setInput(ctx, "stCantMin", 0);
-  setInput(ctx, "stThresh", 25);
-  setInput(ctx, "stSamples", 250);
-  ctx.onAction("save-settings", {});
-  assert.equal(ctx.state.settings.horizonMin, 60, "0 hits the existing ||60 fallback, not Math.max(5,...)");
-  assert.equal(ctx.state.settings.cantMin, 30, "0 hits the ||30 fallback the same way, for consistency");
-});
-
-/* ---------- quick-add context picker ---------- */
-
-test("quick-add: selecting a context chip tags newly added tasks with it", async () => {
-  const { ctx } = await loadApp({ seed: 60 });
-  const home = { id: "ctx_home_t", name: "At home", active: true };
-  ctx.state.contexts.push(home);
-
-  ctx.onAction("qctx", { dataset: { id: home.id } });
-  setInput(ctx, "addInput", "Water the plants");
-  ctx.onAction("add", {});
-
-  const t = ctx.state.tasks.find((x) => x.title === "Water the plants");
-  assert.ok(t, "task should have been added");
-  assert.deepEqual([...t.ctx], [home.id]);
-});
-
-test("quick-add: the picked context is sticky across multiple adds, not cleared after one", async () => {
-  const { ctx } = await loadApp({ seed: 61 });
-  const home = { id: "ctx_home_t2", name: "At home", active: true };
-  ctx.state.contexts.push(home);
-  ctx.onAction("qctx", { dataset: { id: home.id } });
-
-  setInput(ctx, "addInput", "Task one");
-  ctx.onAction("add", {});
-  setInput(ctx, "addInput", "Task two");
-  ctx.onAction("add", {});
-
-  const t1 = ctx.state.tasks.find((x) => x.title === "Task one");
-  const t2 = ctx.state.tasks.find((x) => x.title === "Task two");
-  assert.deepEqual([...t1.ctx], [home.id]);
-  assert.deepEqual([...t2.ctx], [home.id], "selection should still be active for the second add");
-});
-
-test("quick-add: tapping a selected chip again deselects it", async () => {
-  const { ctx } = await loadApp({ seed: 62 });
-  const home = { id: "ctx_home_t3", name: "At home", active: true };
-  ctx.state.contexts.push(home);
-  ctx.onAction("qctx", { dataset: { id: home.id } }); // select
-  ctx.onAction("qctx", { dataset: { id: home.id } }); // deselect
-
-  setInput(ctx, "addInput", "Untagged task");
-  ctx.onAction("add", {});
-  const t = ctx.state.tasks.find((x) => x.title === "Untagged task");
-  assert.equal(t.ctx.length, 0);
-});
-
-test("quick-add: multiple selected chips all apply to the new task", async () => {
-  const { ctx } = await loadApp({ seed: 63 });
-  const home = { id: "ctx_home_t4", name: "At home", active: true };
-  const laptop = { id: "ctx_laptop_t4", name: "At laptop", active: true };
-  ctx.state.contexts.push(home, laptop);
-  ctx.onAction("qctx", { dataset: { id: home.id } });
-  ctx.onAction("qctx", { dataset: { id: laptop.id } });
-
-  setInput(ctx, "addInput", "Multi-context task");
-  ctx.onAction("add", {});
-  const t = ctx.state.tasks.find((x) => x.title === "Multi-context task");
-  assert.equal(t.ctx.length, 2);
-  assert.ok(t.ctx.includes(home.id) && t.ctx.includes(laptop.id));
-});
-
-test("quick-add: 'Add & dot' also tags with the selected context", async () => {
-  const { ctx } = await loadApp({ seed: 64 });
-  const home = { id: "ctx_home_t5", name: "At home", active: true };
-  ctx.state.contexts.push(home);
-  ctx.onAction("qctx", { dataset: { id: home.id } });
-
-  setInput(ctx, "addInput", "Urgent tagged task");
-  ctx.onAction("add-dot", {});
-  const t = ctx.state.tasks.find((x) => x.title === "Urgent tagged task");
-  assert.deepEqual([...t.ctx], [home.id]);
-  assert.ok(ctx.state.chain.includes(t.id));
-});
-
-test("quick-add: pasting/typing a multi-line list through the bar tags every resulting task", async () => {
-  const { ctx } = await loadApp({ seed: 65 });
-  const errand = { id: "ctx_errand_t6", name: "Errands", active: true };
-  ctx.state.contexts.push(errand);
-  ctx.onAction("qctx", { dataset: { id: errand.id } });
-
-  setInput(ctx, "addInput", "1. Buy milk\n2. Return package");
-  ctx.onAction("add", {});
-
-  const milk = ctx.state.tasks.find((x) => x.title === "Buy milk");
-  const pkg = ctx.state.tasks.find((x) => x.title === "Return package");
-  assert.deepEqual([...milk.ctx], [errand.id]);
-  assert.deepEqual([...pkg.ctx], [errand.id]);
-});
-
-test("quick-add context selection does NOT leak into the separate Settings \u2192 Import flow", async () => {
-  const { ctx } = await loadApp({ seed: 66 });
-  const home = { id: "ctx_home_t7", name: "At home", active: true };
-  ctx.state.contexts.push(home);
-  ctx.onAction("qctx", { dataset: { id: home.id } });
-
-  setInput(ctx, "mdImport", "1. From the settings importer");
-  ctx.onAction("import-md", {});
-
-  const t = ctx.state.tasks.find((x) => x.title === "From the settings importer");
-  assert.ok(t, "task should still be added via the settings importer");
-  assert.equal(t.ctx.length, 0, "the settings-modal import must not pick up the quick-add chip selection");
-});
-
-test("quick-add: deleting a selected context removes it from the picker without crashing a subsequent add", async () => {
-  const { ctx } = await loadApp({ seed: 67 });
-  const home = { id: "ctx_home_t8", name: "At home", active: true };
-  ctx.state.contexts.push(home);
-  ctx.onAction("qctx", { dataset: { id: home.id } });
-
-  ctx.onAction("del-ctx", { dataset: { id: home.id } }); // deletes the context entirely
-  ctx.render(); // renderQuickCtx() prunes stale selections against the current context list
-
-  setInput(ctx, "addInput", "Task after context deletion");
-  ctx.onAction("add", {});
-  const t = ctx.state.tasks.find((x) => x.title === "Task after context deletion");
-  assert.ok(t, "add should still work cleanly");
-  assert.equal(t.ctx.length, 0, "a deleted context's id should not linger on new tasks");
-});
-
-/* ---------- regression: the Done control is a plain checkbox, not a custom circle ----------
-   No real layout engine here, so this checks the CSS source directly rather
-   than rendered pixels — enough to catch someone silently reintroducing the
-   custom appearance:none circular style this was explicitly reverted from. */
-test("REGRESSION: .ckbox has no custom appearance override — it renders as a native checkbox", () => {
-  const m = html.match(/\.ckbox\{[^}]*\}/);
-  assert.ok(m, ".ckbox rule should exist");
-  const rule = m[0];
-  assert.ok(!/appearance\s*:\s*none/.test(rule), `.ckbox should not override appearance — found in: ${rule}`);
-  assert.ok(!/border-radius\s*:\s*50%/.test(rule), `.ckbox should not be forced circular — found in: ${rule}`);
-  // no leftover custom :checked pseudo-element rules from the old circular design
-  assert.ok(!/\.ckbox:checked::after/.test(html), "custom checked-state pseudo-element should have been removed");
-});
-
-/* ---------- audit: "cant" marks missing their start timestamp ----------
-   Bug: expireCants()'s expiry check required state.cantAt[id] to be truthy
-   before it would even consider expiring an entry. A "cant" mark with no
-   timestamp — e.g. one set before cantAt existed, or reintroduced via an
-   older JSON import or a cloud sync from a device on an older version —
-   would therefore never expire: permanently stuck, exactly the opposite of
-   "bulletproof for a bounded duration." Fix: expireCants() now backfills a
-   fresh timestamp for any orphaned "cant" it finds, and also sweeps the
-   reverse case (a leftover timestamp with no matching "cant" mark). */
-
-test("AUDIT: a pre-existing can't mark with no cantAt timestamp gets one backfilled instead of staying permanently stuck", async () => {
-  const { ctx } = await loadApp({ seed: 70 });
-  ctx.addTask("Task A", false);
-  ctx.addTask("Orphaned can't", false);
-  const orphanId = ctx.state.tasks.find((t) => t.title === "Orphaned can't").id;
-
-  // Simulate data from before cantAt existed (or an old JSON import): the
-  // "cant" mark is present, but with no matching timestamp.
-  ctx.state.considered[orphanId] = "cant";
-  assert.equal(ctx.state.cantAt[orphanId], undefined, "sanity: no timestamp yet");
-
-  ctx.ensureCandidate(); // runs expireCants() as its first step
-  assert.equal(ctx.state.considered[orphanId], "cant", "should NOT be silently un-cant'd by the audit");
-  assert.ok(typeof ctx.state.cantAt[orphanId] === "number", "a fresh timestamp should have been backfilled");
-});
-
-test("AUDIT: a backfilled can't mark expires normally afterward, on its own schedule", async () => {
-  const { ctx } = await loadApp({ seed: 71 });
-  ctx.state.settings.cantMin = 10;
-  ctx.addTask("Task A", false);
-  ctx.addTask("Orphaned can't", false);
-  const orphanId = ctx.state.tasks.find((t) => t.title === "Orphaned can't").id;
-  ctx.state.considered[orphanId] = "cant"; // no timestamp — simulating old data
-
-  const t0 = realNow(ctx);
-  setFakeTime(ctx, t0);
-  ctx.ensureCandidate(); // backfills cantAt[orphanId] = t0
-  assert.equal(ctx.state.cantAt[orphanId], t0);
-
-  setFakeTime(ctx, t0 + 5 * 60000); // 5 min later, within the fresh 10-min window
-  ctx.ensureCandidate();
-  assert.equal(ctx.state.considered[orphanId], "cant", "still bulletproof within its freshly-backfilled window");
-
-  setFakeTime(ctx, t0 + 11 * 60000); // past the freshly-backfilled window
-  ctx.ensureCandidate();
-  assert.equal(ctx.state.considered[orphanId], undefined, "should expire normally once its (backfilled) window elapses");
-});
-
-test("AUDIT: does not disturb can't marks that already have a valid timestamp", async () => {
-  const { ctx } = await loadApp({ seed: 72 });
-  ctx.state.settings.cantMin = 60;
+test("doneTask: completing the current candidate clears it and a fresh one is dealt", async () => {
+  const { ctx } = await loadApp({ seed: 23 });
   ctx.addTask("Task A", false);
   ctx.addTask("Task B", false);
+  ctx.addTask("Task C", false);
   const cand = ctx.state.candidateId;
-  const t0 = realNow(ctx);
-  setFakeTime(ctx, t0);
-  ctx.decide("cant"); // sets considered + cantAt together, normally
+  assert.ok(cand);
 
-  ctx.ensureCandidate(); // audit runs again — should be a no-op for a healthy entry
-  assert.equal(ctx.state.cantAt[cand], t0, "an already-correct timestamp should not be overwritten");
+  ctx.doneTask(cand);
+  assert.notEqual(ctx.state.candidateId, cand);
+  assert.ok(ctx.state.candidateId, "two tasks remain in the pool, so one should be offered");
 });
 
-test("AUDIT (reverse): an orphaned cantAt timestamp with no matching can't mark is cleaned up", async () => {
-  const { ctx } = await loadApp({ seed: 73 });
+test("doneTask: applies NO strength signal — no comparison was made", async () => {
+  const { ctx } = await loadApp({ seed: 24 });
+  ctx.addTask("Benchmark", true);
+  const t = ctx.addTask("Crossed off from the edit pane", false);
+  const before = ctx.state.tasks.map((x) => ({ id: x.id, mu: x.mu, sigma: x.sigma }));
+
+  ctx.doneTask(t.id);
+  const after = ctx.state.tasks.map((x) => ({ id: x.id, mu: x.mu, sigma: x.sigma }));
+  assert.deepEqual(after, before, "unlike cand-done, this must not score a win over the benchmark");
+});
+
+test("doneTask: a daily task stays open, comes due tomorrow, and is ineligible for the rest of today", async () => {
+  const { ctx } = await loadApp({ seed: 25 });
+  const t = ctx.addTask("Daily walk", false);
+  ctx.state.tasks.find((x) => x.id === t.id).recur = "daily";
+
+  ctx.doneTask(t.id);
+  const task = ctx.state.tasks.find((x) => x.id === t.id);
+  assert.equal(task.done, false, "a daily task is never permanently done");
+  assert.equal(task.due, ctx.todayISO(1));
+  assert.equal(ctx.state.considered[t.id], "done");
+  assert.equal(ctx.isEligible(task, ctx.activeCtxSet()), false);
+});
+
+test("doneTask: an evergreen task stays open and starts its rest window", async () => {
+  const { ctx } = await loadApp({ seed: 26 });
+  const t = ctx.addTask("Tidy the desk", false);
+  ctx.state.tasks.find((x) => x.id === t.id).evergreen = true;
+
+  ctx.doneTask(t.id);
+  const task = ctx.state.tasks.find((x) => x.id === t.id);
+  assert.equal(task.done, false);
+  assert.ok(task.lastDoneAt, "lastDoneAt drives the 90-minute evergreen rest");
+  assert.equal(ctx.isEligible(task, ctx.activeCtxSet()), false);
+});
+
+test("doneTask: clears any considered mark and its can't timestamp", async () => {
+  const { ctx } = await loadApp({ seed: 27 });
+  const t = ctx.addTask("Task A", false);
+  ctx.addTask("Task B", false);
+  ctx.state.considered[t.id] = "cant";
+  ctx.state.cantAt[t.id] = realNow(ctx);
+
+  ctx.doneTask(t.id);
+  assert.equal(t.id in ctx.state.considered, false);
+  assert.equal(t.id in ctx.state.cantAt, false, "no orphaned can't timestamp should linger");
+});
+
+test("doneTask: undo puts the task back, dot and all", async () => {
+  const { ctx } = await loadApp({ seed: 28 });
+  const t = ctx.addTask("Dotted task", true);
+  ctx.doneTask(t.id);
+  assert.equal(ctx.state.tasks.find((x) => x.id === t.id).done, true);
+
+  ctx.undo();
+  const task = ctx.state.tasks.find((x) => x.id === t.id);
+  assert.equal(task.done, false);
+  assert.equal(task.completedAt, null);
+  assert.deepEqual([...ctx.state.chain], [t.id], "undo should restore the dot too");
+});
+
+test("doneTask: an unknown, null, or undefined id is a safe no-op", async () => {
+  const { ctx } = await loadApp({ seed: 29 });
   ctx.addTask("Task A", false);
-  const t = ctx.state.tasks[0];
-  ctx.state.cantAt[t.id] = Date.now(); // leftover timestamp, no considered["cant"] entry at all
-
-  ctx.ensureCandidate();
-  assert.equal(ctx.state.cantAt[t.id], undefined, "an orphaned timestamp with no matching can't mark should be swept");
+  ctx.doneTask("no-such-id");
+  ctx.doneTask(null);
+  ctx.doneTask(undefined);
+  assert.equal(ctx.state.tasks.filter((x) => !x.done).length, 1);
+  assert.equal(ctx.state.tasks.filter((x) => x.done).length, 0);
 });
 
-test("AUDIT (reverse): a timestamp left behind after a mark changed to something other than 'cant' is cleaned up", async () => {
-  const { ctx } = await loadApp({ seed: 74 });
-  ctx.addTask("Task A", false);
-  const t = ctx.state.tasks[0];
-  ctx.state.considered[t.id] = "no";       // e.g. some other path changed the status
-  ctx.state.cantAt[t.id] = Date.now();     // but its old cantAt timestamp was left behind
-
-  ctx.ensureCandidate();
-  assert.equal(ctx.state.considered[t.id], "no", "the non-cant status itself should be untouched");
-  assert.equal(ctx.state.cantAt[t.id], undefined, "its stale cantAt should be cleaned up since it's no longer a can't");
+test("UI: the edit pane renders a Done button carrying that task's id", async () => {
+  const { ctx, shim } = await loadApp({ seed: 30 });
+  const t = ctx.addTask("Task A", false);
+  ctx.openEdit(t.id);
+  const html = shim.elements.get("modalRoot").innerHTML;
+  assert.match(html, /data-act="done-task"/, `expected a done-task button in: ${html}`);
+  assert.match(html, new RegExp(`data-act="done-task" data-id="${t.id}"`));
 });
 
-test("AUDIT: repairs multiple orphaned can't marks in a single pass, without disturbing unrelated entries", async () => {
-  const { ctx } = await loadApp({ seed: 75 });
-  ctx.state.settings.cantMin = 30;
-  for (const title of ["A", "B", "C", "D"]) ctx.addTask(title, false);
-  const ids = Object.fromEntries(ctx.state.tasks.map((t) => [t.title, t.id]));
+test("UI: the done-task action completes the task and closes the pane", async () => {
+  const { ctx, shim } = await loadApp({ seed: 31 });
+  const t = ctx.addTask("Task A", false);
+  ctx.openEdit(t.id);
+  assert.notEqual(shim.elements.get("modalRoot").innerHTML, "");
 
-  ctx.state.considered[ids.A] = "cant";  // orphaned — no timestamp
-  ctx.state.considered[ids.B] = "cant";  // orphaned — no timestamp
-  ctx.state.considered[ids.C] = "no";    // healthy, unrelated — should be untouched
-  const t0 = realNow(ctx);
-  setFakeTime(ctx, t0);
-  ctx.state.considered[ids.D] = "cant";
-  ctx.state.cantAt[ids.D] = t0;          // healthy, already has a timestamp
-
-  ctx.ensureCandidate();
-
-  assert.equal(ctx.state.cantAt[ids.A], t0, "A should be backfilled to the current time");
-  assert.equal(ctx.state.cantAt[ids.B], t0, "B should be backfilled to the current time");
-  assert.equal(ctx.state.considered[ids.C], "no", "unrelated 'no' entry should be untouched");
-  assert.equal(ctx.state.cantAt[ids.C], undefined, "C never had a cantAt and shouldn't get one");
-  assert.equal(ctx.state.cantAt[ids.D], t0, "D's existing valid timestamp should be left alone");
+  ctx.onAction("done-task", { dataset: { id: t.id } });
+  assert.equal(ctx.state.tasks.find((x) => x.id === t.id).done, true);
+  assert.equal(shim.elements.get("modalRoot").innerHTML, "", "the modal should close behind it");
+  assert.match(shim.elements.get("histPanel").innerHTML, /1 done/, "it should show up in History");
 });
 
-/* ---------- chain start: oldest-first, can/can't only, no rank signal ----------
-   Starting a chain has no benchmark, so a ranked pick and a Yes/No comparison
-   are both meaningless. Instead the oldest outstanding task is presented and
-   answered Can / Can't (Done and Delete stay available) until one gets dotted;
-   that first dot moves no ranks. After that, normal ranked scanning resumes. */
+/* ---------- Done saves the pane's fields first ----------
+   Delete throws unsaved edits away; Done doesn't. Retitle a task and cross it
+   off in one motion and the completed task carries the new title. The two
+   halves share a single undo snapshot, so one `u` reverses both. */
 
-function addTaskAged(ctx, title, ageMs) { // add a task with a backdated createdAt
-  const t = ctx.addTask(title, false);
-  ctx.state.tasks.find((x) => x.id === t.id).createdAt = Date.now() - ageMs;
-  return t;
-}
-// The shown candidate is deliberately sticky — it won't swap out just because
-// another task was added. Force a fresh pick to exercise the selection logic.
-function repick(ctx) {
-  ctx.state.candidateId = null;
-  ctx.ensureCandidate();
+function fillEditPane(ctx, shim, { title, url, due, evergreen, daily, ctxIds } = {}) {
+  const g = (id) => ctx.document.getElementById(id);
+  g("etTitle").value = title ?? "";
+  g("etUrl").value = url ?? "";
+  g("etDue").value = due ?? "";
+  g("etEver").checked = !!evergreen;
+  g("etDaily").checked = !!daily;
+  const picks = (ctxIds || []).map((id) => ({ checked: true, dataset: { editctx: id } }));
+  shim.document.querySelectorAll = (sel) => (sel === "[data-editctx]" ? picks : []);
 }
 
-test("chain start: presents the OLDEST outstanding task, not a ranked pick", async () => {
-  const { ctx } = await loadApp({ seed: 80 });
-  addTaskAged(ctx, "Newest", 1000);
-  addTaskAged(ctx, "Oldest", 900000);
-  addTaskAged(ctx, "Middle", 50000);
-  repick(ctx);
+// Characterization test — this one passes BEFORE the refactor as well as after.
+// Its job is to go red if pulling the field-reading into a shared helper breaks
+// the Save path, which nothing else currently covers.
+test("save-edit: still applies title, link, due, daily, and contexts, then closes the pane", async () => {
+  const { ctx, shim } = await loadApp({ seed: 32 });
+  const t = ctx.addTask("Old title", false);
+  ctx.openEdit(t.id);
+  fillEditPane(ctx, shim, { title: "New title", url: "https://example.com/x", due: "2026-09-01", daily: true, ctxIds: ["c_home"] });
 
-  const shown = ctx.state.tasks.find((t) => t.id === ctx.state.candidateId);
-  assert.equal(shown.title, "Oldest");
+  ctx.onAction("save-edit", { dataset: { id: t.id } });
+  const task = ctx.state.tasks.find((x) => x.id === t.id);
+  assert.equal(task.title, "New title");
+  assert.equal(task.url, "https://example.com/x");
+  assert.equal(task.due, "2026-09-01");
+  assert.equal(task.recur, "daily");
+  assert.deepEqual([...task.ctx], ["c_home"]);
+  assert.equal(shim.elements.get("modalRoot").innerHTML, "");
 });
 
-test("chain start: a strong rank does NOT jump the queue ahead of the oldest task", async () => {
-  const { ctx } = await loadApp({ seed: 81 });
-  addTaskAged(ctx, "Oldest but weak", 900000);
-  const strong = addTaskAged(ctx, "Newer but top-ranked", 1000);
-  const st = ctx.state.tasks.find((t) => t.id === strong.id);
-  st.mu = 500; st.sigma = 0.5;   // overwhelmingly the highest-ranked task
-  ctx.recomputeRanks();
-  ctx.state.candidateId = null;
-  ctx.ensureCandidate();
+test("done-task: saves the title you just typed before crossing it off", async () => {
+  const { ctx, shim } = await loadApp({ seed: 33 });
+  const t = ctx.addTask("Old title", false);
+  ctx.openEdit(t.id);
+  fillEditPane(ctx, shim, { title: "Renamed on the way out" });
 
-  const shown = ctx.state.tasks.find((t) => t.id === ctx.state.candidateId);
-  assert.equal(shown.title, "Oldest but weak", "ranking must not influence the chain-start pick");
+  ctx.onAction("done-task", { dataset: { id: t.id } });
+  const task = ctx.state.tasks.find((x) => x.id === t.id);
+  assert.equal(task.title, "Renamed on the way out", "Done must not discard the edit");
+  assert.equal(task.done, true);
 });
 
-test("chain start: 'can' dots the task and starts the chain", async () => {
-  const { ctx } = await loadApp({ seed: 82 });
-  addTaskAged(ctx, "Newer", 1000);          // added first but younger
-  addTaskAged(ctx, "Oldest", 900000);
-  repick(ctx);
-  const first = ctx.state.candidateId;
-  assert.equal(ctx.state.tasks.find((t) => t.id === first).title, "Oldest");
+test("done-task: saves link, due date, and contexts too", async () => {
+  const { ctx, shim } = await loadApp({ seed: 34 });
+  const t = ctx.addTask("Task A", false);
+  ctx.openEdit(t.id);
+  fillEditPane(ctx, shim, { url: "https://example.com/receipt", due: "2026-09-02", ctxIds: ["c_home", "c_laptop"] });
 
-  ctx.decide("can");
-  assert.equal(ctx.state.chain.length, 1);
-  assert.equal(ctx.state.chain[0], first);
+  ctx.onAction("done-task", { dataset: { id: t.id } });
+  const task = ctx.state.tasks.find((x) => x.id === t.id);
+  assert.equal(task.url, "https://example.com/receipt");
+  assert.equal(task.due, "2026-09-02");
+  assert.deepEqual([...task.ctx], ["c_home", "c_laptop"]);
 });
 
-test("chain start: the first dot moves NO ranks (mu/sigma untouched for every task)", async () => {
-  const { ctx } = await loadApp({ seed: 83 });
-  addTaskAged(ctx, "Oldest", 900000);
-  addTaskAged(ctx, "Newer", 1000);
-  const before = ctx.state.tasks.map((t) => ({ id: t.id, mu: t.mu, sigma: t.sigma }));
+test("done-task: ticking 'repeats daily' in the pane makes it complete AS a daily", async () => {
+  const { ctx, shim } = await loadApp({ seed: 35 });
+  const t = ctx.addTask("Daily walk", false);
+  ctx.openEdit(t.id);
+  fillEditPane(ctx, shim, { daily: true });
 
-  ctx.decide("can");
-
-  for (const snap of before) {
-    const now = ctx.state.tasks.find((t) => t.id === snap.id);
-    assert.equal(now.mu, snap.mu, `mu for ${now.title} should be unchanged by the first dot`);
-    assert.equal(now.sigma, snap.sigma, `sigma for ${now.title} should be unchanged by the first dot`);
-  }
+  ctx.onAction("done-task", { dataset: { id: t.id } });
+  const task = ctx.state.tasks.find((x) => x.id === t.id);
+  assert.equal(task.recur, "daily");
+  assert.equal(task.done, false, "the field you just ticked decides HOW it completes");
+  assert.equal(task.due, ctx.todayISO(1));
+  assert.equal(ctx.state.considered[t.id], "done");
 });
 
-test("chain start: 'can't' moves on to the NEXT oldest task", async () => {
-  const { ctx } = await loadApp({ seed: 84 });
-  addTaskAged(ctx, "Newest", 1000);           // added first, but youngest — must be shown last
-  addTaskAged(ctx, "Second oldest", 500000);
-  addTaskAged(ctx, "First oldest", 900000);
-  repick(ctx);
+test("done-task: the edit and the completion are ONE undo step", async () => {
+  const { ctx, shim } = await loadApp({ seed: 36 });
+  const t = ctx.addTask("Old title", false);
+  ctx.openEdit(t.id);
+  fillEditPane(ctx, shim, { title: "New title" });
+  ctx.onAction("done-task", { dataset: { id: t.id } });
+  const saved = ctx.state.tasks.find((x) => x.id === t.id);
+  assert.equal(saved.title, "New title", "precondition: the edit was saved on the way out");
+  assert.equal(saved.done, true, "precondition: and the task was completed");
 
-  assert.equal(ctx.state.tasks.find((t) => t.id === ctx.state.candidateId).title, "First oldest");
-  ctx.decide("cant");
-  assert.equal(ctx.state.tasks.find((t) => t.id === ctx.state.candidateId).title, "Second oldest");
-  ctx.decide("cant");
-  assert.equal(ctx.state.tasks.find((t) => t.id === ctx.state.candidateId).title, "Newest");
-  assert.equal(ctx.state.chain.length, 0, "saying can't repeatedly should never start a chain");
+  ctx.undo();
+  const task = ctx.state.tasks.find((x) => x.id === t.id);
+  assert.equal(task.done, false, "one undo should reverse the completion");
+  assert.equal(task.title, "Old title", "...and the edit that rode along with it");
 });
 
-test("chain start: 'yes' and 'no' are rejected outright — no chain change, no considered mark", async () => {
-  const { ctx } = await loadApp({ seed: 85 });
-  addTaskAged(ctx, "Oldest", 900000);
-  addTaskAged(ctx, "Newer", 1000);
-  const cand = ctx.state.candidateId;
-
-  ctx.decide("yes");
-  assert.equal(ctx.state.chain.length, 0, "'yes' must not dot anything at chain start");
-  assert.equal(ctx.state.candidateId, cand, "the same task should still be showing");
-
-  ctx.decide("no");
-  assert.equal(ctx.state.considered[cand], undefined, "'no' must not mark the task considered at chain start");
-  assert.equal(ctx.state.candidateId, cand, "the same task should still be showing");
-});
-
-test("chain start: Done still works on the first task and does not start a chain", async () => {
-  const { ctx } = await loadApp({ seed: 86 });
-  addTaskAged(ctx, "Oldest", 900000);
-  addTaskAged(ctx, "Newer", 1000);
-  const cand = ctx.state.candidateId;
-
-  ctx.decide("cand-done");
-  assert.equal(ctx.state.tasks.find((t) => t.id === cand).done, true);
-  assert.equal(ctx.state.chain.length, 0);
-});
-
-test("chain start: Delete still works on the first task, and the next oldest comes up", async () => {
-  const { ctx } = await loadApp({ seed: 87 });
-  addTaskAged(ctx, "Oldest", 900000);
-  addTaskAged(ctx, "Second oldest", 500000);
-  const cand = ctx.state.candidateId;
-
-  ctx.deleteTask(cand);
-  assert.equal(ctx.state.tasks.some((t) => t.id === cand), false);
-  assert.equal(ctx.state.tasks.find((t) => t.id === ctx.state.candidateId).title, "Second oldest");
-});
-
-test("after the first dot, scanning hands back to the normal ranked picker", async () => {
-  const { ctx } = await loadApp({ seed: 88 });
-  addTaskAged(ctx, "Oldest", 900000);
-  addTaskAged(ctx, "Second oldest", 800000);
-  const strong = addTaskAged(ctx, "Newest but top-ranked", 1000);
-  const st = ctx.state.tasks.find((t) => t.id === strong.id);
-  st.mu = 500; st.sigma = 0.5;
-  ctx.recomputeRanks();
-
-  ctx.decide("can"); // dots "Oldest", chain now has a benchmark
-
-  const shown = ctx.state.tasks.find((t) => t.id === ctx.state.candidateId);
-  assert.equal(shown.title, "Newest but top-ranked", "ranked picking should resume once a benchmark exists");
-});
-
-test("emptying the chain returns to oldest-first chain-start behavior", async () => {
-  const { ctx } = await loadApp({ seed: 89 });
-  addTaskAged(ctx, "Oldest", 900000);
-  addTaskAged(ctx, "Second oldest", 800000);
-  const strong = addTaskAged(ctx, "Newest but top-ranked", 1000);
-  const st = ctx.state.tasks.find((t) => t.id === strong.id);
-  st.mu = 500; st.sigma = 0.5;
-  ctx.recomputeRanks();
-
-  ctx.decide("can");   // dots "Oldest"
-  ctx.benchDone();     // completes it, chain empties, mode -> "work"
-  ctx.onAction("resume-scan", {});
-  assert.equal(ctx.state.chain.length, 0);
-
-  const shown = ctx.state.tasks.find((t) => t.id === ctx.state.candidateId);
-  assert.equal(shown.title, "Second oldest", "back to oldest-first now that the chain is empty again");
-});
-
-test("UI: chain start shows Can / Can't but NOT Yes / No", async () => {
-  const { ctx, shim } = await loadApp({ seed: 90 });
-  addTaskAged(ctx, "Oldest", 900000);
-  addTaskAged(ctx, "Newer", 1000);
-  ctx.render();
-  const scanHtml = shim.elements.get("scan").innerHTML;
-
-  assert.match(scanHtml, /data-act="can"/, "the Can button should be present at chain start");
-  assert.match(scanHtml, /data-act="cant"/, "the Can't button should be present at chain start");
-  assert.ok(!/data-act="yes"/.test(scanHtml), "Yes must not be offered at chain start");
-  assert.ok(!/data-act="no"/.test(scanHtml), "No must not be offered at chain start");
-  assert.match(scanHtml, /data-act="cand-done"/, "Done should still be available");
-  assert.match(scanHtml, /data-act="delete-task"/, "Delete should still be available");
-});
-
-test("UI: once a chain exists, Yes / No come back and the bare Can button goes away", async () => {
-  const { ctx, shim } = await loadApp({ seed: 91 });
-  addTaskAged(ctx, "Oldest", 900000);
-  addTaskAged(ctx, "Newer", 1000);
-  addTaskAged(ctx, "Third", 500);
-  ctx.decide("can");
-  ctx.render();
-  const scanHtml = shim.elements.get("scan").innerHTML;
-
-  assert.match(scanHtml, /data-act="yes"/, "Yes should be offered once there's a benchmark");
-  assert.match(scanHtml, /data-act="no"/, "No should be offered once there's a benchmark");
-  assert.ok(!/data-act="can"[^t]/.test(scanHtml), "the chain-start Can button should be gone");
-});
-
-/* =====================================================================
-   NIGHT MODE — Unit 1: preference model & resolution
-   ===================================================================== */
-const STORE_KEY = "fvp:chain-scanner:v1";
-
-test("theme: a fresh state defaults the preference to 'system'", async () => {
-  const { ctx } = await loadApp();
-  assert.equal(ctx.state.settings.theme, "system");
-});
-
-test("theme: state saved before night mode existed migrates to 'system' on boot", async () => {
-  const legacy = {
-    v: 1, tasks: [], contexts: [], chain: [], considered: {}, cantAt: {}, candidateId: null,
-    interventionActive: false, interventionP: 0, snooze: 0, mode: "scan", decisionsMs: [],
-    presentedAt: 0, listOpen: false, ctxOpen: true, histOpen: false, updatedAt: 0,
-    settings: { horizonMin: 60, thresholdPct: 25, samples: 250, cantMin: 30 }, // no theme key
-  };
-  const { ctx } = await loadApp({ seedStorage: { [STORE_KEY]: JSON.stringify(legacy) } });
-  assert.equal(ctx.state.settings.theme, "system");
-});
-
-test("theme: a corrupt stored preference is repaired to 'system' on boot", async () => {
-  const bad = {
-    v: 1, tasks: [], contexts: [], chain: [], considered: {}, cantAt: {}, candidateId: null,
-    interventionActive: false, interventionP: 0, snooze: 0, mode: "scan", decisionsMs: [],
-    presentedAt: 0, listOpen: false, ctxOpen: true, histOpen: false, updatedAt: 0,
-    settings: { horizonMin: 60, thresholdPct: 25, samples: 250, cantMin: 30, theme: "banana" },
-  };
-  const { ctx } = await loadApp({ seedStorage: { [STORE_KEY]: JSON.stringify(bad) } });
-  assert.equal(ctx.state.settings.theme, "system");
-});
-
-test("setTheme: accepts each of the three valid preferences", async () => {
-  const { ctx } = await loadApp();
-  ctx.setTheme("dark");
-  assert.equal(ctx.state.settings.theme, "dark");
-  ctx.setTheme("light");
-  assert.equal(ctx.state.settings.theme, "light");
-  ctx.setTheme("system");
-  assert.equal(ctx.state.settings.theme, "system");
-});
-
-test("setTheme: an unrecognised value falls back to 'system' rather than sticking", async () => {
-  const { ctx } = await loadApp();
-  ctx.setTheme("dark");
-  ctx.setTheme("banana");
-  assert.equal(ctx.state.settings.theme, "system");
-});
-
-test("resolvedTheme: with preference 'system', follows the OS reporting dark", async () => {
-  const { ctx } = await loadApp({ prefersDark: true });
-  assert.equal(ctx.state.settings.theme, "system");
-  assert.equal(ctx.resolvedTheme(), "dark");
-});
-
-test("resolvedTheme: with preference 'system', follows the OS reporting light", async () => {
-  const { ctx } = await loadApp({ prefersDark: false });
-  assert.equal(ctx.resolvedTheme(), "light");
-});
-
-test("resolvedTheme: an explicit preference overrides the OS in both directions", async () => {
-  const { ctx: darkOS } = await loadApp({ prefersDark: true });
-  darkOS.setTheme("light");
-  assert.equal(darkOS.resolvedTheme(), "light", "explicit light must win over a dark OS");
-
-  const { ctx: lightOS } = await loadApp({ prefersDark: false });
-  lightOS.setTheme("dark");
-  assert.equal(lightOS.resolvedTheme(), "dark", "explicit dark must win over a light OS");
-});
-
-test("resolvedTheme: an environment with no matchMedia resolves light instead of throwing", async () => {
-  const { ctx } = await loadApp({ noMatchMedia: true });
-  assert.equal(ctx.resolvedTheme(), "light");
-});
-
-/* =====================================================================
-   NIGHT MODE — Unit 2: DOM application, persistence, anti-flash boot
-   ===================================================================== */
-const THEME_HINT_KEY = "fvp:chain-scanner:theme";
-
-// The synchronous <head> script that paints before first frame, sliced out of
-// index.html the same way the engine is, so it's tested as shipped. Sliced
-// lazily: at module load a missing marker would take down the whole file.
-const themeBootSrc = () => slice(html, "/*THEME-BOOT-START*/", "/*THEME-BOOT-END*/");
-
-function runThemeBoot({ hint, throwingStorage = false } = {}) {
-  const root = makeFakeElement();
-  const store = new Map();
-  if (hint !== undefined) store.set(THEME_HINT_KEY, hint);
-  const sandbox = {
-    document: { documentElement: root },
-    localStorage: throwingStorage
-      ? { getItem() { throw new Error("storage blocked"); } }
-      : { getItem(k) { return store.has(k) ? store.get(k) : null; } },
-  };
-  vm.createContext(sandbox);
-  vm.runInContext(themeBootSrc(), sandbox, { filename: "index.html#theme-boot" });
-  return root;
-}
-
-test("applyTheme: an explicit dark preference puts data-theme=dark on the root element", async () => {
-  const { ctx, shim } = await loadApp();
-  ctx.setTheme("dark");
-  assert.equal(shim.documentElement.getAttribute("data-theme"), "dark");
-});
-
-test("applyTheme: an explicit light preference puts data-theme=light on the root element", async () => {
-  const { ctx, shim } = await loadApp({ prefersDark: true });
-  ctx.setTheme("light");
-  assert.equal(shim.documentElement.getAttribute("data-theme"), "light");
-});
-
-test("applyTheme: the 'system' preference removes data-theme so CSS follows the OS unaided", async () => {
-  const { ctx, shim } = await loadApp();
-  ctx.setTheme("dark");
-  assert.equal(shim.documentElement.getAttribute("data-theme"), "dark");
-  ctx.setTheme("system");
-  assert.equal(shim.documentElement.getAttribute("data-theme"), null,
-    "no attribute means color-scheme: light dark governs, which is what makes it reactive");
-});
-
-test("setTheme: marks the state dirty so the choice syncs to other devices", async () => {
-  const { ctx } = await loadApp();
-  const before = ctx.state.updatedAt;
-  ctx.setTheme("dark");
-  assert.ok(ctx.state.updatedAt > before, "updatedAt must advance or the sync will not push");
-});
-
-test("setTheme: writes the paint hint for explicit preferences", async () => {
-  const { ctx, shim } = await loadApp();
-  ctx.setTheme("dark");
-  assert.equal(shim.localStorage.getItem(THEME_HINT_KEY), "dark");
-  ctx.setTheme("light");
-  assert.equal(shim.localStorage.getItem(THEME_HINT_KEY), "light");
-});
-
-test("setTheme: clears the paint hint for 'system' so a stale hint cannot outvote the OS", async () => {
-  const { ctx, shim } = await loadApp();
-  ctx.setTheme("dark");
-  ctx.setTheme("system");
-  assert.equal(shim.localStorage.getItem(THEME_HINT_KEY), null);
-});
-
-test("boot: a synced dark preference is applied to the root element on load", async () => {
-  const stored = {
-    v: 1, tasks: [], contexts: [], chain: [], considered: {}, cantAt: {}, candidateId: null,
-    interventionActive: false, interventionP: 0, snooze: 0, mode: "scan", decisionsMs: [],
-    presentedAt: 0, listOpen: false, ctxOpen: true, histOpen: false, updatedAt: 0,
-    settings: { horizonMin: 60, thresholdPct: 25, samples: 250, cantMin: 30, theme: "dark" },
-  };
-  const { shim } = await loadApp({ seedStorage: { [STORE_KEY]: JSON.stringify(stored) } });
-  assert.equal(shim.documentElement.getAttribute("data-theme"), "dark");
-});
-
-test("applyTheme: a host with no documentElement is a safe no-op", async () => {
-  const shim = makeDomShim();
-  delete shim.document.documentElement;
-  const sandbox = {
-    window: shim.window, document: shim.document, localStorage: shim.localStorage,
-    console, JSON,
-    CustomEvent: class CustomEvent { constructor(type, opts) { this.type = type; Object.assign(this, opts || {}); } },
-    setTimeout: (fn, ms, ...a) => { const t = setTimeout(fn, ms, ...a); t.unref?.(); return t; },
-    clearTimeout, requestAnimationFrame: (fn) => setTimeout(fn, 0),
-    confirm: () => true, alert: () => {}, prompt: () => null,
-  };
-  vm.createContext(sandbox);
-  vm.runInContext(appSrc, sandbox, { filename: "index.html#app" });
-  await flush();
-  assert.doesNotThrow(() => sandbox.setTheme("dark"));
-});
-
-test("cloudPull: adopting a remote state applies that device's theme locally", async () => {
-  const remoteState = {
-    v: 1, tasks: [], contexts: [], chain: [], considered: {}, cantAt: {}, candidateId: null,
-    interventionActive: false, interventionP: 0, snooze: 0, mode: "scan", decisionsMs: [],
-    presentedAt: 0, listOpen: false, ctxOpen: true, histOpen: false, updatedAt: Date.now() + 100000,
-    settings: { horizonMin: 60, thresholdPct: 25, samples: 250, cantMin: 30, theme: "dark" },
-  };
-  const { ctx, shim } = await loadApp({
-    cloudSyncFactory: () => ({
-      configured: true, ready: true, user: "e@example.com", status: "on",
-      signIn() {}, signOut() {},
-      async pull() { return { updatedAt: remoteState.updatedAt, payload: JSON.stringify(remoteState) }; },
-      async push() {},
-    }),
-  });
-  assert.equal(shim.documentElement.getAttribute("data-theme"), null, "starts on system");
-  await ctx.cloudPull();
-  assert.equal(ctx.state.settings.theme, "dark");
-  assert.equal(shim.documentElement.getAttribute("data-theme"), "dark",
-    "a theme arriving from another device must repaint, not just sit in state");
-});
-
-test("theme boot script: a 'dark' hint paints before the app loads", () => {
-  assert.equal(runThemeBoot({ hint: "dark" }).getAttribute("data-theme"), "dark");
-});
-
-test("theme boot script: a 'light' hint paints before the app loads", () => {
-  assert.equal(runThemeBoot({ hint: "light" }).getAttribute("data-theme"), "light");
-});
-
-test("theme boot script: no hint leaves the OS in charge", () => {
-  assert.equal(runThemeBoot().getAttribute("data-theme"), null);
-});
-
-test("theme boot script: a junk hint is ignored rather than written through", () => {
-  assert.equal(runThemeBoot({ hint: "banana" }).getAttribute("data-theme"), null);
-  assert.equal(runThemeBoot({ hint: "system" }).getAttribute("data-theme"), null);
-});
-
-test("theme boot script: blocked localStorage does not throw and does not block the page", () => {
-  assert.doesNotThrow(() => runThemeBoot({ throwingStorage: true }));
-});
-
-/* =====================================================================
-   NIGHT MODE — Unit 3: the one-tap footer control & live OS reactivity
-   ===================================================================== */
-const themeBtnText = (shim) => shim.elements.get("themeBtn").textContent;
-
-test("footer control: the page ships a tappable theme button wired to cycle-theme", () => {
-  const footer = html.slice(html.indexOf('<footer'), html.indexOf('</footer>'));
-  assert.match(footer, /data-act="cycle-theme"/, "the control must live in the footer, not the header");
-  assert.match(footer, /id="themeBtn"/);
-});
-
-test("footer control: on 'system' the label names Auto and the theme it currently resolves to", async () => {
-  const { ctx, shim } = await loadApp({ prefersDark: true });
-  ctx.render();
-  assert.match(themeBtnText(shim), /Auto/i);
-  assert.match(themeBtnText(shim), /dark/i, "Auto should show what it is resolving to right now");
-});
-
-test("footer control: an explicit preference labels itself Light or Dark", async () => {
-  const { ctx, shim } = await loadApp();
-  ctx.setTheme("light");
-  assert.match(themeBtnText(shim), /Light/i);
-  assert.ok(!/Auto/i.test(themeBtnText(shim)), "an explicit choice must not still read as Auto");
-  ctx.setTheme("dark");
-  assert.match(themeBtnText(shim), /Dark/i);
-});
-
-test("cycle-theme: one tap moves system -> light -> dark and wraps back to system", async () => {
-  const { ctx } = await loadApp();
-  assert.equal(ctx.state.settings.theme, "system");
-  ctx.onAction("cycle-theme", {});
-  assert.equal(ctx.state.settings.theme, "light");
-  ctx.onAction("cycle-theme", {});
-  assert.equal(ctx.state.settings.theme, "dark");
-  ctx.onAction("cycle-theme", {});
-  assert.equal(ctx.state.settings.theme, "system", "the cycle must wrap, or Auto becomes unreachable");
-});
-
-test("cycle-theme: tapping repaints the root element as it goes", async () => {
-  const { ctx, shim } = await loadApp();
-  ctx.onAction("cycle-theme", {});
-  assert.equal(shim.documentElement.getAttribute("data-theme"), "light");
-  ctx.onAction("cycle-theme", {});
-  assert.equal(shim.documentElement.getAttribute("data-theme"), "dark");
-  ctx.onAction("cycle-theme", {});
-  assert.equal(shim.documentElement.getAttribute("data-theme"), null);
-});
-
-test("footer control: carries an accessible label naming the next state, not just an icon", async () => {
-  const { ctx, shim } = await loadApp();
-  ctx.render();
-  const btn = shim.elements.get("themeBtn");
-  const label = btn.getAttribute("aria-label") || btn.getAttribute("title") || "";
-  assert.ok(label.length > 0, "an icon-and-word button still needs a description for screen readers");
-  assert.match(label, /light/i, "from Auto the next tap is Light, so say so");
-});
-
-test("reactivity: the app subscribes to the OS colour-scheme query at boot", async () => {
-  const { shim } = await loadApp();
-  assert.ok(shim.mqlListeners.length > 0, "without a subscription nothing can react to the OS flipping");
-});
-
-test("reactivity: flipping the OS while on Auto updates the label live", async () => {
-  const { ctx, shim } = await loadApp({ prefersDark: false });
-  ctx.render();
-  assert.match(themeBtnText(shim), /light/i);
-  shim.setDark(true);
-  assert.match(themeBtnText(shim), /dark/i, "Auto must track the OS without a reload");
-  shim.setDark(false);
-  assert.match(themeBtnText(shim), /light/i, "and track it back again");
-});
-
-test("reactivity: flipping the OS while pinned to an explicit theme changes nothing", async () => {
-  const { ctx, shim } = await loadApp({ prefersDark: false });
-  ctx.setTheme("light");
-  const before = themeBtnText(shim);
-  shim.setDark(true);
-  assert.equal(themeBtnText(shim), before, "an explicit choice must not be overridden by the OS");
-  assert.equal(shim.documentElement.getAttribute("data-theme"), "light");
-  assert.equal(ctx.resolvedTheme(), "light");
-});
-
-test("reactivity: booting without matchMedia wires up nothing and does not throw", async () => {
-  const { ctx, shim } = await loadApp({ noMatchMedia: true });
-  assert.doesNotThrow(() => ctx.render());
-  assert.match(themeBtnText(shim), /Auto/i);
-});
-
-/* =====================================================================
-   NIGHT MODE — Unit 4: the palette itself
-   A dark mode is only as good as its least-converted colour. This guard
-   walks every declaration in <style> and fails on any background, border,
-   fill or accent that is still a hardcoded literal, which is how a stray
-   white input box survives into a dark theme.
-   ===================================================================== */
-const styleSrc = slice(html, "<style>", "</style>").replace(/\/\*[\s\S]*?\*\//g, "");
-
-const COLOR_RE = /#[0-9a-fA-F]{3,8}\b|\brgba?\([^)]*\)/g;
-const WHITE_RE = /^(#fff|#ffffff|rgba?\(\s*255\s*,\s*255\s*,\s*255[^)]*\))$/i;
-// Properties whose colour is decorative or sits on a saturated fill, so it is
-// genuinely the same in both themes.
-const INVARIANT_PROPS = new Set(["box-shadow", "text-decoration-color"]);
-// Deliberate, reviewed exceptions. Each must justify itself.
-const ALLOWED_DECLS = new Set([
-  "background:rgba(28,26,50,.42)",   // modal scrim — dark over both themes by design
-]);
-
-function declarations() {
-  const out = [];
-  for (const [, body] of styleSrc.matchAll(/\{([^{}]*)\}/g)) {
-    for (const chunk of body.split(";")) {
-      const i = chunk.indexOf(":");
-      if (i === -1) continue;
-      const prop = chunk.slice(0, i).trim().toLowerCase();
-      const value = chunk.slice(i + 1).trim();
-      if (prop && value) out.push({ prop, value, text: prop + ":" + value.replace(/\s+/g, " ") });
-    }
-  }
-  return out;
-}
-
-// Pulls the arguments out of every light-dark(...) in a value. Needs real
-// paren balancing, not a regex: light-dark(rgba(...),rgba(...)) is legal and a
-// lazy /\(([^)]*)\)/ would stop at the inner rgba's closing paren.
-function lightDarkArgs(value) {
-  const TAG = "light-dark(";
-  const out = [];
-  let i = 0;
-  while ((i = value.indexOf(TAG, i)) !== -1) {
-    let depth = 0, j = i + TAG.length - 1;
-    for (; j < value.length; j++) {
-      if (value[j] === "(") depth++;
-      else if (value[j] === ")" && --depth === 0) break;
-    }
-    out.push(value.slice(i + TAG.length, j));
-    i = j + 1;
-  }
-  return out.join(",");
-}
-
-function offendingDeclarations() {
-  const bad = [];
-  for (const d of declarations()) {
-    const literals = d.value.match(COLOR_RE);
-    if (!literals) continue;
-    if (INVARIANT_PROPS.has(d.prop)) continue;
-    if (ALLOWED_DECLS.has(d.text.replace(/\s/g, ""))) continue;
-    if (d.prop === "color" && literals.every((l) => WHITE_RE.test(l))) continue; // white on a saturated fill
-    // Everything else must route its literals through light-dark().
-    const insideLightDark = lightDarkArgs(d.value);
-    const escaped = literals.filter((l) => !insideLightDark.includes(l));
-    if (escaped.length) bad.push(`${d.text}   [escaped: ${escaped.join(", ")}]`);
-  }
-  return bad;
-}
-
-test("palette: :root opts into both schemes so the OS drives light-dark() unaided", () => {
-  const root = styleSrc.slice(styleSrc.indexOf(":root{"), styleSrc.indexOf("}", styleSrc.indexOf(":root{")));
-  assert.match(root.replace(/\s/g, ""), /color-scheme:lightdark/,
-    "without this declaration light-dark() has nothing to resolve against");
-});
-
-test("palette: an explicit preference pins color-scheme in both directions", () => {
-  const flat = styleSrc.replace(/\s/g, "");
-  assert.match(flat, /\[data-theme="dark"\][^{]*\{[^}]*color-scheme:dark/);
-  assert.match(flat, /\[data-theme="light"\][^{]*\{[^}]*color-scheme:light/);
-});
-
-test("palette: no background, border, fill or accent escapes light-dark()", () => {
-  const bad = offendingDeclarations();
-  assert.deepEqual(bad, [], `unconverted colours would render wrong in dark mode:\n  ${bad.join("\n  ")}`);
-});
-
-test("palette: the footer theme button is styled rather than inheriting bare button reset", () => {
-  assert.match(styleSrc, /\.themebtn\s*\{/);
-  assert.match(styleSrc, /\.themerow\s*\{/);
-});
-
-/* =====================================================================
-   NIGHT MODE — Unit 5: the app's copy is English
-   Checks characters, not words: anything outside plain ASCII must be a
-   deliberate typographic mark or an icon glyph. \uXXXX escapes are decoded
-   first, so writing foreign text the long way round is caught too.
-   ===================================================================== */
-const ALLOWED_NON_ASCII = new Set([
-  "\u2014", "\u2013", "\u2026", "\u00b7", "\u2022",           // dashes, ellipsis, dots
-  "\u2265", "\u2264", "\u2212", "\u00b1", "\u2248",           // maths
-  "\u2192", "\u2193", "\u2197", "\u21ba", "\u21bb", "\u232b", // arrows & keycaps
-  "\u2715", "\u2699", "\u25c9", "\u25a6", "\u{1f5d3}",        // icons
-  "\u25b6", "\u25b8", "\u25be", "\u25bc", "\u25cf",           // carets & bullets
-  "\u25d0", "\u2600", "\u263e",                               // night-mode faces
-  "\u2019",                                                   // English apostrophe ("Can't")
-  "\u2601",                                                   // cloud-sync icon
-]);
-
-function decodeEscapes(src) {
-  return src
-    .replace(/\\u\{([0-9a-fA-F]+)\}/g, (_, h) => String.fromCodePoint(parseInt(h, 16)))
-    .replace(/\\u([0-9a-fA-F]{4})/g, (_, h) => String.fromCharCode(parseInt(h, 16)));
-}
-
-test("copy: every non-ASCII character in the app is a permitted typographic or icon glyph", () => {
-  const found = new Map();
-  for (const ch of decodeEscapes(html)) {
-    if (ch.codePointAt(0) > 127 && !ALLOWED_NON_ASCII.has(ch)) {
-      found.set(ch, (found.get(ch) || 0) + 1);
-    }
-  }
-  const report = [...found].map(([c, n]) => `U+${c.codePointAt(0).toString(16).toUpperCase()} ${JSON.stringify(c)} x${n}`);
-  assert.deepEqual(report, [], `non-English or non-standard characters in the app:\n  ${report.join("\n  ")}`);
-});
-
-test("copy: the footer credit reads as English rather than a French idiom", () => {
-  const footer = html.slice(html.indexOf("<footer"), html.indexOf("</footer>"));
-  assert.ok(!/\u00e0 la/i.test(footer), "'a la' is French; say it in English");
-  assert.match(footer, /spawelo/, "the credit itself must survive the rewording");
-});
-
-test("copy: the add-context button uses a plain ASCII plus, not a fullwidth one", () => {
-  assert.match(html, /">\+ context</, "U+FF0B is a CJK-width form and renders oddly in a Latin UI");
-});
-
-/* =====================================================================
-   NIGHT MODE — Unit 6: both palettes stay readable
-   Dark mode is easy to ship and hard to ship legibly. These compute real
-   WCAG contrast ratios from the tokens, in both themes, so a palette
-   tweak cannot quietly push text under the line.
-   ===================================================================== */
-function themeTokens() {
-  const rootBlock = styleSrc.slice(styleSrc.indexOf(":root{"), styleSrc.indexOf("*{box-sizing"));
-  const light = {}, dark = {};
-  for (const m of rootBlock.matchAll(/(--[a-z-]+)\s*:\s*light-dark\(\s*([^,]+?)\s*,\s*([^)]+?)\s*\)/g)) {
-    light[m[1]] = m[2];
-    dark[m[1]] = m[3];
-  }
-  return { light, dark };
-}
-
-function channel(c) { c /= 255; return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); }
-function luminance(hex) {
-  let h = hex.replace("#", "");
-  if (h.length === 3) h = [...h].map((c) => c + c).join("");
-  const [r, g, b] = [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16));
-  return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
-}
-function contrast(a, b) {
-  const [la, lb] = [luminance(a), luminance(b)];
-  return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
-}
-
-// [description, foreground token, background token, minimum ratio]
-const CONTRAST_PAIRS = [
-  ["body text on the page",        "--ink",       "--bg",         4.5],
-  ["body text on a panel",         "--ink",       "--panel",      4.5],
-  ["muted secondary text",         "--mut",       "--bg",         4.5],
-  ["links and accents",            "--accent",    "--bg",         4.5],
-  ["white ink, top of chain card", "--chain-ink", "--chain",      3.0],
-  ["white ink, foot of chain card","--chain-ink", "--chain-deep", 3.0],
-  ["candidate card text",          "--cand-ink",  "--cand-bg",    4.5],
-];
-
-for (const [what, fg, bg, min] of CONTRAST_PAIRS) {
-  for (const theme of ["light", "dark"]) {
-    test(`contrast (${theme}): ${what} clears ${min}:1`, () => {
-      const tokens = themeTokens()[theme];
-      assert.ok(tokens[fg], `${fg} must be defined as a light-dark() pair`);
-      assert.ok(tokens[bg], `${bg} must be defined as a light-dark() pair`);
-      const ratio = contrast(tokens[fg], tokens[bg]);
-      assert.ok(ratio >= min,
-        `${fg} on ${bg} in ${theme} is ${ratio.toFixed(2)}:1, below the ${min}:1 floor`);
-    });
-  }
-}
-
-test("contrast: the accent token is used for link text rather than the card-fill token", () => {
-  assert.match(styleSrc, /\na\{color:var\(--accent\)\}/,
-    "a fill tuned to sit under white ink is too dark to double as link text");
+// Characterization test — Cancel's throw-it-away behavior is unchanged.
+test("close-modal: Cancel still throws unsaved edits away", async () => {
+  const { ctx, shim } = await loadApp({ seed: 37 });
+  const t = ctx.addTask("Old title", false);
+  ctx.openEdit(t.id);
+  fillEditPane(ctx, shim, { title: "Typed but not saved" });
+
+  ctx.onAction("close-modal", {});
+  assert.equal(ctx.state.tasks.find((x) => x.id === t.id).title, "Old title");
 });
