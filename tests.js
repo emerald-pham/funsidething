@@ -316,6 +316,46 @@ test("undo: reverses the most recent mutation (dotting a task)", async () => {
   assert.equal(ctx.state.chain.length, 0);
 });
 
+/* ---------- undo has to be durable, not just visible ----------
+   undo() restored the snapshot on screen but called commit(false), which skips
+   save() — so the reverted state never reached storage. Since save() is
+   debounced, any undo more than ~350ms after the action it reverses left the
+   pre-undo state on disk, and a reload resurrected whatever you just took back.
+   save() also stamps updatedAt, which is what arbitrates the cloud's
+   last-write-wins: an undo carrying its snapshot's stale timestamp loses the
+   next reconcile to the remote copy it was meant to overrule. */
+
+const SAVE_DEBOUNCE_MS = 350;
+const settle = () => new Promise((r) => setTimeout(r, SAVE_DEBOUNCE_MS + 120));
+const persisted = (shim) => JSON.parse(shim.localStorage.getItem("fvp:chain-scanner:v1"));
+
+test("undo: writes the restored state to storage, so a reload doesn't resurrect it", async () => {
+  const { ctx, shim } = await loadApp({ seed: 40 });
+  const t = ctx.addTask("Task A", false);
+  ctx.doneTask(t.id);
+  await settle();
+  assert.deepEqual(persisted(shim).tasks.filter((x) => x.done).map((x) => x.title), ["Task A"],
+    "precondition: the completion reached storage before the undo");
+
+  ctx.undo();
+  await settle();
+  assert.deepEqual(persisted(shim).tasks.filter((x) => x.done), [],
+    "the undone completion must not still be on disk");
+  assert.equal(persisted(shim).tasks.find((x) => x.id === t.id).done, false);
+});
+
+test("undo: stamps updatedAt so the restored state outranks the copy it reverses", async () => {
+  const { ctx } = await loadApp({ seed: 41 });
+  ctx.addTask("Task A", false);
+  const stale = ctx.state.updatedAt;
+  ctx.decide("can");
+  await settle();
+
+  ctx.undo();
+  assert.ok(ctx.state.updatedAt > stale,
+    "an undo is itself a write — a snapshot's old timestamp would lose the next cloud reconcile");
+});
+
 test("toggleContext: turning off a required context makes a task ineligible and ensureCandidate swaps it out", async () => {
   const { ctx } = await loadApp({ seed: 6 });
   // two contexts exist by default: c_home, c_laptop, c_car, c_work, c_quiet, c_errand
