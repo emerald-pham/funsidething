@@ -137,8 +137,8 @@ textarea{width:100%;font-family:var(--font-mono);font-size:12px}
 .chip.ever{background:transparent;color:inherit;opacity:.75;font-weight:500;font-style:italic;padding:0}
 .chip.notstarted{background:transparent;color:var(--mut);opacity:.85;font-weight:600;border:1px dashed var(--line)}
 .siderail{display:flex;flex-direction:column;gap:7px;align-items:flex-end;flex:none;padding-top:2px;min-width:86px}
-.reveal{font-size:12.5px;color:var(--ink);text-decoration:underline;background:none}
-.reveal:hover{color:var(--accent)}
+.editlink{font-size:12.5px;color:var(--ink);text-decoration:underline;background:none}
+.editlink:hover{color:var(--accent)}
 .sidesm{font-size:12px;color:var(--mut);text-decoration:underline dotted}
 .sidesm:hover{color:var(--ink)}
 .btn{border-radius:8px;padding:8px 16px;font-weight:700;font-size:14px;color:#fff;box-shadow:0 1px 2px rgba(20,24,48,.15)}
@@ -1158,7 +1158,7 @@ function renderScan(){
          + '<span class="title">'+titleHTML(b)+'</span>'
          + '<span class="chiprow">'+chipHTML(b)+'</span></div>'
          + '<div class="siderail">'
-         + '<button class="reveal" data-act="reveal" data-id="'+b.id+'">Reveal</button>'
+         + '<button class="editlink" data-act="edit" data-id="'+b.id+'">Edit</button>'
          + '<button class="sidesm" data-act="worked" title="Started it, crossing it off, back to the bottom of the list (rule 7, w)">worked on it ↻<span class="keyhint">w</span></button>'
          + (state.mode==="scan" ? '<button class="sidesm" data-act="start-working" title="Stop suggesting new candidates — just work through what\u2019s already dotted">done adding for now</button>' : '')
          + '<button class="btn dislodge" data-act="dislodge" title="Remove from the chain without completing">Dislodge</button>'
@@ -1200,7 +1200,7 @@ function renderScan(){
            + '<label class="donepick" title="Did it just now — cross it off (d)"><input class="ckbox" type="checkbox" data-act="cand-done" aria-label="Did this just now"/> Done<span class="keyhint">d</span></label>'
            + '<span class="title">'+titleHTML(cand)+'</span>'
            + '<span class="chiprow">'+chipHTML(cand)+'</span></div>'
-           + '<div class="siderail"><button class="reveal" data-act="reveal" data-id="'+cand.id+'">Reveal</button>'
+           + '<div class="siderail"><button class="editlink" data-act="edit" data-id="'+cand.id+'">Edit</button>'
            + '<button class="btn del-sm" data-act="delete-task" data-id="'+cand.id+'" title="Delete this task entirely (Delete key)">Delete<span class="keyhint">⌫</span></button></div></div>';
       const q = b
         ? 'Would I rather have spent the next hour (until <span class="until">'+untilClock()+'</span>) doing this?'

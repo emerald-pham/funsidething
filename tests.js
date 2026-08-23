@@ -1535,6 +1535,60 @@ test("UI: once a chain exists, Yes / No come back and the bare Can button goes a
   assert.ok(!/data-act="can"[^t]/.test(scanHtml), "the chain-start Can button should be gone");
 });
 
+/* ---------- Reveal -> direct Edit on the benchmark/candidate cards ----------
+   These two siderail buttons used to scroll-and-flash the task in the
+   (possibly collapsed) All-tasks list. That's now a direct Edit button, same
+   action as clicking a title in the list. The chain breadcrumb crumbs reuse
+   the old reveal-in-list behavior on purpose — they show the task's own
+   title, not a "Reveal" label, so they're a different affordance and stay
+   as-is. */
+
+test("UI: the benchmark card shows a direct Edit button, not Reveal", async () => {
+  const { ctx, shim } = await loadApp({ seed: 92 });
+  const t = ctx.addTask("Dotted task", true);
+  ctx.render();
+  const scanHtml = shim.elements.get("scan").innerHTML;
+
+  assert.match(scanHtml, new RegExp(`data-act="edit" data-id="${t.id}"`));
+  assert.match(scanHtml, />Edit</);
+  assert.ok(!/data-act="reveal"/.test(scanHtml), "Reveal must be gone from the benchmark card");
+  assert.ok(!/>Reveal</.test(scanHtml));
+});
+
+test("UI: the candidate card (chain start, no benchmark) shows a direct Edit button, not Reveal", async () => {
+  const { ctx, shim } = await loadApp({ seed: 93 });
+  addTaskAged(ctx, "Oldest", 900000);
+  addTaskAged(ctx, "Newer", 1000);
+  ctx.render();
+  const scanHtml = shim.elements.get("scan").innerHTML;
+  const cand = ctx.state.candidateId;
+
+  assert.match(scanHtml, new RegExp(`data-act="edit" data-id="${cand}"`));
+  assert.ok(!/data-act="reveal"/.test(scanHtml), "Reveal must be gone from the candidate card");
+  assert.ok(!/>Reveal</.test(scanHtml));
+});
+
+test("UI: clicking the benchmark's Edit button opens the edit pane for that task", async () => {
+  const { ctx, shim } = await loadApp({ seed: 94 });
+  const t = ctx.addTask("Dotted task", true);
+
+  ctx.onAction("edit", { dataset: { id: t.id } });
+  const html = shim.elements.get("modalRoot").innerHTML;
+  assert.match(html, /Edit task/);
+  assert.match(html, /value="Dotted task"/);
+});
+
+test("UI: the chain breadcrumb still reveals-in-list (untouched by the Edit swap)", async () => {
+  const { ctx, shim } = await loadApp({ seed: 95 });
+  const first = ctx.addTask("First dot", true);
+  ctx.addTask("Second dot", true);
+  ctx.render();
+  const scanHtml = shim.elements.get("scan").innerHTML;
+
+  assert.match(scanHtml, new RegExp(`class="crumb" data-act="reveal" data-id="${first.id}"`));
+  assert.match(scanHtml, />First dot</, "the crumb shows the task's own title, not the word Edit");
+});
+
 /* =====================================================================
    MARKING A TASK DONE FROM THE EDIT PANE
    The edit modal could rename, re-context, or delete a task, but not cross it
