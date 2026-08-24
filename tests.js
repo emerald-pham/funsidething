@@ -1667,6 +1667,64 @@ test("UI: every action button in a siderail shares the same .sm sizing", async (
   assert.deepEqual(odd, [], "a siderail button without .sm would render a different size than its neighbours");
 });
 
+test("UI: benchmark's d/⌫ keyhints hide when a candidate is showing", async () => {
+  const { ctx, shim } = await loadApp({ seed: 260 });
+  addTaskAged(ctx, "Oldest", 900000);
+  addTaskAged(ctx, "Newer", 1000);
+  ctx.addTask("Third task", true);
+  ctx.render();
+  const scanHtml = shim.elements.get("scan").innerHTML;
+
+  // benchmark card and candidate card both present
+  assert.ok(scanHtml.includes('data-act="bench-done"'), "benchmark Done button should render");
+  assert.ok(scanHtml.includes('data-act="cand-done"'), "candidate Done button should render");
+
+  // split by the two siderails to isolate each card's buttons
+  const siderails = scanHtml.match(/<div class="siderail">[\s\S]*?<\/div>/g) || [];
+  assert.equal(siderails.length, 2, "should have exactly 2 siderails (benchmark and candidate)");
+
+  const benchmarkSiderail = siderails[0];
+  const candidateSiderail = siderails[1];
+
+  // benchmark's Done should NOT have the d keyhint when candidate is showing
+  assert.ok(!benchmarkSiderail.includes('data-act="bench-done"') || !benchmarkSiderail.includes('<span class="keyhint">d</span>'),
+    "benchmark's Done should not show d keyhint when candidate is present");
+
+  // benchmark's Delete should NOT have the ⌫ keyhint when candidate is showing
+  assert.ok(!benchmarkSiderail.includes('Delete') || !benchmarkSiderail.includes('<span class="keyhint">⌫</span>'),
+    "benchmark's Delete should not show ⌫ keyhint when candidate is present");
+
+  // candidate's Done SHOULD have the d keyhint
+  assert.ok(candidateSiderail.includes('data-act="cand-done"') && candidateSiderail.includes('<span class="keyhint">d</span>'),
+    "candidate's Done should show d keyhint");
+});
+
+test("UI: benchmark's d/⌫ keyhints reappear when no candidate is showing (work mode)", async () => {
+  const { ctx, shim } = await loadApp({ seed: 261 });
+  ctx.addTask("Task", true);
+  ctx.onAction("start-working", {});
+  ctx.render();
+  const scanHtml = shim.elements.get("scan").innerHTML;
+
+  // only benchmark card present, no candidate
+  assert.ok(scanHtml.includes('data-act="bench-done"'), "benchmark Done button should render in work mode");
+  assert.ok(!scanHtml.includes('data-act="cand-done"'), "candidate should not render in work mode");
+
+  // find the only siderail (benchmark's)
+  const siderails = scanHtml.match(/<div class="siderail">[\s\S]*?<\/div>/g) || [];
+  assert.equal(siderails.length, 1, "should have exactly 1 siderail in work mode");
+
+  const benchmarkSiderail = siderails[0];
+
+  // benchmark's Done SHOULD have the d keyhint when no candidate is showing
+  assert.ok(benchmarkSiderail.includes('data-act="bench-done"') && benchmarkSiderail.includes('<span class="keyhint">d</span>'),
+    "benchmark's Done should show d keyhint when no candidate is present");
+
+  // benchmark's Delete SHOULD have the ⌫ keyhint when no candidate is showing
+  assert.ok(benchmarkSiderail.includes('Delete') && benchmarkSiderail.includes('<span class="keyhint">⌫</span>'),
+    "benchmark's Delete should show ⌫ keyhint when no candidate is present");
+});
+
 /* The two Done controls used to be routed through a `change` listener because
    they were checkboxes, and the click handler explicitly skipped them. As
    buttons they go through onAction like everything else. */
