@@ -1164,6 +1164,11 @@ function renderScan(){
   }
   let html = "";
   const b = benchmark();
+  const p = pool();
+  const cand = taskById(state.candidateId);
+  // mirrors hotkeyDone/hotkeyDelete's candidate-first precedence, so only the
+  // side that's actually listening for d/⌫ draws the keyhint for it
+  const candShowing = !(state.interventionActive && b) && state.mode!=="work" && p.length>0 && !!cand;
 
   // chain crumbs (everything dotted before the benchmark)
   if(state.chain.length > 1){
@@ -1182,17 +1187,15 @@ function renderScan(){
          + '<span class="title">'+titleHTML(b)+'</span>'
          + '<span class="chiprow">'+chipHTML(b)+'</span></div>'
          + '<div class="siderail">'
-         + '<button class="btn sm done" data-act="bench-done" title="Done — cross it off (d)">✓ Done<span class="keyhint">d</span></button>'
+         + '<button class="btn sm done" data-act="bench-done" title="Done — cross it off (d)">✓ Done'+(candShowing?'':'<span class="keyhint">d</span>')+'</button>'
          + '<button class="btn sm subtle" data-act="edit" data-id="'+b.id+'">Edit</button>'
          + '<button class="btn sm worked" data-act="worked" title="Started it, crossing it off, back to the bottom of the list (rule 7, w)">Worked on it<span class="keyhint">w</span></button>'
          + (state.mode==="scan" ? '<button class="sidesm" data-act="start-working" title="Stop suggesting new candidates — just work through what\u2019s already dotted">done adding for now</button>' : '')
          + '<button class="btn sm cant" data-act="bench-cant" title="Can’t do it right now — off the chain, and back in the scan on its own once your Can’t window passes (Settings)">Can’t</button>'
          + '<button class="btn sm dislodge" data-act="dislodge" title="Remove from the chain for the rest of this pass, without completing">Dislodge</button>'
-         + '<button class="btn sm danger" data-act="delete-task" data-id="'+b.id+'" title="Delete this task entirely (Delete key)">Delete<span class="keyhint">⌫</span></button>'
+         + '<button class="btn sm danger" data-act="delete-task" data-id="'+b.id+'" title="Delete this task entirely (Delete key)">Delete'+(candShowing?'':'<span class="keyhint">⌫</span>')+'</button>'
          + '</div></div>';
   }
-
-  const p = pool();
 
   if(state.interventionActive && b){
     html += '<div class="notice intervene">'
@@ -1220,7 +1223,6 @@ function renderScan(){
     }
   }
   else {
-    const cand = taskById(state.candidateId);
     if(cand){
       html += '<div class="cardrow"><div class="card cand">'
            + '<span class="title">'+titleHTML(cand)+'</span>'
