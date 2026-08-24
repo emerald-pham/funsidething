@@ -1234,18 +1234,19 @@ test("quick-add: deleting a selected context removes it from the picker without 
   assert.equal(t.ctx.length, 0, "a deleted context's id should not linger on new tasks");
 });
 
-/* ---------- regression: the Done control is a plain checkbox, not a custom circle ----------
-   No real layout engine here, so this checks the CSS source directly rather
-   than rendered pixels — enough to catch someone silently reintroducing the
-   custom appearance:none circular style this was explicitly reverted from. */
-test("REGRESSION: .ckbox has no custom appearance override — it renders as a native checkbox", () => {
-  const m = html.match(/\.ckbox\{[^}]*\}/);
-  assert.ok(m, ".ckbox rule should exist");
-  const rule = m[0];
-  assert.ok(!/appearance\s*:\s*none/.test(rule), `.ckbox should not override appearance — found in: ${rule}`);
-  assert.ok(!/border-radius\s*:\s*50%/.test(rule), `.ckbox should not be forced circular — found in: ${rule}`);
-  // no leftover custom :checked pseudo-element rules from the old circular design
-  assert.ok(!/\.ckbox:checked::after/.test(html), "custom checked-state pseudo-element should have been removed");
+/* ---------- the Done control is a button in the siderail ----------
+   It used to be a checkbox sitting inside the card, on the left, which made
+   the app's single most-used action look unlike every other action and put it
+   nowhere near them. It's now a green button in the siderail with the rest.
+   The old ".ckbox is a native checkbox, not a custom circle" regression guard
+   retired with the checkbox — what replaces it is the guarantee that the
+   control stays a plain button and the dead styles don't drift back. */
+test("the retired card-checkbox styles are gone from the CSS", () => {
+  for (const dead of [".ckbox", ".donepick", ".editlink"]) {
+    assert.ok(!new RegExp(`\\${dead}\\{`).test(html),
+      `${dead} is no longer used by any markup — its rule should have gone with it`);
+  }
+  assert.ok(!/\.ckbox:checked::after/.test(html), "no leftover checked-state pseudo-element");
 });
 
 /* ---------- audit: "cant" marks missing their start timestamp ----------
@@ -1608,8 +1609,98 @@ test("UI: the benchmark card no longer renders the redundant dot circle", async 
   const scanHtml = shim.elements.get("scan").innerHTML;
 
   assert.ok(!/class="dot"/.test(scanHtml), `the dot span should be gone from: ${scanHtml}`);
-  assert.match(scanHtml, /data-act="bench-done"/, "the Done checkbox must survive");
+  assert.match(scanHtml, /data-act="bench-done"/, "the Done control must survive");
   assert.match(scanHtml, />Dotted task</, "and so must the title");
+});
+
+/* ---------- Done and Edit join the rest of the buttons ----------
+   Done was a checkbox inside the card on the left; Edit was a bare underlined
+   text link. Both are now buttons in the right-hand siderail, sized like
+   Dislodge and its neighbours — Done green, since it's the completion. */
+
+test("UI: the benchmark card's Done is a green button in the siderail, not a card checkbox", async () => {
+  const { ctx, shim } = await loadApp({ seed: 250 });
+  ctx.addTask("Dotted task", true);
+  ctx.render();
+  const scanHtml = shim.elements.get("scan").innerHTML;
+
+  assert.ok(!/class="ckbox"/.test(scanHtml), `no checkbox should remain in: ${scanHtml}`);
+  assert.ok(!/class="donepick"/.test(scanHtml), "the card-side Done label should be gone");
+  assert.match(scanHtml, /<button class="btn sm done" data-act="bench-done"/,
+    "Done should be a peer-sized button carrying the green .done fill");
+  assert.match(scanHtml, /data-act="bench-done"[^>]*>[^<]*Done<span class="keyhint">d<\/span>/,
+    "and it should keep its d keyhint");
+});
+
+test("UI: the candidate card's Done gets the same button treatment", async () => {
+  const { ctx, shim } = await loadApp({ seed: 251 });
+  addTaskAged(ctx, "Oldest", 900000);
+  addTaskAged(ctx, "Newer", 1000);
+  ctx.render();
+  const scanHtml = shim.elements.get("scan").innerHTML;
+
+  assert.ok(!/class="ckbox"/.test(scanHtml), "the candidate card should not keep a checkbox either");
+  assert.match(scanHtml, /<button class="btn sm done" data-act="cand-done"/);
+});
+
+test("UI: Edit renders as a button rather than a bare text link", async () => {
+  const { ctx, shim } = await loadApp({ seed: 252 });
+  ctx.addTask("Dotted task", true);
+  ctx.render();
+  const scanHtml = shim.elements.get("scan").innerHTML;
+
+  assert.ok(!/class="editlink"/.test(scanHtml), `Edit should no longer be a text link in: ${scanHtml}`);
+  assert.match(scanHtml, /<button class="btn sm subtle" data-act="edit"/);
+});
+
+test("UI: every action button in a siderail shares the same .sm sizing", async () => {
+  const { ctx, shim } = await loadApp({ seed: 253 });
+  ctx.addTask("Dotted task", true);
+  ctx.render();
+  const scanHtml = shim.elements.get("scan").innerHTML;
+
+  const rails = scanHtml.match(/<div class="siderail">[\s\S]*?<\/div>/g) || [];
+  assert.equal(rails.length, 1, `expected one siderail, found ${rails.length}`);
+  const btns = rails[0].match(/<button class="btn [^"]*"/g) || [];
+  assert.ok(btns.length >= 6, `expected the siderail's buttons, found ${btns.length} in ${rails[0]}`);
+  const odd = btns.filter((b) => !/\bsm\b/.test(b));
+  assert.deepEqual(odd, [], "a siderail button without .sm would render a different size than its neighbours");
+});
+
+/* The two Done controls used to be routed through a `change` listener because
+   they were checkboxes, and the click handler explicitly skipped them. As
+   buttons they go through onAction like everything else. */
+
+test("bench-done: completes the benchmark through the normal onAction path", async () => {
+  const { ctx } = await loadApp({ seed: 254 });
+  const t = ctx.addTask("Dotted task", true);
+
+  ctx.onAction("bench-done", { dataset: {} });
+  assert.equal(ctx.state.tasks.find((x) => x.id === t.id).done, true);
+  assert.equal(ctx.state.chain.includes(t.id), false);
+});
+
+test("cand-done: completes the candidate through the normal onAction path", async () => {
+  const { ctx } = await loadApp({ seed: 255 });
+  ctx.addTask("Task A", false);
+  ctx.addTask("Task B", false);
+  const cand = ctx.state.candidateId;
+
+  ctx.onAction("cand-done", { dataset: {} });
+  assert.equal(ctx.state.tasks.find((x) => x.id === cand).done, true);
+});
+
+test("the header's decorative purple dot is gone", () => {
+  assert.ok(!/class="mark"/.test(html), "the ◉ glyph beside the title should be removed");
+  assert.ok(!/\.mark\{/.test(html), "and its now-unused rule with it");
+  assert.match(html, /<h1>Chain Scanner<\/h1>/, "the title itself stays");
+});
+
+test("the click handler no longer special-cases the two Done controls", () => {
+  assert.ok(!/handled on change/.test(html),
+    "the checkbox-era click bypass should be gone now that Done is a button");
+  assert.ok(!/\[data-act="bench-done"\]'\)\)\{ if\(el\.checked\)/.test(html),
+    "and so should its change-event handler");
 });
 
 test("UI: 'Worked on it' renders as a full-size button, like Dislodge and Delete", async () => {
@@ -1618,7 +1709,7 @@ test("UI: 'Worked on it' renders as a full-size button, like Dislodge and Delete
   ctx.render();
   const scanHtml = shim.elements.get("scan").innerHTML;
 
-  assert.match(scanHtml, /class="btn worked" data-act="worked"/,
+  assert.match(scanHtml, /class="btn sm worked" data-act="worked"/,
     "it should carry the same .btn sizing as its neighbours");
   assert.ok(!/class="sidesm" data-act="worked"/.test(scanHtml),
     "the old small text-link styling should be gone");
@@ -2226,7 +2317,7 @@ test("UI: the Starts hint reads in parentheses", async () => {
   assert.match(shim.elements.get("modalRoot").innerHTML, /\(not eligible for the queue until this date\)/);
 });
 
-test("UI: the edit pane splits form actions from task actions into two button rows", async () => {
+test("UI: the edit pane leads with the task actions, then the form actions", async () => {
   const { ctx, shim } = await loadApp({ seed: 239 });
   const t = ctx.addTask("Task A", false);
   ctx.openEdit(t.id);
@@ -2234,12 +2325,19 @@ test("UI: the edit pane splits form actions from task actions into two button ro
 
   const rows = html.match(/<div class="mbtns[^"]*">[\s\S]*?<\/div>/g) || [];
   assert.equal(rows.length, 2, `expected two button rows, got ${rows.length} in: ${html}`);
-  assert.match(rows[0], /data-act="save-edit"/, "row 1 is the form actions");
-  assert.match(rows[0], /data-act="close-modal"/);
-  assert.ok(!/data-act="delete-task"/.test(rows[0]), "Delete must not sit beside Save");
-  assert.match(rows[1], /data-act="done-task"/, "row 2 is what to do with the task itself");
-  assert.match(rows[1], /data-act="worked-task"/);
+
+  // Row 1 — what to do with the TASK.
+  assert.match(rows[0], /data-act="done-task"/, "Done leads");
+  assert.match(rows[0], /data-act="worked-task"/, "then Worked on it");
+  assert.ok(!/data-act="save-edit"/.test(rows[0]), "Save belongs to the row below");
+  assert.ok(!/data-act="delete-task"/.test(rows[0]), "and so does Delete");
+
+  // Row 2 — what to do with the FORM, with Delete held apart on the right.
+  assert.match(rows[1], /data-act="save-edit"/);
+  assert.match(rows[1], /data-act="close-modal"/);
   assert.match(rows[1], /data-act="delete-task"/);
+  assert.ok(rows[1].indexOf('data-act="save-edit"') < rows[1].indexOf('data-act="delete-task"'),
+    "Delete should come after Save/Cancel, pushed to the far side");
 });
 
 // Characterization test — Cancel's throw-it-away behavior is unchanged.
