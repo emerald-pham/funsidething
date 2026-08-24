@@ -561,6 +561,50 @@ test("UI: the 'done adding for now' button only renders while mode is 'scan' AND
   assert.ok(!shim.elements.get("scan").innerHTML.includes("done adding for now"));
 });
 
+test("UI: 'done adding for now' is now a dedicated button in the decide row, not a text link in the siderail", async () => {
+  const { ctx, shim } = await loadApp({ seed: 14 });
+  ctx.addTask("Task A", false);
+  ctx.addTask("Task B", true); // dots Task B; Task A becomes the candidate, so the decide row shows
+  ctx.render();
+  const scanHtml = shim.elements.get("scan").innerHTML;
+
+  assert.ok(!/class="sidesm" data-act="start-working"/.test(scanHtml),
+    "the old dotted-underline text-link styling should be gone");
+
+  const rails = scanHtml.match(/<div class="siderail">[\s\S]*?<\/div>/g) || [];
+  for (const rail of rails) {
+    assert.ok(!rail.includes('data-act="start-working"'), `siderail should no longer carry the button: ${rail}`);
+  }
+
+  const decideRows = scanHtml.match(/<div class="decide">[\s\S]*?<\/div>/g) || [];
+  assert.equal(decideRows.length, 1, `expected one decide row, found ${decideRows.length}`);
+  assert.match(decideRows[0], /<button class="btn subtle" data-act="start-working"[^>]*>done adding for now<\/button>/,
+    "should render as a real button beside Can't, like Yes/No/Can't's siblings");
+});
+
+test("UI: 'done adding for now' stays hidden once the pool is empty, even mid-scan with a benchmark dotted", async () => {
+  const { ctx, shim } = await loadApp({ seed: 15 });
+  ctx.addTask("Only task", true); // sole task, dotted — becomes the benchmark; pool is now empty, so no decide row
+  ctx.render();
+  const scanHtml = shim.elements.get("scan").innerHTML;
+
+  assert.equal(ctx.state.mode, "scan");
+  assert.ok(!scanHtml.includes("done adding for now"),
+    "nothing left to suggest, and the button now only appears beside an actual candidate decision");
+});
+
+test("UI: 'done adding for now' stays hidden on the very first decision (Can/Can't row, no benchmark yet)", async () => {
+  const { ctx, shim } = await loadApp({ seed: 16 });
+  ctx.addTask("Task A", false);
+  ctx.addTask("Task B", false); // two undotted tasks — first-ever decision, no benchmark, decide row shows Can/Can't
+  ctx.render();
+  const scanHtml = shim.elements.get("scan").innerHTML;
+
+  assert.match(scanHtml, /<button class="btn yes" data-act="can"/, "sanity check: this is indeed the Can/Can't row");
+  assert.ok(!scanHtml.includes("done adding for now"),
+    "nothing is dotted yet, so there's nothing to 'just work through' — stays hidden even though the decide row is showing");
+});
+
 
 test("esc: escapes all five HTML-significant characters, and null/undefined become empty string", async () => {
   const { ctx } = await loadApp();

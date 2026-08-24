@@ -1190,7 +1190,6 @@ function renderScan(){
          + '<button class="btn sm done" data-act="bench-done" title="Done — cross it off (d)">✓ Done'+(candShowing?'':'<span class="keyhint">d</span>')+'</button>'
          + '<button class="btn sm subtle" data-act="edit" data-id="'+b.id+'">Edit</button>'
          + '<button class="btn sm worked" data-act="worked" title="Started it, crossing it off, back to the bottom of the list (rule 7, w)">Worked on it<span class="keyhint">w</span></button>'
-         + (state.mode==="scan" ? '<button class="sidesm" data-act="start-working" title="Stop suggesting new candidates — just work through what\u2019s already dotted">done adding for now</button>' : '')
          + '<button class="btn sm cant" data-act="bench-cant" title="Can’t do it right now — off the chain, and back in the scan on its own once your Can’t window passes (Settings)">Can’t</button>'
          + '<button class="btn sm dislodge" data-act="dislodge" title="Remove from the chain for the rest of this pass, without completing">Dislodge</button>'
          + '<button class="btn sm danger" data-act="delete-task" data-id="'+b.id+'" title="Delete this task entirely (Delete key)">Delete'+(candShowing?'':'<span class="keyhint">⌫</span>')+'</button>'
@@ -1241,6 +1240,7 @@ function renderScan(){
                 + '<button class="btn no" data-act="no">No<span class="keyhint">n</span></button>'
               : '<button class="btn yes" data-act="can" title="Dot it and start the chain \u2014 no ranking happens on the first dot">Can<span class="keyhint">y</span></button>')
            + '<button class="btn cant" data-act="cant" title="Skip it for a while, even if the chain empties out before then \u2014 see Settings">Can\u2019t<span class="keyhint">c</span></button>'
+           + (state.mode==="scan" && b ? '<button class="btn subtle" data-act="start-working" title="Stop suggesting new candidates — just work through what\u2019s already dotted">done adding for now</button>' : '')
            + '<span class="sparkbox">'+sparkSVG(cand.id,84,20)
            + '<span class="topkchip mono">'+topKlabel(cand.id)+'</span>'
            + '<button class="iconbtn" data-act="toggle-list" title="Show the full ranked list">▦</button></span>'
