@@ -1842,6 +1842,40 @@ test("UI: benchmark's d/⌫ keyhints reappear when no candidate is showing (work
     "benchmark's Delete should show ⌫ keyhint when no candidate is present");
 });
 
+/* ---------- undo advertises its key like every other keyboard control ----------
+   Undo has always had a `u` hotkey, but the only place that said so was the
+   tooltip — so the one control you reach for in a hurry was the one you had to
+   hover to learn. It carries the same keyhint glyph as Yes/No/Done/Delete. */
+
+test("UI: the undo button carries its u keyhint glyph", () => {
+  const m = html.match(/<button class="ghost" data-act="undo"[^>]*>([\s\S]*?)<\/button>/);
+  assert.ok(m, "the undo button should still be a ghost button in the header");
+  assert.match(m[1], /<span class="keyhint">u<\/span>/,
+    `expected a u keyhint glyph inside the undo button, got: ${m[1]}`);
+});
+
+test("UI: undo's keyhint glyph sits after its label, as it does on every other keyboard button", () => {
+  const m = html.match(/<button class="ghost" data-act="undo"[^>]*>([\s\S]*?)<\/button>/);
+  assert.match(m[1], /^[^<]*\S[^<]*<span class="keyhint">u<\/span>$/,
+    `the glyph should trail the label with nothing after it, got: ${m[1]}`);
+});
+
+test("UI: undo's tooltip still names the key, so glyph and tooltip agree", () => {
+  const m = html.match(/<button class="ghost" data-act="undo"([^>]*)>/);
+  assert.match(m[1], /title="[^"]*\(u\)"/, `expected the key named in the tooltip, got: ${m[1]}`);
+});
+
+test("undo: the header button reverses the last action through the normal onAction path", async () => {
+  const { ctx } = await loadApp({ seed: 256 });
+  ctx.addTask("Task A", false);
+  ctx.addTask("Task B", false);
+  ctx.startScan();
+  assert.equal(ctx.state.chain.length, 1);
+
+  ctx.onAction("undo", { dataset: {} });
+  assert.equal(ctx.state.chain.length, 0, "the button should take the first dot back, same as the u key");
+});
+
 /* The two Done controls used to be routed through a `change` listener because
    they were checkboxes, and the click handler explicitly skipped them. As
    buttons they go through onAction like everything else. */
