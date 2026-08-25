@@ -1734,7 +1734,7 @@ test("UI: the benchmark card no longer renders the redundant dot circle", async 
    text link. Both are now buttons in the right-hand siderail, sized like
    Dislodge and its neighbours — Done green, since it's the completion. */
 
-test("UI: the benchmark card's Done is a green button in the siderail, not a card checkbox", async () => {
+test("UI: the benchmark card's Done is a green button among its actions, not a card checkbox", async () => {
   const { ctx, shim } = await loadApp({ seed: 250 });
   ctx.addTask("Dotted task", true);
   ctx.render();
@@ -1770,21 +1770,23 @@ test("UI: Edit renders as a button rather than a bare text link", async () => {
   assert.match(scanHtml, /<button class="btn sm subtle" data-act="edit"/);
 });
 
-test("UI: every action button in a siderail shares the same .sm sizing", async () => {
+test("UI: every action button in the candidate's siderail shares the same .sm sizing", async () => {
   const { ctx, shim } = await loadApp({ seed: 253 });
-  ctx.addTask("Dotted task", true);
+  addTaskAged(ctx, "Oldest", 900000);
+  addTaskAged(ctx, "Newer", 1000);
+  ctx.startScan();
   ctx.render();
   const scanHtml = shim.elements.get("scan").innerHTML;
 
   const rails = scanHtml.match(/<div class="siderail">[\s\S]*?<\/div>/g) || [];
-  assert.equal(rails.length, 1, `expected one siderail, found ${rails.length}`);
+  assert.equal(rails.length, 1, `only the candidate keeps a rail; found ${rails.length}`);
   const btns = rails[0].match(/<button class="btn [^"]*"/g) || [];
-  assert.ok(btns.length >= 6, `expected the siderail's buttons, found ${btns.length} in ${rails[0]}`);
+  assert.equal(btns.length, 3, `expected Done/Edit/Delete, found ${btns.length} in ${rails[0]}`);
   const odd = btns.filter((b) => !/\bsm\b/.test(b));
   assert.deepEqual(odd, [], "a siderail button without .sm would render a different size than its neighbours");
 });
 
-test("UI: benchmark's d/⌫ keyhints hide when a candidate is showing", async () => {
+test("UI: the benchmark's d/⌫ keyhints hide when a candidate is showing", async () => {
   const { ctx, shim } = await loadApp({ seed: 260 });
   addTaskAged(ctx, "Oldest", 900000);
   addTaskAged(ctx, "Newer", 1000);
@@ -1796,12 +1798,12 @@ test("UI: benchmark's d/⌫ keyhints hide when a candidate is showing", async ()
   assert.ok(scanHtml.includes('data-act="bench-done"'), "benchmark Done button should render");
   assert.ok(scanHtml.includes('data-act="cand-done"'), "candidate Done button should render");
 
-  // split by the two siderails to isolate each card's buttons
+  // the benchmark's actions are a row beneath its card; the candidate keeps a rail
+  const benchmarkSiderail = benchAction(scanHtml);
+  assert.ok(benchmarkSiderail, "the benchmark should have its action row");
   const siderails = scanHtml.match(/<div class="siderail">[\s\S]*?<\/div>/g) || [];
-  assert.equal(siderails.length, 2, "should have exactly 2 siderails (benchmark and candidate)");
-
-  const benchmarkSiderail = siderails[0];
-  const candidateSiderail = siderails[1];
+  assert.equal(siderails.length, 1, "only the candidate should have a siderail");
+  const candidateSiderail = siderails[0];
 
   // benchmark's Done should NOT have the d keyhint when candidate is showing
   assert.ok(!benchmarkSiderail.includes('data-act="bench-done"') || !benchmarkSiderail.includes('<span class="keyhint">d</span>'),
@@ -1827,11 +1829,10 @@ test("UI: benchmark's d/⌫ keyhints reappear when no candidate is showing (work
   assert.ok(scanHtml.includes('data-act="bench-done"'), "benchmark Done button should render in work mode");
   assert.ok(!scanHtml.includes('data-act="cand-done"'), "candidate should not render in work mode");
 
-  // find the only siderail (benchmark's)
-  const siderails = scanHtml.match(/<div class="siderail">[\s\S]*?<\/div>/g) || [];
-  assert.equal(siderails.length, 1, "should have exactly 1 siderail in work mode");
-
-  const benchmarkSiderail = siderails[0];
+  // find the benchmark's action row — nothing else is on screen to confuse it
+  const benchmarkSiderail = benchAction(scanHtml);
+  assert.ok(benchmarkSiderail, "the benchmark should have its action row in work mode");
+  assert.ok(!/class="siderail"/.test(scanHtml), "and no siderail alongside it");
 
   // benchmark's Done SHOULD have the d keyhint when no candidate is showing
   assert.ok(benchmarkSiderail.includes('data-act="bench-done"') && benchmarkSiderail.includes('<span class="keyhint">d</span>'),
@@ -1874,6 +1875,144 @@ test("undo: the header button reverses the last action through the normal onActi
 
   ctx.onAction("undo", { dataset: {} });
   assert.equal(ctx.state.chain.length, 0, "the button should take the first dot back, same as the u key");
+});
+
+/* ---------- the benchmark's actions are one row beneath the card ----------
+   Six actions stacked in a right-hand rail made the purple card as tall as the
+   rail and pushed the candidate card down past it. They now sit in a single
+   row directly beneath the card they act on, and a hairline separates that
+   whole block from the candidate being compared against it — so the two things
+   you're weighing read as two things, not one long column. */
+
+const benchAction = (scanHtml) => (scanHtml.match(/<div class="actionrow">[\s\S]*?<\/div>/) || [])[0];
+
+test("UI: the benchmark's six actions sit in one row beneath the purple card", async () => {
+  const { ctx, shim } = await loadApp({ seed: 270 });
+  ctx.addTask("Dotted task", true);
+  ctx.render();
+  const scanHtml = shim.elements.get("scan").innerHTML;
+
+  const rows = scanHtml.match(/<div class="actionrow">/g) || [];
+  assert.equal(rows.length, 1, `expected exactly one action row, found ${rows.length} in: ${scanHtml}`);
+
+  const row = benchAction(scanHtml);
+  const acts = [...row.matchAll(/data-act="([a-z-]+)"/g)].map((m) => m[1]);
+  assert.deepEqual(acts, ["bench-done", "edit", "worked", "bench-cant", "dislodge", "delete-task"],
+    "all six actions, in the order they were in the rail");
+});
+
+test("UI: the action row comes after the purple card, not beside it", async () => {
+  const { ctx, shim } = await loadApp({ seed: 271 });
+  ctx.addTask("Dotted task", true);
+  ctx.render();
+  const scanHtml = shim.elements.get("scan").innerHTML;
+
+  assert.ok(scanHtml.indexOf('class="card bench"') < scanHtml.indexOf('class="actionrow"'),
+    "the row should follow the card in the markup, so it renders beneath it");
+  assert.ok(!/class="cardrow"><div class="card bench"/.test(scanHtml),
+    "the benchmark should no longer be laid out as a side-by-side card row");
+});
+
+test("UI: no siderail hangs off the benchmark card any more", async () => {
+  const { ctx, shim } = await loadApp({ seed: 272 });
+  ctx.addTask("Dotted task", true);
+  ctx.render();
+  const scanHtml = shim.elements.get("scan").innerHTML;
+
+  assert.ok(!/class="siderail"/.test(scanHtml),
+    `nothing but a benchmark is showing, so no siderail should remain in: ${scanHtml}`);
+});
+
+test("UI: every action in the benchmark's row shares the same .sm sizing", async () => {
+  const { ctx, shim } = await loadApp({ seed: 273 });
+  ctx.addTask("Dotted task", true);
+  ctx.render();
+  const row = benchAction(shim.elements.get("scan").innerHTML);
+
+  const btns = row.match(/<button class="btn [^"]*"/g) || [];
+  assert.equal(btns.length, 6, `expected six buttons, found ${btns.length} in ${row}`);
+  const odd = btns.filter((b) => !/\bsm\b/.test(b));
+  assert.deepEqual(odd, [], "a button without .sm would render a different size than its neighbours");
+});
+
+test("UI: a separator sits between the benchmark block and the candidate card", async () => {
+  const { ctx, shim } = await loadApp({ seed: 274 });
+  addTaskAged(ctx, "Oldest", 900000);
+  addTaskAged(ctx, "Newer", 1000);
+  ctx.startScan();
+  ctx.render();
+  const scanHtml = shim.elements.get("scan").innerHTML;
+
+  const seps = scanHtml.match(/class="sep"/g) || [];
+  assert.equal(seps.length, 1, `expected exactly one separator, found ${seps.length} in: ${scanHtml}`);
+  assert.ok(scanHtml.indexOf('class="actionrow"') < scanHtml.indexOf('class="sep"'),
+    "the separator comes after the benchmark's actions");
+  assert.ok(scanHtml.indexOf('class="sep"') < scanHtml.indexOf('class="card cand"'),
+    "and before the candidate card it separates them from");
+});
+
+test("UI: no separator is drawn when there's no candidate beneath it", async () => {
+  const { ctx, shim } = await loadApp({ seed: 275 });
+  ctx.addTask("Dotted task", true);
+  ctx.render();
+  assert.ok(!/class="sep"/.test(shim.elements.get("scan").innerHTML),
+    "a rule with nothing under it is just a stray line");
+
+  ctx.onAction("start-working", {});   // benchmark still dotted, but scanning paused
+  ctx.render();
+  assert.ok(!/class="sep"/.test(shim.elements.get("scan").innerHTML),
+    "the paused notice isn't a candidate either");
+});
+
+test("CSS: the separator is a hairline drawn from a theme token, not a hardcoded grey", () => {
+  const rule = styleSrc.match(/\.sep\{([^}]*)\}/);
+  assert.ok(rule, "there should be a .sep rule");
+  const m = rule[1].match(/border-top:\s*1px solid var\((--[a-z-]+)\)/);
+  assert.ok(m, `the line should be a 1px border in a theme token, got: ${rule[1]}`);
+
+  const tokens = themeTokens();
+  assert.ok(tokens.light[m[1]], `${m[1]} must be defined as a light-dark() pair`);
+  assert.notEqual(tokens.light[m[1]], tokens.dark[m[1]],
+    "a separator that doesn't change between themes is hardcoded in all but name");
+});
+
+test("CSS: every button reserves the same 1px border, so a row of them lines up", () => {
+  // .subtle is the only button with a visible border. In the old vertical rail
+  // its extra 2px went unnoticed; in a row beside five filled buttons it reads
+  // as one button sitting proud of its neighbours.
+  const base = styleSrc.match(/\.btn\{([^}]*)\}/);
+  assert.ok(base, "there should be a .btn rule");
+  assert.match(base[1], /border:1px solid transparent/,
+    `every button needs the border reserved, not just the one that paints it: ${base[1]}`);
+
+  const subtle = styleSrc.match(/\.btn\.subtle\{([^}]*)\}/);
+  assert.ok(subtle, "there should be a .btn.subtle rule");
+  assert.match(subtle[1], /border:1px solid var\(--line\)/, "which .subtle then recolours");
+});
+
+/* ---------- header and footer carry less ----------
+   The tagline restated the README at the user, and the footer listed the keys
+   that every button now prints on itself. */
+
+test("UI: the header carries the title alone, without the tagline", () => {
+  assert.ok(!/ranked FVP — dot, compare, execute/.test(html), "the tagline should be gone from the header");
+  assert.ok(!/class="sub"/.test(html), "and its span with it");
+  assert.match(html, /<h1>Chain Scanner<\/h1>/, "the title itself stays");
+});
+
+test("CSS: the retired .sub style is gone too", () => {
+  assert.ok(!/\.sub\{/.test(styleSrc) && !/\.titles \.sub\{/.test(styleSrc),
+    "a style with no element left to match is dead weight");
+});
+
+test("UI: the footer no longer lists the keys, which every button now prints on itself", () => {
+  const foot = html.match(/<footer class="foot">([\s\S]*?)<\/footer>/);
+  assert.ok(foot, "the footer should still be there");
+  assert.ok(!/keys:/i.test(foot[1]), `the keys legend should be gone from: ${foot[1]}`);
+  assert.ok(!/y \/ n \/ c/.test(foot[1]), "including the glyph list itself");
+  assert.match(foot[1], /Final Version Perfected/, "the attributions stay");
+  assert.match(foot[1], /spawelo/, "both of them");
+  assert.match(foot[1], /data-act="cycle-theme"/, "and the theme toggle stays where it is");
 });
 
 /* The two Done controls used to be routed through a `change` listener because

@@ -80,7 +80,6 @@ textarea{width:100%;font-family:var(--font-mono);font-size:12px}
 .top{margin-bottom:12px}
 .brand{display:flex;align-items:center;gap:10px}
 .titles h1{font-size:17px;margin:0;font-weight:700;letter-spacing:.01em}
-.titles .sub{font-size:12px;color:var(--mut)}
 .topbtns{margin-left:auto;display:flex;gap:4px}
 .ghost{color:var(--mut);border:1px solid transparent;border-radius:8px;padding:5px 9px;font-size:13px}
 .ghost:hover{background:var(--surface);border-color:var(--line);color:var(--ink)}
@@ -132,9 +131,14 @@ textarea{width:100%;font-family:var(--font-mono);font-size:12px}
 .chip.ever{background:transparent;color:inherit;opacity:.75;font-weight:500;font-style:italic;padding:0}
 .chip.notstarted{background:transparent;color:var(--mut);opacity:.85;font-weight:600;border:1px dashed var(--line)}
 .siderail{display:flex;flex-direction:column;gap:7px;align-items:flex-end;flex:none;padding-top:2px;min-width:86px}
+.benchblock{margin-bottom:10px}
+.actionrow{display:flex;flex-wrap:wrap;gap:7px;align-items:center;margin-top:8px}
+/* Divides the dotted task and its actions from the candidate being weighed
+   against it. --line is the app's hairline token, so it follows the theme. */
+.sep{border:0;border-top:1px solid var(--line);margin:14px 0 12px}
 .sidesm{font-size:12px;color:var(--mut);text-decoration:underline dotted}
 .sidesm:hover{color:var(--ink)}
-.btn{border-radius:8px;padding:8px 16px;font-weight:700;font-size:14px;color:#fff;box-shadow:0 1px 2px rgba(20,24,48,.15)}
+.btn{border-radius:8px;border:1px solid transparent;padding:8px 16px;font-weight:700;font-size:14px;color:#fff;box-shadow:0 1px 2px rgba(20,24,48,.15)}
 .btn:active{transform:translateY(1px)}
 .btn.sm{padding:6px 12px;font-size:13px}   /* the siderail size — every action beside a card uses it */
 .btn.dislodge{background:var(--danger)}
@@ -267,7 +271,6 @@ textarea{width:100%;font-family:var(--font-mono);font-size:12px}
     <div class="brand">
       <div class="titles">
         <h1>Chain Scanner</h1>
-        <span class="sub">ranked FVP — dot, compare, execute</span>
       </div>
       <div class="topbtns">
         <button id="syncBtn" class="syncbtn" data-act="sync" hidden></button>
@@ -301,7 +304,7 @@ textarea{width:100%;font-family:var(--font-mono);font-size:12px}
 
   <section class="panel histwrap" id="histPanel"></section>
 
-  <footer class="foot">After Mark Forster's <a href="https://blog.beeminder.com/forster/" target="_blank" rel="noopener">Final Version Perfected</a> · rank posteriors following <a href="https://alltom.com/pages/spawelo/" target="_blank" rel="noopener">spawelo</a> · keys: <span class="mono">y / n / c / d / w / ⌫ / u</span><div class="themerow"><button id="themeBtn" class="themebtn" data-act="cycle-theme"></button></div></footer>
+  <footer class="foot">After Mark Forster's <a href="https://blog.beeminder.com/forster/" target="_blank" rel="noopener">Final Version Perfected</a> · rank posteriors following <a href="https://alltom.com/pages/spawelo/" target="_blank" rel="noopener">spawelo</a><div class="themerow"><button id="themeBtn" class="themebtn" data-act="cycle-theme"></button></div></footer>
 </div>
 <div id="modalRoot"></div>
 
@@ -1196,12 +1199,12 @@ function renderScan(){
     html += '<span class="arrow">→</span><span class="lbl" style="color:var(--chain-deep)">this ↓</span></div>';
   }
 
-  // benchmark card
+  // benchmark card, with its six actions in a row beneath the card they act on
   if(b){
-    html += '<div class="cardrow"><div class="card bench">'
+    html += '<div class="benchblock"><div class="card bench">'
          + '<span class="title">'+titleHTML(b)+'</span>'
          + '<span class="chiprow">'+chipHTML(b)+'</span></div>'
-         + '<div class="siderail">'
+         + '<div class="actionrow">'
          + '<button class="btn sm done" data-act="bench-done" title="Done — cross it off (d)">✓ Done'+(candShowing?'':'<span class="keyhint">d</span>')+'</button>'
          + '<button class="btn sm subtle" data-act="edit" data-id="'+b.id+'">Edit</button>'
          + '<button class="btn sm worked" data-act="worked" title="Started it, crossing it off, back to the bottom of the list (rule 7, w)">Worked on it<span class="keyhint">w</span></button>'
@@ -1209,6 +1212,9 @@ function renderScan(){
          + '<button class="btn sm dislodge" data-act="dislodge" title="Remove from the chain for the rest of this pass, without completing">Dislodge</button>'
          + '<button class="btn sm danger" data-act="delete-task" data-id="'+b.id+'" title="Delete this task entirely (Delete key)">Delete'+(candShowing?'':'<span class="keyhint">⌫</span>')+'</button>'
          + '</div></div>';
+    // The dotted task and the candidate are the two things being weighed against
+    // each other, so they get a rule between them — but only when both are there.
+    if(candShowing) html += '<hr class="sep">';
   }
 
   if(state.interventionActive && b){
