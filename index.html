@@ -705,17 +705,25 @@ function oldestFirst(p){ // chain start: plain oldest-outstanding, no ranking in
   if(!p.length) return null;
   return p.reduce((oldest,t) => (t.createdAt||0) < (oldest.createdAt||0) ? t : oldest);
 }
+/* The first dot of a chain, and deliberately not a decision. There's no
+   benchmark yet, so there's nothing to compare the oldest outstanding task
+   against, and nothing that answering "can I do this?" would change about
+   which task goes first — so it just gets dotted and becomes the benchmark.
+   No pushUndo and no updatePair: nothing was compared, so no rank moves. */
+function autoDotOldest(){
+  const t = oldestFirst(pool());
+  if(!t) return;
+  state.chain.push(t.id);
+}
 function ensureCandidate(){
   expireCants();   // let any "can't" marks whose horizon has passed quietly rejoin the pool first
   if(state.mode !== "scan" || state.interventionActive) return;
-  const p = pool();
+  if(chainStart()) autoDotOldest();   // an empty chain dots its own head before any candidate is dealt
+  const p = pool();                   // computed after that dot, so the newly dotted task is already out of it
   const cur = state.candidateId ? taskById(state.candidateId) : null;
   const valid = cur && p.some(t=>t.id===cur.id);
   if(!valid){
-    // With an empty chain there's no benchmark to compare against, so a ranked
-    // pick would be meaningless — walk the list from the oldest outstanding
-    // task until one gets dotted, then hand off to the usual ranked scan.
-    const pick = chainStart() ? oldestFirst(p) : thompsonPick(p);
+    const pick = thompsonPick(p);
     state.candidateId = pick ? pick.id : null;
     state.presentedAt = Date.now();
   }
@@ -739,19 +747,20 @@ function recordDecisionTime(){
   const dt = Date.now() - state.presentedAt;
   if(dt > 300 && dt < 120000){ state.decisionsMs.push(dt); if(state.decisionsMs.length>20) state.decisionsMs.shift(); }
 }
-function decide(kind){ // 'can' | 'yes' | 'no' | 'cant' | 'cand-done'
+function decide(kind){ // 'yes' | 'no' | 'cant' | 'cand-done'
+  // An unrecognised kind — the retired 'can' among them — falls straight out
+  // rather than dropping through to the tail below, which would clear the
+  // candidate and deal a new one for a decision nobody made.
+  if(kind!=="yes" && kind!=="no" && kind!=="cant" && kind!=="cand-done") return;
   const cand = taskById(state.candidateId); if(!cand) return;
   const b = benchmark();
-  // Yes/No are comparisons against the benchmark — meaningless with an empty
-  // chain, so they're not offered there and are rejected here too (this also
-  // stops the y/n hotkeys from sneaking a rank signal in at chain start).
+  // Yes/No are comparisons against the benchmark, so they need one. A chain
+  // now dots its own head before any candidate is dealt, so this shouldn't be
+  // reachable — but a rank signal with nothing to rank against is a fabricated
+  // one, and the guard is cheaper than trusting it stays unreachable.
   if(!b && (kind==="yes" || kind==="no")) return;
   pushUndo(); recordDecisionTime();
-  if(kind==="can"){
-    state.chain.push(cand.id);            // first dot of the chain — no updatePair, nothing to rank against yet
-    delete state.considered[cand.id];
-    delete state.cantAt[cand.id];
-  }else if(kind==="yes"){
+  if(kind==="yes"){
     if(b) updatePair(cand, b);            // "I'd rather do this" → candidate outranks benchmark
     state.chain.push(cand.id);
     delete state.considered[cand.id];
@@ -767,9 +776,9 @@ function decide(kind){ // 'can' | 'yes' | 'no' | 'cant' | 'cand-done'
     completeTask(cand);
   }
   state.candidateId = null;
-  if(kind==="yes" || kind==="no" || kind==="cand-done") recomputeRanks();   // 'can' moves no ranks
+  recomputeRanks();
   maybeIntervene();
-  commit(true, kind==="yes" || kind==="can");   // any dot syncs to the cloud right away
+  commit(true, kind==="yes");   // a dot syncs to the cloud right away
 }
 function completeTask(t){
   t.lastDoneAt = Date.now();
@@ -1230,15 +1239,12 @@ function renderScan(){
            + '<button class="btn sm done" data-act="cand-done" title="Did it just now — cross it off (d)">✓ Done<span class="keyhint">d</span></button>'
            + '<button class="btn sm subtle" data-act="edit" data-id="'+cand.id+'">Edit</button>'
            + '<button class="btn sm danger" data-act="delete-task" data-id="'+cand.id+'" title="Delete this task entirely (Delete key)">Delete<span class="keyhint">⌫</span></button></div></div>';
-      const q = b
-        ? 'Would I rather have spent the next hour (until <span class="until">'+untilClock()+'</span>) doing this?'
-        : 'Starting a chain \u2014 your oldest outstanding task. Can I do this in the next hour (until <span class="until">'+untilClock()+'</span>)?';
-      html += '<div class="qline">'+q+'</div>';
+      // There's always a benchmark to compare against here — an empty chain
+      // dots its own head in ensureCandidate() before any candidate is dealt.
+      html += '<div class="qline">Would I rather have spent the next hour (until <span class="until">'+untilClock()+'</span>) doing this?</div>';
       html += '<div class="decide">'
-           + (b
-              ? '<button class="btn yes" data-act="yes">Yes<span class="keyhint">y</span></button>'
-                + '<button class="btn no" data-act="no">No<span class="keyhint">n</span></button>'
-              : '<button class="btn yes" data-act="can" title="Dot it and start the chain \u2014 no ranking happens on the first dot">Can<span class="keyhint">y</span></button>')
+           + '<button class="btn yes" data-act="yes">Yes<span class="keyhint">y</span></button>'
+           + '<button class="btn no" data-act="no">No<span class="keyhint">n</span></button>' 
            + '<button class="btn cant" data-act="cant" title="Skip it for a while, even if the chain empties out before then \u2014 see Settings">Can\u2019t<span class="keyhint">c</span></button>'
            + (state.mode==="scan" && b ? '<button class="btn subtle" data-act="start-working" title="Stop suggesting new candidates — just work through what\u2019s already dotted">done adding for now</button>' : '')
            + '<span class="sparkbox">'+sparkSVG(cand.id,84,20)
@@ -1325,8 +1331,7 @@ function openHelp(){
     '<div class="mtop"><h2>Quick start</h2><button class="x" data-act="close-modal" aria-label="Close">✕</button></div>'
     + '<div class="help"><ol>'
     + '<li>Add tasks to the bottom of your list as you think of them.</li>'
-    + '<li>To start a chain you\u2019re shown your <b>oldest outstanding task</b>. Answer <b>Can</b> or <b>Can\u2019t</b> — no ranking happens yet, there\u2019s nothing to compare against. <b>Can\u2019t</b> moves to the next oldest.</li>'
-    + '<li>The first <b>Can</b> dots that task and starts the chain. From there the scanner deals ranked candidates as usual.</li>'
+    + '<li>A chain starts itself: your <b>oldest outstanding task</b> is dotted automatically and becomes the first benchmark. Nothing is ranked by that dot — there was nothing to compare it against. From there the scanner deals ranked candidates as usual.</li>'
     + '<li>For each: do you <i>want</i> to do it before the purple benchmark?</li>'
     + '<li><b>Yes</b> dots it — it becomes the new benchmark on the chain.</li>'
     + '<li><b>No</b> skips it (and nudges its rank down). <b>Can\u2019t</b> skips it with no rank signal.</li>'
@@ -1434,7 +1439,7 @@ function onAction(act, el){
       renderQuickCtx();   // ephemeral, UI-only selection — no state mutation, no commit()/save() needed
       break;
     }
-    case "can": case "yes": case "no": case "cant": decide(act); break;
+    case "yes": case "no": case "cant": decide(act); break;
     case "cand-done": decide("cand-done"); break;
     case "bench-done": benchDone(); break;
     case "bench-cant": benchCant(); break;
@@ -1592,8 +1597,8 @@ document.addEventListener("keydown", e=>{
   }
   if(document.querySelector(".mback")){ if(e.key==="Escape") closeModal(); return; }
   const k=e.key.toLowerCase();
-  if(k==="y"&&!state.interventionActive&&state.candidateId) decide(benchmark() ? "yes" : "can");   // dot it
-  else if(k==="n"&&!state.interventionActive&&state.candidateId) decide("no");                     // no-op at chain start
+  if(k==="y"&&!state.interventionActive&&state.candidateId) decide("yes");   // dot it
+  else if(k==="n"&&!state.interventionActive&&state.candidateId) decide("no");
   else if(k==="c"&&!state.interventionActive&&state.candidateId) decide("cant");
   else if(k==="d") hotkeyDone();                                                             // cross off whatever's showing
   else if(k==="w") workedOn();                                                               // worked on it — cross off, back to the bottom

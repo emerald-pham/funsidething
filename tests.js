@@ -227,6 +227,7 @@ test("app harness: boots cleanly with an empty state", async () => {
 
 test("addTask: adds an open task; dot=true also pushes it onto the chain", async () => {
   const { ctx } = await loadApp();
+  ctx.state.mode = "work";   // scanning paused, so the chain only moves when addTask moves it
   const t1 = ctx.addTask("Write scene", false);
   assert.equal(ctx.state.tasks.length, 1);
   assert.equal(t1.title, "Write scene");
@@ -261,9 +262,8 @@ test("decide('yes'): dots the candidate, clears it, and a new candidate is picke
   ctx.addTask("Task A", false);
   ctx.addTask("Task B", false);
   ctx.addTask("Task C", false);
-  ctx.decide("can");            // start the chain first — yes/no need a benchmark to compare against
   const firstCandidate = ctx.state.candidateId;
-  assert.ok(firstCandidate, "a ranked candidate should be presented once the chain has started");
+  assert.ok(firstCandidate, "a ranked candidate should be presented once the chain has started itself");
 
   ctx.decide("yes");
   assert.equal(ctx.state.chain.length, 2);
@@ -277,8 +277,7 @@ test("decide('no') and decide('cant'): candidate is marked considered, NOT added
   ctx.addTask("Task A", false);
   ctx.addTask("Task B", false);
   ctx.addTask("Task C", false);
-  ctx.decide("can");            // establish a benchmark so 'no' is a valid comparison
-  const chainLen = ctx.state.chain.length;
+  const chainLen = ctx.state.chain.length;   // Task A was auto-dotted, so 'no' has a benchmark to lose to
   const cand = ctx.state.candidateId;
   ctx.decide("no");
   assert.equal(ctx.state.chain.length, chainLen, "'no' must not extend the chain");
@@ -293,7 +292,8 @@ test("decide('cand-done'): completes the task directly without ever touching the
   ctx.decide("cand-done");
   const task = ctx.state.tasks.find((t) => t.id === cand);
   assert.equal(task.done, true);
-  assert.equal(ctx.state.chain.length, 0, "cand-done must not add the task to the chain");
+  assert.ok(!ctx.state.chain.includes(cand), "cand-done must not add the task to the chain");
+  assert.equal(ctx.state.chain.length, 1, "the auto-dotted task is the only thing on it");
 });
 
 test("deleteTask: removes from tasks, the chain, and considered; clears candidateId if it was the deleted task", async () => {
@@ -321,11 +321,12 @@ test("deleteTask: a null/undefined id is a safe no-op", async () => {
 test("undo: reverses the most recent mutation (dotting a task)", async () => {
   const { ctx } = await loadApp({ seed: 5 });
   ctx.addTask("Task A", false);
-  ctx.addTask("Task B", false);
-  ctx.decide("can");
+  ctx.addTask("Task B", false);   // A is auto-dotted; B comes up as the candidate
   assert.equal(ctx.state.chain.length, 1);
+  ctx.decide("yes");
+  assert.equal(ctx.state.chain.length, 2);
   ctx.undo();
-  assert.equal(ctx.state.chain.length, 0);
+  assert.equal(ctx.state.chain.length, 1);
 });
 
 /* ---------- undo has to be durable, not just visible ----------
@@ -359,8 +360,9 @@ test("undo: writes the restored state to storage, so a reload doesn't resurrect 
 test("undo: stamps updatedAt so the restored state outranks the copy it reverses", async () => {
   const { ctx } = await loadApp({ seed: 41 });
   ctx.addTask("Task A", false);
+  ctx.addTask("Task B", false);
   const stale = ctx.state.updatedAt;
-  ctx.decide("can");
+  ctx.decide("yes");
   await settle();
 
   ctx.undo();
@@ -422,19 +424,17 @@ test("isEligible: no startsAt at all leaves eligibility untouched (back-compat w
 
 test("a future-start task is excluded from the pool and can never be dotted into the chain", async () => {
   const { ctx } = await loadApp({ seed: 304 });
-  const soon = ctx.addTask("Ready now", false);
-  const future = ctx.addTask("Starts next week", false);
-  ctx.state.tasks.find((x) => x.id === future.id).startsAt = ctx.todayISO(7);
+  let soon, future;
+  withScanPaused(ctx, () => {
+    soon = ctx.addTask("Ready now", false);
+    future = ctx.addTask("Starts next week", false);
+    ctx.state.tasks.find((x) => x.id === future.id).startsAt = ctx.todayISO(7);
 
-  const poolIds = [...ctx.pool()].map((x) => x.id);
-  assert.deepEqual(poolIds, [soon.id], "the future-start task must be excluded from the pool");
+    const poolIds = [...ctx.pool()].map((x) => x.id);
+    assert.deepEqual(poolIds, [soon.id], "the future-start task must be excluded from the pool");
+  });
 
-  ctx.state.candidateId = null; // force a fresh pick
-  ctx.ensureCandidate();
-  assert.equal(ctx.state.candidateId, soon.id);
-
-  ctx.decide("can");
-  assert.deepEqual([...ctx.state.chain], [soon.id]);
+  assert.deepEqual([...ctx.state.chain], [soon.id], "resuming the scan dots the only eligible task");
   assert.equal(ctx.state.chain.includes(future.id), false, "the future-start task must never enter the chain");
 });
 
@@ -535,23 +535,27 @@ test("resume-scan flips back to 'scan' and suggestions resume", async () => {
   const { ctx } = await loadApp({ seed: 12 });
   ctx.addTask("Task A", true);
   ctx.addTask("Task B", false);
+  ctx.addTask("Task C", false);   // one for the fresh chain to dot, one still left to offer
   ctx.benchDone();
   assert.equal(ctx.state.mode, "work");
   ctx.onAction("resume-scan", {});
   assert.equal(ctx.state.mode, "scan");
-  ctx.ensureCandidate();
   assert.ok(ctx.state.candidateId, "a candidate should be offered again after resuming");
 });
 
 test("UI: the 'done adding for now' button only renders while mode is 'scan' AND something is dotted", async () => {
   const { ctx, shim } = await loadApp({ seed: 13 });
-  // nothing dotted yet — no benchmark card at all, so the button cannot appear
+  // Nothing dotted yet — only reachable with scanning paused, since a live scan
+  // dots its own head. No benchmark card at all, so the button cannot appear.
+  ctx.state.mode = "work";
   ctx.addTask("Task A", false);
   ctx.render();
   assert.ok(!shim.elements.get("scan").innerHTML.includes("done adding for now"));
 
-  // dot something — button should now appear (mode is still "scan")
+  // dot something and resume — button should now appear (mode is "scan")
   ctx.addTask("Task B", true);
+  ctx.state.mode = "scan";
+  ctx.commit();
   ctx.render();
   assert.ok(shim.elements.get("scan").innerHTML.includes("done adding for now"));
 
@@ -563,8 +567,11 @@ test("UI: the 'done adding for now' button only renders while mode is 'scan' AND
 
 test("UI: 'done adding for now' is now a dedicated button in the decide row, not a text link in the siderail", async () => {
   const { ctx, shim } = await loadApp({ seed: 14 });
+  ctx.state.mode = "work";     // build the fixture before the auto-dot claims Task A
   ctx.addTask("Task A", false);
   ctx.addTask("Task B", true); // dots Task B; Task A becomes the candidate, so the decide row shows
+  ctx.state.mode = "scan";
+  ctx.commit();
   ctx.render();
   const scanHtml = shim.elements.get("scan").innerHTML;
 
@@ -593,16 +600,16 @@ test("UI: 'done adding for now' stays hidden once the pool is empty, even mid-sc
     "nothing left to suggest, and the button now only appears beside an actual candidate decision");
 });
 
-test("UI: 'done adding for now' stays hidden on the very first decision (Can/Can't row, no benchmark yet)", async () => {
+test("UI: 'done adding for now' shows on the very first decision — the auto-dot already gave it something to work through", async () => {
   const { ctx, shim } = await loadApp({ seed: 16 });
   ctx.addTask("Task A", false);
-  ctx.addTask("Task B", false); // two undotted tasks — first-ever decision, no benchmark, decide row shows Can/Can't
+  ctx.addTask("Task B", false); // A is dotted automatically, B comes up as the candidate
   ctx.render();
   const scanHtml = shim.elements.get("scan").innerHTML;
 
-  assert.match(scanHtml, /<button class="btn yes" data-act="can"/, "sanity check: this is indeed the Can/Can't row");
-  assert.ok(!scanHtml.includes("done adding for now"),
-    "nothing is dotted yet, so there's nothing to 'just work through' — stays hidden even though the decide row is showing");
+  assert.equal(ctx.state.chain.length, 1, "sanity check: a chain exists from the first task onwards");
+  assert.ok(scanHtml.includes("done adding for now"),
+    "there is a dotted task to go work on, so the button has something to mean");
 });
 
 
@@ -899,11 +906,11 @@ test("REGRESSION: dotting a task (immediate cloud sync) does not trigger a runaw
   ctx.addTask("Task A", false);
   ctx.addTask("Task B", false);
 
-  ctx.decide("can"); // chain-start dot, immediate-sync path (cloudPushNow) — pings before its own await too
+  ctx.decide("yes"); // dotting takes the immediate-sync path (cloudPushNow) — which pings before its own await too
 
   await new Promise((r) => setTimeout(r, 200)); // let every fake network call and its chained pings settle
 
-  assert.equal(ctx.state.chain.length, 1, "the dot itself should have gone through");
+  assert.equal(ctx.state.chain.length, 2, "the dot itself should have gone through");
 });
 
 test("REGRESSION: a focus-triggered pull racing a push settles with a small, bounded number of real network calls", async () => {
@@ -921,7 +928,7 @@ test("REGRESSION: a focus-triggered pull racing a push settles with a small, bou
   ctx.addTask("Task A", false);
   ctx.addTask("Task B", false);
 
-  ctx.decide("can");         // fires an immediate push (and, via ping, a legitimate pull attempt)
+  ctx.decide("yes");         // fires an immediate push (and, via ping, a legitimate pull attempt)
   ctx.cloudPull();           // simulates a focus/visibilitychange-triggered pull landing at the same time
 
   await new Promise((r) => setTimeout(r, 200));
@@ -1400,70 +1407,82 @@ test("AUDIT: repairs multiple orphaned can't marks in a single pass, without dis
   assert.equal(ctx.state.cantAt[ids.D], t0, "D's existing valid timestamp should be left alone");
 });
 
-/* ---------- chain start: oldest-first, can/can't only, no rank signal ----------
+/* ---------- chain start: the oldest outstanding task is dotted automatically ----------
    Starting a chain has no benchmark, so a ranked pick and a Yes/No comparison
-   are both meaningless. Instead the oldest outstanding task is presented and
-   answered Can / Can't (Done and Delete stay available) until one gets dotted;
-   that first dot moves no ranks. After that, normal ranked scanning resumes. */
+   are both meaningless — and so is asking "can I do this?", because the answer
+   changes nothing about which task goes first. The scanner just dots the oldest
+   outstanding task and starts comparing against it. That first dot moves no
+   ranks: nothing was compared. */
 
 function addTaskAged(ctx, title, ageMs) { // add a task with a backdated createdAt
   const t = ctx.addTask(title, false);
   ctx.state.tasks.find((x) => x.id === t.id).createdAt = Date.now() - ageMs;
   return t;
 }
-// The shown candidate is deliberately sticky — it won't swap out just because
-// another task was added. Force a fresh pick to exercise the selection logic.
-function repick(ctx) {
+// The auto-dot fires on every commit, so the first task added would be dotted
+// before a fixture finished assembling. Build it with scanning paused (what
+// "done adding for now" does), then resume and let the auto-dot run once
+// against the finished set.
+function withScanPaused(ctx, build) {
+  ctx.state.mode = "work";
+  build();
+  ctx.state.mode = "scan";
   ctx.state.candidateId = null;
   ctx.ensureCandidate();
 }
+const titleOf = (ctx, id) => (ctx.state.tasks.find((t) => t.id === id) || {}).title;
 
-test("chain start: presents the OLDEST outstanding task, not a ranked pick", async () => {
+test("chain start: the OLDEST outstanding task is dotted automatically, with no Can/Can't step", async () => {
   const { ctx } = await loadApp({ seed: 80 });
-  addTaskAged(ctx, "Newest", 1000);
-  addTaskAged(ctx, "Oldest", 900000);
-  addTaskAged(ctx, "Middle", 50000);
-  repick(ctx);
+  withScanPaused(ctx, () => {
+    addTaskAged(ctx, "Newest", 1000);
+    addTaskAged(ctx, "Oldest", 900000);
+    addTaskAged(ctx, "Middle", 50000);
+  });
 
-  const shown = ctx.state.tasks.find((t) => t.id === ctx.state.candidateId);
-  assert.equal(shown.title, "Oldest");
+  assert.equal(ctx.state.chain.length, 1, "a chain should start on its own, with no decision asked for");
+  assert.equal(titleOf(ctx, ctx.state.chain[0]), "Oldest");
+});
+
+test("chain start: the candidate offered is a ranked pick from what's left, never the auto-dotted task", async () => {
+  const { ctx } = await loadApp({ seed: 88 });
+  let strong;
+  withScanPaused(ctx, () => {
+    addTaskAged(ctx, "Oldest", 900000);
+    addTaskAged(ctx, "Second oldest", 800000);
+    strong = addTaskAged(ctx, "Newest but top-ranked", 1000);
+    const st = ctx.state.tasks.find((t) => t.id === strong.id);
+    st.mu = 500; st.sigma = 0.5;   // overwhelmingly the highest-ranked task
+    ctx.recomputeRanks();
+  });
+
+  assert.equal(titleOf(ctx, ctx.state.chain[0]), "Oldest", "the dot itself goes by age");
+  assert.equal(ctx.state.candidateId, strong.id, "ranked scanning resumes immediately, against the auto-dotted benchmark");
 });
 
 test("chain start: a strong rank does NOT jump the queue ahead of the oldest task", async () => {
   const { ctx } = await loadApp({ seed: 81 });
-  addTaskAged(ctx, "Oldest but weak", 900000);
-  const strong = addTaskAged(ctx, "Newer but top-ranked", 1000);
-  const st = ctx.state.tasks.find((t) => t.id === strong.id);
-  st.mu = 500; st.sigma = 0.5;   // overwhelmingly the highest-ranked task
-  ctx.recomputeRanks();
-  ctx.state.candidateId = null;
-  ctx.ensureCandidate();
+  withScanPaused(ctx, () => {
+    addTaskAged(ctx, "Oldest but weak", 900000);
+    const strong = addTaskAged(ctx, "Newer but top-ranked", 1000);
+    const st = ctx.state.tasks.find((t) => t.id === strong.id);
+    st.mu = 500; st.sigma = 0.5;
+    ctx.recomputeRanks();
+  });
 
-  const shown = ctx.state.tasks.find((t) => t.id === ctx.state.candidateId);
-  assert.equal(shown.title, "Oldest but weak", "ranking must not influence the chain-start pick");
+  assert.equal(titleOf(ctx, ctx.state.chain[0]), "Oldest but weak", "ranking must not influence the chain-start dot");
 });
 
-test("chain start: 'can' dots the task and starts the chain", async () => {
-  const { ctx } = await loadApp({ seed: 82 });
-  addTaskAged(ctx, "Newer", 1000);          // added first but younger
-  addTaskAged(ctx, "Oldest", 900000);
-  repick(ctx);
-  const first = ctx.state.candidateId;
-  assert.equal(ctx.state.tasks.find((t) => t.id === first).title, "Oldest");
-
-  ctx.decide("can");
-  assert.equal(ctx.state.chain.length, 1);
-  assert.equal(ctx.state.chain[0], first);
-});
-
-test("chain start: the first dot moves NO ranks (mu/sigma untouched for every task)", async () => {
+test("chain start: the automatic dot moves NO ranks (mu/sigma untouched for every task)", async () => {
   const { ctx } = await loadApp({ seed: 83 });
-  addTaskAged(ctx, "Oldest", 900000);
-  addTaskAged(ctx, "Newer", 1000);
-  const before = ctx.state.tasks.map((t) => ({ id: t.id, mu: t.mu, sigma: t.sigma }));
+  let before;
+  withScanPaused(ctx, () => {
+    addTaskAged(ctx, "Oldest", 900000);
+    addTaskAged(ctx, "Newer", 1000);
+    before = ctx.state.tasks.map((t) => ({ id: t.id, mu: t.mu, sigma: t.sigma }));
+  });
 
-  ctx.decide("can");
-
+  assert.equal(ctx.state.chain.length, 1, "precondition: the auto-dot fired");
   for (const snap of before) {
     const now = ctx.state.tasks.find((t) => t.id === snap.id);
     assert.equal(now.mu, snap.mu, `mu for ${now.title} should be unchanged by the first dot`);
@@ -1471,118 +1490,171 @@ test("chain start: the first dot moves NO ranks (mu/sigma untouched for every ta
   }
 });
 
-test("chain start: 'can't' moves on to the NEXT oldest task", async () => {
+test("chain start: a fresh can't mark keeps a task out of the automatic dot", async () => {
   const { ctx } = await loadApp({ seed: 84 });
-  addTaskAged(ctx, "Newest", 1000);           // added first, but youngest — must be shown last
-  addTaskAged(ctx, "Second oldest", 500000);
-  addTaskAged(ctx, "First oldest", 900000);
-  repick(ctx);
+  withScanPaused(ctx, () => {
+    addTaskAged(ctx, "Newest", 1000);
+    addTaskAged(ctx, "Second oldest", 500000);
+    const first = addTaskAged(ctx, "First oldest", 900000);
+    ctx.state.considered[first.id] = "cant";
+    ctx.state.cantAt[first.id] = Date.now();
+  });
 
-  assert.equal(ctx.state.tasks.find((t) => t.id === ctx.state.candidateId).title, "First oldest");
-  ctx.decide("cant");
-  assert.equal(ctx.state.tasks.find((t) => t.id === ctx.state.candidateId).title, "Second oldest");
-  ctx.decide("cant");
-  assert.equal(ctx.state.tasks.find((t) => t.id === ctx.state.candidateId).title, "Newest");
-  assert.equal(ctx.state.chain.length, 0, "saying can't repeatedly should never start a chain");
+  assert.equal(titleOf(ctx, ctx.state.chain[0]), "Second oldest",
+    "a can't mark is bulletproof — it must not be overridden by dotting the task outright");
 });
 
-test("chain start: 'yes' and 'no' are rejected outright — no chain change, no considered mark", async () => {
-  const { ctx } = await loadApp({ seed: 85 });
+test("chain start: an ineligible task is never auto-dotted, however old it is", async () => {
+  const { ctx } = await loadApp({ seed: 96 });
+  let ready;
+  withScanPaused(ctx, () => {
+    const future = addTaskAged(ctx, "Starts next week", 900000);   // the oldest, but not startable yet
+    ctx.state.tasks.find((x) => x.id === future.id).startsAt = ctx.todayISO(7);
+    ready = addTaskAged(ctx, "Ready now", 1000);
+  });
+
+  assert.deepEqual([...ctx.state.chain], [ready.id], "age must not override eligibility");
+});
+
+test("chain start: an empty pool leaves the chain empty and doesn't throw", async () => {
+  const { ctx } = await loadApp({ seed: 97 });
+  ctx.ensureCandidate();
+  assert.equal(ctx.state.chain.length, 0);
+  assert.equal(ctx.state.candidateId, null);
+});
+
+test("chain start: nothing is auto-dotted while scanning is paused", async () => {
+  const { ctx } = await loadApp({ seed: 98 });
+  ctx.state.mode = "work";
   addTaskAged(ctx, "Oldest", 900000);
   addTaskAged(ctx, "Newer", 1000);
+
+  assert.equal(ctx.state.chain.length, 0, "'done adding for now' means don't start anything new");
+});
+
+test("chain start: nothing is auto-dotted mid-intervention", async () => {
+  const { ctx } = await loadApp({ seed: 99 });
+  ctx.state.mode = "work";
+  addTaskAged(ctx, "Oldest", 900000);
+  addTaskAged(ctx, "Newer", 1000);
+  ctx.state.mode = "scan";
+  ctx.state.interventionActive = true;
+  ctx.ensureCandidate();
+
+  assert.equal(ctx.state.chain.length, 0, "an intervention pauses the scan, the dot included");
+});
+
+test("emptying the chain auto-dots the next oldest as soon as scanning resumes", async () => {
+  const { ctx } = await loadApp({ seed: 89 });
+  withScanPaused(ctx, () => {
+    addTaskAged(ctx, "Oldest", 900000);
+    addTaskAged(ctx, "Second oldest", 800000);
+    const strong = addTaskAged(ctx, "Newest but top-ranked", 1000);
+    const st = ctx.state.tasks.find((t) => t.id === strong.id);
+    st.mu = 500; st.sigma = 0.5;
+    ctx.recomputeRanks();
+  });
+  assert.equal(titleOf(ctx, ctx.state.chain[0]), "Oldest");
+
+  ctx.benchDone();     // completes it, chain empties, mode -> "work"
+  assert.equal(ctx.state.chain.length, 0, "no new chain while you're working the queue");
+
+  ctx.onAction("resume-scan", {});
+  assert.equal(ctx.state.chain.length, 1, "resuming scanning starts a fresh chain by itself");
+  assert.equal(titleOf(ctx, ctx.state.chain[0]), "Second oldest", "oldest-first again, ranking still not involved");
+});
+
+test("Can't on the only dotted task hands the chain to the next oldest, not back to the one refused", async () => {
+  const { ctx } = await loadApp({ seed: 95 });
+  withScanPaused(ctx, () => {
+    addTaskAged(ctx, "Oldest", 900000);
+    addTaskAged(ctx, "Second oldest", 800000);
+  });
+  const refused = ctx.state.chain[0];
+  assert.equal(titleOf(ctx, refused), "Oldest");
+
+  ctx.benchCant();
+  assert.equal(ctx.state.considered[refused], "cant");
+  assert.equal(ctx.state.chain.length, 1, "the chain restarts immediately rather than sitting empty");
+  assert.equal(titleOf(ctx, ctx.state.chain[0]), "Second oldest");
+});
+
+test("deleting the auto-dotted benchmark hands the chain straight to the next oldest", async () => {
+  const { ctx } = await loadApp({ seed: 87 });
+  withScanPaused(ctx, () => {
+    addTaskAged(ctx, "Oldest", 900000);
+    addTaskAged(ctx, "Second oldest", 500000);
+  });
+  const dotted = ctx.state.chain[0];
+
+  ctx.deleteTask(dotted);
+  assert.equal(ctx.state.tasks.some((t) => t.id === dotted), false);
+  assert.equal(titleOf(ctx, ctx.state.chain[0]), "Second oldest");
+});
+
+test("decide('can') is retired — a stale 'can' must not dot anything or drop the candidate", async () => {
+  const { ctx } = await loadApp({ seed: 93 });
+  withScanPaused(ctx, () => {
+    addTaskAged(ctx, "Oldest", 900000);
+    addTaskAged(ctx, "Newer", 1000);
+  });
+  const chainBefore = [...ctx.state.chain];
+  const cand = ctx.state.candidateId;
+
+  ctx.decide("can");
+  assert.deepEqual([...ctx.state.chain], chainBefore, "'can' is no longer a decision — it must not extend the chain");
+  assert.equal(ctx.state.candidateId, cand, "and it must not swap the candidate out either");
+});
+
+test("no code path dispatches a 'can' decision any more", () => {
+  assert.ok(!/data-act="can"/.test(html), "the Can button should be gone from the markup");
+  assert.ok(!/decide\("can"\)/.test(appSrc), "nothing should call decide('can')");
+  assert.ok(!/case "can":/.test(appSrc), "the action dispatch should no longer route 'can'");
+});
+
+test("yes/no still need a benchmark: with nothing dotted they are refused outright", async () => {
+  const { ctx } = await loadApp({ seed: 85 });
+  withScanPaused(ctx, () => {
+    addTaskAged(ctx, "Oldest", 900000);
+    addTaskAged(ctx, "Newer", 1000);
+  });
+  ctx.state.chain = [];              // the one shape the auto-dot can't produce, forced by hand
   const cand = ctx.state.candidateId;
 
   ctx.decide("yes");
-  assert.equal(ctx.state.chain.length, 0, "'yes' must not dot anything at chain start");
-  assert.equal(ctx.state.candidateId, cand, "the same task should still be showing");
+  assert.equal(ctx.state.chain.length, 0, "'yes' has nothing to compare against and must not dot");
 
   ctx.decide("no");
-  assert.equal(ctx.state.considered[cand], undefined, "'no' must not mark the task considered at chain start");
-  assert.equal(ctx.state.candidateId, cand, "the same task should still be showing");
+  assert.equal(ctx.state.considered[cand], undefined, "'no' must not mark the task considered either");
 });
 
-test("chain start: Done still works on the first task and does not start a chain", async () => {
-  const { ctx } = await loadApp({ seed: 86 });
-  addTaskAged(ctx, "Oldest", 900000);
-  addTaskAged(ctx, "Newer", 1000);
-  const cand = ctx.state.candidateId;
-
-  ctx.decide("cand-done");
-  assert.equal(ctx.state.tasks.find((t) => t.id === cand).done, true);
-  assert.equal(ctx.state.chain.length, 0);
-});
-
-test("chain start: Delete still works on the first task, and the next oldest comes up", async () => {
-  const { ctx } = await loadApp({ seed: 87 });
-  addTaskAged(ctx, "Oldest", 900000);
-  addTaskAged(ctx, "Second oldest", 500000);
-  const cand = ctx.state.candidateId;
-
-  ctx.deleteTask(cand);
-  assert.equal(ctx.state.tasks.some((t) => t.id === cand), false);
-  assert.equal(ctx.state.tasks.find((t) => t.id === ctx.state.candidateId).title, "Second oldest");
-});
-
-test("after the first dot, scanning hands back to the normal ranked picker", async () => {
-  const { ctx } = await loadApp({ seed: 88 });
-  addTaskAged(ctx, "Oldest", 900000);
-  addTaskAged(ctx, "Second oldest", 800000);
-  const strong = addTaskAged(ctx, "Newest but top-ranked", 1000);
-  const st = ctx.state.tasks.find((t) => t.id === strong.id);
-  st.mu = 500; st.sigma = 0.5;
-  ctx.recomputeRanks();
-
-  ctx.decide("can"); // dots "Oldest", chain now has a benchmark
-
-  const shown = ctx.state.tasks.find((t) => t.id === ctx.state.candidateId);
-  assert.equal(shown.title, "Newest but top-ranked", "ranked picking should resume once a benchmark exists");
-});
-
-test("emptying the chain returns to oldest-first chain-start behavior", async () => {
-  const { ctx } = await loadApp({ seed: 89 });
-  addTaskAged(ctx, "Oldest", 900000);
-  addTaskAged(ctx, "Second oldest", 800000);
-  const strong = addTaskAged(ctx, "Newest but top-ranked", 1000);
-  const st = ctx.state.tasks.find((t) => t.id === strong.id);
-  st.mu = 500; st.sigma = 0.5;
-  ctx.recomputeRanks();
-
-  ctx.decide("can");   // dots "Oldest"
-  ctx.benchDone();     // completes it, chain empties, mode -> "work"
-  ctx.onAction("resume-scan", {});
-  assert.equal(ctx.state.chain.length, 0);
-
-  const shown = ctx.state.tasks.find((t) => t.id === ctx.state.candidateId);
-  assert.equal(shown.title, "Second oldest", "back to oldest-first now that the chain is empty again");
-});
-
-test("UI: chain start shows Can / Can't but NOT Yes / No", async () => {
+test("UI: the very first decision already offers Yes/No — no Can button, no chain-start question", async () => {
   const { ctx, shim } = await loadApp({ seed: 90 });
-  addTaskAged(ctx, "Oldest", 900000);
-  addTaskAged(ctx, "Newer", 1000);
+  withScanPaused(ctx, () => {
+    addTaskAged(ctx, "Oldest", 900000);
+    addTaskAged(ctx, "Newer", 1000);
+  });
   ctx.render();
   const scanHtml = shim.elements.get("scan").innerHTML;
 
-  assert.match(scanHtml, /data-act="can"/, "the Can button should be present at chain start");
-  assert.match(scanHtml, /data-act="cant"/, "the Can't button should be present at chain start");
-  assert.ok(!/data-act="yes"/.test(scanHtml), "Yes must not be offered at chain start");
-  assert.ok(!/data-act="no"/.test(scanHtml), "No must not be offered at chain start");
+  assert.match(scanHtml, /data-act="yes"/, "Yes is offered against the auto-dotted benchmark");
+  assert.match(scanHtml, /data-act="no"/, "No is offered against the auto-dotted benchmark");
+  assert.ok(!/data-act="can"/.test(scanHtml), "the Can button is gone");
+  assert.ok(!/Starting a chain/.test(scanHtml), "so is the chain-start question line");
+  assert.match(scanHtml, /Would I rather/, "the comparison question is asked from the very first decision");
+  assert.match(scanHtml, /data-act="cant"/, "Can't still skips a candidate");
   assert.match(scanHtml, /data-act="cand-done"/, "Done should still be available");
   assert.match(scanHtml, /data-act="delete-task"/, "Delete should still be available");
 });
 
-test("UI: once a chain exists, Yes / No come back and the bare Can button goes away", async () => {
-  const { ctx, shim } = await loadApp({ seed: 91 });
-  addTaskAged(ctx, "Oldest", 900000);
-  addTaskAged(ctx, "Newer", 1000);
-  addTaskAged(ctx, "Third", 500);
-  ctx.decide("can");
-  ctx.render();
-  const scanHtml = shim.elements.get("scan").innerHTML;
+test("UI: help describes the automatic first dot rather than a Can/Can't step", async () => {
+  const { ctx, shim } = await loadApp({ seed: 94 });
+  ctx.openHelp();
+  const helpHtml = shim.elements.get("modalRoot").innerHTML;
 
-  assert.match(scanHtml, /data-act="yes"/, "Yes should be offered once there's a benchmark");
-  assert.match(scanHtml, /data-act="no"/, "No should be offered once there's a benchmark");
-  assert.ok(!/data-act="can"[^t]/.test(scanHtml), "the chain-start Can button should be gone");
+  assert.match(helpHtml, /oldest outstanding task/, "the rule itself hasn't changed — oldest first");
+  assert.match(helpHtml, /automatically/, "help should say the first dot happens on its own");
+  assert.ok(!/Answer <b>Can<\/b>/.test(helpHtml), "the Can/Can't instruction should be gone");
 });
 
 /* ---------- Reveal -> direct Edit on the benchmark/candidate cards ----------
@@ -2006,16 +2078,20 @@ test("doneTask: an unknown, null, or undefined id is a safe no-op", async () => 
 
 test("doneTask: crossing off the last dot empties the chain and the scan restarts oldest-first", async () => {
   const { ctx } = await loadApp({ seed: 210 });
-  const oldest = addTaskAged(ctx, "Oldest outstanding", 900000);
-  addTaskAged(ctx, "Newer", 300000);
-  const dot = addTaskAged(ctx, "The only dot", 100000);
-  ctx.state.chain = [dot.id];
-  ctx.state.candidateId = null;
+  let oldest, dot;
+  withScanPaused(ctx, () => {
+    oldest = addTaskAged(ctx, "Oldest outstanding", 900000);
+    addTaskAged(ctx, "Newer", 300000);
+    dot = addTaskAged(ctx, "The only dot", 100000);
+    ctx.state.chain = [dot.id];
+    ctx.state.candidateId = null;
+  });
+  assert.deepEqual([...ctx.state.chain], [dot.id], "precondition: one hand-placed dot");
 
   ctx.doneTask(dot.id);
-  assert.deepEqual([...ctx.state.chain], [], "the chain should be empty again");
   assert.equal(ctx.state.mode, "scan");
-  assert.equal(ctx.state.candidateId, oldest.id, "with no benchmark, chain start deals the oldest outstanding");
+  assert.deepEqual([...ctx.state.chain], [oldest.id],
+    "emptying the chain restarts it on the oldest outstanding task");
 });
 
 test("UI: the edit pane renders a Done button carrying that task's id", async () => {
@@ -2267,6 +2343,7 @@ test("benchCant: clears the intervention prompt, like dislodge does", async () =
 
 test("benchCant: a no-op when the chain is empty", async () => {
   const { ctx } = await loadApp({ seed: 245 });
+  ctx.state.mode = "work";   // scanning paused — the one way to hold the chain empty
   ctx.addTask("Undotted", false);
   assert.equal(ctx.state.chain.length, 0, "precondition: no benchmark");
 
