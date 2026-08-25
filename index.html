@@ -135,6 +135,8 @@ textarea{width:100%;font-family:var(--font-mono);font-size:12px}
 .actionrow{display:flex;flex-wrap:wrap;gap:7px;align-items:center;justify-content:flex-end;margin-top:8px;transition:opacity .2s ease}
 .actionrow.disabled{opacity:.5}
 .actionrow.disabled:hover{opacity:1}
+.siderail.disabled{opacity:.5}
+.siderail.disabled:hover{opacity:1}
 /* Divides the dotted task and its actions from the candidate being weighed
    against it. --line is the app's hairline token, so it follows the theme. */
 .sep{border:0;border-top:1px solid var(--line);margin:14px 0 12px}
@@ -1258,7 +1260,7 @@ function renderScan(){
       html += '<div class="cardrow"><div class="card cand">'
            + '<span class="title">'+titleHTML(cand)+'</span>'
            + '<span class="chiprow">'+chipHTML(cand)+'</span></div>'
-           + '<div class="siderail">'
+           + '<div class="siderail' + (state.mode==="scan" ? ' disabled' : '') + '">'
            + '<button class="btn sm done" data-act="cand-done" title="Did it just now — cross it off (d)">✓ Done<span class="keyhint">d</span></button>'
            + '<button class="btn sm subtle" data-act="edit" data-id="'+cand.id+'">Edit</button>'
            + '<button class="btn sm danger" data-act="delete-task" data-id="'+cand.id+'" title="Delete this task entirely (Delete key)">Delete<span class="keyhint">⌫</span></button></div></div>';

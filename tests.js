@@ -572,7 +572,7 @@ test("UI: 'done adding for now' is now a dedicated button in the decide row, not
   assert.ok(!/class="sidesm" data-act="start-working"/.test(scanHtml),
     "the old dotted-underline text-link styling should be gone");
 
-  const rails = scanHtml.match(/<div class="siderail">[\s\S]*?<\/div>/g) || [];
+  const rails = scanHtml.match(/<div class="siderail[^"]*">[\s\S]*?<\/div>/g) || [];
   for (const rail of rails) {
     assert.ok(!rail.includes('data-act="start-working"'), `siderail should no longer carry the button: ${rail}`);
   }
@@ -1778,7 +1778,7 @@ test("UI: every action button in the candidate's siderail shares the same .sm si
   ctx.render();
   const scanHtml = shim.elements.get("scan").innerHTML;
 
-  const rails = scanHtml.match(/<div class="siderail">[\s\S]*?<\/div>/g) || [];
+  const rails = scanHtml.match(/<div class="siderail[^"]*">[\s\S]*?<\/div>/g) || [];
   assert.equal(rails.length, 1, `only the candidate keeps a rail; found ${rails.length}`);
   const btns = rails[0].match(/<button class="btn [^"]*"/g) || [];
   assert.equal(btns.length, 3, `expected Done/Edit/Delete, found ${btns.length} in ${rails[0]}`);
@@ -1801,7 +1801,7 @@ test("UI: the benchmark's d/⌫ keyhints hide when a candidate is showing", asyn
   // the benchmark's actions are a row beneath its card; the candidate keeps a rail
   const benchmarkSiderail = benchAction(scanHtml);
   assert.ok(benchmarkSiderail, "the benchmark should have its action row");
-  const siderails = scanHtml.match(/<div class="siderail">[\s\S]*?<\/div>/g) || [];
+  const siderails = scanHtml.match(/<div class="siderail[^"]*">[\s\S]*?<\/div>/g) || [];
   assert.equal(siderails.length, 1, "only the candidate should have a siderail");
   const candidateSiderail = siderails[0];
 
