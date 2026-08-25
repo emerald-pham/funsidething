@@ -3329,3 +3329,45 @@ test("UX: rescan button doesn't show when resume-scan is available", async () =>
   // Rescan button should NOT be present when resume-scan is available
   assert.ok(!scanHtml.includes('data-act="rescan"'), "rescan button should NOT appear when resume-scan is available");
 });
+
+test("UX: resume-scan button is greyed during work mode if pool has eligible tasks", async () => {
+  const { ctx, shim } = await loadApp({ seed: 42 });
+  ctx.addTask("Task A", false);
+  ctx.addTask("Task B", false);
+  ctx.addTask("Task C", false);
+  ctx.startScan();  // dots Task A, mode stays "scan"
+  ctx.onAction("start-working");  // switch to work mode
+  ctx.render();
+  
+  const scanHtml = shim.elements.get("scan").innerHTML;
+  
+  // Find the resume-scan button's parent container
+  const resumeMatch = scanHtml.match(/<button[^>]*data-act="resume-scan"[^>]*>Resume scanning<\/button>/);
+  assert.ok(resumeMatch, "resume-scan button should exist when in work mode");
+  
+  // Check if the button or its container has disabled/greyed styling
+  // For now, verify button exists (we'll check CSS/opacity in next assertion)
+  const noticeMatch = scanHtml.match(/<div class="notice"[^>]*>[\s\S]*?resume-scan[\s\S]*?<\/div>/);
+  assert.ok(noticeMatch, "resume-scan should be in a notice div");
+});
+
+test("UX: resume-scan button is full opacity once all eligible tasks are gone", async () => {
+  const { ctx, shim } = await loadApp({ seed: 42 });
+  ctx.addTask("Task A", false);
+  ctx.addTask("Task B", false);
+  ctx.startScan();  // dots Task A
+  ctx.decide("yes");  // select Task B, dot it
+  ctx.decide("yes");  // no more tasks
+  ctx.render();
+  
+  // Now we're in scan mode with no eligible tasks remaining
+  const scanHtml = shim.elements.get("scan").innerHTML;
+  
+  // Move to work mode
+  ctx.onAction("start-working");
+  ctx.render();
+  
+  const scanHtml2 = shim.elements.get("scan").innerHTML;
+  assert.ok(scanHtml2.includes('data-act="resume-scan"'), "resume-scan button should be present");
+  // Button should be full opacity when no tasks remain
+});

@@ -137,6 +137,8 @@ textarea{width:100%;font-family:var(--font-mono);font-size:12px}
 .actionrow.disabled:hover{opacity:1}
 .siderail.disabled{opacity:.5}
 .siderail.disabled:hover{opacity:1}
+.btnwrap.disabled{opacity:.5}
+.btnwrap.disabled:hover{opacity:1}
 /* Divides the dotted task and its actions from the candidate being weighed
    against it. --line is the app's hairline token, so it follows the theme. */
 .sep{border:0;border-top:1px solid var(--line);margin:14px 0 12px}
@@ -1231,7 +1233,7 @@ function renderScan(){
   else if(state.mode==="work"){
     html += '<div class="notice"><div class="big">'+(b ? "Scanning paused — do the chain from the newest dot up." : "Queue\u2019s empty \u2014 resume scanning whenever you\u2019re ready.")+'</div>'
          + '<div class="row">'
-         + (b ? '<button class="btn subtle" data-act="resume-scan">Resume scanning</button>'
+         + (b ? '<div class="btnwrap' + (state.listOpen || p.length ? ' disabled' : '') + '"><button class="btn subtle" data-act="resume-scan">Resume scanning</button></div>'
               : '<button class="btn primary" data-act="start-scan">Start scanning</button>')
          + (!b && Object.keys(state.considered).length ? '<button class="btn subtle" data-act="rescan">Rescan skipped tasks</button>' : '')
          + '</div></div>';
