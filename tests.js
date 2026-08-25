@@ -1843,6 +1843,77 @@ test("UI: benchmark's d/⌫ keyhints reappear when no candidate is showing (work
     "benchmark's Delete should show ⌫ keyhint when no candidate is present");
 });
 
+/* ---------- work mode: actions are greyed but still work ----------
+   When you hit "done adding for now" and mode flips to work, the benchmark
+   card stays on screen with its actions, but they're dimmed to show you're
+   in a different phase. Hovering restores them to full brightness to confirm
+   they're still clickable — you can still change your mind mid-queue. */
+
+test("UI: benchmark's action row is greyed out (lowered opacity) in work mode", async () => {
+  const { ctx, shim } = await loadApp({ seed: 280 });
+  ctx.addTask("Dotted task", true);
+  ctx.onAction("start-working", {});
+  ctx.render();
+  const row = shim.elements.get("scan").innerHTML.match(/<div class="actionrow[^"]*">([\s\S]*?)<\/div>/)[0];
+
+  assert.match(row, /class="actionrow[^"]*disabled/, `action row should carry the disabled class in work mode, got: ${row}`);
+});
+
+test("CSS: .actionrow.disabled lowers opacity to show it's a different mode, but keeps it clickable", () => {
+  const rule = styleSrc.match(/\.actionrow\.disabled\{([^}]*)\}/);
+  assert.ok(rule, "there should be a .actionrow.disabled rule");
+  const m = rule[1].match(/opacity:\s*([\d.]+)/);
+  assert.ok(m && +m[1] < 1, `opacity should be < 1 to dim it, got: ${rule[1]}`);
+  assert.ok(!/pointer-events:\s*none/.test(rule[1]), "pointer-events should not be none — actions stay clickable");
+});
+
+test("CSS: hovering over a disabled action row restores full opacity", () => {
+  const rule = styleSrc.match(/\.actionrow\.disabled:hover\{([^}]*)\}/);
+  assert.ok(rule, "there should be a .actionrow.disabled:hover rule");
+  assert.match(rule[1], /opacity:\s*1/, "opacity should return to 1 on hover");
+});
+
+test("UI: a greyed action row's buttons are still clickable — you can change your mind", async () => {
+  const { ctx } = await loadApp({ seed: 281 });
+  ctx.addTask("Task to undo", true);
+  ctx.onAction("start-working", {});
+  assert.equal(ctx.state.mode, "work");
+
+  // In work mode, the benchmark's action row is greyed but still works
+  // Clicking bench-done on a greyed row should complete the task as usual
+  ctx.onAction("bench-done", {});
+  assert.ok(ctx.state.tasks[0].done, "the greyed button should still trigger the action");
+});
+
+/* ---------- new tasks show they'll join the chain ----------
+   When you're adding tasks and haven't started scanning yet, each one you add
+   gets a small arrow indicator → pointing at the scan start button, showing
+   the next click will grab one of them. */
+
+test("UI: a new task shows an arrow → to the Start scanning button when nothing's dotted yet", async () => {
+  const { ctx, shim } = await loadApp({ seed: 282 });
+  ctx.addTask("Will be grabbed", false);
+  ctx.state.listOpen = true;
+  ctx.render();
+  const list = shim.elements.get("listBody").innerHTML;
+
+  assert.match(list, /→/, `expected an arrow indicator, got: ${list}`);
+});
+
+test("UI: the arrow disappears once scanning starts and a task is dotted", async () => {
+  const { ctx, shim } = await loadApp({ seed: 283 });
+  ctx.addTask("Will be grabbed", false);
+  ctx.state.listOpen = true;
+  ctx.render();
+  let list = shim.elements.get("listBody").innerHTML;
+  assert.match(list, /→/, "precondition: arrow is showing before scan");
+
+  ctx.startScan();
+  ctx.render();
+  list = shim.elements.get("listBody").innerHTML;
+  assert.ok(!/→/.test(list), "arrow should disappear once a task is dotted");
+});
+
 /* ---------- undo advertises its key like every other keyboard control ----------
    Undo has always had a `u` hotkey, but the only place that said so was the
    tooltip — so the one control you reach for in a hurry was the one you had to
@@ -1884,7 +1955,7 @@ test("undo: the header button reverses the last action through the normal onActi
    whole block from the candidate being compared against it — so the two things
    you're weighing read as two things, not one long column. */
 
-const benchAction = (scanHtml) => (scanHtml.match(/<div class="actionrow">[\s\S]*?<\/div>/) || [])[0];
+const benchAction = (scanHtml) => (scanHtml.match(/<div class="actionrow[^"]*">[\s\S]*?<\/div>/) || [])[0];
 
 test("UI: the benchmark's six actions sit in one row beneath the purple card", async () => {
   const { ctx, shim } = await loadApp({ seed: 270 });
