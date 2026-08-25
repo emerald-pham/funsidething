@@ -1207,7 +1207,7 @@ function renderScan(){
     html += '<div class="benchblock"><div class="card bench">'
          + '<span class="title">'+titleHTML(b)+'</span>'
          + '<span class="chiprow">'+chipHTML(b)+'</span></div>'
-         + '<div class="actionrow' + (state.mode==="work" ? ' disabled' : '') + '">'
+         + '<div class="actionrow' + (state.mode==="scan" ? ' disabled' : '') + '">'
          + '<button class="btn sm done" data-act="bench-done" title="Done — cross it off (d)">✓ Done'+(candShowing?'':'<span class="keyhint">d</span>')+'</button>'
          + '<button class="btn sm subtle" data-act="edit" data-id="'+b.id+'">Edit</button>'
          + '<button class="btn sm worked" data-act="worked" title="Started it, crossing it off, back to the bottom of the list (rule 7, w)">Worked on it<span class="keyhint">w</span></button>'

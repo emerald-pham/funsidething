@@ -1818,21 +1818,18 @@ test("UI: the benchmark's d/⌫ keyhints hide when a candidate is showing", asyn
     "candidate's Done should show d keyhint");
 });
 
-test("UI: benchmark's d/⌫ keyhints reappear when no candidate is showing (work mode)", async () => {
+test("UI: benchmark's action row is full opacity in work mode (not greyed)", async () => {
   const { ctx, shim } = await loadApp({ seed: 261 });
   ctx.addTask("Task", true);
   ctx.onAction("start-working", {});
   ctx.render();
   const scanHtml = shim.elements.get("scan").innerHTML;
 
-  // only benchmark card present, no candidate
-  assert.ok(scanHtml.includes('data-act="bench-done"'), "benchmark Done button should render in work mode");
-  assert.ok(!scanHtml.includes('data-act="cand-done"'), "candidate should not render in work mode");
-
-  // find the benchmark's action row — nothing else is on screen to confuse it
+  // In work mode, the action row should NOT have the disabled class (full opacity)
   const benchmarkSiderail = benchAction(scanHtml);
   assert.ok(benchmarkSiderail, "the benchmark should have its action row in work mode");
-  assert.ok(!/class="siderail"/.test(scanHtml), "and no siderail alongside it");
+  assert.ok(!/class="actionrow[^"]*disabled/.test(benchmarkSiderail), 
+    "the action row should NOT be greyed out in work mode — actions are relevant here");
 
   // benchmark's Done SHOULD have the d keyhint when no candidate is showing
   assert.ok(benchmarkSiderail.includes('data-act="bench-done"') && benchmarkSiderail.includes('<span class="keyhint">d</span>'),
@@ -1849,14 +1846,14 @@ test("UI: benchmark's d/⌫ keyhints reappear when no candidate is showing (work
    in a different phase. Hovering restores them to full brightness to confirm
    they're still clickable — you can still change your mind mid-queue. */
 
-test("UI: benchmark's action row is greyed out (lowered opacity) in work mode", async () => {
+test("UI: benchmark's action row is greyed out (lowered opacity) during scanning", async () => {
   const { ctx, shim } = await loadApp({ seed: 280 });
   ctx.addTask("Dotted task", true);
-  ctx.onAction("start-working", {});
+  ctx.addTask("Another task", false);
   ctx.render();
   const row = shim.elements.get("scan").innerHTML.match(/<div class="actionrow[^"]*">([\s\S]*?)<\/div>/)[0];
 
-  assert.match(row, /class="actionrow[^"]*disabled/, `action row should carry the disabled class in work mode, got: ${row}`);
+  assert.match(row, /class="actionrow[^"]*disabled/, `action row should carry the disabled class during scan, got: ${row}`);
 });
 
 test("CSS: .actionrow.disabled lowers opacity to show it's a different mode, but keeps it clickable", () => {
@@ -1963,7 +1960,7 @@ test("UI: the benchmark's six actions sit in one row beneath the purple card", a
   ctx.render();
   const scanHtml = shim.elements.get("scan").innerHTML;
 
-  const rows = scanHtml.match(/<div class="actionrow">/g) || [];
+  const rows = scanHtml.match(/<div class="actionrow[^"]*">/g) || [];
   assert.equal(rows.length, 1, `expected exactly one action row, found ${rows.length} in: ${scanHtml}`);
 
   const row = benchAction(scanHtml);
@@ -1978,7 +1975,7 @@ test("UI: the action row comes after the purple card, not beside it", async () =
   ctx.render();
   const scanHtml = shim.elements.get("scan").innerHTML;
 
-  assert.ok(scanHtml.indexOf('class="card bench"') < scanHtml.indexOf('class="actionrow"'),
+  assert.ok(scanHtml.indexOf('class="card bench"') < scanHtml.indexOf('class="actionrow'),
     "the row should follow the card in the markup, so it renders beneath it");
   assert.ok(!/class="cardrow"><div class="card bench"/.test(scanHtml),
     "the benchmark should no longer be laid out as a side-by-side card row");
