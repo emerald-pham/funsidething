@@ -132,7 +132,9 @@ textarea{width:100%;font-family:var(--font-mono);font-size:12px}
 .chip.notstarted{background:transparent;color:var(--mut);opacity:.85;font-weight:600;border:1px dashed var(--line)}
 .siderail{display:flex;flex-direction:column;gap:7px;align-items:flex-end;flex:none;padding-top:2px;min-width:86px}
 .benchblock{margin-bottom:10px}
-.actionrow{display:flex;flex-wrap:wrap;gap:7px;align-items:center;margin-top:8px}
+.actionrow{display:flex;flex-wrap:wrap;gap:7px;align-items:center;justify-content:flex-end;margin-top:8px;transition:opacity .2s ease}
+.actionrow.disabled{opacity:.5}
+.actionrow.disabled:hover{opacity:1}
 /* Divides the dotted task and its actions from the candidate being weighed
    against it. --line is the app's hairline token, so it follows the theme. */
 .sep{border:0;border-top:1px solid var(--line);margin:14px 0 12px}
@@ -187,6 +189,7 @@ textarea{width:100%;font-family:var(--font-mono);font-size:12px}
 .tmain a.ext{font-size:12px;text-decoration:none;flex:none}
 .tmain .chip{flex:none}
 .tmain .inchain{flex:none;color:var(--accent);font-size:13px}
+.tmain .chainind{flex:none;color:var(--mut);font-size:13px;opacity:.6}
 .tmain .skipped{flex:none;color:var(--mut);font-size:11px;border:1px solid var(--line);border-radius:6px;padding:1px 6px}
 .addrow{display:flex;flex-direction:column;gap:8px;padding:12px 14px;border-top:1px solid var(--line);background:var(--subtle)}
 .addline{display:flex;gap:8px}
@@ -1204,7 +1207,7 @@ function renderScan(){
     html += '<div class="benchblock"><div class="card bench">'
          + '<span class="title">'+titleHTML(b)+'</span>'
          + '<span class="chiprow">'+chipHTML(b)+'</span></div>'
-         + '<div class="actionrow">'
+         + '<div class="actionrow' + (state.mode==="work" ? ' disabled' : '') + '">'
          + '<button class="btn sm done" data-act="bench-done" title="Done — cross it off (d)">✓ Done'+(candShowing?'':'<span class="keyhint">d</span>')+'</button>'
          + '<button class="btn sm subtle" data-act="edit" data-id="'+b.id+'">Edit</button>'
          + '<button class="btn sm worked" data-act="worked" title="Started it, crossing it off, back to the bottom of the list (rule 7, w)">Worked on it<span class="keyhint">w</span></button>'
@@ -1303,7 +1306,7 @@ function renderList(){
          + sparkSVG(t.id, 88, 22)
          + '<div class="tk"><span class="tkl">'+(st?("top-"+st.topK):"—")+'</span><div class="tkbar"><i style="width:'+fill+'%"></i></div></div>'
          + '<div class="tmain">'
-         + (inChain.has(t.id) ? '<span class="inchain" title="In the chain">●</span>' : '')
+         + (inChain.has(t.id) ? '<span class="inchain" title="In the chain">●</span>' : '') + (chainStart() ? '<span class="chainind" title="Will be added to the chain when you start scanning">→ </span>' : '')
          + '<button class="tt" data-act="edit" data-id="'+t.id+'">'+esc(t.title)+'</button>'
          + (safeUrl(t.url) ? '<a class="ext" href="'+esc(safeUrl(t.url))+'" target="_blank" rel="noopener noreferrer" title="Open link">↗</a>' : '')
          + chipHTML(t)
