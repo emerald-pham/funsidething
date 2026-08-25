@@ -3303,3 +3303,29 @@ test("UX: clicking OK button closes modal and sets seenQuickStart flag", async (
   const modalHtml = shim.elements.get("modalRoot").innerHTML;
   assert.equal(modalHtml, "", "modal should be closed after clicking OK");
 });
+
+test("UX: rescan button doesn't show when resume-scan is available", async () => {
+  const { ctx, shim } = await loadApp({ seed: 42 });
+  // Add tasks
+  ctx.addTask("Task A", false);
+  ctx.addTask("Task B", false);
+  ctx.addTask("Task C", false);
+  ctx.startScan();  // dots Task A
+  ctx.render();
+  
+  // Skip a task (decide "no")
+  ctx.onAction("no");  // Task B gets skipped
+  ctx.render();
+  
+  // Move to work mode
+  ctx.onAction("start-working");
+  ctx.render();
+  
+  const scanHtml = shim.elements.get("scan").innerHTML;
+  
+  // Resume scanning button should be present
+  assert.match(scanHtml, /data-act="resume-scan"/, "resume-scan button should be present in work mode");
+  
+  // Rescan button should NOT be present when resume-scan is available
+  assert.ok(!scanHtml.includes('data-act="rescan"'), "rescan button should NOT appear when resume-scan is available");
+});

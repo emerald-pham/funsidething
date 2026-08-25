@@ -1233,7 +1233,7 @@ function renderScan(){
          + '<div class="row">'
          + (b ? '<button class="btn subtle" data-act="resume-scan">Resume scanning</button>'
               : '<button class="btn primary" data-act="start-scan">Start scanning</button>')
-         + (Object.keys(state.considered).length ? '<button class="btn subtle" data-act="rescan">Rescan skipped tasks</button>' : '')
+         + (!b && Object.keys(state.considered).length ? '<button class="btn subtle" data-act="rescan">Rescan skipped tasks</button>' : '')
          + '</div></div>';
   }
   else if(p.length && chainStart()){
