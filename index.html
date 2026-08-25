@@ -705,21 +705,27 @@ function oldestFirst(p){ // chain start: plain oldest-outstanding, no ranking in
   if(!p.length) return null;
   return p.reduce((oldest,t) => (t.createdAt||0) < (oldest.createdAt||0) ? t : oldest);
 }
-/* The first dot of a chain, and deliberately not a decision. There's no
-   benchmark yet, so there's nothing to compare the oldest outstanding task
+/* The one click that starts a chain, and deliberately not a decision. There's
+   no benchmark yet, so there's nothing to compare the oldest outstanding task
    against, and nothing that answering "can I do this?" would change about
-   which task goes first — so it just gets dotted and becomes the benchmark.
-   No pushUndo and no updatePair: nothing was compared, so no rank moves. */
-function autoDotOldest(){
-  const t = oldestFirst(pool());
-  if(!t) return;
-  state.chain.push(t.id);
+   which task goes first — so the button just dots it and it becomes the first
+   benchmark. No updatePair: nothing was compared, so no rank moves. Also the
+   way back from a paused queue, so pausing and restarting is one click each. */
+function startScan(){
+  pushUndo();
+  state.mode = "scan";
+  state.interventionActive = false;
+  const t = chainStart() ? oldestFirst(pool()) : null;
+  if(t) state.chain.push(t.id);
+  commit(true, !!t);   // a dot syncs to the cloud right away
 }
 function ensureCandidate(){
   expireCants();   // let any "can't" marks whose horizon has passed quietly rejoin the pool first
   if(state.mode !== "scan" || state.interventionActive) return;
-  if(chainStart()) autoDotOldest();   // an empty chain dots its own head before any candidate is dealt
-  const p = pool();                   // computed after that dot, so the newly dotted task is already out of it
+  // Nothing dotted means nothing to compare a candidate against, so none is
+  // dealt — the scan waits behind the Start scanning button instead.
+  if(chainStart()){ state.candidateId = null; return; }
+  const p = pool();
   const cur = state.candidateId ? taskById(state.candidateId) : null;
   const valid = cur && p.some(t=>t.id===cur.id);
   if(!valid){
@@ -1213,9 +1219,17 @@ function renderScan(){
   }
   else if(state.mode==="work"){
     html += '<div class="notice"><div class="big">'+(b ? "Scanning paused — do the chain from the newest dot up." : "Queue\u2019s empty \u2014 resume scanning whenever you\u2019re ready.")+'</div>'
-         + '<div class="row"><button class="btn subtle" data-act="resume-scan">Resume scanning</button>'
+         + '<div class="row">'
+         + (b ? '<button class="btn subtle" data-act="resume-scan">Resume scanning</button>'
+              : '<button class="btn primary" data-act="start-scan">Start scanning</button>')
          + (Object.keys(state.considered).length ? '<button class="btn subtle" data-act="rescan">Rescan skipped tasks</button>' : '')
          + '</div></div>';
+  }
+  else if(p.length && chainStart()){
+    html += '<div class="notice"><div class="big">Nothing dotted yet \u2014 scanning starts on your oldest outstanding task.</div>'
+         + '<div class="row"><button class="btn primary" data-act="start-scan">Start scanning</button>'
+         + (Object.entries(state.considered).some(([,v])=>v==="no"||v==="cant"||v==="dislodged"||v==="worked") ? '<button class="btn subtle" data-act="rescan">Rescan skipped tasks</button>' : '')
+         + '<span class="quiet">Add as many as you like first.</span></div></div>';
   }
   else if(!p.length){
     if(b){
@@ -1331,7 +1345,7 @@ function openHelp(){
     '<div class="mtop"><h2>Quick start</h2><button class="x" data-act="close-modal" aria-label="Close">✕</button></div>'
     + '<div class="help"><ol>'
     + '<li>Add tasks to the bottom of your list as you think of them.</li>'
-    + '<li>A chain starts itself: your <b>oldest outstanding task</b> is dotted automatically and becomes the first benchmark. Nothing is ranked by that dot — there was nothing to compare it against. From there the scanner deals ranked candidates as usual.</li>'
+    + '<li>Done adding? Hit <b>Start scanning</b>. Your <b>oldest outstanding task</b> is dotted for you and becomes the first benchmark \u2014 nothing is ranked by that dot, there was nothing to compare it against. From there the scanner deals ranked candidates as usual.</li>'
     + '<li>For each: do you <i>want</i> to do it before the purple benchmark?</li>'
     + '<li><b>Yes</b> dots it — it becomes the new benchmark on the chain.</li>'
     + '<li><b>No</b> skips it (and nudges its rank down). <b>Can\u2019t</b> skips it with no rank signal.</li>'
@@ -1449,6 +1463,7 @@ function onAction(act, el){
     case "continue-scan": pushUndo(); state.interventionActive=false; state.snooze=12; commit(); break;
     case "start-working": pushUndo(); state.interventionActive=false; state.mode="work"; commit(); break;
     case "resume-scan": pushUndo(); state.mode="scan"; state.snooze=6; commit(); break;
+    case "start-scan": startScan(); break;
     case "rescan": rescanSkipped(); break;
     case "clear-done": clearCompleted(); openSettings(); break;
     case "new-pass": newPass(); closeModal(); break;
