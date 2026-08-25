@@ -3280,3 +3280,26 @@ test("contrast: the accent token is used for link text rather than the card-fill
   assert.match(styleSrc, /\na\{color:var\(--accent\)\}/,
     "a fill tuned to sit under white ink is too dark to double as link text");
 });
+
+test("UX: first boot shows quick start modal automatically", async () => {
+  const { ctx, shim } = await loadApp({ seed: 5 });
+  assert.equal(ctx.state.seenQuickStart, undefined, "fresh state should not have seenQuickStart");
+  const modalHtml = shim.elements.get("modalRoot").innerHTML;
+  assert.ok(modalHtml.includes("Quick start"), "quick start modal should be open on first boot");
+});
+
+test("UX: first boot quick start has a green OK button", async () => {
+  const { ctx, shim } = await loadApp({ seed: 5 });
+  const modalHtml = shim.elements.get("modalRoot").innerHTML;
+  assert.ok(modalHtml.includes('data-act="ok-quickstart"'), "quick start should have an OK button");
+  assert.ok(modalHtml.includes('class="btn done"'), "OK button should have done (green) styling");
+});
+
+test("UX: clicking OK button closes modal and sets seenQuickStart flag", async () => {
+  const { ctx, shim } = await loadApp({ seed: 5 });
+  assert.equal(ctx.state.seenQuickStart, undefined, "initially undefined");
+  ctx.onAction("ok-quickstart");
+  assert.equal(ctx.state.seenQuickStart, true, "seenQuickStart should be true after clicking OK");
+  const modalHtml = shim.elements.get("modalRoot").innerHTML;
+  assert.equal(modalHtml, "", "modal should be closed after clicking OK");
+});

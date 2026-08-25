@@ -1374,6 +1374,7 @@ function openHelp(){
     + '<b>top-K</b> is the smallest K (≥2) with P(rank ≤ K) ≥ 1 − 1/K: a stopping stat for "if I\u2019ll only do K tasks today, is this plausibly one of them?" '
     + 'And when the odds of finding anything better collapse, the scanner interrupts your clicking and tells you to go work.</p>'
     + '<p class="kv">Keys: <b>y</b> / <b>n</b> / <b>c</b> to decide, <b>d</b> to mark whatever\u2019s showing done, <b>Delete</b> to remove it entirely, <b>u</b> to undo.</p></div>'
+    + '<div class="mbtns"><button class="btn done" data-act="ok-quickstart">OK</button></div>'
   );
 }
 function openEdit(id){
@@ -1551,6 +1552,12 @@ function onAction(act, el){
     }
     case "help": openHelp(); break;
     case "close-modal": closeModal(); break;
+    case "ok-quickstart": {
+      state.seenQuickStart = true;
+      closeModal();
+      commit();
+      break;
+    }
     case "import-md": {
       const box=document.getElementById("mdImport"); if(!box) break;
       const {added, skipped} = importList(box.value);
@@ -1657,10 +1664,12 @@ function hotkeyDelete(){
   applyTheme();
   if(state.histOpen===undefined) state.histOpen=false;
   if(!state.cantAt) state.cantAt = {};
+  const isFirstBoot = !state.seenQuickStart;
   recomputeRanks();
   ensureCandidate();
   watchOSTheme();
   render();
+  if(isFirstBoot) openHelp();
 })();
 </script>
 <script type="module">
