@@ -2338,7 +2338,7 @@ test("UI: the done-task action completes the task and closes the pane", async ()
   ctx.onAction("done-task", { dataset: { id: t.id } });
   assert.equal(ctx.state.tasks.find((x) => x.id === t.id).done, true);
   assert.equal(shim.elements.get("modalRoot").innerHTML, "", "the modal should close behind it");
-  assert.match(shim.elements.get("histPanel").innerHTML, /1 done/, "it should show up in History");
+  assert.match(shim.elements.get("histPanel").innerHTML, /\(1 entry\)/, "it should show up in History");
 });
 
 /* ---------- Done saves the pane's fields first ----------
@@ -2941,6 +2941,212 @@ test("return-candidate: via onAction, a task with no skip mark is untouched and 
   ctx.onAction("return-candidate", { dataset: { id: t.id } });
   assert.notEqual(shim.elements.get("modalRoot").innerHTML, "", "the pane should stay open — nothing to return");
   assert.equal(t.id in ctx.state.considered, false);
+});
+
+/* ---------- work log: History also remembers worked-on and evergreen-done ----------
+   These tasks stay open and cycle back through the scan — they never set
+   t.done — so without a separate record, "worked on it" and completing an
+   evergreen task leave no trace once their skip mark clears. state.workLog is
+   an append-only record of those events, decoupled from state.considered, so
+   it survives Return as candidate, Rescan skipped tasks, and New pass. Not
+   restorable: the task behind an entry is still active, so there's nothing
+   to restore it *to*. */
+
+test("app harness: a fresh state starts with an empty work log", async () => {
+  const { ctx } = await loadApp();
+  assert.deepEqual([...ctx.state.workLog], []);
+});
+
+test("completeTask: an evergreen task logs an 'evergreen-done' entry instead of setting done", async () => {
+  const { ctx } = await loadApp({ seed: 350 });
+  const t = ctx.addTask("Water the plants", false);
+  ctx.state.tasks.find((x) => x.id === t.id).evergreen = true;
+  ctx.completeTask(ctx.state.tasks.find((x) => x.id === t.id));
+
+  const task = ctx.state.tasks.find((x) => x.id === t.id);
+  assert.equal(task.done, false, "evergreen tasks never flip 'done'");
+  assert.equal(ctx.state.workLog.length, 1);
+  const entry = ctx.state.workLog[0];
+  assert.equal(entry.taskId, t.id);
+  assert.equal(entry.title, "Water the plants");
+  assert.equal(entry.kind, "evergreen-done");
+  assert.equal(entry.at, task.lastDoneAt);
+});
+
+test("completeTask: a regular (non-evergreen) task does not add a work log entry", async () => {
+  const { ctx } = await loadApp({ seed: 351 });
+  const t = ctx.addTask("Task A", false);
+  ctx.completeTask(ctx.state.tasks.find((x) => x.id === t.id));
+  assert.deepEqual([...ctx.state.workLog], []);
+});
+
+test("workedOnTask: logs a 'worked' entry", async () => {
+  const { ctx } = await loadApp({ seed: 352 });
+  const t = ctx.addTask("Task A", false);
+  ctx.workedOnTask(t.id);
+  assert.equal(ctx.state.workLog.length, 1);
+  const entry = ctx.state.workLog[0];
+  assert.equal(entry.taskId, t.id);
+  assert.equal(entry.title, "Task A");
+  assert.equal(entry.kind, "worked");
+  assert.ok(entry.at > 0);
+});
+
+test("workedOnTask: marking the same task worked twice logs two separate entries", async () => {
+  const { ctx } = await loadApp({ seed: 353 });
+  const t = ctx.addTask("Task A", false);
+  ctx.workedOnTask(t.id);
+  ctx.workedOnTask(t.id);
+  assert.equal(ctx.state.workLog.length, 2);
+});
+
+test("completeTask: completing the same evergreen task twice logs two separate entries", async () => {
+  const { ctx } = await loadApp({ seed: 354 });
+  const t = ctx.addTask("Water the plants", false);
+  ctx.state.tasks.find((x) => x.id === t.id).evergreen = true;
+  ctx.completeTask(ctx.state.tasks.find((x) => x.id === t.id));
+  ctx.completeTask(ctx.state.tasks.find((x) => x.id === t.id));
+  assert.equal(ctx.state.workLog.length, 2);
+});
+
+test("returnAsCandidate: clearing a 'worked' mark does not remove its work log entry", async () => {
+  const { ctx } = await loadApp({ seed: 355 });
+  const t = ctx.addTask("Task A", false);
+  ctx.workedOnTask(t.id);
+  ctx.returnAsCandidate(t.id);
+  assert.equal(t.id in ctx.state.considered, false, "precondition: the mark is cleared");
+  assert.equal(ctx.state.workLog.length, 1, "the log entry survives the mark being cleared");
+});
+
+test("rescanSkipped: clearing skip marks in bulk does not touch the work log", async () => {
+  const { ctx } = await loadApp({ seed: 356 });
+  const t = ctx.addTask("Task A", false);
+  ctx.workedOnTask(t.id);
+  ctx.rescanSkipped();
+  assert.equal(ctx.state.workLog.length, 1);
+});
+
+test("newPass: starting a fresh pass does not touch the work log", async () => {
+  const { ctx } = await loadApp({ seed: 357 });
+  const t = ctx.addTask("Task A", false);
+  ctx.workedOnTask(t.id);
+  ctx.newPass();
+  assert.equal(ctx.state.workLog.length, 1);
+});
+
+test("undo: reverses a 'worked' marking, log entry and all", async () => {
+  const { ctx } = await loadApp({ seed: 358 });
+  const t = ctx.addTask("Task A", false);
+  ctx.workedOnTask(t.id);
+  assert.equal(ctx.state.workLog.length, 1, "precondition");
+  ctx.undo();
+  assert.deepEqual(ctx.state.workLog, []);
+});
+
+test("deleteTask: does not remove that task's existing work log entries", async () => {
+  const { ctx } = await loadApp({ seed: 359 });
+  const t = ctx.addTask("Task A", false);
+  ctx.workedOnTask(t.id);
+  ctx.deleteTask(t.id);
+  assert.equal(ctx.state.workLog.length, 1, "the log is a historical record, independent of the task's lifecycle");
+});
+
+test("historyRows: combines done tasks and work-log entries, newest first", async () => {
+  const { ctx } = await loadApp({ seed: 360 });
+  setFakeTime(ctx, 1000);
+  const a = ctx.addTask("Old completion", false);
+  ctx.completeTask(ctx.state.tasks.find((x) => x.id === a.id));
+
+  setFakeTime(ctx, 2000);
+  const b = ctx.addTask("Recent worked-on", false);
+  ctx.workedOnTask(b.id);
+
+  const rows = ctx.historyRows();
+  assert.equal(rows.length, 2);
+  assert.equal(rows[0].title, "Recent worked-on", "the later event sorts first");
+  assert.equal(rows[1].title, "Old completion");
+});
+
+test("renderHistory: a 'worked' entry shows its title and a 'worked on it' label, with no restore button", async () => {
+  const { ctx, shim } = await loadApp({ seed: 361 });
+  ctx.state.histOpen = true;
+  const t = ctx.addTask("Task A", false);
+  ctx.workedOnTask(t.id);
+
+  const html = shim.elements.get("histPanel").innerHTML;
+  assert.match(html, /Task A/);
+  assert.match(html, /worked on it/i);
+  assert.ok(!new RegExp(`data-act="restore" data-id="${t.id}"`).test(html), "a worked-on entry must not be restorable");
+});
+
+test("renderHistory: an 'evergreen-done' entry shows its title and an evergreen label, with no restore button", async () => {
+  const { ctx, shim } = await loadApp({ seed: 362 });
+  ctx.state.histOpen = true;
+  const t = ctx.addTask("Water the plants", false);
+  ctx.state.tasks.find((x) => x.id === t.id).evergreen = true;
+  ctx.completeTask(ctx.state.tasks.find((x) => x.id === t.id));
+  ctx.commit();
+
+  const html = shim.elements.get("histPanel").innerHTML;
+  assert.match(html, /Water the plants/);
+  assert.match(html, /evergreen/i);
+  assert.ok(!new RegExp(`data-act="restore" data-id="${t.id}"`).test(html), "an evergreen completion must not be restorable");
+});
+
+test("renderHistory: a regular completed task still shows a restore button", async () => {
+  const { ctx, shim } = await loadApp({ seed: 363 });
+  ctx.state.histOpen = true;
+  const t = ctx.addTask("Task A", false);
+  ctx.completeTask(ctx.state.tasks.find((x) => x.id === t.id));
+  ctx.commit();
+
+  const html = shim.elements.get("histPanel").innerHTML;
+  assert.match(html, new RegExp(`data-act="restore" data-id="${t.id}"`));
+});
+
+test("renderHistory: the header count includes work-log entries alongside done tasks", async () => {
+  const { ctx, shim } = await loadApp({ seed: 364 });
+  const a = ctx.addTask("Task A", false);
+  ctx.completeTask(ctx.state.tasks.find((x) => x.id === a.id));
+  const b = ctx.addTask("Task B", false);
+  ctx.workedOnTask(b.id);
+  ctx.commit();
+
+  const html = shim.elements.get("histPanel").innerHTML;
+  assert.match(html, /\(2 entries\)/);
+});
+
+test("clearCompleted: clears the work log along with completed tasks", async () => {
+  const { ctx } = await loadApp({ seed: 365 });
+  const a = ctx.addTask("Task A", false);
+  ctx.completeTask(ctx.state.tasks.find((x) => x.id === a.id));
+  const b = ctx.addTask("Task B", false);
+  ctx.workedOnTask(b.id);
+
+  ctx.clearCompleted();
+  assert.equal(ctx.state.tasks.some((x) => x.done), false);
+  assert.deepEqual([...ctx.state.workLog], []);
+});
+
+test("clearCompleted: still runs (and clears the log) when there are no done tasks, only logged ones", async () => {
+  const { ctx } = await loadApp({ seed: 366 });
+  const t = ctx.addTask("Task A", false);
+  ctx.workedOnTask(t.id);
+  assert.equal(ctx.state.tasks.some((x) => x.done), false, "precondition: nothing is actually done");
+
+  ctx.clearCompleted();
+  assert.deepEqual([...ctx.state.workLog], [], "should have cleared even with zero done tasks");
+});
+
+test("openSettings: shows the housekeeping copy and Clear history button when only work-log entries exist", async () => {
+  const { ctx, shim } = await loadApp({ seed: 367 });
+  const t = ctx.addTask("Task A", false);
+  ctx.workedOnTask(t.id);
+
+  ctx.openSettings();
+  const html = shim.elements.get("modalRoot").innerHTML;
+  assert.match(html, /data-act="clear-done"/, "Clear history should be offered");
+  assert.ok(!/No completed tasks stored right now/.test(html));
 });
 
 /* =====================================================================
