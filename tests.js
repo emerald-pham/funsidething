@@ -2730,10 +2730,12 @@ test("UI: the edit pane leads with the task actions, then the form actions", asy
   const rows = html.match(/<div class="mbtns[^"]*">[\s\S]*?<\/div>/g) || [];
   assert.equal(rows.length, 2, `expected two button rows, got ${rows.length} in: ${html}`);
 
-  // Row 1 — what to do with the TASK.
+  // Row 1 — what to do with the TASK. (Return as candidate only ever shows up
+  // once a mark makes it relevant — see the "return as candidate" section
+  // below — so a plain, unmarked task doesn't render it at all.)
   assert.match(rows[0], /data-act="done-task"/, "Done leads");
   assert.match(rows[0], /data-act="worked-task"/, "then Worked on it");
-  assert.match(rows[0], /data-act="return-candidate"/, "and Return as candidate");
+  assert.ok(!/data-act="return-candidate"/.test(rows[0]), "no skip mark on this task, so nothing to return");
   assert.ok(!/data-act="save-edit"/.test(rows[0]), "Save belongs to the row below");
   assert.ok(!/data-act="delete-task"/.test(rows[0]), "and so does Delete");
 
@@ -2763,72 +2765,80 @@ test("close-modal: Cancel still throws unsaved edits away", async () => {
    only). This button undoes the former, per task, from the edit pane — it
    deliberately leaves 'done' alone, the same line rescanSkipped() draws. */
 
-test("UI: the edit pane renders a 'Return as candidate' button carrying that task's id", async () => {
+test("UI: the edit pane renders a 'Return as candidate' button carrying that task's id, when it applies", async () => {
   const { ctx, shim } = await loadApp({ seed: 320 });
   const t = ctx.addTask("Task A", false);
+  ctx.state.considered[t.id] = "cant";
   ctx.openEdit(t.id);
   const html = shim.elements.get("modalRoot").innerHTML;
   assert.match(html, new RegExp(`data-act="return-candidate" data-id="${t.id}"`), `expected in: ${html}`);
   assert.match(html, /Return as candidate/);
 });
 
-test("UI: 'Return as candidate' is disabled when the task has no skip mark", async () => {
+test("UI: 'Return as candidate' does not appear at all when the task has no skip mark", async () => {
   const { ctx, shim } = await loadApp({ seed: 321 });
   const t = ctx.addTask("Task A", false);
   ctx.openEdit(t.id);
   const html = shim.elements.get("modalRoot").innerHTML;
-  const btn = html.match(/<button[^>]*data-act="return-candidate"[^>]*>/)[0];
-  assert.ok(btn.includes(" disabled"), `expected disabled in: ${btn}`);
+  assert.ok(!html.includes('data-act="return-candidate"'), `expected no Return as candidate button in: ${html}`);
 });
 
-test("UI: 'Return as candidate' stays disabled when the task is marked 'done' (evergreen rest, not a skip)", async () => {
+test("UI: 'Return as candidate' does not appear when the task is marked 'done' (evergreen rest, not a skip)", async () => {
   const { ctx, shim } = await loadApp({ seed: 322 });
   const t = ctx.addTask("Water the plants", false);
   ctx.state.considered[t.id] = "done";
   ctx.openEdit(t.id);
   const html = shim.elements.get("modalRoot").innerHTML;
-  const btn = html.match(/<button[^>]*data-act="return-candidate"[^>]*>/)[0];
-  assert.ok(btn.includes(" disabled"), `expected disabled in: ${btn}`);
+  assert.ok(!html.includes('data-act="return-candidate"'), `expected no Return as candidate button in: ${html}`);
 });
 
-test("UI: 'Return as candidate' is enabled when the task is marked 'cant'", async () => {
+test("UI: 'Return as candidate' appears when the task is marked 'cant'", async () => {
   const { ctx, shim } = await loadApp({ seed: 323 });
   const t = ctx.addTask("Task A", false);
   ctx.state.considered[t.id] = "cant";
   ctx.openEdit(t.id);
   const html = shim.elements.get("modalRoot").innerHTML;
-  const btn = html.match(/<button[^>]*data-act="return-candidate"[^>]*>/)[0];
-  assert.ok(!btn.includes(" disabled"), `expected enabled in: ${btn}`);
+  assert.match(html, new RegExp(`data-act="return-candidate" data-id="${t.id}"`), `expected in: ${html}`);
 });
 
-test("UI: 'Return as candidate' is enabled when the task is marked 'no'", async () => {
+test("UI: 'Return as candidate' appears when the task is marked 'no'", async () => {
   const { ctx, shim } = await loadApp({ seed: 324 });
   const t = ctx.addTask("Task A", false);
   ctx.state.considered[t.id] = "no";
   ctx.openEdit(t.id);
   const html = shim.elements.get("modalRoot").innerHTML;
-  const btn = html.match(/<button[^>]*data-act="return-candidate"[^>]*>/)[0];
-  assert.ok(!btn.includes(" disabled"), `expected enabled in: ${btn}`);
+  assert.match(html, new RegExp(`data-act="return-candidate" data-id="${t.id}"`), `expected in: ${html}`);
 });
 
-test("UI: 'Return as candidate' is enabled when the task is marked 'dislodged'", async () => {
+test("UI: 'Return as candidate' appears when the task is marked 'dislodged'", async () => {
   const { ctx, shim } = await loadApp({ seed: 325 });
   const t = ctx.addTask("Task A", false);
   ctx.state.considered[t.id] = "dislodged";
   ctx.openEdit(t.id);
   const html = shim.elements.get("modalRoot").innerHTML;
-  const btn = html.match(/<button[^>]*data-act="return-candidate"[^>]*>/)[0];
-  assert.ok(!btn.includes(" disabled"), `expected enabled in: ${btn}`);
+  assert.match(html, new RegExp(`data-act="return-candidate" data-id="${t.id}"`), `expected in: ${html}`);
 });
 
-test("UI: 'Return as candidate' is enabled when the task is marked 'worked'", async () => {
+test("UI: 'Return as candidate' appears when the task is marked 'worked'", async () => {
   const { ctx, shim } = await loadApp({ seed: 326 });
   const t = ctx.addTask("Task A", false);
   ctx.state.considered[t.id] = "worked";
   ctx.openEdit(t.id);
   const html = shim.elements.get("modalRoot").innerHTML;
-  const btn = html.match(/<button[^>]*data-act="return-candidate"[^>]*>/)[0];
-  assert.ok(!btn.includes(" disabled"), `expected enabled in: ${btn}`);
+  assert.match(html, new RegExp(`data-act="return-candidate" data-id="${t.id}"`), `expected in: ${html}`);
+});
+
+test("UI: when it appears, 'Return as candidate' sits in the task-actions row, not the form row", async () => {
+  const { ctx, shim } = await loadApp({ seed: 340 });
+  const t = ctx.addTask("Task A", false);
+  ctx.state.considered[t.id] = "cant";
+  ctx.openEdit(t.id);
+  const html = shim.elements.get("modalRoot").innerHTML;
+
+  const rows = html.match(/<div class="mbtns[^"]*">[\s\S]*?<\/div>/g) || [];
+  assert.equal(rows.length, 2, `expected two button rows, got ${rows.length} in: ${html}`);
+  assert.match(rows[0], /data-act="return-candidate"/, "alongside Done and Worked on it");
+  assert.ok(!/data-act="return-candidate"/.test(rows[1]), "not down with Save/Cancel/Delete");
 });
 
 test("returnAsCandidate: clears a 'cant' mark and its cantAt timestamp", async () => {

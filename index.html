@@ -146,7 +146,6 @@ textarea{width:100%;font-family:var(--font-mono);font-size:12px}
 .sidesm:hover{color:var(--ink)}
 .btn{border-radius:8px;border:1px solid transparent;padding:8px 16px;font-weight:700;font-size:14px;color:#fff;box-shadow:0 1px 2px rgba(20,24,48,.15)}
 .btn:active{transform:translateY(1px)}
-.btn:disabled{opacity:.4;cursor:not-allowed;box-shadow:none}
 .btn.sm{padding:6px 12px;font-size:13px}   /* the siderail size — every action beside a card uses it */
 .btn.dislodge{background:var(--danger)}
 .btn.worked{background:var(--cant)}
@@ -1419,10 +1418,8 @@ function openEdit(id){
     + '<div class="mbtns">'
     + '<button class="btn done" data-act="done-task" data-id="'+t.id+'" title="Cross it off \u2014 completes the task and closes this pane">\u2713 Done</button>'
     + '<button class="btn worked" data-act="worked-task" data-id="'+t.id+'" title="Started it \u2014 cross it off and send it back to the bottom of the list (rule 7)">\u21bb Worked on it</button>'
-    + '<button class="btn subtle" data-act="return-candidate" data-id="'+t.id+'"'+(skipped?"":" disabled")
-    + ' title="'+(skipped
-        ? "Clear its can\u2019t / no / worked / dislodged mark so the scanner can deal it as a candidate again"
-        : "Already eligible to be dealt as a candidate \u2014 nothing to return")+'">Return as candidate</button></div>'
+    + (skipped ? '<button class="btn subtle" data-act="return-candidate" data-id="'+t.id+'" title="Clear its can\u2019t / no / worked / dislodged mark so the scanner can deal it as a candidate again">Return as candidate</button>' : '')
+    + '</div>'
     + '<div class="mbtns formacts">'
     + '<button class="btn primary" data-act="save-edit" data-id="'+t.id+'">Save</button>'
     + '<button class="btn subtle" data-act="close-modal">Cancel</button>'
