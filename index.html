@@ -211,6 +211,8 @@ textarea{width:100%;font-family:var(--font-mono);font-size:12px}
 .drow{display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--rowline);font-size:13px}
 .drow:last-child{border-bottom:none}
 .dt{text-decoration:line-through;opacity:.75;flex:1;overflow-wrap:anywhere;color:var(--ink)}
+.dt.logged{text-decoration:none;opacity:1}   /* still an open, active task — not actually crossed off */
+.dkind{color:var(--mut);font-size:11px;font-weight:600}
 .dwhen{color:var(--mut);font-size:11px;flex:none}
 .restore{font-size:12px;text-decoration:underline;color:var(--mut);flex:none}
 .histfoot{padding:4px 14px 12px}
@@ -266,6 +268,7 @@ textarea{width:100%;font-family:var(--font-mono);font-size:12px}
   .frow input[type=text],.frow input[type=url],.frow input[type=date]{width:100%;min-width:0}
   .frow .cbox{flex-direction:row;align-items:center;min-height:32px}
   .mbtns .btn{flex:1 1 auto;min-height:44px;margin-left:0!important}
+  .histbody{max-height:28vh}   /* shorter scroll window on a phone — worked-on/evergreen entries can make this long */
 }
 @media (prefers-reduced-motion:reduce){
   *{animation:none!important;transition:none!important}
@@ -460,7 +463,7 @@ function defaultState(){
   const tasks = [];   // start empty — add your own, or paste your Obsidian list in Settings
   return {
     v:1, tasks, contexts,
-    chain: [], considered: {}, cantAt: {}, candidateId: null,
+    chain: [], considered: {}, cantAt: {}, candidateId: null, workLog: [],
     interventionActive:false, interventionP:0, snooze:0,
     mode:"scan", decisionsMs:[], presentedAt:0,
     listOpen:false, ctxOpen:true, histOpen:false, updatedAt:0,
@@ -624,6 +627,7 @@ async function cloudPull(){
         applyTheme();
         if(state.histOpen===undefined) state.histOpen=false;
         if(!state.cantAt) state.cantAt = {};
+        if(!state.workLog) state.workLog = [];
         recomputeRanks(); ensureCandidate(); render();
         if(useLocal){ try{ localStorage.setItem(STORE_KEY, remote.payload); }catch(e){} }
       }catch(e){ /* corrupt remote — leave local alone */ }
@@ -802,7 +806,12 @@ function decide(kind){ // 'yes' | 'no' | 'cant' | 'cand-done'
 }
 function completeTask(t){
   t.lastDoneAt = Date.now();
-  if(t.evergreen){ state.considered[t.id]="done"; }
+  if(t.evergreen){
+    state.considered[t.id]="done";
+    // Evergreen tasks never set t.done, so without this they'd leave no trace
+    // in History once the rest period passes — see historyRows().
+    state.workLog.push({id:uid(), taskId:t.id, title:t.title, kind:"evergreen-done", at:t.lastDoneAt});
+  }
   else { t.done = true; t.completedAt = Date.now(); delete state.considered[t.id]; }
 }
 function benchDone(){
@@ -830,6 +839,9 @@ function workedOnTask(id, push){
   if(push!==false) pushUndo();   // false when the caller already snapshotted — see the worked-task action
   state.chain = state.chain.filter(c=>c!==id);
   state.considered[id] = "worked";
+  // Logged separately from the mark above so History remembers this happened
+  // even after the mark itself clears (Return as candidate, Rescan, New pass).
+  state.workLog.push({id:uid(), taskId:id, title:t.title, kind:"worked", at:Date.now()});
   delete state.cantAt[id];
   if(state.candidateId===id) state.candidateId=null;
   state.interventionActive = false;
@@ -919,12 +931,13 @@ function newPass(push){
   state.candidateId = null;
   if(push!==false) commit();
 }
-function clearCompleted(){ // completed tasks otherwise live in state.tasks forever
-  const n = state.tasks.filter(t=>t.done).length;
+function clearCompleted(){ // completed tasks and logged worked-on/evergreen-done entries otherwise live forever
+  const n = historyRows().length;
   if(!n) return;
-  if(!confirm("Permanently remove "+n+" completed task"+(n===1?"":"s")+"? You can still undo with \u21ba right after.")) return;
+  if(!confirm("Permanently clear "+n+" history entr"+(n===1?"y":"ies")+"? You can still undo with \u21ba right after.")) return;
   pushUndo();
   state.tasks = state.tasks.filter(t=>!t.done);
+  state.workLog = [];
   commit();
 }
 function rescanSkipped(){ // clear only the no/can't marks, keep 'done' — an explicit override, ignores the can't timer on purpose
@@ -1337,21 +1350,38 @@ function renderList(){
   body.scrollTop = savedScroll;
 }
 
+/* Done tasks (restorable) plus logged worked-on/evergreen-done events (not —
+   the task behind one of those is still open and cycling through the scan,
+   so there's nothing to restore it *to*), newest first. */
+function historyRows(){
+  const done = state.tasks.filter(t=>t.done).map(t=>({ id:t.id, title:t.title, kind:"done", at:t.completedAt||0, restorable:true }));
+  const logged = (state.workLog||[]).map(e=>({ id:e.id, title:e.title, kind:e.kind, at:e.at||0, restorable:false }));
+  return [...done, ...logged].sort((a,b)=>b.at-a.at);
+}
+function historyKindLabel(kind){
+  if(kind==="worked") return "worked on it";
+  if(kind==="evergreen-done") return "done · evergreen";
+  return "";
+}
 function renderHistory(){
   const el = document.getElementById("histPanel");
   if(!el) return;
   const prevBody = document.getElementById("histBody");  // this div is destroyed and rebuilt every render() —
   const savedScroll = prevBody ? prevBody.scrollTop : 0;  // re-find it after, by id, since the old reference is gone
-  const done = state.tasks.filter(t=>t.done).sort((a,b)=>(b.completedAt||0)-(a.completedAt||0));
+  const rows = historyRows();
   el.classList.toggle("open", state.histOpen);
-  let html = '<button class="chead" data-act="toggle-hist">'+(state.histOpen?"▼":"▶")+' History <span class="n">('+done.length+' done)</span></button>';
+  let html = '<button class="chead" data-act="toggle-hist">'+(state.histOpen?"▼":"▶")+' History <span class="n">('+rows.length+(rows.length===1?" entry":" entries")+')</span></button>';
   if(state.histOpen){
-    if(!done.length){
+    if(!rows.length){
       html += '<div class="histempty">Nothing crossed off yet.</div>';
     }else{
       html += '<div class="histbody" id="histBody">';
-      for(const t of done.slice(0,50)){
-        html += '<div class="drow"><span class="dt">'+esc(t.title)+'</span><span class="dwhen mono">'+fmtWhen(t.completedAt)+'</span><button class="restore" data-act="restore" data-id="'+t.id+'">restore</button></div>';
+      for(const r of rows.slice(0,50)){
+        html += '<div class="drow"><span class="dt'+(r.restorable?"":" logged")+'">'+esc(r.title)
+             + (r.restorable?"":' <span class="dkind">'+historyKindLabel(r.kind)+'</span>')+'</span>'
+             + '<span class="dwhen mono">'+fmtWhen(r.at)+'</span>'
+             + (r.restorable ? '<button class="restore" data-act="restore" data-id="'+r.id+'">restore</button>' : '')
+             + '</div>';
       }
       html += '</div><div class="histfoot"><button class="btn subtle" data-act="clear-done">Clear history</button></div>';
     }
@@ -1428,7 +1458,7 @@ function openEdit(id){
 }
 function openSettings(){
   const s = state.settings;
-  const doneCount = state.tasks.filter(t=>t.done).length;
+  const histCount = historyRows().length;
   let ctxMgr = "";
   for(const c of state.contexts){
     ctxMgr += '<div class="mgr"><input type="checkbox" data-mgrctx="'+c.id+'"'+(c.active?" checked":"")+' title="active"/>'
@@ -1450,8 +1480,8 @@ function openSettings(){
     + '<div class="mgr"><input id="newCtxName" type="text" placeholder="New context…"/><button class="btn subtle" data-act="add-ctx-named">Add</button></div>'
     + '<h3>Pass</h3><div class="mbtns"><button class="btn subtle" data-act="new-pass">Reset pass (clear skips)</button></div>'
     + '<h3>Housekeeping</h3>'
-    + '<div class="kv">'+(doneCount ? (doneCount+' completed task'+(doneCount===1?'':'s')+' sitting in the History panel (kept around so "restore" works).') : 'No completed tasks stored right now.')+'</div>'
-    + (doneCount ? '<div class="mbtns"><button class="btn subtle" data-act="clear-done">Clear history</button></div>' : '')
+    + '<div class="kv">'+(histCount ? (histCount+' history entr'+(histCount===1?'y':'ies')+' sitting in the History panel.') : 'Nothing in the History panel right now.')+'</div>'
+    + (histCount ? '<div class="mbtns"><button class="btn subtle" data-act="clear-done">Clear history</button></div>' : '')
     + '<h3>Bulk import</h3>'
     + '<div class="kv">Paste a list \u2014 numbered (<span class="mono">1.</span> <span class="mono">1)</span> <span class="mono">1 -</span>), bulleted (<span class="mono">-</span> <span class="mono">*</span> <span class="mono">\u2022</span>), Obsidian checkboxes, or just one task per line. '
     + 'Markdown links become clickable, <span class="mono">- [x]</span> items and headings are skipped, and anything already on your list won\u2019t be added twice.<br>'
@@ -1692,6 +1722,7 @@ function hotkeyDelete(){
   applyTheme();
   if(state.histOpen===undefined) state.histOpen=false;
   if(!state.cantAt) state.cantAt = {};
+  if(!state.workLog) state.workLog = [];
   const isFirstBoot = !state.seenQuickStart;
   recomputeRanks();
   ensureCandidate();
