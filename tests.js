@@ -2733,6 +2733,7 @@ test("UI: the edit pane leads with the task actions, then the form actions", asy
   // Row 1 — what to do with the TASK.
   assert.match(rows[0], /data-act="done-task"/, "Done leads");
   assert.match(rows[0], /data-act="worked-task"/, "then Worked on it");
+  assert.match(rows[0], /data-act="return-candidate"/, "and Return as candidate");
   assert.ok(!/data-act="save-edit"/.test(rows[0]), "Save belongs to the row below");
   assert.ok(!/data-act="delete-task"/.test(rows[0]), "and so does Delete");
 
@@ -2756,6 +2757,181 @@ test("close-modal: Cancel still throws unsaved edits away", async () => {
   assert.equal(shim.elements.get("modalRoot").innerHTML, "");
 });
 
+/* ---------- return as candidate ----------
+   A card can be excluded from the pool by a mark left behind from scanning
+   (no/can't/dislodged/worked) or by a genuine completion (done, evergreen
+   only). This button undoes the former, per task, from the edit pane — it
+   deliberately leaves 'done' alone, the same line rescanSkipped() draws. */
+
+test("UI: the edit pane renders a 'Return as candidate' button carrying that task's id", async () => {
+  const { ctx, shim } = await loadApp({ seed: 320 });
+  const t = ctx.addTask("Task A", false);
+  ctx.openEdit(t.id);
+  const html = shim.elements.get("modalRoot").innerHTML;
+  assert.match(html, new RegExp(`data-act="return-candidate" data-id="${t.id}"`), `expected in: ${html}`);
+  assert.match(html, /Return as candidate/);
+});
+
+test("UI: 'Return as candidate' is disabled when the task has no skip mark", async () => {
+  const { ctx, shim } = await loadApp({ seed: 321 });
+  const t = ctx.addTask("Task A", false);
+  ctx.openEdit(t.id);
+  const html = shim.elements.get("modalRoot").innerHTML;
+  const btn = html.match(/<button[^>]*data-act="return-candidate"[^>]*>/)[0];
+  assert.ok(btn.includes(" disabled"), `expected disabled in: ${btn}`);
+});
+
+test("UI: 'Return as candidate' stays disabled when the task is marked 'done' (evergreen rest, not a skip)", async () => {
+  const { ctx, shim } = await loadApp({ seed: 322 });
+  const t = ctx.addTask("Water the plants", false);
+  ctx.state.considered[t.id] = "done";
+  ctx.openEdit(t.id);
+  const html = shim.elements.get("modalRoot").innerHTML;
+  const btn = html.match(/<button[^>]*data-act="return-candidate"[^>]*>/)[0];
+  assert.ok(btn.includes(" disabled"), `expected disabled in: ${btn}`);
+});
+
+test("UI: 'Return as candidate' is enabled when the task is marked 'cant'", async () => {
+  const { ctx, shim } = await loadApp({ seed: 323 });
+  const t = ctx.addTask("Task A", false);
+  ctx.state.considered[t.id] = "cant";
+  ctx.openEdit(t.id);
+  const html = shim.elements.get("modalRoot").innerHTML;
+  const btn = html.match(/<button[^>]*data-act="return-candidate"[^>]*>/)[0];
+  assert.ok(!btn.includes(" disabled"), `expected enabled in: ${btn}`);
+});
+
+test("UI: 'Return as candidate' is enabled when the task is marked 'no'", async () => {
+  const { ctx, shim } = await loadApp({ seed: 324 });
+  const t = ctx.addTask("Task A", false);
+  ctx.state.considered[t.id] = "no";
+  ctx.openEdit(t.id);
+  const html = shim.elements.get("modalRoot").innerHTML;
+  const btn = html.match(/<button[^>]*data-act="return-candidate"[^>]*>/)[0];
+  assert.ok(!btn.includes(" disabled"), `expected enabled in: ${btn}`);
+});
+
+test("UI: 'Return as candidate' is enabled when the task is marked 'dislodged'", async () => {
+  const { ctx, shim } = await loadApp({ seed: 325 });
+  const t = ctx.addTask("Task A", false);
+  ctx.state.considered[t.id] = "dislodged";
+  ctx.openEdit(t.id);
+  const html = shim.elements.get("modalRoot").innerHTML;
+  const btn = html.match(/<button[^>]*data-act="return-candidate"[^>]*>/)[0];
+  assert.ok(!btn.includes(" disabled"), `expected enabled in: ${btn}`);
+});
+
+test("UI: 'Return as candidate' is enabled when the task is marked 'worked'", async () => {
+  const { ctx, shim } = await loadApp({ seed: 326 });
+  const t = ctx.addTask("Task A", false);
+  ctx.state.considered[t.id] = "worked";
+  ctx.openEdit(t.id);
+  const html = shim.elements.get("modalRoot").innerHTML;
+  const btn = html.match(/<button[^>]*data-act="return-candidate"[^>]*>/)[0];
+  assert.ok(!btn.includes(" disabled"), `expected enabled in: ${btn}`);
+});
+
+test("returnAsCandidate: clears a 'cant' mark and its cantAt timestamp", async () => {
+  const { ctx } = await loadApp({ seed: 327 });
+  const t = ctx.addTask("Task A", false);
+  ctx.state.considered[t.id] = "cant";
+  ctx.state.cantAt[t.id] = realNow(ctx);
+  ctx.returnAsCandidate(t.id);
+  assert.equal(t.id in ctx.state.considered, false);
+  assert.equal(t.id in ctx.state.cantAt, false);
+});
+
+test("returnAsCandidate: clears a 'worked' mark", async () => {
+  const { ctx } = await loadApp({ seed: 328 });
+  const t = ctx.addTask("Task A", false);
+  ctx.state.considered[t.id] = "worked";
+  ctx.returnAsCandidate(t.id);
+  assert.equal(t.id in ctx.state.considered, false);
+});
+
+test("returnAsCandidate: clears a 'no' mark", async () => {
+  const { ctx } = await loadApp({ seed: 329 });
+  const t = ctx.addTask("Task A", false);
+  ctx.state.considered[t.id] = "no";
+  ctx.returnAsCandidate(t.id);
+  assert.equal(t.id in ctx.state.considered, false);
+});
+
+test("returnAsCandidate: clears a 'dislodged' mark", async () => {
+  const { ctx } = await loadApp({ seed: 330 });
+  const t = ctx.addTask("Task A", false);
+  ctx.state.considered[t.id] = "dislodged";
+  ctx.returnAsCandidate(t.id);
+  assert.equal(t.id in ctx.state.considered, false);
+});
+
+test("returnAsCandidate: a no-op when the task has no skip mark (nothing to return)", async () => {
+  const { ctx } = await loadApp({ seed: 331 });
+  const t = ctx.addTask("Task A", false);
+  const before = readConst(ctx, "undoStack.length");   // addTask() itself pushes one — measure the delta, not an absolute count
+  ctx.returnAsCandidate(t.id);
+  assert.equal(t.id in ctx.state.considered, false);
+  assert.equal(readConst(ctx, "undoStack.length"), before, "no undo snapshot should be pushed for a no-op");
+});
+
+test("returnAsCandidate: a no-op when the task is marked 'done'", async () => {
+  const { ctx } = await loadApp({ seed: 332 });
+  const t = ctx.addTask("Water the plants", false);
+  ctx.state.considered[t.id] = "done";
+  const before = readConst(ctx, "undoStack.length");
+  ctx.returnAsCandidate(t.id);
+  assert.equal(ctx.state.considered[t.id], "done", "the 'done' mark must be left alone");
+  assert.equal(readConst(ctx, "undoStack.length"), before, "no undo snapshot should be pushed for a no-op");
+});
+
+test("returnAsCandidate: an unknown, null, or undefined id is a safe no-op", async () => {
+  const { ctx } = await loadApp({ seed: 333 });
+  ctx.addTask("Task A", false);
+  ctx.returnAsCandidate("no-such-id");
+  ctx.returnAsCandidate(null);
+  ctx.returnAsCandidate(undefined);
+  assert.equal(ctx.state.tasks.filter((x) => !x.done).length, 1);
+  assert.deepEqual(Object.keys(ctx.state.considered), []);
+});
+
+test("return-candidate: saves the fields you just edited before clearing the mark, and closes the pane", async () => {
+  const { ctx, shim } = await loadApp({ seed: 334 });
+  const t = ctx.addTask("Old title", false);
+  ctx.state.considered[t.id] = "cant";
+  ctx.openEdit(t.id);
+  fillEditPane(ctx, shim, { title: "Renamed on the way out" });
+
+  ctx.onAction("return-candidate", { dataset: { id: t.id } });
+  const task = ctx.state.tasks.find((x) => x.id === t.id);
+  assert.equal(task.title, "Renamed on the way out", "must not discard the edit");
+  assert.equal(t.id in ctx.state.considered, false);
+  assert.equal(shim.elements.get("modalRoot").innerHTML, "", "the modal should close behind it");
+});
+
+test("return-candidate: the edit and the clear are ONE undo step", async () => {
+  const { ctx, shim } = await loadApp({ seed: 335 });
+  const t = ctx.addTask("Old title", false);
+  ctx.state.considered[t.id] = "worked";
+  ctx.openEdit(t.id);
+  fillEditPane(ctx, shim, { title: "New title" });
+  ctx.onAction("return-candidate", { dataset: { id: t.id } });
+  assert.equal(t.id in ctx.state.considered, false, "precondition: it was cleared");
+
+  ctx.undo();
+  const task = ctx.state.tasks.find((x) => x.id === t.id);
+  assert.equal(task.title, "Old title", "one undo reverses the edit...");
+  assert.equal(ctx.state.considered[t.id], "worked", "...and restores the mark that rode along with it");
+});
+
+test("return-candidate: via onAction, a task with no skip mark is untouched and the pane stays open", async () => {
+  const { ctx, shim } = await loadApp({ seed: 336 });
+  const t = ctx.addTask("Task A", false);
+  ctx.openEdit(t.id);
+
+  ctx.onAction("return-candidate", { dataset: { id: t.id } });
+  assert.notEqual(shim.elements.get("modalRoot").innerHTML, "", "the pane should stay open — nothing to return");
+  assert.equal(t.id in ctx.state.considered, false);
+});
 
 /* =====================================================================
    NIGHT MODE — Unit 1: preference model & resolution
