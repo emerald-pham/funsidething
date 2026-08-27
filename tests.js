@@ -1411,6 +1411,387 @@ test("AUDIT: repairs multiple orphaned can't marks in a single pass, without dis
   assert.equal(ctx.state.cantAt[ids.D], t0, "D's existing valid timestamp should be left alone");
 });
 
+/* =====================================================================
+   "WORKED ON IT" IS BULLETPROOF FOR A CONFIGURABLE WINDOW
+   Forster rule 7 crosses a task off and sends it to the bottom of the list.
+   Until now the "worked" mark it left behind never expired on its own — the
+   task stayed out of the scan until a new pass, a rescan, or Return as
+   candidate cleared it by hand. Now the mark carries a timestamp
+   (state.workedAt), survives newPass() while fresh, and expireWorked()
+   clears it once state.settings.workedHours have elapsed. It is the
+   hours-scale sibling of the "can't" window (cantMin / cantAt / expireCants).
+   ===================================================================== */
+
+const WH_STORE_KEY = "fvp:chain-scanner:v1";
+const preChangeState = (over = {}) => Object.assign({
+  v: 1, tasks: [], contexts: [], chain: [], considered: {}, cantAt: {}, candidateId: null,
+  interventionActive: false, interventionP: 0, snooze: 0, mode: "scan", decisionsMs: [],
+  presentedAt: 0, listOpen: false, ctxOpen: true, histOpen: false, updatedAt: 0, workLog: [],
+  seenQuickStart: true,
+  settings: { horizonMin: 60, thresholdPct: 25, samples: 250, cantMin: 30, theme: "system" },
+}, over);
+
+/* ---- default & migration ---- */
+
+test("workedHours: a fresh state defaults the window to 8 hours", async () => {
+  const { ctx } = await loadApp();
+  assert.equal(ctx.state.settings.workedHours, 8);
+});
+
+test("workedHours: a state saved before the window existed migrates to 8 on boot", async () => {
+  const stored = preChangeState();                       // settings has no workedHours key
+  const { ctx } = await loadApp({ seedStorage: { [WH_STORE_KEY]: JSON.stringify(stored) } });
+  assert.equal(ctx.state.settings.workedHours, 8);
+});
+
+test("workedAt: a state saved without the workedAt map gets an empty one on boot, no crash", async () => {
+  const stored = preChangeState();                       // no workedAt key at all
+  const { ctx } = await loadApp({ seedStorage: { [WH_STORE_KEY]: JSON.stringify(stored) } });
+  assert.ok(ctx.state.workedAt && typeof ctx.state.workedAt === "object", "the map must exist");
+  assert.equal(Object.keys(ctx.state.workedAt).length, 0, "and start empty");
+});
+
+test("cloudPull: adopting a remote state from an older version backfills workedHours and workedAt", async () => {
+  const remoteState = preChangeState({ updatedAt: Date.now() + 100000 });
+  const { ctx } = await loadApp({
+    cloudSyncFactory: () => ({
+      configured: true, ready: true, user: "e@example.com", status: "on",
+      signIn() {}, signOut() {},
+      async pull() { return { updatedAt: remoteState.updatedAt, payload: JSON.stringify(remoteState) }; },
+      async push() {},
+    }),
+  });
+  await ctx.cloudPull();
+  assert.equal(ctx.state.settings.workedHours, 8, "the window setting must exist after adoption");
+  assert.ok(ctx.state.workedAt && typeof ctx.state.workedAt === "object", "the timestamp map must exist after adoption");
+  assert.equal(Object.keys(ctx.state.workedAt).length, 0, "and start empty");
+});
+
+test("import-json: importing an export taken before this change backfills workedHours/workedAt and doesn't crash the scan", async () => {
+  const { ctx } = await loadApp({ seed: 403 });
+  const exported = preChangeState({ considered: { z: "worked" } });   // pre-change export: a worked mark, no workedAt, no workedHours
+  ctx.document.getElementById("jsonBox").value = JSON.stringify(exported);
+  ctx.onAction("import-json", {});
+  assert.equal(ctx.state.settings.workedHours, 8, "the window setting is filled in on import");
+  assert.ok(ctx.state.workedAt && typeof ctx.state.workedAt === "object", "the timestamp map exists on import");
+  assert.doesNotThrow(() => ctx.ensureCandidate(), "the scan's expiry sweep must not trip over the imported shape");
+  assert.ok(typeof ctx.state.workedAt.z === "number", "the imported worked mark is given a start point, not left stuck");
+});
+
+test("data from before this change: a stored 'worked' task with no timestamp is honoured, given a window from boot, then rejoins the scan", async () => {
+  const stored = preChangeState({
+    tasks: [
+      { id: "a", title: "Kept scanning", url: null, due: null, evergreen: false, ctx: [], mu: 25, sigma: 8.333, done: false, createdAt: 1, completedAt: null, lastDoneAt: null, startsAt: null },
+      { id: "w", title: "Was worked before the update", url: null, due: null, evergreen: false, ctx: [], mu: 25, sigma: 8.333, done: false, createdAt: 1, completedAt: null, lastDoneAt: null, startsAt: null },
+    ],
+    chain: ["a"],
+    considered: { w: "worked" },                          // the pre-change mark — no timestamp anywhere
+  });
+  const { ctx } = await loadApp({ seedStorage: { [WH_STORE_KEY]: JSON.stringify(stored) } });
+
+  assert.equal(ctx.state.settings.workedHours, 8, "migration ran");
+  assert.equal(ctx.state.considered.w, "worked", "the old mark is honoured, not dropped on load");
+  assert.ok(typeof ctx.state.workedAt.w === "number", "and it gets a start timestamp backfilled at boot");
+  assert.ok(!ctx.pool().some((t) => t.id === "w"), "so it stays out of the scan for a bounded window");
+
+  const bootStamp = ctx.state.workedAt.w;
+  setFakeTime(ctx, bootStamp + 9 * 3600000);              // past an 8h window measured from boot
+  ctx.ensureCandidate();
+  assert.ok(ctx.pool().some((t) => t.id === "w"), "rejoins the scan once that window elapses");
+  assert.equal(ctx.state.considered.w, undefined);
+});
+
+/* ---- save-settings validation (mirrors the cantMin tests) ---- */
+
+test("save-settings: workedHours is read, clamped [1,720], and persisted independently of the other fields", async () => {
+  const { ctx } = await loadApp({ seed: 404 });
+  setInput(ctx, "stHorizon", 90);
+  setInput(ctx, "stCantMin", 30);
+  setInput(ctx, "stThresh", 25);
+  setInput(ctx, "stSamples", 250);
+  setInput(ctx, "stWorkedHrs", 12);
+  ctx.onAction("save-settings", {});
+  assert.equal(ctx.state.settings.workedHours, 12);
+  assert.equal(ctx.state.settings.cantMin, 30, "an unrelated field must be untouched");
+});
+
+test("save-settings: workedHours below 1 clamps up to 1, above 720 clamps down to 720", async () => {
+  const { ctx } = await loadApp({ seed: 405 });
+  setInput(ctx, "stHorizon", 60); setInput(ctx, "stCantMin", 30);
+  setInput(ctx, "stThresh", 25); setInput(ctx, "stSamples", 250);
+
+  setInput(ctx, "stWorkedHrs", -3);                       // non-zero, so it clamps rather than hitting the fallback
+  ctx.onAction("save-settings", {});
+  assert.equal(ctx.state.settings.workedHours, 1);
+
+  setInput(ctx, "stWorkedHrs", 9999);
+  ctx.onAction("save-settings", {});
+  assert.equal(ctx.state.settings.workedHours, 720);
+});
+
+test("save-settings: a blank or non-numeric workedHours falls back to 8", async () => {
+  const { ctx } = await loadApp({ seed: 406 });
+  setInput(ctx, "stHorizon", 60); setInput(ctx, "stCantMin", 30);
+  setInput(ctx, "stThresh", 25); setInput(ctx, "stSamples", 250);
+  setInput(ctx, "stWorkedHrs", "");
+  ctx.onAction("save-settings", {});
+  assert.equal(ctx.state.settings.workedHours, 8);
+});
+
+test("save-settings: a literal 0 workedHours is falsy and falls back to 8, not clamped to 1", async () => {
+  const { ctx } = await loadApp({ seed: 407 });
+  setInput(ctx, "stHorizon", 60); setInput(ctx, "stCantMin", 30);
+  setInput(ctx, "stThresh", 25); setInput(ctx, "stSamples", 250);
+  setInput(ctx, "stWorkedHrs", 0);
+  ctx.onAction("save-settings", {});
+  assert.equal(ctx.state.settings.workedHours, 8, "0 hits the ||8 fallback the same way horizonMin/cantMin do");
+});
+
+/* ---- settings UI ---- */
+
+test("openSettings: renders a workedHours input prefilled with the current value", async () => {
+  const { ctx, shim } = await loadApp({ seed: 408 });
+  ctx.state.settings.workedHours = 8;
+  ctx.openSettings();
+  const html = shim.elements.get("modalRoot").innerHTML;
+  assert.match(html, /id="stWorkedHrs"/, `expected a workedHours field in: ${html}`);
+  assert.match(html, /id="stWorkedHrs"[^>]*value="8"/, "should be prefilled with the current setting");
+});
+
+/* ---- workedOnTask stamps the timestamp ---- */
+
+test("workedOnTask: stamps state.workedAt with the time the mark was set", async () => {
+  const { ctx } = await loadApp({ seed: 409 });
+  const t = ctx.addTask("Task A", false);
+  const t0 = realNow(ctx);
+  setFakeTime(ctx, t0);
+  ctx.workedOnTask(t.id);
+  assert.equal(ctx.state.considered[t.id], "worked", "still marks it worked");
+  assert.equal(ctx.state.workedAt[t.id], t0, "and records when, so it can expire on its own");
+});
+
+test("workedOnTask: still logs its History entry alongside the new timestamp", async () => {
+  const { ctx } = await loadApp({ seed: 410 });
+  const t = ctx.addTask("Task A", false);
+  ctx.workedOnTask(t.id);
+  const entry = ctx.state.workLog.find((e) => e.taskId === t.id);
+  assert.ok(entry && entry.kind === "worked", "the work-log entry must survive the change");
+});
+
+test("workedOn: the benchmark-card path also stamps workedAt", async () => {
+  const { ctx } = await loadApp({ seed: 411 });
+  const t = ctx.addTask("Dotted task", true);
+  const t0 = realNow(ctx);
+  setFakeTime(ctx, t0);
+  ctx.workedOn();
+  assert.equal(ctx.state.considered[t.id], "worked");
+  assert.equal(ctx.state.workedAt[t.id], t0);
+});
+
+/* ---- bulletproof against newPass while fresh ---- */
+
+test("a fresh worked mark survives the chain emptying out (newPass), regardless of ~0 elapsed time", async () => {
+  const { ctx } = await loadApp({ seed: 412 });
+  ctx.addTask("Only queued task", true);                  // dotted — this is what empties the chain
+  const w = ctx.addTask("Worked on this one", false);
+  ctx.workedOnTask(w.id);
+
+  ctx.benchDone();                                        // chain -> empty -> newPass()
+
+  assert.equal(ctx.state.chain.length, 0);
+  assert.equal(ctx.state.considered[w.id], "worked", "the worked mark must survive newPass() while still fresh");
+});
+
+/* ---- expires on its own schedule ---- */
+
+test("a worked mark automatically expires mid-session once workedHours elapses (no newPass needed)", async () => {
+  const { ctx } = await loadApp({ seed: 413 });
+  ctx.state.settings.workedHours = 5;
+  ctx.addTask("Task A", false);
+  const w = ctx.addTask("Worked", false);
+  ctx.startScan();                                        // dots Task A, so "Worked" is the one on offer
+
+  const t0 = realNow(ctx);
+  setFakeTime(ctx, t0);
+  ctx.workedOnTask(w.id);
+  assert.ok(!ctx.pool().some((t) => t.id === w.id), "excluded from the pool right after being marked");
+
+  setFakeTime(ctx, t0 + 2 * 3600000);                     // 2h in, well within the 5h window
+  ctx.ensureCandidate();
+  assert.ok(!ctx.pool().some((t) => t.id === w.id), "still excluded well within workedHours");
+
+  setFakeTime(ctx, t0 + 6 * 3600000);                     // past the window
+  ctx.ensureCandidate();
+  assert.ok(ctx.pool().some((t) => t.id === w.id), "rejoins the pool once workedHours has elapsed");
+  assert.equal(ctx.state.considered[w.id], undefined);
+});
+
+test("a worked mark that has genuinely outlived workedHours IS cleared by newPass()", async () => {
+  const { ctx } = await loadApp({ seed: 414 });
+  ctx.state.settings.workedHours = 2;
+  ctx.addTask("Only queued task", true);
+  const w = ctx.addTask("Old worked", false);
+
+  const t0 = realNow(ctx);
+  setFakeTime(ctx, t0);
+  ctx.workedOnTask(w.id);
+
+  setFakeTime(ctx, t0 + 3 * 3600000);                     // 3h later — past the 2h window
+  ctx.benchDone();                                        // -> newPass()
+
+  assert.equal(ctx.state.considered[w.id], undefined, "an expired worked mark should be dropped, not preserved forever");
+  assert.equal(ctx.state.workedAt[w.id], undefined, "its timestamp should be cleaned up too");
+});
+
+test("shrinking workedHours below the elapsed time expires an existing worked mark on the next check", async () => {
+  const { ctx } = await loadApp({ seed: 415 });
+  ctx.state.settings.workedHours = 10;
+  ctx.addTask("Task A", false);
+  const w = ctx.addTask("Worked", false);
+  ctx.startScan();
+
+  const t0 = realNow(ctx);
+  setFakeTime(ctx, t0);
+  ctx.workedOnTask(w.id);
+
+  setFakeTime(ctx, t0 + 3 * 3600000);                     // 3h later, within a 10h window
+  ctx.state.settings.workedHours = 2;                     // now shorter than the 3h already elapsed
+  ctx.ensureCandidate();
+  assert.equal(ctx.state.considered[w.id], undefined, "shrinking the window below elapsed time expires it immediately");
+});
+
+/* ---- AUDIT: orphans and data from before this change ---- */
+
+test("AUDIT: a pre-existing worked mark with no workedAt timestamp gets one backfilled, not silently cleared", async () => {
+  const { ctx } = await loadApp({ seed: 416 });
+  ctx.addTask("Task A", false);
+  const orphan = ctx.addTask("Orphaned worked", false);
+  ctx.state.considered[orphan.id] = "worked";             // old data: mark present, no timestamp
+  assert.equal(ctx.state.workedAt[orphan.id], undefined, "sanity: no timestamp yet");
+
+  ctx.ensureCandidate();
+  assert.equal(ctx.state.considered[orphan.id], "worked", "must NOT be silently un-worked by the audit");
+  assert.ok(typeof ctx.state.workedAt[orphan.id] === "number", "a fresh timestamp should have been backfilled");
+});
+
+test("AUDIT: a backfilled worked mark then expires normally on its fresh schedule", async () => {
+  const { ctx } = await loadApp({ seed: 417 });
+  ctx.state.settings.workedHours = 4;
+  ctx.addTask("Task A", false);
+  const orphan = ctx.addTask("Orphaned worked", false);
+  ctx.state.considered[orphan.id] = "worked";
+
+  const t0 = realNow(ctx);
+  setFakeTime(ctx, t0);
+  ctx.ensureCandidate();                                  // backfills workedAt[orphan] = t0
+  assert.equal(ctx.state.workedAt[orphan.id], t0);
+
+  setFakeTime(ctx, t0 + 2 * 3600000);
+  ctx.ensureCandidate();
+  assert.equal(ctx.state.considered[orphan.id], "worked", "still bulletproof within its freshly-backfilled window");
+
+  setFakeTime(ctx, t0 + 5 * 3600000);
+  ctx.ensureCandidate();
+  assert.equal(ctx.state.considered[orphan.id], undefined, "expires once the backfilled window elapses");
+});
+
+test("AUDIT (reverse): a workedAt timestamp with no matching worked mark is swept", async () => {
+  const { ctx } = await loadApp({ seed: 418 });
+  const t = ctx.addTask("Task A", false);
+  ctx.state.workedAt[t.id] = realNow(ctx);                // leftover timestamp, no considered["worked"]
+  ctx.ensureCandidate();
+  assert.equal(ctx.state.workedAt[t.id], undefined, "an orphaned timestamp should not linger");
+});
+
+test("AUDIT (reverse): a workedAt left behind after the mark changed to something else is swept", async () => {
+  const { ctx } = await loadApp({ seed: 419 });
+  const t = ctx.addTask("Task A", false);
+  ctx.state.considered[t.id] = "no";                      // some other path changed the status
+  ctx.state.workedAt[t.id] = realNow(ctx);                // but the worked timestamp was left behind
+  ctx.ensureCandidate();
+  assert.equal(ctx.state.considered[t.id], "no", "the non-worked status is untouched");
+  assert.equal(ctx.state.workedAt[t.id], undefined, "its stale workedAt is cleaned up");
+});
+
+test("AUDIT: does not disturb a worked mark that already has a valid timestamp", async () => {
+  const { ctx } = await loadApp({ seed: 420 });
+  const t = ctx.addTask("Task A", false);
+  const t0 = realNow(ctx);
+  setFakeTime(ctx, t0);
+  ctx.workedOnTask(t.id);                                 // sets considered + workedAt together
+  ctx.ensureCandidate();                                  // audit runs again
+  assert.equal(ctx.state.workedAt[t.id], t0, "an already-correct timestamp must not be overwritten");
+});
+
+/* ---- cleanup: no lingering timestamps ---- */
+
+test("deleteTask cleans up workedAt too, so no orphaned timestamps linger", async () => {
+  const { ctx } = await loadApp({ seed: 421 });
+  const t = ctx.addTask("Task A", false);
+  ctx.workedOnTask(t.id);
+  assert.ok(ctx.state.workedAt[t.id]);
+  ctx.deleteTask(t.id);
+  assert.equal(ctx.state.workedAt[t.id], undefined);
+});
+
+test("doneTask cleans up workedAt", async () => {
+  const { ctx } = await loadApp({ seed: 422 });
+  const t = ctx.addTask("Task A", false);
+  ctx.workedOnTask(t.id);
+  ctx.doneTask(t.id);
+  assert.equal(ctx.state.workedAt[t.id], undefined);
+});
+
+test("returnAsCandidate clears the worked mark and its workedAt timestamp", async () => {
+  const { ctx } = await loadApp({ seed: 423 });
+  const t = ctx.addTask("Task A", false);
+  ctx.workedOnTask(t.id);
+  ctx.returnAsCandidate(t.id);
+  assert.equal(ctx.state.considered[t.id], undefined);
+  assert.equal(ctx.state.workedAt[t.id], undefined);
+});
+
+test("decide('yes') clears any workedAt on the dotted task, mirroring its cantAt cleanup", async () => {
+  const { ctx } = await loadApp({ seed: 424 });
+  ctx.addTask("Benchmark", true);
+  ctx.addTask("Candidate", false);
+  ctx.startScan();
+  const cand = ctx.state.candidateId;
+  assert.ok(cand, "precondition: a candidate is on offer");
+  ctx.state.workedAt[cand] = realNow(ctx);               // plant a stale timestamp on the candidate
+  ctx.decide("yes");
+  assert.equal(ctx.state.workedAt[cand], undefined, "a dotted task must not carry a worked timestamp");
+});
+
+test("rescanSkipped clears the worked mark and its workedAt", async () => {
+  const { ctx } = await loadApp({ seed: 425 });
+  const t = ctx.addTask("Task A", false);
+  ctx.workedOnTask(t.id);
+  assert.ok(ctx.state.workedAt[t.id]);
+  ctx.rescanSkipped();
+  assert.equal(ctx.state.considered[t.id], undefined, "rescan clears worked marks like it always has");
+  assert.equal(ctx.state.workedAt[t.id], undefined, "and no longer leaves the timestamp behind");
+});
+
+/* ---- list badge ---- */
+
+test("skippedLabel: a fresh worked mark shows a remaining-hours countdown; a stale or untimestamped one shows plain 'worked'", async () => {
+  const { ctx } = await loadApp({ seed: 426 });
+  ctx.state.settings.workedHours = 8;
+  const t = ctx.addTask("Task A", false);
+  const t0 = realNow(ctx);
+  setFakeTime(ctx, t0);
+  ctx.workedOnTask(t.id);
+
+  assert.match(ctx.skippedLabel(t.id, "worked"), /worked · \d+h/, "fresh: shows hours left");
+
+  setFakeTime(ctx, t0 + 9 * 3600000);                     // past the 8h window
+  assert.equal(ctx.skippedLabel(t.id, "worked"), "worked", "elapsed: falls back to the bare label");
+
+  delete ctx.state.workedAt[t.id];
+  assert.equal(ctx.skippedLabel(t.id, "worked"), "worked", "no timestamp: bare label, no NaN");
+});
+
 /* ---------- chain start: one click, then the oldest outstanding task is dotted ----------
    Starting a chain has no benchmark, so a ranked pick and a Yes/No comparison
    are both meaningless — and so is asking "can I do this?", because the answer
