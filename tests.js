@@ -1988,10 +1988,77 @@ test("migration: a state with no passStartedAt loads as 0 and never auto-recycle
   ctx.startScan();
   const noId = ctx.state.candidateId;
   ctx.decide("no");
-  ctx.state.passStartedAt = 0;                      // simulate a state loaded mid-pass from before this change
+  ctx.state.passStartedAt = 0;                      // simulate a state with no pass in progress and no start time
   setFakeTime(ctx, realNow(ctx) + 48 * 3600000);    // two days later
   ctx.ensureCandidate();
   assert.equal(ctx.state.considered[noId], "no", "passStartedAt 0 never triggers a recycle, no matter the elapsed time");
+});
+
+test("existing data: a pre-change state loaded mid-pass (chain present, no passStartedAt) gets a fresh 18h window from load", async () => {
+  const stored = preChangeState({
+    chain: ["root"],
+    tasks: [
+      { id: "root", title: "Chain root", url: null, due: null, evergreen: false, ctx: [], mu: 25, sigma: 8.333, done: false, createdAt: 1, completedAt: null, lastDoneAt: null, startsAt: null },
+      { id: "other", title: "Other", url: null, due: null, evergreen: false, ctx: [], mu: 25, sigma: 8.333, done: false, createdAt: 2, completedAt: null, lastDoneAt: null, startsAt: null },
+    ],
+    considered: { other: "no" },                    // a lingering skip mark from the pre-change pass
+  });
+  const loadAt = Date.now();
+  const { ctx } = await loadApp({ seedStorage: { [WH_STORE_KEY]: JSON.stringify(stored) } });
+
+  assert.ok(ctx.state.passStartedAt >= loadAt, "an in-progress pass with no start time is stamped as of load, not left at 0");
+  assert.ok(ctx.state.passStartedAt <= Date.now(), "and not stamped in the future");
+
+  ctx.ensureCandidate();
+  assert.equal(ctx.state.considered.other, "no", "not treated as instantly stale on the first check after upgrade");
+
+  setFakeTime(ctx, ctx.state.passStartedAt + 18 * 3600000);
+  ctx.ensureCandidate();
+  assert.equal(ctx.state.considered.other, undefined, "the stale pre-change pass recycles one full window after the upgrade");
+});
+
+test("the stale-pass recycle keeps firing every 18h, not just once", async () => {
+  const { ctx } = await loadApp({ seed: 442 });
+  ctx.addTask("Benchmark", false);
+  const skip = ctx.addTask("Skip me", false);
+  ctx.addTask("Filler", false);
+  const t0 = realNow(ctx);
+  setFakeTime(ctx, t0);
+  ctx.startScan();                                  // dots "Benchmark"; pass starts at t0
+
+  for (let win = 1; win <= 4; win++) {
+    const boundary = t0 + win * 18 * 3600000;
+    ctx.state.considered[skip.id] = "no";           // a fresh mark for this window
+
+    setFakeTime(ctx, boundary - 60000);
+    ctx.ensureCandidate();
+    assert.equal(ctx.state.considered[skip.id], "no", `window ${win}: not stale 1 min before ${win * 18}h`);
+
+    setFakeTime(ctx, boundary);
+    ctx.ensureCandidate();
+    assert.equal(ctx.state.considered[skip.id], undefined, `window ${win}: recycled at ${win * 18}h`);
+    assert.equal(ctx.state.passStartedAt, boundary, `window ${win}: clock re-stamped to the recycle moment`);
+  }
+});
+
+test("the stale-pass recycle catches up a multi-day gap in one shot, then rearms for the next window", async () => {
+  const { ctx } = await loadApp({ seed: 443 });
+  ctx.addTask("Benchmark", false);
+  const skip = ctx.addTask("Skip me", false);
+  const t0 = realNow(ctx);
+  setFakeTime(ctx, t0);
+  ctx.startScan();
+
+  ctx.state.considered[skip.id] = "no";
+  setFakeTime(ctx, t0 + 50 * 3600000);             // away for ~2 days
+  ctx.ensureCandidate();
+  assert.equal(ctx.state.considered[skip.id], undefined, "one recycle covers the whole gap");
+  assert.equal(ctx.state.passStartedAt, t0 + 50 * 3600000, "clock rearmed from the moment it noticed");
+
+  ctx.state.considered[skip.id] = "no";
+  setFakeTime(ctx, t0 + 50 * 3600000 + 18 * 3600000);
+  ctx.ensureCandidate();
+  assert.equal(ctx.state.considered[skip.id], undefined, "and it fires again one window later");
 });
 
 /* ---------- chain start: one click, then the oldest outstanding task is dotted ----------

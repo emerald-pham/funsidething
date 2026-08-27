@@ -461,7 +461,11 @@ function hydrateState(st){
   if(st.settings.workedHours===undefined) st.settings.workedHours=8;
   st.settings.theme = normalizeTheme(st.settings.theme);   // absent or corrupt -> "system"
   if(st.histOpen===undefined) st.histOpen=false;
-  if(st.passStartedAt===undefined) st.passStartedAt=0;   // 0 = no pass started; the stale-pass check skips it until startScan()/newPass() stamps a real time
+  // Older states have no passStartedAt. If a chain is in progress there IS a
+  // pass, we just don't know when it began — stamp it as of now so it gets a
+  // full fresh stale-pass window from the upgrade rather than being invisible
+  // to the check forever. No chain means no pass to clock: leave it 0.
+  if(st.passStartedAt===undefined) st.passStartedAt = (st.chain && st.chain.length) ? Date.now() : 0;
   if(!st.cantAt) st.cantAt = {};
   if(!st.workedAt) st.workedAt = {};
   if(!st.workLog) st.workLog = [];
