@@ -1792,6 +1792,208 @@ test("skippedLabel: a fresh worked mark shows a remaining-hours countdown; a sta
   assert.equal(ctx.skippedLabel(t.id, "worked"), "worked", "no timestamp: bare label, no NaN");
 });
 
+/* =====================================================================
+   A SCAN PASS GOES STALE AFTER 18 HOURS
+   FVP builds one chain per pass. The skip marks from that pass (no,
+   dislodged, and an evergreen completion's "done") only clear when the
+   chain drains and newPass() runs. On a scan that spans more than a day
+   without the chain ever emptying, those marks — and an evergreen you
+   finished hours ago — never recycle. So the pass carries a start time
+   (state.passStartedAt); once it is STALE_PASS_MS old, the next
+   ensureCandidate() auto-runs newPass(). The chain is left intact, and
+   fresh can't / worked marks keep their own windows.
+   ===================================================================== */
+
+test("STALE_PASS_MS is 18 hours", async () => {
+  const { ctx } = await loadApp({ seed: 441 });
+  assert.equal(readConst(ctx, "STALE_PASS_MS"), 18 * 3600000);
+});
+
+test("defaultState includes passStartedAt: 0", async () => {
+  const { ctx } = await loadApp({ seed: 440 });
+  assert.equal(ctx.state.passStartedAt, 0);
+});
+
+test("passStartedAt: starting a chain stamps the pass start time", async () => {
+  const { ctx } = await loadApp({ seed: 430 });
+  assert.equal(ctx.state.passStartedAt, 0, "no pass has started yet on a fresh state");
+
+  ctx.addTask("A", false);
+  ctx.addTask("B", false);
+  const t0 = realNow(ctx);
+  setFakeTime(ctx, t0);
+  ctx.startScan();                                  // dots the oldest — this begins a pass
+  assert.equal(ctx.state.passStartedAt, t0, "starting a chain stamps the pass start time");
+});
+
+test("passStartedAt: resuming a paused scan does NOT re-stamp the pass", async () => {
+  const { ctx } = await loadApp({ seed: 431 });
+  ctx.addTask("A", false);
+  ctx.addTask("B", false);
+  ctx.addTask("C", false);
+  const t0 = realNow(ctx);
+  setFakeTime(ctx, t0);
+  ctx.startScan();                                  // begins the pass, stamps t0
+  assert.equal(ctx.state.passStartedAt, t0);
+
+  ctx.decide("yes");                                // push the candidate onto the chain
+  setFakeTime(ctx, t0 + 60000);
+  ctx.benchDone();                                  // completes the head; chain still non-empty, mode -> "work"
+  assert.ok(ctx.state.chain.length >= 1, "precondition: chain not drained");
+
+  setFakeTime(ctx, t0 + 120000);
+  ctx.startScan();                                  // resume
+  assert.equal(ctx.state.passStartedAt, t0, "resuming must not restart the 18h clock");
+});
+
+test("passStartedAt: newPass() stamps the pass start time", async () => {
+  const { ctx } = await loadApp({ seed: 432 });
+  ctx.addTask("A", false);
+  const t0 = realNow(ctx);
+  setFakeTime(ctx, t0 + 5000);
+  ctx.newPass();
+  assert.equal(ctx.state.passStartedAt, t0 + 5000);
+});
+
+test("a pass 18h old auto-runs newPass() on the next ensureCandidate(): no / dislodged marks clear", async () => {
+  const { ctx } = await loadApp({ seed: 433 });
+  ctx.addTask("Benchmark", false);
+  ctx.addTask("Said no", false);
+  const t0 = realNow(ctx);
+  setFakeTime(ctx, t0);
+  ctx.startScan();                                  // dots "Benchmark" (oldest); pass starts at t0
+  const noId = ctx.state.candidateId;
+  ctx.decide("no");
+  assert.equal(ctx.state.considered[noId], "no");
+
+  ctx.addTask("Dot me", true);                      // chain = [Benchmark, Dot me]
+  const dislodgedId = ctx.state.tasks.find((t) => t.title === "Dot me").id;
+  ctx.dislodge();                                   // pops "Dot me", marks it "dislodged"
+  assert.equal(ctx.state.considered[dislodgedId], "dislodged");
+
+  setFakeTime(ctx, t0 + 18 * 3600000);              // 18h later
+  ctx.ensureCandidate();
+
+  assert.equal(ctx.state.considered[noId], undefined, "an 18h-old 'no' recycles");
+  assert.equal(ctx.state.considered[dislodgedId], undefined, "an 18h-old 'dislodged' recycles");
+});
+
+test("a pass 17h old does NOT recycle — the marks are still there", async () => {
+  const { ctx } = await loadApp({ seed: 434 });
+  ctx.addTask("Benchmark", false);
+  ctx.addTask("Said no", false);
+  const t0 = realNow(ctx);
+  setFakeTime(ctx, t0);
+  ctx.startScan();
+  const noId = ctx.state.candidateId;
+  ctx.decide("no");
+
+  setFakeTime(ctx, t0 + 17 * 3600000);
+  ctx.ensureCandidate();
+  assert.equal(ctx.state.considered[noId], "no", "a 17h-old pass is not yet stale");
+});
+
+test("the 18h auto-recycle leaves the chain and its benchmark untouched", async () => {
+  const { ctx } = await loadApp({ seed: 435 });
+  ctx.addTask("First", true);
+  ctx.addTask("Second", true);
+  ctx.addTask("Third", true);                       // chain = [First, Second, Third]
+  const t0 = realNow(ctx);
+  setFakeTime(ctx, t0);
+  ctx.newPass();                                    // stamps passStartedAt = t0; newPass never touches the chain
+  const chainBefore = [...ctx.state.chain];
+  const benchBefore = ctx.benchmark().id;
+
+  setFakeTime(ctx, t0 + 19 * 3600000);
+  ctx.ensureCandidate();
+
+  assert.deepEqual([...ctx.state.chain], chainBefore, "every dotted task stays dotted");
+  assert.equal(ctx.benchmark().id, benchBefore, "the benchmark is the same task");
+});
+
+test("fresh can't and worked marks survive the 18h auto-recycle — their own windows still apply", async () => {
+  const { ctx } = await loadApp({ seed: 436 });
+  ctx.state.settings.cantMin = 60;                  // 1h window
+  ctx.state.settings.workedHours = 8;               // 8h window
+  ctx.addTask("Benchmark", false);
+  const cantT = ctx.addTask("Can't do it", false);
+  const workedT = ctx.addTask("Worked on it", false);
+  const t0 = realNow(ctx);
+  setFakeTime(ctx, t0);
+  ctx.startScan();                                  // pass starts at t0
+  assert.equal(ctx.state.passStartedAt, t0);
+
+  // Both marks placed 30 min before the recycle — fresh within their own windows.
+  const late = t0 + 17.5 * 3600000;
+  ctx.state.considered[cantT.id] = "cant";     ctx.state.cantAt[cantT.id] = late;
+  ctx.state.considered[workedT.id] = "worked"; ctx.state.workedAt[workedT.id] = late;
+
+  setFakeTime(ctx, t0 + 18 * 3600000);              // pass is 18h old; the two marks are 30 min old
+  ctx.ensureCandidate();                            // -> auto newPass()
+
+  assert.equal(ctx.state.considered[cantT.id], "cant", "a 30-min-old can't is still within its 1h window");
+  assert.equal(ctx.state.considered[workedT.id], "worked", "a 30-min-old worked mark is still within its 8h window");
+});
+
+test("after an auto-recycle, passStartedAt is re-stamped so it does not recycle again immediately", async () => {
+  const { ctx } = await loadApp({ seed: 437 });
+  ctx.addTask("Benchmark", false);
+  ctx.addTask("Said no", false);
+  const t0 = realNow(ctx);
+  setFakeTime(ctx, t0);
+  ctx.startScan();
+  const noId = ctx.state.candidateId;
+  ctx.decide("no");
+
+  const recycleAt = t0 + 18 * 3600000;
+  setFakeTime(ctx, recycleAt);
+  ctx.ensureCandidate();                            // recycles
+  assert.equal(ctx.state.passStartedAt, recycleAt, "the clock restarts from the recycle moment");
+
+  ctx.state.considered[noId] = "no";                // plant a fresh mark
+  ctx.ensureCandidate();
+  assert.equal(ctx.state.considered[noId], "no", "not stale again — no second recycle back-to-back");
+});
+
+test("an evergreen task finished mid-pass is back in the pool after the 18h recycle", async () => {
+  const { ctx } = await loadApp({ seed: 438 });
+  ctx.addTask("Anchor task", false);               // oldest -> becomes the chain root
+  const ever = ctx.addTask("Put on clothes", false);
+  ctx.state.tasks.find((t) => t.id === ever.id).evergreen = true;
+  ctx.addTask("Filler", false);
+  const t0 = realNow(ctx);
+  setFakeTime(ctx, t0);
+  ctx.startScan();                                  // dots "Anchor task"; pass starts at t0
+
+  setFakeTime(ctx, t0 + 3600000);                   // an hour in
+  ctx.state.candidateId = ever.id;                  // the evergreen comes up as the candidate
+  ctx.decide("cand-done");                          // "did it now" -> completeTask: evergreen -> considered "done"
+  assert.equal(ctx.state.considered[ever.id], "done");
+  assert.ok(!ctx.pool().some((t) => t.id === ever.id), "out of the pool while the done mark stands");
+
+  setFakeTime(ctx, t0 + 18 * 3600000);              // pass goes stale (also well past the 90-min evergreen rest)
+  ctx.ensureCandidate();
+
+  assert.equal(ctx.state.considered[ever.id], undefined, "the done mark is recycled");
+  assert.ok(ctx.pool().some((t) => t.id === ever.id), "the evergreen is a candidate again");
+});
+
+test("migration: a state with no passStartedAt loads as 0 and never auto-recycles until a real pass starts", async () => {
+  const stored = preChangeState();
+  const { ctx } = await loadApp({ seedStorage: { [WH_STORE_KEY]: JSON.stringify(stored) } });
+  assert.equal(ctx.state.passStartedAt, 0, "absent in old data -> 0");
+
+  ctx.addTask("A", false);
+  ctx.addTask("B", false);
+  ctx.startScan();
+  const noId = ctx.state.candidateId;
+  ctx.decide("no");
+  ctx.state.passStartedAt = 0;                      // simulate a state loaded mid-pass from before this change
+  setFakeTime(ctx, realNow(ctx) + 48 * 3600000);    // two days later
+  ctx.ensureCandidate();
+  assert.equal(ctx.state.considered[noId], "no", "passStartedAt 0 never triggers a recycle, no matter the elapsed time");
+});
+
 /* ---------- chain start: one click, then the oldest outstanding task is dotted ----------
    Starting a chain has no benchmark, so a ranked pick and a Yes/No comparison
    are both meaningless — and so is asking "can I do this?", because the answer
