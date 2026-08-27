@@ -450,6 +450,21 @@ function isoToDate(iso){ const [y,m,d] = iso.split("-").map(Number); return new 
    ride along in exports and cloud payloads forever. */
 function dropRemovedFields(st){ for(const t of (st && st.tasks) || []) delete t.recur; }
 
+/* Backfills fields that a state from an older version — local storage, a cloud
+   payload, or an imported export — may predate, so the rest of the app can
+   assume they're present. Idempotent, and deliberately DOM-free: callers
+   repaint the theme themselves right after. */
+function hydrateState(st){
+  if(!st.settings) st.settings = {horizonMin:60,thresholdPct:25,samples:250,cantMin:30,workedHours:8};
+  if(st.settings.cantMin===undefined) st.settings.cantMin=30;
+  if(st.settings.workedHours===undefined) st.settings.workedHours=8;
+  st.settings.theme = normalizeTheme(st.settings.theme);   // absent or corrupt -> "system"
+  if(st.histOpen===undefined) st.histOpen=false;
+  if(!st.cantAt) st.cantAt = {};
+  if(!st.workedAt) st.workedAt = {};
+  if(!st.workLog) st.workLog = [];
+}
+
 function defaultState(){
   const C = (id,name,active)=>({id,name,active});
   const contexts = [
@@ -463,11 +478,11 @@ function defaultState(){
   const tasks = [];   // start empty — add your own, or paste your Obsidian list in Settings
   return {
     v:1, tasks, contexts,
-    chain: [], considered: {}, cantAt: {}, candidateId: null, workLog: [],
+    chain: [], considered: {}, cantAt: {}, workedAt: {}, candidateId: null, workLog: [],
     interventionActive:false, interventionP:0, snooze:0,
     mode:"scan", decisionsMs:[], presentedAt:0,
     listOpen:false, ctxOpen:true, histOpen:false, updatedAt:0,
-    settings:{ horizonMin:60, thresholdPct:25, samples:250, cantMin:30, theme:"system" }
+    settings:{ horizonMin:60, thresholdPct:25, samples:250, cantMin:30, workedHours:8, theme:"system" }
   };
 }
 
@@ -621,13 +636,8 @@ async function cloudPull(){
         state = st;
         lastPushed = remote.payload;
         dropRemovedFields(state);
-        if(!state.settings) state.settings = {horizonMin:60,thresholdPct:25,samples:250,cantMin:30};
-        if(state.settings.cantMin===undefined) state.settings.cantMin=30;
-        state.settings.theme = normalizeTheme(state.settings.theme);
+        hydrateState(state);
         applyTheme();
-        if(state.histOpen===undefined) state.histOpen=false;
-        if(!state.cantAt) state.cantAt = {};
-        if(!state.workLog) state.workLog = [];
         recomputeRanks(); ensureCandidate(); render();
         if(useLocal){ try{ localStorage.setItem(STORE_KEY, remote.payload); }catch(e){} }
       }catch(e){ /* corrupt remote — leave local alone */ }
@@ -694,16 +704,45 @@ function expireCants(){ // a "can't" mark is bulletproof until cantMin elapses, 
     if(state.considered[id] !== "cant") delete state.cantAt[id];   // matching "cant" mark shouldn't linger forever
   }
 }
+/* The hours-scale sibling of expireCants(): a "worked on it" mark (Forster
+   rule 7) is bulletproof until state.settings.workedHours have elapsed, then
+   it clears itself and the task rejoins the scan. Same AUDIT handling — an
+   orphaned mark with no start date (old data, an older JSON import, a cloud
+   sync from an older version) gets a fresh bounded window rather than sitting
+   out forever, and a leftover timestamp with no mark is swept. */
+function expireWorked(){
+  const now = Date.now();
+  const workedMs = state.settings.workedHours * 3600000;
+  for(const [id,v] of Object.entries(state.considered)){
+    if(v!=="worked") continue;
+    if(!state.workedAt[id]){ state.workedAt[id] = now; continue; }
+    if((now - state.workedAt[id]) >= workedMs){
+      delete state.considered[id];
+      delete state.workedAt[id];
+    }
+  }
+  for(const id of Object.keys(state.workedAt)){
+    if(state.considered[id] !== "worked") delete state.workedAt[id];
+  }
+}
 function isSkipped(t){ // has a no/can't/dislodged/worked mark — same set rescanSkipped() clears in bulk.
   const v = state.considered[t.id];                          // 'done' (evergreen) is a completion, not a skip, so it's excluded here too.
   return v==="no" || v==="cant" || v==="dislodged" || v==="worked";
 }
-function skippedLabel(id, consid){ // list-view badge text — a can't mark shows how long it's still bulletproof for
-  if(consid!=="cant") return consid==="no" ? "no" : consid;
-  const at = state.cantAt[id];
-  if(!at) return "can\u2019t";
-  const leftMin = Math.ceil((state.settings.cantMin*60000 - (Date.now()-at)) / 60000);
-  return leftMin > 0 ? ("can\u2019t \u00b7 "+leftMin+"m") : "can\u2019t";
+function skippedLabel(id, consid){ // list-view badge text — a can't or worked mark shows how long it's still bulletproof for
+  if(consid==="cant"){
+    const at = state.cantAt[id];
+    if(!at) return "can\u2019t";
+    const leftMin = Math.ceil((state.settings.cantMin*60000 - (Date.now()-at)) / 60000);
+    return leftMin > 0 ? ("can\u2019t \u00b7 "+leftMin+"m") : "can\u2019t";
+  }
+  if(consid==="worked"){
+    const at = state.workedAt[id];
+    if(!at) return "worked";
+    const leftHr = Math.ceil((state.settings.workedHours*3600000 - (Date.now()-at)) / 3600000);
+    return leftHr > 0 ? ("worked \u00b7 "+leftHr+"h") : "worked";
+  }
+  return consid==="no" ? "no" : consid;
 }
 function pool(){ // eligible, not in chain, not yet considered this pass
   const inChain = new Set(state.chain);
@@ -739,6 +778,7 @@ function startScan(){
 }
 function ensureCandidate(){
   expireCants();   // let any "can't" marks whose horizon has passed quietly rejoin the pool first
+  expireWorked();  // and any "worked on it" marks whose window has passed
   if(state.mode !== "scan" || state.interventionActive) return;
   // Nothing dotted means nothing to compare a candidate against, so none is
   // dealt — the scan waits behind the Start scanning button instead.
@@ -789,6 +829,7 @@ function decide(kind){ // 'yes' | 'no' | 'cant' | 'cand-done'
     state.chain.push(cand.id);
     delete state.considered[cand.id];
     delete state.cantAt[cand.id];
+    delete state.workedAt[cand.id];
   }else if(kind==="no"){
     if(b) updatePair(b, cand);            // benchmark wins the comparison
     state.considered[cand.id] = "no";
@@ -839,8 +880,9 @@ function workedOnTask(id, push){
   if(push!==false) pushUndo();   // false when the caller already snapshotted — see the worked-task action
   state.chain = state.chain.filter(c=>c!==id);
   state.considered[id] = "worked";
+  state.workedAt[id] = Date.now();   // stamps the window — expireWorked() returns it to the scan once workedHours elapses
   // Logged separately from the mark above so History remembers this happened
-  // even after the mark itself clears (Return as candidate, Rescan, New pass).
+  // even after the mark itself clears (Return as candidate, Rescan, New pass, the window expiring).
   state.workLog.push({id:uid(), taskId:id, title:t.title, kind:"worked", at:Date.now()});
   delete state.cantAt[id];
   if(state.candidateId===id) state.candidateId=null;
@@ -893,6 +935,7 @@ function returnAsCandidate(id, push){
   if(push!==false) pushUndo();
   delete state.considered[id];
   delete state.cantAt[id];
+  delete state.workedAt[id];
   commit();
 }
 function doneTask(id, push){ // cross any task off from the edit pane, dotted or not, wherever it sits
@@ -901,6 +944,7 @@ function doneTask(id, push){ // cross any task off from the edit pane, dotted or
   completeTask(t);
   state.chain = state.chain.filter(c=>c!==id);   // a completed task must never stay dotted
   delete state.cantAt[id];
+  delete state.workedAt[id];
   if(state.candidateId===id) state.candidateId=null;
   // No mode change and no updatePair on purpose: crossing something off from the
   // edit pane says nothing about whether you're still scanning, and no "would I
@@ -915,15 +959,17 @@ function deleteTask(id){ // removes a task entirely — from the list, the chain
   state.chain = state.chain.filter(c=>c!==id);
   delete state.considered[id];
   delete state.cantAt[id];
+  delete state.workedAt[id];
   if(state.candidateId===id) state.candidateId=null;
   recomputeRanks();
   commit(true, true);           // deletions sync to the cloud right away
 }
 function newPass(push){
   if(push!==false) pushUndo();
-  expireCants();   // drop any "can't" marks that had already outlived the horizon on their own
+  expireCants();    // drop any "can't" marks that had already outlived the horizon on their own
+  expireWorked();   // and any "worked on it" marks past their window
   for(const [id,v] of Object.entries(state.considered)){
-    if(v==="cant") continue;   // still-fresh can't marks are bulletproof — they survive a new pass
+    if(v==="cant" || v==="worked") continue;   // still-fresh can't / worked marks are bulletproof — they survive a new pass
     delete state.considered[id];
   }
   state.snooze = 0;
@@ -943,7 +989,7 @@ function clearCompleted(){ // completed tasks and logged worked-on/evergreen-don
 function rescanSkipped(){ // clear only the no/can't marks, keep 'done' — an explicit override, ignores the can't timer on purpose
   pushUndo();
   for(const [id,v] of Object.entries(state.considered)){
-    if(v==="no"||v==="cant"||v==="dislodged"||v==="worked"){ delete state.considered[id]; delete state.cantAt[id]; }
+    if(v==="no"||v==="cant"||v==="dislodged"||v==="worked"){ delete state.considered[id]; delete state.cantAt[id]; delete state.workedAt[id]; }
   }
   state.mode="scan"; state.interventionActive=false; state.snooze = 6;
   commit();
@@ -1471,6 +1517,8 @@ function openSettings(){
     + '<span class="kv">the "next hour" in the question</span></div>'
     + '<div class="frow"><label for="stCantMin">Can\u2019t sticks for (min)</label><input id="stCantMin" type="number" min="5" max="480" value="'+s.cantMin+'" style="width:90px"/>'
     + '<span class="kv">how long a Can\u2019t holds before it\u2019s reconsidered</span></div>'
+    + '<div class="frow"><label for="stWorkedHrs">Worked on it sticks for (hrs)</label><input id="stWorkedHrs" type="number" min="1" max="720" value="'+s.workedHours+'" style="width:90px"/>'
+    + '<span class="kv">how long a Worked on it keeps a task out of the scan</span></div>'
     + '<div class="frow"><label for="stThresh">Interrupt below</label><input id="stThresh" type="number" min="1" max="90" value="'+s.thresholdPct+'" style="width:90px"/>'
     + '<span class="kv">% chance of a better task within 1 min</span></div>'
     + '<div class="frow"><label for="stSamples">MC samples</label><input id="stSamples" type="number" min="50" max="2000" step="50" value="'+s.samples+'" style="width:90px"/>'
@@ -1604,6 +1652,7 @@ function onAction(act, el){
       const s=state.settings;
       s.horizonMin=Math.max(5,Math.min(480,parseInt(document.getElementById("stHorizon").value)||60));
       s.cantMin=Math.max(5,Math.min(480,parseInt(document.getElementById("stCantMin").value)||30));
+      s.workedHours=Math.max(1,Math.min(720,parseInt(document.getElementById("stWorkedHrs").value)||8));
       s.thresholdPct=Math.max(1,Math.min(90,parseInt(document.getElementById("stThresh").value)||25));
       s.samples=Math.max(50,Math.min(2000,parseInt(document.getElementById("stSamples").value)||250));
       recomputeRanks(); closeModal(); commit(); break;
@@ -1635,7 +1684,8 @@ function onAction(act, el){
       try{
         const st=JSON.parse(box.value);
         if(!st||!Array.isArray(st.tasks)) throw new Error("bad");
-        pushUndo(); state=st; recomputeRanks(); closeModal(); commit();
+        pushUndo(); state=st; dropRemovedFields(state); hydrateState(state); applyTheme();
+        recomputeRanks(); closeModal(); commit();
       }catch(e){ alert("That didn\u2019t parse as exported state."); }
       break;
     }
@@ -1716,13 +1766,8 @@ function hotkeyDelete(){
   const loaded = await loadState();
   state = loaded || defaultState();
   dropRemovedFields(state);
-  if(!state.settings) state.settings = {horizonMin:60,thresholdPct:25,samples:250,cantMin:30};
-  if(state.settings.cantMin===undefined) state.settings.cantMin=30;
-  state.settings.theme = normalizeTheme(state.settings.theme);   // absent or corrupt -> "system"
+  hydrateState(state);
   applyTheme();
-  if(state.histOpen===undefined) state.histOpen=false;
-  if(!state.cantAt) state.cantAt = {};
-  if(!state.workLog) state.workLog = [];
   const isFirstBoot = !state.seenQuickStart;
   recomputeRanks();
   ensureCandidate();
