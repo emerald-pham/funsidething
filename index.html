@@ -415,6 +415,7 @@ function median(arr){ if(!arr.length) return NaN; const s=[...arr].sort((a,b)=>a
    ================================================================ */
 const STORE_KEY = "fvp:chain-scanner:v1";
 const THEME_HINT_KEY = "fvp:chain-scanner:theme";   // paint-time cache only; see writeThemeHint()
+const STALE_PASS_MS = 18 * 3600000;   // a scan pass older than this auto-recycles (newPass) — see ensureCandidate()
 let _uidc = 0;
 const uid = ()=> "t" + Date.now().toString(36) + (_uidc++).toString(36);
 const esc = s => String(s??"").replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -460,6 +461,7 @@ function hydrateState(st){
   if(st.settings.workedHours===undefined) st.settings.workedHours=8;
   st.settings.theme = normalizeTheme(st.settings.theme);   // absent or corrupt -> "system"
   if(st.histOpen===undefined) st.histOpen=false;
+  if(st.passStartedAt===undefined) st.passStartedAt=0;   // 0 = no pass started; the stale-pass check skips it until startScan()/newPass() stamps a real time
   if(!st.cantAt) st.cantAt = {};
   if(!st.workedAt) st.workedAt = {};
   if(!st.workLog) st.workLog = [];
@@ -480,7 +482,7 @@ function defaultState(){
     v:1, tasks, contexts,
     chain: [], considered: {}, cantAt: {}, workedAt: {}, candidateId: null, workLog: [],
     interventionActive:false, interventionP:0, snooze:0,
-    mode:"scan", decisionsMs:[], presentedAt:0,
+    mode:"scan", decisionsMs:[], presentedAt:0, passStartedAt:0,
     listOpen:false, ctxOpen:true, histOpen:false, updatedAt:0,
     settings:{ horizonMin:60, thresholdPct:25, samples:250, cantMin:30, workedHours:8, theme:"system" }
   };
@@ -773,12 +775,21 @@ function startScan(){
   state.mode = "scan";
   state.interventionActive = false;
   const t = chainStart() ? oldestFirst(pool()) : null;
-  if(t) state.chain.push(t.id);
+  if(t){
+    state.chain.push(t.id);
+    state.passStartedAt = Date.now();   // a fresh chain root is a fresh pass — start its stale-pass clock (a plain resume leaves t null and keeps the old time)
+  }
   commit(true, !!t);   // a dot syncs to the cloud right away
 }
 function ensureCandidate(){
   expireCants();   // let any "can't" marks whose horizon has passed quietly rejoin the pool first
   expireWorked();  // and any "worked on it" marks whose window has passed
+  // A pass left running past STALE_PASS_MS (e.g. overnight) is stale: its
+  // no/dislodged marks and any evergreen finished hours ago should recycle so
+  // the next day's priorities re-sort. newPass() keeps the chain and any
+  // still-fresh can't/worked marks, and re-stamps passStartedAt so this fires
+  // at most once per window.
+  if(state.passStartedAt && Date.now() - state.passStartedAt >= STALE_PASS_MS) newPass(false);
   if(state.mode !== "scan" || state.interventionActive) return;
   // Nothing dotted means nothing to compare a candidate against, so none is
   // dealt — the scan waits behind the Start scanning button instead.
@@ -975,6 +986,7 @@ function newPass(push){
   state.snooze = 0;
   state.interventionActive = false;
   state.candidateId = null;
+  state.passStartedAt = Date.now();   // this pass starts now — resets the stale-pass clock (see ensureCandidate())
   if(push!==false) commit();
 }
 function clearCompleted(){ // completed tasks and logged worked-on/evergreen-done entries otherwise live forever
