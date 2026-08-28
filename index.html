@@ -416,6 +416,7 @@ function median(arr){ if(!arr.length) return NaN; const s=[...arr].sort((a,b)=>a
 const STORE_KEY = "fvp:chain-scanner:v1";
 const THEME_HINT_KEY = "fvp:chain-scanner:theme";   // paint-time cache only; see writeThemeHint()
 const STALE_PASS_MS = 18 * 3600000;   // a scan pass older than this auto-recycles (newPass) — see ensureCandidate()
+const PASS_RESET_HOUR = 2;            // ...and so does one that crosses 02:00 local — the "new day" line, usually the trigger that trips first
 let _uidc = 0;
 const uid = ()=> "t" + Date.now().toString(36) + (_uidc++).toString(36);
 const esc = s => String(s??"").replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -785,15 +786,28 @@ function startScan(){
   }
   commit(true, !!t);   // a dot syncs to the cloud right away
 }
+/* The first PASS_RESET_HOUR:00 local instant strictly after `startedAt` — the
+   secondary stale line. A pass started at 22:00 crosses it at 02:00; one
+   started at 09:00 not until 02:00 the next day; one started exactly at 02:00
+   not until 02:00 the day after, never instantly. */
+function passResetCutoff(startedAt){
+  const d = new Date(startedAt);
+  d.setHours(PASS_RESET_HOUR, 0, 0, 0);
+  if(d.getTime() <= startedAt) d.setDate(d.getDate() + 1);
+  return d.getTime();
+}
 function ensureCandidate(){
   expireCants();   // let any "can't" marks whose horizon has passed quietly rejoin the pool first
   expireWorked();  // and any "worked on it" marks whose window has passed
-  // A pass left running past STALE_PASS_MS (e.g. overnight) is stale: its
-  // no/dislodged marks and any evergreen finished hours ago should recycle so
-  // the next day's priorities re-sort. newPass() keeps the chain and any
-  // still-fresh can't/worked marks, and re-stamps passStartedAt so this fires
-  // at most once per window.
-  if(state.passStartedAt && Date.now() - state.passStartedAt >= STALE_PASS_MS) newPass(false);
+  // A pass is stale once it has either run for STALE_PASS_MS or crossed 02:00
+  // local (the day line — usually the one that trips first). Its no/dislodged
+  // marks and any evergreen finished hours ago recycle so the new day's
+  // priorities re-sort. newPass() keeps the chain and still-fresh can't/worked
+  // marks, and re-stamps passStartedAt so each trigger rearms for the next day.
+  const now = Date.now();
+  if(state.passStartedAt && (now - state.passStartedAt >= STALE_PASS_MS || now >= passResetCutoff(state.passStartedAt))){
+    newPass(false);
+  }
   if(state.mode !== "scan" || state.interventionActive) return;
   // Nothing dotted means nothing to compare a candidate against, so none is
   // dealt — the scan waits behind the Start scanning button instead.
