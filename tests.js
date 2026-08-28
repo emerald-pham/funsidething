@@ -1878,19 +1878,18 @@ test("a pass 18h old auto-runs newPass() on the next ensureCandidate(): no / dis
   assert.equal(ctx.state.considered[dislodgedId], undefined, "an 18h-old 'dislodged' recycles");
 });
 
-test("a pass 17h old does NOT recycle — the marks are still there", async () => {
+test("a pass 17h old that has not crossed 02:00 does NOT recycle — the marks are still there", async () => {
   const { ctx } = await loadApp({ seed: 434 });
   ctx.addTask("Benchmark", false);
   ctx.addTask("Said no", false);
-  const t0 = realNow(ctx);
-  setFakeTime(ctx, t0);
+  setFakeTime(ctx, new Date(2026, 7, 28, 6, 0, 0).getTime());   // Fri 06:00 — next 02:00 is 20h away
   ctx.startScan();
   const noId = ctx.state.candidateId;
   ctx.decide("no");
 
-  setFakeTime(ctx, t0 + 17 * 3600000);
+  setFakeTime(ctx, new Date(2026, 7, 28, 23, 0, 0).getTime());  // Fri 23:00 — 17h in, still Friday's "day"
   ctx.ensureCandidate();
-  assert.equal(ctx.state.considered[noId], "no", "a 17h-old pass is not yet stale");
+  assert.equal(ctx.state.considered[noId], "no", "17h in, no 02:00 crossed — pass is not yet stale");
 });
 
 test("the 18h auto-recycle leaves the chain and its benchmark untouched", async () => {
@@ -2017,27 +2016,19 @@ test("existing data: a pre-change state loaded mid-pass (chain present, no passS
   assert.equal(ctx.state.considered.other, undefined, "the stale pre-change pass recycles one full window after the upgrade");
 });
 
-test("the stale-pass recycle keeps firing every 18h, not just once", async () => {
+test("the stale-pass recycle keeps firing day after day, not just once", async () => {
   const { ctx } = await loadApp({ seed: 442 });
   ctx.addTask("Benchmark", false);
   const skip = ctx.addTask("Skip me", false);
-  ctx.addTask("Filler", false);
-  const t0 = realNow(ctx);
-  setFakeTime(ctx, t0);
-  ctx.startScan();                                  // dots "Benchmark"; pass starts at t0
+  const start = new Date(2026, 7, 27, 20, 0, 0).getTime();       // Thu 20:00
+  setFakeTime(ctx, start);
+  ctx.startScan();
 
-  for (let win = 1; win <= 4; win++) {
-    const boundary = t0 + win * 18 * 3600000;
-    ctx.state.considered[skip.id] = "no";           // a fresh mark for this window
-
-    setFakeTime(ctx, boundary - 60000);
+  for (let day = 1; day <= 5; day++) {
+    ctx.state.considered[skip.id] = "no";                        // a fresh mark, left overnight
+    setFakeTime(ctx, start + day * 86400000);                    // 24h later each pass — always stale by one trigger or the other
     ctx.ensureCandidate();
-    assert.equal(ctx.state.considered[skip.id], "no", `window ${win}: not stale 1 min before ${win * 18}h`);
-
-    setFakeTime(ctx, boundary);
-    ctx.ensureCandidate();
-    assert.equal(ctx.state.considered[skip.id], undefined, `window ${win}: recycled at ${win * 18}h`);
-    assert.equal(ctx.state.passStartedAt, boundary, `window ${win}: clock re-stamped to the recycle moment`);
+    assert.equal(ctx.state.considered[skip.id], undefined, `day ${day}: a mark left overnight is recycled`);
   }
 });
 
@@ -2059,6 +2050,103 @@ test("the stale-pass recycle catches up a multi-day gap in one shot, then rearms
   setFakeTime(ctx, t0 + 50 * 3600000 + 18 * 3600000);
   ctx.ensureCandidate();
   assert.equal(ctx.state.considered[skip.id], undefined, "and it fires again one window later");
+});
+
+/* ---------- secondary trigger: crossing 02:00 local time ----------
+   18h is only the ceiling. The pass is also stale the moment the local clock
+   crosses 02:00 after it started — the "new day" line, which on any evening
+   start is what actually trips first. */
+
+test("passResetCutoff: the first 02:00 local strictly after the given moment", async () => {
+  const { ctx } = await loadApp({ seed: 444 });
+  const cut = (y, mo, da, h, mi) => ctx.passResetCutoff(new Date(y, mo, da, h, mi, 0).getTime());
+  assert.equal(cut(2026, 7, 27, 22, 0), new Date(2026, 7, 28, 2, 0, 0).getTime(), "22:00 -> 02:00 next day");
+  assert.equal(cut(2026, 7, 28, 9, 0),  new Date(2026, 7, 29, 2, 0, 0).getTime(), "09:00 -> 02:00 next day");
+  assert.equal(cut(2026, 7, 28, 1, 0),  new Date(2026, 7, 28, 2, 0, 0).getTime(), "01:00 -> 02:00 the same day");
+  assert.equal(cut(2026, 7, 28, 2, 0),  new Date(2026, 7, 29, 2, 0, 0).getTime(), "exactly 02:00 -> 02:00 the NEXT day, never instant");
+});
+
+test("a pass started before 02:00 recycles the moment the clock crosses it, well under 18h", async () => {
+  const { ctx } = await loadApp({ seed: 445 });
+  ctx.addTask("Benchmark", false);
+  const skip = ctx.addTask("Skip me", false);
+  setFakeTime(ctx, new Date(2026, 7, 27, 22, 0, 0).getTime());   // Thu 22:00
+  ctx.startScan();
+  ctx.state.considered[skip.id] = "no";
+
+  setFakeTime(ctx, new Date(2026, 7, 28, 1, 59, 0).getTime());   // 01:59 — not yet
+  ctx.ensureCandidate();
+  assert.equal(ctx.state.considered[skip.id], "no", "01:59: the pass has not crossed 02:00");
+
+  setFakeTime(ctx, new Date(2026, 7, 28, 2, 0, 0).getTime());    // 02:00 sharp
+  ctx.ensureCandidate();
+  assert.equal(ctx.state.considered[skip.id], undefined, "02:00: crossed the day line — recycle after only 4h");
+});
+
+test("a pass that stays within one 02:00-to-02:00 day and under 18h does not recycle", async () => {
+  const { ctx } = await loadApp({ seed: 446 });
+  ctx.addTask("Benchmark", false);
+  const skip = ctx.addTask("Skip me", false);
+  setFakeTime(ctx, new Date(2026, 7, 28, 10, 0, 0).getTime());   // Fri 10:00
+  ctx.startScan();
+  ctx.state.considered[skip.id] = "no";
+
+  setFakeTime(ctx, new Date(2026, 7, 28, 23, 30, 0).getTime());  // Fri 23:30 — 13.5h, no 02:00 crossed
+  ctx.ensureCandidate();
+  assert.equal(ctx.state.considered[skip.id], "no", "within the same day and under 18h — pass stands");
+});
+
+test("a pass started exactly at 02:00 is not instantly stale", async () => {
+  const { ctx } = await loadApp({ seed: 447 });
+  ctx.addTask("Benchmark", false);
+  const skip = ctx.addTask("Skip me", false);
+  setFakeTime(ctx, new Date(2026, 7, 28, 2, 0, 0).getTime());    // 02:00:00 sharp
+  ctx.startScan();
+  ctx.state.considered[skip.id] = "no";
+
+  setFakeTime(ctx, new Date(2026, 7, 28, 2, 5, 0).getTime());    // five minutes later
+  ctx.ensureCandidate();
+  assert.equal(ctx.state.considered[skip.id], "no", "the cutoff is the NEXT 02:00, not the one it started on");
+});
+
+test("the 02:00 trigger rearms for the following day after it fires", async () => {
+  const { ctx } = await loadApp({ seed: 448 });
+  ctx.addTask("Benchmark", false);
+  const skip = ctx.addTask("Skip me", false);
+  setFakeTime(ctx, new Date(2026, 7, 27, 23, 0, 0).getTime());   // Thu 23:00
+  ctx.startScan();
+
+  ctx.state.considered[skip.id] = "no";
+  setFakeTime(ctx, new Date(2026, 7, 28, 2, 0, 0).getTime());    // Fri 02:00 -> recycle #1
+  ctx.ensureCandidate();
+  assert.equal(ctx.state.considered[skip.id], undefined, "recycled at the first 02:00");
+
+  ctx.state.considered[skip.id] = "no";
+  setFakeTime(ctx, new Date(2026, 7, 28, 12, 0, 0).getTime());   // Fri midday — no new 02:00 since the re-stamp, under 18h
+  ctx.ensureCandidate();
+  assert.equal(ctx.state.considered[skip.id], "no", "not stale again the same day");
+
+  ctx.state.considered[skip.id] = "no";
+  setFakeTime(ctx, new Date(2026, 7, 29, 2, 0, 0).getTime());    // Sat 02:00 -> recycle #2
+  ctx.ensureCandidate();
+  assert.equal(ctx.state.considered[skip.id], undefined, "recycles again at the next day's 02:00");
+});
+
+test("the 18h ceiling still fires when it comes before the next 02:00", async () => {
+  const { ctx } = await loadApp({ seed: 449 });
+  ctx.addTask("Benchmark", false);
+  const skip = ctx.addTask("Skip me", false);
+  setFakeTime(ctx, new Date(2026, 7, 28, 7, 0, 0).getTime());    // Fri 07:00 — next 02:00 is 19h out, 18h ceiling is 18h out
+  ctx.startScan();
+  ctx.state.considered[skip.id] = "no";
+
+  setFakeTime(ctx, new Date(2026, 7, 29, 0, 30, 0).getTime());   // Sat 00:30 — 17.5h in, Sat 02:00 not yet reached
+  ctx.ensureCandidate();
+  assert.equal(ctx.state.considered[skip.id], "no", "17.5h in and 02:00 not reached — stands");
+
+  setFakeTime(ctx, new Date(2026, 7, 29, 1, 0, 0).getTime());    // Sat 01:00 — exactly 18h in, still before 02:00
+  ctx.ensureCandidate();
+  assert.equal(ctx.state.considered[skip.id], undefined, "the 18h ceiling trips an hour before the day line would have");
 });
 
 /* ---------- chain start: one click, then the oldest outstanding task is dotted ----------
