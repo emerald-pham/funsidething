@@ -202,7 +202,9 @@ textarea{width:100%;font-family:var(--font-mono);font-size:12px}
 .tmain .inchain{flex:none;color:var(--accent);font-size:13px}
 .tmain .chainind{flex:none;color:var(--mut);font-size:13px;opacity:.6}
 .tmain .skipped{flex:none;color:var(--mut);font-size:11px;border:1px solid var(--line);border-radius:6px;padding:1px 6px}
-.addrow{display:flex;flex-direction:column;gap:8px;padding:12px 14px;border-top:1px solid var(--line);background:var(--subtle)}
+.addwrap{padding:0;overflow:hidden;margin-top:14px}
+.ahead{margin:0;text-align:left;padding:11px 14px;font-weight:600;font-size:13.5px;background:var(--subtle);border-bottom:1px solid var(--line);color:var(--fg)}
+.addrow{display:flex;flex-direction:column;gap:8px;padding:12px 14px}
 .addline{display:flex;gap:8px}
 .addline input{flex:1;min-width:0}
 .qctx{display:flex;flex-wrap:wrap;gap:6px}
@@ -315,6 +317,13 @@ textarea{width:100%;font-family:var(--font-mono);font-size:12px}
       <div class="ltags" id="listTagRow"></div>
     </div>
     <div id="listBody" hidden></div>
+  </section>
+
+  <!-- Its own panel, not a footer on the list above: capturing a task and
+       reviewing the ones you have are different jobs, and the add bar stays
+       usable whether the list is open or collapsed. -->
+  <section class="panel addwrap" id="addPanel">
+    <h2 class="ahead">Add a task</h2>
     <div class="addrow">
       <div class="qctx" id="quickCtxRow"></div>
       <div class="addline">
@@ -503,7 +512,7 @@ function defaultState(){
     chain: [], considered: {}, cantAt: {}, workedAt: {}, candidateId: null, workLog: [],
     interventionActive:false, interventionP:0, snooze:0,
     mode:"scan", decisionsMs:[], presentedAt:0, passStartedAt:0,
-    listOpen:false, ctxOpen:true, histOpen:false, updatedAt:0,
+    listOpen:false, ctxOpen:true, histOpen:false, updatedAt:0, syncRev:0,
     settings:{ horizonMin:60, thresholdPct:25, samples:250, cantMin:30, workedHours:8, theme:"system" }
   };
 }
@@ -655,10 +664,34 @@ function sendPush(){
     if(!pulling) cloudPull();   // self-healing: the write triggers the reconcile it is waiting on
     return;
   }
-  const payload = JSON.stringify(state);
+  const payload = cloudPayload();
   if(payload === lastPushed) return;      // nothing actually changed
   lastPushed = payload;
-  window.CloudSync.push(payload, state.updatedAt || Date.now());
+  const base = state.syncRev;
+  Promise.resolve(window.CloudSync.push(payload, state.updatedAt || Date.now(), base))
+    .then(res=>{
+      if(!res) return;                    // an older shim with nothing to say — leave the rev alone
+      if(res.conflict){
+        /* Somebody else wrote a revision we had not read. The write did NOT
+           land, on purpose: overwriting it is exactly the data loss this is
+           here to prevent. Go read what they wrote and reconcile instead. */
+        lastPushed = "";
+        pendingPush = true;
+        cloudPull();
+        return;
+      }
+      if(typeof res.rev === "number") state.syncRev = res.rev;
+    })
+    .catch(()=>{ lastPushed = ""; });      // a failed write must not look like a synced one
+}
+/* What actually goes into the cloud document. state.syncRev is this device's
+   bookkeeping — which revision its copy is based on — and is deliberately kept
+   out: if it rode along in the payload, every device would see a difference
+   immediately after adopting somebody else's state and push it straight back. */
+function cloudPayload(){
+  const out = {};
+  for(const k of Object.keys(state)) if(k !== "syncRev") out[k] = state[k];
+  return JSON.stringify(out);
 }
 /* BUG FIX: CS.push/CS.pull each ping() (fire the "cloudsync" event) *before*
    their own await — once when they start ("syncing") and once when they
@@ -686,21 +719,44 @@ async function cloudPull(){
     if(!haveRemote && !(remote && remote.empty)) return;
     reconciledAs = window.CloudSync.user;
     if(!haveRemote){                           // empty cloud — seed it from this device
+      state.syncRev = 0;                       // no document yet, so nothing is behind us
       if(state.tasks.length){ lastPushed = ""; cloudPush(); }
       return;
     }
-    /* BUG FIX: this used to read state.updatedAt, which save() re-stamps to
-       Date.now() on every local write. One click in a stale tab therefore put
-       today's timestamp on month-old content and won the comparison below
-       outright, and the stale chain was pushed over the good one deliberately
-       — not by racing. On the session's first reconcile, judge this device by
-       the timestamp it LOADED with instead: what was on disk is what this
-       device can actually vouch for, and edits piled on top of stale content
-       don't make that content any fresher. They are not lost — an adoption
-       goes on the undo stack, and the toast below says so. */
-    const lt = firstReconcile ? baseUpdatedAt : (state.updatedAt || 0);
-    const rt = remote.updatedAt || 0;
-    if(rt > lt){
+    /* Who is ahead?
+
+       BUG FIX: this used to compare state.updatedAt against the document's,
+       and both are stamped with Date.now() on whichever device wrote them —
+       its OWN clock. A laptop running a few hours fast therefore won every
+       reconcile no matter how old its content was, and overwrote a phone's
+       newer work, renames included. Wall-clock time cannot order edits made
+       on two machines; nothing built on it was ever going to hold.
+
+       So the document carries a revision counter instead, and each device
+       remembers which revision its copy is based on (state.syncRev, kept out
+       of the payload). Higher remote revision means the cloud holds work this
+       device has never seen — adopt it. Same revision means we share a base,
+       so any local difference is genuinely this device's to push. No clocks.
+
+       The timestamp comparison survives only as the migration path, for a
+       document written before revisions existed or a device that has never
+       synced under them; the first write on either side ends it. That path
+       still judges an unreconciled device by the timestamp it LOADED with,
+       not one a local edit re-stamped, so a stale tab can't win by being
+       clicked. Nothing here is lost either way: an adoption goes on the undo
+       stack, and the toast below says so. */
+    const rr = typeof remote.rev === "number" ? remote.rev : null;
+    const lr = typeof state.syncRev === "number" ? state.syncRev : null;
+    let remoteWins;
+    if(rr !== null && lr !== null){
+      remoteWins = rr > lr;                                   // revisions: the real answer
+      if(!remoteWins && rr === lr && remote.payload === cloudPayload()) return;   // identical, nothing to do
+    }else{
+      const lt = firstReconcile ? baseUpdatedAt : (state.updatedAt || 0);
+      const rt = remote.updatedAt || 0;
+      remoteWins = rt > lt;
+    }
+    if(remoteWins){
       try{
         const st = JSON.parse(remote.payload);
         if(!st || !Array.isArray(st.tasks)) return;
@@ -712,13 +768,19 @@ async function cloudPull(){
         hydrateState(state);
         applyTheme();
         recomputeRanks(); ensureCandidate(); render();
-        if(useLocal){ try{ localStorage.setItem(STORE_KEY, remote.payload); }catch(e){} }
+        // Adopted wholesale, so this device is now based on the remote's
+        // revision — not on whatever its own copy used to be based on.
+        state.syncRev = rr !== null ? rr : (state.syncRev || 0);
+        if(useLocal){ try{ localStorage.setItem(STORE_KEY, JSON.stringify(state)); }catch(e){} }
         // Swapping the board out from under someone mid-edit needs saying out
         // loud, or the edits they just made look like they simply vanished.
         if(hadLocalEdits) toast("This tab was out of date \u2014 loaded the newer copy. \u21ba undoes it.");
       }catch(e){ /* corrupt remote — leave local alone */ }
-    }else if(lt > rt){
-      lastPushed = ""; cloudPush();            // this device is ahead
+    }else{
+      // Same base revision (or an older document by timestamp): anything
+      // different here is this device's own work, so send it.
+      if(rr !== null && lr === null) state.syncRev = rr;   // first sync under revisions — adopt the counter
+      lastPushed = ""; cloudPush();
     }
   } finally {
     pulling = false;
@@ -803,6 +865,50 @@ function expireWorked(){
     if(state.considered[id] !== "worked") delete state.workedAt[id];
   }
 }
+/* The completion-scale sibling of expireCants()/expireWorked(), run from the
+   same regular sweep. History is a record of things you actually did, so one
+   accomplishment should be one row -- but importList() used to re-add tasks
+   that had already been crossed off, and crossing the duplicate off again left
+   two "done" rows for the same piece of work. That import hole is closed now;
+   this reconciles the entries it already produced, and anything else that ends
+   up looking like them.
+
+   Deliberately narrow, because it removes rows the user can see:
+   - only completed, non-evergreen tasks whose normalised titles are identical
+   - evergreen completions are never touched: recurring is their whole point,
+     and they live in workLog rather than as done tasks anyway
+   - a task explicitly restored from History and finished again carries
+     restoredAt, which marks it as a real second accomplishment
+   The earliest completion is the one kept -- the later ones only exist because
+   the first was invisible to the import check. Returns how many it removed. */
+function reconcileHistory(){
+  const groups = new Map();
+  for(const t of state.tasks){
+    if(!t.done || t.evergreen || t.restoredAt) continue;
+    const k = normTitle(t.title);
+    if(!k) continue;
+    if(!groups.has(k)) groups.set(k, []);
+    groups.get(k).push(t);
+  }
+  const drop = new Set();
+  for(const g of groups.values()){
+    if(g.length < 2) continue;
+    g.sort((a,b)=> (a.completedAt||0) - (b.completedAt||0) || (a.createdAt||0) - (b.createdAt||0));
+    for(const t of g.slice(1)) drop.add(t.id);
+  }
+  if(!drop.size) return 0;
+  state.tasks = state.tasks.filter(t=>!drop.has(t.id));
+  // The same tidy-up deleteTask() does, so a collapsed duplicate can't leave a
+  // dead id sitting on the chain, in a mark, or as the dealt candidate.
+  state.chain = state.chain.filter(id=>!drop.has(id));
+  for(const id of drop){
+    delete state.considered[id];
+    delete state.cantAt[id];
+    delete state.workedAt[id];
+    if(state.candidateId===id) state.candidateId = null;
+  }
+  return drop.size;
+}
 function isSkipped(t){ // has a no/can't/dislodged/worked mark — same set rescanSkipped() clears in bulk.
   const v = state.considered[t.id];                          // 'done' (evergreen) is a completion, not a skip, so it's excluded here too.
   return v==="no" || v==="cant" || v==="dislodged" || v==="worked";
@@ -870,6 +976,7 @@ function passResetCutoff(startedAt){
 function ensureCandidate(){
   expireCants();   // let any "can't" marks whose horizon has passed quietly rejoin the pool first
   expireWorked();  // and any "worked on it" marks whose window has passed
+  reconcileHistory();   // and collapse any repeated completion that isn't a real repeat
   // A pass is stale once it has either run for STALE_PASS_MS or crossed 02:00
   // local (the day line — usually the one that trips first). Its no/dislodged
   // marks and any evergreen finished hours ago recycle so the new day's
@@ -1124,31 +1231,45 @@ function parseTaskList(text){
   }
   return rows;
 }
-/* Adds a parsed list, skipping anything that duplicates an existing open task
-   or an earlier line in the same paste. Returns {added, skipped}. */
+const normTitle = t => (t||"").toLowerCase().replace(/\s+/g," ").trim();
+
+/* Adds a parsed list, skipping anything that duplicates a task already here
+   or an earlier line in the same paste. Returns {added, skipped, completed}.
+
+   BUG FIX: this used to dedupe against openTasks() only, so anything already
+   crossed off was invisible to the check. Re-pasting a list kept elsewhere —
+   the whole point of the paste box — therefore resurrected every line you had
+   already finished, as brand-new open tasks, while the original sat right
+   there in History. Completed titles are matched too now, and counted apart
+   from open duplicates so the summary can say which it was. */
 function importList(text, ctx){
   const rows = parseTaskList(text);
-  if(!rows.length) return {added:0, skipped:0};
-  const norm = t => t.toLowerCase().replace(/\s+/g," ").trim();
-  const seen = new Set(openTasks().map(t => norm(t.title)));
+  if(!rows.length) return {added:0, skipped:0, completed:0};
+  const open = new Set(openTasks().map(t => normTitle(t.title)));
+  const done = new Set(state.tasks.filter(t=>t.done).map(t => normTitle(t.title)));
   const c = Array.isArray(ctx) ? ctx.slice() : [];
-  let added = 0, skipped = 0;
+  let added = 0, skipped = 0, completed = 0;
   pushUndo();
   for(const r of rows){
-    const k = norm(r.title);
-    if(seen.has(k)){ skipped++; continue; }
-    seen.add(k);
+    const k = normTitle(r.title);
+    if(open.has(k)){ skipped++; continue; }
+    if(done.has(k)){ completed++; continue; }
+    open.add(k);
     state.tasks.push({ id:uid(), title:r.title, url:r.url, due:null, startsAt:null, evergreen:false, ctx:c.slice(),
       mu:PRIOR_MU, sigma:PRIOR_SIGMA, done:false, createdAt:Date.now(), completedAt:null, lastDoneAt:null });
     added++;
   }
   if(added){ recomputeRanks(); commit(); } else { undoStack.pop(); }
-  return {added, skipped};
+  return {added, skipped, completed};
 }
-function importSummary(added, skipped){
-  if(!added && !skipped) return "Nothing to import \u2014 no task lines found.";
+function importSummary(added, skipped, completed){
+  if(!added && !skipped && !completed) return "Nothing to import \u2014 no task lines found.";
   let msg = added + " task" + (added===1?"":"s") + " added";
   if(skipped) msg += ", " + skipped + " duplicate" + (skipped===1?"":"s") + " skipped";
+  // Named apart from plain duplicates: "already on the list" and "already done"
+  // are different reasons for a line not landing, and only one of them would
+  // otherwise look like the task had gone missing.
+  if(completed) msg += ", " + completed + " already done";
   return msg + ".";
 }
 let toastTimer = null;
@@ -1649,9 +1770,9 @@ function openHelp(){
     + '<li><b>No</b> skips it (and nudges its rank down). <b>Can\u2019t</b> skips it with no rank signal.</li>'
     + '<li>Do the dotted chain from the bottom (newest) to the top.</li>'
     + '<li>Can’t get to a dotted one after all? <b>Can’t</b> takes it off the chain and puts it back in the scan by itself once your Can’t window passes; <b>Dislodge</b> takes it off for the rest of the pass. Neither moves its rank.</li>'
-    + '<li>Either finish a task and cross it off, or use <b>↻ Worked on it</b> to cross it off and send it back to the bottom. Both are also in the edit pane, for any task.</li>'
+    + '<li>Either finish a task and cross it off, or use <b>↻ Worked on it</b> to cross it off and send it back to the bottom — it stays out of the scan for the window set in Settings, then comes back on its own. Both are also in the edit pane, for any task.</li>'
     + '<li>Urgent task? <b>Add &amp; dot</b> puts it straight on the chain so it\u2019s done first.</li>'
-    + '<li>Tap a context chip above the add bar to tag what you\u2019re about to add \u2014 it stays picked for the next few too.</li>'
+    + '<li>Tap a context chip in the <b>Add a task</b> panel to tag what you\u2019re about to add \u2014 it stays picked for the next few too.</li>'
     + '<li>Once you\u2019ve dotted something, crossing a queued task off (or tapping <b>done adding for now</b>) stops new suggestions until you resume.</li>'
     + '</ol>'
     + '<h3>What the machinery does</h3>'
@@ -1660,7 +1781,7 @@ function openHelp(){
     + 'The <b>sparkline</b> is each task\u2019s likelihood distribution over rank — left-biased means likely to be picked. '
     + '<b>top-K</b> is the smallest K (≥2) with P(rank ≤ K) ≥ 1 − 1/K: a stopping stat for "if I\u2019ll only do K tasks today, is this plausibly one of them?" '
     + 'And when the odds of finding anything better collapse, the scanner interrupts your clicking and tells you to go work.</p>'
-    + '<p class="kv">Keys: <b>y</b> / <b>n</b> / <b>c</b> to decide, <b>d</b> to mark whatever\u2019s showing done, <b>Delete</b> to remove it entirely, <b>u</b> to undo.</p></div>'
+    + '<p class="kv">Keys: <b>y</b> / <b>n</b> / <b>c</b> to decide, <b>d</b> to mark whatever\u2019s showing done, <b>w</b> for worked on it, <b>Delete</b> or <b>Backspace</b> to remove it entirely, <b>u</b> to undo.</p></div>'
     + '<div class="mbtns"><button class="btn done" data-act="ok-quickstart">OK</button></div>'
   );
 }
@@ -1725,8 +1846,8 @@ function openSettings(){
     + (histCount ? '<div class="mbtns"><button class="btn subtle" data-act="clear-done">Clear history</button></div>' : '')
     + '<h3>Bulk import</h3>'
     + '<div class="kv">Paste a list \u2014 numbered (<span class="mono">1.</span> <span class="mono">1)</span> <span class="mono">1 -</span>), bulleted (<span class="mono">-</span> <span class="mono">*</span> <span class="mono">\u2022</span>), Obsidian checkboxes, or just one task per line. '
-    + 'Markdown links become clickable, <span class="mono">- [x]</span> items and headings are skipped, and anything already on your list won\u2019t be added twice.<br>'
-    + 'You can also paste a list straight into the add box at the bottom of the page.</div>'
+    + 'Markdown links become clickable, <span class="mono">- [x]</span> items and headings are skipped, and anything already on your list \u2014 or already crossed off in History \u2014 won\u2019t be added again.<br>'
+    + 'You can also paste a list straight into the <b>Add a task</b> panel.</div>'
     + '<textarea id="mdImport" rows="6" placeholder="1. Write the next Carmine scene&#10;2. Fix the sink&#10;3. [Renew the car tag](https://\u2026)&#10;4. Email the union rep"></textarea>'
     + '<div id="importMsg"></div>'
     + '<div class="mbtns"><button class="btn subtle" data-act="import-md">Import tasks</button></div>'
@@ -1736,7 +1857,7 @@ function openSettings(){
     + '<div class="kv" style="margin-top:6px"><span class="statusdot" style="background:'+(cloudReady()?"var(--good)":"var(--mut)")+'"></span>'
     + (!window.CloudSync || !window.CloudSync.configured
         ? "Cloud sync not configured \u2014 this device only."
-        : cloudReady() ? ("Cloud sync on, as " + esc(window.CloudSync.user) + ". Reconciles on load and when you switch back to this tab.")
+        : cloudReady() ? ("Cloud sync on, as " + esc(window.CloudSync.user) + ". Reconciles on load and when you switch back to this tab; the newest revision wins, never the fastest clock.")
         : "Cloud sync configured \u2014 sign in from the header to link this device.")+'</div>'
     + '<div class="mbtns"><button class="btn subtle" data-act="export-json">Export JSON</button>'
     + '<button class="btn subtle" data-act="import-json">Import JSON</button>'
@@ -1779,8 +1900,8 @@ function onAction(act, el){
     case "add": {
       const inp=document.getElementById("addInput");
       if(/\r?\n/.test(inp.value)){                      // a whole list got in here
-        const {added, skipped} = importList(inp.value, quickAddCtx);
-        if(added || skipped){ inp.value=""; toast(importSummary(added, skipped)); }
+        const {added, skipped, completed} = importList(inp.value, quickAddCtx);
+        if(added || skipped || completed){ inp.value=""; toast(importSummary(added, skipped, completed)); }
       }else if(addTask(inp.value,false,quickAddCtx)){ inp.value=""; }
       inp.focus(); break;
     }
@@ -1838,6 +1959,9 @@ function onAction(act, el){
     case "restore": {
       const t=taskById(el.dataset.id); if(!t) break;
       pushUndo(); t.done=false; t.completedAt=null; t.lastDoneAt=null;
+      // Marks this as a deliberate second run at the task, so finishing it
+      // again reads as a real repeat rather than a duplicate to reconcile away.
+      t.restoredAt = Date.now();
       recomputeRanks(); commit(); break;
     }
     case "cycle-theme": setTheme(nextTheme()); break;
@@ -1862,9 +1986,9 @@ function onAction(act, el){
     }
     case "import-md": {
       const box=document.getElementById("mdImport"); if(!box) break;
-      const {added, skipped} = importList(box.value);
+      const {added, skipped, completed} = importList(box.value);
       const msg=document.getElementById("importMsg");
-      if(msg){ msg.textContent = importSummary(added, skipped); msg.classList.toggle("warn", !added); }
+      if(msg){ msg.textContent = importSummary(added, skipped, completed); msg.classList.toggle("warn", !added); }
       if(added) box.value="";
       break;
     }
@@ -1929,8 +2053,8 @@ document.addEventListener("paste", e=>{
   const txt = cd ? cd.getData("text") : "";
   if(!txt || !/\r?\n/.test(txt.trim())) return;      // single line — let it paste normally
   e.preventDefault();
-  const {added, skipped} = importList(txt, quickAddCtx);
-  if(added || skipped){ t.value = ""; toast(importSummary(added, skipped)); }
+  const {added, skipped, completed} = importList(txt, quickAddCtx);
+  if(added || skipped || completed){ t.value = ""; toast(importSummary(added, skipped, completed)); }
 });
 document.addEventListener("keydown", e=>{
   const t = e.target;
@@ -1992,7 +2116,7 @@ const CFG = window.FIREBASE_CONFIG || {};
 const configured = !!(CFG.apiKey && CFG.apiKey.indexOf("PASTE") !== 0);
 const CS = window.CloudSync = {
   configured, ready:false, user:null, status: configured ? "signed-out" : "off",
-  signIn(){}, signOut(){}, async pull(){ return { error:true }; }, async push(){}
+  signIn(){}, signOut(){}, async pull(){ return { error:true }; }, async push(){ return { error:true }; }
 };
 const ping = ()=> window.dispatchEvent(new CustomEvent("cloudsync"));
 
@@ -2033,13 +2157,29 @@ if(configured){
         return snap.exists() ? snap.data() : { empty:true };
       }catch(e){ CS.status = "error"; ping(); return { error:true }; }
     };
-    CS.push = async (payload, updatedAt)=>{
-      if(!auth.currentUser) return;
+    /* A conditional write, not a blind one. baseRev is the revision the caller
+       actually read; the transaction refuses if the document has moved on
+       since. Two devices pushing at once used to mean the second silently
+       replaced the first — with setDoc there was nothing to notice it. The
+       caller treats a conflict as "go and reconcile", never as "try harder".
+       Returns {ok:true, rev} | {conflict:true, rev} | {error:true}. */
+    CS.push = async (payload, updatedAt, baseRev)=>{
+      if(!auth.currentUser) return { error:true };
       CS.status = "syncing"; ping();
       try{
-        await F.setDoc(ref(), { payload, updatedAt });
+        const res = await F.runTransaction(db, async (tx)=>{
+          const snap = await tx.get(ref());
+          const cur  = snap.exists() ? (snap.data().rev || 0) : 0;
+          if(snap.exists() && typeof baseRev === "number" && cur !== baseRev){
+            return { conflict:true, rev:cur };
+          }
+          const next = cur + 1;
+          tx.set(ref(), { payload, updatedAt, rev: next });
+          return { ok:true, rev: next };
+        });
         CS.status = "ok"; ping();
-      }catch(e){ CS.status = "error"; ping(); }
+        return res;
+      }catch(e){ CS.status = "error"; ping(); return { error:true }; }
     };
 
     A.onAuthStateChanged(auth, u=>{

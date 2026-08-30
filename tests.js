@@ -5175,13 +5175,22 @@ const cloudState = (updatedAt) => syncState({
    pull() mirrors the module's contract: a well-formed {payload, updatedAt}
    when the document exists, {empty:true} when it provably does not, and
    {error:true} when the read failed and we therefore know nothing. */
-function makeSyncHarness({ delayMs = 4, remote = null, failPull = false } = {}) {
+function makeSyncHarness({ delayMs = 4, remote = null, failPull = false, rev = null } = {}) {
   const h = {
-    doc: remote ? { payload: JSON.stringify(remote), updatedAt: remote.updatedAt } : null,
+    doc: remote
+      ? { payload: JSON.stringify(remote), updatedAt: remote.updatedAt, ...(rev === null ? {} : { rev }) }
+      : null,
     failPull,
     calls: [],
+    conflicts: 0,
     remoteState() { return h.doc ? JSON.parse(h.doc.payload) : null; },
     remoteChain() { const s = h.remoteState(); return s ? s.chain : null; },
+    remoteTitles() { const s = h.remoteState(); return s ? s.tasks.map((t) => t.title) : null; },
+    // Stands in for another device writing behind this one's back.
+    writeBehindBack(state) {
+      h.doc = { payload: JSON.stringify(state), updatedAt: state.updatedAt,
+                rev: (h.doc && h.doc.rev ? h.doc.rev : 0) + 1 };
+    },
     factory: () => ({
       configured: true, ready: true, user: "e@example.com", status: "ok",
       signIn() {}, signOut() {},
@@ -5189,12 +5198,17 @@ function makeSyncHarness({ delayMs = 4, remote = null, failPull = false } = {}) 
         h.calls.push("pull");
         await new Promise((r) => setTimeout(r, delayMs));
         if (h.failPull) return { error: true };
-        return h.doc ? { payload: h.doc.payload, updatedAt: h.doc.updatedAt } : { empty: true };
+        return h.doc ? { ...h.doc } : { empty: true };
       },
-      async push(payload, updatedAt) {
+      // Mirrors the module's conditional write: the transaction refuses to
+      // overwrite a revision the caller never read.
+      async push(payload, updatedAt, baseRev) {
         h.calls.push("push");
         await new Promise((r) => setTimeout(r, delayMs));
-        h.doc = { payload, updatedAt };
+        const cur = h.doc && h.doc.rev ? h.doc.rev : 0;
+        if (h.doc && baseRev !== undefined && cur !== baseRev) { h.conflicts++; return { conflict: true, rev: cur }; }
+        h.doc = { payload, updatedAt, rev: cur + 1 };
+        return { ok: true, rev: cur + 1 };
       },
     }),
   };
@@ -5399,4 +5413,352 @@ test("a silent adopt stays silent when there was nothing local to lose", async (
   const el = shim.elements.get("toast");
   assert.ok(!el || !el.textContent, `an uneventful catch-up shouldn't nag: ${el && el.textContent}`);
   assert.deepEqual(ctx.state.chain, CLOUD_CHAIN);
+});
+
+/* =====================================================================
+   REGRESSION: AN IMPORT MUST NOT RESURRECT COMPLETED TASKS
+
+   importList() deduped against openTasks() — state.tasks.filter(!done) —
+   so a completed task was invisible to the check. Re-pasting a list kept
+   somewhere else (the README's Obsidian workflow) therefore re-added, as
+   brand-new open tasks, every line that had already been crossed off and
+   was sitting right there in the History pane.
+   ===================================================================== */
+
+test("REGRESSION: importing a list does not re-add tasks already completed", async () => {
+  const { ctx } = await loadApp({ seed: 981 });
+  const t = ctx.addTask("Email the union rep", false);
+  ctx.completeTask(ctx.state.tasks.find((x) => x.id === t.id));
+  assert.equal(ctx.state.tasks.filter((x) => x.done).length, 1, "it is done, and in History");
+
+  const r = ctx.importList("1. Email the union rep\n2. Fix the sink");
+
+  assert.equal(r.added, 1, "only the genuinely new line is added");
+  assert.deepEqual(Array.from(ctx.state.tasks.filter((x) => !x.done), (x) => x.title), ["Fix the sink"],
+    "the completed task must not come back to the all-tasks list");
+  assert.equal(ctx.state.tasks.filter((x) => x.done).length, 1, "and its History entry is untouched");
+});
+
+test("REGRESSION: a completed match is reported separately, not silently dropped", async () => {
+  const { ctx } = await loadApp({ seed: 982 });
+  const t = ctx.addTask("Email the union rep", false);
+  ctx.completeTask(ctx.state.tasks.find((x) => x.id === t.id));
+  ctx.addTask("Fix the sink", false);
+
+  const r = ctx.importList("1. Email the union rep\n2. Fix the sink\n3. Call the bank");
+
+  assert.equal(r.added, 1);
+  assert.equal(r.skipped, 1, "the open duplicate");
+  assert.equal(r.completed, 1, "the one already crossed off");
+
+  const msg = ctx.importSummary(r.added, r.skipped, r.completed);
+  assert.match(msg, /already (done|completed|crossed off)/i,
+    `the summary has to say why a line didn't land: ${msg}`);
+});
+
+test("importList: completed dedupe is case- and whitespace-insensitive too", async () => {
+  const { ctx } = await loadApp({ seed: 983 });
+  const t = ctx.addTask("Email the union rep", false);
+  ctx.completeTask(ctx.state.tasks.find((x) => x.id === t.id));
+
+  const r = ctx.importList("1.   EMAIL   THE  UNION REP  ");
+  assert.equal(r.added, 0);
+  assert.equal(r.completed, 1);
+});
+
+test("importList: clearing History lets a re-paste legitimately add the task again", async () => {
+  const { ctx } = await loadApp({ seed: 984 });
+  const t = ctx.addTask("Email the union rep", false);
+  ctx.completeTask(ctx.state.tasks.find((x) => x.id === t.id));
+  ctx.clearCompleted();          // the record is gone, so there is nothing left to dedupe against
+
+  const r = ctx.importList("1. Email the union rep");
+  assert.equal(r.added, 1, "with no History entry, re-adding it is the right call");
+});
+
+test("addTask: typing a completed title by hand still adds it — an explicit act, not a stale paste", async () => {
+  const { ctx } = await loadApp({ seed: 985 });
+  const t = ctx.addTask("Email the union rep", false);
+  ctx.completeTask(ctx.state.tasks.find((x) => x.id === t.id));
+
+  const again = ctx.addTask("Email the union rep", false);
+  assert.ok(again, "a deliberate single add is never blocked");
+  assert.equal(ctx.state.tasks.filter((x) => !x.done).length, 1);
+});
+
+/* =====================================================================
+   HISTORY RECONCILE: NO REPEATED COMPLETIONS THAT AREN'T REAL
+
+   Fallout of the import bug above: a task crossed off, then re-added by a
+   re-paste, then crossed off again, leaves two "done" rows in History for
+   one accomplishment. reconcileHistory() sweeps those together on the same
+   schedule as the can't/worked expiries. Two repeats are legitimate and
+   must survive: evergreen completions (recurring by design) and a task
+   deliberately restored from History and done again.
+   ===================================================================== */
+
+const doneTitles = (ctx) =>
+  Array.from(ctx.state.tasks.filter((t) => t.done), (t) => t.title).sort();
+
+// The exact shape the import bug produced: two task objects, same title, both done.
+function seedDuplicateCompletion(ctx, title) {
+  const a = ctx.addTask(title, false);
+  ctx.completeTask(ctx.state.tasks.find((x) => x.id === a.id));
+  const b = { ...ctx.state.tasks.find((x) => x.id === a.id), id: a.id + "_dupe" };
+  ctx.state.tasks.push(b);
+  return { first: a.id, second: b.id };
+}
+
+test("reconcileHistory: two done rows for the same title collapse to one", async () => {
+  const { ctx } = await loadApp({ seed: 986 });
+  seedDuplicateCompletion(ctx, "Email the union rep");
+  assert.equal(doneTitles(ctx).length, 2, "the duplicate is there to start with");
+
+  ctx.reconcileHistory();
+
+  assert.deepEqual(doneTitles(ctx), ["Email the union rep"]);
+  assert.equal(ctx.historyRows().filter((r) => r.kind === "done").length, 1,
+    "History shows one entry for one accomplishment");
+});
+
+test("reconcileHistory: keeps the original completion, drops the later artifact", async () => {
+  const { ctx } = await loadApp({ seed: 987 });
+  const a = ctx.addTask("Email the union rep", false);
+  const first = ctx.state.tasks.find((x) => x.id === a.id);
+  ctx.completeTask(first);
+  first.completedAt = 1000;
+  ctx.state.tasks.push({ ...first, id: "later", completedAt: 9000 });
+
+  ctx.reconcileHistory();
+
+  const rows = ctx.historyRows().filter((r) => r.kind === "done");
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].at, 1000, "the first time you finished it is the real record");
+});
+
+test("reconcileHistory: leaves distinct titles alone", async () => {
+  const { ctx } = await loadApp({ seed: 988 });
+  for (const title of ["Email the union rep", "Fix the sink", "Call the bank"]) {
+    const t = ctx.addTask(title, false);
+    ctx.completeTask(ctx.state.tasks.find((x) => x.id === t.id));
+  }
+  ctx.reconcileHistory();
+  assert.equal(doneTitles(ctx).length, 3, "three different things done is three entries");
+});
+
+test("reconcileHistory: evergreen repeats survive — recurring is the whole point", async () => {
+  const { ctx } = await loadApp({ seed: 989 });
+  const t = ctx.addTask("Water the plants", false);
+  const task = ctx.state.tasks.find((x) => x.id === t.id);
+  task.evergreen = true;
+  ctx.completeTask(task);
+  ctx.completeTask(task);
+  ctx.completeTask(task);
+
+  ctx.reconcileHistory();
+
+  const rows = ctx.historyRows().filter((r) => r.kind === "evergreen-done");
+  assert.equal(rows.length, 3, "every evergreen completion stays in History");
+  assert.equal(ctx.state.tasks.filter((x) => x.done).length, 0, "and it never went done in the first place");
+});
+
+test("reconcileHistory: a task restored from History and done again keeps both records", async () => {
+  const { ctx } = await loadApp({ seed: 990 });
+  const a = ctx.addTask("Email the union rep", false);
+  const first = ctx.state.tasks.find((x) => x.id === a.id);
+  ctx.completeTask(first);
+  first.completedAt = 1000;
+
+  // Restored deliberately from the History pane, then done again — a second,
+  // genuine accomplishment, marked as such by restoredAt.
+  ctx.state.tasks.push({ ...first, id: "redone", completedAt: 9000, restoredAt: 5000 });
+
+  ctx.reconcileHistory();
+
+  assert.equal(ctx.historyRows().filter((r) => r.kind === "done").length, 2,
+    "a deliberate restore-and-redo is a real repeat, not an artifact");
+});
+
+test("reconcileHistory: dropping a duplicate takes its dangling references with it", async () => {
+  const { ctx } = await loadApp({ seed: 991 });
+  const { second } = seedDuplicateCompletion(ctx, "Email the union rep");
+  ctx.state.chain.push(second);
+  ctx.state.considered[second] = "no";
+  ctx.state.candidateId = second;
+
+  ctx.reconcileHistory();
+
+  assert.ok(!ctx.state.chain.includes(second), "no dead id left on the chain");
+  assert.ok(!(second in ctx.state.considered), "no dead mark left behind");
+  assert.equal(ctx.state.candidateId, null, "and it isn't left as the candidate");
+});
+
+test("reconcileHistory: runs on the ordinary sweep schedule, not only when asked", async () => {
+  const { ctx } = await loadApp({ seed: 992 });
+  seedDuplicateCompletion(ctx, "Email the union rep");
+  assert.equal(doneTitles(ctx).length, 2);
+
+  ctx.ensureCandidate();   // the same pass that expires can't/worked marks
+
+  assert.equal(doneTitles(ctx).length, 1, "the regular check catches it without being invoked by hand");
+});
+
+test("the History restore button marks the task as deliberately restored", async () => {
+  const { ctx } = await loadApp({ seed: 993 });
+  const a = ctx.addTask("Email the union rep", false);
+  ctx.completeTask(ctx.state.tasks.find((x) => x.id === a.id));
+
+  ctx.onAction("restore", { dataset: { id: a.id } });
+
+  const t = ctx.state.tasks.find((x) => x.id === a.id);
+  assert.equal(t.done, false, "it comes back to the all-tasks list");
+  assert.ok(typeof t.restoredAt === "number", "and is stamped, so a later re-completion is respected");
+});
+
+/* =====================================================================
+   REGRESSION: DEVICE CLOCKS MUST NOT DECIDE WHO WINS
+
+   Second incident: a laptop's older history replaced a phone's newer one,
+   including task renames. state.updatedAt is stamped with Date.now() — the
+   writing device's OWN clock — and the two sides were compared directly.
+   A laptop running minutes or hours ahead therefore "wins" every reconcile
+   no matter how stale its content is, and no amount of care around when we
+   write fixes an ordering that was never trustworthy to begin with.
+
+   The document now carries a revision counter the devices agree on, and
+   each device remembers which revision its copy is based on. Ahead/behind
+   is a question about revisions, not clocks. Writes are conditional on the
+   revision the device actually read, so a push cannot overwrite a revision
+   it never saw — which also closes the case of two devices pushing at once.
+   ===================================================================== */
+
+const renamedCloud = (rev, title) => cloudState(0 /* clock is irrelevant now */),
+      titlesOf = (ctx) => Array.from(ctx.state.tasks, (t) => t.title);
+
+test("REGRESSION: a device whose clock runs ahead cannot overwrite a newer revision", async () => {
+  const now = Date.now();
+  // The phone's work, at revision 12.
+  const phone = cloudState(now - 6 * HOUR);
+  phone.tasks[0].title = "Draft the chapter (renamed on my phone)";
+  const h = makeSyncHarness({ remote: phone, rev: 12 });
+
+  // The laptop: older content, revision 5, and a clock running hours FAST —
+  // so by timestamp alone it looks newer than everything the phone did.
+  const stale = staleState(now + 6 * HOUR);
+  stale.syncRev = 5;
+  const { ctx } = await loadApp({
+    seed: 994,
+    seedStorage: { [SYNC_STORE_KEY]: JSON.stringify(stale) },
+    cloudSyncFactory: h.factory,
+  });
+
+  await ctx.cloudPull();
+  await syncSettle(PAST_DEBOUNCE);
+
+  assert.ok(titlesOf(ctx).includes("Draft the chapter (renamed on my phone)"),
+    `the laptop must take the phone's newer revision, whatever its clock says: ${titlesOf(ctx)}`);
+  assert.ok(h.remoteTitles().includes("Draft the chapter (renamed on my phone)"),
+    "and the rename must still be in the cloud afterwards");
+});
+
+test("REGRESSION: a rename made on another device is not undone by a stale push", async () => {
+  const now = Date.now();
+  const phone = cloudState(now);
+  phone.tasks[1].title = "Call the credit union";
+  const h = makeSyncHarness({ remote: phone, rev: 9 });
+
+  const stale = staleState(now + 3 * HOUR);   // fast clock again
+  stale.syncRev = 4;
+  const { ctx } = await loadApp({
+    seed: 995,
+    seedStorage: { [SYNC_STORE_KEY]: JSON.stringify(stale) },
+    cloudSyncFactory: h.factory,
+  });
+
+  ctx.addTask("Something typed on the laptop", true);   // and it tries to write
+  await syncSettle(PAST_DEBOUNCE);
+
+  assert.ok(h.remoteTitles().includes("Call the credit union"),
+    `the phone's rename must survive: ${h.remoteTitles()}`);
+});
+
+test("the revision this device last saw, not its clock, decides that it is ahead", async () => {
+  const now = Date.now();
+  const h = makeSyncHarness({ remote: cloudState(now + 6 * HOUR), rev: 7 });   // cloud clock ahead
+
+  const local = staleState(now);            // slow clock, but same revision as the cloud
+  local.syncRev = 7;
+  const { ctx } = await loadApp({
+    seed: 996,
+    seedStorage: { [SYNC_STORE_KEY]: JSON.stringify(local) },
+    cloudSyncFactory: h.factory,
+  });
+
+  await ctx.cloudPull();
+  await syncSettle(PAST_DEBOUNCE);
+
+  assert.deepEqual(ctx.state.chain, STALE_CHAIN,
+    "same base revision plus local edits means this device is ahead, slow clock or not");
+  assert.deepEqual(h.remoteChain(), STALE_CHAIN, "so its work goes up");
+});
+
+test("REGRESSION: a push cannot overwrite a revision this device never read", async () => {
+  const now = Date.now();
+  const h = makeSyncHarness({ remote: cloudState(now), rev: 3 });
+  const local = staleState(now);
+  local.syncRev = 3;
+  const { ctx } = await loadApp({
+    seed: 997,
+    seedStorage: { [SYNC_STORE_KEY]: JSON.stringify(local) },
+    cloudSyncFactory: h.factory,
+  });
+
+  await ctx.cloudPull();                    // in sync at revision 3
+  await syncSettle(PAST_DEBOUNCE);
+
+  // Another device writes revision 4 while this one wasn't looking.
+  const elsewhere = cloudState(now + HOUR);
+  elsewhere.tasks[0].title = "Written from the other device";
+  h.writeBehindBack(elsewhere);
+
+  ctx.addTask("Typed here, unaware", false);
+  await syncSettle(PAST_DEBOUNCE);
+
+  assert.ok(h.remoteTitles().includes("Written from the other device"),
+    `the unseen revision must not be clobbered: ${h.remoteTitles()}`);
+  assert.ok(h.conflicts > 0, "the conditional write is what refused it");
+});
+
+test("the revision a device is based on is device-local, never part of the shared document", async () => {
+  const now = Date.now();
+  const h = makeSyncHarness({ remote: cloudState(now), rev: 2 });
+  const { ctx } = await loadApp({
+    seed: 998,
+    seedStorage: { [SYNC_STORE_KEY]: JSON.stringify(staleState(now - HOUR)) },
+    cloudSyncFactory: h.factory,
+  });
+
+  await ctx.cloudPull();                    // adopts revision 2
+  await syncSettle(PAST_DEBOUNCE);
+
+  assert.equal(ctx.state.syncRev, 2, "the device remembers what it is based on");
+  assert.ok(!("syncRev" in h.remoteState()),
+    "but it must not ride along in the payload, or every adopt would look like a fresh edit");
+  const pushesAfterAdopt = h.calls.filter((c) => c === "push").length;
+  assert.equal(pushesAfterAdopt, 0, "an adopt that changed nothing shouldn't bounce a write back");
+});
+
+test("a cloud document written before revisions existed still reconciles by timestamp", async () => {
+  const now = Date.now();
+  const h = makeSyncHarness({ remote: cloudState(now) });   // no rev field at all
+  const { ctx } = await loadApp({
+    seed: 999,
+    seedStorage: { [SYNC_STORE_KEY]: JSON.stringify(staleState(now - 30 * 24 * HOUR)) },
+    cloudSyncFactory: h.factory,
+  });
+
+  await ctx.cloudPull();
+  await syncSettle(PAST_DEBOUNCE);
+
+  assert.deepEqual(ctx.state.chain, CLOUD_CHAIN, "the legacy path still works during the upgrade");
 });
