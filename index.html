@@ -178,6 +178,13 @@ textarea{width:100%;font-family:var(--font-mono);font-size:12px}
 .lhead{width:100%;text-align:left;padding:11px 14px;font-weight:600;font-size:13.5px;background:var(--subtle);border-bottom:1px solid transparent}
 .lhead .mono{color:var(--mut);font-weight:500}
 #listBody{border-top:1px solid var(--line);max-height:60vh;overflow-y:auto}
+.lfilters{padding:9px 14px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:7px;background:var(--subtle)}
+#listSearch{width:100%;font:inherit;font-size:13px;padding:6px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:inherit}
+.ltags{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.ltaglabel{font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--mut)}
+.ltags:empty{display:none}
+.ltag{font-size:12px;font-weight:600;border:1px solid var(--line);border-radius:99px;padding:3px 10px;color:var(--mut);background:var(--surface);cursor:pointer}
+.ltag.on{background:var(--chain-deep);color:#fff;border-color:var(--chain-deep)}
 .trow{display:grid;grid-template-columns:88px 118px 1fr;gap:12px;align-items:center;padding:8px 14px;border-bottom:1px solid var(--rowline)}
 .trow:last-child{border-bottom:none}
 .trow.flash{animation:flash 1.6s ease}
@@ -301,6 +308,12 @@ textarea{width:100%;font-family:var(--font-mono);font-size:12px}
 
   <section class="panel listwrap" id="listWrap">
     <button class="lhead" data-act="toggle-list"><span id="listCaret">▸</span> All tasks <span id="listCount" class="mono"></span></button>
+    <!-- Lives outside #listBody on purpose: renderList() rebuilds that body wholesale
+         on every commit, which would blow away a focused input mid-keystroke. -->
+    <div class="lfilters" id="listFilters" hidden>
+      <input id="listSearch" type="search" placeholder="Search tasks by name…" aria-label="Search tasks by name" autocomplete="off"/>
+      <div class="ltags" id="listTagRow"></div>
+    </div>
     <div id="listBody" hidden></div>
     <div class="addrow">
       <div class="qctx" id="quickCtxRow"></div>
@@ -438,6 +451,8 @@ let rankCache = new Map();     // id -> {hist,cdf,topK,n}
 let sparkCache = new Map();    // id:WxH -> memoized sparkline SVG string; cleared whenever rankCache changes
 let undoStack = [];
 let quickAddCtx = [];          // context ids currently picked in the quick-add bar — UI-only, sticky across adds, not synced
+let listQuery = "";            // all-tasks search box, already trimmed + lowercased — UI-only, like quickAddCtx: never saved, never synced, never undoable
+let listTagFilter = null;      // ...and the one context id the list is narrowed to, or null. One at a time, by design.
 let saveTimer = null;
 let storageOK = false;
 let useLocal  = false;   // true when running as a plain web page (localStorage)
@@ -1108,6 +1123,7 @@ function toggleContext(id){
   commit();
 }
 function revealTask(id){
+  clearListFilters();   // scrolling to a row the filter is hiding reveals nothing
   state.listOpen = true;
   render();
   requestAnimationFrame(()=>{
@@ -1388,17 +1404,69 @@ function renderScan(){
   el.innerHTML = html;
 }
 
+/* ---------- all-tasks list filters ----------
+   Two independent narrowings of the *view* only. Neither one touches
+   state.contexts[].active, so what the scanner considers eligible is exactly
+   the same whether you're looking at the whole list or one tag's worth of it. */
+
+/* A tag filter can outlive the thing it points at — the context can be
+   deactivated from the Contexts panel or deleted outright in Settings. Only
+   active contexts are offered, so an inactive one can't keep filtering either. */
+function normalizeListFilters(){
+  if(listTagFilter && !state.contexts.some(c=>c.id===listTagFilter && c.active)) listTagFilter = null;
+}
+function listFiltersActive(){ normalizeListFilters(); return !!(listQuery || listTagFilter); }
+function filteredListTasks(){
+  normalizeListFilters();
+  return openTasks().filter(t=>{
+    if(listTagFilter && !t.ctx.includes(listTagFilter)) return false;
+    if(listQuery && !t.title.toLowerCase().includes(listQuery)) return false;
+    return true;
+  });
+}
+function setListQuery(v){
+  listQuery = String(v==null?"":v).trim().toLowerCase();
+  renderList();          // body + header count; the tag chips don't depend on the query
+}
+function toggleListTag(id){
+  listTagFilter = (listTagFilter===id) ? null : id;   // clicking the lit one clears it
+  renderList();
+}
+function clearListFilters(){
+  listQuery = ""; listTagFilter = null;
+  const box = document.getElementById("listSearch");
+  if(box) box.value = "";   // the only place we write back into the input, so typing is never fought
+}
+function renderListFilters(){
+  const wrap = document.getElementById("listFilters");
+  if(wrap) wrap.hidden = !state.listOpen;
+  const row = document.getElementById("listTagRow");
+  if(!row) return;
+  if(!state.listOpen){ row.innerHTML=""; return; }
+  normalizeListFilters();
+  // Labelled because the quick-add bar carries an identical-looking row of the
+  // same contexts a few pixels below, and it does something entirely different.
+  row.innerHTML = '<span class="ltaglabel">Filter</span>' + state.contexts.filter(c=>c.active).map(c => {
+    const on = listTagFilter===c.id;
+    return '<button type="button" class="ltag'+(on?" on":"")+'" data-act="list-tag" data-id="'+c.id+'"'
+         + ' aria-pressed="'+(on?"true":"false")+'">'+esc(c.name)+'</button>';
+  }).join("");
+}
+
 function renderList(){
   const open = openTasks();
   const act = activeCtxSet();
-  document.getElementById("listCount").textContent = "("+open.length+")";
+  renderListFilters();
+  const shown = filteredListTasks();
+  document.getElementById("listCount").textContent =
+    listFiltersActive() ? "("+shown.length+" of "+open.length+")" : "("+open.length+")";
   document.getElementById("listCaret").textContent = state.listOpen ? "▾" : "▸";
   const body = document.getElementById("listBody");
   const savedScroll = body.scrollTop;   // every commit() rebuilds this from scratch — without this, any
   body.hidden = !state.listOpen;        // unrelated action (dotting, toggling a context) snaps it to the top
   if(!state.listOpen){ body.innerHTML=""; return; }
 
-  const rows = [...open].sort((a,b)=>{
+  const rows = [...shown].sort((a,b)=>{
     const ka = rankCache.get(a.id), kb = rankCache.get(b.id);
     const ta = ka?ka.topK:1e9, tb = kb?kb.topK:1e9;
     if(ta!==tb) return ta-tb;
@@ -1422,7 +1490,10 @@ function renderList(){
          + (consid && consid!=="done" ? '<span class="skipped">'+skippedLabel(t.id, consid)+'</span>' : '')
          + '</div></div>';
   }
-  body.innerHTML = html || '<div class="emptystate">No open tasks.</div>';
+  // "nothing here" and "nothing matching" are different problems with different fixes
+  body.innerHTML = html || (open.length
+    ? '<div class="emptystate">No tasks match.<div style="margin-top:12px"><button class="btn subtle" data-act="clear-list-filters">Clear filters</button></div></div>'
+    : '<div class="emptystate">No open tasks.</div>');
   body.scrollTop = savedScroll;
 }
 
@@ -1608,6 +1679,8 @@ function onAction(act, el){
     case "rescan": rescanSkipped(); break;
     case "clear-done": clearCompleted(); openSettings(); break;
     case "new-pass": newPass(); closeModal(); break;
+    case "list-tag": toggleListTag(el.dataset.id); break;          // view-only, so no pushUndo/commit — nothing in state changed
+    case "clear-list-filters": clearListFilters(); renderList(); break;
     case "toggle-list": state.listOpen=!state.listOpen; render(); save(); break;
     case "toggle-ctx": state.ctxOpen=!state.ctxOpen; render(); save(); break;
     case "toggle-hist": state.histOpen=!state.histOpen; render(); save(); break;
@@ -1749,6 +1822,10 @@ document.addEventListener("change", e=>{
   if(el.matches("[data-ctx]")){ toggleContext(el.dataset.ctx); return; }
   if(el.matches("[data-mgrctx]")){ const c=state.contexts.find(c=>c.id===el.dataset.mgrctx); if(c){ pushUndo(); c.active=el.checked; commit(); } return; }
   if(el.matches("[data-mgrname]")){ const c=state.contexts.find(c=>c.id===el.dataset.mgrname); if(c && el.value.trim()){ pushUndo(); c.name=el.value.trim(); commit(); } return; }
+});
+document.addEventListener("input", e=>{
+  const el = e.target;
+  if(el && el.id === "listSearch") setListQuery(el.value);
 });
 document.addEventListener("paste", e=>{
   const t = e.target;
