@@ -41,10 +41,39 @@ two moments: when the page loads, and when the tab regains focus.
 
 - Writes are debounced 2 seconds, so a fast scanning run costs one write, not thirty
 - A pull that finds nothing new produces zero writes
-- Conflicts resolve last-write-wins on a `updatedAt` timestamp
+- Ahead/behind is decided by a revision counter, not by timestamps (below)
 - Adopting a remote state pushes onto the undo stack — `u` takes it back
 - `localStorage` is still the local layer, so the app works offline and
   syncs up next time it can reach the network
+
+### Revisions, not clocks
+
+`state.updatedAt` is stamped with `Date.now()` on whichever device wrote it —
+that device's **own clock**. Comparing two devices' timestamps therefore ranks
+them by clock offset, not by when the edits happened: a laptop running a few
+hours fast wins every reconcile no matter how stale its copy is. That is how a
+phone's newer work, task renames included, got replaced by a laptop's older
+copy. Wall-clock time cannot order edits made on two machines.
+
+So the document carries `rev`, an integer that only ever goes up, and each
+device keeps `state.syncRev` — the revision its copy is based on.
+
+- **Remote `rev` higher than local `syncRev`** → the cloud holds work this
+  device has never seen. Adopt it.
+- **Equal** → both sides share a base, so any local difference is genuinely
+  this device's to push.
+- Writes are **conditional**: `CS.push()` runs a Firestore transaction that
+  refuses if the document has moved past the revision the caller read. Two
+  devices pushing at once used to mean the second silently replaced the first;
+  now the loser gets `{conflict:true}`, pulls, and reconciles.
+
+`syncRev` is deliberately kept **out of the payload** — it is device-local
+bookkeeping. If it rode along, every device would see a difference the instant
+it adopted someone else's state and push it straight back.
+
+The timestamp comparison survives only as the migration path, for a document
+written before revisions existed or a device that has never synced under them.
+The first write on either side ends it.
 
 ### No writing before reading
 
@@ -67,9 +96,11 @@ re-arms it. If a newer remote lands on top of edits you'd just made, a toast
 says so and `u` takes it back.
 
 The failure mode that remains: genuinely concurrent offline edits on two
-devices. There is no merge — the device whose copy is older when it finally
-reconciles adopts the other's, and its own changes live on the undo stack
-rather than in the cloud. Settings → Export JSON is the escape hatch.
+devices. There is no merge — the device on the older revision adopts the
+other's when it reconciles, and its own changes live on the undo stack rather
+than in the cloud. Nothing is overwritten in the cloud without being read
+first, but one side's edits still have to yield. Settings → Export JSON is the
+escape hatch.
 
 Free tier is 50k reads and 20k writes a day. Realistic use here is a few dozen.
 
