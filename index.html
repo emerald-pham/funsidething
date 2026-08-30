@@ -452,7 +452,7 @@ let sparkCache = new Map();    // id:WxH -> memoized sparkline SVG string; clear
 let undoStack = [];
 let quickAddCtx = [];          // context ids currently picked in the quick-add bar — UI-only, sticky across adds, not synced
 let listQuery = "";            // all-tasks search box, already trimmed + lowercased — UI-only, like quickAddCtx: never saved, never synced, never undoable
-let listTagFilter = null;      // ...and the one context id the list is narrowed to, or null. One at a time, by design.
+let listTagFilter = null;      // ...and the one filter key the list is narrowed to ("s:no", "c:c_home"), or null. One at a time, by design.
 let saveTimer = null;
 let storageOK = false;
 let useLocal  = false;   // true when running as a plain web page (localStorage)
@@ -1409,17 +1409,51 @@ function renderScan(){
    state.contexts[].active, so what the scanner considers eligible is exactly
    the same whether you're looking at the whole list or one tag's worth of it. */
 
-/* A tag filter can outlive the thing it points at — the context can be
-   deactivated from the Contexts panel or deleted outright in Settings. Only
-   active contexts are offered, so an inactive one can't keep filtering either. */
+/* The states a row can visibly carry, in the order the row itself draws them:
+   the due chips, the flags, then the skip mark. Filtering by one of these is
+   filtering by something you can already see on the list. */
+const LIST_STATUS_TAGS = [
+  { id:"overdue",    label:"overdue",     match:t=>{ const d=dueInfo(t.due); return !!d && d.cls==="due-overdue"; } },
+  { id:"today",      label:"due today",   match:t=>{ const d=dueInfo(t.due); return !!d && d.cls==="due-today"; } },
+  { id:"notstarted", label:"not started", match:t=>!!t.startsAt && isoToDate(t.startsAt) > isoToDate(todayISO(0)) },
+  { id:"evergreen",  label:"evergreen",   match:t=>!!t.evergreen },
+  { id:"no",         label:"no",          match:t=>state.considered[t.id]==="no" },
+  { id:"cant",       label:"can\u2019t",  match:t=>state.considered[t.id]==="cant" },
+  { id:"dislodged",  label:"dislodged",   match:t=>state.considered[t.id]==="dislodged" },
+  { id:"worked",     label:"worked",      match:t=>state.considered[t.id]==="worked" }
+];
+
+/* One rule for the whole row: a filter is offered only when at least one open
+   task would match it. So the row is empty on a plain unmarked list, it grows
+   a "dislodged" button the moment something gets dislodged, and the contexts
+   you never use never show up. Keys are namespaced so a context someone names
+   "no" can't collide with the no mark. */
+function listTagOptions(){
+  const open = openTasks();
+  const out = [];
+  for(const s of LIST_STATUS_TAGS){
+    if(open.some(s.match)) out.push({ key:"s:"+s.id, label:s.label, match:s.match });
+  }
+  for(const c of state.contexts){
+    if(!c.active) continue;                       // inactive contexts aren't searchable
+    const match = t => t.ctx.includes(c.id);
+    if(open.some(match)) out.push({ key:"c:"+c.id, label:c.name, match });
+  }
+  return out;
+}
+/* A filter can outlive what it points at: the mark gets cleared or expires, the
+   task gets crossed off, the context is deactivated or deleted. When the thing
+   stops being offered, the filter goes with it rather than leaving the list
+   stuck behind a control that's no longer on screen. */
 function normalizeListFilters(){
-  if(listTagFilter && !state.contexts.some(c=>c.id===listTagFilter && c.active)) listTagFilter = null;
+  if(listTagFilter && !listTagOptions().some(o=>o.key===listTagFilter)) listTagFilter = null;
 }
 function listFiltersActive(){ normalizeListFilters(); return !!(listQuery || listTagFilter); }
 function filteredListTasks(){
   normalizeListFilters();
+  const tag = listTagFilter ? listTagOptions().find(o=>o.key===listTagFilter) : null;
   return openTasks().filter(t=>{
-    if(listTagFilter && !t.ctx.includes(listTagFilter)) return false;
+    if(tag && !tag.match(t)) return false;
     if(listQuery && !t.title.toLowerCase().includes(listQuery)) return false;
     return true;
   });
@@ -1444,12 +1478,14 @@ function renderListFilters(){
   if(!row) return;
   if(!state.listOpen){ row.innerHTML=""; return; }
   normalizeListFilters();
-  // Labelled because the quick-add bar carries an identical-looking row of the
-  // same contexts a few pixels below, and it does something entirely different.
-  row.innerHTML = '<span class="ltaglabel">Filter</span>' + state.contexts.filter(c=>c.active).map(c => {
-    const on = listTagFilter===c.id;
-    return '<button type="button" class="ltag'+(on?" on":"")+'" data-act="list-tag" data-id="'+c.id+'"'
-         + ' aria-pressed="'+(on?"true":"false")+'">'+esc(c.name)+'</button>';
+  const opts = listTagOptions();
+  if(!opts.length){ row.innerHTML=""; return; }   // no caption either — nothing to caption
+  // Labelled because the quick-add bar carries a similar-looking chip row a few
+  // pixels below, and it does something entirely different.
+  row.innerHTML = '<span class="ltaglabel">Filter</span>' + opts.map(o => {
+    const on = listTagFilter===o.key;
+    return '<button type="button" class="ltag'+(on?" on":"")+'" data-act="list-tag" data-id="'+esc(o.key)+'"'
+         + ' aria-pressed="'+(on?"true":"false")+'">'+esc(o.label)+'</button>';
   }).join("");
 }
 

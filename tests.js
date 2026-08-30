@@ -4656,214 +4656,424 @@ test("list search: typing in the box is wired to the filter", () => {
   assert.match(m[0], /listSearch/, `the input listener should watch #listSearch: ${m && m[0]}`);
 });
 
-/* ---------- filter by tag ---------- */
+/* ---------- filter by the badges a row actually carries ----------
+   The buttons in the FILTER row are the states you can see on the rows
+   themselves: the skip marks (no / can't / dislodged / worked), the flags
+   (evergreen, not started), the due states, and the contexts. One rule
+   governs all of them — a button exists only when at least one open task
+   would match it. Nothing offers you a filter that returns nothing. */
 
-test("list tag filter: offers a button for each active context", async () => {
-  const { ctx, shim } = await loadApp({ seed: 910 });
+function tagLabels(shim) {
+  return [...tagRowHTML(shim).matchAll(/<button[^>]*>([\s\S]*?)<\/button>/g)].map((m) => m[1]);
+}
+function tagKeys(shim) {
+  return [...tagRowHTML(shim).matchAll(/<button[^>]*data-id="([^"]+)"/g)].map((m) => m[1]);
+}
+function clickTag(ctx, key) {
+  ctx.onAction("list-tag", { dataset: { id: key } });
+}
+function rowTitles(shim) {
+  return [...listHTML(shim).matchAll(/data-act="edit"[^>]*>([\s\S]*?)<\/button>/g)].map((m) => m[1]);
+}
+
+/* ---------- "where present": nothing offers an empty filter ---------- */
+
+test("list filter row: a plain unmarked list offers no filter buttons at all", async () => {
+  const { ctx, shim } = await loadApp({ seed: 940 });
+  ctx.addTask("Write the scene", false);
+  ctx.addTask("Fix the sink", false);
   openList(ctx);
 
-  const row = tagRowHTML(shim);
-  for (const c of ctx.state.contexts) {
-    assert.match(row, new RegExp(`data-id="${c.id}"`), `expected a filter button for ${c.name}: ${row}`);
-  }
+  assert.deepEqual(tagLabels(shim), [],
+    `nothing is marked, so there is nothing to filter by: ${tagRowHTML(shim)}`);
 });
 
-test("list tag filter: an inactive context is not offered as a filter", async () => {
-  const { ctx, shim } = await loadApp({ seed: 911 });
-  ctx.toggleContext("c_car");   // deactivate it
+test("list filter row: a 'no' mark puts a no button on the row", async () => {
+  const { ctx, shim } = await loadApp({ seed: 941 });
+  ctx.addTask("Task A", false);
+  ctx.addTask("Task B", false);
+  ctx.startScan();          // dots Task A, offers Task B
+  ctx.decide("no");         // marks Task B 'no' through the real scan flow
   openList(ctx);
 
-  const row = tagRowHTML(shim);
-  assert.ok(!/data-id="c_car"/.test(row), `an inactive context shouldn't be searchable: ${row}`);
-  assert.match(row, /data-id="c_home"/, "the active ones should still be there");
+  assert.ok(tagLabels(shim).includes("no"), `expected a "no" button: ${tagRowHTML(shim)}`);
 });
 
-test("list tag filter: clicking a tag narrows the list to tasks carrying it", async () => {
-  const { ctx, shim } = await loadApp({ seed: 912 });
+test("list filter row: an evergreen task puts an evergreen button on the row", async () => {
+  const { ctx, shim } = await loadApp({ seed: 942 });
+  const t = ctx.addTask("Water the plants", false);
+  ctx.state.tasks.find((x) => x.id === t.id).evergreen = true;
+  openList(ctx);
+
+  assert.ok(tagLabels(shim).includes("evergreen"), `expected an "evergreen" button: ${tagRowHTML(shim)}`);
+});
+
+test("list filter row: a dislodged task puts a dislodged button on the row", async () => {
+  const { ctx, shim } = await loadApp({ seed: 943 });
+  const t = ctx.addTask("Shunted aside", false);
+  ctx.state.considered[t.id] = "dislodged";
+  openList(ctx);
+
+  assert.ok(tagLabels(shim).includes("dislodged"), `expected a "dislodged" button: ${tagRowHTML(shim)}`);
+});
+
+test("list filter row: a can't mark and a worked mark each get their own button", async () => {
+  const { ctx, shim } = await loadApp({ seed: 944 });
+  const a = ctx.addTask("Blocked on someone", false);
+  const b = ctx.addTask("Chipped away at it", false);
+  ctx.state.considered[a.id] = "cant";
+  ctx.state.considered[b.id] = "worked";
+  openList(ctx);
+
+  const labels = tagLabels(shim);
+  assert.ok(labels.includes("can’t"), `expected a "can't" button: ${labels}`);
+  assert.ok(labels.includes("worked"), `expected a "worked" button: ${labels}`);
+});
+
+test("list filter row: overdue, due today and not started each appear when a task is in that state", async () => {
+  const { ctx, shim } = await loadApp({ seed: 945 });
+  const a = ctx.addTask("Late thing", false);
+  const b = ctx.addTask("Today thing", false);
+  const c = ctx.addTask("Future thing", false);
+  const find = (id) => ctx.state.tasks.find((x) => x.id === id);
+  find(a.id).due = "2020-01-01";
+  find(b.id).due = ctx.todayISO(0);
+  find(c.id).startsAt = ctx.todayISO(30);
+  openList(ctx);
+
+  const labels = tagLabels(shim);
+  assert.ok(labels.includes("overdue"), `expected "overdue": ${labels}`);
+  assert.ok(labels.includes("due today"), `expected "due today": ${labels}`);
+  assert.ok(labels.includes("not started"), `expected "not started": ${labels}`);
+});
+
+test("list filter row: a button disappears once the last task in that state loses it", async () => {
+  const { ctx, shim } = await loadApp({ seed: 946 });
+  const t = ctx.addTask("Shunted aside", false);
+  ctx.state.considered[t.id] = "dislodged";
+  openList(ctx);
+  assert.ok(tagLabels(shim).includes("dislodged"), "precondition: the button is there");
+
+  ctx.rescanSkipped();      // clears every skip mark
+  ctx.render();
+  assert.ok(!tagLabels(shim).includes("dislodged"),
+    `an offer that would now return nothing should be withdrawn: ${tagRowHTML(shim)}`);
+});
+
+/* ---------- contexts share the row, under the same rule ---------- */
+
+test("list filter row: a context carried by an open task is offered alongside the badges", async () => {
+  const { ctx, shim } = await loadApp({ seed: 947 });
+  ctx.addTask("Drive to the shop", false, ["c_car"]);
+  openList(ctx);
+
+  const labels = tagLabels(shim);
+  assert.ok(labels.includes("Have the car"), `a context in use should be filterable: ${labels}`);
+  assert.deepEqual(labels, ["Have the car"],
+    `and only the one in use — the other five active contexts have no tasks: ${labels}`);
+});
+
+test("list filter row: contexts nobody uses stay off the row entirely", async () => {
+  const { ctx, shim } = await loadApp({ seed: 948 });
+  ctx.addTask("Write the scene", false);   // no contexts on it — the common case
+  ctx.addTask("Fix the sink", false);
+  openList(ctx);
+
+  assert.deepEqual(tagLabels(shim), [],
+    `six unused contexts shouldn't clutter the row: ${tagRowHTML(shim)}`);
+});
+
+test("list filter row: an inactive context isn't offered even when a task carries it", async () => {
+  const { ctx, shim } = await loadApp({ seed: 949 });
+  ctx.addTask("Drive to the shop", false, ["c_car"]);
+  ctx.addTask("Write the scene", false, ["c_home"]);
+  openList(ctx);
+  assert.deepEqual(tagLabels(shim).sort(), ["At home", "Have the car"], "precondition: both are offered");
+
+  ctx.toggleContext("c_car");
+  assert.deepEqual(tagLabels(shim), ["At home"],
+    `only active contexts are searchable: ${tagRowHTML(shim)}`);
+});
+
+test("list filter row: a context named after a badge doesn't collide with it", async () => {
+  const { ctx, shim } = await loadApp({ seed: 950 });
+  ctx.state.contexts.push({ id: "c_custom", name: "no", active: true });
+  const tagged = ctx.addTask("Carries a context called no", false, ["c_custom"]);
+  const marked = ctx.addTask("Actually marked no", false);
+  ctx.state.considered[marked.id] = "no";
+  openList(ctx);
+
+  const keys = tagKeys(shim);
+  assert.equal(new Set(keys).size, keys.length, `filter keys must be unique: ${keys}`);
+  const ctxKey = keys.find((k) => k.includes("c_custom"));
+  const statusKey = keys.find((k) => k !== ctxKey);
+  clickTag(ctx, ctxKey);
+  assert.deepEqual(rowTitles(shim), ["Carries a context called no"],
+    "the context filter must not pick up the 'no'-marked task");
+  clickTag(ctx, statusKey);
+  assert.deepEqual(rowTitles(shim), ["Actually marked no"],
+    "and the badge filter must not pick up the context-tagged one");
+  assert.ok(tagged && marked);
+});
+
+/* ---------- what the buttons do ---------- */
+
+test("list filter: clicking 'no' shows only the tasks marked no", async () => {
+  const { ctx, shim } = await loadApp({ seed: 951 });
+  const a = ctx.addTask("Said no to this", false);
+  ctx.addTask("Untouched", false);
+  ctx.state.considered[a.id] = "no";
+  openList(ctx);
+
+  clickTag(ctx, tagKeys(shim)[0]);
+  assert.deepEqual(rowTitles(shim), ["Said no to this"]);
+});
+
+test("list filter: clicking 'evergreen' shows only the evergreen tasks", async () => {
+  const { ctx, shim } = await loadApp({ seed: 952 });
+  const a = ctx.addTask("Water the plants", false);
+  ctx.addTask("One-off job", false);
+  ctx.state.tasks.find((x) => x.id === a.id).evergreen = true;
+  openList(ctx);
+
+  clickTag(ctx, tagKeys(shim)[0]);
+  assert.deepEqual(rowTitles(shim), ["Water the plants"]);
+});
+
+test("list filter: clicking a context shows only the tasks carrying it", async () => {
+  const { ctx, shim } = await loadApp({ seed: 953 });
   ctx.addTask("Drive to the shop", false, ["c_car"]);
   ctx.addTask("Write the scene", false, ["c_home"]);
   openList(ctx);
 
-  ctx.onAction("list-tag", { dataset: { id: "c_car" } });
-  const html = listHTML(shim);
-  assert.match(html, /Drive to the shop/);
-  assert.ok(!/Write the scene/.test(html), `only the tagged task should show: ${html}`);
+  clickTag(ctx, "c:c_car");
+  assert.deepEqual(rowTitles(shim), ["Drive to the shop"]);
 });
 
-test("list tag filter: an untagged task is filtered out when a tag is picked", async () => {
-  const { ctx, shim } = await loadApp({ seed: 913 });
-  ctx.addTask("Drive to the shop", false, ["c_car"]);
-  ctx.addTask("Untagged errand", false);
+test("list filter: clicking the lit button again clears it", async () => {
+  const { ctx, shim } = await loadApp({ seed: 954 });
+  const a = ctx.addTask("Shunted aside", false);
+  ctx.addTask("Untouched", false);
+  ctx.state.considered[a.id] = "dislodged";
   openList(ctx);
 
-  ctx.onAction("list-tag", { dataset: { id: "c_car" } });
-  assert.ok(!/Untagged errand/.test(listHTML(shim)), "no tag means it can't match a tag filter");
+  const key = tagKeys(shim)[0];
+  clickTag(ctx, key);
+  assert.deepEqual(rowTitles(shim), ["Shunted aside"], "precondition: the filter is narrowing");
+  clickTag(ctx, key);
+  assert.equal(rowTitles(shim).length, 2, "toggling it off should restore the full list");
 });
 
-test("list tag filter: clicking the lit tag again clears the filter", async () => {
-  const { ctx, shim } = await loadApp({ seed: 914 });
+test("list filter: only one button is lit at a time, badge or context alike", async () => {
+  const { ctx, shim } = await loadApp({ seed: 955 });
+  const a = ctx.addTask("Shunted aside", false, ["c_car"]);
+  ctx.addTask("Drive to the shop", false, ["c_car"]);
+  ctx.state.considered[a.id] = "dislodged";
+  openList(ctx);
+
+  clickTag(ctx, "s:dislodged");
+  assert.deepEqual(litTags(shim), ["s:dislodged"]);
+  clickTag(ctx, "c:c_car");
+  assert.deepEqual(litTags(shim), ["c:c_car"], "picking a context should replace the badge filter, not add to it");
+  assert.equal(rowTitles(shim).length, 2);
+});
+
+test("list filter: the lit button says so to a screen reader", async () => {
+  const { ctx, shim } = await loadApp({ seed: 956 });
+  const a = ctx.addTask("Shunted aside", false);
+  ctx.state.considered[a.id] = "dislodged";
+  openList(ctx);
+  clickTag(ctx, "s:dislodged");
+
+  const btn = tagRowHTML(shim).match(/<button[^>]*data-id="s:dislodged"[^>]*>/);
+  assert.ok(btn, `expected the dislodged button: ${tagRowHTML(shim)}`);
+  assert.match(btn[0], /aria-pressed="true"/, btn[0]);
+});
+
+test("list filter: a badge filter and the search box narrow together", async () => {
+  const { ctx, shim } = await loadApp({ seed: 957 });
+  const a = ctx.addTask("Wash the car", false);
+  const b = ctx.addTask("Wash the dishes", false);
+  const c = ctx.addTask("Drive to the shop", false);
+  ctx.state.considered[a.id] = "no";
+  ctx.state.considered[c.id] = "no";
+  openList(ctx);
+
+  clickTag(ctx, "s:no");
+  ctx.setListQuery("wash");
+  assert.deepEqual(rowTitles(shim), ["Wash the car"],
+    "only the task that is both marked no and matches the query should survive");
+  assert.ok(b);
+});
+
+test("list filter: the header count reports the narrowing", async () => {
+  const { ctx, shim } = await loadApp({ seed: 958 });
+  const a = ctx.addTask("Shunted aside", false);
+  ctx.addTask("Untouched", false);
+  ctx.addTask("Also untouched", false);
+  ctx.state.considered[a.id] = "dislodged";
+  openList(ctx);
+  assert.equal(listCount(shim), "(3)");
+
+  clickTag(ctx, "s:dislodged");
+  assert.equal(listCount(shim), "(1 of 3)");
+});
+
+/* ---------- a filter can't outlive what it points at ---------- */
+
+test("list filter: clearing the skip marks drops a badge filter that pointed at one", async () => {
+  const { ctx, shim } = await loadApp({ seed: 959 });
+  const a = ctx.addTask("Shunted aside", false);
+  ctx.addTask("Untouched", false);
+  ctx.state.considered[a.id] = "dislodged";
+  openList(ctx);
+  clickTag(ctx, "s:dislodged");
+  assert.equal(rowTitles(shim).length, 1, "precondition: the filter is narrowing");
+
+  ctx.rescanSkipped();
+  ctx.render();
+  assert.equal(rowTitles(shim).length, 2, "the list mustn't stay stuck behind a filter that no longer exists");
+  assert.deepEqual(litTags(shim), []);
+});
+
+test("list filter: deactivating the filtered context drops the filter", async () => {
+  const { ctx, shim } = await loadApp({ seed: 960 });
   ctx.addTask("Drive to the shop", false, ["c_car"]);
   ctx.addTask("Write the scene", false, ["c_home"]);
   openList(ctx);
+  clickTag(ctx, "c:c_car");
+  assert.equal(rowTitles(shim).length, 1, "precondition: the filter is narrowing");
 
-  ctx.onAction("list-tag", { dataset: { id: "c_car" } });
-  assert.ok(!/Write the scene/.test(listHTML(shim)), "precondition: the first click filters");
-
-  ctx.onAction("list-tag", { dataset: { id: "c_car" } });
-  const html = listHTML(shim);
-  assert.match(html, /Drive to the shop/);
-  assert.match(html, /Write the scene/, "toggling the same tag off should restore the full list");
+  ctx.toggleContext("c_car");
+  assert.equal(rowTitles(shim).length, 2);
+  assert.ok(!tagKeys(shim).includes("c:c_car"), "and the button should be gone");
 });
 
-test("list tag filter: only one tag is lit at a time — a second click replaces the first", async () => {
-  const { ctx, shim } = await loadApp({ seed: 915 });
+test("list filter: deleting the filtered context drops the filter", async () => {
+  const { ctx, shim } = await loadApp({ seed: 961 });
   ctx.addTask("Drive to the shop", false, ["c_car"]);
   ctx.addTask("Write the scene", false, ["c_home"]);
   openList(ctx);
-
-  ctx.onAction("list-tag", { dataset: { id: "c_car" } });
-  ctx.onAction("list-tag", { dataset: { id: "c_home" } });
-
-  const html = listHTML(shim);
-  assert.match(html, /Write the scene/);
-  assert.ok(!/Drive to the shop/.test(html), `the earlier tag should have been replaced, not added: ${html}`);
-
-  assert.deepEqual(litTags(shim), ["c_home"],
-    `exactly one tag button should be lit, and it should be the newer one: ${tagRowHTML(shim)}`);
-});
-
-test("list tag filter: the picked tag's button is marked on/pressed", async () => {
-  const { ctx, shim } = await loadApp({ seed: 916 });
-  openList(ctx);
-  ctx.onAction("list-tag", { dataset: { id: "c_home" } });
-
-  const row = tagRowHTML(shim);
-  const btn = row.match(/<button[^>]*data-id="c_home"[^>]*>/);
-  assert.ok(btn, `expected a c_home button: ${row}`);
-  assert.match(btn[0], /\bon\b/, `the picked tag should carry the "on" class: ${btn[0]}`);
-  assert.match(btn[0], /aria-pressed="true"/, `and say so to a screen reader: ${btn[0]}`);
-});
-
-test("list tag filter: deactivating the filtered context drops the filter", async () => {
-  const { ctx, shim } = await loadApp({ seed: 917 });
-  ctx.addTask("Drive to the shop", false, ["c_car"]);
-  ctx.addTask("Write the scene", false, ["c_home"]);
-  openList(ctx);
-  ctx.onAction("list-tag", { dataset: { id: "c_car" } });
-
-  ctx.toggleContext("c_car");   // it's no longer searchable, so the filter can't stand
-  const html = listHTML(shim);
-  assert.match(html, /Write the scene/, `the list shouldn't stay stuck behind a dead filter: ${html}`);
-  assert.ok(!/data-id="c_car"/.test(tagRowHTML(shim)), "and the button should be gone");
-});
-
-test("list tag filter: deleting the filtered context drops the filter", async () => {
-  const { ctx, shim } = await loadApp({ seed: 918 });
-  ctx.addTask("Drive to the shop", false, ["c_car"]);
-  ctx.addTask("Write the scene", false, ["c_home"]);
-  openList(ctx);
-  ctx.onAction("list-tag", { dataset: { id: "c_car" } });
-  assert.ok(!/Write the scene/.test(listHTML(shim)), "precondition: the tag filter is narrowing the list");
+  clickTag(ctx, "c:c_car");
+  assert.equal(rowTitles(shim).length, 1, "precondition: the filter is narrowing");
 
   ctx.onAction("del-ctx", { dataset: { id: "c_car" } });
   ctx.render();
-  assert.match(listHTML(shim), /Write the scene/, "a deleted context can't keep filtering the list");
-  assert.ok(!/data-id="c_car"/.test(tagRowHTML(shim)), "and its filter button should be gone");
+  assert.equal(rowTitles(shim).length, 2);
 });
 
-/* ---------- the two compose, and neither leaks into the scan ---------- */
-
-test("list filters: search and tag filter narrow together", async () => {
-  const { ctx, shim } = await loadApp({ seed: 920 });
-  ctx.addTask("Wash the car", false, ["c_car"]);
-  ctx.addTask("Drive to the shop", false, ["c_car"]);
-  ctx.addTask("Wash the dishes", false, ["c_home"]);
+test("list filter: completing the only task in a filtered state drops the filter", async () => {
+  const { ctx, shim } = await loadApp({ seed: 962 });
+  const a = ctx.addTask("Shunted aside", false);
+  ctx.addTask("Untouched", false);
+  ctx.state.considered[a.id] = "dislodged";
   openList(ctx);
+  clickTag(ctx, "s:dislodged");
+  assert.deepEqual(rowTitles(shim), ["Shunted aside"], "precondition: the filter is narrowing");
 
-  ctx.onAction("list-tag", { dataset: { id: "c_car" } });
-  ctx.setListQuery("wash");
-
-  const html = listHTML(shim);
-  assert.match(html, /Wash the car/, "the one task matching both should survive");
-  assert.ok(!/Drive to the shop/.test(html), `right tag, wrong name: ${html}`);
-  assert.ok(!/Wash the dishes/.test(html), `right name, wrong tag: ${html}`);
+  ctx.doneTask(a.id);
+  assert.equal(rowTitles(shim).length, 1, "the one remaining open task should be visible, not filtered away");
+  assert.deepEqual(litTags(shim), []);
 });
 
-test("list filters: filtering the view never changes which contexts are active", async () => {
-  const { ctx } = await loadApp({ seed: 921 });
-  const before = ctx.state.contexts.map((c) => [c.id, c.active]);
-  ctx.state.listOpen = true;
-  ctx.render();
+/* ---------- still a view, not a mode ---------- */
 
-  ctx.onAction("list-tag", { dataset: { id: "c_car" } });
-  ctx.setListQuery("anything");
-
-  assert.deepEqual(ctx.state.contexts.map((c) => [c.id, c.active]), before,
-    "the list filter is a view, not a context switch — the scan must be unaffected");
-});
-
-test("list filters: filtering the view doesn't change what's eligible to scan", async () => {
-  const { ctx } = await loadApp({ seed: 922 });
+test("list filter: filtering the view never changes which contexts are active", async () => {
+  const { ctx, shim } = await loadApp({ seed: 963 });
   ctx.addTask("Drive to the shop", false, ["c_car"]);
-  ctx.addTask("Write the scene", false, ["c_home"]);
-  ctx.state.listOpen = true;
-  ctx.render();
-  const before = ctx.eligibleTasks().length;
+  ctx.state.listOpen = true; ctx.render();
+  const before = ctx.state.contexts.map((c) => [c.id, c.active]);
 
-  ctx.onAction("list-tag", { dataset: { id: "c_car" } });
+  clickTag(ctx, "c:c_car");
+  assert.deepEqual(litTags(shim), ["c:c_car"], "precondition: the context filter is on");
   ctx.setListQuery("drive");
 
+  assert.deepEqual(ctx.state.contexts.map((c) => [c.id, c.active]), before,
+    "the list filter is a view, not a context switch");
+});
+
+test("list filter: filtering the view doesn't change what's eligible to scan", async () => {
+  const { ctx, shim } = await loadApp({ seed: 964 });
+  const a = ctx.addTask("Drive to the shop", false, ["c_car"]);
+  ctx.addTask("Write the scene", false, ["c_home"]);
+  ctx.state.considered[a.id] = "no";
+  ctx.state.listOpen = true; ctx.render();
+  const before = ctx.eligibleTasks().length;
+
+  clickTag(ctx, "s:no");
+  assert.deepEqual(rowTitles(shim), ["Drive to the shop"], "precondition: the view is narrowed to the no-marked task");
   assert.equal(ctx.eligibleTasks().length, before, "eligibility is a scan concept, not a view concept");
 });
 
-test("list filters: they are UI-only — nothing about them is written into state", async () => {
-  const { ctx } = await loadApp({ seed: 923 });
-  ctx.addTask("Drive to the shop", false, ["c_car"]);
-  ctx.state.listOpen = true;
-  ctx.render();
+test("list filter: nothing about the filters is written into state", async () => {
+  const { ctx, shim } = await loadApp({ seed: 965 });
+  const a = ctx.addTask("Shunted aside", false);
+  ctx.state.considered[a.id] = "dislodged";
+  ctx.state.listOpen = true; ctx.render();
 
-  ctx.onAction("list-tag", { dataset: { id: "c_car" } });
-  ctx.setListQuery("drive");
+  clickTag(ctx, "s:dislodged");
+  assert.deepEqual(litTags(shim), ["s:dislodged"], "precondition: the filter is on");
+  ctx.setListQuery("shunt");
 
   const json = JSON.stringify(ctx.state);
-  assert.ok(!/listQuery/.test(json), `the search query shouldn't be persisted: ${json.slice(0, 200)}`);
-  assert.ok(!/listTagFilter/.test(json), "the tag filter shouldn't be persisted either");
+  assert.ok(!/listQuery|listTagFilter/.test(json), "the filters are UI-only and must not be persisted or synced");
 });
 
-test("list filters: undo doesn't restore an old filter, because filters aren't undoable state", async () => {
-  const { ctx, shim } = await loadApp({ seed: 924 });
-  ctx.addTask("Drive to the shop", false, ["c_car"]);
-  ctx.addTask("Write the scene", false, ["c_home"]);
+test("list filter: undo doesn't restore an old filter, because filters aren't undoable state", async () => {
+  const { ctx, shim } = await loadApp({ seed: 966 });
+  const a = ctx.addTask("Shunted aside", false);
+  ctx.addTask("Untouched", false);
+  ctx.state.considered[a.id] = "dislodged";
   openList(ctx);
-  ctx.onAction("list-tag", { dataset: { id: "c_car" } });
-  assert.deepEqual(litTags(shim), ["c_car"], "precondition: the c_car filter is lit");
+  clickTag(ctx, "s:dislodged");
+  assert.deepEqual(litTags(shim), ["s:dislodged"], "precondition: the filter is lit");
 
-  ctx.undo();   // undoes the last task add, not the filter
-  const html = listHTML(shim);
-  assert.ok(!/Write the scene/.test(html), `undo shouldn't clear the view filter: ${html}`);
+  ctx.addTask("Third thing", false);   // an undoable action taken *after* the mark
+  ctx.undo();                          // walks that back; the dislodged mark is inside the snapshot
+
+  assert.deepEqual(litTags(shim), ["s:dislodged"], "undo walks back state, not what you're looking at");
+  assert.deepEqual(rowTitles(shim), ["Shunted aside"], "and the view stays where you left it");
+});
+
+/* The one case where undo *does* clear a filter: when the thing being undone is
+   the mark the filter was pointing at. That isn't undo touching the view — it's
+   the same rule as everywhere else, an offer that would now return nothing. */
+test("list filter: undoing the mark a filter points at takes the filter with it", async () => {
+  const { ctx, shim } = await loadApp({ seed: 971 });
+  ctx.addTask("Task A", false);
+  ctx.addTask("Task B", false);
+  openList(ctx);                       // before the marking step, so undo's snapshot has the list open
+  ctx.startScan();
+  ctx.decide("no");                    // marks one 'no' — an undoable step
+  clickTag(ctx, "s:no");
+  assert.deepEqual(litTags(shim), ["s:no"], "precondition: the filter is lit");
+
+  ctx.undo();                          // takes the 'no' mark back off
+  assert.deepEqual(litTags(shim), [], "with nothing marked no, the button and its filter both go");
+  assert.equal(rowTitles(shim).length, 2, "and the full list comes back rather than showing nothing");
 });
 
 /* ---------- revealing a task has to beat the filter ---------- */
 
 test("revealTask: clears the list filters so the task it reveals is actually visible", async () => {
-  const { ctx, shim } = await loadApp({ seed: 930 });
-  const car = ctx.addTask("Drive to the shop", false, ["c_car"]);
-  const scene = ctx.addTask("Write the scene", false, ["c_home"]);
+  const { ctx, shim } = await loadApp({ seed: 967 });
+  const a = ctx.addTask("Shunted aside", false);
+  const scene = ctx.addTask("Write the scene", false);
+  ctx.state.considered[a.id] = "dislodged";
   openList(ctx);
-  ctx.onAction("list-tag", { dataset: { id: "c_car" } });
-  ctx.setListQuery("drive");
-  assert.ok(!/Write the scene/.test(listHTML(shim)), "precondition: the scene is filtered out");
+  clickTag(ctx, "s:dislodged");
+  ctx.setListQuery("shunt");
+  assert.ok(!rowTitles(shim).includes("Write the scene"), "precondition: the scene is filtered out");
 
   ctx.revealTask(scene.id);
-  assert.match(listHTML(shim), /data-row="/, "the list should have rows to reveal into");
-  assert.match(listHTML(shim), /Write the scene/,
+  assert.ok(rowTitles(shim).includes("Write the scene"),
     "revealing a task you can't see is a no-op — the filters have to give way");
 });
 
-/* ---------- the filter bar only exists while the list is open ---------- */
+/* ---------- the surrounding chrome ---------- */
 
 test("list filters: the filter bar is hidden while the list is collapsed", async () => {
-  const { ctx, shim } = await loadApp({ seed: 931 });
+  const { ctx, shim } = await loadApp({ seed: 968 });
   ctx.addTask("Write the scene", false);
   ctx.state.listOpen = false;
   ctx.render();
@@ -4873,28 +5083,25 @@ test("list filters: the filter bar is hidden while the list is collapsed", async
   assert.equal(shim.elements.get("listFilters").hidden, false);
 });
 
-/* ---------- telling the two chip rows apart ----------
-   The quick-add bar already has a row of context chips, and it sits a few
-   pixels below this one. Same six pills, same shape — one tags the task
-   you're about to type, the other narrows what you're looking at. The filter
-   row gets a label so they don't read as the same control twice. */
-
-test("list tag filter: the chip row is labelled, so it can't be mistaken for the quick-add chips", async () => {
-  const { ctx, shim } = await loadApp({ seed: 932 });
+test("list filter row: the chip row is labelled when it has anything to offer", async () => {
+  const { ctx, shim } = await loadApp({ seed: 969 });
+  const a = ctx.addTask("Shunted aside", false);
+  ctx.state.considered[a.id] = "dislodged";
   openList(ctx);
 
   const row = tagRowHTML(shim);
   assert.match(row, /class="ltaglabel"/, `expected a label on the filter chip row: ${row}`);
   assert.match(row, /Filter/i, `the label should say what the row does: ${row}`);
+
+  const label = row.match(/<[^>]*class="ltaglabel"[^>]*>/);
+  assert.ok(!/data-act=/.test(label[0]), `the label is a caption, not a control: ${label[0]}`);
 });
 
-test("list tag filter: the label is not itself clickable as a tag", async () => {
-  const { ctx, shim } = await loadApp({ seed: 933 });
+test("list filter row: no label either when there's nothing to filter by", async () => {
+  const { ctx, shim } = await loadApp({ seed: 970 });
+  ctx.addTask("Write the scene", false);
   openList(ctx);
 
-  const label = tagRowHTML(shim).match(/<[^>]*class="ltaglabel"[^>]*>/);
-  assert.ok(label, "precondition: the label exists");
-  assert.ok(!/data-act=/.test(label[0]), `the label is a caption, not a control: ${label[0]}`);
-  // and it must not be counted among the tag buttons
-  assert.equal(litTags(shim).length, 0, "nothing is lit before a tag is picked");
+  assert.equal(tagRowHTML(shim), "",
+    "an empty row shouldn't leave a stray FILTER caption sitting above the list");
 });
