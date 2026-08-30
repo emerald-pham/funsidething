@@ -5105,3 +5105,298 @@ test("list filter row: no label either when there's nothing to filter by", async
   assert.equal(tagRowHTML(shim), "",
     "an empty row shouldn't leave a stray FILTER caption sitting above the list");
 });
+
+/* =====================================================================
+   REGRESSION: A STALE DEVICE MUST NOT OVERWRITE A NEWER CLOUD STATE
+
+   The incident: a browser holding weeks-old localStorage was opened and
+   its stale chain replaced a chain that had been built up in the cloud
+   over a full day of work on another device. Three separate defects in
+   the sync glue each allow that on their own.
+
+   1. CS.pull() returned null both for "the document does not exist" and
+      for "the read threw", and cloudPull() read null as an empty cloud
+      and seeded it from this device. One flaky first request on a stale
+      tab was enough to overwrite a perfectly good remote document.
+
+   2. Pushes were gated only on "is auth ready", never on "has this
+      session actually seen the cloud yet". cloudPushNow() (dotting,
+      deleting) fires with no comparison at all, so an edit made in the
+      seconds before the first pull landed wrote stale content straight
+      over the remote.
+
+   3. save() stamps state.updatedAt = Date.now() on every local write.
+      On a device that had not reconciled yet, that put a fresh timestamp
+      on weeks-old content, which then won the last-write-wins comparison
+      in cloudPull() — so the stale side was declared "ahead" and pushed
+      deliberately, not just by racing.
+
+   The fix has to close all three: a failed read is not an empty cloud,
+   nothing is written before the session reconciles once, and the first
+   reconcile judges this device by the timestamp it LOADED with rather
+   than one a local edit has since re-stamped.
+   ===================================================================== */
+
+const SYNC_STORE_KEY = "fvp:chain-scanner:v1";
+const HOUR = 3600000;
+
+const syncTask = (id, title) => ({
+  id, title, url: null, due: null, evergreen: false, ctx: [],
+  mu: 25, sigma: 25 / 3, done: false, createdAt: 1, completedAt: null, lastDoneAt: null,
+});
+
+/* A complete, valid saved state — the shape loadState() reads off disk and
+   the shape a remote payload carries. `passStartedAt: 0` keeps the boot-time
+   stale-pass recycle out of these tests; it isn't what's under test here. */
+const syncState = (over = {}) => Object.assign({
+  v: 1, tasks: [], contexts: [], chain: [], considered: {}, cantAt: {}, workedAt: {},
+  candidateId: null, workLog: [], interventionActive: false, interventionP: 0, snooze: 0,
+  mode: "scan", decisionsMs: [], presentedAt: 0, passStartedAt: 0,
+  listOpen: false, ctxOpen: true, histOpen: false, seenQuickStart: true, updatedAt: 0,
+  settings: { horizonMin: 60, thresholdPct: 25, samples: 250, cantMin: 30, workedHours: 8, theme: "system" },
+}, over);
+
+/* The weeks-old copy sitting in the stale browser. */
+const STALE_CHAIN = ["t_old"];
+const staleState = (updatedAt) => syncState({
+  tasks: [syncTask("t_old", "Something from last month")],
+  chain: STALE_CHAIN.slice(), updatedAt,
+});
+
+/* The chain built up over today's work, living in the cloud. */
+const CLOUD_CHAIN = ["t_day_a", "t_day_b", "t_day_c"];
+const cloudState = (updatedAt) => syncState({
+  tasks: [syncTask("t_day_a", "Draft the chapter"), syncTask("t_day_b", "Call the bank"), syncTask("t_day_c", "Fix the gate")],
+  chain: CLOUD_CHAIN.slice(), updatedAt,
+});
+
+/* A CloudSync double with a real backing document, so a test can assert what
+   actually survives in the cloud rather than which methods were called.
+   pull() mirrors the module's contract: a well-formed {payload, updatedAt}
+   when the document exists, {empty:true} when it provably does not, and
+   {error:true} when the read failed and we therefore know nothing. */
+function makeSyncHarness({ delayMs = 4, remote = null, failPull = false } = {}) {
+  const h = {
+    doc: remote ? { payload: JSON.stringify(remote), updatedAt: remote.updatedAt } : null,
+    failPull,
+    calls: [],
+    remoteState() { return h.doc ? JSON.parse(h.doc.payload) : null; },
+    remoteChain() { const s = h.remoteState(); return s ? s.chain : null; },
+    factory: () => ({
+      configured: true, ready: true, user: "e@example.com", status: "ok",
+      signIn() {}, signOut() {},
+      async pull() {
+        h.calls.push("pull");
+        await new Promise((r) => setTimeout(r, delayMs));
+        if (h.failPull) return { error: true };
+        return h.doc ? { payload: h.doc.payload, updatedAt: h.doc.updatedAt } : { empty: true };
+      },
+      async push(payload, updatedAt) {
+        h.calls.push("push");
+        await new Promise((r) => setTimeout(r, delayMs));
+        h.doc = { payload, updatedAt };
+      },
+    }),
+  };
+  return h;
+}
+
+const syncSettle = (ms) => new Promise((r) => setTimeout(r, ms));
+const PAST_DEBOUNCE = 2300;   // longer than cloudPush()'s 2s debounce
+
+/* ---- defect 3: a fresh timestamp on stale content must not win ---- */
+
+test("REGRESSION: an edit made before the first reconcile must not let weeks-old content outrank the cloud", async () => {
+  const now = Date.now();
+  const h = makeSyncHarness({ remote: cloudState(now) });
+  const { ctx } = await loadApp({
+    seed: 971,
+    seedStorage: { [SYNC_STORE_KEY]: JSON.stringify(staleState(now - 30 * 24 * HOUR)) },
+    cloudSyncFactory: h.factory,
+  });
+  assert.deepEqual(ctx.state.chain, STALE_CHAIN, "boots from the stale local copy");
+
+  // A single click in the stale tab. save() re-stamps updatedAt to now, which
+  // is the whole trap: the content is a month old, the timestamp is not.
+  ctx.addTask("Typed into the stale tab", false);
+  await ctx.cloudPull();
+
+  assert.deepEqual(ctx.state.chain, CLOUD_CHAIN,
+    "the day's cloud chain must win the first reconcile, not the freshly re-stamped stale one");
+});
+
+test("REGRESSION: a dot racing the session's first pull must not overwrite the cloud chain", async () => {
+  const now = Date.now();
+  const h = makeSyncHarness({ remote: cloudState(now), delayMs: 20 });
+  const { ctx } = await loadApp({
+    seed: 972,
+    seedStorage: { [SYNC_STORE_KEY]: JSON.stringify(staleState(now - 30 * 24 * HOUR)) },
+    cloudSyncFactory: h.factory,
+  });
+
+  const pull = ctx.cloudPull();          // the session's first reconcile, still in flight
+  ctx.addTask("Dotted mid-pull", true);  // a dot takes cloudPushNow() — no debounce, no comparison
+  await pull;
+  await syncSettle(PAST_DEBOUNCE);
+
+  assert.deepEqual(h.remoteChain(), CLOUD_CHAIN,
+    "a write racing the first pull must not land the stale chain in the cloud");
+});
+
+/* ---- defect 2: nothing may be written before the session reconciles ---- */
+
+test("REGRESSION: no cloud write goes out before this session has pulled once", async () => {
+  const now = Date.now();
+  const h = makeSyncHarness({ remote: cloudState(now) });
+  const { ctx } = await loadApp({
+    seed: 973,
+    seedStorage: { [SYNC_STORE_KEY]: JSON.stringify(staleState(now - 30 * 24 * HOUR)) },
+    cloudSyncFactory: h.factory,
+  });
+
+  ctx.addTask("Dotted before anything pulled", true);   // immediate-sync path
+  await syncSettle(PAST_DEBOUNCE);
+
+  const firstPush = h.calls.indexOf("push");
+  if (firstPush !== -1) {
+    const firstPull = h.calls.indexOf("pull");
+    assert.ok(firstPull !== -1 && firstPull < firstPush,
+      `a write must be preceded by a reconcile, got: ${h.calls.join(",")}`);
+  }
+  assert.deepEqual(h.remoteChain(), CLOUD_CHAIN,
+    "an unreconciled device must leave the remote chain alone");
+});
+
+/* ---- defect 1: a failed read is not an empty cloud ---- */
+
+test("REGRESSION: a cloud read that failed must not be seeded over as if the cloud were empty", async () => {
+  const now = Date.now();
+  const h = makeSyncHarness({ remote: cloudState(now), failPull: true });
+  const { ctx } = await loadApp({
+    seed: 974,
+    seedStorage: { [SYNC_STORE_KEY]: JSON.stringify(staleState(now - 30 * 24 * HOUR)) },
+    cloudSyncFactory: h.factory,
+  });
+
+  await ctx.cloudPull();
+  await syncSettle(PAST_DEBOUNCE);
+
+  assert.ok(!h.calls.includes("push"),
+    `a read we could not complete tells us nothing — it must not authorise a write: ${h.calls.join(",")}`);
+  assert.deepEqual(h.remoteChain(), CLOUD_CHAIN, "the remote document must be untouched");
+  assert.deepEqual(ctx.state.chain, STALE_CHAIN, "and local must be left alone too");
+});
+
+/* ---- the fix must not over-correct: legitimate pushes still go out ---- */
+
+test("a device that loaded genuinely newer data than the cloud still wins the reconcile", async () => {
+  const now = Date.now();
+  const h = makeSyncHarness({ remote: cloudState(now - 6 * HOUR) });
+  const { ctx } = await loadApp({
+    seed: 975,
+    seedStorage: { [SYNC_STORE_KEY]: JSON.stringify(staleState(now)) },   // offline edits, newer than the cloud
+    cloudSyncFactory: h.factory,
+  });
+
+  await ctx.cloudPull();
+  await syncSettle(PAST_DEBOUNCE);
+
+  assert.deepEqual(ctx.state.chain, STALE_CHAIN, "this device is ahead — it keeps its own state");
+  assert.deepEqual(h.remoteChain(), STALE_CHAIN, "and pushes it to the cloud");
+});
+
+test("an empty cloud is still seeded from this device", async () => {
+  const h = makeSyncHarness({ remote: null });
+  const { ctx } = await loadApp({
+    seed: 976,
+    seedStorage: { [SYNC_STORE_KEY]: JSON.stringify(staleState(Date.now())) },
+    cloudSyncFactory: h.factory,
+  });
+
+  await ctx.cloudPull();
+  await syncSettle(PAST_DEBOUNCE);
+
+  assert.ok(h.remoteState(), "a cloud with provably no document gets created from this device");
+  assert.deepEqual(h.remoteChain(), STALE_CHAIN);
+});
+
+test("after reconciling once, ordinary edits keep syncing normally", async () => {
+  const now = Date.now();
+  const h = makeSyncHarness({ remote: cloudState(now) });
+  const { ctx } = await loadApp({
+    seed: 977,
+    seedStorage: { [SYNC_STORE_KEY]: JSON.stringify(staleState(now - 30 * 24 * HOUR)) },
+    cloudSyncFactory: h.factory,
+  });
+
+  await ctx.cloudPull();                 // adopts the cloud chain
+  await syncSettle(PAST_DEBOUNCE);
+  assert.deepEqual(ctx.state.chain, CLOUD_CHAIN);
+
+  const t = ctx.addTask("Real work, post-reconcile", true);   // now a legitimate local edit
+  await syncSettle(PAST_DEBOUNCE);
+
+  assert.deepEqual(h.remoteChain(), CLOUD_CHAIN.concat([t.id]),
+    "once the session has seen the cloud, its writes must reach it again");
+});
+
+test("REGRESSION: signing in as a different account re-arms the gate — no write before reading that account's copy", async () => {
+  const now = Date.now();
+  const h = makeSyncHarness({ remote: cloudState(now) });
+  const { ctx, shim } = await loadApp({
+    seed: 978,
+    seedStorage: { [SYNC_STORE_KEY]: JSON.stringify(staleState(now - 30 * 24 * HOUR)) },
+    cloudSyncFactory: h.factory,
+  });
+
+  await ctx.cloudPull();                     // reconciled as e@example.com
+  await syncSettle(PAST_DEBOUNCE);
+  const afterFirst = h.calls.length;
+
+  shim.window.CloudSync.user = "someone-else@example.com";   // signed out, signed back in as another account
+  h.doc = { payload: JSON.stringify(cloudState(now + HOUR)), updatedAt: now + HOUR };
+
+  ctx.addTask("Dotted right after the account switch", true);
+  await syncSettle(PAST_DEBOUNCE);
+
+  const after = h.calls.slice(afterFirst);
+  assert.equal(after[0], "pull",
+    `the new account's document must be read before it is written: ${after.join(",")}`);
+});
+
+test("adopting a newer remote over unsaved local edits says so, so the edits don't just vanish", async () => {
+  const now = Date.now();
+  const h = makeSyncHarness({ remote: cloudState(now) });
+  const { ctx, shim } = await loadApp({
+    seed: 979,
+    seedStorage: { [SYNC_STORE_KEY]: JSON.stringify(staleState(now - 30 * 24 * HOUR)) },
+    cloudSyncFactory: h.factory,
+  });
+
+  ctx.addTask("Typed into the stale tab", false);
+  await ctx.cloudPull();
+
+  const el = shim.elements.get("toast");
+  assert.ok(el && /out of date/i.test(el.textContent),
+    `expected a notice that this tab was replaced, got: ${el && el.textContent}`);
+  assert.match(el.textContent, /↺/, "and it should point at undo as the way back");
+
+  ctx.undo();
+  assert.deepEqual(ctx.state.chain, STALE_CHAIN, "undo really does take the adoption back");
+});
+
+test("a silent adopt stays silent when there was nothing local to lose", async () => {
+  const now = Date.now();
+  const h = makeSyncHarness({ remote: cloudState(now) });
+  const { ctx, shim } = await loadApp({
+    seed: 980,
+    seedStorage: { [SYNC_STORE_KEY]: JSON.stringify(staleState(now - 30 * 24 * HOUR)) },
+    cloudSyncFactory: h.factory,
+  });
+
+  await ctx.cloudPull();          // no local edit first — the ordinary catch-up case
+
+  const el = shim.elements.get("toast");
+  assert.ok(!el || !el.textContent, `an uneventful catch-up shouldn't nag: ${el && el.textContent}`);
+  assert.deepEqual(ctx.state.chain, CLOUD_CHAIN);
+});

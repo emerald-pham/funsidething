@@ -607,18 +607,29 @@ function save(){
    Deliberately NOT a live listener: a realtime push from another device
    mid-scan would swap the benchmark card under your hand. Instead we
    reconcile on load and whenever the tab regains focus. Last write wins,
-   arbitrated by state.updatedAt. */
+   arbitrated by state.updatedAt.
+
+   The rule that keeps last-write-wins honest: this device may not write to
+   the cloud until it has read it at least once this session. A browser left
+   closed for weeks boots holding a stale chain, and every path below used to
+   let that chain reach the cloud before anything had checked what was already
+   up there — which is how a full day of work got overwritten. See sendPush()
+   for the gate and cloudPull() for the two comparisons it depends on. */
 let cloudTimer = null, lastPushed = "", pulling = false;
+let reconciledAs = null;   // the account whose cloud copy this session has successfully READ
+let pendingPush = false;   // a write was asked for before that happened — released once we reconcile
+let baseUpdatedAt = 0;     // state.updatedAt as it came off this device's disk, before any edit re-stamped it
+
 function cloudReady(){ const CS = window.CloudSync; return !!(CS && CS.ready && CS.user); }
+/* Deliberately keyed on the account, not a bare boolean: signing out and in as
+   somebody else puts us right back to knowing nothing about the document we
+   would be writing to, so the gate below has to re-arm rather than coast on a
+   reconcile that belonged to the previous account. */
+function reconciled(){ return reconciledAs !== null && cloudReady() && reconciledAs === window.CloudSync.user; }
 function cloudPush(){
   if(!cloudReady()) return;
   if(cloudTimer) clearTimeout(cloudTimer);
-  cloudTimer = setTimeout(()=>{
-    const payload = JSON.stringify(state);
-    if(payload === lastPushed) return;      // nothing actually changed
-    lastPushed = payload;
-    window.CloudSync.push(payload, state.updatedAt || Date.now());
-  }, 2000);                                  // slow enough not to burn a write per keystroke
+  cloudTimer = setTimeout(()=>{ cloudTimer = null; sendPush(); }, 2000);   // slow enough not to burn a write per keystroke
 }
 /* Bypasses the debounce above for moments that shouldn't wait — dotting a
    task onto the chain, or deleting one. Cancels any pending debounced push
@@ -626,6 +637,24 @@ function cloudPush(){
 function cloudPushNow(){
   if(!cloudReady()) return;
   if(cloudTimer){ clearTimeout(cloudTimer); cloudTimer = null; }
+  sendPush();
+}
+/* The single gate every cloud write goes through.
+
+   BUG FIX: being signed in used to be enough. That let a browser holding
+   weeks-old localStorage overwrite a chain that had been built up in the
+   cloud all day — cloudPushNow() writes with no comparison at all, so one
+   dot in a stale tab, landing before or racing the session's first pull, was
+   enough to destroy the remote document. A write only means something once
+   we know what it would be overwriting, so until this session has read the
+   cloud we hold the write and go read first. cloudPull() releases it. */
+function sendPush(){
+  if(!cloudReady()) return;
+  if(!reconciled() || pulling){
+    pendingPush = true;
+    if(!pulling) cloudPull();   // self-healing: the write triggers the reconcile it is waiting on
+    return;
+  }
   const payload = JSON.stringify(state);
   if(payload === lastPushed) return;      // nothing actually changed
   lastPushed = payload;
@@ -640,20 +669,42 @@ function cloudPushNow(){
    starts while one is already in flight; the event listener (further down)
    no longer triggers a pull at all, only a UI refresh. */
 async function cloudPull(){
-  if(!cloudReady() || pulling) return;
+  if(!cloudReady() || !state || pulling) return;
+  const firstReconcile = !reconciled();
   pulling = true;
   try{
     const remote = await window.CloudSync.pull();
-    const lt = state.updatedAt || 0;
-    if(!remote || !remote.payload){            // empty cloud — seed it from this device
+    /* Three-way answer, and the destructive branch is the one that has to
+       show positive proof. BUG FIX: CS.pull() used to say null both for "no
+       such document" and for "the read threw", and this function read null
+       as an empty cloud and seeded it from here — so one failed request on a
+       stale tab overwrote a perfectly good remote document. Only an explicit
+       {empty:true} authorises that now. Anything we could not read — an
+       error, a malformed reply, an older shim still answering null — leaves
+       us knowing nothing about the cloud, so we touch neither side. */
+    const haveRemote = !!(remote && remote.payload);
+    if(!haveRemote && !(remote && remote.empty)) return;
+    reconciledAs = window.CloudSync.user;
+    if(!haveRemote){                           // empty cloud — seed it from this device
       if(state.tasks.length){ lastPushed = ""; cloudPush(); }
       return;
     }
+    /* BUG FIX: this used to read state.updatedAt, which save() re-stamps to
+       Date.now() on every local write. One click in a stale tab therefore put
+       today's timestamp on month-old content and won the comparison below
+       outright, and the stale chain was pushed over the good one deliberately
+       — not by racing. On the session's first reconcile, judge this device by
+       the timestamp it LOADED with instead: what was on disk is what this
+       device can actually vouch for, and edits piled on top of stale content
+       don't make that content any fresher. They are not lost — an adoption
+       goes on the undo stack, and the toast below says so. */
+    const lt = firstReconcile ? baseUpdatedAt : (state.updatedAt || 0);
     const rt = remote.updatedAt || 0;
     if(rt > lt){
       try{
         const st = JSON.parse(remote.payload);
         if(!st || !Array.isArray(st.tasks)) return;
+        const hadLocalEdits = firstReconcile && (state.updatedAt || 0) > baseUpdatedAt;
         pushUndo();                            // remote adoption is undoable
         state = st;
         lastPushed = remote.payload;
@@ -662,12 +713,17 @@ async function cloudPull(){
         applyTheme();
         recomputeRanks(); ensureCandidate(); render();
         if(useLocal){ try{ localStorage.setItem(STORE_KEY, remote.payload); }catch(e){} }
+        // Swapping the board out from under someone mid-edit needs saying out
+        // loud, or the edits they just made look like they simply vanished.
+        if(hadLocalEdits) toast("This tab was out of date \u2014 loaded the newer copy. \u21ba undoes it.");
       }catch(e){ /* corrupt remote — leave local alone */ }
     }else if(lt > rt){
       lastPushed = ""; cloudPush();            // this device is ahead
     }
   } finally {
     pulling = false;
+    // Whatever sendPush() held back while we had nothing to compare against.
+    if(reconciled() && pendingPush){ pendingPush = false; sendPush(); }
   }
 }
 window.addEventListener("cloudsync", renderSync);   // just the status badge — pulling happens below, not here
@@ -1824,6 +1880,9 @@ function onAction(act, el){
         const st=JSON.parse(box.value);
         if(!st||!Array.isArray(st.tasks)) throw new Error("bad");
         pushUndo(); state=st; dropRemovedFields(state); hydrateState(state); applyTheme();
+        // Pasted in by hand, so it is authoritative as of now — not stale content
+        // that cloudPull() should hold this device's writes back over.
+        baseUpdatedAt = Date.now();
         recomputeRanks(); closeModal(); commit();
       }catch(e){ alert("That didn\u2019t parse as exported state."); }
       break;
@@ -1908,6 +1967,9 @@ function hotkeyDelete(){
 (async function init(){
   const loaded = await loadState();
   state = loaded || defaultState();
+  // What this device knew before any edit this session re-stamps updatedAt.
+  // cloudPull() arbitrates its first reconcile on this, not on the live value.
+  baseUpdatedAt = state.updatedAt || 0;
   dropRemovedFields(state);
   hydrateState(state);
   applyTheme();
@@ -1930,7 +1992,7 @@ const CFG = window.FIREBASE_CONFIG || {};
 const configured = !!(CFG.apiKey && CFG.apiKey.indexOf("PASTE") !== 0);
 const CS = window.CloudSync = {
   configured, ready:false, user:null, status: configured ? "signed-out" : "off",
-  signIn(){}, signOut(){}, async pull(){ return null; }, async push(){}
+  signIn(){}, signOut(){}, async pull(){ return { error:true }; }, async push(){}
 };
 const ping = ()=> window.dispatchEvent(new CustomEvent("cloudsync"));
 
@@ -1956,14 +2018,20 @@ if(configured){
     };
     CS.signOut = ()=> A.signOut(auth);
 
+    /* Three distinct answers, because the caller has to tell them apart:
+       {payload, updatedAt} — the document, read successfully
+       {empty:true}         — we read, and there provably is no document yet
+       {error:true}         — the read did not happen, so we learned nothing
+       Collapsing the last two into null is what let a stale device "seed"
+       an empty cloud that was never empty. See cloudPull(). */
     CS.pull = async ()=>{
-      if(!auth.currentUser) return null;
+      if(!auth.currentUser) return { error:true };
       CS.status = "syncing"; ping();
       try{
         const snap = await F.getDoc(ref());
         CS.status = "ok"; ping();
-        return snap.exists() ? snap.data() : null;
-      }catch(e){ CS.status = "error"; ping(); return null; }
+        return snap.exists() ? snap.data() : { empty:true };
+      }catch(e){ CS.status = "error"; ping(); return { error:true }; }
     };
     CS.push = async (payload, updatedAt)=>{
       if(!auth.currentUser) return;

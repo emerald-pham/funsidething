@@ -46,9 +46,30 @@ two moments: when the page loads, and when the tab regains focus.
 - `localStorage` is still the local layer, so the app works offline and
   syncs up next time it can reach the network
 
-The failure mode to know about: genuinely concurrent offline edits on two
-devices. Whichever syncs second wins, and the other's changes are gone.
-Settings → Export JSON is the escape hatch.
+### No writing before reading
+
+A browser left closed for weeks boots holding a stale chain, and last-write-wins
+alone does not protect you from it. Three rules keep it honest:
+
+- **A tab may not write to the cloud until it has read it once this session.**
+  Dotting a task pushes immediately, with no comparison — so before that first
+  read, the write is held and a pull is fired instead. The pull releases it.
+- **A read that failed is not an empty cloud.** `CS.pull()` answers with the
+  document, or `{empty:true}` when there provably isn't one, or `{error:true}`
+  when the read didn't happen. Only `{empty:true}` lets a device seed the cloud.
+  Anything unreadable means we know nothing, so we write nothing.
+- **The first reconcile judges this device by the timestamp it loaded with**,
+  not by the one `save()` re-stamps on every local edit. Otherwise a single
+  click puts today's timestamp on month-old content and wins outright.
+
+The gate is keyed on the signed-in account, so signing in as someone else
+re-arms it. If a newer remote lands on top of edits you'd just made, a toast
+says so and `u` takes it back.
+
+The failure mode that remains: genuinely concurrent offline edits on two
+devices. There is no merge — the device whose copy is older when it finally
+reconciles adopts the other's, and its own changes live on the undo stack
+rather than in the cloud. Settings → Export JSON is the escape hatch.
 
 Free tier is 50k reads and 20k writes a day. Realistic use here is a few dozen.
 
