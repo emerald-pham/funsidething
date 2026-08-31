@@ -154,6 +154,7 @@ textarea{width:100%;font-family:var(--font-mono);font-size:12px}
 .btn.cant{background:var(--cant)}
 .btn.subtle{background:var(--surface);color:var(--ink);border:1px solid var(--line);box-shadow:none;font-weight:600}
 .btn.urgent{background:var(--chain-deep)}
+.btn.dot{background:var(--chain-deep)}   /* the chain's own colour — this is the button that puts a task on it */
 .qline{font-family:var(--font-q);font-style:italic;font-size:19px;margin:16px 2px 12px;color:var(--ink)}
 .qline .until{white-space:nowrap}
 .decide{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
@@ -1145,6 +1146,30 @@ function returnAsCandidate(id, push){
   delete state.workedAt[id];
   commit();
 }
+/* Puts a task on the chain straight from the edit pane, skipping the scan. The
+   scan's own route onto the chain is answering "yes", which moves rank; this
+   one deliberately records no rank signal, because no "would I rather?" was
+   ever answered — the same reasoning doneTask(), workedOnTask() and dislodge()
+   are built on. It pushes onto the END of the chain, so the task you just
+   dotted becomes the benchmark: the one you do next. */
+function dotTask(id, push){
+  const t = taskById(id); if(!t || t.done) return;   // a completed task must never be dotted
+  if(state.chain.includes(id)) return;               // a duplicate id would break benchmark() and the crumb trail
+  if(push!==false) pushUndo();   // false when the caller already snapshotted — see the dot-task action
+  // Eligibility is deliberately NOT checked. An off-context or not-yet-started
+  // task that you opened and dotted by hand is a decision, not an accident, and
+  // the chain already carries members that go ineligible when a context is
+  // toggled off under them.
+  if(chainStart()) state.passStartedAt = Date.now();   // a fresh chain root is a fresh pass — same as startScan()
+  state.chain.push(id);
+  delete state.considered[id];   // dotted and skipped is a contradiction
+  delete state.cantAt[id];
+  delete state.workedAt[id];
+  if(state.candidateId===id) state.candidateId = null;   // else a later "yes" would dot it a second time
+  state.interventionActive = false;
+  // No mode change and no updatePair, for the same reasons doneTask() skips both.
+  commit(true, true);            // a dot syncs to the cloud right away
+}
 function doneTask(id, push){ // cross any task off from the edit pane, dotted or not, wherever it sits
   const t = taskById(id); if(!t) return;
   if(push!==false) pushUndo();   // false when the caller already snapshotted — see the done-task action
@@ -1788,6 +1813,9 @@ function openHelp(){
 function openEdit(id){
   const t = taskById(id); if(!t) return;
   const skipped = isSkipped(t);
+  // Already on the chain (or crossed off) means there is nothing for Dot to do,
+  // so the button simply isn't offered rather than sitting there inert.
+  const dottable = !t.done && !state.chain.includes(t.id);
   let ctxHtml = "";
   for(const c of state.contexts){
     ctxHtml += '<label><input type="checkbox" data-editctx="'+c.id+'"'+(t.ctx.includes(c.id)?" checked":"")+'/> '+esc(c.name)+'</label>';
@@ -1808,6 +1836,7 @@ function openEdit(id){
     + '<div class="mbtns">'
     + '<button class="btn done" data-act="done-task" data-id="'+t.id+'" title="Cross it off \u2014 completes the task and closes this pane">\u2713 Done</button>'
     + '<button class="btn worked" data-act="worked-task" data-id="'+t.id+'" title="Started it \u2014 cross it off and send it back to the bottom of the list (rule 7)">\u21bb Worked on it</button>'
+    + (dottable ? '<button class="btn dot" data-act="dot-task" data-id="'+t.id+'" title="Put it on the chain now \u2014 it becomes the benchmark, the task you do next">\u25cf Dot</button>' : '')
     + (skipped ? '<button class="btn subtle" data-act="return-candidate" data-id="'+t.id+'" title="Clear its can\u2019t / no / worked / dislodged mark so the scanner can deal it as a candidate again">Return as candidate</button>' : '')
     + '</div>'
     + '<div class="mbtns formacts">'
@@ -1946,6 +1975,13 @@ function onAction(act, el){
       pushUndo();                 // same one-snapshot deal as done-task above
       applyEditFields(t);
       workedOnTask(t.id, false);
+      closeModal(); break;
+    }
+    case "dot-task": {
+      const t=taskById(el.dataset.id); if(!t) break;
+      pushUndo();                 // same one-snapshot deal as done-task/worked-task above
+      applyEditFields(t);
+      dotTask(t.id, false);
       closeModal(); break;
     }
     case "return-candidate": {
