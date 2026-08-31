@@ -440,6 +440,13 @@ const STORE_KEY = "fvp:chain-scanner:v1";
 const THEME_HINT_KEY = "fvp:chain-scanner:theme";   // paint-time cache only; see writeThemeHint()
 const STALE_PASS_MS = 18 * 3600000;   // a scan pass older than this auto-recycles (newPass) — see ensureCandidate()
 const PASS_RESET_HOUR = 2;            // ...and so does one that crosses 02:00 local — the "new day" line, usually the trigger that trips first
+/* One source of truth for every setting default. defaultState() and
+   hydrateState() both read it, so "what a fresh install gets" and "what a
+   state arriving from another device gets backfilled with" can never drift
+   apart — two devices either side of an upgrade would otherwise quietly
+   disagree about a setting neither of them ever set. */
+const DEFAULT_SETTINGS = { horizonMin:60, thresholdPct:25, samples:250, cantMin:30, workedHours:16, theme:"system" };
+const STATE_VERSION = 2;              // bumped when a stored state needs migrating — see hydrateState()
 let _uidc = 0;
 const uid = ()=> "t" + Date.now().toString(36) + (_uidc++).toString(36);
 const esc = s => String(s??"").replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -481,11 +488,42 @@ function dropRemovedFields(st){ for(const t of (st && st.tasks) || []) delete t.
    payload, or an imported export — may predate, so the rest of the app can
    assume they're present. Idempotent, and deliberately DOM-free: callers
    repaint the theme themselves right after. */
+/* Settings reach us from other devices, older versions and pasted JSON, any of
+   which can be missing keys or carrying junk in them.
+
+   BUG FIX: this used to guard only cantMin and workedHours, and only when
+   st.settings was absent entirely. A settings object that existed but was
+   partial — easily produced by an older device or a hand-edited import — left
+   horizonMin, thresholdPct and samples undefined, and the scan's arithmetic
+   quietly became NaN instead of failing where you could see it. Every key is
+   backfilled from DEFAULT_SETTINGS now, and anything non-numeric falls back
+   rather than propagating. */
+function normalizeSettings(s){
+  const out = Object.assign({}, DEFAULT_SETTINGS, (s && typeof s === "object") ? s : {});
+  for(const k of Object.keys(DEFAULT_SETTINGS)){
+    if(k === "theme") continue;
+    // Number(null) and Number("") are 0, not NaN — and a NaN written by an
+    // older build comes back from JSON as null. Coercing blind would turn any
+    // of those into a real-looking 0, so only an actual finite number (or a
+    // numeric string, which a hand-edited import can carry) is accepted.
+    const v = out[k];
+    const n = (typeof v === "string" && v.trim() !== "") ? Number(v) : v;
+    out[k] = (typeof n === "number" && Number.isFinite(n)) ? n : DEFAULT_SETTINGS[k];
+  }
+  out.theme = normalizeTheme(out.theme);                   // absent or corrupt -> "system"
+  return out;
+}
+
 function hydrateState(st){
-  if(!st.settings) st.settings = {horizonMin:60,thresholdPct:25,samples:250,cantMin:30,workedHours:8};
-  if(st.settings.cantMin===undefined) st.settings.cantMin=30;
-  if(st.settings.workedHours===undefined) st.settings.workedHours=8;
-  st.settings.theme = normalizeTheme(st.settings.theme);   // absent or corrupt -> "system"
+  st.settings = normalizeSettings(st.settings);
+  /* One-time migration: the worked window's default moved 8h -> 16h. Eight
+     hours is shorter than a waking day, so a task marked worked at breakfast
+     came back that same evening. Anyone still on the old default moves with
+     it; anyone who picked their own number keeps it. */
+  if(!(st.v >= 2)){
+    if(st.settings.workedHours === 8) st.settings.workedHours = DEFAULT_SETTINGS.workedHours;
+  }
+  st.v = STATE_VERSION;
   if(st.histOpen===undefined) st.histOpen=false;
   // Older states have no passStartedAt. If a chain is in progress there IS a
   // pass, we just don't know when it began — stamp it as of now so it gets a
@@ -509,12 +547,12 @@ function defaultState(){
   }, opts||{});
   const tasks = [];   // start empty — add your own, or paste your Obsidian list in Settings
   return {
-    v:1, tasks, contexts,
+    v:STATE_VERSION, tasks, contexts,
     chain: [], considered: {}, cantAt: {}, workedAt: {}, candidateId: null, workLog: [],
     interventionActive:false, interventionP:0, snooze:0,
     mode:"scan", decisionsMs:[], presentedAt:0, passStartedAt:0,
     listOpen:false, ctxOpen:true, histOpen:false, updatedAt:0, syncRev:0,
-    settings:{ horizonMin:60, thresholdPct:25, samples:250, cantMin:30, workedHours:8, theme:"system" }
+    settings: Object.assign({}, DEFAULT_SETTINGS)
   };
 }
 
@@ -851,13 +889,26 @@ function expireCants(){ // a "can't" mark is bulletproof until cantMin elapses, 
    orphaned mark with no start date (old data, an older JSON import, a cloud
    sync from an older version) gets a fresh bounded window rather than sitting
    out forever, and a leftover timestamp with no mark is swept. */
+/* When a "worked on it" mark lets its task back into the scan.
+
+   BUG FIX: this was purely workedAt + workedHours, and any window shorter
+   than a waking day handed the task straight back the same day — marked
+   worked at 7:38 in the morning, dealt again as a candidate at 5:29 that
+   afternoon, crossed off a second time, and logged in History twice for one
+   day's work. Rule 7 sends a task to the BOTTOM of the list, not to the back
+   of an egg timer. So the mark also holds until the pass day rolls over at
+   02:00 local — the same day line the stale-pass check uses. Whichever comes
+   later wins, so a long window is still honoured in full: worked on at 11pm
+   with a 16h window returns at 3pm, not at 02:00. */
+function workedUntil(at){
+  return Math.max(at + state.settings.workedHours * 3600000, passResetCutoff(at));
+}
 function expireWorked(){
   const now = Date.now();
-  const workedMs = state.settings.workedHours * 3600000;
   for(const [id,v] of Object.entries(state.considered)){
     if(v!=="worked") continue;
     if(!state.workedAt[id]){ state.workedAt[id] = now; continue; }
-    if((now - state.workedAt[id]) >= workedMs){
+    if(now >= workedUntil(state.workedAt[id])){
       delete state.considered[id];
       delete state.workedAt[id];
     }
@@ -897,7 +948,8 @@ function reconcileHistory(){
     g.sort((a,b)=> (a.completedAt||0) - (b.completedAt||0) || (a.createdAt||0) - (b.createdAt||0));
     for(const t of g.slice(1)) drop.add(t.id);
   }
-  if(!drop.size) return 0;
+  const logDropped = reconcileWorkLog();
+  if(!drop.size) return logDropped;
   state.tasks = state.tasks.filter(t=>!drop.has(t.id));
   // The same tidy-up deleteTask() does, so a collapsed duplicate can't leave a
   // dead id sitting on the chain, in a mark, or as the dealt candidate.
@@ -908,7 +960,39 @@ function reconcileHistory(){
     delete state.workedAt[id];
     if(state.candidateId===id) state.candidateId = null;
   }
-  return drop.size;
+  return drop.size + logDropped;
+}
+
+/* The same idea applied to the work log. A task crossed off with Worked on it
+   comes back once its window is up, so working on it again later is real work
+   — but two sessions on the SAME DAY are one day's work as far as History is
+   concerned, and both rows render as "today", which reads as a glitch rather
+   than a record. One row per task per day, stamped with the latest session.
+
+   Across days the repeats stay: Sunday and Monday is two days of work, not a
+   duplicate. evergreen-done entries are exempt outright — recurring daily is
+   the entire point of an evergreen task. */
+function reconcileWorkLog(){
+  const log = state.workLog || [];
+  const at = new Map();          // day + title -> index of the row we're keeping
+  const out = [];
+  let dropped = 0;
+  for(const e of log){
+    if(!e || e.kind !== "worked"){ out.push(e); continue; }
+    const k = dayKey(e.at || 0) + "|" + normTitle(e.title);
+    const i = at.get(k);
+    if(i === undefined){ at.set(k, out.length); out.push(e); continue; }
+    dropped++;
+    if((e.at || 0) > (out[i].at || 0)) out[i] = e;   // keep the day's most recent session
+  }
+  if(dropped) state.workLog = out;
+  return dropped;
+}
+/* Local calendar day, which is what the History labels ("today", "yesterday",
+   a weekday) actually mean — not a UTC one, which would split an evening. */
+function dayKey(ts){
+  const d = new Date(ts);
+  return d.getFullYear() + "-" + d.getMonth() + "-" + d.getDate();
 }
 function isSkipped(t){ // has a no/can't/dislodged/worked mark — same set rescanSkipped() clears in bulk.
   const v = state.considered[t.id];                          // 'done' (evergreen) is a completion, not a skip, so it's excluded here too.
@@ -924,7 +1008,7 @@ function skippedLabel(id, consid){ // list-view badge text — a can't or worked
   if(consid==="worked"){
     const at = state.workedAt[id];
     if(!at) return "worked";
-    const leftHr = Math.ceil((state.settings.workedHours*3600000 - (Date.now()-at)) / 3600000);
+    const leftHr = Math.ceil((workedUntil(at) - Date.now()) / 3600000);
     return leftHr > 0 ? ("worked \u00b7 "+leftHr+"h") : "worked";
   }
   return consid==="no" ? "no" : consid;
@@ -1795,7 +1879,7 @@ function openHelp(){
     + '<li><b>No</b> skips it (and nudges its rank down). <b>Can\u2019t</b> skips it with no rank signal.</li>'
     + '<li>Do the dotted chain from the bottom (newest) to the top.</li>'
     + '<li>Can’t get to a dotted one after all? <b>Can’t</b> takes it off the chain and puts it back in the scan by itself once your Can’t window passes; <b>Dislodge</b> takes it off for the rest of the pass. Neither moves its rank.</li>'
-    + '<li>Either finish a task and cross it off, or use <b>↻ Worked on it</b> to cross it off and send it back to the bottom — it stays out of the scan for the window set in Settings, then comes back on its own. Both are also in the edit pane, for any task.</li>'
+    + '<li>Either finish a task and cross it off, or use <b>↻ Worked on it</b> to cross it off and send it back to the bottom \u2014 it stays out of the scan for the window set in Settings, and never comes back the same day. Both are also in the edit pane, for any task.</li>'
     + '<li>Urgent task? <b>Add &amp; dot</b> puts it straight on the chain so it\u2019s done first.</li>'
     + '<li>Tap a context chip in the <b>Add a task</b> panel to tag what you\u2019re about to add \u2014 it stays picked for the next few too.</li>'
     + '<li>Once you\u2019ve dotted something, crossing a queued task off (or tapping <b>done adding for now</b>) stops new suggestions until you resume.</li>'
@@ -1861,7 +1945,7 @@ function openSettings(){
     + '<div class="frow"><label for="stCantMin">Can\u2019t sticks for (min)</label><input id="stCantMin" type="number" min="5" max="480" value="'+s.cantMin+'" style="width:90px"/>'
     + '<span class="kv">how long a Can\u2019t holds before it\u2019s reconsidered</span></div>'
     + '<div class="frow"><label for="stWorkedHrs">Worked on it sticks for (hrs)</label><input id="stWorkedHrs" type="number" min="1" max="720" value="'+s.workedHours+'" style="width:90px"/>'
-    + '<span class="kv">how long a Worked on it keeps a task out of the scan</span></div>'
+    + '<span class="kv">at least this long \u2014 and never back the same day</span></div>'
     + '<div class="frow"><label for="stThresh">Interrupt below</label><input id="stThresh" type="number" min="1" max="90" value="'+s.thresholdPct+'" style="width:90px"/>'
     + '<span class="kv">% chance of a better task within 1 min</span></div>'
     + '<div class="frow"><label for="stSamples">MC samples</label><input id="stSamples" type="number" min="50" max="2000" step="50" value="'+s.samples+'" style="width:90px"/>'

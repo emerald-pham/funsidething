@@ -1433,15 +1433,52 @@ const preChangeState = (over = {}) => Object.assign({
 
 /* ---- default & migration ---- */
 
-test("workedHours: a fresh state defaults the window to 8 hours", async () => {
+test("workedHours: a fresh state defaults the window to 16 hours", async () => {
   const { ctx } = await loadApp();
-  assert.equal(ctx.state.settings.workedHours, 8);
+  assert.equal(ctx.state.settings.workedHours, 16,
+    "8 was shorter than a waking day, so a task worked at breakfast came back that evening");
 });
 
-test("workedHours: a state saved before the window existed migrates to 8 on boot", async () => {
+test("workedHours: a state saved before the window existed migrates to 16 on boot", async () => {
   const stored = preChangeState();                       // settings has no workedHours key
   const { ctx } = await loadApp({ seedStorage: { [WH_STORE_KEY]: JSON.stringify(stored) } });
-  assert.equal(ctx.state.settings.workedHours, 8);
+  assert.equal(ctx.state.settings.workedHours, 16);
+});
+
+test("workedHours: a state still sitting on the old 8h default is carried up to 16", async () => {
+  const stored = preChangeState({ v: 1, settings: { horizonMin: 60, thresholdPct: 25, samples: 250, cantMin: 30, workedHours: 8, theme: "system" } });
+  const { ctx } = await loadApp({ seedStorage: { [WH_STORE_KEY]: JSON.stringify(stored) } });
+  assert.equal(ctx.state.settings.workedHours, 16, "the old default moves with the new one");
+  assert.equal(ctx.state.v, 2, "and the migration is stamped so it only happens once");
+});
+
+test("workedHours: a window the user picked themselves is never overwritten by the migration", async () => {
+  const stored = preChangeState({ v: 1, settings: { horizonMin: 60, thresholdPct: 25, samples: 250, cantMin: 30, workedHours: 30, theme: "system" } });
+  const { ctx } = await loadApp({ seedStorage: { [WH_STORE_KEY]: JSON.stringify(stored) } });
+  assert.equal(ctx.state.settings.workedHours, 30);
+});
+
+test("REGRESSION: a partial settings object from another device is filled in, not left with holes", async () => {
+  // Reachable from an older device or a hand-edited import: settings exists, so
+  // the old guard skipped it, and horizonMin/thresholdPct/samples stayed
+  // undefined — which turned the scan arithmetic into NaN instead of failing.
+  const stored = preChangeState({ settings: { cantMin: 45 } });
+  const { ctx } = await loadApp({ seedStorage: { [WH_STORE_KEY]: JSON.stringify(stored) } });
+  const s = ctx.state.settings;
+  assert.equal(s.cantMin, 45, "what the other device did set is kept");
+  for (const k of ["horizonMin", "thresholdPct", "samples", "workedHours"]) {
+    assert.ok(Number.isFinite(s[k]), `${k} must be a real number, got ${s[k]}`);
+  }
+  assert.equal(s.theme, "system");
+  assert.match(ctx.untilClock(), /^\d+:\d\d [AP]M$/, `the horizon clock must not read NaN: ${ctx.untilClock()}`);
+});
+
+test("REGRESSION: junk in a synced setting falls back to the default rather than propagating", async () => {
+  const stored = preChangeState({ settings: { horizonMin: "sixty", thresholdPct: null, samples: NaN, cantMin: 30, workedHours: 16, theme: "system" } });
+  const { ctx } = await loadApp({ seedStorage: { [WH_STORE_KEY]: JSON.stringify(stored) } });
+  assert.equal(ctx.state.settings.horizonMin, 60);
+  assert.equal(ctx.state.settings.thresholdPct, 25);
+  assert.equal(ctx.state.settings.samples, 250);
 });
 
 test("workedAt: a state saved without the workedAt map gets an empty one on boot, no crash", async () => {
@@ -1462,7 +1499,7 @@ test("cloudPull: adopting a remote state from an older version backfills workedH
     }),
   });
   await ctx.cloudPull();
-  assert.equal(ctx.state.settings.workedHours, 8, "the window setting must exist after adoption");
+  assert.equal(ctx.state.settings.workedHours, 16, "the window setting must exist after adoption");
   assert.ok(ctx.state.workedAt && typeof ctx.state.workedAt === "object", "the timestamp map must exist after adoption");
   assert.equal(Object.keys(ctx.state.workedAt).length, 0, "and start empty");
 });
@@ -1472,7 +1509,7 @@ test("import-json: importing an export taken before this change backfills worked
   const exported = preChangeState({ considered: { z: "worked" } });   // pre-change export: a worked mark, no workedAt, no workedHours
   ctx.document.getElementById("jsonBox").value = JSON.stringify(exported);
   ctx.onAction("import-json", {});
-  assert.equal(ctx.state.settings.workedHours, 8, "the window setting is filled in on import");
+  assert.equal(ctx.state.settings.workedHours, 16, "the window setting is filled in on import");
   assert.ok(ctx.state.workedAt && typeof ctx.state.workedAt === "object", "the timestamp map exists on import");
   assert.doesNotThrow(() => ctx.ensureCandidate(), "the scan's expiry sweep must not trip over the imported shape");
   assert.ok(typeof ctx.state.workedAt.z === "number", "the imported worked mark is given a start point, not left stuck");
@@ -1489,13 +1526,13 @@ test("data from before this change: a stored 'worked' task with no timestamp is 
   });
   const { ctx } = await loadApp({ seedStorage: { [WH_STORE_KEY]: JSON.stringify(stored) } });
 
-  assert.equal(ctx.state.settings.workedHours, 8, "migration ran");
+  assert.equal(ctx.state.settings.workedHours, 16, "migration ran");
   assert.equal(ctx.state.considered.w, "worked", "the old mark is honoured, not dropped on load");
   assert.ok(typeof ctx.state.workedAt.w === "number", "and it gets a start timestamp backfilled at boot");
   assert.ok(!ctx.pool().some((t) => t.id === "w"), "so it stays out of the scan for a bounded window");
 
   const bootStamp = ctx.state.workedAt.w;
-  setFakeTime(ctx, bootStamp + 9 * 3600000);              // past an 8h window measured from boot
+  setFakeTime(ctx, ctx.workedUntil(bootStamp) + 1000);    // past the window measured from boot
   ctx.ensureCandidate();
   assert.ok(ctx.pool().some((t) => t.id === "w"), "rejoins the scan once that window elapses");
   assert.equal(ctx.state.considered.w, undefined);
@@ -1602,28 +1639,89 @@ test("a fresh worked mark survives the chain emptying out (newPass), regardless 
   assert.equal(ctx.state.considered[w.id], "worked", "the worked mark must survive newPass() while still fresh");
 });
 
-/* ---- expires on its own schedule ---- */
+/* ---- expires on its own schedule ----
+   A worked mark now releases at max(workedAt + workedHours, the next 02:00
+   local). Rule 7 sends a task to the bottom of the list, not to the back of an
+   egg timer, so a window shorter than a waking day must not hand the task back
+   the same day. These anchor to fixed local times so which of the two limits
+   bites is deterministic, rather than depending on the hour the suite runs. */
+const localAt = (day, h, m) => new Date(2026, 7, day, h, m || 0).getTime();
 
-test("a worked mark automatically expires mid-session once workedHours elapses (no newPass needed)", async () => {
+test("a worked mark expires mid-session once its window is up (no newPass needed)", async () => {
   const { ctx } = await loadApp({ seed: 413 });
-  ctx.state.settings.workedHours = 5;
+  ctx.state.settings.workedHours = 25;                    // longer than a day, so the window is the binding limit
   ctx.addTask("Task A", false);
   const w = ctx.addTask("Worked", false);
   ctx.startScan();                                        // dots Task A, so "Worked" is the one on offer
 
-  const t0 = realNow(ctx);
+  const t0 = localAt(30, 3, 0);                           // 3am Sunday
   setFakeTime(ctx, t0);
   ctx.workedOnTask(w.id);
   assert.ok(!ctx.pool().some((t) => t.id === w.id), "excluded from the pool right after being marked");
 
-  setFakeTime(ctx, t0 + 2 * 3600000);                     // 2h in, well within the 5h window
+  setFakeTime(ctx, t0 + 20 * 3600000);                    // 20h in — past 02:00 Monday, inside the 25h window
   ctx.ensureCandidate();
-  assert.ok(!ctx.pool().some((t) => t.id === w.id), "still excluded well within workedHours");
+  assert.ok(!ctx.pool().some((t) => t.id === w.id), "the longer of the two limits is the one that counts");
 
-  setFakeTime(ctx, t0 + 6 * 3600000);                     // past the window
+  setFakeTime(ctx, t0 + 26 * 3600000);                    // past the window
   ctx.ensureCandidate();
-  assert.ok(ctx.pool().some((t) => t.id === w.id), "rejoins the pool once workedHours has elapsed");
+  assert.ok(ctx.pool().some((t) => t.id === w.id), "rejoins the pool once the window has elapsed");
   assert.equal(ctx.state.considered[w.id], undefined);
+});
+
+test("REGRESSION: a task worked on in the morning is not dealt back the same day", async () => {
+  // The report: marked worked at 7:38am, offered again as a candidate at 5:29pm
+  // the same afternoon, crossed off a second time, logged twice for one day.
+  const { ctx } = await loadApp({ seed: 4131 });
+  ctx.state.settings.workedHours = 8;                     // the old default, deliberately kept here
+  ctx.addTask("Task A", false);
+  const w = ctx.addTask("beat mafia 1 definitive edition", false);
+  ctx.startScan();
+
+  setFakeTime(ctx, localAt(31, 7, 38));
+  ctx.workedOnTask(w.id);
+
+  setFakeTime(ctx, localAt(31, 17, 29));                  // 9h51m later — past 8h, same day
+  ctx.ensureCandidate();
+
+  assert.equal(ctx.state.considered[w.id], "worked", "the mark has to hold to the end of the day");
+  assert.ok(!ctx.pool().some((t) => t.id === w.id), "so it is never dealt back as a candidate that evening");
+});
+
+test("it comes back the next day, once the pass day rolls over", async () => {
+  const { ctx } = await loadApp({ seed: 4132 });
+  ctx.state.settings.workedHours = 8;
+  ctx.addTask("Task A", false);
+  const w = ctx.addTask("beat mafia 1 definitive edition", false);
+  ctx.startScan();
+
+  setFakeTime(ctx, localAt(31, 7, 38));
+  ctx.workedOnTask(w.id);
+
+  setFakeTime(ctx, localAt(32, 6, 0));                    // 6am the next morning, past the 02:00 line
+  ctx.ensureCandidate();
+
+  assert.equal(ctx.state.considered[w.id], undefined, "a new day is when rule 7 puts it back in play");
+  assert.ok(ctx.pool().some((t) => t.id === w.id));
+});
+
+test("a late-night worked mark still gets its full window, not just until 02:00", async () => {
+  const { ctx } = await loadApp({ seed: 4133 });
+  ctx.state.settings.workedHours = 16;
+  ctx.addTask("Task A", false);
+  const w = ctx.addTask("Worked at bedtime", false);
+  ctx.startScan();
+
+  setFakeTime(ctx, localAt(30, 23, 0));                   // 11pm Sunday; 02:00 Monday is only 3h away
+  ctx.workedOnTask(w.id);
+
+  setFakeTime(ctx, localAt(31, 2, 30));                   // past the day line, nowhere near 16h
+  ctx.ensureCandidate();
+  assert.equal(ctx.state.considered[w.id], "worked", "the day line must not cut a long window short");
+
+  setFakeTime(ctx, localAt(31, 15, 30));                  // 16h30m after marking
+  ctx.ensureCandidate();
+  assert.equal(ctx.state.considered[w.id], undefined, "and the full window still releases it");
 });
 
 test("a worked mark that has genuinely outlived workedHours IS cleared by newPass()", async () => {
@@ -1632,11 +1730,11 @@ test("a worked mark that has genuinely outlived workedHours IS cleared by newPas
   ctx.addTask("Only queued task", true);
   const w = ctx.addTask("Old worked", false);
 
-  const t0 = realNow(ctx);
+  const t0 = localAt(30, 3, 0);
   setFakeTime(ctx, t0);
   ctx.workedOnTask(w.id);
 
-  setFakeTime(ctx, t0 + 3 * 3600000);                     // 3h later — past the 2h window
+  setFakeTime(ctx, localAt(31, 6, 0));                    // next morning — past the 2h window and the day line
   ctx.benchDone();                                        // -> newPass()
 
   assert.equal(ctx.state.considered[w.id], undefined, "an expired worked mark should be dropped, not preserved forever");
@@ -1650,14 +1748,14 @@ test("shrinking workedHours below the elapsed time expires an existing worked ma
   const w = ctx.addTask("Worked", false);
   ctx.startScan();
 
-  const t0 = realNow(ctx);
+  const t0 = localAt(30, 3, 0);
   setFakeTime(ctx, t0);
   ctx.workedOnTask(w.id);
 
-  setFakeTime(ctx, t0 + 3 * 3600000);                     // 3h later, within a 10h window
-  ctx.state.settings.workedHours = 2;                     // now shorter than the 3h already elapsed
+  setFakeTime(ctx, localAt(31, 6, 0));                    // next morning, still inside a 10h... no: past it
+  ctx.state.settings.workedHours = 2;                     // now far shorter than the time already elapsed
   ctx.ensureCandidate();
-  assert.equal(ctx.state.considered[w.id], undefined, "shrinking the window below elapsed time expires it immediately");
+  assert.equal(ctx.state.considered[w.id], undefined, "shrinking the window below elapsed time expires it on the next check");
 });
 
 /* ---- AUDIT: orphans and data from before this change ---- */
@@ -1681,7 +1779,7 @@ test("AUDIT: a backfilled worked mark then expires normally on its fresh schedul
   const orphan = ctx.addTask("Orphaned worked", false);
   ctx.state.considered[orphan.id] = "worked";
 
-  const t0 = realNow(ctx);
+  const t0 = localAt(30, 3, 0);
   setFakeTime(ctx, t0);
   ctx.ensureCandidate();                                  // backfills workedAt[orphan] = t0
   assert.equal(ctx.state.workedAt[orphan.id], t0);
@@ -1690,7 +1788,7 @@ test("AUDIT: a backfilled worked mark then expires normally on its fresh schedul
   ctx.ensureCandidate();
   assert.equal(ctx.state.considered[orphan.id], "worked", "still bulletproof within its freshly-backfilled window");
 
-  setFakeTime(ctx, t0 + 5 * 3600000);
+  setFakeTime(ctx, localAt(31, 6, 0));                    // next morning, past window and day line alike
   ctx.ensureCandidate();
   assert.equal(ctx.state.considered[orphan.id], undefined, "expires once the backfilled window elapses");
 });
@@ -4015,12 +4113,22 @@ test("workedOnTask: logs a 'worked' entry", async () => {
   assert.ok(entry.at > 0);
 });
 
-test("workedOnTask: marking the same task worked twice logs two separate entries", async () => {
+test("workedOnTask: two sessions on the same task the same day are one History row", async () => {
   const { ctx } = await loadApp({ seed: 353 });
   const t = ctx.addTask("Task A", false);
   ctx.workedOnTask(t.id);
   ctx.workedOnTask(t.id);
-  assert.equal(ctx.state.workLog.length, 2);
+  assert.equal(ctx.state.workLog.length, 1, "one day's work on one task is one row");
+});
+
+test("workedOnTask: sessions on different days are two History rows", async () => {
+  const { ctx } = await loadApp({ seed: 3531 });
+  const t = ctx.addTask("Task A", false);
+  setFakeTime(ctx, localAt(30, 11, 0));
+  ctx.workedOnTask(t.id);
+  setFakeTime(ctx, localAt(31, 11, 0));
+  ctx.workedOnTask(t.id);
+  assert.equal(ctx.state.workLog.length, 2, "Sunday and Monday is two days of work, not a duplicate");
 });
 
 test("completeTask: completing the same evergreen task twice logs two separate entries", async () => {
@@ -6046,4 +6154,145 @@ test("a cloud document written before revisions existed still reconciles by time
   await syncSettle(PAST_DEBOUNCE);
 
   assert.deepEqual(ctx.state.chain, CLOUD_CHAIN, "the legacy path still works during the upgrade");
+});
+
+/* =====================================================================
+   HISTORY RECONCILE, PART 2: SAME-DAY "WORKED ON IT" REPEATS
+
+   The first pass only collapsed duplicate completed *tasks*. The repeats
+   actually showing up in History were workLog entries: "beat mafia 1
+   definitive edition · worked on it · today" twice over, once at 7:38 AM
+   and once at 5:29 PM. Both render as "today", which reads as a glitch.
+
+   Crossing a task off with Worked on it holds it out of the scan for
+   settings.workedHours (8 by default) and then lets it back in, so a
+   second session later the same day is working exactly as designed —
+   there is no mechanism bug here, only a log that records each session
+   as its own row. One row per task per day is what History wants.
+
+   Across days the repeats are real and stay: working on something Sunday
+   AND Monday is two days of work, not a duplicate. Evergreen completions
+   are exempt entirely, repeating daily being their whole point.
+   ===================================================================== */
+
+const workedLog = (ctx) =>
+  Array.from(ctx.state.workLog.filter((e) => e.kind === "worked"), (e) => e.title + "@" + e.at);
+
+// 8/31 7:38 AM and 5:29 PM local, the pair from the report.
+const MORNING = new Date(2026, 7, 31, 7, 38).getTime();
+const EVENING = new Date(2026, 7, 31, 17, 29).getTime();
+const DAY_BEFORE = new Date(2026, 7, 30, 11, 2).getTime();
+
+function seedWorkLog(ctx, entries) {
+  ctx.state.workLog = entries.map((e, i) => ({ id: "w" + i, taskId: e.taskId || "t1", title: e.title, kind: e.kind || "worked", at: e.at }));
+}
+
+test("REGRESSION: two 'worked on it' entries for the same task on the same day collapse to one", async () => {
+  const { ctx } = await loadApp({ seed: 1001 });
+  seedWorkLog(ctx, [
+    { title: "beat mafia 1 definitive edition", at: MORNING },
+    { title: "beat mafia 1 definitive edition", at: EVENING },
+  ]);
+
+  ctx.reconcileHistory();
+
+  assert.deepEqual(workedLog(ctx), ["beat mafia 1 definitive edition@" + EVENING],
+    "one row for the day, stamped with the most recent session");
+});
+
+test("worked entries on different days are real repeats and both stay", async () => {
+  const { ctx } = await loadApp({ seed: 1002 });
+  seedWorkLog(ctx, [
+    { title: "beat mafia 1 definitive edition", at: DAY_BEFORE },
+    { title: "beat mafia 1 definitive edition", at: MORNING },
+    { title: "beat mafia 1 definitive edition", at: EVENING },
+  ]);
+
+  ctx.reconcileHistory();
+
+  assert.deepEqual(workedLog(ctx), [
+    "beat mafia 1 definitive edition@" + DAY_BEFORE,
+    "beat mafia 1 definitive edition@" + EVENING,
+  ], "Sunday's session and Monday's session are two days of work");
+});
+
+test("evergreen completions repeat freely, same day included", async () => {
+  const { ctx } = await loadApp({ seed: 1003 });
+  seedWorkLog(ctx, [
+    { title: "put on work clothes", kind: "evergreen-done", at: MORNING },
+    { title: "put on work clothes", kind: "evergreen-done", at: EVENING },
+  ]);
+
+  ctx.reconcileHistory();
+
+  assert.equal(ctx.state.workLog.length, 2, "recurring daily is the whole point of evergreen");
+});
+
+test("different tasks worked the same day are not each other's duplicates", async () => {
+  const { ctx } = await loadApp({ seed: 1004 });
+  seedWorkLog(ctx, [
+    { taskId: "a", title: "beat mafia 1 definitive edition", at: MORNING },
+    { taskId: "b", title: "beat star wars zero company", at: MORNING + 1000 },
+    { taskId: "c", title: "play marvel gotg game", at: MORNING + 2000 },
+  ]);
+
+  ctx.reconcileHistory();
+
+  assert.equal(ctx.state.workLog.length, 3);
+});
+
+test("a same-day repeat is caught by the regular sweep, not only when asked", async () => {
+  const { ctx } = await loadApp({ seed: 1005 });
+  seedWorkLog(ctx, [
+    { title: "beat star wars zero company", at: MORNING },
+    { title: "beat star wars zero company", at: EVENING },
+  ]);
+
+  ctx.ensureCandidate();
+
+  assert.equal(ctx.state.workLog.length, 1, "the same pass that expires can't/worked marks catches it");
+});
+
+test("collapsing worked entries leaves the rest of the log in order", async () => {
+  const { ctx } = await loadApp({ seed: 1006 });
+  seedWorkLog(ctx, [
+    { taskId: "a", title: "recycle magicband", at: MORNING - 3000 },
+    { taskId: "b", title: "beat mafia 1", at: MORNING },
+    { taskId: "a", title: "recycle magicband", at: EVENING - 1000 },
+    { taskId: "b", title: "beat mafia 1", at: EVENING },
+  ]);
+
+  ctx.reconcileHistory();
+
+  assert.deepEqual(Array.from(ctx.state.workLog, (e) => e.title),
+    ["recycle magicband", "beat mafia 1"], "each survivor keeps its slot; the log stays chronological");
+  assert.deepEqual(Array.from(ctx.state.workLog, (e) => e.at), [EVENING - 1000, EVENING]);
+});
+
+test("the reported log reconciles to one row per task per day", async () => {
+  const { ctx } = await loadApp({ seed: 1007 });
+  // The three same-day pairs from the export, plus the cross-day ones that must survive.
+  seedWorkLog(ctx, [
+    { taskId: "cook", title: "finish cook serve forever",   at: new Date(2026, 7, 26, 20, 22).getTime() },
+    { taskId: "band", title: "recycle magicband",           at: new Date(2026, 7, 30,  6, 44).getTime() },
+    { taskId: "cook", title: "finish cook serve forever",   at: new Date(2026, 7, 30,  6, 49).getTime() },
+    { taskId: "mafia", title: "beat mafia 1",               at: new Date(2026, 7, 30, 11,  2).getTime() },
+    { taskId: "band", title: "recycle magicband",           at: new Date(2026, 7, 30, 15, 57).getTime() },
+    { taskId: "sw",   title: "beat star wars zero company", at: new Date(2026, 7, 31,  6, 38).getTime() },
+    { taskId: "mafia", title: "beat mafia 1",               at: new Date(2026, 7, 31,  7, 38).getTime() },
+    { taskId: "sw",   title: "beat star wars zero company", at: new Date(2026, 7, 31, 17, 28).getTime() },
+    { taskId: "mafia", title: "beat mafia 1",               at: new Date(2026, 7, 31, 17, 29).getTime() },
+  ]);
+
+  ctx.reconcileHistory();
+
+  const rows = Array.from(ctx.state.workLog, (e) => e.title + " " + new Date(e.at).getDate());
+  assert.deepEqual(rows, [
+    "finish cook serve forever 26",
+    "recycle magicband 30",
+    "finish cook serve forever 30",
+    "beat mafia 1 30",
+    "beat star wars zero company 31",
+    "beat mafia 1 31",
+  ], "the three same-day pairs collapse; every cross-day repeat survives");
 });
