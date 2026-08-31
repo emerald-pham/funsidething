@@ -3450,6 +3450,291 @@ test("workedOnTask: an unknown, null, or undefined id is a safe no-op", async ()
   assert.deepEqual(Object.keys(ctx.state.considered), []);
 });
 
+/* ---------- Dot: onto the chain straight from the edit pane ----------
+   The scan's own way onto the chain is answering "yes" to a comparison, which
+   moves rank. This is the override for when you already know — so it dots the
+   task WITHOUT inventing a rank signal, the same stance doneTask(),
+   workedOnTask() and dislodge() take about gestures that answered no
+   "would I rather?". It lands on the end of the chain, i.e. it becomes the
+   benchmark: the thing you do next. */
+
+test("dotTask: pushes onto the end of the chain, making it the new benchmark", async () => {
+  const { ctx } = await loadApp({ seed: 368 });
+  const buried = ctx.addTask("Already dotted", true);
+  const t = ctx.addTask("Dot me", false);
+
+  ctx.dotTask(t.id);
+  assert.deepEqual([...ctx.state.chain], [buried.id, t.id], "it goes on top, not underneath");
+  assert.equal(ctx.benchmark().id, t.id, "the newest dot is what you do next");
+});
+
+test("dotTask: dotting an empty chain roots the chain", async () => {
+  const { ctx } = await loadApp({ seed: 369 });
+  const t = ctx.addTask("Task A", false);
+  ctx.addTask("Task B", false);
+  assert.equal(ctx.state.chain.length, 0, "precondition: nothing dotted");
+
+  ctx.dotTask(t.id);
+  assert.deepEqual([...ctx.state.chain], [t.id]);
+  assert.equal(ctx.benchmark().id, t.id);
+});
+
+test("dotTask: rooting a chain starts the stale-pass clock, like startScan()", async () => {
+  const { ctx } = await loadApp({ seed: 370 });
+  const t = ctx.addTask("Task A", false);
+  assert.equal(ctx.state.passStartedAt, 0, "precondition: no pass is running");
+
+  const before = realNow(ctx);
+  ctx.dotTask(t.id);
+  assert.ok(ctx.state.passStartedAt >= before,
+    `a fresh chain root is a fresh pass — passStartedAt should be stamped, got ${ctx.state.passStartedAt}`);
+});
+
+test("dotTask: dotting onto a running chain does NOT re-stamp the pass clock", async () => {
+  const { ctx } = await loadApp({ seed: 371 });
+  ctx.addTask("Root", false);
+  const t = ctx.addTask("Later dot", false);
+  // A fixed local 10:00, so advancing an hour can never cross the 02:00 day
+  // line and trip the auto-recycle, whatever time of day the suite runs at.
+  const t0 = new Date(2027, 0, 15, 10, 0, 0).getTime();
+  setFakeTime(ctx, t0);
+  ctx.startScan();                       // roots the chain, stamping the clock at t0
+  assert.equal(ctx.state.passStartedAt, t0, "precondition: the root started the pass");
+
+  setFakeTime(ctx, t0 + 60 * 60000);     // 11:00 the same morning — same pass, nowhere near stale
+  ctx.dotTask(t.id);
+  assert.equal(ctx.state.passStartedAt, t0,
+    "a pass that keeps getting re-stamped never goes stale — only a fresh root starts the clock");
+});
+
+test("dotTask: records no rank signal — nothing was compared", async () => {
+  const { ctx } = await loadApp({ seed: 372 });
+  const bench = ctx.addTask("Benchmark", true);
+  const t = ctx.addTask("Dot me", false);
+  const before = ctx.state.tasks.map((x) => ({ id: x.id, mu: x.mu, sigma: x.sigma }));
+
+  ctx.dotTask(t.id);
+  for (const b of before) {
+    const now = ctx.state.tasks.find((x) => x.id === b.id);
+    assert.equal(now.mu, b.mu, `mu moved on ${now.title} — dotting answered no "would I rather?"`);
+    assert.equal(now.sigma, b.sigma, `sigma moved on ${now.title}`);
+  }
+  assert.equal(ctx.benchmark().id, t.id, "precondition check: it really did get dotted");
+  assert.ok(bench.id !== t.id);
+});
+
+test("dotTask: clears a no / can't / dislodged / worked mark — a dotted task is not skipped", async () => {
+  for (const [i, mark] of ["no", "cant", "dislodged", "worked"].entries()) {
+    const { ctx } = await loadApp({ seed: 373 + i * 1000 });
+    ctx.addTask("Root", true);
+    const t = ctx.addTask("Skipped task", false);
+    ctx.state.considered[t.id] = mark;
+
+    ctx.dotTask(t.id);
+    assert.equal(t.id in ctx.state.considered, false,
+      `a "${mark}" mark must not survive the task being dotted`);
+    assert.ok(ctx.state.chain.includes(t.id));
+  }
+});
+
+test("dotTask: clears the can't / worked timestamps alongside the mark", async () => {
+  const { ctx } = await loadApp({ seed: 374 });
+  ctx.addTask("Root", true);
+  const t = ctx.addTask("Task A", false);
+  ctx.state.considered[t.id] = "cant";
+  ctx.state.cantAt[t.id] = realNow(ctx);
+  ctx.state.workedAt[t.id] = realNow(ctx);
+
+  ctx.dotTask(t.id);
+  assert.equal(t.id in ctx.state.cantAt, false, "no orphaned can't timestamp should linger");
+  assert.equal(t.id in ctx.state.workedAt, false, "no orphaned worked timestamp should linger");
+});
+
+test("dotTask: clears the candidate slot when the dotted task was the one on offer", async () => {
+  const { ctx } = await loadApp({ seed: 375 });
+  ctx.addTask("Root", true);
+  const t = ctx.addTask("Task A", false);
+  ctx.state.candidateId = t.id;
+
+  ctx.dotTask(t.id);
+  assert.notEqual(ctx.state.candidateId, t.id,
+    "a task already on the chain must not still be on offer — answering yes would dot it twice");
+});
+
+test("dotTask: leaves the candidate slot alone when some other task is on offer", async () => {
+  const { ctx } = await loadApp({ seed: 376 });
+  ctx.addTask("Root", true);
+  const onOffer = ctx.addTask("On offer", false);
+  const t = ctx.addTask("Dot me", false);
+  ctx.state.candidateId = onOffer.id;
+
+  ctx.dotTask(t.id);
+  assert.equal(ctx.state.candidateId, onOffer.id, "an unrelated candidate should survive");
+});
+
+test("dotTask: clears an active intervention", async () => {
+  const { ctx } = await loadApp({ seed: 377 });
+  ctx.addTask("Root", true);
+  const t = ctx.addTask("Task A", false);
+  ctx.state.interventionActive = true;
+
+  ctx.dotTask(t.id);
+  assert.equal(ctx.state.interventionActive, false, "dotting is a decision — it dismisses the stop-scanning prompt");
+});
+
+test("dotTask: leaves the mode alone — dotting while working does not resume scanning", async () => {
+  const { ctx } = await loadApp({ seed: 378 });
+  ctx.addTask("Root", true);
+  const t = ctx.addTask("Task A", false);
+  ctx.state.mode = "work";
+
+  ctx.dotTask(t.id);
+  assert.equal(ctx.state.mode, "work", "queueing something up next says nothing about resuming the scan");
+  assert.ok(ctx.state.chain.includes(t.id));
+});
+
+test("dotTask: a task already on the chain is a no-op, never a second dot", async () => {
+  const { ctx } = await loadApp({ seed: 379 });
+  const root = ctx.addTask("Root", true);
+  const t = ctx.addTask("Task A", true);
+  assert.deepEqual([...ctx.state.chain], [root.id, t.id], "precondition");
+
+  ctx.dotTask(root.id);
+  assert.deepEqual([...ctx.state.chain], [root.id, t.id],
+    "a duplicate id on the chain would break benchmark() and the crumb trail");
+});
+
+test("dotTask: a completed task is a no-op — a done task must never be dotted", async () => {
+  const { ctx } = await loadApp({ seed: 380 });
+  const t = ctx.addTask("Task A", false);
+  ctx.doneTask(t.id);
+  assert.equal(ctx.state.tasks.find((x) => x.id === t.id).done, true, "precondition");
+
+  ctx.dotTask(t.id);
+  assert.equal(ctx.state.chain.includes(t.id), false);
+});
+
+test("dotTask: an unknown, null, or undefined id is a safe no-op", async () => {
+  const { ctx } = await loadApp({ seed: 381 });
+  ctx.addTask("Task A", false);
+  ctx.dotTask("no-such-id");
+  ctx.dotTask(null);
+  ctx.dotTask(undefined);
+  assert.equal(ctx.state.chain.length, 0);
+  assert.equal(ctx.state.tasks.length, 1);
+});
+
+test("dotTask: dots an ineligible task anyway — a future start date does not block a deliberate dot", async () => {
+  const { ctx } = await loadApp({ seed: 387 });
+  const t = ctx.addTask("Starts next month", false);
+  ctx.state.tasks.find((x) => x.id === t.id).startsAt = "2099-01-01";
+
+  ctx.dotTask(t.id);
+  assert.deepEqual([...ctx.state.chain], [t.id], "you opened it and clicked Dot — that is the decision");
+});
+
+test("dotTask: dots a task whose context is switched off anyway", async () => {
+  const { ctx } = await loadApp({ seed: 388 });
+  ctx.state.contexts.push({ id: "ctx-office", name: "Office", active: false });
+  const t = ctx.addTask("Office job", false, ["ctx-office"]);
+  assert.equal(ctx.isEligible(t), false, "precondition: filtered out of the scan right now");
+
+  ctx.dotTask(t.id);
+  assert.deepEqual([...ctx.state.chain], [t.id]);
+});
+
+/* ---------- the edit pane's Dot button ---------- */
+
+test("UI: the edit pane renders a Dot button carrying that task's id", async () => {
+  const { ctx, shim } = await loadApp({ seed: 384 });
+  const t = ctx.addTask("Task A", false);
+  ctx.openEdit(t.id);
+  const html = shim.elements.get("modalRoot").innerHTML;
+  assert.match(html, /data-act="dot-task"/, `expected a dot-task button in: ${html}`);
+  assert.match(html, new RegExp(`data-act="dot-task" data-id="${t.id}"`));
+});
+
+test("UI: no Dot button on a task that is already dotted", async () => {
+  const { ctx, shim } = await loadApp({ seed: 385 });
+  const dotted = ctx.addTask("Already dotted", true);
+  const loose = ctx.addTask("Not dotted", false);
+
+  // Both halves on purpose: asserting only the absence would pass just as well
+  // against a build that renders no Dot button at all, anywhere.
+  ctx.openEdit(loose.id);
+  assert.match(shim.elements.get("modalRoot").innerHTML, /data-act="dot-task"/,
+    "control: an undotted task must offer the button");
+
+  ctx.openEdit(dotted.id);
+  assert.doesNotMatch(shim.elements.get("modalRoot").innerHTML, /data-act="dot-task"/,
+    "nothing to offer — it is already on the chain");
+});
+
+test("CSS: the Dot button paints a background, so it isn't white-on-nothing", () => {
+  // .btn sets color:#fff and no background of its own — every variant supplies
+  // one. A .btn.dot with no rule wouldn't look plain, it would be invisible.
+  const rule = styleSrc.match(/\.btn\.dot\{([^}]*)\}/);
+  assert.ok(rule, "there should be a .btn.dot rule");
+  assert.match(rule[1], /background:var\(--chain-deep\)/,
+    `the button that puts a task on the chain should wear the chain's own colour: ${rule[1]}`);
+});
+
+test("dot-task: saves the fields you just edited, dots it, and closes the pane", async () => {
+  const { ctx, shim } = await loadApp({ seed: 386 });
+  ctx.addTask("Root", true);
+  const t = ctx.addTask("Old title", false);
+  ctx.openEdit(t.id);
+  fillEditPane(ctx, shim, { title: "Renamed on the way out", due: "2026-09-03" });
+
+  ctx.onAction("dot-task", { dataset: { id: t.id } });
+  const task = ctx.state.tasks.find((x) => x.id === t.id);
+  assert.equal(task.title, "Renamed on the way out", "Dot must not discard the edit");
+  assert.equal(task.due, "2026-09-03");
+  assert.ok(ctx.state.chain.includes(t.id), "and it should be dotted");
+  assert.equal(shim.elements.get("modalRoot").innerHTML, "", "the modal should close behind it");
+});
+
+test("dot-task: the edit and the dot are ONE undo step", async () => {
+  const { ctx, shim } = await loadApp({ seed: 382 });
+  ctx.addTask("Root", true);
+  const t = ctx.addTask("Old title", false);
+  ctx.openEdit(t.id);
+  fillEditPane(ctx, shim, { title: "New title" });
+  ctx.onAction("dot-task", { dataset: { id: t.id } });
+  assert.ok(ctx.state.chain.includes(t.id), "precondition: it was dotted");
+
+  ctx.undo();
+  const task = ctx.state.tasks.find((x) => x.id === t.id);
+  assert.equal(task.title, "Old title", "one undo reverses the edit...");
+  assert.equal(ctx.state.chain.includes(t.id), false, "...and the dot that rode along with it");
+});
+
+test("dot-task: syncs to the cloud right away, like every other dot", async () => {
+  // makeSyncHarness, not makeFakeCloudSyncFactory: the latter answers a bare
+  // null for an empty cloud, which cloudPull() reads as "the read failed" and
+  // refuses to authorise any write off — so nothing would ever push through it.
+  const h = makeSyncHarness();
+  const { ctx, shim } = await loadApp({ seed: 383, cloudSyncFactory: h.factory });
+  const pushes = () => h.calls.filter((c) => c === "push").length;
+
+  ctx.addTask("Root", true);
+  const t = ctx.addTask("Task A", false);
+  await new Promise((r) => setTimeout(r, 300));
+  h.calls.length = 0;                      // ignore whatever the setup already flushed
+
+  ctx.openEdit(t.id);
+  fillEditPane(ctx, shim, { title: "Task A" });
+  ctx.onAction("save-edit", { dataset: { id: t.id } });
+  await new Promise((r) => setTimeout(r, 300));
+  assert.equal(pushes(), 0, "a plain Save is debounced, not immediate — the contrast the next half rests on");
+
+  ctx.openEdit(t.id);
+  fillEditPane(ctx, shim, { title: "Task A" });
+  ctx.onAction("dot-task", { dataset: { id: t.id } });
+  await new Promise((r) => setTimeout(r, 300));
+  assert.ok(pushes() > 0, "a dot must not wait out the 2s debounce — the other device needs it now");
+});
+
 /* ---------- edit pane decluttering ---------- */
 
 test("UI: the Starts hint reads in parentheses", async () => {
