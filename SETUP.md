@@ -67,6 +67,15 @@ device keeps `state.syncRev` — the revision its copy is based on.
   devices pushing at once used to mean the second silently replaced the first;
   now the loser gets `{conflict:true}`, pulls, and reconciles.
 
+Settings ride the payload like everything else, so they sync with the rest of
+the state. `hydrateState()` backfills **every** key from `DEFAULT_SETTINGS` and
+rejects non-numeric values rather than coercing them — a partial or junk
+settings object arriving from an older device used to leave `horizonMin`,
+`thresholdPct` and `samples` undefined and quietly turn the scan's arithmetic
+into `NaN`. `DEFAULT_SETTINGS` is the single source of truth for both a fresh
+install and a backfill, so two devices either side of an upgrade cannot
+disagree about a setting neither of them ever set.
+
 `syncRev` is deliberately kept **out of the payload** — it is device-local
 bookkeeping. If it rode along, every device would see a difference the instant
 it adopted someone else's state and push it straight back.
