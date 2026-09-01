@@ -6409,3 +6409,14 @@ test("HTML: 'Add a task' section comes before 'All tasks' list", () => {
   assert.ok(listWrapIndex !== -1, "listWrap element exists in HTML");
   assert.ok(addPanelIndex < listWrapIndex, "addPanel appears before listWrap in HTML source");
 });
+
+test("CSS: '.listwrap' carries the same margin-top as its '.addwrap'/'.histwrap' siblings", () => {
+  // listWrap used to be the first panel after #scan, which already supplied
+  // the gap via its own margin-bottom — so .listwrap never needed a
+  // margin-top of its own. Now that addPanel sits between #scan and
+  // listWrap, listWrap needs the same spacing rule its stacked siblings use,
+  // or the add panel and the list below it butt up with no gap.
+  const m = html.match(/\.listwrap\{([^}]*)\}/);
+  assert.ok(m, ".listwrap rule exists");
+  assert.match(m[1], /margin-top:\s*14px/, ".listwrap has margin-top:14px, matching .addwrap/.histwrap");
+});
