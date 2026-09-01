@@ -1418,8 +1418,9 @@ test("AUDIT: repairs multiple orphaned can't marks in a single pass, without dis
    task stayed out of the scan until a new pass, a rescan, or Return as
    candidate cleared it by hand. Now the mark carries a timestamp
    (state.workedAt), survives newPass() while fresh, and expireWorked()
-   clears it once state.settings.workedHours have elapsed. It is the
-   hours-scale sibling of the "can't" window (cantMin / cantAt / expireCants).
+   clears it once state.settings.workedHours have elapsed OR the local clock
+   crosses 02:00, whichever comes first. It is the hours-scale sibling of the
+   "can't" window (cantMin / cantAt / expireCants).
    ===================================================================== */
 
 const WH_STORE_KEY = "fvp:chain-scanner:v1";
@@ -1640,16 +1641,17 @@ test("a fresh worked mark survives the chain emptying out (newPass), regardless 
 });
 
 /* ---- expires on its own schedule ----
-   A worked mark now releases at max(workedAt + workedHours, the next 02:00
-   local). Rule 7 sends a task to the bottom of the list, not to the back of an
-   egg timer, so a window shorter than a waking day must not hand the task back
-   the same day. These anchor to fixed local times so which of the two limits
-   bites is deterministic, rather than depending on the hour the suite runs. */
+   A worked mark releases at min(workedAt + workedHours, the next 02:00 local).
+   The 02:00 day line is a hard ceiling: worked on yesterday is today's concern,
+   so no window — however long the user sets it — carries a mark past the next
+   02:00. A short window can still end the hold earlier, within the same day.
+   These anchor to fixed local times so which limit bites is deterministic,
+   rather than depending on the hour the suite runs. */
 const localAt = (day, h, m) => new Date(2026, 7, day, h, m || 0).getTime();
 
 test("a worked mark expires mid-session once its window is up (no newPass needed)", async () => {
   const { ctx } = await loadApp({ seed: 413 });
-  ctx.state.settings.workedHours = 25;                    // longer than a day, so the window is the binding limit
+  ctx.state.settings.workedHours = 25;                    // longer than a day — so the 02:00 line, not the window, is what ends it
   ctx.addTask("Task A", false);
   const w = ctx.addTask("Worked", false);
   ctx.startScan();                                        // dots Task A, so "Worked" is the one on offer
@@ -1659,21 +1661,23 @@ test("a worked mark expires mid-session once its window is up (no newPass needed
   ctx.workedOnTask(w.id);
   assert.ok(!ctx.pool().some((t) => t.id === w.id), "excluded from the pool right after being marked");
 
-  setFakeTime(ctx, t0 + 20 * 3600000);                    // 20h in — past 02:00 Monday, inside the 25h window
+  setFakeTime(ctx, localAt(30, 23, 0));                   // Sun 23:00 — 20h in, the next 02:00 not yet reached
   ctx.ensureCandidate();
-  assert.ok(!ctx.pool().some((t) => t.id === w.id), "the longer of the two limits is the one that counts");
+  assert.ok(!ctx.pool().some((t) => t.id === w.id), "before the day line the mark still holds");
 
-  setFakeTime(ctx, t0 + 26 * 3600000);                    // past the window
+  setFakeTime(ctx, localAt(31, 2, 0));                    // Mon 02:00 — the day line, 2h before the 25h window would end
   ctx.ensureCandidate();
-  assert.ok(ctx.pool().some((t) => t.id === w.id), "rejoins the pool once the window has elapsed");
+  assert.ok(ctx.pool().some((t) => t.id === w.id), "the 02:00 ceiling releases it — the long window never gets to bite");
   assert.equal(ctx.state.considered[w.id], undefined);
 });
 
 test("REGRESSION: a task worked on in the morning is not dealt back the same day", async () => {
   // The report: marked worked at 7:38am, offered again as a candidate at 5:29pm
   // the same afternoon, crossed off a second time, logged twice for one day.
+  // On the 16h default the min() release lands at 23:38 — the working day is
+  // still covered. See the sibling test for what a sub-day window gives up.
   const { ctx } = await loadApp({ seed: 4131 });
-  ctx.state.settings.workedHours = 8;                     // the old default, deliberately kept here
+  assert.equal(ctx.state.settings.workedHours, 16, "sanity: the default window this regression leans on");
   ctx.addTask("Task A", false);
   const w = ctx.addTask("beat mafia 1 definitive edition", false);
   ctx.startScan();
@@ -1681,15 +1685,21 @@ test("REGRESSION: a task worked on in the morning is not dealt back the same day
   setFakeTime(ctx, localAt(31, 7, 38));
   ctx.workedOnTask(w.id);
 
-  setFakeTime(ctx, localAt(31, 17, 29));                  // 9h51m later — past 8h, same day
+  setFakeTime(ctx, localAt(31, 17, 29));                  // 9h51m later — the exact hour from the report
   ctx.ensureCandidate();
 
-  assert.equal(ctx.state.considered[w.id], "worked", "the mark has to hold to the end of the day");
-  assert.ok(!ctx.pool().some((t) => t.id === w.id), "so it is never dealt back as a candidate that evening");
+  assert.equal(ctx.state.considered[w.id], "worked", "the mark holds through the working day");
+  assert.ok(!ctx.pool().some((t) => t.id === w.id), "so it is never dealt back as a candidate that afternoon");
 });
 
-test("it comes back the next day, once the pass day rolls over", async () => {
-  const { ctx } = await loadApp({ seed: 4132 });
+test("a sub-day worked window can hand a morning task back the same evening — the min() trade-off", async () => {
+  // Flipping the 02:00 line from a floor to a ceiling means workedHours is no
+  // longer padded up to it. An 8h window set in the morning genuinely releases
+  // in the evening now. Accepted deliberately: "worked yesterday is today's
+  // concern" is worth more than shielding a window the user shortened below a
+  // waking day, and reconcileWorkLog() still collapses a same-day repeat in
+  // History if a second session does happen.
+  const { ctx } = await loadApp({ seed: 41310 });
   ctx.state.settings.workedHours = 8;
   ctx.addTask("Task A", false);
   const w = ctx.addTask("beat mafia 1 definitive edition", false);
@@ -1698,14 +1708,37 @@ test("it comes back the next day, once the pass day rolls over", async () => {
   setFakeTime(ctx, localAt(31, 7, 38));
   ctx.workedOnTask(w.id);
 
-  setFakeTime(ctx, localAt(32, 6, 0));                    // 6am the next morning, past the 02:00 line
+  setFakeTime(ctx, localAt(31, 16, 0));                   // 8h22m later — past the 8h window, same day
   ctx.ensureCandidate();
-
-  assert.equal(ctx.state.considered[w.id], undefined, "a new day is when rule 7 puts it back in play");
+  assert.equal(ctx.state.considered[w.id], undefined, "the short window releases it the same evening");
   assert.ok(ctx.pool().some((t) => t.id === w.id));
 });
 
-test("a late-night worked mark still gets its full window, not just until 02:00", async () => {
+test("on the default window it comes back the next day, when the pass day rolls over", async () => {
+  const { ctx } = await loadApp({ seed: 4132 });
+  assert.equal(ctx.state.settings.workedHours, 16);
+  ctx.addTask("Task A", false);
+  const w = ctx.addTask("beat mafia 1 definitive edition", false);
+  ctx.startScan();
+
+  setFakeTime(ctx, localAt(31, 20, 0));                   // Mon 20:00 — 16h out is noon Tue, past the day line
+  ctx.workedOnTask(w.id);
+
+  setFakeTime(ctx, localAt(32, 1, 0));                    // Tue 01:00 — before the 02:00 line
+  ctx.ensureCandidate();
+  assert.equal(ctx.state.considered[w.id], "worked", "still last night's mark until the day rolls over");
+
+  setFakeTime(ctx, localAt(32, 2, 30));                   // Tue 02:30 — past the line, hours before the 16h window
+  ctx.ensureCandidate();
+  assert.equal(ctx.state.considered[w.id], undefined, "the 02:00 line puts it back, not the window");
+  assert.ok(ctx.pool().some((t) => t.id === w.id));
+});
+
+test("a late-night worked mark is released at 02:00, not workedHours later", async () => {
+  // Worked on at bedtime, back in play when the day turns. Rule 7 sends a task
+  // to the bottom of the list; the bottom is a new day's list, not a slot 16
+  // hours from now. The window only ever shortens the hold below the day line —
+  // it can never push a mark past it.
   const { ctx } = await loadApp({ seed: 4133 });
   ctx.state.settings.workedHours = 16;
   ctx.addTask("Task A", false);
@@ -1715,13 +1748,70 @@ test("a late-night worked mark still gets its full window, not just until 02:00"
   setFakeTime(ctx, localAt(30, 23, 0));                   // 11pm Sunday; 02:00 Monday is only 3h away
   ctx.workedOnTask(w.id);
 
-  setFakeTime(ctx, localAt(31, 2, 30));                   // past the day line, nowhere near 16h
+  setFakeTime(ctx, localAt(31, 1, 30));                   // Mon 01:30 — still the same day
   ctx.ensureCandidate();
-  assert.equal(ctx.state.considered[w.id], "worked", "the day line must not cut a long window short");
+  assert.equal(ctx.state.considered[w.id], "worked", "before 02:00 the mark holds");
 
-  setFakeTime(ctx, localAt(31, 15, 30));                  // 16h30m after marking
+  setFakeTime(ctx, localAt(31, 2, 30));                   // Mon 02:30 — past the day line, 13h of the window unspent
   ctx.ensureCandidate();
-  assert.equal(ctx.state.considered[w.id], undefined, "and the full window still releases it");
+  assert.equal(ctx.state.considered[w.id], undefined, "the day line releases it");
+  assert.ok(ctx.pool().some((t) => t.id === w.id), "and it can be dealt again today");
+});
+
+/* ---- workedUntil: the two limits, and which one bites ---- */
+
+test("workedUntil returns the earlier of workedHours and the next 02:00", async () => {
+  const { ctx } = await loadApp({ seed: 41331 });
+  ctx.state.settings.workedHours = 16;
+
+  // Worked late Sunday: 02:00 Monday is 3h away, far inside the 16h window, so
+  // the day line is the earlier limit and the one that counts.
+  const lateSun = localAt(30, 23, 0);
+  assert.equal(ctx.workedUntil(lateSun), localAt(31, 2, 0), "late-evening mark: released at the next 02:00");
+  assert.ok(ctx.workedUntil(lateSun) < lateSun + 16 * 3600000, "which is well short of the full window");
+
+  // Worked exactly at 02:00: passResetCutoff jumps to the NEXT day's 02:00
+  // (never instant), so now the 16h window is the earlier limit.
+  const atReset = localAt(31, 2, 0);
+  assert.equal(ctx.workedUntil(atReset), atReset + 16 * 3600000, "a mark set at 02:00 sharp runs the full window, not zero");
+});
+
+test("workedUntil: a window shorter than the time to 02:00 is the limit that bites", async () => {
+  const { ctx } = await loadApp({ seed: 41332 });
+  ctx.state.settings.workedHours = 2;
+
+  const midAfternoon = localAt(30, 14, 0);                // 02:00 is 12h away; the 2h window ends first
+  assert.equal(ctx.workedUntil(midAfternoon), midAfternoon + 2 * 3600000, "short window ends the hold, same day");
+  assert.ok(ctx.workedUntil(midAfternoon) < ctx.passResetCutoff(midAfternoon));
+});
+
+test("boundary: a mark set in the 01:00 hour lives only until 02:00, about an hour", async () => {
+  const { ctx } = await loadApp({ seed: 41333 });
+  ctx.state.settings.workedHours = 16;
+
+  const oneAm = localAt(31, 1, 0);
+  assert.equal(ctx.workedUntil(oneAm), localAt(31, 2, 0), "the very next 02:00, not +16h");
+});
+
+test("crossing 02:00 recycles a worked mark with the pass — not just no / dislodged marks", async () => {
+  const { ctx } = await loadApp({ seed: 4134 });
+  ctx.state.settings.workedHours = 16;                    // long window; only the day line can end it early
+  ctx.addTask("Benchmark", false);
+  const w = ctx.addTask("Worked last night", false);
+  setFakeTime(ctx, localAt(30, 22, 0));                   // Sun 22:00 — the pass starts
+  ctx.startScan();
+  setFakeTime(ctx, localAt(30, 23, 0));                   // Sun 23:00 — worked on it
+  ctx.workedOnTask(w.id);
+
+  setFakeTime(ctx, localAt(31, 1, 59));                   // Mon 01:59 — day line not crossed
+  ctx.ensureCandidate();
+  assert.equal(ctx.state.considered[w.id], "worked", "same day still: the mark holds");
+
+  setFakeTime(ctx, localAt(31, 2, 30));                   // Mon 02:30 — crossed the day line -> auto newPass()
+  ctx.ensureCandidate();
+  assert.equal(ctx.state.considered[w.id], undefined, "new day, new concern: the worked mark recycles with the pass");
+  assert.equal(ctx.state.workedAt[w.id], undefined, "and its timestamp is swept");
+  assert.ok(ctx.pool().some((t) => t.id === w.id), "so the task is dealable again today");
 });
 
 test("a worked mark that has genuinely outlived workedHours IS cleared by newPass()", async () => {
@@ -1877,17 +1967,27 @@ test("skippedLabel: a fresh worked mark shows a remaining-hours countdown; a sta
   const { ctx } = await loadApp({ seed: 426 });
   ctx.state.settings.workedHours = 8;
   const t = ctx.addTask("Task A", false);
-  const t0 = realNow(ctx);
+  const t0 = localAt(30, 3, 0);                           // Sun 03:00 — the 8h window (Sun 11:00) is nearer than the next 02:00
   setFakeTime(ctx, t0);
   ctx.workedOnTask(t.id);
 
   assert.match(ctx.skippedLabel(t.id, "worked"), /worked · \d+h/, "fresh: shows hours left");
 
-  setFakeTime(ctx, t0 + 9 * 3600000);                     // past the 8h window
+  setFakeTime(ctx, t0 + 9 * 3600000);                     // Sun 12:00 — past the 8h window
   assert.equal(ctx.skippedLabel(t.id, "worked"), "worked", "elapsed: falls back to the bare label");
 
   delete ctx.state.workedAt[t.id];
   assert.equal(ctx.skippedLabel(t.id, "worked"), "worked", "no timestamp: bare label, no NaN");
+});
+
+test("skippedLabel: the countdown tracks the nearer 02:00 ceiling, not the full window", async () => {
+  const { ctx } = await loadApp({ seed: 4261 });
+  ctx.state.settings.workedHours = 16;
+  const t = ctx.addTask("Task A", false);
+  setFakeTime(ctx, localAt(30, 23, 0));                   // Sun 23:00 — 02:00 Monday is 3h away, far short of 16h
+  ctx.workedOnTask(t.id);
+
+  assert.equal(ctx.skippedLabel(t.id, "worked"), "worked · 3h", "shows the hours to the day line, not 16");
 });
 
 /* =====================================================================
@@ -2015,21 +2115,26 @@ test("fresh can't and worked marks survive the 18h auto-recycle — their own wi
   ctx.addTask("Benchmark", false);
   const cantT = ctx.addTask("Can't do it", false);
   const workedT = ctx.addTask("Worked on it", false);
-  const t0 = realNow(ctx);
+  // Fixed local 03:00 so the whole span stays inside one 02:00-to-02:00 day:
+  // the 18h ceiling is the trigger under test, and — now that the day line is a
+  // hard ceiling on a worked mark too — no 02:00 crossing sneaks in to expire
+  // the 30-min-old mark early. (With realNow() this flaked when the suite ran
+  // near 08:00 and `late` landed on top of an 02:00.)
+  const t0 = localAt(30, 3, 0);
   setFakeTime(ctx, t0);
   ctx.startScan();                                  // pass starts at t0
   assert.equal(ctx.state.passStartedAt, t0);
 
   // Both marks placed 30 min before the recycle — fresh within their own windows.
-  const late = t0 + 17.5 * 3600000;
+  const late = t0 + 17.5 * 3600000;                 // Sun 20:30
   ctx.state.considered[cantT.id] = "cant";     ctx.state.cantAt[cantT.id] = late;
   ctx.state.considered[workedT.id] = "worked"; ctx.state.workedAt[workedT.id] = late;
 
-  setFakeTime(ctx, t0 + 18 * 3600000);              // pass is 18h old; the two marks are 30 min old
+  setFakeTime(ctx, t0 + 18 * 3600000);              // Sun 21:00 — pass is 18h old; the marks are 30 min old; no 02:00 crossed
   ctx.ensureCandidate();                            // -> auto newPass()
 
   assert.equal(ctx.state.considered[cantT.id], "cant", "a 30-min-old can't is still within its 1h window");
-  assert.equal(ctx.state.considered[workedT.id], "worked", "a 30-min-old worked mark is still within its 8h window");
+  assert.equal(ctx.state.considered[workedT.id], "worked", "a 30-min-old worked mark is still within its window and before the next 02:00");
 });
 
 test("after an auto-recycle, passStartedAt is re-stamped so it does not recycle again immediately", async () => {

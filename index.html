@@ -896,12 +896,19 @@ function expireCants(){ // a "can't" mark is bulletproof until cantMin elapses, 
    worked at 7:38 in the morning, dealt again as a candidate at 5:29 that
    afternoon, crossed off a second time, and logged in History twice for one
    day's work. Rule 7 sends a task to the BOTTOM of the list, not to the back
-   of an egg timer. So the mark also holds until the pass day rolls over at
-   02:00 local — the same day line the stale-pass check uses. Whichever comes
-   later wins, so a long window is still honoured in full: worked on at 11pm
-   with a 16h window returns at 3pm, not at 02:00. */
+   of an egg timer, and "the bottom" is a new day's list.
+
+   So the 02:00 local day line — the same one the stale-pass check uses — is a
+   hard CEILING on the mark: worked on yesterday is today's concern, and no
+   window, however long the user sets it, carries a mark past the next 02:00.
+   min(), not max(): whichever limit comes FIRST releases it. workedHours can
+   still end the hold earlier, within the same day (a short window set in the
+   morning genuinely expires that evening — reconcileWorkLog() collapses the
+   same-day History repeat if a second session happens). What it can't do any
+   more is push a bedtime mark out to mid-afternoon: worked on at 11pm with a
+   16h window returns at 02:00, not at 3pm. */
 function workedUntil(at){
-  return Math.max(at + state.settings.workedHours * 3600000, passResetCutoff(at));
+  return Math.min(at + state.settings.workedHours * 3600000, passResetCutoff(at));
 }
 function expireWorked(){
   const now = Date.now();
@@ -1285,7 +1292,7 @@ function newPass(push){
   expireCants();    // drop any "can't" marks that had already outlived the horizon on their own
   expireWorked();   // and any "worked on it" marks past their window
   for(const [id,v] of Object.entries(state.considered)){
-    if(v==="cant" || v==="worked") continue;   // still-fresh can't / worked marks are bulletproof — they survive a new pass
+    if(v==="cant" || v==="worked") continue;   // still-fresh can't / worked marks survive a new pass (expireWorked above already dropped any that crossed 02:00)
     delete state.considered[id];
   }
   state.snooze = 0;
@@ -1879,7 +1886,7 @@ function openHelp(){
     + '<li><b>No</b> skips it (and nudges its rank down). <b>Can\u2019t</b> skips it with no rank signal.</li>'
     + '<li>Do the dotted chain from the bottom (newest) to the top.</li>'
     + '<li>Can’t get to a dotted one after all? <b>Can’t</b> takes it off the chain and puts it back in the scan by itself once your Can’t window passes; <b>Dislodge</b> takes it off for the rest of the pass. Neither moves its rank.</li>'
-    + '<li>Either finish a task and cross it off, or use <b>↻ Worked on it</b> to cross it off and send it back to the bottom \u2014 it stays out of the scan for the window set in Settings, and never comes back the same day. Both are also in the edit pane, for any task.</li>'
+    + '<li>Either finish a task and cross it off, or use <b>↻ Worked on it</b> to cross it off and send it back to the bottom \u2014 it stays out of the scan for the window set in Settings, or until 02:00 the next day, whichever comes first. Both are also in the edit pane, for any task.</li>'
     + '<li>Urgent task? <b>Add &amp; dot</b> puts it straight on the chain so it\u2019s done first.</li>'
     + '<li>Tap a context chip in the <b>Add a task</b> panel to tag what you\u2019re about to add \u2014 it stays picked for the next few too.</li>'
     + '<li>Once you\u2019ve dotted something, crossing a queued task off (or tapping <b>done adding for now</b>) stops new suggestions until you resume.</li>'
