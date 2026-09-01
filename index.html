@@ -309,18 +309,7 @@ textarea{width:100%;font-family:var(--font-mono);font-size:12px}
 
   <main id="scan" aria-live="polite"></main>
 
-  <section class="panel listwrap" id="listWrap">
-    <button class="lhead" data-act="toggle-list"><span id="listCaret">▸</span> All tasks <span id="listCount" class="mono"></span></button>
-    <!-- Lives outside #listBody on purpose: renderList() rebuilds that body wholesale
-         on every commit, which would blow away a focused input mid-keystroke. -->
-    <div class="lfilters" id="listFilters" hidden>
-      <input id="listSearch" type="search" placeholder="Search tasks by name…" aria-label="Search tasks by name" autocomplete="off"/>
-      <div class="ltags" id="listTagRow"></div>
-    </div>
-    <div id="listBody" hidden></div>
-  </section>
-
-  <!-- Its own panel, not a footer on the list above: capturing a task and
+  <!-- Its own panel, not a footer on the list below: capturing a task and
        reviewing the ones you have are different jobs, and the add bar stays
        usable whether the list is open or collapsed. -->
   <section class="panel addwrap" id="addPanel">
@@ -333,6 +322,17 @@ textarea{width:100%;font-family:var(--font-mono);font-size:12px}
         <button id="addDotBtn" class="btn urgent" data-act="add-dot" title="Urgent — add it with a dot so it's done first (rule 8)">Add &amp; dot</button>
       </div>
     </div>
+  </section>
+
+  <section class="panel listwrap" id="listWrap">
+    <button class="lhead" data-act="toggle-list"><span id="listCaret">▸</span> All tasks <span id="listCount" class="mono"></span></button>
+    <!-- Lives outside #listBody on purpose: renderList() rebuilds that body wholesale
+         on every commit, which would blow away a focused input mid-keystroke. -->
+    <div class="lfilters" id="listFilters" hidden>
+      <input id="listSearch" type="search" placeholder="Search tasks by name…" aria-label="Search tasks by name" autocomplete="off"/>
+      <div class="ltags" id="listTagRow"></div>
+    </div>
+    <div id="listBody" hidden></div>
   </section>
 
   <section class="panel histwrap" id="histPanel"></section>

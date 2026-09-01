@@ -6401,3 +6401,11 @@ test("the reported log reconciles to one row per task per day", async () => {
     "beat mafia 1 31",
   ], "the three same-day pairs collapse; every cross-day repeat survives");
 });
+
+test("HTML: 'Add a task' section comes before 'All tasks' list", () => {
+  const addPanelIndex = html.indexOf('id="addPanel"');
+  const listWrapIndex = html.indexOf('id="listWrap"');
+  assert.ok(addPanelIndex !== -1, "addPanel element exists in HTML");
+  assert.ok(listWrapIndex !== -1, "listWrap element exists in HTML");
+  assert.ok(addPanelIndex < listWrapIndex, "addPanel appears before listWrap in HTML source");
+});
