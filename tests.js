@@ -6262,6 +6262,134 @@ test("a cloud document written before revisions existed still reconciles by time
 });
 
 /* =====================================================================
+   REVISIONS, PART 2: THE REVISION A PUSH EARNS HAS TO REACH DISK
+
+   Symptom, reported from the phone: on a fresh load the first "Done"
+   doesn't take. You tap it, the task comes back, you tap it again and it
+   sticks. Only ever the first one, only ever right after loading.
+
+   Cause: sendPush() records the revision the cloud hands back on
+   state.syncRev and stops there. Nothing saves afterwards — save() has
+   already run by then, since it debounces at 350ms and the push at 2s — so
+   the copy on disk keeps the revision from *before* the write. Every
+   session therefore boots one revision behind a cloud it is perfectly in
+   sync with, reads rr > lr as "the cloud holds work this device has never
+   seen", and adopts the remote wholesale. Anything done while that first
+   pull was in flight goes with it.
+
+   It lands on the first click specifically because a cold load is when the
+   pull is slowest (module import, auth restore, then the read) and because
+   clicking into an unfocused tab fires the focus event that starts one — so
+   the click that gets thrown away is the same click that started the race.
+   ===================================================================== */
+
+test("the revision a push earns is written to disk, not just held in memory", async () => {
+  const now = Date.now();
+  const h = makeSyncHarness({ remote: cloudState(now), rev: 4 });
+  const local = cloudState(now);
+  local.syncRev = 4;
+  const { ctx, shim } = await loadApp({
+    seed: 1101,
+    seedStorage: { [SYNC_STORE_KEY]: JSON.stringify(local) },
+    cloudSyncFactory: h.factory,
+  });
+
+  await ctx.cloudPull();                       // reconciled at revision 4
+  ctx.addTask("Water the plants", false);      // ...and this device writes
+  await syncSettle(PAST_DEBOUNCE + 600);       // past the push debounce, then past save()'s
+
+  assert.ok(h.doc.rev > 4, "the cloud moved on, so there is a new revision to remember");
+  const saved = JSON.parse(shim.localStorage.getItem(SYNC_STORE_KEY));
+  assert.equal(saved.syncRev, h.doc.rev,
+    "the revision this device just wrote has to survive the tab closing, or next boot thinks the cloud is ahead");
+});
+
+test("REGRESSION: the first Done of a session isn't swallowed by that session's first reconcile", async () => {
+  const now = Date.now();
+  const h = makeSyncHarness({ remote: cloudState(now), rev: 4 });
+  const first = cloudState(now);
+  first.syncRev = 4;
+
+  // Session one: ordinary use, ending in a write. Nothing here is unusual —
+  // it is only the last thing she did before closing the tab.
+  const s1 = await loadApp({
+    seed: 1102,
+    seedStorage: { [SYNC_STORE_KEY]: JSON.stringify(first) },
+    cloudSyncFactory: h.factory,
+  });
+  await s1.ctx.cloudPull();
+  s1.ctx.addTask("Water the plants", false);
+  await syncSettle(PAST_DEBOUNCE + 600);
+
+  // Session two boots from exactly what session one left on disk, against
+  // the same cloud document — nobody else has touched it.
+  const s2 = await loadApp({
+    seed: 1103,
+    seedStorage: { [SYNC_STORE_KEY]: s1.shim.localStorage.getItem(SYNC_STORE_KEY) },
+    cloudSyncFactory: h.factory,
+  });
+  assert.equal(s2.ctx.benchmark().id, "t_day_c", "the newest dot is what the Done button acts on");
+
+  const pull = s2.ctx.cloudPull();   // the load's own reconcile, still in flight
+  s2.ctx.benchDone();                // one click on the benchmark card
+  await pull;
+  await syncSettle(PAST_DEBOUNCE + 600);
+
+  const done = s2.ctx.state.tasks.find((t) => t.id === "t_day_c");
+  assert.ok(done.done, "one click has to be enough — the reconcile must not put it back");
+  assert.ok(!s2.ctx.state.chain.includes("t_day_c"), "and it comes off the chain");
+  assert.ok(h.remoteState().tasks.find((t) => t.id === "t_day_c").done,
+    "the completion reaches the cloud too, rather than being reverted to what was already there");
+});
+
+test("a device meeting the revision counter for the first time persists the one it adopts", async () => {
+  const now = Date.now();
+  // A cloud document already on revisions; a device that has never seen one.
+  const h = makeSyncHarness({ remote: cloudState(now - HOUR), rev: 6 });
+  const { ctx, shim } = await loadApp({
+    seed: 1104,
+    seedStorage: { [SYNC_STORE_KEY]: JSON.stringify(staleState(now)) },   // no syncRev at all
+    cloudSyncFactory: h.factory,
+  });
+
+  await ctx.cloudPull();                 // migration path: local is newer, so it pushes
+  await syncSettle(PAST_DEBOUNCE + 600);
+
+  const saved = JSON.parse(shim.localStorage.getItem(SYNC_STORE_KEY));
+  assert.equal(saved.syncRev, h.doc.rev,
+    "the counter it just adopted has to reach disk, or the next boot re-runs this migration a revision behind");
+});
+
+/* The trap in the fix above: the obvious way to persist a revision is to call
+   save(), and save() re-stamps updatedAt and schedules a cloud push. Recording
+   what we just wrote would then count as a change worth writing, whose own
+   callback records another revision, and so on every 2 seconds for as long as
+   the tab is open — an unbounded stream of writes with no edit behind any of
+   them. Hence persist(): the disk half, on its own. */
+test("recording the revision a push earned must not schedule another push", async () => {
+  const now = Date.now();
+  const h = makeSyncHarness({ remote: cloudState(now), rev: 3 });
+  const local = cloudState(now);
+  local.syncRev = 3;
+  const { ctx } = await loadApp({
+    seed: 1105,
+    seedStorage: { [SYNC_STORE_KEY]: JSON.stringify(local) },
+    cloudSyncFactory: h.factory,
+  });
+  await ctx.cloudPull();
+
+  const before = h.calls.filter((c) => c === "push").length;
+  ctx.addTask("One edit, one write", false);
+  await syncSettle(PAST_DEBOUNCE + 600);
+  const after = h.calls.filter((c) => c === "push").length;
+  assert.equal(after - before, 1, "one edit sends one write");
+
+  await syncSettle(PAST_DEBOUNCE * 2);   // two more debounce windows, with nobody touching anything
+  assert.equal(h.calls.filter((c) => c === "push").length, after,
+    "and that write must not breed more of itself while the tab sits idle");
+});
+
+/* =====================================================================
    HISTORY RECONCILE, PART 2: SAME-DAY "WORKED ON IT" REPEATS
 
    The first pass only collapsed duplicate completed *tasks*. The repeats
