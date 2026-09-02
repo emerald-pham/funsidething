@@ -164,10 +164,22 @@ function makeDomShim({ prefersDark = false } = {}) {
 
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
-async function loadApp({ seed, cloudSyncFactory, prefersDark = false, noMatchMedia = false, seedStorage } = {}) {
+async function loadApp({ seed, cloudSyncFactory, prefersDark = false, noMatchMedia = false, seedStorage, hostStorage } = {}) {
   const shim = makeDomShim({ prefersDark });
   if (noMatchMedia) delete shim.window.matchMedia;   // old browser / bare JS host
   if (seedStorage) for (const [k, v] of Object.entries(seedStorage)) shim.localStorage.setItem(k, v);
+  /* The OTHER persistence backend. loadState() prefers window.storage (the
+     artifact host's async key-value store) and only falls back to
+     localStorage — `useLocal` — when there isn't one. Every existing test
+     runs the localStorage path; pass hostStorage to run the other. */
+  if (hostStorage) {
+    const map = new Map(Object.entries(hostStorage));
+    shim.window.storage = {
+      _map: map,
+      async get(k) { return map.has(k) ? { value: map.get(k) } : null; },
+      async set(k, v) { map.set(k, String(v)); },
+    };
+  }
   if (cloudSyncFactory) shim.window.CloudSync = cloudSyncFactory(shim.window);
   const sandbox = {
     window: shim.window,
@@ -6833,4 +6845,77 @@ test("AUDIT H10: the worked-window label must not promise a hold the day line cu
   assert.ok(row, "the Settings row for the worked window exists");
   assert.doesNotMatch(row[0], /at least/, "the label must not promise a minimum it does not keep");
   assert.doesNotMatch(row[0], /never back the same day/, "nor that the task cannot return today");
+});
+
+/* ---- H11: a skip mark reaches innerHTML unescaped ----
+   Every other user-supplied string on a list row goes through esc(). The mark
+   itself does not: skippedLabel() falls through to `return consid` for
+   anything it doesn't recognise, and renderList() concatenates that straight
+   into innerHTML. state.considered only ever holds four known words from the
+   app's own code — but it is also a plain object in the payload, so an
+   imported export or a state from another build can carry anything at all. */
+test("AUDIT H11: an unrecognised skip mark is escaped like every other string on the row", async () => {
+  const { ctx } = await loadApp({ seed: 8011 });
+  const t = ctx.addTask("Ordinary task", false);
+  ctx.state.considered[t.id] = '<img src=x onerror="alert(1)">';
+  ctx.state.listOpen = true;
+  ctx.render();
+
+  const body = ctx.document.getElementById("listBody").innerHTML;
+  assert.ok(!body.includes("<img src=x"), `the mark reached innerHTML as live markup: ${body}`);
+  assert.ok(body.includes("&lt;img"), "it should render as text, the way a title does");
+});
+
+/* ---- H12: clearing history leaves the marks of what it removed ----
+   deleteTask() and reconcileHistory() both sweep the chain, considered, cantAt
+   and workedAt when they drop a task, precisely so no dead id is left behind.
+   clearCompleted() removes tasks too — every done one — and sweeps none of it. */
+test("AUDIT H12: clearing history leaves no mark or dot behind for the tasks it removes", async () => {
+  const { ctx } = await loadApp({ seed: 8012 });
+  const gone = ctx.addTask("Finished, and marked", false);
+  ctx.addTask("Still open", false);
+  // A done task carrying leftovers, which is what an older payload or a
+  // hand-edited import hands us — completeTask() clears its own mark, so
+  // nothing the app does today produces this on its own.
+  // taskById is a top-level const arrow, so it never attaches to the sandbox
+  // (same as esc) — reach the task through state instead.
+  const t = ctx.state.tasks.find((x) => x.id === gone.id);
+  t.done = true; t.completedAt = Date.now();
+  ctx.state.considered[gone.id] = "no";
+  ctx.state.cantAt[gone.id] = Date.now();
+  ctx.state.workedAt[gone.id] = Date.now();
+  ctx.state.chain.push(gone.id);
+
+  ctx.clearCompleted();                       // confirm() is stubbed true
+
+  assert.ok(!ctx.state.tasks.some((x) => x.id === gone.id), "the task is gone");
+  assert.ok(!ctx.state.chain.includes(gone.id), "and so is its dot");
+  assert.ok(!(gone.id in ctx.state.considered), "and its mark");
+  assert.ok(!(gone.id in ctx.state.cantAt), "and its can't timestamp");
+  assert.ok(!(gone.id in ctx.state.workedAt), "and its worked timestamp");
+});
+
+/* ---- H13: an adopted remote only reaches disk on one of the two backends ----
+   cloudPull() writes the state it adopts straight to localStorage, bypassing
+   persist() — so on the artifact host, where loadState() uses window.storage
+   instead and useLocal is false, the adoption never reaches disk at all and a
+   reload resurrects exactly what was just replaced. */
+test("AUDIT H13: a remote adoption reaches disk on the artifact host too, not just localStorage", async () => {
+  const now = Date.now();
+  const h = makeSyncHarness({ remote: cloudState(now), rev: 4 });
+  const local = staleState(now); local.syncRev = 3;
+  const { ctx, shim } = await loadApp({
+    seed: 8013,
+    hostStorage: { [SYNC_STORE_KEY]: JSON.stringify(local) },
+    cloudSyncFactory: h.factory,
+  });
+  assert.deepEqual(Array.from(ctx.state.chain), STALE_CHAIN, "booted from the host store, not localStorage");
+
+  await ctx.cloudPull();
+  assert.deepEqual(Array.from(ctx.state.chain), CLOUD_CHAIN, "the newer revision is adopted in memory");
+
+  await flush();
+  const onDisk = JSON.parse(shim.window.storage._map.get(SYNC_STORE_KEY));
+  assert.deepEqual(onDisk.chain, CLOUD_CHAIN,
+    "a reload must not resurrect the copy the adoption just replaced");
 });

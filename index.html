@@ -952,7 +952,15 @@ async function cloudPull(){
         // Adopted wholesale, so this device is now based on the remote's
         // revision — not on whatever its own copy used to be based on.
         state.syncRev = rr !== null ? rr : (state.syncRev || 0);
-        if(useLocal){ try{ localStorage.setItem(STORE_KEY, JSON.stringify(state)); }catch(e){} }
+        /* persist(), not an inline localStorage write: loadState() prefers
+           window.storage and only falls back to localStorage, so writing one
+           of the two directly meant that on the artifact host the adoption
+           never reached disk at all and a reload brought straight back the
+           copy it had just replaced. persist() writes whichever backend this
+           host actually has. Not save() — recording somebody else's revision
+           is bookkeeping, not an edit, and save() would re-stamp updatedAt
+           and queue a push behind it. */
+        persist();
         // Swapping the board out from under someone mid-edit needs saying out
         // loud, or the edits they just made look like they simply vanished.
         if(hadLocalEdits) toast("This tab was out of date \u2014 loaded the newer copy. \u21ba undoes it.");
@@ -1448,8 +1456,21 @@ function clearCompleted(){ // completed tasks and logged worked-on/evergreen-don
   if(!n) return;
   if(!confirm("Permanently clear "+n+" history entr"+(n===1?"y":"ies")+"? You can still undo with \u21ba right after.")) return;
   pushUndo();
+  const gone = new Set(state.tasks.filter(t=>t.done).map(t=>t.id));
   state.tasks = state.tasks.filter(t=>!t.done);
   state.workLog = [];
+  /* The same tidy-up deleteTask() and reconcileHistory() do when they drop a
+     task. Nothing the app does today leaves a completed task holding a mark or
+     a dot — completeTask() clears its own — but this removes tasks in bulk and
+     had no sweep at all, so anything that reached us already inconsistent (an
+     older payload, a hand-edited import) kept its dead ids forever. */
+  state.chain = state.chain.filter(id=>!gone.has(id));
+  for(const id of gone){
+    delete state.considered[id];
+    delete state.cantAt[id];
+    delete state.workedAt[id];
+    if(state.candidateId===id) state.candidateId = null;
+  }
   commit();
 }
 function rescanSkipped(){ // clear only the no/can't marks, keep 'done' — an explicit override, ignores the can't timer on purpose
@@ -1968,7 +1989,10 @@ function renderList(){
          + '<button class="tt" data-act="edit" data-id="'+t.id+'">'+esc(t.title)+'</button>'
          + (safeUrl(t.url) ? '<a class="ext" href="'+esc(safeUrl(t.url))+'" target="_blank" rel="noopener noreferrer" title="Open link">↗</a>' : '')
          + chipHTML(t)
-         + (consid && consid!=="done" ? '<span class="skipped">'+skippedLabel(t.id, consid)+'</span>' : '')
+         // esc(): skippedLabel() returns plain text, and for a mark it doesn't
+         // recognise that text is the mark itself — which is a plain string in
+         // the payload, so an import or another build can put anything there.
+         + (consid && consid!=="done" ? '<span class="skipped">'+esc(skippedLabel(t.id, consid))+'</span>' : '')
          + '</div></div>';
   }
   // "nothing here" and "nothing matching" are different problems with different fixes
