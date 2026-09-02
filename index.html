@@ -446,6 +446,21 @@ const PASS_RESET_HOUR = 2;            // ...and so does one that crosses 02:00 l
    apart — two devices either side of an upgrade would otherwise quietly
    disagree about a setting neither of them ever set. */
 const DEFAULT_SETTINGS = { horizonMin:60, thresholdPct:25, samples:250, cantMin:30, workedHours:16, theme:"system" };
+/* And one source of truth for the RANGE each of them may hold — the same
+   min/max the Settings inputs enforce, so the form and the backfill cannot
+   drift apart either.
+
+   BUG FIX: normalizeSettings() checked only that a value was a finite number.
+   Type is not range, and every one of these numbers is arithmetic somebody
+   else's device can hand us: a negative horizonMin puts the question's
+   deadline in the past, a thresholdPct over 90 interrupts on every single
+   decision, cantMin 0 expires a can't the instant it is set, and a samples
+   count in the millions is a Monte-Carlo run long enough to hang the tab on
+   every recomputeRanks(). A hand-edited import or an older build is all it
+   takes. Out-of-range clamps rather than falling back, which is what the
+   Settings form has always done with the same numbers. */
+const SETTINGS_RANGE = { horizonMin:[5,480], thresholdPct:[1,90], samples:[50,2000], cantMin:[5,480], workedHours:[1,720] };
+const clampSetting = (k, v)=>{ const r = SETTINGS_RANGE[k]; return r ? Math.min(r[1], Math.max(r[0], v)) : v; };
 const STATE_VERSION = 2;              // bumped when a stored state needs migrating — see hydrateState()
 let _uidc = 0;
 const uid = ()=> "t" + Date.now().toString(36) + (_uidc++).toString(36);
@@ -508,7 +523,7 @@ function normalizeSettings(s){
     // numeric string, which a hand-edited import can carry) is accepted.
     const v = out[k];
     const n = (typeof v === "string" && v.trim() !== "") ? Number(v) : v;
-    out[k] = (typeof n === "number" && Number.isFinite(n)) ? n : DEFAULT_SETTINGS[k];
+    out[k] = (typeof n === "number" && Number.isFinite(n)) ? clampSetting(k, n) : DEFAULT_SETTINGS[k];
   }
   out.theme = normalizeTheme(out.theme);                   // absent or corrupt -> "system"
   return out;
@@ -533,6 +548,24 @@ function hydrateState(st){
   if(!st.cantAt) st.cantAt = {};
   if(!st.workedAt) st.workedAt = {};
   if(!st.workLog) st.workLog = [];
+  /* A dot pointing at a task that no longer exists is worse than untidy: it
+     strands the scan outright. benchmark() resolves the last chain entry
+     through taskById(), which answers null — but the chain is not empty, so
+     chainStart() stays false, ensureCandidate() deals a candidate and the
+     "would I rather?" question renders with nothing to compare it against.
+     decide() then refuses yes and no (correctly — a rank signal with nothing
+     to rank against is a fabricated one), so both buttons fall straight out
+     and there is no way left to advance the scan at all.
+
+     deleteTask() and reconcileHistory() already keep the chain honest as they
+     go. This catches what arrives from everywhere else — a hand-edited
+     import, an export from a build that removed tasks differently, a payload
+     from a device mid-upgrade — at the one point every one of them passes
+     through. */
+  if(Array.isArray(st.chain)){
+    const live = new Set((st.tasks || []).map(t => t && t.id));
+    st.chain = st.chain.filter(id => live.has(id));
+  }
 }
 
 function defaultState(){
@@ -749,14 +782,43 @@ function sendPush(){
     })
     .catch(()=>{ lastPushed = ""; });      // a failed write must not look like a synced one
 }
-/* What actually goes into the cloud document. state.syncRev is this device's
-   bookkeeping — which revision its copy is based on — and is deliberately kept
-   out: if it rode along in the payload, every device would see a difference
-   immediately after adopting somebody else's state and push it straight back. */
+/* The keys that are this DEVICE's bookkeeping rather than this LIST's content:
+   which cloud revision its copy is based on, and whose document that revision
+   counts. Neither belongs in the shared document — if syncRev rode along in
+   the payload, every device would see a difference immediately after adopting
+   somebody else's state and push it straight back — and neither belongs in an
+   export either, which is a backup of a list, not of a device. */
+const DEVICE_LOCAL_KEYS = ["syncRev", "syncAccount"];
+/* What actually goes into the cloud document (and into Export JSON). */
 function cloudPayload(){
   const out = {};
-  for(const k of Object.keys(state)) if(k !== "syncRev") out[k] = state[k];
+  for(const k of Object.keys(state)) if(!DEVICE_LOCAL_KEYS.includes(k)) out[k] = state[k];
   return JSON.stringify(out);
+}
+/* Swapping the whole state object — undo, Import JSON, Reset everything — must
+   not swap this device's sync bookkeeping along with it.
+
+   BUG FIX: syncRev lives inside state, so every wholesale replacement quietly
+   rewound the revision this device claimed to be based on: an undo snapshot
+   carries the rev from before the thing being undone, an export carries the
+   rev of whichever device made it, and defaultState() carries 0. The cloud was
+   then strictly ahead, the conditional write in CS.push() refused, cloudPull()
+   adopted the remote — and the deliberate replacement was silently undone a
+   couple of seconds after it appeared to work. Reset everything put every task
+   back. A pasted export vanished, which is the one thing SETUP.md offers as
+   the escape hatch when sync cannot merge. And the "↺ undoes it" toast shown
+   when a newer remote lands on your edits promised an undo the very next push
+   took straight back. None of it was announced, because the "out of date"
+   toast only fires on a session's FIRST reconcile.
+
+   Which revision this device has read is a fact about the device, not about
+   the content it happens to be holding, so it survives the swap. */
+function replaceState(next){
+  const keep = {};
+  for(const k of DEVICE_LOCAL_KEYS) keep[k] = state ? state[k] : undefined;
+  state = next;
+  for(const k of DEVICE_LOCAL_KEYS) state[k] = keep[k];
+  if(typeof state.syncRev !== "number") state.syncRev = 0;
 }
 /* BUG FIX: CS.push/CS.pull each ping() (fire the "cloudsync" event) *before*
    their own await — once when they start ("syncing") and once when they
@@ -783,8 +845,45 @@ async function cloudPull(){
     const haveRemote = !!(remote && remote.payload);
     if(!haveRemote && !(remote && remote.empty)) return;
     reconciledAs = window.CloudSync.user;
-    if(!haveRemote){                           // empty cloud — seed it from this device
+    /* Whose document that revision counts.
+
+       BUG FIX: nothing recorded which account a state belonged to, and a
+       revision counter is only meaningful against one account's document —
+       theirs has its own counter, starting from scratch. Signing in as a
+       second Google account on the same device therefore went wrong two
+       different ways. If that account had never synced, the {empty:true}
+       branch below read "no document" as "seed me from whatever you are
+       holding" and uploaded the PREVIOUS account's entire task list into
+       theirs. If it had synced but sat on a lower number, this device
+       believed it was ahead of a document it had never read a word of, so it
+       pushed, the conditional write refused a base that didn't match, the
+       conflict handler pulled, and the comparison came out the same way
+       again — a read-and-retry loop with nothing rate-limiting it, burning
+       the daily Firestore quota and never once converging.
+
+       So the account rides alongside the revision, device-local like it, and
+       a change of account throws the base away rather than reinterpreting it
+       against somebody else's counter. */
+    const acct = window.CloudSync.user;
+    const switchedAccount = state.syncAccount != null && state.syncAccount !== acct;
+    if(switchedAccount) state.syncRev = 0;
+    state.syncAccount = acct;
+    if(!haveRemote){                           // empty cloud
       state.syncRev = 0;                       // no document yet, so nothing is behind us
+      if(switchedAccount){
+        /* This device is holding the previous account's list, and an empty
+           document is not an invitation to upload it into someone else's
+           cloud. Start this account clean; the old list is safe under the
+           account that owns it, and comes back on signing in there again. */
+        pushUndo();
+        replaceState(defaultState());
+        state.syncAccount = acct; state.syncRev = 0;
+        lastPushed = "";
+        dropRemovedFields(state); hydrateState(state); applyTheme();
+        recomputeRanks(); ensureCandidate(); render(); persist();
+        toast("Signed in as " + acct + " — nothing synced under that account yet. ↺ undoes it.");
+        return;
+      }
       if(state.tasks.length){ lastPushed = ""; cloudPush(); }
       return;
     }
@@ -811,7 +910,24 @@ async function cloudPull(){
        clicked. Nothing here is lost either way: an adoption goes on the undo
        stack, and the toast below says so. */
     const rr = typeof remote.rev === "number" ? remote.rev : null;
-    const lr = typeof state.syncRev === "number" ? state.syncRev : null;
+    let lr = typeof state.syncRev === "number" ? state.syncRev : null;
+    /* A base ABOVE the document's own counter cannot be honest. The cloud
+       counter only ever goes up, so nothing this device read from THIS
+       document can be ahead of what the document now says. A higher local
+       number means the bookkeeping refers to something else entirely — a
+       recreated document, a restored backup, a state that arrived carrying
+       another account's revision from before syncAccount existed.
+
+       BUG FIX: left standing it deadlocked. "I am ahead" sent a push, the
+       conditional write refused a base the document had never been at, the
+       conflict handler pulled, and the same comparison sent the same push —
+       forever, at network speed, with the debounce bypassed because the
+       pending write is released straight from this function's finally block.
+       Clamping to the revision we just read makes the next push conditional
+       on something real, so it lands. The local content is untouched and
+       still this device's to send; only the number it claims to be based on
+       is corrected. */
+    if(rr !== null && lr !== null && lr > rr){ lr = rr; state.syncRev = rr; }
     let remoteWins;
     if(rr !== null && lr !== null){
       remoteWins = rr > lr;                                   // revisions: the real answer
@@ -862,7 +978,7 @@ function pushUndo(){
 }
 function undo(){
   if(!undoStack.length) return;
-  state = JSON.parse(undoStack.pop());
+  replaceState(JSON.parse(undoStack.pop()));
   // A full commit, not commit(false): taking something back is itself a write.
   // It has to reach storage or a reload resurrects what you just undid, and it
   // has to re-stamp updatedAt or the snapshot's stale timestamp loses the next
@@ -1828,6 +1944,16 @@ function renderList(){
     return b.mu - a.mu;
   });
   const inChain = new Set(state.chain);
+  /* Which task the "→" marker below belongs to. Its tooltip promises the dot
+     that Start scanning is about to hand out, and startScan() hands out
+     exactly one: oldestFirst(pool()). Computed from the same call so the two
+     cannot disagree.
+
+     BUG FIX: the marker was drawn on every row whenever the chain was empty,
+     so a twenty-task list showed twenty rows each claiming they were the one
+     about to be dotted — and the rows are sorted by top-K, not by age, so the
+     task that actually got the dot was rarely even near the top. */
+  const nextDotted = chainStart() ? oldestFirst(pool()) : null;
   let html = "";
   for(const t of rows){
     const st = rankCache.get(t.id);
@@ -1838,7 +1964,7 @@ function renderList(){
          + sparkSVG(t.id, 88, 22)
          + '<div class="tk"><span class="tkl">'+(st?("top-"+st.topK):"—")+'</span><div class="tkbar"><i style="width:'+fill+'%"></i></div></div>'
          + '<div class="tmain">'
-         + (inChain.has(t.id) ? '<span class="inchain" title="In the chain">●</span>' : '') + (chainStart() ? '<span class="chainind" title="Will be added to the chain when you start scanning">→ </span>' : '')
+         + (inChain.has(t.id) ? '<span class="inchain" title="In the chain">●</span>' : '') + (nextDotted && nextDotted.id===t.id ? '<span class="chainind" title="Will be added to the chain when you start scanning">→ </span>' : '')
          + '<button class="tt" data-act="edit" data-id="'+t.id+'">'+esc(t.title)+'</button>'
          + (safeUrl(t.url) ? '<a class="ext" href="'+esc(safeUrl(t.url))+'" target="_blank" rel="noopener noreferrer" title="Open link">↗</a>' : '')
          + chipHTML(t)
@@ -1978,7 +2104,7 @@ function openSettings(){
     + '<div class="frow"><label for="stCantMin">Can\u2019t sticks for (min)</label><input id="stCantMin" type="number" min="5" max="480" value="'+s.cantMin+'" style="width:90px"/>'
     + '<span class="kv">how long a Can\u2019t holds before it\u2019s reconsidered</span></div>'
     + '<div class="frow"><label for="stWorkedHrs">Worked on it sticks for (hrs)</label><input id="stWorkedHrs" type="number" min="1" max="720" value="'+s.workedHours+'" style="width:90px"/>'
-    + '<span class="kv">at least this long \u2014 and never back the same day</span></div>'
+    + '<span class="kv">up to this long \u2014 a mark always clears at the 02:00 day line</span></div>'
     + '<div class="frow"><label for="stThresh">Interrupt below</label><input id="stThresh" type="number" min="1" max="90" value="'+s.thresholdPct+'" style="width:90px"/>'
     + '<span class="kv">% chance of a better task within 1 min</span></div>'
     + '<div class="frow"><label for="stSamples">MC samples</label><input id="stSamples" type="number" min="50" max="2000" step="50" value="'+s.samples+'" style="width:90px"/>'
@@ -2122,11 +2248,20 @@ function onAction(act, el){
     case "save-settings": {
       pushUndo();
       const s=state.settings;
-      s.horizonMin=Math.max(5,Math.min(480,parseInt(document.getElementById("stHorizon").value)||60));
-      s.cantMin=Math.max(5,Math.min(480,parseInt(document.getElementById("stCantMin").value)||30));
-      s.workedHours=Math.max(1,Math.min(720,parseInt(document.getElementById("stWorkedHrs").value)||8));
-      s.thresholdPct=Math.max(1,Math.min(90,parseInt(document.getElementById("stThresh").value)||25));
-      s.samples=Math.max(50,Math.min(2000,parseInt(document.getElementById("stSamples").value)||250));
+      /* Bounds from SETTINGS_RANGE and the empty-field fallback from
+         DEFAULT_SETTINGS, both read rather than retyped.
+
+         BUG FIX: these were five hand-written pairs of literals, and one of
+         them had already drifted — a cleared "worked on it" box fell back to
+         8, the exact value the v2 migration in hydrateState() exists to move
+         people OFF. Saving once put it back, and since the migration only
+         runs for st.v < 2 it never got corrected again. */
+      const field=(id,k)=> clampSetting(k, parseInt(document.getElementById(id).value) || DEFAULT_SETTINGS[k]);
+      s.horizonMin   = field("stHorizon",  "horizonMin");
+      s.cantMin      = field("stCantMin",  "cantMin");
+      s.workedHours  = field("stWorkedHrs","workedHours");
+      s.thresholdPct = field("stThresh",   "thresholdPct");
+      s.samples      = field("stSamples",  "samples");
       recomputeRanks(); closeModal(); commit(); break;
     }
     case "help": openHelp(); break;
@@ -2147,7 +2282,7 @@ function onAction(act, el){
     }
     case "export-json": {
       const box=document.getElementById("jsonBox");
-      box.value=JSON.stringify(state);
+      box.value=cloudPayload();   // the list, without this device's sync bookkeeping
       box.focus(); box.select();
       break;
     }
@@ -2156,7 +2291,7 @@ function onAction(act, el){
       try{
         const st=JSON.parse(box.value);
         if(!st||!Array.isArray(st.tasks)) throw new Error("bad");
-        pushUndo(); state=st; dropRemovedFields(state); hydrateState(state); applyTheme();
+        pushUndo(); replaceState(st); dropRemovedFields(state); hydrateState(state); applyTheme();
         // Pasted in by hand, so it is authoritative as of now — not stale content
         // that cloudPull() should hold this device's writes back over.
         baseUpdatedAt = Date.now();
@@ -2166,7 +2301,7 @@ function onAction(act, el){
     }
     case "wipe": {
       if(confirm("Delete every task and start over from an empty list?")){
-        pushUndo(); state=defaultState(); recomputeRanks(); closeModal(); commit();
+        pushUndo(); replaceState(defaultState()); recomputeRanks(); closeModal(); commit();
       }
       break;
     }
