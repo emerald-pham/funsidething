@@ -1567,22 +1567,29 @@ test("save-settings: workedHours below 1 clamps up to 1, above 720 clamps down t
   assert.equal(ctx.state.settings.workedHours, 720);
 });
 
-test("save-settings: a blank or non-numeric workedHours falls back to 8", async () => {
+/* These two used to assert a literal 8, which was right when 8 was the
+   default and went stale the moment it moved to 16 — leaving them pinning the
+   one save-settings fallback that no longer matched DEFAULT_SETTINGS, i.e.
+   the exact drift AUDIT H6 is about. The behaviour under test is unchanged:
+   an empty or falsy field takes the default. It just reads the default now
+   instead of restating a number that can move again. */
+test("save-settings: a blank or non-numeric workedHours falls back to the default", async () => {
   const { ctx } = await loadApp({ seed: 406 });
   setInput(ctx, "stHorizon", 60); setInput(ctx, "stCantMin", 30);
   setInput(ctx, "stThresh", 25); setInput(ctx, "stSamples", 250);
   setInput(ctx, "stWorkedHrs", "");
   ctx.onAction("save-settings", {});
-  assert.equal(ctx.state.settings.workedHours, 8);
+  assert.equal(ctx.state.settings.workedHours, readConst(ctx, "DEFAULT_SETTINGS").workedHours);
 });
 
-test("save-settings: a literal 0 workedHours is falsy and falls back to 8, not clamped to 1", async () => {
+test("save-settings: a literal 0 workedHours is falsy and takes the default, not a clamp to 1", async () => {
   const { ctx } = await loadApp({ seed: 407 });
   setInput(ctx, "stHorizon", 60); setInput(ctx, "stCantMin", 30);
   setInput(ctx, "stThresh", 25); setInput(ctx, "stSamples", 250);
   setInput(ctx, "stWorkedHrs", 0);
   ctx.onAction("save-settings", {});
-  assert.equal(ctx.state.settings.workedHours, 8, "0 hits the ||8 fallback the same way horizonMin/cantMin do");
+  assert.equal(ctx.state.settings.workedHours, readConst(ctx, "DEFAULT_SETTINGS").workedHours,
+    "0 is falsy, so it takes the default — the same way horizonMin and cantMin take theirs");
 });
 
 /* ---- settings UI ---- */
@@ -6547,4 +6554,283 @@ test("CSS: '.listwrap' carries the same margin-top as its '.addwrap'/'.histwrap'
   const m = html.match(/\.listwrap\{([^}]*)\}/);
   assert.ok(m, ".listwrap rule exists");
   assert.match(m[1], /margin-top:\s*14px/, ".listwrap has margin-top:14px, matching .addwrap/.histwrap");
+});
+
+/* =====================================================================
+   AUDIT — hypotheses about missing logical steps in the app flow.
+
+   Each test below names a step the current flow appears to skip. They are
+   written before any fix, and expected to fail, per the test-first rule.
+
+   H1-H4 share one root cause worth stating once: state.syncRev — the
+   revision this device's copy is based on — lives INSIDE the state blob.
+   Every operation that swaps the blob wholesale (Reset everything, Import
+   JSON, undoing a remote adoption) therefore also rewinds the device's
+   sync base to whatever that blob was carrying. The cloud is then strictly
+   ahead, the conditional write in CS.push() refuses, cloudPull() adopts the
+   remote, and the deliberate replacement is silently undone.
+   ===================================================================== */
+
+/* ---- H1: a confirmed reset is resurrected by the cloud ---- */
+test("AUDIT H1: 'Reset everything' must survive the push that follows it", async () => {
+  const now = Date.now();
+  const h = makeSyncHarness({ remote: cloudState(now), rev: 9 });
+  const local = cloudState(now); local.syncRev = 9;          // this device is up to date
+  const { ctx } = await loadApp({
+    seed: 8001,
+    seedStorage: { [SYNC_STORE_KEY]: JSON.stringify(local) },
+    cloudSyncFactory: h.factory,
+  });
+  await ctx.cloudPull();
+  await syncSettle(PAST_DEBOUNCE);
+
+  ctx.onAction("wipe", {});                 // confirm() is stubbed true in the harness
+  assert.equal(ctx.state.tasks.length, 0, "the wipe empties the list on the spot");
+
+  await syncSettle(PAST_DEBOUNCE);
+  assert.equal(ctx.state.tasks.length, 0,
+    `a confirmed reset must not be resurrected by the cloud: ${titlesOf(ctx)}`);
+  assert.deepEqual(h.remoteTitles(), [], "and the empty list must reach the cloud");
+});
+
+/* ---- H2: the documented escape hatch is overwritten by what it escapes ----
+   SETUP.md offers Export/Import JSON as the way out of the one case sync
+   cannot merge. An export carries the syncRev of the device that made it, so
+   pasting it into a device the cloud has since moved past hands the cloud the
+   win — the paste lands, then vanishes a couple of seconds later, silently:
+   the "out of date" toast only fires on a session's FIRST reconcile. */
+test("AUDIT H2: an imported export must not be overwritten by a revision it predates", async () => {
+  const now = Date.now();
+  const h = makeSyncHarness({ remote: cloudState(now), rev: 9 });
+  const local = cloudState(now); local.syncRev = 9;
+  const { ctx } = await loadApp({
+    seed: 8002,
+    seedStorage: { [SYNC_STORE_KEY]: JSON.stringify(local) },
+    cloudSyncFactory: h.factory,
+  });
+  await ctx.cloudPull();
+  await syncSettle(PAST_DEBOUNCE);
+
+  const exported = syncState({                      // taken on the phone a few revisions back
+    tasks: [syncTask("t_imp", "Restored from my export")], chain: [], updatedAt: now, syncRev: 4,
+  });
+  ctx.document.getElementById("jsonBox").value = JSON.stringify(exported);
+  ctx.onAction("import-json", {});
+  assert.ok(titlesOf(ctx).includes("Restored from my export"), "the paste lands immediately");
+
+  await syncSettle(PAST_DEBOUNCE);
+  assert.ok(titlesOf(ctx).includes("Restored from my export"),
+    `a hand-pasted import is authoritative and must stay: ${titlesOf(ctx)}`);
+  assert.ok(h.remoteTitles().includes("Restored from my export"),
+    `and must reach the cloud: ${h.remoteTitles()}`);
+});
+
+/* ---- H3: the toast promises an undo the cloud takes straight back ----
+   "This tab was out of date — loaded the newer copy. ↺ undoes it." The undo
+   snapshot carries the pre-adoption syncRev, so pressing u puts the device
+   behind the cloud again and the next push loses to it. */
+test("AUDIT H3: undoing a remote adoption must stick, as the toast promises", async () => {
+  const now = Date.now();
+  const h = makeSyncHarness({ remote: cloudState(now), rev: 4 });
+  const local = staleState(now); local.syncRev = 3;
+  const { ctx } = await loadApp({
+    seed: 8003,
+    seedStorage: { [SYNC_STORE_KEY]: JSON.stringify(local) },
+    cloudSyncFactory: h.factory,
+  });
+
+  await ctx.cloudPull();
+  assert.deepEqual(ctx.state.chain, CLOUD_CHAIN, "the newer revision is adopted, as designed");
+
+  ctx.undo();
+  assert.deepEqual(ctx.state.chain, STALE_CHAIN, "u takes it back");
+
+  await syncSettle(PAST_DEBOUNCE);
+  assert.deepEqual(ctx.state.chain, STALE_CHAIN,
+    "and it must stay taken back — an undo the cloud silently reverses is not an undo");
+});
+
+/* ---- H4: a cloud document BEHIND this device never converges ----
+   Reachable by signing in as a second Google account on the same device (the
+   new account's document starts at rev 1 while this device still holds the
+   first account's syncRev), or by the document being recreated. cloudPull()
+   sees rr < lr, decides this device is ahead and pushes; CS.push() sees a base
+   revision that does not match and refuses; the conflict handler pulls again.
+   Neither side ever moves, and the retry is not rate-limited. */
+test("AUDIT H4: a cloud document behind this device's revision must not spin forever", async () => {
+  const now = Date.now();
+  const h = makeSyncHarness({ remote: cloudState(now), rev: 3 });
+  const local = staleState(now); local.syncRev = 50;   // the revision the PREVIOUS account was at
+  const { ctx } = await loadApp({
+    seed: 8004,
+    seedStorage: { [SYNC_STORE_KEY]: JSON.stringify(local) },
+    cloudSyncFactory: h.factory,
+  });
+
+  await ctx.cloudPull();
+  await syncSettle(PAST_DEBOUNCE);
+  const settled = h.calls.length;
+  await syncSettle(300);
+  const extra = h.calls.length - settled;
+
+  h.doc = null;                       // let any live loop converge before the test ends
+  await syncSettle(PAST_DEBOUNCE);
+
+  assert.ok(extra <= 2,
+    `the reconcile must converge, not retry forever: ${extra} further reads/writes in 300ms`);
+});
+
+/* ---- H5: every row claims the dot that only one row gets ----
+   renderList() draws the "→" marker on every row whenever the chain is empty,
+   and its tooltip says "Will be added to the chain when you start scanning".
+   startScan() dots exactly one task: the oldest outstanding one. */
+test("AUDIT H5: with nothing dotted, only the task Start scanning will dot carries the '→' marker", async () => {
+  const { ctx } = await loadApp({ seed: 8005 });
+  const a = ctx.addTask("Oldest", false);
+  const b = ctx.addTask("Middle", false);
+  const c = ctx.addTask("Newest", false);
+  // addTask stamps createdAt off the clock and three adds can share a
+  // millisecond — pin them so "oldest" is unambiguous.
+  ctx.state.tasks.find((t) => t.id === a.id).createdAt = 1000;
+  ctx.state.tasks.find((t) => t.id === b.id).createdAt = 2000;
+  ctx.state.tasks.find((t) => t.id === c.id).createdAt = 3000;
+  ctx.state.listOpen = true;
+  ctx.render();
+
+  const html = ctx.document.getElementById("listBody").innerHTML;
+  const marks = html.split("chainind").length - 1;
+  assert.equal(marks, 1,
+    `the marker promises the dot to one task; ${marks} of ${ctx.state.tasks.length} rows claim it`);
+
+  const rowOf = (id) => html.split('data-row="').find((chunk) => chunk.startsWith(id)) || "";
+  assert.ok(rowOf(a.id).includes("chainind"), "and it belongs to the oldest outstanding task");
+  ctx.startScan();
+  // Array.from: this chain was built by defaultState() inside the vm context,
+  // so it carries that realm's Array.prototype and deepStrictEqual would
+  // reject it against an outer-realm literal however equal the contents are.
+  assert.deepEqual(Array.from(ctx.state.chain), [a.id],
+    "...which is the one Start scanning actually dots");
+});
+
+/* ---- H6: one settings fallback still points at the retired default ----
+   DEFAULT_SETTINGS is documented as the single source of truth for "what a
+   fresh install gets" and "what a backfill gets". save-settings hardcodes its
+   own fallbacks; four match, workedHours does not — it still falls back to 8,
+   the exact value the v2 migration exists to move people off, and once saved
+   the migration will not run again to correct it. */
+test("AUDIT H6: a cleared 'worked on it' field falls back to the current default, not the retired 8", async () => {
+  const { ctx } = await loadApp({ seed: 8006 });
+  const d = ctx.document;
+  d.getElementById("stHorizon").value = "60";
+  d.getElementById("stCantMin").value = "30";
+  d.getElementById("stWorkedHrs").value = "";        // cleared the box, hit Save
+  d.getElementById("stThresh").value = "25";
+  d.getElementById("stSamples").value = "250";
+  ctx.onAction("save-settings", {});
+
+  const DEFAULTS = readConst(ctx, "DEFAULT_SETTINGS");
+  assert.equal(ctx.state.settings.workedHours, DEFAULTS.workedHours,
+    "every save-settings fallback must come from DEFAULT_SETTINGS, workedHours included");
+});
+
+/* ---- H7: a dot pointing at nothing strands the scan ----
+   benchmark() resolves the last chain entry through taskById(), which answers
+   null for an id with no task behind it. chainStart() is still false, so a
+   candidate is dealt and the "Would I rather…" question renders — but decide()
+   refuses yes/no without a benchmark, so both buttons fall straight out and
+   the scan cannot be advanced at all. hydrateState() sweeps stale marks and
+   backfills missing fields; it does not check the chain. */
+test("AUDIT H7: a dot with no task behind it must not strand the scan", async () => {
+  const stored = syncState({
+    tasks: [syncTask("a", "Task A"), syncTask("b", "Task B")],
+    chain: ["ghost"],                    // a hand-edited import, or a payload from another build
+    updatedAt: Date.now(),
+  });
+  const { ctx } = await loadApp({
+    seed: 8007,
+    seedStorage: { [SYNC_STORE_KEY]: JSON.stringify(stored) },
+  });
+
+  assert.deepEqual(
+    ctx.state.chain.filter((id) => !ctx.state.tasks.some((t) => t.id === id)), [],
+    "every dot must point at a task that still exists");
+  assert.ok(!(ctx.state.candidateId && !ctx.benchmark()),
+    "a candidate must never be dealt with no benchmark for Yes/No to compare it against");
+});
+
+/* ---- H8: junk settings are type-checked on the way in, never range-checked ----
+   normalizeSettings() exists so a settings object from an older device or a
+   hand-edited import cannot turn the scan's arithmetic into NaN. It rejects
+   non-numbers, then accepts any finite number at all — including ones the
+   Settings form itself refuses. samples drives a Monte-Carlo run on every
+   recomputeRanks(); a negative horizon puts the question's deadline in the
+   past; thresholdPct above 90 interrupts on every single decision. */
+test("AUDIT H8: hydrateState must reject settings the Settings form itself would refuse", async () => {
+  const { ctx } = await loadApp({ seed: 8008 });
+  const st = {
+    v: 2, tasks: [], contexts: [], chain: [], considered: {}, cantAt: {}, workedAt: {}, workLog: [],
+    settings: { horizonMin: -30, thresholdPct: 900, samples: 5000000, cantMin: 0, workedHours: -1, theme: "system" },
+  };
+  ctx.hydrateState(st);
+  const s = st.settings;
+  // Bounds are the min/max the Settings inputs already enforce.
+  assert.ok(s.horizonMin >= 5 && s.horizonMin <= 480, `horizon out of range: ${s.horizonMin}`);
+  assert.ok(s.cantMin >= 5 && s.cantMin <= 480, `can't window out of range: ${s.cantMin}`);
+  assert.ok(s.workedHours >= 1 && s.workedHours <= 720, `worked window out of range: ${s.workedHours}`);
+  assert.ok(s.thresholdPct >= 1 && s.thresholdPct <= 90, `threshold out of range: ${s.thresholdPct}`);
+  assert.ok(s.samples >= 50 && s.samples <= 2000, `samples out of range: ${s.samples}`);
+});
+
+/* ---- H9: an account switch carries the previous account's list with it ----
+   Nothing in the state records WHICH account it belongs to. The read-before-
+   write gate re-arms on a new account (that regression is already covered),
+   but the read only decides who is ahead — and against a brand-new account
+   with no document at all, cloudPull() takes the {empty:true} branch and
+   seeds it from whatever this device happens to be holding. Which is the
+   previous account's task list. */
+test("AUDIT H9: signing in as a different account must not seed it with the previous account's tasks", async () => {
+  const now = Date.now();
+  const h = makeSyncHarness({ remote: cloudState(now), rev: 9 });
+  const local = cloudState(now); local.syncRev = 9;
+  const { ctx, shim } = await loadApp({
+    seed: 8009,
+    seedStorage: { [SYNC_STORE_KEY]: JSON.stringify(local) },
+    cloudSyncFactory: h.factory,
+  });
+  await ctx.cloudPull();
+  await syncSettle(PAST_DEBOUNCE);
+  const mine = titlesOf(ctx);
+  assert.ok(mine.includes("Draft the chapter"), "this account's list is loaded and in sync");
+
+  h.doc = null;                                                // the other account has never synced
+  shim.window.CloudSync.user = "someone-else@example.com";     // signed out, signed back in as them
+  await ctx.cloudPull();
+  await syncSettle(PAST_DEBOUNCE);
+
+  const seeded = h.remoteTitles() || [];
+  assert.deepEqual(seeded.filter((t) => mine.includes(t)), [],
+    `the other account's cloud must not be seeded from this one: ${seeded}`);
+});
+
+/* ---- H10: the worked-window label promises the opposite of what it does ----
+   Settings says the window holds "at least this long — and never back the same
+   day". workedUntil() takes min(), so the configured hours are a CEILING the
+   02:00 day line can cut short: a mark made just after midnight is released at
+   02:00, hours early, on the same calendar day. The arithmetic is deliberate
+   and documented at workedUntil(); the copy is what drifted away from it. */
+test("AUDIT H10: the worked-window label must not promise a hold the day line cuts short", async () => {
+  const { ctx } = await loadApp({ seed: 8010 });
+  ctx.state.settings.workedHours = 16;
+  const at = new Date(2026, 0, 15, 0, 30).getTime();      // marked worked at 00:30
+  const until = ctx.workedUntil(at);
+
+  assert.ok(until - at < 16 * HOUR,
+    "the day line really does cut the configured window short, so 'at least' cannot be true");
+  assert.equal(new Date(until).getDate(), new Date(at).getDate(),
+    "...and really does release it on the same calendar day");
+
+  const row = html.match(/stWorkedHrs[\s\S]{0,400}?<\/div>/);
+  assert.ok(row, "the Settings row for the worked window exists");
+  assert.doesNotMatch(row[0], /at least/, "the label must not promise a minimum it does not keep");
+  assert.doesNotMatch(row[0], /never back the same day/, "nor that the task cannot return today");
 });
