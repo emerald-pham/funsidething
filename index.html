@@ -634,21 +634,28 @@ function localStorageOK(){
     return true;
   }catch(e){ return false; }
 }
+/* The disk half of save(), on its own: writes what is in memory and does
+   nothing else. save() also re-stamps updatedAt and schedules a cloud push,
+   which is exactly right for an edit and exactly wrong for bookkeeping — the
+   push callback in sendPush() has to record a revision without that counting
+   as a change, or every write re-stamps the state and schedules the next one,
+   a 2-second write loop with no edit behind it. */
+async function persist(){
+  if(!storageOK) return;
+  if(useLocal){
+    try{ localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
+    catch(e){ toast("Couldn't save — local storage might be full."); }
+    return;
+  }
+  if(!window.storage) return;
+  try{ await window.storage.set(STORE_KEY, JSON.stringify(state)); }
+  catch(e){ toast("Couldn't save just now — will retry on your next change."); }
+}
 function save(){
   state.updatedAt = Date.now();
   cloudPush();
   if(saveTimer) clearTimeout(saveTimer);
-  saveTimer = setTimeout(async ()=>{
-    if(!storageOK) return;
-    if(useLocal){
-      try{ localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
-      catch(e){ toast("Couldn't save — local storage might be full."); }
-      return;
-    }
-    if(!window.storage) return;
-    try{ await window.storage.set(STORE_KEY, JSON.stringify(state)); }
-    catch(e){ toast("Couldn't save just now — will retry on your next change."); }
-  }, 350);
+  saveTimer = setTimeout(persist, 350);
 }
 
 /* ---------- cloud sync glue (no-ops until Firebase is configured) ----------
@@ -719,7 +726,26 @@ function sendPush(){
         cloudPull();
         return;
       }
-      if(typeof res.rev === "number") state.syncRev = res.rev;
+      if(typeof res.rev === "number"){
+        state.syncRev = res.rev;
+        /* BUG FIX: this used to stop at the assignment, leaving the new
+           revision in memory only. save() debounces at 350ms and the push at
+           2s, so the copy on disk was always written *before* the write it
+           describes came back — meaning every session booted one revision
+           behind a cloud it was exactly in sync with. Its first reconcile
+           read rr > lr as "the cloud holds work this device has never seen"
+           and adopted the remote wholesale, and whatever had been done while
+           that pull was still in flight went with it. That is why the first
+           ✓ Done after loading needed a second click: a cold load is when the
+           pull is slowest, and clicking into an unfocused tab fires the focus
+           event that starts one, so the click that lost the race was reliably
+           the first one. Which revision a device is based on is state like any
+           other; it has to reach storage or the next boot re-fights this.
+           persist(), not save(): recording what we just wrote is bookkeeping,
+           not an edit, and save() would re-stamp updatedAt and queue another
+           push behind it. */
+        persist();
+      }
     })
     .catch(()=>{ lastPushed = ""; });      // a failed write must not look like a synced one
 }
