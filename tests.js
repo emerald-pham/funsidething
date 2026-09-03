@@ -310,6 +310,95 @@ test("decide('cand-done'): completes the task directly without ever touching the
   assert.equal(ctx.state.chain.length, 1, "the task dotted at the start is the only thing on it");
 });
 
+/* ---------- cand-done records no rank signal ----------
+   decide('cand-done') completes a suggested candidate outright. It used to call
+   updatePair(cand, b) as well, on the reasoning that "doing it right now beats
+   the benchmark" — but that is the exact inference doneTask(), benchDone() and
+   workedOnTask() all refuse to make: no "would I rather?" was answered, so no
+   rank moves. A candidate is done on sight because it's quick far more often
+   than because it outranks the task already on the chain, and that unearned
+   match-outcome win taught the sampler to float thirty-second tasks to the top
+   of the next scan. The chain-start dot is deliberately signal-free for the
+   same reason (oldest != preferred); so is this. */
+
+test("decide('cand-done'): completing the candidate moves neither its rank nor the benchmark's", async () => {
+  const { ctx } = await loadApp({ seed: 3 });
+  ctx.addTask("Task A", false);
+  ctx.addTask("Task B", false);
+  ctx.startScan();                       // dots Task A; Task B is the candidate
+  const candId = ctx.state.candidateId;
+  const benchId = ctx.state.chain[ctx.state.chain.length - 1];
+  const cand = ctx.state.tasks.find((t) => t.id === candId);
+  const bench = ctx.state.tasks.find((t) => t.id === benchId);
+  const snap = { cm: cand.mu, cs: cand.sigma, bm: bench.mu, bs: bench.sigma };
+
+  ctx.decide("cand-done");
+
+  assert.equal(cand.mu, snap.cm, "candidate mu must be untouched — no comparison was answered");
+  assert.equal(cand.sigma, snap.cs, "candidate sigma must be untouched (updatePair inflates it by TAU even for a winner)");
+  assert.equal(bench.mu, snap.bm, "benchmark mu must be untouched");
+  assert.equal(bench.sigma, snap.bs, "benchmark sigma must be untouched");
+  assert.equal(cand.done, true, "and the task is still completed");
+});
+
+test("decide('cand-done'): an evergreen candidate is signal-free too, and still logs its completion", async () => {
+  const { ctx } = await loadApp({ seed: 7 });
+  ctx.addTask("Task A", false);
+  ctx.addTask("Water the plants", false);
+  const evergreen = ctx.state.tasks.find((t) => t.title === "Water the plants");
+  evergreen.evergreen = true;
+  ctx.startScan();                       // dots Task A; the evergreen is the candidate
+  const candId = ctx.state.candidateId;
+  const benchId = ctx.state.chain[ctx.state.chain.length - 1];
+  const cand = ctx.state.tasks.find((t) => t.id === candId);
+  const bench = ctx.state.tasks.find((t) => t.id === benchId);
+  assert.equal(candId, evergreen.id, "precondition: the evergreen task is the one being weighed");
+  const snap = { cm: cand.mu, cs: cand.sigma, bm: bench.mu, bs: bench.sigma };
+
+  ctx.decide("cand-done");
+
+  assert.equal(cand.mu, snap.cm, "evergreen candidate mu untouched");
+  assert.equal(cand.sigma, snap.cs, "evergreen candidate sigma untouched");
+  assert.equal(bench.mu, snap.bm, "benchmark mu untouched");
+  assert.equal(bench.sigma, snap.bs, "benchmark sigma untouched");
+  const logged = ctx.state.workLog.some((e) => e.taskId === candId && e.kind === "evergreen-done");
+  assert.ok(logged, "the evergreen completion is still recorded in the work log");
+});
+
+/* Guards that the change above is confined to the cand-done branch: yes and no
+   still feed the ranker, because those ARE answered comparisons. */
+
+test("decide('yes'): still records the candidate outranking the benchmark", async () => {
+  const { ctx } = await loadApp({ seed: 4 });
+  ctx.addTask("Task A", false);
+  ctx.addTask("Task B", false);
+  ctx.startScan();
+  const candId = ctx.state.candidateId;
+  const benchId = ctx.state.chain[ctx.state.chain.length - 1];
+  const cand = ctx.state.tasks.find((t) => t.id === candId);
+  const bench = ctx.state.tasks.find((t) => t.id === benchId);
+  const cm = cand.mu, bm = bench.mu;
+
+  ctx.decide("yes");
+
+  assert.ok(cand.mu > cm, "a 'yes' lifts the candidate's mu");
+  assert.ok(bench.mu < bm, "and lowers the benchmark's");
+});
+
+test("decide('no'): still records the benchmark outranking the candidate", async () => {
+  const { ctx } = await loadApp({ seed: 5 });
+  ctx.addTask("Task A", false);
+  ctx.addTask("Task B", false);
+  ctx.startScan();
+  const candId = ctx.state.candidateId;
+  const cand = ctx.state.tasks.find((t) => t.id === candId);
+  const cm = cand.mu;
+
+  ctx.decide("no");
+
+  assert.ok(cand.mu < cm, "a 'no' lowers the candidate's mu");
+});
+
 test("deleteTask: removes from tasks, the chain, and considered; clears candidateId if it was the deleted task", async () => {
   const { ctx } = await loadApp({ seed: 4 });
   const t1 = ctx.addTask("Task A", true); // dotted
