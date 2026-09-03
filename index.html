@@ -1286,7 +1286,14 @@ function decide(kind){ // 'yes' | 'no' | 'cant' | 'cand-done'
     state.considered[cand.id] = "cant";   // rejected without a rank signal
     state.cantAt[cand.id] = Date.now();   // bulletproof until cantMin elapses — see expireCants()
   }else if(kind==="cand-done"){
-    if(b) updatePair(cand, b);            // doing it right now beats the benchmark
+    /* No updatePair. Doing a suggested candidate on the spot is the same "I did
+       it" gesture as doneTask()/benchDone()/workedOnTask(), and answers no
+       "would I rather?" — so it moves no rank. This used to record cand > b
+       here ("doing it now beats the benchmark"), but a candidate gets done on
+       sight because it's quick far more often than because it outranks the task
+       already on the chain, and that unearned win floated trivial tasks to the
+       top of the next scan. A completion is not a comparison — same reasoning
+       the chain-start dot rests on (oldest != preferred). */
     completeTask(cand);
   }
   state.candidateId = null;
