@@ -9,6 +9,113 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const HTML_PATH = path.join(__dirname, "index.html");
 const html = fs.readFileSync(HTML_PATH, "utf8");
 
+/* ---------- PWA upgrade contract ----------
+   These are intentionally repository-text tests: they describe the installable
+   shell the implementation must add without requiring a browser or network. */
+function manifestHrefFromHtml() {
+  const match = html.match(/<link\b[^>]*\brel=["']manifest["'][^>]*\bhref=["']([^"']+)["'][^>]*>/i)
+    || html.match(/<link\b[^>]*\bhref=["']([^"']+)["'][^>]*\brel=["']manifest["'][^>]*>/i);
+  assert.ok(match, "index.html must link a web app manifest");
+  assert.ok(!/^(?:[a-z]+:)?\/\//i.test(match[1]), "manifest link must be a repository-local file");
+  return match[1];
+}
+
+test("PWA contract: links a valid manifest with install metadata and required icons", () => {
+  const href = manifestHrefFromHtml();
+  const manifestPath = path.resolve(__dirname, href);
+  assert.ok(manifestPath.startsWith(`${__dirname}${path.sep}`), "manifest must stay inside the app repository");
+  assert.ok(fs.existsSync(manifestPath), `manifest file must exist: ${href}`);
+
+  let manifest;
+  assert.doesNotThrow(() => { manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8")); },
+    "manifest must contain valid JSON");
+  for (const field of ["name", "short_name", "start_url", "display", "theme_color", "background_color"]) {
+    assert.equal(typeof manifest[field], "string", `manifest.${field} must be a string`);
+    assert.ok(manifest[field].trim(), `manifest.${field} must not be empty`);
+  }
+  assert.ok(["standalone", "fullscreen", "minimal-ui", "browser"].includes(manifest.display),
+    "manifest.display must be a recognized display mode");
+  assert.ok(Array.isArray(manifest.icons), "manifest.icons must be an array");
+  for (const size of ["192x192", "512x512"]) {
+    const icon = manifest.icons.find((entry) => entry.sizes === size && typeof entry.src === "string" && entry.src.trim());
+    assert.ok(icon, `manifest must provide a non-empty ${size} icon`);
+    const iconPath = path.resolve(path.dirname(manifestPath), icon.src);
+    assert.ok(iconPath.startsWith(`${__dirname}${path.sep}`), `${size} icon must stay inside the app repository`);
+    assert.ok(fs.existsSync(iconPath), `${size} icon file must exist: ${icon.src}`);
+    const png = fs.readFileSync(iconPath);
+    assert.deepEqual([...png.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10], `${size} icon must be a PNG`);
+    assert.equal(png.readUInt32BE(16), Number(size.slice(0, 3)), `${size} icon must have the declared width`);
+    assert.equal(png.readUInt32BE(20), Number(size.slice(0, 3)), `${size} icon must have the declared height`);
+  }
+});
+
+test("PWA contract: includes install metadata for mobile browsers and notches", () => {
+  assert.match(html, /<meta\b[^>]*name=["']viewport["'][^>]*content=["'][^"']*viewport-fit=cover[^"']*["']/i,
+    "viewport metadata must opt into the safe-area insets used by standalone iOS windows");
+  for (const name of ["theme-color", "apple-mobile-web-app-capable", "apple-mobile-web-app-title", "apple-mobile-web-app-status-bar-style"]) {
+    assert.match(html, new RegExp(`<meta\\b[^>]*name=["']${name}["'][^>]*content=["'][^"']+`, "i"),
+      `index.html must provide ${name} metadata`);
+  }
+  assert.match(html, /<link\b[^>]*rel=["']apple-touch-icon["'][^>]*sizes=["']180x180["']/i,
+    "iOS homescreen installs need an explicit 180x180 touch icon");
+});
+
+test("PWA contract: icon combines a checklist with a linked-chain mark", () => {
+  const iconPath = path.join(__dirname, "icon.svg");
+  assert.ok(fs.existsSync(iconPath), "the scalable PWA icon source must exist");
+  const icon = fs.readFileSync(iconPath, "utf8");
+  assert.match(icon, /<svg\b[^>]*viewBox=["']0 0 512 512["']/i,
+    "the source icon must use the app's 512px coordinate space");
+  assert.match(icon, /<title>\s*Checklist Chain(?: Icon)?\s*<\/title>/i,
+    "the source icon must name the combined checklist-chain mark");
+  assert.match(icon, /<g\b[^>]*id=["']checklist["']/i,
+    "the source icon must group its checklist elements");
+  for (const number of [1, 2, 3]) {
+    assert.match(icon, new RegExp(`id=["']checkmark-${number}["']`, "i"),
+      `the checklist must include checkmark-${number}`);
+  }
+  assert.match(icon, /<g\b[^>]*id=["']chain["']/i,
+    "the source icon must group its chain elements");
+  for (const number of [1, 2]) {
+    assert.match(icon, new RegExp(`id=["']chain-link-${number}["']`, "i"),
+      `the chain must include chain-link-${number}`);
+  }
+});
+
+test("PWA contract: app registers its service worker", () => {
+  const match = html.match(/navigator\.serviceWorker\.register\(\s*["']([^"']+)["']/);
+  assert.ok(match, "app must call navigator.serviceWorker.register() with a script path");
+  assert.ok(match[1].endsWith(".js"), "registered service worker path must be a JavaScript file");
+  const workerPath = path.resolve(__dirname, match[1]);
+  assert.ok(workerPath.startsWith(`${__dirname}${path.sep}`), "service worker must be local to the app repository");
+  assert.ok(fs.existsSync(workerPath), `registered service worker source must exist: ${match[1]}`);
+});
+
+test("PWA contract: service worker precaches the app and uses a cache-first fetch strategy", () => {
+  const match = html.match(/navigator\.serviceWorker\.register\(\s*["']([^"']+)["']/);
+  assert.ok(match, "service-worker source path must be discoverable from the app registration");
+  const workerPath = path.resolve(__dirname, match[1]);
+  assert.ok(fs.existsSync(workerPath), `service-worker source must exist: ${match[1]}`);
+  const worker = fs.readFileSync(workerPath, "utf8");
+
+  assert.match(worker, /addEventListener\(\s*["']install["']/,
+    "service worker must install a cache");
+  assert.match(worker, /caches\.open\(/, "service worker must open a named cache");
+  assert.match(worker, /\.addAll\(\s*\[/, "service worker must precache the app shell");
+  assert.match(worker, /addEventListener\(\s*["']fetch["']/,
+    "service worker must handle fetches");
+  assert.match(worker, /event\.respondWith\(/,
+    "fetch handling must control the response with event.respondWith()");
+  assert.match(worker, /caches\.match\(/, "fetch handling must check the cache first");
+  assert.match(worker, /caches\.match\(\s*event\.request\s*\)[\s\S]{0,240}\|\|\s*fetch\(\s*event\.request\s*\)/,
+    "fetch handling must return the cached response before falling back to the network request");
+  assert.match(worker, /addEventListener\(\s*["']activate["']/,
+    "service worker must activate and retire old shell caches");
+  assert.match(worker, /clients\.claim\(\)/, "service worker must claim already-open app clients");
+  assert.match(worker, /caches\.match\(\s*["']\.\/index\.html["']\s*\)/,
+    "failed navigations must fall back to the cached app shell");
+});
+
 function slice(src, startMarker, endMarker) {
   const s = src.indexOf(startMarker);
   const e = src.indexOf(endMarker);

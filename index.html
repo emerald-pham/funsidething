@@ -2,8 +2,15 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+<meta name="theme-color" content="#6a55e0"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-title" content="Chain Scanner"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="default"/>
 <title>Chain Scanner · ranked FVP</title>
+<link rel="manifest" href="manifest.webmanifest"/>
+<link rel="icon" type="image/svg+xml" href="icon.svg"/>
+<link rel="apple-touch-icon" sizes="180x180" href="icon-180.png"/>
 <script>
 /*THEME-BOOT-START*/
 /* Runs before first paint. Reads the device-local paint hint left by
@@ -66,7 +73,7 @@ window.FIREBASE_CONFIG = {
 *{box-sizing:border-box}
 html,body{margin:0;padding:0}
 body{background:var(--bg);color:var(--ink);font:15px/1.45 var(--font-ui);-webkit-font-smoothing:antialiased}
-.wrap{max-width:700px;margin:0 auto;padding:14px 14px 60px}
+.wrap{max-width:700px;margin:0 auto;padding:max(14px,calc(14px + env(safe-area-inset-top))) max(14px,calc(14px + env(safe-area-inset-right))) max(60px,calc(60px + env(safe-area-inset-bottom))) max(14px,calc(14px + env(safe-area-inset-left)))}
 button{font:inherit;color:inherit;background:none;border:none;padding:0;cursor:pointer}
 button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
 a{color:var(--accent)}
@@ -2423,6 +2430,17 @@ function hotkeyDelete(){
   render();
   if(isFirstBoot) openHelp();
 })();
+
+/* A standalone window still needs the normal page when it first comes up.
+   Registration is deliberately best-effort: unsupported browsers and a
+   temporarily unavailable service worker must leave the local scanner usable. */
+function registerServiceWorker(){
+  if(typeof navigator === "undefined" || !navigator.serviceWorker) return;
+  window.addEventListener("load", ()=>{
+    navigator.serviceWorker.register("./sw.js", {scope:"./"}).catch(()=>{});
+  }, {once:true});
+}
+registerServiceWorker();
 </script>
 <script type="module">
 /* =====================================================================
