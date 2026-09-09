@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import vm from "node:vm";
 import fs from "node:fs";
 import path from "node:path";
@@ -114,6 +115,122 @@ test("PWA contract: service worker precaches the app and uses a cache-first fetc
   assert.match(worker, /clients\.claim\(\)/, "service worker must claim already-open app clients");
   assert.match(worker, /caches\.match\(\s*["']\.\/index\.html["']\s*\)/,
     "failed navigations must fall back to the cached app shell");
+});
+
+function serviceWorkerSource() {
+  const match = html.match(/navigator\.serviceWorker\.register\(\s*["']([^"']+)["']/);
+  assert.ok(match, "service-worker source path must be discoverable from the app registration");
+  const workerPath = path.resolve(__dirname, match[1]);
+  assert.ok(workerPath.startsWith(`${__dirname}${path.sep}`), "service worker must stay inside the app repository");
+  return fs.readFileSync(workerPath, "utf8");
+}
+
+function appShellContract(worker) {
+  const cacheMatch = worker.match(/const\s+CACHE_NAME\s*=\s*["']([^"']+)["']/);
+  assert.ok(cacheMatch, "service worker must declare a literal CACHE_NAME");
+
+  const addAllMatch = worker.match(/\.addAll\(\s*\[([\s\S]*?)\]\s*\)/);
+  assert.ok(addAllMatch, "service worker must precache a literal app-shell path list");
+  const rawPaths = [...addAllMatch[1].matchAll(/["']([^"']+)["']/g)].map((match) => match[1]);
+  assert.ok(rawPaths.length > 0, "service worker app-shell path list must not be empty");
+
+  const localPaths = [...new Set(rawPaths.flatMap((entry) => {
+    // Remote URLs are intentionally not part of the local shell fingerprint.
+    if (/^(?:[a-z][a-z\d+.-]*:)?\/\//i.test(entry) || /^[a-z][a-z\d+.-]*:/i.test(entry)) return [];
+    const normalized = path.posix.normalize(entry.replace(/^\.\//, ""));
+    // The root navigation and its explicit HTML fallback are the same shell file.
+    if (normalized === "." || normalized === "index.html") return ["index.html"];
+    // A worker cannot fingerprint itself without creating a circular release key.
+    if (normalized === "sw.js") return [];
+    return [normalized];
+  }))].sort();
+  assert.ok(localPaths.includes("index.html"), "app-shell fingerprint must include index.html");
+
+  const hash = createHash("sha256");
+  for (const relativePath of localPaths) {
+    const absolutePath = path.resolve(__dirname, relativePath);
+    assert.ok(absolutePath.startsWith(`${__dirname}${path.sep}`),
+      `precached local asset must stay inside the app repository: ${relativePath}`);
+    assert.ok(fs.existsSync(absolutePath), `precached local asset must exist: ${relativePath}`);
+    hash.update(relativePath);
+    hash.update("\0");
+    hash.update(fs.readFileSync(absolutePath));
+    hash.update("\0");
+  }
+
+  return {
+    cacheName: cacheMatch[1],
+    rawPaths,
+    localPaths,
+    fingerprint: hash.digest("hex"),
+  };
+}
+
+test("PWA cache contract: CACHE_NAME is mechanically tied to every local app-shell byte", () => {
+  const { cacheName, fingerprint } = appShellContract(serviceWorkerSource());
+  assert.equal(cacheName, `chain-scanner-shell-${fingerprint}`,
+    "changing any locally precached shell asset must require a corresponding cache-key update");
+});
+
+function serviceWorkerHarness(worker, existingCacheNames = []) {
+  const handlers = {};
+  const cacheRecords = new Map(existingCacheNames.map((name) => [name, { added: [] }]));
+  let skipWaitingCalls = 0;
+  let claimCalls = 0;
+  const caches = {
+    open(name) {
+      if (!cacheRecords.has(name)) cacheRecords.set(name, { added: [] });
+      const record = cacheRecords.get(name);
+      return Promise.resolve({
+        addAll(entries) {
+          record.added.push(...entries);
+          return Promise.resolve();
+        },
+        put() { return Promise.resolve(); },
+      });
+    },
+    keys() { return Promise.resolve([...cacheRecords.keys()]); },
+    delete(name) { return Promise.resolve(cacheRecords.delete(name)); },
+    match() { return Promise.resolve(undefined); },
+  };
+  const context = {
+    caches,
+    console,
+    fetch() { return Promise.reject(new Error("network should not be used in lifecycle test")); },
+    URL,
+    self: {
+      location: { origin: "https://scanner.example" },
+      addEventListener(type, handler) { handlers[type] = handler; },
+      skipWaiting() { skipWaitingCalls += 1; return Promise.resolve(); },
+      clients: { claim() { claimCalls += 1; return Promise.resolve(); } },
+    },
+  };
+  vm.runInNewContext(worker, context, { filename: "sw.js" });
+  return { handlers, cacheRecords, skipWaitingCalls: () => skipWaitingCalls, claimCalls: () => claimCalls };
+}
+
+test("PWA lifecycle: current shell installs and activation retires prior shell caches", async () => {
+  const worker = serviceWorkerSource();
+  const { cacheName, rawPaths } = appShellContract(worker);
+  const harness = serviceWorkerHarness(worker, ["chain-scanner-shell-v1", "unrelated-cache"]);
+
+  const installWaits = [];
+  harness.handlers.install({ waitUntil(promise) { installWaits.push(promise); } });
+  await Promise.all(installWaits);
+  assert.deepEqual(harness.cacheRecords.get(cacheName).added, rawPaths,
+    "install must precache the exact current app-shell path list");
+  assert.equal(harness.skipWaitingCalls(), 1, "install must activate the new worker immediately");
+
+  const activateWaits = [];
+  harness.handlers.activate({ waitUntil(promise) { activateWaits.push(promise); } });
+  await Promise.all(activateWaits);
+  assert.equal(harness.cacheRecords.has("chain-scanner-shell-v1"), false,
+    "activation must delete the previous shell cache");
+  assert.equal(harness.cacheRecords.has(cacheName), true,
+    "activation must retain the current fingerprinted shell cache");
+  assert.equal(harness.cacheRecords.has("unrelated-cache"), true,
+    "activation must leave unrelated caches alone");
+  assert.equal(harness.claimCalls(), 1, "activation must claim already-open app clients");
 });
 
 function slice(src, startMarker, endMarker) {
