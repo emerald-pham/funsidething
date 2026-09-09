@@ -2583,6 +2583,136 @@ function addTaskAged(ctx, title, ageMs) { // add a task with a backdated created
 const titleOf = (ctx, id) => (ctx.state.tasks.find((t) => t.id === id) || {}).title;
 const scanHtmlOf = (ctx, shim) => { ctx.render(); return shim.elements.get("scan").innerHTML; };
 
+/* ---------- optional rank presentation ----------
+   Sparklines and top-K are useful diagnostics, but they are deliberately
+   code-owned presentation switches rather than user settings. Keep the rank
+   machinery running underneath so either display can be restored with one
+   source edit, without migrating saved or synced state. */
+
+test("rank presentation flags default off and are not persisted settings", async () => {
+  const { ctx } = await loadApp();
+  const flags = readConst(ctx, "FEATURE_FLAGS");
+
+  assert.equal(flags.rankSparklines, false);
+  assert.equal(flags.topKLanguage, false);
+  assert.ok(!("rankSparklines" in ctx.state.settings));
+  assert.ok(!("topKLanguage" in ctx.state.settings));
+});
+
+test("rank presentation defaults hide sparklines and top-K everywhere without hiding controls", async () => {
+  const { ctx, shim } = await loadApp({ seed: 790 });
+  const first = addTaskAged(ctx, "Oldest", 900000);
+  addTaskAged(ctx, "Newer", 1000);
+  ctx.startScan();
+  ctx.state.listOpen = true;
+  ctx.render();
+
+  const scanHtml = shim.elements.get("scan").innerHTML;
+  assert.doesNotMatch(scanHtml, /<svg class="spark"/);
+  assert.doesNotMatch(scanHtml, /class="topkchip/);
+  assert.doesNotMatch(scanHtml, /top-\d+/i);
+  assert.match(scanHtml, /data-act="yes"/);
+  assert.match(scanHtml, /data-act="no"/);
+  assert.match(scanHtml, /data-act="toggle-list"/);
+
+  const listHtml = shim.elements.get("listBody").innerHTML;
+  assert.doesNotMatch(listHtml, /<svg class="spark"/);
+  assert.doesNotMatch(listHtml, /class="tk"/);
+  assert.doesNotMatch(listHtml, /class="tkbar"/);
+  assert.doesNotMatch(listHtml, /top-\d+/i);
+  assert.match(listHtml, /class="trow rank-none"/,
+    "rank-free rows should not reserve blank sparkline or top-K columns");
+  assert.match(listHtml, /data-act="edit"/, "task controls should remain in the ranked list");
+
+  ctx.openEdit(first.id);
+  const editHtml = shim.elements.get("modalRoot").innerHTML;
+  assert.match(editHtml, /strength ≈/);
+  assert.doesNotMatch(editHtml, /top-\d+/i);
+
+  ctx.openHelp();
+  const helpHtml = shim.elements.get("modalRoot").innerHTML;
+  assert.doesNotMatch(helpHtml, /sparkline/i);
+  assert.doesNotMatch(helpHtml, /top-K/i);
+
+  ctx.openSettings();
+  const settingsHtml = shim.elements.get("modalRoot").innerHTML;
+  assert.match(settingsHtml, /MC samples/);
+  assert.match(settingsHtml, /more = steadier estimates/);
+  assert.doesNotMatch(settingsHtml, /sparkline/i);
+});
+
+test("rank presentation flags independently restore their existing UI only for literal true", async () => {
+  const { ctx, shim } = await loadApp({ seed: 791 });
+  const first = addTaskAged(ctx, "Oldest", 900000);
+  addTaskAged(ctx, "Newer", 1000);
+  ctx.startScan();
+  ctx.state.listOpen = true;
+
+  vm.runInContext("FEATURE_FLAGS.rankSparklines = true", ctx);
+  ctx.render();
+  assert.match(shim.elements.get("scan").innerHTML, /<svg class="spark"/);
+  assert.doesNotMatch(shim.elements.get("scan").innerHTML, /class="topkchip/);
+  assert.match(shim.elements.get("listBody").innerHTML, /<svg class="spark"/);
+  assert.doesNotMatch(shim.elements.get("listBody").innerHTML, /class="tk"/);
+  ctx.openHelp();
+  assert.match(shim.elements.get("modalRoot").innerHTML, /sparkline/i);
+  assert.doesNotMatch(shim.elements.get("modalRoot").innerHTML, /top-K/i);
+  ctx.openSettings();
+  assert.match(shim.elements.get("modalRoot").innerHTML, /more = smoother sparklines/);
+  ctx.openEdit(first.id);
+  assert.doesNotMatch(shim.elements.get("modalRoot").innerHTML, /top-\d+/i);
+
+  vm.runInContext("FEATURE_FLAGS.rankSparklines = false; FEATURE_FLAGS.topKLanguage = true", ctx);
+  ctx.render();
+  assert.doesNotMatch(shim.elements.get("scan").innerHTML, /<svg class="spark"/);
+  assert.match(shim.elements.get("scan").innerHTML, /class="topkchip[^>]*>top-\d+/i);
+  assert.doesNotMatch(shim.elements.get("listBody").innerHTML, /<svg class="spark"/);
+  assert.match(shim.elements.get("listBody").innerHTML, /class="tk"/);
+  assert.match(shim.elements.get("listBody").innerHTML, /top-\d+/i);
+  ctx.openHelp();
+  assert.doesNotMatch(shim.elements.get("modalRoot").innerHTML, /sparkline/i);
+  assert.match(shim.elements.get("modalRoot").innerHTML, /top-K/i);
+  ctx.openSettings();
+  assert.doesNotMatch(shim.elements.get("modalRoot").innerHTML, /sparkline/i);
+  ctx.openEdit(first.id);
+  assert.match(shim.elements.get("modalRoot").innerHTML, /top-\d+/i);
+
+  vm.runInContext("FEATURE_FLAGS.rankSparklines = 'true'; FEATURE_FLAGS.topKLanguage = 1", ctx);
+  ctx.render();
+  assert.doesNotMatch(shim.elements.get("scan").innerHTML, /<svg class="spark"/);
+  assert.doesNotMatch(shim.elements.get("scan").innerHTML, /class="topkchip/);
+});
+
+test("rank presentation list columns stay responsive for every flag combination", async () => {
+  const { ctx, shim } = await loadApp({ seed: 792 });
+  addTaskAged(ctx, "Oldest", 900000);
+  addTaskAged(ctx, "Newer", 1000);
+  ctx.state.listOpen = true;
+
+  const listRowClass = () => {
+    ctx.render();
+    return (shim.elements.get("listBody").innerHTML.match(/<div class="trow ([^"]+)"/) || [])[1];
+  };
+  assert.equal(listRowClass(), "rank-none");
+  vm.runInContext("FEATURE_FLAGS.rankSparklines = true", ctx);
+  assert.equal(listRowClass(), "rank-spark");
+  vm.runInContext("FEATURE_FLAGS.topKLanguage = true", ctx);
+  assert.equal(listRowClass(), "rank-both");
+  vm.runInContext("FEATURE_FLAGS.rankSparklines = false", ctx);
+  assert.equal(listRowClass(), "rank-topk");
+
+  for (const [cls, desktop, mobile] of [
+    ["rank-none", "1fr", "1fr"],
+    ["rank-spark", "88px 1fr", "70px 1fr"],
+    ["rank-topk", "118px 1fr", "92px 1fr"],
+    ["rank-both", "88px 118px 1fr", "70px 92px 1fr"],
+  ]) {
+    assert.match(html, new RegExp(`\\.trow\\.${cls}\\{grid-template-columns:${desktop.replaceAll(" ", "\\s*")}\\}`));
+    const mobileCss = slice(html, "@media (max-width:560px){", "</style>");
+    assert.match(mobileCss, new RegExp(`\\.trow\\.${cls}\\{grid-template-columns:${mobile.replaceAll(" ", "\\s*")}\\}`));
+  }
+});
+
 test("chain start: nothing is dotted while you're still adding tasks", async () => {
   const { ctx } = await loadApp({ seed: 79 });
   addTaskAged(ctx, "Newest", 1000);

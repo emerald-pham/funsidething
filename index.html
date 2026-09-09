@@ -194,6 +194,10 @@ textarea{width:100%;font-family:var(--font-mono);font-size:12px}
 .ltag{font-size:12px;font-weight:600;border:1px solid var(--line);border-radius:99px;padding:3px 10px;color:var(--mut);background:var(--surface);cursor:pointer}
 .ltag.on{background:var(--chain-deep);color:#fff;border-color:var(--chain-deep)}
 .trow{display:grid;grid-template-columns:88px 118px 1fr;gap:12px;align-items:center;padding:8px 14px;border-bottom:1px solid var(--rowline)}
+.trow.rank-none{grid-template-columns:1fr}
+.trow.rank-spark{grid-template-columns:88px 1fr}
+.trow.rank-topk{grid-template-columns:118px 1fr}
+.trow.rank-both{grid-template-columns:88px 118px 1fr}
 .trow:last-child{border-bottom:none}
 .trow.flash{animation:flash 1.6s ease}
 @keyframes flash{0%{background:light-dark(#fff3c4,#3a3318)}100%{background:transparent}}
@@ -274,6 +278,10 @@ textarea{width:100%;font-family:var(--font-mono);font-size:12px}
 
 @media (max-width:560px){
   .trow{grid-template-columns:70px 92px 1fr;gap:8px;padding:8px 10px}
+  .trow.rank-none{grid-template-columns:1fr}
+  .trow.rank-spark{grid-template-columns:70px 1fr}
+  .trow.rank-topk{grid-template-columns:92px 1fr}
+  .trow.rank-both{grid-template-columns:70px 92px 1fr}
   .siderail{min-width:72px}
   .qline{font-size:17px}
   /* Edit pane on a phone: stack every field label above a full-width control
@@ -447,6 +455,11 @@ const STORE_KEY = "fvp:chain-scanner:v1";
 const THEME_HINT_KEY = "fvp:chain-scanner:theme";   // paint-time cache only; see writeThemeHint()
 const STALE_PASS_MS = 18 * 3600000;   // a scan pass older than this auto-recycles (newPass) — see ensureCandidate()
 const PASS_RESET_HOUR = 2;            // ...and so does one that crosses 02:00 local — the "new day" line, usually the trigger that trips first
+/* Code-owned presentation switches, intentionally kept out of Settings and
+   persisted state. The rank machinery still runs while these are off, so the
+   existing UI can be restored independently by changing either value to true. */
+const FEATURE_FLAGS = Object.seal({ rankSparklines:false, topKLanguage:false });
+const featureEnabled = name => FEATURE_FLAGS[name] === true;
 /* One source of truth for every setting default. defaultState() and
    hydrateState() both read it, so "what a fresh install gets" and "what a
    state arriving from another device gets backfilled with" can never drift
@@ -1865,8 +1878,9 @@ function renderScan(){
            + '<button class="btn no" data-act="no">No<span class="keyhint">n</span></button>' 
            + '<button class="btn cant" data-act="cant" title="Skip it for a while, even if the chain empties out before then \u2014 see Settings">Can\u2019t<span class="keyhint">c</span></button>'
            + (state.mode==="scan" && b ? '<button class="btn subtle" data-act="start-working" title="Stop suggesting new candidates — just work through what\u2019s already dotted">done adding for now</button>' : '')
-           + '<span class="sparkbox">'+sparkSVG(cand.id,84,20)
-           + '<span class="topkchip mono">'+topKlabel(cand.id)+'</span>'
+           + '<span class="sparkbox">'
+           + (featureEnabled("rankSparklines") ? sparkSVG(cand.id,84,20) : '')
+           + (featureEnabled("topKLanguage") ? '<span class="topkchip mono">'+topKlabel(cand.id)+'</span>' : '')
            + '<button class="iconbtn" data-act="toggle-list" title="Show the full ranked list">▦</button></span>'
            + '</div>';
     }
@@ -1989,15 +2003,18 @@ function renderList(){
      about to be dotted — and the rows are sorted by top-K, not by age, so the
      task that actually got the dot was rarely even near the top. */
   const nextDotted = chainStart() ? oldestFirst(pool()) : null;
+  const showSparklines = featureEnabled("rankSparklines");
+  const showTopK = featureEnabled("topKLanguage");
+  const rankColumns = showSparklines ? (showTopK ? "rank-both" : "rank-spark") : (showTopK ? "rank-topk" : "rank-none");
   let html = "";
   for(const t of rows){
     const st = rankCache.get(t.id);
     const fill = st ? Math.max(2, Math.round(st.topK/st.n*100)) : 2;
     const consid = state.considered[t.id];
     const dim = !isEligible(t, act);
-    html += '<div class="trow" data-row="'+t.id+'" style="'+(dim?"opacity:.45":"")+'">'
-         + sparkSVG(t.id, 88, 22)
-         + '<div class="tk"><span class="tkl">'+(st?("top-"+st.topK):"—")+'</span><div class="tkbar"><i style="width:'+fill+'%"></i></div></div>'
+    html += '<div class="trow '+rankColumns+'" data-row="'+t.id+'" style="'+(dim?"opacity:.45":"")+'">'
+         + (showSparklines ? sparkSVG(t.id, 88, 22) : '')
+         + (showTopK ? '<div class="tk"><span class="tkl">'+(st?("top-"+st.topK):"—")+'</span><div class="tkbar"><i style="width:'+fill+'%"></i></div></div>' : '')
          + '<div class="tmain">'
          + (inChain.has(t.id) ? '<span class="inchain" title="In the chain">●</span>' : '') + (nextDotted && nextDotted.id===t.id ? '<span class="chainind" title="Will be added to the chain when you start scanning">→ </span>' : '')
          + '<button class="tt" data-act="edit" data-id="'+t.id+'">'+esc(t.title)+'</button>'
@@ -2084,8 +2101,8 @@ function openHelp(){
     + '<h3>What the machinery does</h3>'
     + '<p class="kv">Every Yes/No is a pairwise match; each task keeps a <b>strength posterior</b> (a bell curve, not a number). '
     + 'Candidates are dealt by sampling those posteriors, so likely picks come early and new tasks still get a look. '
-    + 'The <b>sparkline</b> is each task\u2019s likelihood distribution over rank — left-biased means likely to be picked. '
-    + '<b>top-K</b> is the smallest K (≥2) with P(rank ≤ K) ≥ 1 − 1/K: a stopping stat for "if I\u2019ll only do K tasks today, is this plausibly one of them?" '
+    + (featureEnabled("rankSparklines") ? 'The <b>sparkline</b> is each task\u2019s likelihood distribution over rank — left-biased means likely to be picked. ' : '')
+    + (featureEnabled("topKLanguage") ? '<b>top-K</b> is the smallest K (≥2) with P(rank ≤ K) ≥ 1 − 1/K: a stopping stat for "if I\u2019ll only do K tasks today, is this plausibly one of them?" ' : '')
     + 'And when the odds of finding anything better collapse, the scanner interrupts your clicking and tells you to go work.</p>'
     + '<p class="kv">Keys: <b>y</b> / <b>n</b> / <b>c</b> to decide, <b>d</b> to mark whatever\u2019s showing done, <b>w</b> for worked on it, <b>Delete</b> or <b>Backspace</b> to remove it entirely, <b>u</b> to undo.</p></div>'
     + '<div class="mbtns"><button class="btn done" data-act="ok-quickstart">OK</button></div>'
@@ -2110,7 +2127,8 @@ function openEdit(id){
     + '<div class="frow"><label for="etStart">Starts</label><input id="etStart" type="date" value="'+esc(t.startsAt||"")+'"/>'
     + '<span class="kv">(not eligible for the queue until this date)</span></div>'
     + '<h3>Needs these contexts</h3><div class="ctxpick">'+ctxHtml+'</div>'
-    + '<div class="kv">strength ≈ <b class="mono">'+t.mu.toFixed(1)+'</b> ± '+t.sigma.toFixed(1)+' · '+topKlabel(t.id)+'</div>'
+    + '<div class="kv">strength ≈ <b class="mono">'+t.mu.toFixed(1)+'</b> ± '+t.sigma.toFixed(1)
+    + (featureEnabled("topKLanguage") ? ' · '+topKlabel(t.id) : '')+'</div>'
     // Two rows on purpose: what to do with the TASK, then what to do with the
     // FORM. Five actions get somewhere sane to wrap on a phone instead of one
     // ragged pile, and Delete stays held apart on the far side from Save.
@@ -2146,7 +2164,7 @@ function openSettings(){
     + '<div class="frow"><label for="stThresh">Interrupt below</label><input id="stThresh" type="number" min="1" max="90" value="'+s.thresholdPct+'" style="width:90px"/>'
     + '<span class="kv">% chance of a better task within 1 min</span></div>'
     + '<div class="frow"><label for="stSamples">MC samples</label><input id="stSamples" type="number" min="50" max="2000" step="50" value="'+s.samples+'" style="width:90px"/>'
-    + '<span class="kv">more = smoother sparklines</span></div>'
+    + '<span class="kv">'+(featureEnabled("rankSparklines") ? 'more = smoother sparklines' : 'more = steadier estimates')+'</span></div>'
     + '<div class="mbtns"><button class="btn primary" data-act="save-settings">Save settings</button></div>'
     + '<h3>Contexts</h3>'+ctxMgr
     + '<div class="mgr"><input id="newCtxName" type="text" placeholder="New context…"/><button class="btn subtle" data-act="add-ctx-named">Add</button></div>'
