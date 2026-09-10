@@ -2469,6 +2469,175 @@ test("fresh can't and worked marks survive the 18h auto-recycle — their own wi
   assert.equal(ctx.state.considered[workedT.id], "worked", "a 30-min-old worked mark is still within its window and before the next 02:00");
 });
 
+/* =====================================================================
+   CROSSING THE DATE MARKER IS A NEW DAY, NOT JUST A NEW PASS
+   A pass left open overnight used to wake up carrying last night's
+   can't marks: newPass() spares a still-fresh can't, and expireCants()
+   has no day-line ceiling of its own (only cantMin, up to 8h). So a
+   "can't" hit at 23:00 with a long window was still holding its task out
+   of the pool at 02:30 — the scan resumed against a pool that was NOT
+   the pool a fresh day would have built.
+
+   A worked mark never had this problem: workedUntil() is
+   min(at + workedHours, passResetCutoff(at)), so 02:00 is already a hard
+   ceiling on it. The asymmetry was the bug — crossing the date marker
+   now rebuilds the pool exactly as a fresh day would, minus the dots.
+
+   The 18h ceiling is deliberately NOT a new day. It can fire without the
+   clock ever passing 02:00 (a pass opened at 03:00 goes stale at 21:00
+   the same evening), and that is a long pass, not a new one — fresh
+   can't / worked marks keep their own windows there, as they always did.
+   ===================================================================== */
+
+test("REGRESSION: a long-window can't from last night does not survive the 02:00 date marker", async () => {
+  const { ctx } = await loadApp({ seed: 450 });
+  ctx.state.settings.cantMin = 480;                 // 8h — the widest window Settings allows
+  ctx.addTask("Benchmark", false);
+  const c = ctx.addTask("Can't face it tonight", false);
+  setFakeTime(ctx, localAt(30, 22, 0));             // Sun 22:00 — the pass opens before the line
+  ctx.startScan();                                  // chain stays open across the marker
+  assert.equal(ctx.state.passStartedAt, localAt(30, 22, 0), "precondition: the pass is anchored last night");
+
+  setFakeTime(ctx, localAt(30, 23, 0));             // Sun 23:00 — 02:00 is 3h away, far inside the 8h window
+  ctx.state.considered[c.id] = "cant";
+  ctx.state.cantAt[c.id] = localAt(30, 23, 0);
+
+  setFakeTime(ctx, localAt(31, 1, 30));             // Mon 01:30 — before the line, the mark still holds
+  ctx.ensureCandidate();
+  assert.equal(ctx.state.considered[c.id], "cant", "before 02:00 a fresh can't is still bulletproof");
+
+  setFakeTime(ctx, localAt(31, 2, 30));             // Mon 02:30 — past the date marker, 5h of the window unspent
+  ctx.ensureCandidate();
+
+  assert.equal(ctx.state.considered[c.id], undefined, "the date marker releases it, window or no window");
+  assert.equal(ctx.state.cantAt[c.id], undefined, "and takes its timestamp with it");
+  assert.ok(ctx.pool().some((t) => t.id === c.id), "and it is back in the pool the scan draws from");
+});
+
+test("crossing the date marker leaves the pool exactly as a fresh day would build it, minus the dots", async () => {
+  const { ctx } = await loadApp({ seed: 451 });
+  ctx.state.settings.cantMin = 480;
+  ctx.state.settings.workedHours = 720;             // 30 days — deliberately longer than the day line
+  ctx.addTask("Benchmark", false);
+  const no = ctx.addTask("Said no", false);
+  const cant = ctx.addTask("Said can't", false);
+  const worked = ctx.addTask("Worked on it", false);
+  setFakeTime(ctx, localAt(30, 22, 0));             // Sun 22:00 — everything marked last night
+  ctx.startScan();
+  const dotted = ctx.addTask("Dotted last night", true);   // "Add & dot" — straight onto the chain
+  assert.ok(ctx.state.chain.includes(dotted.id), "precondition: the second dot is on the chain");
+
+  ctx.state.considered[no.id] = "no";
+  ctx.state.considered[cant.id] = "cant";     ctx.state.cantAt[cant.id] = localAt(30, 22, 0);
+  ctx.state.considered[worked.id] = "worked"; ctx.state.workedAt[worked.id] = localAt(30, 22, 0);
+
+  setFakeTime(ctx, localAt(31, 2, 30));             // Mon 02:30 — past the date marker
+  ctx.ensureCandidate();
+
+  assert.deepEqual(Object.keys(ctx.state.considered), [],
+    "a new day starts with no skip marks at all — no, can't and worked alike");
+  assert.deepEqual(Object.keys(ctx.state.cantAt), [], "and no orphan can't timestamps");
+  assert.deepEqual(Object.keys(ctx.state.workedAt), [], "and no orphan worked timestamps");
+
+  const inChain = new Set(ctx.state.chain);
+  assert.deepEqual(
+    ctx.pool().map((t) => t.id).sort(),
+    ctx.eligibleTasks().filter((t) => !inChain.has(t.id)).map((t) => t.id).sort(),
+    "the pool is every eligible task except the dotted ones");
+  assert.ok(!ctx.pool().some((t) => t.id === dotted.id), "the dots are the one thing the new day keeps");
+});
+
+test("the date-marker clear leaves the chain and its benchmark alone", async () => {
+  const { ctx } = await loadApp({ seed: 452 });
+  ctx.state.settings.cantMin = 480;
+  ctx.addTask("Root", false);
+  const c = ctx.addTask("Can't", false);
+  setFakeTime(ctx, localAt(30, 22, 0));
+  ctx.startScan();
+  ctx.addTask("Second dot", true);
+  ctx.addTask("Third dot", true);
+  ctx.state.considered[c.id] = "cant"; ctx.state.cantAt[c.id] = localAt(30, 22, 0);
+  const chainBefore = [...ctx.state.chain];
+  const benchBefore = ctx.benchmark().id;
+  assert.equal(chainBefore.length, 3, "precondition: three dots carried into the new day");
+
+  setFakeTime(ctx, localAt(31, 2, 30));
+  ctx.ensureCandidate();
+
+  assert.deepEqual([...ctx.state.chain], chainBefore, "every dotted task stays dotted");
+  assert.equal(ctx.benchmark().id, benchBefore, "and the benchmark is the same task");
+  assert.equal(ctx.state.considered[c.id], undefined, "while the can't mark went with the old day");
+});
+
+test("the 18h ceiling is a long pass, not a new day: a fresh can't keeps its window", async () => {
+  // The sibling of the 02:00 test above, on the trigger that does NOT mean a
+  // new day. Anchored at 03:00 so the whole 18h span stays inside one
+  // 02:00-to-02:00 day and only the elapsed-time ceiling can fire. The "no"
+  // mark is the canary: it proves the recycle really ran, so the surviving
+  // can't below is a decision and not a recycle that never happened.
+  const { ctx } = await loadApp({ seed: 453 });
+  ctx.state.settings.cantMin = 480;
+  ctx.addTask("Benchmark", false);
+  const c = ctx.addTask("Can't", false);
+  const n = ctx.addTask("Said no", false);
+  const t0 = localAt(30, 3, 0);                     // Sun 03:00 — next 02:00 is 23h away
+  setFakeTime(ctx, t0);
+  ctx.startScan();
+
+  const late = t0 + 17.5 * 3600000;                 // Sun 20:30 — 30 min before the ceiling
+  ctx.state.considered[c.id] = "cant"; ctx.state.cantAt[c.id] = late;
+  ctx.state.considered[n.id] = "no";
+
+  setFakeTime(ctx, t0 + 18 * 3600000);              // Sun 21:00 — 18h in, no 02:00 crossed
+  ctx.ensureCandidate();
+
+  assert.equal(ctx.state.considered[n.id], undefined, "canary: the 18h recycle did run");
+  assert.equal(ctx.state.considered[c.id], "cant",
+    "a 30-min-old can't survives the 18h recycle — that ceiling is not a date marker");
+  assert.equal(ctx.state.cantAt[c.id], late, "and keeps the timestamp its window is measured from");
+});
+
+test("a chain draining mid-day is a new pass, not a new day: a fresh can't keeps its window", async () => {
+  const { ctx } = await loadApp({ seed: 454 });
+  ctx.state.settings.cantMin = 480;
+  ctx.addTask("Only task", false);
+  const c = ctx.addTask("Can't", false);
+  const n = ctx.addTask("Said no", false);
+  setFakeTime(ctx, localAt(30, 14, 0));             // mid-afternoon, nowhere near a day line
+  ctx.startScan();
+  ctx.state.considered[c.id] = "cant"; ctx.state.cantAt[c.id] = localAt(30, 14, 0);
+  ctx.state.considered[n.id] = "no";
+
+  setFakeTime(ctx, localAt(30, 14, 30));
+  ctx.benchDone();                                  // drains the chain -> newPass()
+  assert.equal(ctx.state.chain.length, 0, "precondition: the chain really drained");
+
+  assert.equal(ctx.state.considered[n.id], undefined, "canary: the new pass did run");
+  assert.equal(ctx.state.considered[c.id], "cant",
+    "draining the chain starts a new pass, and a fresh can't survives a new pass as it always has");
+});
+
+test("the date-marker clear is a one-shot: a can't placed after the marker holds normally", async () => {
+  const { ctx } = await loadApp({ seed: 455 });
+  ctx.state.settings.cantMin = 480;
+  ctx.addTask("Benchmark", false);
+  const c = ctx.addTask("Can't", false);
+  setFakeTime(ctx, localAt(30, 22, 0));
+  ctx.startScan();
+
+  setFakeTime(ctx, localAt(31, 2, 30));             // cross the marker with nothing marked
+  ctx.ensureCandidate();
+  assert.equal(ctx.state.passStartedAt, localAt(31, 2, 30), "the crossing re-anchored the pass");
+
+  setFakeTime(ctx, localAt(31, 8, 0));              // Mon 08:00 — a fresh can't, this morning
+  ctx.state.considered[c.id] = "cant"; ctx.state.cantAt[c.id] = localAt(31, 8, 0);
+
+  setFakeTime(ctx, localAt(31, 10, 0));             // two hours later, same day
+  ctx.ensureCandidate();
+  assert.equal(ctx.state.considered[c.id], "cant",
+    "today's can't is held by its own window — the clear belongs to the crossing, not to the day");
+});
+
 test("after an auto-recycle, passStartedAt is re-stamped so it does not recycle again immediately", async () => {
   const { ctx } = await loadApp({ seed: 437 });
   ctx.addTask("Benchmark", false);

@@ -1242,11 +1242,20 @@ function ensureCandidate(){
   // A pass is stale once it has either run for STALE_PASS_MS or crossed 02:00
   // local (the day line — usually the one that trips first). Its no/dislodged
   // marks and any evergreen finished hours ago recycle so the new day's
-  // priorities re-sort. newPass() keeps the chain and still-fresh can't/worked
-  // marks, and re-stamps passStartedAt so each trigger rearms for the next day.
+  // priorities re-sort. newPass() keeps the chain and re-stamps passStartedAt
+  // so each trigger rearms for the next day.
+  //
+  // The two triggers do NOT mean the same thing, and newPass() needs to be told
+  // which one fired. Crossing 02:00 is a new DAY: the pool has to come back
+  // exactly as a fresh day would build it, minus the dots, so no mark is spared.
+  // Running for 18h is a long PASS, which can go stale without the clock ever
+  // passing 02:00 — one opened at 03:00 expires at 21:00 the same evening — and
+  // there a still-fresh can't/worked window is this afternoon's decision, not
+  // yesterday's, so it stands.
   const now = Date.now();
-  if(state.passStartedAt && (now - state.passStartedAt >= STALE_PASS_MS || now >= passResetCutoff(state.passStartedAt))){
-    newPass(false);
+  if(state.passStartedAt){
+    const newDay = now >= passResetCutoff(state.passStartedAt);
+    if(newDay || now - state.passStartedAt >= STALE_PASS_MS) newPass(false, newDay);
   }
   if(state.mode !== "scan" || state.interventionActive) return;
   // Nothing dotted means nothing to compare a candidate against, so none is
@@ -1464,13 +1473,27 @@ function deleteTask(id){ // removes a task entirely — from the list, the chain
   recomputeRanks();
   commit(true, true);           // deletions sync to the cloud right away
 }
-function newPass(push){
+/* newDay is true only when the caller crossed the 02:00 date marker — see
+   ensureCandidate(). It is what separates "a new pass" from "a new day". */
+function newPass(push, newDay){
   if(push!==false) pushUndo();
   expireCants();    // drop any "can't" marks that had already outlived the horizon on their own
   expireWorked();   // and any "worked on it" marks past their window
   for(const [id,v] of Object.entries(state.considered)){
-    if(v==="cant" || v==="worked") continue;   // still-fresh can't / worked marks survive a new pass (expireWorked above already dropped any that crossed 02:00)
+    /* BUG FIX: a still-fresh can't used to be spared here on EVERY new pass,
+       the date marker included — and unlike a worked mark, a can't has no day
+       line of its own. workedUntil() floors at passResetCutoff(), so 02:00 is
+       already a hard ceiling on worked; expireCants() knows only cantMin, which
+       Settings lets run to 8h. So a "can't" hit at 23:00 was still holding its
+       task out of the pool at 02:30, and a pass left open overnight resumed
+       against a pool that was NOT the one a fresh day would have built — the
+       scan kept trawling what was left instead of the whole list again.
+       Crossing the date marker spares nothing; a same-day new pass still
+       respects both windows, because those are today's decisions. */
+    if(!newDay && (v==="cant" || v==="worked")) continue;
     delete state.considered[id];
+    delete state.cantAt[id];     // no mark, no timestamp — the same tidy-up expireCants()/expireWorked() do
+    delete state.workedAt[id];
   }
   state.snooze = 0;
   state.interventionActive = false;
