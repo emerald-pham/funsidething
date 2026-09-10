@@ -2706,17 +2706,17 @@ const scanHtmlOf = (ctx, shim) => { ctx.render(); return shim.elements.get("scan
    machinery running underneath so either display can be restored with one
    source edit, without migrating saved or synced state. */
 
-test("rank presentation defaults keep top-K off and sparklines on, and are not persisted settings", async () => {
+test("rank presentation defaults keep sparklines and top-K on, and are not persisted settings", async () => {
   const { ctx } = await loadApp();
   const flags = readConst(ctx, "FEATURE_FLAGS");
 
   assert.equal(flags.rankSparklines, true);
-  assert.equal(flags.topKLanguage, false);
+  assert.equal(flags.topKLanguage, true);
   assert.ok(!("rankSparklines" in ctx.state.settings));
   assert.ok(!("topKLanguage" in ctx.state.settings));
 });
 
-test("rank presentation defaults show sparklines but hide top-K everywhere without hiding controls", async () => {
+test("rank presentation defaults show sparklines and top-K everywhere without hiding controls", async () => {
   const { ctx, shim } = await loadApp({ seed: 790 });
   const first = addTaskAged(ctx, "Oldest", 900000);
   addTaskAged(ctx, "Newer", 1000);
@@ -2726,35 +2726,41 @@ test("rank presentation defaults show sparklines but hide top-K everywhere witho
 
   const scanHtml = shim.elements.get("scan").innerHTML;
   assert.match(scanHtml, /<svg class="spark"/);
-  assert.doesNotMatch(scanHtml, /class="topkchip/);
-  assert.doesNotMatch(scanHtml, /top-\d+/i);
+  assert.match(scanHtml, /class="topkchip[^>]*>top-\d+/i);
   assert.match(scanHtml, /data-act="yes"/);
   assert.match(scanHtml, /data-act="no"/);
   assert.match(scanHtml, /data-act="toggle-list"/);
 
   const listHtml = shim.elements.get("listBody").innerHTML;
   assert.match(listHtml, /<svg class="spark"/);
-  assert.doesNotMatch(listHtml, /class="tk"/);
-  assert.doesNotMatch(listHtml, /class="tkbar"/);
-  assert.doesNotMatch(listHtml, /top-\d+/i);
-  assert.match(listHtml, /class="trow rank-none"/,
-    "rank-free rows should not reserve blank sparkline or top-K columns");
+  assert.match(listHtml, /class="tk"/);
+  assert.match(listHtml, /class="tkbar"/);
+  assert.match(listHtml, /top-\d+/i);
+  assert.match(listHtml, /class="trow rank-both"/,
+    "ranked rows should reserve both sparkline and top-K columns");
   assert.match(listHtml, /data-act="edit"/, "task controls should remain in the ranked list");
 
   ctx.openEdit(first.id);
   const editHtml = shim.elements.get("modalRoot").innerHTML;
   assert.match(editHtml, /strength ≈/);
-  assert.doesNotMatch(editHtml, /top-\d+/i);
+  assert.match(editHtml, /top-\d+/i);
 
   ctx.openHelp();
   const helpHtml = shim.elements.get("modalRoot").innerHTML;
   assert.match(helpHtml, /sparkline/i);
-  assert.doesNotMatch(helpHtml, /top-K/i);
+  assert.match(helpHtml, /top-K/i);
 
   ctx.openSettings();
   const settingsHtml = shim.elements.get("modalRoot").innerHTML;
   assert.match(settingsHtml, /MC samples/);
   assert.match(settingsHtml, /more = smoother sparklines/);
+  assert.doesNotMatch(settingsHtml, /top-K|rankSparklines|topKLanguage/i,
+    "presentation flags remain code-owned, with no Settings controls");
+
+  await settle();
+  const storedSettings = persisted(shim).settings;
+  assert.ok(!("rankSparklines" in storedSettings));
+  assert.ok(!("topKLanguage" in storedSettings));
 });
 
 test("rank presentation flags independently restore their existing UI only for literal true", async () => {
@@ -2764,7 +2770,7 @@ test("rank presentation flags independently restore their existing UI only for l
   ctx.startScan();
   ctx.state.listOpen = true;
 
-  vm.runInContext("FEATURE_FLAGS.rankSparklines = true", ctx);
+  vm.runInContext("FEATURE_FLAGS.rankSparklines = true; FEATURE_FLAGS.topKLanguage = false", ctx);
   ctx.render();
   assert.match(shim.elements.get("scan").innerHTML, /<svg class="spark"/);
   assert.doesNotMatch(shim.elements.get("scan").innerHTML, /class="topkchip/);
@@ -2809,13 +2815,14 @@ test("rank presentation list columns stay responsive for every flag combination"
     ctx.render();
     return (shim.elements.get("listBody").innerHTML.match(/<div class="trow ([^"]+)"/) || [])[1];
   };
-  assert.equal(listRowClass(), "rank-spark");
+  assert.equal(listRowClass(), "rank-both");
   vm.runInContext("FEATURE_FLAGS.rankSparklines = false", ctx);
-  assert.equal(listRowClass(), "rank-none");
-  vm.runInContext("FEATURE_FLAGS.topKLanguage = true", ctx);
   assert.equal(listRowClass(), "rank-topk");
+  vm.runInContext("FEATURE_FLAGS.topKLanguage = false", ctx);
+  assert.equal(listRowClass(), "rank-none");
   vm.runInContext("FEATURE_FLAGS.rankSparklines = true", ctx);
   assert.equal(listRowClass(), "rank-spark");
+  vm.runInContext("FEATURE_FLAGS.topKLanguage = true", ctx);
   assert.equal(listRowClass(), "rank-both");
 
   for (const [cls, desktop, mobile] of [

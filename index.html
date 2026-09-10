@@ -458,7 +458,7 @@ const PASS_RESET_HOUR = 2;            // ...and so does one that crosses 02:00 l
 /* Code-owned presentation switches, intentionally kept out of Settings and
    persisted state. The rank machinery still runs while these are off, so the
    existing UI can be restored independently by changing either value to true. */
-const FEATURE_FLAGS = Object.seal({ rankSparklines:true, topKLanguage:false });
+const FEATURE_FLAGS = Object.seal({ rankSparklines:true, topKLanguage:true });
 const featureEnabled = name => FEATURE_FLAGS[name] === true;
 /* One source of truth for every setting default. defaultState() and
    hydrateState() both read it, so "what a fresh install gets" and "what a
