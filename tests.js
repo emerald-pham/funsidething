@@ -21,6 +21,162 @@ function livingSky() {
   return ctx.LivingSky;
 }
 
+function livingLocation({ stored, navigator, storage } = {}) {
+  const values = new Map(Object.entries(stored || {}));
+  const events = [];
+  const localStorage = storage || {
+    getItem(key) { return values.has(key) ? values.get(key) : null; },
+    setItem(key, value) { values.set(key, String(value)); },
+    removeItem(key) { values.delete(key); },
+  };
+  const document = {
+    dispatchEvent(event) { events.push(event); return true; },
+    addEventListener() {}, removeEventListener() {},
+    getElementById() { return null; }, querySelector() { return null; },
+  };
+  const ctx = vm.createContext({ Date, Math, console, Intl, JSON, document, localStorage,
+    navigator: navigator || { geolocation: { getCurrentPosition() { throw new Error("prompted"); } } },
+    CustomEvent: class CustomEvent { constructor(type, options) { this.type = type; Object.assign(this, options || {}); } },
+  });
+  const file = path.join(__dirname, "location.js");
+  assert.ok(fs.existsSync(file), "offline location module must exist");
+  vm.runInContext(fs.readFileSync(file, "utf8"), ctx, { filename: "location.js" });
+  return { location: ctx.LivingLocation, events, values, localStorage, ctx };
+}
+
+test("Landscape location: defaults to Orlando, validates coordinates, and never prompts at startup", () => {
+  let prompts = 0;
+  const runtime = livingLocation({ navigator: { geolocation: { getCurrentPosition() { prompts++; } } } });
+  assert.deepEqual({...runtime.location.current()}, {
+    latitude: 28.5383, longitude: -81.3792, timezone: "America/New_York",
+    label: "Orlando, FL", enabled: false,
+  });
+  assert.equal(runtime.location.caption(new Date("2026-06-21T17:00:00Z")), "");
+  assert.equal(prompts, 0, "loading saved state must not request browser geolocation");
+  assert.throws(() => runtime.location.normalize({ latitude: 91, longitude: 0 }), /latitude/i);
+  assert.throws(() => runtime.location.normalize({ latitude: 0, longitude: 181 }), /longitude/i);
+  assert.throws(() => runtime.location.normalize({ latitude: Infinity, longitude: 0 }), /latitude/i);
+});
+
+test("Landscape location: saves a browser fix with device timezone, emits a change, and captions it", async () => {
+  const position = { coords: { latitude: 51.5074, longitude: -0.1278, accuracy: 20 } };
+  const runtime = livingLocation({ navigator: { geolocation: {
+    getCurrentPosition(success) { success(position); },
+  } } });
+  const result = await runtime.location.request();
+  assert.equal(result.enabled, true);
+  assert.equal(result.latitude, position.coords.latitude);
+  assert.equal(result.longitude, position.coords.longitude);
+  assert.match(result.timezone, /\//, "saved location includes the device timezone");
+  assert.equal(JSON.parse(runtime.values.get("fvp:chain-scanner:location")).enabled, true);
+  assert.equal(runtime.events.at(-1).type, "landscape-location-change");
+  assert.match(runtime.location.caption(new Date("2026-06-21T17:00:00Z")), /Near London/);
+  assert.match(runtime.location.caption(new Date("2026-06-21T17:00:00Z")), /\d/);
+});
+
+test("Landscape location: restores saved state, supports a safe editable label, and resets to Orlando", () => {
+  const stored = { "fvp:chain-scanner:location": JSON.stringify({
+    latitude: 35.6762, longitude: 139.6503, timezone: "Asia/Tokyo", label: "Home", enabled: true,
+  }) };
+  const runtime = livingLocation({ stored });
+  assert.equal(runtime.location.current().label, "Home");
+  assert.match(runtime.location.caption(new Date("2026-06-21T17:00:00Z")), /^Home · /);
+  assert.equal(runtime.location.setLabel("  Studio  ").label, "Studio");
+  assert.equal(runtime.location.current().label, "Studio");
+  assert.equal(runtime.location.reset().enabled, false);
+  assert.deepEqual({...runtime.location.current()}, {
+    latitude: 28.5383, longitude: -81.3792, timezone: "America/New_York",
+    label: "Orlando, FL", enabled: false,
+  });
+  assert.equal(runtime.location.caption(new Date()), "");
+});
+
+test("Landscape location: reports denied, unavailable, timeout, and storage failures without changing state", async () => {
+  for (const code of [1, 2, 3]) {
+    const runtime = livingLocation({ navigator: { geolocation: {
+      getCurrentPosition(success, failure) { failure({ code }); },
+    } } });
+    await assert.rejects(runtime.location.request(), error => error.code === code && /location/i.test(error.message));
+    assert.equal(runtime.location.current().enabled, false);
+  }
+  const broken = { getItem() { throw new Error("blocked"); }, setItem() { throw new Error("blocked"); }, removeItem() { throw new Error("blocked"); } };
+  const runtime = livingLocation({ storage: broken, navigator: { geolocation: {
+    getCurrentPosition(success) { success({ coords: { latitude: 64.1466, longitude: -21.9426 } }); },
+  } } });
+  await assert.rejects(runtime.location.request(), /storage/i);
+  assert.equal(runtime.location.current().enabled, false);
+  assert.equal(runtime.location.reset().enabled, false, "reset remains usable when storage is blocked");
+});
+
+test("Landscape location: the browser wiring is explicit, local-only, and exposes the standalone dialog", () => {
+  assert.match(html, /<script defer src="location\.js"><\/script>\s*<script defer src="landscape-geometry\.js"><\/script>\s*<script defer src="landscape-mood\.js"><\/script>\s*<script defer src="landscape\.js">/);
+  assert.match(html, /<script defer src="landscape-geometry\.js"><\/script>/);
+  assert.match(html, /data-act="location-settings"/);
+  assert.match(html, /<dialog id="locationDialog"/);
+  assert.match(html, /data-location-action="request"/);
+  assert.match(html, /data-location-action="reset"/);
+  assert.doesNotMatch(fs.readFileSync(path.join(__dirname, "location.js"), "utf8"), /fetch\(|XMLHttpRequest|https?:\/\//i);
+});
+
+test("Landscape: scene navigation fades task content while the scenery takes focus", () => {
+  const css = fs.readFileSync(path.join(__dirname, "landscape.css"), "utf8");
+  assert.match(css, /\.wrap\{[^}]*transition:[^}]*opacity/);
+  assert.match(css, /\.viewing-scene \.wrap\{[^}]*opacity:0/);
+  assert.match(css, /\.viewing-scene \.wrap\{[^}]*visibility:hidden/);
+});
+
+test("Landscape location: actual coordinates change the sky and polar day returns no rise/set", () => {
+  const sky = livingSky();
+  const instant = new Date("2026-06-21T12:00:00Z");
+  const orlando = sky.skyAt(instant, { latitude: 28.5383, longitude: -81.3792, timezone: "America/New_York", enabled: true });
+  const reykjavik = sky.skyAt(instant, { latitude: 64.1466, longitude: -21.9426, timezone: "Atlantic/Reykjavik", enabled: true });
+  assert.ok(Math.abs(orlando.sun.altitude - reykjavik.sun.altitude) > 10, "Sun altitude follows the supplied observer");
+  assert.ok(Math.abs(orlando.sun.azimuth - reykjavik.sun.azimuth) > 10, "Sun azimuth follows the supplied observer");
+  const polar = sky.sunTimes(new Date("2026-06-21T12:00:00Z"), {
+    latitude: 69.6492, longitude: 18.9553, timezone: "Europe/Oslo", enabled: true,
+  });
+  assert.equal(polar.rise, null);
+  assert.equal(polar.set, null);
+});
+
+test("Landscape: daytime life includes a duck visit and the new bounded animal set", () => {
+  const sky = livingSky();
+  assert.deepEqual([...sky.eventTypes], ["cyclist", "bird", "balloon", "train", "metro", "plane", "duck", "fish", "butterfly", "rabbit", "deer", "kite", "reader", "picnic", "couple", "walker", "airshow", "banner", "hangglider"]);
+  assert.deepEqual([...sky.rareTypes], ["abduction", "vogon"]);
+  const world = sky.createWorld(() => 0.99);
+  assert.equal(world.events.length, 3, "opening life is a small cast");
+  assert.equal(new Set(world.events.map(event => event.type)).size, 3, "opening life has no duplicate visitors");
+  assert.ok(world.events.every(event => event.type !== "abduction"), "rare surprises wait for the scheduler");
+  assert.equal(sky.eventDurations.duck, 80);
+  assert.equal(sky.eventDurations.hangglider, 90);
+  assert.ok(world.wind >= .6 && world.wind <= 1.8);
+  assert.ok(world.events.length <= sky.MAX_EVENTS);
+});
+
+test("Landscape: riders follow trail tangents and pack members have individual ground anchors", () => {
+  const ctx=vm.createContext({Math});
+  const file=path.join(__dirname,"landscape-geometry.js");
+  assert.ok(fs.existsSync(file),"shared ground geometry must exist");
+  vm.runInContext(fs.readFileSync(file,"utf8"),ctx);
+  const G=ctx.LandscapeGeometry;
+  for(const [width,height] of [[320,568],[1440,1000],[844,390]]){
+    const scene=G.create(width,height);
+    assert.ok(scene.waterTop<scene.far(width*.5),"water fits between city and hill");
+    for(const x of [width*.1,width*.5,width*.9]){
+      const pose=scene.rider(x,1,false);
+      const slope=(scene.trail(x+1)-scene.trail(x-1))/2;
+      assert.ok(Math.abs(pose.angle-Math.atan(slope))<.001);
+      assert.equal(scene.rider(x,1,true).angle,pose.angle);
+      assert.equal(scene.rider(x,1,true).direction,-1);
+      assert.ok(Math.abs(pose.y-(scene.trail(x)-3.6))<.001,"wheels meet the path");
+    }
+    const riders=scene.pack(width*.5,6,false);
+    assert.equal(riders.length,6);
+    assert.ok(new Set(riders.map(r=>r.x)).size===6);
+    assert.ok(new Set(riders.map(r=>r.y)).size>1,"each cyclist follows their own ground height");
+  }
+});
+
 test("Landscape: solstice daylight and sunrise use Florida coordinates and the actual instant", () => {
   const sky = livingSky();
   const summer = sky.skyAt(new Date("2026-06-21T17:00:00Z"));
@@ -70,16 +226,48 @@ test("Landscape: a green benchmark is not described as purple", () => {
   assert.doesNotMatch(html,/purple benchmark|that\\u2019s the purple one/);
 });
 
-test("Landscape: white button and benchmark labels retain AA contrast in both themes", () => {
-  const css=fs.readFileSync(path.join(__dirname,"landscape.css"),"utf8");
-  const luminance=hex=>hex.slice(1).match(/../g).map(c=>parseInt(c,16)/255)
+function landscapeLuminance(hex){
+  return hex.slice(1).match(/../g).map(c=>parseInt(c,16)/255)
     .map(c=>c<=.04045?c/12.92:((c+.055)/1.055)**2.4)
     .reduce((sum,c,i)=>sum+c*[.2126,.7152,.0722][i],0);
-  for(const token of ["chain","chain-deep","yes","no","cant","danger"]){
+}
+
+test("Landscape: bright pastel scenery retains a distinct luminous night", () => {
+  const sky=livingSky(),day=sky.palette(35),night=sky.palette(-18);
+  assert.ok(landscapeLuminance(day.front)>.3,"foreground hills should be bright spring green");
+  assert.ok(landscapeLuminance(day.hill)>.48,"middle hills should be light and fresh");
+  assert.ok(landscapeLuminance(day.sky[0])>.5,"day sky should be bright blue");
+  assert.ok(landscapeLuminance(night.front)>.09,"night terrain remains visible");
+  assert.ok(landscapeLuminance(night.sky[0])<.06,"night still reads as night");
+});
+
+test("Landscape: pastel actions use readable dark labels in both themes", () => {
+  const css=fs.readFileSync(path.join(__dirname,"landscape.css"),"utf8");
+  const colors=token=>{
     const match=css.match(new RegExp(`--${token}:light-dark\\((#[a-f0-9]{6}),(#[a-f0-9]{6})\\)`));
-    assert.ok(match,`landscape defines ${token} colors`);
-    for(const color of match.slice(1))assert.ok(1.05/(luminance(color)+.05)>=4.5,`${token} ${color}: white labels need 4.5:1 contrast`);
+    assert.ok(match,`landscape defines ${token} colors`);return match.slice(1);
+  };
+  for(const token of ["chain","chain-deep","yes","no","cant","danger"]){
+    const inks=colors(token.startsWith("chain")?"chain-ink":"action-ink");
+    colors(token).forEach((color,i)=>{
+      const bg=landscapeLuminance(color),fg=landscapeLuminance(inks[i]);
+      assert.ok(bg>.4,`${token} ${color}: use a light pastel fill`);
+      assert.ok((Math.max(bg,fg)+.05)/(Math.min(bg,fg)+.05)>=4.5,`${token}: labels need 4.5:1 contrast`);
+    });
   }
+  const panels=colors("panel"),inks=colors("ink"),muted=colors("mut");
+  assert.ok(landscapeLuminance(panels[1])>.06,"dark mode uses lifted blue slate surfaces");
+  panels.forEach((color,i)=>[inks[i],muted[i]].forEach(ink=>{
+    const a=landscapeLuminance(color),b=landscapeLuminance(ink);
+    assert.ok((Math.max(a,b)+.05)/(Math.min(a,b)+.05)>=4.5,"panel copy retains AA contrast");
+  }));
+});
+
+test("Landscape: birds retain curved wings and their nesting twig", () => {
+  const runtime=fs.readFileSync(path.join(__dirname,"landscape.js"),"utf8");
+  const bird=runtime.slice(runtime.indexOf("  function bird("),runtime.indexOf("  function cyclist("));
+  assert.ok((bird.match(/quadraticCurveTo/g)||[]).length===2,"retain the two curved wings");
+  assert.match(bird,/twig/);
 });
 
 test("Landscape: catalog stars rotate with sidereal time and stay above the horizon", () => {
@@ -7749,4 +7937,91 @@ test("AUDIT H13: a remote adoption reaches disk on the artifact host too, not ju
   const onDisk = JSON.parse(shim.window.storage._map.get(SYNC_STORE_KEY));
   assert.deepEqual(onDisk.chain, CLOUD_CHAIN,
     "a reload must not resurrect the copy the adoption just replaced");
+});
+
+test('Landscape browser: every visitor renders with finite geometry across short and narrow views', {skip:!process.env.LANDSCAPE_BROWSER_URL}, async()=>{
+  const {chromium}=await import(process.env.LANDSCAPE_PLAYWRIGHT);
+  const browser=await chromium.launch({headless:true,channel:'chrome'});
+  try{
+    for(const viewport of [{width:844,height:390},{width:320,height:568}]){
+      const page=await browser.newPage({viewport});const errors=[];page.on('pageerror',e=>errors.push(e.message));
+      await page.addInitScript(()=>{
+        localStorage.setItem('fvp:chain-scanner:landscape-motion','normal');
+        window.invalidGeometry=[];
+        for(const key of ['moveTo','lineTo','translate','rotate','ellipse','fillRect']){
+          const original=CanvasRenderingContext2D.prototype[key];
+          CanvasRenderingContext2D.prototype[key]=function(...args){if(args.some(x=>typeof x==='number'&&!Number.isFinite(x)))invalidGeometry.push(key);return original.apply(this,args);};
+        }
+      });
+      await page.route('**/landscape.js',async route=>{
+        const response=await route.fetch();let body=await response.text();
+        body=body.replace('let skyTimer=0',`world.events=[...LivingSky.eventTypes,...LivingSky.rareTypes].map((type,i)=>({type,age:45,duration:100,seed:(i*.137)%1,lane:(i*.17)%1,reverse:i%2===0}));world.next=1e9;let skyTimer=0`);
+        await route.fulfill({response,body});
+      });
+      await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'networkidle'});
+      await page.locator('#modalRoot [data-act="close-modal"]').click();
+      await page.locator('#viewScene').click();await page.waitForTimeout(750);
+      assert.equal(await page.locator('.wrap').evaluate(e=>getComputedStyle(e).opacity),'0');
+      const coverage=await page.locator('[data-scenery]').evaluate(c=>{const g=c.getContext('2d');return [g.getImageData(0,c.height-1,1,1).data[3],g.getImageData(c.width-1,c.height-1,1,1).data[3]]});
+      assert.deepEqual(coverage,[255,255]);
+      assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+      assert.deepEqual(await page.evaluate(()=>invalidGeometry),[]);
+      await page.locator('#exitScene').click();await page.waitForTimeout(750);
+      assert.equal(await page.locator('.wrap').evaluate(e=>getComputedStyle(e).opacity),'1');
+      assert.deepEqual(errors,[]);await page.close();
+    }
+  }finally{await browser.close();}
+});
+
+ test('Landscape mood: seasons, clock hands and a time-specific message catalog work offline',()=>{
+ const context=vm.createContext({Date,Intl,Math,JSON});
+ vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-mood.js'),'utf8'),context);
+ const mood=context.LandscapeMood;const hexLuminance=landscapeLuminance;
+  const date = value => new Date(value);
+
+  assert.equal(mood.season(date('2026-03-20T16:00:00Z'), 28.5, 'America/New_York').name, 'spring');
+  assert.equal(mood.season(date('2026-06-21T16:00:00Z'), 28.5, 'America/New_York').name, 'summer');
+  assert.equal(mood.season(date('2026-12-21T16:00:00Z'), -33.9, 'Australia/Sydney').name, 'summer');
+  const blend = mood.season(date('2026-06-16T16:00:00Z'), 28.5, 'America/New_York');
+  assert.ok(blend.weights.spring >= 0 && blend.weights.spring < 1);
+  assert.ok(Math.abs(Object.values(blend.weights).reduce((sum, value) => sum + value, 0) - 1) < 1e-8);
+
+  const clock = mood.clock(date('2026-06-21T17:30:45.500Z'), 'America/New_York');
+  assert.ok(Math.abs(clock.hourAngle - (Math.PI * (1.512638888888889 / 6))) < 1e-10);
+  assert.ok(Math.abs(clock.minuteAngle - (Math.PI * (30.758333333333332 / 30))) < 1e-10);
+  assert.throws(() => mood.clock(date('invalid'), 'America/New_York'), /date/i);
+
+  const base = {
+    sky: ['#8ed4f3', '#d4f5f2', '#f6fbe2'],
+    city: '#bbdce1', far: '#c5e8b7', hill: '#ace097', front: '#8dcca1', tint: '#ade1c6', night: 0,
+  };
+  const toned = mood.palette(base, date('2026-10-05T16:00:00Z'), { latitude: 28.5, timezone: 'America/New_York' });
+  assert.notStrictEqual(toned, base);
+  assert.deepEqual(base.sky, ['#8ed4f3', '#d4f5f2', '#f6fbe2']);
+  assert.notDeepEqual(toned.sky, base.sky, 'season should tint scenery');
+  for (const color of [...toned.sky, toned.city, toned.far, toned.hill, toned.front, toned.tint]) {
+    assert.match(color, /^#[0-9a-f]{6}$/);
+  }
+  assert.ok(hexLuminance(toned.front) > hexLuminance(base.front) * 0.75, 'tint keeps foreground luminous');
+
+  const periods = [
+    ['2026-06-21T08:00:00Z', 'predawn'], ['2026-06-21T13:00:00Z', 'morning'],
+    ['2026-06-21T16:30:00Z', 'noon'], ['2026-06-21T20:00:00Z', 'afternoon'],
+    ['2026-06-21T22:30:00Z', 'golden'], ['2026-06-22T00:30:00Z', 'evening'],
+    ['2026-06-22T05:00:00Z', 'night'],
+  ];
+  const values = periods.map(([instant]) => mood.message(date(instant), { latitude: 28.5, timezone: 'America/New_York' }, () => 0));
+  assert.ok(values.every(value => typeof value === 'string' && value.length > 10));
+  assert.ok(mood.messageCount >= 100, 'catalog has a hundred curated combinations');
+  assert.equal(mood.messages(date('2026-06-21T13:00:00Z'), { timezone: 'America/New_York' }, () => 0), values[1]);
+  assert.equal(mood.message(date('2026-06-21T13:00:00Z'), { timezone: 'America/New_York' }, () => 0), mood.message(date('2026-06-21T13:00:00Z'), { timezone: 'America/New_York' }, () => 0));
+  assert.notEqual(mood.message(date('2026-06-21T13:00:00Z'), { timezone: 'America/New_York' }, () => 0), mood.message(date('2026-12-21T13:00:00Z'), { timezone: 'America/New_York' }, () => 0));
+  assert.equal(mood.period(date('2026-12-21T22:00:00Z'), { timezone: 'America/New_York', sunAltitude: -2 }), 'evening');
+  assert.equal(mood.period(date('2026-12-21T22:00:00Z'), { timezone: 'America/New_York', sunAltitude: 4 }), 'golden-hour');
+  assert.equal(mood.period(date('2026-12-21T22:00:00Z'), { timezone: 'America/New_York', sunAltitude: null }), 'golden-hour');
+});
+
+test('Landscape mood: sunrise copy does not describe sunset',()=>{
+  const ctx=vm.createContext({Date,Intl,Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-mood.js'),'utf8'),ctx);
+  assert.equal(ctx.LandscapeMood.period(new Date('2026-09-12T11:30:00Z'),{timezone:'America/New_York',sunAltitude:3}),'morning');
 });

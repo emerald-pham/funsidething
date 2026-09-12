@@ -36,3 +36,33 @@ GitHub Pages reported that commit built successfully. Live HTML, scenery code, s
 Live: https://emerald-pham.github.io/funsidething/
 
 This closeout changes only this checklist; the validated application assets are unchanged. Pre-existing user edits in the original checkout were preserved.
+
+## Detail and liveliness follow-up
+
+- [x] Bright day and night palettes with readable action labels.
+- [x] Shared terrain geometry, direction-aware cyclist packs, individual rail-car tangents, ground shadows, and explicit terrain occlusion.
+- [x] Lake with reflections, wildlife, quieter hill activities, kites and hang gliders.
+- [x] Bounded randomized arrivals, speeds, scenic colors, jet trails, banners, and rare box-ship fleets sharing the alien cooldown.
+- [x] Responsive park amenities and a short secondary walking loop.
+- [x] Device-local location opt-in and caption; no geocoding service or API key.
+- [x] Seasonal color accents, local clock hands, and time-specific breathing-room messages.
+- [x] Fade to scenery and back, overridden by reduced motion.
+
+### Why the first detail pass missed problems
+
+The initial scene placed moving sprites separately from painted paths. A train
+used one height for all its carriages, and all moving objects occupied one layer
+above the terrain. Random-only screenshots could miss a backwards cyclist or a
+particular occlusion. The negative canvas stacking level also made viewport-edge
+painting fragile in Safari.
+
+The renderer now shares pure path geometry with its inhabitants and composites
+cached terrain between groups of visitors. Regression checks exercise opposite
+travel directions, slope and pack anchors, every event with deterministic inputs,
+finite canvas coordinates, bottom corners, fade return and reduced motion. Review
+forced event scenes in Chromium and WebKit, including 320px portrait and short
+landscape, when editing geometry or layering. Test a normal randomized visit too:
+a forced all-event scene is a diagnostic, never the production arrival policy.
+
+The original application code remains MIT. Astronomy Engine and the HYG star
+catalog retain their separately documented licenses in THIRD_PARTY_NOTICES.md.

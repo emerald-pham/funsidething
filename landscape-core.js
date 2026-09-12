@@ -3,47 +3,85 @@
 (function(root){
   'use strict';
   const A=root.Astronomy, RAD=Math.PI/180;
-  const observer=new A.Observer(28.5383,-81.3792,20);
+  const DEFAULT_LOCATION={latitude:28.5383,longitude:-81.3792,timezone:'America/New_York'};
+  const observer=new A.Observer(DEFAULT_LOCATION.latitude,DEFAULT_LOCATION.longitude,20);
   const clamp=(v,a=0,b=1)=>Math.max(a,Math.min(b,v));
   const lerp=(a,b,t)=>a+(b-a)*t;
   const smooth=(a,b,x)=>{const t=clamp((x-a)/(b-a));return t*t*(3-2*t);};
   function validDate(date){if(!(date instanceof Date)||!Number.isFinite(+date))throw new TypeError('Valid date required');}
-  function bodyAt(body,date){
-    const eq=A.Equator(body,date,observer,true,true);
-    const h=A.Horizon(date,observer,eq.ra,eq.dec,'normal');
+  function locationObserver(location){
+    if(location===undefined||location===null)return {observer,timeZone:DEFAULT_LOCATION.timezone};
+    if(typeof location!=='object')throw new TypeError('Location object required');
+    const latitude=location.latitude,longitude=location.longitude;
+    if(typeof latitude!=='number'||!Number.isFinite(latitude)||latitude<-90||latitude>90)throw new RangeError('Invalid latitude');
+    if(typeof longitude!=='number'||!Number.isFinite(longitude)||longitude<-180||longitude>180)throw new RangeError('Invalid longitude');
+    const timeZone=location.timezone===undefined?DEFAULT_LOCATION.timezone:location.timezone;
+    if(typeof timeZone!=='string'||!timeZone.trim())throw new RangeError('Invalid timezone');
+    try{new Intl.DateTimeFormat('en-US',{timeZone}).format();}catch{throw new RangeError('Invalid timezone');}
+    return {observer:new A.Observer(latitude,longitude,Number.isFinite(location.elevation)?location.elevation:20),timeZone};
+  }
+  function partsInZone(date,timeZone){
+    const parts=new Intl.DateTimeFormat('en-US',{timeZone,year:'numeric',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'}).formatToParts(date);
+    return Object.fromEntries(parts.map(p=>[p.type,p.value]));
+  }
+  function localMidnight(date,timeZone){
+    const values=partsInZone(date,timeZone),year=+values.year,month=+values.month,day=+values.day;
+    let guess=Date.UTC(year,month-1,day);
+    // Resolve the zone offset at the candidate midnight. Two passes cover the
+    // DST transition without depending on a host-specific date parser.
+    for(let i=0;i<3;i++){
+      const at=partsInZone(new Date(guess),timeZone);
+      const asUTC=Date.UTC(+at.year,+at.month-1,+at.day,+at.hour,+at.minute,+at.second);
+      guess=Date.UTC(year,month-1,day)-(asUTC-guess);
+    }
+    return new Date(guess);
+  }
+  function sameLocalDay(date,reference,timeZone){
+    const a=partsInZone(date,timeZone),b=partsInZone(reference,timeZone);
+    return a.year===b.year&&a.month===b.month&&a.day===b.day;
+  }
+  function bodyAt(body,date,obs){
+    const eq=A.Equator(body,date,obs,true,true);
+    const h=A.Horizon(date,obs,eq.ra,eq.dec,'normal');
     return {altitude:h.altitude,azimuth:h.azimuth,visible:h.altitude>-.3};
   }
-  function sunTimes(date){
+  function sunTimes(date,location){
     validDate(date);
-    const parts=new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',year:'numeric',month:'numeric',day:'numeric'}).formatToParts(date);
-    const values=Object.fromEntries(parts.map(p=>[p.type,p.value]));
-    // 04:00 UTC is local midnight in summer, 23:00 on the preceding winter
-    // date. Both are safely before Florida's first solar rise/set of this day.
-    const start=new Date(Date.UTC(+values.year,+values.month-1,+values.day,4));
-    return {rise:A.SearchRiseSet('Sun',observer,1,start,1).date,set:A.SearchRiseSet('Sun',observer,-1,start,1).date};
+    const config=locationObserver(location),start=localMidnight(date,config.timeZone);
+    const search=(direction)=>{try{
+      const found=A.SearchRiseSet('Sun',config.observer,direction,start,2);
+      return found&&found.date&&sameLocalDay(found.date,date,config.timeZone)?found.date:null;
+    }catch{return null;}};
+    return {rise:search(1),set:search(-1)};
   }
-  function starAt(date,row,rotation){
+  function projectStar(date,row,rotation,obs){
     const ra=row[0]*15*RAD,dec=row[1]*RAD;
     const v=new A.Vector(Math.cos(dec)*Math.cos(ra),Math.cos(dec)*Math.sin(ra),Math.sin(dec),date);
     const eq=A.EquatorFromVector(A.RotateVector(rotation||A.Rotation_EQJ_EQD(date),v));
-    const h=A.Horizon(date,observer,eq.ra,eq.dec,'normal');
+    const h=A.Horizon(date,obs,eq.ra,eq.dec,'normal');
     return {azimuth:h.azimuth,altitude:h.altitude,magnitude:row[2],colorIndex:row[3]||0};
   }
-  function skyAt(date){
+  function starAt(date,row,rotation,location){
+    // Keep the original (date, row, rotation) call shape while accepting a
+    // location as the convenient third argument for direct callers.
+    if(location===undefined&&rotation&&typeof rotation==='object'&&!Array.isArray(rotation)){location=rotation;rotation=undefined;}
+    validDate(date); return projectStar(date,row,rotation,locationObserver(location).observer);
+  }
+  function skyAt(date,location){
     validDate(date);
-    const sun=bodyAt('Sun',date),moon=bodyAt('Moon',date),phase=A.MoonPhase(date);
+    const config=locationObserver(location),sun=bodyAt('Sun',date,config.observer),moon=bodyAt('Moon',date,config.observer),phase=A.MoonPhase(date);
     const rotation=A.Rotation_EQJ_EQD(date);
     return {date,sun,moon,phase,illumination:(1-Math.cos(phase*RAD))/2,
       period:sun.altitude < -12?'night':sun.altitude<8?(sun.azimuth<180?'dawn':'dusk'):'day',
-      stars:root.SKY_STARS.map(row=>starAt(date,row,rotation)).filter(s=>s.altitude>0)};
+      stars:root.SKY_STARS.map(row=>projectStar(date,row,rotation,config.observer)).filter(s=>s.altitude>0)};
   }
   // Shared anchor stops keep every sky and terrain layer continuous across twilight.
   const STOPS=[
-    [-18,['#071323','#152c46','#3b5360','#293e51','#203b42','#193632','#102b2b','#92acb8']],
-    [-9, ['#18283e','#59617a','#b4888e','#62677a','#435d60','#304e48','#203e37','#c8a8af']],
-    [-1, ['#597c99','#dbaaa0','#f7d9ae','#ac9c9c','#829d8a','#547d62','#325e46','#cc976a']],
-    [7,  ['#7daaba','#c7dad3','#f5e7c0','#9bb3b1','#8faa8b','#6e946c','#456f52','#b38b60']],
-    [35, ['#79b1c8','#c6e0df','#edf0d8','#9ebbbc','#8fae98','#749b76','#4b795d','#879f8e']]
+    [-18,['#152b4a','#365779','#6b8ba5','#526b87','#5b8990','#497d7c','#39666b','#a7c7da']],
+    [-9, ['#4e6287','#b2a4c3','#f3bdd0','#91a0b4','#88aaa5','#68998e','#527f79','#e6bfd5']],
+    [-1, ['#91bedc','#f8c8bb','#fff0cd','#bfc3d1','#bcd5b1','#a3c98d','#7bb28a','#f3c59e']],
+    [7,  ['#9bd4ef','#dbf4ee','#fff5d7','#bdd8dc','#c4e2b3','#aad88f','#8bc89a','#c5e7c5']],
+    [35, ['#8ed4f3','#d4f5f2','#f6fbe2','#bbdce1','#c5e8b7','#ace097','#8dcca1','#ade1c6']]
   ];
   function mixHex(a,b,t){
     const rgb=h=>h.slice(1).match(/../g).map(n=>parseInt(n,16));
@@ -57,17 +95,25 @@
   }
   function activity(sky){return sky.sun.altitude < -6?.24:sky.sun.azimuth<180?1:.65;}
   const MAX_EVENTS=14,RARE_COOLDOWN=420;
-  const EVENT_TYPES=['cyclist','bird','balloon','train','metro','plane'];
+  const EVENT_TYPES=['cyclist','bird','balloon','train','metro','plane','duck','fish','butterfly','rabbit','deer','kite','reader','picnic','couple','walker','airshow','banner','hangglider'];
+  const RARE_TYPES=['abduction','vogon'];
+  const EVENT_DURATIONS={duck:80,fish:5,butterfly:35,rabbit:22,deer:55,kite:90,reader:140,picnic:150,couple:120,walker:60,airshow:40,banner:100,hangglider:90,vogon:50};
+  const INITIAL_TYPES=EVENT_TYPES.slice();
   function createWorld(random=Math.random){
-    const world={random,elapsed:0,events:[],next:3+random()*6,lastRare:-RARE_COOLDOWN,rareCount:0};
-    // Start mid-journey so returning never waits for a first event. Cloud drift
-    // and wind are persistent, separate from this randomized event population.
-    for(const type of ['metro',random()<.5?'cyclist':'bird',random()<.5?'balloon':'plane'])spawn(world,type,true);
+    const world={random,elapsed:0,events:[],next:3+random()*6,lastRare:-RARE_COOLDOWN,rareCount:0,wind:.6+random()*1.2};
+    // Start mid-journey so returning never waits for a first event. Pick three
+    // distinct ordinary visitors; the rare abduction is never in the opening cast.
+    const pool=INITIAL_TYPES.slice();
+    for(let i=0;i<3&&pool.length;i++){
+      const index=Math.min(pool.length-1,Math.floor(clamp(random(),0,1-.0000001)*pool.length));
+      spawn(world,pool.splice(index,1)[0],true);
+    }
     return world;
   }
   function spawn(w,type,initial=false){
     const r=w.random;
-    const duration=type==='abduction'?24:type==='bird'?28:type==='balloon'?150:type==='plane'?95:48+r()*50;
+    const base=EVENT_DURATIONS[type]|| (type==='abduction'?24:type==='bird'?28:type==='balloon'?150:type==='plane'?95:48+r()*50);
+    const duration=base*(type==='abduction'||type==='vogon'?1:.8+r()*.4);
     w.events.push({type,age:initial?duration*(.15+r()*.45):0,duration,lane:r(),seed:r(),reverse:r()>.5});
   }
   function advance(w,dt,sky){
@@ -79,9 +125,9 @@
       w.next=w.elapsed+(7+r()*18)/a;
       if(w.events.length<MAX_EVENTS){
         if(w.elapsed-w.lastRare>=RARE_COOLDOWN && r()<.025){
-          spawn(w,'abduction');w.lastRare=w.elapsed;w.rareCount++;
+          spawn(w,r()<.5?'abduction':'vogon');w.lastRare=w.elapsed;w.rareCount++;
         }else{
-          const type=sky.sun.altitude < -6 ? (r()<.7?'metro':'plane') : EVENT_TYPES[Math.min(5,Math.floor(r()*6))];
+          const type=sky.sun.altitude < -6 ? (r()<.7?'metro':'plane') : EVENT_TYPES[Math.min(EVENT_TYPES.length-1,Math.floor(clamp(r(),0,1-.0000001)*EVENT_TYPES.length))];
           spawn(w,type);
         }
       }
@@ -94,5 +140,5 @@
   function saveMotion(storage,value){try{storage.setItem(MOTION_KEY,value);return true;}catch{return false;}}
   function motionReduced(value,osReduced){return !!osReduced||normalizeMotion(value)!=='normal';}
   root.LivingSky={skyAt,sunTimes,starAt,starCount:root.SKY_STARS.length,palette,activity,createWorld,advance,
-    MAX_EVENTS,RARE_COOLDOWN,readMotion,saveMotion,motionReduced,clamp,lerp,smooth,mixHex};
+    eventTypes:EVENT_TYPES.slice(),rareTypes:RARE_TYPES.slice(),eventDurations:Object.assign({},EVENT_DURATIONS),MAX_EVENTS,RARE_COOLDOWN,readMotion,saveMotion,motionReduced,clamp,lerp,smooth,mixHex};
 })(globalThis);

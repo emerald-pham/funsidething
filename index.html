@@ -303,6 +303,9 @@ textarea{width:100%;font-family:var(--font-mono);font-size:12px}
 <script defer src="vendor/astronomy.min.js"></script>
 <script defer src="stars.js"></script>
 <script defer src="landscape-core.js"></script>
+<script defer src="location.js"></script>
+<script defer src="landscape-geometry.js"></script>
+<script defer src="landscape-mood.js"></script>
 <script defer src="landscape.js"></script>
 </head>
 <body>
@@ -329,7 +332,7 @@ textarea{width:100%;font-family:var(--font-mono);font-size:12px}
   <section class="scene-intro" aria-label="Live Florida landscape"><div class="scene-reading">
     <p class="scene-eyebrow"><span class="scene-dot"></span> A world outside your to-do list</p>
     <h2>One thing at a time.</h2>
-    <div class="scene-details"><span id="sceneStatus">A little room to breathe</span><span id="sceneTime">Orlando, FL</span><button id="viewScene" class="scene-look" data-scene-view>Enjoy the view ↗</button></div></div>
+    <div class="scene-details"><span id="sceneStatus">A little room to breathe</span><span id="sceneTime" hidden aria-live="polite"></span><button id="viewScene" class="scene-look" data-scene-view>Enjoy the view ↗</button></div></div>
   </section>
 
   <section class="panel ctx open" id="ctxPanel"></section>
@@ -378,6 +381,20 @@ textarea{width:100%;font-family:var(--font-mono);font-size:12px}
   </div>
   <p id="deviceMotionNote" hidden>Your device requests reduced motion, so movement stays off with either choice.</p>
   <p>You can change this anytime in Settings. The sky follows Orlando’s sun and Moon, even when the scenery is still.</p>
+</dialog>
+<dialog id="locationDialog" class="motion-dialog location-dialog" aria-labelledby="locationTitle" aria-describedby="locationDescription">
+  <p class="scene-eyebrow">A private sky</p>
+  <h2 id="locationTitle">Choose where the sky is yours.</h2>
+  <p id="locationDescription">Use your device location to make the Sun, Moon, stars, and rise/set times match where you are. It stays on this device and is never sent to a location service.</p>
+  <p id="locationCurrent" class="location-current">Using Orlando, FL until you opt in.</p>
+  <p id="locationStatus" role="status" aria-live="polite"></p>
+  <div class="frow"><label for="locationName">Optional name</label><input id="locationName" type="text" maxlength="80" placeholder="Home, cabin, or a place name" autocomplete="off"/></div>
+  <div class="mbtns">
+    <button class="btn primary" data-location-action="request">Use my location</button>
+    <button class="btn subtle" data-location-action="save-name">Save name</button>
+    <button class="btn subtle" data-location-action="reset">Use Orlando by default</button>
+    <button class="btn subtle" data-location-action="close">Close</button>
+  </div>
 </dialog>
 
 <script>
@@ -1854,7 +1871,7 @@ function renderScan(){
       if(i>0) html += '<span class="arrow">→</span>';
       html += '<button class="crumb" data-act="reveal" data-id="'+id+'" title="'+esc(t.title)+'">'+esc(t.title)+'</button>';
     });
-    html += '<span class="arrow">→</span><span class="lbl" style="color:var(--chain-deep)">this ↓</span></div>';
+    html += '<span class="arrow">→</span><span class="lbl" style="color:var(--accent)">this ↓</span></div>';
   }
 
   // benchmark card, with its six actions in a row beneath the card they act on
@@ -2203,6 +2220,7 @@ function openSettings(){
   modalShell(
     '<div class="mtop"><h2>Settings</h2><button class="x" data-act="close-modal" aria-label="Close">✕</button></div>'
     + '<div class="frow"><label>Landscape</label><button class="btn subtle" data-act="scene-settings">Motion settings</button><span class="kv">Daylight follows Florida; app theme stays independent.</span></div>'
+    + '<div class="frow"><label>Location</label><button class="btn subtle" data-act="location-settings">Choose location</button><span class="kv">Use device coordinates for a local sky; saved only on this device.</span></div>'
     + '<div class="frow"><label for="stHorizon">Horizon (min)</label><input id="stHorizon" type="number" min="5" max="480" value="'+s.horizonMin+'" style="width:90px"/>'
     + '<span class="kv">the "next hour" in the question</span></div>'
     + '<div class="frow"><label for="stCantMin">Can\u2019t sticks for (min)</label><input id="stCantMin" type="number" min="5" max="480" value="'+s.cantMin+'" style="width:90px"/>'

@@ -1,28 +1,35 @@
 /* The real sky is independent of color-scheme. Only a small amount of its
    ambient color enters opaque, readable foreground surfaces. */
 :root{
-  --scene-tint:#879f8e;
-  --bg:light-dark(#f0f1e8,#142126);
-  --panel:light-dark(#fafaf2,#1c292e);
-  --surface:light-dark(#fffef8,#243237);
-  --subtle:light-dark(#f2f3ea,#1a272c);
-  --ink:light-dark(#263d39,#e5ebe3);
-  --mut:light-dark(#52665f,#a5b7ae);
-  --line:light-dark(#dce2d6,#3c4e4f);
-  --accent:light-dark(#356552,#a7cead);
-  --chain:light-dark(#4f7463,#527864);
-  --chain-deep:light-dark(#355e4d,#355e4d);
-  --yes:light-dark(#38784a,#38784a); --no:light-dark(#96601c,#96601c);
-  --cant:light-dark(#52685d,#52685d); --danger:light-dark(#b24449,#b24449);
-  --good:light-dark(#2c7346,#8ac997);
-  --chip:light-dark(#e8eee4,#2e403e);
-  --rowline:light-dark(#e8ede2,#2d3d3d);
-  --track:light-dark(#dce4d7,#344745);
+  --scene-tint:#ade1c6;
+  --bg:light-dark(#f7fcf8,#243d54);
+  --panel:light-dark(#ffffff,#344b5f);
+  --surface:light-dark(#ffffff,#3d566b);
+  --subtle:light-dark(#f5fbf6,#30465c);
+  --ink:light-dark(#284d4e,#f1fafb);
+  --mut:light-dark(#527075,#c1d8e4);
+  --line:light-dark(#d8eadf,#688194);
+  --accent:light-dark(#316b59,#b7ecda);
+  --chain:light-dark(#b9e6c6,#abd9c3);
+  --chain-deep:light-dark(#96d6b2,#8dcbb0);
+  --chain-ink:light-dark(#193f35,#193f35);
+  --action-ink:light-dark(#243b40,#243b40);
+  --yes:light-dark(#b5e9b9,#a6dcae); --no:light-dark(#ffe0a0,#f2d094);
+  --cant:light-dark(#c6e5ec,#afcedc); --danger:light-dark(#ffc4cc,#ebb1c0);
+  --good:light-dark(#2c7346,#b5ebc5);
+  --chip:light-dark(#edf9ed,#456077);
+  --rowline:light-dark(#e4f3e8,#486177);
+  --track:light-dark(#deefe4,#5e7890);
 }
-body{background:var(--bg)}
-#landscape{position:fixed;inset:0;z-index:-1;pointer-events:none;overflow:hidden;background:#79b1c8;contain:strict}
+/* Light fills carry dark labels instead of darkening the whole palette just
+   to support white text. Subtle buttons keep their theme-aware ink rule. */
+.btn{color:var(--action-ink)}
+html{background:var(--bg)}
+body{background:transparent;isolation:isolate}
+#modalRoot{position:relative;z-index:3}
+#landscape{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden;background:#8ed4f3;contain:strict}
 #landscape canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
-.wrap{max-width:760px;padding-top:max(22px,env(safe-area-inset-top));position:relative}
+.wrap{max-width:760px;padding-top:max(22px,env(safe-area-inset-top));position:relative;z-index:1;opacity:1;transition:opacity .65s ease,visibility 0s}
 .top{padding:14px 17px;border-radius:17px;background:color-mix(in srgb,var(--panel) 97%,var(--scene-tint));border:1px solid var(--line);box-shadow:0 4px 24px #1539310a}
 .titles h1{letter-spacing:-.035em;font-size:19px;font-weight:600}
 .passbar{margin-top:12px}
@@ -52,7 +59,8 @@ body{background:var(--bg)}
 .motion-choices span{font-size:12px;font-weight:400;color:var(--mut);margin-top:6px}
 #deviceMotionNote{font-size:12px}
 [data-landscape-motion="reduced"] *,[data-landscape-motion="reduced"] *::before,[data-landscape-motion="reduced"] *::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}
-.viewing-scene .wrap{visibility:hidden;pointer-events:none}
+.viewing-scene .wrap{opacity:0;visibility:hidden;pointer-events:none;transition:opacity .65s ease,visibility 0s .65s}
+html.viewing-scene{overflow:hidden;overscroll-behavior:none}
 #exitScene{position:fixed;bottom:max(24px,env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);z-index:5;border:1px solid var(--line);border-radius:99px;background:var(--panel);color:var(--ink);box-shadow:0 4px 30px #102b3940;padding:12px 20px;white-space:nowrap;font-size:13px}
 @media(max-width:600px){
   .wrap{padding-top:max(12px,env(safe-area-inset-top));padding-left:max(12px,env(safe-area-inset-left));padding-right:max(12px,env(safe-area-inset-right))}
@@ -79,3 +87,7 @@ body{background:var(--bg)}
   .topbtns .keyhint{display:none}
   .syncbtn{width:60px;font-size:11px}
 }
+
+.actionrow.disabled,.siderail.disabled,.btnwrap.disabled{opacity:1}
+.chip.due-today,.chip.due-overdue,.ltag.on,.qctxchip.on{color:var(--action-ink)}
+.syncbtn.err,#importMsg.warn{color:var(--ink)}
