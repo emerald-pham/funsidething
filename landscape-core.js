@@ -95,25 +95,29 @@
   }
   function activity(sky){return sky.sun.altitude < -6?.24:sky.sun.azimuth<180?1:.65;}
   const MAX_EVENTS=14,RARE_COOLDOWN=420;
-  const EVENT_TYPES=['cyclist','bird','balloon','train','metro','plane','duck','fish','butterfly','rabbit','deer','kite','reader','picnic','couple','walker','airshow','banner','hangglider'];
-  const RARE_TYPES=['abduction','vogon'];
-  const EVENT_DURATIONS={duck:80,fish:5,butterfly:35,rabbit:22,deer:55,kite:90,reader:140,picnic:150,couple:120,walker:60,airshow:40,banner:100,hangglider:90,vogon:50};
+  const EVENT_TYPES=['cyclist','bird','balloon','train','metro','plane','duck','fish','butterfly','rabbit','deer','kite','reader','picnic','couple','walker','airshow','banner','hangglider','jetski','sailboat','cruise','yacht'];
+  const RARE_TYPES=['abduction'];
+  const NIGHT_TYPES=['meteor','metro','plane'];
+  const WATER_TYPES=['jetski','sailboat','cruise','yacht'];
+  const EVENT_DURATIONS={duck:80,fish:5,butterfly:35,rabbit:22,deer:55,kite:90,reader:140,picnic:150,couple:120,walker:60,airshow:40,banner:100,hangglider:90,meteor:1.8,jetski:32,sailboat:140,cruise:180,yacht:95};
   const INITIAL_TYPES=EVENT_TYPES.slice();
   function createWorld(random=Math.random){
     const world={random,elapsed:0,events:[],next:3+random()*6,lastRare:-RARE_COOLDOWN,rareCount:0,wind:.6+random()*1.2};
     // Start mid-journey so returning never waits for a first event. Pick three
     // distinct ordinary visitors; the rare abduction is never in the opening cast.
     const pool=INITIAL_TYPES.slice();
-    for(let i=0;i<3&&pool.length;i++){
+    while(world.events.length<3&&pool.length){
       const index=Math.min(pool.length-1,Math.floor(clamp(random(),0,1-.0000001)*pool.length));
       spawn(world,pool.splice(index,1)[0],true);
     }
     return world;
   }
   function spawn(w,type,initial=false){
+    if(['banner','meteor'].includes(type)&&w.events.some(e=>e.type===type))return;
+    if(WATER_TYPES.includes(type)&&w.events.filter(e=>WATER_TYPES.includes(e.type)).length>=2)return;
     const r=w.random;
     const base=EVENT_DURATIONS[type]|| (type==='abduction'?24:type==='bird'?28:type==='balloon'?150:type==='plane'?95:48+r()*50);
-    const duration=base*(type==='abduction'||type==='vogon'?1:.8+r()*.4);
+    const duration=base*(type==='abduction'?1:.8+r()*.4);
     w.events.push({type,age:initial?duration*(.15+r()*.45):0,duration,lane:r(),seed:r(),reverse:r()>.5});
   }
   function advance(w,dt,sky){
@@ -125,9 +129,9 @@
       w.next=w.elapsed+(7+r()*18)/a;
       if(w.events.length<MAX_EVENTS){
         if(w.elapsed-w.lastRare>=RARE_COOLDOWN && r()<.025){
-          spawn(w,r()<.5?'abduction':'vogon');w.lastRare=w.elapsed;w.rareCount++;
+          spawn(w,'abduction');w.lastRare=w.elapsed;w.rareCount++;
         }else{
-          const type=sky.sun.altitude < -6 ? (r()<.7?'metro':'plane') : EVENT_TYPES[Math.min(EVENT_TYPES.length-1,Math.floor(clamp(r(),0,1-.0000001)*EVENT_TYPES.length))];
+          const type=sky.sun.altitude < -6 ? NIGHT_TYPES[Math.min(NIGHT_TYPES.length-1,Math.floor(r()*NIGHT_TYPES.length))] : EVENT_TYPES[Math.min(EVENT_TYPES.length-1,Math.floor(clamp(r(),0,1-.0000001)*EVENT_TYPES.length))];
           spawn(w,type);
         }
       }
@@ -140,5 +144,5 @@
   function saveMotion(storage,value){try{storage.setItem(MOTION_KEY,value);return true;}catch{return false;}}
   function motionReduced(value,osReduced){return !!osReduced||normalizeMotion(value)!=='normal';}
   root.LivingSky={skyAt,sunTimes,starAt,starCount:root.SKY_STARS.length,palette,activity,createWorld,advance,
-    eventTypes:EVENT_TYPES.slice(),rareTypes:RARE_TYPES.slice(),eventDurations:Object.assign({},EVENT_DURATIONS),MAX_EVENTS,RARE_COOLDOWN,readMotion,saveMotion,motionReduced,clamp,lerp,smooth,mixHex};
+    nightEventTypes:NIGHT_TYPES.slice(),eventTypes:EVENT_TYPES.slice(),rareTypes:RARE_TYPES.slice(),eventDurations:Object.assign({},EVENT_DURATIONS),MAX_EVENTS,RARE_COOLDOWN,readMotion,saveMotion,motionReduced,clamp,lerp,smooth,mixHex};
 })(globalThis);

@@ -2,6 +2,7 @@
    ambient color enters opaque, readable foreground surfaces. */
 :root{
   --scene-tint:#ade1c6;
+  --secondary-surface:color-mix(in srgb,var(--panel) 90%,transparent);
   --bg:light-dark(#f7fcf8,#243d54);
   --panel:light-dark(#ffffff,#344b5f);
   --surface:light-dark(#ffffff,#3d566b);
@@ -78,7 +79,7 @@ html.viewing-scene{overflow:hidden;overscroll-behavior:none}
 /* A compact reading surface keeps opposite sky/theme combinations legible. */
 .scene-intro{height:auto;min-height:clamp(165px,25vh,265px)}
 
-.scene-reading{max-width:100%;padding:16px 18px;border:1px solid var(--line);border-radius:18px;background:color-mix(in srgb,var(--panel) 96%,var(--scene-tint));box-shadow:0 5px 24px #17382e0a}
+.scene-reading{width:fit-content;max-width:min(100%,360px);padding:16px 18px;border:1px solid var(--line);border-radius:18px;background:var(--secondary-surface);box-shadow:0 5px 24px #17382e0a}
 @media(max-width:600px){.scene-intro{min-height:190px;padding:12px 0 18px}.scene-reading{padding:14px 12px}.scene-eyebrow{font-size:9px;letter-spacing:.12em}.scene-intro h2{font-size:30px}}
 @media(max-height:500px) and (min-width:601px){.scene-intro{min-height:140px}.scene-reading{padding:10px 14px}.scene-intro h2{margin-bottom:8px}}
 @media(max-width:360px){
@@ -91,3 +92,10 @@ html.viewing-scene{overflow:hidden;overscroll-behavior:none}
 .actionrow.disabled,.siderail.disabled,.btnwrap.disabled{opacity:1}
 .chip.due-today,.chip.due-overdue,.ltag.on,.qctxchip.on{color:var(--action-ink)}
 .syncbtn.err,#importMsg.warn{color:var(--ink)}
+
+/* Let scenery through supporting surfaces without fading text or controls. */
+.foot,#ctxPanel,#histPanel{background:var(--secondary-surface)}
+@media(max-width:600px){
+  .scene-reading{width:300px;max-width:calc(100% - 20px)}
+  .scene-intro h2{font-size:clamp(25px,7.5vw,30px)}
+}

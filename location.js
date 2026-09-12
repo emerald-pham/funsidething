@@ -99,13 +99,7 @@
     }catch{}
   }
   function current(){return clone(state);}
-  function caption(date=new Date()){
-    if(!state.enabled)return '';
-    if(!(date instanceof Date)||!Number.isFinite(+date))return '';
-    let time='';
-    try{time=new Intl.DateTimeFormat(undefined,{hour:'numeric',minute:'2-digit',timeZone:state.timezone}).format(date);}catch{return state.label;}
-    return state.label+' · '+time;
-  }
+  function caption(){return state.enabled?state.label:'';}
   function init(options={}){
     if(Object.prototype.hasOwnProperty.call(options,'storage'))storage=options.storage;
     else if(storage===null)storage=storageRef();
@@ -163,7 +157,7 @@
   function setStatus(text){const el=documentRef&&documentRef.getElementById&&documentRef.getElementById('locationStatus');if(el)el.textContent=text||'';}
   function render(){
     if(!documentRef||typeof documentRef.getElementById!=='function')return;
-    const label=documentRef.getElementById('locationCurrent');if(label)label.textContent=state.enabled?state.label:'Using Orlando, FL until you opt in.';
+    const label=documentRef.getElementById('locationCurrent');if(label)label.textContent=state.enabled?state.label:'Using the default sky. Enable location to make it yours.';
     const input=documentRef.getElementById('locationName');if(input&&documentRef.activeElement!==input)input.value=state.enabled&&state.label.indexOf('Near ')!==0?state.label:'';
     const resetButton=byAction('reset');if(resetButton)resetButton.hidden=!state.enabled;
     const saveButton=byAction('save-name');if(saveButton)saveButton.hidden=!state.enabled;

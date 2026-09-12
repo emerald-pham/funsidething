@@ -28,64 +28,117 @@
 
   const PERIOD_NAMES = ['predawn', 'morning', 'noon', 'afternoon', 'golden-hour', 'evening', 'night'];
   const PERIOD_LINES = {
-    predawn: [
-      'The day is still gathering at the edges.', 'There is room in the blue before the lists wake up.',
-      'A quiet beginning is already enough for now.', 'The first light has nowhere it needs to hurry.',
-      'The world is stretching softly ahead of you.', 'Let this small, blue pause belong to you.',
-      'Before the noise, there is this open breath.', 'The horizon is making space for a new page.',
-      'The early air keeps a little room to breathe.', 'You can meet the morning one gentle step at a time.',
-    ],
-    morning: [
-      'A world outside your todo list is warming into view.', 'Morning has brought more than one way forward.',
-      'You can carry one thing at a time into this light.', 'The day is open, even where the path bends.',
-      'There is a little more sky than there is urgency.', 'Let the first bright hours stay spacious.',
-      'The landscape is busy growing and still takes its time.', 'A soft start can be a real start.',
-      'You have permission to leave some room between tasks.', 'The morning light is a quiet kind of company.',
-    ],
-    noon: [
-      'The bright middle of the day can hold a pause.', 'Sunlight is making ordinary things feel sufficient.',
-      'There is a whole world outside the next checkbox.', 'Let the day be wide for a moment.',
-      'One thing at a time still counts in full daylight.', 'The clearest hour does not need a perfect plan.',
-      'You can look up without falling behind.', 'Even the high sun leaves room for a breath.',
-      'A small pause belongs in the middle of the day.', 'The view is here, asking nothing from you.',
-    ],
-    afternoon: [
-      'The day is easing toward its softer side.', 'There is time for the path and the plan to share space.',
-      'The light is changing; you can change pace too.', 'A little room to breathe can follow a busy hour.',
-      'The afternoon keeps its own quiet momentum.', 'Let one finished thing be enough for this moment.',
-      'The horizon is patient with the rest of your list.', 'You can take the scenic route through this hour.',
-      'The warm air says there is more to notice than progress.', 'Keep a little attention for what is not a task.',
-    ],
-    'golden-hour': [
-      'The light is turning every small thing toward gold.', 'The horizon has softened the edges of the day.',
-      'This is a good hour for leaving a little unscheduled.', 'The long light is asking you to look around.',
-      'The day can end gently, even if it began in a rush.', 'A world outside your todo list is glowing nearby.',
-      'Let the golden quiet find you where you are.', 'Nothing needs solving in this particular light.',
-      'The path is warm, open and in no hurry.', 'One thing at a time; the sun knows how to set.',
-    ],
-    evening: [
-      'The evening is making a little room around the day.', 'You can set down one thought with the sunlight.',
-      'The busy hours are behind you for a while.', 'A softer sky is enough of an arrival.',
-      'Let the last light keep you company, lightly.', 'The world is still here after the list grows quiet.',
-      'There is no need to make this gentle hour productive.', 'The evening path remembers how to wander.',
-      'A little breathing space looks good on the day.', 'You made it here; the rest can wait its turn.',
-    ],
-    night: [
-      'The dark is wide enough to hold a quiet thought.', 'A world outside your todo list is shining somewhere.',
-      'The night keeps its own unhurried company.', 'You can let the unfinished things grow quiet.',
-      'There is room to breathe beneath the patient stars.', 'One thing at a time, and sometimes nothing at all.',
-      'The landscape is resting; you are allowed to rest too.', 'The dark does not ask you to be brighter.',
-      'A small pause can be the whole plan tonight.', 'The sky is carrying on without needing an answer.',
-    ],
-  };
+  "predawn": [
+    "The village is still snoozing.",
+    "A tiny day is getting ready.",
+    "Shh. Even the paths are sleepy.",
+    "Your morning can wait a moment.",
+    "A cozy little pause before hello.",
+    "No hurry, early bird.",
+    "The kettle can take its time.",
+    "A quiet corner, just for you.",
+    "Pocket a little peace for later.",
+    "The day will find you soon."
+  ],
+  "morning": [
+    "Morning, neighbor.",
+    "A fresh day, a familiar path.",
+    "Your little corner is waking up.",
+    "Maybe a stroll before the bustle?",
+    "Good morning to you and the trees.",
+    "One tiny thing, then a tea break.",
+    "The birds have a busy little plan.",
+    "A new day fits in small steps.",
+    "Hello, lovely little morning.",
+    "Leave a little room for daydreams."
+  ],
+  "noon": [
+    "Lunch break, neighbor?",
+    "A little picnic sounds nice.",
+    "The view saved you a seat.",
+    "A tiny pause counts too.",
+    "Perhaps a sandwich by the water?",
+    "There is no rush on this path.",
+    "Time for a pocket-sized adventure.",
+    "Your next thing can be a small thing.",
+    "The village has room for a breather.",
+    "A sip of tea, a bit of sky."
+  ],
+  "afternoon": [
+    "A little wandering time.",
+    "The long way home looks lovely.",
+    "Maybe just one more daydream.",
+    "A bench, a book, a little break.",
+    "Your to-dos can share the day.",
+    "A small step is plenty, neighbor.",
+    "The water is doing its own thing.",
+    "No need to race the butterflies.",
+    "A cozy pause between adventures.",
+    "You have earned a little looking up."
+  ],
+  "golden-hour": [
+    "The day is putting on its cozy colors.",
+    "A golden little goodbye to the day.",
+    "Time to take the scenic way home.",
+    "The village is slowing its footsteps.",
+    "A lovely hour for doing very little.",
+    "One last stroll, neighbor?",
+    "The day can end with a small thing.",
+    "A warm little pause before evening.",
+    "Your next adventure can wait.",
+    "Pocket this little bit of evening."
+  ],
+  "evening": [
+    "Welcome to the cozy part of the day.",
+    "The village is tucking itself in.",
+    "A little lamplight, a little quiet.",
+    "Maybe the kettle is calling.",
+    "The paths are getting sleepy.",
+    "Time to put your busy pockets down.",
+    "Nothing wrong with a gentle evening.",
+    "The day did enough. So did you.",
+    "A quiet hello from the waterfront.",
+    "You can leave a little for tomorrow."
+  ],
+  "night": [
+    "Even the busy bees have clocked out.",
+    "The village has gone soft and quiet.",
+    "A tiny goodnight from the trees.",
+    "Your next adventure can wait.",
+    "The stars can mind the sky tonight.",
+    "Rest your busy little pockets.",
+    "No errands for the moon tonight.",
+    "A cozy corner under the stars.",
+    "Time for a small, sleepy pause.",
+    "Goodnight, neighbor."
+  ]
+};
   const SEASON_LINES = {
-    // Keep these cues compatible with every period: a summer night can hold
-    // warmth and deep green, while a winter night can hold cool air and stars.
-    spring: ['Spring green is returning by degrees.', 'New leaves are taking their time.', 'The season is softening the green edges.', 'A fresh breeze is moving through the view.'],
-    summer: ['Summer warmth is resting over the view.', 'Warm air is holding steady outside.', 'Green is deepening in the quiet light.', 'A soft summer breeze is passing through.'],
-    autumn: ['Autumn is warming the far edges.', 'The season is turning gently toward amber.', 'The trees are keeping a little gold.', 'Cooler air is arriving with soft colours.'],
-    winter: ['Winter is keeping the horizon clear.', 'Cool air is leaving more sky to see.', 'Bare branches are making room for stars.', 'A quiet blue belongs to this season.'],
-  };
+  "spring": [
+    "New leaves, little joys.",
+    "Spring is taking its time.",
+    "A fresh little season.",
+    "Room for something to grow."
+  ],
+  "summer": [
+    "A soft summer hello.",
+    "Summer can take it slow.",
+    "A little summer daydream.",
+    "The green season is here."
+  ],
+  "autumn": [
+    "A cozy turn of the season.",
+    "Autumn has a gentle pace.",
+    "A little leaf-shaped joy.",
+    "Time for cozy little things."
+  ],
+  "winter": [
+    "A little winter quiet.",
+    "The cool season says hello.",
+    "A cozy season for a pause.",
+    "Winter can take its time."
+  ]
+};
 
   function validDate(date) {
     if (!(date instanceof Date) || !Number.isFinite(+date)) throw new TypeError('Valid date required');

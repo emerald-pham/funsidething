@@ -42,7 +42,7 @@ This closeout changes only this checklist; the validated application assets are 
 - [x] Bright day and night palettes with readable action labels.
 - [x] Shared terrain geometry, direction-aware cyclist packs, individual rail-car tangents, ground shadows, and explicit terrain occlusion.
 - [x] Lake with reflections, wildlife, quieter hill activities, kites and hang gliders.
-- [x] Bounded randomized arrivals, speeds, scenic colors, jet trails, banners, and rare box-ship fleets sharing the alien cooldown.
+- [x] Bounded randomized arrivals, speeds, scenic colors, jet trails, banners, and occasional alien visits.
 - [x] Responsive park amenities and a short secondary walking loop.
 - [x] Device-local location opt-in and caption; no geocoding service or API key.
 - [x] Seasonal color accents, local clock hands, and time-specific breathing-room messages.
@@ -66,3 +66,17 @@ a forced all-event scene is a diagnostic, never the production arrival policy.
 
 The original application code remains MIT. Astronomy Engine and the HYG star
 catalog retain their separately documented licenses in THIRD_PARTY_NOTICES.md.
+
+
+## Waterfront refinement
+
+- [x] Compact cozy intro copy and lightly translucent supporting surfaces.
+- [x] Level cottage foundation, seated picnic poses, branch-mounted nest, and railway tree clearance.
+- [x] Pulsing water glints, smaller ducks, and occasional sailboats, yachts, cruise ships and jet skis.
+- [x] One banner plane at a time with either travel direction; box-ship invasion removed.
+- [x] Clocktower uses the device clock independently of the sky location.
+- [x] Cup-and-chain pastel install icon and alltom inspiration credit.
+- [x] Rank sparkline behind its summary, with tutorial explanations.
+
+- [x] Seeded balloon currents, inward-folding butterfly wings, and brief night-only shooting stars.
+- [x] Location caption shows the saved place without a time readout; default-sky wording is neutral.

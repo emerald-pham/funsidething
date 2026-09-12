@@ -71,7 +71,7 @@ test("Landscape location: saves a browser fix with device timezone, emits a chan
   assert.equal(JSON.parse(runtime.values.get("fvp:chain-scanner:location")).enabled, true);
   assert.equal(runtime.events.at(-1).type, "landscape-location-change");
   assert.match(runtime.location.caption(new Date("2026-06-21T17:00:00Z")), /Near London/);
-  assert.match(runtime.location.caption(new Date("2026-06-21T17:00:00Z")), /\d/);
+  assert.equal(runtime.location.caption(new Date("2026-06-21T17:00:00Z")), "Near London, UK");
 });
 
 test("Landscape location: restores saved state, supports a safe editable label, and resets to Orlando", () => {
@@ -80,7 +80,7 @@ test("Landscape location: restores saved state, supports a safe editable label, 
   }) };
   const runtime = livingLocation({ stored });
   assert.equal(runtime.location.current().label, "Home");
-  assert.match(runtime.location.caption(new Date("2026-06-21T17:00:00Z")), /^Home · /);
+  assert.equal(runtime.location.caption(new Date("2026-06-21T17:00:00Z")), "Home");
   assert.equal(runtime.location.setLabel("  Studio  ").label, "Studio");
   assert.equal(runtime.location.current().label, "Studio");
   assert.equal(runtime.location.reset().enabled, false);
@@ -141,8 +141,8 @@ test("Landscape location: actual coordinates change the sky and polar day return
 
 test("Landscape: daytime life includes a duck visit and the new bounded animal set", () => {
   const sky = livingSky();
-  assert.deepEqual([...sky.eventTypes], ["cyclist", "bird", "balloon", "train", "metro", "plane", "duck", "fish", "butterfly", "rabbit", "deer", "kite", "reader", "picnic", "couple", "walker", "airshow", "banner", "hangglider"]);
-  assert.deepEqual([...sky.rareTypes], ["abduction", "vogon"]);
+  assert.deepEqual([...sky.eventTypes], ["cyclist", "bird", "balloon", "train", "metro", "plane", "duck", "fish", "butterfly", "rabbit", "deer", "kite", "reader", "picnic", "couple", "walker", "airshow", "banner", "hangglider", "jetski", "sailboat", "cruise", "yacht"]);
+  assert.deepEqual([...sky.rareTypes], ["abduction"]);
   const world = sky.createWorld(() => 0.99);
   assert.equal(world.events.length, 3, "opening life is a small cast");
   assert.equal(new Set(world.events.map(event => event.type)).size, 3, "opening life has no duplicate visitors");
@@ -322,6 +322,65 @@ test("Landscape: returning visits vary their opening cast", () => {
   assert.notDeepEqual(sky.createWorld(()=>.1).events.map(e=>e.type),sky.createWorld(()=>.9).events.map(e=>e.type));
 });
 
+test("Landscape: only one banner plane may be active while ordinary planes still overlap", () => {
+  const sky = livingSky();
+  const day = { sun: { altitude: 30, azimuth: 100 } };
+  const slot = type => {
+    const index = sky.eventTypes.indexOf(type);
+    assert.ok(index >= 0, `${type} must be an ordinary daytime event`);
+    return (index + .1) / sky.eventTypes.length;
+  };
+  const scheduled = (type, existingType, reverse = false) => {
+    const world = sky.createWorld(() => .5);
+    world.events = existingType ? [{ type: existingType, age: 0, duration: 10000, seed: .2, lane: .3, reverse: false }] : [];
+    world.elapsed = 0;
+    world.next = 0;
+    const values = [0, 1, slot(type), 0, .25, .25, reverse ? 1 : 0];
+    let cursor = 0;
+    world.random = () => values[cursor++] ?? .25;
+    sky.advance(world, 1, day);
+    return world;
+  };
+
+  const banner = scheduled("banner", "banner", true);
+  assert.equal(banner.events.filter(event => event.type === "banner").length, 1,
+    "a second banner is suppressed while the first is still in flight");
+
+  const planes = scheduled("plane", "plane");
+  assert.ok(planes.events.filter(event => event.type === "plane").length >= 2,
+    "ordinary planes remain allowed to overlap");
+
+  const forward = scheduled("banner", null, false).events.find(event => event.type === "banner");
+  const reverse = scheduled("banner", null, true).events.find(event => event.type === "banner");
+  assert.equal(forward.reverse, false);
+  assert.equal(reverse.reverse, true);
+});
+
+test("Landscape: shooting stars are brief, night-only, and singly bounded", () => {
+  const sky = livingSky();
+  assert.ok(sky.nightEventTypes.includes("meteor"), "meteor is a declared night visitor");
+  assert.ok(sky.eventDurations.meteor < 3, "shooting stars stay brief");
+  const schedule = altitude => {
+    const world = sky.createWorld(() => .5);
+    world.events = [];
+    world.elapsed = 0;
+    world.next = 0;
+    world.lastRare = 0;
+    world.random = () => 0;
+    for (let i = 0; i < 24; i++) {
+      world.next = world.elapsed;
+      sky.advance(world, .25, { sun: { altitude, azimuth: 100 } });
+      assert.ok(world.events.filter(event => event.type === "meteor").length <= 1,
+        "the night sky has at most one shooting star at a time");
+    }
+    return world;
+  };
+  assert.equal(schedule(30).events.filter(event => event.type === "meteor").length, 0,
+    "daytime scheduling never emits shooting stars");
+  assert.ok(schedule(-20).events.some(event => event.type === "meteor"),
+    "night scheduling eventually emits a shooting star");
+});
+
 test("Landscape browser: first launch, motion lifecycle, theme independence and return navigation", {
   skip:!process.env.LANDSCAPE_BROWSER_URL
 }, async () => {
@@ -461,26 +520,44 @@ test("PWA contract: includes install metadata for mobile browsers and notches", 
     "iOS homescreen installs need an explicit 180x180 touch icon");
 });
 
-test("PWA contract: icon combines a checklist with a linked-chain mark", () => {
+test("PWA contract: install colors match the mint landscape before it loads", () => {
+  const href = manifestHrefFromHtml();
+  const manifest = JSON.parse(fs.readFileSync(path.resolve(__dirname, href), "utf8"));
+  assert.equal(manifest.theme_color, "#abd9c3");
+  assert.equal(manifest.background_color, "#d7efe1");
+  const meta = html.match(/<meta\b[^>]*name=["']theme-color["'][^>]*content=["']([^"']+)["']/i);
+  assert.ok(meta, "index.html must set an initial theme color");
+  assert.equal(meta[1], "#abd9c3", "the first paint should use the landscape mint tone");
+});
+
+test("PWA contract: icon combines a cup with a linked chain handle", () => {
   const iconPath = path.join(__dirname, "icon.svg");
   assert.ok(fs.existsSync(iconPath), "the scalable PWA icon source must exist");
   const icon = fs.readFileSync(iconPath, "utf8");
   assert.match(icon, /<svg\b[^>]*viewBox=["']0 0 512 512["']/i,
     "the source icon must use the app's 512px coordinate space");
-  assert.match(icon, /<title>\s*Checklist Chain(?: Icon)?\s*<\/title>/i,
-    "the source icon must name the combined checklist-chain mark");
-  assert.match(icon, /<g\b[^>]*id=["']checklist["']/i,
-    "the source icon must group its checklist elements");
-  for (const number of [1, 2, 3]) {
-    assert.match(icon, new RegExp(`id=["']checkmark-${number}["']`, "i"),
-      `the checklist must include checkmark-${number}`);
+  assert.match(icon, /<title>\s*Cup with a Chain Handle\s*<\/title>/i,
+    "the source icon must name the cup and chain handle mark");
+  assert.match(icon, /<g\b[^>]*id=["']cup["']/i,
+    "the source icon must group its cup elements");
+  for (const part of ["cup-rim", "cup-body"]) {
+    assert.match(icon, new RegExp(`id=["']${part}["']`, "i"),
+      `the cup must include ${part}`);
   }
-  assert.match(icon, /<g\b[^>]*id=["']chain["']/i,
-    "the source icon must group its chain elements");
+  assert.match(icon, /<g\b[^>]*id=["']chain-handle["']/i,
+    "the source icon must group the handle separately from the cup");
   for (const number of [1, 2]) {
     assert.match(icon, new RegExp(`id=["']chain-link-${number}["']`, "i"),
-      `the chain must include chain-link-${number}`);
+      `the chain handle must include chain-link-${number}`);
   }
+  assert.doesNotMatch(icon, /id=["'](?:checklist|checkmark-\d+)["']/i,
+    "the app mark should no longer imply a checklist icon");
+});
+
+test("PWA contract: footer gives the requested plain inspiration credit", () => {
+  const note = (html.match(/Implementation inspired by[\s\S]*?(?=<\/footer>)/i) || [])[0];
+  assert.match(note || "", /Implementation inspired by beeminder forum user <b>alltom<\/b>/i);
+  assert.doesNotMatch(note || "", /<a\b/i, "the supplied attribution has no invented destination link");
 });
 
 test("PWA contract: app registers its service worker", () => {
@@ -3332,6 +3409,42 @@ test("rank presentation defaults show sparklines and top-K everywhere without hi
   assert.ok(!("topKLanguage" in storedSettings));
 });
 
+test("rank presentation layers the sparkline behind the readable top-K summary", async () => {
+  const { ctx, shim } = await loadApp({ seed: 793 });
+  addTaskAged(ctx, "Oldest", 900000);
+  addTaskAged(ctx, "Newer", 1000);
+  ctx.state.listOpen = true;
+  ctx.render();
+
+  const listHtml = shim.elements.get("listBody").innerHTML;
+  const summary = (listHtml.match(/<div class="rank-summary">([\s\S]*?)<\/div>/) || [])[1];
+  assert.ok(summary, "ranked rows should group the chart and top-K readout");
+  assert.ok(summary.indexOf('<svg class="spark"') < summary.indexOf('class="tk"'),
+    "the chart should be emitted before the readable overlay");
+  assert.match(html, /\.rank-summary\{[^}]*position:relative/);
+  assert.match(html, /\.rank-summary \.spark\{[^}]*position:absolute[^}]*z-index:0/);
+  assert.match(html, /\.rank-summary \.tk\{[^}]*position:relative[^}]*z-index:1/);
+  assert.match(html, /\.rank-summary \.tkl\{[^}]*background:color-mix/,
+    "the top-K label should keep a readable panel over the chart");
+  assert.match(html, /\.rank-summary \.spark path\.line\{[^}]*stroke:var\(--good\)/,
+    "the distribution line should use the app's readable green signal");
+});
+
+test("rank presentation tutorial explains sampled sparklines and top-K in plain language", async () => {
+  const { ctx, shim } = await loadApp({ seed: 794 });
+  ctx.openHelp();
+  const help = shim.elements.get("modalRoot").innerHTML;
+  assert.match(help, /estimated rank distribution, not a progress chart/i);
+  assert.match(help, /each left-to-right position is a possible rank/i);
+  assert.match(help, /taller bump means more .* samples/i);
+  assert.match(help, /spread across many ranks means more uncertainty/i);
+  assert.match(help, /smallest K .* first K positions/i);
+  assert.match(help, /top-3 means at least a 2\/3/i);
+  assert.match(help, /bar shows K out of the unfinished tasks/i);
+  assert.match(help, /not an exact rank or deadline/i);
+  assert.match(help, /only one unfinished task.*top-1/i);
+});
+
 test("rank presentation flags independently restore their existing UI only for literal true", async () => {
   const { ctx, shim } = await loadApp({ seed: 791 });
   const first = addTaskAged(ctx, "Oldest", 900000);
@@ -3398,7 +3511,7 @@ test("rank presentation list columns stay responsive for every flag combination"
     ["rank-none", "1fr", "1fr"],
     ["rank-spark", "88px 1fr", "70px 1fr"],
     ["rank-topk", "118px 1fr", "92px 1fr"],
-    ["rank-both", "88px 118px 1fr", "70px 92px 1fr"],
+    ["rank-both", "118px 1fr", "92px 1fr"],
   ]) {
     assert.match(html, new RegExp(`\\.trow\\.${cls}\\{grid-template-columns:${desktop.replaceAll(" ", "\\s*")}\\}`));
     const mobileCss = slice(html, "@media (max-width:560px){", "</style>");
@@ -7943,23 +8056,27 @@ test('Landscape browser: every visitor renders with finite geometry across short
   const {chromium}=await import(process.env.LANDSCAPE_PLAYWRIGHT);
   const browser=await chromium.launch({headless:true,channel:'chrome'});
   try{
-    for(const viewport of [{width:844,height:390},{width:320,height:568}]){
-      const page=await browser.newPage({viewport});const errors=[];page.on('pageerror',e=>errors.push(e.message));
+    for(const spec of [{width:844,height:390},{width:320,height:568},{width:844,height:390,night:true}]){
+      const viewport={width:spec.width,height:spec.height};
+      const page=await browser.newPage({viewport});
+      await page.clock.setFixedTime(new Date(spec.night?'2026-09-12T03:00:00Z':'2026-06-21T17:00:00Z')); const errors=[];page.on('pageerror',e=>errors.push(e.message));
       await page.addInitScript(()=>{
         localStorage.setItem('fvp:chain-scanner:landscape-motion','normal');
         window.invalidGeometry=[];
-        for(const key of ['moveTo','lineTo','translate','rotate','ellipse','fillRect']){
+        for(const key of ['moveTo','lineTo','translate','rotate','ellipse','fillRect','bezierCurveTo']){
           const original=CanvasRenderingContext2D.prototype[key];
           CanvasRenderingContext2D.prototype[key]=function(...args){if(args.some(x=>typeof x==='number'&&!Number.isFinite(x)))invalidGeometry.push(key);return original.apply(this,args);};
         }
       });
       await page.route('**/landscape.js',async route=>{
         const response=await route.fetch();let body=await response.text();
-        body=body.replace('let skyTimer=0',`world.events=[...LivingSky.eventTypes,...LivingSky.rareTypes].map((type,i)=>({type,age:45,duration:100,seed:(i*.137)%1,lane:(i*.17)%1,reverse:i%2===0}));world.next=1e9;let skyTimer=0`);
+        body=body.replace('let skyTimer=0',`world.events=[...LivingSky.eventTypes,...LivingSky.rareTypes,...LivingSky.nightEventTypes].map((type,i)=>({type,age:45,duration:100,seed:(i*.137)%1,lane:(i*.17)%1,reverse:i%2===0}));world.next=1e9;let skyTimer=0`);
         await route.fulfill({response,body});
       });
       await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'networkidle'});
       await page.locator('#modalRoot [data-act="close-modal"]').click();
+      const pane=await page.locator('.scene-reading').boundingBox();
+      assert.ok(pane.width<viewport.width-32,'intro leaves the scene visible alongside it');
       await page.locator('#viewScene').click();await page.waitForTimeout(750);
       assert.equal(await page.locator('.wrap').evaluate(e=>getComputedStyle(e).opacity),'0');
       const coverage=await page.locator('[data-scenery]').evaluate(c=>{const g=c.getContext('2d');return [g.getImageData(0,c.height-1,1,1).data[3],g.getImageData(c.width-1,c.height-1,1,1).data[3]]});
@@ -8022,6 +8139,89 @@ test('Landscape browser: every visitor renders with finite geometry across short
 });
 
 test('Landscape mood: sunrise copy does not describe sunset',()=>{
-  const ctx=vm.createContext({Date,Intl,Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-mood.js'),'utf8'),ctx);
-  assert.equal(ctx.LandscapeMood.period(new Date('2026-09-12T11:30:00Z'),{timezone:'America/New_York',sunAltitude:3}),'morning');
+ const ctx=vm.createContext({Date,Intl,Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-mood.js'),'utf8'),ctx);
+ assert.equal(ctx.LandscapeMood.period(new Date('2026-09-12T11:30:00Z'),{timezone:'America/New_York',sunAltitude:3}),'morning');
+});
+
+test('Landscape clock tower follows device local time instead of saved sky location',()=>{
+ const ctx=vm.createContext({Date,Intl,Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-mood.js'),'utf8'),ctx);
+ const date=new Date('2026-09-12T15:30:00Z');
+ const zone=Intl.DateTimeFormat().resolvedOptions().timeZone;
+ const local=ctx.LandscapeMood.clock(date);
+ const explicit=ctx.LandscapeMood.clock(date,zone);
+ assert.equal(local.hourAngle,explicit.hourAngle);
+ assert.equal(local.minuteAngle,explicit.minuteAngle);
+ const runtime=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ assert.doesNotMatch(runtime,/LandscapeMood\?\.clock\(sky\.date,\s*globalThis\.LivingLocation/,
+   'the civic clock should keep device time when the observer location changes');
+});
+
+ test('Landscape waterfront: vessels fit the water, and trees and landmarks share safe anchors',()=>{
+ const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
+ for(const [w,h] of [[320,568],[390,844],[844,390],[1440,1000]]){
+  const g=ctx.LandscapeGeometry.create(w,h);
+  for(const kind of ['jetski','sailboat','cruise','yacht'])for(const lane of [0,.5,1]){
+   const pose=g.vessel(kind,lane,w*.5,3,true);
+   assert.equal(pose.direction,-1);assert.ok(pose.scale>0);
+   assert.ok(pose.y>g.waterTop);assert.ok(pose.y+4*pose.scale<g.horizon+h*.095);
+  }
+  for(let i=0;i<100;i++){
+   const x=w*i/100,y=g.foregroundTree(x,g.lowerRail(x)+(i%15)-7);
+   assert.ok(Math.abs(y-g.lowerRail(x))>=12,'tree base clears the rail');
+   assert.ok(y>=g.near(x),'tree stays grounded');
+  }
+  const house=g.cottage();assert.ok(house.y>=Math.max(g.middle(house.x-20),g.middle(house.x+20)));
+  const nest=g.nest();assert.ok(nest.x!==w*.83);assert.ok(nest.y<nest.ground);
+  const a=g.ripple(4,0,1),b=g.ripple(4,1,1);assert.notEqual(a.alpha,b.alpha);assert.ok(a.alpha>=0&&a.alpha<=1);
+ }
+});
+test('Landscape waterfront: balloon currents stay bounded, seeded, and smooth',()=>{
+ const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
+ for(const [w,h] of [[320,568],[390,844],[844,390],[1440,1000]]){
+  const g=ctx.LandscapeGeometry.create(w,h);
+  const a=g.balloonDrift(.2,0,1),b=g.balloonDrift(.2,5,1),c=g.balloonDrift(.8,0,1);
+  assert.ok(Math.abs(a.x)<=12&&Math.abs(a.y)<=28,'initial current stays near its route');
+  assert.ok(Math.abs(b.x)<=12&&Math.abs(b.y)<=28,'later current stays near its route');
+  assert.ok(Math.abs(c.x)<=12&&Math.abs(c.y)<=28,'a different balloon stays near its route');
+  assert.ok(Math.abs(a.x-b.x)+Math.abs(a.y-b.y)>0.01,'time changes the current');
+  assert.ok(Math.abs(a.x-c.x)+Math.abs(a.y-c.y)>0.01,'seed changes the current');
+  let previous=a;
+  for(let i=1;i<=120;i++){
+   const next=g.balloonDrift(.2,i/24,1);
+   assert.ok(Math.abs(next.y-previous.y)<1,'current has no frame-to-frame jump');
+   previous=next;
+  }
+ }
+});
+test('Landscape waterfront: water visitors are occasional and have distinct travel speeds',()=>{
+ const sky=livingSky();
+ for(const kind of ['jetski','sailboat','cruise','yacht'])assert.ok(sky.eventTypes.includes(kind));
+ assert.ok(sky.eventDurations.jetski<sky.eventDurations.yacht);
+ assert.ok(sky.eventDurations.yacht<sky.eventDurations.cruise);
+ let n=4;const random=()=>{n=(n*1664525+1013904223)>>>0;return n/4294967296};
+ const world=sky.createWorld(random);
+ for(let i=0;i<2000;i++){sky.advance(world,3,{sun:{altitude:30,azimuth:100}});assert.ok(world.events.filter(e=>['jetski','sailboat','cruise','yacht'].includes(e.type)).length<=2);}
+});
+test('Landscape intro: cozy short copy keeps the scenic pane compact',()=>{
+ const runtime=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ assert.match(runtime,/status\.textContent=globalThis\.LandscapeMood/);
+ const mood=vm.createContext({Date,Intl,Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-mood.js'),'utf8'),mood);
+ for(const entry of mood.LandscapeMood.messageCatalog)assert.ok(entry.text.length<=110,'cozy messages stay short');
+ assert.ok(mood.LandscapeMood.messageCatalog.some(entry=>/neighbor|pocket|tea/.test(entry.text)));
+ const css=fs.readFileSync(path.join(__dirname,'landscape.css'),'utf8');
+ assert.match(css,/\.scene-reading\{[^}]*width:fit-content/);
+ assert.match(css,/--secondary-surface:color-mix\(in srgb,var\(--panel\) 90%,transparent\)/);
+});
+
+test('Landscape wings fold toward the body with mirrored motion',()=>{
+ const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
+ const g=ctx.LandscapeGeometry.create(800,600);const spreads=[];
+ for(let t=0;t<2;t+=.05){const fold=g.wingFold(t,.4);assert.equal(fold.left,-fold.right);assert.ok(fold.right>=.12&&fold.right<=1);spreads.push(fold.right);}
+ assert.ok(Math.max(...spreads)-Math.min(...spreads)>.7,'wings open and close');
+});
+
+test('Landscape location: visible default-sky copy does not name Orlando',()=>{
+ assert.doesNotMatch(html,/Orlando|Live Florida|follows Florida/);
+ const script=fs.readFileSync(path.join(__dirname,'location.js'),'utf8');
+ assert.doesNotMatch(script,/Using Orlando, FL until you opt in/);
 });
