@@ -8170,7 +8170,6 @@ test('Landscape clock tower follows device local time instead of saved sky locat
    assert.ok(Math.abs(y-g.lowerRail(x))>=12,'tree base clears the rail');
    assert.ok(y>=g.near(x),'tree stays grounded');
   }
-  const house=g.cottage();assert.ok(house.y>=Math.max(g.middle(house.x-20),g.middle(house.x+20)));
   const nest=g.nest();assert.ok(nest.x!==w*.83);assert.ok(nest.y<nest.ground);
   const a=g.ripple(4,0,1),b=g.ripple(4,1,1);assert.notEqual(a.alpha,b.alpha);assert.ok(a.alpha>=0&&a.alpha<=1);
  }

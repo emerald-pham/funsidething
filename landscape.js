@@ -153,19 +153,6 @@
         line(b,ax-4,ay-5,ax+1,ay-11,color(visitSeed),1.5);line(b,ax+1,ay-11,ax+6,ay-5,color(visitSeed),1.5);
       }
     }
-    // The level foundation sits inside the hill; a short path joins its door.
-    const house=geometry.cottage(),cx=house.x,cy=house.y;
-    ellipse(b,cx+2,cy+1,22,3,S.mixHex(p.hill,p.front,.35));
-    b.beginPath();b.moveTo(cx+1,cy);b.quadraticCurveTo(cx+6,cy+8,cx+3,trail(cx+3));b.strokeStyle=S.mixHex(p.hill,'#ecd9b7',.75);b.lineWidth=4;b.stroke();
-    b.fillStyle=S.mixHex('#eedfc0',p.front,night*.55);b.fillRect(cx-16,cy-20,27,20);
-    b.fillStyle=S.mixHex('#cdbb99',p.front,night*.55);b.beginPath();b.moveTo(cx+11,cy-20);b.lineTo(cx+19,cy-15);b.lineTo(cx+19,cy);b.lineTo(cx+11,cy);b.closePath();b.fill();
-    b.fillStyle=S.mixHex('#a88070',p.front,night*.45);b.fillRect(cx+6,cy-32,4,11);
-    b.beginPath();b.moveTo(cx-20,cy-20);b.lineTo(cx-3,cy-33);b.lineTo(cx+15,cy-20);b.closePath();b.fillStyle=S.mixHex('#c08e79',p.front,night*.45);b.fill();
-    b.beginPath();b.moveTo(cx-3,cy-33);b.lineTo(cx+6,cy-29);b.lineTo(cx+23,cy-15);b.lineTo(cx+15,cy-20);b.closePath();b.fillStyle=S.mixHex('#9f7768',p.front,night*.45);b.fill();
-    b.fillStyle=S.mixHex('#78948c',p.front,night*.5);b.fillRect(cx-2,cy-12,6,12);
-    b.fillStyle=night>.3?'#f7d79d':'#9fced1';b.fillRect(cx-12,cy-15,6,7);
-    line(b,cx-9,cy-15,cx-9,cy-8,'#f4e8d0',.7);line(b,cx-12,cy-11.5,cx-6,cy-11.5,'#f4e8d0',.7);
-    line(b,cx-17,cy,cx+19,cy,S.mixHex('#b9af97',p.front,night*.5),2);
     const nest=geometry.nest();
     tree(b,nest.treeX,nest.ground,54,S.mixHex(p.hill,p.front,.8),.6);
     line(b,nest.treeX,nest.y+5,nest.x-3,nest.y+1,'#8e8065',1.1);

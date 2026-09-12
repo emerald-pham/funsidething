@@ -71,7 +71,7 @@ catalog retain their separately documented licenses in THIRD_PARTY_NOTICES.md.
 ## Waterfront refinement
 
 - [x] Compact cozy intro copy and lightly translucent supporting surfaces.
-- [x] Level cottage foundation, seated picnic poses, branch-mounted nest, and railway tree clearance.
+- [x] Seated picnic poses, branch-mounted nest, and railway tree clearance.
 - [x] Pulsing water glints, smaller ducks, and occasional sailboats, yachts, cruise ships and jet skis.
 - [x] One banner plane at a time with either travel direction; box-ship invasion removed.
 - [x] Clocktower uses the device clock independently of the sky location.
@@ -80,3 +80,5 @@ catalog retain their separately documented licenses in THIRD_PARTY_NOTICES.md.
 
 - [x] Seeded balloon currents, inward-folding butterfly wings, and brief night-only shooting stars.
 - [x] Location caption shows the saved place without a time readout; default-sky wording is neutral.
+
+- [x] Removed the cottage and its access path, leaving open hillside.

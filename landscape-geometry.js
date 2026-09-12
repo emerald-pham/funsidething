@@ -20,7 +20,6 @@
       return {x,y,scale,direction,visible:depth>10};
     }
     const foregroundTree=(x,y)=>Math.abs(y-lowerRail(x))<22?lowerRail(x)+23:Math.max(near(x)+2,y);
-    const cottage=()=>{const x=W*.17;return {x,y:Math.max(middle(x-20),middle(x+20))+9};};
     const nest=()=>{const treeX=W*.9,ground=middle(treeX)+3;return {treeX,ground,x:treeX-17,y:ground-24};};
     const wingFold=(t,seed)=>{const right=.12+.88*Math.abs(Math.sin(t*7+seed*12));return {left:-right,right};};
     const balloonDrift=(seed,t,wind=1)=>({
@@ -28,7 +27,7 @@
       y:Math.sin(t*wind*(.10+seed*.04)+seed*23)*17+Math.sin(t*.23+seed*11)*8
     });
     const ripple=(i,t,wind=1)=>({alpha:.15+.75*(.5+.5*Math.sin(t*wind*1.3+i*1.71))**2,drift:Math.sin(t*wind*.5+i)*9,width:.65+.35*Math.sin(t*.9+i)**2});
-    return {wingFold,balloonDrift,vessel,foregroundTree,cottage,nest,ripple,horizon,waterTop,far,middle,near,rail,trail,lowerRail,tangent,rider,pack};
+    return {wingFold,balloonDrift,vessel,foregroundTree,nest,ripple,horizon,waterTop,far,middle,near,rail,trail,lowerRail,tangent,rider,pack};
   }
   root.LandscapeGeometry={create};
 })(globalThis);
