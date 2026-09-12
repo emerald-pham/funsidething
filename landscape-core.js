@@ -113,7 +113,7 @@
     return world;
   }
   function spawn(w,type,initial=false){
-    if(['banner','meteor'].includes(type)&&w.events.some(e=>e.type===type))return;
+    if(['banner','meteor','bird'].includes(type)&&w.events.some(e=>e.type===type))return;
     if(WATER_TYPES.includes(type)&&w.events.filter(e=>WATER_TYPES.includes(e.type)).length>=2)return;
     const r=w.random;
     const base=EVENT_DURATIONS[type]|| (type==='abduction'?24:type==='bird'?28:type==='balloon'?150:type==='plane'?95:48+r()*50);

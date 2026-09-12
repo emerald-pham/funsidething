@@ -96,3 +96,15 @@ with every stylesheet loaded.
 - [x] End-of-list actions brighten while scan mode remains ready for new tasks.
 - [x] Yellow candidates have their own Worked on it action, with undo and stale-click protection, without a ranking signal.
 - [x] Apple touch artwork has a content-versioned URL, an offline cache entry, and a fingerprint regression test. Existing iOS Home Screen icon refresh still needs device verification.
+
+## Grounding and paint-order repair
+
+- [x] Tree shadows and ground decorations paint before foliage, with trees sorted by their base height. Foreground trees use cached layers on the appropriate side of the train.
+- [x] Hang-glider pilot and wing colors mirror with travel direction.
+- [x] Nest branch supports the bowl, arriving birds have separate perch positions, and perched birds stop flapping. Only one visiting flock occupies the nest at a time.
+- [x] Rabbits pause between distance-based hops. Deer and walkers plant their feet during stance, with local travel speed independent of viewport width.
+
+The earlier geometry checks proved coordinates were finite but did not prove
+correct paint order or ground contact. Regression coverage now checks shared
+renderer depth contracts and foot contact across frames; forced-event visual
+checks cover both directions in narrow/wide Chromium and WebKit scenes.

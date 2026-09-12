@@ -8142,7 +8142,7 @@ test('Landscape clock tower follows device local time instead of saved sky locat
    'the civic clock should keep device time when the observer location changes');
 });
 
- test('Landscape waterfront: vessels fit the water, and trees and landmarks share safe anchors',()=>{
+test('Landscape waterfront: vessels fit the water, and trees and landmarks share safe anchors',()=>{
  const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
  for(const [w,h] of [[320,568],[390,844],[844,390],[1440,1000]]){
   const g=ctx.LandscapeGeometry.create(w,h);
@@ -8159,6 +8159,31 @@ test('Landscape clock tower follows device local time instead of saved sky locat
   const nest=g.nest();assert.ok(nest.x!==w*.83);assert.ok(nest.y<nest.ground);
   const a=g.ripple(4,0,1),b=g.ripple(4,1,1);assert.notEqual(a.alpha,b.alpha);assert.ok(a.alpha>=0&&a.alpha<=1);
  }
+});
+test('Landscape visitors: ground motion, depth bands, nest perches and renderer contracts stay shared',()=>{
+ const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
+ const narrow=ctx.LandscapeGeometry.create(320,568),wide=ctx.LandscapeGeometry.create(1440,900);
+ for(const g of [narrow,wide]){
+  const x=g.horizon*.8;
+  assert.equal(g.groundAnchor('rabbit',x),g.trail(x)+15);
+  assert.equal(g.groundAnchor('deer',x),g.trail(x)+15);
+  assert.equal(g.groundAnchor('walker',x),g.trail(x)+5);
+  assert.equal(g.depthBand(x,g.lowerRail(x)-1),'back');
+  assert.equal(g.depthBand(x,g.lowerRail(x)+1),'front');
+  const forward=g.groundTravelX(4,false),reverse=g.groundTravelX(4,true);
+  assert.ok(reverse>forward,'ground arrivals move in opposite directions');
+  const nest=g.nest();
+  assert.equal(nest.perches.length,2,'the nest offers separate landing points');
+  assert.notEqual(nest.perches[0].x,nest.perches[1].x,'arrivals do not land on one pixel');
+  assert.ok(nest.perches.every(perch=>perch.y<nest.ground),'perches remain in the supported nest');
+ }
+ assert.equal(narrow.groundTravelX(5,false)-narrow.groundTravelX(4,false),wide.groundTravelX(5,false)-wide.groundTravelX(4,false),'animal speed is in scene pixels, not viewport width');
+ const runtime=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ assert.match(runtime,/geometry\.groundPose\(/,'renderer uses the shared fixed-speed ground route');
+ assert.match(runtime,/geometry\.groundAnchor\(/,'renderer uses the shared path anchor for animals');
+ assert.match(runtime,/nest\.perches/,'renderer consumes the two nest landing points');
+ assert.match(runtime,/composite\('trees-ground'\)[\s\S]*composite\('trees-back'\)[\s\S]*paintEvent\(e,t\)[\s\S]*composite\('trees-front'\)/,
+   'terrain shadows, far trees, train and near trees have explicit depth order');
 });
 test('Landscape waterfront: balloon currents stay bounded, seeded, and smooth',()=>{
  const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
@@ -8284,4 +8309,26 @@ test('PWA: Apple touch icon uses a content-versioned offline URL',()=>{
  assert.equal(href,`icon-180-${digest}.png`,'a changed design must change the iOS icon URL');
  assert.deepEqual(fs.readFileSync(path.join(__dirname,href)),fs.readFileSync(path.join(__dirname,'icon-180.png')));
  assert.ok(fs.readFileSync(path.join(__dirname,'sw.js'),'utf8').includes(`./${href}`),'versioned icon is available offline');
+});
+
+test('Landscape locomotion: planted feet stay fixed and rabbits pause between hops',()=>{
+ const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
+ const g=ctx.LandscapeGeometry.create(1440,900);
+ for(const reverse of [false,true]){
+  const a=g.groundPose('rabbit',{age:.1,duration:22,lane:.5,reverse}),b=g.groundPose('rabbit',{age:.2,duration:22,lane:.5,reverse});
+  assert.equal(a.x,b.x);assert.equal(a.hop,0);assert.equal(b.hop,0);
+  const airborne=g.groundPose('rabbit',{age:.7,duration:22,lane:.5,reverse});assert.ok(airborne.hop>0);assert.notEqual(airborne.x,a.x);
+ }
+ const a=g.strideFoot(1,12,0),b=g.strideFoot(2,12,0);
+ assert.equal(a.lift,0);assert.equal(b.lift,0);assert.ok(Math.abs(1+a.x-2-b.x)<1e-9,'stance foot is fixed in world coordinates');
+ const runtime=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ assert.match(runtime,/geometry\.groundPose\(/);assert.match(runtime,/geometry\.strideFoot\(/);
+ const glider=runtime.split("if(e.type==='hangglider'){")[1].split("if(e.type==='airshow')")[0];assert.match(glider,/g\.scale\(dir,1\)/);
+});
+
+test('Landscape nest: a new bird visit waits while the nest is occupied',()=>{
+ const sky=livingSky(),world=sky.createWorld(()=>.05);
+ world.events=[{type:'bird',age:0,duration:100,seed:.5,lane:.3,reverse:false}];world.next=0;
+ sky.advance(world,1,{sun:{altitude:30}});
+ assert.equal(world.events.filter(e=>e.type==='bird').length,1,'two arriving flocks cannot pile onto the same perches');
 });

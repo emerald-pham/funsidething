@@ -34,7 +34,6 @@
   function ellipse(ctx,x,y,rx,ry,color){ctx.beginPath();ctx.ellipse(x,y,rx,ry,0,0,TAU);ctx.fillStyle=color;ctx.fill();}
   function line(ctx,x,y,x2,y2,color,width=1){ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x2,y2);ctx.strokeStyle=color;ctx.lineWidth=width;ctx.stroke();}
   function tree(ctx,x,y,size,color,variant=0){
-    ellipse(ctx,x,y+1,size*.22,2,S.mixHex(color,p.front,.5));
     line(ctx,x,y,x-1,y-size*.8,S.mixHex(color,'#283f33',.4),Math.max(1,size*.07));
     if(variant<.25){
       for(let k=0;k<3;k++){
@@ -132,10 +131,15 @@
     path(b,trail);b.strokeStyle=S.mixHex(p.hill,'#d7cbaa',.72);b.lineWidth=11;b.stroke();
     path(b,trail);b.strokeStyle=S.mixHex(p.hill,'#f3e7bf',.66);b.lineWidth=7;b.stroke();
     b.setLineDash([9,18]);path(b,trail);b.strokeStyle='rgba(255,250,219,.45)';b.lineWidth=.7;b.stroke();b.setLineDash([]);
+    const midTrees=[];
     for(let i=0;i<35;i++){
       const x=rand(i+200)*W,y=middle(x)+2,size=12+rand(i+300)*25;
-      if(Math.abs(x-geometry.nest().treeX)>32)tree(b,x,y,size,S.mixHex(p.hill,p.front,.6),rand(i+10));
+      if(Math.abs(x-geometry.nest().treeX)>32)midTrees.push({x,y,size,variant:rand(i+10)});
     }
+    const nest=geometry.nest();midTrees.push({x:nest.treeX,y:nest.ground,size:54,variant:.6});
+    // Shadows belong to the ground, never to a later tree's foreground pass.
+    for(const t of midTrees)ellipse(b,t.x,t.y+1,t.size*.22,2,S.mixHex(p.hill,p.front,.7));
+    for(const t of midTrees.sort((a,b)=>a.y-b.y))tree(b,t.x,t.y,t.size,S.mixHex(p.hill,p.front,.6),t.variant);
     if(W>650){
       // A short secondary walking loop rejoins the main path; it never crosses rails.
       path(b,x=>trail(x)+Math.sin((x-W*.3)/(W*.25)*Math.PI)*22,W*.3,W*.55);
@@ -153,12 +157,10 @@
         line(b,ax-4,ay-5,ax+1,ay-11,color(visitSeed),1.5);line(b,ax+1,ay-11,ax+6,ay-5,color(visitSeed),1.5);
       }
     }
-    const nest=geometry.nest();
-    tree(b,nest.treeX,nest.ground,54,S.mixHex(p.hill,p.front,.8),.6);
-    line(b,nest.treeX,nest.y+5,nest.x-3,nest.y+1,'#8e8065',1.1);
+    line(b,nest.treeX,nest.y+5,nest.x-6,nest.y+2,'#8e8065',1.4);
     b.beginPath();b.ellipse(nest.x,nest.y,4,2.3,0,0,Math.PI);b.fillStyle='#a28b67';b.fill();
     line(b,nest.x-4,nest.y,nest.x+4,nest.y,'#b6a080',.7);
-    if(sky.sun.altitude<0){ellipse(b,nest.x-1.5,nest.y-1,1.5,1.2,p.front);ellipse(b,nest.x+1.5,nest.y-1,1.5,1.2,p.front);}
+    if(sky.sun.altitude < -8){ellipse(b,nest.x-1.5,nest.y-1,1.5,1.2,p.front);ellipse(b,nest.x+1.5,nest.y-1,1.5,1.2,p.front);}
     for(let i=0;i<8;i++){const x=W*.18+i*7;line(b,x,trail(x)+17,x,trail(x)+6,S.mixHex('#d2c8ab',p.front,night*.7),1.2);}
     path(b,x=>trail(x)+10,W*.18,W*.18+49,7);b.strokeStyle=S.mixHex('#d2c8ab',p.front,night*.7);b.lineWidth=1;b.stroke();
     layer("front",Math.max(0,hy+H*.35));
@@ -166,19 +168,24 @@
     // A lower rail line is distinct from the elevated metro.
     path(b,x=>near(x)+H*.07);b.strokeStyle=S.mixHex(p.front,'#b6b89c',.25);b.lineWidth=6;b.stroke();
     path(b,x=>near(x)+H*.07);b.strokeStyle=S.mixHex(p.front,'#c2c6aa',.38);b.lineWidth=1;b.stroke();
-    layer("trees",Math.max(0,hy+H*.35-85));
+    layer("trees-ground",Math.max(0,hy+H*.35-85));
     const planted=[];
     for(let i=0;i<25;i++){
       const x=rand(i+601)*W,y=geometry.foregroundTree(x,near(x)+10+rand(i+631)*100),size=23+rand(i+711)*47;
       if(planted.some(tree=>Math.abs(tree.x-x)<Math.max(tree.size,size)*.3&&Math.abs(tree.y-y)<22))continue;
-      planted.push({x,y,size});
-      tree(b,x,y,size,S.mixHex(p.front,'#183d32',.25),rand(i+910));
+      planted.push({x,y,size,variant:rand(i+910)});
     }
     // Tiny wildflower groups and grasses are static; wind is confined to the overlay.
     for(let i=0;i<140;i++){
       const x=rand(i+900)*W,y=near(x)+30+rand(i+950)*(H-near(x));
       line(b,x,y,x-2,y-5,S.mixHex(p.front,'#b7c79b',.17),.7);
       if(rand(i+970)>.63)ellipse(b,x-2,y-5,1.4,1,S.mixHex('#e7c98a',p.front,night*.8));
+    }
+    for(const t of planted)ellipse(b,t.x,t.y+1,t.size*.22,2,S.mixHex(p.front,'#183d32',.2));
+    // Cached depth bands keep train occlusion correct without repainting foliage each frame.
+    for(const band of ['back','front']){
+      layer('trees-'+band,Math.max(0,hy+H*.35-85));
+      for(const t of planted.filter(t=>geometry.depthBand(t.x,t.y)===band).sort((a,b)=>a.y-b.y))tree(b,t.x,t.y,t.size,S.mixHex(p.front,'#183d32',.25),t.variant);
     }
     const vignette=b.createLinearGradient(0,hy,0,H);vignette.addColorStop(0,'rgba(5,25,27,0)');vignette.addColorStop(1,'rgba(5,25,27,.035)');b.fillStyle=vignette;b.fillRect(0,hy,W,H-hy);
   }
@@ -193,6 +200,11 @@
     g.globalAlpha=1;
   }
   function bird(x,y,size,t,perched=false,twig=false){
+    if(perched){
+      const ink=S.mixHex('#314a45',p.sky[0],p.night*.6);
+      ellipse(g,x,y-.8,size*.6,size*.38,ink);ellipse(g,x+size*.4,y-size*.4,size*.25,size*.25,ink);
+      line(g,x-.7,y,x-.7,y+1.5,ink,.6);line(g,x+.7,y,x+.7,y+1.5,ink,.6);return;
+    }
     g.strokeStyle=S.mixHex('#314a45',p.sky[0],p.night*.6);g.lineWidth=1.2;g.lineCap='round';
     g.beginPath();g.moveTo(x-size,y-Math.abs(Math.sin(t*5))*size*.6);g.quadraticCurveTo(x-size*.4,y-size*.4,x,y);g.quadraticCurveTo(x+size*.5,y-size*.6,x+size,y-(perched?0:Math.abs(Math.sin(t*5+.3))*size*.6));g.stroke();
     if(twig&&!perched){line(g,x,y+1,x+6,y+4,'#8b745a',.7);line(g,x+3,y+2,x+5,y,'#8b745a',.6);}
@@ -256,13 +268,15 @@
       for(let i=-1;i<=1;i++){g.beginPath();g.moveTo(fx,fy);g.quadraticCurveTo(fx+i*7,fy-20+Math.sin(t*wind)*2,fx+i*7,fy-1);g.strokeStyle=S.mixHex(p.sky[1],'#ffffff',.6);g.lineWidth=1;g.stroke();}
     }
     composite('front');
+    composite('trees-ground');
+    for(let i=0;i<12;i++){const x=rand(i+1700)*W,y=Math.min(H+5,near(x)+85+rand(i+1710)*100);line(g,x,y,x+Math.sin(t*.8+i)*3,y-16,S.mixHex(p.front,'#bdd8a5',.4));}
+    composite('trees-back');
     for(const e of world.events)if(e.type==='train')paintEvent(e,t);
-    composite('trees');
+    composite('trees-front');
     if(p.night>.15)for(let i=0;i<16;i++){
       const x=rand(i+801)*W+Math.sin(t*.7+i)*10,y=middle(x)+28+rand(i+830)*50+Math.cos(t+i)*6;
       g.globalAlpha=(.2+.6*(.5+.5*Math.sin(t*1.4+i)))*p.night;ellipse(g,x,y,1.5,1.5,'#eff7b7');g.globalAlpha=1;
     }
-    for(let i=0;i<12;i++){const x=rand(i+1700)*W,y=Math.min(H+5,near(x)+85+rand(i+1710)*100);line(g,x,y,x+Math.sin(t*.8+i)*3,y-16,S.mixHex(p.front,'#bdd8a5',.4));}
   }
   function paintVessel(e,t){
     if(sky.sun.altitude < -6)return;
@@ -316,12 +330,12 @@
       }
       if(e.type==='bird'){
         if(sky.sun.altitude < -8)return;
-        const nest=geometry.nest(),nx=nest.x,ny=nest.y-2;
+        const nest=geometry.nest(),nx=nest.perches[0].x,ny=nest.perches[0].y;
         // Birds visit the nest with a clean, uninterrupted wing silhouette.
         const travel=S.smooth(0,.8,f),bx=S.lerp(e.reverse?W+20:-20,nx,travel);
         const by=S.lerp(hy*.42+e.lane*30,ny,travel)-Math.sin(travel*Math.PI)*35;
         bird(bx,by,3.5,t,f>.82,true);
-        if(e.seed>.4)bird(bx-S.lerp(16,3,travel),by+S.lerp(7,0,travel),3,t+.6,f>.82);
+        if(e.seed>.4)bird(bx+S.lerp(-16,nest.perches[1].x-nx,travel),by+S.lerp(7,nest.perches[1].y-ny,travel),3,t+.6,f>.82);
         return;
       }
       if(e.type==='plane'){
@@ -397,7 +411,14 @@
         for(let i=0;i<4;i++)line(g,kx+Math.sin(t+i)*3,ky+10+i*4,kx+Math.sin(t+i+1)*3,ky+14+i*4,c,.7);
       }g.restore();return true;
     }
-    if(e.type==='walker'){person(x,trail(x)+5,e.seed,'walk',t);return true;}
+    if(e.type==='walker'){
+      const pose=geometry.groundPose('walker',e);g.save();g.globalAlpha=S.smooth(0,.06,f)*(1-S.smooth(.94,1,f));
+      const skin=['#e9c3a5','#bc8d72','#8e6656'][Math.floor(e.seed*19)%3];
+      ellipse(g,pose.x,pose.y+1,4,1.2,S.mixHex(p.front,p.hill,.5));
+      ellipse(g,pose.x,pose.y-12,2,2,skin);line(g,pose.x,pose.y-9,pose.x,pose.y-4,c,3);
+      for(const offset of [0,.5]){const foot=geometry.strideFoot(pose.distance,10,offset),fx=pose.x+dir*foot.x;line(g,pose.x,pose.y-4,fx,geometry.groundAnchor('walker',fx)-foot.lift,'#647779',1.4);}
+      line(g,pose.x,pose.y-8,pose.x+dir*4,pose.y-6,skin,1.3);g.restore();return true;
+    }
     if(e.type==='duck'){
       const pose=geometry.vessel('duck',e.lane,x,t,e.reverse),scale=Math.min(.5,pose.scale*.65),y=pose.y;
       for(let i=0;i<(e.seed>.4?3:1);i++){
@@ -422,18 +443,24 @@
       line(g,x,yy-1.5,x,yy+2,'#667a65',.7);return true;
     }
     if(e.type==='rabbit'||e.type==='deer'){
-      const deer=e.type==='deer',yy=trail(x)+15,hop=deer?0:Math.abs(Math.sin(t*3))*3;
-      ellipse(g,x,yy+1,deer?8:5,1.5,S.mixHex(p.front,p.hill,.4));
-      g.save();g.translate(x,yy-hop);g.scale(dir,1);
+      const deer=e.type==='deer',pose=geometry.groundPose(e.type,e),yy=pose.y;
+      g.save();g.globalAlpha=S.smooth(0,.06,f)*(1-S.smooth(.94,1,f));
+      ellipse(g,pose.x,yy+1,deer?8:5,1.5,S.mixHex(p.front,p.hill,.4));
+      // Feet plant in world coordinates during stance; their swing follows distance traveled.
+      if(deer)for(const [hip,offset] of [[-4,0],[4,.5]]){
+        const foot=geometry.strideFoot(pose.distance,12,offset),fx=pose.x+dir*(hip+foot.x);
+        line(g,pose.x+dir*hip,yy-8,fx,geometry.groundAnchor(e.type,fx)-foot.lift,c,1.2);
+      }
+      g.translate(pose.x,yy-pose.hop);g.rotate(geometry.tangent(trail,pose.x));g.scale(dir,1);
       ellipse(g,0,deer?-10:-3,deer?7:4,deer?4:3,c);ellipse(g,deer?7:4,deer?-16:-6,deer?3:2,deer?3:2,c);
-      for(const xx of deer?[-4,4]:[-2,2])line(g,xx,deer?-8:-2,xx+Math.sin(t*3+xx),0,c,1.2);
+      if(!deer)for(const xx of [-2,2])line(g,xx,-2,xx+(pose.hop>0?-1:1),0,c,1.2);
       line(g,deer?6:3,deer?-18:-7,deer?5:2,deer?-23:-12,c,1.5);
       if(deer)line(g,5,-11,7,-17,c,3);else line(g,5,-7,6,-12,c,1.4);
       g.restore();return true;
     }
     if(e.type==='hangglider'){
       const y=hy*.4+e.lane*hy*.2+Math.sin(t*.2)*9;
-      g.save();g.translate(x,y);g.rotate(Math.sin(t*.3)*.06);
+      g.save();g.translate(x,y);g.rotate(Math.sin(t*.3)*.06);g.scale(dir,1);
       g.beginPath();g.moveTo(0,-10);g.lineTo(-27,7);g.lineTo(0,2);g.lineTo(27,7);g.closePath();g.fillStyle=c;g.fill();
       g.beginPath();g.moveTo(0,-10);g.lineTo(0,2);g.lineTo(27,7);g.closePath();g.fillStyle=color(e.seed,2);g.fill();
       line(g,-10,3,0,15,'#687d7e',.7);line(g,10,3,0,15,'#687d7e',.7);line(g,0,2,0,11,'#687d7e',.8);
