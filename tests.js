@@ -530,28 +530,14 @@ test("PWA contract: install colors match the mint landscape before it loads", ()
   assert.equal(meta[1], "#abd9c3", "the first paint should use the landscape mint tone");
 });
 
-test("PWA contract: icon combines a cup with a linked chain handle", () => {
-  const iconPath = path.join(__dirname, "icon.svg");
-  assert.ok(fs.existsSync(iconPath), "the scalable PWA icon source must exist");
-  const icon = fs.readFileSync(iconPath, "utf8");
-  assert.match(icon, /<svg\b[^>]*viewBox=["']0 0 512 512["']/i,
-    "the source icon must use the app's 512px coordinate space");
-  assert.match(icon, /<title>\s*Cup with a Chain Handle\s*<\/title>/i,
-    "the source icon must name the cup and chain handle mark");
-  assert.match(icon, /<g\b[^>]*id=["']cup["']/i,
-    "the source icon must group its cup elements");
-  for (const part of ["cup-rim", "cup-body"]) {
-    assert.match(icon, new RegExp(`id=["']${part}["']`, "i"),
-      `the cup must include ${part}`);
+test("PWA contract: original checklist and chain mark uses the scenic palette", () => {
+  const icon = fs.readFileSync(path.join(__dirname, "icon.svg"), "utf8");
+  for (const id of ["checklist", "chain", "chain-link-1", "chain-link-2", "checkmark-1", "checkmark-2", "checkmark-3"]) {
+    assert.ok(icon.includes(`id="${id}"`), `original mark must retain ${id}`);
   }
-  assert.match(icon, /<g\b[^>]*id=["']chain-handle["']/i,
-    "the source icon must group the handle separately from the cup");
-  for (const number of [1, 2]) {
-    assert.match(icon, new RegExp(`id=["']chain-link-${number}["']`, "i"),
-      `the chain handle must include chain-link-${number}`);
-  }
-  assert.doesNotMatch(icon, /id=["'](?:checklist|checkmark-\d+)["']/i,
-    "the app mark should no longer imply a checklist icon");
+  for (const color of ["#abd9c3", "#fffdf2", "#507e70"]) assert.ok(icon.includes(color));
+  assert.ok(icon.includes('d="M104 158l18 18 34-38"'), "preserve the original checkmark geometry");
+  assert.doesNotMatch(icon, /#6a55e0|id="cup"/);
 });
 
 test("PWA contract: footer gives the requested plain inspiration credit", () => {
