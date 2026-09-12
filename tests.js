@@ -3873,7 +3873,7 @@ test("UI: every action button in the candidate's siderail shares the same .sm si
   const rails = scanHtml.match(/<div class="siderail[^"]*">[\s\S]*?<\/div>/g) || [];
   assert.equal(rails.length, 1, `only the candidate keeps a rail; found ${rails.length}`);
   const btns = rails[0].match(/<button class="btn [^"]*"/g) || [];
-  assert.equal(btns.length, 3, `expected Done/Edit/Delete, found ${btns.length} in ${rails[0]}`);
+  assert.equal(btns.length, 4, `expected Done/Edit/Worked/Delete, found ${btns.length} in ${rails[0]}`);
   const odd = btns.filter((b) => !/\bsm\b/.test(b));
   assert.deepEqual(odd, [], "a siderail button without .sm would render a different size than its neighbours");
 });
@@ -8223,4 +8223,79 @@ test('Landscape location: visible default-sky copy does not name Orlando',()=>{
  assert.doesNotMatch(html,/Orlando|Live Florida|follows Florida/);
  const script=fs.readFileSync(path.join(__dirname,'location.js'),'utf8');
  assert.doesNotMatch(script,/Using Orlando, FL until you opt in/);
+});
+
+test('Scanner browser: secondary actions dim during scanning and brighten for focus or work', {skip:!process.env.LANDSCAPE_BROWSER_URL}, async()=>{
+ const {chromium}=await import(process.env.LANDSCAPE_PLAYWRIGHT);
+ const browser=await chromium.launch({headless:true,channel:'chrome'});
+ try{
+  const page=await browser.newPage({viewport:{width:1000,height:900}});
+  await page.addInitScript(()=>localStorage.setItem('fvp:chain-scanner:landscape-motion','reduced'));
+  await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'networkidle'});
+  await page.locator('#modalRoot [data-act="close-modal"]').click();
+  await page.evaluate(()=>{addTask('Dotted task',true);addTask('Next task',false);state.interventionActive=false;render();});
+  await page.mouse.move(0,0);
+  for(const theme of ['light','dark']){
+   await page.evaluate(theme=>document.documentElement.setAttribute('data-theme',theme),theme);
+   assert.ok(await page.locator('.actionrow').evaluate(e=>+getComputedStyle(e).opacity)<1,'benchmark actions must visibly dim after all stylesheets load');
+   assert.ok(await page.locator('.siderail').evaluate(e=>+getComputedStyle(e).opacity)<1,'candidate management actions dim too');
+   assert.equal(await page.locator('.decide').evaluate(e=>getComputedStyle(e).opacity),'1','Yes/No decisions remain prominent');
+   await page.locator('.actionrow [data-act="edit"]').focus();
+   assert.equal(await page.locator('.actionrow').evaluate(e=>getComputedStyle(e).opacity),'1','keyboard focus restores readable brightness');
+   await page.locator('.decide [data-act="yes"]').focus();
+  }
+  await page.locator('[data-act="start-working"]').click();await page.mouse.move(0,0);
+  assert.equal(await page.locator('.actionrow').evaluate(e=>getComputedStyle(e).opacity),'1','finishing scanning restores full emphasis');
+  await page.locator('.btnwrap [data-act="resume-scan"]').focus();
+  assert.equal(await page.locator('.btnwrap').evaluate(e=>getComputedStyle(e).opacity),'1','resume action is readable on keyboard focus');
+  await page.locator('.actionrow [data-act="bench-done"]').click();
+  assert.equal(await page.evaluate(()=>state.tasks.find(t=>t.title==='Dotted task').done),true,'deemphasis never disables task actions');
+ }finally{await browser.close();}
+});
+
+test('Scanner emphasis clears when the candidate pool is exhausted without changing scan mode',async()=>{
+ const {ctx,shim}=await loadApp({seed:2821});
+ ctx.addTask('Dotted task',true);ctx.addTask('Next task',false);ctx.render();
+ assert.match(shim.elements.get('scan').innerHTML,/class="actionrow disabled"/);
+ ctx.decide('no');ctx.render();
+ assert.equal(ctx.state.mode,'scan','new arrivals must still join automatically');
+ assert.doesNotMatch(shim.elements.get('scan').innerHTML,/class="actionrow disabled"/,'work actions brighten at the end of the list');
+ ctx.addTask('New arrival',false);ctx.render();
+ assert.match(shim.elements.get('scan').innerHTML,/class="actionrow disabled"/,'new comparisons regain their emphasis');
+});
+
+test('Candidate Worked on it logs only the displayed yellow task and advances without a rank signal',async()=>{
+ const {ctx,shim}=await loadApp({seed:2841});
+ ctx.addTask('Dotted task',true);ctx.addTask('Yellow task',false);ctx.addTask('Another task',false);ctx.render();
+ const id=ctx.state.candidateId,chain=[...ctx.state.chain],before=ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma]);
+ const rail=shim.elements.get('scan').innerHTML.match(/<div class="siderail[^\"]*">([\s\S]*?)<\/div>/)[1];
+ assert.match(rail,new RegExp('data-act="cand-worked" data-id="'+id+'"'),'candidate action carries its displayed task id');
+ const undoCount=readConst(ctx, "undoStack.length");
+ ctx.onAction('cand-worked',{dataset:{id}});
+ assert.equal(ctx.state.considered[id],'worked');assert.ok(ctx.state.workedAt[id]);
+ assert.equal(ctx.state.workLog.filter(e=>e.taskId===id&&e.kind==='worked').length,1);
+ assert.deepEqual([...ctx.state.chain],chain);assert.equal(ctx.state.mode,'scan');
+ assert.notEqual(ctx.state.candidateId,id);assert.equal(ctx.state.tasks.find(t=>t.id===id).done,false);
+ assert.deepEqual(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma]),before);
+ assert.equal(readConst(ctx, "undoStack.length"),undoCount+1,'one undo step');
+ ctx.onAction('cand-worked',{dataset:{id}});
+ assert.equal(ctx.state.workLog.filter(e=>e.taskId===id).length,1,'stale double click cannot affect the replacement candidate');
+ ctx.onAction('undo',{});
+ assert.equal(ctx.state.workLog.filter(e=>e.taskId===id).length,0);assert.equal(ctx.state.considered[id],undefined);
+});
+
+test('Candidate Worked on it rejects a different task or a paused scan',async()=>{
+ const {ctx}=await loadApp({seed:2842});ctx.addTask('Dotted',true);ctx.addTask('Candidate',false);ctx.render();
+ const id=ctx.state.candidateId;
+ ctx.onAction('cand-worked',{dataset:{id:ctx.state.chain[0]}});assert.equal(ctx.state.workLog.length,0);
+ ctx.onAction('start-working',{});
+ ctx.onAction('cand-worked',{dataset:{id}});assert.equal(ctx.state.workLog.length,0);
+});
+
+test('PWA: Apple touch icon uses a content-versioned offline URL',()=>{
+ const href=html.match(/rel="apple-touch-icon"[^>]*href="([^"]+)"/)[1];
+ const digest=createHash('sha256').update(fs.readFileSync(path.join(__dirname,'icon-180.png'))).digest('hex').slice(0,12);
+ assert.equal(href,`icon-180-${digest}.png`,'a changed design must change the iOS icon URL');
+ assert.deepEqual(fs.readFileSync(path.join(__dirname,href)),fs.readFileSync(path.join(__dirname,'icon-180.png')));
+ assert.ok(fs.readFileSync(path.join(__dirname,'sw.js'),'utf8').includes(`./${href}`),'versioned icon is available offline');
 });

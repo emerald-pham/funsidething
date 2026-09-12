@@ -89,7 +89,10 @@ html.viewing-scene{overflow:hidden;overscroll-behavior:none}
   .syncbtn{width:60px;font-size:11px}
 }
 
-.actionrow.disabled,.siderail.disabled,.btnwrap.disabled{opacity:1}
+/* Preserve the scanner's phase emphasis. A blanket opacity reset here once
+   overrode the earlier scanning rules; keyboard focus should reveal actions
+   just as hover does, without taking those actions out of the tab order. */
+.actionrow.disabled:focus-within,.siderail.disabled:focus-within,.btnwrap.disabled:focus-within{opacity:1}
 .chip.due-today,.chip.due-overdue,.ltag.on,.qctxchip.on{color:var(--action-ink)}
 .syncbtn.err,#importMsg.warn{color:var(--ink)}
 

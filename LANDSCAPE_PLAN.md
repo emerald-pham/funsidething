@@ -82,3 +82,17 @@ catalog retain their separately documented licenses in THIRD_PARTY_NOTICES.md.
 - [x] Location caption shows the saved place without a time readout; default-sky wording is neutral.
 
 - [x] Removed the cottage and its access path, leaving open hillside.
+
+
+## Scanner emphasis regression
+
+Commit `be154e3` added a late landscape stylesheet rule that reset all dimmed
+action groups to full opacity. The original tests checked only the embedded
+stylesheet, so they missed the effective cascade. Removed that override and
+added keyboard-focus brightness alongside the existing hover behavior. A browser
+regression now checks both themes, scanning and working, focus and clickability
+with every stylesheet loaded.
+
+- [x] End-of-list actions brighten while scan mode remains ready for new tasks.
+- [x] Yellow candidates have their own Worked on it action, with undo and stale-click protection, without a ranking signal.
+- [x] Apple touch artwork has a content-versioned URL, an offline cache entry, and a fingerprint regression test. Existing iOS Home Screen icon refresh still needs device verification.

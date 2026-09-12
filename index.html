@@ -10,7 +10,7 @@
 <title>Chain Scanner · ranked FVP</title>
 <link rel="manifest" href="manifest.webmanifest"/>
 <link rel="icon" type="image/svg+xml" href="icon.svg"/>
-<link rel="apple-touch-icon" sizes="180x180" href="icon-180.png"/>
+<link rel="apple-touch-icon" sizes="180x180" href="icon-180-58612cfa3b3f.png"/>
 <script>
 /*THEME-BOOT-START*/
 /* Runs before first paint. Reads the device-local paint hint left by
@@ -1871,6 +1871,8 @@ function renderScan(){
   // mirrors hotkeyDone/hotkeyDelete's candidate-first precedence, so only the
   // side that's actually listening for d/⌫ draws the keyhint for it
   const candShowing = !(state.interventionActive && b) && state.mode!=="work" && p.length>0 && !!cand;
+  // Scan mode remains ready for new arrivals after exhaustion; dim only for a visible choice.
+  const scanning = state.mode==="scan" && (candShowing || state.interventionActive);
 
   // chain crumbs (everything dotted before the benchmark)
   if(state.chain.length > 1){
@@ -1888,7 +1890,7 @@ function renderScan(){
     html += '<div class="benchblock"><div class="card bench">'
          + '<span class="title">'+titleHTML(b)+'</span>'
          + '<span class="chiprow">'+chipHTML(b)+'</span></div>'
-         + '<div class="actionrow' + (state.mode==="scan" ? ' disabled' : '') + '">'
+         + '<div class="actionrow' + (scanning ? ' disabled' : '') + '">'
          + '<button class="btn sm done" data-act="bench-done" title="Done — cross it off (d)">✓ Done'+(candShowing?'':'<span class="keyhint">d</span>')+'</button>'
          + '<button class="btn sm subtle" data-act="edit" data-id="'+b.id+'">Edit</button>'
          + '<button class="btn sm worked" data-act="worked" title="Started it, crossing it off, back to the bottom of the list (rule 7, w)">Worked on it<span class="keyhint">w</span></button>'
@@ -1939,9 +1941,10 @@ function renderScan(){
       html += '<div class="cardrow"><div class="card cand">'
            + '<span class="title">'+titleHTML(cand)+'</span>'
            + '<span class="chiprow">'+chipHTML(cand)+'</span></div>'
-           + '<div class="siderail' + (state.mode==="scan" ? ' disabled' : '') + '">'
+           + '<div class="siderail' + (scanning ? ' disabled' : '') + '">'
            + '<button class="btn sm done" data-act="cand-done" title="Did it just now — cross it off (d)">✓ Done<span class="keyhint">d</span></button>'
            + '<button class="btn sm subtle" data-act="edit" data-id="'+cand.id+'">Edit</button>'
+           + '<button class="btn sm worked" data-act="cand-worked" data-id="'+cand.id+'">Worked on it</button>'
            + '<button class="btn sm danger" data-act="delete-task" data-id="'+cand.id+'" title="Delete this task entirely (Delete key)">Delete<span class="keyhint">⌫</span></button></div></div>';
       // There's always a benchmark to compare against here — an empty chain
       // dots its own head in ensureCandidate() before any candidate is dealt.
@@ -2287,6 +2290,10 @@ function onAction(act, el){
     }
     case "yes": case "no": case "cant": decide(act); break;
     case "cand-done": decide("cand-done"); break;
+    case "cand-worked":
+      // Bind the click to the displayed candidate: a stale click must never log its replacement.
+      if(state.mode==="scan" && !state.interventionActive && el.dataset.id===state.candidateId && pool().some(t=>t.id===el.dataset.id)) workedOnTask(el.dataset.id);
+      break;
     case "bench-done": benchDone(); break;
     case "bench-cant": benchCant(); break;
     case "dislodge": dislodge(); break;
