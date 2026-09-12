@@ -13,7 +13,7 @@ The scene follows the real instant for Orlando (28.5383 N, 81.3792 W). The scann
 - [x] Inspect narrow phone, tablet, desktop and short landscape; check all sky/theme combinations.
 - [x] Validate hidden-tab suspension, bounded work, offline cache and task regressions.
 - [x] Review repository license and third-party notices independently.
-- [ ] Reconcile, commit, final checks, merge, push and verify live deployment.
+- [x] Reconcile, commit, final checks, merge, push and verify live deployment.
 
 Workflow applies the requested portable owner/review/release practices from the referenced project; game-specific architecture, content and tooling are out of scope.
 
@@ -26,3 +26,13 @@ Workflow applies the requested portable owner/review/release practices from the 
 - Headless Chrome on this machine: scene callback p95 approximately 0.2–0.4 ms; this is local CPU timing, not physical-device/GPU capacity evidence.
 - Offline reload: new scenery, all 1,289 stars, motion preference, saved task, and Settings focus restoration passed.
 - License decision: retain MIT for original code; preserve Astronomy Engine MIT and separate HYG CC BY-SA data attribution/licenses.
+
+## Release
+
+Feature commit: `09ab3f8c54b899d583dd3298cc473af131ca39e7`, fast-forward merged to `main` and pushed on 2026-09-12. Final validation on that commit: **511 tests passed, 0 skipped, 0 failures**, including the browser lifecycle test (86.1 seconds).
+
+GitHub Pages reported that commit built successfully. Live HTML, scenery code, styles, star catalog, service worker, astronomy bundle and third-party notices matched the committed bytes. A fresh live browser passed first-launch motion selection, scene/return navigation and an installed offline reload (1,289 stars, active service worker, no console exceptions, no overflow).
+
+Live: https://emerald-pham.github.io/funsidething/
+
+This closeout changes only this checklist; the validated application assets are unchanged. Pre-existing user edits in the original checkout were preserved.
