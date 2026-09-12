@@ -55,7 +55,7 @@ window.FIREBASE_CONFIG = {
   --line:light-dark(#e5e7f0,#2c3140);
   --chain:light-dark(#8f7bf0,#8f7bf0); --chain-deep:light-dark(#6a55e0,#6a55e0);
   --accent:light-dark(#5b46d6,#ab9ef9);   /* links & icons: text, never a fill */
-  --chain-ink:light-dark(#ffffff,#ffffff);   /* sits on the purple card in both themes */
+  --chain-ink:light-dark(#ffffff,#ffffff);   /* sits on the benchmark card in both themes */
   --cand-bg:light-dark(#fff8e2,#302814); --cand-line:light-dark(#e9c34d,#7d6528);
   --cand-ink:light-dark(#7a5c00,#f2dda3);
   --yes:light-dark(#2f9e48,#35a94d); --no:light-dark(#f0930f,#e08a12);
@@ -299,8 +299,14 @@ textarea{width:100%;font-family:var(--font-mono);font-size:12px}
   *{animation:none!important;transition:none!important}
 }
 </style>
+<link rel="stylesheet" href="landscape.css"/>
+<script defer src="vendor/astronomy.min.js"></script>
+<script defer src="stars.js"></script>
+<script defer src="landscape-core.js"></script>
+<script defer src="landscape.js"></script>
 </head>
 <body>
+<div id="landscape" aria-hidden="true"><canvas data-scenery></canvas><canvas data-life></canvas></div>
 <div class="wrap">
   <header class="top">
     <div class="brand">
@@ -319,6 +325,12 @@ textarea{width:100%;font-family:var(--font-mono);font-size:12px}
       <span id="passLabel" class="plabel mono"></span>
     </div>
   </header>
+
+  <section class="scene-intro" aria-label="Live Florida landscape"><div class="scene-reading">
+    <p class="scene-eyebrow"><span class="scene-dot"></span> A world outside your to-do list</p>
+    <h2>One thing at a time.</h2>
+    <div class="scene-details"><span id="sceneStatus">A little room to breathe</span><span id="sceneTime">Orlando, FL</span><button id="viewScene" class="scene-look" data-scene-view>Enjoy the view ↗</button></div></div>
+  </section>
 
   <section class="panel ctx open" id="ctxPanel"></section>
 
@@ -352,9 +364,21 @@ textarea{width:100%;font-family:var(--font-mono);font-size:12px}
 
   <section class="panel histwrap" id="histPanel"></section>
 
-  <footer class="foot">After Mark Forster's <a href="https://blog.beeminder.com/forster/" target="_blank" rel="noopener">Final Version Perfected</a> · rank posteriors following <a href="https://alltom.com/pages/spawelo/" target="_blank" rel="noopener">spawelo</a><div class="themerow"><button id="themeBtn" class="themebtn" data-act="cycle-theme"></button></div></footer>
+  <footer class="foot">After Mark Forster's <a href="https://blog.beeminder.com/forster/" target="_blank" rel="noopener">Final Version Perfected</a> · rank posteriors following <a href="https://alltom.com/pages/spawelo/" target="_blank" rel="noopener">spawelo</a><div class="landscape-controls"><button id="themeBtn" class="themebtn" data-act="cycle-theme"></button><button id="motionButton" class="themebtn" data-act="scene-settings">Motion settings</button></div></footer>
 </div>
 <div id="modalRoot"></div>
+<button id="exitScene" data-scene-view hidden>&larr; Back to your tasks</button>
+<dialog id="motionDialog" class="motion-dialog" aria-labelledby="motionTitle" aria-describedby="motionDescription">
+  <p class="scene-eyebrow">Make yourself at home</p>
+  <h2 id="motionTitle">A living little world.</h2>
+  <p id="motionDescription">Clouds wander, trains pass, and little surprises come and go. How would you like your landscape to move?</p>
+  <div class="motion-choices">
+    <button data-landscape-motion="normal"><strong>Normal motion</strong><span>A gentle, lively landscape</span></button>
+    <button data-landscape-motion="reduced"><strong>Reduced motion</strong><span>A peaceful, still scene</span></button>
+  </div>
+  <p id="deviceMotionNote" hidden>Your device requests reduced motion, so movement stays off with either choice.</p>
+  <p>You can change this anytime in Settings. The sky follows Orlando’s sun and Moon, even when the scenery is still.</p>
+</dialog>
 
 <script>
 "use strict";
@@ -1873,7 +1897,7 @@ function renderScan(){
   }
   else if(!p.length){
     if(b){
-      html += '<div class="notice"><div class="big">End of the list. Work the chain from the newest dot up — that\u2019s the purple one.</div>'
+      html += '<div class="notice"><div class="big">End of the list. Work the chain from the newest dot up — that\u2019s the highlighted one.</div>'
            + '<div class="row">'
            + (Object.entries(state.considered).some(([,v])=>v==="no"||v==="cant"||v==="dislodged"||v==="worked") ? '<button class="btn subtle" data-act="rescan">Rescan skipped tasks</button>' : '')
            + '<button class="btn subtle" data-act="new-pass">Start a fresh pass</button>'
@@ -2111,7 +2135,7 @@ function openHelp(){
     + '<div class="help"><ol>'
     + '<li>Add tasks to the bottom of your list as you think of them.</li>'
     + '<li>Done adding? Hit <b>Start scanning</b>. Your <b>oldest outstanding task</b> is dotted for you and becomes the first benchmark \u2014 nothing is ranked by that dot, there was nothing to compare it against. From there the scanner deals ranked candidates as usual.</li>'
-    + '<li>For each: do you <i>want</i> to do it before the purple benchmark?</li>'
+    + '<li>For each: do you <i>want</i> to do it before the highlighted benchmark?</li>'
     + '<li><b>Yes</b> dots it — it becomes the new benchmark on the chain.</li>'
     + '<li><b>No</b> skips it (and nudges its rank down). <b>Can\u2019t</b> skips it with no rank signal.</li>'
     + '<li>Do the dotted chain from the bottom (newest) to the top.</li>'
@@ -2178,6 +2202,7 @@ function openSettings(){
   }
   modalShell(
     '<div class="mtop"><h2>Settings</h2><button class="x" data-act="close-modal" aria-label="Close">✕</button></div>'
+    + '<div class="frow"><label>Landscape</label><button class="btn subtle" data-act="scene-settings">Motion settings</button><span class="kv">Daylight follows Florida; app theme stays independent.</span></div>'
     + '<div class="frow"><label for="stHorizon">Horizon (min)</label><input id="stHorizon" type="number" min="5" max="480" value="'+s.horizonMin+'" style="width:90px"/>'
     + '<span class="kv">the "next hour" in the question</span></div>'
     + '<div class="frow"><label for="stCantMin">Can\u2019t sticks for (min)</label><input id="stCantMin" type="number" min="5" max="480" value="'+s.cantMin+'" style="width:90px"/>'
@@ -2429,6 +2454,8 @@ document.addEventListener("keydown", e=>{
     if(e.key==="Enter" && t.id==="addInput"){ onAction("add", t); }
     return;
   }
+  // Native scenery controls and the inert scene view must not dispatch task shortcuts.
+  if(document.querySelector("#motionDialog[open], html.viewing-scene")) return;
   if(document.querySelector(".mback")){ if(e.key==="Escape") closeModal(); return; }
   const k=e.key.toLowerCase();
   if(k==="y"&&!state.interventionActive&&state.candidateId) decide("yes");   // dot it

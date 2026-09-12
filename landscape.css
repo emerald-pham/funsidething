@@ -1,0 +1,81 @@
+/* The real sky is independent of color-scheme. Only a small amount of its
+   ambient color enters opaque, readable foreground surfaces. */
+:root{
+  --scene-tint:#879f8e;
+  --bg:light-dark(#f0f1e8,#142126);
+  --panel:light-dark(#fafaf2,#1c292e);
+  --surface:light-dark(#fffef8,#243237);
+  --subtle:light-dark(#f2f3ea,#1a272c);
+  --ink:light-dark(#263d39,#e5ebe3);
+  --mut:light-dark(#52665f,#a5b7ae);
+  --line:light-dark(#dce2d6,#3c4e4f);
+  --accent:light-dark(#356552,#a7cead);
+  --chain:light-dark(#4f7463,#527864);
+  --chain-deep:light-dark(#355e4d,#355e4d);
+  --yes:light-dark(#38784a,#38784a); --no:light-dark(#96601c,#96601c);
+  --cant:light-dark(#52685d,#52685d); --danger:light-dark(#b24449,#b24449);
+  --good:light-dark(#2c7346,#8ac997);
+  --chip:light-dark(#e8eee4,#2e403e);
+  --rowline:light-dark(#e8ede2,#2d3d3d);
+  --track:light-dark(#dce4d7,#344745);
+}
+body{background:var(--bg)}
+#landscape{position:fixed;inset:0;z-index:-1;pointer-events:none;overflow:hidden;background:#79b1c8;contain:strict}
+#landscape canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.wrap{max-width:760px;padding-top:max(22px,env(safe-area-inset-top));position:relative}
+.top{padding:14px 17px;border-radius:17px;background:color-mix(in srgb,var(--panel) 97%,var(--scene-tint));border:1px solid var(--line);box-shadow:0 4px 24px #1539310a}
+.titles h1{letter-spacing:-.035em;font-size:19px;font-weight:600}
+.passbar{margin-top:12px}
+.ptrack{height:4px}
+.scene-intro{height:clamp(165px,25vh,265px);display:flex;flex-direction:column;justify-content:center;align-items:flex-start;padding:12px 12px 17px;position:relative;isolation:isolate}
+
+.scene-eyebrow{font-size:10px;font-weight:600;letter-spacing:.19em;text-transform:uppercase;margin:0 0 8px;color:var(--ink)}
+.scene-intro h2{font-family:var(--font-q);font-size:clamp(30px,4vw,43px);font-weight:400;line-height:1.08;letter-spacing:-.035em;margin:0 0 12px;color:var(--ink)}
+.scene-details{display:flex;align-items:center;flex-wrap:wrap;gap:5px 12px;font-size:11px;color:var(--ink)}
+.scene-dot{width:5px;height:5px;border-radius:50%;background:var(--accent);display:inline-block;margin-right:5px;vertical-align:2px}
+.scene-look{font-size:11px;color:var(--ink);border:1px solid color-mix(in srgb,var(--mut) 40%,transparent);background:color-mix(in srgb,var(--panel) 88%,transparent);padding:5px 10px;border-radius:99px;min-height:30px}
+.panel{border-radius:16px;background:color-mix(in srgb,var(--panel) 97%,var(--scene-tint));box-shadow:0 5px 22px #123c2a0a}
+#scan{border-radius:16px;background:color-mix(in srgb,var(--panel) 97%,var(--scene-tint));padding:18px;border:1px solid var(--line);box-shadow:0 8px 28px #123c2a0b}
+#scan:empty{display:none}
+.bench{box-shadow:0 4px 12px #254c3d25}
+.foot{background:color-mix(in srgb,var(--panel) 97%,var(--scene-tint));padding:16px;border:1px solid var(--line);border-radius:16px}
+.themebtn{min-height:36px}
+.landscape-controls{display:flex;flex-wrap:wrap;justify-content:center;gap:7px;margin-top:10px}
+.motion-dialog{max-width:440px;width:calc(100% - 32px);max-height:calc(100dvh - 40px);overflow:auto;padding:28px;border:1px solid var(--line);border-radius:22px;color:var(--ink);background:var(--panel);box-shadow:0 24px 100px #081c2855}
+.motion-dialog::backdrop{background:#102b3955;backdrop-filter:blur(3px)}
+.motion-dialog h2{font-family:var(--font-q);font-size:32px;font-weight:400;letter-spacing:-.03em;line-height:1.1;margin:7px 0 13px}
+.motion-dialog p{font-size:14px;line-height:1.6;color:var(--mut)}
+.motion-choices{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:20px}
+.motion-choices button{border:1px solid var(--line);border-radius:13px;text-align:left;background:var(--surface);padding:14px;min-height:92px}
+.motion-choices button[aria-pressed="true"]{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.motion-choices strong,.motion-choices span{display:block}
+.motion-choices span{font-size:12px;font-weight:400;color:var(--mut);margin-top:6px}
+#deviceMotionNote{font-size:12px}
+[data-landscape-motion="reduced"] *,[data-landscape-motion="reduced"] *::before,[data-landscape-motion="reduced"] *::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}
+.viewing-scene .wrap{visibility:hidden;pointer-events:none}
+#exitScene{position:fixed;bottom:max(24px,env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);z-index:5;border:1px solid var(--line);border-radius:99px;background:var(--panel);color:var(--ink);box-shadow:0 4px 30px #102b3940;padding:12px 20px;white-space:nowrap;font-size:13px}
+@media(max-width:600px){
+  .wrap{padding-top:max(12px,env(safe-area-inset-top));padding-left:max(12px,env(safe-area-inset-left));padding-right:max(12px,env(safe-area-inset-right))}
+  .top{padding:11px 12px}.titles h1{font-size:17px}.topbtns{gap:0}.topbtns .ghost{padding:7px}
+  .scene-intro{height:clamp(155px,24vh,210px);padding-left:10px}
+  .scene-intro h2{font-size:33px}.scene-details{font-size:10px;gap:6px}
+  #scan{padding:14px}
+}
+@media(max-width:360px){.titles h1{font-size:15px}.scene-intro h2{font-size:30px}.topbtns .ghost{padding:6px}.syncbtn{width:70px}}
+@media(max-height:500px) and (min-width:601px){.scene-intro{height:110px}.scene-intro h2{font-size:30px}.scene-eyebrow{margin-bottom:5px}.top{padding:9px 14px}.passbar{margin-top:5px}.wrap{padding-top:10px}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+
+
+
+/* A compact reading surface keeps opposite sky/theme combinations legible. */
+.scene-intro{height:auto;min-height:clamp(165px,25vh,265px)}
+
+.scene-reading{max-width:100%;padding:16px 18px;border:1px solid var(--line);border-radius:18px;background:color-mix(in srgb,var(--panel) 96%,var(--scene-tint));box-shadow:0 5px 24px #17382e0a}
+@media(max-width:600px){.scene-intro{min-height:190px;padding:12px 0 18px}.scene-reading{padding:14px 12px}.scene-eyebrow{font-size:9px;letter-spacing:.12em}.scene-intro h2{font-size:30px}}
+@media(max-height:500px) and (min-width:601px){.scene-intro{min-height:140px}.scene-reading{padding:10px 14px}.scene-intro h2{margin-bottom:8px}}
+@media(max-width:360px){
+  .titles h1{white-space:nowrap}
+  .topbtns .ghost{padding:5px;white-space:nowrap}
+  .topbtns .keyhint{display:none}
+  .syncbtn{width:60px;font-size:11px}
+}

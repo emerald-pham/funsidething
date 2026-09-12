@@ -10,6 +10,218 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const HTML_PATH = path.join(__dirname, "index.html");
 const html = fs.readFileSync(HTML_PATH, "utf8");
 
+/* The landscape has its own clock and device preferences: it must never
+   borrow task state or make network requests to decide what the sky looks like. */
+function livingSky() {
+  const ctx = vm.createContext({ Date, Math, console });
+  for (const file of ["vendor/astronomy.min.js", "stars.js", "landscape-core.js"]) {
+    assert.ok(fs.existsSync(path.join(__dirname, file)), `offline landscape asset missing: ${file}`);
+    vm.runInContext(fs.readFileSync(path.join(__dirname, file), "utf8"), ctx);
+  }
+  return ctx.LivingSky;
+}
+
+test("Landscape: solstice daylight and sunrise use Florida coordinates and the actual instant", () => {
+  const sky = livingSky();
+  const summer = sky.skyAt(new Date("2026-06-21T17:00:00Z"));
+  const winter = sky.skyAt(new Date("2026-12-21T17:00:00Z"));
+  assert.ok(summer.sun.altitude > winter.sun.altitude + 30);
+  assert.ok(summer.sun.altitude > 75);
+  assert.ok(sky.skyAt(new Date("2026-06-21T10:00:00Z")).sun.altitude < -4);
+  assert.ok(sky.skyAt(new Date("2026-06-21T11:00:00Z")).sun.altitude > 0);
+  assert.ok(sky.skyAt(new Date("2026-06-22T01:00:00Z")).sun.altitude < -4);
+  assert.equal(sky.skyAt(new Date("2026-06-21T03:00:00Z")).period, "night");
+  const before = sky.skyAt(new Date("2026-03-08T06:59:00Z"));
+  const after = sky.skyAt(new Date("2026-03-08T07:01:00Z"));
+  assert.ok(Math.abs(before.sun.altitude-after.sun.altitude) < 1, "DST must not jump the sky an hour");
+  assert.throws(() => sky.skyAt(new Date("invalid")), /date/i);
+});
+
+test("Landscape: real lunar illumination and altitude replace decorative fixed night moons", () => {
+  const sky = livingSky();
+  assert.ok(sky.skyAt(new Date("2026-08-12T17:37:00Z")).illumination < .01, "solar eclipse is new moon");
+  assert.ok(sky.skyAt(new Date("2026-03-03T11:34:00Z")).illumination > .99, "lunar eclipse is full moon");
+  const morning = sky.skyAt(new Date("2026-06-08T13:00:00Z"));
+  assert.ok(morning.sun.altitude > 0 && morning.moon.altitude > 0, "daytime Moon is allowed");
+  for (let h=0;h<24;h+=3) {
+    const s = sky.skyAt(new Date(Date.UTC(2026,5,8,h)));
+    assert.equal(s.moon.visible, s.moon.altitude > -.3);
+  }
+});
+
+test("Landscape: calculated sunrise and sunset agree with independent USNO seasonal fixtures", () => {
+  // USNO one-day tables for 28.54,-81.38; published minute precision. These
+  // fixtures are offline constants, not requests during an app or test run.
+  const sky=livingSky();
+  for(const [day,rise,set] of [
+    ["2026-03-20","11:29","23:37"], ["2026-06-21","10:29","00:26"],
+    ["2026-09-22","11:14","23:22"], ["2026-12-21","12:14","22:34"]
+  ]){
+    const times=sky.sunTimes(new Date(day+"T16:00:00Z"));
+    const expectedRise=Date.parse(day+"T"+rise+":00Z");
+    let expectedSet=Date.parse(day+"T"+set+":00Z");
+    if(expectedSet<expectedRise)expectedSet+=86400000;
+    assert.ok(Math.abs(+times.rise-expectedRise)<120000, `${day} sunrise within two minutes`);
+    assert.ok(Math.abs(+times.set-expectedSet)<120000, `${day} sunset within two minutes`);
+  }
+});
+
+test("Landscape: a green benchmark is not described as purple", () => {
+  assert.doesNotMatch(html,/purple benchmark|that\\u2019s the purple one/);
+});
+
+test("Landscape: white button and benchmark labels retain AA contrast in both themes", () => {
+  const css=fs.readFileSync(path.join(__dirname,"landscape.css"),"utf8");
+  const luminance=hex=>hex.slice(1).match(/../g).map(c=>parseInt(c,16)/255)
+    .map(c=>c<=.04045?c/12.92:((c+.055)/1.055)**2.4)
+    .reduce((sum,c,i)=>sum+c*[.2126,.7152,.0722][i],0);
+  for(const token of ["chain","chain-deep","yes","no","cant","danger"]){
+    const match=css.match(new RegExp(`--${token}:light-dark\\((#[a-f0-9]{6}),(#[a-f0-9]{6})\\)`));
+    assert.ok(match,`landscape defines ${token} colors`);
+    for(const color of match.slice(1))assert.ok(1.05/(luminance(color)+.05)>=4.5,`${token} ${color}: white labels need 4.5:1 contrast`);
+  }
+});
+
+test("Landscape: catalog stars rotate with sidereal time and stay above the horizon", () => {
+  const sky = livingSky();
+  assert.ok(sky.starCount >= 1000, "use real naked-eye catalog stars, not random points");
+  const a = sky.skyAt(new Date("2026-01-01T03:00:00Z"));
+  const b = sky.skyAt(new Date("2026-01-01T06:00:00Z"));
+  assert.ok(a.stars.length > 300);
+  assert.ok(a.stars.every(s=>s.altitude>0 && s.magnitude<=5));
+  assert.notEqual(a.stars[0].azimuth,b.stars[0].azimuth);
+  const polaris = sky.starAt(new Date("2026-01-01T03:00:00Z"), [2.5303,89.2641,1.98,.6]);
+  assert.ok(Math.abs(polaris.altitude-28.5383)<1);
+  assert.ok(polaris.azimuth < 3 || polaris.azimuth > 357);
+});
+
+test("Landscape: continuous elevation palette is independent of UI theme", () => {
+  const sky = livingSky();
+  for (const altitude of [-20,-12,-6,-.833,0,6,30,80]) {
+    const p = sky.palette(altitude);
+    assert.deepEqual(p,sky.palette(altitude,"dark"));
+    assert.ok(p.sky.every(c=>/^#[0-9a-f]{6}$/i.test(c)));
+    const q = sky.palette(altitude+.01);
+    const rgb = hex=>hex.slice(1).match(/../g).map(c=>parseInt(c,16));
+    assert.ok(rgb(p.sky[0]).every((v,i)=>Math.abs(v-rgb(q.sky[0])[i])<=1));
+  }
+  assert.notDeepEqual(sky.palette(-20),sky.palette(40));
+});
+
+test("Landscape: random life is bounded, morning is busier, rare surprises have a cooldown", () => {
+  const sky = livingSky();
+  const dawn = {sun:{altitude:5,azimuth:90},period:"dawn"};
+  const night = {sun:{altitude:-30,azimuth:0},period:"night"};
+  assert.ok(sky.activity(dawn) > sky.activity(night));
+  const world = sky.createWorld(()=>.3);
+  assert.ok(world.events.length > 0, "fresh visits start with life already underway");
+  for(let n=0;n<10000;n++) sky.advance(world,1,dawn);
+  assert.ok(world.events.length <= sky.MAX_EVENTS);
+  assert.ok(world.elapsed === 10000);
+  assert.ok(world.events.every(e=>Number.isFinite(e.age)&&e.age<e.duration));
+  assert.ok(sky.RARE_COOLDOWN >= 300);
+  const old = world.elapsed;
+  sky.advance(world,-1,dawn);
+  sky.advance(world,NaN,dawn);
+  assert.equal(world.elapsed,old, "bad frame deltas cannot corrupt a scene");
+  const rare = sky.createWorld(()=>0);
+  for(let n=0;n<1200;n++) sky.advance(rare,1,night);
+  assert.ok(rare.rareCount > 0 && rare.rareCount <= 4);
+});
+
+test("Landscape: returning visits vary their opening cast", () => {
+  const sky=livingSky();
+  assert.notDeepEqual(sky.createWorld(()=>.1).events.map(e=>e.type),sky.createWorld(()=>.9).events.map(e=>e.type));
+});
+
+test("Landscape browser: first launch, motion lifecycle, theme independence and return navigation", {
+  skip:!process.env.LANDSCAPE_BROWSER_URL
+}, async () => {
+  const {chromium}=await import(process.env.LANDSCAPE_PLAYWRIGHT);
+  const browser=await chromium.launch({headless:true,channel:process.env.LANDSCAPE_BROWSER_CHANNEL||"chrome"});
+  try{
+    const page=await browser.newPage({viewport:{width:390,height:844},deviceScaleFactor:3,reducedMotion:"no-preference"});
+    await page.clock.setFixedTime(new Date("2026-09-12T15:00:00Z"));
+    const errors=[];page.on("pageerror",error=>errors.push(error.message));
+    await page.addInitScript(()=>{
+      window.lifePaints=0;
+      const clear=CanvasRenderingContext2D.prototype.clearRect;
+      CanvasRenderingContext2D.prototype.clearRect=function(...args){if(this.canvas.hasAttribute('data-life'))window.lifePaints++;return clear.apply(this,args);};
+    });
+    await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:"networkidle"});
+    assert.equal(await page.locator('#motionDialog').evaluate(e=>e.open),true);
+    await page.locator('button[data-landscape-motion="reduced"]').click();
+    await page.waitForTimeout(50);
+    assert.equal(await page.evaluate(()=>!!document.activeElement.closest('#modalRoot')),true,"choice restores focus to the still-open first-run help");
+    await page.locator('#modalRoot [data-act="close-modal"]').click();
+    await page.locator('#addInput').fill('Keep this task during scenery controls');
+    await page.locator('[data-act="add-dot"]').click();
+    const tasksBefore=await page.evaluate(()=>JSON.stringify(state.tasks));
+    const still=await page.evaluate(()=>lifePaints);await page.waitForTimeout(250);
+    assert.equal(await page.evaluate(()=>lifePaints),still,"reduced motion has no frame loop");
+    await page.locator('#motionButton').click();await page.keyboard.press('Delete');
+    assert.equal(await page.evaluate(()=>JSON.stringify(state.tasks)),tasksBefore,'motion dialog blocks scanner shortcuts');
+    await page.locator('button[data-landscape-motion="normal"]').click();
+    const moving=await page.evaluate(()=>lifePaints);await page.waitForTimeout(300);
+    assert.ok(await page.evaluate(()=>lifePaints)>moving,"normal mode continuously paints life");
+    await page.emulateMedia({reducedMotion:"reduce"});await page.waitForTimeout(60);
+    const stopped=await page.evaluate(()=>lifePaints);await page.waitForTimeout(250);
+    assert.equal(await page.evaluate(()=>lifePaints),stopped,"live OS reduction stops the loop");
+    await page.emulateMedia({reducedMotion:"no-preference"});
+    await page.evaluate(()=>{window.dispatchEvent(new Event('resize'));Object.defineProperty(document,'hidden',{configurable:true,value:true});document.dispatchEvent(new Event('visibilitychange'));});
+    const hidden=await page.evaluate(()=>lifePaints);await page.waitForTimeout(250);
+    assert.equal(await page.evaluate(()=>lifePaints),hidden,"hidden tabs do not animate");
+    await page.evaluate(()=>{Object.defineProperty(document,'hidden',{configurable:true,value:false});document.dispatchEvent(new Event('visibilitychange'));});
+    await page.waitForTimeout(200);assert.ok(await page.evaluate(()=>lifePaints)>hidden);
+    const background=await page.locator('[data-scenery]').evaluate(c=>c.toDataURL());
+    const chromeColor=await page.locator('meta[name="theme-color"]').getAttribute('content');
+    await page.locator('#themeBtn').click();await page.locator('#themeBtn').click();
+    assert.notEqual(await page.locator('meta[name="theme-color"]').getAttribute('content'),chromeColor,'browser chrome follows the independent UI theme');
+    assert.equal(await page.locator('[data-scenery]').evaluate(c=>c.toDataURL()),background,"theme changes do not repaint the real sky");
+    await page.locator('#viewScene').click();assert.equal(await page.locator('.wrap').evaluate(e=>e.inert),true);
+    await page.keyboard.press('Delete');assert.equal(await page.evaluate(()=>JSON.stringify(state.tasks)),tasksBefore,'scenery view blocks scanner shortcuts');
+    await page.locator('#exitScene').click();assert.equal(await page.locator('.wrap').evaluate(e=>e.inert),false);
+    assert.equal(await page.evaluate(()=>document.activeElement.id),'viewScene');
+    await page.reload({waitUntil:"networkidle"});
+    assert.equal(await page.locator('#motionDialog').evaluate(e=>e.open),false,"motion choice survives reload");
+    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+    await page.setViewportSize({width:2560,height:1080});await page.waitForTimeout(200);
+    assert.ok(await page.locator("[data-scenery]").evaluate(c=>c.width*c.height<=3000000),"high-DPR canvas stays within its pixel budget");
+    assert.deepEqual(errors,[]);
+  }finally{await browser.close();}
+});
+
+test("Landscape: device motion preference fails safely and OS reduction always wins", () => {
+  const sky=livingSky();
+  assert.equal(sky.motionReduced("normal",true),true);
+  assert.equal(sky.motionReduced("reduced",false),true);
+  assert.equal(sky.motionReduced("normal",false),false);
+  assert.equal(sky.motionReduced(null,false),true, "no movement before first-launch consent");
+  assert.equal(sky.readMotion({getItem(){throw Error("blocked")}}),null);
+  assert.equal(sky.readMotion({getItem(){return "garbage"}}),null);
+  let saved;
+  assert.equal(sky.saveMotion({setItem(k,v){saved=v}},"normal"),true);
+  assert.equal(saved,"normal");
+  assert.equal(sky.saveMotion({setItem(){throw Error("quota")}},"reduced"),false);
+});
+
+test("Landscape: local assets, decorative layers and accessible motion controls are integrated", () => {
+  for(const file of ["landscape.css","landscape-core.js","landscape.js","stars.js","vendor/astronomy.min.js"]){
+    assert.ok(html.includes(file), `HTML must load ${file}`);
+    assert.ok(serviceWorkerSource().includes(`./${file}`), `offline cache must include ${file}`);
+  }
+  assert.match(html, /id="landscape"[^>]*aria-hidden="true"/);
+  assert.match(html, /id="motionDialog"/);
+  assert.match(html, /data-landscape-motion/);
+  assert.match(html, /data-act="scene-settings"/);
+  assert.match(html, /id="sceneStatus"/);
+  const runtime=fs.readFileSync(path.join(__dirname,"landscape.js"),"utf8");
+  assert.doesNotMatch(runtime,/\b(?:fetch|XMLHttpRequest|WebSocket)\s*\(/);
+  assert.match(runtime,/visibilitychange/);
+  assert.match(runtime,/cancelAnimationFrame/);
+  assert.match(runtime,/prefers-reduced-motion/);
+});
+
 /* ---------- PWA upgrade contract ----------
    These are intentionally repository-text tests: they describe the installable
    shell the implementation must add without requiring a browser or network. */
