@@ -6,14 +6,18 @@ Text is displayed literally (no Markdown styling). Keep hourly lines short and
 airplane/skywriter lines very short so they fit in the sky.
 
 Hours use the scene location’s local 24-hour clock: 00 is midnight, 12 is noon.
-One or more human lines replace the entire AI pool for that hour, including on
-holidays. Otherwise a populated holiday section overrides the AI holiday copy.
-Multiple lines are chosen randomly. Airplanes use only human lines once any exist.
+All human lines matching the current hour, holiday, or Any time of day section
+form one pool. Each bullet has an equal chance, regardless of its section.
+If that pool has any lines, AI copy is excluded. With no matching human lines,
+the existing AI defaults are used. Airplanes use only their own human lines once
+any exist, with an equal chance for each line.
 Skywriters are reserved for a future animation; adding lines does not create it.
 Existing hourly, holiday, and airplane defaults in landscape-mood.js are AI-written.
 
 Save this file and reload while developing. For the installed/live app, deploy
 this file with a refreshed sw.js shell fingerprint so offline copies update too.
+
+## Any time of day
 
 ## Hour 00
 

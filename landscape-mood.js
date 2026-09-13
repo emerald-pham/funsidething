@@ -659,7 +659,7 @@
     for (const line of String(markdown).split(/\r?\n/)) {
       if (/^##\s/.test(line)) {
         const title = line.replace(/^##\s+/, '').trim();
-        section = /^(Hour (?:[01]\d|2[0-3])|Airplanes|Skywriters)$/.test(title) ||
+        section = /^(Hour (?:[01]\d|2[0-3])|Airplanes|Skywriters|Any time of day)$/.test(title) ||
           (title.startsWith('Holiday ') && Object.hasOwn(HOLIDAY_LINES, title.slice(8))) ? title : null;
       } else if (section && /^-\s+\S/.test(line)) {
         (next[section] ||= []).push(line.slice(2).trim());
@@ -675,9 +675,14 @@
     validDate(date);
     const context = normalizedLocation(location);
     const parts = localParts(date, context.timezone);
-    const lines = humanText['Hour ' + String(parts.hour).padStart(2, '0')] ||
-      humanText['Holiday ' + holidayForParts(parts)];
-    return lines ? {text: pick(lines, random), author: 'Human'} :
+    // Flatten first so every eligible line has one equal share, regardless
+    // of how many lines its occasion contributes. Human copy excludes AI.
+    const lines = [
+      ...(humanText['Hour ' + String(parts.hour).padStart(2, '0')] || []),
+      ...(humanText['Holiday ' + holidayForParts(parts)] || []),
+      ...(humanText['Any time of day'] || []),
+    ];
+    return lines.length ? {text: pick(lines, random), author: 'Human'} :
       {text: aiMessage(date, location, random), author: 'AI'};
   }
   function message(date, location, random) { return messageEntry(date, location, random).text; }

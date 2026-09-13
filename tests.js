@@ -9043,3 +9043,49 @@ test('Human scene copy is loaded locally, cached offline, and attributed in the 
   assert.match(runtime, /airplaneMessage\(e.seed\)/);
   assert.match(serviceWorkerSource(), /HUMAN_WRITTEN_HOURLY_TAGS\.md/);
 });
+
+test('Human scene copy: each matching hour, holiday, and anytime line has equal probability', () => {
+  const mood = moodRuntime();
+  mood.setHumanText('## Hour 15\n- Hour one\n- Hour two\n## Holiday Christmas Day\n- Holiday one\n- Holiday two\n- Holiday three\n## Any time of day\n- Anytime one\n## Hour 16\n- Wrong hour\n## Holiday Halloween\n- Wrong holiday');
+  const date = new Date('2026-12-25T15:00:00Z');
+  const counts = new Map();
+  for (let i = 0; i < 600; i++) {
+    const entry = mood.messageEntry(date, 'UTC', (i + .5) / 600);
+    assert.equal(entry.author, 'Human');
+    counts.set(entry.text, (counts.get(entry.text) || 0) + 1);
+  }
+  assert.deepEqual([...counts.entries()], ['Hour one','Hour two','Holiday one','Holiday two','Holiday three','Anytime one'].map(text => [text,100]));
+  assert.equal(mood.message(new Date('2026-08-11T17:00:00Z'), 'UTC', .5), 'Anytime one');
+  mood.setHumanText('## Any time of day\n- \n## Hour 15\n- ');
+  assert.equal(mood.messageEntry(date, 'UTC', .5).author, 'AI');
+});
+
+test('Human scene copy: multiple airplane and future skywriter lines are all selectable', () => {
+  const mood = moodRuntime();
+  mood.setHumanText('## Airplanes\n- Plane one\n- Plane two\n- Plane three\n## Skywriters\n- Sky one\n- Sky two');
+  assert.deepEqual([0,.4,.9].map(r => mood.airplaneMessage(r)), ['Plane one','Plane two','Plane three']);
+  assert.deepEqual([0,.9].map(r => mood.skywriterMessage(r)), ['Sky one','Sky two']);
+});
+
+test('Resume scan: current-pass skips stay out until the exact local 2 AM boundary', async () => {
+  const {ctx} = await loadApp({seed: 531});
+  const before = new Date(2026,7,27,23,0).getTime();
+  setFakeTime(ctx,before);
+  const root = ctx.addTask('Dotted benchmark',false);
+  const skipped = ctx.addTask('Already scanned',false);
+  const fresh = ctx.addTask('Not yet scanned',false);
+  ctx.state.chain = [root.id];
+  ctx.state.passStartedAt = before;
+  ctx.state.considered[skipped.id] = 'no';
+  ctx.state.candidateId = null;
+  ctx.state.mode = 'work';
+  setFakeTime(ctx,new Date(2026,7,28,1,59,59).getTime());
+  ctx.onAction('resume-scan',{});
+  assert.equal(ctx.state.candidateId,fresh.id);
+  assert.deepEqual(Array.from(ctx.pool(), t=>t.id),[fresh.id]);
+  ctx.state.mode = 'work';
+  setFakeTime(ctx,new Date(2026,7,28,2,0).getTime());
+  ctx.onAction('resume-scan',{});
+  assert.deepEqual(new Set(Array.from(ctx.pool(),t=>t.id)),new Set([skipped.id,fresh.id]));
+  assert.deepEqual(Array.from(ctx.state.chain),[root.id]);
+});
