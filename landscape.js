@@ -23,6 +23,7 @@
   const rail=x=>geometry.rail(x),trail=x=>geometry.trail(x);
   const colors=['#db947e','#a4c9bd','#e6c680','#ada9ce','#88b9cf','#e8b6c4'];
   const color=(seed,offset=0)=>S.mixHex(colors[Math.floor((seed*97+offset)%colors.length)],p.front,p.night*.35);
+  const skinColor=seed=>S.skinTone(seed,p.night,p.city);
   function layer(name,top){
     const canvas=layers[name]||(layers[name]=document.createElement('canvas'));
     canvas.width=Math.floor(W*dpr);canvas.height=Math.max(1,Math.ceil((H-top)*dpr));canvas.top=top;
@@ -215,13 +216,13 @@
     g.beginPath();g.moveTo(x-size,y-Math.abs(Math.sin(t*5))*size*.6);g.quadraticCurveTo(x-size*.4,y-size*.4,x,y);g.quadraticCurveTo(x+size*.5,y-size*.6,x+size,y-(perched?0:Math.abs(Math.sin(t*5+.3))*size*.6));g.stroke();
     if(twig&&!perched){line(g,x,y+1,x+6,y+4,'#8b745a',.7);line(g,x+3,y+2,x+5,y,'#8b745a',.6);}
   }
-  function cyclist(x,y,t,color,scale=1,reverse=false){
+  function cyclist(x,y,t,color,scale=1,reverse=false,skin=skinColor(0)){
     g.save();g.translate(x,y-3.6*scale);g.rotate(geometry.tangent(trail,x));g.scale((reverse?-1:1)*scale,scale);
     g.strokeStyle=S.mixHex('#253f3b',p.front,p.night*.35);g.lineWidth=1;
     for(const xx of [-5,6]){g.beginPath();g.arc(xx,0,3.6,0,TAU);g.stroke();line(g,xx,0,xx+Math.cos(t*6)*3,Math.sin(t*6)*3,g.strokeStyle,.5);}
     const k=Math.sin(t*6)*2;
     line(g,-5,0,-1,-5,color,1.3);line(g,-1,-5,2,0,color,1.3);line(g,2,0,-5,0,color,1.3);line(g,2,0,6,-5,color,1.3);line(g,6,-5,6,0,color,1);
-    line(g,0,-5,1+k,-2,'#e5c7a4',1.5);line(g,1+k,-2,2,0,'#e5c7a4',1.2);line(g,-1,-6,1,-11,color,2.8);line(g,1,-10,5,-7,'#e5c7a4',1.2);ellipse(g,2,-13,2,2,'#e6c7a2');ellipse(g,2,-14,2.2,1.1,color);
+    line(g,0,-5,1+k,-2,skin,1.5);line(g,1+k,-2,2,0,skin,1.2);line(g,-1,-6,1,-11,color,2.8);line(g,1,-10,5,-7,skin,1.2);ellipse(g,2,-13,2,2,skin);ellipse(g,2,-14,2.2,1.1,color);
     g.restore();
   }
   function transport(x,y,progress,isTrain,reverse){
@@ -243,6 +244,14 @@
       g.save();g.globalAlpha=p.night*S.smooth(0,.08,f)*(1-S.smooth(.55,1,f));
       const tail=g.createLinearGradient(x-dx*.35,y-dy*.35,x,y);tail.addColorStop(0,'#e7f5ee00');tail.addColorStop(1,'#effbf5');
       line(g,x-dx*.35,y-dy*.35,x,y,tail,1.1);ellipse(g,x,y,1.2,1.2,'#f9ffe8');g.restore();
+    }
+    if(sky.sun.altitude < -6)for(const e of world.events)if(e.type==='fireworks'){
+      g.save();
+      for(const dot of geometry.fireworks(e.age,e.seed)){
+        g.globalAlpha=dot.alpha*.8;const ink=S.mixHex(color(e.seed,dot.burst),p.sky[2],.25);
+        line(g,dot.tailX,dot.tailY,dot.x,dot.y,ink,1);ellipse(g,dot.x,dot.y,.9,.9,ink);
+      }
+      g.restore();
     }
     // Persistent drift guarantees life even between scheduled arrivals. In reduced
     // motion these exact same shapes are drawn once, with no animation loop.
@@ -281,8 +290,8 @@
       const wave=geometry.ripple(i+30,t,wind),x=rand(i+403)*W+wave.drift,y=geometry.waterTop+rand(i+402)*H*.09;
       g.globalAlpha=wave.alpha*.20;line(g,x,y,x+(7+rand(i+480)*22)*wave.width,y,S.mixHex(p.sky[1],'#ffffff',.6),.8);
     }g.restore();
-    for(const e of world.events)if(['jetski','sailboat','cruise','yacht'].includes(e.type))paintVessel(e,t);
-    const airborne=new Set(['metro','duck','fish','plane','balloon','airshow','banner','hangglider','jetski','sailboat','cruise','yacht','dolphin','flock']);
+    for(const e of world.events)if(['jetski','sailboat','cruise','yacht','windsurfer'].includes(e.type))paintVessel(e,t);
+    const airborne=new Set(['metro','duck','fish','plane','balloon','airshow','banner','hangglider','jetski','sailboat','cruise','yacht','windsurfer','dolphin','flock']);
     for(const e of world.events)if(airborne.has(e.type))paintEvent(e,t);
     composite('middle');
     for(const e of world.events)if(!airborne.has(e.type)&&e.type!=='train')paintEvent(e,t);
@@ -317,9 +326,18 @@
       line(g,wx,y+1+phase*3,wx-direction*(8+phase*8)*scale,y+1+phase*3,p.sky[2],1);
     }g.restore();
     g.save();g.translate(x,y);g.scale(direction*scale,scale);
-    if(e.type==='jetski'){
+    if(e.type==='windsurfer'){
+      // Board sits at the waterline; the rider leans back against the sail.
+      line(g,-10,0,10,0,c,2);line(g,0,0,4,-27,p.city,.8);
+      g.beginPath();g.moveTo(4,-27);g.lineTo(14,-6);g.lineTo(1,-5);g.closePath();g.fillStyle=color(e.seed,2);g.fill();
+      line(g,4,-24,10,-9,hull,.7);
+      const skin=skinColor(e.seed);
+      line(g,-6,-1,-8,-8,p.city,1.4);line(g,-2,-1,-8,-8,p.city,1.4);
+      line(g,-8,-8,-6,-15,c,2.5);ellipse(g,-5,-18,1.8,1.8,skin);
+      line(g,-6,-14,3,-12,skin,1.2);line(g,0,-12,8,-12,p.city,.7);
+    }else if(e.type==='jetski'){
       g.fillStyle=c;g.beginPath();g.moveTo(-9,-2);g.lineTo(6,-3);g.lineTo(10,-1);g.lineTo(5,2);g.lineTo(-6,2);g.closePath();g.fill();
-      line(g,-2,-3,1,-7,color(e.seed,2),3);ellipse(g,2,-9,1.8,1.8,'#dcb99a');line(g,1,-6,6,-4,'#dcb99a',1.2);line(g,5,-4,7,-4,p.city,1);
+      line(g,-2,-3,1,-7,color(e.seed,2),3);ellipse(g,2,-9,1.8,1.8,skinColor(e.seed));line(g,1,-6,6,-4,skinColor(e.seed),1.2);line(g,5,-4,7,-4,p.city,1);
     }else{
       g.fillStyle=hull;g.beginPath();g.moveTo(-length/2,-4);g.lineTo(length/2,-4);g.lineTo(length/2-7,3);g.lineTo(-length/2+4,3);g.closePath();g.fill();
       line(g,-length/2+3,1,length/2-4,1,c,2);
@@ -327,7 +345,7 @@
         line(g,0,-4,0,-31,p.city,.8);
         g.beginPath();g.moveTo(-1,-29);g.lineTo(-1,-6);g.lineTo(-15,-6);g.closePath();g.fillStyle=hull;g.fill();
         g.beginPath();g.moveTo(2,-26);g.lineTo(2,-6);g.lineTo(13,-6);g.closePath();g.fillStyle=color(e.seed,2);g.fill();
-        ellipse(g,5,-5,1.4,1.4,c);
+        ellipse(g,5,-5,1.4,1.4,skinColor(e.seed));
       }else if(e.type==='yacht'){
         g.fillStyle=hull;g.beginPath();g.moveTo(-10,-4);g.lineTo(-5,-12);g.lineTo(7,-12);g.lineTo(14,-4);g.closePath();g.fill();
         g.fillStyle='#83aeb7';g.fillRect(-5,-10,10,3);line(g,-10,-12,9,-12,c,1.5);
@@ -342,14 +360,14 @@
     g.restore();
   }
   function paintEvent(e,t){
-      if(['jetski','sailboat','cruise','yacht'].includes(e.type))return;
+      if(['jetski','sailboat','cruise','yacht','windsurfer'].includes(e.type))return;
       const f=e.age/e.duration,progress=e.reverse?1-f:f,x=-160+progress*(W+320);
       if(e.type==='metro'){transport(x,rail(x)-4,f,false,e.reverse);return;}
       if(e.type==='train'){transport(x,near(x)+H*.07-2,f,true,e.reverse);return;}
       if(e.type==='cyclist'){
 
         const count=e.seed>.55?3+Math.floor(e.seed*4):1;
-        geometry.pack(x,count,e.reverse).forEach((pose,i)=>cyclist(pose.x,trail(pose.x),t+i*.8,color(e.seed,i),W<600?.85:1,e.reverse));
+        geometry.pack(x,count,e.reverse).forEach((pose,i)=>cyclist(pose.x,trail(pose.x),t+i*.8,color(e.seed,i),W<600?.85:1,e.reverse,skinColor((e.seed+i*.173)%1)));
         return;
       }
       if(e.type==='flock'){
@@ -396,7 +414,7 @@
 
   }
   function person(x,y,seed,pose='standing',t=0){
-    const shirt=color(seed),skin=['#e9c3a5','#bc8d72','#8e6656'][Math.floor(seed*19)%3];
+    const shirt=color(seed),skin=skinColor(seed);
     ellipse(g,x,y+1,5,1.4,S.mixHex(p.front,p.hill,.5));
     ellipse(g,x,y-12,2,2,skin);line(g,x,y-9,x+1,y-4,shirt,3);
     const step=pose==='walk'?Math.sin(t*4)*3:2;
@@ -405,7 +423,7 @@
     if(pose==='read'){g.fillStyle='#fff0cf';g.fillRect(x+3,y-8,6,4);line(g,x+6,y-8,x+6,y-4,shirt,.5);}
   }
   function seated(x,y,seed,direction,book){
-    const skin=['#e9c3a5','#bc8d72','#8e6656'][Math.floor(seed*19)%3];
+    const skin=skinColor(seed);
     g.save();g.translate(x,y);g.scale(direction,1);
     line(g,-1,-5,0,-1,color(seed),3.5);ellipse(g,-1,-8,1.9,2.1,skin);
     line(g,0,-1,3,-2,'#647779',1.8);line(g,3,-2,6,0,'#647779',1.5);
@@ -446,9 +464,25 @@
         for(let i=0;i<4;i++)line(g,kx+Math.sin(t+i)*3,ky+10+i*4,kx+Math.sin(t+i+1)*3,ky+14+i*4,c,.7);
       }g.restore();return true;
     }
+    if(e.type==='skateboarder'||e.type==='rollerskater'){
+      const pose=geometry.skater(x,e.reverse),skin=skinColor(e.seed),phase=t*(1.8+e.seed*.6),push=Math.max(0,Math.sin(phase));
+      g.save();g.globalAlpha=S.smooth(0,.06,f)*(1-S.smooth(.94,1,f));
+      g.translate(pose.x,pose.y);g.rotate(pose.angle);g.scale(pose.direction,1);
+      const wheel=(wx)=>ellipse(g,wx,-.9,.9,.9,p.city);
+      if(e.type==='skateboarder'){
+        line(g,-6,-2.2,6,-2.2,color(e.seed,2),1.4);wheel(-4);wheel(4);
+        line(g,0,-8,3,-3,p.city,1.4);line(g,0,-8,-3-push*4,-3+push*2,p.city,1.4);
+      }else{
+        for(const side of [-1,1]){const foot=side*(2+push*2);line(g,0,-8,foot,-2.5,p.city,1.4);line(g,foot-1.5,-2,foot+1.5,-2,color(e.seed,2),1.4);wheel(foot-1);wheel(foot+1);}
+      }
+      line(g,0,-8,2,-14,c,2.7);ellipse(g,3,-17,1.9,1.9,skin);
+      ellipse(g,3,-18,2.2,1.2,color(e.seed,2));
+      line(g,2,-13,6,-10,skin,1.2);line(g,1,-13,-4,-11-push,skin,1.2);
+      g.restore();return true;
+    }
     if(e.type==='walker'){
       const pose=geometry.groundPose('walker',e);g.save();g.globalAlpha=S.smooth(0,.06,f)*(1-S.smooth(.94,1,f));
-      const skin=['#e9c3a5','#bc8d72','#8e6656'][Math.floor(e.seed*19)%3];
+      const skin=skinColor(e.seed);
       ellipse(g,pose.x,pose.y+1,4,1.2,S.mixHex(p.front,p.hill,.5));
       ellipse(g,pose.x,pose.y-12,2,2,skin);line(g,pose.x,pose.y-9,pose.x,pose.y-4,c,3);
       for(const offset of [0,.5]){const foot=geometry.strideFoot(pose.distance,10,offset),fx=pose.x+dir*foot.x;line(g,pose.x,pose.y-4,fx,geometry.groundAnchor('walker',fx)-foot.lift,'#647779',1.4);}
@@ -512,7 +546,7 @@
       g.beginPath();g.moveTo(0,-10);g.lineTo(-27,7);g.lineTo(0,2);g.lineTo(27,7);g.closePath();g.fillStyle=c;g.fill();
       g.beginPath();g.moveTo(0,-10);g.lineTo(0,2);g.lineTo(27,7);g.closePath();g.fillStyle=color(e.seed,2);g.fill();
       line(g,-10,3,0,15,'#687d7e',.7);line(g,10,3,0,15,'#687d7e',.7);line(g,0,2,0,11,'#687d7e',.8);
-      ellipse(g,1,12,2,2,'#d9b597');line(g,-1,14,-8,17,color(e.seed,4),3);g.restore();return true;
+      ellipse(g,1,12,2,2,skinColor(e.seed));line(g,-1,14,-8,17,color(e.seed,4),3);g.restore();return true;
     }
     if(e.type==='airshow'){
       const y=hy*.25+Math.sin(f*Math.PI)*20;

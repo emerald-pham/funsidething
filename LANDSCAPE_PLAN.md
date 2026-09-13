@@ -127,3 +127,11 @@ checks cover both directions in narrow/wide Chromium and WebKit scenes.
 - [x] Profile readers hold an upright cover with a thin visible page edge and a hand against the book; the same pose mirrors correctly for a reader facing either way.
 - [x] Random seven-bird flocks travel across the sky in a V formation, mirrored to match their direction. They pass through without competing for nest perches.
 - [x] Owls were not added, following the revised request. Renderer geometry tests and Chromium/WebKit scene checks cover the book and both flock directions.
+## More people and occasional sky celebrations
+
+- [x] Ten stable skin tones are shared by all human visitors, with gentle ambient shading at night and individual tones within cycling packs.
+- [x] Rare nighttime fireworks create three small, fading bursts; a fixed lifetime preserves the final fade, and the existing motion preference and rare-event cooldown apply.
+- [x] Random skateboarders and rollerskaters follow the path slope in either direction. Windsurfers share the existing two-vessel harbor cap and varied scenic colors.
+- [x] New visitor geometry and scheduling were tested red-to-green, with forced daytime/nighttime renders reviewed in Chromium and WebKit at mobile and desktop sizes.
+
+- [x] Holiday messages cover all eleven federal holidays and familiar U.S. observances, with five kind, hour-specific variations each, local-calendar boundaries, moving weekday dates, and Easter collision coverage.

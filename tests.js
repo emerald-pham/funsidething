@@ -141,8 +141,8 @@ test("Landscape location: actual coordinates change the sky and polar day return
 
 test("Landscape: daytime life includes a duck visit and the new bounded animal set", () => {
   const sky = livingSky();
-  assert.deepEqual([...sky.eventTypes], ["cyclist", "bird", "balloon", "train", "metro", "plane", "duck", "fish", "butterfly", "rabbit", "deer", "kite", "reader", "picnic", "couple", "walker", "airshow", "banner", "hangglider", "jetski", "sailboat", "cruise", "yacht", "dolphin", "flock"]);
-  assert.deepEqual([...sky.rareTypes], ["abduction"]);
+  assert.deepEqual([...sky.eventTypes], ["cyclist", "bird", "balloon", "train", "metro", "plane", "duck", "fish", "butterfly", "rabbit", "deer", "kite", "reader", "picnic", "couple", "walker", "airshow", "banner", "hangglider", "jetski", "sailboat", "cruise", "yacht", "dolphin", "flock", "skateboarder", "rollerskater", "windsurfer"]);
+  assert.deepEqual([...sky.rareTypes], ["abduction", "fireworks"]);
   const world = sky.createWorld(() => 0.99);
   assert.equal(world.events.length, 3, "opening life is a small cast");
   assert.equal(new Set(world.events.map(event => event.type)).size, 3, "opening life has no duplicate visitors");
@@ -8118,7 +8118,7 @@ test('Landscape browser: every visitor renders with finite geometry across short
   assert.ok(mood.messageCount >= 100, 'catalog has a hundred curated combinations');
   assert.equal(mood.messages(date('2026-06-21T13:00:00Z'), { timezone: 'America/New_York' }, () => 0), values[1]);
   assert.equal(mood.message(date('2026-06-21T13:00:00Z'), { timezone: 'America/New_York' }, () => 0), mood.message(date('2026-06-21T13:00:00Z'), { timezone: 'America/New_York' }, () => 0));
-  assert.equal(mood.message(date('2026-06-21T13:00:00Z'), { timezone: 'America/New_York' }, () => 0), mood.message(date('2026-12-21T14:00:00Z'), { timezone: 'America/New_York' }, () => 0));
+  assert.equal(mood.message(date('2026-06-20T13:00:00Z'), { timezone: 'America/New_York' }, () => 0), mood.message(date('2026-12-21T14:00:00Z'), { timezone: 'America/New_York' }, () => 0));
   assert.equal(mood.period(date('2026-12-21T22:00:00Z'), { timezone: 'America/New_York', sunAltitude: -2 }), 'evening');
   assert.equal(mood.period(date('2026-12-21T22:00:00Z'), { timezone: 'America/New_York', sunAltitude: 4 }), 'golden-hour');
   assert.equal(mood.period(date('2026-12-21T22:00:00Z'), { timezone: 'America/New_York', sunAltitude: null }), 'golden-hour');
@@ -8381,7 +8381,7 @@ test('Landscape messages: every hour has five distinct short, season-independent
  const ctx=vm.createContext({Date,Intl,Math,JSON});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-mood.js'),'utf8'),ctx);const mood=ctx.LandscapeMood;
  for(let hour=0;hour<24;hour++){
   const entries=mood.messageCatalog.filter(e=>e.hour===hour);assert.equal(entries.length,5);assert.equal(new Set(entries.map(e=>e.text)).size,5);
-  const date=new Date(Date.UTC(2026,5,21,hour));
+  const date=new Date(Date.UTC(2026,5,20,hour));
   for(let i=0;i<5;i++)assert.equal(mood.message(date,{timezone:'UTC'},()=>i/5),entries[i].text);
   assert.ok(entries.every(e=>e.text.length<=110&&!/summer|winter|autumn|spring|season/i.test(e.text)));
  }
@@ -8438,7 +8438,7 @@ test('Landscape reader: a profile reader holds an upright cover rather than flat
  for(const direction of [-1,1]){
   const polygons=[],scales=[];let points=[];
   const g={save(){},restore(){},translate(){},scale(x,y){scales.push([x,y]);},beginPath(){points=[];},moveTo(x,y){points.push([x,y]);},lineTo(x,y){points.push([x,y]);},closePath(){},fill(){polygons.push({points:[...points],color:this.fillStyle});}};
-  const ctx=vm.createContext({g,color:()=> '#a4c9bd',ellipse(){},line(){},Math});vm.runInContext(seated+`;seated(0,0,.4,${direction},true);`,ctx);
+  const ctx=vm.createContext({g,color:()=> '#a4c9bd',skinColor:()=> '#c68f68',ellipse(){},line(){},Math});vm.runInContext(seated+`;seated(0,0,.4,${direction},true);`,ctx);
   const book=polygons[0],xs=book.points.map(p=>p[0]),ys=book.points.map(p=>p[1]);
   assert.ok(Math.max(...ys)-Math.min(...ys)>Math.max(...xs)-Math.min(...xs),'book should be held upright in profile');
   assert.ok(Math.max(...ys)<0,'book is held above the lap');assert.notEqual(book.color,'#fff0cf','the visible face is a cover, not an unfolded spread');
@@ -8455,4 +8455,165 @@ test('Landscape birds: flocks hold a mirrored V formation',()=>{
   for(let i=1;i<7;i+=2){assert.equal(flock[i].x,flock[i+1].x);assert.equal(flock[i].y-100,100-flock[i+1].y);assert.ok((flock[i].x-500)*(reverse?-1:1)<0,'followers trail the leader');}
  }
  const runtime=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');assert.match(runtime,/geometry\.flock\(/);
+});
+
+test('Landscape people: a broad stable skin-tone range is shared by all human visitors',()=>{
+ const sky=livingSky(),tones=Array.from({length:10},(_,i)=>sky.skinTone((i+.5)/10));
+ assert.equal(new Set(tones).size,10);assert.ok(tones.some(t=>landscapeLuminance(t)<.06));assert.ok(tones.some(t=>landscapeLuminance(t)>.65));
+ const night=tones.map((_,i)=>sky.skinTone((i+.5)/10,1,'#526c80'));assert.equal(new Set(night).size,10);
+ for(let i=0;i<10;i++)assert.equal(sky.skinTone((i+.5)/10),tones[i],'a visitor keeps their tone');
+ const runtime=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');assert.match(runtime,/S\.skinTone\(/);
+ assert.doesNotMatch(runtime,/#e5c7a4|#e6c7a2|#dcb99a|#d9b597|#e9c3a5|#bc8d72|#8e6656/,'readers, walkers, cyclists, gliders and jet-ski riders share the new range');
+});
+
+test('Landscape fireworks: rare nighttime bursts fade completely and stay within the sky',()=>{
+ const sky=livingSky();assert.ok(sky.rareTypes.includes('fireworks'));
+ for(const altitude of [-20,20]){
+  const world=sky.createWorld(()=>0);world.events=[];world.elapsed=sky.RARE_COOLDOWN;world.lastRare=0;world.next=0;
+  sky.advance(world,1,{sun:{altitude,azimuth:90}});
+  assert.equal(world.events.some(e=>e.type==='fireworks'),altitude<0,'fireworks only enter the night sky');
+  if(altitude<0)assert.equal(world.events.find(e=>e.type==='fireworks').duration,9,'allow the final burst to finish fading');
+ }
+ const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
+ for(const [w,h] of [[320,568],[844,390],[1440,900]]){
+  const g=ctx.LandscapeGeometry.create(w,h);assert.equal(g.fireworks(0,.4).length,0);assert.equal(g.fireworks(10,.4).length,0);
+  const dots=g.fireworks(1.6,.4);assert.ok(dots.length>0&&dots.length<=48);
+  for(const dot of dots){assert.ok(dot.x>=0&&dot.x<=w&&dot.y>=0&&dot.y<g.horizon);assert.ok(dot.alpha>0&&dot.alpha<=1);}
+ }
+ assert.match(fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),/geometry\.fireworks\(/);
+});
+
+
+test('Landscape skating: random visitors follow path slope and face their travel direction',()=>{
+ const sky=livingSky();for(const type of ['skateboarder','rollerskater','windsurfer'])assert.ok(sky.eventTypes.includes(type));
+ const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
+ for(const [w,h] of [[320,568],[844,390],[1440,900]]){
+  const g=ctx.LandscapeGeometry.create(w,h);
+  for(const reverse of [false,true])for(const x of [w*.2,w*.5,w*.8]){
+   const pose=g.skater(x,reverse);assert.equal(pose.y,g.trail(x));assert.equal(pose.direction,reverse?-1:1);
+   assert.ok(Math.abs(Math.tan(pose.angle)-(g.trail(x+.5)-g.trail(x-.5)))<1e-8);
+  }
+ }
+ const world=sky.createWorld(()=>.99);world.events=[];
+ for(let i=0;i<3000;i++){sky.advance(world,3,{sun:{altitude:30,azimuth:100}});assert.ok(world.events.filter(e=>['jetski','sailboat','cruise','yacht','dolphin','windsurfer'].includes(e.type)).length<=2);}
+});
+
+function moodRuntime() {
+  const context = vm.createContext({ Date, Intl, Math, JSON });
+  vm.runInContext(fs.readFileSync(path.join(__dirname, "landscape-mood.js"), "utf8"), context, {
+    filename: "landscape-mood.js",
+  });
+  return context.LandscapeMood;
+}
+
+function atNoon(isoDate) {
+  return new Date(`${isoDate}T12:00:00Z`);
+}
+
+function hourLabel(hour) {
+  return `${hour % 12 || 12} ${hour < 12 ? "AM" : "PM"}`;
+}
+
+test("holiday calendar covers federal fixed dates and moving civic holidays", () => {
+  const mood = moodRuntime();
+  const federal = [
+    ["2026-01-01", "New Year's Day"],
+    ["2026-01-19", "Martin Luther King Jr. Day"],
+    ["2026-02-16", "Washington's Birthday"],
+    ["2026-05-25", "Memorial Day"],
+    ["2026-06-19", "Juneteenth National Independence Day"],
+    ["2026-07-04", "Independence Day"],
+    ["2026-09-07", "Labor Day"],
+    ["2026-10-12", "Columbus Day"],
+    ["2026-11-11", "Veterans Day"],
+    ["2026-11-26", "Thanksgiving Day"],
+    ["2026-12-25", "Christmas Day"],
+  ];
+  for (const [date, name] of federal) {
+    assert.equal(mood.holiday(atNoon(date), { timezone: "America/New_York" }), name, date);
+  }
+
+  // These dates prove weekday rules are calculated for the requested year.
+  assert.equal(mood.holiday(atNoon("2027-01-18"), "America/New_York"), "Martin Luther King Jr. Day");
+  assert.equal(mood.holiday(atNoon("2027-05-31"), "America/New_York"), "Memorial Day");
+  assert.equal(mood.holiday(atNoon("2027-11-25"), "America/New_York"), "Thanksgiving Day");
+  assert.equal(mood.holiday(atNoon("2026-01-18"), "America/New_York"), null, "nearby Sunday stays ordinary");
+  assert.equal(mood.holiday(atNoon("2026-05-24"), "America/New_York"), null, "the Sunday before Memorial Day stays ordinary");
+});
+
+test("holiday calendar includes familiar observances and commemorative days", () => {
+  const mood = moodRuntime();
+  const familiar = [
+    ["2026-02-02", "Groundhog Day"],
+    ["2026-02-14", "Valentine's Day"],
+    ["2026-03-17", "St. Patrick's Day"],
+    ["2026-04-01", "April Fools' Day"],
+    ["2026-04-05", "Easter Sunday"],
+    ["2026-04-22", "Earth Day"],
+    ["2026-05-10", "Mother's Day"],
+    ["2026-06-14", "Flag Day"],
+    ["2026-06-21", "Father's Day"],
+    ["2026-10-31", "Halloween"],
+    ["2026-12-24", "Christmas Eve"],
+    ["2026-12-31", "New Year's Eve"],
+  ];
+  for (const [date, name] of familiar) {
+    assert.equal(mood.holiday(atNoon(date), { timezone: "America/New_York" }), name, date);
+  }
+  assert.equal(mood.holiday(atNoon("2025-04-20"), "America/New_York"), "Easter Sunday");
+  assert.equal(mood.holiday(atNoon("2029-04-01"), "America/New_York"), "Easter Sunday", "Easter wins an April Fools collision");
+  assert.equal(mood.holiday(atNoon("2027-05-09"), "America/New_York"), "Mother's Day");
+  assert.equal(mood.holiday(atNoon("2027-06-20"), "America/New_York"), "Father's Day");
+});
+
+test("holiday lookup and messages follow the observer's local calendar date", () => {
+  const mood = moodRuntime();
+  const location = { timezone: "America/New_York" };
+  // One instant straddles New Year's Eve and New Year's Day in New York.
+  assert.equal(mood.holiday(new Date("2027-01-01T04:30:00Z"), location), "New Year's Eve");
+  assert.equal(mood.holiday(new Date("2027-01-01T05:30:00Z"), location), "New Year's Day");
+  const eveMessage = mood.message(new Date("2027-01-01T04:30:00Z"), location, () => 0);
+  const dayMessage = mood.message(new Date("2027-01-01T05:30:00Z"), location, () => 0);
+  assert.match(eveMessage, /New Year's Eve/);
+  assert.match(dayMessage, /New Year's Day/);
+  assert.match(eveMessage, /11 PM/);
+  assert.match(dayMessage, /12 AM/);
+});
+
+test("each holiday has several randomized kind messages that name the current hour", () => {
+  const mood = moodRuntime();
+  const holidays = [
+    ["2026-01-19", "Martin Luther King Jr. Day"],
+    ["2026-02-14", "Valentine's Day"],
+    ["2026-04-05", "Easter Sunday"],
+    ["2026-05-10", "Mother's Day"],
+    ["2026-06-21", "Father's Day"],
+    ["2026-07-04", "Independence Day"],
+    ["2026-10-31", "Halloween"],
+    ["2026-12-24", "Christmas Eve"],
+    ["2026-12-31", "New Year's Eve"],
+  ];
+  for (const [date, name] of holidays) {
+    for (const hour of [0, 7, 12, 18, 23]) {
+      const instant = new Date(`${date}T${String(hour).padStart(2, "0")}:00:00Z`);
+      const messages = Array.from({ length: 5 }, (_, index) => mood.message(instant, "UTC", () => index / 5));
+      assert.equal(new Set(messages).size, 5, `${name} has five variants at ${hourLabel(hour)}`);
+      for (const message of messages) {
+        assert.match(message, new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+        assert.match(message, new RegExp(hourLabel(hour).replace(" ", "\\s+")));
+        assert.ok(message.length <= 110, `${name} remains short enough for the scene card`);
+      }
+    }
+  }
+});
+
+test("ordinary dates retain the existing hourly message catalog", () => {
+  const mood = moodRuntime();
+  const date = new Date("2026-08-11T15:00:00Z");
+  assert.equal(mood.holiday(date, "UTC"), null);
+  const entries = mood.messageCatalog.filter(entry => entry.hour === 15);
+  assert.equal(entries.length, 5);
+  for (let index = 0; index < entries.length; index++) {
+    assert.equal(mood.message(date, "UTC", () => index / 5), entries[index].text);
+  }
 });

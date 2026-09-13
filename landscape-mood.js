@@ -198,6 +198,173 @@
   ]
 ];
 
+  // Holiday copy is a second pool so ordinary days keep their five stable
+  // hour-specific lines. Each holiday gets the same generous five choices,
+  // with the local hour and holiday name filled in at the last moment.
+  const HOLIDAY_LINES = Object.freeze({
+    "New Year's Day": [
+      "{{hour}}, neighbor. {{name}} can begin with one soft little hello.",
+      "{{hour}}. A fresh page for {{name}}, with plenty of room around it.",
+      "{{hour}}, huh? {{name}} does not need a grand plan just yet.",
+      "{{hour}}. The waterfront is raising a quiet cup to {{name}}.",
+      "{{hour}}, neighbor. Let {{name}} arrive at a comfortable walking speed."
+    ],
+    "Martin Luther King Jr. Day": [
+      "{{hour}}. {{name}} leaves room for kindness to take the next step.",
+      "{{hour}}, neighbor. A gentle pause can honor the hope in {{name}}.",
+      "{{hour}}. The view is holding a quiet, thoughtful space for {{name}}.",
+      "{{hour}}, huh? Let {{name}} be a small invitation toward kindness.",
+      "{{hour}}, neighbor. There is room today for care, courage, and rest on {{name}}."
+    ],
+    "Washington's Birthday": [
+      "{{hour}}. {{name}} can be a quiet pause among the big ideas.",
+      "{{hour}}, neighbor. Even {{name}} deserves a slow stroll by the water.",
+      "{{hour}}, huh? Set down the speeches and keep one kind thought for {{name}}.",
+      "{{hour}}. The waterfront saved a calm little bench for {{name}}.",
+      "{{hour}}, neighbor. A comfortable pace is a fine way to mark {{name}}."
+    ],
+    "Memorial Day": [
+      "{{hour}}. {{name}} holds a quiet place for remembrance and rest.",
+      "{{hour}}, neighbor. Let {{name}} be gentle, grateful, and unhurried.",
+      "{{hour}}. The water is keeping a peaceful moment for {{name}}.",
+      "{{hour}}, huh? A little stillness can belong to {{name}} too.",
+      "{{hour}}, neighbor. Remembering can share {{name}} with a soft breath."
+    ],
+    "Juneteenth National Independence Day": [
+      "{{hour}}. {{name}} brings room for freedom, joy, and a slow breath.",
+      "{{hour}}, neighbor. Let {{name}} carry a little lightness and a lot of hope.",
+      "{{hour}}. The harbor is making room for the joy in {{name}}.",
+      "{{hour}}, huh? A small celebration is a lovely part of {{name}}.",
+      "{{hour}}, neighbor. {{name}} can hold joy at whatever pace feels kind."
+    ],
+    "Independence Day": [
+      "{{hour}}. {{name}} can sparkle softly; no grand finale required.",
+      "{{hour}}, neighbor. A little picnic is a perfectly good {{name}} plan.",
+      "{{hour}}, huh? The sky saved a quiet patch for {{name}} daydreams.",
+      "{{hour}}. Let {{name}} bring a warm glow and a slower pace.",
+      "{{hour}}, neighbor. Fireworks can wait while you enjoy this small {{name}} view."
+    ],
+    "Labor Day": [
+      "{{hour}}. {{name}} is an excellent excuse to loosen your shoulders.",
+      "{{hour}}, neighbor. The to-do list can take a little {{name}} break too.",
+      "{{hour}}, huh? A slow stroll is worthy {{name}} celebration.",
+      "{{hour}}. Let {{name}} leave some space around the work of being alive.",
+      "{{hour}}, neighbor. Rest is allowed to be the main event on {{name}}."
+    ],
+    "Columbus Day": [
+      "{{hour}}. {{name}} and Indigenous Peoples' Day invite thoughtful reflection.",
+      "{{hour}}, neighbor. The horizon holds many histories to remember on {{name}}.",
+      "{{hour}}, huh? Let {{name}} make room for listening, learning, and rest.",
+      "{{hour}}. The harbor keeps a quiet, respectful space for {{name}}.",
+      "{{hour}}, neighbor. A thoughtful pause is a kind way to mark {{name}}."
+    ],
+    "Veterans Day": [
+      "{{hour}}. {{name}} holds a grateful, quiet space for those who served.",
+      "{{hour}}, neighbor. Let {{name}} be gentle, thankful, and unhurried.",
+      "{{hour}}. The harbor is keeping a calm moment of gratitude for {{name}}.",
+      "{{hour}}, huh? A peaceful pause is a worthy way to mark {{name}}.",
+      "{{hour}}, neighbor. Gratitude for {{name}} can sit beside you while water moves."
+    ],
+    "Thanksgiving Day": [
+      "{{hour}}. {{name}} can fit one more small thing: a comfortable breath.",
+      "{{hour}}, neighbor. A thankful pause is plenty for this part of {{name}}.",
+      "{{hour}}, huh? The table can wait while you enjoy the view on {{name}}.",
+      "{{hour}}. Let {{name}} be warm, simple, and generous with its margins.",
+      "{{hour}}, neighbor. No need to race toward {{name}} dessert or anything else."
+    ],
+    "Christmas Day": [
+      "{{hour}}. {{name}} can be cozy, quiet, and exactly your size today.",
+      "{{hour}}, neighbor. A little wonder is plenty for {{name}}.",
+      "{{hour}}, huh? The {{name}} lights are twinkling without asking anything of you.",
+      "{{hour}}. Let {{name}} bring a soft glow to this small waterfront pause.",
+      "{{hour}}, neighbor. Slippers are excellent formalwear for {{name}}."
+    ],
+    "Groundhog Day": [
+      "{{hour}}. {{name}} is a fine day to peek out and go gently back in.",
+      "{{hour}}, neighbor. No shadow can hurry this little {{name}} pause.",
+      "{{hour}}, huh? A cozy burrow is a perfectly good {{name}} destination.",
+      "{{hour}}. The forecast for {{name}} calls for one unhurried breath.",
+      "{{hour}}, neighbor. A small {{name}} hello to the groundhog, then back to your pace."
+    ],
+    "Valentine's Day": [
+      "{{hour}}. {{name}} includes you, too, right here in the quiet.",
+      "{{hour}}, neighbor. A little kindness for yourself is a lovely {{name}} gift.",
+      "{{hour}}, huh? The harbor has saved a warm corner for {{name}}.",
+      "{{hour}}. Let {{name}} be soft around the edges and generous with rest.",
+      "{{hour}}, neighbor. No grand {{name}} gesture needed; a gentle breath is enough."
+    ],
+    "St. Patrick's Day": [
+      "{{hour}}. {{name}} can have a little green, a little luck, and no hurry.",
+      "{{hour}}, neighbor. A lucky pause is a perfectly good {{name}} tradition.",
+      "{{hour}}, huh? The river is carrying a tiny bit of {{name}} cheer.",
+      "{{hour}}. Let {{name}} be playful without becoming another task.",
+      "{{hour}}, neighbor. A small wandering thought counts as {{name}} magic."
+    ],
+    "April Fools' Day": [
+      "{{hour}}. The only {{name}} trick today is making your next step smaller.",
+      "{{hour}}, neighbor. {{name}} permits a little silliness and a lot of ease.",
+      "{{hour}}, huh? The ducks promise no surprise meeting for {{name}}.",
+      "{{hour}}. A soft joke and a quiet view make a fine {{name}} plan.",
+      "{{hour}}, neighbor. On {{name}}, leave punchlines and to-dos unfinished."
+    ],
+    "Easter Sunday": [
+      "{{hour}}. {{name}} can be a small bright pause among the new beginnings.",
+      "{{hour}}, neighbor. A gentle morning or evening is enough for {{name}}.",
+      "{{hour}}, huh? Let {{name}} bring a little color without a busy schedule.",
+      "{{hour}}. The waterfront is hiding one peaceful egg-shaped moment for {{name}}.",
+      "{{hour}}, neighbor. New beginnings can start very softly on {{name}}."
+    ],
+    "Earth Day": [
+      "{{hour}}. The river and trees have saved a grateful breath for {{name}}.",
+      "{{hour}}, neighbor. {{name}} is a lovely excuse to look closely at the living view.",
+      "{{hour}}, huh? One small kind choice is plenty for {{name}}.",
+      "{{hour}}. Let {{name}} be a gentle thank-you to the ground beneath you.",
+      "{{hour}}, neighbor. The clouds, water, and trees celebrate {{name}} quietly too."
+    ],
+    "Mother's Day": [
+      "{{hour}}. {{name}} has room for a soft thank-you and a comfortable pause.",
+      "{{hour}}, neighbor. Let {{name}} include a little care for the caregiver, too.",
+      "{{hour}}, huh? A warm cup and a kind thought make a lovely {{name}} gift.",
+      "{{hour}}. The harbor is holding a gentle seat for everyone marking {{name}}.",
+      "{{hour}}, neighbor. Rest can be part of the {{name}} celebration."
+    ],
+    "Flag Day": [
+      "{{hour}}. {{name}} can be a small, breezy pause with room for belonging.",
+      "{{hour}}, neighbor. Let the colors of {{name}} pass by at a quiet pace.",
+      "{{hour}}, huh? The harbor has a little wind and a lot of breathing room for {{name}}.",
+      "{{hour}}. A gentle look up is a fine way to mark {{name}}.",
+      "{{hour}}, neighbor. {{name}} can be thoughtful without becoming another assignment."
+    ],
+    "Father's Day": [
+      "{{hour}}. {{name}} has room for a quiet thank-you and a slow breath.",
+      "{{hour}}, neighbor. A simple stroll makes a fine {{name}} celebration.",
+      "{{hour}}, huh? Let {{name}} be easygoing, warm, and generous with time.",
+      "{{hour}}. The water saved a calm little seat for everyone marking {{name}}.",
+      "{{hour}}, neighbor. Rest is a perfectly good part of the {{name}} plan."
+    ],
+    "Halloween": [
+      "{{hour}}. {{name}} can be spooky, cozy, and entirely free of pressure.",
+      "{{hour}}, neighbor. A tiny moonlit wander is plenty of {{name}} adventure.",
+      "{{hour}}, huh? The ghosts have promised to queue politely for {{name}}.",
+      "{{hour}}. Let {{name}} bring the soft lantern glow and leave the rush outside.",
+      "{{hour}}, neighbor. Even a {{name}} pumpkin knows there is time to sit and glow."
+    ],
+    "Christmas Eve": [
+      "{{hour}}. {{name}} can be a quiet pocket before the lights and laughter.",
+      "{{hour}}, neighbor. A soft pause is a lovely gift on {{name}}.",
+      "{{hour}}, huh? The harbor is keeping one calm little corner for {{name}}.",
+      "{{hour}}. Let {{name}} arrive slowly; the twinkle lights can wait.",
+      "{{hour}}, neighbor. No wrapping required for this peaceful {{name}} moment."
+    ],
+    "New Year's Eve": [
+      "{{hour}}. {{name}} can end gently; tomorrow will bring its own hello.",
+      "{{hour}}, neighbor. A quiet little countdown is plenty for {{name}}.",
+      "{{hour}}, huh? The list can stay in its slippers through {{name}}.",
+      "{{hour}}. Let {{name}} be a warm pause before the calendar turns.",
+      "{{hour}}, neighbor. You do not have to carry {{name}} or the whole year to its doorstep."
+    ],
+  });
+
   function validDate(date) {
     if (!(date instanceof Date) || !Number.isFinite(+date)) throw new TypeError('Valid date required');
   }
@@ -249,6 +416,87 @@
 
   function ordinal(year, month, day) {
     return (Date.UTC(year, month - 1, day) - Date.UTC(year, 0, 1)) / DAY;
+  }
+
+  function dayOfWeek(year, month, day) {
+    return new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+  }
+
+  function nthWeekday(year, month, weekday, occurrence) {
+    const first = dayOfWeek(year, month, 1);
+    return 1 + (weekday - first + 7) % 7 + (occurrence - 1) * 7;
+  }
+
+  function lastWeekday(year, month, weekday) {
+    const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+    return lastDay - (dayOfWeek(year, month, lastDay) - weekday + 7) % 7;
+  }
+
+  // Gregorian Easter, kept local and deterministic so a holiday never needs
+  // a network lookup or an embedded table that expires after one year.
+  function easterDate(year) {
+    const a = year % 19;
+    const b = Math.floor(year / 100);
+    const c = year % 100;
+    const d = Math.floor(b / 4);
+    const e = b % 4;
+    const f = Math.floor((b + 8) / 25);
+    const g = Math.floor((b - f + 1) / 3);
+    const h = (19 * a + b - d - g + 15) % 30;
+    const i = Math.floor(c / 4);
+    const k = c % 4;
+    const l = (32 + 2 * e + 2 * i - h - k) % 7;
+    const m = Math.floor((a + 11 * h + 22 * l) / 451);
+    const month = Math.floor((h + l - 7 * m + 114) / 31);
+    const day = (h + l - 7 * m + 114) % 31 + 1;
+    return { month, day };
+  }
+
+  function holidayForParts(parts) {
+    const { year, month, day } = parts;
+    const easter = easterDate(year);
+    // Easter takes precedence over smaller fixed observances when their dates
+    // happen to coincide (as they do on April 1 in 2029).
+    if (month === easter.month && day === easter.day) return 'Easter Sunday';
+    const fixed = {
+      '1-1': "New Year's Day",
+      '2-2': 'Groundhog Day',
+      '2-14': "Valentine's Day",
+      '3-17': "St. Patrick's Day",
+      '4-1': "April Fools' Day",
+      '4-22': 'Earth Day',
+      '6-14': 'Flag Day',
+      '6-19': 'Juneteenth National Independence Day',
+      '7-4': 'Independence Day',
+      '10-31': 'Halloween',
+      '11-11': 'Veterans Day',
+      '12-24': 'Christmas Eve',
+      '12-25': 'Christmas Day',
+      '12-31': "New Year's Eve",
+    };
+    const fixedName = fixed[`${month}-${day}`];
+    if (fixedName) return fixedName;
+
+    // US federal holidays whose dates are set by a weekday occurrence.
+    if (month === 1 && day === nthWeekday(year, 1, 1, 3)) return 'Martin Luther King Jr. Day';
+    if (month === 2 && day === nthWeekday(year, 2, 1, 3)) return "Washington's Birthday";
+    if (month === 5 && day === lastWeekday(year, 5, 1)) return 'Memorial Day';
+    if (month === 9 && day === nthWeekday(year, 9, 1, 1)) return 'Labor Day';
+    if (month === 10 && day === nthWeekday(year, 10, 1, 2)) return 'Columbus Day';
+    if (month === 11 && day === nthWeekday(year, 11, 4, 4)) return 'Thanksgiving Day';
+
+    // These familiar observances are also calculated from their Sunday rule.
+    if (month === 5 && day === nthWeekday(year, 5, 0, 2)) return "Mother's Day";
+    if (month === 6 && day === nthWeekday(year, 6, 0, 3)) return "Father's Day";
+    return null;
+  }
+
+  function hourLabel(hour) {
+    return `${hour % 12 || 12} ${hour < 12 ? 'AM' : 'PM'}`;
+  }
+
+  function materializeHoliday(template, hour, name) {
+    return template.replace(/\{\{hour\}\}/g, hourLabel(hour)).replace(/\{\{name\}\}/g, name);
   }
 
   function season(date, latitude, timezone) {
@@ -403,14 +651,33 @@
 
   function message(date, location, random) {
     validDate(date);
-    const hour=localParts(date,normalizedLocation(location).timezone).hour;
-    const lines=HOUR_LINES[hour];return lines[Math.floor(randomFraction(random)*lines.length)];
+    const context = normalizedLocation(location);
+    const parts = localParts(date, context.timezone);
+    const name = holidayForParts(parts);
+    if (name) {
+      const lines = HOLIDAY_LINES[name];
+      return materializeHoliday(lines[Math.floor(randomFraction(random) * lines.length)], parts.hour, name);
+    }
+    const lines = HOUR_LINES[parts.hour];
+    return lines[Math.floor(randomFraction(random) * lines.length)];
   }
+
+  function holiday(date, location) {
+    validDate(date);
+    const context = normalizedLocation(location);
+    return holidayForParts(localParts(date, context.timezone));
+  }
+
   const messageCatalog=HOUR_LINES.flatMap((lines,hour)=>lines.map(text=>({hour,text})));
+  const holidayCatalog = Object.freeze(Object.keys(HOLIDAY_LINES).map(name => Object.freeze({
+    name,
+    variantCount: HOLIDAY_LINES[name].length,
+  })));
 
   const api = Object.freeze({
-    season, palette, clock, period, message, messages: message,
+    season, palette, clock, period, holiday, message, messages: message,
     messageCatalog: Object.freeze(messageCatalog), messageCount: messageCatalog.length,
+    holidayCatalog,
     periods: Object.freeze(PERIOD_NAMES.slice()),
   });
   root.LandscapeMood = api;

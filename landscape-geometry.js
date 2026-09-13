@@ -11,6 +11,7 @@
     const lowerRail=x=>near(x)+H*.07;
     const tangent=(fn,x)=>Math.atan((fn(x+.5)-fn(x-.5)));
     const rider=(x,scale=1,reverse=false)=>({x,y:trail(x)-3.6*scale,angle:tangent(trail,x),direction:reverse?-1:1});
+    const skater=(x,reverse=false)=>({x,y:trail(x),angle:tangent(trail,x),direction:reverse?-1:1});
     const pack=(x,count,reverse=false)=>Array.from({length:count},(_,i)=>rider(x-i*21*(reverse?-1:1),1,reverse));
     const waterTop=horizon+15,shore=horizon+H*.095;
     function vessel(kind,lane,x,t=0,reverse=false){
@@ -59,6 +60,19 @@
     const flock=(x,y,reverse=false)=>Array.from({length:7},(_,i)=>{
       const rank=Math.ceil(i/2);return {x:x-rank*15*(reverse?-1:1),y:y+(i%2?1:-1)*rank*7};
     });
+    function fireworks(age,seed){
+      const dots=[];
+      for(let burst=0;burst<3;burst++){
+        const time=age-1-burst*2.1;if(time<=0||time>=2.7)continue;
+        const cx=W*(.25+seed*.3+burst*.13),cy=horizon*(.28+(burst%2)*.12);
+        const radius=Math.min(35,horizon*.18)*(1-Math.exp(-time*1.6)),alpha=Math.min(1,time/.12)*(1-time/2.7)**1.5;
+        for(let i=0;i<16;i++){
+          const angle=i*Math.PI/8+seed*6,dx=Math.cos(angle)*radius,dy=Math.sin(angle)*radius,fall=time*time*1.5;
+          dots.push({x:cx+dx,y:cy+dy+fall,tailX:cx+dx*.78,tailY:cy+dy*.78+fall,alpha,burst});
+        }
+      }
+      return dots;
+    }
     const sunReflection=sun=>sun.visible&&sun.altitude>0;
     function cityReflection(t,wind,night){
       if(night<=0)return [];
@@ -72,7 +86,7 @@
       return rows;
     }
     const ripple=(i,t,wind=1)=>({alpha:.15+.75*(.5+.5*Math.sin(t*wind*1.3+i*1.71))**2,drift:Math.sin(t*wind*.5+i)*9,width:.65+.35*Math.sin(t*.9+i)**2});
-    return {flock,dolphin,starReflection,cityReflection,sunReflection,depthBand,groundAnchor,groundTravelX,groundPose,strideFoot,wingFold,balloonDrift,vessel,foregroundTree,nest,ripple,horizon,waterTop,far,middle,near,rail,trail,lowerRail,tangent,rider,pack};
+    return {skater,fireworks,flock,dolphin,starReflection,cityReflection,sunReflection,depthBand,groundAnchor,groundTravelX,groundPose,strideFoot,wingFold,balloonDrift,vessel,foregroundTree,nest,ripple,horizon,waterTop,far,middle,near,rail,trail,lowerRail,tangent,rider,pack};
   }
   root.LandscapeGeometry={create};
 })(globalThis);
