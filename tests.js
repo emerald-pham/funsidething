@@ -3745,7 +3745,7 @@ test("UI: Quick start displays the requested seven steps in order", async () => 
     "You can also hit can’t, which will snooze the task for a duration you’ve configured in settings.",
     "You will continue until either you hit done scanning, or the app recognizes the chances of you finding a better task dips below 25% (percentage configurable in settings menu) in which case it will gently nudge you to stop searching for a new todo.",
     "Once you’re done scanning, you will be presented with a chain of todos you will need to complete from the bottom of the “chain” up to the top, marking tasks as done, worked on (sends it back to the todo list for later) or can’t / dislodge."
-]);
+  ]);
 });
 
 test("UI: help describes Start scanning rather than a Can/Can't step", async () => {
@@ -5952,6 +5952,7 @@ const ALLOWED_NON_ASCII = new Set([
   "\u2713",                                                  // check mark, Done in the edit pane
   "\u25b6", "\u25b8", "\u25be", "\u25bc", "\u25cf",           // carets & bullets
   "\u25d0", "\u2600", "\u263e",                               // night-mode faces
+  "\u201c", "\u201d",                                     // English quotation marks in Quick start
   "\u2019",                                                   // English apostrophe ("Can't")
   "\u2601",                                                   // cloud-sync icon
 ]);
