@@ -548,6 +548,15 @@ test("PWA contract: install colors match the mint landscape before it loads", ()
   assert.equal(meta[1], "#abd9c3", "the first paint should use the landscape mint tone");
 });
 
+test("PWA: favicon uses a content-versioned offline URL", () => {
+  const href = html.match(/rel="icon"[^>]*href="([^"]+)"/)[1];
+  const icon = fs.readFileSync(path.join(__dirname, "icon.svg"));
+  const digest = createHash("sha256").update(icon).digest("hex").slice(0, 12);
+  assert.equal(href, `icon-${digest}.svg`, "a changed design must change the browser favicon URL");
+  assert.deepEqual(fs.readFileSync(path.join(__dirname, href)), icon);
+  assert.ok(serviceWorkerSource().includes(`./${href}`), "the versioned favicon must be available offline");
+});
+
 test("PWA contract: original checklist and chain mark uses the scenic palette", () => {
   const icon = fs.readFileSync(path.join(__dirname, "icon.svg"), "utf8");
   for (const id of ["checklist", "chain", "chain-link-1", "chain-link-2", "checkmark-1", "checkmark-2", "checkmark-3"]) {
