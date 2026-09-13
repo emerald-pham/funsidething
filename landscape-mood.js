@@ -667,39 +667,81 @@
     }
     humanText = next;
   }
-  function pick(lines, random) { return lines[Math.floor(randomFraction(random) * lines.length)]; }
-  function airplaneMessage(random) { return pick(humanText.Airplanes || AI_AIRPLANE_LINES, random); }
+  const HISTORY_KEY = 'fvp:chain-scanner:scene-seen:v1';
+  const SEEN_MS = 7 * 86400000;
+  let historyStorage = null, historyClock = () => Date.now(), seen = new Map();
+  function configureHistory(storage, clock = () => Date.now()) {
+    historyStorage = storage; historyClock = clock; seen = new Map();
+  }
+  function readSeen() {
+    const now = historyClock();
+    // Each observation has its own storage key. Concurrent tabs cannot replace
+    // one another's observations as they could with one read/modify/write list.
+    // A blocked store still leaves the in-memory history usable for this visit.
+    try {
+      const keys = Array.from({length: historyStorage?.length || 0}, (_,i) => historyStorage.key(i));
+      for (const key of keys) {
+        if (!key?.startsWith(HISTORY_KEY + ':')) continue;
+        let rows;
+        try { rows = JSON.parse(historyStorage.getItem(key)); } catch { continue; }
+        if (!Array.isArray(rows)) continue;
+        let expired = true;
+        for (const row of rows) {
+          if (!Array.isArray(row) || typeof row[0] !== 'string' || !Number.isFinite(row[1])) continue;
+          if (now - row[1] < SEEN_MS) expired = false;
+          if (row[1] <= now && now - row[1] < SEEN_MS)
+            seen.set(row[0], Math.max(seen.get(row[0]) || 0, row[1]));
+        }
+        if (expired) historyStorage.removeItem(key);
+      }
+    } catch {}
+    for (const [text, at] of seen) if (now - at >= SEEN_MS) seen.delete(text);
+    return seen;
+  }
+  function recordSeen(text, seenKey = text) {
+    if (!text) return;
+    readSeen();
+    const now = historyClock(), rows = [...new Set([text, seenKey])].map(key => [key, now]);
+    for (const [key, at] of rows) seen.set(key, at);
+    // Store rendered wording and its template identity atomically. The identity
+    // holds across clock labels; the wording holds across human/AI/banner pools.
+    const key = HISTORY_KEY + ':' + now + ':' + encodeURIComponent(text) + ':' + encodeURIComponent(seenKey);
+    try { historyStorage?.setItem(key, JSON.stringify(rows)); } catch {}
+  }
+  function unique(lines) { return [...new Set(lines)]; }
+  function unseen(lines) { const history = readSeen(); return unique(lines).filter(text => !history.has(text)); }
+  function pick(lines, random) { return lines[Math.floor(randomFraction(random) * lines.length)] || ''; }
+  function airplaneMessage(random) { return pick(unseen(humanText.Airplanes || AI_AIRPLANE_LINES), random); }
   // Reserved for future skywriter rendering; no invented human placeholders.
-  function skywriterMessage(random) { return pick(humanText.Skywriters || [''], random); }
+  function skywriterMessage(random) { return pick(unseen(humanText.Skywriters || []), random); }
   function messageEntry(date, location, random) {
     validDate(date);
     const context = normalizedLocation(location);
     const parts = localParts(date, context.timezone);
-    // Flatten first so every eligible line has one equal share, regardless
-    // of how many lines its occasion contributes. Human copy excludes AI.
-    const lines = [
-      ...(humanText['Hour ' + String(parts.hour).padStart(2, '0')] || []),
-      ...(humanText['Holiday ' + holidayForParts(parts)] || []),
+    const name = holidayForParts(parts);
+    const hourly = humanText['Hour ' + String(parts.hour).padStart(2, '0')] || [];
+    const human = unique([
+      ...hourly, ...(humanText['Holiday ' + name] || []),
       ...(humanText['Any time of day'] || []),
-    ];
-    return lines.length ? {text: pick(lines, random), author: 'Human'} :
-      {text: aiMessage(date, location, random), author: 'AI'};
+    ]);
+    if (human.length) {
+      const available = unseen(human);
+      if (available.length) return {text: pick(available, random), author: 'Human'};
+    } else {
+      // The changing clock label is presentation, not a new holiday variant.
+      const ai = name ? HOLIDAY_LINES[name].map(line => ({text: materializeHoliday(line, parts.hour, name), seenKey: 'holiday:' + name + ':' + line})) :
+        HOUR_LINES[parts.hour].map(text => ({text, seenKey: text}));
+      const history = readSeen();
+      const available = ai.filter(entry => !history.has(entry.seenKey) && !history.has(entry.text));
+      if (available.length) return {...available[Math.floor(randomFraction(random) * available.length)], author: 'AI'};
+    }
+    // Exhaust the full matching pool before allowing any repeats. Only the
+    // current hour recycles; holiday/anytime lines keep their seven-day hold.
+    const fallback = hourly.length ? hourly : HOUR_LINES[parts.hour];
+    const freshHourly = unseen(fallback);
+    return {text: pick(freshHourly.length ? freshHourly : unique(fallback), random), author: hourly.length ? 'Human' : 'AI'};
   }
   function message(date, location, random) { return messageEntry(date, location, random).text; }
-
-  // Existing hourly and holiday catalogs are AI-written fallback copy.
-  function aiMessage(date, location, random) {
-    validDate(date);
-    const context = normalizedLocation(location);
-    const parts = localParts(date, context.timezone);
-    const name = holidayForParts(parts);
-    if (name) {
-      const lines = HOLIDAY_LINES[name];
-      return materializeHoliday(lines[Math.floor(randomFraction(random) * lines.length)], parts.hour, name);
-    }
-    const lines = HOUR_LINES[parts.hour];
-    return lines[Math.floor(randomFraction(random) * lines.length)];
-  }
 
   function holiday(date, location) {
     validDate(date);
@@ -715,7 +757,7 @@
 
   const api = Object.freeze({
     season, palette, clock, period, holiday, message, messages: message,
-    setHumanText, messageEntry, airplaneMessage, skywriterMessage,
+    setHumanText, messageEntry, airplaneMessage, skywriterMessage, configureHistory, recordSeen,
     messageCatalog: Object.freeze(messageCatalog), messageCount: messageCatalog.length,
     holidayCatalog,
     periods: Object.freeze(PERIOD_NAMES.slice()),

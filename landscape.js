@@ -11,6 +11,37 @@
   if(!b||!g){host.hidden=true;return;}
   const mq=window.matchMedia('(prefers-reduced-motion: reduce)');
   let storage;try{storage=window.localStorage;}catch{storage=null;}
+  LandscapeMood.configureHistory(storage);
+  let currentEntry=null,visibleBanners=[];
+  function sceneTextVisible(element){
+    const rect=element.getBoundingClientRect();
+    if(!rect.width||!rect.height)return false;
+    const x=(Math.max(0,rect.left)+Math.min(window.innerWidth,rect.right))/2;
+    const y=(Math.max(0,rect.top)+Math.min(window.innerHeight,rect.bottom))/2;
+    if(rect.bottom<=0||rect.top>=window.innerHeight||rect.right<=0||rect.left>=window.innerWidth)return false;
+    const hit=document.elementFromPoint(x,y);
+    return hit===element||element.contains(hit);
+  }
+  function scenePointVisible(x,y){
+    if(x<0||x>window.innerWidth||y<0||y>window.innerHeight)return false;
+    const hit=document.elementFromPoint(x,y);
+    return hit===document.body||hit===document.documentElement||!!hit?.closest('#landscape');
+  }
+  function observeSceneInteraction(event){
+    // Passive time, synthetic events, hidden tabs, and covered text are not
+    // evidence of reading. Capture before a click changes the displayed UI.
+    if(!event.isTrusted||document.hidden||!document.hasFocus())return;
+    if(currentEntry&&!currentEntry.seen&&sceneTextVisible(status)){
+      LandscapeMood.recordSeen(currentEntry.text,currentEntry.seenKey||currentEntry.text);currentEntry.seen=true;
+    }
+    for(const {event:banner,x,y} of visibleBanners){
+      if(!banner.textSeen&&banner.bannerText&&scenePointVisible(x,y)){
+        LandscapeMood.recordSeen(banner.bannerText);banner.textSeen=true;
+      }
+    }
+  }
+  for(const type of ['pointerdown','keydown','wheel','touchstart'])
+    document.addEventListener(type,observeSceneInteraction,{capture:true,passive:true});
   let preference=S.readMotion(storage),reduced=S.motionReduced(preference,mq.matches);
   const cityLights={next:30,windows:[]};
   let W=0,H=0,hy=0,dpr=1,frame=0,last=0,nextPaint=0,sky,p,world=S.createWorld();
@@ -242,6 +273,7 @@
     }
   }
   function paintLife(t){
+    visibleBanners=[];
     g.clearRect(0,0,W,H);
     for(const e of world.events)if(e.type==='meteor'&&p.night>.3){
       const f=e.age/e.duration,dx=(e.reverse?-1:1)*(85+e.seed*70),dy=24+e.lane*20;
@@ -601,9 +633,12 @@
     }
     if(e.type==='banner'){
       const y=hy*.3+e.lane*hy*.18,bx=x-dir*86;
+      if(e.bannerText===undefined)e.bannerText=LandscapeMood.airplaneMessage(e.seed);
+      if(!e.bannerText){airplane(x,y,dir,e.seed);return true;}
+      visibleBanners.push({event:e,x:bx,y:y+3});
       airplane(x,y,dir,e.seed);line(g,x-dir*18,y,bx+dir*39,y+3,'#99a69b',.7);
       g.save();g.translate(bx,y+3);g.rotate(Math.sin(t)*.025);g.fillStyle=S.mixHex('#fff2d8',c,.2);g.fillRect(-39,-6,78,12);
-      g.fillStyle='#4d6c72';g.font='7px sans-serif';g.textAlign='center';g.fillText(LandscapeMood.airplaneMessage(e.seed),0,2.5);g.restore();return true;
+      g.fillStyle='#4d6c72';g.font='7px sans-serif';g.textAlign='center';g.fillText(e.bannerText,0,2.5);g.restore();return true;
     }
     return false;
   }
@@ -623,6 +658,7 @@
     document.documentElement.style.setProperty('--scene-tint',p.tint);
     document.documentElement.dataset.scenePeriod=sky.period;
     const entry=LandscapeMood.messageEntry(sky.date,{...location,sunAltitude:sky.sun.altitude},Math.random);
+    currentEntry=entry;
     status.textContent=entry.text+' · '+entry.author+' written';
     paintBackground();paintLife(world.elapsed);
   }

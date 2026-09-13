@@ -7,10 +7,19 @@ airplane/skywriter lines very short so they fit in the sky.
 
 Hours use the scene location’s local 24-hour clock: 00 is midnight, 12 is noon.
 All human lines matching the current hour, holiday, or Any time of day section
-form one pool. Each bullet has an equal chance, regardless of its section.
-If that pool has any lines, AI copy is excluded. With no matching human lines,
-the existing AI defaults are used. Airplanes use only their own human lines once
-any exist, with an equal chance for each line.
+form one pool. Each distinct line has an equal chance, regardless of its section.
+Human copy takes priority over AI defaults while any matching unseen lines remain.
+
+A line counts as seen only after a click, tap, key press, or scroll while it is
+visible in the focused page. Seen history is stored on this device, shared across
+its tabs, and lasts seven real days (scene-time overrides do not change it).
+Passive display does not count. Repeating a line in multiple sections does not
+bypass its history or give it more chances.
+
+If every matching line was seen recently, only the current hourly pool may repeat.
+Use human hourly lines when present; otherwise use AI hourly defaults. Holiday
+and anytime lines remain held for seven days. Airplanes use their own human pool
+when populated, otherwise AI defaults; with no unseen lines they fly without text.
 Skywriters are reserved for a future animation; adding lines does not create it.
 Existing hourly, holiday, and airplane defaults in landscape-mood.js are AI-written.
 

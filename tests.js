@@ -9109,3 +9109,128 @@ test('Scan help describes descending learned likelihood instead of random sampli
   assert.ok(!html.includes('dealt by sampling those posteriors'));
   assert.ok(html.includes('highest estimated likelihood first'));
 });
+
+test('Scene seen history: selection alone does not consume lines; interaction history lasts exactly seven days', () => {
+  const mood=moodRuntime();let now=1000000000;const saved=new Map();
+  const storage={getItem:k=>saved.get(k)||null,setItem:(k,v)=>saved.set(k,v),key:i=>[...saved.keys()][i],get length(){return saved.size;},removeItem:k=>saved.delete(k)};
+  mood.configureHistory(storage,()=>now);
+  mood.setHumanText('## Hour 15\n- First\n- Second\n## Any time of day\n- Anytime');
+  const date=new Date('2026-08-11T15:00:00Z');
+  assert.equal(mood.message(date,'UTC',0),'First');
+  assert.equal(mood.message(date,'UTC',0),'First','passive display is not consumption');
+  mood.recordSeen('First');
+  assert.equal(mood.message(date,'UTC',0),'Second');
+  const reload=moodRuntime();reload.configureHistory(storage,()=>now);
+  reload.setHumanText('## Hour 15\n- First\n- Second');
+  assert.equal(reload.message(date,'UTC',0),'Second','reload retains seen history');
+  now+=7*86400000-1;
+  assert.equal(mood.message(date,'UTC',0),'Second');
+  now++;
+  assert.equal(mood.message(date,'UTC',0),'First','exact seven-day expiry');
+});
+
+test('Scene seen history: exhaust unseen matching pools before recycling hourly lines only', () => {
+  const mood=moodRuntime();mood.configureHistory(null,()=>1000000000);
+  mood.setHumanText('## Hour 15\n- Hour\n## Holiday Christmas Day\n- Holiday\n## Any time of day\n- Anytime');
+  const date=new Date('2026-12-25T15:00:00Z');
+  mood.recordSeen('Hour');assert.equal(mood.message(date,'UTC',0),'Holiday');
+  mood.recordSeen('Holiday');assert.equal(mood.message(date,'UTC',0),'Anytime');
+  mood.recordSeen('Anytime');
+  for(const random of [0,.5,.999])assert.equal(mood.message(date,'UTC',random),'Hour');
+});
+
+test('Scene seen history: identical text shares history across pools and banner flights', () => {
+  const mood=moodRuntime();mood.configureHistory(null,()=>1000000000);
+  mood.setHumanText('## Hour 15\n- Shared\n## Any time of day\n- Shared\n- Other\n## Airplanes\n- Shared\n- Banner\n## Skywriters\n- Shared');
+  const date=new Date('2026-08-11T15:00:00Z');
+  assert.equal(mood.message(date,'UTC',.5),'Other','duplicate text is one candidate');
+  mood.recordSeen('Shared');assert.equal(mood.airplaneMessage(0),'Banner');
+  assert.equal(mood.skywriterMessage(0),'');
+  mood.recordSeen('Banner');assert.equal(mood.airplaneMessage(0),'','no banner repeats when its pool is exhausted');
+});
+
+test('Scene seen history: corrupt or unavailable storage cannot stop messages', () => {
+  const mood=moodRuntime();
+  mood.configureHistory({length:1,key:()=> 'fvp:chain-scanner:scene-seen:v1:corrupt',getItem:()=>'{broken',setItem:()=>{throw Error('blocked');}},()=>1000000000);
+  mood.setHumanText('## Hour 15\n- First\n- Second');
+  mood.recordSeen('First');
+  assert.equal(mood.message(new Date('2026-08-11T15:00:00Z'),'UTC',0),'Second');
+});
+
+test('Scene observation: only trusted interaction with visible text in a focused page records it once', () => {
+  const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+  const start=source.indexOf('  function observeSceneInteraction(event)');
+  assert.ok(start>=0,'interaction observer exists');
+  const end=source.indexOf('\n  for(const type of',start);
+  const calls=[];const ctx=vm.createContext({
+    document:{hidden:false,hasFocus:()=>true}, currentEntry:{text:'Visible',seen:false},
+    status:{}, visibleBanners:[], sceneTextVisible:()=>true, scenePointVisible:()=>true,
+    LandscapeMood:{recordSeen:text=>calls.push(text)},
+  });
+  vm.runInContext(source.slice(start,end),ctx);
+  ctx.observeSceneInteraction({isTrusted:false});assert.deepEqual(calls,[]);
+  ctx.document.hidden=true;ctx.observeSceneInteraction({isTrusted:true});assert.deepEqual(calls,[]);
+  ctx.document.hidden=false;ctx.sceneTextVisible=()=>false;
+  ctx.observeSceneInteraction({isTrusted:true});assert.deepEqual(calls,[]);
+  ctx.sceneTextVisible=()=>true;ctx.document.hasFocus=()=>false;
+  ctx.observeSceneInteraction({isTrusted:true});assert.deepEqual(calls,[]);
+  ctx.document.hasFocus=()=>true;ctx.observeSceneInteraction({isTrusted:true});
+  ctx.observeSceneInteraction({isTrusted:true});assert.deepEqual(calls,['Visible']);
+  ctx.visibleBanners=[{event:{bannerText:'Flying line'},x:30,y:30}];
+  ctx.scenePointVisible=()=>false;ctx.observeSceneInteraction({isTrusted:true});
+  assert.deepEqual(calls,['Visible'],'covered banner does not count');
+  ctx.scenePointVisible=()=>true;ctx.observeSceneInteraction({isTrusted:true});
+  ctx.observeSceneInteraction({isTrusted:true});
+  assert.deepEqual(calls,['Visible','Flying line'],'visible banner counts once per flight');
+});
+
+test('Scene seen history: holiday templates stay seen when their displayed hour changes', () => {
+  const mood=moodRuntime();mood.configureHistory(null,()=>1000000000);
+  const first=mood.messageEntry(new Date('2026-12-25T15:00:00Z'),'UTC',0);
+  assert.ok(first.seenKey,'AI holiday variants have a stable identity');
+  mood.recordSeen(first.seenKey);
+  const next=mood.messageEntry(new Date('2026-12-25T16:00:00Z'),'UTC',0);
+  assert.notEqual(next.seenKey,first.seenKey);
+  assert.notEqual(next.text.replace('4 PM','3 PM'),first.text,'the same source template must not return with another clock label');
+});
+
+test('Scene seen history: separate tabs merge observed lines rather than losing earlier history', () => {
+  const saved=new Map();const storage={getItem:k=>saved.get(k)||null,setItem:(k,v)=>saved.set(k,v),key:i=>[...saved.keys()][i],get length(){return saved.size;},removeItem:k=>saved.delete(k)};
+  const a=moodRuntime(),b=moodRuntime();
+  for(const mood of [a,b]){mood.configureHistory(storage,()=>1000000000);mood.setHumanText('## Hour 15\n- One\n- Two\n- Three');}
+  a.recordSeen('One');b.recordSeen('Two');
+  assert.equal(a.message(new Date('2026-08-11T15:00:00Z'),'UTC',0),'Three');
+});
+
+test('Scene seen history: exhausted non-hour human pools fall back to hourly AI without releasing holiday or anytime lines', () => {
+  const mood=moodRuntime();mood.configureHistory(null,()=>1000000000);
+  mood.setHumanText('## Any time of day\n- Human anytime\n## Holiday Christmas Day\n- Human holiday');
+  mood.recordSeen('Human anytime');mood.recordSeen('Human holiday');
+  const entry=mood.messageEntry(new Date('2026-12-25T15:00:00Z'),'UTC',0);
+  assert.equal(entry.author,'AI');
+  assert.ok(mood.messageCatalog.some(line=>line.hour===15&&line.text===entry.text));
+});
+
+
+test('Scene seen history: holiday template and rendered wording are recorded together across text pools', () => {
+  const mood=moodRuntime();mood.configureHistory(null,()=>1000000000);
+  const first=mood.messageEntry(new Date('2026-12-25T15:00:00Z'),'UTC',0);
+  mood.recordSeen(first.text,first.seenKey);
+  const next=mood.messageEntry(new Date('2026-12-25T16:00:00Z'),'UTC',0);
+  assert.notEqual(next.text.replace('4 PM','3 PM'),first.text);
+  mood.setHumanText('## Hour 15\n- '+first.text+'\n- Other\n## Airplanes\n- '+first.text+'\n- Banner');
+  assert.equal(mood.message(new Date('2026-12-25T15:00:00Z'),'UTC',0),'Other');
+  assert.equal(mood.airplaneMessage(0),'Banner');
+});
+
+test('Scene seen history: interleaved tab writes cannot overwrite different observations', () => {
+  const saved=new Map();let interleave=null;
+  const storage={getItem:k=>saved.get(k)||null,key:i=>[...saved.keys()][i],get length(){return saved.size;},removeItem:k=>saved.delete(k),
+    setItem(k,v){if(interleave){const other=interleave;interleave=null;other();}saved.set(k,v);}};
+  const a=moodRuntime(),b=moodRuntime();
+  for(const mood of [a,b])mood.configureHistory(storage,()=>1000000000);
+  interleave=()=>b.recordSeen('Two');a.recordSeen('One');
+  const reload=moodRuntime();reload.configureHistory(storage,()=>1000000000);
+  reload.setHumanText('## Hour 15\n- One\n- Two\n- Three');
+  assert.equal(reload.message(new Date('2026-08-11T15:00:00Z'),'UTC',0),'Three');
+});
