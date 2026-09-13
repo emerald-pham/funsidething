@@ -14,9 +14,11 @@ Light/Dark/System applies only to the foreground app. It receives a subtle scene
 
 First launch asks for Normal or Reduced motion. Settings and a footer control reopen that choice. A device request for reduced motion always wins, including changes while the app is open. Reduced motion stops all ambient animation; the sky and clock still update once per minute to reflect reality. Before a choice, the scene is still; Escape chooses reduced motion. The preference is device-local, not cloud-synced. If storage is blocked, it still applies for that visit.
 
-Normal motion uses persistent clouds and wind, with fireflies after dusk, plus bounded randomized arrivals. Morning arrivals are more frequent. Rare alien visits have at least seven minutes of active-scene cooldown; the cow is returned unharmed. Returning to a tab refreshes ordinary arrivals without resetting the rare-event cooldown. Hidden tabs stop the animation and astronomy timers.
+Normal motion uses persistent clouds and wind, with fireflies after dusk, plus bounded randomized arrivals. Morning arrivals are more frequent. Rare alien visits have at least seven minutes of active-scene cooldown; the cow is returned unharmed. Returning to a tab resumes existing visitors without resetting the rare-event cooldown. Hidden tabs stop the animation and astronomy timers.
 
 The scenery uses two local canvases: a cached background and sparse dynamic foreground. The loop is capped at 30 fps, effective DPR at 1.5, each canvas at three million pixels, and transient events at 14. Tab switches preserve active visitors and their progress. Long suspended intervals are not replayed. All assets are precached for offline PWA use. No runtime landscape API, key, billing or quota is involved.
+
+Cyclists pedal through a complete crank rotation. Deer legs share the body’s slope transform, dogs plant their paws according to distance traveled, and nesting birds perch before taking off and leaving the scene.
 
 ## Validation
 

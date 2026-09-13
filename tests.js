@@ -8801,3 +8801,64 @@ test('Animation audit: tab resume preserves visitors and their progress',()=>{
  assert.equal(stops,1);assert.equal(starts,1);
  assert.equal(JSON.stringify(world),before,'returning must not teleport or replace active visitors');
 });
+
+test('Animation poses: cyclist feet actually revolve around the crank',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ const code=source.slice(source.indexOf('  function cyclist('),source.indexOf('  function transport('));
+ const geo=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),geo);
+ const feet=[];
+ for(const t of [0,Math.PI/12,Math.PI/6,Math.PI/4]){
+  const lines=[],g=new Proxy({},{get:(o,k)=>o[k]??(()=>{}),set:(o,k,v)=>(o[k]=v,true)});
+  const ctx=vm.createContext({g,Math,TAU:Math.PI*2,geometry:geo.LandscapeGeometry.create(1000,800),trail:()=>400,p:{front:'#fff',night:0},S:{mixHex:()=> '#555'},ellipse(){},line(...args){lines.push(args);}});
+  vm.runInContext(code+`;cyclist(400,400,${t},'#aaa',1,false,'skin');`,ctx);
+  feet.push(lines.filter(a=>a[5]==='skin'&&a[6]===1.2).map(a=>[a[3],a[4]]));
+ }
+ assert.ok(new Set(feet.map(f=>JSON.stringify(f))).size===4,'feet must move through four different pedal positions');
+});
+
+test('Animation poses: deer hips follow their rotated body while feet follow the ground',()=>{
+ const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
+ for(const [w,h] of [[320,568],[1440,900]]){
+  const g=ctx.LandscapeGeometry.create(w,h);
+  assert.equal(typeof g.deerLeg,'function','deer need a shared transformed hip and ground foot pose');
+  for(const reverse of [false,true])for(const age of [5,15,25,35,45])for(const [hip,offset] of [[-4,0],[4,.5]]){
+   const pose=g.groundPose('deer',{age,duration:55,lane:.5,reverse}),leg=g.deerLeg(pose,hip,offset),a=g.tangent(g.trail,pose.x);
+   assert.ok(Math.abs(leg.hipX-(pose.x+Math.cos(a)*pose.direction*hip+Math.sin(a)*8))<1e-9);
+   assert.ok(Math.abs(leg.hipY-(pose.y+Math.sin(a)*pose.direction*hip-Math.cos(a)*8))<1e-9);
+   const foot=g.strideFoot(pose.distance,12,offset);
+   assert.equal(leg.footY,g.groundAnchor('deer',leg.footX)-foot.lift);
+  }
+ }
+ assert.match(fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),/geometry\.deerLeg\(/);
+});
+
+test('Animation poses: nesting birds depart before their event expires',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ const code=source.slice(source.indexOf("      if(e.type==='bird'){"),source.indexOf("      if(e.type==='plane'){"));
+ const geo=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),geo);
+ const geometry=geo.LandscapeGeometry.create(1000,800),S=livingSky();
+ for(const reverse of [false,true]){
+  function at(f){const birds=[];vm.runInNewContext(`(function(){${code}})()`,{e:{type:'bird',seed:.8,lane:.5,reverse},f,t:f*28,W:1000,hy:geometry.horizon,sky:{sun:{altitude:30}},geometry,S,bird(...a){birds.push(a);}});return birds;}
+  const end=at(1);assert.equal(end.length,2);
+  assert.ok(end.every(b=>reverse?b[0]<-5:b[0]>1005),'both birds must fly offscreen instead of vanishing in the nest');
+  assert.ok(Array.from({length:99},(_,i)=>at((i+1)/100)).some(b=>b.every(p=>p[4])),'birds still perch during the visit');
+  let previous=at(0);
+  for(let i=1;i<=1000;i++){const next=at(i/1000);next.forEach((b,j)=>assert.ok(Math.hypot(b[0]-previous[j][0],b[1]-previous[j][1])<12,'flight has no teleport'));previous=next;}
+ }
+});
+
+test('Animation poses: a dogs planted paw does not slide as it follows its owner',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ const dogCode=source.slice(source.indexOf("      if(e.type==='dogwalker'){"),source.indexOf("    if(e.type==='dolphin'){"));
+ const step=dogCode.match(/const foot=geometry\.strideFoot\([^;]+;/)[0];
+ const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
+ const geometry=ctx.LandscapeGeometry.create(1000,800);
+ for(const dir of [-1,1]){
+  const planted=[1,1.1].map(distance=>{
+   const dog=geometry.dogPose(400+dir*distance,distance,dir);
+   return vm.runInNewContext(step+';({x:fx,lift:foot.lift})',{geometry,dog,dir,pose:{distance},hip:0,offset:0});
+  });
+  assert.equal(planted[0].lift,0);assert.equal(planted[1].lift,0);
+  assert.ok(Math.abs(planted[0].x-planted[1].x)<1e-9,'stance paw must stay fixed in world coordinates');
+ }
+});

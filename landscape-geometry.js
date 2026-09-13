@@ -45,7 +45,35 @@
     }
     function dogPose(ownerX,distance,direction){
       const x=ownerX+direction*(16+Math.sin(distance*.15)*4);
-      return {x,y:groundAnchor('walker',x),direction};
+      // Include the dog's small lead changes in its traveled distance so paws
+      // stay planted during stance rather than sliding behind a faster leg cycle.
+      return {x,y:groundAnchor('walker',x),direction,distance:distance+Math.sin(distance*.15)*4};
+    }
+    function cycleLeg(t,offset=0){
+      const phase=t*6+offset*Math.PI*2,footX=2+Math.cos(phase)*1.7,footY=Math.sin(phase)*1.7;
+      // Two equal-length segments connect the seated hip to the moving pedal.
+      const dx=footX,dy=footY+5,d=Math.hypot(dx,dy),bend=Math.sqrt(Math.max(0,16-d*d/4));
+      return {kneeX:dx/2+dy/d*bend,kneeY:-5+dy/2-dx/d*bend,footX,footY};
+    }
+    function deerLeg(pose,hip,offset){
+      const angle=tangent(trail,pose.x),foot=strideFoot(pose.distance,12,offset);
+      const footX=pose.x+pose.direction*(hip+foot.x);
+      // The torso is rotated with the slope; its leg roots must use that same
+      // transform while hooves remain planted on the actual ground curve.
+      return {hipX:pose.x+Math.cos(angle)*pose.direction*hip+Math.sin(angle)*8,
+        hipY:pose.y+Math.sin(angle)*pose.direction*hip-Math.cos(angle)*8,
+        footX,footY:groundAnchor('deer',footX)-foot.lift};
+    }
+    function nestVisit(f,lane,reverse,perch,index=0){
+      const ease=value=>{const v=Math.max(0,Math.min(1,value));return v*v*(3-2*v);};
+      const arrival=ease(f/.55),departure=ease((f-.72)/.28);
+      const startX=(reverse?W+30:-30)+(reverse?1:-1)*index*16;
+      const endX=(reverse?-30:W+30)+(reverse?-1:1)*index*16;
+      const flightY=horizon*.42+lane*30+index*7;
+      const x=f<.55?startX+(perch.x-startX)*arrival:perch.x+(endX-perch.x)*departure;
+      const y=f<.55?flightY+(perch.y-flightY)*arrival-Math.sin(arrival*Math.PI)*35
+        :perch.y+(flightY-perch.y)*departure-Math.sin(departure*Math.PI)*35;
+      return {x,y,perched:f>=.55&&f<=.72,twig:f<.55};
     }
     function strideArm(distance,stride,offset=0){
       const x=-3*Math.cos((distance/stride+offset)*Math.PI*2);
@@ -101,7 +129,7 @@
       return rows;
     }
     const ripple=(i,t,wind=1)=>({alpha:.15+.75*(.5+.5*Math.sin(t*wind*1.3+i*1.71))**2,drift:Math.sin(t*wind*.5+i)*9,width:.65+.35*Math.sin(t*.9+i)**2});
-    return {eventDepth,dogPose,skater,fireworks,flock,dolphin,starReflection,cityReflection,sunReflection,depthBand,groundAnchor,groundTravelX,groundPose,strideArm,strideFoot,wingFold,balloonDrift,vessel,foregroundTree,nest,ripple,horizon,waterTop,far,middle,near,rail,trail,lowerRail,tangent,rider,pack};
+    return {cycleLeg,deerLeg,nestVisit,eventDepth,dogPose,skater,fireworks,flock,dolphin,starReflection,cityReflection,sunReflection,depthBand,groundAnchor,groundTravelX,groundPose,strideArm,strideFoot,wingFold,balloonDrift,vessel,foregroundTree,nest,ripple,horizon,waterTop,far,middle,near,rail,trail,lowerRail,tangent,rider,pack};
   }
   root.LandscapeGeometry={create};
 })(globalThis);

@@ -217,9 +217,16 @@
     g.save();g.translate(x,y-3.6*scale);g.rotate(geometry.tangent(trail,x));g.scale((reverse?-1:1)*scale,scale);
     g.strokeStyle=S.mixHex('#253f3b',p.front,p.night*.35);g.lineWidth=1;
     for(const xx of [-5,6]){g.beginPath();g.arc(xx,0,3.6,0,TAU);g.stroke();line(g,xx,0,xx+Math.cos(t*6)*3,Math.sin(t*6)*3,g.strokeStyle,.5);}
-    const k=Math.sin(t*6)*2;
     line(g,-5,0,-1,-5,color,1.3);line(g,-1,-5,2,0,color,1.3);line(g,2,0,-5,0,color,1.3);line(g,2,0,6,-5,color,1.3);line(g,6,-5,6,0,color,1);
-    line(g,0,-5,1+k,-2,skin,1.5);line(g,1+k,-2,2,0,skin,1.2);line(g,-1,-6,1,-11,color,2.8);line(g,1,-10,5,-7,skin,1.2);ellipse(g,2,-13,2,2,skin);ellipse(g,2,-14,2.2,1.1,color);
+    // Feet follow opposing pedals instead of remaining glued to the crank axle.
+    for(const offset of [.5,0]){
+      const leg=geometry.cycleLeg(t,offset);
+      line(g,2,0,leg.footX,leg.footY,g.strokeStyle,.7);
+      line(g,0,-5,leg.kneeX,leg.kneeY,skin,1.5);
+      line(g,leg.kneeX,leg.kneeY,leg.footX,leg.footY,skin,1.2);
+      line(g,leg.footX-1,leg.footY,leg.footX+1,leg.footY,color,.8);
+    }
+    line(g,-1,-6,1,-11,color,2.8);line(g,1,-10,5,-7,skin,1.2);ellipse(g,2,-13,2,2,skin);ellipse(g,2,-14,2.2,1.1,color);
     g.restore();
   }
   function transport(x,y,progress,isTrain,reverse){
@@ -383,12 +390,13 @@
       }
       if(e.type==='bird'){
         if(sky.sun.altitude < -8)return;
-        const nest=geometry.nest(),nx=nest.perches[0].x,ny=nest.perches[0].y;
-        // Birds visit the nest with a clean, uninterrupted wing silhouette.
-        const travel=S.smooth(0,.8,f),bx=S.lerp(e.reverse?W+20:-20,nx,travel);
-        const by=S.lerp(hy*.42+e.lane*30,ny,travel)-Math.sin(travel*Math.PI)*35;
-        bird(bx,by,3.5,t,f>.82,true);
-        if(e.seed>.4)bird(bx+S.lerp(-16,nest.perches[1].x-nx,travel),by+S.lerp(7,nest.perches[1].y-ny,travel),3,t+.6,f>.82);
+        const nest=geometry.nest();
+        // Finish the visit with a takeoff and an offscreen exit, so expiring the
+        // event cannot make a perched bird abruptly disappear from its nest.
+        for(let i=0;i<(e.seed>.4?2:1);i++){
+          const pose=geometry.nestVisit(f,e.lane,e.reverse,nest.perches[i],i);
+          bird(pose.x,pose.y,i?3:3.5,t+i*.6,pose.perched,pose.twig);
+        }
         return;
       }
       if(e.type==='plane'){
@@ -502,7 +510,7 @@
         g.beginPath();g.moveTo(pose.x+dir*hand.x,pose.y-8+hand.y);g.quadraticCurveTo((pose.x+dog.x)/2,dog.y+1,dog.x-dir*2,dog.y-5);g.strokeStyle=fur;g.lineWidth=.55;g.stroke();
         ellipse(g,dog.x,dog.y+1,5,1,S.mixHex(p.front,p.hill,.5));
         for(const [hip,offset] of [[-3,0],[3,.5]]){
-          const foot=geometry.strideFoot(pose.distance*1.7,6,offset),fx=dog.x+dir*(hip+foot.x);
+          const foot=geometry.strideFoot(dog.distance,6,offset),fx=dog.x+dir*(hip+foot.x);
           line(g,dog.x+dir*hip,dog.y-3,fx,geometry.groundAnchor('walker',fx)-foot.lift,fur,1);
         }
         g.save();g.translate(dog.x,dog.y);g.scale(dir,1);
@@ -553,8 +561,8 @@
       ellipse(g,pose.x,yy+1,deer?8:5,1.5,S.mixHex(p.front,p.hill,.4));
       // Feet plant in world coordinates during stance; their swing follows distance traveled.
       if(deer)for(const [hip,offset] of [[-4,0],[4,.5]]){
-        const foot=geometry.strideFoot(pose.distance,12,offset),fx=pose.x+dir*(hip+foot.x);
-        line(g,pose.x+dir*hip,yy-8,fx,geometry.groundAnchor(e.type,fx)-foot.lift,c,1.2);
+        const leg=geometry.deerLeg(pose,hip,offset);
+        line(g,leg.hipX,leg.hipY,leg.footX,leg.footY,c,1.2);
       }
       g.translate(pose.x,yy-pose.hop);g.rotate(geometry.tangent(trail,pose.x));g.scale(dir,1);
       ellipse(g,0,deer?-10:-3,deer?7:4,deer?4:3,c);ellipse(g,deer?7:4,deer?-16:-6,deer?3:2,deer?3:2,c);
