@@ -10,8 +10,8 @@ in `tests.js`, has been run, and has been **seen to fail for the right reason**.
 written after the code is a test that has never been observed to catch anything.
 
 The loop, every time: pin down the behavior → enumerate the cases (happy path,
-boundaries, invalid input, failure modes, ordering effects) → show the case list and
-wait → write the tests → run them and show the red output → minimum implementation →
+boundaries, invalid input, failure modes, ordering effects) → write the tests →
+run them and show the red output → minimum implementation →
 run and show the green output.
 
 Watch for a new test that passes *before* the implementation exists. That test is

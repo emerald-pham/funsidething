@@ -8286,6 +8286,32 @@ test('Landscape location: visible default-sky copy does not name Orlando',()=>{
  assert.doesNotMatch(script,/Using Orlando, FL until you opt in/);
 });
 
+test('Scanner browser: yellow task actions run horizontally below the card and wrap on mobile', {skip:!process.env.LANDSCAPE_BROWSER_URL}, async()=>{
+ const {chromium}=await import(process.env.LANDSCAPE_PLAYWRIGHT);
+ const browser=await chromium.launch({headless:true,channel:'chrome'});
+ try{
+  const page=await browser.newPage();
+  await page.addInitScript(()=>localStorage.setItem('fvp:chain-scanner:landscape-motion','reduced'));
+  await page.goto(process.env.LANDSCAPE_BROWSER_URL);
+  await page.locator('#modalRoot [data-act="close-modal"]').click();
+  await page.evaluate(()=>{addTask('Dotted task',true);addTask('Next task',false);state.interventionActive=false;render();});
+  for(const width of [1000,390,320]){
+   await page.setViewportSize({width,height:900});
+   const layout=await page.evaluate(()=>{
+    const rect=e=>{const r=e.getBoundingClientRect();return {x:r.x,y:r.y,right:r.right,bottom:r.bottom};};
+    const rail=document.querySelector('.siderail');
+    return {card:rect(document.querySelector('.cand')),rail:rect(rail),buttons:[...rail.querySelectorAll('button')].map(rect),actions:[...rail.querySelectorAll('button')].map(e=>e.dataset.act),overflow:document.documentElement.scrollWidth>innerWidth};
+   });
+   assert.ok(layout.rail.y>=layout.card.bottom,`actions must be below the yellow card at ${width}px`);
+   assert.equal(layout.buttons[0].y,layout.buttons[1].y,'buttons begin in a horizontal row');
+   if(width===1000) assert.ok(layout.buttons.every(b=>b.y===layout.buttons[0].y),'all buttons fit on one desktop row');
+   assert.deepEqual(layout.actions,['cand-done','edit','cand-worked','delete-task']);
+   assert.ok(!layout.overflow,`no horizontal page overflow at ${width}px`);
+   assert.ok(layout.buttons.every(b=>b.x>=0&&b.right<=width),'every button stays inside the viewport');
+  }
+ }finally{await browser.close();}
+});
+
 test('Scanner browser: secondary actions dim during scanning and brighten for focus or work', {skip:!process.env.LANDSCAPE_BROWSER_URL}, async()=>{
  const {chromium}=await import(process.env.LANDSCAPE_PLAYWRIGHT);
  const browser=await chromium.launch({headless:true,channel:'chrome'});

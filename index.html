@@ -121,7 +121,8 @@ textarea{width:100%;font-family:var(--font-mono);font-size:12px}
 .crumb:hover{background:light-dark(#e0dcfb,#322a58)}
 .crumbs .arrow{color:light-dark(#b9b3e8,#5f5796)}
 
-.cardrow{display:flex;gap:12px;align-items:flex-start;margin-bottom:10px}
+/* Both task cards keep their actions underneath, leaving the title full width. */
+.cardrow{display:flex;flex-direction:column;gap:8px;align-items:stretch;margin-bottom:10px}
 .card{flex:1;border-radius:12px;padding:13px 15px;display:flex;align-items:center;gap:11px;min-height:52px}
 .card .title{font-weight:600;font-size:15.5px;overflow-wrap:anywhere}
 .card a{color:inherit}
@@ -137,7 +138,7 @@ textarea{width:100%;font-family:var(--font-mono);font-size:12px}
 .chip.due-later{background:var(--chip);color:var(--mut)}
 .chip.ever{background:transparent;color:inherit;opacity:.75;font-weight:500;font-style:italic;padding:0}
 .chip.notstarted{background:transparent;color:var(--mut);opacity:.85;font-weight:600;border:1px dashed var(--line)}
-.siderail{display:flex;flex-direction:column;gap:7px;align-items:flex-end;flex:none;padding-top:2px;min-width:86px}
+.siderail{display:flex;flex-direction:row;flex-wrap:wrap;gap:7px;align-items:center;justify-content:flex-end;flex:none}
 .benchblock{margin-bottom:10px}
 .actionrow{display:flex;flex-wrap:wrap;gap:7px;align-items:center;justify-content:flex-end;margin-top:8px;transition:opacity .2s ease}
 .actionrow.disabled{opacity:.5}
