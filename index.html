@@ -656,8 +656,7 @@ function hydrateState(st){
 function defaultState(){
   const C = (id,name,active)=>({id,name,active});
   const contexts = [
-    C("c_home","At home",true), C("c_laptop","Have my laptop",true), C("c_car","Have the car",true),
-    C("c_work","At work",true), C("c_quiet","Quiet house",true), C("c_errand","Out running errands",true)
+    C("c_errand","Errands",true), C("c_home","Home Only",true)
   ];
   const T = (title,opts)=> Object.assign({
     id: uid(), title, url:null, due:null, evergreen:false, ctx:[],

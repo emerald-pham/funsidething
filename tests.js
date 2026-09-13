@@ -10,6 +10,24 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const HTML_PATH = path.join(__dirname, "index.html");
 const html = fs.readFileSync(HTML_PATH, "utf8");
 
+test("Default contexts: fresh starts contain only Errands and Home Only, enabled in order", async () => {
+  const { ctx } = await loadApp();
+  assert.deepEqual(JSON.parse(JSON.stringify(ctx.state.contexts)), [
+    { id: "c_errand", name: "Errands", active: true },
+    { id: "c_home", name: "Home Only", active: true },
+  ]);
+});
+
+test("Default contexts: saved custom contexts and task assignments survive reload", async () => {
+  const { ctx } = await loadApp();
+  const saved = JSON.parse(JSON.stringify(ctx.state));
+  saved.contexts = [{ id: "custom", name: "Workshop", active: false }];
+  saved.tasks = [{ id: "task", title: "Repair shelf", ctx: ["custom"], done: false }];
+  const restored = await loadApp({ seedStorage: { "fvp:chain-scanner:v1": JSON.stringify(saved) } });
+  assert.deepEqual(JSON.parse(JSON.stringify(restored.ctx.state.contexts)), saved.contexts);
+  assert.deepEqual(Array.from(restored.ctx.state.tasks[0].ctx), ["custom"]);
+});
+
 /* The landscape has its own clock and device preferences: it must never
    borrow task state or make network requests to decide what the sky looks like. */
 function livingSky() {
@@ -1164,7 +1182,7 @@ test("undo: stamps updatedAt so the restored state outranks the copy it reverses
 
 test("toggleContext: turning off a required context makes a task ineligible and ensureCandidate swaps it out", async () => {
   const { ctx } = await loadApp({ seed: 6 });
-  // two contexts exist by default: c_home, c_laptop, c_car, c_work, c_quiet, c_errand
+  // Two contexts exist by default: c_errand and c_home.
   const homeCtxId = ctx.state.contexts.find((c) => c.id === "c_home").id;
   const t = ctx.addTask("Needs home", false);
   const task = ctx.state.tasks.find((x) => x.id === t.id);
@@ -6399,13 +6417,13 @@ test("list filter row: a button disappears once the last task in that state lose
 
 test("list filter row: a context carried by an open task is offered alongside the badges", async () => {
   const { ctx, shim } = await loadApp({ seed: 947 });
-  ctx.addTask("Drive to the shop", false, ["c_car"]);
+  ctx.addTask("Drive to the shop", false, ["c_errand"]);
   openList(ctx);
 
   const labels = tagLabels(shim);
-  assert.ok(labels.includes("Have the car"), `a context in use should be filterable: ${labels}`);
-  assert.deepEqual(labels, ["Have the car"],
-    `and only the one in use — the other five active contexts have no tasks: ${labels}`);
+  assert.ok(labels.includes("Errands"), `a context in use should be filterable: ${labels}`);
+  assert.deepEqual(labels, ["Errands"],
+    `and only the one in use — the other active context has no tasks: ${labels}`);
 });
 
 test("list filter row: contexts nobody uses stay off the row entirely", async () => {
@@ -6415,18 +6433,18 @@ test("list filter row: contexts nobody uses stay off the row entirely", async ()
   openList(ctx);
 
   assert.deepEqual(tagLabels(shim), [],
-    `six unused contexts shouldn't clutter the row: ${tagRowHTML(shim)}`);
+    `unused contexts shouldn't clutter the row: ${tagRowHTML(shim)}`);
 });
 
 test("list filter row: an inactive context isn't offered even when a task carries it", async () => {
   const { ctx, shim } = await loadApp({ seed: 949 });
-  ctx.addTask("Drive to the shop", false, ["c_car"]);
+  ctx.addTask("Drive to the shop", false, ["c_errand"]);
   ctx.addTask("Write the scene", false, ["c_home"]);
   openList(ctx);
-  assert.deepEqual(tagLabels(shim).sort(), ["At home", "Have the car"], "precondition: both are offered");
+  assert.deepEqual(tagLabels(shim).sort(), ["Errands", "Home Only"], "precondition: both are offered");
 
-  ctx.toggleContext("c_car");
-  assert.deepEqual(tagLabels(shim), ["At home"],
+  ctx.toggleContext("c_errand");
+  assert.deepEqual(tagLabels(shim), ["Home Only"],
     `only active contexts are searchable: ${tagRowHTML(shim)}`);
 });
 
@@ -6477,11 +6495,11 @@ test("list filter: clicking 'evergreen' shows only the evergreen tasks", async (
 
 test("list filter: clicking a context shows only the tasks carrying it", async () => {
   const { ctx, shim } = await loadApp({ seed: 953 });
-  ctx.addTask("Drive to the shop", false, ["c_car"]);
+  ctx.addTask("Drive to the shop", false, ["c_errand"]);
   ctx.addTask("Write the scene", false, ["c_home"]);
   openList(ctx);
 
-  clickTag(ctx, "c:c_car");
+  clickTag(ctx, "c:c_errand");
   assert.deepEqual(rowTitles(shim), ["Drive to the shop"]);
 });
 
@@ -6501,15 +6519,15 @@ test("list filter: clicking the lit button again clears it", async () => {
 
 test("list filter: only one button is lit at a time, badge or context alike", async () => {
   const { ctx, shim } = await loadApp({ seed: 955 });
-  const a = ctx.addTask("Shunted aside", false, ["c_car"]);
-  ctx.addTask("Drive to the shop", false, ["c_car"]);
+  const a = ctx.addTask("Shunted aside", false, ["c_errand"]);
+  ctx.addTask("Drive to the shop", false, ["c_errand"]);
   ctx.state.considered[a.id] = "dislodged";
   openList(ctx);
 
   clickTag(ctx, "s:dislodged");
   assert.deepEqual(litTags(shim), ["s:dislodged"]);
-  clickTag(ctx, "c:c_car");
-  assert.deepEqual(litTags(shim), ["c:c_car"], "picking a context should replace the badge filter, not add to it");
+  clickTag(ctx, "c:c_errand");
+  assert.deepEqual(litTags(shim), ["c:c_errand"], "picking a context should replace the badge filter, not add to it");
   assert.equal(rowTitles(shim).length, 2);
 });
 
@@ -6573,26 +6591,26 @@ test("list filter: clearing the skip marks drops a badge filter that pointed at 
 
 test("list filter: deactivating the filtered context drops the filter", async () => {
   const { ctx, shim } = await loadApp({ seed: 960 });
-  ctx.addTask("Drive to the shop", false, ["c_car"]);
+  ctx.addTask("Drive to the shop", false, ["c_errand"]);
   ctx.addTask("Write the scene", false, ["c_home"]);
   openList(ctx);
-  clickTag(ctx, "c:c_car");
+  clickTag(ctx, "c:c_errand");
   assert.equal(rowTitles(shim).length, 1, "precondition: the filter is narrowing");
 
-  ctx.toggleContext("c_car");
+  ctx.toggleContext("c_errand");
   assert.equal(rowTitles(shim).length, 2);
-  assert.ok(!tagKeys(shim).includes("c:c_car"), "and the button should be gone");
+  assert.ok(!tagKeys(shim).includes("c:c_errand"), "and the button should be gone");
 });
 
 test("list filter: deleting the filtered context drops the filter", async () => {
   const { ctx, shim } = await loadApp({ seed: 961 });
-  ctx.addTask("Drive to the shop", false, ["c_car"]);
+  ctx.addTask("Drive to the shop", false, ["c_errand"]);
   ctx.addTask("Write the scene", false, ["c_home"]);
   openList(ctx);
-  clickTag(ctx, "c:c_car");
+  clickTag(ctx, "c:c_errand");
   assert.equal(rowTitles(shim).length, 1, "precondition: the filter is narrowing");
 
-  ctx.onAction("del-ctx", { dataset: { id: "c_car" } });
+  ctx.onAction("del-ctx", { dataset: { id: "c_errand" } });
   ctx.render();
   assert.equal(rowTitles(shim).length, 2);
 });
@@ -6615,12 +6633,12 @@ test("list filter: completing the only task in a filtered state drops the filter
 
 test("list filter: filtering the view never changes which contexts are active", async () => {
   const { ctx, shim } = await loadApp({ seed: 963 });
-  ctx.addTask("Drive to the shop", false, ["c_car"]);
+  ctx.addTask("Drive to the shop", false, ["c_errand"]);
   ctx.state.listOpen = true; ctx.render();
   const before = ctx.state.contexts.map((c) => [c.id, c.active]);
 
-  clickTag(ctx, "c:c_car");
-  assert.deepEqual(litTags(shim), ["c:c_car"], "precondition: the context filter is on");
+  clickTag(ctx, "c:c_errand");
+  assert.deepEqual(litTags(shim), ["c:c_errand"], "precondition: the context filter is on");
   ctx.setListQuery("drive");
 
   assert.deepEqual(ctx.state.contexts.map((c) => [c.id, c.active]), before,
@@ -6629,7 +6647,7 @@ test("list filter: filtering the view never changes which contexts are active", 
 
 test("list filter: filtering the view doesn't change what's eligible to scan", async () => {
   const { ctx, shim } = await loadApp({ seed: 964 });
-  const a = ctx.addTask("Drive to the shop", false, ["c_car"]);
+  const a = ctx.addTask("Drive to the shop", false, ["c_errand"]);
   ctx.addTask("Write the scene", false, ["c_home"]);
   ctx.state.considered[a.id] = "no";
   ctx.state.listOpen = true; ctx.render();
