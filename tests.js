@@ -8777,3 +8777,27 @@ test('Landscape stand: path visitors sort behind the counter and meadow visitors
  assert.match(source,/groundPass\.sort\(\(a,b\)=>a.depth-b.depth\)/);
  assert.match(source,/depth:geometry\.eventDepth\(e\)/);
 });
+
+test('Animation audit: steady thirty-frame pacing across display refresh rates',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ const tick=source.slice(source.indexOf('  function tick(now){'),source.indexOf('  function stop(){'));
+ for(const hz of [60,90,120,144]){
+  const paints=[],ctx=vm.createContext({reduced:false,document:{hidden:false},frame:0,last:0,lastPaint:0,nextPaint:0,world:{elapsed:0},sky:{},cityLights:{},p:{night:0},Math,requestAnimationFrame(){return 1;},S:{advance(w,dt){w.elapsed+=dt;},advanceLights(){return false;}},paintLife(){paints.push(ctx.now);}});
+  vm.runInContext(tick,ctx);
+  for(let i=1;i<=hz*2;i++){ctx.now=i*1000/hz;vm.runInContext('tick(now)',ctx);}
+  assert.ok(paints.length>=59&&paints.length<=61,`${hz}Hz produced ${paints.length} paints in two seconds; expected about 60`);
+  assert.ok(ctx.world.elapsed>1.9&&ctx.world.elapsed<=2,'motion keeps real elapsed time');
+ }
+});
+
+test('Animation audit: tab resume preserves visitors and their progress',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ const handler=source.slice(source.indexOf("  document.addEventListener('visibilitychange'"),source.indexOf("  document.addEventListener('landscape-location-change'"));
+ let listener,stops=0,starts=0;
+ const world={elapsed:42,next:50,lastRare:12,events:[{type:'walker',age:8,duration:60}]};
+ const before=JSON.stringify(world),document={hidden:true,addEventListener(type,fn){listener=fn;}};
+ vm.runInNewContext(handler,{document,world,S:{createWorld:()=>({events:[],next:3})},stop(){stops++;},start(){starts++;}});
+ listener();document.hidden=false;listener();
+ assert.equal(stops,1);assert.equal(starts,1);
+ assert.equal(JSON.stringify(world),before,'returning must not teleport or replace active visitors');
+});

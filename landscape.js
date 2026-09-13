@@ -1,5 +1,5 @@
 /* Two canvases: the painted landscape is cached, only its sparse inhabitants
-   redraw at 24fps. Device motion preference never enters the synced task state. */
+   redraw at 30fps. Device motion preference never enters the synced task state. */
 (function(){
   'use strict';
   const S=globalThis.LivingSky,host=document.getElementById('landscape');
@@ -13,7 +13,7 @@
   let storage;try{storage=window.localStorage;}catch{storage=null;}
   let preference=S.readMotion(storage),reduced=S.motionReduced(preference,mq.matches);
   const cityLights={next:30,windows:[]};
-  let W=0,H=0,hy=0,dpr=1,frame=0,last=0,lastPaint=0,sky,p,world=S.createWorld();
+  let W=0,H=0,hy=0,dpr=1,frame=0,last=0,nextPaint=0,sky,p,world=S.createWorld();
   let skyTimer=0,resizeTimer=0,returnFocus=null;
   const dialog=document.getElementById('motionDialog');
   const status=document.getElementById('sceneStatus');
@@ -617,13 +617,17 @@
   function tick(now){
     if(reduced||document.hidden){frame=0;return;}
     frame=requestAnimationFrame(tick);
-    if(now-lastPaint<1000/24)return;
+    // Carry the deadline across display frames instead of rounding every interval
+    // up (the old 24fps limiter ran at only 20fps on a 60Hz display).
+    if(now+.5<nextPaint)return;
+    nextPaint+=1000/30;
+    if(nextPaint<=now)nextPaint=now+1000/30;
     const dt=last?Math.min((now-last)/1000,.12):0;
-    last=now;lastPaint=now;S.advance(world,dt,sky);
+    last=now;S.advance(world,dt,sky);
     if(S.advanceLights(cityLights,world.elapsed,p.night>.2))paintBackground();
     paintLife(world.elapsed);
   }
-  function stop(){if(frame)cancelAnimationFrame(frame);frame=0;last=0;clearTimeout(skyTimer);clearTimeout(resizeTimer);skyTimer=0;resizeTimer=0;}
+  function stop(){if(frame)cancelAnimationFrame(frame);frame=0;last=0;nextPaint=0;clearTimeout(skyTimer);clearTimeout(resizeTimer);skyTimer=0;resizeTimer=0;}
   function scheduleSky(){clearTimeout(skyTimer);if(!document.hidden)skyTimer=setTimeout(()=>{refreshSky();scheduleSky();},60000);}
   function start(){
     stop();if(document.hidden)return;
@@ -691,11 +695,9 @@
   window.addEventListener('storage',event=>{if(event.key==='fvp:chain-scanner:landscape-motion'||event.key===null){preference=S.readMotion(storage);updateMotion();}});
   window.addEventListener('resize',()=>{clearTimeout(resizeTimer);if(!document.hidden)resizeTimer=setTimeout(resize,120);});
   document.addEventListener('visibilitychange',()=>{
-    if(document.hidden)stop();else{
-      // Resume with a fresh set of commonplace arrivals; the rare-event cooldown
-      // survives tab switches, so switching tabs cannot farm an alien encounter.
-      const fresh=S.createWorld();world.events=fresh.events;world.next=world.elapsed+fresh.next;start();
-    }
+    // Pause the existing scene: replacing its visitors on return visibly teleports
+    // people and vehicles. start() resets the clock so hidden time never catches up.
+    if(document.hidden)stop();else start();
   });
   document.addEventListener('landscape-location-change',()=>{refreshSky();});
   window.addEventListener('pagehide',stop);
