@@ -575,13 +575,14 @@
   document.addEventListener('click',event=>{
     const control=event.target.closest('[data-act="scene-time-settings"], [data-scene-time], [data-scene-preset]');if(!control)return;
     if(control.dataset.act==='scene-time-settings'){
-      timeReturnFocus=document.activeElement;const saved=S.readSceneTime(storage);timeInput.value=saved&&saved.includes(':')?saved:new Date().toTimeString().slice(0,5);
+      timeReturnFocus=document.activeElement;const saved=S.readSceneTime(storage);timeInput.value=S.sceneDate(new Date(),storage,globalThis.LivingLocation?.current()).toTimeString().slice(0,5);
       timeStatus.textContent=saved?'Scene time locked to '+saved+'.':'Following live time.';timeDialog.showModal();timeInput.focus();return;
     }
     if(control.dataset.sceneTime==='close'){timeDialog.close();return;}
     const value=control.dataset.sceneTime==='live'?null:control.dataset.scenePreset||timeInput.value;
     if(value!==null&&!control.dataset.scenePreset&&!timeInput.reportValidity())return;
     if(!S.saveSceneTime(storage,value)){timeStatus.textContent='Could not save this time on this device. Please try again.';return;}
+    timeInput.value=S.sceneDate(new Date(),storage,globalThis.LivingLocation?.current()).toTimeString().slice(0,5);
     timeStatus.textContent=value?'Scene time locked to '+value+'.':'Following live time.';
     if(value==='sunrise'||value==='sunset'){const times=S.sunTimes(new Date(),globalThis.LivingLocation?.current());if(!times[value==='sunrise'?'rise':'set'])timeStatus.textContent='No '+value+' here today. Following live time until it returns.';}sunDay=null;refreshSky();
   });

@@ -8395,7 +8395,7 @@ test('Landscape browser: scene time presets persist and return to live without c
   await page.goto(process.env.LANDSCAPE_BROWSER_URL);await page.locator('#modalRoot [data-act="close-modal"]').click();
   const tasks=await page.evaluate(()=>JSON.stringify(state.tasks));
   await page.evaluate(()=>openSettings());await page.locator('[data-act="scene-time-settings"]').click();
-  await page.locator('[data-scene-preset="00:00"]').click();assert.equal(await page.evaluate(()=>document.documentElement.dataset.scenePeriod),'night');
+  await page.locator('[data-scene-preset="00:00"]').click();assert.equal(await page.locator('#sceneTimeInput').inputValue(),'00:00');assert.equal(await page.evaluate(()=>document.documentElement.dataset.scenePeriod),'night');
   await page.locator('[data-scene-preset="12:00"]').click();assert.equal(await page.evaluate(()=>document.documentElement.dataset.scenePeriod),'day');
   await page.locator('[data-scene-preset="sunset"]').click();assert.equal(await page.evaluate(()=>LivingSky.readSceneTime(localStorage)),'sunset');
   await page.locator('#sceneTimeInput').fill('23:15');await page.locator('[data-scene-time="lock"]').click();
