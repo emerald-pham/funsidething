@@ -2815,21 +2815,11 @@ test("skippedLabel: the countdown tracks the nearer 02:00 ceiling, not the full 
 });
 
 /* =====================================================================
-   A SCAN PASS GOES STALE AFTER 18 HOURS
-   FVP builds one chain per pass. The skip marks from that pass (no,
-   dislodged, and an evergreen completion's "done") only clear when the
-   chain drains and newPass() runs. On a scan that spans more than a day
-   without the chain ever emptying, those marks — and an evergreen you
-   finished hours ago — never recycle. So the pass carries a start time
-   (state.passStartedAt); once it is STALE_PASS_MS old, the next
-   ensureCandidate() auto-runs newPass(). The chain is left intact, and
-   fresh can't / worked marks keep their own windows.
+   SCAN PASSES RECYCLE AT THE LOCAL 02:00 DATE MARKER
+   A pass carries its start time so overnight skips recycle without draining
+   the dotted chain. Elapsed hours alone never recycle a same-day pass.
    ===================================================================== */
 
-test("STALE_PASS_MS is 18 hours", async () => {
-  const { ctx } = await loadApp({ seed: 441 });
-  assert.equal(readConst(ctx, "STALE_PASS_MS"), 18 * 3600000);
-});
 
 test("defaultState includes passStartedAt: 0", async () => {
   const { ctx } = await loadApp({ seed: 440 });
@@ -2865,7 +2855,7 @@ test("passStartedAt: resuming a paused scan does NOT re-stamp the pass", async (
 
   setFakeTime(ctx, t0 + 120000);
   ctx.startScan();                                  // resume
-  assert.equal(ctx.state.passStartedAt, t0, "resuming must not restart the 18h clock");
+  assert.equal(ctx.state.passStartedAt, t0, "resuming must not move the pass start");
 });
 
 test("passStartedAt: newPass() stamps the pass start time", async () => {
@@ -2877,7 +2867,7 @@ test("passStartedAt: newPass() stamps the pass start time", async () => {
   assert.equal(ctx.state.passStartedAt, t0 + 5000);
 });
 
-test("a pass 18h old auto-runs newPass() on the next ensureCandidate(): no / dislodged marks clear", async () => {
+test("a pass date-marker old auto-runs newPass() on the next ensureCandidate(): no / dislodged marks clear", async () => {
   const { ctx } = await loadApp({ seed: 433 });
   ctx.addTask("Benchmark", false);
   ctx.addTask("Said no", false);
@@ -2893,11 +2883,11 @@ test("a pass 18h old auto-runs newPass() on the next ensureCandidate(): no / dis
   ctx.dislodge();                                   // pops "Dot me", marks it "dislodged"
   assert.equal(ctx.state.considered[dislodgedId], "dislodged");
 
-  setFakeTime(ctx, t0 + 18 * 3600000);              // 18h later
+  setFakeTime(ctx, ctx.passResetCutoff(t0));              // date-marker later
   ctx.ensureCandidate();
 
-  assert.equal(ctx.state.considered[noId], undefined, "an 18h-old 'no' recycles");
-  assert.equal(ctx.state.considered[dislodgedId], undefined, "an 18h-old 'dislodged' recycles");
+  assert.equal(ctx.state.considered[noId], undefined, "an date-marker-old 'no' recycles");
+  assert.equal(ctx.state.considered[dislodgedId], undefined, "an date-marker-old 'dislodged' recycles");
 });
 
 test("a pass 17h old that has not crossed 02:00 does NOT recycle — the marks are still there", async () => {
@@ -2914,7 +2904,7 @@ test("a pass 17h old that has not crossed 02:00 does NOT recycle — the marks a
   assert.equal(ctx.state.considered[noId], "no", "17h in, no 02:00 crossed — pass is not yet stale");
 });
 
-test("the 18h auto-recycle leaves the chain and its benchmark untouched", async () => {
+test("the date-marker auto-recycle leaves the chain and its benchmark untouched", async () => {
   const { ctx } = await loadApp({ seed: 435 });
   ctx.addTask("First", true);
   ctx.addTask("Second", true);
@@ -2925,25 +2915,21 @@ test("the 18h auto-recycle leaves the chain and its benchmark untouched", async 
   const chainBefore = [...ctx.state.chain];
   const benchBefore = ctx.benchmark().id;
 
-  setFakeTime(ctx, t0 + 19 * 3600000);
+  setFakeTime(ctx, ctx.passResetCutoff(t0));
   ctx.ensureCandidate();
 
   assert.deepEqual([...ctx.state.chain], chainBefore, "every dotted task stays dotted");
   assert.equal(ctx.benchmark().id, benchBefore, "the benchmark is the same task");
 });
 
-test("fresh can't and worked marks survive the 18h auto-recycle — their own windows still apply", async () => {
+test("fresh can't and worked marks survive a long same-day pass", async () => {
   const { ctx } = await loadApp({ seed: 436 });
   ctx.state.settings.cantMin = 60;                  // 1h window
   ctx.state.settings.workedHours = 8;               // 8h window
   ctx.addTask("Benchmark", false);
   const cantT = ctx.addTask("Can't do it", false);
   const workedT = ctx.addTask("Worked on it", false);
-  // Fixed local 03:00 so the whole span stays inside one 02:00-to-02:00 day:
-  // the 18h ceiling is the trigger under test, and — now that the day line is a
-  // hard ceiling on a worked mark too — no 02:00 crossing sneaks in to expire
-  // the 30-min-old mark early. (With realNow() this flaked when the suite ran
-  // near 08:00 and `late` landed on top of an 02:00.)
+  // Fixed local 03:00 keeps this long pass inside one scan day.
   const t0 = localAt(30, 3, 0);
   setFakeTime(ctx, t0);
   ctx.startScan();                                  // pass starts at t0
@@ -2955,7 +2941,7 @@ test("fresh can't and worked marks survive the 18h auto-recycle — their own wi
   ctx.state.considered[workedT.id] = "worked"; ctx.state.workedAt[workedT.id] = late;
 
   setFakeTime(ctx, t0 + 18 * 3600000);              // Sun 21:00 — pass is 18h old; the marks are 30 min old; no 02:00 crossed
-  ctx.ensureCandidate();                            // -> auto newPass()
+  ctx.ensureCandidate();                            // no date marker crossed
 
   assert.equal(ctx.state.considered[cantT.id], "cant", "a 30-min-old can't is still within its 1h window");
   assert.equal(ctx.state.considered[workedT.id], "worked", "a 30-min-old worked mark is still within its window and before the next 02:00");
@@ -2975,10 +2961,7 @@ test("fresh can't and worked marks survive the 18h auto-recycle — their own wi
    ceiling on it. The asymmetry was the bug — crossing the date marker
    now rebuilds the pool exactly as a fresh day would, minus the dots.
 
-   The 18h ceiling is deliberately NOT a new day. It can fire without the
-   clock ever passing 02:00 (a pass opened at 03:00 goes stale at 21:00
-   the same evening), and that is a long pass, not a new one — fresh
-   can't / worked marks keep their own windows there, as they always did.
+   A long same-day pass keeps its marks; only the date marker resets them.
    ===================================================================== */
 
 test("REGRESSION: a long-window can't from last night does not survive the 02:00 date marker", async () => {
@@ -3061,12 +3044,8 @@ test("the date-marker clear leaves the chain and its benchmark alone", async () 
   assert.equal(ctx.state.considered[c.id], undefined, "while the can't mark went with the old day");
 });
 
-test("the 18h ceiling is a long pass, not a new day: a fresh can't keeps its window", async () => {
-  // The sibling of the 02:00 test above, on the trigger that does NOT mean a
-  // new day. Anchored at 03:00 so the whole 18h span stays inside one
-  // 02:00-to-02:00 day and only the elapsed-time ceiling can fire. The "no"
-  // mark is the canary: it proves the recycle really ran, so the surviving
-  // can't below is a decision and not a recycle that never happened.
+test("a long same-day pass retains skips and fresh can't windows", async () => {
+  // A long pass inside one scan day preserves both skips and fresh windows.
   const { ctx } = await loadApp({ seed: 453 });
   ctx.state.settings.cantMin = 480;
   ctx.addTask("Benchmark", false);
@@ -3083,9 +3062,9 @@ test("the 18h ceiling is a long pass, not a new day: a fresh can't keeps its win
   setFakeTime(ctx, t0 + 18 * 3600000);              // Sun 21:00 — 18h in, no 02:00 crossed
   ctx.ensureCandidate();
 
-  assert.equal(ctx.state.considered[n.id], undefined, "canary: the 18h recycle did run");
+  assert.equal(ctx.state.considered[n.id], "no", "elapsed time alone does not recycle the pass");
   assert.equal(ctx.state.considered[c.id], "cant",
-    "a 30-min-old can't survives the 18h recycle — that ceiling is not a date marker");
+    "a 30-min-old can't survives a long same-day pass");
   assert.equal(ctx.state.cantAt[c.id], late, "and keeps the timestamp its window is measured from");
 });
 
@@ -3140,7 +3119,7 @@ test("after an auto-recycle, passStartedAt is re-stamped so it does not recycle 
   const noId = ctx.state.candidateId;
   ctx.decide("no");
 
-  const recycleAt = t0 + 18 * 3600000;
+  const recycleAt = ctx.passResetCutoff(t0);
   setFakeTime(ctx, recycleAt);
   ctx.ensureCandidate();                            // recycles
   assert.equal(ctx.state.passStartedAt, recycleAt, "the clock restarts from the recycle moment");
@@ -3150,7 +3129,7 @@ test("after an auto-recycle, passStartedAt is re-stamped so it does not recycle 
   assert.equal(ctx.state.considered[noId], "no", "not stale again — no second recycle back-to-back");
 });
 
-test("an evergreen task finished mid-pass is back in the pool after the 18h recycle", async () => {
+test("an evergreen task finished mid-pass is back in the pool after the date-marker recycle", async () => {
   const { ctx } = await loadApp({ seed: 438 });
   ctx.addTask("Anchor task", false);               // oldest -> becomes the chain root
   const ever = ctx.addTask("Put on clothes", false);
@@ -3166,7 +3145,7 @@ test("an evergreen task finished mid-pass is back in the pool after the 18h recy
   assert.equal(ctx.state.considered[ever.id], "done");
   assert.ok(!ctx.pool().some((t) => t.id === ever.id), "out of the pool while the done mark stands");
 
-  setFakeTime(ctx, t0 + 18 * 3600000);              // pass goes stale (also well past the 90-min evergreen rest)
+  setFakeTime(ctx, ctx.passResetCutoff(t0));              // pass goes stale (also well past the 90-min evergreen rest)
   ctx.ensureCandidate();
 
   assert.equal(ctx.state.considered[ever.id], undefined, "the done mark is recycled");
@@ -3189,7 +3168,7 @@ test("migration: a state with no passStartedAt loads as 0 and never auto-recycle
   assert.equal(ctx.state.considered[noId], "no", "passStartedAt 0 never triggers a recycle, no matter the elapsed time");
 });
 
-test("existing data: a pre-change state loaded mid-pass (chain present, no passStartedAt) gets a fresh 18h window from load", async () => {
+test("existing data: a pre-change state loaded mid-pass (chain present, no passStartedAt) gets a fresh date-marker window from load", async () => {
   const stored = preChangeState({
     chain: ["root"],
     tasks: [
@@ -3207,9 +3186,9 @@ test("existing data: a pre-change state loaded mid-pass (chain present, no passS
   ctx.ensureCandidate();
   assert.equal(ctx.state.considered.other, "no", "not treated as instantly stale on the first check after upgrade");
 
-  setFakeTime(ctx, ctx.state.passStartedAt + 18 * 3600000);
+  setFakeTime(ctx, ctx.passResetCutoff(ctx.state.passStartedAt));
   ctx.ensureCandidate();
-  assert.equal(ctx.state.considered.other, undefined, "the stale pre-change pass recycles one full window after the upgrade");
+  assert.equal(ctx.state.considered.other, undefined, "the stale pre-change pass recycles at the next date marker after the upgrade");
 });
 
 test("the stale-pass recycle keeps firing day after day, not just once", async () => {
@@ -3243,15 +3222,12 @@ test("the stale-pass recycle catches up a multi-day gap in one shot, then rearms
   assert.equal(ctx.state.passStartedAt, t0 + 50 * 3600000, "clock rearmed from the moment it noticed");
 
   ctx.state.considered[skip.id] = "no";
-  setFakeTime(ctx, t0 + 50 * 3600000 + 18 * 3600000);
+  setFakeTime(ctx, ctx.passResetCutoff(ctx.state.passStartedAt));
   ctx.ensureCandidate();
   assert.equal(ctx.state.considered[skip.id], undefined, "and it fires again one window later");
 });
 
-/* ---------- secondary trigger: crossing 02:00 local time ----------
-   18h is only the ceiling. The pass is also stale the moment the local clock
-   crosses 02:00 after it started — the "new day" line, which on any evening
-   start is what actually trips first. */
+/* ---------- crossing 02:00 local time resets the scan pass ---------- */
 
 test("passResetCutoff: the first 02:00 local strictly after the given moment", async () => {
   const { ctx } = await loadApp({ seed: 444 });
@@ -3328,7 +3304,7 @@ test("the 02:00 trigger rearms for the following day after it fires", async () =
   assert.equal(ctx.state.considered[skip.id], undefined, "recycles again at the next day's 02:00");
 });
 
-test("the 18h ceiling still fires when it comes before the next 02:00", async () => {
+test("18 hours elapsed before the next 02:00 does not recycle scanned tasks", async () => {
   const { ctx } = await loadApp({ seed: 449 });
   ctx.addTask("Benchmark", false);
   const skip = ctx.addTask("Skip me", false);
@@ -3342,7 +3318,7 @@ test("the 18h ceiling still fires when it comes before the next 02:00", async ()
 
   setFakeTime(ctx, new Date(2026, 7, 29, 1, 0, 0).getTime());    // Sat 01:00 — exactly 18h in, still before 02:00
   ctx.ensureCandidate();
-  assert.equal(ctx.state.considered[skip.id], undefined, "the 18h ceiling trips an hour before the day line would have");
+  assert.equal(ctx.state.considered[skip.id], "no", "18 hours alone cannot return a scanned task");
 });
 
 /* ---------- chain start: one click, then the oldest outstanding task is dotted ----------
@@ -9088,4 +9064,48 @@ test('Resume scan: current-pass skips stay out until the exact local 2 AM bounda
   ctx.onAction('resume-scan',{});
   assert.deepEqual(new Set(Array.from(ctx.pool(),t=>t.id)),new Set([skipped.id,fresh.id]));
   assert.deepEqual(Array.from(ctx.state.chain),[root.id]);
+});
+
+test('Resume scan ranks remaining candidates strictly by estimated likelihood before and after 2 AM', async () => {
+  const {ctx} = await loadApp({seed: 730});
+  const start = new Date(2026,7,27,3).getTime();
+  setFakeTime(ctx,start);
+  const root=ctx.addTask('Benchmark',false);
+  const high=ctx.addTask('High',false), middle=ctx.addTask('Middle',false), low=ctx.addTask('Low',false);
+  high.mu=40;middle.mu=30;low.mu=20;
+  high.sigma=middle.sigma=low.sigma=8;
+  ctx.state.chain=[root.id];ctx.state.passStartedAt=start;
+  ctx.state.considered[high.id]='no';
+  ctx.state.candidateId=low.id;ctx.state.mode='work';ctx.state.interventionActive=true;
+  // Resume must discard a previously held lower candidate and avoid random sampling.
+  vm.runInContext('gauss = () => { throw new Error("Scan selection must not sample"); }; recomputeRanks = () => {};',ctx);
+  ctx.onAction('resume-scan',{});
+  assert.equal(ctx.state.candidateId,middle.id);
+  assert.equal(ctx.state.interventionActive,false);
+  ctx.decide('cant');
+  assert.equal(ctx.state.candidateId,low.id);
+  ctx.state.mode='work';
+  setFakeTime(ctx,new Date(2026,7,28,2).getTime());
+  ctx.onAction('resume-scan',{});
+  assert.equal(ctx.state.candidateId,high.id);
+  ctx.decide('cant');assert.equal(ctx.state.candidateId,middle.id);
+  ctx.decide('cant');assert.equal(ctx.state.candidateId,low.id);
+  ctx.decide('cant');assert.equal(ctx.state.candidateId,null);
+  assert.deepEqual(Array.from(ctx.state.chain),[root.id]);
+});
+
+test('Resume scan keeps skips after 18 hours until the date marker', async () => {
+  const {ctx}=await loadApp({seed:731});
+  const start=new Date(2026,7,27,3).getTime();setFakeTime(ctx,start);
+  const root=ctx.addTask('Benchmark',false), skip=ctx.addTask('Skipped',false);
+  ctx.state.chain=[root.id];ctx.state.passStartedAt=start;ctx.state.considered[skip.id]='no';
+  ctx.state.mode='work';setFakeTime(ctx,start+22*3600000);
+  ctx.onAction('resume-scan',{});
+  assert.equal(ctx.state.considered[skip.id],'no');assert.equal(ctx.state.candidateId,null);
+  assert.equal(ctx.state.passStartedAt,start);
+});
+
+test('Scan help describes descending learned likelihood instead of random sampling', () => {
+  assert.ok(!html.includes('dealt by sampling those posteriors'));
+  assert.ok(html.includes('highest estimated likelihood first'));
 });

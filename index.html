@@ -514,8 +514,7 @@ function median(arr){ if(!arr.length) return NaN; const s=[...arr].sort((a,b)=>a
    ================================================================ */
 const STORE_KEY = "fvp:chain-scanner:v1";
 const THEME_HINT_KEY = "fvp:chain-scanner:theme";   // paint-time cache only; see writeThemeHint()
-const STALE_PASS_MS = 18 * 3600000;   // a scan pass older than this auto-recycles (newPass) — see ensureCandidate()
-const PASS_RESET_HOUR = 2;            // ...and so does one that crosses 02:00 local — the "new day" line, usually the trigger that trips first
+const PASS_RESET_HOUR = 2;            // the local date marker returns scanned tasks to the pool
 /* Code-owned presentation switches, intentionally kept out of Settings and
    persisted state. The rank machinery still runs while these are off, so the
    existing UI can be restored independently by changing either value to true. */
@@ -1291,7 +1290,7 @@ function startScan(){
   commit(true, !!t);   // a dot syncs to the cloud right away
 }
 /* The first PASS_RESET_HOUR:00 local instant strictly after `startedAt` — the
-   secondary stale line. A pass started at 22:00 crosses it at 02:00; one
+   date marker. A pass started at 22:00 crosses it at 02:00; one
    started at 09:00 not until 02:00 the next day; one started exactly at 02:00
    not until 02:00 the day after, never instantly. */
 function passResetCutoff(startedAt){
@@ -1304,24 +1303,11 @@ function ensureCandidate(){
   expireCants();   // let any "can't" marks whose horizon has passed quietly rejoin the pool first
   expireWorked();  // and any "worked on it" marks whose window has passed
   reconcileHistory();   // and collapse any repeated completion that isn't a real repeat
-  // A pass is stale once it has either run for STALE_PASS_MS or crossed 02:00
-  // local (the day line — usually the one that trips first). Its no/dislodged
-  // marks and any evergreen finished hours ago recycle so the new day's
-  // priorities re-sort. newPass() keeps the chain and re-stamps passStartedAt
-  // so each trigger rearms for the next day.
-  //
-  // The two triggers do NOT mean the same thing, and newPass() needs to be told
-  // which one fired. Crossing 02:00 is a new DAY: the pool has to come back
-  // exactly as a fresh day would build it, minus the dots, so no mark is spared.
-  // Running for 18h is a long PASS, which can go stale without the clock ever
-  // passing 02:00 — one opened at 03:00 expires at 21:00 the same evening — and
-  // there a still-fresh can't/worked window is this afternoon's decision, not
-  // yesterday's, so it stands.
+  // Resume preserves this pass's decisions until the local 02:00 date marker.
+  // Elapsed hours alone must not recycle tasks the user already scanned.
+  // A new day clears all scan marks, retains the chain, and rearms the marker.
   const now = Date.now();
-  if(state.passStartedAt){
-    const newDay = now >= passResetCutoff(state.passStartedAt);
-    if(newDay || now - state.passStartedAt >= STALE_PASS_MS) newPass(false, newDay);
-  }
+  if(state.passStartedAt && now >= passResetCutoff(state.passStartedAt)) newPass(false, true);
   if(state.mode !== "scan" || state.interventionActive) return;
   // Nothing dotted means nothing to compare a candidate against, so none is
   // dealt — the scan waits behind the Start scanning button instead.
@@ -1330,7 +1316,9 @@ function ensureCandidate(){
   const cur = state.candidateId ? taskById(state.candidateId) : null;
   const valid = cur && p.some(t=>t.id===cur.id);
   if(!valid){
-    const pick = thompsonPick(p);
+    // The learned mean is our estimated preference rank. Sampling uncertainty
+    // used to let lower-ranked tasks jump ahead; ties keep pool order stable.
+    const pick = p.reduce((best,t) => !best || t.mu > best.mu ? t : best, null);
     state.candidateId = pick ? pick.id : null;
     state.presentedAt = Date.now();
   }
@@ -2197,7 +2185,7 @@ function openHelp(){
     + '<li>Tap a context chip in the <b>Add a task</b> panel to tag what you’re about to add — this allows you to more easily filter todos.</li>'
     + '</ol>'
     + '<h3>What the machinery does</h3>'
-    + '<p class="kv">Every Yes/No is a pairwise match; each task keeps a <b>strength posterior</b> (a bell curve, not a number). Candidates are dealt by sampling those posteriors, so likely picks come early and new tasks still get a look.</p>'
+    + '<p class="kv">Every Yes/No is a pairwise match; each task keeps a <b>strength posterior</b> (a bell curve, not a number). Candidates appear highest estimated likelihood first. Resume excludes tasks already scanned in this pass; the local 2 AM date marker returns them to the eligible pool.</p>'
     + (featureEnabled("rankSparklines") ? '<p class="kv rank-help-spark">The <b>sparkline</b> is an estimated rank distribution, not a progress chart. Each left-to-right position is a possible rank; a taller bump means more of the same Monte Carlo samples landed there. A shape spread across many ranks means more uncertainty.</p>' : '')
     + (featureEnabled("topKLanguage") ? '<p class="kv rank-help-topk"><b>top-K</b> is a cutoff, not an exact rank or deadline. It is the smallest K (at least 2 when there are two or more tasks) whose sampled chance of landing in the first K positions reaches 1 − 1/K. So top-3 means at least a 2/3 chance within the first three; the bar shows K out of the unfinished tasks, and a shorter bar means a smaller cutoff. With only one unfinished task, the label is top-1.</p>' : '')
     + '<p class="kv">When the odds of finding anything better collapse, the scanner interrupts your clicking and tells you to go work.</p>'
@@ -2362,7 +2350,7 @@ function onAction(act, el){
     case "reveal": revealTask(el.dataset.id); break;
     case "continue-scan": pushUndo(); state.interventionActive=false; state.snooze=12; commit(); break;
     case "start-working": pushUndo(); state.interventionActive=false; state.mode="work"; commit(); break;
-    case "resume-scan": pushUndo(); state.mode="scan"; state.snooze=6; commit(); break;
+    case "resume-scan": pushUndo(); state.mode="scan"; state.candidateId=null; state.interventionActive=false; state.snooze=6; commit(); break;
     case "start-scan": startScan(); break;
     case "rescan": rescanSkipped(); break;
     case "clear-done": clearCompleted(); openSettings(); break;
