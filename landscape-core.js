@@ -138,11 +138,24 @@
     }
     return w;
   }
+  const SCENE_TIME_KEY='fvp:chain-scanner:scene-time';
+  const validSceneTime=value=>['sunrise','sunset'].includes(value)||typeof value==='string'&&/^([01]\d|2[0-3]):[0-5]\d$/.test(value);
+  function readSceneTime(storage){try{const value=storage.getItem(SCENE_TIME_KEY);return validSceneTime(value)?value:null;}catch{return null;}}
+  function saveSceneTime(storage,value){
+    if(value!==null&&!validSceneTime(value))return false;
+    try{if(value===null)storage.removeItem(SCENE_TIME_KEY);else storage.setItem(SCENE_TIME_KEY,value);return true;}catch{return false;}
+  }
+  function sceneDate(now,storage,location){
+    const date=new Date(now),time=readSceneTime(storage);
+    if(time==='sunrise'||time==='sunset')return sunTimes(date,location)[time==='sunrise'?'rise':'set']||date;
+    if(time){const [hour,minute]=time.split(':').map(Number);date.setHours(hour,minute,0,0);}
+    return date;
+  }
   const MOTION_KEY='fvp:chain-scanner:landscape-motion';
   const normalizeMotion=v=>v==='normal'||v==='reduced'?v:null;
   function readMotion(storage){try{return normalizeMotion(storage.getItem(MOTION_KEY));}catch{return null;}}
   function saveMotion(storage,value){try{storage.setItem(MOTION_KEY,value);return true;}catch{return false;}}
   function motionReduced(value,osReduced){return !!osReduced||normalizeMotion(value)!=='normal';}
-  root.LivingSky={skyAt,sunTimes,starAt,starCount:root.SKY_STARS.length,palette,activity,createWorld,advance,
+  root.LivingSky={sceneDate,readSceneTime,saveSceneTime,skyAt,sunTimes,starAt,starCount:root.SKY_STARS.length,palette,activity,createWorld,advance,
     nightEventTypes:NIGHT_TYPES.slice(),eventTypes:EVENT_TYPES.slice(),rareTypes:RARE_TYPES.slice(),eventDurations:Object.assign({},EVENT_DURATIONS),MAX_EVENTS,RARE_COOLDOWN,readMotion,saveMotion,motionReduced,clamp,lerp,smooth,mixHex};
 })(globalThis);

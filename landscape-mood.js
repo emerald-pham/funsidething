@@ -27,118 +27,176 @@
   };
 
   const PERIOD_NAMES = ['predawn', 'morning', 'noon', 'afternoon', 'golden-hour', 'evening', 'night'];
-  const PERIOD_LINES = {
-  "predawn": [
-    "The village is still snoozing.",
-    "A tiny day is getting ready.",
-    "Shh. Even the paths are sleepy.",
-    "Your morning can wait a moment.",
-    "A cozy little pause before hello.",
-    "No hurry, early bird.",
-    "The kettle can take its time.",
-    "A quiet corner, just for you.",
-    "Pocket a little peace for later.",
-    "The day will find you soon."
+  const HOUR_LINES = [
+  [
+    "Midnight has a little room for you.",
+    "A new date, no need for a new demand.",
+    "The clock turned over. You can stay still.",
+    "Hello, midnight neighbor. Keep it gentle.",
+    "Let this first hour be a soft landing."
   ],
-  "morning": [
-    "Morning, neighbor.",
-    "A fresh day, a familiar path.",
-    "Your little corner is waking up.",
-    "Maybe a stroll before the bustle?",
-    "Good morning to you and the trees.",
-    "One tiny thing, then a tea break.",
-    "The birds have a busy little plan.",
-    "A new day fits in small steps.",
-    "Hello, lovely little morning.",
-    "Leave a little room for daydreams."
+  [
+    "One in the morning is a quiet kind of company.",
+    "A small light and a smaller next step.",
+    "You can leave a little unfinished tonight.",
+    "The late hours need no grand plans.",
+    "Rest is welcome in this corner, too."
   ],
-  "noon": [
-    "Lunch break, neighbor?",
-    "A little picnic sounds nice.",
-    "The view saved you a seat.",
-    "A tiny pause counts too.",
-    "Perhaps a sandwich by the water?",
-    "There is no rush on this path.",
-    "Time for a pocket-sized adventure.",
-    "Your next thing can be a small thing.",
-    "The village has room for a breather.",
-    "A sip of tea, a bit of sky."
+  [
+    "Two o'clock. Nothing here needs a hurry.",
+    "A quiet sip of water might be nice.",
+    "Let your shoulders find their way down.",
+    "A little pause in the middle of the night.",
+    "Even a busy mind can visit a still place."
   ],
-  "afternoon": [
-    "A little wandering time.",
-    "The long way home looks lovely.",
-    "Maybe just one more daydream.",
-    "A bench, a book, a little break.",
-    "Your to-dos can share the day.",
-    "A small step is plenty, neighbor.",
-    "The water is doing its own thing.",
-    "No need to race the butterflies.",
-    "A cozy pause between adventures.",
-    "You have earned a little looking up."
+  [
+    "Three in the morning, and the river carries on.",
+    "You do not have to solve tomorrow tonight.",
+    "A soft place for a wandering thought.",
+    "The small hours can stay small.",
+    "Put one thought down. Let the others wait."
   ],
-  "golden-hour": [
-    "The day is putting on its cozy colors.",
-    "A golden little goodbye to the day.",
-    "Time to take the scenic way home.",
-    "The village is slowing its footsteps.",
-    "A lovely hour for doing very little.",
-    "One last stroll, neighbor?",
-    "The day can end with a small thing.",
-    "A warm little pause before evening.",
-    "Your next adventure can wait.",
-    "Pocket this little bit of evening."
+  [
+    "Four o'clock leaves room between things.",
+    "Before the bustle, a little breathing space.",
+    "The early hours have a bench for you.",
+    "No need to get ahead of the whole day.",
+    "One gentle thing is enough for now."
   ],
-  "evening": [
-    "Welcome to the cozy part of the day.",
-    "The village is tucking itself in.",
-    "A little lamplight, a little quiet.",
-    "Maybe the kettle is calling.",
-    "The paths are getting sleepy.",
-    "Time to put your busy pockets down.",
-    "Nothing wrong with a gentle evening.",
-    "The day did enough. So did you.",
-    "A quiet hello from the waterfront.",
-    "You can leave a little for tomorrow."
+  [
+    "Five o'clock. A little hello to the day.",
+    "Let the morning arrive at its own pace.",
+    "A warm cup can be a beginning.",
+    "Early bird, you can take the slow path.",
+    "A fresh page does not need filling at once."
   ],
-  "night": [
-    "Even the busy bees have clocked out.",
-    "The village has gone soft and quiet.",
-    "A tiny goodnight from the trees.",
-    "Your next adventure can wait.",
-    "The stars can mind the sky tonight.",
-    "Rest your busy little pockets.",
-    "No errands for the moon tonight.",
-    "A cozy corner under the stars.",
-    "Time for a small, sleepy pause.",
-    "Goodnight, neighbor."
+  [
+    "Six o'clock, and a new little chapter.",
+    "Good morning, neighbor. Start softly.",
+    "One small kindness before the day gathers speed.",
+    "There is time for a stretch and a breath.",
+    "Let your first step be an easy one."
+  ],
+  [
+    "Seven o'clock has breakfast-sized possibilities.",
+    "A sip, a bite, a little look outside.",
+    "The morning can fit around you, too.",
+    "Pick one thing to carry into the day.",
+    "A familiar path is a fine place to start."
+  ],
+  [
+    "Eight o'clock. Settle in at your own pace.",
+    "A little plan, with room around the edges.",
+    "The day need not be decided all at once.",
+    "Good morning to you and your next small step.",
+    "Take a breath before opening another door."
+  ],
+  [
+    "Nine o'clock, and one thing can have your attention.",
+    "A clear little space for a modest beginning.",
+    "You can start without knowing every step.",
+    "A cup beside you, a single thing ahead.",
+    "The rest of the list can wait its turn."
+  ],
+  [
+    "Ten o'clock might be a good time to look up.",
+    "A tiny break belongs in the morning, too.",
+    "Let your eyes wander farther than the next task.",
+    "A little water, a little sky, then onward.",
+    "There is room for a slower minute."
+  ],
+  [
+    "Eleven o'clock. Leave some room for lunch.",
+    "One more small step, if it feels right.",
+    "The morning does not need a perfect ending.",
+    "A pause before the middle of the day.",
+    "You can set something down for a while."
+  ],
+  [
+    "Noon, neighbor. The view saved you a seat.",
+    "A midday breather is a lovely little plan.",
+    "Perhaps a sandwich and a moment by the water.",
+    "Half a day behind you. Just this moment here.",
+    "Let lunch be more than another thing to finish."
+  ],
+  [
+    "One in the afternoon. Begin again gently.",
+    "The afternoon can have a smaller plan.",
+    "A fresh sip and an unhurried next step.",
+    "You can ease back in, little by little.",
+    "There is no need to race the lunch break."
+  ],
+  [
+    "Two o'clock has room for a daydream.",
+    "A small step is still a step, neighbor.",
+    "Let the afternoon stretch its legs.",
+    "A change of view can be a little reset.",
+    "Take the next thing at a comfortable pace."
+  ],
+  [
+    "Three o'clock sounds like a tea-sized pause.",
+    "A snack, a stretch, a moment to yourself.",
+    "The river is in no rush this afternoon.",
+    "One tiny thing, then look up again.",
+    "A little breathing room for the middle stretch."
+  ],
+  [
+    "Four o'clock. Notice what is already done.",
+    "The day can leave a few loose ends.",
+    "A gentle finish begins with one small choice.",
+    "There is room to make the next thing smaller.",
+    "You can take the scenic route through this hour."
+  ],
+  [
+    "Five o'clock, and a chance to change pace.",
+    "Let the busy part of the day loosen its grip.",
+    "A small walk might be a lovely transition.",
+    "Put down one thing before picking up another.",
+    "The evening does not need the whole list."
+  ],
+  [
+    "Six o'clock brings dinner-sized daydreams.",
+    "A place at the table, a little time to breathe.",
+    "Let this hour be a softer part of the day.",
+    "Something simple can be something lovely.",
+    "A slow hello to your evening, neighbor."
+  ],
+  [
+    "Seven o'clock. Perhaps a little wandering time.",
+    "A book, a stroll, or simply this view.",
+    "There is room for things without a checkbox.",
+    "Let the evening have some unplanned space.",
+    "A quiet little adventure can stay close to home."
+  ],
+  [
+    "Eight o'clock has a cozy corner for you.",
+    "The list can wait while you settle in.",
+    "A warm drink and a softer pace.",
+    "Leave a little room for doing very little.",
+    "A gentle evening is a perfectly good plan."
+  ],
+  [
+    "Nine o'clock. Start putting the day down.",
+    "A small tidy thought, then a little peace.",
+    "Nothing needs a grand finale tonight.",
+    "The next hour can ask less of you.",
+    "Let a quiet moment be enough, neighbor."
+  ],
+  [
+    "Ten o'clock is a good hour for softer edges.",
+    "You can leave tomorrow a little note.",
+    "Let the unfinished things rest for tonight.",
+    "A last sip, a deep breath, a comfortable pause.",
+    "The day does not need any more proving."
+  ],
+  [
+    "Eleven o'clock. A gentle goodbye to the day.",
+    "Keep one kind thought and let the rest settle.",
+    "Tomorrow can meet you when it arrives.",
+    "A quiet minute before the calendar turns.",
+    "You have a place to rest your attention here."
   ]
-};
-  const SEASON_LINES = {
-  "spring": [
-    "New leaves, little joys.",
-    "Spring is taking its time.",
-    "A fresh little season.",
-    "Room for something to grow."
-  ],
-  "summer": [
-    "A soft summer hello.",
-    "Summer can take it slow.",
-    "A little summer daydream.",
-    "The green season is here."
-  ],
-  "autumn": [
-    "A cozy turn of the season.",
-    "Autumn has a gentle pace.",
-    "A little leaf-shaped joy.",
-    "Time for cozy little things."
-  ],
-  "winter": [
-    "A little winter quiet.",
-    "The cool season says hello.",
-    "A cozy season for a pause.",
-    "Winter can take its time."
-  ]
-};
+];
 
   function validDate(date) {
     if (!(date instanceof Date) || !Number.isFinite(+date)) throw new TypeError('Valid date required');
@@ -345,22 +403,10 @@
 
   function message(date, location, random) {
     validDate(date);
-    const context = normalizedLocation(location);
-    const current = season(date, context.latitude, context.timezone);
-    const which = period(date, context);
-    const lines = PERIOD_LINES[which];
-    const value = randomFraction(random);
-    const index = Math.min(lines.length - 1, Math.floor(value * lines.length));
-    const scenery = SEASON_LINES[current.name][(index + Math.floor(value * 4)) % 4];
-    return lines[index] + ' ' + scenery;
+    const hour=localParts(date,normalizedLocation(location).timezone).hour;
+    const lines=HOUR_LINES[hour];return lines[Math.floor(randomFraction(random)*lines.length)];
   }
-
-  const messageCatalog = [];
-  for (const which of PERIOD_NAMES) {
-    for (const line of PERIOD_LINES[which]) {
-      for (const name of SEASON_ORDER) messageCatalog.push({ period: which, season: name, text: line + ' ' + SEASON_LINES[name][messageCatalog.length % 4] });
-    }
-  }
+  const messageCatalog=HOUR_LINES.flatMap((lines,hour)=>lines.map(text=>({hour,text})));
 
   const api = Object.freeze({
     season, palette, clock, period, message, messages: message,

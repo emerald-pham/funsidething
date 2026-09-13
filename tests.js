@@ -8118,7 +8118,7 @@ test('Landscape browser: every visitor renders with finite geometry across short
   assert.ok(mood.messageCount >= 100, 'catalog has a hundred curated combinations');
   assert.equal(mood.messages(date('2026-06-21T13:00:00Z'), { timezone: 'America/New_York' }, () => 0), values[1]);
   assert.equal(mood.message(date('2026-06-21T13:00:00Z'), { timezone: 'America/New_York' }, () => 0), mood.message(date('2026-06-21T13:00:00Z'), { timezone: 'America/New_York' }, () => 0));
-  assert.notEqual(mood.message(date('2026-06-21T13:00:00Z'), { timezone: 'America/New_York' }, () => 0), mood.message(date('2026-12-21T13:00:00Z'), { timezone: 'America/New_York' }, () => 0));
+  assert.equal(mood.message(date('2026-06-21T13:00:00Z'), { timezone: 'America/New_York' }, () => 0), mood.message(date('2026-12-21T14:00:00Z'), { timezone: 'America/New_York' }, () => 0));
   assert.equal(mood.period(date('2026-12-21T22:00:00Z'), { timezone: 'America/New_York', sunAltitude: -2 }), 'evening');
   assert.equal(mood.period(date('2026-12-21T22:00:00Z'), { timezone: 'America/New_York', sunAltitude: 4 }), 'golden-hour');
   assert.equal(mood.period(date('2026-12-21T22:00:00Z'), { timezone: 'America/New_York', sunAltitude: null }), 'golden-hour');
@@ -8331,4 +8331,77 @@ test('Landscape nest: a new bird visit waits while the nest is occupied',()=>{
  world.events=[{type:'bird',age:0,duration:100,seed:.5,lane:.3,reverse:false}];world.next=0;
  sky.advance(world,1,{sun:{altitude:30}});
  assert.equal(world.events.filter(e=>e.type==='bird').length,1,'two arriving flocks cannot pile onto the same perches');
+});
+
+test('Landscape water: night reflects the actual city in bounded flowing strips, never a moon glint',()=>{
+ const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
+ for(const [w,h] of [[320,568],[844,390],[1440,900]]){
+  const g=ctx.LandscapeGeometry.create(w,h),rows=g.cityReflection(0,1,1),later=g.cityReflection(1,1,1);
+  assert.ok(rows.length>5&&rows.length<=80);assert.equal(g.cityReflection(0,1,0).length,0);
+  for(const row of rows){assert.ok(row.sourceY>=0&&row.sourceY<g.waterTop);assert.ok(row.y>=g.waterTop);assert.ok(Math.abs(row.dx)<5);assert.ok(row.alpha>0&&row.alpha<=.3);}
+  assert.ok(rows.some((row,i)=>row.dx!==later[i].dx),'water shifts the mirrored skyline gently');
+  assert.equal(g.sunReflection({visible:false,altitude:-20}),false);
+  assert.equal(g.sunReflection({visible:true,altitude:-1}),false);
+  assert.equal(g.sunReflection({visible:true,altitude:20}),true);
+ }
+ const runtime=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ assert.match(runtime,/geometry\.cityReflection\(/);assert.match(runtime,/drawImage\(cityReflection/);
+ assert.match(runtime,/geometry\.sunReflection\(sky.sun\)/);
+ assert.doesNotMatch(runtime,/sky\.sun\.visible\?sky\.sun:sky\.moon/);
+});
+
+test('Landscape time: a saved device-local hour locks scenery without changing the real date',()=>{
+ const sky=livingSky(),values=new Map(),storage={getItem:k=>values.get(k),setItem:(k,v)=>values.set(k,v),removeItem:k=>values.delete(k)};
+ const now=new Date(2026,8,12,14,32,45);
+ assert.equal(sky.sceneDate(now,storage).getTime(),now.getTime());
+ assert.equal(sky.saveSceneTime(storage,'23:15'),true);
+ const frozen=sky.sceneDate(now,storage);assert.equal(frozen.getHours(),23);assert.equal(frozen.getMinutes(),15);assert.equal(frozen.getSeconds(),0);assert.equal(frozen.getDate(),now.getDate());assert.equal(now.getHours(),14);
+ assert.equal(sky.saveSceneTime(storage,'25:90'),false);assert.equal(sky.sceneDate(now,storage).getHours(),23);
+ assert.equal(sky.saveSceneTime(storage,null),true);assert.equal(sky.sceneDate(now,storage).getTime(),now.getTime());
+ assert.match(html,/data-act="scene-time-settings"/);assert.match(html,/id="sceneTimeInput" type="time"/);
+});
+
+test('Landscape water: visible stars mirror into the lake with bounded drift',()=>{
+ const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
+ const g=ctx.LandscapeGeometry.create(1440,900),star={azimuth:180,altitude:25,magnitude:1};
+ const a=g.starReflection(star,0,1),b=g.starReflection(star,1,1);
+ assert.ok(Math.abs(a.x-720)<4);assert.ok(a.y>g.waterTop&&a.y<g.far(a.x));assert.notEqual(a.x,b.x);
+ assert.equal(g.starReflection({...star,altitude:-2},0,1),null);
+ assert.equal(g.starReflection({...star,magnitude:6},0,1),null);
+ const runtime=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');assert.match(runtime,/geometry\.starReflection\(/);assert.match(runtime,/S\.sceneDate\(/);
+});
+
+test('Landscape time: solar presets follow the date and saved observer',()=>{
+ const sky=livingSky(),values=new Map(),storage={getItem:k=>values.get(k),setItem:(k,v)=>values.set(k,v),removeItem:k=>values.delete(k)},location={latitude:28.5,longitude:-81.4,timezone:'America/New_York'},now=new Date('2026-09-12T16:00:00Z');
+ for(const [preset,key] of [['sunrise','rise'],['sunset','set']]){assert.equal(sky.saveSceneTime(storage,preset),true);assert.equal(sky.sceneDate(now,storage,location).getTime(),sky.sunTimes(now,location)[key].getTime());}
+ for(const preset of ['00:00','12:00','sunrise','sunset'])assert.ok(html.includes(`data-scene-preset="${preset}"`));
+});
+
+test('Landscape messages: every hour has five distinct short, season-independent comments',()=>{
+ const ctx=vm.createContext({Date,Intl,Math,JSON});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-mood.js'),'utf8'),ctx);const mood=ctx.LandscapeMood;
+ for(let hour=0;hour<24;hour++){
+  const entries=mood.messageCatalog.filter(e=>e.hour===hour);assert.equal(entries.length,5);assert.equal(new Set(entries.map(e=>e.text)).size,5);
+  const date=new Date(Date.UTC(2026,5,21,hour));
+  for(let i=0;i<5;i++)assert.equal(mood.message(date,{timezone:'UTC'},()=>i/5),entries[i].text);
+  assert.ok(entries.every(e=>e.text.length<=110&&!/summer|winter|autumn|spring|season/i.test(e.text)));
+ }
+});
+
+test('Landscape browser: scene time presets persist and return to live without changing tasks',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const {chromium}=await import(process.env.LANDSCAPE_PLAYWRIGHT),browser=await chromium.launch({channel:'chrome'});
+ try{
+  const page=await browser.newPage({viewport:{width:390,height:844},timezoneId:'America/New_York'});
+  await page.addInitScript(()=>localStorage.setItem('fvp:chain-scanner:landscape-motion','reduced'));
+  await page.goto(process.env.LANDSCAPE_BROWSER_URL);await page.locator('#modalRoot [data-act="close-modal"]').click();
+  const tasks=await page.evaluate(()=>JSON.stringify(state.tasks));
+  await page.evaluate(()=>openSettings());await page.locator('[data-act="scene-time-settings"]').click();
+  await page.locator('[data-scene-preset="00:00"]').click();assert.equal(await page.evaluate(()=>document.documentElement.dataset.scenePeriod),'night');
+  await page.locator('[data-scene-preset="12:00"]').click();assert.equal(await page.evaluate(()=>document.documentElement.dataset.scenePeriod),'day');
+  await page.locator('[data-scene-preset="sunset"]').click();assert.equal(await page.evaluate(()=>LivingSky.readSceneTime(localStorage)),'sunset');
+  await page.locator('#sceneTimeInput').fill('23:15');await page.locator('[data-scene-time="lock"]').click();
+  await page.reload();assert.equal(await page.evaluate(()=>LivingSky.readSceneTime(localStorage)),'23:15');assert.equal(await page.evaluate(()=>document.documentElement.dataset.scenePeriod),'night');
+  await page.evaluate(()=>openSettings());await page.locator('[data-act="scene-time-settings"]').click();await page.locator('[data-scene-time="live"]').click();
+  assert.equal(await page.evaluate(()=>LivingSky.readSceneTime(localStorage)),null);assert.equal(await page.evaluate(()=>JSON.stringify(state.tasks)),tasks);
+  await page.locator('[data-scene-time="close"]').click();assert.equal(await page.locator('[data-act="scene-time-settings"]').evaluate(e=>e===document.activeElement),true);
+ }finally{await browser.close();}
 });

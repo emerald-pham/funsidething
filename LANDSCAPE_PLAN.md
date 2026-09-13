@@ -108,3 +108,10 @@ The earlier geometry checks proved coordinates were finite but did not prove
 correct paint order or ground contact. Regression coverage now checks shared
 renderer depth contracts and foot contact across frames; forced-event visual
 checks cover both directions in narrow/wide Chromium and WebKit scenes.
+
+## Night river and favorite hours
+
+- [x] Night water reuses the actual building/window pixels in gently shifting mirrored strips. Sky colors and visible bright stars reflect faintly; celestial glints remain daytime-only. Existing palette definitions are unchanged.
+- [x] Settings offers a device-local scene-time lock, custom time, Midnight/Noon/Sunrise/Sunset presets, and return to live time. Solar presets follow the current date and selected observer. Task clocks and synced state are unchanged.
+- [x] 120 short comments give each of the 24 hours five distinct lines without seasonal suffixes.
+- [x] Regression checks cover reflection bounds, time persistence, solar presets, every hourly message, and browser return-to-live behavior. Narrow, short-landscape, and desktop night renders reviewed in Chromium and WebKit.

@@ -391,6 +391,16 @@ textarea{width:100%;font-family:var(--font-mono);font-size:12px}
   <p id="deviceMotionNote" hidden>Your device requests reduced motion, so movement stays off with either choice.</p>
   <p>You can change this anytime in Settings. The sun and Moon follow their real paths, even when the scenery is still.</p>
 </dialog>
+<dialog id="sceneTimeDialog" class="motion-dialog" aria-labelledby="sceneTimeTitle">
+  <h2 id="sceneTimeTitle">Stay a little longer.</h2>
+  <p>Hold the scenery at a favorite time of day, or let it follow live time. The date still follows the season.</p>
+  <label for="sceneTimeInput">Scene time (your device's local time)</label>
+  <input id="sceneTimeInput" type="time" required/>
+  <p>Saved on this device. Task dates and reminders always use real time.</p>
+  <div class="motion-choices"><button data-scene-preset="00:00">Midnight</button><button data-scene-preset="12:00">Noon</button><button data-scene-preset="sunrise">Sunrise</button><button data-scene-preset="sunset">Sunset</button></div>
+  <p id="sceneTimeStatus" role="status"></p>
+  <div class="motion-choices"><button data-scene-time="lock">Lock this time</button><button data-scene-time="live">Use live time</button><button data-scene-time="close">Close</button></div>
+</dialog>
 <dialog id="locationDialog" class="motion-dialog location-dialog" aria-labelledby="locationTitle" aria-describedby="locationDescription">
   <p class="scene-eyebrow">A private sky</p>
   <h2 id="locationTitle">Choose where the sky is yours.</h2>
@@ -2236,6 +2246,7 @@ function openSettings(){
   modalShell(
     '<div class="mtop"><h2>Settings</h2><button class="x" data-act="close-modal" aria-label="Close">✕</button></div>'
     + '<div class="frow"><label>Landscape</label><button class="btn subtle" data-act="scene-settings">Motion settings</button><span class="kv">Daylight follows the sky; app theme stays independent.</span></div>'
+    + '<div class="frow"><label>Scene time</label><button class="btn subtle" data-act="scene-time-settings">Choose scene time</button><span class="kv">Follow live time or hold a favorite hour on this device.</span></div>'
     + '<div class="frow"><label>Location</label><button class="btn subtle" data-act="location-settings">Choose location</button><span class="kv">Use device coordinates for a local sky; saved only on this device.</span></div>'
     + '<div class="frow"><label for="stHorizon">Horizon (min)</label><input id="stHorizon" type="number" min="5" max="480" value="'+s.horizonMin+'" style="width:90px"/>'
     + '<span class="kv">the "next hour" in the question</span></div>'
@@ -2493,7 +2504,7 @@ document.addEventListener("keydown", e=>{
     return;
   }
   // Native scenery controls and the inert scene view must not dispatch task shortcuts.
-  if(document.querySelector("#motionDialog[open], html.viewing-scene")) return;
+  if(document.querySelector("#motionDialog[open], #sceneTimeDialog[open], html.viewing-scene")) return;
   if(document.querySelector(".mback")){ if(e.key==="Escape") closeModal(); return; }
   const k=e.key.toLowerCase();
   if(k==="y"&&!state.interventionActive&&state.candidateId) decide("yes");   // dot it

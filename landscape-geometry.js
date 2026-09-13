@@ -46,8 +46,25 @@
       x:Math.sin(t*wind*(.08+seed*.025)+seed*17)*8+Math.sin(t*.17+seed*31)*3,
       y:Math.sin(t*wind*(.10+seed*.04)+seed*23)*17+Math.sin(t*.23+seed*11)*8
     });
+    function starReflection(star,t,wind){
+      if(star.altitude<=0||star.magnitude>2.5)return null;
+      const depth=Math.min(H*.09,95),y=waterTop+5+star.altitude/90*depth;
+      return {x:star.azimuth/360*W+Math.sin(y*.19-t*wind)*1.8,y};
+    }
+    const sunReflection=sun=>sun.visible&&sun.altitude>0;
+    function cityReflection(t,wind,night){
+      if(night<=0)return [];
+      const depth=Math.min(H*.12,140),rows=[];
+      for(let d=0;d<depth;d+=2){
+        const fraction=d/depth;
+        rows.push({sourceY:Math.max(0,waterTop-(d+2)/1.35),y:waterTop+d,
+          dx:(Math.sin(d*.23-t*wind*.8)*1.8+Math.sin(d*.09+t*wind*.35))*(.25+.75*fraction),
+          alpha:Math.min(.3,night*.28)*(1-fraction)**1.5*(.65+.35*Math.sin(d*.7-t*wind)**2)});
+      }
+      return rows;
+    }
     const ripple=(i,t,wind=1)=>({alpha:.15+.75*(.5+.5*Math.sin(t*wind*1.3+i*1.71))**2,drift:Math.sin(t*wind*.5+i)*9,width:.65+.35*Math.sin(t*.9+i)**2});
-    return {depthBand,groundAnchor,groundTravelX,groundPose,strideFoot,wingFold,balloonDrift,vessel,foregroundTree,nest,ripple,horizon,waterTop,far,middle,near,rail,trail,lowerRail,tangent,rider,pack};
+    return {starReflection,cityReflection,sunReflection,depthBand,groundAnchor,groundTravelX,groundPose,strideFoot,wingFold,balloonDrift,vessel,foregroundTree,nest,ripple,horizon,waterTop,far,middle,near,rail,trail,lowerRail,tangent,rider,pack};
   }
   root.LandscapeGeometry={create};
 })(globalThis);

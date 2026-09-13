@@ -7,6 +7,7 @@
   const back=host.querySelector('[data-scenery]'),front=host.querySelector('[data-life]');
   let b=back.getContext('2d',{alpha:false});const base=b,g=front.getContext('2d');
   const layers={};let geometry;
+  const cityReflection=document.createElement('canvas');
   if(!b||!g){host.hidden=true;return;}
   const mq=window.matchMedia('(prefers-reduced-motion: reduce)');
   let storage;try{storage=window.localStorage;}catch{storage=null;}
@@ -91,6 +92,11 @@
     paintMoon(b);
     // Atmospheric ridge and a city whose small imperfections avoid a repeated skyline.
     hill(b,x=>hy+Math.sin(x/W*8)*12,S.mixHex(p.city,p.sky[2],.45));
+    // Cache precisely the painted buildings and windows, on transparency. The
+    // water reuses these pixels rather than inventing unrelated light streaks.
+    const cityTarget=b;
+    cityReflection.width=Math.floor(W*dpr);cityReflection.height=Math.ceil(geometry.waterTop*dpr);
+    b=cityReflection.getContext('2d');b.setTransform(dpr,0,0,dpr,0,0);
     const count=Math.ceil(W/15);
     for(let i=0;i<count;i++){
       const x=i*W/count,cluster=.4+.6*Math.pow(Math.sin(x/W*Math.PI*3+.5),2);
@@ -109,13 +115,13 @@
     const hands=globalThis.LandscapeMood?.clock(sky.date)||{minuteAngle:0,hourAngle:0};
     line(b,tx,ty+12,tx+Math.sin(hands.minuteAngle)*4,ty+12-Math.cos(hands.minuteAngle)*4,'#577581',.9);
     line(b,tx,ty+12,tx+Math.sin(hands.hourAngle)*2.8,ty+12-Math.cos(hands.hourAngle)*2.8,'#577581',1.2);
+    b=cityTarget;b.drawImage(cityReflection,0,0,cityReflection.width/dpr,cityReflection.height/dpr);
     const water=b.createLinearGradient(0,geometry.waterTop,0,hy+H*.18);
     water.addColorStop(0,S.mixHex(p.sky[2],p.sky[0],.35));water.addColorStop(1,S.mixHex(p.sky[1],p.front,.3));
     b.fillStyle=water;b.fillRect(0,geometry.waterTop,W,H);
     for(let i=0;i<90;i++){
       const x=rand(i+44)*W,y=geometry.waterTop+rand(i+79)*H*.12;
       line(b,x,y,x+8+rand(i)*28,y,S.mixHex(p.sky[2],p.city,.18),.6);
-      if(night>.4&&i%3===0)line(b,x,geometry.waterTop,x+2,y,'rgba(255,220,163,.16)',2);
     }
     hill(b,far,p.far);
     // Viaduct, stations and catenary are below the skyline, behind the cycle hills.
@@ -246,12 +252,30 @@
       cloud(x,25+rand(i+82)*(hy*.68),size,.22+rand(i+54)*.18);
     }
     g.save();path(g,far);g.lineTo(W,geometry.waterTop);g.lineTo(0,geometry.waterTop);g.closePath();g.clip();
-    const reflection=point((sky.sun.visible?sky.sun:sky.moon).azimuth,0).x;
-    for(let i=0;i<24;i++){
+    if(p.night>.05){
+      const reflectedSky=g.createLinearGradient(0,geometry.waterTop,0,geometry.waterTop+H*.12);
+      reflectedSky.addColorStop(0,p.sky[2]);reflectedSky.addColorStop(1,p.sky[0]);
+      g.globalAlpha=p.night*.18;g.fillStyle=reflectedSky;g.fillRect(0,geometry.waterTop,W,H*.12);
+      for(const star of sky.stars){
+        const reflected=geometry.starReflection(star,t,wind);if(!reflected)continue;
+        const moonlight=sky.moon.visible?sky.illumination*.32:0;
+        g.globalAlpha=p.night*(1-moonlight)*(.16-star.magnitude*.025)*S.smooth(0,12,star.altitude);
+        const color=star.colorIndex>1?'#ffdbab':star.colorIndex<0?'#d3eaff':'#f6f3df';
+        line(g,reflected.x-1.2,reflected.y,reflected.x+1.2,reflected.y,color,.7);
+      }
+    }
+    // Invert the actual skyline into narrow, softly moving water bands. The
+    // existing shoreline clip keeps reflections beneath the hills and boats.
+    for(const row of geometry.cityReflection(t,wind,p.night)){
+      g.globalAlpha=row.alpha;
+      g.drawImage(cityReflection,0,row.sourceY*dpr,cityReflection.width,Math.min(2/1.35*dpr,cityReflection.height-row.sourceY*dpr),row.dx,row.y,W,2);
+    }
+    const reflection=point(sky.sun.azimuth,0).x;
+    if(geometry.sunReflection(sky.sun))for(let i=0;i<24;i++){
       const wave=geometry.ripple(i,t,wind),y=geometry.waterTop+5+i*H*.0035,w=(5+i*1.9)*wave.width;
       const x=reflection+wave.drift;
-      g.globalAlpha=(sky.sun.visible?.7:sky.moon.visible?.35:0)*(1-i/28)*wave.alpha;
-      line(g,x-w,y,x+w,y,p.night>.4?'#e2ecdc':'#fff6d7',1);
+      g.globalAlpha=.7*(1-i/28)*wave.alpha;
+      line(g,x-w,y,x+w,y,'#fff6d7',1);
     }
     for(let i=0;i<40;i++){
       const wave=geometry.ripple(i+30,t,wind),x=rand(i+403)*W+wave.drift,y=geometry.waterTop+rand(i+402)*H*.09;
@@ -494,7 +518,7 @@
   themeQuery.addEventListener('change',updateChrome);
   function refreshSky(){
     const location=globalThis.LivingLocation?.current();
-    sky=S.skyAt(new Date(),location);p=S.palette(sky.sun.altitude);
+    sky=S.skyAt(S.sceneDate(new Date(),storage,location),location);p=S.palette(sky.sun.altitude);
     if(globalThis.LandscapeMood)p=LandscapeMood.palette(p,sky.date,location);updateChrome();
     document.documentElement.style.setProperty('--scene-tint',p.tint);
     document.documentElement.dataset.scenePeriod=sky.period;
@@ -546,6 +570,23 @@
     dialog.showModal();
     dialog.querySelector('[data-landscape-motion="reduced"]').focus();
   }
+  const timeDialog=document.getElementById('sceneTimeDialog'),timeInput=document.getElementById('sceneTimeInput'),timeStatus=document.getElementById('sceneTimeStatus');
+  let timeReturnFocus=null;
+  document.addEventListener('click',event=>{
+    const control=event.target.closest('[data-act="scene-time-settings"], [data-scene-time], [data-scene-preset]');if(!control)return;
+    if(control.dataset.act==='scene-time-settings'){
+      timeReturnFocus=document.activeElement;const saved=S.readSceneTime(storage);timeInput.value=saved&&saved.includes(':')?saved:new Date().toTimeString().slice(0,5);
+      timeStatus.textContent=saved?'Scene time locked to '+saved+'.':'Following live time.';timeDialog.showModal();timeInput.focus();return;
+    }
+    if(control.dataset.sceneTime==='close'){timeDialog.close();return;}
+    const value=control.dataset.sceneTime==='live'?null:control.dataset.scenePreset||timeInput.value;
+    if(value!==null&&!control.dataset.scenePreset&&!timeInput.reportValidity())return;
+    if(!S.saveSceneTime(storage,value)){timeStatus.textContent='Could not save this time on this device. Please try again.';return;}
+    timeStatus.textContent=value?'Scene time locked to '+value+'.':'Following live time.';
+    if(value==='sunrise'||value==='sunset'){const times=S.sunTimes(new Date(),globalThis.LivingLocation?.current());if(!times[value==='sunrise'?'rise':'set'])timeStatus.textContent='No '+value+' here today. Following live time until it returns.';}sunDay=null;refreshSky();
+  });
+  timeDialog.addEventListener('close',()=>timeReturnFocus?.isConnected&&timeReturnFocus.focus());
+  window.addEventListener('storage',event=>{if(event.key==='fvp:chain-scanner:scene-time'||event.key===null){sunDay=null;refreshSky();}});
   document.addEventListener('click',event=>{
     const button=event.target.closest('[data-landscape-motion], [data-act="scene-settings"], [data-scene-view]');
     if(!button)return;
