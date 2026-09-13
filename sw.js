@@ -3,7 +3,7 @@
    same-origin additions to fill the cache as they are requested. */
 // The shell key is a fingerprint of every local asset in the addAll list.
 // Update it with any shell change so installed workers cannot serve stale UI.
-const CACHE_NAME = "chain-scanner-shell-7741f5afdc0dc84bdf70c90df0f9d39200f1e8eac1327013efe6bf06d415ef32";
+const CACHE_NAME = "chain-scanner-shell-d94f8d6dc4a25da23aa67158752e7c51f96bc5d003a1cadf76c8a55dd8ea2460";
 
 self.addEventListener("install", event => {
   event.waitUntil(
@@ -19,10 +19,15 @@ self.addEventListener("install", event => {
         "./icon-192.png",
         "./icon-512.png",
         "./landscape.css",
+        "./landscape-config.js",
         "./landscape-core.js",
         "./location.js",
         "./landscape-geometry.js",
         "./landscape-mood.js",
+        "./landscape-appearance.js",
+        "./landscape-riders.js",
+        "./landscape-winter.js",
+        "./landscape-seasonal.js",
         "./HUMAN_WRITTEN_HOURLY_TAGS.md",
         "./landscape.js",
         "./stars.js",

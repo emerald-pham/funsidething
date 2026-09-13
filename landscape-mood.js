@@ -6,6 +6,8 @@
 
   const TAU = Math.PI * 2;
   const DAY = 86400000;
+  const CONFIG = root.LandscapeConfig;
+  if (!CONFIG) throw new Error('LandscapeConfig must load before landscape-mood.js');
   const DEFAULT_TIMEZONE = (() => {
     try { return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'; }
     catch { return 'UTC'; }
@@ -16,15 +18,10 @@
   const SEASON_ORDER = ['spring', 'summer', 'autumn', 'winter'];
   const TRANSITION_DAYS = 14;
 
-  // These are intentionally soft accents. LivingSky already handles the
-  // brightness of the sky; mood adds a quiet seasonal cast without replacing
+  // These intentionally soft accents live in the shared registry. LivingSky
+  // handles sky brightness; mood adds a quiet seasonal cast without replacing
   // that calibrated day/night contrast.
-  const ACCENTS = {
-    spring: { sky: '#b9dfd2', city: '#a9cec5', far: '#b8d99f', hill: '#9fce94', front: '#79b88b', tint: '#cfe8c4' },
-    summer: { sky: '#f0d19a', city: '#d6b18a', far: '#d3d48e', hill: '#b8cb83', front: '#8bb47a', tint: '#f2d8a9' },
-    autumn: { sky: '#e8b594', city: '#d29a83', far: '#d2ae73', hill: '#b78463', front: '#95654f', tint: '#e8b189' },
-    winter: { sky: '#bfcee8', city: '#aabbd6', far: '#a8c9c9', hill: '#82a5b3', front: '#668a9b', tint: '#d1dbef' },
-  };
+  const ACCENTS = Object.freeze(Object.fromEntries(SEASON_ORDER.map(name => [name, CONFIG.seasons[name].accent])));
 
   const PERIOD_NAMES = ['predawn', 'morning', 'noon', 'afternoon', 'golden-hour', 'evening', 'night'];
   const HOUR_LINES = [
@@ -608,7 +605,14 @@
     for (const role of ['sky', 'city', 'far', 'hill', 'front', 'tint']) accents[role] = weightedAccent(current.weights, role);
     function apply(value, role) {
       if (Array.isArray(value)) return value.map(item => apply(item, role));
-      if (typeof value === 'string' && parseHex(value)) return mixColor(value, accents[role] || accents.front, amount);
+      if (typeof value === 'string' && parseHex(value)) {
+        const ground=['far','hill','front'].includes(role);
+        // Snowfields lose their lawn tint in daylight, while the existing
+        // night palette still determines how much light reaches the ground.
+        const winterStrength=role==='front'?.55:.80;
+        const strength=amount+(ground?(winterStrength*current.weights.winter+.5*current.weights.autumn)*(1-(base.night||0)*.78):0);
+        return mixColor(value, accents[role] || accents.front, strength);
+      }
       if (!value || typeof value !== 'object') return value;
       const copy = {};
       for (const key of Object.keys(value)) {

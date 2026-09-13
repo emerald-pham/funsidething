@@ -2,7 +2,8 @@
    Florida is an explicit observer, not an inference from the device timezone. */
 (function(root){
   'use strict';
-  const A=root.Astronomy, RAD=Math.PI/180;
+  const A=root.Astronomy, CONFIG=root.LandscapeConfig, RAD=Math.PI/180;
+  if(!CONFIG)throw new Error('LandscapeConfig must load before landscape-core.js');
   const DEFAULT_LOCATION={latitude:28.5383,longitude:-81.3792,timezone:'America/New_York'};
   const observer=new A.Observer(DEFAULT_LOCATION.latitude,DEFAULT_LOCATION.longitude,20);
   const clamp=(v,a=0,b=1)=>Math.max(a,Math.min(b,v));
@@ -121,18 +122,29 @@
   }
   function activity(sky){return sky.sun.altitude < -6?.24:sky.sun.azimuth<180?1:.65;}
   const MAX_EVENTS=14,RARE_COOLDOWN=420;
-  const EVENT_TYPES=['cyclist','bird','balloon','train','metro','plane','duck','fish','butterfly','rabbit','deer','kite','reader','picnic','couple','walker','airshow','banner','hangglider','jetski','sailboat','cruise','yacht','dolphin','flock','skateboarder','rollerskater','windsurfer','dogwalker'];
+  const EVENT_TYPES=CONFIG.eventTypes;
+  const WINTER_VISITORS=CONFIG.winterEvents.filter(type=>!EVENT_TYPES.includes(type));
+  const WINTER_EVENTS=CONFIG.seasons.winter.events;
+  const eventsForSeason=season=>CONFIG.eventsForSeason(season);
+  function setSeason(world,season){
+    if(world.season===season)return;
+    world.season=season;
+    const allowed=new Set([...eventsForSeason(season),'meteor','abduction','fireworks']);
+    // A season selection should not leave a summer picnic or watersport on snow.
+    // Preserve the ordinary schedule rather than forcing a burst of replacements.
+    world.events=world.events.filter(event=>allowed.has(event.type));
+  }
   const RARE_TYPES=['abduction','fireworks'];
-  const NIGHT_TYPES=['meteor',...EVENT_TYPES.filter(type=>!['bird','butterfly'].includes(type))];
-  const NIGHT_REGULARS=['meteor','metro','plane'];
-  const WATER_TYPES=['jetski','sailboat','cruise','yacht','dolphin','windsurfer'];
-  const EVENT_DURATIONS={dogwalker:70,skateboarder:65,rollerskater:75,windsurfer:95,fireworks:9,flock:65,dolphin:8,duck:80,fish:5,butterfly:35,rabbit:22,deer:55,kite:90,reader:140,picnic:150,couple:120,walker:60,airshow:40,banner:100,hangglider:90,meteor:1.8,jetski:32,sailboat:140,cruise:180,yacht:95};
+  const NIGHT_TYPES=CONFIG.nightEvents;
+  const NIGHT_REGULARS=CONFIG.nightRegulars;
+  const WATER_TYPES=CONFIG.waterEvents;
+  const EVENT_DURATIONS=CONFIG.eventDurations||CONFIG.durations;
   const INITIAL_TYPES=EVENT_TYPES.filter(type=>type!=='dolphin');
-  function createWorld(random=Math.random){
-    const world={random,elapsed:0,events:[],next:3+random()*6,lastRare:-RARE_COOLDOWN,rareCount:0,wind:.6+random()*1.2};
+  function createWorld(random=Math.random,season='summer'){
+    const world={random,season,elapsed:0,events:[],next:3+random()*6,lastRare:-RARE_COOLDOWN,rareCount:0,wind:.6+random()*1.2};
     // Start mid-journey so returning never waits for a first event. Pick three
     // distinct ordinary visitors; the rare abduction is never in the opening cast.
-    const pool=INITIAL_TYPES.slice();
+    const pool=season==='winter'?WINTER_EVENTS.slice():INITIAL_TYPES.slice();
     while(world.events.length<3&&pool.length){
       const index=Math.min(pool.length-1,Math.floor(clamp(random(),0,1-.0000001)*pool.length));
       spawn(world,pool.splice(index,1)[0],true);
@@ -159,26 +171,36 @@
         if(w.elapsed-w.lastRare>=RARE_COOLDOWN && r()<.025){
           spawn(w,sky.sun.altitude < -6&&r()<.5?'fireworks':'abduction');w.lastRare=w.elapsed;w.rareCount++;
         }else{
-          const choices=sky.sun.altitude < -6?(r()<.75?NIGHT_REGULARS:NIGHT_TYPES):EVENT_TYPES;
-          const type=choices[Math.min(choices.length-1,Math.floor(clamp(r(),0,1-.0000001)*choices.length))];
+          let type;
+          if(sky.sun.altitude < -6){
+            // Preserve the existing quiet night bias toward meteor, metro and
+            // plane events while letting the shared pool grow independently.
+            type=r()<.75?NIGHT_REGULARS[Math.min(NIGHT_REGULARS.length-1,Math.floor(clamp(r(),0,1-.0000001)*NIGHT_REGULARS.length))]:CONFIG.pickEvent(w.season,'night',r);
+          }else type=CONFIG.pickEvent(w.season,'day',r);
           spawn(w,type);
         }
       }
     }
     return w;
   }
-  function weatherAt(now){
+  function weatherAt(now,season='summer'){
     validDate(now);
-    // A UTC slot plus a stable integer hash is the shared weather schedule.
-    // Fresh installs, offline devices and signed-out tabs agree without writes,
-    // device-local scene locks, API quotas, or competing cloud revisions.
-    const slot=Math.floor(+now/1800000),minute=(+now-slot*1800000)/60000;
-    let hash=(slot^0x51a7c3d9)|0;hash=Math.imul(hash^(hash>>>16),0x7feb352d);hash=Math.imul(hash^(hash>>>15),0x846ca68b);hash=(hash^(hash>>>16))>>>0;
-    const raining=hash/4294967296<.2&&minute>=5&&minute<17;
-    return {status:raining?'rain':'clear',intensity:raining?smooth(5,5.5,minute)*(1-smooth(16.5,17,minute)):0,slot};
+    // One immutable UTC episode schedule is shared by offline and online devices.
+    // A selected winter scene changes the precipitation, never its timing.
+    const weather=CONFIG.weather,slot=Math.floor(+now/weather.slot);
+    const random=salt=>{let hash=(slot^0x51a7c3d9^Math.imul(salt,0x9e3779b9))|0;hash=Math.imul(hash^(hash>>>16),0x7feb352d);hash=Math.imul(hash^(hash>>>15),0x846ca68b);return ((hash^(hash>>>16))>>>0)/4294967296;};
+    const enabled=random(0)<weather.chance,storm=random(1)<weather.stormChance;
+    // NWS ordinary thunderstorm cells last about 30–60 minutes. Quieter
+    // showers are shorter; three-hour slots leave room for a natural clearing.
+    const start=Math.round(slot*weather.slot+(weather.startMinutes[0]+random(3)*(weather.startMinutes[1]-weather.startMinutes[0]))*60000);
+    const durationRange=storm?weather.stormMinutes:weather.showerMinutes;
+    const end=Math.round(start+(durationRange[0]+random(2)*(durationRange[1]-durationRange[0]))*60000);
+    const active=enabled&&+now>=start&&+now<end;
+    const status=!active?'clear':season==='winter'?(storm?'snowstorm':'snow'):(storm?'thunderstorm':'rain');
+    return {status,intensity:active?smooth(start,start+120000,+now)*(1-smooth(end-120000,end,+now)):0,storm:active&&storm,slot,start,end};
   }
-  const woodlandTypes=['deer','fox','rabbit','raccoon'];
-  function createWoodland(random=Math.random){return {random,elapsed:0,next:30,events:[]};}
+  const woodlandConfig=CONFIG.woodland,woodlandTypes=woodlandConfig.types;
+  function createWoodland(random=Math.random){return {random,elapsed:0,next:woodlandConfig.interval,events:[]};}
   function advanceWoodland(w,dt){
     if(!Number.isFinite(dt)||dt<=0)return w;
     w.elapsed+=dt;
@@ -186,9 +208,9 @@
     if(w.elapsed>=w.next){
       // Its own RNG, budget and deadline leave every other visitor's odds alone.
       // Never replay missed rolls after a pause or a delayed frame.
-      w.next=w.elapsed+30;
-      if(w.events.length<4&&w.random()<.01){
-        const r=w.random;w.events.push({type:woodlandTypes[Math.min(3,Math.floor(r()*4))],age:0,duration:180,seed:r(),lane:r(),reverse:r()>.5});
+      w.next=w.elapsed+woodlandConfig.interval;
+      if(w.events.length<woodlandConfig.maxActive&&w.random()<woodlandConfig.chance){
+        const r=w.random;w.events.push({type:woodlandTypes[Math.min(woodlandTypes.length-1,Math.floor(r()*woodlandTypes.length))],age:0,duration:woodlandConfig.duration,seed:r(),lane:r(),reverse:r()>.5});
       }
     }
     return w;
@@ -230,6 +252,6 @@
   function readMotion(storage){try{return normalizeMotion(storage.getItem(MOTION_KEY));}catch{return null;}}
   function saveMotion(storage,value){try{storage.setItem(MOTION_KEY,value);return true;}catch{return false;}}
   function motionReduced(value,osReduced){return !!osReduced||normalizeMotion(value)!=='normal';}
-  root.LivingSky={sceneSolarDate,weatherAt,createWoodland,advanceWoodland,woodlandTypes,readSceneSeason,saveSceneSeason,advanceLights,skinTone,sceneDate,readSceneTime,saveSceneTime,skyAt,sunTimes,starAt,starCount:root.SKY_STARS.length,palette,activity,createWorld,advance,
-    nightEventTypes:NIGHT_TYPES.slice(),eventTypes:EVENT_TYPES.slice(),rareTypes:RARE_TYPES.slice(),eventDurations:Object.assign({},EVENT_DURATIONS),MAX_EVENTS,RARE_COOLDOWN,readMotion,saveMotion,motionReduced,clamp,lerp,smooth,mixHex};
+  root.LivingSky={setSeason,eventsForSeason,sceneSolarDate,weatherAt,createWoodland,advanceWoodland,woodlandTypes,readSceneSeason,saveSceneSeason,advanceLights,skinTone,sceneDate,readSceneTime,saveSceneTime,skyAt,sunTimes,starAt,starCount:root.SKY_STARS.length,palette,activity,createWorld,advance,
+    nightEventTypes:NIGHT_TYPES.slice(),eventTypes:[...EVENT_TYPES,...WINTER_VISITORS],rareTypes:RARE_TYPES.slice(),eventDurations:Object.assign({},EVENT_DURATIONS),MAX_EVENTS,RARE_COOLDOWN,readMotion,saveMotion,motionReduced,clamp,lerp,smooth,mixHex};
 })(globalThis);

@@ -32,7 +32,7 @@ test("Default contexts: saved custom contexts and task assignments survive reloa
    borrow task state or make network requests to decide what the sky looks like. */
 function livingSky() {
   const ctx = vm.createContext({ Date, Math, console });
-  for (const file of ["vendor/astronomy.min.js", "stars.js", "landscape-core.js"]) {
+  for (const file of ["landscape-config.js", "vendor/astronomy.min.js", "stars.js", "landscape-core.js"]) {
     assert.ok(fs.existsSync(path.join(__dirname, file)), `offline landscape asset missing: ${file}`);
     vm.runInContext(fs.readFileSync(path.join(__dirname, file), "utf8"), ctx);
   }
@@ -127,7 +127,7 @@ test("Landscape location: reports denied, unavailable, timeout, and storage fail
 });
 
 test("Landscape location: the browser wiring is explicit, local-only, and exposes the standalone dialog", () => {
-  assert.match(html, /<script defer src="location\.js"><\/script>\s*<script defer src="landscape-geometry\.js"><\/script>\s*<script defer src="landscape-mood\.js"><\/script>\s*<script defer src="landscape\.js">/);
+  assert.match(html, /<script defer src="location\.js"><\/script>\s*<script defer src="landscape-geometry\.js"><\/script>\s*<script defer src="landscape-mood\.js"><\/script>\s*(?:<script defer src="landscape-(?:appearance|riders|winter|seasonal)\.js"><\/script>\s*)+<script defer src="landscape\.js">/);
   assert.match(html, /<script defer src="landscape-geometry\.js"><\/script>/);
   assert.match(html, /data-act="location-settings"/);
   assert.match(html, /<dialog id="locationDialog"/);
@@ -159,7 +159,7 @@ test("Landscape location: actual coordinates change the sky and polar day return
 
 test("Landscape: daytime life includes a duck visit and the new bounded animal set", () => {
   const sky = livingSky();
-  assert.deepEqual([...sky.eventTypes], ["cyclist", "bird", "balloon", "train", "metro", "plane", "duck", "fish", "butterfly", "rabbit", "deer", "kite", "reader", "picnic", "couple", "walker", "airshow", "banner", "hangglider", "jetski", "sailboat", "cruise", "yacht", "dolphin", "flock", "skateboarder", "rollerskater", "windsurfer", "dogwalker"]);
+  assert.deepEqual([...sky.eventTypes], ["cyclist", "bird", "balloon", "train", "metro", "plane", "duck", "fish", "butterfly", "rabbit", "deer", "kite", "reader", "picnic", "couple", "walker", "airshow", "banner", "hangglider", "jetski", "sailboat", "cruise", "yacht", "dolphin", "flock", "skateboarder", "rollerskater", "hoverboard", "scooter", "windsurfer", "dogwalker", "snowman", "skier", "snowangel"]);
   assert.deepEqual([...sky.rareTypes], ["abduction", "fireworks"]);
   const world = sky.createWorld(() => 0.99);
   assert.equal(world.events.length, 3, "opening life is a small cast");
@@ -344,9 +344,10 @@ test("Landscape: only one banner plane may be active while ordinary planes still
   const sky = livingSky();
   const day = { sun: { altitude: 30, azimuth: 100 } };
   const slot = type => {
-    const index = sky.eventTypes.indexOf(type);
+    const context=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-config.js'),'utf8'),context);
+    const entries=context.LandscapeConfig.pools.day,index=entries.findIndex(entry=>entry.type===type);
     assert.ok(index >= 0, `${type} must be an ordinary daytime event`);
-    return (index + .1) / sky.eventTypes.length;
+    return (entries.slice(0,index).reduce((sum,entry)=>sum+entry.weight,0)+.1)/entries.reduce((sum,entry)=>sum+entry.weight,0);
   };
   const scheduled = (type, existingType, reverse = false) => {
     const world = sky.createWorld(() => .5);
@@ -8103,7 +8104,7 @@ test('Landscape browser: every visitor renders with finite geometry across short
 
  test('Landscape mood: seasons, clock hands and a time-specific message catalog work offline',()=>{
  const context=vm.createContext({Date,Intl,Math,JSON});
- vm.runInContext(fs.readFileSync(path.join(__dirname,'vendor/astronomy.min.js'),'utf8'),context);vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-mood.js'),'utf8'),context);
+ vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-config.js'),'utf8'),context);vm.runInContext(fs.readFileSync(path.join(__dirname,'vendor/astronomy.min.js'),'utf8'),context);vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-mood.js'),'utf8'),context);
  const mood=context.LandscapeMood;const hexLuminance=landscapeLuminance;
   const date = value => new Date(value);
 
@@ -8150,12 +8151,12 @@ test('Landscape browser: every visitor renders with finite geometry across short
 });
 
 test('Landscape mood: sunrise copy does not describe sunset',()=>{
- const ctx=vm.createContext({Date,Intl,Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'vendor/astronomy.min.js'),'utf8'),ctx);vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-mood.js'),'utf8'),ctx);
+ const ctx=vm.createContext({Date,Intl,Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-config.js'),'utf8'),ctx);vm.runInContext(fs.readFileSync(path.join(__dirname,'vendor/astronomy.min.js'),'utf8'),ctx);vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-mood.js'),'utf8'),ctx);
  assert.equal(ctx.LandscapeMood.period(new Date('2026-09-12T11:30:00Z'),{timezone:'America/New_York',sunAltitude:3}),'morning');
 });
 
 test('Landscape clock tower follows device local time instead of saved sky location',()=>{
- const ctx=vm.createContext({Date,Intl,Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'vendor/astronomy.min.js'),'utf8'),ctx);vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-mood.js'),'utf8'),ctx);
+ const ctx=vm.createContext({Date,Intl,Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-config.js'),'utf8'),ctx);vm.runInContext(fs.readFileSync(path.join(__dirname,'vendor/astronomy.min.js'),'utf8'),ctx);vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-mood.js'),'utf8'),ctx);
  const date=new Date('2026-09-12T15:30:00Z');
  const zone=Intl.DateTimeFormat().resolvedOptions().timeZone;
  const local=ctx.LandscapeMood.clock(date);
@@ -8240,7 +8241,7 @@ test('Landscape waterfront: water visitors are occasional and have distinct trav
 test('Landscape intro: cozy short copy keeps the scenic pane compact',()=>{
  const runtime=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
  assert.match(runtime,/status\.textContent=entry\.text/);
- const mood=vm.createContext({Date,Intl,Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'vendor/astronomy.min.js'),'utf8'),mood);vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-mood.js'),'utf8'),mood);
+ const mood=vm.createContext({Date,Intl,Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-config.js'),'utf8'),mood);vm.runInContext(fs.readFileSync(path.join(__dirname,'vendor/astronomy.min.js'),'utf8'),mood);vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-mood.js'),'utf8'),mood);
  for(const entry of mood.LandscapeMood.messageCatalog)assert.ok(entry.text.length<=110,'cozy messages stay short');
  assert.ok(mood.LandscapeMood.messageCatalog.some(entry=>/neighbor|pocket|tea/.test(entry.text)));
  const css=fs.readFileSync(path.join(__dirname,'landscape.css'),'utf8');
@@ -8429,7 +8430,7 @@ test('Landscape time: solar presets follow the date and saved observer',()=>{
 });
 
 test('Landscape messages: every hour has five distinct short, season-independent comments',()=>{
- const ctx=vm.createContext({Date,Intl,Math,JSON});vm.runInContext(fs.readFileSync(path.join(__dirname,'vendor/astronomy.min.js'),'utf8'),ctx);vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-mood.js'),'utf8'),ctx);const mood=ctx.LandscapeMood;
+ const ctx=vm.createContext({Date,Intl,Math,JSON});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-config.js'),'utf8'),ctx);vm.runInContext(fs.readFileSync(path.join(__dirname,'vendor/astronomy.min.js'),'utf8'),ctx);vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-mood.js'),'utf8'),ctx);const mood=ctx.LandscapeMood;
  for(let hour=0;hour<24;hour++){
   const entries=mood.messageCatalog.filter(e=>e.hour===hour);assert.equal(entries.length,5);assert.equal(new Set(entries.map(e=>e.text)).size,5);
   const date=new Date(Date.UTC(2026,5,20,hour));
@@ -8460,14 +8461,14 @@ test('Landscape browser: scene time presets persist and return to live without c
 });
 
 test('Landscape comments explicitly name their hour and the intro has no location caption',()=>{
- const ctx=vm.createContext({Date,Intl,Math,JSON});vm.runInContext(fs.readFileSync(path.join(__dirname,'vendor/astronomy.min.js'),'utf8'),ctx);vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-mood.js'),'utf8'),ctx);
+ const ctx=vm.createContext({Date,Intl,Math,JSON});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-config.js'),'utf8'),ctx);vm.runInContext(fs.readFileSync(path.join(__dirname,'vendor/astronomy.min.js'),'utf8'),ctx);vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-mood.js'),'utf8'),ctx);
  for(const entry of ctx.LandscapeMood.messageCatalog){const label=`${entry.hour%12||12} ${entry.hour<12?'AM':'PM'}`;assert.ok(entry.text.includes(label),`every comment must explicitly say ${label}: ${entry.text}`);}
  const intro=html.split('<div class="scene-details">')[1].split('</div>')[0];assert.doesNotMatch(intro,/id="sceneTime"/);
 });
 
 test('Landscape night: most daytime visitors remain possible at a much quieter pace',()=>{
  const sky=livingSky();
- for(const type of sky.eventTypes.filter(t=>!['bird','butterfly'].includes(t)))assert.ok(sky.nightEventTypes.includes(type),`${type} can visit after dark`);
+ for(const type of sky.eventsForSeason('summer').filter(t=>!['bird','butterfly'].includes(t)))assert.ok(sky.nightEventTypes.includes(type),`${type} can visit after dark`);
  assert.ok(sky.activity({sun:{altitude:-20,azimuth:0}})<sky.activity({sun:{altitude:20,azimuth:90}})/3);
  const runtime=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
  assert.doesNotMatch(runtime,/if\(sky.sun.altitude < -6\)return;/);
@@ -8491,7 +8492,7 @@ test('Landscape reader: a profile reader holds an upright cover rather than flat
  for(const direction of [-1,1]){
   const polygons=[],scales=[];let points=[];
   const g={save(){},restore(){},translate(){},scale(x,y){scales.push([x,y]);},beginPath(){points=[];},moveTo(x,y){points.push([x,y]);},lineTo(x,y){points.push([x,y]);},closePath(){},fill(){polygons.push({points:[...points],color:this.fillStyle});}};
-  const ctx=vm.createContext({g,color:()=> '#a4c9bd',skinColor:()=> '#c68f68',ellipse(){},line(){},Math});vm.runInContext(seated+`;seated(0,0,.4,${direction},true);`,ctx);
+  const ctx=vm.createContext({g,color:()=> '#a4c9bd',skinColor:()=> '#c68f68',personHead(){},ellipse(){},line(){},Math});vm.runInContext(seated+`;seated(0,0,.4,${direction},true);`,ctx);
   const book=polygons[0],xs=book.points.map(p=>p[0]),ys=book.points.map(p=>p[1]);
   assert.ok(Math.max(...ys)-Math.min(...ys)>Math.max(...xs)-Math.min(...xs),'book should be held upright in profile');
   assert.ok(Math.max(...ys)<0,'book is held above the lap');assert.notEqual(book.color,'#fff0cf','the visible face is a cover, not an unfolded spread');
@@ -8553,7 +8554,7 @@ test('Landscape skating: random visitors follow path slope and face their travel
 
 function moodRuntime() {
   const context = vm.createContext({ Date, Intl, Math, JSON });
-  vm.runInContext(fs.readFileSync(path.join(__dirname,'vendor/astronomy.min.js'),'utf8'),context);vm.runInContext(fs.readFileSync(path.join(__dirname, "landscape-mood.js"), "utf8"), context, {
+  vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-config.js'),'utf8'),context);vm.runInContext(fs.readFileSync(path.join(__dirname,'vendor/astronomy.min.js'),'utf8'),context);vm.runInContext(fs.readFileSync(path.join(__dirname, "landscape-mood.js"), "utf8"), context, {
     filename: "landscape-mood.js",
   });
   return context.LandscapeMood;
@@ -8693,7 +8694,7 @@ test('Landscape bird: nesting twig stays smaller than the bird and disappears wh
  const code=runtime.slice(runtime.indexOf('  function bird('),runtime.indexOf('  function cyclist('));
  for(const size of [2,3.5,5])for(const perched of [false,true]){
   const twigs=[],g={save(){},restore(){},beginPath(){},moveTo(){},quadraticCurveTo(){},stroke(){}};
-  const ctx=vm.createContext({g,Math,p:{sky:['#ffffff'],night:0},S:{mixHex:()=> '#334433'},ellipse(){},line(g,x,y,x2,y2,color){if(color==='#8b745a')twigs.push([x,y,x2,y2]);}});
+  const ctx=vm.createContext({g,Math,p:{sky:['#ffffff'],night:0},S:{mixHex:()=> '#334433'},LandscapeAppearance:{birdColor:()=> '#334433'},ellipse(){},line(g,x,y,x2,y2,color){if(color==='#8b745a')twigs.push([x,y,x2,y2]);}});
   vm.runInContext(code+`;bird(0,0,${size},0,${perched},true);`,ctx);
   assert.equal(twigs.length,perched?0:2);
   for(const [x,y,x2,y2] of twigs)assert.ok(Math.hypot(x2-x,y2-y)<=size,'twig scales below half the wingspan');
@@ -8828,7 +8829,7 @@ test('Landscape stand: path visitors sort behind the counter and meadow visitors
  }
  const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
  assert.match(source,/groundPass\.sort\(\(a,b\)=>a.depth-b.depth\)/);
- assert.match(source,/depth:geometry\.eventDepth\(e\)/);
+ assert.match(source,/depth:[^\n]*geometry\.eventDepth\(e\)/);
 });
 
 test('Animation audit: steady thirty-frame pacing across display refresh rates',()=>{
@@ -8986,7 +8987,7 @@ test('Animation state: flapping birds do not change the stroke caps of later sce
  const code=source.slice(source.indexOf('  function bird('),source.indexOf('  function cyclist('));
  for(const cap of ['butt','square'])for(const perched of [false,true]){
   const stack=[],g={lineCap:cap,save(){stack.push(this.lineCap);},restore(){this.lineCap=stack.pop();},beginPath(){},moveTo(){},quadraticCurveTo(){},stroke(){}};
-  vm.runInNewContext(code+`;bird(10,10,3.5,1,${perched},true);`,{g,p:{sky:['#fff'],night:0},S:{mixHex:()=> '#333'},Math,line(){},ellipse(){}});
+  vm.runInNewContext(code+`;bird(10,10,3.5,1,${perched},true);`,{g,p:{sky:['#fff'],night:0},S:{mixHex:()=> '#333'},LandscapeAppearance:{birdColor:()=> '#333'},Math,line(){},ellipse(){}});
   assert.equal(g.lineCap,cap,'a flying bird must not round every subsequent stroke');assert.equal(stack.length,0);
  }
 });
@@ -9322,7 +9323,7 @@ test('Scene scale: water depth and vessel class preserve small-craft versus ship
 
 test('Astronomy seasons: real equinox instants, leap years, hemispheres and local dates agree with USNO',()=>{
  const ctx=vm.createContext({Date,Intl,Math,JSON});
- for(const file of ['vendor/astronomy.min.js','landscape-mood.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,file),'utf8'),ctx);
+ for(const file of ['landscape-config.js','vendor/astronomy.min.js','landscape-mood.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,file),'utf8'),ctx);
  const mood=ctx.LandscapeMood;
  // USNO Earth's Seasons 2026: March equinox 14:46 UTC (minute precision).
  const before=new Date('2026-03-20T14:40:00Z'),after=new Date('2026-03-20T14:50:00Z');
@@ -9392,7 +9393,7 @@ test('Astronomy location: solar season locks use the observer calendar and star 
   assert.equal(parts.find(p=>p.type==='day').value,'15','solar locks use the chosen date in the observer zone');
   assert.equal(parts.find(p=>p.type==='month').value,location.latitude<0?'10':'4');
  }
- const ctx=vm.createContext({Date,Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'vendor/astronomy.min.js'),'utf8'),ctx);
+ const ctx=vm.createContext({Date,Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-config.js'),'utf8'),ctx);vm.runInContext(fs.readFileSync(path.join(__dirname,'vendor/astronomy.min.js'),'utf8'),ctx);
  const row=[2.5303,89.2641,1.98,.6],rotation=ctx.Astronomy.Rotation_EQJ_EQD(now);
  assert.deepEqual(sky.starAt(now,row,rotation),sky.starAt(now,row));
 });
@@ -9408,20 +9409,23 @@ test('Astronomy location: sunrise and sunset stay on the observer day across DST
  assert.notEqual(north.sun.altitude,south.sun.altitude);assert.notEqual(north.moon.altitude,south.moon.altitude);assert.equal(north.phase,south.phase);
 });
 
-test('Weather: occasional rain follows one real-time schedule across devices and scene locks',()=>{
- const first=livingSky(),second=livingSky();assert.equal(typeof first.weatherAt,'function');
- let rainy=0,clear=0;
- for(let window=990000;window<991000;window++){
-  const date=new Date(window*1800000+600000),a=first.weatherAt(date),b=second.weatherAt(new Date(+date));
-  assert.equal(JSON.stringify(a),JSON.stringify(b),'independent devices agree without a storage write or a network');
-  if(a.status==='rain')rainy++;else clear++;
-  assert.ok(a.intensity>=0&&a.intensity<=1);
-  assert.equal(first.weatherAt(new Date(window*1800000)).status,'clear');
-  assert.equal(first.weatherAt(new Date(window*1800000+1200000)).status,'clear','rain finishes within its episode');
+test('Weather: realistic finite episodes stay synchronized and become snow in winter',()=>{
+ const first=livingSky(),second=livingSky();let wet=0,dry=0,storms=0;
+ for(let slot=160000;slot<161000;slot++){
+  const descriptor=first.weatherAt(new Date(slot*10800000));
+  assert.ok(Number.isFinite(descriptor.start)&&Number.isFinite(descriptor.end),'episodes expose their real-time boundaries');
+  const now=new Date((descriptor.start+descriptor.end)/2),a=first.weatherAt(now),b=second.weatherAt(new Date(+now)),winter=second.weatherAt(now,'winter');
+  assert.equal(JSON.stringify(a),JSON.stringify(b),'independent devices agree on weather');
+  assert.equal(winter.start,a.start);assert.equal(winter.end,a.end);assert.equal(winter.storm,a.storm,'winter changes precipitation, never episode timing');
+  if(a.status==='clear'){dry++;continue;}wet++;if(a.storm)storms++;
+  const minutes=(a.end-a.start)/60000;assert.ok(minutes>=(a.storm?30:20)&&minutes<=(a.storm?60:45),'rain showers last 20-45 minutes; storms 30-60 minutes');
+  assert.equal(winter.status,a.storm?'snowstorm':'snow');assert.equal(a.status,a.storm?'thunderstorm':'rain');
+  assert.equal(first.weatherAt(new Date(a.start-1)).status,'clear');assert.equal(first.weatherAt(new Date(a.end)).status,'clear');
+  assert.equal(a.intensity,1);assert.ok(first.weatherAt(new Date(a.start+1000)).intensity<.01,'weather eases in');
  }
- assert.ok(rainy>100&&rainy<300);assert.ok(clear>rainy,'rain is occasional');
+ assert.ok(wet>250&&wet<450);assert.ok(storms>50&&storms<200);assert.ok(dry>wet);
  assert.throws(()=>first.weatherAt(new Date('invalid')),/date/i);
- const runtime=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');assert.match(runtime,/S\.weatherAt\(new Date\(\)\)/);assert.match(runtime,/reduced\?0:/,'reduced motion renders stationary rain');
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');assert.match(source,/S\.weatherAt\(new Date\(\),sceneSeason\)/);assert.match(source,/reduced\?0:/);
 });
 
 test('Location: saving an explicit observer timezone validates it and preserves coordinates',()=>{
@@ -9432,7 +9436,7 @@ test('Location: saving an explicit observer timezone validates it and preserves 
 });
 
 test('Moon: illuminated fraction is physical and its bright limb points toward the Sun at any observer',()=>{
- const ctx=vm.createContext({Date,Math});for(const file of ['vendor/astronomy.min.js','stars.js','landscape-core.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,file),'utf8'),ctx);
+ const ctx=vm.createContext({Date,Math});for(const file of ['landscape-config.js','vendor/astronomy.min.js','stars.js','landscape-core.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,file),'utf8'),ctx);
  for(const latitude of [51.5,-33.87])for(const longitude of [-74,151])for(const day of [3,10,17,24]){
   const date=new Date(Date.UTC(2026,8,day,20)),sky=ctx.LivingSky.skyAt(date,{latitude,longitude,timezone:'UTC'});
   assert.equal(sky.illumination,ctx.Astronomy.Illumination('Moon',date).phase_fraction);
@@ -9456,15 +9460,16 @@ test('Astronomy polar day: the midnight sun remains daylight, not a fictitious s
 test('Weather browser: separate devices agree despite different local scene settings',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
  const {chromium}=await import(process.env.LANDSCAPE_PLAYWRIGHT),browser=await chromium.launch({channel:'chrome'});
  try{
-  const sky=livingSky();let slot=990000;while(sky.weatherAt(new Date(slot*1800000+600000)).status!=='rain')slot++;
+  const sky=livingSky();let slot=160000,episode,instant;
+  do{const d=sky.weatherAt(new Date(slot++*10800000));instant=(d.start+d.end)/2;episode=sky.weatherAt(new Date(instant));}while(episode.status!=='rain');
   const pages=[];
   for(const [timezoneId,sceneTime] of [['America/New_York','00:00'],['Asia/Tokyo','12:00']]){
    const context=await browser.newContext({timezoneId,reducedMotion:'reduce'}),page=await context.newPage();
-   await page.clock.setFixedTime(new Date(slot*1800000+600000));await page.addInitScript(time=>{localStorage.setItem('fvp:chain-scanner:scene-time',time);localStorage.setItem('fvp:chain-scanner:landscape-motion','reduced');},sceneTime);
+   await page.clock.setFixedTime(new Date(instant));await page.addInitScript(time=>{localStorage.setItem('fvp:chain-scanner:scene-time',time);localStorage.setItem('fvp:chain-scanner:scene-season','summer');localStorage.setItem('fvp:chain-scanner:landscape-motion','reduced');},sceneTime);
    await page.goto(process.env.LANDSCAPE_BROWSER_URL);assert.equal(await page.evaluate(()=>document.documentElement.dataset.sceneWeather),'rain');
    const before=await page.locator('[data-life]').evaluate(c=>c.toDataURL());await page.waitForTimeout(100);assert.equal(await page.locator('[data-life]').evaluate(c=>c.toDataURL()),before,'reduced rain stays still');pages.push(page);
   }
-  for(const page of pages){await page.clock.setFixedTime(new Date(slot*1800000+1200000));await page.evaluate(()=>window.dispatchEvent(new StorageEvent('storage',{key:null})));assert.equal(await page.evaluate(()=>document.documentElement.dataset.sceneWeather),'clear');}
+  for(const page of pages){await page.clock.setFixedTime(new Date(episode.end+1000));await page.evaluate(()=>window.dispatchEvent(new StorageEvent('storage',{key:null})));assert.equal(await page.evaluate(()=>document.documentElement.dataset.sceneWeather),'clear');}
  }finally{await browser.close();}
 });
 
@@ -9476,7 +9481,7 @@ test('Solar locks: unavailable seasonal sunrise or sunset truly falls back to li
 });
 
 test('Astronomy boundaries: September changes local dates, not the equinox instant; custom star observers work',()=>{
- const ctx=vm.createContext({Date,Math,Intl,JSON});for(const file of ['vendor/astronomy.min.js','stars.js','landscape-core.js','landscape-mood.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,file),'utf8'),ctx);
+ const ctx=vm.createContext({Date,Math,Intl,JSON});for(const file of ['landscape-config.js','vendor/astronomy.min.js','stars.js','landscape-core.js','landscape-mood.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,file),'utf8'),ctx);
  const instant=ctx.Astronomy.Seasons(2026).sep_equinox.date;
  for(const [zone,day] of [['America/New_York','22'],['Asia/Tokyo','23'],['Pacific/Kiritimati','23'],['Australia/Sydney','23']]){
   const season=ctx.LandscapeMood.season(instant,35,zone);assert.equal(+season.start,+instant);assert.equal(season.name,'autumn');assert.equal(new Intl.DateTimeFormat('en-US',{timeZone:zone,day:'numeric'}).format(season.start),day);assert.equal(ctx.LandscapeMood.season(instant,-35,zone).name,'spring');
@@ -9484,4 +9489,686 @@ test('Astronomy boundaries: September changes local dates, not the equinox insta
  const star=[2.5303,89.2641,1.98,.6],north={latitude:51.5,longitude:-.12,timezone:'Europe/London'},south={latitude:-33.87,longitude:151.21,timezone:'Australia/Sydney'};
  const a=ctx.LivingSky.starAt(instant,star,north),b=ctx.LivingSky.starAt(instant,star,south);
  assert.ok(Math.abs(a.altitude-51.5)<1);assert.ok(b.altitude<0);assert.deepEqual(a,ctx.LivingSky.starAt(instant,star,ctx.Astronomy.Rotation_EQJ_EQD(instant),north));
+});
+
+test('Landscape winter visitors: deterministic finite poses, grounded slopes, and full departures', () => {
+  const ctx = vm.createContext({ Date, Math, console });
+  for (const file of ['landscape-geometry.js', 'landscape-winter.js']) {
+    assert.ok(fs.existsSync(path.join(__dirname, file)), `winter asset missing: ${file}`);
+    vm.runInContext(fs.readFileSync(path.join(__dirname, file), 'utf8'), ctx, { filename: file });
+  }
+  const winter = ctx.LandscapeWinter;
+  assert.deepEqual([...winter.types], ['snowman', 'skier', 'snowangel']);
+  assert.equal(typeof winter.pose, 'function');
+  assert.equal(typeof winter.paint, 'function');
+
+  for (const [W, H] of [[320, 568], [390, 844], [844, 390], [1440, 900]]) {
+    const geometry = ctx.LandscapeGeometry.create(W, H);
+    for (const type of winter.types) {
+      for (const reverse of [false, true]) {
+        for (const lane of [.1, .5, .9]) {
+          const event = { age: 0, duration: 100, seed: lane, lane, reverse };
+          for (let age = 0; age <= 100; age += 2.5) {
+            event.age = age;
+            const pose = winter.pose(type, event, geometry, W, H);
+            for (const key of ['x', 'y', 'scale', 'alpha', 'progress']) {
+              assert.ok(Number.isFinite(pose[key]), `${type} ${key} must stay finite`);
+            }
+            assert.ok(pose.scale > .35 && pose.scale <= 1.2, `${type} should match nearby person scale`);
+            assert.ok(pose.alpha >= 0 && pose.alpha <= 1, `${type} alpha is bounded`);
+            assert.ok(pose.x > -W * .6 && pose.x < W * 1.6, `${type} remains near the scene during its finite visit`);
+          }
+          event.age = 0;
+          assert.ok(winter.pose(type, event, geometry, W, H).alpha < .2, `${type} fades in`);
+          event.age = 100;
+          assert.ok(winter.pose(type, event, geometry, W, H).alpha < .2, `${type} fades out`);
+        }
+      }
+    }
+  }
+
+  const geometry = ctx.LandscapeGeometry.create(1000, 700);
+  const skier = { age: 50, duration: 100, seed: .35, lane: .4, reverse: false };
+  const skiPose = winter.pose('skier', skier, geometry, 1000, 700);
+  assert.ok(Math.abs(skiPose.y - (geometry.middle(skiPose.x) + skiPose.snowOffset)) < 1e-8,
+    'skier skis remain on the actual middle hillside');
+  assert.ok(Math.abs(skiPose.angle - geometry.tangent(geometry.middle, skiPose.x)) < 1e-8,
+    'skier follows the rendered hillside tangent');
+  assert.ok(skiPose.scale < 1, 'skier stays close to a trail visitor scale');
+
+  const snowman = { age: 0, duration: 100, seed: .2, lane: .5, reverse: false };
+  const builds = [.18, .3, .45, .6, .75].map(f => {
+    snowman.age = f * snowman.duration;
+    return winter.pose('snowman', snowman, geometry, 1000, 700).build;
+  });
+  assert.ok(builds.every((value, i) => i === 0 || value >= builds[i - 1]), 'snowman grows in place');
+  assert.ok(builds[0] < .2 && builds.at(-1) > .9, 'snowman construction is visibly gradual');
+
+  const angel = { age: 50, duration: 100, seed: .7, lane: .6, reverse: false };
+  const angelStart = winter.pose('snowangel', { ...angel, age: 20 }, geometry, 1000, 700);
+  const angelMiddle = winter.pose('snowangel', angel, geometry, 1000, 700);
+  const angelEnd = winter.pose('snowangel', { ...angel, age: 88 }, geometry, 1000, 700);
+  assert.ok(angelStart.armSweep !== angelMiddle.armSweep || angelStart.legSweep !== angelMiddle.legSweep,
+    'snow angel limbs sweep while making the imprint');
+  assert.equal(angelMiddle.walking, false, 'snow angel lies in the snow during the imprint');
+  assert.equal(angelEnd.walking, true, 'snow angel stands and walks away before expiry');
+
+  for (const type of winter.types) {
+    const event = { age: 50, duration: 100, seed: .42, lane: .3, reverse: false };
+    for (const [before, after] of [[.119, .121], [.719, .721], [.819, .821]]) {
+      const a = winter.pose(type, { ...event, age: before * event.duration }, geometry, 1000, 700);
+      const b = winter.pose(type, { ...event, age: after * event.duration }, geometry, 1000, 700);
+      assert.ok(Math.hypot(a.x - b.x, a.y - b.y) < 5, `${type} transition ${before} does not jump`);
+    }
+  }
+});
+
+test('Landscape winter visitors: renderer paints grounded snow, build stages, ski tracks, and finite alpha', () => {
+  const ctx = vm.createContext({ Date, Math, console });
+  for (const file of ['landscape-geometry.js', 'landscape-winter.js']) {
+    assert.ok(fs.existsSync(path.join(__dirname, file)), `winter asset missing: ${file}`);
+    vm.runInContext(fs.readFileSync(path.join(__dirname, file), 'utf8'), ctx, { filename: file });
+  }
+  const winter = ctx.LandscapeWinter;
+  const geometry = ctx.LandscapeGeometry.create(1000, 700);
+  const numbers = [];
+  const g = {
+    save() {}, restore() {}, beginPath() {}, closePath() {}, moveTo(...a) { numbers.push(...a); },
+    lineTo(...a) { numbers.push(...a); }, quadraticCurveTo(...a) { numbers.push(...a); },
+    bezierCurveTo(...a) { numbers.push(...a); }, ellipse(...a) { numbers.push(...a); },
+    arc(...a) { numbers.push(...a); }, fill() {}, stroke() {}, fillRect(...a) { numbers.push(...a); },
+    translate(...a) { numbers.push(...a); }, rotate(...a) { numbers.push(...a); }, scale(...a) { numbers.push(...a); },
+    setLineDash() {},
+    globalAlpha: 1, fillStyle: '', strokeStyle: '', lineWidth: 1,
+  };
+  const p = { sky: ['#8ed4f3', '#d4f5f2', '#f6fbe2'], city: '#bbdce1', far: '#c5e8b7', hill: '#ace097', front: '#8dcca1', tint: '#ade1c6', night: 0 };
+  const helpers = {
+    ellipse(ctx, x, y, rx, ry, color) { numbers.push(x, y, rx, ry); ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2); },
+    line(ctx, x, y, x2, y2, color, width = 1) { numbers.push(x, y, x2, y2, width); ctx.moveTo(x, y); ctx.lineTo(x2, y2); },
+    color: () => '#cb8d80', skinColor: () => '#b27d58', S: { smooth: (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); }, clamp: v => Math.max(0, Math.min(1, v)), mixHex: (a, b) => a },
+  };
+  for (const type of winter.types) for (const age of [0, 20, 45, 70, 88, 99]) {
+    winter.paint(g, geometry, 1000, 700, { type, age, duration: 100, seed: .42, lane: .35, reverse: age % 2 === 0 }, age / 10, p, helpers);
+  }
+  assert.ok(numbers.length > 100, 'winter visitors draw visible geometry');
+  assert.ok(numbers.every(Number.isFinite), 'winter drawing coordinates stay finite');
+  assert.ok(g.globalAlpha >= 0 && g.globalAlpha <= 1, 'winter renderer leaves alpha bounded');
+});
+
+test('Seasonal visitor pools: winter excludes warm-weather activities and draws snow activities without changing spawn cadence',()=>{
+ const sky=livingSky();assert.equal(typeof sky.setSeason,'function');
+ const winter=sky.eventsForSeason('winter');for(const kind of ['snowman','skier','snowangel'])assert.ok(winter.includes(kind));
+ for(const kind of ['jetski','sailboat','cruise','yacht','windsurfer','duck','fish','dolphin','picnic','butterfly','skateboarder','rollerskater'])assert.ok(!winter.includes(kind),kind+' is excluded from winter');
+ const world=sky.createWorld(()=>.5);world.events=[{type:'picnic',age:10,duration:100},{type:'walker',age:10,duration:100}];const next=world.next;
+ sky.setSeason(world,'winter');assert.deepEqual(world.events.map(e=>e.type),['walker']);assert.equal(world.next,next);
+ for(let i=0;i<1500;i++){sky.advance(world,3,{sun:{altitude:25}});assert.ok(world.events.every(e=>winter.includes(e.type)||sky.rareTypes.includes(e.type)));}
+ sky.setSeason(world,'spring');assert.ok(sky.eventsForSeason('spring').includes('picnic'));assert.ok(!sky.eventsForSeason('spring').includes('skier'));
+ assert.match(html,/src="landscape-winter.js"/);assert.match(fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),/LandscapeWinter\.paint/);
+});
+
+test('Seasonal palette: winter ground is snowy, autumn ground is warm and foliage is seasonal',()=>{
+ const mood=moodRuntime(),sky=livingSky(),base=sky.palette(25),location={latitude:28.5,timezone:'America/New_York'};
+ const winter=mood.palette(base,new Date('2026-01-15T17:00:00Z'),location),autumn=mood.palette(base,new Date('2026-10-15T16:00:00Z'),location);
+ assert.ok(landscapeLuminance(winter.far)>landscapeLuminance(base.far)+.08,'winter adds visible snow cover');
+ const rgb=c=>c.slice(1).match(/../g).map(v=>parseInt(v,16)),[r,g,b]=rgb(autumn.front);assert.ok(r>g&&r>b,'autumn foreground is brown rather than green');
+ assert.match(fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),/sceneSeason==='autumn'/);
+});
+
+test('Seasonal ambient module: exposes deterministic bounded particles and blossoms', () => {
+  const source = fs.readFileSync(path.join(__dirname, 'landscape-seasonal.js'), 'utf8');
+  const context = vm.createContext({ Math, JSON });
+  vm.runInContext(fs.readFileSync(path.join(__dirname, 'landscape-geometry.js'), 'utf8'), context);
+  vm.runInContext(source, context, { filename: 'landscape-seasonal.js' });
+  const seasonal = context.LandscapeSeasonal;
+  assert.equal(typeof seasonal.paint, 'function');
+  assert.equal(typeof seasonal.particles, 'function');
+  assert.equal(typeof seasonal.blossoms, 'function');
+  const W = 844, H = 600, geometry = context.LandscapeGeometry.create(W, H);
+  const trees = [
+    { x: 90, y: geometry.near(90) + 42, size: 42 },
+    { x: 380, y: geometry.near(380) + 56, size: 56 },
+    { x: 720, y: geometry.near(720) + 35, size: 35 },
+  ];
+  const clear = { status: 'clear', intensity: 0, storm: false };
+  const storm = { status: 'thunderstorm', intensity: 1, storm: true };
+  const finiteParticle = particle => {
+    for (const key of ['x', 'y', 'alpha', 'size']) assert.ok(Number.isFinite(particle[key]), `${key} must be finite`);
+    assert.ok(particle.alpha >= 0 && particle.alpha <= 1, 'alpha stays bounded');
+    assert.ok(particle.size > 0 && particle.size <= 4, 'particles stay small');
+    assert.match(particle.color, /^#[0-9a-f]{6}$/i, 'particles use local hex colors');
+    assert.ok(particle.x >= -24 && particle.x <= W + 24, 'particle x remains near the canvas');
+    assert.ok(particle.y >= -24 && particle.y <= H + 24, 'particle y remains near the canvas');
+  };
+  for (const season of ['spring', 'summer', 'autumn', 'winter']) {
+    const at = seasonal.particles(.3, season, trees, geometry, W, H, clear);
+    const again = seasonal.particles(.3, season, trees, geometry, W, H, clear);
+    assert.deepEqual(at, again, `${season} particles are deterministic`);
+    assert.ok(at.length <= 60, `${season} stays within the ambient particle budget`);
+    at.forEach(finiteParticle);
+  }
+  const autumn = seasonal.particles(.2, 'autumn', trees, geometry, W, H, clear);
+  assert.ok(autumn.length > 0, 'autumn continuously has falling leaves');
+  assert.ok(autumn.every(p => p.kind === 'leaf'), 'autumn particles are leaves');
+  assert.ok(autumn.every(p => {
+    const rgb = p.color.slice(1).match(/../g).map(value => parseInt(value, 16));
+    return rgb[0] > rgb[1] && rgb[1] > rgb[2];
+  }), 'autumn leaves stay brown, amber, or rust');
+  const autumnLater = seasonal.particles(.8, 'autumn', trees, geometry, W, H, clear);
+  assert.ok(autumnLater.some((p, i) => autumn[i] && p.y > autumn[i].y),
+    'some autumn leaves fall between phases');
+  assert.ok(autumnLater.some(p => p.alpha < 1), 'falling leaves fade into the ground');
+
+  const spring = seasonal.particles(.2, 'spring', trees, geometry, W, H, storm);
+  const springLater = seasonal.particles(.8, 'spring', trees, geometry, W, H, storm);
+  assert.ok(spring.some(p => p.kind === 'petal') && springLater.some(p => p.kind === 'petal'), 'spring storms keep petals active');
+  assert.ok(springLater.some((p, i) => p.kind === 'petal' && spring[i]?.kind === 'petal' && p.y < spring[i].y), 'some spring petals lift into the air');
+  const flowers = seasonal.blossoms(geometry, W, H);
+  assert.ok(flowers.length >= 12, 'spring blossoms are dispersed across the scene');
+  assert.ok(flowers.every(f => Number.isFinite(f.x) && Number.isFinite(f.y) && Number.isFinite(f.size)));
+  assert.ok(Math.min(...flowers.map(f => f.x)) < W * .2 && Math.max(...flowers.map(f => f.x)) > W * .8,
+    'blossoms reach both sides of the landscape');
+
+  const summer = seasonal.particles(.3, 'summer', trees, geometry, W, H, clear);
+  assert.ok(summer.some(p => p.kind === 'wind'), 'summer has a subtle generic wind gesture');
+  const stormAutumn = seasonal.particles(.3, 'autumn', trees, geometry, W, H, storm);
+  const stormSpring = seasonal.particles(.3, 'spring', trees, geometry, W, H, storm);
+  assert.ok(stormAutumn.length <= 60 && stormSpring.length <= 60, 'storm particles remain bounded');
+  stormAutumn.forEach(finiteParticle); stormSpring.forEach(finiteParticle);
+  assert.ok(stormAutumn.some(p => p.kind === 'leaf'), 'storms keep autumn leaves active');
+  assert.ok(stormSpring.some(p => p.kind === 'pollen'), 'spring storms add pollen');
+  assert.ok(stormAutumn.some((p, i) => Math.abs(p.x - autumn[Math.min(i, autumn.length - 1)].x) > .01),
+    'storm gusts alter autumn drift');
+  assert.ok(stormSpring.some((p, i) => p.kind === 'petal' && spring[Math.min(i, spring.length - 1)] &&
+    Math.abs(p.x - spring[Math.min(i, spring.length - 1)].x) > .01),
+    'storm gusts alter spring drift');
+  assert.ok(!seasonal.particles(.3, 'winter', trees, geometry, W, H, { status: 'snowstorm', intensity: 1, storm: true })
+    .some(p => p.kind === 'snow'), 'parent weather renderer owns snow particles');
+  assert.doesNotMatch(source, /LivingSky|createWorld|eventTypes|events\s*=/,
+    'seasonal ambience does not create or mutate the ordinary event pool');
+});
+
+test('Seasonal ambient module: reduced motion freezes blossoms and omits airborne motion', () => {
+  const context = vm.createContext({ Math, JSON });
+  vm.runInContext(fs.readFileSync(path.join(__dirname, 'landscape-geometry.js'), 'utf8'), context);
+  vm.runInContext(fs.readFileSync(path.join(__dirname, 'landscape-seasonal.js'), 'utf8'), context,
+    { filename: 'landscape-seasonal.js' });
+  const seasonal = context.LandscapeSeasonal, W = 844, H = 600;
+  const geometry = context.LandscapeGeometry.create(W, H);
+  const trees = [{ x: 200, y: geometry.near(200) + 50, size: 50 }];
+  const p = { sky: ['#8ed4f3', '#d4f5f2', '#f6fbe2'], front: '#8dcca1', hill: '#ace097', city: '#bbdce1' };
+  const weather = { status: 'thunderstorm', intensity: 1, storm: true };
+  const render = (t, reduced) => {
+    const ops = [], g = {
+      globalAlpha: 1, fillStyle: '', strokeStyle: '', lineWidth: 1,
+      save() { ops.push(['save']); }, restore() { ops.push(['restore']); },
+      beginPath() { ops.push(['begin']); }, closePath() { ops.push(['close']); },
+      moveTo(...a) { ops.push(['move', ...a]); }, lineTo(...a) { ops.push(['line', ...a]); },
+      quadraticCurveTo(...a) { ops.push(['quadratic', ...a]); }, bezierCurveTo(...a) { ops.push(['bezier', ...a]); },
+      ellipse(...a) { ops.push(['ellipse', ...a]); }, arc(...a) { ops.push(['arc', ...a]); },
+      translate(...a) { ops.push(['translate', ...a]); }, rotate(...a) { ops.push(['rotate', ...a]); }, scale(...a) { ops.push(['scale', ...a]); },
+      fill() { ops.push(['fill', this.fillStyle, this.globalAlpha]); }, stroke() { ops.push(['stroke', this.strokeStyle, this.globalAlpha]); },
+      fillRect(...a) { ops.push(['rect', ...a, this.fillStyle, this.globalAlpha]); },
+    };
+    seasonal.paint(g, trees, geometry, W, H, t, 'spring', p, reduced, weather);
+    return ops;
+  };
+  assert.deepEqual(render(0, true), render(100, true), 'reduced motion uses one static blossom frame');
+  assert.notDeepEqual(render(0, false), render(100, false), 'normal motion animates seasonal ambience');
+});
+
+test('Landscape winter visitors: activity anchors stay put while builders and angels leave smoothly', () => {
+  const ctx = vm.createContext({ Date, Math, console });
+  for (const file of ['landscape-geometry.js', 'landscape-winter.js']) {
+    vm.runInContext(fs.readFileSync(path.join(__dirname, file), 'utf8'), ctx, { filename: file });
+  }
+  const winter = ctx.LandscapeWinter;
+  const geometry = ctx.LandscapeGeometry.create(1000, 700);
+  const event = { duration: 100, seed: .25, lane: .5, reverse: false };
+
+  const early = winter.pose('snowman', { ...event, age: 55 }, geometry, 1000, 700);
+  const finished = winter.pose('snowman', { ...event, age: 78 }, geometry, 1000, 700);
+  const leaving = winter.pose('snowman', { ...event, age: 88 }, geometry, 1000, 700);
+  assert.equal(early.x, finished.x, 'the snowman remains at its activity anchor');
+  assert.equal(finished.x, leaving.x, 'the finished snowman does not travel away');
+  assert.equal(early.patchX, leaving.patchX, 'the snow patch remains under the snowman');
+  assert.ok(leaving.builderX > finished.builderX, 'the builder walks away from the finished snowman');
+  assert.ok(leaving.structureAlpha > leaving.finalFadeAlpha, 'the snowman gently fades in the final interval');
+  assert.ok(leaving.patchAlpha > leaving.finalFadeAlpha, 'the snow patch follows the same final fade');
+  assert.ok(leaving.builderScale >= .85, 'the builder is a full-sized winter visitor');
+
+  const lying = winter.pose('snowangel', { ...event, age: 70 }, geometry, 1000, 700);
+  const standing = winter.pose('snowangel', { ...event, age: 78 }, geometry, 1000, 700);
+  const walking = winter.pose('snowangel', { ...event, age: 90 }, geometry, 1000, 700);
+  assert.equal(lying.imprintX, walking.imprintX, 'the angel imprint stays where it was made');
+  assert.ok(standing.bodyMode > 0 && standing.bodyMode < 1, 'lying and standing bodies crossfade');
+  assert.ok(standing.lyingAlpha > 0 && standing.standingAlpha > 0, 'both angel poses overlap during the transition');
+  assert.equal(walking.walking, true, 'the angel walks away before the event expires');
+  assert.ok(walking.x !== walking.imprintX, 'the departing person leaves the imprint behind');
+});
+
+test('Landscape winter visitors: skiers use a bounded downhill segment, correct scale, and level skis', () => {
+  const ctx = vm.createContext({ Date, Math, console });
+  for (const file of ['landscape-geometry.js', 'landscape-winter.js']) {
+    vm.runInContext(fs.readFileSync(path.join(__dirname, file), 'utf8'), ctx, { filename: file });
+  }
+  const winter = ctx.LandscapeWinter;
+  for (const reverse of [false, true]) {
+    const geometry = ctx.LandscapeGeometry.create(1000, 700);
+    const event = { duration: 100, seed: .45, lane: .5, reverse };
+    const active = [.16, .24, .32, .40, .48, .56, .64, .72, .80, .86]
+      .map(age => winter.pose('skier', { ...event, age: age * event.duration }, geometry, 1000, 700));
+    const skiing = active.filter(pose => pose.skiing);
+    assert.ok(skiing.length > 5, 'skier has a meaningful active downhill run');
+    for (let i = 1; i < skiing.length; i++) {
+      assert.ok(skiing[i].y >= skiing[i - 1].y - 1e-7, 'skiing progresses downhill on the rendered hill');
+    }
+    assert.ok(skiing.every(pose => Math.abs(pose.y - (geometry.middle(pose.x) + pose.snowOffset)) < 1e-8));
+    assert.ok(skiing.every(pose => Math.abs(pose.angle - geometry.tangent(geometry.middle, pose.x)) < 1e-8));
+  }
+  const phone = winter.pose('skier', { age: 50, duration: 100, seed: .4, lane: .5 }, ctx.LandscapeGeometry.create(320, 568), 320, 568);
+  const desktop = winter.pose('skier', { age: 50, duration: 100, seed: .4, lane: .5 }, ctx.LandscapeGeometry.create(1440, 900), 1440, 900);
+  const builder = winter.pose('snowman', { age: 50, duration: 100, seed: .4, lane: .5 }, ctx.LandscapeGeometry.create(320, 568), 320, 568);
+  assert.ok(phone.scale >= .85 && desktop.scale >= .95, 'winter people keep sensible phone and desktop scale');
+  assert.ok(Math.abs(phone.scale - builder.scale) < .12, 'skier and builder share a consistent human scale');
+
+  const rotations = [];
+  let currentRotation = 0;
+  const g = {
+    save() {}, restore() {}, beginPath() {}, closePath() {}, moveTo() {}, lineTo() {}, ellipse() {}, fill() {}, stroke() {},
+    translate() {}, scale() {}, rotate(value) { currentRotation = value; rotations.push(value); }, fillRect() {},
+    globalAlpha: 1, fillStyle: '', strokeStyle: '', lineWidth: 1,
+  };
+  const lines = [];
+  const helpers = {
+    ellipse() {},
+    line(_ctx, x, y, x2, y2) { lines.push({ x, y, x2, y2, rotation: currentRotation }); },
+    color: () => '#cb8d80', skinColor: () => '#b27d58', S: { smooth: (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); }, mixHex: (a) => a },
+  };
+  const geometry = ctx.LandscapeGeometry.create(1000, 700);
+  const pose = winter.pose('skier', { age: 50, duration: 100, seed: .4, lane: .5 }, geometry, 1000, 700);
+  winter.paint(g, geometry, 1000, 700, { type: 'skier', age: 50, duration: 100, seed: .4, lane: .5 }, 2, { sky: ['#8ed4f3', '#d4f5f2', '#f6fbe2'], city: '#bbdce1', hill: '#ace097', front: '#8dcca1' }, helpers);
+  assert.ok(rotations.some(value => Math.abs(value - pose.angle) < 1e-12), 'ski bases rotate on the terrain tangent');
+  assert.ok(lines.some(item => item.x === -7 && item.y === 1 && Math.abs(item.rotation - pose.angle) < 1e-12), 'ski bases stay level with the slope');
+});
+
+test('Scene appearance: birds retain identity with dark distant colors and brighter nearby plumage; hair is stable and varied',()=>{
+ const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-appearance.js'),'utf8'),ctx);
+ const a=ctx.LandscapeAppearance,near=new Set(),far=new Set(),styles=new Set(),hair=new Set();
+ for(let i=0;i<100;i++){
+  const seed=i/100,n=a.birdColor(seed,0,'#ffffff',1),f=a.birdColor(seed,0,'#ffffff',0);
+  assert.equal(a.birdColor(seed,0,'#ffffff',1),n);near.add(n);far.add(f);
+  assert.ok(landscapeLuminance(f)<.08,'sky birds read as silhouettes');
+  assert.ok(landscapeLuminance(n)>landscapeLuminance(f),'nearby plumage is more visible');
+  const mid=a.birdColor(seed,0,'#ffffff',.5);assert.notEqual(mid,n);assert.notEqual(mid,f);
+  const person=a.person(seed);assert.deepEqual(a.person(seed),person);styles.add(person.style);hair.add(person.color);
+ }
+ assert.ok(near.size>=6&&far.size>=6);assert.ok(styles.size>=6&&hair.size>=6);
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ assert.match(source,/LandscapeAppearance.birdColor/);assert.match(source,/function personHead\(/);
+ const head=source.slice(source.indexOf('  function personHead('),source.indexOf('  function layer('));
+ const draw=hat=>{const colors=[],g={save(){},restore(){},beginPath(){},ellipse(){},fill(){},moveTo(){},lineTo(){},stroke(){}};vm.runInNewContext(head+';personHead(g,0,0,2,2,.34,"#abcdef",hat)',{g,hat,LandscapeAppearance:a,p:{night:0,city:'#333333'},S:livingSky(),ellipse(g,x,y,rx,ry,c){colors.push(c);},line(){}});return colors;};
+ assert.deepEqual(draw(true),['#abcdef'],'hats and helmets suppress hair');assert.ok(draw(false).length>1,'uncovered heads draw hair and skin');
+ assert.match(html,/src="landscape-appearance.js"/);
+});
+
+test('Banner aircraft: propeller craft has a tail tow point and animated blades without altering airshows',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),code=source.slice(source.indexOf('  function airplane('),source.indexOf('  function paintGuest('));
+ const render=(time,propeller)=>{const calls=[],g={save(){},restore(){},translate(){},scale(){},beginPath(){},moveTo(...v){calls.push(['m',...v]);},lineTo(...v){calls.push(['l',...v]);},closePath(){},fill(){}};vm.runInNewContext(code+`;airplane(0,0,1,.2,${time},${propeller})`,{g,Math,color:()=> '#123456',line(g,...v){calls.push(['line',...v]);},ellipse(g,...v){calls.push(['ellipse',...v]);}});return calls;};
+ assert.notDeepEqual(render(0,true),render(.07,true),'propeller visibly spins');assert.deepEqual(render(0,false),render(.07,false),'airshow silhouette stays unchanged');
+ const banner=source.slice(source.indexOf("    if(e.type==='banner'){"));assert.match(banner,/airplane\(x,y,dir,e.seed,t,true\)/);assert.match(banner,/line\(g,x-dir\*18,y/,'tow starts at the tail');
+});
+
+test('Weather rendering: snow drifts smoothly at real epoch times and seasonal ambience also paints in clear weather',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ const code=source.slice(source.indexOf('  function paintWeather('),source.indexOf('  function paintWoodland('));
+ const run=time=>{const points=[],seasonal=[],g={save(){},restore(){},fillRect(){}};const weather={status:'snowstorm',intensity:1,storm:true,slot:10};
+ vm.runInNewContext(code+';paintWeather()', {g,Math,Date:class extends Date{static now(){return time*1000;}},W:1000,H:700,hy:300,reduced:false,sceneSeason:'winter',treeOrigins:[],geometry:{},world:{elapsed:3},p:{city:'#555555',sky:['#fff','#fff','#fff']},rand:n=>(Math.sin(n)+1)/2,S:{weatherAt:()=>weather},document:{documentElement:{dataset:{}}},LandscapeSeasonal:{paint(...args){seasonal.push(args);}},ellipse(g,x,y,rx,ry,c){if(c==='#f4f4e8')points.push([x,y]);},line(){}});return {points,seasonal};};
+ const a=run(1789300000),b=run(1789300000+1/30);assert.ok(a.points.length>50);
+ a.points.forEach((point,i)=>{const dx=Math.abs(point[0]-b.points[i][0]);assert.ok(Math.min(dx,1000-dx)<5,'snow does not jitter across screen');});
+ assert.equal(a.seasonal.length,1);assert.ok(code.indexOf('LandscapeSeasonal.paint')<code.indexOf('if(!weather.intensity)return'),'clear weather retains season ambience');
+});
+
+test('Landscape config: one frozen registry drives season pools, accents, weather, and woodland', () => {
+  const ctx = vm.createContext({ Date, Intl, Math, JSON, console });
+  for (const file of ['landscape-config.js', 'vendor/astronomy.min.js', 'stars.js', 'landscape-core.js', 'landscape-mood.js']) {
+    assert.ok(fs.existsSync(path.join(__dirname, file)), `shared config asset missing: ${file}`);
+    vm.runInContext(fs.readFileSync(path.join(__dirname, file), 'utf8'), ctx, { filename: file });
+  }
+  const config = ctx.LandscapeConfig, sky = ctx.LivingSky, mood = ctx.LandscapeMood;
+  assert.ok(config && Object.isFrozen(config), 'the registry is immutable');
+  assert.ok(Object.isFrozen(config.seasons) && Object.isFrozen(config.weather) && Object.isFrozen(config.woodland),
+    'the registry sections are immutable');
+  for (const name of ['spring', 'summer', 'autumn', 'winter']) {
+    assert.ok(Object.isFrozen(config.seasons[name]), `${name} season config is immutable`);
+    assert.ok(Object.isFrozen(config.seasons[name].events), `${name} event pool is immutable`);
+    assert.ok(Object.isFrozen(config.seasons[name].accent), `${name} accent is immutable`);
+    assert.deepEqual([...sky.eventsForSeason(name)], [...config.seasons[name].events], `${name} uses the shared event pool`);
+  }
+  assert.deepEqual([...sky.woodlandTypes], [...config.woodland.types], 'woodland types come from the registry');
+  assert.equal(sky.createWoodland(() => 1).next, config.woodland.interval, 'woodland timing comes from the registry');
+  assert.match(fs.readFileSync(path.join(__dirname, 'landscape-core.js'), 'utf8'), /LandscapeConfig/,
+    'core scheduling reads the shared registry');
+  assert.match(fs.readFileSync(path.join(__dirname, 'landscape-mood.js'), 'utf8'), /LandscapeConfig/,
+    'mood accents read the shared registry');
+  assert.deepEqual(mood.palette(sky.palette(35), new Date('2026-01-15T17:00:00Z'), { latitude: 28.5, timezone: 'America/New_York' }).far,
+    mood.palette(sky.palette(35), new Date('2026-01-15T17:00:00Z'), { latitude: 28.5, timezone: 'America/New_York' }).far,
+    'registry backed mood remains deterministic');
+});
+
+test('Landscape config: daytime balloon weighting restores variety and allows winter balloons', () => {
+  const ctx = vm.createContext({ Date, Intl, Math, JSON, console });
+  for (const file of ['landscape-config.js', 'vendor/astronomy.min.js', 'stars.js', 'landscape-core.js']) {
+    vm.runInContext(fs.readFileSync(path.join(__dirname, file), 'utf8'), ctx, { filename: file });
+  }
+  const config = ctx.LandscapeConfig, sky = ctx.LivingSky;
+  assert.equal(typeof config.pickEvent, 'function', 'the registry owns weighted event selection');
+  const count = 10000, picks = Array.from({ length: count }, (_, i) =>
+    config.pickEvent('summer', 'day', () => (i + .5) / count));
+  const balloonCount = picks.filter(type => type === 'balloon').length;
+  assert.ok(balloonCount >= count * .08 && balloonCount <= count * .12,
+    `daytime balloons stay near 10% (observed ${balloonCount / count})`);
+  assert.ok(new Set(picks).size >= 12, 'daytime weighting preserves broad event variety');
+  assert.ok(picks.includes('cyclist') && picks.includes('picnic') && picks.includes('windsurfer'),
+    'ordinary daytime activities remain selectable');
+  const winter = Array.from({ length: 2000 }, (_, i) => config.pickEvent('winter', 'day', () => (i + .5) / 2000));
+  assert.ok(winter.includes('balloon'), 'winter permits cool-air balloon visits');
+  assert.ok(winter.includes('snowman') && winter.includes('skier') && winter.includes('snowangel'),
+    'winter keeps its snow activities in the same selection framework');
+  assert.deepEqual(sky.weatherAt(new Date('2026-01-15T17:00:00Z')).start,
+    sky.weatherAt(new Date('2026-01-15T17:00:00Z'), 'winter').start,
+    'season weather uses the same immutable episode schedule');
+});
+
+test('Landscape config: weather and woodland behavior keep their existing bounds', () => {
+  const ctx = vm.createContext({ Date, Intl, Math, JSON, console });
+  for (const file of ['landscape-config.js', 'vendor/astronomy.min.js', 'stars.js', 'landscape-core.js']) {
+    vm.runInContext(fs.readFileSync(path.join(__dirname, file), 'utf8'), ctx, { filename: file });
+  }
+  const config = ctx.LandscapeConfig, sky = ctx.LivingSky;
+  assert.equal(config.weather.slot, 10800000, 'weather remains on three-hour immutable slots');
+  assert.deepEqual([...config.weather.showerMinutes], [20, 45]);
+  assert.deepEqual([...config.weather.stormMinutes], [30, 60]);
+  assert.equal(config.weather.chance, .35);
+  assert.equal(config.weather.stormChance, .35);
+  const moments = [0, 1, 2, 7, 15].map(slot => new Date((160000 + slot) * config.weather.slot));
+  for (const date of moments) {
+    const ordinary = sky.weatherAt(date), winter = sky.weatherAt(date, 'winter');
+    assert.deepEqual(
+      { slot: ordinary.slot, start: ordinary.start, end: ordinary.end, intensity: ordinary.intensity, storm: ordinary.storm },
+      { slot: winter.slot, start: winter.start, end: winter.end, intensity: winter.intensity, storm: winter.storm },
+      'winter changes precipitation kind without changing episode timing');
+  }
+  assert.equal(config.woodland.interval, 30);
+  assert.equal(config.woodland.maxActive, 4);
+  assert.equal(config.woodland.chance, .01);
+  assert.equal(config.woodland.duration, 180);
+});
+
+test('Seasonal ambience: winter retires ice cream, flowers, fireflies and fountain spray',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ assert.match(source,/sceneSeason!=='winter'&&W>650&&visitSeed>\.25/);
+ assert.match(source,/sceneSeason!=='winter'&&p.night>\.15/);
+ assert.match(source,/if\(sceneSeason!=='winter'\)for\(let i=-1;i<=1;i\+\+\)/);
+ assert.match(source,/if\(sceneSeason!=='winter'\)for\(let i=0;i<140;i\+\+\)/);
+});
+
+test('Landscape config: nighttime picks honor the selected season pool', () => {
+  const ctx = vm.createContext({ Date, Intl, Math, JSON, console });
+  vm.runInContext(fs.readFileSync(path.join(__dirname, 'landscape-config.js'), 'utf8'), ctx, { filename: 'landscape-config.js' });
+  const config = ctx.LandscapeConfig;
+  const winterTypes = new Set(config.seasons.winter.nightEntries.map(entry => entry.type));
+  const picks = Array.from({ length: 2000 }, (_, i) => config.pickEvent('winter', 'night', () => (i + .5) / 2000));
+  assert.ok(picks.every(type => winterTypes.has(type)), 'winter night picks stay in the winter pool');
+  assert.ok(picks.includes('snowman') && picks.includes('skier') && picks.includes('snowangel'),
+    'winter night pool keeps the snow activities available');
+  assert.ok(picks.includes('balloon'), 'winter night pool permits an occasional balloon');
+  assert.ok(!picks.includes('picnic') && !picks.includes('jetski'),
+    'winter night picks do not reintroduce warm-season activities');
+  const springTypes = new Set(config.seasons.spring.nightEntries.map(entry => entry.type));
+  assert.ok(springTypes.has(config.pickEvent('spring', 'night', () => .9999)),
+    'other seasons retain their own nighttime pool');
+});
+
+test('Winter snow cover: open hills look snowy in daylight and retain a distinct night',()=>{
+ const mood=moodRuntime(),sky=livingSky(),location={latitude:28.5,timezone:'America/New_York'},date=new Date('2026-01-15T17:00:00Z');
+ const day=mood.palette(sky.palette(30),date,location),night=mood.palette(sky.palette(-25),date,location);
+ for(const role of ['far','hill']){const rgb=day[role].slice(1).match(/../g).map(v=>parseInt(v,16));assert.ok(Math.max(...rgb)-Math.min(...rgb)<22,'open snowfields should not read as green lawns');assert.ok(landscapeLuminance(day[role])-landscapeLuminance(night[role])>.18,'snow remains dimmer at night');}
+});
+
+test('Small personal transit: scooters and hoverboards follow the trail, remain human scale, and have finite departures',()=>{
+ const ctx=vm.createContext({Math});for(const file of ['landscape-geometry.js','landscape-riders.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,file),'utf8'),ctx);
+ const riders=ctx.LandscapeRiders;assert.deepEqual([...riders.types],['hoverboard','scooter']);
+ for(const W of [320,1440])for(const reverse of [false,true])for(const type of riders.types){const geo=ctx.LandscapeGeometry.create(W,800),pose=f=>riders.pose({type,age:f*75,duration:75,seed:.4,reverse},geo,W);
+  const first=pose(0),middle=pose(.5),last=pose(1);assert.ok(first.x<0||first.x>W);assert.ok(last.x<0||last.x>W);assert.ok((last.x-first.x)*(reverse?-1:1)>0);assert.equal(middle.y,geo.trail(middle.x));assert.equal(middle.angle,geo.tangent(geo.trail,middle.x));assert.ok(middle.scale>=.85&&middle.scale<=1);
+  const lines=[],heads=[],g={save(){},restore(){},translate(){},rotate(){},scale(){}};
+  riders.paint(g,geo,W,{type,age:37.5,duration:75,seed:.4,reverse},2,{city:'#334433'}, {ellipse(){},line(g,...v){lines.push(v);},color:()=> '#cc8866',skinColor:()=> '#aa7755',personHead(...args){heads.push(args);}});
+  assert.equal(heads.length,1);assert.equal(heads[0].at(-1),true,'riders wear helmets');assert.ok(lines.length>=8);if(type==='scooter')assert.ok(lines.some(v=>v[0]===6&&v[1]===-3&&v[2]===5&&v[3]===-13),'scooter steering column stays attached');
+ }
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');assert.match(source,/LandscapeRiders.paint/);assert.match(html,/src="landscape-riders.js"/);
+});
+
+test('Transit variety: hoverboards and scooters are finite scheduled visitors with a weighted daytime pool', () => {
+  const ctx = vm.createContext({ Date, Intl, Math, JSON, console });
+  for (const file of ['landscape-config.js', 'vendor/astronomy.min.js', 'stars.js', 'landscape-core.js']) {
+    vm.runInContext(fs.readFileSync(path.join(__dirname, file), 'utf8'), ctx, { filename: file });
+  }
+  const config = ctx.LandscapeConfig, sky = ctx.LivingSky;
+  assert.ok(config.eventTypes.includes('hoverboard') && config.eventTypes.includes('scooter'),
+    'new riders belong to the shared event catalog');
+  assert.ok(config.seasons.summer.events.includes('hoverboard') && config.seasons.summer.events.includes('scooter'));
+  assert.ok(!config.seasons.winter.events.includes('hoverboard') && !config.seasons.winter.events.includes('scooter'),
+    'unplowed winter paths exclude hoverboards and scooters');
+  for (const type of ['hoverboard', 'scooter']) {
+    assert.ok(sky.eventDurations[type] > 0 && sky.eventDurations[type] <= 180,
+      `${type} has a finite visitor duration`);
+  }
+
+  const count = 20000;
+  const picks = Array.from({ length: count }, (_, i) => config.pickEvent('summer', 'day', () => (i + .5) / count));
+  const share = types => picks.filter(type => types.includes(type)).length / count;
+  const balloons = share(['balloon']);
+  assert.ok(balloons >= .08 && balloons <= .12, `balloons remain near 10% (observed ${balloons})`);
+  assert.ok(share(['walker']) >= .07, 'walkers are distinctly common daytime visitors');
+  assert.ok(share(['train', 'metro', 'cyclist', 'hoverboard', 'scooter', 'skateboarder', 'rollerskater']) >= .30,
+    'transit and riders are collectively more common');
+  for (const type of ['hoverboard', 'scooter', 'train', 'metro', 'walker']) assert.ok(picks.includes(type), `${type} remains selectable`);
+
+  const world = sky.createWorld(() => .37);
+  assert.equal(new Set(world.events.map(event => event.type)).size, 3, 'the opening cast remains distinct');
+});
+
+test('Winter skier departure: visible travel stays downhill through the final fade',()=>{
+ const ctx=vm.createContext({Math});for(const file of ['landscape-geometry.js','landscape-winter.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,file),'utf8'),ctx);
+ for(const W of [320,1000,1440])for(const reverse of [false,true])for(const lane of [0,.5,1]){
+  const geo=ctx.LandscapeGeometry.create(W,900);let previous=null;
+  for(let i=0;i<=1000;i++){const p=ctx.LandscapeWinter.pose('skier',{age:i/10,duration:100,seed:.4,lane,reverse},geo,W,900);if(previous&&p.alpha>.01&&previous.alpha>.01)assert.ok(p.y>=previous.y-.001,'a visible skier never accelerates back uphill');previous=p;}
+ }
+});
+
+test('Winter skier anatomy: thighs connect the torso to both knees and a helmet covers the head',()=>{
+ const ctx=vm.createContext({Math});for(const file of ['landscape-geometry.js','landscape-winter.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,file),'utf8'),ctx);
+ const lines=[],caps=[],g={save(){},restore(){},translate(){},rotate(){},scale(){}};
+ ctx.LandscapeWinter.paint(g,ctx.LandscapeGeometry.create(1000,700),1000,700,{type:'skier',age:50,duration:100,seed:.4,lane:.5},2,{city:'#334455',front:'#556655',sky:['#aabbcc','#bbccdd','#ccddee']},{line(g,...args){lines.push(args);},ellipse(g,...args){caps.push(args);},color:()=> '#123456',skinColor:()=> '#abcdef',personHead(){}});
+ for(const knee of [-4,4])assert.ok(lines.some(v=>v[0]===0&&v[1]===-7&&v[2]===knee&&v[3]===-7),'each thigh joins the hip to its knee');
+ assert.ok(caps.some(v=>v[0]===2&&v[1]===-17&&v[4]==='#123456'),'helmet is visibly painted');
+});
+
+function loadSeasonalRepair(){
+  const context=vm.createContext({Math,JSON});
+  vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),context);
+  vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-seasonal.js'),'utf8'),context,{filename:'landscape-seasonal.js'});
+  return {context,seasonal:context.LandscapeSeasonal};
+}
+
+function seasonalRepairCanvas(){
+  const ops=[];
+  return {ops,g:{globalAlpha:1,fillStyle:'',strokeStyle:'',lineWidth:1,
+    save(){ops.push(['save']);},restore(){ops.push(['restore']);},
+    beginPath(){ops.push(['begin']);},closePath(){ops.push(['close']);},
+    moveTo(...a){ops.push(['move',...a]);},lineTo(...a){ops.push(['line',...a]);},
+    quadraticCurveTo(...a){ops.push(['quadratic',...a]);},bezierCurveTo(...a){ops.push(['bezier',...a]);},
+    ellipse(...a){ops.push(['ellipse',...a]);},arc(...a){ops.push(['arc',...a]);},
+    fill(){ops.push(['fill',this.fillStyle,this.globalAlpha]);},
+    stroke(){ops.push(['stroke',this.strokeStyle,this.globalAlpha]);},
+    fillRect(...a){ops.push(['rect',...a,this.fillStyle,this.globalAlpha]);},
+  }};
+}
+
+const seasonalRepairPalette={sky:['#8ed4f3','#d4f5f2','#f6fbe2'],front:'#8dcca1',hill:'#ace097',city:'#bbdce1',night:0};
+const seasonalRepairNight={...seasonalRepairPalette,night:1};
+const seasonalRepairWeather={status:'clear',intensity:0,storm:false};
+const seasonalRepairRain={status:'rain',intensity:1,storm:false};
+const seasonalRepairStorm={status:'thunderstorm',intensity:1,storm:true};
+const seasonalRepairSnow={status:'snow',intensity:1,storm:false};
+const seasonalRepairSnowstorm={status:'snowstorm',intensity:1,storm:true};
+
+test('Seasonal repair: spring gusts are intermittent, rain increases them, and storms stay active',()=>{
+  const {seasonal}=loadSeasonalRepair(),W=900,H=640,geometry={near:()=>540};
+  const trees=[{x:140,y:150,size:48},{x:440,y:180,size:54},{x:760,y:125,size:42}];
+  const clearFrames=Array.from({length:3600},(_,second)=>seasonal.particles(second,'spring',trees,geometry,W,H,seasonalRepairWeather));
+  const clearActive=clearFrames.filter(frame=>frame.some(p=>p.kind==='petal'));
+  const clearRatio=clearActive.length/clearFrames.length;
+  assert.ok(clearRatio>.02&&clearRatio<.12,`fair-weather petal gusts should be intermittent (35% of one-minute slots, about ten seconds each), got ${clearRatio}`);
+  const clearRuns=[];let run=0;
+  for(const frame of clearFrames){if(frame.some(p=>p.kind==='petal'))run++;else if(run){clearRuns.push(run);run=0;}}
+  if(run)clearRuns.push(run);
+  assert.ok(clearRuns.length>1&&clearRuns.every(length=>length>=6&&length<=16),
+    'fair-weather gust windows should last roughly 8-12 seconds');
+  const rainFrames=clearFrames.map((_,second)=>seasonal.particles(second,'spring',trees,geometry,W,H,seasonalRepairRain));
+  const rainActive=rainFrames.filter(frame=>frame.some(p=>p.kind==='petal')).length;
+  const clearTotal=clearFrames.reduce((sum,frame)=>sum+frame.filter(p=>p.kind==='petal').length,0);
+  const rainTotal=rainFrames.reduce((sum,frame)=>sum+frame.filter(p=>p.kind==='petal').length,0);
+  assert.ok(rainActive>clearActive.length||rainTotal>clearTotal,'rain increases petal gust frequency or amount');
+  for(let second=0;second<120;second+=2){
+    const frame=seasonal.particles(second,'spring',trees,geometry,W,H,seasonalRepairStorm);
+    assert.ok(frame.some(p=>p.kind==='petal'),'storm gusts stay active continuously');
+    assert.ok(frame.some(p=>p.kind==='pollen'),'spring storms carry pollen');
+  }
+  assert.ok(seasonal.blossoms(geometry,W,H).length>=12,'static spring blossoms remain widespread');
+});
+
+test('Seasonal repair: leaves use actual tree bases and sample every tree origin',()=>{
+  const {seasonal}=loadSeasonalRepair(),W=960,H=640,geometry={near:()=>520};
+  const trees=Array.from({length:15},(_,index)=>({x:30+index*64,y:100+(index%3)*14,size:36+index%4*4}));
+  const leaves=seasonal.particles(0,'autumn',trees,geometry,W,H,seasonalRepairWeather).filter(p=>p.kind==='leaf');
+  assert.ok(leaves.length>0&&leaves.length<=60);
+  for(const tree of trees){
+    assert.ok(leaves.some(p=>Math.abs(p.x-tree.x)<tree.size*1.25),`tree at ${tree.x} contributes leaves`);
+  }
+  const midground=trees[7],midLeaves=leaves.filter(p=>Math.abs(p.x-midground.x)<midground.size*1.25);
+  assert.ok(midLeaves.length>0&&Math.min(...midLeaves.map(p=>p.y))<midground.y+midground.size*.8,
+    'midground leaves begin at the supplied tree base instead of the near-hill ground');
+});
+
+test('Seasonal repair: airborne particles have zero-alpha lifecycle endpoints and no visible wrap pop',()=>{
+  const {seasonal}=loadSeasonalRepair(),W=900,H=640,geometry={near:()=>540};
+  const trees=[{x:120,y:160,size:48},{x:430,y:175,size:54},{x:790,y:140,size:46}];
+  for(const [season,weather,kinds] of [
+    ['spring',seasonalRepairStorm,['petal','pollen']],
+    ['autumn',seasonalRepairWeather,['leaf']],
+  ]){
+    const samples=[];
+    for(let t=0;t<180;t+=.5)for(const particle of seasonal.particles(t,season,trees,geometry,W,H,weather))
+      if(kinds.includes(particle.kind))samples.push(particle);
+    assert.ok(samples.some(p=>p.alpha<=.001),`${season} particles fade to zero at a lifecycle endpoint`);
+    assert.ok(samples.some(p=>p.alpha>.45),`${season} particles have a visible middle of life`);
+    samples.forEach(p=>assert.ok(p.alpha>=0&&p.alpha<=1,'lifecycle alpha remains bounded'));
+  }
+});
+
+test('Seasonal repair: winter adds static tree caps and rare canopy snow clumps',()=>{
+  const {seasonal}=loadSeasonalRepair(),W=900,H=640,geometry={near:()=>540};
+  const trees=[{x:100,y:160,size:48},{x:430,y:175,size:54},{x:790,y:140,size:46}];
+  const clear=[];const storm=[];
+  for(let t=0;t<240;t+=.5){
+    clear.push(...seasonal.particles(t,'winter',trees,geometry,W,H,seasonalRepairSnow));
+    storm.push(...seasonal.particles(t,'winter',trees,geometry,W,H,seasonalRepairSnowstorm));
+  }
+  const clearClumps=clear.filter(p=>p.kind==='snow-clump');
+  const stormClumps=storm.filter(p=>p.kind==='snow-clump');
+  assert.ok(clearClumps.length>0&&clearClumps.length<240,'clear winter clumps stay occasional');
+  assert.ok(stormClumps.length>clearClumps.length,'snowstorms amplify canopy clumps');
+  for(const particle of stormClumps){
+    assert.ok(Number.isFinite(particle.x)&&Number.isFinite(particle.y));
+    assert.ok(trees.some(tree=>Math.abs(particle.x-tree.x)<tree.size*1.3),'clumps originate at a tree canopy');
+    assert.ok(particle.alpha>=0&&particle.alpha<=1);
+  }
+  assert.ok(!storm.some(p=>p.kind==='snow'),'winter ambience does not duplicate sky snow');
+  const render=(t,reduced,palette)=>{const canvas=seasonalRepairCanvas();seasonal.paint(canvas.g,trees,geometry,W,H,t,'winter',palette,reduced,seasonalRepairSnowstorm);return canvas.ops;};
+  assert.ok(render(0,true,seasonalRepairPalette).length>0,'winter paints static snowcaps');
+  assert.deepEqual(render(0,true,seasonalRepairPalette),render(100,true,seasonalRepairPalette),'reduced caps stay static');
+});
+
+test('Seasonal repair: night paint subdues foliage, petals, and snowcaps; reduced motion removes airborne draws',()=>{
+  const {seasonal}=loadSeasonalRepair(),W=900,H=640,geometry={near:()=>540};
+  const trees=[{x:100,y:160,size:48},{x:430,y:175,size:54},{x:790,y:140,size:46}];
+  const render=(season,palette,reduced,t,weather)=>{const canvas=seasonalRepairCanvas();seasonal.paint(canvas.g,trees,geometry,W,H,t,season,palette,reduced,weather);return canvas.ops;};
+  const alpha=ops=>ops.filter(op=>op[0]==='fill'||op[0]==='stroke').map(op=>op[2]).filter(Number.isFinite);
+  for(const season of ['spring','autumn','winter']){
+    const day=alpha(render(season,seasonalRepairPalette,false,23,season==='winter'?seasonalRepairSnow:seasonalRepairWeather));
+    const night=alpha(render(season,seasonalRepairNight,false,23,season==='winter'?seasonalRepairSnow:seasonalRepairWeather));
+    assert.ok(day.length>0&&night.length>0,`${season} paints visible ambient forms`);
+    assert.ok(Math.max(...night)<Math.max(...day)*.9,`${season} is visibly subdued at night`);
+  }
+  assert.deepEqual(render('spring',seasonalRepairPalette,true,0,seasonalRepairWeather),
+    render('spring',seasonalRepairPalette,true,100,seasonalRepairWeather),'reduced spring keeps only static blossoms');
+  assert.deepEqual(render('winter',seasonalRepairPalette,true,0,seasonalRepairSnowstorm),
+    render('winter',seasonalRepairPalette,true,100,seasonalRepairSnowstorm),'reduced winter keeps only static caps');
+});
+
+test('Seasonal opening cast: winter boots with three eligible visitors for saved and live seasons',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),code=source.slice(source.indexOf('  let sceneSeason='),source.indexOf('  let skyTimer='));
+ for(const saved of [null,'winter']){
+  const S=livingSky(),ctx=vm.createContext({Math,Date,S,storage:{getItem:key=>key.endsWith('scene-season')?saved:null},LandscapeMood:{season:()=>({name:'winter'})},LivingLocation:{current:()=>({latitude:28.5,timezone:'America/New_York'})}});
+  vm.runInContext(code+';globalThis.bootWorld=world;',ctx);assert.equal(ctx.bootWorld.season,'winter');assert.equal(ctx.bootWorld.events.length,3);assert.ok(ctx.bootWorld.events.every(e=>S.eventsForSeason('winter').includes(e.type)));
+ }
+});
+
+test('Weather synchronization: reduced-motion refreshes align with UTC and exact episode boundaries',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),code=source.slice(source.indexOf('  function scheduleSky('),source.indexOf('  function start('));
+ for(const [now,start,end,expected] of [[123000,125000,140000,2000],[126000,125000,140000,14000],[141000,125000,140000,39000],[180000,200000,250000,20000]]){
+  const delays=[];vm.runInNewContext(code+';scheduleSky()', {Date:class extends Date{constructor(){super(now);}static now(){return now;}},Math,sceneSeason:'winter',skyTimer:0,document:{hidden:false},clearTimeout(){},setTimeout(fn,ms){delays.push(ms);return 1;},refreshSky(){},S:{weatherAt:()=>({start,end})}});assert.deepEqual(delays,[expected],'devices do not wait a minute from their individual boot times');
+ }
+});
+function seasonalEnvelopeRuntime(){
+  const context=vm.createContext({Math,JSON});
+  vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),context);
+  vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-seasonal.js'),'utf8'),context,{filename:'landscape-seasonal.js'});
+  return context.LandscapeSeasonal;
+}
+
+test('Seasonal envelope: spring gust gates fade in and out before particles disappear',()=>{
+  const seasonal=seasonalEnvelopeRuntime(),W=900,H=640,geometry={near:()=>540};
+  const trees=[{x:140,y:150,size:48},{x:440,y:180,size:54},{x:760,y:125,size:42}];
+  const weather={status:'clear',intensity:0,storm:false};
+  const hasPetals=time=>seasonal.particles(time,'spring',trees,geometry,W,H,weather).some(p=>p.kind==='petal');
+  let first=null;
+  for(let time=0;time<60;time+=.05)if(hasPetals(time)){first=time;break;}
+  assert.notEqual(first,null,'the seeded fair-weather schedule has a gust window');
+  let last=first;
+  while(last<60&&hasPetals(last+.05))last+=.05;
+  const frame=time=>seasonal.particles(time,'spring',trees,geometry,W,H,weather).filter(p=>p.kind==='petal');
+  const sum=particles=>particles.reduce((total,p)=>total+p.alpha,0);
+  const startAlpha=sum(frame(first)),middleAlpha=sum(frame((first+last)/2)),endAlpha=sum(frame(last));
+  assert.ok(middleAlpha>1,'the gust has a visible middle');
+  assert.ok(startAlpha<middleAlpha*.65,`gust fades in before start (start ${startAlpha}, middle ${middleAlpha})`);
+  assert.ok(endAlpha<middleAlpha*.65,`gust fades out before end (end ${endAlpha}, middle ${middleAlpha})`);
+});
+
+test('Seasonal envelope: spring canopy blossoms sample the full supplied tree set',()=>{
+  const seasonal=seasonalEnvelopeRuntime(),W=900,H=640,geometry={near:()=>540};
+  const trees=Array.from({length:10},(_,index)=>({x:40+index*92,y:100+(index%2)*12,size:42}));
+  const ops=[];const g={globalAlpha:1,fillStyle:'',save(){},restore(){},beginPath(){},ellipse(...args){ops.push(args);},fill(){}};
+  seasonal.paint(g,trees,geometry,W,H,0,'spring',{night:0},true,{status:'clear',intensity:0,storm:false});
+  const last=trees[trees.length-1];
+  assert.ok(ops.some(([x,y])=>Math.abs(x-last.x)<last.size&&y<last.y-last.size*.2),
+    'a late tree receives blossoms over its canopy');
+});
+
+test('Winter canopy placement: snow follows actual offscreen tree bases and rests on the crown',()=>{
+ const {seasonal}=loadSeasonalRepair(),W=900,H=640,geometry={near:()=>520};
+ const render=tree=>{const canvas=seasonalRepairCanvas();seasonal.paint(canvas.g,[tree],geometry,W,H,0,'winter',seasonalRepairPalette,true,seasonalRepairWeather);return canvas.ops;};
+ const hidden=render({x:200,y:800,size:50,variant:.6});assert.ok(hidden.filter(op=>op[0]==='ellipse').every(op=>op[2]>H),'offscreen trunks must not acquire floating onscreen snowcaps');
+ const tree={x:200,y:400,size:50,variant:.6},caps=render(tree).filter(op=>op[0]==='ellipse');assert.ok(caps.length);assert.ok(caps.every(op=>op[2]<=tree.y-tree.size*1.08),'snowcaps sit on the crown rather than the middle of the foliage');
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');assert.match(source,/treeOrigins.push\(\{x,y,size,variant\}\)/,'seasonal painters know the actual tree silhouette');
 });
