@@ -3751,6 +3751,29 @@ test("UI: once scanning starts it's Yes/No — no Can button, no chain-start que
   assert.match(scanHtml, /data-act="delete-task"/, "Delete should still be available");
 });
 
+test("UI: Quick start displays the requested eleven steps in order", async () => {
+  const { ctx, shim } = await loadApp();
+  ctx.openHelp();
+  const markup = shim.elements.get("modalRoot").innerHTML;
+  assert.match(markup, /<h2>Quick start<\/h2>/);
+  const list = markup.match(/<ol>([\s\S]*?)<\/ol>/)[1];
+  const steps = [...list.matchAll(/<li>([\s\S]*?)<\/li>/g)]
+    .map(match => match[1].replace(/<[^>]+>/g, "").replace(/&amp;/g, "&"));
+  assert.deepEqual(steps, [
+    "Add tasks to the bottom of your list as you think of them.",
+    "Done adding? Hit Start scanning. Your oldest outstanding task is dotted and becomes the first task on your list. Then the scanner starts dealing you tasks in descending order of your likelihood to complete it.",
+    "For each task, you will have to decide: do you want to do it before the highlighted benchmark?",
+    "Yes dots it — it gets added to the chain of todos you need to do.",
+    "No skips it (and nudges its rank down in terms of likelihood for you to want to do it). Can’t skips it with no rank signal.",
+    "When you are done, click done scanning.",
+    "Do the dotted todo list from the bottom to the top.",
+    "Can’t get to a todo you added to the chain? Can’t takes it off the chain and puts it back in the scan by itself once your Can’t window passes; Dislodge takes it off for the rest of the pass. Neither moves its rank.",
+    "Either finish a task and cross it off, or use ↻ Worked on it to cross it off and send it back to the bottom — it stays out of the scan for the window set in Settings, or until 02:00 the next day, whichever comes first.",
+    "Urgent task? Add & dot from edit for a task puts it straight on the todo list so it’s done first.",
+    "Tap a context chip in the Add a task panel to tag what you’re about to add — this allows you to more easily filter todos.",
+  ]);
+});
+
 test("UI: help describes Start scanning rather than a Can/Can't step", async () => {
   const { ctx, shim } = await loadApp({ seed: 94 });
   ctx.openHelp();
