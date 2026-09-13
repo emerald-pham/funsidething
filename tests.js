@@ -8639,7 +8639,7 @@ test('Landscape bird: nesting twig stays smaller than the bird and disappears wh
  const runtime=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
  const code=runtime.slice(runtime.indexOf('  function bird('),runtime.indexOf('  function cyclist('));
  for(const size of [2,3.5,5])for(const perched of [false,true]){
-  const twigs=[],g={beginPath(){},moveTo(){},quadraticCurveTo(){},stroke(){}};
+  const twigs=[],g={save(){},restore(){},beginPath(){},moveTo(){},quadraticCurveTo(){},stroke(){}};
   const ctx=vm.createContext({g,Math,p:{sky:['#ffffff'],night:0},S:{mixHex:()=> '#334433'},ellipse(){},line(g,x,y,x2,y2,color){if(color==='#8b745a')twigs.push([x,y,x2,y2]);}});
   vm.runInContext(code+`;bird(0,0,${size},0,${perched},true);`,ctx);
   assert.equal(twigs.length,perched?0:2);
@@ -8860,5 +8860,80 @@ test('Animation poses: a dogs planted paw does not slide as it follows its owner
   });
   assert.equal(planted[0].lift,0);assert.equal(planted[1].lift,0);
   assert.ok(Math.abs(planted[0].x-planted[1].x)<1e-9,'stance paw must stay fixed in world coordinates');
+ }
+});
+
+test('Animation boundaries: the UFO cow stays visible before pickup and after return',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ const code=source.slice(source.indexOf("      if(e.type==='abduction'){"),source.indexOf('  function person('));
+ const branch=code.slice(0,code.lastIndexOf('\n  }'));
+ const S=livingSky();
+ function frame(f,reverse=false){
+  const shapes=[],stack=[],g={globalAlpha:1,save(){stack.push(this.globalAlpha);},restore(){this.globalAlpha=stack.pop();},createLinearGradient(){return {addColorStop(){}};},beginPath(){},moveTo(){},lineTo(){},closePath(){},fill(){}};
+  vm.runInNewContext(`(function(){${branch}})()`,{e:{type:'abduction',lane:.5,reverse},f,t:f*24,W:1000,hy:380,middle:()=>500,g,S,Math,line(){},ellipse(ctx,x,y,rx,ry,color){shapes.push({x,y,color,alpha:ctx.globalAlpha});}});
+  return shapes;
+ }
+ for(const f of [.2,.23,.24,.76,.78,.8]){
+  const cow=frame(f).find(s=>s.color==='#eee8cd');
+  assert.ok(cow&&cow.alpha>.95,`cow must be present on the ground around pickup/return at ${f}`);
+ }
+ for(const f of [0,1])assert.ok(frame(f).filter(s=>s.color==='#eee8cd').every(s=>s.alpha===0),'event endpoints fade the local cow away');
+ for(const reverse of [false,true]){
+  const start=frame(0,reverse).find(s=>s.color==='#c7d5bd'),end=frame(1,reverse).find(s=>s.color==='#c7d5bd');
+  assert.ok(reverse?start.x>1000&&end.x<0:start.x<0&&end.x>1000,'UFO respects its travel direction');
+ }
+});
+
+test('Animation boundaries: fish emerge and submerge smoothly in either direction',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ const code=source.slice(source.indexOf("    if(e.type==='fish'){"),source.indexOf("    if(e.type==='butterfly'){"));
+ function frame(f,dir=1){
+  const shapes=[],stack=[],g={globalAlpha:1,save(){stack.push(this.globalAlpha);},restore(){this.globalAlpha=stack.pop();},beginPath(){},ellipse(){},stroke(){}};
+  vm.runInNewContext(`(function(){${code}})()`,{TAU:Math.PI*2,e:{type:'fish'},f,dir,anchor:400,H:800,geometry:{waterTop:300},g,Math,S:livingSky(),c:'fish',p:{sky:['#fff','#fff','#fff']},ellipse(ctx,x,y,rx,ry){shapes.push({x,y,alpha:ctx.globalAlpha});}});
+  assert.equal(g.globalAlpha,1,'fish cannot fade later visitors');return shapes[0];
+ }
+ assert.equal(frame(0).alpha,0);assert.equal(frame(1).alpha,0);
+ assert.ok(frame(.001).alpha<.01&&frame(.999).alpha<.01);
+ assert.ok(frame(.5).alpha>.95);
+ assert.ok(frame(.75,1).x>frame(.25,1).x);
+ assert.ok(frame(.75,-1).x<frame(.25,-1).x,'reverse fish must travel left');
+});
+
+test('Animation layering: all water visitors draw back to front regardless of arrival order',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ const anchor=source.indexOf('    const reflection=');
+ const begin=source.indexOf('    }g.restore();',anchor)+'    }g.restore();'.length;
+ const code=source.slice(begin,source.indexOf("    composite('middle')",begin));
+ const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
+ for(const [w,h] of [[320,568],[844,390],[1440,900]]){
+  const geometry=ctx.LandscapeGeometry.create(w,h);
+  const events=['sailboat','duck','yacht','fish','cruise','dolphin','jetski','windsurfer'].map((type,i)=>({type,age:50,duration:100,lane:i%2?.1:.9,reverse:false,seed:.3}));
+  const depth=e=>e.type==='fish'?geometry.waterTop+h*.035:e.type==='dolphin'?geometry.dolphin(.5,e.lane).waterY:geometry.vessel(e.type,e.lane,w/2,50).y;
+  for(const ordered of [events,[...events].reverse()]){
+   const drawn=[];vm.runInNewContext(code,{world:{events:ordered},geometry,t:50,Set,paintVessel(e){drawn.push(e);},paintEvent(e){if(['duck','fish','dolphin'].includes(e.type))drawn.push(e);}});
+   assert.equal(drawn.length,events.length,'each visitor paints once');assert.equal(new Set(drawn).size,events.length);
+   for(let i=1;i<drawn.length;i++)assert.ok(depth(drawn[i-1])<=depth(drawn[i]),`${drawn[i].type} behind ${drawn[i-1].type} cannot paint on top`);
+  }
+ }
+});
+
+test('Animation controls: revealing a task respects app and device reduced motion',()=>{
+ const code=html.slice(html.indexOf('function revealTask(id){'),html.indexOf('function commit(doSave, immediateSync){'));
+ for(const [preference,osReduced,expected] of [['normal',false,'smooth'],['reduced',false,'instant'],['normal',true,'instant'],[undefined,false,'instant']]){
+  const calls=[],row={classList:{remove(){},add(){}},offsetWidth:100,scrollIntoView(options){calls.push(options);}};
+  const ctx=vm.createContext({state:{listOpen:false},clearListFilters(){},render(){},requestAnimationFrame(fn){fn();},document:{documentElement:{dataset:{landscapeMotion:preference}},querySelector(){return row;}},window:{matchMedia(){return {matches:osReduced};}}});
+  vm.runInContext(code+';revealTask("task");',ctx);
+  assert.equal(calls[0].behavior,expected,`${preference}/${osReduced} must choose ${expected}`);
+  assert.equal(calls[0].block,'center');assert.equal(ctx.state.listOpen,true);
+ }
+});
+
+test('Animation state: flapping birds do not change the stroke caps of later scenery',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ const code=source.slice(source.indexOf('  function bird('),source.indexOf('  function cyclist('));
+ for(const cap of ['butt','square'])for(const perched of [false,true]){
+  const stack=[],g={lineCap:cap,save(){stack.push(this.lineCap);},restore(){this.lineCap=stack.pop();},beginPath(){},moveTo(){},quadraticCurveTo(){},stroke(){}};
+  vm.runInNewContext(code+`;bird(10,10,3.5,1,${perched},true);`,{g,p:{sky:['#fff'],night:0},S:{mixHex:()=> '#333'},Math,line(){},ellipse(){}});
+  assert.equal(g.lineCap,cap,'a flying bird must not round every subsequent stroke');assert.equal(stack.length,0);
  }
 });

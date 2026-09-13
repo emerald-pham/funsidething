@@ -209,9 +209,10 @@
       ellipse(g,x,y-.8,size*.6,size*.38,ink);ellipse(g,x+size*.4,y-size*.4,size*.25,size*.25,ink);
       line(g,x-.7,y,x-.7,y+1.5,ink,.6);line(g,x+.7,y,x+.7,y+1.5,ink,.6);return;
     }
-    g.strokeStyle=S.mixHex('#314a45',p.sky[0],p.night*.6);g.lineWidth=1.2;g.lineCap='round';
+    // Wing styling belongs to this bird, not every visitor painted after it.
+    g.save();g.strokeStyle=S.mixHex('#314a45',p.sky[0],p.night*.6);g.lineWidth=1.2;g.lineCap='round';
     g.beginPath();g.moveTo(x-size,y-Math.abs(Math.sin(t*5))*size*.6);g.quadraticCurveTo(x-size*.4,y-size*.4,x,y);g.quadraticCurveTo(x+size*.5,y-size*.6,x+size,y-(perched?0:Math.abs(Math.sin(t*5+.3))*size*.6));g.stroke();
-    if(twig&&!perched){line(g,x,y+.4,x+size*.7,y+size*.35,'#8b745a',.55);line(g,x+size*.35,y+size*.2,x+size*.5,y-.1,'#8b745a',.45);}
+    if(twig&&!perched){line(g,x,y+.4,x+size*.7,y+size*.35,'#8b745a',.55);line(g,x+size*.35,y+size*.2,x+size*.5,y-.1,'#8b745a',.45);}    g.restore();
   }
   function cyclist(x,y,t,color,scale=1,reverse=false,skin=skinColor(0)){
     g.save();g.translate(x,y-3.6*scale);g.rotate(geometry.tangent(trail,x));g.scale((reverse?-1:1)*scale,scale);
@@ -294,9 +295,13 @@
       const wave=geometry.ripple(i+30,t,wind),x=rand(i+403)*W+wave.drift,y=geometry.waterTop+rand(i+402)*H*.09;
       g.globalAlpha=wave.alpha*.20;line(g,x,y,x+(7+rand(i+480)*22)*wave.width,y,S.mixHex(p.sky[1],'#ffffff',.6),.8);
     }g.restore();
-    for(const e of world.events)if(['jetski','sailboat','cruise','yacht','windsurfer'].includes(e.type))paintVessel(e,t);
+    const water=new Set(['jetski','sailboat','cruise','yacht','windsurfer','duck','fish','dolphin']);
+    // Arrival order cannot decide which overlapping boat or animal is in front.
+    for(const e of world.events.filter(e=>water.has(e.type)).sort((a,b)=>geometry.waterDepth(a,t)-geometry.waterDepth(b,t))){
+      if(['duck','fish','dolphin'].includes(e.type))paintEvent(e,t);else paintVessel(e,t);
+    }
     const airborne=new Set(['metro','duck','fish','plane','balloon','airshow','banner','hangglider','jetski','sailboat','cruise','yacht','windsurfer','dolphin','flock']);
-    for(const e of world.events)if(airborne.has(e.type))paintEvent(e,t);
+    for(const e of world.events)if(airborne.has(e.type)&&!water.has(e.type))paintEvent(e,t);
     composite('middle');
     // Ground contact determines occlusion, including props previously baked into the hill.
     const groundPass=world.events.filter(e=>!airborne.has(e.type)&&e.type!=='train').map(e=>({depth:geometry.eventDepth(e),draw:()=>paintEvent(e,t)}));
@@ -416,13 +421,16 @@
       if(e.type==='abduction'){
         const targetX=W*(.18+e.lane*.62),ground=middle(targetX)+25;
         const enter=S.smooth(0,.22,f),leave=S.smooth(.78,1,f);
-        const ux=S.lerp(-80,targetX,enter)+leave*(W+150-targetX),uy=hy*.6+Math.sin(t)*2;
-        if(f>.23&&f<.78){
-          const beam=g.createLinearGradient(ux,uy,ux,ground);beam.addColorStop(0,'rgba(198,242,188,.3)');beam.addColorStop(1,'rgba(198,242,188,0)');g.fillStyle=beam;g.beginPath();g.moveTo(ux-7,uy);g.lineTo(ux-28,ground);g.lineTo(ux+28,ground);g.lineTo(ux+7,uy);g.closePath();g.fill();
-          const lift=Math.sin(S.clamp((f-.25)/.5)*Math.PI),cowY=S.lerp(ground,uy+14,lift);
-          // A tiny cow is safely returned before the visitor leaves.
-          ellipse(g,ux,cowY,5,3,'#eee8cd');ellipse(g,ux+5,cowY-1,2.3,2,'#eee8cd');ellipse(g,ux-2,cowY-1,2,1.6,'#46584f');line(g,ux-3,cowY+2,ux-3,cowY+5,'#eee8cd',1);line(g,ux+3,cowY+2,ux+3,cowY+5,'#eee8cd',1);
-        }
+        const from=e.reverse?W+80:-80,to=e.reverse?-150:W+150;
+        const ux=S.lerp(from,targetX,enter)+leave*(to-targetX),uy=hy*.6+Math.sin(t)*2;
+        // Let the beam grow and fade while the cow remains a continuous visitor,
+        // rather than making the animal pop in and out with the beam's lifetime.
+        g.save();g.globalAlpha=S.smooth(.22,.3,f)*(1-S.smooth(.7,.78,f));
+        const beam=g.createLinearGradient(ux,uy,ux,ground);beam.addColorStop(0,'rgba(198,242,188,.3)');beam.addColorStop(1,'rgba(198,242,188,0)');g.fillStyle=beam;g.beginPath();g.moveTo(ux-7,uy);g.lineTo(ux-28,ground);g.lineTo(ux+28,ground);g.lineTo(ux+7,uy);g.closePath();g.fill();g.restore();
+        const lift=Math.sin(S.clamp((f-.25)/.5)*Math.PI),cowY=S.lerp(ground,uy+14,lift);
+        // Keep the returned cow on its ground anchor as the craft departs.
+        g.save();g.globalAlpha=S.smooth(0,.08,f)*(1-S.smooth(.9,1,f));
+        ellipse(g,targetX,cowY,5,3,'#eee8cd');ellipse(g,targetX+5,cowY-1,2.3,2,'#eee8cd');ellipse(g,targetX-2,cowY-1,2,1.6,'#46584f');line(g,targetX-3,cowY+2,targetX-3,cowY+5,'#eee8cd',1);line(g,targetX+3,cowY+2,targetX+3,cowY+5,'#eee8cd',1);g.restore();
         ellipse(g,ux,uy-3,8,5,'#96bcb1');ellipse(g,ux,uy,18,4,'#c7d5bd');for(let j=-10;j<=10;j+=5)ellipse(g,ux+j,uy+1,1,1,'#f2e5aa');
       }
 
@@ -543,9 +551,12 @@
       }return true;
     }
     if(e.type==='fish'){
-      const fx=anchor+f*25,fy=geometry.waterTop+H*.035;
-      ellipse(g,fx,fy-Math.sin(f*Math.PI)*14,3,1.5,c);
-      g.globalAlpha=1-f;g.strokeStyle=p.sky[2];g.beginPath();g.ellipse(fx,fy+2,4+f*14,1+f*2,0,0,TAU);g.stroke();g.globalAlpha=1;return true;
+      const fx=anchor+dir*f*25,fy=geometry.waterTop+H*.035;
+      // A short breach should emerge from and disappear into the water, not
+      // appear at full opacity on the first frame and vanish on the last.
+      const fade=S.smooth(0,.12,f)*(1-S.smooth(.85,1,f));
+      g.save();g.globalAlpha=fade;ellipse(g,fx,fy-Math.sin(f*Math.PI)*14,3,1.5,c);
+      g.globalAlpha=fade*(1-f);g.strokeStyle=p.sky[2];g.beginPath();g.ellipse(fx,fy+2,4+f*14,1+f*2,0,0,TAU);g.stroke();g.restore();return true;
     }
     if(e.type==='butterfly'){
       const yy=middle(x)+14+Math.sin(t*2)*8,fold=geometry.wingFold(t,e.seed);

@@ -1699,7 +1699,9 @@ function revealTask(id){
   render();
   requestAnimationFrame(()=>{
     const row = document.querySelector('[data-row="'+id+'"]');
-    if(row){ row.scrollIntoView({block:"center",behavior:"smooth"}); row.classList.remove("flash"); void row.offsetWidth; row.classList.add("flash"); }
+    // CSS reduced-motion rules do not override an explicit smooth-scroll request.
+    const reduced=document.documentElement.dataset.landscapeMotion!=="normal" || window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    if(row){ row.scrollIntoView({block:"center",behavior:reduced?"instant":"smooth"}); row.classList.remove("flash"); void row.offsetWidth; row.classList.add("flash"); }
   });
 }
 function commit(doSave, immediateSync){
