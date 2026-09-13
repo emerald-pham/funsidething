@@ -17,7 +17,8 @@
     function vessel(kind,lane,x,t=0,reverse=false){
       const depth=Math.max(1,shore-waterTop),direction=reverse?-1:1;
       const scale=Math.min(kind==='cruise'?1:.95,W/600,depth/38);
-      const y=waterTop+depth*(.38+Math.max(0,Math.min(1,lane))*.30)+Math.sin(t*.8+lane*6)*scale*.5;
+      const course=kind==='windsurfer'?Math.sin(t*(.10+lane*.04)+lane*6)*depth*.12:0;
+      const y=waterTop+depth*(.38+Math.max(0,Math.min(1,lane))*.30)+course+Math.sin(t*.8+lane*6)*scale*.5;
       return {x,y,scale,direction,visible:depth>10};
     }
     const foregroundTree=(x,y)=>Math.abs(y-lowerRail(x))<22?lowerRail(x)+23:Math.max(near(x)+2,y);
@@ -35,6 +36,14 @@
         hop=Math.sin(flight*Math.PI)*5;
       }
       return {x,y:groundAnchor(kind,x),direction,hop,distance:e.age*speed};
+    }
+    function dogPose(ownerX,distance,direction){
+      const x=ownerX+direction*(16+Math.sin(distance*.15)*4);
+      return {x,y:groundAnchor('walker',x),direction};
+    }
+    function strideArm(distance,stride,offset=0){
+      const x=-3*Math.cos((distance/stride+offset)*Math.PI*2);
+      return {x,y:Math.sqrt(25-x*x)};
     }
     function strideFoot(distance,stride,offset=0){
       const phase=((distance/stride+offset)%1+1)%1;
@@ -86,7 +95,7 @@
       return rows;
     }
     const ripple=(i,t,wind=1)=>({alpha:.15+.75*(.5+.5*Math.sin(t*wind*1.3+i*1.71))**2,drift:Math.sin(t*wind*.5+i)*9,width:.65+.35*Math.sin(t*.9+i)**2});
-    return {skater,fireworks,flock,dolphin,starReflection,cityReflection,sunReflection,depthBand,groundAnchor,groundTravelX,groundPose,strideFoot,wingFold,balloonDrift,vessel,foregroundTree,nest,ripple,horizon,waterTop,far,middle,near,rail,trail,lowerRail,tangent,rider,pack};
+    return {dogPose,skater,fireworks,flock,dolphin,starReflection,cityReflection,sunReflection,depthBand,groundAnchor,groundTravelX,groundPose,strideArm,strideFoot,wingFold,balloonDrift,vessel,foregroundTree,nest,ripple,horizon,waterTop,far,middle,near,rail,trail,lowerRail,tangent,rider,pack};
   }
   root.LandscapeGeometry={create};
 })(globalThis);

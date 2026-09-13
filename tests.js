@@ -141,7 +141,7 @@ test("Landscape location: actual coordinates change the sky and polar day return
 
 test("Landscape: daytime life includes a duck visit and the new bounded animal set", () => {
   const sky = livingSky();
-  assert.deepEqual([...sky.eventTypes], ["cyclist", "bird", "balloon", "train", "metro", "plane", "duck", "fish", "butterfly", "rabbit", "deer", "kite", "reader", "picnic", "couple", "walker", "airshow", "banner", "hangglider", "jetski", "sailboat", "cruise", "yacht", "dolphin", "flock", "skateboarder", "rollerskater", "windsurfer"]);
+  assert.deepEqual([...sky.eventTypes], ["cyclist", "bird", "balloon", "train", "metro", "plane", "duck", "fish", "butterfly", "rabbit", "deer", "kite", "reader", "picnic", "couple", "walker", "airshow", "banner", "hangglider", "jetski", "sailboat", "cruise", "yacht", "dolphin", "flock", "skateboarder", "rollerskater", "windsurfer", "dogwalker"]);
   assert.deepEqual([...sky.rareTypes], ["abduction", "fireworks"]);
   const world = sky.createWorld(() => 0.99);
   assert.equal(world.events.length, 3, "opening life is a small cast");
@@ -8616,4 +8616,148 @@ test("ordinary dates retain the existing hourly message catalog", () => {
   for (let index = 0; index < entries.length; index++) {
     assert.equal(mood.message(date, "UTC", () => index / 5), entries[index].text);
   }
+});
+
+test('Landscape walker: arms swing opposite the legs through a full repeatable stride',()=>{
+ const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
+ const geo=ctx.LandscapeGeometry.create(1000,800);
+ for(const distance of [0,2.5,5,7.5,10]){
+  const left=geo.strideArm(distance,10,0),right=geo.strideArm(distance,10,.5);
+  assert.ok(Math.abs(left.x+right.x)<1e-8,'arms oppose each other');
+  assert.ok(Math.abs(Math.hypot(left.x,left.y)-5)<1e-8,'arm length stays stable');
+  assert.ok(left.y>0,'hands remain below the shoulders');
+  assert.ok(Math.abs(left.x-geo.strideArm(distance+10,10,0).x)<1e-8,'stride repeats smoothly');
+ }
+ assert.ok(geo.strideArm(0,10).x<0);assert.ok(geo.strideArm(5,10).x>0);
+ const runtime=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ const walker=runtime.slice(runtime.indexOf("    if(e.type==='walker'||e.type==='dogwalker'){"),runtime.indexOf("    if(e.type==='dolphin'){"));
+ assert.match(walker,/geometry\.strideArm\(pose.distance,10,offset\)/);
+ assert.match(walker,/pose.x\+dir\*arm.x/,'mirror the swing with travel direction');
+});
+
+test('Landscape bird: nesting twig stays smaller than the bird and disappears when perched',()=>{
+ const runtime=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ const code=runtime.slice(runtime.indexOf('  function bird('),runtime.indexOf('  function cyclist('));
+ for(const size of [2,3.5,5])for(const perched of [false,true]){
+  const twigs=[],g={beginPath(){},moveTo(){},quadraticCurveTo(){},stroke(){}};
+  const ctx=vm.createContext({g,Math,p:{sky:['#ffffff'],night:0},S:{mixHex:()=> '#334433'},ellipse(){},line(g,x,y,x2,y2,color){if(color==='#8b745a')twigs.push([x,y,x2,y2]);}});
+  vm.runInContext(code+`;bird(0,0,${size},0,${perched},true);`,ctx);
+  assert.equal(twigs.length,perched?0:2);
+  for(const [x,y,x2,y2] of twigs)assert.ok(Math.hypot(x2-x,y2-y)<=size,'twig scales below half the wingspan');
+ }
+});
+
+test('Landscape companions: dogs remain near their owners and follow the trail in either direction',()=>{
+ const sky=livingSky();assert.ok(sky.eventTypes.includes('dogwalker'));
+ const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
+ const g=ctx.LandscapeGeometry.create(844,600);
+ for(const direction of [-1,1])for(const distance of [0,5,10,20]){
+  const dog=g.dogPose(400,distance,direction);assert.ok((dog.x-400)*direction>=12&&(dog.x-400)*direction<=20);
+  assert.equal(dog.y,g.groundAnchor('walker',dog.x));assert.equal(dog.direction,direction);
+ }
+});
+
+test('Landscape city: only one window changes per thirty seconds of active night',()=>{
+ const sky=livingSky(),state={next:30,windows:[true,false,true,false]};
+ assert.equal(sky.advanceLights(state,29,true,()=>.3),false);assert.deepEqual(state.windows,[true,false,true,false]);
+ assert.equal(sky.advanceLights(state,30,true,()=>.3),true);assert.deepEqual(state.windows,[true,true,true,false]);
+ assert.equal(sky.advanceLights(state,31,true,()=>.3),false);
+ assert.equal(sky.advanceLights(state,60,false,()=>.3),false);
+ assert.equal(sky.advanceLights(state,100,true,()=>.3),true);assert.deepEqual(state.windows,[true,false,true,false],'no catch-up burst after a pause');
+ assert.equal(sky.advanceLights({next:0,windows:[]},1,true,()=>0),false);
+});
+
+test('Landscape nest: support branch ends inside the bowl instead of protruding past it',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ const statement=source.split('\n').find(line=>line.includes('line(b,nest.treeX,nest.y+5'));
+ const calls=[],nest={treeX:100,x:87,y:60};vm.runInNewContext(statement,{b:{},nest,line(...args){calls.push(args);}});
+ assert.ok(calls[0][3]>=nest.x-4&&calls[0][3]<=nest.x+4);
+});
+
+test('Landscape windsurfers: courses sweep through harbor depth without reaching either shore',()=>{
+ const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
+ for(const [w,h] of [[320,568],[844,390],[1440,900]]){
+  const g=ctx.LandscapeGeometry.create(w,h);
+  for(const lane of [0,.5,1]){
+   const points=Array.from({length:80},(_,t)=>g.vessel('windsurfer',lane,w/2,t));
+   const depth=g.horizon+h*.095-g.waterTop;
+   assert.ok(Math.max(...points.map(p=>p.y))-Math.min(...points.map(p=>p.y))>depth*.15,'course changes depth beyond simple bobbing');
+   for(const p of points)assert.ok(p.y>g.waterTop+2&&p.y<g.horizon+h*.095-2);
+  }
+ }
+});
+
+const nativeSource = html.slice(html.indexOf("async function installNative(){"), html.indexOf("function openSettings(){"));
+
+test("install entry: Settings exposes the requested phone action", () => {
+  assert.match(html, /<button class="btn subtle" data-act="install-app">Install this app on your phone<\/button>/);
+});
+
+test("install dialog: explains iPhone Safari and Android Chrome steps", () => {
+  assert.match(html, /function openInstallHelp\(\)/);
+  assert.match(html, /iPhone.*Safari/s);
+  assert.match(html, /Share.*Add to Home Screen/s);
+  assert.match(html, /Android.*Chrome/s);
+  assert.match(html, /Install app.*Add to Home screen/s);
+  assert.match(html, /data-act="close-modal"/);
+});
+
+test("install flow: captures and uses the browser native install prompt", () => {
+  assert.match(html, /beforeinstallprompt/);
+  assert.match(html, /preventDefault\(\)/);
+  assert.match(html, /deferredInstallPrompt/);
+  assert.match(html, /data-act="native-install"/);
+  assert.match(html, /\.prompt\(\)/);
+  assert.match(html, /userChoice/);
+  assert.match(html, /case "install-app": openInstallHelp\(\)/);
+  assert.match(html, /case "native-install": installNative\(\)/);
+});
+
+async function runNativeInstall(promptEvent) {
+  const calls = { prompt: 0, help: 0, close: 0, toasts: [] };
+  const context = vm.createContext({
+    deferredInstallPrompt: promptEvent,
+    openInstallHelp() { calls.help++; },
+    closeModal() { calls.close++; },
+    toast(message) { calls.toasts.push(message); },
+  });
+  vm.runInContext(nativeSource + "\nthis.runNativeInstall = installNative;", context);
+  context.deferredInstallPrompt.prompt = async () => {
+    calls.prompt++;
+    if (promptEvent.throwOnPrompt) throw new Error("withdrawn");
+  };
+  await context.runNativeInstall();
+  return calls;
+}
+
+test("native install: accepted prompts close the help and report a request", async () => {
+  const calls = await runNativeInstall({ userChoice: Promise.resolve({ outcome: "accepted" }) });
+  assert.equal(calls.prompt, 1);
+  assert.equal(calls.close, 1);
+  assert.deepEqual(calls.toasts, ["Installation requested. Follow your browser's prompts."]);
+  assert.equal(calls.help, 0);
+});
+
+test("native install: dismissed prompts return to manual instructions", async () => {
+  const calls = await runNativeInstall({ userChoice: Promise.resolve({ outcome: "dismissed" }) });
+  assert.equal(calls.prompt, 1);
+  assert.equal(calls.close, 0);
+  assert.deepEqual(calls.toasts, []);
+  assert.equal(calls.help, 1);
+});
+
+test("native install: a rejected choice also returns to manual instructions", async () => {
+  const calls = await runNativeInstall({ userChoice: Promise.resolve({ outcome: "rejected" }) });
+  assert.equal(calls.prompt, 1);
+  assert.equal(calls.close, 0);
+  assert.deepEqual(calls.toasts, []);
+  assert.equal(calls.help, 1);
+});
+
+test("native install: a withdrawn prompt returns to manual instructions", async () => {
+  const calls = await runNativeInstall({ throwOnPrompt: true, userChoice: Promise.resolve({ outcome: "dismissed" }) });
+  assert.equal(calls.prompt, 1);
+  assert.equal(calls.close, 0);
+  assert.deepEqual(calls.toasts, []);
+  assert.equal(calls.help, 1);
 });

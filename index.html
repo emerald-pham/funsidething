@@ -568,6 +568,11 @@ let listTagFilter = null;      // ...and the one filter key the list is narrowed
 let saveTimer = null;
 let storageOK = false;
 let useLocal  = false;   // true when running as a plain web page (localStorage)
+// Chromium offers a one-shot, user-gesture-bound install event when this PWA
+// is eligible for a native install prompt. Keep it only until the user opens
+// that prompt; iPhone Safari has no equivalent event and gets the manual steps
+// in openInstallHelp() instead.
+let deferredInstallPrompt = null;
 
 function todayISO(offsetDays){
   const d = new Date(); d.setDate(d.getDate() + (offsetDays||0));
@@ -2234,6 +2239,48 @@ function openEdit(id){
     + '<button class="btn danger" data-act="delete-task" data-id="'+t.id+'" style="margin-left:auto">Delete</button></div>'
   );
 }
+function openInstallHelp(){
+  const native = deferredInstallPrompt
+    ? '<div class="notice"><div class="big">This browser can install Chain Scanner directly.</div><div class="row"><button class="btn primary" data-act="native-install">Install now</button><span class="quiet">Use the browser’s own install prompt.</span></div></div>'
+    : '<p class="kv">If your browser offers an install button in its address bar or menu, you can use that too.</p>';
+  modalShell(
+    '<div class="mtop"><h2>Install this app on your phone</h2><button class="x" data-act="close-modal" aria-label="Close">✕</button></div>'
+    + '<div class="help install-help">'
+    + native
+    + '<h3>iPhone · Safari</h3><ol>'
+    + '<li>Open this page in <b>Safari</b>. If it is open in another app, use Safari to open the page first.</li>'
+    + '<li>Tap <b>Share</b> (the square with the up arrow). If you see the More button first, tap it, then Share.</li>'
+    + '<li>Scroll down and tap <b>Add to Home Screen</b>. If it is missing, scroll to the bottom, tap <b>Edit Actions</b>, and add it.</li>'
+    + '<li>Turn on <b>Open as Web App</b> if that option appears, then tap <b>Add</b>.</li>'
+    + '</ol>'
+    + '<h3>Android · Chrome</h3><ol>'
+    + '<li>Open this page in <b>Chrome</b> on your Android phone.</li>'
+    + '<li>Tap the <b>three-dot menu</b> to the right of the address bar.</li>'
+    + '<li>Tap <b>Install app</b>. Depending on your phone or Chrome version, this may say <b>Install and create shortcut</b> or <b>Add to Home screen</b>.</li>'
+    + '<li>Follow the on-screen prompt and tap <b>Install</b> or <b>Add</b>.</li>'
+    + '</ol></div>'
+    + '<div class="mbtns"><button class="btn subtle" data-act="close-modal">Done</button></div>'
+  );
+}
+async function installNative(){
+  const promptEvent = deferredInstallPrompt;
+  if(!promptEvent){ openInstallHelp(); return; }
+  deferredInstallPrompt = null; // beforeinstallprompt may only be used once
+  try{
+    await promptEvent.prompt();
+    const choice = await promptEvent.userChoice;
+    if(choice && choice.outcome === "accepted"){
+      closeModal();
+      toast("Installation requested. Follow your browser's prompts.");
+    }else{
+      openInstallHelp();
+    }
+  }catch(e){
+    // A browser can withdraw eligibility between the Settings tap and this
+    // gesture; leave the clear manual instructions available in that case.
+    openInstallHelp();
+  }
+}
 function openSettings(){
   const s = state.settings;
   const histCount = historyRows().length;
@@ -2248,6 +2295,7 @@ function openSettings(){
     + '<div class="frow"><label>Landscape</label><button class="btn subtle" data-act="scene-settings">Motion settings</button><span class="kv">Daylight follows the sky; app theme stays independent.</span></div>'
     + '<div class="frow"><label>Scene time</label><button class="btn subtle" data-act="scene-time-settings">Choose scene time</button><span class="kv">Follow live time or hold a favorite hour on this device.</span></div>'
     + '<div class="frow"><label>Location</label><button class="btn subtle" data-act="location-settings">Choose location</button><span class="kv">Use device coordinates for a local sky; saved only on this device.</span></div>'
+    + '<div class="frow"><label>On your phone</label><button class="btn subtle" data-act="install-app">Install this app on your phone</button><span class="kv">Add a home-screen icon and open Chain Scanner like an app.</span></div>'
     + '<div class="frow"><label for="stHorizon">Horizon (min)</label><input id="stHorizon" type="number" min="5" max="480" value="'+s.horizonMin+'" style="width:90px"/>'
     + '<span class="kv">the "next hour" in the question</span></div>'
     + '<div class="frow"><label for="stCantMin">Can\u2019t sticks for (min)</label><input id="stCantMin" type="number" min="5" max="480" value="'+s.cantMin+'" style="width:90px"/>'
@@ -2398,6 +2446,8 @@ function onAction(act, el){
     }
     case "cycle-theme": setTheme(nextTheme()); break;
     case "settings": openSettings(); break;
+    case "install-app": openInstallHelp(); break;
+    case "native-install": installNative(); break;
     case "save-settings": {
       pushUndo();
       const s=state.settings;
@@ -2468,6 +2518,12 @@ function onAction(act, el){
     case "mback": break; // handled in click listener
   }
 }
+
+window.addEventListener("beforeinstallprompt", e=>{
+  e.preventDefault();
+  deferredInstallPrompt = e;
+});
+window.addEventListener("appinstalled", ()=>{ deferredInstallPrompt = null; });
 
 document.addEventListener("click", e=>{
   const back = e.target.classList && e.target.classList.contains("mback");

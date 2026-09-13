@@ -135,3 +135,11 @@ checks cover both directions in narrow/wide Chromium and WebKit scenes.
 - [x] New visitor geometry and scheduling were tested red-to-green, with forced daytime/nighttime renders reviewed in Chromium and WebKit at mobile and desktop sizes.
 
 - [x] Holiday messages cover all eleven federal holidays and familiar U.S. observances, with five kind, hour-specific variations each, local-calendar boundaries, moving weekday dates, and Easter collision coverage.
+
+## Walking detail, companions, and quiet windows
+
+- [x] Walkers swing both arms with their stride, with the far arm behind the torso. Carried twigs scale to the bird, and the nest support ends within its bowl.
+- [x] Random dog-and-owner visits stay together on the trail with a loose lead, mirrored direction, and trotting legs.
+- [x] One window toggles about every thirty seconds of active nighttime scenery; the cached city and its reflection update together. Reduced motion pauses the changes.
+- [x] Windsurfers trace a gentle course through the harbor depth as well as horizontally, staying clear of both shores.
+- [x] Settings opens phone installation instructions for Safari and Chrome, with a one-use native install prompt when available and manual fallback.

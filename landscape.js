@@ -12,6 +12,7 @@
   const mq=window.matchMedia('(prefers-reduced-motion: reduce)');
   let storage;try{storage=window.localStorage;}catch{storage=null;}
   let preference=S.readMotion(storage),reduced=S.motionReduced(preference,mq.matches);
+  const cityLights={next:30,windows:[]};
   let W=0,H=0,hy=0,dpr=1,frame=0,last=0,lastPaint=0,sky,p,world=S.createWorld();
   let skyTimer=0,resizeTimer=0,returnFocus=null;
   const dialog=document.getElementById('motionDialog');
@@ -98,14 +99,16 @@
     const cityTarget=b;
     cityReflection.width=Math.floor(W*dpr);cityReflection.height=Math.ceil(geometry.waterTop*dpr);
     b=cityReflection.getContext('2d');b.setTransform(dpr,0,0,dpr,0,0);
-    const count=Math.ceil(W/15);
+    const count=Math.ceil(W/15);let windowIndex=0;
     for(let i=0;i<count;i++){
       const x=i*W/count,cluster=.4+.6*Math.pow(Math.sin(x/W*Math.PI*3+.5),2);
       const bh=(18+rand(i+14)*65)*cluster*(W<600?.8:1),bw=7+rand(i+91)*18,y=hy+12-bh;
       b.fillStyle=S.mixHex(p.city,p.sky[2],rand(i+13)*.25);b.fillRect(x,y,bw,bh+15);
       if(rand(i+33)>.68){b.fillRect(x+bw*.25,y-5,bw*.5,6);line(b,x+bw*.5,y-5,x+bw*.5,y-12,p.city,.7);}
       for(let yy=y+5;yy<hy+8;yy+=7)for(let xx=x+3;xx<x+bw-2;xx+=5){
-        b.fillStyle=night>.2 && rand(xx+yy)>.42?`rgba(255,220,153,${night*.8})`:'rgba(225,239,232,.22)';b.fillRect(xx,yy,1.6,2.7);
+        const lightIndex=windowIndex++;
+        if(cityLights.windows[lightIndex]===undefined)cityLights.windows[lightIndex]=rand(xx+yy)>.42;
+        b.fillStyle=night>.2 && cityLights.windows[lightIndex]?`rgba(255,220,153,${night*.8})`:'rgba(225,239,232,.22)';b.fillRect(xx,yy,1.6,2.7);
       }
     }
     // A small clock tower and civic dome give the distant city a recognizable heart.
@@ -164,7 +167,7 @@
         line(b,ax-4,ay-5,ax+1,ay-11,color(visitSeed),1.5);line(b,ax+1,ay-11,ax+6,ay-5,color(visitSeed),1.5);
       }
     }
-    line(b,nest.treeX,nest.y+5,nest.x-6,nest.y+2,'#8e8065',1.4);
+    line(b,nest.treeX,nest.y+5,nest.x+1,nest.y+2,'#8e8065',1.4);
     b.beginPath();b.ellipse(nest.x,nest.y,4,2.3,0,0,Math.PI);b.fillStyle='#a28b67';b.fill();
     line(b,nest.x-4,nest.y,nest.x+4,nest.y,'#b6a080',.7);
     if(sky.sun.altitude < -8){ellipse(b,nest.x-1.5,nest.y-1,1.5,1.2,p.front);ellipse(b,nest.x+1.5,nest.y-1,1.5,1.2,p.front);}
@@ -214,7 +217,7 @@
     }
     g.strokeStyle=S.mixHex('#314a45',p.sky[0],p.night*.6);g.lineWidth=1.2;g.lineCap='round';
     g.beginPath();g.moveTo(x-size,y-Math.abs(Math.sin(t*5))*size*.6);g.quadraticCurveTo(x-size*.4,y-size*.4,x,y);g.quadraticCurveTo(x+size*.5,y-size*.6,x+size,y-(perched?0:Math.abs(Math.sin(t*5+.3))*size*.6));g.stroke();
-    if(twig&&!perched){line(g,x,y+1,x+6,y+4,'#8b745a',.7);line(g,x+3,y+2,x+5,y,'#8b745a',.6);}
+    if(twig&&!perched){line(g,x,y+.4,x+size*.7,y+size*.35,'#8b745a',.55);line(g,x+size*.35,y+size*.2,x+size*.5,y-.1,'#8b745a',.45);}
   }
   function cyclist(x,y,t,color,scale=1,reverse=false,skin=skinColor(0)){
     g.save();g.translate(x,y-3.6*scale);g.rotate(geometry.tangent(trail,x));g.scale((reverse?-1:1)*scale,scale);
@@ -480,13 +483,30 @@
       line(g,2,-13,6,-10,skin,1.2);line(g,1,-13,-4,-11-push,skin,1.2);
       g.restore();return true;
     }
-    if(e.type==='walker'){
+    if(e.type==='walker'||e.type==='dogwalker'){
       const pose=geometry.groundPose('walker',e);g.save();g.globalAlpha=S.smooth(0,.06,f)*(1-S.smooth(.94,1,f));
       const skin=skinColor(e.seed);
       ellipse(g,pose.x,pose.y+1,4,1.2,S.mixHex(p.front,p.hill,.5));
+      // The far arm passes behind the torso; both arms share the leg stride.
+      const armAt=offset=>{const arm=geometry.strideArm(pose.distance,10,offset);line(g,pose.x,pose.y-8,pose.x+dir*arm.x,pose.y-8+arm.y,skin,1.3);};
+      armAt(.5);
       ellipse(g,pose.x,pose.y-12,2,2,skin);line(g,pose.x,pose.y-9,pose.x,pose.y-4,c,3);
       for(const offset of [0,.5]){const foot=geometry.strideFoot(pose.distance,10,offset),fx=pose.x+dir*foot.x;line(g,pose.x,pose.y-4,fx,geometry.groundAnchor('walker',fx)-foot.lift,'#647779',1.4);}
-      line(g,pose.x,pose.y-8,pose.x+dir*4,pose.y-6,skin,1.3);g.restore();return true;
+      armAt(0);
+      if(e.type==='dogwalker'){
+        const dog=geometry.dogPose(pose.x,pose.distance,dir),fur=S.mixHex(color(e.seed,2),p.city,.4),hand=geometry.strideArm(pose.distance,10,0);
+        // A loose lead keeps the companion visibly paired with this owner.
+        g.beginPath();g.moveTo(pose.x+dir*hand.x,pose.y-8+hand.y);g.quadraticCurveTo((pose.x+dog.x)/2,dog.y+1,dog.x-dir*2,dog.y-5);g.strokeStyle=fur;g.lineWidth=.55;g.stroke();
+        ellipse(g,dog.x,dog.y+1,5,1,S.mixHex(p.front,p.hill,.5));
+        for(const [hip,offset] of [[-3,0],[3,.5]]){
+          const foot=geometry.strideFoot(pose.distance*1.7,6,offset),fx=dog.x+dir*(hip+foot.x);
+          line(g,dog.x+dir*hip,dog.y-3,fx,geometry.groundAnchor('walker',fx)-foot.lift,fur,1);
+        }
+        g.save();g.translate(dog.x,dog.y);g.scale(dir,1);
+        ellipse(g,0,-4,4.6,2.1,fur);ellipse(g,4,-6,2,2,fur);ellipse(g,5.8,-5.6,1.3,.8,fur);
+        line(g,3,-7,2.5,-4.8,p.city,1.4);line(g,-4,-4,-6,-7+Math.sin(pose.distance)*.8,fur,1.2);g.restore();
+      }
+      g.restore();return true;
     }
     if(e.type==='dolphin'){
       const pose=geometry.dolphin(f,e.lane,e.reverse),ink=S.mixHex(p.city,p.night>.4?p.sky[2]:p.front,.5);
@@ -584,6 +604,7 @@
     paintBackground();paintLife(world.elapsed);
   }
   function resize(){
+    cityLights.windows=[];
     W=host.clientWidth;H=host.clientHeight;geometry=LandscapeGeometry.create(W,H);hy=geometry.horizon;
     // Pixel budget prevents high-DPR phones from allocating desktop-size canvases.
     dpr=Math.min(window.devicePixelRatio||1,1.5,Math.sqrt(3000000/(W*H)));
@@ -595,7 +616,9 @@
     frame=requestAnimationFrame(tick);
     if(now-lastPaint<1000/24)return;
     const dt=last?Math.min((now-last)/1000,.12):0;
-    last=now;lastPaint=now;S.advance(world,dt,sky);paintLife(world.elapsed);
+    last=now;lastPaint=now;S.advance(world,dt,sky);
+    if(S.advanceLights(cityLights,world.elapsed,p.night>.2))paintBackground();
+    paintLife(world.elapsed);
   }
   function stop(){if(frame)cancelAnimationFrame(frame);frame=0;last=0;clearTimeout(skyTimer);clearTimeout(resizeTimer);skyTimer=0;resizeTimer=0;}
   function scheduleSky(){clearTimeout(skyTimer);if(!document.hidden)skyTimer=setTimeout(()=>{refreshSky();scheduleSky();},60000);}
