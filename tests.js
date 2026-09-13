@@ -141,7 +141,7 @@ test("Landscape location: actual coordinates change the sky and polar day return
 
 test("Landscape: daytime life includes a duck visit and the new bounded animal set", () => {
   const sky = livingSky();
-  assert.deepEqual([...sky.eventTypes], ["cyclist", "bird", "balloon", "train", "metro", "plane", "duck", "fish", "butterfly", "rabbit", "deer", "kite", "reader", "picnic", "couple", "walker", "airshow", "banner", "hangglider", "jetski", "sailboat", "cruise", "yacht", "dolphin"]);
+  assert.deepEqual([...sky.eventTypes], ["cyclist", "bird", "balloon", "train", "metro", "plane", "duck", "fish", "butterfly", "rabbit", "deer", "kite", "reader", "picnic", "couple", "walker", "airshow", "banner", "hangglider", "jetski", "sailboat", "cruise", "yacht", "dolphin", "flock"]);
   assert.deepEqual([...sky.rareTypes], ["abduction"]);
   const world = sky.createWorld(() => 0.99);
   assert.equal(world.events.length, 3, "opening life is a small cast");
@@ -8430,4 +8430,29 @@ test('Landscape dolphins: occasional brief visits follow a bounded harbor arc in
   for(const reverse of [false,true]){const a=g.dolphin(.1,.5,reverse),b=g.dolphin(.5,.5,reverse),c=g.dolphin(.9,.5,reverse);assert.ok(b.y<a.y);assert.ok(b.y>g.waterTop);assert.ok(b.waterY<g.far(b.x));assert.equal(Math.sign(c.x-a.x),reverse?-1:1);}
  }
  assert.match(fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),/geometry\.dolphin\(/);
+});
+
+test('Landscape reader: a profile reader holds an upright cover rather than flat visible pages',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ const seated=source.slice(source.indexOf('  function seated('),source.indexOf('  function airplane('));
+ for(const direction of [-1,1]){
+  const polygons=[],scales=[];let points=[];
+  const g={save(){},restore(){},translate(){},scale(x,y){scales.push([x,y]);},beginPath(){points=[];},moveTo(x,y){points.push([x,y]);},lineTo(x,y){points.push([x,y]);},closePath(){},fill(){polygons.push({points:[...points],color:this.fillStyle});}};
+  const ctx=vm.createContext({g,color:()=> '#a4c9bd',ellipse(){},line(){},Math});vm.runInContext(seated+`;seated(0,0,.4,${direction},true);`,ctx);
+  const book=polygons[0],xs=book.points.map(p=>p[0]),ys=book.points.map(p=>p[1]);
+  assert.ok(Math.max(...ys)-Math.min(...ys)>Math.max(...xs)-Math.min(...xs),'book should be held upright in profile');
+  assert.ok(Math.max(...ys)<0,'book is held above the lap');assert.notEqual(book.color,'#fff0cf','the visible face is a cover, not an unfolded spread');
+  assert.deepEqual(scales,[[direction,1]],'book and reader face the same direction');
+ }
+});
+
+test('Landscape birds: flocks hold a mirrored V formation',()=>{
+ const sky=livingSky();assert.ok(sky.eventTypes.includes('flock'));assert.ok(!sky.eventTypes.includes('owl'),'no owl event is introduced');
+ const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
+ const g=ctx.LandscapeGeometry.create(1000,800);
+ for(const reverse of [false,true]){
+  const flock=g.flock(500,100,reverse);assert.equal(flock.length,7);assert.equal(flock[0].x,500);assert.equal(flock[0].y,100);
+  for(let i=1;i<7;i+=2){assert.equal(flock[i].x,flock[i+1].x);assert.equal(flock[i].y-100,100-flock[i+1].y);assert.ok((flock[i].x-500)*(reverse?-1:1)<0,'followers trail the leader');}
+ }
+ const runtime=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');assert.match(runtime,/geometry\.flock\(/);
 });

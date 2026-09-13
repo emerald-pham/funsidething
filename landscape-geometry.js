@@ -56,6 +56,9 @@
       const x=W*(.2+.6*lane)+direction*(progress-.5)*45,waterY=waterTop+depth*.6;
       return {x,y:waterY-Math.sin(progress*Math.PI)*Math.min(9,depth*.22),waterY,scale,direction};
     }
+    const flock=(x,y,reverse=false)=>Array.from({length:7},(_,i)=>{
+      const rank=Math.ceil(i/2);return {x:x-rank*15*(reverse?-1:1),y:y+(i%2?1:-1)*rank*7};
+    });
     const sunReflection=sun=>sun.visible&&sun.altitude>0;
     function cityReflection(t,wind,night){
       if(night<=0)return [];
@@ -69,7 +72,7 @@
       return rows;
     }
     const ripple=(i,t,wind=1)=>({alpha:.15+.75*(.5+.5*Math.sin(t*wind*1.3+i*1.71))**2,drift:Math.sin(t*wind*.5+i)*9,width:.65+.35*Math.sin(t*.9+i)**2});
-    return {dolphin,starReflection,cityReflection,sunReflection,depthBand,groundAnchor,groundTravelX,groundPose,strideFoot,wingFold,balloonDrift,vessel,foregroundTree,nest,ripple,horizon,waterTop,far,middle,near,rail,trail,lowerRail,tangent,rider,pack};
+    return {flock,dolphin,starReflection,cityReflection,sunReflection,depthBand,groundAnchor,groundTravelX,groundPose,strideFoot,wingFold,balloonDrift,vessel,foregroundTree,nest,ripple,horizon,waterTop,far,middle,near,rail,trail,lowerRail,tangent,rider,pack};
   }
   root.LandscapeGeometry={create};
 })(globalThis);

@@ -121,3 +121,9 @@ checks cover both directions in narrow/wide Chromium and WebKit scenes.
 - [x] Every one of the 120 comments explicitly names its hour, with gentle humor and no guilt. Removed the location caption from the intro; location preferences remain available in Settings.
 - [x] Most daytime event types can now be selected after dark. Night scheduling remains under one-quarter morning frequency, and three-quarters of nighttime selections stay with familiar night visitors. Existing night color shading applies to the expanded cast.
 - [x] Dolphins make brief, single, scheduled harbor visits, with an additional rarity check and a bounded surface arc. They share the harbor traffic cap and never form the opening cast.
+
+## Reader perspective and passing flocks
+
+- [x] Profile readers hold an upright cover with a thin visible page edge and a hand against the book; the same pose mirrors correctly for a reader facing either way.
+- [x] Random seven-bird flocks travel across the sky in a V formation, mirrored to match their direction. They pass through without competing for nest perches.
+- [x] Owls were not added, following the revised request. Renderer geometry tests and Chromium/WebKit scene checks cover the book and both flock directions.

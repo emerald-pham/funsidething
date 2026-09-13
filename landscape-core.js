@@ -95,12 +95,12 @@
   }
   function activity(sky){return sky.sun.altitude < -6?.24:sky.sun.azimuth<180?1:.65;}
   const MAX_EVENTS=14,RARE_COOLDOWN=420;
-  const EVENT_TYPES=['cyclist','bird','balloon','train','metro','plane','duck','fish','butterfly','rabbit','deer','kite','reader','picnic','couple','walker','airshow','banner','hangglider','jetski','sailboat','cruise','yacht','dolphin'];
+  const EVENT_TYPES=['cyclist','bird','balloon','train','metro','plane','duck','fish','butterfly','rabbit','deer','kite','reader','picnic','couple','walker','airshow','banner','hangglider','jetski','sailboat','cruise','yacht','dolphin','flock'];
   const RARE_TYPES=['abduction'];
   const NIGHT_TYPES=['meteor',...EVENT_TYPES.filter(type=>!['bird','butterfly'].includes(type))];
   const NIGHT_REGULARS=['meteor','metro','plane'];
   const WATER_TYPES=['jetski','sailboat','cruise','yacht','dolphin'];
-  const EVENT_DURATIONS={dolphin:8,duck:80,fish:5,butterfly:35,rabbit:22,deer:55,kite:90,reader:140,picnic:150,couple:120,walker:60,airshow:40,banner:100,hangglider:90,meteor:1.8,jetski:32,sailboat:140,cruise:180,yacht:95};
+  const EVENT_DURATIONS={flock:65,dolphin:8,duck:80,fish:5,butterfly:35,rabbit:22,deer:55,kite:90,reader:140,picnic:150,couple:120,walker:60,airshow:40,banner:100,hangglider:90,meteor:1.8,jetski:32,sailboat:140,cruise:180,yacht:95};
   const INITIAL_TYPES=EVENT_TYPES.filter(type=>type!=='dolphin');
   function createWorld(random=Math.random){
     const world={random,elapsed:0,events:[],next:3+random()*6,lastRare:-RARE_COOLDOWN,rareCount:0,wind:.6+random()*1.2};

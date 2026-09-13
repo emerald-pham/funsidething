@@ -282,7 +282,7 @@
       g.globalAlpha=wave.alpha*.20;line(g,x,y,x+(7+rand(i+480)*22)*wave.width,y,S.mixHex(p.sky[1],'#ffffff',.6),.8);
     }g.restore();
     for(const e of world.events)if(['jetski','sailboat','cruise','yacht'].includes(e.type))paintVessel(e,t);
-    const airborne=new Set(['metro','duck','fish','plane','balloon','airshow','banner','hangglider','jetski','sailboat','cruise','yacht','dolphin']);
+    const airborne=new Set(['metro','duck','fish','plane','balloon','airshow','banner','hangglider','jetski','sailboat','cruise','yacht','dolphin','flock']);
     for(const e of world.events)if(airborne.has(e.type))paintEvent(e,t);
     composite('middle');
     for(const e of world.events)if(!airborne.has(e.type)&&e.type!=='train')paintEvent(e,t);
@@ -352,6 +352,11 @@
         geometry.pack(x,count,e.reverse).forEach((pose,i)=>cyclist(pose.x,trail(pose.x),t+i*.8,color(e.seed,i),W<600?.85:1,e.reverse));
         return;
       }
+      if(e.type==='flock'){
+        const y=hy*(.25+e.lane*.32)+Math.sin(f*Math.PI)*10;
+        geometry.flock(x,y,e.reverse).forEach((pose,i)=>bird(pose.x,pose.y,2.5,t+i*.13));
+        return;
+      }
       if(e.type==='bird'){
         if(sky.sun.altitude < -8)return;
         const nest=geometry.nest(),nx=nest.perches[0].x,ny=nest.perches[0].y;
@@ -405,7 +410,13 @@
     line(g,-1,-5,0,-1,color(seed),3.5);ellipse(g,-1,-8,1.9,2.1,skin);
     line(g,0,-1,3,-2,'#647779',1.8);line(g,3,-2,6,0,'#647779',1.5);
     line(g,6,0,8,0,'#526b6c',1.3);line(g,0,-5,3,-3,skin,1.2);
-    if(book){g.fillStyle='#fff0cf';g.beginPath();g.moveTo(2,-4);g.lineTo(5,-3);g.lineTo(8,-4);g.lineTo(7,-1);g.lineTo(5,0);g.lineTo(2,-1);g.closePath();g.fill();line(g,5,-3,5,0,'#cbb594',.5);}
+    if(book){
+      // This reader is in profile: show an upright cover and a thin page edge,
+      // not a face-on spread lying flat across their lap.
+      g.fillStyle=color(seed,2);g.beginPath();g.moveTo(3,-8);g.lineTo(6,-7);g.lineTo(5,-2);g.lineTo(2,-3);g.closePath();g.fill();
+      line(g,3,-7.7,2.2,-3.3,'#fff0cf',.65);line(g,0,-5,3,-3,skin,1.2);
+      ellipse(g,3,-3,.65,.65,skin);
+    }
     g.restore();
   }
   function airplane(x,y,dir,seed){
