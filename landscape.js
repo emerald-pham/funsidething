@@ -603,7 +603,7 @@
       const y=hy*.3+e.lane*hy*.18,bx=x-dir*86;
       airplane(x,y,dir,e.seed);line(g,x-dir*18,y,bx+dir*39,y+3,'#99a69b',.7);
       g.save();g.translate(bx,y+3);g.rotate(Math.sin(t)*.025);g.fillStyle=S.mixHex('#fff2d8',c,.2);g.fillRect(-39,-6,78,12);
-      g.fillStyle='#4d6c72';g.font='7px sans-serif';g.textAlign='center';g.fillText(['ONE THING AT A TIME','ROOM TO BREATHE','HELLO, BEAUTIFUL DAY','TAKE YOUR TIME'][Math.floor(e.seed*4)],0,2.5);g.restore();return true;
+      g.fillStyle='#4d6c72';g.font='7px sans-serif';g.textAlign='center';g.fillText(LandscapeMood.airplaneMessage(e.seed),0,2.5);g.restore();return true;
     }
     return false;
   }
@@ -622,7 +622,8 @@
     if(globalThis.LandscapeMood)p=LandscapeMood.palette(p,sky.date,location);updateChrome();
     document.documentElement.style.setProperty('--scene-tint',p.tint);
     document.documentElement.dataset.scenePeriod=sky.period;
-    status.textContent=globalThis.LandscapeMood?.message(sky.date,{...location,sunAltitude:sky.sun.altitude},Math.random)||'A little room to breathe';
+    const entry=LandscapeMood.messageEntry(sky.date,{...location,sunAltitude:sky.sun.altitude},Math.random);
+    status.textContent=entry.text+' · '+entry.author+' written';
     paintBackground();paintLife(world.elapsed);
   }
   function resize(){
@@ -722,4 +723,10 @@
   window.addEventListener('pagehide',stop);
   window.addEventListener('pageshow',start);
   resize();updateMotion();if(preference===null)openMotion();
+  // The editable local file is precached for offline use. A failed first load
+  // leaves the AI defaults usable and cannot interrupt animation startup.
+  fetch('./HUMAN_WRITTEN_HOURLY_TAGS.md').then(response=>{
+    if(!response.ok)throw new Error('Human text unavailable');
+    return response.text();
+  }).then(markdown=>{LandscapeMood.setHumanText(markdown);refreshSky();}).catch(()=>{});
 })();

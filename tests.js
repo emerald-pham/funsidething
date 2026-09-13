@@ -481,7 +481,9 @@ test("Landscape: local assets, decorative layers and accessible motion controls 
   assert.match(html, /data-act="scene-settings"/);
   assert.match(html, /id="sceneStatus"/);
   const runtime=fs.readFileSync(path.join(__dirname,"landscape.js"),"utf8");
-  assert.doesNotMatch(runtime,/\b(?:fetch|XMLHttpRequest|WebSocket)\s*\(/);
+  // Authored copy is a precached local asset; no external runtime services.
+  const withoutLocalCopy = runtime.replace("fetch('./HUMAN_WRITTEN_HOURLY_TAGS.md')", 'localCopy');
+  assert.doesNotMatch(withoutLocalCopy,/\b(?:fetch|XMLHttpRequest|WebSocket)\s*\(/);
   assert.match(runtime,/visibilitychange/);
   assert.match(runtime,/cancelAnimationFrame/);
   assert.match(runtime,/prefers-reduced-motion/);
@@ -8264,7 +8266,7 @@ test('Landscape waterfront: water visitors are occasional and have distinct trav
 });
 test('Landscape intro: cozy short copy keeps the scenic pane compact',()=>{
  const runtime=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
- assert.match(runtime,/status\.textContent=globalThis\.LandscapeMood/);
+ assert.match(runtime,/status\.textContent=entry\.text/);
  const mood=vm.createContext({Date,Intl,Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-mood.js'),'utf8'),mood);
  for(const entry of mood.LandscapeMood.messageCatalog)assert.ok(entry.text.length<=110,'cozy messages stay short');
  assert.ok(mood.LandscapeMood.messageCatalog.some(entry=>/neighbor|pocket|tea/.test(entry.text)));
@@ -9012,4 +9014,32 @@ test('Animation state: flapping birds do not change the stroke caps of later sce
   vm.runInNewContext(code+`;bird(10,10,3.5,1,${perched},true);`,{g,p:{sky:['#fff'],night:0},S:{mixHex:()=> '#333'},Math,line(){},ellipse(){}});
   assert.equal(g.lineCap,cap,'a flying bird must not round every subsequent stroke');assert.equal(stack.length,0);
  }
+});
+
+test('Human scene copy: blank templates, per-hour precedence, holidays, and rotating banners', () => {
+  const mood = moodRuntime();
+  assert.equal(typeof mood.setHumanText, 'function');
+  mood.setHumanText(fs.readFileSync(path.join(__dirname, 'HUMAN_WRITTEN_HOURLY_TAGS.md'), 'utf8'));
+  const date = new Date('2026-08-11T15:00:00Z');
+  assert.equal(mood.messageEntry(date, 'UTC', 0).author, 'AI');
+  mood.setHumanText('## Hour 15\n- My first line\n- My second line\n## Hour 16\n-   \n## Airplanes\n- Hello from me\n## Skywriters\n- Look up\n## Unknown\n- Ignore me');
+  assert.equal(mood.message(date, 'UTC', 0), 'My first line');
+  assert.equal(mood.message(date, 'UTC', .99), 'My second line');
+  assert.equal(mood.messageEntry(date, 'UTC', 0).author, 'Human');
+  assert.equal(mood.message(new Date('2026-12-25T15:00:00Z'), 'UTC', 0), 'My first line');
+  assert.equal(mood.messageEntry(new Date('2026-08-11T16:00:00Z'), 'UTC', 0).author, 'AI');
+  assert.equal(mood.airplaneMessage(.9), 'Hello from me');
+  assert.equal(mood.skywriterMessage(0), 'Look up');
+  mood.setHumanText('## Holiday Christmas Day\n- A human Christmas');
+  assert.equal(mood.message(new Date('2026-12-25T15:00:00Z'), 'UTC', 0), 'A human Christmas');
+  assert.equal(mood.skywriterMessage(0), '');
+  assert.ok(mood.airplaneMessage(0));
+});
+
+test('Human scene copy is loaded locally, cached offline, and attributed in the scene', () => {
+  const runtime = fs.readFileSync(path.join(__dirname, 'landscape.js'), 'utf8');
+  assert.match(runtime, /messageEntry\(/);
+  assert.match(runtime, /entry.author/);
+  assert.match(runtime, /airplaneMessage\(e.seed\)/);
+  assert.match(serviceWorkerSource(), /HUMAN_WRITTEN_HOURLY_TAGS\.md/);
 });

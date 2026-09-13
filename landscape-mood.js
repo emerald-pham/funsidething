@@ -649,7 +649,41 @@
     return Math.max(0, Math.min(0.999999999999, value));
   }
 
-  function message(date, location, random) {
+  // Only bullet lines inside recognized sections are authored copy. Empty
+  // sections must never suppress the fallback, and Markdown stays plain text.
+  let humanText = Object.create(null);
+  const AI_AIRPLANE_LINES = ['ONE THING AT A TIME','ROOM TO BREATHE','HELLO, BEAUTIFUL DAY','TAKE YOUR TIME'];
+  function setHumanText(markdown) {
+    const next = Object.create(null);
+    let section = null;
+    for (const line of String(markdown).split(/\r?\n/)) {
+      if (/^##\s/.test(line)) {
+        const title = line.replace(/^##\s+/, '').trim();
+        section = /^(Hour (?:[01]\d|2[0-3])|Airplanes|Skywriters)$/.test(title) ||
+          (title.startsWith('Holiday ') && Object.hasOwn(HOLIDAY_LINES, title.slice(8))) ? title : null;
+      } else if (section && /^-\s+\S/.test(line)) {
+        (next[section] ||= []).push(line.slice(2).trim());
+      }
+    }
+    humanText = next;
+  }
+  function pick(lines, random) { return lines[Math.floor(randomFraction(random) * lines.length)]; }
+  function airplaneMessage(random) { return pick(humanText.Airplanes || AI_AIRPLANE_LINES, random); }
+  // Reserved for future skywriter rendering; no invented human placeholders.
+  function skywriterMessage(random) { return pick(humanText.Skywriters || [''], random); }
+  function messageEntry(date, location, random) {
+    validDate(date);
+    const context = normalizedLocation(location);
+    const parts = localParts(date, context.timezone);
+    const lines = humanText['Hour ' + String(parts.hour).padStart(2, '0')] ||
+      humanText['Holiday ' + holidayForParts(parts)];
+    return lines ? {text: pick(lines, random), author: 'Human'} :
+      {text: aiMessage(date, location, random), author: 'AI'};
+  }
+  function message(date, location, random) { return messageEntry(date, location, random).text; }
+
+  // Existing hourly and holiday catalogs are AI-written fallback copy.
+  function aiMessage(date, location, random) {
     validDate(date);
     const context = normalizedLocation(location);
     const parts = localParts(date, context.timezone);
@@ -676,6 +710,7 @@
 
   const api = Object.freeze({
     season, palette, clock, period, holiday, message, messages: message,
+    setHumanText, messageEntry, airplaneMessage, skywriterMessage,
     messageCatalog: Object.freeze(messageCatalog), messageCount: messageCatalog.length,
     holidayCatalog,
     periods: Object.freeze(PERIOD_NAMES.slice()),
