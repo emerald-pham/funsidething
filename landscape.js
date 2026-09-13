@@ -154,12 +154,6 @@
       // A short secondary walking loop rejoins the main path; it never crosses rails.
       path(b,x=>trail(x)+Math.sin((x-W*.3)/(W*.25)*Math.PI)*22,W*.3,W*.55);
       b.strokeStyle=S.mixHex(p.hill,'#eedcba',.65);b.lineWidth=4;b.stroke();
-      if(visitSeed>.25){
-        const ax=W*.43,ay=trail(ax)+15;
-        b.fillStyle=color(visitSeed);b.fillRect(ax-9,ay-12,18,12);
-        for(let i=0;i<4;i++){b.fillStyle=i%2?'#fff0d6':color(visitSeed,2);b.fillRect(ax-11+i*5.5,ay-16,5.5,5);}
-        ellipse(b,ax,ay-7,2,2,'#fff0d6');b.fillStyle='#c39877';b.fillRect(ax-1,ay-5,2,3);
-      }
       if(W>1000&&visitSeed<.75){
         const ax=W*.62,ay=trail(ax)+18;
         line(b,ax-6,ay,ax-6,ay-15,p.city,1.3);line(b,ax-8,ay-15,ax+8,ay-15,p.city,1.3);
@@ -297,7 +291,10 @@
     const airborne=new Set(['metro','duck','fish','plane','balloon','airshow','banner','hangglider','jetski','sailboat','cruise','yacht','windsurfer','dolphin','flock']);
     for(const e of world.events)if(airborne.has(e.type))paintEvent(e,t);
     composite('middle');
-    for(const e of world.events)if(!airborne.has(e.type)&&e.type!=='train')paintEvent(e,t);
+    // Ground contact determines occlusion, including props previously baked into the hill.
+    const groundPass=world.events.filter(e=>!airborne.has(e.type)&&e.type!=='train').map(e=>({depth:geometry.eventDepth(e),draw:()=>paintEvent(e,t)}));
+    if(W>650&&visitSeed>.25)groundPass.push({depth:trail(W*.43)+15,draw:paintIceCreamStand});
+    for(const item of groundPass.sort((a,b)=>a.depth-b.depth))item.draw();
     if(W>850&&visitSeed>.45){
       const fx=W*.54,fy=trail(fx)+24;
       ellipse(g,fx,fy,11,3,S.mixHex(p.city,'#e8e4d1',.6));ellipse(g,fx,fy-1,8,2,p.sky[1]);
@@ -361,6 +358,12 @@
       }
     }
     g.restore();
+  }
+  function paintIceCreamStand(){
+    const ax=W*.43,ay=trail(ax)+15;
+    g.fillStyle=color(visitSeed);g.fillRect(ax-9,ay-12,18,12);
+    for(let i=0;i<4;i++){g.fillStyle=i%2?'#fff0d6':color(visitSeed,2);g.fillRect(ax-11+i*5.5,ay-16,5.5,5);}
+    ellipse(g,ax,ay-7,2,2,'#fff0d6');g.fillStyle='#c39877';g.fillRect(ax-1,ay-5,2,3);
   }
   function paintEvent(e,t){
       if(['jetski','sailboat','cruise','yacht','windsurfer'].includes(e.type))return;

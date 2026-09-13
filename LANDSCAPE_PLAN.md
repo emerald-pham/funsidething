@@ -143,3 +143,5 @@ checks cover both directions in narrow/wide Chromium and WebKit scenes.
 - [x] One window toggles about every thirty seconds of active nighttime scenery; the cached city and its reflection update together. Reduced motion pauses the changes.
 - [x] Windsurfers trace a gentle course through the harbor depth as well as horizontally, staying clear of both shores.
 - [x] Settings opens phone installation instructions for Safari and Chrome, with a one-use native install prompt when available and manual fallback.
+
+- [x] The ice cream stand shares ground-depth ordering with visitors, so path walkers pass behind its counter and nearer meadow visitors stay in front.

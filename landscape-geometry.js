@@ -37,6 +37,12 @@
       }
       return {x,y:groundAnchor(kind,x),direction,hop,distance:e.age*speed};
     }
+    function eventDepth(e){
+      if(['walker','dogwalker','rabbit','deer'].includes(e.type))return groundPose(e.type==='dogwalker'?'walker':e.type,e).y;
+      if(['reader','picnic','couple','kite'].includes(e.type))return trail(W*(.1+e.lane*.8))+19;
+      const progress=e.reverse?1-e.age/e.duration:e.age/e.duration;
+      return trail(-160+progress*(W+320));
+    }
     function dogPose(ownerX,distance,direction){
       const x=ownerX+direction*(16+Math.sin(distance*.15)*4);
       return {x,y:groundAnchor('walker',x),direction};
@@ -95,7 +101,7 @@
       return rows;
     }
     const ripple=(i,t,wind=1)=>({alpha:.15+.75*(.5+.5*Math.sin(t*wind*1.3+i*1.71))**2,drift:Math.sin(t*wind*.5+i)*9,width:.65+.35*Math.sin(t*.9+i)**2});
-    return {dogPose,skater,fireworks,flock,dolphin,starReflection,cityReflection,sunReflection,depthBand,groundAnchor,groundTravelX,groundPose,strideArm,strideFoot,wingFold,balloonDrift,vessel,foregroundTree,nest,ripple,horizon,waterTop,far,middle,near,rail,trail,lowerRail,tangent,rider,pack};
+    return {eventDepth,dogPose,skater,fireworks,flock,dolphin,starReflection,cityReflection,sunReflection,depthBand,groundAnchor,groundTravelX,groundPose,strideArm,strideFoot,wingFold,balloonDrift,vessel,foregroundTree,nest,ripple,horizon,waterTop,far,middle,near,rail,trail,lowerRail,tangent,rider,pack};
   }
   root.LandscapeGeometry={create};
 })(globalThis);

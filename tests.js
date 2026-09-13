@@ -8761,3 +8761,19 @@ test("native install: a withdrawn prompt returns to manual instructions", async 
   assert.deepEqual(calls.toasts, []);
   assert.equal(calls.help, 1);
 });
+
+test('Landscape stand: path visitors sort behind the counter and meadow visitors in front',()=>{
+ const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
+ for(const w of [844,1440]){
+  const g=ctx.LandscapeGeometry.create(w,900),x=w*.43,stand=g.trail(x)+15;
+  for(const reverse of [false,true]){
+   const walker={type:'walker',age:30,duration:60,lane:(.43-.18)/.64,reverse};
+   assert.ok(g.eventDepth(walker)<stand);
+   assert.ok(g.eventDepth({...walker,type:'dogwalker'})<stand);
+   assert.ok(g.eventDepth({...walker,type:'reader',lane:(.43-.1)/.8})>stand);
+  }
+ }
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ assert.match(source,/groundPass\.sort\(\(a,b\)=>a.depth-b.depth\)/);
+ assert.match(source,/depth:geometry\.eventDepth\(e\)/);
+});
