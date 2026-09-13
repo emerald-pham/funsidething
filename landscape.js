@@ -13,7 +13,7 @@
   let storage;try{storage=window.localStorage;}catch{storage=null;}
   let preference=S.readMotion(storage),reduced=S.motionReduced(preference,mq.matches);
   let W=0,H=0,hy=0,dpr=1,frame=0,last=0,lastPaint=0,sky,p,world=S.createWorld();
-  let skyTimer=0,resizeTimer=0,returnFocus=null,sunDay=null,sunTimes=null;
+  let skyTimer=0,resizeTimer=0,returnFocus=null;
   const dialog=document.getElementById('motionDialog');
   const status=document.getElementById('sceneStatus');
   const motionButton=document.getElementById('motionButton');
@@ -282,7 +282,7 @@
       g.globalAlpha=wave.alpha*.20;line(g,x,y,x+(7+rand(i+480)*22)*wave.width,y,S.mixHex(p.sky[1],'#ffffff',.6),.8);
     }g.restore();
     for(const e of world.events)if(['jetski','sailboat','cruise','yacht'].includes(e.type))paintVessel(e,t);
-    const airborne=new Set(['metro','duck','fish','plane','balloon','airshow','banner','hangglider','jetski','sailboat','cruise','yacht']);
+    const airborne=new Set(['metro','duck','fish','plane','balloon','airshow','banner','hangglider','jetski','sailboat','cruise','yacht','dolphin']);
     for(const e of world.events)if(airborne.has(e.type))paintEvent(e,t);
     composite('middle');
     for(const e of world.events)if(!airborne.has(e.type)&&e.type!=='train')paintEvent(e,t);
@@ -303,7 +303,7 @@
     }
   }
   function paintVessel(e,t){
-    if(sky.sun.altitude < -6)return;
+
     const progress=e.reverse?1-e.age/e.duration:e.age/e.duration;
     const pose=geometry.vessel(e.type,e.lane,-160+progress*(W+320),t,e.reverse);
     if(!pose.visible)return;
@@ -347,7 +347,7 @@
       if(e.type==='metro'){transport(x,rail(x)-4,f,false,e.reverse);return;}
       if(e.type==='train'){transport(x,near(x)+H*.07-2,f,true,e.reverse);return;}
       if(e.type==='cyclist'){
-        if(sky.sun.altitude < -6)return;
+
         const count=e.seed>.55?3+Math.floor(e.seed*4):1;
         geometry.pack(x,count,e.reverse).forEach((pose,i)=>cyclist(pose.x,trail(pose.x),t+i*.8,color(e.seed,i),W<600?.85:1,e.reverse));
         return;
@@ -370,7 +370,7 @@
         if(p.night>.4){ellipse(g,0,-2,1,1,'#ed8976');ellipse(g,0,2,1,1,'#abcdaa');}g.restore();return;
       }
       if(e.type==='balloon'){
-        if(sky.sun.altitude < -4)return;
+
         const drift=geometry.balloonDrift(e.seed,t,wind),y=hy*.48+e.lane*hy*.18+drift.y,r=10+e.lane*7;
         g.save();g.translate(x+drift.x,y);ellipse(g,0,0,r,r*1.2,color(e.seed));ellipse(g,0,0,r*.62,r*1.2,color(e.seed,2));ellipse(g,0,0,r*.25,r*1.2,color(e.seed,4));
         line(g,-r*.4,r*.95,-3,r*1.6,'#867458',.65);line(g,r*.4,r*.95,3,r*1.6,'#867458',.65);g.fillStyle='#897659';g.fillRect(-3,r*1.5,6,4);g.restore();return;
@@ -413,7 +413,7 @@
     g.beginPath();g.moveTo(12,0);g.lineTo(-12,-2);g.lineTo(-17,-7);g.lineTo(-20,-7);g.lineTo(-17,3);g.lineTo(-4,3);g.lineTo(-9,10);g.lineTo(-4,10);g.lineTo(3,3);g.closePath();g.fill();line(g,0,0,-7,-10,color(seed,2),3);g.restore();
   }
   function paintGuest(e,x,f,t){
-    if(sky.sun.altitude < -6 && e.type!=='abduction')return true;
+
     const dir=e.reverse?-1:1,c=color(e.seed),anchor=W*(.1+e.lane*.8),ground=trail(anchor)+19;
     if(['reader','picnic','couple','kite'].includes(e.type)){
       const fade=S.smooth(0,.08,f)*(1-S.smooth(.9,1,f));g.save();g.globalAlpha=fade;
@@ -442,6 +442,19 @@
       ellipse(g,pose.x,pose.y-12,2,2,skin);line(g,pose.x,pose.y-9,pose.x,pose.y-4,c,3);
       for(const offset of [0,.5]){const foot=geometry.strideFoot(pose.distance,10,offset),fx=pose.x+dir*foot.x;line(g,pose.x,pose.y-4,fx,geometry.groundAnchor('walker',fx)-foot.lift,'#647779',1.4);}
       line(g,pose.x,pose.y-8,pose.x+dir*4,pose.y-6,skin,1.3);g.restore();return true;
+    }
+    if(e.type==='dolphin'){
+      const pose=geometry.dolphin(f,e.lane,e.reverse),ink=S.mixHex(p.city,p.night>.4?p.sky[2]:p.front,.5);
+      g.save();g.globalAlpha=S.smooth(0,.12,f)*(1-S.smooth(.8,1,f));
+      // Ripples sit on the waterline; the short breach curves above it.
+      for(let i=0;i<3;i++){
+        const radius=3+i*3+f*5;g.beginPath();g.ellipse(pose.x-dir*i*3,pose.waterY+1,radius,Math.max(.4,radius*.13),0,0,TAU);
+        g.strokeStyle=S.mixHex(p.sky[2],p.city,.25);g.lineWidth=.65;g.stroke();
+      }
+      g.translate(pose.x,pose.y);g.rotate((f-.5)*.7*dir);g.scale(dir*pose.scale,pose.scale);
+      g.fillStyle=ink;g.beginPath();g.moveTo(-7,1);g.bezierCurveTo(-3,-4,3,-4,6,-1);g.lineTo(9,0);g.lineTo(5,1);g.quadraticCurveTo(0,3,-7,1);g.fill();
+      g.beginPath();g.moveTo(-1,-2);g.lineTo(-2,-6);g.lineTo(2,-2);g.moveTo(-6,1);g.lineTo(-10,-2);g.lineTo(-9,3);g.closePath();g.fill();
+      g.restore();return true;
     }
     if(e.type==='duck'){
       const pose=geometry.vessel('duck',e.lane,x,t,e.reverse),scale=Math.min(.5,pose.scale*.65),y=pose.y;
@@ -494,7 +507,7 @@
       const y=hy*.25+Math.sin(f*Math.PI)*20;
       for(let i=0;i<3;i++){
         const xx=x-i*23*dir,yy=y+(i-1)*17,smoke=['#ec7181','#fffaf2','#639ed9'][i];
-        g.save();g.globalAlpha=.85*S.smooth(0,.1,f)*(1-S.smooth(.65,1,f));
+        g.save();g.globalAlpha=.85*(1-p.night*.45)*S.smooth(0,.1,f)*(1-S.smooth(.65,1,f));
         const tail=g.createLinearGradient(xx-dir*160,0,xx,0);tail.addColorStop(0,smoke+'00');tail.addColorStop(1,smoke);
         g.strokeStyle=tail;g.lineWidth=4;g.beginPath();g.moveTo(xx,yy);for(let k=1;k<25;k++)g.lineTo(xx-k*7*dir,yy+Math.sin(t*.5-k*.13)*k*.2);g.stroke();g.restore();airplane(xx,yy,dir,e.seed+i*.1);
       }return true;
@@ -523,15 +536,6 @@
     document.documentElement.style.setProperty('--scene-tint',p.tint);
     document.documentElement.dataset.scenePeriod=sky.period;
     status.textContent=globalThis.LandscapeMood?.message(sky.date,{...location,sunAltitude:sky.sun.altitude},Math.random)||'A little room to breathe';
-    const timeLabel=document.getElementById('sceneTime');
-    timeLabel.textContent=globalThis.LivingLocation?.caption(sky.date)||'';
-    timeLabel.hidden=!location?.enabled;
-    const zone=location?.timezone||'America/New_York';
-    const day=new Intl.DateTimeFormat('en-US',{timeZone:zone}).format(sky.date);
-    if(day!==sunDay){sunDay=day;sunTimes=S.sunTimes(sky.date,location);}
-    const format=d=>d?new Intl.DateTimeFormat(undefined,{hour:'numeric',minute:'2-digit',timeZone:zone}).format(d):'not today';
-    timeLabel.title='Sunrise '+format(sunTimes.rise)+' · Sunset '+format(sunTimes.set);
-    timeLabel.setAttribute('aria-label',timeLabel.textContent+'. '+timeLabel.title);
     paintBackground();paintLife(world.elapsed);
   }
   function resize(){
@@ -584,10 +588,10 @@
     if(!S.saveSceneTime(storage,value)){timeStatus.textContent='Could not save this time on this device. Please try again.';return;}
     timeInput.value=S.sceneDate(new Date(),storage,globalThis.LivingLocation?.current()).toTimeString().slice(0,5);
     timeStatus.textContent=value?'Scene time locked to '+value+'.':'Following live time.';
-    if(value==='sunrise'||value==='sunset'){const times=S.sunTimes(new Date(),globalThis.LivingLocation?.current());if(!times[value==='sunrise'?'rise':'set'])timeStatus.textContent='No '+value+' here today. Following live time until it returns.';}sunDay=null;refreshSky();
+    if(value==='sunrise'||value==='sunset'){const times=S.sunTimes(new Date(),globalThis.LivingLocation?.current());if(!times[value==='sunrise'?'rise':'set'])timeStatus.textContent='No '+value+' here today. Following live time until it returns.';}refreshSky();
   });
   timeDialog.addEventListener('close',()=>timeReturnFocus?.isConnected&&timeReturnFocus.focus());
-  window.addEventListener('storage',event=>{if(event.key==='fvp:chain-scanner:scene-time'||event.key===null){sunDay=null;refreshSky();}});
+  window.addEventListener('storage',event=>{if(event.key==='fvp:chain-scanner:scene-time'||event.key===null){refreshSky();}});
   document.addEventListener('click',event=>{
     const button=event.target.closest('[data-landscape-motion], [data-act="scene-settings"], [data-scene-view]');
     if(!button)return;
@@ -622,7 +626,7 @@
       const fresh=S.createWorld();world.events=fresh.events;world.next=world.elapsed+fresh.next;start();
     }
   });
-  document.addEventListener('landscape-location-change',()=>{sunDay=null;refreshSky();});
+  document.addEventListener('landscape-location-change',()=>{refreshSky();});
   window.addEventListener('pagehide',stop);
   window.addEventListener('pageshow',start);
   resize();updateMotion();if(preference===null)openMotion();

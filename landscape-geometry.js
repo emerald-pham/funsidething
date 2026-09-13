@@ -51,6 +51,11 @@
       const depth=Math.min(H*.09,95),y=waterTop+5+star.altitude/90*depth;
       return {x:star.azimuth/360*W+Math.sin(y*.19-t*wind)*1.8,y};
     }
+    function dolphin(progress,lane,reverse=false){
+      const direction=reverse?-1:1,depth=Math.max(1,shore-waterTop),scale=Math.min(.9,W/600,depth/30);
+      const x=W*(.2+.6*lane)+direction*(progress-.5)*45,waterY=waterTop+depth*.6;
+      return {x,y:waterY-Math.sin(progress*Math.PI)*Math.min(9,depth*.22),waterY,scale,direction};
+    }
     const sunReflection=sun=>sun.visible&&sun.altitude>0;
     function cityReflection(t,wind,night){
       if(night<=0)return [];
@@ -64,7 +69,7 @@
       return rows;
     }
     const ripple=(i,t,wind=1)=>({alpha:.15+.75*(.5+.5*Math.sin(t*wind*1.3+i*1.71))**2,drift:Math.sin(t*wind*.5+i)*9,width:.65+.35*Math.sin(t*.9+i)**2});
-    return {starReflection,cityReflection,sunReflection,depthBand,groundAnchor,groundTravelX,groundPose,strideFoot,wingFold,balloonDrift,vessel,foregroundTree,nest,ripple,horizon,waterTop,far,middle,near,rail,trail,lowerRail,tangent,rider,pack};
+    return {dolphin,starReflection,cityReflection,sunReflection,depthBand,groundAnchor,groundTravelX,groundPose,strideFoot,wingFold,balloonDrift,vessel,foregroundTree,nest,ripple,horizon,waterTop,far,middle,near,rail,trail,lowerRail,tangent,rider,pack};
   }
   root.LandscapeGeometry={create};
 })(globalThis);

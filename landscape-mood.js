@@ -29,172 +29,172 @@
   const PERIOD_NAMES = ['predawn', 'morning', 'noon', 'afternoon', 'golden-hour', 'evening', 'night'];
   const HOUR_LINES = [
   [
-    "Midnight has a little room for you.",
-    "A new date, no need for a new demand.",
-    "The clock turned over. You can stay still.",
-    "Hello, midnight neighbor. Keep it gentle.",
-    "Let this first hour be a soft landing."
+    "12 AM, huh? Even the calendar just turned in a fresh leaf.",
+    "12 AM. A new day, but no need to unwrap it yet.",
+    "12 AM already? The list can wear its pajamas too.",
+    "12 AM. Midnight saved you the quietest bench.",
+    "12 AM, neighbor. Tomorrow can knock again later."
   ],
   [
-    "One in the morning is a quiet kind of company.",
-    "A small light and a smaller next step.",
-    "You can leave a little unfinished tonight.",
-    "The late hours need no grand plans.",
-    "Rest is welcome in this corner, too."
+    "1 AM, huh? The moon has the late shift covered.",
+    "1 AM. Your thoughts can queue politely until morning.",
+    "1 AM, neighbor. A sip of water is a fine little plan.",
+    "1 AM. Even your next step can use an indoor voice.",
+    "1 AM already? Let's keep the adventures blanket-sized."
   ],
   [
-    "Two o'clock. Nothing here needs a hurry.",
-    "A quiet sip of water might be nice.",
-    "Let your shoulders find their way down.",
-    "A little pause in the middle of the night.",
-    "Even a busy mind can visit a still place."
+    "2 AM. The river is handling all the running tonight.",
+    "2 AM, huh? No need to hold a meeting with tomorrow.",
+    "2 AM. A sleepy little pause counts as a plan.",
+    "2 AM, neighbor. Your shoulders can clock out.",
+    "2 AM. The to-dos won't mind waiting in their slippers."
   ],
   [
-    "Three in the morning, and the river carries on.",
-    "You do not have to solve tomorrow tonight.",
-    "A soft place for a wandering thought.",
-    "The small hours can stay small.",
-    "Put one thought down. Let the others wait."
+    "3 AM. A very small hour deserves very small expectations.",
+    "3 AM, huh? The fish have declined all meetings.",
+    "3 AM. Tomorrow's puzzles can stay in their box.",
+    "3 AM, neighbor. You can just sit with the view.",
+    "3 AM. Nothing here needs you to be impressive."
   ],
   [
-    "Four o'clock leaves room between things.",
-    "Before the bustle, a little breathing space.",
-    "The early hours have a bench for you.",
-    "No need to get ahead of the whole day.",
-    "One gentle thing is enough for now."
+    "4 AM. The morning is still looking for its slippers.",
+    "4 AM, huh? Early doesn't have to mean hurried.",
+    "4 AM. A quiet hello before the kettle gets ideas.",
+    "4 AM, neighbor. You don't need to wake the whole list.",
+    "4 AM. One gentle thing. Preferably with a blanket nearby."
   ],
   [
-    "Five o'clock. A little hello to the day.",
-    "Let the morning arrive at its own pace.",
-    "A warm cup can be a beginning.",
-    "Early bird, you can take the slow path.",
-    "A fresh page does not need filling at once."
+    "5 AM. The day is stretching. You can take your time too.",
+    "5 AM, huh? Early birds are allowed tea breaks.",
+    "5 AM. A fresh start can be very, very small.",
+    "5 AM, neighbor. The morning saved you a slow lane.",
+    "5 AM. No need to finish breakfast and the future at once."
   ],
   [
-    "Six o'clock, and a new little chapter.",
-    "Good morning, neighbor. Start softly.",
-    "One small kindness before the day gathers speed.",
-    "There is time for a stretch and a breath.",
-    "Let your first step be an easy one."
+    "6 AM. Good morning. The list can wait for the kettle.",
+    "6 AM, huh? A stretch is a perfectly respectable opening act.",
+    "6 AM. Let's start with a little kindness, neighbor.",
+    "6 AM. The day comes in bite-sized pieces, luckily.",
+    "6 AM. Your first task may simply be finding your slippers."
   ],
   [
-    "Seven o'clock has breakfast-sized possibilities.",
-    "A sip, a bite, a little look outside.",
-    "The morning can fit around you, too.",
-    "Pick one thing to carry into the day.",
-    "A familiar path is a fine place to start."
+    "7 AM. Breakfast before world domination, perhaps?",
+    "7 AM, huh? The toast has a very manageable agenda.",
+    "7 AM. One small plan, with room for jam.",
+    "7 AM, neighbor. Your morning needn't win any races.",
+    "7 AM. A sip, a breath, and we'll see what happens."
   ],
   [
-    "Eight o'clock. Settle in at your own pace.",
-    "A little plan, with room around the edges.",
-    "The day need not be decided all at once.",
-    "Good morning to you and your next small step.",
-    "Take a breath before opening another door."
+    "8 AM. The day is open. Browsing is allowed.",
+    "8 AM, huh? No need to carry the entire afternoon yet.",
+    "8 AM. A little plan with generous margins sounds nice.",
+    "8 AM, neighbor. One thing can have the front seat.",
+    "8 AM. The rest of the list can enjoy the view from here."
   ],
   [
-    "Nine o'clock, and one thing can have your attention.",
-    "A clear little space for a modest beginning.",
-    "You can start without knowing every step.",
-    "A cup beside you, a single thing ahead.",
-    "The rest of the list can wait its turn."
+    "9 AM. One thing at a time. The others can form a polite queue.",
+    "9 AM, huh? A modest beginning is still a beginning.",
+    "9 AM. You don't need a grand entrance, neighbor.",
+    "9 AM. A cup beside you and one little thing ahead.",
+    "9 AM. Let's give the morning a comfortable walking speed."
   ],
   [
-    "Ten o'clock might be a good time to look up.",
-    "A tiny break belongs in the morning, too.",
-    "Let your eyes wander farther than the next task.",
-    "A little water, a little sky, then onward.",
-    "There is room for a slower minute."
+    "10 AM. A tiny break? The clouds seem in favor.",
+    "10 AM, huh? Your eyes might enjoy a field trip outside.",
+    "10 AM. A little water for you, a whole river for the ducks.",
+    "10 AM. The next thing can wait for one good stretch.",
+    "10 AM, neighbor. Pauses belong in the plan too."
   ],
   [
-    "Eleven o'clock. Leave some room for lunch.",
-    "One more small step, if it feels right.",
-    "The morning does not need a perfect ending.",
-    "A pause before the middle of the day.",
-    "You can set something down for a while."
+    "11 AM. Lunch is on the horizon. No need to sprint toward it.",
+    "11 AM, huh? The morning can leave a few loose threads.",
+    "11 AM. One small step, then maybe something crunchy.",
+    "11 AM, neighbor. You can set that thought down for a minute.",
+    "11 AM. The view has no objection to an early breather."
   ],
   [
-    "Noon, neighbor. The view saved you a seat.",
-    "A midday breather is a lovely little plan.",
-    "Perhaps a sandwich and a moment by the water.",
-    "Half a day behind you. Just this moment here.",
-    "Let lunch be more than another thing to finish."
+    "12 PM. Noon, huh? The sandwich committee has a suggestion.",
+    "12 PM. The view saved you a lunch seat.",
+    "12 PM, neighbor. Even big days need little picnics.",
+    "12 PM. Let lunch be lunch. The list can bring its own sandwich.",
+    "12 PM. Half a day behind you, one gentle moment here."
   ],
   [
-    "One in the afternoon. Begin again gently.",
-    "The afternoon can have a smaller plan.",
-    "A fresh sip and an unhurried next step.",
-    "You can ease back in, little by little.",
-    "There is no need to race the lunch break."
+    "1 PM. Welcome back. The afternoon accepts gentle arrivals.",
+    "1 PM, huh? No need to restart at full kettle.",
+    "1 PM. A small step is plenty after a sandwich.",
+    "1 PM, neighbor. The afternoon left room for you.",
+    "1 PM. Let's ease back in at strolling speed."
   ],
   [
-    "Two o'clock has room for a daydream.",
-    "A small step is still a step, neighbor.",
-    "Let the afternoon stretch its legs.",
-    "A change of view can be a little reset.",
-    "Take the next thing at a comfortable pace."
+    "2 PM. A daydream fits nicely in this hour.",
+    "2 PM, huh? The butterflies aren't keeping score.",
+    "2 PM. A little stretch could be the plot twist.",
+    "2 PM, neighbor. You can make the next thing smaller.",
+    "2 PM. The river has chosen a steady, unbothered pace."
   ],
   [
-    "Three o'clock sounds like a tea-sized pause.",
-    "A snack, a stretch, a moment to yourself.",
-    "The river is in no rush this afternoon.",
-    "One tiny thing, then look up again.",
-    "A little breathing room for the middle stretch."
+    "3 PM. A tea-sized pause seems like sound planning.",
+    "3 PM, huh? The snack department would like a word.",
+    "3 PM. One tiny thing, then a little looking up.",
+    "3 PM, neighbor. Your afternoon is allowed a soft spot.",
+    "3 PM. The clouds have been taking breaks all day. Very sensible."
   ],
   [
-    "Four o'clock. Notice what is already done.",
-    "The day can leave a few loose ends.",
-    "A gentle finish begins with one small choice.",
-    "There is room to make the next thing smaller.",
-    "You can take the scenic route through this hour."
+    "4 PM. Notice what's done. The list can wait its turn.",
+    "4 PM, huh? Not every loose end needs tying today.",
+    "4 PM. A gentle finish can begin with a small pause.",
+    "4 PM, neighbor. The scenic route is still a route.",
+    "4 PM. You may leave some adventure for tomorrow."
   ],
   [
-    "Five o'clock, and a chance to change pace.",
-    "Let the busy part of the day loosen its grip.",
-    "A small walk might be a lovely transition.",
-    "Put down one thing before picking up another.",
-    "The evening does not need the whole list."
+    "5 PM. Time to let the busy bits loosen their collars.",
+    "5 PM, huh? A little change of pace sounds lovely.",
+    "5 PM. Put one thing down before picking up the evening.",
+    "5 PM, neighbor. The whole list needn't come to dinner.",
+    "5 PM. A short walk is a perfectly good transition scene."
   ],
   [
-    "Six o'clock brings dinner-sized daydreams.",
-    "A place at the table, a little time to breathe.",
-    "Let this hour be a softer part of the day.",
-    "Something simple can be something lovely.",
-    "A slow hello to your evening, neighbor."
+    "6 PM. Dinner-sized daydreams are welcome here.",
+    "6 PM, huh? Something simple can be something lovely.",
+    "6 PM. The evening has room for a slower fork.",
+    "6 PM, neighbor. Let's leave a little space around the plans.",
+    "6 PM. No need to serve the to-do list a second helping."
   ],
   [
-    "Seven o'clock. Perhaps a little wandering time.",
-    "A book, a stroll, or simply this view.",
-    "There is room for things without a checkbox.",
-    "Let the evening have some unplanned space.",
-    "A quiet little adventure can stay close to home."
+    "7 PM. A book, a stroll, or a very small expedition to the sofa.",
+    "7 PM, huh? Some nice things don't need checkboxes.",
+    "7 PM. An unplanned little hour sounds quite grand.",
+    "7 PM, neighbor. The view is happy to do the entertaining.",
+    "7 PM. The evening has no dress code. Slippers are welcome."
   ],
   [
-    "Eight o'clock has a cozy corner for you.",
-    "The list can wait while you settle in.",
-    "A warm drink and a softer pace.",
-    "Leave a little room for doing very little.",
-    "A gentle evening is a perfectly good plan."
+    "8 PM. The cozy corner is accepting visitors.",
+    "8 PM, huh? A warm drink could be the whole event.",
+    "8 PM. The list can settle in with a blanket too.",
+    "8 PM, neighbor. Doing very little is an available option.",
+    "8 PM. Let's give the evening some comfortable edges."
   ],
   [
-    "Nine o'clock. Start putting the day down.",
-    "A small tidy thought, then a little peace.",
-    "Nothing needs a grand finale tonight.",
-    "The next hour can ask less of you.",
-    "Let a quiet moment be enough, neighbor."
+    "9 PM, huh? The list can put its pajamas on too.",
+    "9 PM. A small tidy thought, then a little peace.",
+    "9 PM, neighbor. Nothing needs a grand finale tonight.",
+    "9 PM. The next hour is allowed to ask less of you.",
+    "9 PM. Even the imaginary village has closed its suggestion box."
   ],
   [
-    "Ten o'clock is a good hour for softer edges.",
-    "You can leave tomorrow a little note.",
-    "Let the unfinished things rest for tonight.",
-    "A last sip, a deep breath, a comfortable pause.",
-    "The day does not need any more proving."
+    "10 PM. Tomorrow can have a note instead of a rehearsal.",
+    "10 PM, huh? The unfinished things have somewhere to sleep.",
+    "10 PM. A last sip and a softer pace sound nice.",
+    "10 PM, neighbor. You can start putting the day down.",
+    "10 PM. The list won't get lonely. It has all those other tasks."
   ],
   [
-    "Eleven o'clock. A gentle goodbye to the day.",
-    "Keep one kind thought and let the rest settle.",
-    "Tomorrow can meet you when it arrives.",
-    "A quiet minute before the calendar turns.",
-    "You have a place to rest your attention here."
+    "11 PM. A gentle goodbye to this particular day.",
+    "11 PM, huh? Tomorrow can introduce itself when it arrives.",
+    "11 PM. Keep one kind thought. The others can find a pillow.",
+    "11 PM, neighbor. The calendar can turn its own page.",
+    "11 PM. A quiet minute is a lovely closing scene."
   ]
 ];
 

@@ -115,3 +115,9 @@ checks cover both directions in narrow/wide Chromium and WebKit scenes.
 - [x] Settings offers a device-local scene-time lock, custom time, Midnight/Noon/Sunrise/Sunset presets, and return to live time. Solar presets follow the current date and selected observer. Task clocks and synced state are unchanged.
 - [x] 120 short comments give each of the 24 hours five distinct lines without seasonal suffixes.
 - [x] Regression checks cover reflection bounds, time persistence, solar presets, every hourly message, and browser return-to-live behavior. Narrow, short-landscape, and desktop night renders reviewed in Chromium and WebKit.
+
+## Kind hours and occasional night visitors
+
+- [x] Every one of the 120 comments explicitly names its hour, with gentle humor and no guilt. Removed the location caption from the intro; location preferences remain available in Settings.
+- [x] Most daytime event types can now be selected after dark. Night scheduling remains under one-quarter morning frequency, and three-quarters of nighttime selections stay with familiar night visitors. Existing night color shading applies to the expanded cast.
+- [x] Dolphins make brief, single, scheduled harbor visits, with an additional rarity check and a bounded surface arc. They share the harbor traffic cap and never form the opening cast.

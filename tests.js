@@ -141,7 +141,7 @@ test("Landscape location: actual coordinates change the sky and polar day return
 
 test("Landscape: daytime life includes a duck visit and the new bounded animal set", () => {
   const sky = livingSky();
-  assert.deepEqual([...sky.eventTypes], ["cyclist", "bird", "balloon", "train", "metro", "plane", "duck", "fish", "butterfly", "rabbit", "deer", "kite", "reader", "picnic", "couple", "walker", "airshow", "banner", "hangglider", "jetski", "sailboat", "cruise", "yacht"]);
+  assert.deepEqual([...sky.eventTypes], ["cyclist", "bird", "balloon", "train", "metro", "plane", "duck", "fish", "butterfly", "rabbit", "deer", "kite", "reader", "picnic", "couple", "walker", "airshow", "banner", "hangglider", "jetski", "sailboat", "cruise", "yacht", "dolphin"]);
   assert.deepEqual([...sky.rareTypes], ["abduction"]);
   const world = sky.createWorld(() => 0.99);
   assert.equal(world.events.length, 3, "opening life is a small cast");
@@ -8404,4 +8404,30 @@ test('Landscape browser: scene time presets persist and return to live without c
   assert.equal(await page.evaluate(()=>LivingSky.readSceneTime(localStorage)),null);assert.equal(await page.evaluate(()=>JSON.stringify(state.tasks)),tasks);
   await page.locator('[data-scene-time="close"]').click();assert.equal(await page.locator('[data-act="scene-time-settings"]').evaluate(e=>e===document.activeElement),true);
  }finally{await browser.close();}
+});
+
+test('Landscape comments explicitly name their hour and the intro has no location caption',()=>{
+ const ctx=vm.createContext({Date,Intl,Math,JSON});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-mood.js'),'utf8'),ctx);
+ for(const entry of ctx.LandscapeMood.messageCatalog){const label=`${entry.hour%12||12} ${entry.hour<12?'AM':'PM'}`;assert.ok(entry.text.includes(label),`every comment must explicitly say ${label}: ${entry.text}`);}
+ const intro=html.split('<div class="scene-details">')[1].split('</div>')[0];assert.doesNotMatch(intro,/id="sceneTime"/);
+});
+
+test('Landscape night: most daytime visitors remain possible at a much quieter pace',()=>{
+ const sky=livingSky();
+ for(const type of sky.eventTypes.filter(t=>!['bird','butterfly'].includes(t)))assert.ok(sky.nightEventTypes.includes(type),`${type} can visit after dark`);
+ assert.ok(sky.activity({sun:{altitude:-20,azimuth:0}})<sky.activity({sun:{altitude:20,azimuth:90}})/3);
+ const runtime=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ assert.doesNotMatch(runtime,/if\(sky.sun.altitude < -6\)return;/);
+ assert.doesNotMatch(runtime,/if\(sky.sun.altitude < -6 && e.type!=='abduction'\)/);
+});
+
+test('Landscape dolphins: occasional brief visits follow a bounded harbor arc in both directions',()=>{
+ const sky=livingSky();assert.ok(sky.eventTypes.includes('dolphin'));assert.ok(sky.eventDurations.dolphin<=10);
+ assert.ok(!sky.createWorld(()=>.999).events.some(e=>e.type==='dolphin'),'dolphins are a scheduled surprise');
+ const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
+ for(const [w,h] of [[320,568],[844,390],[1440,900]]){
+  const g=ctx.LandscapeGeometry.create(w,h);
+  for(const reverse of [false,true]){const a=g.dolphin(.1,.5,reverse),b=g.dolphin(.5,.5,reverse),c=g.dolphin(.9,.5,reverse);assert.ok(b.y<a.y);assert.ok(b.y>g.waterTop);assert.ok(b.waterY<g.far(b.x));assert.equal(Math.sign(c.x-a.x),reverse?-1:1);}
+ }
+ assert.match(fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),/geometry\.dolphin\(/);
 });

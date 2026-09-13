@@ -95,12 +95,13 @@
   }
   function activity(sky){return sky.sun.altitude < -6?.24:sky.sun.azimuth<180?1:.65;}
   const MAX_EVENTS=14,RARE_COOLDOWN=420;
-  const EVENT_TYPES=['cyclist','bird','balloon','train','metro','plane','duck','fish','butterfly','rabbit','deer','kite','reader','picnic','couple','walker','airshow','banner','hangglider','jetski','sailboat','cruise','yacht'];
+  const EVENT_TYPES=['cyclist','bird','balloon','train','metro','plane','duck','fish','butterfly','rabbit','deer','kite','reader','picnic','couple','walker','airshow','banner','hangglider','jetski','sailboat','cruise','yacht','dolphin'];
   const RARE_TYPES=['abduction'];
-  const NIGHT_TYPES=['meteor','metro','plane'];
-  const WATER_TYPES=['jetski','sailboat','cruise','yacht'];
-  const EVENT_DURATIONS={duck:80,fish:5,butterfly:35,rabbit:22,deer:55,kite:90,reader:140,picnic:150,couple:120,walker:60,airshow:40,banner:100,hangglider:90,meteor:1.8,jetski:32,sailboat:140,cruise:180,yacht:95};
-  const INITIAL_TYPES=EVENT_TYPES.slice();
+  const NIGHT_TYPES=['meteor',...EVENT_TYPES.filter(type=>!['bird','butterfly'].includes(type))];
+  const NIGHT_REGULARS=['meteor','metro','plane'];
+  const WATER_TYPES=['jetski','sailboat','cruise','yacht','dolphin'];
+  const EVENT_DURATIONS={dolphin:8,duck:80,fish:5,butterfly:35,rabbit:22,deer:55,kite:90,reader:140,picnic:150,couple:120,walker:60,airshow:40,banner:100,hangglider:90,meteor:1.8,jetski:32,sailboat:140,cruise:180,yacht:95};
+  const INITIAL_TYPES=EVENT_TYPES.filter(type=>type!=='dolphin');
   function createWorld(random=Math.random){
     const world={random,elapsed:0,events:[],next:3+random()*6,lastRare:-RARE_COOLDOWN,rareCount:0,wind:.6+random()*1.2};
     // Start mid-journey so returning never waits for a first event. Pick three
@@ -113,9 +114,10 @@
     return world;
   }
   function spawn(w,type,initial=false){
-    if(['banner','meteor','bird'].includes(type)&&w.events.some(e=>e.type===type))return;
+    if(['banner','meteor','bird','dolphin'].includes(type)&&w.events.some(e=>e.type===type))return;
     if(WATER_TYPES.includes(type)&&w.events.filter(e=>WATER_TYPES.includes(e.type)).length>=2)return;
     const r=w.random;
+    if(type==='dolphin'&&r()>.35)return; // A short, occasional surprise, never an opening attraction.
     const base=EVENT_DURATIONS[type]|| (type==='abduction'?24:type==='bird'?28:type==='balloon'?150:type==='plane'?95:48+r()*50);
     const duration=base*(type==='abduction'?1:.8+r()*.4);
     w.events.push({type,age:initial?duration*(.15+r()*.45):0,duration,lane:r(),seed:r(),reverse:r()>.5});
@@ -131,7 +133,8 @@
         if(w.elapsed-w.lastRare>=RARE_COOLDOWN && r()<.025){
           spawn(w,'abduction');w.lastRare=w.elapsed;w.rareCount++;
         }else{
-          const type=sky.sun.altitude < -6 ? NIGHT_TYPES[Math.min(NIGHT_TYPES.length-1,Math.floor(r()*NIGHT_TYPES.length))] : EVENT_TYPES[Math.min(EVENT_TYPES.length-1,Math.floor(clamp(r(),0,1-.0000001)*EVENT_TYPES.length))];
+          const choices=sky.sun.altitude < -6?(r()<.75?NIGHT_REGULARS:NIGHT_TYPES):EVENT_TYPES;
+          const type=choices[Math.min(choices.length-1,Math.floor(clamp(r(),0,1-.0000001)*choices.length))];
           spawn(w,type);
         }
       }
