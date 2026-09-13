@@ -3729,7 +3729,7 @@ test("UI: once scanning starts it's Yes/No — no Can button, no chain-start que
   assert.match(scanHtml, /data-act="delete-task"/, "Delete should still be available");
 });
 
-test("UI: Quick start displays the requested eleven steps in order", async () => {
+test("UI: Quick start displays the requested seven steps in order", async () => {
   const { ctx, shim } = await loadApp();
   ctx.openHelp();
   const markup = shim.elements.get("modalRoot").innerHTML;
@@ -3738,18 +3738,14 @@ test("UI: Quick start displays the requested eleven steps in order", async () =>
   const steps = [...list.matchAll(/<li>([\s\S]*?)<\/li>/g)]
     .map(match => match[1].replace(/<[^>]+>/g, "").replace(/&amp;/g, "&"));
   assert.deepEqual(steps, [
-    "Add tasks to the bottom of your list as you think of them.",
-    "Done adding? Hit Start scanning. Your oldest outstanding task is dotted and becomes the first task on your list. Then the scanner starts dealing you tasks in descending order of your likelihood to complete it.",
-    "For each task, you will have to decide: do you want to do it before the highlighted benchmark?",
-    "Yes dots it — it gets added to the chain of todos you need to do.",
-    "No skips it (and nudges its rank down in terms of likelihood for you to want to do it). Can’t skips it with no rank signal.",
-    "When you are done, click done scanning.",
-    "Do the dotted todo list from the bottom to the top.",
-    "Can’t get to a todo you added to the chain? Can’t takes it off the chain and puts it back in the scan by itself once your Can’t window passes; Dislodge takes it off for the rest of the pass. Neither moves its rank.",
-    "Either finish a task and cross it off, or use ↻ Worked on it to cross it off and send it back to the bottom — it stays out of the scan for the window set in Settings, or until 02:00 the next day, whichever comes first.",
-    "Urgent task? Add & dot from edit for a task puts it straight on the todo list so it’s done first.",
-    "Tap a context chip in the Add a task panel to tag what you’re about to add — this allows you to more easily filter todos.",
-  ]);
+    "Add tasks. You can tag them with contexts and enable contexts so that todos that NEED to match that context are surfaced. If the context is not enabled, those todos are not surfaced.",
+    "Then hit start scanning.",
+    "The oldest task outstanding and not blocked on your list is added to a “chain” of todos you need to do in order.",
+    "Then, you are presented with candidates to add to the todo list in descending order of your likelihood to want to add it to your chain. You can hit yes, improving its rank via trueskill rating, or no, to decrease its chance of coming up again.",
+    "You can also hit can’t, which will snooze the task for a duration you’ve configured in settings.",
+    "You will continue until either you hit done scanning, or the app recognizes the chances of you finding a better task dips below 25% (percentage configurable in settings menu) in which case it will gently nudge you to stop searching for a new todo.",
+    "Once you’re done scanning, you will be presented with a chain of todos you will need to complete from the bottom of the “chain” up to the top, marking tasks as done, worked on (sends it back to the todo list for later) or can’t / dislodge."
+]);
 });
 
 test("UI: help describes Start scanning rather than a Can/Can't step", async () => {
@@ -3757,8 +3753,8 @@ test("UI: help describes Start scanning rather than a Can/Can't step", async () 
   ctx.openHelp();
   const helpHtml = shim.elements.get("modalRoot").innerHTML;
 
-  assert.match(helpHtml, /Start scanning/, "help should name the button that starts a chain");
-  assert.match(helpHtml, /oldest outstanding task/, "the rule itself hasn't changed — oldest first");
+  assert.match(helpHtml, /start scanning/i, "help should name the button that starts a chain");
+  assert.match(helpHtml, /oldest task outstanding and not blocked/, "the rule itself hasn't changed — oldest first");
   assert.ok(!/Answer <b>Can<\/b>/.test(helpHtml), "the Can/Can't instruction should be gone");
 });
 
@@ -9233,4 +9229,12 @@ test('Scene seen history: interleaved tab writes cannot overwrite different obse
   const reload=moodRuntime();reload.configureHistory(storage,()=>1000000000);
   reload.setHumanText('## Hour 15\n- One\n- Two\n- Three');
   assert.equal(reload.message(new Date('2026-08-11T15:00:00Z'),'UTC',0),'Three');
+});
+
+test('Scene copy: AI sentences have no authorship tag while human sentences retain theirs', () => {
+  const source = fs.readFileSync(path.join(__dirname, 'landscape.js'), 'utf8');
+  const assignment = source.match(/status\.textContent=([^;]+);/)[1];
+  const render = entry => vm.runInNewContext(assignment, { entry });
+  assert.equal(render({text:'A quiet afternoon.',author:'AI'}), 'A quiet afternoon.');
+  assert.equal(render({text:'A human line.',author:'Human'}), 'A human line. · Human written');
 });

@@ -659,7 +659,7 @@
     document.documentElement.dataset.scenePeriod=sky.period;
     const entry=LandscapeMood.messageEntry(sky.date,{...location,sunAltitude:sky.sun.altitude},Math.random);
     currentEntry=entry;
-    status.textContent=entry.text+' · '+entry.author+' written';
+    status.textContent=entry.text+(entry.author==='Human'?' · Human written':'');
     paintBackground();paintLife(world.elapsed);
   }
   function resize(){
