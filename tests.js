@@ -8103,13 +8103,13 @@ test('Landscape browser: every visitor renders with finite geometry across short
 
  test('Landscape mood: seasons, clock hands and a time-specific message catalog work offline',()=>{
  const context=vm.createContext({Date,Intl,Math,JSON});
- vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-mood.js'),'utf8'),context);
+ vm.runInContext(fs.readFileSync(path.join(__dirname,'vendor/astronomy.min.js'),'utf8'),context);vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-mood.js'),'utf8'),context);
  const mood=context.LandscapeMood;const hexLuminance=landscapeLuminance;
   const date = value => new Date(value);
 
   assert.equal(mood.season(date('2026-03-20T16:00:00Z'), 28.5, 'America/New_York').name, 'spring');
   assert.equal(mood.season(date('2026-06-21T16:00:00Z'), 28.5, 'America/New_York').name, 'summer');
-  assert.equal(mood.season(date('2026-12-21T16:00:00Z'), -33.9, 'Australia/Sydney').name, 'summer');
+  assert.equal(mood.season(date('2026-12-21T22:00:00Z'), -33.9, 'Australia/Sydney').name, 'summer');
   const blend = mood.season(date('2026-06-16T16:00:00Z'), 28.5, 'America/New_York');
   assert.ok(blend.weights.spring >= 0 && blend.weights.spring < 1);
   assert.ok(Math.abs(Object.values(blend.weights).reduce((sum, value) => sum + value, 0) - 1) < 1e-8);
@@ -8150,12 +8150,12 @@ test('Landscape browser: every visitor renders with finite geometry across short
 });
 
 test('Landscape mood: sunrise copy does not describe sunset',()=>{
- const ctx=vm.createContext({Date,Intl,Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-mood.js'),'utf8'),ctx);
+ const ctx=vm.createContext({Date,Intl,Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'vendor/astronomy.min.js'),'utf8'),ctx);vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-mood.js'),'utf8'),ctx);
  assert.equal(ctx.LandscapeMood.period(new Date('2026-09-12T11:30:00Z'),{timezone:'America/New_York',sunAltitude:3}),'morning');
 });
 
 test('Landscape clock tower follows device local time instead of saved sky location',()=>{
- const ctx=vm.createContext({Date,Intl,Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-mood.js'),'utf8'),ctx);
+ const ctx=vm.createContext({Date,Intl,Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'vendor/astronomy.min.js'),'utf8'),ctx);vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-mood.js'),'utf8'),ctx);
  const date=new Date('2026-09-12T15:30:00Z');
  const zone=Intl.DateTimeFormat().resolvedOptions().timeZone;
  const local=ctx.LandscapeMood.clock(date);
@@ -8240,7 +8240,7 @@ test('Landscape waterfront: water visitors are occasional and have distinct trav
 test('Landscape intro: cozy short copy keeps the scenic pane compact',()=>{
  const runtime=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
  assert.match(runtime,/status\.textContent=entry\.text/);
- const mood=vm.createContext({Date,Intl,Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-mood.js'),'utf8'),mood);
+ const mood=vm.createContext({Date,Intl,Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'vendor/astronomy.min.js'),'utf8'),mood);vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-mood.js'),'utf8'),mood);
  for(const entry of mood.LandscapeMood.messageCatalog)assert.ok(entry.text.length<=110,'cozy messages stay short');
  assert.ok(mood.LandscapeMood.messageCatalog.some(entry=>/neighbor|pocket|tea/.test(entry.text)));
  const css=fs.readFileSync(path.join(__dirname,'landscape.css'),'utf8');
@@ -8425,11 +8425,11 @@ test('Landscape water: visible stars mirror into the lake with bounded drift',()
 test('Landscape time: solar presets follow the date and saved observer',()=>{
  const sky=livingSky(),values=new Map(),storage={getItem:k=>values.get(k),setItem:(k,v)=>values.set(k,v),removeItem:k=>values.delete(k)},location={latitude:28.5,longitude:-81.4,timezone:'America/New_York'},now=new Date('2026-09-12T16:00:00Z');
  for(const [preset,key] of [['sunrise','rise'],['sunset','set']]){assert.equal(sky.saveSceneTime(storage,preset),true);assert.equal(sky.sceneDate(now,storage,location).getTime(),sky.sunTimes(now,location)[key].getTime());}
- for(const preset of ['00:00','12:00','sunrise','sunset'])assert.ok(html.includes(`data-scene-preset="${preset}"`));
+ for(const preset of ['00:00','12:00','solar'])assert.ok(html.includes(`data-scene-preset="${preset}"`));
 });
 
 test('Landscape messages: every hour has five distinct short, season-independent comments',()=>{
- const ctx=vm.createContext({Date,Intl,Math,JSON});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-mood.js'),'utf8'),ctx);const mood=ctx.LandscapeMood;
+ const ctx=vm.createContext({Date,Intl,Math,JSON});vm.runInContext(fs.readFileSync(path.join(__dirname,'vendor/astronomy.min.js'),'utf8'),ctx);vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-mood.js'),'utf8'),ctx);const mood=ctx.LandscapeMood;
  for(let hour=0;hour<24;hour++){
   const entries=mood.messageCatalog.filter(e=>e.hour===hour);assert.equal(entries.length,5);assert.equal(new Set(entries.map(e=>e.text)).size,5);
   const date=new Date(Date.UTC(2026,5,20,hour));
@@ -8446,19 +8446,21 @@ test('Landscape browser: scene time presets persist and return to live without c
   await page.goto(process.env.LANDSCAPE_BROWSER_URL);await page.locator('#modalRoot [data-act="close-modal"]').click();
   const tasks=await page.evaluate(()=>JSON.stringify(state.tasks));
   await page.evaluate(()=>openSettings());await page.locator('[data-act="scene-time-settings"]').click();
+  assert.equal(await page.locator('#sceneTimeDialog').evaluate(e=>e.scrollHeight>e.clientHeight),false,'time controls fit a typical phone without hiding Close');
+  const timeBox=await page.locator('#sceneTimeInput').boundingBox(),seasonLabel=await page.locator('[for="sceneSeasonInput"]').boundingBox();assert.ok(seasonLabel.y>=timeBox.y+timeBox.height+8,'Season has its own clearly separated field');
   await page.locator('[data-scene-preset="00:00"]').click();assert.equal(await page.locator('#sceneTimeInput').inputValue(),'00:00');assert.equal(await page.evaluate(()=>document.documentElement.dataset.scenePeriod),'night');
   await page.locator('[data-scene-preset="12:00"]').click();assert.equal(await page.evaluate(()=>document.documentElement.dataset.scenePeriod),'day');
-  await page.locator('[data-scene-preset="sunset"]').click();assert.equal(await page.evaluate(()=>LivingSky.readSceneTime(localStorage)),'sunset');
-  await page.locator('#sceneTimeInput').fill('23:15');await page.locator('[data-scene-time="lock"]').click();
-  await page.reload();assert.equal(await page.evaluate(()=>LivingSky.readSceneTime(localStorage)),'23:15');assert.equal(await page.evaluate(()=>document.documentElement.dataset.scenePeriod),'night');
+  await page.locator('[data-scene-preset="solar"]').click();await page.locator('[data-scene-preset="solar"]').click();assert.equal(await page.evaluate(()=>LivingSky.readSceneTime(localStorage)),'sunset');
+  await page.locator('#sceneSeasonInput').selectOption('winter');await page.locator('#sceneTimeInput').fill('23:15');await page.locator('[data-scene-time="lock"]').click();
+  await page.reload();assert.equal(await page.evaluate(()=>LivingSky.readSceneSeason(localStorage)),'winter');assert.equal(await page.evaluate(()=>LivingSky.readSceneTime(localStorage)),'23:15');assert.equal(await page.evaluate(()=>document.documentElement.dataset.scenePeriod),'night');
   await page.evaluate(()=>openSettings());await page.locator('[data-act="scene-time-settings"]').click();await page.locator('[data-scene-time="live"]').click();
-  assert.equal(await page.evaluate(()=>LivingSky.readSceneTime(localStorage)),null);assert.equal(await page.evaluate(()=>JSON.stringify(state.tasks)),tasks);
-  await page.locator('[data-scene-time="close"]').click();assert.equal(await page.locator('[data-act="scene-time-settings"]').evaluate(e=>e===document.activeElement),true);
+  assert.equal(await page.evaluate(()=>LivingSky.readSceneSeason(localStorage)),null);assert.equal(await page.evaluate(()=>LivingSky.readSceneTime(localStorage)),null);assert.equal(await page.evaluate(()=>JSON.stringify(state.tasks)),tasks);
+  await page.locator('[data-scene-time="close"]').click();assert.equal(await page.locator('[data-act="scene-time-settings"]').evaluate(e=>e===document.activeElement),true);await page.getByText('Changelog',{exact:true}).click();assert.ok(await page.getByText('Cyclists pedal with connected hips and naturally bending knees.').isVisible());
  }finally{await browser.close();}
 });
 
 test('Landscape comments explicitly name their hour and the intro has no location caption',()=>{
- const ctx=vm.createContext({Date,Intl,Math,JSON});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-mood.js'),'utf8'),ctx);
+ const ctx=vm.createContext({Date,Intl,Math,JSON});vm.runInContext(fs.readFileSync(path.join(__dirname,'vendor/astronomy.min.js'),'utf8'),ctx);vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-mood.js'),'utf8'),ctx);
  for(const entry of ctx.LandscapeMood.messageCatalog){const label=`${entry.hour%12||12} ${entry.hour<12?'AM':'PM'}`;assert.ok(entry.text.includes(label),`every comment must explicitly say ${label}: ${entry.text}`);}
  const intro=html.split('<div class="scene-details">')[1].split('</div>')[0];assert.doesNotMatch(intro,/id="sceneTime"/);
 });
@@ -8551,7 +8553,7 @@ test('Landscape skating: random visitors follow path slope and face their travel
 
 function moodRuntime() {
   const context = vm.createContext({ Date, Intl, Math, JSON });
-  vm.runInContext(fs.readFileSync(path.join(__dirname, "landscape-mood.js"), "utf8"), context, {
+  vm.runInContext(fs.readFileSync(path.join(__dirname,'vendor/astronomy.min.js'),'utf8'),context);vm.runInContext(fs.readFileSync(path.join(__dirname, "landscape-mood.js"), "utf8"), context, {
     filename: "landscape-mood.js",
   });
   return context.LandscapeMood;
@@ -8833,7 +8835,7 @@ test('Animation audit: steady thirty-frame pacing across display refresh rates',
  const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
  const tick=source.slice(source.indexOf('  function tick(now){'),source.indexOf('  function stop(){'));
  for(const hz of [60,90,120,144]){
-  const paints=[],ctx=vm.createContext({reduced:false,document:{hidden:false},frame:0,last:0,lastPaint:0,nextPaint:0,world:{elapsed:0},sky:{},cityLights:{},p:{night:0},Math,requestAnimationFrame(){return 1;},S:{advance(w,dt){w.elapsed+=dt;},advanceLights(){return false;}},paintLife(){paints.push(ctx.now);}});
+  const paints=[],ctx=vm.createContext({reduced:false,document:{hidden:false},frame:0,last:0,lastPaint:0,nextPaint:0,world:{elapsed:0},woodland:{},sky:{},cityLights:{},p:{night:0},Math,requestAnimationFrame(){return 1;},S:{advance(w,dt){w.elapsed+=dt;},advanceWoodland(){},advanceLights(){return false;}},paintLife(){paints.push(ctx.now);}});
   vm.runInContext(tick,ctx);
   for(let i=1;i<=hz*2;i++){ctx.now=i*1000/hz;vm.runInContext('tick(now)',ctx);}
   assert.ok(paints.length>=59&&paints.length<=61,`${hz}Hz produced ${paints.length} paints in two seconds; expected about 60`);
@@ -9238,4 +9240,248 @@ test('Scene copy: AI sentences have no authorship tag while human sentences reta
   const render = entry => vm.runInNewContext(assignment, { entry });
   assert.equal(render({text:'A quiet afternoon.',author:'AI'}), 'A quiet afternoon.');
   assert.equal(render({text:'A human line.',author:'Human'}), 'A human line. · Human written');
+});
+
+
+test('Scene season: validated persistent seasons select hemisphere-aware dates and reset',()=>{
+ const sky=livingSky(),values=new Map(),storage={getItem:k=>values.get(k),setItem:(k,v)=>values.set(k,v),removeItem:k=>values.delete(k)},now=new Date(2026,8,13,14,30);
+ assert.equal(typeof sky.saveSceneSeason,'function');
+ for(const latitude of [28.5,-33.9])for(const [season,month] of [['spring',3],['summer',6],['autumn',9],['winter',0]]){
+  assert.equal(sky.saveSceneSeason(storage,season),true);
+  const date=sky.sceneDate(now,storage,{latitude});assert.equal(date.getMonth(),(month+(latitude<0?6:0))%12);assert.equal(date.getDate(),15);assert.equal(date.getHours(),14);
+ }
+ assert.equal(sky.saveSceneSeason(storage,'bad'),false);assert.equal(sky.readSceneSeason(storage),'winter');
+ sky.saveSceneSeason(storage,null);assert.equal(+sky.sceneDate(now,storage),+now);
+ assert.match(html,/id="sceneSeasonInput"/);assert.doesNotMatch(html,/data-scene-preset="sun(?:rise|set)"/);
+ assert.equal(sky.saveSceneSeason({setItem(){throw Error();}},'summer'),false);
+});
+
+test('Cyclist knees: both legs attach to the seated hip and bend forward through a full revolution',()=>{
+ const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
+ const geometry=ctx.LandscapeGeometry.create(1000,800);
+ for(let i=0;i<=120;i++)for(const offset of [0,.5]){
+  const leg=geometry.cycleLeg(i*Math.PI/360,offset);
+  assert.equal(leg.hipX,-1);assert.equal(leg.hipY,-6);
+  assert.ok(leg.kneeX>leg.hipX,'knees stay ahead of the hip');
+  assert.ok(Math.abs(Math.hypot(leg.kneeX-leg.hipX,leg.kneeY-leg.hipY)-4.5)<1e-9);
+  assert.ok(Math.abs(Math.hypot(leg.kneeX-leg.footX,leg.kneeY-leg.footY)-4.5)<1e-9);
+  assert.ok(Math.abs(Math.hypot(leg.footX-2,leg.footY)-1.7)<1e-9);
+ }
+ assert.match(fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),/line\(g,leg.hipX,leg.hipY,leg.kneeX/);
+});
+
+test('Settings changelog: every app asset change requires a current changelog entry',()=>{
+ const match=html.match(/<!-- changelog:start -->([\s\S]*?)<!-- changelog:end -->/);
+ assert.ok(match,'Settings must contain a changelog');
+ assert.match(match[1],/Sunrise \/ Sunset/);assert.match(match[1],/season/i);assert.match(match[1],/cyclist/i);
+ const hash=createHash('sha256');
+ // Normalize the embedded changelog and worker cache key to avoid circular hashes.
+ for(const file of [...appShellContract(serviceWorkerSource()).localPaths,'sw.js'].sort()){
+  let data=fs.readFileSync(path.join(__dirname,file));
+  if(file==='index.html')data=Buffer.from(data.toString().replace(/<!-- changelog:start -->[\s\S]*?<!-- changelog:end -->/,'<!-- changelog -->'));
+  if(file==='sw.js')data=Buffer.from(data.toString().replace(/chain-scanner-shell-[a-f0-9]+/,'chain-scanner-shell-HASH'));
+  hash.update(file+'\0');hash.update(data);hash.update('\0');
+ }
+ assert.ok(match[1].includes('data-app-fingerprint="'+hash.digest('hex')+'"'),'App changed: add a dated changelog entry describing the changes and refresh its app fingerprint');
+});
+
+test('Ducks: seeded occasional takeoffs lift continuously from the water and leave in either direction',()=>{
+ const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
+ for(const [w,h] of [[320,568],[844,390],[1440,900]])for(const reverse of [false,true]){
+  const g=ctx.LandscapeGeometry.create(w,h),e={age:0,duration:80,lane:.5,seed:.8,reverse};
+  assert.equal(typeof g.duckPose,'function');
+  const start=e.duration*(.35+e.seed*.15);
+  const before=g.duckPose({...e,age:start-1e-6},start-1e-6),at=g.duckPose({...e,age:start},start),after=g.duckPose({...e,age:start+1e-6},start+1e-6);
+  assert.ok(Math.hypot(before.x-after.x,before.y-after.y)<.001,'no teleport at takeoff');assert.equal(at.flying,false);
+  const flying=g.duckPose({...e,age:start+5},start+5);assert.equal(flying.flying,true);assert.ok(flying.y<at.y-15);
+  const end=g.duckPose({...e,age:80},80);assert.ok(reverse?end.x< -20:end.x>w+20,'flies off screen before expiry');
+  assert.equal(g.duckPose({...e,seed:.3,age:60},60).flying,false,'some visits keep swimming');
+  assert.notEqual(g.duckPose({...e,age:start+.2},start+.2,0).flying,g.duckPose({...e,age:start+.2},start+.2,1).flying,'companions take off with a slight stagger');
+ }
+ assert.match(fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),/geometry\.duckPose\(/);
+});
+
+test('Scene scale: water depth and vessel class preserve small-craft versus ship proportions',()=>{
+ const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
+ for(const [w,h] of [[320,568],[390,844],[844,390],[1440,900]]){
+  const g=ctx.LandscapeGeometry.create(w,h);
+  for(const kind of ['windsurfer','jetski','sailboat','yacht','cruise','duck']){
+   const scales=[0,.5,1].map(lane=>g.vessel(kind,lane,w/2,0).scale);
+   assert.ok(scales[0]<scales[1]&&scales[1]<scales[2],kind+' must shrink into the distance');
+   assert.equal(g.vessel(kind,0,w/2,0,true).scale,scales[0]);
+  }
+  const farSurf=g.vessel('windsurfer',0,w/2,0).scale,nearSurf=g.vessel('windsurfer',1,w/2,0).scale,farShip=g.vessel('cruise',0,w/2,0).scale;
+  assert.ok(27*nearSurf<26*farShip*.75,'even a near windsurf sail is distinctly shorter than a distant ship');
+  assert.ok(20*farSurf<72*farShip*.2,'small distant boards cannot rival ship hulls');
+  assert.equal(g.dolphin(.5,0).scale,g.dolphin(.5,1).scale,'dolphin lane changes horizontal position on one fixed-depth course');
+ }
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ assert.match(source,/p.sky\[2\],scale\)/,'wake stroke scales with the vessel');
+ assert.match(source,/isTrain\?1:\.72/,'distant metro has smaller carriages than the foreground train');
+});
+
+test('Astronomy seasons: real equinox instants, leap years, hemispheres and local dates agree with USNO',()=>{
+ const ctx=vm.createContext({Date,Intl,Math,JSON});
+ for(const file of ['vendor/astronomy.min.js','landscape-mood.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,file),'utf8'),ctx);
+ const mood=ctx.LandscapeMood;
+ // USNO Earth's Seasons 2026: March equinox 14:46 UTC (minute precision).
+ const before=new Date('2026-03-20T14:40:00Z'),after=new Date('2026-03-20T14:50:00Z');
+ for(const timezone of ['America/New_York','Pacific/Honolulu','Pacific/Kiritimati','Australia/Sydney']){
+  assert.equal(mood.season(before,28.5,timezone).name,'winter');
+  assert.equal(mood.season(after,28.5,timezone).name,'spring');
+  assert.equal(mood.season(before,-33.9,timezone).name,'summer');
+  assert.equal(mood.season(after,-33.9,timezone).name,'autumn');
+ }
+ const season=mood.season(after,28.5,'Pacific/Kiritimati');
+ assert.ok(Math.abs(+season.start-Date.parse('2026-03-20T14:46:00Z'))<90000);
+ assert.equal(new Intl.DateTimeFormat('en-US',{timeZone:'Pacific/Kiritimati',day:'numeric'}).format(season.start),'21');
+ for(const year of [2024,2026,2027,2028])for(const [key,name] of [['mar_equinox','spring'],['jun_solstice','summer'],['sep_equinox','autumn'],['dec_solstice','winter']]){
+  const boundary=ctx.Astronomy.Seasons(year)[key].date;
+  const current=mood.season(boundary,40,'America/New_York');assert.equal(current.name,name);assert.equal(+current.start,+boundary);assert.ok(current.end>boundary);
+  assert.notEqual(mood.season(new Date(+boundary-1),40,'America/New_York').name,name);
+  assert.equal(current.weights[name],.5);
+ }
+});
+
+test('Foreground wildlife: independent one-percent thirty-second rolls allow zero to four animals',()=>{
+ const sky=livingSky();assert.equal(typeof sky.createWoodland,'function');
+ for(const [roll,expected] of [[0,1],[.009999,1],[.01,0],[.5,0]]){
+  let calls=0;const wood=sky.createWoodland(()=>{calls++;return roll;});
+  sky.advanceWoodland(wood,29.99);assert.equal(calls,0);assert.equal(wood.events.length,0);
+  sky.advanceWoodland(wood,.01);assert.equal(wood.events.length,expected);
+ }
+ const wood=sky.createWoodland(()=>0),other=sky.createWorld(()=>.5),before=JSON.stringify(other);
+ for(let i=0;i<5;i++)sky.advanceWoodland(wood,30);
+ assert.equal(wood.events.length,4);assert.equal(JSON.stringify(other),before,'woodland never consumes or modifies the ordinary event pool');
+ sky.advanceWoodland(wood,NaN);assert.equal(wood.elapsed,150);
+ wood.random=()=>1;sky.advanceWoodland(wood,300);assert.equal(wood.events.length,0,'visits expire rather than accumulating');
+ assert.deepEqual([...sky.woodlandTypes],['deer','fox','rabbit','raccoon']);
+ const runtime=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');assert.match(runtime,/S\.advanceWoodland\(woodland,dt\)/);assert.match(runtime,/paintWoodland\(/);
+});
+
+test('Foreground wildlife: wandering stays in the dark forest at every viewport and faces its travel direction',()=>{
+ const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
+ for(const [w,h] of [[320,568],[390,844],[844,390],[1440,900]]){
+  const g=ctx.LandscapeGeometry.create(w,h);assert.equal(typeof g.woodlandPose,'function');
+  for(const reverse of [false,true])for(const seed of [0,.25,.5,.99])for(let age=0;age<=180;age+=3){
+   const pose=g.woodlandPose({age,duration:180,seed,lane:seed,reverse});
+   assert.ok(pose.x>15&&pose.x<w-15);assert.ok(pose.y>g.near(pose.x));assert.ok(pose.y<h-8);assert.ok(pose.y>h*.7);
+   assert.ok(Number.isFinite(pose.distance));assert.ok(pose.scale>1,'foreground animals are larger than their meadow counterparts');
+  }
+ }
+});
+
+test('Visitor lifecycle: picnics pack up, guests stand and walk fully out in either direction',()=>{
+ const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
+ for(const [w,h] of [[320,568],[844,390],[1440,900]])for(const reverse of [false,true]){
+  const g=ctx.LandscapeGeometry.create(w,h);assert.equal(typeof g.visitPose,'function');
+  const e={lane:.5,reverse},settled=g.visitPose(e,.5),packing=g.visitPose(e,.77),leaving=g.visitPose(e,.9),gone=g.visitPose(e,1);
+  assert.equal(settled.pack,0);assert.equal(settled.stand,0);assert.ok(packing.pack>0&&packing.pack<1);assert.equal(leaving.pack,1);assert.equal(leaving.stand,1);
+  assert.ok(reverse?leaving.x<settled.x:leaving.x>settled.x);assert.ok(reverse?gone.x< -50:gone.x>w+50);
+  assert.equal(leaving.y,g.trail(leaving.x)+19);
+  for(const boundary of [.12,.72,.76,.82]){const a=g.visitPose(e,boundary-1e-6),b=g.visitPose(e,boundary+1e-6);assert.ok(Math.hypot(a.x-b.x,a.y-b.y)<.01);}
+ }
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');assert.match(source,/geometry\.visitPose\(/);assert.match(source,/1-visit.pack/);
+});
+
+test('Astronomy location: solar season locks use the observer calendar and star rotations remain supported',()=>{
+ const sky=livingSky(),values=new Map(),storage={getItem:k=>values.get(k),setItem:(k,v)=>values.set(k,v)},now=new Date('2026-09-12T16:00:00Z');
+ sky.saveSceneSeason(storage,'spring');sky.saveSceneTime(storage,'sunrise');
+ for(const location of [{latitude:35.67,longitude:139.65,timezone:'Asia/Tokyo'},{latitude:1.87,longitude:-157.43,timezone:'Pacific/Kiritimati'},{latitude:-33.87,longitude:151.21,timezone:'Australia/Sydney'}]){
+  const date=sky.sceneDate(now,storage,location),parts=new Intl.DateTimeFormat('en-US',{timeZone:location.timezone,month:'numeric',day:'numeric'}).formatToParts(date);
+  assert.equal(parts.find(p=>p.type==='day').value,'15','solar locks use the chosen date in the observer zone');
+  assert.equal(parts.find(p=>p.type==='month').value,location.latitude<0?'10':'4');
+ }
+ const ctx=vm.createContext({Date,Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'vendor/astronomy.min.js'),'utf8'),ctx);
+ const row=[2.5303,89.2641,1.98,.6],rotation=ctx.Astronomy.Rotation_EQJ_EQD(now);
+ assert.deepEqual(sky.starAt(now,row,rotation),sky.starAt(now,row));
+});
+
+test('Astronomy location: sunrise and sunset stay on the observer day across DST and polar seasons',()=>{
+ const sky=livingSky();
+ for(const [latitude,longitude,timezone,days] of [[40.71,-74.01,'America/New_York',['2026-03-08','2026-11-01']],[51.5,-.12,'Europe/London',['2026-03-29','2026-10-25']],[-33.87,151.21,'Australia/Sydney',['2026-04-05','2026-10-04']],[1.87,-157.43,'Pacific/Kiritimati',['2026-01-01','2026-12-31']]]){
+  const fmt=d=>new Intl.DateTimeFormat('en-CA',{timeZone:timezone,year:'numeric',month:'2-digit',day:'2-digit'}).format(d);
+  for(const day of days){const date=new Date(day+'T12:00:00Z'),times=sky.sunTimes(date,{latitude,longitude,timezone});assert.ok(times.rise&&times.set);assert.equal(fmt(times.rise),fmt(date));assert.equal(fmt(times.set),fmt(date));assert.ok(times.rise<times.set);}
+ }
+ for(const day of ['2026-06-21','2026-12-21']){const times=sky.sunTimes(new Date(day+'T12:00:00Z'),{latitude:69.65,longitude:18.96,timezone:'Europe/Oslo'});assert.equal(times.rise,null);assert.equal(times.set,null);}
+ const date=new Date('2026-06-21T12:00:00Z'),north=sky.skyAt(date,{latitude:51.5,longitude:-.12,timezone:'Europe/London'}),south=sky.skyAt(date,{latitude:-33.87,longitude:151.21,timezone:'Australia/Sydney'});
+ assert.notEqual(north.sun.altitude,south.sun.altitude);assert.notEqual(north.moon.altitude,south.moon.altitude);assert.equal(north.phase,south.phase);
+});
+
+test('Weather: occasional rain follows one real-time schedule across devices and scene locks',()=>{
+ const first=livingSky(),second=livingSky();assert.equal(typeof first.weatherAt,'function');
+ let rainy=0,clear=0;
+ for(let window=990000;window<991000;window++){
+  const date=new Date(window*1800000+600000),a=first.weatherAt(date),b=second.weatherAt(new Date(+date));
+  assert.equal(JSON.stringify(a),JSON.stringify(b),'independent devices agree without a storage write or a network');
+  if(a.status==='rain')rainy++;else clear++;
+  assert.ok(a.intensity>=0&&a.intensity<=1);
+  assert.equal(first.weatherAt(new Date(window*1800000)).status,'clear');
+  assert.equal(first.weatherAt(new Date(window*1800000+1200000)).status,'clear','rain finishes within its episode');
+ }
+ assert.ok(rainy>100&&rainy<300);assert.ok(clear>rainy,'rain is occasional');
+ assert.throws(()=>first.weatherAt(new Date('invalid')),/date/i);
+ const runtime=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');assert.match(runtime,/S\.weatherAt\(new Date\(\)\)/);assert.match(runtime,/reduced\?0:/,'reduced motion renders stationary rain');
+});
+
+test('Location: saving an explicit observer timezone validates it and preserves coordinates',()=>{
+ const runtime=livingLocation();runtime.location.saveCoordinates({latitude:35.67,longitude:139.65},{timezone:'America/New_York'});
+ const saved=runtime.location.setLabel('Tokyo','Asia/Tokyo');assert.equal(saved.timezone,'Asia/Tokyo');assert.equal(saved.latitude,35.67);
+ assert.throws(()=>runtime.location.setLabel('Tokyo','Not/AZone'),/timezone/i);assert.equal(runtime.location.current().timezone,'Asia/Tokyo');
+ assert.match(html,/id="locationTimezone"/);
+});
+
+test('Moon: illuminated fraction is physical and its bright limb points toward the Sun at any observer',()=>{
+ const ctx=vm.createContext({Date,Math});for(const file of ['vendor/astronomy.min.js','stars.js','landscape-core.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,file),'utf8'),ctx);
+ for(const latitude of [51.5,-33.87])for(const longitude of [-74,151])for(const day of [3,10,17,24]){
+  const date=new Date(Date.UTC(2026,8,day,20)),sky=ctx.LivingSky.skyAt(date,{latitude,longitude,timezone:'UTC'});
+  assert.equal(sky.illumination,ctx.Astronomy.Illumination('Moon',date).phase_fraction);
+  const rad=Math.PI/180,delta=(sky.sun.azimuth-sky.moon.azimuth)*rad,sa=sky.sun.altitude*rad,ma=sky.moon.altitude*rad;
+  const dx=Math.cos(sa)*Math.sin(delta),dy=-(Math.sin(sa)*Math.cos(ma)-Math.cos(sa)*Math.sin(ma)*Math.cos(delta));
+  const angle=sky.moon.brightLimbAngle;assert.ok(Number.isFinite(angle));assert.ok(Math.cos(angle)*dx+Math.sin(angle)*dy>0,'illuminated side faces projected sunlight');
+ }
+ assert.match(fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),/sky.moon.brightLimbAngle/);
+});
+
+test('Guest departure: gait eases into walking and a reverse kite stays attached to the mirrored hand',()=>{
+ const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);const g=ctx.LandscapeGeometry.create(1440,900);
+ const e={lane:.5,reverse:true};assert.equal(g.visitPose(e,.82).walkAmount,0);assert.ok(g.visitPose(e,.84).walkAmount>0);assert.equal(g.visitPose(e,.86).walkAmount,1);
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');assert.match(source,/ax\+visit.direction\*5/);assert.match(source,/t,visit.walkAmount/);
+});
+
+test('Astronomy polar day: the midnight sun remains daylight, not a fictitious sunrise or sunset',()=>{
+ const sky=livingSky();for(const time of ['2026-06-21T00:00:00Z','2026-06-21T22:00:00Z']){const state=sky.skyAt(new Date(time),{latitude:69.65,longitude:18.96,timezone:'Europe/Oslo'});assert.equal(state.period,'day');assert.equal(state.polarDay,true);}
+});
+
+test('Weather browser: separate devices agree despite different local scene settings',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const {chromium}=await import(process.env.LANDSCAPE_PLAYWRIGHT),browser=await chromium.launch({channel:'chrome'});
+ try{
+  const sky=livingSky();let slot=990000;while(sky.weatherAt(new Date(slot*1800000+600000)).status!=='rain')slot++;
+  const pages=[];
+  for(const [timezoneId,sceneTime] of [['America/New_York','00:00'],['Asia/Tokyo','12:00']]){
+   const context=await browser.newContext({timezoneId,reducedMotion:'reduce'}),page=await context.newPage();
+   await page.clock.setFixedTime(new Date(slot*1800000+600000));await page.addInitScript(time=>{localStorage.setItem('fvp:chain-scanner:scene-time',time);localStorage.setItem('fvp:chain-scanner:landscape-motion','reduced');},sceneTime);
+   await page.goto(process.env.LANDSCAPE_BROWSER_URL);assert.equal(await page.evaluate(()=>document.documentElement.dataset.sceneWeather),'rain');
+   const before=await page.locator('[data-life]').evaluate(c=>c.toDataURL());await page.waitForTimeout(100);assert.equal(await page.locator('[data-life]').evaluate(c=>c.toDataURL()),before,'reduced rain stays still');pages.push(page);
+  }
+  for(const page of pages){await page.clock.setFixedTime(new Date(slot*1800000+1200000));await page.evaluate(()=>window.dispatchEvent(new StorageEvent('storage',{key:null})));assert.equal(await page.evaluate(()=>document.documentElement.dataset.sceneWeather),'clear');}
+ }finally{await browser.close();}
+});
+
+test('Solar locks: unavailable seasonal sunrise or sunset truly falls back to live time',()=>{
+ const sky=livingSky(),values=new Map(),storage={getItem:k=>values.get(k),setItem:(k,v)=>values.set(k,v)},location={latitude:69.65,longitude:18.96,timezone:'Europe/Oslo'},now=new Date('2026-09-13T13:24:56Z');
+ sky.saveSceneSeason(storage,'summer');
+ for(const preset of ['sunrise','sunset']){sky.saveSceneTime(storage,preset);assert.equal(+sky.sceneDate(now,storage,location),+now);}
+ assert.equal(sky.sunTimes(sky.sceneSolarDate(now,storage,location),location).rise,null,'availability checks the selected seasonal date, not the fallback day');
+});
+
+test('Astronomy boundaries: September changes local dates, not the equinox instant; custom star observers work',()=>{
+ const ctx=vm.createContext({Date,Math,Intl,JSON});for(const file of ['vendor/astronomy.min.js','stars.js','landscape-core.js','landscape-mood.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,file),'utf8'),ctx);
+ const instant=ctx.Astronomy.Seasons(2026).sep_equinox.date;
+ for(const [zone,day] of [['America/New_York','22'],['Asia/Tokyo','23'],['Pacific/Kiritimati','23'],['Australia/Sydney','23']]){
+  const season=ctx.LandscapeMood.season(instant,35,zone);assert.equal(+season.start,+instant);assert.equal(season.name,'autumn');assert.equal(new Intl.DateTimeFormat('en-US',{timeZone:zone,day:'numeric'}).format(season.start),day);assert.equal(ctx.LandscapeMood.season(instant,-35,zone).name,'spring');
+ }
+ const star=[2.5303,89.2641,1.98,.6],north={latitude:51.5,longitude:-.12,timezone:'Europe/London'},south={latitude:-33.87,longitude:151.21,timezone:'Australia/Sydney'};
+ const a=ctx.LivingSky.starAt(instant,star,north),b=ctx.LivingSky.starAt(instant,star,south);
+ assert.ok(Math.abs(a.altitude-51.5)<1);assert.ok(b.altitude<0);assert.deepEqual(a,ctx.LivingSky.starAt(instant,star,ctx.Astronomy.Rotation_EQJ_EQD(instant),north));
 });

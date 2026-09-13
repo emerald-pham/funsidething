@@ -499,26 +499,27 @@
     return template.replace(/\{\{hour\}\}/g, hourLabel(hour)).replace(/\{\{name\}\}/g, name);
   }
 
+  const seasonCache = new Map();
+  function seasonBoundaries(year) {
+    if (!seasonCache.has(year)) {
+      const values = root.Astronomy.Seasons(year);
+      seasonCache.set(year, ['mar_equinox','jun_solstice','sep_equinox','dec_solstice'].map((key,index) => ({date:values[key].date,index})));
+      if (seasonCache.size > 9) seasonCache.delete(seasonCache.keys().next().value);
+    }
+    return seasonCache.get(year);
+  }
   function season(date, latitude, timezone) {
     const location = typeof latitude === 'object' && latitude !== null
       ? normalizedLocation(latitude)
       : normalizedLocation({ latitude: latitude === undefined ? 0 : latitude, timezone });
     const parts = localParts(date, location.timezone);
-    const leapDays = (Date.UTC(parts.year + 1, 0, 1) - Date.UTC(parts.year, 0, 1)) / DAY;
-    const boundaries = [
-      ordinal(parts.year, 3, 20), ordinal(parts.year, 6, 21),
-      ordinal(parts.year, 9, 22), ordinal(parts.year, 12, 21),
-    ];
-    const rawCurrent = dayNumber(parts);
-    let index = 3;
-    for (let i = 0; i < boundaries.length; i++) if (rawCurrent >= boundaries[i]) index = i;
-    const start = boundaries[index];
-    const end = index === 3 ? boundaries[0] + leapDays : boundaries[index + 1];
-    // Winter begins in the previous calendar year. Unwrap January and March
-    // dates onto that same interval before calculating progress or blending.
-    const current = index === 3 && rawCurrent < start ? rawCurrent + leapDays : rawCurrent;
-    const span = end - start;
-    const position = current - start;
+    // Equinoxes and solstices are global instants. A timezone changes their
+    // calendar label, never the instant or the palette's transition progress.
+    const boundaries = [parts.year-1,parts.year,parts.year+1].flatMap(seasonBoundaries);
+    const next = boundaries.findIndex(boundary => +boundary.date > +date);
+    const start = boundaries[next-1], end = boundaries[next], index = start.index;
+    const span = (+end.date - +start.date) / DAY;
+    const position = (+date - +start.date) / DAY;
     const remaining = span - position;
     const names = location.latitude < 0 ? SOUTHERN_NAMES : NORTHERN_NAMES;
     const weights = { spring: 0, summer: 0, autumn: 0, winter: 0 };
@@ -537,6 +538,7 @@
     }
     return {
       name: names[index],
+      start: new Date(+start.date), end: new Date(+end.date),
       hemisphere: location.latitude < 0 ? 'south' : 'north',
       progress: Math.max(0, Math.min(1, position / span)),
       weights,

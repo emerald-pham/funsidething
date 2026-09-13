@@ -102,3 +102,7 @@ html.viewing-scene{overflow:hidden;overscroll-behavior:none}
   .scene-reading{width:300px;max-width:calc(100% - 20px)}
   .scene-intro h2{font-size:clamp(25px,7.5vw,30px)}
 }
+/* Keep the clock and season as separate labeled fields on narrow screens. */
+#sceneTimeDialog label { display:block; margin:12px 0 6px; }
+#sceneTimeDialog input, #sceneTimeDialog select { display:block; width:100%; box-sizing:border-box; min-height:40px; }
+#sceneTimeDialog .motion-choices button { min-height:48px; padding:12px; }

@@ -1,44 +1,44 @@
-# Animation audit — September 13, 2026
+# Landscape tuning audit — September 13, 2026
 
-This audit covers the current animation catalog, complete event lifetimes, direction and randomized variants, ambient scenery, interaction layering, and motion controls. It extends the earlier repairs to frame pacing, tab continuity, pedaling, deer leg attachment, bird departures, and dog paw contact.
+This pass preserves the existing palette, scene composition, ordinary visitor cadence, and reduced-motion behavior. It checks scale, visitor lifetimes, astronomy, and the added occasional wildlife and rain.
 
-## Coverage
+## Scale and lifetimes
 
-The deterministic renderer sweep exercises 121 evenly spaced points from birth through expiry for every type below, both directions, seeds 0 / 0.551 / 0.999, lanes 0 / 0.5 / 0.999, and short / nominal / long durations (0.8 / 1 / 1.2). Chrome and WebKit run at 320×568, 844×390, and 1440×900. It checks finite drawing coordinates, balanced canvas save/restore, opacity, transforms, and stroke caps after every frame. Day-only and night-only visitors are evaluated under their visibility condition.
-
-Enlarged rendered sequences and boundary frames complement the numerical sweep. Numerical validity alone does not establish visual correctness. Normal and reduced motion are checked separately, as are local verification and deployed/offline verification.
-
-| Family | Every catalog member included | Visual checks |
+| Family | Members reviewed | Result |
 | --- | --- | --- |
-| Path travelers | cyclist, skateboarder, rollerskater, walker, dogwalker | Entry/exit, direction, gait, wheels/feet, hills, packs/companions |
-| Meadow animals | rabbit, deer | Hop/stride cycles, slope attachment, ground contact, fades |
-| Stationary visitors | reader, picnic, couple, kite | Entrance/exit fades, seated poses, props, kite/string continuity |
-| Birds/insects | bird, flock, butterfly | Nest arrival/perching/departure, paired birds, flock formation, wing folding |
-| Rail transport | train, metro | Carriage spacing, full tail exit, track alignment, tree occlusion |
-| Aircraft | plane, airshow, banner, hangglider, balloon | Direction, smoke/banner attachment, formation, drift and offscreen boundaries |
-| Water visitors | jetski, sailboat, cruise, yacht, windsurfer, duck, fish, dolphin | Shore clearance, wakes, bobbing/courses, jumps, facing, overlap depth |
-| Rare/night events | meteor, fireworks, abduction | Full emergence/decay, burst sequence, beam/pickup/return/departure |
+| Path travelers | cyclist and packs, skateboarder, rollerskater, walker, dogwalker | Cyclist hips now connect to fixed-length, forward-bending legs throughout the pedal revolution. Existing path scales remain coherent. Through-travelers exit the viewport; local walkers continue walking while fading into the scenery. |
+| Meadow animals | rabbit, deer | Existing local routes, ground contact, and discreet entrance/exit fades retained. |
+| Seated visitors | reader, picnic, couple, kite | Arrival, activity, packing, standing, and walking-away phases. Blankets fold, food is gathered, books are carried, and kites are reeled in. Direction, hand/string attachment, gait transitions, and moving depth are checked. |
+| Birds and insects | bird, flock, butterfly | Nest visits end with takeoff; flocks and butterflies travel out of view. Their established size hierarchy is retained. |
+| Rail transport | train, metro | The farther metro is reduced to 72% of its previous carriage scale, including spacing and strokes. The foreground train keeps its size. Both remain aligned with their rails. |
+| Aircraft | plane, airshow, banner, hangglider, balloon | Existing silhouettes represent different distances; altitude lanes alone are not treated as distance. Banner, smoke, pilot, and basket stay attached. Offscreen travel or effect fade completes each visit. |
+| Water visitors | jetski, sailboat, cruise, yacht, windsurfer, duck, fish, dolphin | Water lanes now scale vessels with distance. Small craft remain much smaller than ships, even across opposing depth lanes; wakes scale too. Dolphin/fish lanes describe horizontal routes at fixed water depth. Ducks may take off continuously from their swimming position, with staggered companions. Fish and dolphins finish local breaches with fades. |
+| Rare effects | meteor, fireworks, abduction | Finite streak/burst/pickup-and-return sequences; existing fades and departures retained. |
+| Foreground wildlife | deer, fox, rabbit, raccoon | Separate pool and random source: one 1% roll every 30 seconds, at most one arrival per successful roll, four animals maximum, three-minute visits. No initial guaranteed animal and no effect on ordinary spawn odds or capacity. Slow walks fade in/out among foreground trees. |
+| Ambient scene | clouds, water, reflections, wind grass, fireflies, fountain, stand | These are scenery or repeating ambient processes, not unexpired visitor events. They intentionally remain, while visitors renew. |
+| Rain | gentle streaks and a faint atmospheric tint | Episodes ease in and out. A fixed UTC schedule gives the same weather status on all devices, independent of login, storage, location, and locked scene time. Twenty percent of half-hour slots contain a twelve-minute shower; this is decorative weather, not a forecast. Correct device clocks are required for agreement. Reduced motion uses stationary streaks. |
+| App UI | fades, toast/row transitions, button states, scrolling | Existing behavior and reduced-motion contracts retained. |
 
-There are **32 distinct event types**: 29 regular types, meteors, and two rare types. Random seed/lane/time inputs are continuous; this is a full catalog and boundary audit with a defined variation matrix, not a claim to have viewed every possible random frame.
+Every ordinary/rare visitor still has a finite duration. Normal motion advances their ages and removes expired events. Pausing or hiding the app preserves visits without accumulating missed spawns. Ordinary singleton/water caps can intentionally skip a spawn opportunity; ambient movement continues. These limits preserve the existing density and atmosphere.
 
-## Ambient and UI coverage
+## Astronomy
 
-Source review covered cloud drift and wraparound; sun, moon, stars and clock refresh; city windows; sun/star/city water reflections; ripples and wakes; fountain jets; wind grass; fireflies; cached layer clipping and draw order; scheduling and event limits. Browser checks covered noon, sunset and midnight, scene-only and scanner views, normal/reduced motion, live preference changes, hidden-tab pause/resume, phone/short-landscape/desktop layouts and high-DPR sizing. No further clipping or lifecycle defects were found in that matrix.
+Season names now change at Astronomy Engine's computed equinox/solstice instant, rather than fixed dates. Both hemispheres share that instant; their names differ, and time zones determine its local calendar date. Palette blending remains gentle around boundaries.
 
-The scanner review included scene-view fades, row highlighting, toast fade/translation, progress-bar width, action opacity/focus restoration, button press transforms, and programmatic task-reveal scrolling. Reduced scrolling was reproduced and checked after repair in Chrome and WebKit.
+Sunrise and sunset use the observer's coordinates and local calendar day, including DST, date-line zones, and polar absence of events. Seasonal solar locks construct the representative date in the observer's time zone. Fixed `HH:MM` scene locks intentionally use the device's local clock, as labeled; standard JavaScript DST normalization applies to a nonexistent local hour. A time-zone field permits correcting an observer/device-zone mismatch without a network geocoder.
 
-## Confirmed defects repaired in this pass
+Sun/Moon positions use topocentric coordinates, date-of-observation equatorial transforms, and atmospheric refraction. Star positions retain the J2000-to-date rotation. The public star helper now correctly accepts an explicit Astronomy Engine rotation object. Lunar illumination uses the library's physical illuminated fraction, and its bright limb faces the Sun in the observer's sky. Midnight sun is classified as daylight.
 
-| Defect | Repair and regression coverage |
-| --- | --- |
-| Fish popped in/out fully opaque and reverse fish still moved right | Fade the local breach at both endpoints and honor direction; test endpoints, near-endpoints, mid-flight and both directions |
-| UFO cow/beam appeared and disappeared abruptly; reverse UFO flew the same way | Separate the cow's lifetime from the beam, ease the beam, keep the returned cow on its ground anchor, and honor UFO direction; test pickup/return boundaries and offscreen entry/exit |
-| Rear water visitors could paint over nearer boats | Unify boats, ducks, fish and dolphins into a waterline-depth-sorted pass; test both arrival orders, all eight water types and three viewports; visually confirm rear duck/front sailboat |
-| Flying birds leaked rounded stroke caps into later scenery | Save and restore bird drawing state; test flying/perched variants and pre-existing cap styles |
-| Revealing a task still animated scrolling under Reduced motion | Use an immediate scroll unless Normal motion is explicitly selected and the device permits it; test app/device preferences and verify real scroll positions in both browsers |
+Reference fixtures: [USNO 2026 Earth seasons](https://aa.usno.navy.mil/calculated/seasons?dst=false&submit=Get+Data&tz=0&tz_label=true&tz_sign=1&year=2026), [Astronomy Engine API](https://github.com/cosinekitty/astronomy/blob/master/source/js/README.md). Calculations remain bundled and offline; no weather or astronomy API is called at runtime. The panoramic scene and celestial disk sizes are illustrative, not an angularly calibrated planetarium.
 
-## Final validation
+## Verification
 
-The final deterministic sweep completed **1,254,528 frame cases**, covering all 32 types with no invalid coordinates, unbalanced canvas state, opacity/transform leaks, or stroke-cap leaks. This is automated frame coverage, not a claim that a person watched one million images. Visual inspections use enlarged sequences, phase boundaries, representative overlaps and full scene layouts.
+Test-first failures were observed for the new controls, missing changelog, hip geometry, water depth scale, duck takeoff, fixed season boundaries, observer-date solar locks, explicit star rotation, independent wildlife scheduling, guest departure, rain scheduling, timezone edits, lunar illumination, reverse kite attachment, and polar daylight.
 
-The final repository suite passed **590 tests with zero failures and zero skips**, including the opt-in browser tests. Service-worker cache fingerprints are regenerated for the changed shell; deployment and offline reload are verified separately after push.
+Chrome and WebKit each completed a 6,534-case sprite sweep over 33 ordinary/foreground visitor variants, three viewport sizes (320×568, 844×390, 1440×900), both directions, three lanes, and eleven lifecycle points. No invalid drawing coordinates or page errors were reported. Five contact sheets at a common drawing scale were visually inspected, including packing/departure, duck flight, boat proportions, and all four foreground animals. Separate screenshots check full-scene composition and time controls on phone and desktop. These checks supplement rather than replace the existing rare-effect and lifecycle regression tests.
+
+The final repository suite passed 632 tests with no failures or skips, including all enabled browser tests. Chrome and WebKit passed day/night, reduced-motion/resume, overflow, and page-error checks at desktop, phone, and short-landscape sizes. Two isolated browser contexts with New York and Tokyo time zones and different scene locks agreed on rain and clear weather; reduced rain stayed still. A local service-worker-controlled offline reload restored the current changelog, season lock, wildlife, and weather assets. Independent review found a polar-season fallback mismatch; it was repaired and regression-tested. Deployment is verified separately in the delivery result.
+
+## Changelog maintenance
+
+Settings renders the dated entries in `#appChangelog`. Add an outcome-focused entry for each app change. The changelog test fingerprints every precached app asset plus the service worker (normalizing the changelog block and cache key to avoid circular hashes), so an unrecorded source change fails validation. Refresh the entry's `data-app-fingerprint` after writing the entry, then refresh the service-worker shell fingerprint. The latter includes the changelog itself, ensuring installed/offline devices receive the updated history.

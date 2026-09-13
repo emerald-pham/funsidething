@@ -137,10 +137,10 @@
       catch(error){lastError=error instanceof Error?error:geoError({code:2});render();reject(lastError);}
     });
   }
-  function setLabel(value){
+  function setLabel(value,timezone=state.timezone){
     if(!state.enabled)return current();
     const label=cleanLabel(value)||nearestLabel(state.latitude,state.longitude);
-    const next=Object.assign(clone(state),{label});
+    const next=normalize(Object.assign(clone(state),{label,timezone}));
     if(!persist(next)){const error=new Error('Location name could not be saved in device storage.');error.code='STORAGE';throw error;}
     state=next;lastError=null;emit();render();return current();
   }
@@ -159,6 +159,8 @@
     if(!documentRef||typeof documentRef.getElementById!=='function')return;
     const label=documentRef.getElementById('locationCurrent');if(label)label.textContent=state.enabled?state.label:'Using the default sky. Enable location to make it yours.';
     const input=documentRef.getElementById('locationName');if(input&&documentRef.activeElement!==input)input.value=state.enabled&&state.label.indexOf('Near ')!==0?state.label:'';
+    const timezone=documentRef.getElementById('locationTimezone');if(timezone&&documentRef.activeElement!==timezone)timezone.value=state.enabled?state.timezone:deviceTimezone();
+    const zones=documentRef.getElementById('locationTimezones');if(zones&&!zones.children.length&&typeof Intl.supportedValuesOf==='function')for(const zone of Intl.supportedValuesOf('timeZone')){const option=documentRef.createElement('option');option.value=zone;zones.append(option);}
     const resetButton=byAction('reset');if(resetButton)resetButton.hidden=!state.enabled;
     const saveButton=byAction('save-name');if(saveButton)saveButton.hidden=!state.enabled;
     if(lastError)setStatus(lastError.message);
@@ -182,10 +184,10 @@
       if(local==='close'){event.preventDefault();closeDialog();return;}
       if(local==='request'){
         event.preventDefault();setStatus('Requesting your browser location…');
-        request().then(()=>{}).catch(()=>{});return;
+        request({timezone:documentRef.getElementById('locationTimezone')?.value||deviceTimezone()}).then(()=>{}).catch(()=>{});return;
       }
       if(local==='save-name'){
-        event.preventDefault();const input=documentRef.getElementById('locationName');try{setLabel(input&&input.value);}catch(error){lastError=error;render();}return;
+        event.preventDefault();const input=documentRef.getElementById('locationName');try{setLabel(input&&input.value,documentRef.getElementById('locationTimezone')?.value||state.timezone);}catch(error){lastError=error;render();}return;
       }
       if(local==='reset'){event.preventDefault();reset();return;}
     });

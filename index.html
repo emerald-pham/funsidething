@@ -392,13 +392,18 @@ textarea{width:100%;font-family:var(--font-mono);font-size:12px}
   <p id="deviceMotionNote" hidden>Your device requests reduced motion, so movement stays off with either choice.</p>
   <p>You can change this anytime in Settings. The sun and Moon follow their real paths, even when the scenery is still.</p>
 </dialog>
+<!-- changelog:start -->
+<template id="appChangelog"><details data-app-fingerprint="6b718d8039d4814de8174430c4dd16cc936a4c15dd58df178bfc6eff89fb3fd0"><summary>Changelog</summary><h3>September 13, 2026</h3><ul><li>One Sunrise / Sunset button switches between dawn and dusk.</li><li>Choose a season when locking the scenery, or follow the current season.</li><li>Cyclists pedal with connected hips and naturally bending knees.</li><li>Distant boats shrink with depth; windsurfers and small craft stay smaller than ships, and the far metro is smaller than the foreground train.</li><li>Ducks sometimes lift off from the lake and fly away.</li><li>Seasons now follow the actual equinox and solstice, with hemisphere and local date handling. Solar locks use the sky location’s calendar.</li><li>Choose the sky location’s time zone when it differs from your device. The Moon’s illuminated side now follows the Sun, and the midnight sun stays daylight.</li><li>Deer, foxes, rabbits, and raccoons occasionally wander through the foreground: a 1% chance every 30 seconds, up to four animals, independent of other visitors.</li><li>Picnic groups fold their blanket and gather their things; readers, couples, and kite flyers also finish up and walk away.</li><li>Occasional gentle rain follows the same real-time schedule across devices, including offline. Reduced motion keeps the rain still.</li><li>Settings now includes this changelog, with a check that catches undocumented app changes.</li></ul></details></template>
+<!-- changelog:end -->
 <dialog id="sceneTimeDialog" class="motion-dialog" aria-labelledby="sceneTimeTitle">
   <h2 id="sceneTimeTitle">Stay a little longer.</h2>
-  <p>Hold the scenery at a favorite time of day, or let it follow live time. The date still follows the season.</p>
+  <p>Hold the scenery at a favorite time of day, or let it follow live time. Choose a season, or keep following the current season.</p>
   <label for="sceneTimeInput">Scene time (your device's local time)</label>
   <input id="sceneTimeInput" type="time" required/>
+  <label for="sceneSeasonInput">Season</label>
+  <select id="sceneSeasonInput"><option value="">Follow current season</option><option value="spring">Spring</option><option value="summer">Summer</option><option value="autumn">Autumn</option><option value="winter">Winter</option></select>
   <p>Saved on this device. Task dates and reminders always use real time.</p>
-  <div class="motion-choices"><button data-scene-preset="00:00">Midnight</button><button data-scene-preset="12:00">Noon</button><button data-scene-preset="sunrise">Sunrise</button><button data-scene-preset="sunset">Sunset</button></div>
+  <div class="motion-choices"><button data-scene-preset="00:00">Midnight</button><button data-scene-preset="12:00">Noon</button><button data-scene-preset="solar" title="Switch between sunrise and sunset">Sunrise / Sunset</button></div>
   <p id="sceneTimeStatus" role="status"></p>
   <div class="motion-choices"><button data-scene-time="lock">Lock this time</button><button data-scene-time="live">Use live time</button><button data-scene-time="close">Close</button></div>
 </dialog>
@@ -409,9 +414,10 @@ textarea{width:100%;font-family:var(--font-mono);font-size:12px}
   <p id="locationCurrent" class="location-current">Using the default sky. Enable location to make it yours.</p>
   <p id="locationStatus" role="status" aria-live="polite"></p>
   <div class="frow"><label for="locationName">Optional name</label><input id="locationName" type="text" maxlength="80" placeholder="Home, cabin, or a place name" autocomplete="off"/></div>
+  <div class="frow"><label for="locationTimezone">Sky time zone</label><input id="locationTimezone" type="text" list="locationTimezones" placeholder="America/New_York" autocomplete="off"/><datalist id="locationTimezones"></datalist><span class="kv">Starts with your device time zone. Choose the sky location’s zone if it differs.</span></div>
   <div class="mbtns">
     <button class="btn primary" data-location-action="request">Use my location</button>
-    <button class="btn subtle" data-location-action="save-name">Save name</button>
+    <button class="btn subtle" data-location-action="save-name">Save name and time zone</button>
     <button class="btn subtle" data-location-action="reset">Use the default sky</button>
     <button class="btn subtle" data-location-action="close">Close</button>
   </div>
@@ -2277,6 +2283,7 @@ function openSettings(){
   }
   modalShell(
     '<div class="mtop"><h2>Settings</h2><button class="x" data-act="close-modal" aria-label="Close">✕</button></div>'
+    + (document.getElementById('appChangelog')?.innerHTML || '')
     + '<div class="frow"><label>Landscape</label><button class="btn subtle" data-act="scene-settings">Motion settings</button><span class="kv">Daylight follows the sky; app theme stays independent.</span></div>'
     + '<div class="frow"><label>Scene time</label><button class="btn subtle" data-act="scene-time-settings">Choose scene time</button><span class="kv">Follow live time or hold a favorite hour on this device.</span></div>'
     + '<div class="frow"><label>Location</label><button class="btn subtle" data-act="location-settings">Choose location</button><span class="kv">Use device coordinates for a local sky; saved only on this device.</span></div>'

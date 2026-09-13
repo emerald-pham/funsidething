@@ -16,10 +16,25 @@
     const waterTop=horizon+15,shore=horizon+H*.095;
     function vessel(kind,lane,x,t=0,reverse=false){
       const depth=Math.max(1,shore-waterTop),direction=reverse?-1:1;
-      const scale=Math.min(kind==='cruise'?1:.95,W/600,depth/38);
+      // Hull sizes are intentionally compressed, but a person and board must
+      // remain much smaller than a ship even across opposite depth lanes.
+      const base={windsurfer:.4,jetski:.55,sailboat:.8,yacht:.95,cruise:1,duck:.8}[kind]||1;
+      const scale=Math.min(1,W/600,depth/38)*base*(.65+.35*Math.max(0,Math.min(1,lane)));
       const course=kind==='windsurfer'?Math.sin(t*(.10+lane*.04)+lane*6)*depth*.12:0;
       const y=waterTop+depth*(.38+Math.max(0,Math.min(1,lane))*.30)+course+Math.sin(t*.8+lane*6)*scale*.5;
       return {x,y,scale,direction,visible:depth>10};
+    }
+    function duckPose(e,t,index=0){
+      const direction=e.reverse?-1:1,progress=e.age/e.duration;
+      const x=-160+(e.reverse?1-progress:progress)*(W+320)-index*8*direction;
+      const takeoff=e.duration*(.35+e.seed*.15)+index*.35;
+      // A visit's random seed chooses whether and when to depart. No frame-time
+      // randomness means pausing or redrawing cannot reroll or teleport a duck.
+      const flight=e.seed>.65?Math.max(0,e.age-takeoff):0;
+      const water=vessel('duck',e.lane,x,t-flight,e.reverse);
+      const lift=7*flight*(1-Math.exp(-flight));
+      return {x:x+direction*1.5*flight*flight,y:water.y+Math.sin(t-flight+index)*.3-lift,
+        scale:Math.min(.5,water.scale*.65),direction,flying:flight>0,wing:Math.sin(flight*13+index)*5};
     }
     function waterDepth(e,t){
       // Sort at the waterline, not at a mast top or an animal's airborne height.
@@ -46,7 +61,7 @@
     }
     function eventDepth(e){
       if(['walker','dogwalker','rabbit','deer'].includes(e.type))return groundPose(e.type==='dogwalker'?'walker':e.type,e).y;
-      if(['reader','picnic','couple','kite'].includes(e.type))return trail(W*(.1+e.lane*.8))+19;
+      if(['reader','picnic','couple','kite'].includes(e.type))return visitPose(e,e.age/e.duration).y;
       const progress=e.reverse?1-e.age/e.duration:e.age/e.duration;
       return trail(-160+progress*(W+320));
     }
@@ -56,11 +71,29 @@
       // stay planted during stance rather than sliding behind a faster leg cycle.
       return {x,y:groundAnchor('walker',x),direction,distance:distance+Math.sin(distance*.15)*4};
     }
+    function visitPose(e,f){
+      const smooth=(a,b,v)=>{const q=Math.max(0,Math.min(1,(v-a)/(b-a)));return q*q*(3-2*q);};
+      const direction=e.reverse?-1:1,anchor=W*(.1+e.lane*.8);
+      const departure=smooth(.82,1,f),arrival=smooth(0,.12,f);
+      const x=anchor-direction*40*(1-arrival)+((e.reverse?-80:W+80)-anchor)*departure;
+      return {x,y:trail(x)+19,anchor,direction,pack:smooth(.72,.82,f),stand:Math.max(1-arrival,smooth(.76,.82,f)),walkAmount:Math.max(1-smooth(.08,.12,f),smooth(.82,.85,f)),walking:f<.12||f>.82};
+    }
+    function woodlandPose(e){
+      // Pick a clearing with room for a short stroll on the darkest near hill.
+      // The clearings depend on terrain rather than a viewport-specific y value.
+      const clearings=Array.from({length:12},(_,i)=>W*(.15+i*.7/11)).filter(x=>Math.max(near(x-24),near(x),near(x+24))<H-65);
+      const anchor=clearings[Math.min(clearings.length-1,Math.floor(e.lane*clearings.length))]||W*.7;
+      const direction=e.reverse?-1:1,distance=e.age*.22;
+      const x=anchor+direction*(distance-19.8),y=Math.max(near(x)+18,H-28-e.seed*25);
+      return {x,y,direction,distance,scale:W<600?1.25:1.6};
+    }
     function cycleLeg(t,offset=0){
       const phase=t*6+offset*Math.PI*2,footX=2+Math.cos(phase)*1.7,footY=Math.sin(phase)*1.7;
       // Two equal-length segments connect the seated hip to the moving pedal.
-      const dx=footX,dy=footY+5,d=Math.hypot(dx,dy),bend=Math.sqrt(Math.max(0,16-d*d/4));
-      return {kneeX:dx/2+dy/d*bend,kneeY:-5+dy/2-dx/d*bend,footX,footY};
+      const hipX=-1,hipY=-6,dx=footX-hipX,dy=footY-hipY,d=Math.hypot(dx,dy),bend=Math.sqrt(Math.max(0,4.5**2-d*d/4));
+      // Keep the forward knee solution throughout the stroke; the seated hip
+      // must match the torso, and neither limb may stretch to reach a pedal.
+      return {hipX,hipY,kneeX:hipX+dx/2+dy/d*bend,kneeY:hipY+dy/2-dx/d*bend,footX,footY};
     }
     function deerLeg(pose,hip,offset){
       const angle=tangent(trail,pose.x),foot=strideFoot(pose.distance,12,offset);
@@ -136,7 +169,7 @@
       return rows;
     }
     const ripple=(i,t,wind=1)=>({alpha:.15+.75*(.5+.5*Math.sin(t*wind*1.3+i*1.71))**2,drift:Math.sin(t*wind*.5+i)*9,width:.65+.35*Math.sin(t*.9+i)**2});
-    return {waterDepth,cycleLeg,deerLeg,nestVisit,eventDepth,dogPose,skater,fireworks,flock,dolphin,starReflection,cityReflection,sunReflection,depthBand,groundAnchor,groundTravelX,groundPose,strideArm,strideFoot,wingFold,balloonDrift,vessel,foregroundTree,nest,ripple,horizon,waterTop,far,middle,near,rail,trail,lowerRail,tangent,rider,pack};
+    return {visitPose,woodlandPose,duckPose,waterDepth,cycleLeg,deerLeg,nestVisit,eventDepth,dogPose,skater,fireworks,flock,dolphin,starReflection,cityReflection,sunReflection,depthBand,groundAnchor,groundTravelX,groundPose,strideArm,strideFoot,wingFold,balloonDrift,vessel,foregroundTree,nest,ripple,horizon,waterTop,far,middle,near,rail,trail,lowerRail,tangent,rider,pack};
   }
   root.LandscapeGeometry={create};
 })(globalThis);

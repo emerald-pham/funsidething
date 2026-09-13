@@ -24,17 +24,20 @@
     const parts=new Intl.DateTimeFormat('en-US',{timeZone,year:'numeric',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'}).formatToParts(date);
     return Object.fromEntries(parts.map(p=>[p.type,p.value]));
   }
-  function localMidnight(date,timeZone){
-    const values=partsInZone(date,timeZone),year=+values.year,month=+values.month,day=+values.day;
-    let guess=Date.UTC(year,month-1,day);
+  function dateInZone(year,month,day,timeZone,hour=0){
+    let guess=Date.UTC(year,month-1,day,hour);
     // Resolve the zone offset at the candidate midnight. Two passes cover the
     // DST transition without depending on a host-specific date parser.
     for(let i=0;i<3;i++){
       const at=partsInZone(new Date(guess),timeZone);
       const asUTC=Date.UTC(+at.year,+at.month-1,+at.day,+at.hour,+at.minute,+at.second);
-      guess=Date.UTC(year,month-1,day)-(asUTC-guess);
+      guess=Date.UTC(year,month-1,day,hour)-(asUTC-guess);
     }
     return new Date(guess);
+  }
+  function localMidnight(date,timeZone){
+    const values=partsInZone(date,timeZone);
+    return dateInZone(+values.year,+values.month,+values.day,timeZone);
   }
   function sameLocalDay(date,reference,timeZone){
     const a=partsInZone(date,timeZone),b=partsInZone(reference,timeZone);
@@ -64,15 +67,26 @@
   function starAt(date,row,rotation,location){
     // Keep the original (date, row, rotation) call shape while accepting a
     // location as the convenient third argument for direct callers.
-    if(location===undefined&&rotation&&typeof rotation==='object'&&!Array.isArray(rotation)){location=rotation;rotation=undefined;}
+    if(location===undefined&&rotation&&typeof rotation==='object'&&!Array.isArray(rotation)&&!Array.isArray(rotation.rot)){location=rotation;rotation=undefined;}
     validDate(date); return projectStar(date,row,rotation,locationObserver(location).observer);
   }
+  const polarDayCache=new Map();
   function skyAt(date,location){
     validDate(date);
     const config=locationObserver(location),sun=bodyAt('Sun',date,config.observer),moon=bodyAt('Moon',date,config.observer),phase=A.MoonPhase(date);
+    let polarDay=false;
+    if(Math.abs(config.observer.latitude)>66&&sun.visible){
+      const parts=partsInZone(date,config.timeZone),key=[config.observer.latitude,config.observer.longitude,config.timeZone,parts.year,parts.month,parts.day].join(':');
+      if(!polarDayCache.has(key)){const times=sunTimes(date,location);polarDayCache.set(key,!times.rise&&!times.set);if(polarDayCache.size>8)polarDayCache.delete(polarDayCache.keys().next().value);}
+      polarDay=polarDayCache.get(key);
+    }
     const rotation=A.Rotation_EQJ_EQD(date);
-    return {date,sun,moon,phase,illumination:(1-Math.cos(phase*RAD))/2,
-      period:sun.altitude < -12?'night':sun.altitude<8?(sun.azimuth<180?'dawn':'dusk'):'day',
+    const delta=(sun.azimuth-moon.azimuth)*RAD,sa=sun.altitude*RAD,ma=moon.altitude*RAD;
+    // Project sunlight onto the Moon's local sky tangent plane. This follows
+    // horizon tilt and hemisphere rather than always lighting a vertical side.
+    moon.brightLimbAngle=Math.atan2(-(Math.sin(sa)*Math.cos(ma)-Math.cos(sa)*Math.sin(ma)*Math.cos(delta)),Math.cos(sa)*Math.sin(delta));
+    return {date,sun,moon,phase,polarDay,illumination:A.Illumination('Moon',date).phase_fraction,
+      period:polarDay?'day':sun.altitude < -12?'night':sun.altitude<8?(sun.azimuth<180?'dawn':'dusk'):'day',
       stars:root.SKY_STARS.map(row=>projectStar(date,row,rotation,config.observer)).filter(s=>s.altitude>0)};
   }
   // Shared anchor stops keep every sky and terrain layer continuous across twilight.
@@ -153,6 +167,32 @@
     }
     return w;
   }
+  function weatherAt(now){
+    validDate(now);
+    // A UTC slot plus a stable integer hash is the shared weather schedule.
+    // Fresh installs, offline devices and signed-out tabs agree without writes,
+    // device-local scene locks, API quotas, or competing cloud revisions.
+    const slot=Math.floor(+now/1800000),minute=(+now-slot*1800000)/60000;
+    let hash=(slot^0x51a7c3d9)|0;hash=Math.imul(hash^(hash>>>16),0x7feb352d);hash=Math.imul(hash^(hash>>>15),0x846ca68b);hash=(hash^(hash>>>16))>>>0;
+    const raining=hash/4294967296<.2&&minute>=5&&minute<17;
+    return {status:raining?'rain':'clear',intensity:raining?smooth(5,5.5,minute)*(1-smooth(16.5,17,minute)):0,slot};
+  }
+  const woodlandTypes=['deer','fox','rabbit','raccoon'];
+  function createWoodland(random=Math.random){return {random,elapsed:0,next:30,events:[]};}
+  function advanceWoodland(w,dt){
+    if(!Number.isFinite(dt)||dt<=0)return w;
+    w.elapsed+=dt;
+    w.events=w.events.filter(e=>{e.age+=dt;return e.age<e.duration;});
+    if(w.elapsed>=w.next){
+      // Its own RNG, budget and deadline leave every other visitor's odds alone.
+      // Never replay missed rolls after a pause or a delayed frame.
+      w.next=w.elapsed+30;
+      if(w.events.length<4&&w.random()<.01){
+        const r=w.random;w.events.push({type:woodlandTypes[Math.min(3,Math.floor(r()*4))],age:0,duration:180,seed:r(),lane:r(),reverse:r()>.5});
+      }
+    }
+    return w;
+  }
   const SCENE_TIME_KEY='fvp:chain-scanner:scene-time';
   const validSceneTime=value=>['sunrise','sunset'].includes(value)||typeof value==='string'&&/^([01]\d|2[0-3]):[0-5]\d$/.test(value);
   function readSceneTime(storage){try{const value=storage.getItem(SCENE_TIME_KEY);return validSceneTime(value)?value:null;}catch{return null;}}
@@ -160,9 +200,28 @@
     if(value!==null&&!validSceneTime(value))return false;
     try{if(value===null)storage.removeItem(SCENE_TIME_KEY);else storage.setItem(SCENE_TIME_KEY,value);return true;}catch{return false;}
   }
+  const SCENE_SEASON_KEY='fvp:chain-scanner:scene-season';
+  const seasons=['spring','summer','autumn','winter'];
+  function readSceneSeason(storage){try{const value=storage.getItem(SCENE_SEASON_KEY);return seasons.includes(value)?value:null;}catch{return null;}}
+  function saveSceneSeason(storage,value){
+    if(value!==null&&!seasons.includes(value))return false;
+    try{if(value===null)storage.removeItem(SCENE_SEASON_KEY);else storage.setItem(SCENE_SEASON_KEY,value);return true;}catch{return false;}
+  }
+  function sceneSolarDate(now,storage,location){
+    const season=readSceneSeason(storage);
+    if(!season)return new Date(now);
+    const zone=locationObserver(location).timeZone,month=([3,6,9,0][seasons.indexOf(season)]+(location?.latitude<0?6:0))%12;
+    return dateInZone(+partsInZone(now,zone).year,month+1,15,zone,12);
+  }
   function sceneDate(now,storage,location){
     const date=new Date(now),time=readSceneTime(storage);
-    if(time==='sunrise'||time==='sunset')return sunTimes(date,location)[time==='sunrise'?'rise':'set']||date;
+    const season=readSceneSeason(storage);
+    // Dates comfortably inside each season keep palette and daylight in agreement.
+    // Use the observer's hemisphere, while preserving device-local clock selection.
+    if(season)date.setMonth(([3,6,9,0][seasons.indexOf(season)]+(location?.latitude<0?6:0))%12,15);
+    if(time==='sunrise'||time==='sunset'){
+      return sunTimes(sceneSolarDate(now,storage,location),location)[time==='sunrise'?'rise':'set']||new Date(now);
+    }
     if(time){const [hour,minute]=time.split(':').map(Number);date.setHours(hour,minute,0,0);}
     return date;
   }
@@ -171,6 +230,6 @@
   function readMotion(storage){try{return normalizeMotion(storage.getItem(MOTION_KEY));}catch{return null;}}
   function saveMotion(storage,value){try{storage.setItem(MOTION_KEY,value);return true;}catch{return false;}}
   function motionReduced(value,osReduced){return !!osReduced||normalizeMotion(value)!=='normal';}
-  root.LivingSky={advanceLights,skinTone,sceneDate,readSceneTime,saveSceneTime,skyAt,sunTimes,starAt,starCount:root.SKY_STARS.length,palette,activity,createWorld,advance,
+  root.LivingSky={sceneSolarDate,weatherAt,createWoodland,advanceWoodland,woodlandTypes,readSceneSeason,saveSceneSeason,advanceLights,skinTone,sceneDate,readSceneTime,saveSceneTime,skyAt,sunTimes,starAt,starCount:root.SKY_STARS.length,palette,activity,createWorld,advance,
     nightEventTypes:NIGHT_TYPES.slice(),eventTypes:EVENT_TYPES.slice(),rareTypes:RARE_TYPES.slice(),eventDurations:Object.assign({},EVENT_DURATIONS),MAX_EVENTS,RARE_COOLDOWN,readMotion,saveMotion,motionReduced,clamp,lerp,smooth,mixHex};
 })(globalThis);
