@@ -9009,8 +9009,8 @@ test('Human scene copy: each matching hour, holiday, and anytime line has equal 
     assert.equal(entry.author, 'Human');
     counts.set(entry.text, (counts.get(entry.text) || 0) + 1);
   }
-  assert.deepEqual([...counts.entries()], ['Hour one','Hour two','Holiday one','Holiday two','Holiday three','Anytime one'].map(text => [text,100]));
-  assert.equal(mood.message(new Date('2026-08-11T17:00:00Z'), 'UTC', .5), 'Anytime one');
+  assert.deepEqual([...counts.entries()], ['Hour one','Hour two','Holiday one','Holiday two','Holiday three','3 PM. Anytime one'].map(text => [text,100]));
+  assert.equal(mood.message(new Date('2026-08-11T17:00:00Z'), 'UTC', .5), '5 PM. Anytime one');
   mood.setHumanText('## Any time of day\n- \n## Hour 15\n- ');
   assert.equal(mood.messageEntry(date, 'UTC', .5).text, '');
 });
@@ -9113,7 +9113,7 @@ test('Scene seen history: exhaust unseen matching pools before recycling hourly 
   mood.setHumanText('## Hour 15\n- Hour\n## Holiday Christmas Day\n- Holiday\n## Any time of day\n- Anytime');
   const date=new Date('2026-12-25T15:00:00Z');
   mood.recordSeen('Hour');assert.equal(mood.message(date,'UTC',0),'Holiday');
-  mood.recordSeen('Holiday');assert.equal(mood.message(date,'UTC',0),'Anytime');
+  mood.recordSeen('Holiday');assert.equal(mood.message(date,'UTC',0),'3 PM. Anytime');
   mood.recordSeen('Anytime');
   for(const random of [0,.5,.999])assert.equal(mood.message(date,'UTC',random),'Hour');
 });
@@ -9122,7 +9122,7 @@ test('Scene seen history: identical text shares history across pools and banner 
   const mood=moodRuntime();mood.configureHistory(null,()=>1000000000);
   mood.setHumanText('## Hour 15\n- Shared\n## Any time of day\n- Shared\n- Other\n## Airplanes\n- Shared\n- Banner\n## Skywriters\n- Shared');
   const date=new Date('2026-08-11T15:00:00Z');
-  assert.equal(mood.message(date,'UTC',.5),'Other','duplicate text is one candidate');
+  assert.equal(mood.message(date,'UTC',.5),'3 PM. Other','duplicate text is one candidate');
   mood.recordSeen('Shared');assert.equal(mood.airplaneMessage(0),'Banner');
   assert.equal(mood.skywriterMessage(0),'');
   mood.recordSeen('Banner');assert.equal(mood.airplaneMessage(0),'','no banner repeats when its pool is exhausted');
@@ -10209,4 +10209,20 @@ test('Spawn rates: seasonal ambience can be disabled for every season',()=>{
  assert.equal(typeof context.LandscapeConfig.setSpawnRates,'function');
  context.LandscapeConfig.setSpawnRates(['spring','summer','autumn','winter'].map(s=>`| ambience-${s} | 0 |`).join('\n'));
  for(const season of ['spring','summer','autumn','winter'])assert.equal(seasonal.particles(100,season,[],{},1000,800,{status:'clear'}).length,0);
+});
+
+test('Anytime human prompts: always prefix the scene hour with AM or PM and preserve seen identity',()=>{
+ const mood=moodRuntime();mood.configureHistory(null,()=>1000000000);
+ mood.setHumanText('## Any time of day\n- Take a breath.');
+ for(const [instant,zone,expected] of [
+  ['2026-09-14T09:30:00Z','America/New_York','5 AM. Take a breath.'],
+  ['2026-09-14T16:30:00Z','America/New_York','12 PM. Take a breath.'],
+  ['2026-09-14T04:30:00Z','America/New_York','12 AM. Take a breath.'],
+  ['2026-09-14T17:30:00Z','UTC','5 PM. Take a breath.']]){
+   const entry=mood.messageEntry(new Date(instant),zone,0);
+   assert.equal(entry.text,expected);assert.equal(entry.author,'Human');assert.equal(entry.seenKey,'Take a breath.');
+ }
+ const entry=mood.messageEntry(new Date('2026-09-14T09:30:00Z'),'America/New_York',0);
+ mood.recordSeen(entry.text,entry.seenKey);
+ assert.equal(mood.message(new Date('2026-09-14T10:30:00Z'),'America/New_York',0),'','a new clock label does not bypass seven-day history');
 });

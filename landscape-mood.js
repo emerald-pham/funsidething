@@ -726,17 +726,21 @@
     const parts = localParts(date, context.timezone);
     const name = holidayForParts(parts);
     const hourly = humanText['Hour ' + String(parts.hour).padStart(2, '0')] || [];
+    const anytime = humanText['Any time of day'] || [];
+    // The hour is a display label, not a new line for seven-day seen history.
+    const humanEntry = text => anytime.includes(text) ?
+      {text: hourLabel(parts.hour) + '. ' + text, seenKey: text, author: 'Human'} : {text, author: 'Human'};
     const human = unique([
       ...hourly, ...(humanText['Holiday ' + name] || []),
-      ...(humanText['Any time of day'] || []),
+      ...anytime,
     ]);
     if (human.length) {
       const available = unseen(human);
-      if (available.length) return {text: pick(available, random), author: 'Human'};
+      if (available.length) return humanEntry(pick(available, random));
     }
     // Only human hourly copy may recycle. No AI fallback on load, holidays,
     // or after exhausting the human holiday/anytime pool.
-    return hourly.length ? {text: pick(unique(hourly), random), author: 'Human'} : {text: '', author: null};
+    return hourly.length ? humanEntry(pick(unique(hourly), random)) : {text: '', author: null};
   }
 
   function message(date, location, random) { return messageEntry(date, location, random).text; }

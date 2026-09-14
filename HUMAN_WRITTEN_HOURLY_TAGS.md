@@ -6,6 +6,10 @@ Text is displayed literally (no Markdown styling). Keep hourly lines short and
 airplane/skywriter lines very short so they fit in the sky.
 
 Hours use the scene location’s local 24-hour clock: 00 is midnight, 12 is noon.
+Any time of day lines always display with the current scene hour in front:
+`5 AM. Your prompt text` or `5 PM. Your prompt text`. Write only the prompt
+text in that section; the app adds the hour. Noon is 12 PM; midnight is 12 AM.
+The same line keeps its seven-day seen history when the clock label changes.
 All human lines matching the current hour, holiday, or Any time of day section
 form one pool. Each distinct line has an equal chance, regardless of its section.
 Only human-written copy is displayed here; no matching copy leaves the prompt blank.
