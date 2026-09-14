@@ -656,7 +656,7 @@
   }
 
   // Only bullet lines inside recognized sections are authored copy. Empty
-  // sections must never suppress the fallback, and Markdown stays plain text.
+  // sections leave the hourly prompt blank, and Markdown stays plain text.
   let humanText = Object.create(null);
   const AI_AIRPLANE_LINES = ['ONE THING AT A TIME','ROOM TO BREATHE','HELLO, BEAUTIFUL DAY','TAKE YOUR TIME'];
   function setHumanText(markdown) {
@@ -733,20 +733,12 @@
     if (human.length) {
       const available = unseen(human);
       if (available.length) return {text: pick(available, random), author: 'Human'};
-    } else {
-      // The changing clock label is presentation, not a new holiday variant.
-      const ai = name ? HOLIDAY_LINES[name].map(line => ({text: materializeHoliday(line, parts.hour, name), seenKey: 'holiday:' + name + ':' + line})) :
-        HOUR_LINES[parts.hour].map(text => ({text, seenKey: text}));
-      const history = readSeen();
-      const available = ai.filter(entry => !history.has(entry.seenKey) && !history.has(entry.text));
-      if (available.length) return {...available[Math.floor(randomFraction(random) * available.length)], author: 'AI'};
     }
-    // Exhaust the full matching pool before allowing any repeats. Only the
-    // current hour recycles; holiday/anytime lines keep their seven-day hold.
-    const fallback = hourly.length ? hourly : HOUR_LINES[parts.hour];
-    const freshHourly = unseen(fallback);
-    return {text: pick(freshHourly.length ? freshHourly : unique(fallback), random), author: hourly.length ? 'Human' : 'AI'};
+    // Only human hourly copy may recycle. No AI fallback on load, holidays,
+    // or after exhausting the human holiday/anytime pool.
+    return hourly.length ? {text: pick(unique(hourly), random), author: 'Human'} : {text: '', author: null};
   }
+
   function message(date, location, random) { return messageEntry(date, location, random).text; }
 
   function holiday(date, location) {

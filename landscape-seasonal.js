@@ -199,6 +199,9 @@
   function particles(t,season,trees,geometry,W,H,weather){
     const width=Math.max(1,finite(W,1)),height=Math.max(1,finite(H,1));
     const name=seasonName(season);
+    const rate=globalThis.LandscapeConfig?.spawnRate('ambience-'+name) ?? 1;
+    if(!rate)return [];
+    t*=rate;
     if(name==='autumn')return autumnParticles(t,trees,geometry,width,height,weather);
     if(name==='spring')return springParticles(t,trees,geometry,width,height,weather);
     if(name==='summer')return summerParticles(t,width,height,weather);

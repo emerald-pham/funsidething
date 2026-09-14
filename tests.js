@@ -353,6 +353,7 @@ test("Landscape: only one banner plane may be active while ordinary planes still
     const world = sky.createWorld(() => .5);
     world.events = existingType ? [{ type: existingType, age: 0, duration: 10000, seed: .2, lane: .3, reverse: false }] : [];
     world.elapsed = 0;
+    world.railNext = {train:Infinity,metro:Infinity}; // Isolate the ordinary flight schedule.
     world.next = 0;
     const values = [0, 1, slot(type), 0, .25, .25, reverse ? 1 : 0];
     let cursor = 0;
@@ -383,6 +384,7 @@ test("Landscape: shooting stars are brief, night-only, and singly bounded", () =
     const world = sky.createWorld(() => .5);
     world.events = [];
     world.elapsed = 0;
+    world.railNext = {train:Infinity,metro:Infinity}; // Isolate the ordinary flight schedule.
     world.next = 0;
     world.lastRare = 0;
     world.random = () => 0;
@@ -483,7 +485,7 @@ test("Landscape: local assets, decorative layers and accessible motion controls 
   assert.match(html, /id="sceneStatus"/);
   const runtime=fs.readFileSync(path.join(__dirname,"landscape.js"),"utf8");
   // Authored copy is a precached local asset; no external runtime services.
-  const withoutLocalCopy = runtime.replace("fetch('./HUMAN_WRITTEN_HOURLY_TAGS.md')", 'localCopy');
+  const withoutLocalCopy = runtime.replace("fetch('./HUMAN_WRITTEN_HOURLY_TAGS.md')", 'localCopy').replace("fetch('./SPAWN_RATES.md')", 'localRates');
   assert.doesNotMatch(withoutLocalCopy,/\b(?:fetch|XMLHttpRequest|WebSocket)\s*\(/);
   assert.match(runtime,/visibilitychange/);
   assert.match(runtime,/cancelAnimationFrame/);
@@ -8140,7 +8142,7 @@ test('Landscape browser: every visitor renders with finite geometry across short
     ['2026-06-22T05:00:00Z', 'night'],
   ];
   const values = periods.map(([instant]) => mood.message(date(instant), { latitude: 28.5, timezone: 'America/New_York' }, () => 0));
-  assert.ok(values.every(value => typeof value === 'string' && value.length > 10));
+  assert.ok(values.every(value => value === ''), 'no AI hourly fallback');
   assert.ok(mood.messageCount >= 100, 'catalog has a hundred curated combinations');
   assert.equal(mood.messages(date('2026-06-21T13:00:00Z'), { timezone: 'America/New_York' }, () => 0), values[1]);
   assert.equal(mood.message(date('2026-06-21T13:00:00Z'), { timezone: 'America/New_York' }, () => 0), mood.message(date('2026-06-21T13:00:00Z'), { timezone: 'America/New_York' }, () => 0));
@@ -8434,7 +8436,7 @@ test('Landscape messages: every hour has five distinct short, season-independent
  for(let hour=0;hour<24;hour++){
   const entries=mood.messageCatalog.filter(e=>e.hour===hour);assert.equal(entries.length,5);assert.equal(new Set(entries.map(e=>e.text)).size,5);
   const date=new Date(Date.UTC(2026,5,20,hour));
-  for(let i=0;i<5;i++)assert.equal(mood.message(date,{timezone:'UTC'},()=>i/5),entries[i].text);
+  for(let i=0;i<5;i++)assert.equal(mood.message(date,{timezone:'UTC'},()=>i/5),'');
   assert.ok(entries.every(e=>e.text.length<=110&&!/summer|winter|autumn|spring|season/i.test(e.text)));
  }
 });
@@ -8628,37 +8630,14 @@ test("holiday lookup and messages follow the observer's local calendar date", ()
   assert.equal(mood.holiday(new Date("2027-01-01T05:30:00Z"), location), "New Year's Day");
   const eveMessage = mood.message(new Date("2027-01-01T04:30:00Z"), location, () => 0);
   const dayMessage = mood.message(new Date("2027-01-01T05:30:00Z"), location, () => 0);
-  assert.match(eveMessage, /New Year's Eve/);
-  assert.match(dayMessage, /New Year's Day/);
-  assert.match(eveMessage, /11 PM/);
-  assert.match(dayMessage, /12 AM/);
+  assert.equal(eveMessage, '');
+  assert.equal(dayMessage, '');
 });
 
-test("each holiday has several randomized kind messages that name the current hour", () => {
-  const mood = moodRuntime();
-  const holidays = [
-    ["2026-01-19", "Martin Luther King Jr. Day"],
-    ["2026-02-14", "Valentine's Day"],
-    ["2026-04-05", "Easter Sunday"],
-    ["2026-05-10", "Mother's Day"],
-    ["2026-06-21", "Father's Day"],
-    ["2026-07-04", "Independence Day"],
-    ["2026-10-31", "Halloween"],
-    ["2026-12-24", "Christmas Eve"],
-    ["2026-12-31", "New Year's Eve"],
-  ];
-  for (const [date, name] of holidays) {
-    for (const hour of [0, 7, 12, 18, 23]) {
-      const instant = new Date(`${date}T${String(hour).padStart(2, "0")}:00:00Z`);
-      const messages = Array.from({ length: 5 }, (_, index) => mood.message(instant, "UTC", () => index / 5));
-      assert.equal(new Set(messages).size, 5, `${name} has five variants at ${hourLabel(hour)}`);
-      for (const message of messages) {
-        assert.match(message, new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
-        assert.match(message, new RegExp(hourLabel(hour).replace(" ", "\\s+")));
-        assert.ok(message.length <= 110, `${name} remains short enough for the scene card`);
-      }
-    }
-  }
+test("AI holiday messages stay disabled throughout the day", () => {
+  const mood=moodRuntime();
+  for(const holiday of ['2026-12-25','2026-07-04','2026-01-01'])for(let hour=0;hour<24;hour++)
+    assert.equal(mood.message(new Date(`${holiday}T${String(hour).padStart(2,'0')}:30:00Z`),'UTC',.5),'');
 });
 
 test("ordinary dates retain the existing hourly message catalog", () => {
@@ -8668,7 +8647,7 @@ test("ordinary dates retain the existing hourly message catalog", () => {
   const entries = mood.messageCatalog.filter(entry => entry.hour === 15);
   assert.equal(entries.length, 5);
   for (let index = 0; index < entries.length; index++) {
-    assert.equal(mood.message(date, "UTC", () => index / 5), entries[index].text);
+    assert.equal(mood.message(date, "UTC", () => index / 5), '');
   }
 });
 
@@ -8997,13 +8976,13 @@ test('Human scene copy: blank templates, per-hour precedence, holidays, and rota
   assert.equal(typeof mood.setHumanText, 'function');
   mood.setHumanText(fs.readFileSync(path.join(__dirname, 'HUMAN_WRITTEN_HOURLY_TAGS.md'), 'utf8'));
   const date = new Date('2026-08-11T15:00:00Z');
-  assert.equal(mood.messageEntry(date, 'UTC', 0).author, 'AI');
+  assert.equal(mood.messageEntry(date, 'UTC', 0).text, '');
   mood.setHumanText('## Hour 15\n- My first line\n- My second line\n## Hour 16\n-   \n## Airplanes\n- Hello from me\n## Skywriters\n- Look up\n## Unknown\n- Ignore me');
   assert.equal(mood.message(date, 'UTC', 0), 'My first line');
   assert.equal(mood.message(date, 'UTC', .99), 'My second line');
   assert.equal(mood.messageEntry(date, 'UTC', 0).author, 'Human');
   assert.equal(mood.message(new Date('2026-12-25T15:00:00Z'), 'UTC', 0), 'My first line');
-  assert.equal(mood.messageEntry(new Date('2026-08-11T16:00:00Z'), 'UTC', 0).author, 'AI');
+  assert.equal(mood.messageEntry(new Date('2026-08-11T16:00:00Z'), 'UTC', 0).text, '');
   assert.equal(mood.airplaneMessage(.9), 'Hello from me');
   assert.equal(mood.skywriterMessage(0), 'Look up');
   mood.setHumanText('## Holiday Christmas Day\n- A human Christmas');
@@ -9033,7 +9012,7 @@ test('Human scene copy: each matching hour, holiday, and anytime line has equal 
   assert.deepEqual([...counts.entries()], ['Hour one','Hour two','Holiday one','Holiday two','Holiday three','Anytime one'].map(text => [text,100]));
   assert.equal(mood.message(new Date('2026-08-11T17:00:00Z'), 'UTC', .5), 'Anytime one');
   mood.setHumanText('## Any time of day\n- \n## Hour 15\n- ');
-  assert.equal(mood.messageEntry(date, 'UTC', .5).author, 'AI');
+  assert.equal(mood.messageEntry(date, 'UTC', .5).text, '');
 });
 
 test('Human scene copy: multiple airplane and future skywriter lines are all selectable', () => {
@@ -9184,15 +9163,6 @@ test('Scene observation: only trusted interaction with visible text in a focused
   assert.deepEqual(calls,['Visible','Flying line'],'visible banner counts once per flight');
 });
 
-test('Scene seen history: holiday templates stay seen when their displayed hour changes', () => {
-  const mood=moodRuntime();mood.configureHistory(null,()=>1000000000);
-  const first=mood.messageEntry(new Date('2026-12-25T15:00:00Z'),'UTC',0);
-  assert.ok(first.seenKey,'AI holiday variants have a stable identity');
-  mood.recordSeen(first.seenKey);
-  const next=mood.messageEntry(new Date('2026-12-25T16:00:00Z'),'UTC',0);
-  assert.notEqual(next.seenKey,first.seenKey);
-  assert.notEqual(next.text.replace('4 PM','3 PM'),first.text,'the same source template must not return with another clock label');
-});
 
 test('Scene seen history: separate tabs merge observed lines rather than losing earlier history', () => {
   const saved=new Map();const storage={getItem:k=>saved.get(k)||null,setItem:(k,v)=>saved.set(k,v),key:i=>[...saved.keys()][i],get length(){return saved.size;},removeItem:k=>saved.delete(k)};
@@ -9202,18 +9172,19 @@ test('Scene seen history: separate tabs merge observed lines rather than losing 
   assert.equal(a.message(new Date('2026-08-11T15:00:00Z'),'UTC',0),'Three');
 });
 
-test('Scene seen history: exhausted non-hour human pools fall back to hourly AI without releasing holiday or anytime lines', () => {
+test('Scene seen history: exhausted non-hour human pools show no prompt without releasing holiday or anytime lines', () => {
   const mood=moodRuntime();mood.configureHistory(null,()=>1000000000);
   mood.setHumanText('## Any time of day\n- Human anytime\n## Holiday Christmas Day\n- Human holiday');
   mood.recordSeen('Human anytime');mood.recordSeen('Human holiday');
   const entry=mood.messageEntry(new Date('2026-12-25T15:00:00Z'),'UTC',0);
-  assert.equal(entry.author,'AI');
-  assert.ok(mood.messageCatalog.some(line=>line.hour===15&&line.text===entry.text));
+  assert.equal(entry.text,'');
+  assert.equal(entry.author,null);
 });
 
 
 test('Scene seen history: holiday template and rendered wording are recorded together across text pools', () => {
   const mood=moodRuntime();mood.configureHistory(null,()=>1000000000);
+  mood.setHumanText('## Any time of day\n- Human holiday line\n- Another human line');
   const first=mood.messageEntry(new Date('2026-12-25T15:00:00Z'),'UTC',0);
   mood.recordSeen(first.text,first.seenKey);
   const next=mood.messageEntry(new Date('2026-12-25T16:00:00Z'),'UTC',0);
@@ -10171,4 +10142,71 @@ test('Winter canopy placement: snow follows actual offscreen tree bases and rest
  const hidden=render({x:200,y:800,size:50,variant:.6});assert.ok(hidden.filter(op=>op[0]==='ellipse').every(op=>op[2]>H),'offscreen trunks must not acquire floating onscreen snowcaps');
  const tree={x:200,y:400,size:50,variant:.6},caps=render(tree).filter(op=>op[0]==='ellipse');assert.ok(caps.length);assert.ok(caps.every(op=>op[2]<=tree.y-tree.size*1.08),'snowcaps sit on the crown rather than the middle of the foliage');
  const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');assert.match(source,/treeOrigins.push\(\{x,y,size,variant\}\)/,'seasonal painters know the actual tree silhouette');
+});
+
+
+test('Hourly prompts: 5:30 AM and every other hour require human copy, without disabling planes',()=>{
+ const mood=moodRuntime();
+ for(let hour=0;hour<24;hour++)assert.equal(mood.message(new Date(Date.UTC(2026,8,14,hour,30)),'UTC',.7),'');
+ assert.ok(mood.airplaneMessage(0));
+ mood.setHumanText('## Hour 05\n- My dawn line\n## Skywriters\n- Sky message');
+ assert.equal(mood.message(new Date('2026-09-14T09:30:00Z'),'America/New_York',0),'My dawn line');
+ assert.equal(mood.message(new Date('2026-09-14T10:00:00Z'),'America/New_York',0),'');
+ assert.equal(mood.skywriterMessage(0),'Sky message');
+ assert.match(html,/<span id="sceneStatus"><\/span>/,'no AI placeholder before human text loads');
+});
+
+test('Rail service: both lines run regularly in every season, even at night',()=>{
+ const sky=livingSky();
+ for(const season of ['spring','summer','autumn','winter'])for(const altitude of [-20,30]){
+  const world=sky.createWorld(()=>.99,season),counts={train:0,metro:0},last={train:0,metro:0};
+  let previous=new Set();
+  for(let second=1;second<=600;second++){
+   sky.advance(world,1,{sun:{altitude,azimuth:90}});
+   assert.ok(world.events.length<=sky.MAX_EVENTS);
+   for(const type of ['train','metro']){
+    const active=world.events.filter(e=>e.type===type);assert.ok(active.length<=1,'no overlapping rail vehicles');
+    for(const event of active)if(!previous.has(event)){counts[type]++;assert.ok(second-last[type]<=120,'bounded departure gap');last[type]=second;}
+    assert.ok(second-last[type]<=120,`${type} must not disappear for minutes`);
+   }
+   previous=new Set(world.events);
+  }
+  assert.ok(counts.train>=5&&counts.metro>=5,JSON.stringify(counts));
+ }
+});
+
+test('Spawn rates: root Markdown controls every visitor and rejects invalid rates atomically',()=>{
+ const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-config.js'),'utf8'),ctx);const config=ctx.LandscapeConfig;
+ assert.equal(typeof config.setSpawnRates,'function');
+ assert.equal(config.setSpawnRates('| Event | Rate |\n| bird | 0 |\n| train | 2 |'),true);
+ assert.equal(config.spawnRate('bird'),0);assert.equal(config.spawnRate('train'),2);
+ assert.equal(config.setSpawnRates('| train | -1 |'),false);assert.equal(config.spawnRate('train'),2);
+ assert.equal(config.setSpawnRates('| train | Infinity |'),false);
+ assert.equal(config.setSpawnRates('| misspelled-event | 1 |'),false);
+ assert.equal(config.setSpawnRates(fs.readFileSync(path.join(__dirname,'SPAWN_RATES.md'),'utf8')),true);
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ assert.match(source,/fetch\('\.\/SPAWN_RATES\.md'\)/);
+ assert.match(serviceWorkerSource(),/SPAWN_RATES\.md/);
+});
+
+test('Spawn rates: zero disables all ordinary and rail spawns including the opening cast',()=>{
+ const sky=livingSky();
+ // livingSky exposes the same config object through a fresh VM below.
+ const ctx=vm.createContext({Date,Intl,Math,JSON});
+ for(const file of ['landscape-config.js','vendor/astronomy.min.js','stars.js','landscape-core.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,file),'utf8'),ctx);
+ const config=ctx.LandscapeConfig;
+ assert.equal(typeof config.setSpawnRates,'function');
+ config.setSpawnRates(config.spawnRateNames.map(name=>`| ${name} | 0 |`).join('\n'));
+ const world=ctx.LivingSky.createWorld(()=>.5);
+ for(let i=0;i<600;i++)ctx.LivingSky.advance(world,1,{sun:{altitude:-20,azimuth:90}});
+ assert.equal(world.events.length,0);
+ const woodland=ctx.LivingSky.createWoodland(()=>0);ctx.LivingSky.advanceWoodland(woodland,30);assert.equal(woodland.events.length,0);
+});
+
+test('Spawn rates: seasonal ambience can be disabled for every season',()=>{
+ const {context,seasonal}=loadSeasonalRepair();
+ vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-config.js'),'utf8'),context);
+ assert.equal(typeof context.LandscapeConfig.setSpawnRates,'function');
+ context.LandscapeConfig.setSpawnRates(['spring','summer','autumn','winter'].map(s=>`| ambience-${s} | 0 |`).join('\n'));
+ for(const season of ['spring','summer','autumn','winter'])assert.equal(seasonal.particles(100,season,[],{},1000,800,{status:'clear'}).length,0);
 });

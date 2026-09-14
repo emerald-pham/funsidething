@@ -141,22 +141,25 @@
   const EVENT_DURATIONS=CONFIG.eventDurations||CONFIG.durations;
   const INITIAL_TYPES=EVENT_TYPES.filter(type=>type!=='dolphin');
   function createWorld(random=Math.random,season='summer'){
-    const world={random,season,elapsed:0,events:[],next:3+random()*6,lastRare:-RARE_COOLDOWN,rareCount:0,wind:.6+random()*1.2};
+    const world={random,season,railNext:{train:0,metro:12},elapsed:0,events:[],next:3+random()*6,lastRare:-RARE_COOLDOWN,rareCount:0,wind:.6+random()*1.2};
     // Start mid-journey so returning never waits for a first event. Pick three
     // distinct ordinary visitors; the rare abduction is never in the opening cast.
-    const pool=season==='winter'?WINTER_EVENTS.slice():INITIAL_TYPES.slice();
+    const pool=(season==='winter'?WINTER_EVENTS:INITIAL_TYPES).filter(type=>CONFIG.spawnRate(type)>0);
     while(world.events.length<3&&pool.length){
-      const index=Math.min(pool.length-1,Math.floor(clamp(random(),0,1-.0000001)*pool.length));
+      let cursor=clamp(random(),0,1-.0000001)*pool.reduce((sum,type)=>sum+CONFIG.spawnRate(type),0),index=0;
+      while(index<pool.length-1&&cursor>=CONFIG.spawnRate(pool[index]))cursor-=CONFIG.spawnRate(pool[index++]);
       spawn(world,pool.splice(index,1)[0],true);
     }
     return world;
   }
   function spawn(w,type,initial=false){
+    if(!type||!CONFIG.spawnRate(type))return;
+    if(CONFIG.rail[type]&&w.events.some(e=>e.type===type))return;
     if(['banner','meteor','bird','dolphin'].includes(type)&&w.events.some(e=>e.type===type))return;
     if(WATER_TYPES.includes(type)&&w.events.filter(e=>WATER_TYPES.includes(e.type)).length>=2)return;
     const r=w.random;
     if(type==='dolphin'&&r()>.35)return; // A short, occasional surprise, never an opening attraction.
-    const base=EVENT_DURATIONS[type]|| (type==='abduction'?24:type==='bird'?28:type==='balloon'?150:type==='plane'?95:48+r()*50);
+    const base=CONFIG.rail[type]?.duration||EVENT_DURATIONS[type]|| (type==='abduction'?24:type==='bird'?28:type==='balloon'?150:type==='plane'?95:48+r()*50);
     const duration=base*((type==='abduction'||type==='fireworks')?1:.8+r()*.4);
     w.events.push({type,age:initial?duration*(.15+r()*.45):0,duration,lane:r(),seed:r(),reverse:r()>.5});
   }
@@ -164,20 +167,31 @@
     if(!Number.isFinite(dt)||dt<=0)return w;
     w.elapsed+=dt;
     w.events=w.events.filter(e=>{e.age+=dt;return e.age<e.duration;});
+    // Reserve two of the existing slots for rail service. Each track has one
+    // vehicle at most; after it clears, a short gap replaces random long waits.
+    for(const type of ['train','metro']){
+      const rate=CONFIG.spawnRate(type),active=w.events.find(e=>e.type===type);
+      if(active){w.railNext[type]=w.elapsed+Math.max(0,active.duration-active.age)+CONFIG.rail[type].gap/(rate||1);continue;}
+      if(rate&&w.elapsed>=w.railNext[type]&&w.events.length<MAX_EVENTS){
+        spawn(w,type);w.railNext[type]=w.elapsed+CONFIG.rail[type].gap/rate;
+      }
+    }
     if(w.elapsed>=w.next){
       const r=w.random,a=activity(sky);
       w.next=w.elapsed+(7+r()*18)/a;
-      if(w.events.length<MAX_EVENTS){
-        if(w.elapsed-w.lastRare>=RARE_COOLDOWN && r()<.025){
-          spawn(w,sky.sun.altitude < -6&&r()<.5?'fireworks':'abduction');w.lastRare=w.elapsed;w.rareCount++;
+      if(w.events.length<MAX_EVENTS-2){
+        const abduction=CONFIG.spawnRate('abduction'),fireworks=sky.sun.altitude < -6?CONFIG.spawnRate('fireworks'):0;
+        const rareRate=sky.sun.altitude < -6?(abduction+fireworks)/2:abduction;
+        if(w.elapsed-w.lastRare>=RARE_COOLDOWN && r()<.025*rareRate){
+          const type=fireworks&&r()<fireworks/(abduction+fireworks)?'fireworks':'abduction';
+          spawn(w,type);w.lastRare=w.elapsed;w.rareCount++;
         }else{
           let type;
           if(sky.sun.altitude < -6){
-            // Preserve the existing quiet night bias toward meteor, metro and
-            // plane events while letting the shared pool grow independently.
-            type=r()<.75?NIGHT_REGULARS[Math.min(NIGHT_REGULARS.length-1,Math.floor(clamp(r(),0,1-.0000001)*NIGHT_REGULARS.length))]:CONFIG.pickEvent(w.season,'night',r);
+            // Night visitors share the editable weights; rail service is independent.
+            type=CONFIG.pickEvent(w.season,'night',r);
           }else type=CONFIG.pickEvent(w.season,'day',r);
-          spawn(w,type);
+          if(!CONFIG.rail[type])spawn(w,type);
         }
       }
     }
@@ -189,7 +203,9 @@
     // A selected winter scene changes the precipitation, never its timing.
     const weather=CONFIG.weather,slot=Math.floor(+now/weather.slot);
     const random=salt=>{let hash=(slot^0x51a7c3d9^Math.imul(salt,0x9e3779b9))|0;hash=Math.imul(hash^(hash>>>16),0x7feb352d);hash=Math.imul(hash^(hash>>>15),0x846ca68b);return ((hash^(hash>>>16))>>>0)/4294967296;};
-    const enabled=random(0)<weather.chance,storm=random(1)<weather.stormChance;
+    const storm=random(1)<weather.stormChance;
+    const weatherType=season==='winter'?(storm?'snowstorm':'snow'):(storm?'thunderstorm':'rain');
+    const enabled=random(0)<Math.min(1,weather.chance*CONFIG.spawnRate(weatherType));
     // NWS ordinary thunderstorm cells last about 30–60 minutes. Quieter
     // showers are shorter; three-hour slots leave room for a natural clearing.
     const start=Math.round(slot*weather.slot+(weather.startMinutes[0]+random(3)*(weather.startMinutes[1]-weather.startMinutes[0]))*60000);
@@ -209,8 +225,10 @@
       // Its own RNG, budget and deadline leave every other visitor's odds alone.
       // Never replay missed rolls after a pause or a delayed frame.
       w.next=w.elapsed+woodlandConfig.interval;
-      if(w.events.length<woodlandConfig.maxActive&&w.random()<woodlandConfig.chance){
-        const r=w.random;w.events.push({type:woodlandTypes[Math.min(woodlandTypes.length-1,Math.floor(r()*woodlandTypes.length))],age:0,duration:woodlandConfig.duration,seed:r(),lane:r(),reverse:r()>.5});
+      const weights=woodlandTypes.map(type=>CONFIG.spawnRate('woodland-'+type)),total=weights.reduce((a,b)=>a+b,0);
+      if(total&&w.events.length<woodlandConfig.maxActive&&w.random()<woodlandConfig.chance*total/woodlandTypes.length){
+        const r=w.random;let cursor=r()*total,index=0;while(index<weights.length-1&&cursor>=weights[index])cursor-=weights[index++];
+        w.events.push({type:woodlandTypes[index],age:0,duration:woodlandConfig.duration,seed:r(),lane:r(),reverse:r()>.5});
       }
     }
     return w;

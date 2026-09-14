@@ -72,6 +72,28 @@
   }
   seasonConfig.winter = freeze({ name: 'winter', events: WINTER_EVENTS, accent: ACCENTS.winter, mood: ACCENTS.winter, dayEntries: WINTER_DAY_ENTRIES, nightEntries: WINTER_NIGHT_ENTRIES, weather: WEATHER });
 
+  // Markdown is data, never executable code. Validate the whole table before
+  // replacing rates so a typo cannot partially change a scene's schedule.
+  const spawnRateNames=freeze([...new Set([...BASE_EVENTS,...WINTER_EVENTS,'meteor','abduction','fireworks',
+    ...WOODLAND.types.map(type=>'woodland-'+type),'rain','thunderstorm','snow','snowstorm',
+    ...['spring','summer','autumn','winter'].map(season=>'ambience-'+season)])]);
+  let rates=Object.create(null);
+  function spawnRate(type){return rates[type] ?? 1;}
+  function setSpawnRates(markdown){
+    const next=Object.create(null);let count=0;
+    for(const line of String(markdown).split(/\r?\n/)){
+      if(!line.trim().startsWith('|'))continue;
+      const cells=line.split('|').slice(1,-1).map(cell=>cell.trim());
+      if(cells[0]==='Event'||cells.every(cell=>/^:?-+:?$/.test(cell)))continue;
+      if(cells.length!==2||!spawnRateNames.includes(cells[0])||!/^\d+(?:\.\d+)?$/.test(cells[1]))return false;
+      const value=Number(cells[1]);
+      if(!Number.isFinite(value)||value>10||Object.hasOwn(next,cells[0]))return false;
+      next[cells[0]]=value;count++;
+    }
+    if(!count)return false;
+    rates=next;return true;
+  }
+
   function fraction(random) {
     let value;
     try { value = typeof random === 'function' ? random() : random; } catch { value = 0; }
@@ -82,8 +104,9 @@
     return (seasonConfig[season] || seasonConfig.summer).dayEntries;
   }
   function pickEvent(season = 'summer', phase = 'day', random = Math.random) {
-    const entries = entriesFor(season, phase);
+    const entries = entriesFor(season, phase).map(entry=>({...entry,weight:entry.weight*spawnRate(entry.type)}));
     const total = entries.reduce((sum, entry) => sum + entry.weight, 0);
+    if(!total)return null;
     let cursor = fraction(random) * total;
     for (const entry of entries) {
       if (cursor < entry.weight) return entry.type;
@@ -94,6 +117,8 @@
 
   const API = freeze({
     version: 1,
+    spawnRateNames, spawnRate, setSpawnRates,
+    rail: freeze({train: freeze({duration:65,gap:12}),metro: freeze({duration:50,gap:8})}),
     seasons: freeze(seasonConfig),
     eventTypes: BASE_EVENTS,
     winterEvents: WINTER_EVENTS,

@@ -8,7 +8,7 @@ airplane/skywriter lines very short so they fit in the sky.
 Hours use the scene location’s local 24-hour clock: 00 is midnight, 12 is noon.
 All human lines matching the current hour, holiday, or Any time of day section
 form one pool. Each distinct line has an equal chance, regardless of its section.
-Human copy takes priority over AI defaults while any matching unseen lines remain.
+Only human-written copy is displayed here; no matching copy leaves the prompt blank.
 
 A line counts as seen only after a click, tap, key press, or scroll while it is
 visible in the focused page. Seen history is stored on this device, shared across
@@ -17,7 +17,7 @@ Passive display does not count. Repeating a line in multiple sections does not
 bypass its history or give it more chances.
 
 If every matching line was seen recently, only the current hourly pool may repeat.
-Use human hourly lines when present; otherwise use AI hourly defaults. Holiday
+Use human hourly lines when present; otherwise leave the prompt blank. Holiday
 and anytime lines remain held for seven days. Airplanes use their own human pool
 when populated, otherwise AI defaults; with no unseen lines they fly without text.
 Skywriters are reserved for a future animation; adding lines does not create it.

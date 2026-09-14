@@ -1,9 +1,16 @@
 /* Two canvases: the painted landscape is cached, only its sparse inhabitants
    redraw at 30fps. Device motion preference never enters the synced task state. */
-(function(){
+(async function(){
   'use strict';
   const S=globalThis.LivingSky,host=document.getElementById('landscape');
   if(!host||!S)return;
+  // Apply local rates before creating the opening cast, including zero rates.
+  await fetch('./SPAWN_RATES.md').then(response=>{
+    if(!response.ok)throw new Error('Spawn rates unavailable');
+    return response.text();
+  }).then(markdown=>{
+    if(!LandscapeConfig.setSpawnRates(markdown))throw new Error('Invalid spawn rates');
+  }).catch(error=>console.warn(error.message));
   const back=host.querySelector('[data-scenery]'),front=host.querySelector('[data-life]');
   let b=back.getContext('2d',{alpha:false});const base=b,g=front.getContext('2d');
   const layers={};let geometry;
@@ -870,7 +877,7 @@
   window.addEventListener('pageshow',start);
   resize();updateMotion();if(preference===null)openMotion();
   // The editable local file is precached for offline use. A failed first load
-  // leaves the AI defaults usable and cannot interrupt animation startup.
+  // leaves hourly text blank and cannot interrupt animation startup.
   fetch('./HUMAN_WRITTEN_HOURLY_TAGS.md').then(response=>{
     if(!response.ok)throw new Error('Human text unavailable');
     return response.text();
