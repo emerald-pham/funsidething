@@ -155,13 +155,15 @@
   function spawn(w,type,initial=false){
     if(!type||!CONFIG.spawnRate(type))return;
     if(CONFIG.rail[type]&&w.events.some(e=>e.type===type))return;
-    if(['banner','meteor','bird','dolphin'].includes(type)&&w.events.some(e=>e.type===type))return;
+    if(['banner','skywriter','meteor','bird','dolphin'].includes(type)&&w.events.some(e=>e.type===type))return;
     if(WATER_TYPES.includes(type)&&w.events.filter(e=>WATER_TYPES.includes(e.type)).length>=2)return;
     const r=w.random;
+    const skywriterWord=type==='skywriter'?root.LandscapeMood?.skywriterMessage(r):undefined;
+    if(type==='skywriter'&&!skywriterWord)return;
     if(type==='dolphin'&&r()>.35)return; // A short, occasional surprise, never an opening attraction.
     const base=CONFIG.rail[type]?.duration||EVENT_DURATIONS[type]|| (type==='abduction'?24:type==='bird'?28:type==='balloon'?150:type==='plane'?95:48+r()*50);
     const duration=base*((type==='abduction'||type==='fireworks')?1:.8+r()*.4);
-    w.events.push({type,age:initial?duration*(.15+r()*.45):0,duration,lane:r(),seed:r(),reverse:r()>.5});
+    w.events.push({type,...(skywriterWord?{skywriterWord}:{}),age:initial?duration*(.15+r()*.45):0,duration,lane:r(),seed:r(),reverse:r()>.5});
   }
   function advance(w,dt,sky){
     if(!Number.isFinite(dt)||dt<=0)return w;

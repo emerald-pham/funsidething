@@ -24,7 +24,10 @@ If every matching line was seen recently, only the current hourly pool may repea
 Use human hourly lines when present; otherwise leave the prompt blank. Holiday
 and anytime lines remain held for seven days. Airplanes use their own human pool
 when populated, otherwise AI defaults; with no unseen lines they fly without text.
-Skywriters are reserved for a future animation; adding lines does not create it.
+Skywriters trace one word per flight from the Skywriters section below, in
+uppercase smoke letters. Use one word of 1–16 English letters (A–Z) per bullet.
+Phrases, numbers, punctuation, and longer entries are ignored. An empty or fully
+seen bank produces no skywriter; there is no AI fallback.
 Existing hourly, holiday, and airplane defaults in landscape-mood.js are AI-written.
 
 Save this file and reload while developing. For the installed/live app, deploy

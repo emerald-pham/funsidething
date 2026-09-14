@@ -127,7 +127,7 @@ test("Landscape location: reports denied, unavailable, timeout, and storage fail
 });
 
 test("Landscape location: the browser wiring is explicit, local-only, and exposes the standalone dialog", () => {
-  assert.match(html, /<script defer src="location\.js"><\/script>\s*<script defer src="landscape-geometry\.js"><\/script>\s*<script defer src="landscape-mood\.js"><\/script>\s*(?:<script defer src="landscape-(?:appearance|riders|winter|seasonal)\.js"><\/script>\s*)+<script defer src="landscape\.js">/);
+  assert.match(html, /<script defer src="location\.js"><\/script>\s*<script defer src="landscape-geometry\.js"><\/script>\s*<script defer src="landscape-mood\.js"><\/script>\s*(?:<script defer src="landscape-(?:appearance|riders|winter|seasonal|skywriter)\.js"><\/script>\s*)+<script defer src="landscape\.js">/);
   assert.match(html, /<script defer src="landscape-geometry\.js"><\/script>/);
   assert.match(html, /data-act="location-settings"/);
   assert.match(html, /<dialog id="locationDialog"/);
@@ -159,7 +159,7 @@ test("Landscape location: actual coordinates change the sky and polar day return
 
 test("Landscape: daytime life includes a duck visit and the new bounded animal set", () => {
   const sky = livingSky();
-  assert.deepEqual([...sky.eventTypes], ["cyclist", "bird", "balloon", "train", "metro", "plane", "duck", "fish", "butterfly", "rabbit", "deer", "kite", "reader", "picnic", "couple", "walker", "airshow", "banner", "hangglider", "jetski", "sailboat", "cruise", "yacht", "dolphin", "flock", "skateboarder", "rollerskater", "hoverboard", "scooter", "windsurfer", "dogwalker", "snowman", "skier", "snowangel"]);
+  assert.deepEqual([...sky.eventTypes], ["cyclist", "bird", "balloon", "train", "metro", "plane", "duck", "fish", "butterfly", "rabbit", "deer", "kite", "reader", "picnic", "couple", "walker", "airshow", "banner", "skywriter", "hangglider", "jetski", "sailboat", "cruise", "yacht", "dolphin", "flock", "skateboarder", "rollerskater", "hoverboard", "scooter", "windsurfer", "dogwalker", "snowman", "skier", "snowangel"]);
   assert.deepEqual([...sky.rareTypes], ["abduction", "fireworks"]);
   const world = sky.createWorld(() => 0.99);
   assert.equal(world.events.length, 3, "opening life is a small cast");
@@ -8977,14 +8977,14 @@ test('Human scene copy: blank templates, per-hour precedence, holidays, and rota
   mood.setHumanText(fs.readFileSync(path.join(__dirname, 'HUMAN_WRITTEN_HOURLY_TAGS.md'), 'utf8'));
   const date = new Date('2026-08-11T15:00:00Z');
   assert.equal(mood.messageEntry(date, 'UTC', 0).text, '');
-  mood.setHumanText('## Hour 15\n- My first line\n- My second line\n## Hour 16\n-   \n## Airplanes\n- Hello from me\n## Skywriters\n- Look up\n## Unknown\n- Ignore me');
+  mood.setHumanText('## Hour 15\n- My first line\n- My second line\n## Hour 16\n-   \n## Airplanes\n- Hello from me\n## Skywriters\n- Look\n## Unknown\n- Ignore me');
   assert.equal(mood.message(date, 'UTC', 0), 'My first line');
   assert.equal(mood.message(date, 'UTC', .99), 'My second line');
   assert.equal(mood.messageEntry(date, 'UTC', 0).author, 'Human');
   assert.equal(mood.message(new Date('2026-12-25T15:00:00Z'), 'UTC', 0), 'My first line');
   assert.equal(mood.messageEntry(new Date('2026-08-11T16:00:00Z'), 'UTC', 0).text, '');
   assert.equal(mood.airplaneMessage(.9), 'Hello from me');
-  assert.equal(mood.skywriterMessage(0), 'Look up');
+  assert.equal(mood.skywriterMessage(0), 'Look');
   mood.setHumanText('## Holiday Christmas Day\n- A human Christmas');
   assert.equal(mood.message(new Date('2026-12-25T15:00:00Z'), 'UTC', 0), 'A human Christmas');
   assert.equal(mood.skywriterMessage(0), '');
@@ -9017,9 +9017,9 @@ test('Human scene copy: each matching hour, holiday, and anytime line has equal 
 
 test('Human scene copy: multiple airplane and future skywriter lines are all selectable', () => {
   const mood = moodRuntime();
-  mood.setHumanText('## Airplanes\n- Plane one\n- Plane two\n- Plane three\n## Skywriters\n- Sky one\n- Sky two');
+  mood.setHumanText('## Airplanes\n- Plane one\n- Plane two\n- Plane three\n## Skywriters\n- ONE\n- TWO');
   assert.deepEqual([0,.4,.9].map(r => mood.airplaneMessage(r)), ['Plane one','Plane two','Plane three']);
-  assert.deepEqual([0,.9].map(r => mood.skywriterMessage(r)), ['Sky one','Sky two']);
+  assert.deepEqual([0,.9].map(r => mood.skywriterMessage(r)), ['ONE','TWO']);
 });
 
 test('Resume scan: current-pass skips stay out until the exact local 2 AM boundary', async () => {
@@ -10149,10 +10149,10 @@ test('Hourly prompts: 5:30 AM and every other hour require human copy, without d
  const mood=moodRuntime();
  for(let hour=0;hour<24;hour++)assert.equal(mood.message(new Date(Date.UTC(2026,8,14,hour,30)),'UTC',.7),'');
  assert.ok(mood.airplaneMessage(0));
- mood.setHumanText('## Hour 05\n- My dawn line\n## Skywriters\n- Sky message');
+ mood.setHumanText('## Hour 05\n- My dawn line\n## Skywriters\n- SKY');
  assert.equal(mood.message(new Date('2026-09-14T09:30:00Z'),'America/New_York',0),'My dawn line');
  assert.equal(mood.message(new Date('2026-09-14T10:00:00Z'),'America/New_York',0),'');
- assert.equal(mood.skywriterMessage(0),'Sky message');
+ assert.equal(mood.skywriterMessage(0),'SKY');
  assert.match(html,/<span id="sceneStatus"><\/span>/,'no AI placeholder before human text loads');
 });
 
@@ -10225,4 +10225,41 @@ test('Anytime human prompts: always prefix the scene hour with AM or PM and pres
  const entry=mood.messageEntry(new Date('2026-09-14T09:30:00Z'),'America/New_York',0);
  mood.recordSeen(entry.text,entry.seenKey);
  assert.equal(mood.message(new Date('2026-09-14T10:30:00Z'),'America/New_York',0),'','a new clock label does not bypass seven-day history');
+});
+
+test('Skywriters: accept only human single words and keep their seen history',()=>{
+ const mood=moodRuntime();assert.equal(mood.skywriterMessage(0),'');
+ mood.setHumanText('## Skywriters\n- Hello there\n- HELLO\n- 123\n- WORLD\n- toooooooooooooooolong');
+ assert.equal(mood.skywriterMessage(0),'HELLO');assert.equal(mood.skywriterMessage(.99),'WORLD');
+ mood.recordSeen('HELLO');assert.equal(mood.skywriterMessage(0),'WORLD');
+ mood.recordSeen('WORLD');assert.equal(mood.skywriterMessage(0),'');
+});
+
+test('Skywriters: smoke strokes reveal progressively with a plane at the writing tip',()=>{
+ const file=path.join(__dirname,'landscape-skywriter.js');assert.ok(fs.existsSync(file));
+ const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(file,'utf8'),ctx);
+ const sky=ctx.LandscapeSkywriter;
+ for(const word of ['HELLO','ABCDEFGHIJKLM','NOPQRSTUVWXYZ','a']){
+  const drawing=sky.wordPath(word),start=sky.trace(drawing,0),half=sky.trace(drawing,.5),end=sky.trace(drawing,1);
+  assert.equal(start.segments.length,0);assert.ok(half.segments.length>0);assert.ok(end.segments.length>half.segments.length);
+  assert.ok(end.complete);assert.ok(!half.complete);
+  for(const frame of [start,half,end])assert.ok([frame.x,frame.y,frame.angle].every(Number.isFinite));
+  assert.ok(drawing.width>0);
+ }
+ assert.equal(sky.wordPath('two words'),null);
+ assert.equal(sky.wordPath(''),null);
+ assert.ok(html.includes('landscape-skywriter.js'));assert.ok(serviceWorkerSource().includes('landscape-skywriter.js'));
+});
+
+test('Skywriters: scheduler requires a human word, respects its rate, and allows only one flight',()=>{
+ const ctx=vm.createContext({Date,Intl,Math,JSON});
+ for(const file of ['landscape-config.js','vendor/astronomy.min.js','stars.js','landscape-mood.js','landscape-core.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,file),'utf8'),ctx);
+ const C=ctx.LandscapeConfig,S=ctx.LivingSky;
+ assert.ok(C.spawnRateNames.includes('skywriter'));
+ C.setSpawnRates(C.spawnRateNames.map(name=>`| ${name} | ${name==='skywriter'?1:0} |`).join('\n'));
+ const empty=S.createWorld(()=>.5);S.advance(empty,30,{sun:{altitude:30,azimuth:90}});assert.equal(empty.events.length,0);
+ ctx.LandscapeMood.setHumanText('## Skywriters\n- HELLO');
+ const world=S.createWorld(()=>.5);assert.equal(world.events.length,1);assert.equal(world.events[0].skywriterWord,'HELLO');
+ S.advance(world,1,{sun:{altitude:30,azimuth:90}});assert.equal(world.events.length,1);
+ C.setSpawnRates('| skywriter | 0 |');assert.ok(!S.createWorld(()=>.5).events.some(e=>e.type==='skywriter'));
 });

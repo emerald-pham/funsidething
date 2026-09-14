@@ -9,12 +9,12 @@
   const BASE_EVENTS = freeze([
     'cyclist', 'bird', 'balloon', 'train', 'metro', 'plane', 'duck', 'fish',
     'butterfly', 'rabbit', 'deer', 'kite', 'reader', 'picnic', 'couple',
-    'walker', 'airshow', 'banner', 'hangglider', 'jetski', 'sailboat',
+    'walker', 'airshow', 'banner', 'skywriter', 'hangglider', 'jetski', 'sailboat',
     'cruise', 'yacht', 'dolphin', 'flock', 'skateboarder', 'rollerskater',
     'hoverboard', 'scooter', 'windsurfer', 'dogwalker',
   ]);
   const WINTER_EVENTS = freeze([
-    'train', 'metro', 'plane', 'balloon', 'walker', 'dogwalker', 'deer',
+    'train', 'metro', 'plane', 'balloon', 'skywriter', 'walker', 'dogwalker', 'deer',
     'rabbit', 'flock', 'snowman', 'skier', 'snowangel',
   ]);
   const NIGHT_EVENTS = freeze([
@@ -45,7 +45,7 @@
     rollerskater: 75, hoverboard: 65, scooter: 70, windsurfer: 95, fireworks: 9,
     flock: 65, dolphin: 8, duck: 80, fish: 5, butterfly: 35, rabbit: 22,
     deer: 55, kite: 90, reader: 140, picnic: 150, couple: 120, walker: 60,
-    airshow: 40, banner: 100, hangglider: 90, meteor: 1.8, jetski: 32,
+    airshow: 40, banner: 100, skywriter: 90, hangglider: 90, meteor: 1.8, jetski: 32,
     sailboat: 140, cruise: 180, yacht: 95,
   });
 

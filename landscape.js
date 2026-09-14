@@ -359,7 +359,7 @@
     for(const e of world.events.filter(e=>water.has(e.type)).sort((a,b)=>geometry.waterDepth(a,t)-geometry.waterDepth(b,t))){
       if(['duck','fish','dolphin'].includes(e.type))paintEvent(e,t);else paintVessel(e,t);
     }
-    const airborne=new Set(['metro','duck','fish','plane','balloon','airshow','banner','hangglider','jetski','sailboat','cruise','yacht','windsurfer','dolphin','flock']);
+    const airborne=new Set(['metro','duck','fish','plane','balloon','airshow','banner','skywriter','hangglider','jetski','sailboat','cruise','yacht','windsurfer','dolphin','flock']);
     for(const e of world.events)if(airborne.has(e.type)&&!water.has(e.type))paintEvent(e,t);
     composite('middle');
     // Ground contact determines occlusion, including props previously baked into the hill.
@@ -737,6 +737,28 @@
         const tail=g.createLinearGradient(xx-dir*160,0,xx,0);tail.addColorStop(0,smoke+'00');tail.addColorStop(1,smoke);
         g.strokeStyle=tail;g.lineWidth=4;g.beginPath();g.moveTo(xx,yy);for(let k=1;k<25;k++)g.lineTo(xx-k*7*dir,yy+Math.sin(t*.5-k*.13)*k*.2);g.stroke();g.restore();airplane(xx,yy,dir,e.seed+i*.1);
       }return true;
+    }
+    if(e.type==='skywriter'){
+      const drawing=e.skywriterPath ||= LandscapeSkywriter.wordPath(e.skywriterWord);
+      if(!drawing)return true;
+      // Reduced motion presents the completed word. Normal motion follows every
+      // ink stroke and pen-up transfer, then gives the finished word time to fade.
+      const frame=LandscapeSkywriter.trace(drawing,reduced?1:Math.min(1,f/.65));
+      const scale=Math.min(4,W*.72/drawing.width),left=(W-drawing.width*scale)/2,top=hy*(.16+e.lane*.16);
+      const fade=reduced?1:1-S.smooth(.78,1,f),drift=reduced?0:Math.max(0,f-.65)*12;
+      g.save();g.translate(left,top-drift);g.scale(scale,scale);
+      g.globalAlpha=fade*.8;g.lineCap='round';g.lineJoin='round';g.strokeStyle=p.night>.5?'#dce5ed':'#fffaf2';g.lineWidth=1.05;
+      g.beginPath();for(const [a,b] of frame.segments){g.moveTo(a[0],a[1]);g.lineTo(b[0],b[1]);}g.stroke();g.restore();
+      if(frame.complete&&fade>.3){
+        // Reuse the visible sky-text observer so a word is only marked seen
+        // after trusted interaction, once the complete lettering is readable.
+        e.bannerText=e.skywriterWord;visibleBanners.push({event:e,x:W/2,y:top+4*scale-drift});
+      }
+      if(!reduced){
+        const departure=Math.max(0,(f-.65)/.35),px=left+frame.x*scale+departure*(W+80),py=top+frame.y*scale-departure*hy*.2;
+        g.save();g.translate(px,py);g.rotate(frame.complete?-.1:frame.angle);g.scale(.65,.65);airplane(0,0,1,e.seed,t,true);g.restore();
+      }
+      return true;
     }
     if(e.type==='banner'){
       const y=hy*.3+e.lane*hy*.18,bx=x-dir*86;

@@ -17,7 +17,8 @@ Ambience rows scale seasonal particle cycle speed (0 hides particles).
 All safety caps, reduced-motion preferences, and season rules remain in effect.
 
 The banner event is the message-towing biplane; airshow is the aerobatic plane.
-Skywriters have no animation yet, so there is no skywriter spawn rate.
+Skywriters trace one human word in smoke. They appear only when the Skywriters
+bank has an unseen valid word; the skywriter rate cannot create fallback words.
 Cloud movement, astronomical objects, and the clock are continuous scenery,
 not spawned visitors. Text itself is edited in HUMAN_WRITTEN_HOURLY_TAGS.md.
 
@@ -44,6 +45,7 @@ and deploy this file with the app so installed offline copies receive it.
 | walker | 1 |
 | airshow | 1 |
 | banner | 1 |
+| skywriter | 1 |
 | hangglider | 1 |
 | jetski | 1 |
 | sailboat | 1 |
