@@ -10452,3 +10452,10 @@ test('Scan preference: both mode buttons are available when resuming a chain',as
  const rendered=shim.document.getElementById('scan').innerHTML;assert.match(rendered,/data-act="resume-scan" data-mode="chance"/);
  ctx.onAction('resume-scan',{dataset:{mode:'chance'}});assert.equal(ctx.state.scanMode,'chance');
 });
+test('Scan preference: choosing a mode saves immediately and closing Settings cannot revert it',async()=>{
+ const {ctx,shim}=await loadApp();ctx.addTask('a');ctx.addTask('b');ctx.startScan();ctx.openSettings();
+ ctx.setScanPreference('chance');ctx.closeModal();ctx.openSettings();
+ assert.equal(ctx.state.settings.scanMode,'chance');assert.equal(ctx.state.scanMode,'chance');assert.match(shim.document.getElementById('modalRoot').innerHTML,/<option value="chance" selected>/);
+ await ctx.persist();const saved=shim.localStorage.getItem(SYNC_STORE_KEY);const reloaded=await loadApp({seedStorage:{[SYNC_STORE_KEY]:saved}});assert.equal(reloaded.ctx.state.settings.scanMode,'chance');
+ assert.match(html,/el\.id === "stScanMode"[\s\S]{0,70}setScanPreference\(el\.value\)/);
+});
