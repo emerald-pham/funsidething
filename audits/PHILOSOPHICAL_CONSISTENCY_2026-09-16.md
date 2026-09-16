@@ -3,7 +3,7 @@
 Audited application commit: `1ae4d5058b7efc8a3480823be845ee7d64cd12d8`.
 Repair branch: `fix/consistency-findings`.
 
-Status: all seven findings below have been repaired and independently reviewed. Source line numbers describe the audited commit above, before the repairs. Existing unrelated changes to README.md, CLAUDE.md, the test-first hook, and untracked AGENTS.md remain separate. The earlier scan-mode routing fix shipped as `1c80cef`; closing Settings without Save was subsequently covered by immediate dropdown persistence. No real accounts were used in the audit or its regression tests.
+Status: all seven findings below have been repaired and independently reviewed. Source line numbers describe the audited commit above, before the repairs. Existing unrelated changes to README.md, CLAUDE.md, the test-first hook, and untracked AGENTS.md remain separate. The earlier scan-mode routing fix shipped as `1c80cef`; closing Settings without Save was subsequently fixed by immediate dropdown persistence in `b435e2a`. No real accounts were used in the audit or its regression tests.
 
 ## Governing principles
 
@@ -105,6 +105,6 @@ node --test --test-name-pattern='Consistency repair:|Scan preference:' tests.js
 node --test tests.js
 ```
 
-The audit baseline passed 687 tests with 6 skipped despite the reproduced gaps. The immediate routing fix passed 689 tests with 6 skipped. Final combined validation is recorded below once complete.
+The audit baseline passed 687 tests with 6 skipped despite the reproduced gaps. The immediate routing fix passed 689 tests with 6 skipped. Final combined validation passed 701 tests with 6 skipped (707 total). Real-browser checks passed for all three scan preferences across close/reopen and reload, cloud deletion deferred during editing with saved-draft recovery through Undo, the automatic 2 AM reset, 320px layout, and offline reload.
 
 Independent review cleared the repair diff, including the asynchronous account-switch guard, old-backup Undo provenance, editor protection, and midnight repaint. Final release gates include the full suite, real-browser checks, changelog/cache fingerprints, and exact deployed HTML/service-worker verification. Only intended changes are staged; unrelated working-tree changes stay local.

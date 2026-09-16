@@ -10520,3 +10520,10 @@ test('Consistency repair: midnight repaints a paused scan even with unchanged st
  setClock(new Date(2026,8,16,23,59).getTime());ctx.state.mode='work';const t=ctx.addTask('Tomorrow');t.startsAt='2026-09-17';ctx.render();let renders=0;const render=ctx.render;ctx.render=()=>{renders++;render();};
  setClock(new Date(2026,8,17,0).getTime());ctx.refreshScanClock();assert.equal(renders,1);
 });
+test('Scan preference: choosing a mode saves immediately and closing Settings cannot revert it',async()=>{
+ const {ctx,shim}=await loadApp();ctx.addTask('a');ctx.addTask('b');ctx.startScan();ctx.openSettings();
+ ctx.setScanPreference('chance');ctx.closeModal();ctx.openSettings();
+ assert.equal(ctx.state.settings.scanMode,'chance');assert.equal(ctx.state.scanMode,'chance');assert.match(shim.document.getElementById('modalRoot').innerHTML,/<option value="chance" selected>/);
+ await ctx.persist();const saved=shim.localStorage.getItem(SYNC_STORE_KEY);const reloaded=await loadApp({seedStorage:{[SYNC_STORE_KEY]:saved}});assert.equal(reloaded.ctx.state.settings.scanMode,'chance');
+ assert.match(html,/el\.id === "stScanMode"[\s\S]{0,70}setScanPreference\(el\.value\)/);
+});
