@@ -624,7 +624,7 @@ function appShellContract(worker) {
   const cacheMatch = worker.match(/const\s+CACHE_NAME\s*=\s*["']([^"']+)["']/);
   assert.ok(cacheMatch, "service worker must declare a literal CACHE_NAME");
 
-  const addAllMatch = worker.match(/\.addAll\(\s*\[([\s\S]*?)\]\s*\)/);
+  const addAllMatch = worker.match(/\.addAll\(\s*\[([\s\S]*?)\]/);
   assert.ok(addAllMatch, "service worker must precache a literal app-shell path list");
   const rawPaths = [...addAllMatch[1].matchAll(/["']([^"']+)["']/g)].map((match) => match[1]);
   assert.ok(rawPaths.length > 0, "service worker app-shell path list must not be empty");
@@ -693,6 +693,7 @@ function serviceWorkerHarness(worker, existingCacheNames = []) {
     console,
     fetch() { return Promise.reject(new Error("network should not be used in lifecycle test")); },
     URL,
+    Request: class { constructor(url, options){ this.url=url; this.cache=options.cache; } },
     self: {
       location: { origin: "https://scanner.example" },
       addEventListener(type, handler) { handlers[type] = handler; },
@@ -712,7 +713,7 @@ test("PWA lifecycle: current shell installs and activation retires prior shell c
   const installWaits = [];
   harness.handlers.install({ waitUntil(promise) { installWaits.push(promise); } });
   await Promise.all(installWaits);
-  assert.deepEqual(harness.cacheRecords.get(cacheName).added, rawPaths,
+  assert.deepEqual(harness.cacheRecords.get(cacheName).added.map(request=>request.url), rawPaths,
     "install must precache the exact current app-shell path list");
   assert.equal(harness.skipWaitingCalls(), 1, "install must activate the new worker immediately");
 
@@ -1290,7 +1291,8 @@ test("clearCompleted: removes done tasks when confirm() is accepted, leaves them
     const shim = makeDomShim();
     const sandbox = {
       window: shim.window, document: shim.document, localStorage: shim.localStorage,
-      console, JSON, CustomEvent: class {}, setTimeout, clearTimeout,
+      console, JSON, CustomEvent: class {},
+      setTimeout: (fn, ms, ...a) => { const timer = setTimeout(fn, ms, ...a); timer.unref?.(); return timer; }, clearTimeout,
       requestAnimationFrame: (fn) => setTimeout(fn, 0),
       confirm: () => false, alert: () => {}, prompt: () => null,
     };
@@ -10262,4 +10264,177 @@ test('Skywriters: scheduler requires a human word, respects its rate, and allows
  const world=S.createWorld(()=>.5);assert.equal(world.events.length,1);assert.equal(world.events[0].skywriterWord,'HELLO');
  S.advance(world,1,{sun:{altitude:30,azimuth:90}});assert.equal(world.events.length,1);
  C.setSpawnRates('| skywriter | 0 |');assert.ok(!S.createWorld(()=>.5).events.some(e=>e.type==='skywriter'));
+});
+
+// Chance order is part of the pass, not a side effect of rendering or voting.
+test('Chance scan: settings select one default button or two explicit buttons', async()=>{
+ const {ctx}=await loadApp();
+ assert.equal(ctx.state.settings.scanMode,'descending');
+ assert.match(ctx.scanStartButtons(),/>Start scanning</);
+ ctx.state.settings.scanMode='both';
+ assert.match(ctx.scanStartButtons(),/Scan in chance mode/);
+ assert.match(ctx.scanStartButtons(),/Scan in descending likelihood/);
+ ctx.state.settings.scanMode='chance';
+ ctx.addTask('one');ctx.addTask('two');ctx.startScan();
+ assert.equal(ctx.state.scanMode,'chance');
+});
+test('Chance scan: TrueSkill means give proportional weight and every rating has positive weight',async()=>{
+ const {ctx}=await loadApp();
+ assert.equal(ctx.chanceWeight({mu:40})/ctx.chanceWeight({mu:20}),2);
+ assert.ok(ctx.chanceWeight({mu:-10})>0);
+ let high=0;
+ const tasks=[{id:'a',mu:10},{id:'b',mu:30}];
+ for(let i=0;i<5000;i++){
+  ctx.state.tasks=tasks;ctx.state.chance={seed:String(i),at:Date.now(),weights:{}};
+  if(ctx.chancePick(tasks).id==='b')high++;
+ }
+ assert.ok(high>3550&&high<3950,`30 vs 10 should win about 75%, got ${high/50}%`);
+});
+test('Chance scan: choices, undo, reload and eligibility preserve the frozen ordering',async()=>{
+ const {ctx}=await loadApp({seed:21});
+ for(let i=0;i<8;i++)ctx.addTask('task '+i);
+ ctx.startScan('chance');ctx.state.snooze=100;
+ const seed=ctx.state.chance.seed;
+ const first=ctx.state.candidateId;
+ ctx.decide('no');const next=ctx.state.candidateId;
+ ctx.undo();assert.equal(ctx.state.candidateId,first);
+ ctx.decide('yes');assert.equal(ctx.state.candidateId,next);
+ assert.equal(ctx.state.chance.seed,seed);
+ const saved=JSON.stringify(ctx.state);
+ const restored=await loadApp({seedStorage:{[SYNC_STORE_KEY]:saved}});
+ assert.equal(restored.ctx.state.chance.seed,seed);
+ assert.equal(restored.ctx.state.candidateId,next);
+ const weights=JSON.stringify(ctx.state.chance.weights);
+ ctx.state.tasks.forEach(t=>t.mu=1000-t.mu);
+ ctx.chancePick(ctx.pool());assert.equal(JSON.stringify(ctx.state.chance.weights),weights);
+ ctx.newPass();assert.notEqual(ctx.state.chance.seed,seed);
+});
+test('Chance scan: day boundary refreshes while paused and undo never revives yesterday',async()=>{
+ const {ctx}=await loadApp();const before=new Date(2026,8,16,1,59).getTime();setFakeTime(ctx,before);
+ for(let i=0;i<5;i++)ctx.addTask('task '+i);
+ ctx.startScan('chance');const seed=ctx.state.chance.seed;ctx.pushUndo();ctx.state.mode='work';
+ setFakeTime(ctx,new Date(2026,8,16,2,0).getTime());ctx.ensureCandidate();
+ const today=ctx.state.chance.seed;assert.notEqual(today,seed);
+ ctx.undo();assert.equal(ctx.state.chance.seed,today);
+});
+test('Evergreen interval: defaults are copied to new tasks and imported tasks',async()=>{
+ const {ctx}=await loadApp();assert.equal(ctx.state.settings.evergreenHours,18);assert.equal(ctx.state.settings.evergreenResetAtDay,true);
+ ctx.state.settings.evergreenHours=24;ctx.state.settings.evergreenResetAtDay=false;
+ const t=ctx.addTask('new');ctx.importList('imported');
+ for(const task of ctx.state.tasks){assert.equal(task.evergreenHours,24);assert.equal(task.evergreenResetAtDay,false);}
+ ctx.state.settings.evergreenHours=2;assert.equal(t.evergreenHours,24);
+});
+test('Evergreen interval: completion expires exactly at duration or enabled day marker',async()=>{
+ const {ctx}=await loadApp();const at=new Date(2026,8,15,23,0).getTime();setFakeTime(ctx,at);
+ const t=ctx.addTask('repeat');Object.assign(t,{evergreen:true,evergreenHours:24,evergreenResetAtDay:false});ctx.completeTask(t);
+ setFakeTime(ctx,new Date(2026,8,16,2,0).getTime());ctx.newPass(false,true);
+ assert.equal(ctx.isEligible(t),false);
+ t.evergreenResetAtDay=true;ctx.ensureCandidate();assert.ok(ctx.pool().some(x=>x.id===t.id));
+ t.evergreenResetAtDay=false;setFakeTime(ctx,at+24*HOUR-1);assert.equal(ctx.isEligible(t),false);
+ setFakeTime(ctx,at+24*HOUR);ctx.ensureCandidate();assert.ok(ctx.pool().some(x=>x.id===t.id));
+});
+test('Evergreen interval: expiry clears done mark within the same pass',async()=>{
+ const {ctx}=await loadApp();const at=new Date(2026,8,16,9).getTime();setFakeTime(ctx,at);
+ const t=ctx.addTask('repeat');Object.assign(t,{evergreen:true,evergreenHours:0.5,evergreenResetAtDay:false});ctx.completeTask(t);
+ setFakeTime(ctx,at+HOUR/2);ctx.ensureCandidate();assert.ok(ctx.pool().some(x=>x.id===t.id));
+ assert.equal(ctx.state.workLog.length,1);
+});
+test('Evergreen and chance settings: malformed persisted values normalize without losing false',async()=>{
+ const {ctx}=await loadApp();const st=ctx.defaultState();
+ st.settings={evergreenHours:-5,evergreenResetAtDay:false,scanMode:'invalid'};
+ st.tasks=[{...syncTask('a','a'),evergreenHours:'junk',evergreenResetAtDay:'false'}];
+ ctx.hydrateState(st);assert.ok(st.settings.evergreenHours>0);assert.equal(st.settings.evergreenResetAtDay,false);assert.equal(st.settings.scanMode,'descending');
+ assert.ok(Number.isFinite(st.tasks[0].evergreenHours));assert.equal(typeof st.tasks[0].evergreenResetAtDay,'boolean');
+});
+test('Chance scan: live TrueSkill ratings still change on Yes and No',async()=>{
+ const {ctx}=await loadApp();for(let i=0;i<5;i++)ctx.addTask('task '+i);ctx.startScan('chance');ctx.state.snooze=100;
+ const t=ctx.state.tasks.find(t=>t.id===ctx.state.candidateId);const mu=t.mu;ctx.decide('no');assert.ok(t.mu<mu);
+ ctx.undo();const restored=ctx.state.tasks.find(t=>t.id===ctx.state.candidateId);ctx.decide('yes');assert.ok(restored.mu>mu);
+});
+test('Scan clock: schedules the earliest expiry and refreshes eligibility without an action',async()=>{
+ const {ctx}=await loadApp();const at=new Date(2026,8,16,9).getTime();setFakeTime(ctx,at);
+ const t=ctx.addTask('repeat');Object.assign(t,{evergreen:true,evergreenHours:0.5,evergreenResetAtDay:false});ctx.completeTask(t);
+ assert.equal(ctx.nextScanWakeAt(),at+HOUR/2);
+ setFakeTime(ctx,at+HOUR/2);ctx.refreshScanClock();assert.ok(ctx.pool().some(x=>x.id===t.id));
+ assert.match(html,/addEventListener\("focus", refreshScanClock\)/);
+});
+test('Evergreen edit: hours threshold suggests checkbox but allows either manual override',async()=>{
+ const {ctx,shim}=await loadApp();const t=ctx.addTask('repeat');ctx.openEdit(t.id);
+ const hours=shim.document.getElementById('etEverHours'), reset=shim.document.getElementById('etEverReset');hours.id='etEverHours';
+ hours.value='19';ctx.suggestEvergreenReset(hours);assert.equal(reset.checked,false);
+ reset.checked=true;fillEditPane(ctx,shim,{evergreen:true});ctx.applyEditFields(t);assert.equal(t.evergreenHours,19);assert.equal(t.evergreenResetAtDay,true);
+ hours.value='18';ctx.suggestEvergreenReset(hours);assert.equal(reset.checked,true);
+ reset.checked=false;ctx.applyEditFields(t);assert.equal(t.evergreenResetAtDay,false);
+});
+test('Scan settings: long mode selector stays within a narrow edit pane',()=>{
+ assert.match(html,/\.frow select\s*\{[^}]*min-width:0[^}]*max-width:100%/);
+});
+test('Chance scan: cold boot after day marker saves its refreshed order before another reload',async()=>{
+ const old=syncState({scanMode:'chance',passStartedAt:Date.now()-48*HOUR,chain:['root'],tasks:[syncTask('root','root'),syncTask('a','a'),syncTask('b','b')],chance:{seed:'yesterday',at:Date.now()-48*HOUR,weights:{root:25,a:25,b:25}}});
+ const {ctx,shim}=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(old)}});
+ assert.notEqual(ctx.state.chance.seed,'yesterday');
+ const saved=shim.localStorage.getItem(SYNC_STORE_KEY);
+ assert.equal(JSON.parse(saved).chance.seed,ctx.state.chance.seed);
+ const reloaded=await loadApp({seedStorage:{[SYNC_STORE_KEY]:saved}});
+ assert.equal(reloaded.ctx.state.chance.seed,ctx.state.chance.seed);
+ assert.equal(reloaded.ctx.state.candidateId,ctx.state.candidateId);
+});
+test('Chance scan: undo across an explicit fresh-pass boundary keeps the fresh ordering',async()=>{
+ const {ctx}=await loadApp();for(let i=0;i<4;i++)ctx.addTask('task '+i);ctx.startScan('chance');
+ ctx.newPass();const fresh=ctx.state.chance.seed;ctx.undo();assert.equal(ctx.state.chance.seed,fresh);
+});
+test('Chance scan: fresh draws are saved immediately, without the edit debounce',async()=>{
+ const {ctx,shim}=await loadApp();ctx.addTask('a');ctx.addTask('b');ctx.startScan('chance');
+ assert.equal(JSON.parse(shim.localStorage.getItem(SYNC_STORE_KEY)).chance.seed,ctx.state.chance.seed);
+ ctx.newPass();assert.equal(JSON.parse(shim.localStorage.getItem(SYNC_STORE_KEY)).chance.seed,ctx.state.chance.seed);
+});
+test('Chance scan: async host writes cannot persist an older draw over a newer one',async()=>{
+ const {ctx,shim}=await loadApp({hostStorage:{[SYNC_STORE_KEY]:JSON.stringify(syncState())}});
+ const writes=[];let durable;
+ shim.window.storage.set=(key,payload)=>new Promise(resolve=>writes.push(()=>{durable=payload;resolve();}));
+ ctx.addTask('a');ctx.addTask('b');ctx.startScan('chance');await flush();
+ ctx.newPass();await flush();const latest=ctx.state.chance.seed;
+ assert.equal(writes.length,1,'second asynchronous write must wait for first');
+ writes.shift()();await flush();assert.equal(writes.length,1);writes.shift()();await flush();
+ assert.equal(JSON.parse(durable).chance.seed,latest);
+});
+function pwaUpdateHarness({controller=true,editing=false,saveOK=true}={}){
+ const wh={},dh={},sh={};let updates=0,reloads=0,saves=0,options;
+ const registration={update:async()=>{updates++;}};
+ const sw={controller:controller?{}:null,addEventListener:(e,f)=>sh[e]=f,register:async(url,opts)=>{options=opts;return registration;}};
+ const doc={hidden:false,readyState:'complete',activeElement:{matches:()=>false},querySelector:()=>editing?{}:null,addEventListener:(e,f)=>dh[e]=f};
+ const box={navigator:{serviceWorker:sw},window:{addEventListener:(e,f)=>wh[e]=f,location:{reload:()=>reloads++}},document:doc,setTimeout,clearTimeout,state:{},persist:async()=>{saves++;return saveOK;},toast(){},console};
+ const source=html.slice(html.indexOf('function registerServiceWorker(){'),html.indexOf('registerServiceWorker();',html.indexOf('function registerServiceWorker(){')));
+ vm.runInNewContext(source+';registerServiceWorker();',box);
+ return {box,sw,wh,dh,sh,ready:async()=>{if(wh.load)await wh.load();await flush();},counts:()=>({updates,reloads,saves,options}),edit:v=>editing=v};
+}
+test('PWA updates: check on launch, foreground and reconnect with HTTP cache bypass',async()=>{
+ const h=pwaUpdateHarness();await h.ready();assert.equal(h.counts().options.updateViaCache,'none');
+ assert.equal(h.counts().updates,1);await h.wh.focus();await h.wh.online();await h.dh.visibilitychange();
+ assert.equal(h.counts().updates,4);
+});
+test('PWA updates: new controller saves state then reloads once, but never during editing',async()=>{
+ const h=pwaUpdateHarness({editing:true});await h.ready();await h.sh.controllerchange();assert.equal(h.counts().reloads,0);
+ h.edit(false);await h.box.window.applyPendingAppUpdate();assert.equal(h.counts().saves,1);assert.equal(h.counts().reloads,1);
+ await h.sh.controllerchange();assert.equal(h.counts().reloads,1);
+});
+test('PWA updates: initial install does not reload; failed persistence prevents reload',async()=>{
+ const first=pwaUpdateHarness({controller:false});await first.ready();first.sw.controller={};await first.sh.controllerchange();assert.equal(first.counts().reloads,0);
+ const failed=pwaUpdateHarness({saveOK:false});await failed.ready();await failed.sh.controllerchange();assert.equal(failed.counts().reloads,0);
+});
+test('PWA updates: install reloads shell assets instead of accepting stale HTTP responses',async()=>{
+ assert.match(serviceWorkerSource(),/\.map\(.*new Request\(.*cache:\s*"reload"/);
+});
+test('PWA updates: boot retries a controller update that arrived before state loaded',async()=>{
+ const h=pwaUpdateHarness();await h.ready();h.box.state=null;await h.sh.controllerchange();assert.equal(h.counts().reloads,0);
+ h.box.state={};
+ const boot=html.slice(html.indexOf('(async function init(){'),html.indexOf('/* A standalone window'));
+ assert.match(boot,/if\(isFirstBoot\) openHelp\(\);\s*window\.applyPendingAppUpdate\?\.\(\)/);
+ await h.box.window.applyPendingAppUpdate();assert.equal(h.counts().reloads,1);
+});
+test('PWA updates: opening an edit during an asynchronous save defers reload again',async()=>{
+ const h=pwaUpdateHarness();await h.ready();let release;
+ h.box.persist=()=>new Promise(r=>release=r);
+ const applying=h.sh.controllerchange();await flush();h.edit(true);release(true);await applying;
+ assert.equal(h.counts().reloads,0,'new editing must be checked after the async save');
 });
