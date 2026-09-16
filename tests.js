@@ -3745,8 +3745,8 @@ test("UI: Quick start displays the requested seven steps in order", async () => 
   assert.deepEqual(steps, [
     "Add tasks. You can tag them with contexts and enable contexts so that todos that NEED to match that context are surfaced. If the context is not enabled, those todos are not surfaced.",
     "Then hit start scanning.",
-    "The oldest task outstanding and not blocked on your list is added to a “chain” of todos you need to do in order.",
-    "Then, you are presented with candidates to add to the todo list in descending order of your likelihood to want to add it to your chain. You can hit yes, improving its rank via trueskill rating, or no, to decrease its chance of coming up again.",
+    "In descending mode, the oldest eligible task becomes the first dot in your chain. In chance mode, the first task is drawn using TrueSkill strength as its weight.",
+    "Then compare candidates with the newest dot. Descending mode orders them by estimated TrueSkill strength; chance mode uses a saved weighted random order. Yes/No updates ratings immediately. In chance mode, those updates affect the next fresh ordering.",
     "You can also hit can’t, which will snooze the task for a duration you’ve configured in settings.",
     "You will continue until either you hit done scanning, or the app recognizes the chances of you finding a better task dips below 25% (percentage configurable in settings menu) in which case it will gently nudge you to stop searching for a new todo.",
     "Once you’re done scanning, you will be presented with a chain of todos you will need to complete from the bottom of the “chain” up to the top, marking tasks as done, worked on (sends it back to the todo list for later) or can’t / dislodge."
@@ -3759,7 +3759,7 @@ test("UI: help describes Start scanning rather than a Can/Can't step", async () 
   const helpHtml = shim.elements.get("modalRoot").innerHTML;
 
   assert.match(helpHtml, /start scanning/i, "help should name the button that starts a chain");
-  assert.match(helpHtml, /oldest task outstanding and not blocked/, "the rule itself hasn't changed — oldest first");
+  assert.match(helpHtml, /descending mode, the oldest eligible task/, "normal mode retains the oldest eligible anchor");
   assert.ok(!/Answer <b>Can<\/b>/.test(helpHtml), "the Can/Can't instruction should be gone");
 });
 
@@ -10404,7 +10404,7 @@ function pwaUpdateHarness({controller=true,editing=false,saveOK=true}={}){
  const sw={controller:controller?{}:null,addEventListener:(e,f)=>sh[e]=f,register:async(url,opts)=>{options=opts;return registration;}};
  const doc={hidden:false,readyState:'complete',activeElement:{matches:()=>false},querySelector:()=>editing?{}:null,addEventListener:(e,f)=>dh[e]=f};
  const box={navigator:{serviceWorker:sw},window:{addEventListener:(e,f)=>wh[e]=f,location:{reload:()=>reloads++}},document:doc,setTimeout,clearTimeout,state:{},persist:async()=>{saves++;return saveOK;},toast(){},console};
- const source=html.slice(html.indexOf('function registerServiceWorker(){'),html.indexOf('registerServiceWorker();',html.indexOf('function registerServiceWorker(){')));
+ const source=html.slice(html.indexOf('function hasActiveEditor(){'),html.indexOf('function resumeDeferredCloudPull(){'))+html.slice(html.indexOf('function registerServiceWorker(){'),html.indexOf('registerServiceWorker();',html.indexOf('function registerServiceWorker(){')));
  vm.runInNewContext(source+';registerServiceWorker();',box);
  return {box,sw,wh,dh,sh,ready:async()=>{if(wh.load)await wh.load();await flush();},counts:()=>({updates,reloads,saves,options}),edit:v=>editing=v};
 }
@@ -10451,4 +10451,72 @@ test('Scan preference: both mode buttons are available when resuming a chain',as
  const {ctx,shim}=await loadApp();ctx.addTask('a');ctx.addTask('b');ctx.startScan();ctx.state.settings.scanMode='both';ctx.onAction('start-working',{});
  const rendered=shim.document.getElementById('scan').innerHTML;assert.match(rendered,/data-act="resume-scan" data-mode="chance"/);
  ctx.onAction('resume-scan',{dataset:{mode:'chance'}});assert.equal(ctx.state.scanMode,'chance');
+});
+test('Consistency repair: remote adoption retains account isolation before switching accounts',async()=>{
+ const now=Date.now(),h=makeSyncHarness({remote:cloudState(now),rev:9});const local=staleState(now-1000);local.syncRev=8;local.syncAccount='e@example.com';
+ const {ctx,shim}=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(local)},cloudSyncFactory:h.factory});
+ await ctx.cloudPull();assert.equal(ctx.state.syncAccount,'e@example.com');
+ h.doc=null;shim.window.CloudSync.user='other@example.com';await ctx.cloudPull();ctx.cloudPushNow();await syncSettle(50);
+ assert.ok(!(h.remoteTitles()||[]).includes('Draft the chapter'));
+});
+test('Consistency repair: import Undo restores the original chance order, including across repeated undos',async()=>{
+ const {ctx,shim}=await loadApp();for(let i=0;i<5;i++)ctx.addTask('Original '+i);ctx.startScan('chance');ctx.state.snooze=100;
+ const oldSeed=ctx.state.chance.seed,oldCandidate=ctx.state.candidateId;const backup=JSON.parse(ctx.cloudPayload());backup.chance.seed='imported-seed';backup.tasks[0].title='Imported';
+ shim.document.getElementById('jsonBox').value=JSON.stringify(backup);ctx.onAction('import-json',{});ctx.undo();
+ assert.equal(ctx.state.tasks[0].title,'Original 0');assert.equal(ctx.state.chance.seed,oldSeed);assert.equal(ctx.state.candidateId,oldCandidate);
+ ctx.decide('no');ctx.newPass();const fresh=ctx.state.chance.seed;ctx.undo();ctx.undo();assert.equal(ctx.state.chance.seed,fresh,'explicit fresh pass remains a boundary across older undos');
+});
+test('Consistency repair: cloud adoption waits for an edit, blocks stale push, and makes saved draft recoverable',async()=>{
+ const now=Date.now(),remote=cloudState(now),h=makeSyncHarness({remote,rev:9});remote.syncRev=9;
+ const {ctx,shim}=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(remote)},cloudSyncFactory:h.factory});await ctx.cloudPull();
+ const id=ctx.state.tasks[0].id;ctx.openEdit(id);fillEditPane(ctx,shim,{title:'Saved draft'});
+ let editing=true;shim.document.querySelector=selector=>selector.includes('.mback')&&editing?{}:null;
+ const newer=JSON.parse(ctx.cloudPayload());newer.tasks=newer.tasks.filter(t=>t.id!==id);newer.chain=newer.chain.filter(t=>t!==id);h.writeBehindBack(newer);
+ await ctx.cloudPull();assert.ok(ctx.state.tasks.some(t=>t.id===id));
+ ctx.cloudPushNow();await syncSettle(20);assert.equal(h.remoteState().tasks.some(t=>t.id===id),false,'deferred reconciliation cannot overwrite remote deletion');
+ editing=false;ctx.onAction('save-edit',{dataset:{id}});await syncSettle(40);
+ assert.equal(ctx.state.tasks.some(t=>t.id===id),false,'newer remote eventually adopts');ctx.undo();assert.equal(ctx.state.tasks.find(t=>t.id===id).title,'Saved draft');
+});
+test('Consistency repair: Add and dot establishes the 2 AM clock and honors single-mode preference',async()=>{
+ const {ctx}=await loadApp();const at=new Date(2026,8,16,1).getTime();setFakeTime(ctx,at);ctx.addTask('Candidate');ctx.addTask('Urgent',true);ctx.state.snooze=100;
+ assert.equal(ctx.state.passStartedAt,at);const id=ctx.state.candidateId;ctx.decide('no');setFakeTime(ctx,new Date(2026,8,16,2).getTime());ctx.refreshScanClock();assert.equal(ctx.state.considered[id],undefined);
+ const second=await loadApp();second.ctx.state.settings.scanMode='chance';second.ctx.addTask('Urgent',true);assert.equal(second.ctx.state.scanMode,'chance');
+});
+test('Consistency repair: stop estimate uses actual chance order without reshuffling',async()=>{
+ const {ctx}=await loadApp();const bench={...syncTask('root','Root'),mu:25,sigma:1},low={...syncTask('low','Low'),mu:15,sigma:1},low2={...syncTask('low2','Low2'),mu:15,sigma:1},high={...syncTask('high','High'),mu:35,sigma:1};
+ ctx.state.tasks=[bench,low,low2,high];ctx.state.chain=['root'];ctx.state.scanMode='chance';ctx.state.decisionsMs=[30000];ctx.state.mode='scan';
+ for(let i=0;i<1000;i++){ctx.state.chance={seed:String(i),at:Date.now(),weights:{root:25,low:15,low2:15,high:35}};const rest=[low,low2,high];let last;while(rest.length){last=ctx.chancePick(rest);rest.splice(rest.indexOf(last),1);}if(last.id==='high')break;}
+ const frozen=JSON.stringify(ctx.state.chance);ctx.maybeIntervene();assert.equal(ctx.state.interventionActive,true);assert.ok(ctx.state.interventionP<.001);assert.equal(JSON.stringify(ctx.state.chance),frozen);
+});
+test('Consistency repair: Starts eligibility gets a midnight wake as well as the day marker',async()=>{
+ const {ctx}=await loadApp();const at=new Date(2026,8,16,23,59).getTime();setFakeTime(ctx,at);const t=ctx.addTask('Tomorrow');t.startsAt='2026-09-17';assert.equal(ctx.nextScanWakeAt(),new Date(2026,8,17,0).getTime());
+});
+test('Consistency repair: quick start distinguishes chance from the oldest normal anchor',async()=>{
+ const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(help,/descending mode.*oldest/i);assert.match(help,/chance mode.*first task/i);
+ assert.doesNotMatch(help,/candidates to add to the todo list in descending order of your likelihood/);
+});
+test('Consistency repair: undoing an old backup import restores today\'s original chance pass',async()=>{
+ const {ctx,shim}=await loadApp();for(let i=0;i<4;i++)ctx.addTask('Task '+i);ctx.startScan('chance');const original=ctx.state.chance.seed;
+ const old=JSON.parse(ctx.cloudPayload());old.chance.seed='old-backup';old.chance.at=Date.now()-48*HOUR;old.passStartedAt=old.chance.at;
+ shim.document.getElementById('jsonBox').value=JSON.stringify(old);ctx.onAction('import-json',{});ctx.undo();assert.equal(ctx.state.chance.seed,original);
+});
+test('Consistency repair: an in-flight pull cannot adopt the previous account under a new identity',async()=>{
+ const {ctx,shim}=await loadApp();ctx.state.syncAccount='A';ctx.state.syncRev=1;let release;
+ const a=syncState({tasks:[syncTask('a','A private')]}),b=syncState({tasks:[syncTask('b','B own')]});
+ shim.window.CloudSync={ready:true,user:'A',pull:async()=>{const who=shim.window.CloudSync.user;if(who==='A')await new Promise(r=>release=r);return {payload:JSON.stringify(who==='A'?a:b),rev:who==='A'?9:1};},push:async()=>({rev:2})};
+ const pulling=ctx.cloudPull();await flush();shim.window.CloudSync.user='B';release();await pulling;await syncSettle(20);
+ assert.equal(ctx.state.syncAccount,'B');assert.deepEqual(Array.from(ctx.state.tasks,t=>t.title),['B own']);
+});
+test('Consistency repair: an old account push acknowledgement cannot change the new account revision',async()=>{
+ const {ctx,shim}=await loadApp();let release;shim.window.CloudSync={ready:true,user:'A',pull:async()=>({empty:true}),push:()=>new Promise(r=>release=r)};
+ await ctx.cloudPull();ctx.addTask('A task');ctx.cloudPushNow();await flush();
+ shim.window.CloudSync.user='B';await ctx.cloudPull();assert.equal(ctx.state.syncRev,0);
+ release({rev:99});await flush();assert.equal(ctx.state.syncRev,0);
+});
+test('Consistency repair: midnight repaints a paused scan even with unchanged stored state',async()=>{
+ const {ctx}=await loadApp();
+ const setClock=at=>vm.runInContext(`this.auditOriginalDate ||= Date; Date=class extends auditOriginalDate{constructor(...args){super(...(args.length?args:[${at}]));}static now(){return ${at};}}`,ctx);
+ setClock(new Date(2026,8,16,23,59).getTime());ctx.state.mode='work';const t=ctx.addTask('Tomorrow');t.startsAt='2026-09-17';ctx.render();let renders=0;const render=ctx.render;ctx.render=()=>{renders++;render();};
+ setClock(new Date(2026,8,17,0).getTime());ctx.refreshScanClock();assert.equal(renders,1);
 });
