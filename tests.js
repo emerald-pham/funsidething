@@ -10438,3 +10438,17 @@ test('PWA updates: opening an edit during an asynchronous save defers reload aga
  const applying=h.sh.controllerchange();await flush();h.edit(true);release(true);await applying;
  assert.equal(h.counts().reloads,0,'new editing must be checked after the async save');
 });
+test('Scan preference: saving always chance changes the current scan, without changing ratings or marks',async()=>{
+ const {ctx,shim}=await loadApp();for(let i=0;i<5;i++)ctx.addTask('task '+i);ctx.startScan();ctx.state.snooze=100;ctx.decide('no');
+ const marks=JSON.stringify(ctx.state.considered), ratings=ctx.state.tasks.map(t=>t.mu);
+ ctx.openSettings();shim.document.getElementById('stScanMode').value='chance';ctx.onAction('save-settings',{});
+ assert.equal(ctx.state.scanMode,'chance');assert.ok(ctx.state.chance);
+ assert.equal(JSON.stringify(ctx.state.considered),marks);assert.deepEqual(ctx.state.tasks.map(t=>t.mu),ratings);
+ const seed=ctx.state.chance.seed;ctx.onAction('start-working',{});ctx.onAction('resume-scan',{});assert.equal(ctx.state.chance.seed,seed);
+ shim.document.getElementById('stScanMode').value='descending';ctx.onAction('save-settings',{});assert.equal(ctx.state.scanMode,'descending');
+});
+test('Scan preference: both mode buttons are available when resuming a chain',async()=>{
+ const {ctx,shim}=await loadApp();ctx.addTask('a');ctx.addTask('b');ctx.startScan();ctx.state.settings.scanMode='both';ctx.onAction('start-working',{});
+ const rendered=shim.document.getElementById('scan').innerHTML;assert.match(rendered,/data-act="resume-scan" data-mode="chance"/);
+ ctx.onAction('resume-scan',{dataset:{mode:'chance'}});assert.equal(ctx.state.scanMode,'chance');
+});
