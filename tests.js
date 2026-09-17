@@ -997,7 +997,7 @@ test("decide('yes'): dots the candidate, clears it, and a new candidate is picke
   ctx.addTask("Task A", false);
   ctx.addTask("Task B", false);
   ctx.addTask("Task C", false);
-  ctx.startScan();              // dots Task A; yes/no need a benchmark to compare against
+  ctx.startScan('descending');              // dots Task A; yes/no need a benchmark to compare against
   const firstCandidate = ctx.state.candidateId;
   assert.ok(firstCandidate, "a ranked candidate should be presented once the chain has started");
 
@@ -1013,7 +1013,7 @@ test("decide('no') and decide('cant'): candidate is marked considered, NOT added
   ctx.addTask("Task A", false);
   ctx.addTask("Task B", false);
   ctx.addTask("Task C", false);
-  ctx.startScan();              // establish a benchmark so 'no' is a valid comparison
+  ctx.startScan('descending');              // establish a benchmark so 'no' is a valid comparison
   const chainLen = ctx.state.chain.length;
   const cand = ctx.state.candidateId;
   ctx.decide("no");
@@ -1025,7 +1025,7 @@ test("decide('cand-done'): completes the task directly without ever touching the
   const { ctx } = await loadApp({ seed: 3 });
   ctx.addTask("Task A", false);
   ctx.addTask("Task B", false);
-  ctx.startScan();              // dots Task A, so Task B comes up as the candidate
+  ctx.startScan('descending');              // dots Task A, so Task B comes up as the candidate
   const cand = ctx.state.candidateId;
   ctx.decide("cand-done");
   const task = ctx.state.tasks.find((t) => t.id === cand);
@@ -1049,7 +1049,7 @@ test("decide('cand-done'): completing the candidate moves neither its rank nor t
   const { ctx } = await loadApp({ seed: 3 });
   ctx.addTask("Task A", false);
   ctx.addTask("Task B", false);
-  ctx.startScan();                       // dots Task A; Task B is the candidate
+  ctx.startScan('descending');                       // dots Task A; Task B is the candidate
   const candId = ctx.state.candidateId;
   const benchId = ctx.state.chain[ctx.state.chain.length - 1];
   const cand = ctx.state.tasks.find((t) => t.id === candId);
@@ -1071,7 +1071,7 @@ test("decide('cand-done'): an evergreen candidate is signal-free too, and still 
   ctx.addTask("Water the plants", false);
   const evergreen = ctx.state.tasks.find((t) => t.title === "Water the plants");
   evergreen.evergreen = true;
-  ctx.startScan();                       // dots Task A; the evergreen is the candidate
+  ctx.startScan('descending');                       // dots Task A; the evergreen is the candidate
   const candId = ctx.state.candidateId;
   const benchId = ctx.state.chain[ctx.state.chain.length - 1];
   const cand = ctx.state.tasks.find((t) => t.id === candId);
@@ -1096,7 +1096,7 @@ test("decide('yes'): still records the candidate outranking the benchmark", asyn
   const { ctx } = await loadApp({ seed: 4 });
   ctx.addTask("Task A", false);
   ctx.addTask("Task B", false);
-  ctx.startScan();
+  ctx.startScan('descending');
   const candId = ctx.state.candidateId;
   const benchId = ctx.state.chain[ctx.state.chain.length - 1];
   const cand = ctx.state.tasks.find((t) => t.id === candId);
@@ -1113,7 +1113,7 @@ test("decide('no'): still records the benchmark outranking the candidate", async
   const { ctx } = await loadApp({ seed: 5 });
   ctx.addTask("Task A", false);
   ctx.addTask("Task B", false);
-  ctx.startScan();
+  ctx.startScan('descending');
   const candId = ctx.state.candidateId;
   const cand = ctx.state.tasks.find((t) => t.id === candId);
   const cm = cand.mu;
@@ -1149,7 +1149,7 @@ test("undo: reverses the most recent mutation (dotting a task)", async () => {
   const { ctx } = await loadApp({ seed: 5 });
   ctx.addTask("Task A", false);
   ctx.addTask("Task B", false);
-  ctx.startScan();                // dots A; B comes up as the candidate
+  ctx.startScan('descending');                // dots A; B comes up as the candidate
   assert.equal(ctx.state.chain.length, 1);
   ctx.decide("yes");
   assert.equal(ctx.state.chain.length, 2);
@@ -1189,7 +1189,7 @@ test("undo: stamps updatedAt so the restored state outranks the copy it reverses
   const { ctx } = await loadApp({ seed: 41 });
   ctx.addTask("Task A", false);
   ctx.addTask("Task B", false);
-  ctx.startScan();
+  ctx.startScan('descending');
   const stale = ctx.state.updatedAt;
   ctx.decide("yes");
   await settle();
@@ -1260,7 +1260,7 @@ test("a future-start task is excluded from the pool and can never be dotted into
   const poolIds = [...ctx.pool()].map((x) => x.id);
   assert.deepEqual(poolIds, [soon.id], "the future-start task must be excluded from the pool");
 
-  ctx.startScan();
+  ctx.startScan('descending');
   assert.deepEqual([...ctx.state.chain], [soon.id], "the scan starts on the only eligible task");
   assert.equal(ctx.state.chain.includes(future.id), false, "the future-start task must never enter the chain");
 });
@@ -1424,7 +1424,7 @@ test("UI: 'done adding for now' shows from the first decision — Start scanning
   const { ctx, shim } = await loadApp({ seed: 16 });
   ctx.addTask("Task A", false);
   ctx.addTask("Task B", false);
-  ctx.startScan();             // dots Task A, Task B comes up as the candidate
+  ctx.startScan('descending');             // dots Task A, Task B comes up as the candidate
   ctx.render();
   const scanHtml = shim.elements.get("scan").innerHTML;
 
@@ -1726,7 +1726,7 @@ test("REGRESSION: dotting a task (immediate cloud sync) does not trigger a runaw
   const { ctx } = await loadApp({ seed: 20, cloudSyncFactory: factory });
   ctx.addTask("Task A", false);
   ctx.addTask("Task B", false);
-  ctx.startScan();
+  ctx.startScan('descending');
 
   ctx.decide("yes"); // dotting takes the immediate-sync path (cloudPushNow) — which pings before its own await too
 
@@ -1749,7 +1749,7 @@ test("REGRESSION: a focus-triggered pull racing a push settles with a small, bou
   const { ctx } = await loadApp({ seed: 21, cloudSyncFactory: wrapped });
   ctx.addTask("Task A", false);
   ctx.addTask("Task B", false);
-  ctx.startScan();
+  ctx.startScan('descending');
 
   ctx.decide("yes");         // fires an immediate push (and, via ping, a legitimate pull attempt)
   ctx.cloudPull();           // simulates a focus/visibilitychange-triggered pull landing at the same time
@@ -1792,7 +1792,7 @@ test("cant is timestamped and excludes the task from the pool immediately", asyn
   const { ctx } = await loadApp({ seed: 30 });
   ctx.addTask("Task A", false);
   ctx.addTask("Task B", false);
-  ctx.startScan();
+  ctx.startScan('descending');
   const cand = ctx.state.candidateId;
   ctx.decide("cant");
   assert.equal(ctx.state.considered[cand], "cant");
@@ -1838,7 +1838,7 @@ test("a can't mark automatically expires mid-session (no newPass needed) once ca
   ctx.state.settings.cantMin = 15;
   ctx.addTask("Task A", false);
   ctx.addTask("Said can't", false);
-  ctx.startScan();               // dots Task A, so "Said can't" is the one on offer
+  ctx.startScan('descending');               // dots Task A, so "Said can't" is the one on offer
   const cantId = ctx.state.candidateId;
 
   const t0 = realNow(ctx);
@@ -1860,7 +1860,7 @@ test("changing cantMin immediately affects how much longer an existing can't mar
   ctx.state.settings.cantMin = 60;
   ctx.addTask("Task A", false);
   ctx.addTask("Said can't", false);
-  ctx.startScan();               // dots Task A, so "Said can't" is the one on offer
+  ctx.startScan('descending');               // dots Task A, so "Said can't" is the one on offer
   const cantId = ctx.state.candidateId;
   const t0 = realNow(ctx);
   setFakeTime(ctx, t0);
@@ -1876,7 +1876,7 @@ test("rescanSkipped() remains a deliberate manual override — clears can't imme
   const { ctx } = await loadApp({ seed: 35 });
   ctx.addTask("Task A", false);
   ctx.addTask("Said can't", false);
-  ctx.startScan();               // dots Task A, so "Said can't" is the one on offer
+  ctx.startScan('descending');               // dots Task A, so "Said can't" is the one on offer
   const cantId = ctx.state.candidateId;
   ctx.decide("cant"); // freshly marked, nowhere near expiry
 
@@ -1889,7 +1889,7 @@ test("deleteTask cleans up cantAt too, so no orphaned timestamps linger", async 
   const { ctx } = await loadApp({ seed: 36 });
   ctx.addTask("Task A", false);
   ctx.addTask("Said can't", false);
-  ctx.startScan();               // dots Task A, so "Said can't" is the one on offer
+  ctx.startScan('descending');               // dots Task A, so "Said can't" is the one on offer
   const cantId = ctx.state.candidateId;
   ctx.decide("cant");
   assert.ok(ctx.state.cantAt[cantId]);
@@ -1902,7 +1902,7 @@ test("UI: the list badge shows remaining cooldown minutes for an active can't ma
   ctx.state.settings.cantMin = 60;
   ctx.addTask("Task A", false);
   ctx.addTask("Said can't", false);
-  ctx.startScan();               // dots Task A, so "Said can't" is the one on offer
+  ctx.startScan('descending');               // dots Task A, so "Said can't" is the one on offer
   const t0 = realNow(ctx);
   setFakeTime(ctx, t0);
   ctx.decide("cant");
@@ -2182,7 +2182,7 @@ test("AUDIT: does not disturb can't marks that already have a valid timestamp", 
   ctx.state.settings.cantMin = 60;
   ctx.addTask("Task A", false);
   ctx.addTask("Task B", false);
-  ctx.startScan();
+  ctx.startScan('descending');
   const cand = ctx.state.candidateId;
   const t0 = realNow(ctx);
   setFakeTime(ctx, t0);
@@ -2487,7 +2487,7 @@ test("a worked mark expires mid-session once its window is up (no newPass needed
   ctx.state.settings.workedHours = 25;                    // longer than a day — so the 02:00 line, not the window, is what ends it
   ctx.addTask("Task A", false);
   const w = ctx.addTask("Worked", false);
-  ctx.startScan();                                        // dots Task A, so "Worked" is the one on offer
+  ctx.startScan('descending');                                        // dots Task A, so "Worked" is the one on offer
 
   const t0 = localAt(30, 3, 0);                           // 3am Sunday
   setFakeTime(ctx, t0);
@@ -2513,7 +2513,7 @@ test("REGRESSION: a task worked on in the morning is not dealt back the same day
   assert.equal(ctx.state.settings.workedHours, 16, "sanity: the default window this regression leans on");
   ctx.addTask("Task A", false);
   const w = ctx.addTask("beat mafia 1 definitive edition", false);
-  ctx.startScan();
+  ctx.startScan('descending');
 
   setFakeTime(ctx, localAt(31, 7, 38));
   ctx.workedOnTask(w.id);
@@ -2536,7 +2536,7 @@ test("a sub-day worked window can hand a morning task back the same evening — 
   ctx.state.settings.workedHours = 8;
   ctx.addTask("Task A", false);
   const w = ctx.addTask("beat mafia 1 definitive edition", false);
-  ctx.startScan();
+  ctx.startScan('descending');
 
   setFakeTime(ctx, localAt(31, 7, 38));
   ctx.workedOnTask(w.id);
@@ -2552,7 +2552,7 @@ test("on the default window it comes back the next day, when the pass day rolls 
   assert.equal(ctx.state.settings.workedHours, 16);
   ctx.addTask("Task A", false);
   const w = ctx.addTask("beat mafia 1 definitive edition", false);
-  ctx.startScan();
+  ctx.startScan('descending');
 
   setFakeTime(ctx, localAt(31, 20, 0));                   // Mon 20:00 — 16h out is noon Tue, past the day line
   ctx.workedOnTask(w.id);
@@ -2576,7 +2576,7 @@ test("a late-night worked mark is released at 02:00, not workedHours later", asy
   ctx.state.settings.workedHours = 16;
   ctx.addTask("Task A", false);
   const w = ctx.addTask("Worked at bedtime", false);
-  ctx.startScan();
+  ctx.startScan('descending');
 
   setFakeTime(ctx, localAt(30, 23, 0));                   // 11pm Sunday; 02:00 Monday is only 3h away
   ctx.workedOnTask(w.id);
@@ -2632,7 +2632,7 @@ test("crossing 02:00 recycles a worked mark with the pass — not just no / disl
   ctx.addTask("Benchmark", false);
   const w = ctx.addTask("Worked last night", false);
   setFakeTime(ctx, localAt(30, 22, 0));                   // Sun 22:00 — the pass starts
-  ctx.startScan();
+  ctx.startScan('descending');
   setFakeTime(ctx, localAt(30, 23, 0));                   // Sun 23:00 — worked on it
   ctx.workedOnTask(w.id);
 
@@ -2669,7 +2669,7 @@ test("shrinking workedHours below the elapsed time expires an existing worked ma
   ctx.state.settings.workedHours = 10;
   ctx.addTask("Task A", false);
   const w = ctx.addTask("Worked", false);
-  ctx.startScan();
+  ctx.startScan('descending');
 
   const t0 = localAt(30, 3, 0);
   setFakeTime(ctx, t0);
@@ -2776,7 +2776,7 @@ test("decide('yes') clears any workedAt on the dotted task, mirroring its cantAt
   const { ctx } = await loadApp({ seed: 424 });
   ctx.addTask("Benchmark", true);
   ctx.addTask("Candidate", false);
-  ctx.startScan();
+  ctx.startScan('descending');
   const cand = ctx.state.candidateId;
   assert.ok(cand, "precondition: a candidate is on offer");
   ctx.state.workedAt[cand] = realNow(ctx);               // plant a stale timestamp on the candidate
@@ -2843,7 +2843,7 @@ test("passStartedAt: starting a chain stamps the pass start time", async () => {
   ctx.addTask("B", false);
   const t0 = realNow(ctx);
   setFakeTime(ctx, t0);
-  ctx.startScan();                                  // dots the oldest — this begins a pass
+  ctx.startScan('descending');                                  // dots the oldest — this begins a pass
   assert.equal(ctx.state.passStartedAt, t0, "starting a chain stamps the pass start time");
 });
 
@@ -2854,7 +2854,7 @@ test("passStartedAt: resuming a paused scan does NOT re-stamp the pass", async (
   ctx.addTask("C", false);
   const t0 = realNow(ctx);
   setFakeTime(ctx, t0);
-  ctx.startScan();                                  // begins the pass, stamps t0
+  ctx.startScan('descending');                                  // begins the pass, stamps t0
   assert.equal(ctx.state.passStartedAt, t0);
 
   ctx.decide("yes");                                // push the candidate onto the chain
@@ -2863,7 +2863,7 @@ test("passStartedAt: resuming a paused scan does NOT re-stamp the pass", async (
   assert.ok(ctx.state.chain.length >= 1, "precondition: chain not drained");
 
   setFakeTime(ctx, t0 + 120000);
-  ctx.startScan();                                  // resume
+  ctx.startScan('descending');                                  // resume
   assert.equal(ctx.state.passStartedAt, t0, "resuming must not move the pass start");
 });
 
@@ -2882,7 +2882,7 @@ test("a pass date-marker old auto-runs newPass() on the next ensureCandidate(): 
   ctx.addTask("Said no", false);
   const t0 = realNow(ctx);
   setFakeTime(ctx, t0);
-  ctx.startScan();                                  // dots "Benchmark" (oldest); pass starts at t0
+  ctx.startScan('descending');                                  // dots "Benchmark" (oldest); pass starts at t0
   const noId = ctx.state.candidateId;
   ctx.decide("no");
   assert.equal(ctx.state.considered[noId], "no");
@@ -2904,7 +2904,7 @@ test("a pass 17h old that has not crossed 02:00 does NOT recycle — the marks a
   ctx.addTask("Benchmark", false);
   ctx.addTask("Said no", false);
   setFakeTime(ctx, new Date(2026, 7, 28, 6, 0, 0).getTime());   // Fri 06:00 — next 02:00 is 20h away
-  ctx.startScan();
+  ctx.startScan('descending');
   const noId = ctx.state.candidateId;
   ctx.decide("no");
 
@@ -2941,7 +2941,7 @@ test("fresh can't and worked marks survive a long same-day pass", async () => {
   // Fixed local 03:00 keeps this long pass inside one scan day.
   const t0 = localAt(30, 3, 0);
   setFakeTime(ctx, t0);
-  ctx.startScan();                                  // pass starts at t0
+  ctx.startScan('descending');                                  // pass starts at t0
   assert.equal(ctx.state.passStartedAt, t0);
 
   // Both marks placed 30 min before the recycle — fresh within their own windows.
@@ -2979,7 +2979,7 @@ test("REGRESSION: a long-window can't from last night does not survive the 02:00
   ctx.addTask("Benchmark", false);
   const c = ctx.addTask("Can't face it tonight", false);
   setFakeTime(ctx, localAt(30, 22, 0));             // Sun 22:00 — the pass opens before the line
-  ctx.startScan();                                  // chain stays open across the marker
+  ctx.startScan('descending');                                  // chain stays open across the marker
   assert.equal(ctx.state.passStartedAt, localAt(30, 22, 0), "precondition: the pass is anchored last night");
 
   setFakeTime(ctx, localAt(30, 23, 0));             // Sun 23:00 — 02:00 is 3h away, far inside the 8h window
@@ -3007,7 +3007,7 @@ test("crossing the date marker leaves the pool exactly as a fresh day would buil
   const cant = ctx.addTask("Said can't", false);
   const worked = ctx.addTask("Worked on it", false);
   setFakeTime(ctx, localAt(30, 22, 0));             // Sun 22:00 — everything marked last night
-  ctx.startScan();
+  ctx.startScan('descending');
   const dotted = ctx.addTask("Dotted last night", true);   // "Add & dot" — straight onto the chain
   assert.ok(ctx.state.chain.includes(dotted.id), "precondition: the second dot is on the chain");
 
@@ -3037,7 +3037,7 @@ test("the date-marker clear leaves the chain and its benchmark alone", async () 
   ctx.addTask("Root", false);
   const c = ctx.addTask("Can't", false);
   setFakeTime(ctx, localAt(30, 22, 0));
-  ctx.startScan();
+  ctx.startScan('descending');
   ctx.addTask("Second dot", true);
   ctx.addTask("Third dot", true);
   ctx.state.considered[c.id] = "cant"; ctx.state.cantAt[c.id] = localAt(30, 22, 0);
@@ -3062,7 +3062,7 @@ test("a long same-day pass retains skips and fresh can't windows", async () => {
   const n = ctx.addTask("Said no", false);
   const t0 = localAt(30, 3, 0);                     // Sun 03:00 — next 02:00 is 23h away
   setFakeTime(ctx, t0);
-  ctx.startScan();
+  ctx.startScan('descending');
 
   const late = t0 + 17.5 * 3600000;                 // Sun 20:30 — 30 min before the ceiling
   ctx.state.considered[c.id] = "cant"; ctx.state.cantAt[c.id] = late;
@@ -3084,7 +3084,7 @@ test("a chain draining mid-day is a new pass, not a new day: a fresh can't keeps
   const c = ctx.addTask("Can't", false);
   const n = ctx.addTask("Said no", false);
   setFakeTime(ctx, localAt(30, 14, 0));             // mid-afternoon, nowhere near a day line
-  ctx.startScan();
+  ctx.startScan('descending');
   ctx.state.considered[c.id] = "cant"; ctx.state.cantAt[c.id] = localAt(30, 14, 0);
   ctx.state.considered[n.id] = "no";
 
@@ -3103,7 +3103,7 @@ test("the date-marker clear is a one-shot: a can't placed after the marker holds
   ctx.addTask("Benchmark", false);
   const c = ctx.addTask("Can't", false);
   setFakeTime(ctx, localAt(30, 22, 0));
-  ctx.startScan();
+  ctx.startScan('descending');
 
   setFakeTime(ctx, localAt(31, 2, 30));             // cross the marker with nothing marked
   ctx.ensureCandidate();
@@ -3124,7 +3124,7 @@ test("after an auto-recycle, passStartedAt is re-stamped so it does not recycle 
   ctx.addTask("Said no", false);
   const t0 = realNow(ctx);
   setFakeTime(ctx, t0);
-  ctx.startScan();
+  ctx.startScan('descending');
   const noId = ctx.state.candidateId;
   ctx.decide("no");
 
@@ -3146,7 +3146,7 @@ test("an evergreen task finished mid-pass is back in the pool after the date-mar
   ctx.addTask("Filler", false);
   const t0 = realNow(ctx);
   setFakeTime(ctx, t0);
-  ctx.startScan();                                  // dots "Anchor task"; pass starts at t0
+  ctx.startScan('descending');                                  // dots "Anchor task"; pass starts at t0
 
   setFakeTime(ctx, t0 + 3600000);                   // an hour in
   ctx.state.candidateId = ever.id;                  // the evergreen comes up as the candidate
@@ -3168,7 +3168,7 @@ test("migration: a state with no passStartedAt loads as 0 and never auto-recycle
 
   ctx.addTask("A", false);
   ctx.addTask("B", false);
-  ctx.startScan();
+  ctx.startScan('descending');
   const noId = ctx.state.candidateId;
   ctx.decide("no");
   ctx.state.passStartedAt = 0;                      // simulate a state with no pass in progress and no start time
@@ -3206,7 +3206,7 @@ test("the stale-pass recycle keeps firing day after day, not just once", async (
   const skip = ctx.addTask("Skip me", false);
   const start = new Date(2026, 7, 27, 20, 0, 0).getTime();       // Thu 20:00
   setFakeTime(ctx, start);
-  ctx.startScan();
+  ctx.startScan('descending');
 
   for (let day = 1; day <= 5; day++) {
     ctx.state.considered[skip.id] = "no";                        // a fresh mark, left overnight
@@ -3222,7 +3222,7 @@ test("the stale-pass recycle catches up a multi-day gap in one shot, then rearms
   const skip = ctx.addTask("Skip me", false);
   const t0 = realNow(ctx);
   setFakeTime(ctx, t0);
-  ctx.startScan();
+  ctx.startScan('descending');
 
   ctx.state.considered[skip.id] = "no";
   setFakeTime(ctx, t0 + 50 * 3600000);             // away for ~2 days
@@ -3252,7 +3252,7 @@ test("a pass started before 02:00 recycles the moment the clock crosses it, well
   ctx.addTask("Benchmark", false);
   const skip = ctx.addTask("Skip me", false);
   setFakeTime(ctx, new Date(2026, 7, 27, 22, 0, 0).getTime());   // Thu 22:00
-  ctx.startScan();
+  ctx.startScan('descending');
   ctx.state.considered[skip.id] = "no";
 
   setFakeTime(ctx, new Date(2026, 7, 28, 1, 59, 0).getTime());   // 01:59 — not yet
@@ -3269,7 +3269,7 @@ test("a pass that stays within one 02:00-to-02:00 day and under 18h does not rec
   ctx.addTask("Benchmark", false);
   const skip = ctx.addTask("Skip me", false);
   setFakeTime(ctx, new Date(2026, 7, 28, 10, 0, 0).getTime());   // Fri 10:00
-  ctx.startScan();
+  ctx.startScan('descending');
   ctx.state.considered[skip.id] = "no";
 
   setFakeTime(ctx, new Date(2026, 7, 28, 23, 30, 0).getTime());  // Fri 23:30 — 13.5h, no 02:00 crossed
@@ -3282,7 +3282,7 @@ test("a pass started exactly at 02:00 is not instantly stale", async () => {
   ctx.addTask("Benchmark", false);
   const skip = ctx.addTask("Skip me", false);
   setFakeTime(ctx, new Date(2026, 7, 28, 2, 0, 0).getTime());    // 02:00:00 sharp
-  ctx.startScan();
+  ctx.startScan('descending');
   ctx.state.considered[skip.id] = "no";
 
   setFakeTime(ctx, new Date(2026, 7, 28, 2, 5, 0).getTime());    // five minutes later
@@ -3295,7 +3295,7 @@ test("the 02:00 trigger rearms for the following day after it fires", async () =
   ctx.addTask("Benchmark", false);
   const skip = ctx.addTask("Skip me", false);
   setFakeTime(ctx, new Date(2026, 7, 27, 23, 0, 0).getTime());   // Thu 23:00
-  ctx.startScan();
+  ctx.startScan('descending');
 
   ctx.state.considered[skip.id] = "no";
   setFakeTime(ctx, new Date(2026, 7, 28, 2, 0, 0).getTime());    // Fri 02:00 -> recycle #1
@@ -3318,7 +3318,7 @@ test("18 hours elapsed before the next 02:00 does not recycle scanned tasks", as
   ctx.addTask("Benchmark", false);
   const skip = ctx.addTask("Skip me", false);
   setFakeTime(ctx, new Date(2026, 7, 28, 7, 0, 0).getTime());    // Fri 07:00 — next 02:00 is 19h out, 18h ceiling is 18h out
-  ctx.startScan();
+  ctx.startScan('descending');
   ctx.state.considered[skip.id] = "no";
 
   setFakeTime(ctx, new Date(2026, 7, 29, 0, 30, 0).getTime());   // Sat 00:30 — 17.5h in, Sat 02:00 not yet reached
@@ -3366,7 +3366,7 @@ test("rank presentation defaults show sparklines and top-K everywhere without hi
   const { ctx, shim } = await loadApp({ seed: 790 });
   const first = addTaskAged(ctx, "Oldest", 900000);
   addTaskAged(ctx, "Newer", 1000);
-  ctx.startScan();
+  ctx.startScan('descending');
   ctx.state.listOpen = true;
   ctx.render();
 
@@ -3449,7 +3449,7 @@ test("rank presentation flags independently restore their existing UI only for l
   const { ctx, shim } = await loadApp({ seed: 791 });
   const first = addTaskAged(ctx, "Oldest", 900000);
   addTaskAged(ctx, "Newer", 1000);
-  ctx.startScan();
+  ctx.startScan('descending');
   ctx.state.listOpen = true;
 
   vm.runInContext("FEATURE_FLAGS.rankSparklines = true; FEATURE_FLAGS.topKLanguage = false", ctx);
@@ -3536,7 +3536,7 @@ test("chain start: Start scanning dots the OLDEST outstanding task", async () =>
   addTaskAged(ctx, "Oldest", 900000);
   addTaskAged(ctx, "Middle", 50000);
 
-  ctx.startScan();
+  ctx.startScan('descending');
   assert.equal(ctx.state.chain.length, 1);
   assert.equal(titleOf(ctx, ctx.state.chain[0]), "Oldest");
 });
@@ -3550,7 +3550,7 @@ test("chain start: the candidate offered is a ranked pick from what's left, neve
   st.mu = 500; st.sigma = 0.5;   // overwhelmingly the highest-ranked task
   ctx.recomputeRanks();
 
-  ctx.startScan();
+  ctx.startScan('descending');
   assert.equal(titleOf(ctx, ctx.state.chain[0]), "Oldest", "the dot itself goes by age");
   assert.equal(ctx.state.candidateId, strong.id, "ranked scanning starts immediately, against the task just dotted");
 });
@@ -3563,7 +3563,7 @@ test("chain start: a strong rank does NOT jump the queue ahead of the oldest tas
   st.mu = 500; st.sigma = 0.5;
   ctx.recomputeRanks();
 
-  ctx.startScan();
+  ctx.startScan('descending');
   assert.equal(titleOf(ctx, ctx.state.chain[0]), "Oldest but weak", "ranking must not influence the first dot");
 });
 
@@ -3573,7 +3573,7 @@ test("chain start: the first dot moves NO ranks (mu/sigma untouched for every ta
   addTaskAged(ctx, "Newer", 1000);
   const before = ctx.state.tasks.map((t) => ({ id: t.id, mu: t.mu, sigma: t.sigma }));
 
-  ctx.startScan();
+  ctx.startScan('descending');
   assert.equal(ctx.state.chain.length, 1, "precondition: the first dot landed");
   for (const snap of before) {
     const now = ctx.state.tasks.find((t) => t.id === snap.id);
@@ -3590,7 +3590,7 @@ test("chain start: a fresh can't mark keeps a task out of the first dot", async 
   ctx.state.considered[first.id] = "cant";
   ctx.state.cantAt[first.id] = Date.now();
 
-  ctx.startScan();
+  ctx.startScan('descending');
   assert.equal(titleOf(ctx, ctx.state.chain[0]), "Second oldest",
     "a can't mark is bulletproof — it must not be overridden by dotting the task outright");
 });
@@ -3601,13 +3601,13 @@ test("chain start: an ineligible task is never dotted, however old it is", async
   ctx.state.tasks.find((x) => x.id === future.id).startsAt = ctx.todayISO(7);
   const ready = addTaskAged(ctx, "Ready now", 1000);
 
-  ctx.startScan();
+  ctx.startScan('descending');
   assert.deepEqual([...ctx.state.chain], [ready.id], "age must not override eligibility");
 });
 
 test("chain start: Start scanning with nothing eligible leaves the chain empty and doesn't throw", async () => {
   const { ctx } = await loadApp({ seed: 97 });
-  ctx.startScan();
+  ctx.startScan('descending');
   assert.equal(ctx.state.chain.length, 0);
   assert.equal(ctx.state.candidateId, null);
   assert.equal(ctx.state.mode, "scan", "the button still puts you in scanning mode, just with nothing to dot");
@@ -3615,6 +3615,7 @@ test("chain start: Start scanning with nothing eligible leaves the chain empty a
 
 test("chain start: Start scanning from a paused queue resumes and dots in the one click", async () => {
   const { ctx } = await loadApp({ seed: 98 });
+  ctx.state.settings.scanMode = "descending";
   addTaskAged(ctx, "Oldest", 900000);
   addTaskAged(ctx, "Newer", 1000);
   ctx.onAction("start-working", {});
@@ -3639,7 +3640,7 @@ test("crossing off the last dot empties the chain and hands back the Start scann
   assert.equal(ctx.state.candidateId, null, "no candidate is dealt with nothing dotted");
   assert.match(scanHtmlOf(ctx, shim), /data-act="start-scan"/, "you're offered the start of a fresh chain");
 
-  ctx.startScan();
+  ctx.startScan('descending');
   assert.deepEqual([...ctx.state.chain], [oldest.id], "which starts on the oldest outstanding task, as ever");
 });
 
@@ -3647,7 +3648,7 @@ test("Can't on the only dotted task goes back to Start scanning, and doesn't re-
   const { ctx } = await loadApp({ seed: 95 });
   addTaskAged(ctx, "Oldest", 900000);
   addTaskAged(ctx, "Second oldest", 800000);
-  ctx.startScan();
+  ctx.startScan('descending');
   const refused = ctx.state.chain[0];
   assert.equal(titleOf(ctx, refused), "Oldest");
 
@@ -3655,7 +3656,7 @@ test("Can't on the only dotted task goes back to Start scanning, and doesn't re-
   assert.equal(ctx.state.considered[refused], "cant");
   assert.equal(ctx.state.chain.length, 0, "nothing is dotted behind your back");
 
-  ctx.startScan();
+  ctx.startScan('descending');
   assert.equal(titleOf(ctx, ctx.state.chain[0]), "Second oldest");
 });
 
@@ -3663,14 +3664,14 @@ test("deleting the only dotted task goes back to Start scanning", async () => {
   const { ctx } = await loadApp({ seed: 87 });
   addTaskAged(ctx, "Oldest", 900000);
   addTaskAged(ctx, "Second oldest", 500000);
-  ctx.startScan();
+  ctx.startScan('descending');
   const dotted = ctx.state.chain[0];
 
   ctx.deleteTask(dotted);
   assert.equal(ctx.state.tasks.some((t) => t.id === dotted), false);
   assert.equal(ctx.state.chain.length, 0);
 
-  ctx.startScan();
+  ctx.startScan('descending');
   assert.equal(titleOf(ctx, ctx.state.chain[0]), "Second oldest");
 });
 
@@ -3678,7 +3679,7 @@ test("decide('can') is retired — a stale 'can' must not dot anything or drop t
   const { ctx } = await loadApp({ seed: 93 });
   addTaskAged(ctx, "Oldest", 900000);
   addTaskAged(ctx, "Newer", 1000);
-  ctx.startScan();
+  ctx.startScan('descending');
   const chainBefore = [...ctx.state.chain];
   const cand = ctx.state.candidateId;
 
@@ -3723,7 +3724,7 @@ test("UI: once scanning starts it's Yes/No — no Can button, no chain-start que
   const { ctx, shim } = await loadApp({ seed: 91 });
   addTaskAged(ctx, "Oldest", 900000);
   addTaskAged(ctx, "Newer", 1000);
-  ctx.startScan();
+  ctx.startScan('descending');
   const scanHtml = scanHtmlOf(ctx, shim);
 
   assert.ok(!/data-act="start-scan"/.test(scanHtml), "the Start scanning button has done its job and gone");
@@ -3791,7 +3792,7 @@ test("UI: the candidate card shows a direct Edit button, not Reveal", async () =
   const { ctx, shim } = await loadApp({ seed: 93 });
   addTaskAged(ctx, "Oldest", 900000);
   addTaskAged(ctx, "Newer", 1000);
-  ctx.startScan();
+  ctx.startScan('descending');
   ctx.render();
   const scanHtml = shim.elements.get("scan").innerHTML;
   const cand = ctx.state.candidateId;
@@ -3863,7 +3864,7 @@ test("UI: the candidate card's Done gets the same button treatment", async () =>
   const { ctx, shim } = await loadApp({ seed: 251 });
   addTaskAged(ctx, "Oldest", 900000);
   addTaskAged(ctx, "Newer", 1000);
-  ctx.startScan();
+  ctx.startScan('descending');
   ctx.render();
   const scanHtml = shim.elements.get("scan").innerHTML;
 
@@ -3885,7 +3886,7 @@ test("UI: every action button in the candidate's siderail shares the same .sm si
   const { ctx, shim } = await loadApp({ seed: 253 });
   addTaskAged(ctx, "Oldest", 900000);
   addTaskAged(ctx, "Newer", 1000);
-  ctx.startScan();
+  ctx.startScan('descending');
   ctx.render();
   const scanHtml = shim.elements.get("scan").innerHTML;
 
@@ -4016,7 +4017,7 @@ test("UI: the arrow disappears once scanning starts and a task is dotted", async
   let list = shim.elements.get("listBody").innerHTML;
   assert.match(list, /→/, "precondition: arrow is showing before scan");
 
-  ctx.startScan();
+  ctx.startScan('descending');
   ctx.render();
   list = shim.elements.get("listBody").innerHTML;
   assert.ok(!/→/.test(list), "arrow should disappear once a task is dotted");
@@ -4049,7 +4050,7 @@ test("undo: the header button reverses the last action through the normal onActi
   const { ctx } = await loadApp({ seed: 256 });
   ctx.addTask("Task A", false);
   ctx.addTask("Task B", false);
-  ctx.startScan();
+  ctx.startScan('descending');
   assert.equal(ctx.state.chain.length, 1);
 
   ctx.onAction("undo", { dataset: {} });
@@ -4118,7 +4119,7 @@ test("UI: a separator sits between the benchmark block and the candidate card", 
   const { ctx, shim } = await loadApp({ seed: 274 });
   addTaskAged(ctx, "Oldest", 900000);
   addTaskAged(ctx, "Newer", 1000);
-  ctx.startScan();
+  ctx.startScan('descending');
   ctx.render();
   const scanHtml = shim.elements.get("scan").innerHTML;
 
@@ -4211,7 +4212,7 @@ test("cand-done: completes the candidate through the normal onAction path", asyn
   const { ctx } = await loadApp({ seed: 255 });
   ctx.addTask("Task A", false);
   ctx.addTask("Task B", false);
-  ctx.startScan();
+  ctx.startScan('descending');
   const cand = ctx.state.candidateId;
 
   ctx.onAction("cand-done", { dataset: {} });
@@ -4289,7 +4290,7 @@ test("doneTask: completing the current candidate clears it and a fresh one is de
   addTaskAged(ctx, "Task A", 900000);
   addTaskAged(ctx, "Task B", 600000);
   addTaskAged(ctx, "Task C", 300000);
-  ctx.startScan();
+  ctx.startScan('descending');
   const cand = ctx.state.candidateId;
   assert.ok(cand);
 
@@ -4871,7 +4872,7 @@ test("dotTask: dotting onto a running chain does NOT re-stamp the pass clock", a
   // line and trip the auto-recycle, whatever time of day the suite runs at.
   const t0 = new Date(2027, 0, 15, 10, 0, 0).getTime();
   setFakeTime(ctx, t0);
-  ctx.startScan();                       // roots the chain, stamping the clock at t0
+  ctx.startScan('descending');                       // roots the chain, stamping the clock at t0
   assert.equal(ctx.state.passStartedAt, t0, "precondition: the root started the pass");
 
   setFakeTime(ctx, t0 + 60 * 60000);     // 11:00 the same morning — same pass, nowhere near stale
@@ -6109,7 +6110,7 @@ test("UX: rescan button doesn't show when resume-scan is available", async () =>
   ctx.addTask("Task A", false);
   ctx.addTask("Task B", false);
   ctx.addTask("Task C", false);
-  ctx.startScan();  // dots Task A
+  ctx.startScan('descending');  // dots Task A
   ctx.render();
   
   // Skip a task (decide "no")
@@ -6134,7 +6135,7 @@ test("UX: resume-scan button is greyed during work mode if pool has eligible tas
   ctx.addTask("Task A", false);
   ctx.addTask("Task B", false);
   ctx.addTask("Task C", false);
-  ctx.startScan();  // dots Task A, mode stays "scan"
+  ctx.startScan('descending');  // dots Task A, mode stays "scan"
   ctx.onAction("start-working");  // switch to work mode
   ctx.render();
   
@@ -6154,7 +6155,7 @@ test("UX: resume-scan button is full opacity once all eligible tasks are gone", 
   const { ctx, shim } = await loadApp({ seed: 42 });
   ctx.addTask("Task A", false);
   ctx.addTask("Task B", false);
-  ctx.startScan();  // dots Task A
+  ctx.startScan('descending');  // dots Task A
   ctx.decide("yes");  // select Task B, dot it
   ctx.decide("yes");  // no more tasks
   ctx.render();
@@ -6361,7 +6362,7 @@ test("list filter row: a 'no' mark puts a no button on the row", async () => {
   const { ctx, shim } = await loadApp({ seed: 941 });
   ctx.addTask("Task A", false);
   ctx.addTask("Task B", false);
-  ctx.startScan();          // dots Task A, offers Task B
+  ctx.startScan('descending');          // dots Task A, offers Task B
   ctx.decide("no");         // marks Task B 'no' through the real scan flow
   openList(ctx);
 
@@ -6712,7 +6713,7 @@ test("list filter: undoing the mark a filter points at takes the filter with it"
   ctx.addTask("Task A", false);
   ctx.addTask("Task B", false);
   openList(ctx);                       // before the marking step, so undo's snapshot has the list open
-  ctx.startScan();
+  ctx.startScan('descending');
   ctx.decide("no");                    // marks one 'no' — an undoable step
   clickTag(ctx, "s:no");
   assert.deepEqual(litTags(shim), ["s:no"], "precondition: the filter is lit");
@@ -7868,7 +7869,7 @@ test("AUDIT H5: with nothing dotted, only the task Start scanning will dot carri
 
   const rowOf = (id) => html.split('data-row="').find((chunk) => chunk.startsWith(id)) || "";
   assert.ok(rowOf(a.id).includes("chainind"), "and it belongs to the oldest outstanding task");
-  ctx.startScan();
+  ctx.startScan('descending');
   // Array.from: this chain was built by defaultState() inside the vm context,
   // so it carries that realm's Array.prototype and deepStrictEqual would
   // reject it against an outer-realm literal however equal the contents are.
@@ -10273,7 +10274,7 @@ test('Skywriters: scheduler requires a human word, respects its rate, and allows
 // Chance order is part of the pass, not a side effect of rendering or voting.
 test('Chance scan: settings select one default button or two explicit buttons', async()=>{
  const {ctx}=await loadApp();
- assert.equal(ctx.state.settings.scanMode,'descending');
+ assert.equal(ctx.state.settings.scanMode,'chance');
  assert.match(ctx.scanStartButtons(),/>Start scanning</);
  ctx.state.settings.scanMode='both';
  assert.match(ctx.scanStartButtons(),/Scan in chance mode/);
@@ -10378,7 +10379,7 @@ test('Evergreen and chance settings: malformed persisted values normalize withou
  const {ctx}=await loadApp();const st=ctx.defaultState();
  st.settings={evergreenHours:-5,evergreenResetAtDay:false,scanMode:'invalid'};
  st.tasks=[{...syncTask('a','a'),evergreenHours:'junk',evergreenResetAtDay:'false'}];
- ctx.hydrateState(st);assert.ok(st.settings.evergreenHours>0);assert.equal(st.settings.evergreenResetAtDay,false);assert.equal(st.settings.scanMode,'descending');
+ ctx.hydrateState(st);assert.ok(st.settings.evergreenHours>0);assert.equal(st.settings.evergreenResetAtDay,false);assert.equal(st.settings.scanMode,'chance');
  assert.ok(Number.isFinite(st.tasks[0].evergreenHours));assert.equal(typeof st.tasks[0].evergreenResetAtDay,'boolean');
 });
 test('Chance scan: live TrueSkill ratings still change on Yes and No',async()=>{
@@ -10464,7 +10465,7 @@ test('PWA updates: boot retries a controller update that arrived before state lo
  const h=pwaUpdateHarness();await h.ready();h.box.state=null;await h.sh.controllerchange();assert.equal(h.counts().reloads,0);
  h.box.state={};
  const boot=html.slice(html.indexOf('(async function init(){'),html.indexOf('/* A standalone window'));
- assert.match(boot,/if\(isFirstBoot\) openHelp\(\);\s*window\.applyPendingAppUpdate\?\.\(\)/);
+ assert.match(boot,/if\(isFirstBoot\) openHelp\(\);[\s\S]*window\.applyPendingAppUpdate\?\.\(\)/);
  await h.box.window.applyPendingAppUpdate();assert.equal(h.counts().reloads,1);
 });
 test('PWA updates: opening an edit during an asynchronous save defers reload again',async()=>{
@@ -10620,4 +10621,66 @@ test('Cloud auth bootstrap: an auth-triggered pull before state load is replayed
   await syncSettle(50);
   assert.deepEqual(Array.from(ctx.state.chain), CLOUD_CHAIN,
     'tasks fetched by the early auth callback must render after state boot without a reload');
+});
+
+const updateNoticeKey='fvp:chain-scanner:last-notified-release';
+const releaseMarkup=html.match(/<template id="appChangelog">([\s\S]*?)<\/template>/)[1];
+const releaseFingerprint=releaseMarkup.match(/data-app-fingerprint="([^"]+)"/)[1];
+function prepareReleaseNotice(ctx,shim){shim.document.getElementById('appChangelog').innerHTML=releaseMarkup;}
+test('Update toast: fresh install is quiet, changed release notifies once and reload stays quiet',async()=>{
+ const fresh=await loadApp({beforeStateReady:prepareReleaseNotice});
+ assert.equal(fresh.shim.localStorage.getItem(updateNoticeKey),releaseFingerprint);
+ assert.ok(!fresh.shim.elements.get('toast')?.textContent?.includes('App updated'));
+ const updated=await loadApp({seedStorage:{[updateNoticeKey]:'old-release'},beforeStateReady:prepareReleaseNotice});
+ assert.match(updated.shim.elements.get('toast').textContent,/App updated.*Settings.*Changelog/);
+ assert.equal(updated.shim.localStorage.getItem(updateNoticeKey),releaseFingerprint);
+ const reload=await loadApp({seedStorage:{[updateNoticeKey]:releaseFingerprint},beforeStateReady:prepareReleaseNotice});
+ assert.ok(!reload.shim.elements.get('toast')?.textContent?.includes('App updated'));
+});
+test('Update toast: waits for visible app and closed editor, then survives blocked storage',async()=>{
+ const {ctx,shim}=await loadApp({seedStorage:{[updateNoticeKey]:'old-release'},beforeStateReady(c,s){prepareReleaseNotice(c,s);s.document.hidden=true;}});
+ assert.equal(shim.localStorage.getItem(updateNoticeKey),'old-release');
+ shim.document.hidden=false;shim.document.querySelector=()=>({});ctx.showAppUpdateNotice();
+ assert.equal(shim.localStorage.getItem(updateNoticeKey),'old-release');
+ shim.document.querySelector=()=>null;shim.localStorage.setItem=()=>{throw Error('blocked');};
+ assert.doesNotThrow(()=>ctx.showAppUpdateNotice());
+ assert.match(shim.elements.get('toast').textContent,/App updated/);
+ shim.elements.get('toast').textContent='other';ctx.showAppUpdateNotice();assert.equal(shim.elements.get('toast').textContent,'other');
+});
+test('Update toast: existing installations without release tracking get the first announcement',async()=>{
+ const old=await loadApp();const saved=JSON.stringify(old.ctx.state);
+ const {shim}=await loadApp({seedStorage:{[SYNC_STORE_KEY]:saved},beforeStateReady:prepareReleaseNotice});
+ assert.match(shim.elements.get('toast').textContent,/App updated/);
+});
+
+test('Evergreen controls: task editor hides interval and reset until evergreen is checked',async()=>{
+ const {ctx,shim}=await loadApp();const task=ctx.addTask('One-off');ctx.openEdit(task.id);
+ assert.match(shim.document.getElementById('modalRoot').innerHTML,/<div id="etEverOptions" hidden>[\s\S]*id="etEverHours"[\s\S]*id="etEverReset"/);
+ task.evergreen=true;ctx.openEdit(task.id);
+ assert.match(shim.document.getElementById('modalRoot').innerHTML,/<div id="etEverOptions">/);
+ const hours=shim.document.getElementById('etEverHours');hours.value='32';
+ const reset=shim.document.getElementById('etEverReset');reset.checked=true;
+ ctx.toggleEvergreenOptions(false);assert.equal(shim.document.getElementById('etEverOptions').hidden,true);
+ ctx.toggleEvergreenOptions(true);assert.equal(shim.document.getElementById('etEverOptions').hidden,false);
+ assert.equal(hours.value,'32');assert.equal(reset.checked,true);
+ assert.match(appSrc,/el.id === "etEver"[\s\S]{0,100}toggleEvergreenOptions\(el.checked\)/);
+});
+
+test('Scan default: chance is used for new or missing preferences, while saved choices survive',async()=>{
+ const {ctx}=await loadApp();assert.equal(ctx.normalizeSettings({}).scanMode,'chance');
+ assert.equal(ctx.normalizeSettings({scanMode:'invalid'}).scanMode,'chance');
+ for(const mode of ['descending','chance','both'])assert.equal(ctx.normalizeSettings({scanMode:mode}).scanMode,mode);
+ ctx.addTask('A');ctx.addTask('B');ctx.startScan();assert.equal(ctx.state.scanMode,'chance');
+});
+
+test('Dislodge signal: one loss to a fresh default reference, other tasks and chance draw untouched, undo restores rating',async()=>{
+ const {ctx}=await loadApp();const a=ctx.addTask('A'),b=ctx.addTask('B');
+ ctx.state.chain=[a.id];ctx.state.scanMode='chance';ctx.resetChance();
+ const before=JSON.stringify(a),other=JSON.stringify(b),draw=JSON.stringify(ctx.state.chance);
+ const expected={mu:a.mu,sigma:a.sigma};ctx.updatePair({mu:25,sigma:25/3},expected);
+ ctx.dislodge();assert.equal(a.mu,expected.mu);assert.equal(a.sigma,expected.sigma);
+ assert.ok(a.mu<25);assert.equal(JSON.stringify(b),other);assert.equal(JSON.stringify(ctx.state.chance),draw);
+ assert.equal(ctx.state.considered[a.id],'dislodged');assert.equal(ctx.state.chain.length,0);
+ ctx.undo();assert.equal(JSON.stringify(ctx.state.tasks.find(t=>t.id===a.id)),before);
+ ctx.state.chain=[a.id];ctx.dislodge();assert.equal(ctx.state.tasks.find(t=>t.id===a.id).mu,expected.mu);
 });
