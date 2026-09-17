@@ -884,7 +884,7 @@ function makeDomShim({ prefersDark = false } = {}) {
 
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
-async function loadApp({ seed, cloudSyncFactory, prefersDark = false, noMatchMedia = false, seedStorage, hostStorage } = {}) {
+async function loadApp({ seed, cloudSyncFactory, prefersDark = false, noMatchMedia = false, seedStorage, hostStorage, hostStorageDelayMs = 0, beforeStateReady } = {}) {
   const shim = makeDomShim({ prefersDark });
   if (noMatchMedia) delete shim.window.matchMedia;   // old browser / bare JS host
   if (seedStorage) for (const [k, v] of Object.entries(seedStorage)) shim.localStorage.setItem(k, v);
@@ -896,7 +896,10 @@ async function loadApp({ seed, cloudSyncFactory, prefersDark = false, noMatchMed
     const map = new Map(Object.entries(hostStorage));
     shim.window.storage = {
       _map: map,
-      async get(k) { return map.has(k) ? { value: map.get(k) } : null; },
+      async get(k) {
+        if (hostStorageDelayMs) await new Promise((resolve) => setTimeout(resolve, hostStorageDelayMs));
+        return map.has(k) ? { value: map.get(k) } : null;
+      },
       async set(k, v) { map.set(k, String(v)); },
     };
   }
@@ -923,6 +926,7 @@ async function loadApp({ seed, cloudSyncFactory, prefersDark = false, noMatchMed
   vm.createContext(sandbox);
   if (seed !== undefined) vm.runInContext(SEED_SNIPPET(seed), sandbox);
   vm.runInContext(appSrc, sandbox, { filename: "index.html#app" });
+  beforeStateReady?.(sandbox, shim);
   // `state` is a top-level `let`, reassigned wholesale by undo()/cloudPull() —
   // expose it as a live getter (re-reading the binding each time) rather than
   // a one-time snapshot, so it never goes stale after such a reassignment.
@@ -10278,17 +10282,48 @@ test('Chance scan: settings select one default button or two explicit buttons', 
  ctx.addTask('one');ctx.addTask('two');ctx.startScan();
  assert.equal(ctx.state.scanMode,'chance');
 });
-test('Chance scan: TrueSkill means give proportional weight and every rating has positive weight',async()=>{
+test('Chance scan: weights are mean TrueSkill win probabilities, including negative ratings',async()=>{
  const {ctx}=await loadApp();
- assert.equal(ctx.chanceWeight({mu:40})/ctx.chanceWeight({mu:20}),2);
- assert.ok(ctx.chanceWeight({mu:-10})>0);
- let high=0;
- const tasks=[{id:'a',mu:10},{id:'b',mu:30}];
- for(let i=0;i<5000;i++){
-  ctx.state.tasks=tasks;ctx.state.chance={seed:String(i),at:Date.now(),weights:{}};
-  if(ctx.chancePick(tasks).id==='b')high++;
+ const tasks=[{id:'a',mu:-10,sigma:3},{id:'b',mu:-5,sigma:7},{id:'c',mu:20,sigma:2}];
+ ctx.state.tasks=tasks;const before=JSON.stringify(tasks);ctx.resetChance();
+ for(const t of tasks){
+  const others=tasks.filter(o=>o.id!==t.id);
+  const expected=others.reduce((s,o)=>s+ctx.pBeats(t,o),0)/others.length;
+  assert.equal(ctx.state.chance.weights[t.id],expected);
  }
- assert.ok(high>3550&&high<3950,`30 vs 10 should win about 75%, got ${high/50}%`);
+ assert.equal(JSON.stringify(tasks),before);
+ const weights={...ctx.state.chance.weights};
+ tasks.forEach(t=>t.mu+=100);ctx.resetChance();
+ for(const t of tasks)assert.ok(Math.abs(ctx.state.chance.weights[t.id]-weights[t.id])<1e-12);
+ let high=0;const pair=[{id:'a',mu:10,sigma:5},{id:'b',mu:20,sigma:5}];ctx.state.tasks=pair;
+ const expected=ctx.pBeats(pair[1],pair[0]);
+ for(let i=0;i<5000;i++){
+  ctx.state.chance={seed:String(i),at:Date.now(),weights:{}};
+  if(ctx.chancePick(pair).id==='b')high++;
+ }
+ assert.ok(Math.abs(high/5000-expected)<0.04,`observed ${high/5000}, expected ${expected}`);
+});
+test('Chance probabilities: uncertainty matters, completed opponents do not, and new entrants use the frozen field',async()=>{
+ const {ctx}=await loadApp();
+ const a={id:'a',mu:-5,sigma:2},b={id:'b',mu:5,sigma:2};
+ ctx.state.tasks=[a,b,{id:'done',mu:1000,sigma:1,done:true}];ctx.resetChance();
+ assert.equal(ctx.state.chance.weights.a,ctx.pBeats(a,b));
+ const low=ctx.state.chance.weights.a;a.sigma=20;ctx.resetChance();assert.ok(ctx.state.chance.weights.a>low);
+ const newcomer={id:'new',mu:0,sigma:3};
+ const expected=(ctx.pBeats(newcomer,a)+ctx.pBeats(newcomer,b))/2;
+ a.mu=100;b.mu=200;ctx.state.tasks.push(newcomer);ctx.chanceScore(newcomer);
+ assert.equal(ctx.state.chance.weights.new,expected);
+ ctx.state.tasks=[a];ctx.resetChance();assert.equal(ctx.state.chance.weights.a,1);
+ assert.equal(ctx.chancePick([]),null);
+});
+test('Chance probabilities: a computed zero is retained without a positive floor',async()=>{
+ const {ctx}=await loadApp();const a={id:'a',mu:-10000,sigma:1},b={id:'b',mu:10000,sigma:1};
+ ctx.state.tasks=[a,b];ctx.resetChance();assert.equal(ctx.state.chance.weights.a,0);
+ assert.equal(ctx.chanceScore(a),Infinity);assert.equal(ctx.chancePick([a,b]).id,'b');
+ assert.equal(ctx.chancePick([a]).id,'a');
+ const c={id:'c',mu:-9000,sigma:1};ctx.state.tasks.push(c);
+ ctx.state.chance.weights.c=0;
+ assert.equal(ctx.chancePick([a,c]).id,'c');
 });
 test('Chance scan: choices, undo, reload and eligibility preserve the frozen ordering',async()=>{
  const {ctx}=await loadApp({seed:21});
@@ -10526,4 +10561,63 @@ test('Scan preference: choosing a mode saves immediately and closing Settings ca
  assert.equal(ctx.state.settings.scanMode,'chance');assert.equal(ctx.state.scanMode,'chance');assert.match(shim.document.getElementById('modalRoot').innerHTML,/<option value="chance" selected>/);
  await ctx.persist();const saved=shim.localStorage.getItem(SYNC_STORE_KEY);const reloaded=await loadApp({seedStorage:{[SYNC_STORE_KEY]:saved}});assert.equal(reloaded.ctx.state.settings.scanMode,'chance');
  assert.match(html,/el\.id === "stScanMode"[\s\S]{0,70}setScanPreference\(el\.value\)/);
+});
+
+test('Eligibility filter: separate row combines with tags and search without mutating scan state',async()=>{
+ const {ctx,shim}=await loadApp();
+ const a=ctx.addTask('Ready evergreen'),b=ctx.addTask('Held evergreen'),c=ctx.addTask('Future');
+ a.evergreen=true;b.evergreen=true;b.lastDoneAt=Date.now();c.startsAt='2099-01-01';
+ openList(ctx);const before=JSON.stringify(ctx.state);
+ ctx.onAction('list-eligibility',{dataset:{id:'eligible'}});
+ assert.deepEqual(rowTitles(shim),['Ready evergreen']);
+ assert.match(shim.elements.get('listEligibilityRow').innerHTML,/aria-pressed="true">Eligible/);
+ assert.doesNotMatch(tagRowHTML(shim),/>Eligible</);
+ ctx.onAction('list-eligibility',{dataset:{id:'ineligible'}});
+ assert.equal(rowTitles(shim).length,2);
+ ctx.toggleListTag('s:evergreen');assert.deepEqual(rowTitles(shim),['Held evergreen']);
+ ctx.setListQuery('Future');assert.equal(rowTitles(shim).length,0);
+ ctx.clearListFilters();ctx.renderList();assert.equal(rowTitles(shim).length,3);
+ assert.equal(JSON.stringify(ctx.state),before);
+});
+test('Eligibility filter: active context and day changes use the scanner eligibility predicate',async()=>{
+ const {ctx,shim}=await loadApp();const a=ctx.addTask('Context task');
+ ctx.state.contexts.push({id:'closed',name:'Closed',active:false});a.ctx=['closed'];openList(ctx);
+ ctx.onAction('list-eligibility',{dataset:{id:'ineligible'}});assert.deepEqual(rowTitles(shim),['Context task']);
+ ctx.state.contexts.at(-1).active=true;ctx.renderList();assert.equal(rowTitles(shim).length,0);
+ ctx.onAction('list-eligibility',{dataset:{id:'eligible'}});assert.deepEqual(rowTitles(shim),['Context task']);
+});
+
+test('Chance probabilities: legacy and malformed opponent snapshots hydrate safely and freeze new joins',async()=>{
+ for(const opponents of [undefined,{},[null],[{id:'bad',mu:3,sigma:-1}]]){
+  const {ctx}=await loadApp();ctx.addTask('Existing');ctx.startScan('chance');
+  const saved=JSON.parse(JSON.stringify(ctx.state));saved.chance.opponents=opponents;
+  const originalWeights=JSON.stringify(saved.chance.weights);
+  const restored=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(saved)}});
+  const c=restored.ctx;assert.ok(Array.isArray(c.state.chance.opponents));
+  assert.equal(JSON.stringify(c.state.chance.weights),originalWeights);
+  const newcomer={id:'new',mu:20,sigma:3};const expected=c.chanceWeight(newcomer,c.state.chance.opponents);
+  c.state.tasks[0].mu=100;c.state.tasks.push(newcomer);c.chanceScore(newcomer);
+  assert.equal(c.state.chance.weights.new,expected);
+ }
+});
+
+test('Cloud auth bootstrap: an auth-triggered pull before state load is replayed after boot', async () => {
+  const now = Date.now();
+  const h = makeSyncHarness({ remote: cloudState(now), rev: 4 });
+  const local = staleState(now - 30 * HOUR); local.syncRev = 3;
+  let earlyPulls = 0;
+  const { ctx } = await loadApp({
+    seed: 180916,
+    hostStorage: { [SYNC_STORE_KEY]: JSON.stringify(local) },
+    hostStorageDelayMs: 20,
+    cloudSyncFactory: h.factory,
+    beforeStateReady(sandbox) {
+      setTimeout(() => { earlyPulls++; sandbox.cloudPull(); }, 0);
+    },
+  });
+
+  assert.equal(earlyPulls, 1, 'the simulated auth callback must arrive before persisted state finishes loading');
+  await syncSettle(50);
+  assert.deepEqual(Array.from(ctx.state.chain), CLOUD_CHAIN,
+    'tasks fetched by the early auth callback must render after state boot without a reload');
 });

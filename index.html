@@ -377,6 +377,7 @@ textarea{width:100%;font-family:var(--font-mono);font-size:12px}
          on every commit, which would blow away a focused input mid-keystroke. -->
     <div class="lfilters" id="listFilters" hidden>
       <input id="listSearch" type="search" placeholder="Search tasks by name…" aria-label="Search tasks by name" autocomplete="off"/>
+      <div class="ltags" id="listEligibilityRow" aria-label="Task eligibility"></div>
       <div class="ltags" id="listTagRow"></div>
     </div>
     <div id="listBody" hidden></div>
@@ -400,7 +401,7 @@ textarea{width:100%;font-family:var(--font-mono);font-size:12px}
   <p>You can change this anytime in Settings. The sun and Moon follow their real paths, even when the scenery is still.</p>
 </dialog>
 <!-- changelog:start -->
-<template id="appChangelog"><details data-app-fingerprint="0ea3d7b7385a4b68129b090d5a598bcde19a8bf3d0b96157bec4abbb06436611"><summary>Changelog</summary><h3>September 16, 2026</h3><ul><li>The scan-mode dropdown saves immediately, including when you close Settings without pressing Save.</li><li>Account switching keeps task lists separate after a cloud refresh. Cloud refreshes wait for edits, and Undo restores an imported scan correctly.</li><li>Add &amp; dot now starts the daily reset clock. Tasks with a start date wake at midnight, and stop-scanning guidance uses the candidates actually ahead.</li><li>Changing the scan-mode setting now takes effect in the current scan. Choosing both modes also offers both buttons when resuming.</li><li>The installed app checks for updates whenever it opens or returns to the foreground. Available updates load automatically after you finish editing, without reinstalling.</li><li>Choose descending scans, TrueSkill-weighted chance scans, or both scan buttons in Settings. Chance order stays steady through undo and refreshes on a fresh pass or at 2 AM; decisions still update ratings immediately.</li><li>Set an evergreen interval for each task, with an optional 2 AM reset. New tasks default to 18 hours or the next day marker, whichever comes first; Settings lets you change those defaults.</li></ul><h3>September 14, 2026</h3><ul><li>Skywriters trace single human-written words in smoke, then fly away as the letters fade.</li><li>Hourly messages appear only when human-written copy is available. Anytime prompts show the current hour, such as 5 AM. Sky messages keep their existing behavior.</li><li>Trains and metros now run regularly throughout the day and night.</li><li>Event rates can be adjusted in SPAWN_RATES.md.</li></ul><h3>September 13, 2026 — Seasonal details</h3><ul><li>Rain showers last 20–45 minutes; thunderstorms last 30–60 minutes. Winter brings snow and snowstorms on the same shared weather schedule.</li><li>Winter visitors build snowmen, ski downhill, and make snow angels. Warm-weather outings wait for warmer seasons.</li><li>Autumn turns the landscape amber and brown, with leaves falling from trees and blowing in storms.</li><li>Spring brings scattered flowers and tree blossoms. Occasional gusts lift petals; rain and storms bring more petals and pollen.</li><li>Winter trees gather snow and occasionally shed small clumps. Seasonal debris gets livelier during storms.</li><li>Birds have individual plumage: distant sky birds look dark with hints of color, while nearby birds show more color.</li><li>People have varied hairstyles and hair colors, with helmets and hats kept clear.</li><li>Little propeller planes tow the messages overhead. Hot air balloons appear more often during the day.</li><li>More trains, riders, and people walking pass through the scene, including new scooter and hoverboard riders.</li><li>Season rules, weather timing, and visitor odds now share an expandable configuration; seasonal effects keep their own small budgets and visitor lifetimes.</li></ul><h3>September 13, 2026</h3><ul><li>One Sunrise / Sunset button switches between dawn and dusk.</li><li>Choose a season when locking the scenery, or follow the current season.</li><li>Cyclists pedal with connected hips and naturally bending knees.</li><li>Distant boats shrink with depth; windsurfers and small craft stay smaller than ships, and the far metro is smaller than the foreground train.</li><li>Ducks sometimes lift off from the lake and fly away.</li><li>Seasons now follow the actual equinox and solstice, with hemisphere and local date handling. Solar locks use the sky location’s calendar.</li><li>Choose the sky location’s time zone when it differs from your device. The Moon’s illuminated side now follows the Sun, and the midnight sun stays daylight.</li><li>Deer, foxes, rabbits, and raccoons occasionally wander through the foreground: a 1% chance every 30 seconds, up to four animals, independent of other visitors.</li><li>Picnic groups fold their blanket and gather their things; readers, couples, and kite flyers also finish up and walk away.</li><li>Occasional gentle rain follows the same real-time schedule across devices, including offline. Reduced motion keeps the rain still.</li><li>Settings now includes this changelog, with a check that catches undocumented app changes.</li></ul></details></template>
+<template id="appChangelog"><details data-app-fingerprint="a1c15008c69ff019961e6ddd1db6903f4c4b9e42cc28795d7415804b63b8e778"><summary>Changelog</summary><h3>September 16, 2026</h3><ul><li>Signing in while the app is loading now brings synced tasks into view without a manual refresh.</li><li>All Tasks has a separate All / Eligible / Ineligible filter row that combines with search and task-status filters.</li><li>Chance scans use TrueSkill win probabilities, including rating uncertainty, with no rating floor or offset. If no candidate can draw, scanning falls back to descending likelihood.</li><li>The scan-mode dropdown saves immediately, including when you close Settings without pressing Save.</li><li>Account switching keeps task lists separate after a cloud refresh. Cloud refreshes wait for edits, and Undo restores an imported scan correctly.</li><li>Add &amp; dot now starts the daily reset clock. Tasks with a start date wake at midnight, and stop-scanning guidance uses the candidates actually ahead.</li><li>Changing the scan-mode setting now takes effect in the current scan. Choosing both modes also offers both buttons when resuming.</li><li>The installed app checks for updates whenever it opens or returns to the foreground. Available updates load automatically after you finish editing, without reinstalling.</li><li>Choose descending scans, TrueSkill-weighted chance scans, or both scan buttons in Settings. Chance order stays steady through undo and refreshes on a fresh pass or at 2 AM; decisions still update ratings immediately.</li><li>Set an evergreen interval for each task, with an optional 2 AM reset. New tasks default to 18 hours or the next day marker, whichever comes first; Settings lets you change those defaults.</li></ul><h3>September 14, 2026</h3><ul><li>Skywriters trace single human-written words in smoke, then fly away as the letters fade.</li><li>Hourly messages appear only when human-written copy is available. Anytime prompts show the current hour, such as 5 AM. Sky messages keep their existing behavior.</li><li>Trains and metros now run regularly throughout the day and night.</li><li>Event rates can be adjusted in SPAWN_RATES.md.</li></ul><h3>September 13, 2026 — Seasonal details</h3><ul><li>Rain showers last 20–45 minutes; thunderstorms last 30–60 minutes. Winter brings snow and snowstorms on the same shared weather schedule.</li><li>Winter visitors build snowmen, ski downhill, and make snow angels. Warm-weather outings wait for warmer seasons.</li><li>Autumn turns the landscape amber and brown, with leaves falling from trees and blowing in storms.</li><li>Spring brings scattered flowers and tree blossoms. Occasional gusts lift petals; rain and storms bring more petals and pollen.</li><li>Winter trees gather snow and occasionally shed small clumps. Seasonal debris gets livelier during storms.</li><li>Birds have individual plumage: distant sky birds look dark with hints of color, while nearby birds show more color.</li><li>People have varied hairstyles and hair colors, with helmets and hats kept clear.</li><li>Little propeller planes tow the messages overhead. Hot air balloons appear more often during the day.</li><li>More trains, riders, and people walking pass through the scene, including new scooter and hoverboard riders.</li><li>Season rules, weather timing, and visitor odds now share an expandable configuration; seasonal effects keep their own small budgets and visitor lifetimes.</li></ul><h3>September 13, 2026</h3><ul><li>One Sunrise / Sunset button switches between dawn and dusk.</li><li>Choose a season when locking the scenery, or follow the current season.</li><li>Cyclists pedal with connected hips and naturally bending knees.</li><li>Distant boats shrink with depth; windsurfers and small craft stay smaller than ships, and the far metro is smaller than the foreground train.</li><li>Ducks sometimes lift off from the lake and fly away.</li><li>Seasons now follow the actual equinox and solstice, with hemisphere and local date handling. Solar locks use the sky location’s calendar.</li><li>Choose the sky location’s time zone when it differs from your device. The Moon’s illuminated side now follows the Sun, and the midnight sun stays daylight.</li><li>Deer, foxes, rabbits, and raccoons occasionally wander through the foreground: a 1% chance every 30 seconds, up to four animals, independent of other visitors.</li><li>Picnic groups fold their blanket and gather their things; readers, couples, and kite flyers also finish up and walk away.</li><li>Occasional gentle rain follows the same real-time schedule across devices, including offline. Reduced motion keeps the rain still.</li><li>Settings now includes this changelog, with a check that catches undocumented app changes.</li></ul></details></template>
 <!-- changelog:end -->
 <dialog id="sceneTimeDialog" class="motion-dialog" aria-labelledby="sceneTimeTitle">
   <h2 id="sceneTimeTitle">Stay a little longer.</h2>
@@ -580,6 +581,7 @@ let undoStack = [];
 let chanceGeneration = 0; // local provenance: only deliberate scan/day boundaries advance it
 let quickAddCtx = [];          // context ids currently picked in the quick-add bar — UI-only, sticky across adds, not synced
 let listQuery = "";            // all-tasks search box, already trimmed + lowercased — UI-only, like quickAddCtx: never saved, never synced, never undoable
+let listEligibilityFilter = "all"; // independent view-only eligibility narrowing
 let listTagFilter = null;      // ...and the one filter key the list is narrowed to ("s:no", "c:c_home"), or null. One at a time, by design.
 let saveTimer = null;
 let persistedChanceSeed = null;
@@ -643,6 +645,10 @@ function hydrateState(st){
   st.scanMode = st.scanMode === "chance" ? "chance" : "descending";
   const c = st.chance;
   if(!c || typeof c.seed !== "string" || !Number.isFinite(c.at) || !c.weights || typeof c.weights !== "object" || Array.isArray(c.weights)) st.chance = null;
+  else if(!Array.isArray(c.opponents) || c.opponents.some(o=>!o || typeof o.id !== "string" || !Number.isFinite(o.mu) || !Number.isFinite(o.sigma) || o.sigma <= 0)){
+    // Legacy/imported passes keep their draw, but future joins need a valid frozen field.
+    c.opponents = (st.tasks || []).filter(t=>!t.done && Number.isFinite(t.mu) && Number.isFinite(t.sigma) && t.sigma > 0).map(({id,mu,sigma})=>({id,mu,sigma}));
+  }
   /* One-time migration: the worked window's default moved 8h -> 16h. Eight
      hours is shorter than a waking day, so a task marked worked at breakfast
      came back that same evening. Anyone still on the old default moves with
@@ -842,6 +848,7 @@ let cloudTimer = null, lastPushed = "", pulling = false;
 let reconciledAs = null;   // the account whose cloud copy this session has successfully READ
 let deferredCloudPull = false;
 let pendingPush = false;   // a write was asked for before that happened — released once we reconcile
+let cloudPullPending = false; // auth can report a user before init has loaded the local state
 let baseUpdatedAt = 0;     // state.updatedAt as it came off this device's disk, before any edit re-stamped it
 
 function cloudReady(){ const CS = window.CloudSync; return !!(CS && CS.ready && CS.user); }
@@ -979,7 +986,10 @@ function resumeDeferredCloudPull(){
   if(deferredCloudPull && !hasActiveEditor()) cloudPull();
 }
 async function cloudPull(){
-  if(!cloudReady() || !state || pulling) return;
+  if(!cloudReady()) return;
+  if(!state){ cloudPullPending = true; return; }
+  if(pulling) return;
+  cloudPullPending = false;
   // Treat cloud replacement like an app update: a DOM-only draft is still
   // user work. Hold both adoption and writes until reconciliation can finish.
   if(hasActiveEditor()){ deferredCloudPull = true; return; }
@@ -1363,11 +1373,13 @@ function oldestFirst(p){ // chain start: plain oldest-outstanding, no ranking in
    which task goes first — so the button just dots it and it becomes the first
    benchmark. No updatePair: nothing was compared, so no rank moves. Also the
    way back from a paused queue, so pausing and restarting is one click each. */
-/* Exponential races implement weighted sampling without replacement: weight
-   40 beats weight 20 two thirds of the time. Hashing seed + task ID gives each
-   task a stable draw, including tasks that become eligible later. Freeze the
-   TrueSkill means for this pass; Yes/No still update the live ratings. */
-function chanceWeight(t){ return Number.isFinite(t.mu) ? Math.max(0.001, t.mu) : PRIOR_MU; }
+/* Freeze model-derived win probabilities for each pass. The reference field is
+   the unfinished list, so neither negative means nor a chosen rating origin
+   require offsets or floors. Decisions still update the live TrueSkill model. */
+function chanceWeight(t, opponents = state.tasks.filter(o=>!o.done)){
+  const others = opponents.filter(o=>o.id !== t.id);
+  return others.length ? others.reduce((sum,o)=>sum+pBeats(t,o),0)/others.length : 1;
+}
 function chanceHash(text){
   let h = 2166136261;
   for(let i=0;i<text.length;i++) h = Math.imul(h ^ text.charCodeAt(i), 16777619);
@@ -1377,28 +1389,30 @@ function chanceHash(text){
 }
 function resetChance(boundary = false){
   if(boundary) chanceGeneration++;
-  state.chance = {seed:uid()+":"+Math.random().toString(36), at:Date.now(), weights:{}};
-  for(const t of state.tasks) state.chance.weights[t.id] = chanceWeight(t);
+  const opponents = state.tasks.filter(t=>!t.done).map(({id,mu,sigma})=>({id,mu,sigma}));
+  state.chance = {seed:uid()+":"+Math.random().toString(36), at:Date.now(), weights:{}, opponents};
+  for(const t of state.tasks) state.chance.weights[t.id] = chanceWeight(t, opponents);
 }
 function chanceScore(t){
   if(!state.chance) resetChance();
   const c = state.chance;
-  if(!Object.hasOwn(c.weights,t.id) || !Number.isFinite(c.weights[t.id]) || c.weights[t.id] <= 0) c.weights[t.id] = chanceWeight(t);
+  if(!Object.hasOwn(c.weights,t.id) || !Number.isFinite(c.weights[t.id]) || c.weights[t.id] < 0) c.weights[t.id] = chanceWeight(t, c.opponents);
   const u = (chanceHash(c.seed+":"+t.id) + 0.5) / 4294967296;
   return -Math.log(u) / c.weights[t.id];
 }
 function candidateOrder(tasks){
   if(state.scanMode !== "chance") return [...tasks].sort((a,b)=>b.mu-a.mu);
   const scores = new Map(tasks.map(t=>[t.id,chanceScore(t)]));
-  return [...tasks].sort((a,b)=>scores.get(a.id)-scores.get(b.id) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  return [...tasks].sort((a,b)=>scores.get(a.id)-scores.get(b.id) || (scores.get(a.id) === Infinity ? b.mu-a.mu : 0) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 }
 function chancePick(tasks){
   let best = null, lowest = Infinity;
   for(const t of tasks){
     const score = chanceScore(t);
-    if(score < lowest || (score === lowest && t.id < best.id)){ best=t; lowest=score; }
+    if(Number.isFinite(score) && (score < lowest || (score === lowest && (!best || t.id < best.id)))){ best=t; lowest=score; }
   }
-  return best;
+  // Numerical tail probabilities can be zero; use normal ordering if none can draw.
+  return best || [...tasks].sort((a,b)=>b.mu-a.mu || (a.id < b.id ? -1 : 1))[0] || null;
 }
 function scanStartButtons(action = "start-scan"){
   return state.settings.scanMode === "both"
@@ -2162,7 +2176,7 @@ function renderScan(){
 }
 
 /* ---------- all-tasks list filters ----------
-   Two independent narrowings of the *view* only. Neither one touches
+   Independent narrowings of the *view* only. None touches
    state.contexts[].active, so what the scanner considers eligible is exactly
    the same whether you're looking at the whole list or one tag's worth of it. */
 
@@ -2205,11 +2219,12 @@ function listTagOptions(){
 function normalizeListFilters(){
   if(listTagFilter && !listTagOptions().some(o=>o.key===listTagFilter)) listTagFilter = null;
 }
-function listFiltersActive(){ normalizeListFilters(); return !!(listQuery || listTagFilter); }
+function listFiltersActive(){ normalizeListFilters(); return !!(listQuery || listTagFilter || listEligibilityFilter !== "all"); }
 function filteredListTasks(){
   normalizeListFilters();
   const tag = listTagFilter ? listTagOptions().find(o=>o.key===listTagFilter) : null;
   return openTasks().filter(t=>{
+    if(listEligibilityFilter !== "all" && isEligible(t) !== (listEligibilityFilter === "eligible")) return false;
     if(tag && !tag.match(t)) return false;
     if(listQuery && !t.title.toLowerCase().includes(listQuery)) return false;
     return true;
@@ -2224,13 +2239,16 @@ function toggleListTag(id){
   renderList();
 }
 function clearListFilters(){
-  listQuery = ""; listTagFilter = null;
+  listQuery = ""; listTagFilter = null; listEligibilityFilter = "all";
   const box = document.getElementById("listSearch");
   if(box) box.value = "";   // the only place we write back into the input, so typing is never fought
 }
 function renderListFilters(){
   const wrap = document.getElementById("listFilters");
   if(wrap) wrap.hidden = !state.listOpen;
+  const eligibilityRow = document.getElementById("listEligibilityRow");
+  if(eligibilityRow) eligibilityRow.innerHTML = state.listOpen ? '<span class="ltaglabel">Eligibility</span>' + [["all","All"],["eligible","Eligible"],["ineligible","Ineligible"]].map(([id,label])=>
+    '<button type="button" class="ltag'+(listEligibilityFilter===id?' on':'')+'" data-act="list-eligibility" data-id="'+id+'" aria-pressed="'+(listEligibilityFilter===id)+'">'+label+'</button>').join('') : '';
   const row = document.getElementById("listTagRow");
   if(!row) return;
   if(!state.listOpen){ row.innerHTML=""; return; }
@@ -2550,6 +2568,7 @@ function onAction(act, el){
     case "clear-done": clearCompleted(); openSettings(); break;
     case "new-pass": newPass(); closeModal(); break;
     case "list-tag": toggleListTag(el.dataset.id); break;          // view-only, so no pushUndo/commit — nothing in state changed
+    case "list-eligibility": listEligibilityFilter = ["eligible","ineligible"].includes(el.dataset.id) ? el.dataset.id : "all"; renderList(); break;
     case "clear-list-filters": clearListFilters(); renderList(); break;
     case "toggle-list": state.listOpen=!state.listOpen; render(); save(); break;
     case "toggle-ctx": state.ctxOpen=!state.ctxOpen; render(); save(); break;
@@ -2803,6 +2822,10 @@ function hotkeyDelete(){
   if(state.chance && state.chance.seed !== loadedChanceSeed) save();
   watchOSTheme();
   render();
+  // Auth restoration can finish while loadState() is still awaiting the host
+  // store. cloudPull() records that early request; replay it now that state
+  // exists so a signed-in device paints its synced tasks without a reload.
+  if(cloudPullPending) cloudPull();
   if(isFirstBoot) openHelp();
   window.applyPendingAppUpdate?.();
 })();
