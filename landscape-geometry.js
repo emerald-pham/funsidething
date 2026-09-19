@@ -18,7 +18,7 @@
       const depth=Math.max(1,shore-waterTop),direction=reverse?-1:1;
       // Hull sizes are intentionally compressed, but a person and board must
       // remain much smaller than a ship even across opposite depth lanes.
-      const base={windsurfer:.4,jetski:.55,sailboat:.8,yacht:.95,cruise:1,duck:.8}[kind]||1;
+      const base={windsurfer:.4,jetski:.95,sailboat:.8,yacht:.95,cruise:1,duck:1.05}[kind]||1;
       const scale=Math.min(1,W/600,depth/38)*base*(.65+.35*Math.max(0,Math.min(1,lane)));
       const course=kind==='windsurfer'?Math.sin(t*(.10+lane*.04)+lane*6)*depth*.12:0;
       const y=waterTop+depth*(.38+Math.max(0,Math.min(1,lane))*.30)+course+Math.sin(t*.8+lane*6)*scale*.5;
@@ -34,7 +34,7 @@
       const water=vessel('duck',e.lane,x,t-flight,e.reverse);
       const lift=7*flight*(1-Math.exp(-flight));
       return {x:x+direction*1.5*flight*flight,y:water.y+Math.sin(t-flight+index)*.3-lift,
-        scale:Math.min(.5,water.scale*.65),direction,flying:flight>0,wing:Math.sin(flight*13+index)*5};
+        scale:Math.min(.75,water.scale*.82),direction,flying:flight>0,wing:Math.sin(flight*13+index)*5};
     }
     function waterDepth(e,t){
       // Sort at the waterline, not at a mast top or an animal's airborne height.
@@ -74,9 +74,14 @@
     function visitPose(e,f){
       const smooth=(a,b,v)=>{const q=Math.max(0,Math.min(1,(v-a)/(b-a)));return q*q*(3-2*q);};
       const direction=e.reverse?-1:1,anchor=W*(.1+e.lane*.8);
-      const departure=smooth(.82,1,f),arrival=smooth(0,.12,f);
+      // Seeded visitors no longer all stand at the same fraction of their
+      // visit. A high seed buys a longer settled stay, while seedless geometry
+      // callers retain the original .82 boundary used by older contracts.
+      const seeded=Number.isFinite(e.seed),seed=seeded?Math.max(0,Math.min(.999999,e.seed)):.5;
+      const departureStart=seeded?.82+seed*.12:.82,packStart=departureStart-.1,standStart=departureStart-.06;
+      const departure=smooth(departureStart,1,f),arrival=smooth(0,.12,f);
       const x=anchor-direction*40*(1-arrival)+((e.reverse?-80:W+80)-anchor)*departure;
-      return {x,y:trail(x)+19,anchor,direction,pack:smooth(.72,.82,f),stand:Math.max(1-arrival,smooth(.76,.82,f)),walkAmount:Math.max(1-smooth(.08,.12,f),smooth(.82,.85,f)),walking:f<.12||f>.82};
+      return {x,y:trail(x)+19,anchor,direction,pack:smooth(packStart,departureStart,f),stand:Math.max(1-arrival,smooth(standStart,departureStart,f)),walkAmount:Math.max(1-smooth(.08,.12,f),smooth(departureStart,departureStart+.03,f)),walking:f<.12||f>departureStart};
     }
     function woodlandPose(e){
       // Pick a clearing with room for a short stroll on the darkest near hill.
@@ -136,7 +141,7 @@
       return {x:star.azimuth/360*W+Math.sin(y*.19-t*wind)*1.8,y};
     }
     function dolphin(progress,lane,reverse=false){
-      const direction=reverse?-1:1,depth=Math.max(1,shore-waterTop),scale=Math.min(.9,W/600,depth/30);
+      const direction=reverse?-1:1,depth=Math.max(1,shore-waterTop),scale=Math.min(1.2,W/560,depth/20);
       const x=W*(.2+.6*lane)+direction*(progress-.5)*45,waterY=waterTop+depth*.6;
       return {x,y:waterY-Math.sin(progress*Math.PI)*Math.min(9,depth*.22),waterY,scale,direction};
     }

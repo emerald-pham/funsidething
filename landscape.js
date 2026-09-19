@@ -612,7 +612,11 @@
         if(e.type!=='kite'&&visit.stand<1){g.save();g.globalAlpha*=1-visit.stand;seated(px,py,seed,i?-1:1,book&&visit.pack<.8);g.restore();}
         if(e.type==='kite'||visit.stand>0){
           g.save();g.globalAlpha*=e.type==='kite'?1:visit.stand;g.translate(px,py);g.scale(visit.direction,1);person(0,0,seed,'walk',t,visit.walkAmount);
-          if(visit.pack>.7&&e.type!=='kite'){g.fillStyle=book?'#fff0cf':color(e.seed,2);g.fillRect(4,-6,book?4:6,book?3:4);}
+          if(visit.pack>.7&&e.type!=='kite'){
+            // Once a reader stands, keep the cover down by the carrying hand
+            // at the hip instead of drawing it over the torso.
+            g.fillStyle=book?'#fff0cf':color(e.seed,2);g.fillRect(4,-3,book?4:6,book?3:4);
+          }
           g.restore();
         }
       });
@@ -694,7 +698,7 @@
       // A short breach should emerge from and disappear into the water, not
       // appear at full opacity on the first frame and vanish on the last.
       const fade=S.smooth(0,.12,f)*(1-S.smooth(.85,1,f));
-      g.save();g.globalAlpha=fade;ellipse(g,fx,fy-Math.sin(f*Math.PI)*14,3,1.5,c);
+      g.save();g.globalAlpha=fade;ellipse(g,fx,fy-Math.sin(f*Math.PI)*14,4.5,2.25,c);
       g.globalAlpha=fade*(1-f);g.strokeStyle=p.sky[2];g.beginPath();g.ellipse(fx,fy+2,4+f*14,1+f*2,0,0,TAU);g.stroke();g.restore();return true;
     }
     if(e.type==='butterfly'){
@@ -791,6 +795,7 @@
     currentEntry=entry;
     status.textContent=entry.text+(entry.author==='Human'?' · Human written':'');
     paintBackground();paintLife(world.elapsed);
+    if(timeDialog.open)refreshSolarTimes();
   }
   function resize(){
     cityLights.windows=[];
@@ -844,21 +849,40 @@
   }
   const timeDialog=document.getElementById('sceneTimeDialog'),timeInput=document.getElementById('sceneTimeInput'),timeStatus=document.getElementById('sceneTimeStatus'),seasonInput=document.getElementById('sceneSeasonInput');
   let timeReturnFocus=null;
+  function refreshSolarTimes(){
+    const location=globalThis.LivingLocation?.current();
+    // Preview a selected season before saving it; all labels use the observer's
+    // calendar and zone, even when this device is on the other side of Earth.
+    const preview={getItem:()=>seasonInput.value||null};
+    const schedule=S.solarSchedule(S.sceneSolarDate(new Date(),preview,location),location);
+    document.getElementById('sceneSolarDate').textContent=schedule.dateLabel+' · '+schedule.timeZone;
+    for(const entry of schedule.events){
+      const button=timeDialog.querySelector('[data-scene-preset="'+entry.preset+'"]');
+      button.replaceChildren();
+      const label=document.createElement('strong'),time=document.createElement('span');
+      label.textContent=entry.label;time.textContent=entry.time;button.append(label,time);
+      button.setAttribute('aria-pressed',String(S.readSceneTime(storage)===entry.preset));
+    }
+    return schedule;
+  }
+  seasonInput.addEventListener('change',refreshSolarTimes);
   document.addEventListener('click',event=>{
     const control=event.target.closest('[data-act="scene-time-settings"], [data-scene-time], [data-scene-preset]');if(!control)return;
     if(control.dataset.act==='scene-time-settings'){
       seasonInput.value=S.readSceneSeason(storage)||'';timeReturnFocus=document.activeElement;const saved=S.readSceneTime(storage);timeInput.value=S.sceneDate(new Date(),storage,globalThis.LivingLocation?.current()).toTimeString().slice(0,5);
-      timeStatus.textContent=saved?'Scene time locked to '+saved+'.':'Following live time.';timeDialog.showModal();timeInput.focus();return;
+      timeStatus.textContent=saved?'Scene time locked to '+saved.replaceAll('-',' ')+'.':'Following live time.';refreshSolarTimes();timeDialog.showModal();timeInput.focus();return;
     }
     if(control.dataset.sceneTime==='close'){timeDialog.close();return;}
-    const preset=control.dataset.scenePreset==='solar'?(S.readSceneTime(storage)==='sunrise'?'sunset':'sunrise'):control.dataset.scenePreset;
+    const preset=control.dataset.scenePreset;
     const value=control.dataset.sceneTime==='live'?null:preset||timeInput.value;
     if(value!==null&&!control.dataset.scenePreset&&!timeInput.reportValidity())return;
     if(!S.saveSceneSeason(storage,control.dataset.sceneTime==='live'?null:seasonInput.value||null)||!S.saveSceneTime(storage,value)){timeStatus.textContent='Could not save this time on this device. Please try again.';return;}
     timeInput.value=S.sceneDate(new Date(),storage,globalThis.LivingLocation?.current()).toTimeString().slice(0,5);
     if(control.dataset.sceneTime==='live')seasonInput.value='';
-    timeStatus.textContent=value?'Scene time locked to '+value+'.':'Following live time.';
-    if(value==='sunrise'||value==='sunset'){const times=S.sunTimes(S.sceneSolarDate(new Date(),storage,globalThis.LivingLocation?.current()),globalThis.LivingLocation?.current());if(!times[value==='sunrise'?'rise':'set'])timeStatus.textContent='No '+value+' on the selected date. Following live time.';}refreshSky();
+    timeStatus.textContent=value?'Scene time locked to '+value.replaceAll('-',' ')+'.':'Following live time.';
+    const selected=refreshSolarTimes().events.find(entry=>entry.preset===value);
+    if(selected&&!selected.at)timeStatus.textContent='No '+selected.label.toLowerCase()+' on the selected date. Following live time.';
+    refreshSky();
   });
   timeDialog.addEventListener('close',()=>timeReturnFocus?.isConnected&&timeReturnFocus.focus());
   window.addEventListener('storage',event=>{if(event.key==='fvp:chain-scanner:scene-time'||event.key==='fvp:chain-scanner:scene-season'||event.key===null){refreshSky();}});

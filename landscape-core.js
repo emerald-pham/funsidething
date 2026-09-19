@@ -52,11 +52,21 @@
   function sunTimes(date,location){
     validDate(date);
     const config=locationObserver(location),start=localMidnight(date,config.timeZone);
-    const search=(direction)=>{try{
-      const found=A.SearchRiseSet('Sun',config.observer,direction,start,2);
+    const search=(direction,twilight=false)=>{try{
+      // Twilight uses the geometric solar center at -6 degrees; rise/set
+      // instead includes the upper limb and atmospheric refraction.
+      const found=twilight?A.SearchAltitude('Sun',config.observer,direction,start,2,-6):A.SearchRiseSet('Sun',config.observer,direction,start,2);
       return found&&found.date&&sameLocalDay(found.date,date,config.timeZone)?found.date:null;
     }catch{return null;}};
-    return {rise:search(1),set:search(-1)};
+    return {firstLight:search(1,true),rise:search(1),set:search(-1),lastLight:search(-1,true)};
+  }
+  const solarPresets=Object.freeze({'first-light':'firstLight',sunrise:'rise',sunset:'set','last-light':'lastLight'});
+  function solarSchedule(date,location){
+    const timeZone=locationObserver(location).timeZone,times=sunTimes(date,location);
+    const labels=['First light','Sunrise','Sunset','Last light'];
+    const clock=new Intl.DateTimeFormat('en-US',{timeZone,hour:'numeric',minute:'2-digit'});
+    return {timeZone,dateLabel:new Intl.DateTimeFormat('en-US',{timeZone,year:'numeric',month:'short',day:'numeric'}).format(date),
+      events:Object.entries(solarPresets).map(([preset,key],i)=>({preset,label:labels[i],at:times[key],time:times[key]?clock.format(times[key]):'Does not occur'}))};
   }
   function projectStar(date,row,rotation,obs){
     const ra=row[0]*15*RAD,dec=row[1]*RAD;
@@ -180,7 +190,11 @@
     }
     if(w.elapsed>=w.next){
       const r=w.random,a=activity(sky);
-      w.next=w.elapsed+(7+r()*18)/a;
+      // Daylight is the scene's busiest window. Keep its gaps at half the
+      // former seven-to-twenty-five second range, while preserving the quieter
+      // nighttime rhythm for the same seeded visitors.
+      const interval=sky.sun.altitude < -6 ? 7+r()*18 : 3.5+r()*9;
+      w.next=w.elapsed+interval/a;
       if(w.events.length<MAX_EVENTS-2){
         const abduction=CONFIG.spawnRate('abduction'),fireworks=sky.sun.altitude < -6?CONFIG.spawnRate('fireworks'):0;
         const rareRate=sky.sun.altitude < -6?(abduction+fireworks)/2:abduction;
@@ -236,7 +250,7 @@
     return w;
   }
   const SCENE_TIME_KEY='fvp:chain-scanner:scene-time';
-  const validSceneTime=value=>['sunrise','sunset'].includes(value)||typeof value==='string'&&/^([01]\d|2[0-3]):[0-5]\d$/.test(value);
+  const validSceneTime=value=>Object.hasOwn(solarPresets,value)||typeof value==='string'&&/^([01]\d|2[0-3]):[0-5]\d$/.test(value);
   function readSceneTime(storage){try{const value=storage.getItem(SCENE_TIME_KEY);return validSceneTime(value)?value:null;}catch{return null;}}
   function saveSceneTime(storage,value){
     if(value!==null&&!validSceneTime(value))return false;
@@ -261,8 +275,8 @@
     // Dates comfortably inside each season keep palette and daylight in agreement.
     // Use the observer's hemisphere, while preserving device-local clock selection.
     if(season)date.setMonth(([3,6,9,0][seasons.indexOf(season)]+(location?.latitude<0?6:0))%12,15);
-    if(time==='sunrise'||time==='sunset'){
-      return sunTimes(sceneSolarDate(now,storage,location),location)[time==='sunrise'?'rise':'set']||new Date(now);
+    if(Object.hasOwn(solarPresets,time)){
+      return sunTimes(sceneSolarDate(now,storage,location),location)[solarPresets[time]]||new Date(now);
     }
     if(time){const [hour,minute]=time.split(':').map(Number);date.setHours(hour,minute,0,0);}
     return date;
@@ -272,6 +286,6 @@
   function readMotion(storage){try{return normalizeMotion(storage.getItem(MOTION_KEY));}catch{return null;}}
   function saveMotion(storage,value){try{storage.setItem(MOTION_KEY,value);return true;}catch{return false;}}
   function motionReduced(value,osReduced){return !!osReduced||normalizeMotion(value)!=='normal';}
-  root.LivingSky={setSeason,eventsForSeason,sceneSolarDate,weatherAt,createWoodland,advanceWoodland,woodlandTypes,readSceneSeason,saveSceneSeason,advanceLights,skinTone,sceneDate,readSceneTime,saveSceneTime,skyAt,sunTimes,starAt,starCount:root.SKY_STARS.length,palette,activity,createWorld,advance,
+  root.LivingSky={setSeason,eventsForSeason,sceneSolarDate,weatherAt,createWoodland,advanceWoodland,woodlandTypes,readSceneSeason,saveSceneSeason,advanceLights,skinTone,sceneDate,readSceneTime,saveSceneTime,skyAt,sunTimes,solarSchedule,solarPresets,starAt,starCount:root.SKY_STARS.length,palette,activity,createWorld,advance,
     nightEventTypes:NIGHT_TYPES.slice(),eventTypes:[...EVENT_TYPES,...WINTER_VISITORS],rareTypes:RARE_TYPES.slice(),eventDurations:Object.assign({},EVENT_DURATIONS),MAX_EVENTS,RARE_COOLDOWN,readMotion,saveMotion,motionReduced,clamp,lerp,smooth,mixHex};
 })(globalThis);

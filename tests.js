@@ -1034,18 +1034,9 @@ test("decide('cand-done'): completes the task directly without ever touching the
   assert.equal(ctx.state.chain.length, 1, "the task dotted at the start is the only thing on it");
 });
 
-/* ---------- cand-done records no rank signal ----------
-   decide('cand-done') completes a suggested candidate outright. It used to call
-   updatePair(cand, b) as well, on the reasoning that "doing it right now beats
-   the benchmark" — but that is the exact inference doneTask(), benchDone() and
-   workedOnTask() all refuse to make: no "would I rather?" was answered, so no
-   rank moves. A candidate is done on sight because it's quick far more often
-   than because it outranks the task already on the chain, and that unearned
-   match-outcome win taught the sampler to float thirty-second tasks to the top
-   of the next scan. The chain-start dot is deliberately signal-free for the
-   same reason (oldest != preferred); so is this. */
+/* Done rewards the completed task against a neutral reference; other tasks stay unchanged. */
 
-test("decide('cand-done'): completing the candidate moves neither its rank nor the benchmark's", async () => {
+test("decide('cand-done'): completing the candidate rewards only its own rating", async () => {
   const { ctx } = await loadApp({ seed: 3 });
   ctx.addTask("Task A", false);
   ctx.addTask("Task B", false);
@@ -1058,14 +1049,14 @@ test("decide('cand-done'): completing the candidate moves neither its rank nor t
 
   ctx.decide("cand-done");
 
-  assert.equal(cand.mu, snap.cm, "candidate mu must be untouched — no comparison was answered");
-  assert.equal(cand.sigma, snap.cs, "candidate sigma must be untouched (updatePair inflates it by TAU even for a winner)");
+  assert.ok(cand.mu > snap.cm);
+  assert.ok(cand.sigma < snap.cs);
   assert.equal(bench.mu, snap.bm, "benchmark mu must be untouched");
   assert.equal(bench.sigma, snap.bs, "benchmark sigma must be untouched");
   assert.equal(cand.done, true, "and the task is still completed");
 });
 
-test("decide('cand-done'): an evergreen candidate is signal-free too, and still logs its completion", async () => {
+test("decide('cand-done'): an evergreen candidate gains rating and still logs its completion", async () => {
   const { ctx } = await loadApp({ seed: 7 });
   ctx.addTask("Task A", false);
   ctx.addTask("Water the plants", false);
@@ -1081,8 +1072,8 @@ test("decide('cand-done'): an evergreen candidate is signal-free too, and still 
 
   ctx.decide("cand-done");
 
-  assert.equal(cand.mu, snap.cm, "evergreen candidate mu untouched");
-  assert.equal(cand.sigma, snap.cs, "evergreen candidate sigma untouched");
+  assert.ok(cand.mu > snap.cm);
+  assert.ok(cand.sigma < snap.cs);
   assert.equal(bench.mu, snap.bm, "benchmark mu untouched");
   assert.equal(bench.sigma, snap.bs, "benchmark sigma untouched");
   const logged = ctx.state.workLog.some((e) => e.taskId === candId && e.kind === "evergreen-done");
@@ -3750,7 +3741,7 @@ test("UI: Quick start displays the requested seven steps in order", async () => 
   assert.deepEqual(steps, [
     "Add tasks. You can tag them with contexts and enable contexts so that todos that NEED to match that context are surfaced. If the context is not enabled, those todos are not surfaced.",
     "Then hit start scanning.",
-    "In descending mode, the oldest eligible task becomes the first dot in your chain. In chance mode, the first task is drawn using TrueSkill strength as its weight.",
+    "In both modes, the oldest eligible task becomes the first dot in your chain. Chance mode then draws subsequent candidates using TrueSkill win probabilities.",
     "Then compare candidates with the newest dot. Descending mode orders them by estimated TrueSkill strength; chance mode uses a saved weighted random order. Yes/No updates ratings immediately. In chance mode, those updates affect the next fresh ordering.",
     "You can also hit can’t, which will snooze the task for a duration you’ve configured in settings.",
     "You will continue until either you hit done scanning, or the app recognizes the chances of you finding a better task dips below 25% (percentage configurable in settings menu) in which case it will gently nudge you to stop searching for a new todo.",
@@ -3764,7 +3755,7 @@ test("UI: help describes Start scanning rather than a Can/Can't step", async () 
   const helpHtml = shim.elements.get("modalRoot").innerHTML;
 
   assert.match(helpHtml, /start scanning/i, "help should name the button that starts a chain");
-  assert.match(helpHtml, /descending mode, the oldest eligible task/, "normal mode retains the oldest eligible anchor");
+  assert.match(helpHtml, /both modes, the oldest eligible task/, "normal mode retains the oldest eligible anchor");
   assert.ok(!/Answer <b>Can<\/b>/.test(helpHtml), "the Can/Can't instruction should be gone");
 });
 
@@ -4299,7 +4290,7 @@ test("doneTask: completing the current candidate clears it and a fresh one is de
   assert.ok(ctx.state.candidateId, "two tasks remain in the pool, so one should be offered");
 });
 
-test("doneTask: applies NO strength signal — no comparison was made", async () => {
+test("doneTask: rewards completion without changing the benchmark", async () => {
   const { ctx } = await loadApp({ seed: 204 });
   ctx.addTask("Benchmark", true);
   const t = ctx.addTask("Crossed off from the edit pane", false);
@@ -4307,7 +4298,8 @@ test("doneTask: applies NO strength signal — no comparison was made", async ()
 
   ctx.doneTask(t.id);
   const after = ctx.state.tasks.map((x) => ({ id: x.id, mu: x.mu, sigma: x.sigma }));
-  assert.deepEqual(after, before, "unlike cand-done, this must not score a win over the benchmark");
+  assert.deepEqual(after[0], before[0]);
+  assert.ok(after[1].mu > before[1].mu);
 });
 
 /* ---------- "repeats daily" is gone ----------
@@ -8435,7 +8427,7 @@ test('Landscape water: visible stars mirror into the lake with bounded drift',()
 test('Landscape time: solar presets follow the date and saved observer',()=>{
  const sky=livingSky(),values=new Map(),storage={getItem:k=>values.get(k),setItem:(k,v)=>values.set(k,v),removeItem:k=>values.delete(k)},location={latitude:28.5,longitude:-81.4,timezone:'America/New_York'},now=new Date('2026-09-12T16:00:00Z');
  for(const [preset,key] of [['sunrise','rise'],['sunset','set']]){assert.equal(sky.saveSceneTime(storage,preset),true);assert.equal(sky.sceneDate(now,storage,location).getTime(),sky.sunTimes(now,location)[key].getTime());}
- for(const preset of ['00:00','12:00','solar'])assert.ok(html.includes(`data-scene-preset="${preset}"`));
+ for(const preset of ['00:00','12:00','first-light','sunrise','sunset','last-light'])assert.ok(html.includes(`data-scene-preset="${preset}"`));
 });
 
 test('Landscape messages: every hour has five distinct short, season-independent comments',()=>{
@@ -8460,7 +8452,7 @@ test('Landscape browser: scene time presets persist and return to live without c
   const timeBox=await page.locator('#sceneTimeInput').boundingBox(),seasonLabel=await page.locator('[for="sceneSeasonInput"]').boundingBox();assert.ok(seasonLabel.y>=timeBox.y+timeBox.height+8,'Season has its own clearly separated field');
   await page.locator('[data-scene-preset="00:00"]').click();assert.equal(await page.locator('#sceneTimeInput').inputValue(),'00:00');assert.equal(await page.evaluate(()=>document.documentElement.dataset.scenePeriod),'night');
   await page.locator('[data-scene-preset="12:00"]').click();assert.equal(await page.evaluate(()=>document.documentElement.dataset.scenePeriod),'day');
-  await page.locator('[data-scene-preset="solar"]').click();await page.locator('[data-scene-preset="solar"]').click();assert.equal(await page.evaluate(()=>LivingSky.readSceneTime(localStorage)),'sunset');
+  await page.locator('[data-scene-preset="sunrise"]').click();await page.locator('[data-scene-preset="sunset"]').click();assert.equal(await page.evaluate(()=>LivingSky.readSceneTime(localStorage)),'sunset');
   await page.locator('#sceneSeasonInput').selectOption('winter');await page.locator('#sceneTimeInput').fill('23:15');await page.locator('[data-scene-time="lock"]').click();
   await page.reload();assert.equal(await page.evaluate(()=>LivingSky.readSceneSeason(localStorage)),'winter');assert.equal(await page.evaluate(()=>LivingSky.readSceneTime(localStorage)),'23:15');assert.equal(await page.evaluate(()=>document.documentElement.dataset.scenePeriod),'night');
   await page.evaluate(()=>openSettings());await page.locator('[data-act="scene-time-settings"]').click();await page.locator('[data-scene-time="live"]').click();
@@ -10529,7 +10521,7 @@ test('Consistency repair: Starts eligibility gets a midnight wake as well as the
 });
 test('Consistency repair: quick start distinguishes chance from the oldest normal anchor',async()=>{
  const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
- assert.match(help,/descending mode.*oldest/i);assert.match(help,/chance mode.*first task/i);
+ assert.match(help,/both modes.*oldest/i);assert.match(help,/Chance mode.*subsequent/i);
  assert.doesNotMatch(help,/candidates to add to the todo list in descending order of your likelihood/);
 });
 test('Consistency repair: undoing an old backup import restores today\'s original chance pass',async()=>{
@@ -10683,4 +10675,269 @@ test('Dislodge signal: one loss to a fresh default reference, other tasks and ch
  assert.equal(ctx.state.considered[a.id],'dislodged');assert.equal(ctx.state.chain.length,0);
  ctx.undo();assert.equal(JSON.stringify(ctx.state.tasks.find(t=>t.id===a.id)),before);
  ctx.state.chain=[a.id];ctx.dislodge();assert.equal(ctx.state.tasks.find(t=>t.id===a.id).mu,expected.mu);
+});
+
+
+test('Scan anchor: both modes dot the oldest eligible task regardless of chance strength',async()=>{
+ for(const mode of ['chance','descending']){
+  const {ctx}=await loadApp();const a=ctx.addTask('Old'),b=ctx.addTask('New'),held=ctx.addTask('Held');
+  a.createdAt=2;b.createdAt=3;held.createdAt=1;held.startsAt='2099-01-01';a.mu=-10000;b.mu=10000;
+  ctx.startScan(mode);assert.equal(ctx.state.chain[0],a.id);assert.equal(ctx.state.candidateId,b.id);
+ }
+});
+test('Done signal: all completion routes reward once, undo restores, Worked on it stays neutral',async()=>{
+ for(const route of ['bench','candidate','editor'])for(const evergreen of [false,true]){
+  const {ctx}=await loadApp();const a=ctx.addTask('A'),b=ctx.addTask('B');a.evergreen=evergreen;
+  ctx.state.chain=route==='bench'?[b.id,a.id]:[b.id];ctx.state.candidateId=route==='candidate'?a.id:null;
+  const before=JSON.stringify(a),other=JSON.stringify(b),expected={mu:a.mu,sigma:a.sigma};
+  ctx.updatePair(expected,{mu:25,sigma:25/3});
+  if(route==='bench')ctx.benchDone();else if(route==='candidate')ctx.decide('cand-done');else ctx.doneTask(a.id);
+  assert.equal(a.mu,expected.mu);assert.equal(a.sigma,expected.sigma);assert.equal(JSON.stringify(b),other);
+  ctx.doneTask(a.id);assert.equal(a.mu,expected.mu,'duplicate completion cannot farm rating');
+  ctx.undo();ctx.undo();assert.equal(JSON.stringify(ctx.state.tasks.find(t=>t.id===a.id)),before);
+  const restored=ctx.state.tasks.find(t=>t.id===a.id);ctx.workedOnTask(a.id);assert.equal(restored.mu,25);assert.equal(restored.sigma,25/3);
+ }
+});
+test('Add dates: both buttons save optional start and due dates together, then clear fields',async()=>{
+ for(const action of ['add','add-dot']){
+  const {ctx,shim}=await loadApp();shim.document.getElementById('addInput').value='Dated';
+  shim.document.getElementById('addStart').value='2099-01-01';shim.document.getElementById('addDue').value='2099-01-03';
+  ctx.onAction(action,{});const t=ctx.state.tasks[0];assert.equal(t.startsAt,'2099-01-01');assert.equal(t.due,'2099-01-03');
+  assert.equal(shim.document.getElementById('addStart').value,'');assert.equal(shim.document.getElementById('addDue').value,'');
+  assert.equal(ctx.isEligible(t),false);assert.equal(ctx.state.chain.includes(t.id),action==='add-dot');
+  ctx.undo();assert.equal(ctx.state.tasks.length,0);
+ }
+ assert.match(html,/<label for="addStart">Starts<\/label><input id="addStart" type="date"/);
+ assert.match(html,/<label for="addDue">Due<\/label><input id="addDue" type="date"/);
+});
+test('Eligibility filter: selecting Eligible clears stale narrowings and shows every eligible task',async()=>{
+ const {ctx,shim}=await loadApp();const a=ctx.addTask('Ready'),b=ctx.addTask('Also ready');b.evergreen=true;
+ ctx.addTask('Future').startsAt='2099-01-01';openList(ctx);ctx.toggleListTag('s:evergreen');ctx.setListQuery('missing');
+ ctx.onAction('list-eligibility',{dataset:{id:'eligible'}});assert.deepEqual(rowTitles(shim).sort(),['Also ready','Ready']);
+ assert.equal(shim.document.getElementById('listSearch').value,'');
+});
+test('Landscape waterfront: small water visitors stay readable at harbor scale', () => {
+  const ctx = vm.createContext({ Math });
+  vm.runInContext(fs.readFileSync(path.join(__dirname, 'landscape-geometry.js'), 'utf8'), ctx);
+  for (const [w, h] of [[320, 568], [844, 390], [1440, 900]]) {
+    const g = ctx.LandscapeGeometry.create(w, h);
+    const ship = g.vessel('cruise', 1, w / 2, 0).scale;
+    assert.ok(g.vessel('jetski', 1, w / 2, 0).scale >= ship * .85,
+      'jet skis need a readable share of the foreground water scale');
+    assert.ok(g.vessel('duck', 1, w / 2, 0).scale >= ship,
+      'small swimming visitors should be at least ship-scale at the foreground waterline');
+    const dolphin = g.dolphin(.5, .5);
+    assert.ok(dolphin.scale >= Math.min(1, w / 600) * 1.05,
+      'dolphin breaches need enough silhouette to read at every viewport');
+  }
+
+  const source = fs.readFileSync(path.join(__dirname, 'landscape.js'), 'utf8');
+  const fish = source.slice(source.indexOf("    if(e.type==='fish'){"), source.indexOf("    if(e.type==='butterfly'){"));
+  const shapes = [];
+  const g = { globalAlpha: 1, save() {}, restore() {}, beginPath() {}, ellipse() {}, stroke() {} };
+  vm.runInNewContext(`(function(){${fish}})()`, {
+    TAU: Math.PI * 2, e: { type: 'fish' }, f: .5, dir: 1, anchor: 400, H: 800,
+    geometry: { waterTop: 300 }, g, Math, S: livingSky(), c: 'fish', p: { sky: ['#fff', '#fff', '#fff'] },
+    ellipse(ctx, x, y, rx, ry) { shapes.push({ x, y, rx, ry }); },
+  });
+  assert.ok(shapes[0].rx >= 4.5 && shapes[0].ry >= 2.25,
+    'fish silhouettes should be larger than the old three by one-and-a-half pixel mark');
+});
+
+test('Landscape scheduler: daytime visitor intervals are half the old pace', () => {
+  const sky = livingSky();
+  const world = sky.createWorld(() => .5);
+  world.events = [];
+  world.elapsed = 0;
+  world.next = 0;
+  world.railNext = { train: Infinity, metro: Infinity };
+  world.lastRare = 0;
+  world.random = () => .5;
+  sky.advance(world, 1, { sun: { altitude: 30, azimuth: 90 } });
+  assert.ok(world.next - world.elapsed <= 8.1,
+    'a daytime event should be followed by a half-length 3.5 to 12.5 second interval');
+});
+
+test('Landscape guest visits: departure timing varies and high seeds stay longer', () => {
+  const ctx = vm.createContext({ Math });
+  vm.runInContext(fs.readFileSync(path.join(__dirname, 'landscape-geometry.js'), 'utf8'), ctx);
+  const g = ctx.LandscapeGeometry.create(1440, 900);
+  const early = g.visitPose({ lane: .5, seed: .02, reverse: false }, .84);
+  const late = g.visitPose({ lane: .5, seed: .98, reverse: false }, .84);
+  assert.equal(early.walking, true, 'a short seeded stay may already be walking away');
+  assert.equal(late.walking, false, 'a long seeded stay remains settled at the same elapsed fraction');
+  assert.ok(late.stand < 1, 'the long stay has not stood up before its randomized departure');
+  assert.equal(g.visitPose({ lane: .5, seed: .98, reverse: false }, .98).walking, true,
+    'the long stay eventually walks fully away');
+});
+
+test('Landscape readers: carried books hang at the walker side during departure', () => {
+  const source = fs.readFileSync(path.join(__dirname, 'landscape.js'), 'utf8');
+  const guest = source.slice(source.indexOf('  function paintGuest('), source.indexOf("    if(e.type==='skateboarder'", source.indexOf('  function paintGuest(')));
+  assert.match(guest, /book\s*&&\s*visit\.pack/);
+  assert.match(guest, /fillRect\(4,-3,book\?4:6,book\?3:4\)/,
+    'departure books sit by the hand and hip instead of across the chest');
+});
+test('Landscape guest durations: readers and groups stay long enough before departure', () => {
+  const sky = livingSky();
+  assert.ok(sky.eventDurations.reader >= 220, 'readers need a substantially longer visit');
+  assert.ok(sky.eventDurations.picnic >= 240, 'picnics need a substantially longer visit');
+  assert.ok(sky.eventDurations.couple >= 200, 'couples need a substantially longer visit');
+  assert.ok(sky.eventDurations.reader < 600 && sky.eventDurations.picnic < 600 && sky.eventDurations.couple < 600,
+    'longer stays remain finite and bounded');
+});
+
+test('Add dates: list capture honors the date fields for each new task',async()=>{
+ const {ctx,shim}=await loadApp();shim.document.getElementById('addInput').value='First\nSecond';
+ shim.document.getElementById('addStart').value='2099-01-01';shim.document.getElementById('addDue').value='2099-01-03';
+ ctx.onAction('add',{});assert.equal(ctx.state.tasks.length,2);
+ for(const t of ctx.state.tasks){assert.equal(t.startsAt,'2099-01-01');assert.equal(t.due,'2099-01-03');}
+ assert.equal(shim.document.getElementById('addStart').value,'');
+ assert.match(appSrc,/importList\(txt, quickAddCtx, quickAddDates\(\)\)/,'paste capture uses the same draft dates');
+});
+
+// USNO one-day API reference observations retrieved 2026-09-19; no runtime network dependency.
+const SOLAR_AUDIT_FIXTURES = [
+  {
+    "name": "London",
+    "latitude": 51.5,
+    "longitude": -0.12,
+    "timezone": "Europe/London",
+    "date": "2026-09-19",
+    "offset": 1,
+    "source": "https://aa.usno.navy.mil/api/rstt/oneday?date=2026-09-19&coords=51.5,-0.12&tz=1",
+    "firstLight": "06:08",
+    "rise": "06:42",
+    "set": "19:06",
+    "lastLight": "19:39"
+  },
+  {
+    "name": "Orlando",
+    "latitude": 28.5383,
+    "longitude": -81.3792,
+    "timezone": "America/New_York",
+    "date": "2026-06-21",
+    "offset": -4,
+    "source": "https://aa.usno.navy.mil/api/rstt/oneday?date=2026-06-21&coords=28.5383,-81.3792&tz=-4",
+    "firstLight": "06:02",
+    "rise": "06:29",
+    "set": "20:26",
+    "lastLight": "20:53"
+  },
+  {
+    "name": "Sydney",
+    "latitude": -33.87,
+    "longitude": 151.21,
+    "timezone": "Australia/Sydney",
+    "date": "2026-12-21",
+    "offset": 11,
+    "source": "https://aa.usno.navy.mil/api/rstt/oneday?date=2026-12-21&coords=-33.87,151.21&tz=11",
+    "firstLight": "05:11",
+    "rise": "05:41",
+    "set": "20:05",
+    "lastLight": "20:35"
+  },
+  {
+    "name": "New York DST",
+    "latitude": 40.71,
+    "longitude": -74.01,
+    "timezone": "America/New_York",
+    "date": "2026-03-08",
+    "offset": -4,
+    "source": "https://aa.usno.navy.mil/api/rstt/oneday?date=2026-03-08&coords=40.71,-74.01&tz=-4",
+    "firstLight": "06:52",
+    "rise": "07:19",
+    "set": "18:55",
+    "lastLight": "19:23"
+  },
+  {
+    "name": "Kathmandu",
+    "latitude": 27.72,
+    "longitude": 85.32,
+    "timezone": "Asia/Kathmandu",
+    "date": "2026-03-20",
+    "offset": 5.75,
+    "source": "https://aa.usno.navy.mil/api/rstt/oneday?date=2026-03-20&coords=27.72,85.32&tz=5.75",
+    "firstLight": "05:45",
+    "rise": "06:08",
+    "set": "18:15",
+    "lastLight": "18:38"
+  },
+  {
+    "name": "Kiritimati",
+    "latitude": 1.87,
+    "longitude": -157.43,
+    "timezone": "Pacific/Kiritimati",
+    "date": "2026-01-01",
+    "offset": 14,
+    "source": "https://aa.usno.navy.mil/api/rstt/oneday?date=2026-01-01&coords=1.87,-157.43&tz=14",
+    "firstLight": "06:10",
+    "rise": "06:32",
+    "set": "18:34",
+    "lastLight": "18:56"
+  },
+  {
+    "name": "Tromso winter",
+    "latitude": 69.65,
+    "longitude": 18.96,
+    "timezone": "Europe/Oslo",
+    "date": "2026-12-21",
+    "offset": 1,
+    "source": "https://aa.usno.navy.mil/api/rstt/oneday?date=2026-12-21&coords=69.65,18.96&tz=1",
+    "firstLight": "09:31",
+    "rise": null,
+    "set": null,
+    "lastLight": "13:53"
+  },
+  {
+    "name": "Tromso summer",
+    "latitude": 69.65,
+    "longitude": 18.96,
+    "timezone": "Europe/Oslo",
+    "date": "2026-06-21",
+    "offset": 2,
+    "source": "https://aa.usno.navy.mil/api/rstt/oneday?date=2026-06-21&coords=69.65,18.96&tz=2",
+    "firstLight": null,
+    "rise": null,
+    "set": null,
+    "lastLight": null
+  }
+];
+
+test('Solar audit: four daylight boundaries agree with independent USNO tables across locations and seasons',()=>{
+ const sky=livingSky();
+ for(const fixture of SOLAR_AUDIT_FIXTURES){
+  const noon=new Date(Date.parse(fixture.date+'T12:00:00Z')-fixture.offset*3600000);
+  const times=sky.sunTimes(noon,fixture);
+  for(const key of ['firstLight','rise','set','lastLight']){
+   if(fixture[key]===null){assert.equal(times[key],null,fixture.name+' '+key);continue;}
+   const expected=Date.parse(fixture.date+'T'+fixture[key]+':00Z')-fixture.offset*3600000;
+   assert.ok(Math.abs(+times[key]-expected)<120000,fixture.name+' '+key+' within two minutes of USNO');
+  }
+ }
+});
+test('Solar presets: first and last light lock to local civil twilight with seasonal and polar handling',()=>{
+ const sky=livingSky(),values=new Map(),storage={getItem:k=>values.get(k),setItem:(k,v)=>values.set(k,v),removeItem:k=>values.delete(k)};
+ const now=new Date('2026-01-01T01:00:00Z');
+ for(const location of [SOLAR_AUDIT_FIXTURES[2],SOLAR_AUDIT_FIXTURES[5]])for(const season of [null,'spring','summer','autumn','winter']){
+  sky.saveSceneSeason(storage,season);
+  for(const [preset,key] of [['first-light','firstLight'],['sunrise','rise'],['sunset','set'],['last-light','lastLight']]){
+   assert.equal(sky.saveSceneTime(storage,preset),true);
+   assert.equal(+sky.sceneDate(now,storage,location),+sky.sunTimes(sky.sceneSolarDate(now,storage,location),location)[key]);
+  }
+ }
+ const polar=SOLAR_AUDIT_FIXTURES[7];sky.saveSceneSeason(storage,'summer');
+ for(const preset of ['first-light','last-light']){sky.saveSceneTime(storage,preset);assert.equal(+sky.sceneDate(now,storage,polar),+now);}
+});
+test('Solar schedule: labels and clock times use the observer date and zone and distinguish absent polar events',()=>{
+ const sky=livingSky(),london=SOLAR_AUDIT_FIXTURES[0];
+ const schedule=sky.solarSchedule(new Date('2026-09-19T12:00:00Z'),london);
+ assert.equal(schedule.timeZone,'Europe/London');assert.match(schedule.dateLabel,/19/);
+ assert.deepEqual(Array.from(schedule.events,e=>e.label),['First light','Sunrise','Sunset','Last light']);
+ assert.deepEqual(Array.from(schedule.events,e=>e.preset),['first-light','sunrise','sunset','last-light']);
+ assert.ok(schedule.events.every(e=>e.at instanceof Date && /\d/.test(e.time)));
+ const polar=sky.solarSchedule(new Date('2026-12-21T12:00:00Z'),SOLAR_AUDIT_FIXTURES[6]);
+ assert.equal(polar.events[1].at,null);assert.equal(polar.events[1].time,'Does not occur');assert.ok(polar.events[0].at);
+ assert.match(html,/id="sceneSolarTimes"/);assert.match(html,/civil twilight/i);
+ for(const preset of ['first-light','sunrise','sunset','last-light'])assert.ok(html.includes('data-scene-preset="'+preset+'"'));
 });

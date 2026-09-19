@@ -106,3 +106,12 @@ html.viewing-scene{overflow:hidden;overscroll-behavior:none}
 #sceneTimeDialog label { display:block; margin:12px 0 6px; }
 #sceneTimeDialog input, #sceneTimeDialog select { display:block; width:100%; box-sizing:border-box; min-height:40px; }
 #sceneTimeDialog .motion-choices button { min-height:48px; padding:12px; }
+/* Four separate solar moments remain visible alongside the lock controls on phones. */
+#sceneTimeDialog{padding:20px}
+#sceneTimeDialog h2{font-size:28px;margin:4px 0 10px}
+#sceneTimeDialog p{font-size:13px;line-height:1.4;margin:8px 0}
+#sceneTimeDialog .motion-choices{gap:8px;margin-top:10px}
+#sceneTimeDialog .motion-choices button{min-height:44px;padding:9px}
+#sceneTimeDialog .motion-choices span{margin-top:2px}
+#sceneSolarTimes strong{font-size:13px}
+#sceneSolarDate{overflow-wrap:anywhere}
