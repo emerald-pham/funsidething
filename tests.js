@@ -10941,3 +10941,18 @@ test('Solar schedule: labels and clock times use the observer date and zone and 
  assert.match(html,/id="sceneSolarTimes"/);assert.match(html,/civil twilight/i);
  for(const preset of ['first-light','sunrise','sunset','last-light'])assert.ok(html.includes('data-scene-preset="'+preset+'"'));
 });
+
+test('Eligibility filter: No, Cannot and Dislodged are ineligible until their marks clear',async()=>{
+ const {ctx,shim}=await loadApp();
+ const ready=ctx.addTask('Ready');const no=ctx.addTask('No');const cant=ctx.addTask('Cannot');const dislodged=ctx.addTask('Dislodged');
+ ctx.state.considered[no.id]='no';ctx.state.considered[cant.id]='cant';ctx.state.considered[dislodged.id]='dislodged';ctx.state.cantAt[cant.id]=Date.now();
+ openList(ctx);const before=JSON.stringify(ctx.state);
+ ctx.onAction('list-eligibility',{dataset:{id:'eligible'}});assert.deepEqual(rowTitles(shim),['Ready']);
+ ctx.onAction('list-eligibility',{dataset:{id:'ineligible'}});assert.deepEqual(rowTitles(shim).sort(),['Cannot','Dislodged','No']);
+ ctx.onAction('list-eligibility',{dataset:{id:'all'}});assert.equal(rowTitles(shim).length,4);
+ assert.equal(JSON.stringify(ctx.state),before,'filtering does not change task or scanner state');
+ ctx.returnAsCandidate(no.id);ctx.returnAsCandidate(dislodged.id);
+ ctx.state.cantAt[cant.id]=Date.now()-(ctx.state.settings.cantMin+1)*60000;ctx.expireCants();
+ ctx.onAction('list-eligibility',{dataset:{id:'eligible'}});assert.equal(rowTitles(shim).length,4);
+ ctx.onAction('list-eligibility',{dataset:{id:'ineligible'}});assert.equal(rowTitles(shim).length,0);
+});
