@@ -7702,6 +7702,78 @@ test("HTML: 'Add a task' section comes before 'All tasks' list", () => {
   assert.ok(addPanelIndex < listWrapIndex, "addPanel appears before listWrap in HTML source");
 });
 
+test("Add panel: starts open, minimizes without losing a draft, and reopens", async () => {
+  const { ctx, shim } = await loadApp();
+  const toggle = shim.document.getElementById("addToggle");
+  const body = shim.document.getElementById("addBody");
+  const title = shim.document.getElementById("addInput");
+  const start = shim.document.getElementById("addStart");
+  const due = shim.document.getElementById("addDue");
+
+  assert.equal(ctx.state.addOpen, true);
+  assert.equal(body.hidden, false);
+  assert.equal(toggle.getAttribute("aria-expanded"), "true");
+  title.value = "Keep this draft";
+  start.value = "2099-01-01";
+  due.value = "2099-01-02";
+
+  ctx.onAction("toggle-add", {});
+  assert.equal(ctx.state.addOpen, false);
+  assert.equal(body.hidden, true);
+  assert.equal(toggle.getAttribute("aria-expanded"), "false");
+  assert.equal(shim.document.getElementById("addCaret").textContent, "▸");
+  ctx.render();
+  assert.equal(body.hidden, true, "an ordinary full render preserves the collapsed state");
+  assert.equal(title.value, "Keep this draft", "an ordinary full render does not rebuild the draft fields");
+
+  ctx.onAction("toggle-add", {});
+  assert.equal(body.hidden, false);
+  assert.equal(title.value, "Keep this draft");
+  assert.equal(start.value, "2099-01-01");
+  assert.equal(due.value, "2099-01-02");
+});
+
+test("Add panel: minimized state persists and legacy saved states default open", async () => {
+  const first = await loadApp();
+  first.ctx.onAction("toggle-add", {});
+  await first.ctx.persist();
+  const saved = first.shim.localStorage.getItem("fvp:chain-scanner:v1");
+  assert.ok(saved);
+  const restored = await loadApp({ seedStorage: { "fvp:chain-scanner:v1": saved } });
+  assert.equal(restored.ctx.state.addOpen, false);
+  assert.equal(restored.shim.document.getElementById("addBody").hidden, true);
+
+  const legacy = JSON.parse(saved);
+  delete legacy.addOpen;
+  const upgraded = await loadApp({ seedStorage: { "fvp:chain-scanner:v1": JSON.stringify(legacy) } });
+  assert.equal(upgraded.ctx.state.addOpen, true);
+  assert.equal(upgraded.shim.document.getElementById("addBody").hidden, false);
+});
+
+test("Add panel: header is an accessible disclosure control", () => {
+  assert.match(html, /<h2[^>]*class="ahead"[^>]*>\s*<button[^>]*id="addToggle"[^>]*data-act="toggle-add"[^>]*aria-controls="addBody"/);
+  assert.match(html, /id="addCaret"[^>]*aria-hidden="true"/);
+  assert.match(html, /id="addBody"/);
+});
+
+test("Add panel: adopting a legacy cloud payload defaults the panel open", async () => {
+  const now = Date.now();
+  const remote = cloudState(now);
+  delete remote.addOpen;
+  remote.syncRev = 3;
+  const local = staleState(now - 1000);
+  local.addOpen = false;
+  local.syncRev = 2;
+  const h = makeSyncHarness({ remote, rev: 3 });
+  const { ctx, shim } = await loadApp({
+    seedStorage: { [SYNC_STORE_KEY]: JSON.stringify(local) },
+    cloudSyncFactory: h.factory,
+  });
+  await ctx.cloudPull();
+  assert.equal(ctx.state.addOpen, true);
+  assert.equal(shim.document.getElementById("addBody").hidden, false);
+});
+
 test("CSS: '.listwrap' carries the same margin-top as its '.addwrap'/'.histwrap' siblings", () => {
   // listWrap used to be the first panel after #scan, which already supplied
   // the gap via its own margin-bottom — so .listwrap never needed a
