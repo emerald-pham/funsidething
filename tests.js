@@ -9223,7 +9223,7 @@ test('Scene season: validated persistent seasons select hemisphere-aware dates a
  }
  assert.equal(sky.saveSceneSeason(storage,'bad'),false);assert.equal(sky.readSceneSeason(storage),'winter');
  sky.saveSceneSeason(storage,null);assert.equal(+sky.sceneDate(now,storage),+now);
- assert.match(html,/id="sceneSeasonInput"/);assert.doesNotMatch(html,/data-scene-preset="sun(?:rise|set)"/);
+ assert.match(html,/id="sceneSeasonInput"/);assert.match(html,/data-scene-preset="sunrise"/);assert.match(html,/data-scene-preset="sunset"/);
  assert.equal(sky.saveSceneSeason({setItem(){throw Error();}},'summer'),false);
 });
 
