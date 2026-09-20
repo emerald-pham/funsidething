@@ -2,6 +2,21 @@
 (function(root){
   'use strict';
   function create(W,H){
+    const clamp=value=>Math.max(0,Math.min(1,Number.isFinite(Number(value))?Number(value):0));
+    const unit=value=>((value%1)+1)%1;
+    // Each visit keeps its exact entrance, exit and lifetime, but eases through
+    // two or three gentle seeded pace changes. Independent axis phases stop
+    // airborne and breaching visitors from tracing one mechanical diagonal.
+    function motionProgress(event,axis='x',offset=0){
+      const duration=Math.max(.001,Number(event?.duration)||1),raw=clamp((Number(event?.age)||0)/duration);
+      if(raw===0||raw===1)return raw;
+      const seed=clamp(event?.seed??.5),salt=axis==='y'?.417:.071;
+      const character=unit(seed+Number(offset||0)*.61803398875+salt);
+      const strength=.16+.06*unit(character*7.13+.29),cycles=2+(unit(character*5.37+.11)>.5?1:0);
+      const phase=Math.PI*2*unit(character*11.71+.23),angle=Math.PI*2*cycles*raw;
+      return clamp(raw+strength/(Math.PI*2*cycles)*(Math.sin(angle+phase)-Math.sin(phase)));
+    }
+    const motionAge=(event,axis='x',offset=0)=>motionProgress(event,axis,offset)*Math.max(.001,Number(event?.duration)||1);
     const horizon=Math.min(H*(W<600?.37:.47),W<600?310:480);
     const far=x=>horizon+H*.12+Math.sin(x/W*7+.8)*H*.025;
     const middle=x=>horizon+H*.25+Math.sin(x/W*6.5-1)*H*.065;
@@ -25,23 +40,26 @@
       return {x,y,scale,direction,visible:depth>10};
     }
     function duckPose(e,t,index=0){
-      const direction=e.reverse?-1:1,progress=e.age/e.duration;
+      const direction=e.reverse?-1:1,progress=motionProgress(e,'x',index),ageY=motionAge(e,'y',index);
       const x=-160+(e.reverse?1-progress:progress)*(W+320)-index*8*direction;
       const takeoff=e.duration*(.35+e.seed*.15)+index*.35;
       // A visit's random seed chooses whether and when to depart. No frame-time
       // randomness means pausing or redrawing cannot reroll or teleport a duck.
-      const flight=e.seed>.65?Math.max(0,e.age-takeoff):0;
-      const water=vessel('duck',e.lane,x,t-flight,e.reverse);
-      const lift=7*flight*(1-Math.exp(-flight));
-      return {x:x+direction*1.5*flight*flight,y:water.y+Math.sin(t-flight+index)*.3-lift,
-        scale:Math.min(.75,water.scale*.82),direction,flying:flight>0,wing:Math.sin(flight*13+index)*5};
+      const rawAge=Number(e.age)||0,flying=e.seed>.65&&rawAge>takeoff;
+      const takeoffEvent={...e,age:takeoff};
+      const flightX=flying?Math.max(0,motionAge(e,'x',index)-motionAge(takeoffEvent,'x',index)):0;
+      const flightY=flying?Math.max(0,ageY-motionAge(takeoffEvent,'y',index)):0;
+      const water=vessel('duck',e.lane,x,ageY-flightY,e.reverse);
+      const lift=7*flightY*(1-Math.exp(-flightY));
+      return {x:x+direction*1.5*flightX*flightX,y:water.y+Math.sin(ageY-flightY+index)*.3-lift,
+        scale:Math.min(.75,water.scale*.82),direction,flying,wing:Math.sin(flightY*13+index)*5};
     }
     function waterDepth(e,t){
       // Sort at the waterline, not at a mast top or an animal's airborne height.
       if(e.type==='fish')return waterTop+H*.035;
-      if(e.type==='dolphin')return dolphin(e.age/e.duration,e.lane,e.reverse).waterY;
-      const progress=e.reverse?1-e.age/e.duration:e.age/e.duration;
-      return vessel(e.type,e.lane,-160+progress*(W+320),t,e.reverse).y;
+      if(e.type==='dolphin')return dolphin(motionProgress(e,'x'),e.lane,e.reverse,motionProgress(e,'y')).waterY;
+      const progress=e.reverse?1-motionProgress(e,'x'):motionProgress(e,'x');
+      return vessel(e.type,e.lane,-160+progress*(W+320),motionAge(e,'y'),e.reverse).y;
     }
     const foregroundTree=(x,y)=>Math.abs(y-lowerRail(x))<22?lowerRail(x)+23:Math.max(near(x)+2,y);
     const nest=()=>{const treeX=W*.9,ground=middle(treeX)+3,x=treeX-13,y=ground-21;return {treeX,ground,x,y,perches:[{x:x-2,y:y-1.5},{x:x+2,y:y-1.5}]};};
@@ -50,19 +68,19 @@
     // Local meadow journeys keep speed independent of viewport width.
     const groundTravelX=(age,reverse=false,lane=.5,duration=22,speed=6)=>W*(.18+lane*.64)+(reverse?-1:1)*(age-duration/2)*speed;
     function groundPose(kind,e){
-      const direction=e.reverse?-1:1,speed=kind==='walker'?7:6;
-      let x=groundTravelX(e.age,e.reverse,e.lane,e.duration,speed),hop=0;
+      const direction=e.reverse?-1:1,speed=kind==='walker'?7:6,age=motionAge(e,'x');
+      let x=groundTravelX(age,e.reverse,e.lane,e.duration,speed),hop=0;
       if(kind==='rabbit'){
-        const cycle=e.age/1.2,phase=cycle%1,flight=Math.max(0,(phase-.3)/.7),travel=Math.floor(cycle)*10+flight*10;
+        const cycle=age/1.2,phase=cycle%1,flight=Math.max(0,(phase-.3)/.7),travel=Math.floor(cycle)*10+flight*10;
         x=W*(.18+e.lane*.64)+direction*(travel-e.duration/1.2*5);
         hop=Math.sin(flight*Math.PI)*5;
       }
-      return {x,y:groundAnchor(kind,x),direction,hop,distance:e.age*speed};
+      return {x,y:groundAnchor(kind,x),direction,hop,distance:age*speed};
     }
     function eventDepth(e){
       if(['walker','dogwalker','rabbit','deer'].includes(e.type))return groundPose(e.type==='dogwalker'?'walker':e.type,e).y;
-      if(['reader','picnic','couple','kite'].includes(e.type))return visitPose(e,e.age/e.duration).y;
-      const progress=e.reverse?1-e.age/e.duration:e.age/e.duration;
+      if(['reader','picnic','couple','kite'].includes(e.type))return visitPose(e,motionProgress(e,'x')).y;
+      const progress=e.reverse?1-motionProgress(e,'x'):motionProgress(e,'x');
       return trail(-160+progress*(W+320));
     }
     function dogPose(ownerX,distance,direction){
@@ -88,7 +106,7 @@
       // The clearings depend on terrain rather than a viewport-specific y value.
       const clearings=Array.from({length:12},(_,i)=>W*(.15+i*.7/11)).filter(x=>Math.max(near(x-24),near(x),near(x+24))<H-65);
       const anchor=clearings[Math.min(clearings.length-1,Math.floor(e.lane*clearings.length))]||W*.7;
-      const direction=e.reverse?-1:1,distance=e.age*.22;
+      const direction=e.reverse?-1:1,distance=motionAge(e,'x')*.22;
       const x=anchor+direction*(distance-19.8),y=Math.max(near(x)+18,H-28-e.seed*25);
       return {x,y,direction,distance,scale:W<600?1.25:1.6};
     }
@@ -109,15 +127,16 @@
         hipY:pose.y+Math.sin(angle)*pose.direction*hip-Math.cos(angle)*8,
         footX,footY:groundAnchor('deer',footX)-foot.lift};
     }
-    function nestVisit(f,lane,reverse,perch,index=0){
+    function nestVisit(f,lane,reverse,perch,index=0,vertical=f){
       const ease=value=>{const v=Math.max(0,Math.min(1,value));return v*v*(3-2*v);};
       const arrival=ease(f/.55),departure=ease((f-.72)/.28);
       const startX=(reverse?W+30:-30)+(reverse?1:-1)*index*16;
       const endX=(reverse?-30:W+30)+(reverse?-1:1)*index*16;
       const flightY=horizon*.42+lane*30+index*7;
       const x=f<.55?startX+(perch.x-startX)*arrival:perch.x+(endX-perch.x)*departure;
-      const y=f<.55?flightY+(perch.y-flightY)*arrival-Math.sin(arrival*Math.PI)*35
-        :perch.y+(flightY-perch.y)*departure-Math.sin(departure*Math.PI)*35;
+      const verticalArrival=ease(vertical/.55),verticalDeparture=ease((vertical-.72)/.28);
+      const y=f<.55?flightY+(perch.y-flightY)*verticalArrival-Math.sin(verticalArrival*Math.PI)*35
+        :perch.y+(flightY-perch.y)*verticalDeparture-Math.sin(verticalDeparture*Math.PI)*35;
       return {x,y,perched:f>=.55&&f<=.72,twig:f<.55};
     }
     function strideArm(distance,stride,offset=0){
@@ -131,19 +150,19 @@
       return {x:(-.3+.6*swing)*stride,lift:Math.sin(swing*Math.PI)*2};
     }
     const wingFold=(t,seed)=>{const right=.12+.88*Math.abs(Math.sin(t*7+seed*12));return {left:-right,right};};
-    const balloonDrift=(seed,t,wind=1)=>({
+    const balloonDrift=(seed,t,wind=1,verticalTime=t)=>({
       x:Math.sin(t*wind*(.08+seed*.025)+seed*17)*8+Math.sin(t*.17+seed*31)*3,
-      y:Math.sin(t*wind*(.10+seed*.04)+seed*23)*17+Math.sin(t*.23+seed*11)*8
+      y:Math.sin(verticalTime*wind*(.10+seed*.04)+seed*23)*17+Math.sin(verticalTime*.23+seed*11)*8
     });
     function starReflection(star,t,wind){
       if(star.altitude<=0||star.magnitude>2.5)return null;
       const depth=Math.min(H*.09,95),y=waterTop+5+star.altitude/90*depth;
       return {x:star.azimuth/360*W+Math.sin(y*.19-t*wind)*1.8,y};
     }
-    function dolphin(progress,lane,reverse=false){
+    function dolphin(progress,lane,reverse=false,verticalProgress=progress){
       const direction=reverse?-1:1,depth=Math.max(1,shore-waterTop),scale=Math.min(1.2,W/560,depth/20);
       const x=W*(.2+.6*lane)+direction*(progress-.5)*45,waterY=waterTop+depth*.6;
-      return {x,y:waterY-Math.sin(progress*Math.PI)*Math.min(9,depth*.22),waterY,scale,direction};
+      return {x,y:waterY-Math.sin(verticalProgress*Math.PI)*Math.min(9,depth*.22),waterY,scale,direction};
     }
     const flock=(x,y,reverse=false)=>Array.from({length:7},(_,i)=>{
       const rank=Math.ceil(i/2);return {x:x-rank*15*(reverse?-1:1),y:y+(i%2?1:-1)*rank*7};
@@ -174,7 +193,7 @@
       return rows;
     }
     const ripple=(i,t,wind=1)=>({alpha:.15+.75*(.5+.5*Math.sin(t*wind*1.3+i*1.71))**2,drift:Math.sin(t*wind*.5+i)*9,width:.65+.35*Math.sin(t*.9+i)**2});
-    return {visitPose,woodlandPose,duckPose,waterDepth,cycleLeg,deerLeg,nestVisit,eventDepth,dogPose,skater,fireworks,flock,dolphin,starReflection,cityReflection,sunReflection,depthBand,groundAnchor,groundTravelX,groundPose,strideArm,strideFoot,wingFold,balloonDrift,vessel,foregroundTree,nest,ripple,horizon,waterTop,far,middle,near,rail,trail,lowerRail,tangent,rider,pack};
+    return {motionProgress,motionAge,visitPose,woodlandPose,duckPose,waterDepth,cycleLeg,deerLeg,nestVisit,eventDepth,dogPose,skater,fireworks,flock,dolphin,starReflection,cityReflection,sunReflection,depthBand,groundAnchor,groundTravelX,groundPose,strideArm,strideFoot,wingFold,balloonDrift,vessel,foregroundTree,nest,ripple,horizon,waterTop,far,middle,near,rail,trail,lowerRail,tangent,rider,pack};
   }
   root.LandscapeGeometry={create};
 })(globalThis);

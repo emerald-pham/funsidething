@@ -16,6 +16,8 @@ First launch asks for Normal or Reduced motion. Settings and a footer control re
 
 Normal motion uses persistent clouds and wind, with fireflies after dusk, plus bounded randomized arrivals. Morning arrivals are more frequent. Rare alien visits have at least seven minutes of active-scene cooldown; the cow is returned unharmed. Returning to a tab resumes existing visitors without resetting the rare-event cooldown. Hidden tabs stop the animation and astronomy timers.
 
+Moving visitors use deterministic, seeded pace curves that gently speed up and slow down during each finite visit. Routes remain forward-only and keep their exact entrance, exit, and lifetime. Flying, breaching, and other two-axis movement uses a separate vertical phase so it does not trace a mechanical diagonal; terrain-following visitors keep both axes coupled to the ground.
+
 The scenery uses two local canvases: a cached background and sparse dynamic foreground. The loop is capped at 30 fps, effective DPR at 1.5, each canvas at three million pixels, and transient events at 14. Tab switches preserve active visitors and their progress. Long suspended intervals are not replayed. All assets are precached for offline PWA use. No runtime landscape API, key, billing or quota is involved.
 
 Cyclists pedal through a complete crank rotation. Deer legs share the body’s slope transform, dogs plant their paws according to distance traveled, and nesting birds perch before taking off and leaving the scene.

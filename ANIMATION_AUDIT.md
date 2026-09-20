@@ -26,6 +26,8 @@ The shared `landscape-config.js` registry owns season pools, weighted visitor se
 
 Every ordinary/rare visitor still has a finite duration. Normal motion advances their ages and removes expired events. Pausing or hiding the app preserves visits without accumulating missed spawns. Ice cream stands, wildflowers, fireflies, and fountain spray retire in winter. Ordinary singleton/water caps can intentionally skip a spawn opportunity; ambient movement continues. These limits preserve the existing density and atmosphere.
 
+All moving visitor families now consume a deterministic seeded pace curve instead of uniform route progress. Instantaneous travel speed varies by roughly 16–22 percent, remains strictly forward, and returns to the exact route endpoints at expiry. Airborne, breaching, and pickup motion has an independent vertical phase; ground slopes and companions that must stay physically attached retain their shared path geometry. Body cycles use the same paced clock so feet, pedals, pushes, and walking gestures change with travel rather than drifting at one global cadence.
+
 ## Astronomy
 
 Season names now change at Astronomy Engine's computed equinox/solstice instant, rather than fixed dates. Both hemispheres share that instant; their names differ, and time zones determine its local calendar date. Palette blending remains gentle around boundaries.

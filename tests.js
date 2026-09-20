@@ -8451,6 +8451,36 @@ test('Landscape locomotion: planted feet stay fixed and rabbits pause between ho
  const glider=runtime.split("if(e.type==='hangglider'){")[1].split("if(e.type==='airshow')")[0];assert.match(glider,/g\.scale\(dir,1\)/);
 });
 
+test('Landscape character velocity: every visit gets smooth seeded pacing on each applicable axis',()=>{
+ const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
+ const g=ctx.LandscapeGeometry.create(1000,700),event={age:0,duration:80,seed:.37,lane:.4,reverse:false};
+ assert.equal(typeof g.motionProgress,'function');assert.equal(typeof g.motionAge,'function');
+ for(const axis of ['x','y']){
+  event.age=0;assert.equal(g.motionProgress(event,axis),0,`${axis} begins at the route entrance`);
+  event.age=event.duration;assert.equal(g.motionProgress(event,axis),1,`${axis} ends at the route exit`);
+  const positions=[];
+  for(let age=0;age<=event.duration;age+=.5){event.age=age;positions.push(g.motionProgress(event,axis));}
+  const steps=positions.slice(1).map((value,index)=>value-positions[index]);
+  assert.ok(steps.every(step=>step>0),`${axis} pacing never reverses or stalls`);
+  assert.ok(Math.max(...steps)/Math.min(...steps)>1.25,`${axis} speed variation is noticeable`);
+  assert.ok(Math.max(...steps)/Math.min(...steps)<1.7,`${axis} speed variation stays gentle`);
+ }
+ event.age=31;
+ assert.notEqual(g.motionProgress(event,'x'),g.motionProgress(event,'y'),'vertical pacing has its own seeded phase');
+ assert.notEqual(g.motionProgress(event,'x'),g.motionProgress({...event,seed:.73},'x'),'different visitors do not share one speed curve');
+ assert.notEqual(g.motionProgress(event,'x'),g.motionProgress(event,'x',1),'companions can vary without frame-time randomness');
+ assert.equal(g.motionAge(event,'x'),g.motionProgress(event,'x')*event.duration);
+
+ const walker={...event,age:25};
+ const before=g.groundPose('walker',walker),after=g.groundPose('walker',{...walker,age:25.5});
+ assert.ok(after.x>before.x&&after.distance>before.distance,'ground characters consume the varied travel clock');
+ const runtime=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ assert.match(runtime,/motionProgress\(e,'x'\)/,'the shared renderer varies horizontal travel');
+ assert.match(runtime,/motionProgress\(e,'y'\)/,'the shared renderer varies vertical travel independently');
+ assert.match(fs.readFileSync(path.join(__dirname,'landscape-riders.js'),'utf8'),/motionProgress/,'small riders use varied pacing');
+ assert.match(fs.readFileSync(path.join(__dirname,'landscape-winter.js'),'utf8'),/motionProgress/,'winter characters use varied pacing');
+});
+
 test('Landscape nest: a new bird visit waits while the nest is occupied',()=>{
  const sky=livingSky(),world=sky.createWorld(()=>.05);
  world.events=[{type:'bird',age:0,duration:100,seed:.5,lane:.3,reverse:false}];world.next=0;

@@ -22,16 +22,17 @@
   };
   const finite = (value, fallback) => Number.isFinite(Number(value)) ? Number(value) : fallback;
 
-  function eventValues(event, W) {
+  function eventValues(event, geometry, W) {
     const duration = Math.max(.001, finite(event && event.duration, 1));
-    const progress = clamp(finite(event && event.age, 0) / duration);
+    const progress = geometry.motionProgress(event, 'x');
+    const verticalProgress = geometry.motionProgress(event, 'y');
     const lane = clamp(finite(event && event.lane, .5));
     const seed = clamp(finite(event && event.seed, .5));
     const direction = event && event.reverse ? -1 : 1;
     // Winter visitors share the trail visitor's visual weight. Preserve a
     // readable minimum on phones while keeping desktop people close to 1x.
     const scale = Math.min(1, Math.max(.85, W / 720));
-    return { duration, progress, lane, seed, direction, scale };
+    return { duration, progress, verticalProgress, clock: geometry.motionAge(event, 'x'), lane, seed, direction, scale };
   }
 
   function requireGeometry(geometry, W, H) {
@@ -70,8 +71,8 @@
   function pose(type, event, geometry, W, H) {
     if (!TYPES.includes(type)) throw new RangeError('Unknown winter visitor');
     requireGeometry(geometry, W, H);
-    const values = eventValues(event || {}, W);
-    const { progress, lane, seed, direction, scale } = values;
+    const values = eventValues(event || {}, geometry, W);
+    const { progress, verticalProgress, clock, lane, seed, direction, scale } = values;
     const alpha = smooth(0, .06, progress) * (1 - smooth(.94, 1, progress));
 
     if (type === 'skier') {
@@ -82,7 +83,7 @@
         snowOffset, angle: geometry.tangent(geometry.middle, x),
         // The skis use angle alone; lean is reserved for the torso.
         lean: direction * (.08 + seed * .1),
-        scale: Math.max(.85, scale * (.98 + lane * .02)), alpha, progress, lane, seed, direction,
+        scale: Math.max(.85, scale * (.98 + lane * .02)), alpha, progress, verticalProgress, clock, lane, seed, direction,
         skiing: progress >= .12 && progress <= .88, walking: false,
       };
     }
@@ -104,7 +105,7 @@
         type, x: anchor, y: groundY, groundY, snowOffset,
         builderX, builderGroundY, builderScale: scale, structureAlpha, patchAlpha: structureAlpha,
         finalFadeAlpha, angle: geometry.tangent(geometry.middle, anchor), scale, alpha,
-        progress, lane, seed, direction, build,
+        progress, verticalProgress, clock, lane, seed, direction, build,
         building: progress >= .08 && progress < .78,
         builderLeaving: progress >= .68 && progress < .99,
         builderVisible: builderAlpha > 0, builderAlpha, walking: progress >= .68,
@@ -123,7 +124,7 @@
       type, x: activity.x, y: bodyGroundY, groundY: bodyGroundY,
       imprintX: anchor, imprintGroundY, imprintAlpha, patchAlpha: imprintAlpha,
       snowOffset: 9 + lane * 2, angle: geometry.tangent(geometry.near, activity.x),
-      scale: scale * .96, alpha, progress, lane, seed, direction,
+      scale: scale * .96, alpha, progress, verticalProgress, clock, lane, seed, direction,
       imprint: armSweep, standing: bodyMode, bodyMode,
       lyingAlpha: 1 - bodyMode, standingAlpha: bodyMode,
       armSweep, legSweep, walking, walkAmount: walking ? smooth(.84, .94, progress) : 0,
@@ -150,7 +151,7 @@
     const snow = mixHex(sky[1] || '#d4f5f2', '#ffffff', .7);
     const snowShadow = mixHex(sky[2] || '#f6fbe2', '#9bbcc5', .35);
     const ink = mixHex(palette && palette.city || '#bbdce1', '#4c6870', .3);
-    const tValue = Number.isFinite(t) ? t : 0;
+    const tValue = Number.isFinite(poseValue.clock) ? poseValue.clock : (Number.isFinite(t) ? t : 0);
     const drawEllipse = (x, y, rx, ry, fill) => ellipse(g, x, y, Math.max(0, rx), Math.max(0, ry), fill);
     const drawLine = (x, y, x2, y2, stroke, width = 1) => line(g, x, y, x2, y2, stroke, width);
     const drawHead = (x, y, rx, ry, seed, skin, hat = false) => {
