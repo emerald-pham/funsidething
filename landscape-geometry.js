@@ -2,13 +2,18 @@
 (function(root){
   'use strict';
   function create(W,H){
+    const FIXED_X_TYPES=new Set(['cyclist','train','metro','plane','balloon','airshow','banner','hangglider','jetski','sailboat','cruise','yacht','skateboarder','rollerskater','hoverboard','scooter','windsurfer']);
     const clamp=value=>Math.max(0,Math.min(1,Number.isFinite(Number(value))?Number(value):0));
     const unit=value=>((value%1)+1)%1;
+    const rawProgress=event=>{
+      const duration=Math.max(.001,Number(event?.duration)||1);
+      return clamp((Number(event?.age)||0)/duration);
+    };
     // Each visit keeps its exact entrance, exit and lifetime, but eases through
     // two or three gentle seeded pace changes. Independent axis phases stop
     // airborne and breaching visitors from tracing one mechanical diagonal.
     function motionProgress(event,axis='x',offset=0){
-      const duration=Math.max(.001,Number(event?.duration)||1),raw=clamp((Number(event?.age)||0)/duration);
+      const raw=rawProgress(event);
       if(raw===0||raw===1)return raw;
       const seed=clamp(event?.seed??.5),salt=axis==='y'?.417:.071;
       const character=unit(seed+Number(offset||0)*.61803398875+salt);
@@ -17,6 +22,9 @@
       return clamp(raw+strength/(Math.PI*2*cycles)*(Math.sin(angle+phase)-Math.sin(phase)));
     }
     const motionAge=(event,axis='x',offset=0)=>motionProgress(event,axis,offset)*Math.max(.001,Number(event?.duration)||1);
+    // Vehicle silhouettes cross at a constant horizontal rate. Their bodies,
+    // wheels, water courses and flight altitude still use the varied clocks.
+    const routeProgress=(event,axis='x',offset=0)=>axis==='x'&&FIXED_X_TYPES.has(event?.type)?rawProgress(event):motionProgress(event,axis,offset);
     const horizon=Math.min(H*(W<600?.37:.47),W<600?310:480);
     const far=x=>horizon+H*.12+Math.sin(x/W*7+.8)*H*.025;
     const middle=x=>horizon+H*.25+Math.sin(x/W*6.5-1)*H*.065;
@@ -58,7 +66,7 @@
       // Sort at the waterline, not at a mast top or an animal's airborne height.
       if(e.type==='fish')return waterTop+H*.035;
       if(e.type==='dolphin')return dolphin(motionProgress(e,'x'),e.lane,e.reverse,motionProgress(e,'y')).waterY;
-      const progress=e.reverse?1-motionProgress(e,'x'):motionProgress(e,'x');
+      const progress=e.reverse?1-routeProgress(e,'x'):routeProgress(e,'x');
       return vessel(e.type,e.lane,-160+progress*(W+320),motionAge(e,'y'),e.reverse).y;
     }
     const foregroundTree=(x,y)=>Math.abs(y-lowerRail(x))<22?lowerRail(x)+23:Math.max(near(x)+2,y);
@@ -80,7 +88,7 @@
     function eventDepth(e){
       if(['walker','dogwalker','rabbit','deer'].includes(e.type))return groundPose(e.type==='dogwalker'?'walker':e.type,e).y;
       if(['reader','picnic','couple','kite'].includes(e.type))return visitPose(e,motionProgress(e,'x')).y;
-      const progress=e.reverse?1-motionProgress(e,'x'):motionProgress(e,'x');
+      const progress=e.reverse?1-routeProgress(e,'x'):routeProgress(e,'x');
       return trail(-160+progress*(W+320));
     }
     function dogPose(ownerX,distance,direction){
@@ -193,7 +201,7 @@
       return rows;
     }
     const ripple=(i,t,wind=1)=>({alpha:.15+.75*(.5+.5*Math.sin(t*wind*1.3+i*1.71))**2,drift:Math.sin(t*wind*.5+i)*9,width:.65+.35*Math.sin(t*.9+i)**2});
-    return {motionProgress,motionAge,visitPose,woodlandPose,duckPose,waterDepth,cycleLeg,deerLeg,nestVisit,eventDepth,dogPose,skater,fireworks,flock,dolphin,starReflection,cityReflection,sunReflection,depthBand,groundAnchor,groundTravelX,groundPose,strideArm,strideFoot,wingFold,balloonDrift,vessel,foregroundTree,nest,ripple,horizon,waterTop,far,middle,near,rail,trail,lowerRail,tangent,rider,pack};
+    return {routeProgress,motionProgress,motionAge,visitPose,woodlandPose,duckPose,waterDepth,cycleLeg,deerLeg,nestVisit,eventDepth,dogPose,skater,fireworks,flock,dolphin,starReflection,cityReflection,sunReflection,depthBand,groundAnchor,groundTravelX,groundPose,strideArm,strideFoot,wingFold,balloonDrift,vessel,foregroundTree,nest,ripple,horizon,waterTop,far,middle,near,rail,trail,lowerRail,tangent,rider,pack};
   }
   root.LandscapeGeometry={create};
 })(globalThis);

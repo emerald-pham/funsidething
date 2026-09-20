@@ -292,6 +292,10 @@
     const track=isTrain?geometry.lowerRail:rail,n=isTrain?5:3,cw=isTrain?24:22,dir=reverse?-1:1,scale=isTrain?1:.72;
     for(let i=0;i<n;i++){
       const xx=x-i*(cw+2)*scale*dir;
+      if(isTrain&&i){
+        const previous=xx+(cw+2)*scale*dir,from=xx+cw/2*scale*dir,to=previous-cw/2*scale*dir;
+        line(g,from,track(from)-5,to,track(to)-5,p.city,1.6);
+      }
       g.save();g.translate(xx,track(xx)-2);g.rotate(geometry.tangent(track,xx));g.scale(dir*scale,scale);
       g.fillStyle=S.mixHex(isTrain?'#e4cfa5':'#dceade',p.city,p.night*.3);g.beginPath();g.roundRect(-cw/2,-10,cw,8,2);g.fill();
       g.fillStyle=isTrain?'#bb8275':'#77a8a2';g.fillRect(-cw/2,-5,cw,2);
@@ -436,7 +440,7 @@
   }
   function paintVessel(e,t){
 
-    const fx=geometry.motionProgress(e,'x'),progress=e.reverse?1-fx:fx;
+    const fx=geometry.routeProgress(e,'x'),progress=e.reverse?1-fx:fx;
     const pose=geometry.vessel(e.type,e.lane,-160+progress*(W+320),geometry.motionAge(e,'y'),e.reverse);
     if(!pose.visible)return;
     const {x,y,scale,direction}=pose,c=color(e.seed),hull=S.mixHex('#fff3dd',p.sky[1],p.night*.4);
@@ -496,7 +500,7 @@
         LandscapeWinter.paint(g,geometry,W,H,e,t,p,{ellipse,line,color,skinColor,personHead,S});return;
       }
       if(['jetski','sailboat','cruise','yacht','windsurfer'].includes(e.type))return;
-      const f=geometry.motionProgress(e,'x'),fy=geometry.motionProgress(e,'y'),clock=geometry.motionAge(e,'x'),verticalClock=geometry.motionAge(e,'y'),progress=e.reverse?1-f:f,x=-160+progress*(W+320);
+      const f=geometry.routeProgress(e,'x'),fy=geometry.motionProgress(e,'y'),clock=geometry.motionAge(e,'x'),verticalClock=geometry.motionAge(e,'y'),progress=e.reverse?1-f:f,x=-160+progress*(W+320);
       if(e.type==='metro'){transport(x,rail(x)-4,f,false,e.reverse);return;}
       if(e.type==='train'){transport(x,near(x)+H*.07-2,f,true,e.reverse);return;}
       if(e.type==='cyclist'){
@@ -532,7 +536,7 @@
       if(e.type==='balloon'){
 
         const drift=geometry.balloonDrift(e.seed,clock,wind,verticalClock),y=hy*.48+e.lane*hy*.18+drift.y,r=10+e.lane*7;
-        g.save();g.translate(x+drift.x,y);ellipse(g,0,0,r,r*1.2,color(e.seed));ellipse(g,0,0,r*.62,r*1.2,color(e.seed,2));ellipse(g,0,0,r*.25,r*1.2,color(e.seed,4));
+        g.save();g.translate(x,y);ellipse(g,0,0,r,r*1.2,color(e.seed));ellipse(g,0,0,r*.62,r*1.2,color(e.seed,2));ellipse(g,0,0,r*.25,r*1.2,color(e.seed,4));
         line(g,-r*.4,r*.95,-3,r*1.6,'#867458',.65);line(g,r*.4,r*.95,3,r*1.6,'#867458',.65);g.fillStyle='#897659';g.fillRect(-3,r*1.5,6,4);g.restore();return;
       }
       if(paintGuest(e,x,f,clock))return;

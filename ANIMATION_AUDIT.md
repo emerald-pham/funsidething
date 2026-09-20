@@ -26,7 +26,7 @@ The shared `landscape-config.js` registry owns season pools, weighted visitor se
 
 Every ordinary/rare visitor still has a finite duration. Normal motion advances their ages and removes expired events. Pausing or hiding the app preserves visits without accumulating missed spawns. Ice cream stands, wildflowers, fireflies, and fountain spray retire in winter. Ordinary singleton/water caps can intentionally skip a spawn opportunity; ambient movement continues. These limits preserve the existing density and atmosphere.
 
-All moving visitor families now consume a deterministic seeded pace curve instead of uniform route progress. Instantaneous travel speed varies by roughly 16–22 percent, remains strictly forward, and returns to the exact route endpoints at expiry. Airborne, breaching, and pickup motion has an independent vertical phase; ground slopes and companions that must stay physically attached retain their shared path geometry. Body cycles use the same paced clock so feet, pedals, pushes, and walking gestures change with travel rather than drifting at one global cadence.
+Moving characters consume a deterministic seeded pace curve instead of uniform route progress. Their instantaneous travel speed varies by roughly 16–22 percent, remains strictly forward, and returns to the exact route endpoints at expiry. Vehicles retain linear horizontal progress; vertical motion can still vary with waves, altitude, and the existing track or path. Ground slopes and companions that must stay physically attached retain their shared geometry, while body cycles use the paced clock. The five existing lower tram cars are unchanged and joined by four narrow couplers.
 
 ## Astronomy
 

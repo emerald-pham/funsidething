@@ -8451,7 +8451,7 @@ test('Landscape locomotion: planted feet stay fixed and rabbits pause between ho
  const glider=runtime.split("if(e.type==='hangglider'){")[1].split("if(e.type==='airshow')")[0];assert.match(glider,/g\.scale\(dir,1\)/);
 });
 
-test('Landscape character velocity: every visit gets smooth seeded pacing on each applicable axis',()=>{
+test('Landscape character velocity: moving characters get smooth seeded pacing on each applicable axis',()=>{
  const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
  const g=ctx.LandscapeGeometry.create(1000,700),event={age:0,duration:80,seed:.37,lane:.4,reverse:false};
  assert.equal(typeof g.motionProgress,'function');assert.equal(typeof g.motionAge,'function');
@@ -8475,10 +8475,46 @@ test('Landscape character velocity: every visit gets smooth seeded pacing on eac
  const before=g.groundPose('walker',walker),after=g.groundPose('walker',{...walker,age:25.5});
  assert.ok(after.x>before.x&&after.distance>before.distance,'ground characters consume the varied travel clock');
  const runtime=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
- assert.match(runtime,/motionProgress\(e,'x'\)/,'the shared renderer varies horizontal travel');
+ assert.match(runtime,/routeProgress\(e,'x'\)/,'the shared renderer selects character or vehicle travel');
  assert.match(runtime,/motionProgress\(e,'y'\)/,'the shared renderer varies vertical travel independently');
- assert.match(fs.readFileSync(path.join(__dirname,'landscape-riders.js'),'utf8'),/motionProgress/,'small riders use varied pacing');
+ assert.match(fs.readFileSync(path.join(__dirname,'landscape-riders.js'),'utf8'),/motionAge/,'small rider body motion still uses the varied clock');
  assert.match(fs.readFileSync(path.join(__dirname,'landscape-winter.js'),'utf8'),/motionProgress/,'winter characters use varied pacing');
+});
+
+test('Landscape vehicle velocity: horizontal routes stay linear while vertical motion remains varied',()=>{
+ const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
+ const g=ctx.LandscapeGeometry.create(1000,700);
+ const vehicles=['cyclist','train','metro','plane','balloon','airshow','banner','hangglider','jetski','sailboat','cruise','yacht','skateboarder','rollerskater','hoverboard','scooter','windsurfer'];
+ assert.equal(typeof g.routeProgress,'function');
+ for(const type of vehicles){
+  const event={type,age:31,duration:80,seed:.37,lane:.4,reverse:false};
+  assert.equal(g.routeProgress(event,'x'),31/80,`${type} has fixed horizontal speed`);
+  assert.notEqual(g.routeProgress(event,'y'),31/80,`${type} keeps seeded vertical variation`);
+ }
+ const walker={type:'walker',age:31,duration:80,seed:.37,lane:.4,reverse:false};
+ assert.equal(g.routeProgress(walker,'x'),g.motionProgress(walker,'x'),'characters retain varied horizontal travel');
+ assert.notEqual(g.routeProgress(walker,'x'),31/80);
+ const runtime=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ assert.match(runtime,/routeProgress\(e,'x'\)/,'crossing vehicles use the linear route clock');
+ const balloon=runtime.slice(runtime.indexOf("if(e.type==='balloon'){"),runtime.indexOf('if(paintGuest',runtime.indexOf("if(e.type==='balloon'){")));
+ assert.doesNotMatch(balloon,/x\+drift\.x/,'balloon currents cannot alter horizontal speed');
+ assert.match(fs.readFileSync(path.join(__dirname,'landscape-riders.js'),'utf8'),/routeProgress/,'wheeled riders keep fixed horizontal speed');
+});
+
+test('Landscape lower tram: existing cars are linked by four couplers',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ const code=source.slice(source.indexOf('  function transport('),source.indexOf('  function paintLife('));
+ const render=isTrain=>{
+  const lines=[],g={save(){},restore(){},translate(){},rotate(){},scale(){},beginPath(){},roundRect(){},fill(){},fillRect(){}};
+  const geometry={lowerRail:x=>500+Math.sin(x/80)*4,tangent:()=>0};
+  const rail=x=>300+Math.sin(x/100)*2,p={city:'#456',night:0},S={mixHex:value=>value};
+  vm.runInNewContext(`${code};transport(500,0,.5,${isTrain},false)`,{g,geometry,rail,p,S,ellipse(){},line(g,...args){lines.push(args);}});
+  return lines.filter(args=>args[5]===1.6&&args[4]===p.city);
+ };
+ const tram=render(true),middleTrain=render(false);
+ assert.equal(tram.length,4,'five lower tram cars need one coupler at each join');
+ assert.equal(middleTrain.length,0,'the existing middle train model stays unchanged');
+ assert.ok(tram.every(([x,y,x2,y2])=>Number.isFinite(x)&&Number.isFinite(y)&&Number.isFinite(x2)&&Number.isFinite(y2)&&Math.abs(x2-x)<=3),'couplers bridge only the small gap between neighboring cars');
 });
 
 test('Landscape nest: a new bird visit waits while the nest is occupied',()=>{

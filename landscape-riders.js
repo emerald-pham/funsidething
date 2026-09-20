@@ -3,7 +3,7 @@
   'use strict';
   const types=Object.freeze(['hoverboard','scooter']);
   function pose(event,geometry,W){
-    const progress=geometry.motionProgress(event,'x'),direction=event.reverse?-1:1;
+    const progress=geometry.routeProgress(event,'x'),direction=event.reverse?-1:1;
     const x=-160+(event.reverse?1-progress:progress)*(W+320);
     return {...geometry.skater(x,event.reverse),scale:W<600?.85:1,direction};
   }
