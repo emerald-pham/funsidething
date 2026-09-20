@@ -3154,7 +3154,9 @@ test("an evergreen task finished mid-pass is back in the pool after the date-mar
   const ever = ctx.addTask("Put on clothes", false);
   ctx.state.tasks.find((t) => t.id === ever.id).evergreen = true;
   ctx.addTask("Filler", false);
-  const t0 = realNow(ctx);
+  // Keep this fixture well clear of the 02:00 day marker. Using the wall clock
+  // made the promised 90-minute rest false whenever the suite ran after 00:30.
+  const t0 = localAt(30, 12, 0);
   setFakeTime(ctx, t0);
   ctx.startScan('descending');                                  // dots "Anchor task"; pass starts at t0
 
@@ -4671,7 +4673,9 @@ test("dislodge: by contrast, does NOT expire — it stays skipped for the pass",
   const t = ctx.addTask("Dotted task", true);
   ctx.addTask("Filler", false);
 
-  const t0 = realNow(ctx);
+  // An elapsed-time test must not accidentally cross the separate 02:00 pass
+  // boundary just because the suite happens to run shortly before it.
+  const t0 = localAt(30, 12, 0);
   setFakeTime(ctx, t0);
   ctx.dislodge();
   assert.equal(ctx.state.considered[t.id], "dislodged");
