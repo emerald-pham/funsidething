@@ -167,6 +167,22 @@
       const depth=Math.min(H*.09,95),y=waterTop+5+star.altitude/90*depth;
       return {x:star.azimuth/360*W+Math.sin(y*.19-t*wind)*1.8,y};
     }
+    function horizonReflection(t,wind,night){
+      if(night<=.05)return [];
+      const compression=.28,depth=Math.min(H*.12,140),rows=[];
+      // Sample real pixels above the horizon into shallow horizontal bands.
+      // The shoreline clip rejects sources that would land beyond the visible
+      // lake, so height and perspective decide what is close enough to reflect.
+      for(let d=0;d<depth;d+=2){
+        const sourceY=horizon-(d+2)/compression;
+        if(sourceY<0)break;
+        const fraction=d/depth;
+        rows.push({sourceY,sourceHeight:2/compression,y:waterTop+d,
+          dx:(Math.sin(d*.21-t*wind*.85)*2.2+Math.sin(d*.08+t*wind*.3))*(.25+.75*fraction),
+          alpha:Math.min(.24,night*.2)*(1-fraction*.58),height:2});
+      }
+      return rows;
+    }
     function dolphin(progress,lane,reverse=false,verticalProgress=progress){
       const direction=reverse?-1:1,depth=Math.max(1,shore-waterTop),scale=Math.min(1.2,W/560,depth/20);
       const x=W*(.2+.6*lane)+direction*(progress-.5)*45,waterY=waterTop+depth*.6;
@@ -201,7 +217,7 @@
       return rows;
     }
     const ripple=(i,t,wind=1)=>({alpha:.15+.75*(.5+.5*Math.sin(t*wind*1.3+i*1.71))**2,drift:Math.sin(t*wind*.5+i)*9,width:.65+.35*Math.sin(t*.9+i)**2});
-    return {routeProgress,motionProgress,motionAge,visitPose,woodlandPose,duckPose,waterDepth,cycleLeg,deerLeg,nestVisit,eventDepth,dogPose,skater,fireworks,flock,dolphin,starReflection,cityReflection,sunReflection,depthBand,groundAnchor,groundTravelX,groundPose,strideArm,strideFoot,wingFold,balloonDrift,vessel,foregroundTree,nest,ripple,horizon,waterTop,far,middle,near,rail,trail,lowerRail,tangent,rider,pack};
+    return {routeProgress,motionProgress,motionAge,visitPose,woodlandPose,duckPose,waterDepth,cycleLeg,deerLeg,nestVisit,eventDepth,dogPose,skater,fireworks,flock,dolphin,starReflection,horizonReflection,cityReflection,sunReflection,depthBand,groundAnchor,groundTravelX,groundPose,strideArm,strideFoot,wingFold,balloonDrift,vessel,foregroundTree,nest,ripple,horizon,waterTop,far,middle,near,rail,trail,lowerRail,tangent,rider,pack};
   }
   root.LandscapeGeometry={create};
 })(globalThis);

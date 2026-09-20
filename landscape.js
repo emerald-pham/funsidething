@@ -14,7 +14,7 @@
   const back=host.querySelector('[data-scenery]'),front=host.querySelector('[data-life]');
   let b=back.getContext('2d',{alpha:false});const base=b,g=front.getContext('2d');
   const layers={};let geometry;
-  const cityReflection=document.createElement('canvas');
+  const cityReflection=document.createElement('canvas'),skyReflection=document.createElement('canvas');
   if(!b||!g){host.hidden=true;return;}
   const mq=window.matchMedia('(prefers-reduced-motion: reduce)');
   let storage;try{storage=window.localStorage;}catch{storage=null;}
@@ -84,6 +84,12 @@
     b=canvas.getContext('2d');b.setTransform(dpr,0,0,dpr,0,-top*dpr);
   }
   function composite(name){const c=layers[name];if(c)g.drawImage(c,0,c.top,c.width/dpr,c.height/dpr);}
+  function paintHorizonReflection(source,t,opacity=1){
+    for(const row of geometry.horizonReflection(t,wind,p.night)){
+      g.globalAlpha=row.alpha*opacity;
+      g.drawImage(source,0,row.sourceY*dpr,source.width,row.sourceHeight*dpr,row.dx,row.y,W,row.height);
+    }
+  }
   const point=(az,alt)=>({x:az/360*W,y:hy-(Math.max(alt,-2)/90)*(hy-22)});
   function path(ctx,fn,start=0,end=W,step=12){ctx.beginPath();ctx.moveTo(start,fn(start));for(let x=start+step;x<end;x+=step)ctx.lineTo(x,fn(x));ctx.lineTo(end,fn(end));}
   function hill(ctx,fn,color){path(ctx,fn);ctx.lineTo(W,H);ctx.lineTo(0,H);ctx.closePath();ctx.fillStyle=color;ctx.fill();}
@@ -306,6 +312,8 @@
   function paintLife(t){
     visibleBanners=[];
     g.clearRect(0,0,W,H);
+    const waterEvents=new Set(['jetski','sailboat','cruise','yacht','windsurfer','duck','fish','dolphin']);
+    const airborne=new Set(['metro','duck','fish','plane','balloon','airshow','banner','skywriter','hangglider','jetski','sailboat','cruise','yacht','windsurfer','dolphin','flock']);
     for(const e of world.events)if(e.type==='meteor'&&p.night>.3){
       const fx=geometry.motionProgress(e,'x'),fy=geometry.motionProgress(e,'y'),dx=(e.reverse?-1:1)*(85+e.seed*70),dy=24+e.lane*20;
       const sx=W*(.2+e.seed*.6),sy=hy*(.08+e.lane*.3),x=sx+dx*fx,y=sy+dy*fy;
@@ -328,18 +336,21 @@
       const x=((rand(i+71)*W+t*wind*(1.2+rand(i+2)*1.5)+size*3)%(W+size*6))-size*3;
       cloud(x,25+rand(i+82)*(hy*.68),size,.22+rand(i+54)*.18);
     }
+    // Paint moving sky visitors once, then snapshot only the pixels above the
+    // horizon. The lake can mirror any present or future visitor without a
+    // type-specific reflection that would inevitably miss something.
+    for(const e of world.events)if(airborne.has(e.type)&&!waterEvents.has(e.type))paintEvent(e,t);
+    skyReflection.width=front.width;skyReflection.height=Math.max(1,Math.ceil(hy*dpr));
+    const reflectionContext=skyReflection.getContext('2d');
+    reflectionContext.clearRect(0,0,skyReflection.width,skyReflection.height);
+    reflectionContext.drawImage(front,0,0,front.width,skyReflection.height,0,0,skyReflection.width,skyReflection.height);
     g.save();path(g,far);g.lineTo(W,geometry.waterTop);g.lineTo(0,geometry.waterTop);g.closePath();g.clip();
     if(p.night>.05){
       const reflectedSky=g.createLinearGradient(0,geometry.waterTop,0,geometry.waterTop+H*.12);
       reflectedSky.addColorStop(0,p.sky[2]);reflectedSky.addColorStop(1,p.sky[0]);
       g.globalAlpha=p.night*.18;g.fillStyle=reflectedSky;g.fillRect(0,geometry.waterTop,W,H*.12);
-      for(const star of sky.stars){
-        const reflected=geometry.starReflection(star,t,wind);if(!reflected)continue;
-        const moonlight=sky.moon.visible?sky.illumination*.32:0;
-        g.globalAlpha=p.night*(1-moonlight)*(.16-star.magnitude*.025)*S.smooth(0,12,star.altitude);
-        const color=star.colorIndex>1?'#ffdbab':star.colorIndex<0?'#d3eaff':'#f6f3df';
-        line(g,reflected.x-1.2,reflected.y,reflected.x+1.2,reflected.y,color,.7);
-      }
+      paintHorizonReflection(base.canvas,t,.72);
+      paintHorizonReflection(skyReflection,t,1);
     }
     // Invert the actual skyline into narrow, softly moving water bands. The
     // existing shoreline clip keeps reflections beneath the hills and boats.
@@ -363,8 +374,6 @@
     for(const e of world.events.filter(e=>water.has(e.type)).sort((a,b)=>geometry.waterDepth(a,t)-geometry.waterDepth(b,t))){
       if(['duck','fish','dolphin'].includes(e.type))paintEvent(e,t);else paintVessel(e,t);
     }
-    const airborne=new Set(['metro','duck','fish','plane','balloon','airshow','banner','skywriter','hangglider','jetski','sailboat','cruise','yacht','windsurfer','dolphin','flock']);
-    for(const e of world.events)if(airborne.has(e.type)&&!water.has(e.type))paintEvent(e,t);
     composite('middle');
     // Ground contact determines occlusion, including props previously baked into the hill.
     const groundPass=world.events.filter(e=>!airborne.has(e.type)&&e.type!=='train'&&e.type!=='snowangel').map(e=>({depth:globalThis.LandscapeWinter?.types.includes(e.type)?LandscapeWinter.pose(e.type,e,geometry,W,H).y:geometry.eventDepth(e),draw:()=>paintEvent(e,t)}));
@@ -452,7 +461,7 @@
       g.globalAlpha=(1-phase)*.3;const wx=x-direction*(length*.35+i*5)*scale;
       line(g,wx,y+(1+phase*3)*scale,wx-direction*(8+phase*8)*scale,y+(1+phase*3)*scale,p.sky[2],scale);
     }g.restore();
-    g.save();g.translate(x,y);g.scale(direction*scale,scale);
+    const paintVesselShape=()=>{
     if(e.type==='windsurfer'){
       // Board sits at the waterline; the rider leans back against the sail.
       line(g,-10,0,10,0,c,2);line(g,0,0,4,-27,p.city,.8);
@@ -484,7 +493,15 @@
         line(g,-27,-5,24,-5,c,1);
       }
     }
-    g.restore();
+    };
+    if(p.night>.05){
+      // Mirror the complete silhouette from its own waterline. A vertical
+      // squeeze and low alpha keep it attached to the boat while waves pass
+      // over it; the lake clip prevents any reflected pixel reaching land.
+      g.save();path(g,far);g.lineTo(W,geometry.waterTop);g.lineTo(0,geometry.waterTop);g.closePath();g.clip();
+      g.globalAlpha=p.night*.2;g.translate(x,y);g.scale(direction*scale,-scale*.62);paintVesselShape();g.restore();
+    }
+    g.save();g.translate(x,y);g.scale(direction*scale,scale);paintVesselShape();g.restore();
   }
   function paintIceCreamStand(){
     const ax=W*.43,ay=trail(ax)+15;
@@ -776,10 +793,11 @@
       const y=hy*.3+e.lane*hy*.18,bx=x-dir*86;
       if(e.bannerText===undefined)e.bannerText=LandscapeMood.airplaneMessage(e.seed);
       if(!e.bannerText){airplane(x,y,dir,e.seed,t,true);return true;}
+      const bannerPalette=LandscapeAppearance.bannerColors(p.night,c,p.city);
       visibleBanners.push({event:e,x:bx,y:y+3});
-      airplane(x,y,dir,e.seed,t,true);line(g,x-dir*18,y,bx+dir*39,y+3,'#99a69b',.7);
-      g.save();g.translate(bx,y+3);g.rotate(Math.sin(verticalClock)*.025);g.fillStyle=S.mixHex('#fff2d8',c,.2);g.fillRect(-39,-6,78,12);
-      g.fillStyle='#4d6c72';g.font='7px sans-serif';g.textAlign='center';g.fillText(e.bannerText,0,2.5);g.restore();return true;
+      airplane(x,y,dir,e.seed,t,true);line(g,x-dir*18,y,bx+dir*39,y+3,bannerPalette.tow,.7);
+      g.save();g.translate(bx,y+3);g.rotate(Math.sin(verticalClock)*.025);g.fillStyle=bannerPalette.fabric;g.fillRect(-39,-6,78,12);
+      g.fillStyle=bannerPalette.ink;g.font='7px sans-serif';g.textAlign='center';g.fillText(e.bannerText,0,2.5);g.restore();return true;
     }
     return false;
   }

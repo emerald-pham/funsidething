@@ -5,6 +5,7 @@
   const hair=Object.freeze(['#302c2c','#614638','#9b6650','#c9ad74','#a6a29a','#914e37']);
   const styles=Object.freeze(['short','bob','long','bun','ponytail','curly','bald']);
   const unit=n=>((Number.isFinite(n)?n:0)%1+1)%1;
+  const clamp=n=>Math.max(0,Math.min(1,Number.isFinite(Number(n))?Number(n):0));
   const mix=(a,b,t)=>'#'+a.slice(1).match(/../g).map((v,i)=>Math.round(parseInt(v,16)*(1-t)+parseInt(b.slice(1+i*2,3+i*2),16)*t).toString(16).padStart(2,'0')).join('');
   function birdColor(seed,night=0,ambient='#23332f',proximity=0){
     const plumage=birds[Math.floor(unit(seed)*birds.length)];
@@ -12,5 +13,9 @@
     return mix(ink,ambient,Math.max(0,Math.min(1,night))*.55);
   }
   function person(seed){return {style:styles[Math.floor(unit(seed*13.17)*styles.length)],color:hair[Math.floor(unit(seed*7.31)*hair.length)]};}
-  root.LandscapeAppearance=Object.freeze({birdColor,person});
+  function bannerColors(night=0,accent='#b27765',ambient='#416b68'){
+    const amount=clamp(night),dayFabric=mix('#fff2d8',accent,.2),nightFabric=mix('#102c3b',ambient,.18);
+    return {fabric:mix(dayFabric,nightFabric,amount*.96),ink:mix('#4d6c72','#ffe6a7',amount),tow:mix('#99a69b','#405965',amount*.9)};
+  }
+  root.LandscapeAppearance=Object.freeze({birdColor,person,bannerColors});
 })(globalThis);

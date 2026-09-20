@@ -8,6 +8,8 @@ The observer is Orlando: 28.5383° N, 81.3792° W, 20 m elevation. The device cl
 
 The starfield contains 1,289 catalog stars to visual magnitude 4.8. J2000 positions are precessed/nutated to the observation date and projected onto a cylindrical full-azimuth panorama (north at its seam, east left, south center, west right). Only above-horizon stars are drawn, without constellation lines. This preserves a real rotating starfield while compressing it into the available sky; it is scenery, not a calibrated planetarium. Moonlight and low elevation reduce star brightness. The Moon is also visible by day when above the horizon.
 
+At night, the lake samples the actual painted sky in narrow moving bands. The Moon, stars, airplanes, balloons, birds, skywriting, and any future object above the horizon therefore share one reflection rule. Perspective and the shoreline mask decide whether an object is close enough to the horizon to reach visible water. Boats mirror their complete silhouette downward from their own waterline, with wave-softened compression.
+
 Light/Dark/System applies only to the foreground app. It receives a subtle scene tint, while the background always follows the calculated Florida sky. `Enjoy the view` reveals the scenery; `Back to your tasks` returns focus to the originating control.
 
 ## Motion and performance
@@ -16,7 +18,7 @@ First launch asks for Normal or Reduced motion. Settings and a footer control re
 
 Normal motion uses persistent clouds and wind, with fireflies after dusk, plus bounded randomized arrivals. Morning arrivals are more frequent. Rare alien visits have at least seven minutes of active-scene cooldown; the cow is returned unharmed. Returning to a tab resumes existing visitors without resetting the rare-event cooldown. Hidden tabs stop the animation and astronomy timers.
 
-Moving people and animals use deterministic, seeded pace curves that gently speed up and slow down during each finite visit. Vehicles cross the horizontal axis at a fixed rate while their vertical movement may still vary with water, air, or terrain. Routes remain forward-only and keep their exact entrance, exit, and lifetime. The existing lower tram cars are joined by small couplers; the vehicle models and the flyers/train/tram depth order remain unchanged.
+Every arrival is assigned a travel speed between 82 and 118 percent of the baseline, so a later fast visitor can overtake a slower one. Moving people and animals also use deterministic, seeded pace curves that gently speed up and slow down during each finite visit. Vehicles hold their assigned speed on the horizontal axis while their vertical movement may still vary with water, air, or terrain. Routes remain forward-only and keep their exact entrance and exit. The existing lower tram cars are joined by small couplers; the vehicle models and the flyers/train/tram depth order remain unchanged. Airplane banners transition from light fabric in daylight to dark blue fabric with light lettering as night falls.
 
 The scenery uses two local canvases: a cached background and sparse dynamic foreground. The loop is capped at 30 fps, effective DPR at 1.5, each canvas at three million pixels, and transient events at 14. Tab switches preserve active visitors and their progress. Long suspended intervals are not replayed. All assets are precached for offline PWA use. No runtime landscape API, key, billing or quota is involved.
 

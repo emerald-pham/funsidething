@@ -1,13 +1,15 @@
 # Chain Scanner
 
-A ranked FVP task scanner. One self-contained `index.html`; all tests in `tests.js`,
-run with `node --test tests.js`.
+A ranked FVP task scanner. The app is centered in `index.html`, with its installable
+PWA shell in `manifest.webmanifest`, `sw.js`, and the local icon assets. All tests
+live in `tests.js`, run with `node --test tests.js`.
 
 ## Test-first, without exception
 
-No implementation code goes into `index.html` until a test for that behavior exists
-in `tests.js`, has been run, and has been **seen to fail for the right reason**. A test
-written after the code is a test that has never been observed to catch anything.
+No implementation code goes into `index.html`, `sw.js`, `manifest.webmanifest`, or
+the PWA icon assets until a test for that behavior exists in `tests.js`, has been run,
+and has been **seen to fail for the right reason**. A test written after the code is
+a test that has never been observed to catch anything.
 
 The loop, every time: pin down the behavior → enumerate the cases (happy path,
 boundaries, invalid input, failure modes, ordering effects) → write the tests →
@@ -18,8 +20,8 @@ Watch for a new test that passes *before* the implementation exists. That test i
 broken, not finished — strengthen it until it discriminates, then continue.
 
 A `PreToolUse` hook (`.claude/hooks/test-first-guard.sh`) enforces the ordering: an edit
-to `index.html` is refused while `tests.js` has no uncommitted changes. Treat the block
-as correct and go write the test — do not work around it.
+to an app or PWA shell file is refused while `tests.js` has no uncommitted changes.
+Treat the block as correct and go write the test — do not work around it.
 
 Exceptions, and only these: config, dependency manifests, pure documentation
 (`README.md`, `SETUP.md`), and deleting code. Everything else — bug fixes, "trivial"

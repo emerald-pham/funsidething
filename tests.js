@@ -340,6 +340,25 @@ test("Landscape: returning visits vary their opening cast", () => {
   assert.notDeepEqual(sky.createWorld(()=>.1).events.map(e=>e.type),sky.createWorld(()=>.9).events.map(e=>e.type));
 });
 
+test("Landscape visitors: every arrival gets a starting speed and faster traffic can overtake", () => {
+  const sky=livingSky(),geometryContext=vm.createContext({Math});
+  vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),geometryContext);
+  const geometry=geometryContext.LandscapeGeometry.create(1000,700);
+  assert.equal(typeof sky.startingSpeed,'function');
+  const slowSpeed=sky.startingSpeed(0),fastSpeed=sky.startingSpeed(1);
+  assert.ok(slowSpeed<1&&fastSpeed>1&&fastSpeed/slowSpeed>1.35,'the starting-speed range is noticeable but bounded');
+  const slow={type:'plane',age:12,duration:100/slowSpeed,seed:.2,lane:.4,reverse:false};
+  const fast={type:'plane',age:0,duration:100/fastSpeed,seed:.8,lane:.4,reverse:false};
+  assert.ok(geometry.routeProgress(slow,'x')>geometry.routeProgress(fast,'x'),'the slower plane starts ahead');
+  slow.age+=40;fast.age+=40;
+  assert.ok(geometry.routeProgress(fast,'x')>geometry.routeProgress(slow,'x'),'the later, faster plane overtakes it');
+
+  const world=sky.createWorld(()=>.25);
+  assert.ok(world.events.length&&world.events.every(event=>event.speed>=slowSpeed&&event.speed<=fastSpeed),'ordinary and opening arrivals retain their assigned speed');
+  const woodland=sky.createWoodland(()=>0);woodland.next=0;sky.advanceWoodland(woodland,1);
+  assert.ok(woodland.events.length&&woodland.events.every(event=>event.speed>=slowSpeed&&event.speed<=fastSpeed),'woodland arrivals use the same speed contract');
+});
+
 test("Landscape: only one banner plane may be active while ordinary planes still overlap", () => {
   const sky = livingSky();
   const day = { sun: { altitude: 30, azimuth: 100 } };
@@ -8524,7 +8543,7 @@ test('Landscape nest: a new bird visit waits while the nest is occupied',()=>{
  assert.equal(world.events.filter(e=>e.type==='bird').length,1,'two arriving flocks cannot pile onto the same perches');
 });
 
-test('Landscape water: night reflects the actual city in bounded flowing strips, never a moon glint',()=>{
+test('Landscape water: night reflects the actual city in bounded flowing strips',()=>{
  const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
  for(const [w,h] of [[320,568],[844,390],[1440,900]]){
   const g=ctx.LandscapeGeometry.create(w,h),rows=g.cityReflection(0,1,1),later=g.cityReflection(1,1,1);
@@ -8541,6 +8560,25 @@ test('Landscape water: night reflects the actual city in bounded flowing strips,
  assert.doesNotMatch(runtime,/sky\.sun\.visible\?sky\.sun:sky\.moon/);
 });
 
+test('Landscape water: one horizon rule reflects nearby night sky objects and every vessel',()=>{
+ const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
+ for(const [w,h] of [[320,568],[844,390],[1440,900]]){
+  const g=ctx.LandscapeGeometry.create(w,h),rows=g.horizonReflection(0,1,1),later=g.horizonReflection(1,1,1);
+  assert.ok(rows.length>4,'the lake samples several reflection bands');
+  assert.equal(g.horizonReflection(0,1,0).length,0,'daylight has no night-sky mirror');
+  assert.ok(rows.every(row=>row.sourceY>=0&&row.sourceY<g.horizon),'every sample comes from above the horizon');
+  assert.ok(rows.every(row=>row.y>=g.waterTop&&row.sourceHeight>0&&row.alpha>0&&row.alpha<=.24),'every sample lands softly below the waterline');
+  assert.ok(rows.some((row,index)=>row.dx!==later[index].dx),'the mirrored pixels move with the water');
+  assert.ok(rows[0].sourceY>rows.at(-1).sourceY,'objects nearest the horizon enter the water first');
+ }
+ const runtime=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ assert.match(runtime,/paintHorizonReflection\(base\.canvas/,'the painted Moon, stars, and any other nearby sky object share the rule through its canvas');
+ assert.match(runtime,/paintHorizonReflection\(skyReflection/,'airplanes and every other moving sky visitor share the rule');
+ const vessel=runtime.slice(runtime.indexOf('  function paintVessel('),runtime.indexOf('  function paintIceCreamStand('));
+ assert.match(vessel,/p\.night\s*>\s*\.05/,'boats reflect only when the real sky is dark');
+ assert.match(vessel,/g\.scale\(direction\*scale,-scale\*/,'the full boat silhouette mirrors downward from its waterline');
+});
+
 test('Landscape time: a saved device-local hour locks scenery without changing the real date',()=>{
  const sky=livingSky(),values=new Map(),storage={getItem:k=>values.get(k),setItem:(k,v)=>values.set(k,v),removeItem:k=>values.delete(k)};
  const now=new Date(2026,8,12,14,32,45);
@@ -8552,14 +8590,14 @@ test('Landscape time: a saved device-local hour locks scenery without changing t
  assert.match(html,/data-act="scene-time-settings"/);assert.match(html,/id="sceneTimeInput" type="time"/);
 });
 
-test('Landscape water: visible stars mirror into the lake with bounded drift',()=>{
+test('Landscape water: visible stars remain eligible for bounded horizon reflections',()=>{
  const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
  const g=ctx.LandscapeGeometry.create(1440,900),star={azimuth:180,altitude:25,magnitude:1};
  const a=g.starReflection(star,0,1),b=g.starReflection(star,1,1);
  assert.ok(Math.abs(a.x-720)<4);assert.ok(a.y>g.waterTop&&a.y<g.far(a.x));assert.notEqual(a.x,b.x);
  assert.equal(g.starReflection({...star,altitude:-2},0,1),null);
  assert.equal(g.starReflection({...star,magnitude:6},0,1),null);
- const runtime=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');assert.match(runtime,/geometry\.starReflection\(/);assert.match(runtime,/S\.sceneDate\(/);
+ const runtime=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');assert.match(runtime,/paintHorizonReflection\(base\.canvas/);assert.match(runtime,/S\.sceneDate\(/);
 });
 
 test('Landscape time: solar presets follow the date and saved observer',()=>{
@@ -9924,6 +9962,12 @@ test('Banner aircraft: propeller craft has a tail tow point and animated blades 
  const render=(time,propeller)=>{const calls=[],g={save(){},restore(){},translate(){},scale(){},beginPath(){},moveTo(...v){calls.push(['m',...v]);},lineTo(...v){calls.push(['l',...v]);},closePath(){},fill(){}};vm.runInNewContext(code+`;airplane(0,0,1,.2,${time},${propeller})`,{g,Math,color:()=> '#123456',line(g,...v){calls.push(['line',...v]);},ellipse(g,...v){calls.push(['ellipse',...v]);}});return calls;};
  assert.notDeepEqual(render(0,true),render(.07,true),'propeller visibly spins');assert.deepEqual(render(0,false),render(.07,false),'airshow silhouette stays unchanged');
  const banner=source.slice(source.indexOf("    if(e.type==='banner'){"));assert.match(banner,/airplane\(x,y,dir,e.seed,t,true\)/);assert.match(banner,/line\(g,x-dir\*18,y/,'tow starts at the tail');
+ assert.match(banner,/LandscapeAppearance\.bannerColors\(p\.night,c,p\.city\)/,'banner colors follow the actual sky rather than the UI theme');
+ const appearance=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-appearance.js'),'utf8'),appearance);
+ const day=appearance.LandscapeAppearance.bannerColors(0,'#cb8d80','#416b68'),night=appearance.LandscapeAppearance.bannerColors(1,'#cb8d80','#416b68');
+ assert.ok(landscapeLuminance(night.fabric)<landscapeLuminance(day.fabric)*.3,'night banner fabric is much darker');
+ assert.ok(landscapeLuminance(night.ink)>landscapeLuminance(night.fabric)*5,'light night lettering remains easy to read');
+ assert.notEqual(night.tow,day.tow,'the tow line joins the night palette');
 });
 
 test('Weather rendering: snow drifts smoothly at real epoch times and seasonal ambience also paints in clear weather',()=>{

@@ -9,6 +9,8 @@
   const clamp=(v,a=0,b=1)=>Math.max(a,Math.min(b,v));
   const lerp=(a,b,t)=>a+(b-a)*t;
   const smooth=(a,b,x)=>{const t=clamp((x-a)/(b-a));return t*t*(3-2*t);};
+  const START_SPEED_MIN=.82,START_SPEED_MAX=1.18;
+  const startingSpeed=sample=>lerp(START_SPEED_MIN,START_SPEED_MAX,clamp(Number(sample)||0));
   function validDate(date){if(!(date instanceof Date)||!Number.isFinite(+date))throw new TypeError('Valid date required');}
   function locationObserver(location){
     if(location===undefined||location===null)return {observer,timeZone:DEFAULT_LOCATION.timezone};
@@ -172,8 +174,12 @@
     if(type==='skywriter'&&!skywriterWord)return;
     if(type==='dolphin'&&r()>.35)return; // A short, occasional surprise, never an opening attraction.
     const base=CONFIG.rail[type]?.duration||EVENT_DURATIONS[type]|| (type==='abduction'?24:type==='bird'?28:type==='balloon'?150:type==='plane'?95:48+r()*50);
-    const duration=base*((type==='abduction'||type==='fireworks')?1:.8+r()*.4);
-    w.events.push({type,...(skywriterWord?{skywriterWord}:{}),age:initial?duration*(.15+r()*.45):0,duration,lane:r(),seed:r(),reverse:r()>.5});
+    // Pick travel speed once at arrival. Duration is its inverse so every
+    // visitor still completes the full route, while later fast traffic can
+    // visibly catch and pass a slower visitor without frame-time randomness.
+    const travels=type!=='abduction'&&type!=='fireworks';
+    const speed=travels?startingSpeed(r()):1,duration=base/speed;
+    w.events.push({type,...(skywriterWord?{skywriterWord}:{}),age:initial?duration*(.15+r()*.45):0,duration,speed,lane:r(),seed:r(),reverse:r()>.5});
   }
   function advance(w,dt,sky){
     if(!Number.isFinite(dt)||dt<=0)return w;
@@ -244,7 +250,8 @@
       const weights=woodlandTypes.map(type=>CONFIG.spawnRate('woodland-'+type)),total=weights.reduce((a,b)=>a+b,0);
       if(total&&w.events.length<woodlandConfig.maxActive&&w.random()<woodlandConfig.chance*total/woodlandTypes.length){
         const r=w.random;let cursor=r()*total,index=0;while(index<weights.length-1&&cursor>=weights[index])cursor-=weights[index++];
-        w.events.push({type:woodlandTypes[index],age:0,duration:woodlandConfig.duration,seed:r(),lane:r(),reverse:r()>.5});
+        const speed=startingSpeed(r());
+        w.events.push({type:woodlandTypes[index],age:0,duration:woodlandConfig.duration/speed,speed,seed:r(),lane:r(),reverse:r()>.5});
       }
     }
     return w;
@@ -286,6 +293,6 @@
   function readMotion(storage){try{return normalizeMotion(storage.getItem(MOTION_KEY));}catch{return null;}}
   function saveMotion(storage,value){try{storage.setItem(MOTION_KEY,value);return true;}catch{return false;}}
   function motionReduced(value,osReduced){return !!osReduced||normalizeMotion(value)!=='normal';}
-  root.LivingSky={setSeason,eventsForSeason,sceneSolarDate,weatherAt,createWoodland,advanceWoodland,woodlandTypes,readSceneSeason,saveSceneSeason,advanceLights,skinTone,sceneDate,readSceneTime,saveSceneTime,skyAt,sunTimes,solarSchedule,solarPresets,starAt,starCount:root.SKY_STARS.length,palette,activity,createWorld,advance,
+  root.LivingSky={setSeason,eventsForSeason,sceneSolarDate,weatherAt,createWoodland,advanceWoodland,woodlandTypes,startingSpeed,readSceneSeason,saveSceneSeason,advanceLights,skinTone,sceneDate,readSceneTime,saveSceneTime,skyAt,sunTimes,solarSchedule,solarPresets,starAt,starCount:root.SKY_STARS.length,palette,activity,createWorld,advance,
     nightEventTypes:NIGHT_TYPES.slice(),eventTypes:[...EVENT_TYPES,...WINTER_VISITORS],rareTypes:RARE_TYPES.slice(),eventDurations:Object.assign({},EVENT_DURATIONS),MAX_EVENTS,RARE_COOLDOWN,readMotion,saveMotion,motionReduced,clamp,lerp,smooth,mixHex};
 })(globalThis);
