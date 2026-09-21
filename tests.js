@@ -10982,6 +10982,37 @@ test('RISK browser layout matrix: native dates respect pane insets, rank evidenc
   const ordinary=await page.locator('#appHeader').boundingBox();assert.ok(ordinary&&ordinary.y<0,'disabled header scrolls normally');
  }finally{await browser.close();}
 });
+test('RISK iOS native date chrome: WebKit Add and Edit dates keep usable inset borders and accept values', {skip:!process.env.LANDSCAPE_BROWSER_URL}, async()=>{
+ const {webkit,devices}=await import(process.env.LANDSCAPE_PLAYWRIGHT);
+ const browser=await webkit.launch();
+ try{
+  const page=await browser.newPage({...devices['iPhone 13'],serviceWorkers:'block'});
+  await page.addInitScript(()=>localStorage.setItem('fvp:chain-scanner:landscape-motion','reduced'));
+  await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'networkidle'});
+  await page.evaluate(()=>{closeModal();state.addOpen=true;addTask('Date boundary regression');render();});
+  for(const width of [320,393,402])for(const size of [16,24]){
+   await page.setViewportSize({width,height:852});
+   await page.addStyleTag({content:`input[type=date]{font-size:${size}px!important}`});
+   for(const pane of ['add','edit']){
+    if(pane==='edit')await page.evaluate(()=>openEdit(state.tasks[0].id));
+    const selector=pane==='add'?'#addBody input[type=date]':'.modal input[type=date]';
+    const controls=page.locator(selector);assert.equal(await controls.count(),2);
+    for(const input of await controls.all())for(const value of ['', '2099-12-31']){
+     await input.fill(value);
+     const box=await input.evaluate(e=>{
+      const root=e.closest('.modal')||document.querySelector('#addBody'),r=root.getBoundingClientRect(),s=getComputedStyle(root),c=getComputedStyle(e),b=e.getBoundingClientRect();
+      return {appearance:c.webkitAppearance||c.appearance,left:b.left,right:b.right,height:b.height,min:r.left+parseFloat(s.paddingLeft),max:r.right-parseFloat(s.paddingRight),value:e.value,type:e.type};
+     });
+     assert.equal(box.appearance,'none','iOS native date chrome must not paint outside the CSS box; retain the semantic date picker');
+     assert.equal(box.type,'date');assert.equal(box.value,value);
+     assert.ok(box.left>=box.min-1&&box.right<=box.max+1,`${pane}, ${width}px, ${size}px text: date border respects pane padding`);
+     assert.ok(box.height>=44,'empty and filled date fields retain a touch target');
+    }
+    if(pane==='edit')await page.getByRole('button',{name:'Close',exact:true}).click();
+   }
+  }
+ }finally{await browser.close();}
+});
 test('Eligibility filter: selecting Eligible clears stale narrowings and shows every eligible task',async()=>{
  const {ctx,shim}=await loadApp();const a=ctx.addTask('Ready'),b=ctx.addTask('Also ready');b.evergreen=true;
  ctx.addTask('Future').startsAt='2099-01-01';openList(ctx);ctx.toggleListTag('s:evergreen');ctx.setListQuery('missing');
