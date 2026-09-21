@@ -10868,7 +10868,7 @@ test('Scan anchor: both modes dot the oldest eligible task regardless of chance 
   ctx.startScan(mode);assert.equal(ctx.state.chain[0],a.id);assert.equal(ctx.state.candidateId,b.id);
  }
 });
-test('Done and Worked on it are rating-neutral for ordinary and evergreen tasks',async()=>{
+test('RISK rating drift: Done and Worked on it stay neutral on every completion route and recurrence type',async()=>{
  for(const route of ['bench','candidate','editor'])for(const evergreen of [false,true]){
   const {ctx}=await loadApp();const a=ctx.addTask('A'),b=ctx.addTask('B');a.evergreen=evergreen;
   ctx.state.chain=route==='bench'?[b.id,a.id]:[b.id];ctx.state.candidateId=route==='candidate'?a.id:null;
@@ -10882,7 +10882,7 @@ test('Done and Worked on it are rating-neutral for ordinary and evergreen tasks'
   assert.deepEqual({mu:restored.mu,sigma:restored.sigma},before,'Worked on it stays neutral too');
  }
 });
-test('All Tasks Dot is a pairwise rank signal against the current benchmark, with a neutral first dot',async()=>{
+test('RISK false preference evidence: All Tasks Dot compares only with the current benchmark and a first dot stays neutral',async()=>{
  const {ctx,shim}=await loadApp();const bench=ctx.addTask('Benchmark'),dotted=ctx.addTask('Choose directly'),other=ctx.addTask('Other');
  ctx.state.chain=[bench.id];ctx.state.scanMode='chance';ctx.resetChance();const frozen=JSON.stringify(ctx.state.chance);
  const expectedWinner={mu:dotted.mu,sigma:dotted.sigma},expectedLoser={mu:bench.mu,sigma:bench.sigma};ctx.updatePair(expectedWinner,expectedLoser);
@@ -10898,7 +10898,7 @@ test('All Tasks Dot is a pairwise rank signal against the current benchmark, wit
  const empty=await loadApp();const first=empty.ctx.addTask('First');const before={mu:first.mu,sigma:first.sigma};empty.ctx.dotTask(first.id);
  assert.deepEqual({mu:first.mu,sigma:first.sigma},before,'without a current benchmark the first dot carries no invented comparison');
 });
-test('Add dates: both buttons save optional start and due dates together, then clear fields',async()=>{
+test('RISK lost scheduling metadata: both Add routes save and clear Start and Due together',async()=>{
  for(const action of ['add','add-dot']){
   const {ctx,shim}=await loadApp();shim.document.getElementById('addInput').value='Dated';
   shim.document.getElementById('addStart').value='2099-01-01';shim.document.getElementById('addDue').value='2099-01-03';
@@ -10907,10 +10907,12 @@ test('Add dates: both buttons save optional start and due dates together, then c
   assert.equal(ctx.isEligible(t),false);assert.equal(ctx.state.chain.includes(t.id),action==='add-dot');
   ctx.undo();assert.equal(ctx.state.tasks.length,0);
  }
- assert.match(html,/<label for="addStart">Starts<\/label><input id="addStart" type="date"/);
- assert.match(html,/<label for="addDue">Due<\/label><input id="addDue" type="date"/);
+ assert.match(html,/class="add-dates"[\s\S]*class="add-date-field"[\s\S]*<label for="addStart">Starts<\/label>[\s\S]*<input id="addStart" type="date"/);
+ assert.match(html,/class="add-date-field"[\s\S]*<label for="addDue">Due<\/label>[\s\S]*<input id="addDue" type="date"/);
+ assert.match(html,/\.add-dates\{[^}]*grid-template-columns:repeat\(2,minmax\(0,1fr\)\)[^}]*max-width:100%/,'date columns must shrink inside the padded Add content box');
+ assert.match(html,/\.add-date-field input\[type=date\]\{[^}]*min-inline-size:0[^}]*max-inline-size:100%/,'native iOS date controls must not impose an overflowing intrinsic width');
 });
-test('Add a task exposes an evergreen draft with 18-hour and 2 AM defaults, and applies it to single or pasted tasks',async()=>{
+test('RISK recurrence-default loss: quick Add preserves 18-hour and 2 AM defaults across single and pasted tasks',async()=>{
  assert.match(html,/<input id="addEver" type="checkbox"[^>]*\/>\s*Evergreen/);
  assert.match(html,/<div[^>]*id="addEverOptions"[^>]*hidden>[\s\S]*id="addEverHours"[^>]*value="18"[\s\S]*id="addEverReset"[^>]*checked/);
  for(const title of ['Recurring task','First\nSecond']){
@@ -10925,24 +10927,29 @@ test('Add a task exposes an evergreen draft with 18-hour and 2 AM defaults, and 
   assert.equal(hours.value,'18');assert.equal(reset.checked,true);assert.equal(options.hidden,true);
  }
 });
-test('Floating header defaults off, backfills off, and Settings can make Undo sticky',async()=>{
+test('RISK unreachable Undo and lost preference: floating header defaults off, saves on toggle, and survives close and reload',async()=>{
  const {ctx,shim}=await loadApp();assert.equal(ctx.state.settings.floatingHeader,false);
  ctx.render();const header=shim.document.getElementById('appHeader');assert.equal(header.classList.contains('floating'),false);
  const legacy=JSON.parse(JSON.stringify(ctx.state));delete legacy.settings.floatingHeader;ctx.hydrateState(legacy);assert.equal(legacy.settings.floatingHeader,false);
  ctx.openSettings();assert.match(shim.document.getElementById('modalRoot').innerHTML,/id="stFloatingHeader" type="checkbox"/);
- shim.document.getElementById('stFloatingHeader').checked=true;ctx.onAction('save-settings',{});
+ shim.document.getElementById('stFloatingHeader').checked=true;ctx.setFloatingHeaderPreference(true);ctx.closeModal();ctx.openSettings();
  assert.equal(ctx.state.settings.floatingHeader,true);assert.equal(header.classList.contains('floating'),true);
- assert.match(html,/\.top\.floating\{[^}]*position:sticky[^}]*z-index:/);
+ assert.match(shim.document.getElementById('modalRoot').innerHTML,/id="stFloatingHeader" type="checkbox" checked/,'reopening Settings retains the checkmark');
+ await ctx.persist();const saved=shim.localStorage.getItem(SYNC_STORE_KEY);const reloaded=await loadApp({seedStorage:{[SYNC_STORE_KEY]:saved}});assert.equal(reloaded.ctx.state.settings.floatingHeader,true);
+ assert.match(html,/el\.id === "stFloatingHeader"[\s\S]{0,90}setFloatingHeaderPreference\(el\.checked\)/,'the toggle saves on change, not only via Save settings');
+ assert.match(html,/\.top\.floating\{[^}]*position:fixed[^}]*z-index:/,'fixed positioning avoids sticky ancestor and iOS standalone scroll failures');
 });
-test('Touch and responsive layout contracts keep zoom accessible and mobile controls on-screen',()=>{
+test('RISK inaccessible zoom: double tap is suppressed without disabling pinch zoom',()=>{
  const viewport=html.match(/<meta name="viewport" content="([^"]+)"/i)?.[1]||'';
  assert.doesNotMatch(viewport,/user-scalable\s*=\s*no|maximum-scale\s*=\s*1/i,'pinch zoom must remain available');
  assert.match(html,/html\{[^}]*touch-action:manipulation[^}]*\}/,'manipulation removes double-tap zoom while retaining pan and pinch');
+});
+test('RISK narrow decision row: Add actions may wrap but done adding and rank evidence remain grouped',()=>{
  assert.match(html,/@media \(max-width:560px\)\{[\s\S]*?\.addline\{[^}]*flex-wrap:wrap/);
  assert.match(html,/class="decide-finish"[\s\S]*?data-act="start-working"[\s\S]*?class="sparkbox"/,'stop button and rank summary share one layout group');
  assert.match(html,/\.decide-finish\{[^}]*display:flex[^}]*align-items:center/);
 });
-test('Scanner browser: sticky Undo, Add fields, and stop-line rank visuals stay inside risky viewports', {skip:!process.env.LANDSCAPE_BROWSER_URL}, async()=>{
+test('RISK browser layout matrix: native dates respect pane insets, rank evidence stays aligned, and enabled Undo remains pinned', {skip:!process.env.LANDSCAPE_BROWSER_URL}, async()=>{
  const {chromium}=await import(process.env.LANDSCAPE_PLAYWRIGHT);const browser=await chromium.launch({headless:true,channel:'chrome'});
  try{
   const page=await browser.newPage();await page.addInitScript(()=>localStorage.setItem('fvp:chain-scanner:landscape-motion','reduced'));
@@ -10950,20 +10957,27 @@ test('Scanner browser: sticky Undo, Add fields, and stop-line rank visuals stay 
   const close=page.locator('#modalRoot [data-act="close-modal"]');if(await close.count())await close.click();
   await page.evaluate(()=>{for(let i=0;i<24;i++)addTask('Task '+i);state.addOpen=true;state.listOpen=true;startScan('descending');render();});
   await page.locator('#addEver').check();
-  for(const spec of [{width:320,height:568},{width:390,height:844},{width:844,height:390},{width:1000,height:900}]){
+  for(const spec of [
+   {risk:'minimum supported phone',width:320,height:568},
+   {risk:'reported iPhone portrait',width:390,height:844},
+   {risk:'short phone landscape',width:844,height:390},
+   {risk:'wide desktop regression',width:1000,height:900},
+  ]){
    await page.setViewportSize(spec);
    const layout=await page.evaluate(()=>{
     const rect=e=>{const r=e.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height};};
-    const visible=e=>!e.hidden&&getComputedStyle(e).display!=='none';const controls=[...document.querySelectorAll('#addPanel input,#addPanel button')].filter(visible).map(e=>({id:e.id||e.textContent.trim(),...rect(e)}));
+    const visible=e=>!e.hidden&&getComputedStyle(e).display!=='none';const controls=[...document.querySelectorAll('#addBody input,#addBody button')].filter(visible).map(e=>({id:e.id||e.textContent.trim(),scrollWidth:e.scrollWidth,clientWidth:e.clientWidth,...rect(e)}));
+    const body=document.querySelector('#addBody'),bodyRect=rect(body),bodyStyle=getComputedStyle(body);const content={left:bodyRect.left+parseFloat(bodyStyle.paddingLeft),right:bodyRect.right-parseFloat(bodyStyle.paddingRight)};
     const stop=document.querySelector('[data-act="start-working"]'),rank=document.querySelector('.decide-finish .sparkbox');
-    return {controls,panel:rect(document.querySelector('#addPanel')),stop:rect(stop),rank:rect(rank),touch:getComputedStyle(document.documentElement).touchAction,overflow:document.documentElement.scrollWidth>innerWidth};
+    return {controls,content,stop:rect(stop),rank:rect(rank),touch:getComputedStyle(document.documentElement).touchAction,overflow:document.documentElement.scrollWidth>innerWidth};
    });
-   assert.equal(layout.touch,'manipulation');assert.equal(layout.overflow,false,`no page overflow at ${spec.width}x${spec.height}`);
-   for(const control of layout.controls){assert.ok(control.left>=layout.panel.left-1&&control.right<=layout.panel.right+1,`${control.id} stays inside Add a task at ${spec.width}px`);assert.ok(control.left>=-1&&control.right<=spec.width+1,`${control.id} stays inside the viewport`);}
-   assert.ok(layout.stop.top<layout.rank.bottom&&layout.rank.top<layout.stop.bottom,`done adding and rank summary remain on one line at ${spec.width}px`);
+   assert.equal(layout.touch,'manipulation');assert.equal(layout.overflow,false,`${spec.risk}: no page overflow at ${spec.width}x${spec.height}`);
+   for(const control of layout.controls){assert.ok(control.left>=layout.content.left-1&&control.right<=layout.content.right+1,`${spec.risk}: ${control.id} stays inside the Add pane's padded content boundary`);assert.ok(control.scrollWidth<=control.clientWidth+1,`${spec.risk}: ${control.id} has no clipped intrinsic content box`);}
+   assert.ok(layout.stop.top<layout.rank.bottom&&layout.rank.top<layout.stop.bottom,`${spec.risk}: done adding and rank summary remain on one line`);
   }
-  await page.evaluate(()=>{state.settings.floatingHeader=true;render();window.scrollTo(0,document.body.scrollHeight);});await page.waitForTimeout(50);
-  const sticky=await page.locator('#appHeader').boundingBox();assert.ok(sticky&&sticky.y>=0,'enabled header stays visible after scrolling');assert.ok(await page.locator('#appHeader [data-act="undo"]').isVisible());
+  await page.evaluate(()=>{setFloatingHeaderPreference(true);document.scrollingElement.scrollTo(0,document.scrollingElement.scrollHeight);});await page.waitForTimeout(50);
+  const pinned=await page.locator('#appHeader').boundingBox();assert.ok(pinned&&pinned.y>=0&&pinned.y<844,'enabled header stays visible after document scrolling');assert.ok(await page.locator('#appHeader [data-act="undo"]').isVisible());
+  await page.getByTitle('Settings, contexts, import/export').click();await page.locator('#stFloatingHeader').uncheck();await page.locator('#stFloatingHeader').check();await page.locator('[data-act="close-modal"]').click();await page.getByTitle('Settings, contexts, import/export').click();assert.equal(await page.locator('#stFloatingHeader').isChecked(),true,'closing and reopening Settings retains the checkmark');await page.locator('[data-act="close-modal"]').click();
   await page.evaluate(()=>{state.settings.floatingHeader=false;render();window.scrollTo(0,document.body.scrollHeight);});await page.waitForTimeout(50);
   const ordinary=await page.locator('#appHeader').boundingBox();assert.ok(ordinary&&ordinary.y<0,'disabled header scrolls normally');
  }finally{await browser.close();}
