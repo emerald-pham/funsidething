@@ -71,6 +71,7 @@ window.FIREBASE_CONFIG = {
 :root[data-theme="light"]{color-scheme:light}
 :root[data-theme="dark"]{color-scheme:dark}
 *{box-sizing:border-box}
+html{touch-action:manipulation}
 html,body{margin:0;padding:0}
 body{background:var(--bg);color:var(--ink);font:15px/1.45 var(--font-ui);-webkit-font-smoothing:antialiased}
 .wrap{max-width:700px;margin:0 auto;padding:max(14px,calc(14px + env(safe-area-inset-top))) max(14px,calc(14px + env(safe-area-inset-right))) max(60px,calc(60px + env(safe-area-inset-bottom))) max(14px,calc(14px + env(safe-area-inset-left)))}
@@ -85,6 +86,7 @@ textarea{width:100%;font-family:var(--font-mono);font-size:12px}
 
 /* ---------- header ---------- */
 .top{margin-bottom:12px}
+.top.floating{position:sticky;top:max(0px,env(safe-area-inset-top));z-index:40;padding:8px 10px;margin:-8px -10px 12px;background:color-mix(in srgb,var(--bg) 88%,transparent);border:1px solid color-mix(in srgb,var(--line) 75%,transparent);border-radius:10px;box-shadow:0 5px 18px rgba(20,24,48,.12);backdrop-filter:blur(12px)}
 .brand{display:flex;align-items:center;gap:10px}
 .titles h1{font-size:17px;margin:0;font-weight:700;letter-spacing:.01em}
 .topbtns{margin-left:auto;display:flex;gap:4px}
@@ -166,6 +168,10 @@ textarea{width:100%;font-family:var(--font-mono);font-size:12px}
 .qline{font-family:var(--font-q);font-style:italic;font-size:19px;margin:16px 2px 12px;color:var(--ink)}
 .qline .until{white-space:nowrap}
 .decide{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.decide-finish{display:flex;align-items:center;gap:8px;margin-left:auto;min-width:0;flex:1 1 290px;justify-content:flex-end}
+.decide-finish .btn{white-space:nowrap}
+.decide-finish .sparkbox{margin-left:auto;min-width:0;flex:0 1 auto}
+.decide-finish .spark{width:clamp(56px,12vw,84px);max-width:84px;height:20px}
 .keyhint{font-size:10px;opacity:.7;font-weight:500;margin-left:5px}
 .sparkbox{display:flex;align-items:center;gap:8px;margin-left:auto}
 .spark{display:block}
@@ -228,8 +234,12 @@ textarea{width:100%;font-family:var(--font-mono);font-size:12px}
 .ahead button{display:block;width:100%;text-align:left;padding:11px 14px;font-weight:600;font-size:13.5px;color:var(--fg)}
 .addwrap.open .ahead{border-bottom-color:var(--line)}
 .addrow{display:flex;flex-direction:column;gap:8px;padding:12px 14px}
+.addrow>*{min-width:0}
 .addline{display:flex;gap:8px}
 .addline input{flex:1;min-width:0}
+.add-ever-toggle{width:fit-content}
+.add-ever-options{display:flex;flex-direction:column;gap:8px;min-width:0;padding:2px 0}
+.add-ever-options .frow{margin:0}
 .qctx{display:flex;flex-wrap:wrap;gap:6px}
 .qctx:empty{display:none}
 .qctxchip{font-size:12px;font-weight:600;border:1px solid var(--line);border-radius:99px;padding:3px 10px;color:var(--mut);background:var(--surface);cursor:pointer}
@@ -297,6 +307,13 @@ textarea{width:100%;font-family:var(--font-mono);font-size:12px}
   .rank-summary .tk{max-width:92px}
   .siderail{min-width:72px}
   .qline{font-size:17px}
+  .addline{flex-wrap:wrap}
+  .addline input{flex:1 0 100%;width:100%}
+  .addline .btn{flex:1 1 0;min-width:0;padding-left:8px;padding-right:8px}
+  .decide-finish{flex-basis:100%;gap:6px}
+  .decide-finish .btn{font-size:12.5px;padding:7px 8px}
+  .decide-finish .sparkbox{gap:4px}
+  .decide-finish .spark{width:56px}
   /* Edit pane on a phone: stack every field label above a full-width control
      instead of cramming them onto one line, and give the actions real
      thumb-sized targets that share the row evenly rather than wrapping ragged. */
@@ -330,7 +347,7 @@ textarea{width:100%;font-family:var(--font-mono);font-size:12px}
 <body>
 <div id="landscape" aria-hidden="true"><canvas data-scenery></canvas><canvas data-life></canvas></div>
 <div class="wrap">
-  <header class="top">
+  <header class="top" id="appHeader">
     <div class="brand">
       <div class="titles">
         <h1>Chain Scanner</h1>
@@ -371,6 +388,11 @@ textarea{width:100%;font-family:var(--font-mono);font-size:12px}
         <button id="addDotBtn" class="btn urgent" data-act="add-dot" title="Urgent — add it with a dot so it's done first (rule 8)">Add &amp; dot</button>
       </div>
       <div class="frow"><label for="addStart">Starts</label><input id="addStart" type="date"/><label for="addDue">Due</label><input id="addDue" type="date"/></div>
+      <label class="cbox add-ever-toggle"><input id="addEver" type="checkbox"/> Evergreen</label>
+      <div class="add-ever-options" id="addEverOptions" hidden>
+        <div class="frow"><label for="addEverHours">Recurrence (hours)</label><input id="addEverHours" type="number" min="0.01" max="87600" step="any" value="18"/></div>
+        <label class="cbox"><input id="addEverReset" type="checkbox" checked/> Allow task to automatically become eligible as candidate after date line passes (2 AM)</label>
+      </div>
     </div>
   </section>
 
@@ -404,6 +426,7 @@ textarea{width:100%;font-family:var(--font-mono);font-size:12px}
   <p>You can change this anytime in Settings. The sun and Moon follow their real paths, even when the scenery is still.</p>
 </dialog>
 <!-- changelog:start -->
+<template id="appChangelogCurrent"><div data-app-fingerprint="d1066fb7d5dbdd7add65a0f78885d3450fa78d263b2742e86f342374177cf4f7"><h3>September 21, 2026</h3><ul><li>Settings can keep the header floating while you scroll so Undo stays within reach; the option is off by default.</li><li>The top-K summary and sparkline stay aligned with done adding for now.</li><li>Double-tap zoom is disabled while pinch zoom remains available.</li><li>Add a task can now capture Evergreen recurrence hours and the 2 AM reset, starting at 18 hours with the day reset checked.</li><li>Start, Due, Evergreen, and neighboring Add controls stay on-screen across narrow phones and short landscape layouts.</li><li>Dot from the All Tasks editor now ranks that task above the current benchmark. Done and Evergreen Done no longer change ratings.</li></ul></div></template>
 <template id="appChangelog"><details data-app-fingerprint="43c2064b3e3eb36a00a54cdade10bda1db44258e57c84075fc23fa8ab524530d"><summary>Changelog</summary><h3>September 19, 2026</h3><ul><li>At night, boats and nearby objects above the horizon reflect naturally in the water, including airplanes, the Moon, and stars.</li><li>The Add a task panel can be minimized and remembers that choice.</li><li>Every visitor starts with an individual travel speed, so faster arrivals can overtake slower ones. Vehicles hold that speed horizontally while vertical movement can still vary, the existing lower tram cars remain linked, and airplane banners switch to a dark, light-lettered night palette.</li><li>Tasks marked No, Can’t, or Dislodged appear under Ineligible until their marks clear.</li><li>First light, sunrise, sunset, and last light now have separate scenery controls and show times for the sky location. Solar times were checked across seasons, time zones, and polar days.</li><li>Jet skis and small water creatures are easier to see. Daytime visitors arrive twice as often.</li><li>Readers and groups linger longer, leave at varied times, and carry books by their sides.</li><li>Add tasks with start and due dates. Selecting Eligible clears other filters to show every eligible task.</li><li>Both scan modes start with the oldest eligible task. Done raises its preference rating; Worked on it leaves ratings unchanged.</li></ul><h3>September 16, 2026</h3><ul><li>Updates announce themselves with a toast pointing to this changelog.</li><li>Task editors show evergreen interval and day-reset controls only when Evergreen is checked.</li><li>Chance mode is the default for new scan preferences. Dislodge now lowers the task’s preference rating; Undo restores it.</li><li>Signing in while the app is loading now brings synced tasks into view without a manual refresh.</li><li>All Tasks has a separate All / Eligible / Ineligible filter row that combines with search and task-status filters.</li><li>Chance scans use TrueSkill win probabilities, including rating uncertainty, with no rating floor or offset. If no candidate can draw, scanning falls back to descending likelihood.</li><li>The scan-mode dropdown saves immediately, including when you close Settings without pressing Save.</li><li>Account switching keeps task lists separate after a cloud refresh. Cloud refreshes wait for edits, and Undo restores an imported scan correctly.</li><li>Add &amp; dot now starts the daily reset clock. Tasks with a start date wake at midnight, and stop-scanning guidance uses the candidates actually ahead.</li><li>Changing the scan-mode setting now takes effect in the current scan. Choosing both modes also offers both buttons when resuming.</li><li>The installed app checks for updates whenever it opens or returns to the foreground. Available updates load automatically after you finish editing, without reinstalling.</li><li>Choose descending scans, TrueSkill-weighted chance scans, or both scan buttons in Settings. Chance order stays steady through undo and refreshes on a fresh pass or at 2 AM; decisions still update ratings immediately.</li><li>Set an evergreen interval for each task, with an optional 2 AM reset. New tasks default to 18 hours or the next day marker, whichever comes first; Settings lets you change those defaults.</li></ul><h3>September 14, 2026</h3><ul><li>Skywriters trace single human-written words in smoke, then fly away as the letters fade.</li><li>Hourly messages appear only when human-written copy is available. Anytime prompts show the current hour, such as 5 AM. Sky messages keep their existing behavior.</li><li>Trains and metros now run regularly throughout the day and night.</li><li>Event rates can be adjusted in SPAWN_RATES.md.</li></ul><h3>September 13, 2026 — Seasonal details</h3><ul><li>Rain showers last 20–45 minutes; thunderstorms last 30–60 minutes. Winter brings snow and snowstorms on the same shared weather schedule.</li><li>Winter visitors build snowmen, ski downhill, and make snow angels. Warm-weather outings wait for warmer seasons.</li><li>Autumn turns the landscape amber and brown, with leaves falling from trees and blowing in storms.</li><li>Spring brings scattered flowers and tree blossoms. Occasional gusts lift petals; rain and storms bring more petals and pollen.</li><li>Winter trees gather snow and occasionally shed small clumps. Seasonal debris gets livelier during storms.</li><li>Birds have individual plumage: distant sky birds look dark with hints of color, while nearby birds show more color.</li><li>People have varied hairstyles and hair colors, with helmets and hats kept clear.</li><li>Little propeller planes tow the messages overhead. Hot air balloons appear more often during the day.</li><li>More trains, riders, and people walking pass through the scene, including new scooter and hoverboard riders.</li><li>Season rules, weather timing, and visitor odds now share an expandable configuration; seasonal effects keep their own small budgets and visitor lifetimes.</li></ul><h3>September 13, 2026</h3><ul><li>One Sunrise / Sunset button switches between dawn and dusk.</li><li>Choose a season when locking the scenery, or follow the current season.</li><li>Cyclists pedal with connected hips and naturally bending knees.</li><li>Distant boats shrink with depth; windsurfers and small craft stay smaller than ships, and the far metro is smaller than the foreground train.</li><li>Ducks sometimes lift off from the lake and fly away.</li><li>Seasons now follow the actual equinox and solstice, with hemisphere and local date handling. Solar locks use the sky location’s calendar.</li><li>Choose the sky location’s time zone when it differs from your device. The Moon’s illuminated side now follows the Sun, and the midnight sun stays daylight.</li><li>Deer, foxes, rabbits, and raccoons occasionally wander through the foreground: a 1% chance every 30 seconds, up to four animals, independent of other visitors.</li><li>Picnic groups fold their blanket and gather their things; readers, couples, and kite flyers also finish up and walk away.</li><li>Occasional gentle rain follows the same real-time schedule across devices, including offline. Reduced motion keeps the rain still.</li><li>Settings now includes this changelog, with a check that catches undocumented app changes.</li></ul></details></template>
 <!-- changelog:end -->
 <dialog id="sceneTimeDialog" class="motion-dialog" aria-labelledby="sceneTimeTitle">
@@ -549,7 +572,7 @@ const featureEnabled = name => FEATURE_FLAGS[name] === true;
    state arriving from another device gets backfilled with" can never drift
    apart — two devices either side of an upgrade would otherwise quietly
    disagree about a setting neither of them ever set. */
-const DEFAULT_SETTINGS = { horizonMin:60, thresholdPct:25, samples:250, cantMin:30, workedHours:16, evergreenHours:18, evergreenResetAtDay:true, scanMode:"chance", theme:"system" };
+const DEFAULT_SETTINGS = { horizonMin:60, thresholdPct:25, samples:250, cantMin:30, workedHours:16, evergreenHours:18, evergreenResetAtDay:true, scanMode:"chance", floatingHeader:false, theme:"system" };
 /* And one source of truth for the RANGE each of them may hold — the same
    min/max the Settings inputs enforce, so the form and the backfill cannot
    drift apart either.
@@ -588,6 +611,7 @@ let sparkCache = new Map();    // id:WxH -> memoized sparkline SVG string; clear
 let undoStack = [];
 let chanceGeneration = 0; // local provenance: only deliberate scan/day boundaries advance it
 let quickAddCtx = [];          // context ids currently picked in the quick-add bar — UI-only, sticky across adds, not synced
+let quickAddEvergreenInitialized = false; // the visible draft survives renders/collapse, but starts from the synced defaults once
 let listQuery = "";            // all-tasks search box, already trimmed + lowercased — UI-only, like quickAddCtx: never saved, never synced, never undoable
 let listEligibilityFilter = "all"; // independent view-only eligibility narrowing
 let listTagFilter = null;      // ...and the one filter key the list is narrowed to ("s:no", "c:c_home"), or null. One at a time, by design.
@@ -629,7 +653,7 @@ function dropRemovedFields(st){ for(const t of (st && st.tasks) || []) delete t.
 function normalizeSettings(s){
   const out = Object.assign({}, DEFAULT_SETTINGS, (s && typeof s === "object") ? s : {});
   for(const k of Object.keys(DEFAULT_SETTINGS)){
-    if(k === "theme" || k === "scanMode" || k === "evergreenResetAtDay") continue;
+    if(k === "theme" || k === "scanMode" || k === "evergreenResetAtDay" || k === "floatingHeader") continue;
     // Number(null) and Number("") are 0, not NaN — and a NaN written by an
     // older build comes back from JSON as null. Coercing blind would turn any
     // of those into a real-looking 0, so only an actual finite number (or a
@@ -640,6 +664,7 @@ function normalizeSettings(s){
   }
   out.scanMode = ["descending","chance","both"].includes(out.scanMode) ? out.scanMode : DEFAULT_SETTINGS.scanMode;
   out.evergreenResetAtDay = typeof out.evergreenResetAtDay === "boolean" ? out.evergreenResetAtDay : true;
+  out.floatingHeader = typeof out.floatingHeader === "boolean" ? out.floatingHeader : DEFAULT_SETTINGS.floatingHeader;
   out.theme = normalizeTheme(out.theme);                   // absent or corrupt -> "system"
   return out;
 }
@@ -1549,11 +1574,9 @@ function decide(kind){ // 'yes' | 'no' | 'cant' | 'cand-done'
   commit(true, kind==="yes");   // a dot syncs to the cloud right away
 }
 function completeTask(t){
-  // Completion mirrors Dislodge against a neutral reference, without changing
-  // unrelated tasks. Repeated clicks during the same completion cannot farm wins.
-  if(!t.done && !(t.evergreen && t.lastDoneAt && Date.now() < evergreenUntil(t))){
-    updatePair(t, {mu:PRIOR_MU, sigma:PRIOR_SIGMA});
-  }
+  // Completion records what happened, not a preference comparison. Ordinary
+  // and evergreen Done actions therefore leave TrueSkill untouched; only an
+  // explicit comparison or Dislodge should teach the ranker.
   t.lastDoneAt = Date.now();
   if(t.evergreen){
     state.considered[t.id]="done";
@@ -1654,15 +1677,16 @@ function returnAsCandidate(id, push){
   delete state.workedAt[id];
   commit();
 }
-/* Puts a task on the chain straight from the edit pane, skipping the scan. The
-   scan's own route onto the chain is answering "yes", which moves rank; this
-   one deliberately records no rank signal, because no "would I rather?" was
-   ever answered — the same reasoning workedOnTask() is built on. It pushes
-   onto the END of the chain, so the task you just
+/* Puts a task on the chain straight from the All Tasks editor, skipping the
+   scan. Choosing it while a benchmark exists is the same preference statement
+   as Yes: the directly dotted task wins against that benchmark. The first dot
+   remains neutral because there is nothing to compare it with. It pushes onto
+   the END of the chain, so the task you just
    dotted becomes the benchmark: the one you do next. */
 function dotTask(id, push){
   const t = taskById(id); if(!t || t.done) return;   // a completed task must never be dotted
   if(state.chain.includes(id)) return;               // a duplicate id would break benchmark() and the crumb trail
+  const b = benchmark();
   if(push!==false) pushUndo();   // false when the caller already snapshotted — see the dot-task action
   // Eligibility is deliberately NOT checked. An off-context or not-yet-started
   // task that you opened and dotted by hand is a decision, not an accident, and
@@ -1675,7 +1699,8 @@ function dotTask(id, push){
   delete state.workedAt[id];
   if(state.candidateId===id) state.candidateId = null;   // else a later "yes" would dot it a second time
   state.interventionActive = false;
-  // Dotting changes neither scanning mode nor preference ratings.
+  if(b) updatePair(t, b);
+  recomputeRanks();
   commit(true, true);            // a dot syncs to the cloud right away
 }
 function doneTask(id, push){ // cross any task off from the edit pane, dotted or not, wherever it sits
@@ -1803,7 +1828,7 @@ const normTitle = t => (t||"").toLowerCase().replace(/\s+/g," ").trim();
    already finished, as brand-new open tasks, while the original sat right
    there in History. Completed titles are matched too now, and counted apart
    from open duplicates so the summary can say which it was. */
-function importList(text, ctx, dates = {}){
+function importList(text, ctx, dates = {}, taskOptions = {}){
   const rows = parseTaskList(text);
   if(!rows.length) return {added:0, skipped:0, completed:0};
   const open = new Set(openTasks().map(t => normTitle(t.title)));
@@ -1816,7 +1841,12 @@ function importList(text, ctx, dates = {}){
     if(open.has(k)){ skipped++; continue; }
     if(done.has(k)){ completed++; continue; }
     open.add(k);
-    state.tasks.push({ id:uid(), title:r.title, url:r.url, due:dates.due || null, startsAt:dates.startsAt || null, evergreen:false, ...evergreenDefaults(), ctx:c.slice(),
+    const defaults = evergreenDefaults();
+    state.tasks.push({ id:uid(), title:r.title, url:r.url, due:dates.due || null, startsAt:dates.startsAt || null,
+      evergreen:taskOptions.evergreen === true,
+      evergreenHours:evergreenHours(taskOptions.evergreenHours, defaults.evergreenHours),
+      evergreenResetAtDay:typeof taskOptions.evergreenResetAtDay === "boolean" ? taskOptions.evergreenResetAtDay : defaults.evergreenResetAtDay,
+      ctx:c.slice(),
       mu:PRIOR_MU, sigma:PRIOR_SIGMA, done:false, createdAt:Date.now(), completedAt:null, lastDoneAt:null });
     added++;
   }
@@ -1849,7 +1879,7 @@ function toast(msg, duration = 2600){
 const UPDATE_NOTICE_KEY = "fvp:chain-scanner:last-notified-release";
 let pendingUpdateNotice = null;
 function checkAppUpdateNotice(existingInstall){
-  const fingerprint = document.getElementById("appChangelog")?.innerHTML.match(/data-app-fingerprint="([^"]+)"/)?.[1];
+  const fingerprint = document.getElementById("appChangelogCurrent")?.innerHTML.match(/data-app-fingerprint="([^"]+)"/)?.[1];
   if(!fingerprint) return;
   let previous = null;
   try{ previous = localStorage.getItem(UPDATE_NOTICE_KEY); }catch(e){}
@@ -1874,14 +1904,35 @@ document.addEventListener("close", showAppUpdateNotice, true);
 function quickAddDates(){
   return {startsAt:document.getElementById("addStart").value, due:document.getElementById("addDue").value};
 }
+function quickAddTaskOptions(){
+  const evergreen = !!document.getElementById("addEver")?.checked;
+  return {
+    evergreen,
+    evergreenHours:evergreenHours(document.getElementById("addEverHours")?.value, state.settings.evergreenHours),
+    evergreenResetAtDay:document.getElementById("addEverReset")?.checked ?? state.settings.evergreenResetAtDay
+  };
+}
 function clearQuickAddDates(){
   document.getElementById("addStart").value="";
   document.getElementById("addDue").value="";
 }
-function addTask(title, dot, ctx, dates = {}){
+function clearQuickAddEvergreen(){
+  const toggle=document.getElementById("addEver"),hours=document.getElementById("addEverHours"),reset=document.getElementById("addEverReset");
+  if(toggle) toggle.checked=false;
+  if(hours) hours.value=String(state.settings.evergreenHours);
+  if(reset) reset.checked=state.settings.evergreenResetAtDay;
+  toggleQuickEvergreenOptions(false);
+}
+function clearQuickAddDraft(){ clearQuickAddDates(); clearQuickAddEvergreen(); }
+function addTask(title, dot, ctx, dates = {}, taskOptions = {}){
   title = (title||"").trim(); if(!title) return null;
   pushUndo();
-  const t = { id:uid(), title, url:null, due:dates.due || null, startsAt:dates.startsAt || null, evergreen:false, ...evergreenDefaults(), ctx: Array.isArray(ctx) ? ctx.slice() : [],
+  const defaults=evergreenDefaults();
+  const t = { id:uid(), title, url:null, due:dates.due || null, startsAt:dates.startsAt || null,
+              evergreen:taskOptions.evergreen === true,
+              evergreenHours:evergreenHours(taskOptions.evergreenHours, defaults.evergreenHours),
+              evergreenResetAtDay:typeof taskOptions.evergreenResetAtDay === "boolean" ? taskOptions.evergreenResetAtDay : defaults.evergreenResetAtDay,
+              ctx: Array.isArray(ctx) ? ctx.slice() : [],
               mu:PRIOR_MU, sigma:PRIOR_SIGMA, done:false, createdAt:Date.now(), completedAt:null, lastDoneAt:null };
   state.tasks.push(t);
   if(dot){
@@ -2009,14 +2060,26 @@ function refreshScanClock(){
 }
 window.addEventListener("focus", refreshScanClock);
 document.addEventListener("visibilitychange", ()=>{ if(!document.hidden) refreshScanClock(); });
-function render(){ renderedCalendarDay = todayISO(0); scheduleScanClock(); renderPass(); renderCtx(); renderScan(); renderList(); renderHistory(); renderQuickCtx(); renderAddPanel(); renderAddRow(); renderSync(); renderTheme(); }
+function render(){ renderedCalendarDay = todayISO(0); scheduleScanClock(); renderPass(); renderCtx(); renderScan(); renderList(); renderHistory(); renderQuickCtx(); renderAddPanel(); renderAddRow(); renderSync(); renderTheme(); renderFloatingHeader(); }
+
+function renderFloatingHeader(){
+  document.getElementById("appHeader")?.classList.toggle("floating", state.settings.floatingHeader === true);
+}
 
 function renderAddPanel(){
   const panel=document.getElementById("addPanel"),body=document.getElementById("addBody"),toggle=document.getElementById("addToggle");
+  if(!quickAddEvergreenInitialized){
+    const evergreen=document.getElementById("addEver"),hours=document.getElementById("addEverHours"),reset=document.getElementById("addEverReset");
+    if(evergreen) evergreen.checked=false;
+    if(hours) hours.value=String(state.settings.evergreenHours);
+    if(reset) reset.checked=state.settings.evergreenResetAtDay;
+    quickAddEvergreenInitialized=true;
+  }
   panel.classList.toggle("open",state.addOpen);
   body.hidden=!state.addOpen;
   toggle.setAttribute("aria-expanded",String(state.addOpen));
   document.getElementById("addCaret").textContent=state.addOpen?"▾":"▸";
+  toggleQuickEvergreenOptions(!!document.getElementById("addEver")?.checked);
 }
 
 // "Add & dot" cuts straight onto the top of the chain — only meaningful before
@@ -2215,11 +2278,12 @@ function renderScan(){
            + '<button class="btn yes" data-act="yes">Yes<span class="keyhint">y</span></button>'
            + '<button class="btn no" data-act="no">No<span class="keyhint">n</span></button>' 
            + '<button class="btn cant" data-act="cant" title="Skip it for a while, even if the chain empties out before then \u2014 see Settings">Can\u2019t<span class="keyhint">c</span></button>'
+           + '<span class="decide-finish">'
            + (state.mode==="scan" && b ? '<button class="btn subtle" data-act="start-working" title="Stop suggesting new candidates — just work through what\u2019s already dotted">done adding for now</button>' : '')
            + '<span class="sparkbox">'
            + (featureEnabled("rankSparklines") ? sparkSVG(cand.id,84,20) : '')
            + (featureEnabled("topKLanguage") ? '<span class="topkchip mono">'+topKlabel(cand.id)+'</span>' : '')
-           + '<button class="iconbtn" data-act="toggle-list" title="Show the full ranked list">▦</button></span>'
+           + '<button class="iconbtn" data-act="toggle-list" title="Show the full ranked list">▦</button></span></span>'
            + '</div>';
     }
   }
@@ -2445,6 +2509,7 @@ function openHelp(){
     + '</ol>'
     + '<h3>What the machinery does</h3>'
     + '<p class="kv">Every Yes/No is a pairwise match; each task keeps a <b>strength posterior</b> (a bell curve, not a number). Candidates appear highest estimated likelihood first, or in a saved random order weighted by TrueSkill strength in chance mode. Yes/No still updates ratings immediately; the chance order stays fixed until a fresh pass or 2 AM. Resume excludes tasks already scanned in this pass; the local 2 AM date marker returns them to the eligible pool.</p>'
+    + '<p class="kv"><b>Rank signals:</b> Yes, No, Dot from the All Tasks editor, and Dislodge. Done, Evergreen Done, Worked on it, Can’t, the initial scan dot, and Add &amp; dot leave ratings unchanged.</p>'
     + (featureEnabled("rankSparklines") ? '<p class="kv rank-help-spark">The <b>sparkline</b> is an estimated rank distribution, not a progress chart. Each left-to-right position is a possible rank; a taller bump means more of the same Monte Carlo samples landed there. A shape spread across many ranks means more uncertainty.</p>' : '')
     + (featureEnabled("topKLanguage") ? '<p class="kv rank-help-topk"><b>top-K</b> is a cutoff, not an exact rank or deadline. It is the smallest K (at least 2 when there are two or more tasks) whose sampled chance of landing in the first K positions reaches 1 − 1/K. So top-3 means at least a 2/3 chance within the first three; the bar shows K out of the unfinished tasks, and a shorter bar means a smaller cutoff. With only one unfinished task, the label is top-1.</p>' : '')
     + '<p class="kv">Keys: <b>y</b> / <b>n</b> / <b>c</b> to decide, <b>d</b> to mark whatever\u2019s showing done, <b>w</b> for worked on it, <b>Delete</b> or <b>Backspace</b> to remove it entirely, <b>u</b> to undo.</p></div>'
@@ -2536,6 +2601,9 @@ async function installNative(){
 function openSettings(){
   const s = state.settings;
   const histCount = historyRows().length;
+  const latestChangelog = document.getElementById('appChangelogCurrent')?.innerHTML || '';
+  const archivedChangelog = document.getElementById('appChangelog')?.innerHTML || '';
+  const changelogHtml = archivedChangelog.replace('<summary>Changelog</summary>', '<summary>Changelog</summary>'+latestChangelog);
   let ctxMgr = "";
   for(const c of state.contexts){
     ctxMgr += '<div class="mgr"><input type="checkbox" data-mgrctx="'+c.id+'"'+(c.active?" checked":"")+' title="active"/>'
@@ -2544,11 +2612,12 @@ function openSettings(){
   }
   modalShell(
     '<div class="mtop"><h2>Settings</h2><button class="x" data-act="close-modal" aria-label="Close">✕</button></div>'
-    + (document.getElementById('appChangelog')?.innerHTML || '')
+    + changelogHtml
     + '<div class="frow"><label>Landscape</label><button class="btn subtle" data-act="scene-settings">Motion settings</button><span class="kv">Daylight follows the sky; app theme stays independent.</span></div>'
     + '<div class="frow"><label>Scene time</label><button class="btn subtle" data-act="scene-time-settings">Choose scene time</button><span class="kv">Follow live time or hold a favorite hour on this device.</span></div>'
     + '<div class="frow"><label>Location</label><button class="btn subtle" data-act="location-settings">Choose location</button><span class="kv">Use device coordinates for a local sky; saved only on this device.</span></div>'
     + '<div class="frow"><label>On your phone</label><button class="btn subtle" data-act="install-app">Install this app on your phone</button><span class="kv">Add a home-screen icon and open Chain Scanner like an app.</span></div>'
+    + '<label class="cbox"><input id="stFloatingHeader" type="checkbox"'+(s.floatingHeader?' checked':'')+'/> Keep the header visible while scrolling</label><p class="kv">Keeps Undo, Help, and Settings within reach. Off by default.</p>'
     + '<div class="frow"><label for="stScanMode">Scan buttons</label><select id="stScanMode">'+[['descending','Scan in descending likelihood always'],['chance','Default - scan in chance mode always'],['both','Show both chance and descending likelihood scan buttons']].map(([v,label])=>'<option value="'+v+'"'+(s.scanMode===v?' selected':'')+'>'+label+'</option>').join('')+'</select><span class="kv">Scan mode saves immediately.</span></div>'
     + '<div class="frow"><label for="stEverHours">Default evergreen interval (hours)</label><input id="stEverHours" type="number" min="0.01" max="87600" step="any" value="'+s.evergreenHours+'"/></div>'
     + '<label class="cbox"><input id="stEverReset" type="checkbox"'+(s.evergreenResetAtDay?' checked':'')+'/> Default evergreen reset at day mark (2 AM)</label><p class="kv">Evergreen defaults apply to newly added tasks.</p>'
@@ -2631,14 +2700,14 @@ function onAction(act, el){
     case "add": {
       const inp=document.getElementById("addInput");
       if(/\r?\n/.test(inp.value)){                      // a whole list got in here
-        const {added, skipped, completed} = importList(inp.value, quickAddCtx, quickAddDates());
-        if(added || skipped || completed){ inp.value=""; clearQuickAddDates(); toast(importSummary(added, skipped, completed)); }
-      }else if(addTask(inp.value,false,quickAddCtx,quickAddDates())){ inp.value=""; clearQuickAddDates(); }
+        const {added, skipped, completed} = importList(inp.value, quickAddCtx, quickAddDates(), quickAddTaskOptions());
+        if(added || skipped || completed){ inp.value=""; clearQuickAddDraft(); toast(importSummary(added, skipped, completed)); }
+      }else if(addTask(inp.value,false,quickAddCtx,quickAddDates(),quickAddTaskOptions())){ inp.value=""; clearQuickAddDraft(); }
       inp.focus(); break;
     }
     case "add-dot": {
       const inp=document.getElementById("addInput");
-      if(addTask(inp.value,true,quickAddCtx,quickAddDates())){ inp.value=""; clearQuickAddDates(); }
+      if(addTask(inp.value,true,quickAddCtx,quickAddDates(),quickAddTaskOptions())){ inp.value=""; clearQuickAddDraft(); }
       inp.focus(); break;
     }
     case "add-ctx": {
@@ -2725,6 +2794,7 @@ function onAction(act, el){
       s.samples      = field("stSamples",  "samples");
       s.evergreenHours = evergreenHours(document.getElementById("stEverHours")?.value, s.evergreenHours);
       s.evergreenResetAtDay = document.getElementById("stEverReset")?.checked ?? s.evergreenResetAtDay;
+      s.floatingHeader = document.getElementById("stFloatingHeader")?.checked ?? s.floatingHeader;
       s.scanMode = normalizeSettings({scanMode:document.getElementById("stScanMode")?.value}).scanMode;
       applyScanPreference();
       recomputeRanks(); closeModal(); commit(); break;
@@ -2799,6 +2869,7 @@ document.addEventListener("change", e=>{
   const el = e.target;
   if(!el || !el.matches) return;
   if(el.id === "etEver"){ toggleEvergreenOptions(el.checked); return; }
+  if(el.id === "addEver"){ toggleQuickEvergreenOptions(el.checked); return; }
   if(el.id === "stScanMode"){ setScanPreference(el.value); return; }
   if(el.matches("[data-ctx]")){ toggleContext(el.dataset.ctx); return; }
   if(el.matches("[data-mgrctx]")){ const c=state.contexts.find(c=>c.id===el.dataset.mgrctx); if(c){ pushUndo(); c.active=el.checked; commit(); } return; }
@@ -2808,9 +2879,14 @@ function toggleEvergreenOptions(enabled){
   const options = document.getElementById("etEverOptions");
   if(options) options.hidden = !enabled; // Keep draft values when toggling off and on.
 }
+function toggleQuickEvergreenOptions(enabled){
+  const options = document.getElementById("addEverOptions");
+  if(options) options.hidden = !enabled; // Collapsing or rerendering must not discard the quick-add draft.
+}
 function suggestEvergreenReset(el){
-  if(el && (el.id === "etEverHours" || el.id === "stEverHours") && el.value.trim() && Number.isFinite(Number(el.value))){
-    document.getElementById(el.id === "etEverHours" ? "etEverReset" : "stEverReset").checked = Number(el.value) <= 18;
+  if(el && (el.id === "etEverHours" || el.id === "stEverHours" || el.id === "addEverHours") && el.value.trim() && Number.isFinite(Number(el.value))){
+    const resetId = el.id === "etEverHours" ? "etEverReset" : (el.id === "addEverHours" ? "addEverReset" : "stEverReset");
+    document.getElementById(resetId).checked = Number(el.value) <= 18;
   }
 }
 document.addEventListener("input", e=>{
@@ -2825,8 +2901,8 @@ document.addEventListener("paste", e=>{
   const txt = cd ? cd.getData("text") : "";
   if(!txt || !/\r?\n/.test(txt.trim())) return;      // single line — let it paste normally
   e.preventDefault();
-  const {added, skipped, completed} = importList(txt, quickAddCtx, quickAddDates());
-  if(added || skipped || completed){ t.value = ""; clearQuickAddDates(); toast(importSummary(added, skipped, completed)); }
+  const {added, skipped, completed} = importList(txt, quickAddCtx, quickAddDates(), quickAddTaskOptions());
+  if(added || skipped || completed){ t.value = ""; clearQuickAddDraft(); toast(importSummary(added, skipped, completed)); }
 });
 document.addEventListener("keydown", e=>{
   const t = e.target;

@@ -1053,9 +1053,9 @@ test("decide('cand-done'): completes the task directly without ever touching the
   assert.equal(ctx.state.chain.length, 1, "the task dotted at the start is the only thing on it");
 });
 
-/* Done rewards the completed task against a neutral reference; other tasks stay unchanged. */
+/* Done records completion without adding preference evidence. */
 
-test("decide('cand-done'): completing the candidate rewards only its own rating", async () => {
+test("decide('cand-done'): completing the candidate leaves both ratings alone", async () => {
   const { ctx } = await loadApp({ seed: 3 });
   ctx.addTask("Task A", false);
   ctx.addTask("Task B", false);
@@ -1068,14 +1068,14 @@ test("decide('cand-done'): completing the candidate rewards only its own rating"
 
   ctx.decide("cand-done");
 
-  assert.ok(cand.mu > snap.cm);
-  assert.ok(cand.sigma < snap.cs);
+  assert.equal(cand.mu, snap.cm);
+  assert.equal(cand.sigma, snap.cs);
   assert.equal(bench.mu, snap.bm, "benchmark mu must be untouched");
   assert.equal(bench.sigma, snap.bs, "benchmark sigma must be untouched");
   assert.equal(cand.done, true, "and the task is still completed");
 });
 
-test("decide('cand-done'): an evergreen candidate gains rating and still logs its completion", async () => {
+test("decide('cand-done'): an evergreen candidate stays rating-neutral and still logs its completion", async () => {
   const { ctx } = await loadApp({ seed: 7 });
   ctx.addTask("Task A", false);
   ctx.addTask("Water the plants", false);
@@ -1091,8 +1091,8 @@ test("decide('cand-done'): an evergreen candidate gains rating and still logs it
 
   ctx.decide("cand-done");
 
-  assert.ok(cand.mu > snap.cm);
-  assert.ok(cand.sigma < snap.cs);
+  assert.equal(cand.mu, snap.cm);
+  assert.equal(cand.sigma, snap.cs);
   assert.equal(bench.mu, snap.bm, "benchmark mu untouched");
   assert.equal(bench.sigma, snap.bs, "benchmark sigma untouched");
   const logged = ctx.state.workLog.some((e) => e.taskId === candId && e.kind === "evergreen-done");
@@ -4311,7 +4311,7 @@ test("doneTask: completing the current candidate clears it and a fresh one is de
   assert.ok(ctx.state.candidateId, "two tasks remain in the pool, so one should be offered");
 });
 
-test("doneTask: rewards completion without changing the benchmark", async () => {
+test("doneTask: completes from the editor without changing any rating", async () => {
   const { ctx } = await loadApp({ seed: 204 });
   ctx.addTask("Benchmark", true);
   const t = ctx.addTask("Crossed off from the edit pane", false);
@@ -4319,8 +4319,7 @@ test("doneTask: rewards completion without changing the benchmark", async () => 
 
   ctx.doneTask(t.id);
   const after = ctx.state.tasks.map((x) => ({ id: x.id, mu: x.mu, sigma: x.sigma }));
-  assert.deepEqual(after[0], before[0]);
-  assert.ok(after[1].mu > before[1].mu);
+  assert.deepEqual(after, before);
 });
 
 /* ---------- "repeats daily" is gone ----------
@@ -4896,18 +4895,16 @@ test("dotTask: dotting onto a running chain does NOT re-stamp the pass clock", a
     "a pass that keeps getting re-stamped never goes stale — only a fresh root starts the clock");
 });
 
-test("dotTask: records no rank signal — nothing was compared", async () => {
+test("dotTask: treats a direct choice as the dotted task beating the benchmark", async () => {
   const { ctx } = await loadApp({ seed: 372 });
   const bench = ctx.addTask("Benchmark", true);
   const t = ctx.addTask("Dot me", false);
-  const before = ctx.state.tasks.map((x) => ({ id: x.id, mu: x.mu, sigma: x.sigma }));
+  const winner = { mu:t.mu, sigma:t.sigma }, loser = { mu:bench.mu, sigma:bench.sigma };
+  ctx.updatePair(winner, loser);
 
   ctx.dotTask(t.id);
-  for (const b of before) {
-    const now = ctx.state.tasks.find((x) => x.id === b.id);
-    assert.equal(now.mu, b.mu, `mu moved on ${now.title} — dotting answered no "would I rather?"`);
-    assert.equal(now.sigma, b.sigma, `sigma moved on ${now.title}`);
-  }
+  assert.deepEqual({mu:t.mu,sigma:t.sigma},winner);
+  assert.deepEqual({mu:bench.mu,sigma:bench.sigma},loser);
   assert.equal(ctx.benchmark().id, t.id, "precondition check: it really did get dotted");
   assert.ok(bench.id !== t.id);
 });
@@ -10802,9 +10799,9 @@ test('Cloud auth bootstrap: an auth-triggered pull before state load is replayed
 });
 
 const updateNoticeKey='fvp:chain-scanner:last-notified-release';
-const releaseMarkup=html.match(/<template id="appChangelog">([\s\S]*?)<\/template>/)[1];
+const releaseMarkup=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];
 const releaseFingerprint=releaseMarkup.match(/data-app-fingerprint="([^"]+)"/)[1];
-function prepareReleaseNotice(ctx,shim){shim.document.getElementById('appChangelog').innerHTML=releaseMarkup;}
+function prepareReleaseNotice(ctx,shim){shim.document.getElementById('appChangelogCurrent').innerHTML=releaseMarkup;}
 test('Update toast: fresh install is quiet, changed release notifies once and reload stays quiet',async()=>{
  const fresh=await loadApp({beforeStateReady:prepareReleaseNotice});
  assert.equal(fresh.shim.localStorage.getItem(updateNoticeKey),releaseFingerprint);
@@ -10871,18 +10868,35 @@ test('Scan anchor: both modes dot the oldest eligible task regardless of chance 
   ctx.startScan(mode);assert.equal(ctx.state.chain[0],a.id);assert.equal(ctx.state.candidateId,b.id);
  }
 });
-test('Done signal: all completion routes reward once, undo restores, Worked on it stays neutral',async()=>{
+test('Done and Worked on it are rating-neutral for ordinary and evergreen tasks',async()=>{
  for(const route of ['bench','candidate','editor'])for(const evergreen of [false,true]){
   const {ctx}=await loadApp();const a=ctx.addTask('A'),b=ctx.addTask('B');a.evergreen=evergreen;
   ctx.state.chain=route==='bench'?[b.id,a.id]:[b.id];ctx.state.candidateId=route==='candidate'?a.id:null;
-  const before=JSON.stringify(a),other=JSON.stringify(b),expected={mu:a.mu,sigma:a.sigma};
-  ctx.updatePair(expected,{mu:25,sigma:25/3});
+  const before={mu:a.mu,sigma:a.sigma},other={mu:b.mu,sigma:b.sigma};
   if(route==='bench')ctx.benchDone();else if(route==='candidate')ctx.decide('cand-done');else ctx.doneTask(a.id);
-  assert.equal(a.mu,expected.mu);assert.equal(a.sigma,expected.sigma);assert.equal(JSON.stringify(b),other);
-  ctx.doneTask(a.id);assert.equal(a.mu,expected.mu,'duplicate completion cannot farm rating');
-  ctx.undo();ctx.undo();assert.equal(JSON.stringify(ctx.state.tasks.find(t=>t.id===a.id)),before);
-  const restored=ctx.state.tasks.find(t=>t.id===a.id);ctx.workedOnTask(a.id);assert.equal(restored.mu,25);assert.equal(restored.sigma,25/3);
+  assert.deepEqual({mu:a.mu,sigma:a.sigma},before,'Done records completion without preference evidence');
+  assert.deepEqual({mu:b.mu,sigma:b.sigma},other,'Done never changes another task either');
+  ctx.doneTask(a.id);assert.deepEqual({mu:a.mu,sigma:a.sigma},before,'duplicate completion stays neutral');
+  ctx.undo();ctx.undo();
+  const restored=ctx.state.tasks.find(t=>t.id===a.id);ctx.workedOnTask(a.id);
+  assert.deepEqual({mu:restored.mu,sigma:restored.sigma},before,'Worked on it stays neutral too');
  }
+});
+test('All Tasks Dot is a pairwise rank signal against the current benchmark, with a neutral first dot',async()=>{
+ const {ctx,shim}=await loadApp();const bench=ctx.addTask('Benchmark'),dotted=ctx.addTask('Choose directly'),other=ctx.addTask('Other');
+ ctx.state.chain=[bench.id];ctx.state.scanMode='chance';ctx.resetChance();const frozen=JSON.stringify(ctx.state.chance);
+ const expectedWinner={mu:dotted.mu,sigma:dotted.sigma},expectedLoser={mu:bench.mu,sigma:bench.sigma};ctx.updatePair(expectedWinner,expectedLoser);
+ const untouched={mu:other.mu,sigma:other.sigma};ctx.openEdit(dotted.id);
+ assert.match(shim.document.getElementById('modalRoot').innerHTML,/data-act="dot-task"/,'All Tasks editor exposes Dot');
+ ctx.dotTask(dotted.id);
+ assert.deepEqual({mu:dotted.mu,sigma:dotted.sigma},expectedWinner,'the directly dotted task wins the comparison');
+ assert.deepEqual({mu:bench.mu,sigma:bench.sigma},expectedLoser,'the current benchmark loses the comparison');
+ assert.deepEqual({mu:other.mu,sigma:other.sigma},untouched,'unrelated tasks stay unchanged');
+ assert.equal(JSON.stringify(ctx.state.chance),frozen,'the current chance draw stays frozen');
+ assert.equal(ctx.state.chain.at(-1),dotted.id);ctx.undo();
+ assert.deepEqual({mu:ctx.state.tasks.find(t=>t.id===dotted.id).mu,sigma:ctx.state.tasks.find(t=>t.id===dotted.id).sigma},{mu:25,sigma:25/3});
+ const empty=await loadApp();const first=empty.ctx.addTask('First');const before={mu:first.mu,sigma:first.sigma};empty.ctx.dotTask(first.id);
+ assert.deepEqual({mu:first.mu,sigma:first.sigma},before,'without a current benchmark the first dot carries no invented comparison');
 });
 test('Add dates: both buttons save optional start and due dates together, then clear fields',async()=>{
  for(const action of ['add','add-dot']){
@@ -10895,6 +10909,64 @@ test('Add dates: both buttons save optional start and due dates together, then c
  }
  assert.match(html,/<label for="addStart">Starts<\/label><input id="addStart" type="date"/);
  assert.match(html,/<label for="addDue">Due<\/label><input id="addDue" type="date"/);
+});
+test('Add a task exposes an evergreen draft with 18-hour and 2 AM defaults, and applies it to single or pasted tasks',async()=>{
+ assert.match(html,/<input id="addEver" type="checkbox"[^>]*\/>\s*Evergreen/);
+ assert.match(html,/<div[^>]*id="addEverOptions"[^>]*hidden>[\s\S]*id="addEverHours"[^>]*value="18"[\s\S]*id="addEverReset"[^>]*checked/);
+ for(const title of ['Recurring task','First\nSecond']){
+  const {ctx,shim}=await loadApp();ctx.render();const toggle=shim.document.getElementById('addEver');
+  const options=shim.document.getElementById('addEverOptions'),hours=shim.document.getElementById('addEverHours'),reset=shim.document.getElementById('addEverReset');
+  assert.equal(toggle.checked,false);assert.equal(hours.value,'18');assert.equal(reset.checked,true);assert.equal(options.hidden,true);
+  toggle.checked=true;ctx.toggleQuickEvergreenOptions(true);assert.equal(options.hidden,false);
+  hours.value='24';reset.checked=false;shim.document.getElementById('addInput').value=title;ctx.onAction('add',{});
+  assert.equal(ctx.state.tasks.length,title.includes('\n')?2:1);
+  for(const task of ctx.state.tasks){assert.equal(task.evergreen,true);assert.equal(task.evergreenHours,24);assert.equal(task.evergreenResetAtDay,false);}
+  assert.equal(toggle.checked,false,'successful capture resets the evergreen draft');
+  assert.equal(hours.value,'18');assert.equal(reset.checked,true);assert.equal(options.hidden,true);
+ }
+});
+test('Floating header defaults off, backfills off, and Settings can make Undo sticky',async()=>{
+ const {ctx,shim}=await loadApp();assert.equal(ctx.state.settings.floatingHeader,false);
+ ctx.render();const header=shim.document.getElementById('appHeader');assert.equal(header.classList.contains('floating'),false);
+ const legacy=JSON.parse(JSON.stringify(ctx.state));delete legacy.settings.floatingHeader;ctx.hydrateState(legacy);assert.equal(legacy.settings.floatingHeader,false);
+ ctx.openSettings();assert.match(shim.document.getElementById('modalRoot').innerHTML,/id="stFloatingHeader" type="checkbox"/);
+ shim.document.getElementById('stFloatingHeader').checked=true;ctx.onAction('save-settings',{});
+ assert.equal(ctx.state.settings.floatingHeader,true);assert.equal(header.classList.contains('floating'),true);
+ assert.match(html,/\.top\.floating\{[^}]*position:sticky[^}]*z-index:/);
+});
+test('Touch and responsive layout contracts keep zoom accessible and mobile controls on-screen',()=>{
+ const viewport=html.match(/<meta name="viewport" content="([^"]+)"/i)?.[1]||'';
+ assert.doesNotMatch(viewport,/user-scalable\s*=\s*no|maximum-scale\s*=\s*1/i,'pinch zoom must remain available');
+ assert.match(html,/html\{[^}]*touch-action:manipulation[^}]*\}/,'manipulation removes double-tap zoom while retaining pan and pinch');
+ assert.match(html,/@media \(max-width:560px\)\{[\s\S]*?\.addline\{[^}]*flex-wrap:wrap/);
+ assert.match(html,/class="decide-finish"[\s\S]*?data-act="start-working"[\s\S]*?class="sparkbox"/,'stop button and rank summary share one layout group');
+ assert.match(html,/\.decide-finish\{[^}]*display:flex[^}]*align-items:center/);
+});
+test('Scanner browser: sticky Undo, Add fields, and stop-line rank visuals stay inside risky viewports', {skip:!process.env.LANDSCAPE_BROWSER_URL}, async()=>{
+ const {chromium}=await import(process.env.LANDSCAPE_PLAYWRIGHT);const browser=await chromium.launch({headless:true,channel:'chrome'});
+ try{
+  const page=await browser.newPage();await page.addInitScript(()=>localStorage.setItem('fvp:chain-scanner:landscape-motion','reduced'));
+  await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'networkidle'});
+  const close=page.locator('#modalRoot [data-act="close-modal"]');if(await close.count())await close.click();
+  await page.evaluate(()=>{for(let i=0;i<24;i++)addTask('Task '+i);state.addOpen=true;state.listOpen=true;startScan('descending');render();});
+  await page.locator('#addEver').check();
+  for(const spec of [{width:320,height:568},{width:390,height:844},{width:844,height:390},{width:1000,height:900}]){
+   await page.setViewportSize(spec);
+   const layout=await page.evaluate(()=>{
+    const rect=e=>{const r=e.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height};};
+    const visible=e=>!e.hidden&&getComputedStyle(e).display!=='none';const controls=[...document.querySelectorAll('#addPanel input,#addPanel button')].filter(visible).map(e=>({id:e.id||e.textContent.trim(),...rect(e)}));
+    const stop=document.querySelector('[data-act="start-working"]'),rank=document.querySelector('.decide-finish .sparkbox');
+    return {controls,panel:rect(document.querySelector('#addPanel')),stop:rect(stop),rank:rect(rank),touch:getComputedStyle(document.documentElement).touchAction,overflow:document.documentElement.scrollWidth>innerWidth};
+   });
+   assert.equal(layout.touch,'manipulation');assert.equal(layout.overflow,false,`no page overflow at ${spec.width}x${spec.height}`);
+   for(const control of layout.controls){assert.ok(control.left>=layout.panel.left-1&&control.right<=layout.panel.right+1,`${control.id} stays inside Add a task at ${spec.width}px`);assert.ok(control.left>=-1&&control.right<=spec.width+1,`${control.id} stays inside the viewport`);}
+   assert.ok(layout.stop.top<layout.rank.bottom&&layout.rank.top<layout.stop.bottom,`done adding and rank summary remain on one line at ${spec.width}px`);
+  }
+  await page.evaluate(()=>{state.settings.floatingHeader=true;render();window.scrollTo(0,document.body.scrollHeight);});await page.waitForTimeout(50);
+  const sticky=await page.locator('#appHeader').boundingBox();assert.ok(sticky&&sticky.y>=0,'enabled header stays visible after scrolling');assert.ok(await page.locator('#appHeader [data-act="undo"]').isVisible());
+  await page.evaluate(()=>{state.settings.floatingHeader=false;render();window.scrollTo(0,document.body.scrollHeight);});await page.waitForTimeout(50);
+  const ordinary=await page.locator('#appHeader').boundingBox();assert.ok(ordinary&&ordinary.y<0,'disabled header scrolls normally');
+ }finally{await browser.close();}
 });
 test('Eligibility filter: selecting Eligible clears stale narrowings and shows every eligible task',async()=>{
  const {ctx,shim}=await loadApp();const a=ctx.addTask('Ready'),b=ctx.addTask('Also ready');b.evergreen=true;
@@ -10979,7 +11051,7 @@ test('Add dates: list capture honors the date fields for each new task',async()=
  ctx.onAction('add',{});assert.equal(ctx.state.tasks.length,2);
  for(const t of ctx.state.tasks){assert.equal(t.startsAt,'2099-01-01');assert.equal(t.due,'2099-01-03');}
  assert.equal(shim.document.getElementById('addStart').value,'');
- assert.match(appSrc,/importList\(txt, quickAddCtx, quickAddDates\(\)\)/,'paste capture uses the same draft dates');
+ assert.match(appSrc,/importList\(txt, quickAddCtx, quickAddDates\(\), quickAddTaskOptions\(\)\)/,'paste capture uses the same draft dates and recurrence');
 });
 
 // USNO one-day API reference observations retrieved 2026-09-19; no runtime network dependency.
