@@ -2352,6 +2352,88 @@ test("import-json: importing an export taken before this change backfills worked
   assert.ok(typeof ctx.state.workedAt.z === "number", "the imported worked mark is given a start point, not left stuck");
 });
 
+test("LOGIC AUDIT: a malformed JSON backup cannot replace the healthy in-memory board", async () => {
+  const { ctx } = await loadApp({ seed: 4031 });
+  const kept = ctx.addTask("Keep this task", false);
+  ctx.document.getElementById("jsonBox").value = JSON.stringify({ tasks: [null] });
+
+  ctx.onAction("import-json", {});
+
+  assert.ok(ctx.state.tasks.some((task) => task && task.id === kept.id),
+    "validation must finish before an import becomes the live board");
+  assert.doesNotThrow(() => ctx.render(), "a rejected backup must leave the app usable");
+});
+
+test("LOGIC AUDIT: malformed saved state cannot stop the app from booting", async () => {
+  const malformed = JSON.stringify({ tasks: [null] });
+  const { ctx, shim } = await loadApp({
+    seed: 40311,
+    seedStorage: { [WH_STORE_KEY]: malformed },
+  });
+
+  assert.deepEqual(Array.from(ctx.state.tasks), [], "boot falls back to a usable empty board");
+  assert.equal(shim.localStorage.getItem(WH_STORE_KEY), malformed,
+    "the unreadable source remains available for manual recovery until a real edit is saved");
+  assert.doesNotThrow(() => ctx.render());
+});
+
+test("LOGIC AUDIT: a sparse legacy backup is fully hydrated into a usable active scan", async () => {
+  const { ctx } = await loadApp({ seed: 40312 });
+  const task = (id, title, createdAt) => ({ id, title, createdAt });
+  ctx.document.getElementById("jsonBox").value = JSON.stringify({
+    v: 1,
+    tasks: [task("root", "Root task", 1), task("next", "Next task", 2)],
+    chain: ["root"],
+  });
+
+  ctx.onAction("import-json", {});
+
+  assert.equal(ctx.state.mode, "scan", "a missing mode defaults to the interactive scanner");
+  assert.equal(ctx.state.candidateId, "next", "the imported chain can immediately deal its next candidate");
+  assert.equal(ctx.state.ctxOpen, true);
+  assert.equal(ctx.state.listOpen, false);
+  assert.equal(ctx.state.interventionActive, false);
+  assert.doesNotThrow(() => ctx.render());
+});
+
+test("LOGIC AUDIT: malformed optional task fields are repaired before a backup becomes live", async () => {
+  const { ctx } = await loadApp({ seed: 40313 });
+  ctx.document.getElementById("jsonBox").value = JSON.stringify({
+    tasks: [
+      { id: "root", title: "Root task", createdAt: 1 },
+      { id: "next", title: "Next task", createdAt: 2, startsAt: [], due: {}, url: "javascript:alert(1)", lastDoneAt: "never" },
+    ],
+    chain: ["root"],
+    considered: { next: "cant" },
+    cantAt: { next: { stuck: true } },
+  });
+
+  ctx.onAction("import-json", {});
+
+  const next = ctx.state.tasks.find((task) => task.id === "next");
+  assert.ok(next, "the otherwise valid task is preserved");
+  assert.equal(next.startsAt, null);
+  assert.equal(next.due, null);
+  assert.equal(next.url, null);
+  assert.equal(next.lastDoneAt, null);
+  assert.ok(Number.isFinite(ctx.state.cantAt.next), "the invalid cooldown is backfilled with a usable timestamp");
+  assert.doesNotThrow(() => ctx.render());
+});
+
+test("LOGIC AUDIT: reserved object-map keys cannot enter live state as task ids", async () => {
+  const { ctx } = await loadApp({ seed: 40314 });
+  const kept = ctx.addTask("Keep this task", false);
+  ctx.document.getElementById("jsonBox").value = JSON.stringify({
+    tasks: [{ id: "__proto__", title: "Break task maps", createdAt: 1 }],
+  });
+
+  ctx.onAction("import-json", {});
+
+  assert.ok(ctx.state.tasks.some((task) => task.id === kept.id),
+    "a reserved id rejects the backup before it can replace the healthy board");
+  assert.ok(!ctx.state.tasks.some((task) => task.id === "__proto__"));
+});
+
 test("data from before this change: a stored 'worked' task with no timestamp is honoured, given a window from boot, then rejoins the scan", async () => {
   const stored = preChangeState({
     tasks: [
@@ -6897,6 +6979,24 @@ function makeSyncHarness({ delayMs = 4, remote = null, failPull = false, rev = n
   return h;
 }
 
+test("LOGIC AUDIT: a malformed newer cloud payload cannot corrupt the local board", async () => {
+  const now = Date.now();
+  const local = staleState(now); local.syncRev = 2;
+  const h = makeSyncHarness({ remote: cloudState(now + HOUR), rev: 3 });
+  h.doc.payload = JSON.stringify({ tasks: [null] });
+  const { ctx } = await loadApp({
+    seed: 4032,
+    seedStorage: { [SYNC_STORE_KEY]: JSON.stringify(local) },
+    cloudSyncFactory: h.factory,
+  });
+
+  await ctx.cloudPull();
+
+  assert.ok(ctx.state.tasks.some((task) => task && task.id === "t_old"),
+    "the local board must stay live until the remote payload is fully validated");
+  assert.doesNotThrow(() => ctx.render(), "a rejected remote payload must leave the app usable");
+});
+
 const syncSettle = (ms) => new Promise((r) => setTimeout(r, ms));
 const PAST_DEBOUNCE = 2300;   // longer than cloudPush()'s 2s debounce
 
@@ -7169,20 +7269,20 @@ test("addTask: typing a completed title by hand still adds it — an explicit ac
 });
 
 /* =====================================================================
-   HISTORY RECONCILE: NO REPEATED COMPLETIONS THAT AREN'T REAL
+   HISTORY RECONCILE: TASK IDENTITY OUTRANKS DISPLAY TEXT
 
-   Fallout of the import bug above: a task crossed off, then re-added by a
-   re-paste, then crossed off again, leaves two "done" rows in History for
-   one accomplishment. reconcileHistory() sweeps those together on the same
-   schedule as the can't/worked expiries. Two repeats are legitimate and
-   must survive: evergreen completions (recurring by design) and a task
-   deliberately restored from History and done again.
+   The import path now blocks completed-title duplicates before creating
+   them. Existing same-title tasks are ambiguous, though: Quick Add explicitly
+   permits them, and deleting one after completion destroys real user data.
+   reconcileHistory() therefore preserves completed task records and only
+   sweeps impossible live references; same-day work sessions consolidate by
+   taskId rather than title.
    ===================================================================== */
 
 const doneTitles = (ctx) =>
   Array.from(ctx.state.tasks.filter((t) => t.done), (t) => t.title).sort();
 
-// The exact shape the import bug produced: two task objects, same title, both done.
+// An ambiguous old shape: an import artifact and two deliberate tasks look identical here.
 function seedDuplicateCompletion(ctx, title) {
   const a = ctx.addTask(title, false);
   ctx.completeTask(ctx.state.tasks.find((x) => x.id === a.id));
@@ -7191,19 +7291,19 @@ function seedDuplicateCompletion(ctx, title) {
   return { first: a.id, second: b.id };
 }
 
-test("reconcileHistory: two done rows for the same title collapse to one", async () => {
+test("reconcileHistory: two done rows with distinct ids survive even when titles match", async () => {
   const { ctx } = await loadApp({ seed: 986 });
   seedDuplicateCompletion(ctx, "Email the union rep");
   assert.equal(doneTitles(ctx).length, 2, "the duplicate is there to start with");
 
   ctx.reconcileHistory();
 
-  assert.deepEqual(doneTitles(ctx), ["Email the union rep"]);
-  assert.equal(ctx.historyRows().filter((r) => r.kind === "done").length, 1,
-    "History shows one entry for one accomplishment");
+  assert.deepEqual(doneTitles(ctx), ["Email the union rep", "Email the union rep"]);
+  assert.equal(ctx.historyRows().filter((r) => r.kind === "done").length, 2,
+    "two task ids remain two History records because text cannot prove identity");
 });
 
-test("reconcileHistory: keeps the original completion, drops the later artifact", async () => {
+test("reconcileHistory: completion timestamps do not authorize deleting a later same-title task", async () => {
   const { ctx } = await loadApp({ seed: 987 });
   const a = ctx.addTask("Email the union rep", false);
   const first = ctx.state.tasks.find((x) => x.id === a.id);
@@ -7214,8 +7314,9 @@ test("reconcileHistory: keeps the original completion, drops the later artifact"
   ctx.reconcileHistory();
 
   const rows = ctx.historyRows().filter((r) => r.kind === "done");
-  assert.equal(rows.length, 1);
-  assert.equal(rows[0].at, 1000, "the first time you finished it is the real record");
+  assert.equal(rows.length, 2);
+  assert.deepEqual(Array.from(rows, (row) => row.at), [9000, 1000],
+    "both completion records remain, ordered normally by History");
 });
 
 test("reconcileHistory: leaves distinct titles alone", async () => {
@@ -7261,7 +7362,7 @@ test("reconcileHistory: a task restored from History and done again keeps both r
     "a deliberate restore-and-redo is a real repeat, not an artifact");
 });
 
-test("reconcileHistory: dropping a duplicate takes its dangling references with it", async () => {
+test("reconcileHistory: completed records survive while their impossible live references are swept", async () => {
   const { ctx } = await loadApp({ seed: 991 });
   const { second } = seedDuplicateCompletion(ctx, "Email the union rep");
   ctx.state.chain.push(second);
@@ -7270,19 +7371,35 @@ test("reconcileHistory: dropping a duplicate takes its dangling references with 
 
   ctx.reconcileHistory();
 
+  assert.ok(ctx.state.tasks.some((task) => task.id === second), "the completed task record itself is preserved");
   assert.ok(!ctx.state.chain.includes(second), "no dead id left on the chain");
   assert.ok(!(second in ctx.state.considered), "no dead mark left behind");
   assert.equal(ctx.state.candidateId, null, "and it isn't left as the candidate");
 });
 
-test("reconcileHistory: runs on the ordinary sweep schedule, not only when asked", async () => {
+test("reconcileHistory: the ordinary sweep never deletes ambiguous same-title records", async () => {
   const { ctx } = await loadApp({ seed: 992 });
   seedDuplicateCompletion(ctx, "Email the union rep");
   assert.equal(doneTitles(ctx).length, 2);
 
   ctx.ensureCandidate();   // the same pass that expires can't/worked marks
 
-  assert.equal(doneTitles(ctx).length, 1, "the regular check catches it without being invoked by hand");
+  assert.equal(doneTitles(ctx).length, 2, "a background cleanup must not guess that one task is disposable");
+});
+
+test("LOGIC AUDIT: completing two deliberately added same-title tasks preserves both tasks", async () => {
+  const { ctx } = await loadApp({ seed: 9931 });
+  const first = ctx.addTask("Call the bank", false);
+  const second = ctx.addTask("Call the bank", false);
+
+  ctx.doneTask(first.id);
+  ctx.doneTask(second.id);
+
+  assert.deepEqual(
+    Array.from(ctx.state.tasks.filter((task) => task.done), (task) => task.id).sort(),
+    [first.id, second.id].sort(),
+    "title equality is not task identity; History must never delete an explicitly created task",
+  );
 });
 
 test("the History restore button marks the task as deliberately restored", async () => {
@@ -7656,6 +7773,22 @@ test("different tasks worked the same day are not each other's duplicates", asyn
   ctx.reconcileHistory();
 
   assert.equal(ctx.state.workLog.length, 3);
+});
+
+test("LOGIC AUDIT: same-title tasks worked on the same day retain separate History rows", async () => {
+  const { ctx } = await loadApp({ seed: 10041 });
+  seedWorkLog(ctx, [
+    { taskId: "first", title: "Review the draft", at: MORNING },
+    { taskId: "second", title: "Review the draft", at: EVENING },
+  ]);
+
+  ctx.reconcileHistory();
+
+  assert.deepEqual(
+    Array.from(ctx.state.workLog, (entry) => entry.taskId),
+    ["first", "second"],
+    "same-day consolidation may join repeated sessions for one task, never two different task ids",
+  );
 });
 
 test("a same-day repeat is caught by the regular sweep, not only when asked", async () => {
