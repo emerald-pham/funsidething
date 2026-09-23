@@ -3865,6 +3865,27 @@ test("UI: Quick start displays the requested seven steps in order", async () => 
   ]);
 });
 
+test("UI: Quick start keeps task-state explanations in a collapsed More FAQs section", async () => {
+  const { ctx, shim } = await loadApp();
+  ctx.openHelp();
+  const markup = shim.elements.get("modalRoot").innerHTML;
+  const quickStartEnd = markup.indexOf("</ol>");
+  const faqStart = markup.indexOf('<details class="help-faq">');
+  assert.ok(quickStartEnd > 0 && faqStart > quickStartEnd, "FAQs follow the seven quick-start steps");
+  const faq = markup.match(/<details class="help-faq">([\s\S]*?)<\/details>/)?.[1];
+  assert.ok(faq, "More FAQs is a separate native disclosure, closed by default");
+  assert.match(faq, /<summary>More FAQs<\/summary>/);
+  const answers = new Map([...faq.matchAll(/<dt>(.*?)<\/dt><dd>(.*?)<\/dd>/g)].map(([, question, answer]) => [question, answer]));
+  assert.match(answers.get("What happens when I choose Done?"), /ordinary task.*active task list.*crossed out in History/);
+  assert.match(answers.get("What does Done mean for an evergreen task?"), /History.*per-task interval.*18 hours.*Settings.*2 AM/);
+  assert.match(answers.get("What does Worked on it mean?"), /History.*Settings.*16 hours.*2 AM.*no per-task hour field.*distinct from/);
+  assert.match(answers.get("What does Dislodge do?"), /current scan.*negative rank signal.*next fresh scan.*every eligible card/);
+  assert.match(answers.get("What do the countdown tags mean?"), /hours.*eligible candidate again.*minutes.*next pass/);
+  assert.match(answers.get("Can I return a task early?"), /All Tasks.*Return as candidate.*No.*Can.t.*Worked on it.*Dislodged.*disabled.*evergreen completion/);
+  assert.match(answers.get("What happens around 2 AM?"), /2 AM.*No.*Can.t.*Worked on it.*Dislodged.*Evergreen Done.*day reset/);
+  assert.match(faq, /<h3>What the machinery does<\/h3>/, "advanced rank details belong in the disclosure too");
+});
+
 test("UI: help describes Start scanning rather than a Can/Can't step", async () => {
   const { ctx, shim } = await loadApp({ seed: 94 });
   ctx.openHelp();
