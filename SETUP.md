@@ -14,24 +14,16 @@ whenever you next need to touch it.
 
 The four config values in `index.html` are public by design — they identify the
 project, they don't grant access to anything. The security rule is what protects
-the data.
+the data. Its deployable source is `firestore.rules`, referenced by `firebase.json`.
 
 ## The security rule
 
-```
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /users/{uid} {
-      allow read, write: if request.auth != null && request.auth.uid == uid;
-    }
-  }
-}
-```
-
 A signed-in account can read and write exactly one document — its own,
 at `users/{their uid}`. Nobody else's, and nothing at all while signed out.
-There is no path in this rule that grants public access.
+Writes need the next revision and a Firestore server timestamp. Old shells may
+still read, but their blind writes are denied until they reload. Document
+deletion is denied. The rule checks the write envelope; it cannot parse the
+JSON payload, so client-side history gates and backups remain necessary.
 
 ## How syncing behaves
 
@@ -41,12 +33,15 @@ two moments: when the page loads, and when the tab regains focus.
 
 - Writes are debounced 2 seconds, so a fast scanning run costs one write, not thirty
 - A pull that finds nothing new produces zero writes
-- Ahead/behind is decided by a revision counter, not by timestamps (below)
+- Firestore server dates order copies that both have one; revisions break ties
+  and prevent concurrent writes from silently replacing each other
+- Automatic reconciliation retains unique task IDs, completion dates and
+  work-log rows unless a delete or clear marker explicitly removes them
 - Adopting a remote state pushes onto the undo stack — `u` takes it back
 - `localStorage` is still the local layer, so the app works offline and
   syncs up next time it can reach the network
 
-### Revisions, not clocks
+### Server dates and revisions
 
 `state.updatedAt` is stamped with `Date.now()` on whichever device wrote it —
 that device's **own clock**. Comparing two devices' timestamps therefore ranks
@@ -55,13 +50,14 @@ hours fast wins every reconcile no matter how stale its copy is. That is how a
 phone's newer work, task renames included, got replaced by a laptop's older
 copy. Wall-clock time cannot order edits made on two machines.
 
-So the document carries `rev`, an integer that only ever goes up, and each
-device keeps `state.syncRev` — the revision its copy is based on.
+New cloud writes carry `serverUpdatedAt`, assigned by Firestore rather than a
+device. The document also carries `rev`, an integer that only ever goes up, and
+each device keeps `state.syncRev` — the revision its copy is based on.
 
-- **Remote `rev` higher than local `syncRev`** → the cloud holds work this
-  device has never seen. Adopt it.
-- **Equal** → both sides share a base, so any local difference is genuinely
-  this device's to push.
+- **Both copies have Firestore dates** → the later server date wins; revision
+  breaks a tie. A newer remote copy is adopted after task and history union.
+- **A date is missing** → use revisions when both copies have them, then the
+  older device-clock path only for pre-revision documents.
 - Writes are **conditional**: `CS.push()` runs a Firestore transaction that
   refuses if the document has moved past the revision the caller read. Two
   devices pushing at once used to mean the second silently replaced the first;
@@ -80,9 +76,9 @@ disagree about a setting neither of them ever set.
 bookkeeping. If it rode along, every device would see a difference the instant
 it adopted someone else's state and push it straight back.
 
-The timestamp comparison survives only as the migration path, for a document
-written before revisions existed or a device that has never synced under them.
-The first write on either side ends it.
+Older documents without server dates use revisions. The device-clock timestamp
+comparison survives only for documents without either. It never proves that a
+missing task was deleted.
 
 ### No writing before reading
 
@@ -104,14 +100,21 @@ The gate is keyed on the signed-in account, so signing in as someone else
 re-arms it. If a newer remote lands on top of edits you'd just made, a toast
 says so and `u` takes it back.
 
-The failure mode that remains: genuinely concurrent offline edits on two
-devices. There is no merge — the device on the older revision adopts the
-other's when it reconciles, and its own changes live on the undo stack rather
-than in the cloud. Nothing is overwritten in the cloud without being read
-first, but one side's edits still have to yield. Settings → Export JSON is the
-escape hatch.
+Automatic reconciliation combines unique tasks and recorded completion/work
+history by stable ID. It keeps explicit task-deletion and history-clear markers
+indefinitely so a very old tab cannot resurrect an intentional removal. A
+separate dated deletion log retains two months of actions even after clearing
+visible History. Settings holds seven days of device-local full-board backups:
+the first and latest copy of each day, plus pre-restore safety copies. Manual
+backups stay in the browser until site data is cleared. Tasks are never dropped
+because of age. Restoring an old backup also keeps later tasks that have no
+recorded deletion; the chosen backup restores its scan and settings state.
 
-Free tier is 50k reads and 20k writes a day. Realistic use here is a few dozen.
+GitHub Pages uses GitHub Actions as its publishing source. The deployment job
+depends on the release gate: `npm test` and `npm run test:rules` against the
+Firestore emulator. `firestore.rules` is deployed separately with
+`firebase deploy --only firestore:rules --project chain-scanner`; a passing
+emulator run does not update the live rule by itself.
 
 ## Turning it off
 
