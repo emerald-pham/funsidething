@@ -5221,12 +5221,11 @@ test("UI: the edit pane leads with the task actions, then the form actions", asy
   const rows = html.match(/<div class="mbtns[^"]*">[\s\S]*?<\/div>/g) || [];
   assert.equal(rows.length, 2, `expected two button rows, got ${rows.length} in: ${html}`);
 
-  // Row 1 — what to do with the TASK. (Return as candidate only ever shows up
-  // once a mark makes it relevant — see the "return as candidate" section
-  // below — so a plain, unmarked task doesn't render it at all.)
+  // Row 1 — what to do with the TASK. Return as candidate keeps its place
+  // even before a skip mark makes it available.
   assert.match(rows[0], /data-act="done-task"/, "Done leads");
   assert.match(rows[0], /data-act="worked-task"/, "then Worked on it");
-  assert.ok(!/data-act="return-candidate"/.test(rows[0]), "no skip mark on this task, so nothing to return");
+  assert.match(rows[0], /data-act="return-candidate"/, "Return as candidate keeps its place");
   assert.ok(!/data-act="save-edit"/.test(rows[0]), "Save belongs to the row below");
   assert.ok(!/data-act="delete-task"/.test(rows[0]), "and so does Delete");
 
@@ -5264,23 +5263,28 @@ test("UI: the edit pane renders a 'Return as candidate' button carrying that tas
   const html = shim.elements.get("modalRoot").innerHTML;
   assert.match(html, new RegExp(`data-act="return-candidate" data-id="${t.id}"`), `expected in: ${html}`);
   assert.match(html, /Return as candidate/);
+  assert.doesNotMatch(html.match(/<button[^>]*data-act="return-candidate"[^>]*>/)[0], /\bdisabled\b/);
 });
 
-test("UI: 'Return as candidate' does not appear at all when the task has no skip mark", async () => {
+test("UI: 'Return as candidate' stays visible but disabled when the task has no skip mark", async () => {
   const { ctx, shim } = await loadApp({ seed: 321 });
   const t = ctx.addTask("Task A", false);
   ctx.openEdit(t.id);
   const html = shim.elements.get("modalRoot").innerHTML;
-  assert.ok(!html.includes('data-act="return-candidate"'), `expected no Return as candidate button in: ${html}`);
+  assert.match(html, new RegExp(`<button[^>]*data-act="return-candidate" data-id="${t.id}"[^>]* disabled[^>]*>Return as candidate</button>`));
 });
 
-test("UI: 'Return as candidate' does not appear when the task is marked 'done' (evergreen rest, not a skip)", async () => {
+test("UI: 'Return as candidate' stays visible but disabled for a 'done' mark (evergreen rest, not a skip)", async () => {
   const { ctx, shim } = await loadApp({ seed: 322 });
   const t = ctx.addTask("Water the plants", false);
   ctx.state.considered[t.id] = "done";
   ctx.openEdit(t.id);
   const html = shim.elements.get("modalRoot").innerHTML;
-  assert.ok(!html.includes('data-act="return-candidate"'), `expected no Return as candidate button in: ${html}`);
+  assert.match(html, new RegExp(`<button[^>]*data-act="return-candidate" data-id="${t.id}"[^>]* disabled[^>]*>Return as candidate</button>`));
+});
+
+test("UI: unavailable Return as candidate has a grey button style", () => {
+  assert.match(styleSrc, /\.btn\.subtle:disabled\{[^}]*background:[^;}]*;[^}]*color:[^;}]*;[^}]*cursor:not-allowed/);
 });
 
 test("UI: 'Return as candidate' appears when the task is marked 'cant'", async () => {
