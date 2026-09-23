@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
+import { createHash, webcrypto } from "node:crypto";
 import vm from "node:vm";
 import fs from "node:fs";
 import path from "node:path";
@@ -85,7 +85,8 @@ test("Landscape location: saves a browser fix with device timezone, emits a chan
   assert.equal(result.enabled, true);
   assert.equal(result.latitude, position.coords.latitude);
   assert.equal(result.longitude, position.coords.longitude);
-  assert.match(result.timezone, /\//, "saved location includes the device timezone");
+  assert.equal(result.timezone, Intl.DateTimeFormat().resolvedOptions().timeZone,
+    "saved location includes the device timezone, including UTC on CI runners");
   assert.equal(JSON.parse(runtime.values.get("fvp:chain-scanner:location")).enabled, true);
   assert.equal(runtime.events.at(-1).type, "landscape-location-change");
   assert.match(runtime.location.caption(new Date("2026-06-21T17:00:00Z")), /Near London/);
@@ -839,7 +840,7 @@ function makeFakeElement() {
   return el;
 }
 
-function makeDomShim({ prefersDark = false } = {}) {
+function makeDomShim({ prefersDark = false, sharedStorage = null } = {}) {
   const elements = new Map();
   const winListeners = {};
   const localStorageMap = new Map();
@@ -859,7 +860,7 @@ function makeDomShim({ prefersDark = false } = {}) {
     body: { appendChild() {} },
     documentElement,
   };
-  const localStorage = {
+  const localStorage = sharedStorage || {
     getItem(k) { return localStorageMap.has(k) ? localStorageMap.get(k) : null; },
     setItem(k, v) { localStorageMap.set(k, String(v)); },
     removeItem(k) { localStorageMap.delete(k); },
@@ -903,8 +904,8 @@ function makeDomShim({ prefersDark = false } = {}) {
 
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
-async function loadApp({ seed, cloudSyncFactory, prefersDark = false, noMatchMedia = false, seedStorage, hostStorage, hostStorageDelayMs = 0, beforeStateReady } = {}) {
-  const shim = makeDomShim({ prefersDark });
+async function loadApp({ seed, cloudSyncFactory, prefersDark = false, noMatchMedia = false, seedStorage, sharedStorage, hostStorage, hostStorageDelayMs = 0, beforeStateReady, cryptoProvider = webcrypto } = {}) {
+  const shim = makeDomShim({ prefersDark, sharedStorage });
   if (noMatchMedia) delete shim.window.matchMedia;   // old browser / bare JS host
   if (seedStorage) for (const [k, v] of Object.entries(seedStorage)) shim.localStorage.setItem(k, v);
   /* The OTHER persistence backend. loadState() prefers window.storage (the
@@ -929,6 +930,7 @@ async function loadApp({ seed, cloudSyncFactory, prefersDark = false, noMatchMed
     localStorage: shim.localStorage,
     console,
     JSON,
+    crypto:cryptoProvider,
     // NOTE: deliberately NOT injecting the outer process's `Date` here — it's
     // passed by reference, so overriding Date.now on it (for time-travel
     // tests) would leak into the whole Node process. Leave Date unset and the
@@ -1193,6 +1195,18 @@ test("undo: writes the restored state to storage, so a reload doesn't resurrect 
   assert.deepEqual(persisted(shim).tasks.filter((x) => x.done), [],
     "the undone completion must not still be on disk");
   assert.equal(persisted(shim).tasks.find((x) => x.id === t.id).done, false);
+});
+
+test("undo: a persisted deletion restores its task without the old tombstone deleting it again", async () => {
+  const { ctx, shim } = await loadApp({ seed: 400 });
+  const t = ctx.addTask("Keep after undo", false);
+  await settle();
+  ctx.deleteTask(t.id);
+  await settle();
+  assert.equal(persisted(shim).tasks.some((x) => x.id === t.id), false);
+  ctx.undo();
+  await settle();
+  assert.equal(persisted(shim).tasks.some((x) => x.id === t.id), true);
 });
 
 test("undo: stamps updatedAt so the restored state outranks the copy it reverses", async () => {
@@ -6927,7 +6941,468 @@ test("list filter row: no label either when there's nothing to filter by", async
    ===================================================================== */
 
 const SYNC_STORE_KEY = "fvp:chain-scanner:v1";
+const LOCAL_HEAD_KEY = "fvp:chain-scanner:protected:v1";
+const LOCAL_BACKUPS_KEY = "fvp:chain-scanner:daily-backups:v1";
 const HOUR = 3600000;
+
+function sharedScannerStorage(initial = {}) {
+  const values = new Map(Object.entries(initial));
+  return {
+    getItem: key => values.has(key) ? values.get(key) : null,
+    setItem: (key, value) => values.set(key, String(value)),
+    removeItem: key => values.delete(key),
+  };
+}
+
+test('STALE TAB: a September 2 tab cannot replace a September 23 browser save or cloud revision', async () => {
+  const september2 = Date.parse('2026-09-02T12:00:00Z');
+  const september23 = Date.parse('2026-09-23T12:00:00Z');
+  const storage = sharedScannerStorage({ [SYNC_STORE_KEY]: JSON.stringify(staleState(september2)) });
+  const oldTab = await loadApp({ sharedStorage: storage });
+  const currentTab = await loadApp({ sharedStorage: storage });
+  setFakeTime(currentTab.ctx, september23);
+  currentTab.ctx.addTask('September 23 history');
+  assert.equal(await currentTab.ctx.persist(), true);
+  const currentBytes = storage.getItem(SYNC_STORE_KEY);
+  setFakeTime(oldTab.ctx, september23 + 1000);
+  oldTab.ctx.addTask('Stale tab edit');
+  await oldTab.ctx.persist();
+  assert.notEqual(storage.getItem(SYNC_STORE_KEY), currentBytes, 'both edits are retained in a new save');
+  assert.ok(JSON.parse(storage.getItem(SYNC_STORE_KEY)).tasks.some(task => task.title === 'September 23 history'), 'current history stays durable');
+  assert.ok(JSON.parse(storage.getItem(SYNC_STORE_KEY)).tasks.some(task => task.title === 'Stale tab edit'), 'unrecorded stale-tab task is merged');
+  assert.ok(oldTab.ctx.state.tasks.some(task => task.title === 'September 23 history'), 'stale tab reloads current board');
+  assert.ok(oldTab.ctx.readLocalBackups().some(entry => entry.payload.includes('Stale tab edit')), 'rejected draft remains restorable');
+});
+
+test('CLOUD MERGE: a higher revision without deletion evidence retains older unique tasks', async () => {
+  const local = syncState({ tasks: [syncTask('september23', 'September 23 no-history task')], syncRev: 4 });
+  const remote = syncState({ tasks: [syncTask('september2', 'Old tab task')] });
+  const h = makeSyncHarness({ remote, rev: 5 });
+  const { ctx } = await loadApp({ seedStorage: { [SYNC_STORE_KEY]: JSON.stringify(local) }, cloudSyncFactory: h.factory });
+  await ctx.cloudPull(); await syncSettle(PAST_DEBOUNCE);
+  assert.deepEqual(new Set(Array.from(ctx.state.tasks, task => task.id)), new Set(['september23', 'september2']));
+  assert.deepEqual(new Set(h.remoteState().tasks.map(task => task.id)), new Set(['september23', 'september2']));
+});
+
+test('CLOUD MERGE: explicit deletion evidence prevents resurrection on a stale device', async () => {
+  const local = syncState({ tasks: [syncTask('keep', 'Keep'), syncTask('remove', 'Remove')], syncRev: 4 });
+  const remote = syncState({ tasks: [syncTask('keep', 'Keep')], deletedTaskIds: { remove: true } });
+  const h = makeSyncHarness({ remote, rev: 5 });
+  const { ctx } = await loadApp({ seedStorage: { [SYNC_STORE_KEY]: JSON.stringify(local) }, cloudSyncFactory: h.factory });
+  await ctx.cloudPull();
+  assert.deepEqual(Array.from(ctx.state.tasks, task => task.id), ['keep']);
+  ctx.deleteTask('keep');
+  assert.equal(ctx.state.deletedTaskIds.keep, true);
+});
+
+test('CLOUD TIME: Firestore server dates decide which dated copy is newer', async () => {
+  const local = syncState({ tasks: [syncTask('local', 'Local')], syncRev: 4, lastCloudServerAt: 1000 });
+  const remote = syncState({ tasks: [syncTask('remote', 'Remote')] });
+  const h = makeSyncHarness({ remote, rev: 4 });
+  h.doc.serverUpdatedAt = { toMillis: () => 2000 };
+  const { ctx } = await loadApp({ seedStorage: { [SYNC_STORE_KEY]: JSON.stringify(local) }, cloudSyncFactory: h.factory });
+  await ctx.cloudPull();
+  assert.ok(ctx.state.tasks.some(task => task.id === 'remote'), 'server dated remote copy was adopted');
+  assert.ok(ctx.state.tasks.some(task => task.id === 'local'), 'undel​eted local task still survives');
+  assert.equal(ctx.state.lastCloudServerAt, 2000);
+  assert.ok(!JSON.parse(ctx.cloudPayload()).lastCloudServerAt, 'server read watermark remains device local');
+});
+
+test('CLOUD TIME: equal server milliseconds fall back to revision so a newer write is adopted', async () => {
+  const local=syncState({tasks:[syncTask('local','Local')],syncRev:4,lastCloudServerAt:1000});
+  const remote=syncState({tasks:[syncTask('remote','Remote')]});
+  const h=makeSyncHarness({remote,rev:5}); h.doc.serverUpdatedAt={toMillis:()=>1000};
+  const {ctx}=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(local)},cloudSyncFactory:h.factory});
+  await ctx.cloudPull();
+  assert.ok(ctx.state.tasks.some(task=>task.id==='remote'));
+});
+
+test('CLOUD TIME: an older server date cannot win by revision or cause a retry loop', async () => {
+  const local=syncState({tasks:[syncTask('shared','Later local')],syncRev:4,lastCloudServerAt:2000});
+  const remote=syncState({tasks:[syncTask('shared','Earlier remote')]});
+  const h=makeSyncHarness({remote,rev:5}); h.doc.serverUpdatedAt={toMillis:()=>1000};
+  const {ctx}=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(local)},cloudSyncFactory:h.factory});
+  await ctx.cloudPull(); await syncSettle(PAST_DEBOUNCE);
+  assert.equal(ctx.state.tasks[0].title,'Later local');
+  assert.equal(h.remoteState().tasks[0].title,'Later local');
+  assert.equal(h.conflicts,0);
+});
+
+test('CLOUD TIME: Firestore writes request an authoritative server timestamp', () => {
+  assert.match(html, /tx\.set\(pushRef,\s*\{[^}]*serverUpdatedAt:\s*F\.serverTimestamp\(\)/);
+});
+
+test('CLOUD ACCOUNT: a transaction binds its document before auth can switch', () => {
+  const push=html.slice(html.indexOf('CS.push = async'),html.indexOf('A.onAuthStateChanged'));
+  assert.match(push,/const pushRef\s*=\s*F\.doc\(db,\s*"users",\s*auth\.currentUser\.uid\)/);
+  assert.match(push,/tx\.get\(pushRef\)/);
+  assert.match(push,/tx\.set\(pushRef,/);
+});
+
+test('CLOUD RULES: old clients cannot write without next revision and server time', () => {
+  const rules=fs.readFileSync(path.join(__dirname,'firestore.rules'),'utf8');
+  assert.match(rules,/request\.resource\.data\.serverUpdatedAt\s*==\s*request\.time/);
+  assert.match(rules,/request\.resource\.data\.rev\s*==\s*resource\.data\.get\('rev',\s*0\)\s*\+\s*1/);
+  assert.match(rules,/allow delete:\s*if false/);
+});
+
+test('CLOUD RETRY: rejected server write is not mistaken for a synced payload', async () => {
+  const {ctx,shim}=await loadApp(); let pushes=0;
+  shim.window.CloudSync={ready:true,configured:true,user:'account',pull:async()=>({empty:true}),push:async()=>{pushes++;return {error:true};}};
+  await ctx.cloudPull(); ctx.addTask('Retry me'); ctx.cloudPushNow(); await syncSettle(20);
+  ctx.cloudPushNow(); await syncSettle(20);
+  assert.equal(pushes,2);
+});
+
+test('HARD GATE: local persistence repairs a task silently omitted without deletion evidence', async () => {
+  const { ctx, shim } = await loadApp();
+  ctx.addTask('Keep one'); ctx.addTask('Keep two'); await ctx.persist();
+  const lost = ctx.state.tasks[1];
+  ctx.state.tasks = ctx.state.tasks.filter(task => task.id !== lost.id); // simulate a future regression
+  await ctx.persist();
+  assert.ok(ctx.state.tasks.some(task => task.id === lost.id));
+  assert.ok(JSON.parse(shim.localStorage.getItem(SYNC_STORE_KEY)).tasks.some(task => task.id === lost.id));
+});
+
+test('HARD GATE: cloud push repairs an omitted legacy task before conditional write', async () => {
+  const base = syncState({ tasks: [syncTask('a','A'), syncTask('b','B')], syncRev: 3 });
+  const h = makeSyncHarness({ remote: base, rev: 3 });
+  const { ctx } = await loadApp({ seedStorage: { [SYNC_STORE_KEY]: JSON.stringify(base) }, cloudSyncFactory: h.factory });
+  await ctx.cloudPull();
+  ctx.state.tasks = ctx.state.tasks.filter(task => task.id !== 'b'); // no delete action
+  ctx.cloudPushNow(); await syncSettle(PAST_DEBOUNCE);
+  assert.ok(h.remoteState().tasks.some(task => task.id === 'b'));
+});
+
+test('HARD GATE: a failed local safety backup blocks the repaired cloud write', async () => {
+  const base=syncState({tasks:[syncTask('a','A'),syncTask('b','B')],syncRev:3});
+  const h=makeSyncHarness({remote:base,rev:3});
+  const storage=sharedScannerStorage({[SYNC_STORE_KEY]:JSON.stringify(base)});
+  const {ctx}=await loadApp({sharedStorage:storage,cloudSyncFactory:h.factory});
+  await ctx.cloudPull();
+  const set=storage.setItem;
+  storage.setItem=(key,value)=>{if(key===LOCAL_BACKUPS_KEY)throw Error('quota');set(key,value);};
+  ctx.state.tasks=ctx.state.tasks.filter(t=>t.id!=='b');
+  ctx.cloudPushNow(); await syncSettle(30);
+  assert.equal(h.calls.includes('push'),false);
+  assert.ok(h.remoteState().tasks.some(t=>t.id==='b'));
+});
+
+test('LEGACY MIGRATION: old v1 browser and cloud boards retain unique historyless tasks', async () => {
+  const local = syncState({ v:1, tasks:[syncTask('legacy-local','Saved on old app')], syncRev:2 });
+  delete local.deletedTaskIds;
+  const remote = syncState({ v:1, tasks:[syncTask('legacy-cloud','Synced on old app')] });
+  delete remote.deletedTaskIds;
+  const h=makeSyncHarness({remote,rev:3});
+  const {ctx,shim}=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(local)},cloudSyncFactory:h.factory});
+  await ctx.cloudPull(); await syncSettle(PAST_DEBOUNCE);
+  assert.deepEqual(new Set(Array.from(ctx.state.tasks,task=>task.id)),new Set(['legacy-local','legacy-cloud']));
+  assert.deepEqual(new Set(JSON.parse(shim.localStorage.getItem(SYNC_STORE_KEY)).tasks.map(task=>task.id)),new Set(['legacy-local','legacy-cloud']));
+  assert.deepEqual(new Set(h.remoteState().tasks.map(task=>task.id)),new Set(['legacy-local','legacy-cloud']));
+});
+
+test('HISTORY GATE: next client keeps September 23 completion and work log after stale cloud write', async () => {
+  const done=syncTask('shared','Shared task'); done.done=true; done.completedAt=Date.parse('2026-09-23T10:00:00Z');
+  const local=syncState({tasks:[done],workLog:[{id:'session23',taskId:'shared',title:'Shared task',kind:'worked',at:Date.parse('2026-09-23T09:00:00Z')}],syncRev:4});
+  const old=syncState({tasks:[syncTask('shared','Shared task')],workLog:[]});
+  const h=makeSyncHarness({remote:old,rev:5});
+  const storage=sharedScannerStorage({[SYNC_STORE_KEY]:JSON.stringify(local)});
+  const first=await loadApp({sharedStorage:storage,cloudSyncFactory:h.factory});
+  await first.ctx.cloudPull(); await syncSettle(PAST_DEBOUNCE);
+  assert.equal(first.ctx.state.tasks[0].completedAt,done.completedAt);
+  assert.ok(first.ctx.state.workLog.some(entry=>entry.id==='session23'));
+  const second=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify({...h.remoteState(),syncRev:h.doc.rev})},cloudSyncFactory:h.factory});
+  await second.ctx.cloudPull();
+  assert.equal(second.ctx.state.tasks[0].completedAt,done.completedAt);
+  assert.ok(second.ctx.state.workLog.some(entry=>entry.id==='session23'));
+});
+
+test('DELETE INTENT: an unrelated newer cloud write cannot resurrect a locally deleted task or cleared row', async () => {
+  const log={id:'worked-row',taskId:'removed',title:'Removed',kind:'worked',at:Date.now()-1000};
+  const local=syncState({tasks:[],workLog:[],deletedTaskIds:{removed:true},clearedHistoryIds:{'worked-row':true},syncRev:4});
+  const remote=syncState({tasks:[syncTask('removed','Removed')],workLog:[log]});
+  const h=makeSyncHarness({remote,rev:5});
+  const {ctx}=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(local)},cloudSyncFactory:h.factory});
+  await ctx.cloudPull(); await syncSettle(PAST_DEBOUNCE);
+  assert.equal(ctx.state.tasks.some(task=>task.id==='removed'),false);
+  assert.equal(ctx.state.workLog.some(entry=>entry.id==='worked-row'),false);
+  assert.equal(h.remoteState().tasks.some(task=>task.id==='removed'),false);
+});
+
+test('RESTORE INTENT: an unrelated newer tombstone cannot discard an offline task or History restore', async () => {
+  const {ctx}=await loadApp();
+  const task=syncTask('restore-me','Restored task');
+  const row={id:'restore-row',taskId:task.id,title:task.title,kind:'worked',at:Date.now()-1000};
+  const remote=syncState({tasks:[],workLog:[],deletedTaskIds:{[task.id]:true},clearedHistoryIds:{[row.id]:true}});
+  const local=syncState({tasks:[task],workLog:[row],restoredTaskIds:{[task.id]:true},restoredHistoryIds:{[row.id]:true},
+    restoredTaskOps:{[task.id]:['restore-1']},restoredHistoryOps:{[row.id]:['restore-row-1']}});
+  assert.equal(ctx.mergeUndeletedTasks(remote,local),true);
+  assert.ok(remote.tasks.some(t=>t.id===task.id));
+  assert.ok(remote.workLog.some(e=>e.id===row.id));
+  assert.equal(remote.deletedTaskIds[task.id],undefined);
+  assert.equal(remote.clearedHistoryIds[row.id],undefined);
+});
+
+test('RESTORE INTENT: a delete that observed the restore may remove it', async () => {
+  const {ctx}=await loadApp();
+  const task=syncTask('restore-me','Restored task');
+  ctx.state.tasks.push(task);
+  ctx.state.restoredTaskIds[task.id]=true;
+  ctx.state.restoredTaskOps[task.id]=['restore-1'];
+  ctx.deleteTask(task.id);
+  assert.deepEqual(Array.from(ctx.state.deletedAfterRestoreOps[task.id][0]),['restore-1']);
+  const restored=syncState({tasks:[task],restoredTaskIds:{[task.id]:true},restoredTaskOps:{[task.id]:['restore-1']}});
+  ctx.mergeUndeletedTasks(ctx.state,restored);
+  assert.equal(ctx.state.tasks.some(t=>t.id===task.id),false);
+});
+
+test('RESTORE INTENT: two partial delete observations cannot combine into false causal proof', async () => {
+  const {ctx}=await loadApp();
+  const task=syncTask('concurrent','Concurrent restores');
+  const deletedA=syncState({tasks:[],deletedTaskIds:{[task.id]:true},deletedAfterRestoreOps:{[task.id]:['restore-a']}});
+  const deletedB=syncState({tasks:[],deletedTaskIds:{[task.id]:true},deletedAfterRestoreOps:{[task.id]:['restore-b']}});
+  const restored=syncState({tasks:[task],restoredTaskIds:{[task.id]:true},restoredTaskOps:{[task.id]:['restore-a','restore-b']}});
+  ctx.mergeUndeletedTasks(deletedA,deletedB);
+  ctx.mergeUndeletedTasks(deletedA,restored);
+  assert.ok(deletedA.tasks.some(t=>t.id===task.id));
+});
+
+test('RESTORE INTENT: merging a weaker delete cannot erase stronger causal proof', async () => {
+  const {ctx}=await loadApp();
+  const task=syncTask('strong-delete','Strong delete');
+  const weak=syncState({tasks:[],deletedTaskIds:{[task.id]:true},deletedAfterRestoreOps:{[task.id]:[['restore-a']]}});
+  const strong=syncState({tasks:[],deletedTaskIds:{[task.id]:true},deletedAfterRestoreOps:{[task.id]:[['restore-a','restore-b']]}});
+  const restored=syncState({tasks:[task],restoredTaskIds:{[task.id]:true},restoredTaskOps:{[task.id]:['restore-a','restore-b']}});
+  ctx.mergeUndeletedTasks(weak,strong);
+  ctx.mergeUndeletedTasks(weak,restored);
+  assert.equal(weak.tasks.some(t=>t.id===task.id),false);
+});
+
+test('RESTORE INTENT: operation evidence has stable order across merge direction', async () => {
+  const {ctx}=await loadApp();
+  const task=syncTask('stable','Stable evidence');
+  const a=syncState({tasks:[task],restoredTaskIds:{[task.id]:true},restoredTaskOps:{[task.id]:['run-b']}});
+  const b=syncState({tasks:[task],restoredTaskIds:{[task.id]:true},restoredTaskOps:{[task.id]:['run-a']}});
+  const left=JSON.parse(JSON.stringify(a)),right=JSON.parse(JSON.stringify(b));
+  ctx.mergeUndeletedTasks(left,b);
+  ctx.mergeUndeletedTasks(right,a);
+  assert.deepEqual(left.restoredTaskOps,right.restoredTaskOps);
+});
+
+test('RESTORE INTENT: two tabs at the same clock tick mint distinct task and operation IDs', async () => {
+  const first=await loadApp({seed:1,cryptoProvider:{randomUUID:()=> '11111111-1111-4111-8111-111111111111'}});
+  const second=await loadApp({seed:1,cryptoProvider:{randomUUID:()=> '22222222-2222-4222-8222-222222222222'}});
+  const when=Date.parse('2026-09-23T12:00:00Z');
+  setFakeTime(first.ctx,when); setFakeTime(second.ctx,when);
+  const a=first.ctx.addTask('First'); const b=second.ctx.addTask('Second');
+  assert.notEqual(a.id,b.id);
+  first.ctx.state.deletedTaskIds[a.id]=true;
+  second.ctx.state.deletedTaskIds[b.id]=true;
+  first.ctx.noteRestoreIntent(first.ctx.state,a.id,'deletedTaskIds','restoredTaskIds','restoredTaskOps','deletedAfterRestoreOps');
+  second.ctx.noteRestoreIntent(second.ctx.state,b.id,'deletedTaskIds','restoredTaskIds','restoredTaskOps','deletedAfterRestoreOps');
+  assert.notEqual(first.ctx.state.restoredTaskOps[a.id][0],second.ctx.state.restoredTaskOps[b.id][0]);
+});
+
+test('RESTORE INTENT: reopening a completed task survives a later unrelated cloud write', async () => {
+  const {ctx}=await loadApp();
+  const old=syncTask('same','Same'); old.done=true; old.completedAt=1000; old.lastDoneAt=1000;
+  const local=syncState({tasks:[{...old,done:false,completedAt:null,lastDoneAt:null,restoredAt:2000,restoredRunOp:'run-1'}]});
+  const remote=syncState({tasks:[old]});
+  ctx.mergeUndeletedTasks(remote,local);
+  assert.equal(remote.tasks[0].done,false);
+  assert.equal(remote.tasks[0].restoredRunOp,'run-1');
+});
+
+test('RESTORE INTENT: concurrent reopen evidence survives a completion that observed only one', async () => {
+  const {ctx}=await loadApp();
+  const base=syncTask('shared-open','Shared open');
+  const first=syncState({tasks:[{...base,restoredRunOp:'run-a',restoredAt:1000}]});
+  const second=syncState({tasks:[{...base,restoredRunOp:'run-b',restoredAt:1001}]});
+  ctx.mergeUndeletedTasks(first,second);
+  const done=syncState({tasks:[{...base,done:true,completedAt:2000,lastDoneAt:2000,restoredRunOp:'run-a',completedAfterRestoreOp:'run-a'}]});
+  ctx.mergeUndeletedTasks(done,first);
+  assert.equal(done.tasks[0].done,false);
+});
+
+test('DELETION LOG: two-month deletion evidence survives Clear history and tombstones outlive the log', async () => {
+  const {ctx}=await loadApp();
+  setFakeTime(ctx,Date.parse('2026-09-01T12:00:00Z'));
+  const old=ctx.addTask('Delete in September'); ctx.deleteTask(old.id);
+  assert.ok(ctx.state.deletionLog.some(entry=>entry.taskId===old.id && entry.kind==='task'));
+  setFakeTime(ctx,Date.parse('2026-09-23T12:00:00Z'));
+  const completed=ctx.addTask('Complete then clear'); ctx.completeTask(completed);
+  ctx.clearCompleted();
+  assert.ok(ctx.state.deletionLog.some(entry=>entry.taskId===old.id), 'clearing visible History keeps the independent log');
+  assert.ok(ctx.state.deletionLog.some(entry=>entry.taskId===completed.id));
+  setFakeTime(ctx,Date.parse('2026-10-03T12:00:00Z'));
+  assert.ok(ctx.state.deletionLog.some(entry=>entry.taskId===old.id),'September event remains in October');
+  setFakeTime(ctx,Date.parse('2026-11-03T12:00:00Z'));
+  const recent=ctx.addTask('Delete in October'); ctx.deleteTask(recent.id);
+  assert.equal(ctx.state.deletionLog.some(entry=>entry.taskId===old.id),false,'dated log rolls after two months');
+  assert.equal(ctx.state.deletedTaskIds[old.id],true,'compact tombstone remains so a very old tab cannot resurrect it');
+});
+
+test('DELETION LOG: short February does not make the two-month window expire early', async () => {
+  const {ctx}=await loadApp();
+  setFakeTime(ctx,Date.parse('2026-02-28T12:00:00Z'));
+  const edge=ctx.addTask('Last day of February'); ctx.deleteTask(edge.id);
+  setFakeTime(ctx,Date.parse('2026-04-30T12:00:00Z'));
+  const current=ctx.addTask('April'); ctx.deleteTask(current.id);
+  assert.ok(ctx.state.deletionLog.some(row=>row.taskId===edge.id));
+});
+
+test('ACCOUNT BOUNDARY: divergent ownerless v1 bytes are backed up but not merged into another account', async () => {
+  const known=syncState({tasks:[syncTask('b','Account B')],syncAccount:'b@example.com'});
+  const storage=sharedScannerStorage({[SYNC_STORE_KEY]:JSON.stringify(known)});
+  const first=await loadApp({sharedStorage:storage}); await first.ctx.persist();
+  const unknown=syncState({tasks:[syncTask('a','Unknown owner')]}); delete unknown.syncAccount;
+  storage.setItem(SYNC_STORE_KEY,JSON.stringify(unknown));
+  const second=await loadApp({sharedStorage:storage});
+  assert.deepEqual(Array.from(second.ctx.state.tasks,task=>task.id),['b']);
+  assert.ok(second.ctx.readLocalBackups().some(entry=>entry.payload.includes('Unknown owner')));
+});
+
+test('LEGACY TAB: old shell additions and history merge into protected copy on next load', async () => {
+  const storage=sharedScannerStorage();
+  const current=await loadApp({sharedStorage:storage});
+  const task=current.ctx.addTask('Current'); await current.ctx.persist();
+  const legacy=JSON.parse(storage.getItem(SYNC_STORE_KEY));
+  legacy.tasks.push(syncTask('older-shell-add','Added in older shell'));
+  legacy.tasks.find(t=>t.id===task.id).done=true;
+  legacy.tasks.find(t=>t.id===task.id).completedAt=Date.parse('2026-09-23T10:00:00Z');
+  legacy.workLog.push({id:'older-shell-log',taskId:task.id,title:'Current',kind:'worked',at:Date.parse('2026-09-23T09:00:00Z')});
+  storage.setItem(SYNC_STORE_KEY,JSON.stringify(legacy));
+  const reopened=await loadApp({sharedStorage:storage});
+  assert.ok(reopened.ctx.state.tasks.some(t=>t.id==='older-shell-add'));
+  assert.equal(reopened.ctx.state.tasks.find(t=>t.id===task.id).completedAt,Date.parse('2026-09-23T10:00:00Z'));
+  assert.ok(reopened.ctx.state.workLog.some(e=>e.id==='older-shell-log'));
+});
+
+test('LEGACY TAB: a direct v1 overwrite is recovered from the protected copy on next load', async () => {
+  const storage = sharedScannerStorage();
+  const current = await loadApp({ sharedStorage: storage });
+  current.ctx.addTask('September 23 history');
+  await current.ctx.persist();
+  const currentBytes = storage.getItem(SYNC_STORE_KEY);
+  assert.equal(storage.getItem(LOCAL_HEAD_KEY), currentBytes);
+  const oldBytes = JSON.stringify(staleState(Date.now()));
+  storage.setItem(SYNC_STORE_KEY, oldBytes); // an older cached app knows only this key
+  const reopened = await loadApp({ sharedStorage: storage });
+  assert.ok(reopened.ctx.state.tasks.some(task => task.title === 'September 23 history'));
+  assert.ok(JSON.parse(storage.getItem(SYNC_STORE_KEY)).tasks.some(task => task.id === 't_old'), 'legacy task without deletion evidence is also retained');
+  assert.notEqual(storage.getItem(SYNC_STORE_KEY), oldBytes);
+  assert.ok(reopened.ctx.readLocalBackups().some(entry => entry.payload === oldBytes), 'legacy write remains available for manual restore');
+});
+
+test('LOCAL BACKUPS: seven local calendar days, latest save today, and pre-restore safety copy', async () => {
+  const storage = sharedScannerStorage();
+  const { ctx, shim } = await loadApp({ sharedStorage: storage });
+  for (let day = 1; day <= 8; day++) {
+    setFakeTime(ctx, Date.parse(`2026-09-${String(day).padStart(2, '0')}T12:00:00Z`));
+    ctx.addTask(`Day ${day}`);
+    await ctx.persist();
+  }
+  let entries = ctx.readLocalBackups();
+  assert.deepEqual(Array.from(new Set(entries.map(entry => entry.day))).sort(),
+    ['2026-09-02','2026-09-03','2026-09-04','2026-09-05','2026-09-06','2026-09-07','2026-09-08']);
+  const day3 = entries.find(entry => entry.day === '2026-09-03' && entry.kind === 'daily');
+  ctx.openSettings();
+  assert.match(shim.document.getElementById('modalRoot').innerHTML, /Daily local backups/);
+  assert.match(shim.document.getElementById('modalRoot').innerHTML, /seven calendar days/);
+  ctx.onAction('restore-local-backup', { dataset: { id: day3.id } });
+  entries = ctx.readLocalBackups();
+  assert.ok(entries.some(entry => entry.kind === 'before-restore' && entry.payload.includes('Day 8')),
+    'the current state is captured before replacement');
+  assert.deepEqual(Array.from(ctx.state.tasks, task => task.title),
+    ['Day 1','Day 2','Day 3','Day 4','Day 5','Day 6','Day 7','Day 8'],
+    'restoring an older backup must retain later tasks that have no delete log');
+  await ctx.persist();
+  assert.ok(entries.every(entry => !JSON.parse(entry.payload).localBackups), 'backups stay outside the synced state');
+  assert.equal(storage.getItem(LOCAL_BACKUPS_KEY) !== null, true);
+});
+
+test('LOCAL BACKUPS: a manual backup remains restorable after the seven-day window', async () => {
+  const storage=sharedScannerStorage(); const {ctx,shim}=await loadApp({sharedStorage:storage});
+  setFakeTime(ctx,Date.parse('2026-09-01T12:00:00Z'));
+  ctx.addTask('Keep indefinitely'); await ctx.persist();
+  ctx.onAction('make-manual-backup',{});
+  const saved=ctx.readLocalBackups().find(entry=>entry.kind==='manual');
+  assert.ok(saved);
+  setFakeTime(ctx,Date.parse('2026-11-03T12:00:00Z'));
+  ctx.addTask('Current board'); await ctx.persist();
+  assert.ok(ctx.readLocalBackups().some(entry=>entry.id===saved.id));
+  ctx.openSettings();
+  assert.match(shim.document.getElementById('modalRoot').innerHTML,/Make manual backup/);
+  ctx.onAction('restore-local-backup',{dataset:{id:saved.id}});
+  assert.deepEqual(Array.from(ctx.state.tasks,task=>task.title),['Keep indefinitely','Current board']);
+  assert.ok(ctx.readLocalBackups().some(entry=>entry.kind==='before-restore' && entry.payload.includes('Current board')));
+});
+
+test('LOCAL BACKUPS: restoring an open task deliberately reopens a later completion', async () => {
+  const {ctx}=await loadApp();
+  const task=ctx.addTask('Open in backup'); await ctx.persist();
+  ctx.onAction('make-manual-backup',{});
+  const backup=ctx.readLocalBackups().find(row=>row.kind==='manual');
+  ctx.doneTask(task.id); await ctx.persist();
+  assert.equal(ctx.state.tasks.find(t=>t.id===task.id).done,true);
+  ctx.onAction('restore-local-backup',{dataset:{id:backup.id}});
+  assert.equal(ctx.state.tasks.find(t=>t.id===task.id).done,false);
+});
+
+test('SETTINGS: manual local backups replace visible JSON import and export controls', async () => {
+  const {ctx,shim}=await loadApp(); ctx.openSettings();
+  const markup=shim.document.getElementById('modalRoot').innerHTML;
+  assert.match(markup,/data-act="make-manual-backup"/);
+  assert.doesNotMatch(markup,/data-act="(?:import|export)-json"|id="jsonBox"/);
+  assert.match(html,/title="Settings, contexts, and backups"/);
+});
+
+test('LOCAL BACKUPS: a failed safety copy blocks restore and leaves the current board untouched', async () => {
+  const storage = sharedScannerStorage();
+  const { ctx } = await loadApp({ sharedStorage: storage });
+  ctx.addTask('Keep this'); await ctx.persist();
+  const before = ctx.readLocalBackups()[0];
+  const originalSet = storage.setItem;
+  storage.setItem = (key, value) => { if (key === LOCAL_BACKUPS_KEY) throw Error('quota'); originalSet(key, value); };
+  ctx.onAction('restore-local-backup', { dataset: { id: before.id } });
+  assert.deepEqual(Array.from(ctx.state.tasks, task => task.title), ['Keep this']);
+});
+
+test('HARD GATE: failed pre-adoption backup cannot replace a healthy local board', async () => {
+  const local=syncState({tasks:[syncTask('local','Current history')],syncRev:1});
+  const remote=syncState({tasks:[syncTask('remote','Remote copy')]});
+  const h=makeSyncHarness({remote,rev:2});
+  const storage=sharedScannerStorage({[SYNC_STORE_KEY]:JSON.stringify(local)});
+  const {ctx}=await loadApp({sharedStorage:storage,cloudSyncFactory:h.factory});
+  const set=storage.setItem;
+  storage.setItem=(key,value)=>{if(key===LOCAL_BACKUPS_KEY)throw Error('quota');set(key,value);};
+  await ctx.cloudPull();
+  assert.ok(ctx.state.tasks.some(task=>task.id==='local'));
+  assert.ok(!ctx.state.tasks.some(task=>task.id==='remote'));
+  assert.ok(JSON.parse(storage.getItem(SYNC_STORE_KEY)).tasks.some(task=>task.id==='local'));
+});
+
+test('HARD GATE: full backup store blocks browser overwrite and preserves its prior bytes', async () => {
+  const storage=sharedScannerStorage();
+  const {ctx}=await loadApp({sharedStorage:storage});
+  ctx.addTask('Original'); await ctx.persist();
+  const prior=storage.getItem(SYNC_STORE_KEY);
+  const set=storage.setItem;
+  storage.setItem=(key,value)=>{if(key===LOCAL_BACKUPS_KEY)throw Error('quota');set(key,value);};
+  ctx.addTask('Unsaved new work');
+  assert.equal(await ctx.persist(),false);
+  assert.equal(storage.getItem(SYNC_STORE_KEY),prior);
+  assert.equal(storage.getItem(LOCAL_HEAD_KEY),prior);
+  assert.match(ctx.document.getElementById('toast').textContent,/Keep this tab open/);
+});
+
+test('HARD GATE: unreadable backup index is preserved instead of overwritten by a save', async () => {
+  const storage=sharedScannerStorage({[LOCAL_BACKUPS_KEY]:'damaged backup bytes'});
+  const {ctx}=await loadApp({sharedStorage:storage});
+  ctx.addTask('In memory');
+  assert.equal(await ctx.persist(),false);
+  assert.equal(storage.getItem(LOCAL_BACKUPS_KEY),'damaged backup bytes');
+});
 
 const syncTask = (id, title) => ({
   id, title, url: null, due: null, evergreen: false, ctx: [],
@@ -7565,11 +8040,11 @@ test("the revision a device is based on is device-local, never part of the share
   await ctx.cloudPull();                    // adopts revision 2
   await syncSettle(PAST_DEBOUNCE);
 
-  assert.equal(ctx.state.syncRev, 2, "the device remembers what it is based on");
+  assert.equal(ctx.state.syncRev, 3, "the repaired union earns and remembers a new revision");
   assert.ok(!("syncRev" in h.remoteState()),
     "but it must not ride along in the payload, or every adopt would look like a fresh edit");
   const pushesAfterAdopt = h.calls.filter((c) => c === "push").length;
-  assert.equal(pushesAfterAdopt, 0, "an adopt that changed nothing shouldn't bounce a write back");
+  assert.equal(pushesAfterAdopt, 1, "unique tasks from the older local copy must be published once");
 });
 
 test("a cloud document written before revisions existed still reconciles by timestamp", async () => {
@@ -9381,6 +9856,8 @@ test('Resume scan: current-pass skips stay out until the exact local 2 AM bounda
 
 test('Resume scan ranks remaining candidates strictly by estimated likelihood before and after 2 AM', async () => {
   const {ctx} = await loadApp({seed: 730});
+  ctx.state.settings.scanMode='descending';
+  ctx.state.scanMode='descending';
   const start = new Date(2026,7,27,3).getTime();
   setFakeTime(ctx,start);
   const root=ctx.addTask('Benchmark',false);
@@ -10824,7 +11301,7 @@ test('Scan preference: both mode buttons are available when resuming a chain',as
 test('Consistency repair: remote adoption retains account isolation before switching accounts',async()=>{
  const now=Date.now(),h=makeSyncHarness({remote:cloudState(now),rev:9});const local=staleState(now-1000);local.syncRev=8;local.syncAccount='e@example.com';
  const {ctx,shim}=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(local)},cloudSyncFactory:h.factory});
- await ctx.cloudPull();assert.equal(ctx.state.syncAccount,'e@example.com');
+ await ctx.cloudPull();await syncSettle(PAST_DEBOUNCE);assert.equal(ctx.state.syncAccount,'e@example.com');
  h.doc=null;shim.window.CloudSync.user='other@example.com';await ctx.cloudPull();ctx.cloudPushNow();await syncSettle(50);
  assert.ok(!(h.remoteTitles()||[]).includes('Draft the chapter'));
 });
@@ -10835,16 +11312,17 @@ test('Consistency repair: import Undo restores the original chance order, includ
  assert.equal(ctx.state.tasks[0].title,'Original 0');assert.equal(ctx.state.chance.seed,oldSeed);assert.equal(ctx.state.candidateId,oldCandidate);
  ctx.decide('no');ctx.newPass();const fresh=ctx.state.chance.seed;ctx.undo();ctx.undo();assert.equal(ctx.state.chance.seed,fresh,'explicit fresh pass remains a boundary across older undos');
 });
-test('Consistency repair: cloud adoption waits for an edit, blocks stale push, and makes saved draft recoverable',async()=>{
+test('Consistency repair: cloud adoption waits for an edit and retains a historyless task missing without a tombstone',async()=>{
  const now=Date.now(),remote=cloudState(now),h=makeSyncHarness({remote,rev:9});remote.syncRev=9;
  const {ctx,shim}=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(remote)},cloudSyncFactory:h.factory});await ctx.cloudPull();
  const id=ctx.state.tasks[0].id;ctx.openEdit(id);fillEditPane(ctx,shim,{title:'Saved draft'});
  let editing=true;shim.document.querySelector=selector=>selector.includes('.mback')&&editing?{}:null;
  const newer=JSON.parse(ctx.cloudPayload());newer.tasks=newer.tasks.filter(t=>t.id!==id);newer.chain=newer.chain.filter(t=>t!==id);h.writeBehindBack(newer);
  await ctx.cloudPull();assert.ok(ctx.state.tasks.some(t=>t.id===id));
- ctx.cloudPushNow();await syncSettle(20);assert.equal(h.remoteState().tasks.some(t=>t.id===id),false,'deferred reconciliation cannot overwrite remote deletion');
+ ctx.cloudPushNow();await syncSettle(20);assert.equal(h.remoteState().tasks.some(t=>t.id===id),false,'deferred reconciliation cannot overwrite a remote change during editing');
  editing=false;ctx.onAction('save-edit',{dataset:{id}});await syncSettle(40);
- assert.equal(ctx.state.tasks.some(t=>t.id===id),false,'newer remote eventually adopts');ctx.undo();assert.equal(ctx.state.tasks.find(t=>t.id===id).title,'Saved draft');
+ assert.equal(ctx.state.tasks.some(t=>t.id===id),true,'absence without explicit deletion cannot discard the task');
+ assert.equal(ctx.state.tasks.find(t=>t.id===id).title,'Saved draft');
 });
 test('Consistency repair: Add and dot establishes the 2 AM clock and honors single-mode preference',async()=>{
  const {ctx}=await loadApp();const at=new Date(2026,8,16,1).getTime();setFakeTime(ctx,at);ctx.addTask('Candidate');ctx.addTask('Urgent',true);ctx.state.snooze=100;
@@ -11135,7 +11613,7 @@ test('RISK browser layout matrix: native dates respect pane insets, rank evidenc
   }
   await page.evaluate(()=>{setFloatingHeaderPreference(true);document.scrollingElement.scrollTo(0,document.scrollingElement.scrollHeight);});await page.waitForTimeout(50);
   const pinned=await page.locator('#appHeader').boundingBox();assert.ok(pinned&&pinned.y>=0&&pinned.y<844,'enabled header stays visible after document scrolling');assert.ok(await page.locator('#appHeader [data-act="undo"]').isVisible());
-  await page.getByTitle('Settings, contexts, import/export').click();await page.locator('#stFloatingHeader').uncheck();await page.locator('#stFloatingHeader').check();await page.locator('[data-act="close-modal"]').click();await page.getByTitle('Settings, contexts, import/export').click();assert.equal(await page.locator('#stFloatingHeader').isChecked(),true,'closing and reopening Settings retains the checkmark');await page.locator('[data-act="close-modal"]').click();
+  await page.getByTitle('Settings, contexts, and backups').click();await page.locator('#stFloatingHeader').uncheck();await page.locator('#stFloatingHeader').check();await page.locator('[data-act="close-modal"]').click();await page.getByTitle('Settings, contexts, and backups').click();assert.equal(await page.locator('#stFloatingHeader').isChecked(),true,'closing and reopening Settings retains the checkmark');await page.locator('[data-act="close-modal"]').click();
   await page.evaluate(()=>{state.settings.floatingHeader=false;render();window.scrollTo(0,document.body.scrollHeight);});await page.waitForTimeout(50);
   const ordinary=await page.locator('#appHeader').boundingBox();assert.ok(ordinary&&ordinary.y<0,'disabled header scrolls normally');
  }finally{await browser.close();}
@@ -11416,4 +11894,38 @@ test('Eligibility filter: No, Cannot and Dislodged are ineligible until their ma
  ctx.state.cantAt[cant.id]=Date.now()-(ctx.state.settings.cantMin+1)*60000;ctx.expireCants();
  ctx.onAction('list-eligibility',{dataset:{id:'eligible'}});assert.equal(rowTitles(shim).length,4);
  ctx.onAction('list-eligibility',{dataset:{id:'ineligible'}});assert.equal(rowTitles(shim).length,0);
+});
+
+test('Firestore rules: old clients cannot replace a revisioned board', {skip:!process.env.FIRESTORE_EMULATOR_HOST}, async () => {
+  const {assertFails,assertSucceeds,initializeTestEnvironment}=await import('@firebase/rules-unit-testing');
+  const {doc,getDoc,setDoc,deleteDoc,serverTimestamp}=await import('firebase/firestore');
+  const rules=fs.readFileSync(path.join(__dirname,'firestore.rules'),'utf8');
+  const env=await initializeTestEnvironment({projectId:'demo-chain-scanner-data-safety',firestore:{rules}});
+  try{
+    const alice=env.authenticatedContext('alice').firestore();
+    const bob=env.authenticatedContext('bob').firestore();
+    const guest=env.unauthenticatedContext().firestore();
+    const aliceRef=doc(alice,'users/alice');
+    const base={payload:'{"tasks":[]}',updatedAt:1};
+    await assertFails(setDoc(aliceRef,{...base,rev:1}));
+    await assertFails(setDoc(aliceRef,{...base,rev:1,serverUpdatedAt:new Date()}));
+    await assertSucceeds(setDoc(aliceRef,{...base,rev:1,serverUpdatedAt:serverTimestamp()}));
+    assert.ok((await getDoc(aliceRef)).data().serverUpdatedAt.toMillis()>0);
+    await assertFails(setDoc(aliceRef,{...base,rev:1,serverUpdatedAt:serverTimestamp()}));
+    await assertFails(setDoc(aliceRef,{...base,rev:3,serverUpdatedAt:serverTimestamp()}));
+    await assertFails(setDoc(aliceRef,{...base,rev:2,serverUpdatedAt:new Date()}));
+    await assertSucceeds(setDoc(aliceRef,{...base,rev:2,serverUpdatedAt:serverTimestamp()}));
+    await assertFails(setDoc(doc(bob,'users/alice'),{...base,rev:3,serverUpdatedAt:serverTimestamp()}));
+    await assertFails(getDoc(doc(bob,'users/alice')));
+    await assertFails(getDoc(doc(guest,'users/alice')));
+    await assertFails(deleteDoc(aliceRef));
+    // A pre-upgrade document has no revision. Only the new stamped client
+    // may advance it to rev 1; an old shell's blind write is denied.
+    await env.withSecurityRulesDisabled(async context=>{
+      await setDoc(doc(context.firestore(),'users/legacy'),base);
+    });
+    const legacyRef=doc(env.authenticatedContext('legacy').firestore(),'users/legacy');
+    await assertFails(setDoc(legacyRef,base));
+    await assertSucceeds(setDoc(legacyRef,{...base,rev:1,serverUpdatedAt:serverTimestamp()}));
+  }finally{ await env.cleanup(); }
 });

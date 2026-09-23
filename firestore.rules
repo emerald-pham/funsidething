@@ -1,0 +1,23 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{uid} {
+      function owner() {
+        return request.auth != null && request.auth.uid == uid;
+      }
+      function datedRevision() {
+        return request.resource.data.keys().hasAll(['payload', 'updatedAt', 'rev', 'serverUpdatedAt'])
+          && request.resource.data.payload is string
+          && request.resource.data.rev is int
+          && request.resource.data.serverUpdatedAt == request.time;
+      }
+      allow read: if owner();
+      // A still-open old shell may read its copy, but cannot replace the
+      // current document with a blind write or a device-clock timestamp.
+      allow create: if owner() && datedRevision() && request.resource.data.rev == 1;
+      allow update: if owner() && datedRevision()
+        && request.resource.data.rev == resource.data.get('rev', 0) + 1;
+      allow delete: if false;
+    }
+  }
+}

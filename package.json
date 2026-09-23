@@ -1,0 +1,12 @@
+{
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests.js",
+    "test:rules": "firebase emulators:exec --only firestore --project demo-chain-scanner-data-safety \"node --test --test-name-pattern='Firestore rules:' tests.js\""
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "5.0.2",
+    "firebase-tools": "15.30.2"
+  }
+}
