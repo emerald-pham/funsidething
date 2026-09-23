@@ -9856,6 +9856,8 @@ test('Resume scan: current-pass skips stay out until the exact local 2 AM bounda
 
 test('Resume scan ranks remaining candidates strictly by estimated likelihood before and after 2 AM', async () => {
   const {ctx} = await loadApp({seed: 730});
+  ctx.state.settings.scanMode='descending';
+  ctx.state.scanMode='descending';
   const start = new Date(2026,7,27,3).getTime();
   setFakeTime(ctx,start);
   const root=ctx.addTask('Benchmark',false);
