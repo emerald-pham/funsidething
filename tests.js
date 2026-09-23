@@ -85,7 +85,8 @@ test("Landscape location: saves a browser fix with device timezone, emits a chan
   assert.equal(result.enabled, true);
   assert.equal(result.latitude, position.coords.latitude);
   assert.equal(result.longitude, position.coords.longitude);
-  assert.match(result.timezone, /\//, "saved location includes the device timezone");
+  assert.equal(result.timezone, Intl.DateTimeFormat().resolvedOptions().timeZone,
+    "saved location includes the device timezone, including UTC on CI runners");
   assert.equal(JSON.parse(runtime.values.get("fvp:chain-scanner:location")).enabled, true);
   assert.equal(runtime.events.at(-1).type, "landscape-location-change");
   assert.match(runtime.location.caption(new Date("2026-06-21T17:00:00Z")), /Near London/);
