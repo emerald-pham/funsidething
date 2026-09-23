@@ -6995,16 +6995,14 @@ test('CLOUD MERGE: explicit deletion evidence prevents resurrection on a stale d
   assert.equal(ctx.state.deletedTaskIds.keep, true);
 });
 
-test('CLOUD TIME: Firestore server dates decide which dated copy is newer', async () => {
-  const local = syncState({ tasks: [syncTask('local', 'Local')], syncRev: 4, lastCloudServerAt: 1000 });
-  const remote = syncState({ tasks: [syncTask('remote', 'Remote')] });
+test('CLOUD REVISION: a server date alone cannot replace unsynced work at the same revision', async () => {
+  const local = syncState({ tasks: [syncTask('shared', 'Local edit')], syncRev: 4, lastCloudServerAt: 1000 });
+  const remote = syncState({ tasks: [syncTask('shared', 'Prior cloud value')] });
   const h = makeSyncHarness({ remote, rev: 4 });
   h.doc.serverUpdatedAt = { toMillis: () => 2000 };
   const { ctx } = await loadApp({ seedStorage: { [SYNC_STORE_KEY]: JSON.stringify(local) }, cloudSyncFactory: h.factory });
   await ctx.cloudPull();
-  assert.ok(ctx.state.tasks.some(task => task.id === 'remote'), 'server dated remote copy was adopted');
-  assert.ok(ctx.state.tasks.some(task => task.id === 'local'), 'undel​eted local task still survives');
-  assert.equal(ctx.state.lastCloudServerAt, 2000);
+  assert.equal(ctx.state.tasks[0].title, 'Local edit', 'same revision means the local edit may still need to be pushed');
   assert.ok(!JSON.parse(ctx.cloudPayload()).lastCloudServerAt, 'server read watermark remains device local');
 });
 
@@ -7017,14 +7015,14 @@ test('CLOUD TIME: equal server milliseconds fall back to revision so a newer wri
   assert.ok(ctx.state.tasks.some(task=>task.id==='remote'));
 });
 
-test('CLOUD TIME: an older server date cannot win by revision or cause a retry loop', async () => {
+test('CLOUD REVISION: a higher cloud revision wins even when its server clock reads earlier', async () => {
   const local=syncState({tasks:[syncTask('shared','Later local')],syncRev:4,lastCloudServerAt:2000});
-  const remote=syncState({tasks:[syncTask('shared','Earlier remote')]});
+  const remote=syncState({tasks:[syncTask('shared','Newer revision')]});
   const h=makeSyncHarness({remote,rev:5}); h.doc.serverUpdatedAt={toMillis:()=>1000};
   const {ctx}=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(local)},cloudSyncFactory:h.factory});
   await ctx.cloudPull(); await syncSettle(PAST_DEBOUNCE);
-  assert.equal(ctx.state.tasks[0].title,'Later local');
-  assert.equal(h.remoteState().tasks[0].title,'Later local');
+  assert.equal(ctx.state.tasks[0].title,'Newer revision');
+  assert.equal(h.remoteState().tasks[0].title,'Newer revision');
   assert.equal(h.conflicts,0);
 });
 
@@ -7338,6 +7336,47 @@ test('LOCAL BACKUPS: a manual backup remains restorable after the seven-day wind
   assert.ok(ctx.readLocalBackups().some(entry=>entry.kind==='before-restore' && entry.payload.includes('Current board')));
 });
 
+test('LOCAL BACKUPS: an account-switch recovery copy survives past the daily retention window',async()=>{
+  const {ctx}=await loadApp();
+  setFakeTime(ctx,Date.parse('2026-09-01T12:00:00Z'));
+  ctx.addTask('Unsynced account A edit');
+  assert.equal(ctx.saveLocalBackup('before-account-switch',JSON.stringify(ctx.state)),true);
+  setFakeTime(ctx,Date.parse('2026-09-23T12:00:00Z'));
+  await ctx.persist(); // a later save also prunes the stored backup index
+  assert.ok(ctx.readLocalBackups().some(row=>row.kind==='before-account-switch' && row.payload.includes('Unsynced account A edit')),
+    'an account-switch copy must stay recoverable until the user explicitly removes site data');
+});
+
+test('LOCAL BACKUPS: repeated switches with the same board do not duplicate a recovery copy',async()=>{
+  const {ctx}=await loadApp();
+  ctx.addTask('Same board');
+  const payload=JSON.stringify(ctx.state);
+  assert.equal(ctx.saveLocalBackup('before-account-switch',payload),true);
+  assert.equal(ctx.saveLocalBackup('before-account-switch',payload),true);
+  assert.equal(ctx.readLocalBackups().filter(row=>row.kind==='before-account-switch').length,1);
+});
+
+test('LOCAL BACKUPS: a user can remove an old recovery copy without changing the board',async()=>{
+  const {ctx,shim}=await loadApp();
+  ctx.addTask('Current board');
+  ctx.saveLocalBackup('before-account-switch',JSON.stringify(ctx.state));
+  const entry=ctx.readLocalBackups().find(row=>row.kind==='before-account-switch');
+  ctx.openSettings();
+  assert.match(shim.document.getElementById('modalRoot').innerHTML,/data-act="delete-local-backup"/);
+  ctx.onAction('delete-local-backup',{dataset:{id:entry.id}});
+  assert.ok(!ctx.readLocalBackups().some(row=>row.id===entry.id));
+  assert.deepEqual(Array.from(ctx.state.tasks,task=>task.title),['Current board']);
+});
+
+test('LOCAL BACKUPS: restore and delete controls can wrap inside narrow Settings panes',async()=>{
+  const {ctx,shim}=await loadApp();
+  ctx.saveLocalBackup('before-account-switch',JSON.stringify(ctx.state));
+  ctx.openSettings();
+  assert.match(shim.document.getElementById('modalRoot').innerHTML,/class="mgr backup-row"/);
+  assert.match(html,/\.backup-row\{[^}]*flex-wrap:wrap/);
+  assert.match(html,/\.backup-row \.kv\{[^}]*min-width:0/);
+});
+
 test('LOCAL BACKUPS: restoring an open task deliberately reopens a later completion', async () => {
   const {ctx}=await loadApp();
   const task=ctx.addTask('Open in backup'); await ctx.persist();
@@ -7402,6 +7441,21 @@ test('HARD GATE: unreadable backup index is preserved instead of overwritten by 
   ctx.addTask('In memory');
   assert.equal(await ctx.persist(),false);
   assert.equal(storage.getItem(LOCAL_BACKUPS_KEY),'damaged backup bytes');
+});
+
+test('HARD GATE: a cloud refresh cannot overwrite unreadable browser copies',async()=>{
+  const storage=sharedScannerStorage();
+  const {ctx,shim}=await loadApp({sharedStorage:storage});
+  ctx.addTask('Current in-memory board');await ctx.persist();
+  storage.setItem(SYNC_STORE_KEY,'unreadable browser bytes');
+  storage.setItem(LOCAL_HEAD_KEY,'unreadable protected bytes');
+  const h=makeSyncHarness({remote:syncState({tasks:[syncTask('remote','Cloud board')]}),rev:2});
+  shim.window.CloudSync=h.factory();
+  await ctx.cloudPull();
+  assert.equal(storage.getItem(SYNC_STORE_KEY),'unreadable browser bytes');
+  assert.equal(storage.getItem(LOCAL_HEAD_KEY),'unreadable protected bytes');
+  assert.deepEqual(Array.from(ctx.state.tasks,task=>task.title),['Current in-memory board']);
+  assert.equal(h.calls.filter(call=>call==='pull').length,0,'reconciliation stops at the unreadable local boundary');
 });
 
 const syncTask = (id, title) => ({
@@ -7585,12 +7639,13 @@ test("REGRESSION: a cloud read that failed must not be seeded over as if the clo
 
 /* ---- the fix must not over-correct: legitimate pushes still go out ---- */
 
-test("a device that loaded genuinely newer data than the cloud still wins the reconcile", async () => {
+test("an offline edit based on the same cloud revision can still win the reconcile", async () => {
   const now = Date.now();
-  const h = makeSyncHarness({ remote: cloudState(now - 6 * HOUR) });
+  const h = makeSyncHarness({ remote: cloudState(now - 6 * HOUR), rev: 4 });
+  const local=staleState(now); local.syncRev=4;
   const { ctx } = await loadApp({
     seed: 975,
-    seedStorage: { [SYNC_STORE_KEY]: JSON.stringify(staleState(now)) },   // offline edits, newer than the cloud
+    seedStorage: { [SYNC_STORE_KEY]: JSON.stringify(local) },   // offline edits based on revision 4
     cloudSyncFactory: h.factory,
   });
 
@@ -8047,19 +8102,32 @@ test("the revision a device is based on is device-local, never part of the share
   assert.equal(pushesAfterAdopt, 1, "unique tasks from the older local copy must be published once");
 });
 
-test("a cloud document written before revisions existed still reconciles by timestamp", async () => {
+test("a cloud document written before revisions existed is adopted without trusting device clocks", async () => {
   const now = Date.now();
-  const h = makeSyncHarness({ remote: cloudState(now) });   // no rev field at all
+  const h = makeSyncHarness({ remote: cloudState(now - HOUR) });   // no rev field at all
+  const local=staleState(now + HOUR);local.syncRev=4;
   const { ctx } = await loadApp({
     seed: 999,
-    seedStorage: { [SYNC_STORE_KEY]: JSON.stringify(staleState(now - 30 * 24 * HOUR)) },
+    seedStorage: { [SYNC_STORE_KEY]: JSON.stringify(local) },
     cloudSyncFactory: h.factory,
   });
 
   await ctx.cloudPull();
   await syncSettle(PAST_DEBOUNCE);
 
-  assert.deepEqual(ctx.state.chain, CLOUD_CHAIN, "the legacy path still works during the upgrade");
+  assert.deepEqual(ctx.state.chain, CLOUD_CHAIN, "an unversioned document is adopted conservatively");
+  assert.equal(ctx.state.syncRev,1,'the first versioned write uses the legacy document as revision zero');
+});
+
+test('CLOUD LEGACY: an adopted unversioned board is upgraded even with no local tasks to merge',async()=>{
+  const h=makeSyncHarness({remote:syncState({tasks:[syncTask('legacy','Already in cloud')]})});
+  const {ctx}=await loadApp({cloudSyncFactory:h.factory});
+  await ctx.cloudPull();await syncSettle(PAST_DEBOUNCE);
+  assert.equal(h.doc.rev,1,'the legacy document must stop triggering adoption on every focus');
+  assert.equal(ctx.state.syncRev,1);
+  const pushes=h.calls.filter(call=>call==='push').length;
+  await ctx.cloudPull();await syncSettle(PAST_DEBOUNCE);
+  assert.equal(h.calls.filter(call=>call==='push').length,pushes,'a stable upgraded board is not rewritten');
 });
 
 /* =====================================================================
@@ -11356,10 +11424,177 @@ test('Consistency repair: an in-flight pull cannot adopt the previous account un
  assert.equal(ctx.state.syncAccount,'B');assert.deepEqual(Array.from(ctx.state.tasks,t=>t.title),['B own']);
 });
 test('Consistency repair: an old account push acknowledgement cannot change the new account revision',async()=>{
- const {ctx,shim}=await loadApp();let release;shim.window.CloudSync={ready:true,user:'A',pull:async()=>({empty:true}),push:()=>new Promise(r=>release=r)};
- await ctx.cloudPull();ctx.addTask('A task');ctx.cloudPushNow();await flush();
- shim.window.CloudSync.user='B';await ctx.cloudPull();assert.equal(ctx.state.syncRev,0);
- release({rev:99});await flush();assert.equal(ctx.state.syncRev,0);
+  const {ctx,shim}=await loadApp();let release;shim.window.CloudSync={ready:true,user:'A',pull:async()=>({empty:true}),push:()=>new Promise(r=>release=r)};
+  await ctx.cloudPull();ctx.addTask('A task');ctx.cloudPushNow();await flush();
+  shim.window.CloudSync.user='B';await ctx.cloudPull();assert.equal(ctx.state.syncRev,0);
+  release({rev:99});await flush();assert.equal(ctx.state.syncRev,0);
+});
+
+test('CLOUD ACCOUNT: switching to an empty account preserves unsynced previous-account edits in a local backup',async()=>{
+  const old=syncState({tasks:[syncTask('old','Previously saved')],syncAccount:'old@example.com',syncRev:4});
+  const {ctx,shim}=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(old)}});
+  ctx.addTask('Unsynced old-account edit');
+  shim.window.CloudSync={ready:true,user:'new@example.com',pull:async()=>({empty:true}),push:async()=>({error:true})};
+  await ctx.cloudPull();
+  assert.equal(ctx.state.syncAccount,'new@example.com');
+  assert.equal(ctx.state.tasks.length,0);
+  assert.ok(ctx.readLocalBackups().some(row=>row.payload.includes('Unsynced old-account edit')),
+    'the old account must remain recoverable after a reload, not only in the undo stack');
+});
+
+test('CLOUD ACCOUNT: a fully synced previous board needs only a seven-day switch backup',async()=>{
+  const {ctx,shim}=await loadApp();
+  const h=makeSyncHarness({remote:JSON.parse(ctx.cloudPayload()),rev:4});
+  shim.window.CloudSync=h.factory();
+  await ctx.cloudPull();
+  h.doc=null;shim.window.CloudSync.user='other@example.com';
+  await ctx.cloudPull();
+  assert.ok(ctx.readLocalBackups().some(row=>row.kind==='before-cloud-adoption'),
+    'a cloud-confirmed board does not need another permanent full-board copy');
+  assert.ok(!ctx.readLocalBackups().some(row=>row.kind==='before-account-switch'));
+});
+
+test('CLOUD ACCOUNT: an empty-account switch stops if the previous board cannot be backed up',async()=>{
+  const old=syncState({tasks:[syncTask('old','Previously saved')],syncAccount:'old@example.com',syncRev:4});
+  const storage=sharedScannerStorage({[SYNC_STORE_KEY]:JSON.stringify(old)});
+  const {ctx,shim}=await loadApp({sharedStorage:storage});
+  ctx.addTask('Unsynced old-account edit');
+  const set=storage.setItem;
+  storage.setItem=(key,value)=>{if(key===LOCAL_BACKUPS_KEY)throw Error('quota');set(key,value);};
+  shim.window.CloudSync={ready:true,user:'new@example.com',pull:async()=>({empty:true}),push:async()=>({error:true})};
+  await ctx.cloudPull();
+  assert.equal(ctx.state.syncAccount,'old@example.com');
+  assert.ok(ctx.state.tasks.some(task=>task.title==='Unsynced old-account edit'));
+  assert.equal(ctx.reconciled(),false,'the new account is not safe to write until its switch completes');
+});
+
+test('CLOUD ACCOUNT: an older-format document under another account wins over the prior account board',async()=>{
+  const local=syncState({tasks:[syncTask('private-a','Private A')],syncAccount:'a@example.com',syncRev:8,updatedAt:Date.now()+HOUR});
+  const remote=syncState({tasks:[syncTask('private-b','Private B')],updatedAt:1});
+  const h=makeSyncHarness({remote});
+  const {ctx,shim}=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(local)},cloudSyncFactory:h.factory});
+  shim.window.CloudSync.user='b@example.com';
+  await ctx.cloudPull();
+  assert.deepEqual(Array.from(ctx.state.tasks,task=>task.title),['Private B']);
+  await syncSettle(PAST_DEBOUNCE);
+  assert.deepEqual(h.remoteTitles(),['Private B'],'the prior account must never be pushed into the new account');
+});
+
+test('CLOUD ACCOUNT: Undo cannot bring the old board into an empty new account',async()=>{
+  const local=syncState({tasks:[syncTask('private-a','Private A')],syncAccount:'a@example.com',syncRev:4});
+  const h=makeSyncHarness();
+  const {ctx,shim}=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(local)},cloudSyncFactory:h.factory});
+  shim.window.CloudSync.user='b@example.com';
+  await ctx.cloudPull();
+  ctx.undo();ctx.cloudPushNow();await syncSettle(PAST_DEBOUNCE);
+  assert.deepEqual(Array.from(ctx.state.tasks,task=>task.title),[]);
+  assert.ok(!h.remoteTitles()?.includes('Private A'),'Undo must not upload A to B');
+});
+
+test('CLOUD ACCOUNT: Undo cannot replace a populated new account with the old board',async()=>{
+  const local=syncState({tasks:[syncTask('private-a','Private A')],syncAccount:'a@example.com',syncRev:4});
+  const h=makeSyncHarness({remote:syncState({tasks:[syncTask('private-b','Private B')]}),rev:2});
+  const {ctx,shim}=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(local)},cloudSyncFactory:h.factory});
+  shim.window.CloudSync.user='b@example.com';
+  await ctx.cloudPull();
+  ctx.undo();ctx.cloudPushNow();await syncSettle(PAST_DEBOUNCE);
+  assert.deepEqual(Array.from(ctx.state.tasks,task=>task.title),['Private B']);
+  assert.deepEqual(h.remoteTitles(),['Private B']);
+});
+
+test('CLOUD ACCOUNT: restoring another account backup warns which cloud will receive it',async()=>{
+  const current=syncState({tasks:[syncTask('private-b','Private B')],syncAccount:'b@example.com'});
+  const older=syncState({tasks:[syncTask('private-a','Private A')],syncAccount:'a@example.com'});
+  const at=Date.now(),id='other-account-backup';
+  const entry={id,day:new Date(at).toISOString().slice(0,10),at,kind:'manual',payload:JSON.stringify(older)};
+  const {ctx}=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(current),[LOCAL_BACKUPS_KEY]:JSON.stringify([entry])}});
+  const prompts=[];ctx.confirm=message=>{prompts.push(message);return false;};
+  ctx.onAction('restore-local-backup',{dataset:{id}});
+  assert.match(prompts[0],/a@example\.com/);
+  assert.match(prompts[0],/b@example\.com/);
+  assert.match(prompts[0],/cloud/i);
+  assert.deepEqual(Array.from(ctx.state.tasks,task=>task.title),['Private B'],'cancel preserves the current account');
+});
+
+test('BROWSER ACCOUNT: Undo cannot restore another account after a shared browser copy changed owners',async()=>{
+  const a=syncState({tasks:[syncTask('private-a','Private A')],syncAccount:'a@example.com'});
+  const b=syncState({tasks:[syncTask('private-b','Private B')],syncAccount:'b@example.com'});
+  const storage=sharedScannerStorage({[SYNC_STORE_KEY]:JSON.stringify(a)});
+  const {ctx}=await loadApp({sharedStorage:storage});
+  storage.setItem(LOCAL_HEAD_KEY,JSON.stringify(b));storage.setItem(SYNC_STORE_KEY,JSON.stringify(b));
+  ctx.refreshBrowserCopy();ctx.undo();
+  assert.deepEqual(Array.from(ctx.state.tasks,task=>task.title),['Private B']);
+});
+
+test('CLOUD ADOPTION: host storage also keeps unsynced local edits before replacement',async()=>{
+  const local=syncState({tasks:[syncTask('saved','Saved host task')],syncAccount:'e@example.com',syncRev:1});
+  const h=makeSyncHarness({remote:syncState({tasks:[syncTask('remote','Remote task')]}),rev:2});
+  const {ctx}=await loadApp({hostStorage:{[SYNC_STORE_KEY]:JSON.stringify(local)},cloudSyncFactory:h.factory});
+  ctx.addTask('Unsynced host edit');
+  await ctx.cloudPull();
+  assert.ok(ctx.readLocalBackups().some(row=>row.kind==='before-cloud-adoption' && row.payload.includes('Unsynced host edit')));
+});
+
+test('CLOUD REVISION: a late acknowledgement cannot lower a newer adopted revision',async()=>{
+  const {ctx,shim}=await loadApp();
+  const h=makeSyncHarness({remote:JSON.parse(ctx.cloudPayload()),rev:4});
+  const CS=h.factory();shim.window.CloudSync=CS;
+  await ctx.cloudPull();
+  let releaseFirst, pushes=0;
+  CS.push=async()=>{pushes++;return pushes===1 ? new Promise(resolve=>{releaseFirst=resolve;}) : {error:true};};
+  ctx.addTask('Local pending edit');ctx.cloudPushNow();
+  await syncSettle(20);
+  assert.equal(pushes,1,'the first write is awaiting its acknowledgement');
+  const newer=JSON.parse(h.doc.payload);
+  newer.tasks.push(syncTask('remote-later','Remote later edit'));
+  h.doc={payload:JSON.stringify(newer),updatedAt:Date.now(),rev:6};
+  await ctx.cloudPull();
+  assert.equal(ctx.state.syncRev,6);
+  releaseFirst({ok:true,rev:5});await flush();
+  assert.equal(ctx.state.syncRev,6,'the stale callback cannot rewind the device to revision 5');
+});
+
+test('CLOUD WRITES: same-tab edits wait for the prior acknowledgement before sending a new base revision',async()=>{
+  const {ctx,shim}=await loadApp();
+  ctx.addTask('Base title');await ctx.persist();
+  const h=makeSyncHarness({remote:JSON.parse(ctx.cloudPayload()),rev:4});
+  const CS=h.factory();shim.window.CloudSync=CS;
+  await ctx.cloudPull();
+  const pushes=[];let releaseFirst;
+  CS.push=(payload,updatedAt,baseRev)=>{
+    pushes.push({payload,baseRev});
+    if(baseRev!==h.doc.rev)return Promise.resolve({conflict:true,rev:h.doc.rev});
+    const rev=h.doc.rev+1;
+    h.doc={payload,updatedAt,rev};
+    if(pushes.length===1)return new Promise(resolve=>{releaseFirst=()=>resolve({ok:true,rev});});
+    return Promise.resolve({ok:true,rev});
+  };
+  ctx.state.tasks[0].title='First edit';ctx.save();ctx.cloudPushNow();
+  await syncSettle(30);
+  assert.equal(pushes.length,1);
+  ctx.state.tasks[0].title='Second edit';ctx.save();ctx.cloudPushNow();
+  await syncSettle(30);
+  try{assert.equal(pushes.length,1,'the second write must not race its own earlier revision');}
+  finally{releaseFirst?.();}
+  await syncSettle(80);
+  assert.equal(h.remoteState().tasks[0].title,'Second edit');
+  assert.deepEqual(pushes.map(call=>call.baseRev),[4,5]);
+});
+
+test('CLOUD CONFLICT: a later same-task remote edit warns that this tab lost its local edit',async()=>{
+  const {ctx,shim}=await loadApp();
+  ctx.addTask('Base title');await ctx.persist();
+  const h=makeSyncHarness({remote:JSON.parse(ctx.cloudPayload()),rev:4});
+  shim.window.CloudSync=h.factory();await ctx.cloudPull();
+  shim.document.getElementById('toast').textContent='';
+  ctx.state.tasks[0].title='My offline edit';ctx.save();
+  const newer=JSON.parse(h.doc.payload);newer.tasks[0].title='Other device edit';
+  h.writeBehindBack(newer);
+  await ctx.cloudPull();
+  assert.equal(ctx.state.tasks[0].title,'Other device edit');
+  assert.ok(ctx.readLocalBackups().some(row=>row.kind==='before-cloud-adoption' && row.payload.includes('My offline edit')));
+  assert.match(shim.document.getElementById('toast').textContent,/out of date|previous board/i,
+    'a same-task edit cannot be silently removed from the active board');
 });
 test('Consistency repair: midnight repaints a paused scan even with unchanged stored state',async()=>{
  const {ctx}=await loadApp();

@@ -304,6 +304,8 @@ input[type=date]::-webkit-date-and-time-value{min-width:0;text-align:left}
 .btn.primary{background:var(--chain-deep)}
 .mgr{display:flex;gap:8px;align-items:center;margin:5px 0}
 .mgr input[type=text]{flex:1}
+.backup-row{flex-wrap:wrap}
+.backup-row .kv{flex:1 1 180px;min-width:0;overflow-wrap:anywhere}
 .help ol{padding-left:20px;line-height:1.65}
 .help li{margin:4px 0}
 .help-faq{margin-top:18px;padding:10px 12px;border:1px solid var(--line);border-radius:9px}
@@ -447,7 +449,7 @@ input[type=date]::-webkit-date-and-time-value{min-width:0;text-align:left}
   <p>You can change this anytime in Settings. The sun and Moon follow their real paths, even when the scenery is still.</p>
 </dialog>
 <!-- changelog:start -->
-<template id="appChangelogCurrent"><div data-app-fingerprint="d91205327f1325eb85abe94146b80a54b35039adf8587532926f19080c04bf8b"><h3>September 23, 2026</h3><ul><li>Old tabs can no longer roll back tasks and History without keeping a recoverable copy.</li><li>Settings now keeps seven days of local backups and manual copies you can restore. Restoring saves your current board first and keeps later tasks without a recorded deletion.</li><li>Cloud saves use server time and keep tasks unless you deleted them.</li><li>Return as candidate stays visible in the task editor and greys out when unavailable.</li><li>Quick start now has a collapsed More FAQs section explaining Done, Worked on it, Dislodge, cooldowns, and early returns to scanning.</li></ul><h3>September 21, 2026</h3><ul><li>Separate tasks with the same name now keep their own completed and worked-on History entries.</li><li>A damaged backup, saved board, or cloud copy can no longer replace healthy tasks or stop the app from opening.</li><li>Start and Due use consistent field borders on iPhone in both Add and Edit, while keeping the date picker.</li><li>Keep the header visible now saves as soon as it is checked and reliably keeps Undo in reach while scrolling; the option remains off by default.</li><li>The top-K summary and sparkline stay aligned with done adding for now.</li><li>Double-tap zoom is disabled while pinch zoom remains available.</li><li>Add a task can now capture Evergreen recurrence hours and the 2 AM reset, starting at 18 hours with the day reset checked.</li><li>Start, Due, Evergreen, and neighboring Add controls now respect the pane's inner margins across narrow phones and short landscape layouts.</li><li>Dot from the All Tasks editor now ranks that task above the current benchmark. Done and Evergreen Done no longer change ratings.</li></ul></div></template>
+<template id="appChangelogCurrent"><div data-app-fingerprint="1277af590ed794d514b362683457ce9834be427d6d17434bfad72e3e84eece4c"><h3>September 23, 2026</h3><ul><li>Old tabs can no longer roll back tasks and History without keeping a recoverable copy. Cloud refresh also stops when the browser’s saved copy is unreadable.</li><li>Settings now keeps seven days of local backups and manual copies you can restore or delete. Restoring saves your current board first and keeps later tasks without a recorded deletion.</li><li>Cloud saves follow revision order and keep tasks unless you deleted them.</li><li>Account switches keep unsynced work in a local recovery copy, and Undo cannot move one account’s tasks into another. Backup restore warns before crossing accounts.</li><li>Quick edits from one tab wait for the previous cloud save, so an older confirmation cannot replace a newer change. If another device updates the same task first, this tab warns you and keeps a restorable copy.</li><li>Return as candidate stays visible in the task editor and greys out when unavailable.</li><li>Quick start now has a collapsed More FAQs section explaining Done, Worked on it, Dislodge, cooldowns, and early returns to scanning.</li></ul><h3>September 21, 2026</h3><ul><li>Separate tasks with the same name now keep their own completed and worked-on History entries.</li><li>A damaged backup, saved board, or cloud copy can no longer replace healthy tasks or stop the app from opening.</li><li>Start and Due use consistent field borders on iPhone in both Add and Edit, while keeping the date picker.</li><li>Keep the header visible now saves as soon as it is checked and reliably keeps Undo in reach while scrolling; the option remains off by default.</li><li>The top-K summary and sparkline stay aligned with done adding for now.</li><li>Double-tap zoom is disabled while pinch zoom remains available.</li><li>Add a task can now capture Evergreen recurrence hours and the 2 AM reset, starting at 18 hours with the day reset checked.</li><li>Start, Due, Evergreen, and neighboring Add controls now respect the pane's inner margins across narrow phones and short landscape layouts.</li><li>Dot from the All Tasks editor now ranks that task above the current benchmark. Done and Evergreen Done no longer change ratings.</li></ul></div></template>
 <template id="appChangelog"><details data-app-fingerprint="43c2064b3e3eb36a00a54cdade10bda1db44258e57c84075fc23fa8ab524530d"><summary>Changelog</summary><h3>September 19, 2026</h3><ul><li>At night, boats and nearby objects above the horizon reflect naturally in the water, including airplanes, the Moon, and stars.</li><li>The Add a task panel can be minimized and remembers that choice.</li><li>Every visitor starts with an individual travel speed, so faster arrivals can overtake slower ones. Vehicles hold that speed horizontally while vertical movement can still vary, the existing lower tram cars remain linked, and airplane banners switch to a dark, light-lettered night palette.</li><li>Tasks marked No, Can’t, or Dislodged appear under Ineligible until their marks clear.</li><li>First light, sunrise, sunset, and last light now have separate scenery controls and show times for the sky location. Solar times were checked across seasons, time zones, and polar days.</li><li>Jet skis and small water creatures are easier to see. Daytime visitors arrive twice as often.</li><li>Readers and groups linger longer, leave at varied times, and carry books by their sides.</li><li>Add tasks with start and due dates. Selecting Eligible clears other filters to show every eligible task.</li><li>Both scan modes start with the oldest eligible task. Done raises its preference rating; Worked on it leaves ratings unchanged.</li></ul><h3>September 16, 2026</h3><ul><li>Updates announce themselves with a toast pointing to this changelog.</li><li>Task editors show evergreen interval and day-reset controls only when Evergreen is checked.</li><li>Chance mode is the default for new scan preferences. Dislodge now lowers the task’s preference rating; Undo restores it.</li><li>Signing in while the app is loading now brings synced tasks into view without a manual refresh.</li><li>All Tasks has a separate All / Eligible / Ineligible filter row that combines with search and task-status filters.</li><li>Chance scans use TrueSkill win probabilities, including rating uncertainty, with no rating floor or offset. If no candidate can draw, scanning falls back to descending likelihood.</li><li>The scan-mode dropdown saves immediately, including when you close Settings without pressing Save.</li><li>Account switching keeps task lists separate after a cloud refresh. Cloud refreshes wait for edits, and Undo restores an imported scan correctly.</li><li>Add &amp; dot now starts the daily reset clock. Tasks with a start date wake at midnight, and stop-scanning guidance uses the candidates actually ahead.</li><li>Changing the scan-mode setting now takes effect in the current scan. Choosing both modes also offers both buttons when resuming.</li><li>The installed app checks for updates whenever it opens or returns to the foreground. Available updates load automatically after you finish editing, without reinstalling.</li><li>Choose descending scans, TrueSkill-weighted chance scans, or both scan buttons in Settings. Chance order stays steady through undo and refreshes on a fresh pass or at 2 AM; decisions still update ratings immediately.</li><li>Set an evergreen interval for each task, with an optional 2 AM reset. New tasks default to 18 hours or the next day marker, whichever comes first; Settings lets you change those defaults.</li></ul><h3>September 14, 2026</h3><ul><li>Skywriters trace single human-written words in smoke, then fly away as the letters fade.</li><li>Hourly messages appear only when human-written copy is available. Anytime prompts show the current hour, such as 5 AM. Sky messages keep their existing behavior.</li><li>Trains and metros now run regularly throughout the day and night.</li><li>Event rates can be adjusted in SPAWN_RATES.md.</li></ul><h3>September 13, 2026 — Seasonal details</h3><ul><li>Rain showers last 20–45 minutes; thunderstorms last 30–60 minutes. Winter brings snow and snowstorms on the same shared weather schedule.</li><li>Winter visitors build snowmen, ski downhill, and make snow angels. Warm-weather outings wait for warmer seasons.</li><li>Autumn turns the landscape amber and brown, with leaves falling from trees and blowing in storms.</li><li>Spring brings scattered flowers and tree blossoms. Occasional gusts lift petals; rain and storms bring more petals and pollen.</li><li>Winter trees gather snow and occasionally shed small clumps. Seasonal debris gets livelier during storms.</li><li>Birds have individual plumage: distant sky birds look dark with hints of color, while nearby birds show more color.</li><li>People have varied hairstyles and hair colors, with helmets and hats kept clear.</li><li>Little propeller planes tow the messages overhead. Hot air balloons appear more often during the day.</li><li>More trains, riders, and people walking pass through the scene, including new scooter and hoverboard riders.</li><li>Season rules, weather timing, and visitor odds now share an expandable configuration; seasonal effects keep their own small budgets and visitor lifetimes.</li></ul><h3>September 13, 2026</h3><ul><li>One Sunrise / Sunset button switches between dawn and dusk.</li><li>Choose a season when locking the scenery, or follow the current season.</li><li>Cyclists pedal with connected hips and naturally bending knees.</li><li>Distant boats shrink with depth; windsurfers and small craft stay smaller than ships, and the far metro is smaller than the foreground train.</li><li>Ducks sometimes lift off from the lake and fly away.</li><li>Seasons now follow the actual equinox and solstice, with hemisphere and local date handling. Solar locks use the sky location’s calendar.</li><li>Choose the sky location’s time zone when it differs from your device. The Moon’s illuminated side now follows the Sun, and the midnight sun stays daylight.</li><li>Deer, foxes, rabbits, and raccoons occasionally wander through the foreground: a 1% chance every 30 seconds, up to four animals, independent of other visitors.</li><li>Picnic groups fold their blanket and gather their things; readers, couples, and kite flyers also finish up and walk away.</li><li>Occasional gentle rain follows the same real-time schedule across devices, including offline. Reduced motion keeps the rain still.</li><li>Settings now includes this changelog, with a check that catches undocumented app changes.</li></ul></details></template>
 <!-- changelog:end -->
 <dialog id="sceneTimeDialog" class="motion-dialog" aria-labelledby="sceneTimeTitle">
@@ -917,7 +919,9 @@ function readLocalBackups(){
     const rows = JSON.parse(localStorage.getItem(LOCAL_BACKUPS_KEY) || "[]");
     const cutoff = new Date(Date.now()); cutoff.setHours(12,0,0,0); cutoff.setDate(cutoff.getDate()-6);
     const oldest=backupDay(+cutoff);
-    return Array.isArray(rows) ? rows.filter(row=>row && typeof row.id==="string" && typeof row.day==="string" && (row.kind==="manual" || row.day>=oldest) && typeof row.payload==="string") : [];
+    // A switch can park unsynced work from another account. Its recovery copy
+    // must not expire before the user returns to that account to restore it.
+    return Array.isArray(rows) ? rows.filter(row=>row && typeof row.id==="string" && typeof row.day==="string" && (row.kind==="manual" || row.kind==="before-account-switch" || row.day>=oldest) && typeof row.payload==="string") : [];
   }catch(e){ return []; }
 }
 function saveLocalBackup(kind, payload, onlyIfMissing=false){
@@ -928,6 +932,9 @@ function saveLocalBackup(kind, payload, onlyIfMissing=false){
     if(stored!==null && !Array.isArray(JSON.parse(stored))) return false;
     const at = Date.now(), day = backupDay(at);
     let rows = readLocalBackups();
+    // A parked account board can be seen again on repeated sign-ins. Keep
+    // one durable copy per exact state, but preserve distinct unsynced edits.
+    if(kind==="before-account-switch" && rows.some(row=>row.kind===kind && row.payload===payload)) return true;
     const existing = rows.findIndex(row=>row.day===day && row.kind==="daily");
     const entry = {id:String(at)+"-"+Math.random().toString(36).slice(2), day, at, kind, payload};
     if(kind==="daily"){
@@ -1176,7 +1183,10 @@ function refreshBrowserCopy(){
     try{ dropRemovedFields(next); hydrateState(next); }
     catch(e){ return false; }
     added = state && sameListOwner(next,state) && mergeUndeletedTasks(next, state);
-    if(state) pushUndo();
+    // Undo must never carry a board from one signed-in account into another.
+    // The divergent browser bytes were backed up above for manual recovery.
+    if(state && !sameListOwner(next,state)) undoStack=[];
+    else if(state) pushUndo();
     state=next; lastPersistedRaw=recoveredHead; persistedChanceSeed=state.chance?.seed ?? null;
     if(saveTimer){ clearTimeout(saveTimer); saveTimer=null; }
     if(cloudTimer){ clearTimeout(cloudTimer); cloudTimer=null; }
@@ -1274,8 +1284,8 @@ function save(){
 /* ---------- cloud sync glue (no-ops until Firebase is configured) ----------
    Deliberately NOT a live listener: a realtime push from another device
    mid-scan would swap the benchmark card under your hand. Instead we
-   reconcile on load and whenever the tab regains focus. Firestore server dates
-   order dated documents; revisions break ties and reject concurrent writes.
+   reconcile on load and whenever the tab regains focus. Firestore revisions
+   order documents and reject concurrent writes; server dates are metadata.
 
    The rule that keeps last-write-wins honest: this device may not write to
    the cloud until it has read it at least once this session. A browser left
@@ -1283,13 +1293,13 @@ function save(){
    let that chain reach the cloud before anything had checked what was already
    up there — which is how a full day of work got overwritten. See sendPush()
    for the gate and cloudPull() for the two comparisons it depends on. */
-let cloudTimer = null, lastPushed = "", pulling = false;
+let cloudTimer = null, lastPushed = "", pulling = false, cloudPushInFlight = false;
 let lastKnownCloudPayload = null; // the exact remote membership last read or acknowledged
 let reconciledAs = null;   // the account whose cloud copy this session has successfully READ
 let deferredCloudPull = false;
 let pendingPush = false;   // a write was asked for before that happened — released once we reconcile
 let cloudPullPending = false; // auth can report a user before init has loaded the local state
-let baseUpdatedAt = 0;     // state.updatedAt as it came off this device's disk, before any edit re-stamped it
+let baseUpdatedAt = 0;     // loaded edit time, used only to explain a first-pull replacement to the user
 
 function cloudReady(){ const CS = window.CloudSync; return !!(CS && CS.ready && CS.user); }
 /* Deliberately keyed on the account, not a bare boolean: signing out and in as
@@ -1321,29 +1331,37 @@ function cloudPushNow(){
    cloud we hold the write and go read first. cloudPull() releases it. */
 async function sendPush(){
   if(!cloudReady()) return;
+  if(cloudPushInFlight){ pendingPush=true; return; }
   if(useLocal && !refreshBrowserCopy()) return;
   if(!reconciled() || pulling){
     pendingPush = true;
     if(!pulling) cloudPull();   // self-healing: the write triggers the reconcile it is waiting on
     return;
   }
-  if(validSavedPayload(lastKnownCloudPayload) && mergeUndeletedTasks(state, JSON.parse(lastKnownCloudPayload))){
-    state.updatedAt=Date.now(); recomputeRanks(); render();
-    toast("A missing task was kept before cloud sync.", 6000);
-  }
-  let payload = cloudPayload();
-  if(payload === lastPushed) return;      // nothing actually changed
-  // A cloud write is not allowed to outrun its device-local safety copy.
-  // This also covers membership repaired from the last cloud read above.
-  if(!await persist()) return;
-  if(!reconciled() || pulling){ pendingPush=true; return; }
-  payload = cloudPayload(); // persist may have merged a newer browser copy
-  if(payload === lastPushed) return;
-  lastPushed = payload;
-  const base = state.syncRev;
+  // Hold this slot through local persistence and the cloud acknowledgement.
+  // Otherwise two quick writes from one tab use the same base revision: the
+  // second conflicts with its own first write and may adopt the older edit.
+  cloudPushInFlight = true;
   const pushAccount = window.CloudSync.user;
-  Promise.resolve(window.CloudSync.push(payload, state.updatedAt || Date.now(), base))
-    .then(res=>{
+  try{
+    if(validSavedPayload(lastKnownCloudPayload) && mergeUndeletedTasks(state, JSON.parse(lastKnownCloudPayload))){
+      state.updatedAt=Date.now(); recomputeRanks(); render();
+      toast("A missing task was kept before cloud sync.", 6000);
+    }
+    let payload = cloudPayload();
+    if(payload === lastPushed) return;      // nothing actually changed
+    // A cloud write is not allowed to outrun its device-local safety copy.
+    // This also covers membership repaired from the last cloud read above.
+    if(!await persist()) return;
+    if(!cloudReady() || window.CloudSync.user !== pushAccount) return;
+    if(!reconciled() || pulling){ pendingPush=true; return; }
+    // If an edit arrived while the save was in flight, retry with its exact
+    // payload so a cloud write never outruns that edit's local safety copy.
+    if(payload !== cloudPayload()){ pendingPush=true; return; }
+    if(payload === lastPushed) return;
+    lastPushed = payload;
+    const base = state.syncRev;
+    const res = await window.CloudSync.push(payload, state.updatedAt || Date.now(), base);
       if(!cloudReady() || window.CloudSync.user !== pushAccount){ lastPushed = ""; return; }
       if(!res) return;                    // an older shim with nothing to say — leave the rev alone
       if(res.error){ lastPushed=""; return; }
@@ -1357,6 +1375,10 @@ async function sendPush(){
         return;
       }
       if(typeof res.rev === "number"){
+        // A pull or another push can advance this tab while an older write's
+        // acknowledgement is still in flight. Never rewind its revision or
+        // replace the newer cloud membership with the older payload.
+        if(res.rev < state.syncRev) return;
         state.syncRev = res.rev;
         lastKnownCloudPayload = payload;
         if(Number.isFinite(res.serverUpdatedAt)) state.lastCloudServerAt=res.serverUpdatedAt;
@@ -1376,10 +1398,13 @@ async function sendPush(){
            persist(), not save(): recording what we just wrote is bookkeeping,
            not an edit, and save() would re-stamp updatedAt and queue another
            push behind it. */
-        persist();
+        await persist();
       }
-    })
-    .catch(()=>{ lastPushed = ""; });      // a failed write must not look like a synced one
+  }catch(e){ lastPushed=""; }             // a failed write must not look like a synced one
+  finally{
+    cloudPushInFlight=false;
+    if(reconciled() && !pulling && pendingPush){ pendingPush=false; sendPush(); }
+  }
 }
 /* The keys that are this DEVICE's bookkeeping rather than this LIST's content:
    which cloud revision its copy is based on, and whose document that revision
@@ -1446,7 +1471,9 @@ function resumeDeferredCloudPull(){
 async function cloudPull(){
   if(!cloudReady()) return;
   if(!state){ cloudPullPending = true; return; }
-  if(useLocal) refreshBrowserCopy();
+  // An unreadable or unbacked-up browser copy is still evidence to preserve.
+  // Do not let a cloud adoption write over it after refreshBrowserCopy fails.
+  if(useLocal && !refreshBrowserCopy()) return;
   if(pulling) return;
   cloudPullPending = false;
   // Treat cloud replacement like an app update: a DOM-only draft is still
@@ -1481,6 +1508,19 @@ async function cloudPull(){
         hydrateState(remoteState);
       }catch(e){ return; }
     }
+    const switchedAccount = state.syncAccount != null && state.syncAccount !== acct;
+    // A board whose exact payload is already confirmed in its old account's
+    // cloud only needs the normal seven-day safety copy. Unsynced work must
+    // survive until the user deliberately clears its recovery copy.
+    const confirmedPreviousBoard = switchedAccount && state.syncAccount===reconciledAs
+      && lastKnownCloudPayload!==null && cloudPayload()===lastKnownCloudPayload
+      && !cloudPushInFlight && !pendingPush;
+    const changedSinceRead = !switchedAccount && lastKnownCloudPayload!==null
+      && cloudPayload()!==lastKnownCloudPayload;
+    if(switchedAccount && !saveLocalBackup(confirmedPreviousBoard ? "before-cloud-adoption" : "before-account-switch", JSON.stringify(state))){
+      toast("Account switch held: the previous board could not be backed up on this device.", 7000);
+      return;
+    }
     deferredCloudPull = false;
     reconciledAs = window.CloudSync.user;
     lastKnownCloudPayload = haveRemote ? remote.payload : null;
@@ -1503,8 +1543,10 @@ async function cloudPull(){
        So the account rides alongside the revision, device-local like it, and
        a change of account throws the base away rather than reinterpreting it
        against somebody else's counter. */
-    const switchedAccount = state.syncAccount != null && state.syncAccount !== acct;
-    if(switchedAccount){ state.syncRev = 0; delete state.lastCloudServerAt; }
+    if(switchedAccount){
+      undoStack=[]; // old-account frames cannot become new-account cloud writes
+      state.syncRev = 0; delete state.lastCloudServerAt;
+    }
     state.syncAccount = acct;
     if(!haveRemote){                           // empty cloud
       state.syncRev = 0;                       // no document yet, so nothing is behind us
@@ -1513,13 +1555,12 @@ async function cloudPull(){
            document is not an invitation to upload it into someone else's
            cloud. Start this account clean; the old list is safe under the
            account that owns it, and comes back on signing in there again. */
-        pushUndo();
         replaceState(defaultState());
         state.syncAccount = acct; state.syncRev = 0;
         lastPushed = "";
         dropRemovedFields(state); hydrateState(state); applyTheme();
         recomputeRanks(); initializeReplacedScan(); render(); persist();
-        toast("Signed in as " + acct + " — nothing synced under that account yet. ↺ undoes it.");
+        toast("Signed in as " + acct + " — nothing synced under that account yet. The previous board is in Settings backups.");
         return;
       }
       if(state.tasks.length){ lastPushed = ""; cloudPush(); }
@@ -1534,15 +1575,13 @@ async function cloudPull(){
        newer work, renames included. Wall-clock time cannot order edits made
        on two machines; nothing built on it was ever going to hold.
 
-       The document carries a Firestore server timestamp and a revision. When
-       both copies have server dates, use them first; the revision breaks a
-       same-millisecond tie and rejects a concurrent transaction. Revisions
-       order copies when either server date is unavailable. Device timestamps
-       survive only for documents predating both, using the time loaded from
-       disk rather than a click's fresh stamp. Task/history union and a local
-       safety backup guard adoption whichever copy wins. */
-    const rr = typeof remote.rev === "number" ? remote.rev : null;
-    let lr = typeof state.syncRev === "number" ? state.syncRev : null;
+       The document's revision is the ordering authority. A server timestamp
+       records when a write landed, but even that clock cannot override a
+       higher revision. For a legacy document with no revision we cannot
+       establish order, so we adopt it after keeping a local safety backup
+       and merging task/history evidence. */
+    const rr = Number.isSafeInteger(remote.rev) && remote.rev>=0 ? remote.rev : null;
+    let lr = Number.isSafeInteger(state.syncRev) && state.syncRev>=0 ? state.syncRev : null;
     /* A base ABOVE the document's own counter cannot be honest. The cloud
        counter only ever goes up, so nothing this device read from THIS
        document can be ahead of what the document now says. A higher local
@@ -1555,47 +1594,43 @@ async function cloudPull(){
        conflict handler pulled, and the same comparison sent the same push —
        forever, at network speed, with the debounce bypassed because the
        pending write is released straight from this function's finally block.
-       Clamping to the revision we just read makes the next push conditional
-       on something real, so it lands. The local content is untouched and
-       still this device's to send; only the number it claims to be based on
-       is corrected. */
-    if(rr !== null && lr !== null && lr > rr){ lr = rr; state.syncRev = rr; }
-    let remoteWins;
+       Clamp the impossible number, then adopt the document we actually read.
+       The local copy is backed up, and unique tasks and history are merged
+       before any later write. */
+    const impossibleLocalBase = rr !== null && lr !== null && lr > rr;
+    if(impossibleLocalBase){ lr = rr; state.syncRev = rr; }
     const remoteAt=serverTimeMs(remote.serverUpdatedAt);
-    const localAt=serverTimeMs(state.lastCloudServerAt);
-    if(remoteAt!==null && localAt!==null){
-      remoteWins=remoteAt>localAt || (remoteAt===localAt && rr!==null && lr!==null && rr>lr);
-    }else if(rr !== null && lr !== null){
-      remoteWins = rr > lr; // older documents have no server timestamp
-    }else{
-      const lt = firstReconcile ? baseUpdatedAt : (state.updatedAt || 0);
-      const rt = remote.updatedAt || 0;
-      remoteWins = rt > lt;
-    }
+    // A document's revision orders its contents. Server and device clocks
+    // only annotate writes; they cannot prove that a lower revision is newer.
+    // An unversioned legacy document or an impossible local base is adopted
+    // conservatively, with local task/history evidence merged and backed up.
+    const remoteWins = switchedAccount || rr === null || lr === null || impossibleLocalBase || rr > lr;
     if(!remoteWins && rr===lr && remote.payload===cloudPayload()){
       if(remoteAt!==null && state.lastCloudServerAt!==remoteAt){ state.lastCloudServerAt=remoteAt; persist(); }
       return;
     }
     if(remoteWins){
       try{
-        if(useLocal && !saveLocalBackup("before-cloud-adoption", JSON.stringify(state))){
+        if(!switchedAccount && !saveLocalBackup("before-cloud-adoption", JSON.stringify(state))){
           reconciledAs=null; lastKnownCloudPayload=null; pendingPush=false;
           toast("Cloud copy held: current board could not be backed up on this device.", 7000);
           return;
         }
         const st = remoteState;
-        const hadLocalEdits = firstReconcile && (state.updatedAt || 0) > baseUpdatedAt;
+        const hadLocalEdits = (firstReconcile && (state.updatedAt || 0) > baseUpdatedAt) || changedSinceRead;
         // A newer document may be an old tab's partial board. Its revision
         // orders writes, not deletion intent; preserve IDs it did not delete.
         const recoveredTasks = !switchedAccount && mergeUndeletedTasks(st, state);
-        pushUndo();                            // remote adoption is undoable
+        if(!switchedAccount) pushUndo();       // same-account remote adoption is undoable
         replaceState(st); // retain the device-local account binding as well as revision
-        lastPushed = remote.payload;
+        // A legacy document with no revision must be rewritten at revision 1.
+        // Without this, every focus adopts it again and makes another backup.
+        lastPushed = rr===null ? "" : remote.payload;
         applyTheme();
         recomputeRanks(); initializeReplacedScan(); render();
         // Adopted wholesale, so this device is now based on the remote's
         // revision — not on whatever its own copy used to be based on.
-        state.syncRev = rr !== null ? rr : (state.syncRev || 0);
+        state.syncRev = rr !== null ? rr : 0;
         if(remoteAt!==null) state.lastCloudServerAt=remoteAt;
         /* persist(), not an inline localStorage write: loadState() prefers
            window.storage and only falls back to localStorage, so writing one
@@ -1606,21 +1641,15 @@ async function cloudPull(){
            is bookkeeping, not an edit, and save() would re-stamp updatedAt
            and queue a push behind it. */
         persist();
-        if(recoveredTasks) pendingPush = true; // publish the repaired union at the revision just read
+        if(recoveredTasks || rr===null) pendingPush = true; // publish the union or upgrade a legacy document
         // Swapping the board out from under someone mid-edit needs saying out
         // loud, or the edits they just made look like they simply vanished.
-        if(hadLocalEdits) toast("This tab was out of date \u2014 loaded the newer copy. \u21ba undoes it.");
+        if(switchedAccount) toast("Signed in as " + acct + " — the previous board is in Settings backups.");
+        else if(hadLocalEdits) toast("This tab was out of date \u2014 loaded the newer copy. The previous board is in Settings backups; \u21ba undoes it.", 7000);
       }catch(e){ /* corrupt remote — leave local alone */ }
     }else{
-      // Same base revision (or an older document by timestamp): anything
-      // different here is this device's own work, so send it.
-      if(rr !== null && (lr === null || (remoteAt!==null && localAt!==null && remoteAt<localAt && rr>lr))){
-        // We read this document and chose the later server-dated local copy.
-        // Base its conditional write on the revision just read, or a higher
-        // remote counter would conflict and pull forever despite losing by date.
-        state.syncRev = rr;
-      }
-      if(remoteAt!==null && localAt===null) state.lastCloudServerAt=remoteAt;
+      // Same revision: this device has an edit that has not been written yet.
+      if(remoteAt!==null) state.lastCloudServerAt=remoteAt;
       lastPushed = ""; cloudPush();
     }
   } finally {
@@ -1642,8 +1671,10 @@ function pushUndo(){
 function undo(){
   if(!undoStack.length) return;
   const currentChance = state.chance;
-  const frame = undoStack.pop();
+  const frame = undoStack.at(-1);
   const next=JSON.parse(frame.snapshot);
+  if(!sameListOwner(next,state)){ undoStack=[]; return; }
+  undoStack.pop();
   // Undo is a deliberate replacement. Carry the deletion evidence forward
   // and record which removed tasks/history were explicitly brought back.
   markReplacementDeletes(next);
@@ -1665,8 +1696,8 @@ function undo(){
   }
   // A full commit, not commit(false): taking something back is itself a write.
   // It has to reach storage or a reload resurrects what you just undid, and it
-  // has to re-stamp updatedAt or the snapshot's stale timestamp loses the next
-  // cloud reconcile to the very state it was meant to overrule.
+  // has to re-stamp updatedAt for the local edit record. Its revision base is
+  // preserved by replaceState(), so the next cloud write can carry the Undo.
   recomputeRanks(); commit();
 }
 
@@ -3077,7 +3108,7 @@ function openSettings(){
   const archivedChangelog = document.getElementById('appChangelog')?.innerHTML || '';
   const changelogHtml = archivedChangelog.replace('<summary>Changelog</summary>', '<summary>Changelog</summary>'+latestChangelog);
   const backups = readLocalBackups().slice().reverse();
-  const backupHtml = backups.map(entry=>'<div class="mgr"><span class="kv">'+esc(entry.day)+' · '+esc(new Date(entry.at).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}))+' · '+esc(entry.kind.replaceAll('-', ' '))+'</span><button class="btn subtle" data-act="restore-local-backup" data-id="'+esc(entry.id)+'">Restore</button></div>').join('');
+  const backupHtml = backups.map(entry=>'<div class="mgr backup-row"><span class="kv">'+esc(entry.day)+' · '+esc(new Date(entry.at).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}))+' · '+esc(entry.kind.replaceAll('-', ' '))+'</span><button class="btn subtle" data-act="restore-local-backup" data-id="'+esc(entry.id)+'">Restore</button><button class="btn subtle" data-act="delete-local-backup" data-id="'+esc(entry.id)+'" aria-label="Delete '+esc(entry.kind.replaceAll('-', ' '))+' backup from '+esc(entry.day)+'">Delete</button></div>').join('');
   let ctxMgr = "";
   for(const c of state.contexts){
     ctxMgr += '<div class="mgr"><input type="checkbox" data-mgrctx="'+c.id+'"'+(c.active?" checked":"")+' title="active"/>'
@@ -3128,7 +3159,7 @@ function openSettings(){
         : cloudReady() ? ("Cloud sync on, as " + esc(window.CloudSync.user) + ". Reconciles on load and when you switch back to this tab; the newest revision wins, never the fastest clock.")
         : "Cloud sync configured \u2014 sign in from the header to link this device.")+'</div>'
     + '<div class="mbtns"><button class="btn danger" data-act="wipe">Reset everything</button></div>'
-    + '<h3>Daily local backups</h3><p class="kv">Automatic copies stay on this device for seven calendar days. Manual backups stay until browser site data is cleared. Each restore first saves the current board.</p>'
+    + '<h3>Daily local backups</h3><p class="kv">Automatic copies stay on this device for seven calendar days. Manual and unsynced account-switch copies stay until you delete them or clear browser site data. Each restore first saves the current board.</p>'
     + '<div class="mbtns"><button class="btn subtle" data-act="make-manual-backup">Make manual backup</button></div>'
     + (backupHtml || '<p class="kv">No local backups yet.</p>')
   );
@@ -3324,10 +3355,16 @@ function onAction(act, el){
     }
     case "restore-local-backup": {
       const entry=readLocalBackups().find(row=>row.id===el?.dataset?.id);
-      if(!entry || !confirm("Restore this local backup? Your current board will be saved first. Tasks without a recorded deletion will stay.")) break;
+      if(!entry) break;
       try{
         const next=JSON.parse(entry.payload);
         dropRemovedFields(next); hydrateState(next);
+        const destination=state.syncAccount || (cloudReady() ? window.CloudSync.user : null);
+        const source=typeof next.syncAccount==="string" ? next.syncAccount : null;
+        const question=destination && source!==destination
+          ? "This backup belongs to " + (source || "an unknown account") + ". This board belongs to " + destination + ". Restoring can sync its tasks and History to " + destination + "'s cloud. Your current board will be saved first. Continue?"
+          : "Restore this local backup? Your current board will be saved first. Tasks without a recorded deletion will stay.";
+        if(!confirm(question)) break;
         if(!saveLocalBackup("before-restore", JSON.stringify(state))){
           toast("Restore stopped: the current board could not be backed up.", 7000); break;
         }
@@ -3358,6 +3395,16 @@ function onAction(act, el){
     case "make-manual-backup": {
       if(saveLocalBackup("manual", JSON.stringify(state))){ openSettings(); toast("Manual backup saved on this device."); }
       else toast("Manual backup could not be saved on this device.", 7000);
+      break;
+    }
+    case "delete-local-backup": {
+      const rows=readLocalBackups();
+      const entry=rows.find(row=>row.id===el?.dataset?.id);
+      if(!entry || !confirm("Delete this local backup? The current board will stay.")) break;
+      try{
+        localStorage.setItem(LOCAL_BACKUPS_KEY, JSON.stringify(rows.filter(row=>row.id!==entry.id)));
+        openSettings(); toast("Local backup deleted from this device.");
+      }catch(e){ toast("Local backup could not be deleted from this device.", 7000); }
       break;
     }
     case "sync": {
@@ -3473,8 +3520,8 @@ function hotkeyDelete(){
     rejectedSavedState = true;
   }
   persistedChanceSeed = state.chance?.seed ?? null;
-  // What this device knew before any edit this session re-stamps updatedAt.
-  // cloudPull() arbitrates its first reconcile on this, not on the live value.
+  // Keep the loaded edit time to explain an adoption that overtakes local
+  // edits made while the first cloud read is in flight.
   baseUpdatedAt = rejectedSavedState ? 0 : (state.updatedAt || 0);
   if(!rejectedSavedState && loaded) saveLocalBackup("daily", JSON.stringify(state), true);
   applyTheme();
@@ -3483,8 +3530,8 @@ function hotkeyDelete(){
   const loadedChanceSeed = state.chance?.seed;
   ensureCandidate();
   // A cold start after 2 AM creates a draw just like a timer wake. Persist it
-  // now so a second reload cannot draw again; baseUpdatedAt above still guards
-  // first cloud reconciliation against an older local copy.
+  // now so a second reload cannot draw again; baseUpdatedAt above still helps
+  // explain a first-pull replacement to the user.
   if(state.chance && state.chance.seed !== loadedChanceSeed) save();
   watchOSTheme();
   render();
