@@ -7154,6 +7154,105 @@ test('RESTORE INTENT: a delete that observed the restore may remove it', async (
   assert.equal(ctx.state.tasks.some(t=>t.id===task.id),false);
 });
 
+test('RESTORE INTENT: deleting after a second restoration cannot revive an older restoration', async () => {
+  const {ctx}=await loadApp();
+  const task=ctx.addTask('Restore twice');
+  ctx.deleteTask(task.id);
+  ctx.undo();
+  const olderOpen=JSON.parse(JSON.stringify(ctx.state));
+  ctx.deleteTask(task.id);
+  ctx.undo();
+  ctx.deleteTask(task.id);
+  ctx.mergeUndeletedTasks(ctx.state,olderOpen);
+  assert.equal(ctx.state.tasks.some(t=>t.id===task.id),false,
+    'the final delete observed both restorations, including the older saved copy');
+});
+
+test('RESTORE INTENT: finishing after a second reopening cannot revive an older open run', async () => {
+  const {ctx}=await loadApp();
+  const task=ctx.addTask('Finish twice');
+  ctx.doneTask(task.id);
+  ctx.onAction('restore',{dataset:{id:task.id}});
+  const olderOpen=JSON.parse(JSON.stringify(ctx.state));
+  ctx.doneTask(task.id);
+  ctx.onAction('restore',{dataset:{id:task.id}});
+  ctx.doneTask(task.id);
+  ctx.mergeUndeletedTasks(ctx.state,olderOpen);
+  assert.equal(ctx.state.tasks.find(t=>t.id===task.id).done,true,
+    'the final completion observed both open runs, including the older saved copy');
+});
+
+test('RESTORE INTENT: importing an open backup deliberately reopens a completed task', async () => {
+  const {ctx,shim}=await loadApp();
+  const task=ctx.addTask('Open in export');
+  const openBackup=ctx.cloudPayload();
+  ctx.doneTask(task.id);
+  const completed=JSON.parse(JSON.stringify(ctx.state));
+  shim.document.getElementById('jsonBox').value=openBackup;
+  ctx.onAction('import-json',{});
+  ctx.mergeUndeletedTasks(ctx.state,completed);
+  assert.equal(ctx.state.tasks.find(t=>t.id===task.id).done,false,
+    'an older completed copy cannot silently undo the deliberate import');
+});
+
+test('RESTORE INTENT: merging independent open runs retains both through the final completion', async () => {
+  const {ctx}=await loadApp();
+  const base=syncTask('parallel-runs','Parallel runs');
+  const openB=syncState({tasks:[{...base,restoredRunOp:'run-b',restoredAt:2000}]});
+  const doneA=syncState({tasks:[{...base,done:true,completedAt:3000,lastDoneAt:3000,
+    restoredRunOp:'run-a',completedAfterRestoreOp:'run-a'}]});
+  for(const [winner,other] of [[doneA,openB],[openB,doneA]]){
+    const merged=JSON.parse(JSON.stringify(winner));
+    ctx.mergeUndeletedTasks(merged,other);
+    assert.equal(merged.tasks[0].done,false);
+    const doneB=syncState({tasks:[{...merged.tasks[0],done:true,completedAt:4000,
+      lastDoneAt:4000,completedAfterRestoreOp:merged.tasks[0].restoredRunOp}]});
+    ctx.mergeUndeletedTasks(doneB,syncState({tasks:[{...base,restoredRunOp:'run-a',restoredAt:1000}]}));
+    assert.equal(doneB.tasks[0].done,true,
+      'finishing the merged run must also settle the older independent run');
+  }
+});
+
+test('RESTORE INTENT: merging independent completed runs settles both stale open copies', async () => {
+  const {ctx}=await loadApp();
+  const base=syncTask('parallel-done','Parallel completions');
+  const doneA=syncState({tasks:[{...base,done:true,completedAt:3000,lastDoneAt:3000,
+    restoredRunOp:'run-a',completedAfterRestoreOp:'run-a'}]});
+  const doneB=syncState({tasks:[{...base,done:true,completedAt:2000,lastDoneAt:2000,
+    restoredRunOp:'run-b',completedAfterRestoreOp:'run-b'}]});
+  ctx.mergeUndeletedTasks(doneA,doneB);
+  for(const op of ['run-a','run-b']){
+    ctx.mergeUndeletedTasks(doneA,syncState({tasks:[{...base,restoredRunOp:op,restoredAt:1000}]}));
+    assert.equal(doneA.tasks[0].done,true,`completed ${op} run must stay completed`);
+  }
+});
+
+test('RESTORE INTENT: importing an older board retains newer restore and delete observations', async () => {
+  const base=syncTask('retained-intent','Retained intent');
+  const current=syncState({tasks:[base],restoredTaskIds:{[base.id]:true},
+    restoredTaskOps:{[base.id]:['run-a','run-b']}});
+  const old=syncState({tasks:[base],restoredTaskIds:{[base.id]:true},
+    restoredTaskOps:{[base.id]:['run-a']}});
+  const {ctx,shim}=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(current)}});
+  shim.document.getElementById('jsonBox').value=JSON.stringify(old);
+  ctx.onAction('import-json',{});
+  ctx.deleteTask(base.id);
+  ctx.mergeUndeletedTasks(ctx.state,current);
+  assert.equal(ctx.state.tasks.some(t=>t.id===base.id),false,
+    'import cannot discard the newer run before a deliberate delete');
+
+  const strong=syncState({tasks:[],deletedTaskIds:{[base.id]:true},
+    deletedAfterRestoreOps:{[base.id]:[['run-a','run-b']]}});
+  const weak=syncState({tasks:[],deletedTaskIds:{[base.id]:true},
+    deletedAfterRestoreOps:{[base.id]:[['run-a']]}});
+  const reloaded=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(strong)}});
+  reloaded.shim.document.getElementById('jsonBox').value=JSON.stringify(weak);
+  reloaded.ctx.onAction('import-json',{});
+  reloaded.ctx.mergeUndeletedTasks(reloaded.ctx.state,current);
+  assert.equal(reloaded.ctx.state.tasks.some(t=>t.id===base.id),false,
+    'import cannot discard a stronger delete observation');
+});
+
 test('RESTORE INTENT: two partial delete observations cannot combine into false causal proof', async () => {
   const {ctx}=await loadApp();
   const task=syncTask('concurrent','Concurrent restores');
