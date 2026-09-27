@@ -897,6 +897,8 @@
     }
     const settingsButton=document.querySelector('#modalRoot [data-act="scene-time-settings"]');
     if(settingsButton){settingsButton.classList.toggle('setting-set',!!saved);settingsButton.classList.toggle('setting-unset',!saved);}
+    const settingsStatus=document.getElementById('settingsSceneTimeStatus');
+    if(settingsStatus)settingsStatus.textContent=(saved?'A scene time is selected.':'Following live time.')+' Saved on this device.';
   }
   function refreshSolarTimes(){
     const location=globalThis.LivingLocation?.current();

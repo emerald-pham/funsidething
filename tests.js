@@ -12374,6 +12374,28 @@ test('Settings and FAQ: grouped controls expose statuses and explain the core ap
   assert.match(faq,new RegExp(topic,'i'),`FAQ should explain ${topic}`);
 });
 
+test('RISK Settings status: open scene-time and location labels update with their button states',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ const sceneFunction=source.slice(source.indexOf('  function renderSceneTimeChoice(){'),source.indexOf('  function refreshSolarTimes(){'));
+ const sceneStatus={textContent:''},sceneButton={classList:{toggle(){}}};
+ const sceneContext=vm.createContext({S:{readSceneTime:()=>sceneContext.saved},storage:{},saved:'12:00',timeDialog:{querySelectorAll:()=>[],querySelector:()=>null},document:{querySelector:()=>sceneButton,getElementById:id=>id==='settingsSceneTimeStatus'?sceneStatus:null}});
+ vm.runInContext(sceneFunction+';renderSceneTimeChoice();',sceneContext);
+ assert.match(sceneStatus.textContent,/A scene time is selected/);
+ sceneContext.saved=null;vm.runInContext('renderSceneTimeChoice();',sceneContext);
+ assert.match(sceneStatus.textContent,/Following live time/);
+ const start=appSrc.indexOf("document.addEventListener('landscape-location-change',()=>{");
+ const end=appSrc.indexOf('\n});',start)+4;
+ assert.ok(start>=0&&end>start);
+ let locationHandler;const locationStatus={textContent:''},locationButton={classList:{toggle(){}}};
+ const locationContext=vm.createContext({document:{addEventListener:(_name,callback)=>{locationHandler=callback;},querySelector:()=>locationButton,getElementById:id=>id==='settingsLocationStatus'?locationStatus:null},LivingLocation:{current:()=>({enabled:true})}});
+ vm.runInContext(appSrc.slice(start,end),locationContext);locationHandler();
+ assert.match(locationStatus.textContent,/Sky location set/);
+ locationContext.LivingLocation.current=()=>({enabled:false});locationHandler();
+ assert.match(locationStatus.textContent,/Using the default sky/);
+ assert.match(appSrc,/id="settingsSceneTimeStatus"/);
+ assert.match(appSrc,/id="settingsLocationStatus"/);
+});
+
 test('Landscape polish: small autumn leaves, seeded group sizes, stronger vertical drift, and daytime skyline',()=>{
  const context=vm.createContext({Math});
  for(const file of ['landscape-geometry.js','landscape-seasonal.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,file),'utf8'),context);
