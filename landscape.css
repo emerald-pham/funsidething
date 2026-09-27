@@ -55,7 +55,7 @@ body{background:transparent;isolation:isolate}
 .motion-dialog p{font-size:14px;line-height:1.6;color:var(--mut)}
 .motion-choices{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:20px}
 .motion-choices button{border:1px solid var(--line);border-radius:13px;text-align:left;background:var(--surface);padding:14px;min-height:92px}
-.motion-choices button[aria-pressed="true"]{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.motion-choices button[aria-pressed="true"]{border-color:var(--good);background:var(--yes);color:var(--action-ink);box-shadow:inset 0 0 0 1px var(--good)}
 .motion-choices strong,.motion-choices span{display:block}
 .motion-choices span{font-size:12px;font-weight:400;color:var(--mut);margin-top:6px}
 #deviceMotionNote{font-size:12px}

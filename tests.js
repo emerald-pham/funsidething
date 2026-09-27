@@ -9348,7 +9348,11 @@ test('Landscape water: night reflects the actual city in bounded flowing strips'
  const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
  for(const [w,h] of [[320,568],[844,390],[1440,900]]){
   const g=ctx.LandscapeGeometry.create(w,h),rows=g.cityReflection(0,1,1),later=g.cityReflection(1,1,1);
-  assert.ok(rows.length>5&&rows.length<=80);assert.equal(g.cityReflection(0,1,0).length,0);
+  assert.ok(rows.length>5&&rows.length<=80);
+  const daylight=g.cityReflection(0,1,0);
+  assert.ok(daylight.length>5,'the actual skyline remains visible in the lake by day');
+  assert.ok(daylight.every(row=>row.alpha>0&&row.alpha<.3),'daylight reflection stays soft');
+  assert.ok(Math.max(...daylight.map(row=>row.alpha))>=.2,'daytime building shapes have enough contrast to read in the lake');
   for(const row of rows){assert.ok(row.sourceY>=0&&row.sourceY<g.waterTop);assert.ok(row.y>=g.waterTop);assert.ok(Math.abs(row.dx)<5);assert.ok(row.alpha>0&&row.alpha<=.3);}
   assert.ok(rows.some((row,i)=>row.dx!==later[i].dx),'water shifts the mirrored skyline gently');
   assert.equal(g.sunReflection({visible:false,altitude:-20}),false);
@@ -9483,7 +9487,7 @@ test('Landscape birds: flocks hold a mirrored V formation',()=>{
  const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
  const g=ctx.LandscapeGeometry.create(1000,800);
  for(const reverse of [false,true]){
-  const flock=g.flock(500,100,reverse);assert.equal(flock.length,7);assert.equal(flock[0].x,500);assert.equal(flock[0].y,100);
+  const flock=g.flock(500,100,reverse,7);assert.equal(flock.length,7);assert.equal(flock[0].x,500);assert.equal(flock[0].y,100);
   for(let i=1;i<7;i+=2){assert.equal(flock[i].x,flock[i+1].x);assert.equal(flock[i].y-100,100-flock[i+1].y);assert.ok((flock[i].x-500)*(reverse?-1:1)<0,'followers trail the leader');}
  }
  const runtime=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');assert.match(runtime,/geometry\.flock\(/);
@@ -11364,10 +11368,11 @@ test('Chance scan: live TrueSkill ratings still change on Yes and No',async()=>{
  const t=ctx.state.tasks.find(t=>t.id===ctx.state.candidateId);const mu=t.mu;ctx.decide('no');assert.ok(t.mu<mu);
  ctx.undo();const restored=ctx.state.tasks.find(t=>t.id===ctx.state.candidateId);ctx.decide('yes');assert.ok(restored.mu>mu);
 });
-test('Scan clock: schedules the earliest expiry and refreshes eligibility without an action',async()=>{
+test('Scan clock: schedules the next countdown change and refreshes eligibility without an action',async()=>{
  const {ctx}=await loadApp();const at=new Date(2026,8,16,9).getTime();setFakeTime(ctx,at);
  const t=ctx.addTask('repeat');Object.assign(t,{evergreen:true,evergreenHours:0.5,evergreenResetAtDay:false});ctx.completeTask(t);
- assert.equal(ctx.nextScanWakeAt(),at+HOUR/2);
+ assert.equal(ctx.nextScanWakeAt(),at+60000);
+ setFakeTime(ctx,at+60000);assert.match(ctx.chipHTML(t),/29m/);
  setFakeTime(ctx,at+HOUR/2);ctx.refreshScanClock();assert.ok(ctx.pool().some(x=>x.id===t.id));
  assert.match(html,/addEventListener\("focus", refreshScanClock\)/);
 });
@@ -11947,7 +11952,7 @@ test('RISK browser layout matrix: native dates respect pane insets, rank evidenc
   }
   await page.evaluate(()=>{setFloatingHeaderPreference(true);document.scrollingElement.scrollTo(0,document.scrollingElement.scrollHeight);});await page.waitForTimeout(50);
   const pinned=await page.locator('#appHeader').boundingBox();assert.ok(pinned&&pinned.y>=0&&pinned.y<844,'enabled header stays visible after document scrolling');assert.ok(await page.locator('#appHeader [data-act="undo"]').isVisible());
-  await page.getByTitle('Settings, contexts, and backups').click();await page.locator('#stFloatingHeader').uncheck();await page.locator('#stFloatingHeader').check();await page.locator('[data-act="close-modal"]').click();await page.getByTitle('Settings, contexts, and backups').click();assert.equal(await page.locator('#stFloatingHeader').isChecked(),true,'closing and reopening Settings retains the checkmark');await page.locator('[data-act="close-modal"]').click();
+  await page.getByTitle('Settings, contexts, and backups').click();await page.locator('.settings-section summary').filter({hasText:'Scanning and recurrence'}).click();await page.locator('#stFloatingHeader').uncheck();await page.locator('#stFloatingHeader').check();await page.locator('[data-act="close-modal"]').click();await page.getByTitle('Settings, contexts, and backups').click();assert.equal(await page.locator('#stFloatingHeader').isChecked(),true,'closing and reopening Settings retains the checkmark');await page.locator('[data-act="close-modal"]').click();
   await page.evaluate(()=>{state.settings.floatingHeader=false;render();window.scrollTo(0,document.body.scrollHeight);});await page.waitForTimeout(50);
   const ordinary=await page.locator('#appHeader').boundingBox();assert.ok(ordinary&&ordinary.y<0,'disabled header scrolls normally');
  }finally{await browser.close();}
@@ -12228,6 +12233,230 @@ test('Eligibility filter: No, Cannot and Dislodged are ineligible until their ma
  ctx.state.cantAt[cant.id]=Date.now()-(ctx.state.settings.cantMin+1)*60000;ctx.expireCants();
  ctx.onAction('list-eligibility',{dataset:{id:'eligible'}});assert.equal(rowTitles(shim).length,4);
  ctx.onAction('list-eligibility',{dataset:{id:'ineligible'}});assert.equal(rowTitles(shim).length,0);
+});
+
+test('RISK prerequisites: completion, evergreen Done, restore, and deletion govern scan eligibility by ID',async()=>{
+ const {ctx,shim}=await loadApp();const bob=ctx.addTask('bob'),gene=ctx.addTask('gene');
+ assert.equal(ctx.setTaskPrerequisite(gene.id,bob.id),true);
+ assert.equal(gene.prerequisiteId,bob.id);assert.equal(ctx.isEligible(gene),false);
+ ctx.completeTask(bob);assert.equal(ctx.isEligible(gene),true,'ordinary completion unlocks the dependent');
+ ctx.reopenTask(bob);assert.equal(ctx.isEligible(gene),false,'restoring an ordinary prerequisite blocks again');
+ bob.evergreen=true;ctx.completeTask(bob);assert.equal(bob.done,false);
+ assert.equal(ctx.isEligible(gene),true,'an evergreen completion counts while bob rests and when it returns');
+ ctx.deleteTask(bob.id);assert.equal(ctx.isEligible(gene),true,'a deleted prerequisite releases the dependent');
+ assert.equal(gene.prerequisiteId,bob.id,'the reference stays stable for backup and undo');
+ ctx.openSettings();assert.match(shim.document.getElementById('modalRoot').innerHTML,/gene needs deleted task[\s\S]*data-act="remove-prerequisite"/,'a dangling link remains removable in Settings');
+ ctx.undo();assert.equal(ctx.isEligible(ctx.state.tasks.find(t=>t.id===gene.id)),true,'undo restores completed evergreen evidence');
+});
+
+test('RISK prerequisites: invalid links and cycles are rejected; missing imported references are eligible',async()=>{
+ const {ctx}=await loadApp();const a=ctx.addTask('A'),b=ctx.addTask('B'),c=ctx.addTask('C');
+ assert.equal(ctx.setTaskPrerequisite(a.id,a.id),false);
+ assert.equal(ctx.setTaskPrerequisite(a.id,'unknown'),false);
+ assert.equal(ctx.setTaskPrerequisite(a.id,b.id),true);
+ assert.equal(ctx.setTaskPrerequisite(b.id,c.id),true);
+ assert.equal(ctx.setTaskPrerequisite(c.id,a.id),false,'a task chain cannot become a deadlock');
+ assert.equal(ctx.setTaskPrerequisite(a.id,null),true);assert.equal(ctx.isEligible(a),true);
+ const saved=JSON.parse(JSON.stringify(ctx.state));saved.tasks.find(t=>t.id===a.id).prerequisiteId='deleted-on-another-device';
+ ctx.hydrateState(saved);assert.equal(saved.tasks.find(t=>t.id===a.id).prerequisiteId,'deleted-on-another-device');
+ assert.equal(ctx.isEligible(saved.tasks.find(t=>t.id===a.id)),true);
+});
+
+test('RISK prerequisites: Add, Edit, and Settings expose stable task selectors and removal',async()=>{
+ const {ctx,shim}=await loadApp();const bob=ctx.addTask('bob');
+ ctx.render();shim.document.getElementById('addInput').value='gene';
+ shim.document.getElementById('addPrerequisite').value=bob.id;ctx.onAction('add',{});
+ const gene=ctx.state.tasks.find(t=>t.title==='gene');assert.equal(gene.prerequisiteId,bob.id);
+ ctx.openEdit(gene.id);assert.match(shim.document.getElementById('modalRoot').innerHTML,/id="etPrerequisite"[\s\S]*bob/);
+ shim.document.getElementById('etPrerequisite').value='';ctx.applyEditFields(gene);assert.equal(gene.prerequisiteId,null);
+ ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(settings,/Task prerequisites[\s\S]*id="stPrerequisiteTask"[\s\S]*id="stPrerequisiteNeeds"/);
+ shim.document.getElementById('stPrerequisiteTask').value=gene.id;
+ shim.document.getElementById('stPrerequisiteNeeds').value=bob.id;
+ ctx.onAction('set-prerequisite',{});assert.equal(gene.prerequisiteId,bob.id);
+ ctx.onAction('remove-prerequisite',{dataset:{id:gene.id}});assert.equal(gene.prerequisiteId,null);
+});
+
+test('RISK evergreen hours or days: stored hours survive conversion, UI save, and 2 AM reset suggestion',async()=>{
+ const {ctx,shim}=await loadApp();
+ assert.equal(ctx.evergreenDurationHours('7','days'),168);
+ assert.equal(ctx.evergreenDurationHours('18','hours'),18);
+ assert.equal(ctx.evergreenDurationHours('junk','days',18),18);
+ assert.deepEqual({...ctx.evergreenIntervalParts(168)},{value:7,unit:'days'});
+ assert.deepEqual({...ctx.evergreenIntervalParts(18)},{value:18,unit:'hours'});
+ ctx.render();shim.document.getElementById('addEver').checked=true;
+ shim.document.getElementById('addEverHours').value='7';shim.document.getElementById('addEverUnit').value='days';
+ shim.document.getElementById('addInput').value='Weekly';ctx.onAction('add',{});
+ const weekly=ctx.state.tasks[0];assert.equal(weekly.evergreenHours,168);
+ ctx.openEdit(weekly.id);assert.match(shim.document.getElementById('modalRoot').innerHTML,/id="etEverHours"[^>]*value="7"[\s\S]*id="etEverUnit"[\s\S]*value="days" selected/);
+ shim.document.getElementById('etEverHours').value='2';shim.document.getElementById('etEverUnit').value='days';
+ ctx.applyEditFields(weekly);assert.equal(weekly.evergreenHours,48);
+ ctx.openSettings();assert.match(shim.document.getElementById('modalRoot').innerHTML,/id="stEverUnit"/);
+ shim.document.getElementById('stEverHours').value='3';shim.document.getElementById('stEverUnit').value='days';
+ ctx.onAction('save-settings',{});assert.equal(ctx.state.settings.evergreenHours,72);
+ const fresh=ctx.addTask('New default');assert.equal(fresh.evergreenHours,72);
+});
+
+test('Evergreen countdown: multi-day rest shows ceil days and then hours until eligibility',async()=>{
+ const {ctx}=await loadApp();const now=new Date(2026,8,27,9).getTime();setFakeTime(ctx,now);
+ const t=ctx.addTask('Weekly');Object.assign(t,{evergreen:true,evergreenHours:168,evergreenResetAtDay:false,lastDoneAt:now});
+ assert.match(ctx.chipHTML(t),/7d/);assert.equal(ctx.isEligible(t),false);
+ setFakeTime(ctx,now+24*HOUR+1);assert.match(ctx.chipHTML(t),/6d/);
+ setFakeTime(ctx,now+167*HOUR);assert.match(ctx.chipHTML(t),/1h/);
+ setFakeTime(ctx,now+168*HOUR);assert.doesNotMatch(ctx.chipHTML(t),/\d+[dh]/);assert.equal(ctx.isEligible(t),true);
+});
+
+test('RISK evergreen countdown: idle foreground timer repaints at the next displayed hour and minute',async()=>{
+ const {ctx,shim}=await loadApp();const now=new Date(2026,8,27,9).getTime();setFakeTime(ctx,now);
+ const t=ctx.addTask('Short rest');Object.assign(t,{evergreen:true,evergreenHours:18,evergreenResetAtDay:false,lastDoneAt:now});
+ ctx.state.listOpen=true;
+ let scheduled;ctx.setTimeout=(fn,ms)=>{scheduled={fn,ms};return 12345;};
+ ctx.render();assert.match(shim.document.getElementById('listBody').innerHTML,/18h/);
+ assert.ok(scheduled.ms>0&&scheduled.ms<=HOUR+1000,`next badge repaint is due in ${scheduled.ms}ms`);
+ setFakeTime(ctx,now+HOUR+1);scheduled.fn();
+ assert.match(shim.document.getElementById('listBody').innerHTML,/17h/,'the scheduled wake repaints the badge without interaction');
+ assert.ok(scheduled.ms<=HOUR+1000,'the next hour boundary is scheduled too');
+ setFakeTime(ctx,now+17*HOUR);ctx.render();
+ assert.match(shim.document.getElementById('listBody').innerHTML,/1h/);
+ assert.ok(scheduled.ms<=60000+1000,`the final hour updates its minute badge (scheduled ${scheduled.ms}ms)`);
+ setFakeTime(ctx,now+17*HOUR+1);scheduled.fn();
+ assert.match(shim.document.getElementById('listBody').innerHTML,/60m/);
+ assert.ok(scheduled.ms<=60000+1000,'minute badges continue to update without interaction');
+});
+
+test('RISK prerequisites: editing after deletion retains the missing task link until explicitly removed',async()=>{
+ const {ctx,shim}=await loadApp();const bob=ctx.addTask('bob'),gene=ctx.addTask('gene');
+ assert.equal(ctx.setTaskPrerequisite(gene.id,bob.id),true);ctx.deleteTask(bob.id);
+ assert.equal(ctx.isEligible(gene),true);
+ ctx.openEdit(gene.id);
+ const html=shim.document.getElementById('modalRoot').innerHTML;
+ const selected=html.match(/<option value="([^"]+)" selected>deleted task<\/option>/);
+ assert.ok(selected,'the editor keeps the missing prerequisite selected until the user chooses None');
+ shim.document.getElementById('etPrerequisite').value=selected?.[1]||'';
+ shim.document.getElementById('etTitle').value='gene renamed';
+ ctx.onAction('save-edit',{dataset:{id:gene.id}});
+ const edited=ctx.state.tasks.find(t=>t.id===gene.id);
+ assert.equal(edited.prerequisiteId,bob.id,'a title edit must not erase a dangling link');
+ ctx.undo();ctx.undo();
+ const restored=ctx.state.tasks.find(t=>t.id===gene.id);
+ assert.equal(restored.prerequisiteId,bob.id);
+ assert.equal(ctx.isEligible(restored),false,'restoring the prerequisite blocks the dependent again');
+});
+
+test('RISK custom hourly quotes: Settings saves plain text by hour and the scene combines it with file copy',async()=>{
+ const {ctx,shim}=await loadApp();ctx.openSettings();
+ const panel=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(panel,/id="stQuoteHour"[\s\S]*id="stQuoteLines"/);
+ shim.document.getElementById('stQuoteHour').value='14';shim.document.getElementById('stQuoteLines').value='Take one step\nPause kindly';
+ ctx.onAction('save-hourly-quotes',{});
+ assert.deepEqual(Array.from(ctx.state.settings.hourlyQuotes['14']),['Take one step','Pause kindly']);
+ const mood=moodRuntime(),date=new Date('2026-09-29T14:00:00Z'),location={timezone:'UTC'};
+ mood.setHumanText('## Hour 14\n- From the file');mood.setPersonalHourlyQuotes(ctx.state.settings.hourlyQuotes);
+ const pool=[0,.4,.8].map(n=>mood.message(date,location,()=>n));
+ assert.ok(pool.includes('From the file')&&pool.includes('Take one step')&&pool.includes('Pause kindly'));
+ shim.document.getElementById('stQuoteLines').value='';ctx.onAction('save-hourly-quotes',{});
+ assert.equal(ctx.state.settings.hourlyQuotes['14'],undefined,'an empty field removes personal lines for that hour');
+ assert.equal(mood.message(date,location,()=>0),'From the file','the local Markdown remains available');
+});
+
+test('Settings and FAQ: grouped controls expose statuses and explain the core app',async()=>{
+ const {ctx,shim}=await loadApp();ctx.openSettings();let panel=shim.document.getElementById('modalRoot').innerHTML;
+ assert.ok((panel.match(/class="settings-section"/g)||[]).length>=4,'Settings is grouped into native collapsible sections');
+ assert.match(panel,/data-act="location-settings"[^>]*class="[^"]*setting-unset/);
+ assert.match(panel,/data-act="scene-time-settings"[^>]*class="[^"]*setting-unset/);
+ assert.doesNotMatch(panel,/id="jsonBox"|data-act="(?:import|export)-json"/,'manual backups remain the visible recovery flow');
+ vm.runInContext('globalThis.LivingLocation={current:()=>({enabled:true})}',ctx);
+ shim.localStorage.setItem('fvp:chain-scanner:scene-time','12:00');ctx.openSettings();panel=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(panel,/data-act="location-settings"[^>]*class="[^"]*setting-set/);
+ assert.match(panel,/data-act="scene-time-settings"[^>]*class="[^"]*setting-set/);
+ ctx.openHelp();const faq=shim.document.getElementById('modalRoot').innerHTML;
+ for(const topic of ['prerequisite','Hours or Days','custom hourly','location','offline','backup','chance mode','undo'])
+  assert.match(faq,new RegExp(topic,'i'),`FAQ should explain ${topic}`);
+});
+
+test('RISK Settings status: open scene-time and location labels update with their button states',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ const sceneFunction=source.slice(source.indexOf('  function renderSceneTimeChoice(){'),source.indexOf('  function refreshSolarTimes(){'));
+ const sceneStatus={textContent:''},sceneButton={classList:{toggle(){}}};
+ const sceneContext=vm.createContext({S:{readSceneTime:()=>sceneContext.saved},storage:{},saved:'12:00',timeDialog:{querySelectorAll:()=>[],querySelector:()=>null},document:{querySelector:()=>sceneButton,getElementById:id=>id==='settingsSceneTimeStatus'?sceneStatus:null}});
+ vm.runInContext(sceneFunction+';renderSceneTimeChoice();',sceneContext);
+ assert.match(sceneStatus.textContent,/A scene time is selected/);
+ sceneContext.saved=null;vm.runInContext('renderSceneTimeChoice();',sceneContext);
+ assert.match(sceneStatus.textContent,/Following live time/);
+ const start=appSrc.indexOf("document.addEventListener('landscape-location-change',()=>{");
+ const end=appSrc.indexOf('\n});',start)+4;
+ assert.ok(start>=0&&end>start);
+ let locationHandler;const locationStatus={textContent:''},locationButton={classList:{toggle(){}}};
+ const locationContext=vm.createContext({document:{addEventListener:(_name,callback)=>{locationHandler=callback;},querySelector:()=>locationButton,getElementById:id=>id==='settingsLocationStatus'?locationStatus:null},LivingLocation:{current:()=>({enabled:true})}});
+ vm.runInContext(appSrc.slice(start,end),locationContext);locationHandler();
+ assert.match(locationStatus.textContent,/Sky location set/);
+ locationContext.LivingLocation.current=()=>({enabled:false});locationHandler();
+ assert.match(locationStatus.textContent,/Using the default sky/);
+ assert.match(appSrc,/id="settingsSceneTimeStatus"/);
+ assert.match(appSrc,/id="settingsLocationStatus"/);
+});
+
+test('Landscape polish: small autumn leaves, seeded group sizes, stronger vertical drift, and daytime skyline',()=>{
+ const context=vm.createContext({Math});
+ for(const file of ['landscape-geometry.js','landscape-seasonal.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,file),'utf8'),context);
+ const g=context.LandscapeGeometry.create(390,844),trees=[{x:180,y:g.near(180),size:50}];
+ const leaves=context.LandscapeSeasonal.particles(3,'autumn',trees,g,390,844,{status:'clear',intensity:0,storm:false}).filter(p=>p.kind==='leaf');
+ assert.ok(leaves.length>0&&leaves.every(p=>p.size<=1.15),'autumn leaves are much smaller than petals');
+ const sky=livingSky(),flocks=new Set(),packs=new Set();
+ for(const seed of [.02,.22,.42,.62,.82]){flocks.add(sky.groupSize('flock',seed));packs.add(sky.groupSize('cyclist',seed));}
+ assert.ok(flocks.size>=3&&packs.size>=3,'each group type varies across arrivals');
+ for(const count of flocks)assert.equal(g.flock(200,100,false,count).length,count);
+ const airplane={type:'banner',age:37,duration:90,lane:.5,seed:.37,reverse:false};
+ const offsets=[10,25,40,55,70].map(age=>g.verticalOffset({...airplane,age},20));
+ assert.ok(Math.max(...offsets)-Math.min(...offsets)>10,'eligible airborne motion is visibly vertical');
+ assert.ok(g.cityReflection(0,1,0).length>0);
+});
+
+test('Landscape polish: tram car spacing follows track length on phone and tablet',()=>{
+ const context=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),context);
+ for(const [w,h] of [[390,844],[1024,768],[844,390]]){
+  const g=context.LandscapeGeometry.create(w,h),cars=g.railCars(w*.58,5,26,false);
+  assert.equal(cars.length,5);
+  const distances=cars.slice(1).map((car,i)=>Math.hypot(car.x-cars[i].x,car.y-cars[i].y));
+  assert.ok(distances.every(d=>Math.abs(d-26)<1.4),`${w}x${h} cars keep a constant visible gap: ${distances}`);
+ }
+ assert.match(fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),/geometry\.railCars\(/);
+});
+
+test('Landscape polish: rain darkens the sky, foreground fireflies double, and the message plane has two wings',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ const rain=source.slice(source.indexOf('  function paintWeather(){'),source.indexOf('  function paintWoodland('));
+ const overlays=[],streaks=[],g={save(){},restore(){},fillRect(){overlays.push(this.globalAlpha)}};
+ vm.runInNewContext(`${rain};paintWeather()`,{g,W:390,H:844,hy:300,sceneSeason:'autumn',world:{elapsed:0},reduced:true,rand:()=>.5,ellipse(){},line(_g,...args){streaks.push(args)},document:{documentElement:{dataset:{}}},LandscapeSeasonal:{paint(){}},geometry:{},treeOrigins:[],p:{city:'#345',sky:['#abc','#bcd','#def']},S:{weatherAt:()=>({status:'rain',intensity:1,storm:false,slot:1})}});
+ assert.ok(overlays[0]>=.18,'rain produces a clearly darker whole-scene sky');
+ assert.ok(streaks.length>=30,'rain is readily visible on a phone');
+ assert.match(source,/for\(let i=0;i<32;i\+\+\)/,'night has twice the original sixteen fireflies');
+ assert.match(source,/const y=Math\.min\(H-\d+,near\(x\)/,'fireflies sit on the foreground hill');
+ const plane=source.slice(source.indexOf('  function airplane('),source.indexOf('  function paintGuest('));
+ const lines=[];const gg={save(){},restore(){},translate(){},scale(){}};
+ vm.runInNewContext(`${plane};airplane(100,100,1,.2,0,true)`,{g:gg,color:()=> '#345',line(_g,x1,y1,x2,y2,...rest){lines.push([x1,y1,x2,y2,...rest])},ellipse(){}});
+ const wings=lines.filter(([x1,y1,x2,y2])=>Math.abs(x2-x1)>=10&&Math.abs(y2-y1)<=2);
+ assert.ok(wings.some(([,y])=>y<0)&&wings.some(([,y])=>y>0),'message aircraft has distinct upper and lower wings');
+ assert.ok(lines.some(([x1,y1,x2,y2])=>Math.abs(y2-y1)>=6&&Math.abs(x2-x1)<=5),'wing struts join the biplane');
+});
+
+test('Repository test-first guard covers every app module and documents risk cases',()=>{
+ const guard=fs.readFileSync(path.join(__dirname,'.claude/hooks/test-first-guard.sh'),'utf8');
+ for(const file of ['landscape.js','landscape-core.js','landscape-mood.js','landscape-geometry.js','landscape-seasonal.js','location.js','landscape.css','index.html','sw.js'])
+  assert.match(guard,new RegExp(file.replaceAll('.','\\.')));
+ const policy=fs.readFileSync(path.join(__dirname,'CLAUDE.md'),'utf8');
+ assert.match(policy,/risk-based/i);assert.match(policy,/red output/i);assert.match(policy,/full suite/i);
+});
+
+test('Repository CI gate requires changed tests and risk cases with app source diffs',async()=>{
+ const {validateTestFirst}=await import('./scripts/test-first-gate.mjs');
+ assert.deepEqual(validateTestFirst(['README.md'],[]),[]);
+ assert.match(validateTestFirst(['landscape.css'],[])[0],/tests\.js/);
+ assert.deepEqual(validateTestFirst(['landscape.css','tests.js'],['+test("visual regression",()=>{})']),[]);
+ assert.match(validateTestFirst(['index.html','tests.js'],['+test("ordinary",()=>{})'])[0],/RISK/);
+ assert.deepEqual(validateTestFirst(['index.html','tests.js'],['+test("RISK eligibility: boundary",()=>{})']),[]);
+ const workflow=fs.readFileSync(path.join(__dirname,'.github/workflows/data-safety.yml'),'utf8');
+ assert.match(workflow,/test-first-gate\.mjs/);assert.match(workflow,/npm test/);
 });
 
 test('Firestore rules: old clients cannot replace a revisioned board', {skip:!process.env.FIRESTORE_EMULATOR_HOST}, async () => {

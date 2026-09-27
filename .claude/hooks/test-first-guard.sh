@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Test-first guard for Chain Scanner.
 #
-# The app implementation lives in index.html and the PWA shell files, with all
-# tests in tests.js, so "is there a test for this yet?" has a cheap mechanical
+# The app implementation includes the scanner, landscape, location and shell.
+# All behavior tests live in tests.js, so "is there a test for this yet?" has a cheap mechanical
 # answer: has tests.js been touched since the last commit? If not, an edit to an
-# app or PWA shell file is implementation arriving before its test, and this
+# app file is implementation arriving before its test, and this
 # blocks it.
 #
 # The legitimate way past it is the one the discipline asks for anyway: write
@@ -16,7 +16,7 @@ payload=$(cat)
 file=$(printf '%s' "$payload" | jq -r '.tool_input.file_path // ""')
 
 case "$file" in
-  */index.html|*/sw.js|*/manifest.webmanifest|*/icon.svg|*/icon-*.png) ;;
+  */index.html|*/sw.js|*/manifest.webmanifest|*/icon.svg|*/icon-*.png|*/location.js|*/landscape.css|*/landscape.js|*/landscape-core.js|*/landscape-config.js|*/landscape-geometry.js|*/landscape-mood.js|*/landscape-appearance.js|*/landscape-riders.js|*/landscape-seasonal.js|*/landscape-skywriter.js|*/landscape-winter.js|*/stars.js) ;;
   *) exit 0 ;;
 esac
 
@@ -32,7 +32,7 @@ cat <<'JSON'
   "hookSpecificOutput": {
     "hookEventName": "PreToolUse",
     "permissionDecision": "deny",
-    "permissionDecisionReason": "Test-first guard: tests.js has no uncommitted changes, so this app/PWA shell edit is implementation arriving before its test. Write the failing test in tests.js first, run it, and watch it fail for the right reason — then this edit goes through. (Pure docs live in README.md / SETUP.md and are never blocked. To lift the guard, edit .claude/settings.json.)"
+    "permissionDecisionReason": "Test-first guard: tests.js has no uncommitted changes, so this app edit is implementation arriving before its test. Write the failing test in tests.js first, run it, and watch it fail for the right reason — then this edit goes through. Pure documentation is exempt."
   }
 }
 JSON

@@ -19,6 +19,10 @@
   const mq=window.matchMedia('(prefers-reduced-motion: reduce)');
   let storage;try{storage=window.localStorage;}catch{storage=null;}
   LandscapeMood.configureHistory(storage);
+  LandscapeMood.setPersonalHourlyQuotes(window.getScannerHourlyQuotes?.()||{});
+  window.addEventListener('scanner-hourly-quotes-change',event=>{
+    LandscapeMood.setPersonalHourlyQuotes(event.detail||{});refreshSky();
+  });
   let currentEntry=null,visibleBanners=[];
   function sceneTextVisible(element){
     const rect=element.getBoundingClientRect();
@@ -296,13 +300,15 @@
   }
   function transport(x,y,progress,isTrain,reverse){
     const track=isTrain?geometry.lowerRail:rail,n=isTrain?5:3,cw=isTrain?24:22,dir=reverse?-1:1,scale=isTrain?1:.72;
+    const cars=isTrain&&geometry.railCars?geometry.railCars(x,n,(cw+2)*scale,reverse)
+      :Array.from({length:n},(_,i)=>{const xx=x-i*(cw+2)*scale*dir;return {x:xx,y:track(xx),angle:geometry.tangent(track,xx)};});
     for(let i=0;i<n;i++){
-      const xx=x-i*(cw+2)*scale*dir;
+      const xx=cars[i].x;
       if(isTrain&&i){
-        const previous=xx+(cw+2)*scale*dir,from=xx+cw/2*scale*dir,to=previous-cw/2*scale*dir;
+        const previous=cars[i-1].x,from=xx+cw/2*scale*dir,to=previous-cw/2*scale*dir;
         line(g,from,track(from)-5,to,track(to)-5,p.city,1.6);
       }
-      g.save();g.translate(xx,track(xx)-2);g.rotate(geometry.tangent(track,xx));g.scale(dir*scale,scale);
+      g.save();g.translate(xx,cars[i].y-2);g.rotate(cars[i].angle);g.scale(dir*scale,scale);
       g.fillStyle=S.mixHex(isTrain?'#e4cfa5':'#dceade',p.city,p.night*.3);g.beginPath();g.roundRect(-cw/2,-10,cw,8,2);g.fill();
       g.fillStyle=isTrain?'#bb8275':'#77a8a2';g.fillRect(-cw/2,-5,cw,2);
       g.fillStyle=p.night>.4?'#edce89':'#71969c';for(let j=3;j<cw-3;j+=5)g.fillRect(-cw/2+j,-8,3,2);
@@ -352,8 +358,8 @@
       paintHorizonReflection(base.canvas,t,.72);
       paintHorizonReflection(skyReflection,t,1);
     }
-    // Invert the actual skyline into narrow, softly moving water bands. The
-    // existing shoreline clip keeps reflections beneath the hills and boats.
+    // Invert the actual skyline by day and night into narrow, softly moving
+    // bands. The shoreline clip keeps them beneath the hills and boats.
     for(const row of geometry.cityReflection(t,wind,p.night)){
       g.globalAlpha=row.alpha;
       g.drawImage(cityReflection,0,row.sourceY*dpr,cityReflection.width,Math.min(2/1.35*dpr,cityReflection.height-row.sourceY*dpr),row.dx,row.y,W,2);
@@ -393,8 +399,9 @@
     for(const e of woodland.events)paintWoodland(e);
     composite('trees-front');
     paintWeather();
-    if(sceneSeason!=='winter'&&p.night>.15)for(let i=0;i<16;i++){
-      const x=rand(i+801)*W+Math.sin(t*.7+i)*10,y=middle(x)+28+rand(i+830)*50+Math.cos(t+i)*6;
+    if(sceneSeason!=='winter'&&p.night>.15)for(let i=0;i<32;i++){
+      const x=rand(i+801)*W+Math.sin(t*.7+i)*10;
+      const y=Math.min(H-8,near(x)+16+rand(i+830)*44+Math.cos(t+i)*6);
       g.globalAlpha=(.2+.6*(.5+.5*Math.sin(t*1.4+i)))*p.night;ellipse(g,x,y,1.5,1.5,'#eff7b7');g.globalAlpha=1;
     }
   }
@@ -405,16 +412,17 @@
     if(!weather.intensity)return;
     const phase=reduced?0:Date.now()/1000,snow=weather.status==='snow'||weather.status==='snowstorm',storm=weather.storm;
     const gust=Math.sin(phase*.22)+Math.sin(phase*.071)*.5,wind=storm?2.3+gust:.5+gust*.15;
-    g.save();g.globalAlpha=weather.intensity*(storm?.1:.045);g.fillStyle=p.city;g.fillRect(0,0,W,H);
-    for(let i=0;i<6;i++){const x=((i+.3)*W/6+phase*(storm?3:1))%(W+180)-90;ellipse(g,x,hy*(.12+rand(i+6100)*.2),W*.14,hy*.065,p.city);}
-    g.globalAlpha=weather.intensity*(snow?.55:.24);
-    const count=Math.round(W/(storm?10:snow?22:18));
+    g.save();g.globalAlpha=weather.intensity*(snow?.08:storm?.32:.22);g.fillStyle='#243746';g.fillRect(0,0,W,hy+H*.08);
+    g.globalAlpha=weather.intensity*(snow?.18:.4);
+    for(let i=0;i<6;i++){const x=((i+.3)*W/6+phase*(storm?3:1))%(W+180)-90;ellipse(g,x,hy*(.12+rand(i+6100)*.2),W*.14,hy*.065,'#344e61');}
+    g.globalAlpha=weather.intensity*(snow?.55:storm?.72:.62);
+    const count=Math.round(W/(storm?8:snow?22:9));
     for(let i=0;i<count;i++){
       const speed=snow?10+rand(i+4500)*15:75+rand(i+4500)*50;
       const y=(rand(i+4600)*H+phase*speed)%H;
       const x=((rand(i+4700)*W+y*.12*wind+(snow?phase*(storm?18:4)+Math.sin(phase*.22)*12+Math.sin(phase*.071)*8+Math.sin(phase*.5+i)*5:0))%W+W)%W;
       if(snow)ellipse(g,x,y,.8+rand(i+4800),.8+rand(i+4800),'#f4f4e8');
-      else line(g,x,y,x+1.2*wind,y+6+rand(i+4800)*5,p.sky[2],.65);
+      else line(g,x,y,x+1.2*wind,y+9+rand(i+4800)*7,'#e4f2f6',.9);
     }
     // An occasional distant bolt, never a full-screen flash or a reduced-motion effect.
     const flash=(phase+rand(weather.slot)*40)%47;
@@ -521,14 +529,13 @@
       if(e.type==='metro'){transport(x,rail(x)-4,f,false,e.reverse);return;}
       if(e.type==='train'){transport(x,near(x)+H*.07-2,f,true,e.reverse);return;}
       if(e.type==='cyclist'){
-
-        const count=e.seed>.55?3+Math.floor(e.seed*4):1;
+        const count=e.count||S.groupSize('cyclist',e.seed);
         geometry.pack(x,count,e.reverse).forEach((pose,i)=>cyclist(pose.x,trail(pose.x),clock+i*.8,color(e.seed,i),W<600?.85:1,e.reverse,skinColor((e.seed+i*.173)%1)));
         return;
       }
       if(e.type==='flock'){
-        const y=hy*(.25+e.lane*.32)+Math.sin(fy*Math.PI)*10;
-        geometry.flock(x,y,e.reverse).forEach((pose,i)=>bird(pose.x,pose.y,2.5,clock+i*.13,false,false,(e.seed+i*.173)%1,0));
+        const y=hy*(.25+e.lane*.32)+geometry.verticalOffset(e,18);
+        geometry.flock(x,y,e.reverse,e.count||S.groupSize('flock',e.seed)).forEach((pose,i)=>bird(pose.x,pose.y,2.5,clock+i*.13,false,false,(e.seed+i*.173)%1,0));
         return;
       }
       if(e.type==='bird'){
@@ -544,15 +551,14 @@
         return;
       }
       if(e.type==='plane'){
-        const y=hy*.18+e.lane*hy*.18;
+        const y=hy*.18+e.lane*hy*.18+geometry.verticalOffset(e,14);
         g.save();g.translate(x,y);g.scale(e.reverse?-1:1,1);
         g.globalAlpha=.45;const tail=g.createLinearGradient(-90,0,-6,0);tail.addColorStop(0,'rgba(248,246,225,0)');tail.addColorStop(1,'rgba(248,246,225,.65)');g.fillStyle=tail;g.fillRect(-90,1,83,.7);g.globalAlpha=1;
         g.fillStyle=S.mixHex('#f6f1db',p.sky[1],p.night*.7);g.beginPath();g.moveTo(9,0);g.lineTo(0,-2);g.lineTo(-7,-8);g.lineTo(-10,-8);g.lineTo(-5,-1);g.lineTo(-13,-1);g.lineTo(-17,-4);g.lineTo(-18,-3);g.lineTo(-16,2);g.lineTo(-5,2);g.lineTo(-10,8);g.lineTo(-7,8);g.lineTo(0,2);g.closePath();g.fill();
         if(p.night>.4){ellipse(g,0,-2,1,1,'#ed8976');ellipse(g,0,2,1,1,'#abcdaa');}g.restore();return;
       }
       if(e.type==='balloon'){
-
-        const drift=geometry.balloonDrift(e.seed,clock,wind,verticalClock),y=hy*.48+e.lane*hy*.18+drift.y,r=10+e.lane*7;
+        const drift=geometry.balloonDrift(e.seed,clock,wind,verticalClock),y=hy*.48+e.lane*hy*.18+drift.y+geometry.verticalOffset(e,10),r=10+e.lane*7;
         g.save();g.translate(x,y);ellipse(g,0,0,r,r*1.2,color(e.seed));ellipse(g,0,0,r*.62,r*1.2,color(e.seed,2));ellipse(g,0,0,r*.25,r*1.2,color(e.seed,4));
         line(g,-r*.4,r*.95,-3,r*1.6,'#867458',.65);line(g,r*.4,r*.95,3,r*1.6,'#867458',.65);g.fillStyle='#897659';g.fillRect(-3,r*1.5,6,4);g.restore();return;
       }
@@ -602,12 +608,19 @@
   function airplane(x,y,dir,seed,t=0,propeller=false){
     if(propeller){
       g.save();g.translate(x,y);g.scale(dir,1);
-      line(g,-18,0,8,0,color(seed),3);ellipse(g,7,0,4,2.4,color(seed));
-      line(g,-16,0,-18,-5,color(seed,2),2);line(g,-18,0,-12,3,color(seed,2),2);
-      line(g,-2,-7,2,6,color(seed,2),3);ellipse(g,3,-1.5,3,1.1,'#8faeb7');
-      line(g,12,0,14,0,'#6c7770',1);
+      // Stacked wings, braced struts, fixed wheels and a nose propeller make
+      // the message towplane legible as a classic biplane at scenery scale.
+      const hull=color(seed),wing=color(seed,2);
+      ellipse(g,-2,0,15,2.4,hull);ellipse(g,10,0,4,2.7,hull);
+      line(g,-18,-3,-13,-3,wing,1.6);line(g,-17,0,-18,-6,wing,1.4);
+      line(g,-9,-6,8,-6,wing,2.4);line(g,-9,3,8,3,wing,2.5);
+      line(g,-6,-5,-5,2,'#516972',1);line(g,5,-5,4,2,'#516972',1);
+      ellipse(g,-1,-2.6,3,1.6,'#8faeb7');
+      line(g,-5,2,-6,6,'#516972',1);line(g,6,2,5,6,'#516972',1);
+      ellipse(g,-6,6,1.5,1.5,'#394850');ellipse(g,5,6,1.5,1.5,'#394850');
+      line(g,13,0,15,0,'#6c7770',1);
       const blade=Math.cos(t*37)*5;
-      line(g,14,-blade,14,blade,'#6c7770',.9);ellipse(g,14,0,.7,.7,'#6c7770');
+      line(g,15,-blade,15,blade,'#6c7770',.9);ellipse(g,15,0,.7,.7,'#6c7770');
       g.restore();return;
     }
     g.save();g.translate(x,y);g.scale(dir,1);g.fillStyle=color(seed);
@@ -751,7 +764,7 @@
       g.restore();return true;
     }
     if(e.type==='hangglider'){
-      const y=hy*.4+e.lane*hy*.2+Math.sin(verticalClock*.2+e.seed*TAU)*9;
+      const y=hy*.4+e.lane*hy*.2+Math.sin(verticalClock*.2+e.seed*TAU)*9+geometry.verticalOffset(e,15);
       g.save();g.translate(x,y);g.rotate(Math.sin(verticalClock*.3+e.seed*TAU)*.06);g.scale(dir,1);
       g.beginPath();g.moveTo(0,-10);g.lineTo(-27,7);g.lineTo(0,2);g.lineTo(27,7);g.closePath();g.fillStyle=c;g.fill();
       g.beginPath();g.moveTo(0,-10);g.lineTo(0,2);g.lineTo(27,7);g.closePath();g.fillStyle=color(e.seed,2);g.fill();
@@ -759,7 +772,7 @@
       personHead(g,1,12,2,2,e.seed,skinColor(e.seed));line(g,-1,14,-8,17,color(e.seed,4),3);g.restore();return true;
     }
     if(e.type==='airshow'){
-      const y=hy*.25+Math.sin(fy*Math.PI)*20;
+      const y=hy*.25+geometry.verticalOffset(e,20);
       for(let i=0;i<3;i++){
         const xx=x-i*23*dir,yy=y+(i-1)*17,smoke=['#ec7181','#fffaf2','#639ed9'][i];
         g.save();g.globalAlpha=.85*(1-p.night*.45)*S.smooth(0,.1,f)*(1-S.smooth(.65,1,f));
@@ -790,7 +803,7 @@
       return true;
     }
     if(e.type==='banner'){
-      const y=hy*.3+e.lane*hy*.18,bx=x-dir*86;
+      const y=hy*.3+e.lane*hy*.18+geometry.verticalOffset(e,18),bx=x-dir*86;
       if(e.bannerText===undefined)e.bannerText=LandscapeMood.airplaneMessage(e.seed);
       if(!e.bannerText){airplane(x,y,dir,e.seed,t,true);return true;}
       const bannerPalette=LandscapeAppearance.bannerColors(p.night,c,p.city);
@@ -875,6 +888,18 @@
   }
   const timeDialog=document.getElementById('sceneTimeDialog'),timeInput=document.getElementById('sceneTimeInput'),timeStatus=document.getElementById('sceneTimeStatus'),seasonInput=document.getElementById('sceneSeasonInput');
   let timeReturnFocus=null;
+  function renderSceneTimeChoice(){
+    const saved=S.readSceneTime(storage);
+    for(const button of timeDialog.querySelectorAll('[data-scene-preset], [data-scene-time="live"], [data-scene-time="lock"]')){
+      const active=button.dataset.scenePreset===saved || (button.dataset.sceneTime==='live' && saved===null)
+        || (button.dataset.sceneTime==='lock' && !!saved && !button.dataset.scenePreset && !timeDialog.querySelector('[data-scene-preset="'+saved+'"]'));
+      button.setAttribute('aria-pressed',String(active));
+    }
+    const settingsButton=document.querySelector('#modalRoot [data-act="scene-time-settings"]');
+    if(settingsButton){settingsButton.classList.toggle('setting-set',!!saved);settingsButton.classList.toggle('setting-unset',!saved);}
+    const settingsStatus=document.getElementById('settingsSceneTimeStatus');
+    if(settingsStatus)settingsStatus.textContent=(saved?'A scene time is selected.':'Following live time.')+' Saved on this device.';
+  }
   function refreshSolarTimes(){
     const location=globalThis.LivingLocation?.current();
     // Preview a selected season before saving it; all labels use the observer's
@@ -889,6 +914,7 @@
       label.textContent=entry.label;time.textContent=entry.time;button.append(label,time);
       button.setAttribute('aria-pressed',String(S.readSceneTime(storage)===entry.preset));
     }
+    renderSceneTimeChoice();
     return schedule;
   }
   seasonInput.addEventListener('change',refreshSolarTimes);

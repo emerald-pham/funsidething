@@ -658,6 +658,7 @@
   // Only bullet lines inside recognized sections are authored copy. Empty
   // sections leave the hourly prompt blank, and Markdown stays plain text.
   let humanText = Object.create(null);
+  let personalHourlyQuotes = Object.create(null);
   const AI_AIRPLANE_LINES = ['ONE THING AT A TIME','ROOM TO BREATHE','HELLO, BEAUTIFUL DAY','TAKE YOUR TIME'];
   function setHumanText(markdown) {
     const next = Object.create(null);
@@ -672,6 +673,15 @@
       }
     }
     humanText = next;
+  }
+  function setPersonalHourlyQuotes(quotes){
+    const next=Object.create(null);
+    if(quotes && typeof quotes==='object' && !Array.isArray(quotes))for(const [hour,lines] of Object.entries(quotes)){
+      if(!/^(?:[01]\d|2[0-3])$/.test(hour) || !Array.isArray(lines))continue;
+      const clean=[...new Set(lines.filter(line=>typeof line==='string').map(line=>line.trim()).filter(line=>line&&line.length<=180))].slice(0,12);
+      if(clean.length)next[hour]=clean;
+    }
+    personalHourlyQuotes=next;
   }
   const HISTORY_KEY = 'fvp:chain-scanner:scene-seen:v1';
   const SEEN_MS = 7 * 86400000;
@@ -726,7 +736,8 @@
     const context = normalizedLocation(location);
     const parts = localParts(date, context.timezone);
     const name = holidayForParts(parts);
-    const hourly = humanText['Hour ' + String(parts.hour).padStart(2, '0')] || [];
+    const hourKey=String(parts.hour).padStart(2,'0');
+    const hourly = [...(humanText['Hour ' + hourKey] || []),...(personalHourlyQuotes[hourKey] || [])];
     const anytime = humanText['Any time of day'] || [];
     // The hour is a display label, not a new line for seven-day seen history.
     const humanEntry = text => anytime.includes(text) ?
@@ -760,7 +771,7 @@
 
   const api = Object.freeze({
     season, palette, clock, period, holiday, message, messages: message,
-    setHumanText, messageEntry, airplaneMessage, skywriterMessage, configureHistory, recordSeen,
+    setHumanText, setPersonalHourlyQuotes, messageEntry, airplaneMessage, skywriterMessage, configureHistory, recordSeen,
     messageCatalog: Object.freeze(messageCatalog), messageCount: messageCatalog.length,
     holidayCatalog,
     periods: Object.freeze(PERIOD_NAMES.slice()),

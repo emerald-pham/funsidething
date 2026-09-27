@@ -19,6 +19,24 @@ run and show the green output.
 Watch for a new test that passes *before* the implementation exists. That test is
 broken, not finished — strengthen it until it discriminates, then continue.
 
+## Forced risk-based TDD and regression gates
+
+Before editing any scanner, landscape, location, or offline-shell behavior,
+write a discriminating test in `tests.js`, run it, and keep the red output for
+the release record. The edit guard covers every app module. The CI diff gate
+also rejects app changes without changed tests; state, eligibility, sync,
+astronomy, and shell changes require a new `RISK` test in the same diff.
+
+Choose cases by failure cost. For persisted task rules, include old saved data,
+undo, import or restore, deletion, and cross-device reconciliation when those
+paths touch the change. For a visual or motion change, cover the numerical
+geometry or paint contract, reduced motion, and relevant phone, tablet, and
+short-landscape viewports. For offline changes, check the asset fingerprint and
+offline reload. A text or styling fix needs a direct UI assertion that would
+have failed before the edit. Run the full suite after the change, then inspect
+the rendered result when pixels or controls changed. Record test, browser,
+offline, CI, and live results separately.
+
 A `PreToolUse` hook (`.claude/hooks/test-first-guard.sh`) enforces the ordering: an edit
 to an app or PWA shell file is refused while `tests.js` has no uncommitted changes.
 Treat the block as correct and go write the test — do not work around it.

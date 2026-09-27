@@ -25,6 +25,12 @@
     // Vehicle silhouettes cross at a constant horizontal rate. Their bodies,
     // wheels, water courses and flight altitude still use the varied clocks.
     const routeProgress=(event,axis='x',offset=0)=>axis==='x'&&FIXED_X_TYPES.has(event?.type)?rawProgress(event):motionProgress(event,axis,offset);
+    // A separate seeded vertical wave makes flight and water motion perceptible
+    // without changing the constant crossing speed of vehicles.
+    const verticalOffset=(event,amplitude=20)=>{
+      const progress=motionProgress(event,'y'),seed=clamp(event?.seed??.5);
+      return Math.sin(Math.PI*progress)*Math.sin(Math.PI*2*(1.7*progress+seed))*amplitude;
+    };
     const horizon=Math.min(H*(W<600?.37:.47),W<600?310:480);
     const far=x=>horizon+H*.12+Math.sin(x/W*7+.8)*H*.025;
     const middle=x=>horizon+H*.25+Math.sin(x/W*6.5-1)*H*.065;
@@ -32,6 +38,21 @@
     const rail=x=>horizon+H*.145+Math.sin(x/W*3)*H*.01;
     const trail=x=>middle(x)+H*.042;
     const lowerRail=x=>near(x)+H*.07;
+    function railCars(x,count,spacing=26,reverse=false){
+      const cars=[{x,y:lowerRail(x),angle:tangent(lowerRail,x)}],direction=reverse?1:-1;
+      for(let i=1;i<count;i++){
+        const previous=cars[i-1];let low=0,high=spacing*2;
+        // Solve for the projected center distance on the curved lower track.
+        // A fixed x step made cars visibly bunch on steep phone hills.
+        for(let step=0;step<20;step++){
+          const mid=(low+high)/2,nextX=previous.x+direction*mid;
+          if(Math.hypot(mid,lowerRail(nextX)-previous.y)<spacing)low=mid;else high=mid;
+        }
+        const nextX=previous.x+direction*(low+high)/2;
+        cars.push({x:nextX,y:lowerRail(nextX),angle:tangent(lowerRail,nextX)});
+      }
+      return cars;
+    }
     const tangent=(fn,x)=>Math.atan((fn(x+.5)-fn(x-.5)));
     const rider=(x,scale=1,reverse=false)=>({x,y:trail(x)-3.6*scale,angle:tangent(trail,x),direction:reverse?-1:1});
     const skater=(x,reverse=false)=>({x,y:trail(x),angle:tangent(trail,x),direction:reverse?-1:1});
@@ -188,7 +209,7 @@
       const x=W*(.2+.6*lane)+direction*(progress-.5)*45,waterY=waterTop+depth*.6;
       return {x,y:waterY-Math.sin(verticalProgress*Math.PI)*Math.min(9,depth*.22),waterY,scale,direction};
     }
-    const flock=(x,y,reverse=false)=>Array.from({length:7},(_,i)=>{
+    const flock=(x,y,reverse=false,count=7)=>Array.from({length:Math.max(1,Math.min(11,Math.floor(count)||7))},(_,i)=>{
       const rank=Math.ceil(i/2);return {x:x-rank*15*(reverse?-1:1),y:y+(i%2?1:-1)*rank*7};
     });
     function fireworks(age,seed){
@@ -206,18 +227,17 @@
     }
     const sunReflection=sun=>sun.visible&&sun.altitude>0;
     function cityReflection(t,wind,night){
-      if(night<=0)return [];
       const depth=Math.min(H*.12,140),rows=[];
       for(let d=0;d<depth;d+=2){
         const fraction=d/depth;
         rows.push({sourceY:Math.max(0,waterTop-(d+2)/1.35),y:waterTop+d,
           dx:(Math.sin(d*.23-t*wind*.8)*1.8+Math.sin(d*.09+t*wind*.35))*(.25+.75*fraction),
-          alpha:Math.min(.3,night*.28)*(1-fraction)**1.5*(.65+.35*Math.sin(d*.7-t*wind)**2)});
+          alpha:Math.min(.3,.27+night*.01)*(1-fraction)**1.15*(.72+.28*Math.sin(d*.7-t*wind)**2)});
       }
       return rows;
     }
     const ripple=(i,t,wind=1)=>({alpha:.15+.75*(.5+.5*Math.sin(t*wind*1.3+i*1.71))**2,drift:Math.sin(t*wind*.5+i)*9,width:.65+.35*Math.sin(t*.9+i)**2});
-    return {routeProgress,motionProgress,motionAge,visitPose,woodlandPose,duckPose,waterDepth,cycleLeg,deerLeg,nestVisit,eventDepth,dogPose,skater,fireworks,flock,dolphin,starReflection,horizonReflection,cityReflection,sunReflection,depthBand,groundAnchor,groundTravelX,groundPose,strideArm,strideFoot,wingFold,balloonDrift,vessel,foregroundTree,nest,ripple,horizon,waterTop,far,middle,near,rail,trail,lowerRail,tangent,rider,pack};
+    return {routeProgress,motionProgress,motionAge,verticalOffset,visitPose,woodlandPose,duckPose,waterDepth,cycleLeg,deerLeg,nestVisit,eventDepth,dogPose,skater,fireworks,flock,dolphin,starReflection,horizonReflection,cityReflection,sunReflection,depthBand,groundAnchor,groundTravelX,groundPose,strideArm,strideFoot,wingFold,balloonDrift,vessel,foregroundTree,nest,ripple,horizon,waterTop,far,middle,near,rail,trail,lowerRail,railCars,tangent,rider,pack};
   }
   root.LandscapeGeometry={create};
 })(globalThis);
