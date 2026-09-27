@@ -28,8 +28,8 @@ test("Default contexts: saved custom contexts and task assignments survive reloa
   assert.deepEqual(Array.from(restored.ctx.state.tasks[0].ctx), ["custom"]);
 });
 
-/* The landscape has its own clock and device preferences: it must never
-   borrow task state or make network requests to decide what the sky looks like. */
+/* The landscape computes its sky locally from offline scene mirrors. It never
+   makes a location-service request to decide what the sky looks like. */
 function livingSky() {
   const ctx = vm.createContext({ Date, Math, console });
   for (const file of ["landscape-config.js", "vendor/astronomy.min.js", "stars.js", "landscape-core.js"]) {
@@ -127,7 +127,7 @@ test("Landscape location: reports denied, unavailable, timeout, and storage fail
   assert.equal(runtime.location.reset().enabled, false, "reset remains usable when storage is blocked");
 });
 
-test("Landscape location: the browser wiring is explicit, local-only, and exposes the standalone dialog", () => {
+test("Landscape location: the browser wiring is explicit and exposes the standalone dialog", () => {
   assert.match(html, /<script defer src="location\.js"><\/script>\s*<script defer src="landscape-geometry\.js"><\/script>\s*<script defer src="landscape-mood\.js"><\/script>\s*(?:<script defer src="landscape-(?:appearance|riders|winter|seasonal|skywriter)\.js"><\/script>\s*)+<script defer src="landscape\.js">/);
   assert.match(html, /<script defer src="landscape-geometry\.js"><\/script>/);
   assert.match(html, /data-act="location-settings"/);
@@ -812,7 +812,7 @@ const appSrc = extractAppScript(html);
 
 function makeFakeElement() {
   const el = {
-    innerHTML: "", textContent: "", value: "", hidden: false, scrollTop: 0,
+    innerHTML: "", textContent: "", value: "", hidden: false, scrollTop: 0, children: [],
     dataset: {}, style: {},
     classList: {
       _set: new Set(),
@@ -835,7 +835,7 @@ function makeFakeElement() {
     setAttribute(k, v) { this._attrs.set(k, String(v)); },
     removeAttribute(k) { this._attrs.delete(k); },
     hasAttribute(k) { return this._attrs.has(k); },
-    appendChild() {}, scrollIntoView() {},
+    appendChild(child) { this.children.push(child); }, append(child) { this.children.push(child); }, scrollIntoView() {},
   };
   return el;
 }
@@ -843,6 +843,7 @@ function makeFakeElement() {
 function makeDomShim({ prefersDark = false, sharedStorage = null } = {}) {
   const elements = new Map();
   const winListeners = {};
+  const documentListeners = {};
   const localStorageMap = new Map();
 
   const documentElement = makeFakeElement();
@@ -854,8 +855,12 @@ function makeDomShim({ prefersDark = false, sharedStorage = null } = {}) {
     },
     querySelector() { return null; },   // "no modal open" by default
     querySelectorAll() { return []; },
-    addEventListener() {},
+    addEventListener(evt, fn) { (documentListeners[evt] ||= []).push(fn); },
     removeEventListener() {},
+    dispatchEvent(evt) {
+      for (const fn of (documentListeners[evt.type] || [])) fn(evt);
+      return true;
+    },
     createElement() { return makeFakeElement(); },
     body: { appendChild() {} },
     documentElement,
@@ -904,7 +909,7 @@ function makeDomShim({ prefersDark = false, sharedStorage = null } = {}) {
 
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
-async function loadApp({ seed, cloudSyncFactory, prefersDark = false, noMatchMedia = false, seedStorage, sharedStorage, hostStorage, hostStorageDelayMs = 0, beforeStateReady, cryptoProvider = webcrypto } = {}) {
+async function loadApp({ seed, cloudSyncFactory, prefersDark = false, noMatchMedia = false, seedStorage, sharedStorage, hostStorage, hostStorageDelayMs = 0, beforeStateReady, cryptoProvider = webcrypto, withSceneModules = false, sceneModulesAfterDomReady = false } = {}) {
   const shim = makeDomShim({ prefersDark, sharedStorage });
   if (noMatchMedia) delete shim.window.matchMedia;   // old browser / bare JS host
   if (seedStorage) for (const [k, v] of Object.entries(seedStorage)) shim.localStorage.setItem(k, v);
@@ -946,8 +951,33 @@ async function loadApp({ seed, cloudSyncFactory, prefersDark = false, noMatchMed
   };
   vm.createContext(sandbox);
   if (seed !== undefined) vm.runInContext(SEED_SNIPPET(seed), sandbox);
+  const installSceneModules = () => {
+    vm.runInContext(fs.readFileSync(path.join(__dirname, "location.js"), "utf8"), sandbox, { filename: "location.js" });
+    const timeKey = "fvp:chain-scanner:scene-time", seasonKey = "fvp:chain-scanner:scene-season";
+    sandbox.LivingSky = {
+      readSceneTime: storage => storage.getItem(timeKey),
+      readSceneSeason: storage => storage.getItem(seasonKey),
+    };
+    return () => { shim.window.applySyncedSceneTime = (time, season) => {
+      if (time === null) shim.localStorage.removeItem(timeKey);
+      else shim.localStorage.setItem(timeKey, time);
+      if (season === null) shim.localStorage.removeItem(seasonKey);
+      else shim.localStorage.setItem(seasonKey, season);
+    }; };
+  };
+  if (withSceneModules && !sceneModulesAfterDomReady) installSceneModules()();
+  if (sceneModulesAfterDomReady) shim.document.readyState = "loading";
   vm.runInContext(appSrc, sandbox, { filename: "index.html#app" });
   beforeStateReady?.(sandbox, shim);
+  if (sceneModulesAfterDomReady) {
+    await flush(); // the inline boot script can resume before deferred modules execute
+    const installTimeHook=installSceneModules();
+    shim.document.readyState = "interactive";
+    shim.document.dispatchEvent({ type: "DOMContentLoaded" });
+    await flush(); // landscape.js also awaits its local spawn-rates file
+    installTimeHook();
+    shim.document.dispatchEvent({ type: "landscape-scene-time-ready" });
+  }
   // `state` is a top-level `let`, reassigned wholesale by undo()/cloudPull() —
   // expose it as a live getter (re-reading the binding each time) rather than
   // a one-time snapshot, so it never goes stale after such a reassignment.
@@ -9370,18 +9400,43 @@ test('Landscape water: one horizon rule reflects nearby night sky objects and ev
  for(const [w,h] of [[320,568],[844,390],[1440,900]]){
   const g=ctx.LandscapeGeometry.create(w,h),rows=g.horizonReflection(0,1,1),later=g.horizonReflection(1,1,1);
   assert.ok(rows.length>4,'the lake samples several reflection bands');
-  assert.equal(g.horizonReflection(0,1,0).length,0,'daylight has no night-sky mirror');
+  assert.ok(g.horizonReflection(0,1,0).length>4,'daylight can mirror the sky and its visitors');
   assert.ok(rows.every(row=>row.sourceY>=0&&row.sourceY<g.horizon),'every sample comes from above the horizon');
   assert.ok(rows.every(row=>row.y>=g.waterTop&&row.sourceHeight>0&&row.alpha>0&&row.alpha<=.24),'every sample lands softly below the waterline');
   assert.ok(rows.some((row,index)=>row.dx!==later[index].dx),'the mirrored pixels move with the water');
   assert.ok(rows[0].sourceY>rows.at(-1).sourceY,'objects nearest the horizon enter the water first');
  }
  const runtime=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
- assert.match(runtime,/paintHorizonReflection\(base\.canvas/,'the painted Moon, stars, and any other nearby sky object share the rule through its canvas');
+ assert.match(runtime,/reflectionContext\.drawImage\(base\.canvas/,'the painted Moon, stars, and any other nearby sky object enter the reflected canvas');
  assert.match(runtime,/paintHorizonReflection\(skyReflection/,'airplanes and every other moving sky visitor share the rule');
  const vessel=runtime.slice(runtime.indexOf('  function paintVessel('),runtime.indexOf('  function paintIceCreamStand('));
  assert.match(vessel,/p\.night\s*>\s*\.05/,'boats reflect only when the real sky is dark');
  assert.match(vessel,/g\.scale\(direction\*scale,-scale\*/,'the full boat silhouette mirrors downward from its waterline');
+});
+
+test('RISK landscape water: the full above-horizon scene and weather can reflect at every scene time',()=>{
+ const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
+ for(const [w,h] of [[320,568],[568,320],[844,390],[1440,900]]){
+  const g=ctx.LandscapeGeometry.create(w,h);
+  for(const night of [0,.35,1]){
+   const rows=g.horizonReflection(0,1,night),depth=Math.min(h*.12,140);
+   assert.ok(rows.length>4,`sky reflection exists at brightness ${night} on ${w}x${h}`);
+   assert.ok(rows.every(row=>row.sourceY>=0&&row.sourceY+row.sourceHeight<=g.horizon+.01&&row.y>=g.waterTop&&row.y<g.waterTop+depth&&row.alpha>0&&row.alpha<=.24));
+   assert.ok(rows.at(-1).sourceY<g.horizon*.04,'the top of the sky remains eligible to reflect');
+   assert.ok(rows[0].sourceY+rows[0].sourceHeight>=g.horizon-.01,'the horizon remains eligible to reflect');
+   assert.ok(Array.from({length:101},(_,i)=>g.far(w*i/100)).some(shore=>rows.at(-1).y+rows.at(-1).height<=shore),
+    'even on a short screen, a visible part of the lake can show the sky top');
+  }
+ }
+ const runtime=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ const snapshot=runtime.slice(runtime.indexOf('    skyReflection.width=front.width'),runtime.indexOf('    g.save();path(g,far)',runtime.indexOf('    skyReflection.width=front.width')));
+ assert.match(snapshot,/reflectionContext\.drawImage\(base\.canvas/,'static sky, sun, Moon, stars and skyline enter the same sampled canvas');
+ assert.match(snapshot,/reflectionContext\.drawImage\(front/,'moving sky visitors enter the sampled canvas');
+ assert.match(snapshot,/paintWeatherOn\(reflectionContext/,'weather and floating seasonal detail enter the sampled canvas');
+ const waterPass=runtime.slice(runtime.indexOf('    g.save();path(g,far)',runtime.indexOf('    skyReflection.width=front.width')),runtime.indexOf('    const water=new Set',runtime.indexOf('    skyReflection.width=front.width')));
+ assert.match(waterPass,/paintHorizonReflection\(skyReflection,t/,'the sampled canvas is mirrored into the lake');
+ assert.ok(waterPass.indexOf('paintHorizonReflection(skyReflection,t')>waterPass.indexOf('g.clip()'),'the shoreline clips every mirrored object');
+ assert.doesNotMatch(waterPass,/if\(p\.night>\.05\)\{[^}]*paintHorizonReflection\(skyReflection/,'the sky mirror is outside the night tint');
 });
 
 test('Landscape time: a saved device-local hour locks scenery without changing the real date',()=>{
@@ -9402,7 +9457,7 @@ test('Landscape water: visible stars remain eligible for bounded horizon reflect
  assert.ok(Math.abs(a.x-720)<4);assert.ok(a.y>g.waterTop&&a.y<g.far(a.x));assert.notEqual(a.x,b.x);
  assert.equal(g.starReflection({...star,altitude:-2},0,1),null);
  assert.equal(g.starReflection({...star,magnitude:6},0,1),null);
- const runtime=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');assert.match(runtime,/paintHorizonReflection\(base\.canvas/);assert.match(runtime,/S\.sceneDate\(/);
+ const runtime=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');assert.match(runtime,/reflectionContext\.drawImage\(base\.canvas/);assert.match(runtime,/S\.sceneDate\(/);
 });
 
 test('Landscape time: solar presets follow the date and saved observer',()=>{
@@ -10779,10 +10834,11 @@ test('Banner aircraft: propeller craft has a tail tow point and animated blades 
 
 test('Weather rendering: snow drifts smoothly at real epoch times and seasonal ambience also paints in clear weather',()=>{
  const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
- const code=source.slice(source.indexOf('  function paintWeather('),source.indexOf('  function paintWoodland('));
+ const code=source.slice(source.indexOf('  function paintWeatherOn('),source.indexOf('  function paintWoodland('));
  const run=time=>{const points=[],seasonal=[],g={save(){},restore(){},fillRect(){}};const weather={status:'snowstorm',intensity:1,storm:true,slot:10};
- vm.runInNewContext(code+';paintWeather()', {g,Math,Date:class extends Date{static now(){return time*1000;}},W:1000,H:700,hy:300,reduced:false,sceneSeason:'winter',treeOrigins:[],geometry:{},world:{elapsed:3},p:{city:'#555555',sky:['#fff','#fff','#fff']},rand:n=>(Math.sin(n)+1)/2,S:{weatherAt:()=>weather},document:{documentElement:{dataset:{}}},LandscapeSeasonal:{paint(...args){seasonal.push(args);}},ellipse(g,x,y,rx,ry,c){if(c==='#f4f4e8')points.push([x,y]);},line(){}});return {points,seasonal};};
+ vm.runInNewContext(code+';paintWeatherOn(g,weather,time,true)', {g,weather,time,Math,Date:class extends Date{static now(){return time*1000;}},W:1000,H:700,hy:300,reduced:false,sceneSeason:'winter',treeOrigins:[],geometry:{},world:{elapsed:3},p:{city:'#555555',sky:['#fff','#fff','#fff']},rand:n=>(Math.sin(n)+1)/2,S:{weatherAt:()=>weather},document:{documentElement:{dataset:{}}},LandscapeSeasonal:{paint(...args){seasonal.push(args);}},ellipse(g,x,y,rx,ry,c){if(c==='#f4f4e8')points.push([x,y]);},line(){}});return {points,seasonal};};
  const a=run(1789300000),b=run(1789300000+1/30);assert.ok(a.points.length>50);
+ assert.ok(a.points.some((point,i)=>Math.abs(point[0]-b.points[i][0])>.001),'snow advances across frames');
  a.points.forEach((point,i)=>{const dx=Math.abs(point[0]-b.points[i][0]);assert.ok(Math.min(dx,1000-dx)<5,'snow does not jitter across screen');});
  assert.equal(a.seasonal.length,1);assert.ok(code.indexOf('LandscapeSeasonal.paint')<code.indexOf('if(!weather.intensity)return'),'clear weather retains season ambience');
 });
@@ -11078,7 +11134,7 @@ test('Seasonal repair: night paint subdues foliage, petals, and snowcaps; reduce
 test('Seasonal opening cast: winter boots with three eligible visitors for saved and live seasons',()=>{
  const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),code=source.slice(source.indexOf('  let sceneSeason='),source.indexOf('  let skyTimer='));
  for(const saved of [null,'winter']){
-  const S=livingSky(),ctx=vm.createContext({Math,Date,S,storage:{getItem:key=>key.endsWith('scene-season')?saved:null},LandscapeMood:{season:()=>({name:'winter'})},LivingLocation:{current:()=>({latitude:28.5,timezone:'America/New_York'})}});
+  const S=livingSky(),sceneStorage=S.createSceneMirror({getItem:key=>key.endsWith('scene-season')?saved:null}),ctx=vm.createContext({Math,Date,S,sceneStorage,LandscapeMood:{season:()=>({name:'winter'})},LivingLocation:{current:()=>({latitude:28.5,timezone:'America/New_York'})}});
   vm.runInContext(code+';globalThis.bootWorld=world;',ctx);assert.equal(ctx.bootWorld.season,'winter');assert.equal(ctx.bootWorld.events.length,3);assert.ok(ctx.bootWorld.events.every(e=>S.eventsForSeason('winter').includes(e.type)));
  }
 });
@@ -12245,7 +12301,7 @@ test('RISK prerequisites: completion, evergreen Done, restore, and deletion gove
  assert.equal(ctx.isEligible(gene),true,'an evergreen completion counts while bob rests and when it returns');
  ctx.deleteTask(bob.id);assert.equal(ctx.isEligible(gene),true,'a deleted prerequisite releases the dependent');
  assert.equal(gene.prerequisiteId,bob.id,'the reference stays stable for backup and undo');
- ctx.openSettings();assert.match(shim.document.getElementById('modalRoot').innerHTML,/gene needs deleted task[\s\S]*data-act="remove-prerequisite"/,'a dangling link remains removable in Settings');
+ ctx.openEdit(gene.id);assert.match(shim.document.getElementById('modalRoot').innerHTML,/id="etPrerequisite"[\s\S]*deleted task/,'a dangling link remains visible and removable in the task editor');
  ctx.undo();assert.equal(ctx.isEligible(ctx.state.tasks.find(t=>t.id===gene.id)),true,'undo restores completed evergreen evidence');
 });
 
@@ -12262,19 +12318,16 @@ test('RISK prerequisites: invalid links and cycles are rejected; missing importe
  assert.equal(ctx.isEligible(saved.tasks.find(t=>t.id===a.id)),true);
 });
 
-test('RISK prerequisites: Add, Edit, and Settings expose stable task selectors and removal',async()=>{
+test('RISK prerequisites: Add and each task editor expose stable selectors and removal',async()=>{
  const {ctx,shim}=await loadApp();const bob=ctx.addTask('bob');
  ctx.render();shim.document.getElementById('addInput').value='gene';
  shim.document.getElementById('addPrerequisite').value=bob.id;ctx.onAction('add',{});
  const gene=ctx.state.tasks.find(t=>t.title==='gene');assert.equal(gene.prerequisiteId,bob.id);
  ctx.openEdit(gene.id);assert.match(shim.document.getElementById('modalRoot').innerHTML,/id="etPrerequisite"[\s\S]*bob/);
  shim.document.getElementById('etPrerequisite').value='';ctx.applyEditFields(gene);assert.equal(gene.prerequisiteId,null);
+ shim.document.getElementById('etPrerequisite').value=bob.id;ctx.applyEditFields(gene);assert.equal(gene.prerequisiteId,bob.id);
  ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
- assert.match(settings,/Task prerequisites[\s\S]*id="stPrerequisiteTask"[\s\S]*id="stPrerequisiteNeeds"/);
- shim.document.getElementById('stPrerequisiteTask').value=gene.id;
- shim.document.getElementById('stPrerequisiteNeeds').value=bob.id;
- ctx.onAction('set-prerequisite',{});assert.equal(gene.prerequisiteId,bob.id);
- ctx.onAction('remove-prerequisite',{dataset:{id:gene.id}});assert.equal(gene.prerequisiteId,null);
+ assert.doesNotMatch(settings,/Task prerequisites|stPrerequisiteTask|stPrerequisiteNeeds|data-act="remove-prerequisite"/);
 });
 
 test('RISK evergreen hours or days: stored hours survive conversion, UI save, and 2 AM reset suggestion',async()=>{
@@ -12343,57 +12396,261 @@ test('RISK prerequisites: editing after deletion retains the missing task link u
  assert.equal(ctx.isEligible(restored),false,'restoring the prerequisite blocks the dependent again');
 });
 
-test('RISK custom hourly quotes: Settings saves plain text by hour and the scene combines it with file copy',async()=>{
- const {ctx,shim}=await loadApp();ctx.openSettings();
+test('RISK custom hourly quotes: saved quotes still play after Settings controls are removed',async()=>{
+ const board=JSON.parse(JSON.stringify((await loadApp()).ctx.defaultState()));
+ board.settings.hourlyQuotes={'14':['Take one step','Pause kindly']};
+ const {ctx,shim}=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(board)}});ctx.openSettings();
  const panel=shim.document.getElementById('modalRoot').innerHTML;
- assert.match(panel,/id="stQuoteHour"[\s\S]*id="stQuoteLines"/);
- shim.document.getElementById('stQuoteHour').value='14';shim.document.getElementById('stQuoteLines').value='Take one step\nPause kindly';
- ctx.onAction('save-hourly-quotes',{});
+ assert.doesNotMatch(panel,/Custom hourly quotes|stQuoteHour|stQuoteLines|save-hourly-quotes/);
  assert.deepEqual(Array.from(ctx.state.settings.hourlyQuotes['14']),['Take one step','Pause kindly']);
  const mood=moodRuntime(),date=new Date('2026-09-29T14:00:00Z'),location={timezone:'UTC'};
  mood.setHumanText('## Hour 14\n- From the file');mood.setPersonalHourlyQuotes(ctx.state.settings.hourlyQuotes);
  const pool=[0,.4,.8].map(n=>mood.message(date,location,()=>n));
  assert.ok(pool.includes('From the file')&&pool.includes('Take one step')&&pool.includes('Pause kindly'));
- shim.document.getElementById('stQuoteLines').value='';ctx.onAction('save-hourly-quotes',{});
- assert.equal(ctx.state.settings.hourlyQuotes['14'],undefined,'an empty field removes personal lines for that hour');
- assert.equal(mood.message(date,location,()=>0),'From the file','the local Markdown remains available');
+});
+
+test('RISK Settings slim controls: pass reset and bulk import stay out of Settings',async()=>{
+ const {ctx,shim}=await loadApp();ctx.openSettings();
+ const panel=shim.document.getElementById('modalRoot').innerHTML;
+ assert.doesNotMatch(panel,/Pass and data|Reset pass|data-act="new-pass"|Bulk import|id="mdImport"|data-act="import-md"/);
+ const scanSource=appSrc.slice(appSrc.indexOf('function renderScan(){'),appSrc.indexOf('function renderList(){'));
+ assert.match(scanSource,/data-act="new-pass"/,'the scanner still offers a fresh pass');
+ assert.match(html,/id="addInput"/,'Add a task still accepts pasted lists');
 });
 
 test('Settings and FAQ: grouped controls expose statuses and explain the core app',async()=>{
  const {ctx,shim}=await loadApp();ctx.openSettings();let panel=shim.document.getElementById('modalRoot').innerHTML;
  assert.ok((panel.match(/class="settings-section"/g)||[]).length>=4,'Settings is grouped into native collapsible sections');
  assert.match(panel,/data-act="location-settings"[^>]*class="[^"]*setting-unset/);
- assert.match(panel,/data-act="scene-time-settings"[^>]*class="[^"]*setting-unset/);
+ assert.match(panel,/data-act="scene-time-settings"[^>]*class="[^"]*setting-set/,'live scene time is green');
  assert.doesNotMatch(panel,/id="jsonBox"|data-act="(?:import|export)-json"/,'manual backups remain the visible recovery flow');
- vm.runInContext('globalThis.LivingLocation={current:()=>({enabled:true})}',ctx);
- shim.localStorage.setItem('fvp:chain-scanner:scene-time','12:00');ctx.openSettings();panel=shim.document.getElementById('modalRoot').innerHTML;
+ vm.runInContext('globalThis.LivingLocation={current:()=>({enabled:true,latitude:28.5383,longitude:-81.3792,timezone:"America/New_York",label:"Home"})}',ctx);
+ shim.document.dispatchEvent({type:'landscape-location-change'});
+ shim.document.dispatchEvent({type:'landscape-scene-time-change',detail:{time:'12:00',season:null}});ctx.openSettings();panel=shim.document.getElementById('modalRoot').innerHTML;
  assert.match(panel,/data-act="location-settings"[^>]*class="[^"]*setting-set/);
- assert.match(panel,/data-act="scene-time-settings"[^>]*class="[^"]*setting-set/);
+ assert.match(panel,/data-act="scene-time-settings"[^>]*class="[^"]*setting-unset/,'locked scene time is red');
  ctx.openHelp();const faq=shim.document.getElementById('modalRoot').innerHTML;
- for(const topic of ['prerequisite','Hours or Days','custom hourly','location','offline','backup','chance mode','undo'])
+ for(const topic of ['prerequisite','Hours or Days','location','offline','backup','chance mode','undo'])
   assert.match(faq,new RegExp(topic,'i'),`FAQ should explain ${topic}`);
+ assert.doesNotMatch(faq,/Add custom hourly quotes for a chosen scene hour in Settings/);
+ const release=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)?.[1]||'';
+ assert.match(release,/above the horizon can reflect in the lake by day and night/);
+ assert.match(release,/scene time is green for live time and red for a chosen time/i);
+ assert.doesNotMatch(release,/Settings can set or remove the link|Settings now has[^<]*custom hourly quotes/);
 });
 
 test('RISK Settings status: open scene-time and location labels update with their button states',()=>{
  const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
  const sceneFunction=source.slice(source.indexOf('  function renderSceneTimeChoice(){'),source.indexOf('  function refreshSolarTimes(){'));
- const sceneStatus={textContent:''},sceneButton={classList:{toggle(){}}};
- const sceneContext=vm.createContext({S:{readSceneTime:()=>sceneContext.saved},storage:{},saved:'12:00',timeDialog:{querySelectorAll:()=>[],querySelector:()=>null},document:{querySelector:()=>sceneButton,getElementById:id=>id==='settingsSceneTimeStatus'?sceneStatus:null}});
+ const sceneStatus={textContent:''},sceneClasses=new Set(),sceneButton={classList:{toggle(name,enabled){if(enabled)sceneClasses.add(name);else sceneClasses.delete(name);}}};
+ const sceneContext=vm.createContext({S:{readSceneTime:()=>sceneContext.saved},sceneStorage:{},saved:'12:00',timeDialog:{querySelectorAll:()=>[],querySelector:()=>null},document:{querySelector:()=>sceneButton,getElementById:id=>id==='settingsSceneTimeStatus'?sceneStatus:null}});
  vm.runInContext(sceneFunction+';renderSceneTimeChoice();',sceneContext);
  assert.match(sceneStatus.textContent,/A scene time is selected/);
+ assert.ok(sceneClasses.has('setting-unset')&&!sceneClasses.has('setting-set'),'locked scene time shows red in open Settings');
  sceneContext.saved=null;vm.runInContext('renderSceneTimeChoice();',sceneContext);
  assert.match(sceneStatus.textContent,/Following live time/);
+ assert.ok(sceneClasses.has('setting-set')&&!sceneClasses.has('setting-unset'),'live scene time shows green in open Settings');
  const start=appSrc.indexOf("document.addEventListener('landscape-location-change',()=>{");
  const end=appSrc.indexOf('\n});',start)+4;
  assert.ok(start>=0&&end>start);
  let locationHandler;const locationStatus={textContent:''},locationButton={classList:{toggle(){}}};
- const locationContext=vm.createContext({document:{addEventListener:(_name,callback)=>{locationHandler=callback;},querySelector:()=>locationButton,getElementById:id=>id==='settingsLocationStatus'?locationStatus:null},LivingLocation:{current:()=>({enabled:true})}});
+ const locationContext=vm.createContext({document:{addEventListener:(_name,callback)=>{locationHandler=callback;},querySelector:()=>locationButton,getElementById:id=>id==='settingsLocationStatus'?locationStatus:null},LivingLocation:{current:()=>({enabled:true})},recordScenePreferences:()=>{}});
  vm.runInContext(appSrc.slice(start,end),locationContext);locationHandler();
  assert.match(locationStatus.textContent,/Sky location set/);
  locationContext.LivingLocation.current=()=>({enabled:false});locationHandler();
  assert.match(locationStatus.textContent,/Using the default sky/);
  assert.match(appSrc,/id="settingsSceneTimeStatus"/);
  assert.match(appSrc,/id="settingsLocationStatus"/);
+});
+
+test('RISK scene-time color: live choice stays green while a locked choice is red',()=>{
+ const css=fs.readFileSync(path.join(__dirname,'landscape.css'),'utf8');
+ assert.match(css,/#sceneTimeDialog[^\n]*\[aria-pressed="true"\]:not\(\[data-scene-time="live"\]\)[^\n]*background:var\(--danger\)/);
+ assert.match(css,/\.motion-choices button\[aria-pressed="true"\][^\n]*background:var\(--yes\)/,'the live dialog choice keeps its green highlight');
+});
+
+test('RISK synced scene: location and time choices reach the cloud even on an empty board',async()=>{
+ const h=makeSyncHarness();
+ const {ctx,shim}=await loadApp({withSceneModules:true,cloudSyncFactory:h.factory});
+ await ctx.cloudPull();
+ ctx.LivingLocation.saveCoordinates({latitude:51.5074,longitude:-0.1278},{timezone:'Europe/London',label:'Home'});
+ shim.document.dispatchEvent({type:'landscape-scene-time-change',detail:{time:'sunset',season:'autumn'}});
+ const scene=JSON.parse(ctx.cloudPayload()).settings.scene;
+ assert.deepEqual(JSON.parse(JSON.stringify(scene)),{
+  time:'sunset',season:'autumn',location:{latitude:51.5074,longitude:-0.1278,timezone:'Europe/London',label:'Home',enabled:true},
+ });
+ ctx.cloudPushNow();await syncSettle(80);
+ assert.deepEqual(h.remoteState().settings.scene,JSON.parse(JSON.stringify(scene)),'a signed-in board with no tasks still uploads its scene choices');
+});
+
+test('RISK synced scene: newer remote choices replace device mirrors and account switches clear them',async()=>{
+ const base=(await loadApp()).ctx.defaultState();
+ const london={latitude:51.5074,longitude:-0.1278,timezone:'Europe/London',label:'Home',enabled:true};
+ const tokyo={latitude:35.6762,longitude:139.6503,timezone:'Asia/Tokyo',label:'Studio',enabled:true};
+ const remote=JSON.parse(JSON.stringify(base));remote.settings.scene={time:'sunrise',season:'winter',location:tokyo};
+ const local=JSON.parse(JSON.stringify(base));local.settings.scene={time:'22:30',season:'summer',location:london};local.syncRev=2;local.syncAccount='e@example.com';
+ const h=makeSyncHarness({remote,rev:3});
+ const {ctx,shim}=await loadApp({withSceneModules:true,cloudSyncFactory:h.factory,seedStorage:{
+  [SYNC_STORE_KEY]:JSON.stringify(local),
+  'fvp:chain-scanner:location':JSON.stringify(london),
+  'fvp:chain-scanner:scene-time':'22:30',
+  'fvp:chain-scanner:scene-season':'summer',
+ }});
+ await ctx.cloudPull();
+ assert.deepEqual(JSON.parse(JSON.stringify(ctx.state.settings.scene)),remote.settings.scene);
+ assert.equal(ctx.LivingLocation.current().label,'Studio');
+ assert.equal(shim.localStorage.getItem('fvp:chain-scanner:scene-time'),'sunrise');
+ assert.equal(shim.localStorage.getItem('fvp:chain-scanner:scene-season'),'winter');
+ shim.window.CloudSync.user='other@example.com';h.doc=null;
+ await ctx.cloudPull();await syncSettle(30);
+ assert.equal(ctx.state.settings.scene.location,null,'the prior account location cannot seed a new account');
+ assert.equal(ctx.LivingLocation.current().enabled,false);
+ assert.equal(shim.localStorage.getItem('fvp:chain-scanner:location'),null);
+ assert.equal(shim.localStorage.getItem('fvp:chain-scanner:scene-time'),null);
+ assert.equal(h.doc,null,'an empty second account receives no old scene settings');
+});
+
+test('RISK synced scene: a cold reload waits for deferred scene modules before applying the board',async()=>{
+ const board=JSON.parse(JSON.stringify((await loadApp()).ctx.defaultState()));
+ board.settings.scene={time:'sunset',season:'winter',location:{latitude:35.6762,longitude:139.6503,timezone:'Asia/Tokyo',label:'Studio',enabled:true}};
+ const {ctx,shim}=await loadApp({withSceneModules:true,sceneModulesAfterDomReady:true,seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(board)}});
+ assert.equal(ctx.LivingLocation.current().label,'Studio','the saved board reaches a location module loaded after the inline script');
+ assert.equal(shim.localStorage.getItem('fvp:chain-scanner:scene-time'),'sunset');
+ assert.equal(shim.localStorage.getItem('fvp:chain-scanner:scene-season'),'winter');
+});
+
+test('RISK synced scene: delayed boot still gives the early renderer saved hourly quotes',async()=>{
+ const board=JSON.parse(JSON.stringify((await loadApp()).ctx.defaultState()));
+ board.settings.hourlyQuotes={'08':['Start here']};
+ let rendererQuotes=null;
+ await loadApp({withSceneModules:true,sceneModulesAfterDomReady:true,seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(board)},
+  beforeStateReady:(_ctx,shim)=>shim.window.addEventListener('scanner-hourly-quotes-change',event=>{rendererQuotes=JSON.parse(JSON.stringify(event.detail));})});
+ assert.deepEqual(rendererQuotes,{'08':['Start here']});
+});
+
+test('RISK synced scene: a stale same-browser tab repaints from the protected board copy',async()=>{
+ const storage=sharedScannerStorage();
+ const current=await loadApp({withSceneModules:true,sharedStorage:storage});
+ const stale=await loadApp({withSceneModules:true,sharedStorage:storage});
+ current.ctx.LivingLocation.saveCoordinates({latitude:51.5074,longitude:-0.1278},{timezone:'Europe/London',label:'Home'});
+ current.shim.document.dispatchEvent({type:'landscape-scene-time-change',detail:{time:'sunrise',season:'autumn'}});
+ await current.ctx.persist();
+ stale.ctx.refreshBrowserCopy();
+ assert.equal(stale.ctx.state.settings.scene.location.label,'Home');
+ assert.equal(stale.ctx.LivingLocation.current().label,'Home','the renderer follows the newer browser board');
+ assert.equal(stale.shim.localStorage.getItem('fvp:chain-scanner:scene-time'),'sunrise');
+});
+
+test('RISK synced scene: another tab adopts a saved scene on the board storage event',async()=>{
+ const storage=sharedScannerStorage();
+ const first=await loadApp({withSceneModules:true,sharedStorage:storage});
+ const second=await loadApp({withSceneModules:true,sharedStorage:storage});
+ first.ctx.LivingLocation.saveCoordinates({latitude:51.5074,longitude:-0.1278},{timezone:'Europe/London',label:'Home'});
+ first.shim.document.dispatchEvent({type:'landscape-scene-time-change',detail:{time:'sunset',season:'autumn'}});
+ await first.ctx.persist();
+ second.shim.window.dispatchEvent({type:'storage',key:SYNC_STORE_KEY,newValue:storage.getItem(SYNC_STORE_KEY)});
+ assert.equal(second.ctx.state.settings.scene.time,'sunset');
+ assert.equal(second.ctx.LivingLocation.current().label,'Home');
+ second.ctx.openSettings();
+ const panel=second.shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(panel,/data-act="scene-time-settings"[^>]*class="[^"]*setting-unset/);
+ assert.match(panel,/data-act="location-settings"[^>]*class="[^"]*setting-set/);
+});
+
+test('RISK synced scene: an open editor defers another tab scene adoption until it closes',async()=>{
+ const storage=sharedScannerStorage();
+ const first=await loadApp({withSceneModules:true,sharedStorage:storage});
+ const second=await loadApp({withSceneModules:true,sharedStorage:storage});
+ first.shim.document.dispatchEvent({type:'landscape-scene-time-change',detail:{time:'sunrise',season:'winter'}});
+ await first.ctx.persist();
+ second.shim.document.querySelector=()=>({}); // an active dialog or edit form
+ second.shim.window.dispatchEvent({type:'storage',key:SYNC_STORE_KEY,newValue:storage.getItem(SYNC_STORE_KEY)});
+ assert.equal(second.ctx.state.settings.scene.time,null,'do not replace a board underneath an editor');
+ second.shim.document.querySelector=()=>null;
+ second.shim.document.dispatchEvent({type:'focusout'});
+ await flush();
+ assert.equal(second.ctx.state.settings.scene.time,'sunrise');
+ assert.equal(second.shim.localStorage.getItem('fvp:chain-scanner:scene-season'),'winter');
+});
+
+test('RISK synced scene: a legacy cloud board adopts existing device choices before publishing',async()=>{
+ const old=JSON.parse(JSON.stringify((await loadApp()).ctx.defaultState()));delete old.settings.scene;
+ const london={latitude:51.5074,longitude:-0.1278,timezone:'Europe/London',label:'Home',enabled:true};
+ const local=JSON.parse(JSON.stringify(old));local.syncAccount='e@example.com';local.syncRev=2;
+ const h=makeSyncHarness({remote:old,rev:3});
+ const {ctx}=await loadApp({withSceneModules:true,cloudSyncFactory:h.factory,seedStorage:{
+  [SYNC_STORE_KEY]:JSON.stringify(local),
+  'fvp:chain-scanner:location':JSON.stringify(london),
+  'fvp:chain-scanner:scene-time':'sunset',
+  'fvp:chain-scanner:scene-season':'autumn',
+ }});
+ await ctx.cloudPull();await syncSettle(80);
+ assert.deepEqual(JSON.parse(JSON.stringify(ctx.state.settings.scene)),{time:'sunset',season:'autumn',location:london});
+ assert.deepEqual(h.remoteState().settings.scene,JSON.parse(JSON.stringify(ctx.state.settings.scene)));
+});
+
+test('RISK synced scene: malformed imported coordinates and times are discarded',async()=>{
+ const {ctx}=await loadApp({withSceneModules:true});
+ const bad=ctx.defaultState();bad.settings.scene={time:'25:90',season:'monsoon',location:{latitude:181,longitude:0,timezone:'Bad/Zone',label:'Home',enabled:true}};
+ ctx.hydrateState(bad);
+ assert.deepEqual(JSON.parse(JSON.stringify(bad.settings.scene)),{time:null,season:null,location:null});
+});
+
+test('RISK synced scene: location mirror and time events have production entry points',()=>{
+ const runtime=livingLocation();
+ const tokyo={latitude:35.6762,longitude:139.6503,timezone:'Asia/Tokyo',label:'Studio',enabled:true};
+ assert.equal(runtime.location.applySynced(tokyo).label,'Studio');
+ assert.equal(runtime.location.current().label,'Studio');
+ assert.equal(JSON.parse(runtime.values.get('fvp:chain-scanner:location')).label,'Studio');
+ assert.equal(runtime.location.applySynced(null).enabled,false);
+ assert.equal(runtime.values.has('fvp:chain-scanner:location'),false);
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ assert.match(source,/landscape-scene-time-change/,'choosing a time informs the synced board');
+ assert.match(source,/applySyncedSceneTime/,'remote choices repaint the local sky');
+});
+
+test('RISK synced scene: adopted time and season paint from memory when browser storage refuses writes',()=>{
+ const sky=livingSky();
+ const blocked={getItem(){throw new Error('blocked');},setItem(){throw new Error('blocked');},removeItem(){throw new Error('blocked');}};
+ const mirror=sky.createSceneMirror(blocked);
+ mirror.applySynced('05:30','winter');
+ assert.equal(sky.readSceneTime(mirror),'05:30');
+ assert.equal(sky.readSceneSeason(mirror),'winter');
+ const date=sky.sceneDate(new Date('2026-07-15T16:00:00Z'),mirror,{latitude:51.5074,longitude:-0.1278,timezone:'Europe/London',enabled:true});
+ assert.equal(date.getHours(),5,'the rendered sky uses the adopted hour despite the failed device write');
+ assert.equal(date.getMonth(),0,'the rendered sky uses the adopted winter despite the failed device write');
+ mirror.applySynced(null,null);
+ assert.equal(sky.readSceneTime(mirror),null,'account switches clear the in-memory choice too');
+ assert.equal(sky.readSceneSeason(mirror),null);
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ assert.match(source,/S\.sceneDate\(new Date\(\),sceneStorage,location\)/,'the renderer reads the memory-backed scene');
+ assert.match(source,/window\.applySyncedSceneTime=\(time,season\)=>\{[\s\S]*?sceneStorage\.applySynced\(time,season\)/,'board adoption writes the memory-backed scene');
+});
+
+test('RISK synced scene: Settings reflects board scene choices when device mirror writes fail',async()=>{
+ const board=JSON.parse(JSON.stringify((await loadApp()).ctx.defaultState()));
+ board.settings.scene={time:'05:30',season:'winter',location:{latitude:51.5074,longitude:-0.1278,timezone:'Europe/London',label:'Home',enabled:true}};
+ const values=new Map([[SYNC_STORE_KEY,JSON.stringify(board)]]);
+ const storage={
+  getItem(key){return values.get(key)??null;},
+  setItem(key,value){if(key.startsWith('fvp:chain-scanner:scene-')||key==='fvp:chain-scanner:location')throw new Error('blocked');values.set(key,String(value));},
+  removeItem(key){if(key.startsWith('fvp:chain-scanner:scene-')||key==='fvp:chain-scanner:location')throw new Error('blocked');values.delete(key);},
+ };
+ const {ctx,shim}=await loadApp({sharedStorage:storage});
+ assert.equal(shim.localStorage.getItem('fvp:chain-scanner:scene-time'),null);
+ ctx.openSettings();
+ const panel=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(panel,/data-act="scene-time-settings"[^>]*class="[^"]*setting-unset/);
+ assert.match(panel,/data-act="location-settings"[^>]*class="[^"]*setting-set/);
+ assert.match(panel,/A scene time is selected\. Synced with your board when signed in/);
+ assert.match(panel,/Sky location set\. Synced with your board when signed in/);
+});
+
+test('RISK synced scene: Settings discloses coordinate sync and offline device copies',()=>{
+ assert.match(html,/id="locationDescription"[^>]*>[^<]*coordinates[^<]*signed-in board/i);
+ assert.doesNotMatch(html,/It stays on this device and is never sent to a location service/);
+ assert.match(appSrc,/Scene time[^\n]*Synced with your board when signed in/);
+ assert.match(appSrc,/Location[^\n]*Synced with your board when signed in/);
 });
 
 test('Landscape polish: small autumn leaves, seeded group sizes, stronger vertical drift, and daytime skyline',()=>{
@@ -12425,9 +12682,9 @@ test('Landscape polish: tram car spacing follows track length on phone and table
 
 test('Landscape polish: rain darkens the sky, foreground fireflies double, and the message plane has two wings',()=>{
  const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
- const rain=source.slice(source.indexOf('  function paintWeather(){'),source.indexOf('  function paintWoodland('));
+ const rain=source.slice(source.indexOf('  function paintWeatherOn('),source.indexOf('  function paintWoodland('));
  const overlays=[],streaks=[],g={save(){},restore(){},fillRect(){overlays.push(this.globalAlpha)}};
- vm.runInNewContext(`${rain};paintWeather()`,{g,W:390,H:844,hy:300,sceneSeason:'autumn',world:{elapsed:0},reduced:true,rand:()=>.5,ellipse(){},line(_g,...args){streaks.push(args)},document:{documentElement:{dataset:{}}},LandscapeSeasonal:{paint(){}},geometry:{},treeOrigins:[],p:{city:'#345',sky:['#abc','#bcd','#def']},S:{weatherAt:()=>({status:'rain',intensity:1,storm:false,slot:1})}});
+ vm.runInNewContext(`${rain};paintWeatherOn(g,{status:'rain',intensity:1,storm:false,slot:1},0,true)`,{g,W:390,H:844,hy:300,sceneSeason:'autumn',world:{elapsed:0},reduced:true,rand:()=>.5,ellipse(){},line(_g,...args){streaks.push(args)},document:{documentElement:{dataset:{}}},LandscapeSeasonal:{paint(){}},geometry:{},treeOrigins:[],p:{city:'#345',sky:['#abc','#bcd','#def']}});
  assert.ok(overlays[0]>=.18,'rain produces a clearly darker whole-scene sky');
  assert.ok(streaks.length>=30,'rain is readily visible on a phone');
  assert.match(source,/for\(let i=0;i<32;i\+\+\)/,'night has twice the original sixteen fireflies');

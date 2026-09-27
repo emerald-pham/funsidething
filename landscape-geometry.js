@@ -189,18 +189,17 @@
       return {x:star.azimuth/360*W+Math.sin(y*.19-t*wind)*1.8,y};
     }
     function horizonReflection(t,wind,night){
-      if(night<=.05)return [];
-      const compression=.28,depth=Math.min(H*.12,140),rows=[];
-      // Sample real pixels above the horizon into shallow horizontal bands.
-      // The shoreline clip rejects sources that would land beyond the visible
-      // lake, so height and perspective decide what is close enough to reflect.
+      // Leave enough lake beneath at least one stretch of far shoreline for
+      // the last band to show the very top of the sky on short phones too.
+      const depth=Math.max(2,Math.floor(Math.min(H*.10,140,H*.145-15)/2)*2),sourceStep=horizon*2/depth,rows=[];
+      // Spread the whole sky, from the horizon to its top edge, across the
+      // shallow lake. Shoreline clipping still decides which bands are visible.
       for(let d=0;d<depth;d+=2){
-        const sourceY=horizon-(d+2)/compression;
-        if(sourceY<0)break;
+        const sourceY=Math.max(0,horizon-(d+2)*horizon/depth);
         const fraction=d/depth;
-        rows.push({sourceY,sourceHeight:2/compression,y:waterTop+d,
+        rows.push({sourceY,sourceHeight:Math.min(sourceStep,horizon-sourceY),y:waterTop+d,
           dx:(Math.sin(d*.21-t*wind*.85)*2.2+Math.sin(d*.08+t*wind*.3))*(.25+.75*fraction),
-          alpha:Math.min(.24,night*.2)*(1-fraction*.58),height:2});
+          alpha:Math.min(.24,.15+night*.06)*(1-fraction*.58),height:2});
       }
       return rows;
     }
