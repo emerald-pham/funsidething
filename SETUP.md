@@ -41,6 +41,8 @@ two moments: when the page loads, and when the tab regains focus.
   `u` takes it back. Account switches use device-local backups instead.
 - Device storage is still the offline layer, so the app works offline and
   syncs up next time it can reach the network
+- Chosen sky coordinates, their label and time zone, and scene time and season
+  travel with the signed-in board. The location dialog never uses a geocoder.
 
 ### Server dates and revisions
 

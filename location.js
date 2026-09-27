@@ -1,6 +1,6 @@
-/* Device-local location opt-in for the landscape. No geocoder or network
-   service is involved: the optional city caption comes from a small set of
-   deliberately approximate, hand-authored anchors below. */
+/* The landscape keeps a device mirror of the chosen location so it works
+   offline. The signed-in board also carries that choice across devices. No
+   geocoder is involved: captions use approximate hand-authored anchors. */
 (function(root){
   'use strict';
 
@@ -149,6 +149,15 @@
     if(!removed&&storageRef())lastError=Object.assign(new Error('Location preference could not be cleared from this device.'),{code:'STORAGE'});
     emit();render();return current();
   }
+  function applySynced(value){
+    // A cloud adoption, Undo, or account switch has already chosen the board
+    // value. Repaint immediately even when browser storage refuses a mirror;
+    // the board remains the source for the next successful load.
+    state=value&&value.enabled===true?normalize(value):clone(DEFAULT);
+    lastError=null;
+    if(state.enabled)persist(state);else removeSaved();
+    emit();render();return current();
+  }
 
   function byAction(action){
     if(!documentRef||typeof documentRef.querySelector!=='function')return null;
@@ -164,7 +173,7 @@
     const resetButton=byAction('reset');if(resetButton)resetButton.hidden=!state.enabled;
     const saveButton=byAction('save-name');if(saveButton)saveButton.hidden=!state.enabled;
     if(lastError)setStatus(lastError.message);
-    else if(state.enabled)setStatus('Saved on this device.');
+    else if(state.enabled)setStatus('Saved on this device. Signed-in boards sync when online.');
     else setStatus('Your browser will ask only after you choose Use my location.');
   }
   function openDialog(){
@@ -194,7 +203,7 @@
     documentRef.addEventListener('landscape-location-change',render);
   }
 
-  const api={KEY,DEFAULT,CITY_DATA,current,caption,init,normalize,nearestLabel,request,saveCoordinates,setLabel,reset,
+  const api={KEY,DEFAULT,CITY_DATA,current,caption,init,normalize,nearestLabel,request,saveCoordinates,setLabel,reset,applySynced,
     get lastError(){return lastError;}};
   root.LivingLocation=api;
   init();bind();

@@ -18,6 +18,7 @@
   if(!b||!g){host.hidden=true;return;}
   const mq=window.matchMedia('(prefers-reduced-motion: reduce)');
   let storage;try{storage=window.localStorage;}catch{storage=null;}
+  const sceneStorage=S.createSceneMirror(storage);
   LandscapeMood.configureHistory(storage);
   LandscapeMood.setPersonalHourlyQuotes(window.getScannerHourlyQuotes?.()||{});
   window.addEventListener('scanner-hourly-quotes-change',event=>{
@@ -55,7 +56,7 @@
     document.addEventListener(type,observeSceneInteraction,{capture:true,passive:true});
   let preference=S.readMotion(storage),reduced=S.motionReduced(preference,mq.matches);
   const cityLights={next:30,windows:[]},woodland=S.createWoodland();
-  let sceneSeason=S.readSceneSeason(storage)||LandscapeMood.season(new Date(),globalThis.LivingLocation?.current()).name,treeOrigins=[];
+  let sceneSeason=S.readSceneSeason(sceneStorage)||LandscapeMood.season(new Date(),globalThis.LivingLocation?.current()).name,treeOrigins=[];
   let W=0,H=0,hy=0,dpr=1,frame=0,last=0,nextPaint=0,sky,p,world=S.createWorld(Math.random,sceneSeason);
   let skyTimer=0,resizeTimer=0,returnFocus=null;
   const dialog=document.getElementById('motionDialog');
@@ -342,22 +343,25 @@
       const x=((rand(i+71)*W+t*wind*(1.2+rand(i+2)*1.5)+size*3)%(W+size*6))-size*3;
       cloud(x,25+rand(i+82)*(hy*.68),size,.22+rand(i+54)*.18);
     }
-    // Paint moving sky visitors once, then snapshot only the pixels above the
-    // horizon. The lake can mirror any present or future visitor without a
-    // type-specific reflection that would inevitably miss something.
+    // Paint moving sky visitors once, then collect every visible layer above
+    // the horizon. New visitors and weather can enter the lake without a
+    // separate reflection rule for each type.
     for(const e of world.events)if(airborne.has(e.type)&&!waterEvents.has(e.type))paintEvent(e,t);
+    const weather=S.weatherAt(new Date(),sceneSeason),weatherPhase=reduced?0:Date.now()/1000;
     skyReflection.width=front.width;skyReflection.height=Math.max(1,Math.ceil(hy*dpr));
     const reflectionContext=skyReflection.getContext('2d');
-    reflectionContext.clearRect(0,0,skyReflection.width,skyReflection.height);
-    reflectionContext.drawImage(front,0,0,front.width,skyReflection.height,0,0,skyReflection.width,skyReflection.height);
+    reflectionContext.setTransform(dpr,0,0,dpr,0,0);
+    reflectionContext.clearRect(0,0,W,hy);
+    reflectionContext.drawImage(base.canvas,0,0,front.width,skyReflection.height,0,0,W,hy);
+    reflectionContext.drawImage(front,0,0,front.width,skyReflection.height,0,0,W,hy);
+    paintWeatherOn(reflectionContext,weather,weatherPhase);
     g.save();path(g,far);g.lineTo(W,geometry.waterTop);g.lineTo(0,geometry.waterTop);g.closePath();g.clip();
     if(p.night>.05){
       const reflectedSky=g.createLinearGradient(0,geometry.waterTop,0,geometry.waterTop+H*.12);
       reflectedSky.addColorStop(0,p.sky[2]);reflectedSky.addColorStop(1,p.sky[0]);
       g.globalAlpha=p.night*.18;g.fillStyle=reflectedSky;g.fillRect(0,geometry.waterTop,W,H*.12);
-      paintHorizonReflection(base.canvas,t,.72);
-      paintHorizonReflection(skyReflection,t,1);
     }
+    paintHorizonReflection(skyReflection,t,1);
     // Invert the actual skyline by day and night into narrow, softly moving
     // bands. The shoreline clip keeps them beneath the hills and boats.
     for(const row of geometry.cityReflection(t,wind,p.night)){
@@ -398,40 +402,39 @@
     for(const e of world.events)if(e.type==='train')paintEvent(e,t);
     for(const e of woodland.events)paintWoodland(e);
     composite('trees-front');
-    paintWeather();
+    paintWeatherOn(g,weather,weatherPhase,true);
     if(sceneSeason!=='winter'&&p.night>.15)for(let i=0;i<32;i++){
       const x=rand(i+801)*W+Math.sin(t*.7+i)*10;
       const y=Math.min(H-8,near(x)+16+rand(i+830)*44+Math.cos(t+i)*6);
       g.globalAlpha=(.2+.6*(.5+.5*Math.sin(t*1.4+i)))*p.night;ellipse(g,x,y,1.5,1.5,'#eff7b7');g.globalAlpha=1;
     }
   }
-  function paintWeather(){
-    const weather=S.weatherAt(new Date(),sceneSeason);
-    document.documentElement.dataset.sceneWeather=weather.status;
-    LandscapeSeasonal.paint(g,treeOrigins,geometry,W,H,world.elapsed,sceneSeason,p,reduced,weather);
+  function paintWeatherOn(ctx,weather,phase,updateStatus=false){
+    if(updateStatus)document.documentElement.dataset.sceneWeather=weather.status;
+    LandscapeSeasonal.paint(ctx,treeOrigins,geometry,W,H,world.elapsed,sceneSeason,p,reduced,weather);
     if(!weather.intensity)return;
-    const phase=reduced?0:Date.now()/1000,snow=weather.status==='snow'||weather.status==='snowstorm',storm=weather.storm;
+    const snow=weather.status==='snow'||weather.status==='snowstorm',storm=weather.storm;
     const gust=Math.sin(phase*.22)+Math.sin(phase*.071)*.5,wind=storm?2.3+gust:.5+gust*.15;
-    g.save();g.globalAlpha=weather.intensity*(snow?.08:storm?.32:.22);g.fillStyle='#243746';g.fillRect(0,0,W,hy+H*.08);
-    g.globalAlpha=weather.intensity*(snow?.18:.4);
-    for(let i=0;i<6;i++){const x=((i+.3)*W/6+phase*(storm?3:1))%(W+180)-90;ellipse(g,x,hy*(.12+rand(i+6100)*.2),W*.14,hy*.065,'#344e61');}
-    g.globalAlpha=weather.intensity*(snow?.55:storm?.72:.62);
+    ctx.save();ctx.globalAlpha=weather.intensity*(snow?.08:storm?.32:.22);ctx.fillStyle='#243746';ctx.fillRect(0,0,W,hy+H*.08);
+    ctx.globalAlpha=weather.intensity*(snow?.18:.4);
+    for(let i=0;i<6;i++){const x=((i+.3)*W/6+phase*(storm?3:1))%(W+180)-90;ellipse(ctx,x,hy*(.12+rand(i+6100)*.2),W*.14,hy*.065,'#344e61');}
+    ctx.globalAlpha=weather.intensity*(snow?.55:storm?.72:.62);
     const count=Math.round(W/(storm?8:snow?22:9));
     for(let i=0;i<count;i++){
       const speed=snow?10+rand(i+4500)*15:75+rand(i+4500)*50;
       const y=(rand(i+4600)*H+phase*speed)%H;
       const x=((rand(i+4700)*W+y*.12*wind+(snow?phase*(storm?18:4)+Math.sin(phase*.22)*12+Math.sin(phase*.071)*8+Math.sin(phase*.5+i)*5:0))%W+W)%W;
-      if(snow)ellipse(g,x,y,.8+rand(i+4800),.8+rand(i+4800),'#f4f4e8');
-      else line(g,x,y,x+1.2*wind,y+9+rand(i+4800)*7,'#e4f2f6',.9);
+      if(snow)ellipse(ctx,x,y,.8+rand(i+4800),.8+rand(i+4800),'#f4f4e8');
+      else line(ctx,x,y,x+1.2*wind,y+9+rand(i+4800)*7,'#e4f2f6',.9);
     }
     // An occasional distant bolt, never a full-screen flash or a reduced-motion effect.
     const flash=(phase+rand(weather.slot)*40)%47;
     if(storm&&!snow&&!reduced&&flash<.28){
-      g.globalAlpha=weather.intensity*Math.sin(flash/.28*Math.PI)*.6;
+      ctx.globalAlpha=weather.intensity*Math.sin(flash/.28*Math.PI)*.6;
       const x=W*(.15+rand(Math.floor(phase/47))* .7),y=hy*.13;
-      line(g,x,y,x-5,y+12,'#fff4d1',1);line(g,x-5,y+12,x+2,y+10,'#fff4d1',1);line(g,x+2,y+10,x-6,y+24,'#fff4d1',1);
+      line(ctx,x,y,x-5,y+12,'#fff4d1',1);line(ctx,x-5,y+12,x+2,y+10,'#fff4d1',1);line(ctx,x+2,y+10,x-6,y+24,'#fff4d1',1);
     }
-    g.restore();
+    ctx.restore();
   }
   function paintWoodland(e){
     const pose=geometry.woodlandPose(e),f=geometry.motionProgress(e,'x'),deer=e.type==='deer',rabbit=e.type==='rabbit',fox=e.type==='fox';
@@ -825,7 +828,7 @@
   themeQuery.addEventListener('change',updateChrome);
   function refreshSky(){
     const location=globalThis.LivingLocation?.current();
-    sky=S.skyAt(S.sceneDate(new Date(),storage,location),location);p=S.palette(sky.sun.altitude);
+    sky=S.skyAt(S.sceneDate(new Date(),sceneStorage,location),location);p=S.palette(sky.sun.altitude);
     if(globalThis.LandscapeMood){sceneSeason=LandscapeMood.season(sky.date,location).name;p=LandscapeMood.palette(p,sky.date,location);}
     document.documentElement.dataset.sceneSeason=sceneSeason;S.setSeason(world,sceneSeason);updateChrome();
     document.documentElement.style.setProperty('--scene-tint',p.tint);
@@ -889,16 +892,16 @@
   const timeDialog=document.getElementById('sceneTimeDialog'),timeInput=document.getElementById('sceneTimeInput'),timeStatus=document.getElementById('sceneTimeStatus'),seasonInput=document.getElementById('sceneSeasonInput');
   let timeReturnFocus=null;
   function renderSceneTimeChoice(){
-    const saved=S.readSceneTime(storage);
+    const saved=S.readSceneTime(sceneStorage);
     for(const button of timeDialog.querySelectorAll('[data-scene-preset], [data-scene-time="live"], [data-scene-time="lock"]')){
       const active=button.dataset.scenePreset===saved || (button.dataset.sceneTime==='live' && saved===null)
         || (button.dataset.sceneTime==='lock' && !!saved && !button.dataset.scenePreset && !timeDialog.querySelector('[data-scene-preset="'+saved+'"]'));
       button.setAttribute('aria-pressed',String(active));
     }
     const settingsButton=document.querySelector('#modalRoot [data-act="scene-time-settings"]');
-    if(settingsButton){settingsButton.classList.toggle('setting-set',!!saved);settingsButton.classList.toggle('setting-unset',!saved);}
+    if(settingsButton){settingsButton.classList.toggle('setting-set',!saved);settingsButton.classList.toggle('setting-unset',!!saved);}
     const settingsStatus=document.getElementById('settingsSceneTimeStatus');
-    if(settingsStatus)settingsStatus.textContent=(saved?'A scene time is selected.':'Following live time.')+' Saved on this device.';
+    if(settingsStatus)settingsStatus.textContent=(saved?'A scene time is selected.':'Following live time.')+' Synced with your board when signed in.';
   }
   function refreshSolarTimes(){
     const location=globalThis.LivingLocation?.current();
@@ -912,16 +915,25 @@
       button.replaceChildren();
       const label=document.createElement('strong'),time=document.createElement('span');
       label.textContent=entry.label;time.textContent=entry.time;button.append(label,time);
-      button.setAttribute('aria-pressed',String(S.readSceneTime(storage)===entry.preset));
+      button.setAttribute('aria-pressed',String(S.readSceneTime(sceneStorage)===entry.preset));
     }
     renderSceneTimeChoice();
     return schedule;
   }
+  window.applySyncedSceneTime=(time,season)=>{
+    // A board adoption mirrors the shared choice into the offline sky keys.
+    // Memory also holds it when browser storage rejects writes. Repaint
+    // without emitting a user edit back into cloud sync.
+    sceneStorage.applySynced(time,season);
+    renderSceneTimeChoice();
+    if(timeDialog.open){seasonInput.value=season||'';refreshSolarTimes();}
+    refreshSky();
+  };
   seasonInput.addEventListener('change',refreshSolarTimes);
   document.addEventListener('click',event=>{
     const control=event.target.closest('[data-act="scene-time-settings"], [data-scene-time], [data-scene-preset]');if(!control)return;
     if(control.dataset.act==='scene-time-settings'){
-      seasonInput.value=S.readSceneSeason(storage)||'';timeReturnFocus=document.activeElement;const saved=S.readSceneTime(storage);timeInput.value=S.sceneDate(new Date(),storage,globalThis.LivingLocation?.current()).toTimeString().slice(0,5);
+      seasonInput.value=S.readSceneSeason(sceneStorage)||'';timeReturnFocus=document.activeElement;const saved=S.readSceneTime(sceneStorage);timeInput.value=S.sceneDate(new Date(),sceneStorage,globalThis.LivingLocation?.current()).toTimeString().slice(0,5);
       timeStatus.textContent=saved?'Scene time locked to '+saved.replaceAll('-',' ')+'.':'Following live time.';refreshSolarTimes();timeDialog.showModal();timeInput.focus();return;
     }
     if(control.dataset.sceneTime==='close'){timeDialog.close();return;}
@@ -929,15 +941,17 @@
     const value=control.dataset.sceneTime==='live'?null:preset||timeInput.value;
     if(value!==null&&!control.dataset.scenePreset&&!timeInput.reportValidity())return;
     if(!S.saveSceneSeason(storage,control.dataset.sceneTime==='live'?null:seasonInput.value||null)||!S.saveSceneTime(storage,value)){timeStatus.textContent='Could not save this time on this device. Please try again.';return;}
-    timeInput.value=S.sceneDate(new Date(),storage,globalThis.LivingLocation?.current()).toTimeString().slice(0,5);
+    sceneStorage.recordDeviceChoice(value,control.dataset.sceneTime==='live'?null:seasonInput.value||null);
+    timeInput.value=S.sceneDate(new Date(),sceneStorage,globalThis.LivingLocation?.current()).toTimeString().slice(0,5);
     if(control.dataset.sceneTime==='live')seasonInput.value='';
     timeStatus.textContent=value?'Scene time locked to '+value.replaceAll('-',' ')+'.':'Following live time.';
     const selected=refreshSolarTimes().events.find(entry=>entry.preset===value);
     if(selected&&!selected.at)timeStatus.textContent='No '+selected.label.toLowerCase()+' on the selected date. Following live time.';
     refreshSky();
+    document.dispatchEvent(new CustomEvent('landscape-scene-time-change',{detail:{time:S.readSceneTime(sceneStorage),season:S.readSceneSeason(sceneStorage)}}));
   });
   timeDialog.addEventListener('close',()=>timeReturnFocus?.isConnected&&timeReturnFocus.focus());
-  window.addEventListener('storage',event=>{if(event.key==='fvp:chain-scanner:scene-time'||event.key==='fvp:chain-scanner:scene-season'||event.key===null){refreshSky();}});
+  window.addEventListener('storage',event=>{if(event.key==='fvp:chain-scanner:scene-time'||event.key==='fvp:chain-scanner:scene-season'||event.key===null){sceneStorage.release(event.key);refreshSky();renderSceneTimeChoice();}});
   document.addEventListener('click',event=>{
     const button=event.target.closest('[data-landscape-motion], [data-act="scene-settings"], [data-scene-view]');
     if(!button)return;
@@ -974,6 +988,9 @@
   window.addEventListener('pagehide',stop);
   window.addEventListener('pageshow',start);
   resize();updateMotion();if(preference===null)openMotion();
+  // Spawn-rate loading can finish after scanner boot. Tell the board when
+  // this renderer is ready to receive its synced time and season choice.
+  document.dispatchEvent(new CustomEvent('landscape-scene-time-ready'));
   // The editable local file is precached for offline use. A failed first load
   // leaves hourly text blank and cannot interrupt animation startup.
   fetch('./HUMAN_WRITTEN_HOURLY_TAGS.md').then(response=>{

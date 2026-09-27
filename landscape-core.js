@@ -276,6 +276,32 @@
     if(value!==null&&!seasons.includes(value))return false;
     try{if(value===null)storage.removeItem(SCENE_SEASON_KEY);else storage.setItem(SCENE_SEASON_KEY,value);return true;}catch{return false;}
   }
+  function createSceneMirror(storage){
+    // The board can remain readable when browser preference writes fail. Keep
+    // adopted scene choices in memory so a failed offline mirror cannot make
+    // the displayed sky disagree with the board that was just accepted.
+    let timeOverride,seasonOverride;
+    function recordDeviceChoice(time,season){
+      if(time!==null&&!validSceneTime(time)||season!==null&&!seasons.includes(season))return false;
+      timeOverride=time;seasonOverride=season;return true;
+    }
+    return {
+      getItem(key){
+        if(key===SCENE_TIME_KEY&&timeOverride!==undefined)return timeOverride;
+        if(key===SCENE_SEASON_KEY&&seasonOverride!==undefined)return seasonOverride;
+        try{return storage?.getItem(key)??null;}catch{return null;}
+      },
+      applySynced(time,season){
+        if(!recordDeviceChoice(time,season))return false;
+        saveSceneSeason(storage,season);saveSceneTime(storage,time);return true;
+      },
+      recordDeviceChoice,
+      release(key){
+        if(key===null||key===SCENE_TIME_KEY)timeOverride=undefined;
+        if(key===null||key===SCENE_SEASON_KEY)seasonOverride=undefined;
+      },
+    };
+  }
   function sceneSolarDate(now,storage,location){
     const season=readSceneSeason(storage);
     if(!season)return new Date(now);
@@ -299,6 +325,6 @@
   function readMotion(storage){try{return normalizeMotion(storage.getItem(MOTION_KEY));}catch{return null;}}
   function saveMotion(storage,value){try{storage.setItem(MOTION_KEY,value);return true;}catch{return false;}}
   function motionReduced(value,osReduced){return !!osReduced||normalizeMotion(value)!=='normal';}
-  root.LivingSky={setSeason,eventsForSeason,sceneSolarDate,weatherAt,createWoodland,advanceWoodland,woodlandTypes,startingSpeed,groupSize,readSceneSeason,saveSceneSeason,advanceLights,skinTone,sceneDate,readSceneTime,saveSceneTime,skyAt,sunTimes,solarSchedule,solarPresets,starAt,starCount:root.SKY_STARS.length,palette,activity,createWorld,advance,
+  root.LivingSky={setSeason,eventsForSeason,sceneSolarDate,weatherAt,createWoodland,advanceWoodland,woodlandTypes,startingSpeed,groupSize,readSceneSeason,saveSceneSeason,createSceneMirror,advanceLights,skinTone,sceneDate,readSceneTime,saveSceneTime,skyAt,sunTimes,solarSchedule,solarPresets,starAt,starCount:root.SKY_STARS.length,palette,activity,createWorld,advance,
     nightEventTypes:NIGHT_TYPES.slice(),eventTypes:[...EVENT_TYPES,...WINTER_VISITORS],rareTypes:RARE_TYPES.slice(),eventDurations:Object.assign({},EVENT_DURATIONS),MAX_EVENTS,RARE_COOLDOWN,readMotion,saveMotion,motionReduced,clamp,lerp,smooth,mixHex};
 })(globalThis);
