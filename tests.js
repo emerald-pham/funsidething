@@ -11368,10 +11368,11 @@ test('Chance scan: live TrueSkill ratings still change on Yes and No',async()=>{
  const t=ctx.state.tasks.find(t=>t.id===ctx.state.candidateId);const mu=t.mu;ctx.decide('no');assert.ok(t.mu<mu);
  ctx.undo();const restored=ctx.state.tasks.find(t=>t.id===ctx.state.candidateId);ctx.decide('yes');assert.ok(restored.mu>mu);
 });
-test('Scan clock: schedules the earliest expiry and refreshes eligibility without an action',async()=>{
+test('Scan clock: schedules the next countdown change and refreshes eligibility without an action',async()=>{
  const {ctx}=await loadApp();const at=new Date(2026,8,16,9).getTime();setFakeTime(ctx,at);
  const t=ctx.addTask('repeat');Object.assign(t,{evergreen:true,evergreenHours:0.5,evergreenResetAtDay:false});ctx.completeTask(t);
- assert.equal(ctx.nextScanWakeAt(),at+HOUR/2);
+ assert.equal(ctx.nextScanWakeAt(),at+60000);
+ setFakeTime(ctx,at+60000);assert.match(ctx.chipHTML(t),/29m/);
  setFakeTime(ctx,at+HOUR/2);ctx.refreshScanClock();assert.ok(ctx.pool().some(x=>x.id===t.id));
  assert.match(html,/addEventListener\("focus", refreshScanClock\)/);
 });
@@ -12303,6 +12304,43 @@ test('Evergreen countdown: multi-day rest shows ceil days and then hours until e
  setFakeTime(ctx,now+24*HOUR+1);assert.match(ctx.chipHTML(t),/6d/);
  setFakeTime(ctx,now+167*HOUR);assert.match(ctx.chipHTML(t),/1h/);
  setFakeTime(ctx,now+168*HOUR);assert.doesNotMatch(ctx.chipHTML(t),/\d+[dh]/);assert.equal(ctx.isEligible(t),true);
+});
+
+test('RISK evergreen countdown: idle foreground timer repaints at the next displayed hour and minute',async()=>{
+ const {ctx,shim}=await loadApp();const now=new Date(2026,8,27,9).getTime();setFakeTime(ctx,now);
+ const t=ctx.addTask('Short rest');Object.assign(t,{evergreen:true,evergreenHours:18,evergreenResetAtDay:false,lastDoneAt:now});
+ ctx.state.listOpen=true;
+ let scheduled;ctx.setTimeout=(fn,ms)=>{scheduled={fn,ms};return 12345;};
+ ctx.render();assert.match(shim.document.getElementById('listBody').innerHTML,/18h/);
+ assert.ok(scheduled.ms>0&&scheduled.ms<=HOUR+1000,`next badge repaint is due in ${scheduled.ms}ms`);
+ setFakeTime(ctx,now+HOUR+1);scheduled.fn();
+ assert.match(shim.document.getElementById('listBody').innerHTML,/17h/,'the scheduled wake repaints the badge without interaction');
+ assert.ok(scheduled.ms<=HOUR+1000,'the next hour boundary is scheduled too');
+ setFakeTime(ctx,now+17*HOUR);ctx.render();
+ assert.match(shim.document.getElementById('listBody').innerHTML,/1h/);
+ assert.ok(scheduled.ms<=60000+1000,`the final hour updates its minute badge (scheduled ${scheduled.ms}ms)`);
+ setFakeTime(ctx,now+17*HOUR+1);scheduled.fn();
+ assert.match(shim.document.getElementById('listBody').innerHTML,/60m/);
+ assert.ok(scheduled.ms<=60000+1000,'minute badges continue to update without interaction');
+});
+
+test('RISK prerequisites: editing after deletion retains the missing task link until explicitly removed',async()=>{
+ const {ctx,shim}=await loadApp();const bob=ctx.addTask('bob'),gene=ctx.addTask('gene');
+ assert.equal(ctx.setTaskPrerequisite(gene.id,bob.id),true);ctx.deleteTask(bob.id);
+ assert.equal(ctx.isEligible(gene),true);
+ ctx.openEdit(gene.id);
+ const html=shim.document.getElementById('modalRoot').innerHTML;
+ const selected=html.match(/<option value="([^"]+)" selected>deleted task<\/option>/);
+ assert.ok(selected,'the editor keeps the missing prerequisite selected until the user chooses None');
+ shim.document.getElementById('etPrerequisite').value=selected?.[1]||'';
+ shim.document.getElementById('etTitle').value='gene renamed';
+ ctx.onAction('save-edit',{dataset:{id:gene.id}});
+ const edited=ctx.state.tasks.find(t=>t.id===gene.id);
+ assert.equal(edited.prerequisiteId,bob.id,'a title edit must not erase a dangling link');
+ ctx.undo();ctx.undo();
+ const restored=ctx.state.tasks.find(t=>t.id===gene.id);
+ assert.equal(restored.prerequisiteId,bob.id);
+ assert.equal(ctx.isEligible(restored),false,'restoring the prerequisite blocks the dependent again');
 });
 
 test('RISK custom hourly quotes: Settings saves plain text by hour and the scene combines it with file copy',async()=>{
