@@ -115,7 +115,7 @@
         const gust=(info.storm?(8+18*info.intensity):0)*Math.sin(time*.7+id*1.7);
         const x=clamp(startX+Math.sin(time*.9+id*2.1)*tree.size*.2+gust*phase,-20,W+20);
         const fadeIn=smooth(0,.08,phase),fadeOut=1-smooth(.82,1,phase),fade=fadeIn*fadeOut;
-        out.push({x,y,size:1.2+noise(id,87)*1.5,alpha:clamp(.9*fade,0,1),
+        out.push({x,y,size:.4+noise(id,87)*.55,alpha:clamp(.9*fade,0,1),
           color:LEAF_COLORS[id%LEAF_COLORS.length],kind:'leaf',angle:time*.7+id});
       }
     }

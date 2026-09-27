@@ -145,6 +145,7 @@ input[type=date]::-webkit-date-and-time-value{min-width:0;text-align:left}
 .chip.due-tomorrow{background:light-dark(#ffe1b0,#5c4413);color:light-dark(#8a5b00,#ffd699)}
 .chip.due-later{background:var(--chip);color:var(--mut)}
 .chip.ever{background:transparent;color:inherit;opacity:.75;font-weight:500;font-style:italic;padding:0}
+.chip.ever-countdown{background:var(--chip);color:var(--ink);font-variant-numeric:tabular-nums}
 .chip.notstarted{background:transparent;color:var(--mut);opacity:.85;font-weight:600;border:1px dashed var(--line)}
 .siderail{display:flex;flex-direction:row;flex-wrap:wrap;gap:7px;align-items:center;justify-content:flex-end;flex:none}
 .benchblock{margin-bottom:10px}
@@ -172,6 +173,10 @@ input[type=date]::-webkit-date-and-time-value{min-width:0;text-align:left}
 /* A task without a skip mark has nothing to return, but keeping this action
    visible makes its place in the edit pane predictable. */
 .btn.subtle:disabled{background:light-dark(#e8e8eb,#343840);color:light-dark(#777b83,#9ba0aa);border-color:light-dark(#d5d7dd,#4b5059);cursor:not-allowed}
+/* Settings use one reusable state vocabulary, including future choice buttons. */
+.btn.setting-choice{color:var(--action-ink);box-shadow:none}
+.btn.setting-set{background:var(--yes);border-color:var(--good)}
+.btn.setting-unset{background:var(--danger);border-color:var(--danger)}
 .btn.urgent{background:var(--chain-deep)}
 .btn.dot{background:var(--chain-deep)}   /* the chain's own colour — this is the button that puts a task on it */
 .qline{font-family:var(--font-q);font-style:italic;font-size:19px;margin:16px 2px 12px;color:var(--ink)}
@@ -252,6 +257,7 @@ input[type=date]::-webkit-date-and-time-value{min-width:0;text-align:left}
 .add-ever-toggle{width:fit-content}
 .add-ever-options{display:flex;flex-direction:column;gap:8px;min-width:0;padding:2px 0}
 .add-ever-options .frow{margin:0}
+.addrow .frow select{min-width:0;max-width:100%}
 .qctx{display:flex;flex-wrap:wrap;gap:6px}
 .qctx:empty{display:none}
 .qctxchip{font-size:12px;font-weight:600;border:1px solid var(--line);border-radius:99px;padding:3px 10px;color:var(--mut);background:var(--surface);cursor:pointer}
@@ -313,6 +319,11 @@ input[type=date]::-webkit-date-and-time-value{min-width:0;text-align:left}
 .help-faq dl{margin:14px 0 0}
 .help-faq dt{font-weight:700;margin-top:14px}
 .help-faq dd{margin:4px 0 0;line-height:1.55}
+.settings-section{border:1px solid var(--line);border-radius:10px;margin:12px 0;padding:0 12px 12px;background:var(--subtle)}
+.settings-section:not([open]){padding-bottom:0}
+.settings-section>summary{cursor:pointer;font-weight:700;padding:11px 2px;list-style-position:inside}
+.settings-section .mgr .kv{flex:1;min-width:0;overflow-wrap:anywhere}
+.settings-section textarea{display:block;width:100%;margin-top:7px}
 .kv{font-size:13.5px;color:var(--mut);line-height:1.6}
 .kv b{color:var(--ink)}
 .statusdot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}
@@ -411,9 +422,10 @@ input[type=date]::-webkit-date-and-time-value{min-width:0;text-align:left}
         <div class="add-date-field"><label for="addStart">Starts</label><input id="addStart" type="date"/></div>
         <div class="add-date-field"><label for="addDue">Due</label><input id="addDue" type="date"/></div>
       </div>
+      <div class="frow"><label for="addPrerequisite">Prerequisite task</label><select id="addPrerequisite"><option value="">None</option></select></div>
       <label class="cbox add-ever-toggle"><input id="addEver" type="checkbox"/> Evergreen</label>
       <div class="add-ever-options" id="addEverOptions" hidden>
-        <div class="frow"><label for="addEverHours">Recurrence (hours)</label><input id="addEverHours" type="number" min="0.01" max="87600" step="any" value="18"/></div>
+        <div class="frow"><label for="addEverHours">Recurrence</label><input id="addEverHours" type="number" min="0.01" max="87600" step="any" value="18"/><select id="addEverUnit" aria-label="Recurrence unit"><option value="hours">Hours</option><option value="days">Days</option></select></div>
         <label class="cbox"><input id="addEverReset" type="checkbox" checked/> Allow task to automatically become eligible as candidate after date line passes (2 AM)</label>
       </div>
     </div>
@@ -449,7 +461,7 @@ input[type=date]::-webkit-date-and-time-value{min-width:0;text-align:left}
   <p>You can change this anytime in Settings. The sun and Moon follow their real paths, even when the scenery is still.</p>
 </dialog>
 <!-- changelog:start -->
-<template id="appChangelogCurrent"><div data-app-fingerprint="ad9fd9497f9c76f01ac57aec485a592793320dac1388eed6e4e1f2a6649b21cb"><h3>September 24, 2026</h3><ul><li>Older tabs can no longer bring back a task after you complete or delete it following multiple restores. Backup imports and restores now keep the history needed for sync to respect those choices.</li></ul><h3>September 23, 2026</h3><ul><li>Old tabs can no longer roll back tasks and History without keeping a recoverable copy. Cloud refresh also stops when the browser’s saved copy is unreadable.</li><li>Settings now keeps seven days of local backups and manual copies you can restore or delete. Restoring saves your current board first and keeps later tasks without a recorded deletion.</li><li>Cloud saves follow revision order and keep tasks unless you deleted them.</li><li>Account switches keep unsynced work in a local recovery copy, and Undo cannot move one account’s tasks into another. Backup restore warns before crossing accounts.</li><li>Quick edits from one tab wait for the previous cloud save, so an older confirmation cannot replace a newer change. If another device updates the same task first, this tab warns you and keeps a restorable copy.</li><li>Return as candidate stays visible in the task editor and greys out when unavailable.</li><li>Quick start now has a collapsed More FAQs section explaining Done, Worked on it, Dislodge, cooldowns, and early returns to scanning.</li></ul><h3>September 21, 2026</h3><ul><li>Separate tasks with the same name now keep their own completed and worked-on History entries.</li><li>A damaged backup, saved board, or cloud copy can no longer replace healthy tasks or stop the app from opening.</li><li>Start and Due use consistent field borders on iPhone in both Add and Edit, while keeping the date picker.</li><li>Keep the header visible now saves as soon as it is checked and reliably keeps Undo in reach while scrolling; the option remains off by default.</li><li>The top-K summary and sparkline stay aligned with done adding for now.</li><li>Double-tap zoom is disabled while pinch zoom remains available.</li><li>Add a task can now capture Evergreen recurrence hours and the 2 AM reset, starting at 18 hours with the day reset checked.</li><li>Start, Due, Evergreen, and neighboring Add controls now respect the pane's inner margins across narrow phones and short landscape layouts.</li><li>Dot from the All Tasks editor now ranks that task above the current benchmark. Done and Evergreen Done no longer change ratings.</li></ul></div></template>
+<template id="appChangelogCurrent"><div data-app-fingerprint="d48c79f4068a7f3e7ce9c85ee63d0f9165e128a2182fe96f82e59473a9787b2a"><h3>September 27, 2026</h3><ul><li>Tasks can now wait for one prerequisite task to be completed. Evergreen Done counts, and a deleted prerequisite releases its dependent task. Add, Edit, and Settings can set or remove the link.</li><li>Evergreen intervals can be entered in hours or days, with a countdown tag while a task rests.</li><li>Settings now has collapsible sections, custom hourly quotes, and clear green or red states for scene time and location. The FAQ covers these and other essential controls.</li><li>Autumn leaves are smaller. Message planes now have classic biplane wings and wheels. Daytime water mirrors the skyline, rain is darker and easier to see, and fireflies gather in the foreground.</li><li>Bird flocks and bicycle packs vary in size, trams keep even spacing across screen sizes, and airborne visitors move more visibly up and down.</li></ul><h3>September 24, 2026</h3><ul><li>Older tabs can no longer bring back a task after you complete or delete it following multiple restores. Backup imports and restores now keep the history needed for sync to respect those choices.</li></ul><h3>September 23, 2026</h3><ul><li>Old tabs can no longer roll back tasks and History without keeping a recoverable copy. Cloud refresh also stops when the browser’s saved copy is unreadable.</li><li>Settings now keeps seven days of local backups and manual copies you can restore or delete. Restoring saves your current board first and keeps later tasks without a recorded deletion.</li><li>Cloud saves follow revision order and keep tasks unless you deleted them.</li><li>Account switches keep unsynced work in a local recovery copy, and Undo cannot move one account’s tasks into another. Backup restore warns before crossing accounts.</li><li>Quick edits from one tab wait for the previous cloud save, so an older confirmation cannot replace a newer change. If another device updates the same task first, this tab warns you and keeps a restorable copy.</li><li>Return as candidate stays visible in the task editor and greys out when unavailable.</li><li>Quick start now has a collapsed More FAQs section explaining Done, Worked on it, Dislodge, cooldowns, and early returns to scanning.</li></ul><h3>September 21, 2026</h3><ul><li>Separate tasks with the same name now keep their own completed and worked-on History entries.</li><li>A damaged backup, saved board, or cloud copy can no longer replace healthy tasks or stop the app from opening.</li><li>Start and Due use consistent field borders on iPhone in both Add and Edit, while keeping the date picker.</li><li>Keep the header visible now saves as soon as it is checked and reliably keeps Undo in reach while scrolling; the option remains off by default.</li><li>The top-K summary and sparkline stay aligned with done adding for now.</li><li>Double-tap zoom is disabled while pinch zoom remains available.</li><li>Add a task can now capture Evergreen recurrence hours and the 2 AM reset, starting at 18 hours with the day reset checked.</li><li>Start, Due, Evergreen, and neighboring Add controls now respect the pane's inner margins across narrow phones and short landscape layouts.</li><li>Dot from the All Tasks editor now ranks that task above the current benchmark. Done and Evergreen Done no longer change ratings.</li></ul></div></template>
 <template id="appChangelog"><details data-app-fingerprint="43c2064b3e3eb36a00a54cdade10bda1db44258e57c84075fc23fa8ab524530d"><summary>Changelog</summary><h3>September 19, 2026</h3><ul><li>At night, boats and nearby objects above the horizon reflect naturally in the water, including airplanes, the Moon, and stars.</li><li>The Add a task panel can be minimized and remembers that choice.</li><li>Every visitor starts with an individual travel speed, so faster arrivals can overtake slower ones. Vehicles hold that speed horizontally while vertical movement can still vary, the existing lower tram cars remain linked, and airplane banners switch to a dark, light-lettered night palette.</li><li>Tasks marked No, Can’t, or Dislodged appear under Ineligible until their marks clear.</li><li>First light, sunrise, sunset, and last light now have separate scenery controls and show times for the sky location. Solar times were checked across seasons, time zones, and polar days.</li><li>Jet skis and small water creatures are easier to see. Daytime visitors arrive twice as often.</li><li>Readers and groups linger longer, leave at varied times, and carry books by their sides.</li><li>Add tasks with start and due dates. Selecting Eligible clears other filters to show every eligible task.</li><li>Both scan modes start with the oldest eligible task. Done raises its preference rating; Worked on it leaves ratings unchanged.</li></ul><h3>September 16, 2026</h3><ul><li>Updates announce themselves with a toast pointing to this changelog.</li><li>Task editors show evergreen interval and day-reset controls only when Evergreen is checked.</li><li>Chance mode is the default for new scan preferences. Dislodge now lowers the task’s preference rating; Undo restores it.</li><li>Signing in while the app is loading now brings synced tasks into view without a manual refresh.</li><li>All Tasks has a separate All / Eligible / Ineligible filter row that combines with search and task-status filters.</li><li>Chance scans use TrueSkill win probabilities, including rating uncertainty, with no rating floor or offset. If no candidate can draw, scanning falls back to descending likelihood.</li><li>The scan-mode dropdown saves immediately, including when you close Settings without pressing Save.</li><li>Account switching keeps task lists separate after a cloud refresh. Cloud refreshes wait for edits, and Undo restores an imported scan correctly.</li><li>Add &amp; dot now starts the daily reset clock. Tasks with a start date wake at midnight, and stop-scanning guidance uses the candidates actually ahead.</li><li>Changing the scan-mode setting now takes effect in the current scan. Choosing both modes also offers both buttons when resuming.</li><li>The installed app checks for updates whenever it opens or returns to the foreground. Available updates load automatically after you finish editing, without reinstalling.</li><li>Choose descending scans, TrueSkill-weighted chance scans, or both scan buttons in Settings. Chance order stays steady through undo and refreshes on a fresh pass or at 2 AM; decisions still update ratings immediately.</li><li>Set an evergreen interval for each task, with an optional 2 AM reset. New tasks default to 18 hours or the next day marker, whichever comes first; Settings lets you change those defaults.</li></ul><h3>September 14, 2026</h3><ul><li>Skywriters trace single human-written words in smoke, then fly away as the letters fade.</li><li>Hourly messages appear only when human-written copy is available. Anytime prompts show the current hour, such as 5 AM. Sky messages keep their existing behavior.</li><li>Trains and metros now run regularly throughout the day and night.</li><li>Event rates can be adjusted in SPAWN_RATES.md.</li></ul><h3>September 13, 2026 — Seasonal details</h3><ul><li>Rain showers last 20–45 minutes; thunderstorms last 30–60 minutes. Winter brings snow and snowstorms on the same shared weather schedule.</li><li>Winter visitors build snowmen, ski downhill, and make snow angels. Warm-weather outings wait for warmer seasons.</li><li>Autumn turns the landscape amber and brown, with leaves falling from trees and blowing in storms.</li><li>Spring brings scattered flowers and tree blossoms. Occasional gusts lift petals; rain and storms bring more petals and pollen.</li><li>Winter trees gather snow and occasionally shed small clumps. Seasonal debris gets livelier during storms.</li><li>Birds have individual plumage: distant sky birds look dark with hints of color, while nearby birds show more color.</li><li>People have varied hairstyles and hair colors, with helmets and hats kept clear.</li><li>Little propeller planes tow the messages overhead. Hot air balloons appear more often during the day.</li><li>More trains, riders, and people walking pass through the scene, including new scooter and hoverboard riders.</li><li>Season rules, weather timing, and visitor odds now share an expandable configuration; seasonal effects keep their own small budgets and visitor lifetimes.</li></ul><h3>September 13, 2026</h3><ul><li>One Sunrise / Sunset button switches between dawn and dusk.</li><li>Choose a season when locking the scenery, or follow the current season.</li><li>Cyclists pedal with connected hips and naturally bending knees.</li><li>Distant boats shrink with depth; windsurfers and small craft stay smaller than ships, and the far metro is smaller than the foreground train.</li><li>Ducks sometimes lift off from the lake and fly away.</li><li>Seasons now follow the actual equinox and solstice, with hemisphere and local date handling. Solar locks use the sky location’s calendar.</li><li>Choose the sky location’s time zone when it differs from your device. The Moon’s illuminated side now follows the Sun, and the midnight sun stays daylight.</li><li>Deer, foxes, rabbits, and raccoons occasionally wander through the foreground: a 1% chance every 30 seconds, up to four animals, independent of other visitors.</li><li>Picnic groups fold their blanket and gather their things; readers, couples, and kite flyers also finish up and walk away.</li><li>Occasional gentle rain follows the same real-time schedule across devices, including offline. Reduced motion keeps the rain still.</li><li>Settings now includes this changelog, with a check that catches undocumented app changes.</li></ul></details></template>
 <!-- changelog:end -->
 <dialog id="sceneTimeDialog" class="motion-dialog" aria-labelledby="sceneTimeTitle">
@@ -597,7 +609,7 @@ const featureEnabled = name => FEATURE_FLAGS[name] === true;
    state arriving from another device gets backfilled with" can never drift
    apart — two devices either side of an upgrade would otherwise quietly
    disagree about a setting neither of them ever set. */
-const DEFAULT_SETTINGS = { horizonMin:60, thresholdPct:25, samples:250, cantMin:30, workedHours:16, evergreenHours:18, evergreenResetAtDay:true, scanMode:"chance", floatingHeader:false, theme:"system" };
+const DEFAULT_SETTINGS = { horizonMin:60, thresholdPct:25, samples:250, cantMin:30, workedHours:16, evergreenHours:18, evergreenResetAtDay:true, scanMode:"chance", floatingHeader:false, theme:"system", hourlyQuotes:{} };
 /* And one source of truth for the RANGE each of them may hold — the same
    min/max the Settings inputs enforce, so the form and the backfill cannot
    drift apart either.
@@ -649,6 +661,9 @@ let undoStack = [];
 let chanceGeneration = 0; // local provenance: only deliberate scan/day boundaries advance it
 let quickAddCtx = [];          // context ids currently picked in the quick-add bar — UI-only, sticky across adds, not synced
 let quickAddEvergreenInitialized = false; // the visible draft survives renders/collapse, but starts from the synced defaults once
+let settingsQuoteHour = '00';
+let appliedHourlyQuotes = null;
+window.getScannerHourlyQuotes = () => state?.settings?.hourlyQuotes || {};
 let listQuery = "";            // all-tasks search box, already trimmed + lowercased — UI-only, like quickAddCtx: never saved, never synced, never undoable
 let listEligibilityFilter = "all"; // independent view-only eligibility narrowing
 let listTagFilter = null;      // ...and the one filter key the list is narrowed to ("s:no", "c:c_home"), or null. One at a time, by design.
@@ -697,7 +712,7 @@ function dropRemovedFields(st){ for(const t of (st && st.tasks) || []) delete t.
 function normalizeSettings(s){
   const out = Object.assign({}, DEFAULT_SETTINGS, (s && typeof s === "object") ? s : {});
   for(const k of Object.keys(DEFAULT_SETTINGS)){
-    if(k === "theme" || k === "scanMode" || k === "evergreenResetAtDay" || k === "floatingHeader") continue;
+    if(k === "theme" || k === "scanMode" || k === "evergreenResetAtDay" || k === "floatingHeader" || k === "hourlyQuotes") continue;
     // Number(null) and Number("") are 0, not NaN — and a NaN written by an
     // older build comes back from JSON as null. Coercing blind would turn any
     // of those into a real-looking 0, so only an actual finite number (or a
@@ -710,6 +725,17 @@ function normalizeSettings(s){
   out.evergreenResetAtDay = typeof out.evergreenResetAtDay === "boolean" ? out.evergreenResetAtDay : true;
   out.floatingHeader = typeof out.floatingHeader === "boolean" ? out.floatingHeader : DEFAULT_SETTINGS.floatingHeader;
   out.theme = normalizeTheme(out.theme);                   // absent or corrupt -> "system"
+  out.hourlyQuotes = normalizeHourlyQuotes(out.hourlyQuotes);
+  return out;
+}
+function normalizeHourlyQuotes(value){
+  if(!value || typeof value!=="object" || Array.isArray(value)) return {};
+  const out={};
+  for(const [hour,lines] of Object.entries(value)){
+    if(!/^(?:[01]\d|2[0-3])$/.test(hour) || !Array.isArray(lines)) continue;
+    const clean=[...new Set(lines.filter(line=>typeof line==="string").map(line=>line.trim()).filter(line=>line&&line.length<=180))].slice(0,12);
+    if(clean.length) out[hour]=clean;
+  }
   return out;
 }
 
@@ -726,6 +752,7 @@ function hydrateState(st){
     t.due = normalizedISODate(t.due);
     t.startsAt = normalizedISODate(t.startsAt);
     t.evergreen = t.evergreen === true;
+    t.prerequisiteId = typeof t.prerequisiteId === "string" && t.prerequisiteId.trim() ? t.prerequisiteId : null;
     if(!Number.isFinite(t.mu)) t.mu = PRIOR_MU;
     if(!Number.isFinite(t.sigma) || t.sigma <= 0) t.sigma = PRIOR_SIGMA;
     if(!Number.isFinite(t.createdAt)) t.createdAt = Date.now();
@@ -735,6 +762,16 @@ function hydrateState(st){
     if(typeof t.restoredRunOp!=="string") delete t.restoredRunOp;
     if(typeof t.completedAfterRestoreOp!=="string") delete t.completedAfterRestoreOp;
     t.done = t.done === true;
+  }
+  // Imported or older synced boards can contain a cycle no UI would allow.
+  // Break the closing edge instead of leaving a permanent ineligible island.
+  const byId=new Map(st.tasks.map(t=>[t.id,t]));
+  for(const t of st.tasks){
+    const seen=new Set([t.id]);let next=t.prerequisiteId;
+    while(next && byId.has(next)){
+      if(seen.has(next)){ t.prerequisiteId=null; break; }
+      seen.add(next);next=byId.get(next).prerequisiteId;
+    }
   }
   st.contexts = Array.isArray(st.contexts)
     ? st.contexts.filter(c=>c && typeof c === "object" && typeof c.id === "string" && typeof c.name === "string")
@@ -826,6 +863,15 @@ function hydrateState(st){
 function evergreenHours(value, fallback){
   const n = typeof value === "string" && value.trim() ? Number(value) : value;
   return typeof n === "number" && Number.isFinite(n) ? clampSetting("evergreenHours", n) : (fallback ?? DEFAULT_SETTINGS.evergreenHours);
+}
+function evergreenDurationHours(value, unit="hours", fallback=DEFAULT_SETTINGS.evergreenHours){
+  const n=typeof value==="string" && value.trim() ? Number(value) : value;
+  if(typeof n!=="number" || !Number.isFinite(n) || n<=0) return evergreenHours(fallback);
+  return evergreenHours(n*(unit==="days"?24:1),fallback);
+}
+function evergreenIntervalParts(hours){
+  const safe=evergreenHours(hours);
+  return safe>=24 && safe%24===0 ? {value:safe/24,unit:"days"} : {value:safe,unit:"hours"};
 }
 function evergreenDefaults(){
   return {evergreenHours:state.settings.evergreenHours, evergreenResetAtDay:state.settings.evergreenResetAtDay};
@@ -1740,10 +1786,25 @@ function isEligible(t, act){
   if(t.done) return false;
   const now = Date.now();
   if(t.evergreen && t.lastDoneAt && now < evergreenUntil(t)) return false;
+  // A missing ID is an intentional release: deletion, clear History, and old
+  // imports must never leave a dependent waiting for a task that no longer exists.
+  const prerequisite=taskById(t.prerequisiteId);
+  if(prerequisite && !prerequisite.done && !(prerequisite.evergreen && prerequisite.lastDoneAt)) return false;
   if(t.startsAt && isoToDate(t.startsAt) > isoToDate(todayISO(0))) return false;  // not started yet — can't be queued
   act = act || activeCtxSet();
   for(const c of t.ctx){ if(state.contexts.some(x=>x.id===c) && !act.has(c)) return false; }
   return true;
+}
+function setTaskPrerequisite(taskId,prerequisiteId){
+  const task=taskById(taskId),needed=prerequisiteId?taskById(prerequisiteId):null;
+  if(!task || (prerequisiteId && !needed) || prerequisiteId===taskId) return false;
+  let cursor=needed;const seen=new Set([taskId]);
+  while(cursor){
+    if(seen.has(cursor.id)) return false;
+    seen.add(cursor.id);cursor=taskById(cursor.prerequisiteId);
+  }
+  if((task.prerequisiteId||null)===(prerequisiteId||null)) return true;
+  pushUndo();task.prerequisiteId=prerequisiteId||null;commit();return true;
 }
 function eligibleTasks(){ const act=activeCtxSet(); return state.tasks.filter(t=>isEligible(t,act)); }
 function benchmark(){ return state.chain.length ? taskById(state.chain[state.chain.length-1]) : null; }
@@ -2169,9 +2230,16 @@ function applyEditFields(t){
   const sd = document.getElementById("etStart").value; t.startsAt = sd || null;
   t.evergreen = !!document.getElementById("etEver").checked;
   const hours = document.getElementById("etEverHours");
+  const unit = document.getElementById("etEverUnit");
   const reset = document.getElementById("etEverReset");
-  if(hours) t.evergreenHours = evergreenHours(hours.value, t.evergreenHours);
+  if(hours) t.evergreenHours = evergreenDurationHours(hours.value, unit?.value, t.evergreenHours);
   if(reset) t.evergreenResetAtDay = !!reset.checked;
+  const prerequisiteId=document.getElementById("etPrerequisite")?.value||null;
+  if(!prerequisiteId || (taskById(prerequisiteId) && prerequisiteId!==t.id)){
+    let cursor=taskById(prerequisiteId),cycle=false;const seen=new Set([t.id]);
+    while(cursor){if(seen.has(cursor.id)){cycle=true;break;}seen.add(cursor.id);cursor=taskById(cursor.prerequisiteId);}
+    if(!cycle)t.prerequisiteId=prerequisiteId;
+  }
   t.ctx = [...document.querySelectorAll("[data-editctx]")].filter(x=>x.checked).map(x=>x.dataset.editctx);
   return true;
 }
@@ -2426,8 +2494,9 @@ function quickAddTaskOptions(){
   const evergreen = !!document.getElementById("addEver")?.checked;
   return {
     evergreen,
-    evergreenHours:evergreenHours(document.getElementById("addEverHours")?.value, state.settings.evergreenHours),
-    evergreenResetAtDay:document.getElementById("addEverReset")?.checked ?? state.settings.evergreenResetAtDay
+    evergreenHours:evergreenDurationHours(document.getElementById("addEverHours")?.value,document.getElementById("addEverUnit")?.value,state.settings.evergreenHours),
+    evergreenResetAtDay:document.getElementById("addEverReset")?.checked ?? state.settings.evergreenResetAtDay,
+    prerequisiteId:document.getElementById("addPrerequisite")?.value||null
   };
 }
 function clearQuickAddDates(){
@@ -2435,13 +2504,14 @@ function clearQuickAddDates(){
   document.getElementById("addDue").value="";
 }
 function clearQuickAddEvergreen(){
-  const toggle=document.getElementById("addEver"),hours=document.getElementById("addEverHours"),reset=document.getElementById("addEverReset");
+  const toggle=document.getElementById("addEver"),hours=document.getElementById("addEverHours"),unit=document.getElementById("addEverUnit"),reset=document.getElementById("addEverReset");
   if(toggle) toggle.checked=false;
-  if(hours) hours.value=String(state.settings.evergreenHours);
+  if(hours) hours.value=String(evergreenIntervalParts(state.settings.evergreenHours).value);
+  if(unit) unit.value=evergreenIntervalParts(state.settings.evergreenHours).unit;
   if(reset) reset.checked=state.settings.evergreenResetAtDay;
   toggleQuickEvergreenOptions(false);
 }
-function clearQuickAddDraft(){ clearQuickAddDates(); clearQuickAddEvergreen(); }
+function clearQuickAddDraft(){ clearQuickAddDates(); clearQuickAddEvergreen();const prerequisite=document.getElementById("addPrerequisite");if(prerequisite)prerequisite.value=""; }
 function addTask(title, dot, ctx, dates = {}, taskOptions = {}){
   title = (title||"").trim(); if(!title) return null;
   pushUndo();
@@ -2450,6 +2520,7 @@ function addTask(title, dot, ctx, dates = {}, taskOptions = {}){
               evergreen:taskOptions.evergreen === true,
               evergreenHours:evergreenHours(taskOptions.evergreenHours, defaults.evergreenHours),
               evergreenResetAtDay:typeof taskOptions.evergreenResetAtDay === "boolean" ? taskOptions.evergreenResetAtDay : defaults.evergreenResetAtDay,
+              prerequisiteId:taskById(taskOptions.prerequisiteId)?.id||null,
               ctx: Array.isArray(ctx) ? ctx.slice() : [],
               mu:PRIOR_MU, sigma:PRIOR_SIGMA, done:false, createdAt:Date.now(), completedAt:null, lastDoneAt:null };
   state.tasks.push(t);
@@ -2557,7 +2628,11 @@ function nextScanWakeAt(){
   // Starts and date labels follow the calendar, while scan recycling is 2 AM.
   let next = Math.min(passResetCutoff(now), midnight.getTime());
   const include = at => { if(Number.isFinite(at) && at > now) next = Math.min(next, at); };
-  for(const t of state.tasks) if(t.evergreen && t.lastDoneAt) include(evergreenUntil(t));
+  for(const t of state.tasks) if(t.evergreen && t.lastDoneAt){
+    const until=evergreenUntil(t);include(until);
+    const remaining=until-now;
+    if(remaining>86400000) include(until-(Math.ceil(remaining/86400000)-1)*86400000);
+  }
   for(const [id,kind] of Object.entries(state.considered)){
     if(kind === "cant") include(state.cantAt[id] + state.settings.cantMin * 60000);
     if(kind === "worked") include(workedUntil(state.workedAt[id]));
@@ -2573,12 +2648,17 @@ function refreshScanClock(){
   const before = JSON.stringify(state);
   ensureCandidate();
   if(JSON.stringify(state) !== before){ save(); render(); }
-  else if(todayISO(0) !== renderedCalendarDay) render();
-  else scheduleScanClock();
+  else render(); // a countdown badge can change without changing saved task state
 }
 window.addEventListener("focus", refreshScanClock);
 document.addEventListener("visibilitychange", ()=>{ if(!document.hidden) refreshScanClock(); });
-function render(){ renderedCalendarDay = todayISO(0); scheduleScanClock(); renderPass(); renderCtx(); renderScan(); renderList(); renderHistory(); renderQuickCtx(); renderAddPanel(); renderAddRow(); renderSync(); renderTheme(); renderFloatingHeader(); }
+function render(){ renderedCalendarDay = todayISO(0); scheduleScanClock(); renderPass(); renderCtx(); renderScan(); renderList(); renderHistory(); renderQuickCtx(); renderAddPanel(); renderAddRow(); renderSync(); renderTheme(); renderFloatingHeader(); syncPersonalHourlyQuotes(); }
+function syncPersonalHourlyQuotes(){
+  const quotes=state?.settings?.hourlyQuotes||{},signature=JSON.stringify(quotes);
+  if(signature===appliedHourlyQuotes)return;
+  appliedHourlyQuotes=signature;
+  window.dispatchEvent(new CustomEvent('scanner-hourly-quotes-change',{detail:quotes}));
+}
 
 function renderFloatingHeader(){
   const header=document.getElementById("appHeader"),enabled=state.settings.floatingHeader === true;
@@ -2594,9 +2674,10 @@ function renderFloatingHeader(){
 function renderAddPanel(){
   const panel=document.getElementById("addPanel"),body=document.getElementById("addBody"),toggle=document.getElementById("addToggle");
   if(!quickAddEvergreenInitialized){
-    const evergreen=document.getElementById("addEver"),hours=document.getElementById("addEverHours"),reset=document.getElementById("addEverReset");
+    const evergreen=document.getElementById("addEver"),hours=document.getElementById("addEverHours"),unit=document.getElementById("addEverUnit"),reset=document.getElementById("addEverReset");
     if(evergreen) evergreen.checked=false;
-    if(hours) hours.value=String(state.settings.evergreenHours);
+    if(hours) hours.value=String(evergreenIntervalParts(state.settings.evergreenHours).value);
+    if(unit) unit.value=evergreenIntervalParts(state.settings.evergreenHours).unit;
     if(reset) reset.checked=state.settings.evergreenResetAtDay;
     quickAddEvergreenInitialized=true;
   }
@@ -2605,6 +2686,16 @@ function renderAddPanel(){
   toggle.setAttribute("aria-expanded",String(state.addOpen));
   document.getElementById("addCaret").textContent=state.addOpen?"▾":"▸";
   toggleQuickEvergreenOptions(!!document.getElementById("addEver")?.checked);
+  const prerequisite=document.getElementById("addPrerequisite");
+  if(prerequisite){
+    const selected=prerequisite.value;
+    prerequisite.innerHTML=prerequisiteOptions(null);
+    prerequisite.value=state.tasks.some(t=>t.id===selected)?selected:"";
+  }
+}
+function prerequisiteOptions(excludeId,selectedId=null){
+  return '<option value="">None</option>'+state.tasks.filter(t=>t.id!==excludeId).map(t=>
+    '<option value="'+esc(t.id)+'"'+(t.id===selectedId?' selected':'')+'>'+esc(t.title)+(t.done?' (done)':'')+'</option>').join('');
 }
 
 // "Add & dot" cuts straight onto the top of the chain — only meaningful before
@@ -2693,6 +2784,14 @@ function chipHTML(t){
     out += '<span class="chip notstarted">🗓 not started · '+(sd.getMonth()+1)+'/'+sd.getDate()+'</span>';
   }
   if(t.evergreen) out += '<span class="chip ever">(evergreen)</span>';
+  if(t.evergreen && t.lastDoneAt){
+    const remaining=evergreenUntil(t)-Date.now();
+    if(remaining>0){
+      const value=remaining>86400000 ? Math.ceil(remaining/86400000)+'d'
+        : remaining>=3600000 ? Math.ceil(remaining/3600000)+'h' : Math.ceil(remaining/60000)+'m';
+      out += '<span class="chip ever-countdown" title="Eligible again in '+value+'">'+value+'</span>';
+    }
+  }
   return out;
 }
 function titleHTML(t){
@@ -3040,6 +3139,14 @@ function openHelp(){
     + '<dt>What do the countdown tags mean?</dt><dd>The hours beside a Worked on it tag count down until that task can be an eligible candidate again. A Can’t tag counts down in minutes. No and Dislodged wait for the next pass instead of showing a timer.</dd>'
     + '<dt>Can I return a task early?</dt><dd>In All Tasks, click a task to open its editor, then choose Return as candidate. This clears its No, Can’t, Worked on it, or Dislodged mark so it can be scanned early if its other eligibility rules allow it. The button is disabled when there is no such mark; an evergreen completion still follows its interval or day reset.</dd>'
     + '<dt>What happens around 2 AM?</dt><dd>A hidden local 2 AM day marker refreshes the scan and clears most old scan marks, so yesterday’s No, Can’t, Worked on it, and Dislodged choices do not leave you stuck. Evergreen Done follows its own interval unless that task’s day reset is enabled.</dd>'
+    + '<dt>How do I add tasks, dates, and links?</dt><dd>Use Add a task for one title or paste a numbered, bulleted, or Obsidian list. Starts delays scan eligibility until that date; Due adds a reminder tag. Open a task in All Tasks to edit its title, dates, and optional link. Add &amp; dot puts one task directly on the chain.</dd>'
+    + '<dt>What is a prerequisite task?</dt><dd>Choose one prerequisite while adding a task, in its editor, or in Settings. The dependent task can enter the scan after its prerequisite is Done. An Evergreen Done counts as completion even while that evergreen task rests or returns. Deleting the prerequisite also releases the dependent. Renaming either task keeps the link.</dd>'
+    + '<dt>How do Evergreen Hours or Days work?</dt><dd>Choose a number and Hours or Days in Add, Edit, or Settings defaults. A resting evergreen task shows a countdown such as 7d, then hours and minutes as it gets close. The optional 2 AM reset can make it eligible sooner; turn it off for a full multi-day interval.</dd>'
+    + '<dt>How do contexts and list filters work?</dt><dd>Contexts include a task only while every assigned context is active. All Tasks can search and filter by eligible, ineligible, task state, or context without changing the scan. Settings can add, rename, or remove contexts.</dd>'
+    + '<dt>What is chance mode?</dt><dd>Chance mode draws from TrueSkill win probabilities; descending mode offers the strongest estimate first. Settings can show either mode or both scan buttons. The first dot is always the oldest eligible task, and a chance order stays fixed until a fresh pass.</dd>'
+    + '<dt>Can I undo, restore, or remove a task?</dt><dd>Use Undo in the header for your last change. Ordinary Done tasks appear in History and can be restored; Delete removes a task entirely. Settings offers daily local backups, manual backups, and Reset everything.</dd>'
+    + '<dt>Can I use the app offline or on another device?</dt><dd>The installed app keeps its shell and editable scenery files available offline. Tasks save in this browser; if cloud sync is configured and you sign in, your board can reconcile across devices. Settings shows backup and sync status.</dd>'
+    + '<dt>How do I change the scenery and custom hourly quotes?</dt><dd>Settings opens motion, scene time, and location controls. Scene time and location are saved on this device; real task dates stay live. Add custom hourly quotes for a chosen scene hour in Settings, one per line. They join the editable human-written quotes; the scene may show no quote when none is available.</dd>'
     + '</dl><h3>What the machinery does</h3>'
     + '<p class="kv">Every Yes/No is a pairwise match; each task keeps a <b>strength posterior</b> (a bell curve, not a number). Candidates appear highest estimated likelihood first, or in a saved random order weighted by TrueSkill strength in chance mode. Yes/No still updates ratings immediately; the chance order stays fixed until a fresh pass or 2 AM. Resume excludes tasks already scanned in this pass; the local 2 AM date marker returns them to the eligible pool.</p>'
     + '<p class="kv"><b>Rank signals:</b> Yes, No, Dot from the All Tasks editor, and Dislodge. Done, Evergreen Done, Worked on it, Can’t, the initial scan dot, and Add &amp; dot leave ratings unchanged.</p>'
@@ -3067,11 +3174,12 @@ function openEdit(id){
     + '<div class="frow"><label for="etDue">Due</label><input id="etDue" type="date" value="'+esc(t.due||"")+'"/>'
     + '<label class="cbox"><input id="etEver" type="checkbox"'+(t.evergreen?" checked":"")+'/> evergreen</label></div>'
     + '<div id="etEverOptions"'+(t.evergreen?'':' hidden')+'>'
-    + '<div class="frow"><label for="etEverHours">Evergreen interval (hours)</label><input id="etEverHours" type="number" min="0.01" max="87600" step="any" value="'+evergreenHours(t.evergreenHours)+'"/></div>'
+    + '<div class="frow"><label for="etEverHours">Evergreen interval (hours or days)</label><input id="etEverHours" type="number" min="0.01" max="87600" step="any" value="'+evergreenIntervalParts(t.evergreenHours).value+'"/><select id="etEverUnit" aria-label="Evergreen interval unit"><option value="hours"'+(evergreenIntervalParts(t.evergreenHours).unit==='hours'?' selected':'')+'>Hours</option><option value="days"'+(evergreenIntervalParts(t.evergreenHours).unit==='days'?' selected':'')+'>Days</option></select></div>'
     + '<label class="cbox"><input id="etEverReset" type="checkbox"'+(t.evergreenResetAtDay !== false ? ' checked' : '')+'/> Allow task to automatically become eligible as candidate after date line passes (2 AM)</label>'
     + '<p class="kv">More than 18 hours turns the day reset off; you can change the checkbox afterward.</p></div>'
     + '<div class="frow"><label for="etStart">Starts</label><input id="etStart" type="date" value="'+esc(t.startsAt||"")+'"/>'
     + '<span class="kv">(not eligible for the queue until this date)</span></div>'
+    + '<div class="frow"><label for="etPrerequisite">Prerequisite task</label><select id="etPrerequisite">'+prerequisiteOptions(t.id,t.prerequisiteId)+'</select><span class="kv">Eligible after this task is done or deleted.</span></div>'
     + '<h3>Needs these contexts</h3><div class="ctxpick">'+ctxHtml+'</div>'
     + '<div class="kv">strength ≈ <b class="mono">'+t.mu.toFixed(1)+'</b> ± '+t.sigma.toFixed(1)
     + (featureEnabled("topKLanguage") ? ' · '+topKlabel(t.id) : '')+'</div>'
@@ -3134,6 +3242,15 @@ async function installNative(){
 }
 function openSettings(){
   const s = state.settings;
+  const locationSet=!!globalThis.LivingLocation?.current()?.enabled;
+  let sceneTimeSet=false;
+  try{sceneTimeSet=!!(globalThis.LivingSky?.readSceneTime?.(localStorage)||localStorage?.getItem('fvp:chain-scanner:scene-time'));}catch{}
+  const quoteHour=settingsQuoteHour;
+  const quoteOptions=Array.from({length:24},(_,hour)=>{
+    const key=String(hour).padStart(2,'0');
+    return '<option value="'+key+'"'+(key===quoteHour?' selected':'')+'>'+key+':00</option>';
+  }).join('');
+  const quoteLines=(s.hourlyQuotes?.[quoteHour]||[]).join('\n');
   const histCount = historyRows().length;
   const latestChangelog = document.getElementById('appChangelogCurrent')?.innerHTML || '';
   const archivedChangelog = document.getElementById('appChangelog')?.innerHTML || '';
@@ -3146,16 +3263,25 @@ function openSettings(){
            + '<input type="text" data-mgrname="'+c.id+'" value="'+esc(c.name)+'"/>'
            + '<button class="ghost" data-act="del-ctx" data-id="'+c.id+'" title="Delete context">✕</button></div>';
   }
+  const prerequisiteRows=state.tasks.filter(t=>t.prerequisiteId).map(t=>
+    '<div class="mgr"><span class="kv">'+esc(t.title)+' needs '+esc(taskById(t.prerequisiteId)?.title||'deleted task')+'</span><button class="btn subtle" data-act="remove-prerequisite" data-id="'+esc(t.id)+'">Remove</button></div>').join('');
   modalShell(
     '<div class="mtop"><h2>Settings</h2><button class="x" data-act="close-modal" aria-label="Close">✕</button></div>'
     + changelogHtml
+    + '<details class="settings-section" open><summary>Scene and appearance</summary>'
     + '<div class="frow"><label>Landscape</label><button class="btn subtle" data-act="scene-settings">Motion settings</button><span class="kv">Daylight follows the sky; app theme stays independent.</span></div>'
-    + '<div class="frow"><label>Scene time</label><button class="btn subtle" data-act="scene-time-settings">Choose scene time</button><span class="kv">Follow live time or hold a favorite hour on this device.</span></div>'
-    + '<div class="frow"><label>Location</label><button class="btn subtle" data-act="location-settings">Choose location</button><span class="kv">Use device coordinates for a local sky; saved only on this device.</span></div>'
+    + '<div class="frow"><label>Scene time</label><button data-act="scene-time-settings" class="btn setting-choice '+(sceneTimeSet?'setting-set':'setting-unset')+'">Choose scene time</button><span class="kv">'+(sceneTimeSet?'A scene time is selected.':'Following live time.')+' Saved on this device.</span></div>'
+    + '<div class="frow"><label>Location</label><button data-act="location-settings" class="btn setting-choice '+(locationSet?'setting-set':'setting-unset')+'">Choose location</button><span class="kv">'+(locationSet?'Sky location set.':'Using the default sky.')+' Saved only on this device.</span></div>'
+    + '<div class="frow"><label for="stQuoteHour">Custom hourly quotes</label><select id="stQuoteHour">'+quoteOptions+'</select></div>'
+    + '<label for="stQuoteLines" class="kv">One quote per line for the selected scene hour. Your quotes join the editable Markdown quotes.</label>'
+    + '<textarea id="stQuoteLines" rows="4" maxlength="2200">'+esc(quoteLines)+'</textarea>'
+    + '<div class="mbtns"><button class="btn primary" data-act="save-hourly-quotes">Save hourly quotes</button></div>'
+    + '</details>'
+    + '<details class="settings-section"><summary>Scanning and recurrence</summary>'
     + '<div class="frow"><label>On your phone</label><button class="btn subtle" data-act="install-app">Install this app on your phone</button><span class="kv">Add a home-screen icon and open Chain Scanner like an app.</span></div>'
     + '<label class="cbox"><input id="stFloatingHeader" type="checkbox"'+(s.floatingHeader?' checked':'')+'/> Keep the header visible while scrolling</label><p class="kv">Keeps Undo, Help, and Settings within reach. Off by default.</p>'
     + '<div class="frow"><label for="stScanMode">Scan buttons</label><select id="stScanMode">'+[['descending','Scan in descending likelihood always'],['chance','Default - scan in chance mode always'],['both','Show both chance and descending likelihood scan buttons']].map(([v,label])=>'<option value="'+v+'"'+(s.scanMode===v?' selected':'')+'>'+label+'</option>').join('')+'</select><span class="kv">Scan mode saves immediately.</span></div>'
-    + '<div class="frow"><label for="stEverHours">Default evergreen interval (hours)</label><input id="stEverHours" type="number" min="0.01" max="87600" step="any" value="'+s.evergreenHours+'"/></div>'
+    + '<div class="frow"><label for="stEverHours">Default evergreen interval (hours or days)</label><input id="stEverHours" type="number" min="0.01" max="87600" step="any" value="'+evergreenIntervalParts(s.evergreenHours).value+'"/><select id="stEverUnit" aria-label="Default evergreen interval unit"><option value="hours"'+(evergreenIntervalParts(s.evergreenHours).unit==='hours'?' selected':'')+'>Hours</option><option value="days"'+(evergreenIntervalParts(s.evergreenHours).unit==='days'?' selected':'')+'>Days</option></select></div>'
     + '<label class="cbox"><input id="stEverReset" type="checkbox"'+(s.evergreenResetAtDay?' checked':'')+'/> Default evergreen reset at day mark (2 AM)</label><p class="kv">Evergreen defaults apply to newly added tasks.</p>'
     + '<div class="frow"><label for="stHorizon">Horizon (min)</label><input id="stHorizon" type="number" min="5" max="480" value="'+s.horizonMin+'" style="width:90px"/>'
     + '<span class="kv">the "next hour" in the question</span></div>'
@@ -3167,9 +3293,15 @@ function openSettings(){
     + '<span class="kv">% chance of a better task within 1 min</span></div>'
     + '<div class="frow"><label for="stSamples">MC samples</label><input id="stSamples" type="number" min="50" max="2000" step="50" value="'+s.samples+'" style="width:90px"/>'
     + '<span class="kv">'+(featureEnabled("rankSparklines") ? 'more = smoother sparklines' : 'more = steadier estimates')+'</span></div>'
+    + '</details>'
     + '<div class="mbtns"><button class="btn primary" data-act="save-settings">Save settings</button></div>'
-    + '<h3>Contexts</h3>'+ctxMgr
+    + '<details class="settings-section"><summary>Contexts and prerequisites</summary><h3>Contexts</h3>'+ctxMgr
     + '<div class="mgr"><input id="newCtxName" type="text" placeholder="New context…"/><button class="btn subtle" data-act="add-ctx-named">Add</button></div>'
+    + '<h3>Task prerequisites</h3><p class="kv">A task enters the scan after the task it needs is done or deleted. Evergreen Done counts as done. Pick one prerequisite per task.</p>'
+    + '<div class="frow"><label for="stPrerequisiteTask">Task</label><select id="stPrerequisiteTask">'+prerequisiteOptions(null)+'</select><label for="stPrerequisiteNeeds">Needs</label><select id="stPrerequisiteNeeds">'+prerequisiteOptions(null)+'</select><button class="btn primary" data-act="set-prerequisite">Set prerequisite</button></div>'
+    + prerequisiteRows
+    + '</details>'
+    + '<details class="settings-section"><summary>Pass and data</summary>'
     + '<h3>Pass</h3><div class="mbtns"><button class="btn subtle" data-act="new-pass">Reset pass (clear skips)</button></div>'
     + '<h3>Housekeeping</h3>'
     + '<div class="kv">'+(histCount ? (histCount+' history entr'+(histCount===1?'y':'ies')+' sitting in the History panel.') : 'Nothing in the History panel right now.')+'</div>'
@@ -3193,6 +3325,7 @@ function openSettings(){
     + '<h3>Daily local backups</h3><p class="kv">Automatic copies stay on this device for seven calendar days. Manual and unsynced account-switch copies stay until you delete them or clear browser site data. Each restore first saves the current board.</p>'
     + '<div class="mbtns"><button class="btn subtle" data-act="make-manual-backup">Make manual backup</button></div>'
     + (backupHtml || '<p class="kv">No local backups yet.</p>')
+    + '</details>'
   );
 }
 
@@ -3263,6 +3396,13 @@ function onAction(act, el){
       for(const t of state.tasks) t.ctx = t.ctx.filter(c=>c!==id);
       commit(); openSettings(); break;
     }
+    case "set-prerequisite": {
+      const taskId=document.getElementById("stPrerequisiteTask")?.value;
+      const neededId=document.getElementById("stPrerequisiteNeeds")?.value;
+      if(!setTaskPrerequisite(taskId,neededId||null)){ toast("Choose two different tasks without a prerequisite loop."); break; }
+      openSettings(); break;
+    }
+    case "remove-prerequisite": setTaskPrerequisite(el.dataset.id,null);openSettings();break;
     case "edit": openEdit(el.dataset.id); break;
     case "save-edit": {
       const t=taskById(el.dataset.id); if(!t) break;
@@ -3309,6 +3449,13 @@ function onAction(act, el){
     }
     case "cycle-theme": setTheme(nextTheme()); break;
     case "settings": openSettings(); break;
+    case "save-hourly-quotes": {
+      const hour=document.getElementById("stQuoteHour")?.value;
+      const lines=document.getElementById("stQuoteLines")?.value||"";
+      if(!/^(?:[01]\d|2[0-3])$/.test(hour)) break;
+      const next=normalizeHourlyQuotes({...state.settings.hourlyQuotes,[hour]:lines.split(/\r?\n/)});
+      pushUndo();state.settings.hourlyQuotes=next;settingsQuoteHour=hour;commit();openSettings();break;
+    }
     case "install-app": openInstallHelp(); break;
     case "native-install": installNative(); break;
     case "save-settings": {
@@ -3328,7 +3475,7 @@ function onAction(act, el){
       s.workedHours  = field("stWorkedHrs","workedHours");
       s.thresholdPct = field("stThresh",   "thresholdPct");
       s.samples      = field("stSamples",  "samples");
-      s.evergreenHours = evergreenHours(document.getElementById("stEverHours")?.value, s.evergreenHours);
+      s.evergreenHours = evergreenDurationHours(document.getElementById("stEverHours")?.value,document.getElementById("stEverUnit")?.value,s.evergreenHours);
       s.evergreenResetAtDay = document.getElementById("stEverReset")?.checked ?? s.evergreenResetAtDay;
       s.floatingHeader = document.getElementById("stFloatingHeader")?.checked ?? s.floatingHeader;
       s.scanMode = normalizeSettings({scanMode:document.getElementById("stScanMode")?.value}).scanMode;
@@ -3464,9 +3611,25 @@ document.addEventListener("change", e=>{
   if(el.id === "addEver"){ toggleQuickEvergreenOptions(el.checked); return; }
   if(el.id === "stScanMode"){ setScanPreference(el.value); return; }
   if(el.id === "stFloatingHeader"){ setFloatingHeaderPreference(el.checked); return; }
+  if(el.id === "stQuoteHour"){
+    settingsQuoteHour=el.value;
+    const field=document.getElementById("stQuoteLines");
+    if(field)field.value=(state.settings.hourlyQuotes?.[settingsQuoteHour]||[]).join("\n");
+    return;
+  }
+  if(["etEverUnit","addEverUnit","stEverUnit"].includes(el.id)){
+    const field=document.getElementById(el.id==="etEverUnit"?"etEverHours":el.id==="addEverUnit"?"addEverHours":"stEverHours");
+    suggestEvergreenReset(field);return;
+  }
   if(el.matches("[data-ctx]")){ toggleContext(el.dataset.ctx); return; }
   if(el.matches("[data-mgrctx]")){ const c=state.contexts.find(c=>c.id===el.dataset.mgrctx); if(c){ pushUndo(); c.active=el.checked; commit(); } return; }
   if(el.matches("[data-mgrname]")){ const c=state.contexts.find(c=>c.id===el.dataset.mgrname); if(c && el.value.trim()){ pushUndo(); c.name=el.value.trim(); commit(); } return; }
+});
+document.addEventListener('landscape-location-change',()=>{
+  const button=document.querySelector('#modalRoot [data-act="location-settings"]');
+  if(!button)return;
+  const set=!!globalThis.LivingLocation?.current()?.enabled;
+  button.classList.toggle('setting-set',set);button.classList.toggle('setting-unset',!set);
 });
 function toggleEvergreenOptions(enabled){
   const options = document.getElementById("etEverOptions");
@@ -3479,7 +3642,8 @@ function toggleQuickEvergreenOptions(enabled){
 function suggestEvergreenReset(el){
   if(el && (el.id === "etEverHours" || el.id === "stEverHours" || el.id === "addEverHours") && el.value.trim() && Number.isFinite(Number(el.value))){
     const resetId = el.id === "etEverHours" ? "etEverReset" : (el.id === "addEverHours" ? "addEverReset" : "stEverReset");
-    document.getElementById(resetId).checked = Number(el.value) <= 18;
+    const unitId=el.id === "etEverHours" ? "etEverUnit" : (el.id === "addEverHours" ? "addEverUnit" : "stEverUnit");
+    document.getElementById(resetId).checked = evergreenDurationHours(el.value,document.getElementById(unitId)?.value) <= 18;
   }
 }
 document.addEventListener("input", e=>{

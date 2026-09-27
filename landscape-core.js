@@ -152,6 +152,10 @@
   const WATER_TYPES=CONFIG.waterEvents;
   const EVENT_DURATIONS=CONFIG.eventDurations||CONFIG.durations;
   const INITIAL_TYPES=EVENT_TYPES.filter(type=>type!=='dolphin');
+  const groupSize=(type,seed)=>{
+    const index=Math.floor(clamp(Number(seed)||0,0,.999999)*5);
+    return type==='flock'?3+index*2:type==='cyclist'?1+index:1;
+  };
   function createWorld(random=Math.random,season='summer'){
     const world={random,season,railNext:{train:0,metro:12},elapsed:0,events:[],next:3+random()*6,lastRare:-RARE_COOLDOWN,rareCount:0,wind:.6+random()*1.2};
     // Start mid-journey so returning never waits for a first event. Pick three
@@ -179,7 +183,9 @@
     // visibly catch and pass a slower visitor without frame-time randomness.
     const travels=type!=='abduction'&&type!=='fireworks';
     const speed=travels?startingSpeed(r()):1,duration=base/speed;
-    w.events.push({type,...(skywriterWord?{skywriterWord}:{}),age:initial?duration*(.15+r()*.45):0,duration,speed,lane:r(),seed:r(),reverse:r()>.5});
+    const age=initial?duration*(.15+r()*.45):0,lane=r(),seed=r(),reverse=r()>.5;
+    w.events.push({type,...(skywriterWord?{skywriterWord}:{}),age,duration,speed,lane,seed,reverse,
+      ...(['flock','cyclist'].includes(type)?{count:groupSize(type,seed)}:{})});
   }
   function advance(w,dt,sky){
     if(!Number.isFinite(dt)||dt<=0)return w;
@@ -293,6 +299,6 @@
   function readMotion(storage){try{return normalizeMotion(storage.getItem(MOTION_KEY));}catch{return null;}}
   function saveMotion(storage,value){try{storage.setItem(MOTION_KEY,value);return true;}catch{return false;}}
   function motionReduced(value,osReduced){return !!osReduced||normalizeMotion(value)!=='normal';}
-  root.LivingSky={setSeason,eventsForSeason,sceneSolarDate,weatherAt,createWoodland,advanceWoodland,woodlandTypes,startingSpeed,readSceneSeason,saveSceneSeason,advanceLights,skinTone,sceneDate,readSceneTime,saveSceneTime,skyAt,sunTimes,solarSchedule,solarPresets,starAt,starCount:root.SKY_STARS.length,palette,activity,createWorld,advance,
+  root.LivingSky={setSeason,eventsForSeason,sceneSolarDate,weatherAt,createWoodland,advanceWoodland,woodlandTypes,startingSpeed,groupSize,readSceneSeason,saveSceneSeason,advanceLights,skinTone,sceneDate,readSceneTime,saveSceneTime,skyAt,sunTimes,solarSchedule,solarPresets,starAt,starCount:root.SKY_STARS.length,palette,activity,createWorld,advance,
     nightEventTypes:NIGHT_TYPES.slice(),eventTypes:[...EVENT_TYPES,...WINTER_VISITORS],rareTypes:RARE_TYPES.slice(),eventDurations:Object.assign({},EVENT_DURATIONS),MAX_EVENTS,RARE_COOLDOWN,readMotion,saveMotion,motionReduced,clamp,lerp,smooth,mixHex};
 })(globalThis);
