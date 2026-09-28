@@ -9454,7 +9454,7 @@ test('RISK landscape water: the Moon mirrors at full resolution with no displace
  assert.match(runtime,/blurredReflection/,'the existing slight depth softness stays');
 });
 
-test('RISK landscape water: one continuous mirror shifts subtly over time without changing its height',()=>{
+test('RISK landscape water: the mirror stays anchored while local ripples move independently',()=>{
  const runtime=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
  const start=runtime.indexOf('  function paintHorizonReflection('),end=runtime.indexOf('  const point=',start);
  assert.ok(start>=0&&end>start,'the production reflection painter is available');
@@ -9471,9 +9471,14 @@ test('RISK landscape water: one continuous mirror shifts subtly over time withou
  assert.ok(first.top>599&&first.top<=600,'a device-pixel seam overlap must not compress the natural-height reflection');
  assert.equal(later.top,first.top,'wave motion keeps the same reflection axis');
  assert.equal(first.width,390);assert.equal(first.height,300);
- assert.ok(Math.abs(later.left-first.left)>.1,'the Moon and skyline must move spatially between animation frames');
- assert.ok(Math.abs(first.left)<=1.25&&Math.abs(later.left)<=1.25,'the motion stays within a subtle subpixel-to-pixel range');
+ assert.equal(first.left,0,'the Moon and skyline do not drift as one sheet');
+ assert.equal(later.left,first.left,'the full reflection never slides sideways');
  assert.equal(still.left,first.left,'a still or reduced-motion frame is deterministic');
+ const context=vm.createContext({Math});
+ vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),context);
+ const ripple=context.LandscapeGeometry.create(390,844).ripple;
+ const movement=Array.from({length:40},(_,i)=>ripple(i+30,.5,1).drift-ripple(i+30,0,1).drift);
+ assert.ok(movement.some(delta=>delta>.1)&&movement.some(delta=>delta<-.1),'local highlights travel in different directions');
 });
 
 test('RISK landscape water: the full-size mirror overdraws the clipped horizon by one device pixel',()=>{
@@ -9547,23 +9552,41 @@ test('RISK landscape road: all trail strokes continue beyond mobile viewport edg
  }
 });
 
-test('RISK landscape night: the distant unlit rail line fades from the treeline',()=>{
+test('RISK landscape trains: track deck, supports, and overhead electrical stay visible at night',()=>{
  const runtime=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
  const start=runtime.indexOf('    // Viaduct, stations and catenary');
  const end=runtime.indexOf('    layer("middle"',start);
  assert.ok(start>=0&&end>start,'the distant rail pass is isolated from the hills and trees');
  const railPass=runtime.slice(start,end);
  const render=night=>{
-  const alpha=[],stack=[];
-  const b={globalAlpha:1,save(){stack.push(this.globalAlpha);},restore(){this.globalAlpha=stack.pop();},stroke(){alpha.push(this.globalAlpha);}};
-  vm.runInNewContext(railPass,{b,night,W:390,rail:()=>430,path(){},line(ctx){alpha.push(ctx.globalAlpha);},p:{city:'#456',far:'#789'},S:{mixHex:()=> '#aaa'}});
+  const strokes=[],lines=[],stack=[];
+  const b={globalAlpha:1,pathY:null,save(){stack.push(this.globalAlpha);},restore(){this.globalAlpha=stack.pop();},stroke(){strokes.push({y:this.pathY,alpha:this.globalAlpha});}};
+  vm.runInNewContext(railPass,{b,night,W:390,rail:()=>430,path(ctx,fn){ctx.pathY=fn(0);},line(ctx,x,y,x2,y2){lines.push({x,y,x2,y2,alpha:ctx.globalAlpha});},p:{city:'#456',far:'#789'},S:{mixHex:()=> '#aaa'}});
   assert.equal(b.globalAlpha,1,'rail opacity cannot dim later terrain and foreground trees');
-  return alpha;
+  return {strokes,lines};
  };
  const day=render(0),dusk=render(.5),night=render(1);
- assert.ok(day.length>4&&day.every(value=>value===1),'the viaduct keeps its normal daytime structure');
- assert.ok(dusk.every(value=>value>0&&value<1),'the rail dims gradually at dusk');
- assert.ok(night.every(value=>value<=.05),'the line cannot stripe across the dark treeline');
+ for(const sample of [day,dusk,night]){
+  assert.equal(sample.strokes.length,3,'the rail deck, edge, and overhead wire all render');
+  for(const y of [430,426,417])assert.equal(sample.strokes.find(stroke=>stroke.y===y)?.alpha,1,
+   'all three rail lines stay visible at the same opacity');
+  assert.ok(sample.lines.length>4&&sample.lines.every(line=>line.alpha===1),
+   'supports and overhead electrical poles stay visible at night');
+  const pole=sample.lines.find(line=>line.y===426&&line.y2<line.y);
+  assert.ok(pole,'the electrical pole rises above the track edge');
+  const carRoof=430-2-10*.72;
+  assert.ok(pole.y2>=carRoof-6&&pole.y2<=carRoof-3,'the pole head stays near the metro car roof');
+  const crossbar=sample.lines.find(line=>line.y===pole.y2&&line.y2===pole.y2);
+  assert.ok(crossbar&&crossbar.x2-crossbar.x<=22*.72,'the electrical crossbar does not outscale a metro car');
+ }
+ assert.match(runtime,/const track=isTrain\?geometry\.lowerRail:rail/,'metro cars still follow the same rail as the visible deck');
+});
+
+test('RISK landscape trains: the current changelog describes the intact night railway',()=>{
+ const entry=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)?.[1];
+ assert.ok(entry,'the current changelog is present');
+ assert.match(entry,/railway keeps its deck, supports, and overhead electrical at night/);
+ assert.doesNotMatch(entry,/overhead wire fades at night/);
 });
 
 test('RISK landscape water: full-frame animation reuses its reflection buffers',()=>{

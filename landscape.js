@@ -89,16 +89,15 @@
     b=canvas.getContext('2d');b.setTransform(dpr,0,0,dpr,0,-top*dpr);
   }
   function composite(name){const c=layers[name];if(c)g.drawImage(c,0,c.top,c.width/dpr,c.height/dpr);}
-  function paintHorizonReflection(source,t,opacity=1){
+  function paintHorizonReflection(source,_t,opacity=1){
     const surface=geometry.reflectionSurface(p.night);
-    // Move the whole mirror by less than a pixel; offsetting separate rows
-    // made the Moon and other rounded shapes break into visible bands.
-    const drift=.65*Math.sin(t*wind*.9)+.25*Math.sin(t*wind*.37+1.1);
+    // Keep the Moon and skyline anchored. Independent surface glints below
+    // supply wave motion without sliding every reflected object together.
     g.save();g.globalAlpha=opacity;
     g.translate(0,2*surface.axisY);
     // Overdraw the clipped waterline by one device pixel so canvas edge
     // sampling cannot leave a pale seam under the skyline.
-    g.translate(drift,-1/dpr);g.scale(1,-1);
+    g.translate(0,-1/dpr);g.scale(1,-1);
     g.drawImage(source,0,0,W,geometry.waterTop);
     g.restore();
   }
@@ -213,14 +212,16 @@
     }
     hill(b,far,p.far);
     // Viaduct, stations and catenary are below the skyline, behind the cycle hills.
-    // Their unlit line used to run visibly across the treeline after dark.
-    b.save();b.globalAlpha*=1-night;
+    // Keep the deck, supports, and overhead electrical together at every
+    // hour; fading any one leaves the passing metro visibly disconnected.
     for(let x=15;x<W;x+=65){line(b,x,rail(x)+3,x,rail(x)+55,S.mixHex(p.city,p.far,.4),5);}
     path(b,rail);b.strokeStyle=S.mixHex(p.city,'#d6d6bb',.45);b.lineWidth=8;b.stroke();
     path(b,x=>rail(x)-4);b.strokeStyle=S.mixHex(p.city,'#334d4a',.3);b.lineWidth=1.2;b.stroke();
-    for(let x=35;x<W;x+=140){line(b,x,rail(x)-4,x,rail(x)-25,p.city,.8);line(b,x-8,rail(x)-25,x+12,rail(x)-25,p.city,.8);}
-    path(b,x=>rail(x)-24);b.strokeStyle=p.city;b.lineWidth=.5;b.stroke();
-    b.restore();
+    // The metro is drawn at 72% scale; its roof is about nine pixels above
+    // the rail. Keep the wire and crossarms close to that roof, not at the
+    // full-size train height used by the separate foreground line.
+    for(let x=35;x<W;x+=140){line(b,x,rail(x)-4,x,rail(x)-14,p.city,.8);line(b,x-6,rail(x)-14,x+8,rail(x)-14,p.city,.8);}
+    path(b,x=>rail(x)-13);b.strokeStyle=p.city;b.lineWidth=.5;b.stroke();
     layer("middle",Math.max(0,hy+H*.14-85));
     hill(b,middle,p.hill);
     // Long, gentle contour bands give the hills volume without texture downloads.
