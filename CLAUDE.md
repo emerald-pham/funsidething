@@ -52,3 +52,27 @@ glue, one-line changes — gets a test first.
   invites the same bug back.
 - Cloud sync orders writes by a revision counter, never by wall-clock timestamps.
 - Run the full suite after every change, not just the tests you added.
+
+## Protect existing features when changing tests
+
+Existing passing behavior tests are feature contracts. Preserve their assertions
+unless a user explicitly changes the behavior or concrete bug evidence shows the
+old expectation is wrong. Never weaken, delete, skip, or replace a regression
+test merely to make an implementation pass. Fix the implementation first.
+
+Every executable change in `tests.js`, including new coverage, needs an entry
+in `TEST_CHANGE_RATIONALES.json` with the exact protected-test-change fingerprint,
+the specific reason, previous and intended behavior, named replacement or new
+tests, remaining feature boundaries, and the command plus observed failure from
+the red run. Write and observe that failure before implementing the change. Keep
+unrelated protections intact. Update the entry if the test diff changes.
+
+`scripts/test-first-gate.mjs` runs in required CI and rejects test changes without
+this record, including test-only changes and deletion of `tests.js`. It protects
+all executable additions as well as removals: early returns, comment delimiters,
+and appended termination code cannot silently bypass the suite. Blank lines and
+single-line `//` comments are ignored; block-comment changes are protected
+because they can hide assertions. The record is evidence for review, not an
+automatic permission to regress: the independent reviewer must judge the reason,
+replacement coverage, and actual user-visible result on the final commit. CI
+checks the record and diff; it cannot itself prove that a command ran earlier.
