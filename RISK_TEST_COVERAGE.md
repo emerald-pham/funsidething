@@ -55,6 +55,7 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK LOCAL BACKUPS: primary quota rotation keeps the newest stable recovery copy
 - RISK LOCAL BACKUPS: quota during Restore keeps the immediate pre-restore board
 - RISK LOCAL BACKUPS: async host Restore rolls back if its safety row disappears
+- RISK LOCAL BACKUPS: host rollback restores an unsaved first-session board
 - RISK LOCAL BACKUPS: older queued host save cannot clear a newer Restore proof
 - RISK LOCAL BACKUPS: a changed board before backup announces the unsaved draft
 - RISK LOCAL BACKUPS: cold head initialization holds a concurrent shared-key edit

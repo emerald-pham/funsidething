@@ -8148,8 +8148,15 @@ test('RISK LOCAL BACKUPS: quota during Restore keeps the immediate pre-restore b
  assert.match(shim.document.getElementById('toast')?.textContent||'',/Could(?:n't| not) save (?:this edit|your changes) on this device/,
   'an unsavable restore reports the held edit');
  if(!laterSaved){
+  const future=Date.now()+8*24*60*60*1000;
+  setFakeTime(ctx,future);
   quota=Infinity; // freeing browser space later allows the held in-memory Restore to finish
   assert.equal(await ctx.persist(),true);
+  assert.ok(ctx.readLocalBackups().some(row=>row.kind==='before-restore' && row.payload===before),
+   'a long-held safety row remains restorable after its guarded primary finally saves');
+  const later=await loadApp({sharedStorage:storage});setFakeTime(later.ctx,future);
+  assert.ok(later.ctx.readLocalBackups().some(row=>row.kind==='before-restore' && row.payload===before),
+   'the renewed snapshot remains visible after reopening beyond the seven-day cutoff');
  }
  assert.ok(JSON.parse(storage.getItem(SYNC_STORE_KEY)).tasks.some(row=>row.title.startsWith('Restored huge')),
   'a later guarded retry can save the restored board');
@@ -8185,6 +8192,30 @@ test('RISK LOCAL BACKUPS: async host Restore rolls back if its safety row disapp
   'a changed backup index rolls back this host write rather than accepting an unprotected Restore');
  assert.equal(vm.runInContext('pendingRestoreSafetyIds.size',ctx),1,
   'the pending recovery proof remains until a protected primary write succeeds');
+});
+
+test('RISK LOCAL BACKUPS: host rollback restores an unsaved first-session board',async()=>{
+ const {ctx,shim}=await loadApp({hostStorage:{}});
+ ctx.state.tasks.push(syncTask('unsaved-host','Unsaved first-session work'));
+ const prior=JSON.stringify(ctx.state);
+ const target=JSON.stringify(syncState({tasks:[syncTask('target-host','Restored host board')]}));
+ assert.equal(ctx.saveLocalBackup('manual',target),true);
+ const backup=ctx.readLocalBackups().find(row=>row.kind==='manual' && row.payload===target);
+ const set=shim.window.storage.set.bind(shim.window.storage);let release;
+ shim.window.storage.set=async(key,payload)=>{
+  await set(key,payload);
+  if(key===SYNC_STORE_KEY && payload.includes('Restored host board'))
+   await new Promise(resolve=>{release=resolve;});
+ };
+ ctx.openSettings();ctx.onAction('restore-local-backup',{dataset:{id:backup.id}});
+ await flush();assert.equal(typeof release,'function');
+ const rows=JSON.parse(shim.localStorage.getItem(LOCAL_BACKUPS_KEY));
+ const safety=rows.find(row=>row.kind==='before-restore' && row.payload===prior);
+ assert.ok(safety);
+ shim.localStorage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify(rows.filter(row=>row.id!==safety.id)));
+ release();await flush();await flush();
+ assert.equal(shim.window.storage._map.get(SYNC_STORE_KEY),prior,
+  'an absent host key rolls back to the exact displaced in-memory board, not an empty value');
 });
 
 test('RISK LOCAL BACKUPS: older queued host save cannot clear a newer Restore proof',async()=>{
