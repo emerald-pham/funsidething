@@ -8053,6 +8053,72 @@ test('RISK LOCAL BACKUPS: primary quota rotation keeps the newest stable recover
  assert.deepEqual(rows.map(row=>row.id),['stable-daily'],'the last automatic copy is a stable daily snapshot, not replaceable latest history');
 });
 
+test('RISK LOCAL BACKUPS: quota during Restore keeps the immediate pre-restore board',async()=>{
+ const values=new Map();let quota=Infinity,quotaArmed=false;
+ const used=()=>[...values].reduce((sum,[key,value])=>sum+key.length+value.length,0);
+ const storage={
+  getItem:key=>values.has(key)?values.get(key):null,
+  removeItem:key=>values.delete(key),
+  setItem(key,value){
+   const next=new Map(values);next.set(key,String(value));
+   if([...next].reduce((sum,[name,raw])=>sum+name.length+raw.length,0)>quota){
+    const error=Error('aggregate browser storage quota');error.name='QuotaExceededError';throw error;
+   }
+   values.set(key,String(value));
+   if(key===LOCAL_BACKUPS_KEY && !quotaArmed){
+    const rows=JSON.parse(value);
+    const latest=rows.find(row=>row.kind==='latest' && row.payload.includes('Restored huge'));
+    if(latest && rows.some(row=>row.kind==='before-restore')){
+     const withoutLatest=JSON.stringify(rows.filter(row=>row!==latest));
+     const released=value.length-withoutLatest.length;
+     const primaryGrowth=2*(latest.payload.length-storage.getItem(LOCAL_HEAD_KEY).length);
+     // The index write fits, but removing only replaceable latest still leaves
+     // the complete two-key restored board one code unit over site quota.
+     quota=used()-released+primaryGrowth-1;
+     quotaArmed=true;
+    }
+   }
+  },
+ };
+ const {ctx,shim}=await loadApp({sharedStorage:storage});
+ ctx.addTask('Current unique work');await ctx.persist();
+ const before=storage.getItem(SYNC_STORE_KEY),at=Date.now();
+ const target=JSON.stringify(syncState({tasks:[syncTask('restored-target','Restored huge '.repeat(100).trim())]}));
+ const manual={id:'restore-target',day:new Date(at).toISOString().slice(0,10),at,kind:'manual',payload:target};
+ storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify([manual]));
+ ctx.openSettings();
+ ctx.onAction('restore-local-backup',{dataset:{id:manual.id}});
+ assert.equal(quotaArmed,true,'the restore encountered aggregate quota after both backup writes');
+ assert.equal(storage.getItem(SYNC_STORE_KEY),before,'a restore that cannot keep its safety copy holds the original primary board');
+ assert.equal(storage.getItem(LOCAL_HEAD_KEY),storage.getItem(SYNC_STORE_KEY));
+ const rows=JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY));
+ assert.ok(rows.some(row=>row.kind==='before-restore' && row.payload===before),
+  'the exact board displaced by this Restore stays recoverable after the quota retry');
+ const reopened=await loadApp({sharedStorage:storage});
+ assert.ok(reopened.ctx.readLocalBackups().some(row=>row.kind==='before-restore' && row.payload===before),
+  'the safety copy survives reload');
+ assert.match(shim.document.getElementById('toast')?.textContent||'',/Couldn't save this edit/,
+  'an unsavable restore reports the held edit');
+ // With one more disposable historical copy, the same aggregate quota can
+ // admit the restore without sacrificing its freshly written safety copy.
+ quota=Infinity;quotaArmed=false;
+ const history={id:'old-automatic-history',day:new Date(at-3600000).toISOString().slice(0,10),
+  at:at-3600000,kind:'before-cloud-adoption',payload:before};
+ storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify([...rows,history]));
+ reopened.ctx.openSettings();
+ reopened.ctx.onAction('restore-local-backup',{dataset:{id:manual.id}});
+ assert.equal(quotaArmed,true);
+ const restored=JSON.parse(storage.getItem(SYNC_STORE_KEY));
+ assert.ok(restored.tasks.some(row=>row.title.startsWith('Restored huge')),
+  'ordinary history makes room for the restored primary board');
+ const after=JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY));
+ assert.ok(after.some(row=>row.kind==='before-restore' && row.payload===before),
+  'the saved restore still has an exact prior-board snapshot');
+ assert.ok(!after.some(row=>row.id===history.id),'old ordinary history makes the room');
+ const current=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)?.[1]||'';
+ assert.match(current,/Restoring a backup also keeps the exact board it replaces through a storage-quota retry\./);
+});
+
 test('RISK LOCAL BACKUPS: a changed board before backup announces the unsaved draft',async()=>{
  const original=syncState({tasks:[syncTask('shared','Original')]});
  const concurrent=JSON.stringify(syncState({tasks:[syncTask('shared','Other tab edit')]}));

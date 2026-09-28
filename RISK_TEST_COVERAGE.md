@@ -53,6 +53,7 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK LOCAL BACKUPS: primary save holds when another tab commits during its backup
 - RISK LOCAL BACKUPS: single-device Undo frees old automatic history for its primary save
 - RISK LOCAL BACKUPS: primary quota rotation keeps the newest stable recovery copy
+- RISK LOCAL BACKUPS: quota during Restore keeps the immediate pre-restore board
 - RISK LOCAL BACKUPS: a changed board before backup announces the unsaved draft
 - RISK LOCAL BACKUPS: cold head initialization holds a concurrent shared-key edit
 - RISK LOCAL BACKUPS: paired save holds an older-shell write between its two keys

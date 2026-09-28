@@ -252,22 +252,24 @@
     }
   },
   {
-    "testChangesSha256": "e2e7864b7c155c3b2332f1c5e9a0a2bcf7905ef07d16b6309baf7687718c4a96",
-    "reason": "The user reported a save failure when tapping Undo on iOS in one device. A backup index can fit under the browser's aggregate storage quota while the following restored full-board write cannot. The new tests model the same quota across all localStorage keys and distinguish recyclable automatic history from manual or protected recovery copies.",
+    "testChangesSha256": "22374562aecc1f43b399f2f47c2eb66df00861e868d1c86ef83297abb5124f1d",
+    "reason": "The user reported a save failure when tapping Undo on iOS in one device. A backup index can fit under the browser's aggregate storage quota while the following restored full-board write cannot. The new tests model the same quota across all localStorage keys and distinguish recyclable automatic history from manual or protected recovery copies. Independent review found that a Restore could otherwise retire its just-created prior-board snapshot on the same quota path.",
     "previousBehavior": "Undo could save its optional automatic backup yet fail to write the larger restored board, showing an unsaved-edit warning despite old automatic snapshots occupying storage. Primary saves did not retire backup history on proven quota failure.",
-    "intendedBehavior": "When Undo's primary write hits aggregate storage quota in one tab, retire the oldest unprotected automatic history and retry the guarded primary write until it succeeds, keeping the newest stable recovery copy. Preserve manual and pinned recovery bytes; if no safe space remains, hold the unsaved edit with an honest warning. The restored title and Start date must survive reload.",
+    "intendedBehavior": "When Undo's primary write hits aggregate storage quota in one tab, retire the oldest unprotected automatic history and retry the guarded primary write until it succeeds, keeping the newest stable recovery copy. Preserve manual and pinned recovery bytes; if no safe space remains, hold the unsaved edit with an honest warning. The restored title and Start date must survive reload. A Restore also protects its immediate pre-restore snapshot through both backup and primary quota retirement; it either saves with that copy intact or holds the original primary board.",
     "replacementTests": [
       "RISK LOCAL BACKUPS: single-device Undo frees old automatic history for its primary save",
-      "RISK LOCAL BACKUPS: primary quota rotation keeps the newest stable recovery copy"
+      "RISK LOCAL BACKUPS: primary quota rotation keeps the newest stable recovery copy",
+      "RISK LOCAL BACKUPS: quota during Restore keeps the immediate pre-restore board"
     ],
     "preservedCoverage": [
       "Existing cloud adoption and restore backup guards still hold replacement when a safe copy cannot be stored.",
       "Existing concurrent-tab primary and backup-index guards retain newer bytes; this retry only runs after a quota exception while expected primary bytes remain current.",
-      "The Undo quota test verifies Start date, title, paired browser keys, reload, protected and manual rows, toast absence after success, and truthful failure when only protected copies remain."
+      "The Undo quota test verifies Start date, title, paired browser keys, reload, protected and manual rows, toast absence after success, and truthful failure when only protected copies remain.",
+      "The Restore quota test verifies fail-closed behavior when its safety copy cannot fit, and successful recovery when older ordinary history can instead be retired."
     ],
     "redEvidence": {
-      "command": "node --test --test-name-pattern='RISK LOCAL BACKUPS: single-device Undo' tests.js; node --test --test-name-pattern='RISK LOCAL BACKUPS: primary quota rotation' tests.js",
-      "failure": "Before implementation, the single-device test returned false instead of true at its Undo persist assertion, with the exact 'Couldn't save this edit on this device' toast. The stable-copy test then failed because transient-latest survived while stable-daily was retired; after the narrow correction it passed. The new changelog assertion also failed before its current-entry sentence was added."
+      "command": "node --test --test-name-pattern='RISK LOCAL BACKUPS: single-device Undo' tests.js; node --test --test-name-pattern='RISK LOCAL BACKUPS: primary quota rotation' tests.js; node --test --test-name-pattern='RISK LOCAL BACKUPS: quota during Restore' tests.js",
+      "failure": "Before implementation, the single-device test returned false instead of true at its Undo persist assertion, with the exact 'Couldn't save this edit on this device' toast. The stable-copy test then failed because transient-latest survived while stable-daily was retired; after the narrow correction it passed. The new changelog assertion also failed before its current-entry sentence was added. After independent review, the new aggregate-quota Restore test failed because the restored primary board replaced the original while its immediate before-restore copy was deleted; after protecting that snapshot ID through backup and primary retirement, the held and successful quota branches both passed."
     }
   }
 ]
