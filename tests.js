@@ -8110,6 +8110,10 @@ test('RISK LOCAL BACKUPS: quota during Restore keeps the immediate pre-restore b
   ? {...row,payload:target} : row)));
  assert.equal(await ctx.persist(),false,'reusing the safety ID for different bytes cannot authorize replacement');
  assert.equal(storage.getItem(SYNC_STORE_KEY),before);
+ storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify(peerRows.map(row=>row.id===displaced.id
+  ? {...row,day:null} : row)));
+ assert.equal(await ctx.persist(true),false,'an unreadable same-ID safety row cannot authorize replacement even when a prior backup was declared safe');
+ assert.equal(storage.getItem(SYNC_STORE_KEY),before);
  storage.setItem(LOCAL_BACKUPS_KEY,peerIndex); // restore fixture for background retry coverage
  quota=used(); // a genuinely full device remains full for later background retries
  ctx.saveLocalBackup('before-cloud-adoption',JSON.stringify(ctx.state));
@@ -8155,6 +8159,61 @@ test('RISK LOCAL BACKUPS: quota during Restore keeps the immediate pre-restore b
  const current=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)?.[1]||'';
  assert.match(current,/Restoring a backup also keeps the exact board it replaces through a storage-quota retry\./);
  }
+});
+
+test('RISK LOCAL BACKUPS: async host Restore rolls back if its safety row disappears',async()=>{
+ const prior=JSON.stringify(syncState({tasks:[syncTask('prior-host','Prior host board')]}));
+ const {ctx,shim}=await loadApp({hostStorage:{[SYNC_STORE_KEY]:prior}});
+ const target=JSON.stringify(syncState({tasks:[syncTask('restored-host','Restored huge '.repeat(50).trim())]}));
+ assert.equal(ctx.saveLocalBackup('manual',target),true);
+ const backup=ctx.readLocalBackups().find(row=>row.kind==='manual' && row.payload===target);
+ const set=shim.window.storage.set.bind(shim.window.storage);
+ let release;
+ shim.window.storage.set=async(key,payload)=>{
+  await set(key,payload);
+  if(key===SYNC_STORE_KEY && payload.includes('Restored huge')) await new Promise(resolve=>{release=resolve;});
+ };
+ ctx.openSettings();ctx.onAction('restore-local-backup',{dataset:{id:backup.id}});
+ await flush();
+ assert.equal(typeof release,'function','the host primary write is awaiting its asynchronous acknowledgement');
+ const rows=JSON.parse(shim.localStorage.getItem(LOCAL_BACKUPS_KEY));
+ const safety=rows.find(row=>row.kind==='before-restore' && row.payload.includes('Prior host board'));
+ assert.ok(safety);
+ shim.localStorage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify(rows.filter(row=>row.id!==safety.id)));
+ release();await flush();await flush();
+ assert.equal(shim.window.storage._map.get(SYNC_STORE_KEY),prior,
+  'a changed backup index rolls back this host write rather than accepting an unprotected Restore');
+ assert.equal(vm.runInContext('pendingRestoreSafetyIds.size',ctx),1,
+  'the pending recovery proof remains until a protected primary write succeeds');
+});
+
+test('RISK LOCAL BACKUPS: older queued host save cannot clear a newer Restore proof',async()=>{
+ const prior=JSON.stringify(syncState({tasks:[syncTask('prior-host','Prior host board')]}));
+ const {ctx,shim}=await loadApp({hostStorage:{[SYNC_STORE_KEY]:prior}});
+ const set=shim.window.storage.set.bind(shim.window.storage);
+ let releaseOlder,releaseRestore;
+ shim.window.storage.set=async(key,payload)=>{
+  await set(key,payload);
+  if(key!==SYNC_STORE_KEY) return;
+  if(payload.includes('Older queued edit') && !payload.includes('Restored board'))
+   await new Promise(resolve=>{releaseOlder=resolve;});
+  if(payload.includes('Restored board')) await new Promise(resolve=>{releaseRestore=resolve;});
+ };
+ ctx.state.tasks.push(syncTask('older-edit','Older queued edit'));
+ const olderSave=ctx.persist();await flush();
+ assert.equal(typeof releaseOlder,'function');
+ const target=JSON.stringify(syncState({tasks:[syncTask('restored','Restored board')]}));
+ assert.equal(ctx.saveLocalBackup('manual',target),true);
+ const backup=ctx.readLocalBackups().find(row=>row.kind==='manual' && row.payload===target);
+ ctx.openSettings();ctx.onAction('restore-local-backup',{dataset:{id:backup.id}});
+ assert.equal(vm.runInContext('pendingRestoreSafetyIds.size',ctx),1);
+ releaseOlder();await olderSave;await flush();
+ assert.equal(typeof releaseRestore,'function');
+ assert.equal(vm.runInContext('pendingRestoreSafetyIds.size',ctx),1,
+  'completion of an older queued write cannot clear a later Restore proof');
+ releaseRestore();await flush();await flush();
+ assert.equal(vm.runInContext('pendingRestoreSafetyIds.size',ctx),0,
+  'the matching protected Restore write clears only its own proof');
 });
 
 test('RISK LOCAL BACKUPS: a changed board before backup announces the unsaved draft',async()=>{
