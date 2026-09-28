@@ -232,5 +232,23 @@
       "command": "node --test --test-reporter=dot --test-name-pattern='RISK landscape shadows: grounded|RISK landscape vehicles: lower train|RISK landscape metro: electrified' tests.js; node --test --test-reporter=dot --test-name-pattern='RISK landscape metro: electrified' tests.js",
       "failure": "Before implementation, three focused tests failed: the grounded-shadow and renamed lower-train contracts found the unconditional paintRailVehicleShadow call, and the new metro test counted 3 car shadows instead of 0 at 390x844 daylight. After the render conditional passed, the metro test failed again because the current changelog lacked the new distinction; it passed after the copy was updated."
     }
+  },
+  {
+    "testChangesSha256": "4ee38457df32581f68a6eaa271b787492a91a23f212ee3d59867b30066613a32",
+    "reason": "The user identified horizontal banding around the elevated electrified railway after asking to keep shadows on its supports. A continuous rail-deck ground-shadow stroke added a second screen-wide stripe underneath the physical deck. The prior shadow and night-rail contracts explicitly required that extra stripe, so they now distinguish the individual support shadows and visible deck from that continuous shadow.",
+    "previousBehavior": "paintRailShadow painted an 8-pixel continuous ground-shadow line for the elevated rail in addition to the 8-pixel physical deck; tests required both even though the user reported a band across the scene. Support shadows and the separate lower-rail shadow existed independently.",
+    "intendedBehavior": "Across phone, short-landscape, and tablet dimensions in daylight, night, and reduced motion, the elevated rail has one visible physical deck, edge, and overhead wire without the second continuous shadow band. Every viaduct support retains its individual contact shadow. Lower train cars and their separate lower-track shadow remain untouched, and the changelog states the precise visual change.",
+    "replacementTests": [
+      "RISK landscape viaduct: deck has no continuous shadow band while supports keep contact shade"
+    ],
+    "preservedCoverage": [
+      "The support-shadow call is counted independently from the full-width deck shadow across three viewport shapes, day and night, and both motion settings.",
+      "The rail deck, edge, overhead wire, poles, and their full-opacity night visibility remain asserted; lower rail contact and train shadows retain their existing tests.",
+      "The changed shared-light test still checks Sun, Moon, and starlight projection for grounded visitors and trees."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK landscape shadows: grounded|RISK landscape metro:|RISK landscape trains: track deck' tests.js; node --test --test-name-pattern='RISK landscape viaduct:' tests.js",
+      "failure": "Before implementation the first focused run failed 3/3 changed contracts: the elevated paintRailShadow call remained, and the night rail mock recorded one continuous shadow instead of zero. The new viaduct RISK test then failed at 390x844 daylight/reduced=false with one continuous shadow instead of zero; after the renderer change it failed on the absent changelog sentence, then passed when the copy was updated."
+    }
   }
 ]

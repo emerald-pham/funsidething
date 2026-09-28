@@ -331,7 +331,8 @@
       paintGroundShadow(b,x,rail(x)+55,55,5,p.far,.55);
       line(b,x,rail(x)+3,x,rail(x)+55,S.mixHex(p.city,p.far,.4),5);
     }
-    paintRailShadow(b,rail,16,8,p.far,.6);
+    // The deck itself marks the full-width line; a second continuous ground
+    // shadow made the elevated railway read as a broad horizontal band.
     path(b,rail);b.strokeStyle=S.mixHex(p.city,'#d6d6bb',.45);b.lineWidth=8;b.stroke();
     path(b,x=>rail(x)-4);b.strokeStyle=S.mixHex(p.city,'#334d4a',.3);b.lineWidth=1.2;b.stroke();
     // The metro is drawn at 72% scale; its roof is about nine pixels above
