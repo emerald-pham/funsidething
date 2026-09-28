@@ -44,6 +44,7 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK LOCAL BACKUPS: an unreadable index explains the paused save without claiming quota
 - RISK CLOUD BACKUP: quota retirement keeps the exact prior board needed for adoption
 - RISK CLOUD BACKUP: an overwritten local edit survives later quota rotation
+- RISK CLOUD BACKUP: an offline edit reopened before conflict remains protected
 - RISK CLOUD BACKUP: an exact chosen copy avoids duplicate displaced-edit storage
 - RISK LOCAL BACKUPS: aged stale-tab and other-browser recovery stays available
 - RISK LOCAL BACKUPS: unknown legacy kinds do not expire during rotation
