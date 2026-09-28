@@ -124,6 +124,12 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK landscape water: lake clip overlaps the horizon contact at fractional pixel densities
 - RISK landscape water browser: GPU distortion preserves contact and sharp pixels while patches move independently
 
+## Offline shell and updates
+
+- RISK PWA updates: an already durable board applies a downloaded worker without a redundant quota write
+- RISK PWA updates: an unsaved draft visibly defers reload while update checks continue
+- RISK PWA updates: a host write in flight must finish before a reverted board reloads
+
 ## Test-first enforcement and regression protection
 
 - RISK regression gate: changing existing tests requires a specific reason and replacement coverage

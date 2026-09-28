@@ -12933,15 +12933,17 @@ test('Chance scan: async host writes cannot persist an older draw over a newer o
  writes.shift()();await flush();assert.equal(writes.length,1);writes.shift()();await flush();
  assert.equal(JSON.parse(durable).chance.seed,latest);
 });
-function pwaUpdateHarness({controller=true,editing=false,saveOK=true}={}){
- const wh={},dh={},sh={};let updates=0,reloads=0,saves=0,options;
+function pwaUpdateHarness({controller=true,editing=false,saveOK=true,durable=false,host=false}={}){
+ const wh={},dh={},sh={};let updates=0,reloads=0,saves=0,options;const toasts=[];
  const registration={update:async()=>{updates++;}};
  const sw={controller:controller?{}:null,addEventListener:(e,f)=>sh[e]=f,register:async(url,opts)=>{options=opts;return registration;}};
  const doc={hidden:false,readyState:'complete',activeElement:{matches:()=>false},querySelector:()=>editing?{}:null,addEventListener:(e,f)=>dh[e]=f};
- const box={navigator:{serviceWorker:sw},window:{addEventListener:(e,f)=>wh[e]=f,location:{reload:()=>reloads++}},document:doc,setTimeout,clearTimeout,state:{},persist:async()=>{saves++;return saveOK;},toast(){},console};
+ const raw='{}',storage={getItem:key=>durable&&(key==='head'||key==='store')?raw:null};
+ const box={navigator:{serviceWorker:sw},window:{addEventListener:(e,f)=>wh[e]=f,location:{reload:()=>reloads++}},document:doc,setTimeout,clearTimeout,state:{},persist:async()=>{saves++;return saveOK;},toast:message=>toasts.push(message),console,
+  storageOK:true,useLocal:durable&&!host,lastPersistedRaw:durable?raw:null,localStorage:storage,LOCAL_HEAD_KEY:'head',STORE_KEY:'store'};
  const source=html.slice(html.indexOf('function hasActiveEditor(){'),html.indexOf('function resumeDeferredCloudPull(){'))+html.slice(html.indexOf('function registerServiceWorker(){'),html.indexOf('registerServiceWorker();',html.indexOf('function registerServiceWorker(){')));
  vm.runInNewContext(source+';registerServiceWorker();',box);
- return {box,sw,wh,dh,sh,ready:async()=>{if(wh.load)await wh.load();await flush();},counts:()=>({updates,reloads,saves,options}),edit:v=>editing=v};
+ return {box,sw,wh,dh,sh,ready:async()=>{if(wh.load)await wh.load();await flush();},counts:()=>({updates,reloads,saves,options,toasts}),edit:v=>editing=v};
 }
 test('PWA updates: check on launch, foreground and reconnect with HTTP cache bypass',async()=>{
  const h=pwaUpdateHarness();await h.ready();assert.equal(h.counts().options.updateViaCache,'none');
@@ -12952,6 +12954,36 @@ test('PWA updates: new controller saves state then reloads once, but never durin
  const h=pwaUpdateHarness({editing:true});await h.ready();await h.sh.controllerchange();assert.equal(h.counts().reloads,0);
  h.edit(false);await h.box.window.applyPendingAppUpdate();assert.equal(h.counts().saves,1);assert.equal(h.counts().reloads,1);
  await h.sh.controllerchange();assert.equal(h.counts().reloads,1);
+});
+test('RISK PWA updates: an already durable board applies a downloaded worker without a redundant quota write',async()=>{
+ const h=pwaUpdateHarness({durable:true,saveOK:false});await h.ready();
+ await h.sh.controllerchange();
+ assert.equal(h.counts().updates,1,'worker checking and download do not depend on a save');
+ assert.equal(h.counts().saves,0,'exactly confirmed primary bytes need no fresh backup before reload');
+ assert.equal(h.counts().reloads,1,'the installed worker must reach the visible shell despite backup quota');
+ const divergent=pwaUpdateHarness({durable:true,saveOK:false});await divergent.ready();
+ divergent.box.localStorage.getItem=key=>key==='head'?'older head':'{}';
+ await divergent.sh.controllerchange();
+ assert.equal(divergent.counts().saves,1,'a mismatched primary key cannot be treated as durable');
+ assert.equal(divergent.counts().reloads,0);
+});
+test('RISK PWA updates: an unsaved draft visibly defers reload while update checks continue',async()=>{
+ const h=pwaUpdateHarness({saveOK:false});await h.ready();
+ await h.sh.controllerchange();
+ assert.equal(h.counts().reloads,0,'an unsaved draft must stay on screen');
+ assert.ok(h.counts().toasts.some(message=>/update.*save|save.*update/i.test(message)),'the deferred update must be visible');
+ await h.wh.focus();
+ assert.equal(h.counts().updates,2,'a failed save cannot block later worker checks');
+});
+test('RISK PWA updates: a host write in flight must finish before a reverted board reloads',async()=>{
+ const h=pwaUpdateHarness({durable:true,host:true});await h.ready();
+ let release;
+ h.box.persist=()=>new Promise(resolve=>{release=resolve;});
+ const applying=h.sh.controllerchange();await flush();
+ assert.equal(typeof release,'function','async host persistence must be awaited despite matching old bytes');
+ assert.equal(h.counts().reloads,0,'reload cannot cancel the corrective write queued after a newer board');
+ release(true);await applying;
+ assert.equal(h.counts().reloads,1);
 });
 test('PWA updates: initial install does not reload; failed persistence prevents reload',async()=>{
  const first=pwaUpdateHarness({controller:false});await first.ready();first.sw.controller={};await first.sh.controllerchange();assert.equal(first.counts().reloads,0);
