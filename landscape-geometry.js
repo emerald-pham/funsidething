@@ -210,8 +210,14 @@
       const source=sunStrength>0?'sun':moonStrength>.014?'moon':'stars';
       const body=source==='sun'?sun:moon;
       const altitude=source==='stars'?90:Math.max(3,Number(body.altitude)||0);
-      const length=source==='stars'?0:Math.min(Math.max(3,height),
+      const highSun=source==='sun'?clamp((altitude-12)/33):0;
+      // The perspective ground plane made even a high Sun stretch tall trees
+      // across the path. Ease only direct sunlight toward a small contact pool;
+      // keep a nonzero ray so it still points away from the painted Sun.
+      const directLength=Math.min(Math.max(3,height),
         Math.max(3,height)*.75/Math.tan(altitude*Math.PI/180));
+      const length=source==='stars'?0:source==='sun'
+        ?Math.max(1.5,directLength*(1-.94*highSun*highSun*(3-2*highSun))):directLength;
       const origin=source==='stars'?null:skyPoint(Number(body.azimuth)||0,Number(body.altitude)||0);
       // Use the body actually painted on this screen, including at its edges.
       // A wrapped sky copy would reverse a tree's shadow toward the visible Moon.

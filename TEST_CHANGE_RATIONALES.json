@@ -20,5 +20,25 @@
       "failure": "Before implementation, the tests failed on whole-image motion.shear, missing fractional lakeContact overlap, and contactDepth outside 12-18 pixels. Regression gate test also first failed because validateRegressionChanges was undefined. Full-suite validation also caught the old ceiling-buffer contract; its updated assertion now preserves the full-size mirror while requiring an opaque edge. Add-only return and moved-insertion gate fixtures each failed before their corresponding guard fixes. Appended executable-code exemption was removed after red fixtures showed new test additions and process termination could evade explanation."
     },
     "testChangesSha256": "270d89627c58af4da6bd20b826980663b86ba2878a9284095bdd3288388de1ac"
+  },
+  {
+    "reason": "The user's phone screenshot shows six dark oval rainclouds and a hard grey weather boundary, and the user asked for near-base shadows as the Sun reaches noon. New tests pin the cloud silhouette, full-height tint fade, and high-sun geometry. Two existing canvas mocks gained the new gradient and path methods while retaining all prior rain, snow, firefly, and aircraft assertions.",
+    "previousBehavior": "Rain painted flat dark ellipses over a rectangular tint ending just below the horizon, while high solar altitudes still cast long tree shadows.",
+    "intendedBehavior": "Weather paints softly shaded rounded cloud contours and a continuous tint fading through the whole scene; high sunlight casts short contact shade that still points away from the visible Sun.",
+    "replacementTests": [
+      "RISK landscape shadows: high Sun draws short near-base shade on phone and landscape screens",
+      "RISK landscape weather: rainclouds have rounded layered contours and the tint fades without a horizon rule",
+      "RISK landscape weather: reflected clouds remain visible without doubling the lake tint"
+    ],
+    "preservedCoverage": [
+      "Rain remains visibly darker with readable streaks, while firefly placement and biplane wing assertions remain unchanged.",
+      "Snow still drifts smoothly at real epoch times and seasonal ambience continues in clear weather.",
+      "Low-Sun, Moon, and star shadow direction, opacity, and shared-object painting remain covered by existing tests; the new high-Moon assertion checks its prior near-zenith length."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='high Sun draws short|rainclouds have rounded' tests.js",
+      "failure": "The first two new tests failed before implementation: 390x844 high Sun leaves a compact puddle near the trunk was false; 390x844 rain tint covers the full screen was false. A later high-Moon preservation assertion failed while the minimum length affected Moon as well, then passed after restricting it to Sun. Rendered QA exposed a darker lake strip; the new reflection test failed 1 tint rectangle versus expected 0, then passed after retaining reflected clouds and rain without a second tint. The autumn-noon shadow check then failed at 390x844 because a 40-degree Sun still cast a long shade; it passed after shifting the altitude-based falloff."
+    },
+    "testChangesSha256": "e0f8d84846750c4734e41d3ef31c34cbab1cda4c46745a7d028a5f3586212355"
   }
 ]
