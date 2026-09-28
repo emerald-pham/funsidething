@@ -109,12 +109,15 @@ Automatic reconciliation combines unique tasks and recorded completion/work
 history by stable ID. It keeps explicit task-deletion and history-clear markers
 indefinitely so a very old tab cannot resurrect an intentional removal. A
 separate dated deletion log retains two months of actions even after clearing
-visible History. Settings holds seven days of device-local full-board backups:
-the first and latest copy of each day, plus pre-restore safety copies. Manual
-backups and account-switch copies of unsynced boards stay until the user deletes
-them or clears site data. A switch away from a cloud-confirmed board needs only
-the seven-day safety copy. Repeated copies of the same unsynced board are
-deduplicated.
+visible History. Settings holds up to seven days of automatic device-local
+full-board backups: the first and latest copy of each day, plus pre-restore
+and cloud-adoption safety copies. Older automatic copies retire first as new
+ones arrive or browser space gets tight; the incoming stable copy and any
+active cloud-adoption proof remain. Manual backups, stale-tab drafts,
+other-browser recovery copies, and account-switch copies of unsynced boards
+stay until the user deletes them or clears site data. A switch away from a
+cloud-confirmed board needs only the ordinary automatic safety copy. Repeated
+copies of the same unsynced board are deduplicated.
 
 Tasks are never dropped because of age. Restoring an old backup also keeps
 later tasks that have no recorded deletion; the chosen backup restores its scan
@@ -124,9 +127,10 @@ before its tasks can be synced into the current account.
 The entire synced board currently lives in one Firestore document. Firestore's
 [1 MiB document limit](https://firebase.google.com/docs/firestore/quotas)
 therefore limits this design; task, History, and deletion evidence all count.
-The app does not yet split large boards across documents. Local backup storage
-also has a browser quota, and a failed safety backup stops replacement or
-cloud writes until space is available.
+The app does not yet split large boards across documents. Browser storage has
+a quota; automatic history rotates before and at the quota boundary. If even
+the newest safety copy cannot fit beside user-kept recovery data, replacement
+and cloud writes stay paused, and an unsaved primary board is reported plainly.
 
 GitHub Pages uses GitHub Actions as its publishing source. The deployment job
 depends on the release gate: `npm test` and `npm run test:rules` against the

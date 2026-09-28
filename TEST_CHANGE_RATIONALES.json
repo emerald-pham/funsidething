@@ -92,23 +92,35 @@
     "testChangesSha256": "abc74e74942d3f4773cac508282a59657f16cfe62e325d17466aee09001b20de"
   },
   {
-    "reason": "The vehicle width was passed to an upright-object shadow ellipse, producing a tall oval across the rail. Floating mirrors began at the exact antialiased contact edge, and shallow craft used a deeper generic boat contact. The shared-source assertion now requires a rail-specific footprint, the coupler mock accepts its paint helper, and existing natural-height reflection coverage keeps its size and day/night checks while requiring contact overlap.",
-    "previousBehavior": "Train and metro cars used the upright-object oval rotated toward the celestial ray. Floating-object reflections clipped exactly at the hull edge; windsurfer boards and jet skis mirrored from the deeper boat hull draft.",
-    "intendedBehavior": "Rail-car shade remains a shallow footprint aligned with each curved track while moving away from the Sun or Moon. Floating reflections overlap their painted hull contact by one physical pixel at any display density, with natural height, lake clip, and day/night visibility intact.",
+    "reason": "The user reported distorted vehicle shadows and a visible gap under floating objects, then reported routine local-backup-full failures. New visual tests pinned track-aligned shadows, exact hull draft, and device-pixel mirror contact. New data-safety tests require bounded automatic history, quota retry, preserved chosen/conflict recovery, cloud-adoption proof, primary-save honesty, and user-visible retention copy. Existing transport and reflection contracts changed only to accept the new geometry and retained their original size, coupler, and day/night checks.",
+    "previousBehavior": "Rail vehicles cast upright-object ovals and shallow craft mirrored from a generic deeper hull edge. Full-board automatic backups accumulated until quota; a failed backup write blocked ordinary saves and displayed a non-actionable backup-full warning.",
+    "intendedBehavior": "Rail shade follows curved tracks and celestial light. Floating mirrors meet each painted hull. Automatic backup history rotates oldest first under a byte budget and quota retry, preserving manual, unsynced, unreadable, and active adoption recovery while reporting only genuinely unsaved primary data.",
     "replacementTests": [
       "RISK landscape vehicles: train and metro shadows lie along their rails under changing light",
       "RISK landscape water: floating silhouettes and mirrors overlap at their contact row",
-      "RISK landscape water: each craft mirrors from its own painted hull draft"
+      "RISK landscape water: each craft mirrors from its own painted hull draft",
+      "RISK LOCAL BACKUPS: quota retires the oldest automatic copy while keeping recent, manual, and account recovery",
+      "RISK LOCAL BACKUPS: automatic history has a byte budget before browser quota",
+      "RISK LOCAL BACKUPS: the non-actionable backup-full warning is absent from save UI",
+      "RISK LOCAL BACKUPS: Settings explains automatic early retirement while preserving chosen copies",
+      "RISK LOCAL BACKUPS: exhausted quota leaves the original index and unsaved board untouched",
+      "RISK CLOUD BACKUP: quota retirement keeps the exact prior board needed for adoption",
+      "RISK LOCAL BACKUPS: parseable but unrestorable history cannot be retired for quota",
+      "RISK LOCAL BACKUPS: an unreadable index explains the paused save without claiming quota",
+      "RISK LOCAL BACKUPS: a single stable new copy fits when its duplicate latest does not"
     ],
     "preservedCoverage": [
       "Existing celestial source, direction, rail deck, trees, ground visitors, and winter shadow assertions remain in place.",
       "Existing tram coupler counts and positions stay unchanged; its isolated mock only accepts the new shadow helper.",
-      "Existing natural-height, day/night, lake clip, duck, fish, dolphin, and vessel reflection checks remain, with the contact origin adjusted to the new one-pixel overlap."
+      "Existing natural-height, day/night, lake clip, duck, fish, dolphin, and vessel reflection checks remain, with contact overlap adjusted.",
+      "Existing manual, account-switch, unreadable raw backup, restore, stale-tab, other-browser, cloud-adoption, and failed-primary-store safety tests remain in the full suite.",
+      "A quota that cannot fit protected data leaves the original backup index and both primary board keys unchanged.",
+      "Readable legacy backups still hydrate through the existing restore path; unreadable backup rows remain byte-for-byte stored and visible through raw Settings recovery."
     ],
     "redEvidence": {
-      "command": "node --test --test-reporter=dot --test-name-pattern='RISK landscape vehicles:|RISK landscape water: floating silhouettes' tests.js",
-      "failure": "Before implementation the vehicle test failed because no contact-footprint painter existed, and the 390x844 mirror test failed because its clip began at the exact hull row. After the overlap repair, the craft-draft test first failed on the windsurfer because its board reflected from the generic three-unit boat draft. The old shared-source assertion also failed on the former vehicle call."
+      "command": "node --test --test-reporter=dot --test-name-pattern='RISK landscape vehicles:|RISK landscape water: floating silhouettes|RISK landscape water: each craft mirrors|RISK LOCAL BACKUPS: quota|RISK LOCAL BACKUPS: automatic history|RISK LOCAL BACKUPS: the non-actionable|RISK LOCAL BACKUPS: Settings explains|RISK CLOUD BACKUP: quota retirement' tests.js (new cases run as each behavior was introduced)",
+      "failure": "Before visual changes the rail painter was absent and the mirror clip began at the exact hull row; the craft-draft test failed on the windsurfer. Before backup changes the quota-retirement test returned false, cloud adoption remained held, the automatic index exceeded its byte budget, the non-actionable backup-full text remained in save UI, and Settings did not explain early retirement. A parseable backup with a reserved task ID was accepted as a valid row before stronger restore validation; the unreadable-index UI test received the generic manual-backup warning instead of raw-recovery guidance. The one-copy quota test then failed because an identical incoming latest row could not retire even though the stable daily row alone fit."
     },
-    "testChangesSha256": "6e84611571dfe85710447b8b9bc94c0918a2515b0da841fb1f2cb336daadc76f"
+    "testChangesSha256": "0a633841306769ae8d0509397e3b473e610bb1bdf05e298d989388f1fe0de15d"
   }
 ]

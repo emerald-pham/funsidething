@@ -7654,6 +7654,138 @@ test('LOCAL BACKUPS: repeated switches with the same board do not duplicate a re
   assert.equal(ctx.readLocalBackups().filter(row=>row.kind==='before-account-switch').length,1);
 });
 
+test('RISK LOCAL BACKUPS: quota retires the oldest automatic copy while keeping recent, manual, and account recovery',async()=>{
+ const storage=sharedScannerStorage(),{ctx}=await loadApp({sharedStorage:storage});
+ const at=Date.now(),day=ctx.backupDay(at),base=JSON.stringify(ctx.state);
+ ctx.addTask('Recent recovery');const recent=JSON.stringify(ctx.state);
+ ctx.addTask('Incoming board');const incoming=JSON.stringify(ctx.state);
+ const row=(id,age,kind,payload)=>({id,day,at:at-age,kind,payload});
+ const rows=[row('old-auto',4000,'before-restore',base),row('recent-auto',3000,'before-cloud-adoption',recent),
+  row('manual-keep',2000,'manual',base),row('switch-keep',1000,'before-account-switch',base)];
+ storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify(rows));
+ const write=storage.setItem;
+ storage.setItem=(key,value)=>{
+  if(key===LOCAL_BACKUPS_KEY && JSON.parse(value).some(entry=>entry.id==='old-auto')){
+   const error=Error('browser quota');error.name='QuotaExceededError';throw error;
+  }
+  write(key,value);
+ };
+ assert.equal(ctx.saveLocalBackup('daily',incoming),true,'a full index retries after retiring the oldest automatic copy');
+ const saved=JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY));
+ assert.ok(!saved.some(entry=>entry.id==='old-auto'));
+ for(const id of ['recent-auto','manual-keep','switch-keep'])assert.ok(saved.some(entry=>entry.id===id),`${id} remains available`);
+ assert.ok(saved.some(entry=>entry.kind==='daily'&&entry.payload===incoming),'the incoming board has a stable recovery copy');
+});
+
+test('RISK LOCAL BACKUPS: automatic history has a byte budget before browser quota',async()=>{
+ const storage=sharedScannerStorage(),{ctx}=await loadApp({sharedStorage:storage});
+ const at=Date.now(),day=ctx.backupDay(at);
+ const large=JSON.stringify({...ctx.state,tasks:[syncTask('large','x'.repeat(140000))]});
+ const rows=Array.from({length:9},(_,i)=>({id:'auto-'+i,day,at:at-9000+i*1000,
+  kind:i%2?'before-cloud-adoption':'before-restore',payload:large}));
+ const manual={id:'manual-keep',day,at:at-500,kind:'manual',payload:large};
+ storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify([...rows,manual]));
+ assert.equal(ctx.saveLocalBackup('daily',large),true);
+ const saved=JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY));
+ const automatic=saved.filter(row=>['daily','latest','before-restore','before-cloud-adoption'].includes(row.kind));
+ assert.ok(automatic.reduce((size,row)=>size+JSON.stringify(row).length,0)<=1000000,
+  'automatic full-board history stays within a bounded local-storage budget');
+ assert.ok(saved.some(row=>row.id==='auto-8'),'the newest historical recovery point survives rotation');
+ assert.ok(saved.some(row=>row.id==='manual-keep'),'manual recovery is never retired by the automatic budget');
+});
+
+test('RISK LOCAL BACKUPS: a single stable new copy fits when its duplicate latest does not',async()=>{
+ const storage=sharedScannerStorage(),{ctx}=await loadApp({sharedStorage:storage});
+ storage.setItem(LOCAL_BACKUPS_KEY,'[]');
+ const board=JSON.stringify(ctx.state),write=storage.setItem;
+ storage.setItem=(key,value)=>{
+  if(key===LOCAL_BACKUPS_KEY && JSON.parse(value).length>1){
+   const error=Error('browser quota');error.name='QuotaExceededError';throw error;
+  }
+  write(key,value);
+ };
+ assert.equal(ctx.saveLocalBackup('daily',board),true,'the latest duplicate can retire before the new stable daily copy');
+ const saved=JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY));
+ assert.equal(saved.length,1);
+ assert.equal(saved[0].kind,'daily');assert.equal(saved[0].payload,board);
+});
+
+test('RISK LOCAL BACKUPS: the non-actionable backup-full warning is absent from save UI',()=>{
+ assert.doesNotMatch(html,/Could not save: local backup storage is full/);
+ assert.match(html,/Could not save your changes on this device/,
+  'a genuinely failed primary save still reports unsaved work');
+});
+
+test('RISK LOCAL BACKUPS: Settings explains automatic early retirement while preserving chosen copies',async()=>{
+ const {ctx,shim}=await loadApp();ctx.openSettings();
+ const markup=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(markup,/older automatic copies may retire sooner/);
+ assert.match(markup,/Manual and unsynced account-switch copies stay until you delete them/);
+});
+
+test('RISK LOCAL BACKUPS: exhausted quota leaves the original index and unsaved board untouched',async()=>{
+ const storage=sharedScannerStorage(),{ctx}=await loadApp({sharedStorage:storage});
+ const at=Date.now(),day=ctx.backupDay(at),prior=JSON.stringify(ctx.state);
+ const row=(id,kind)=>({id,day,at,kind,payload:prior});
+ const original=JSON.stringify([row('manual-keep','manual'),row('switch-keep','before-account-switch')]);
+ storage.setItem(LOCAL_BACKUPS_KEY,original);
+ const boardBefore=storage.getItem(SYNC_STORE_KEY),headBefore=storage.getItem(LOCAL_HEAD_KEY);
+ const write=storage.setItem;
+ storage.setItem=(key,value)=>{
+  if(key===LOCAL_BACKUPS_KEY){const error=Error('browser quota');error.name='QuotaExceededError';throw error;}
+  write(key,value);
+ };
+ ctx.addTask('Unsaved after quota');
+ assert.equal(await ctx.persist(),false);
+ assert.equal(storage.getItem(LOCAL_BACKUPS_KEY),original,'failed retries cannot drop protected recovery rows');
+ assert.equal(storage.getItem(SYNC_STORE_KEY),boardBefore);
+ assert.equal(storage.getItem(LOCAL_HEAD_KEY),headBefore);
+});
+
+test('RISK LOCAL BACKUPS: parseable but unrestorable history cannot be retired for quota',async()=>{
+ const storage=sharedScannerStorage(),{ctx}=await loadApp({sharedStorage:storage});
+ const invalid=JSON.stringify({tasks:[{id:'__proto__',title:'Unreadable',createdAt:1}]});
+ assert.equal(ctx.validSavedPayload(invalid),false,'the row is not a valid restore point');
+ const at=Date.now(),row={id:'unrestorable',day:ctx.backupDay(at),at:at-1000,kind:'before-restore',payload:invalid};
+ const raw=JSON.stringify([row]);storage.setItem(LOCAL_BACKUPS_KEY,raw);
+ assert.equal(ctx.saveLocalBackup('daily',JSON.stringify(ctx.state)),false);
+ assert.equal(storage.getItem(LOCAL_BACKUPS_KEY),raw,'the original unreadable source remains byte-for-byte available');
+});
+
+test('RISK LOCAL BACKUPS: an unreadable index explains the paused save without claiming quota',async()=>{
+ const storage=sharedScannerStorage({[LOCAL_BACKUPS_KEY]:'damaged backup bytes'});
+ const {ctx}=await loadApp({sharedStorage:storage});
+ ctx.addTask('Still in memory');
+ assert.equal(await ctx.persist(),false);
+ assert.match(ctx.document.getElementById('toast').textContent,/unreadable backup/i);
+ assert.doesNotMatch(ctx.document.getElementById('toast').textContent,/storage is full/i);
+});
+
+test('RISK CLOUD BACKUP: quota retirement keeps the exact prior board needed for adoption',async()=>{
+ const local=syncState({tasks:[syncTask('local','Local')],syncRev:2});
+ const remote=syncState({tasks:[syncTask('remote','Remote')]});
+ const h=makeSyncHarness({remote,rev:3});
+ const storage=sharedScannerStorage({[SYNC_STORE_KEY]:JSON.stringify(local)});
+ const {ctx}=await loadApp({sharedStorage:storage,cloudSyncFactory:h.factory});
+ ctx.state.tasks.push(syncTask('unsaved','Unsaved before adoption'));
+ const priorBoard=JSON.stringify(ctx.state),at=Date.now(),day=ctx.backupDay(at);
+ const old={id:'old-auto',day,at:at-5000,kind:'before-restore',payload:JSON.stringify(local)};
+ storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify([old]));
+ const write=storage.setItem;
+ storage.setItem=(key,value)=>{
+  if(key===LOCAL_BACKUPS_KEY && JSON.parse(value).some(entry=>entry.id==='old-auto')){
+   const error=Error('browser quota');error.name='QuotaExceededError';throw error;
+  }
+  write(key,value);
+ };
+ await ctx.cloudPull();await syncSettle(30);
+ assert.equal(ctx.reconciled(),true,'the reconciled board is accepted after a safe backup fits');
+ const saved=JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY));
+ assert.ok(saved.some(entry=>entry.kind==='before-cloud-adoption'&&entry.payload===priorBoard),'the exact prior board survives retirement and remains restorable');
+ assert.ok(!saved.some(entry=>entry.id==='old-auto'));
+ assert.deepEqual(new Set(Array.from(ctx.state.tasks,task=>task.id)),new Set(['local','unsaved','remote']));
+});
+
 test('LOCAL BACKUPS: a user can remove an old recovery copy without changing the board',async()=>{
   const {ctx,shim}=await loadApp();
   ctx.addTask('Current board');
