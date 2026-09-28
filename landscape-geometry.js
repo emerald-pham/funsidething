@@ -80,7 +80,7 @@
       const flightY=flying?Math.max(0,ageY-motionAge(takeoffEvent,'y',index)):0;
       const water=vessel('duck',e.lane,x,ageY-flightY,e.reverse);
       const lift=7*flightY*(1-Math.exp(-flightY));
-      return {x:x+direction*1.5*flightX*flightX,y:water.y+Math.sin(ageY-flightY+index)*.3-lift,
+      return {x:x+direction*1.5*flightX*flightX,y:water.y+Math.sin(ageY-flightY+index)*.3-lift,waterY:water.y,
         scale:Math.min(.75,water.scale*.82),direction,flying,wing:Math.sin(flightY*13+index)*5};
     }
     function waterDepth(e,t){
@@ -197,6 +197,43 @@
         softness:depth=>Math.min(softMax,Math.max(0,depth)/softDepth*softMax),
         contactAlpha:depth=>alpha+(1-alpha)*Math.max(0,1-Math.max(0,depth)/contactDepth)};
     }
+    function castShadow(sky,height,width){
+      const sun=sky?.sun||{},moon=sky?.moon||{},illumination=clamp(sky?.illumination);
+      // Direct light comes from a body above the horizon. A dim crescent
+      // cannot replace daylight, and the stars together have no single ray.
+      const sunStrength=sun.altitude>0? .1+.08*Math.sin(Math.min(90,sun.altitude)*Math.PI/180):0;
+      const moonStrength=moon.altitude>0&&illumination>.08?
+        (.022+.05*illumination)*Math.sin(Math.min(90,moon.altitude)*Math.PI/180)**.5:0;
+      const source=sunStrength>=moonStrength&&sunStrength>0?'sun':moonStrength>.014?'moon':'stars';
+      const body=source==='sun'?sun:moon;
+      const altitude=source==='stars'?90:Math.max(3,Number(body.altitude)||0);
+      const length=source==='stars'?0:Math.min(Math.max(3,height),
+        Math.max(3,height)*.75/Math.tan(altitude*Math.PI/180));
+      const azimuth=(Number(body.azimuth)||0)*Math.PI/180;
+      const dx=source==='stars'?0:Math.sin(azimuth)*length;
+      const dy=source==='stars'?0:-Math.cos(azimuth)*length*.27;
+      return {source,dx,dy,rx:Math.max(1,width*.42+length*.48),ry:Math.max(.7,width*.16+length*.07),
+        alpha:source==='sun'?sunStrength:source==='moon'?moonStrength:.012};
+    }
+    function grassBand(kind){
+      const bounds=kind==='far'?x=>[far(x)+3,rail(x)-4]:kind==='middle'?x=>[middle(x)+3,near(x)-12]:x=>[near(x)+30,H-3];
+      const depth=Array.from({length:9},(_,i)=>{const [top,bottom]=bounds(W*i/8);return Math.max(0,bottom-top);})
+        .reduce((sum,value)=>sum+value,0)/9;
+      const density=.0033*(kind==='near'?1:.72),count=Math.max(1,Math.round(W*depth*density));
+      const scale=Math.max(.65,Math.min(1.25,H/844));
+      const height=(kind==='far'?1.4:kind==='middle'?2.8:5)*scale;
+      const salt=kind==='far'?3100:kind==='middle'?4100:5100;
+      const random=n=>unit(Math.sin(n*127.1+311.7)*43758.5453);
+      const blades=[];
+      // The railway sometimes meets the far hill. Retry those hidden samples
+      // so the remaining visible strip does not lose grass density.
+      for(let i=0;blades.length<count&&i<count*12;i++){
+        const x=random(i+salt)*W,[top,bottom]=bounds(x);
+        if(bottom<=top)continue;
+        blades.push({x,y:top+random(i+salt+671)*Math.max(0,bottom-top),height:height*(.65+random(i+salt+1073)*.7),seed:random(i+salt+1973)});
+      }
+      return blades;
+    }
     function dolphin(progress,lane,reverse=false,verticalProgress=progress){
       const direction=reverse?-1:1,depth=Math.max(1,shore-waterTop),scale=Math.min(1.2,W/560,depth/20);
       const x=W*(.2+.6*lane)+direction*(progress-.5)*45,waterY=waterTop+depth*.6;
@@ -220,7 +257,7 @@
     }
     const sunReflection=sun=>sun.visible&&sun.altitude>0;
     const ripple=(i,t,wind=1)=>({alpha:.15+.75*(.5+.5*Math.sin(t*wind*1.3+i*1.71))**2,drift:Math.sin(t*wind*.5+i)*9,width:.65+.35*Math.sin(t*.9+i)**2});
-    return {routeProgress,motionProgress,motionAge,verticalOffset,visitPose,woodlandPose,duckPose,waterDepth,cycleLeg,deerLeg,nestVisit,eventDepth,dogPose,skater,fireworks,flock,dolphin,starReflection,reflectionSurface,sunReflection,depthBand,groundAnchor,groundTravelX,groundPose,strideArm,strideFoot,wingFold,balloonDrift,vessel,foregroundTree,nest,ripple,horizon,waterTop,far,middle,near,rail,trail,lowerRail,railCars,tangent,rider,pack};
+    return {routeProgress,motionProgress,motionAge,verticalOffset,visitPose,woodlandPose,duckPose,waterDepth,cycleLeg,deerLeg,nestVisit,eventDepth,dogPose,skater,fireworks,flock,dolphin,starReflection,reflectionSurface,castShadow,grassBand,sunReflection,depthBand,groundAnchor,groundTravelX,groundPose,strideArm,strideFoot,wingFold,balloonDrift,vessel,foregroundTree,nest,ripple,horizon,waterTop,far,middle,near,rail,trail,lowerRail,railCars,tangent,rider,pack};
   }
   root.LandscapeGeometry={create};
 })(globalThis);

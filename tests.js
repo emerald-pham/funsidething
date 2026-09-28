@@ -9358,7 +9358,7 @@ test('Landscape lower tram: existing cars are linked by four couplers',()=>{
   const lines=[],g={save(){},restore(){},translate(){},rotate(){},scale(){},beginPath(){},roundRect(){},fill(){},fillRect(){}};
   const geometry={lowerRail:x=>500+Math.sin(x/80)*4,tangent:()=>0};
   const rail=x=>300+Math.sin(x/100)*2,p={city:'#456',night:0},S={mixHex:value=>value};
-  vm.runInNewContext(`${code};transport(500,0,.5,${isTrain},false)`,{g,geometry,rail,p,S,ellipse(){},line(g,...args){lines.push(args);}});
+  vm.runInNewContext(`${code};transport(500,0,.5,${isTrain},false)`,{g,geometry,rail,p,S,ellipse(){},paintGroundShadow(){},line(g,...args){lines.push(args);}});
   return lines.filter(args=>args[5]===1.6&&args[4]===p.city);
  };
  const tram=render(true),middleTrain=render(false);
@@ -9392,7 +9392,7 @@ test('Landscape water: the actual skyline shares the full-size sky mirror',()=>{
  assert.doesNotMatch(runtime,/sky\.sun\.visible\?sky\.sun:sky\.moon/);
 });
 
-test('Landscape water: one continuous mirror reflects night sky objects while vessels keep their own reflections',()=>{
+test('RISK landscape water: the sky and every floating visitor keep a full-height reflection by day and night',()=>{
  const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
  for(const [w,h] of [[320,568],[844,390],[1440,900]]){
   const g=ctx.LandscapeGeometry.create(w,h),surface=g.reflectionSurface(1);
@@ -9403,9 +9403,71 @@ test('Landscape water: one continuous mirror reflects night sky objects while ve
  const runtime=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
  assert.match(runtime,/reflectionContext\.drawImage\(skyCity/,'the painted Moon, stars, and any other nearby sky object enter the reflected canvas');
  assert.match(runtime,/paintHorizonReflection\(reflectionCanvas/,'airplanes and every other moving sky visitor share the rule');
+ const helperStart=runtime.indexOf('  function reflectWaterObject('),helperEnd=runtime.indexOf('  function paintVessel(',helperStart);
+ assert.ok(helperStart>=0&&helperEnd>helperStart,'water visitors share a reflection painter');
+ const helper=runtime.slice(helperStart,helperEnd),run=night=>{
+  const calls=[],g={globalAlpha:1,save(){calls.push(['save']);},restore(){calls.push(['restore']);},beginPath(){},lineTo(){},closePath(){},clip(){calls.push(['clip']);},rect(...args){calls.push(['rect',...args]);},translate(...args){calls.push(['translate',...args]);},scale(...args){calls.push(['scale',...args]);}};
+  vm.runInNewContext(`${helper};reflectWaterObject(250,()=>calls.push(['paint',g.globalAlpha]))`,{g,path(){},far:()=>220,W:390,H:844,geometry:{waterTop:180},p:{night},calls});
+  return calls;
+ };
+ for(const night of [0,1]){
+  const calls=run(night);
+  assert.ok(calls.filter(call=>call[0]==='clip').length>=2,'the reflection clips to both the lake and its own waterline');
+  assert.deepEqual(Array.from(calls.find(call=>call[0]==='rect')),["rect",0,250,390,594]);
+  assert.deepEqual(Array.from(calls.find(call=>call[0]==='translate')),["translate",0,500]);
+  assert.deepEqual(Array.from(calls.find(call=>call[0]==='scale')),["scale",1,-1],'the entire visible silhouette keeps its height');
+  assert.ok(calls.find(call=>call[0]==='paint')[1]>0,'the reflection is visible at this scene time');
+ }
  const vessel=runtime.slice(runtime.indexOf('  function paintVessel('),runtime.indexOf('  function paintIceCreamStand('));
- assert.match(vessel,/p\.night\s*>\s*\.05/,'boats reflect only when the real sky is dark');
- assert.match(vessel,/g\.scale\(direction\*scale,-scale\*/,'the full boat silhouette mirrors downward from its waterline');
+ assert.match(vessel,/reflectWaterObject\(/,'boats and riders use the full-height water mirror');
+ assert.doesNotMatch(vessel,/-scale\*\.62|if\(p\.night>\.05\)/,'boats do not squeeze or omit their daytime reflections');
+ for(const kind of ['dolphin','duck','fish']){
+  const section=runtime.slice(runtime.indexOf(`    if(e.type==='${kind}')`),runtime.indexOf("    if(e.type==='",runtime.indexOf(`    if(e.type==='${kind}')`)+5));
+  assert.match(section,/reflectWaterObject\(/,`${kind} mirrors its above-water body`);
+ }
+});
+
+test('RISK landscape shadows: grounded objects share the dominant celestial light',()=>{
+ const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
+ const geometry=ctx.LandscapeGeometry.create(390,844);
+ const sky=(sunAltitude,sunAzimuth,moonAltitude=-20,moonAzimuth=270,illumination=0)=>({sun:{altitude:sunAltitude,azimuth:sunAzimuth,visible:sunAltitude>0},moon:{altitude:moonAltitude,azimuth:moonAzimuth,visible:moonAltitude>0},illumination});
+ const morning=geometry.castShadow(sky(12,90),45,12),noon=geometry.castShadow(sky(70,180),45,12),evening=geometry.castShadow(sky(12,270),45,12);
+ const moon=geometry.castShadow(sky(-25,90,35,270,1),45,12),stars=geometry.castShadow(sky(-25,90,-15,270,0),45,12);
+ assert.equal(morning.source,'sun');assert.equal(evening.source,'sun');assert.ok(morning.dx>0&&evening.dx<0,'sun shadows turn with the sun');
+ assert.ok(Math.abs(morning.dx)>Math.abs(noon.dx)+5,'low sun casts a longer shadow than high sun');
+ assert.equal(moon.source,'moon');assert.ok(moon.dx<0,'moon shadows follow the Moon, not the absent Sun');
+ assert.equal(stars.source,'stars');assert.equal(stars.dx,0,'starlight is diffuse rather than a fake directional beam');
+ assert.ok(morning.alpha>moon.alpha&&moon.alpha>stars.alpha&&stars.alpha>0,'light-source strength controls shadow opacity');
+ assert.ok(morning.alpha<.2&&Math.abs(morning.dx)<45*1.15,'low-sun shadows remain subtle at scenery scale');
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ assert.match(source,/function paintGroundShadow\(/,'the scene has one shadow painter');
+ assert.match(source,/paintGroundShadow\(b,x,rail\(x\)\+55/,'elevated railway supports cast on the far terrain');
+ assert.match(source,/railShade=geometry\.castShadow\(sky,16,8\)/,'the railway deck has the same time-of-day light');
+ assert.ok((source.match(/paintGroundShadow\(b,t\.x,t\.y/g)||[]).length>=2,'middle and foreground trees use the shared source');
+ assert.match(source,/paintGroundShadow\(g,xx,track\(xx\)/,'metro and train cars use the same source');
+ assert.match(source,/paintGroundEventShadow\(e,/,'other grounded visitors use the same source');
+ assert.match(source,/groundShadow:paintGroundShadow/,'winter visitors use the same source');
+});
+
+test('RISK landscape grass: visible far, middle, and near ground keep depth-scaled detail density',()=>{
+ const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
+ for(const [W,H] of [[390,844],[568,320],[820,1180]]){
+  const geometry=ctx.LandscapeGeometry.create(W,H),bands=['far','middle','near'].map(kind=>geometry.grassBand(kind));
+  assert.ok(bands.every(band=>band.length>0),'every visible ground band receives grass');
+  const avgHeight=band=>band.reduce((sum,blade)=>sum+blade.height,0)/band.length;
+  assert.ok(avgHeight(bands[0])<avgHeight(bands[1])&&avgHeight(bands[1])<avgHeight(bands[2]),'grass gets smaller with distance');
+  for(const [index,kind] of ['far','middle','near'].entries()){
+   const band=bands[index],bounds=x=>kind==='far'?[geometry.far(x)+3,geometry.rail(x)-4]:kind==='middle'?[geometry.middle(x)+3,geometry.near(x)-12]:[geometry.near(x)+30,H-3];
+   for(const blade of band){const [top,bottom]=bounds(blade.x);assert.ok(blade.y>=top&&blade.y<=bottom,`${kind} grass stays on its ground`);}
+  }
+  const density=(band,kind)=>{let depth=0;for(let i=0;i<9;i++){const x=W*i/8;depth+=kind==='far'?Math.max(0,geometry.rail(x)-4-(geometry.far(x)+3)):kind==='middle'?Math.max(0,geometry.near(x)-12-(geometry.middle(x)+3)):Math.max(0,H-3-(geometry.near(x)+30));}return band.length/(W*depth/9);};
+  const farDensity=density(bands[0],'far'),midDensity=density(bands[1],'middle'),nearDensity=density(bands[2],'near');
+  assert.ok(farDensity>nearDensity*.45&&farDensity<nearDensity*1.1,'far grass density is scaled to its narrow visible band');
+  assert.ok(midDensity>nearDensity*.45&&midDensity<nearDensity*1.1,'middle grass density is comparable per visible area');
+ }
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ assert.match(source,/geometry\.grassBand\(kind\)/,'the grass painter uses the geometry bands');
+ for(const kind of ['far','middle','near'])assert.match(source,new RegExp(`paintGrass\\('${kind}'`),`${kind} grass is painted`);
 });
 
 test('RISK landscape water: the full above-horizon scene and weather can reflect at every scene time',()=>{
@@ -9561,7 +9623,7 @@ test('RISK landscape trains: track deck, supports, and overhead electrical stay 
  const render=night=>{
   const strokes=[],lines=[],stack=[];
   const b={globalAlpha:1,pathY:null,save(){stack.push(this.globalAlpha);},restore(){this.globalAlpha=stack.pop();},stroke(){strokes.push({y:this.pathY,alpha:this.globalAlpha});}};
-  vm.runInNewContext(railPass,{b,night,W:390,rail:()=>430,path(ctx,fn){ctx.pathY=fn(0);},line(ctx,x,y,x2,y2){lines.push({x,y,x2,y2,alpha:ctx.globalAlpha});},p:{city:'#456',far:'#789'},S:{mixHex:()=> '#aaa'}});
+  vm.runInNewContext(railPass,{b,night,W:390,rail:()=>430,path(ctx,fn){ctx.pathY=fn(0);},line(ctx,x,y,x2,y2){lines.push({x,y,x2,y2,alpha:ctx.globalAlpha});},paintGroundShadow(){},geometry:{castShadow:()=>({alpha:.1,dx:0,dy:0})},sky:{},p:{city:'#456',far:'#789'},S:{mixHex:()=> '#aaa'}});
   assert.equal(b.globalAlpha,1,'rail opacity cannot dim later terrain and foreground trees');
   return {strokes,lines};
  };
@@ -9587,6 +9649,14 @@ test('RISK landscape trains: the current changelog describes the intact night ra
  assert.ok(entry,'the current changelog is present');
  assert.match(entry,/railway keeps its deck, supports, and overhead electrical at night/);
  assert.doesNotMatch(entry,/overhead wire fades at night/);
+});
+
+test('RISK landscape shadows: the current changelog describes reflections, celestial shade, and depth-scaled grass',()=>{
+ const entry=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)?.[1];
+ assert.ok(entry,'the current changelog is present');
+ assert.match(entry,/Floating boats and water wildlife now reflect their complete visible shapes at natural height/);
+ assert.match(entry,/Railway and ground shadows follow the Sun or Moon/);
+ assert.match(entry,/Far, middle, and foreground grass now share depth-scaled detail and density/);
 });
 
 test('RISK landscape water: full-frame animation reuses its reflection buffers',()=>{
@@ -10004,7 +10074,8 @@ test('Landscape stand: path visitors sort behind the counter and meadow visitors
  }
  const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
  assert.match(source,/groundPass\.sort\(\(a,b\)=>a.depth-b.depth\)/);
- assert.match(source,/depth:[^\n]*geometry\.eventDepth\(e\)/);
+ assert.match(source,/const depth=[^\n]*geometry\.eventDepth\(e\)/);
+ assert.match(source,/return \{depth,draw:/,'the depth still orders visitors before drawing');
 });
 
 test('RISK Animation audit: water and visitors keep a thirty-fps paint cap while time advances',()=>{
@@ -10078,7 +10149,7 @@ test('Animation poses: nesting birds depart before their event expires',()=>{
 
 test('Animation poses: a dogs planted paw does not slide as it follows its owner',()=>{
  const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
- const dogCode=source.slice(source.indexOf("      if(e.type==='dogwalker'){"),source.indexOf("    if(e.type==='dolphin'){"));
+ const dogCode=source.slice(source.indexOf("      if(e.type==='dogwalker'){",source.indexOf('  function paintGuest(')),source.indexOf("    if(e.type==='dolphin'){"));
  const step=dogCode.match(/const foot=geometry\.strideFoot\([^;]+;/)[0];
  const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
  const geometry=ctx.LandscapeGeometry.create(1000,800);
@@ -10118,7 +10189,7 @@ test('Animation boundaries: fish emerge and submerge smoothly in either directio
  const code=source.slice(source.indexOf("    if(e.type==='fish'){"),source.indexOf("    if(e.type==='butterfly'){"));
  function frame(f,dir=1){
   const shapes=[],stack=[],g={globalAlpha:1,save(){stack.push(this.globalAlpha);},restore(){this.globalAlpha=stack.pop();},beginPath(){},ellipse(){},stroke(){}};
-  vm.runInNewContext(`(function(){${code}})()`,{TAU:Math.PI*2,e:{type:'fish'},f,dir,anchor:400,H:800,geometry:{waterTop:300},g,Math,S:livingSky(),c:'fish',p:{sky:['#fff','#fff','#fff']},ellipse(ctx,x,y,rx,ry){shapes.push({x,y,alpha:ctx.globalAlpha});}});
+  vm.runInNewContext(`(function(){${code}})()`,{TAU:Math.PI*2,e:{type:'fish'},f,dir,anchor:400,H:800,geometry:{waterTop:300},g,Math,S:livingSky(),c:'fish',p:{sky:['#fff','#fff','#fff']},reflectWaterObject(){},ellipse(ctx,x,y,rx,ry){shapes.push({x,y,alpha:ctx.globalAlpha});}});
   assert.equal(g.globalAlpha,1,'fish cannot fade later visitors');return shapes[0];
  }
  assert.equal(frame(0).alpha,0);assert.equal(frame(1).alpha,0);
@@ -11085,7 +11156,7 @@ test('Seasonal ambience: winter retires ice cream, flowers, fireflies and founta
  assert.match(source,/sceneSeason!=='winter'&&W>650&&visitSeed>\.25/);
  assert.match(source,/sceneSeason!=='winter'&&p.night>\.15/);
  assert.match(source,/if\(sceneSeason!=='winter'\)for\(let i=-1;i<=1;i\+\+\)/);
- assert.match(source,/if\(sceneSeason!=='winter'\)for\(let i=0;i<140;i\+\+\)/);
+ assert.match(source,/function paintGrass\(kind,ground\)\{\s*if\(sceneSeason==='winter'\)return;/);
 });
 
 test('Landscape config: nighttime picks honor the selected season pool', () => {
@@ -12320,7 +12391,7 @@ test('Landscape waterfront: small water visitors stay readable at harbor scale',
   const g = { globalAlpha: 1, save() {}, restore() {}, beginPath() {}, ellipse() {}, stroke() {} };
   vm.runInNewContext(`(function(){${fish}})()`, {
     TAU: Math.PI * 2, e: { type: 'fish' }, f: .5, dir: 1, anchor: 400, H: 800,
-    geometry: { waterTop: 300 }, g, Math, S: livingSky(), c: 'fish', p: { sky: ['#fff', '#fff', '#fff'] },
+    geometry: { waterTop: 300 }, g, Math, S: livingSky(), c: 'fish', p: { sky: ['#fff', '#fff', '#fff'] },reflectWaterObject(){},
     ellipse(ctx, x, y, rx, ry) { shapes.push({ x, y, rx, ry }); },
   });
   assert.ok(shapes[0].rx >= 4.5 && shapes[0].ry >= 2.25,
