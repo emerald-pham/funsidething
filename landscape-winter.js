@@ -165,7 +165,12 @@
     const shadowX = type === 'snowangel' ? poseValue.imprintX : poseValue.x;
     const shadowY = type === 'snowangel' ? poseValue.imprintGroundY : poseValue.groundY;
     g.globalAlpha = sceneAlpha;
-    drawEllipse(shadowX, shadowY + depthScale * .7, 14 * depthScale, 2.2 * depthScale, snowShadow);
+    if (typeof helpers.groundShadow === 'function') {
+      g.globalAlpha *= type === 'snowman' ? clamp(poseValue.build) : 1;
+      helpers.groundShadow(g, shadowX, shadowY, type === 'snowman' ? 24 * depthScale :
+        type === 'skier' ? 18 * depthScale : 5 * depthScale, 14 * depthScale, snowShadow);
+      g.globalAlpha = sceneAlpha;
+    } else drawEllipse(shadowX, shadowY + depthScale * .7, 14 * depthScale, 2.2 * depthScale, snowShadow);
 
     if (type === 'snowman') {
       g.globalAlpha = sceneAlpha * clamp(poseValue.structureAlpha);
@@ -187,6 +192,8 @@
       if (poseValue.builderVisible) {
         g.save();
         g.globalAlpha = sceneAlpha * clamp(poseValue.builderAlpha);
+        if (typeof helpers.groundShadow === 'function')
+          helpers.groundShadow(g, poseValue.builderX, poseValue.builderGroundY, 14 * depthScale, 7 * depthScale, snowShadow);
         const builderX = poseValue.builderX;
         const builderY = poseValue.builderGroundY;
         const s = poseValue.builderScale;

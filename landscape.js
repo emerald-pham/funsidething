@@ -106,6 +106,23 @@
   function hill(ctx,fn,color){path(ctx,fn);ctx.lineTo(W,H);ctx.lineTo(0,H);ctx.closePath();ctx.fillStyle=color;ctx.fill();}
   function ellipse(ctx,x,y,rx,ry,color){ctx.beginPath();ctx.ellipse(x,y,rx,ry,0,0,TAU);ctx.fillStyle=color;ctx.fill();}
   function line(ctx,x,y,x2,y2,color,width=1){ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x2,y2);ctx.strokeStyle=color;ctx.lineWidth=width;ctx.stroke();}
+  function paintGroundShadow(ctx,x,y,height,width,ground=p.front,strength=1){
+    const shade=geometry.castShadow(sky,height,width);
+    ctx.save();ctx.globalAlpha*=shade.alpha*strength;
+    ctx.beginPath();ctx.ellipse(x+shade.dx*.5,y+shade.dy*.5,shade.rx,shade.ry,
+      Math.atan2(shade.dy,shade.dx),0,TAU);
+    ctx.fillStyle=S.mixHex(ground,'#203d37',.68);ctx.fill();ctx.restore();
+  }
+  function paintGrass(kind,ground){
+    if(sceneSeason==='winter')return;
+    for(const blade of geometry.grassBand(kind)){
+      const ink=S.mixHex(ground,blade.seed>.78?'#dfc995':'#b7c79b',.15+(1-p.night)*.11);
+      line(b,blade.x,blade.y,blade.x-blade.height*.3,blade.y-blade.height,ink,
+        kind==='near'?.7:kind==='middle'?.55:.45);
+      if(kind==='near'&&blade.seed>.89)ellipse(b,blade.x-blade.height*.3,blade.y-blade.height,
+        1.2,.9,S.mixHex('#e7c98a',ground,p.night*.8));
+    }
+  }
   function tree(ctx,x,y,size,color,variant=0){
     treeOrigins.push({x,y,size,variant});
     if(sceneSeason==='autumn')color=S.mixHex(['#a76c43','#bb864d','#c59b59','#956343'][Math.floor(rand(x+y)*4)],p.front,p.night*.5);
@@ -211,11 +228,18 @@
       line(b,x,y,x+8+rand(i)*28,y,S.mixHex(p.sky[2],p.city,.18),.6);
     }
     hill(b,far,p.far);
+    paintGrass('far',p.far);
     // Viaduct, stations and catenary are below the skyline, behind the cycle hills.
     // Keep the deck, supports, and overhead electrical together at every
     // hour; fading any one leaves the passing metro visibly disconnected.
-    for(let x=15;x<W;x+=65){line(b,x,rail(x)+3,x,rail(x)+55,S.mixHex(p.city,p.far,.4),5);}
-    path(b,rail);b.strokeStyle=S.mixHex(p.city,'#d6d6bb',.45);b.lineWidth=8;b.stroke();
+    for(let x=15;x<W;x+=65){
+      paintGroundShadow(b,x,rail(x)+55,55,5,p.far,.55);
+      line(b,x,rail(x)+3,x,rail(x)+55,S.mixHex(p.city,p.far,.4),5);
+    }
+    const railShade=geometry.castShadow(sky,16,8);
+    b.save();b.shadowColor=`rgba(22,46,41,${railShade.alpha*.6})`;
+    b.shadowOffsetX=railShade.dx*.45;b.shadowOffsetY=railShade.dy*.45+1;b.shadowBlur=2;
+    path(b,rail);b.strokeStyle=S.mixHex(p.city,'#d6d6bb',.45);b.lineWidth=8;b.stroke();b.restore();
     path(b,x=>rail(x)-4);b.strokeStyle=S.mixHex(p.city,'#334d4a',.3);b.lineWidth=1.2;b.stroke();
     // The metro is drawn at 72% scale; its roof is about nine pixels above
     // the rail. Keep the wire and crossarms close to that roof, not at the
@@ -224,6 +248,7 @@
     path(b,x=>rail(x)-13);b.strokeStyle=p.city;b.lineWidth=.5;b.stroke();
     layer("middle",Math.max(0,hy+H*.14-85));
     hill(b,middle,p.hill);
+    paintGrass('middle',p.hill);
     // Long, gentle contour bands give the hills volume without texture downloads.
     for(let i=0;i<3;i++){path(b,x=>middle(x)+15+i*8);b.strokeStyle=`rgba(225,236,184,${.055*(1-night)})`;b.lineWidth=3;b.stroke();}
     // Carry every road stroke past the viewport so its end caps cannot show
@@ -238,7 +263,7 @@
     }
     const nest=geometry.nest();midTrees.push({x:nest.treeX,y:nest.ground,size:54,variant:.6});
     // Shadows belong to the ground, never to a later tree's foreground pass.
-    for(const t of midTrees)ellipse(b,t.x,t.y+1,t.size*.22,2,S.mixHex(p.hill,p.front,.7));
+    for(const t of midTrees)paintGroundShadow(b,t.x,t.y,t.size,t.size*.44,p.hill);
     for(const t of midTrees.sort((a,b)=>a.y-b.y))tree(b,t.x,t.y,t.size,S.mixHex(p.hill,p.front,.6),t.variant);
     if(W>650){
       // A short secondary walking loop rejoins the main path; it never crosses rails.
@@ -259,8 +284,12 @@
     path(b,x=>trail(x)+10,W*.18,W*.18+49,7);b.strokeStyle=S.mixHex('#d2c8ab',p.front,night*.7);b.lineWidth=1;b.stroke();
     layer("front",Math.max(0,hy+H*.35));
     hill(b,near,p.front);
+    paintGrass('near',p.front);
     // A lower rail line is distinct from the elevated metro.
-    path(b,x=>near(x)+H*.07);b.strokeStyle=S.mixHex(p.front,'#b6b89c',.25);b.lineWidth=6;b.stroke();
+    const lowerRailShade=geometry.castShadow(sky,8,6);
+    b.save();b.shadowColor=`rgba(22,46,41,${lowerRailShade.alpha*.5})`;
+    b.shadowOffsetX=lowerRailShade.dx*.35;b.shadowOffsetY=lowerRailShade.dy*.35+1;b.shadowBlur=1.5;
+    path(b,x=>near(x)+H*.07);b.strokeStyle=S.mixHex(p.front,'#b6b89c',.25);b.lineWidth=6;b.stroke();b.restore();
     path(b,x=>near(x)+H*.07);b.strokeStyle=S.mixHex(p.front,'#c2c6aa',.38);b.lineWidth=1;b.stroke();
     layer("trees-ground",Math.max(0,hy+H*.35-85));
     const planted=[];
@@ -269,13 +298,7 @@
       if(planted.some(tree=>Math.abs(tree.x-x)<Math.max(tree.size,size)*.3&&Math.abs(tree.y-y)<22))continue;
       planted.push({x,y,size,variant:rand(i+910)});
     }
-    // Tiny wildflower groups and grasses are static; wind is confined to the overlay.
-    if(sceneSeason!=='winter')for(let i=0;i<140;i++){
-      const x=rand(i+900)*W,y=near(x)+30+rand(i+950)*(H-near(x));
-      line(b,x,y,x-2,y-5,S.mixHex(p.front,'#b7c79b',.17),.7);
-      if(rand(i+970)>.63)ellipse(b,x-2,y-5,1.4,1,S.mixHex('#e7c98a',p.front,night*.8));
-    }
-    for(const t of planted)ellipse(b,t.x,t.y+1,t.size*.22,2,S.mixHex(p.front,'#183d32',.2));
+    for(const t of planted)paintGroundShadow(b,t.x,t.y,t.size,t.size*.44,p.front);
     // Cached depth bands keep train occlusion correct without repainting foliage each frame.
     for(const band of ['back','front']){
       layer('trees-'+band,Math.max(0,hy+H*.35-85));
@@ -330,12 +353,44 @@
         const previous=cars[i-1].x,from=xx+cw/2*scale*dir,to=previous-cw/2*scale*dir;
         line(g,from,track(from)-5,to,track(to)-5,p.city,1.6);
       }
+      paintGroundShadow(g,xx,track(xx),isTrain?11:8,cw*scale,p.front);
       g.save();g.translate(xx,cars[i].y-2);g.rotate(cars[i].angle);g.scale(dir*scale,scale);
       g.fillStyle=S.mixHex(isTrain?'#e4cfa5':'#dceade',p.city,p.night*.3);g.beginPath();g.roundRect(-cw/2,-10,cw,8,2);g.fill();
       g.fillStyle=isTrain?'#bb8275':'#77a8a2';g.fillRect(-cw/2,-5,cw,2);
       g.fillStyle=p.night>.4?'#edce89':'#71969c';for(let j=3;j<cw-3;j+=5)g.fillRect(-cw/2+j,-8,3,2);
       ellipse(g,-cw/2+4,-1,1.5,1.5,p.city);ellipse(g,cw/2-4,-1,1.5,1.5,p.city);g.restore();
     }
+  }
+  function paintGroundEventShadow(e,depth){
+    if(globalThis.LandscapeWinter?.types.includes(e.type))return;
+    const f=geometry.routeProgress(e,'x'),progress=e.reverse?1-f:f;
+    const x=-160+progress*(W+320),fade=S.smooth(0,.06,f)*(1-S.smooth(.94,1,f));
+    g.save();g.globalAlpha*=fade;
+    if(e.type==='cyclist'){
+      geometry.pack(x,e.count||S.groupSize('cyclist',e.seed),e.reverse).forEach(pose=>
+        paintGroundShadow(g,pose.x,trail(pose.x),15,12,p.hill));
+    }else if(['reader','picnic','couple','kite'].includes(e.type)){
+      const visit=geometry.visitPose(e,geometry.motionProgress(e,'x'));
+      for(const offset of e.type==='picnic'||e.type==='couple'?[-11,11]:[0]){
+        const xx=visit.x+offset;paintGroundShadow(g,xx,trail(xx)+20,14,7,p.hill);
+      }
+    }else if(['walker','dogwalker','rabbit','deer'].includes(e.type)){
+      const pose=geometry.groundPose(e.type==='dogwalker'?'walker':e.type,e);
+      paintGroundShadow(g,pose.x,pose.y,e.type==='deer'?18:e.type==='rabbit'?6:14,e.type==='deer'?15:7,p.hill);
+      if(e.type==='dogwalker'){
+        const dog=geometry.dogPose(pose.x,pose.distance,pose.direction);
+        paintGroundShadow(g,dog.x,dog.y,7,9,p.hill);
+      }
+    }else if(['skateboarder','rollerskater','hoverboard','scooter'].includes(e.type)){
+      paintGroundShadow(g,x,trail(x),18,12,p.hill);
+    }else if(e.type==='abduction'){
+      const lift=Math.sin(S.clamp((geometry.motionProgress(e,'y')-.25)/.5)*Math.PI);
+      if(lift<.1){
+        const xx=W*(.18+e.lane*.62);
+        paintGroundShadow(g,xx,middle(xx)+30,8,10,p.hill);
+      }
+    }
+    g.restore();
   }
   function paintLife(t){
     visibleBanners=[];
@@ -445,7 +500,10 @@
     for(const e of world.events)if(e.type==='metro')paintEvent(e,t);
     composite('middle');
     // Ground contact determines occlusion, including props previously baked into the hill.
-    const groundPass=world.events.filter(e=>!airborne.has(e.type)&&e.type!=='metro'&&e.type!=='train'&&e.type!=='snowangel').map(e=>({depth:globalThis.LandscapeWinter?.types.includes(e.type)?LandscapeWinter.pose(e.type,e,geometry,W,H).y:geometry.eventDepth(e),draw:()=>paintEvent(e,t)}));
+    const groundPass=world.events.filter(e=>!airborne.has(e.type)&&e.type!=='metro'&&e.type!=='train'&&e.type!=='snowangel').map(e=>{
+      const depth=globalThis.LandscapeWinter?.types.includes(e.type)?LandscapeWinter.pose(e.type,e,geometry,W,H).y:geometry.eventDepth(e);
+      return {depth,draw:()=>{paintGroundEventShadow(e,depth);paintEvent(e,t);}};
+    });
     if(sceneSeason!=='winter'&&W>650&&visitSeed>.25)groundPass.push({depth:trail(W*.43)+15,draw:paintIceCreamStand});
     for(const item of groundPass.sort((a,b)=>a.depth-b.depth))item.draw();
     if(W>850&&visitSeed>.45){
@@ -500,8 +558,8 @@
     const fur=S.mixHex(deer?'#bda181':rabbit?'#a99d88':fox?'#b7764f':'#92958c',p.front,p.night*.45);
     const bodyY=deer?-11:rabbit?-4:-6,hipY=deer?-9:-4,half=deer?7:rabbit?3:5;
     g.save();g.globalAlpha=S.smooth(0,.1,f)*(1-S.smooth(.85,1,f));
+    paintGroundShadow(g,pose.x,pose.y,deer?19:rabbit?8:11,(half+2)*pose.scale*2,p.front);
     g.translate(pose.x,pose.y);g.scale(pose.direction*pose.scale,pose.scale);
-    ellipse(g,0,1,half+2,1.4,S.mixHex(p.front,'#183d32',.25));
     for(const [hip,offset] of [[-half*.65,0],[half*.65,.5]]){
       const step=geometry.strideFoot(pose.distance,5,offset),kneeX=hip+step.x*.45;
       line(g,hip,hipY,kneeX,hipY*.5,fur,deer?1.5:1.8);line(g,kneeX,hipY*.5,hip+step.x,-step.lift*.4,fur,deer?1.2:1.6);
@@ -516,6 +574,15 @@
     line(g,hx+1,hy-1,hx+1,hy-(rabbit?6:4),fur,1.2);
     if(e.type==='raccoon')line(g,hx,hy,hx+2,hy,p.city,1.4);
     ellipse(g,hx+1.3,hy-.3,.45,.45,p.city);g.restore();
+  }
+  function reflectWaterObject(waterY,paint){
+    // Each visitor mirrors around its own contact with the water. Both clips
+    // keep the upright body above the surface and its mirror out of the shore.
+    g.save();path(g,far);g.lineTo(W,geometry.waterTop);g.lineTo(0,geometry.waterTop);g.closePath();g.clip();
+    g.beginPath();g.rect(0,waterY,W,Math.max(0,H-waterY));g.clip();
+    g.globalAlpha*=.22+p.night*.12;
+    g.translate(0,2*waterY);g.scale(1,-1);
+    paint();g.restore();
   }
   function paintVessel(e,t){
 
@@ -564,17 +631,15 @@
       }
     }
     };
-    if(p.night>.05){
-      // Mirror the complete silhouette from its own waterline. A vertical
-      // squeeze and low alpha keep it attached to the boat while waves pass
-      // over it; the lake clip prevents any reflected pixel reaching land.
-      g.save();path(g,far);g.lineTo(W,geometry.waterTop);g.lineTo(0,geometry.waterTop);g.closePath();g.clip();
-      g.globalAlpha=p.night*.2;g.translate(x,y);g.scale(direction*scale,-scale*.62);paintVesselShape();g.restore();
-    }
-    g.save();g.translate(x,y);g.scale(direction*scale,scale);paintVesselShape();g.restore();
+    const drawVessel=()=>{
+      g.save();g.translate(x,y);g.scale(direction*scale,scale);paintVesselShape();g.restore();
+    };
+    reflectWaterObject(y+3*scale,drawVessel);
+    drawVessel();
   }
   function paintIceCreamStand(){
     const ax=W*.43,ay=trail(ax)+15;
+    paintGroundShadow(g,ax,ay,16,21,p.hill);
     g.fillStyle=color(visitSeed);g.fillRect(ax-9,ay-12,18,12);
     for(let i=0;i<4;i++){g.fillStyle=i%2?'#fff0d6':color(visitSeed,2);g.fillRect(ax-11+i*5.5,ay-16,5.5,5);}
     ellipse(g,ax,ay-7,2,2,'#fff0d6');g.fillStyle='#c39877';g.fillRect(ax-1,ay-5,2,3);
@@ -584,7 +649,7 @@
         LandscapeRiders.paint(g,geometry,W,e,t,p,{ellipse,line,color,skinColor,personHead});return;
       }
       if(globalThis.LandscapeWinter?.types.includes(e.type)){
-        LandscapeWinter.paint(g,geometry,W,H,e,t,p,{ellipse,line,color,skinColor,personHead,S});return;
+        LandscapeWinter.paint(g,geometry,W,H,e,t,p,{ellipse,line,color,skinColor,personHead,S,groundShadow:paintGroundShadow});return;
       }
       if(['jetski','sailboat','cruise','yacht','windsurfer'].includes(e.type))return;
       const f=geometry.routeProgress(e,'x'),fy=geometry.motionProgress(e,'y'),clock=geometry.motionAge(e,'x'),verticalClock=geometry.motionAge(e,'y'),progress=e.reverse?1-f:f,x=-160+progress*(W+320);
@@ -645,7 +710,6 @@
   }
   function person(x,y,seed,pose='standing',t=0,walkAmount=1){
     const shirt=color(seed),skin=skinColor(seed);
-    ellipse(g,x,y+1,5,1.4,S.mixHex(p.front,p.hill,.5));
     personHead(g,x,y-12,2,2,seed,skin);line(g,x,y-9,x+1,y-4,shirt,3);
     const step=pose==='walk'?2+(Math.sin(t*4)*3-2)*walkAmount:2;
     line(g,x+1,y-4,x-step,y,'#647779',1.4);line(g,x+1,y-4,x+3+step,y,'#647779',1.4);
@@ -747,7 +811,6 @@
     if(e.type==='walker'||e.type==='dogwalker'){
       const pose=geometry.groundPose('walker',e);g.save();g.globalAlpha=S.smooth(0,.06,f)*(1-S.smooth(.94,1,f));
       const skin=skinColor(e.seed);
-      ellipse(g,pose.x,pose.y+1,4,1.2,S.mixHex(p.front,p.hill,.5));
       // The far arm passes behind the torso; both arms share the leg stride.
       const armAt=offset=>{const arm=geometry.strideArm(pose.distance,10,offset);line(g,pose.x,pose.y-8,pose.x+dir*arm.x,pose.y-8+arm.y,skin,1.3);};
       armAt(.5);
@@ -758,7 +821,6 @@
         const dog=geometry.dogPose(pose.x,pose.distance,dir),fur=S.mixHex(color(e.seed,2),p.city,.4),hand=geometry.strideArm(pose.distance,10,0);
         // A loose lead keeps the companion visibly paired with this owner.
         g.beginPath();g.moveTo(pose.x+dir*hand.x,pose.y-8+hand.y);g.quadraticCurveTo((pose.x+dog.x)/2,dog.y+1,dog.x-dir*2,dog.y-5);g.strokeStyle=fur;g.lineWidth=.55;g.stroke();
-        ellipse(g,dog.x,dog.y+1,5,1,S.mixHex(p.front,p.hill,.5));
         for(const [hip,offset] of [[-3,0],[3,.5]]){
           const foot=geometry.strideFoot(dog.distance,6,offset),fx=dog.x+dir*(hip+foot.x);
           line(g,dog.x+dir*hip,dog.y-3,fx,geometry.groundAnchor('walker',fx)-foot.lift,fur,1);
@@ -777,19 +839,27 @@
         const radius=3+i*3+f*5;g.beginPath();g.ellipse(pose.x-dir*i*3,pose.waterY+1,radius,Math.max(.4,radius*.13),0,0,TAU);
         g.strokeStyle=S.mixHex(p.sky[2],p.city,.25);g.lineWidth=.65;g.stroke();
       }
-      g.translate(pose.x,pose.y);g.rotate((f-.5)*.7*dir);g.scale(dir*pose.scale,pose.scale);
-      g.fillStyle=ink;g.beginPath();g.moveTo(-7,1);g.bezierCurveTo(-3,-4,3,-4,6,-1);g.lineTo(9,0);g.lineTo(5,1);g.quadraticCurveTo(0,3,-7,1);g.fill();
-      g.beginPath();g.moveTo(-1,-2);g.lineTo(-2,-6);g.lineTo(2,-2);g.moveTo(-6,1);g.lineTo(-10,-2);g.lineTo(-9,3);g.closePath();g.fill();
+      const drawDolphin=()=>{
+        g.save();g.translate(pose.x,pose.y);g.rotate((f-.5)*.7*dir);g.scale(dir*pose.scale,pose.scale);
+        g.fillStyle=ink;g.beginPath();g.moveTo(-7,1);g.bezierCurveTo(-3,-4,3,-4,6,-1);g.lineTo(9,0);g.lineTo(5,1);g.quadraticCurveTo(0,3,-7,1);g.fill();
+        g.beginPath();g.moveTo(-1,-2);g.lineTo(-2,-6);g.lineTo(2,-2);g.moveTo(-6,1);g.lineTo(-10,-2);g.lineTo(-9,3);g.closePath();g.fill();g.restore();
+      };
+      reflectWaterObject(pose.waterY,drawDolphin);drawDolphin();
       g.restore();return true;
     }
     if(e.type==='duck'){
       for(let i=0;i<(e.seed>.4?3:1);i++){
         const pose=geometry.duckPose(e,verticalClock,i);
-        g.save();g.translate(pose.x,pose.y);g.scale(dir*pose.scale,pose.scale);
-        if(!pose.flying)line(g,-7,3,7,3,S.mixHex(p.sky[2],p.sky[0],.3),.7);
-        ellipse(g,0,0,4,2.2,S.mixHex('#d6c6a2',c,.25));ellipse(g,3,-3,1.8,1.8,S.mixHex('#668d78',c,.25));line(g,4,-3,6,-3,'#dcb779',1);
-        if(pose.flying){line(g,-1,-1,-4,-2-pose.wing,c,1.6);line(g,-1,-1,2,-2+pose.wing,c,1.3);}
-        g.restore();
+        const drawDuck=()=>{
+          g.save();g.translate(pose.x,pose.y);g.scale(dir*pose.scale,pose.scale);
+          ellipse(g,0,0,4,2.2,S.mixHex('#d6c6a2',c,.25));ellipse(g,3,-3,1.8,1.8,S.mixHex('#668d78',c,.25));line(g,4,-3,6,-3,'#dcb779',1);
+          if(pose.flying){line(g,-1,-1,-4,-2-pose.wing,c,1.6);line(g,-1,-1,2,-2+pose.wing,c,1.3);}
+          g.restore();
+        };
+        reflectWaterObject(pose.waterY+2.3*pose.scale,drawDuck);
+        if(!pose.flying)line(g,pose.x-7*pose.scale,pose.waterY+3*pose.scale,
+          pose.x+7*pose.scale,pose.waterY+3*pose.scale,S.mixHex(p.sky[2],p.sky[0],.3),.7*pose.scale);
+        drawDuck();
       }return true;
     }
     if(e.type==='fish'){
@@ -798,7 +868,8 @@
       // A short breach should emerge from and disappear into the water, not
       // appear at full opacity on the first frame and vanish on the last.
       const fade=S.smooth(0,.12,f)*(1-S.smooth(.85,1,f));
-      g.save();g.globalAlpha=fade;ellipse(g,fishX,waterY-Math.sin(vertical*Math.PI)*14,4.5,2.25,c);
+      const drawFish=()=>ellipse(g,fishX,waterY-Math.sin(vertical*Math.PI)*14,4.5,2.25,c);
+      g.save();g.globalAlpha=fade;reflectWaterObject(waterY,drawFish);drawFish();
       g.globalAlpha=fade*(1-f);g.strokeStyle=p.sky[2];g.beginPath();g.ellipse(fishX,waterY+2,4+f*14,1+f*2,0,0,TAU);g.stroke();g.restore();return true;
     }
     if(e.type==='butterfly'){
@@ -812,7 +883,6 @@
     if(e.type==='rabbit'||e.type==='deer'){
       const deer=e.type==='deer',pose=geometry.groundPose(e.type,e),yy=pose.y;
       g.save();g.globalAlpha=S.smooth(0,.06,f)*(1-S.smooth(.94,1,f));
-      ellipse(g,pose.x,yy+1,deer?8:5,1.5,S.mixHex(p.front,p.hill,.4));
       // Feet plant in world coordinates during stance; their swing follows distance traveled.
       if(deer)for(const [hip,offset] of [[-4,0],[4,.5]]){
         const leg=geometry.deerLeg(pose,hip,offset);
