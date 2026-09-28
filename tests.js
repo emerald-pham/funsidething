@@ -11265,7 +11265,10 @@ test('Animation layering: all water visitors draw back to front regardless of ar
 });
 
 test('Animation controls: revealing a task respects app and device reduced motion',()=>{
- const code=html.slice(html.indexOf('function revealTask(id){'),html.indexOf('function commit(doSave, immediateSync){'));
+ const start=html.indexOf('function revealTask(id){');
+ const end=html.indexOf('function commit(',start);
+ assert.ok(end>start,'the revealTask snippet ends before the commit helper');
+ const code=html.slice(start,end);
  for(const [preference,osReduced,expected] of [['normal',false,'smooth'],['reduced',false,'instant'],['normal',true,'instant'],[undefined,false,'instant']]){
   const calls=[],row={classList:{remove(){},add(){}},offsetWidth:100,scrollIntoView(options){calls.push(options);}};
   const ctx=vm.createContext({state:{listOpen:false},clearListFilters(){},render(){},requestAnimationFrame(fn){fn();},document:{documentElement:{dataset:{landscapeMotion:preference}},querySelector(){return row;}},window:{matchMedia(){return {matches:osReduced};}}});
