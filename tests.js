@@ -7666,6 +7666,77 @@ test('LOCAL BACKUPS: a user can remove an old recovery copy without changing the
   assert.deepEqual(Array.from(ctx.state.tasks,task=>task.title),['Current board']);
 });
 
+test('RISK LOCAL BACKUPS: deleting one visible copy preserves hidden unreadable recovery bytes',async()=>{
+  const storage=sharedScannerStorage();
+  const {ctx}=await loadApp({sharedStorage:storage});
+  const bad={id:'old-unreadable',day:'2020-01-01',at:Date.parse('2020-01-01T12:00:00Z'),kind:'daily',payload:'unreadable'};
+  const good={id:'current',day:'2026-09-28',at:Date.now(),kind:'manual',payload:JSON.stringify(ctx.state)};
+  const raw='[ '+JSON.stringify(bad)+' , '+JSON.stringify(good)+' ]';
+  storage.setItem(LOCAL_BACKUPS_KEY,raw);
+  ctx.openSettings();
+  ctx.onAction('delete-local-backup',{dataset:{id:'current'}});
+  assert.deepEqual(JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY)),[bad]);
+  assert.ok(storage.getItem(LOCAL_BACKUPS_KEY).includes(JSON.stringify(bad)),
+    'the unreadable row remains byte-for-byte available in the raw index');
+});
+
+test('RISK LOCAL BACKUPS: unreadable old copy is visible with exact raw recovery and targeted removal',async()=>{
+  const storage=sharedScannerStorage();
+  const {ctx,shim}=await loadApp({sharedStorage:storage});
+  const bad={id:'old-unreadable',day:'2020-01-01',at:Date.parse('2020-01-01T12:00:00Z'),kind:'daily',payload:'unreadable'};
+  const good={id:'keep',day:'2026-09-28',at:Date.now(),kind:'manual',payload:JSON.stringify(ctx.state)};
+  const raw=JSON.stringify([bad,good]);
+  storage.setItem(LOCAL_BACKUPS_KEY,raw);
+  ctx.openSettings();
+  let view=shim.document.getElementById('modalRoot').innerHTML;
+  assert.match(view,/old-unreadable/);
+  assert.match(view,/Unreadable backup/);
+  assert.match(view,/data-act="view-raw-backups"/);
+  assert.match(view,/data-act="download-raw-backups"/);
+  assert.match(view,/data-act="restore-local-backup"[^>]*disabled/);
+  ctx.onAction('view-raw-backups',{});
+  view=shim.document.getElementById('modalRoot').innerHTML;
+  assert.ok(view.includes(ctx.esc(raw)),'the raw viewer contains every original byte for recovery');
+  ctx.openSettings();
+  ctx.onAction('delete-local-backup',{dataset:{id:'old-unreadable'}});
+  assert.deepEqual(JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY)),[good]);
+  assert.equal(ctx.saveLocalBackup('manual',JSON.stringify(ctx.state)),true,'new backups resume after the selected bad row is removed');
+});
+
+test('RISK LOCAL BACKUPS: duplicate IDs and malformed root never permit ambiguous deletion',async()=>{
+  const storage=sharedScannerStorage();
+  const {ctx,shim}=await loadApp({sharedStorage:storage});
+  const payload=JSON.stringify(ctx.state);
+  const first={id:'same',day:'2026-09-28',at:Date.now(),kind:'manual',payload};
+  const second={...first,payload:JSON.stringify({...ctx.state,updatedAt:123})};
+  const duplicates=JSON.stringify([first,second]);
+  storage.setItem(LOCAL_BACKUPS_KEY,duplicates);
+  ctx.openSettings();
+  assert.match(shim.document.getElementById('modalRoot').innerHTML,/Duplicate backup ID/);
+  ctx.onAction('delete-local-backup',{dataset:{id:'same'}});
+  assert.equal(storage.getItem(LOCAL_BACKUPS_KEY),duplicates);
+  const malformed='[{"id":"partial"';
+  storage.setItem(LOCAL_BACKUPS_KEY,malformed);
+  ctx.openSettings();
+  assert.match(shim.document.getElementById('modalRoot').innerHTML,/Backup list cannot be read/);
+  ctx.onAction('delete-local-backup',{dataset:{id:'partial'}});
+  assert.equal(storage.getItem(LOCAL_BACKUPS_KEY),malformed);
+  ctx.onAction('view-raw-backups',{});
+  assert.ok(shim.document.getElementById('modalRoot').innerHTML.includes(ctx.esc(malformed)));
+});
+
+test('RISK LOCAL BACKUPS: a stale Settings click cannot delete a row rewritten by another tab',async()=>{
+  const storage=sharedScannerStorage();
+  const {ctx}=await loadApp({sharedStorage:storage});
+  const row={id:'current',day:'2026-09-28',at:Date.now(),kind:'manual',payload:JSON.stringify(ctx.state)};
+  storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify([row]));
+  ctx.openSettings();
+  const changed=JSON.stringify([{...row,payload:JSON.stringify({...ctx.state,updatedAt:123})}]);
+  storage.setItem(LOCAL_BACKUPS_KEY,changed);
+  ctx.onAction('delete-local-backup',{dataset:{id:'current'}});
+  assert.equal(storage.getItem(LOCAL_BACKUPS_KEY),changed);
+});
+
 test('LOCAL BACKUPS: restore and delete controls can wrap inside narrow Settings panes',async()=>{
   const {ctx,shim}=await loadApp();
   ctx.saveLocalBackup('before-account-switch',JSON.stringify(ctx.state));

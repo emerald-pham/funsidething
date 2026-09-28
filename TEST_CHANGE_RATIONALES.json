@@ -61,9 +61,9 @@
     "testChangesSha256": "422edb121b6815687ec04135d2340a4585a7c8f611d2e7e0bc0de412a563773e"
   },
   {
-    "reason": "On iOS opening, an exact stable daily copy can already protect the local board, yet cloud adoption tried to append the same full board again and could hit quota. The old failed-backup gate was strengthened with a genuinely unsaved local edit so it still proves a missing recovery copy blocks replacement. New tests cover malformed backup bytes, transactional markers, durable adoption, conditional union push, in-flight edits, and reload.",
-    "previousBehavior": "Every cloud adoption appended another pre-adoption backup even when a stable exact copy existed. Quota could hold the cloud, and a later board-store failure could leave an adopted state unsaved or advance reconciliation bookkeeping. A held read from an earlier reconciled session could release a pending write.",
-    "intendedBehavior": "Reuse only an exact stable recovery snapshot for cloud adoption; preserve distinct and unreadable backup bytes. Accept a replacement after its merged board reaches local storage. Permit only that exact saved board with its original stable snapshot to reach the cloud, persist its revision acknowledgement, and keep later edits behind the ordinary backup gate.",
+    "reason": "On iOS opening, an exact stable daily copy can already protect the local board, yet cloud adoption tried to append the same full board again and could hit quota. The old failed-backup gate was strengthened with a genuinely unsaved local edit so it still proves a missing recovery copy blocks replacement. New tests cover malformed backup bytes, transactional markers, durable adoption, conditional union push, in-flight edits, and reload. An independent review found that deleting a visible backup rewrote only the filtered list and silently dropped an older unreadable recovery row. The new red-first tests require visible raw recovery and single-row deletion against the original stored index.",
+    "previousBehavior": "Every cloud adoption appended another pre-adoption backup even when a stable exact copy existed. Quota could hold the cloud, and a later board-store failure could leave an adopted state unsaved or advance reconciliation bookkeeping. A held read from an earlier reconciled session could release a pending write. Settings hid expired malformed rows, then deleting another visible backup silently removed those hidden bytes.",
+    "intendedBehavior": "Reuse only an exact stable recovery snapshot for cloud adoption; preserve distinct and unreadable backup bytes. Accept a replacement after its merged board reaches local storage. Permit only that exact saved board with its original stable snapshot to reach the cloud, persist its revision acknowledgement, and keep later edits behind the ordinary backup gate. Settings must show unreadable rows and offer exact raw view/download. An explicit deletion removes only one uniquely identified row, preserving other source bytes and refusing stale or ambiguous indices.",
     "replacementTests": [
       "RISK CLOUD BACKUP: an exact stable recovery copy satisfies adoption when duplicate writes hit quota",
       "RISK CLOUD BACKUP: an unreadable backup row is never discarded to make room",
@@ -72,17 +72,23 @@
       "RISK CLOUD ADOPTION: a later edit during union push cannot borrow the saved adoption proof",
       "RISK CLOUD ADOPTION: held newer read cannot release a pending write from an earlier reconcile",
       "RISK CLOUD ADOPTION: a board-store quota failure restores both browser keys and holds the cloud",
-      "RISK CLOUD ADOPTION: failed write rollback preserves another tab newer browser bytes"
+      "RISK CLOUD ADOPTION: failed write rollback preserves another tab newer browser bytes",
+      "RISK LOCAL BACKUPS: deleting one visible copy preserves hidden unreadable recovery bytes",
+      "RISK LOCAL BACKUPS: unreadable old copy is visible with exact raw recovery and targeted removal",
+      "RISK LOCAL BACKUPS: duplicate IDs and malformed root never permit ambiguous deletion",
+      "RISK LOCAL BACKUPS: a stale Settings click cannot delete a row rewritten by another tab"
     ],
     "preservedCoverage": [
       "The existing pre-adoption hard gate now uses an unsaved distinct task and still refuses replacement when no stable recovery copy exists.",
       "Manual and account-switch backups retain their original retention behavior; before-restore copies remain distinct and restorable.",
-      "Existing task, history, tombstone, restore, account, stale-tab, and cloud revision tests remain unchanged and run in the full suite."
+      "Existing task, history, tombstone, restore, account, stale-tab, and cloud revision tests remain unchanged and run in the full suite.",
+      "Existing seven-day, manual, account-switch, before-restore, and restore-lineage tests remain unchanged and pass with original recovery semantics.",
+      "A unique unreadable row can be deliberately deleted after raw inspection; duplicate IDs and malformed root data cannot be deleted through the row action."
     ],
     "redEvidence": {
-      "command": "node --test --test-name-pattern='RISK CLOUD BACKUP|RISK CLOUD ADOPTION' tests.js; node --test --test-name-pattern='iOS-style cold open keeps the merged board|later edit during union push' tests.js",
-      "failure": "Before implementation, three tests failed: an exact saved board was still held ('Local' versus 'Cloud'), an unreadable backup row was overwritten (true versus false), and failed adoption changed the board/revision instead of holding. The cold-open test then failed because the merged board remained only in memory; after that repair it failed because the union never reached cloud. A pending newer read test failed because reconciled() remained true. The in-flight edit test failed because no union push started, then because reload could not align its saved union to the cloud acknowledgement. The concurrent-write rollback test failed before its fix: failed-store recovery overwrote another tab's newer browser bytes with the old board."
+      "command": "node --test --test-name-pattern='RISK CLOUD BACKUP|RISK CLOUD ADOPTION' tests.js; node --test --test-name-pattern='iOS-style cold open keeps the merged board|later edit during union push' tests.js; node --test --test-name-pattern='RISK LOCAL BACKUPS:' tests.js",
+      "failure": "Before implementation, three tests failed: an exact saved board was still held ('Local' versus 'Cloud'), an unreadable backup row was overwritten (true versus false), and failed adoption changed the board/revision instead of holding. The cold-open test then failed because the merged board remained only in memory; after that repair it failed because the union never reached cloud. A pending newer read test failed because reconciled() remained true. The in-flight edit test failed because no union push started, then because reload could not align its saved union to the cloud acknowledgement. The concurrent-write rollback test failed before its fix: failed-store recovery overwrote another tab's newer browser bytes with the old board. Four independent review regressions failed before the Settings repair: deleting the visible copy left [] instead of the unreadable row; the unreadable entry and raw controls were absent; duplicate IDs were deletable; a stale Settings click deleted a row changed by another tab."
     },
-    "testChangesSha256": "0360a6a2ce84045769f7d4c90710738cfbfe10b95bcc75fe12eb20503d04cb81"
+    "testChangesSha256": "abc74e74942d3f4773cac508282a59657f16cfe62e325d17466aee09001b20de"
   }
 ]
