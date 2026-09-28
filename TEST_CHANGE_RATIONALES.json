@@ -316,6 +316,24 @@
     }
   },
   {
+    "testChangesSha256": "359e38350322e02ef5214d410003878b155f4ed422e4a330b7e0c21c5550ed9a",
+    "reason": "The release-gate repair added a Linux-focused regression for custom core.hooksPath handling after GitHub Actions exposed that the first hook installer treated Git's configured hook path as the shared default. Push CI validates each pushed commit range, so this incremental test addition needs its own exact-diff rationale alongside the cumulative release-gate rationale.",
+    "previousBehavior": "The earlier release-gate candidate covered shared-hook installation but its custom-path fixture passed on macOS and failed on Linux with Missing expected exception. The rationale file described the cumulative pull-request test diff only, leaving the incremental push comparison without an exact fingerprint record.",
+    "intendedBehavior": "A configured custom core.hooksPath is always distinguished from the real shared Git hooks directory, the custom dispatcher remains untouched, and the default directory remains unmodified. Both the incremental push diff and the cumulative pull-request diff retain exact rationale records for the tests each comparison sees.",
+    "replacementTests": [
+      "RISK repository process: custom hook paths are compared with the shared git default"
+    ],
+    "preservedCoverage": [
+      "The new test isolates a configured external hook directory, verifies that installation fails closed, and checks that neither the custom dispatcher nor the shared default is modified.",
+      "Existing shared-hook chaining, tamper detection, legacy-worktree blocking, receipt validation, status publication, deployment verification, and test-first enforcement tests remain unchanged.",
+      "The cumulative release-gate rationale remains bound to the complete base-to-candidate test diff; this additional record binds the same observed red evidence to the smaller commit-range diff used by push CI."
+    ],
+    "redEvidence": {
+      "command": "TMPDIR=/private/tmp node --test --test-reporter=spec --test-name-pattern='RISK repository process: custom hook paths are compared with the shared git default' tests.js",
+      "failure": "Before the installer repair, GitHub Actions on Linux ran the focused contract and reported Missing expected exception at tests.js:14735 because Git resolved --git-path hooks through core.hooksPath. The focused local reproduction against the pre-fix installer also failed before canonical default-hook resolution was added."
+    }
+  },
+  {
     "testChangesSha256": "0ae35d402b588e05cbfbe01b36d4d5da086a9232a89bb103dbec33a7efcbd145",
     "reason": "The user asked for a hard memory audit and independent review gate for every future release. The existing test-first process had no exact-candidate audit receipt, no local push check, and no deployment check tying the published tree to the reviewed pull request.",
     "previousBehavior": "The required workflow ran application and rules tests, but a push or Pages deployment did not prove that the exact candidate had a current memory audit and independent final review. The local hook protected app edits only and could silently miss future release-evidence scripts.",
