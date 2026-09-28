@@ -188,18 +188,14 @@
       const depth=Math.min(H*.09,95),y=waterTop+5+star.altitude/90*depth;
       return {x:star.azimuth/360*W+Math.sin(y*.19-t*wind)*1.8,y};
     }
-    function horizonReflection(t,wind,night){
-      const rows=[];
-      // A reflected object's distance below the waterline equals its height
-      // above it. The far shore clips distant sky without rescaling it.
-      for(let d=0;d<waterTop;d+=2){
-        const height=Math.min(2,waterTop-d),sourceY=waterTop-d-height,fraction=d/waterTop;
-        rows.push({sourceY,sourceHeight:height,y:waterTop+d,
-          dx:(Math.sin(d*.21-t*wind*.85)*2.2+Math.sin(d*.08+t*wind*.3))*(.25+.75*fraction),
-          alpha:(.47+night*.09)*(1-fraction*.10),
-          blurMix:Math.min(.36,d/Math.max(30,H*.12)*.36),height});
-      }
-      return rows;
+    function reflectionSurface(night){
+      // One waterline preserves each object's height and unbroken edge. The
+      // shore clips high reflections; softness grows only within the lake.
+      const softDepth=Math.max(30,H*.12),softMax=.36,contactDepth=3,alpha=.47+night*.09;
+      return {axisY:waterTop,alpha,softDepth,softMax,contactDepth,
+        mirrorY:y=>2*waterTop-y,
+        softness:depth=>Math.min(softMax,Math.max(0,depth)/softDepth*softMax),
+        contactAlpha:depth=>alpha+(1-alpha)*Math.max(0,1-Math.max(0,depth)/contactDepth)};
     }
     function dolphin(progress,lane,reverse=false,verticalProgress=progress){
       const direction=reverse?-1:1,depth=Math.max(1,shore-waterTop),scale=Math.min(1.2,W/560,depth/20);
@@ -224,7 +220,7 @@
     }
     const sunReflection=sun=>sun.visible&&sun.altitude>0;
     const ripple=(i,t,wind=1)=>({alpha:.15+.75*(.5+.5*Math.sin(t*wind*1.3+i*1.71))**2,drift:Math.sin(t*wind*.5+i)*9,width:.65+.35*Math.sin(t*.9+i)**2});
-    return {routeProgress,motionProgress,motionAge,verticalOffset,visitPose,woodlandPose,duckPose,waterDepth,cycleLeg,deerLeg,nestVisit,eventDepth,dogPose,skater,fireworks,flock,dolphin,starReflection,horizonReflection,sunReflection,depthBand,groundAnchor,groundTravelX,groundPose,strideArm,strideFoot,wingFold,balloonDrift,vessel,foregroundTree,nest,ripple,horizon,waterTop,far,middle,near,rail,trail,lowerRail,railCars,tangent,rider,pack};
+    return {routeProgress,motionProgress,motionAge,verticalOffset,visitPose,woodlandPose,duckPose,waterDepth,cycleLeg,deerLeg,nestVisit,eventDepth,dogPose,skater,fireworks,flock,dolphin,starReflection,reflectionSurface,sunReflection,depthBand,groundAnchor,groundTravelX,groundPose,strideArm,strideFoot,wingFold,balloonDrift,vessel,foregroundTree,nest,ripple,horizon,waterTop,far,middle,near,rail,trail,lowerRail,railCars,tangent,rider,pack};
   }
   root.LandscapeGeometry={create};
 })(globalThis);

@@ -1,5 +1,5 @@
-/* Two canvases: the painted landscape is cached, only its sparse inhabitants
-   redraw at 30fps. Device motion preference never enters the synced task state. */
+/* Two visible canvases: the painted landscape is cached, while its sparse
+   inhabitants and water redraw on the animation clock. Motion preference stays local. */
 (async function(){
   'use strict';
   const S=globalThis.LivingSky,host=document.getElementById('landscape');
@@ -14,7 +14,7 @@
   const back=host.querySelector('[data-scenery]'),front=host.querySelector('[data-life]');
   let b=back.getContext('2d',{alpha:false});const base=b,g=front.getContext('2d');
   const layers={};let geometry;
-  const cityLayer=document.createElement('canvas'),skyReflection=document.createElement('canvas'),blurredReflection=document.createElement('canvas');
+  const cityLayer=document.createElement('canvas'),skyCity=document.createElement('canvas'),skyReflection=document.createElement('canvas'),blurredReflection=document.createElement('canvas'),softenedReflection=document.createElement('canvas'),reflectionCanvas=document.createElement('canvas');
   if(!b||!g){host.hidden=true;return;}
   const mq=window.matchMedia('(prefers-reduced-motion: reduce)');
   let storage;try{storage=window.localStorage;}catch{storage=null;}
@@ -90,15 +90,17 @@
   }
   function composite(name){const c=layers[name];if(c)g.drawImage(c,0,c.top,c.width/dpr,c.height/dpr);}
   function paintHorizonReflection(source,t,opacity=1){
-    const softScale=blurredReflection.height/source.height;
-    for(const row of geometry.horizonReflection(t,wind,p.night)){
-      g.globalAlpha=row.alpha*opacity*(1-row.blurMix);
-      g.drawImage(source,0,row.sourceY*dpr,source.width,row.sourceHeight*dpr,row.dx,row.y,W,row.height);
-      if(row.blurMix>0){
-        g.globalAlpha=row.alpha*opacity*row.blurMix;
-        g.drawImage(blurredReflection,0,row.sourceY*dpr*softScale,blurredReflection.width,row.sourceHeight*dpr*softScale,row.dx,row.y,W,row.height);
-      }
-    }
+    const surface=geometry.reflectionSurface(p.night);
+    // Move the whole mirror by less than a pixel; offsetting separate rows
+    // made the Moon and other rounded shapes break into visible bands.
+    const drift=.65*Math.sin(t*wind*.9)+.25*Math.sin(t*wind*.37+1.1);
+    g.save();g.globalAlpha=opacity;
+    g.translate(0,2*surface.axisY);
+    // Overdraw the clipped waterline by one device pixel so canvas edge
+    // sampling cannot leave a pale seam under the skyline.
+    g.translate(drift,-1/dpr);g.scale(1,-1);
+    g.drawImage(source,0,0,W,geometry.waterTop);
+    g.restore();
   }
   const point=(az,alt)=>({x:az/360*W,y:hy-(Math.max(alt,-2)/90)*(hy-22)});
   function path(ctx,fn,start=0,end=W,step=12){ctx.beginPath();ctx.moveTo(start,fn(start));for(let x=start+step;x<end;x+=step)ctx.lineTo(x,fn(x));ctx.lineTo(end,fn(end));}
@@ -194,6 +196,14 @@
     line(b,tx,ty+12,tx+Math.sin(hands.minuteAngle)*4,ty+12-Math.cos(hands.minuteAngle)*4,'#577581',.9);
     line(b,tx,ty+12,tx+Math.sin(hands.hourAngle)*2.8,ty+12-Math.cos(hands.hourAngle)*2.8,'#577581',1.2);
     b=cityTarget;b.drawImage(cityLayer,0,0,cityLayer.width/dpr,cityLayer.height/dpr);
+    // Cache the opaque sky and skyline before the lake fill touches their
+    // bottom row; sampling that water row made a thin bright horizon seam.
+    const skyCityHeight=Math.max(1,Math.ceil(geometry.waterTop*dpr));
+    if(skyCity.width!==back.width)skyCity.width=back.width;
+    if(skyCity.height!==skyCityHeight)skyCity.height=skyCityHeight;
+    const skyCityContext=skyCity.getContext('2d');
+    skyCityContext.setTransform(1,0,0,1,0,0);
+    skyCityContext.drawImage(base.canvas,0,0,back.width,skyCityHeight,0,0,skyCity.width,skyCity.height);
     const water=b.createLinearGradient(0,geometry.waterTop,0,hy+H*.18);
     water.addColorStop(0,S.mixHex(p.sky[2],p.sky[0],.35));water.addColorStop(1,S.mixHex(p.sky[1],p.front,.3));
     b.fillStyle=water;b.fillRect(0,geometry.waterTop,W,H);
@@ -325,7 +335,7 @@
     visibleBanners=[];
     g.clearRect(0,0,W,H);
     const waterEvents=new Set(['jetski','sailboat','cruise','yacht','windsurfer','duck','fish','dolphin']);
-    const airborne=new Set(['metro','duck','fish','plane','balloon','airshow','banner','skywriter','hangglider','jetski','sailboat','cruise','yacht','windsurfer','dolphin','flock']);
+    const airborne=new Set(['duck','fish','plane','balloon','airshow','banner','skywriter','hangglider','jetski','sailboat','cruise','yacht','windsurfer','dolphin','flock']);
     for(const e of world.events)if(e.type==='meteor'&&p.night>.3){
       const fx=geometry.motionProgress(e,'x'),fy=geometry.motionProgress(e,'y'),dx=(e.reverse?-1:1)*(85+e.seed*70),dy=24+e.lane*20;
       const sx=W*(.2+e.seed*.6),sy=hy*(.08+e.lane*.3),x=sx+dx*fx,y=sy+dy*fy;
@@ -353,27 +363,61 @@
     // separate reflection rule for each type.
     for(const e of world.events)if(airborne.has(e.type)&&!waterEvents.has(e.type))paintEvent(e,t);
     const weather=S.weatherAt(new Date(),sceneSeason),weatherPhase=reduced?0:Date.now()/1000;
-    skyReflection.width=front.width;skyReflection.height=Math.max(1,Math.ceil(geometry.waterTop*dpr));
+    const reflectionHeight=Math.max(1,Math.ceil(geometry.waterTop*dpr));
+    if(skyReflection.width!==front.width)skyReflection.width=front.width;
+    if(skyReflection.height!==reflectionHeight)skyReflection.height=reflectionHeight;
     const reflectionContext=skyReflection.getContext('2d');
+    reflectionContext.setTransform(1,0,0,1,0,0);
+    reflectionContext.clearRect(0,0,skyReflection.width,skyReflection.height);
     reflectionContext.setTransform(dpr,0,0,dpr,0,0);
-    reflectionContext.clearRect(0,0,W,geometry.waterTop);
-    reflectionContext.drawImage(base.canvas,0,0,front.width,skyReflection.height,0,0,W,geometry.waterTop);
+    reflectionContext.drawImage(skyCity,0,0,skyCity.width,skyCity.height,0,0,W,geometry.waterTop);
     reflectionContext.drawImage(front,0,0,front.width,skyReflection.height,0,0,W,geometry.waterTop);
     paintWeatherOn(reflectionContext,weather,weatherPhase);
     // Downsampling makes a faint soft copy; deeper water blends in a little
     // more of it without moving or shrinking any reflected object.
-    blurredReflection.width=Math.max(1,Math.ceil(skyReflection.width/3));
-    blurredReflection.height=Math.max(1,Math.ceil(skyReflection.height/3));
+    const softWidth=Math.max(1,Math.ceil(skyReflection.width/3)),softHeight=Math.max(1,Math.ceil(skyReflection.height/3));
+    if(blurredReflection.width!==softWidth)blurredReflection.width=softWidth;
+    if(blurredReflection.height!==softHeight)blurredReflection.height=softHeight;
     const softContext=blurredReflection.getContext('2d');
+    softContext.setTransform(1,0,0,1,0,0);softContext.clearRect(0,0,softWidth,softHeight);
     softContext.imageSmoothingEnabled=true;softContext.imageSmoothingQuality='high';
     softContext.drawImage(skyReflection,0,0,blurredReflection.width,blurredReflection.height);
+    // Blend the same light softness by water depth before mirroring. Shifting
+    // separate source rows made small round objects look stepped and pixelated.
+    const surface=geometry.reflectionSurface(p.night);
+    if(softenedReflection.width!==skyReflection.width)softenedReflection.width=skyReflection.width;
+    if(softenedReflection.height!==skyReflection.height)softenedReflection.height=skyReflection.height;
+    const softened=softenedReflection.getContext('2d');
+    softened.setTransform(1,0,0,1,0,0);softened.globalCompositeOperation='source-over';
+    softened.clearRect(0,0,softenedReflection.width,softenedReflection.height);
+    softened.setTransform(dpr,0,0,dpr,0,0);
+    softened.drawImage(blurredReflection,0,0,blurredReflection.width,blurredReflection.height,0,0,W,geometry.waterTop);
+    softened.globalCompositeOperation='destination-in';
+    const softness=softened.createLinearGradient(0,geometry.waterTop-surface.softDepth,0,geometry.waterTop);
+    softness.addColorStop(0,`rgba(0,0,0,${surface.softMax})`);softness.addColorStop(1,'rgba(0,0,0,0)');
+    softened.fillStyle=softness;softened.fillRect(0,0,W,geometry.waterTop);
+    if(reflectionCanvas.width!==skyReflection.width)reflectionCanvas.width=skyReflection.width;
+    if(reflectionCanvas.height!==skyReflection.height)reflectionCanvas.height=skyReflection.height;
+    const mirror=reflectionCanvas.getContext('2d');
+    mirror.setTransform(1,0,0,1,0,0);mirror.clearRect(0,0,reflectionCanvas.width,reflectionCanvas.height);
+    mirror.setTransform(dpr,0,0,dpr,0,0);
+    mirror.drawImage(skyReflection,0,0,skyReflection.width,skyReflection.height,0,0,W,geometry.waterTop);
+    mirror.drawImage(softenedReflection,0,0,softenedReflection.width,softenedReflection.height,0,0,W,geometry.waterTop);
+    // The first reflected row should meet the skyline. Fade its opacity to
+    // the usual water strength within three pixels, with no separate band.
+    mirror.globalCompositeOperation='destination-in';
+    const contact=mirror.createLinearGradient(0,geometry.waterTop-surface.contactDepth,0,geometry.waterTop);
+    contact.addColorStop(0,`rgba(0,0,0,${surface.contactAlpha(surface.contactDepth)})`);
+    contact.addColorStop(1,`rgba(0,0,0,${surface.contactAlpha(0)})`);
+    mirror.fillStyle=contact;mirror.fillRect(0,0,W,geometry.waterTop);
+    mirror.globalCompositeOperation='source-over';
     g.save();path(g,far);g.lineTo(W,geometry.waterTop);g.lineTo(0,geometry.waterTop);g.closePath();g.clip();
     if(p.night>.05){
       const reflectedSky=g.createLinearGradient(0,geometry.waterTop,0,geometry.waterTop+H*.12);
       reflectedSky.addColorStop(0,p.sky[2]);reflectedSky.addColorStop(1,p.sky[0]);
       g.globalAlpha=p.night*.18;g.fillStyle=reflectedSky;g.fillRect(0,geometry.waterTop,W,H*.12);
     }
-    paintHorizonReflection(skyReflection,t,1);
+    paintHorizonReflection(reflectionCanvas,t,1);
     const reflection=point(sky.sun.azimuth,0).x;
     if(geometry.sunReflection(sky.sun))for(let i=0;i<24;i++){
       const wave=geometry.ripple(i,t,wind),y=geometry.waterTop+5+i*H*.0035,w=(5+i*1.9)*wave.width;
@@ -390,9 +434,12 @@
     for(const e of world.events.filter(e=>water.has(e.type)).sort((a,b)=>geometry.waterDepth(a,t)-geometry.waterDepth(b,t))){
       if(['duck','fish','dolphin'].includes(e.type))paintEvent(e,t);else paintVessel(e,t);
     }
+    // The metro runs below the reflection source but in front of the lake.
+    // Painting it here keeps the water overlay from darkening its visible cars.
+    for(const e of world.events)if(e.type==='metro')paintEvent(e,t);
     composite('middle');
     // Ground contact determines occlusion, including props previously baked into the hill.
-    const groundPass=world.events.filter(e=>!airborne.has(e.type)&&e.type!=='train'&&e.type!=='snowangel').map(e=>({depth:globalThis.LandscapeWinter?.types.includes(e.type)?LandscapeWinter.pose(e.type,e,geometry,W,H).y:geometry.eventDepth(e),draw:()=>paintEvent(e,t)}));
+    const groundPass=world.events.filter(e=>!airborne.has(e.type)&&e.type!=='metro'&&e.type!=='train'&&e.type!=='snowangel').map(e=>({depth:globalThis.LandscapeWinter?.types.includes(e.type)?LandscapeWinter.pose(e.type,e,geometry,W,H).y:geometry.eventDepth(e),draw:()=>paintEvent(e,t)}));
     if(sceneSeason!=='winter'&&W>650&&visitSeed>.25)groundPass.push({depth:trail(W*.43)+15,draw:paintIceCreamStand});
     for(const item of groundPass.sort((a,b)=>a.depth-b.depth))item.draw();
     if(W>850&&visitSeed>.45){
@@ -856,8 +903,8 @@
   function tick(now){
     if(reduced||document.hidden){frame=0;return;}
     frame=requestAnimationFrame(tick);
-    // Carry the deadline across display frames instead of rounding every interval
-    // up (the old 24fps limiter ran at only 20fps on a 60Hz display).
+    // Carry the deadline across display frames so a 60Hz screen paints at
+    // about 30fps rather than rounding each interval into a slower cadence.
     if(now+.5<nextPaint)return;
     nextPaint+=1000/30;
     if(nextPaint<=now)nextPaint=now+1000/30;

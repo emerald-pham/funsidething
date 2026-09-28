@@ -9377,36 +9377,32 @@ test('Landscape nest: a new bird visit waits while the nest is occupied',()=>{
 test('Landscape water: the actual skyline shares the full-size sky mirror',()=>{
  const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
  for(const [w,h] of [[320,568],[844,390],[1440,900]]){
-  const g=ctx.LandscapeGeometry.create(w,h),rows=g.horizonReflection(0,1,1),later=g.horizonReflection(1,1,1);
-  assert.ok(rows.length>5&&rows.every(row=>row.sourceY>=0&&row.sourceY<g.waterTop));
-  assert.ok(g.horizonReflection(0,1,0).every(row=>row.alpha>0),'the skyline remains visible in the lake by day');
-  assert.ok(rows.some((row,i)=>row.dx!==later[i].dx),'water shifts the mirrored skyline gently');
+  const g=ctx.LandscapeGeometry.create(w,h),day=g.reflectionSurface(0),night=g.reflectionSurface(1);
+  assert.equal(day.axisY,g.waterTop);
+  assert.ok(day.alpha>0&&night.alpha>day.alpha,'the skyline remains visible in the lake by day and night');
   assert.equal(g.sunReflection({visible:false,altitude:-20}),false);
   assert.equal(g.sunReflection({visible:true,altitude:-1}),false);
   assert.equal(g.sunReflection({visible:true,altitude:20}),true);
  }
  const runtime=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
- const waterPass=runtime.slice(runtime.indexOf('    paintHorizonReflection(skyReflection,t'),runtime.indexOf('    const reflection=point(sky.sun.azimuth'));
+ const waterPass=runtime.slice(runtime.indexOf('    paintHorizonReflection(reflectionCanvas,t'),runtime.indexOf('    const reflection=point(sky.sun.azimuth'));
  assert.doesNotMatch(waterPass,/geometry\.cityReflection\(|g\.drawImage\(cityLayer/,'the city cannot be rescaled in a second water pass');
- assert.match(runtime,/skyReflection\.height=Math\.max\(1,Math\.ceil\(geometry\.waterTop\*dpr\)\)/,'the source includes the full skyline down to the waterline');
+ assert.match(runtime,/const reflectionHeight=Math\.max\(1,Math\.ceil\(geometry\.waterTop\*dpr\)\)/,'the source includes the full skyline down to the waterline');
  assert.match(runtime,/geometry\.sunReflection\(sky.sun\)/);
  assert.doesNotMatch(runtime,/sky\.sun\.visible\?sky\.sun:sky\.moon/);
 });
 
-test('Landscape water: one horizon rule reflects nearby night sky objects and every vessel',()=>{
+test('Landscape water: one continuous mirror reflects night sky objects while vessels keep their own reflections',()=>{
  const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
  for(const [w,h] of [[320,568],[844,390],[1440,900]]){
-  const g=ctx.LandscapeGeometry.create(w,h),rows=g.horizonReflection(0,1,1),later=g.horizonReflection(1,1,1);
-  assert.ok(rows.length>4,'the lake samples several reflection bands');
-  assert.ok(g.horizonReflection(0,1,0).length>4,'daylight can mirror the sky and its visitors');
-  assert.ok(rows.every(row=>row.sourceY>=0&&row.sourceY<g.waterTop),'every sample comes from above the waterline');
-  assert.ok(rows.every(row=>row.y>=g.waterTop&&row.sourceHeight>0&&row.alpha>0&&row.alpha<=.57),'every sample lands softly below the waterline');
-  assert.ok(rows.some((row,index)=>row.dx!==later[index].dx),'the mirrored pixels move with the water');
-  assert.ok(rows[0].sourceY>rows.at(-1).sourceY,'objects nearest the horizon enter the water first');
+  const g=ctx.LandscapeGeometry.create(w,h),surface=g.reflectionSurface(1);
+  assert.equal(surface.mirrorY(g.waterTop),g.waterTop);
+  assert.equal(surface.mirrorY(g.waterTop-20),g.waterTop+20);
+  assert.equal(surface.mirrorY(0),g.waterTop*2,'the full sky keeps its original height');
  }
  const runtime=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
- assert.match(runtime,/reflectionContext\.drawImage\(base\.canvas/,'the painted Moon, stars, and any other nearby sky object enter the reflected canvas');
- assert.match(runtime,/paintHorizonReflection\(skyReflection/,'airplanes and every other moving sky visitor share the rule');
+ assert.match(runtime,/reflectionContext\.drawImage\(skyCity/,'the painted Moon, stars, and any other nearby sky object enter the reflected canvas');
+ assert.match(runtime,/paintHorizonReflection\(reflectionCanvas/,'airplanes and every other moving sky visitor share the rule');
  const vessel=runtime.slice(runtime.indexOf('  function paintVessel('),runtime.indexOf('  function paintIceCreamStand('));
  assert.match(vessel,/p\.night\s*>\s*\.05/,'boats reflect only when the real sky is dark');
  assert.match(vessel,/g\.scale\(direction\*scale,-scale\*/,'the full boat silhouette mirrors downward from its waterline');
@@ -9417,53 +9413,132 @@ test('RISK landscape water: the full above-horizon scene and weather can reflect
  for(const [w,h] of [[320,568],[568,320],[844,390],[1440,900]]){
   const g=ctx.LandscapeGeometry.create(w,h);
   for(const night of [0,.35,1]){
-   const rows=g.horizonReflection(0,1,night);
-   assert.ok(rows.length>4,`sky reflection exists at brightness ${night} on ${w}x${h}`);
-   assert.ok(rows.every(row=>row.sourceY>=0&&row.sourceY+row.sourceHeight<=g.waterTop+.01&&row.y>=g.waterTop&&row.y<g.waterTop*2+2&&row.alpha>0&&row.alpha<=.57));
-   assert.ok(rows.at(-1).sourceY<g.horizon*.04,'the top of the sky remains eligible to reflect');
-   assert.ok(rows[0].sourceY+rows[0].sourceHeight>=g.waterTop-.01,'the waterline remains eligible to reflect');
-   assert.ok(rows.at(-1).y>Math.max(...Array.from({length:101},(_,i)=>g.far(w*i/100))),
+   const surface=g.reflectionSurface(night);
+   assert.ok(surface.alpha>0&&surface.alpha<=.57,`sky reflection exists at brightness ${night} on ${w}x${h}`);
+   assert.equal(surface.mirrorY(0),g.waterTop*2,'the top of the sky remains eligible to reflect');
+   assert.equal(surface.mirrorY(g.waterTop),g.waterTop,'the waterline remains eligible to reflect');
+   assert.ok(surface.mirrorY(0)>Math.max(...Array.from({length:101},(_,i)=>g.far(w*i/100))),
     'the distant shore crops high sky instead of shrinking it into the lake');
   }
  }
  const runtime=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
- const snapshot=runtime.slice(runtime.indexOf('    skyReflection.width=front.width'),runtime.indexOf('    g.save();path(g,far)',runtime.indexOf('    skyReflection.width=front.width')));
- assert.match(snapshot,/reflectionContext\.drawImage\(base\.canvas/,'static sky, sun, Moon, stars and skyline enter the same sampled canvas');
+ const snapshot=runtime.slice(runtime.indexOf('    const reflectionHeight='),runtime.indexOf('    g.save();path(g,far)',runtime.indexOf('    const reflectionHeight=')));
+ assert.match(snapshot,/reflectionContext\.drawImage\(skyCity/,'static sky, sun, Moon, stars and skyline enter the same sampled canvas');
  assert.match(snapshot,/reflectionContext\.drawImage\(front/,'moving sky visitors enter the sampled canvas');
  assert.match(snapshot,/paintWeatherOn\(reflectionContext/,'weather and floating seasonal detail enter the sampled canvas');
- const waterPass=runtime.slice(runtime.indexOf('    g.save();path(g,far)',runtime.indexOf('    skyReflection.width=front.width')),runtime.indexOf('    const water=new Set',runtime.indexOf('    skyReflection.width=front.width')));
- assert.match(waterPass,/paintHorizonReflection\(skyReflection,t/,'the sampled canvas is mirrored into the lake');
- assert.ok(waterPass.indexOf('paintHorizonReflection(skyReflection,t')>waterPass.indexOf('g.clip()'),'the shoreline clips every mirrored object');
- assert.doesNotMatch(waterPass,/if\(p\.night>\.05\)\{[^}]*paintHorizonReflection\(skyReflection/,'the sky mirror is outside the night tint');
+ const waterPass=runtime.slice(runtime.indexOf('    g.save();path(g,far)',runtime.indexOf('    const reflectionHeight=')),runtime.indexOf('    const water=new Set',runtime.indexOf('    const reflectionHeight=')));
+ assert.match(waterPass,/paintHorizonReflection\(reflectionCanvas,t/,'the sampled canvas is mirrored into the lake');
+ assert.ok(waterPass.indexOf('paintHorizonReflection(reflectionCanvas,t')>waterPass.indexOf('g.clip()'),'the shoreline clips every mirrored object');
+ assert.doesNotMatch(waterPass,/if\(p\.night>\.05\)\{[^}]*paintHorizonReflection\(reflectionCanvas/,'the sky mirror is outside the night tint');
 });
 
-test('RISK landscape water: the mirror preserves vertical height instead of fitting the sky into each shore',()=>{
+test('RISK landscape water: the Moon mirrors at full resolution with no displaced scanline bands',()=>{
  const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
  for(const [w,h] of [[320,568],[390,844],[568,320],[844,390],[1440,900]]){
-  const g=ctx.LandscapeGeometry.create(w,h),rows=g.horizonReflection(0,1,.75);
-  assert.equal(rows.length,Math.ceil(g.waterTop/2),'all above-waterline heights keep their own water band');
-  for(const row of rows){
-   assert.ok(Math.abs(row.sourceHeight-row.height)<.001,'an object keeps its vertical size in the mirror');
-   assert.ok(Math.abs((row.y-g.waterTop)-(g.waterTop-row.sourceY-row.sourceHeight))<.001,
-    'distance below the waterline equals distance above it');
-  }
-  assert.equal(rows[0].blurMix,0,'reflection is sharp at the waterline');
-  assert.ok(rows[1].blurMix>rows[0].blurMix&&rows.at(-1).blurMix>rows[1].blurMix,
-   'reflection softens gradually with water depth');
-  assert.ok(rows.every(row=>row.blurMix>=0&&row.blurMix<=.4),'softening stays subtle');
-  const sourceY=g.waterTop-40,moonBand=rows.find(row=>row.sourceY<=sourceY&&sourceY<row.sourceY+row.sourceHeight);
-  assert.ok(moonBand&&Math.abs(moonBand.y-(g.waterTop+40))<=2,'an object 40px above the waterline lands about 40px below it');
-  for(const night of [0,.75,1])assert.ok(g.horizonReflection(0,1,night).every(row=>row.alpha>=.42&&row.alpha<=.57),
-   'the natural-size sky remains visible by day and night');
-  assert.equal(JSON.stringify(g.horizonReflection(0,0,.75)),JSON.stringify(g.horizonReflection(10,0,.75)),
-   'a still scene holds the same reflection');
+  const g=ctx.LandscapeGeometry.create(w,h),surface=g.reflectionSurface(.75);
+  for(const y of [0,g.horizon-40,g.horizon,g.waterTop-40,g.waterTop])
+   assert.ok(Math.abs((surface.mirrorY(y)-g.waterTop)-(g.waterTop-y))<.001,'mirror distance and object height remain equal');
+  assert.equal(surface.softness(0),0,'the waterline stays sharp');
+  assert.ok(surface.softness(2)<surface.softness(40)&&surface.softness(40)<=surface.softMax,
+   'the existing tiny depth softness remains gradual');
+  assert.ok(surface.softMax<=.4,'the reflection is not broadly blurred');
+  assert.ok(surface.alpha>=.42&&surface.alpha<=.57,'natural-size sky contrast remains visible');
  }
  const runtime=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
- assert.doesNotMatch(runtime,/horizonReflectionColumns|warpedReflection/,'the renderer no longer squeezes sky columns');
- assert.match(runtime,/g\.drawImage\(source,0,row\.sourceY\*dpr/,'the water samples the sky at its original vertical scale');
- assert.match(runtime,/reflectionContext\.drawImage\(base\.canvas/,'the real painted sky is the source');
- assert.match(runtime,/paintHorizonReflection\(skyReflection,t/,'the same source reflects all above-horizon detail');
- assert.match(runtime,/blurredReflection/,'a softly blurred copy supplies distant water bands');
+ assert.doesNotMatch(runtime,/horizonReflectionColumns|warpedReflection|geometry\.horizonReflection\(|row\.sourceY/,'the renderer no longer shifts separate strips of the Moon');
+ assert.match(runtime,/g\.translate\(0,2\*surface\.axisY\)/,'the water mirrors around one continuous line');
+ assert.match(runtime,/g\.scale\(1,-1\)/,'the entire source flips once at original scale');
+ assert.match(runtime,/g\.drawImage\(source,0,0,W,geometry\.waterTop\)/,'the entire reflected scene is one high-resolution draw');
+ assert.match(runtime,/reflectionContext\.drawImage\(skyCity/,'the real painted sky is the source');
+ assert.match(runtime,/paintHorizonReflection\(reflectionCanvas,t/,'the same source reflects all above-horizon detail');
+ assert.match(runtime,/blurredReflection/,'the existing slight depth softness stays');
+});
+
+test('RISK landscape water: one continuous mirror shifts subtly over time without changing its height',()=>{
+ const runtime=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ const start=runtime.indexOf('  function paintHorizonReflection('),end=runtime.indexOf('  const point=',start);
+ assert.ok(start>=0&&end>start,'the production reflection painter is available');
+ const painter=runtime.slice(start,end);
+ const frameAt=t=>{
+  const draws=[],transform={x:0,y:0,sx:1,sy:1};
+  const g={globalAlpha:1,save(){},restore(){},translate(x,y){transform.x+=transform.sx*x;transform.y+=transform.sy*y;},scale(x,y){transform.sx*=x;transform.sy*=y;},drawImage(_source,x,y,w,h){draws.push({left:transform.x+transform.sx*x,top:transform.y+transform.sy*y,width:w,height:h,scaleX:transform.sx,scaleY:transform.sy});}};
+  vm.runInNewContext(`${painter};paintHorizonReflection({},${t})`,{g,geometry:{waterTop:300,reflectionSurface:()=>({axisY:300,alpha:.5})},p:{night:.75},wind:1,W:390,dpr:1.5,Math});
+  assert.equal(draws.length,1,'each frame mirrors the whole image in one draw');
+  return draws[0];
+ };
+ const first=frameAt(0),later=frameAt(1.5),still=frameAt(0);
+ assert.equal(first.scaleX,1);assert.equal(first.scaleY,-1);
+ assert.ok(first.top>599&&first.top<=600,'a device-pixel seam overlap must not compress the natural-height reflection');
+ assert.equal(later.top,first.top,'wave motion keeps the same reflection axis');
+ assert.equal(first.width,390);assert.equal(first.height,300);
+ assert.ok(Math.abs(later.left-first.left)>.1,'the Moon and skyline must move spatially between animation frames');
+ assert.ok(Math.abs(first.left)<=1.25&&Math.abs(later.left)<=1.25,'the motion stays within a subtle subpixel-to-pixel range');
+ assert.equal(still.left,first.left,'a still or reduced-motion frame is deterministic');
+});
+
+test('RISK landscape water: the full-size mirror overdraws the clipped horizon by one device pixel',()=>{
+ const runtime=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ const painter=runtime.slice(runtime.indexOf('  function paintHorizonReflection('),runtime.indexOf('  const point=',runtime.indexOf('  function paintHorizonReflection(')));
+ for(const dpr of [1,1.5,2]){
+  let translateY=0,scaleY=1,draw;
+  const g={globalAlpha:1,save(){},restore(){},translate(_x,y){translateY+=scaleY*y;},scale(_x,y){scaleY*=y;},drawImage(_source,_x,y,_w,h){draw={start:translateY+scaleY*(y+h),scaleY};}};
+  vm.runInNewContext(`${painter};paintHorizonReflection({},0)`,{g,geometry:{waterTop:300,reflectionSurface:()=>({axisY:300,alpha:.5})},p:{night:.75},wind:1,W:390,dpr,Math});
+  assert.equal(draw.scaleY,-1,'the Moon keeps its original reflected height');
+  assert.ok(draw.start<=300-1/dpr+1e-9&&draw.start>=300-2/dpr-1e-9,
+   `${dpr}x reflection begins just above the clipped waterline, leaving no empty pixel row`);
+ }
+});
+
+test('RISK landscape water: the reflected sky is captured before lake paint reaches the horizon',()=>{
+ const runtime=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ const city=runtime.indexOf('b=cityTarget;b.drawImage(cityLayer');
+ const capture=runtime.indexOf('skyCityContext.drawImage(base.canvas');
+ const lake=runtime.indexOf('const water=b.createLinearGradient(',city);
+ assert.ok(city>=0&&capture>city&&capture<lake,'the cached mirror source contains the full skyline but no water fill');
+ assert.match(runtime,/reflectionContext\.drawImage\(skyCity/,'the reflection samples that pre-water source');
+ assert.doesNotMatch(runtime,/reflectionContext\.drawImage\(base\.canvas/,'the water surface cannot mirror itself into a bright horizon row');
+});
+
+test('RISK landscape water: reflection opacity meets the skyline before fading into the lake',()=>{
+ const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
+ for(const [w,h] of [[320,568],[390,844],[844,390],[1440,900]])for(const night of [0,.5,1]){
+  const surface=ctx.LandscapeGeometry.create(w,h).reflectionSurface(night);
+  assert.ok(surface.contactDepth>=2&&surface.contactDepth<=4,'the contact transition stays only a few pixels deep');
+  assert.equal(surface.contactAlpha(0),1,'the first reflected row meets the original sky color');
+  assert.equal(surface.contactAlpha(surface.contactDepth),surface.alpha,'deeper water keeps its existing opacity');
+  assert.equal(surface.contactAlpha(surface.contactDepth*2),surface.alpha);
+  assert.ok(surface.contactAlpha(1)>surface.alpha&&surface.contactAlpha(1)<1,'the join fades smoothly instead of forming a second hard band');
+ }
+ const runtime=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ assert.match(runtime,/mirror\.globalCompositeOperation='destination-in'/,'one continuous alpha mask shapes the source');
+ assert.match(runtime,/surface\.contactAlpha\(0\)/,'the mirrored contact row uses full opacity');
+ assert.doesNotMatch(runtime,/g\.globalAlpha=surface\.alpha\*opacity/,'the final draw cannot halve the contact row again');
+});
+
+test('RISK landscape transit: the metro paints above the water tint without an unused mirror pass',()=>{
+ const runtime=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ const life=runtime.slice(runtime.indexOf('  function paintLife(t){'),runtime.indexOf('  function paintVessel('));
+ const capture=life.indexOf('reflectionContext.drawImage(front');
+ const lake=life.indexOf('paintHorizonReflection(reflectionCanvas');
+ const endWater=life.indexOf('}g.restore();',lake);
+ const visibleMetro=life.indexOf("if(e.type==='metro')paintEvent(e,t)",endWater);
+ const land=life.indexOf("composite('middle')",endWater);
+ assert.ok(capture>=0&&lake>capture,'the actual sky enters the reflection source');
+ assert.doesNotMatch(life,/transport\(reflectionContext/,'the metro runs below the waterline and needs no reflected source draw');
+ assert.ok(visibleMetro>endWater&&visibleMetro<land,'visible metro cars paint after the water tint and before the land');
+ assert.doesNotMatch(life.slice(0,capture),/const airborne=new Set\(\[[^\]]*'metro'/,'water cannot tint the first visible metro pass');
+ assert.ok(life.indexOf("if(e.type==='train')paintEvent(e,t)")>land,'the nearer train keeps its foreground pass');
+});
+
+test('RISK landscape water: full-frame animation reuses its reflection buffers',()=>{
+ const runtime=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ for(const canvas of ['skyReflection','blurredReflection','softenedReflection','reflectionCanvas']){
+  assert.match(runtime,new RegExp(`if\\(${canvas}\\.width!==`),`${canvas} width changes only on resize`);
+  assert.match(runtime,new RegExp(`if\\(${canvas}\\.height!==`),`${canvas} height changes only on resize`);
+ }
+ assert.match(runtime,/softContext\.clearRect\(/,'the small soft source clears between frames');
+ assert.match(runtime,/softened\.clearRect\(/,'the depth mask clears between frames');
+ assert.match(runtime,/mirror\.clearRect\(/,'the final mirror clears between frames');
 });
 
 test('Landscape time: a saved device-local hour locks scenery without changing the real date',()=>{
@@ -9484,7 +9559,7 @@ test('Landscape water: visible stars remain eligible for bounded horizon reflect
  assert.ok(Math.abs(a.x-720)<4);assert.ok(a.y>g.waterTop&&a.y<g.far(a.x));assert.notEqual(a.x,b.x);
  assert.equal(g.starReflection({...star,altitude:-2},0,1),null);
  assert.equal(g.starReflection({...star,magnitude:6},0,1),null);
- const runtime=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');assert.match(runtime,/reflectionContext\.drawImage\(base\.canvas/);assert.match(runtime,/S\.sceneDate\(/);
+ const runtime=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');assert.match(runtime,/reflectionContext\.drawImage\(skyCity/);assert.match(runtime,/S\.sceneDate\(/);
 });
 
 test('Landscape time: solar presets follow the date and saved observer',()=>{
@@ -9873,14 +9948,14 @@ test('Landscape stand: path visitors sort behind the counter and meadow visitors
  assert.match(source,/depth:[^\n]*geometry\.eventDepth\(e\)/);
 });
 
-test('Animation audit: steady thirty-frame pacing across display refresh rates',()=>{
+test('RISK Animation audit: water and visitors keep a thirty-fps paint cap while time advances',()=>{
  const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
  const tick=source.slice(source.indexOf('  function tick(now){'),source.indexOf('  function stop(){'));
  for(const hz of [60,90,120,144]){
-  const paints=[],ctx=vm.createContext({reduced:false,document:{hidden:false},frame:0,last:0,lastPaint:0,nextPaint:0,world:{elapsed:0},woodland:{},sky:{},cityLights:{},p:{night:0},Math,requestAnimationFrame(){return 1;},S:{advance(w,dt){w.elapsed+=dt;},advanceWoodland(){},advanceLights(){return false;}},paintLife(){paints.push(ctx.now);}});
+  const paints=[],ctx=vm.createContext({reduced:false,document:{hidden:false},frame:0,last:0,nextPaint:0,world:{elapsed:0},woodland:{},sky:{},cityLights:{},p:{night:0},Math,requestAnimationFrame(){return 1;},S:{advance(w,dt){w.elapsed+=dt;},advanceWoodland(){},advanceLights(){return false;}},paintLife(){paints.push(ctx.now);}});
   vm.runInContext(tick,ctx);
   for(let i=1;i<=hz*2;i++){ctx.now=i*1000/hz;vm.runInContext('tick(now)',ctx);}
-  assert.ok(paints.length>=59&&paints.length<=61,`${hz}Hz produced ${paints.length} paints in two seconds; expected about 60`);
+  assert.ok(paints.length>=59&&paints.length<=61,`${hz}Hz produced ${paints.length} paints in two seconds; the reflection should paint at about 30fps`);
   assert.ok(ctx.world.elapsed>1.9&&ctx.world.elapsed<=2,'motion keeps real elapsed time');
  }
 });
@@ -12748,7 +12823,7 @@ test('Landscape polish: small autumn leaves, seeded group sizes, stronger vertic
  const airplane={type:'banner',age:37,duration:90,lane:.5,seed:.37,reverse:false};
  const offsets=[10,25,40,55,70].map(age=>g.verticalOffset({...airplane,age},20));
  assert.ok(Math.max(...offsets)-Math.min(...offsets)>10,'eligible airborne motion is visibly vertical');
- assert.ok(g.horizonReflection(0,1,0).length>0);
+ assert.ok(g.reflectionSurface(0).alpha>0);
 });
 
 test('Landscape polish: tram car spacing follows track length on phone and tablet',()=>{
