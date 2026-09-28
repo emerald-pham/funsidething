@@ -7116,6 +7116,175 @@ test('HARD GATE: a failed local safety backup blocks the repaired cloud write', 
   assert.ok(h.remoteState().tasks.some(t=>t.id==='b'));
 });
 
+test('RISK CLOUD BACKUP: an exact stable recovery copy satisfies adoption when duplicate writes hit quota', async () => {
+  const local=syncState({tasks:[syncTask('shared','Local')],syncRev:2});
+  const remote=syncState({tasks:[syncTask('shared','Cloud')]});
+  const h=makeSyncHarness({remote,rev:3});
+  const storage=sharedScannerStorage({[SYNC_STORE_KEY]:JSON.stringify(local)});
+  const {ctx}=await loadApp({sharedStorage:storage,cloudSyncFactory:h.factory});
+  const original=storage.getItem(LOCAL_BACKUPS_KEY);
+  assert.ok(ctx.readLocalBackups().some(row=>row.kind==='daily' && row.payload===JSON.stringify(ctx.state)));
+  const write=storage.setItem;
+  storage.setItem=(key,value)=>{if(key===LOCAL_BACKUPS_KEY)throw Error('quota');write(key,value);};
+  await ctx.cloudPull();
+  assert.equal(ctx.state.tasks[0].title,'Cloud');
+  assert.equal(storage.getItem(LOCAL_BACKUPS_KEY),original,'the existing stable snapshot remains untouched');
+  assert.equal(h.calls.includes('push'),false);
+});
+
+test('RISK CLOUD BACKUP: an unreadable backup row is never discarded to make room', async () => {
+  const storage=sharedScannerStorage();
+  const {ctx}=await loadApp({sharedStorage:storage});
+  const old=Date.parse('2020-01-01T12:00:00Z');
+  const raw=JSON.stringify([{id:'unreadable-copy',day:'2020-01-01',at:old,kind:'daily',payload:'unreadable'}]);
+  storage.setItem(LOCAL_BACKUPS_KEY,raw);
+  assert.equal(ctx.saveLocalBackup('daily',JSON.stringify(ctx.state)),false);
+  assert.equal(storage.getItem(LOCAL_BACKUPS_KEY),raw);
+});
+
+test('RISK CLOUD ADOPTION: failed safety backup leaves the local revision and board unchanged', async () => {
+  const local=syncState({tasks:[syncTask('shared','Local')],syncRev:9});
+  const remote=syncState({tasks:[syncTask('shared','Cloud')]});
+  const h=makeSyncHarness({remote,rev:3});
+  const storage=sharedScannerStorage({[SYNC_STORE_KEY]:JSON.stringify(local)});
+  const {ctx}=await loadApp({sharedStorage:storage,cloudSyncFactory:h.factory});
+  ctx.state.tasks.push(syncTask('unsaved','Unsaved local edit'));
+  vm.runInContext('pendingPush=true',ctx);
+  const before=JSON.stringify(ctx.state);
+  const markers=()=>vm.runInContext('JSON.stringify({reconciledAs,lastKnownCloudPayload,pendingPush,deferredCloudPull,lastPushed})',ctx);
+  const beforeMarkers=markers();
+  const write=storage.setItem;
+  storage.setItem=(key,value)=>{if(key===LOCAL_BACKUPS_KEY)throw Error('quota');write(key,value);};
+  await ctx.cloudPull();
+  assert.equal(JSON.stringify(ctx.state),before);
+  assert.equal(markers(),beforeMarkers);
+  assert.equal(ctx.reconciled(),false);
+  assert.equal(h.calls.includes('push'),false);
+  storage.setItem=write;
+  await ctx.cloudPull(); await syncSettle(30);
+  assert.ok(ctx.state.syncRev>=3);
+  assert.ok(ctx.state.tasks.some(task=>task.id==='unsaved'));
+  assert.equal(ctx.reconciled(),true);
+});
+
+test('RISK CLOUD ADOPTION: iOS-style cold open keeps the merged board after backup quota and reload', async () => {
+  const local=syncState({tasks:[syncTask('local','Offline edit')],syncRev:2});
+  const remote=syncState({tasks:[syncTask('remote','Other device')],syncRev:3});
+  const storage=sharedScannerStorage({[SYNC_STORE_KEY]:JSON.stringify(local)});
+  await loadApp({sharedStorage:storage}); // a prior launch left the exact local board in today's daily backup
+  const oldBoard=storage.getItem(SYNC_STORE_KEY);
+  const oldSnapshot=JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY)).find(row=>row.kind==='daily');
+  const write=storage.setItem;
+  storage.setItem=(key,value)=>{if(key===LOCAL_BACKUPS_KEY)throw Error('quota');write(key,value);};
+  const h=makeSyncHarness({remote,rev:3});
+  const opened=await loadApp({sharedStorage:storage,cloudSyncFactory:h.factory,
+    beforeStateReady:ctx=>ctx.cloudPull()});
+  await syncSettle(30);
+  assert.deepEqual(new Set(Array.from(opened.ctx.state.tasks,t=>t.id)),new Set(['local','remote']));
+  assert.notEqual(storage.getItem(SYNC_STORE_KEY),oldBoard,'the merged board reaches disk before adoption is accepted');
+  assert.deepEqual(new Set(h.remoteState().tasks.map(t=>t.id)),new Set(['local','remote']),
+    'the exact merged board already saved on this device may reach the cloud without a duplicate backup');
+  assert.equal(JSON.parse(storage.getItem(SYNC_STORE_KEY)).syncRev,h.doc.rev,
+    'the cloud acknowledgement must reach disk despite backup-index quota');
+  opened.ctx.addTask('Later unbacked edit');
+  opened.ctx.cloudPushNow(); await syncSettle(30);
+  assert.equal(h.remoteState().tasks.some(t=>t.title==='Later unbacked edit'),false,
+    'a later edit must still pass the ordinary backup gate before it can sync');
+  const reopened=await loadApp({sharedStorage:storage,cloudSyncFactory:h.factory});
+  await reopened.ctx.cloudPull();
+  assert.equal(reopened.ctx.reconciled(),true,'reload should recognize the acknowledged revision without another held adoption');
+  assert.deepEqual(new Set(Array.from(reopened.ctx.state.tasks,t=>t.id)),new Set(['local','remote']));
+  assert.ok(reopened.ctx.readLocalBackups().some(row=>row.id===oldSnapshot.id && row.payload===oldSnapshot.payload),
+    'the original offline board stays available for restore');
+});
+
+test('RISK CLOUD ADOPTION: a later edit during union push cannot borrow the saved adoption proof', async () => {
+  const local=syncState({tasks:[syncTask('local','Offline edit')],syncRev:2});
+  const h=makeSyncHarness({remote:syncState({tasks:[syncTask('remote','Other device')]}),rev:3,delayMs:45});
+  const storage=sharedScannerStorage({[SYNC_STORE_KEY]:JSON.stringify(local)});
+  const {ctx}=await loadApp({sharedStorage:storage,cloudSyncFactory:h.factory});
+  const write=storage.setItem;
+  storage.setItem=(key,value)=>{if(key===LOCAL_BACKUPS_KEY)throw Error('quota');write(key,value);};
+  await ctx.cloudPull();
+  assert.ok(h.calls.includes('push'),'the union write must be in flight');
+  ctx.addTask('Later unbacked edit');
+  ctx.cloudPushNow();
+  await syncSettle(160);
+  assert.deepEqual(new Set(h.remoteState().tasks.map(t=>t.id)),new Set(['local','remote']));
+  assert.equal(h.remoteState().tasks.some(t=>t.title==='Later unbacked edit'),false);
+  assert.ok(ctx.state.tasks.some(t=>t.title==='Later unbacked edit'),'the unsaved draft remains visible in this tab');
+  const reload=await loadApp({sharedStorage:storage,cloudSyncFactory:h.factory});
+  await reload.ctx.cloudPull();
+  assert.equal(reload.ctx.reconciled(),true,'the saved union can align to its cloud acknowledgement on reload');
+  assert.deepEqual(new Set(Array.from(reload.ctx.state.tasks,t=>t.id)),new Set(['local','remote']));
+});
+
+test('RISK CLOUD ADOPTION: held newer read cannot release a pending write from an earlier reconcile', async () => {
+  const local=syncState({tasks:[syncTask('shared','Original')],syncRev:2});
+  const h=makeSyncHarness({remote:syncState({tasks:[syncTask('shared','Original')]}),rev:2});
+  const storage=sharedScannerStorage({[SYNC_STORE_KEY]:JSON.stringify(local)});
+  const {ctx}=await loadApp({sharedStorage:storage,cloudSyncFactory:h.factory});
+  await ctx.cloudPull();
+  assert.equal(ctx.reconciled(),true);
+  h.writeBehindBack(syncState({tasks:[syncTask('shared','Changed elsewhere')]}));
+  ctx.state.tasks.push(syncTask('unsaved','Offline pending edit'));
+  vm.runInContext('pendingPush=true',ctx);
+  const markers=()=>vm.runInContext('JSON.stringify({reconciledAs,lastKnownCloudPayload,pendingPush})',ctx);
+  const before=markers();
+  const write=storage.setItem;
+  storage.setItem=(key,value)=>{if(key===LOCAL_BACKUPS_KEY)throw Error('quota');write(key,value);};
+  await ctx.cloudPull(); await syncSettle(30);
+  assert.equal(ctx.reconciled(),false,'a failed safety copy revokes permission to write from the older read');
+  assert.equal(markers(),before,'the pending edit and prior read evidence are kept for retry');
+  assert.equal(h.calls.includes('push'),false);
+  storage.setItem=write;
+  await ctx.cloudPull(); await syncSettle(30);
+  assert.ok(ctx.state.tasks.some(task=>task.id==='unsaved'));
+  assert.equal(ctx.reconciled(),true);
+});
+
+test('RISK CLOUD ADOPTION: a board-store quota failure restores both browser keys and holds the cloud', async () => {
+  const local=syncState({tasks:[syncTask('local','Offline work')],syncRev:2});
+  const remote=syncState({tasks:[syncTask('remote','Cloud work')]});
+  const h=makeSyncHarness({remote,rev:3});
+  const storage=sharedScannerStorage({[SYNC_STORE_KEY]:JSON.stringify(local)});
+  const {ctx}=await loadApp({sharedStorage:storage,cloudSyncFactory:h.factory});
+  const before=JSON.stringify(ctx.state),oldStore=storage.getItem(SYNC_STORE_KEY);
+  const oldHead=storage.getItem(LOCAL_HEAD_KEY),oldBackups=storage.getItem(LOCAL_BACKUPS_KEY);
+  const write=storage.setItem;
+  storage.setItem=(key,value)=>{if(key===SYNC_STORE_KEY || key===LOCAL_BACKUPS_KEY)throw Error('quota');write(key,value);};
+  await ctx.cloudPull();
+  assert.equal(JSON.stringify(ctx.state),before);
+  assert.equal(ctx.reconciled(),false);
+  assert.equal(storage.getItem(SYNC_STORE_KEY),oldStore);
+  assert.equal(storage.getItem(LOCAL_HEAD_KEY),oldHead);
+  assert.equal(storage.getItem(LOCAL_BACKUPS_KEY),oldBackups);
+  assert.equal(h.calls.includes('push'),false);
+});
+
+test('RISK CLOUD ADOPTION: failed write rollback preserves another tab newer browser bytes', async () => {
+  const local=syncState({tasks:[syncTask('local','Offline work')],syncRev:2});
+  const remote=syncState({tasks:[syncTask('remote','Cloud work')]});
+  const other=syncState({tasks:[syncTask('other','Another tab edit')],syncRev:2});
+  const otherRaw=JSON.stringify(other);
+  const h=makeSyncHarness({remote,rev:3});
+  const storage=sharedScannerStorage({[SYNC_STORE_KEY]:JSON.stringify(local)});
+  const {ctx}=await loadApp({sharedStorage:storage,cloudSyncFactory:h.factory});
+  const oldBackups=storage.getItem(LOCAL_BACKUPS_KEY);
+  const write=storage.setItem;
+  let replaced=false;
+  storage.setItem=(key,value)=>{
+    if(key===LOCAL_BACKUPS_KEY)throw Error('quota');
+    if(key===SYNC_STORE_KEY && !replaced){replaced=true;write(key,otherRaw);throw Error('concurrent write');}
+    write(key,value);
+  };
+  await ctx.cloudPull();
+  assert.equal(storage.getItem(SYNC_STORE_KEY),otherRaw,'rollback must not overwrite the concurrent browser edit');
+  assert.equal(storage.getItem(LOCAL_BACKUPS_KEY),oldBackups);
+  assert.equal(ctx.reconciled(),false);
+  assert.equal(h.calls.includes('push'),false);
+});
+
 test('LEGACY MIGRATION: old v1 browser and cloud boards retain unique historyless tasks', async () => {
   const local = syncState({ v:1, tasks:[syncTask('legacy-local','Saved on old app')], syncRev:2 });
   delete local.deletedTaskIds;
@@ -7497,6 +7666,77 @@ test('LOCAL BACKUPS: a user can remove an old recovery copy without changing the
   assert.deepEqual(Array.from(ctx.state.tasks,task=>task.title),['Current board']);
 });
 
+test('RISK LOCAL BACKUPS: deleting one visible copy preserves hidden unreadable recovery bytes',async()=>{
+  const storage=sharedScannerStorage();
+  const {ctx}=await loadApp({sharedStorage:storage});
+  const bad={id:'old-unreadable',day:'2020-01-01',at:Date.parse('2020-01-01T12:00:00Z'),kind:'daily',payload:'unreadable'};
+  const good={id:'current',day:'2026-09-28',at:Date.now(),kind:'manual',payload:JSON.stringify(ctx.state)};
+  const raw='[ '+JSON.stringify(bad)+' , '+JSON.stringify(good)+' ]';
+  storage.setItem(LOCAL_BACKUPS_KEY,raw);
+  ctx.openSettings();
+  ctx.onAction('delete-local-backup',{dataset:{id:'current'}});
+  assert.deepEqual(JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY)),[bad]);
+  assert.ok(storage.getItem(LOCAL_BACKUPS_KEY).includes(JSON.stringify(bad)),
+    'the unreadable row remains byte-for-byte available in the raw index');
+});
+
+test('RISK LOCAL BACKUPS: unreadable old copy is visible with exact raw recovery and targeted removal',async()=>{
+  const storage=sharedScannerStorage();
+  const {ctx,shim}=await loadApp({sharedStorage:storage});
+  const bad={id:'old-unreadable',day:'2020-01-01',at:Date.parse('2020-01-01T12:00:00Z'),kind:'daily',payload:'unreadable'};
+  const good={id:'keep',day:'2026-09-28',at:Date.now(),kind:'manual',payload:JSON.stringify(ctx.state)};
+  const raw=JSON.stringify([bad,good]);
+  storage.setItem(LOCAL_BACKUPS_KEY,raw);
+  ctx.openSettings();
+  let view=shim.document.getElementById('modalRoot').innerHTML;
+  assert.match(view,/old-unreadable/);
+  assert.match(view,/Unreadable backup/);
+  assert.match(view,/data-act="view-raw-backups"/);
+  assert.match(view,/data-act="download-raw-backups"/);
+  assert.match(view,/data-act="restore-local-backup"[^>]*disabled/);
+  ctx.onAction('view-raw-backups',{});
+  view=shim.document.getElementById('modalRoot').innerHTML;
+  assert.ok(view.includes(ctx.esc(raw)),'the raw viewer contains every original byte for recovery');
+  ctx.openSettings();
+  ctx.onAction('delete-local-backup',{dataset:{id:'old-unreadable'}});
+  assert.deepEqual(JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY)),[good]);
+  assert.equal(ctx.saveLocalBackup('manual',JSON.stringify(ctx.state)),true,'new backups resume after the selected bad row is removed');
+});
+
+test('RISK LOCAL BACKUPS: duplicate IDs and malformed root never permit ambiguous deletion',async()=>{
+  const storage=sharedScannerStorage();
+  const {ctx,shim}=await loadApp({sharedStorage:storage});
+  const payload=JSON.stringify(ctx.state);
+  const first={id:'same',day:'2026-09-28',at:Date.now(),kind:'manual',payload};
+  const second={...first,payload:JSON.stringify({...ctx.state,updatedAt:123})};
+  const duplicates=JSON.stringify([first,second]);
+  storage.setItem(LOCAL_BACKUPS_KEY,duplicates);
+  ctx.openSettings();
+  assert.match(shim.document.getElementById('modalRoot').innerHTML,/Duplicate backup ID/);
+  ctx.onAction('delete-local-backup',{dataset:{id:'same'}});
+  assert.equal(storage.getItem(LOCAL_BACKUPS_KEY),duplicates);
+  const malformed='[{"id":"partial"';
+  storage.setItem(LOCAL_BACKUPS_KEY,malformed);
+  ctx.openSettings();
+  assert.match(shim.document.getElementById('modalRoot').innerHTML,/Backup list cannot be read/);
+  ctx.onAction('delete-local-backup',{dataset:{id:'partial'}});
+  assert.equal(storage.getItem(LOCAL_BACKUPS_KEY),malformed);
+  ctx.onAction('view-raw-backups',{});
+  assert.ok(shim.document.getElementById('modalRoot').innerHTML.includes(ctx.esc(malformed)));
+});
+
+test('RISK LOCAL BACKUPS: a stale Settings click cannot delete a row rewritten by another tab',async()=>{
+  const storage=sharedScannerStorage();
+  const {ctx}=await loadApp({sharedStorage:storage});
+  const row={id:'current',day:'2026-09-28',at:Date.now(),kind:'manual',payload:JSON.stringify(ctx.state)};
+  storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify([row]));
+  ctx.openSettings();
+  const changed=JSON.stringify([{...row,payload:JSON.stringify({...ctx.state,updatedAt:123})}]);
+  storage.setItem(LOCAL_BACKUPS_KEY,changed);
+  ctx.onAction('delete-local-backup',{dataset:{id:'current'}});
+  assert.equal(storage.getItem(LOCAL_BACKUPS_KEY),changed);
+});
+
 test('LOCAL BACKUPS: restore and delete controls can wrap inside narrow Settings panes',async()=>{
   const {ctx,shim}=await loadApp();
   ctx.saveLocalBackup('before-account-switch',JSON.stringify(ctx.state));
@@ -7542,6 +7782,8 @@ test('HARD GATE: failed pre-adoption backup cannot replace a healthy local board
   const h=makeSyncHarness({remote,rev:2});
   const storage=sharedScannerStorage({[SYNC_STORE_KEY]:JSON.stringify(local)});
   const {ctx}=await loadApp({sharedStorage:storage,cloudSyncFactory:h.factory});
+  ctx.state.tasks.push(syncTask('unsaved','Still needs a recovery copy'));
+  assert.ok(!ctx.readLocalBackups().some(row=>row.payload===JSON.stringify(ctx.state)));
   const set=storage.setItem;
   storage.setItem=(key,value)=>{if(key===LOCAL_BACKUPS_KEY)throw Error('quota');set(key,value);};
   await ctx.cloudPull();
