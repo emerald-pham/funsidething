@@ -8096,6 +8096,21 @@ test('RISK LOCAL BACKUPS: quota during Restore keeps the immediate pre-restore b
  assert.equal(storage.getItem(LOCAL_HEAD_KEY),storage.getItem(SYNC_STORE_KEY));
  await new Promise(resolve=>setTimeout(resolve,420));
  assert.equal(storage.getItem(SYNC_STORE_KEY),before,'a delayed save cannot bypass the protected restore hold');
+ // A second tab has no access to this tab's in-memory pending marker and can
+ // rotate the ordinary index row before this Restore gets another save chance.
+ const peerIndex=storage.getItem(LOCAL_BACKUPS_KEY);
+ const peerRows=JSON.parse(peerIndex);
+ const displaced=peerRows.find(row=>row.kind==='before-restore' && row.payload===before);
+ assert.ok(displaced);
+ storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify(peerRows.filter(row=>row.id!==displaced.id)));
+ quota=Infinity; // otherwise quota, rather than missing safety, could hold the write
+ assert.equal(await ctx.persist(),false,'a missing exact safety row blocks primary replacement');
+ assert.equal(storage.getItem(SYNC_STORE_KEY),before);
+ storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify(peerRows.map(row=>row.id===displaced.id
+  ? {...row,payload:target} : row)));
+ assert.equal(await ctx.persist(),false,'reusing the safety ID for different bytes cannot authorize replacement');
+ assert.equal(storage.getItem(SYNC_STORE_KEY),before);
+ storage.setItem(LOCAL_BACKUPS_KEY,peerIndex); // restore fixture for background retry coverage
  quota=used(); // a genuinely full device remains full for later background retries
  ctx.saveLocalBackup('before-cloud-adoption',JSON.stringify(ctx.state));
  assert.ok(JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY)).some(row=>row.kind==='before-restore' && row.payload===before),
