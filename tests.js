@@ -7744,7 +7744,7 @@ test('RISK LOCAL BACKUPS: exhausted quota leaves the original index and unsaved 
  const boardBefore=storage.getItem(SYNC_STORE_KEY),headBefore=storage.getItem(LOCAL_HEAD_KEY);
  const write=storage.setItem;
  storage.setItem=(key,value)=>{
-  if(key===LOCAL_BACKUPS_KEY){const error=Error('browser quota');error.name='QuotaExceededError';throw error;}
+  if(key===LOCAL_BACKUPS_KEY || key===LOCAL_HEAD_KEY){const error=Error('browser quota');error.name='QuotaExceededError';throw error;}
   write(key,value);
  };
  ctx.addTask('Unsaved after quota');
@@ -8032,7 +8032,7 @@ test('RISK LOCAL BACKUPS: single-device Undo frees old automatic history for its
  assert.equal(storage.getItem(LOCAL_HEAD_KEY),beforeHead);
  assert.equal(storage.getItem(SYNC_STORE_KEY),beforeBoard);
  assert.equal(storage.getItem(LOCAL_BACKUPS_KEY),protectedOnly,'manual and pinned copies keep their exact bytes');
- assert.match(reopened.shim.document.getElementById('toast')?.textContent||'',/Could not save your changes on this device/);
+ assert.match(reopened.shim.document.getElementById('toast')?.textContent||'',/Couldn't save this edit on this device/);
  const current=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)?.[1]||'';
  assert.match(current,/Undo now clears older automatic backup history when needed to save your edit, while keeping manual and protected recovery copies\./);
 });
@@ -8051,6 +8051,40 @@ test('RISK LOCAL BACKUPS: primary quota rotation keeps the newest stable recover
  assert.equal(ctx.retireAutomaticBackupForPrimarySave(head,board),true);
  const rows=JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY));
  assert.deepEqual(rows.map(row=>row.id),['stable-daily'],'the last automatic copy is a stable daily snapshot, not replaceable latest history');
+});
+
+test('RISK LOCAL BACKUPS: full optional history cannot block an ordinary edit that fits primary storage',async()=>{
+ const values=new Map(),used=()=>[...values].reduce((sum,[key,value])=>sum+key.length+value.length,0);
+ let quota=Infinity;
+ const storage={
+  getItem:key=>values.get(key)??null,
+  setItem:(key,value)=>{
+   const next=String(value),prior=values.get(key)||'';
+   if(used()-prior.length+next.length>quota){const error=Error('site quota');error.name='QuotaExceededError';throw error;}
+   values.set(key,next);
+  },
+  removeItem:key=>values.delete(key),
+ };
+ const {ctx,shim}=await loadApp({sharedStorage:storage});
+ ctx.addTask('Saved task');assert.equal(await ctx.persist(),true);
+ const before=storage.getItem(SYNC_STORE_KEY),at=Date.now(),day=ctx.backupDay(at);
+ const archive=Array.from({length:6},(_,i)=>({id:'manual-'+i,day,at:at-i,kind:'manual',payload:before}));
+ storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify(archive));
+ ctx.state.tasks[0].title='Saved task with an ordinary new edit';
+ const after=JSON.stringify(ctx.state),growth=(after.length-before.length)*2;
+ quota=used()+growth+32; // both primary replacements fit; another full-board history row cannot
+ assert.equal(await ctx.persist(),true,'optional backup quota must not hold a primary edit: '+(shim.document.getElementById('toast')?.textContent||''));
+ assert.equal(storage.getItem(SYNC_STORE_KEY),after);
+ assert.equal(storage.getItem(LOCAL_HEAD_KEY),after);
+ assert.ok(JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY)).filter(row=>row.kind==='manual').length===archive.length);
+ assert.doesNotMatch(shim.document.getElementById('toast')?.textContent||'',/remove an old manual backup/);
+ const reopened=await loadApp({sharedStorage:storage});
+ assert.equal(reopened.ctx.state.tasks[0].title,'Saved task with an ordinary new edit');
+ quota=Infinity;
+ reopened.ctx.state.tasks[0].title='Another edit after space returns';
+ assert.equal(await reopened.ctx.persist(),true);
+ assert.ok(JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY)).some(row=>row.kind==='daily'&&row.payload===JSON.stringify(reopened.ctx.state)),
+  'automatic history resumes on a later save when storage has room');
 });
 
 test('RISK LOCAL BACKUPS: quota during Restore keeps the immediate pre-restore board',async()=>{
