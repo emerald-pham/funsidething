@@ -46,6 +46,9 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK CLOUD BACKUP: an overwritten local edit survives later quota rotation
 - RISK CLOUD BACKUP: an offline edit reopened before conflict remains protected
 - RISK LOCAL BACKUPS: cold older-tab repair keeps a pinned recovery copy
+- RISK LOCAL BACKUPS: stale-tab adoption carries pinned recovery IDs durably
+- RISK LOCAL BACKUPS: failed stale-tab marker write leaves both browser keys intact
+- RISK LOCAL BACKUPS: cold older-tab bytes carry their recovery IDs into the head
 - RISK CLOUD BACKUP: an exact chosen copy avoids duplicate displaced-edit storage
 - RISK LOCAL BACKUPS: aged stale-tab and other-browser recovery stays available
 - RISK LOCAL BACKUPS: unknown legacy kinds do not expire during rotation

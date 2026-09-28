@@ -7881,6 +7881,59 @@ test('RISK LOCAL BACKUPS: cold older-tab repair keeps a pinned recovery copy',as
  assert.ok(!saved.some(row=>row.id===ordinary.id),'ordinary history retires when the cold repair reaches quota');
 });
 
+test('RISK LOCAL BACKUPS: stale-tab adoption carries pinned recovery IDs durably',async()=>{
+ const at=Date.parse('2026-09-01T12:00:00Z');
+ const lost=syncState({tasks:[syncTask('shared','Displaced offline edit')]});
+ const current=syncState({tasks:[syncTask('shared','Current title')],protectedBackupIds:['pinned-edit'],syncDirty:false});
+ const pinned={id:'pinned-edit',day:'2026-09-01',at,kind:'daily',payload:JSON.stringify(lost)};
+ const storage=sharedScannerStorage({[LOCAL_HEAD_KEY]:JSON.stringify(current),[SYNC_STORE_KEY]:JSON.stringify(current),
+  [LOCAL_BACKUPS_KEY]:JSON.stringify([pinned])});
+ const {ctx}=await loadApp({sharedStorage:storage});
+ const newer=syncState({tasks:[syncTask('shared','Other tab title')],syncDirty:false});
+ storage.setItem(LOCAL_HEAD_KEY,JSON.stringify(newer));storage.setItem(SYNC_STORE_KEY,JSON.stringify(newer));
+ ctx.refreshBrowserCopy();
+ assert.ok(ctx.state.protectedBackupIds?.includes(pinned.id),'the adopted board retains the displaced edit reference');
+ assert.ok(JSON.parse(storage.getItem(LOCAL_HEAD_KEY)).protectedBackupIds?.includes(pinned.id),
+  'the recovery reference survives another cold start');
+ const {ctx:reopened}=await loadApp({sharedStorage:storage});
+ setFakeTime(reopened,Date.now()+8*24*HOUR);
+ assert.equal(reopened.saveLocalBackup('daily',JSON.stringify(reopened.state)),true);
+ assert.ok(reopened.readLocalBackups().some(row=>row.id===pinned.id),'later expiry cannot drop the original edit');
+});
+
+test('RISK LOCAL BACKUPS: failed stale-tab marker write leaves both browser keys intact',async()=>{
+ const current=syncState({tasks:[syncTask('shared','Current board')],protectedBackupIds:['pinned-edit']});
+ const newer=syncState({tasks:[syncTask('shared','Other tab title')]});
+ const storage=sharedScannerStorage({[LOCAL_HEAD_KEY]:JSON.stringify(current),[SYNC_STORE_KEY]:JSON.stringify(current)});
+ const {ctx}=await loadApp({sharedStorage:storage});
+ const incoming=JSON.stringify(newer);
+ storage.setItem(LOCAL_HEAD_KEY,incoming);storage.setItem(SYNC_STORE_KEY,incoming);
+ const write=storage.setItem;
+ storage.setItem=(key,value)=>{
+  if(key===SYNC_STORE_KEY && value.includes('protectedBackupIds')){
+   const error=Error('browser quota');error.name='QuotaExceededError';throw error;
+  }
+  write(key,value);
+ };
+ assert.equal(ctx.refreshBrowserCopy(),false);
+ assert.equal(storage.getItem(LOCAL_HEAD_KEY),incoming,'rollback cannot overwrite the other tab head');
+ assert.equal(storage.getItem(SYNC_STORE_KEY),incoming,'the shared browser key remains the other tab version');
+ assert.ok(ctx.state.protectedBackupIds.includes('pinned-edit'),'this tab keeps its recovery reference while adoption is held');
+});
+
+test('RISK LOCAL BACKUPS: cold older-tab bytes carry their recovery IDs into the head',async()=>{
+ const at=Date.parse('2026-09-01T12:00:00Z');
+ const head=syncState({tasks:[syncTask('shared','Newer shell title')]});
+ const older=syncState({tasks:[syncTask('shared','Older shell title')],protectedBackupIds:['older-pin']});
+ const pinned={id:'older-pin',day:'2026-09-01',at,kind:'daily',payload:JSON.stringify(older)};
+ const storage=sharedScannerStorage({[LOCAL_HEAD_KEY]:JSON.stringify(head),[SYNC_STORE_KEY]:JSON.stringify(older),
+  [LOCAL_BACKUPS_KEY]:JSON.stringify([pinned])});
+ await loadApp({sharedStorage:storage});
+ assert.ok(JSON.parse(storage.getItem(LOCAL_HEAD_KEY)).protectedBackupIds?.includes(pinned.id),
+  'the valid older-tab board transfers its device recovery reference to the repaired head');
+ assert.ok(JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY)).some(row=>row.id===pinned.id));
+});
+
 test('RISK CLOUD BACKUP: an exact chosen copy avoids duplicate displaced-edit storage',async()=>{
  const storage=sharedScannerStorage(),{ctx}=await loadApp({sharedStorage:storage});
  ctx.addTask('My unsynced edit');
