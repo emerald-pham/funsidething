@@ -262,15 +262,13 @@
       return dots;
     }
     const sunReflection=sun=>sun.visible&&sun.altitude>0;
-    const ripple=(i,t,wind=1)=>{
-      const phase=i*1.71;
-      return {alpha:.25+.75*(.5+.5*Math.sin(t*wind*1.65+phase))**2,
-        drift:Math.sin(t*wind*(.8+(i%7)*.11)+phase)*22,
-        lift:Math.sin(t*wind*(1.05+(i%5)*.08)+phase*.83)*4,
-        curl:Math.sin(t*wind*(1.1+(i%3)*.16)+phase*1.23)*2.1,
-        width:.7+.45*(.5+.5*Math.sin(t*wind*1.2+i*.93))};
-    };
-    return {routeProgress,motionProgress,motionAge,verticalOffset,visitPose,woodlandPose,duckPose,waterDepth,cycleLeg,deerLeg,nestVisit,eventDepth,dogPose,skater,fireworks,flock,dolphin,starReflection,reflectionSurface,castShadow,grassBand,sunReflection,depthBand,groundAnchor,groundTravelX,groundPose,strideArm,strideFoot,wingFold,balloonDrift,vessel,foregroundTree,nest,ripple,skyPoint,horizon,waterTop,far,middle,near,rail,trail,lowerRail,railCars,tangent,rider,pack};
+    const ripple=(i,t,wind=1)=>({alpha:.15+.75*(.5+.5*Math.sin(t*wind*1.3+i*1.71))**2,drift:Math.sin(t*wind*.5+i)*9,width:.65+.35*Math.sin(t*.9+i)**2});
+    // One affine sway keeps every reflected pixel moving together. Its zero at
+    // the waterline preserves the clean horizon join and natural object height.
+    const reflectionMotion=(t,wind=1,frozen=false)=>({
+      shear:frozen?0:Math.sin(t*Math.max(.35,Number(wind)||1)*.82)*Math.min(.022,5/Math.max(1,waterTop))
+    });
+    return {routeProgress,motionProgress,motionAge,verticalOffset,visitPose,woodlandPose,duckPose,waterDepth,cycleLeg,deerLeg,nestVisit,eventDepth,dogPose,skater,fireworks,flock,dolphin,starReflection,reflectionSurface,reflectionMotion,castShadow,grassBand,sunReflection,depthBand,groundAnchor,groundTravelX,groundPose,strideArm,strideFoot,wingFold,balloonDrift,vessel,foregroundTree,nest,ripple,skyPoint,horizon,waterTop,far,middle,near,rail,trail,lowerRail,railCars,tangent,rider,pack};
   }
   root.LandscapeGeometry={create};
 })(globalThis);
