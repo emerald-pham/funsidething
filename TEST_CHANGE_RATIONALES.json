@@ -294,5 +294,25 @@
       "command": "node --test --test-name-pattern='RISK LOCAL BACKUPS: full optional history cannot block' tests.js",
       "failure": "Before implementation, the new test returned false instead of true and displayed the user's exact toast: 'Could not save your changes on this device. Keep this tab open, remove an old manual backup in Settings if needed, and try again.' The mock had sufficient capacity for both primary board replacements but no room for an extra full-board history row."
     }
+  },
+  {
+    "testChangesSha256": "ab83df88f24073e17255158d3c8d0bc4c6a0615913fd47404ff5d978cd18092e",
+    "reason": "The user reported that an older installed app did not appear to download its repair update while saving was blocked. The page already checks and downloads workers independently, but its controller-change handler always makes a redundant storage write before showing a downloaded update, and silently defers an unsaved board.",
+    "previousBehavior": "Even when both local primary keys exactly matched the current board, applying a new service worker called persist again. Optional backup quota could fail that extra write and leave the old visible shell indefinitely. A genuinely unsaved draft also had no update-specific notice when reload was held.",
+    "intendedBehavior": "If current in-memory bytes exactly match confirmed primary storage, apply the downloaded worker without a quota-sensitive backup write. A mismatched primary key or unsaved draft still goes through persist and cannot reload on failure; the pending update becomes visible while future registration checks continue. Editing and offline shell behavior remain unchanged. The no-write shortcut is limited to synchronously verified browser keys; asynchronous host writes still drain through persist before reload.",
+    "replacementTests": [
+      "RISK PWA updates: an already durable board applies a downloaded worker without a redundant quota write",
+      "RISK PWA updates: an unsaved draft visibly defers reload while update checks continue",
+      "RISK PWA updates: a host write in flight must finish before a reverted board reloads"
+    ],
+    "preservedCoverage": [
+      "The existing PWA tests continue to assert launch/focus/online worker checks with HTTP cache bypass, no reload on first installation, edit deferral, async edit-race deferral, and offline cached shell fallback.",
+      "The new durable-board case checks both primary browser keys and a divergent-key failure hold. The unsaved case checks visible deferral, no reload, and continued update checks. Cache and changelog fingerprints are refreshed.",
+      "A reviewer-identified host race is covered by a held async persist: a reverted board cannot reload before its corrective queued write resolves."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK PWA updates:' tests.js",
+      "failure": "Before implementation both tests failed. The durable-board case observed one redundant persist call rather than zero and no reload under a simulated quota failure. The unsaved-draft case found no visible update/save message after persist failed, although it correctly withheld reload. Independent review then identified an async host race: the new host test failed before the repair because no persist promise was created, meaning reload could overtake an in-flight host write after Undo. Restricting the shortcut to verified browser keys made it pass."
+    }
   }
 ]
