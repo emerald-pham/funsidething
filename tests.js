@@ -14739,6 +14739,27 @@ test('RISK repository process: shared hook chains prior hooks and blocks a legac
  }finally{cleanupReleaseGateFixture(fixture);}
 });
 
+test('RISK repository process: custom hook paths are compared with the shared git default',async()=>{
+ const {installSharedPrePushHook}=await import('./scripts/install-release-hook.mjs');
+ const fixture=makeReleaseGateFixture();
+ try{
+  const common=releaseGateGit(fixture.repo,['rev-parse','--path-format=absolute','--git-common-dir']);
+  const defaultHooks=path.join(fs.realpathSync(common),'hooks');
+  const customHooks=path.join(fixture.root,'custom-hooks');
+  fs.mkdirSync(customHooks);
+  const customHook=path.join(customHooks,'pre-push');
+  const customContents='#!/usr/bin/env bash\nexit 0\n';
+  fs.writeFileSync(customHook,customContents,{mode:0o755});
+  assert.notEqual(fs.realpathSync(customHooks),fs.realpathSync(defaultHooks),
+   'the configured external hook fixture must be distinct from the shared Git default');
+  releaseGateGit(fixture.repo,['config','core.hooksPath',customHooks]);
+  assert.throws(()=>installSharedPrePushHook(fixture.repo),/core\.hooksPath|custom hook/i,
+   'Git resolving --git-path hooks to core.hooksPath must not make a custom dispatcher look default');
+  assert.equal(fs.readFileSync(customHook,'utf8'),customContents,'the configured dispatcher remains untouched');
+  assert.equal(fs.existsSync(path.join(defaultHooks,'pre-push')),false,'the shared default remains unmodified');
+ }finally{cleanupReleaseGateFixture(fixture);}
+});
+
 test('RISK repository process: release hooks reject marker-only or tampered dispatchers',async()=>{
  const {installSharedPrePushHook}=await import('./scripts/install-release-hook.mjs');
  const markerOnly=makeReleaseGateFixture();

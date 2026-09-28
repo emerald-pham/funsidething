@@ -8,10 +8,27 @@ function git(repoRoot, args) {
   return execFileSync('git', ['-C', repoRoot, ...args], { encoding: 'utf8' }).trim();
 }
 
+function canonicalPath(target) {
+  const absolute = path.resolve(target);
+  let current = absolute;
+  const suffix = [];
+  while (true) {
+    try {
+      return path.join(fs.realpathSync(current), ...suffix.reverse());
+    } catch (error) {
+      if (error.code !== 'ENOENT' && error.code !== 'ENOTDIR') throw error;
+      const parent = path.dirname(current);
+      if (parent === current) return absolute;
+      suffix.push(path.basename(current));
+      current = parent;
+    }
+  }
+}
+
 function resolveHookLocation(repoRoot) {
   const root = git(repoRoot, ['rev-parse', '--show-toplevel']);
-  const common = git(root, ['rev-parse', '--path-format=absolute', '--git-common-dir']);
-  const defaultHooks = path.resolve(git(root, ['rev-parse', '--path-format=absolute', '--git-path', 'hooks']));
+  const common = canonicalPath(git(root, ['rev-parse', '--path-format=absolute', '--git-common-dir']));
+  const defaultHooks = path.join(common, 'hooks');
   let configured = '';
   try {
     configured = git(root, ['config', '--path', '--get', 'core.hooksPath']);
@@ -19,7 +36,7 @@ function resolveHookLocation(repoRoot) {
     configured = '';
   }
   const configuredHooks = configured
-    ? path.resolve(path.isAbsolute(configured) ? configured : path.join(root, configured))
+    ? canonicalPath(path.isAbsolute(configured) ? configured : path.join(root, configured))
     : defaultHooks;
   if (configuredHooks !== defaultHooks) {
     throw new Error('Refusing to replace a custom core.hooksPath; preserve its dispatcher and install the release gate explicitly.');
