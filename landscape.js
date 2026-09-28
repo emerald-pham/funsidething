@@ -444,7 +444,9 @@
         const previous=cars[i-1].x,from=xx+cw/2*scale*dir,to=previous-cw/2*scale*dir;
         line(g,from,track(from)-5,to,track(to)-5,p.city,1.6);
       }
-      paintRailVehicleShadow(g,xx,track(xx),isTrain?11:8,cw*scale,cars[i].angle,p.front);
+      // The electrified metro rides the viaduct; its supports and deck have
+      // their own shade. Only the lower train needs a ground-contact shadow.
+      if(isTrain)paintRailVehicleShadow(g,xx,track(xx),11,cw*scale,cars[i].angle,p.front);
       g.save();g.translate(xx,cars[i].y-2);g.rotate(cars[i].angle);g.scale(dir*scale,scale);
       g.fillStyle=S.mixHex(isTrain?'#e4cfa5':'#dceade',p.city,p.night*.3);g.beginPath();g.roundRect(-cw/2,-10,cw,8,2);g.fill();
       g.fillStyle=isTrain?'#bb8275':'#77a8a2';g.fillRect(-cw/2,-5,cw,2);

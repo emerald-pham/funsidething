@@ -82,7 +82,8 @@ The named-contract test in tests.js checks that every top-level test whose title
 
 - RISK landscape water: the sky and every floating visitor keep a full-height reflection by day and night
 - RISK landscape shadows: grounded objects share the dominant celestial light
-- RISK landscape vehicles: train and metro shadows lie along their rails under changing light
+- RISK landscape vehicles: lower train shadows lie along its rail under changing light
+- RISK landscape metro: electrified cars have no shadow while viaduct supports keep theirs
 - RISK landscape water: floating silhouettes and mirrors overlap at their contact row
 - RISK landscape water: each craft mirrors from its own painted hull draft
 - RISK landscape shadows: each object projects away from the visible Sun or Moon position

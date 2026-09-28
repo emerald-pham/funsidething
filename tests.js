@@ -10133,12 +10133,12 @@ test('RISK landscape shadows: grounded objects share the dominant celestial ligh
  assert.match(source,/paintGroundShadow\(b,x,rail\(x\)\+55/,'elevated railway supports cast on the far terrain');
  assert.match(source,/paintRailShadow\(b,rail,16,8/,'the railway deck uses the same time-of-day light');
  assert.ok((source.match(/paintGroundShadow\(b,t\.x,t\.y/g)||[]).length>=2,'middle and foreground trees use the shared source');
- assert.match(source,/paintRailVehicleShadow\(g,xx,track\(xx\)/,'metro and train cars use the same celestial source with a track-sized footprint');
+ assert.match(source,/if\(isTrain\)paintRailVehicleShadow\(g,xx,track\(xx\)/,'the lower train keeps its track-sized celestial shade');
  assert.match(source,/paintGroundEventShadow\(e,/,'other grounded visitors use the same source');
  assert.match(source,/groundShadow:paintGroundShadow/,'winter visitors use the same source');
 });
 
-test('RISK landscape vehicles: train and metro shadows lie along their rails under changing light',()=>{
+test('RISK landscape vehicles: lower train shadows lie along its rail under changing light',()=>{
  const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
  const helper=source.slice(source.indexOf('  function paintRailVehicleShadow('),source.indexOf('  function paintRailShadow('));
  assert.ok(helper.startsWith('  function paintRailVehicleShadow('),'rail vehicles have a separate contact-footprint painter');
@@ -10155,15 +10155,37 @@ test('RISK landscape vehicles: train and metro shadows lie along their rails und
    return captured[0];
   };
   const slope=geometry.tangent(geometry.lowerRail,x);
-  const morning=render(12,90,24,slope),evening=render(12,270,24,slope),metro=render(70,180,22*.72,geometry.tangent(geometry.rail,x));
-  assert.ok(morning&&evening&&metro,`${w}x${h}: both vehicles paint contact shade`);
-  assert.ok(morning[2]>morning[3]*3&&metro[2]>metro[3]*3,`${w}x${h}: footprint stays long and shallow`);
-  assert.ok(Math.abs(morning[4]-slope)<.001&&Math.abs(metro[4]-geometry.tangent(geometry.rail,x))<.001,'the footprint follows each track');
+  const morning=render(12,90,24,slope),evening=render(12,270,24,slope);
+  assert.ok(morning&&evening,`${w}x${h}: the lower train paints contact shade`);
+  assert.ok(morning[2]>morning[3]*3,`${w}x${h}: footprint stays long and shallow`);
+  assert.ok(Math.abs(morning[4]-slope)<.001,'the footprint follows the lower track');
   assert.ok(morning[0]>x&&evening[0]<x,`${w}x${h}: low Sun moves shade to opposite sides`);
-  assert.ok(Math.abs(metro[1]-y)<Math.abs(morning[1]-y),`${w}x${h}: high Sun keeps shade near the rail`);
  }
  const transport=source.slice(source.indexOf('  function transport('),source.indexOf('  function paintGroundEventShadow('));
- assert.match(transport,/paintRailVehicleShadow\(g,xx,track\(xx\),isTrain\?11:8,cw\*scale,cars\[i\]\.angle/,'train and metro pass their own track angle and footprint width');
+ assert.match(transport,/if\(isTrain\)paintRailVehicleShadow\(g,xx,track\(xx\),11,cw\*scale,cars\[i\]\.angle/,'only the lower train passes its track angle and footprint width');
+});
+
+test('RISK landscape metro: electrified cars have no shadow while viaduct supports keep theirs',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ const transport=source.slice(source.indexOf('  function transport('),source.indexOf('  function paintGroundEventShadow('));
+ for(const [w,h] of [[390,844],[568,320],[820,1180]]) for(const night of [0,1]){
+  const shades=[],cars=[],g={save(){},restore(){},translate(){},rotate(){},scale(){},beginPath(){},roundRect(){cars.push(1);},fill(){},fillRect(){}};
+  const geometry={lowerRail:x=>h*.7+x*.01,tangent:()=>.01},rail=x=>h*.42+x*.01;
+  const p={city:'#456',front:'#789',night},S={mixHex:value=>value};
+  const paintRailVehicleShadow=(...args)=>shades.push(args);
+  vm.runInNewContext(`${transport};transport(${w*.5},0,.5,false,false)`,{g,geometry,rail,p,S,ellipse(){},paintRailVehicleShadow,line(){}});
+  assert.equal(cars.length,3,`${w}x${h}, night ${night}: all electrified metro cars still render`);
+  assert.equal(shades.length,0,`${w}x${h}, night ${night}: elevated cars do not shade the ground`);
+  cars.length=0;
+  vm.runInNewContext(`${transport};transport(${w*.5},0,.5,true,false)`,{g,geometry,rail,p,S,ellipse(){},paintRailVehicleShadow,line(){}});
+  assert.equal(cars.length,5,`${w}x${h}, night ${night}: the lower train still renders`);
+  assert.equal(shades.length,5,`${w}x${h}, night ${night}: the lower train keeps contact shade`);
+ }
+ assert.match(source,/paintGroundShadow\(b,x,rail\(x\)\+55,55,5,p\.far,\.55\)/,'elevated supports retain their ground shadow');
+ assert.match(source,/paintRailShadow\(b,rail,16,8,p\.far,\.6\)/,'the viaduct deck retains its shadow');
+ const current=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)?.[1] || '';
+ assert.match(current,/Elevated electric metro cars no longer cast ground shadows; railway support shadows remain\./,'the current changelog explains the visible distinction');
+ assert.doesNotMatch(current,/Rail vehicles now cast shallow shadows along their tracks/,'the old blanket rail-shadow claim is corrected');
 });
 
 test('RISK landscape water: floating silhouettes and mirrors overlap at their contact row',()=>{
