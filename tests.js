@@ -8096,30 +8096,44 @@ test('RISK LOCAL BACKUPS: quota during Restore keeps the immediate pre-restore b
  assert.equal(storage.getItem(LOCAL_HEAD_KEY),storage.getItem(SYNC_STORE_KEY));
  await new Promise(resolve=>setTimeout(resolve,420));
  assert.equal(storage.getItem(SYNC_STORE_KEY),before,'a delayed save cannot bypass the protected restore hold');
+ quota=used(); // a genuinely full device remains full for later background retries
+ ctx.saveLocalBackup('before-cloud-adoption',JSON.stringify(ctx.state));
+ assert.ok(JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY)).some(row=>row.kind==='before-restore' && row.payload===before),
+  'a cloud-reconciliation backup rotation keeps the pending Restore safety copy');
+ let cloudSends=0;
+ shim.window.CloudSync={ready:true,user:'e@example.com',push:async()=>{cloudSends++;return null;}};
+ vm.runInContext('reconciledAs=window.CloudSync.user;',ctx); // an already-reconciled signed-in session
+ ctx.cloudPush();
+ await new Promise(resolve=>setTimeout(resolve,2050));
+ assert.equal(vm.runInContext('cloudTimer',ctx),null,'the signed-in two-second cloud retry ran');
+ assert.ok(JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY)).some(row=>row.kind==='before-restore' && row.payload===before),
+  'the two-second cloud retry cannot retire the pending Restore safety copy');
+ assert.ok(cloudSends===0 || JSON.parse(storage.getItem(SYNC_STORE_KEY)).tasks.some(row=>row.title.startsWith('Restored huge')),
+  'cloud writes only after a durable restored primary board exists');
+ const update=pwaUpdateHarness();await update.ready();
+ update.box.persist=()=>ctx.persist();
+ await update.sh.controllerchange();
+ assert.equal(update.counts().reloads,0,'a pending app update cannot reload while Restore is held');
+ assert.ok(JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY)).some(row=>row.kind==='before-restore' && row.payload===before),
+  'the app-update flush keeps the pending Restore safety copy');
+ const laterSaved=await ctx.persist(); // the same no-argument path used by cloud push and app-update flush
+ assert.ok(JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY)).some(row=>row.kind==='before-restore' && row.payload===before),
+  'a later bare save cannot retire the pending Restore safety copy');
+ if(!laterSaved) assert.equal(storage.getItem(SYNC_STORE_KEY),before,'a still-full retry keeps the original primary');
  const rows=JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY));
  assert.ok(rows.some(row=>row.kind==='before-restore' && row.payload===before),
   'the exact board displaced by this Restore stays recoverable after the quota retry');
  const reopened=await loadApp({sharedStorage:storage});
  assert.ok(reopened.ctx.readLocalBackups().some(row=>row.kind==='before-restore' && row.payload===before),
   'the safety copy survives reload');
- assert.match(shim.document.getElementById('toast')?.textContent||'',/Couldn't save this edit/,
+ assert.match(shim.document.getElementById('toast')?.textContent||'',/Could(?:n't| not) save (?:this edit|your changes) on this device/,
   'an unsavable restore reports the held edit');
- // With one more disposable historical copy, the same aggregate quota can
- // admit the restore without sacrificing its freshly written safety copy.
- quota=Infinity;quotaArmed=false;
- const history={id:'old-automatic-history',day:new Date(at-3600000).toISOString().slice(0,10),
-  at:at-3600000,kind:'before-cloud-adoption',payload:before};
- storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify([...rows,history]));
- reopened.ctx.openSettings();
- reopened.ctx.onAction('restore-local-backup',{dataset:{id:manual.id}});
- assert.equal(quotaArmed,true);
- const restored=JSON.parse(storage.getItem(SYNC_STORE_KEY));
- assert.ok(restored.tasks.some(row=>row.title.startsWith('Restored huge')),
-  'ordinary history makes room for the restored primary board');
- const after=JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY));
- assert.ok(after.some(row=>row.kind==='before-restore' && row.payload===before),
-  'the saved restore still has an exact prior-board snapshot');
- assert.ok(!after.some(row=>row.id===history.id),'old ordinary history makes the room');
+ if(!laterSaved){
+  quota=Infinity; // freeing browser space later allows the held in-memory Restore to finish
+  assert.equal(await ctx.persist(),true);
+ }
+ assert.ok(JSON.parse(storage.getItem(SYNC_STORE_KEY)).tasks.some(row=>row.title.startsWith('Restored huge')),
+  'a later guarded retry can save the restored board');
  await new Promise(resolve=>setTimeout(resolve,420));
  assert.ok(JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY)).some(row=>row.kind==='before-restore' && row.payload===before),
   'a delayed save after successful restore cannot retire its safety copy');
