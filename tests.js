@@ -8054,6 +8054,7 @@ test('RISK LOCAL BACKUPS: primary quota rotation keeps the newest stable recover
 });
 
 test('RISK LOCAL BACKUPS: quota during Restore keeps the immediate pre-restore board',async()=>{
+ for(const changedChance of [false,true]){
  const values=new Map();let quota=Infinity,quotaArmed=false;
  const used=()=>[...values].reduce((sum,[key,value])=>sum+key.length+value.length,0);
  const storage={
@@ -8083,7 +8084,9 @@ test('RISK LOCAL BACKUPS: quota during Restore keeps the immediate pre-restore b
  const {ctx,shim}=await loadApp({sharedStorage:storage});
  ctx.addTask('Current unique work');await ctx.persist();
  const before=storage.getItem(SYNC_STORE_KEY),at=Date.now();
- const target=JSON.stringify(syncState({tasks:[syncTask('restored-target','Restored huge '.repeat(100).trim())]}));
+ const targetBoard=syncState({tasks:[syncTask('restored-target','Restored huge '.repeat(100).trim())]});
+ if(changedChance) targetBoard.chance={seed:'restored-seed',at:Date.now(),weights:{}};
+ const target=JSON.stringify(targetBoard);
  const manual={id:'restore-target',day:new Date(at).toISOString().slice(0,10),at,kind:'manual',payload:target};
  storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify([manual]));
  ctx.openSettings();
@@ -8091,6 +8094,8 @@ test('RISK LOCAL BACKUPS: quota during Restore keeps the immediate pre-restore b
  assert.equal(quotaArmed,true,'the restore encountered aggregate quota after both backup writes');
  assert.equal(storage.getItem(SYNC_STORE_KEY),before,'a restore that cannot keep its safety copy holds the original primary board');
  assert.equal(storage.getItem(LOCAL_HEAD_KEY),storage.getItem(SYNC_STORE_KEY));
+ await new Promise(resolve=>setTimeout(resolve,420));
+ assert.equal(storage.getItem(SYNC_STORE_KEY),before,'a delayed save cannot bypass the protected restore hold');
  const rows=JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY));
  assert.ok(rows.some(row=>row.kind==='before-restore' && row.payload===before),
   'the exact board displaced by this Restore stays recoverable after the quota retry');
@@ -8115,8 +8120,12 @@ test('RISK LOCAL BACKUPS: quota during Restore keeps the immediate pre-restore b
  assert.ok(after.some(row=>row.kind==='before-restore' && row.payload===before),
   'the saved restore still has an exact prior-board snapshot');
  assert.ok(!after.some(row=>row.id===history.id),'old ordinary history makes the room');
+ await new Promise(resolve=>setTimeout(resolve,420));
+ assert.ok(JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY)).some(row=>row.kind==='before-restore' && row.payload===before),
+  'a delayed save after successful restore cannot retire its safety copy');
  const current=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)?.[1]||'';
  assert.match(current,/Restoring a backup also keeps the exact board it replaces through a storage-quota retry\./);
+ }
 });
 
 test('RISK LOCAL BACKUPS: a changed board before backup announces the unsaved draft',async()=>{
