@@ -7858,6 +7858,29 @@ test('RISK CLOUD BACKUP: an offline edit reopened before conflict remains protec
  assert.ok(!later.readLocalBackups().some(row=>row.id===ordinary.id));
 });
 
+test('RISK LOCAL BACKUPS: cold older-tab repair keeps a pinned recovery copy',async()=>{
+ const at=Date.parse('2026-09-01T12:00:00Z');
+ const head=syncState({tasks:[syncTask('current','Current board')],protectedBackupIds:['pinned-conflict']});
+ const older=syncState({tasks:[syncTask('old','Older tab addition')]});
+ const pinned={id:'pinned-conflict',day:'2026-09-01',at,kind:'daily',payload:JSON.stringify(older)};
+ const ordinary={id:'ordinary-history',day:new Date().toISOString().slice(0,10),at:Date.now(),
+  kind:'before-restore',payload:JSON.stringify(head)};
+ const storage=sharedScannerStorage({[LOCAL_HEAD_KEY]:JSON.stringify(head),[SYNC_STORE_KEY]:JSON.stringify(older),
+  [LOCAL_BACKUPS_KEY]:JSON.stringify([pinned,ordinary])});
+ const write=storage.setItem;
+ storage.setItem=(key,value)=>{
+  if(key===LOCAL_BACKUPS_KEY && JSON.parse(value).length>2){
+   const error=Error('browser quota');error.name='QuotaExceededError';throw error;
+  }
+  write(key,value);
+ };
+ await loadApp({sharedStorage:storage});
+ const saved=JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY));
+ assert.ok(saved.some(row=>row.id===pinned.id),'pre-init older-tab repair cannot expire the pinned conflict recovery');
+ assert.ok(saved.some(row=>row.kind==='other-browser-copy'),'the divergent older-tab board is still captured');
+ assert.ok(!saved.some(row=>row.id===ordinary.id),'ordinary history retires when the cold repair reaches quota');
+});
+
 test('RISK CLOUD BACKUP: an exact chosen copy avoids duplicate displaced-edit storage',async()=>{
  const storage=sharedScannerStorage(),{ctx}=await loadApp({sharedStorage:storage});
  ctx.addTask('My unsynced edit');
