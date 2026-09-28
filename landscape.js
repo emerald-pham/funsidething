@@ -183,6 +183,16 @@
       Math.atan2(shade.dy,shade.dx),0,TAU);
     ctx.fillStyle=S.mixHex(ground,'#203d37',.68);ctx.fill();ctx.restore();
   }
+  function paintRailVehicleShadow(ctx,x,y,height,width,angle,ground){
+    const shade=geometry.castShadow(sky,height,width,x,y);
+    ctx.save();ctx.globalAlpha*=shade.alpha;
+    ctx.beginPath();
+    // Car bodies span the rail, so their contact shade follows the rail too.
+    // The upright-object oval turns the whole car width toward the light ray.
+    ctx.ellipse(x+shade.dx*.45,y+shade.dy*.35,width*.54+Math.abs(shade.dx)*.12,
+      Math.max(1.1,height*.13),angle,0,TAU);
+    ctx.fillStyle=S.mixHex(ground,'#203d37',.68);ctx.fill();ctx.restore();
+  }
   function paintRailShadow(ctx,track,height,width,ground,strength){
     ctx.save();ctx.strokeStyle=S.mixHex(ground,'#203d37',.68);
     ctx.lineWidth=width;ctx.lineCap='round';
@@ -434,7 +444,7 @@
         const previous=cars[i-1].x,from=xx+cw/2*scale*dir,to=previous-cw/2*scale*dir;
         line(g,from,track(from)-5,to,track(to)-5,p.city,1.6);
       }
-      paintGroundShadow(g,xx,track(xx),isTrain?11:8,cw*scale,p.front);
+      paintRailVehicleShadow(g,xx,track(xx),isTrain?11:8,cw*scale,cars[i].angle,p.front);
       g.save();g.translate(xx,cars[i].y-2);g.rotate(cars[i].angle);g.scale(dir*scale,scale);
       g.fillStyle=S.mixHex(isTrain?'#e4cfa5':'#dceade',p.city,p.night*.3);g.beginPath();g.roundRect(-cw/2,-10,cw,8,2);g.fill();
       g.fillStyle=isTrain?'#bb8275':'#77a8a2';g.fillRect(-cw/2,-5,cw,2);
@@ -700,10 +710,12 @@
   function reflectWaterObject(waterY,paint){
     // Each visitor mirrors around its own contact with the water. Both clips
     // keep the upright body above the surface and its mirror out of the shore.
+    // One device pixel of overlap covers the antialiased gap at a floating hull.
+    const contactY=waterY-1/dpr;
     g.save();path(g,far);g.lineTo(W,geometry.waterTop);g.lineTo(0,geometry.waterTop);g.closePath();g.clip();
-    g.beginPath();g.rect(0,waterY,W,Math.max(0,H-waterY));g.clip();
+    g.beginPath();g.rect(0,contactY,W,Math.max(0,H-contactY));g.clip();
     g.globalAlpha*=.22+p.night*.12;
-    g.translate(0,2*waterY);g.scale(1,-1);
+    g.translate(0,2*contactY);g.scale(1,-1);
     paint();g.restore();
   }
   function paintVessel(e,t){
@@ -756,7 +768,9 @@
     const drawVessel=()=>{
       g.save();g.translate(x,y);g.scale(direction*scale,scale);paintVesselShape();g.restore();
     };
-    reflectWaterObject(y+3*scale,drawVessel);
+    // Boards and jet skis sit shallower than boat hulls; mirror at the painted draft.
+    const hullDraft=e.type==='windsurfer'?1:e.type==='jetski'?2:3;
+    reflectWaterObject(y+hullDraft*scale,drawVessel);
     drawVessel();
   }
   function paintIceCreamStand(){

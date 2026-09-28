@@ -9600,7 +9600,7 @@ test('Landscape lower tram: existing cars are linked by four couplers',()=>{
   const lines=[],g={save(){},restore(){},translate(){},rotate(){},scale(){},beginPath(){},roundRect(){},fill(){},fillRect(){}};
   const geometry={lowerRail:x=>500+Math.sin(x/80)*4,tangent:()=>0};
   const rail=x=>300+Math.sin(x/100)*2,p={city:'#456',night:0},S={mixHex:value=>value};
-  vm.runInNewContext(`${code};transport(500,0,.5,${isTrain},false)`,{g,geometry,rail,p,S,ellipse(){},paintGroundShadow(){},line(g,...args){lines.push(args);}});
+  vm.runInNewContext(`${code};transport(500,0,.5,${isTrain},false)`,{g,geometry,rail,p,S,ellipse(){},paintRailVehicleShadow(){},line(g,...args){lines.push(args);}});
   return lines.filter(args=>args[5]===1.6&&args[4]===p.city);
  };
  const tram=render(true),middleTrain=render(false);
@@ -9649,14 +9649,14 @@ test('RISK landscape water: the sky and every floating visitor keep a full-heigh
  assert.ok(helperStart>=0&&helperEnd>helperStart,'water visitors share a reflection painter');
  const helper=runtime.slice(helperStart,helperEnd),run=night=>{
   const calls=[],g={globalAlpha:1,save(){calls.push(['save']);},restore(){calls.push(['restore']);},beginPath(){},lineTo(){},closePath(){},clip(){calls.push(['clip']);},rect(...args){calls.push(['rect',...args]);},translate(...args){calls.push(['translate',...args]);},scale(...args){calls.push(['scale',...args]);}};
-  vm.runInNewContext(`${helper};reflectWaterObject(250,()=>calls.push(['paint',g.globalAlpha]))`,{g,path(){},far:()=>220,W:390,H:844,geometry:{waterTop:180},p:{night},calls});
+  vm.runInNewContext(`${helper};reflectWaterObject(250,()=>calls.push(['paint',g.globalAlpha]))`,{g,path(){},far:()=>220,W:390,H:844,dpr:2,geometry:{waterTop:180},p:{night},calls});
   return calls;
  };
  for(const night of [0,1]){
   const calls=run(night);
   assert.ok(calls.filter(call=>call[0]==='clip').length>=2,'the reflection clips to both the lake and its own waterline');
-  assert.deepEqual(Array.from(calls.find(call=>call[0]==='rect')),["rect",0,250,390,594]);
-  assert.deepEqual(Array.from(calls.find(call=>call[0]==='translate')),["translate",0,500]);
+  assert.deepEqual(Array.from(calls.find(call=>call[0]==='rect')),["rect",0,249.5,390,594.5]);
+  assert.deepEqual(Array.from(calls.find(call=>call[0]==='translate')),["translate",0,499]);
   assert.deepEqual(Array.from(calls.find(call=>call[0]==='scale')),["scale",1,-1],'the entire visible silhouette keeps its height');
   assert.ok(calls.find(call=>call[0]==='paint')[1]>0,'the reflection is visible at this scene time');
  }
@@ -9687,9 +9687,68 @@ test('RISK landscape shadows: grounded objects share the dominant celestial ligh
  assert.match(source,/paintGroundShadow\(b,x,rail\(x\)\+55/,'elevated railway supports cast on the far terrain');
  assert.match(source,/paintRailShadow\(b,rail,16,8/,'the railway deck uses the same time-of-day light');
  assert.ok((source.match(/paintGroundShadow\(b,t\.x,t\.y/g)||[]).length>=2,'middle and foreground trees use the shared source');
- assert.match(source,/paintGroundShadow\(g,xx,track\(xx\)/,'metro and train cars use the same source');
+ assert.match(source,/paintRailVehicleShadow\(g,xx,track\(xx\)/,'metro and train cars use the same celestial source with a track-sized footprint');
  assert.match(source,/paintGroundEventShadow\(e,/,'other grounded visitors use the same source');
  assert.match(source,/groundShadow:paintGroundShadow/,'winter visitors use the same source');
+});
+
+test('RISK landscape vehicles: train and metro shadows lie along their rails under changing light',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ const helper=source.slice(source.indexOf('  function paintRailVehicleShadow('),source.indexOf('  function paintRailShadow('));
+ assert.ok(helper.startsWith('  function paintRailVehicleShadow('),'rail vehicles have a separate contact-footprint painter');
+ for(const [w,h] of [[390,844],[568,320],[820,1180]]){
+  const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
+  const geometry=ctx.LandscapeGeometry.create(w,h),x=w*.72,y=geometry.lowerRail(x);
+  const captured=[];
+  const canvas={globalAlpha:1,save(){},restore(){},beginPath(){},ellipse(...args){captured.push(args);},fill(){}};
+  const S={mixHex:()=> '#203d37'},p={front:'#aabbaa'};
+  const render=(altitude,azimuth,width,angle)=>{
+   captured.length=0;
+   const sky={sun:{altitude,azimuth,visible:true},moon:{altitude:-20},illumination:0};
+   vm.runInNewContext(`${helper};paintRailVehicleShadow(canvas,x,y,11,width,angle,p.front)`,{canvas,x,y,width,angle,geometry,sky,p,S,TAU:Math.PI*2});
+   return captured[0];
+  };
+  const slope=geometry.tangent(geometry.lowerRail,x);
+  const morning=render(12,90,24,slope),evening=render(12,270,24,slope),metro=render(70,180,22*.72,geometry.tangent(geometry.rail,x));
+  assert.ok(morning&&evening&&metro,`${w}x${h}: both vehicles paint contact shade`);
+  assert.ok(morning[2]>morning[3]*3&&metro[2]>metro[3]*3,`${w}x${h}: footprint stays long and shallow`);
+  assert.ok(Math.abs(morning[4]-slope)<.001&&Math.abs(metro[4]-geometry.tangent(geometry.rail,x))<.001,'the footprint follows each track');
+  assert.ok(morning[0]>x&&evening[0]<x,`${w}x${h}: low Sun moves shade to opposite sides`);
+  assert.ok(Math.abs(metro[1]-y)<Math.abs(morning[1]-y),`${w}x${h}: high Sun keeps shade near the rail`);
+ }
+ const transport=source.slice(source.indexOf('  function transport('),source.indexOf('  function paintGroundEventShadow('));
+ assert.match(transport,/paintRailVehicleShadow\(g,xx,track\(xx\),isTrain\?11:8,cw\*scale,cars\[i\]\.angle/,'train and metro pass their own track angle and footprint width');
+});
+
+test('RISK landscape water: floating silhouettes and mirrors overlap at their contact row',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ const helper=source.slice(source.indexOf('  function reflectWaterObject('),source.indexOf('  function paintVessel('));
+ for(const [w,h,dpr] of [[390,844,1],[568,320,2],[820,1180,3]]){
+  const geometry={waterTop:h*.37},waterY=geometry.waterTop+34,calls=[];
+  const g={globalAlpha:1,save(){},restore(){},lineTo(){},closePath(){},clip(){},beginPath(){},rect(...args){calls.push(['rect',...args]);},translate(...args){calls.push(['translate',...args]);},scale(){}};
+  vm.runInNewContext(`${helper};reflectWaterObject(waterY,()=>calls.push(['paint']))`,{g,path(){},far:()=>geometry.waterTop+100,W:w,H:h,dpr,geometry,p:{night:0},waterY,calls});
+  const rect=calls.find(call=>call[0]==='rect'),offset=calls.find(call=>call[0]==='translate');
+  assert.ok(rect&&offset,`${w}x${h}: each floating object gets a local mirror`);
+  assert.ok(rect[2]<waterY&&rect[2]>=waterY-1/dpr-.001,`${w}x${h}: the mirror reaches one physical pixel into the hull`);
+  assert.ok(Math.abs(offset[2]-2*rect[2])<.001,'clip and reflection share the same contact origin');
+ }
+ const vessel=source.slice(source.indexOf('  function paintVessel('),source.indexOf('  function paintIceCreamStand('));
+ const duck=source.slice(source.indexOf("    if(e.type==='duck'){",source.indexOf('  function paintEvent(')),source.indexOf("    if(e.type==='fish'){",source.indexOf('  function paintEvent(')));
+ assert.match(vessel,/reflectWaterObject\(y\+hullDraft\*scale,drawVessel\)/,'vessels mirror at their painted hull bottom');
+ assert.match(duck,/reflectWaterObject\(pose\.waterY\+2\.3\*pose\.scale,drawDuck\)/,'swimming ducks mirror at their body underside');
+});
+
+test('RISK landscape water: each craft mirrors from its own painted hull draft',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ const painter=source.slice(source.indexOf('  function paintVessel('),source.indexOf('  function paintIceCreamStand('));
+ for(const [type,bottom] of [['windsurfer',1],['jetski',2],['sailboat',3],['yacht',3],['cruise',3]]){
+  let contact;
+  const g={globalAlpha:1,save(){},restore(){},beginPath(){},moveTo(){},lineTo(){},closePath(){},clip(){},translate(){},scale(){},fill(){},fillRect(){}};
+  const geometry={waterTop:180,routeProgress:()=>.5,motionAge:()=>0,vessel:()=>({x:200,y:300,scale:.5,direction:1,visible:true})};
+  const e={type,age:50,duration:100,seed:.3,lane:.5,reverse:false};
+  vm.runInNewContext(`${painter};paintVessel(e,0)`,{g,geometry,e,W:390,p:{sky:['#123','#456','#789'],city:'#456',night:0},S:{mixHex:value=>value},color:()=> '#abc',skinColor:()=> '#def',path(){},far:()=>220,line(){},personHead(){},reflectWaterObject(y){contact=y;}});
+  assert.ok(Math.abs(contact-(300+bottom*.5))<.001,`${type}: mirror touches the lowest painted hull point`);
+ }
 });
 
 test('RISK landscape shadows: each object projects away from the visible Sun or Moon position',()=>{

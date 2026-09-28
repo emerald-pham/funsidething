@@ -90,5 +90,25 @@
       "failure": "Before implementation, three tests failed: an exact saved board was still held ('Local' versus 'Cloud'), an unreadable backup row was overwritten (true versus false), and failed adoption changed the board/revision instead of holding. The cold-open test then failed because the merged board remained only in memory; after that repair it failed because the union never reached cloud. A pending newer read test failed because reconciled() remained true. The in-flight edit test failed because no union push started, then because reload could not align its saved union to the cloud acknowledgement. The concurrent-write rollback test failed before its fix: failed-store recovery overwrote another tab's newer browser bytes with the old board. Four independent review regressions failed before the Settings repair: deleting the visible copy left [] instead of the unreadable row; the unreadable entry and raw controls were absent; duplicate IDs were deletable; a stale Settings click deleted a row changed by another tab."
     },
     "testChangesSha256": "abc74e74942d3f4773cac508282a59657f16cfe62e325d17466aee09001b20de"
+  },
+  {
+    "reason": "The vehicle width was passed to an upright-object shadow ellipse, producing a tall oval across the rail. Floating mirrors began at the exact antialiased contact edge, and shallow craft used a deeper generic boat contact. The shared-source assertion now requires a rail-specific footprint, the coupler mock accepts its paint helper, and existing natural-height reflection coverage keeps its size and day/night checks while requiring contact overlap.",
+    "previousBehavior": "Train and metro cars used the upright-object oval rotated toward the celestial ray. Floating-object reflections clipped exactly at the hull edge; windsurfer boards and jet skis mirrored from the deeper boat hull draft.",
+    "intendedBehavior": "Rail-car shade remains a shallow footprint aligned with each curved track while moving away from the Sun or Moon. Floating reflections overlap their painted hull contact by one physical pixel at any display density, with natural height, lake clip, and day/night visibility intact.",
+    "replacementTests": [
+      "RISK landscape vehicles: train and metro shadows lie along their rails under changing light",
+      "RISK landscape water: floating silhouettes and mirrors overlap at their contact row",
+      "RISK landscape water: each craft mirrors from its own painted hull draft"
+    ],
+    "preservedCoverage": [
+      "Existing celestial source, direction, rail deck, trees, ground visitors, and winter shadow assertions remain in place.",
+      "Existing tram coupler counts and positions stay unchanged; its isolated mock only accepts the new shadow helper.",
+      "Existing natural-height, day/night, lake clip, duck, fish, dolphin, and vessel reflection checks remain, with the contact origin adjusted to the new one-pixel overlap."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=dot --test-name-pattern='RISK landscape vehicles:|RISK landscape water: floating silhouettes' tests.js",
+      "failure": "Before implementation the vehicle test failed because no contact-footprint painter existed, and the 390x844 mirror test failed because its clip began at the exact hull row. After the overlap repair, the craft-draft test first failed on the windsurfer because its board reflected from the generic three-unit boat draft. The old shared-source assertion also failed on the former vehicle call."
+    },
+    "testChangesSha256": "6e84611571dfe85710447b8b9bc94c0918a2515b0da841fb1f2cb336daadc76f"
   }
 ]
