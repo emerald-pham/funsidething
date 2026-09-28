@@ -7976,6 +7976,83 @@ test('RISK LOCAL BACKUPS: primary save holds when another tab commits during its
  assert.match(shim.document.getElementById('toast')?.textContent || '',/keep this tab open|try again/i);
 });
 
+test('RISK LOCAL BACKUPS: single-device Undo frees old automatic history for its primary save',async()=>{
+ const values=new Map();let quota=Infinity;
+ const used=()=>[...values].reduce((sum,[key,value])=>sum+key.length+value.length,0);
+ const storage={
+  getItem:key=>values.has(key)?values.get(key):null,
+  removeItem:key=>values.delete(key),
+  setItem(key,value){
+   const next=new Map(values);next.set(key,String(value));
+   const size=[...next].reduce((sum,[name,raw])=>sum+name.length+raw.length,0);
+   if(size>quota){const error=Error('aggregate browser storage quota');error.name='QuotaExceededError';throw error;}
+   values.set(key,String(value));
+  },
+ };
+ const {ctx,shim}=await loadApp({sharedStorage:storage});
+ const originalTitle='Restored work '.repeat(70).trim();
+ const task=ctx.addTask(originalTitle,false);await ctx.persist();
+ ctx.state.tasks.find(row=>row.id===task.id).startsAt='2026-10-01';await ctx.persist();
+ ctx.openEdit(task.id);fillEditPane(ctx,shim,{title:'Short',start:''});
+ ctx.onAction('save-edit',{dataset:{id:task.id}});await ctx.persist();
+ const edited=storage.getItem(SYNC_STORE_KEY);
+ assert.equal(JSON.parse(edited).tasks.find(row=>row.id===task.id).title,'Short');
+ const at=Date.now()-3600000,day=new Date(at).toISOString().slice(0,10);
+ const rows=JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY));
+ rows.push({id:'pinned-recovery',day,at:at-1,kind:'before-restore',payload:edited});
+ rows.push({id:'old-automatic',day,at,kind:'before-restore',payload:edited});
+ rows.push({id:'kept-manual',day,at:at+1,kind:'manual',payload:edited});
+ storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify(rows));
+ ctx.state.protectedBackupIds=['pinned-recovery'];
+ // The next backup-index replacement fits, but the subsequent full-board
+ // head write exceeds the same aggregate UTF-16 site budget on this one tab.
+ quota=used()+(originalTitle.length-'Short'.length)+100;
+ ctx.undo();
+ assert.equal(await ctx.persist(),true,'Undo must persist after retiring old automatic history; toast: '+(shim.document.getElementById('toast')?.textContent||''));
+ const saved=JSON.parse(storage.getItem(SYNC_STORE_KEY));
+ assert.equal(saved.tasks.find(row=>row.id===task.id).title,originalTitle);
+ assert.equal(saved.tasks.find(row=>row.id===task.id).startsAt,'2026-10-01','Undo restores the Start date');
+ assert.equal(storage.getItem(LOCAL_HEAD_KEY),storage.getItem(SYNC_STORE_KEY),'both primary keys agree');
+ const retained=JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY));
+ assert.ok(retained.some(row=>row.id==='pinned-recovery'),'pinned recovery survives quota rotation');
+ assert.ok(retained.some(row=>row.id==='kept-manual'),'the manual recovery copy is never retired');
+ assert.ok(!retained.some(row=>row.id==='old-automatic'),'old automatic history creates room for Undo');
+ assert.doesNotMatch(shim.document.getElementById('toast')?.textContent||'',/Couldn't save this edit/);
+ const reopened=await loadApp({sharedStorage:storage});
+ assert.equal(reopened.ctx.state.tasks.find(row=>row.id===task.id).title,originalTitle,'Undo survives reload');
+ assert.equal(reopened.ctx.state.tasks.find(row=>row.id===task.id).startsAt,'2026-10-01');
+ // When only user-kept or pinned recovery remains, a genuinely full site
+ // must hold the next edit instead of sacrificing those copies or lying.
+ const protectedOnly=JSON.stringify(retained.filter(row=>row.kind==='manual'||row.id==='pinned-recovery'));
+ storage.setItem(LOCAL_BACKUPS_KEY,protectedOnly);
+ quota=used();
+ const beforeHead=storage.getItem(LOCAL_HEAD_KEY),beforeBoard=storage.getItem(SYNC_STORE_KEY);
+ reopened.ctx.state.tasks.find(row=>row.id===task.id).title+=' New change';
+ assert.equal(await reopened.ctx.persist(),false,'an irreducible aggregate quota still holds the unsaved edit');
+ assert.equal(storage.getItem(LOCAL_HEAD_KEY),beforeHead);
+ assert.equal(storage.getItem(SYNC_STORE_KEY),beforeBoard);
+ assert.equal(storage.getItem(LOCAL_BACKUPS_KEY),protectedOnly,'manual and pinned copies keep their exact bytes');
+ assert.match(reopened.shim.document.getElementById('toast')?.textContent||'',/Could not save your changes on this device/);
+ const current=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)?.[1]||'';
+ assert.match(current,/Undo now clears older automatic backup history when needed to save your edit, while keeping manual and protected recovery copies\./);
+});
+
+test('RISK LOCAL BACKUPS: primary quota rotation keeps the newest stable recovery copy',async()=>{
+ const storage=sharedScannerStorage();
+ const {ctx}=await loadApp({sharedStorage:storage});
+ ctx.addTask('Recoverable board');await ctx.persist();
+ const payload=storage.getItem(SYNC_STORE_KEY),at=Date.now(),day=new Date(at).toISOString().slice(0,10);
+ const row=(id,kind,time)=>({id,day,at:time,kind,payload});
+ storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify([
+  row('old-adoption','before-cloud-adoption',at-3000),row('stable-daily','daily',at-2000),row('transient-latest','latest',at-1000),
+ ]));
+ const head=storage.getItem(LOCAL_HEAD_KEY),board=storage.getItem(SYNC_STORE_KEY);
+ assert.equal(ctx.retireAutomaticBackupForPrimarySave(head,board),true);
+ assert.equal(ctx.retireAutomaticBackupForPrimarySave(head,board),true);
+ const rows=JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY));
+ assert.deepEqual(rows.map(row=>row.id),['stable-daily'],'the last automatic copy is a stable daily snapshot, not replaceable latest history');
+});
+
 test('RISK LOCAL BACKUPS: a changed board before backup announces the unsaved draft',async()=>{
  const original=syncState({tasks:[syncTask('shared','Original')]});
  const concurrent=JSON.stringify(syncState({tasks:[syncTask('shared','Other tab edit')]}));
