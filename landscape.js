@@ -213,18 +213,23 @@
     }
     hill(b,far,p.far);
     // Viaduct, stations and catenary are below the skyline, behind the cycle hills.
+    // Their unlit line used to run visibly across the treeline after dark.
+    b.save();b.globalAlpha*=1-night;
     for(let x=15;x<W;x+=65){line(b,x,rail(x)+3,x,rail(x)+55,S.mixHex(p.city,p.far,.4),5);}
     path(b,rail);b.strokeStyle=S.mixHex(p.city,'#d6d6bb',.45);b.lineWidth=8;b.stroke();
     path(b,x=>rail(x)-4);b.strokeStyle=S.mixHex(p.city,'#334d4a',.3);b.lineWidth=1.2;b.stroke();
     for(let x=35;x<W;x+=140){line(b,x,rail(x)-4,x,rail(x)-25,p.city,.8);line(b,x-8,rail(x)-25,x+12,rail(x)-25,p.city,.8);}
     path(b,x=>rail(x)-24);b.strokeStyle=p.city;b.lineWidth=.5;b.stroke();
+    b.restore();
     layer("middle",Math.max(0,hy+H*.14-85));
     hill(b,middle,p.hill);
     // Long, gentle contour bands give the hills volume without texture downloads.
     for(let i=0;i<3;i++){path(b,x=>middle(x)+15+i*8);b.strokeStyle=`rgba(225,236,184,${.055*(1-night)})`;b.lineWidth=3;b.stroke();}
-    path(b,trail);b.strokeStyle=S.mixHex(p.hill,'#d7cbaa',.72);b.lineWidth=11;b.stroke();
-    path(b,trail);b.strokeStyle=S.mixHex(p.hill,'#f3e7bf',.66);b.lineWidth=7;b.stroke();
-    b.setLineDash([9,18]);path(b,trail);b.strokeStyle='rgba(255,250,219,.45)';b.lineWidth=.7;b.stroke();b.setLineDash([]);
+    // Carry every road stroke past the viewport so its end caps cannot show
+    // as clipped road ends on narrow screens.
+    path(b,trail,-12,W+12);b.strokeStyle=S.mixHex(p.hill,'#d7cbaa',.72);b.lineWidth=11;b.stroke();
+    path(b,trail,-12,W+12);b.strokeStyle=S.mixHex(p.hill,'#f3e7bf',.66);b.lineWidth=7;b.stroke();
+    b.setLineDash([9,18]);path(b,trail,-12,W+12);b.strokeStyle='rgba(255,250,219,.45)';b.lineWidth=.7;b.stroke();b.setLineDash([]);
     const midTrees=[];
     for(let i=0;i<35;i++){
       const x=rand(i+200)*W,y=middle(x)+2,size=12+rand(i+300)*25;

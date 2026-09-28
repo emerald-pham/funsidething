@@ -9530,6 +9530,42 @@ test('RISK landscape transit: the metro paints above the water tint without an u
  assert.ok(life.indexOf("if(e.type==='train')paintEvent(e,t)")>land,'the nearer train keeps its foreground pass');
 });
 
+test('RISK landscape road: all trail strokes continue beyond mobile viewport edges',()=>{
+ const runtime=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ const start=runtime.indexOf('    path(b,trail',runtime.indexOf('    hill(b,middle,p.hill)'));
+ const end=runtime.indexOf('    const midTrees=[]',start);
+ assert.ok(start>=0&&end>start,'the painted road is present in the static background');
+ const road=runtime.slice(start,end);
+ for(const W of [320,390,568,900]){
+  const paths=[],b={stroke(){},setLineDash(){}},p={hill:'#456'},S={mixHex:()=> '#eee'};
+  vm.runInNewContext(road,{W,b,p,S,trail:x=>x,path:(_ctx,_fn,from=0,to=W)=>paths.push({from,to}),Math});
+  assert.equal(paths.length,3,'the base, light center, and dashed road marks share the same route');
+  for(const segment of paths){
+   assert.ok(segment.from<=-6,`${W}px road enters from offscreen so its left cap never shows`);
+   assert.ok(segment.to>=W+6,`${W}px road exits offscreen so its right cap never shows`);
+  }
+ }
+});
+
+test('RISK landscape night: the distant unlit rail line fades from the treeline',()=>{
+ const runtime=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ const start=runtime.indexOf('    // Viaduct, stations and catenary');
+ const end=runtime.indexOf('    layer("middle"',start);
+ assert.ok(start>=0&&end>start,'the distant rail pass is isolated from the hills and trees');
+ const railPass=runtime.slice(start,end);
+ const render=night=>{
+  const alpha=[],stack=[];
+  const b={globalAlpha:1,save(){stack.push(this.globalAlpha);},restore(){this.globalAlpha=stack.pop();},stroke(){alpha.push(this.globalAlpha);}};
+  vm.runInNewContext(railPass,{b,night,W:390,rail:()=>430,path(){},line(ctx){alpha.push(ctx.globalAlpha);},p:{city:'#456',far:'#789'},S:{mixHex:()=> '#aaa'}});
+  assert.equal(b.globalAlpha,1,'rail opacity cannot dim later terrain and foreground trees');
+  return alpha;
+ };
+ const day=render(0),dusk=render(.5),night=render(1);
+ assert.ok(day.length>4&&day.every(value=>value===1),'the viaduct keeps its normal daytime structure');
+ assert.ok(dusk.every(value=>value>0&&value<1),'the rail dims gradually at dusk');
+ assert.ok(night.every(value=>value<=.05),'the line cannot stripe across the dark treeline');
+});
+
 test('RISK landscape water: full-frame animation reuses its reflection buffers',()=>{
  const runtime=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
  for(const canvas of ['skyReflection','blurredReflection','softenedReflection','reflectionCanvas']){
@@ -12127,10 +12163,43 @@ test('RISK unreachable Undo and lost preference: floating header defaults off, s
  assert.match(html,/el\.id === "stFloatingHeader"[\s\S]{0,90}setFloatingHeaderPreference\(el\.checked\)/,'the toggle saves on change, not only via Save settings');
  assert.match(html,/\.top\.floating\{[^}]*position:fixed[^}]*z-index:/,'fixed positioning avoids sticky ancestor and iOS standalone scroll failures');
 });
-test('RISK inaccessible zoom: double tap is suppressed without disabling pinch zoom',()=>{
+test('RISK app zoom: pinch and double-tap scaling are blocked while ordinary scrolling works',()=>{
  const viewport=html.match(/<meta name="viewport" content="([^"]+)"/i)?.[1]||'';
- assert.doesNotMatch(viewport,/user-scalable\s*=\s*no|maximum-scale\s*=\s*1/i,'pinch zoom must remain available');
- assert.match(html,/html\{[^}]*touch-action:manipulation[^}]*\}/,'manipulation removes double-tap zoom while retaining pan and pinch');
+ assert.match(viewport,/user-scalable\s*=\s*no/i,'mobile browsers must not scale the app with a pinch');
+ assert.match(viewport,/maximum-scale\s*=\s*1/i,'mobile zoom-in stays at the original scale');
+ assert.match(viewport,/minimum-scale\s*=\s*1/i,'mobile zoom-out stays at the original scale');
+ assert.match(html,/html\{[^}]*touch-action:pan-x pan-y[^}]*\}/,'one-finger scrolling remains available without browser pinch zoom');
+ const start=html.indexOf('function lockPageZoom(){'),end=html.indexOf('lockPageZoom();',start);
+ assert.ok(start>=0&&end>start,'the app installs a gesture fallback for mobile WebKit and desktop trackpads');
+ const listeners=[];
+ const document={addEventListener(type,listener,options){listeners.push({type,listener,options});}};
+ vm.runInNewContext(html.slice(start,end+'lockPageZoom();'.length),{document});
+ const fire=(type,props={})=>{let blocked=false;const e={...props,preventDefault(){blocked=true;}};for(const entry of listeners.filter(item=>item.type===type))entry.listener(e);return blocked;};
+ for(const type of ['gesturestart','gesturechange','touchmove','wheel'])
+  assert.ok(listeners.some(entry=>entry.type===type&&entry.options?.passive===false),`${type} must be cancellable`);
+ assert.equal(fire('gesturestart'),true);
+ assert.equal(fire('gesturechange'),true);
+ assert.equal(fire('touchmove',{touches:[{},{}]}),true,'two-finger movement cannot zoom');
+ assert.equal(fire('touchmove',{touches:[{}]}),false,'one-finger scrolling still works');
+ assert.equal(fire('wheel',{ctrlKey:true}),true,'trackpad pinch cannot zoom');
+ assert.equal(fire('wheel',{ctrlKey:false}),false,'ordinary mouse scrolling still works');
+ assert.equal(fire('keydown',{metaKey:true,key:'+'}),true,'the app suppresses a browser zoom shortcut where allowed');
+ assert.equal(fire('keydown',{key:'+'}),false,'ordinary typing still works');
+});
+test('RISK footer typography: attribution, controls, and credit share one rendered size on phones and tablets',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const {chromium}=await import(process.env.LANDSCAPE_PLAYWRIGHT),browser=await chromium.launch({headless:true});
+ try{
+  for(const viewport of [{width:320,height:568},{width:390,height:844},{width:844,height:390}]){
+   const page=await browser.newPage({viewport,serviceWorkers:'block'});
+   await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'load'});
+   const sizes=await page.locator('footer.foot').evaluate(footer=>{
+    const size=selector=>getComputedStyle(footer.querySelector(selector)).fontSize;
+    return [getComputedStyle(footer).fontSize,size('a'),size('#themeBtn'),size('#motionButton'),size('.inspiration-note')];
+   });
+   assert.equal(new Set(sizes).size,1,`${viewport.width}px footer text sizes disagree: ${sizes.join(', ')}`);
+   await page.close();
+  }
+ }finally{await browser.close();}
 });
 test('RISK narrow decision row: Add actions may wrap but done adding and rank evidence remain grouped',()=>{
  assert.match(html,/@media \(max-width:560px\)\{[\s\S]*?\.addline\{[^}]*flex-wrap:wrap/);

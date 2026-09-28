@@ -46,7 +46,8 @@ body{background:transparent;isolation:isolate}
 #scan{border-radius:16px;background:color-mix(in srgb,var(--panel) 97%,var(--scene-tint));padding:18px;border:1px solid var(--line);box-shadow:0 8px 28px #123c2a0b}
 #scan:empty{display:none}
 .bench{box-shadow:0 4px 12px #254c3d25}
-.foot{background:color-mix(in srgb,var(--panel) 97%,var(--scene-tint));padding:16px;border:1px solid var(--line);border-radius:16px}
+.foot{background:color-mix(in srgb,var(--panel) 97%,var(--scene-tint));padding:16px;border:1px solid var(--line);border-radius:16px;font-size:13px}
+.foot .themebtn,.foot .inspiration-note{font-size:inherit}
 .themebtn{min-height:36px}
 .landscape-controls{display:flex;flex-wrap:wrap;justify-content:center;gap:7px;margin-top:10px}
 .motion-dialog{max-width:440px;width:calc(100% - 32px);max-height:calc(100dvh - 40px);overflow:auto;padding:28px;border:1px solid var(--line);border-radius:22px;color:var(--ink);background:var(--panel);box-shadow:0 24px 100px #081c2855}
