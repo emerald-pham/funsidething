@@ -9374,23 +9374,21 @@ test('Landscape nest: a new bird visit waits while the nest is occupied',()=>{
  assert.equal(world.events.filter(e=>e.type==='bird').length,1,'two arriving flocks cannot pile onto the same perches');
 });
 
-test('Landscape water: night reflects the actual city in bounded flowing strips',()=>{
+test('Landscape water: the actual skyline shares the full-size sky mirror',()=>{
  const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
  for(const [w,h] of [[320,568],[844,390],[1440,900]]){
-  const g=ctx.LandscapeGeometry.create(w,h),rows=g.cityReflection(0,1,1),later=g.cityReflection(1,1,1);
-  assert.ok(rows.length>5&&rows.length<=80);
-  const daylight=g.cityReflection(0,1,0);
-  assert.ok(daylight.length>5,'the actual skyline remains visible in the lake by day');
-  assert.ok(daylight.every(row=>row.alpha>0&&row.alpha<.3),'daylight reflection stays soft');
-  assert.ok(Math.max(...daylight.map(row=>row.alpha))>=.2,'daytime building shapes have enough contrast to read in the lake');
-  for(const row of rows){assert.ok(row.sourceY>=0&&row.sourceY<g.waterTop);assert.ok(row.y>=g.waterTop);assert.ok(Math.abs(row.dx)<5);assert.ok(row.alpha>0&&row.alpha<=.3);}
+  const g=ctx.LandscapeGeometry.create(w,h),rows=g.horizonReflection(0,1,1),later=g.horizonReflection(1,1,1);
+  assert.ok(rows.length>5&&rows.every(row=>row.sourceY>=0&&row.sourceY<g.waterTop));
+  assert.ok(g.horizonReflection(0,1,0).every(row=>row.alpha>0),'the skyline remains visible in the lake by day');
   assert.ok(rows.some((row,i)=>row.dx!==later[i].dx),'water shifts the mirrored skyline gently');
   assert.equal(g.sunReflection({visible:false,altitude:-20}),false);
   assert.equal(g.sunReflection({visible:true,altitude:-1}),false);
   assert.equal(g.sunReflection({visible:true,altitude:20}),true);
  }
  const runtime=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
- assert.match(runtime,/geometry\.cityReflection\(/);assert.match(runtime,/drawImage\(cityReflection/);
+ const waterPass=runtime.slice(runtime.indexOf('    paintHorizonReflection(skyReflection,t'),runtime.indexOf('    const reflection=point(sky.sun.azimuth'));
+ assert.doesNotMatch(waterPass,/geometry\.cityReflection\(|g\.drawImage\(cityLayer/,'the city cannot be rescaled in a second water pass');
+ assert.match(runtime,/skyReflection\.height=Math\.max\(1,Math\.ceil\(geometry\.waterTop\*dpr\)\)/,'the source includes the full skyline down to the waterline');
  assert.match(runtime,/geometry\.sunReflection\(sky.sun\)/);
  assert.doesNotMatch(runtime,/sky\.sun\.visible\?sky\.sun:sky\.moon/);
 });
@@ -9401,7 +9399,7 @@ test('Landscape water: one horizon rule reflects nearby night sky objects and ev
   const g=ctx.LandscapeGeometry.create(w,h),rows=g.horizonReflection(0,1,1),later=g.horizonReflection(1,1,1);
   assert.ok(rows.length>4,'the lake samples several reflection bands');
   assert.ok(g.horizonReflection(0,1,0).length>4,'daylight can mirror the sky and its visitors');
-  assert.ok(rows.every(row=>row.sourceY>=0&&row.sourceY<g.horizon),'every sample comes from above the horizon');
+  assert.ok(rows.every(row=>row.sourceY>=0&&row.sourceY<g.waterTop),'every sample comes from above the waterline');
   assert.ok(rows.every(row=>row.y>=g.waterTop&&row.sourceHeight>0&&row.alpha>0&&row.alpha<=.57),'every sample lands softly below the waterline');
   assert.ok(rows.some((row,index)=>row.dx!==later[index].dx),'the mirrored pixels move with the water');
   assert.ok(rows[0].sourceY>rows.at(-1).sourceY,'objects nearest the horizon enter the water first');
@@ -9419,13 +9417,13 @@ test('RISK landscape water: the full above-horizon scene and weather can reflect
  for(const [w,h] of [[320,568],[568,320],[844,390],[1440,900]]){
   const g=ctx.LandscapeGeometry.create(w,h);
   for(const night of [0,.35,1]){
-   const rows=g.horizonReflection(0,1,night),depth=Math.min(h*.12,140);
+   const rows=g.horizonReflection(0,1,night);
    assert.ok(rows.length>4,`sky reflection exists at brightness ${night} on ${w}x${h}`);
-   assert.ok(rows.every(row=>row.sourceY>=0&&row.sourceY+row.sourceHeight<=g.horizon+.01&&row.y>=g.waterTop&&row.y<g.waterTop+depth&&row.alpha>0&&row.alpha<=.57));
+   assert.ok(rows.every(row=>row.sourceY>=0&&row.sourceY+row.sourceHeight<=g.waterTop+.01&&row.y>=g.waterTop&&row.y<g.waterTop*2+2&&row.alpha>0&&row.alpha<=.57));
    assert.ok(rows.at(-1).sourceY<g.horizon*.04,'the top of the sky remains eligible to reflect');
-   assert.ok(rows[0].sourceY+rows[0].sourceHeight>=g.horizon-.01,'the horizon remains eligible to reflect');
-   assert.ok(Array.from({length:101},(_,i)=>g.far(w*i/100)).some(shore=>rows.at(-1).y+rows.at(-1).height<=shore),
-    'even on a short screen, a visible part of the lake can show the sky top');
+   assert.ok(rows[0].sourceY+rows[0].sourceHeight>=g.waterTop-.01,'the waterline remains eligible to reflect');
+   assert.ok(rows.at(-1).y>Math.max(...Array.from({length:101},(_,i)=>g.far(w*i/100))),
+    'the distant shore crops high sky instead of shrinking it into the lake');
   }
  }
  const runtime=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
@@ -9439,27 +9437,33 @@ test('RISK landscape water: the full above-horizon scene and weather can reflect
  assert.doesNotMatch(waterPass,/if\(p\.night>\.05\)\{[^}]*paintHorizonReflection\(skyReflection/,'the sky mirror is outside the night tint');
 });
 
-test('RISK landscape water: the whole sky stays legible under every shoreline',()=>{
+test('RISK landscape water: the mirror preserves vertical height instead of fitting the sky into each shore',()=>{
  const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
  for(const [w,h] of [[320,568],[390,844],[568,320],[844,390],[1440,900]]){
-  const g=ctx.LandscapeGeometry.create(w,h),columns=g.horizonReflectionColumns(),rows=g.horizonReflection(0,1,.75);
-  assert.equal(columns[0].x,0);assert.equal(columns.at(-1).x+columns.at(-1).width,w);
-  for(let i=0;i<columns.length;i++){
-   const column=columns[i];
-   if(i)assert.equal(column.x,columns[i-1].x+columns[i-1].width,'the sky covers the whole width without gaps');
-   assert.ok(column.depth>0&&column.depth<=Math.min(g.far(column.x),g.far(column.x+column.width))-g.waterTop,
-    'the entire sky, including its top edge, fits below the local shore');
+  const g=ctx.LandscapeGeometry.create(w,h),rows=g.horizonReflection(0,1,.75);
+  assert.equal(rows.length,Math.ceil(g.waterTop/2),'all above-waterline heights keep their own water band');
+  for(const row of rows){
+   assert.ok(Math.abs(row.sourceHeight-row.height)<.001,'an object keeps its vertical size in the mirror');
+   assert.ok(Math.abs((row.y-g.waterTop)-(g.waterTop-row.sourceY-row.sourceHeight))<.001,
+    'distance below the waterline equals distance above it');
   }
+  assert.equal(rows[0].blurMix,0,'reflection is sharp at the waterline');
+  assert.ok(rows[1].blurMix>rows[0].blurMix&&rows.at(-1).blurMix>rows[1].blurMix,
+   'reflection softens gradually with water depth');
+  assert.ok(rows.every(row=>row.blurMix>=0&&row.blurMix<=.4),'softening stays subtle');
+  const sourceY=g.waterTop-40,moonBand=rows.find(row=>row.sourceY<=sourceY&&sourceY<row.sourceY+row.sourceHeight);
+  assert.ok(moonBand&&Math.abs(moonBand.y-(g.waterTop+40))<=2,'an object 40px above the waterline lands about 40px below it');
   for(const night of [0,.75,1])assert.ok(g.horizonReflection(0,1,night).every(row=>row.alpha>=.42&&row.alpha<=.57),
-   'compressed moonlight, stars, clouds and other sky details retain visible contrast by day and night');
-  assert.ok(rows.every(row=>row.sampleY>=0&&row.sampleY+row.height<=h*.15),
-   'each water band samples the mirrored sky at its own water depth');
+   'the natural-size sky remains visible by day and night');
+  assert.equal(JSON.stringify(g.horizonReflection(0,0,.75)),JSON.stringify(g.horizonReflection(10,0,.75)),
+   'a still scene holds the same reflection');
  }
  const runtime=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
- assert.match(runtime,/geometry\.horizonReflectionColumns\(\)/,'the reflection follows each local shoreline');
- assert.match(runtime,/warp\.scale\(1,-1\)/,'each source column mirrors vertically into the water');
+ assert.doesNotMatch(runtime,/horizonReflectionColumns|warpedReflection/,'the renderer no longer squeezes sky columns');
+ assert.match(runtime,/g\.drawImage\(source,0,row\.sourceY\*dpr/,'the water samples the sky at its original vertical scale');
  assert.match(runtime,/reflectionContext\.drawImage\(base\.canvas/,'the real painted sky is the source');
  assert.match(runtime,/paintHorizonReflection\(skyReflection,t/,'the same source reflects all above-horizon detail');
+ assert.match(runtime,/blurredReflection/,'a softly blurred copy supplies distant water bands');
 });
 
 test('Landscape time: a saved device-local hour locks scenery without changing the real date',()=>{
@@ -11168,6 +11172,61 @@ test('Weather synchronization: reduced-motion refreshes align with UTC and exact
   const delays=[];vm.runInNewContext(code+';scheduleSky()', {Date:class extends Date{constructor(){super(now);}static now(){return now;}},Math,sceneSeason:'winter',skyTimer:0,document:{hidden:false},clearTimeout(){},setTimeout(fn,ms){delays.push(ms);return 1;},refreshSky(){},S:{weatherAt:()=>({start,end})}});assert.deepEqual(delays,[expected],'devices do not wait a minute from their individual boot times');
  }
 });
+
+test('Landscape browser: live Sun, Moon, and stars repaint on minute ticks while a chosen hour stays fixed',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const {chromium}=await import(process.env.LANDSCAPE_PLAYWRIGHT),browser=await chromium.launch({channel:'chrome'});
+ try{
+  const page=await browser.newPage({viewport:{width:390,height:844},timezoneId:'America/New_York',reducedMotion:'reduce',serviceWorkers:'block'});
+  await page.clock.install({time:new Date('2026-09-24T23:00:10Z')});
+  await page.addInitScript(()=>localStorage.setItem('fvp:chain-scanner:landscape-motion','reduced'));
+  await page.goto(process.env.LANDSCAPE_BROWSER_URL);
+  await page.waitForFunction(()=>document.documentElement.dataset.scenePeriod&&document.querySelector('[data-scenery]')?.width>0);
+  const before=await page.locator('[data-scenery]').evaluate(canvas=>canvas.toDataURL());
+  await page.evaluate(()=>{
+   window.skyRefreshes=[];
+   const original=LivingSky.skyAt;
+   LivingSky.skyAt=(...args)=>{
+    const result=original(...args);
+    window.skyRefreshes.push({date:result.date.toISOString(),sun:result.sun.azimuth,moon:result.moon.azimuth,star:result.stars[0]?.azimuth});
+    return result;
+   };
+  });
+  await page.clock.runFor(125000);
+  const live=await page.evaluate(()=>window.skyRefreshes);
+  assert.deepEqual(live.map(entry=>entry.date),['2026-09-24T23:01:00.000Z','2026-09-24T23:02:00.000Z'],'the live scene recomputes astronomy at consecutive minute boundaries');
+  for(const body of ['sun','moon','star'])assert.ok(Number.isFinite(live[0][body])&&Number.isFinite(live[1][body])&&Math.abs(live[1][body]-live[0][body])>.001,`${body} position advances over time`);
+  assert.notEqual(await page.locator('[data-scenery]').evaluate(canvas=>canvas.toDataURL()),before,'the painted scene updates even with reduced motion');
+  await page.evaluate(()=>{
+   localStorage.setItem('fvp:chain-scanner:scene-time','19:59');
+   window.dispatchEvent(new StorageEvent('storage',{key:'fvp:chain-scanner:scene-time'}));
+   window.skyRefreshes=[];
+  });
+  await page.clock.runFor(125000);
+  const locked=await page.evaluate(()=>window.skyRefreshes);
+  assert.equal(locked.length,2,'the scheduled refresh continues with a chosen hour');
+  assert.ok(locked.every(entry=>entry.date==='2026-09-24T23:59:00.000Z'),'a chosen scene hour keeps celestial positions fixed within its local date');
+ }finally{await browser.close();}
+});
+
+test('RISK Landscape browser: live scenery paints day, dusk, night, and dawn as time advances',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const {chromium}=await import(process.env.LANDSCAPE_PLAYWRIGHT),browser=await chromium.launch({channel:'chrome'});
+ try{
+  const page=await browser.newPage({viewport:{width:390,height:844},timezoneId:'America/New_York',reducedMotion:'reduce',serviceWorkers:'block'});
+  await page.clock.install({time:new Date('2026-09-24T15:00:10Z')});
+  await page.addInitScript(()=>localStorage.setItem('fvp:chain-scanner:landscape-motion','reduced'));
+  await page.goto(process.env.LANDSCAPE_BROWSER_URL);
+  await page.waitForFunction(()=>document.documentElement.dataset.scenePeriod&&document.querySelector('[data-scenery]')?.width>0);
+  let previous=await page.locator('[data-scenery]').evaluate(canvas=>canvas.toDataURL());
+  assert.equal(await page.evaluate(()=>document.documentElement.dataset.scenePeriod),'day');
+  for(const [hours,period] of [[8,'dusk'],[3,'night'],[8.5,'dawn'],[2.5,'day']]){
+   await page.clock.fastForward(hours*60*60*1000);
+   assert.equal(await page.evaluate(()=>document.documentElement.dataset.scenePeriod),period,`the live sky reaches ${period}`);
+   const painted=await page.locator('[data-scenery]').evaluate(canvas=>canvas.toDataURL());
+   assert.notEqual(painted,previous,`the ${period} palette and celestial scene repaint`);
+   previous=painted;
+  }
+ }finally{await browser.close();}
+});
 function seasonalEnvelopeRuntime(){
   const context=vm.createContext({Math,JSON});
   vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),context);
@@ -12689,7 +12748,7 @@ test('Landscape polish: small autumn leaves, seeded group sizes, stronger vertic
  const airplane={type:'banner',age:37,duration:90,lane:.5,seed:.37,reverse:false};
  const offsets=[10,25,40,55,70].map(age=>g.verticalOffset({...airplane,age},20));
  assert.ok(Math.max(...offsets)-Math.min(...offsets)>10,'eligible airborne motion is visibly vertical');
- assert.ok(g.cityReflection(0,1,0).length>0);
+ assert.ok(g.horizonReflection(0,1,0).length>0);
 });
 
 test('Landscape polish: tram car spacing follows track length on phone and tablet',()=>{

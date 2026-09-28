@@ -14,7 +14,7 @@
   const back=host.querySelector('[data-scenery]'),front=host.querySelector('[data-life]');
   let b=back.getContext('2d',{alpha:false});const base=b,g=front.getContext('2d');
   const layers={};let geometry;
-  const cityReflection=document.createElement('canvas'),skyReflection=document.createElement('canvas'),warpedReflection=document.createElement('canvas');
+  const cityLayer=document.createElement('canvas'),skyReflection=document.createElement('canvas'),blurredReflection=document.createElement('canvas');
   if(!b||!g){host.hidden=true;return;}
   const mq=window.matchMedia('(prefers-reduced-motion: reduce)');
   let storage;try{storage=window.localStorage;}catch{storage=null;}
@@ -90,21 +90,14 @@
   }
   function composite(name){const c=layers[name];if(c)g.drawImage(c,0,c.top,c.width/dpr,c.height/dpr);}
   function paintHorizonReflection(source,t,opacity=1){
-    const rows=geometry.horizonReflection(t,wind,p.night);
-    const warpHeight=Math.max(1,Math.ceil((rows.at(-1).sampleY+rows.at(-1).height)*dpr));
-    if(warpedReflection.width!==source.width)warpedReflection.width=source.width;
-    if(warpedReflection.height!==warpHeight)warpedReflection.height=warpHeight;
-    const warp=warpedReflection.getContext('2d');
-    warp.setTransform(dpr,0,0,dpr,0,0);
-    warp.clearRect(0,0,W,warpHeight/dpr);
-    for(const column of geometry.horizonReflectionColumns()){
-      warp.save();warp.translate(0,column.depth);warp.scale(1,-1);
-      warp.drawImage(source,column.x*dpr,0,column.width*dpr,source.height,column.x,0,column.width,column.depth);
-      warp.restore();
-    }
-    for(const row of rows){
-      g.globalAlpha=row.alpha*opacity;
-      g.drawImage(warpedReflection,0,row.sampleY*dpr,warpedReflection.width,row.height*dpr,row.dx,row.y,W,row.height);
+    const softScale=blurredReflection.height/source.height;
+    for(const row of geometry.horizonReflection(t,wind,p.night)){
+      g.globalAlpha=row.alpha*opacity*(1-row.blurMix);
+      g.drawImage(source,0,row.sourceY*dpr,source.width,row.sourceHeight*dpr,row.dx,row.y,W,row.height);
+      if(row.blurMix>0){
+        g.globalAlpha=row.alpha*opacity*row.blurMix;
+        g.drawImage(blurredReflection,0,row.sourceY*dpr*softScale,blurredReflection.width,row.sourceHeight*dpr*softScale,row.dx,row.y,W,row.height);
+      }
     }
   }
   const point=(az,alt)=>({x:az/360*W,y:hy-(Math.max(alt,-2)/90)*(hy-22)});
@@ -175,11 +168,11 @@
     paintMoon(b);
     // Atmospheric ridge and a city whose small imperfections avoid a repeated skyline.
     hill(b,x=>hy+Math.sin(x/W*8)*12,S.mixHex(p.city,p.sky[2],.45));
-    // Cache precisely the painted buildings and windows, on transparency. The
-    // water reuses these pixels rather than inventing unrelated light streaks.
+    // Cache the painted buildings and windows on transparency before adding
+    // them to the background and the shared sky-and-city mirror.
     const cityTarget=b;
-    cityReflection.width=Math.floor(W*dpr);cityReflection.height=Math.ceil(geometry.waterTop*dpr);
-    b=cityReflection.getContext('2d');b.setTransform(dpr,0,0,dpr,0,0);
+    cityLayer.width=Math.floor(W*dpr);cityLayer.height=Math.ceil(geometry.waterTop*dpr);
+    b=cityLayer.getContext('2d');b.setTransform(dpr,0,0,dpr,0,0);
     const count=Math.ceil(W/15);let windowIndex=0;
     for(let i=0;i<count;i++){
       const x=i*W/count,cluster=.4+.6*Math.pow(Math.sin(x/W*Math.PI*3+.5),2);
@@ -200,7 +193,7 @@
     const hands=globalThis.LandscapeMood?.clock(sky.date)||{minuteAngle:0,hourAngle:0};
     line(b,tx,ty+12,tx+Math.sin(hands.minuteAngle)*4,ty+12-Math.cos(hands.minuteAngle)*4,'#577581',.9);
     line(b,tx,ty+12,tx+Math.sin(hands.hourAngle)*2.8,ty+12-Math.cos(hands.hourAngle)*2.8,'#577581',1.2);
-    b=cityTarget;b.drawImage(cityReflection,0,0,cityReflection.width/dpr,cityReflection.height/dpr);
+    b=cityTarget;b.drawImage(cityLayer,0,0,cityLayer.width/dpr,cityLayer.height/dpr);
     const water=b.createLinearGradient(0,geometry.waterTop,0,hy+H*.18);
     water.addColorStop(0,S.mixHex(p.sky[2],p.sky[0],.35));water.addColorStop(1,S.mixHex(p.sky[1],p.front,.3));
     b.fillStyle=water;b.fillRect(0,geometry.waterTop,W,H);
@@ -360,13 +353,20 @@
     // separate reflection rule for each type.
     for(const e of world.events)if(airborne.has(e.type)&&!waterEvents.has(e.type))paintEvent(e,t);
     const weather=S.weatherAt(new Date(),sceneSeason),weatherPhase=reduced?0:Date.now()/1000;
-    skyReflection.width=front.width;skyReflection.height=Math.max(1,Math.ceil(hy*dpr));
+    skyReflection.width=front.width;skyReflection.height=Math.max(1,Math.ceil(geometry.waterTop*dpr));
     const reflectionContext=skyReflection.getContext('2d');
     reflectionContext.setTransform(dpr,0,0,dpr,0,0);
-    reflectionContext.clearRect(0,0,W,hy);
-    reflectionContext.drawImage(base.canvas,0,0,front.width,skyReflection.height,0,0,W,hy);
-    reflectionContext.drawImage(front,0,0,front.width,skyReflection.height,0,0,W,hy);
+    reflectionContext.clearRect(0,0,W,geometry.waterTop);
+    reflectionContext.drawImage(base.canvas,0,0,front.width,skyReflection.height,0,0,W,geometry.waterTop);
+    reflectionContext.drawImage(front,0,0,front.width,skyReflection.height,0,0,W,geometry.waterTop);
     paintWeatherOn(reflectionContext,weather,weatherPhase);
+    // Downsampling makes a faint soft copy; deeper water blends in a little
+    // more of it without moving or shrinking any reflected object.
+    blurredReflection.width=Math.max(1,Math.ceil(skyReflection.width/3));
+    blurredReflection.height=Math.max(1,Math.ceil(skyReflection.height/3));
+    const softContext=blurredReflection.getContext('2d');
+    softContext.imageSmoothingEnabled=true;softContext.imageSmoothingQuality='high';
+    softContext.drawImage(skyReflection,0,0,blurredReflection.width,blurredReflection.height);
     g.save();path(g,far);g.lineTo(W,geometry.waterTop);g.lineTo(0,geometry.waterTop);g.closePath();g.clip();
     if(p.night>.05){
       const reflectedSky=g.createLinearGradient(0,geometry.waterTop,0,geometry.waterTop+H*.12);
@@ -374,12 +374,6 @@
       g.globalAlpha=p.night*.18;g.fillStyle=reflectedSky;g.fillRect(0,geometry.waterTop,W,H*.12);
     }
     paintHorizonReflection(skyReflection,t,1);
-    // Invert the actual skyline by day and night into narrow, softly moving
-    // bands. The shoreline clip keeps them beneath the hills and boats.
-    for(const row of geometry.cityReflection(t,wind,p.night)){
-      g.globalAlpha=row.alpha;
-      g.drawImage(cityReflection,0,row.sourceY*dpr,cityReflection.width,Math.min(2/1.35*dpr,cityReflection.height-row.sourceY*dpr),row.dx,row.y,W,2);
-    }
     const reflection=point(sky.sun.azimuth,0).x;
     if(geometry.sunReflection(sky.sun))for(let i=0;i<24;i++){
       const wave=geometry.ripple(i,t,wind),y=geometry.waterTop+5+i*H*.0035,w=(5+i*1.9)*wave.width;
