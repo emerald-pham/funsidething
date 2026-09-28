@@ -330,7 +330,7 @@
     ],
     "redEvidence": {
       "command": "TMPDIR=/private/tmp node --test --test-reporter=spec --test-name-pattern='RISK repository process: custom hook paths are compared with the shared git default' tests.js",
-      "failure": "Before the installer repair, GitHub Actions on Linux ran the focused contract and reported Missing expected exception at tests.js:14735 because Git resolved --git-path hooks through core.hooksPath. The focused local reproduction against the pre-fix installer also failed before canonical default-hook resolution was added."
+      "failure": "Before the installer repair, GitHub Actions on Linux ran the existing 'RISK repository process: shared hook chains prior hooks and blocks a legacy worktree without the validator' test and reported Missing expected exception at tests.js:14735 because Git resolved --git-path hooks through core.hooksPath. The later focused local run named by this record reproduced that failure against the pre-fix installer before canonical default-hook resolution was added."
     }
   },
   {
