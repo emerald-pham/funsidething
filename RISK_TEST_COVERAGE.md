@@ -141,6 +141,19 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK test-first gate: initial branch pushes cannot skip the diff comparison
 - RISK test inventory: every named risk contract maps to a feature boundary
 
+## Release memory and independent review
+
+- RISK repository process: exact-SHA receipts bind audit and review evidence outside the git tree
+- RISK repository process: absent, stale, malformed, or nonindependent receipts fail closed
+- RISK repository process: pre-push checks every outgoing tip and rejects dirty worktrees
+- RISK repository process: status publication needs a valid exact-SHA receipt
+- RISK repository process: main deployment requires the merged reviewed head, full tree parity, and latest statuses
+- RISK repository process: CI makes verified release evidence a deployment prerequisite
+- RISK repository process: shared hook chains prior hooks and blocks a legacy worktree without the validator
+- RISK test-first gate: release evidence scripts receive edit-time process protection
+
+The release gate records, validates, and publishes the exact-SHA memory and review evidence required by [RELEASE_GATES.md](RELEASE_GATES.md). Its local hook checks each outgoing tip; the main deployment job independently verifies the merged PR head and latest status contexts. The status checks bind reports but cannot prove that a person actually read or reviewed them.
+
 Companion coverage protects the existing local-backup behavior: LOCAL BACKUPS: seven local calendar days, latest save today, and pre-restore safety copy; LOCAL BACKUPS: a manual backup remains restorable after the seven-day window; LOCAL BACKUPS: a failed safety copy blocks restore and leaves the current board untouched; HARD GATE: full backup store blocks browser overwrite and preserves its prior bytes; and HARD GATE: unreadable backup index is preserved instead of overwritten by a save.
 
 ## Using the inventory for future work

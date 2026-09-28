@@ -14428,16 +14428,25 @@ test('RISK test-first gate: scanner, landscape, time, rules, and offline-shell e
 
 test('RISK test-first gate: changing enforcement code requires process tests and a new risk case',async()=>{
  const {validateTestFirst}=await import('./scripts/test-first-gate.mjs');
- for(const file of ['scripts/test-first-gate.mjs','.claude/hooks/test-first-guard.sh','.github/workflows/data-safety.yml']){
+ for(const file of ['scripts/test-first-gate.mjs','scripts/release-evidence.mjs','scripts/install-release-hook.mjs','.claude/hooks/test-first-guard.sh','.github/workflows/data-safety.yml']){
   assert.match(validateTestFirst([file],[]).join(' '),/tests\.js/,`${file} must be covered by a process test`);
   assert.match(validateTestFirst([file,'tests.js'],['+test("ordinary behavior test",()=>{})']).join(' '),/RISK/,`${file} requires a risk-labeled process test`);
+ }
+});
+
+test('RISK test-first gate: release evidence scripts receive edit-time process protection',async()=>{
+ const {validateTestFirst}=await import('./scripts/test-first-gate.mjs');
+ const hook=fs.readFileSync(path.join(__dirname,'.claude/hooks/test-first-guard.sh'),'utf8');
+ for(const file of ['scripts/release-evidence.mjs','scripts/install-release-hook.mjs']){
+  assert.match(validateTestFirst([file],[]).join(' '),/tests\.js/,'release enforcement edits need process tests');
+  assert.ok(hook.includes(file),'release enforcement scripts need edit-time test-first protection');
  }
 });
 
 test('RISK test-first gate: unrelated risk cases cannot approve enforcement edits',async()=>{
  const {validateTestFirst}=await import('./scripts/test-first-gate.mjs');
  const unrelated=['+test("RISK landscape colors: dawn hue stays warm",()=>{})'];
- for(const file of ['scripts/test-first-gate.mjs','.claude/hooks/test-first-guard.sh','.github/workflows/data-safety.yml']){
+ for(const file of ['scripts/test-first-gate.mjs','scripts/release-evidence.mjs','scripts/install-release-hook.mjs','.claude/hooks/test-first-guard.sh','.github/workflows/data-safety.yml']){
   assert.match(validateTestFirst([file,'tests.js'],unrelated).join(' '),/process/i,
    `${file} needs a risk-labeled process test rather than an unrelated risk case`);
  }
@@ -14449,6 +14458,229 @@ test('RISK test-first gate: initial branch pushes cannot skip the diff compariso
  assert.match(result.stderr,/base|compare|resolve/i);
  const workflow=fs.readFileSync(path.join(__dirname,'.github/workflows/data-safety.yml'),'utf8');
  assert.match(workflow,/git merge-base origin\/main/i,'branch creation must compare against the existing default branch');
+});
+
+function releaseGateGit(repo,args){
+ const result=spawnSync('git',['-C',repo,...args],{encoding:'utf8'});
+ assert.equal(result.status,0,'git '+args.join(' ')+' failed: '+result.stderr);
+ return result.stdout.trim();
+}
+function releaseGateHash(file){
+ return createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+}
+function makeReleaseGateFixture(){
+ const root=fs.mkdtempSync(path.join(process.env.TMPDIR||'/tmp','funsidething-release-gate-'));
+ const repo=path.join(root,'repo');
+ fs.mkdirSync(repo);
+ const init=spawnSync('git',['init','--quiet',repo],{encoding:'utf8'});
+ assert.equal(init.status,0,init.stderr);
+ releaseGateGit(repo,['config','user.name','Release Owner']);
+ releaseGateGit(repo,['config','user.email','release-owner@example.test']);
+ releaseGateGit(repo,['remote','add','origin','https://github.com/emerald-pham/funsidething.git']);
+ fs.writeFileSync(path.join(repo,'app.js'),'const value = 1;\n');
+ releaseGateGit(repo,['add','app.js']);
+ releaseGateGit(repo,['commit','-m','Create release base']);
+ const baseSha=releaseGateGit(repo,['rev-parse','HEAD']);
+ fs.writeFileSync(path.join(repo,'app.js'),'const value = 2;\n');
+ releaseGateGit(repo,['commit','-am','Change release behavior']);
+ const candidateSha=releaseGateGit(repo,['rev-parse','HEAD']);
+ const treeSha=releaseGateGit(repo,['rev-parse',candidateSha+'^{tree}']);
+ const sourcePath=path.join(root,'MEMORY.md');
+ const memoryEvidencePath=path.join(root,'memory-audit.md');
+ const reviewEvidencePath=path.join(root,'independent-review.md');
+ fs.writeFileSync(sourcePath,'Memory source snapshot\n');
+ fs.writeFileSync(memoryEvidencePath,'Audited memory sources against current project behavior.\n');
+ fs.writeFileSync(reviewEvidencePath,'Reviewed the full diff, tests, and user-visible and data-safety effects.\n');
+ return {root,repo,baseSha,candidateSha,treeSha,sourcePath,memoryEvidencePath,reviewEvidencePath};
+}
+function releaseGateInput(fixture,overrides={}){
+ const now=new Date().toISOString();
+ const input={
+  schemaVersion:1,
+  candidate:{commitSha:fixture.candidateSha,treeSha:fixture.treeSha,baseSha:fixture.baseSha},
+  ownerTask:'/root/release-owner',
+  memoryAudit:{task:'/root/memory-auditor',outcome:'pass',completedAt:now,
+   sources:[{path:fixture.sourcePath,sha256:releaseGateHash(fixture.sourcePath)}],
+   evidencePath:fixture.memoryEvidencePath,evidenceSha256:releaseGateHash(fixture.memoryEvidencePath)},
+  independentReview:{task:'/root/exact-final-review',outcome:'approved',reviewedSha:fixture.candidateSha,completedAt:now,
+   summary:'Reviewed the full diff, relevant tests, and user-visible and data-safety effects.',
+   scope:{fullDiff:true,relevantTests:true,userVisibleAndDataSafety:true},
+   evidencePath:fixture.reviewEvidencePath,evidenceSha256:releaseGateHash(fixture.reviewEvidencePath)}
+ };
+ return {...input,...overrides,
+  candidate:{...input.candidate,...overrides.candidate},
+  memoryAudit:{...input.memoryAudit,...overrides.memoryAudit},
+  independentReview:{...input.independentReview,...overrides.independentReview}};
+}
+function cleanupReleaseGateFixture(fixture){
+ fs.rmSync(fixture.root,{recursive:true,force:true});
+}
+
+test('RISK repository process: exact-SHA receipts bind audit and review evidence outside the git tree',async()=>{
+ const {recordReleaseEvidence,verifyReleaseEvidence}=await import('./scripts/release-evidence.mjs');
+ const fixture=makeReleaseGateFixture();
+ try{
+  const recorded=recordReleaseEvidence(fixture.repo,releaseGateInput(fixture));
+  assert.equal(recorded.receipt.candidate.commitSha,fixture.candidateSha);
+  assert.equal(recorded.receipt.candidate.treeSha,fixture.treeSha);
+  assert.equal(recorded.receipt.candidate.baseSha,fixture.baseSha);
+  assert.equal(verifyReleaseEvidence(fixture.repo,fixture.candidateSha).ok,true);
+  const common=releaseGateGit(fixture.repo,['rev-parse','--path-format=absolute','--git-common-dir']);
+  assert.ok(recorded.receiptPath.startsWith(path.join(common,'funsidething-release-evidence')+path.sep),
+   'evidence must remain in git metadata outside the committed tree');
+  assert.ok(!releaseGateGit(fixture.repo,['ls-tree','-r','--name-only',fixture.candidateSha]).includes('funsidething-release-evidence'),
+   'release evidence must never be committed into the candidate tree');
+  fs.writeFileSync(fixture.sourcePath,'An unrelated memory note was added after this audit.\n');
+  assert.equal(verifyReleaseEvidence(fixture.repo,fixture.candidateSha).ok,true,
+   'later changes to an audited source do not rewrite historical evidence for this exact candidate');
+  fs.appendFileSync(path.join(path.dirname(recorded.receiptPath),'memory-audit.md'),'tampered\n');
+  assert.equal(verifyReleaseEvidence(fixture.repo,fixture.candidateSha).ok,false,
+   'editing the recorded audit evidence invalidates its digest');
+ }finally{cleanupReleaseGateFixture(fixture);}
+});
+
+test('RISK repository process: absent, stale, malformed, or nonindependent receipts fail closed',async()=>{
+ const {recordReleaseEvidence,verifyReleaseEvidence}=await import('./scripts/release-evidence.mjs');
+ const fixture=makeReleaseGateFixture();
+ try{
+  assert.equal(verifyReleaseEvidence(fixture.repo,fixture.candidateSha).ok,false,'a missing receipt blocks the candidate');
+  const invalid=[
+   releaseGateInput(fixture,{candidate:{commitSha:fixture.baseSha}}),
+   releaseGateInput(fixture,{ownerTask:'/root/memory-auditor'}),
+   releaseGateInput(fixture,{independentReview:{task:'/root/memory-auditor'}}),
+   releaseGateInput(fixture,{memoryAudit:{sources:[]}}),
+   releaseGateInput(fixture,{independentReview:{reviewedSha:fixture.baseSha}}),
+   releaseGateInput(fixture,{independentReview:{scope:{fullDiff:true,relevantTests:false,userVisibleAndDataSafety:true}}})
+  ];
+  for(const input of invalid)assert.throws(()=>recordReleaseEvidence(fixture.repo,input),
+   /receipt|sha|identity|source|review|scope|candidate/i,'invalid release evidence must never become a receipt');
+  const recorded=recordReleaseEvidence(fixture.repo,releaseGateInput(fixture));
+  fs.writeFileSync(recorded.receiptPath,'{ malformed');
+  assert.equal(verifyReleaseEvidence(fixture.repo,fixture.candidateSha).ok,false,'malformed evidence cannot authorize a push');
+ }finally{cleanupReleaseGateFixture(fixture);}
+});
+
+test('RISK repository process: pre-push checks every outgoing tip and rejects dirty worktrees',async()=>{
+ const {recordReleaseEvidence,validatePrePushUpdates}=await import('./scripts/release-evidence.mjs');
+ const fixture=makeReleaseGateFixture();
+ try{
+  recordReleaseEvidence(fixture.repo,releaseGateInput(fixture));
+  const deletion={localRef:'refs/heads/old',localSha:'0'.repeat(40),remoteRef:'refs/heads/old',remoteSha:fixture.candidateSha};
+  const candidate={localRef:'refs/heads/release',localSha:fixture.candidateSha,remoteRef:'refs/heads/release',remoteSha:'0'.repeat(40)};
+  assert.deepEqual(validatePrePushUpdates(fixture.repo,[candidate,deletion]),[]);
+  fs.writeFileSync(path.join(fixture.repo,'uncommitted-draft.txt'),'not in the reviewed tree');
+  assert.match(validatePrePushUpdates(fixture.repo,[candidate]).join(' '),/clean/i,
+   'local changes cannot be confused with the reviewed immutable commit');
+  fs.rmSync(path.join(fixture.repo,'uncommitted-draft.txt'));
+  fs.writeFileSync(path.join(fixture.repo,'app.js'),'const value = 3;\n');
+  releaseGateGit(fixture.repo,['commit','-am','Add a second outgoing commit']);
+  const newerTip=releaseGateGit(fixture.repo,['rev-parse','HEAD']);
+  const errors=validatePrePushUpdates(fixture.repo,[candidate,{...candidate,localRef:'refs/heads/second',localSha:newerTip}]);
+  assert.match(errors.join(' '),/receipt|exact|evidence/i,'each distinct outgoing commit tip needs its own receipt');
+ }finally{cleanupReleaseGateFixture(fixture);}
+});
+
+test('RISK repository process: status publication needs a valid exact-SHA receipt',async()=>{
+ const {recordReleaseEvidence,publishReleaseStatuses}=await import('./scripts/release-evidence.mjs');
+ const fixture=makeReleaseGateFixture();
+ try{
+  const calls=[];
+  await assert.rejects(()=>publishReleaseStatuses(fixture.repo,fixture.candidateSha,
+   async status=>calls.push(status)),/receipt|evidence/i);
+  assert.equal(calls.length,0,'status publication cannot invent missing clearance');
+  const recorded=recordReleaseEvidence(fixture.repo,releaseGateInput(fixture));
+  await publishReleaseStatuses(fixture.repo,fixture.candidateSha,async status=>calls.push(status));
+  assert.deepEqual(calls.map(status=>status.context).sort(),
+   ['funsidething/independent-review','funsidething/memory-audit']);
+  assert.ok(calls.every(status=>status.state==='success'&&status.description.includes(recorded.receipt.receiptSha256)));
+  assert.ok(calls.every(status=>status.commitSha===fixture.candidateSha&&status.baseSha===fixture.baseSha));
+ }finally{cleanupReleaseGateFixture(fixture);}
+});
+
+test('RISK repository process: main deployment requires the merged reviewed head, full tree parity, and latest statuses',async()=>{
+ const {verifyDeploymentEvidence}=await import('./scripts/release-evidence.mjs');
+ const fixture=makeReleaseGateFixture();
+ const mainSha='a'.repeat(40),receiptHash='b'.repeat(64);
+ try{
+  const api=async options=>async input=>{
+   const url=new URL(typeof input==='string'?input:input.url);
+   const pathname=url.pathname;
+   let body;
+   if(pathname.endsWith('/commits/'+mainSha+'/pulls'))body=options.merged?[{number:23,state:'closed',merged_at:'2026-09-28T21:00:00Z',merge_commit_sha:mainSha,head:{sha:fixture.candidateSha},base:{ref:'main'}}]:[];
+   else if(pathname.endsWith('/commits/'+mainSha))body={sha:mainSha,commit:{tree:{sha:options.tree||fixture.treeSha}},parents:[{sha:fixture.baseSha}]};
+   else if(pathname.endsWith('/commits/'+fixture.candidateSha))body={sha:fixture.candidateSha,commit:{tree:{sha:fixture.treeSha}}};
+   else if(pathname.endsWith('/compare/'+fixture.baseSha+'...'+fixture.candidateSha))body={status:options.compare||'ahead'};
+   else if(pathname.endsWith('/commits/'+fixture.candidateSha+'/statuses'))body=options.reviewStatuses||[
+    {context:'funsidething/memory-audit',state:'success',description:'receipt-sha256='+receiptHash+';base='+fixture.baseSha,created_at:'2026-09-28T21:02:00Z'},
+    {context:'funsidething/independent-review',state:'success',description:'receipt-sha256='+receiptHash+';base='+fixture.baseSha,created_at:'2026-09-28T21:03:00Z'}];
+   else throw new Error('Unexpected GitHub API request: '+pathname);
+   return {ok:true,status:200,json:async()=>body};
+  };
+  const verify=fetchImpl=>verifyDeploymentEvidence({repository:'emerald-pham/funsidething',deployedSha:mainSha,
+   beforeSha:fixture.baseSha,token:'test-token',fetchImpl});
+  const good=await verify(await api({merged:true}));
+  assert.equal(good.ok,true,good.errors.join('\n'));
+  assert.equal((await verify(await api({merged:true,tree:'c'.repeat(40)}))).ok,false,
+   'a different full tree cannot authorize deployment');
+  assert.equal((await verify(await api({merged:true,compare:'diverged'}))).ok,false,
+   'an out-of-date reviewed branch cannot authorize deployment');
+  const latestStatuses=[
+   {context:'funsidething/memory-audit',state:'success',description:'receipt-sha256='+receiptHash+';base='+fixture.baseSha,created_at:'2026-09-28T21:01:00Z'},
+   {context:'funsidething/memory-audit',state:'failure',description:'receipt-sha256='+receiptHash+';base='+fixture.baseSha,created_at:'2026-09-28T21:04:00Z'},
+   {context:'funsidething/independent-review',state:'success',description:'receipt-sha256='+receiptHash+';base='+fixture.baseSha,created_at:'2026-09-28T21:03:00Z'}];
+  assert.equal((await verify(await api({merged:true,reviewStatuses:latestStatuses}))).ok,false,
+   'the latest status for each exact-head context controls');
+  assert.equal((await verify(await api({merged:false}))).ok,false,
+   'a main push without an associated merged PR cannot deploy');
+ }finally{cleanupReleaseGateFixture(fixture);}
+});
+
+test('RISK repository process: CI makes verified release evidence a deployment prerequisite',()=>{
+ const workflow=fs.readFileSync(path.join(__dirname,'.github/workflows/data-safety.yml'),'utf8');
+ assert.match(workflow,/release-evidence:/,'CI must have a distinct exact-SHA deployment evidence job');
+ assert.match(workflow,/node scripts\/release-evidence\.mjs verify-deployment/,
+  'the main push must check its merged pull request, exact tree, and latest review statuses');
+ assert.match(workflow,/needs: \[scanner-tests, release-evidence\]/,
+  'Pages deployment must wait for both behavior checks and reviewer/memory evidence');
+});
+
+test('RISK repository process: shared hook chains prior hooks and blocks a legacy worktree without the validator',async()=>{
+ const {installSharedPrePushHook}=await import('./scripts/install-release-hook.mjs');
+ const fixture=makeReleaseGateFixture();
+ try{
+  const common=releaseGateGit(fixture.repo,['rev-parse','--path-format=absolute','--git-common-dir']);
+  const hooks=path.join(common,'hooks');
+  const legacyWorktree=path.join(fixture.root,'legacy');
+  const marker=path.join(fixture.root,'prior-hook-ran');
+  fs.mkdirSync(hooks,{recursive:true});
+  const priorHook=path.join(hooks,'pre-push');
+  const priorContents='#!/usr/bin/env bash\nprintf preserved > "$RELEASE_HOOK_MARKER"\n';
+  fs.writeFileSync(priorHook,priorContents,{mode:0o755});
+  releaseGateGit(fixture.repo,['worktree','add','-b','legacy',legacyWorktree,fixture.baseSha]);
+  const installed=installSharedPrePushHook(fixture.repo);
+  assert.equal(fs.readFileSync(installed.preservedHookPath,'utf8'),priorContents,
+   'installing the gate retains the previous hook byte-for-byte');
+  const legacyHook=releaseGateGit(legacyWorktree,['rev-parse','--path-format=absolute','--git-path','hooks/pre-push']);
+  assert.equal(legacyHook,path.join(hooks,'pre-push'),'the shared hook covers every worktree');
+  const result=spawnSync('bash',[legacyHook],{cwd:legacyWorktree,encoding:'utf8',
+   input:'refs/heads/legacy '+fixture.candidateSha+' refs/heads/legacy '+'0'.repeat(40)+'\n',
+   env:{...process.env,RELEASE_HOOK_MARKER:marker}});
+  assert.ok(fs.existsSync(marker),'the pre-existing hook still runs before the gate');
+  assert.notEqual(result.status,0,'an old branch without the validator must fail closed');
+  assert.match(result.stderr,/validator|release gate|missing/i);
+
+  const custom=makeReleaseGateFixture();
+  try{
+   const externalHooks=path.join(custom.root,'custom-hooks');
+   fs.mkdirSync(externalHooks);
+   const externalHook=path.join(externalHooks,'pre-push');
+   fs.writeFileSync(externalHook,'#!/usr/bin/env bash\nexit 0\n',{mode:0o755});
+   releaseGateGit(custom.repo,['config','core.hooksPath',externalHooks]);
+   assert.throws(()=>installSharedPrePushHook(custom.repo),/core\.hooksPath|custom hook/i);
+   assert.equal(fs.readFileSync(externalHook,'utf8'),'#!/usr/bin/env bash\nexit 0\n',
+    'a configured hook path is never replaced or silently bypassed');
+  }finally{cleanupReleaseGateFixture(custom);}
+ }finally{cleanupReleaseGateFixture(fixture);}
 });
 
 test('RISK test inventory: every named risk contract maps to a feature boundary',()=>{

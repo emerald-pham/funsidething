@@ -16,7 +16,7 @@ file=$(printf '%s' "$payload" | jq -r '.tool_input.file_path // ""')
 case "$file" in */tests.js) exit 0 ;; esac
 
 case "$file" in
-  */scripts/test-first-gate.mjs|*/.claude/hooks/test-first-guard.sh|*/.github/workflows/*.yml|*/.github/workflows/*.yaml) ;;
+  */scripts/test-first-gate.mjs|*/scripts/release-evidence.mjs|*/scripts/install-release-hook.mjs|*/.claude/hooks/test-first-guard.sh|*/.github/workflows/*.yml|*/.github/workflows/*.yaml) ;;
   *)
     case "$file" in
       */.git/*|*/.github/*|*/.claude/*|*/audits/*|*/node_modules/*|*/scripts/*) exit 0 ;;
