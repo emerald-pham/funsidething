@@ -7934,6 +7934,95 @@ test('RISK LOCAL BACKUPS: cold older-tab bytes carry their recovery IDs into the
  assert.ok(JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY)).some(row=>row.id===pinned.id));
 });
 
+test('RISK LOCAL BACKUPS: concurrent older-tab write survives the stale-tab repair tail',async()=>{
+ const original=syncState({tasks:[syncTask('shared','Original')]});
+ const newer=syncState({tasks:[syncTask('shared','New head')],syncAccount:'new-owner'});
+ const legacy=syncState({tasks:[syncTask('shared','Older shared key')],syncAccount:'old-owner'});
+ const concurrent=syncState({tasks:[syncTask('shared','Concurrent older-shell edit')],syncAccount:'old-owner'});
+ const storage=sharedScannerStorage({[LOCAL_HEAD_KEY]:JSON.stringify(original),[SYNC_STORE_KEY]:JSON.stringify(original)});
+ const {ctx}=await loadApp({sharedStorage:storage});
+ storage.setItem(LOCAL_HEAD_KEY,JSON.stringify(newer));storage.setItem(SYNC_STORE_KEY,JSON.stringify(legacy));
+ const write=storage.setItem;let raced=false;
+ storage.setItem=(key,value)=>{
+  write(key,value);
+  if(key===LOCAL_BACKUPS_KEY && value.includes('stale-tab-draft') && !raced){
+   raced=true;write(SYNC_STORE_KEY,JSON.stringify(concurrent));
+  }
+ };
+ assert.equal(ctx.refreshBrowserCopy(),false);
+ assert.equal(raced,true);
+ assert.equal(storage.getItem(SYNC_STORE_KEY),JSON.stringify(concurrent),'repair cannot overwrite a newer older-shell edit');
+});
+
+test('RISK LOCAL BACKUPS: primary save holds when another tab commits during its backup',async()=>{
+ const original=syncState({tasks:[syncTask('shared','Original')]});
+ const concurrent=syncState({tasks:[syncTask('shared','Other tab edit')]});
+ const storage=sharedScannerStorage({[LOCAL_HEAD_KEY]:JSON.stringify(original),[SYNC_STORE_KEY]:JSON.stringify(original)});
+ const {ctx}=await loadApp({sharedStorage:storage});
+ ctx.state.tasks[0].title='This tab edit';
+ const write=storage.setItem;let raced=false;
+ storage.setItem=(key,value)=>{
+  write(key,value);
+  if(key===LOCAL_BACKUPS_KEY && !raced){
+   raced=true;write(LOCAL_HEAD_KEY,JSON.stringify(concurrent));write(SYNC_STORE_KEY,JSON.stringify(concurrent));
+  }
+ };
+ assert.equal(await ctx.persist(),false);
+ assert.equal(raced,true);
+ assert.equal(storage.getItem(LOCAL_HEAD_KEY),JSON.stringify(concurrent));
+ assert.equal(storage.getItem(SYNC_STORE_KEY),JSON.stringify(concurrent));
+ assert.equal(ctx.state.tasks[0].title,'This tab edit','this tab retains its unsaved draft');
+});
+
+test('RISK LOCAL BACKUPS: cold head initialization holds a concurrent shared-key edit',async()=>{
+ const original=JSON.stringify(syncState({tasks:[syncTask('shared','Original')]}));
+ const concurrent=JSON.stringify(syncState({tasks:[syncTask('shared','Concurrent edit')]}));
+ const storage=sharedScannerStorage({[SYNC_STORE_KEY]:original});
+ const {ctx}=await loadApp({sharedStorage:storage});
+ storage.removeItem(LOCAL_HEAD_KEY);storage.setItem(SYNC_STORE_KEY,original);
+ const read=storage.getItem;let raced=false;
+ storage.getItem=key=>{
+  const value=read(key);
+  if(key===LOCAL_HEAD_KEY && !raced){raced=true;storage.setItem(SYNC_STORE_KEY,concurrent);}
+  return value;
+ };
+ ctx.protectedBrowserPayload(original);
+ assert.equal(storage.getItem(LOCAL_HEAD_KEY),null,'stale cold initialization must not create a competing head');
+ assert.equal(storage.getItem(SYNC_STORE_KEY),concurrent);
+});
+
+test('RISK LOCAL BACKUPS: paired save holds an older-shell write between its two keys',async()=>{
+ const original=syncState({tasks:[syncTask('shared','Original')]});
+ const concurrent=JSON.stringify(syncState({tasks:[syncTask('shared','Older-shell edit')]}));
+ const storage=sharedScannerStorage({[LOCAL_HEAD_KEY]:JSON.stringify(original),[SYNC_STORE_KEY]:JSON.stringify(original)});
+ const {ctx}=await loadApp({sharedStorage:storage});
+ ctx.state.tasks[0].title='This tab edit';
+ const write=storage.setItem;let raced=false;
+ storage.setItem=(key,value)=>{
+  write(key,value);
+  if(key===LOCAL_HEAD_KEY && value.includes('This tab edit') && !raced){raced=true;write(SYNC_STORE_KEY,concurrent);}
+ };
+ assert.equal(await ctx.persist(),false);
+ assert.equal(raced,true);
+ assert.equal(storage.getItem(SYNC_STORE_KEY),concurrent);
+ assert.equal(storage.getItem(LOCAL_HEAD_KEY),JSON.stringify(original));
+});
+
+test('RISK LOCAL BACKUPS: concurrent manual copy survives an automatic index write',async()=>{
+ const storage=sharedScannerStorage();
+ const {ctx}=await loadApp({sharedStorage:storage});
+ const manual={id:'other-tab-manual',day:'2026-09-28',at:Date.now(),kind:'manual',payload:JSON.stringify(ctx.state)};
+ const read=storage.getItem;let raced=false;
+ storage.getItem=key=>{
+  const value=read(key);
+  if(key===LOCAL_HEAD_KEY && !raced){raced=true;storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify([manual]));}
+  return value;
+ };
+ assert.equal(ctx.saveLocalBackup('daily',JSON.stringify(ctx.state)),true);
+ assert.equal(raced,true);
+ assert.ok(JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY)).some(row=>row.id===manual.id));
+});
+
 test('RISK CLOUD BACKUP: an exact chosen copy avoids duplicate displaced-edit storage',async()=>{
  const storage=sharedScannerStorage(),{ctx}=await loadApp({sharedStorage:storage});
  ctx.addTask('My unsynced edit');
@@ -8055,6 +8144,23 @@ test('RISK LOCAL BACKUPS: a stale Settings click cannot delete a row rewritten b
   storage.setItem(LOCAL_BACKUPS_KEY,changed);
   ctx.onAction('delete-local-backup',{dataset:{id:'current'}});
   assert.equal(storage.getItem(LOCAL_BACKUPS_KEY),changed);
+});
+
+test('RISK LOCAL BACKUPS: concurrent backup append survives a confirmed manual delete',async()=>{
+ const storage=sharedScannerStorage();
+ const {ctx}=await loadApp({sharedStorage:storage});
+ const row={id:'chosen',day:'2026-09-28',at:Date.now(),kind:'manual',payload:JSON.stringify(ctx.state)};
+ const peer={...row,id:'peer-copy'};
+ storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify([row]));
+ ctx.openSettings();
+ const read=storage.getItem;let reads=0;
+ storage.getItem=key=>{
+  const value=read(key);
+  if(key===LOCAL_BACKUPS_KEY && ++reads===2) storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify([row,peer]));
+  return value;
+ };
+ ctx.onAction('delete-local-backup',{dataset:{id:row.id}});
+ assert.ok(JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY)).some(item=>item.id===peer.id));
 });
 
 test('LOCAL BACKUPS: restore and delete controls can wrap inside narrow Settings panes',async()=>{
