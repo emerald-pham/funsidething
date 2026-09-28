@@ -9542,52 +9542,53 @@ test('RISK landscape water: the Moon mirrors at full resolution with no displace
  assert.match(runtime,/blurredReflection/,'the existing slight depth softness stays');
 });
 
-test('RISK landscape water: the mirror stays anchored while local ripples move independently',()=>{
+test('RISK landscape water: the complete reflection moves as one smooth surface without overlay strokes',()=>{
  const runtime=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
  const start=runtime.indexOf('  function paintHorizonReflection('),end=runtime.indexOf('  const point=',start);
  assert.ok(start>=0&&end>start,'the production reflection painter is available');
  const painter=runtime.slice(start,end);
  const frameAt=t=>{
-  const draws=[],transform={x:0,y:0,sx:1,sy:1};
-  const g={globalAlpha:1,save(){},restore(){},translate(x,y){transform.x+=transform.sx*x;transform.y+=transform.sy*y;},scale(x,y){transform.sx*=x;transform.sy*=y;},drawImage(_source,x,y,w,h){draws.push({left:transform.x+transform.sx*x,top:transform.y+transform.sy*y,width:w,height:h,scaleX:transform.sx,scaleY:transform.sy});}};
-  vm.runInNewContext(`${painter};paintHorizonReflection({},${t})`,{g,geometry:{waterTop:300,reflectionSurface:()=>({axisY:300,alpha:.5})},p:{night:.75},wind:1,W:390,dpr:1.5,Math});
+  const draws=[],affine=[];
+  const g={globalAlpha:1,save(){},restore(){},translate(){},scale(){},transform(...args){affine.push(args);},drawImage(_source,x,y,w,h){draws.push({x,y,w,h});}};
+  vm.runInNewContext(`${painter};paintHorizonReflection({},${t})`,{g,geometry:{waterTop:300,reflectionSurface:()=>({axisY:300,alpha:.5}),reflectionMotion(time){return {shear:Math.sin(time)*.012};}},p:{night:.75},wind:1,reduced:false,W:390,dpr:1.5,Math});
   assert.equal(draws.length,1,'each frame mirrors the whole image in one draw');
-  return draws[0];
+  assert.equal(affine.length,1,'one continuous affine transform moves the complete reflection');
+  return {draw:draws[0],affine:affine[0]};
  };
- const first=frameAt(0),later=frameAt(1.5),still=frameAt(0);
- assert.equal(first.scaleX,1);assert.equal(first.scaleY,-1);
- assert.ok(first.top>599&&first.top<=600,'a device-pixel seam overlap must not compress the natural-height reflection');
- assert.equal(later.top,first.top,'wave motion keeps the same reflection axis');
- assert.equal(first.width,390);assert.equal(first.height,300);
- assert.equal(first.left,0,'the Moon and skyline do not drift as one sheet');
- assert.equal(later.left,first.left,'the full reflection never slides sideways');
- assert.equal(still.left,first.left,'a still or reduced-motion frame is deterministic');
+ const first=frameAt(0),later=frameAt(1.5);
+ assert.deepEqual(first.draw,{x:0,y:0,w:390,h:300},'natural-height reflection remains one full-resolution draw');
+ assert.equal(first.affine[2],0,'the surface starts from its neutral pose');
+ assert.notEqual(later.affine[2],0,'the reflected scene itself moves over time');
+ assert.equal(later.affine[4],-later.affine[2]*300,'the horizon stays fixed while deeper water moves');
  const context=vm.createContext({Math});
  vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),context);
- const ripple=context.LandscapeGeometry.create(390,844).ripple;
- const movement=Array.from({length:40},(_,i)=>ripple(i+30,.5,1).drift-ripple(i+30,0,1).drift);
- assert.ok(movement.some(delta=>delta>.1)&&movement.some(delta=>delta<-.1),'local highlights travel in different directions');
+ for(const [w,h] of [[390,844],[588,1280],[568,320]]){
+  const geometry=context.LandscapeGeometry.create(w,h),motion=geometry.reflectionMotion;
+  const poses=Array.from({length:90},(_,i)=>motion(i/30,.7,false));
+  const deep=poses.map(p=>-geometry.waterTop*p.shear);
+  assert.ok(Math.max(...deep)-Math.min(...deep)>2.5,'the complete reflection visibly sways even in light wind');
+  assert.ok(deep.every(value=>Math.abs(value)<=5.1),'motion remains gentle enough to preserve the scene');
+  for(let i=1;i<deep.length;i++)assert.ok(Math.abs(deep[i]-deep[i-1])<.35,'the 30fps reflection motion has no low-frame-rate jumps');
+  assert.equal(motion(4,.7,true).shear,0,'reduced motion freezes the water at its neutral pose');
+ }
+ assert.doesNotMatch(runtime,/function paintWaterSurface|paintWaterSurface\(/,'water motion comes from the reflection instead of drawn-on lines');
 });
 
-test('RISK landscape water: visible waves travel and rise smoothly without shifting the whole reflection',()=>{
+test('RISK landscape water: existing glints stay restrained while the reflection supplies the motion',()=>{
  const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
  for(const [w,h] of [[390,844],[588,1280],[820,390]]){
   const ripple=ctx.LandscapeGeometry.create(w,h).ripple;
   const waves=Array.from({length:60},(_,i)=>[ripple(i+30,0,.6),ripple(i+30,1.25,.6)]);
-  assert.ok(waves.every(pair=>pair.every(wave=>[wave.alpha,wave.drift,wave.lift,wave.width,wave.curl].every(Number.isFinite))));
-  assert.ok(waves.filter(([a,b])=>Math.abs(b.drift-a.drift)>9).length>=15,'even light wind moves many crests visibly');
-  assert.ok(waves.filter(([a,b])=>Math.abs(b.lift-a.lift)>1.5).length>=15,'crests undulate as well as drift');
-  assert.ok(waves.some(([a,b])=>b.drift>a.drift)&&waves.some(([a,b])=>b.drift<a.drift),'the water does not move as one sheet');
-  for(let i=30;i<90;i++){
-   const a=ripple(i,1,.6),next=ripple(i,1+1/30,.6);
-   assert.ok(Math.abs(next.drift-a.drift)<2&&Math.abs(next.lift-a.lift)<1,'motion remains smooth at the 30fps paint cap');
-  }
+  assert.ok(waves.every(pair=>pair.every(wave=>[wave.alpha,wave.drift,wave.width].every(Number.isFinite))));
+  assert.ok(waves.every(pair=>pair.every(wave=>!('lift' in wave)&&!('curl' in wave))),'legacy glints do not grow into conspicuous wave strokes');
+  assert.ok(waves.every(pair=>pair.every(wave=>Math.abs(wave.drift)<=9.1)),'the former restrained glint travel is restored');
  }
  const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
  const lake=source.slice(source.indexOf('    paintHorizonReflection(reflectionCanvas,t'),source.indexOf('    const water=new Set',source.indexOf('    paintHorizonReflection(reflectionCanvas,t')));
- assert.match(lake,/paintWaterSurface\(t\)/,'local animated crests paint over the anchored mirror');
- assert.match(source,/wave\.lift/,'moving crests also rise and fall');
- assert.match(source,/wave\.curl/,'visible water strokes bend rather than form pixel bands');
+ assert.doesNotMatch(lake,/quadraticCurveTo|paintWaterSurface/,'no new lines are painted over the lake');
+ assert.doesNotMatch(lake,/wave\.lift|wave\.curl/,'sun glints retain the earlier clean surface style');
+ assert.match(lake,/for\(let i=0;i<40;i\+\+\)/,'the earlier restrained generic glints remain visible at night');
+ assert.match(lake,/wave\.alpha\*\.20;line\(/,'generic glints keep their former low opacity');
 });
 
 test('RISK landscape water: the full-size mirror overdraws the clipped horizon by one device pixel',()=>{
@@ -9595,8 +9596,8 @@ test('RISK landscape water: the full-size mirror overdraws the clipped horizon b
  const painter=runtime.slice(runtime.indexOf('  function paintHorizonReflection('),runtime.indexOf('  const point=',runtime.indexOf('  function paintHorizonReflection(')));
  for(const dpr of [1,1.5,2]){
   let translateY=0,scaleY=1,draw;
-  const g={globalAlpha:1,save(){},restore(){},translate(_x,y){translateY+=scaleY*y;},scale(_x,y){scaleY*=y;},drawImage(_source,_x,y,_w,h){draw={start:translateY+scaleY*(y+h),scaleY};}};
-  vm.runInNewContext(`${painter};paintHorizonReflection({},0)`,{g,geometry:{waterTop:300,reflectionSurface:()=>({axisY:300,alpha:.5})},p:{night:.75},wind:1,W:390,dpr,Math});
+  const g={globalAlpha:1,save(){},restore(){},translate(_x,y){translateY+=scaleY*y;},scale(_x,y){scaleY*=y;},transform(){},drawImage(_source,_x,y,_w,h){draw={start:translateY+scaleY*(y+h),scaleY};}};
+  vm.runInNewContext(`${painter};paintHorizonReflection({},0)`,{g,geometry:{waterTop:300,reflectionSurface:()=>({axisY:300,alpha:.5}),reflectionMotion:()=>({shear:0})},p:{night:.75},wind:1,reduced:false,W:390,dpr,Math});
   assert.equal(draw.scaleY,-1,'the Moon keeps its original reflected height');
   assert.ok(draw.start<=300-1/dpr+1e-9&&draw.start>=300-2/dpr-1e-9,
    `${dpr}x reflection begins just above the clipped waterline, leaving no empty pixel row`);
@@ -9707,11 +9708,12 @@ test('RISK landscape shadows: the current changelog describes reflections, celes
  assert.match(entry,/Far, middle, and foreground grass now share depth-scaled detail and density/);
 });
 
-test('RISK landscape light and water: the current changelog names per-object projection and livelier waves',()=>{
+test('RISK landscape light and water: the current changelog names per-object projection and coherent reflection motion',()=>{
  const current=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)?.[1]||'';
  assert.match(current,/September 28, 2026/);
  assert.match(current,/Sun and Moon.*visible origin.*shadow/);
- assert.match(current,/Water surface ripples move more clearly/);
+ assert.match(current,/clean earlier surface.*complete reflection moves smoothly with the water/);
+ assert.doesNotMatch(current,/ripples move more clearly and rise independently/);
 });
 
 test('RISK landscape water: full-frame animation reuses its reflection buffers',()=>{

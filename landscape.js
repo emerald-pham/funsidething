@@ -89,15 +89,18 @@
     b=canvas.getContext('2d');b.setTransform(dpr,0,0,dpr,0,-top*dpr);
   }
   function composite(name){const c=layers[name];if(c)g.drawImage(c,0,c.top,c.width/dpr,c.height/dpr);}
-  function paintHorizonReflection(source,_t,opacity=1){
+  function paintHorizonReflection(source,t,opacity=1){
     const surface=geometry.reflectionSurface(p.night);
-    // Keep the Moon and skyline anchored. Independent surface glints below
-    // supply wave motion without sliding every reflected object together.
+    const motion=geometry.reflectionMotion(t,wind,reduced);
+    // Move the complete high-resolution mirror through one continuous affine
+    // transform. Separate strips and drawn-on crests made the Moon band and the
+    // water look disconnected from its reflection.
     g.save();g.globalAlpha=opacity;
     g.translate(0,2*surface.axisY);
     // Overdraw the clipped waterline by one device pixel so canvas edge
     // sampling cannot leave a pale seam under the skyline.
     g.translate(0,-1/dpr);g.scale(1,-1);
+    g.transform(1,0,motion.shear,1,-motion.shear*surface.axisY,0);
     g.drawImage(source,0,0,W,geometry.waterTop);
     g.restore();
   }
@@ -403,24 +406,6 @@
     }
     g.restore();
   }
-  function paintWaterSurface(t){
-    const crest=S.mixHex(p.sky[1],'#fffdf2',.62),trough=S.mixHex(p.sky[0],p.city,.45);
-    g.save();g.lineWidth=.8;
-    // Independent curved crests put motion on the water itself. The complete
-    // reflection underneath stays sharp and anchored at the horizon.
-    for(let i=0;i<64;i++){
-      const wave=geometry.ripple(i+30,t,wind),x=rand(i+403)*W+wave.drift;
-      const y=geometry.waterTop+rand(i+402)*H*.09+wave.lift;
-      const half=(8+rand(i+480)*22)*wave.width*.5;
-      g.globalAlpha=.18+.20*wave.alpha;g.strokeStyle=crest;
-      g.beginPath();g.moveTo(x-half,y);
-      g.quadraticCurveTo(x,y-wave.curl,x+half,y+wave.curl*.2);g.stroke();
-      g.globalAlpha=.07+.08*wave.alpha;g.strokeStyle=trough;
-      g.beginPath();g.moveTo(x-half*.8,y+2);
-      g.quadraticCurveTo(x,y+2+wave.curl*.35,x+half*.8,y+2);g.stroke();
-    }
-    g.restore();
-  }
   function paintLife(t){
     visibleBanners=[];
     g.clearRect(0,0,W,H);
@@ -510,12 +495,16 @@
     paintHorizonReflection(reflectionCanvas,t,1);
     const reflection=point(sky.sun.azimuth,0).x;
     if(geometry.sunReflection(sky.sun))for(let i=0;i<24;i++){
-      const wave=geometry.ripple(i,t,wind),y=geometry.waterTop+5+i*H*.0035+wave.lift,w=(5+i*1.9)*wave.width;
+      const wave=geometry.ripple(i,t,wind),y=geometry.waterTop+5+i*H*.0035,w=(5+i*1.9)*wave.width;
       const x=reflection+wave.drift;
       g.globalAlpha=.7*(1-i/28)*wave.alpha;
       line(g,x-w,y,x+w,y,'#fff6d7',1);
     }
-    paintWaterSurface(t);g.restore();
+    for(let i=0;i<40;i++){
+      const wave=geometry.ripple(i+30,t,wind),x=rand(i+403)*W+wave.drift,y=geometry.waterTop+rand(i+402)*H*.09;
+      g.globalAlpha=wave.alpha*.20;line(g,x,y,x+(7+rand(i+480)*22)*wave.width,y,S.mixHex(p.sky[1],'#ffffff',.6),.8);
+    }
+    g.restore();
     const water=new Set(['jetski','sailboat','cruise','yacht','windsurfer','duck','fish','dolphin']);
     // Arrival order cannot decide which overlapping boat or animal is in front.
     for(const e of world.events.filter(e=>water.has(e.type)).sort((a,b)=>geometry.waterDepth(a,t)-geometry.waterDepth(b,t))){
