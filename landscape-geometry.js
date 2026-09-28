@@ -32,6 +32,9 @@
       return Math.sin(Math.PI*progress)*Math.sin(Math.PI*2*(1.7*progress+seed))*amplitude;
     };
     const horizon=Math.min(H*(W<600?.37:.47),W<600?310:480);
+    // The light origin must be exactly the point used to paint its sky disc.
+    const skyPoint=(azimuth,altitude)=>({x:azimuth/360*W,
+      y:horizon-(Math.max(altitude,-2)/90)*(horizon-22)});
     const far=x=>horizon+H*.12+Math.sin(x/W*7+.8)*H*.025;
     const middle=x=>horizon+H*.25+Math.sin(x/W*6.5-1)*H*.065;
     const near=x=>horizon+H*.46+Math.sin(x/W*6+1)*H*.10;
@@ -197,22 +200,25 @@
         softness:depth=>Math.min(softMax,Math.max(0,depth)/softDepth*softMax),
         contactAlpha:depth=>alpha+(1-alpha)*Math.max(0,1-Math.max(0,depth)/contactDepth)};
     }
-    function castShadow(sky,height,width){
+    function castShadow(sky,height,width,x=W/2,y=H*.75){
       const sun=sky?.sun||{},moon=sky?.moon||{},illumination=clamp(sky?.illumination);
-      // Direct light comes from a body above the horizon. A dim crescent
-      // cannot replace daylight, and the stars together have no single ray.
+      // Direct light comes from a body above the horizon. Sunlight always
+      // dominates moonlight when both are up; stars have no single ray.
       const sunStrength=sun.altitude>0? .1+.08*Math.sin(Math.min(90,sun.altitude)*Math.PI/180):0;
       const moonStrength=moon.altitude>0&&illumination>.08?
-        (.022+.05*illumination)*Math.sin(Math.min(90,moon.altitude)*Math.PI/180)**.5:0;
-      const source=sunStrength>=moonStrength&&sunStrength>0?'sun':moonStrength>.014?'moon':'stars';
+        (.035+.075*illumination)*Math.sin(Math.min(90,moon.altitude)*Math.PI/180)**.5:0;
+      const source=sunStrength>0?'sun':moonStrength>.014?'moon':'stars';
       const body=source==='sun'?sun:moon;
       const altitude=source==='stars'?90:Math.max(3,Number(body.altitude)||0);
       const length=source==='stars'?0:Math.min(Math.max(3,height),
         Math.max(3,height)*.75/Math.tan(altitude*Math.PI/180));
-      const azimuth=(Number(body.azimuth)||0)*Math.PI/180;
-      const dx=source==='stars'?0:Math.sin(azimuth)*length;
-      const dy=source==='stars'?0:-Math.cos(azimuth)*length*.27;
-      return {source,dx,dy,rx:Math.max(1,width*.42+length*.48),ry:Math.max(.7,width*.16+length*.07),
+      const origin=source==='stars'?null:skyPoint(Number(body.azimuth)||0,Number(body.altitude)||0);
+      // Use the body actually painted on this screen, including at its edges.
+      // A wrapped sky copy would reverse a tree's shadow toward the visible Moon.
+      const awayX=origin?x-origin.x:0;
+      const awayY=origin?Math.max(1,y-origin.y):0,distance=Math.hypot(awayX,awayY)||1;
+      const dx=length*awayX/distance,dy=length*awayY/distance;
+      return {source,origin,dx,dy,rx:Math.max(1,width*.42+length*.48),ry:Math.max(.7,width*.16+length*.07),
         alpha:source==='sun'?sunStrength:source==='moon'?moonStrength:.012};
     }
     function grassBand(kind){
@@ -256,8 +262,15 @@
       return dots;
     }
     const sunReflection=sun=>sun.visible&&sun.altitude>0;
-    const ripple=(i,t,wind=1)=>({alpha:.15+.75*(.5+.5*Math.sin(t*wind*1.3+i*1.71))**2,drift:Math.sin(t*wind*.5+i)*9,width:.65+.35*Math.sin(t*.9+i)**2});
-    return {routeProgress,motionProgress,motionAge,verticalOffset,visitPose,woodlandPose,duckPose,waterDepth,cycleLeg,deerLeg,nestVisit,eventDepth,dogPose,skater,fireworks,flock,dolphin,starReflection,reflectionSurface,castShadow,grassBand,sunReflection,depthBand,groundAnchor,groundTravelX,groundPose,strideArm,strideFoot,wingFold,balloonDrift,vessel,foregroundTree,nest,ripple,horizon,waterTop,far,middle,near,rail,trail,lowerRail,railCars,tangent,rider,pack};
+    const ripple=(i,t,wind=1)=>{
+      const phase=i*1.71;
+      return {alpha:.25+.75*(.5+.5*Math.sin(t*wind*1.65+phase))**2,
+        drift:Math.sin(t*wind*(.8+(i%7)*.11)+phase)*22,
+        lift:Math.sin(t*wind*(1.05+(i%5)*.08)+phase*.83)*4,
+        curl:Math.sin(t*wind*(1.1+(i%3)*.16)+phase*1.23)*2.1,
+        width:.7+.45*(.5+.5*Math.sin(t*wind*1.2+i*.93))};
+    };
+    return {routeProgress,motionProgress,motionAge,verticalOffset,visitPose,woodlandPose,duckPose,waterDepth,cycleLeg,deerLeg,nestVisit,eventDepth,dogPose,skater,fireworks,flock,dolphin,starReflection,reflectionSurface,castShadow,grassBand,sunReflection,depthBand,groundAnchor,groundTravelX,groundPose,strideArm,strideFoot,wingFold,balloonDrift,vessel,foregroundTree,nest,ripple,skyPoint,horizon,waterTop,far,middle,near,rail,trail,lowerRail,railCars,tangent,rider,pack};
   }
   root.LandscapeGeometry={create};
 })(globalThis);

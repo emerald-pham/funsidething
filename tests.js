@@ -9431,22 +9431,48 @@ test('RISK landscape shadows: grounded objects share the dominant celestial ligh
  const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
  const geometry=ctx.LandscapeGeometry.create(390,844);
  const sky=(sunAltitude,sunAzimuth,moonAltitude=-20,moonAzimuth=270,illumination=0)=>({sun:{altitude:sunAltitude,azimuth:sunAzimuth,visible:sunAltitude>0},moon:{altitude:moonAltitude,azimuth:moonAzimuth,visible:moonAltitude>0},illumination});
- const morning=geometry.castShadow(sky(12,90),45,12),noon=geometry.castShadow(sky(70,180),45,12),evening=geometry.castShadow(sky(12,270),45,12);
- const moon=geometry.castShadow(sky(-25,90,35,270,1),45,12),stars=geometry.castShadow(sky(-25,90,-15,270,0),45,12);
+ const morning=geometry.castShadow(sky(12,90),45,12,200,600),noon=geometry.castShadow(sky(70,180),45,12,200,600),evening=geometry.castShadow(sky(12,270),45,12,200,600);
+ const moon=geometry.castShadow(sky(-25,90,35,270,1),45,12,200,600),stars=geometry.castShadow(sky(-25,90,-15,270,0),45,12,200,600);
  assert.equal(morning.source,'sun');assert.equal(evening.source,'sun');assert.ok(morning.dx>0&&evening.dx<0,'sun shadows turn with the sun');
  assert.ok(Math.abs(morning.dx)>Math.abs(noon.dx)+5,'low sun casts a longer shadow than high sun');
  assert.equal(moon.source,'moon');assert.ok(moon.dx<0,'moon shadows follow the Moon, not the absent Sun');
  assert.equal(stars.source,'stars');assert.equal(stars.dx,0,'starlight is diffuse rather than a fake directional beam');
  assert.ok(morning.alpha>moon.alpha&&moon.alpha>stars.alpha&&stars.alpha>0,'light-source strength controls shadow opacity');
+ assert.ok(moon.alpha>.065&&moon.alpha<.11,'a full Moon casts visible but softer shade than the morning Sun');
  assert.ok(morning.alpha<.2&&Math.abs(morning.dx)<45*1.15,'low-sun shadows remain subtle at scenery scale');
  const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
  assert.match(source,/function paintGroundShadow\(/,'the scene has one shadow painter');
  assert.match(source,/paintGroundShadow\(b,x,rail\(x\)\+55/,'elevated railway supports cast on the far terrain');
- assert.match(source,/railShade=geometry\.castShadow\(sky,16,8\)/,'the railway deck has the same time-of-day light');
+ assert.match(source,/paintRailShadow\(b,rail,16,8/,'the railway deck uses the same time-of-day light');
  assert.ok((source.match(/paintGroundShadow\(b,t\.x,t\.y/g)||[]).length>=2,'middle and foreground trees use the shared source');
  assert.match(source,/paintGroundShadow\(g,xx,track\(xx\)/,'metro and train cars use the same source');
  assert.match(source,/paintGroundEventShadow\(e,/,'other grounded visitors use the same source');
  assert.match(source,/groundShadow:paintGroundShadow/,'winter visitors use the same source');
+});
+
+test('RISK landscape shadows: each object projects away from the visible Sun or Moon position',()=>{
+ const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
+ for(const [w,h] of [[390,844],[588,1280],[820,390]]){
+  const g=ctx.LandscapeGeometry.create(w,h);
+  const moon={sun:{altitude:-25,azimuth:90},moon:{altitude:35,azimuth:270,visible:true},illumination:1};
+  const light=g.skyPoint(270,35),left=g.castShadow(moon,45,12,w*.55,h*.75),right=g.castShadow(moon,45,12,w*.95,h*.75);
+  assert.equal(left.source,'moon');assert.equal(left.origin.x,light.x);assert.equal(left.origin.y,light.y);
+  assert.ok(left.dx<0&&right.dx>0,'objects on opposite sides cast away from the painted Moon');
+  assert.ok(left.dy>0&&right.dy>0,'the Moon above the skyline casts toward the foreground');
+  const sun={sun:{altitude:22,azimuth:90,visible:true},moon:{altitude:35,azimuth:270,visible:true},illumination:1};
+  const west=g.castShadow(sun,45,12,w*.1,h*.75),east=g.castShadow(sun,45,12,w*.5,h*.75);
+  assert.equal(west.source,'sun');assert.ok(west.dx<0&&east.dx>0,'daylight follows the painted Sun on both sides');
+  assert.equal(g.castShadow({...sun,sun:{altitude:1,azimuth:90},moon:{altitude:75,azimuth:270}},45,12,w*.5,h*.75).source,'sun',
+   'even a low visible Sun dominates a high full Moon');
+  const seam={...moon,moon:{altitude:35,azimuth:355,visible:true}};
+  assert.ok(g.castShadow(seam,45,12,w*.03,h*.75).dx<0,'even at the screen edge, the visible Moon remains the light origin');
+  const stars=g.castShadow({sun:{altitude:-25},moon:{altitude:-15},illumination:0},45,12,w*.5,h*.75);
+  assert.equal(stars.source,'stars');assert.equal(stars.dx,0);assert.equal(stars.dy,0);
+ }
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ assert.match(source,/const point=\(az,alt\)=>geometry\.skyPoint\(az,alt\)/,'the Sun and Moon use the same projected point as the shadow source');
+ assert.match(source,/geometry\.castShadow\(sky,height,width,x,y\)/,'grounded objects pass their own contact point');
+ assert.match(source,/function paintRailShadow\(/,'rail shadows vary by track segment relative to the light');
 });
 
 test('RISK landscape grass: visible far, middle, and near ground keep depth-scaled detail density',()=>{
@@ -9543,6 +9569,27 @@ test('RISK landscape water: the mirror stays anchored while local ripples move i
  assert.ok(movement.some(delta=>delta>.1)&&movement.some(delta=>delta<-.1),'local highlights travel in different directions');
 });
 
+test('RISK landscape water: visible waves travel and rise smoothly without shifting the whole reflection',()=>{
+ const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
+ for(const [w,h] of [[390,844],[588,1280],[820,390]]){
+  const ripple=ctx.LandscapeGeometry.create(w,h).ripple;
+  const waves=Array.from({length:60},(_,i)=>[ripple(i+30,0,.6),ripple(i+30,1.25,.6)]);
+  assert.ok(waves.every(pair=>pair.every(wave=>[wave.alpha,wave.drift,wave.lift,wave.width,wave.curl].every(Number.isFinite))));
+  assert.ok(waves.filter(([a,b])=>Math.abs(b.drift-a.drift)>9).length>=15,'even light wind moves many crests visibly');
+  assert.ok(waves.filter(([a,b])=>Math.abs(b.lift-a.lift)>1.5).length>=15,'crests undulate as well as drift');
+  assert.ok(waves.some(([a,b])=>b.drift>a.drift)&&waves.some(([a,b])=>b.drift<a.drift),'the water does not move as one sheet');
+  for(let i=30;i<90;i++){
+   const a=ripple(i,1,.6),next=ripple(i,1+1/30,.6);
+   assert.ok(Math.abs(next.drift-a.drift)<2&&Math.abs(next.lift-a.lift)<1,'motion remains smooth at the 30fps paint cap');
+  }
+ }
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ const lake=source.slice(source.indexOf('    paintHorizonReflection(reflectionCanvas,t'),source.indexOf('    const water=new Set',source.indexOf('    paintHorizonReflection(reflectionCanvas,t')));
+ assert.match(lake,/paintWaterSurface\(t\)/,'local animated crests paint over the anchored mirror');
+ assert.match(source,/wave\.lift/,'moving crests also rise and fall');
+ assert.match(source,/wave\.curl/,'visible water strokes bend rather than form pixel bands');
+});
+
 test('RISK landscape water: the full-size mirror overdraws the clipped horizon by one device pixel',()=>{
  const runtime=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
  const painter=runtime.slice(runtime.indexOf('  function paintHorizonReflection('),runtime.indexOf('  const point=',runtime.indexOf('  function paintHorizonReflection(')));
@@ -9621,14 +9668,15 @@ test('RISK landscape trains: track deck, supports, and overhead electrical stay 
  assert.ok(start>=0&&end>start,'the distant rail pass is isolated from the hills and trees');
  const railPass=runtime.slice(start,end);
  const render=night=>{
-  const strokes=[],lines=[],stack=[];
+  const strokes=[],lines=[],shadows=[],stack=[];
   const b={globalAlpha:1,pathY:null,save(){stack.push(this.globalAlpha);},restore(){this.globalAlpha=stack.pop();},stroke(){strokes.push({y:this.pathY,alpha:this.globalAlpha});}};
-  vm.runInNewContext(railPass,{b,night,W:390,rail:()=>430,path(ctx,fn){ctx.pathY=fn(0);},line(ctx,x,y,x2,y2){lines.push({x,y,x2,y2,alpha:ctx.globalAlpha});},paintGroundShadow(){},geometry:{castShadow:()=>({alpha:.1,dx:0,dy:0})},sky:{},p:{city:'#456',far:'#789'},S:{mixHex:()=> '#aaa'}});
+  vm.runInNewContext(railPass,{b,night,W:390,rail:()=>430,path(ctx,fn){ctx.pathY=fn(0);},line(ctx,x,y,x2,y2){lines.push({x,y,x2,y2,alpha:ctx.globalAlpha});},paintGroundShadow(){},paintRailShadow(_ctx,track){shadows.push(track(0));},sky:{},p:{city:'#456',far:'#789'},S:{mixHex:()=> '#aaa'}});
   assert.equal(b.globalAlpha,1,'rail opacity cannot dim later terrain and foreground trees');
-  return {strokes,lines};
+  return {strokes,lines,shadows};
  };
  const day=render(0),dusk=render(.5),night=render(1);
  for(const sample of [day,dusk,night]){
+  assert.deepEqual(sample.shadows,[430],'the railway deck keeps its directional shade beneath it');
   assert.equal(sample.strokes.length,3,'the rail deck, edge, and overhead wire all render');
   for(const y of [430,426,417])assert.equal(sample.strokes.find(stroke=>stroke.y===y)?.alpha,1,
    'all three rail lines stay visible at the same opacity');
@@ -9657,6 +9705,13 @@ test('RISK landscape shadows: the current changelog describes reflections, celes
  assert.match(entry,/Floating boats and water wildlife now reflect their complete visible shapes at natural height/);
  assert.match(entry,/Railway and ground shadows follow the Sun or Moon/);
  assert.match(entry,/Far, middle, and foreground grass now share depth-scaled detail and density/);
+});
+
+test('RISK landscape light and water: the current changelog names per-object projection and livelier waves',()=>{
+ const current=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)?.[1]||'';
+ assert.match(current,/September 28, 2026/);
+ assert.match(current,/Sun and Moon.*visible origin.*shadow/);
+ assert.match(current,/Water surface ripples move more clearly/);
 });
 
 test('RISK landscape water: full-frame animation reuses its reflection buffers',()=>{
@@ -10202,7 +10257,8 @@ test('Animation boundaries: fish emerge and submerge smoothly in either directio
 test('Animation layering: all water visitors draw back to front regardless of arrival order',()=>{
  const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
  const anchor=source.indexOf('    const reflection=');
- const begin=source.indexOf('    }g.restore();',anchor)+'    }g.restore();'.length;
+ const begin=source.indexOf('    const water=new Set',anchor);
+ assert.ok(begin>anchor,'water visitors paint after the complete water surface');
  const code=source.slice(begin,source.indexOf("    composite('middle')",begin));
  const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
  for(const [w,h] of [[320,568],[844,390],[1440,900]]){

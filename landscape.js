@@ -101,17 +101,32 @@
     g.drawImage(source,0,0,W,geometry.waterTop);
     g.restore();
   }
-  const point=(az,alt)=>({x:az/360*W,y:hy-(Math.max(alt,-2)/90)*(hy-22)});
+  const point=(az,alt)=>geometry.skyPoint(az,alt);
   function path(ctx,fn,start=0,end=W,step=12){ctx.beginPath();ctx.moveTo(start,fn(start));for(let x=start+step;x<end;x+=step)ctx.lineTo(x,fn(x));ctx.lineTo(end,fn(end));}
   function hill(ctx,fn,color){path(ctx,fn);ctx.lineTo(W,H);ctx.lineTo(0,H);ctx.closePath();ctx.fillStyle=color;ctx.fill();}
   function ellipse(ctx,x,y,rx,ry,color){ctx.beginPath();ctx.ellipse(x,y,rx,ry,0,0,TAU);ctx.fillStyle=color;ctx.fill();}
   function line(ctx,x,y,x2,y2,color,width=1){ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x2,y2);ctx.strokeStyle=color;ctx.lineWidth=width;ctx.stroke();}
   function paintGroundShadow(ctx,x,y,height,width,ground=p.front,strength=1){
-    const shade=geometry.castShadow(sky,height,width);
+    const shade=geometry.castShadow(sky,height,width,x,y);
     ctx.save();ctx.globalAlpha*=shade.alpha*strength;
     ctx.beginPath();ctx.ellipse(x+shade.dx*.5,y+shade.dy*.5,shade.rx,shade.ry,
       Math.atan2(shade.dy,shade.dx),0,TAU);
     ctx.fillStyle=S.mixHex(ground,'#203d37',.68);ctx.fill();ctx.restore();
+  }
+  function paintRailShadow(ctx,track,height,width,ground,strength){
+    ctx.save();ctx.strokeStyle=S.mixHex(ground,'#203d37',.68);
+    ctx.lineWidth=width;ctx.lineCap='round';
+    // Each short span faces the same sky disc from its own place on the hill.
+    // A single canvas shadow offset incorrectly points every span one way.
+    for(let x=-8;x<W+8;x+=18){
+      const end=Math.min(W+8,x+18),startY=track(x),endY=track(end);
+      const a=geometry.castShadow(sky,height,width,x,startY);
+      const z=geometry.castShadow(sky,height,width,end,endY);
+      ctx.globalAlpha=a.alpha*strength;
+      ctx.beginPath();ctx.moveTo(x+a.dx*.4,startY+a.dy*.4+1);
+      ctx.lineTo(end+z.dx*.4,endY+z.dy*.4+1);ctx.stroke();
+    }
+    ctx.restore();
   }
   function paintGrass(kind,ground){
     if(sceneSeason==='winter')return;
@@ -236,10 +251,8 @@
       paintGroundShadow(b,x,rail(x)+55,55,5,p.far,.55);
       line(b,x,rail(x)+3,x,rail(x)+55,S.mixHex(p.city,p.far,.4),5);
     }
-    const railShade=geometry.castShadow(sky,16,8);
-    b.save();b.shadowColor=`rgba(22,46,41,${railShade.alpha*.6})`;
-    b.shadowOffsetX=railShade.dx*.45;b.shadowOffsetY=railShade.dy*.45+1;b.shadowBlur=2;
-    path(b,rail);b.strokeStyle=S.mixHex(p.city,'#d6d6bb',.45);b.lineWidth=8;b.stroke();b.restore();
+    paintRailShadow(b,rail,16,8,p.far,.6);
+    path(b,rail);b.strokeStyle=S.mixHex(p.city,'#d6d6bb',.45);b.lineWidth=8;b.stroke();
     path(b,x=>rail(x)-4);b.strokeStyle=S.mixHex(p.city,'#334d4a',.3);b.lineWidth=1.2;b.stroke();
     // The metro is drawn at 72% scale; its roof is about nine pixels above
     // the rail. Keep the wire and crossarms close to that roof, not at the
@@ -286,10 +299,8 @@
     hill(b,near,p.front);
     paintGrass('near',p.front);
     // A lower rail line is distinct from the elevated metro.
-    const lowerRailShade=geometry.castShadow(sky,8,6);
-    b.save();b.shadowColor=`rgba(22,46,41,${lowerRailShade.alpha*.5})`;
-    b.shadowOffsetX=lowerRailShade.dx*.35;b.shadowOffsetY=lowerRailShade.dy*.35+1;b.shadowBlur=1.5;
-    path(b,x=>near(x)+H*.07);b.strokeStyle=S.mixHex(p.front,'#b6b89c',.25);b.lineWidth=6;b.stroke();b.restore();
+    paintRailShadow(b,x=>near(x)+H*.07,8,6,p.front,.5);
+    path(b,x=>near(x)+H*.07);b.strokeStyle=S.mixHex(p.front,'#b6b89c',.25);b.lineWidth=6;b.stroke();
     path(b,x=>near(x)+H*.07);b.strokeStyle=S.mixHex(p.front,'#c2c6aa',.38);b.lineWidth=1;b.stroke();
     layer("trees-ground",Math.max(0,hy+H*.35-85));
     const planted=[];
@@ -392,6 +403,24 @@
     }
     g.restore();
   }
+  function paintWaterSurface(t){
+    const crest=S.mixHex(p.sky[1],'#fffdf2',.62),trough=S.mixHex(p.sky[0],p.city,.45);
+    g.save();g.lineWidth=.8;
+    // Independent curved crests put motion on the water itself. The complete
+    // reflection underneath stays sharp and anchored at the horizon.
+    for(let i=0;i<64;i++){
+      const wave=geometry.ripple(i+30,t,wind),x=rand(i+403)*W+wave.drift;
+      const y=geometry.waterTop+rand(i+402)*H*.09+wave.lift;
+      const half=(8+rand(i+480)*22)*wave.width*.5;
+      g.globalAlpha=.18+.20*wave.alpha;g.strokeStyle=crest;
+      g.beginPath();g.moveTo(x-half,y);
+      g.quadraticCurveTo(x,y-wave.curl,x+half,y+wave.curl*.2);g.stroke();
+      g.globalAlpha=.07+.08*wave.alpha;g.strokeStyle=trough;
+      g.beginPath();g.moveTo(x-half*.8,y+2);
+      g.quadraticCurveTo(x,y+2+wave.curl*.35,x+half*.8,y+2);g.stroke();
+    }
+    g.restore();
+  }
   function paintLife(t){
     visibleBanners=[];
     g.clearRect(0,0,W,H);
@@ -481,15 +510,12 @@
     paintHorizonReflection(reflectionCanvas,t,1);
     const reflection=point(sky.sun.azimuth,0).x;
     if(geometry.sunReflection(sky.sun))for(let i=0;i<24;i++){
-      const wave=geometry.ripple(i,t,wind),y=geometry.waterTop+5+i*H*.0035,w=(5+i*1.9)*wave.width;
+      const wave=geometry.ripple(i,t,wind),y=geometry.waterTop+5+i*H*.0035+wave.lift,w=(5+i*1.9)*wave.width;
       const x=reflection+wave.drift;
       g.globalAlpha=.7*(1-i/28)*wave.alpha;
       line(g,x-w,y,x+w,y,'#fff6d7',1);
     }
-    for(let i=0;i<40;i++){
-      const wave=geometry.ripple(i+30,t,wind),x=rand(i+403)*W+wave.drift,y=geometry.waterTop+rand(i+402)*H*.09;
-      g.globalAlpha=wave.alpha*.20;line(g,x,y,x+(7+rand(i+480)*22)*wave.width,y,S.mixHex(p.sky[1],'#ffffff',.6),.8);
-    }g.restore();
+    paintWaterSurface(t);g.restore();
     const water=new Set(['jetski','sailboat','cruise','yacht','windsurfer','duck','fish','dolphin']);
     // Arrival order cannot decide which overlapping boat or animal is in front.
     for(const e of world.events.filter(e=>water.has(e.type)).sort((a,b)=>geometry.waterDepth(a,t)-geometry.waterDepth(b,t))){
