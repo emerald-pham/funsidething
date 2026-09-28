@@ -10131,7 +10131,7 @@ test('RISK landscape shadows: grounded objects share the dominant celestial ligh
  const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
  assert.match(source,/function paintGroundShadow\(/,'the scene has one shadow painter');
  assert.match(source,/paintGroundShadow\(b,x,rail\(x\)\+55/,'elevated railway supports cast on the far terrain');
- assert.match(source,/paintRailShadow\(b,rail,16,8/,'the railway deck uses the same time-of-day light');
+ assert.doesNotMatch(source,/paintRailShadow\(b,rail,16,8/,'the elevated deck does not paint a second continuous stripe');
  assert.ok((source.match(/paintGroundShadow\(b,t\.x,t\.y/g)||[]).length>=2,'middle and foreground trees use the shared source');
  assert.match(source,/if\(isTrain\)paintRailVehicleShadow\(g,xx,track\(xx\)/,'the lower train keeps its track-sized celestial shade');
  assert.match(source,/paintGroundEventShadow\(e,/,'other grounded visitors use the same source');
@@ -10182,10 +10182,33 @@ test('RISK landscape metro: electrified cars have no shadow while viaduct suppor
   assert.equal(shades.length,5,`${w}x${h}, night ${night}: the lower train keeps contact shade`);
  }
  assert.match(source,/paintGroundShadow\(b,x,rail\(x\)\+55,55,5,p\.far,\.55\)/,'elevated supports retain their ground shadow');
- assert.match(source,/paintRailShadow\(b,rail,16,8,p\.far,\.6\)/,'the viaduct deck retains its shadow');
+ assert.doesNotMatch(source,/paintRailShadow\(b,rail,16,8,p\.far,\.6\)/,'the elevated deck does not retain a continuous ground shadow');
  const current=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)?.[1] || '';
  assert.match(current,/Elevated electric metro cars no longer cast ground shadows; railway support shadows remain\./,'the current changelog explains the visible distinction');
  assert.doesNotMatch(current,/Rail vehicles now cast shallow shadows along their tracks/,'the old blanket rail-shadow claim is corrected');
+});
+
+test('RISK landscape viaduct: deck has no continuous shadow band while supports keep contact shade',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ const start=source.indexOf('    // Viaduct, stations and catenary');
+ const end=source.indexOf('    layer("middle"',start);
+ assert.ok(start>=0&&end>start,'the elevated railway is isolated from the lower train');
+ const railPass=source.slice(start,end);
+ for(const [W,H] of [[390,844],[568,320],[820,1180]]) for(const night of [0,1]) for(const reduced of [false,true]){
+  const supports=[],deck=[],continuous=[];
+  const b={globalAlpha:1,stroke(){deck.push(this.pathY);}};
+  const rail=x=>H*.48+x*.005;
+  vm.runInNewContext(railPass,{b,W,H,night,reduced,rail,
+   path(ctx,fn){ctx.pathY=fn(0);},line(){},paintGroundShadow(_ctx,x,y){supports.push({x,y});},
+   paintRailShadow(){continuous.push(1);},p:{city:'#456',far:'#789'},S:{mixHex:()=> '#aaa'}});
+  assert.equal(continuous.length,0,`${W}x${H}, night ${night}, reduced ${reduced}: no full-width deck shadow`);
+  assert.ok(supports.length>=5&&supports.every(({x,y})=>Math.abs(y-(rail(x)+55))<.001),
+   `${W}x${H}, night ${night}, reduced ${reduced}: each support keeps its own ground shadow`);
+  assert.equal(deck.length,3,`${W}x${H}: physical deck, edge, and overhead wire remain`);
+ }
+ const current=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)?.[1]||'';
+ assert.match(current,/Elevated railway keeps its visible track and individual support shadows, without a second continuous shadow band\./,
+  'the current changelog explains which elevated railway marks remain');
 });
 
 test('RISK landscape water: floating silhouettes and mirrors overlap at their contact row',()=>{
@@ -10453,15 +10476,16 @@ test('RISK landscape trains: track deck, supports, and overhead electrical stay 
  assert.ok(start>=0&&end>start,'the distant rail pass is isolated from the hills and trees');
  const railPass=runtime.slice(start,end);
  const render=night=>{
-  const strokes=[],lines=[],shadows=[],stack=[];
+  const strokes=[],lines=[],shadows=[],supports=[],stack=[];
   const b={globalAlpha:1,pathY:null,save(){stack.push(this.globalAlpha);},restore(){this.globalAlpha=stack.pop();},stroke(){strokes.push({y:this.pathY,alpha:this.globalAlpha});}};
-  vm.runInNewContext(railPass,{b,night,W:390,rail:()=>430,path(ctx,fn){ctx.pathY=fn(0);},line(ctx,x,y,x2,y2){lines.push({x,y,x2,y2,alpha:ctx.globalAlpha});},paintGroundShadow(){},paintRailShadow(_ctx,track){shadows.push(track(0));},sky:{},p:{city:'#456',far:'#789'},S:{mixHex:()=> '#aaa'}});
+  vm.runInNewContext(railPass,{b,night,W:390,rail:()=>430,path(ctx,fn){ctx.pathY=fn(0);},line(ctx,x,y,x2,y2){lines.push({x,y,x2,y2,alpha:ctx.globalAlpha});},paintGroundShadow(_ctx,x,y){supports.push({x,y});},paintRailShadow(_ctx,track){shadows.push(track(0));},sky:{},p:{city:'#456',far:'#789'},S:{mixHex:()=> '#aaa'}});
   assert.equal(b.globalAlpha,1,'rail opacity cannot dim later terrain and foreground trees');
-  return {strokes,lines,shadows};
+  return {strokes,lines,shadows,supports};
  };
  const day=render(0),dusk=render(.5),night=render(1);
  for(const sample of [day,dusk,night]){
-  assert.deepEqual(sample.shadows,[430],'the railway deck keeps its directional shade beneath it');
+  assert.deepEqual(sample.shadows,[],'the elevated track has no continuous ground-shadow band');
+  assert.ok(sample.supports.length>=5&&sample.supports.every(support=>support.y===485),'individual viaduct supports keep their ground shadows');
   assert.equal(sample.strokes.length,3,'the rail deck, edge, and overhead wire all render');
   for(const y of [430,426,417])assert.equal(sample.strokes.find(stroke=>stroke.y===y)?.alpha,1,
    'all three rail lines stay visible at the same opacity');
