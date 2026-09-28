@@ -4,22 +4,40 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { createHash } from 'node:crypto';
 
-const appFiles=new Set([
-  'index.html','sw.js','manifest.webmanifest','icon.svg','location.js','stars.js',
-  'landscape.css','landscape.js','landscape-core.js','landscape-config.js',
-  'landscape-geometry.js','landscape-mood.js','landscape-appearance.js',
-  'landscape-riders.js','landscape-seasonal.js','landscape-skywriter.js','landscape-winter.js',
+const runtimeFilePattern=/\.(?:html|js|mjs|cjs|jsx|ts|tsx|css|scss|webmanifest|svg|png|jpe?g|webp|avif)$/i;
+const nonAppDirectories=new Set(['.git','.github','.claude','audits','node_modules','scripts']);
+const processFiles=new Set([
+  'scripts/test-first-gate.mjs',
+  '.claude/hooks/test-first-guard.sh',
 ]);
-const riskFiles=new Set(['index.html','sw.js','location.js','landscape-core.js','landscape-geometry.js','landscape-mood.js']);
-const isAppFile=file=>appFiles.has(file)||/^icon-.*\.png$/.test(file);
+const isProcessFile=file=>processFiles.has(file)||/^\.github\/workflows\/[^/]+\.ya?ml$/.test(file);
+const isAppFile=file=>{
+  if(file==='tests.js')return false;
+  if(file==='firestore.rules')return true;
+  if(file.split('/').some(segment=>nonAppDirectories.has(segment)))return false;
+  return runtimeFilePattern.test(file);
+};
+// Browser code and the offline/security shell all carry state, eligibility,
+// layout, timing, or paint behavior. New runtime modules inherit the RISK bar
+// automatically instead of waiting for a hand-maintained filename list.
+const isHighRiskAppFile=file=>file==='firestore.rules'||isAppFile(file)&&/\.(?:html|js|mjs|cjs|jsx|ts|tsx|webmanifest)$/i.test(file);
+const hasAddedRiskTest=lines=>lines.some(line=>/^\+\s*test\s*\(\s*['"]RISK\b/.test(line));
+const hasAddedProcessRiskTest=lines=>lines.some(line=>/^\+\s*test\s*\(\s*['"]RISK (?:test-first gate|regression gate|test inventory|repository process)\b/.test(line));
 
 export function validateTestFirst(changedFiles,addedTestLines){
   const edited=changedFiles.filter(isAppFile);
-  if(!edited.length)return [];
+  const enforcementEdits=changedFiles.filter(isProcessFile);
+  if(!edited.length&&!enforcementEdits.length)return [];
   const errors=[];
-  if(!changedFiles.includes('tests.js')) errors.push(`App files changed (${edited.join(', ')}) without tests.js in the diff.`);
-  if(edited.some(file=>riskFiles.has(file)) && !addedTestLines.some(line=>/^\+\s*test\s*\(\s*['"]RISK\b/.test(line)))
-    errors.push(`A high-risk app file changed (${edited.filter(file=>riskFiles.has(file)).join(', ')}) without a new RISK test in tests.js.`);
+  if(!changedFiles.includes('tests.js')){
+    if(edited.length)errors.push(`App files changed (${edited.join(', ')}) without tests.js in the diff.`);
+    if(enforcementEdits.length)errors.push(`Test-first enforcement changed (${enforcementEdits.join(', ')}) without tests.js process coverage in the diff.`);
+  }
+  const highRisk=[...edited.filter(isHighRiskAppFile),...enforcementEdits];
+  if(highRisk.length&&!hasAddedRiskTest(addedTestLines))
+    errors.push(`A high-risk app or enforcement file changed (${highRisk.join(', ')}) without a new RISK test in tests.js.`);
+  if(enforcementEdits.length&&!hasAddedProcessRiskTest(addedTestLines))
+    errors.push(`Test-first enforcement changed (${enforcementEdits.join(', ')}) without a new RISK process test in tests.js.`);
   return errors;
 }
 
@@ -66,7 +84,7 @@ if(process.argv[1] && path.resolve(process.argv[1])===fileURLToPath(import.meta.
   if(!base || !/^[0-9a-f]{40}$/.test(base)){
     process.stderr.write('Pass the 40-character base commit SHA.\n');process.exitCode=2;
   }else if(/^0+$/.test(base)){
-    process.stdout.write('Initial branch push: no previous commit to compare.\n');
+    process.stderr.write('A zero base SHA has no commit to compare. Resolve the base against the default branch before running the gate.\n');process.exitCode=2;
   }else{
     try{
       const diff=(...args)=>execFileSync('git',['diff',...args,`${base}...HEAD`],{encoding:'utf8'});

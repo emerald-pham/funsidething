@@ -24,8 +24,12 @@ broken, not finished — strengthen it until it discriminates, then continue.
 Before editing any scanner, landscape, location, or offline-shell behavior,
 write a discriminating test in `tests.js`, run it, and keep the red output for
 the release record. The edit guard covers every app module. The CI diff gate
-also rejects app changes without changed tests; state, eligibility, sync,
-astronomy, and shell changes require a new `RISK` test in the same diff.
+also rejects app changes without changed tests. Browser/runtime JavaScript,
+HTML, the web manifest, Firestore rules, and the test-first gate, hook, or
+workflow require a new `RISK` test in the same diff. Runtime paths are matched
+by file type, so a newly added module cannot avoid the gate by using a new
+filename. CSS and static image edits still need a direct test in the same diff;
+they use a `RISK` case when the failure cost warrants one.
 
 Choose cases by failure cost. For persisted task rules, include old saved data,
 undo, import or restore, deletion, and cross-device reconciliation when those
@@ -38,8 +42,23 @@ the rendered result when pixels or controls changed. Record test, browser,
 offline, CI, and live results separately.
 
 A `PreToolUse` hook (`.claude/hooks/test-first-guard.sh`) enforces the ordering: an edit
-to an app or PWA shell file is refused while `tests.js` has no uncommitted changes.
+to an app, PWA shell, or enforcement file is refused while `tests.js` has no uncommitted changes.
 Treat the block as correct and go write the test — do not work around it.
+
+`RISK_TEST_COVERAGE.md` maps the current high-cost feature contracts to their
+named tests. Add or rename its entry whenever a `RISK` test is added, removed,
+or renamed; a test in `tests.js` checks that the map stays complete. Changes to
+the diff gate, edit hook, or CI workflow also need a new process-focused
+`RISK` test, named under the test-first gate, regression gate, test inventory,
+or repository process boundary. An unrelated feature risk test cannot satisfy
+that process requirement.
+
+The hook and CI gate enforce structural requirements: tests appear in the app
+diff, a new risk case is named, and test changes carry a rationale with red
+command/failure evidence. They cannot independently prove that the command ran
+before implementation or that the recorded failure was observed. Keep the real
+red output with task or release evidence, then run the focused test and the full
+suite after the fix. Treat the rationale as a review aid, not proof of chronology.
 
 Exceptions, and only these: config, dependency manifests, pure documentation
 (`README.md`, `SETUP.md`), and deleting code. Everything else — bug fixes, "trivial"

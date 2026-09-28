@@ -5,6 +5,7 @@ import vm from "node:vm";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { spawnSync } from "node:child_process";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const HTML_PATH = path.join(__dirname, "index.html");
@@ -7129,7 +7130,16 @@ test('RISK CLOUD BACKUP: an exact stable recovery copy satisfies adoption when d
   await ctx.cloudPull();
   assert.equal(ctx.state.tasks[0].title,'Cloud');
   assert.equal(storage.getItem(LOCAL_BACKUPS_KEY),original,'the existing stable snapshot remains untouched');
+  const reused=ctx.readLocalBackups().find(row=>row.kind==='daily' && row.payload.includes('Local'));
+  assert.ok(ctx.state.protectedBackupIds.includes(reused.id),'an unmarked legacy board treats its reused recovery row as protected');
+  assert.ok(!Object.hasOwn(JSON.parse(ctx.cloudPayload()),'protectedBackupIds'),'device recovery IDs do not sync to another account');
   assert.equal(h.calls.includes('push'),false);
+  storage.setItem=write;
+  const {ctx:later}=await loadApp({sharedStorage:storage});
+  setFakeTime(later,Date.now()+8*24*HOUR);
+  assert.equal(later.saveLocalBackup('daily',JSON.stringify(later.state)),true);
+  assert.ok(later.readLocalBackups().some(row=>row.id===reused.id),
+    'the reused legacy recovery copy remains visible and cannot expire during later rotation');
 });
 
 test('RISK CLOUD BACKUP: an unreadable backup row is never discarded to make room', async () => {
@@ -7213,6 +7223,8 @@ test('RISK CLOUD ADOPTION: a later edit during union push cannot borrow the save
   assert.deepEqual(new Set(h.remoteState().tasks.map(t=>t.id)),new Set(['local','remote']));
   assert.equal(h.remoteState().tasks.some(t=>t.title==='Later unbacked edit'),false);
   assert.ok(ctx.state.tasks.some(t=>t.title==='Later unbacked edit'),'the unsaved draft remains visible in this tab');
+  assert.equal(ctx.state.syncDirty,true,'the earlier acknowledgement cannot mark a later unsynced edit clean');
+  assert.ok(!Object.hasOwn(JSON.parse(ctx.cloudPayload()),'syncDirty'),'device sync provenance stays off the shared board');
   const reload=await loadApp({sharedStorage:storage,cloudSyncFactory:h.factory});
   await reload.ctx.cloudPull();
   assert.equal(reload.ctx.reconciled(),true,'the saved union can align to its cloud acknowledgement on reload');
@@ -7654,6 +7666,423 @@ test('LOCAL BACKUPS: repeated switches with the same board do not duplicate a re
   assert.equal(ctx.readLocalBackups().filter(row=>row.kind==='before-account-switch').length,1);
 });
 
+test('RISK LOCAL BACKUPS: quota retires the oldest automatic copy while keeping recent, manual, and account recovery',async()=>{
+ const storage=sharedScannerStorage(),{ctx}=await loadApp({sharedStorage:storage});
+ const at=Date.now(),day=ctx.backupDay(at),base=JSON.stringify(ctx.state);
+ ctx.addTask('Recent recovery');const recent=JSON.stringify(ctx.state);
+ ctx.addTask('Incoming board');const incoming=JSON.stringify(ctx.state);
+ const row=(id,age,kind,payload)=>({id,day,at:at-age,kind,payload});
+ const rows=[row('old-auto',4000,'before-restore',base),row('recent-auto',3000,'before-cloud-adoption',recent),
+  row('manual-keep',2000,'manual',base),row('switch-keep',1000,'before-account-switch',base)];
+ storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify(rows));
+ const write=storage.setItem;
+ storage.setItem=(key,value)=>{
+  if(key===LOCAL_BACKUPS_KEY && JSON.parse(value).some(entry=>entry.id==='old-auto')){
+   const error=Error('browser quota');error.name='QuotaExceededError';throw error;
+  }
+  write(key,value);
+ };
+ assert.equal(ctx.saveLocalBackup('daily',incoming),true,'a full index retries after retiring the oldest automatic copy');
+ const saved=JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY));
+ assert.ok(!saved.some(entry=>entry.id==='old-auto'));
+ for(const id of ['recent-auto','manual-keep','switch-keep'])assert.ok(saved.some(entry=>entry.id===id),`${id} remains available`);
+ assert.ok(saved.some(entry=>entry.kind==='daily'&&entry.payload===incoming),'the incoming board has a stable recovery copy');
+});
+
+test('RISK LOCAL BACKUPS: automatic history has a byte budget before browser quota',async()=>{
+ const storage=sharedScannerStorage(),{ctx}=await loadApp({sharedStorage:storage});
+ const at=Date.now(),day=ctx.backupDay(at);
+ const large=JSON.stringify({...ctx.state,tasks:[syncTask('large','x'.repeat(140000))]});
+ const rows=Array.from({length:9},(_,i)=>({id:'auto-'+i,day,at:at-9000+i*1000,
+  kind:i%2?'before-cloud-adoption':'before-restore',payload:large}));
+ const manual={id:'manual-keep',day,at:at-500,kind:'manual',payload:large};
+ storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify([...rows,manual]));
+ assert.equal(ctx.saveLocalBackup('daily',large),true);
+ const saved=JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY));
+ const automatic=saved.filter(row=>['daily','latest','before-restore','before-cloud-adoption'].includes(row.kind));
+ assert.ok(automatic.reduce((size,row)=>size+JSON.stringify(row).length,0)<=1000000,
+  'automatic full-board history stays within a bounded local-storage budget');
+ assert.ok(saved.some(row=>row.id==='auto-8'),'the newest historical recovery point survives rotation');
+ assert.ok(saved.some(row=>row.id==='manual-keep'),'manual recovery is never retired by the automatic budget');
+});
+
+test('RISK LOCAL BACKUPS: a single stable new copy fits when its duplicate latest does not',async()=>{
+ const storage=sharedScannerStorage(),{ctx}=await loadApp({sharedStorage:storage});
+ storage.setItem(LOCAL_BACKUPS_KEY,'[]');
+ const board=JSON.stringify(ctx.state),write=storage.setItem;
+ storage.setItem=(key,value)=>{
+  if(key===LOCAL_BACKUPS_KEY && JSON.parse(value).length>1){
+   const error=Error('browser quota');error.name='QuotaExceededError';throw error;
+  }
+  write(key,value);
+ };
+ assert.equal(ctx.saveLocalBackup('daily',board),true,'the latest duplicate can retire before the new stable daily copy');
+ const saved=JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY));
+ assert.equal(saved.length,1);
+ assert.equal(saved[0].kind,'daily');assert.equal(saved[0].payload,board);
+});
+
+test('RISK LOCAL BACKUPS: the non-actionable backup-full warning is absent from save UI',()=>{
+ assert.doesNotMatch(html,/Could not save: local backup storage is full/);
+ assert.match(html,/Could not save your changes on this device/,
+  'a genuinely failed primary save still reports unsaved work');
+});
+
+test('RISK LOCAL BACKUPS: Settings explains automatic early retirement while preserving chosen copies',async()=>{
+ const {ctx,shim}=await loadApp();ctx.openSettings();
+ const markup=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(markup,/older automatic copies may retire sooner/);
+ assert.match(markup,/Manual, displaced local edits, stale-tab drafts, other-browser copies, and unsynced account-switch copies stay until you delete them/);
+});
+
+test('RISK LOCAL BACKUPS: exhausted quota leaves the original index and unsaved board untouched',async()=>{
+ const storage=sharedScannerStorage(),{ctx}=await loadApp({sharedStorage:storage});
+ const at=Date.now(),day=ctx.backupDay(at),prior=JSON.stringify(ctx.state);
+ const row=(id,kind)=>({id,day,at,kind,payload:prior});
+ const original=JSON.stringify([row('manual-keep','manual'),row('switch-keep','before-account-switch')]);
+ storage.setItem(LOCAL_BACKUPS_KEY,original);
+ const boardBefore=storage.getItem(SYNC_STORE_KEY),headBefore=storage.getItem(LOCAL_HEAD_KEY);
+ const write=storage.setItem;
+ storage.setItem=(key,value)=>{
+  if(key===LOCAL_BACKUPS_KEY){const error=Error('browser quota');error.name='QuotaExceededError';throw error;}
+  write(key,value);
+ };
+ ctx.addTask('Unsaved after quota');
+ assert.equal(await ctx.persist(),false);
+ assert.equal(storage.getItem(LOCAL_BACKUPS_KEY),original,'failed retries cannot drop protected recovery rows');
+ assert.equal(storage.getItem(SYNC_STORE_KEY),boardBefore);
+ assert.equal(storage.getItem(LOCAL_HEAD_KEY),headBefore);
+});
+
+test('RISK LOCAL BACKUPS: parseable but unrestorable history cannot be retired for quota',async()=>{
+ const storage=sharedScannerStorage(),{ctx}=await loadApp({sharedStorage:storage});
+ const invalid=JSON.stringify({tasks:[{id:'__proto__',title:'Unreadable',createdAt:1}]});
+ assert.equal(ctx.validSavedPayload(invalid),false,'the row is not a valid restore point');
+ const at=Date.now(),row={id:'unrestorable',day:ctx.backupDay(at),at:at-1000,kind:'before-restore',payload:invalid};
+ const raw=JSON.stringify([row]);storage.setItem(LOCAL_BACKUPS_KEY,raw);
+ assert.equal(ctx.saveLocalBackup('daily',JSON.stringify(ctx.state)),false);
+ assert.equal(storage.getItem(LOCAL_BACKUPS_KEY),raw,'the original unreadable source remains byte-for-byte available');
+});
+
+test('RISK LOCAL BACKUPS: an unreadable index explains the paused save without claiming quota',async()=>{
+ const storage=sharedScannerStorage({[LOCAL_BACKUPS_KEY]:'damaged backup bytes'});
+ const {ctx}=await loadApp({sharedStorage:storage});
+ ctx.addTask('Still in memory');
+ assert.equal(await ctx.persist(),false);
+ assert.match(ctx.document.getElementById('toast').textContent,/unreadable backup/i);
+ assert.doesNotMatch(ctx.document.getElementById('toast').textContent,/storage is full/i);
+});
+
+test('RISK CLOUD BACKUP: quota retirement keeps the exact prior board needed for adoption',async()=>{
+ const local=syncState({tasks:[syncTask('local','Local')],syncRev:2});
+ const remote=syncState({tasks:[syncTask('remote','Remote')]});
+ const h=makeSyncHarness({remote,rev:3});
+ const storage=sharedScannerStorage({[SYNC_STORE_KEY]:JSON.stringify(local)});
+ const {ctx}=await loadApp({sharedStorage:storage,cloudSyncFactory:h.factory});
+ ctx.state.tasks.push(syncTask('unsaved','Unsaved before adoption'));
+ const priorBoard=JSON.stringify(ctx.state),at=Date.now(),day=ctx.backupDay(at);
+ const old={id:'old-auto',day,at:at-5000,kind:'before-restore',payload:JSON.stringify(local)};
+ storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify([old]));
+ const write=storage.setItem;
+ storage.setItem=(key,value)=>{
+  if(key===LOCAL_BACKUPS_KEY && JSON.parse(value).some(entry=>entry.id==='old-auto')){
+   const error=Error('browser quota');error.name='QuotaExceededError';throw error;
+  }
+  write(key,value);
+ };
+ await ctx.cloudPull();await syncSettle(30);
+ assert.equal(ctx.reconciled(),true,'the reconciled board is accepted after a safe backup fits');
+ const saved=JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY));
+ assert.ok(saved.some(entry=>entry.kind==='before-cloud-local-edit'&&entry.payload===priorBoard),'the exact prior board survives retirement and remains restorable');
+ assert.ok(!saved.some(entry=>entry.id==='old-auto'));
+ assert.deepEqual(new Set(Array.from(ctx.state.tasks,task=>task.id)),new Set(['local','unsaved','remote']));
+});
+
+test('RISK CLOUD BACKUP: an overwritten local edit survives later quota rotation',async()=>{
+ const storage=sharedScannerStorage();
+ const {ctx,shim}=await loadApp({sharedStorage:storage});
+ ctx.addTask('Base title');await ctx.persist();
+ const h=makeSyncHarness({remote:JSON.parse(ctx.cloudPayload()),rev:4});
+ shim.window.CloudSync=h.factory();await ctx.cloudPull();
+ ctx.state.tasks[0].title='My offline edit';ctx.save();
+ const newer=JSON.parse(h.doc.payload);newer.tasks[0].title='Other device edit';h.writeBehindBack(newer);
+ await ctx.cloudPull();
+ const conflict=ctx.readLocalBackups().find(row=>row.payload.includes('My offline edit'));
+ assert.ok(conflict,'the overwritten edit has a recovery copy');
+ const {ctx:reopened}=await loadApp({sharedStorage:storage});
+ const at=Date.now(),ordinary={id:'newer-ordinary',day:reopened.backupDay(at),at:at+1,
+  kind:'before-restore',payload:JSON.stringify(reopened.state)};
+ storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify([conflict,ordinary]));
+ const write=storage.setItem;
+ storage.setItem=(key,value)=>{
+  if(key===LOCAL_BACKUPS_KEY && JSON.parse(value).length>2){
+   const error=Error('browser quota');error.name='QuotaExceededError';throw error;
+  }
+  write(key,value);
+ };
+ assert.equal(reopened.saveLocalBackup('daily',JSON.stringify(reopened.state)),true);
+ const saved=reopened.readLocalBackups();
+ assert.ok(saved.some(row=>row.id===conflict.id),'the overwritten edit remains restorable after a later ordinary save');
+ assert.ok(!saved.some(row=>row.id===ordinary.id),'ordinary history retires first');
+});
+
+test('RISK CLOUD BACKUP: an offline edit reopened before conflict remains protected',async()=>{
+ const storage=sharedScannerStorage();
+ const {ctx,shim}=await loadApp({sharedStorage:storage});
+ ctx.addTask('Base title');await ctx.persist();
+ const h=makeSyncHarness({remote:JSON.parse(ctx.cloudPayload()),rev:4});
+ shim.window.CloudSync=h.factory();await ctx.cloudPull();
+ shim.window.CloudSync.ready=false;
+ ctx.state.tasks[0].title='Saved offline edit';ctx.save();await ctx.persist();
+ assert.equal(JSON.parse(storage.getItem(SYNC_STORE_KEY)).syncDirty,true,'offline edit provenance survives closing the tab');
+ const remote=JSON.parse(h.doc.payload);remote.tasks[0].title='Other device edit';h.writeBehindBack(remote);
+ const {ctx:reopened}=await loadApp({sharedStorage:storage,cloudSyncFactory:h.factory});
+ await reopened.cloudPull();
+ assert.equal(reopened.state.tasks[0].title,'Other device edit');
+ assert.equal(reopened.state.syncDirty,false,'the safely adopted remote board is known clean until edited');
+ const conflict=reopened.readLocalBackups().find(row=>row.kind==='before-cloud-local-edit'&&row.payload.includes('Saved offline edit'));
+ assert.ok(conflict,'the persisted offline edit needs durable recovery after cold open');
+ const {ctx:later}=await loadApp({sharedStorage:storage});
+ const at=Date.now(),ordinary={id:'later-ordinary',day:later.backupDay(at),at:at+1,
+  kind:'before-restore',payload:JSON.stringify(later.state)};
+ storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify([conflict,ordinary]));
+ const write=storage.setItem;
+ storage.setItem=(key,value)=>{
+  if(key===LOCAL_BACKUPS_KEY && JSON.parse(value).length>2){
+   const error=Error('browser quota');error.name='QuotaExceededError';throw error;
+  }
+  write(key,value);
+ };
+ assert.equal(later.saveLocalBackup('daily',JSON.stringify(later.state)),true);
+ assert.ok(later.readLocalBackups().some(row=>row.id===conflict.id),'later rotation must preserve the offline edit');
+ assert.ok(!later.readLocalBackups().some(row=>row.id===ordinary.id));
+});
+
+test('RISK LOCAL BACKUPS: cold older-tab repair keeps a pinned recovery copy',async()=>{
+ const at=Date.parse('2026-09-01T12:00:00Z');
+ const head=syncState({tasks:[syncTask('current','Current board')],protectedBackupIds:['pinned-conflict']});
+ const older=syncState({tasks:[syncTask('old','Older tab addition')]});
+ const pinned={id:'pinned-conflict',day:'2026-09-01',at,kind:'daily',payload:JSON.stringify(older)};
+ const ordinary={id:'ordinary-history',day:new Date().toISOString().slice(0,10),at:Date.now(),
+  kind:'before-restore',payload:JSON.stringify(head)};
+ const storage=sharedScannerStorage({[LOCAL_HEAD_KEY]:JSON.stringify(head),[SYNC_STORE_KEY]:JSON.stringify(older),
+  [LOCAL_BACKUPS_KEY]:JSON.stringify([pinned,ordinary])});
+ const write=storage.setItem;
+ storage.setItem=(key,value)=>{
+  if(key===LOCAL_BACKUPS_KEY && JSON.parse(value).length>2){
+   const error=Error('browser quota');error.name='QuotaExceededError';throw error;
+  }
+  write(key,value);
+ };
+ await loadApp({sharedStorage:storage});
+ const saved=JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY));
+ assert.ok(saved.some(row=>row.id===pinned.id),'pre-init older-tab repair cannot expire the pinned conflict recovery');
+ assert.ok(saved.some(row=>row.kind==='other-browser-copy'),'the divergent older-tab board is still captured');
+ assert.ok(!saved.some(row=>row.id===ordinary.id),'ordinary history retires when the cold repair reaches quota');
+});
+
+test('RISK LOCAL BACKUPS: stale-tab adoption carries pinned recovery IDs durably',async()=>{
+ const at=Date.parse('2026-09-01T12:00:00Z');
+ const lost=syncState({tasks:[syncTask('shared','Displaced offline edit')]});
+ const current=syncState({tasks:[syncTask('shared','Current title')],protectedBackupIds:['pinned-edit'],syncDirty:false});
+ const pinned={id:'pinned-edit',day:'2026-09-01',at,kind:'daily',payload:JSON.stringify(lost)};
+ const storage=sharedScannerStorage({[LOCAL_HEAD_KEY]:JSON.stringify(current),[SYNC_STORE_KEY]:JSON.stringify(current),
+  [LOCAL_BACKUPS_KEY]:JSON.stringify([pinned])});
+ const {ctx}=await loadApp({sharedStorage:storage});
+ const newer=syncState({tasks:[syncTask('shared','Other tab title')],syncDirty:false});
+ storage.setItem(LOCAL_HEAD_KEY,JSON.stringify(newer));storage.setItem(SYNC_STORE_KEY,JSON.stringify(newer));
+ ctx.refreshBrowserCopy();
+ assert.ok(ctx.state.protectedBackupIds?.includes(pinned.id),'the adopted board retains the displaced edit reference');
+ assert.ok(JSON.parse(storage.getItem(LOCAL_HEAD_KEY)).protectedBackupIds?.includes(pinned.id),
+  'the recovery reference survives another cold start');
+ const {ctx:reopened}=await loadApp({sharedStorage:storage});
+ setFakeTime(reopened,Date.now()+8*24*HOUR);
+ assert.equal(reopened.saveLocalBackup('daily',JSON.stringify(reopened.state)),true);
+ assert.ok(reopened.readLocalBackups().some(row=>row.id===pinned.id),'later expiry cannot drop the original edit');
+});
+
+test('RISK LOCAL BACKUPS: failed stale-tab marker write leaves both browser keys intact',async()=>{
+ const current=syncState({tasks:[syncTask('shared','Current board')],protectedBackupIds:['pinned-edit']});
+ const newer=syncState({tasks:[syncTask('shared','Other tab title')]});
+ const storage=sharedScannerStorage({[LOCAL_HEAD_KEY]:JSON.stringify(current),[SYNC_STORE_KEY]:JSON.stringify(current)});
+ const {ctx}=await loadApp({sharedStorage:storage});
+ const incoming=JSON.stringify(newer);
+ storage.setItem(LOCAL_HEAD_KEY,incoming);storage.setItem(SYNC_STORE_KEY,incoming);
+ const write=storage.setItem;
+ storage.setItem=(key,value)=>{
+  if(key===SYNC_STORE_KEY && value.includes('protectedBackupIds')){
+   const error=Error('browser quota');error.name='QuotaExceededError';throw error;
+  }
+  write(key,value);
+ };
+ assert.equal(ctx.refreshBrowserCopy(),false);
+ assert.equal(storage.getItem(LOCAL_HEAD_KEY),incoming,'rollback cannot overwrite the other tab head');
+ assert.equal(storage.getItem(SYNC_STORE_KEY),incoming,'the shared browser key remains the other tab version');
+ assert.ok(ctx.state.protectedBackupIds.includes('pinned-edit'),'this tab keeps its recovery reference while adoption is held');
+});
+
+test('RISK LOCAL BACKUPS: cold older-tab bytes carry their recovery IDs into the head',async()=>{
+ const at=Date.parse('2026-09-01T12:00:00Z');
+ const head=syncState({tasks:[syncTask('shared','Newer shell title')]});
+ const older=syncState({tasks:[syncTask('shared','Older shell title')],protectedBackupIds:['older-pin']});
+ const pinned={id:'older-pin',day:'2026-09-01',at,kind:'daily',payload:JSON.stringify(older)};
+ const storage=sharedScannerStorage({[LOCAL_HEAD_KEY]:JSON.stringify(head),[SYNC_STORE_KEY]:JSON.stringify(older),
+  [LOCAL_BACKUPS_KEY]:JSON.stringify([pinned])});
+ await loadApp({sharedStorage:storage});
+ assert.ok(JSON.parse(storage.getItem(LOCAL_HEAD_KEY)).protectedBackupIds?.includes(pinned.id),
+  'the valid older-tab board transfers its device recovery reference to the repaired head');
+ assert.ok(JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY)).some(row=>row.id===pinned.id));
+});
+
+test('RISK LOCAL BACKUPS: concurrent older-tab write survives the stale-tab repair tail',async()=>{
+ const original=syncState({tasks:[syncTask('shared','Original')]});
+ const newer=syncState({tasks:[syncTask('shared','New head')],syncAccount:'new-owner'});
+ const legacy=syncState({tasks:[syncTask('shared','Older shared key')],syncAccount:'old-owner'});
+ const concurrent=syncState({tasks:[syncTask('shared','Concurrent older-shell edit')],syncAccount:'old-owner'});
+ const storage=sharedScannerStorage({[LOCAL_HEAD_KEY]:JSON.stringify(original),[SYNC_STORE_KEY]:JSON.stringify(original)});
+ const {ctx,shim}=await loadApp({sharedStorage:storage});
+ storage.setItem(LOCAL_HEAD_KEY,JSON.stringify(newer));storage.setItem(SYNC_STORE_KEY,JSON.stringify(legacy));
+ const write=storage.setItem;let raced=false;
+ storage.setItem=(key,value)=>{
+  write(key,value);
+  if(key===LOCAL_BACKUPS_KEY && value.includes('stale-tab-draft') && !raced){
+   raced=true;write(SYNC_STORE_KEY,JSON.stringify(concurrent));
+  }
+ };
+ assert.equal(ctx.refreshBrowserCopy(),false);
+ assert.equal(raced,true);
+ assert.equal(storage.getItem(SYNC_STORE_KEY),JSON.stringify(concurrent),'repair cannot overwrite a newer older-shell edit');
+ assert.match(shim.document.getElementById('toast')?.textContent || '',/keep this tab open|try again/i);
+});
+
+test('RISK LOCAL BACKUPS: primary save holds when another tab commits during its backup',async()=>{
+ const original=syncState({tasks:[syncTask('shared','Original')]});
+ const concurrent=syncState({tasks:[syncTask('shared','Other tab edit')]});
+ const storage=sharedScannerStorage({[LOCAL_HEAD_KEY]:JSON.stringify(original),[SYNC_STORE_KEY]:JSON.stringify(original)});
+ const {ctx,shim}=await loadApp({sharedStorage:storage});
+ ctx.state.tasks[0].title='This tab edit';
+ const write=storage.setItem;let raced=false;
+ storage.setItem=(key,value)=>{
+  write(key,value);
+  if(key===LOCAL_BACKUPS_KEY && !raced){
+   raced=true;write(LOCAL_HEAD_KEY,JSON.stringify(concurrent));write(SYNC_STORE_KEY,JSON.stringify(concurrent));
+  }
+ };
+ assert.equal(await ctx.persist(),false);
+ assert.equal(raced,true);
+ assert.equal(storage.getItem(LOCAL_HEAD_KEY),JSON.stringify(concurrent));
+ assert.equal(storage.getItem(SYNC_STORE_KEY),JSON.stringify(concurrent));
+ assert.equal(ctx.state.tasks[0].title,'This tab edit','this tab retains its unsaved draft');
+ assert.match(shim.document.getElementById('toast')?.textContent || '',/keep this tab open|try again/i);
+});
+
+test('RISK LOCAL BACKUPS: a changed board before backup announces the unsaved draft',async()=>{
+ const original=syncState({tasks:[syncTask('shared','Original')]});
+ const concurrent=JSON.stringify(syncState({tasks:[syncTask('shared','Other tab edit')]}));
+ const storage=sharedScannerStorage({[LOCAL_HEAD_KEY]:JSON.stringify(original),[SYNC_STORE_KEY]:JSON.stringify(original)});
+ const {ctx,shim}=await loadApp({sharedStorage:storage});
+ ctx.state.tasks[0].title='Unsaved draft';
+ const read=storage.getItem;let heads=0;
+ storage.getItem=key=>{
+  const value=read(key);
+  if(key===LOCAL_HEAD_KEY && ++heads===2){storage.setItem(LOCAL_HEAD_KEY,concurrent);storage.setItem(SYNC_STORE_KEY,concurrent);}
+  return value;
+ };
+ assert.equal(await ctx.persist(),false);
+ assert.equal(storage.getItem(SYNC_STORE_KEY),concurrent);
+ assert.equal(ctx.state.tasks[0].title,'Unsaved draft');
+ assert.match(shim.document.getElementById('toast')?.textContent || '',/keep this tab open|try again/i);
+});
+
+test('RISK LOCAL BACKUPS: cold head initialization holds a concurrent shared-key edit',async()=>{
+ const original=JSON.stringify(syncState({tasks:[syncTask('shared','Original')]}));
+ const concurrent=JSON.stringify(syncState({tasks:[syncTask('shared','Concurrent edit')]}));
+ const storage=sharedScannerStorage({[SYNC_STORE_KEY]:original});
+ const {ctx}=await loadApp({sharedStorage:storage});
+ storage.removeItem(LOCAL_HEAD_KEY);storage.setItem(SYNC_STORE_KEY,original);
+ const read=storage.getItem;let raced=false;
+ storage.getItem=key=>{
+  const value=read(key);
+  if(key===LOCAL_HEAD_KEY && !raced){raced=true;storage.setItem(SYNC_STORE_KEY,concurrent);}
+  return value;
+ };
+ ctx.protectedBrowserPayload(original);
+ assert.equal(storage.getItem(LOCAL_HEAD_KEY),null,'stale cold initialization must not create a competing head');
+ assert.equal(storage.getItem(SYNC_STORE_KEY),concurrent);
+});
+
+test('RISK LOCAL BACKUPS: paired save holds an older-shell write between its two keys',async()=>{
+ const original=syncState({tasks:[syncTask('shared','Original')]});
+ const concurrent=JSON.stringify(syncState({tasks:[syncTask('shared','Older-shell edit')]}));
+ const storage=sharedScannerStorage({[LOCAL_HEAD_KEY]:JSON.stringify(original),[SYNC_STORE_KEY]:JSON.stringify(original)});
+ const {ctx}=await loadApp({sharedStorage:storage});
+ ctx.state.tasks[0].title='This tab edit';
+ const write=storage.setItem;let raced=false;
+ storage.setItem=(key,value)=>{
+  write(key,value);
+  if(key===LOCAL_HEAD_KEY && value.includes('This tab edit') && !raced){raced=true;write(SYNC_STORE_KEY,concurrent);}
+ };
+ assert.equal(await ctx.persist(),false);
+ assert.equal(raced,true);
+ assert.equal(storage.getItem(SYNC_STORE_KEY),concurrent);
+ assert.equal(storage.getItem(LOCAL_HEAD_KEY),JSON.stringify(original));
+});
+
+test('RISK LOCAL BACKUPS: concurrent manual copy survives an automatic index write',async()=>{
+ const storage=sharedScannerStorage();
+ const {ctx}=await loadApp({sharedStorage:storage});
+ const manual={id:'other-tab-manual',day:'2026-09-28',at:Date.now(),kind:'manual',payload:JSON.stringify(ctx.state)};
+ const read=storage.getItem;let raced=false;
+ storage.getItem=key=>{
+  const value=read(key);
+  if(key===LOCAL_HEAD_KEY && !raced){raced=true;storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify([manual]));}
+  return value;
+ };
+ assert.equal(ctx.saveLocalBackup('daily',JSON.stringify(ctx.state)),true);
+ assert.equal(raced,true);
+ assert.ok(JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY)).some(row=>row.id===manual.id));
+});
+
+test('RISK CLOUD BACKUP: an exact chosen copy avoids duplicate displaced-edit storage',async()=>{
+ const storage=sharedScannerStorage(),{ctx}=await loadApp({sharedStorage:storage});
+ ctx.addTask('My unsynced edit');
+ const payload=JSON.stringify(ctx.state),at=Date.now();
+ const manual={id:'chosen-copy',day:ctx.backupDay(at),at,kind:'manual',payload};
+ const original=JSON.stringify([manual]);storage.setItem(LOCAL_BACKUPS_KEY,original);
+ const write=storage.setItem;
+ storage.setItem=(key,value)=>{
+  if(key===LOCAL_BACKUPS_KEY && value!==original){
+   const error=Error('browser quota');error.name='QuotaExceededError';throw error;
+  }
+  write(key,value);
+ };
+ assert.equal(ctx.saveLocalBackup('before-cloud-local-edit',payload),true,
+  'the exact manual copy already preserves this displaced board');
+ assert.equal(storage.getItem(LOCAL_BACKUPS_KEY),original);
+});
+
+test('RISK LOCAL BACKUPS: aged stale-tab and other-browser recovery stays available',async()=>{
+ const storage=sharedScannerStorage(),{ctx}=await loadApp({sharedStorage:storage});
+ const at=Date.parse('2026-09-01T12:00:00Z'),day=ctx.backupDay(at),payload=JSON.stringify(ctx.state);
+ const rows=['stale-tab-draft','other-browser-copy'].map((kind,i)=>({id:'protected-'+i,day,at,kind,payload}));
+ storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify(rows));
+ setFakeTime(ctx,Date.parse('2026-09-23T12:00:00Z'));
+ assert.equal(ctx.saveLocalBackup('daily',payload),true);
+ const saved=ctx.readLocalBackups();
+ for(const row of rows)assert.ok(saved.some(entry=>entry.id===row.id),`${row.kind} is not routine expiring history`);
+});
+
+test('RISK LOCAL BACKUPS: unknown legacy kinds do not expire during rotation',async()=>{
+ const storage=sharedScannerStorage(),{ctx}=await loadApp({sharedStorage:storage});
+ const at=Date.parse('2026-09-01T12:00:00Z'),row={id:'legacy-copy',day:ctx.backupDay(at),at,
+  kind:'older-client-recovery',payload:JSON.stringify(ctx.state)};
+ storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify([row]));
+ setFakeTime(ctx,Date.parse('2026-09-23T12:00:00Z'));
+ assert.equal(ctx.saveLocalBackup('daily',JSON.stringify(ctx.state)),true);
+ assert.ok(ctx.readLocalBackups().some(entry=>entry.id===row.id),
+  'an unknown older-client recovery kind must not be silently classified as disposable history');
+});
+
 test('LOCAL BACKUPS: a user can remove an old recovery copy without changing the board',async()=>{
   const {ctx,shim}=await loadApp();
   ctx.addTask('Current board');
@@ -7735,6 +8164,23 @@ test('RISK LOCAL BACKUPS: a stale Settings click cannot delete a row rewritten b
   storage.setItem(LOCAL_BACKUPS_KEY,changed);
   ctx.onAction('delete-local-backup',{dataset:{id:'current'}});
   assert.equal(storage.getItem(LOCAL_BACKUPS_KEY),changed);
+});
+
+test('RISK LOCAL BACKUPS: concurrent backup append survives a confirmed manual delete',async()=>{
+ const storage=sharedScannerStorage();
+ const {ctx}=await loadApp({sharedStorage:storage});
+ const row={id:'chosen',day:'2026-09-28',at:Date.now(),kind:'manual',payload:JSON.stringify(ctx.state)};
+ const peer={...row,id:'peer-copy'};
+ storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify([row]));
+ ctx.openSettings();
+ const read=storage.getItem;let reads=0;
+ storage.getItem=key=>{
+  const value=read(key);
+  if(key===LOCAL_BACKUPS_KEY && ++reads===2) storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify([row,peer]));
+  return value;
+ };
+ ctx.onAction('delete-local-backup',{dataset:{id:row.id}});
+ assert.ok(JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY)).some(item=>item.id===peer.id));
 });
 
 test('LOCAL BACKUPS: restore and delete controls can wrap inside narrow Settings panes',async()=>{
@@ -9600,7 +10046,7 @@ test('Landscape lower tram: existing cars are linked by four couplers',()=>{
   const lines=[],g={save(){},restore(){},translate(){},rotate(){},scale(){},beginPath(){},roundRect(){},fill(){},fillRect(){}};
   const geometry={lowerRail:x=>500+Math.sin(x/80)*4,tangent:()=>0};
   const rail=x=>300+Math.sin(x/100)*2,p={city:'#456',night:0},S={mixHex:value=>value};
-  vm.runInNewContext(`${code};transport(500,0,.5,${isTrain},false)`,{g,geometry,rail,p,S,ellipse(){},paintGroundShadow(){},line(g,...args){lines.push(args);}});
+  vm.runInNewContext(`${code};transport(500,0,.5,${isTrain},false)`,{g,geometry,rail,p,S,ellipse(){},paintRailVehicleShadow(){},line(g,...args){lines.push(args);}});
   return lines.filter(args=>args[5]===1.6&&args[4]===p.city);
  };
  const tram=render(true),middleTrain=render(false);
@@ -9649,14 +10095,14 @@ test('RISK landscape water: the sky and every floating visitor keep a full-heigh
  assert.ok(helperStart>=0&&helperEnd>helperStart,'water visitors share a reflection painter');
  const helper=runtime.slice(helperStart,helperEnd),run=night=>{
   const calls=[],g={globalAlpha:1,save(){calls.push(['save']);},restore(){calls.push(['restore']);},beginPath(){},lineTo(){},closePath(){},clip(){calls.push(['clip']);},rect(...args){calls.push(['rect',...args]);},translate(...args){calls.push(['translate',...args]);},scale(...args){calls.push(['scale',...args]);}};
-  vm.runInNewContext(`${helper};reflectWaterObject(250,()=>calls.push(['paint',g.globalAlpha]))`,{g,path(){},far:()=>220,W:390,H:844,geometry:{waterTop:180},p:{night},calls});
+  vm.runInNewContext(`${helper};reflectWaterObject(250,()=>calls.push(['paint',g.globalAlpha]))`,{g,path(){},far:()=>220,W:390,H:844,dpr:2,geometry:{waterTop:180},p:{night},calls});
   return calls;
  };
  for(const night of [0,1]){
   const calls=run(night);
   assert.ok(calls.filter(call=>call[0]==='clip').length>=2,'the reflection clips to both the lake and its own waterline');
-  assert.deepEqual(Array.from(calls.find(call=>call[0]==='rect')),["rect",0,250,390,594]);
-  assert.deepEqual(Array.from(calls.find(call=>call[0]==='translate')),["translate",0,500]);
+  assert.deepEqual(Array.from(calls.find(call=>call[0]==='rect')),["rect",0,249.5,390,594.5]);
+  assert.deepEqual(Array.from(calls.find(call=>call[0]==='translate')),["translate",0,499]);
   assert.deepEqual(Array.from(calls.find(call=>call[0]==='scale')),["scale",1,-1],'the entire visible silhouette keeps its height');
   assert.ok(calls.find(call=>call[0]==='paint')[1]>0,'the reflection is visible at this scene time');
  }
@@ -9687,9 +10133,68 @@ test('RISK landscape shadows: grounded objects share the dominant celestial ligh
  assert.match(source,/paintGroundShadow\(b,x,rail\(x\)\+55/,'elevated railway supports cast on the far terrain');
  assert.match(source,/paintRailShadow\(b,rail,16,8/,'the railway deck uses the same time-of-day light');
  assert.ok((source.match(/paintGroundShadow\(b,t\.x,t\.y/g)||[]).length>=2,'middle and foreground trees use the shared source');
- assert.match(source,/paintGroundShadow\(g,xx,track\(xx\)/,'metro and train cars use the same source');
+ assert.match(source,/paintRailVehicleShadow\(g,xx,track\(xx\)/,'metro and train cars use the same celestial source with a track-sized footprint');
  assert.match(source,/paintGroundEventShadow\(e,/,'other grounded visitors use the same source');
  assert.match(source,/groundShadow:paintGroundShadow/,'winter visitors use the same source');
+});
+
+test('RISK landscape vehicles: train and metro shadows lie along their rails under changing light',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ const helper=source.slice(source.indexOf('  function paintRailVehicleShadow('),source.indexOf('  function paintRailShadow('));
+ assert.ok(helper.startsWith('  function paintRailVehicleShadow('),'rail vehicles have a separate contact-footprint painter');
+ for(const [w,h] of [[390,844],[568,320],[820,1180]]){
+  const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
+  const geometry=ctx.LandscapeGeometry.create(w,h),x=w*.72,y=geometry.lowerRail(x);
+  const captured=[];
+  const canvas={globalAlpha:1,save(){},restore(){},beginPath(){},ellipse(...args){captured.push(args);},fill(){}};
+  const S={mixHex:()=> '#203d37'},p={front:'#aabbaa'};
+  const render=(altitude,azimuth,width,angle)=>{
+   captured.length=0;
+   const sky={sun:{altitude,azimuth,visible:true},moon:{altitude:-20},illumination:0};
+   vm.runInNewContext(`${helper};paintRailVehicleShadow(canvas,x,y,11,width,angle,p.front)`,{canvas,x,y,width,angle,geometry,sky,p,S,TAU:Math.PI*2});
+   return captured[0];
+  };
+  const slope=geometry.tangent(geometry.lowerRail,x);
+  const morning=render(12,90,24,slope),evening=render(12,270,24,slope),metro=render(70,180,22*.72,geometry.tangent(geometry.rail,x));
+  assert.ok(morning&&evening&&metro,`${w}x${h}: both vehicles paint contact shade`);
+  assert.ok(morning[2]>morning[3]*3&&metro[2]>metro[3]*3,`${w}x${h}: footprint stays long and shallow`);
+  assert.ok(Math.abs(morning[4]-slope)<.001&&Math.abs(metro[4]-geometry.tangent(geometry.rail,x))<.001,'the footprint follows each track');
+  assert.ok(morning[0]>x&&evening[0]<x,`${w}x${h}: low Sun moves shade to opposite sides`);
+  assert.ok(Math.abs(metro[1]-y)<Math.abs(morning[1]-y),`${w}x${h}: high Sun keeps shade near the rail`);
+ }
+ const transport=source.slice(source.indexOf('  function transport('),source.indexOf('  function paintGroundEventShadow('));
+ assert.match(transport,/paintRailVehicleShadow\(g,xx,track\(xx\),isTrain\?11:8,cw\*scale,cars\[i\]\.angle/,'train and metro pass their own track angle and footprint width');
+});
+
+test('RISK landscape water: floating silhouettes and mirrors overlap at their contact row',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ const helper=source.slice(source.indexOf('  function reflectWaterObject('),source.indexOf('  function paintVessel('));
+ for(const [w,h,dpr] of [[390,844,1],[568,320,2],[820,1180,3]]){
+  const geometry={waterTop:h*.37},waterY=geometry.waterTop+34,calls=[];
+  const g={globalAlpha:1,save(){},restore(){},lineTo(){},closePath(){},clip(){},beginPath(){},rect(...args){calls.push(['rect',...args]);},translate(...args){calls.push(['translate',...args]);},scale(){}};
+  vm.runInNewContext(`${helper};reflectWaterObject(waterY,()=>calls.push(['paint']))`,{g,path(){},far:()=>geometry.waterTop+100,W:w,H:h,dpr,geometry,p:{night:0},waterY,calls});
+  const rect=calls.find(call=>call[0]==='rect'),offset=calls.find(call=>call[0]==='translate');
+  assert.ok(rect&&offset,`${w}x${h}: each floating object gets a local mirror`);
+  assert.ok(rect[2]<waterY&&rect[2]>=waterY-1/dpr-.001,`${w}x${h}: the mirror reaches one physical pixel into the hull`);
+  assert.ok(Math.abs(offset[2]-2*rect[2])<.001,'clip and reflection share the same contact origin');
+ }
+ const vessel=source.slice(source.indexOf('  function paintVessel('),source.indexOf('  function paintIceCreamStand('));
+ const duck=source.slice(source.indexOf("    if(e.type==='duck'){",source.indexOf('  function paintEvent(')),source.indexOf("    if(e.type==='fish'){",source.indexOf('  function paintEvent(')));
+ assert.match(vessel,/reflectWaterObject\(y\+hullDraft\*scale,drawVessel\)/,'vessels mirror at their painted hull bottom');
+ assert.match(duck,/reflectWaterObject\(pose\.waterY\+2\.3\*pose\.scale,drawDuck\)/,'swimming ducks mirror at their body underside');
+});
+
+test('RISK landscape water: each craft mirrors from its own painted hull draft',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ const painter=source.slice(source.indexOf('  function paintVessel('),source.indexOf('  function paintIceCreamStand('));
+ for(const [type,bottom] of [['windsurfer',1],['jetski',2],['sailboat',3],['yacht',3],['cruise',3]]){
+  let contact;
+  const g={globalAlpha:1,save(){},restore(){},beginPath(){},moveTo(){},lineTo(){},closePath(){},clip(){},translate(){},scale(){},fill(){},fillRect(){}};
+  const geometry={waterTop:180,routeProgress:()=>.5,motionAge:()=>0,vessel:()=>({x:200,y:300,scale:.5,direction:1,visible:true})};
+  const e={type,age:50,duration:100,seed:.3,lane:.5,reverse:false};
+  vm.runInNewContext(`${painter};paintVessel(e,0)`,{g,geometry,e,W:390,p:{sky:['#123','#456','#789'],city:'#456',night:0},S:{mixHex:value=>value},color:()=> '#abc',skinColor:()=> '#def',path(){},far:()=>220,line(){},personHead(){},reflectWaterObject(y){contact=y;}});
+  assert.ok(Math.abs(contact-(300+bottom*.5))<.001,`${type}: mirror touches the lowest painted hull point`);
+ }
 });
 
 test('RISK landscape shadows: each object projects away from the visible Sun or Moon position',()=>{
@@ -12193,7 +12698,8 @@ test('Consistency repair: an old account push acknowledgement cannot change the 
 });
 
 test('CLOUD ACCOUNT: switching to an empty account preserves unsynced previous-account edits in a local backup',async()=>{
-  const old=syncState({tasks:[syncTask('old','Previously saved')],syncAccount:'old@example.com',syncRev:4});
+  const old=syncState({tasks:[syncTask('old','Previously saved')],syncAccount:'old@example.com',syncRev:4,
+    syncDirty:true,protectedBackupIds:['old-account-copy']});
   const {ctx,shim}=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(old)}});
   ctx.addTask('Unsynced old-account edit');
   shim.window.CloudSync={ready:true,user:'new@example.com',pull:async()=>({empty:true}),push:async()=>({error:true})};
@@ -12202,6 +12708,8 @@ test('CLOUD ACCOUNT: switching to an empty account preserves unsynced previous-a
   assert.equal(ctx.state.tasks.length,0);
   assert.ok(ctx.readLocalBackups().some(row=>row.payload.includes('Unsynced old-account edit')),
     'the old account must remain recoverable after a reload, not only in the undo stack');
+  assert.ok(ctx.state.protectedBackupIds.includes('old-account-copy'),'the old account recovery reference remains device-local');
+  assert.ok(!Object.hasOwn(JSON.parse(ctx.cloudPayload()),'protectedBackupIds'),'another account never receives local recovery IDs');
 });
 
 test('CLOUD ACCOUNT: a fully synced previous board needs only a seven-day switch backup',async()=>{
@@ -12294,7 +12802,7 @@ test('CLOUD ADOPTION: host storage also keeps unsynced local edits before replac
   const {ctx}=await loadApp({hostStorage:{[SYNC_STORE_KEY]:JSON.stringify(local)},cloudSyncFactory:h.factory});
   ctx.addTask('Unsynced host edit');
   await ctx.cloudPull();
-  assert.ok(ctx.readLocalBackups().some(row=>row.kind==='before-cloud-adoption' && row.payload.includes('Unsynced host edit')));
+  assert.ok(ctx.readLocalBackups().some(row=>row.kind==='before-cloud-local-edit' && row.payload.includes('Unsynced host edit')));
 });
 
 test('CLOUD REVISION: a late acknowledgement cannot lower a newer adopted revision',async()=>{
@@ -12354,7 +12862,7 @@ test('CLOUD CONFLICT: a later same-task remote edit warns that this tab lost its
   h.writeBehindBack(newer);
   await ctx.cloudPull();
   assert.equal(ctx.state.tasks[0].title,'Other device edit');
-  assert.ok(ctx.readLocalBackups().some(row=>row.kind==='before-cloud-adoption' && row.payload.includes('My offline edit')));
+  assert.ok(ctx.readLocalBackups().some(row=>row.kind==='before-cloud-local-edit' && row.payload.includes('My offline edit')));
   assert.match(shim.document.getElementById('toast').textContent,/out of date|previous board/i,
     'a same-task edit cannot be silently removed from the active board');
 });
@@ -13388,8 +13896,10 @@ test('RISK landscape weather: organic rain storm and snow clouds darken smoothly
 
 test('Repository test-first guard covers every app module and documents risk cases',()=>{
  const guard=fs.readFileSync(path.join(__dirname,'.claude/hooks/test-first-guard.sh'),'utf8');
- for(const file of ['landscape.js','landscape-core.js','landscape-mood.js','landscape-geometry.js','landscape-seasonal.js','location.js','landscape.css','index.html','sw.js'])
-  assert.match(guard,new RegExp(file.replaceAll('.','\\.')));
+ for(const pattern of ['*.html','*.js','*.mjs','*.css','*.webmanifest','*.svg','*.png'])
+  assert.ok(guard.includes(pattern),`future runtime files of type ${pattern} must remain protected`);
+ assert.match(guard,/scripts\/test-first-gate\.mjs/);
+ assert.match(guard,/\.github\/workflows/);
  const policy=fs.readFileSync(path.join(__dirname,'CLAUDE.md'),'utf8');
  assert.match(policy,/risk-based/i);assert.match(policy,/red output/i);assert.match(policy,/full suite/i);
 });
@@ -13514,3 +14024,53 @@ test('RISK regression gate: changing existing tests requires a specific reason a
   assert.ok(validateRegressionChanges(['@@ -40,0 +41 @@','+process.exit(0);'],[],40).length,'appended executable code cannot disable the suite');
   assert.ok(validateRegressionChanges(['@@ -12,0 +13 @@','+ const helper = () => true;'],[],40).length,'conservative gate protects arbitrary edits inside existing coverage');
  });
+
+test('RISK test-first gate: future runtime modules are detected without a filename allowlist',async()=>{
+ const {validateTestFirst}=await import('./scripts/test-first-gate.mjs');
+ const errors=validateTestFirst(['features/new-scan-rule.js'],[]).join(' ');
+ assert.match(errors,/tests\.js/,'a new application module must not bypass the test-first diff gate');
+});
+
+test('RISK test-first gate: scanner, landscape, time, rules, and offline-shell edits need a new risk case',async()=>{
+ const {validateTestFirst}=await import('./scripts/test-first-gate.mjs');
+ const riskFiles=['index.html','location.js','stars.js','landscape.js','landscape-appearance.js','landscape-riders.js','landscape-seasonal.js','landscape-skywriter.js','landscape-winter.js','sw.js','manifest.webmanifest','firestore.rules','features/new-module.js'];
+ for(const file of riskFiles){
+  const errors=validateTestFirst([file,'tests.js'],['+test("ordinary behavior test",()=>{})']).join(' ');
+  assert.match(errors,/RISK/,`${file} must require a new high-risk contract`);
+ }
+});
+
+test('RISK test-first gate: changing enforcement code requires process tests and a new risk case',async()=>{
+ const {validateTestFirst}=await import('./scripts/test-first-gate.mjs');
+ for(const file of ['scripts/test-first-gate.mjs','.claude/hooks/test-first-guard.sh','.github/workflows/data-safety.yml']){
+  assert.match(validateTestFirst([file],[]).join(' '),/tests\.js/,`${file} must be covered by a process test`);
+  assert.match(validateTestFirst([file,'tests.js'],['+test("ordinary behavior test",()=>{})']).join(' '),/RISK/,`${file} requires a risk-labeled process test`);
+ }
+});
+
+test('RISK test-first gate: unrelated risk cases cannot approve enforcement edits',async()=>{
+ const {validateTestFirst}=await import('./scripts/test-first-gate.mjs');
+ const unrelated=['+test("RISK landscape colors: dawn hue stays warm",()=>{})'];
+ for(const file of ['scripts/test-first-gate.mjs','.claude/hooks/test-first-guard.sh','.github/workflows/data-safety.yml']){
+  assert.match(validateTestFirst([file,'tests.js'],unrelated).join(' '),/process/i,
+   `${file} needs a risk-labeled process test rather than an unrelated risk case`);
+ }
+});
+
+test('RISK test-first gate: initial branch pushes cannot skip the diff comparison',()=>{
+ const result=spawnSync(process.execPath,[path.join(__dirname,'scripts/test-first-gate.mjs'),'0'.repeat(40)],{cwd:__dirname,encoding:'utf8'});
+ assert.equal(result.status,2,`an all-zero base must fail closed; received ${result.status}: ${result.stdout}`);
+ assert.match(result.stderr,/base|compare|resolve/i);
+ const workflow=fs.readFileSync(path.join(__dirname,'.github/workflows/data-safety.yml'),'utf8');
+ assert.match(workflow,/git merge-base origin\/main/i,'branch creation must compare against the existing default branch');
+});
+
+test('RISK test inventory: every named risk contract maps to a feature boundary',()=>{
+ const inventoryPath=path.join(__dirname,'RISK_TEST_COVERAGE.md');
+ assert.ok(fs.existsSync(inventoryPath),'the repository must keep a readable inventory of current risk contracts');
+ const inventory=fs.readFileSync(inventoryPath,'utf8');
+ const source=fs.readFileSync(path.join(__dirname,'tests.js'),'utf8');
+ const riskNames=[...source.matchAll(/^\s*test\(\s*(['"])(RISK\b[^'"]*)\1/gm)].map(match=>match[2]);
+ for(const name of riskNames)assert.ok(inventory.includes(name),`risk contract is missing from the feature inventory: ${name}`);
+ assert.match(inventory,/future|new feature/i,'the inventory must explain how future work adds risk contracts');
+});
