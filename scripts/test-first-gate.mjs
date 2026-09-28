@@ -22,6 +22,7 @@ const isAppFile=file=>{
 // automatically instead of waiting for a hand-maintained filename list.
 const isHighRiskAppFile=file=>file==='firestore.rules'||isAppFile(file)&&/\.(?:html|js|mjs|cjs|jsx|ts|tsx|webmanifest)$/i.test(file);
 const hasAddedRiskTest=lines=>lines.some(line=>/^\+\s*test\s*\(\s*['"]RISK\b/.test(line));
+const hasAddedProcessRiskTest=lines=>lines.some(line=>/^\+\s*test\s*\(\s*['"]RISK (?:test-first gate|regression gate|test inventory|repository process)\b/.test(line));
 
 export function validateTestFirst(changedFiles,addedTestLines){
   const edited=changedFiles.filter(isAppFile);
@@ -35,6 +36,8 @@ export function validateTestFirst(changedFiles,addedTestLines){
   const highRisk=[...edited.filter(isHighRiskAppFile),...enforcementEdits];
   if(highRisk.length&&!hasAddedRiskTest(addedTestLines))
     errors.push(`A high-risk app or enforcement file changed (${highRisk.join(', ')}) without a new RISK test in tests.js.`);
+  if(enforcementEdits.length&&!hasAddedProcessRiskTest(addedTestLines))
+    errors.push(`Test-first enforcement changed (${enforcementEdits.join(', ')}) without a new RISK process test in tests.js.`);
   return errors;
 }
 

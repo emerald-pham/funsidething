@@ -113,8 +113,8 @@ visible History. Settings holds up to seven days of automatic device-local
 full-board backups: the first and latest copy of each day, plus pre-restore
 and cloud-adoption safety copies. Older automatic copies retire first as new
 ones arrive or browser space gets tight; the incoming stable copy and any
-active cloud-adoption proof remain. Manual backups, stale-tab drafts,
-other-browser recovery copies, and account-switch copies of unsynced boards
+active cloud-adoption proof remain. Manual backups, displaced local edits,
+stale-tab drafts, other-browser recovery copies, and account-switch copies of unsynced boards
 stay until the user deletes them or clears site data. A switch away from a
 cloud-confirmed board needs only the ordinary automatic safety copy. Repeated
 copies of the same unsynced board are deduplicated.

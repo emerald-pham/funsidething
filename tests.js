@@ -7721,7 +7721,7 @@ test('RISK LOCAL BACKUPS: Settings explains automatic early retirement while pre
  const {ctx,shim}=await loadApp();ctx.openSettings();
  const markup=shim.document.getElementById('modalRoot').innerHTML;
  assert.match(markup,/older automatic copies may retire sooner/);
- assert.match(markup,/Manual and unsynced account-switch copies stay until you delete them/);
+ assert.match(markup,/Manual, displaced local edits, stale-tab drafts, other-browser copies, and unsynced account-switch copies stay until you delete them/);
 });
 
 test('RISK LOCAL BACKUPS: exhausted quota leaves the original index and unsaved board untouched',async()=>{
@@ -7782,9 +7782,77 @@ test('RISK CLOUD BACKUP: quota retirement keeps the exact prior board needed for
  await ctx.cloudPull();await syncSettle(30);
  assert.equal(ctx.reconciled(),true,'the reconciled board is accepted after a safe backup fits');
  const saved=JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY));
- assert.ok(saved.some(entry=>entry.kind==='before-cloud-adoption'&&entry.payload===priorBoard),'the exact prior board survives retirement and remains restorable');
+ assert.ok(saved.some(entry=>entry.kind==='before-cloud-local-edit'&&entry.payload===priorBoard),'the exact prior board survives retirement and remains restorable');
  assert.ok(!saved.some(entry=>entry.id==='old-auto'));
  assert.deepEqual(new Set(Array.from(ctx.state.tasks,task=>task.id)),new Set(['local','unsaved','remote']));
+});
+
+test('RISK CLOUD BACKUP: an overwritten local edit survives later quota rotation',async()=>{
+ const storage=sharedScannerStorage();
+ const {ctx,shim}=await loadApp({sharedStorage:storage});
+ ctx.addTask('Base title');await ctx.persist();
+ const h=makeSyncHarness({remote:JSON.parse(ctx.cloudPayload()),rev:4});
+ shim.window.CloudSync=h.factory();await ctx.cloudPull();
+ ctx.state.tasks[0].title='My offline edit';ctx.save();
+ const newer=JSON.parse(h.doc.payload);newer.tasks[0].title='Other device edit';h.writeBehindBack(newer);
+ await ctx.cloudPull();
+ const conflict=ctx.readLocalBackups().find(row=>row.payload.includes('My offline edit'));
+ assert.ok(conflict,'the overwritten edit has a recovery copy');
+ const {ctx:reopened}=await loadApp({sharedStorage:storage});
+ const at=Date.now(),ordinary={id:'newer-ordinary',day:reopened.backupDay(at),at:at+1,
+  kind:'before-restore',payload:JSON.stringify(reopened.state)};
+ storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify([conflict,ordinary]));
+ const write=storage.setItem;
+ storage.setItem=(key,value)=>{
+  if(key===LOCAL_BACKUPS_KEY && JSON.parse(value).length>2){
+   const error=Error('browser quota');error.name='QuotaExceededError';throw error;
+  }
+  write(key,value);
+ };
+ assert.equal(reopened.saveLocalBackup('daily',JSON.stringify(reopened.state)),true);
+ const saved=reopened.readLocalBackups();
+ assert.ok(saved.some(row=>row.id===conflict.id),'the overwritten edit remains restorable after a later ordinary save');
+ assert.ok(!saved.some(row=>row.id===ordinary.id),'ordinary history retires first');
+});
+
+test('RISK CLOUD BACKUP: an exact chosen copy avoids duplicate displaced-edit storage',async()=>{
+ const storage=sharedScannerStorage(),{ctx}=await loadApp({sharedStorage:storage});
+ ctx.addTask('My unsynced edit');
+ const payload=JSON.stringify(ctx.state),at=Date.now();
+ const manual={id:'chosen-copy',day:ctx.backupDay(at),at,kind:'manual',payload};
+ const original=JSON.stringify([manual]);storage.setItem(LOCAL_BACKUPS_KEY,original);
+ const write=storage.setItem;
+ storage.setItem=(key,value)=>{
+  if(key===LOCAL_BACKUPS_KEY && value!==original){
+   const error=Error('browser quota');error.name='QuotaExceededError';throw error;
+  }
+  write(key,value);
+ };
+ assert.equal(ctx.saveLocalBackup('before-cloud-local-edit',payload),true,
+  'the exact manual copy already preserves this displaced board');
+ assert.equal(storage.getItem(LOCAL_BACKUPS_KEY),original);
+});
+
+test('RISK LOCAL BACKUPS: aged stale-tab and other-browser recovery stays available',async()=>{
+ const storage=sharedScannerStorage(),{ctx}=await loadApp({sharedStorage:storage});
+ const at=Date.parse('2026-09-01T12:00:00Z'),day=ctx.backupDay(at),payload=JSON.stringify(ctx.state);
+ const rows=['stale-tab-draft','other-browser-copy'].map((kind,i)=>({id:'protected-'+i,day,at,kind,payload}));
+ storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify(rows));
+ setFakeTime(ctx,Date.parse('2026-09-23T12:00:00Z'));
+ assert.equal(ctx.saveLocalBackup('daily',payload),true);
+ const saved=ctx.readLocalBackups();
+ for(const row of rows)assert.ok(saved.some(entry=>entry.id===row.id),`${row.kind} is not routine expiring history`);
+});
+
+test('RISK LOCAL BACKUPS: unknown legacy kinds do not expire during rotation',async()=>{
+ const storage=sharedScannerStorage(),{ctx}=await loadApp({sharedStorage:storage});
+ const at=Date.parse('2026-09-01T12:00:00Z'),row={id:'legacy-copy',day:ctx.backupDay(at),at,
+  kind:'older-client-recovery',payload:JSON.stringify(ctx.state)};
+ storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify([row]));
+ setFakeTime(ctx,Date.parse('2026-09-23T12:00:00Z'));
+ assert.equal(ctx.saveLocalBackup('daily',JSON.stringify(ctx.state)),true);
+ assert.ok(ctx.readLocalBackups().some(entry=>entry.id===row.id),
+  'an unknown older-client recovery kind must not be silently classified as disposable history');
 });
 
 test('LOCAL BACKUPS: a user can remove an old recovery copy without changing the board',async()=>{
@@ -12486,7 +12554,7 @@ test('CLOUD ADOPTION: host storage also keeps unsynced local edits before replac
   const {ctx}=await loadApp({hostStorage:{[SYNC_STORE_KEY]:JSON.stringify(local)},cloudSyncFactory:h.factory});
   ctx.addTask('Unsynced host edit');
   await ctx.cloudPull();
-  assert.ok(ctx.readLocalBackups().some(row=>row.kind==='before-cloud-adoption' && row.payload.includes('Unsynced host edit')));
+  assert.ok(ctx.readLocalBackups().some(row=>row.kind==='before-cloud-local-edit' && row.payload.includes('Unsynced host edit')));
 });
 
 test('CLOUD REVISION: a late acknowledgement cannot lower a newer adopted revision',async()=>{
@@ -12546,7 +12614,7 @@ test('CLOUD CONFLICT: a later same-task remote edit warns that this tab lost its
   h.writeBehindBack(newer);
   await ctx.cloudPull();
   assert.equal(ctx.state.tasks[0].title,'Other device edit');
-  assert.ok(ctx.readLocalBackups().some(row=>row.kind==='before-cloud-adoption' && row.payload.includes('My offline edit')));
+  assert.ok(ctx.readLocalBackups().some(row=>row.kind==='before-cloud-local-edit' && row.payload.includes('My offline edit')));
   assert.match(shim.document.getElementById('toast').textContent,/out of date|previous board/i,
     'a same-task edit cannot be silently removed from the active board');
 });
@@ -13729,6 +13797,15 @@ test('RISK test-first gate: changing enforcement code requires process tests and
  for(const file of ['scripts/test-first-gate.mjs','.claude/hooks/test-first-guard.sh','.github/workflows/data-safety.yml']){
   assert.match(validateTestFirst([file],[]).join(' '),/tests\.js/,`${file} must be covered by a process test`);
   assert.match(validateTestFirst([file,'tests.js'],['+test("ordinary behavior test",()=>{})']).join(' '),/RISK/,`${file} requires a risk-labeled process test`);
+ }
+});
+
+test('RISK test-first gate: unrelated risk cases cannot approve enforcement edits',async()=>{
+ const {validateTestFirst}=await import('./scripts/test-first-gate.mjs');
+ const unrelated=['+test("RISK landscape colors: dawn hue stays warm",()=>{})'];
+ for(const file of ['scripts/test-first-gate.mjs','.claude/hooks/test-first-guard.sh','.github/workflows/data-safety.yml']){
+  assert.match(validateTestFirst([file,'tests.js'],unrelated).join(' '),/process/i,
+   `${file} needs a risk-labeled process test rather than an unrelated risk case`);
  }
 });
 

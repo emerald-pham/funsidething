@@ -49,7 +49,9 @@ Treat the block as correct and go write the test — do not work around it.
 named tests. Add or rename its entry whenever a `RISK` test is added, removed,
 or renamed; a test in `tests.js` checks that the map stays complete. Changes to
 the diff gate, edit hook, or CI workflow also need a new process-focused
-`RISK` test.
+`RISK` test, named under the test-first gate, regression gate, test inventory,
+or repository process boundary. An unrelated feature risk test cannot satisfy
+that process requirement.
 
 The hook and CI gate enforce structural requirements: tests appear in the app
 diff, a new risk case is named, and test changes carry a rationale with red

@@ -43,6 +43,10 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK LOCAL BACKUPS: parseable but unrestorable history cannot be retired for quota
 - RISK LOCAL BACKUPS: an unreadable index explains the paused save without claiming quota
 - RISK CLOUD BACKUP: quota retirement keeps the exact prior board needed for adoption
+- RISK CLOUD BACKUP: an overwritten local edit survives later quota rotation
+- RISK CLOUD BACKUP: an exact chosen copy avoids duplicate displaced-edit storage
+- RISK LOCAL BACKUPS: aged stale-tab and other-browser recovery stays available
+- RISK LOCAL BACKUPS: unknown legacy kinds do not expire during rotation
 
 ## Location, scene settings, and cross-device behavior
 
@@ -106,6 +110,7 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK test-first gate: future runtime modules are detected without a filename allowlist
 - RISK test-first gate: scanner, landscape, time, rules, and offline-shell edits need a new risk case
 - RISK test-first gate: changing enforcement code requires process tests and a new risk case
+- RISK test-first gate: unrelated risk cases cannot approve enforcement edits
 - RISK test-first gate: initial branch pushes cannot skip the diff comparison
 - RISK test inventory: every named risk contract maps to a feature boundary
 
