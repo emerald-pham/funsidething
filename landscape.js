@@ -622,16 +622,23 @@
       tint.addColorStop(1,'rgba(36,55,70,0)');
       ctx.fillStyle=tint;ctx.fillRect(0,0,W,H);
     }
-    ctx.globalAlpha=weather.intensity*(snow?.43:storm?.70:.58);
+    ctx.globalAlpha=weather.intensity*(snow?.43:storm?.70:.58)*(1-.12*p.night);
+    // Pale daytime highlights became luminous stickers after sunset. Blend
+    // every lobe shade with the sky's continuous night fraction instead.
+    const daylight=snow?['#eef0e9','#c7d2d2','#a6bac1']:
+      storm?['#b7c9ca','#8fa8b0','#6d8996']:['#d0ded8','#adc5c7','#8eabb3'];
+    const afterDark=snow?['#687a85','#526875','#405866']:
+      storm?['#4b5f70','#394e60','#253c4e']:['#5d7180','#43596b','#31495b'];
+    const cloudShades=daylight.map((ink,index)=>S.mixHex(ink,afterDark[index],p.night));
     for(let i=0;i<6;i++){
       const x=((i+.3)*W/6+phase*(storm?3:1))%(W+180)-90;
       const y=hy*(.13+rand(i+6100)*.22),w=W*(.18+rand(i+6200)*.11),h=hy*(.075+rand(i+6300)*.05);
       // Uneven lobes and a bowed underside read as a single cloud, while the
       // vertical shading keeps its weight without opaque floating discs.
       const shade=ctx.createLinearGradient(0,y-h,0,y+h*.65);
-      shade.addColorStop(0,snow?'#eef0e9':storm?'#b7c9ca':'#d0ded8');
-      shade.addColorStop(.55,snow?'#c7d2d2':storm?'#8fa8b0':'#adc5c7');
-      shade.addColorStop(1,snow?'#a6bac1':storm?'#6d8996':'#8eabb3');
+      shade.addColorStop(0,cloudShades[0]);
+      shade.addColorStop(.55,cloudShades[1]);
+      shade.addColorStop(1,cloudShades[2]);
       ctx.fillStyle=shade;ctx.beginPath();ctx.moveTo(x-w*.5,y+h*.25);
       ctx.bezierCurveTo(x-w*.63,y-h*.10,x-w*.47,y-h*.32,x-w*.35,y-h*.30);
       ctx.bezierCurveTo(x-w*.34,y-h*.80,x-w*.12,y-h*.91,x+w*.01,y-h*.57);

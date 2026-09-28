@@ -11132,7 +11132,7 @@ test('Weather rendering: snow drifts smoothly at real epoch times and seasonal a
  const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
  const code=source.slice(source.indexOf('  function paintWeatherOn('),source.indexOf('  function paintWoodland('));
  const run=time=>{const points=[],seasonal=[],g={save(){},restore(){},fillRect(){},createLinearGradient(){return {addColorStop(){}}},beginPath(){},moveTo(){},bezierCurveTo(){},closePath(){},fill(){}};const weather={status:'snowstorm',intensity:1,storm:true,slot:10};
- vm.runInNewContext(code+';paintWeatherOn(g,weather,time,true)', {g,weather,time,Math,Date:class extends Date{static now(){return time*1000;}},W:1000,H:700,hy:300,reduced:false,sceneSeason:'winter',treeOrigins:[],geometry:{},world:{elapsed:3},p:{city:'#555555',sky:['#fff','#fff','#fff']},rand:n=>(Math.sin(n)+1)/2,S:{weatherAt:()=>weather},document:{documentElement:{dataset:{}}},LandscapeSeasonal:{paint(...args){seasonal.push(args);}},ellipse(g,x,y,rx,ry,c){if(c==='#f4f4e8')points.push([x,y]);},line(){}});return {points,seasonal};};
+ vm.runInNewContext(code+';paintWeatherOn(g,weather,time,true)', {g,weather,time,Math,Date:class extends Date{static now(){return time*1000;}},W:1000,H:700,hy:300,reduced:false,sceneSeason:'winter',treeOrigins:[],geometry:{},world:{elapsed:3},p:{night:0,city:'#555555',sky:['#fff','#fff','#fff']},rand:n=>(Math.sin(n)+1)/2,S:{weatherAt:()=>weather,mixHex:(day)=>day},document:{documentElement:{dataset:{}}},LandscapeSeasonal:{paint(...args){seasonal.push(args);}},ellipse(g,x,y,rx,ry,c){if(c==='#f4f4e8')points.push([x,y]);},line(){}});return {points,seasonal};};
  const a=run(1789300000),b=run(1789300000+1/30);assert.ok(a.points.length>50);
  assert.ok(a.points.some((point,i)=>Math.abs(point[0]-b.points[i][0])>.001),'snow advances across frames');
  a.points.forEach((point,i)=>{const dx=Math.abs(point[0]-b.points[i][0]);assert.ok(Math.min(dx,1000-dx)<5,'snow does not jitter across screen');});
@@ -13068,7 +13068,7 @@ test('Landscape polish: rain darkens the sky, foreground fireflies double, and t
  const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
  const rain=source.slice(source.indexOf('  function paintWeatherOn('),source.indexOf('  function paintWoodland('));
  const overlays=[],streaks=[],g={save(){},restore(){},fillRect(){overlays.push(this.globalAlpha)},createLinearGradient(){return {addColorStop(){}}},beginPath(){},moveTo(){},bezierCurveTo(){},closePath(){},fill(){}};
- vm.runInNewContext(`${rain};paintWeatherOn(g,{status:'rain',intensity:1,storm:false,slot:1},0,true)`,{g,W:390,H:844,hy:300,sceneSeason:'autumn',world:{elapsed:0},reduced:true,rand:()=>.5,ellipse(){},line(_g,...args){streaks.push(args)},document:{documentElement:{dataset:{}}},LandscapeSeasonal:{paint(){}},geometry:{},treeOrigins:[],p:{city:'#345',sky:['#abc','#bcd','#def']}});
+ vm.runInNewContext(`${rain};paintWeatherOn(g,{status:'rain',intensity:1,storm:false,slot:1},0,true)`,{g,W:390,H:844,hy:300,sceneSeason:'autumn',world:{elapsed:0},reduced:true,rand:()=>.5,ellipse(){},line(_g,...args){streaks.push(args)},document:{documentElement:{dataset:{}}},LandscapeSeasonal:{paint(){}},geometry:{},treeOrigins:[],p:{night:0,city:'#345',sky:['#abc','#bcd','#def']},S:{mixHex:(day)=>day}});
  assert.ok(overlays[0]>=.18,'rain produces a clearly darker whole-scene sky');
  assert.ok(streaks.length>=30,'rain is readily visible on a phone');
  assert.match(source,/for\(let i=0;i<32;i\+\+\)/,'night has twice the original sixteen fireflies');
@@ -13089,7 +13089,7 @@ test('RISK landscape weather: rainclouds have rounded layered contours and the t
    const gradients=[],rects=[],paths=[];
    const g={save(){},restore(){},beginPath(){paths.push({curves:0})},moveTo(){},bezierCurveTo(){paths.at(-1).curves++},closePath(){},fill(){},fillRect(x,y,width,height){rects.push({x,y,width,height,gradient:this.fillStyle})},createLinearGradient(x,y,x2,y2){const gradient={x,y,x2,y2,stops:[],addColorStop(at,color){this.stops.push({at,color})}};gradients.push(gradient);return gradient}};
    const weather={status,intensity:1,storm:status==='storm',slot:1};
-   vm.runInNewContext(`${rain};paintWeatherOn(g,weather,0,true)`,{g,weather,W:w,H:h,hy:Math.min(h*(w<600?.37:.47),w<600?310:480),sceneSeason:'autumn',world:{elapsed:0},reduced:true,rand:n=>(Math.sin(n)+1)/2,ellipse(){},line(){},document:{documentElement:{dataset:{}}},LandscapeSeasonal:{paint(){}},geometry:{},treeOrigins:[],p:{city:'#345',sky:['#abc','#bcd','#def']}});
+   vm.runInNewContext(`${rain};paintWeatherOn(g,weather,0,true)`,{g,weather,W:w,H:h,hy:Math.min(h*(w<600?.37:.47),w<600?310:480),sceneSeason:'autumn',world:{elapsed:0},reduced:true,rand:n=>(Math.sin(n)+1)/2,ellipse(){},line(){},document:{documentElement:{dataset:{}}},LandscapeSeasonal:{paint(){}},geometry:{},treeOrigins:[],p:{night:0,city:'#345',sky:['#abc','#bcd','#def']},S:{mixHex:(day)=>day}});
    assert.ok(rects.some(rect=>rect.x===0&&rect.y===0&&rect.width===w&&rect.height===h&&gradients.includes(rect.gradient)),`${w}x${h} ${status}: tint covers the full screen`);
    const tint=gradients.find(gradient=>rects.some(rect=>rect.gradient===gradient));
    assert.ok(tint.stops.length>=3&&tint.stops.at(-1).at===1&&/rgba?\(/.test(tint.stops.at(-1).color),`${w}x${h} ${status}: tint eases to transparent at the bottom`);
@@ -13103,10 +13103,36 @@ test('RISK landscape weather: reflected clouds remain visible without doubling t
  const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
  const rain=source.slice(source.indexOf('  function paintWeatherOn('),source.indexOf('  function paintWoodland('));
  const rects=[],streaks=[],g={save(){},restore(){},fillRect(...args){rects.push(args)},createLinearGradient(){return {addColorStop(){}}},beginPath(){},moveTo(){},bezierCurveTo(){},closePath(){},fill(){}};
- vm.runInNewContext(`${rain};paintWeatherOn(g,{status:'rain',intensity:1,storm:false,slot:1},0,false,false)`,{g,W:390,H:844,hy:300,sceneSeason:'autumn',world:{elapsed:0},reduced:true,rand:n=>(Math.sin(n)+1)/2,ellipse(){},line(_g,...args){streaks.push(args)},document:{documentElement:{dataset:{}}},LandscapeSeasonal:{paint(){}},geometry:{},treeOrigins:[],p:{city:'#345',sky:['#abc','#bcd','#def']}});
+ vm.runInNewContext(`${rain};paintWeatherOn(g,{status:'rain',intensity:1,storm:false,slot:1},0,false,false)`,{g,W:390,H:844,hy:300,sceneSeason:'autumn',world:{elapsed:0},reduced:true,rand:n=>(Math.sin(n)+1)/2,ellipse(){},line(_g,...args){streaks.push(args)},document:{documentElement:{dataset:{}}},LandscapeSeasonal:{paint(){}},geometry:{},treeOrigins:[],p:{night:0,city:'#345',sky:['#abc','#bcd','#def']},S:{mixHex:(day)=>day}});
  assert.equal(rects.length,0,'reflection does not darken the lake a second time with a full-scene tint');
  assert.ok(streaks.length>=30,'rain and its cloud layer still enter the reflected source');
  assert.match(source,/paintWeatherOn\(reflectionContext,weather,weatherPhase,false,false\)/);
+});
+
+test('RISK landscape weather: organic rain storm and snow clouds darken smoothly with the night sky',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ const rain=source.slice(source.indexOf('  function paintWeatherOn('),source.indexOf('  function paintWoodland('));
+ const sky=livingSky(),brightness=color=>{
+  assert.match(color,/^#[0-9a-f]{6}$/i,'cloud shades resolve to six-digit colors');
+  return [1,3,5].reduce((sum,index)=>sum+parseInt(color.slice(index,index+2),16),0)/3;
+ };
+ for(const status of ['rain','storm','snow']){
+  const draw=night=>{
+   const clouds=[];let curves=0;
+   const g={save(){},restore(){},fillRect(){},beginPath(){curves=0},moveTo(){},bezierCurveTo(){curves++},closePath(){},fill(){clouds.push({stops:this.fillStyle.stops,alpha:this.globalAlpha,curves})},createLinearGradient(){return {stops:[],addColorStop(at,color){this.stops.push({at,color})}}}};
+   const weather={status,intensity:1,storm:status==='storm',slot:1};
+   vm.runInNewContext(`${rain};paintWeatherOn(g,weather,0,true)`,{g,weather,W:390,H:844,hy:300,sceneSeason:'autumn',world:{elapsed:0},reduced:true,rand:n=>(Math.sin(n)+1)/2,ellipse(){},line(){},document:{documentElement:{dataset:{}}},LandscapeSeasonal:{paint(){}},geometry:{},treeOrigins:[],p:{night,city:'#345',sky:['#abc','#bcd','#def']},S:sky});
+   assert.ok(clouds.length>=3&&clouds.every(cloud=>cloud.curves>=5),`${status}: organic contours remain at every light level`);
+   return clouds[0];
+  };
+  const day=draw(0),dusk=draw(.5),night=draw(1);
+  for(const stop of [0,1,2]){
+   const light=[day,dusk,night].map(cloud=>brightness(cloud.stops[stop].color));
+   assert.ok(light[0]>light[1]&&light[1]>light[2],`${status}: cloud shade ${stop} blends continuously into night`);
+  }
+  assert.ok(brightness(night.stops[0].color)<130&&brightness(night.stops[2].color)<100,`${status}: night clouds cannot glow pale against the dark sky`);
+  assert.ok(day.alpha>dusk.alpha&&dusk.alpha>night.alpha,`${status}: translucent cloud strength also follows the night sky`);
+ }
 });
 
 test('Repository test-first guard covers every app module and documents risk cases',()=>{
