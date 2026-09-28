@@ -47,6 +47,13 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK CLOUD BACKUP: an offline edit reopened before conflict remains protected
 - RISK LOCAL BACKUPS: cold older-tab repair keeps a pinned recovery copy
 - RISK LOCAL BACKUPS: stale-tab adoption carries pinned recovery IDs durably
+- RISK CLOUD BACKUP: confirmed cloud state releases temporary recovery pins for later device saves
+- RISK CLOUD BACKUP: union recovery stays pinned only until its exact Firestore acknowledgement
+- RISK CLOUD BACKUP: acknowledgement frees disk pins before saving a larger in-flight draft
+- RISK CLOUD BACKUP: overwritten same-task edits outlive equal cloud pulls when a daily row was reused
+- RISK CLOUD BACKUP: a legacy ambiguous daily pin becomes durable before equal-cloud release
+- RISK CLOUD BACKUP: a tight legacy store releases a user-equivalent daily pin without growing the index
+- RISK LOCAL STORAGE: a full iOS store still opens its readable primary board
 - RISK LOCAL BACKUPS: failed stale-tab marker write leaves both browser keys intact
 - RISK LOCAL BACKUPS: cold older-tab bytes carry their recovery IDs into the head
 - RISK LOCAL BACKUPS: concurrent older-tab write survives the stale-tab repair tail
