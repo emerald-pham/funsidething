@@ -14,7 +14,7 @@
   const back=host.querySelector('[data-scenery]'),front=host.querySelector('[data-life]');
   let b=back.getContext('2d',{alpha:false});const base=b,g=front.getContext('2d');
   const layers={};let geometry;
-  const cityReflection=document.createElement('canvas'),skyReflection=document.createElement('canvas');
+  const cityReflection=document.createElement('canvas'),skyReflection=document.createElement('canvas'),warpedReflection=document.createElement('canvas');
   if(!b||!g){host.hidden=true;return;}
   const mq=window.matchMedia('(prefers-reduced-motion: reduce)');
   let storage;try{storage=window.localStorage;}catch{storage=null;}
@@ -90,9 +90,21 @@
   }
   function composite(name){const c=layers[name];if(c)g.drawImage(c,0,c.top,c.width/dpr,c.height/dpr);}
   function paintHorizonReflection(source,t,opacity=1){
-    for(const row of geometry.horizonReflection(t,wind,p.night)){
+    const rows=geometry.horizonReflection(t,wind,p.night);
+    const warpHeight=Math.max(1,Math.ceil((rows.at(-1).sampleY+rows.at(-1).height)*dpr));
+    if(warpedReflection.width!==source.width)warpedReflection.width=source.width;
+    if(warpedReflection.height!==warpHeight)warpedReflection.height=warpHeight;
+    const warp=warpedReflection.getContext('2d');
+    warp.setTransform(dpr,0,0,dpr,0,0);
+    warp.clearRect(0,0,W,warpHeight/dpr);
+    for(const column of geometry.horizonReflectionColumns()){
+      warp.save();warp.translate(0,column.depth);warp.scale(1,-1);
+      warp.drawImage(source,column.x*dpr,0,column.width*dpr,source.height,column.x,0,column.width,column.depth);
+      warp.restore();
+    }
+    for(const row of rows){
       g.globalAlpha=row.alpha*opacity;
-      g.drawImage(source,0,row.sourceY*dpr,source.width,row.sourceHeight*dpr,row.dx,row.y,W,row.height);
+      g.drawImage(warpedReflection,0,row.sampleY*dpr,warpedReflection.width,row.height*dpr,row.dx,row.y,W,row.height);
     }
   }
   const point=(az,alt)=>({x:az/360*W,y:hy-(Math.max(alt,-2)/90)*(hy-22)});

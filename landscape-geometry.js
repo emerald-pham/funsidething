@@ -58,6 +58,7 @@
     const skater=(x,reverse=false)=>({x,y:trail(x),angle:tangent(trail,x),direction:reverse?-1:1});
     const pack=(x,count,reverse=false)=>Array.from({length:count},(_,i)=>rider(x-i*21*(reverse?-1:1),1,reverse));
     const waterTop=horizon+15,shore=horizon+H*.095;
+    const horizonMirrorDepth=Math.max(2,Math.floor(Math.min(H*.10,140,H*.145-15)/2)*2);
     function vessel(kind,lane,x,t=0,reverse=false){
       const depth=Math.max(1,shore-waterTop),direction=reverse?-1:1;
       // Hull sizes are intentionally compressed, but a person and board must
@@ -189,19 +190,29 @@
       return {x:star.azimuth/360*W+Math.sin(y*.19-t*wind)*1.8,y};
     }
     function horizonReflection(t,wind,night){
-      // Leave enough lake beneath at least one stretch of far shoreline for
-      // the last band to show the very top of the sky on short phones too.
-      const depth=Math.max(2,Math.floor(Math.min(H*.10,140,H*.145-15)/2)*2),sourceStep=horizon*2/depth,rows=[];
-      // Spread the whole sky, from the horizon to its top edge, across the
-      // shallow lake. Shoreline clipping still decides which bands are visible.
+      // One wave grid serves the whole lake; the sky is fitted beneath each
+      // local shoreline before these bands sample the mirrored pixels.
+      const depth=horizonMirrorDepth,sourceStep=horizon*2/depth,rows=[];
+      // The source coordinates also describe which part of the real sky each
+      // band represents, from the horizon at the top to the sky top below.
       for(let d=0;d<depth;d+=2){
         const sourceY=Math.max(0,horizon-(d+2)*horizon/depth);
         const fraction=d/depth;
-        rows.push({sourceY,sourceHeight:Math.min(sourceStep,horizon-sourceY),y:waterTop+d,
+        rows.push({sourceY,sourceHeight:Math.min(sourceStep,horizon-sourceY),sampleY:d,y:waterTop+d,
           dx:(Math.sin(d*.21-t*wind*.85)*2.2+Math.sin(d*.08+t*wind*.3))*(.25+.75*fraction),
-          alpha:Math.min(.24,.15+night*.06)*(1-fraction*.58),height:2});
+          alpha:(.47+night*.09)*(1-fraction*.10),height:2});
       }
       return rows;
+    }
+    function horizonReflectionColumns(){
+      const columns=[],step=Math.max(4,Math.ceil(W/120));
+      for(let x=0;x<W;x+=step){
+        const width=Math.min(step,W-x),edge=Math.min(far(x),far(x+width/2),far(x+width));
+        // A high shoreline can hide the last bands of a single flat mirror.
+        // Fit the complete sky into the water available at each horizontal slice.
+        columns.push({x,width,depth:Math.max(1,Math.min(horizonMirrorDepth,edge-waterTop-1))});
+      }
+      return columns;
     }
     function dolphin(progress,lane,reverse=false,verticalProgress=progress){
       const direction=reverse?-1:1,depth=Math.max(1,shore-waterTop),scale=Math.min(1.2,W/560,depth/20);
@@ -236,7 +247,7 @@
       return rows;
     }
     const ripple=(i,t,wind=1)=>({alpha:.15+.75*(.5+.5*Math.sin(t*wind*1.3+i*1.71))**2,drift:Math.sin(t*wind*.5+i)*9,width:.65+.35*Math.sin(t*.9+i)**2});
-    return {routeProgress,motionProgress,motionAge,verticalOffset,visitPose,woodlandPose,duckPose,waterDepth,cycleLeg,deerLeg,nestVisit,eventDepth,dogPose,skater,fireworks,flock,dolphin,starReflection,horizonReflection,cityReflection,sunReflection,depthBand,groundAnchor,groundTravelX,groundPose,strideArm,strideFoot,wingFold,balloonDrift,vessel,foregroundTree,nest,ripple,horizon,waterTop,far,middle,near,rail,trail,lowerRail,railCars,tangent,rider,pack};
+    return {routeProgress,motionProgress,motionAge,verticalOffset,visitPose,woodlandPose,duckPose,waterDepth,cycleLeg,deerLeg,nestVisit,eventDepth,dogPose,skater,fireworks,flock,dolphin,starReflection,horizonReflection,horizonReflectionColumns,cityReflection,sunReflection,depthBand,groundAnchor,groundTravelX,groundPose,strideArm,strideFoot,wingFold,balloonDrift,vessel,foregroundTree,nest,ripple,horizon,waterTop,far,middle,near,rail,trail,lowerRail,railCars,tangent,rider,pack};
   }
   root.LandscapeGeometry={create};
 })(globalThis);

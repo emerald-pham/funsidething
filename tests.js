@@ -9402,7 +9402,7 @@ test('Landscape water: one horizon rule reflects nearby night sky objects and ev
   assert.ok(rows.length>4,'the lake samples several reflection bands');
   assert.ok(g.horizonReflection(0,1,0).length>4,'daylight can mirror the sky and its visitors');
   assert.ok(rows.every(row=>row.sourceY>=0&&row.sourceY<g.horizon),'every sample comes from above the horizon');
-  assert.ok(rows.every(row=>row.y>=g.waterTop&&row.sourceHeight>0&&row.alpha>0&&row.alpha<=.24),'every sample lands softly below the waterline');
+  assert.ok(rows.every(row=>row.y>=g.waterTop&&row.sourceHeight>0&&row.alpha>0&&row.alpha<=.57),'every sample lands softly below the waterline');
   assert.ok(rows.some((row,index)=>row.dx!==later[index].dx),'the mirrored pixels move with the water');
   assert.ok(rows[0].sourceY>rows.at(-1).sourceY,'objects nearest the horizon enter the water first');
  }
@@ -9421,7 +9421,7 @@ test('RISK landscape water: the full above-horizon scene and weather can reflect
   for(const night of [0,.35,1]){
    const rows=g.horizonReflection(0,1,night),depth=Math.min(h*.12,140);
    assert.ok(rows.length>4,`sky reflection exists at brightness ${night} on ${w}x${h}`);
-   assert.ok(rows.every(row=>row.sourceY>=0&&row.sourceY+row.sourceHeight<=g.horizon+.01&&row.y>=g.waterTop&&row.y<g.waterTop+depth&&row.alpha>0&&row.alpha<=.24));
+   assert.ok(rows.every(row=>row.sourceY>=0&&row.sourceY+row.sourceHeight<=g.horizon+.01&&row.y>=g.waterTop&&row.y<g.waterTop+depth&&row.alpha>0&&row.alpha<=.57));
    assert.ok(rows.at(-1).sourceY<g.horizon*.04,'the top of the sky remains eligible to reflect');
    assert.ok(rows[0].sourceY+rows[0].sourceHeight>=g.horizon-.01,'the horizon remains eligible to reflect');
    assert.ok(Array.from({length:101},(_,i)=>g.far(w*i/100)).some(shore=>rows.at(-1).y+rows.at(-1).height<=shore),
@@ -9437,6 +9437,29 @@ test('RISK landscape water: the full above-horizon scene and weather can reflect
  assert.match(waterPass,/paintHorizonReflection\(skyReflection,t/,'the sampled canvas is mirrored into the lake');
  assert.ok(waterPass.indexOf('paintHorizonReflection(skyReflection,t')>waterPass.indexOf('g.clip()'),'the shoreline clips every mirrored object');
  assert.doesNotMatch(waterPass,/if\(p\.night>\.05\)\{[^}]*paintHorizonReflection\(skyReflection/,'the sky mirror is outside the night tint');
+});
+
+test('RISK landscape water: the whole sky stays legible under every shoreline',()=>{
+ const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
+ for(const [w,h] of [[320,568],[390,844],[568,320],[844,390],[1440,900]]){
+  const g=ctx.LandscapeGeometry.create(w,h),columns=g.horizonReflectionColumns(),rows=g.horizonReflection(0,1,.75);
+  assert.equal(columns[0].x,0);assert.equal(columns.at(-1).x+columns.at(-1).width,w);
+  for(let i=0;i<columns.length;i++){
+   const column=columns[i];
+   if(i)assert.equal(column.x,columns[i-1].x+columns[i-1].width,'the sky covers the whole width without gaps');
+   assert.ok(column.depth>0&&column.depth<=Math.min(g.far(column.x),g.far(column.x+column.width))-g.waterTop,
+    'the entire sky, including its top edge, fits below the local shore');
+  }
+  for(const night of [0,.75,1])assert.ok(g.horizonReflection(0,1,night).every(row=>row.alpha>=.42&&row.alpha<=.57),
+   'compressed moonlight, stars, clouds and other sky details retain visible contrast by day and night');
+  assert.ok(rows.every(row=>row.sampleY>=0&&row.sampleY+row.height<=h*.15),
+   'each water band samples the mirrored sky at its own water depth');
+ }
+ const runtime=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ assert.match(runtime,/geometry\.horizonReflectionColumns\(\)/,'the reflection follows each local shoreline');
+ assert.match(runtime,/warp\.scale\(1,-1\)/,'each source column mirrors vertically into the water');
+ assert.match(runtime,/reflectionContext\.drawImage\(base\.canvas/,'the real painted sky is the source');
+ assert.match(runtime,/paintHorizonReflection\(skyReflection,t/,'the same source reflects all above-horizon detail');
 });
 
 test('Landscape time: a saved device-local hour locks scenery without changing the real date',()=>{
