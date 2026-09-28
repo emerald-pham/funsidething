@@ -314,5 +314,56 @@
       "command": "node --test --test-name-pattern='RISK PWA updates:' tests.js",
       "failure": "Before implementation both tests failed. The durable-board case observed one redundant persist call rather than zero and no reload under a simulated quota failure. The unsaved-draft case found no visible update/save message after persist failed, although it correctly withheld reload. Independent review then identified an async host race: the new host test failed before the repair because no persist promise was created, meaning reload could overtake an in-flight host write after Undo. Restricting the shortcut to verified browser keys made it pass."
     }
+  },
+  {
+    "testChangesSha256": "359e38350322e02ef5214d410003878b155f4ed422e4a330b7e0c21c5550ed9a",
+    "reason": "The release-gate repair added a Linux-focused regression for custom core.hooksPath handling after GitHub Actions exposed that the first hook installer treated Git's configured hook path as the shared default. Push CI validates each pushed commit range, so this incremental test addition needs its own exact-diff rationale alongside the cumulative release-gate rationale.",
+    "previousBehavior": "The earlier release-gate candidate covered shared-hook installation but its custom-path fixture passed on macOS and failed on Linux with Missing expected exception. The rationale file described the cumulative pull-request test diff only, leaving the incremental push comparison without an exact fingerprint record.",
+    "intendedBehavior": "A configured custom core.hooksPath is always distinguished from the real shared Git hooks directory, the custom dispatcher remains untouched, and the default directory remains unmodified. Both the incremental push diff and the cumulative pull-request diff retain exact rationale records for the tests each comparison sees.",
+    "replacementTests": [
+      "RISK repository process: custom hook paths are compared with the shared git default"
+    ],
+    "preservedCoverage": [
+      "The new test isolates a configured external hook directory, verifies that installation fails closed, and checks that neither the custom dispatcher nor the shared default is modified.",
+      "Existing shared-hook chaining, tamper detection, legacy-worktree blocking, receipt validation, status publication, deployment verification, and test-first enforcement tests remain unchanged.",
+      "The cumulative release-gate rationale remains bound to the complete base-to-candidate test diff; this additional record binds the same observed red evidence to the smaller commit-range diff used by push CI."
+    ],
+    "redEvidence": {
+      "command": "TMPDIR=/private/tmp node --test --test-reporter=spec --test-name-pattern='RISK repository process: custom hook paths are compared with the shared git default' tests.js",
+      "failure": "Before the installer repair, GitHub Actions on Linux ran the existing 'RISK repository process: shared hook chains prior hooks and blocks a legacy worktree without the validator' test and reported Missing expected exception at tests.js:14735 because Git resolved --git-path hooks through core.hooksPath. The later focused local run named by this record reproduced that failure against the pre-fix installer before canonical default-hook resolution was added."
+    }
+  },
+  {
+    "testChangesSha256": "0ae35d402b588e05cbfbe01b36d4d5da086a9232a89bb103dbec33a7efcbd145",
+    "reason": "The user asked for a hard memory audit and independent review gate for every future release. The existing test-first process had no exact-candidate audit receipt, no local push check, and no deployment check tying the published tree to the reviewed pull request.",
+    "previousBehavior": "The required workflow ran application and rules tests, but a push or Pages deployment did not prove that the exact candidate had a current memory audit and independent final review. The local hook protected app edits only and could silently miss future release-evidence scripts.",
+    "intendedBehavior": "Bind memory-audit and reviewer evidence to the exact commit, tree, and base in external hashed files; require distinct task identities and full review scope; block every outgoing non-deletion tip without valid evidence; publish explicit exact-SHA status contexts only after receipt validation; and block Pages unless a merged PR head has identical tree content, includes the base, and has the latest successful statuses.",
+    "replacementTests": [
+      "RISK repository process: exact-SHA receipts bind audit and review evidence outside the git tree",
+      "RISK repository process: absent, stale, malformed, or nonindependent receipts fail closed",
+      "RISK repository process: pre-push checks every outgoing tip and rejects dirty worktrees",
+      "RISK repository process: status publication needs a valid exact-SHA receipt",
+      "RISK repository process: main deployment requires the merged reviewed head, full tree parity, and latest statuses",
+      "RISK repository process: shared hook chains prior hooks and blocks a legacy worktree without the validator",
+      "RISK test-first gate: release evidence scripts receive edit-time process protection",
+      "RISK repository process: CI makes verified release evidence a deployment prerequisite",
+      "RISK repository process: memory receipts require absolute source paths",
+      "RISK repository process: release evidence rejects future and noncanonical audit timestamps",
+      "RISK repository process: release hooks reject marker-only or tampered dispatchers",
+      "RISK repository process: custom hook paths are compared with the shared git default"
+    ],
+    "preservedCoverage": [
+      "Existing application behavior tests and feature-risk inventory remain unchanged; the added process contracts cover the release policy without weakening saved-task, backup, sync, PWA, or landscape protections.",
+      "Existing regression-rationale, initial-branch comparison, test inventory, CI scanner, and Firestore rules checks remain in place.",
+      "An audited source may change after its recorded audit without invalidating historical evidence for an unchanged candidate; the candidate SHA and copied evidence hashes remain immutable.",
+      "The memory and review evidence is stored under the shared Git metadata directory, excluded from the candidate tree, and validated on every outgoing tip. The deployment fixture matches GitHub’s REST commit response shape and covers missing association, tree mismatch, stale or failed statuses, and out-of-date review bases.",
+      "Absolute source-path checks run during receipt creation and verification. Both audit and review completion times must be canonical UTC timestamps no later than validation time; checksum-valid malformed time claims fail closed.",
+      "The installer accepts only its complete generated dispatcher and verifies any preserved-hook sidecar digest. Marker-only, modified, or sidecar-tampered hooks are left unchanged and rejected.",
+      "A configured custom core.hooksPath remains untouched even where Git reports that configured path as --git-path hooks; default hook installation stays tied to the real Git common directory."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='RISK repository process:|RISK test-first gate: release evidence|RISK test-first gate: unrelated risk' tests.js; node --test --test-reporter=spec --test-name-pattern='RISK repository process: main deployment|RISK repository process: CI makes|RISK repository process: exact-SHA' tests.js; node --test --test-reporter=spec --test-name-pattern='RISK repository process: memory receipts require absolute source paths|RISK repository process: release evidence rejects future and noncanonical audit timestamps|RISK repository process: release hooks reject marker-only or tampered dispatchers' tests.js; temporary a5b29fd receipt fixture re-sealed future and noncanonical timestamps; TMPDIR=/private/tmp node --test --test-reporter=spec --test-name-pattern='RISK repository process: custom hook paths are compared with the shared git default' tests.js",
+      "failure": "In the initial implementation red run, 6 of 8 selected tests failed: four reported missing release-evidence or hook modules, while the process-gate tests accepted untested enforcement scripts and an unrelated scenery RISK case. The later deployment red run passed exact receipt storage but failed deployment verification because the implementation read parents from the wrong location in GitHub’s commit response; the CI contract also failed because Pages had no release-evidence dependency. The unrelated memory-source edit and evidence-tampering checks are now green, and the corrected REST-shape and CI cases pass. Against a5b29fd, all three new focused contracts failed: a relative memory source was recorded, a future audit time was accepted, and a marker-only exit-0 hook was treated as installed. The new timestamp test’s later verifier assertions were not reached in that first run because record-time assertions failed first; an isolated fixture using the original a5b29fd module then re-sealed each altered timestamp and observed both future audit and noncanonical review times accepted by the old verifier. After the fixes, the three focused contracts pass. The latest GitHub Actions run independently exposed a cross-platform failure in the existing custom-hook test: it reported Missing expected exception at tests.js:14735. The new focused test reproduced that result with a canonical temporary path before the fix, then passed after the installer derived the default hooks directory from the common Git directory."
+    }
   }
 ]

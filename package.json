@@ -3,7 +3,11 @@
   "type": "module",
   "scripts": {
     "test": "node --test tests.js",
-    "test:rules": "firebase emulators:exec --only firestore --project demo-chain-scanner-data-safety \"node --test --test-name-pattern='Firestore rules:' tests.js\""
+    "test:rules": "firebase emulators:exec --only firestore --project demo-chain-scanner-data-safety \"node --test --test-name-pattern='Firestore rules:' tests.js\"",
+    "release:install-hook": "node scripts/install-release-hook.mjs",
+    "release:record": "node scripts/release-evidence.mjs record",
+    "release:verify": "node scripts/release-evidence.mjs verify",
+    "release:publish": "node scripts/release-evidence.mjs publish"
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "5.0.2",

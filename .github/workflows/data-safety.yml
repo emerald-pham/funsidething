@@ -45,9 +45,26 @@ jobs:
       - run: npm test
       - run: npm run test:rules
 
+  release-evidence:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+      statuses: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify memory and reviewer evidence for the deployed commit
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/release-evidence.mjs verify-deployment "${{ github.sha }}" "${{ github.event.before }}"
+
   deploy-pages:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: scanner-tests
+    needs: [scanner-tests, release-evidence]
     runs-on: ubuntu-latest
     permissions:
       contents: read

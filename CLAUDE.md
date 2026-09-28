@@ -95,3 +95,20 @@ because they can hide assertions. The record is evidence for review, not an
 automatic permission to regress: the independent reviewer must judge the reason,
 replacement coverage, and actual user-visible result on the final commit. CI
 checks the record and diff; it cannot itself prove that a command ran earlier.
+
+## Memory and exact-commit release gates
+
+Every push candidate needs external receipts for a current memory audit and an
+independent review of that exact commit. Install the shared pre-push gate with
+`npm run release:install-hook`, record evidence with `npm run release:record`,
+verify it with `npm run release:verify`, and publish both required GitHub status
+contexts with `npm run release:publish` before merging. Re-review and re-audit
+whenever the candidate SHA changes. The main ruleset must require
+`funsidething/memory-audit` and
+`funsidething/independent-review` alongside its existing checks. Pages CI
+independently verifies the merged PR head, exact tree, base, and latest statuses
+before deployment. Follow [RELEASE_GATES.md](RELEASE_GATES.md) for the evidence
+format, source snapshots, and release steps. Receipts and statuses record human
+work but cannot prove that the audit or review actually happened; repository
+writers with status permission and protection-bypassing administrators remain
+inside the trust boundary.
