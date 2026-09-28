@@ -7940,7 +7940,7 @@ test('RISK LOCAL BACKUPS: concurrent older-tab write survives the stale-tab repa
  const legacy=syncState({tasks:[syncTask('shared','Older shared key')],syncAccount:'old-owner'});
  const concurrent=syncState({tasks:[syncTask('shared','Concurrent older-shell edit')],syncAccount:'old-owner'});
  const storage=sharedScannerStorage({[LOCAL_HEAD_KEY]:JSON.stringify(original),[SYNC_STORE_KEY]:JSON.stringify(original)});
- const {ctx}=await loadApp({sharedStorage:storage});
+ const {ctx,shim}=await loadApp({sharedStorage:storage});
  storage.setItem(LOCAL_HEAD_KEY,JSON.stringify(newer));storage.setItem(SYNC_STORE_KEY,JSON.stringify(legacy));
  const write=storage.setItem;let raced=false;
  storage.setItem=(key,value)=>{
@@ -7952,13 +7952,14 @@ test('RISK LOCAL BACKUPS: concurrent older-tab write survives the stale-tab repa
  assert.equal(ctx.refreshBrowserCopy(),false);
  assert.equal(raced,true);
  assert.equal(storage.getItem(SYNC_STORE_KEY),JSON.stringify(concurrent),'repair cannot overwrite a newer older-shell edit');
+ assert.match(shim.document.getElementById('toast')?.textContent || '',/keep this tab open|try again/i);
 });
 
 test('RISK LOCAL BACKUPS: primary save holds when another tab commits during its backup',async()=>{
  const original=syncState({tasks:[syncTask('shared','Original')]});
  const concurrent=syncState({tasks:[syncTask('shared','Other tab edit')]});
  const storage=sharedScannerStorage({[LOCAL_HEAD_KEY]:JSON.stringify(original),[SYNC_STORE_KEY]:JSON.stringify(original)});
- const {ctx}=await loadApp({sharedStorage:storage});
+ const {ctx,shim}=await loadApp({sharedStorage:storage});
  ctx.state.tasks[0].title='This tab edit';
  const write=storage.setItem;let raced=false;
  storage.setItem=(key,value)=>{
@@ -7972,6 +7973,25 @@ test('RISK LOCAL BACKUPS: primary save holds when another tab commits during its
  assert.equal(storage.getItem(LOCAL_HEAD_KEY),JSON.stringify(concurrent));
  assert.equal(storage.getItem(SYNC_STORE_KEY),JSON.stringify(concurrent));
  assert.equal(ctx.state.tasks[0].title,'This tab edit','this tab retains its unsaved draft');
+ assert.match(shim.document.getElementById('toast')?.textContent || '',/keep this tab open|try again/i);
+});
+
+test('RISK LOCAL BACKUPS: a changed board before backup announces the unsaved draft',async()=>{
+ const original=syncState({tasks:[syncTask('shared','Original')]});
+ const concurrent=JSON.stringify(syncState({tasks:[syncTask('shared','Other tab edit')]}));
+ const storage=sharedScannerStorage({[LOCAL_HEAD_KEY]:JSON.stringify(original),[SYNC_STORE_KEY]:JSON.stringify(original)});
+ const {ctx,shim}=await loadApp({sharedStorage:storage});
+ ctx.state.tasks[0].title='Unsaved draft';
+ const read=storage.getItem;let heads=0;
+ storage.getItem=key=>{
+  const value=read(key);
+  if(key===LOCAL_HEAD_KEY && ++heads===2){storage.setItem(LOCAL_HEAD_KEY,concurrent);storage.setItem(SYNC_STORE_KEY,concurrent);}
+  return value;
+ };
+ assert.equal(await ctx.persist(),false);
+ assert.equal(storage.getItem(SYNC_STORE_KEY),concurrent);
+ assert.equal(ctx.state.tasks[0].title,'Unsaved draft');
+ assert.match(shim.document.getElementById('toast')?.textContent || '',/keep this tab open|try again/i);
 });
 
 test('RISK LOCAL BACKUPS: cold head initialization holds a concurrent shared-key edit',async()=>{

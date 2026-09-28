@@ -51,6 +51,7 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK LOCAL BACKUPS: cold older-tab bytes carry their recovery IDs into the head
 - RISK LOCAL BACKUPS: concurrent older-tab write survives the stale-tab repair tail
 - RISK LOCAL BACKUPS: primary save holds when another tab commits during its backup
+- RISK LOCAL BACKUPS: a changed board before backup announces the unsaved draft
 - RISK LOCAL BACKUPS: cold head initialization holds a concurrent shared-key edit
 - RISK LOCAL BACKUPS: paired save holds an older-shell write between its two keys
 - RISK LOCAL BACKUPS: concurrent manual copy survives an automatic index write
