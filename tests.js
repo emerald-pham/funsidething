@@ -7901,6 +7901,203 @@ test('RISK LOCAL BACKUPS: stale-tab adoption carries pinned recovery IDs durably
  assert.ok(reopened.readLocalBackups().some(row=>row.id===pinned.id),'later expiry cannot drop the original edit');
 });
 
+test('RISK CLOUD BACKUP: confirmed cloud state releases temporary recovery pins for later device saves',async()=>{
+ const prepared=await loadApp();
+ const at=Date.now(),day=prepared.ctx.backupDay(at);
+ const local=JSON.parse(JSON.stringify(prepared.ctx.state));
+ Object.assign(local,{tasks:[syncTask('shared','Confirmed board')],syncRev:4,syncAccount:'e@example.com',
+  syncDirty:false,protectedBackupIds:['confirmed-adoption']});
+ prepared.ctx.hydrateState(local);
+ const remote=JSON.parse(JSON.stringify(local));
+ for(const key of ['syncRev','syncAccount','lastCloudServerAt','syncDirty','protectedBackupIds']) delete remote[key];
+ const pinned={id:'confirmed-adoption',day,at,kind:'before-cloud-adoption',payload:JSON.stringify(local)};
+ const raw=JSON.stringify(local);
+ const storage=sharedScannerStorage({[LOCAL_HEAD_KEY]:raw,[SYNC_STORE_KEY]:raw,[LOCAL_BACKUPS_KEY]:JSON.stringify([pinned])});
+ const h=makeSyncHarness({remote,rev:4});
+ const {ctx,shim}=await loadApp({sharedStorage:storage,cloudSyncFactory:h.factory});
+ await ctx.cloudPull();
+ assert.ok(ctx.readLocalBackups().some(row=>row.id===pinned.id),
+  'confirmation releases only the temporary pin; the recovery row remains until ordinary rotation needs room');
+ setFakeTime(ctx,Date.now()+8*24*HOUR);
+ const write=storage.setItem;
+ storage.setItem=(key,value)=>{
+  if((key===LOCAL_HEAD_KEY||key===SYNC_STORE_KEY) && String(value).includes('Saved after cloud confirmation') &&
+      JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY)||'[]').some(row=>row.id===pinned.id)){
+   const error=Error('aggregate browser storage quota');error.name='QuotaExceededError';throw error;
+  }
+  write(key,value);
+ };
+ ctx.state.tasks[0].title='Saved after cloud confirmation';
+ assert.equal(await ctx.persist(),true,
+  'ordinary automatic rotation may retire the released row so the primary board can save; toast: '+
+   (shim.document.getElementById('toast')?.textContent||'')+'; pins: '+JSON.stringify(ctx.state.protectedBackupIds)+
+   '; disk pins: '+JSON.stringify(JSON.parse(storage.getItem(LOCAL_HEAD_KEY)).protectedBackupIds)+
+   '; backups: '+storage.getItem(LOCAL_BACKUPS_KEY));
+ assert.equal(ctx.state.protectedBackupIds.length,0,
+  'an exact Firestore read proves every prior adoption board no longer needs a permanent quota pin');
+ assert.deepEqual(JSON.parse(storage.getItem(LOCAL_HEAD_KEY)).protectedBackupIds,[],
+  'the released recovery marker must survive an iOS reload');
+ assert.ok(!ctx.readLocalBackups().some(row=>row.id===pinned.id));
+ assert.doesNotMatch(shim.document.getElementById('toast')?.textContent||'',/Couldn't save this edit on this device/);
+});
+
+test('RISK CLOUD BACKUP: union recovery stays pinned only until its exact Firestore acknowledgement',async()=>{
+ const local=syncState({tasks:[syncTask('local','Offline edit')],syncRev:2,syncDirty:true});
+ const remote=syncState({tasks:[syncTask('remote','Other device')],syncRev:3});
+ const storage=sharedScannerStorage({[SYNC_STORE_KEY]:JSON.stringify(local)});
+ const h=makeSyncHarness({remote,rev:3,delayMs:35});
+ const {ctx}=await loadApp({sharedStorage:storage,cloudSyncFactory:h.factory});
+ await ctx.cloudPull();
+ assert.ok(ctx.state.protectedBackupIds.length>0,
+  'the displaced board remains pinned while the reconciled union write is in flight');
+ const recoveryId=ctx.state.protectedBackupIds[0];
+ assert.ok(ctx.readLocalBackups().some(row=>row.id===recoveryId));
+ await syncSettle(120);
+ assert.deepEqual(new Set(h.remoteState().tasks.map(task=>task.id)),new Set(['local','remote']));
+ assert.equal(ctx.state.protectedBackupIds.length,0,
+  'the exact cloud acknowledgement ends temporary quota protection');
+ assert.equal(JSON.parse(storage.getItem(SYNC_STORE_KEY)).protectedBackupIds.length,0,
+  'the acknowledgement release is durable across reload');
+ assert.ok(ctx.readLocalBackups().some(row=>row.id===recoveryId),
+  'releasing the pin does not immediately delete the recovery board');
+});
+
+test('RISK CLOUD BACKUP: acknowledgement frees disk pins before saving a larger in-flight draft',async()=>{
+ const local=syncState({tasks:[syncTask('local','Saved local task')],syncRev:2,syncDirty:false});
+ const remote=syncState({tasks:[syncTask('remote','Other device')],syncRev:3});
+ const storage=sharedScannerStorage({[SYNC_STORE_KEY]:JSON.stringify(local)});
+ const h=makeSyncHarness({remote,rev:3,delayMs:35});
+ const {ctx,shim}=await loadApp({sharedStorage:storage,cloudSyncFactory:h.factory});
+ await ctx.cloudPull();
+ const recoveryId=ctx.state.protectedBackupIds[0];
+ assert.ok(recoveryId,'the union push begins with an exact displaced-board recovery row');
+ const write=storage.setItem;
+ storage.setItem=(key,value)=>{
+  if((key===LOCAL_HEAD_KEY||key===SYNC_STORE_KEY) && String(value).includes('Larger in-flight draft') &&
+      JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY)||'[]').some(row=>row.id===recoveryId)){
+   const error=Error('aggregate browser storage quota');error.name='QuotaExceededError';throw error;
+  }
+  write(key,value);
+ };
+ ctx.state.tasks.push(syncTask('later','Larger in-flight draft'));
+ ctx.state.updatedAt=Date.now();ctx.state.syncDirty=true;
+ await syncSettle(140);
+ assert.ok(JSON.parse(storage.getItem(SYNC_STORE_KEY)).tasks.some(task=>task.id==='later'),
+  'the acknowledgement first shrinks its stored metadata, then rotates the released automatic row for the larger draft; '+
+   'toast: '+(shim.document.getElementById('toast')?.textContent||'')+'; state pins: '+JSON.stringify(ctx.state.protectedBackupIds)+
+   '; disk: '+storage.getItem(SYNC_STORE_KEY)+'; backups: '+storage.getItem(LOCAL_BACKUPS_KEY));
+ assert.equal(JSON.parse(storage.getItem(SYNC_STORE_KEY)).protectedBackupIds.length,0);
+ assert.ok(!ctx.readLocalBackups().some(row=>row.id===recoveryId));
+ assert.doesNotMatch(shim.document.getElementById('toast')?.textContent||'',/Couldn't save this edit on this device/);
+});
+
+test('RISK CLOUD BACKUP: overwritten same-task edits outlive equal cloud pulls when a daily row was reused',async()=>{
+  const storage=sharedScannerStorage();
+  const {ctx,shim}=await loadApp({sharedStorage:storage});
+  setFakeTime(ctx,Date.parse('2026-09-01T12:00:00Z'));
+  ctx.addTask('Base title'); await ctx.persist();
+  const h=makeSyncHarness({remote:JSON.parse(ctx.cloudPayload()),rev:4});
+  shim.window.CloudSync=h.factory(); await ctx.cloudPull();
+
+  setFakeTime(ctx,Date.parse('2026-09-02T12:00:00Z'));
+  ctx.state.tasks[0].title='My only offline title';
+  ctx.state.updatedAt=Date.now(); ctx.state.syncDirty=true;
+  await ctx.persist();
+  const offlineBoard=JSON.stringify(ctx.state);
+  const stableDaily=ctx.readLocalBackups().find(row=>row.kind==='daily' && row.payload===offlineBoard);
+  assert.ok(stableDaily,'precondition: a new-day save puts the offline edit in a reusable daily row');
+
+  const newer=JSON.parse(h.doc.payload);
+  newer.tasks[0].title='Other device title'; h.writeBehindBack(newer);
+  await ctx.cloudPull();
+  assert.equal(ctx.state.tasks[0].title,'Other device title');
+  assert.ok(ctx.state.protectedBackupIds.includes(stableDaily.id),
+    'the daily row is initially pinned because its overwritten title is absent from the adopted cloud board');
+
+  await ctx.cloudPull();
+  const recovery=ctx.readLocalBackups().find(row=>row.id===stableDaily.id);
+  assert.ok(recovery && recovery.kind==='before-cloud-local-edit' && recovery.payload===offlineBoard,
+    'equal cloud content may release the temporary pin only after the displaced edit is durable nonautomatic recovery');
+});
+
+test('RISK CLOUD BACKUP: a legacy ambiguous daily pin becomes durable before equal-cloud release',async()=>{
+  const prepared=await loadApp();
+  Object.assign(prepared.ctx.state,{tasks:[syncTask('shared','Other device title')],syncRev:5,
+    syncAccount:'e@example.com',syncDirty:false,protectedBackupIds:['legacy-daily']});
+  prepared.ctx.hydrateState(prepared.ctx.state);
+  const local=JSON.parse(JSON.stringify(prepared.ctx.state));
+  const displaced=JSON.parse(JSON.stringify(local));
+  displaced.tasks[0].title='My only offline title'; displaced.syncRev=4; displaced.syncDirty=true;
+  const remote=JSON.parse(prepared.ctx.cloudPayload());
+  const row={id:'legacy-daily',day:'2026-09-02',at:Date.parse('2026-09-02T12:00:00Z'),
+    kind:'daily',payload:JSON.stringify(displaced)};
+  const raw=JSON.stringify(local);
+  const storage=sharedScannerStorage({[LOCAL_HEAD_KEY]:raw,[SYNC_STORE_KEY]:raw,
+    [LOCAL_BACKUPS_KEY]:JSON.stringify([row])});
+  const h=makeSyncHarness({remote,rev:5});
+  const {ctx}=await loadApp({sharedStorage:storage,cloudSyncFactory:h.factory});
+  await ctx.cloudPull();
+  const recovery=ctx.readLocalBackups().find(entry=>entry.id===row.id);
+  assert.ok(recovery && recovery.kind==='before-cloud-local-edit' && recovery.payload===row.payload,
+    'an installed board without new provenance keeps its conflicting offline title in durable recovery');
+  assert.ok(!ctx.state.protectedBackupIds.includes(row.id),
+    'after durable promotion, the stale protection marker no longer blocks ordinary automatic rotation');
+});
+
+test('RISK CLOUD BACKUP: a tight legacy store releases a user-equivalent daily pin without growing the index',async()=>{
+  const prepared=await loadApp();
+  Object.assign(prepared.ctx.state,{tasks:[syncTask('shared','Already in cloud')],updatedAt:200,
+    syncRev:5,syncAccount:'e@example.com',syncDirty:false,protectedBackupIds:['legacy-redundant']});
+  prepared.ctx.hydrateState(prepared.ctx.state);
+  const local=JSON.parse(JSON.stringify(prepared.ctx.state));
+  const older=JSON.parse(JSON.stringify(local));
+  older.updatedAt=100; older.syncRev=4; older.syncDirty=true; delete older.protectedBackupIds;
+  const row={id:'legacy-redundant',day:'2026-09-02',at:Date.parse('2026-09-02T12:00:00Z'),
+    kind:'daily',payload:JSON.stringify(older)};
+  const raw=JSON.stringify(local),backupRaw=JSON.stringify([row]);
+  const storage=sharedScannerStorage({[LOCAL_HEAD_KEY]:raw,[SYNC_STORE_KEY]:raw,[LOCAL_BACKUPS_KEY]:backupRaw});
+  const {ctx,shim}=await loadApp({sharedStorage:storage});
+  const h=makeSyncHarness({remote:JSON.parse(prepared.ctx.cloudPayload()),rev:5});
+  shim.window.CloudSync=h.factory();
+  const backupBeforePull=storage.getItem(LOCAL_BACKUPS_KEY);
+  const write=storage.setItem;
+  storage.setItem=(key,value)=>{
+    if(key===LOCAL_BACKUPS_KEY && value!==backupBeforePull){
+      const error=Error('aggregate browser storage quota'); error.name='QuotaExceededError'; throw error;
+    }
+    write(key,value);
+  };
+  await ctx.cloudPull();
+  assert.ok(!ctx.state.protectedBackupIds.includes(row.id),
+    'device metadata and updatedAt do not make otherwise represented user data ambiguous');
+  assert.equal(storage.getItem(LOCAL_BACKUPS_KEY),backupBeforePull,
+    'redundancy proof releases the pin without needing one more byte for index migration');
+});
+
+test('RISK LOCAL STORAGE: a full iOS store still opens its readable primary board',async()=>{
+ const board=syncState({tasks:[syncTask('daily-work','Daily work must stay visible')]});
+ const raw=JSON.stringify(board),values=new Map([[LOCAL_HEAD_KEY,raw],[SYNC_STORE_KEY,raw],[LOCAL_BACKUPS_KEY,'[]']]);
+ const used=()=>[...values].reduce((sum,[key,value])=>sum+key.length+value.length,0);
+ const quota=used();
+ const storage={
+  getItem:key=>values.has(key)?values.get(key):null,
+  removeItem:key=>values.delete(key),
+  setItem(key,value){
+   const next=new Map(values);next.set(key,String(value));
+   if([...next].reduce((sum,[name,data])=>sum+name.length+data.length,0)>quota){
+    const error=Error('aggregate browser storage quota');error.name='QuotaExceededError';throw error;
+   }
+   values.set(key,String(value));
+  },
+ };
+ const {ctx}=await loadApp({sharedStorage:storage});
+ assert.equal(ctx.state.tasks.find(task=>task.id==='daily-work')?.title,'Daily work must stay visible',
+  'a failed write probe must not make the app ignore readable saved work');
+ assert.equal(vm.runInContext('useLocal && storageOK',ctx),true,
+  'the readable browser store remains the active backend so later rotation can recover space');
+ assert.equal(storage.getItem(SYNC_STORE_KEY),raw,'opening at quota leaves the primary bytes untouched');
+});
+
 test('RISK LOCAL BACKUPS: failed stale-tab marker write leaves both browser keys intact',async()=>{
  const current=syncState({tasks:[syncTask('shared','Current board')],protectedBackupIds:['pinned-edit']});
  const newer=syncState({tasks:[syncTask('shared','Other tab title')]});
