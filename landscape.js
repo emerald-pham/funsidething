@@ -506,7 +506,7 @@
     reflectionContext.setTransform(dpr,0,0,dpr,0,0);
     reflectionContext.drawImage(skyCity,0,0,skyCity.width,skyCity.height,0,0,W,geometry.waterTop);
     reflectionContext.drawImage(front,0,0,front.width,skyReflection.height,0,0,W,geometry.waterTop);
-    paintWeatherOn(reflectionContext,weather,weatherPhase);
+    paintWeatherOn(reflectionContext,weather,weatherPhase,false,false);
     // Downsampling makes a faint soft copy; deeper water blends in a little
     // more of it without moving or shrinking any reflected object.
     const softWidth=Math.max(1,Math.ceil(skyReflection.width/3)),softHeight=Math.max(1,Math.ceil(skyReflection.height/3));
@@ -603,15 +603,52 @@
       g.globalAlpha=(.2+.6*(.5+.5*Math.sin(t*1.4+i)))*p.night;ellipse(g,x,y,1.5,1.5,'#eff7b7');g.globalAlpha=1;
     }
   }
-  function paintWeatherOn(ctx,weather,phase,updateStatus=false){
+  function paintWeatherOn(ctx,weather,phase,updateStatus=false,includeTint=true){
     if(updateStatus)document.documentElement.dataset.sceneWeather=weather.status;
     LandscapeSeasonal.paint(ctx,treeOrigins,geometry,W,H,world.elapsed,sceneSeason,p,reduced,weather);
     if(!weather.intensity)return;
     const snow=weather.status==='snow'||weather.status==='snowstorm',storm=weather.storm;
     const gust=Math.sin(phase*.22)+Math.sin(phase*.071)*.5,wind=storm?2.3+gust:.5+gust*.15;
-    ctx.save();ctx.globalAlpha=weather.intensity*(snow?.08:storm?.32:.22);ctx.fillStyle='#243746';ctx.fillRect(0,0,W,hy+H*.08);
-    ctx.globalAlpha=weather.intensity*(snow?.18:.4);
-    for(let i=0;i<6;i++){const x=((i+.3)*W/6+phase*(storm?3:1))%(W+180)-90;ellipse(ctx,x,hy*(.12+rand(i+6100)*.2),W*.14,hy*.065,'#344e61');}
+    ctx.save();
+    // A sky-only rectangle left a straight grey boundary across the water and
+    // hills. Carry the weather tint down the whole scene and let it disappear.
+    // The reflection receives clouds and rain, but not a second lake tint.
+    if(includeTint){
+      ctx.globalAlpha=weather.intensity*(snow?.08:storm?.32:.22);
+      const tint=ctx.createLinearGradient(0,0,0,H);
+      tint.addColorStop(0,'rgba(36,55,70,1)');
+      tint.addColorStop(.4,'rgba(36,55,70,.72)');
+      tint.addColorStop(.78,'rgba(36,55,70,.17)');
+      tint.addColorStop(1,'rgba(36,55,70,0)');
+      ctx.fillStyle=tint;ctx.fillRect(0,0,W,H);
+    }
+    ctx.globalAlpha=weather.intensity*(snow?.43:storm?.70:.58)*(1-.12*p.night);
+    // Pale daytime highlights became luminous stickers after sunset. Blend
+    // every lobe shade with the sky's continuous night fraction instead.
+    const daylight=snow?['#eef0e9','#c7d2d2','#a6bac1']:
+      storm?['#b7c9ca','#8fa8b0','#6d8996']:['#d0ded8','#adc5c7','#8eabb3'];
+    const afterDark=snow?['#687a85','#526875','#405866']:
+      storm?['#4b5f70','#394e60','#253c4e']:['#5d7180','#43596b','#31495b'];
+    const cloudShades=daylight.map((ink,index)=>S.mixHex(ink,afterDark[index],p.night));
+    for(let i=0;i<6;i++){
+      const x=((i+.3)*W/6+phase*(storm?3:1))%(W+180)-90;
+      const y=hy*(.13+rand(i+6100)*.22),w=W*(.18+rand(i+6200)*.11),h=hy*(.075+rand(i+6300)*.05);
+      // Uneven lobes and a bowed underside read as a single cloud, while the
+      // vertical shading keeps its weight without opaque floating discs.
+      const shade=ctx.createLinearGradient(0,y-h,0,y+h*.65);
+      shade.addColorStop(0,cloudShades[0]);
+      shade.addColorStop(.55,cloudShades[1]);
+      shade.addColorStop(1,cloudShades[2]);
+      ctx.fillStyle=shade;ctx.beginPath();ctx.moveTo(x-w*.5,y+h*.25);
+      ctx.bezierCurveTo(x-w*.63,y-h*.10,x-w*.47,y-h*.32,x-w*.35,y-h*.30);
+      ctx.bezierCurveTo(x-w*.34,y-h*.80,x-w*.12,y-h*.91,x+w*.01,y-h*.57);
+      ctx.bezierCurveTo(x+w*.13,y-h*.97,x+w*.35,y-h*.78,x+w*.37,y-h*.39);
+      ctx.bezierCurveTo(x+w*.56,y-h*.38,x+w*.64,y-h*.08,x+w*.49,y+h*.25);
+      ctx.bezierCurveTo(x+w*.34,y+h*.49,x+w*.22,y+h*.38,x+w*.08,y+h*.42);
+      ctx.bezierCurveTo(x-w*.08,y+h*.54,x-w*.26,y+h*.40,x-w*.38,y+h*.37);
+      ctx.bezierCurveTo(x-w*.47,y+h*.34,x-w*.49,y+h*.31,x-w*.5,y+h*.25);
+      ctx.closePath();ctx.fill();
+    }
     ctx.globalAlpha=weather.intensity*(snow?.55:storm?.72:.62);
     const count=Math.round(W/(storm?8:snow?22:9));
     for(let i=0;i<count;i++){
