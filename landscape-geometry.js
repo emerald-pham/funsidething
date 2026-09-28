@@ -269,13 +269,18 @@
     }
     const sunReflection=sun=>sun.visible&&sun.altitude>0;
     const ripple=(i,t,wind=1)=>({alpha:.15+.75*(.5+.5*Math.sin(t*wind*1.3+i*1.71))**2,drift:Math.sin(t*wind*.5+i)*9,width:.65+.35*Math.sin(t*.9+i)**2});
-    // Local interference gives neighboring patches different phases. The same
-    // field is sampled continuously per pixel by the reflection shader.
+    // Fine crossing ripple packets mostly compress reflected height. Their
+    // weak sideways component avoids rubbery building edges; this numerical
+    // twin keeps the GPU field testable at every viewport and frame time.
     const reflectionMotion=(x,depth,t,wind=1,frozen=false)=>{
-      if(frozen||depth<=0)return 0;
-      const phase=t*Math.max(.35,Number(wind)||1),q=Math.min(1,Math.max(0,depth)/24);
-      return q*q*(3-2*q)*(1.7*Math.sin(x*.045+depth*.32-phase*.9)+
-        .9*Math.sin(x*.073-depth*.21+phase*1.1)*Math.cos(x*.017+phase*.63));
+      if(frozen||depth<=0)return {dx:0,dy:0};
+      const phase=t*Math.max(.35,Number(wind)||1),q=Math.min(1,Math.max(0,depth)/28);
+      const envelope=q*q*(3-2*q)*(.25+.75*Math.min(1,Math.max(0,depth)/110));
+      const warp=.6*Math.sin(x*.034+depth*.051+phase*.23);
+      const packet=Math.sin(depth*.49+x*.022-phase*1.11+warp);
+      const detail=Math.sin(depth*.91-x*.047+phase*1.39+.35*Math.sin(x*.015+depth*.037-phase*.31));
+      const field=packet*.68+detail*.32;
+      return {dx:envelope*(.33*field+.1*Math.sin(x*.071+depth*.24-phase*.63)),dy:envelope*1.25*field};
     };
     return {routeProgress,motionProgress,motionAge,verticalOffset,visitPose,woodlandPose,duckPose,waterDepth,cycleLeg,deerLeg,nestVisit,eventDepth,dogPose,skater,fireworks,flock,dolphin,starReflection,reflectionSurface,reflectionMotion,castShadow,grassBand,sunReflection,depthBand,groundAnchor,groundTravelX,groundPose,strideArm,strideFoot,wingFold,balloonDrift,vessel,foregroundTree,nest,ripple,skyPoint,horizon,waterTop,far,middle,near,rail,trail,lowerRail,railCars,tangent,rider,pack};
   }
