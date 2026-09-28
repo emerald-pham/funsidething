@@ -20,9 +20,28 @@ jobs:
           distribution: temurin
           java-version: '21'
       - run: npm ci
-      - run: node scripts/test-first-gate.mjs "$BASE_SHA"
+      - name: Resolve comparison base
+        id: diff-base
+        shell: bash
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha || '' }}
+          PUSH_BEFORE_SHA: ${{ github.event.before || '' }}
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          if [[ -n "$PR_BASE_SHA" ]]; then
+            base="$PR_BASE_SHA"
+          elif [[ -z "$PUSH_BEFORE_SHA" || "$PUSH_BEFORE_SHA" =~ ^0+$ ]]; then
+            git fetch --no-tags origin main
+            base="$(git merge-base origin/main "$HEAD_SHA")"
+          else
+            base="$PUSH_BEFORE_SHA"
+          fi
+          if [[ ! "$base" =~ ^[0-9a-f]{40}$ ]] || ! git cat-file -e "$base^{commit}"; then
+            echo "Could not resolve a commit to compare against." >&2
+            exit 1
+          fi
+          echo "sha=$base" >> "$GITHUB_OUTPUT"
+      - run: node scripts/test-first-gate.mjs "${{ steps.diff-base.outputs.sha }}"
       - run: npm test
       - run: npm run test:rules
 

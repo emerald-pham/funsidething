@@ -5,6 +5,7 @@ import vm from "node:vm";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { spawnSync } from "node:child_process";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const HTML_PATH = path.join(__dirname, "index.html");
@@ -13579,8 +13580,10 @@ test('RISK landscape weather: organic rain storm and snow clouds darken smoothly
 
 test('Repository test-first guard covers every app module and documents risk cases',()=>{
  const guard=fs.readFileSync(path.join(__dirname,'.claude/hooks/test-first-guard.sh'),'utf8');
- for(const file of ['landscape.js','landscape-core.js','landscape-mood.js','landscape-geometry.js','landscape-seasonal.js','location.js','landscape.css','index.html','sw.js'])
-  assert.match(guard,new RegExp(file.replaceAll('.','\\.')));
+ for(const pattern of ['*.html','*.js','*.mjs','*.css','*.webmanifest','*.svg','*.png'])
+  assert.ok(guard.includes(pattern),`future runtime files of type ${pattern} must remain protected`);
+ assert.match(guard,/scripts\/test-first-gate\.mjs/);
+ assert.match(guard,/\.github\/workflows/);
  const policy=fs.readFileSync(path.join(__dirname,'CLAUDE.md'),'utf8');
  assert.match(policy,/risk-based/i);assert.match(policy,/red output/i);assert.match(policy,/full suite/i);
 });
@@ -13705,3 +13708,44 @@ test('RISK regression gate: changing existing tests requires a specific reason a
   assert.ok(validateRegressionChanges(['@@ -40,0 +41 @@','+process.exit(0);'],[],40).length,'appended executable code cannot disable the suite');
   assert.ok(validateRegressionChanges(['@@ -12,0 +13 @@','+ const helper = () => true;'],[],40).length,'conservative gate protects arbitrary edits inside existing coverage');
  });
+
+test('RISK test-first gate: future runtime modules are detected without a filename allowlist',async()=>{
+ const {validateTestFirst}=await import('./scripts/test-first-gate.mjs');
+ const errors=validateTestFirst(['features/new-scan-rule.js'],[]).join(' ');
+ assert.match(errors,/tests\.js/,'a new application module must not bypass the test-first diff gate');
+});
+
+test('RISK test-first gate: scanner, landscape, time, rules, and offline-shell edits need a new risk case',async()=>{
+ const {validateTestFirst}=await import('./scripts/test-first-gate.mjs');
+ const riskFiles=['index.html','location.js','stars.js','landscape.js','landscape-appearance.js','landscape-riders.js','landscape-seasonal.js','landscape-skywriter.js','landscape-winter.js','sw.js','manifest.webmanifest','firestore.rules','features/new-module.js'];
+ for(const file of riskFiles){
+  const errors=validateTestFirst([file,'tests.js'],['+test("ordinary behavior test",()=>{})']).join(' ');
+  assert.match(errors,/RISK/,`${file} must require a new high-risk contract`);
+ }
+});
+
+test('RISK test-first gate: changing enforcement code requires process tests and a new risk case',async()=>{
+ const {validateTestFirst}=await import('./scripts/test-first-gate.mjs');
+ for(const file of ['scripts/test-first-gate.mjs','.claude/hooks/test-first-guard.sh','.github/workflows/data-safety.yml']){
+  assert.match(validateTestFirst([file],[]).join(' '),/tests\.js/,`${file} must be covered by a process test`);
+  assert.match(validateTestFirst([file,'tests.js'],['+test("ordinary behavior test",()=>{})']).join(' '),/RISK/,`${file} requires a risk-labeled process test`);
+ }
+});
+
+test('RISK test-first gate: initial branch pushes cannot skip the diff comparison',()=>{
+ const result=spawnSync(process.execPath,[path.join(__dirname,'scripts/test-first-gate.mjs'),'0'.repeat(40)],{cwd:__dirname,encoding:'utf8'});
+ assert.equal(result.status,2,`an all-zero base must fail closed; received ${result.status}: ${result.stdout}`);
+ assert.match(result.stderr,/base|compare|resolve/i);
+ const workflow=fs.readFileSync(path.join(__dirname,'.github/workflows/data-safety.yml'),'utf8');
+ assert.match(workflow,/git merge-base origin\/main/i,'branch creation must compare against the existing default branch');
+});
+
+test('RISK test inventory: every named risk contract maps to a feature boundary',()=>{
+ const inventoryPath=path.join(__dirname,'RISK_TEST_COVERAGE.md');
+ assert.ok(fs.existsSync(inventoryPath),'the repository must keep a readable inventory of current risk contracts');
+ const inventory=fs.readFileSync(inventoryPath,'utf8');
+ const source=fs.readFileSync(path.join(__dirname,'tests.js'),'utf8');
+ const riskNames=[...source.matchAll(/^\s*test\(\s*(['"])(RISK\b[^'"]*)\1/gm)].map(match=>match[2]);
+ for(const name of riskNames)assert.ok(inventory.includes(name),`risk contract is missing from the feature inventory: ${name}`);
+ assert.match(inventory,/future|new feature/i,'the inventory must explain how future work adds risk contracts');
+});
