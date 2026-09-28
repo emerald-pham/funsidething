@@ -14468,6 +14468,16 @@ function releaseGateGit(repo,args){
 function releaseGateHash(file){
  return createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 }
+function releaseGateCanonicalJson(value){
+ if(Array.isArray(value))return '['+value.map(releaseGateCanonicalJson).join(',')+']';
+ if(value&&typeof value==='object')return '{'+Object.keys(value).sort().map(key=>JSON.stringify(key)+':'+releaseGateCanonicalJson(value[key])).join(',')+'}';
+ return JSON.stringify(value);
+}
+function releaseGateReseal(receipt){
+ const {receiptSha256,...payload}=receipt;
+ receipt.receiptSha256=createHash('sha256').update(releaseGateCanonicalJson(payload)).digest('hex');
+ return receipt;
+}
 function makeReleaseGateFixture(){
  const root=fs.mkdtempSync(path.join(process.env.TMPDIR||'/tmp','funsidething-release-gate-'));
  const repo=path.join(root,'repo');
@@ -14557,6 +14567,52 @@ test('RISK repository process: absent, stale, malformed, or nonindependent recei
   const recorded=recordReleaseEvidence(fixture.repo,releaseGateInput(fixture));
   fs.writeFileSync(recorded.receiptPath,'{ malformed');
   assert.equal(verifyReleaseEvidence(fixture.repo,fixture.candidateSha).ok,false,'malformed evidence cannot authorize a push');
+ }finally{cleanupReleaseGateFixture(fixture);}
+});
+
+test('RISK repository process: memory receipts require absolute source paths',async()=>{
+ const {recordReleaseEvidence,verifyReleaseEvidence}=await import('./scripts/release-evidence.mjs');
+ const fixture=makeReleaseGateFixture();
+ try{
+  const relative=path.relative(process.cwd(),fixture.sourcePath);
+  const invalid=releaseGateInput(fixture,{memoryAudit:{sources:[{path:relative,sha256:releaseGateHash(fixture.sourcePath)}]}});
+  assert.throws(()=>recordReleaseEvidence(fixture.repo,invalid),/absolute/i,
+   'relative source paths must not be accepted by resolving them from an incidental current directory');
+  const recorded=recordReleaseEvidence(fixture.repo,releaseGateInput(fixture));
+  const receipt=JSON.parse(fs.readFileSync(recorded.receiptPath,'utf8'));
+  receipt.memoryAudit.sources[0].path=relative;
+  releaseGateReseal(receipt);
+  fs.writeFileSync(recorded.receiptPath,JSON.stringify(receipt,null,2)+'\n');
+  const verified=verifyReleaseEvidence(fixture.repo,fixture.candidateSha);
+  assert.equal(verified.ok,false,'a checksum-valid but nonabsolute source must not authorize the candidate');
+  assert.match(verified.errors.join(' '),/absolute/i);
+ }finally{cleanupReleaseGateFixture(fixture);}
+});
+
+test('RISK repository process: release evidence rejects future and noncanonical audit timestamps',async()=>{
+ const {recordReleaseEvidence,verifyReleaseEvidence}=await import('./scripts/release-evidence.mjs');
+ const fixture=makeReleaseGateFixture();
+ try{
+  const future=new Date(Date.now()+60_000).toISOString();
+  const noncanonical=new Date(Date.now()-60_000).toISOString().replace(/\.\d{3}Z$/,'Z');
+  for(const [field,time] of [['memoryAudit',future],['independentReview',future],
+   ['memoryAudit',noncanonical],['independentReview',noncanonical]]){
+   assert.throws(()=>recordReleaseEvidence(fixture.repo,releaseGateInput(fixture,{[field]:{completedAt:time}})),
+    /time|timestamp|future|canonical/i,`${field} must reject ${time}`);
+  }
+
+  const recorded=recordReleaseEvidence(fixture.repo,releaseGateInput(fixture));
+  const original=JSON.parse(fs.readFileSync(recorded.receiptPath,'utf8'));
+  for(const [field,time] of [['memoryAudit',future],['independentReview',future],
+   ['memoryAudit',noncanonical],['independentReview',noncanonical]]){
+   const receipt=structuredClone(original);
+   receipt[field].completedAt=time;
+   releaseGateReseal(receipt);
+   fs.writeFileSync(recorded.receiptPath,JSON.stringify(receipt,null,2)+'\n');
+   const verified=verifyReleaseEvidence(fixture.repo,fixture.candidateSha);
+   assert.equal(verified.ok,false,`verification must reject ${field} timestamp ${time}`);
+   assert.match(verified.errors.join(' '),/time|timestamp|future|canonical/i);
+  }
  }finally{cleanupReleaseGateFixture(fixture);}
 });
 
@@ -14681,6 +14737,41 @@ test('RISK repository process: shared hook chains prior hooks and blocks a legac
     'a configured hook path is never replaced or silently bypassed');
   }finally{cleanupReleaseGateFixture(custom);}
  }finally{cleanupReleaseGateFixture(fixture);}
+});
+
+test('RISK repository process: release hooks reject marker-only or tampered dispatchers',async()=>{
+ const {installSharedPrePushHook}=await import('./scripts/install-release-hook.mjs');
+ const markerOnly=makeReleaseGateFixture();
+ try{
+  const common=releaseGateGit(markerOnly.repo,['rev-parse','--path-format=absolute','--git-common-dir']);
+  const hooks=path.join(common,'hooks');
+  fs.mkdirSync(hooks,{recursive:true});
+  const hook=path.join(hooks,'pre-push');
+  const bypass='#!/usr/bin/env bash\n# codex-release-gate-managed-v1\nexit 0\n';
+  fs.writeFileSync(hook,bypass,{mode:0o755});
+  assert.throws(()=>installSharedPrePushHook(markerOnly.repo),/managed|modified|tampered|integrity/i,
+   'a marker comment cannot be treated as a valid release gate');
+  assert.equal(fs.readFileSync(hook,'utf8'),bypass,'an untrusted marker-only hook is left untouched');
+ }finally{cleanupReleaseGateFixture(markerOnly);}
+
+ const tampered=makeReleaseGateFixture();
+ try{
+  const common=releaseGateGit(tampered.repo,['rev-parse','--path-format=absolute','--git-common-dir']);
+  const hooks=path.join(common,'hooks');
+  fs.mkdirSync(hooks,{recursive:true});
+  const hook=path.join(hooks,'pre-push');
+  const prior='#!/usr/bin/env bash\nprintf prior-hook-preserved\n';
+  fs.writeFileSync(hook,prior,{mode:0o755});
+  const installed=installSharedPrePushHook(tampered.repo);
+  const altered=fs.readFileSync(hook,'utf8').replace('printf "%s\\n" "$payload" | node "$validator" pre-push "$@"','exit 0');
+  assert.notEqual(altered,fs.readFileSync(hook,'utf8'),'fixture must remove the validator call');
+  fs.writeFileSync(hook,altered,{mode:0o755});
+  assert.throws(()=>installSharedPrePushHook(tampered.repo),/managed|modified|tampered|integrity/i,
+   'an altered dispatcher must not be accepted as an installed gate');
+  assert.equal(fs.readFileSync(hook,'utf8'),altered,'repair does not overwrite an unrecognized dispatcher');
+  assert.equal(fs.readFileSync(installed.preservedHookPath,'utf8'),prior,
+   'the real hook remains recoverable byte-for-byte');
+ }finally{cleanupReleaseGateFixture(tampered);}
 });
 
 test('RISK test inventory: every named risk contract maps to a feature boundary',()=>{

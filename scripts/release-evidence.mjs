@@ -50,8 +50,9 @@ function taskId(value, field) {
 }
 
 function validTime(value, field) {
-  if (typeof value !== 'string' || !Number.isFinite(Date.parse(value)) || new Date(value).toISOString() !== value) {
-    throw new Error(field + ' must be a canonical ISO timestamp.');
+  const timestamp = typeof value === 'string' ? Date.parse(value) : NaN;
+  if (!Number.isFinite(timestamp) || new Date(timestamp).toISOString() !== value || timestamp > Date.now()) {
+    throw new Error(field + ' must be a current or past canonical ISO timestamp; future completion times are invalid.');
   }
   return value;
 }
@@ -117,6 +118,7 @@ function validateInput(repoRoot, input) {
     if (!source || typeof source.path !== 'string' || source.path.trim().length < 3 || !SHA256.test(source.sha256 || '')) {
       throw new Error('Each memory audit source needs a path and a SHA-256 fingerprint.');
     }
+    if (!path.isAbsolute(source.path)) throw new Error('Memory audit source paths must be absolute.');
     const resolved = path.resolve(source.path);
     if (!fs.statSync(resolved).isFile() || hashFile(resolved) !== source.sha256) {
       throw new Error('Memory audit source fingerprint does not match the source read at audit time: ' + source.path);
@@ -215,9 +217,16 @@ export function verifyReleaseEvidence(repoRoot, commitSha) {
   if (receipt?.memoryAudit?.outcome !== 'pass') errors.push('Memory audit receipt is not a pass.');
   if (receipt?.independentReview?.outcome !== 'approved') errors.push('Independent review receipt is not approved.');
   if (receipt?.independentReview?.reviewedSha !== commitSha) errors.push('Independent review does not name the exact candidate SHA.');
+  for (const [key, label] of [['memoryAudit', 'Memory audit'], ['independentReview', 'Independent review']]) {
+    try {
+      validTime(receipt?.[key]?.completedAt, label);
+    } catch (error) {
+      errors.push(error.message);
+    }
+  }
   if (!Array.isArray(receipt?.memoryAudit?.sources) || receipt.memoryAudit.sources.length === 0 ||
-      !receipt.memoryAudit.sources.every(source => typeof source.path === 'string' && SHA256.test(source.sha256 || ''))) {
-    errors.push('Memory audit source list or fingerprints are incomplete.');
+      !receipt.memoryAudit.sources.every(source => typeof source.path === 'string' && path.isAbsolute(source.path) && SHA256.test(source.sha256 || ''))) {
+    errors.push('Memory audit source list, absolute paths, or fingerprints are incomplete.');
   }
   const scope = receipt?.independentReview?.scope;
   if (!scope || scope.fullDiff !== true || scope.relevantTests !== true || scope.userVisibleAndDataSafety !== true) {

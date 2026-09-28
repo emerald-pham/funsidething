@@ -56,7 +56,27 @@ export function installSharedPrePushHook(repoRoot) {
     const current = fs.readFileSync(location.hook, 'utf8');
     if (current.includes('codex-release-gate-managed-v1')) {
       const match = current.match(/^prior_hook="\$hook_dir\/([^"]+)"$/m);
-      return { installed: false, hookPath: location.hook, preservedHookPath: match ? path.join(location.hooks, match[1]) : null, commonDir: location.common };
+      const priorName = match?.[1] || '';
+      if (current !== makeDispatcher(priorName)) {
+        throw new Error('Managed pre-push hook is modified or unrecognized; it was left untouched for inspection.');
+      }
+      let preservedHookPath = null;
+      if (priorName) {
+        const priorMatch = priorName.match(/^pre-push\.codex-preserved-([0-9a-f]{12})$/);
+        if (!priorMatch) throw new Error('Managed pre-push hook names an invalid preserved hook; it was left untouched.');
+        preservedHookPath = path.join(location.hooks, priorName);
+        try {
+          const priorStat = fs.statSync(preservedHookPath);
+          const priorBytes = fs.readFileSync(preservedHookPath);
+          const priorDigest = createHash('sha256').update(priorBytes).digest('hex').slice(0, 12);
+          if (!priorStat.isFile() || priorDigest !== priorMatch[1]) {
+            throw new Error('Managed pre-push hook backup is missing or has changed.');
+          }
+        } catch (error) {
+          throw new Error('Managed pre-push hook backup cannot be verified; it was left untouched. ' + error.message);
+        }
+      }
+      return { installed: false, hookPath: location.hook, preservedHookPath, commonDir: location.common };
     }
   }
   let priorName = '';
