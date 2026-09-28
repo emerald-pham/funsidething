@@ -9558,7 +9558,7 @@ test('RISK landscape water: the Moon mirrors at full resolution with no displace
  assert.match(runtime,/blurredReflection/,'the existing slight depth softness stays');
 });
 
-test('RISK landscape water: reflection distortion varies across the lake without rigid sway',()=>{
+test('RISK landscape water: natural ripples move reflected detail mostly vertically without rigid sway',()=>{
  const runtime=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
  assert.doesNotMatch(runtime,/motion\.shear|g\.transform\(1,0,motion/,'the lake must not swing as one rigid image');
  assert.match(runtime,/waterDistortion\.render\(source,t,wind,reduced,W,geometry.waterTop\)/,'the complete sky image receives local distortion');
@@ -9568,13 +9568,22 @@ test('RISK landscape water: reflection distortion varies across the lake without
   const geometry=context.LandscapeGeometry.create(w,h),motion=geometry.reflectionMotion;
   const depth=40;
   const left=motion(w*.2,depth,1.5,.7,false),right=motion(w*.8,depth,1.5,.7,false);
-  assert.ok(Math.abs(left-right)>.1,'different places at the same depth must distort differently');
+  assert.ok(Math.hypot(left.dx-right.dx,left.dy-right.dy)>.1,'different places at the same depth distort differently');
   const poses=Array.from({length:90},(_,i)=>motion(w*.4,depth,i/30,.7,false));
-  assert.ok(Math.max(...poses)-Math.min(...poses)>.5,'visible reflection detail changes locally over time');
-  assert.ok(poses.every(value=>Math.abs(value)<=3.5),'local waves stay restrained');
-  for(let i=1;i<poses.length;i++)assert.ok(Math.abs(poses[i]-poses[i-1])<.35,'30fps has no coarse jumps');
-  assert.equal(motion(w*.5,0,4,.7,false),0,'waterline displacement is exactly zero');
-  assert.equal(motion(w*.5,depth,4,.7,true),0,'reduced motion keeps the original reflection');
+  assert.ok(poses.every(pose=>Number.isFinite(pose.dx)&&Number.isFinite(pose.dy)),'each sample has two finite displacement axes');
+  const movingPatches=[.2,.4,.6,.8].map(fraction=>{
+   const values=Array.from({length:90},(_,i)=>motion(w*fraction,depth,i/30,.7,false).dy);
+   return Math.max(...values)-Math.min(...values);
+  });
+  assert.ok(Math.max(...movingPatches)>.6,'fine vertical shimmer stays visible while individual patches may rest briefly');
+  assert.ok(poses.every(pose=>Math.abs(pose.dx)<.65&&Math.abs(pose.dy)<1.6),'lateral edges barely wander and vertical compression stays restrained');
+  const verticalEnergy=poses.reduce((sum,pose)=>sum+Math.abs(pose.dy),0),lateralEnergy=poses.reduce((sum,pose)=>sum+Math.abs(pose.dx),0);
+  assert.ok(verticalEnergy>lateralEnergy*1.8,'water movement favors vertical reflection compression over snake-like side sway');
+  for(let i=1;i<poses.length;i++)assert.ok(Math.hypot(poses[i].dx-poses[i-1].dx,poses[i].dy-poses[i-1].dy)<.22,'30fps has no coarse jumps');
+  const contact=motion(w*.5,0,4,.7,false),frozen=motion(w*.5,depth,4,.7,true),shallow=motion(w*.5,2,4,.7,false);
+  assert.equal(contact.dx,0);assert.equal(contact.dy,0,'horizon remains stationary');
+  assert.equal(frozen.dx,0);assert.equal(frozen.dy,0,'reduced motion keeps the original reflection');
+  assert.ok(Math.hypot(shallow.dx,shallow.dy)<.05,'ripple amplitude grows gradually below the horizon');
  }
  assert.doesNotMatch(runtime,/function paintWaterSurface|paintWaterSurface\(/,'no extra contour strokes');
 });
@@ -13205,32 +13214,31 @@ test('RISK landscape water browser: GPU distortion preserves contact and sharp p
    const source=document.createElement('canvas');source.width=390;source.height=300;
    const c=source.getContext('2d'),pixels=c.createImageData(390,300);
    for(let y=0;y<300;y++)for(let x=0;x<390;x++){
-    const i=(y*390+x)*4;pixels.data[i]=x%16<8?240:20;pixels.data[i+1]=y<150?200:40;pixels.data[i+2]=70;pixels.data[i+3]=255;
+    const i=(y*390+x)*4;pixels.data[i]=x%16<8?240:20;pixels.data[i+1]=y%14<7?200:40;pixels.data[i+2]=y<150?70:150;pixels.data[i+3]=255;
    }
    c.putImageData(pixels,0,0);
    const copy=document.createElement('canvas');copy.width=390;copy.height=300;const ctx=copy.getContext('2d');
    const frame=t=>{const out=renderer.render(source,t,1,false,390,300);ctx.clearRect(0,0,390,300);ctx.drawImage(out,0,0);return {gpu:out!==source,data:ctx.getImageData(0,0,390,300).data};};
-   const a=frame(0),b=frame(1.5);let changed=0,contactError=0,alphaMin=255;
-   const shifts=[];
+   const a=frame(0),b=frame(1.5);let changed=0,contactError=0,alphaMin=255,redTravel=0,greenTravel=0;
    for(let y=0;y<300;y++)for(let x=0;x<390;x++){
     const i=(y*390+x)*4;alphaMin=Math.min(alphaMin,b.data[i+3]);
     if(a.data[i]!==b.data[i])changed++;
-    if(y===299)contactError=Math.max(contactError,Math.abs(b.data[i]-pixels.data[i]));
+    redTravel+=Math.abs(a.data[i]-b.data[i]);greenTravel+=Math.abs(a.data[i+1]-b.data[i+1]);
+    if(y===299)for(let channel=0;channel<3;channel++)contactError=Math.max(contactError,Math.abs(b.data[i+channel]-pixels.data[i+channel]));
    }
-   // Same-depth vertical edges should move in different directions/amounts.
-   for(const x0 of [32,96,160,224,288,352]){
-    const edge=data=>{let best=0,bestX=x0;for(let x=x0-5;x<=x0+5;x++){const d=data[(250*390+x)*4]-data[(250*390+x-1)*4];if(d>best){best=d;bestX=x;}}return bestX;};
-    shifts.push(edge(b.data)-edge(a.data));
-   }
+   // At a horizontal stripe edge, neighboring patches receive different
+   // vertical displacement, while the rigid vertical bars hardly snake.
+   const verticalPatches=[32,96,160,224,288,352].map(x=>b.data[(251*390+x)*4+1]);
    const frozen=renderer.render(source,6,1,true,390,300)===source;
-   const orientation=b.data[(20*390+5)*4+1]===200&&b.data[(280*390+5)*4+1]===40;
+   const orientation=b.data[(20*390+5)*4+2]===70&&b.data[(280*390+5)*4+2]===150;
    source.width=568;source.height=132;c.fillStyle='#aabbcc';c.fillRect(0,0,568,132);
    const resized=renderer.render(source,2,1,false,568,132);
-   return {gpu:a.gpu&&b.gpu,changed,contactError,alphaMin,shifts,frozen,orientation,resized:[resized.width,resized.height]};
+   return {gpu:a.gpu&&b.gpu,changed,contactError,alphaMin,redTravel,greenTravel,verticalPatches,frozen,orientation,resized:[resized.width,resized.height]};
   },helper);
   assert.equal(result.gpu,true,'real shader compiled and rendered');
   assert.ok(result.changed>10000,'substantial reflected detail animates');
-  assert.ok(new Set(result.shifts).size>=3,'same-depth patches have independent movement');
+  assert.ok(result.greenTravel>result.redTravel*1.8,'vertical shimmer dominates sideways edge travel');
+  assert.ok(new Set(result.verticalPatches).size>=3,'same-depth patches compress horizontal detail differently');
   assert.ok(result.contactError<=1,'horizon contact row stays sharp and stationary');
   assert.equal(result.alphaMin,255,'no transparent seams or edge holes');
   assert.equal(result.orientation,true,'GPU upload preserves top and bottom');

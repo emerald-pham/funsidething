@@ -41,5 +41,23 @@
       "failure": "The first two new tests failed before implementation: 390x844 high Sun leaves a compact puddle near the trunk was false; 390x844 rain tint covers the full screen was false. A later high-Moon preservation assertion failed while the minimum length affected Moon as well, then passed after restricting it to Sun. Rendered QA exposed a darker lake strip; the new reflection test failed 1 tint rectangle versus expected 0, then passed after retaining reflected clouds and rain without a second tint. The autumn-noon shadow check then failed at 390x844 because a 40-degree Sun still cast a long shade; it passed after shifting the altitude-based falloff. Independent review's night-weather test failed rain cloud shade 0 blends continuously into night, then passed when all three shades and opacity used the palette's night fraction."
     },
     "testChangesSha256": "af5857d794a93f89ea6f6a1955ca94037953c76bfedf0768b9ddff1f3e8259e7"
+  },
+  {
+    "reason": "The user reported that the earlier local wave motion still looked uncanny. Its shader moved reflected detail almost entirely sideways, so vertical building edges visibly snaked. The revised numerical and real-GPU tests protect a restrained crossing-ripple field with mostly vertical compression, while retaining local variation, sharp source sampling, and fixed horizon contact.",
+    "previousBehavior": "Local distortion was a continuous horizontal displacement field with a broad side-to-side sine rhythm; reflected vertical edges wandered across the lake.",
+    "intendedBehavior": "Fine irregular ripple packets change reflected height more than width, with subpixel lateral travel, smooth frame-to-frame motion, and zero displacement at the horizon or under reduced motion.",
+    "replacementTests": [
+      "RISK landscape water: natural ripples move reflected detail mostly vertically without rigid sway"
+    ],
+    "preservedCoverage": [
+      "The revised numerical test still checks independent same-depth patches, bounded 30fps steps, gradual contact ramp, stationary waterline and reduced motion.",
+      "The existing GPU browser test now measures vertical versus lateral texture travel while preserving full-resolution source, orientation, opaque edges, resize, and reduced-motion assertions.",
+      "Other water geometry, boat and celestial reflections, soft depth fade, and no additional contour strokes remain protected by unchanged tests."
+    ],
+    "redEvidence": {
+      "command": "node /tmp/natural-water-base-red.mjs (isolated reproduction loading 22245b3:landscape-geometry.js)",
+      "failure": "AssertionError: natural ripples require two finite displacement axes instead of lateral-only sway; the baseline reflectionMotion returned a single horizontal number rather than finite dx and dy. The previous owner also reported observing the new tests red before applying the paused implementation."
+    },
+    "testChangesSha256": "422edb121b6815687ec04135d2340a4585a7c8f611d2e7e0bc0de412a563773e"
   }
 ]

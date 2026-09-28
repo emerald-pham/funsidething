@@ -110,10 +110,18 @@
           // Texture upload is flipped: depth is distance upward from its bottom
           // edge, which becomes distance below the horizon after the final flip.
           float x=uv.x*size.x,depth=uv.y*size.y;
-          float q=clamp(depth/24.,0.,1.);
-          float dx=q*q*(3.-2.*q)*(1.7*sin(x*.045+depth*.32-time*.9)
-            +.9*sin(x*.073-depth*.21+time*1.1)*cos(x*.017+time*.63));
-          gl_FragColor=texture2D(image,vec2(uv.x+dx/size.x,uv.y));
+          float q=clamp(depth/28.,0.,1.);
+          float envelope=q*q*(3.-2.*q)*(.25+.75*clamp(depth/110.,0.,1.));
+          // Crossing fine packets make reflected height breathe while skyline
+          // edges move less than a pixel sideways. The phase warp breaks the
+          // obvious back-and-forth rhythm of a single traveling sine wave.
+          float warp=.6*sin(x*.034+depth*.051+time*.23);
+          float packet=sin(depth*.49+x*.022-time*1.11+warp);
+          float detail=sin(depth*.91-x*.047+time*1.39+.35*sin(x*.015+depth*.037-time*.31));
+          float field=packet*.68+detail*.32;
+          float dx=envelope*(.33*field+.1*sin(x*.071+depth*.24-time*.63));
+          float dy=envelope*1.25*field;
+          gl_FragColor=texture2D(image,uv+vec2(dx/size.x,dy/size.y));
         }`);
       if(!vertex||!fragment){if(vertex)gl.deleteShader(vertex);if(fragment)gl.deleteShader(fragment);return false;}
       program=gl.createProgram();gl.attachShader(program,vertex);gl.attachShader(program,fragment);gl.linkProgram(program);
