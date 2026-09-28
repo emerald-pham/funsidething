@@ -89,18 +89,77 @@
     b=canvas.getContext('2d');b.setTransform(dpr,0,0,dpr,0,-top*dpr);
   }
   function composite(name){const c=layers[name];if(c)g.drawImage(c,0,c.top,c.width/dpr,c.height/dpr);}
+  function createWaterDistortion(){
+    const canvas=document.createElement('canvas');
+    let gl=null,ready=false,unavailable=false,program,texture,position,time,size;
+    canvas.addEventListener('webglcontextlost',event=>{event.preventDefault();ready=false;});
+    canvas.addEventListener('webglcontextrestored',()=>{ready=false;});
+    function initialize(){
+      gl=gl||canvas.getContext('webgl',{alpha:true,premultipliedAlpha:true,antialias:false,depth:false,stencil:false});
+      if(!gl)return false;
+      const shader=(type,source)=>{
+        const result=gl.createShader(type);gl.shaderSource(result,source);gl.compileShader(result);
+        if(!gl.getShaderParameter(result,gl.COMPILE_STATUS)){gl.deleteShader(result);return null;}
+        return result;
+      };
+      const vertex=shader(gl.VERTEX_SHADER,`attribute vec2 position;
+        varying vec2 uv;void main(){uv=position*.5+.5;gl_Position=vec4(position,0.,1.);}`);
+      const fragment=shader(gl.FRAGMENT_SHADER,`precision highp float;
+        varying vec2 uv;uniform sampler2D image;uniform float time;uniform vec2 size;
+        void main(){
+          // Texture upload is flipped: depth is distance upward from its bottom
+          // edge, which becomes distance below the horizon after the final flip.
+          float x=uv.x*size.x,depth=uv.y*size.y;
+          float q=clamp(depth/24.,0.,1.);
+          float dx=q*q*(3.-2.*q)*(1.7*sin(x*.045+depth*.32-time*.9)
+            +.9*sin(x*.073-depth*.21+time*1.1)*cos(x*.017+time*.63));
+          gl_FragColor=texture2D(image,vec2(uv.x+dx/size.x,uv.y));
+        }`);
+      if(!vertex||!fragment){if(vertex)gl.deleteShader(vertex);if(fragment)gl.deleteShader(fragment);return false;}
+      program=gl.createProgram();gl.attachShader(program,vertex);gl.attachShader(program,fragment);gl.linkProgram(program);
+      gl.deleteShader(vertex);gl.deleteShader(fragment);
+      if(!gl.getProgramParameter(program,gl.LINK_STATUS)){gl.deleteProgram(program);return false;}
+      gl.useProgram(program);
+      const buffer=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buffer);
+      gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),gl.STATIC_DRAW);
+      position=gl.getAttribLocation(program,'position');gl.enableVertexAttribArray(position);
+      gl.vertexAttribPointer(position,2,gl.FLOAT,false,0,0);
+      texture=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,texture);
+      gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);
+      gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL,true);
+      gl.uniform1i(gl.getUniformLocation(program,'image'),0);
+      time=gl.getUniformLocation(program,'time');size=gl.getUniformLocation(program,'size');
+      ready=true;return true;
+    }
+    return {render(source,t,wind,frozen,width,height){
+      // Reduced motion and unavailable/lost GPU contexts retain a complete,
+      // undistorted mirror. No rows, meshes, or extra water strokes are drawn.
+      if(frozen||unavailable||gl?.isContextLost())return source;
+      if(!ready&&!initialize()){unavailable=true;return source;}
+      if(canvas.width!==source.width)canvas.width=source.width;
+      if(canvas.height!==source.height)canvas.height=source.height;
+      gl.viewport(0,0,canvas.width,canvas.height);
+      gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,source);
+      gl.uniform1f(time,t*Math.max(.35,Number(wind)||1));gl.uniform2f(size,width,height);
+      gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
+      return canvas;
+    }};
+  }
+  const waterDistortion=createWaterDistortion();
   function paintHorizonReflection(source,t,opacity=1){
     const surface=geometry.reflectionSurface(p.night);
-    const motion=geometry.reflectionMotion(t,wind,reduced);
-    // Move the complete high-resolution mirror through one continuous affine
-    // transform. Separate strips and drawn-on crests made the Moon band and the
-    // water look disconnected from its reflection.
+    source=waterDistortion.render(source,t,wind,reduced,W,geometry.waterTop);
+    // A continuous pixel displacement bends local patches without introducing
+    // strip boundaries, lowering resolution, or swaying the lake as one sheet.
     g.save();g.globalAlpha=opacity;
     g.translate(0,2*surface.axisY);
     // Overdraw the clipped waterline by one device pixel so canvas edge
     // sampling cannot leave a pale seam under the skyline.
     g.translate(0,-1/dpr);g.scale(1,-1);
-    g.transform(1,0,motion.shear,1,-motion.shear*surface.axisY,0);
     g.drawImage(source,0,0,W,geometry.waterTop);
     g.restore();
   }
@@ -232,7 +291,7 @@
     b=cityTarget;b.drawImage(cityLayer,0,0,cityLayer.width/dpr,cityLayer.height/dpr);
     // Cache the opaque sky and skyline before the lake fill touches their
     // bottom row; sampling that water row made a thin bright horizon seam.
-    const skyCityHeight=Math.max(1,Math.ceil(geometry.waterTop*dpr));
+    const skyCityHeight=Math.max(1,Math.floor(geometry.waterTop*dpr));
     if(skyCity.width!==back.width)skyCity.width=back.width;
     if(skyCity.height!==skyCityHeight)skyCity.height=skyCityHeight;
     const skyCityContext=skyCity.getContext('2d');
@@ -438,7 +497,7 @@
     // separate reflection rule for each type.
     for(const e of world.events)if(airborne.has(e.type)&&!waterEvents.has(e.type))paintEvent(e,t);
     const weather=S.weatherAt(new Date(),sceneSeason),weatherPhase=reduced?0:Date.now()/1000;
-    const reflectionHeight=Math.max(1,Math.ceil(geometry.waterTop*dpr));
+    const reflectionHeight=Math.max(1,Math.floor(geometry.waterTop*dpr));
     if(skyReflection.width!==front.width)skyReflection.width=front.width;
     if(skyReflection.height!==reflectionHeight)skyReflection.height=reflectionHeight;
     const reflectionContext=skyReflection.getContext('2d');
@@ -478,15 +537,18 @@
     mirror.setTransform(dpr,0,0,dpr,0,0);
     mirror.drawImage(skyReflection,0,0,skyReflection.width,skyReflection.height,0,0,W,geometry.waterTop);
     mirror.drawImage(softenedReflection,0,0,softenedReflection.width,softenedReflection.height,0,0,W,geometry.waterTop);
-    // The first reflected row should meet the skyline. Fade its opacity to
-    // the usual water strength within three pixels, with no separate band.
+    // Match skyline opacity with a flat slope at contact. A three-pixel
+    // linear fade produced a conspicuous straight rule across the water.
     mirror.globalCompositeOperation='destination-in';
     const contact=mirror.createLinearGradient(0,geometry.waterTop-surface.contactDepth,0,geometry.waterTop);
-    contact.addColorStop(0,`rgba(0,0,0,${surface.contactAlpha(surface.contactDepth)})`);
-    contact.addColorStop(1,`rgba(0,0,0,${surface.contactAlpha(0)})`);
+    for(let i=0;i<=16;i++){
+      const depth=surface.contactDepth*(1-i/16);
+      contact.addColorStop(i/16,`rgba(0,0,0,${surface.contactAlpha(depth)})`);
+    }
     mirror.fillStyle=contact;mirror.fillRect(0,0,W,geometry.waterTop);
     mirror.globalCompositeOperation='source-over';
-    g.save();path(g,far);g.lineTo(W,geometry.waterTop);g.lineTo(0,geometry.waterTop);g.closePath();g.clip();
+    const lakeContact=Math.floor(geometry.waterTop*dpr)/dpr-1/dpr;
+    g.save();path(g,far);g.lineTo(W,lakeContact);g.lineTo(0,lakeContact);g.closePath();g.clip();
     if(p.night>.05){
       const reflectedSky=g.createLinearGradient(0,geometry.waterTop,0,geometry.waterTop+H*.12);
       reflectedSky.addColorStop(0,p.sky[2]);reflectedSky.addColorStop(1,p.sky[0]);

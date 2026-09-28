@@ -1,0 +1,24 @@
+[
+  {
+    "reason": "The user explicitly rejected synchronized reflection sway and reported a regression at the horizon. Local distortion replaces only that obsolete motion expectation; the three-pixel contact fade was a demonstrated source of the visible horizon rule. The old ceiling-buffer assertion was explicitly replaced because its partial-alpha terminal row contributes a seam at fractional pixel density; only whole opaque source rows are now sampled.",
+    "previousBehavior": "The entire reflected scene used one affine shear, and opacity fell linearly within three pixels of the waterline.",
+    "intendedBehavior": "Reflected patches distort independently with continuous pixel sampling. Horizon contact starts with a flat opacity slope and fades gradually without a straight rule.",
+    "replacementTests": [
+      "RISK landscape water: reflection distortion varies across the lake without rigid sway",
+      "RISK landscape water browser: GPU distortion preserves contact and sharp pixels while patches move independently",
+      "RISK landscape water: lake clip overlaps the horizon contact at fractional pixel densities",
+      "RISK regression gate: changing existing tests requires a specific reason and replacement coverage",
+      "RISK regression gate: insertions cannot silently disable existing assertions"
+    ],
+    "preservedCoverage": [
+      "Natural reflected height, full-resolution sampling, local motion boundedness and smooth 30fps steps.",
+      "Stationary horizon contact, eased opacity, no overlay contours, restrained original glints and reduced motion.",
+      "Existing floating-object reflection, celestial timing and lighting, train tracks, electrical and vehicle layering tests remain intact."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='reflection distortion varies|lake clip overlaps|reflection opacity meets' tests.js (run separately before each implementation)",
+      "failure": "Before implementation, the tests failed on whole-image motion.shear, missing fractional lakeContact overlap, and contactDepth outside 12-18 pixels. Regression gate test also first failed because validateRegressionChanges was undefined. Full-suite validation also caught the old ceiling-buffer contract; its updated assertion now preserves the full-size mirror while requiring an opaque edge. Add-only return and moved-insertion gate fixtures each failed before their corresponding guard fixes. Appended executable-code exemption was removed after red fixtures showed new test additions and process termination could evade explanation."
+    },
+    "testChangesSha256": "270d89627c58af4da6bd20b826980663b86ba2878a9284095bdd3288388de1ac"
+  }
+]

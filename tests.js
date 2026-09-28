@@ -9387,7 +9387,7 @@ test('Landscape water: the actual skyline shares the full-size sky mirror',()=>{
  const runtime=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
  const waterPass=runtime.slice(runtime.indexOf('    paintHorizonReflection(reflectionCanvas,t'),runtime.indexOf('    const reflection=point(sky.sun.azimuth'));
  assert.doesNotMatch(waterPass,/geometry\.cityReflection\(|g\.drawImage\(cityLayer/,'the city cannot be rescaled in a second water pass');
- assert.match(runtime,/const reflectionHeight=Math\.max\(1,Math\.ceil\(geometry\.waterTop\*dpr\)\)/,'the source includes the full skyline down to the waterline');
+ assert.match(runtime,/const reflectionHeight=Math\.max\(1,Math\.floor\(geometry\.waterTop\*dpr\)\)/,'the source includes opaque whole skyline pixels without a partial-alpha final row');
  assert.match(runtime,/geometry\.sunReflection\(sky.sun\)/);
  assert.doesNotMatch(runtime,/sky\.sun\.visible\?sky\.sun:sky\.moon/);
 });
@@ -9542,36 +9542,25 @@ test('RISK landscape water: the Moon mirrors at full resolution with no displace
  assert.match(runtime,/blurredReflection/,'the existing slight depth softness stays');
 });
 
-test('RISK landscape water: the complete reflection moves as one smooth surface without overlay strokes',()=>{
+test('RISK landscape water: reflection distortion varies across the lake without rigid sway',()=>{
  const runtime=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
- const start=runtime.indexOf('  function paintHorizonReflection('),end=runtime.indexOf('  const point=',start);
- assert.ok(start>=0&&end>start,'the production reflection painter is available');
- const painter=runtime.slice(start,end);
- const frameAt=t=>{
-  const draws=[],affine=[];
-  const g={globalAlpha:1,save(){},restore(){},translate(){},scale(){},transform(...args){affine.push(args);},drawImage(_source,x,y,w,h){draws.push({x,y,w,h});}};
-  vm.runInNewContext(`${painter};paintHorizonReflection({},${t})`,{g,geometry:{waterTop:300,reflectionSurface:()=>({axisY:300,alpha:.5}),reflectionMotion(time){return {shear:Math.sin(time)*.012};}},p:{night:.75},wind:1,reduced:false,W:390,dpr:1.5,Math});
-  assert.equal(draws.length,1,'each frame mirrors the whole image in one draw');
-  assert.equal(affine.length,1,'one continuous affine transform moves the complete reflection');
-  return {draw:draws[0],affine:affine[0]};
- };
- const first=frameAt(0),later=frameAt(1.5);
- assert.deepEqual(first.draw,{x:0,y:0,w:390,h:300},'natural-height reflection remains one full-resolution draw');
- assert.equal(first.affine[2],0,'the surface starts from its neutral pose');
- assert.notEqual(later.affine[2],0,'the reflected scene itself moves over time');
- assert.equal(later.affine[4],-later.affine[2]*300,'the horizon stays fixed while deeper water moves');
+ assert.doesNotMatch(runtime,/motion\.shear|g\.transform\(1,0,motion/,'the lake must not swing as one rigid image');
+ assert.match(runtime,/waterDistortion\.render\(source,t,wind,reduced,W,geometry.waterTop\)/,'the complete sky image receives local distortion');
  const context=vm.createContext({Math});
  vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),context);
- for(const [w,h] of [[390,844],[588,1280],[568,320]]){
+ for(const [w,h] of [[390,844],[588,1280],[768,1024],[568,320]]){
   const geometry=context.LandscapeGeometry.create(w,h),motion=geometry.reflectionMotion;
-  const poses=Array.from({length:90},(_,i)=>motion(i/30,.7,false));
-  const deep=poses.map(p=>-geometry.waterTop*p.shear);
-  assert.ok(Math.max(...deep)-Math.min(...deep)>2.5,'the complete reflection visibly sways even in light wind');
-  assert.ok(deep.every(value=>Math.abs(value)<=5.1),'motion remains gentle enough to preserve the scene');
-  for(let i=1;i<deep.length;i++)assert.ok(Math.abs(deep[i]-deep[i-1])<.35,'the 30fps reflection motion has no low-frame-rate jumps');
-  assert.equal(motion(4,.7,true).shear,0,'reduced motion freezes the water at its neutral pose');
+  const depth=40;
+  const left=motion(w*.2,depth,1.5,.7,false),right=motion(w*.8,depth,1.5,.7,false);
+  assert.ok(Math.abs(left-right)>.1,'different places at the same depth must distort differently');
+  const poses=Array.from({length:90},(_,i)=>motion(w*.4,depth,i/30,.7,false));
+  assert.ok(Math.max(...poses)-Math.min(...poses)>.5,'visible reflection detail changes locally over time');
+  assert.ok(poses.every(value=>Math.abs(value)<=3.5),'local waves stay restrained');
+  for(let i=1;i<poses.length;i++)assert.ok(Math.abs(poses[i]-poses[i-1])<.35,'30fps has no coarse jumps');
+  assert.equal(motion(w*.5,0,4,.7,false),0,'waterline displacement is exactly zero');
+  assert.equal(motion(w*.5,depth,4,.7,true),0,'reduced motion keeps the original reflection');
  }
- assert.doesNotMatch(runtime,/function paintWaterSurface|paintWaterSurface\(/,'water motion comes from the reflection instead of drawn-on lines');
+ assert.doesNotMatch(runtime,/function paintWaterSurface|paintWaterSurface\(/,'no extra contour strokes');
 });
 
 test('RISK landscape water: existing glints stay restrained while the reflection supplies the motion',()=>{
@@ -9597,7 +9586,7 @@ test('RISK landscape water: the full-size mirror overdraws the clipped horizon b
  for(const dpr of [1,1.5,2]){
   let translateY=0,scaleY=1,draw;
   const g={globalAlpha:1,save(){},restore(){},translate(_x,y){translateY+=scaleY*y;},scale(_x,y){scaleY*=y;},transform(){},drawImage(_source,_x,y,_w,h){draw={start:translateY+scaleY*(y+h),scaleY};}};
-  vm.runInNewContext(`${painter};paintHorizonReflection({},0)`,{g,geometry:{waterTop:300,reflectionSurface:()=>({axisY:300,alpha:.5}),reflectionMotion:()=>({shear:0})},p:{night:.75},wind:1,reduced:false,W:390,dpr,Math});
+  vm.runInNewContext(`${painter};paintHorizonReflection({},0)`,{g,geometry:{waterTop:300,reflectionSurface:()=>({axisY:300,alpha:.5}),reflectionMotion:()=>0},waterDistortion:{render:s=>s},p:{night:.75},wind:1,reduced:false,W:390,dpr,Math});
   assert.equal(draw.scaleY,-1,'the Moon keeps its original reflected height');
   assert.ok(draw.start<=300-1/dpr+1e-9&&draw.start>=300-2/dpr-1e-9,
    `${dpr}x reflection begins just above the clipped waterline, leaving no empty pixel row`);
@@ -9618,7 +9607,8 @@ test('RISK landscape water: reflection opacity meets the skyline before fading i
  const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
  for(const [w,h] of [[320,568],[390,844],[844,390],[1440,900]])for(const night of [0,.5,1]){
   const surface=ctx.LandscapeGeometry.create(w,h).reflectionSurface(night);
-  assert.ok(surface.contactDepth>=2&&surface.contactDepth<=4,'the contact transition stays only a few pixels deep');
+  assert.ok(surface.contactDepth>=12&&surface.contactDepth<=18,'contact fades gradually enough to avoid a straight three-pixel band');
+  assert.ok(1-surface.contactAlpha(.5)<.005,'opacity has a flat slope where skyline meets water');
   assert.equal(surface.contactAlpha(0),1,'the first reflected row meets the original sky color');
   assert.equal(surface.contactAlpha(surface.contactDepth),surface.alpha,'deeper water keeps its existing opacity');
   assert.equal(surface.contactAlpha(surface.contactDepth*2),surface.alpha);
@@ -9626,7 +9616,7 @@ test('RISK landscape water: reflection opacity meets the skyline before fading i
  }
  const runtime=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
  assert.match(runtime,/mirror\.globalCompositeOperation='destination-in'/,'one continuous alpha mask shapes the source');
- assert.match(runtime,/surface\.contactAlpha\(0\)/,'the mirrored contact row uses full opacity');
+ assert.match(runtime,/surface\.contactAlpha\(depth\)/,'the mask samples the eased contact fade');
  assert.doesNotMatch(runtime,/g\.globalAlpha=surface\.alpha\*opacity/,'the final draw cannot halve the contact row again');
 });
 
@@ -9712,7 +9702,7 @@ test('RISK landscape light and water: the current changelog names per-object pro
  const current=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)?.[1]||'';
  assert.match(current,/September 28, 2026/);
  assert.match(current,/Sun and Moon.*visible origin.*shadow/);
- assert.match(current,/clean earlier surface.*complete reflection moves smoothly with the water/);
+ assert.match(current,/local ripples distort different parts of the reflection.*waterline/);
  assert.doesNotMatch(current,/ripples move more clearly and rise independently/);
 });
 
@@ -13127,3 +13117,80 @@ test('Firestore rules: old clients cannot replace a revisioned board', {skip:!pr
     await assertSucceeds(setDoc(legacyRef,{...base,rev:1,serverUpdatedAt:serverTimestamp()}));
   }finally{ await env.cleanup(); }
 });
+
+ test('RISK landscape water: lake clip overlaps the horizon contact at fractional pixel densities',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ assert.match(source,/const lakeContact=Math.floor\(geometry.waterTop\*dpr\)\/dpr-1\/dpr/,'cover the fractional contact row instead of antialiasing against water');
+ assert.match(source,/g.lineTo\(W,lakeContact\);g.lineTo\(0,lakeContact\)/,'the actual lake clip includes the overlap');
+ });
+
+test('RISK landscape water browser: GPU distortion preserves contact and sharp pixels while patches move independently',{skip:!process.env.LANDSCAPE_PLAYWRIGHT},async()=>{
+ const {chromium}=await import(process.env.LANDSCAPE_PLAYWRIGHT),browser=await chromium.launch({channel:'chrome'});
+ const runtime=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ const helper=runtime.slice(runtime.indexOf('  function createWaterDistortion(){'),runtime.indexOf('  const waterDistortion='));
+ try{
+  const page=await browser.newPage();
+  const result=await page.evaluate(helper=>{
+   const factory=new Function(helper+';return createWaterDistortion;')(),renderer=factory();
+   const source=document.createElement('canvas');source.width=390;source.height=300;
+   const c=source.getContext('2d'),pixels=c.createImageData(390,300);
+   for(let y=0;y<300;y++)for(let x=0;x<390;x++){
+    const i=(y*390+x)*4;pixels.data[i]=x%16<8?240:20;pixels.data[i+1]=y<150?200:40;pixels.data[i+2]=70;pixels.data[i+3]=255;
+   }
+   c.putImageData(pixels,0,0);
+   const copy=document.createElement('canvas');copy.width=390;copy.height=300;const ctx=copy.getContext('2d');
+   const frame=t=>{const out=renderer.render(source,t,1,false,390,300);ctx.clearRect(0,0,390,300);ctx.drawImage(out,0,0);return {gpu:out!==source,data:ctx.getImageData(0,0,390,300).data};};
+   const a=frame(0),b=frame(1.5);let changed=0,contactError=0,alphaMin=255;
+   const shifts=[];
+   for(let y=0;y<300;y++)for(let x=0;x<390;x++){
+    const i=(y*390+x)*4;alphaMin=Math.min(alphaMin,b.data[i+3]);
+    if(a.data[i]!==b.data[i])changed++;
+    if(y===299)contactError=Math.max(contactError,Math.abs(b.data[i]-pixels.data[i]));
+   }
+   // Same-depth vertical edges should move in different directions/amounts.
+   for(const x0 of [32,96,160,224,288,352]){
+    const edge=data=>{let best=0,bestX=x0;for(let x=x0-5;x<=x0+5;x++){const d=data[(250*390+x)*4]-data[(250*390+x-1)*4];if(d>best){best=d;bestX=x;}}return bestX;};
+    shifts.push(edge(b.data)-edge(a.data));
+   }
+   const frozen=renderer.render(source,6,1,true,390,300)===source;
+   const orientation=b.data[(20*390+5)*4+1]===200&&b.data[(280*390+5)*4+1]===40;
+   source.width=568;source.height=132;c.fillStyle='#aabbcc';c.fillRect(0,0,568,132);
+   const resized=renderer.render(source,2,1,false,568,132);
+   return {gpu:a.gpu&&b.gpu,changed,contactError,alphaMin,shifts,frozen,orientation,resized:[resized.width,resized.height]};
+  },helper);
+  assert.equal(result.gpu,true,'real shader compiled and rendered');
+  assert.ok(result.changed>10000,'substantial reflected detail animates');
+  assert.ok(new Set(result.shifts).size>=3,'same-depth patches have independent movement');
+  assert.ok(result.contactError<=1,'horizon contact row stays sharp and stationary');
+  assert.equal(result.alphaMin,255,'no transparent seams or edge holes');
+  assert.equal(result.orientation,true,'GPU upload preserves top and bottom');
+  assert.equal(result.frozen,true);assert.deepEqual(result.resized,[568,132]);
+ }finally{await browser.close();}
+});
+
+test('RISK regression gate: changing existing tests requires a specific reason and replacement coverage',async()=>{
+ const {validateRegressionChanges,protectedTestFingerprint}=await import('./scripts/test-first-gate.mjs');
+ assert.equal(typeof validateRegressionChanges,'function','CI must protect existing feature tests');
+ const diff=["- assert.equal(actual,expected,'existing feature');","+test('RISK replacement: preserve feature',()=>{});"];
+ const record={testChangesSha256:protectedTestFingerprint(diff),reason:'The user explicitly requested a different motion model.',previousBehavior:'All reflected objects sway together across the water.',intendedBehavior:'Different patches move independently at the same depth.',replacementTests:['RISK replacement: preserve feature'],preservedCoverage:['Natural reflected height, sharpness, horizon contact and reduced motion.'],redEvidence:{command:"node --test --test-name-pattern='replacement' tests.js",failure:'Existing implementation failed because every patch moved together.'}};
+ assert.match(validateRegressionChanges(diff,[]).join(' '),/reason|rationale/i,'deleting or changing assertions cannot silently pass');
+ assert.deepEqual(validateRegressionChanges(diff,[record]),[],'a reviewed behavior change can replace obsolete expectations');
+ assert.ok(validateRegressionChanges(diff,[{...record,testChangesSha256:'0'.repeat(64)}]).length,'earlier explanations cannot approve a different diff');
+ assert.ok(validateRegressionChanges(diff,[{...record,reason:''}]).length);
+ assert.ok(validateRegressionChanges(diff,[{...record,replacementTests:['Unrelated unchanged test']}]).length,'replacement must appear in this diff');
+ assert.ok(validateRegressionChanges(diff,[{...record,redEvidence:{command:'',failure:''}}]).length,'record the discriminating red result');
+ assert.ok(validateRegressionChanges(diff,[{...record,preservedCoverage:[]}]).length,'name the existing feature boundaries retained');
+ assert.ok(validateRegressionChanges(["+test('new coverage',()=>{});"],[]).length,'all executable test changes record their purpose and red evidence');
+ assert.deepEqual(validateRegressionChanges(['--- a/tests.js','-   ','- // explanatory comment'],[]),[],'format-only blank/comment removals are harmless');
+});
+
+ test('RISK regression gate: insertions cannot silently disable existing assertions',async()=>{
+  const {validateRegressionChanges,protectedTestFingerprint}=await import('./scripts/test-first-gate.mjs');
+  assert.notEqual(protectedTestFingerprint(['@@ -12,0 +13 @@','+ return;'],40),protectedTestFingerprint(['@@ -22,0 +23 @@','+ return;'],40),'a reason for one test cannot authorize editing another');
+  for(const line of ['+ return;','+ if(false){','+ /*']){
+   assert.ok(validateRegressionChanges(['@@ -12,0 +13 @@',line],[],40).length,'add-only suppression within existing coverage needs a reason');
+  }
+  assert.ok(validateRegressionChanges(['@@ -40,0 +41,2 @@',"+test('new feature coverage',()=>{});",'+'],[],40).length,'appending tests also requires a purpose and red evidence');
+  assert.ok(validateRegressionChanges(['@@ -40,0 +41 @@','+process.exit(0);'],[],40).length,'appended executable code cannot disable the suite');
+  assert.ok(validateRegressionChanges(['@@ -12,0 +13 @@','+ const helper = () => true;'],[],40).length,'conservative gate protects arbitrary edits inside existing coverage');
+ });

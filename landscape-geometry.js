@@ -194,11 +194,11 @@
     function reflectionSurface(night){
       // One waterline preserves each object's height and unbroken edge. The
       // shore clips high reflections; softness grows only within the lake.
-      const softDepth=Math.max(30,H*.12),softMax=.36,contactDepth=3,alpha=.47+night*.09;
+      const softDepth=Math.max(30,H*.12),softMax=.36,contactDepth=16,alpha=.47+night*.09;
       return {axisY:waterTop,alpha,softDepth,softMax,contactDepth,
         mirrorY:y=>2*waterTop-y,
         softness:depth=>Math.min(softMax,Math.max(0,depth)/softDepth*softMax),
-        contactAlpha:depth=>alpha+(1-alpha)*Math.max(0,1-Math.max(0,depth)/contactDepth)};
+        contactAlpha:depth=>{const q=clamp(depth/contactDepth);return alpha+(1-alpha)*(1-q*q*(3-2*q));}};
     }
     function castShadow(sky,height,width,x=W/2,y=H*.75){
       const sun=sky?.sun||{},moon=sky?.moon||{},illumination=clamp(sky?.illumination);
@@ -263,11 +263,14 @@
     }
     const sunReflection=sun=>sun.visible&&sun.altitude>0;
     const ripple=(i,t,wind=1)=>({alpha:.15+.75*(.5+.5*Math.sin(t*wind*1.3+i*1.71))**2,drift:Math.sin(t*wind*.5+i)*9,width:.65+.35*Math.sin(t*.9+i)**2});
-    // One affine sway keeps every reflected pixel moving together. Its zero at
-    // the waterline preserves the clean horizon join and natural object height.
-    const reflectionMotion=(t,wind=1,frozen=false)=>({
-      shear:frozen?0:Math.sin(t*Math.max(.35,Number(wind)||1)*.82)*Math.min(.022,5/Math.max(1,waterTop))
-    });
+    // Local interference gives neighboring patches different phases. The same
+    // field is sampled continuously per pixel by the reflection shader.
+    const reflectionMotion=(x,depth,t,wind=1,frozen=false)=>{
+      if(frozen||depth<=0)return 0;
+      const phase=t*Math.max(.35,Number(wind)||1),q=Math.min(1,Math.max(0,depth)/24);
+      return q*q*(3-2*q)*(1.7*Math.sin(x*.045+depth*.32-phase*.9)+
+        .9*Math.sin(x*.073-depth*.21+phase*1.1)*Math.cos(x*.017+phase*.63));
+    };
     return {routeProgress,motionProgress,motionAge,verticalOffset,visitPose,woodlandPose,duckPose,waterDepth,cycleLeg,deerLeg,nestVisit,eventDepth,dogPose,skater,fireworks,flock,dolphin,starReflection,reflectionSurface,reflectionMotion,castShadow,grassBand,sunReflection,depthBand,groundAnchor,groundTravelX,groundPose,strideArm,strideFoot,wingFold,balloonDrift,vessel,foregroundTree,nest,ripple,skyPoint,horizon,waterTop,far,middle,near,rail,trail,lowerRail,railCars,tangent,rider,pack};
   }
   root.LandscapeGeometry={create};
