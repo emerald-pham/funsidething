@@ -219,9 +219,10 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK test-first gate: initial branch pushes cannot skip the diff comparison
 - RISK test inventory: every named risk contract maps to a feature boundary
 
-## Release memory and independent review
+## Release memory/cloud/sync and independent code review
 
 - RISK repository process: exact-SHA receipts bind audit and review evidence outside the git tree
+- RISK repository process: memory cloud and sync review scope scales evidence to impact
 - RISK repository process: absent, stale, malformed, or nonindependent receipts fail closed
 - RISK repository process: memory receipts require absolute source paths
 - RISK repository process: release evidence rejects future and noncanonical audit timestamps
@@ -234,7 +235,7 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK repository process: release hooks reject marker-only or tampered dispatchers
 - RISK test-first gate: release evidence scripts receive edit-time process protection
 
-The release gate records, validates, and publishes the exact-SHA memory and review evidence required by [RELEASE_GATES.md](RELEASE_GATES.md). Its local hook checks each outgoing tip; the main deployment job independently verifies the merged PR head and latest status contexts. The status checks bind reports but cannot prove that a person actually read or reviewed them.
+The release gate records, validates, and publishes exact-SHA memory/cloud/sync and code-review evidence required by [RELEASE_GATES.md](RELEASE_GATES.md). The memory review explicitly records impact, rationale, and proportional test evidence for each domain. Its local hook checks each outgoing tip; the main deployment job independently verifies the merged PR head and latest status contexts. The status checks bind reports but cannot prove that a person actually read or reviewed them.
 
 Companion coverage protects the existing local-backup behavior: LOCAL BACKUPS: seven local calendar days, latest save today, and pre-restore safety copy; LOCAL BACKUPS: a manual backup remains restorable after the seven-day window; LOCAL BACKUPS: a failed safety copy blocks restore and leaves the current board untouched; HARD GATE: full backup store blocks browser overwrite and preserves its prior bytes; and HARD GATE: unreadable backup index is preserved instead of overwritten by a save.
 
@@ -254,3 +255,12 @@ The editor hook blocks app or enforcement edits while tests.js has no staged or 
 
 - RISK CLOUD V2 STARTUP: transport and permission failures retain their code instead of masquerading as corrupt data
 - RISK CLOUD V2 STARTUP: a transient chunk read automatically recovers to synced without reloading the board
+
+## TrueSkill probability and rating safety
+
+- RISK TrueSkill probability: answer judgments use the same performance noise as rank updates
+- RISK chance forecast: five candidates share one uncertain benchmark draw
+- RISK chance forecast: one-candidate marginal and supplied order stay intact
+- RISK TrueSkill truncation: inverse-Mills tails match references through the former cutoff and extreme upset
+- RISK rating bounds: hydration and frozen chance opponents normalize extremes without changing healthy ratings
+- RISK Diagnostics download: Settings and save directions retain current-board recovery actions

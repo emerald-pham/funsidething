@@ -96,10 +96,16 @@ automatic permission to regress: the independent reviewer must judge the reason,
 replacement coverage, and actual user-visible result on the final commit. CI
 checks the record and diff; it cannot itself prove that a command ran earlier.
 
-## Memory and exact-commit release gates
+## Memory, cloud/sync, and exact-commit release gates
 
-Every push candidate needs external receipts for a current memory audit and an
-independent review of that exact commit. Install the shared pre-push gate with
+Every push candidate needs two distinct exact-SHA receipts: the memory reviewer
+also audits current memory sources and explicitly assesses memory, cloud-data,
+and synchronization effects; an independent code/behavior reviewer inspects
+the full diff and relevant tests. Each data-safety domain records its impact,
+rationale, and focused test references when affected. A justified not-affected
+decision is sufficient for unrelated UI or copy changes and does not require a
+broad cloud suite. The owner, memory reviewer/auditor, and code reviewer must
+have distinct task identities. Install the shared pre-push gate with
 `npm run release:install-hook`, record evidence with `npm run release:record`,
 verify it with `npm run release:verify`, and publish both required GitHub status
 contexts with `npm run release:publish` before merging. Re-review and re-audit

@@ -12,12 +12,17 @@ requirements, and conventions.
 - Use `gpt-6-luna` at `max` reasoning.
 - The coordinator model and reasoning effort remain unchanged.
 
-## Final commit review
+## Exact-final release reviews
 
-For every future code change in this repository, assign an independent reviewer
-to the exact final commit before pushing, merging, or deploying it. Give the
-reviewer the commit SHA and ask them to inspect the full diff, relevant tests,
-and user-visible or data-safety effects. The change owner fixes actionable
-findings and has the changed areas rechecked before release. Record the review
-result with the release evidence; a review of an earlier draft is not a review
-of the final commit.
+For every release, require two independent checks of the exact final commit
+before pushing, merging, or deploying it: a code/behavior review and a
+memory/cloud/sync review. Give both reviewers the full candidate SHA. The
+code/behavior reviewer inspects the full diff, relevant tests, and
+user-visible or data-safety effects. The memory/cloud/sync reviewer checks
+current memory sources against repository behavior and explicitly assesses
+memory, cloud-data, and synchronization impact. Each domain records a concrete
+rationale; affected domains cite focused tests, while a pure UI or copy change
+may record a justified no-impact decision without unrelated cloud testing.
+Keep the owner, memory reviewer/auditor, and code reviewer task identities
+distinct. Fix actionable findings and recheck changed areas before release.
+A review of an earlier draft is not a review of the final commit.
