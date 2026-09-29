@@ -6,6 +6,7 @@ The named-contract test in tests.js checks that every top-level test whose title
 
 ## Task state, eligibility, and scanner controls
 
+- RISK IMPORT RENDERING: restored identifiers cannot inject attributes or break task reveal
 - RISK rating drift: Done and Worked on it stay neutral on every completion route and recurrence type
 - RISK false preference evidence: All Tasks Dot compares only with the current benchmark and a first dot stays neutral
 - RISK lost scheduling metadata: both Add routes save and clear Start and Due together
@@ -14,6 +15,8 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK prerequisites: completion, evergreen Done, restore, and deletion govern scan eligibility by ID
 - RISK prerequisites: invalid links and cycles are rejected; missing imported references are eligible
 - RISK prerequisites: Add and each task editor expose stable selectors and removal
+- RISK prerequisites: pasted Add tasks keep the chosen prerequisite
+- RISK eligibility filter: Worked on it remains ineligible until its hold clears
 - RISK evergreen hours or days: stored hours survive conversion, UI save, and 2 AM reset suggestion
 - RISK evergreen countdown: idle foreground timer repaints at the next displayed hour and minute
 - RISK prerequisites: editing after deletion retains the missing task link until explicitly removed
@@ -22,6 +25,12 @@ The named-contract test in tests.js checks that every top-level test whose title
 
 ## Local backups, cloud adoption, and recovery
 
+- RISK CLOUD ADAPTER: malformed revisions fail closed before Firestore writes
+- RISK CLOUD DIAGNOSTICS: safe failure stage and code survive backend and UI boundaries
+- RISK CLOUD ACCOUNT: signing out and back into the same account requires a fresh read
+- RISK CLOUD ACCOUNT: signing in after sign-out opens the Google account chooser
+- RISK RECOVERY EXPORT: an unsaved in-memory board remains copyable without device storage
+- RISK LOCAL DIAGNOSTICS: ordinary edits and Undo identify the exact device save gate
 - RISK CLOUD BACKUP: an exact stable recovery copy satisfies adoption when duplicate writes hit quota
 - RISK CLOUD BACKUP: an unreadable backup row is never discarded to make room
 - RISK CLOUD ADOPTION: failed safety backup leaves the local revision and board unchanged
@@ -50,6 +59,8 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK CLOUD BACKUP: confirmed cloud state releases temporary recovery pins for later device saves
 - RISK CLOUD BACKUP: union recovery stays pinned only until its exact Firestore acknowledgement
 - RISK CLOUD BACKUP: acknowledgement frees disk pins before saving a larger in-flight draft
+- RISK CLOUD BACKUP: a clean adoption releases redundant recovery without waiting for a write
+- RISK CLOUD BACKUP: clean adoption frees automatic history for the next ordinary save
 - RISK CLOUD BACKUP: overwritten same-task edits outlive equal cloud pulls when a daily row was reused
 - RISK CLOUD BACKUP: a legacy ambiguous daily pin becomes durable before equal-cloud release
 - RISK CLOUD BACKUP: a tight legacy store releases a user-equivalent daily pin without growing the index
