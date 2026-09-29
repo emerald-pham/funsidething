@@ -15777,3 +15777,161 @@ test('RISK RESET SAFETY: failed primary reset preserves Undo and never restores 
  assert.equal(pending.shim.window.CloudSync.user,'new@example.test');
  void originalPersist;
 });
+
+const recentDeletionAt=Date.now();
+function deletionEvidence(id,taskId,kind='task',at=recentDeletionAt,extra={}){
+ return {id,taskId,kind,at,...extra};
+}
+
+function repeatedDeletionBoard(ctx){
+ const counts=[32,384,768,768,3072,3072];
+ const rows=counts.map((count,index)=>({count,row:deletionEvidence(
+  `operation-${index}-00000000-0000-4000-8000-000000000000`,
+  `task-${index}-00000000-0000-4000-8000-000000000000`,
+  index%2?'history':'task',
+  recentDeletionAt+index,
+  {futureEvidence:{source:'sanitized-size-fixture',slot:index}}
+ )}));
+ const board=ctx.defaultState();
+ board.seenQuickStart=true;board.syncDirty=true;
+ ctx.hydrateState(board);
+ board.deletionLog=rows.flatMap(({count,row})=>Array.from({length:count},()=>JSON.parse(JSON.stringify(row))));
+ return {board,unique:rows.map(({row})=>row)};
+}
+
+test('RISK CLOUD PAYLOAD: hydration removes only exact duplicate deletion facts and preserves conflicting same-ID evidence',async()=>{
+ const {ctx}=await loadApp();
+ const exact=deletionEvidence('same-operation','removed-task','task',recentDeletionAt,{future:{source:'one'}});
+ const otherTask={...exact,taskId:'different-task'};
+ const otherKind={...exact,kind:'history'};
+ const otherUnknown={...exact,future:{source:'two'}};
+ const board=ctx.defaultState();
+ board.deletionLog=[exact,JSON.parse(JSON.stringify(exact)),otherTask,otherKind,otherUnknown];
+ assert.equal(JSON.parse(ctx.cloudPayloadFor(board)).deletionLog.length,4,
+  'serialization repairs an old in-memory source even before another hydration boundary');
+ ctx.hydrateState(board);
+ assert.equal(board.deletionLog.length,4,'only the byte-equivalent repeated fact is redundant');
+ assert.equal(JSON.stringify(board.deletionLog.map(row=>JSON.stringify(row))),
+  JSON.stringify([exact,otherTask,otherKind,otherUnknown].map(row=>JSON.stringify(row))));
+ assert.equal(board.deletionLog.filter(row=>row.id==='same-operation').length,4,
+  'sharing an operation ID is not authority to discard conflicting or extended evidence');
+});
+
+test('RISK CLOUD PAYLOAD: Undo and Restore replacement unions stay idempotent while recording new causal deletion facts',async()=>{
+ const {ctx}=await loadApp();
+ const keep=syncTask('keep','Keep');const removed=syncTask('removed','Remove explicitly');
+ const shared=deletionEvidence('shared-op','older-task','task',recentDeletionAt);
+ const currentOnly=deletionEvidence('current-op','current-task','task',recentDeletionAt+1);
+ const snapshotOnly=deletionEvidence('snapshot-op','snapshot-task','history',recentDeletionAt+2);
+ const current=syncState({tasks:[keep,removed],deletionLog:[shared,JSON.parse(JSON.stringify(shared)),currentOnly]});
+ ctx.hydrateState(current);ctx.replaceState(current);
+ // Old Undo and Restore snapshots can each contain copies of evidence already
+ // carried by the live board. A replacement must form a set union, then add
+ // only the new fact that the replacement actually caused.
+ const next=syncState({tasks:[keep],deletionLog:[shared,JSON.parse(JSON.stringify(shared)),snapshotOnly]});
+ ctx.markReplacementDeletes(next);
+ const keys=next.deletionLog.map(row=>JSON.stringify(row));
+ assert.equal(keys.length,new Set(keys).size,'replacement cannot multiply an existing fact');
+ assert.ok(next.deletionLog.some(row=>row.id==='current-op'));
+ assert.ok(next.deletionLog.some(row=>row.id==='snapshot-op'));
+ assert.ok(next.deletionLog.some(row=>row.taskId==='removed'&&row.kind==='task'),
+  'the explicit replacement still records its new task deletion');
+ const once=next.deletionLog.map(row=>JSON.stringify(row));
+ ctx.replaceState(next);
+ const repeated=JSON.parse(JSON.stringify(next));
+ ctx.markReplacementDeletes(repeated);
+ assert.deepEqual(repeated.deletionLog.map(row=>JSON.stringify(row)),once,
+  'repeating the same Undo/Restore replacement is idempotent');
+});
+
+test('RISK CLOUD PAYLOAD: reconciliation compacts each side and retains distinct records that share an operation ID',async()=>{
+ const {ctx}=await loadApp();
+ const exact=deletionEvidence('shared-id','task-a','task',recentDeletionAt,{future:'winner'});
+ const winnerVariant={...exact,taskId:'task-b'};
+ const incomingVariant={...exact,kind:'history',future:'remote'};
+ const incomingNew=deletionEvidence('new-id','task-c','task',recentDeletionAt+3);
+ const winner=syncState({deletionLog:[exact,JSON.parse(JSON.stringify(exact)),winnerVariant]});
+ const other=syncState({deletionLog:[JSON.parse(JSON.stringify(exact)),incomingVariant,incomingNew,JSON.parse(JSON.stringify(incomingNew))]});
+ ctx.mergeUndeletedTasks(winner,other);
+ const actual=winner.deletionLog.map(row=>JSON.stringify(row));
+ assert.equal(actual.length,new Set(actual).size);
+ assert.deepEqual(new Set(actual),new Set([exact,winnerVariant,incomingVariant,incomingNew].map(row=>JSON.stringify(row))));
+});
+
+test('RISK CLOUD PAYLOAD: amplified legacy deletion history is repaired below the Firestore limit without changing other board content',async()=>{
+ const {ctx}=await loadApp();
+ const {board,unique}=repeatedDeletionBoard(ctx);
+ const withoutLog=value=>JSON.stringify(Object.fromEntries(Object.entries(value).filter(([key])=>key!=='deletionLog')));
+ const nonLogBefore=withoutLog(board);
+ assert.equal(board.deletionLog.length,8096,'fixture mirrors the reported multiplicity shape');
+ assert.ok(Buffer.byteLength(JSON.stringify(board),'utf8')>1048576,
+  'precondition: repeated causal rows alone make the cloud document too large');
+ ctx.hydrateState(board);
+ assert.equal(board.deletionLog.length,unique.length);
+ assert.equal(withoutLog(board),nonLogBefore,'repair changes no task, setting, history, or unknown top-level content');
+ const payload=ctx.cloudPayloadFor(board);
+ assert.ok(Buffer.byteLength(payload,'utf8')<1048576,'the repaired document fits Firestore again');
+ assert.deepEqual(JSON.parse(payload).deletionLog.map(row=>JSON.stringify(row)),unique.map(row=>JSON.stringify(row)));
+});
+
+test('RISK CLOUD PAYLOAD: a cold duplicated board repairs both primary keys, uploads once, and reaches a clean acknowledgement',async()=>{
+ const prepared=await loadApp();
+ const exact=deletionEvidence('cold-op','cold-task','task',recentDeletionAt,{future:'kept'});
+ const local=syncState({
+  tasks:[syncTask('live-task','Live task')],deletionLog:[exact,JSON.parse(JSON.stringify(exact)),JSON.parse(JSON.stringify(exact))],
+  syncRev:0,syncDirty:true,syncAccount:'e@example.com',updatedAt:1000,
+ });
+ prepared.ctx.hydrateState(local);
+ local.deletionLog=[exact,JSON.parse(JSON.stringify(exact)),JSON.parse(JSON.stringify(exact))];
+ const raw=JSON.stringify(local),storage=sharedScannerStorage({[LOCAL_HEAD_KEY]:raw,[SYNC_STORE_KEY]:raw});
+ const h=makeSyncHarness();
+ const {ctx,shim}=await loadApp({sharedStorage:storage,cloudSyncFactory:h.factory});
+ await ctx.cloudPull();await syncSettle(PAST_DEBOUNCE);
+ const head=JSON.parse(storage.getItem(LOCAL_HEAD_KEY)),store=JSON.parse(storage.getItem(SYNC_STORE_KEY));
+ assert.equal(head.deletionLog.length,1);assert.equal(store.deletionLog.length,1);
+ assert.equal(storage.getItem(LOCAL_HEAD_KEY),storage.getItem(SYNC_STORE_KEY),'the guarded browser pair converges exactly');
+ assert.equal(h.calls.filter(call=>call==='push').length,1,'the compacted board is uploaded once after the required read');
+ assert.equal(h.remoteState().deletionLog.length,1);
+ assert.equal(ctx.state.syncDirty,false);assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ synced');
+});
+
+test('RISK CLOUD PAYLOAD: a duplicated newer remote is rewritten once and later pulls do not loop',async()=>{
+ const exact=deletionEvidence('remote-op','remote-task','task',recentDeletionAt,{future:'kept'});
+ const local=syncState({tasks:[syncTask('shared','Shared')],deletionLog:[exact],syncRev:4,syncDirty:false,syncAccount:'e@example.com'});
+ const remote=syncState({tasks:[syncTask('shared','Shared')],deletionLog:[exact,JSON.parse(JSON.stringify(exact)),JSON.parse(JSON.stringify(exact))]});
+ const h=makeSyncHarness({remote,rev:5});
+ const {ctx}=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(local)},cloudSyncFactory:h.factory});
+ await ctx.cloudPull();await syncSettle(80);
+ assert.equal(h.calls.filter(call=>call==='push').length,1,'normalizing a newer remote publishes one conditional rewrite');
+ assert.equal(h.doc.rev,6);assert.equal(h.remoteState().deletionLog.length,1);
+ assert.equal(ctx.state.syncDirty,false);
+ const calls=h.calls.length;
+ await ctx.cloudPull();await syncSettle(30);
+ assert.equal(h.calls.length,calls+1,'the confirmed compact payload needs only the requested read');
+ assert.equal(h.calls.at(-1),'pull');assert.equal(h.doc.rev,6,'later reads do not keep rewriting the same evidence');
+});
+
+test('RISK CLOUD PAYLOAD: duplicated legacy Undo and backup Restore sources converge without losing their distinct facts',async()=>{
+ const storage=sharedScannerStorage(),{ctx}=await loadApp({sharedStorage:storage});
+ const exact=deletionEvidence('legacy-op','legacy-task','task',recentDeletionAt,{future:'kept'});
+ const different={...exact,kind:'history'};
+ ctx.state.deletionLog=[exact,JSON.parse(JSON.stringify(exact)),different];
+ const temporary=ctx.addTask('Temporary Undo task');ctx.undo();await ctx.persist();
+ const undoKeys=ctx.state.deletionLog.map(row=>JSON.stringify(row));
+ assert.equal(undoKeys.length,new Set(undoKeys).size);
+ assert.ok(undoKeys.includes(JSON.stringify(exact)));assert.ok(undoKeys.includes(JSON.stringify(different)));
+ assert.ok(ctx.state.deletionLog.some(row=>row.taskId===temporary.id&&row.kind==='task'),
+  'Undo still records the causal deletion of the task it removed');
+
+ const restoredTask=syncTask('restored-from-backup','Restored from old backup');
+ const oldBackup=JSON.parse(JSON.stringify(ctx.state));
+ oldBackup.tasks.push(restoredTask);
+ oldBackup.deletionLog=[exact,JSON.parse(JSON.stringify(exact)),different,JSON.parse(JSON.stringify(different))];
+ assert.equal(ctx.saveLocalBackup('manual',JSON.stringify(oldBackup)),true);
+ const row=ctx.readLocalBackups().find(entry=>entry.kind==='manual'&&entry.payload.includes('restored-from-backup'));
+ ctx.openSettings();ctx.onAction('restore-local-backup',{dataset:{id:row.id}});await syncSettle(40);
+ const restoredKeys=ctx.state.deletionLog.map(entry=>JSON.stringify(entry));
+ assert.equal(restoredKeys.length,new Set(restoredKeys).size);
+ assert.ok(ctx.state.tasks.some(task=>task.id===restoredTask.id));
+ assert.ok(restoredKeys.includes(JSON.stringify(exact)));assert.ok(restoredKeys.includes(JSON.stringify(different)));
+});

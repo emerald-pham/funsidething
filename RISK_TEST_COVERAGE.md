@@ -25,6 +25,13 @@ The named-contract test in tests.js checks that every top-level test whose title
 
 ## Local backups, cloud adoption, and recovery
 
+- RISK CLOUD PAYLOAD: hydration removes only exact duplicate deletion facts and preserves conflicting same-ID evidence
+- RISK CLOUD PAYLOAD: Undo and Restore replacement unions stay idempotent while recording new causal deletion facts
+- RISK CLOUD PAYLOAD: reconciliation compacts each side and retains distinct records that share an operation ID
+- RISK CLOUD PAYLOAD: amplified legacy deletion history is repaired below the Firestore limit without changing other board content
+- RISK CLOUD PAYLOAD: a cold duplicated board repairs both primary keys, uploads once, and reaches a clean acknowledgement
+- RISK CLOUD PAYLOAD: a duplicated newer remote is rewritten once and later pulls do not loop
+- RISK CLOUD PAYLOAD: duplicated legacy Undo and backup Restore sources converge without losing their distinct facts
 - RISK CLOUD ADAPTER: malformed revisions fail closed before Firestore writes
 - RISK CLOUD DIAGNOSTICS: safe failure stage and code survive backend and UI boundaries
 - RISK CLOUD RECOVERY: a durable ordinary save retries and clears its stale cloud error without reload
