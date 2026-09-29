@@ -501,5 +501,32 @@
       "command": "node --test --test-reporter=spec --test-name-pattern='RISK CLOUD PAYLOAD' tests.js",
       "failure": "Before implementation, all five initial production-path tests failed: hydration kept a fifth exact duplicate, replacement and reconciliation multiplied repeated records, the sanitized 8,096-row board remained above one MiB instead of compacting to six unique facts, and cold repair left three copies in both primary keys instead of durably converging to one. Two later tests extend the same repaired boundaries to a duplicated newer remote and old Undo/backup Restore sources."
     }
+  },
+  {
+    "testChangesSha256": "7964ca33f15755e002e361820918aab7d8c905bd4fd951c6abf84f666748b1a7",
+    "reason": "The user reported that a freshly updated signed-in app could remain on syncing or error until tapping the cloud control. Production-path tests reproduce a completed browser-pair recovery that interrupted startup without resuming its cloud read, indefinitely pending Firebase SDK promises, automatic recovery from transient reads and uncertain writes, and account changes during acknowledgement readback.",
+    "previousBehavior": "When refreshBrowserCopy durably reconciled different protected and shared keys, it returned false so the caller would discard its stale snapshot, but cloudPull and sendPush treated that successful recovery like a hard failure and queued nothing. An unresolved Firestore read, transaction, or acknowledgement read had no deadline, leaving pulling or the write slot busy forever. Later results could also clear the current account status after identity changed.",
+    "intendedBehavior": "Distinguish a completed durable browser-pair recovery from unreadable or unbacked-up data, then resume the interrupted cloud read on the next turn under the same account. Bound Firebase operations with a safe deadline, retain real permission and reconciliation failures, retry only recoverable transport failures through an authoritative read with capped backoff, and bind every post-await status mutation to the originating UID and operation. A same-UID token refresh remains valid; a different account cancels stale results.",
+    "replacementTests": [
+      "RISK CLOUD STARTUP: a repaired divergent browser pair resumes the initial cloud read without tapping the badge",
+      "RISK CLOUD STARTUP: a browser repair after the network read restarts reconciliation automatically",
+      "RISK CLOUD STARTUP: failed pair recovery stays blocked and a queued retry cannot cross accounts",
+      "RISK CLOUD STARTUP: unresolved Firebase reads and writes time out with a retryable diagnostic",
+      "RISK CLOUD STARTUP: a late write acknowledgement is bound to the account through timestamp readback",
+      "RISK CLOUD STARTUP: a transient startup timeout retries automatically and only a completed read clears error",
+      "RISK CLOUD STARTUP: a timed-out write reads before its automatic retry and reaches acknowledgement",
+      "RISK CLOUD STARTUP: a late timed-out transaction cannot overwrite the authoritative retry read"
+    ],
+    "preservedCoverage": [
+      "Unreadable, quota-blocked, or unbacked-up browser copies still block every cloud read and write; the new recovery serial advances only after guarded pair repair and required backups complete.",
+      "Revision arbitration remains the write authority. A timed-out transaction is treated as uncertain, so recovery reads first; if the original transaction commits late, the retry conflicts and rereads rather than overwriting its unobserved revision.",
+      "Permission denied, resource exhausted, invalid payload, invalid revision, authentication storage, sign-in, and setup failures remain visible and are not included in the recoverable transport retry set.",
+      "Account-switch, same-account reauthentication, stale callback, local backup, Restore, Undo, cloud adoption, and device-save recovery contracts remain intact. Retry timers are capped, cancel on identity change, defer around editors, and reset only after completed reconciliation.",
+      "The existing transaction binding test now follows the captured UID rather than the Firebase user object so token refreshes cannot strand a valid same-account write, while post-transaction and post-timestamp awaits recheck UID and operation authority."
+    ],
+    "redEvidence": {
+      "command": "With the final tests.js and released origin/main index.html: node --test --test-reporter=spec --test-name-pattern='RISK CLOUD STARTUP' tests.js",
+      "failure": "The released implementation failed 7 of 8 cases. The repaired-key startup made zero cloud calls instead of one, and a pair repair after the first network reply made one read instead of restarting with a second authoritative read. Unresolved Firebase reads remained hung; a prior-UID acknowledgement returned success and cleared status; transient pull failure ran once instead of twice; the uncertain write made only its first push/read sequence; and a transaction that completed after the local deadline never entered the authoritative read/conflict recovery path. The fail-closed backup-quota/account-cancel case passed, confirming that unsafe local recovery must remain blocked."
+    }
   }
 ]
