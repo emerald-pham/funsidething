@@ -3907,7 +3907,7 @@ test("UI: Quick start displays the requested seven steps in order", async () => 
   assert.deepEqual(steps, [
     "Add tasks. You can tag them with contexts and enable contexts so that todos that NEED to match that context are surfaced. If the context is not enabled, those todos are not surfaced.",
     "Then hit start scanning.",
-    "In both modes, the oldest eligible task becomes the first dot in your chain. Chance mode then draws subsequent candidates using TrueSkill win probabilities.",
+    "In both modes, the oldest eligible task never marked Done becomes the first dot. Worked on it is fine. If all eligible tasks have been done before, the oldest eligible task starts the chain. Chance mode then draws subsequent candidates using TrueSkill win probabilities.",
     "Then compare candidates with the newest dot. Descending mode orders them by estimated TrueSkill strength; chance mode uses a saved weighted random order. Yes/No updates ratings immediately. In chance mode, those updates affect the next fresh ordering.",
     "You can also hit can’t, which will snooze the task for a duration you’ve configured in settings.",
     "You will continue until either you hit done scanning, or the app recognizes the chances of you finding a better task dips below 25% (percentage configurable in settings menu) in which case it will gently nudge you to stop searching for a new todo.",
@@ -16742,4 +16742,40 @@ test('RISK SCALABLE QUOTA: optional IndexedDB history cannot block a primary boa
  assert.ok(rows.some(row=>row.id===manual.id&&row.kind==='manual'),'manual recovery remains byte-exact');
  assert.ok(rows.every(row=>!automatic.some(old=>old.id===row.id)),'retired automatic history no longer consumes snapshot references');
  await store.close();
+});
+
+test('RISK oldest never done: both modes prefer never-completed tasks and keep worked tasks eligible',async()=>{
+ for(const mode of ['descending','chance']){
+  const {ctx}=await loadApp();
+  const recurring=ctx.addTask('Previously done'),worked=ctx.addTask('Worked only'),fresh=ctx.addTask('Fresh');
+  recurring.createdAt=1;worked.createdAt=2;fresh.createdAt=3;
+  recurring.evergreen=true;ctx.completeTask(recurring);recurring.lastDoneAt=1;
+  ctx.workedOnTask(worked.id);ctx.state.considered={};ctx.state.workedAt={};
+  ctx.startScan(mode);
+  assert.equal(ctx.state.chain[0],worked.id,'Worked on it does not count as Done');
+  assert.ok(ctx.pool().some(t=>t.id===recurring.id),'previously done tasks remain available for later comparison');
+ }
+});
+test('RISK oldest never done: legacy completion and restore evidence survives reload and reconciliation',async()=>{
+ for(const evidence of [{lastDoneAt:1},{completedAt:1},{restoredAt:1}]){
+  const {ctx}=await loadApp();const old=ctx.addTask('Old'),fresh=ctx.addTask('Never done');
+  old.createdAt=1;fresh.createdAt=2;Object.assign(old,evidence);
+  const saved=JSON.parse(JSON.stringify(ctx.state));
+  const reopened=await loadApp({seedStorage:{'fvp:chain-scanner:v1':JSON.stringify(saved)}});
+  assert.equal(reopened.ctx.oldestFirst(reopened.ctx.pool()).id,fresh.id,'legacy evidence is honored after reload');
+ }
+ const {ctx}=await loadApp();const old=ctx.addTask('Restored'),fresh=ctx.addTask('Never done');
+ old.createdAt=1;fresh.createdAt=2;ctx.doneTask(old.id);ctx.reopenTask(old);
+ const stale=JSON.parse(JSON.stringify(ctx.state));delete stale.tasks[0].restoredAt;delete stale.tasks[0].restoredRunOp;
+ ctx.mergeUndeletedTasks(stale,JSON.parse(JSON.stringify(ctx.state)));
+ assert.equal(ctx.oldestFirst(stale.tasks).id,fresh.id,'reconciled restore remains completion evidence');
+});
+test('RISK oldest never done: all-completed fallback and eligibility boundaries preserve usable scans',async()=>{
+ const {ctx}=await loadApp();const a=ctx.addTask('Old recurring'),b=ctx.addTask('New recurring'),held=ctx.addTask('Future never done');
+ a.createdAt=1;b.createdAt=2;held.createdAt=0;held.startsAt='2099-01-01';
+ a.lastDoneAt=1;b.lastDoneAt=2;
+ assert.equal(ctx.oldestFirst(ctx.pool()).id,a.id,'all previously completed tasks still allow a scan');
+ assert.equal(ctx.oldestFirst([]),null);
+ delete b.lastDoneAt;
+ assert.equal(ctx.oldestFirst(ctx.pool()).id,b.id,'an eligible never-done task takes precedence');
 });
