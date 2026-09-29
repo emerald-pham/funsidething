@@ -165,6 +165,7 @@ The named-contract test in tests.js checks that every top-level test whose title
 
 ## Landscape rendering, motion, and responsive presentation
 
+- RISK landscape city: clock tower meets the waterline on tablet, phone, and short-landscape viewports
 - RISK landscape water: the sky and every floating visitor keep a full-height reflection by day and night
 - RISK landscape shadows: grounded objects share the dominant celestial light
 - RISK landscape vehicles: lower train shadows lie along its rail under changing light

@@ -11041,6 +11041,24 @@ test('Landscape clock tower follows device local time instead of saved sky locat
    'the civic clock should keep device time when the observer location changes');
 });
 
+test('RISK landscape city: clock tower meets the waterline on tablet, phone, and short-landscape viewports',()=>{
+ const context=vm.createContext({Math,LandscapeMood:{clock:()=>({minuteAngle:0,hourAngle:0})},S:{mixHex:()=>'#fff0c9'},ellipse(){},line(){}});
+ vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),context);
+ const runtime=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ const start=runtime.indexOf('    const tx=W*.71,ty=hy-72;');
+ const end=runtime.indexOf('    b=cityTarget;',start);
+ assert.ok(start>=0&&end>start,'the tested block is the clock tower paint path');
+ const painter=runtime.slice(start,end);
+ for(const [W,H] of [[768,1024],[1024,768],[820,1180],[390,844],[320,568],[568,320],[1440,900]]){
+  const geometry=context.LandscapeGeometry.create(W,H),rects=[];
+  context.W=W;context.hy=geometry.horizon;context.geometry=geometry;context.p={city:'#bbdce1'};context.sky={date:new Date('2026-09-12T15:30:00Z')};
+  context.b={fillRect(...rect){rects.push(rect);},beginPath(){},moveTo(){},lineTo(){},fill(){}};
+  vm.runInContext('{'+painter+'}',context);
+  const [,top,,height]=rects[0];
+  assert.equal(top+height,geometry.waterTop,`tower body touches lake at ${W}x${H}`);
+ }
+});
+
 test('Landscape waterfront: vessels fit the water, and trees and landmarks share safe anchors',()=>{
  const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
  for(const [w,h] of [[320,568],[390,844],[844,390],[1440,1000]]){
