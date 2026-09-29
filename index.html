@@ -461,7 +461,7 @@ input[type=date]::-webkit-date-and-time-value{min-width:0;text-align:left}
   <p>You can change this anytime in Settings. The sun and Moon follow their real paths, even when the scenery is still.</p>
 </dialog>
 <!-- changelog:start -->
-<template id="appChangelogCurrent"><div data-app-fingerprint="3d0deedb7fc0971946746a911cf4bec56c3864fe665cc8008e8ef3c16cf42f16"><h3>September 28, 2026</h3><ul><li>Cloud sync now resumes automatically when startup repairs two browser copies left by different app versions. A stalled Firestore read or write becomes a visible timed-out attempt and retries through a fresh read, while unreadable local data, account changes, and real permission errors remain blocked.</li><li>Boards whose deletion history grew past the cloud limit now repair themselves automatically. Only byte-for-byte duplicate deletion facts are removed; distinct recovery evidence remains intact, and the smaller board is saved on this device before cloud sync retries.</li><li>After a device save recovers, the app now retries the matching cloud read or write automatically. A successful read clears the old error, pending edits stay marked syncing until their write is acknowledged, and a real backend or permission failure remains visible.</li><li>Reset everything now asks for a second explicit tap and first keeps an exact restorable copy of the current board. If that device backup cannot be saved, the reset stops without changing the board.</li><li>When retained recovery copies fill browser storage, the app now losslessly compacts their archive and retries the save automatically. Manual, displaced, protected, and unreadable recovery bytes remain intact; ordinary edits and cloud adoption no longer require manual backup deletion when compaction creates room. The cloud button also stops saying synced while the latest edit is not saved on this device.</li><li>When a newer cloud board already contains every local task, its redundant safety copy no longer stays protected while waiting for a cloud write that will never be needed. The copy remains in local history, while later edits can rotate it when browser space is full; displaced or conflicting edits remain protected.</li><li>Cloud errors now identify whether sign-in, reading, writing, or local reconciliation failed and show a safe error code. Invalid cloud revisions stop before writing, and signing back into the same account reads its current board before sending a local edit.</li><li>Signing in now opens the Google account chooser, so signing out can actually switch to a different board and account.</li><li>Settings can now view, copy, or download the board currently open in this tab, including an edit that device storage could not save. Device-save warnings also include a stable stage and code that Settings repeats without exposing board contents.</li><li>Pasted tasks now keep their chosen prerequisite, Worked on it tasks stay under Ineligible until their hold clears, and restored identifiers remain plain data in every task and context control.</li><li>Cloud-confirmed recovery copies now stop consuming protected device storage after their exact sync is acknowledged. An overwritten offline edit remains a durable recovery copy until you remove it, even when it had reused that day’s automatic backup. A full iPhone or iPad store still opens its readable saved board, and later edits can rotate released automatic history instead of failing.</li><li>Saving an ordinary edit now uses the available board storage even when optional automatic backup history is full. Manual and protected recovery copies remain untouched, and automatic history resumes when space returns.</li><li>Downloaded app updates now open immediately when this board is already saved, without making another backup write. If an edit is unsaved, the update stays pending with a visible notice while update checks continue.</li><li>Cloud sync on opening now keeps offline tasks alongside newer tasks from another device and saves the merged board before sending it. The earlier board stays in Settings backups; if this device cannot save a recovery copy, sync stays paused without replacing it. Settings now shows unreadable backups and lets you view or download their original data; deleting one copy leaves every other recovery copy untouched.</li><li>The Sun and Moon now act as the visible origin for each object's shadow, including railway spans, while starlight stays diffuse. The water keeps its clean earlier surface while local ripples distort different parts of the reflection with fine, irregular vertical shimmer instead of swinging buildings sideways; the waterline stays continuous, without striping or pixelation.</li><li>Rainclouds now have softly shaded, rounded contours that darken with the night sky. Rain and snow dim the scene gradually without a straight grey band or a darker lake strip, and shadows draw close to their objects as the Sun climbs high.</li><li>Lower trains cast shallow shadows along their tracks, and floating objects’ reflections meet their hulls without a visible seam.</li><li>Elevated electric metro cars no longer cast ground shadows; railway support shadows remain.</li><li>Elevated railway keeps its visible track and individual support shadows, without a second continuous shadow band.</li><li>Older automatic backups now clear as new ones arrive or browser space gets tight, so routine saves can continue. Manual copies, displaced local edits, stale-tab drafts, other-browser copies, and unsynced account-switch copies stay until you remove them.</li><li>Undo now clears older automatic backup history when needed to save your edit, while keeping manual and protected recovery copies. Restoring a backup also keeps the exact board it replaces through a storage-quota retry.</li></ul><h3>September 27, 2026</h3><ul><li>Chosen sky coordinates, their label and time zone, and scene time and season now sync with the signed-in board across devices. The device keeps an offline copy, and switching accounts clears the previous account’s scene.</li><li>Tasks can now wait for one prerequisite task to be completed. Evergreen Done counts, and a deleted prerequisite releases its dependent task. Add and each task’s editor can set or remove the link.</li><li>Evergreen intervals can be entered in hours or days, with a countdown tag while a task rests.</li><li>Settings has collapsible sections. Scene time is green for live time and red for a chosen time; location is green when set and red when unset. Pass reset and bulk import are removed from Settings. Previously saved custom hourly quotes still play, and the FAQ explains the main controls.</li><li>Autumn leaves are smaller. Message planes now have classic biplane wings and wheels. Daytime water mirrors the skyline, and everything above the horizon can reflect in the lake by day and night. The sky and skyline now mirror at their original vertical scale, with the existing far shore naturally hiding higher reflections. The water grows a little softer farther from its horizon line. The Moon and skyline now reflect without horizontal striping while the water keeps its 30-frame-per-second animation pace. The reflected scene stays put while small surface ripples move independently. The waterline joins cleanly, metro cars keep their color as they cross in front of the lake, the road continues past mobile edges, and the railway keeps its deck, supports, and overhead electrical at night, sized to the metro cars. Rain is darker and easier to see, and fireflies gather in the foreground.</li><li>Floating boats and water wildlife now reflect their complete visible shapes at natural height in daylight and at night. Railway and ground shadows follow the Sun or Moon, while starlit nights keep faint diffuse shade. Far, middle, and foreground grass now share depth-scaled detail and density.</li><li>Pinch and other page zoom gestures are disabled while normal scrolling stays available. Footer text now uses a consistent size.</li><li>Bird flocks and bicycle packs vary in size, trams keep even spacing across screen sizes, and airborne visitors move more visibly up and down.</li></ul><h3>September 24, 2026</h3><ul><li>Older tabs can no longer bring back a task after you complete or delete it following multiple restores. Backup imports and restores now keep the history needed for sync to respect those choices.</li></ul><h3>September 23, 2026</h3><ul><li>Old tabs can no longer roll back tasks and History without keeping a recoverable copy. Cloud refresh also stops when the browser’s saved copy is unreadable.</li><li>Settings now keeps seven days of local backups and manual copies you can restore or delete. Restoring saves your current board first and keeps later tasks without a recorded deletion.</li><li>Cloud saves follow revision order and keep tasks unless you deleted them.</li><li>Account switches keep unsynced work in a local recovery copy, and Undo cannot move one account’s tasks into another. Backup restore warns before crossing accounts.</li><li>Quick edits from one tab wait for the previous cloud save, so an older confirmation cannot replace a newer change. If another device updates the same task first, this tab warns you and keeps a restorable copy.</li><li>Return as candidate stays visible in the task editor and greys out when unavailable.</li><li>Quick start now has a collapsed More FAQs section explaining Done, Worked on it, Dislodge, cooldowns, and early returns to scanning.</li></ul><h3>September 21, 2026</h3><ul><li>Separate tasks with the same name now keep their own completed and worked-on History entries.</li><li>A damaged backup, saved board, or cloud copy can no longer replace healthy tasks or stop the app from opening.</li><li>Start and Due use consistent field borders on iPhone in both Add and Edit, while keeping the date picker.</li><li>Keep the header visible now saves as soon as it is checked and reliably keeps Undo in reach while scrolling; the option remains off by default.</li><li>The top-K summary and sparkline stay aligned with done adding for now.</li><li>Double-tap zoom was disabled.</li><li>Add a task can now capture Evergreen recurrence hours and the 2 AM reset, starting at 18 hours with the day reset checked.</li><li>Start, Due, Evergreen, and neighboring Add controls now respect the pane's inner margins across narrow phones and short landscape layouts.</li><li>Dot from the All Tasks editor now ranks that task above the current benchmark. Done and Evergreen Done no longer change ratings.</li></ul></div></template>
+<template id="appChangelogCurrent"><div data-app-fingerprint="0a7c125948c9597cd40fbea8ecdb3685ec3b18eb02be3ab612cc60ee3e6c41a8"><h3>September 29, 2026</h3><ul><li>Boards now move automatically into verified transactional browser storage that can keep edits, Undo, Restore, Reset backups, manual recovery copies, and unknown board fields beyond the old local-storage ceiling. The retained older browser bytes are never deleted during migration; if the new store is temporarily unavailable, they stay recovery data instead of being mistaken for the current board.</li><li>Cloud sync now stores large boards as verified UTF-8 chunks behind one revisioned manifest. An interrupted or corrupt upload stays invisible, concurrent devices still use revision comparison, and automatic cleanup retains the current and previous complete generations while retiring older published data.</li><li>Existing one-document cloud boards remain readable and migrate on their next successful save. After migration, older clients cannot replace the new manifest. Automatic device history keeps one stable daily copy and one latest copy while manual, displaced-edit, account-switch, and protected recovery copies remain explicit.</li><li>Edits made while device storage is finishing another save now follow that save without being marked durable too early. Old app tabs are checked through both retained browser keys, blocked device storage fails closed without hanging startup, and optional automatic history cannot block a primary save that fits.</li></ul><h3>September 28, 2026</h3><ul><li>Cloud sync now resumes automatically when startup repairs two browser copies left by different app versions. A stalled Firestore read or write becomes a visible timed-out attempt and retries through a fresh read, while unreadable local data, account changes, and real permission errors remain blocked.</li><li>Boards whose deletion history grew past the cloud limit now repair themselves automatically. Only byte-for-byte duplicate deletion facts are removed; distinct recovery evidence remains intact, and the smaller board is saved on this device before cloud sync retries.</li><li>After a device save recovers, the app now retries the matching cloud read or write automatically. A successful read clears the old error, pending edits stay marked syncing until their write is acknowledged, and a real backend or permission failure remains visible.</li><li>Reset everything now asks for a second explicit tap and first keeps an exact restorable copy of the current board. If that device backup cannot be saved, the reset stops without changing the board.</li><li>When retained recovery copies fill browser storage, the app now losslessly compacts their archive and retries the save automatically. Manual, displaced, protected, and unreadable recovery bytes remain intact; ordinary edits and cloud adoption no longer require manual backup deletion when compaction creates room. The cloud button also stops saying synced while the latest edit is not saved on this device.</li><li>When a newer cloud board already contains every local task, its redundant safety copy no longer stays protected while waiting for a cloud write that will never be needed. The copy remains in local history, while later edits can rotate it when browser space is full; displaced or conflicting edits remain protected.</li><li>Cloud errors now identify whether sign-in, reading, writing, or local reconciliation failed and show a safe error code. Invalid cloud revisions stop before writing, and signing back into the same account reads its current board before sending a local edit.</li><li>Signing in now opens the Google account chooser, so signing out can actually switch to a different board and account.</li><li>Settings can now view, copy, or download the board currently open in this tab, including an edit that device storage could not save. Device-save warnings also include a stable stage and code that Settings repeats without exposing board contents.</li><li>Pasted tasks now keep their chosen prerequisite, Worked on it tasks stay under Ineligible until their hold clears, and restored identifiers remain plain data in every task and context control.</li><li>Cloud-confirmed recovery copies now stop consuming protected device storage after their exact sync is acknowledged. An overwritten offline edit remains a durable recovery copy until you remove it, even when it had reused that day’s automatic backup. A full iPhone or iPad store still opens its readable saved board, and later edits can rotate released automatic history instead of failing.</li><li>Saving an ordinary edit now uses the available board storage even when optional automatic backup history is full. Manual and protected recovery copies remain untouched, and automatic history resumes when space returns.</li><li>Downloaded app updates now open immediately when this board is already saved, without making another backup write. If an edit is unsaved, the update stays pending with a visible notice while update checks continue.</li><li>Cloud sync on opening now keeps offline tasks alongside newer tasks from another device and saves the merged board before sending it. The earlier board stays in Settings backups; if this device cannot save a recovery copy, sync stays paused without replacing it. Settings now shows unreadable backups and lets you view or download their original data; deleting one copy leaves every other recovery copy untouched.</li><li>The Sun and Moon now act as the visible origin for each object's shadow, including railway spans, while starlight stays diffuse. The water keeps its clean earlier surface while local ripples distort different parts of the reflection with fine, irregular vertical shimmer instead of swinging buildings sideways; the waterline stays continuous, without striping or pixelation.</li><li>Rainclouds now have softly shaded, rounded contours that darken with the night sky. Rain and snow dim the scene gradually without a straight grey band or a darker lake strip, and shadows draw close to their objects as the Sun climbs high.</li><li>Lower trains cast shallow shadows along their tracks, and floating objects’ reflections meet their hulls without a visible seam.</li><li>Elevated electric metro cars no longer cast ground shadows; railway support shadows remain.</li><li>Elevated railway keeps its visible track and individual support shadows, without a second continuous shadow band.</li><li>Older automatic backups now clear as new ones arrive or browser space gets tight, so routine saves can continue. Manual copies, displaced local edits, stale-tab drafts, other-browser copies, and unsynced account-switch copies stay until you remove them.</li><li>Undo now clears older automatic backup history when needed to save your edit, while keeping manual and protected recovery copies. Restoring a backup also keeps the exact board it replaces through a storage-quota retry.</li></ul><h3>September 27, 2026</h3><ul><li>Chosen sky coordinates, their label and time zone, and scene time and season now sync with the signed-in board across devices. The device keeps an offline copy, and switching accounts clears the previous account’s scene.</li><li>Tasks can now wait for one prerequisite task to be completed. Evergreen Done counts, and a deleted prerequisite releases its dependent task. Add and each task’s editor can set or remove the link.</li><li>Evergreen intervals can be entered in hours or days, with a countdown tag while a task rests.</li><li>Settings has collapsible sections. Scene time is green for live time and red for a chosen time; location is green when set and red when unset. Pass reset and bulk import are removed from Settings. Previously saved custom hourly quotes still play, and the FAQ explains the main controls.</li><li>Autumn leaves are smaller. Message planes now have classic biplane wings and wheels. Daytime water mirrors the skyline, and everything above the horizon can reflect in the lake by day and night. The sky and skyline now mirror at their original vertical scale, with the existing far shore naturally hiding higher reflections. The water grows a little softer farther from its horizon line. The Moon and skyline now reflect without horizontal striping while the water keeps its 30-frame-per-second animation pace. The reflected scene stays put while small surface ripples move independently. The waterline joins cleanly, metro cars keep their color as they cross in front of the lake, the road continues past mobile edges, and the railway keeps its deck, supports, and overhead electrical at night, sized to the metro cars. Rain is darker and easier to see, and fireflies gather in the foreground.</li><li>Floating boats and water wildlife now reflect their complete visible shapes at natural height in daylight and at night. Railway and ground shadows follow the Sun or Moon, while starlit nights keep faint diffuse shade. Far, middle, and foreground grass now share depth-scaled detail and density.</li><li>Pinch and other page zoom gestures are disabled while normal scrolling stays available. Footer text now uses a consistent size.</li><li>Bird flocks and bicycle packs vary in size, trams keep even spacing across screen sizes, and airborne visitors move more visibly up and down.</li></ul><h3>September 24, 2026</h3><ul><li>Older tabs can no longer bring back a task after you complete or delete it following multiple restores. Backup imports and restores now keep the history needed for sync to respect those choices.</li></ul><h3>September 23, 2026</h3><ul><li>Old tabs can no longer roll back tasks and History without keeping a recoverable copy. Cloud refresh also stops when the browser’s saved copy is unreadable.</li><li>Settings now keeps seven days of local backups and manual copies you can restore or delete. Restoring saves your current board first and keeps later tasks without a recorded deletion.</li><li>Cloud saves follow revision order and keep tasks unless you deleted them.</li><li>Account switches keep unsynced work in a local recovery copy, and Undo cannot move one account’s tasks into another. Backup restore warns before crossing accounts.</li><li>Quick edits from one tab wait for the previous cloud save, so an older confirmation cannot replace a newer change. If another device updates the same task first, this tab warns you and keeps a restorable copy.</li><li>Return as candidate stays visible in the task editor and greys out when unavailable.</li><li>Quick start now has a collapsed More FAQs section explaining Done, Worked on it, Dislodge, cooldowns, and early returns to scanning.</li></ul><h3>September 21, 2026</h3><ul><li>Separate tasks with the same name now keep their own completed and worked-on History entries.</li><li>A damaged backup, saved board, or cloud copy can no longer replace healthy tasks or stop the app from opening.</li><li>Start and Due use consistent field borders on iPhone in both Add and Edit, while keeping the date picker.</li><li>Keep the header visible now saves as soon as it is checked and reliably keeps Undo in reach while scrolling; the option remains off by default.</li><li>The top-K summary and sparkline stay aligned with done adding for now.</li><li>Double-tap zoom was disabled.</li><li>Add a task can now capture Evergreen recurrence hours and the 2 AM reset, starting at 18 hours with the day reset checked.</li><li>Start, Due, Evergreen, and neighboring Add controls now respect the pane's inner margins across narrow phones and short landscape layouts.</li><li>Dot from the All Tasks editor now ranks that task above the current benchmark. Done and Evergreen Done no longer change ratings.</li></ul></div></template>
 <template id="appChangelog"><details data-app-fingerprint="43c2064b3e3eb36a00a54cdade10bda1db44258e57c84075fc23fa8ab524530d"><summary>Changelog</summary><h3>September 19, 2026</h3><ul><li>At night, boats and nearby objects above the horizon reflect naturally in the water, including airplanes, the Moon, and stars.</li><li>The Add a task panel can be minimized and remembers that choice.</li><li>Every visitor starts with an individual travel speed, so faster arrivals can overtake slower ones. Vehicles hold that speed horizontally while vertical movement can still vary, the existing lower tram cars remain linked, and airplane banners switch to a dark, light-lettered night palette.</li><li>Tasks marked No, Can’t, or Dislodged appear under Ineligible until their marks clear.</li><li>First light, sunrise, sunset, and last light now have separate scenery controls and show times for the sky location. Solar times were checked across seasons, time zones, and polar days.</li><li>Jet skis and small water creatures are easier to see. Daytime visitors arrive twice as often.</li><li>Readers and groups linger longer, leave at varied times, and carry books by their sides.</li><li>Add tasks with start and due dates. Selecting Eligible clears other filters to show every eligible task.</li><li>Both scan modes start with the oldest eligible task. Done raises its preference rating; Worked on it leaves ratings unchanged.</li></ul><h3>September 16, 2026</h3><ul><li>Updates announce themselves with a toast pointing to this changelog.</li><li>Task editors show evergreen interval and day-reset controls only when Evergreen is checked.</li><li>Chance mode is the default for new scan preferences. Dislodge now lowers the task’s preference rating; Undo restores it.</li><li>Signing in while the app is loading now brings synced tasks into view without a manual refresh.</li><li>All Tasks has a separate All / Eligible / Ineligible filter row that combines with search and task-status filters.</li><li>Chance scans use TrueSkill win probabilities, including rating uncertainty, with no rating floor or offset. If no candidate can draw, scanning falls back to descending likelihood.</li><li>The scan-mode dropdown saves immediately, including when you close Settings without pressing Save.</li><li>Account switching keeps task lists separate after a cloud refresh. Cloud refreshes wait for edits, and Undo restores an imported scan correctly.</li><li>Add &amp; dot now starts the daily reset clock. Tasks with a start date wake at midnight, and stop-scanning guidance uses the candidates actually ahead.</li><li>Changing the scan-mode setting now takes effect in the current scan. Choosing both modes also offers both buttons when resuming.</li><li>The installed app checks for updates whenever it opens or returns to the foreground. Available updates load automatically after you finish editing, without reinstalling.</li><li>Choose descending scans, TrueSkill-weighted chance scans, or both scan buttons in Settings. Chance order stays steady through undo and refreshes on a fresh pass or at 2 AM; decisions still update ratings immediately.</li><li>Set an evergreen interval for each task, with an optional 2 AM reset. New tasks default to 18 hours or the next day marker, whichever comes first; Settings lets you change those defaults.</li></ul><h3>September 14, 2026</h3><ul><li>Skywriters trace single human-written words in smoke, then fly away as the letters fade.</li><li>Hourly messages appear only when human-written copy is available. Anytime prompts show the current hour, such as 5 AM. Sky messages keep their existing behavior.</li><li>Trains and metros now run regularly throughout the day and night.</li><li>Event rates can be adjusted in SPAWN_RATES.md.</li></ul><h3>September 13, 2026 — Seasonal details</h3><ul><li>Rain showers last 20–45 minutes; thunderstorms last 30–60 minutes. Winter brings snow and snowstorms on the same shared weather schedule.</li><li>Winter visitors build snowmen, ski downhill, and make snow angels. Warm-weather outings wait for warmer seasons.</li><li>Autumn turns the landscape amber and brown, with leaves falling from trees and blowing in storms.</li><li>Spring brings scattered flowers and tree blossoms. Occasional gusts lift petals; rain and storms bring more petals and pollen.</li><li>Winter trees gather snow and occasionally shed small clumps. Seasonal debris gets livelier during storms.</li><li>Birds have individual plumage: distant sky birds look dark with hints of color, while nearby birds show more color.</li><li>People have varied hairstyles and hair colors, with helmets and hats kept clear.</li><li>Little propeller planes tow the messages overhead. Hot air balloons appear more often during the day.</li><li>More trains, riders, and people walking pass through the scene, including new scooter and hoverboard riders.</li><li>Season rules, weather timing, and visitor odds now share an expandable configuration; seasonal effects keep their own small budgets and visitor lifetimes.</li></ul><h3>September 13, 2026</h3><ul><li>One Sunrise / Sunset button switches between dawn and dusk.</li><li>Choose a season when locking the scenery, or follow the current season.</li><li>Cyclists pedal with connected hips and naturally bending knees.</li><li>Distant boats shrink with depth; windsurfers and small craft stay smaller than ships, and the far metro is smaller than the foreground train.</li><li>Ducks sometimes lift off from the lake and fly away.</li><li>Seasons now follow the actual equinox and solstice, with hemisphere and local date handling. Solar locks use the sky location’s calendar.</li><li>Choose the sky location’s time zone when it differs from your device. The Moon’s illuminated side now follows the Sun, and the midnight sun stays daylight.</li><li>Deer, foxes, rabbits, and raccoons occasionally wander through the foreground: a 1% chance every 30 seconds, up to four animals, independent of other visitors.</li><li>Picnic groups fold their blanket and gather their things; readers, couples, and kite flyers also finish up and walk away.</li><li>Occasional gentle rain follows the same real-time schedule across devices, including offline. Reduced motion keeps the rain still.</li><li>Settings now includes this changelog, with a check that catches undocumented app changes.</li></ul></details></template>
 <!-- changelog:end -->
 <dialog id="sceneTimeDialog" class="motion-dialog" aria-labelledby="sceneTimeTitle">
@@ -498,6 +498,8 @@ input[type=date]::-webkit-date-and-time-value{min-width:0;text-align:left}
 </dialog>
 
 <script src="vendor/lz-string-1.5.0.min.js"></script>
+<script src="device-store-v2.js"></script>
+<script src="cloud-store-v2.js"></script>
 <script>
 "use strict";
 // Keep the scene and task controls at one scale while leaving ordinary page
@@ -610,6 +612,7 @@ function median(arr){ if(!arr.length) return NaN; const s=[...arr].sort((a,b)=>a
 const STORE_KEY = "fvp:chain-scanner:v1";
 const LOCAL_HEAD_KEY = "fvp:chain-scanner:protected:v1";
 const LOCAL_BACKUPS_KEY = "fvp:chain-scanner:daily-backups:v1";
+const DEVICE_AUTHORITY_KEY = "fvp:chain-scanner:device-store-v2";
 const THEME_HINT_KEY = "fvp:chain-scanner:theme";   // paint-time cache only; see writeThemeHint()
 const PASS_RESET_HOUR = 2;            // the local date marker returns scanned tasks to the pool
 /* Code-owned presentation switches, intentionally kept out of Settings and
@@ -686,7 +689,15 @@ let persistQueue = Promise.resolve();
 let lastPersistedRaw = null; // exact browser bytes this tab actually loaded or wrote
 let storageOK = false;
 let useLocal  = false;   // true when running as a plain web page (localStorage)
+let deviceStore = null;
+let deviceHeadHash = null;
+let deviceBackupCache = [];
+let deviceBackupCacheReadable = true;
+let deviceStorageAuthority = false;
+let deviceStorageRequired = false;
+let deviceLegacySeenSignature = null;
 let lastDeviceSaveIssue = null;
+function deviceStorageActive(){ return deviceStorageAuthority; }
 function setDeviceSaveIssue(stage,code){ lastDeviceSaveIssue={stage,code}; renderSync(); }
 function clearDeviceSaveIssue(){
   const recovered=lastDeviceSaveIssue;
@@ -1085,7 +1096,7 @@ function protectedBackupIdSet(){
   }
   return ids;
 }
-function readLocalBackups(){
+function readLegacyBackups(){
   try{
     const rows = parseBackupIndex(localStorage.getItem(LOCAL_BACKUPS_KEY));
     const oldest=oldestBackupDay();
@@ -1095,7 +1106,17 @@ function readLocalBackups(){
     return Array.isArray(rows) ? rows.filter(row=>row && typeof row.id==="string" && typeof row.day==="string" && (!automaticBackupKinds.has(row.kind) || row.day>=oldest || protectedIds.has(row.id)) && typeof row.payload==="string") : [];
   }catch(e){ return []; }
 }
+function readLocalBackups(){
+  if(!deviceStorageAuthority) return readLegacyBackups();
+  const rows=[...deviceBackupCache,...readLegacyBackups()],seen=new Set(),out=[];
+  for(const row of rows){
+    const key=String(row?.id||"")+"\u0000"+String(row?.kind||"")+"\u0000"+String(row?.payload||"");
+    if(!seen.has(key)){seen.add(key);out.push(row);}
+  }
+  return out;
+}
 let backupIndexShownRaw = null;
+let backupRowsShown = null;
 function inspectBackupIndex(){
   let raw;
   try{ raw=localStorage.getItem(LOCAL_BACKUPS_KEY); }
@@ -1270,7 +1291,7 @@ function saveLocalBackup(kind, payload, onlyIfMissing=false, changedRetries=0,pr
       return validSavedPayload(row.payload);
     })) return false;
     const at = Date.now(), day = backupDay(at);
-    let rows = readLocalBackups();
+    let rows = readLegacyBackups();
     // Stable snapshots retain their exact bytes until normal expiry or an
     // explicit delete. Reuse one for cloud adoption when the same board is
     // already recoverable; duplicate full boards can exhaust browser quota.
@@ -1352,6 +1373,28 @@ function reclassifyCloudRecoveryBackup(id,payload,kind){
     }
     return writeBackupIndexIfCurrent(raw,encodeBackupIndex(next,packedBackupIndex(raw)));
   }catch(e){ return false; }
+}
+async function reclassifyDurableCloudRecoveryBackup(id,payload,kind,allowFreshDurable=false){
+  let matched=false;
+  try{
+    const deviceMatches=deviceStorageAuthority&&deviceBackupCacheReadable
+      ? deviceBackupCache.filter(row=>row.id===id&&row.payload===payload) : [];
+    if(deviceStorageAuthority&&!deviceBackupCacheReadable) return false;
+    if(deviceMatches.length){
+      matched=true;
+      if(deviceMatches.some(row=>!automaticBackupKinds.has(row.kind))&&!allowFreshDurable){}
+      else if(!await deviceStore.updateBackupKind(id,payload,kind)) return false;
+      await refreshDeviceBackupCache();
+      if(!deviceBackupCacheReadable) return false;
+    }
+    const raw=localStorage.getItem(LOCAL_BACKUPS_KEY),rows=raw===null?[]:parseBackupIndex(raw);
+    if(!Array.isArray(rows)||!rows.every(readableBackupRow)) return false;
+    if(rows.some(row=>row.id===id&&row.payload===payload)){
+      matched=true;
+      if(!reclassifyCloudRecoveryBackup(id,payload,kind)) return false;
+    }
+    return matched;
+  }catch(e){return false;}
 }
 function retireAutomaticBackupForPrimarySave(expectedHead,expectedStore,preserveBackupId=null){
   try{
@@ -1697,6 +1740,168 @@ function protectedBrowserPayload(raw){
   }
   return raw;
 }
+async function refreshDeviceBackupCache(){
+  if(!deviceStore) return [];
+  try{deviceBackupCache=await deviceStore.listBackups();deviceBackupCacheReadable=true;}
+  catch(e){deviceBackupCache=[];deviceBackupCacheReadable=false;}
+  return deviceBackupCache;
+}
+function hasDeviceStorageAuthorityMarker(){
+  try{return localStorage.getItem(DEVICE_AUTHORITY_KEY)==="1";}catch(e){return false;}
+}
+function markDeviceStorageAuthority(){
+  try{localStorage.setItem(DEVICE_AUTHORITY_KEY,"1");return localStorage.getItem(DEVICE_AUTHORITY_KEY)==="1";}
+  catch(e){return false;}
+}
+function legacyBoardCopies(){
+  try{
+    const head=localStorage.getItem(LOCAL_HEAD_KEY),shared=localStorage.getItem(STORE_KEY);
+    return [[LOCAL_HEAD_KEY,head],[STORE_KEY,shared]]
+      .filter(([,raw])=>validSavedPayload(raw)).map(([key,raw])=>({key,raw}));
+  }catch(e){return [];}
+}
+function legacyBoardBytes(){
+  const copies=legacyBoardCopies();
+  return copies.find(copy=>copy.key===LOCAL_HEAD_KEY)?.raw || copies[0]?.raw || null;
+}
+function legacyBoardSignature(copies=legacyBoardCopies()){return JSON.stringify(copies);}
+function legacyMigrationRows(){
+  let raw=null,rows=[];
+  try{raw=localStorage.getItem(LOCAL_BACKUPS_KEY);const parsed=parseBackupIndex(raw);if(Array.isArray(parsed))rows=parsed.filter(readableBackupRow);}
+  catch(e){}
+  return {rows,opaqueArchives:raw===null?[]:[{key:LOCAL_BACKUPS_KEY,raw}]};
+}
+function legacyMigrationBundle(headPayload,copies=legacyBoardCopies()){
+  const migration=legacyMigrationRows(),unique=[...new Map(copies.map(copy=>[copy.raw,copy])).values()];
+  let next=JSON.parse(headPayload),changed=false;dropRemovedFields(next);hydrateState(next);
+  if(unique.some(copy=>copy.raw!==headPayload)){
+    for(const copy of unique){
+      const at=Date.now();migration.rows.push({id:deviceBackupId("other-browser-copy"),day:backupDay(at),at,
+        kind:"other-browser-copy",payload:copy.raw});
+      const incoming=JSON.parse(copy.raw);dropRemovedFields(incoming);hydrateState(incoming);
+      if(sameListOwner(next,incoming))changed=mergeUndeletedTasks(next,incoming)||carryProtectedBackupIds(next,incoming)||changed;
+    }
+  }
+  return {headPayload:changed?JSON.stringify(next):headPayload,...migration};
+}
+async function activateDeviceStorage(payload){
+  if(!deviceStore||deviceStorageAuthority||typeof payload!=="string") return deviceStorageAuthority;
+  try{
+    const copies=legacyBoardCopies(),migration=legacyMigrationBundle(payload,copies),signature=legacyBoardSignature(copies);
+    const sourceFingerprint=await ChainStorageV2.hashPayload(signature);
+    const result=await deviceStore.migrateLegacy({headPayload:migration.headPayload,account:state?.syncAccount??null,
+      sourceFingerprint,backups:migration.rows,opaqueArchives:migration.opaqueArchives});
+    if(!result?.ok||!result.verified) return false;
+    const head=await deviceStore.readHead();
+    if(!head||head.payload!==migration.headPayload) return false;
+    // A later browser boot must be able to distinguish an unavailable v2
+    // authority from the deliberately retained, older localStorage shell.
+    // If even this tiny marker cannot be made durable, keep using the old
+    // authority rather than creating an undiscoverable split brain.
+    if(!markDeviceStorageAuthority()) return false;
+    deviceHeadHash=head.hash;lastPersistedRaw=head.payload;deviceLegacySeenSignature=signature;deviceStorageAuthority=true;
+    await refreshDeviceBackupCache();window.ScannerDeviceStore=deviceStore;return true;
+  }catch(e){return false;}
+}
+async function initializeDeviceStorage(){
+  deviceStorageRequired=hasDeviceStorageAuthorityMarker();
+  if(window.storage||!window.ChainStorageV2||!window.indexedDB||!crypto?.subtle) return null;
+  try{
+    deviceStore=ChainStorageV2.createDeviceStore({indexedDB:window.indexedDB,crypto,
+      dbName:window.CHAIN_STORAGE_DB_NAME||"chain-scanner-v2",
+      openTimeoutMs:window.CHAIN_STORAGE_OPEN_TIMEOUT_MS||5000});
+    await deviceStore.open();window.ScannerDeviceStore=deviceStore;
+    let head=await deviceStore.readHead();
+    const legacyCopies=legacyBoardCopies(),legacy=legacyBoardBytes(),legacySignature=legacyBoardSignature(legacyCopies);
+    if(!head&&legacy){
+      const migration=legacyMigrationBundle(legacy,legacyCopies),sourceFingerprint=await ChainStorageV2.hashPayload(legacySignature);
+      const result=await deviceStore.migrateLegacy({headPayload:migration.headPayload,account:JSON.parse(legacy).syncAccount??null,
+        sourceFingerprint,backups:migration.rows,opaqueArchives:migration.opaqueArchives});
+      if(!result?.ok||!result.verified) return null;
+      head=await deviceStore.readHead();
+    }
+    if(!head) return null;
+    if(!markDeviceStorageAuthority()) return null;
+    deviceStorageAuthority=true;deviceHeadHash=head.hash;
+    const legacyFingerprint=legacy?await ChainStorageV2.hashPayload(legacySignature):null;
+    deviceLegacySeenSignature=legacy&&head.sourceFingerprint===legacyFingerprint?legacySignature:null;
+    await refreshDeviceBackupCache();
+    if(legacy&&!deviceLegacySeenSignature){
+      if(!await reconcileDeviceLegacyCopy())return null;
+      head=await deviceStore.readHead();
+    }
+    return head.payload;
+  }catch(e){deviceStore=null;deviceStorageAuthority=false;window.ScannerDeviceStore=null;return null;}
+}
+function deviceBackupId(kind){return kind+":"+Date.now()+":"+uid();}
+function deviceAutomaticBackupPlan(payload,preserveBackupId=null){
+  const now=Date.now(),day=backupDay(now),oldest=oldestBackupDay(),protectedIds=protectedBackupIdSet();
+  if(preserveBackupId)protectedIds.add(preserveBackupId);
+  const backups=[];
+  if(!deviceBackupCache.some(row=>row.kind==="daily"&&row.day===day))
+    backups.push({id:deviceBackupId("daily"),day,at:now,kind:"daily",payload});
+  backups.push({id:deviceBackupId("latest"),day,at:now,kind:"latest",payload});
+  const removeBackupIds=deviceBackupCache.filter(row=>
+    (row.kind==="latest"||(automaticBackupKinds.has(row.kind)&&row.day<oldest))&&
+    !protectedIds.has(row.id)&&row.id!==adoptedSafety?.backupId
+  ).map(row=>row.id);
+  return {backups,removeBackupIds};
+}
+async function saveDurableBackup(kind,payload){
+  if(!deviceStorageAuthority||!deviceStore) return saveLocalBackup(kind,payload) ?
+    readLocalBackups().filter(row=>row.kind===kind&&row.payload===payload).sort((a,b)=>b.at-a.at)[0]||true : null;
+  try{
+    const existing=deviceBackupCache.find(row=>row.kind===kind&&row.payload===payload);
+    if(existing&&["before-account-switch","before-cloud-local-edit","before-cloud-adoption"].includes(kind)) return existing;
+    const at=Date.now(),backup={id:deviceBackupId(kind),day:backupDay(at),at,kind,payload};
+    const result=await deviceStore.putBackup({expectedHash:deviceHeadHash,backup});
+    if(!result?.ok) return null;
+    await refreshDeviceBackupCache();return Object.assign({},result.row,{newRecovery:true});
+  }catch(e){return null;}
+}
+async function reconcileDeviceLegacyCopy(){
+  if(!deviceStorageAuthority||!deviceStore) return true;
+  const copies=legacyBoardCopies(),signature=legacyBoardSignature(copies);
+  if(!copies.length||signature===deviceLegacySeenSignature) return true;
+  try{
+    const current=await deviceStore.readHead();
+    if(!current||current.hash!==deviceHeadHash) return false;
+    let seen=[];try{seen=JSON.parse(deviceLegacySeenSignature||"[]");}catch(e){}
+    const changedCopies=copies.filter(copy=>!seen.some(prior=>prior?.key===copy.key&&prior.raw===copy.raw));
+    if(!changedCopies.length){
+      deviceLegacySeenSignature=signature;
+      await deviceStore.setLegacyFingerprint(deviceHeadHash,await ChainStorageV2.hashPayload(signature));
+      return true;
+    }
+    const backups=[],uniqueRaw=new Set(),next=JSON.parse(current.payload);let changed=false;
+    dropRemovedFields(next);hydrateState(next);
+    for(const copy of changedCopies){
+      if(!uniqueRaw.has(copy.raw)){
+        const at=Date.now();uniqueRaw.add(copy.raw);
+        backups.push({id:deviceBackupId("other-browser-copy"),day:backupDay(at),at,kind:"other-browser-copy",payload:copy.raw});
+      }
+      const incoming=JSON.parse(copy.raw);dropRemovedFields(incoming);hydrateState(incoming);
+      if(sameListOwner(next,incoming)) changed=mergeUndeletedTasks(next,incoming)||carryProtectedBackupIds(next,incoming)||changed;
+    }
+    const liveRaw=state?JSON.stringify(state):null,live=liveRaw?JSON.parse(liveRaw):null;
+    if(live&&sameListOwner(next,live)) changed=mergeUndeletedTasks(next,live)||carryProtectedBackupIds(next,live)||changed;
+    const payload=changed?JSON.stringify(next):current.payload;
+    const committed=await deviceStore.commitHead({expectedHash:current.hash,payload,account:next.syncAccount??null,backups});
+    if(!committed?.ok) return false;
+    deviceHeadHash=committed.hash;lastPersistedRaw=payload;deviceLegacySeenSignature=signature;
+    await deviceStore.setLegacyFingerprint(deviceHeadHash,await ChainStorageV2.hashPayload(signature));
+    await refreshDeviceBackupCache();
+    if(live&&changed){
+      pushUndo();
+      if(JSON.stringify(state)!==liveRaw){
+        const newer=JSON.parse(JSON.stringify(state));dropRemovedFields(newer);hydrateState(newer);
+        if(sameListOwner(newer,next)){mergeUndeletedTasks(newer,next);carryProtectedBackupIds(newer,next);state=newer;}
+      }else state=next;
+      persistedChanceSeed=JSON.parse(payload).chance?.seed??null;applyTheme();applyScenePreferences();recomputeRanks();render();
+    }
+    return true;
+  }catch(e){return false;}
+}
 function refreshBrowserCopy(){
   if(!useLocal || !storageOK) return true;
   let disk, head;
@@ -1792,8 +1997,18 @@ async function loadState(){
       try{ await window.storage.set(STORE_KEY+":probe","1"); storageOK = true; }catch(_){ storageOK = false; }
     }
   }
+  if(!storageOK){
+    useLocal = true;
+    const durable=await initializeDeviceStorage();
+    if(durable!==null){storageOK=true;lastPersistedRaw=durable;return JSON.parse(durable);}
+    // Once a verified IndexedDB head has become authoritative, the retained
+    // v1 bytes are recovery evidence for old shells, not a current board.
+    // An unavailable/blocked database must fail closed instead of reviving
+    // and uploading that stale copy.
+    if(deviceStorageRequired) return null;
+  }
   if(!storageOK && localStorageOK()){   // plain web page (e.g. GitHub Pages)
-    useLocal = true; storageOK = true;
+    storageOK = true;
     try{
       const raw = protectedBrowserPayload(localStorage.getItem(STORE_KEY));
       lastPersistedRaw = raw;
@@ -1814,21 +2029,87 @@ function localStorageOK(){
     return true;
   }catch(e){ return false; }
 }
+function retirableDeviceAutomaticIds(preserveBackupId=null){
+  const protectedIds=protectedBackupIdSet();
+  if(preserveBackupId)protectedIds.add(preserveBackupId);
+  if(adoptedSafety?.backupId)protectedIds.add(adoptedSafety.backupId);
+  return deviceBackupCache.filter(row=>automaticBackupKinds.has(row.kind)&&!protectedIds.has(row.id)).map(row=>row.id);
+}
+function deviceQuotaFailure(error){
+  return error?.name==="QuotaExceededError"||error?.code==="quota-exhausted"||error?.code==="QuotaExceededError";
+}
 /* The disk half of save(), on its own: writes what is in memory and does
    nothing else. save() also re-stamps updatedAt and schedules a cloud push,
    which is exactly right for an edit and exactly wrong for bookkeeping — the
    push callback in sendPush() has to record a revision without that counting
    as a change, or every write re-stamps the state and schedules the next one,
    a 2-second write loop with no edit behind it. */
-async function persist(backupAlreadySafe=false,preserveBackupId=null){
+async function persist(backupAlreadySafe=false,preserveBackupId=null,deviceRetry=0){
   if(!storageOK) return reportDeviceSaveFailure("storage","unavailable","Keep this tab open; use Current board recovery in Settings before closing it.");
-  if(useLocal && !refreshBrowserCopy()) return false;
+  if(deviceStore&&!deviceStorageAuthority){
+    const bootstrap=JSON.stringify(state);
+    await activateDeviceStorage(bootstrap);
+  }
+  if(deviceStorageAuthority){if(!await reconcileDeviceLegacyCopy()) return reportDeviceSaveFailure("device-store","legacy-reconcile-failed","An older tab changed the board and its recovery copy could not be verified.");}
+  else if(useLocal && !refreshBrowserCopy()) return false;
   if(validSavedPayload(lastPersistedRaw) && sameListOwner(state, JSON.parse(lastPersistedRaw))){
     const recovered=mergeUndeletedTasks(state, JSON.parse(lastPersistedRaw));
     if(recovered){ recomputeRanks(); render(); toast("A missing task was kept in the saved board.", 6000); }
   }
   const chanceSeed = state.chance?.seed;
   const payload = JSON.stringify(state);
+  if(deviceStorageAuthority){
+    try{
+      const commit=async options=>{
+        try{return await deviceStore.commitHead(options);}
+        catch(error){if(deviceQuotaFailure(error))return {error:true,code:"quota-exhausted"};throw error;}
+      };
+      const automatic=backupAlreadySafe?{backups:[],removeBackupIds:[]}:deviceAutomaticBackupPlan(payload,preserveBackupId);
+      let result=await commit({expectedHash:deviceHeadHash,payload,account:state.syncAccount??null,...automatic});
+      if(result?.code==="quota-exhausted"){
+        // Daily/latest rows are optional. If adding one reaches the device
+        // quota, atomically retire only unprotected automatic references and
+        // write the primary board. Manual and replacement proofs remain.
+        const removeBackupIds=[...new Set([...automatic.removeBackupIds,...retirableDeviceAutomaticIds(preserveBackupId)])];
+        result=await commit({expectedHash:deviceHeadHash,payload,account:state.syncAccount??null,backups:[],removeBackupIds});
+      }
+      let committedPayload=payload,observedPayload=payload,mergedState=null;
+      if(result?.conflict){
+        const latest=await deviceStore.readHead(),draft=JSON.stringify(state);
+        if(!latest) return false;
+        const next=JSON.parse(latest.payload),mine=JSON.parse(draft);
+        hydrateState(next);hydrateState(mine);
+        if(!sameListOwner(next,mine)) return reportDeviceSaveFailure("device-store","account-changed","The signed-in account changed while this board was saving.");
+        mergeUndeletedTasks(next,mine);carryProtectedBackupIds(next,mine);
+        const merged=JSON.stringify(next),at=Date.now();
+        result=await commit({expectedHash:latest.hash,payload:merged,account:next.syncAccount??null,
+          backup:{id:deviceBackupId("stale-tab-draft"),day:backupDay(at),at,kind:"stale-tab-draft",payload:draft}});
+        committedPayload=merged;observedPayload=draft;mergedState=next;
+      }
+      if(!result?.ok) return reportDeviceSaveFailure("device-store",result?.code||"write-failed","The previous durable board remains unchanged; keep this tab open and try again.");
+      deviceHeadHash=result.hash;lastPersistedRaw=committedPayload;persistedChanceSeed=JSON.parse(committedPayload).chance?.seed??null;
+      if(mergedState){
+        const liveRaw=JSON.stringify(state);
+        if(liveRaw===observedPayload) state=mergedState;
+        else{
+          // A third edit arrived while the CAS repair awaited its durable
+          // commit. Keep it as the base and join the peer head into it; the
+          // guarded retry below then makes that complete union durable.
+          const newer=JSON.parse(liveRaw),durable=JSON.parse(committedPayload);
+          hydrateState(newer);hydrateState(durable);
+          if(!sameListOwner(newer,durable)) return reportDeviceSaveFailure("device-store","account-changed","The signed-in account changed while this board was saving.");
+          mergeUndeletedTasks(newer,durable);carryProtectedBackupIds(newer,durable);state=newer;
+        }
+        recomputeRanks();render();
+      }
+      await refreshDeviceBackupCache();
+      if(JSON.stringify(state)!==committedPayload){
+        if(deviceRetry>=3) return reportDeviceSaveFailure("device-store","changed-during-save","The board kept changing while it was being saved; keep this tab open and try again.");
+        return persist(backupAlreadySafe,preserveBackupId,deviceRetry+1);
+      }
+      clearDeviceSaveIssue();return true;
+    }catch(e){return reportDeviceSaveFailure("device-store","write-failed","The previous durable board remains unchanged; keep this tab open and try again.");}
+  }
   if(useLocal){
     let expectedHead, expectedStore;
     try{
@@ -2034,7 +2315,8 @@ function reconciled(){ return !cloudAdoptionHeld && !deferredCloudPull && reconc
 function cloudPush(){
   if(!cloudReady()) return;
   if(cloudTimer) clearTimeout(cloudTimer);
-  cloudTimer = setTimeout(()=>{ cloudTimer = null; sendPush(); }, 2000);   // slow enough not to burn a write per keystroke
+  const override=Number(window.CLOUD_PUSH_DELAY_MS),delay=Number.isFinite(override)&&override>=0?override:2000;
+  cloudTimer = setTimeout(()=>{ cloudTimer = null; sendPush(); }, delay);   // slow enough not to burn a write per keystroke
 }
 /* Bypasses the debounce above for moments that shouldn't wait — dotting a
    task onto the chain, or deleting one. Cancels any pending debounced push
@@ -2046,6 +2328,7 @@ function cloudPushNow(){
 }
 function adoptionSafetyStored(proof){
   if(!useLocal || !proof || lastPersistedRaw!==proof.raw) return false;
+  if(deviceStorageAuthority)return deviceBackupCache.some(row=>row.id===proof.backupId&&row.kind!=="latest"&&row.payload===proof.priorBoard);
   try{
     if(localStorage.getItem(LOCAL_HEAD_KEY)!==proof.raw || localStorage.getItem(STORE_KEY)!==proof.raw) return false;
     return readLocalBackups().some(row=>row.id===proof.backupId && row.kind!=="latest" && row.payload===proof.priorBoard);
@@ -2063,27 +2346,47 @@ function releaseCloudRecoveryPins(ids=state?.protectedBackupIds || []){
   state.protectedBackupIds=kept;
   return true;
 }
-function releasableCloudRecoveryIds(ids,confirmedPayload){
+async function releasableCloudRecoveryIds(ids,confirmedPayload){
   if(!Array.isArray(ids) || !ids.length) return [];
   let confirmedBoard;
   try{ confirmedBoard=JSON.parse(confirmedPayload); }
   catch(e){ return []; }
+  let legacyRows=[];
+  try{
+    const raw=localStorage.getItem(LOCAL_BACKUPS_KEY);
+    if(raw!==null){legacyRows=parseBackupIndex(raw);if(!Array.isArray(legacyRows)||!legacyRows.every(readableBackupRow))return [];}
+  }catch(e){return [];}
+  if(deviceStorageAuthority&&!deviceBackupCacheReadable)return [];
   const released=[];
   for(const id of ids){
     try{
-      const raw=localStorage.getItem(LOCAL_BACKUPS_KEY);
-      const rows=parseBackupIndex(raw);
-      if(!Array.isArray(rows) || !rows.every(readableBackupRow)) continue;
-      const matching=rows.filter(row=>row.id===id);
+      let deviceRows=deviceStorageAuthority?deviceBackupCache.filter(row=>row.id===id):[];
+      if(deviceRows.some(row=>!readableBackupRow(row)))continue;
+      let matching=[...legacyRows.filter(row=>row.id===id),...deviceRows];
       if(!matching.length){ released.push(id); continue; }
-      const unsafe=matching.filter(row=>automaticBackupKinds.has(row.kind) && row.kind!=="cloud-merged" &&
+      const unsafe=matching.filter(row=>automaticBackupKinds.has(row.kind) &&
         !recoveryBoardRepresented(row.payload,confirmedBoard));
-      if(!unsafe.length){ released.push(id); continue; }
       // Older installed boards have no provenance beyond the pin itself. If
       // their automatic row differs from the confirmed cloud board, preserve
       // one exact copy as durable conflict recovery before unpinning it.
       const payloads=[...new Set(unsafe.map(row=>row.payload))];
-      if(payloads.every(payload=>reclassifyCloudRecoveryBackup(id,payload,"before-cloud-local-edit"))) released.push(id);
+      let promoted=true;
+      for(const payload of payloads)
+        if(!await reclassifyDurableCloudRecoveryBackup(id,payload,"before-cloud-local-edit")){promoted=false;break;}
+      if(!promoted)continue;
+      // IndexedDB recovery references have no seven-day localStorage rotation.
+      // Once their exact user data is represented by the confirmed cloud and
+      // durable head, remove only those redundant automatic references so
+      // immutable snapshot storage cannot grow without bound.
+      deviceRows=deviceStorageAuthority?deviceBackupCache.filter(row=>row.id===id):[];
+      let retired=true;
+      for(const row of deviceRows){
+        if(!automaticBackupKinds.has(row.kind)||!recoveryBoardRepresented(row.payload,confirmedBoard))continue;
+        if(!await deviceStore.deleteBackup(id,{payload:row.payload,allowedKinds:[...automaticBackupKinds]})){retired=false;break;}
+        await refreshDeviceBackupCache();
+        if(!deviceBackupCacheReadable){retired=false;break;}
+      }
+      if(retired)released.push(id);
     }catch(e){}
   }
   return released;
@@ -2106,7 +2409,7 @@ function recoveryBoardRepresented(raw,merged){
     return JSON.stringify(prior)===JSON.stringify(current);
   }catch(e){ return false; }
 }
-function releaseStoredCloudRecoveryPins(ids){
+async function releaseStoredCloudRecoveryPins(ids){
   if(!useLocal || !ids.length || !validSavedPayload(lastPersistedRaw)) return false;
   try{
     const saved=JSON.parse(lastPersistedRaw);
@@ -2116,6 +2419,11 @@ function releaseStoredCloudRecoveryPins(ids){
     if(kept.length===saved.protectedBackupIds.length) return true;
     saved.protectedBackupIds=kept;
     const next=JSON.stringify(saved),prior=lastPersistedRaw;
+    if(deviceStorageAuthority){
+      const result=await deviceStore.commitHead({expectedHash:deviceHeadHash,payload:next,account:saved.syncAccount??null});
+      if(!result?.ok)return false;
+      deviceHeadHash=result.hash;lastPersistedRaw=next;return true;
+    }
     if(!writeBrowserPairIfCurrent(prior,prior,next)) return false;
     lastPersistedRaw=next;
     return true;
@@ -2132,10 +2440,14 @@ function releaseStoredCloudRecoveryPins(ids){
    cloud we hold the write and go read first. cloudPull() releases it. */
 async function sendPush(){
   if(!cloudReady()) return;
+  if(deviceStorageRequired&&!deviceStorageAuthority){
+    reportDeviceSaveFailure("device-store","unavailable","The durable board remains in browser storage. Keep this tab open and retry after browser storage is available.");
+    return;
+  }
   if(cloudPushInFlight){ pendingPush=true; return; }
   const browserRecoveryBefore=browserCopyRecoverySerial;
   const browserRecoveryAccount=window.CloudSync.user;
-  if(useLocal && !refreshBrowserCopy()){
+  if(deviceStorageAuthority ? !await reconcileDeviceLegacyCopy() : useLocal && !refreshBrowserCopy()){
     resumeCloudAfterBrowserRecovery(browserRecoveryBefore,browserRecoveryAccount);
     return;
   }
@@ -2192,6 +2504,7 @@ async function sendPush(){
         lastKnownCloudPayload = payload;lastKnownCloudAccount=pushAccount;
         // An edit made while this write was in flight is still unsynced.
         state.syncDirty = payload!==cloudPayload();
+        if(!state.syncDirty)clearCloudRetry();
         if(Number.isFinite(res.serverUpdatedAt)) state.lastCloudServerAt=res.serverUpdatedAt;
         /* BUG FIX: this used to stop at the assignment, leaving the new
            revision in memory only. save() debounces at 350ms and the push at
@@ -2220,13 +2533,13 @@ async function sendPush(){
         // every later device save. Release only the IDs present when this
         // request began; a concurrent adoption keeps its newer proof.
         if(adoptedSafety===adoptionProof) adoptedSafety=null;
-        const releasedRecoveryIds=releasableCloudRecoveryIds(pushRecoveryIds,payload);
+        const releasedRecoveryIds=await releasableCloudRecoveryIds(pushRecoveryIds,payload);
         releaseCloudRecoveryPins(releasedRecoveryIds);
         // A later draft can be larger than the acknowledged union. Shrink the
         // already-durable browser board first so its old on-disk marker cannot
         // keep the released automatic row pinned while persist() tries to make
         // room for that draft.
-        releaseStoredCloudRecoveryPins(releasedRecoveryIds);
+        await releaseStoredCloudRecoveryPins(releasedRecoveryIds);
         await persist(!!savedAdoption);
       }
   }catch(e){ lastPushed=""; scheduleCloudRetry(pushAccount); } // a failed write must not look like a synced one
@@ -2310,7 +2623,7 @@ function resumeCloudAfterBrowserRecovery(previousSerial,account){
 function resumeDeferredBrowserCopy(){
   if(!deferredBrowserCopy || !state || hasActiveEditor()) return;
   deferredBrowserCopy=false;
-  refreshBrowserCopy();
+  if(deviceStorageAuthority)reconcileDeviceLegacyCopy();else refreshBrowserCopy();
 }
 window.addEventListener("storage",event=>{
   // Another tab has finished writing both the protected and shared board
@@ -2318,7 +2631,7 @@ window.addEventListener("storage",event=>{
   // an open editor still gets the same no-swap protection as a cloud pull.
   if(event.key!==STORE_KEY || !state || !useLocal) return;
   if(hasActiveEditor()){deferredBrowserCopy=true;return;}
-  refreshBrowserCopy();
+  if(deviceStorageAuthority)reconcileDeviceLegacyCopy();else refreshBrowserCopy();
 });
 window.addEventListener("focus",resumeDeferredBrowserCopy);
 document.addEventListener("focusout",()=>setTimeout(resumeDeferredBrowserCopy,0));
@@ -2329,13 +2642,17 @@ function resumeDeferredCloudPull(){
 async function cloudPull(){
   observeCloudIdentity();
   if(!cloudReady()) return;
+  if(deviceStorageRequired&&!deviceStorageAuthority){
+    reportDeviceSaveFailure("device-store","unavailable","The durable board remains in browser storage. Keep this tab open and retry after browser storage is available.");
+    return;
+  }
   if(cloudRetryTimer){clearTimeout(cloudRetryTimer);cloudRetryTimer=null;}
   if(!state){ cloudPullPending = true; return; }
   // An unreadable or unbacked-up browser copy is still evidence to preserve.
   // Do not let a cloud adoption write over it after refreshBrowserCopy fails.
   const browserRecoveryBefore=browserCopyRecoverySerial;
   const browserRecoveryAccount=window.CloudSync.user;
-  if(useLocal && !refreshBrowserCopy()){
+  if(deviceStorageAuthority ? !await reconcileDeviceLegacyCopy() : useLocal && !refreshBrowserCopy()){
     resumeCloudAfterBrowserRecovery(browserRecoveryBefore,browserRecoveryAccount);
     return;
   }
@@ -2380,7 +2697,7 @@ async function cloudPull(){
     // completed repair makes this reply stale just like the startup guard;
     // discard it, then read again from the repaired board automatically.
     const browserRecoveryAfterRead=browserCopyRecoverySerial;
-    if(useLocal && !refreshBrowserCopy()){
+    if(deviceStorageAuthority ? !await reconcileDeviceLegacyCopy() : useLocal && !refreshBrowserCopy()){
       resumeCloudAfterBrowserRecovery(browserRecoveryAfterRead,acct);
       return;
     }
@@ -2397,7 +2714,7 @@ async function cloudPull(){
       || changedSinceRead || state.syncDirty===true;
     const mustProtectPrior=hadLocalEditsBeforeAdoption || state.syncDirty!==false
       || (useLocal && JSON.stringify(state)!==lastPersistedRaw);
-    if(switchedAccount && !saveLocalBackup(confirmedPreviousBoard ? "before-cloud-adoption" : "before-account-switch", JSON.stringify(state))){
+    if(switchedAccount && !await saveDurableBackup(confirmedPreviousBoard ? "before-cloud-adoption" : "before-account-switch", JSON.stringify(state))){
       cloudAdoptionHeld = true;
       toast("Account switch held: the previous board could not be backed up on this device.", 7000);
       return;
@@ -2421,7 +2738,7 @@ async function cloudPull(){
       state.syncRev=rr;
       state.syncAccount=acct;
       state.syncDirty=remoteDeletionLogRepaired;
-      releaseCloudRecoveryPins(releasableCloudRecoveryIds(state.protectedBackupIds,remotePayload));
+      releaseCloudRecoveryPins(await releasableCloudRecoveryIds(state.protectedBackupIds,remotePayload));
       const at=serverTimeMs(remote.serverUpdatedAt);
       if(at!==null) state.lastCloudServerAt=at;
       if(!await persist(true)){
@@ -2441,13 +2758,18 @@ async function cloudPull(){
     const impossibleLocalBase = haveRemote && !switchedAccount && rr !== null && localRev !== null && localRev > rr;
     const lr = impossibleLocalBase ? rr : localRev;
     const remoteWins = haveRemote && (switchedAccount || rr === null || lr === null || impossibleLocalBase || rr > lr);
-    if(remoteWins && !switchedAccount && !saveLocalBackup(mustProtectPrior ? "before-cloud-local-edit" : "before-cloud-adoption", JSON.stringify(state))){
-      cloudAdoptionHeld = true;
-      toast("Cloud copy held: current board could not be backed up on this device.", 7000);
-      return;
+    let remoteSafetyCopy=null;
+    if(remoteWins && !switchedAccount){
+      remoteSafetyCopy=await saveDurableBackup(mustProtectPrior ? "before-cloud-local-edit" : "before-cloud-adoption", JSON.stringify(state));
+      if(!remoteSafetyCopy){
+        cloudAdoptionHeld = true;
+        toast("Cloud copy held: current board could not be backed up on this device.", 7000);
+        return;
+      }
     }
     const priorBoard = remoteWins ? JSON.stringify(state) : null;
-    const stablePrior = remoteWins && useLocal ? readLocalBackups().find(row=>row.kind!=="latest" && row.payload===priorBoard) : null;
+    const stablePrior = remoteWins && useLocal
+      ? (remoteSafetyCopy&&typeof remoteSafetyCopy==="object" ? remoteSafetyCopy : readLocalBackups().find(row=>row.kind!=="latest" && row.payload===priorBoard)) : null;
     if(remoteWins && useLocal && !stablePrior){
       cloudAdoptionHeld=true;
       toast("Cloud copy held: the previous board has no restorable local copy.", 7000);
@@ -2540,7 +2862,7 @@ async function cloudPull(){
       const wasDirty=state.syncDirty!==false;
       state.syncDirty=remoteDeletionLogRepaired;
       if(remoteAt!==null && state.lastCloudServerAt!==remoteAt) state.lastCloudServerAt=remoteAt;
-      const releasedRecovery=releaseCloudRecoveryPins(releasableCloudRecoveryIds(state.protectedBackupIds,remotePayload));
+      const releasedRecovery=releaseCloudRecoveryPins(await releasableCloudRecoveryIds(state.protectedBackupIds,remotePayload));
       if(wasDirty || remoteDeletionLogRepaired || releasedRecovery || JSON.stringify(state)!==lastPersistedRaw) await persist(true);
       if(remoteDeletionLogRepaired){lastPushed="";pendingPush=true;}
       return;
@@ -2572,13 +2894,13 @@ async function cloudPull(){
         // account's coordinates into another account's document.
         recoveredScene = !switchedAccount && !remoteHadScene && sceneHasChoice(state.settings.scene);
         if(recoveredScene) st.settings.scene=normalizeSceneSettings(state.settings.scene);
-        if(mustProtectPrior && !switchedAccount && stablePrior && automaticBackupKinds.has(stablePrior.kind)){
+        if(mustProtectPrior && !switchedAccount && stablePrior && (automaticBackupKinds.has(stablePrior.kind)||stablePrior.newRecovery)){
           priorFullyRepresented=recoveryBoardRepresented(priorBoard,st);
           const recoveryKind=priorFullyRepresented ? "cloud-merged" : "before-cloud-local-edit";
           // Classification is an optimization, not permission to adopt. If a
           // full store cannot rewrite the index, the durable pin remains and
           // a later acknowledgement fails closed instead of losing the row.
-          reclassifyCloudRecoveryBackup(stablePrior.id,stablePrior.payload,recoveryKind);
+          await reclassifyDurableCloudRecoveryBackup(stablePrior.id,stablePrior.payload,recoveryKind,!!stablePrior.newRecovery);
         }
         replaceState(st); // retain the device-local account binding as well as revision
         if(mustProtectPrior && !switchedAccount && stablePrior)
@@ -2613,8 +2935,8 @@ async function cloudPull(){
           // proof used by ACK/equal-read release. Conflicting legacy rows are
           // promoted to durable displaced-edit recovery before unpinning.
           const adoptedRelease=!state.syncDirty && priorFullyRepresented
-            ? releasableCloudRecoveryIds([stablePrior.id],remotePayload) : [];
-          if(adoptedRelease.length && releaseStoredCloudRecoveryPins(adoptedRelease))
+            ? await releasableCloudRecoveryIds([stablePrior.id],remotePayload) : [];
+          if(adoptedRelease.length && await releaseStoredCloudRecoveryPins(adoptedRelease))
             releaseCloudRecoveryPins(adoptedRelease);
           adoptedSafety=state.protectedBackupIds?.includes(stablePrior.id)
             ? {raw:JSON.stringify(state),account:acct,backupId:stablePrior.id,priorBoard}
@@ -2641,7 +2963,7 @@ async function cloudPull(){
     }
   } finally {
     pulling = false;
-    if(window.CloudSync?.status==="ok" && reconciledAs===acct) clearCloudRetry();
+    if(window.CloudSync?.status==="ok"&&reconciledAs===acct&&state?.syncDirty===false&&!pendingPush)clearCloudRetry();
     renderSync();
     // Whatever sendPush() held back while we had nothing to compare against.
     if(cloudReady() && window.CloudSync.user !== acct) cloudPull();
@@ -4188,9 +4510,20 @@ function openSettings(){
   const changelogHtml = archivedChangelog.replace('<summary>Changelog</summary>', '<summary>Changelog</summary>'+latestChangelog);
   const backupIndex=inspectBackupIndex();
   backupIndexShownRaw=backupIndex.raw;
+  // Settings is also the recovery surface for malformed or expired legacy
+  // rows. Runtime helpers intentionally return only usable current backups;
+  // the list must include every physical legacy row so its exact raw bytes
+  // remain visible/downloadable and a unique bad row can be removed safely.
+  const visibleBackupRows=[],visibleKeys=new Set();
+  for(const row of [...(deviceStorageAuthority&&deviceBackupCacheReadable?deviceBackupCache:[]),
+                     ...(Array.isArray(backupIndex.rows)?backupIndex.rows:[])]){
+    const key=JSON.stringify(row);
+    if(!visibleKeys.has(key)){visibleKeys.add(key);visibleBackupRows.push(row);}
+  }
+  backupRowsShown=visibleBackupRows.map(row=>({id:row.id,kind:row.kind,day:row.day,at:row.at,payload:row.payload}));
   const idCounts=new Map();
-  for(const row of backupIndex.rows || []) if(typeof row?.id==="string") idCounts.set(row.id,(idCounts.get(row.id)||0)+1);
-  const backups=(backupIndex.rows || []).slice().reverse();
+  for(const row of visibleBackupRows) if(typeof row?.id==="string") idCounts.set(row.id,(idCounts.get(row.id)||0)+1);
+  const backups=visibleBackupRows.slice().sort((a,b)=>(a.at||0)-(b.at||0)).reverse();
   const backupHtml=backups.map(entry=>{
     const readable=readableBackupRow(entry);
     const unique=typeof entry?.id==="string" && !!entry.id && idCounts.get(entry.id)===1;
@@ -4262,7 +4595,7 @@ function openSettings(){
     + (histCount ? '<div class="mbtns"><button class="btn subtle" data-act="clear-done">Clear history</button></div>' : '')
     + '<h3>Backup</h3>'
     + '<div class="kv"><span class="statusdot" style="background:'+(storageOK?"var(--good)":"var(--no)")+'"></span>'
-    + (storageOK ? (useLocal ? "Saving automatically in this browser\u2019s local storage." : "Saving automatically in this artifact\u2019s storage.") : "Persistent storage unavailable here. Keep this tab open until storage returns.")+'</div>'
+    + (storageOK ? (useLocal ? (deviceStorageAuthority ? "Saving automatically in this browser\u2019s durable storage." : "Saving automatically in this browser\u2019s local storage.") : "Saving automatically in this artifact\u2019s storage.") : "Persistent storage unavailable here. Keep this tab open until storage returns.")+'</div>'
     + deviceIssue
     + '<div class="kv" style="margin-top:6px"><span class="statusdot" style="background:'+(cloudReady()?"var(--good)":"var(--mut)")+'"></span>'
     + (!window.CloudSync || !window.CloudSync.configured
@@ -4286,6 +4619,41 @@ function openResetConfirmation(){
     +'<p class="kv">Before resetting, Chain Scanner will keep an exact restorable copy of the current board on this device. If that copy cannot be saved, nothing will be reset.</p>'
     +'<div class="mbtns"><button class="btn subtle" data-act="close-modal">Cancel</button><button class="btn danger" data-act="confirm-wipe">Confirm reset</button></div>');
 }
+async function restoreDurableBackupById(id){
+  const rows=readLocalBackups(),matches=rows.filter(row=>row?.id===id);
+  const entry=matches.length&&matches.every(row=>readableBackupRow(row)&&row.payload===matches[0].payload)?matches[0]:null;
+  const shown=(backupRowsShown||rows).filter(row=>row?.id===id);
+  if(!entry||!shown.length||shown.some(row=>!readableBackupRow(row)||row.payload!==entry.payload)){
+    toast("Backup list changed or this copy cannot be restored. Check Settings again.",7000);return false;
+  }
+  try{
+    const next=JSON.parse(entry.payload);dropRemovedFields(next);hydrateState(next);
+    const destination=state.syncAccount||(cloudReady()?window.CloudSync.user:null),source=typeof next.syncAccount==="string"?next.syncAccount:null;
+    const question=destination&&source!==destination
+      ? "This backup belongs to "+(source||"an unknown account")+". This board belongs to "+destination+". Restoring can sync its tasks and History to "+destination+"'s cloud. Your current board will be saved first. Continue?"
+      : "Restore this local backup? Your current board will be saved first. Tasks without a recorded deletion will stay.";
+    if(!confirm(question))return false;
+    const currentBoard=JSON.stringify(state);
+    const safetyCopy=await saveDurableBackup("before-restore",currentBoard);
+    if(!safetyCopy?.id){toast("Restore stopped: the current board could not be backed up.",7000);return false;}
+    if(!deviceStorageAuthority)pendingRestoreSafetyIds.set(safetyCopy.id,currentBoard);
+    next.restoredTaskIds||={};next.restoredTaskOps||={};
+    for(const task of next.tasks)if(state.deletedTaskIds?.[task.id])noteRestoreIntent(next,task.id,"deletedTaskIds","restoredTaskIds","restoredTaskOps","deletedAfterRestoreOps");
+    next.restoredHistoryIds||={};next.restoredHistoryOps||={};
+    for(const row of next.workLog)if(state.clearedHistoryIds?.[historyEntryKey(row)])noteRestoreIntent(next,historyEntryKey(row),"clearedHistoryIds","restoredHistoryIds","restoredHistoryOps","clearedAfterRestoreOps");
+    for(const task of next.tasks){const current=state.tasks.find(t=>t.id===task.id);if(current?.done&&!task.done)reopenTask(task,current);}
+    mergeUndeletedTasks(next,state);pushUndo();replaceState(next);applyTheme();baseUpdatedAt=Date.now();initializeReplacedScan();recomputeRanks();render();
+    state.updatedAt=Date.now();state.syncDirty=true;
+    if(!await persist(deviceStorageAuthority,safetyCopy.id)){
+      // Preserve the restored board in this open tab and keep its exact
+      // pre-Restore proof pinned. A later automatic or user edit can retry;
+      // the durable head remains the prior board until that guarded write
+      // succeeds, so neither side is silently discarded.
+      toast("Restore is open but could not be saved yet. Keep this tab open; the previous board remains in Settings backups.",7000);return false;
+    }
+    closeModal();render();cloudPush();return true;
+  }catch(e){toast("That local backup could not be restored.",7000);return false;}
+}
 let resetInFlight=false;
 async function confirmResetEverything(){
   if(resetInFlight) return;
@@ -4293,13 +4661,8 @@ async function confirmResetEverything(){
   const currentBoard=JSON.stringify(state);
   const resetAccount=window.CloudSync?.user || null;
   try{
-    if(!saveLocalBackup("before-reset",currentBoard)){
-      toast("Reset stopped: the current board could not be backed up on this device.",7000);
-      return;
-    }
-    const safetyCopy=readLocalBackups().filter(row=>row.kind==="before-reset" && row.payload===currentBoard)
-      .sort((a,b)=>b.at-a.at)[0];
-    if(!safetyCopy){
+    const safetyCopy=await saveDurableBackup("before-reset",currentBoard);
+    if(!safetyCopy?.id){
       toast("Reset stopped: the current board could not be backed up on this device.",7000);
       return;
     }
@@ -4535,67 +4898,11 @@ function onAction(act, el){
       break;
     }
     case "confirm-wipe": confirmResetEverything(); break;
-    case "restore-local-backup": {
-      const index=inspectBackupIndex();
-      const matches=index.rows?.filter(row=>row?.id===el?.dataset?.id) || [];
-      const entry=matches.length && matches.every(row=>readableBackupRow(row) && row.payload===matches[0].payload) ? matches[0] : null;
-      let shownMatches=[];
-      try{
-        const shown=parseBackupIndex(backupIndexShownRaw);
-        if(Array.isArray(shown)) shownMatches=shown.filter(row=>row?.id===el?.dataset?.id);
-      }catch(e){ /* a malformed shown index cannot authorize restore */ }
-      if(!entry || (backupIndexShownRaw!==null &&
-          (!shownMatches.length || shownMatches.some(row=>!readableBackupRow(row) || row.payload!==entry.payload)))){
-        toast("Backup list changed or this copy cannot be restored. Check Settings again.",7000); break;
-      }
-      try{
-        const next=JSON.parse(entry.payload);
-        dropRemovedFields(next); hydrateState(next);
-        const destination=state.syncAccount || (cloudReady() ? window.CloudSync.user : null);
-        const source=typeof next.syncAccount==="string" ? next.syncAccount : null;
-        const question=destination && source!==destination
-          ? "This backup belongs to " + (source || "an unknown account") + ". This board belongs to " + destination + ". Restoring can sync its tasks and History to " + destination + "'s cloud. Your current board will be saved first. Continue?"
-          : "Restore this local backup? Your current board will be saved first. Tasks without a recorded deletion will stay.";
-        if(!confirm(question)) break;
-        const currentBoard=JSON.stringify(state);
-        if(!saveLocalBackup("before-restore", currentBoard)){
-          toast("Restore stopped: the current board could not be backed up.", 7000); break;
-        }
-        // This particular snapshot must outlive the primary write that
-        // replaces its board, even when older ordinary history can rotate.
-        const safetyCopy=readLocalBackups().filter(row=>row.kind==="before-restore" && row.payload===currentBoard)
-          .sort((a,b)=>b.at-a.at)[0];
-        if(!safetyCopy){ toast("Restore stopped: the current board could not be backed up.", 7000); break; }
-        pendingRestoreSafetyIds.set(safetyCopy.id,currentBoard);
-        // Restoring an old snapshot is not evidence that tasks added since
-        // then were deleted. Keep those IDs and their history, while a task
-        // deliberately present in the chosen backup may override a later
-        // tombstone as an explicit restoration.
-        next.restoredTaskIds ||= {};
-        next.restoredTaskOps ||= {};
-        for(const task of next.tasks) if(state.deletedTaskIds?.[task.id]) noteRestoreIntent(next,task.id,"deletedTaskIds","restoredTaskIds","restoredTaskOps","deletedAfterRestoreOps");
-        next.restoredHistoryIds ||= {};
-        next.restoredHistoryOps ||= {};
-        for(const row of next.workLog) if(state.clearedHistoryIds?.[historyEntryKey(row)]) noteRestoreIntent(next,historyEntryKey(row),"clearedHistoryIds","restoredHistoryIds","restoredHistoryOps","clearedAfterRestoreOps");
-        for(const task of next.tasks){
-          const current=state.tasks.find(t=>t.id===task.id);
-          if(current?.done && !task.done) reopenTask(task,current);
-        }
-        mergeUndeletedTasks(next,state);
-        pushUndo(); replaceState(next); applyTheme();
-        baseUpdatedAt=Date.now(); initializeReplacedScan(); recomputeRanks(); closeModal(); commit(true,false,safetyCopy.id);
-        // Restore persists before the click returns; its deferred companion
-        // must not retry later without this exact safety copy in scope.
-        if(saveTimer){ clearTimeout(saveTimer); saveTimer=null; }
-        persist(false,safetyCopy.id); // local storage commits before the restore click returns
-      }catch(e){ toast("That local backup could not be restored.", 7000); }
-      break;
-    }
-    case "make-manual-backup": {
-      if(saveLocalBackup("manual", JSON.stringify(state))){ openSettings(); toast("Manual backup saved on this device."); }
-      else toast("Manual backup could not be saved on this device.", 7000);
-      break;
-    }
+    case "restore-local-backup": restoreDurableBackupById(el?.dataset?.id);break;
+    case "make-manual-backup": saveDurableBackup("manual",JSON.stringify(state)).then(saved=>{
+      if(saved){openSettings();toast("Manual backup saved on this device.");}
+      else toast("Manual backup could not be saved on this device.",7000);
+    });break;
     case "view-raw-backups": viewRawBackups(); break;
     case "view-current-board": viewCurrentBoard(); break;
     case "select-current-board": {
@@ -4611,6 +4918,27 @@ function onAction(act, el){
     }
     case "download-raw-backups": downloadRawBackups(); break;
     case "delete-local-backup": {
+      const id=el?.dataset?.id,shown=(backupRowsShown||[]).filter(row=>row?.id===id);
+      const deviceMatches=deviceStorageAuthority&&deviceBackupCacheReadable ? deviceBackupCache.filter(row=>row.id===id) : [];
+      if(deviceMatches.length){
+        let legacyMatches=[];
+        try{const raw=localStorage.getItem(LOCAL_BACKUPS_KEY),rows=raw===null?[]:parseBackupIndex(raw);if(Array.isArray(rows))legacyMatches=rows.filter(row=>row?.id===id);else legacyMatches=[null];}
+        catch(e){legacyMatches=[null];}
+        if(shown.length!==1||deviceMatches.length!==1||legacyMatches.length||
+           !readableBackupRow(deviceMatches[0])||deviceMatches[0].payload!==shown[0].payload||deviceMatches[0].kind!==shown[0].kind){
+          toast("Backup could not be identified safely. Check Settings again.",7000);break;
+        }
+        const row=deviceMatches[0];
+        if(!confirm("Delete this local backup? The current board will stay."))break;
+        (async()=>{
+          try{
+            const removed=await deviceStore.deleteBackup(row.id,{payload:row.payload,allowedKinds:[row.kind]});
+            if(!removed){openSettings();toast("Backup list changed. Check it again before deleting.",7000);return;}
+            await refreshDeviceBackupCache();openSettings();toast("Local backup deleted from this device.");
+          }catch(e){toast("Local backup could not be deleted from this device.",7000);}
+        })();
+        break;
+      }
       const index=inspectBackupIndex();
       if(!index.rows || index.raw===null ||
          (backupIndexShownRaw!==null && index.raw!==backupIndexShownRaw)){
@@ -4812,6 +5140,8 @@ function hotkeyDelete(){
     state.updatedAt=Date.now();state.syncDirty=true;
     if(await persist(true)) cloudPush();
   }
+  if(deviceStorageRequired&&!deviceStorageAuthority)
+    toast("Durable browser storage is unavailable. The saved board was left untouched; sync and saves will retry when storage is available.",8000);
   // Auth restoration can finish while loadState() is still awaiting the host
   // store. cloudPull() records that early request; replay it now that state
   // exists so a signed-in device paints its synced tasks without a reload.
@@ -4936,6 +5266,77 @@ if(configured){
     const db   = F.getFirestore(app);
     let pullOperation=0,pushOperation=0,backendAuthUid=auth.currentUser?.uid || null;
     let authStorageFailure=null;
+    const rootRef=uid=>F.doc(db,"users",uid);
+    const generationRef=(uid,id)=>F.doc(db,"users",uid,"generations",id);
+    const chunksRef=(uid,id)=>F.collection(db,"users",uid,"generations",id,"chunks");
+    const chunkRef=(uid,id,index)=>F.doc(db,"users",uid,"generations",id,"chunks",String(index).padStart(8,"0"));
+    const snapshotData=snapshot=>snapshot?.exists?.()?snapshot.data():null;
+    const cloudAdapter={
+      async readRoot(uid){return snapshotData(await F.getDoc(rootRef(uid)));},
+      async beginGeneration(uid,id,header){
+        return F.runTransaction(db,async tx=>{
+          const ref=generationRef(uid,id),existing=snapshotData(await tx.get(ref));
+          if(existing)return existing;
+          tx.set(ref,{...header,createdAt:F.serverTimestamp()});return header;
+        });
+      },
+      async readGeneration(uid,id){return snapshotData(await F.getDoc(generationRef(uid,id)));},
+      async readChunks(uid,id){
+        const result=await F.getDocs(chunksRef(uid,id));
+        return result.docs.map(snapshot=>snapshot.data()).sort((a,b)=>a.index-b.index);
+      },
+      async writeChunks(uid,id,chunks){
+        const batch=F.writeBatch(db);
+        for(const chunk of chunks)batch.set(chunkRef(uid,id,chunk.index),chunk);
+        await batch.commit();
+      },
+      async sealGeneration(uid,id,header){
+        return F.runTransaction(db,async tx=>{
+          const ref=generationRef(uid,id),current=snapshotData(await tx.get(ref));
+          if(!current)return null;
+          if(current.state==="sealed")return current;
+          if(current.state!=="staging"||current.hash!==header.hash||current.chunkCount!==header.chunkCount)return null;
+          tx.update(ref,{state:"sealed",sealedAt:F.serverTimestamp()});return {...current,state:"sealed"};
+        });
+      },
+      async publishGeneration(uid,id,{baseRev,updatedAt,stillCurrent}){
+        return F.runTransaction(db,async tx=>{
+          const root=rootRef(uid),generation=generationRef(uid,id);
+          const [rootSnapshot,generationSnapshot]=await Promise.all([tx.get(root),tx.get(generation)]);
+          if(stillCurrent&&!stillCurrent())return {cancelled:true};
+          const current=snapshotData(rootSnapshot),header=snapshotData(generationSnapshot),revision=current?.rev??0;
+          if(!validRevision(revision)||revision===Number.MAX_SAFE_INTEGER)return {error:true,code:"invalid-revision"};
+          if(revision!==baseRev)return {conflict:true,rev:revision};
+          if(!header||header.state!=="sealed")return {error:true,code:"unsealed-generation"};
+          const next={schemaVersion:2,rev:revision+1,activeGeneration:id,
+            previousGeneration:current?.schemaVersion===2?current.activeGeneration:null,
+            updatedAt:Number.isFinite(updatedAt)?Math.trunc(updatedAt):Date.now(),serverUpdatedAt:F.serverTimestamp()};
+          tx.update(generation,{state:"published",publishedAt:F.serverTimestamp()});
+          tx.set(root,next);return {ok:true,rev:next.rev};
+        });
+      },
+      async listGenerations(uid){
+        const result=await F.getDocs(F.collection(db,"users",uid,"generations"));
+        return result.docs.map(snapshot=>({id:snapshot.id,...snapshot.data()}));
+      },
+      async markDeleting(uid,id,protectedIds=[]){
+        return F.runTransaction(db,async tx=>{
+          const root=snapshotData(await tx.get(rootRef(uid))),ref=generationRef(uid,id),generation=snapshotData(await tx.get(ref));
+          if(!generation||root?.activeGeneration===id||root?.previousGeneration===id||protectedIds.includes(id))return false;
+          tx.update(ref,{state:"deleting",deletingAt:F.serverTimestamp()});return true;
+        });
+      },
+      async deleteChunks(uid,id){
+        const snapshots=(await F.getDocs(chunksRef(uid,id))).docs;
+        for(let offset=0;offset<snapshots.length;offset+=400){
+          const batch=F.writeBatch(db);for(const snapshot of snapshots.slice(offset,offset+400))batch.delete(snapshot.ref);await batch.commit();
+        }
+      },
+      async deleteGeneration(uid,id){
+        await F.runTransaction(db,async tx=>{const ref=generationRef(uid,id),row=snapshotData(await tx.get(ref));if(row?.state!=="deleting")throw Error("generation is not deleting");tx.delete(ref);});
+      },
+    };
+    const generationStore=window.ChainCloudV2?.createCloudStore({adapter:cloudAdapter,crypto});
     try{ await A.setPersistence(auth, A.browserLocalPersistence); }
     catch(e){ authStorageFailure=e;cloudFailure("auth-storage",e); }
 
@@ -4962,13 +5363,14 @@ if(configured){
       if(!pullUser) return { error:true };
       const pullUid=pullUser.uid;
       const operation=++pullOperation;
-      const pullRef=F.doc(db,"users",pullUid);
       clearCloudError();CS.status = "syncing"; ping();
       try{
-        const snap = await cloudDeadline(F.getDoc(pullRef));
+        if(!generationStore)throw Object.assign(Error("Cloud generation codec unavailable"),{code:"codec-unavailable"});
+        const result=await cloudDeadline(generationStore.pull(pullUid,{stillCurrent:()=>auth.currentUser?.uid===pullUid&&operation===pullOperation}));
         if(auth.currentUser?.uid!==pullUid || operation!==pullOperation) return {cancelled:true};
-        clearCloudError();CS.status = "ok"; ping();
-        return snap.exists() ? snap.data() : { empty:true };
+        if(result?.error){cloudFailure("pull",{code:result.code||"unknown"});return result;}
+        if(result?.cancelled)return result;
+        clearCloudError();CS.status = "ok"; ping();return result;
       }catch(e){
         if(auth.currentUser?.uid!==pullUid || operation!==pullOperation) return {cancelled:true};
         cloudFailure("pull",e); return { error:true };
@@ -4986,34 +5388,46 @@ if(configured){
       const pushUid=pushUser.uid;
       if(!validRevision(baseRev)){cloudFailure("push",{code:"invalid-revision"});return {error:true};}
       const operation=++pushOperation;
-      const pushRef=F.doc(db, "users", pushUid);
       clearCloudError();CS.status = "syncing"; ping();
       try{
-        const res = await cloudDeadline(F.runTransaction(db, async (tx)=>{
-          const snap = await tx.get(pushRef);
-          const storedRev=snap.exists() ? snap.data().rev : 0;
-          const cur=storedRev===undefined ? 0 : storedRev;
-          if(!validRevision(cur) || cur===Number.MAX_SAFE_INTEGER) return {error:true,invalidRevision:true};
-          if(cur !== baseRev){
-            return { conflict:true, rev:cur };
-          }
-          const next = cur + 1;
-          tx.set(pushRef, { payload, updatedAt, rev: next, serverUpdatedAt:F.serverTimestamp() });
-          return { ok:true, rev: next };
-        }));
+        if(!generationStore||!window.ChainStorageV2)throw Object.assign(Error("Cloud generation codec unavailable"),{code:"codec-unavailable"});
+        const payloadHash=await window.ChainStorageV2.hashPayload(payload);
+        if(auth.currentUser?.uid!==pushUid || operation!==pushOperation)return {cancelled:true};
+        const pendingStore=window.ScannerDeviceStore;
+        const existing=await pendingStore?.getPendingUpload?.(pushUid);
+        if(auth.currentUser?.uid!==pushUid || operation!==pushOperation)return {cancelled:true};
+        const generationId=existing&&existing.payloadHash===payloadHash&&existing.baseRev===baseRev
+          ? existing.generationId : (crypto.randomUUID?.()||Array.from(crypto.getRandomValues(new Uint8Array(16)),
+            value=>value.toString(16).padStart(2,"0")).join(""));
+        if(!existing||existing.generationId!==generationId){
+          const recorded=await pendingStore?.setPendingUpload?.(pushUid,{generationId,payloadHash,baseRev,updatedAt});
+          if(pendingStore&&recorded?.error)throw Object.assign(Error("Pending upload could not be saved"),{code:"pending-upload-storage"});
+        }
+        if(auth.currentUser?.uid!==pushUid || operation!==pushOperation)return {cancelled:true};
+        const res=await cloudDeadline(generationStore.push(pushUid,payload,updatedAt,baseRev,{generationId,
+          stillCurrent:()=>auth.currentUser?.uid===pushUid&&operation===pushOperation}));
         if(auth.currentUser?.uid!==pushUid || operation!==pushOperation) return {cancelled:true};
-        if(res.invalidRevision){cloudFailure("push",{code:"invalid-revision"});return {error:true};}
+        if(res?.error){cloudFailure("push",{code:res.code||"unknown"});return res;}
+        if(res?.cancelled)return res;
+        if(res.ok||res.conflict)await pendingStore?.clearPendingUpload?.(pushUid,generationId);
+        if(auth.currentUser?.uid!==pushUid || operation!==pushOperation) return {cancelled:true};
         if(res.ok){
           // Read the committed server value for this exact revision. If
           // another writer moved the document first, revision arbitration
           // handles that conflict on the next pull.
           try{
-            const stamped=await cloudDeadline(F.getDoc(pushRef));
+            const stamped=await cloudDeadline(F.getDoc(rootRef(pushUid)));
             if(stamped.exists() && stamped.data().rev===res.rev){
               const at=stamped.data().serverUpdatedAt?.toMillis?.();
               if(Number.isFinite(at)) res.serverUpdatedAt=at;
             }
           }catch(e){}
+          // Current and previous generations remain root-protected. Published
+          // generations older than those two are unreachable recovery debris;
+          // retire them asynchronously so edit frequency cannot grow cloud
+          // storage without bound. Staging/sealed uploads from another device
+          // keep the module's seven-day resume grace.
+          generationStore.collectGarbage(pushUid).catch(()=>{});
         }
         if(auth.currentUser?.uid!==pushUid || operation!==pushOperation) return {cancelled:true};
         clearCloudError();CS.status = "ok"; ping();

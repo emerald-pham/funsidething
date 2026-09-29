@@ -44,6 +44,33 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK CLOUD STARTUP: a transient startup timeout retries automatically and only a completed read clears error
 - RISK CLOUD STARTUP: a timed-out write reads before its automatic retry and reaches acknowledgement
 - RISK CLOUD STARTUP: a late timed-out transaction cannot overwrite the authoritative retry read
+- RISK CLOUD STARTUP: repeated unavailable writes keep one bounded retry budget across successful read-before-write checks
+- RISK SCALABLE BOARD CODEC: a multi-megabyte Unicode board roundtrips through bounded verified chunks
+- RISK DEVICE STORAGE V2: migration and head plus recovery commits are atomic, CAS guarded, and preserve legacy bytes
+- RISK DEVICE STORAGE V2: unreferenced immutable snapshots retire while head and recovery references remain exact
+- RISK CLOUD V2: a multi-megabyte board publishes only after verified chunks and pulls byte-exactly
+- RISK CLOUD V2: crash resume, concurrent revisions, and account cancellation never publish partial data
+- RISK CLOUD V2: corrupt active data fails closed, manifest races retry, and garbage collection keeps recovery generations
+- RISK CLOUD V2 ADAPTER: production migrates a legacy root to verified chunks and pulls the exact multi-megabyte board
+- RISK CLOUD V2 ADAPTER: an interrupted upload stays invisible and resumes its account-bound generation
+- RISK CLOUD V2 ADAPTER: production garbage collection retains current and previous complete generations only
+- RISK SCALABLE END TO END: a multi-megabyte local board reaches a v2 manifest ACK and clean device badge
+- RISK SCALABLE LOCAL BOARD: a multi-megabyte legacy board migrates without rewriting source bytes and survives edit Undo and offline reload
+- RISK SCALABLE LOCAL HISTORY: IndexedDB keeps one daily and one latest automatic recovery reference while edits continue
+- RISK SCALABLE RECOVERY: cloud replacement awaits an IndexedDB safety copy and old-tab bytes reconcile without becoming blind authority
+- RISK SCALABLE RECOVERY: clean cloud adoption releases its IndexedDB proof only after shared legacy conflicts become durable
+- RISK SCALABLE RECOVERY: an inaccessible established IndexedDB authority never revives or uploads its stale legacy shell
+- RISK SCALABLE RECOVERY: pending cloud uploads are account-bound and a failed mandatory recovery transaction leaves the head unchanged
+- RISK SCALABLE DESTRUCTIVE ACTIONS: Restore and Reset await exact IndexedDB recovery proof before replacing a large board
+- RISK SCALABLE SETTINGS: one confirmed delete removes only the selected IndexedDB recovery reference
+- RISK SCALABLE OFFLINE SHELL: storage and cloud generation modules load before the scanner and are cached together
+- RISK SCALABLE CONCURRENCY: a newer edit made during a device commit is the only board marked durable
+- RISK SCALABLE CONCURRENCY: CAS repair retains peer work and a third in-tab edit before replacing state
+- RISK SCALABLE STARTUP: blocked and nonsettling IndexedDB opens fail closed within a bounded boot
+- RISK SCALABLE LEGACY TAB: each divergent v1 primary key is preserved and reconciled after migration
+- RISK SCALABLE LEGACY TAB: cold migration preserves both already-divergent valid v1 keys
+- RISK SCALABLE LEGACY TAB: first activation preserves a new single legacy copy before marking it seen
+- RISK SCALABLE QUOTA: optional IndexedDB history cannot block a primary board that fits
 - RISK CLOUD ACCOUNT: signing out and back into the same account requires a fresh read
 - RISK CLOUD ACCOUNT: signing in after sign-out opens the Google account chooser
 - RISK RECOVERY EXPORT: an unsaved in-memory board remains copyable without device storage

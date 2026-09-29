@@ -911,7 +911,7 @@ function makeDomShim({ prefersDark = false, sharedStorage = null } = {}) {
 
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
-async function loadApp({ seed, cloudSyncFactory, prefersDark = false, noMatchMedia = false, seedStorage, sharedStorage, hostStorage, hostStorageDelayMs = 0, beforeStateReady, cryptoProvider = webcrypto, withSceneModules = false, sceneModulesAfterDomReady = false } = {}) {
+async function loadApp({ seed, cloudSyncFactory, prefersDark = false, noMatchMedia = false, seedStorage, sharedStorage, hostStorage, hostStorageDelayMs = 0, beforeStateReady, cryptoProvider = webcrypto, indexedDBProvider, deviceDbName, deviceOpenTimeoutMs, withSceneModules = false, sceneModulesAfterDomReady = false } = {}) {
   const shim = makeDomShim({ prefersDark, sharedStorage });
   if (noMatchMedia) delete shim.window.matchMedia;   // old browser / bare JS host
   if (seedStorage) for (const [k, v] of Object.entries(seedStorage)) shim.localStorage.setItem(k, v);
@@ -931,6 +931,9 @@ async function loadApp({ seed, cloudSyncFactory, prefersDark = false, noMatchMed
     };
   }
   if (cloudSyncFactory) shim.window.CloudSync = cloudSyncFactory(shim.window);
+  if (deviceDbName) shim.window.CHAIN_STORAGE_DB_NAME = deviceDbName;
+  if (deviceOpenTimeoutMs) shim.window.CHAIN_STORAGE_OPEN_TIMEOUT_MS = deviceOpenTimeoutMs;
+  if (indexedDBProvider) shim.window.indexedDB = indexedDBProvider;
   const sandbox = {
     window: shim.window,
     document: shim.document,
@@ -938,6 +941,10 @@ async function loadApp({ seed, cloudSyncFactory, prefersDark = false, noMatchMed
     console,
     JSON,
     crypto:cryptoProvider,
+    indexedDB:indexedDBProvider,
+    TextEncoder,
+    TextDecoder,
+    structuredClone,
     // NOTE: deliberately NOT injecting the outer process's `Date` here — it's
     // passed by reference, so overriding Date.now on it (for time-travel
     // tests) would leak into the whole Node process. Leave Date unset and the
@@ -953,6 +960,12 @@ async function loadApp({ seed, cloudSyncFactory, prefersDark = false, noMatchMed
   };
   vm.createContext(sandbox);
   vm.runInContext(lzStringSrc, sandbox, { filename: "vendor/lz-string-1.5.0.min.js" });
+  if(indexedDBProvider){
+    vm.runInContext(fs.readFileSync(path.join(__dirname,"device-store-v2.js"),"utf8"),sandbox,{filename:"device-store-v2.js"});
+    vm.runInContext(fs.readFileSync(path.join(__dirname,"cloud-store-v2.js"),"utf8"),sandbox,{filename:"cloud-store-v2.js"});
+    shim.window.ChainStorageV2=sandbox.ChainStorageV2;
+    shim.window.ChainCloudV2=sandbox.ChainCloudV2;
+  }
   if (seed !== undefined) vm.runInContext(SEED_SNIPPET(seed), sandbox);
   const installSceneModules = () => {
     vm.runInContext(fs.readFileSync(path.join(__dirname, "location.js"), "utf8"), sandbox, { filename: "location.js" });
@@ -993,6 +1006,9 @@ async function loadApp({ seed, cloudSyncFactory, prefersDark = false, noMatchMed
   // own. It's never reassigned though, so a one-time copy is fine here.
   vm.runInContext("this.esc = esc;", sandbox);
   await flush(); // let the boot IIFE's `await loadState()` resolve before returning
+  if(indexedDBProvider){
+    for(let attempt=0;attempt<40 && vm.runInContext("state",sandbox)===null;attempt++) await flush();
+  }
   return { ctx: sandbox, shim };
 }
 
@@ -6976,6 +6992,7 @@ test("list filter row: no label either when there's nothing to filter by", async
 const SYNC_STORE_KEY = "fvp:chain-scanner:v1";
 const LOCAL_HEAD_KEY = "fvp:chain-scanner:protected:v1";
 const LOCAL_BACKUPS_KEY = "fvp:chain-scanner:daily-backups:v1";
+const DEVICE_AUTHORITY_KEY = "fvp:chain-scanner:device-store-v2";
 const HOUR = 3600000;
 
 function sharedScannerStorage(initial = {}) {
@@ -7060,67 +7077,123 @@ test('CLOUD REVISION: a higher cloud revision wins even when its server clock re
 });
 
 test('CLOUD TIME: Firestore writes request an authoritative server timestamp', () => {
-  assert.match(html, /tx\.set\(pushRef,\s*\{[^}]*serverUpdatedAt:\s*F\.serverTimestamp\(\)/);
+  assert.match(html, /tx\.set\(root,next\)/);
+  assert.match(html, /serverUpdatedAt:F\.serverTimestamp\(\)/,'the v2 manifest publication still uses Firestore server time');
+  assert.match(html, /sealedAt:F\.serverTimestamp\(\)/,'generation visibility is also server-stamped');
 });
 
 test('CLOUD ACCOUNT: a transaction binds its document before auth can switch', () => {
   const push=html.slice(html.indexOf('CS.push = async'),html.indexOf('A.onAuthStateChanged'));
   assert.match(push,/const pushUser\s*=\s*auth\.currentUser/);
   assert.match(push,/const pushUid\s*=\s*pushUser\.uid/);
-  assert.match(push,/const pushRef\s*=\s*F\.doc\(db,\s*"users",\s*pushUid\)/);
-  assert.match(push,/tx\.get\(pushRef\)/);
-  assert.match(push,/tx\.set\(pushRef,/);
+  assert.match(html,/const rootRef=uid=>F\.doc\(db,"users",uid\)/);
+  assert.match(html,/publishGeneration\(uid,id,\{baseRev,updatedAt,stillCurrent\}\)/);
+  assert.match(html,/if\(stillCurrent&&!stillCurrent\(\)\)return \{cancelled:true\}/,'the manifest transaction rechecks identity after its reads');
+  assert.match(push,/stillCurrent:\(\)=>auth\.currentUser\?\.uid===pushUid&&operation===pushOperation/);
   assert.match(push,/auth\.currentUser\?\.uid\s*!==\s*pushUid/,'a late result from an earlier account cannot change current cloud status');
 });
 
 async function loadCloudBackend({ serverData={rev:4}, serverExists=true, failures={}, timeoutMs=25 }={}){
-  const moduleMatch=html.match(/<script type="module">([\s\S]*?)<\/script>/);
-  assert.ok(moduleMatch,'cloud backend module exists');
-  const moduleSource=moduleMatch[1].replace(
-    /const \[appMod, A, F\] = await Promise\.all\(\[[\s\S]*?\]\);/,
-    'const [appMod, A, F] = globalThis.__cloudModules;'
-  );
-  const writes=[];
-  let stored={exists:serverExists,data:{...serverData}};
-  const snapshot=()=>({exists:()=>stored.exists,data:()=>stored.data});
-  const auth={currentUser:{uid:'owner',email:'owner@example.test'}};
-  const popupProviders=[];
-  const A={
-    browserLocalPersistence:{},
-    getAuth:()=>auth,
-    setPersistence:async()=>{if(failures.persistence)throw failures.persistence;},
-    signInWithPopup:async(_auth,provider)=>{popupProviders.push(provider);if(failures.signIn)throw failures.signIn;},
-    signOut:async()=>{if(failures.signOut)throw failures.signOut;},
-    GoogleAuthProvider:class GoogleAuthProvider{setCustomParameters(value){this.customParameters=value;}},
-    onAuthStateChanged(_auth,listener){listener(auth.currentUser);},
-  };
-  const F={
-    getFirestore:()=>({}),
-    doc:(_db,collection,uid)=>({collection,uid}),
-    getDoc:async()=>{if(writes.length&&failures.stampPending)return failures.stampPending;if(failures.pullPending)return failures.pullPending;if(failures.pull)throw failures.pull;return snapshot();},
-    runTransaction:async(_db,fn)=>{
-      if(failures.pushPending)return failures.pushPending;
-      if(failures.push)throw failures.push;
-      const tx={
-        get:async()=>snapshot(),
-        set(_ref,next){writes.push(next);stored={exists:true,data:{...next,serverUpdatedAt:{toMillis:()=>1234}}};},
-      };
-      return fn(tx);
-    },
-    serverTimestamp:()=>({toMillis:()=>1234}),
-  };
-  const events=[];
-  const window={FIREBASE_CONFIG:{apiKey:'test-key'},CLOUD_SYNC_TIMEOUT_MS:timeoutMs,dispatchEvent:event=>{events.push(event);return true;}};
-  window.window=window;
-  const context=vm.createContext({
-    window,
-    CustomEvent:class CustomEvent{constructor(type){this.type=type;}},
-    __cloudModules:[{initializeApp:()=>({})},A,F],
-    setTimeout,clearTimeout,
-  });
-  await vm.runInContext(`(async()=>{${moduleSource}\n})()`,context,{filename:'index.html#cloud-backend'});
-  return {CS:window.CloudSync,auth,writes,events,popupProviders,getStored:()=>stored};
+  const rootData=serverExists?{...serverData}:null;
+  const h=await loadCloudBackendV2({rootData,failures,timeoutMs});
+  return {...h,getStored:()=>({exists:h.docs.has('users/owner'),data:h.docs.get('users/owner')})};
 }
+
+async function loadCloudBackendV2({rootData=null,batchFailureAt=Infinity,failures={},timeoutMs=25}={}){
+ const moduleMatch=html.match(/<script type="module">([\s\S]*?)<\/script>/);assert.ok(moduleMatch);
+ const moduleSource=moduleMatch[1].replace(/const \[appMod, A, F\] = await Promise\.all\(\[[\s\S]*?\]\);/,
+  'const [appMod, A, F] = globalThis.__cloudModules;');
+ const clone=value=>value==null||typeof value!=='object'?value:Array.isArray(value)?value.map(clone):Object.fromEntries(Object.entries(value).map(([key,item])=>[key,clone(item)]));
+ const docs=new Map(),rootPath='users/owner';
+ if(rootData)docs.set(rootPath,clone(rootData));
+ const pathOf=(parts)=>parts.filter(part=>part!==undefined).join('/');
+ const ref=(...parts)=>({path:pathOf(parts),id:String(parts.at(-1))});
+ const snap=reference=>({id:reference.id,ref:reference,exists:()=>docs.has(reference.path),data:()=>clone(docs.get(reference.path))});
+ const directRows=collectionRef=>[...docs].filter(([key])=>key.startsWith(collectionRef.path+'/')&&
+  !key.slice(collectionRef.path.length+1).includes('/')).map(([key])=>snap(ref(...key.split('/'))));
+ const writes=[],popupProviders=[];let batchCommits=0,transactionCalls=0;
+ const normalize=value=>Object.fromEntries(Object.entries(value).map(([key,item])=>[key,item?.__serverTimestamp?{toMillis:()=>1234}:item]));
+ const apply=(operation)=>{
+  if(operation.type==='set'){docs.set(operation.ref.path,normalize(clone(operation.value)));if(operation.ref.path===rootPath)writes.push(clone(docs.get(rootPath)));}
+  else if(operation.type==='update')docs.set(operation.ref.path,{...(docs.get(operation.ref.path)||{}),...normalize(clone(operation.value))});
+  else docs.delete(operation.ref.path);
+ };
+ const F={
+  getFirestore:()=>({}),doc:(_db,...parts)=>ref(...parts),collection:(_db,...parts)=>ref(...parts),
+  getDoc:async reference=>{if(reference.path===rootPath&&docs.get(rootPath)?.schemaVersion===2&&failures.stampPending)return failures.stampPending;if(reference.path===rootPath&&failures.pullPending)return failures.pullPending;if(reference.path===rootPath&&failures.pull)throw failures.pull;return snap(reference);},getDocs:async collectionRef=>({docs:directRows(collectionRef)}),
+  serverTimestamp:()=>({__serverTimestamp:true}),
+  runTransaction:async(_db,fn)=>{transactionCalls++;if(failures.pushPending)return failures.pushPending;if(failures.push)throw failures.push;const operations=[],tx={get:async reference=>snap(reference),set:(reference,value)=>operations.push({type:'set',ref:reference,value}),update:(reference,value)=>operations.push({type:'update',ref:reference,value}),delete:reference=>operations.push({type:'delete',ref:reference})};const result=await fn(tx);for(const operation of operations)apply(operation);return result;},
+  writeBatch:()=>{const operations=[];return {set:(reference,value)=>operations.push({type:'set',ref:reference,value}),delete:reference=>operations.push({type:'delete',ref:reference}),async commit(){batchCommits++;if(batchCommits===batchFailureAt)throw Object.assign(Error('batch unavailable'),{code:'unavailable'});for(const operation of operations)apply(operation);}};},
+ };
+ const auth={currentUser:{uid:'owner',email:'owner@example.test'}},A={browserLocalPersistence:{},getAuth:()=>auth,setPersistence:async()=>{if(failures.persistence)throw failures.persistence;},
+  signInWithPopup:async(_auth,provider)=>{popupProviders.push(provider);if(failures.signIn)throw failures.signIn;},signOut:async()=>{if(failures.signOut)throw failures.signOut;},GoogleAuthProvider:class{setCustomParameters(value){this.customParameters=value;}},onAuthStateChanged(_auth,listener){listener(auth.currentUser);}};
+ const events=[],pending=new Map(),window={FIREBASE_CONFIG:{apiKey:'test-key'},CLOUD_SYNC_TIMEOUT_MS:timeoutMs,dispatchEvent:event=>{events.push(event);return true;}};window.window=window;
+ window.ScannerDeviceStore={
+  async getPendingUpload(account){return clone(pending.get(account)||null);},
+  async setPendingUpload(account,value){pending.set(account,clone(value));return {ok:true};},
+  async clearPendingUpload(account,generationId){if(pending.get(account)?.generationId!==generationId)return false;pending.delete(account);return true;},
+ };
+ const context=vm.createContext({window,CustomEvent:class{constructor(type){this.type=type;}},__cloudModules:[{initializeApp:()=>({})},A,F],
+  console,crypto:webcrypto,TextEncoder,TextDecoder,structuredClone,setTimeout,clearTimeout});context.globalThis=context;
+ for(const file of ['device-store-v2.js','cloud-store-v2.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,file),'utf8'),context,{filename:file});
+ window.ChainStorageV2=context.ChainStorageV2;window.ChainCloudV2=context.ChainCloudV2;
+ await vm.runInContext(`(async()=>{${moduleSource}\n})()`,context,{filename:'index.html#cloud-v2-backend'});
+ return {CS:window.CloudSync,auth,docs,pending,events,batchCommits,writes,popupProviders,transactionCalls};
+}
+
+test('RISK CLOUD V2 ADAPTER: production migrates a legacy root to verified chunks and pulls the exact multi-megabyte board',async()=>{
+ const legacy=JSON.stringify({tasks:[{id:'legacy'}]}),payload=cloudV2Payload('production');assert.ok(Buffer.byteLength(payload,'utf8')>1048576);
+ const h=await loadCloudBackendV2({rootData:{payload:legacy,updatedAt:1,rev:4,serverUpdatedAt:1},timeoutMs:5000});
+ assert.equal((await h.CS.pull()).payload,legacy,'v1 stays readable until its first v2 publication');
+ const pushed=await h.CS.push(payload,5,4);assert.equal(pushed.ok,true,JSON.stringify({pushed,stage:h.CS.errorStage,code:h.CS.errorCode}));assert.equal(pushed.rev,5);
+ const root=h.docs.get('users/owner');assert.equal(root.schemaVersion,2);assert.equal(Object.hasOwn(root,'payload'),false);
+ assert.equal(root.previousGeneration,null);assert.equal(root.activeGeneration.length>8,true);
+ const header=h.docs.get(`users/owner/generations/${root.activeGeneration}`);assert.equal(header.state,'published');
+ const chunks=[...h.docs].filter(([key])=>key.startsWith(`users/owner/generations/${root.activeGeneration}/chunks/`));assert.ok(chunks.length>4);
+ const pulled=await h.CS.pull();assert.equal(pulled.payload,payload);assert.equal(pulled.rev,5);
+ assert.equal(h.pending.size,0,'a verified published generation clears only its matching resume record');
+});
+
+test('RISK CLOUD V2 ADAPTER: an interrupted upload stays invisible and resumes its account-bound generation',async()=>{
+ const base=JSON.stringify({tasks:[{id:'base'}]}),payload=cloudV2Payload('resume-production');
+ const failed=await loadCloudBackendV2({rootData:{payload:base,updatedAt:1,rev:1,serverUpdatedAt:1},batchFailureAt:1,timeoutMs:5000});
+ const first=await failed.CS.push(payload,2,1);assert.equal(first.error,true);assert.equal(failed.docs.get('users/owner').payload,base,'partial chunks never change the visible root');
+ const pending=failed.pending.get('owner');assert.ok(pending?.generationId,'the exact generation is durable for reload resume');
+ assert.equal(pending.baseRev,1);assert.match(pending.payloadHash,/^[0-9a-f]{64}$/);
+});
+
+test('RISK CLOUD V2 ADAPTER: production garbage collection retains current and previous complete generations only',async()=>{
+ const h=await loadCloudBackendV2({rootData:null,timeoutMs:5000});
+ for(let rev=0;rev<4;rev++){
+  const payload=JSON.stringify({tasks:[{id:'board',title:'revision '+(rev+1)}]});
+  const pushed=await h.CS.push(payload,rev+1,rev);assert.equal(pushed.ok,true,JSON.stringify(pushed));
+  for(let attempt=0;attempt<10;attempt++)await flush();
+ }
+ const root=h.docs.get('users/owner'),generationPaths=[...h.docs.keys()].filter(key=>/^users\/owner\/generations\/[^/]+$/.test(key));
+ assert.equal(generationPaths.length,2,'published storage stays bounded to the active and previous complete snapshots');
+ assert.ok(generationPaths.includes(`users/owner/generations/${root.activeGeneration}`));
+ assert.ok(generationPaths.includes(`users/owner/generations/${root.previousGeneration}`));
+ assert.ok([...h.docs.keys()].filter(key=>key.includes('/chunks/')).every(key=>generationPaths.some(path=>key.startsWith(path+'/'))),'retired generation chunks leave no orphan documents');
+});
+
+test('RISK SCALABLE END TO END: a multi-megabyte local board reaches a v2 manifest ACK and clean device badge',async()=>{
+ const {indexedDB}=await import('fake-indexeddb'),dbName='chain-scanner-end-to-end-'+Date.now()+'-'+Math.random();
+ const board=syncState({tasks:[syncTask('large','Large local board')],syncRev:0,syncAccount:null,syncDirty:true});
+ board.futureBoardData={unknown:true,blob:'cloud-scale 😀 '.repeat(90000)};
+ const raw=JSON.stringify(board);assert.ok(Buffer.byteLength(raw,'utf8')>1048576);
+ const storage=sharedScannerStorage({[LOCAL_HEAD_KEY]:raw,[SYNC_STORE_KEY]:raw});
+ const loaded=await loadApp({sharedStorage:storage,indexedDBProvider:indexedDB,deviceDbName:dbName});
+ const backend=await loadCloudBackendV2({rootData:null,timeoutMs:5000});
+ loaded.shim.window.CloudSync=backend.CS;loaded.shim.window.CLOUD_PUSH_DELAY_MS=0;
+ await loaded.ctx.cloudPull();loaded.ctx.cloudPushNow();
+ for(let attempt=0;attempt<80&&loaded.ctx.state.syncDirty;attempt++)await new Promise(resolve=>setTimeout(resolve,10));
+ const root=backend.docs.get('users/owner');assert.equal(root?.schemaVersion,2,'the production caller publishes a manifest instead of an oversized root payload');
+ assert.equal(Object.hasOwn(root,'payload'),false);assert.equal(loaded.ctx.state.syncRev,1);assert.equal(loaded.ctx.state.syncDirty,false);
+ const pulled=await backend.CS.pull();assert.equal(pulled.payload,loaded.ctx.cloudPayload(),'verified chunks decode to the app ACK payload');
+ assert.equal(JSON.parse((await loaded.shim.window.ScannerDeviceStore.readHead()).payload).syncRev,1,'the cloud ACK is durable in the scalable device head');
+ loaded.ctx.renderSync();const badge=loaded.shim.document.getElementById('syncBtn');
+ assert.doesNotMatch(badge.textContent,/error/i);assert.doesNotMatch(badge.title,/syncing|unsaved/i);
+});
 
 test('RISK CLOUD ADAPTER: malformed revisions fail closed before Firestore writes',async()=>{
   for(const baseRev of [undefined,'4',-1,1.5,Number.MAX_SAFE_INTEGER+1]){
@@ -8105,7 +8178,7 @@ test('RISK LOCAL BACKUPS: packed recovery remains restorable with an exact safet
  const currentBoard=JSON.stringify(ctx.state),plain=storage.getItem(LOCAL_BACKUPS_KEY),packed=ctx.packBackupIndex(plain);
  assert.ok(packed.length<plain.length,'fixture archive compacts');
  storage.setItem(LOCAL_BACKUPS_KEY,packed);
- ctx.openSettings();ctx.onAction('restore-local-backup',{dataset:{id:saved.id}});
+ ctx.openSettings();await ctx.restoreDurableBackupById(saved.id);
  assert.equal(ctx.state.tasks.find(row=>row.id===task.id).title,'Title preserved in packed recovery',
   'Restore decodes the packed Settings snapshot: '+(shim.document.getElementById('toast')?.textContent||''));
  assert.ok(ctx.readLocalBackups().some(row=>row.kind==='before-restore'&&row.payload===currentBoard),
@@ -8855,7 +8928,7 @@ test('RISK LOCAL BACKUPS: quota during Restore keeps the immediate pre-restore b
  const manual={id:'restore-target',day:new Date(at).toISOString().slice(0,10),at,kind:'manual',payload:target};
  storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify([manual]));
  ctx.openSettings();
- ctx.onAction('restore-local-backup',{dataset:{id:manual.id}});
+ await ctx.restoreDurableBackupById(manual.id);
  assert.equal(quotaArmed,true,'the restore encountered aggregate quota after both backup writes');
  assert.equal(storage.getItem(SYNC_STORE_KEY),before,'a restore that cannot keep its safety copy holds the original primary board');
  assert.equal(storage.getItem(LOCAL_HEAD_KEY),storage.getItem(SYNC_STORE_KEY));
@@ -8945,14 +9018,14 @@ test('RISK LOCAL BACKUPS: async host Restore rolls back if its safety row disapp
   await set(key,payload);
   if(key===SYNC_STORE_KEY && payload.includes('Restored huge')) await new Promise(resolve=>{release=resolve;});
  };
- ctx.openSettings();ctx.onAction('restore-local-backup',{dataset:{id:backup.id}});
+ ctx.openSettings();const restore=ctx.restoreDurableBackupById(backup.id);
  await flush();
  assert.equal(typeof release,'function','the host primary write is awaiting its asynchronous acknowledgement');
  const rows=JSON.parse(shim.localStorage.getItem(LOCAL_BACKUPS_KEY));
  const safety=rows.find(row=>row.kind==='before-restore' && row.payload.includes('Prior host board'));
  assert.ok(safety);
  shim.localStorage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify(rows.filter(row=>row.id!==safety.id)));
- release();await flush();await flush();
+ release();await restore;await flush();await flush();
  assert.equal(shim.window.storage._map.get(SYNC_STORE_KEY),prior,
   'a changed backup index rolls back this host write rather than accepting an unprotected Restore');
  assert.equal(vm.runInContext('pendingRestoreSafetyIds.size',ctx),1,
@@ -8972,13 +9045,13 @@ test('RISK LOCAL BACKUPS: host rollback restores an unsaved first-session board'
   if(key===SYNC_STORE_KEY && payload.includes('Restored host board'))
    await new Promise(resolve=>{release=resolve;});
  };
- ctx.openSettings();ctx.onAction('restore-local-backup',{dataset:{id:backup.id}});
+ ctx.openSettings();const restore=ctx.restoreDurableBackupById(backup.id);
  await flush();assert.equal(typeof release,'function');
  const rows=JSON.parse(shim.localStorage.getItem(LOCAL_BACKUPS_KEY));
  const safety=rows.find(row=>row.kind==='before-restore' && row.payload===prior);
  assert.ok(safety);
  shim.localStorage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify(rows.filter(row=>row.id!==safety.id)));
- release();await flush();await flush();
+ release();await restore;await flush();await flush();
  assert.equal(shim.window.storage._map.get(SYNC_STORE_KEY),prior,
   'an absent host key rolls back to the exact displaced in-memory board, not an empty value');
 });
@@ -9001,13 +9074,13 @@ test('RISK LOCAL BACKUPS: older queued host save cannot clear a newer Restore pr
  const target=JSON.stringify(syncState({tasks:[syncTask('restored','Restored board')]}));
  assert.equal(ctx.saveLocalBackup('manual',target),true);
  const backup=ctx.readLocalBackups().find(row=>row.kind==='manual' && row.payload===target);
- ctx.openSettings();ctx.onAction('restore-local-backup',{dataset:{id:backup.id}});
+ ctx.openSettings();const restore=ctx.restoreDurableBackupById(backup.id);await flush();
  assert.equal(vm.runInContext('pendingRestoreSafetyIds.size',ctx),1);
  releaseOlder();await olderSave;await flush();
  assert.equal(typeof releaseRestore,'function');
  assert.equal(vm.runInContext('pendingRestoreSafetyIds.size',ctx),1,
   'completion of an older queued write cannot clear a later Restore proof');
- releaseRestore();await flush();await flush();
+ releaseRestore();await restore;await flush();await flush();
  assert.equal(vm.runInContext('pendingRestoreSafetyIds.size',ctx),0,
   'the matching protected Restore write clears only its own proof');
 });
@@ -9231,11 +9304,10 @@ test('LOCAL BACKUPS: restore and delete controls can wrap inside narrow Settings
 test('LOCAL BACKUPS: restoring an open task deliberately reopens a later completion', async () => {
   const {ctx}=await loadApp();
   const task=ctx.addTask('Open in backup'); await ctx.persist();
-  ctx.onAction('make-manual-backup',{});
-  const backup=ctx.readLocalBackups().find(row=>row.kind==='manual');
+  const backup=await ctx.saveDurableBackup('manual',JSON.stringify(ctx.state));
   ctx.doneTask(task.id); await ctx.persist();
   assert.equal(ctx.state.tasks.find(t=>t.id===task.id).done,true);
-  ctx.onAction('restore-local-backup',{dataset:{id:backup.id}});
+  ctx.openSettings();await ctx.restoreDurableBackupById(backup.id);
   assert.equal(ctx.state.tasks.find(t=>t.id===task.id).done,false);
 });
 
@@ -15776,6 +15848,8 @@ test('RISK RESET SAFETY: failed primary reset preserves Undo and never restores 
  pending.ctx.persist=undefined;
  vm.runInContext("persist=(async function(backupAlreadySafe=false){await new Promise(resolve=>window.__finishReset=resolve);return false;})",pending.ctx);
  pending.ctx.openSettings();pending.ctx.onAction('wipe',{});pending.ctx.onAction('confirm-wipe',{});
+ for(let attempt=0;attempt<30&&typeof pending.shim.window.__finishReset!=='function';attempt++)await flush();
+ assert.equal(typeof pending.shim.window.__finishReset,'function','the reset reaches its guarded primary write after the awaited recovery proof');
  pending.shim.window.CloudSync.user='new@example.test';pending.shim.window.__finishReset();await syncSettle(30);
  assert.equal(pending.ctx.state.tasks.some(task=>task.title==='Private old account task'),false,
   'a failed callback from the old account cannot restore its board after identity changed');
@@ -16115,4 +16189,557 @@ test('RISK CLOUD STARTUP: a late timed-out transaction cannot overwrite the auth
  assert.equal(JSON.parse(remote).tasks.some(task=>task.title==='Committed after the local deadline'),true);
  assert.equal(ctx.state.syncRev,5);assert.equal(ctx.state.syncDirty,false);
  assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ synced');
+});
+
+test('RISK CLOUD STARTUP: repeated unavailable writes keep one bounded retry budget across successful read-before-write checks',async()=>{
+ const local=syncState({tasks:[syncTask('shared','Current board')],syncRev:4,syncAccount:'e@example.com',syncDirty:false});
+ const remote=JSON.stringify(local);let pulls=0,pushes=0;
+ const factory=window=>{
+  const ping=()=>window.dispatchEvent({type:'cloudsync'}),CS={configured:true,ready:true,user:'e@example.com',status:'ok',errorStage:null,errorCode:null,signIn(){},signOut(){},
+   async pull(){pulls++;CS.status='syncing';ping();await flush();CS.status='ok';CS.errorStage=null;CS.errorCode=null;ping();return {payload:remote,rev:4};},
+   async push(){pushes++;CS.status='syncing';ping();await flush();CS.status='error';CS.errorStage='push';CS.errorCode='unavailable';ping();return {error:true};},
+  };return CS;
+ };
+ const storage=sharedScannerStorage({[LOCAL_HEAD_KEY]:JSON.stringify(local),[SYNC_STORE_KEY]:JSON.stringify(local)}),loaded=await loadApp({sharedStorage:storage,cloudSyncFactory:factory});
+ loaded.shim.window.CLOUD_RETRY_DELAY_MS=2;loaded.shim.window.CLOUD_PUSH_DELAY_MS=2;await loaded.ctx.cloudPull();loaded.ctx.addTask('Cannot upload yet');await loaded.ctx.persist();loaded.ctx.cloudPushNow();
+ await syncSettle(180);
+ assert.equal(pushes,5,'the initial write plus four bounded retries run, without a permanent 2-second retry loop: '+vm.runInContext('JSON.stringify({attempt:cloudRetryAttempt,timer:!!cloudRetryTimer,status:window.CloudSync.status,code:window.CloudSync.errorCode})',loaded.ctx));
+ assert.equal(pulls,5,'each uncertain retry reads current cloud authority before writing again');
+ assert.equal(loaded.shim.window.CloudSync.status,'error');assert.equal(loaded.ctx.state.syncDirty,true);
+});
+
+function loadStorageV2({indexedDB}={}){
+ const file=path.join(__dirname,'device-store-v2.js');
+ assert.ok(fs.existsSync(file),'the scalable local/cloud storage module must ship with the offline app');
+ const sandbox=vm.createContext({console,crypto:webcrypto,TextEncoder,TextDecoder,indexedDB,
+  setTimeout,clearTimeout,structuredClone});
+ sandbox.globalThis=sandbox;
+ vm.runInContext(fs.readFileSync(file,'utf8'),sandbox,{filename:'device-store-v2.js'});
+ assert.ok(sandbox.ChainStorageV2,'the storage module exposes its browser API');
+ return sandbox.ChainStorageV2;
+}
+
+test('RISK SCALABLE BOARD CODEC: a multi-megabyte Unicode board roundtrips through bounded verified chunks',async()=>{
+ const storageV2=loadStorageV2();
+ const payload=JSON.stringify({tasks:Array.from({length:3200},(_,index)=>({
+  id:'task-'+index,title:'Unicode '+index+' 😀 漢字 '+('\uD800')+' '+('recoverable '.repeat(32)),done:false,
+ })),settings:{future:{unknown:true}}});
+ assert.ok(Buffer.byteLength(payload,'utf8')>1048576,'fixture exceeds the old single-document ceiling');
+ const encoded=await storageV2.encodeSnapshot(payload,{targetBytes:256*1024});
+ assert.ok(encoded.chunks.length>4,'chunk count is data-driven rather than fixed to one document');
+ assert.equal(encoded.chunkCount,encoded.chunks.length);
+ assert.equal(encoded.byteLength,Buffer.byteLength(payload,'utf8'));
+ for(const [index,chunk] of encoded.chunks.entries()){
+  assert.equal(chunk.index,index);
+  assert.ok(chunk.byteLength<=256*1024,'every Firestore chunk stays within the target');
+  assert.equal(chunk.byteLength,Buffer.byteLength(chunk.text,'utf8'));
+  assert.match(chunk.hash,/^[0-9a-f]{64}$/);
+ }
+ assert.equal(await storageV2.decodeSnapshot(encoded,encoded.chunks),payload,'UTF-8, emoji, escaped lone surrogates and unknown fields roundtrip byte-exactly');
+ const tampered=encoded.chunks.map(row=>({...row}));tampered[1].text+='x';
+ await assert.rejects(storageV2.decodeSnapshot(encoded,tampered),/hash|length|corrupt/i,'a damaged generation never becomes a board');
+});
+
+test('RISK DEVICE STORAGE V2: migration and head plus recovery commits are atomic, CAS guarded, and preserve legacy bytes',async()=>{
+ const {indexedDB}=await import('fake-indexeddb');
+ const storageV2=loadStorageV2({indexedDB});
+ const store=storageV2.createDeviceStore({indexedDB,crypto:webcrypto,dbName:'chain-scanner-test-'+Date.now()+'-'+Math.random()});
+ await store.open();
+ const legacyHead=JSON.stringify({tasks:[{id:'old',title:'Legacy 😀'}],future:{kept:true}});
+ const unreadableArchive='opaque-old-shell-bytes:\u0000\uD800';
+ const legacy={headPayload:legacyHead,sourceFingerprint:'legacy-pair-a',opaqueArchives:[{key:'daily-backups',raw:unreadableArchive}],
+  backups:[{id:'manual-old',day:'2026-09-29',at:1,kind:'manual',payload:legacyHead}]};
+ const before=structuredClone(legacy);
+ const migrated=await store.migrateLegacy(legacy);
+ assert.equal(migrated.ok,true);assert.equal(migrated.verified,true);
+ assert.deepEqual(legacy,before,'migration never rewrites or deletes live legacy bytes');
+ assert.equal((await store.readHead()).payload,legacyHead);
+ assert.equal((await store.listBackups()).find(row=>row.id==='manual-old').payload,legacyHead);
+ assert.deepEqual(await store.listOpaqueArchives(),legacy.opaqueArchives,'unreadable archives remain byte-exact recovery evidence');
+
+ const next=JSON.stringify({tasks:[{id:'new',title:'Larger board '+('x'.repeat(20000))}],future:{kept:true}});
+ const prior=await store.readHead();
+ const committed=await store.commitHead({expectedHash:prior.hash,payload:next,account:'owner@example.test',
+  backup:{id:'before-replace',day:'2026-09-29',at:2,kind:'before-cloud-local-edit',payload:legacyHead}});
+ assert.equal(committed.ok,true);assert.equal((await store.readHead()).payload,next);
+ assert.equal((await store.listBackups()).find(row=>row.id==='before-replace').payload,legacyHead,
+  'the replacement head and its mandatory recovery copy commit together');
+
+ const stale=await store.commitHead({expectedHash:prior.hash,payload:'{"tasks":[]}',account:'owner@example.test'});
+ assert.equal(stale.conflict,true,'a tab cannot publish against a head it did not read');
+ assert.equal((await store.readHead()).payload,next,'a failed CAS keeps the newer durable head');
+
+ const collision=await store.commitHead({expectedHash:committed.hash,payload:'{"tasks":[{"id":"lost"}]}',account:'owner@example.test',
+  backup:{id:'before-replace',day:'2026-09-29',at:3,kind:'manual',payload:'{"tasks":[{"id":"different"}]}'}});
+ assert.equal(collision.error,true,'a conflicting recovery ID aborts rather than replacing old recovery data');
+ assert.equal((await store.readHead()).payload,next,'the same transaction abort preserves the prior head');
+ assert.equal((await store.listBackups()).find(row=>row.id==='before-replace').payload,legacyHead);
+ await store.close();
+});
+
+test('RISK DEVICE STORAGE V2: unreferenced immutable snapshots retire while head and recovery references remain exact',async()=>{
+ const {indexedDB}=await import('fake-indexeddb'),dbName='chain-scanner-gc-'+Date.now()+'-'+Math.random();
+ const storageV2=loadStorageV2({indexedDB}),store=storageV2.createDeviceStore({indexedDB,crypto:webcrypto,dbName});
+ await store.open();
+ const first='{"tasks":[{"id":"first"}]}',second='{"tasks":[{"id":"second"}]}',third='{"tasks":[{"id":"third"}]}';
+ await store.migrateLegacy({headPayload:first,backups:[],opaqueArchives:[]});
+ let head=await store.readHead();
+ let result=await store.commitHead({expectedHash:head.hash,payload:second,backup:{id:'kept-first',day:'2026-09-29',at:1,kind:'manual',payload:first}});
+ result=await store.commitHead({expectedHash:result.hash,payload:third});
+ const openDb=()=>new Promise((resolve,reject)=>{const request=indexedDB.open(dbName);request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});
+ const snapshotPayloads=async()=>{const db=await openDb();try{return await new Promise((resolve,reject)=>{const request=db.transaction('snapshots').objectStore('snapshots').getAll();request.onsuccess=()=>resolve(request.result.map(row=>row.payload));request.onerror=()=>reject(request.error);});}finally{db.close();}};
+ assert.deepEqual(new Set(await snapshotPayloads()),new Set([first,third]),'the live head and referenced recovery remain, while an unreferenced intermediate head retires');
+ assert.equal(await store.deleteBackup('kept-first',{payload:first,allowedKinds:['manual']}),true);
+ assert.deepEqual(await snapshotPayloads(),[third],'deleting the last recovery reference retires its immutable payload but never the head');
+ await store.close();
+});
+
+function loadCloudV2(){
+ const sandbox=vm.createContext({console,crypto:webcrypto,TextEncoder,TextDecoder,setTimeout,clearTimeout,structuredClone});
+ sandbox.globalThis=sandbox;
+ for(const file of ['device-store-v2.js','cloud-store-v2.js']){
+  assert.ok(fs.existsSync(path.join(__dirname,file)),'the scalable cloud module must ship with the offline app: '+file);
+  vm.runInContext(fs.readFileSync(path.join(__dirname,file),'utf8'),sandbox,{filename:file});
+ }
+ return sandbox.ChainCloudV2;
+}
+
+function cloudV2Payload(label='large'){
+ return JSON.stringify({tasks:Array.from({length:3600},(_,index)=>({id:`${label}-${index}`,
+  title:`${label} ${index} 😀 ${'recoverable '.repeat(32)}`,done:false})),settings:{future:{kept:true}}});
+}
+
+function cloudV2Adapter(){
+ const roots=new Map(),generations=new Map();let crashAfter=Infinity,crashed=false,beforePublish=null,onGenerationRead=null;
+ const key=(uid,id)=>uid+'/'+id,clone=value=>value==null?value:structuredClone(value);
+ const api={roots,generations,
+  setCrashAfter(value){crashAfter=value;crashed=false},setBeforePublish(fn){beforePublish=fn},setGenerationRead(fn){onGenerationRead=fn},
+  async readRoot(uid){return clone(roots.get(uid)||null)},
+  async beginGeneration(uid,id,header){const k=key(uid,id),existing=generations.get(k);if(existing)return clone(existing.header);generations.set(k,{header:clone(header),chunks:new Map()});return clone(header)},
+  async readGeneration(uid,id){if(onGenerationRead){const fn=onGenerationRead;onGenerationRead=null;await fn({uid,id,api});}return clone(generations.get(key(uid,id))?.header||null)},
+  async readChunks(uid,id){return [...(generations.get(key(uid,id))?.chunks.values()||[])].sort((a,b)=>a.index-b.index).map(clone)},
+  async writeChunks(uid,id,chunks){const generation=generations.get(key(uid,id));if(!generation)throw Error('missing generation');for(const chunk of chunks){
+   if(!crashed&&generation.chunks.size>=crashAfter){crashed=true;throw Error('simulated upload crash');}
+   const old=generation.chunks.get(chunk.index);if(old&&JSON.stringify(old)!==JSON.stringify(chunk))throw Error('immutable chunk mismatch');if(!old)generation.chunks.set(chunk.index,clone(chunk));
+  }},
+  async sealGeneration(uid,id,header){const generation=generations.get(key(uid,id));if(!generation)throw Error('missing generation');generation.header={...clone(header),state:'sealed'};return clone(generation.header)},
+  async publishGeneration(uid,id,{baseRev,updatedAt,stillCurrent}){if(beforePublish)await beforePublish();if(stillCurrent&&!stillCurrent())return {cancelled:true};const generation=generations.get(key(uid,id));const current=roots.get(uid)||null,rev=current?.rev||0;if(generation?.header.state!=='sealed')return {error:true,code:'unsealed'};if(rev!==baseRev)return {conflict:true,rev};const root={schemaVersion:2,rev:rev+1,activeGeneration:id,previousGeneration:current?.activeGeneration||null,updatedAt};generation.header={...generation.header,state:'published',publishedAt:Date.now()};roots.set(uid,root);return {ok:true,rev:root.rev,root:clone(root)}},
+  async listGenerations(uid){return [...generations].filter(([k])=>k.startsWith(uid+'/')).map(([k,value])=>({id:k.slice(uid.length+1),...clone(value.header)}))},
+  async markDeleting(uid,id,protectedIds=[]){const root=roots.get(uid),generation=generations.get(key(uid,id));if(!generation||root?.activeGeneration===id||root?.previousGeneration===id||protectedIds.includes(id))return false;generation.header={...generation.header,state:'deleting'};return true},
+  async deleteChunks(uid,id){const generation=generations.get(key(uid,id));if(generation?.header.state!=='deleting')throw Error('generation is not deleting');generation.chunks.clear()},
+  async deleteGeneration(uid,id){const k=key(uid,id),generation=generations.get(k);if(generation?.header.state!=='deleting'||generation.chunks.size)throw Error('generation is not empty');generations.delete(k)},
+ };
+ return api;
+}
+
+test('RISK CLOUD V2: a multi-megabyte board publishes only after verified chunks and pulls byte-exactly',async()=>{
+ const cloudV2=loadCloudV2(),adapter=cloudV2Adapter(),store=cloudV2.createCloudStore({adapter,crypto:webcrypto,targetBytes:256*1024,batchSize:3});
+ const payload=cloudV2Payload('published');assert.ok(Buffer.byteLength(payload,'utf8')>1048576);
+ const pushed=await store.push('owner',payload,123,0);
+ assert.equal(pushed.ok,true);assert.equal(pushed.rev,1);
+ const root=adapter.roots.get('owner');assert.equal(root.schemaVersion,2);assert.equal(Object.hasOwn(root,'payload'),false,'v2 root never carries the whole board');
+ const generation=adapter.generations.get('owner/'+root.activeGeneration);
+ assert.equal(generation.header.state,'published');assert.ok(generation.chunks.size>4);
+ const pulled=await store.pull('owner');assert.equal(pulled.payload,payload);assert.equal(pulled.rev,1);
+});
+
+test('RISK CLOUD V2: crash resume, concurrent revisions, and account cancellation never publish partial data',async()=>{
+ const cloudV2=loadCloudV2(),adapter=cloudV2Adapter(),store=cloudV2.createCloudStore({adapter,crypto:webcrypto,targetBytes:64*1024,batchSize:2});
+ const base=await store.push('owner',JSON.stringify({tasks:[{id:'base'}]}),1,0);assert.equal(base.ok,true);
+ adapter.setCrashAfter(2);
+ const interrupted=await store.push('owner',cloudV2Payload('resume'),2,1);
+ assert.equal(interrupted.error,true);assert.ok(interrupted.generationId);assert.equal(adapter.roots.get('owner').rev,1,'partial chunks are unreachable');
+ adapter.setCrashAfter(Infinity);
+ const resumed=await store.push('owner',cloudV2Payload('resume'),2,1,{generationId:interrupted.generationId});
+ assert.equal(resumed.ok,true);assert.equal((await store.pull('owner')).payload,cloudV2Payload('resume'));
+
+ const first=await store.push('owner',JSON.stringify({tasks:[{id:'winner'}]}),3,2);
+ const stale=await store.push('owner',JSON.stringify({tasks:[{id:'loser'}]}),3,2);
+ assert.equal(first.ok,true);assert.equal(stale.conflict,true);assert.equal(JSON.parse((await store.pull('owner')).payload).tasks[0].id,'winner');
+ let current=true;adapter.setBeforePublish(()=>{current=false});
+ const cancelled=await store.push('owner',JSON.stringify({tasks:[{id:'wrong-account'}]}),4,3,{stillCurrent:()=>current});
+ assert.equal(cancelled.cancelled,true);assert.equal(JSON.parse((await store.pull('owner')).payload).tasks[0].id,'winner');
+});
+
+test('RISK CLOUD V2: corrupt active data fails closed, manifest races retry, and garbage collection keeps recovery generations',async()=>{
+ const cloudV2=loadCloudV2(),adapter=cloudV2Adapter(),store=cloudV2.createCloudStore({adapter,crypto:webcrypto,targetBytes:16*1024,batchSize:2});
+ for(let rev=0;rev<4;rev++)assert.equal((await store.push('owner',JSON.stringify({tasks:[{id:'rev-'+(rev+1)}]}),rev+1,rev)).ok,true);
+ const root=adapter.roots.get('owner'),protectedGeneration=[...adapter.generations.keys()].map(key=>key.split('/')[1]).find(id=>id!==root.activeGeneration&&id!==root.previousGeneration);
+ const pendingGeneration=[...adapter.generations.keys()].map(key=>key.split('/')[1]).find(id=>id!==root.activeGeneration&&id!==root.previousGeneration&&id!==protectedGeneration);
+ for(const [key,generation] of adapter.generations)if(![root.activeGeneration,root.previousGeneration].some(id=>key.endsWith('/'+id)))generation.header.createdAt=Date.now()-8*86400000;
+ await adapter.beginGeneration('owner','young-other-device',{schemaVersion:2,state:'staging',encoding:'utf8',chunkCount:1,byteLength:2,hash:'a'.repeat(64),baseRev:4,createdAt:Date.now()});
+ await store.collectGarbage('owner',{pendingGenerationIds:[pendingGeneration]});
+ assert.ok(adapter.generations.has('owner/'+root.activeGeneration));assert.ok(adapter.generations.has('owner/'+root.previousGeneration));assert.ok(adapter.generations.has('owner/'+pendingGeneration));
+ assert.equal(adapter.generations.has('owner/'+protectedGeneration),false,'unreferenced nonpending generations are retired');
+ assert.ok(adapter.generations.has('owner/young-other-device'),'a recent staged upload from another device is never collected mid-publication');
+
+ const previous=root.previousGeneration,active=root.activeGeneration;
+ adapter.setGenerationRead(({api})=>{api.roots.set('owner',{...api.roots.get('owner'),activeGeneration:previous,previousGeneration:active,rev:5});});
+ assert.equal(JSON.parse((await store.pull('owner')).payload).tasks[0].id,'rev-3','a root change during read restarts from the new active generation');
+ const newRoot=adapter.roots.get('owner'),generation=adapter.generations.get('owner/'+newRoot.activeGeneration),firstChunk=generation.chunks.get(0);
+ generation.chunks.set(0,{...firstChunk,text:firstChunk.text+'damage'});
+ const corrupt=await store.pull('owner');assert.equal(corrupt.error,true);assert.match(corrupt.code,/corrupt|hash/i);
+ assert.notEqual(JSON.parse(adapter.generations.get('owner/'+newRoot.previousGeneration).chunks.get(0).text).tasks[0].id,undefined,
+  'the previous generation stays available for explicit recovery but is never silently made current');
+});
+
+test('Firestore rules: v2 chunks are owner-only, immutable, sealed before publish, and old clients fail closed', {skip:!process.env.FIRESTORE_EMULATOR_HOST}, async()=>{
+ const {assertFails,assertSucceeds,initializeTestEnvironment}=await import('@firebase/rules-unit-testing');
+ const {doc,getDoc,setDoc,updateDoc,deleteDoc,serverTimestamp}=await import('firebase/firestore');
+ const rules=fs.readFileSync(path.join(__dirname,'firestore.rules'),'utf8');
+ const env=await initializeTestEnvironment({projectId:'demo-chain-scanner-v2',firestore:{rules}});
+ try{
+  const alice=env.authenticatedContext('alice').firestore(),bob=env.authenticatedContext('bob').firestore();
+  const root=doc(alice,'users/alice'),generation=id=>doc(alice,`users/alice/generations/${id}`),chunk=(id,index)=>doc(alice,`users/alice/generations/${id}/chunks/${index}`);
+  const header=(state='staging')=>({schemaVersion:2,state,encoding:'utf8',chunkCount:1,byteLength:13,hash:'a'.repeat(64),baseRev:0,createdAt:serverTimestamp()});
+  const chunkData={index:0,text:'{"tasks":[]}',byteLength:12,hash:'b'.repeat(64)};
+  await assertSucceeds(setDoc(generation('g1'),header()));await assertSucceeds(setDoc(chunk('g1',0),chunkData));
+  await assertFails(setDoc(root,{schemaVersion:2,rev:1,activeGeneration:'g1',previousGeneration:null,updatedAt:1,serverUpdatedAt:serverTimestamp()}));
+  await assertSucceeds(updateDoc(generation('g1'),{state:'sealed',sealedAt:serverTimestamp()}));
+  await assertSucceeds(setDoc(root,{schemaVersion:2,rev:1,activeGeneration:'g1',previousGeneration:null,updatedAt:1,serverUpdatedAt:serverTimestamp()}));
+  await assertFails(setDoc(root,{payload:'{"tasks":[]}',updatedAt:2,rev:2,serverUpdatedAt:serverTimestamp()}));
+  await assertFails(updateDoc(chunk('g1',0),{text:'changed'}));await assertFails(deleteDoc(chunk('g1',0)));
+  await assertFails(getDoc(doc(bob,'users/alice/generations/g1')));await assertFails(setDoc(doc(bob,'users/alice/generations/x'),header()));
+
+  for(const [id,baseRev] of [['g2',1],['g3',2]]){
+   await assertSucceeds(setDoc(generation(id),{...header(),baseRev}));await assertSucceeds(setDoc(chunk(id,0),chunkData));
+   await assertSucceeds(updateDoc(generation(id),{state:'sealed',sealedAt:serverTimestamp()}));
+   const current=(await getDoc(root)).data();
+   await assertSucceeds(setDoc(root,{schemaVersion:2,rev:baseRev+1,activeGeneration:id,previousGeneration:current.activeGeneration,updatedAt:baseRev+1,serverUpdatedAt:serverTimestamp()}));
+  }
+  await assertFails(updateDoc(generation('g2'),{state:'deleting',deletingAt:serverTimestamp()}),'the previous generation remains protected');
+  await assertSucceeds(updateDoc(generation('g1'),{state:'deleting',deletingAt:serverTimestamp()}));
+  await assertSucceeds(deleteDoc(chunk('g1',0)));await assertSucceeds(deleteDoc(generation('g1')));
+  await assertFails(deleteDoc(root));
+ }finally{await env.cleanup();}
+});
+
+test('RISK SCALABLE LOCAL BOARD: a multi-megabyte legacy board migrates without rewriting source bytes and survives edit Undo and offline reload',async()=>{
+ const {indexedDB}=await import('fake-indexeddb');
+ const dbName='chain-scanner-app-large-'+Date.now()+'-'+Math.random();
+ const large=syncState({tasks:[syncTask('legacy-large','Legacy large board')],syncRev:0,syncAccount:null,syncDirty:true});
+ large.futureBoardData={unknown:true,blob:'😀 recoverable '.repeat(100000)};
+ const raw=JSON.stringify(large);
+ assert.ok(Buffer.byteLength(raw,'utf8')>1048576,'production fixture exceeds Firestore and common localStorage headroom');
+ const values=new Map([[LOCAL_HEAD_KEY,raw],[SYNC_STORE_KEY,raw],[LOCAL_BACKUPS_KEY,'opaque legacy archive bytes']]);
+ const storage={
+  getItem:key=>values.has(key)?values.get(key):null,
+  setItem(key,value){value=String(value);if(value.length>300000)throw Object.assign(Error('quota'),{name:'QuotaExceededError'});values.set(key,value);},
+  removeItem:key=>values.delete(key),
+ };
+ const first=await loadApp({sharedStorage:storage,indexedDBProvider:indexedDB,deviceDbName:dbName});
+ assert.equal(first.ctx.deviceStorageActive(),true,'verified IndexedDB becomes the durable head authority');
+ assert.equal(storage.getItem(SYNC_STORE_KEY),raw,'migration never rewrites the old shell board bytes');
+ assert.equal(storage.getItem(LOCAL_BACKUPS_KEY),'opaque legacy archive bytes','unreadable legacy archives remain byte-exact');
+ first.ctx.addTask('Saved beyond localStorage quota');
+ assert.equal(await first.ctx.persist(),true);
+ assert.ok((await first.shim.window.ScannerDeviceStore.readHead()).payload.includes('Saved beyond localStorage quota'));
+ first.ctx.undo();assert.equal(await first.ctx.persist(),true,'Undo itself is a durable scalable save');
+
+ const reopened=await loadApp({sharedStorage:storage,indexedDBProvider:indexedDB,deviceDbName:dbName});
+ assert.equal(reopened.ctx.state.futureBoardData.blob,large.futureBoardData.blob,'unknown large board fields survive cold reload');
+ assert.equal(reopened.ctx.state.tasks.some(task=>task.title==='Saved beyond localStorage quota'),false,'the durable Undo survives offline reload');
+ assert.equal(storage.getItem(SYNC_STORE_KEY),raw,'a v2 save that cannot mirror into localStorage preserves the last legacy copy');
+});
+
+test('RISK SCALABLE LOCAL HISTORY: IndexedDB keeps one daily and one latest automatic recovery reference while edits continue',async()=>{
+ const {indexedDB}=await import('fake-indexeddb'),dbName='chain-scanner-history-'+Date.now()+'-'+Math.random();
+ const board=syncState({tasks:[syncTask('history','Initial title')]});board.futureBoardData={blob:'H'.repeat(1050000)};
+ const raw=JSON.stringify(board),storage=sharedScannerStorage({[LOCAL_HEAD_KEY]:raw,[SYNC_STORE_KEY]:raw});
+ const loaded=await loadApp({sharedStorage:storage,indexedDBProvider:indexedDB,deviceDbName:dbName});
+ for(let edit=1;edit<=4;edit++){loaded.ctx.state.tasks[0].title='Edit '+edit;assert.equal(await loaded.ctx.persist(),true);}
+ const rows=await loaded.shim.window.ScannerDeviceStore.listBackups(),daily=rows.filter(row=>row.kind==='daily'),latest=rows.filter(row=>row.kind==='latest');
+ assert.equal(daily.length,1,'the first verified board of the local day remains a stable automatic restore point');
+ assert.equal(latest.length,1,'later edits replace, rather than accumulate, the latest automatic reference');
+ assert.equal(JSON.parse(latest[0].payload).tasks[0].title,'Edit 4');
+ assert.equal(JSON.parse((await loaded.shim.window.ScannerDeviceStore.readHead()).payload).tasks[0].title,'Edit 4');
+});
+
+test('RISK SCALABLE RECOVERY: cloud replacement awaits an IndexedDB safety copy and old-tab bytes reconcile without becoming blind authority',async()=>{
+ const {indexedDB}=await import('fake-indexeddb');
+ const dbName='chain-scanner-app-recovery-'+Date.now()+'-'+Math.random();
+ const local=syncState({tasks:[syncTask('local','Local task')],syncRev:1,syncAccount:'e@example.com',syncDirty:false});
+ local.futureBoardData={blob:'L'.repeat(1150000)};
+ const localRaw=JSON.stringify(local),values=new Map([[LOCAL_HEAD_KEY,localRaw],[SYNC_STORE_KEY,localRaw]]);
+ const storage={
+  getItem:key=>values.has(key)?values.get(key):null,
+  setItem(key,value){value=String(value);if(value.length>350000)throw Object.assign(Error('quota'),{name:'QuotaExceededError'});values.set(key,value);},
+  removeItem:key=>values.delete(key),
+ };
+ const remote=syncState({tasks:[syncTask('local','Other device title'),syncTask('remote','Remote task')],syncRev:0});
+ remote.futureBoardData=local.futureBoardData;
+ const sync=makeSyncHarness({remote,rev:2});
+ const loaded=await loadApp({sharedStorage:storage,indexedDBProvider:indexedDB,deviceDbName:dbName,cloudSyncFactory:sync.factory});
+ const priorBoard=JSON.stringify(loaded.ctx.state);
+ await loaded.ctx.cloudPull();await syncSettle(PAST_DEBOUNCE+40);
+ const durable=loaded.shim.window.ScannerDeviceStore;
+ const afterAdoption=await durable.readHead(),backups=await durable.listBackups();
+ assert.ok(JSON.parse(afterAdoption.payload).tasks.some(task=>task.id==='remote'),'the adopted board is durable before it is rendered as accepted');
+ assert.ok(backups.some(row=>row.payload===priorBoard&&/^before-cloud-/.test(row.kind)),
+  'the exact displaced board is independently restorable: '+JSON.stringify(backups.map(row=>({kind:row.kind,length:row.payload.length,same:row.payload===priorBoard}))));
+
+ const oldTab=syncState({tasks:[syncTask('old-tab','Old tab edit')],syncRev:1,syncAccount:'e@example.com',syncDirty:true});
+ const oldRaw=JSON.stringify(oldTab);values.set(LOCAL_HEAD_KEY,oldRaw);values.set(SYNC_STORE_KEY,oldRaw);
+ assert.equal(await loaded.ctx.reconcileDeviceLegacyCopy(),true);
+ const reconciled=JSON.parse((await durable.readHead()).payload);
+ assert.ok(reconciled.tasks.some(task=>task.id==='remote'));assert.ok(reconciled.tasks.some(task=>task.id==='old-tab'));
+ assert.ok((await durable.listBackups()).some(row=>row.payload===oldRaw&&row.kind==='other-browser-copy'),'old-shell writes become recovery evidence before merge');
+
+ loaded.ctx.undo();assert.equal(await loaded.ctx.persist(),true);
+ assert.ok(JSON.parse((await durable.readHead()).payload).tasks.some(task=>task.id==='remote'),'Undo after reconciliation remains a guarded durable write');
+});
+
+test('RISK SCALABLE RECOVERY: clean cloud adoption releases its IndexedDB proof only after shared legacy conflicts become durable',async()=>{
+ const {indexedDB}=await import('fake-indexeddb'),dbName='chain-scanner-release-proof-'+Date.now()+'-'+Math.random();
+ const local=syncState({tasks:[syncTask('local','Already in cloud')],syncRev:1,syncAccount:'e@example.com',syncDirty:true});
+ local.futureBoardData={blob:'represented '.repeat(1000)};
+ const raw=JSON.stringify(local),storage=sharedScannerStorage({[LOCAL_HEAD_KEY]:raw,[SYNC_STORE_KEY]:raw});
+ const loaded=await loadApp({sharedStorage:storage,indexedDBProvider:indexedDB,deviceDbName:dbName});
+ const priorBoard=JSON.stringify(loaded.ctx.state),remote=JSON.parse(loaded.ctx.cloudPayload());
+ remote.tasks.push(syncTask('remote','New remote task'));loaded.ctx.hydrateState(remote);const sync=makeSyncHarness({remote,rev:2});
+ loaded.shim.window.CloudSync=sync.factory();
+ assert.equal(loaded.ctx.recoveryBoardRepresented(priorBoard,remote),true,'precondition: the incoming board fully represents the displaced board');
+ const mergedProbe=JSON.parse(JSON.stringify(remote));loaded.ctx.mergeUndeletedTasks(mergedProbe,loaded.ctx.state);
+ assert.equal(loaded.ctx.recoveryBoardRepresented(priorBoard,mergedProbe),true,'precondition: reconciliation keeps every displaced user field represented');
+ const displaced=JSON.parse(priorBoard);displaced.tasks[0].title='Only offline title';
+ const sharedId='shared-recovery-id';
+ storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify([{id:sharedId,day:'2026-09-28',at:1,kind:'daily',payload:JSON.stringify(displaced)}]));
+ vm.runInContext(`deviceBackupId=()=>${JSON.stringify(sharedId)}`,loaded.ctx);
+ await loaded.ctx.cloudPull();await syncSettle(PAST_DEBOUNCE+40);
+ const deviceRows=await loaded.shim.window.ScannerDeviceStore.listBackups();
+ const legacyRows=JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY));
+ assert.ok(!deviceRows.some(row=>row.id===sharedId),'the represented automatic IndexedDB proof retires after the adopted head is durable: '+JSON.stringify({deviceRows:deviceRows.map(row=>({id:row.id,kind:row.kind,same:row.payload===priorBoard})),pins:loaded.ctx.state.protectedBackupIds,syncDirty:loaded.ctx.state.syncDirty,calls:sync.calls,legacyKinds:legacyRows.map(row=>row.kind)}));
+ assert.equal(legacyRows.find(row=>row.id===sharedId)?.kind,'before-cloud-local-edit','a same-ID sole-copy legacy conflict becomes durable before release');
+ assert.ok(!loaded.ctx.state.protectedBackupIds.includes(sharedId),'the shared pin releases only after every store is safe');
+ assert.ok(JSON.parse((await loaded.shim.window.ScannerDeviceStore.readHead()).payload).tasks.some(task=>task.id==='remote'));
+});
+
+test('RISK SCALABLE RECOVERY: an inaccessible established IndexedDB authority never revives or uploads its stale legacy shell',async()=>{
+ const {indexedDB}=await import('fake-indexeddb'),dbName='chain-scanner-authority-loss-'+Date.now()+'-'+Math.random();
+ const legacy=syncState({tasks:[syncTask('legacy','Legacy shell task')],syncRev:3,syncAccount:'e@example.com',syncDirty:false});
+ const legacyRaw=JSON.stringify(legacy),storage=sharedScannerStorage({[LOCAL_HEAD_KEY]:legacyRaw,[SYNC_STORE_KEY]:legacyRaw});
+ const first=await loadApp({sharedStorage:storage,indexedDBProvider:indexedDB,deviceDbName:dbName});
+ first.ctx.addTask('Only in durable v2');assert.equal(await first.ctx.persist(),true);
+ assert.equal(storage.getItem(DEVICE_AUTHORITY_KEY),'1','verified migration leaves a tiny durable authority marker for later boots');
+ await first.shim.window.ScannerDeviceStore.close();
+ const blocked={open(){const request={};setTimeout(()=>{request.error=Object.assign(Error('blocked'),{name:'InvalidStateError'});request.onerror?.();},0);return request;}};
+ const pushes=[];const cloudSyncFactory=()=>({ready:true,configured:true,user:'e@example.com',status:'ok',async pull(){return null;},async push(payload){pushes.push(payload);return {rev:4};},signIn(){},signOut(){}});
+ const reopened=await loadApp({sharedStorage:storage,indexedDBProvider:blocked,deviceDbName:dbName,cloudSyncFactory});
+ assert.equal(vm.runInContext('storageOK',reopened.ctx),false,'the app reports the authoritative store unavailable instead of accepting old localStorage');
+ assert.equal(reopened.ctx.state.tasks.some(task=>task.title==='Legacy shell task'),false,'stale legacy bytes are not treated as the current board');
+ reopened.ctx.addTask('Must remain in memory');assert.equal(await reopened.ctx.persist(),false);
+ reopened.ctx.cloudPushNow();await syncSettle(PAST_DEBOUNCE+40);
+ assert.equal(pushes.length,0,'an unavailable durable authority cannot upload a default or stale board');
+ assert.equal(storage.getItem(SYNC_STORE_KEY),legacyRaw,'the last legacy recovery bytes stay untouched');
+});
+
+test('RISK SCALABLE RECOVERY: pending cloud uploads are account-bound and a failed mandatory recovery transaction leaves the head unchanged',async()=>{
+ const {indexedDB}=await import('fake-indexeddb'),storageV2=loadStorageV2({indexedDB});
+ const store=storageV2.createDeviceStore({indexedDB,crypto:webcrypto,dbName:'chain-scanner-pending-'+Date.now()+'-'+Math.random()});
+ await store.open();
+ const initial='{"tasks":[{"id":"safe"}]}';
+ assert.equal((await store.migrateLegacy({headPayload:initial,backups:[],opaqueArchives:[]})).verified,true);
+ const head=await store.readHead();
+ await store.setPendingUpload('alice',{generationId:'alice-generation',payloadHash:'a'.repeat(64),baseRev:3,updatedAt:1});
+ await store.setPendingUpload('bob',{generationId:'bob-generation',payloadHash:'b'.repeat(64),baseRev:7,updatedAt:2});
+ assert.equal((await store.getPendingUpload('alice')).generationId,'alice-generation');
+ assert.equal((await store.getPendingUpload('bob')).generationId,'bob-generation');
+ assert.equal(await store.clearPendingUpload('alice','wrong-generation'),false,'a stale result cannot clear a newer pending upload');
+ assert.equal((await store.getPendingUpload('alice')).generationId,'alice-generation');
+ assert.equal(await store.clearPendingUpload('alice','alice-generation'),true);
+ assert.equal(await store.getPendingUpload('alice'),null);assert.equal((await store.getPendingUpload('bob')).generationId,'bob-generation');
+
+ const originalCommit=store.commitHead;
+ const collision=await originalCommit({expectedHash:head.hash,payload:'{"tasks":[]}',account:'alice',backup:{id:'same',kind:'before-restore',day:'2026-09-29',at:1,payload:initial}});
+ assert.equal(collision.ok,true);
+ const beforeFailure=await store.readHead();
+ const rejected=await originalCommit({expectedHash:beforeFailure.hash,payload:'{"tasks":[{"id":"lost"}]}',account:'alice',backup:{id:'same',kind:'before-restore',day:'2026-09-29',at:2,payload:'{"tasks":[{"id":"different"}]}'}});
+ assert.equal(rejected.error,true);assert.equal((await store.readHead()).payload,beforeFailure.payload,'backup proof and replacement head fail atomically');
+ await store.close();
+});
+
+test('RISK SCALABLE DESTRUCTIVE ACTIONS: Restore and Reset await exact IndexedDB recovery proof before replacing a large board',async()=>{
+ const {indexedDB}=await import('fake-indexeddb'),dbName='chain-scanner-destructive-'+Date.now()+'-'+Math.random();
+ const original=syncState({tasks:[syncTask('original','Original large board')],syncDirty:true});original.futureBoardData={blob:'R'.repeat(1100000)};
+ const raw=JSON.stringify(original),values=new Map([[LOCAL_HEAD_KEY,raw],[SYNC_STORE_KEY,raw]]),storage={
+  getItem:key=>values.has(key)?values.get(key):null,
+  setItem(key,value){value=String(value);if(value.length>250000)throw Object.assign(Error('quota'),{name:'QuotaExceededError'});values.set(key,value);},
+  removeItem:key=>values.delete(key),
+ };
+ const loaded=await loadApp({sharedStorage:storage,indexedDBProvider:indexedDB,deviceDbName:dbName});
+ const manual=await loaded.ctx.saveDurableBackup('manual',JSON.stringify(loaded.ctx.state));assert.ok(manual?.id);
+ loaded.ctx.addTask('Later edit');assert.equal(await loaded.ctx.persist(),true);
+ assert.equal(await loaded.ctx.restoreDurableBackupById(manual.id),true);
+ assert.equal(loaded.ctx.state.tasks.some(task=>task.title==='Later edit'),true,'Restore keeps later tasks without deletion evidence');
+ assert.ok((await loaded.shim.window.ScannerDeviceStore.listBackups()).some(row=>row.kind==='before-restore'&&row.payload.includes('Later edit')),
+  'the exact board displaced by Restore is durable in the same scalable store');
+
+ const beforeReset=JSON.stringify(loaded.ctx.state);
+ await loaded.ctx.confirmResetEverything();
+ assert.equal(loaded.ctx.state.tasks.length,0);assert.equal(JSON.parse((await loaded.shim.window.ScannerDeviceStore.readHead()).payload).tasks.length,0);
+ assert.ok((await loaded.shim.window.ScannerDeviceStore.listBackups()).some(row=>row.kind==='before-reset'&&row.payload===beforeReset));
+
+ const restored=JSON.parse(beforeReset);loaded.ctx.state.tasks=restored.tasks;await loaded.ctx.persist();
+ const stable=JSON.stringify(loaded.ctx.state),putBackup=loaded.shim.window.ScannerDeviceStore.putBackup;
+ loaded.shim.window.ScannerDeviceStore.putBackup=async()=>({error:true,code:'forced-backup-failure'});
+ await loaded.ctx.confirmResetEverything();
+ assert.equal(JSON.stringify(loaded.ctx.state),stable,'a failed mandatory recovery transaction aborts Reset without mutating the live board');
+ assert.equal((await loaded.shim.window.ScannerDeviceStore.readHead()).payload,stable);
+ loaded.shim.window.ScannerDeviceStore.putBackup=putBackup;
+});
+
+test('RISK SCALABLE SETTINGS: one confirmed delete removes only the selected IndexedDB recovery reference',async()=>{
+ const {indexedDB}=await import('fake-indexeddb'),dbName='chain-scanner-settings-delete-'+Date.now()+'-'+Math.random();
+ const board=syncState({tasks:[syncTask('saved','Saved board')]});
+ const raw=JSON.stringify(board),storage=sharedScannerStorage({[LOCAL_HEAD_KEY]:raw,[SYNC_STORE_KEY]:raw});
+ const loaded=await loadApp({sharedStorage:storage,indexedDBProvider:indexedDB,deviceDbName:dbName});
+ const first=await loaded.ctx.saveDurableBackup('manual',JSON.stringify(loaded.ctx.state));
+ loaded.ctx.state.tasks[0].title='Second exact board';const second=await loaded.ctx.saveDurableBackup('manual',JSON.stringify(loaded.ctx.state));
+ loaded.ctx.openSettings();loaded.ctx.onAction('delete-local-backup',{dataset:{id:first.id}});
+ for(let attempt=0;attempt<10;attempt++)await flush();
+ const rows=await loaded.shim.window.ScannerDeviceStore.listBackups();
+ assert.ok(!rows.some(row=>row.id===first.id),'the selected durable recovery reference is gone');
+ assert.ok(rows.some(row=>row.id===second.id),'neighboring recovery bytes remain available');
+ assert.equal(JSON.parse((await loaded.shim.window.ScannerDeviceStore.readHead()).payload).tasks[0].title,'Saved board','backup deletion never changes the live board');
+});
+
+test('RISK SCALABLE OFFLINE SHELL: storage and cloud generation modules load before the scanner and are cached together',()=>{
+ const storageScript=html.indexOf('<script src="device-store-v2.js"></script>');
+ const cloudScript=html.indexOf('<script src="cloud-store-v2.js"></script>');
+ const appScript=html.indexOf('/* ================================================================\n   ENGINE');
+ assert.ok(storageScript>0&&cloudScript>storageScript&&appScript>cloudScript,'durable storage and cloud codecs load before scanner boot');
+ const sw=fs.readFileSync(path.join(__dirname,'sw.js'),'utf8');
+ assert.match(sw,/"\.\/device-store-v2\.js"/);assert.match(sw,/"\.\/cloud-store-v2\.js"/);
+});
+
+test('RISK SCALABLE CONCURRENCY: a newer edit made during a device commit is the only board marked durable',async()=>{
+ const {indexedDB}=await import('fake-indexeddb'),dbName='chain-scanner-device-race-'+Date.now()+'-'+Math.random();
+ const initial=syncState({tasks:[syncTask('base','Base')]});
+ const raw=JSON.stringify(initial),storage=sharedScannerStorage({[LOCAL_HEAD_KEY]:raw,[SYNC_STORE_KEY]:raw});
+ const {ctx,shim}=await loadApp({sharedStorage:storage,indexedDBProvider:indexedDB,deviceDbName:dbName});
+ const store=shim.window.ScannerDeviceStore,original=store.commitHead.bind(store);
+ let entered,release;const started=new Promise(resolve=>entered=resolve),gate=new Promise(resolve=>release=resolve);
+ store.commitHead=async options=>{entered();await gate;return original(options);};
+ ctx.addTask('First edit');const saving=ctx.persist();await started;
+ ctx.addTask('Second edit');release();
+ assert.equal(await saving,true,'the guarded save follows the newer in-memory edit instead of reporting an older commit as current');
+ const head=await store.readHead(),claimed=vm.runInContext('lastPersistedRaw',ctx);
+ assert.equal(JSON.parse(head.payload).tasks.some(row=>row.title==='Second edit'),true);
+ assert.equal(JSON.parse(claimed).tasks.some(row=>row.title==='Second edit'),true);
+ assert.equal(claimed,JSON.stringify(ctx.state),'the durability marker is byte-exactly the verified head and live board');
+ await store.close();
+});
+
+test('RISK SCALABLE CONCURRENCY: CAS repair retains peer work and a third in-tab edit before replacing state',async()=>{
+ const {indexedDB}=await import('fake-indexeddb'),dbName='chain-scanner-cas-race-'+Date.now()+'-'+Math.random();
+ const initial=syncState({tasks:[syncTask('base','Base')]});
+ const raw=JSON.stringify(initial),storage=sharedScannerStorage({[LOCAL_HEAD_KEY]:raw,[SYNC_STORE_KEY]:raw});
+ const {ctx,shim}=await loadApp({sharedStorage:storage,indexedDBProvider:indexedDB,deviceDbName:dbName});
+ const store=shim.window.ScannerDeviceStore,original=store.commitHead.bind(store);
+ let calls=0,entered,release;const started=new Promise(resolve=>entered=resolve),gate=new Promise(resolve=>release=resolve);
+ store.commitHead=async options=>{
+  calls++;
+  if(calls===1){
+   const peer=JSON.parse((await store.readHead()).payload);peer.tasks.push(syncTask('peer','Peer edit'));
+   assert.equal((await original({expectedHash:options.expectedHash,payload:JSON.stringify(peer)})).ok,true);
+   return {conflict:true};
+  }
+  if(calls===2){entered();await gate;}
+  return original(options);
+ };
+ ctx.addTask('First edit');const saving=ctx.persist();await started;
+ ctx.addTask('Second edit');release();
+ assert.equal(await saving,true);
+ const head=await store.readHead();
+ for(const title of ['Peer edit','First edit','Second edit']){
+  assert.equal(ctx.state.tasks.some(row=>row.title===title),true,'live board keeps '+title);
+  assert.equal(JSON.parse(head.payload).tasks.some(row=>row.title===title),true,'durable board keeps '+title);
+ }
+ assert.ok((await store.listBackups()).some(row=>row.kind==='stale-tab-draft'&&row.payload.includes('First edit')),
+  'the CAS repair keeps its exact local draft before merging the peer head');
+ await store.close();
+});
+
+test('RISK SCALABLE STARTUP: blocked and nonsettling IndexedDB opens fail closed within a bounded boot',async()=>{
+ const stale=syncState({tasks:[syncTask('stale','Stale legacy shell')],syncAccount:'e@example.com'}),raw=JSON.stringify(stale);
+ for(const [label,indexedDB] of [
+  ['nonsettling',{open(){return {};}}],
+  ['blocked',{open(){const request={};queueMicrotask(()=>request.onblocked?.());return request;}}],
+ ]){
+  const storage=sharedScannerStorage({[LOCAL_HEAD_KEY]:raw,[SYNC_STORE_KEY]:raw,[DEVICE_AUTHORITY_KEY]:'1'});
+  const started=Date.now(),loaded=await loadApp({sharedStorage:storage,indexedDBProvider:indexedDB,
+   deviceDbName:'chain-scanner-'+label+'-'+Date.now(),deviceOpenTimeoutMs:20});
+  assert.ok(Date.now()-started<500,'bootstrap is bounded for '+label);
+  assert.ok(loaded.ctx.state,'the app reaches a usable in-memory board for '+label);
+  assert.equal(vm.runInContext('storageOK',loaded.ctx),false,'established unavailable authority fails closed for '+label);
+  assert.equal(loaded.ctx.state.tasks.some(task=>task.id==='stale'),false,'stale localStorage never revives for '+label);
+ }
+});
+
+test('RISK SCALABLE LEGACY TAB: each divergent v1 primary key is preserved and reconciled after migration',async()=>{
+ const {indexedDB}=await import('fake-indexeddb'),dbName='chain-scanner-both-v1-keys-'+Date.now()+'-'+Math.random();
+ const initial=syncState({tasks:[syncTask('base','Base')],syncAccount:'e@example.com',syncRev:1});
+ const raw=JSON.stringify(initial),storage=sharedScannerStorage({[LOCAL_HEAD_KEY]:raw,[SYNC_STORE_KEY]:raw});
+ const {ctx,shim}=await loadApp({sharedStorage:storage,indexedDBProvider:indexedDB,deviceDbName:dbName});
+ const fromOld=JSON.parse(raw);fromOld.tasks.push(syncTask('old-tab-only','Old v1 tab edit'));
+ const oldRaw=JSON.stringify(fromOld);storage.setItem(SYNC_STORE_KEY,oldRaw);
+ assert.equal(await ctx.reconcileDeviceLegacyCopy(),true);
+ const head=await shim.window.ScannerDeviceStore.readHead(),backups=await shim.window.ScannerDeviceStore.listBackups();
+ assert.equal(JSON.parse(head.payload).tasks.some(row=>row.id==='old-tab-only'),true,'the STORE_KEY-only edit joins the durable head');
+ assert.ok(backups.some(row=>row.kind==='other-browser-copy'&&row.payload===oldRaw),'the exact old-shell bytes are independently recoverable');
+ assert.equal(storage.getItem(LOCAL_HEAD_KEY),raw,'the protected legacy copy remains available until old shells retire');
+ await shim.window.ScannerDeviceStore.close();
+});
+
+test('RISK SCALABLE LEGACY TAB: cold migration preserves both already-divergent valid v1 keys',async()=>{
+ const {indexedDB}=await import('fake-indexeddb'),dbName='chain-scanner-cold-divergent-v1-'+Date.now()+'-'+Math.random();
+ const initial=syncState({tasks:[syncTask('base','Base')],syncAccount:'e@example.com',syncRev:1});
+ const fromOld=JSON.parse(JSON.stringify(initial));fromOld.tasks.push(syncTask('old-tab-only','Old v1 tab edit'));
+ const protectedRaw=JSON.stringify(initial),sharedRaw=JSON.stringify(fromOld);
+ const storage=sharedScannerStorage({[LOCAL_HEAD_KEY]:protectedRaw,[SYNC_STORE_KEY]:sharedRaw});
+ const {ctx,shim}=await loadApp({sharedStorage:storage,indexedDBProvider:indexedDB,deviceDbName:dbName});
+ const store=shim.window.ScannerDeviceStore,head=await store.readHead(),backups=await store.listBackups();
+ assert.equal(ctx.deviceStorageActive(),true);
+ assert.equal(JSON.parse(head.payload).tasks.some(row=>row.id==='old-tab-only'),true,'compatible evidence from both keys joins the first authoritative head');
+ assert.ok(backups.some(row=>row.kind==='other-browser-copy'&&row.payload===sharedRaw),'the exact displaced shared-key bytes are independently recoverable');
+ assert.equal(storage.getItem(LOCAL_HEAD_KEY),protectedRaw);assert.equal(storage.getItem(SYNC_STORE_KEY),sharedRaw,'migration leaves both old-shell keys untouched');
+ assert.equal(await ctx.reconcileDeviceLegacyCopy(),true,'the already-proved pair is stable on the next reconciliation');
+ await store.close();
+});
+
+test('RISK SCALABLE LEGACY TAB: first activation preserves a new single legacy copy before marking it seen',async()=>{
+ const {indexedDB}=await import('fake-indexeddb'),dbName='chain-scanner-first-activation-v1-'+Date.now()+'-'+Math.random();
+ const storage=sharedScannerStorage(),loaded=await loadApp({sharedStorage:storage,indexedDBProvider:indexedDB,deviceDbName:dbName});
+ assert.equal(loaded.ctx.deviceStorageActive(),false,'an empty new browser has no durable authority before its first save');
+ const fromOld=syncState({tasks:[syncTask('old-tab-only','Old v1 tab edit')]});
+ const oldRaw=JSON.stringify(fromOld);storage.setItem(LOCAL_HEAD_KEY,oldRaw);storage.setItem(SYNC_STORE_KEY,oldRaw);
+ loaded.ctx.addTask('Live first edit');assert.equal(await loaded.ctx.persist(),true);
+ const store=loaded.shim.window.ScannerDeviceStore,head=await store.readHead(),backups=await store.listBackups();
+ for(const title of ['Old v1 tab edit','Live first edit'])assert.equal(JSON.parse(head.payload).tasks.some(row=>row.title===title),true,'first head keeps '+title);
+ assert.ok(backups.some(row=>row.kind==='other-browser-copy'&&row.payload===oldRaw),'the exact intervening old-shell copy is independently recoverable');
+ assert.equal(await loaded.ctx.reconcileDeviceLegacyCopy(),true,'the copy becomes seen only after its recovery and union are durable');
+ await store.close();
+});
+
+test('RISK SCALABLE QUOTA: optional IndexedDB history cannot block a primary board that fits',async()=>{
+ const {indexedDB}=await import('fake-indexeddb'),dbName='chain-scanner-idb-quota-'+Date.now()+'-'+Math.random();
+ const initial=syncState({tasks:[syncTask('base','Base')]});
+ const raw=JSON.stringify(initial),storage=sharedScannerStorage({[LOCAL_HEAD_KEY]:raw,[SYNC_STORE_KEY]:raw});
+ const {ctx,shim}=await loadApp({sharedStorage:storage,indexedDBProvider:indexedDB,deviceDbName:dbName});
+ ctx.addTask('First durable edit');assert.equal(await ctx.persist(),true);
+ const manual=await ctx.saveDurableBackup('manual',JSON.stringify(ctx.state));assert.ok(manual?.id);
+ const before=await shim.window.ScannerDeviceStore.listBackups(),automatic=before.filter(row=>['daily','latest'].includes(row.kind));
+ assert.ok(automatic.length>=1,'precondition: optional automatic history consumes device capacity');
+ const store=shim.window.ScannerDeviceStore,original=store.commitHead.bind(store);let quotaFailures=0,retryOptions=null;
+ store.commitHead=async options=>{
+  if(options.backups?.length){quotaFailures++;throw Object.assign(Error('synthetic IndexedDB quota'),{name:'QuotaExceededError'});}
+  retryOptions=options;return original(options);
+ };
+ ctx.addTask('Primary still fits');assert.equal(await ctx.persist(),true,'optional history quota falls back to the guarded primary write');
+ const head=await store.readHead(),rows=await store.listBackups();
+ assert.equal(JSON.parse(head.payload).tasks.some(row=>row.title==='Primary still fits'),true);
+ assert.equal(quotaFailures,1);assert.ok(automatic.every(row=>retryOptions.removeBackupIds.includes(row.id)),'retry retires only eligible automatic references');
+ assert.ok(rows.some(row=>row.id===manual.id&&row.kind==='manual'),'manual recovery remains byte-exact');
+ assert.ok(rows.every(row=>!automatic.some(old=>old.id===row.id)),'retired automatic history no longer consumes snapshot references');
+ await store.close();
 });

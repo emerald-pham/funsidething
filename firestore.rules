@@ -5,19 +5,117 @@ service cloud.firestore {
       function owner() {
         return request.auth != null && request.auth.uid == uid;
       }
+      function userPath() {
+        return /databases/$(database)/documents/users/$(uid);
+      }
+      function generationPath(generationId) {
+        return /databases/$(database)/documents/users/$(uid)/generations/$(generationId);
+      }
       function datedRevision() {
         return request.resource.data.keys().hasAll(['payload', 'updatedAt', 'rev', 'serverUpdatedAt'])
+          && !request.resource.data.keys().hasAny(['schemaVersion'])
           && request.resource.data.payload is string
           && request.resource.data.rev is int
           && request.resource.data.serverUpdatedAt == request.time;
       }
+      function v2Manifest() {
+        return request.resource.data.keys().hasAll(['schemaVersion', 'rev', 'activeGeneration',
+            'previousGeneration', 'updatedAt', 'serverUpdatedAt'])
+          && request.resource.data.keys().hasOnly(['schemaVersion', 'rev', 'activeGeneration',
+            'previousGeneration', 'updatedAt', 'serverUpdatedAt'])
+          && request.resource.data.schemaVersion == 2
+          && request.resource.data.rev is int
+          && request.resource.data.rev > 0
+          && request.resource.data.activeGeneration is string
+          && (request.resource.data.previousGeneration == null || request.resource.data.previousGeneration is string)
+          && request.resource.data.updatedAt is int
+          && request.resource.data.serverUpdatedAt == request.time;
+      }
+      function targetIsSealed() {
+        return exists(generationPath(request.resource.data.activeGeneration))
+          && get(generationPath(request.resource.data.activeGeneration)).data.state == 'sealed';
+      }
+      function v2Create() {
+        return v2Manifest() && request.resource.data.rev == 1
+          && request.resource.data.previousGeneration == null && targetIsSealed();
+      }
+      function v2Update() {
+        return v2Manifest() && request.resource.data.rev == resource.data.get('rev', 0) + 1
+          && targetIsSealed()
+          && (resource.data.get('schemaVersion', 1) == 2
+            ? request.resource.data.previousGeneration == resource.data.activeGeneration
+            : request.resource.data.previousGeneration == null);
+      }
+      function rootDoesNotReference(generationId) {
+        return !exists(userPath())
+          || (get(userPath()).data.get('activeGeneration', '') != generationId
+            && get(userPath()).data.get('previousGeneration', '') != generationId);
+      }
+
       allow read: if owner();
-      // A still-open old shell may read its copy, but cannot replace the
-      // current document with a blind write or a device-clock timestamp.
-      allow create: if owner() && datedRevision() && request.resource.data.rev == 1;
-      allow update: if owner() && datedRevision()
-        && request.resource.data.rev == resource.data.get('rev', 0) + 1;
+      // V1 remains readable during migration. Once a v2 manifest is active,
+      // an older shell cannot replace it with a one-document board.
+      allow create: if owner() && ((datedRevision() && request.resource.data.rev == 1) || v2Create());
+      allow update: if owner() && ((resource.data.get('schemaVersion', 1) != 2
+          && datedRevision() && request.resource.data.rev == resource.data.get('rev', 0) + 1) || v2Update());
       allow delete: if false;
+
+      match /generations/{generationId} {
+        function validStagingHeader() {
+          return request.resource.data.keys().hasAll(['schemaVersion', 'state', 'encoding', 'chunkCount',
+              'byteLength', 'hash', 'baseRev', 'createdAt'])
+            && request.resource.data.keys().hasOnly(['schemaVersion', 'state', 'encoding', 'chunkCount',
+              'byteLength', 'hash', 'baseRev', 'createdAt'])
+            && request.resource.data.schemaVersion == 2
+            && request.resource.data.state == 'staging'
+            && request.resource.data.encoding == 'utf8'
+            && request.resource.data.chunkCount is int && request.resource.data.chunkCount > 0
+            && request.resource.data.byteLength is int && request.resource.data.byteLength >= 0
+            && request.resource.data.hash is string && request.resource.data.hash.size() == 64
+            && request.resource.data.baseRev is int && request.resource.data.baseRev >= 0
+            && request.resource.data.createdAt == request.time;
+        }
+        function sealTransition() {
+          return resource.data.state == 'staging' && request.resource.data.state == 'sealed'
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['state', 'sealedAt'])
+            && request.resource.data.sealedAt == request.time;
+        }
+        function publishTransition() {
+          return resource.data.state == 'sealed' && request.resource.data.state == 'published'
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['state', 'publishedAt'])
+            && request.resource.data.publishedAt == request.time;
+        }
+        function deletingTransition() {
+          return (resource.data.state == 'staging' || resource.data.state == 'sealed' || resource.data.state == 'published')
+            && request.resource.data.state == 'deleting'
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['state', 'deletingAt'])
+            && request.resource.data.deletingAt == request.time
+            && rootDoesNotReference(generationId);
+        }
+        allow read: if owner();
+        allow create: if owner() && validStagingHeader();
+        allow update: if owner() && (sealTransition() || publishTransition() || deletingTransition());
+        allow delete: if owner() && resource.data.state == 'deleting' && rootDoesNotReference(generationId);
+
+        match /chunks/{chunkId} {
+          function validChunk() {
+            return request.resource.data.keys().hasAll(['index', 'text', 'byteLength', 'hash'])
+              && request.resource.data.keys().hasOnly(['index', 'text', 'byteLength', 'hash'])
+              && request.resource.data.index is int && request.resource.data.index >= 0
+              && request.resource.data.text is string && request.resource.data.text.size() <= 262144
+              && request.resource.data.byteLength is int && request.resource.data.byteLength >= 0
+              && request.resource.data.byteLength <= 262144
+              && request.resource.data.hash is string && request.resource.data.hash.size() == 64;
+          }
+          allow read: if owner();
+          allow create: if owner() && exists(generationPath(generationId))
+            && get(generationPath(generationId)).data.state == 'staging' && validChunk();
+          allow update: if false;
+          allow delete: if owner() && exists(generationPath(generationId))
+            && get(generationPath(generationId)).data.state == 'deleting'
+            && rootDoesNotReference(generationId);
+        }
+      }
     }
   }
 }
