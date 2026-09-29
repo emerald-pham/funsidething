@@ -8170,7 +8170,8 @@ test('RISK LOCAL DIAGNOSTICS: cloud badge cannot say synced while the latest edi
  storage.setItem=write;
  assert.equal(await ctx.persist(),true);
  ctx.renderSync();
- assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ synced','a successful durable retry clears the local warning');
+  assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ syncing',
+   'a successful durable retry clears the local warning without calling an unreconciled board synced');
 });
 
 test('RISK CLOUD BACKUP: quota retirement keeps the exact prior board needed for adoption',async()=>{
@@ -10414,7 +10415,7 @@ test("CSS: '.listwrap' carries the same margin-top as its '.addwrap'/'.histwrap'
    ===================================================================== */
 
 /* ---- H1: a confirmed reset is resurrected by the cloud ---- */
-test("AUDIT H1: 'Reset everything' must survive the push that follows it", async () => {
+test("AUDIT H1: a twice-confirmed 'Reset everything' must survive the push that follows it", async () => {
   const now = Date.now();
   const h = makeSyncHarness({ remote: cloudState(now), rev: 9 });
   const local = cloudState(now); local.syncRev = 9;          // this device is up to date
@@ -10426,7 +10427,10 @@ test("AUDIT H1: 'Reset everything' must survive the push that follows it", async
   await ctx.cloudPull();
   await syncSettle(PAST_DEBOUNCE);
 
-  ctx.onAction("wipe", {});                 // confirm() is stubbed true in the harness
+  ctx.onAction("wipe", {});
+  assert.notEqual(ctx.state.tasks.length, 0, "the first tap only opens the explicit confirmation");
+  ctx.onAction("confirm-wipe", {});
+  await flush();
   assert.equal(ctx.state.tasks.length, 0, "the wipe empties the list on the spot");
 
   await syncSettle(PAST_DEBOUNCE);
@@ -15594,4 +15598,182 @@ test('RISK test inventory: every named risk contract maps to a feature boundary'
  const riskNames=[...source.matchAll(/^\s*test\(\s*(['"])(RISK\b[^'"]*)\1/gm)].map(match=>match[2]);
  for(const name of riskNames)assert.ok(inventory.includes(name),`risk contract is missing from the feature inventory: ${name}`);
  assert.match(inventory,/future|new feature/i,'the inventory must explain how future work adds risk contracts');
+});
+
+function recoveringCloudStatusHarness(shim,ctx,{failedRetry=false}={}){
+ let pulls=0,pushes=0;
+ let remotePayload=ctx.cloudPayload(),remoteRev=ctx.state.syncRev||0;
+ const ping=()=>shim.window.dispatchEvent({type:'cloudsync'});
+ const fail=(stage,code)=>{CS.status='error';CS.errorStage=stage;CS.errorCode=code;ping();};
+ const succeed=()=>{CS.status='ok';CS.errorStage=null;CS.errorCode=null;ping();};
+ const CS={configured:true,ready:true,user:'owner@example.test',status:'ok',errorStage:null,errorCode:null,
+  signIn(){},signOut(){},
+  reportError(stage,code){fail(stage,code)},
+  async pull(){
+   pulls++;CS.status='syncing';ping();await flush();
+   if(failedRetry){fail('pull','unavailable');return {error:true};}
+   succeed();return {payload:remotePayload,rev:remoteRev};
+  },
+  async push(payload,_updatedAt,baseRev){
+   pushes++;CS.status='syncing';ping();await flush();
+   if(failedRetry){fail('push','permission-denied');return {error:true};}
+   if(baseRev!==remoteRev){succeed();return {conflict:true,rev:remoteRev};}
+   remotePayload=payload;remoteRev++;succeed();return {ok:true,rev:remoteRev};
+  },
+ };
+ shim.window.CloudSync=CS;
+ return {CS,fail,pulls:()=>pulls,pushes:()=>pushes,remote:()=>JSON.parse(remotePayload)};
+}
+
+test('RISK CLOUD RECOVERY: a durable ordinary save retries and clears its stale cloud error without reload',async()=>{
+ const storage=sharedScannerStorage(),{ctx,shim}=await loadApp({sharedStorage:storage});
+ const cloud=recoveringCloudStatusHarness(shim,ctx);
+ await ctx.cloudPull();
+ cloud.fail('reconcile','invalid-payload');
+ const set=storage.setItem;
+ storage.setItem=(key,value)=>{
+  if(key===LOCAL_HEAD_KEY||key===SYNC_STORE_KEY){const error=Error('site quota');error.name='QuotaExceededError';throw error;}
+  set(key,value);
+ };
+ ctx.state.tasks.push(syncTask('recovered-edit','Edit that outlived device quota'));ctx.state.syncDirty=true;
+ assert.equal(await ctx.persist(),false,'the production pair write records the local failure first');
+ storage.setItem=set;
+ assert.equal(await ctx.persist(),true,'automatic archive recovery makes the same board durable');
+ await syncSettle(30);
+ assert.equal(cloud.pulls(),2,'the successful local recovery retries the failed reconciliation automatically');
+ assert.equal(cloud.CS.errorStage,null);assert.equal(cloud.CS.errorCode,null);
+ assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ syncing',
+  'a successful read clears the stale error but cannot call an unacknowledged edit synced');
+ assert.match(shim.document.getElementById('syncBtn').title,/pending|acknowledged|syncing/i,
+  'the accessible status must not claim a pending board is already synced');
+ ctx.cloudPushNow();await syncSettle(30);
+ assert.equal(cloud.pushes(),1);assert.equal(cloud.remote().tasks.some(task=>task.id==='recovered-edit'),true);
+ assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ synced','the write acknowledgement completes recovery');
+});
+
+test('RISK CLOUD RECOVERY: Undo retries a failed write, while a failed retry and an account change stay errors',async()=>{
+ const storage=sharedScannerStorage(),{ctx,shim}=await loadApp({sharedStorage:storage});
+ const cloud=recoveringCloudStatusHarness(shim,ctx);
+ await ctx.cloudPull();
+ const task=ctx.addTask('Before Undo');await ctx.persist();ctx.cloudPushNow();await syncSettle(30);
+ ctx.openEdit(task.id);fillEditPane(ctx,shim,{title:'After edit'});ctx.onAction('save-edit',{dataset:{id:task.id}});
+ await ctx.persist();ctx.cloudPushNow();await syncSettle(30);
+ cloud.fail('push','unavailable');
+ const set=storage.setItem;let blocked=true;
+ storage.setItem=(key,value)=>{
+  if(blocked&&(key===LOCAL_HEAD_KEY||key===SYNC_STORE_KEY)){const error=Error('site quota');error.name='QuotaExceededError';throw error;}
+  set(key,value);
+ };
+ ctx.undo();assert.equal(await ctx.persist(),false);
+ blocked=false;assert.equal(await ctx.persist(),true);await syncSettle(40);
+ assert.equal(cloud.remote().tasks.find(row=>row.id===task.id).title,'Before Undo');
+ assert.equal(cloud.CS.status,'ok');assert.equal(cloud.CS.errorStage,null);
+
+ const failed=await loadApp({sharedStorage:sharedScannerStorage()});
+ const stillBad=recoveringCloudStatusHarness(failed.shim,failed.ctx,{failedRetry:true});
+ stillBad.fail('pull','unavailable');
+ vm.runInContext("lastDeviceSaveIssue={stage:'primary-write',code:'quota-exhausted'}",failed.ctx);
+ assert.equal(await failed.ctx.persist(),true);await syncSettle(30);
+ assert.equal(stillBad.pulls(),1);assert.equal(stillBad.CS.status,'error');assert.equal(stillBad.CS.errorCode,'unavailable',
+  'a failed automatic retry remains visibly failed');
+
+ const switched=await loadApp({sharedStorage:sharedScannerStorage()});
+ const stale=recoveringCloudStatusHarness(switched.shim,switched.ctx);
+ stale.fail('reconcile','invalid-payload');
+ vm.runInContext("lastDeviceSaveIssue={stage:'primary-write',code:'quota-exhausted'}",switched.ctx);
+ const saved=switched.ctx.persist();stale.CS.user='other@example.test';await saved;await syncSettle(30);
+ assert.equal(stale.pulls(),0,'a queued recovery from the old account cannot run under the new identity');
+ assert.equal(stale.CS.status,'error','changing accounts does not let a stale callback clear the current error');
+});
+
+test('RISK RESET SAFETY: Reset everything needs a second tap and Cancel leaves every byte unchanged',async()=>{
+ const storage=sharedScannerStorage(),{ctx,shim}=await loadApp({sharedStorage:storage});
+ ctx.addTask('Keep until the second tap');assert.equal(await ctx.persist(),true);
+ const board=JSON.stringify(ctx.state),head=storage.getItem(LOCAL_HEAD_KEY),stored=storage.getItem(SYNC_STORE_KEY),backups=storage.getItem(LOCAL_BACKUPS_KEY);
+ ctx.openSettings();ctx.onAction('wipe',{});
+ assert.equal(JSON.stringify(ctx.state),board,'the first tap only asks for confirmation');
+ assert.equal(storage.getItem(LOCAL_HEAD_KEY),head);assert.equal(storage.getItem(SYNC_STORE_KEY),stored);assert.equal(storage.getItem(LOCAL_BACKUPS_KEY),backups);
+ assert.match(shim.document.getElementById('modalRoot').innerHTML,/Confirm reset/i);
+ assert.match(shim.document.getElementById('modalRoot').innerHTML,/data-act="confirm-wipe"/);
+ ctx.onAction('close-modal',{});
+ assert.equal(JSON.stringify(ctx.state),board,'Cancel/close leaves the open board unchanged');
+ assert.equal(storage.getItem(LOCAL_BACKUPS_KEY),backups,'Cancel does not create a misleading reset backup');
+});
+
+test('RISK RESET SAFETY: the confirmed reset keeps an exact durable pre-reset copy that survives reload and restores',async()=>{
+ const storage=sharedScannerStorage(),{ctx}=await loadApp({sharedStorage:storage});
+ const task=ctx.addTask('Recover me after Reset');ctx.state.syncAccount='owner@example.test';ctx.state.protectedBackupIds=['older-pin'];
+ assert.equal(await ctx.persist(),true);const prior=JSON.stringify(ctx.state);
+ ctx.openSettings();ctx.onAction('wipe',{});ctx.onAction('confirm-wipe',{});await syncSettle(30);
+ assert.equal(ctx.state.tasks.length,0);assert.equal(ctx.state.syncAccount,'owner@example.test');
+ assert.ok(ctx.state.protectedBackupIds.includes('older-pin'),'reset preserves device recovery pins');
+ const safety=ctx.readLocalBackups().find(row=>row.kind==='before-reset'&&row.payload===prior);
+ assert.ok(safety,'the exact current board is retained as nonautomatic reset recovery');
+ const reopened=await loadApp({sharedStorage:storage});assert.equal(reopened.ctx.state.tasks.length,0,'the reset itself is durable');
+ reopened.ctx.openSettings();reopened.ctx.onAction('restore-local-backup',{dataset:{id:safety.id}});await syncSettle(30);
+ assert.equal(reopened.ctx.state.tasks.some(row=>row.id===task.id),true,'the pre-reset copy remains restorable');
+ const restored=await loadApp({sharedStorage:storage});assert.equal(restored.ctx.state.tasks.some(row=>row.id===task.id),true,'restored reset recovery survives reload');
+});
+
+test('RISK RESET SAFETY: backup failure aborts reset before state or primary storage changes',async()=>{
+ const storage=sharedScannerStorage(),{ctx,shim}=await loadApp({sharedStorage:storage});
+ ctx.addTask('Never reset without backup');assert.equal(await ctx.persist(),true);
+ const before=JSON.stringify(ctx.state),head=storage.getItem(LOCAL_HEAD_KEY),stored=storage.getItem(SYNC_STORE_KEY);
+ const set=storage.setItem;
+ storage.setItem=(key,value)=>{if(key===LOCAL_BACKUPS_KEY){const error=Error('quota');error.name='QuotaExceededError';throw error;}set(key,value);};
+ ctx.openSettings();ctx.onAction('wipe',{});ctx.onAction('confirm-wipe',{});await syncSettle(30);
+ assert.equal(JSON.stringify(ctx.state),before);assert.equal(storage.getItem(LOCAL_HEAD_KEY),head);assert.equal(storage.getItem(SYNC_STORE_KEY),stored);
+ assert.match(shim.document.getElementById('toast').textContent,/Reset stopped.*backed up/i);
+});
+
+test('RISK RESET SAFETY: quota compaction makes room for the mandatory copy without deleting retained rows',async()=>{
+ const values=new Map(),used=()=>[...values].reduce((sum,[key,value])=>sum+key.length+value.length,0);let quota=Infinity;
+ const storage={getItem:key=>values.get(key)??null,removeItem:key=>values.delete(key),setItem(key,value){
+  const next=String(value),prior=values.get(key)||'';
+  if(used()-prior.length+next.length>quota){const error=Error('aggregate quota');error.name='QuotaExceededError';throw error;}
+  values.set(key,next);
+ }};
+ const {ctx}=await loadApp({sharedStorage:storage});ctx.addTask('Reset after automatic compaction');assert.equal(await ctx.persist(),true);
+ const prior=JSON.stringify(ctx.state),at=Date.now(),day=ctx.backupDay(at);
+ const retained=Array.from({length:14},(_,i)=>({
+  id:'manual-'+i,day,at:at-i,kind:'manual',
+  payload:JSON.stringify({...ctx.state,tasks:[syncTask('kept-'+i,'Retained repeated board '+('compressible recovery '.repeat(300)))]}),
+ }));
+ storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify(retained));quota=used()+96;
+ ctx.openSettings();ctx.onAction('wipe',{});ctx.onAction('confirm-wipe',{});await syncSettle(30);
+ assert.equal(ctx.state.tasks.length,0,'the reset proceeds after lossless archive compaction creates capacity');
+ assert.equal(ctx.packedBackupIndex(storage.getItem(LOCAL_BACKUPS_KEY)),true);
+ const rows=ctx.readLocalBackups();
+ assert.ok(rows.some(row=>row.kind==='before-reset'&&row.payload===prior));
+ for(const row of retained)assert.equal(rows.find(saved=>saved.id===row.id)?.payload,row.payload,'retained recovery stays exact: '+row.id);
+});
+
+test('RISK RESET SAFETY: failed primary reset preserves Undo and never restores an old account after switching',async()=>{
+ const storage=sharedScannerStorage(),{ctx}=await loadApp({sharedStorage:storage});
+ ctx.addTask('Old account board');ctx.state.syncAccount='old@example.test';assert.equal(await ctx.persist(),true);
+ vm.runInContext("undoStack=Array.from({length:30},(_,i)=>({snapshot:JSON.stringify(state),generation:i}))",ctx);
+ const priorUndo=vm.runInContext('JSON.stringify(undoStack)',ctx);
+ const set=storage.setItem;
+ storage.setItem=(key,value)=>{
+  if((key===LOCAL_HEAD_KEY||key===SYNC_STORE_KEY)&&!String(value).includes('Old account board')){
+   const error=Error('primary write refused');error.name='SecurityError';throw error;
+  }
+  set(key,value);
+ };
+ ctx.openSettings();ctx.onAction('wipe',{});ctx.onAction('confirm-wipe',{});await syncSettle(30);
+ assert.equal(vm.runInContext('JSON.stringify(undoStack)',ctx),priorUndo,'a failed reset restores every prior Undo frame in order');
+
+ const switchedStorage=sharedScannerStorage(),pending=await loadApp({sharedStorage:switchedStorage});
+ pending.ctx.addTask('Private old account task');pending.ctx.state.syncAccount='old@example.test';assert.equal(await pending.ctx.persist(),true);
+ pending.shim.window.CloudSync={configured:true,ready:true,user:'old@example.test',status:'ok',pull:async()=>({empty:true}),push:async()=>({error:true})};
+ let finish;
+ const originalPersist=pending.ctx.persist;
+ pending.ctx.persist=undefined;
+ vm.runInContext("persist=(async function(backupAlreadySafe=false){await new Promise(resolve=>window.__finishReset=resolve);return false;})",pending.ctx);
+ pending.ctx.openSettings();pending.ctx.onAction('wipe',{});pending.ctx.onAction('confirm-wipe',{});
+ pending.shim.window.CloudSync.user='new@example.test';pending.shim.window.__finishReset();await syncSettle(30);
+ assert.equal(pending.ctx.state.tasks.some(task=>task.title==='Private old account task'),false,
+  'a failed callback from the old account cannot restore its board after identity changed');
+ assert.equal(pending.shim.window.CloudSync.user,'new@example.test');
+ void originalPersist;
 });
