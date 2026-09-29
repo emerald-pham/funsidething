@@ -477,5 +477,29 @@
       "command": "node --test --test-reporter=spec --test-name-pattern='RISK CLOUD RECOVERY|RISK RESET SAFETY|AUDIT H1' tests.js; node --test --test-reporter=spec --test-name-pattern='failed primary reset preserves Undo' tests.js; node --test --test-reporter=spec --test-name-pattern='durable ordinary save retries' tests.js",
       "failure": "Before implementation, 6 of 10 selected cases failed. The durable local recovery observed only the initial pull instead of the required retry (1 rather than 2), Undo left the remote title at After edit, the first reset tap immediately emptied the board, no before-reset copy existed, and backup failure still mutated the board. The existing H1 reset contract also failed at its new first-tap boundary. The follow-up reset race test failed because truncating the 30-frame Undo stack retained the reset frame and lost the oldest frame; the account-switch assertion was then exercised after exact stack restoration. The accessible pending-status red run rendered text syncing but still titled the control Synced as owner@example.test instead of identifying an unacknowledged board."
     }
+  },
+  {
+    "testChangesSha256": "7f772f7ed6fd881c19549b10041640cf6028e03ff691bfb92b2d1c48c8c486fc",
+    "reason": "A current exported board proved that exact duplicate deletion evidence had amplified the single Firestore board beyond its hard document-size limit. The sanitized production-shape regressions reproduce the 8,096-row multiplication without including user data, repair old local and remote boards automatically, and preserve every distinct causal record and every non-log field.",
+    "previousBehavior": "Undo, Restore, import, reset, and reconciliation concatenated whole deletion logs. Repeating a replacement multiplied identical causal rows, hydration kept them, and cloud serialization sent the amplified array unchanged until an otherwise valid board exceeded Firestore’s one-document limit and could never be acknowledged.",
+    "intendedBehavior": "Treat only byte-for-byte identical deletion records as redundant at hydration, replacement, merge, pruning, and cloud serialization boundaries. Keep records that share an operation ID but differ in task, kind, time, or unknown fields. Cold local repair first updates the guarded primary pair, then uses the existing read-before-write cloud path; a duplicated newer remote is rewritten once and subsequent pulls remain clean.",
+    "replacementTests": [
+      "RISK CLOUD PAYLOAD: hydration removes only exact duplicate deletion facts and preserves conflicting same-ID evidence",
+      "RISK CLOUD PAYLOAD: Undo and Restore replacement unions stay idempotent while recording new causal deletion facts",
+      "RISK CLOUD PAYLOAD: reconciliation compacts each side and retains distinct records that share an operation ID",
+      "RISK CLOUD PAYLOAD: amplified legacy deletion history is repaired below the Firestore limit without changing other board content",
+      "RISK CLOUD PAYLOAD: a cold duplicated board repairs both primary keys, uploads once, and reaches a clean acknowledgement",
+      "RISK CLOUD PAYLOAD: a duplicated newer remote is rewritten once and later pulls do not loop",
+      "RISK CLOUD PAYLOAD: duplicated legacy Undo and backup Restore sources converge without losing their distinct facts"
+    ],
+    "preservedCoverage": [
+      "Distinct same-ID records, unknown deletion fields, causal task and history tombstones, Undo, Restore, import, account, revision, and recovery-pin behavior remain covered; only exact serialized duplicates are removed.",
+      "The cold repair keeps the guarded two-key browser authority, writes the smaller local board before cloud upload, performs the required read before write, waits for acknowledgement, and does not loop on later pulls.",
+      "The sanitized 8,096-row shape exceeds one MiB before repair and fits afterward without changing any non-deletionLog JSON. A separate private local-only proof repaired the supplied export from 8,096 rows to 6 while every non-log field stayed byte-identical; the attachment was never copied into the repository or uploaded."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='RISK CLOUD PAYLOAD' tests.js",
+      "failure": "Before implementation, all five initial production-path tests failed: hydration kept a fifth exact duplicate, replacement and reconciliation multiplied repeated records, the sanitized 8,096-row board remained above one MiB instead of compacting to six unique facts, and cold repair left three copies in both primary keys instead of durably converging to one. Two later tests extend the same repaired boundaries to a duplicated newer remote and old Undo/backup Restore sources."
+    }
   }
 ]
