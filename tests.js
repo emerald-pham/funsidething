@@ -16779,3 +16779,32 @@ test('RISK oldest never done: all-completed fallback and eligibility boundaries 
  delete b.lastDoneAt;
  assert.equal(ctx.oldestFirst(ctx.pool()).id,b.id,'an eligible never-done task takes precedence');
 });
+
+test('RISK CLOUD V2 STARTUP: transport and permission failures retain their code instead of masquerading as corrupt data',async()=>{
+ for(const method of ['readGeneration','readChunks'])for(const code of ['unavailable','deadline-exceeded','permission-denied','unauthenticated']){
+  const adapter=cloudV2Adapter(),store=loadCloudV2().createCloudStore({adapter,crypto:webcrypto});
+  const payload=JSON.stringify({tasks:[{id:'kept'}]});await store.push('owner',payload,1,0);
+  const original=adapter[method];adapter[method]=async()=>{throw Object.assign(Error('private transport detail'),{code:'firestore/'+code});};
+  const failed=await store.pull('owner');assert.equal(failed.error,true);assert.equal(failed.code,code,'the read failure must retain its retry/authorization meaning');
+  assert.equal(adapter.roots.get('owner').rev,1,'failed reads never write');
+  adapter[method]=original;assert.equal((await store.pull('owner')).payload,payload,'the same intact generation remains readable');
+ }
+});
+test('RISK CLOUD V2 STARTUP: a transient chunk read automatically recovers to synced without reloading the board',async()=>{
+ const local=syncState({tasks:[syncTask('shared','Saved board')],syncRev:1,syncAccount:'e@example.com',syncDirty:false});
+ const adapter=cloudV2Adapter(),store=loadCloudV2().createCloudStore({adapter,crypto:webcrypto});
+ const payload=JSON.stringify(local);await store.push('owner',payload,1,0);
+ const read=adapter.readChunks;let attempts=0,pushes=0;
+ adapter.readChunks=async(...args)=>{if(++attempts===1)throw Object.assign(Error('temporary connection'),{code:'unavailable'});return read(...args);};
+ const factory=window=>{
+  const CS={configured:true,ready:true,user:'e@example.com',status:'ok',signIn(){},signOut(){},
+   async pull(){const result=await store.pull('owner');CS.status=result.error?'error':'ok';CS.errorStage=result.error?'pull':null;CS.errorCode=result.code||null;window.dispatchEvent({type:'cloudsync'});return result;},
+   async push(){pushes++;throw Error('no upload is needed');}};return CS;
+ };
+ const {ctx,shim}=await loadApp({seedStorage:{[SYNC_STORE_KEY]:payload},cloudSyncFactory:factory});
+ shim.window.CLOUD_RETRY_DELAY_MS=5;await ctx.cloudPull();
+ assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ error');await syncSettle(80);
+ assert.equal(attempts,2,'a transient chunk failure must enter the existing bounded retry path');
+ assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ synced');assert.equal(pushes,0);
+ assert.equal(ctx.state.tasks[0].id,'shared');assert.equal(adapter.roots.get('owner').rev,1);
+});

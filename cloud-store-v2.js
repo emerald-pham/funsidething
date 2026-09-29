@@ -55,6 +55,12 @@
           return {payload,rev:manifest.rev,updatedAt:manifest.updatedAt,
             serverUpdatedAt:manifest.serverUpdatedAt,schemaVersion:SCHEMA_VERSION,generationId};
         }catch(error){
+          if(!current(stillCurrent)) return {cancelled:true};
+          // A failed network/auth read says nothing about snapshot integrity.
+          // Preserve its safe code so startup can retry transient failures and
+          // keep real permission errors blocked, rather than calling both corrupt.
+          const code=safeFailureCode(error);
+          if(code!=="upload-interrupted") return {error:true,code,generationId};
           const latest=await adapter.readRoot(uid);
           if(!current(stillCurrent)) return {cancelled:true};
           if(latest?.schemaVersion===SCHEMA_VERSION&&
