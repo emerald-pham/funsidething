@@ -581,5 +581,25 @@
       "command": "node --test --test-reporter=spec --test-name-pattern='RISK SCALABLE BOARD CODEC|RISK DEVICE STORAGE V2' tests.js; node --test --test-reporter=spec --test-name-pattern='RISK CLOUD V2:' tests.js; npm run test:rules; node --test --test-reporter=spec --test-name-pattern='RISK SCALABLE LOCAL|RISK SCALABLE RECOVERY|RISK SCALABLE DESTRUCTIVE|RISK SCALABLE SETTINGS|RISK SCALABLE OFFLINE' tests.js; node --test --test-reporter=spec --test-name-pattern='RISK CLOUD V2 ADAPTER|RISK SCALABLE END TO END' tests.js; npm test; node --test --test-reporter=spec --test-name-pattern='RISK SCALABLE CONCURRENCY|RISK SCALABLE STARTUP|RISK SCALABLE LEGACY TAB' tests.js; node --test --test-reporter=spec --test-name-pattern='RISK SCALABLE QUOTA' tests.js; node --test --test-reporter=spec --test-name-pattern='cold migration preserves both already-divergent' tests.js; node --test --test-reporter=spec --test-name-pattern='first activation preserves a new single legacy copy' tests.js",
       "failure": "Before implementation, the first codec and device-store run failed 2 of 2 because the storage module did not exist; the low-level cloud run failed 3 of 3 for the same reason; and the v2 rules test was denied before the generation rules existed. The initial production integration run failed 4 of 4 because no scalable APIs or shell assets were present. Subsequent red runs exposed unbounded young staged generations, 23 repeated pushes instead of the bounded retry budget, three unreferenced local blobs instead of two referenced snapshots, clean-adoption proof leakage, a missing authority marker, failed IndexedDB Settings deletion, absent daily device history, and four cloud generations instead of current plus previous. The first final full suite then reached 1008 pass, 1 fail, 14 skip: its only failure called the injected reset primary-write hook before the newly awaited recovery proof had reached that hook. A bounded wait reproduced and corrected that test scheduling race while retaining every original assertion. Exact-candidate review added four production probes that all failed: a delayed commit left the second edit outside the durable head while marking it saved; CAS repair erased the second edit from memory and disk; a nonsettling database open remained pending; and a STORE_KEY-only old-shell edit reached neither head nor recovery. The equivalent repository tests reproduced 0 of 4 passing. The additional quota test failed because a synthetic IndexedDB QuotaExceededError from optional daily/latest insertion made persist return false even though the primary-only transaction fit. Follow-up review then reproduced a cold-start variant: protected key A and shared key B were fingerprinted together, but migration wrote only A and immediately marked the pair seen. The added test failed because B's unique task was absent from both the IndexedDB head and exact recovery rows. The activation variant failed because two physical keys containing the same intervening board collapsed to one unique payload; the bundle skipped it solely because unique.length was one, then marked its signature seen while the new head contained only the live draft."
     }
+  },
+  {
+    "reason": "Emerald requested that the oldest first dot prefer tasks never marked Done while Worked on it remains eligible.",
+    "previousBehavior": "The oldest eligible task anchored both modes even when it had previously been completed.",
+    "intendedBehavior": "Prefer the oldest eligible task with no completion or reopening evidence, falling back to oldest eligible when all have been done.",
+    "replacementTests": [
+      "RISK oldest never done: both modes prefer never-completed tasks and keep worked tasks eligible",
+      "RISK oldest never done: legacy completion and restore evidence survives reload and reconciliation",
+      "RISK oldest never done: all-completed fallback and eligibility boundaries preserve usable scans",
+      "UI: Quick start displays the requested seven steps in order"
+    ],
+    "preservedCoverage": [
+      "Existing eligibility, preference neutrality, recurring-task availability, and both scan modes remain unchanged.",
+      "Legacy completion timestamps and reopening lineage remain effective after hydration and reconciliation without a storage migration."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK oldest never done' tests.js; node --test --test-name-pattern='UI: Quick start displays' tests.js",
+      "failure": "All three tests initially failed: Worked on it does not count as Done; legacy evidence is honored after reload; an eligible never-done task takes precedence. First green attempt additionally failed reconciled restore remains completion evidence, proving restoredRunOp must also count. Quick start copy test failed its exact seven-step comparison before the help text was updated."
+    },
+    "testChangesSha256": "28282e86a2c001d5ddc65b13642b945d1dc7d831dc76c555123155753e5169da"
   }
 ]

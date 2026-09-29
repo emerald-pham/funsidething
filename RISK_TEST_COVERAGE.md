@@ -243,3 +243,9 @@ Companion coverage protects the existing local-backup behavior: LOCAL BACKUPS: s
 Start with the failure cost and the user-visible invariant. Persisted task or backup changes need cases for affected old data, undo, import or restore, deletion, and sync paths. Eligibility changes need valid and invalid prerequisites, boundaries, ordering, and recurrence. Location or time changes need invalid-input, saved-state, reload, and cross-device cases. Visual or motion changes need numeric paint or geometry contracts, reduced-motion behavior, and affected phone, tablet, or short-landscape sizes. Offline changes need shell fingerprints and offline reload checks. Keep unrelated established assertions intact.
 
 The editor hook blocks app or enforcement edits while tests.js has no staged or unstaged change. CI checks that relevant tests are in the final diff and that TEST_CHANGE_RATIONALES.json names the exact test diff, purpose, retained boundaries, and red command/failure. These checks do not prove that a test was run before implementation or that a red result was actually observed. Run the new focused risk test against the unmodified implementation, preserve the real red output in task or release evidence, implement the smallest fix, then run the focused test and npm test. Run npm run test:rules for Firestore rule changes and rendered/browser or offline checks when affected behavior needs them.
+
+## Oldest never-done scan anchor
+
+- RISK oldest never done: both modes prefer never-completed tasks and keep worked tasks eligible
+- RISK oldest never done: legacy completion and restore evidence survives reload and reconciliation
+- RISK oldest never done: all-completed fallback and eligibility boundaries preserve usable scans
