@@ -422,15 +422,17 @@
     }
   },
   {
-    "reason": "A screenshot from the user's current iPhone build proved that retained recovery data exhausted browser quota: ordinary edits failed at device-save:primary-write/quota-exhausted, mandatory cloud adoption was held before replacement, and the cloud badge still said synced. The user required automatic recovery without deleting recovery copies. New tests pin a lossless, local, offline archive codec and the exact quota, corruption, compare-and-swap, recovery-view, deletion, reload, adoption, and badge boundaries. Existing quota fixtures changed only so their deliberately irreducible stores are already compacted and continue to prove that protected data is never discarded.",
+    "reason": "A screenshot from the user's current iPhone build proved that retained recovery data exhausted browser quota: ordinary edits failed at device-save:primary-write/quota-exhausted, mandatory cloud adoption was held before replacement, and the cloud badge still said synced. The user required automatic recovery without deleting recovery copies. New tests pin a lossless, local, offline archive codec and the exact quota, corruption, compare-and-swap, recovery-view, deletion, Restore, reload, adoption, and badge boundaries. Existing quota fixtures changed only so their deliberately irreducible stores are already compacted and continue to prove that protected data is never discarded. Exact-candidate review then found the Restore stale-view guard still parsed physical packed bytes as plain JSON; its production test requires Restore to decode the displayed snapshot while retaining raw-byte CAS and the exact pre-Restore safety copy.",
     "previousBehavior": "When manual, displaced-edit, or protected recovery rows filled localStorage, rotation had no eligible row left to remove. The two guarded primary board keys and mandatory pre-adoption snapshot then failed even when lossless archive compaction would create room, and a green cloud badge could hide the unsaved local edit.",
     "intendedBehavior": "After safe automatic-history retirement is exhausted, compact the recovery index in its existing key and retry the guarded primary save or mandatory adoption backup. Whole-index compaction preserves the exact decoded UTF-16 JSON; appending a required safety row preserves every existing payload byte. Retain physical compare-and-swap semantics, corrupt and unknown formats, and already-compacted irreducible failures. Show a save error until a later durable local save succeeds.",
     "replacementTests": [
       "RISK LOCAL BACKUPS: lossless compaction frees protected archive quota without deleting recovery",
+      "RISK LOCAL BACKUPS: Undo compacts retained recovery before growing the guarded board",
       "RISK LOCAL BACKUPS: packed archive codec round-trips exact Unicode and rejects corruption",
       "RISK LOCAL BACKUPS: corrupt or unknown packed recovery stays byte-exact and blocks overwrite",
       "RISK LOCAL BACKUPS: archive compaction keeps cross-tab CAS and failed writes byte-exact",
       "RISK LOCAL BACKUPS: packed view download and delete preserve decoded recovery bytes",
+      "RISK LOCAL BACKUPS: packed recovery remains restorable with an exact safety copy",
       "RISK OFFLINE RECOVERY: packed archive codec is a pinned local shell asset",
       "RISK CLOUD BACKUP: mandatory adoption backup compacts protected recovery automatically",
       "RISK LOCAL DIAGNOSTICS: cloud badge cannot say synced while the latest edit is unsaved"
@@ -439,14 +441,15 @@
       "Manual, displaced local edits, Restore proofs, account-switch copies, stale-tab copies, other-browser copies, shared recovery IDs, and protected pins remain present with payload bytes unchanged after compaction and reload.",
       "Unreadable or unknown archive formats remain untouched and block overwrite; a pre-codec shell cannot parse the versioned envelope and therefore follows its existing fail-closed save path.",
       "The two primary board keys retain their existing plain JSON, guarded pair-write, rollback, stale-tab, and Restore-safety behavior; only the recovery-index storage boundary is compacted.",
+      "The actual Undo action uses the same automatic compaction retry before a larger restored board pair write and keeps every retained recovery payload unchanged.",
       "An already compacted archive that still cannot fit retains the prior index and both primary keys, while optional automatic history continues to retire under its existing data-safety rules.",
-      "Packed raw view and download return the exact decoded JSON, and targeted deletion preserves every other row's lexical bytes before atomically replacing the physical packed index.",
+      "Packed raw view and download return the exact decoded JSON; targeted deletion preserves every other row's lexical bytes, and Restore authorizes only the decoded Settings snapshot while retaining the physical raw-byte stale-view check and its exact safety copy.",
       "The vendored codec and license are local offline shell assets with a pinned byte fingerprint and no runtime network dependency."
     ],
     "redEvidence": {
       "command": "node --test --test-reporter=spec --test-name-pattern='lossless compaction frees|packed archive codec|mandatory adoption backup compacts|cloud badge cannot say synced' tests.js",
-      "failure": "Before implementation, all four discriminating tests failed: the protected-archive primary save returned false with device-save:primary-write/quota-exhausted; packBackupIndex was undefined; the newer cloud board remained held because its mandatory backup could not fit; and the status button still rendered a green synced label after the local pair write failed. The later corruption, CAS, exact recovery view/download/delete, offline-asset, and reload assertions exercise the same codec boundary and retain the original fail-closed contracts."
+      "failure": "Before implementation, all four discriminating tests failed: the protected-archive primary save returned false with device-save:primary-write/quota-exhausted; packBackupIndex was undefined; the newer cloud board remained held because its mandatory backup could not fit; and the status button still rendered a green synced label after the local pair write failed. The later corruption, CAS, exact recovery view/download/delete, offline-asset, and reload assertions exercise the same codec boundary and retain the original fail-closed contracts. Exact-candidate review then reproduced packed Restore failing with 'Backup list changed or this copy cannot be restored'; the added production test failed with the current title still live instead of the packed recovery title, then passed after the displayed snapshot used the central decoder while raw CAS remained unchanged."
     },
-    "testChangesSha256": "a132fc2d18caa702b55d7bf3fabb9956243a4744c712ac14dd09c73bc44010aa"
+    "testChangesSha256": "033bf6a5a77e09be3afc58e25c38db912835ba1039219c4879513c31108fcdff"
   }
 ]

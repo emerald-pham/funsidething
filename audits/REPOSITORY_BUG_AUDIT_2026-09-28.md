@@ -25,6 +25,7 @@ It did not inspect a user's tasks or production Firestore documents.
 | Local failure diagnosis | Ordinary edits and Undo shared an undifferentiated two-copy device-save warning, so aggregate quota, concurrent writes, storage denial, and a missing Restore proof could not be told apart. | Emit a stable `device-save:<stage>/<code>` signature in the warning and Settings. The live board remains untouched and is linked to Current board recovery. A successful retry clears the stale diagnosis. |
 | Clean cloud adoption | A newer Firestore board could already contain every local task, become durable and clean without a push, yet leave its redundant safety backup pinned until an acknowledgement that would never arrive. Under aggregate browser quota, that false pin could stop the next ordinary edit with the exact device-save warning. | After the adopted board is durably saved, release the pin only when the board is clean and a complete shared-content comparison proves the prior board is represented. Keep the recovery row as ordinary history. Union writes, same-task conflicts, unknown legacy rows, and failed durable writes remain protected. |
 | Retained recovery archive quota | A current iPhone screenshot after PR #26 showed `device-save:primary-write/quota-exhausted` while the cloud badge still said synced. Once manual, displaced, or protected recovery rows consumed the local-storage budget, automatic-history rotation could not make room for either guarded primary key; the same pressure also stopped the mandatory pre-adoption backup with `Cloud copy held`. | On a real quota failure, losslessly compact the recovery index and retry. The versioned archive has a checksum, exact UTF-16 round-trip, legacy plain-JSON reads, compare-and-swap writes, and fail-closed corrupt/unknown handling. Whole-index compaction preserves the exact decoded JSON; appending a required safety row preserves every existing payload byte. Packed targeted deletion retains every remaining row's lexical bytes. The header reports `save error` until a durable retry succeeds. |
+| Packed Restore authorization | Exact-candidate review found that Settings retained the physical packed envelope for its stale-view guard, but Restore still parsed that snapshot as plain JSON. Every readable packed recovery row was therefore rejected as changed. | Decode the displayed snapshot through the central archive codec while continuing to compare the physical raw bytes for stale-view protection. A production-path regression restores the selected packed row, creates the exact pre-Restore safety copy, completes the guarded pair write, and survives reload. |
 
 The original local diagnostic did not create more browser capacity. The
 follow-up quota repair compacts retained recovery data without deleting it and
@@ -71,6 +72,9 @@ failing before its implementation:
 - A protected recovery archive at a fixed aggregate quota reproduced the
   phone's exact primary-save signature; the same storage state held the cloud
   at its mandatory pre-adoption backup. The cloud button remained falsely green.
+- Exact-candidate review reproduced every packed Restore click failing before
+  it could create a safety copy; the production test failed with the current
+  title still live and the stale-view warning visible.
 
 The focused repaired matrix passes cloud adapter, cloud diagnostics,
 account, resource-exhausted retry, recovery export, imported-ID rendering,
@@ -79,17 +83,18 @@ existing local-backup/cloud-adoption cases. The cloud-adoption cluster covers
 clean no-push adoption, the next ordinary save under a fixed total quota,
 union acknowledgement, a larger concurrent draft, same-task displacement,
 legacy ambiguous recovery, and a zero-headroom user-equivalent row. The final
-local full suite passes 965 of 978 tests with 13 expected browser skips and no
+local full suite passes 967 of 980 tests with 13 expected browser skips and no
 failures. The Firestore emulator rule case passes 1 of 1. Cache-fingerprint,
 changelog, risk-inventory, and test-change rationale checks pass inside that
 suite; exact-commit validation remains a release gate after the commit is
 frozen.
 
-The quota follow-up additionally covers byte-exact Unicode and lone-surrogate
+The quota follow-up additionally covers the actual Undo action, byte-exact Unicode and lone-surrogate
 codec round-trips, corrupt and unknown envelopes, cross-tab compare-and-swap,
 failed encoded writes, compressed cold reload, raw view/download/delete,
-ordinary primary recovery, mandatory adoption recovery, and an irreducible
-already-compacted store that still refuses without deleting protected rows.
+packed Restore with its exact pre-Restore safety row, ordinary primary recovery,
+mandatory adoption recovery, and an irreducible already-compacted store that
+still refuses without deleting protected rows.
 
 ## Scope checked without a new finding
 

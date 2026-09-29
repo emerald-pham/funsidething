@@ -7972,6 +7972,42 @@ test('RISK LOCAL BACKUPS: lossless compaction frees protected archive quota with
  for(const [id,payload] of originalPayloads) assert.equal(reopenedRows.get(id),payload,'cold reload decodes retained recovery '+id);
 });
 
+test('RISK LOCAL BACKUPS: Undo compacts retained recovery before growing the guarded board',async()=>{
+ const values=new Map(),used=()=>[...values].reduce((sum,[key,value])=>sum+key.length+value.length,0);
+ let quota=Infinity;
+ const storage={
+  getItem:key=>values.get(key)??null,
+  removeItem:key=>values.delete(key),
+  setItem(key,value){
+   const next=String(value),prior=values.get(key)||'';
+   if(used()-prior.length+next.length>quota){const error=Error('aggregate browser storage quota');error.name='QuotaExceededError';throw error;}
+   values.set(key,next);
+  },
+ };
+ const {ctx}=await loadApp({sharedStorage:storage});
+ const task=ctx.addTask('Undo restores this larger task '+('detail '.repeat(90)));await ctx.persist();
+ vm.runInContext('if(saveTimer){clearTimeout(saveTimer);saveTimer=null}',ctx);
+ ctx.deleteTask(task.id);await ctx.persist();
+ vm.runInContext('if(saveTimer){clearTimeout(saveTimer);saveTimer=null}',ctx);
+ const at=Date.now(),day=ctx.backupDay(at),archives=[];
+ for(let i=0;i<18;i++){
+  const board=JSON.parse(JSON.stringify(ctx.state));
+  board.tasks=[syncTask('undo-archive-'+i,'Retained Undo recovery '+i+' '+('repeatable recovery words '.repeat(360)))];
+  archives.push({id:'undo-archive-'+i,day,at:at-i,kind:i%2?'manual':'before-cloud-local-edit',payload:JSON.stringify(board)});
+ }
+ storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify(archives));
+ const originalPayloads=new Map(archives.map(row=>[row.id,row.payload]));
+ quota=used()+80;
+ ctx.undo();const saved=await ctx.persist();
+ vm.runInContext('if(saveTimer){clearTimeout(saveTimer);saveTimer=null}',ctx);
+ assert.equal(saved,true,'Undo automatically compacts the retained archive before its larger board pair write');
+ assert.ok(ctx.state.tasks.some(row=>row.id===task.id),'the deleted task is restored in memory');
+ assert.ok(JSON.parse(storage.getItem(SYNC_STORE_KEY)).tasks.some(row=>row.id===task.id),'the Undo survives reload storage');
+ assert.equal(ctx.packedBackupIndex(storage.getItem(LOCAL_BACKUPS_KEY)),true);
+ const recovered=new Map(ctx.readLocalBackups().map(row=>[row.id,row.payload]));
+ for(const [id,payload] of originalPayloads) assert.equal(recovered.get(id),payload,'Undo keeps retained archive '+id);
+});
+
 test('RISK LOCAL BACKUPS: packed archive codec round-trips exact Unicode and rejects corruption',async()=>{
  const {ctx}=await loadApp();
  const loneHigh=String.fromCharCode(0xd800),loneLow=String.fromCharCode(0xdc00);
@@ -8053,6 +8089,26 @@ test('RISK LOCAL BACKUPS: packed view download and delete preserve decoded recov
  const stored=storage.getItem(LOCAL_BACKUPS_KEY),decoded=ctx.backupRecoveryText(stored),remaining=ctx.parseBackupIndex(stored);
  assert.equal(remaining.length,1);assert.equal(remaining[0].id,'two');assert.equal(remaining[0].payload,rows[1].payload);
  assert.match(decoded,/"legacyNumber": 1e3/,'deleting another row preserves unknown lexical recovery bytes');
+});
+
+test('RISK LOCAL BACKUPS: packed recovery remains restorable with an exact safety copy',async()=>{
+ const storage=sharedScannerStorage(),{ctx,shim}=await loadApp({sharedStorage:storage});
+ const task=ctx.addTask('Title preserved in packed recovery');await ctx.persist();
+ assert.equal(ctx.saveLocalBackup('manual',JSON.stringify(ctx.state)),true);
+ const saved=ctx.readLocalBackups().find(row=>row.kind==='manual');
+ ctx.state.tasks.find(row=>row.id===task.id).title='Current title to replace';await ctx.persist();
+ const currentBoard=JSON.stringify(ctx.state),plain=storage.getItem(LOCAL_BACKUPS_KEY),packed=ctx.packBackupIndex(plain);
+ assert.ok(packed.length<plain.length,'fixture archive compacts');
+ storage.setItem(LOCAL_BACKUPS_KEY,packed);
+ ctx.openSettings();ctx.onAction('restore-local-backup',{dataset:{id:saved.id}});
+ assert.equal(ctx.state.tasks.find(row=>row.id===task.id).title,'Title preserved in packed recovery',
+  'Restore decodes the packed Settings snapshot: '+(shim.document.getElementById('toast')?.textContent||''));
+ assert.ok(ctx.readLocalBackups().some(row=>row.kind==='before-restore'&&row.payload===currentBoard),
+  'the exact board displaced by packed Restore remains in its safety copy');
+ assert.equal(vm.runInContext('pendingRestoreSafetyIds.size',ctx),0,'a successful guarded pair write releases only the in-memory safety pin');
+ assert.equal(ctx.packedBackupIndex(storage.getItem(LOCAL_BACKUPS_KEY)),true,'the safety copy stays in the packed archive');
+ const reopened=await loadApp({sharedStorage:storage});
+ assert.equal(reopened.ctx.state.tasks.find(row=>row.id===task.id).title,'Title preserved in packed recovery');
 });
 
 test('RISK OFFLINE RECOVERY: packed archive codec is a pinned local shell asset',()=>{
