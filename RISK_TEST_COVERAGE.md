@@ -249,3 +249,8 @@ The editor hook blocks app or enforcement edits while tests.js has no staged or 
 - RISK oldest never done: both modes prefer never-completed tasks and keep worked tasks eligible
 - RISK oldest never done: legacy completion and restore evidence survives reload and reconciliation
 - RISK oldest never done: all-completed fallback and eligibility boundaries preserve usable scans
+
+## Cloud chunk startup recovery
+
+- RISK CLOUD V2 STARTUP: transport and permission failures retain their code instead of masquerading as corrupt data
+- RISK CLOUD V2 STARTUP: a transient chunk read automatically recovers to synced without reloading the board

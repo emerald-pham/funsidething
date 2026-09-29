@@ -600,5 +600,23 @@
       "failure": "All three tests initially failed: Worked on it does not count as Done; legacy evidence is honored after reload; an eligible never-done task takes precedence. First green attempt additionally failed reconciled restore remains completion evidence, proving restoredRunOp must also count. Quick start copy test failed its exact seven-step comparison before the help text was updated."
     },
     "testChangesSha256": "28282e86a2c001d5ddc65b13642b945d1dc7d831dc76c555123155753e5169da"
+  },
+  {
+    "reason": "The user reports a browser startup cloud error that clears only after manual refresh. Reproduction found transient generation/chunk read failures were mislabeled corrupt-generation, disabling the existing safe retry path.",
+    "previousBehavior": "Any exception while reading a generation or chunks became corrupt-generation, including temporary network failures and permission failures.",
+    "intendedBehavior": "Retain safe transport and authorization codes so transient failures retry through the existing bounded read-first path; genuinely corrupt data still fails closed.",
+    "replacementTests": [
+      "RISK CLOUD V2 STARTUP: transport and permission failures retain their code instead of masquerading as corrupt data",
+      "RISK CLOUD V2 STARTUP: a transient chunk read automatically recovers to synced without reloading the board"
+    ],
+    "preservedCoverage": [
+      "Existing corrupt-chunk hash checks, manifest-race recovery, revision arbitration, account cancellation, and bounded retry protections are unchanged.",
+      "The startup test retains local tasks and cloud revision and reaches synced without writing or reloading."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK CLOUD V2 STARTUP' tests.js",
+      "failure": "Both tests failed before implementation: expected unavailable but received corrupt-generation; expected two chunk read attempts for automatic recovery but received one."
+    },
+    "testChangesSha256": "a4a589ad62d01ffae692073d874f6a375093d66f5331e1f37196e145e1a13b2a"
   }
 ]
