@@ -36,6 +36,14 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK CLOUD DIAGNOSTICS: safe failure stage and code survive backend and UI boundaries
 - RISK CLOUD RECOVERY: a durable ordinary save retries and clears its stale cloud error without reload
 - RISK CLOUD RECOVERY: Undo retries a failed write, while a failed retry and an account change stay errors
+- RISK CLOUD STARTUP: a repaired divergent browser pair resumes the initial cloud read without tapping the badge
+- RISK CLOUD STARTUP: a browser repair after the network read restarts reconciliation automatically
+- RISK CLOUD STARTUP: failed pair recovery stays blocked and a queued retry cannot cross accounts
+- RISK CLOUD STARTUP: unresolved Firebase reads and writes time out with a retryable diagnostic
+- RISK CLOUD STARTUP: a late write acknowledgement is bound to the account through timestamp readback
+- RISK CLOUD STARTUP: a transient startup timeout retries automatically and only a completed read clears error
+- RISK CLOUD STARTUP: a timed-out write reads before its automatic retry and reaches acknowledgement
+- RISK CLOUD STARTUP: a late timed-out transaction cannot overwrite the authoritative retry read
 - RISK CLOUD ACCOUNT: signing out and back into the same account requires a fresh read
 - RISK CLOUD ACCOUNT: signing in after sign-out opens the Google account chooser
 - RISK RECOVERY EXPORT: an unsaved in-memory board remains copyable without device storage

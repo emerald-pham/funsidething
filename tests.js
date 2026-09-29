@@ -7065,12 +7065,15 @@ test('CLOUD TIME: Firestore writes request an authoritative server timestamp', (
 
 test('CLOUD ACCOUNT: a transaction binds its document before auth can switch', () => {
   const push=html.slice(html.indexOf('CS.push = async'),html.indexOf('A.onAuthStateChanged'));
-  assert.match(push,/const pushRef\s*=\s*F\.doc\(db,\s*"users",\s*auth\.currentUser\.uid\)/);
+  assert.match(push,/const pushUser\s*=\s*auth\.currentUser/);
+  assert.match(push,/const pushUid\s*=\s*pushUser\.uid/);
+  assert.match(push,/const pushRef\s*=\s*F\.doc\(db,\s*"users",\s*pushUid\)/);
   assert.match(push,/tx\.get\(pushRef\)/);
   assert.match(push,/tx\.set\(pushRef,/);
+  assert.match(push,/auth\.currentUser\?\.uid\s*!==\s*pushUid/,'a late result from an earlier account cannot change current cloud status');
 });
 
-async function loadCloudBackend({ serverData={rev:4}, serverExists=true, failures={} }={}){
+async function loadCloudBackend({ serverData={rev:4}, serverExists=true, failures={}, timeoutMs=25 }={}){
   const moduleMatch=html.match(/<script type="module">([\s\S]*?)<\/script>/);
   assert.ok(moduleMatch,'cloud backend module exists');
   const moduleSource=moduleMatch[1].replace(
@@ -7094,8 +7097,9 @@ async function loadCloudBackend({ serverData={rev:4}, serverExists=true, failure
   const F={
     getFirestore:()=>({}),
     doc:(_db,collection,uid)=>({collection,uid}),
-    getDoc:async()=>{if(failures.pull)throw failures.pull;return snapshot();},
+    getDoc:async()=>{if(writes.length&&failures.stampPending)return failures.stampPending;if(failures.pullPending)return failures.pullPending;if(failures.pull)throw failures.pull;return snapshot();},
     runTransaction:async(_db,fn)=>{
+      if(failures.pushPending)return failures.pushPending;
       if(failures.push)throw failures.push;
       const tx={
         get:async()=>snapshot(),
@@ -7106,12 +7110,13 @@ async function loadCloudBackend({ serverData={rev:4}, serverExists=true, failure
     serverTimestamp:()=>({toMillis:()=>1234}),
   };
   const events=[];
-  const window={FIREBASE_CONFIG:{apiKey:'test-key'},dispatchEvent:event=>{events.push(event);return true;}};
+  const window={FIREBASE_CONFIG:{apiKey:'test-key'},CLOUD_SYNC_TIMEOUT_MS:timeoutMs,dispatchEvent:event=>{events.push(event);return true;}};
   window.window=window;
   const context=vm.createContext({
     window,
     CustomEvent:class CustomEvent{constructor(type){this.type=type;}},
     __cloudModules:[{initializeApp:()=>({})},A,F],
+    setTimeout,clearTimeout,
   });
   await vm.runInContext(`(async()=>{${moduleSource}\n})()`,context,{filename:'index.html#cloud-backend'});
   return {CS:window.CloudSync,auth,writes,events,popupProviders,getStored:()=>stored};
@@ -15934,4 +15939,180 @@ test('RISK CLOUD PAYLOAD: duplicated legacy Undo and backup Restore sources conv
  assert.equal(restoredKeys.length,new Set(restoredKeys).size);
  assert.ok(ctx.state.tasks.some(task=>task.id===restoredTask.id));
  assert.ok(restoredKeys.includes(JSON.stringify(exact)));assert.ok(restoredKeys.includes(JSON.stringify(different)));
+});
+
+test('RISK CLOUD STARTUP: a repaired divergent browser pair resumes the initial cloud read without tapping the badge',async()=>{
+ const local=syncState({tasks:[syncTask('shared','Old browser copy')],syncRev:4,syncAccount:'e@example.com',syncDirty:false});
+ const current=syncState({tasks:[syncTask('shared','Current protected copy')],syncRev:4,syncAccount:'e@example.com',syncDirty:false});
+ const raw=JSON.stringify(local),storage=sharedScannerStorage({[LOCAL_HEAD_KEY]:raw,[SYNC_STORE_KEY]:raw});
+ const h=makeSyncHarness({remote:current,rev:4});
+ const {ctx,shim}=await loadApp({sharedStorage:storage,cloudSyncFactory:h.factory,beforeStateReady:sandbox=>{
+  // A still-open old shell can update one key after the new version read its
+  // startup snapshot but before restored auth replays the initial cloud read.
+  storage.setItem(LOCAL_HEAD_KEY,JSON.stringify(current));sandbox.cloudPull();
+ }});
+ await syncSettle(40);
+ assert.deepEqual(h.calls,['pull'],'the successful local pair repair must automatically continue the read it interrupted');
+ assert.equal(ctx.state.tasks[0].title,'Current protected copy');
+ assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ synced','a completed automatic reconcile clears the fresh-start pending badge');
+});
+
+test('RISK CLOUD STARTUP: a browser repair after the network read restarts reconciliation automatically',async()=>{
+ const local=syncState({tasks:[syncTask('shared','Old browser copy')],syncRev:4,syncAccount:'e@example.com',syncDirty:false});
+ const current=syncState({tasks:[syncTask('shared','Current protected copy')],syncRev:4,syncAccount:'e@example.com',syncDirty:false});
+ const raw=JSON.stringify(local),storage=sharedScannerStorage({[LOCAL_HEAD_KEY]:raw,[SYNC_STORE_KEY]:raw});
+ const h=makeSyncHarness({delayMs:12,remote:current,rev:4});
+ const {ctx,shim}=await loadApp({sharedStorage:storage,cloudSyncFactory:h.factory});
+ const initial=ctx.cloudPull();
+ // The first guard already passed. An older installed shell changes one key
+ // while Firestore is answering, so the post-read guard performs the repair.
+ storage.setItem(LOCAL_HEAD_KEY,JSON.stringify(current));
+ await initial;await syncSettle(50);
+ assert.deepEqual(h.calls,['pull','pull'],
+  'a completed post-read pair repair discards the stale reply and queues a fresh authoritative read');
+ assert.equal(ctx.state.tasks[0].title,'Current protected copy');
+ assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ synced');
+});
+
+test('RISK CLOUD STARTUP: failed pair recovery stays blocked and a queued retry cannot cross accounts',async()=>{
+ const local=syncState({tasks:[syncTask('shared','Old browser copy')],syncRev:4,syncAccount:'e@example.com',syncDirty:false});
+ const current=syncState({tasks:[syncTask('shared','Current protected copy')],syncRev:4,syncAccount:'e@example.com',syncDirty:false});
+ const raw=JSON.stringify(local),storage=sharedScannerStorage({[LOCAL_HEAD_KEY]:raw,[SYNC_STORE_KEY]:raw});
+ const blocked=makeSyncHarness({remote:current,rev:4});
+ const first=await loadApp({sharedStorage:storage,cloudSyncFactory:blocked.factory});
+ storage.setItem(LOCAL_HEAD_KEY,JSON.stringify(current));
+ const set=storage.setItem;
+ storage.setItem=(key,value)=>{if(key===LOCAL_BACKUPS_KEY){const error=Error('quota');error.name='QuotaExceededError';throw error;}set(key,value);};
+ await first.ctx.cloudPull();await syncSettle(30);
+ assert.equal(blocked.calls.length,0,'unbacked divergent bytes never authorize a cloud operation');
+ assert.match(first.shim.document.getElementById('toast').textContent,/could not be backed up/i);
+
+ const accountStorage=sharedScannerStorage({[LOCAL_HEAD_KEY]:raw,[SYNC_STORE_KEY]:raw});
+ const switched=makeSyncHarness({remote:current,rev:4});
+ const second=await loadApp({sharedStorage:accountStorage,cloudSyncFactory:switched.factory});
+ accountStorage.setItem(LOCAL_HEAD_KEY,JSON.stringify(current));
+ const pending=second.ctx.cloudPull();
+ second.shim.window.CloudSync.user='other@example.test';
+ await pending;await syncSettle(30);
+ assert.equal(switched.calls.length,0,'a deferred retry from the old identity cannot read or publish under the new account');
+});
+
+test('RISK CLOUD STARTUP: unresolved Firebase reads and writes time out with a retryable diagnostic',async()=>{
+ const never=new Promise(()=>{});
+ const pull=await loadCloudBackend({failures:{pullPending:never},timeoutMs:10});
+ const pullResult=await Promise.race([pull.CS.pull(),syncSettle(80).then(()=>({hung:true}))]);
+ assert.equal(pullResult.hung,undefined,'a suspended SDK read cannot hold the app in syncing forever');
+ assert.equal(pullResult.error,true);assert.equal(pull.CS.errorStage,'pull');assert.equal(pull.CS.errorCode,'deadline-exceeded');
+
+ const push=await loadCloudBackend({failures:{pushPending:never},timeoutMs:10});
+ const pushResult=await Promise.race([push.CS.push('{"tasks":[]}',1,4),syncSettle(80).then(()=>({hung:true}))]);
+ assert.equal(pushResult.hung,undefined,'a suspended transaction releases the in-flight write slot');
+ assert.equal(pushResult.error,true);assert.equal(push.CS.errorStage,'push');assert.equal(push.CS.errorCode,'deadline-exceeded');
+});
+
+test('RISK CLOUD STARTUP: a late write acknowledgement is bound to the account through timestamp readback',async()=>{
+ const stamped={exists:()=>true,data:()=>({rev:5,serverUpdatedAt:{toMillis:()=>4321}})};
+ let finishSame;
+ const same=await loadCloudBackend({failures:{stampPending:new Promise(resolve=>{finishSame=resolve;})},timeoutMs:200});
+ const samePush=same.CS.push('{"tasks":[]}',1,4);await flush();
+ same.auth.currentUser={uid:'owner',email:'owner@example.test'};
+ finishSame(stamped);
+ const sameReply=await samePush;
+ assert.equal(sameReply.ok,true,'a same-UID Firebase token refresh does not cancel the account write');
+ assert.equal(sameReply.serverUpdatedAt,4321);assert.equal(same.CS.status,'ok');
+
+ let finishOther;
+ const other=await loadCloudBackend({failures:{stampPending:new Promise(resolve=>{finishOther=resolve;})},timeoutMs:200});
+ const oldPush=other.CS.push('{"tasks":[]}',1,4);await flush();
+ other.auth.currentUser={uid:'other',email:'other@example.test'};
+ other.CS.user='other@example.test';other.CS.status='error';other.CS.errorStage='pull';other.CS.errorCode='permission-denied';
+ finishOther(stamped);
+ const oldReply=await oldPush;
+ assert.equal(oldReply.cancelled,true,'an acknowledgement from the prior UID has no authority in the new session');
+ assert.equal(other.CS.status,'error','the stale timestamp read cannot clear the new account failure');
+ assert.equal(other.CS.errorCode,'permission-denied');
+});
+
+test('RISK CLOUD STARTUP: a transient startup timeout retries automatically and only a completed read clears error',async()=>{
+ const local=syncState({tasks:[syncTask('shared','Current board')],syncRev:4,syncAccount:'e@example.com',syncDirty:false});
+ let calls=0;
+ const factory=window=>{
+  const ping=()=>window.dispatchEvent({type:'cloudsync'});
+  const CS={configured:true,ready:true,user:'e@example.com',status:'ok',errorStage:null,errorCode:null,signIn(){},signOut(){},
+   async pull(){
+    calls++;CS.status='syncing';ping();await flush();
+    if(calls===1){CS.status='error';CS.errorStage='pull';CS.errorCode='deadline-exceeded';ping();return {error:true};}
+    CS.status='ok';CS.errorStage=null;CS.errorCode=null;ping();return {payload:JSON.stringify(local),rev:4};
+   },async push(){throw Error('not expected')},
+  };
+  return CS;
+ };
+ const {ctx,shim}=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(local)},cloudSyncFactory:factory});
+ shim.window.CLOUD_RETRY_DELAY_MS=5;
+ await ctx.cloudPull();
+ assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ error','the real failed attempt remains visible before recovery');
+ await syncSettle(40);
+ assert.equal(calls,2,'the signed-in startup retries a recoverable transport failure without a badge tap');
+ assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ synced');
+});
+
+test('RISK CLOUD STARTUP: a timed-out write reads before its automatic retry and reaches acknowledgement',async()=>{
+ const local=syncState({tasks:[syncTask('shared','Current board')],syncRev:4,syncAccount:'e@example.com',syncDirty:false});
+ let remote=JSON.stringify(local),rev=4,pulls=0,pushes=0;
+ const factory=window=>{
+  const ping=()=>window.dispatchEvent({type:'cloudsync'});
+  const succeed=()=>{CS.status='ok';CS.errorStage=null;CS.errorCode=null;ping();};
+  const CS={configured:true,ready:true,user:'e@example.com',status:'ok',errorStage:null,errorCode:null,signIn(){},signOut(){},
+   async pull(){pulls++;CS.status='syncing';ping();await flush();succeed();return {payload:remote,rev};},
+   async push(payload,_updatedAt,baseRev){
+    pushes++;CS.status='syncing';ping();await flush();
+    if(pushes===1){CS.status='error';CS.errorStage='push';CS.errorCode='deadline-exceeded';ping();return {error:true};}
+    if(baseRev!==rev){succeed();return {conflict:true,rev};}
+    remote=payload;rev++;succeed();return {ok:true,rev};
+   },
+  };
+  return CS;
+ };
+ const storage=sharedScannerStorage({[SYNC_STORE_KEY]:JSON.stringify(local)});
+ const {ctx,shim}=await loadApp({sharedStorage:storage,cloudSyncFactory:factory});
+ shim.window.CLOUD_RETRY_DELAY_MS=5;
+ await ctx.cloudPull();ctx.addTask('Retry without tapping cloud');await ctx.persist();ctx.cloudPushNow();
+ await syncSettle(PAST_DEBOUNCE+80);
+ assert.equal(pulls,2,'the uncertain write outcome is read before another transaction starts');
+ assert.equal(pushes,2,'the unchanged revision is retried automatically after that read');
+ assert.equal(JSON.parse(remote).tasks.some(task=>task.title==='Retry without tapping cloud'),true);
+ assert.equal(ctx.state.syncDirty,false);assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ synced');
+});
+
+test('RISK CLOUD STARTUP: a late timed-out transaction cannot overwrite the authoritative retry read',async()=>{
+ const local=syncState({tasks:[syncTask('shared','Current board')],syncRev:4,syncAccount:'e@example.com',syncDirty:false});
+ let remote=JSON.stringify(local),rev=4,pulls=0,pushes=0;
+ const factory=window=>{
+  const ping=()=>window.dispatchEvent({type:'cloudsync'});
+  const succeed=()=>{CS.status='ok';CS.errorStage=null;CS.errorCode=null;ping();};
+  const CS={configured:true,ready:true,user:'e@example.com',status:'ok',errorStage:null,errorCode:null,signIn(){},signOut(){},
+   async pull(){pulls++;CS.status='syncing';ping();await flush();succeed();return {payload:remote,rev};},
+   async push(payload,_updatedAt,baseRev){
+    pushes++;CS.status='syncing';ping();await flush();
+    if(pushes===1){
+      setTimeout(()=>{if(rev===baseRev){remote=payload;rev++;}},20);
+      CS.status='error';CS.errorStage='push';CS.errorCode='deadline-exceeded';ping();return {error:true};
+    }
+    if(baseRev!==rev){succeed();return {conflict:true,rev};}
+    remote=payload;rev++;succeed();return {ok:true,rev};
+   },
+  };
+  return CS;
+ };
+ const storage=sharedScannerStorage({[SYNC_STORE_KEY]:JSON.stringify(local)});
+ const {ctx,shim}=await loadApp({sharedStorage:storage,cloudSyncFactory:factory});
+ shim.window.CLOUD_RETRY_DELAY_MS=5;
+ await ctx.cloudPull();ctx.addTask('Committed after the local deadline');await ctx.persist();ctx.cloudPushNow();
+ await syncSettle(PAST_DEBOUNCE+180);
+ assert.equal(pushes,2,'the retry still uses the old base and is rejected after the late commit');
+ assert.equal(pulls,3,'the client reads once after timeout and again after the revision conflict');
+ assert.equal(rev,5,'only one transaction advances the original base revision');
+ assert.equal(JSON.parse(remote).tasks.some(task=>task.title==='Committed after the local deadline'),true);
+ assert.equal(ctx.state.syncRev,5);assert.equal(ctx.state.syncDirty,false);
+ assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ synced');
 });
