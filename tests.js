@@ -7068,6 +7068,153 @@ test('CLOUD ACCOUNT: a transaction binds its document before auth can switch', (
   assert.match(push,/tx\.set\(pushRef,/);
 });
 
+async function loadCloudBackend({ serverData={rev:4}, serverExists=true, failures={} }={}){
+  const moduleMatch=html.match(/<script type="module">([\s\S]*?)<\/script>/);
+  assert.ok(moduleMatch,'cloud backend module exists');
+  const moduleSource=moduleMatch[1].replace(
+    /const \[appMod, A, F\] = await Promise\.all\(\[[\s\S]*?\]\);/,
+    'const [appMod, A, F] = globalThis.__cloudModules;'
+  );
+  const writes=[];
+  let stored={exists:serverExists,data:{...serverData}};
+  const snapshot=()=>({exists:()=>stored.exists,data:()=>stored.data});
+  const auth={currentUser:{uid:'owner',email:'owner@example.test'}};
+  const popupProviders=[];
+  const A={
+    browserLocalPersistence:{},
+    getAuth:()=>auth,
+    setPersistence:async()=>{if(failures.persistence)throw failures.persistence;},
+    signInWithPopup:async(_auth,provider)=>{popupProviders.push(provider);if(failures.signIn)throw failures.signIn;},
+    signOut:async()=>{if(failures.signOut)throw failures.signOut;},
+    GoogleAuthProvider:class GoogleAuthProvider{setCustomParameters(value){this.customParameters=value;}},
+    onAuthStateChanged(_auth,listener){listener(auth.currentUser);},
+  };
+  const F={
+    getFirestore:()=>({}),
+    doc:(_db,collection,uid)=>({collection,uid}),
+    getDoc:async()=>{if(failures.pull)throw failures.pull;return snapshot();},
+    runTransaction:async(_db,fn)=>{
+      if(failures.push)throw failures.push;
+      const tx={
+        get:async()=>snapshot(),
+        set(_ref,next){writes.push(next);stored={exists:true,data:{...next,serverUpdatedAt:{toMillis:()=>1234}}};},
+      };
+      return fn(tx);
+    },
+    serverTimestamp:()=>({toMillis:()=>1234}),
+  };
+  const events=[];
+  const window={FIREBASE_CONFIG:{apiKey:'test-key'},dispatchEvent:event=>{events.push(event);return true;}};
+  window.window=window;
+  const context=vm.createContext({
+    window,
+    CustomEvent:class CustomEvent{constructor(type){this.type=type;}},
+    __cloudModules:[{initializeApp:()=>({})},A,F],
+  });
+  await vm.runInContext(`(async()=>{${moduleSource}\n})()`,context,{filename:'index.html#cloud-backend'});
+  return {CS:window.CloudSync,auth,writes,events,popupProviders,getStored:()=>stored};
+}
+
+test('RISK CLOUD ADAPTER: malformed revisions fail closed before Firestore writes',async()=>{
+  for(const baseRev of [undefined,'4',-1,1.5,Number.MAX_SAFE_INTEGER+1]){
+    const h=await loadCloudBackend();
+    const reply=await h.CS.push('{}',Date.now(),baseRev);
+    assert.equal(reply.error,true,`base revision ${String(baseRev)} must fail closed`);
+    assert.equal(h.writes.length,0,'an invalid caller revision never reaches tx.set');
+  }
+  for(const rev of ['4',-1,1.5,Number.MAX_SAFE_INTEGER+1]){
+    const h=await loadCloudBackend({serverData:{rev}});
+    const reply=await h.CS.push('{}',Date.now(),4);
+    assert.equal(reply.error,true,`stored revision ${String(rev)} must fail closed`);
+    assert.equal(h.writes.length,0,'an invalid stored revision never reaches tx.set');
+  }
+  const missing=await loadCloudBackend({serverExists:false});
+  const staleCreate=await missing.CS.push('{}',Date.now(),4);
+  assert.equal(staleCreate.conflict,true,'a caller that remembers a document cannot recreate a missing one blindly');
+  assert.equal(missing.writes.length,0);
+  assert.equal((await missing.CS.push('{}',Date.now(),0)).ok,true,'revision zero may create a genuinely absent document');
+  const valid=await loadCloudBackend();
+  const reply=await valid.CS.push('{}',Date.now(),4);
+  assert.equal(reply.ok,true);assert.equal(reply.rev,5);assert.equal(reply.serverUpdatedAt,1234);
+  assert.equal(valid.writes.length,1);
+});
+
+test('RISK CLOUD DIAGNOSTICS: safe failure stage and code survive backend and UI boundaries',async()=>{
+  const pullFailure=await loadCloudBackend({failures:{pull:Object.assign(Error('private payload detail'),{code:'permission-denied'})}});
+  assert.equal((await pullFailure.CS.pull()).error,true);
+  assert.equal(pullFailure.CS.errorStage,'pull');
+  assert.equal(pullFailure.CS.errorCode,'permission-denied');
+  assert.doesNotMatch(JSON.stringify(pullFailure.CS),/private payload detail/);
+
+  const pushFailure=await loadCloudBackend({failures:{push:Object.assign(Error('private write detail'),{code:'unavailable'})}});
+  assert.equal((await pushFailure.CS.push('{}',Date.now(),4)).error,true);
+  assert.equal(pushFailure.CS.errorStage,'push');
+  assert.equal(pushFailure.CS.errorCode,'unavailable');
+
+  const signInFailure=await loadCloudBackend({failures:{signIn:Object.assign(Error('popup detail'),{code:'auth/popup-blocked'})}});
+  await signInFailure.CS.signIn();
+  assert.equal(signInFailure.CS.errorStage,'sign-in');
+  assert.equal(signInFailure.CS.errorCode,'auth/popup-blocked');
+
+  const persistenceFailure=await loadCloudBackend({failures:{persistence:Object.assign(Error('storage detail'),{code:'auth/web-storage-unsupported'})}});
+  assert.equal(persistenceFailure.CS.configured,true,'an auth-storage failure must not hide configured cloud recovery');
+  assert.equal(typeof persistenceFailure.CS.signIn,'function');
+
+  const {ctx,shim}=await loadApp();
+  shim.window.CloudSync={configured:true,ready:true,user:'owner@example.test',status:'error',errorStage:'pull',errorCode:'permission-denied'};
+  ctx.renderSync();
+  const button=shim.document.getElementById('syncBtn');
+  assert.equal(button.textContent,'☁ error','compact header label stays stable');
+  assert.match(button.title,/pull failed/i);
+  assert.match(button.title,/permission denied/i);
+  assert.match(button.title,/owner@example\.test/);
+  shim.window.CloudSync={configured:true,ready:true,user:null,status:'error',errorStage:'init',errorCode:'unavailable'};
+  ctx.renderSync();
+  assert.match(button.title,/reload/i,'a backend setup failure names the action that can actually retry module loading');
+  assert.doesNotMatch(button.title,/sign in again/i);
+
+  const malformed=await loadApp();let reported=null;
+  malformed.shim.window.CloudSync={configured:true,ready:true,user:'owner@example.test',status:'ok',
+    pull:async()=>({payload:'{"tasks":[null]}',rev:5}),push:async()=>({error:true}),
+    reportError:(stage,code)=>{reported={stage,code};}};
+  await malformed.ctx.cloudPull();
+  assert.deepEqual(reported,{stage:'reconcile',code:'invalid-payload'},'a readable but unusable cloud board must not leave a false synced status');
+  const badRevision=await loadApp();reported=null;
+  badRevision.shim.window.CloudSync={configured:true,ready:true,user:'owner@example.test',status:'ok',
+    pull:async()=>({payload:badRevision.ctx.cloudPayload(),rev:'5'}),push:async()=>({error:true}),
+    reportError:(stage,code)=>{reported={stage,code};}};
+  await badRevision.ctx.cloudPull();
+  assert.deepEqual(reported,{stage:'reconcile',code:'invalid-revision'},'a malformed remote revision cannot masquerade as a legacy document');
+});
+
+test('RISK CLOUD ACCOUNT: signing out and back into the same account requires a fresh read',async()=>{
+  const local=syncState({tasks:[syncTask('shared','Original')],syncRev:4,syncAccount:'e@example.com'});
+  const h=makeSyncHarness({remote:local,rev:4});
+  const {ctx,shim}=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(local)},cloudSyncFactory:h.factory});
+  await ctx.cloudPull();
+  const before=h.calls.length;
+  shim.window.CloudSync.user=null;shim.window.dispatchEvent({type:'cloudsync'});
+  h.writeBehindBack(syncState({tasks:[syncTask('shared','Changed while signed out')],syncAccount:'e@example.com'}));
+  shim.window.CloudSync.user='e@example.com';shim.window.dispatchEvent({type:'cloudsync'});
+  ctx.addTask('Local edit after signing back in',true);
+  await syncSettle(40);
+  assert.equal(h.calls[before],'pull',`same-account reauthentication must read before writing: ${h.calls.slice(before).join(',')}`);
+});
+
+test('RISK CLOUD ACCOUNT: signing in after sign-out opens the Google account chooser',async()=>{
+  const backend=await loadCloudBackend();
+  await backend.CS.signIn();
+  assert.equal(backend.popupProviders.length,1);
+  assert.equal(JSON.stringify(backend.popupProviders[0].customParameters),JSON.stringify({prompt:'select_account'}),
+    'a fresh popup must not silently reuse the account that just signed out');
+
+  const {ctx,shim}=await loadApp();let signedOut=0,signedIn=0;
+  shim.window.CloudSync={configured:true,ready:true,user:'first@example.test',status:'ok',signOut(){signedOut++;},signIn(){signedIn++;}};
+  ctx.onAction('sync',{});assert.equal(signedOut,1);
+  shim.window.CloudSync.user=null;shim.window.dispatchEvent({type:'cloudsync'});
+  ctx.onAction('sync',{});assert.equal(signedIn,1,'the next cloud-button click enters the chooser-backed sign-in path');
+});
+
 test('CLOUD RULES: old clients cannot write without next revision and server time', () => {
   const rules=fs.readFileSync(path.join(__dirname,'firestore.rules'),'utf8');
   assert.match(rules,/request\.resource\.data\.serverUpdatedAt\s*==\s*request\.time/);
@@ -7081,6 +7228,20 @@ test('CLOUD RETRY: rejected server write is not mistaken for a synced payload', 
   await ctx.cloudPull(); ctx.addTask('Retry me'); ctx.cloudPushNow(); await syncSettle(20);
   ctx.cloudPushNow(); await syncSettle(20);
   assert.equal(pushes,2);
+});
+
+test('CLOUD SIZE: a resource-exhausted write keeps the local draft dirty and retryable',async()=>{
+  const storage=sharedScannerStorage();let pushes=0;
+  const {ctx,shim}=await loadApp({sharedStorage:storage});
+  shim.window.CloudSync={configured:true,ready:true,user:'owner@example.test',status:'ok',
+    pull:async()=>({empty:true}),push:async()=>{pushes++;shim.window.CloudSync.status='error';shim.window.CloudSync.errorStage='push';shim.window.CloudSync.errorCode='resource-exhausted';return {error:true};}};
+  await ctx.cloudPull();ctx.addTask('Draft beyond the cloud document limit');await ctx.persist();
+  ctx.cloudPushNow();await syncSettle(20);
+  assert.equal(ctx.state.syncDirty,true);
+  assert.ok(ctx.state.tasks.some(task=>task.title==='Draft beyond the cloud document limit'));
+  assert.ok(JSON.parse(storage.getItem(SYNC_STORE_KEY)).tasks.some(task=>task.title==='Draft beyond the cloud document limit'));
+  assert.equal(shim.window.CloudSync.errorCode,'resource-exhausted');
+  ctx.cloudPushNow();await syncSettle(20);assert.equal(pushes,2,'the failed payload is not mistaken for an acknowledgement');
 });
 
 test('HARD GATE: local persistence repairs a task silently omitted without deletion evidence', async () => {
@@ -7991,6 +8152,100 @@ test('RISK CLOUD BACKUP: acknowledgement frees disk pins before saving a larger 
  assert.doesNotMatch(shim.document.getElementById('toast')?.textContent||'',/Couldn't save this edit on this device/);
 });
 
+test('RISK CLOUD BACKUP: a clean adoption releases redundant recovery without waiting for a write',async()=>{
+ const local=syncState({tasks:[syncTask('local','Already in cloud')],syncRev:1,syncAccount:'e@example.com',syncDirty:true});
+ const remote=syncState({tasks:[syncTask('local','Already in cloud'),syncTask('remote','Newer remote task')]});
+ const storage=sharedScannerStorage({[SYNC_STORE_KEY]:JSON.stringify(local)});
+ const h=makeSyncHarness({remote,rev:2});
+ const {ctx,shim}=await loadApp({sharedStorage:storage,cloudSyncFactory:h.factory});
+ await ctx.cloudPull();
+ assert.deepEqual(new Set(Array.from(ctx.state.tasks,task=>task.id)),new Set(['local','remote']));
+ assert.equal(ctx.state.syncDirty,false,'the adopted Firestore document already contains every local task');
+ assert.equal(h.calls.includes('push'),false,'a clean adoption needs no union write or acknowledgement');
+ const redundant=ctx.readLocalBackups().find(row=>row.kind==='cloud-merged'&&row.payload.includes('Already in cloud'));
+ assert.ok(redundant,'the prior board remains ordinary local recovery history');
+ assert.ok(!ctx.state.protectedBackupIds.includes(redundant.id),'the durable clean adoption no longer needs to pin cloud-redundant history');
+ assert.ok(!JSON.parse(storage.getItem(SYNC_STORE_KEY)).protectedBackupIds.includes(redundant.id),'the release survives reload');
+
+ const write=storage.setItem;
+ storage.setItem=(key,value)=>{
+  if((key===LOCAL_HEAD_KEY||key===SYNC_STORE_KEY) && String(value).includes('Later local edit') &&
+      JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY)||'[]').some(row=>row.id===redundant.id)){
+   const error=Error('aggregate browser storage quota');error.name='QuotaExceededError';throw error;
+  }
+  write(key,value);
+ };
+ ctx.state.tasks.push(syncTask('later','Later local edit'));
+ assert.equal(await ctx.persist(),true,'the now-ordinary redundant row can rotate so local edits keep saving');
+ assert.ok(!ctx.readLocalBackups().some(row=>row.id===redundant.id));
+ assert.doesNotMatch(shim.document.getElementById('toast')?.textContent||'',/device-save:primary-write\/quota-exhausted/);
+});
+
+test('RISK CLOUD BACKUP: clean adoption frees automatic history for the next ordinary save',async()=>{
+ const values=new Map(),used=()=>[...values].reduce((sum,[key,value])=>sum+key.length+value.length,0);
+ let quota=Infinity;
+ const storage={
+  getItem:key=>values.get(key)??null,
+  removeItem:key=>values.delete(key),
+  setItem(key,value){
+   const next=String(value),prior=values.get(key)||'';
+   if(used()-prior.length+next.length>quota){const error=Error('aggregate browser storage quota');error.name='QuotaExceededError';throw error;}
+   values.set(key,next);
+  },
+ };
+ const local=syncState({tasks:[syncTask('local','Already in cloud')],syncRev:1,syncAccount:'e@example.com',syncDirty:true});
+ const raw=JSON.stringify(local),now=Date.now();
+ const remote=syncState({tasks:[syncTask('local','Already in cloud'),syncTask('remote','Newer remote task')]});
+ const h=makeSyncHarness({remote,rev:2});
+ const {ctx,shim}=await loadApp({sharedStorage:storage,seedStorage:{[LOCAL_HEAD_KEY]:raw,[SYNC_STORE_KEY]:raw},cloudSyncFactory:h.factory});
+ assert.equal(await ctx.persist(),true);
+ const normalizedLocal=storage.getItem(SYNC_STORE_KEY);
+ storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify([{id:'prior-day',day:new Date(now-24*HOUR).toISOString().slice(0,10),
+  at:now-24*HOUR,kind:'daily',payload:normalizedLocal}]));
+ await ctx.cloudPull();
+ const prior=ctx.readLocalBackups().find(row=>row.id==='prior-day');
+ assert.ok(prior&&prior.kind==='cloud-merged','the adopted local board remains ordinary automatic recovery history: '+storage.getItem(LOCAL_BACKUPS_KEY));
+ const adopted=storage.getItem(SYNC_STORE_KEY);
+ const rows=JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY));
+ rows.push({id:'today-stable',day:ctx.backupDay(now),at:now,kind:'daily',payload:adopted});
+ storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify(rows));
+
+ ctx.state.tasks.find(task=>task.id==='local').title+=' with a modest later edit '.repeat(8).trimEnd();
+ ctx.state.updatedAt=now+1;ctx.state.syncDirty=true;
+ const changed=JSON.stringify(ctx.state),growth=changed.length-adopted.length;
+ quota=used()+growth*2+96;
+ assert.equal(await ctx.persist(),true,'released prior-day history must create room for both guarded primary keys: '+
+  (shim.document.getElementById('toast')?.textContent||'')+'; rows: '+storage.getItem(LOCAL_BACKUPS_KEY));
+ assert.equal(storage.getItem(LOCAL_HEAD_KEY),changed);
+ assert.equal(storage.getItem(SYNC_STORE_KEY),changed);
+ assert.ok(!ctx.readLocalBackups().some(row=>row.id==='prior-day'),'the redundant prior-day row rotates only when the edit needs its space');
+ assert.ok(ctx.readLocalBackups().some(row=>row.kind==='daily'),'the newest stable automatic recovery remains');
+ assert.doesNotMatch(shim.document.getElementById('toast')?.textContent||'',/Couldn't save this edit on this device/);
+});
+
+test('RISK CLOUD BACKUP: clean adoption promotes every conflicting row that shares a recovery ID',async()=>{
+ const local=syncState({tasks:[syncTask('local','Already in cloud')],syncRev:1,syncAccount:'e@example.com',syncDirty:true});
+ const remote=syncState({tasks:[syncTask('local','Already in cloud'),syncTask('remote','Newer remote task')]});
+ const storage=sharedScannerStorage({[SYNC_STORE_KEY]:JSON.stringify(local)});
+ const h=makeSyncHarness({remote,rev:2});
+ const {ctx}=await loadApp({sharedStorage:storage,cloudSyncFactory:h.factory});
+ const priorBoard=JSON.stringify(ctx.state),displaced=JSON.parse(priorBoard);
+ displaced.tasks[0].title='Sole overwritten offline title';
+ const sharedId='legacy-shared-id';
+ storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify([
+  {id:sharedId,day:'2026-09-27',at:Date.parse('2026-09-27T12:00:00Z'),kind:'daily',payload:priorBoard},
+  {id:sharedId,day:'2026-09-26',at:Date.parse('2026-09-26T12:00:00Z'),kind:'daily',payload:JSON.stringify(displaced)},
+ ]));
+ await ctx.cloudPull();
+ const rows=ctx.readLocalBackups().filter(row=>row.id===sharedId);
+ const conflicting=rows.find(row=>row.payload===JSON.stringify(displaced));
+ assert.ok(conflicting,'precondition: the conflicting legacy row remains readable');
+ assert.ok(!new Set(['daily','latest','before-restore','before-cloud-adoption','cloud-merged']).has(conflicting.kind),
+  'every automatic sole-copy row sharing the released ID becomes durable displaced-edit recovery');
+ assert.ok(!ctx.state.protectedBackupIds.includes(sharedId),
+  'the shared ID is released only after every conflicting row is durable');
+});
+
 test('RISK CLOUD BACKUP: overwritten same-task edits outlive equal cloud pulls when a daily row was reused',async()=>{
   const storage=sharedScannerStorage();
   const {ctx,shim}=await loadApp({sharedStorage:storage});
@@ -8232,6 +8487,32 @@ test('RISK LOCAL BACKUPS: single-device Undo frees old automatic history for its
  assert.match(reopened.shim.document.getElementById('toast')?.textContent||'',/Couldn't save this edit on this device/);
  const current=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)?.[1]||'';
  assert.match(current,/Undo now clears older automatic backup history when needed to save your edit, while keeping manual and protected recovery copies\./);
+});
+
+test('RISK LOCAL DIAGNOSTICS: ordinary edits and Undo identify the exact device save gate',async()=>{
+ const storage=sharedScannerStorage(),{ctx,shim}=await loadApp({sharedStorage:storage});
+ const original='Original board content '.repeat(30).trim();
+ const task=ctx.addTask(original);assert.equal(await ctx.persist(),true);
+ ctx.openEdit(task.id);fillEditPane(ctx,shim,{title:'Short'});ctx.onAction('save-edit',{dataset:{id:task.id}});
+ assert.equal(await ctx.persist(),true);
+ const write=storage.setItem;let blockOriginal=true;
+ storage.setItem=(key,value)=>{
+  if(blockOriginal && (key===LOCAL_HEAD_KEY||key===SYNC_STORE_KEY) && String(value).includes(original)){
+   const error=Error('aggregate site quota');error.name='QuotaExceededError';throw error;
+  }
+  write(key,value);
+ };
+ ctx.undo();assert.equal(await ctx.persist(),false,'the modeled local-only Undo reaches the same protected pair-write failure as an ordinary edit');
+ assert.equal(JSON.stringify(ctx.deviceSaveIssue()),JSON.stringify({stage:'primary-write',code:'quota-exhausted'}));
+ assert.match(shim.document.getElementById('toast').textContent,/device-save:primary-write\/quota-exhausted/);
+ ctx.openSettings();assert.match(shim.document.getElementById('modalRoot').innerHTML,/primary-write\/quota-exhausted/);
+ assert.match(shim.document.getElementById('modalRoot').innerHTML,/View \/ copy current board/);
+ blockOriginal=false;assert.equal(await ctx.persist(),true);assert.equal(ctx.deviceSaveIssue(),null,'a successful retry clears the stale diagnosis');
+
+ const missing=await loadApp();
+ vm.runInContext("pendingRestoreSafetyIds.set('missing-proof',JSON.stringify(state))",missing.ctx);
+ assert.equal(await missing.ctx.persist(),false);
+ assert.equal(JSON.stringify(missing.ctx.deviceSaveIssue()),JSON.stringify({stage:'restore-safety',code:'missing-or-changed'}));
 });
 
 test('RISK LOCAL BACKUPS: primary quota rotation keeps the newest stable recovery copy',async()=>{
@@ -8711,6 +8992,51 @@ test('SETTINGS: manual local backups replace visible JSON import and export cont
   assert.match(markup,/data-act="make-manual-backup"/);
   assert.doesNotMatch(markup,/data-act="(?:import|export)-json"|id="jsonBox"/);
   assert.match(html,/title="Settings, contexts, and backups"/);
+});
+
+test('RISK RECOVERY EXPORT: an unsaved in-memory board remains copyable without device storage',async()=>{
+  const storage=sharedScannerStorage();
+  const {ctx,shim}=await loadApp({sharedStorage:storage});
+  const originalSet=storage.setItem;
+  storage.setItem=(key,value)=>{if(key===SYNC_STORE_KEY||key===SYNC_HEAD_KEY)throw Error('quota');originalSet(key,value);};
+  ctx.addTask('Only in this open tab');
+  ctx.state.syncDirty=true;
+  ctx.state.protectedBackupIds=['device-only-recovery-id'];
+  ctx.openSettings();
+  const settings=shim.document.getElementById('modalRoot').innerHTML;
+  assert.match(settings,/data-act="view-current-board"/);
+  assert.match(settings,/data-act="download-current-board"/);
+  assert.doesNotMatch(settings,/data-act="import-json"|id="jsonBox"/,'bulk import stays out of Settings');
+  ctx.onAction('view-current-board',{});
+  const recovery=shim.document.getElementById('modalRoot').innerHTML;
+  assert.match(recovery,/Current board data/);
+  assert.match(recovery,/Only in this open tab/);
+  assert.doesNotMatch(recovery,/syncDirty|protectedBackupIds|device-only-recovery-id/,'device-only sync bookkeeping stays out of exports');
+  let download=null;
+  const link=makeFakeElement();link.remove=()=>{};link.click=()=>{download={...download,href:link.href,name:link.download};};
+  shim.document.createElement=tag=>tag==='a'?link:makeFakeElement();
+  ctx.Blob=class Blob{constructor(parts,options){this.text=parts.join('');this.type=options.type;}};
+  ctx.URL={createObjectURL(blob){download={blob};return 'blob:current-board';},revokeObjectURL(){}};
+  ctx.onAction('download-current-board',{});
+  assert.equal(download.name,'chain-scanner-current-board.json');assert.equal(download.href,'blob:current-board');
+  assert.match(download.blob.text,/Only in this open tab/);assert.doesNotMatch(download.blob.text,/device-only-recovery-id/);
+});
+
+test('RISK IMPORT RENDERING: restored identifiers cannot inject attributes or break task reveal',async()=>{
+  const base=syncState({tasks:[syncTask('task" autofocus data-injected="yes','Restored task')],contexts:[
+    {id:'ctx" autofocus data-injected="yes',name:'Restored context',active:true},
+  ],listOpen:true});
+  base.tasks[0].ctx=[base.contexts[0].id];
+  const {ctx,shim}=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(base)}});
+  const rendered=[shim.document.getElementById('ctxPanel').innerHTML,shim.document.getElementById('quickCtxRow').innerHTML,
+    shim.document.getElementById('scan').innerHTML,shim.document.getElementById('listBody').innerHTML].join('\n');
+  assert.doesNotMatch(rendered,/data-(?:ctx|id|row)="(?:task|ctx)" autofocus/);
+  assert.match(rendered,/&quot; autofocus data-injected=&quot;yes/,'the identifier remains data, not markup');
+  ctx.openSettings();
+  assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/data-(?:mgrctx|mgrname|id)="ctx" autofocus/);
+  shim.document.querySelector=selector=>{if(selector.includes('autofocus'))throw Error('invalid selector');return null;};
+  shim.document.querySelectorAll=selector=>{assert.equal(selector,'[data-row]');return [];};
+  assert.doesNotThrow(()=>ctx.revealTask(base.tasks[0].id));
 });
 
 test('LOCAL BACKUPS: a failed safety copy blocks restore and leaves the current board untouched', async () => {
@@ -11592,7 +11918,7 @@ test('Animation controls: revealing a task respects app and device reduced motio
  const code=html.slice(start,end);
  for(const [preference,osReduced,expected] of [['normal',false,'smooth'],['reduced',false,'instant'],['normal',true,'instant'],[undefined,false,'instant']]){
   const calls=[],row={classList:{remove(){},add(){}},offsetWidth:100,scrollIntoView(options){calls.push(options);}};
-  const ctx=vm.createContext({state:{listOpen:false},clearListFilters(){},render(){},requestAnimationFrame(fn){fn();},document:{documentElement:{dataset:{landscapeMotion:preference}},querySelector(){return row;}},window:{matchMedia(){return {matches:osReduced};}}});
+  const ctx=vm.createContext({state:{listOpen:false},clearListFilters(){},render(){},requestAnimationFrame(fn){fn();},document:{documentElement:{dataset:{landscapeMotion:preference}},querySelectorAll(){return [Object.assign(row,{dataset:{row:'task'}})];}},window:{matchMedia(){return {matches:osReduced};}}});
   vm.runInContext(code+';revealTask("task");',ctx);
   assert.equal(calls[0].behavior,expected,`${preference}/${osReduced} must choose ${expected}`);
   assert.equal(calls[0].block,'center');assert.equal(ctx.state.listOpen,true);
@@ -14017,6 +14343,16 @@ test('Eligibility filter: No, Cannot and Dislodged are ineligible until their ma
  ctx.onAction('list-eligibility',{dataset:{id:'ineligible'}});assert.equal(rowTitles(shim).length,0);
 });
 
+test('RISK eligibility filter: Worked on it remains ineligible until its hold clears',async()=>{
+ const {ctx,shim}=await loadApp();ctx.state.listOpen=true;
+ const ready=ctx.addTask('Ready'),worked=ctx.addTask('Worked');ctx.workedOnTask(worked.id);
+ assert.equal(ctx.pool().some(task=>task.id===worked.id),false,'the scanner holds the worked task out');
+ ctx.onAction('list-eligibility',{dataset:{id:'eligible'}});assert.deepEqual(rowTitles(shim),[ready.title]);
+ ctx.onAction('list-eligibility',{dataset:{id:'ineligible'}});assert.deepEqual(rowTitles(shim),[worked.title]);
+ ctx.returnAsCandidate(worked.id);
+ ctx.onAction('list-eligibility',{dataset:{id:'eligible'}});assert.deepEqual(rowTitles(shim).sort(),[ready.title,worked.title].sort());
+});
+
 test('RISK prerequisites: completion, evergreen Done, restore, and deletion govern scan eligibility by ID',async()=>{
  const {ctx,shim}=await loadApp();const bob=ctx.addTask('bob'),gene=ctx.addTask('gene');
  assert.equal(ctx.setTaskPrerequisite(gene.id,bob.id),true);
@@ -14054,6 +14390,17 @@ test('RISK prerequisites: Add and each task editor expose stable selectors and r
  shim.document.getElementById('etPrerequisite').value=bob.id;ctx.applyEditFields(gene);assert.equal(gene.prerequisiteId,bob.id);
  ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
  assert.doesNotMatch(settings,/Task prerequisites|stPrerequisiteTask|stPrerequisiteNeeds|data-act="remove-prerequisite"/);
+});
+
+test('RISK prerequisites: pasted Add tasks keep the chosen prerequisite',async()=>{
+ const {ctx,shim}=await loadApp();const prerequisite=ctx.addTask('First finish this');ctx.render();
+ shim.document.getElementById('addPrerequisite').value=prerequisite.id;
+ shim.document.getElementById('addInput').value='Pasted one\nPasted two';
+ ctx.onAction('add',{});
+ const pasted=ctx.state.tasks.filter(task=>task.id!==prerequisite.id);
+ assert.equal(pasted.length,2);
+ assert.ok(pasted.every(task=>task.prerequisiteId===prerequisite.id),'multiline Add must preserve the same scheduling choice as single Add');
+ assert.ok(pasted.every(task=>ctx.isEligible(task)===false));
 });
 
 test('RISK evergreen hours or days: stored hours survive conversion, UI save, and 2 AM reset suggestion',async()=>{
