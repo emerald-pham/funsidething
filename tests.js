@@ -1748,6 +1748,144 @@ test("chanceBetterSoon: rises toward 1 as the pool has more equally-strong candi
   assert.ok(chance3 > chance1, "considering more candidates per minute should raise the chance of finding a better one");
 });
 
+test("RISK TrueSkill probability: answer judgments use the same performance noise as rank updates", () => {
+  const E = loadEngine();
+  const a = { mu: 29, sigma: 4 }, b = { mu: 21, sigma: 7 };
+  assert.equal(E.pJudged(a, b), E.pBeats(a, b),
+    "one Yes/No answer and one rank update must use the same BETA performance-noise model");
+});
+
+test("RISK chance forecast: five candidates share one uncertain benchmark draw", () => {
+  const E = loadEngine();
+  const bench = { mu: 25, sigma: 25 / 3 };
+  const pool = Array.from({ length: 5 }, () => ({ mu: 25, sigma: 0.8 }));
+  const chance = E.chanceBetterSoon(bench, pool, 5);
+  // Independent reference: a 256-panel Simpson integral over the shared
+  // benchmark performance, with Python math.erfc for the conditional normal CDF.
+  assert.ok(Math.abs(chance - 0.6934877295879022) < 2e-6,
+    `five candidates should share benchmark uncertainty; got ${chance}`);
+  assert.ok(chance < 0.75, "the benchmark's one shared uncertain score cannot be counted as five independent draws");
+});
+
+test("RISK chance forecast: one-candidate marginal and supplied order stay intact", () => {
+  const E = loadEngine();
+  const bench = { mu: 25, sigma: 5 };
+  const first = { id: "first", mu: 20, sigma: 2 };
+  const later = { id: "later", mu: 40, sigma: 2 };
+  const single = E.chanceBetterSoon(bench, [later], 1);
+  assert.ok(Math.abs(single - E.pBeats(later, bench)) < 2e-7,
+    "with one candidate, the shared-performance integral equals the existing match probability");
+  const ordered = E.chanceBetterSoon(bench, [first, later], 1);
+  assert.ok(Math.abs(ordered - E.pBeats(first, bench)) < 2e-7,
+    "the forecast uses the first candidate in the caller's actual queue order");
+  assert.ok(ordered < single, "a later strong candidate must not be forecast ahead of the first task");
+});
+
+test("RISK chance forecast: one candidate matches pBeats across extreme supported uncertainty ratios", () => {
+  const E = loadEngine();
+  const bench = { mu: -50, sigma: 1000 };
+  const candidate = { mu: -100, sigma: 0.8 };
+  const chance = E.chanceBetterSoon(bench, [candidate], 1);
+  assert.equal(chance, E.pBeats(candidate, bench),
+    "the one-candidate forecast is exactly the existing match probability, even when the shared draw is much broader");
+});
+
+test("RISK chance forecast: adaptive integration resolves narrow shared-benchmark transitions", () => {
+  const E = loadEngine();
+  // Independent references use Python math.erfc with adaptive Simpson split
+  // around each candidate's conditional-CDF transition.
+  const cases = [
+    {
+      bench: { mu: -50, sigma: 1000 },
+      pool: [{ mu: -100, sigma: 0.8 }, { mu: -55, sigma: 0.8 }],
+      expected: 0.49800533217659593
+    },
+    {
+      bench: { mu: 0, sigma: 10000 },
+      pool: [{ mu: -5000, sigma: 0.8 }, { mu: 5000, sigma: 0.8 }],
+      expected: 0.69146243014948894
+    }
+  ];
+  for (const { bench, pool, expected } of cases) {
+    const chance = E.chanceBetterSoon(bench, pool, 2);
+    assert.ok(Math.abs(chance - expected) < 2e-8,
+      `shared benchmark integral should match the independent high-precision reference; got ${chance}, expected ${expected}`);
+  }
+});
+
+test("RISK TrueSkill truncation: inverse-Mills tails match references through the former cutoff and extreme upset", () => {
+  const E = loadEngine();
+  const cases = [
+    [-5.999, 6.157506595658616, 0.9760054082233257],
+    [-6, 6.158482604544579, 0.9760123632107078],
+    [-6.001, 6.159458620384075, 0.9760193152988542],
+    [-10, 10.09809323396242, 0.9905546221734387],
+    [-25, 25.039873012055, 0.9984151584653532],
+  ];
+  for (const [t, expectedV, expectedW] of cases) {
+    const actual = E.truncGaussVW(t);
+    assert.ok(Math.abs(actual.v - expectedV) < 2e-8, `v(${t}) should match the stable normal-tail reference, got ${actual.v}`);
+    assert.ok(Math.abs(actual.w - expectedW) < 2e-9, `w(${t}) should match the stable normal-tail reference, got ${actual.w}`);
+  }
+  const atCutoff = E.truncGaussVW(-6);
+  const justAbove = E.truncGaussVW(-5.999);
+  const justBelow = E.truncGaussVW(-6.001);
+  assert.ok(Math.abs(atCutoff.v - (justAbove.v + justBelow.v) / 2) < 2e-6,
+    "the former denominator switch must not create a discontinuous jump in v");
+  const extreme = E.truncGaussVW(-80);
+  assert.ok(Number.isFinite(extreme.v) && Number.isFinite(extreme.w));
+  assert.ok(extreme.v > 80 && extreme.w > 0.999 && extreme.w < 1,
+    "an extreme upset keeps the finite, nonzero Gaussian tail correction");
+});
+
+test("RISK rating bounds: hydration and frozen chance opponents normalize extremes without changing healthy ratings", async () => {
+  const { ctx } = await loadApp();
+  const muLimit = readConst(ctx, "RATING_MU_LIMIT");
+  const sigmaLimit = readConst(ctx, "RATING_SIGMA_LIMIT");
+  const sigmaFloor = readConst(ctx, "SIGMA_FLOOR");
+  const board = structuredClone(ctx.state);
+  board.v = 2;
+  board.tasks = [
+    { id: "healthy", title: "Healthy", mu: 37.25, sigma: 1.125, createdAt: 1, ctx: [] },
+    { id: "huge", title: "Huge", mu: 1e200, sigma: 1e200, createdAt: 2, ctx: [] },
+    { id: "invalid", title: "Invalid", mu: NaN, sigma: 0, createdAt: 3, ctx: [] },
+  ];
+  board.chance = {
+    seed: "same-frozen-pass", at: 1, weights: {},
+    opponents: [{ id: "frozen-huge", mu: -1e200, sigma: 1e200 }],
+  };
+  board.scanMode = "chance";
+  ctx.hydrateState(board);
+
+  assert.deepEqual([board.tasks[0].mu, board.tasks[0].sigma], [37.25, 1.125],
+    "ordinary saved ratings keep their exact values");
+  assert.deepEqual([board.tasks[1].mu, board.tasks[1].sigma], [muLimit, sigmaLimit]);
+  assert.deepEqual([board.tasks[2].mu, board.tasks[2].sigma], [readConst(ctx, "PRIOR_MU"), readConst(ctx, "PRIOR_SIGMA")]);
+  assert.deepEqual([board.chance.opponents[0].mu, board.chance.opponents[0].sigma], [-muLimit, sigmaLimit]);
+  assert.equal(board.chance.seed, "same-frozen-pass", "rating repair keeps the already-frozen pass identity");
+
+  const winner = { mu: 1e200, sigma: 1e200 };
+  const loser = { mu: -1e200, sigma: 1e200 };
+  ctx.updatePair(winner, loser);
+  for (const value of [winner.mu, winner.sigma, loser.mu, loser.sigma]) assert.ok(Number.isFinite(value));
+  assert.ok(Math.abs(winner.mu) <= muLimit && Math.abs(loser.mu) <= muLimit);
+  assert.ok(winner.sigma >= sigmaFloor && winner.sigma <= sigmaLimit);
+  assert.ok(loser.sigma >= sigmaFloor && loser.sigma <= sigmaLimit);
+});
+
+test("RISK Diagnostics download: Settings and save directions retain current-board recovery actions", async () => {
+  const { ctx, shim } = await loadApp();
+  ctx.openSettings();
+  const panel = shim.document.getElementById("modalRoot").innerHTML;
+  assert.match(panel, /<h3>Diagnostics download<\/h3>/);
+  assert.match(panel, /data-act="view-current-board"/);
+  assert.match(panel, /data-act="download-current-board"/);
+  assert.doesNotMatch(panel, /Current board recovery/i);
+  assert.match(html, /use Diagnostics download in Settings before closing it/);
+  assert.match(html, /use Diagnostics download in Settings before choosing whether to delete an older backup/);
+  assert.doesNotMatch(html, /Current board recovery/);
+});
+
 test("median: odd, even, and empty arrays", () => {
   const E = loadEngine();
   assert.equal(E.median([3, 1, 2]), 2);
@@ -10935,6 +11073,24 @@ test('Landscape clock tower follows device local time instead of saved sky locat
    'the civic clock should keep device time when the observer location changes');
 });
 
+test('RISK landscape city: clock tower meets the waterline on tablet, phone, and short-landscape viewports',()=>{
+ const context=vm.createContext({Math,LandscapeMood:{clock:()=>({minuteAngle:0,hourAngle:0})},S:{mixHex:()=>'#fff0c9'},ellipse(){},line(){}});
+ vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),context);
+ const runtime=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ const start=runtime.indexOf('    const tx=W*.71,ty=hy-72;');
+ const end=runtime.indexOf('    b=cityTarget;',start);
+ assert.ok(start>=0&&end>start,'the tested block is the clock tower paint path');
+ const painter=runtime.slice(start,end);
+ for(const [W,H] of [[768,1024],[1024,768],[820,1180],[390,844],[320,568],[568,320],[1440,900]]){
+  const geometry=context.LandscapeGeometry.create(W,H),rects=[];
+  context.W=W;context.hy=geometry.horizon;context.geometry=geometry;context.p={city:'#bbdce1'};context.sky={date:new Date('2026-09-12T15:30:00Z')};
+  context.b={fillRect(...rect){rects.push(rect);},beginPath(){},moveTo(){},lineTo(){},fill(){}};
+  vm.runInContext('{'+painter+'}',context);
+  const [,top,,height]=rects[0];
+  assert.equal(top+height,geometry.waterTop,`tower body touches lake at ${W}x${H}`);
+ }
+});
+
 test('Landscape waterfront: vessels fit the water, and trees and landmarks share safe anchors',()=>{
  const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
  for(const [w,h] of [[320,568],[390,844],[844,390],[1440,1000]]){
@@ -13905,7 +14061,7 @@ test('Consistency repair: stop estimate uses actual chance order without reshuff
  const {ctx}=await loadApp();const bench={...syncTask('root','Root'),mu:25,sigma:1},low={...syncTask('low','Low'),mu:15,sigma:1},low2={...syncTask('low2','Low2'),mu:15,sigma:1},high={...syncTask('high','High'),mu:35,sigma:1};
  ctx.state.tasks=[bench,low,low2,high];ctx.state.chain=['root'];ctx.state.scanMode='chance';ctx.state.decisionsMs=[30000];ctx.state.mode='scan';
  for(let i=0;i<1000;i++){ctx.state.chance={seed:String(i),at:Date.now(),weights:{root:25,low:15,low2:15,high:35}};const rest=[low,low2,high];let last;while(rest.length){last=ctx.chancePick(rest);rest.splice(rest.indexOf(last),1);}if(last.id==='high')break;}
- const frozen=JSON.stringify(ctx.state.chance);ctx.maybeIntervene();assert.equal(ctx.state.interventionActive,true);assert.ok(ctx.state.interventionP<.001);assert.equal(JSON.stringify(ctx.state.chance),frozen);
+ const frozen=JSON.stringify(ctx.state.chance);ctx.maybeIntervene();assert.equal(ctx.state.interventionActive,true);assert.ok(ctx.state.interventionP>.08&&ctx.state.interventionP<.1,'the two weak tasks actually ahead stay below the later strong task under the shared BETA model');assert.equal(JSON.stringify(ctx.state.chance),frozen);
 });
 test('Consistency repair: Starts eligibility gets a midnight wake as well as the day marker',async()=>{
  const {ctx}=await loadApp();const at=new Date(2026,8,16,23,59).getTime();setFakeTime(ctx,at);const t=ctx.addTask('Tomorrow');t.startsAt='2026-09-17';assert.equal(ctx.nextScanWakeAt(),new Date(2026,8,17,0).getTime());
@@ -15382,6 +15538,11 @@ function releaseGateInput(fixture,overrides={}){
   candidate:{commitSha:fixture.candidateSha,treeSha:fixture.treeSha,baseSha:fixture.baseSha},
   ownerTask:'/root/release-owner',
   memoryAudit:{task:'/root/memory-auditor',outcome:'pass',completedAt:now,
+   scope:{
+    memory:{affected:false,rationale:'This fixture changes no memory-dependent behavior.',tests:[]},
+    cloud:{affected:false,rationale:'This fixture changes no cloud data or account path.',tests:[]},
+    sync:{affected:false,rationale:'This fixture changes no synchronization or reconciliation path.',tests:[]}
+   },
    sources:[{path:fixture.sourcePath,sha256:releaseGateHash(fixture.sourcePath)}],
    evidencePath:fixture.memoryEvidencePath,evidenceSha256:releaseGateHash(fixture.memoryEvidencePath)},
   independentReview:{task:'/root/exact-final-review',outcome:'approved',reviewedSha:fixture.candidateSha,completedAt:now,
@@ -15406,6 +15567,10 @@ test('RISK repository process: exact-SHA receipts bind audit and review evidence
   assert.equal(recorded.receipt.candidate.commitSha,fixture.candidateSha);
   assert.equal(recorded.receipt.candidate.treeSha,fixture.treeSha);
   assert.equal(recorded.receipt.candidate.baseSha,fixture.baseSha);
+  assert.deepEqual(Object.keys(recorded.receipt.memoryAudit.scope).sort(),['cloud','memory','sync'],
+   'the exact-SHA memory review receipt records each data-safety domain');
+  assert.equal(recorded.receipt.memoryAudit.scope.cloud.affected,false,
+   'a pure release-gate fixture can record a justified cloud no-impact assessment');
   assert.equal(verifyReleaseEvidence(fixture.repo,fixture.candidateSha).ok,true);
   const common=releaseGateGit(fixture.repo,['rev-parse','--path-format=absolute','--git-common-dir']);
   assert.ok(recorded.receiptPath.startsWith(path.join(common,'funsidething-release-evidence')+path.sep),
@@ -15419,6 +15584,42 @@ test('RISK repository process: exact-SHA receipts bind audit and review evidence
   assert.equal(verifyReleaseEvidence(fixture.repo,fixture.candidateSha).ok,false,
    'editing the recorded audit evidence invalidates its digest');
  }finally{cleanupReleaseGateFixture(fixture);}
+});
+
+test('RISK repository process: memory cloud and sync review scope scales evidence to impact',async()=>{
+ const {recordReleaseEvidence,verifyReleaseEvidence}=await import('./scripts/release-evidence.mjs');
+ const fixture=makeReleaseGateFixture();
+ const affectedFixture=makeReleaseGateFixture();
+ try{
+  const baseScope=releaseGateInput(fixture).memoryAudit.scope;
+  const missing=releaseGateInput(fixture,{memoryAudit:{scope:undefined}});
+  assert.throws(()=>recordReleaseEvidence(fixture.repo,missing),/scope|memory|cloud|sync/i,
+   'the existing memory audit role must explicitly assess all three data-safety domains');
+  const noImpact=releaseGateInput(fixture,{memoryAudit:{scope:{
+   memory:{affected:false,rationale:'This candidate changes no behavior that reads or writes saved memory.',tests:[]},
+   cloud:{affected:false,rationale:'This candidate does not change cloud documents, accounts, or ownership.',tests:[]},
+   sync:{affected:false,rationale:'This candidate does not change synchronization or reconciliation paths.',tests:[]}
+  }}});
+  const noImpactReceipt=recordReleaseEvidence(fixture.repo,noImpact);
+  assert.deepEqual(noImpactReceipt.receipt.memoryAudit.scope,noImpact.memoryAudit.scope,
+   'pure copy or UI changes retain explicit, justified no-impact decisions without requiring unrelated cloud tests');
+  assert.equal(verifyReleaseEvidence(fixture.repo,fixture.candidateSha).ok,true);
+
+  const affectedScope=structuredClone(baseScope);
+  affectedScope.memory={affected:true,rationale:'This candidate changes persisted rating data during hydration and normalization.',tests:[]};
+  assert.throws(()=>recordReleaseEvidence(affectedFixture.repo,
+   releaseGateInput(affectedFixture,{memoryAudit:{scope:affectedScope}})),/test|evidence|scope|affected/i,
+   'an affected data-safety domain needs focused test evidence');
+  affectedScope.memory.tests=['RISK rating bounds: hydration and frozen chance opponents normalize extremes without changing healthy ratings'];
+  const affectedReceipt=recordReleaseEvidence(affectedFixture.repo,
+   releaseGateInput(affectedFixture,{memoryAudit:{scope:affectedScope}}));
+  assert.equal(affectedReceipt.receipt.memoryAudit.scope.memory.affected,true);
+  assert.equal(verifyReleaseEvidence(affectedFixture.repo,affectedFixture.candidateSha).ok,true,
+   'risk-based affected review evidence is preserved and verifiable on the exact candidate');
+ }finally{
+  cleanupReleaseGateFixture(fixture);
+  cleanupReleaseGateFixture(affectedFixture);
+ }
 });
 
 test('RISK repository process: absent, stale, malformed, or nonindependent receipts fail closed',async()=>{

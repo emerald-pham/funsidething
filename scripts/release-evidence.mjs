@@ -57,6 +57,35 @@ function validTime(value, field) {
   return value;
 }
 
+function memoryCloudSyncScope(scope, field = 'memoryAudit.scope') {
+  const domains = ['memory', 'cloud', 'sync'];
+  if (!scope || typeof scope !== 'object' || Array.isArray(scope)) {
+    throw new Error(field + ' must explicitly assess memory, cloud, and sync impact.');
+  }
+  const assessed = {};
+  for (const domain of domains) {
+    const entry = scope[domain];
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry) || typeof entry.affected !== 'boolean') {
+      throw new Error(field + '.' + domain + ' must set an affected boolean.');
+    }
+    if (typeof entry.rationale !== 'string' || entry.rationale.trim().length < 20) {
+      throw new Error(field + '.' + domain + ' must record a specific impact rationale.');
+    }
+    if (!Array.isArray(entry.tests) || !entry.tests.every(test => typeof test === 'string' && test.trim().length >= 10)) {
+      throw new Error(field + '.' + domain + '.tests must list focused test evidence or be an empty array.');
+    }
+    if (entry.affected && entry.tests.length === 0) {
+      throw new Error(field + '.' + domain + ' is affected and needs focused test evidence.');
+    }
+    assessed[domain] = {
+      affected: entry.affected,
+      rationale: entry.rationale.trim(),
+      tests: entry.tests.map(test => test.trim()),
+    };
+  }
+  return assessed;
+}
+
 function isInside(parent, child) {
   const relative = path.relative(parent, child);
   return relative === '' || (!relative.startsWith('..' + path.sep) && relative !== '..' && !path.isAbsolute(relative));
@@ -100,6 +129,7 @@ function validateInput(repoRoot, input) {
   const identities = [ownerTask, auditorTask, reviewerTask].map(value => value.toLocaleLowerCase());
   if (new Set(identities).size !== identities.length) throw new Error('Owner, memory auditor, and independent reviewer need distinct task identities.');
   if (input.memoryAudit.outcome !== 'pass') throw new Error('Memory audit outcome must be pass.');
+  const memoryScope = memoryCloudSyncScope(input.memoryAudit.scope);
   if (input.independentReview.outcome !== 'approved') throw new Error('Independent review outcome must be approved.');
   if (input.independentReview.reviewedSha !== commitSha) throw new Error('Independent review must name the exact candidate SHA.');
   const auditTime = validTime(input.memoryAudit.completedAt, 'Memory audit');
@@ -136,6 +166,7 @@ function validateInput(repoRoot, input) {
         task: auditorTask,
         outcome: 'pass',
         completedAt: auditTime,
+        scope: memoryScope,
         sources,
         evidence: { file: 'memory-audit.md', sha256: sha256(memoryBytes) },
       },
@@ -227,6 +258,11 @@ export function verifyReleaseEvidence(repoRoot, commitSha) {
   if (!Array.isArray(receipt?.memoryAudit?.sources) || receipt.memoryAudit.sources.length === 0 ||
       !receipt.memoryAudit.sources.every(source => typeof source.path === 'string' && path.isAbsolute(source.path) && SHA256.test(source.sha256 || ''))) {
     errors.push('Memory audit source list, absolute paths, or fingerprints are incomplete.');
+  }
+  try {
+    memoryCloudSyncScope(receipt?.memoryAudit?.scope);
+  } catch (error) {
+    errors.push(error.message);
   }
   const scope = receipt?.independentReview?.scope;
   if (!scope || scope.fullDiff !== true || scope.relevantTests !== true || scope.userVisibleAndDataSafety !== true) {

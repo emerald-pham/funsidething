@@ -300,7 +300,7 @@
     }
     // A small clock tower and civic dome give the distant city a recognizable heart.
     const tx=W*.71,ty=hy-72;
-    b.fillStyle=p.city;b.fillRect(tx-9,ty,18,83);b.fillRect(tx-12,ty-4,24,5);
+    b.fillStyle=p.city;b.fillRect(tx-9,ty,18,geometry.waterTop-ty);b.fillRect(tx-12,ty-4,24,5);
     b.beginPath();b.moveTo(tx-11,ty-4);b.lineTo(tx,ty-19);b.lineTo(tx+11,ty-4);b.fill();
     ellipse(b,tx,ty+12,5,5,S.mixHex('#fff0c9',p.city,.18));
     const hands=globalThis.LandscapeMood?.clock(sky.date)||{minuteAngle:0,hourAngle:0};
