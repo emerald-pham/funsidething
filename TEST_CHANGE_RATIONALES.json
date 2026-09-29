@@ -589,8 +589,7 @@
     "replacementTests": [
       "RISK oldest never done: both modes prefer never-completed tasks and keep worked tasks eligible",
       "RISK oldest never done: legacy completion and restore evidence survives reload and reconciliation",
-      "RISK oldest never done: all-completed fallback and eligibility boundaries preserve usable scans",
-      "UI: Quick start displays the requested seven steps in order"
+      "RISK oldest never done: all-completed fallback and eligibility boundaries preserve usable scans"
     ],
     "preservedCoverage": [
       "Existing eligibility, preference neutrality, recurring-task availability, and both scan modes remain unchanged.",
