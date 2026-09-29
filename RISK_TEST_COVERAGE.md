@@ -262,6 +262,8 @@ The editor hook blocks app or enforcement edits while tests.js has no staged or 
 - RISK TrueSkill probability: answer judgments use the same performance noise as rank updates
 - RISK chance forecast: five candidates share one uncertain benchmark draw
 - RISK chance forecast: one-candidate marginal and supplied order stay intact
+- RISK chance forecast: one candidate matches pBeats across extreme supported uncertainty ratios
+- RISK chance forecast: adaptive integration resolves narrow shared-benchmark transitions
 - RISK TrueSkill truncation: inverse-Mills tails match references through the former cutoff and extreme upset
 - RISK rating bounds: hydration and frozen chance opponents normalize extremes without changing healthy ratings
 - RISK Diagnostics download: Settings and save directions retain current-board recovery actions

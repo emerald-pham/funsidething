@@ -1781,6 +1781,38 @@ test("RISK chance forecast: one-candidate marginal and supplied order stay intac
   assert.ok(ordered < single, "a later strong candidate must not be forecast ahead of the first task");
 });
 
+test("RISK chance forecast: one candidate matches pBeats across extreme supported uncertainty ratios", () => {
+  const E = loadEngine();
+  const bench = { mu: -50, sigma: 1000 };
+  const candidate = { mu: -100, sigma: 0.8 };
+  const chance = E.chanceBetterSoon(bench, [candidate], 1);
+  assert.equal(chance, E.pBeats(candidate, bench),
+    "the one-candidate forecast is exactly the existing match probability, even when the shared draw is much broader");
+});
+
+test("RISK chance forecast: adaptive integration resolves narrow shared-benchmark transitions", () => {
+  const E = loadEngine();
+  // Independent references use Python math.erfc with adaptive Simpson split
+  // around each candidate's conditional-CDF transition.
+  const cases = [
+    {
+      bench: { mu: -50, sigma: 1000 },
+      pool: [{ mu: -100, sigma: 0.8 }, { mu: -55, sigma: 0.8 }],
+      expected: 0.49800533217659593
+    },
+    {
+      bench: { mu: 0, sigma: 10000 },
+      pool: [{ mu: -5000, sigma: 0.8 }, { mu: 5000, sigma: 0.8 }],
+      expected: 0.69146243014948894
+    }
+  ];
+  for (const { bench, pool, expected } of cases) {
+    const chance = E.chanceBetterSoon(bench, pool, 2);
+    assert.ok(Math.abs(chance - expected) < 2e-8,
+      `shared benchmark integral should match the independent high-precision reference; got ${chance}, expected ${expected}`);
+  }
+});
+
 test("RISK TrueSkill truncation: inverse-Mills tails match references through the former cutoff and extreme upset", () => {
   const E = loadEngine();
   const cases = [
