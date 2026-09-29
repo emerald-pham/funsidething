@@ -27,6 +27,8 @@ The named-contract test in tests.js checks that every top-level test whose title
 
 - RISK CLOUD ADAPTER: malformed revisions fail closed before Firestore writes
 - RISK CLOUD DIAGNOSTICS: safe failure stage and code survive backend and UI boundaries
+- RISK CLOUD RECOVERY: a durable ordinary save retries and clears its stale cloud error without reload
+- RISK CLOUD RECOVERY: Undo retries a failed write, while a failed retry and an account change stay errors
 - RISK CLOUD ACCOUNT: signing out and back into the same account requires a fresh read
 - RISK CLOUD ACCOUNT: signing in after sign-out opens the Google account chooser
 - RISK RECOVERY EXPORT: an unsaved in-memory board remains copyable without device storage
@@ -95,6 +97,11 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK CLOUD BACKUP: an exact chosen copy avoids duplicate displaced-edit storage
 - RISK LOCAL BACKUPS: aged stale-tab and other-browser recovery stays available
 - RISK LOCAL BACKUPS: unknown legacy kinds do not expire during rotation
+- RISK RESET SAFETY: Reset everything needs a second tap and Cancel leaves every byte unchanged
+- RISK RESET SAFETY: the confirmed reset keeps an exact durable pre-reset copy that survives reload and restores
+- RISK RESET SAFETY: backup failure aborts reset before state or primary storage changes
+- RISK RESET SAFETY: quota compaction makes room for the mandatory copy without deleting retained rows
+- RISK RESET SAFETY: failed primary reset preserves Undo and never restores an old account after switching
 
 ## Location, scene settings, and cross-device behavior
 

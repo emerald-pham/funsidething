@@ -451,5 +451,31 @@
       "failure": "Before implementation, all four discriminating tests failed: the protected-archive primary save returned false with device-save:primary-write/quota-exhausted; packBackupIndex was undefined; the newer cloud board remained held because its mandatory backup could not fit; and the status button still rendered a green synced label after the local pair write failed. The later corruption, CAS, exact recovery view/download/delete, offline-asset, and reload assertions exercise the same codec boundary and retain the original fail-closed contracts. Exact-candidate review then reproduced packed Restore failing with 'Backup list changed or this copy cannot be restored'; the added production test failed with the current title still live instead of the packed recovery title, then passed after the displayed snapshot used the central decoder while raw CAS remained unchanged."
     },
     "testChangesSha256": "033bf6a5a77e09be3afc58e25c38db912835ba1039219c4879513c31108fcdff"
+  },
+  {
+    "testChangesSha256": "66a67d4d9367eae2bd91b4a1da9a0c1826246290c53f117ddb45f5b026cd7d2a",
+    "reason": "After the lossless quota recovery release, the user confirmed device saving worked but the cloud badge remained stuck on error until reload. The user also required Reset everything to need a second explicit tap and an immediate restorable backup. Production-path tests reproduce the missing post-save cloud retry and exercise reset confirmation, mandatory backup, quota compaction, failure rollback, reload/restore, Undo, and account-transition boundaries.",
+    "previousBehavior": "A successful retry of a formerly failed primary device save cleared only the local device warning. It did not retry the pull, push, or reconciliation operation whose earlier error remained in CloudSync, so the header could stay on cloud error until focus or reload despite recovered local capacity. Reset everything used one native confirmation and immediately replaced the board without making a dedicated pre-reset recovery copy.",
+    "intendedBehavior": "When a failed device save becomes durable, retry exactly the matching pull, push, or reconciliation stage once under the same signed-in identity and error signature. Clear the cloud error only through a successful adapter operation, keep genuine failures visible, and show syncing until every recovered edit is acknowledged. Reset opens a visible confirmation first; the second tap must durably keep the exact current board in a retained before-reset copy before saving or syncing an empty board. Cancel, backup failure, primary failure, and account changes preserve the appropriate board and recovery boundaries.",
+    "replacementTests": [
+      "RISK CLOUD RECOVERY: a durable ordinary save retries and clears its stale cloud error without reload",
+      "RISK CLOUD RECOVERY: Undo retries a failed write, while a failed retry and an account change stay errors",
+      "RISK RESET SAFETY: Reset everything needs a second tap and Cancel leaves every byte unchanged",
+      "RISK RESET SAFETY: the confirmed reset keeps an exact durable pre-reset copy that survives reload and restores",
+      "RISK RESET SAFETY: backup failure aborts reset before state or primary storage changes",
+      "RISK RESET SAFETY: quota compaction makes room for the mandatory copy without deleting retained rows",
+      "RISK RESET SAFETY: failed primary reset preserves Undo and never restores an old account after switching"
+    ],
+    "preservedCoverage": [
+      "Existing cloud diagnostics, revision arbitration, read-before-write, same-account reauthentication, account-switch, stale-callback, failed-adoption, union, and permission-error tests remain intact. Backend success remains the only authority that clears a cloud failure.",
+      "Existing local quota, packed archive, protected/manual/sole-copy recovery, paired primary write, Undo, Restore proof, stale-tab, and cloud-adoption tests still preserve exact user data and fail closed when recovery cannot be proved.",
+      "The H1 reset resurrection contract now performs the newly required first and second taps, while retaining its original assertion that the empty board reaches the cloud and is not resurrected.",
+      "A pre-reset copy uses a retained nonautomatic kind, preserves account and recovery-pin bookkeeping, survives reset and reload, and remains restorable. Failed asynchronous reset callbacks cannot restore one account's captured board after identity changes or corrupt the prior Undo stack.",
+      "Pending reads, writes, and reconciliation render as syncing rather than synced. A failed automatic retry remains error, and auth/setup failures outside the recovered device-save operation are not silently cleared or retried."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='RISK CLOUD RECOVERY|RISK RESET SAFETY|AUDIT H1' tests.js; node --test --test-reporter=spec --test-name-pattern='failed primary reset preserves Undo' tests.js; node --test --test-reporter=spec --test-name-pattern='durable ordinary save retries' tests.js",
+      "failure": "Before implementation, 6 of 10 selected cases failed. The durable local recovery observed only the initial pull instead of the required retry (1 rather than 2), Undo left the remote title at After edit, the first reset tap immediately emptied the board, no before-reset copy existed, and backup failure still mutated the board. The existing H1 reset contract also failed at its new first-tap boundary. The follow-up reset race test failed because truncating the 30-frame Undo stack retained the reset frame and lost the oldest frame; the account-switch assertion was then exercised after exact stack restoration. The accessible pending-status red run rendered text syncing but still titled the control Synced as owner@example.test instead of identifying an unacknowledged board."
+    }
   }
 ]
