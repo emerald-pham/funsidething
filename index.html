@@ -461,7 +461,7 @@ input[type=date]::-webkit-date-and-time-value{min-width:0;text-align:left}
   <p>You can change this anytime in Settings. The sun and Moon follow their real paths, even when the scenery is still.</p>
 </dialog>
 <!-- changelog:start -->
-<template id="appChangelogCurrent"><div data-app-fingerprint="34a16f7d8aa789c3cd62e81165248549eddff117e5795e653b9c125c50988ff2"><h3>September 28, 2026</h3><ul><li>When a newer cloud board already contains every local task, its redundant safety copy no longer stays protected while waiting for a cloud write that will never be needed. The copy remains in local history, while later edits can rotate it when browser space is full; displaced or conflicting edits remain protected.</li><li>Cloud errors now identify whether sign-in, reading, writing, or local reconciliation failed and show a safe error code. Invalid cloud revisions stop before writing, and signing back into the same account reads its current board before sending a local edit.</li><li>Signing in now opens the Google account chooser, so signing out can actually switch to a different board and account.</li><li>Settings can now view, copy, or download the board currently open in this tab, including an edit that device storage could not save. Device-save warnings also include a stable stage and code that Settings repeats without exposing board contents.</li><li>Pasted tasks now keep their chosen prerequisite, Worked on it tasks stay under Ineligible until their hold clears, and restored identifiers remain plain data in every task and context control.</li><li>Cloud-confirmed recovery copies now stop consuming protected device storage after their exact sync is acknowledged. An overwritten offline edit remains a durable recovery copy until you remove it, even when it had reused that day’s automatic backup. A full iPhone or iPad store still opens its readable saved board, and later edits can rotate released automatic history instead of failing.</li><li>Saving an ordinary edit now uses the available board storage even when optional automatic backup history is full. Manual and protected recovery copies remain untouched, and automatic history resumes when space returns.</li><li>Downloaded app updates now open immediately when this board is already saved, without making another backup write. If an edit is unsaved, the update stays pending with a visible notice while update checks continue.</li><li>Cloud sync on opening now keeps offline tasks alongside newer tasks from another device and saves the merged board before sending it. The earlier board stays in Settings backups; if this device cannot save a recovery copy, sync stays paused without replacing it. Settings now shows unreadable backups and lets you view or download their original data; deleting one copy leaves every other recovery copy untouched.</li><li>The Sun and Moon now act as the visible origin for each object's shadow, including railway spans, while starlight stays diffuse. The water keeps its clean earlier surface while local ripples distort different parts of the reflection with fine, irregular vertical shimmer instead of swinging buildings sideways; the waterline stays continuous, without striping or pixelation.</li><li>Rainclouds now have softly shaded, rounded contours that darken with the night sky. Rain and snow dim the scene gradually without a straight grey band or a darker lake strip, and shadows draw close to their objects as the Sun climbs high.</li><li>Lower trains cast shallow shadows along their tracks, and floating objects’ reflections meet their hulls without a visible seam.</li><li>Elevated electric metro cars no longer cast ground shadows; railway support shadows remain.</li><li>Elevated railway keeps its visible track and individual support shadows, without a second continuous shadow band.</li><li>Older automatic backups now clear as new ones arrive or browser space gets tight, so routine saves can continue. Manual copies, displaced local edits, stale-tab drafts, other-browser copies, and unsynced account-switch copies stay until you remove them.</li><li>Undo now clears older automatic backup history when needed to save your edit, while keeping manual and protected recovery copies. Restoring a backup also keeps the exact board it replaces through a storage-quota retry.</li></ul><h3>September 27, 2026</h3><ul><li>Chosen sky coordinates, their label and time zone, and scene time and season now sync with the signed-in board across devices. The device keeps an offline copy, and switching accounts clears the previous account’s scene.</li><li>Tasks can now wait for one prerequisite task to be completed. Evergreen Done counts, and a deleted prerequisite releases its dependent task. Add and each task’s editor can set or remove the link.</li><li>Evergreen intervals can be entered in hours or days, with a countdown tag while a task rests.</li><li>Settings has collapsible sections. Scene time is green for live time and red for a chosen time; location is green when set and red when unset. Pass reset and bulk import are removed from Settings. Previously saved custom hourly quotes still play, and the FAQ explains the main controls.</li><li>Autumn leaves are smaller. Message planes now have classic biplane wings and wheels. Daytime water mirrors the skyline, and everything above the horizon can reflect in the lake by day and night. The sky and skyline now mirror at their original vertical scale, with the existing far shore naturally hiding higher reflections. The water grows a little softer farther from its horizon line. The Moon and skyline now reflect without horizontal striping while the water keeps its 30-frame-per-second animation pace. The reflected scene stays put while small surface ripples move independently. The waterline joins cleanly, metro cars keep their color as they cross in front of the lake, the road continues past mobile edges, and the railway keeps its deck, supports, and overhead electrical at night, sized to the metro cars. Rain is darker and easier to see, and fireflies gather in the foreground.</li><li>Floating boats and water wildlife now reflect their complete visible shapes at natural height in daylight and at night. Railway and ground shadows follow the Sun or Moon, while starlit nights keep faint diffuse shade. Far, middle, and foreground grass now share depth-scaled detail and density.</li><li>Pinch and other page zoom gestures are disabled while normal scrolling stays available. Footer text now uses a consistent size.</li><li>Bird flocks and bicycle packs vary in size, trams keep even spacing across screen sizes, and airborne visitors move more visibly up and down.</li></ul><h3>September 24, 2026</h3><ul><li>Older tabs can no longer bring back a task after you complete or delete it following multiple restores. Backup imports and restores now keep the history needed for sync to respect those choices.</li></ul><h3>September 23, 2026</h3><ul><li>Old tabs can no longer roll back tasks and History without keeping a recoverable copy. Cloud refresh also stops when the browser’s saved copy is unreadable.</li><li>Settings now keeps seven days of local backups and manual copies you can restore or delete. Restoring saves your current board first and keeps later tasks without a recorded deletion.</li><li>Cloud saves follow revision order and keep tasks unless you deleted them.</li><li>Account switches keep unsynced work in a local recovery copy, and Undo cannot move one account’s tasks into another. Backup restore warns before crossing accounts.</li><li>Quick edits from one tab wait for the previous cloud save, so an older confirmation cannot replace a newer change. If another device updates the same task first, this tab warns you and keeps a restorable copy.</li><li>Return as candidate stays visible in the task editor and greys out when unavailable.</li><li>Quick start now has a collapsed More FAQs section explaining Done, Worked on it, Dislodge, cooldowns, and early returns to scanning.</li></ul><h3>September 21, 2026</h3><ul><li>Separate tasks with the same name now keep their own completed and worked-on History entries.</li><li>A damaged backup, saved board, or cloud copy can no longer replace healthy tasks or stop the app from opening.</li><li>Start and Due use consistent field borders on iPhone in both Add and Edit, while keeping the date picker.</li><li>Keep the header visible now saves as soon as it is checked and reliably keeps Undo in reach while scrolling; the option remains off by default.</li><li>The top-K summary and sparkline stay aligned with done adding for now.</li><li>Double-tap zoom was disabled.</li><li>Add a task can now capture Evergreen recurrence hours and the 2 AM reset, starting at 18 hours with the day reset checked.</li><li>Start, Due, Evergreen, and neighboring Add controls now respect the pane's inner margins across narrow phones and short landscape layouts.</li><li>Dot from the All Tasks editor now ranks that task above the current benchmark. Done and Evergreen Done no longer change ratings.</li></ul></div></template>
+<template id="appChangelogCurrent"><div data-app-fingerprint="a18f9e894db2e1521d8a75e8b42b6ed58edf1efae1d98ed3fafa4021dd59e433"><h3>September 28, 2026</h3><ul><li>When retained recovery copies fill browser storage, the app now losslessly compacts their archive and retries the save automatically. Manual, displaced, protected, and unreadable recovery bytes remain intact; ordinary edits and cloud adoption no longer require manual backup deletion when compaction creates room. The cloud button also stops saying synced while the latest edit is not saved on this device.</li><li>When a newer cloud board already contains every local task, its redundant safety copy no longer stays protected while waiting for a cloud write that will never be needed. The copy remains in local history, while later edits can rotate it when browser space is full; displaced or conflicting edits remain protected.</li><li>Cloud errors now identify whether sign-in, reading, writing, or local reconciliation failed and show a safe error code. Invalid cloud revisions stop before writing, and signing back into the same account reads its current board before sending a local edit.</li><li>Signing in now opens the Google account chooser, so signing out can actually switch to a different board and account.</li><li>Settings can now view, copy, or download the board currently open in this tab, including an edit that device storage could not save. Device-save warnings also include a stable stage and code that Settings repeats without exposing board contents.</li><li>Pasted tasks now keep their chosen prerequisite, Worked on it tasks stay under Ineligible until their hold clears, and restored identifiers remain plain data in every task and context control.</li><li>Cloud-confirmed recovery copies now stop consuming protected device storage after their exact sync is acknowledged. An overwritten offline edit remains a durable recovery copy until you remove it, even when it had reused that day’s automatic backup. A full iPhone or iPad store still opens its readable saved board, and later edits can rotate released automatic history instead of failing.</li><li>Saving an ordinary edit now uses the available board storage even when optional automatic backup history is full. Manual and protected recovery copies remain untouched, and automatic history resumes when space returns.</li><li>Downloaded app updates now open immediately when this board is already saved, without making another backup write. If an edit is unsaved, the update stays pending with a visible notice while update checks continue.</li><li>Cloud sync on opening now keeps offline tasks alongside newer tasks from another device and saves the merged board before sending it. The earlier board stays in Settings backups; if this device cannot save a recovery copy, sync stays paused without replacing it. Settings now shows unreadable backups and lets you view or download their original data; deleting one copy leaves every other recovery copy untouched.</li><li>The Sun and Moon now act as the visible origin for each object's shadow, including railway spans, while starlight stays diffuse. The water keeps its clean earlier surface while local ripples distort different parts of the reflection with fine, irregular vertical shimmer instead of swinging buildings sideways; the waterline stays continuous, without striping or pixelation.</li><li>Rainclouds now have softly shaded, rounded contours that darken with the night sky. Rain and snow dim the scene gradually without a straight grey band or a darker lake strip, and shadows draw close to their objects as the Sun climbs high.</li><li>Lower trains cast shallow shadows along their tracks, and floating objects’ reflections meet their hulls without a visible seam.</li><li>Elevated electric metro cars no longer cast ground shadows; railway support shadows remain.</li><li>Elevated railway keeps its visible track and individual support shadows, without a second continuous shadow band.</li><li>Older automatic backups now clear as new ones arrive or browser space gets tight, so routine saves can continue. Manual copies, displaced local edits, stale-tab drafts, other-browser copies, and unsynced account-switch copies stay until you remove them.</li><li>Undo now clears older automatic backup history when needed to save your edit, while keeping manual and protected recovery copies. Restoring a backup also keeps the exact board it replaces through a storage-quota retry.</li></ul><h3>September 27, 2026</h3><ul><li>Chosen sky coordinates, their label and time zone, and scene time and season now sync with the signed-in board across devices. The device keeps an offline copy, and switching accounts clears the previous account’s scene.</li><li>Tasks can now wait for one prerequisite task to be completed. Evergreen Done counts, and a deleted prerequisite releases its dependent task. Add and each task’s editor can set or remove the link.</li><li>Evergreen intervals can be entered in hours or days, with a countdown tag while a task rests.</li><li>Settings has collapsible sections. Scene time is green for live time and red for a chosen time; location is green when set and red when unset. Pass reset and bulk import are removed from Settings. Previously saved custom hourly quotes still play, and the FAQ explains the main controls.</li><li>Autumn leaves are smaller. Message planes now have classic biplane wings and wheels. Daytime water mirrors the skyline, and everything above the horizon can reflect in the lake by day and night. The sky and skyline now mirror at their original vertical scale, with the existing far shore naturally hiding higher reflections. The water grows a little softer farther from its horizon line. The Moon and skyline now reflect without horizontal striping while the water keeps its 30-frame-per-second animation pace. The reflected scene stays put while small surface ripples move independently. The waterline joins cleanly, metro cars keep their color as they cross in front of the lake, the road continues past mobile edges, and the railway keeps its deck, supports, and overhead electrical at night, sized to the metro cars. Rain is darker and easier to see, and fireflies gather in the foreground.</li><li>Floating boats and water wildlife now reflect their complete visible shapes at natural height in daylight and at night. Railway and ground shadows follow the Sun or Moon, while starlit nights keep faint diffuse shade. Far, middle, and foreground grass now share depth-scaled detail and density.</li><li>Pinch and other page zoom gestures are disabled while normal scrolling stays available. Footer text now uses a consistent size.</li><li>Bird flocks and bicycle packs vary in size, trams keep even spacing across screen sizes, and airborne visitors move more visibly up and down.</li></ul><h3>September 24, 2026</h3><ul><li>Older tabs can no longer bring back a task after you complete or delete it following multiple restores. Backup imports and restores now keep the history needed for sync to respect those choices.</li></ul><h3>September 23, 2026</h3><ul><li>Old tabs can no longer roll back tasks and History without keeping a recoverable copy. Cloud refresh also stops when the browser’s saved copy is unreadable.</li><li>Settings now keeps seven days of local backups and manual copies you can restore or delete. Restoring saves your current board first and keeps later tasks without a recorded deletion.</li><li>Cloud saves follow revision order and keep tasks unless you deleted them.</li><li>Account switches keep unsynced work in a local recovery copy, and Undo cannot move one account’s tasks into another. Backup restore warns before crossing accounts.</li><li>Quick edits from one tab wait for the previous cloud save, so an older confirmation cannot replace a newer change. If another device updates the same task first, this tab warns you and keeps a restorable copy.</li><li>Return as candidate stays visible in the task editor and greys out when unavailable.</li><li>Quick start now has a collapsed More FAQs section explaining Done, Worked on it, Dislodge, cooldowns, and early returns to scanning.</li></ul><h3>September 21, 2026</h3><ul><li>Separate tasks with the same name now keep their own completed and worked-on History entries.</li><li>A damaged backup, saved board, or cloud copy can no longer replace healthy tasks or stop the app from opening.</li><li>Start and Due use consistent field borders on iPhone in both Add and Edit, while keeping the date picker.</li><li>Keep the header visible now saves as soon as it is checked and reliably keeps Undo in reach while scrolling; the option remains off by default.</li><li>The top-K summary and sparkline stay aligned with done adding for now.</li><li>Double-tap zoom was disabled.</li><li>Add a task can now capture Evergreen recurrence hours and the 2 AM reset, starting at 18 hours with the day reset checked.</li><li>Start, Due, Evergreen, and neighboring Add controls now respect the pane's inner margins across narrow phones and short landscape layouts.</li><li>Dot from the All Tasks editor now ranks that task above the current benchmark. Done and Evergreen Done no longer change ratings.</li></ul></div></template>
 <template id="appChangelog"><details data-app-fingerprint="43c2064b3e3eb36a00a54cdade10bda1db44258e57c84075fc23fa8ab524530d"><summary>Changelog</summary><h3>September 19, 2026</h3><ul><li>At night, boats and nearby objects above the horizon reflect naturally in the water, including airplanes, the Moon, and stars.</li><li>The Add a task panel can be minimized and remembers that choice.</li><li>Every visitor starts with an individual travel speed, so faster arrivals can overtake slower ones. Vehicles hold that speed horizontally while vertical movement can still vary, the existing lower tram cars remain linked, and airplane banners switch to a dark, light-lettered night palette.</li><li>Tasks marked No, Can’t, or Dislodged appear under Ineligible until their marks clear.</li><li>First light, sunrise, sunset, and last light now have separate scenery controls and show times for the sky location. Solar times were checked across seasons, time zones, and polar days.</li><li>Jet skis and small water creatures are easier to see. Daytime visitors arrive twice as often.</li><li>Readers and groups linger longer, leave at varied times, and carry books by their sides.</li><li>Add tasks with start and due dates. Selecting Eligible clears other filters to show every eligible task.</li><li>Both scan modes start with the oldest eligible task. Done raises its preference rating; Worked on it leaves ratings unchanged.</li></ul><h3>September 16, 2026</h3><ul><li>Updates announce themselves with a toast pointing to this changelog.</li><li>Task editors show evergreen interval and day-reset controls only when Evergreen is checked.</li><li>Chance mode is the default for new scan preferences. Dislodge now lowers the task’s preference rating; Undo restores it.</li><li>Signing in while the app is loading now brings synced tasks into view without a manual refresh.</li><li>All Tasks has a separate All / Eligible / Ineligible filter row that combines with search and task-status filters.</li><li>Chance scans use TrueSkill win probabilities, including rating uncertainty, with no rating floor or offset. If no candidate can draw, scanning falls back to descending likelihood.</li><li>The scan-mode dropdown saves immediately, including when you close Settings without pressing Save.</li><li>Account switching keeps task lists separate after a cloud refresh. Cloud refreshes wait for edits, and Undo restores an imported scan correctly.</li><li>Add &amp; dot now starts the daily reset clock. Tasks with a start date wake at midnight, and stop-scanning guidance uses the candidates actually ahead.</li><li>Changing the scan-mode setting now takes effect in the current scan. Choosing both modes also offers both buttons when resuming.</li><li>The installed app checks for updates whenever it opens or returns to the foreground. Available updates load automatically after you finish editing, without reinstalling.</li><li>Choose descending scans, TrueSkill-weighted chance scans, or both scan buttons in Settings. Chance order stays steady through undo and refreshes on a fresh pass or at 2 AM; decisions still update ratings immediately.</li><li>Set an evergreen interval for each task, with an optional 2 AM reset. New tasks default to 18 hours or the next day marker, whichever comes first; Settings lets you change those defaults.</li></ul><h3>September 14, 2026</h3><ul><li>Skywriters trace single human-written words in smoke, then fly away as the letters fade.</li><li>Hourly messages appear only when human-written copy is available. Anytime prompts show the current hour, such as 5 AM. Sky messages keep their existing behavior.</li><li>Trains and metros now run regularly throughout the day and night.</li><li>Event rates can be adjusted in SPAWN_RATES.md.</li></ul><h3>September 13, 2026 — Seasonal details</h3><ul><li>Rain showers last 20–45 minutes; thunderstorms last 30–60 minutes. Winter brings snow and snowstorms on the same shared weather schedule.</li><li>Winter visitors build snowmen, ski downhill, and make snow angels. Warm-weather outings wait for warmer seasons.</li><li>Autumn turns the landscape amber and brown, with leaves falling from trees and blowing in storms.</li><li>Spring brings scattered flowers and tree blossoms. Occasional gusts lift petals; rain and storms bring more petals and pollen.</li><li>Winter trees gather snow and occasionally shed small clumps. Seasonal debris gets livelier during storms.</li><li>Birds have individual plumage: distant sky birds look dark with hints of color, while nearby birds show more color.</li><li>People have varied hairstyles and hair colors, with helmets and hats kept clear.</li><li>Little propeller planes tow the messages overhead. Hot air balloons appear more often during the day.</li><li>More trains, riders, and people walking pass through the scene, including new scooter and hoverboard riders.</li><li>Season rules, weather timing, and visitor odds now share an expandable configuration; seasonal effects keep their own small budgets and visitor lifetimes.</li></ul><h3>September 13, 2026</h3><ul><li>One Sunrise / Sunset button switches between dawn and dusk.</li><li>Choose a season when locking the scenery, or follow the current season.</li><li>Cyclists pedal with connected hips and naturally bending knees.</li><li>Distant boats shrink with depth; windsurfers and small craft stay smaller than ships, and the far metro is smaller than the foreground train.</li><li>Ducks sometimes lift off from the lake and fly away.</li><li>Seasons now follow the actual equinox and solstice, with hemisphere and local date handling. Solar locks use the sky location’s calendar.</li><li>Choose the sky location’s time zone when it differs from your device. The Moon’s illuminated side now follows the Sun, and the midnight sun stays daylight.</li><li>Deer, foxes, rabbits, and raccoons occasionally wander through the foreground: a 1% chance every 30 seconds, up to four animals, independent of other visitors.</li><li>Picnic groups fold their blanket and gather their things; readers, couples, and kite flyers also finish up and walk away.</li><li>Occasional gentle rain follows the same real-time schedule across devices, including offline. Reduced motion keeps the rain still.</li><li>Settings now includes this changelog, with a check that catches undocumented app changes.</li></ul></details></template>
 <!-- changelog:end -->
 <dialog id="sceneTimeDialog" class="motion-dialog" aria-labelledby="sceneTimeTitle">
@@ -497,6 +497,7 @@ input[type=date]::-webkit-date-and-time-value{min-width:0;text-align:left}
   </div>
 </dialog>
 
+<script src="vendor/lz-string-1.5.0.min.js"></script>
 <script>
 "use strict";
 // Keep the scene and task controls at one scale while leaving ordinary page
@@ -686,8 +687,8 @@ let lastPersistedRaw = null; // exact browser bytes this tab actually loaded or 
 let storageOK = false;
 let useLocal  = false;   // true when running as a plain web page (localStorage)
 let lastDeviceSaveIssue = null;
-function setDeviceSaveIssue(stage,code){ lastDeviceSaveIssue={stage,code}; }
-function clearDeviceSaveIssue(){ lastDeviceSaveIssue=null; }
+function setDeviceSaveIssue(stage,code){ lastDeviceSaveIssue={stage,code}; renderSync(); }
+function clearDeviceSaveIssue(){ lastDeviceSaveIssue=null; renderSync(); }
 function deviceSaveIssue(){ return lastDeviceSaveIssue ? {...lastDeviceSaveIssue} : null; }
 function reportDeviceSaveFailure(stage,code,help="Keep this tab open and try again."){
   setDeviceSaveIssue(stage,code);
@@ -1061,7 +1062,7 @@ function protectedBackupIdSet(){
 }
 function readLocalBackups(){
   try{
-    const rows = JSON.parse(localStorage.getItem(LOCAL_BACKUPS_KEY) || "[]");
+    const rows = parseBackupIndex(localStorage.getItem(LOCAL_BACKUPS_KEY));
     const oldest=oldestBackupDay();
     const protectedIds=protectedBackupIdSet();
     // Only recognized automatic history expires. Unknown older-client kinds
@@ -1076,7 +1077,7 @@ function inspectBackupIndex(){
   catch(e){ return {raw:null,rows:null}; }
   if(raw===null) return {raw,rows:[]};
   try{
-    const rows=JSON.parse(raw);
+    const rows=parseBackupIndex(raw);
     return {raw,rows:Array.isArray(rows) ? rows : null};
   }catch(e){ return {raw,rows:null}; }
 }
@@ -1128,9 +1129,10 @@ function removeBackupIndexRow(raw, index, count){
 function viewRawBackups(){
   const {raw}=inspectBackupIndex();
   if(raw===null){ toast("Raw backup data is unavailable on this device.",7000); return; }
+  const recovery=backupRecoveryText(raw);
   modalShell('<div class="mtop"><h2>Raw backup data</h2><button class="x" data-act="close-modal" aria-label="Close">✕</button></div>'
-    +'<p class="kv">This is the exact stored backup list, including entries the app cannot restore. Copy or download it before deleting an unreadable backup.</p>'
-    +'<textarea id="rawBackupData" readonly aria-label="Raw backup data" style="width:100%;min-height:12rem">'+esc(raw)+'</textarea>'
+    +'<p class="kv">This is the recoverable backup list, including entries the app cannot restore. Copy or download it before deleting an unreadable backup.</p>'
+    +'<textarea id="rawBackupData" readonly aria-label="Raw backup data" style="width:100%;min-height:12rem">'+esc(recovery)+'</textarea>'
     +'<div class="mbtns"><button class="btn subtle" data-act="select-raw-backups">Select all</button>'
     +'<button class="btn subtle" data-act="download-raw-backups">Download raw backup data</button>'
     +'<button class="btn subtle" data-act="settings">Back to Settings</button></div>');
@@ -1162,8 +1164,9 @@ function downloadCurrentBoard(){
 function downloadRawBackups(){
   const {raw}=inspectBackupIndex();
   if(raw===null){ toast("Raw backup data is unavailable on this device.",7000); return; }
+  const recovery=backupRecoveryText(raw);
   try{
-    const url=URL.createObjectURL(new Blob([raw],{type:"application/json"}));
+    const url=URL.createObjectURL(new Blob([recovery],{type:"application/json"}));
     const link=document.createElement("a");
     link.href=url; link.download="chain-scanner-raw-local-backups.json";
     document.body.appendChild(link); link.click(); link.remove();
@@ -1172,6 +1175,56 @@ function downloadRawBackups(){
 }
 function backupQuotaError(error){
   return error?.name==="QuotaExceededError" || error?.code===22 || error?.code===1014;
+}
+const BACKUP_PACK_PREFIX="chain-scanner-backups-lzw1:";
+function backupArchiveHash(raw){
+  let hash=2166136261;
+  for(let i=0;i<raw.length;i++){
+    const code=raw.charCodeAt(i);
+    hash=Math.imul(hash^(code&255),16777619);
+    hash=Math.imul(hash^(code>>>8),16777619);
+  }
+  return (hash>>>0).toString(16).padStart(8,"0");
+}
+function packedBackupIndex(raw){ return typeof raw==="string" && raw.startsWith(BACKUP_PACK_PREFIX); }
+function packBackupIndex(raw){
+  if(typeof raw!=="string" || typeof LZString?.compressToUTF16!=="function") throw Error("backup archive codec unavailable");
+  const body=LZString.compressToUTF16(raw);
+  if(typeof body!=="string" || LZString.decompressFromUTF16(body)!==raw) throw Error("backup archive codec failed");
+  return BACKUP_PACK_PREFIX+backupArchiveHash(raw)+":"+body;
+}
+function unpackBackupIndex(raw){
+  if(!packedBackupIndex(raw)) return raw;
+  const rest=raw.slice(BACKUP_PACK_PREFIX.length),split=rest.indexOf(":");
+  if(split!==8 || !/^[0-9a-f]{8}$/.test(rest.slice(0,split))) throw Error("backup archive header is unreadable");
+  const plain=LZString?.decompressFromUTF16(rest.slice(split+1));
+  if(typeof plain!=="string" || backupArchiveHash(plain)!==rest.slice(0,split)) throw Error("backup archive is corrupted");
+  return plain;
+}
+function parseBackupIndex(raw){
+  return JSON.parse(raw===null ? "[]" : unpackBackupIndex(raw));
+}
+function encodeBackupIndex(rows,forcePacked=false){
+  const plain=JSON.stringify(rows);
+  if(!forcePacked) return plain;
+  const packed=packBackupIndex(plain);
+  return packed.length<plain.length ? packed : plain;
+}
+function compactBackupIndexForCapacity(expectedHead,expectedStore){
+  try{
+    if(localStorage.getItem(LOCAL_HEAD_KEY)!==expectedHead || localStorage.getItem(STORE_KEY)!==expectedStore) return false;
+    const raw=localStorage.getItem(LOCAL_BACKUPS_KEY);
+    if(raw===null || packedBackupIndex(raw)) return false;
+    const rows=parseBackupIndex(raw);
+    if(!Array.isArray(rows)) return false;
+    const packed=packBackupIndex(raw);
+    if(packed.length>=raw.length || unpackBackupIndex(packed)!==raw) return false;
+    return writeBackupIndexIfCurrent(raw,packed);
+  }catch(e){ return false; }
+}
+function backupRecoveryText(raw){
+  try{ return unpackBackupIndex(raw); }
+  catch(e){ return raw; }
 }
 function writeBackupIndexIfCurrent(expected,next){
   if(localStorage.getItem(LOCAL_BACKUPS_KEY)!==expected) return false;
@@ -1183,7 +1236,7 @@ function saveLocalBackup(kind, payload, onlyIfMissing=false, changedRetries=0,pr
     const parsed = JSON.parse(payload);
     if(!parsed || !Array.isArray(parsed.tasks)) return false;
     const stored=localStorage.getItem(LOCAL_BACKUPS_KEY);
-    const savedRows=stored===null ? [] : JSON.parse(stored);
+    const savedRows=parseBackupIndex(stored);
     // An unreadable row is still the user's recovery data. Do not silently
     // filter it out and overwrite the index just to make a new snapshot.
     if(!Array.isArray(savedRows) || !savedRows.every(row=>{
@@ -1235,7 +1288,7 @@ function saveLocalBackup(kind, payload, onlyIfMissing=false, changedRetries=0,pr
     const automaticBytes=()=>rows.filter(row=>automaticBackupKinds.has(row.kind))
       .reduce((bytes,row)=>bytes+JSON.stringify(row).length,0);
     while(automaticBytes()>1000000 && retireOldest()){}
-    const write=()=>writeBackupIndexIfCurrent(stored,JSON.stringify(rows));
+    const write=(compact=false)=>writeBackupIndexIfCurrent(stored,encodeBackupIndex(rows,compact||packedBackupIndex(stored)));
     const retryChanged=()=>changedRetries<2 && saveLocalBackup(kind,payload,onlyIfMissing,changedRetries+1,preserveBackupId,onQuota);
     try{ return write() || retryChanged(); }
     catch(error){ if(!backupQuotaError(error)) return false; onQuota?.(); }
@@ -1245,6 +1298,13 @@ function saveLocalBackup(kind, payload, onlyIfMissing=false, changedRetries=0,pr
       try{ return write() || retryChanged(); }
       catch(error){ if(!backupQuotaError(error)) return false; onQuota?.(); }
     }
+    // All eligible automatic history is already gone. Retained manual and
+    // displaced-edit rows may be the only copies of user work, so compact the
+    // exact readable archive rather than asking the user to delete it.
+    if(!packedBackupIndex(stored)){
+      try{ return write(true) || retryChanged(); }
+      catch(error){ if(!backupQuotaError(error)) return false; onQuota?.(); }
+    }
     return false;
   }catch(e){ return false; }
 }
@@ -1252,7 +1312,7 @@ function reclassifyCloudRecoveryBackup(id,payload,kind){
   try{
     const raw=localStorage.getItem(LOCAL_BACKUPS_KEY);
     if(raw===null) return false;
-    const rows=JSON.parse(raw);
+    const rows=parseBackupIndex(raw);
     if(!Array.isArray(rows) || !rows.every(readableBackupRow)) return false;
     const matching=rows.filter(row=>row.id===id && row.payload===payload);
     if(!matching.length) return false;
@@ -1265,7 +1325,7 @@ function reclassifyCloudRecoveryBackup(id,payload,kind){
       if(row===chosen) next.push(Object.assign({},row,{kind}));
       else if(row.id!==id || row.payload!==payload || !automaticBackupKinds.has(row.kind)) next.push(row);
     }
-    return writeBackupIndexIfCurrent(raw,JSON.stringify(next));
+    return writeBackupIndexIfCurrent(raw,encodeBackupIndex(next,packedBackupIndex(raw)));
   }catch(e){ return false; }
 }
 function retireAutomaticBackupForPrimarySave(expectedHead,expectedStore,preserveBackupId=null){
@@ -1276,7 +1336,7 @@ function retireAutomaticBackupForPrimarySave(expectedHead,expectedStore,preserve
     if(localStorage.getItem(LOCAL_HEAD_KEY)!==expectedHead || localStorage.getItem(STORE_KEY)!==expectedStore) return false;
     const raw=localStorage.getItem(LOCAL_BACKUPS_KEY);
     if(raw===null) return false;
-    const rows=JSON.parse(raw);
+    const rows=parseBackupIndex(raw);
     if(!Array.isArray(rows) || !rows.every(readableBackupRow)) return false;
     const protectedIds=protectedBackupIdSet();
     const ordinary=rows.filter(row=>automaticBackupKinds.has(row.kind));
@@ -1286,7 +1346,7 @@ function retireAutomaticBackupForPrimarySave(expectedHead,expectedStore,preserve
     const redundant=ordinary.find(row=>row.kind==="latest" && eligible(row) &&
       rows.some(other=>other!==row && other.kind==="daily" && other.payload===row.payload));
     const old=redundant || ordinary.filter(row=>row!==newestStable && row.kind!=="latest" && eligible(row)).sort((a,b)=>a.at-b.at)[0];
-    if(old) return writeBackupIndexIfCurrent(raw,JSON.stringify(rows.filter(row=>row!==old)));
+    if(old) return writeBackupIndexIfCurrent(raw,encodeBackupIndex(rows.filter(row=>row!==old),packedBackupIndex(raw)));
     const replacement=ordinary.filter(row=>row.kind==="latest" && eligible(row))
       .sort((a,b)=>a.at-b.at).at(-1);
     // Today's daily row can describe the older board while "latest" already
@@ -1297,11 +1357,11 @@ function retireAutomaticBackupForPrimarySave(expectedHead,expectedStore,preserve
     if(!redundant && newestStable && eligible(newestStable) && replacement && replacement.payload!==newestStable.payload){
       const next=rows.filter(row=>row!==newestStable && row!==replacement);
       next.push(Object.assign({},replacement,{kind:"daily"}));
-      return writeBackupIndexIfCurrent(raw,JSON.stringify(next));
+      return writeBackupIndexIfCurrent(raw,encodeBackupIndex(next,packedBackupIndex(raw)));
     }
     const replaceableLatest=ordinary.filter(row=>row!==newestStable && row.kind==="latest" && eligible(row))
       .sort((a,b)=>a.at-b.at)[0];
-    if(replaceableLatest) return writeBackupIndexIfCurrent(raw,JSON.stringify(rows.filter(row=>row!==replaceableLatest)));
+    if(replaceableLatest) return writeBackupIndexIfCurrent(raw,encodeBackupIndex(rows.filter(row=>row!==replaceableLatest),packedBackupIndex(raw)));
     return false; // retain the newest stable automatic recovery copy
   }catch(e){ return false; }
 }
@@ -1548,7 +1608,7 @@ function renewPendingRestoreSafetyRows(proofs=pendingRestoreSafetyIds){
         row.day=today; row.at=now; changed=true;
       }
     }
-    return !changed || writeBackupIndexIfCurrent(raw,JSON.stringify(rows));
+    return !changed || writeBackupIndexIfCurrent(raw,encodeBackupIndex(rows,packedBackupIndex(raw)));
   }catch(e){ return false; }
 }
 function writeBrowserPairIfCurrent(expectedHead,expectedStore,payload,onError,checkSafety){
@@ -1780,6 +1840,10 @@ async function persist(backupAlreadySafe=false,preserveBackupId=null){
       quota=false;writeFailure=null;
       written=writeBrowserPairIfCurrent(expectedHead,expectedStore,payload,captureWriteFailure,checkSafety);
     }
+    if(!written && quota && compactBackupIndexForCapacity(expectedHead,expectedStore)){
+      quota=false;writeFailure=null;
+      written=writeBrowserPairIfCurrent(expectedHead,expectedStore,payload,captureWriteFailure,checkSafety);
+    }
     if(written){
       pendingRestoreSafetyIds.clear();
       lastPersistedRaw=payload; persistedChanceSeed = chanceSeed; clearDeviceSaveIssue(); return true;
@@ -1933,7 +1997,7 @@ function releasableCloudRecoveryIds(ids,confirmedPayload){
   for(const id of ids){
     try{
       const raw=localStorage.getItem(LOCAL_BACKUPS_KEY);
-      const rows=raw===null ? [] : JSON.parse(raw);
+      const rows=parseBackupIndex(raw);
       if(!Array.isArray(rows) || !rows.every(readableBackupRow)) continue;
       const matching=rows.filter(row=>row.id===id);
       if(!matching.length){ released.push(id); continue; }
@@ -3477,12 +3541,16 @@ function renderSync(){
   if(!CS || !CS.configured){ el.hidden = true; return; }   // not set up — stay invisible
   el.hidden = false;
   const s = CS.status;
-  el.className = "syncbtn" + (s==="ok" ? " ok" : s==="syncing" ? " busy" : s==="error" ? " err" : "");
-  el.textContent = s==="ok" ? "\u2601 synced"
+  const deviceError=s==="ok" && !!lastDeviceSaveIssue;
+  el.className = "syncbtn" + (deviceError ? " err" : s==="ok" ? " ok" : s==="syncing" ? " busy" : s==="error" ? " err" : "");
+  el.textContent = deviceError ? "\u2601 save error"
+                 : s==="ok" ? "\u2601 synced"
                  : s==="syncing" ? "\u2601 syncing"
                  : s==="error" ? "\u2601 error"
                  : "\u2601 sign in";
-  if(s==="error"){
+  if(deviceError){
+    el.title="The latest edit is not saved on this device. Keep this tab open.";
+  }else if(s==="error"){
     const stages={"sign-in":"sign-in","sign-out":"sign-out",pull:"pull",push:"push",reconcile:"reconcile","auth-storage":"auth storage",init:"setup"};
     const rawCode=typeof CS.errorCode==="string" && /^(?:auth\/)?[a-z0-9-]{1,64}$/.test(CS.errorCode) ? CS.errorCode : "unknown";
     const detail=(stages[CS.errorStage]||"sync")+" failed ("+rawCode.replace(/^auth\//,"").replaceAll("-"," ")+").";
@@ -4387,9 +4455,11 @@ function onAction(act, el){
         if(localStorage.getItem(LOCAL_BACKUPS_KEY)!==index.raw){
           openSettings(); toast("Backup list changed. Check it again before deleting.",7000); break;
         }
-        const next=removeBackupIndexRow(index.raw,matches[0],index.rows.length);
         const remaining=index.rows.filter((_,i)=>i!==matches[0]);
-        if(next===null || JSON.stringify(JSON.parse(next))!==JSON.stringify(remaining)){
+        const decoded=unpackBackupIndex(index.raw);
+        const removed=removeBackupIndexRow(decoded,matches[0],index.rows.length);
+        const next=removed===null ? null : packedBackupIndex(index.raw) ? packBackupIndex(removed) : removed;
+        if(next===null || JSON.stringify(parseBackupIndex(next))!==JSON.stringify(remaining)){
           toast("Backup could not be removed safely. The original data remains stored.",7000); break;
         }
         if(!writeBackupIndexIfCurrent(index.raw,next)){

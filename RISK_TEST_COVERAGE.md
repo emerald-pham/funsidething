@@ -51,6 +51,14 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK LOCAL BACKUPS: exhausted quota leaves the original index and unsaved board untouched
 - RISK LOCAL BACKUPS: parseable but unrestorable history cannot be retired for quota
 - RISK LOCAL BACKUPS: an unreadable index explains the paused save without claiming quota
+- RISK LOCAL BACKUPS: lossless compaction frees protected archive quota without deleting recovery
+- RISK LOCAL BACKUPS: packed archive codec round-trips exact Unicode and rejects corruption
+- RISK LOCAL BACKUPS: corrupt or unknown packed recovery stays byte-exact and blocks overwrite
+- RISK LOCAL BACKUPS: archive compaction keeps cross-tab CAS and failed writes byte-exact
+- RISK LOCAL BACKUPS: packed view download and delete preserve decoded recovery bytes
+- RISK OFFLINE RECOVERY: packed archive codec is a pinned local shell asset
+- RISK CLOUD BACKUP: mandatory adoption backup compacts protected recovery automatically
+- RISK LOCAL DIAGNOSTICS: cloud badge cannot say synced while the latest edit is unsaved
 - RISK CLOUD BACKUP: quota retirement keeps the exact prior board needed for adoption
 - RISK CLOUD BACKUP: an overwritten local edit survives later quota rotation
 - RISK CLOUD BACKUP: an offline edit reopened before conflict remains protected

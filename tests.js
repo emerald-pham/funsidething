@@ -10,6 +10,7 @@ import { spawnSync } from "node:child_process";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const HTML_PATH = path.join(__dirname, "index.html");
 const html = fs.readFileSync(HTML_PATH, "utf8");
+const lzStringSrc = fs.readFileSync(path.join(__dirname, "vendor/lz-string-1.5.0.min.js"), "utf8");
 
 test("Default contexts: fresh starts contain only Errands and Home Only, enabled in order", async () => {
   const { ctx } = await loadApp();
@@ -951,6 +952,7 @@ async function loadApp({ seed, cloudSyncFactory, prefersDark = false, noMatchMed
     prompt: () => null,
   };
   vm.createContext(sandbox);
+  vm.runInContext(lzStringSrc, sandbox, { filename: "vendor/lz-string-1.5.0.min.js" });
   if (seed !== undefined) vm.runInContext(SEED_SNIPPET(seed), sandbox);
   const installSceneModules = () => {
     vm.runInContext(fs.readFileSync(path.join(__dirname, "location.js"), "utf8"), sandbox, { filename: "location.js" });
@@ -7934,6 +7936,187 @@ test('RISK LOCAL BACKUPS: an unreadable index explains the paused save without c
  assert.doesNotMatch(ctx.document.getElementById('toast').textContent,/storage is full/i);
 });
 
+test('RISK LOCAL BACKUPS: lossless compaction frees protected archive quota without deleting recovery',async()=>{
+ const values=new Map(),used=()=>[...values].reduce((sum,[key,value])=>sum+key.length+value.length,0);
+ let quota=Infinity;
+ const storage={
+  getItem:key=>values.get(key)??null,
+  removeItem:key=>values.delete(key),
+  setItem(key,value){
+   const next=String(value),prior=values.get(key)||'';
+   if(used()-prior.length+next.length>quota){const error=Error('aggregate browser storage quota');error.name='QuotaExceededError';throw error;}
+   values.set(key,next);
+  },
+ };
+ const {ctx,shim}=await loadApp({sharedStorage:storage});
+ const at=Date.now(),day=ctx.backupDay(at),archives=[];
+ for(let i=0;i<18;i++){
+  const board=JSON.parse(JSON.stringify(ctx.state));
+  board.tasks=[syncTask('kept-'+i,'Retained recovery '+i+' '+('repeatable recovery words '.repeat(360)))];
+  archives.push({id:'kept-'+i,day,at:at-i,kind:i%2?'manual':'before-cloud-local-edit',payload:JSON.stringify(board)});
+ }
+ storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify(archives));
+ const originalPayloads=new Map(archives.map(row=>[row.id,row.payload]));
+ quota=used()+80;
+ ctx.state.tasks.push(syncTask('new-edit','A modest edit that must save automatically'));
+ ctx.state.updatedAt=at+1;ctx.state.syncDirty=true;
+ const changed=JSON.stringify(ctx.state);
+ assert.equal(await ctx.persist(),true,'lossless archive compaction must create room before protected rows can block the guarded primary pair: '+
+  (shim.document.getElementById('toast')?.textContent||''));
+ assert.equal(storage.getItem(LOCAL_HEAD_KEY),changed);
+ assert.equal(storage.getItem(SYNC_STORE_KEY),changed);
+ const recovered=new Map(ctx.readLocalBackups().map(row=>[row.id,row.payload]));
+ for(const [id,payload] of originalPayloads) assert.equal(recovered.get(id),payload,'retained recovery '+id+' round-trips exactly');
+ const reopened=await loadApp({sharedStorage:storage});
+ const reopenedRows=new Map(reopened.ctx.readLocalBackups().map(row=>[row.id,row.payload]));
+ for(const [id,payload] of originalPayloads) assert.equal(reopenedRows.get(id),payload,'cold reload decodes retained recovery '+id);
+});
+
+test('RISK LOCAL BACKUPS: packed archive codec round-trips exact Unicode and rejects corruption',async()=>{
+ const {ctx}=await loadApp();
+ const loneHigh=String.fromCharCode(0xd800),loneLow=String.fromCharCode(0xdc00);
+ const raw=JSON.stringify([{id:'unicode',payload:(('rain ☂️ café e\u0301 🛶 '+loneHigh+' '+loneLow+' \\ escaped ').repeat(800))}]);
+ const packed=ctx.packBackupIndex(raw);
+ assert.match(packed,/^chain-scanner-backups-lzw1:/);
+ assert.ok(packed.length<raw.length,'the packed form must actually create capacity');
+ assert.equal(ctx.unpackBackupIndex(packed),raw,'every UTF-16 code unit survives the storage codec');
+ assert.throws(()=>ctx.unpackBackupIndex(packed.slice(0,-4)+'AAAA'),/backup archive/i,'corruption fails closed');
+});
+
+test('RISK LOCAL BACKUPS: corrupt or unknown packed recovery stays byte-exact and blocks overwrite',async()=>{
+ const prepared=await loadApp(),plain=JSON.stringify([{id:'kept',day:prepared.ctx.backupDay(Date.now()),at:Date.now(),kind:'manual',payload:JSON.stringify(prepared.ctx.state)}]);
+ const packed=prepared.ctx.packBackupIndex(plain);
+ for(const source of [packed.slice(0,-5)+'broken','chain-scanner-backups-lzw9:unknown-format']){
+  const storage=sharedScannerStorage({[LOCAL_BACKUPS_KEY]:source});
+  const {ctx,shim}=await loadApp({sharedStorage:storage});
+  ctx.state.tasks.push(syncTask('unsaved','Still only in memory'));
+  assert.equal(await ctx.persist(),false);
+  assert.equal(storage.getItem(LOCAL_BACKUPS_KEY),source,'failed decode never rewrites the source bytes');
+  assert.match(shim.document.getElementById('toast').textContent,/unreadable backup/i);
+ }
+});
+
+test('RISK LOCAL BACKUPS: archive compaction keeps cross-tab CAS and failed writes byte-exact',async()=>{
+ const storage=sharedScannerStorage(),{ctx}=await loadApp({sharedStorage:storage});
+ const at=Date.now(),day=ctx.backupDay(at),board=JSON.parse(JSON.stringify(ctx.state));
+ board.tasks=[syncTask('archive','Repeated retained recovery '+('same words '.repeat(500)))];
+ const row={id:'archive',day,at,kind:'manual',payload:JSON.stringify(board)};
+ const original=JSON.stringify([row]);storage.setItem(LOCAL_BACKUPS_KEY,original);
+ const head=storage.getItem(LOCAL_HEAD_KEY),store=storage.getItem(SYNC_STORE_KEY);
+ const peer=JSON.stringify([row,{...row,id:'peer',at:at+1}]);
+ const get=storage.getItem,set=storage.setItem;let reads=0;
+ storage.getItem=key=>{
+  if(key===LOCAL_BACKUPS_KEY && ++reads===2){set(LOCAL_BACKUPS_KEY,peer);return peer;}
+  return get(key);
+ };
+ assert.equal(ctx.compactBackupIndexForCapacity(head,store),false,'a peer index wins the compare-and-swap race');
+ assert.equal(get(LOCAL_BACKUPS_KEY),peer);
+
+ storage.getItem=get;set(LOCAL_BACKUPS_KEY,original);
+ storage.setItem=(key,value)=>{
+  if(key===LOCAL_BACKUPS_KEY && String(value).startsWith('chain-scanner-backups-lzw1:')){
+   const error=Error('aggregate browser storage quota');error.name='QuotaExceededError';throw error;
+  }
+  set(key,value);
+ };
+ assert.equal(ctx.compactBackupIndexForCapacity(head,store),false);
+ assert.equal(get(LOCAL_BACKUPS_KEY),original,'failed atomic replacement leaves the complete legacy JSON bytes untouched');
+});
+
+test('RISK LOCAL BACKUPS: packed view download and delete preserve decoded recovery bytes',async()=>{
+ const prepared=await loadApp(),at=Date.now(),day=prepared.ctx.backupDay(at);
+ const first=JSON.parse(JSON.stringify(prepared.ctx.state));first.tasks=[syncTask('one','First packed recovery '+('repeat '.repeat(100)))];
+ const second=JSON.parse(JSON.stringify(prepared.ctx.state));second.tasks=[syncTask('two','Second packed recovery '+('repeat '.repeat(100)))];
+ const rows=[
+  {id:'one',day,at,kind:'manual',payload:JSON.stringify(first)},
+  {id:'two',day,at:at+1,kind:'before-cloud-local-edit',legacyNumber:1000,payload:JSON.stringify(second)},
+ ];
+ const plain=JSON.stringify(rows,null,2).replace('"legacyNumber": 1000','"legacyNumber": 1e3'),packed=prepared.ctx.packBackupIndex(plain);
+ const storage=sharedScannerStorage({[LOCAL_BACKUPS_KEY]:packed}),legacyBefore=storage.getItem(LOCAL_BACKUPS_KEY);
+ const legacySave=()=>{
+  try{
+   const legacyRows=JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY));
+   storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify(legacyRows));return true;
+  }catch(e){ return false; }
+ };
+ assert.equal(legacySave(),false,'a released pre-codec shell follows its unreadable-index fail-closed path');
+ assert.equal(storage.getItem(LOCAL_BACKUPS_KEY),legacyBefore,'the old shell cannot overwrite the packed recovery bytes');
+ const {ctx,shim}=await loadApp({sharedStorage:storage});
+ assert.equal(ctx.backupRecoveryText(storage.getItem(LOCAL_BACKUPS_KEY)),plain);
+ ctx.viewRawBackups();assert.match(shim.document.getElementById('modalRoot').innerHTML,/First packed recovery/);
+ let download=null;const link=makeFakeElement();link.remove=()=>{};link.click=()=>{download={...download,name:link.download};};
+ shim.document.createElement=tag=>tag==='a'?link:makeFakeElement();
+ ctx.Blob=class Blob{constructor(parts,options){this.text=parts.join('');this.type=options.type;}};
+ ctx.URL={createObjectURL(blob){download={blob};return 'blob:packed-backups';},revokeObjectURL(){}};
+ ctx.downloadRawBackups();assert.equal(download.name,'chain-scanner-raw-local-backups.json');assert.equal(download.blob.text,plain);
+ ctx.openSettings();ctx.onAction('delete-local-backup',{dataset:{id:'one'}});
+ const stored=storage.getItem(LOCAL_BACKUPS_KEY),decoded=ctx.backupRecoveryText(stored),remaining=ctx.parseBackupIndex(stored);
+ assert.equal(remaining.length,1);assert.equal(remaining[0].id,'two');assert.equal(remaining[0].payload,rows[1].payload);
+ assert.match(decoded,/"legacyNumber": 1e3/,'deleting another row preserves unknown lexical recovery bytes');
+});
+
+test('RISK OFFLINE RECOVERY: packed archive codec is a pinned local shell asset',()=>{
+ assert.match(html,/<script src="vendor\/lz-string-1\.5\.0\.min\.js"><\/script>/);
+ const shell=appShellContract(serviceWorkerSource());
+ assert.ok(shell.rawPaths.includes('./vendor/lz-string-1.5.0.min.js'));
+ assert.ok(shell.rawPaths.includes('./vendor/lz-string-LICENSE'));
+ assert.equal(createHash('sha256').update(lzStringSrc).digest('hex'),'95f4d1cbf099f57161b664bc048426ec3df92637801a4c79116e83315aa787e7');
+});
+
+test('RISK CLOUD BACKUP: mandatory adoption backup compacts protected recovery automatically',async()=>{
+ const values=new Map(),used=()=>[...values].reduce((sum,[key,value])=>sum+key.length+value.length,0);
+ let quota=Infinity;
+ const storage={
+  getItem:key=>values.get(key)??null,
+  removeItem:key=>values.delete(key),
+  setItem(key,value){
+   const next=String(value),prior=values.get(key)||'';
+   if(used()-prior.length+next.length>quota){const error=Error('aggregate browser storage quota');error.name='QuotaExceededError';throw error;}
+   values.set(key,next);
+  },
+ };
+ const local=syncState({tasks:[syncTask('local','Offline work already on this device')],syncRev:1,syncAccount:'e@example.com',syncDirty:true});
+ const remote=syncState({tasks:[syncTask('local','Offline work already on this device'),syncTask('remote','Newer remote work')]});
+ const h=makeSyncHarness({remote,rev:2});
+ const {ctx,shim}=await loadApp({sharedStorage:storage,seedStorage:{[LOCAL_HEAD_KEY]:JSON.stringify(local),[SYNC_STORE_KEY]:JSON.stringify(local)},cloudSyncFactory:h.factory});
+ const prior=JSON.stringify(ctx.state),at=Date.now(),day=ctx.backupDay(at),archives=[];
+ for(let i=0;i<18;i++){
+  const board=JSON.parse(prior);
+  board.tasks=[syncTask('archive-'+i,'Retained displaced work '+i+' '+('repeatable displaced words '.repeat(360)))];
+  archives.push({id:'archive-'+i,day,at:at-i,kind:i%2?'manual':'before-cloud-local-edit',payload:JSON.stringify(board)});
+ }
+ storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify(archives));
+ const originalPayloads=new Map(archives.map(row=>[row.id,row.payload]));
+ quota=used()+80;
+ await ctx.cloudPull();await syncSettle(30);
+ assert.ok(ctx.state.tasks.some(task=>task.id==='remote'),'the newer cloud board is adopted after local capacity recovers: '+
+  (shim.document.getElementById('toast')?.textContent||''));
+ assert.equal(ctx.reconciled(),true);
+ assert.ok(ctx.readLocalBackups().some(row=>row.kind==='before-cloud-local-edit'&&row.payload===prior),
+  'the exact pre-adoption board remains a durable recovery copy');
+ const recovered=new Map(ctx.readLocalBackups().map(row=>[row.id,row.payload]));
+ for(const [id,payload] of originalPayloads) assert.equal(recovered.get(id),payload,'cloud recovery keeps archive '+id+' byte-exact');
+});
+
+test('RISK LOCAL DIAGNOSTICS: cloud badge cannot say synced while the latest edit is unsaved',async()=>{
+ const storage=sharedScannerStorage(),{ctx,shim}=await loadApp({sharedStorage:storage});
+ shim.window.CloudSync={configured:true,ready:true,user:'owner@example.test',status:'ok'};ctx.renderSync();
+ const write=storage.setItem;
+ storage.setItem=(key,value)=>{
+  if(key===LOCAL_HEAD_KEY||key===SYNC_STORE_KEY){const error=Error('aggregate site quota');error.name='QuotaExceededError';throw error;}
+  write(key,value);
+ };
+ ctx.state.tasks.push(syncTask('held','Unsaved device edit'));
+ assert.equal(await ctx.persist(),false);
+ ctx.renderSync();
+ assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ save error');
+ assert.match(shim.document.getElementById('syncBtn').title,/latest edit is not saved on this device/i);
+ storage.setItem=write;
+ assert.equal(await ctx.persist(),true);
+ ctx.renderSync();
+ assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ synced','a successful durable retry clears the local warning');
+});
+
 test('RISK CLOUD BACKUP: quota retirement keeps the exact prior board needed for adoption',async()=>{
  const local=syncState({tasks:[syncTask('local','Local')],syncRev:2});
  const remote=syncState({tasks:[syncTask('remote','Remote')]});
@@ -8475,7 +8658,8 @@ test('RISK LOCAL BACKUPS: single-device Undo frees old automatic history for its
  assert.equal(reopened.ctx.state.tasks.find(row=>row.id===task.id).startsAt,'2026-10-01');
  // When only user-kept or pinned recovery remains, a genuinely full site
  // must hold the next edit instead of sacrificing those copies or lying.
- const protectedOnly=JSON.stringify(retained.filter(row=>row.kind==='manual'||row.id==='pinned-recovery'));
+ const protectedOnlyPlain=JSON.stringify(retained.filter(row=>row.kind==='manual'||row.id==='pinned-recovery'));
+ const protectedOnly=ctx.packBackupIndex(protectedOnlyPlain);
  storage.setItem(LOCAL_BACKUPS_KEY,protectedOnly);
  quota=used();
  const beforeHead=storage.getItem(LOCAL_HEAD_KEY),beforeBoard=storage.getItem(SYNC_STORE_KEY);
@@ -8554,20 +8738,21 @@ test('RISK LOCAL BACKUPS: full optional history cannot block an ordinary edit th
  assert.equal(await ctx.persist(),true,'optional backup quota must not hold a primary edit: '+(shim.document.getElementById('toast')?.textContent||''));
  assert.equal(storage.getItem(SYNC_STORE_KEY),after);
  assert.equal(storage.getItem(LOCAL_HEAD_KEY),after);
- assert.ok(JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY)).filter(row=>row.kind==='manual').length===archive.length);
+ assert.ok(ctx.parseBackupIndex(storage.getItem(LOCAL_BACKUPS_KEY)).filter(row=>row.kind==='manual').length===archive.length);
  assert.doesNotMatch(shim.document.getElementById('toast')?.textContent||'',/remove an old manual backup/);
  const reopened=await loadApp({sharedStorage:storage});
  assert.equal(reopened.ctx.state.tasks[0].title,'Saved task with an ordinary new edit');
  quota=Infinity;
  reopened.ctx.state.tasks[0].title='Another edit after space returns';
  assert.equal(await reopened.ctx.persist(),true);
- assert.ok(JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY)).some(row=>row.kind==='daily'&&row.payload===JSON.stringify(reopened.ctx.state)),
+ assert.ok(reopened.ctx.parseBackupIndex(storage.getItem(LOCAL_BACKUPS_KEY)).some(row=>row.kind==='latest'&&row.payload===JSON.stringify(reopened.ctx.state)),
   'automatic history resumes on a later save when storage has room');
 });
 
 test('RISK LOCAL BACKUPS: quota during Restore keeps the immediate pre-restore board',async()=>{
  for(const changedChance of [false,true]){
  const values=new Map();let quota=Infinity,quotaArmed=false;
+ let appCtx=null;
  const used=()=>[...values].reduce((sum,[key,value])=>sum+key.length+value.length,0);
  const storage={
   getItem:key=>values.has(key)?values.get(key):null,
@@ -8578,12 +8763,17 @@ test('RISK LOCAL BACKUPS: quota during Restore keeps the immediate pre-restore b
     const error=Error('aggregate browser storage quota');error.name='QuotaExceededError';throw error;
    }
    values.set(key,String(value));
-   if(key===LOCAL_BACKUPS_KEY && !quotaArmed){
-    const rows=JSON.parse(value);
+   if(key===LOCAL_BACKUPS_KEY && appCtx && !quotaArmed){
+    const rows=appCtx.parseBackupIndex(value);
     const latest=rows.find(row=>row.kind==='latest' && row.payload.includes('Restored huge'));
     if(latest && rows.some(row=>row.kind==='before-restore')){
-     const withoutLatest=JSON.stringify(rows.filter(row=>row!==latest));
-     const released=value.length-withoutLatest.length;
+     const plain=JSON.stringify(rows),packed=appCtx.packBackupIndex(plain);
+     const stored=packed.length<plain.length?packed:plain;
+     values.set(key,stored);
+     const withoutPlain=JSON.stringify(rows.filter(row=>row!==latest));
+     const withoutPacked=appCtx.packBackupIndex(withoutPlain);
+     const withoutLatest=withoutPacked.length<withoutPlain.length?withoutPacked:withoutPlain;
+     const released=stored.length-withoutLatest.length;
      const primaryGrowth=2*(latest.payload.length-storage.getItem(LOCAL_HEAD_KEY).length);
      // The index write fits, but removing only replaceable latest still leaves
      // the complete two-key restored board one code unit over site quota.
@@ -8594,6 +8784,7 @@ test('RISK LOCAL BACKUPS: quota during Restore keeps the immediate pre-restore b
   },
  };
  const {ctx,shim}=await loadApp({sharedStorage:storage});
+ appCtx=ctx;
  ctx.addTask('Current unique work');await ctx.persist();
  const before=storage.getItem(SYNC_STORE_KEY),at=Date.now();
  const targetBoard=syncState({tasks:[syncTask('restored-target','Restored huge '.repeat(100).trim())]});
@@ -8611,10 +8802,10 @@ test('RISK LOCAL BACKUPS: quota during Restore keeps the immediate pre-restore b
  // A second tab has no access to this tab's in-memory pending marker and can
  // rotate the ordinary index row before this Restore gets another save chance.
  const peerIndex=storage.getItem(LOCAL_BACKUPS_KEY);
- const peerRows=JSON.parse(peerIndex);
+ const peerRows=ctx.parseBackupIndex(peerIndex);
  const displaced=peerRows.find(row=>row.kind==='before-restore' && row.payload===before);
  assert.ok(displaced);
- storage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify(peerRows.filter(row=>row.id!==displaced.id)));
+ storage.setItem(LOCAL_BACKUPS_KEY,ctx.encodeBackupIndex(peerRows.filter(row=>row.id!==displaced.id),ctx.packedBackupIndex(peerIndex)));
  quota=Infinity; // otherwise quota, rather than missing safety, could hold the write
  assert.equal(await ctx.persist(),false,'a missing exact safety row blocks primary replacement');
  assert.equal(storage.getItem(SYNC_STORE_KEY),before);
@@ -8629,7 +8820,7 @@ test('RISK LOCAL BACKUPS: quota during Restore keeps the immediate pre-restore b
  storage.setItem(LOCAL_BACKUPS_KEY,peerIndex); // restore fixture for background retry coverage
  quota=used(); // a genuinely full device remains full for later background retries
  ctx.saveLocalBackup('before-cloud-adoption',JSON.stringify(ctx.state));
- assert.ok(JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY)).some(row=>row.kind==='before-restore' && row.payload===before),
+ assert.ok(ctx.parseBackupIndex(storage.getItem(LOCAL_BACKUPS_KEY)).some(row=>row.kind==='before-restore' && row.payload===before),
   'a cloud-reconciliation backup rotation keeps the pending Restore safety copy');
  let cloudSends=0;
  shim.window.CloudSync={ready:true,user:'e@example.com',push:async()=>{cloudSends++;return null;}};
@@ -8637,7 +8828,7 @@ test('RISK LOCAL BACKUPS: quota during Restore keeps the immediate pre-restore b
  ctx.cloudPush();
  await new Promise(resolve=>setTimeout(resolve,2050));
  assert.equal(vm.runInContext('cloudTimer',ctx),null,'the signed-in two-second cloud retry ran');
- assert.ok(JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY)).some(row=>row.kind==='before-restore' && row.payload===before),
+ assert.ok(ctx.parseBackupIndex(storage.getItem(LOCAL_BACKUPS_KEY)).some(row=>row.kind==='before-restore' && row.payload===before),
   'the two-second cloud retry cannot retire the pending Restore safety copy');
  assert.ok(cloudSends===0 || JSON.parse(storage.getItem(SYNC_STORE_KEY)).tasks.some(row=>row.title.startsWith('Restored huge')),
   'cloud writes only after a durable restored primary board exists');
@@ -8645,13 +8836,13 @@ test('RISK LOCAL BACKUPS: quota during Restore keeps the immediate pre-restore b
  update.box.persist=()=>ctx.persist();
  await update.sh.controllerchange();
  assert.equal(update.counts().reloads,0,'a pending app update cannot reload while Restore is held');
- assert.ok(JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY)).some(row=>row.kind==='before-restore' && row.payload===before),
+ assert.ok(ctx.parseBackupIndex(storage.getItem(LOCAL_BACKUPS_KEY)).some(row=>row.kind==='before-restore' && row.payload===before),
   'the app-update flush keeps the pending Restore safety copy');
  const laterSaved=await ctx.persist(); // the same no-argument path used by cloud push and app-update flush
- assert.ok(JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY)).some(row=>row.kind==='before-restore' && row.payload===before),
+ assert.ok(ctx.parseBackupIndex(storage.getItem(LOCAL_BACKUPS_KEY)).some(row=>row.kind==='before-restore' && row.payload===before),
   'a later bare save cannot retire the pending Restore safety copy');
  if(!laterSaved) assert.equal(storage.getItem(SYNC_STORE_KEY),before,'a still-full retry keeps the original primary');
- const rows=JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY));
+ const rows=ctx.parseBackupIndex(storage.getItem(LOCAL_BACKUPS_KEY));
  assert.ok(rows.some(row=>row.kind==='before-restore' && row.payload===before),
   'the exact board displaced by this Restore stays recoverable after the quota retry');
  const reopened=await loadApp({sharedStorage:storage});
@@ -8673,7 +8864,7 @@ test('RISK LOCAL BACKUPS: quota during Restore keeps the immediate pre-restore b
  assert.ok(JSON.parse(storage.getItem(SYNC_STORE_KEY)).tasks.some(row=>row.title.startsWith('Restored huge')),
   'a later guarded retry can save the restored board');
  await new Promise(resolve=>setTimeout(resolve,420));
- assert.ok(JSON.parse(storage.getItem(LOCAL_BACKUPS_KEY)).some(row=>row.kind==='before-restore' && row.payload===before),
+ assert.ok(ctx.parseBackupIndex(storage.getItem(LOCAL_BACKUPS_KEY)).some(row=>row.kind==='before-restore' && row.payload===before),
   'a delayed save after successful restore cannot retire its safety copy');
  const current=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)?.[1]||'';
  assert.match(current,/Restoring a backup also keeps the exact board it replaces through a storage-quota retry\./);

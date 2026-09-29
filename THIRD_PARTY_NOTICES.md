@@ -12,6 +12,16 @@ The repository's MIT license covers original Chain Scanner application and lands
 - Bundle SHA-256: `f41139a87941ea017ab902b954c9389fa27ea72083d7fab4971756d7769d14e6`.
 - Full license: [vendor/astronomy-LICENSE](vendor/astronomy-LICENSE).
 
+## lz-string 1.5.0 — MIT
+
+`vendor/lz-string-1.5.0.min.js` is the unmodified browser bundle from the official `lz-string` npm package, version 1.5.0. It compacts the device recovery archive when browser storage reaches quota; the app loads it locally and makes no runtime network request for it.
+
+- Project: https://github.com/pieroxy/lz-string
+- Package: https://registry.npmjs.org/lz-string/-/lz-string-1.5.0.tgz
+- Package integrity: `sha512-h5bgJWpxJNswbU7qCrV0tIKQCaS3blPDrqKWx+QxzuzL1zGUzij9XCWLrSLsJPu5t+eWA/ycetzYAO5IOMcWAQ==`.
+- Bundle SHA-256: `95f4d1cbf099f57161b664bc048426ec3df92637801a4c79116e83315aa787e7`.
+- Full license: [vendor/lz-string-LICENSE](vendor/lz-string-LICENSE).
+
 ## HYG Database v4.1 — CC BY-SA 4.0
 
 `stars.js` contains an adapted subset of the HYG Database by David Nash / Astronexus, which combines the Hipparcos, Yale Bright Star, and Gliese catalogs. This adapted data remains licensed under **Creative Commons Attribution-ShareAlike 4.0 International**, separately from the application code.
