@@ -17516,3 +17516,58 @@ test('RISK CLOUD V2 STARTUP: a transient chunk read automatically recovers to sy
  assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ synced');assert.equal(pushes,0);
  assert.equal(ctx.state.tasks[0].id,'shared');assert.equal(adapter.roots.get('owner').rev,1);
 });
+
+test('RISK repository process: backward compatibility is a mandatory fail-closed release gate',()=>{
+ const workflow=fs.readFileSync(path.join(__dirname,'.github/workflows/data-safety.yml'),'utf8');
+ assert.match(workflow,/name: Backward compatibility/,'the required scanner job must run the compatibility matrix');
+ assert.match(workflow,/run: npm run test:compatibility/);
+ const pkg=JSON.parse(fs.readFileSync(path.join(__dirname,'package.json'),'utf8'));
+ assert.match(pkg.scripts['test:compatibility'],/firebase emulators:exec.*backward-compatibility\.mjs/);
+ const result=spawnSync(process.execPath,['scripts/backward-compatibility.mjs'],{cwd:__dirname,encoding:'utf8',env:{...process.env,FIRESTORE_EMULATOR_HOST:''}});
+ assert.notEqual(result.status,0,'missing emulator cannot silently skip compatibility');
+ assert.match(result.stderr,/Firestore emulator is required/);
+});
+
+test('RISK repository process: backward compatibility pins released code and rejects broken roundtrips',async()=>{
+ const {SUPPORTED_RELEASE,readReleasedClient,assertRoundTrip}=await import('./scripts/backward-compatibility.mjs');
+ assert.equal(SUPPORTED_RELEASE,'7b9c92a41999a44a12f92b7d6d1c8d02758c635e','the oldest supported baseline cannot float with HEAD');
+ const released=readReleasedClient(__dirname,SUPPORTED_RELEASE);
+ assert.ok(released.html.includes('const CS = window.CloudSync'));
+ assert.ok(released.cloud.includes('createCloudStore'));
+ assert.throws(()=>readReleasedClient(__dirname,'HEAD'),/full commit SHA/);
+ let payload=null;
+ const healthy={status:'ok',async push(value){payload=value;return {ok:true,rev:1};},async pull(){return {payload,rev:1};}};
+ await assertRoundTrip(healthy,'exact legacy bytes',0,'healthy');
+ await assert.rejects(assertRoundTrip({status:'ok',async push(){return {error:true};}},'x',0,'old writer'),/old writer.*upload/);
+ await assert.rejects(assertRoundTrip({status:'ok',async push(){return {ok:true,rev:1};},async pull(){return {payload:'lost',rev:1};}},'x',0,'bad reader'),/bad reader.*payload/);
+});
+
+test('RISK BACKWARD COMPATIBILITY: released clients and candidate interoperate across both rule versions',{skip:!process.env.FIRESTORE_EMULATOR_HOST},async()=>{
+ const {runCompatibilityMatrix}=await import('./scripts/backward-compatibility.mjs');
+ const report=await runCompatibilityMatrix(__dirname,{base:process.env.COMPATIBILITY_BASE_SHA});
+ assert.ok(report.baselines.includes('7b9c92a41999a44a12f92b7d6d1c8d02758c635e'));
+ assert.ok(report.cases.some(row=>row.direction==='old-client/new-rules'));
+ assert.ok(report.cases.some(row=>row.direction==='new-client/old-rules'));
+ assert.equal(report.historicalBreakDetected,true,'the actual pre-September-23 client must demonstrate why read success is insufficient');
+ assert.ok(report.cases.every(row=>row.legacyMigration && row.staleWriteRejected && row.ownerIsolation && row.largePayload));
+});
+
+test('RISK repository process: backward compatibility rejects skipped or empty gate runs',async()=>{
+ const {validateGateSummary}=await import('./scripts/backward-compatibility.mjs');
+ const report=(tests,pass,fail,skip)=>`# tests ${tests}\n# pass ${pass}\n# fail ${fail}\n# cancelled 0\n# skipped ${skip}\n`;
+ assert.doesNotThrow(()=>validateGateSummary(report(15,15,0,0)));
+ for(const output of ['',report(0,0,0,0),report(15,14,0,1),report(15,14,1,0),report(15,15,0,0).replace('# cancelled 0','# cancelled 1')])
+  assert.throws(()=>validateGateSummary(output),/compatibility/i,'missing or skipped coverage is a failed gate');
+});
+
+test('RISK repository process: Firestore deployment aborts when backward compatibility fails',async()=>{
+ const config=JSON.parse(fs.readFileSync(path.join(__dirname,'firebase.json'),'utf8'));
+ assert.deepEqual(config.firestore.predeploy,['npm run test:compatibility'],'direct rules deployments must run the same gate');
+ const {lifecycleHooks}=await import('firebase-tools/lib/deploy/lifecycleHooks.js');
+ const os=await import('node:os'),temp=fs.mkdtempSync(path.join(os.tmpdir(),'compatibility-hook-'));
+ try{
+  fs.writeFileSync(path.join(temp,'package.json'),JSON.stringify({scripts:{'test:compatibility':'node -e "process.exit(17)"'}}));
+  const options={project:'demo-compatibility-hook',projectRoot:temp,only:'firestore:rules',config:{projectDir:temp,path:value=>path.resolve(temp,value||'.'),get:key=>config[key]}};
+  await assert.rejects(lifecycleHooks('firestore','predeploy')({},options),/firestore predeploy error/,'the real CLI hook must propagate a failing compatibility command');
+ }finally{fs.rmSync(temp,{recursive:true,force:true});}
+});

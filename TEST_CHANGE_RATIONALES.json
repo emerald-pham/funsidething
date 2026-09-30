@@ -704,5 +704,26 @@
       "command": "node --test --test-name-pattern='RISK FIRST SIGN IN:|RISK CLOUD LOOP:|RISK CLOUD RECOVERY UI:|RISK PWA recovery:' tests.js",
       "failure": "Two pre-implementation red runs retained: google-signin-sync-red.log recorded 25/24 !== 5 and undefined !== true; google-signin-sync-loop-red.log recorded 21 !== 1 (all failed-read variants), 5 !== 1 (permanent denial), 0 !== 1 (reload), and missing checkForAppUpdate. Existing adoption evidence assertions were preserved when the fix reused the hold gate. A third pre-implementation red run (google-signin-sync-conflict-red.log) recorded 31 !== 6 when repeated revision conflicts reached the deliberate safety cutoff. Independent review found an incomplete recovery-test backend leaving a delayed callback after completion; full4 logged an unhandled pull-is-not-a-function rejection. The mock now implements the read boundary and signs out realistically, and the test settles callbacks. The new mobile recovery layout assertion failed before replacing the unstyled row with the existing spaced, wrapping modal actions (google-signin-sync-review-red.log)."
     }
+  },
+  {
+    "testChangesSha256": "8dd91a92be6049fc526a297f6fabf89363b508340505abf741ff642543035c7a",
+    "reason": "The returning-user sync incident exposed missing cross-release checks: current-only rules tests accepted a release whose old clients read successfully but could not write. The user requires a backward compatibility release gate.",
+    "previousBehavior": "Required CI ran only current app and rules tests. Direct Firebase rules deployment had no compatibility predeploy hook. A selected test run with no emulator or skipped cases could appear successful.",
+    "intendedBehavior": "Require immutable released and rolling-base clients against candidate rules, and candidate clients against released rules, with exact legacy/large payloads, conflicting writes, isolation, and bounded recovery contracts. Missing emulator/history/tests, skipped cases, incompatible supported clients, and failing predeploy checks block release.",
+    "replacementTests": [
+      "RISK repository process: backward compatibility is a mandatory fail-closed release gate",
+      "RISK repository process: backward compatibility pins released code and rejects broken roundtrips",
+      "RISK repository process: backward compatibility rejects skipped or empty gate runs",
+      "RISK repository process: Firestore deployment aborts when backward compatibility fails",
+      "RISK BACKWARD COMPATIBILITY: released clients and candidate interoperate across both rule versions"
+    ],
+    "preservedCoverage": [
+      "All prior task, state, recovery, migration, conflict and Firestore assertions remain intact; the new runner additionally executes existing returning-user and safe-update contracts.",
+      "The permanent unsupported pre-September-23 writer is only a negative control; supported baseline clients must complete exact acknowledged roundtrips in both deployment orders."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK repository process: backward compatibility|RISK repository process: Firestore deployment aborts' tests.js",
+      "failure": "Observed missing mandatory workflow step and ERR_MODULE_NOT_FOUND for the new runner in backward-compatibility-red.log. The skip/empty-run contract then failed with validateGateSummary is not a function. The direct Firestore deployment test failed because predeploy was undefined instead of the required command. After implementation, a real CLI lifecycle hook propagates the fixture exit17 and the emulator matrix checks actual SDK permission-denied on the historical unstamped transaction."
+    }
   }
 ]
