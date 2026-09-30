@@ -332,3 +332,13 @@ The editor hook blocks app or enforcement edits while tests.js has no staged or 
 - RISK CLOUD LATENCY: snapshot reads overlap while validation and account cancellation remain mandatory
 - RISK CLOUD LATENCY: fresh uploads omit the empty resume query but resumed uploads still verify existing chunks
 - RISK SYNC ERROR ICON: the small thundercloud appears only beside a current error
+
+## Installed PWA wake and sync recovery
+
+- RISK PWA SYNC RESUME: sleeping requests cancel promptly and cannot report a stale timeout or acknowledgement
+- RISK PWA SYNC RESUME: cloud authority requires server reads and never an offline cache miss
+- RISK PWA SYNC RESUME: reopening drains interrupted reads and writes before one fresh reconciliation
+- RISK PWA SYNC RESUME: restoration preserves editor drafts and sign-out while asleep
+- RISK PWA SYNC RESUME: visibility before pageshow shares one reconnect and genuine reconnect failures stay bounded
+- RISK PWA SYNC RESUME: a publication committed during sleep is read back without a duplicate write
+- RISK PWA SYNC RESUME: a timed-out reconnect cannot poison later online or wake recovery
