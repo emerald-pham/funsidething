@@ -286,12 +286,28 @@
     const cityTarget=b;
     cityLayer.width=Math.floor(W*dpr);cityLayer.height=Math.ceil(geometry.waterTop*dpr);
     b=cityLayer.getContext('2d');b.setTransform(dpr,0,0,dpr,0,0);
-    const count=Math.ceil(W/15);let windowIndex=0;
-    const buildings=Array.from({length:count},(_,i)=>{
-      const x=i*W/count,cluster=.4+.6*Math.pow(Math.sin(x/W*Math.PI*3+.5),2);
-      const bh=(18+rand(i+14)*65)*cluster*(W<600?.8:1),bw=7+rand(i+91)*18,y=hy+12-bh;
-      return {x,y,bw,bh};
-    });
+    const plan=geometry.cityscape(rand),buildings=plan.towers,count=buildings.length;let windowIndex=0;
+    // A close packed, pale neighborhood sits on the same far bank. Painting it
+    // first lets the taller skyline naturally hide roofs and windows behind it.
+    b.save();b.globalAlpha=.98;
+    for(const low of plan.backfill){
+      const wall=S.mixHex(p.city,p.front,.28+low.seed*.1),shade=S.mixHex(wall,p.front,.42);
+      b.fillStyle=wall;b.fillRect(low.x,low.y,low.width,low.height+1);
+      b.fillStyle=shade;b.fillRect(low.x+low.width*.82,low.y+1,Math.max(.6,low.width*.18),Math.max(.5,low.height));
+      line(b,low.x,low.y,low.x+low.width,low.y,shade,.8);
+      if(low.seed>.66){
+        b.fillStyle=shade;
+        b.fillRect(low.x+low.width*.16,low.y-1,Math.max(.8,low.width*.2),1);
+      }
+      const lit=night>.2&&rand(low.index+2020)>.55;
+      b.fillStyle=lit?`rgba(255,225,162,${night*.82})`:shade;
+      for(let row=0;row<low.stories;row++){
+        const windowY=low.y+low.height*(row+1)/(low.stories+1);
+        b.fillRect(low.x+low.width*.28,windowY,Math.min(1.2,low.width*.18),.7);
+      }
+    }
+    b.restore();
+    const gardens=new Map(plan.gardens.map(garden=>[garden.index,garden]));
     cityLights.visible=[];
     for(let i=0;i<count;i++){
       const {x,y,bw,bh}=buildings[i],facade=LandscapeAppearance.building(rand(i+113),bh/(W<600?66.4:83),night,p.city);
@@ -303,7 +319,7 @@
         }
       }else for(let xx=x+2;xx<x+bw;xx+=4)line(b,xx,y,xx,hy+12,facade.detail,.5);
       b.fillStyle=facade.wall;
-      if(rand(i+33)>.68){b.fillRect(x+bw*.25,y-5,bw*.5,6);line(b,x+bw*.5,y-5,x+bw*.5,y-12,p.city,.7);}
+      if(buildings[i].hasLightningRod){b.fillRect(x+bw*.25,y-5,bw*.5,6);line(b,x+bw*.5,y-5,x+bw*.5,y-12,p.city,.7);}
       for(let yy=y+5;yy<hy+8;yy+=7)for(let xx=x+3;xx<x+bw-2;xx+=5){
         const lightIndex=windowIndex++;
         if(cityLights.windows[lightIndex]===undefined)cityLights.windows[lightIndex]=rand(xx+yy)>.42;
@@ -312,6 +328,27 @@
         if(xx+1.6<W&&!behindTower&&!covered)cityLights.visible.push(lightIndex);
         b.fillStyle=night>.2 && cityLights.windows[lightIndex]?`rgba(255,220,153,${night*.8})`:'rgba(225,239,232,.22)';b.fillRect(xx,yy,1.6,2.7);
       }
+      if(gardens.has(i)){
+        const garden=gardens.get(i);
+        const deckWidth=Math.max(3,bw*.72),deckX=x+(bw-deckWidth)/2,deckY=y-1.8;
+        b.fillStyle=S.mixHex(p.hill,p.front,.42);b.fillRect(deckX,deckY,deckWidth,1.8);
+        line(b,deckX,deckY,deckX+deckWidth,deckY,S.mixHex(p.front,p.sky[2],.36),.55);
+        for(let pot=0;pot<2;pot++){
+          const px=deckX+deckWidth*(.23+pot*.52);
+          b.fillStyle=S.mixHex(p.far,p.hill,.38+rand(i+pot+1100)*.2);b.fillRect(px,deckY-1,Math.max(1,deckWidth*.18),1.1);
+          ellipse(b,px+deckWidth*.08,deckY-1.2,.8,.65,S.mixHex(p.far,p.front,.28));
+        }
+        if(night>.12)for(let light=0;light<garden.lights;light++)
+          ellipse(b,deckX+deckWidth*(.44+light*.22),deckY-1.1,.55,.55,`rgba(255,228,157,${night*.92})`);
+      }
+    }
+    // These small tree crowns sit on the city's near edge, separate from the
+    // much larger forest trees painted on the rolling hills below.
+    for(const sapling of plan.trees){
+      const foliage=S.mixHex(p.front,p.far,.15+sapling.seed*.08),crown=sapling.height*.42;
+      line(b,sapling.x,sapling.baseY,sapling.x,sapling.baseY-sapling.height,S.mixHex(p.front,p.city,.08),.7);
+      ellipse(b,sapling.x,sapling.baseY-sapling.height*.62,crown,crown*.72,foliage);
+      if(sapling.seed>.45)ellipse(b,sapling.x+crown*.55,sapling.baseY-sapling.height*.7,crown*.55,crown*.55,S.mixHex(foliage,p.front,.24));
     }
     // A small clock tower and civic dome give the distant city a recognizable heart.
     const tx=W*.71,ty=hy-72;
@@ -915,7 +952,18 @@
         const y=hy*.18+e.lane*hy*.18+geometry.verticalOffset(e,14);
         g.save();g.translate(x,y);g.scale(e.reverse?-1:1,1);
         g.globalAlpha=.45;const tail=g.createLinearGradient(-90,0,-6,0);tail.addColorStop(0,'rgba(248,246,225,0)');tail.addColorStop(1,'rgba(248,246,225,.65)');g.fillStyle=tail;g.fillRect(-90,1,83,.7);g.globalAlpha=1;
-        g.fillStyle=S.mixHex('#f6f1db',p.sky[1],p.night*.7);g.beginPath();g.moveTo(9,0);g.lineTo(0,-2);g.lineTo(-7,-8);g.lineTo(-10,-8);g.lineTo(-5,-1);g.lineTo(-13,-1);g.lineTo(-17,-4);g.lineTo(-18,-3);g.lineTo(-16,2);g.lineTo(-5,2);g.lineTo(-10,8);g.lineTo(-7,8);g.lineTo(0,2);g.closePath();g.fill();
+        const hull=S.mixHex(color(e.seed),'#f6f1db',p.night*.28),upper=S.mixHex(hull,'#fff0d2',.34),lower=S.mixHex(hull,p.city,.42),glass=S.mixHex('#5f9eaa',p.sky[2],p.night*.22);
+        // The swept wings, tailplane and fuselage remain separate painted
+        // surfaces, so changing sky light can shape the craft instead of
+        // leaving a single flat arrow across the scene.
+        g.fillStyle=lower;g.beginPath();g.moveTo(-4,-1);g.lineTo(-12,-14);g.lineTo(-5,-17);g.lineTo(5,-1);g.closePath();g.fill();
+        g.fillStyle=upper;g.beginPath();g.moveTo(-3,1);g.lineTo(-10,13);g.lineTo(-4,15);g.lineTo(6,1);g.closePath();g.fill();
+        g.fillStyle=lower;g.beginPath();g.moveTo(-13,-1);g.lineTo(-18,-4);g.lineTo(-17,-1);g.lineTo(-12,1);g.closePath();g.fill();
+        g.fillStyle=lower;g.beginPath();g.moveTo(-17,-1.7);g.lineTo(-20,-7);g.lineTo(-15,-4.2);g.lineTo(-13,-1.6);g.closePath();g.fill();
+        g.fillStyle=hull;g.beginPath();g.moveTo(10,0);g.lineTo(4,-.8);g.lineTo(-7,-1.8);g.lineTo(-15,-3.7);g.lineTo(-18,-3);g.lineTo(-16,1.7);g.lineTo(-5,2);g.lineTo(-9,7);g.lineTo(-6,7);g.lineTo(1,2);g.lineTo(8,1);g.closePath();g.fill();
+        line(g,8,-.2,-12,-1.7,upper,1);line(g,7,1.1,-8,1.6,lower,.95);
+        line(g,-7,-12,-3,-2,upper,.85);line(g,-6,11,-2,2,lower,.85);line(g,-13,-2,-16,-3,upper,.7);
+        ellipse(g,4,-.7,2.8,1.05,glass);g.fillStyle=glass;for(let window=0;window<4;window++)g.fillRect(-5+window*2.2,-.15,1.15,.7);
         if(p.night>.4){ellipse(g,0,-2,1,1,'#ed8976');ellipse(g,0,2,1,1,'#abcdaa');}g.restore();return;
       }
       if(e.type==='balloon'){
@@ -970,21 +1018,37 @@
       g.save();g.translate(x,y);g.scale(dir,1);
       // Stacked wings, braced struts, fixed wheels and a nose propeller make
       // the message towplane legible as a classic biplane at scenery scale.
-      const hull=color(seed),wing=color(seed,2);
-      ellipse(g,-2,0,15,2.4,hull);ellipse(g,10,0,4,2.7,hull);
-      line(g,-18,-3,-13,-3,wing,1.6);line(g,-17,0,-18,-6,wing,1.4);
-      line(g,-9,-6,8,-6,wing,2.4);line(g,-9,3,8,3,wing,2.5);
+      const hull=color(seed),wing=color(seed,1),shade=color(seed,2);
+      ellipse(g,-2,0,15,2.4,hull);ellipse(g,10,0,4,2.7,shade);
+      line(g,-18,-3,-13,-3,wing,1.6);line(g,-17,0,-18,-6,shade,1.4);
+      line(g,-9,-6,8,-6,shade,3.1);line(g,-9,3,8,3,shade,3.1);
+      line(g,-9,-6,8,-6,wing,.8);line(g,-9,3,8,3,wing,.8);
       line(g,-6,-5,-5,2,'#516972',1);line(g,5,-5,4,2,'#516972',1);
       ellipse(g,-1,-2.6,3,1.6,'#8faeb7');
-      line(g,-5,2,-6,6,'#516972',1);line(g,6,2,5,6,'#516972',1);
-      ellipse(g,-6,6,1.5,1.5,'#394850');ellipse(g,5,6,1.5,1.5,'#394850');
+      line(g,-4,-1,-9,-1,wing,.65);line(g,-9,1,5,1,shade,.65);
+      line(g,0,2,0,5.4,'#516972',1);line(g,-2,5.4,2,5.4,'#516972',1);
+      ellipse(g,-.7,6,1.25,1.3,'#394850');ellipse(g,.7,6,1.25,1.3,'#394850');
       line(g,13,0,15,0,'#6c7770',1);
       const blade=Math.cos(t*37)*5;
       line(g,15,-blade,15,blade,'#6c7770',.9);ellipse(g,15,0,.7,.7,'#6c7770');
       g.restore();return;
     }
-    g.save();g.translate(x,y);g.scale(dir,1);g.fillStyle=color(seed);
-    g.beginPath();g.moveTo(12,0);g.lineTo(-12,-2);g.lineTo(-17,-7);g.lineTo(-20,-7);g.lineTo(-17,3);g.lineTo(-4,3);g.lineTo(-9,10);g.lineTo(-4,10);g.lineTo(3,3);g.closePath();g.fill();line(g,0,0,-7,-10,color(seed,2),3);g.restore();
+    g.save();g.translate(x,y);g.scale(dir,1);
+    const hull=color(seed),upper=color(seed,1),lower=color(seed,2),glass=S.mixHex('#b9dcdf',p.sky[2],p.night*.25),shade=S.mixHex(hull,p.city,.34);
+    // Far and near wings use separate filled planes. Their unequal highlights
+    // keep a small aircraft from reading as one flat arrow in the open sky.
+    g.fillStyle=lower;g.beginPath();g.moveTo(-3,-1);g.lineTo(-12,-15);g.lineTo(-4,-18);g.lineTo(7,-1);g.closePath();g.fill();
+    g.fillStyle=upper;g.beginPath();g.moveTo(-2,1);g.lineTo(-10,14);g.lineTo(-3,16);g.lineTo(8,1);g.closePath();g.fill();
+    g.fillStyle=lower;g.beginPath();g.moveTo(-13,-1);g.lineTo(-20,-6);g.lineTo(-17,-2);g.lineTo(-11,1);g.closePath();g.fill();
+    g.fillStyle=upper;g.beginPath();g.moveTo(-16,-1.7);g.lineTo(-20,-8);g.lineTo(-14,-4);g.lineTo(-12,-1.4);g.closePath();g.fill();
+    g.fillStyle=hull;g.beginPath();g.moveTo(13,0);g.lineTo(10,-.6);g.lineTo(1,-1.3);g.lineTo(-11,-2);g.lineTo(-17,-6);g.lineTo(-20,-6);g.lineTo(-17,1.4);g.lineTo(-5,2);g.lineTo(-9,8);g.lineTo(-5,8);g.lineTo(2,2);g.lineTo(10,1.2);g.closePath();g.fill();
+    line(g,9,-.2,-10,-1.7,upper,1);line(g,8,1.1,-6,1.6,shade,1);
+    line(g,-7,-13,-2,-2,upper,.9);line(g,-6,12,-1,2,shade,.9);
+    line(g,-12,-3,-17,-5,upper,.8);line(g,-8,5,-5,2,lower,.75);
+    line(g,-4,-.2,8,-.1,shade,.65);
+    ellipse(g,3.5,-.65,2.8,1.05,glass);
+    for(let window=0;window<4;window++)ellipse(g,-3+window*2.5,.25,.68,.48,glass);
+    g.restore();
   }
   function paintGuest(e,x,f,t){
 

@@ -235,6 +235,7 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK repository process: risk-based statuses bind required roles and keep legacy receipts valid
 - RISK repository process: exact-SHA receipts bind audit and review evidence outside the git tree
 - RISK repository process: memory cloud and sync review scope scales evidence to impact
+- RISK repository process: schema-v2 specialist scope accepts unaffected assessments with preservation evidence
 - RISK repository process: absent, stale, malformed, or nonindependent receipts fail closed
 - RISK repository process: memory receipts require absolute source paths
 - RISK repository process: release evidence rejects future and noncanonical audit timestamps
@@ -247,7 +248,7 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK repository process: release hooks reject marker-only or tampered dispatchers
 - RISK test-first gate: release evidence scripts receive edit-time process protection
 
-The release gate derives a review plan from the exact candidate diff: the owner reviews every diff, ordinary behavior changes require one independent code reviewer, and high-risk domains require a specialist. It requires both independent roles only when code behavior and specialist risk are materially affected. Ambiguous auth, state-persistence, and session changes fail closed to relevant specialists; callers may add known specialist domains to raise the plan but cannot replace or remove derived domains. Memory/cloud/sync specialist evidence records source fingerprints, per-domain impact, rationale, and focused tests. Schema version 1 receipts remain verifiable under their former two-review rule, and their publisher also emits a third specialist-compatibility status bound to the same receipt so current branch protection can accept them without inventing a new reviewer. The local hook checks each outgoing tip; the main deployment job independently verifies the merged PR head, derived status plan, and latest statuses. Statuses bind receipts but cannot prove that a person actually read or reviewed them.
+The release gate derives a review plan from the exact candidate diff: the owner reviews every diff, ordinary behavior changes require one independent code reviewer, and high-risk domains require a specialist. It requires both independent roles only when code behavior and specialist risk are materially affected. Ambiguous auth, state-persistence, and session changes fail closed to relevant specialists; callers may add known specialist domains to raise the plan but cannot replace or remove derived domains. Memory/cloud/sync specialist evidence records source fingerprints, per-domain impact, and rationale. Every affected domain lists focused tests; an all-unaffected assessment still includes at least one focused preservation test across the assessed domains. Schema version 1 receipts remain verifiable under their former two-review rule, and their publisher also emits a third specialist-compatibility status bound to the same receipt so current branch protection can accept them without inventing a new reviewer. The local hook checks each outgoing tip; the main deployment job independently verifies the merged PR head, derived status plan, and latest statuses. Statuses bind receipts but cannot prove that a person actually read or reviewed them.
 
 Companion coverage protects the existing local-backup behavior: LOCAL BACKUPS: seven local calendar days, latest save today, and pre-restore safety copy; LOCAL BACKUPS: a manual backup remains restorable after the seven-day window; LOCAL BACKUPS: a failed safety copy blocks restore and leaves the current board untouched; HARD GATE: full backup store blocks browser overwrite and preserves its prior bytes; and HARD GATE: unreadable backup index is preserved instead of overwritten by a save.
 
@@ -305,6 +306,12 @@ The editor hook blocks app or enforcement edits while tests.js has no staged or 
 
 ## Night shows and skyline
 
+- RISK landscape metropolis: seeded low-rise city, gardens, and microtrees stay behind the skyline
+- RISK landscape metropolis: gardens skip towers with lightning rods
+- RISK landscape city and aircraft: current changelog names the skyline and plane details
+- RISK landscape aircraft: the biplane has one centered landing gear set
+- RISK landscape aircraft: ordinary planes show shaded wings, a cockpit, and panel detail
+- RISK landscape aircraft: scheduled planes keep a shaded body and night navigation lights
 - RISK night shows: standalone fireworks recur independently of the rare cooldown and stay bounded
 - RISK night shows: festival odds are lower than standalone fireworks with finite visits and rate controls
 - RISK night shows: launches lead to bounded fading bursts and the festival sails fully on and off screen
