@@ -287,14 +287,29 @@
     cityLayer.width=Math.floor(W*dpr);cityLayer.height=Math.ceil(geometry.waterTop*dpr);
     b=cityLayer.getContext('2d');b.setTransform(dpr,0,0,dpr,0,0);
     const count=Math.ceil(W/15);let windowIndex=0;
-    for(let i=0;i<count;i++){
+    const buildings=Array.from({length:count},(_,i)=>{
       const x=i*W/count,cluster=.4+.6*Math.pow(Math.sin(x/W*Math.PI*3+.5),2);
       const bh=(18+rand(i+14)*65)*cluster*(W<600?.8:1),bw=7+rand(i+91)*18,y=hy+12-bh;
-      b.fillStyle=S.mixHex(p.city,p.sky[2],rand(i+13)*.25);b.fillRect(x,y,bw,bh+15);
+      return {x,y,bw,bh};
+    });
+    cityLights.visible=[];
+    for(let i=0;i<count;i++){
+      const {x,y,bw,bh}=buildings[i],facade=LandscapeAppearance.building(rand(i+113),bh/(W<600?66.4:83),night,p.city);
+      b.fillStyle=facade.wall;b.fillRect(x,y,bw,bh+15);
+      if(facade.material==='brick'){
+        for(let yy=y+4;yy<hy+12;yy+=4){
+          line(b,x,yy,x+bw,yy,facade.detail,.45);
+          for(let xx=x+((Math.round(yy-y)/4)%2?3:0);xx<x+bw;xx+=6)line(b,xx,yy-3,xx,yy,facade.detail,.45);
+        }
+      }else for(let xx=x+2;xx<x+bw;xx+=4)line(b,xx,y,xx,hy+12,facade.detail,.5);
+      b.fillStyle=facade.wall;
       if(rand(i+33)>.68){b.fillRect(x+bw*.25,y-5,bw*.5,6);line(b,x+bw*.5,y-5,x+bw*.5,y-12,p.city,.7);}
       for(let yy=y+5;yy<hy+8;yy+=7)for(let xx=x+3;xx<x+bw-2;xx+=5){
         const lightIndex=windowIndex++;
         if(cityLights.windows[lightIndex]===undefined)cityLights.windows[lightIndex]=rand(xx+yy)>.42;
+        const behindTower=xx+1.6>W*.71-12&&xx<W*.71+12&&yy+2.7>hy-91;
+        const covered=buildings.slice(i+1).some(other=>xx+1.6>other.x&&xx<other.x+other.bw&&yy+2.7>other.y-12);
+        if(xx+1.6<W&&!behindTower&&!covered)cityLights.visible.push(lightIndex);
         b.fillStyle=night>.2 && cityLights.windows[lightIndex]?`rgba(255,220,153,${night*.8})`:'rgba(225,239,232,.22)';b.fillRect(xx,yy,1.6,2.7);
       }
     }
@@ -486,6 +501,55 @@
     }
     g.restore();
   }
+  function paintFestival(e){
+    const pose=geometry.festival(e),night=1-S.smooth(-12,-6,sky.sun.altitude);
+    if(!pose.alpha||!night)return;
+    const {x,y,width:w,height:h}=pose,inks=['#7be5ed','#bd9af6','#f4b982'];
+    const ink=inks[Math.floor(e.seed*3)%3],second=inks[(Math.floor(e.seed*3)+1)%3];
+    g.save();g.translate(x,y);g.globalAlpha=pose.alpha*night;
+    // A complete distant setup eases into view. Steady colored light and
+    // slow beam sweeps suggest a show without strobes or brightness pulses.
+    for(const side of [-1,1]){
+      g.save();g.translate(side*w*.35,-h*.75);g.rotate(side*.27+pose.beamAngle);
+      const beam=g.createLinearGradient(0,0,0,-h*2.1);
+      beam.addColorStop(0,ink+'22');beam.addColorStop(1,ink+'00');
+      g.fillStyle=beam;g.beginPath();g.moveTo(-1,0);g.lineTo(-h*.48,-h*2.1);g.lineTo(h*.48,-h*2.1);g.lineTo(1,0);g.fill();g.restore();
+    }
+    g.fillStyle='#152736';g.fillRect(-w*.43,-h*.73,w*.86,h*.62);
+    // Roof chevrons, trusses and speaker stacks keep the silhouette legible
+    // at panorama scale; the LEDs never blink or use additive compositing.
+    for(const side of [-1,1]){
+      line(g,0,-h,side*w*.46,-h*.65,ink,1.3);
+      line(g,0,-h*.86,side*w*.31,-h*.59,second,.9);
+      line(g,side*w*.43,-h*.75,side*w*.43,-h*.12,'#7b8d99',1.4);
+      g.fillStyle='#10222d';g.fillRect(side*w*.34-w*.045,-h*.61,w*.09,h*.42);
+      for(let i=0;i<3;i++)ellipse(g,side*w*.34,-h*(.25+i*.13),w*.021,h*.05,'#3a4e59');
+      line(g,side*w*.49,-h*.10,side*w*.49,-h*.77,'#637687',.8);
+      g.fillStyle=second;g.beginPath();g.moveTo(side*w*.49,-h*.77);g.lineTo(side*w*.49+side*w*.075,-h*.69);g.lineTo(side*w*.49,-h*.61);g.fill();
+    }
+    const screen=g.createLinearGradient(-w*.23,-h*.6,w*.23,-h*.28);
+    screen.addColorStop(0,ink+'77');screen.addColorStop(1,second+'88');
+    g.fillStyle=screen;g.fillRect(-w*.23,-h*.63,w*.46,h*.35);
+    g.beginPath();
+    for(let i=0;i<=24;i++){
+      const xx=-w*.22+i*w*.44/24,yy=-h*.45+Math.sin(i*.63+e.age*.6)*h*.055;
+      if(i)g.lineTo(xx,yy);else g.moveTo(xx,yy);
+    }
+    g.strokeStyle=ink;g.lineWidth=.7;g.stroke();
+    g.fillStyle='#233749';g.fillRect(-w*.16,-h*.27,w*.32,h*.10);
+    line(g,-w*.16,-h*.27,w*.16,-h*.27,second,1);
+    ellipse(g,0,-h*.35,1.6,1.7,'#d8b596');line(g,0,-h*.33,0,-h*.27,'#c4d3d3',2);
+    line(g,-w*.46,-h*.1,w*.46,-h*.1,ink,.8);
+    // An anchored crowd sways gently; the finite setup fade also covers all
+    // people and flags, leaving no stranded props at expiry.
+    for(let i=0;i<26;i++){
+      const xx=(i/25-.5)*w*.82,yy=-2-(i%3)*1.8,bob=Math.sin(pose.crowdPhase+i*1.7)*.6;
+      const shirt=i%4===0?S.mixHex(ink,'#182936',.55):'#243440';
+      line(g,xx,yy,xx,yy-3.5+bob,shirt,1.7);ellipse(g,xx,yy-5+bob,1.2,1.25,'#788c99');
+      if(i%3===0){line(g,xx,yy-3,xx-2,yy-5.5+bob,shirt,.8);line(g,xx,yy-3,xx+2,yy-6+bob,shirt,.8);}
+    }
+    g.restore();
+  }
   function paintLife(t){
     visibleBanners=[];
     g.clearRect(0,0,W,H);
@@ -498,11 +562,14 @@
       const tail=g.createLinearGradient(x-dx*.35,y-dy*.35,x,y);tail.addColorStop(0,'#e7f5ee00');tail.addColorStop(1,'#effbf5');
       line(g,x-dx*.35,y-dy*.35,x,y,tail,1.1);ellipse(g,x,y,1.2,1.2,'#f9ffe8');g.restore();
     }
-    if(sky.sun.altitude < -6)for(const e of world.events)if(e.type==='fireworks'){
+    if(sky.sun.altitude < -6)for(const e of world.events)if(e.type==='fireworks'||e.type==='festival'){
+      if(e.type==='festival')paintFestival(e);
       g.save();
-      for(const dot of geometry.fireworks(e.age,e.seed)){
-        g.globalAlpha=dot.alpha*.8;const ink=S.mixHex(color(e.seed,dot.burst),p.sky[2],.25);
-        line(g,dot.tailX,dot.tailY,dot.x,dot.y,ink,1);ellipse(g,dot.x,dot.y,.9,.9,ink);
+      for(const dot of geometry.fireworks(e.age,e.seed,e.type==='festival')){
+        g.globalAlpha=dot.alpha*(1-S.smooth(-12,-6,sky.sun.altitude));
+        const ink=['#ffd38d','#7de5ef','#cf9fff','#ffa8c5'][(dot.burst+Math.floor(e.seed*4))%4];
+        line(g,dot.tailX,dot.tailY,dot.x,dot.y,ink,dot.kind==='rocket'?1.1:1.25);
+        ellipse(g,dot.x,dot.y,dot.kind==='rocket'?.9:1.15,dot.kind==='rocket'?.9:1.15,ink);
       }
       g.restore();
     }

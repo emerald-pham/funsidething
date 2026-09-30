@@ -743,5 +743,29 @@
       "command": "node --test --test-name-pattern='RISK DESTRUCTIVE ACTION RACE:|RISK repository process: the app harness awaits' tests.js",
       "failure": "Observed repo-bug-hunt-red.log before implementation: all six destructive-action cases failed exact-state preservation (Restore reverted Current work, Reset emptied tasks), and slow durable startup failed with actual null state. No existing feature assertion was removed or weakened."
     }
+  },
+  {
+    "testChangesSha256": "f2d6a69c9bb375094318dc20d066ac1409240bc8c2f0007d0b18b4a1a9bb731f",
+    "reason": "The user requested a rare nighttime EDM festival, much more frequent independent fireworks with water reflections, varied building materials, and an animation audit. Existing standalone-firework coverage explicitly isolates its scheduler from the new festival; the catalog adds one new rare type.",
+    "previousBehavior": "Standalone fireworks shared a seven-minute rare cooldown and had no visible launch. Distant high bursts could be fully clipped out of the lake. City lights could toggle occluded windows and buildings had one material palette.",
+    "intendedBehavior": "Standalone fireworks use forty-percent checks every thirty seconds with sixty seconds of rest after a show. Festivals use six-percent minute checks and a seven-minute rare cooldown. Shows rise, burst, fade and reflect; skyline materials depend on height and only exposed windows toggle.",
+    "replacementTests": [
+      "RISK night shows: standalone fireworks recur independently of the rare cooldown and stay bounded",
+      "RISK night shows: festival odds are lower than standalone fireworks with finite visits and rate controls",
+      "RISK night shows: launches lead to bounded fading bursts and the festival enters and exits gently",
+      "RISK skyline materials: short buildings favor brick while tall towers favor stable modern colors",
+      "RISK skyline lights: only exposed windows can be selected so both on and off are visible",
+      "RISK night shows: festival and standalone sparks enter the shared mirror before foreground hills",
+      "RISK Landscape browser: both night shows reflect actual sparks and exposed windows visibly switch on and off"
+    ],
+    "preservedCoverage": [
+      "Existing daylight, finite lifetime, event-cap, hidden/reduced-motion and ordinary rare cooldown assertions remain intact.",
+      "The standalone nine-second lifetime and sky-particle assertions remain, while new tests separately cover its more frequent schedule.",
+      "No task persistence, cloud reconciliation, authorization or rules assertions are changed."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK night shows|RISK skyline' tests.js",
+      "failure": "All six new tests failed before implementation: no standalone show during rare cooldown (0 vs 1); festival absent; festival geometry and building material helper undefined; occluded window 0 toggled instead of visible window 1; no festival paint before shared reflection capture. Saved full output in task-artifacts/night-festival-20260930/red.txt. Supplemental browser-pixel coverage was also run against a served git archive of the unchanged base a4993cf: it failed at 320x568 because standalone sparks contributed zero visible lake pixels. The candidate passes the identical check, isolating sparks from the stage, on four viewport sizes. See pixel-red.txt and pixel-green.txt."
+    }
   }
 ]

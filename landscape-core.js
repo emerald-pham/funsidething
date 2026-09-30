@@ -128,8 +128,11 @@
   function advanceLights(state,elapsed,night,random=Math.random){
     if(elapsed<state.next)return false;
     state.next=elapsed+30;
-    if(!night||!state.windows.length)return false;
-    const index=Math.floor(clamp(random(),0,.999999)*state.windows.length);
+    const visible=state.visible;
+    if(!night||!state.windows.length||(visible&&!visible.length))return false;
+    // A window behind another building is real state, but not visible motion.
+    const slot=Math.floor(clamp(random(),0,.999999)*(visible?visible.length:state.windows.length));
+    const index=visible?visible[slot]:slot;
     state.windows[index]=!state.windows[index];return true;
   }
   function activity(sky){return sky.sun.altitude < -6?.24:sky.sun.azimuth<180?1:.65;}
@@ -141,12 +144,12 @@
   function setSeason(world,season){
     if(world.season===season)return;
     world.season=season;
-    const allowed=new Set([...eventsForSeason(season),'meteor','abduction','fireworks']);
+    const allowed=new Set([...eventsForSeason(season),'meteor','abduction','fireworks','festival']);
     // A season selection should not leave a summer picnic or watersport on snow.
     // Preserve the ordinary schedule rather than forcing a burst of replacements.
     world.events=world.events.filter(event=>allowed.has(event.type));
   }
-  const RARE_TYPES=['abduction','fireworks'];
+  const RARE_TYPES=['abduction','fireworks','festival'];
   const NIGHT_TYPES=CONFIG.nightEvents;
   const NIGHT_REGULARS=CONFIG.nightRegulars;
   const WATER_TYPES=CONFIG.waterEvents;
@@ -157,7 +160,7 @@
     return type==='flock'?3+index*2:type==='cyclist'?1+index:1;
   };
   function createWorld(random=Math.random,season='summer'){
-    const world={random,season,railNext:{train:0,metro:12},elapsed:0,events:[],next:3+random()*6,lastRare:-RARE_COOLDOWN,rareCount:0,wind:.6+random()*1.2};
+    const world={random,season,railNext:{train:0,metro:12},nextFireworks:20,nextFestival:60,elapsed:0,events:[],next:3+random()*6,lastRare:-RARE_COOLDOWN,rareCount:0,wind:.6+random()*1.2};
     // Start mid-journey so returning never waits for a first event. Pick three
     // distinct ordinary visitors; the rare abduction is never in the opening cast.
     const pool=(season==='winter'?WINTER_EVENTS:INITIAL_TYPES).filter(type=>CONFIG.spawnRate(type)>0);
@@ -181,7 +184,7 @@
     // Pick travel speed once at arrival. Duration is its inverse so every
     // visitor still completes the full route, while later fast traffic can
     // visibly catch and pass a slower visitor without frame-time randomness.
-    const travels=type!=='abduction'&&type!=='fireworks';
+    const travels=!RARE_TYPES.includes(type);
     const speed=travels?startingSpeed(r()):1,duration=base/speed;
     const age=initial?duration*(.15+r()*.45):0,lane=r(),seed=r(),reverse=r()>.5;
     w.events.push({type,...(skywriterWord?{skywriterWord}:{}),age,duration,speed,lane,seed,reverse,
@@ -200,6 +203,20 @@
         spawn(w,type);w.railNext[type]=w.elapsed+CONFIG.rail[type].gap/rate;
       }
     }
+    // These deadlines use active scene time, so hidden/reduced-motion time
+    // never queues missed shows. A festival owns its own shells and does not
+    // overlap a standalone display. Two slots remain reserved for rail.
+    for(const type of ['festival','fireworks']){
+      const key=type==='festival'?'nextFestival':'nextFireworks',show=CONFIG.nightShows[type];
+      if(w.elapsed<w[key])continue;
+      w[key]=w.elapsed+show.interval;
+      if(sky.sun.altitude>=-6||!CONFIG.spawnRate(type)||w.events.length>=MAX_EVENTS-2||w.events.some(e=>e.type==='festival'||e.type==='fireworks'))continue;
+      if(type==='festival'&&w.elapsed-w.lastRare<RARE_COOLDOWN)continue;
+      if(w.random()>=Math.min(1,show.chance*CONFIG.spawnRate(type)))continue;
+      spawn(w,type);
+      if(type==='festival'){w.lastRare=w.elapsed;w.rareCount++;}
+      else w[key]=w.elapsed+EVENT_DURATIONS.fireworks+show.rest;
+    }
     if(w.elapsed>=w.next){
       const r=w.random,a=activity(sky);
       // Daylight is the scene's busiest window. Keep its gaps at half the
@@ -208,11 +225,9 @@
       const interval=sky.sun.altitude < -6 ? 7+r()*18 : 3.5+r()*9;
       w.next=w.elapsed+interval/a;
       if(w.events.length<MAX_EVENTS-2){
-        const abduction=CONFIG.spawnRate('abduction'),fireworks=sky.sun.altitude < -6?CONFIG.spawnRate('fireworks'):0;
-        const rareRate=sky.sun.altitude < -6?(abduction+fireworks)/2:abduction;
+        const rareRate=CONFIG.spawnRate('abduction')*(sky.sun.altitude < -6?.5:1);
         if(w.elapsed-w.lastRare>=RARE_COOLDOWN && r()<.025*rareRate){
-          const type=fireworks&&r()<fireworks/(abduction+fireworks)?'fireworks':'abduction';
-          spawn(w,type);w.lastRare=w.elapsed;w.rareCount++;
+          spawn(w,'abduction');w.lastRare=w.elapsed;w.rareCount++;
         }else{
           let type;
           if(sky.sun.altitude < -6){

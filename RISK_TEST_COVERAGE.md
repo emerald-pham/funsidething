@@ -302,3 +302,13 @@ The editor hook blocks app or enforcement edits while tests.js has no staged or 
 
 - RISK DESTRUCTIVE ACTION RACE: Restore and Reset stop if their backed-up board or account changes
 - RISK repository process: the app harness awaits slow durable startup instead of returning null state
+
+## Night shows and skyline
+
+- RISK night shows: standalone fireworks recur independently of the rare cooldown and stay bounded
+- RISK night shows: festival odds are lower than standalone fireworks with finite visits and rate controls
+- RISK night shows: launches lead to bounded fading bursts and the festival enters and exits gently
+- RISK skyline materials: short buildings favor brick while tall towers favor stable modern colors
+- RISK skyline lights: only exposed windows can be selected so both on and off are visible
+- RISK night shows: festival and standalone sparks enter the shared mirror before foreground hills
+- RISK Landscape browser: both night shows reflect actual sparks and exposed windows visibly switch on and off

@@ -254,15 +254,35 @@
     const flock=(x,y,reverse=false,count=7)=>Array.from({length:Math.max(1,Math.min(11,Math.floor(count)||7))},(_,i)=>{
       const rank=Math.ceil(i/2);return {x:x-rank*15*(reverse?-1:1),y:y+(i%2?1:-1)*rank*7};
     });
-    function fireworks(age,seed){
+    function festival(event){
+      const age=Math.max(0,Number(event.age)||0),duration=Number(event.duration)||96;
+      const ease=n=>{const q=clamp(n);return q*q*(3-2*q);};
+      return {x:W*(.28+clamp(event.seed)*.44),y:waterTop-2,
+        width:Math.min(156,W*.32),height:Math.min(45,H*.074),
+        alpha:ease(age/6)*(1-ease((age-(duration-12))/12)),
+        beamAngle:Math.sin(age*.16)*.24,crowdPhase:age*2.1};
+    }
+    function fireworks(age,seed,atFestival=false){
       const dots=[];
-      for(let burst=0;burst<3;burst++){
-        const time=age-1-burst*2.1;if(time<=0||time>=2.7)continue;
-        const cx=W*(.25+seed*.3+burst*.13),cy=horizon*(.28+(burst%2)*.12);
-        const radius=Math.min(35,horizon*.18)*(1-Math.exp(-time*1.6)),alpha=Math.min(1,time/.12)*(1-time/2.7)**1.5;
-        for(let i=0;i<16;i++){
-          const angle=i*Math.PI/8+seed*6,dx=Math.cos(angle)*radius,dy=Math.sin(angle)*radius,fall=time*time*1.5;
-          dots.push({x:cx+dx,y:cy+dy+fall,tailX:cx+dx*.78,tailY:cy+dy*.78+fall,alpha,burst});
+      for(let burst=0;burst<(atFestival?19:3);burst++){
+        const time=age-(atFestival?8+burst*3.8:burst*2.1);
+        if(time<=0||time>=3.7)continue;
+        const cx=atFestival?W*(.28+seed*.44)+(burst%5-2)*Math.min(34,W*.055):W*(.25+seed*.3+burst*.13);
+        // Low waterfront shells leave room for their real mirrored sparks in
+        // the narrow lake. High sky bursts were entirely hidden by the shore.
+        const rise=Math.max(30,Math.min(horizon*.55,(far(cx)-waterTop)*.74));
+        const cy=waterTop-rise,launchY=waterTop-2;
+        if(time<1){
+          const q=1-(1-time)**2,y=launchY+(cy-launchY)*q;
+          dots.push({kind:'rocket',x:cx,y,tailX:cx,tailY:Math.min(launchY,y+rise*.16),alpha:Math.min(1,time/.3)*Math.min(1,(1-time)/.18),burst});
+          continue;
+        }
+        const t=time-1,radius=Math.min(36,rise*.42)*(1-Math.exp(-t*1.6));
+        const alpha=Math.min(1,t/.25)*(1-t/2.7)**1.5;
+        for(let i=0;i<24;i++){
+          const angle=i*Math.PI/12+seed*6,stretch=burst%3===1?.76:1;
+          const dx=Math.cos(angle)*radius,dy=Math.sin(angle)*radius*stretch,fall=t*t*1.5;
+          dots.push({kind:'spark',x:cx+dx,y:Math.min(waterTop-1,cy+dy+fall),tailX:cx+dx*.73,tailY:Math.min(waterTop-1,cy+dy*.73+fall),alpha,burst});
         }
       }
       return dots;
@@ -282,7 +302,7 @@
       const field=packet*.68+detail*.32;
       return {dx:envelope*(.33*field+.1*Math.sin(x*.071+depth*.24-phase*.63)),dy:envelope*1.25*field};
     };
-    return {routeProgress,motionProgress,motionAge,verticalOffset,visitPose,woodlandPose,duckPose,waterDepth,cycleLeg,deerLeg,nestVisit,eventDepth,dogPose,skater,fireworks,flock,dolphin,starReflection,reflectionSurface,reflectionMotion,castShadow,grassBand,sunReflection,depthBand,groundAnchor,groundTravelX,groundPose,strideArm,strideFoot,wingFold,balloonDrift,vessel,foregroundTree,nest,ripple,skyPoint,horizon,waterTop,far,middle,near,rail,trail,lowerRail,railCars,tangent,rider,pack};
+    return {routeProgress,motionProgress,motionAge,verticalOffset,visitPose,woodlandPose,duckPose,waterDepth,cycleLeg,deerLeg,nestVisit,eventDepth,dogPose,skater,festival,fireworks,flock,dolphin,starReflection,reflectionSurface,reflectionMotion,castShadow,grassBand,sunReflection,depthBand,groundAnchor,groundTravelX,groundPose,strideArm,strideFoot,wingFold,balloonDrift,vessel,foregroundTree,nest,ripple,skyPoint,horizon,waterTop,far,middle,near,rail,trail,lowerRail,railCars,tangent,rider,pack};
   }
   root.LandscapeGeometry={create};
 })(globalThis);
