@@ -1007,7 +1007,12 @@ async function loadApp({ seed, cloudSyncFactory, prefersDark = false, noMatchMed
   vm.runInContext("this.esc = esc;", sandbox);
   await flush(); // let the boot IIFE's `await loadState()` resolve before returning
   if(indexedDBProvider){
-    for(let attempt=0;attempt<40 && vm.runInContext("state",sandbox)===null;attempt++) await flush();
+    // Hashing and IndexedDB completion are not bounded by an event-loop count.
+    // Await readiness with an explicit deadline so slowness cannot masquerade
+    // as an unrelated task-action failure against null state.
+    const deadline=Date.now()+5000;
+    while(vm.runInContext("state",sandbox)===null && Date.now()<deadline) await flush();
+    assert.notEqual(vm.runInContext("state",sandbox),null,"App durable startup did not finish within 5 seconds");
   }
   return { ctx: sandbox, shim };
 }
@@ -17570,4 +17575,45 @@ test('RISK repository process: Firestore deployment aborts when backward compati
   const options={project:'demo-compatibility-hook',projectRoot:temp,only:'firestore:rules',config:{projectDir:temp,path:value=>path.resolve(temp,value||'.'),get:key=>config[key]}};
   await assert.rejects(lifecycleHooks('firestore','predeploy')({},options),/firestore predeploy error/,'the real CLI hook must propagate a failing compatibility command');
  }finally{fs.rmSync(temp,{recursive:true,force:true});}
+});
+
+test('RISK DESTRUCTIVE ACTION RACE: Restore and Reset stop if their backed-up board or account changes',async t=>{
+ for(const action of ['restore','reset'])for(const change of ['board','account','backend'])await t.test(action+' / '+change,async()=>{
+  const {ctx,shim}=await loadApp();
+  ctx.addTask('Original account work');ctx.state.syncAccount='original@example.test';assert.equal(await ctx.persist(),true);
+  const manual=await ctx.saveDurableBackup('manual',JSON.stringify(ctx.state));
+  ctx.state.tasks[0].title='Current work';assert.equal(await ctx.persist(),true);
+  shim.window.CloudSync={ready:false,user:'original@example.test',status:'ok'};
+  const originalSave=ctx.saveDurableBackup;let release,started;
+  const waiting=new Promise(resolve=>started=resolve);
+  ctx.saveDurableBackup=async(...args)=>{const copy=await originalSave(...args);started();await new Promise(resolve=>release=resolve);return copy;};
+  const before=JSON.stringify(ctx.state);
+  const pending=action==='restore'?ctx.restoreDurableBackupById(manual.id):ctx.confirmResetEverything();
+  await waiting;
+  if(change==='board')ctx.addTask('New work while backup waits');
+  if(change==='account')shim.window.CloudSync.user='different@example.test';
+  if(change==='backend')shim.window.CloudSync={...shim.window.CloudSync};
+  const expected=JSON.stringify(ctx.state),undo=vm.runInContext('JSON.stringify(undoStack)',ctx);
+  release();await pending;
+  assert.equal(JSON.stringify(ctx.state),expected,'a stale destructive action must not replace newer state');
+  assert.equal(vm.runInContext('JSON.stringify(undoStack)',ctx),undo,'cancelled action cannot add Undo frames');
+  assert.ok(ctx.readLocalBackups().some(row=>row.kind==='before-'+action&&row.payload===before),'the completed safety copy remains recoverable');
+  assert.match(shim.document.getElementById('toast').textContent,/stopped.*changed/i);
+  vm.runInContext('if(saveTimer)clearTimeout(saveTimer);if(cloudTimer)clearTimeout(cloudTimer)',ctx);
+ });
+});
+
+test('RISK repository process: the app harness awaits slow durable startup instead of returning null state',async()=>{
+ const {indexedDB}=await import('fake-indexeddb');let delayed=false;
+ const cryptoProvider={...webcrypto,subtle:{async digest(...args){
+  if(!delayed){delayed=true;await new Promise(resolve=>setTimeout(resolve,180));}
+  return webcrypto.subtle.digest(...args);
+ }},getRandomValues:array=>webcrypto.getRandomValues(array),randomUUID:()=>webcrypto.randomUUID()};
+ const board=syncState({tasks:[syncTask('slow','Recovered after slow hashing')]});
+ const raw=JSON.stringify(board);
+ const {ctx,shim}=await loadApp({indexedDBProvider:indexedDB,cryptoProvider,deviceDbName:'slow-start-'+Date.now(),
+  seedStorage:{[LOCAL_HEAD_KEY]:raw,[SYNC_STORE_KEY]:raw}});
+ assert.ok(ctx.state,'loadApp must wait until the durable boot has supplied state');
+ assert.equal(ctx.state.tasks[0].title,'Recovered after slow hashing');
+ await shim.window.ScannerDeviceStore.close();
 });
