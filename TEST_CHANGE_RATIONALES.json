@@ -769,5 +769,27 @@
       "command": "node --test --test-name-pattern='RISK night shows|RISK skyline' tests.js; node --test --test-name-pattern='RISK night shows|RISK festival barge|RISK fireworks realism' tests.js",
       "failure": "All six new tests failed before implementation: no standalone show during rare cooldown (0 vs 1); festival absent; festival geometry and building material helper undefined; occluded window 0 toggled instead of visible window 1; no festival paint before shared reflection capture. Saved full output in task-artifacts/night-festival-20260930/red.txt. Supplemental browser-pixel coverage was also run against a served git archive of the unchanged base a4993cf: it failed at 320x568 because standalone sparks contributed zero visible lake pixels. The candidate passes the identical check, isolating sparks from the stage, on four viewport sizes. See pixel-red.txt and pixel-green.txt. On the barge follow-up, four focused contracts failed before the change: 96-second fixed duration vs vehicle speed, stationary entry position, missing boat pass and NaN water depth. A separate realism red test rejected the old sparse equal-length ring. Full evidence is in barge-red.txt and fireworks-red.txt. Attachment fixtures use launches at 65 and 84 seconds when both launch racks are visible in either direction; the earlier 38.4-second port rack was still offscreen on narrow phones. The rendered reflection fixture now uses a mature 0.8-second bloom instead of the initial 0.3-second expansion, since the shoreline legitimately clips higher sparks."
     }
+  },
+  {
+    "reason": "The reported error recovers before it can be inspected. Preserve safe diagnostic codes for one hour with a ten-minute per-code interval, as requested.",
+    "previousBehavior": "Successful sync cleared the error code; Settings had no retained sync history.",
+    "intendedBehavior": "Timestamped stage/code entries survive recovery and reload, expire after one hour, and cannot mutate board data or interrupt sync. Repeated codes are suppressed for ten minutes across reloads and existing tabs.",
+    "replacementTests": [
+      "RISK SYNC ERROR LOG: backend failures remain under Settings diagnostics after recovery and reload",
+      "RISK SYNC ERROR LOG: history rejects unsafe or malformed diagnostic fields",
+      "RISK SYNC ERROR LOG: denied diagnostic storage and a throwing recorder cannot interrupt sync or board saves",
+      "RISK SYNC ERROR LOG: reconciliation errors record once and update an open Settings log without replacing drafts",
+      "RISK SYNC ERROR LOG: each code logs once per ten minutes and entries expire at one hour without resetting on repeats",
+      "RISK SYNC ERROR LOG: older tabs retain newer diagnostics and share the ten-minute suppression window"
+    ],
+    "preservedCoverage": [
+      "Existing sync retries, read-before-write authority, revision arbitration, account isolation, and safe backups remain unchanged.",
+      "Existing board exports and settings fields retain their behavior; error messages and private account/task content are excluded from the log."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK SYNC ERROR LOG' tests.js",
+      "failure": "Before implementation all five cases failed: Settings omitted Recent sync errors and the empty state; recordSyncError was missing for quota and timing cases; the open log remained empty after reconciliation. The additional older-tabs test then failed 1 !== 2 because a stale tab overwrote the newer diagnostic. Logs: log-retention-red.log and log-tabs-red.log."
+    },
+    "testChangesSha256": "ffd4246e1aa39e39ea71ed924a0f259694acd1c30097cc6daeeebefe0827b661"
   }
 ]

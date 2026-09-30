@@ -314,3 +314,13 @@ The editor hook blocks app or enforcement edits while tests.js has no staged or 
 - RISK Landscape browser: both night shows reflect actual sparks and exposed windows visibly switch on and off
 - RISK festival barge: shell launches follow the moving deck and fireworks have varied ballistic trails
 - RISK fireworks realism: uneven blooms leave ballistic trails and fading embers
+
+## Retained sync diagnostics
+
+- RISK SYNC ERROR LOG: backend failures remain under Settings diagnostics after recovery and reload
+- RISK SYNC ERROR LOG: history rejects unsafe or malformed diagnostic fields
+- RISK SYNC ERROR LOG: denied diagnostic storage and a throwing recorder cannot interrupt sync or board saves
+- RISK SYNC ERROR LOG: reconciliation errors record once and update an open Settings log without replacing drafts
+- RISK SYNC ERROR LOG: each code logs once per ten minutes and entries expire at one hour without resetting on repeats
+
+- RISK SYNC ERROR LOG: older tabs retain newer diagnostics and share the ten-minute suppression window

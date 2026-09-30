@@ -7242,7 +7242,7 @@ async function loadCloudBackend({ serverData={rev:4}, serverExists=true, failure
   return {...h,getStored:()=>({exists:h.docs.has('users/owner'),data:h.docs.get('users/owner')})};
 }
 
-async function loadCloudBackendV2({rootData=null,batchFailureAt=Infinity,failures={},timeoutMs=25}={}){
+async function loadCloudBackendV2({rootData=null,batchFailureAt=Infinity,failures={},timeoutMs=25,recordSyncError}={}){
  const moduleMatch=html.match(/<script type="module">([\s\S]*?)<\/script>/);assert.ok(moduleMatch);
  const moduleSource=moduleMatch[1].replace(/const \[appMod, A, F\] = await Promise\.all\(\[[\s\S]*?\]\);/,
   'const [appMod, A, F] = globalThis.__cloudModules;');
@@ -7276,6 +7276,7 @@ async function loadCloudBackendV2({rootData=null,batchFailureAt=Infinity,failure
   async setPendingUpload(account,value){pending.set(account,clone(value));return {ok:true};},
   async clearPendingUpload(account,generationId){if(pending.get(account)?.generationId!==generationId)return false;pending.delete(account);return true;},
  };
+ window.recordSyncError=recordSyncError;
  const context=vm.createContext({window,CustomEvent:class{constructor(type){this.type=type;}},__cloudModules:[{initializeApp:()=>({})},A,F],
   console,crypto:webcrypto,TextEncoder,TextDecoder,structuredClone,setTimeout,clearTimeout});context.globalThis=context;
  for(const file of ['device-store-v2.js','cloud-store-v2.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,file),'utf8'),context,{filename:file});
@@ -17797,4 +17798,115 @@ test('RISK fireworks realism: uneven blooms leave ballistic trails and fading em
  for(const spark of sparks){assert.ok(spark.trail.length>=4);for(const point of spark.trail)for(const value of [point.x,point.y,point.alpha])assert.ok(Number.isFinite(value));}
  const late=g.fireworks(3.1,.4).filter(dot=>dot.kind==='spark');
  assert.ok(late.some(d=>d.trail.at(-1).y>d.trail[0].y),'gravity curves trails down as embers fade');
+});
+
+
+test('RISK SYNC ERROR LOG: backend failures remain under Settings diagnostics after recovery and reload',async()=>{
+ const storage=sharedScannerStorage(),app=await loadApp({sharedStorage:storage});
+ const failures={push:Object.assign(Error('private task and token detail'),{code:'unavailable'})};
+ const backend=await loadCloudBackendV2({failures,timeoutMs:5000,recordSyncError:(stage,code)=>app.ctx.recordSyncError(stage,code)});
+ const before=app.ctx.cloudPayload();
+ assert.equal((await backend.CS.push('{}',1,0)).error,true);
+ delete failures.push;
+ assert.equal((await backend.CS.push('{}',1,0)).ok,true);
+ assert.equal(backend.CS.status,'ok');assert.equal(backend.CS.errorCode,null);
+ app.ctx.openSettings();
+ const rendered=app.shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(rendered,/Recent sync errors/);
+ assert.ok(rendered.indexOf('Recent sync errors')>rendered.indexOf('Diagnostics download'));
+ assert.ok(rendered.indexOf('Recent sync errors')<rendered.indexOf('Daily local backups'));
+ assert.match(rendered,/push.*unavailable/);
+ assert.match(rendered,/<time datetime="[^"]+"/);
+ assert.doesNotMatch(rendered,/private task and token detail/);
+ assert.equal(app.ctx.cloudPayload(),before,'logging cannot mark or mutate the board');
+ assert.doesNotMatch(app.ctx.currentBoardExportPayload(),/unavailable|sync-error-log/);
+ const raw=storage.getItem('fvp:chain-scanner:sync-error-log:v1');
+ assert.ok(raw,'the diagnosis survives the recovered error fields');
+ assert.deepEqual(Object.keys(JSON.parse(raw)[0]).sort(),['at','code','stage']);
+ const reloaded=await loadApp({sharedStorage:storage});reloaded.ctx.openSettings();
+ assert.match(reloaded.shim.document.getElementById('modalRoot').innerHTML,/push.*unavailable/);
+});
+
+test('RISK SYNC ERROR LOG: history rejects unsafe or malformed diagnostic fields',async()=>{
+ const storage=sharedScannerStorage({'fvp:chain-scanner:sync-error-log:v1':'{broken'}),{ctx,shim}=await loadApp({sharedStorage:storage});
+ ctx.openSettings();assert.match(shim.document.getElementById('modalRoot').innerHTML,/No sync errors recorded/);
+ for(let i=0;i<35;i++)ctx.recordSyncError('pull','failure-'+i);
+ ctx.recordSyncError('<img src=x>','private@example.test / task contents');
+ const entries=JSON.parse(storage.getItem('fvp:chain-scanner:sync-error-log:v1'));
+ assert.equal(entries.length,36);assert.deepEqual(entries[0],{at:entries[0].at,stage:'sync',code:'unknown'});
+ assert.equal(entries[1].code,'failure-34');assert.equal(entries.at(-1).code,'failure-0');
+ assert.ok(entries.every(entry=>Number.isFinite(entry.at)&&entry.at>0));
+ ctx.openSettings();assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/<img src=x>|private@example/);
+ storage.setItem('fvp:chain-scanner:sync-error-log:v1',JSON.stringify([{at:1e99,stage:'push',code:'invalid'},
+  {at:Date.now(),stage:'pull',code:'unavailable',payload:'private payload',account:'private@example.test'}]));
+ const restored=await loadApp({sharedStorage:storage});restored.ctx.openSettings();
+ assert.match(restored.shim.document.getElementById('modalRoot').innerHTML,/unavailable/);
+ assert.doesNotMatch(restored.shim.document.getElementById('modalRoot').innerHTML,/private payload|private@example|Invalid Date/);
+});
+
+test('RISK SYNC ERROR LOG: denied diagnostic storage and a throwing recorder cannot interrupt sync or board saves',async()=>{
+ const storage=sharedScannerStorage(),{ctx,shim}=await loadApp({sharedStorage:storage});
+ const original=storage.setItem;
+ storage.setItem=(key,value)=>{if(key==='fvp:chain-scanner:sync-error-log:v1')throw Error('quota');return original(key,value);};
+ assert.doesNotThrow(()=>ctx.recordSyncError('reconcile','revision-conflict'));
+ ctx.openSettings();assert.match(shim.document.getElementById('modalRoot').innerHTML,/revision-conflict/);
+ ctx.state.tasks.push(syncTask('saved','Still saved'));assert.equal(await ctx.persist(),true);
+ assert.equal(ctx.deviceSaveIssue(),null);
+ const backend=await loadCloudBackendV2({failures:{pull:Object.assign(Error('offline'),{code:'unavailable'})},recordSyncError:()=>{throw Error('recorder failed');}});
+ assert.equal((await backend.CS.pull()).error,true);assert.equal(backend.CS.errorCode,'unavailable');
+});
+
+test('RISK SYNC ERROR LOG: reconciliation errors record once and update an open Settings log without replacing drafts',async()=>{
+ const {ctx,shim}=await loadApp();
+ shim.window.CloudSync={configured:true,ready:true,user:'owner@example.test',status:'ok'};
+ ctx.openSettings();
+ const root=shim.document.getElementById('modalRoot'),before=root.innerHTML;
+ const log=shim.document.getElementById('syncErrorLog');
+ ctx.reportCloudReconcileError('invalid-payload');
+ assert.match(log.innerHTML,/reconcile.*invalid-payload/);
+ assert.equal(root.innerHTML,before,'only the log subtree updates, leaving Settings drafts untouched');
+ ctx.renderSync();ctx.renderSync();
+ assert.equal(JSON.parse(shim.localStorage.getItem('fvp:chain-scanner:sync-error-log:v1')).length,1,'repainting does not duplicate an error');
+});
+
+
+test('RISK SYNC ERROR LOG: each code logs once per ten minutes and entries expire at one hour without resetting on repeats',async()=>{
+ const storage=sharedScannerStorage(),{ctx,shim}=await loadApp({sharedStorage:storage});
+ const start=Date.now(),minute=60000,key='fvp:chain-scanner:sync-error-log:v1';
+ const timers=new Map();let serial=0;
+ ctx.setTimeout=(fn,delay)=>{const id=++serial;timers.set(id,{fn,delay});return id;};ctx.clearTimeout=id=>timers.delete(id);
+ setFakeTime(ctx,start);ctx.recordSyncError('pull','unavailable');
+ setFakeTime(ctx,start+10*minute-1);ctx.recordSyncError('push','unavailable');
+ assert.equal(JSON.parse(storage.getItem(key)).length,1,'the same code, even in another phase, cannot flood the log');
+ setFakeTime(ctx,start+10*minute);ctx.recordSyncError('push','unavailable');
+ assert.equal(JSON.parse(storage.getItem(key)).length,2,'the code can record again at the ten-minute boundary');
+ setFakeTime(ctx,start+59*minute);ctx.recordSyncError('pull','deadline-exceeded');
+ ctx.openSettings();
+ assert.equal(JSON.parse(storage.getItem(key)).length,3);
+ assert.equal(timers.size,1,'one expiry timer tracks the oldest retained entry');
+ assert.equal([...timers.values()][0].delay,minute);
+ setFakeTime(ctx,start+60*minute);const first=[...timers.values()][0];timers.clear();first.fn();
+ assert.equal(JSON.parse(storage.getItem(key)).length,2,'the first entry expires at exactly one hour even while Settings stays open');
+ assert.doesNotMatch(shim.document.getElementById('syncErrorLog').innerHTML,new RegExp(new Date(start).toISOString()));
+ setFakeTime(ctx,start+119*minute);const next=[...timers.values()][0];timers.clear();next.fn();
+ assert.equal(storage.getItem(key),null,'an empty expired log is removed from storage');
+ assert.match(shim.document.getElementById('syncErrorLog').innerHTML,/No sync errors recorded/);
+ assert.equal(timers.size,0);
+ storage.setItem(key,JSON.stringify([{at:Date.now()-61*minute,stage:'pull',code:'expired-code'}]));
+ const reloaded=await loadApp({sharedStorage:storage});reloaded.ctx.openSettings();
+ assert.doesNotMatch(reloaded.shim.document.getElementById('modalRoot').innerHTML,/expired-code/);
+ assert.equal(storage.getItem(key),null,'cold startup removes expired persisted rows too');
+});
+
+test('RISK SYNC ERROR LOG: older tabs retain newer diagnostics and share the ten-minute suppression window',async()=>{
+ const storage=sharedScannerStorage(),a=await loadApp({sharedStorage:storage}),b=await loadApp({sharedStorage:storage});
+ const start=Date.now(),key='fvp:chain-scanner:sync-error-log:v1';
+ setFakeTime(a.ctx,start);a.ctx.recordSyncError('pull','unavailable');
+ setFakeTime(b.ctx,start+1000);b.ctx.recordSyncError('push','deadline-exceeded');
+ assert.equal(JSON.parse(storage.getItem(key)).length,2,'a stale tab must retain errors recorded since it loaded');
+ setFakeTime(b.ctx,start+2000);b.ctx.recordSyncError('push','unavailable');
+ assert.equal(JSON.parse(storage.getItem(key)).length,2,'another tab must respect the existing code interval');
+ setFakeTime(a.ctx,start+3000);a.ctx.openSettings();
+ assert.match(a.shim.document.getElementById('modalRoot').innerHTML,/deadline-exceeded/);
+ assert.equal(JSON.parse(storage.getItem(key)).length,2,'opening older Settings cannot erase another tab error');
 });
