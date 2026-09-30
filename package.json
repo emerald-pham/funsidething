@@ -4,6 +4,7 @@
   "scripts": {
     "test": "node --test tests.js",
     "test:rules": "firebase emulators:exec --only firestore --project demo-chain-scanner-data-safety \"node --test --test-name-pattern='Firestore rules:' tests.js\"",
+    "test:compatibility": "firebase emulators:exec --only firestore --project demo-backward-compatibility \"node scripts/backward-compatibility.mjs\"",
     "release:install-hook": "node scripts/install-release-hook.mjs",
     "release:record": "node scripts/release-evidence.mjs record",
     "release:verify": "node scripts/release-evidence.mjs verify",

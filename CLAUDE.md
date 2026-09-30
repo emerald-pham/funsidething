@@ -72,6 +72,25 @@ glue, one-line changes — gets a test first.
 - Cloud sync orders writes by a revision counter, never by wall-clock timestamps.
 - Run the full suite after every change, not just the tests you added.
 
+## Backward compatibility before release
+
+Run `npm run test:compatibility` before release. The required `scanner-tests`
+CI job runs it for every PR, push, and Pages deployment. It requires the
+Firestore emulator, available Git history, and zero skipped compatibility cases.
+It executes real released client backends and codecs against candidate rules,
+and candidate clients against released rules, then runs the bounded sync-error
+and safe reload contracts. Read success alone is never evidence of sync success.
+
+The matrix retains the immutable supported baseline in
+`scripts/backward-compatibility.mjs` and also tests the exact comparison base
+(`COMPATIBILITY_BASE_SHA` in CI, `origin/main` locally). Do not advance or remove
+the pinned baseline to make an incompatible change pass. A new protocol needs
+a staged compatible rollout or an explicitly reviewed support/migration change.
+See [BACKWARD_COMPATIBILITY.md](BACKWARD_COMPATIBILITY.md) for the supported
+boundary and the historical negative control. The Firestore `predeploy` hook
+also runs this same gate before `firebase deploy --only firestore:rules`, so a
+manual CLI rules deployment cannot accidentally omit the compatibility check.
+
 ## Protect existing features when changing tests
 
 Existing passing behavior tests are feature contracts. Preserve their assertions

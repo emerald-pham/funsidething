@@ -44,6 +44,10 @@ jobs:
       - run: node scripts/test-first-gate.mjs "${{ steps.diff-base.outputs.sha }}"
       - run: npm test
       - run: npm run test:rules
+      - name: Backward compatibility
+        env:
+          COMPATIBILITY_BASE_SHA: ${{ steps.diff-base.outputs.sha }}
+        run: npm run test:compatibility
 
   release-evidence:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'

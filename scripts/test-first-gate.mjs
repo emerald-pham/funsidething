@@ -8,6 +8,7 @@ const runtimeFilePattern=/\.(?:html|js|mjs|cjs|jsx|ts|tsx|css|scss|webmanifest|s
 const nonAppDirectories=new Set(['.git','.github','.claude','audits','node_modules','scripts']);
 const processFiles=new Set([
   'scripts/test-first-gate.mjs',
+  'scripts/backward-compatibility.mjs',
   'scripts/release-evidence.mjs',
   'scripts/install-release-hook.mjs',
   '.claude/hooks/test-first-guard.sh',

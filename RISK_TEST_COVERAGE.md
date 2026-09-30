@@ -289,3 +289,11 @@ The editor hook blocks app or enforcement edits while tests.js has no staged or 
 - RISK CLOUD RECOVERY UI: reload waits for a durable unchanged board and explicit sign out remains available
 - RISK PWA recovery: cloud compatibility failures can request the normal safe update check
 - RISK CLOUD LOOP: repeated revision conflicts cannot spin even when every read succeeds
+
+## Cross-release compatibility gate
+
+- RISK repository process: backward compatibility is a mandatory fail-closed release gate
+- RISK repository process: backward compatibility pins released code and rejects broken roundtrips
+- RISK repository process: backward compatibility rejects skipped or empty gate runs
+- RISK BACKWARD COMPATIBILITY: released clients and candidate interoperate across both rule versions
+- RISK repository process: Firestore deployment aborts when backward compatibility fails
