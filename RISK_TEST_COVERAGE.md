@@ -297,3 +297,8 @@ The editor hook blocks app or enforcement edits while tests.js has no staged or 
 - RISK repository process: backward compatibility rejects skipped or empty gate runs
 - RISK BACKWARD COMPATIBILITY: released clients and candidate interoperate across both rule versions
 - RISK repository process: Firestore deployment aborts when backward compatibility fails
+
+## Destructive action and startup races
+
+- RISK DESTRUCTIVE ACTION RACE: Restore and Reset stop if their backed-up board or account changes
+- RISK repository process: the app harness awaits slow durable startup instead of returning null state

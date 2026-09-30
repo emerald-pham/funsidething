@@ -725,5 +725,23 @@
       "command": "node --test --test-name-pattern='RISK repository process: backward compatibility|RISK repository process: Firestore deployment aborts' tests.js",
       "failure": "Observed missing mandatory workflow step and ERR_MODULE_NOT_FOUND for the new runner in backward-compatibility-red.log. The skip/empty-run contract then failed with validateGateSummary is not a function. The direct Firestore deployment test failed because predeploy was undefined instead of the required command. After implementation, a real CLI lifecycle hook propagates the fixture exit17 and the emulator matrix checks actual SDK permission-denied on the historical unstamped transaction."
     }
+  },
+  {
+    "testChangesSha256": "8a1b6a8e51d371dbea37727308328fb078c4e9fab70dfc75af8bd0991b6b0e88",
+    "reason": "The requested repo bug hunt reproduced stale Restore/Reset consent after asynchronous safety-copy completion, and a separate fixed-loop test-harness startup race.",
+    "previousBehavior": "Restore and Reset replaced state after backup I/O even when newer edits or a different signed-in backend/account arrived. The IndexedDB app harness could return null state after forty event-loop turns.",
+    "intendedBehavior": "Cancel stale destructive operations before replacement or Undo mutation while retaining completed safety backups. Await non-null durable startup with a five-second explicit failure deadline, preserving every existing behavior assertion.",
+    "replacementTests": [
+      "RISK DESTRUCTIVE ACTION RACE: Restore and Reset stop if their backed-up board or account changes",
+      "RISK repository process: the app harness awaits slow durable startup instead of returning null state"
+    ],
+    "preservedCoverage": [
+      "All existing Restore/Reset success, failed recovery proof, Undo, exact backup, persistence and cross-account assertions remain unchanged. Six delayed-backup cases cover both actions and board/account/backend changes.",
+      "Existing startup tests retain all assertions; only the harness readiness wait changes. A delayed real codec digest proves that the harness waits for the recovered task instead of returning null."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK DESTRUCTIVE ACTION RACE:|RISK repository process: the app harness awaits' tests.js",
+      "failure": "Observed repo-bug-hunt-red.log before implementation: all six destructive-action cases failed exact-state preservation (Restore reverted Current work, Reset emptied tasks), and slow durable startup failed with actual null state. No existing feature assertion was removed or weakened."
+    }
   }
 ]
