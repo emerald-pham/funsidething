@@ -305,6 +305,12 @@ The editor hook blocks app or enforcement edits while tests.js has no staged or 
 
 ## Night shows and skyline
 
+- RISK landscape metropolis: seeded low-rise city, gardens, and microtrees stay behind the skyline
+- RISK landscape metropolis: gardens skip towers with lightning rods
+- RISK landscape city and aircraft: current changelog names the skyline and plane details
+- RISK landscape aircraft: the biplane has one centered landing gear set
+- RISK landscape aircraft: ordinary planes show shaded wings, a cockpit, and panel detail
+- RISK landscape aircraft: scheduled planes keep a shaded body and night navigation lights
 - RISK night shows: standalone fireworks recur independently of the rare cooldown and stay bounded
 - RISK night shows: festival odds are lower than standalone fireworks with finite visits and rate controls
 - RISK night shows: launches lead to bounded fading bursts and the festival sails fully on and off screen

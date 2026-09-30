@@ -845,5 +845,29 @@
       "failure": "Initial four tests all failed: no suspend function, cache miss returned no revision instead of server revision 7, wake remained syncing behind the old deadline, and closing the editor did not release a server read. The additional event-order test failed with two reconnects instead of one. Publication-during-sleep coverage verifies the existing revision readback path without weakening it. Independent exact-candidate review identified a poisoned reconnect promise; the new follow-up test failed before repair because online recovery remained error instead of ok. The repaired reset has its own bounded/cancellable lifetime and later foreground recovery replaces it.",
       "followUpCommand": "node --test --test-reporter=spec --test-name-pattern='RISK PWA SYNC RESUME: a timed-out reconnect' tests.js"
     }
+  },
+  {
+    "reason": "The user requested shaded airplane detail, a single landing-gear set for biplanes, a dense metropolis of tiny one- and two-story buildings behind the existing skyline, lit rooftop gardens on shorter skyscrapers without lightning rods, and very tiny foreground trees. The existing canvas had no testable city plan, the biplane wheels read as separated front and rear gear, and both propeller and ordinary aircraft were flat arrow-like silhouettes.",
+    "previousBehavior": "The city had only the irregular towers, leaving open gaps at the distant-bank baseline. There were no rooftop gardens or tiny city-edge trees. Biplane wheels sat eleven pixels apart without a shared axle. Ordinary, airshow, and scheduled planes lacked separate shaded surfaces, a readable cockpit, and panel detail.",
+    "intendedBehavior": "A deterministic responsive plan adds dense backfill that is 3–7 pixels high at desktop scale and proportionally shorter on phones, with one- and two-story roofs behind the towers. Tiny trees stay at the city foreground. Lit gardens appear only on shorter towers and exclude lightning-rod buildings using the same deterministic hasLightningRod flag that paints each rod. Biplanes show one centered paired-wheel assembly, and ordinary, scheduled, airshow, and banner aircraft have shaped fuselages, distinct wing planes, tails, cockpit detail, and restrained shading while preserving event routes, contrails, tow ropes, navigation lights, reflections, and reduced-motion behavior.",
+    "replacementTests": [
+      "RISK landscape metropolis: seeded low-rise city, gardens, and microtrees stay behind the skyline",
+      "RISK landscape metropolis: gardens skip towers with lightning rods",
+      "RISK landscape aircraft: the biplane has one centered landing gear set",
+      "RISK landscape aircraft: ordinary planes show shaded wings, a cockpit, and panel detail",
+      "RISK landscape aircraft: scheduled planes keep a shaded body and night navigation lights",
+      "RISK landscape city and aircraft: current changelog names the skyline and plane details"
+    ],
+    "preservedCoverage": [
+      "Existing tower materials, exposed-window selection, clock-tower waterline, skyline reflection, deterministic rendering, and reduced-motion contracts remain intact.",
+      "The visible rod uses the city-plan hasLightningRod flag, so rooftop gardens cannot overlap any rod-equipped tower or the tallest tier.",
+      "Existing aircraft scheduling, banner towing, biplane wing and strut geometry, contrails, night navigation lights, and online and offline local assets remain covered."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='RISK landscape metropolis|RISK landscape aircraft|RISK landscape city and aircraft' tests.js; targeted low-rise-height and lightning-rod tests against the current draft",
+      "failure": "An origin/main archive run failed all six new contracts: city plan, rod-plan property, changelog, centered biplane gear, shaded ordinary aircraft, and shaded scheduled aircraft were absent. On the implementation draft, the added 3–7 px roof ceiling failed against the earlier 16–28 px backfill, and garden eligibility failed while hasLightningRod was not yet exposed. The existing Banner aircraft renderer test also failed after the new shading used production palette inputs missing from its test harness; adding those legitimate palette stubs made that existing contract pass. Full red outputs are retained in /Users/emeraldpham/.codex/task-artifacts/aircraft-metropolis-2026-09-30/red-first/.",
+      "followUpCommand": "node --test --test-reporter=spec --test-name-pattern='Banner aircraft|RISK landscape aircraft|RISK landscape metropolis' tests.js"
+    },
+    "testChangesSha256": "ca6a198ec8d232054c5faa7c7dea395d9602d44b29833960facfddb81203243c"
   }
 ]

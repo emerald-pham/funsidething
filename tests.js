@@ -11104,6 +11104,52 @@ test('RISK landscape city: clock tower meets the waterline on tablet, phone, and
  }
 });
 
+test('RISK landscape metropolis: seeded low-rise city, gardens, and microtrees stay behind the skyline',()=>{
+ const context=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),context);
+ const seed=value=>{const v=Math.sin(value*127.1+311.7)*43758.5453;return v-Math.floor(v);};
+ for(const [width,height] of [[320,568],[390,844],[568,320],[768,1024],[1280,720],[1440,900]]){
+  const scene=context.LandscapeGeometry.create(width,height),plan=scene.cityscape(seed),again=scene.cityscape(seed);
+  assert.deepEqual(plan,again,`${width}x${height}: city details are stable across repaints`);
+  assert.equal(plan.groundY,scene.horizon+12,'every city layer meets the same distant-bank baseline');
+  assert.ok(plan.backfill.length>=Math.ceil(width/8),`${width}x${height}: small buildings fill the skyline gaps`);
+  const coverage=plan.backfill.reduce((sum,building)=>sum+building.width,0)/width;
+  assert.ok(coverage>.80&&coverage<=1,`${width}x${height}: low-rise roofs form a dense field, got ${coverage}`);
+  assert.ok(plan.backfill.every(building=>building.x>=0&&building.x+building.width<=width+1&&Math.abs(building.y+building.height-plan.groundY)<1e-6&&building.height<=7),`${width}x${height}: one- and two-story infill stays much shorter than the skyline`);
+  assert.ok(plan.backfill.some(building=>building.height>=(width<600?5.2:6)),`${width}x${height}: some rooflines remain distinct through the shoreline haze`);
+  assert.ok(plan.backfill.every(building=>building.stories===1||building.stories===2)&&plan.backfill.some(building=>building.stories===1)&&plan.backfill.some(building=>building.stories===2),`${width}x${height}: the field contains one- and two-story buildings`);
+  const tallest=Math.max(...plan.towers.map(tower=>tower.height));
+  assert.ok(plan.gardens.length>0,`${width}x${height}: a few shorter towers carry rooftop gardens`);
+  assert.ok(plan.gardens.every(garden=>garden.height<tallest*.78&&garden.height>=(width<600?14:20)),`${width}x${height}: the very tallest towers stay clear of rooftop gardens`);
+  assert.ok(plan.trees.length>=4&&plan.trees.every(tree=>tree.x>=0&&tree.x<=width&&tree.baseY===plan.groundY&&tree.height<=4),`${width}x${height}: foreground trees stay random, grounded, and tiny`);
+ }
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),background=source.slice(source.indexOf('  function paintBackground(){'),source.indexOf('  function paintWoodland('));
+ assert.match(background,/geometry\.cityscape\(rand\)/,'the renderer paints the tested responsive city plan');
+ assert.ok(background.indexOf('plan.backfill')<background.indexOf('for(let i=0;i<count;i++)'),'low-rise buildings paint behind the existing skyline');
+ assert.ok(background.indexOf('plan.trees')>background.indexOf('for(let i=0;i<count;i++)'),'tiny foreground trees paint over the distant city base');
+});
+
+test('RISK landscape metropolis: gardens skip towers with lightning rods',()=>{
+ const context=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),context);
+ const seed=value=>{const v=Math.sin(value*127.1+311.7)*43758.5453;return v-Math.floor(v);};
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),background=source.slice(source.indexOf('  function paintBackground(){'),source.indexOf('  function paintWoodland('));
+ for(const [width,height] of [[320,568],[1280,720]]){
+  const city=context.LandscapeGeometry.create(width,height).cityscape(seed),towers=city.towers;
+  assert.ok(towers.every(tower=>typeof tower.hasLightningRod==='boolean'),`${width}x${height}: roof hardware comes from the shared tower plan`);
+  assert.ok(city.gardens.every(garden=>garden.hasLightningRod===false),`${width}x${height}: gardens never sit under a lightning rod`);
+ }
+ assert.match(background,/if\(buildings\[i\]\.hasLightningRod\)/,'the renderer uses the same tower hardware flag as garden selection');
+});
+
+test('RISK landscape city and aircraft: current changelog names the skyline and plane details',()=>{
+ const html=fs.readFileSync(path.join(__dirname,'index.html'),'utf8'),entry=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)?.[1];
+ assert.ok(entry,'the current changelog stays available in Settings and offline');
+ assert.match(entry,/shaded wings, a cockpit and clearer body detail/i);
+ assert.match(entry,/biplanes use a single landing-gear set/i);
+ assert.match(entry,/dense one- and two-story buildings behind the towers/i);
+ assert.match(entry,/lit roof gardens on selected shorter skyscrapers without lightning rods/i);
+ assert.match(entry,/tiny trees along the city's near edge/i);
+});
+
 test('Landscape waterfront: vessels fit the water, and trees and landmarks share safe anchors',()=>{
  const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
  for(const [w,h] of [[320,568],[390,844],[844,390],[1440,1000]]){
@@ -13247,7 +13293,7 @@ test('Scene appearance: birds retain identity with dark distant colors and brigh
 
 test('Banner aircraft: propeller craft has a tail tow point and animated blades without altering airshows',()=>{
  const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),code=source.slice(source.indexOf('  function airplane('),source.indexOf('  function paintGuest('));
- const render=(time,propeller)=>{const calls=[],g={save(){},restore(){},translate(){},scale(){},beginPath(){},moveTo(...v){calls.push(['m',...v]);},lineTo(...v){calls.push(['l',...v]);},closePath(){},fill(){}};vm.runInNewContext(code+`;airplane(0,0,1,.2,${time},${propeller})`,{g,Math,color:()=> '#123456',line(g,...v){calls.push(['line',...v]);},ellipse(g,...v){calls.push(['ellipse',...v]);}});return calls;};
+ const render=(time,propeller)=>{const calls=[],g={save(){},restore(){},translate(){},scale(){},beginPath(){},moveTo(...v){calls.push(['m',...v]);},lineTo(...v){calls.push(['l',...v]);},closePath(){},fill(){}};vm.runInNewContext(code+`;airplane(0,0,1,.2,${time},${propeller})`,{g,Math,color:()=> '#123456',S:livingSky(),p:{sky:['#abc','#bcd','#def'],front:'#789abc',city:'#345678',night:0},line(g,...v){calls.push(['line',...v]);},ellipse(g,...v){calls.push(['ellipse',...v]);}});return calls;};
  assert.notDeepEqual(render(0,true),render(.07,true),'propeller visibly spins');assert.deepEqual(render(0,false),render(.07,false),'airshow silhouette stays unchanged');
  const banner=source.slice(source.indexOf("    if(e.type==='banner'){"));assert.match(banner,/airplane\(x,y,dir,e.seed,t,true\)/);assert.match(banner,/line\(g,x-dir\*18,y/,'tow starts at the tail');
  assert.match(banner,/LandscapeAppearance\.bannerColors\(p\.night,c,p\.city\)/,'banner colors follow the actual sky rather than the UI theme');
@@ -15248,6 +15294,49 @@ test('Landscape polish: tram car spacing follows track length on phone and table
   assert.ok(distances.every(d=>Math.abs(d-26)<1.4),`${w}x${h} cars keep a constant visible gap: ${distances}`);
  }
  assert.match(fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),/geometry\.railCars\(/);
+});
+
+test('RISK landscape aircraft: the biplane has one centered landing gear set',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),plane=source.slice(source.indexOf('  function airplane('),source.indexOf('  function paintGuest('));
+ const lines=[],ellipses=[],g={save(){},restore(){},translate(){},scale(){}};
+ vm.runInNewContext(`${plane};airplane(100,100,1,.2,0,true)`,{g,color:()=> '#345678',line(_g,x1,y1,x2,y2,paint,width){lines.push({x1,y1,x2,y2,paint,width});},ellipse(_g,x,y,rx,ry,paint){ellipses.push({x,y,rx,ry,paint});}});
+ const wheels=ellipses.filter(item=>item.paint==='#394850');
+ assert.equal(wheels.length,2,'the single landing-gear set keeps its pair of wheels');
+ assert.ok(Math.abs(wheels[0].x-wheels[1].x)<=2&&Math.abs(wheels[0].y-wheels[1].y)<=1,'the paired wheels share one centered axle instead of reading as front and rear sets');
+ assert.equal(lines.filter(item=>item.y1===item.y2&&Math.abs(item.y1-5.4)<.2&&item.x1<0&&item.x2>0).length,1,'one axle joins the paired wheels');
+});
+
+test('RISK landscape aircraft: ordinary planes show shaded wings, a cockpit, and panel detail',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),plane=source.slice(source.indexOf('  function airplane('),source.indexOf('  function paintGuest('));
+ const lines=[],ellipses=[],fills=[];let current=null;const g={save(){},restore(){},translate(){},scale(){},beginPath(){current=[];},moveTo(x,y){current.push([x,y]);},lineTo(x,y){current.push([x,y]);},closePath(){},fill(){fills.push({paint:this.fillStyle,path:current});}};
+ vm.runInNewContext(`${plane};airplane(100,100,-1,.43,0,false)`,{g,color:(seed,shade=0)=>shade?shade===1?'#789abc':'#9dbbd5':'#345678',line(_g,x1,y1,x2,y2,paint,width){lines.push({x1,y1,x2,y2,paint,width});},ellipse(_g,x,y,rx,ry,paint){ellipses.push({x,y,rx,ry,paint});},S:{mixHex:(a,b,amount)=>amount>.5?b:a},p:{sky:['#abc','#bcd','#def'],front:'#789abc',night:0}});
+ assert.ok(fills.length>=2,'the fuselage and wing receive separate shaded surfaces');
+ assert.ok(fills.some(item=>item.path?.some(point=>Math.abs(point[1])>=15)),'wing surfaces have a broad, readable span');
+ assert.ok(lines.length>=5&&new Set(lines.map(item=>item.paint)).size>=2,'highlight, shadow, and panel strokes give the wing and body depth');
+ assert.ok(ellipses.some(item=>item.rx>=2.5&&item.ry>=1&&item.ry<=2),'a clear cockpit canopy breaks up the fuselage silhouette');
+});
+
+test('RISK landscape aircraft: scheduled planes keep a shaded body and night navigation lights',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),start=source.indexOf("      if(e.type==='plane'){"),end=source.indexOf("      if(e.type==='balloon')",start),branch=source.slice(start,end);
+ assert.ok(start>=0&&end>start,'the exercised code is the ordinary scheduled-plane visitor');
+ const render=night=>{
+  const paths=[],fills=[],lines=[],ellipses=[],rectangles=[];let current=null;
+  const g={globalAlpha:1,save(){},restore(){},translate(){},scale(){},beginPath(){current=[];paths.push(current);},moveTo(x,y){current.push([x,y]);},lineTo(x,y){current.push([x,y]);},closePath(){},fill(){fills.push({paint:this.fillStyle,path:current});},fillRect(...rect){rectangles.push({rect,paint:this.fillStyle,alpha:this.globalAlpha});},createLinearGradient(...from){return {from,stops:[],addColorStop(at,paint){this.stops.push({at,paint});}};}};
+  const context={g,W:1280,hy:338,p:{night,sky:['#123','#456','#789'],city:'#abc'},geometry:{verticalOffset:()=>0},color:(seed,shade=0)=>`aircraft-${shade}`,S:{mixHex:(a,b,amount)=>[a,b,amount].join(':')},ellipse(_g,x,y,rx,ry,paint){ellipses.push({x,y,rx,ry,paint});},line(_g,x1,y1,x2,y2,paint,width){lines.push({x1,y1,x2,y2,paint,width});}};
+  const paint=vm.runInNewContext(`(function(e,x){${branch}\n})`,context);
+  paint({type:'plane',lane:.5,reverse:false},100);
+  return {paths,fills,lines,ellipses,rectangles,g};
+ };
+ const day=render(0),night=render(.8);
+ assert.ok(day.fills.length>=3&&new Set(day.fills.map(item=>item.paint)).size>=3,'the scheduled plane separates its fuselage, wing, and tail into shaded surfaces');
+ assert.ok(day.fills.some(item=>String(item.paint).startsWith('aircraft-0:')),'the daytime fuselage keeps an aircraft hue that reads against the pale sky');
+ assert.ok(day.fills.some(item=>item.path?.some(point=>Math.abs(point[1])>=13)),'scheduled plane wings have a broad silhouette at scene scale');
+ assert.ok(day.ellipses.some(item=>item.rx>=2.7&&item.ry>=1),'scheduled planes keep a readable cockpit canopy');
+ assert.ok(day.lines.length>=5,'short panel and highlight strokes add shape detail');
+ assert.ok(day.rectangles.some(item=>item.rect[0]===-90&&item.rect[2]===83),'the existing contrail remains attached to the scheduled plane');
+ assert.equal(night.ellipses.filter(item=>item.paint==='#ed8976'||item.paint==='#abcdaa').length,2,'both night navigation lights remain visible');
+ assert.match(source,/const f=geometry\.routeProgress\(e,'x'\)/,'aircraft keep their existing event lifecycle and horizontal route');
+ assert.match(branch,/geometry\.verticalOffset\(e,14\)/,'aircraft keep their existing vertical flight motion');
 });
 
 test('Landscape polish: rain darkens the sky, foreground fireflies double, and the message plane has two wings',()=>{

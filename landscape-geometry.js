@@ -41,6 +41,28 @@
     const rail=x=>horizon+H*.145+Math.sin(x/W*3)*H*.01;
     const trail=x=>middle(x)+H*.042;
     const lowerRail=x=>near(x)+H*.07;
+    function cityscape(random=()=>.5){
+      const groundY=horizon+12,count=Math.ceil(W/15);
+      const towers=Array.from({length:count},(_,index)=>{
+        const x=index*W/count,cluster=.4+.6*Math.pow(Math.sin(x/W*Math.PI*3+.5),2);
+        const height=(18+random(index+14)*65)*cluster*(W<600?.8:1),width=7+random(index+91)*18;
+        return {index,x,y:groundY-height,width,height,bw:width,bh:height,hasLightningRod:random(index+33)>.68};
+      });
+      const tallest=Math.max(...towers.map(tower=>tower.height));
+      const gardens=towers.filter(tower=>tower.height>=(W<600?14:22)&&tower.height<tallest*.78&&!tower.hasLightningRod&&random(tower.index+702)>.55)
+        .map(tower=>({...tower,lights:1+Math.floor(random(tower.index+951)*2)}));
+      const backfillCount=Math.ceil(W/7),cell=W/backfillCount;
+      const backfill=Array.from({length:backfillCount},(_,index)=>{
+        const width=cell*(.82+random(index+981)*.16),height=(3+random(index+721)*4)*(W<600?.8:1),x=index*cell;
+        return {index,x,y:groundY-height,width,height,stories:height>=(W<600?4.2:5.2)?2:1,seed:random(index+1111)};
+      });
+      const treeCount=Math.max(4,Math.round(W/82)),treeCell=W/treeCount;
+      const trees=Array.from({length:treeCount},(_,index)=>({
+        index,x:clamp((index+.5)*treeCell+(random(index+1301)-.5)*treeCell*.5,0,W),
+        baseY:groundY,height:1.8+random(index+1471)*1.7,seed:random(index+1559),
+      }));
+      return {groundY,backfill,towers,gardens,trees};
+    }
     function railCars(x,count,spacing=26,reverse=false){
       const cars=[{x,y:lowerRail(x),angle:tangent(lowerRail,x)}],direction=reverse?1:-1;
       for(let i=1;i<count;i++){
@@ -325,7 +347,7 @@
       const field=packet*.68+detail*.32;
       return {dx:envelope*(.33*field+.1*Math.sin(x*.071+depth*.24-phase*.63)),dy:envelope*1.25*field};
     };
-    return {routeProgress,motionProgress,motionAge,verticalOffset,visitPose,woodlandPose,duckPose,waterDepth,cycleLeg,deerLeg,nestVisit,eventDepth,dogPose,skater,festival,fireworks,flock,dolphin,starReflection,reflectionSurface,reflectionMotion,castShadow,grassBand,sunReflection,depthBand,groundAnchor,groundTravelX,groundPose,strideArm,strideFoot,wingFold,balloonDrift,vessel,foregroundTree,nest,ripple,skyPoint,horizon,waterTop,far,middle,near,rail,trail,lowerRail,railCars,tangent,rider,pack};
+    return {routeProgress,motionProgress,motionAge,verticalOffset,visitPose,woodlandPose,duckPose,waterDepth,cycleLeg,deerLeg,nestVisit,eventDepth,dogPose,skater,festival,fireworks,flock,dolphin,starReflection,reflectionSurface,reflectionMotion,castShadow,grassBand,sunReflection,depthBand,groundAnchor,groundTravelX,groundPose,strideArm,strideFoot,wingFold,balloonDrift,vessel,foregroundTree,nest,ripple,skyPoint,horizon,waterTop,far,middle,near,rail,trail,lowerRail,railCars,tangent,rider,pack,cityscape};
   }
   root.LandscapeGeometry={create};
 })(globalThis);
