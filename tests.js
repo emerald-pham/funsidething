@@ -18149,3 +18149,26 @@ test('RISK PWA SYNC RESUME: a publication committed during sleep is read back wi
  assert.equal(h.writes.length,1,'the authoritative matching read acknowledges an already-published board');
  assert.equal(app.ctx.state.tasks.some(task=>task.title==='Publication before sleep'),true);
 });
+
+
+test('RISK PWA SYNC RESUME: a timed-out reconnect cannot poison later online or wake recovery',async()=>{
+ for(const recovery of ['online','wake']){
+  let finishOld;const failures={enablePending:new Promise(resolve=>{finishOld=resolve;})};
+  const board=syncState({tasks:[syncTask('retained','Do not lose this')],syncRev:4,syncAccount:'owner@example.test',syncDirty:false});
+  const app=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(board)}}),h=await loadCloudBackendV2({rootData:{rev:4,payload:app.ctx.cloudPayload()},failures,timeoutMs:20});
+  app.shim.window.CloudSync=h.CS;
+  app.shim.document.hidden=true;app.shim.window.dispatchEvent({type:'pagehide'});
+  app.shim.document.hidden=false;app.shim.window.dispatchEvent({type:'pageshow',persisted:true});
+  await syncSettle(35);assert.equal(h.CS.errorCode,'deadline-exceeded');
+  delete failures.enablePending;
+  if(recovery==='wake'){
+   app.shim.document.hidden=true;app.shim.window.dispatchEvent({type:'pagehide'});
+   app.shim.document.hidden=false;app.shim.window.dispatchEvent({type:'pageshow',persisted:true});
+  }else app.shim.window.dispatchEvent({type:'online'});
+  await syncSettle(35);
+  assert.equal(h.CS.status,'ok',recovery+' must supersede a reset whose promise never settled');
+  assert.equal(app.ctx.state.syncDirty,false);assert.equal(app.ctx.state.tasks[0].id,'retained');
+  assert.equal(h.network.filter(row=>row==='disable').length,2,'one new reset replaces the expired attempt');
+  finishOld();await syncSettle(5);assert.equal(h.CS.status,'ok','late completion of the expired reset cannot change sync status');
+ }
+});

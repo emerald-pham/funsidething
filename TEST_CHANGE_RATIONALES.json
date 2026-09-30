@@ -823,7 +823,7 @@
     }
   },
   {
-    "testChangesSha256": "c9c5125325d473da1e9a260f1fc862a2f05e20a90d565b29a733b9a4807611de",
+    "testChangesSha256": "8289dfdec741ff622d47dd83101b7ed84be0116f4df740b3e6b1096f9c40c31b",
     "reason": "The installed PWA reports timeout errors mainly after reopening or unlocking. Pending pre-sleep requests retain sync slots and the backend has no lifecycle cancellation or transport restoration.",
     "previousBehavior": "Hidden requests retain their deadlines; pageshow does not reconcile; Firestore reads can fall back to cached data.",
     "intendedBehavior": "Cancel suspended operations promptly, coalesce wake events, reconnect before server-only reconciliation, preserve uncertain writes and editor/account boundaries, and retain bounded foreground errors.",
@@ -833,7 +833,8 @@
       "RISK PWA SYNC RESUME: reopening drains interrupted reads and writes before one fresh reconciliation",
       "RISK PWA SYNC RESUME: restoration preserves editor drafts and sign-out while asleep",
       "RISK PWA SYNC RESUME: visibility before pageshow shares one reconnect and genuine reconnect failures stay bounded",
-      "RISK PWA SYNC RESUME: a publication committed during sleep is read back without a duplicate write"
+      "RISK PWA SYNC RESUME: a publication committed during sleep is read back without a duplicate write",
+      "RISK PWA SYNC RESUME: a timed-out reconnect cannot poison later online or wake recovery"
     ],
     "preservedCoverage": [
       "Existing foreground timeout and bounded retries, revision CAS, unknown write readback, durable recovery, account identity and all original test assertions remain intact.",
@@ -841,7 +842,8 @@
     ],
     "redEvidence": {
       "command": "node --test --test-reporter=spec --test-name-pattern='RISK PWA SYNC RESUME' tests.js",
-      "failure": "Initial four tests all failed: no suspend function, cache miss returned no revision instead of server revision 7, wake remained syncing behind the old deadline, and closing the editor did not release a server read. The additional event-order test failed with two reconnects instead of one. Publication-during-sleep coverage verifies the existing revision readback path without weakening it."
+      "failure": "Initial four tests all failed: no suspend function, cache miss returned no revision instead of server revision 7, wake remained syncing behind the old deadline, and closing the editor did not release a server read. The additional event-order test failed with two reconnects instead of one. Publication-during-sleep coverage verifies the existing revision readback path without weakening it. Independent exact-candidate review identified a poisoned reconnect promise; the new follow-up test failed before repair because online recovery remained error instead of ok. The repaired reset has its own bounded/cancellable lifetime and later foreground recovery replaces it.",
+      "followUpCommand": "node --test --test-reporter=spec --test-name-pattern='RISK PWA SYNC RESUME: a timed-out reconnect' tests.js"
     }
   }
 ]

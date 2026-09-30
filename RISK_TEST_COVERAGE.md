@@ -341,3 +341,4 @@ The editor hook blocks app or enforcement edits while tests.js has no staged or 
 - RISK PWA SYNC RESUME: restoration preserves editor drafts and sign-out while asleep
 - RISK PWA SYNC RESUME: visibility before pageshow shares one reconnect and genuine reconnect failures stay bounded
 - RISK PWA SYNC RESUME: a publication committed during sleep is read back without a duplicate write
+- RISK PWA SYNC RESUME: a timed-out reconnect cannot poison later online or wake recovery
