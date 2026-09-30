@@ -769,5 +769,57 @@
       "command": "node --test --test-name-pattern='RISK night shows|RISK skyline' tests.js; node --test --test-name-pattern='RISK night shows|RISK festival barge|RISK fireworks realism' tests.js",
       "failure": "All six new tests failed before implementation: no standalone show during rare cooldown (0 vs 1); festival absent; festival geometry and building material helper undefined; occluded window 0 toggled instead of visible window 1; no festival paint before shared reflection capture. Saved full output in task-artifacts/night-festival-20260930/red.txt. Supplemental browser-pixel coverage was also run against a served git archive of the unchanged base a4993cf: it failed at 320x568 because standalone sparks contributed zero visible lake pixels. The candidate passes the identical check, isolating sparks from the stage, on four viewport sizes. See pixel-red.txt and pixel-green.txt. On the barge follow-up, four focused contracts failed before the change: 96-second fixed duration vs vehicle speed, stationary entry position, missing boat pass and NaN water depth. A separate realism red test rejected the old sparse equal-length ring. Full evidence is in barge-red.txt and fireworks-red.txt. Attachment fixtures use launches at 65 and 84 seconds when both launch racks are visible in either direction; the earlier 38.4-second port rack was still offscreen on narrow phones. The rendered reflection fixture now uses a mature 0.8-second bloom instead of the initial 0.3-second expansion, since the shoreline legitimately clips higher sparks."
     }
+  },
+  {
+    "reason": "The reported error recovers before it can be inspected. Preserve safe diagnostic codes for one hour with a ten-minute per-code interval, as requested.",
+    "previousBehavior": "Successful sync cleared the error code; Settings had no retained sync history.",
+    "intendedBehavior": "Timestamped stage/code entries survive recovery and reload, expire after one hour, and cannot mutate board data or interrupt sync. Repeated codes are suppressed for ten minutes across reloads and existing tabs.",
+    "replacementTests": [
+      "RISK SYNC ERROR LOG: backend failures remain under Settings diagnostics after recovery and reload",
+      "RISK SYNC ERROR LOG: history rejects unsafe or malformed diagnostic fields",
+      "RISK SYNC ERROR LOG: denied diagnostic storage and a throwing recorder cannot interrupt sync or board saves",
+      "RISK SYNC ERROR LOG: reconciliation errors record once and update an open Settings log without replacing drafts",
+      "RISK SYNC ERROR LOG: each code logs once per ten minutes and entries expire at one hour without resetting on repeats",
+      "RISK SYNC ERROR LOG: older tabs retain newer diagnostics and share the ten-minute suppression window"
+    ],
+    "preservedCoverage": [
+      "Existing sync retries, read-before-write authority, revision arbitration, account isolation, and safe backups remain unchanged.",
+      "Existing board exports and settings fields retain their behavior; error messages and private account/task content are excluded from the log."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK SYNC ERROR LOG' tests.js",
+      "failure": "Before implementation all five cases failed: Settings omitted Recent sync errors and the empty state; recordSyncError was missing for quota and timing cases; the open log remained empty after reconciliation. The additional older-tabs test then failed 1 !== 2 because a stale tab overwrote the newer diagnostic. Logs: log-retention-red.log and log-tabs-red.log."
+    },
+    "testChangesSha256": "ffd4246e1aa39e39ea71ed924a0f259694acd1c30097cc6daeeebefe0827b661"
+  },
+  {
+    "testChangesSha256": "9b0f233769fba58545bf45c994d911d00885df610e4ce52be801b34f0f444a35",
+    "reason": "Retain transient sync codes for the requested one-hour lifetime and ten-minute per-code interval, repair concurrent tab logging, and shorten confirmed sync network waits while preserving the user-approved two-second debounce. Add the requested small thundercloud beside active errors.",
+    "previousBehavior": "Successful sync erased error details. Concurrent diagnostic writes could lose distinct codes or duplicate one code. Snapshot reads were serial, new uploads queried provably empty chunks, and confirmed writes waited up to twenty seconds for optional timestamp metadata.",
+    "intendedBehavior": "Device-only diagnostics survive recovery and reload, merge queued tab events, expire at one hour without extension, and suppress repeated codes for ten minutes. Overlap immutable downloads, skip only the acknowledged fresh-generation resume query, bound optional timestamp readback, and keep all integrity/revision/account/recovery gates and the two-second debounce.",
+    "replacementTests": [
+      "RISK SYNC ERROR LOG: backend failures remain under Settings diagnostics after recovery and reload",
+      "RISK SYNC ERROR LOG: history rejects unsafe or malformed diagnostic fields",
+      "RISK SYNC ERROR LOG: denied diagnostic storage and a throwing recorder cannot interrupt sync or board saves",
+      "RISK SYNC ERROR LOG: reconciliation errors record once and update an open Settings log without replacing drafts",
+      "RISK SYNC ERROR LOG: each code logs once per ten minutes and entries expire at one hour without resetting on repeats",
+      "RISK SYNC ERROR LOG: older tabs retain newer diagnostics and share the ten-minute suppression window",
+      "RISK SYNC ERROR LOG: concurrent tab writes converge without loss or same-code duplicates",
+      "RISK SYNC ERROR LOG: queued storage events retain an error after its originating tab closes",
+      "RISK CLOUD LATENCY: ordinary edits retain the two-second debounce and stay dirty until server acknowledgement",
+      "RISK CLOUD LATENCY: confirmed writes do not wait seconds for optional timestamp metadata",
+      "RISK CLOUD LATENCY: snapshot reads overlap while validation and account cancellation remain mandatory",
+      "RISK CLOUD LATENCY: fresh uploads omit the empty resume query but resumed uploads still verify existing chunks",
+      "RISK SYNC ERROR ICON: the small thundercloud appears only beside a current error"
+    ],
+    "preservedCoverage": [
+      "Existing tests and assertions are retained, including exact server timestamps when available, acknowledged clean badges, revision conflicts, corrupt snapshots, chunk resume, local recovery and account isolation. The helper adds only diagnostic callback injection and query recording.",
+      "The initial new immediate-upload expectation was revised after the user explicitly clarified that the two-second debounce is fine and the slow syncing state is the problem. The revised debounce test was observed red before restoring the original delay. All original icon text and recovery controls remain available.",
+      "The explicit thundercloud request adds only U+1F329 and its emoji presentation selector to the existing deliberate-icon allowlist. The full suite first rejected those exact two code points; all other character restrictions and the original assertion remain intact."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK SYNC ERROR LOG|RISK CLOUD LATENCY|RISK SYNC ERROR ICON' tests.js (focused red runs before each implementation)",
+      "failure": "Saved real red logs in /tmp/cloud-sync-errors-evidence: log-retention-red.log and log-tabs-red.log show missing recorder/UI and lost stale-tab entry; race-latency-red.log shows lost concurrent entry, old two-second initiation and blocked metadata; queued-event-red.log shows lost closed-tab entry; parallel-read-red.log shows chunks not started while header waits; confirmed-latency-red.log shows the clarified debounce failing and two chunk queries instead of one; thundercloud-red.log shows missing error decoration. Existing feature assertions were not removed or weakened. The full suite also rejected exactly U+1F329 and U+FE0F before those two requested icon characters were allowlisted (thundercloud-allowlist-red.log)."
+    }
   }
 ]
