@@ -7255,7 +7255,7 @@ async function loadCloudBackendV2({rootData=null,batchFailureAt=Infinity,failure
  const snap=reference=>({id:reference.id,ref:reference,exists:()=>docs.has(reference.path),data:()=>clone(docs.get(reference.path))});
  const directRows=collectionRef=>[...docs].filter(([key])=>key.startsWith(collectionRef.path+'/')&&
   !key.slice(collectionRef.path.length+1).includes('/')).map(([key])=>snap(ref(...key.split('/'))));
- const writes=[],popupProviders=[],queries=[];let batchCommits=0,transactionCalls=0;
+ const writes=[],popupProviders=[],queries=[],network=[];let batchCommits=0,transactionCalls=0;
  const normalize=value=>Object.fromEntries(Object.entries(value).map(([key,item])=>[key,item?.__serverTimestamp?{toMillis:()=>1234}:item]));
  const apply=(operation)=>{
   if(operation.type==='set'){docs.set(operation.ref.path,normalize(clone(operation.value)));if(operation.ref.path===rootPath)writes.push(clone(docs.get(rootPath)));}
@@ -7266,9 +7266,15 @@ async function loadCloudBackendV2({rootData=null,batchFailureAt=Infinity,failure
   getFirestore:()=>({}),doc:(_db,...parts)=>ref(...parts),collection:(_db,...parts)=>ref(...parts),
   getDoc:async reference=>{if(reference.path===rootPath&&docs.get(rootPath)?.schemaVersion===2&&failures.stampPending)return failures.stampPending;if(reference.path===rootPath&&failures.pullPending)return failures.pullPending;if(reference.path===rootPath&&failures.pull)throw failures.pull;return snap(reference);},getDocs:async collectionRef=>{queries.push(collectionRef.path);return {docs:directRows(collectionRef)};},
   serverTimestamp:()=>({__serverTimestamp:true}),
-  runTransaction:async(_db,fn)=>{transactionCalls++;if(failures.pushPending)return failures.pushPending;if(failures.push)throw failures.push;const operations=[],tx={get:async reference=>snap(reference),set:(reference,value)=>operations.push({type:'set',ref:reference,value}),update:(reference,value)=>operations.push({type:'update',ref:reference,value}),delete:reference=>operations.push({type:'delete',ref:reference})};const result=await fn(tx);for(const operation of operations)apply(operation);return result;},
+  runTransaction:async(_db,fn)=>{transactionCalls++;if(failures.pushPending)return failures.pushPending;if(failures.push)throw failures.push;const operations=[],tx={get:async reference=>snap(reference),set:(reference,value)=>operations.push({type:'set',ref:reference,value}),update:(reference,value)=>operations.push({type:'update',ref:reference,value}),delete:reference=>operations.push({type:'delete',ref:reference})};const result=await fn(tx);if(failures.publishPending&&operations.some(op=>op.ref.path===rootPath)){failures.publicationStarted=true;await failures.publishPending;}for(const operation of operations)apply(operation);return result;},
   writeBatch:()=>{const operations=[];return {set:(reference,value)=>operations.push({type:'set',ref:reference,value}),delete:reference=>operations.push({type:'delete',ref:reference}),async commit(){batchCommits++;if(batchCommits===batchFailureAt)throw Object.assign(Error('batch unavailable'),{code:'unavailable'});for(const operation of operations)apply(operation);}};},
  };
+ const readDoc=F.getDoc,readDocs=F.getDocs;
+ F.getDoc=async reference=>failures.cacheMiss?{exists:()=>false}:readDoc(reference);
+ F.getDocFromServer=async reference=>{network.push('server:'+reference.path);if(failures.serverOffline)throw Object.assign(Error('offline'),{code:'unavailable'});return readDoc(reference);};
+ F.getDocsFromServer=async reference=>{network.push('server:'+reference.path);if(failures.serverOffline)throw Object.assign(Error('offline'),{code:'unavailable'});return readDocs(reference);};
+ F.disableNetwork=async()=>{network.push('disable');if(failures.disable)throw failures.disable;};
+ F.enableNetwork=async()=>{network.push('enable');if(failures.enablePending)await failures.enablePending;};
  const auth={currentUser:{uid:'owner',email:'owner@example.test'}},A={browserLocalPersistence:{},getAuth:()=>auth,setPersistence:async()=>{if(failures.persistence)throw failures.persistence;},
   signInWithPopup:async(_auth,provider)=>{popupProviders.push(provider);if(failures.signIn)throw failures.signIn;},signOut:async()=>{if(failures.signOut)throw failures.signOut;},GoogleAuthProvider:class{setCustomParameters(value){this.customParameters=value;}},onAuthStateChanged(_auth,listener){listener(auth.currentUser);}};
  const events=[],pending=new Map(),window={FIREBASE_CONFIG:{apiKey:'test-key'},CLOUD_SYNC_TIMEOUT_MS:timeoutMs,dispatchEvent:event=>{events.push(event);return true;}};window.window=window;
@@ -7283,7 +7289,7 @@ async function loadCloudBackendV2({rootData=null,batchFailureAt=Infinity,failure
  for(const file of ['device-store-v2.js','cloud-store-v2.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,file),'utf8'),context,{filename:file});
  window.ChainStorageV2=context.ChainStorageV2;window.ChainCloudV2=context.ChainCloudV2;
  await vm.runInContext(`(async()=>{${moduleSource}\n})()`,context,{filename:'index.html#cloud-v2-backend'});
- return {CS:window.CloudSync,auth,docs,pending,events,batchCommits,writes,popupProviders,transactionCalls,queries};
+ return {CS:window.CloudSync,auth,docs,pending,events,batchCommits,writes,popupProviders,transactionCalls,queries,network};
 }
 
 test('RISK CLOUD V2 ADAPTER: production migrates a legacy root to verified chunks and pulls the exact multi-megabyte board',async()=>{
@@ -18035,4 +18041,111 @@ test('RISK SYNC ERROR ICON: the small thundercloud appears only beside a current
  CS.status='syncing';ctx.renderSync();assert.doesNotMatch(button.className,/\berr\b/);
  CS.status='ok';await ctx.cloudPull();ctx.renderSync();assert.doesNotMatch(button.className,/\berr\b/);
  ctx.openSettings();assert.match(shim.document.getElementById('modalRoot').innerHTML,/pull: unavailable/,'the retained error remains available after the icon clears');
+});
+
+
+test('RISK PWA SYNC RESUME: sleeping requests cancel promptly and cannot report a stale timeout or acknowledgement',async()=>{
+ for(const stage of ['pull','push']){
+  let finish;const failures={[stage+'Pending']:new Promise(resolve=>{finish=resolve;})},logged=[];
+  const h=await loadCloudBackendV2({rootData:{rev:4,payload:'{}'},failures,timeoutMs:200,recordSyncError:(...row)=>logged.push(row)});
+  assert.equal(typeof h.CS.suspend,'function','backgrounding must release the old network slot');
+  const old=stage==='pull'?h.CS.pull():h.CS.push('{}',1,4);
+  await syncSettle(10);h.CS.suspend();
+  const result=await Promise.race([old,new Promise(resolve=>setTimeout(()=>resolve({stuck:true}),40))]);
+  assert.equal(result.cancelled,true,'suspension does not wait for the request deadline');
+  if(stage==='push')assert.equal(h.pending.size,1,'uncertain upload recovery remains durable');
+  delete failures[stage+'Pending'];h.CS.resume();h.CS.resume();
+  assert.equal((await h.CS.pull()).rev,4,'fresh server state is readable after reopening');
+  assert.deepEqual(h.network.filter(row=>!row.startsWith('server:')),['disable','enable'],'one reconnection per sleep cycle');
+  finish(stage==='pull'?{exists:()=>true,data:()=>({rev:999,payload:'{}'})}:{ok:true,rev:999});
+  await syncSettle(220);
+  assert.equal(h.CS.status,'ok');assert.deepEqual(logged,[],'sleep and late completion are not cloud failures');
+ }
+});
+
+test('RISK PWA SYNC RESUME: cloud authority requires server reads and never an offline cache miss',async()=>{
+ const h=await loadCloudBackendV2({rootData:{rev:7,payload:'{"tasks":[]}'},failures:{cacheMiss:true}});
+ const remote=await h.CS.pull();assert.equal(remote.rev,7,'a stale empty cache must not authorize cloud creation');
+ const offline=await loadCloudBackendV2({failures:{serverOffline:true,cacheMiss:true}});
+ const unavailable=await offline.CS.pull();assert.equal(unavailable.error,true);assert.equal(unavailable.empty,undefined);
+ assert.equal(offline.CS.errorCode,'unavailable');assert.equal(offline.writes.length,0);
+});
+
+test('RISK PWA SYNC RESUME: reopening drains interrupted reads and writes before one fresh reconciliation',async()=>{
+ for(const stage of ['pull','push']){
+  const board=syncState({tasks:[syncTask('kept','Keep this task')],syncRev:4,syncAccount:'owner@example.test',syncDirty:false});
+  const app=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(board)}}),failures={},logged=[];
+  const h=await loadCloudBackendV2({rootData:{rev:4,payload:app.ctx.cloudPayload()},failures,timeoutMs:500,recordSyncError:(...row)=>logged.push(row)});
+  app.shim.window.CloudSync=h.CS;app.shim.window.CLOUD_PUSH_DELAY_MS=0;
+  await app.ctx.cloudPull();
+  failures[stage+'Pending']=new Promise(()=>{});
+  let old;
+  if(stage==='pull')old=app.ctx.cloudPull();
+  else{app.ctx.addTask('Saved after waking');app.ctx.cloudPushNow();}
+  await syncSettle(15);
+  app.shim.document.hidden=true;app.shim.document.dispatchEvent({type:'visibilitychange'});
+  app.shim.window.dispatchEvent({type:'pagehide'});
+  if(stage==='push')assert.equal(app.ctx.state.syncDirty,true);
+  delete failures[stage+'Pending'];
+  h.network.length=0;
+  app.shim.document.hidden=false;app.shim.window.dispatchEvent({type:'pageshow',persisted:true});
+  app.shim.document.dispatchEvent({type:'visibilitychange'});app.shim.window.dispatchEvent({type:'focus'});
+  await syncSettle(100);
+  assert.equal(h.CS.status,'ok','wake must not sit behind the pre-sleep deadline');
+  assert.equal(app.ctx.state.syncDirty,false,'only server reconciliation or write ACK clears the local dirty marker');
+  assert.equal(app.ctx.state.tasks.some(task=>task.id==='kept'),true);
+  if(stage==='push')assert.equal(JSON.parse((await h.CS.pull()).payload).tasks.some(task=>task.title==='Saved after waking'),true);
+  assert.deepEqual(h.network.slice(0,3),['disable','enable','server:users/owner'],'reconnect and authoritative read precede a resumed write');
+  assert.equal(h.network.filter(row=>row==='disable').length,1,'visibility, pageshow and focus coalesce');
+  assert.deepEqual(logged,[],'cancellation must not become malformed-response or deadline-exceeded');
+  if(old)await old;
+ }
+});
+
+test('RISK PWA SYNC RESUME: restoration preserves editor drafts and sign-out while asleep',async()=>{
+ const app=await loadApp(),h=await loadCloudBackendV2({rootData:null,timeoutMs:200});
+ app.shim.window.CloudSync=h.CS;
+ app.shim.document.hidden=true;app.shim.window.dispatchEvent({type:'pagehide'});
+ app.shim.document.hidden=false;app.shim.document.querySelector=()=>({});
+ app.shim.window.dispatchEvent({type:'pageshow',persisted:true});await syncSettle(20);
+ assert.equal(h.network.filter(row=>row.startsWith('server:')).length,0,'open drafts defer cloud adoption');
+ app.shim.document.querySelector=()=>null;app.shim.document.dispatchEvent({type:'focusout'});await syncSettle(20);
+ assert.ok(h.network.some(row=>row==='server:users/owner'),'closing the editor releases reconciliation');
+ app.shim.document.hidden=true;app.shim.window.dispatchEvent({type:'pagehide'});
+ h.auth.currentUser=null;h.CS.user=null;h.CS.status='signed-out';
+ app.shim.document.hidden=false;app.shim.window.dispatchEvent({type:'pageshow',persisted:true});await syncSettle(20);
+ assert.equal(h.CS.status,'signed-out','wake never revives a previous account');
+});
+
+
+test('RISK PWA SYNC RESUME: visibility before pageshow shares one reconnect and genuine reconnect failures stay bounded',async()=>{
+ let enable;const failures={enablePending:new Promise(resolve=>{enable=resolve;})};
+ const app=await loadApp(),h=await loadCloudBackendV2({failures,timeoutMs:100});
+ app.shim.window.CloudSync=h.CS;
+ app.shim.document.hidden=true;app.shim.document.dispatchEvent({type:'visibilitychange'});app.shim.window.dispatchEvent({type:'pagehide'});
+ app.shim.document.hidden=false;app.shim.document.dispatchEvent({type:'visibilitychange'});await syncSettle(5);
+ app.shim.window.dispatchEvent({type:'pageshow',persisted:true});app.shim.window.dispatchEvent({type:'focus'});
+ enable();await syncSettle(30);
+ assert.equal(h.network.filter(row=>row==='disable').length,1,'pageshow must not cancel a visibility-started restoration');
+ const logged=[],blocked=await loadCloudBackendV2({failures:{enablePending:new Promise(()=>{})},timeoutMs:15,recordSyncError:(...row)=>logged.push(row)});
+ blocked.CS.suspend();blocked.CS.resume();const failed=await blocked.CS.pull();
+ assert.equal(failed.error,true);assert.deepEqual(logged,[['pull','deadline-exceeded']],'a foreground reconnect still has a real deadline and diagnostic');
+});
+
+test('RISK PWA SYNC RESUME: a publication committed during sleep is read back without a duplicate write',async()=>{
+ let acknowledge;const failures={},board=syncState({tasks:[syncTask('safe','Keep me')],syncRev:4,syncAccount:'owner@example.test',syncDirty:false});
+ const app=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(board)}}),h=await loadCloudBackendV2({rootData:{rev:4,payload:app.ctx.cloudPayload()},failures,timeoutMs:500});
+ app.shim.window.CloudSync=h.CS;app.shim.window.CLOUD_PUSH_DELAY_MS=0;
+ await app.ctx.cloudPull();failures.publishPending=new Promise(resolve=>{acknowledge=resolve;});
+ app.ctx.addTask('Publication before sleep');app.ctx.cloudPushNow();
+ for(let i=0;i<30&&!failures.publicationStarted;i++)await syncSettle(2);
+ assert.equal(failures.publicationStarted,true);
+ app.shim.document.hidden=true;app.shim.window.dispatchEvent({type:'pagehide'});await syncSettle(5);
+ assert.equal(app.ctx.state.syncDirty,true,'interrupted ACK cannot mark the local draft clean');
+ delete failures.publishPending;acknowledge();await syncSettle(5);
+ assert.equal(h.docs.get('users/owner').rev,5,'the server may finish a write after the client cancels');
+ app.shim.document.hidden=false;app.shim.window.dispatchEvent({type:'pageshow',persisted:true});await syncSettle(40);
+ assert.equal(app.ctx.state.syncRev,5);assert.equal(app.ctx.state.syncDirty,false);
+ assert.equal(h.writes.length,1,'the authoritative matching read acknowledges an already-published board');
+ assert.equal(app.ctx.state.tasks.some(task=>task.title==='Publication before sleep'),true);
 });

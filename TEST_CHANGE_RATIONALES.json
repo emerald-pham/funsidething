@@ -821,5 +821,27 @@
       "command": "node --test --test-name-pattern='RISK SYNC ERROR LOG|RISK CLOUD LATENCY|RISK SYNC ERROR ICON' tests.js (focused red runs before each implementation)",
       "failure": "Saved real red logs in /tmp/cloud-sync-errors-evidence: log-retention-red.log and log-tabs-red.log show missing recorder/UI and lost stale-tab entry; race-latency-red.log shows lost concurrent entry, old two-second initiation and blocked metadata; queued-event-red.log shows lost closed-tab entry; parallel-read-red.log shows chunks not started while header waits; confirmed-latency-red.log shows the clarified debounce failing and two chunk queries instead of one; thundercloud-red.log shows missing error decoration. Existing feature assertions were not removed or weakened. The full suite also rejected exactly U+1F329 and U+FE0F before those two requested icon characters were allowlisted (thundercloud-allowlist-red.log)."
     }
+  },
+  {
+    "testChangesSha256": "c9c5125325d473da1e9a260f1fc862a2f05e20a90d565b29a733b9a4807611de",
+    "reason": "The installed PWA reports timeout errors mainly after reopening or unlocking. Pending pre-sleep requests retain sync slots and the backend has no lifecycle cancellation or transport restoration.",
+    "previousBehavior": "Hidden requests retain their deadlines; pageshow does not reconcile; Firestore reads can fall back to cached data.",
+    "intendedBehavior": "Cancel suspended operations promptly, coalesce wake events, reconnect before server-only reconciliation, preserve uncertain writes and editor/account boundaries, and retain bounded foreground errors.",
+    "replacementTests": [
+      "RISK PWA SYNC RESUME: sleeping requests cancel promptly and cannot report a stale timeout or acknowledgement",
+      "RISK PWA SYNC RESUME: cloud authority requires server reads and never an offline cache miss",
+      "RISK PWA SYNC RESUME: reopening drains interrupted reads and writes before one fresh reconciliation",
+      "RISK PWA SYNC RESUME: restoration preserves editor drafts and sign-out while asleep",
+      "RISK PWA SYNC RESUME: visibility before pageshow shares one reconnect and genuine reconnect failures stay bounded",
+      "RISK PWA SYNC RESUME: a publication committed during sleep is read back without a duplicate write"
+    ],
+    "preservedCoverage": [
+      "Existing foreground timeout and bounded retries, revision CAS, unknown write readback, durable recovery, account identity and all original test assertions remain intact.",
+      "Existing two-second edit debounce, one-hour diagnostic retention, ten-minute code suppression and thundercloud rendering remain unchanged."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='RISK PWA SYNC RESUME' tests.js",
+      "failure": "Initial four tests all failed: no suspend function, cache miss returned no revision instead of server revision 7, wake remained syncing behind the old deadline, and closing the editor did not release a server read. The additional event-order test failed with two reconnects instead of one. Publication-during-sleep coverage verifies the existing revision readback path without weakening it."
+    }
   }
 ]
