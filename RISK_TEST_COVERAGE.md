@@ -222,6 +222,17 @@ The named-contract test in tests.js checks that every top-level test whose title
 
 ## Release memory/cloud/sync and independent code review
 
+- RISK repository process: review policy derives code and specialist roles from the exact diff
+- RISK repository process: a generic role guard requires a security specialist
+- RISK repository process: generic state persistence requires a memory specialist
+- RISK repository process: persisting generic sessions requires both affected specialists
+- RISK repository process: TypeScript tooling directives cannot use comment-only exemption
+- RISK repository process: CSS comment removal cannot join selector tokens under owner-only review
+- RISK repository process: risk-based receipts require the derived exact-final reviewer roles
+- RISK repository process: caller-declared specialist domains can only raise the derived plan
+- RISK repository process: caller-declared specialist domains raise and bind the exact review plan
+- RISK repository process: caller-declared specialist domains reject unknown values
+- RISK repository process: risk-based statuses bind required roles and keep legacy receipts valid
 - RISK repository process: exact-SHA receipts bind audit and review evidence outside the git tree
 - RISK repository process: memory cloud and sync review scope scales evidence to impact
 - RISK repository process: absent, stale, malformed, or nonindependent receipts fail closed
@@ -236,7 +247,7 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK repository process: release hooks reject marker-only or tampered dispatchers
 - RISK test-first gate: release evidence scripts receive edit-time process protection
 
-The release gate records, validates, and publishes exact-SHA memory/cloud/sync and code-review evidence required by [RELEASE_GATES.md](RELEASE_GATES.md). The memory review explicitly records impact, rationale, and proportional test evidence for each domain. Its local hook checks each outgoing tip; the main deployment job independently verifies the merged PR head and latest status contexts. The status checks bind reports but cannot prove that a person actually read or reviewed them.
+The release gate derives a review plan from the exact candidate diff: the owner reviews every diff, ordinary behavior changes require one independent code reviewer, and high-risk domains require a specialist. It requires both independent roles only when code behavior and specialist risk are materially affected. Ambiguous auth, state-persistence, and session changes fail closed to relevant specialists; callers may add known specialist domains to raise the plan but cannot replace or remove derived domains. Memory/cloud/sync specialist evidence records source fingerprints, per-domain impact, rationale, and focused tests. Schema version 1 receipts remain verifiable under their former two-review rule, and their publisher also emits a third specialist-compatibility status bound to the same receipt so current branch protection can accept them without inventing a new reviewer. The local hook checks each outgoing tip; the main deployment job independently verifies the merged PR head, derived status plan, and latest statuses. Statuses bind receipts but cannot prove that a person actually read or reviewed them.
 
 Companion coverage protects the existing local-backup behavior: LOCAL BACKUPS: seven local calendar days, latest save today, and pre-restore safety copy; LOCAL BACKUPS: a manual backup remains restorable after the seven-day window; LOCAL BACKUPS: a failed safety copy blocks restore and leaves the current board untouched; HARD GATE: full backup store blocks browser overwrite and preserves its prior bytes; and HARD GATE: unreadable backup index is preserved instead of overwritten by a save.
 

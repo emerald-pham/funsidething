@@ -96,25 +96,40 @@ automatic permission to regress: the independent reviewer must judge the reason,
 replacement coverage, and actual user-visible result on the final commit. CI
 checks the record and diff; it cannot itself prove that a command ran earlier.
 
-## Memory, cloud/sync, and exact-commit release gates
+## Risk-based exact-commit release gates
 
-Every push candidate needs two distinct exact-SHA receipts: the memory reviewer
-also audits current memory sources and explicitly assesses memory, cloud-data,
-and synchronization effects; an independent code/behavior reviewer inspects
-the full diff and relevant tests. Each data-safety domain records its impact,
-rationale, and focused test references when affected. A justified not-affected
-decision is sufficient for unrelated UI or copy changes and does not require a
-broad cloud suite. The owner, memory reviewer/auditor, and code reviewer must
-have distinct task identities. Install the shared pre-push gate with
+Every candidate needs an owner review of its exact diff. The release validator
+derives the review plan from the exact base-to-candidate diff and records it in
+the receipt. Pure documentation, comments, copy, and housekeeping with no
+executable, configuration, test, release-gate, data, or product-behavior change
+need only the owner's exact-diff review. Ordinary code or behavior needs one
+independent code/behavior review. Shared session state, callable or auth
+behavior, Firestore rules, deployment/authentication infrastructure, data
+migration, memory, cloud persistence, and synchronization need the relevant
+specialist review. A code reviewer and a specialist reviewer are both required
+only when the exact diff affects both domains.
+
+Risk is derived from changed paths and their exact diff content; callers cannot
+lower the required review plan. An optional `additionalSpecialistDomains`
+input may add domains from the validator's known-domain list, but cannot replace
+or remove any derived domain; that escalation is recorded in the receipt.
+Ambiguous auth, state-persistence, and session-persistence changes fail closed
+to their relevant specialists. Affected memory/cloud/sync
+specialist receipts record source fingerprints and per-domain impact, rationale,
+and focused tests. Install the shared pre-push gate with
 `npm run release:install-hook`, record evidence with `npm run release:record`,
-verify it with `npm run release:verify`, and publish both required GitHub status
-contexts with `npm run release:publish` before merging. Re-review and re-audit
-whenever the candidate SHA changes. The main ruleset must require
-`funsidething/memory-audit` and
-`funsidething/independent-review` alongside its existing checks. Pages CI
-independently verifies the merged PR head, exact tree, base, and latest statuses
-before deployment. Follow [RELEASE_GATES.md](RELEASE_GATES.md) for the evidence
-format, source snapshots, and release steps. Receipts and statuses record human
-work but cannot prove that the audit or review actually happened; repository
-writers with status permission and protection-bypassing administrators remain
-inside the trust boundary.
+verify it with `npm run release:verify`, and publish statuses with
+`npm run release:publish` before merging. Re-review affected domains whenever
+the candidate SHA changes. The main ruleset must retain
+`funsidething/memory-audit` and `funsidething/independent-review`, add
+`funsidething/specialist-review`, and keep its other required checks. Schema
+version 1 receipts retain their original two-review policy and publish a
+receipt-bound specialist-compatibility status so all current required contexts
+are present; this compatibility status does not claim a third human review. New
+schema version 2 receipts follow the derived plan. Pages CI independently
+verifies the merged PR head, exact tree, base, receipt digest, and latest status
+contexts before deployment. Follow [RELEASE_GATES.md](RELEASE_GATES.md) for the
+evidence format and release steps. Receipts and statuses record human work but
+cannot prove that a person actually performed the review; repository writers
+with status permission and protection-bypassing administrators remain inside
+the trust boundary.

@@ -1,55 +1,72 @@
-# Exact-SHA memory, cloud/sync, and independent-review gate
+# Risk-based exact-SHA release gate
 
-Every Pages release needs two independent checks of the exact candidate commit: a memory/cloud/sync review that also audits current memory sources, and a code/behavior review. A test run, an earlier review, historical release evidence, or a successful build does not replace either receipt.
+Every release candidate receives an owner review of its exact diff. The release
+validator derives the minimum review plan from the candidate's exact
+base-to-commit diff; the input cannot choose a lower-risk plan. An optional
+`additionalSpecialistDomains` input may add known domains to raise the review
+plan, but it cannot replace or remove any domain derived from the diff, and its
+value is bound into the receipt. Ambiguous auth, state-persistence, and
+session-persistence changes fail closed to their relevant specialists. Pure
+documentation, comments, copy, and repository housekeeping with no executable,
+configuration, test, release-gate, data, or product-behavior change need only the
+owner's exact-diff review. Ordinary code or behavior needs one independent
+code/behavior review. Shared session state, callable or authorization behavior,
+Firestore rules, deployment or authentication infrastructure, data migration,
+memory, cloud persistence, and synchronization need the relevant specialist
+review. When both code behavior and a specialist domain are materially affected,
+record both independent reviews. When only one domain is affected, only its
+reviewer is required.
+
+Schema version 1 receipts retain their original review policy: both a
+memory/cloud/sync audit and a distinct code/behavior review are required. They
+also publish a third specialist-compatibility status bound to the same receipt;
+that context does not claim an additional human review. New receipts use schema
+version 2 and the risk plan derived from the exact diff.
 
 ## Prepare and record evidence
 
-Create the final candidate commit first. Record its full 40-character commit SHA, tree SHA, and the base commit it is intended to release from. The owner, the memory/cloud/sync reviewer (who also performs the memory audit), and the code/behavior reviewer must use distinct task identities. The memory review reads current memory sources, resolves any conflict with current repository behavior, and records the absolute source paths and SHA-256 fingerprints it actually checked. It separately assesses memory, cloud-data, and synchronization impact, giving a concrete rationale and focused test references for affected domains. For an unaffected domain, a specific no-impact rationale is sufficient; routine UI/copy changes do not require unrelated cloud testing. The code reviewer inspects the full final diff, relevant tests, and user-visible or data-safety effects, and names that exact candidate SHA.
+Create the final candidate commit first. Record its full 40-character commit
+SHA, tree SHA, and intended base SHA. Every schema version 2 input includes an
+owner exact-diff review with a specific risk rationale. It includes an
+`independentReview` only when `reviewPlan.requiresCodeReview` is true and a
+`specialistReview` only when `reviewPlan.requiresSpecialistReview` is true. Add
+`additionalSpecialistDomains` only when the owner identifies an ambiguous
+high-risk domain the exact-diff classifier did not derive; values must be known
+specialist domain names, and they only add to the plan. The validator derives
+and stores `reviewPlan`; callers do not provide it. Reviewer task identities
+must be distinct from the owner and from each other.
 
-Each person writes a concise evidence file outside the checkout. The JSON input to `npm run release:record -- /absolute/path/to/input.json` has this shape:
+The schema version 2 input has this shape; include only the review objects
+required by the derived plan:
 
 ```json
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "candidate": {
     "commitSha": "<full candidate SHA>",
     "treeSha": "<full candidate tree SHA>",
     "baseSha": "<full intended base SHA>"
   },
-  "ownerTask": "<owner task identity>",
-  "memoryAudit": {
-    "task": "<auditor task identity>",
-    "outcome": "pass",
-    "completedAt": "<UTC ISO timestamp with milliseconds>",
-    "scope": {
-      "memory": {
-        "affected": false,
-        "rationale": "<specific reason the candidate does not affect saved memory behavior>",
-        "tests": []
-      },
-      "cloud": {
-        "affected": false,
-        "rationale": "<specific reason the candidate does not affect cloud data or accounts>",
-        "tests": []
-      },
-      "sync": {
-        "affected": false,
-        "rationale": "<specific reason the candidate does not affect synchronization or reconciliation>",
-        "tests": []
-      }
-    },
-    "sources": [
-      { "path": "/absolute/path/to/memory/source", "sha256": "<64 lowercase hex characters>" }
-    ],
-    "evidencePath": "/absolute/path/to/memory-audit.md",
-    "evidenceSha256": "<64 lowercase hex characters>"
-  },
-  "independentReview": {
-    "task": "<independent reviewer task identity>",
+  "additionalSpecialistDomains": ["security-deployment"],
+  "ownerReview": {
+    "task": "<owner task identity>",
     "outcome": "approved",
     "reviewedSha": "<same full candidate SHA>",
     "completedAt": "<UTC ISO timestamp with milliseconds>",
-    "summary": "<specific result of reviewing this candidate>",
+    "summary": "<specific exact-diff self-review result>",
+    "scope": {
+      "fullDiff": true,
+      "rationale": "<why the owner believes the derived review level fits>"
+    },
+    "evidencePath": "/absolute/path/to/owner-review.md",
+    "evidenceSha256": "<64 lowercase hex characters>"
+  },
+  "independentReview": {
+    "task": "<independent code reviewer task identity>",
+    "outcome": "approved",
+    "reviewedSha": "<same full candidate SHA>",
+    "completedAt": "<UTC ISO timestamp with milliseconds>",
+    "summary": "<specific full-diff and relevant-test result>",
     "scope": {
       "fullDiff": true,
       "relevantTests": true,
@@ -57,30 +74,113 @@ Each person writes a concise evidence file outside the checkout. The JSON input 
     },
     "evidencePath": "/absolute/path/to/independent-review.md",
     "evidenceSha256": "<64 lowercase hex characters>"
+  },
+  "specialistReview": {
+    "task": "<independent specialist task identity>",
+    "outcome": "approved",
+    "reviewedSha": "<same full candidate SHA>",
+    "completedAt": "<UTC ISO timestamp with milliseconds>",
+    "domains": ["<exact domains printed in the derived plan>"],
+    "summary": "<specific specialist review result>",
+    "scope": {
+      "fullDiff": true,
+      "relevantTests": true,
+      "userVisibleAndDataSafety": true
+    },
+    "memoryScope": {
+      "memory": {
+        "affected": false,
+        "rationale": "<specific memory impact rationale>",
+        "tests": []
+      },
+      "cloud": {
+        "affected": true,
+        "rationale": "<specific cloud impact rationale>",
+        "tests": ["<focused test name>"]
+      },
+      "sync": {
+        "affected": false,
+        "rationale": "<specific synchronization impact rationale>",
+        "tests": []
+      }
+    },
+    "sources": [
+      { "path": "/absolute/path/to/memory/source", "sha256": "<64 lowercase hex characters>" }
+    ],
+    "evidencePath": "/absolute/path/to/specialist-review.md",
+    "evidenceSha256": "<64 lowercase hex characters>"
   }
 }
 ```
 
-Set `affected` to `true` only when the candidate touches that domain and list
-the focused tests in `tests`; an affected domain with no test evidence is
-rejected. Every domain needs a concrete rationale. This risk-based record keeps
-no-impact UI releases proportional while making data and synchronization
-effects explicit.
+For a memory/cloud/sync specialist domain, include `memoryScope` and absolute
+fingerprinted `sources`. Each data domain records an affected decision and
+specific rationale; affected domains list focused tests. At least one affected
+memory/cloud/sync domain must name test evidence. Other specialist domains name
+their exact domain list and relevant test evidence in the specialist report.
+The owner always reviews the full diff, including when one or two independent
+reviews are also required.
 
-The recorder checks the candidate and base, verifies source and evidence digests, and copies the evidence with an immutable manifest under the repository's shared Git metadata directory at `funsidething-release-evidence/<candidate-sha>/`. It refuses to replace an existing receipt. Source fingerprints capture what the auditor read at audit time; later unrelated edits to memory sources do not rewrite an already-recorded audit of the same candidate. If a relevant memory instruction changes before the candidate is pushed, refresh the candidate and repeat both checks so the new exact SHA records the current instruction. Any candidate SHA change requires a new audit and review. The receipt remains outside the committed tree and should be retained with release records.
+The recorder verifies the candidate tree and base, derives the review plan,
+checks reviewer identities and evidence digests, and copies reports with an
+immutable manifest under the shared Git metadata directory at
+`funsidething-release-evidence/<candidate-sha>/`. It refuses to replace an
+existing receipt. Evidence remains outside the committed tree. Source
+fingerprints capture what the specialist read at review time; later unrelated
+edits do not rewrite a receipt for that exact candidate. Any candidate SHA
+change requires a new receipt and affected reviews.
 
-Verify a recorded receipt locally with `npm run release:verify -- <candidate-sha>` before publishing its statuses.
+Verify a receipt locally with `npm run release:verify -- <candidate-sha>` before
+publishing its statuses.
 
 ## Local push check and GitHub statuses
 
-Run `npm run release:install-hook` once for a clone. It installs one pre-push dispatcher in the shared Git directory so every worktree uses the same gate, preserves and chains an existing default pre-push hook, and refuses to replace a custom `core.hooksPath`. Every outgoing non-deletion tip must have a valid exact-SHA receipt, and the current worktree must be clean. An older checkout without the validator fails closed.
+Run `npm run release:install-hook` once per clone. It installs one pre-push
+dispatcher in the shared Git directory, chains an existing default hook, and
+refuses to replace a custom `core.hooksPath`. Every outgoing non-deletion tip
+needs a valid exact-SHA receipt, and the current worktree must be clean. An
+older checkout without the validator fails closed.
 
-After recording a receipt, run `npm run release:publish -- <candidate-sha>` while authenticated with `gh`. It publishes the existing `funsidething/memory-audit` and `funsidething/independent-review` success statuses whose descriptions bind the receipt digest and base SHA. The memory-audit status now includes the explicit memory/cloud/sync impact scope; neither context is removed or weakened. The status publisher reads the receipt; it does not create audit or review evidence. A changed candidate needs new evidence and new statuses.
+After recording a receipt, run `npm run release:publish -- <candidate-sha>`
+while authenticated with `gh`. Schema version 1 publishes the established
+`funsidething/memory-audit` and `funsidething/independent-review` contexts plus
+`funsidething/specialist-review` as a compatibility status with the same legacy
+receipt/base binding; no extra schema-v1 specialist report is implied. Schema
+version 2 publishes all three contexts with compact status descriptions that
+bind the full receipt digest, base SHA, a 12-character review-plan digest
+prefix, and the code/specialist-required bits. The publisher sends all three
+contexts for every schema version 2 receipt so the branch-protection context
+set stays stable. A version-2 receipt requires an `independentReview` exactly
+when the code bit is set and a `specialistReview` exactly when the specialist
+bit is set. The legacy
+`memory-audit` context remains a successful compatibility status; it does not
+assert a separate memory audit for schema version 2. Status publication occurs
+only after the publisher validates the exact receipt and every required review.
 
-The `main` ruleset must keep its existing required checks and require both status contexts above for pull requests and main updates. Direct pushes to main are blocked by the Pages deployment verifier because they have no merged pull request with matching evidence. Do not remove existing protections or add a PR approval count as a substitute for either independent task review.
+The `main` ruleset must keep its existing checks and require all three contexts
+for pull requests and main updates:
+`funsidething/memory-audit`, `funsidething/independent-review`, and
+`funsidething/specialist-review`. Direct pushes to main are blocked by the Pages
+deployment verifier because they have no merged pull request with matching
+evidence. A PR approval count does not replace the exact-task reviews recorded
+in the receipt.
 
 ## Deployment verification and limits
 
-Before Pages deploys, CI resolves the merged pull request for the pushed commit, checks that its head tree exactly matches the deployed tree and is based on the exact pre-deploy main commit, and requires the latest statuses on that exact reviewed head to succeed with the same receipt digest and base. Missing, stale, mismatched, or failed evidence stops deployment.
+Before Pages deploys, CI resolves the merged pull request for the pushed commit,
+checks that its head tree exactly matches the deployed tree and is based on the
+exact pre-deploy main commit, then requires successful latest statuses on that
+exact reviewed head. It accepts the original schema version 1 receipt and
+two-review bindings only when all three current contexts are successful, or the
+schema version 2 receipt, base, and conditional-review bindings. If a schema-v1
+candidate already has a valid receipt but lacks the specialist-compatibility
+status, republish statuses for that same exact head before merge/deployment.
+Missing, stale, mismatched, or failed evidence stops deployment.
 
-GitHub Actions cannot read a developer's local Git metadata receipt. Deployment therefore validates the exact status contexts and their receipt/base binding. A repository writer with permission to publish commit statuses, or an administrator who can bypass repository protections, can forge those statuses. These checks make the required evidence visible and bind it to an immutable candidate; they cannot prove that a person actually read memory or performed the review. Keep the separate task identities and retain the auditor and reviewer reports as the evidence of those human actions.
+GitHub Actions cannot read a developer's local Git metadata receipt. Deployment
+therefore validates status descriptions bound to the immutable receipt digest
+and review-plan marker. A repository writer with permission to publish commit
+statuses, or an administrator who can bypass repository protections, can forge
+those statuses. The validator checks exact diffs and receipts locally, but no
+status can prove that a person actually read or reviewed them. Retain owner,
+code, and specialist reports as evidence of those human actions.

@@ -57,7 +57,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Verify memory and reviewer evidence for the deployed commit
+      - name: Verify exact-SHA risk-based review evidence for the deployed commit
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: node scripts/release-evidence.mjs verify-deployment "${{ github.sha }}" "${{ github.event.before }}"

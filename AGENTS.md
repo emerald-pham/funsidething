@@ -12,17 +12,35 @@ requirements, and conventions.
 - Use `gpt-6-luna` at `max` reasoning.
 - The coordinator model and reasoning effort remain unchanged.
 
-## Exact-final release reviews
+## Risk-based final-candidate review
 
-For every release, require two independent checks of the exact final commit
-before pushing, merging, or deploying it: a code/behavior review and a
-memory/cloud/sync review. Give both reviewers the full candidate SHA. The
-code/behavior reviewer inspects the full diff, relevant tests, and
-user-visible or data-safety effects. The memory/cloud/sync reviewer checks
-current memory sources against repository behavior and explicitly assesses
-memory, cloud-data, and synchronization impact. Each domain records a concrete
-rationale; affected domains cite focused tests, while a pure UI or copy change
-may record a justified no-impact decision without unrelated cloud testing.
-Keep the owner, memory reviewer/auditor, and code reviewer task identities
-distinct. Fix actionable findings and recheck changed areas before release.
-A review of an earlier draft is not a review of the final commit.
+Before pushing, merging, or deploying a change, classify its risk from the
+exact final commit and record the rationale with the release evidence.
+
+- Pure documentation, comments, copy, or repository housekeeping with no
+  executable, configuration, test, release-gate, data, or user-visible behavior
+  change needs an exact-diff owner self-review, but no independent reviewer.
+- Ordinary code or behavior changes need one independent reviewer of the exact
+  final commit, including the full diff, relevant tests, and user-visible or
+  data-safety effects.
+- Changes to shared session state, callable behavior or authorization,
+  Firestore rules, deployment or authentication infrastructure, data migration,
+  memory, cloud persistence, or synchronization need the relevant independent
+  specialist review. Use separate code/behavior and memory/cloud/sync reviewers
+  only when both risk domains are materially affected.
+
+Fix actionable findings and recheck changed areas before release. If the
+candidate changes after review, repeat the affected review on the new exact
+commit. A review of an earlier draft is not a review of the final commit.
+
+## Branch and worktree hygiene
+
+At the start and end of repository work, fetch and prune `origin`, inspect local
+and remote branches plus all worktrees, and check for open pull requests. Delete
+only branch tips proven reachable from `origin/main`; preserve branches with
+unique commits, dirty or ignored worktree data, an open pull request, or active
+coordination ownership. Before deleting a remote branch, capture its exact SHA
+and use an exact-SHA force-with-lease. Do not remove another task's worktree or
+branch while that task is running or pending. Keep `main` aligned with
+`origin/main` when its worktree is clean, and report anything intentionally
+retained.
