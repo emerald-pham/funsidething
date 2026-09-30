@@ -10,7 +10,15 @@ others' share of the same limited visitor budget. Seasonal eligibility still app
 Train and metro have dedicated service: about 65 and 50 seconds crossing,
 respectively, followed by 12 and 8 seconds of rest at rate 1. Their rate divides
 that rest time; only one vehicle per track runs at once. Motion pauses offscreen.
-Rare-event rates scale encounter chances; the seven-minute rare cooldown remains.
+Standalone fireworks check every 30 seconds of active nighttime viewing with a
+40% chance at rate 1, then rest for 60 seconds after the nine-second show. The
+first check is after 20 active seconds. This averages about two minutes between
+shows when space is available; it is random, not a guarantee.
+Festivals check once per active minute at a 6% chance, share the seven-minute
+rare cooldown with alien visits, and cross the lake on a barge in about 127–183 seconds, depending on the
+assigned travel speed (150-second baseline). A festival owns its
+fireworks; standalone shows and festivals do not overlap. Both require the Sun
+below civil twilight. Rates scale these chances, capped at 100%.
 Woodland rows control the separate animal pool (default: 1% chance per 30 seconds).
 Weather rows scale episode chances, capped at 100%; durations remain unchanged.
 Ambience rows scale seasonal particle cycle speed (0 hides particles).
@@ -65,6 +73,7 @@ and deploy this file with the app so installed offline copies receive it.
 | meteor | 1 |
 | abduction | 1 |
 | fireworks | 1 |
+| festival | 1 |
 | woodland-deer | 1 |
 | woodland-fox | 1 |
 | woodland-rabbit | 1 |

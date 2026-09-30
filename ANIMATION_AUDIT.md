@@ -1,3 +1,30 @@
+# Night shows and skyline audit — September 30, 2026
+
+The new festival is a rare, finite barge crossing. Its hull, stage, crowd, flags, speakers and launch racks sail completely on and off screen in either direction, without a setup fade or stranded props. Its 150-second baseline duration varies with the same 82–118% starting-speed range as other vehicles. Horizontal speed stays constant while the hull gently bobs. Its wake is clipped to the lake, its stage reflects around the hull’s own waterline, and it joins the depth-sorted boat pass. Shells retain the position and momentum of their launch from the moving deck; they finish before the barge expires. Constant LED brightness, slow beam sweeps, and gentle crowd movement avoid strobes. Normal motion and visibility use the existing pausable scene clock; reduced motion leaves the scene still.
+
+Standalone fireworks now have their own scheduler: a 40% check every 30 active nighttime seconds, a first check at 20 seconds, and 60 seconds of rest after each nine-second show. With capacity available this averages about 114 seconds between starts, before festival interference; it is random, not guaranteed. Festivals have a 6% check each active minute and share the seven-minute cooldown with alien visits. Zero rates disable either kind. A festival and a standalone show cannot overlap, and both respect the existing event cap and reserved rail capacity. Both need the Sun below −6°.
+
+## Findings and repairs
+
+- Standalone fireworks previously shared the seven-minute rare cooldown, making them easy to miss. The independent schedule is covered by success, failure, daytime, capacity, rate-zero, and expiry checks.
+- Existing high bursts were painted into the mirror source but entirely clipped out of the narrow lake. Waterfront launches and lower bursts now put real sparks inside visible water geometry. There is no decorative second firework or separate reflection projection.
+- The city scheduler could toggle windows covered by a later building or the clock tower. The painter now records exposed indices, and the scheduler chooses only those. One window still switches per 30 seconds of active night; unrelated windows and daytime behavior retain their existing contracts.
+- Stable facade colors add modest variation. Short buildings favor brick, while tall towers favor modern materials. Brick joints and modern vertical divisions remain subdued at this distance and darken with the scene.
+
+## Scope and evidence
+
+Chrome and WebKit each exercised the 39 ordinary, seasonal, rare, and night event types plus four foreground wildlife types, both directions, three lanes/seeds, and eight lifetime points (birth, 0.1%, 6%, 25%, midpoint, 85%, 99.9%, and expiry), at 320×568, 568×320, 768×1024, and 1440×900. The 16,512 catalog/lifecycle cases use production geometry and painters; rare sky effects also receive separate complete-scene rendering and numerical checks. No nonfinite canvas coordinates, page errors, or event transform/opacity/line-cap leaks were found. The woodland pass checks geometry but does not independently assert its canvas-state restoration.
+
+Full-scene day and night images were visually inspected on phone, short landscape, tablet, and desktop. The stage sits on a visible moving hull in the distant lake, with its reflection clipped by the existing shoreline. Screenshots show a seeded scene for inspection; they are not evidence that a random visit occurred naturally during a short browser session.
+
+A permanent browser test renders each show twice at the same age, with only its shell painter suppressed in the control frame. It requires actual spark pixels in the visible lake for both standalone and festival shows on all four viewports. The same test samples an exposed window through two changes and verifies its original color returns. Against the unmodified release base, the spark test fails at 320×568; the new candidate passes. Broader Chrome/WebKit checks also verified visible on/off changes and reflected scene pixels.
+
+Six initial behavioral tests were observed failing before implementation. After the owner chose a moving barge, new red tests rejected the stationary entrance/exit, fixed visit duration, missing vessel depth, and sparse equal-length firework rings. The repaired bursts have forty varied trajectories, six-point ballistic trails, drooping golden willows and fading embers; stage lights remain steady. A mature-burst pixel fixture checks the shallow-water reflection after the expanding sparks actually reach its visible geometry. Existing motion, hidden-tab resume, 30-fps pacing, weather, astronomy, and UI coverage remain intact. The test rationale records the changed catalog and the now-isolated standalone-firework fixture. Full test, browser, rule, compatibility, offline, independent exact-commit review, CI, and deployed verification results are recorded separately with this release's evidence; a local image is not deployment proof. No task, storage, cloud, authorization, or Firestore-rule behavior was changed. Two optional general-UI browser checks fail identically on the unchanged release base in this local runtime: the footer check requests an absent bundled Chromium binary, and the layout check expects `manipulation` while Chrome computes the existing zoom-disabled rule as `pan-x pan-y`. Their assertions are preserved. Chrome offline reload passed; WebKit offline automation returned an internal browser navigation error, so it is not counted as offline proof.
+
+The memory audit rechecked current repository rules against the earlier complete-animation audit, visible lifecycle boundaries, short-landscape reflection, and exact-candidate release guidance. Historical test counts and release SHAs were not treated as current verification.
+
+---
+
 # Landscape tuning audit — September 13, 2026
 
 This pass preserves the scene composition, gentle atmosphere, and reduced-motion behavior. Seasonal terrain colors and requested transit frequency receive targeted changes. It checks scale, visitor lifetimes, astronomy, and the added occasional wildlife and rain.

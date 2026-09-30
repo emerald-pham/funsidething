@@ -17,5 +17,12 @@
     const amount=clamp(night),dayFabric=mix('#fff2d8',accent,.2),nightFabric=mix('#102c3b',ambient,.18);
     return {fabric:mix(dayFabric,nightFabric,amount*.96),ink:mix('#4d6c72','#ffe6a7',amount),tow:mix('#99a69b','#405965',amount*.9)};
   }
-  root.LandscapeAppearance=Object.freeze({birdColor,person,bannerColors});
+  function building(seed,height,night=0,ambient='#7a9395'){
+    const h=clamp((height-.25)/.5),brick=unit(seed)<.78*(1-h*h*(3-2*h));
+    const palette=brick?['#a87e70','#967569','#b09378','#8e716d']:['#8babb4','#99a8ae','#b3b5ac','#889baf'];
+    const pigment=palette[Math.floor(unit(seed*7.31)*palette.length)];
+    const wall=mix(pigment,ambient,.66+clamp(night)*.23);
+    return {material:brick?'brick':'modern',wall,detail:mix(wall,ambient,.55)};
+  }
+  root.LandscapeAppearance=Object.freeze({birdColor,person,bannerColors,building});
 })(globalThis);

@@ -163,7 +163,7 @@ test("Landscape location: actual coordinates change the sky and polar day return
 test("Landscape: daytime life includes a duck visit and the new bounded animal set", () => {
   const sky = livingSky();
   assert.deepEqual([...sky.eventTypes], ["cyclist", "bird", "balloon", "train", "metro", "plane", "duck", "fish", "butterfly", "rabbit", "deer", "kite", "reader", "picnic", "couple", "walker", "airshow", "banner", "skywriter", "hangglider", "jetski", "sailboat", "cruise", "yacht", "dolphin", "flock", "skateboarder", "rollerskater", "hoverboard", "scooter", "windsurfer", "dogwalker", "snowman", "skier", "snowangel"]);
-  assert.deepEqual([...sky.rareTypes], ["abduction", "fireworks"]);
+  assert.deepEqual([...sky.rareTypes], ["abduction", "fireworks", "festival"]);
   const world = sky.createWorld(() => 0.99);
   assert.equal(world.events.length, 3, "opening life is a small cast");
   assert.equal(new Set(world.events.map(event => event.type)).size, 3, "opening life has no duplicate visitors");
@@ -11973,7 +11973,7 @@ test('Landscape people: a broad stable skin-tone range is shared by all human vi
 test('Landscape fireworks: rare nighttime bursts fade completely and stay within the sky',()=>{
  const sky=livingSky();assert.ok(sky.rareTypes.includes('fireworks'));
  for(const altitude of [-20,20]){
-  const world=sky.createWorld(()=>0);world.events=[];world.elapsed=sky.RARE_COOLDOWN;world.lastRare=0;world.next=0;
+  const world=sky.createWorld(()=>0);world.events=[];world.elapsed=sky.RARE_COOLDOWN;world.lastRare=0;world.next=0;world.nextFestival=Infinity;
   sky.advance(world,1,{sun:{altitude,azimuth:90}});
   assert.equal(world.events.some(e=>e.type==='fireworks'),altitude<0,'fireworks only enter the night sky');
   if(altitude<0)assert.equal(world.events.find(e=>e.type==='fireworks').duration,9,'allow the final burst to finish fading');
@@ -17616,4 +17616,185 @@ test('RISK repository process: the app harness awaits slow durable startup inste
  assert.ok(ctx.state,'loadApp must wait until the durable boot has supplied state');
  assert.equal(ctx.state.tasks[0].title,'Recovered after slow hashing');
  await shim.window.ScannerDeviceStore.close();
+});
+
+// Night-show regressions cover clocks and pixels separately: a changing array
+// alone does not prove a visible window or a firework reaches the lake.
+test('RISK night shows: standalone fireworks recur independently of the rare cooldown and stay bounded',()=>{
+ const sky=livingSky(),night={sun:{altitude:-20,azimuth:0}};
+ const w=sky.createWorld(()=>0);w.events=[];w.next=Infinity;w.railNext={train:Infinity,metro:Infinity};
+ w.nextFireworks=0;w.nextFestival=Infinity;w.lastRare=0;
+ sky.advance(w,1,night);
+ assert.equal(w.events.filter(e=>e.type==='fireworks').length,1,'standalone fireworks do not wait seven minutes');
+ assert.equal(w.lastRare,0,'standalone shows do not delay the festival or alien visit');
+ for(let i=0;i<70;i++)sky.advance(w,1,night);
+ assert.equal(w.events.filter(e=>e.type==='fireworks').length,1,'a second independent show occurs within seventy seconds on successful rolls');
+ assert.ok(w.events.length<=sky.MAX_EVENTS);
+ const day=sky.createWorld(()=>0);day.events=[];day.next=Infinity;day.railNext=w.railNext;day.nextFireworks=0;day.nextFestival=0;
+ sky.advance(day,100,{sun:{altitude:-6,azimuth:0}});
+ assert.ok(day.events.every(e=>!['fireworks','festival'].includes(e.type)),'both shows need the Sun below civil twilight');
+ const full=sky.createWorld(()=>0);full.events=Array.from({length:sky.MAX_EVENTS},()=>({type:'walker',age:0,duration:100}));full.nextFireworks=0;full.nextFestival=0;
+ sky.advance(full,1,night);assert.equal(full.events.length,sky.MAX_EVENTS,'shows cannot bypass the scene budget');
+});
+
+test('RISK night shows: festival odds are lower than standalone fireworks with finite visits and rate controls',()=>{
+ const ctx=vm.createContext({Date,Math,console});
+ for(const file of ['landscape-config.js','vendor/astronomy.min.js','stars.js','landscape-core.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,file),'utf8'),ctx);
+ const sky=ctx.LivingSky;
+ assert.ok(sky.rareTypes.includes('festival'));
+ assert.equal(ctx.LandscapeConfig.setSpawnRates('| Event | Rate |\n| festival | 0 |\n| fireworks | 0 |'),true);
+ const run=(roll,altitude=-20)=>{
+  const w=sky.createWorld(()=>roll);w.events=[];w.next=Infinity;w.railNext={train:Infinity,metro:Infinity};w.nextFireworks=0;w.nextFestival=0;
+  sky.advance(w,1,{sun:{altitude,azimuth:0}});return w;
+ };
+ assert.equal(run(0).events.length,0,'zero rates disable both shows');
+ ctx.LandscapeConfig.setSpawnRates('| Event | Rate |\n| festival | 1 |\n| fireworks | 1 |');
+ assert.ok(run(.05).events.some(e=>e.type==='festival'),'a low successful festival roll enters');
+ assert.ok(!run(.07).events.some(e=>e.type==='festival'),'the festival chance is only six percent per minute');
+ assert.ok(run(.3).events.some(e=>e.type==='fireworks'),'standalone shows have forty percent checks');
+ const w=run(.05),festival=w.events.find(e=>e.type==='festival');
+ assert.equal(festival.duration,150/sky.startingSpeed(.05));assert.equal(festival.speed,sky.startingSpeed(.05));
+ w.nextFireworks=Infinity;w.nextFestival=Infinity;sky.advance(w,festival.duration+1,{sun:{altitude:-20,azimuth:0}});
+ assert.ok(!w.events.some(e=>e.type==='festival'),'the final fade retires the event');
+ assert.ok(run(0,20).events.length===0);
+});
+
+test('RISK night shows: launches lead to bounded fading bursts and the festival sails fully on and off screen',()=>{
+ const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
+ for(const [w,h] of [[320,568],[568,320],[768,1024],[1440,900]]){
+  const g=ctx.LandscapeGeometry.create(w,h),event={type:'festival',age:0,duration:150,seed:.4};
+  assert.equal(typeof g.festival,'function','festival lifecycle geometry exists');
+  for(const reverse of [false,true]){
+   const enter=g.festival({...event,reverse}),leave=g.festival({...event,age:150,reverse});
+   assert.ok(reverse?enter.x-enter.width>w:enter.x+enter.width<0,'entire barge and lighting start offscreen');
+   assert.ok(reverse?leave.x+leave.width<0:leave.x-leave.width>w,'entire barge and lighting exit offscreen');
+   const mid=g.festival({...event,age:75,reverse});assert.ok(Math.abs(mid.x-w/2)<1e-6);assert.ok(mid.y>g.waterTop&&mid.y+mid.hullDepth<g.far(mid.x));
+  }
+  assert.ok(g.fireworks(.4,.4).some(dot=>dot.kind==='rocket'),'shells visibly rise from the waterfront');
+  for(const festival of [false,true]){
+   const end=festival?150:9;
+   assert.equal(g.fireworks(0,.4,festival,event).length,0);assert.equal(g.fireworks(end,.4,festival,event).length,0);
+   let reflected=false,burst=false;
+   for(let age=0;age<=end;age+=.1){
+    const dots=g.fireworks(age,.4,festival,event);assert.ok(dots.length<=96,'bounded particle budget');
+    for(const dot of dots){
+     for(const n of [dot.x,dot.y,dot.tailX,dot.tailY,dot.alpha])assert.ok(Number.isFinite(n));
+     assert.ok(dot.x>=-128&&dot.x<=w+128&&dot.y>=0&&dot.y<=g.waterTop+12);
+     assert.ok(dot.alpha>=0&&dot.alpha<=1);
+     if(dot.kind==='spark'){burst=true;const y=g.reflectionSurface(1).mirrorY(dot.y);if(y<g.far(dot.x)-1&&y>g.waterTop)reflected=true;}
+    }
+   }
+   assert.ok(burst);assert.ok(reflected,`${w}x${h}: actual burst sparks reach visible lake geometry`);
+  }
+ }
+});
+
+test('RISK skyline materials: short buildings favor brick while tall towers favor stable modern colors',()=>{
+ const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-appearance.js'),'utf8'),ctx);
+ const appearance=ctx.LandscapeAppearance;
+ assert.equal(typeof appearance.building,'function');
+ let lowBrick=0,highBrick=0;const walls=new Set();
+ for(let i=0;i<200;i++){
+  const low=appearance.building(i/200,.2,0,'#a4b2ac'),high=appearance.building(i/200,.9,0,'#a4b2ac');
+  lowBrick+=low.material==='brick';highBrick+=high.material==='brick';walls.add(low.wall);
+  assert.deepEqual(low,appearance.building(i/200,.2,0,'#a4b2ac'),'materials do not flicker between repaints');
+  for(const color of [low.wall,low.detail,high.wall])assert.match(color,/^#[0-9a-f]{6}$/);
+ }
+ assert.ok(lowBrick>110&&lowBrick<180);assert.ok(highBrick<20);assert.ok(walls.size>=4);
+});
+
+test('RISK skyline lights: only exposed windows can be selected so both on and off are visible',()=>{
+ const sky=livingSky(),state={next:0,windows:[false,false,true,false],visible:[1,3]};
+ assert.equal(sky.advanceLights(state,30,true,()=>0),true);
+ assert.deepEqual(state.windows,[false,true,true,false],'an occluded first window is never selected');
+ sky.advanceLights(state,60,true,()=>0);assert.deepEqual(state.windows,[false,false,true,false],'the same visible window switches off');
+ const paused=JSON.stringify(state);sky.advanceLights(state,61,true,()=>0);assert.equal(JSON.stringify(state),paused);
+ assert.equal(sky.advanceLights({next:0,windows:[false],visible:[]},30,true,()=>0),false);
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ assert.match(source,/cityLights\.visible/,'renderer must supply exposed window indices');
+});
+
+test('RISK night shows: festival and standalone sparks enter the shared mirror before foreground hills',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ const life=source.slice(source.indexOf('  function paintLife(t){'),source.indexOf('  function paintWeatherOn('));
+ const capture=life.indexOf('reflectionContext.drawImage(front');
+ assert.ok(life.indexOf('paintFestivalBarge(e)')>capture,'the hull and its own waterline reflection join the depth-sorted boat pass');
+ assert.match(life.slice(0,capture),/e\.type==='fireworks'\|\|e\.type==='festival'/);
+ assert.match(life.slice(0,capture),/geometry\.fireworks\(e\.age,e\.seed,e\.type==='festival',e\)/);
+ const start=source.indexOf('  function paintFestivalBarge('),end=source.indexOf('  function paintLife(t){');
+ assert.ok(start>=0&&end>start);
+ assert.doesNotMatch(source.slice(start,end),/Date\.now|Math\.random|setInterval|globalCompositeOperation\s*=\s*['"](?:lighter|screen)/,'show motion uses the pausable event clock and no flash compositing');
+});
+
+test('RISK Landscape browser: both night shows reflect actual sparks and exposed windows visibly switch on and off', {skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const {chromium}=await import(process.env.LANDSCAPE_PLAYWRIGHT);
+ const browser=await chromium.launch({headless:true,channel:process.env.LANDSCAPE_BROWSER_CHANNEL||'chrome'});
+ try{for(const [width,height] of [[320,568],[568,320],[768,1024],[1440,900]]){
+  const page=await browser.newPage({viewport:{width,height},deviceScaleFactor:1,serviceWorkers:'block'}),errors=[];
+  page.on('pageerror',e=>errors.push(e.message));
+  await page.clock.setFixedTime(new Date('2026-09-30T03:00:00Z'));
+  await page.addInitScript(()=>localStorage.setItem('fvp:chain-scanner:landscape-motion','reduced'));
+  await page.route('**/landscape.js',async route=>{
+   const response=await route.fetch();let body=await response.text();
+   body=body.replace('resize();updateMotion();if(preference===null)openMotion();',`resize();updateMotion();if(preference===null)openMotion();
+    globalThis.nightShowProbe=()=>{
+     stop();reduced=true;world.events=[];paintBackground();
+     const read=()=>new Uint8ClampedArray(g.getImageData(0,0,W,H).data),shows=[];
+     for(const type of ['fireworks','festival']){
+      world.events=[{type,age:type==='festival'?78.2:1.6,duration:type==='festival'?150:9,seed:.4,lane:.4,reverse:false}];
+      const shells=geometry.fireworks;geometry.fireworks=()=>[];paintLife(20);const without=read();geometry.fireworks=shells;paintLife(20);const withSparks=read();let pixels=0;
+      for(let x=0;x<W;x++)for(let y=Math.ceil(geometry.waterTop+2);y<Math.min(H,geometry.far(x)-2);y++){
+       const j=(y*W+x)*4;if(Math.abs(withSparks[j]-without[j])+Math.abs(withSparks[j+1]-without[j+1])+Math.abs(withSparks[j+2]-without[j+2])>6)pixels++;
+      }
+      shows.push({type,pixels});
+     }
+     const selected=cityLights.visible?.[0],count=Math.ceil(W/15);let index=0,patch;
+     for(let i=0;i<count;i++){
+      const x=i*W/count,cluster=.4+.6*Math.pow(Math.sin(x/W*Math.PI*3+.5),2),bh=(18+rand(i+14)*65)*cluster*(W<600?.8:1),bw=7+rand(i+91)*18,y=hy+12-bh;
+      for(let yy=y+5;yy<hy+8;yy+=7)for(let xx=x+3;xx<x+bw-2;xx+=5)if(index++===selected)patch=[Math.floor(xx),Math.floor(yy),3,4];
+     }
+     if(!patch)return {shows,lights:null};
+     const readPatch=()=>Array.from(base.getImageData(...patch).data),difference=(a,b)=>a.reduce((n,v,i)=>n+Math.abs(v-b[i]),0);
+     const before=readPatch();cityLights.next=0;S.advanceLights(cityLights,30,true,()=>0);paintBackground();const after=readPatch();S.advanceLights(cityLights,60,true,()=>0);paintBackground();const restored=readPatch();
+     return {shows,lights:{changed:difference(before,after),returned:difference(before,restored)}};
+    };`);
+   await route.fulfill({response,body});
+  });
+  await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'networkidle'});await page.waitForFunction(()=>window.nightShowProbe);
+  const probe=await page.evaluate(()=>nightShowProbe());
+  for(const show of probe.shows)assert.ok(show.pixels>8,`${width}x${height} ${show.type}: individual sparks must reach visible water, not just the stage`);
+  assert.ok(probe.lights&&probe.lights.changed>50,'a selected exposed window visibly switches');
+  assert.ok(probe.lights.returned<probe.lights.changed*.08+30,'the next switch restores the original window color within canvas rounding');
+  assert.deepEqual(errors,[]);await page.close();
+ }}finally{await browser.close();}
+});
+
+
+test('RISK festival barge: shell launches follow the moving deck and fireworks have varied ballistic trails',()=>{
+ const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
+ for(const [w,h] of [[320,568],[568,320],[1440,900]])for(const reverse of [false,true]){
+  const g=ctx.LandscapeGeometry.create(w,h),e={type:'festival',duration:150,seed:.4,reverse};
+  const p=g.festival({...e,age:50}),q=g.festival({...e,age:60}),r=g.festival({...e,age:70});
+  assert.ok(Math.abs((q.x-p.x)-(r.x-q.x))<1e-6,'barge has constant horizontal travel speed');
+  assert.equal(Math.sign(q.x-p.x),reverse?-1:1,'barge actually moves in its chosen direction');
+  assert.equal(g.waterDepth({...e,age:60},60),q.y,'barge participates in physical water depth ordering');
+  for(const launch of [65,84]){
+   const age=launch+.12,deck=g.festival({...e,age});
+   const rocket=g.fireworks(age,.4,true,e).find(dot=>dot.kind==='rocket');
+   assert.ok(rocket,'a shell rises while its deck is on screen');
+   assert.ok(Math.abs(rocket.x-deck.x)<deck.width*.65,'launch stays attached to the traveling deck');
+  }
+ }
+});
+
+test('RISK fireworks realism: uneven blooms leave ballistic trails and fading embers',()=>{
+ const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
+ const g=ctx.LandscapeGeometry.create(1440,900),sparks=g.fireworks(1.8,.4).filter(dot=>dot.kind==='spark');
+ assert.ok(sparks.length>=30,'fuller bursts use multiple spark lengths');
+ const cx=sparks.reduce((n,d)=>n+d.x,0)/sparks.length,cy=sparks.reduce((n,d)=>n+d.y,0)/sparks.length;
+ const radii=sparks.map(d=>Math.hypot(d.x-cx,d.y-cy));
+ assert.ok(Math.max(...radii)-Math.min(...radii)>Math.max(...radii)*.3,'sparks fill the bloom instead of making a tidy ring');
+ for(const spark of sparks){assert.ok(spark.trail.length>=4);for(const point of spark.trail)for(const value of [point.x,point.y,point.alpha])assert.ok(Number.isFinite(value));}
+ const late=g.fireworks(3.1,.4).filter(dot=>dot.kind==='spark');
+ assert.ok(late.some(d=>d.trail.at(-1).y>d.trail[0].y),'gravity curves trails down as embers fade');
 });
