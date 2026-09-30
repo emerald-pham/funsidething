@@ -16009,6 +16009,66 @@ test('RISK repository process: memory cloud and sync review scope scales evidenc
  }
 });
 
+test('RISK repository process: schema-v2 specialist scope accepts unaffected assessments with preservation evidence',async()=>{
+ const {recordReleaseEvidence,verifyReleaseEvidence}=await import('./scripts/release-evidence.mjs');
+ const fixture=makeReleaseGateFixture({changedPath:'src/cloud-sync.mjs'});
+ const noEvidence=makeReleaseGateFixture({changedPath:'src/cloud-sync.mjs'});
+ const affectedNoEvidence=makeReleaseGateFixture({changedPath:'src/cloud-sync.mjs'});
+ try{
+  const memoryScope={
+   memory:{affected:false,rationale:'The fixture changes no saved-board bytes, recovery records, or local restore behavior.',
+    tests:['RISK LOCAL BACKUPS: exhausted quota leaves the original index and unsaved board untouched']},
+   cloud:{affected:false,rationale:'The fixture does not alter cloud documents, serialization, rules, accounts, or compatibility.',
+    tests:['RISK BACKWARD COMPATIBILITY: released clients and candidate interoperate across both rule versions']},
+   sync:{affected:false,rationale:'The fixture does not alter sync ordering, reconciliation, or acknowledgement behavior.',
+    tests:['RISK PWA SYNC RESUME: reopening drains interrupted reads and writes before one fresh reconciliation']}
+  };
+  const validInput=riskBasedReleaseInput(fixture,{input:{specialistReview:{memoryScope}}});
+  const noTestsScope=structuredClone(memoryScope);
+  for(const entry of Object.values(noTestsScope))entry.tests=[];
+  assert.throws(()=>recordReleaseEvidence(noEvidence.repo,
+   riskBasedReleaseInput(noEvidence,{input:{specialistReview:{memoryScope:noTestsScope}}})),
+   /focused test|preservation test|assessed domains/i,
+   'an all-unaffected specialist scope still needs focused preservation evidence');
+  const affectedScope=structuredClone(memoryScope);
+  affectedScope.memory={...affectedScope.memory,affected:true,tests:[]};
+  assert.throws(()=>recordReleaseEvidence(affectedNoEvidence.repo,
+   riskBasedReleaseInput(affectedNoEvidence,{input:{specialistReview:{memoryScope:affectedScope}}})),
+   /affected.*test|focused test/i,
+   'every affected memory, cloud, or sync domain still needs its own focused tests');
+
+  const invalidInputs=[
+   riskBasedReleaseInput(fixture,{input:{specialistReview:{reviewedSha:fixture.baseSha}}}),
+   riskBasedReleaseInput(fixture,{input:{specialistReview:{domains:['security-deployment']}}}),
+   riskBasedReleaseInput(fixture,{input:{specialistReview:{sources:[{path:fixture.sourcePath,sha256:'0'.repeat(64)}]}}}),
+   riskBasedReleaseInput(fixture,{input:{specialistReview:{evidenceSha256:'0'.repeat(64)}}}),
+   riskBasedReleaseInput(fixture,{input:{specialistReview:{task:'/root/exact-code-review'}}})
+  ];
+  for(const input of invalidInputs)assert.throws(()=>recordReleaseEvidence(fixture.repo,input),
+   /sha|domain|source|fingerprint|identit|distinct|evidence/i,
+   'scope evidence cannot weaken exact-SHA, derived-domain, source, evidence, or reviewer-identity checks');
+
+  const recorded=recordReleaseEvidence(fixture.repo,validInput);
+  assert.deepEqual(recorded.receipt.reviewPlan.specialistDomains,['memory-cloud-sync']);
+  assert.deepEqual(recorded.receipt.specialistReview.memoryScope,memoryScope,
+   'the recorder preserves all-false domain decisions and their focused preservation tests');
+  assert.equal(verifyReleaseEvidence(fixture.repo,fixture.candidateSha).ok,true,
+   'an all-unaffected assessment with focused preservation evidence records and verifies');
+
+  for(const scope of [noTestsScope,affectedScope]){
+   const tampered=JSON.parse(fs.readFileSync(recorded.receiptPath,'utf8'));
+   tampered.specialistReview.memoryScope=scope;
+   releaseGateReseal(tampered);
+   fs.writeFileSync(recorded.receiptPath,JSON.stringify(tampered,null,2)+'\n');
+   const verified=verifyReleaseEvidence(fixture.repo,fixture.candidateSha);
+   assert.equal(verified.ok,false,'verification must reject a checksum-valid scope without required preservation evidence');
+   assert.match(verified.errors.join(' '),/focused test|affected.*test|preservation/i);
+  }
+ }finally{
+  for(const item of [fixture,noEvidence,affectedNoEvidence])cleanupReleaseGateFixture(item);
+ }
+});
+
 test('RISK repository process: absent, stale, malformed, or nonindependent receipts fail closed',async()=>{
  const {recordReleaseEvidence,verifyReleaseEvidence}=await import('./scripts/release-evidence.mjs');
  const fixture=makeReleaseGateFixture();

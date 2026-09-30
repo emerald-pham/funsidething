@@ -869,5 +869,30 @@
       "followUpCommand": "node --test --test-reporter=spec --test-name-pattern='Banner aircraft|RISK landscape aircraft|RISK landscape metropolis' tests.js"
     },
     "testChangesSha256": "ca6a198ec8d232054c5faa7c7dea395d9602d44b29833960facfddb81203243c"
+  },
+  {
+    "reason": "The user requested a detailed aircraft and denser metropolis, which required new deterministic geometry and canvas contracts. The exact-diff release gate also derived memory/cloud/sync review for unchanged state-preservation text and drawing APIs, then rejected a truthful all-unaffected specialist assessment despite focused preservation evidence. This adds a process regression for accepting that honest assessment without reducing any derived review domain.",
+    "previousBehavior": "The scene lacked tiny low-rise infill, rod-free lit terraces, tiny near-edge trees, shaded aircraft detail, and a single centered biplane gear set. Schema-v2 receipts also rejected an all-unaffected memory/cloud/sync scope even when the specialist supplied focused tests, while affected domains already required per-domain evidence.",
+    "intendedBehavior": "Keep the deterministic scenery contracts and every derived review role, domain, identity, source fingerprint, and evidence digest. A schema-v2 specialist can record memory/cloud/sync as all unaffected when the assessment includes focused preservation tests; every affected domain still requires its own tests. The recorder and verifier reject an all-false scope without tests and an affected domain without tests.",
+    "replacementTests": [
+      "RISK landscape metropolis: seeded low-rise city, gardens, and microtrees stay behind the skyline",
+      "RISK landscape metropolis: gardens skip towers with lightning rods",
+      "RISK landscape city and aircraft: current changelog names the skyline and plane details",
+      "RISK landscape aircraft: the biplane has one centered landing gear set",
+      "RISK landscape aircraft: ordinary planes show shaded wings, a cockpit, and panel detail",
+      "RISK landscape aircraft: scheduled planes keep a shaded body and night navigation lights",
+      "RISK repository process: schema-v2 specialist scope accepts unaffected assessments with preservation evidence"
+    ],
+    "preservedCoverage": [
+      "Existing scenery, aircraft, scheduling, reflection, and reduced-motion assertions remain intact; the existing Banner fixture only receives palette values required by the production drawing code.",
+      "Code and specialist reviewers remain separate and are still required from the exact diff; wrong or missing roles, domains, SHA, identities, source fingerprints, and evidence digests remain rejected.",
+      "Each affected memory, cloud, or sync domain still needs focused tests; schema-v1 behavior and deployment/status bindings remain unchanged."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='schema-v2 specialist scope accepts unaffected assessments with preservation evidence' tests.js",
+      "failure": "Before the validator change, the new process RISK test failed at recordReleaseEvidence with `A memory, cloud, or sync specialist review must name the affected domain and focused test evidence.` The test's all-false scope supplied a focused preservation test for each assessed domain. Full output is saved in /Users/emeraldpham/.codex/task-artifacts/aircraft-metropolis-2026-09-30/reports/red-release-scope.txt.",
+      "followUpCommand": "node --test --test-reporter=spec --test-name-pattern='schema-v2 specialist scope accepts unaffected assessments with preservation evidence|memory cloud and sync review scope scales evidence to impact|risk-based receipts require the derived exact-final reviewer roles' tests.js"
+    },
+    "testChangesSha256": "ae6c00a36be314d21c451ab0ae8bcba1eeff86e11044f61a7cb1c0e3e1a8ffbd"
   }
 ]

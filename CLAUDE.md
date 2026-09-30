@@ -133,9 +133,10 @@ lower the required review plan. An optional `additionalSpecialistDomains`
 input may add domains from the validator's known-domain list, but cannot replace
 or remove any derived domain; that escalation is recorded in the receipt.
 Ambiguous auth, state-persistence, and session-persistence changes fail closed
-to their relevant specialists. Affected memory/cloud/sync
-specialist receipts record source fingerprints and per-domain impact, rationale,
-and focused tests. Install the shared pre-push gate with
+to their relevant specialists. Memory/cloud/sync specialist receipts record
+source fingerprints and per-domain impact and rationale. Every affected domain
+lists focused tests; an all-unaffected assessment still includes at least one
+focused preservation test across the assessed domains. Install the shared pre-push gate with
 `npm run release:install-hook`, record evidence with `npm run release:record`,
 verify it with `npm run release:verify`, and publish statuses with
 `npm run release:publish` before merging. Re-review affected domains whenever

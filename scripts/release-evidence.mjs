@@ -105,6 +105,10 @@ function memoryCloudSyncScope(scope, field = 'memoryAudit.scope') {
   return assessed;
 }
 
+function hasFocusedMemoryCloudSyncTests(scope) {
+  return Object.values(scope).some(entry => entry.tests.length > 0);
+}
+
 function normalizeAdditionalSpecialistDomains(domains, field = 'additionalSpecialistDomains') {
   if (!Array.isArray(domains)) throw new Error(field + ' must be an array of known specialist domains.');
   const normalized = domains.map(domain => {
@@ -484,8 +488,8 @@ function validateRiskBasedInput(repoRoot, input) {
     let sources;
     if (reviewPlan.specialistDomains.includes('memory-cloud-sync')) {
       memoryScope = memoryCloudSyncScope(review.memoryScope, 'specialistReview.memoryScope');
-      if (!Object.values(memoryScope).some(entry => entry.affected && entry.tests.length > 0)) {
-        throw new Error('A memory, cloud, or sync specialist review must name the affected domain and focused test evidence.');
+      if (!hasFocusedMemoryCloudSyncTests(memoryScope)) {
+        throw new Error('A memory, cloud, or sync specialist review must include focused tests for the assessed domains, even when none are affected.');
       }
       sources = validatedMemorySources(review.sources, 'Specialist memory/cloud/sync review', true);
     }
@@ -667,8 +671,8 @@ function verifyRiskBasedReceipt(repoRoot, commitSha, receipt, receiptPath) {
     if (domains.includes('memory-cloud-sync')) {
       try {
         const scope = memoryCloudSyncScope(review.memoryScope, 'specialistReview.memoryScope');
-        if (!Object.values(scope).some(entry => entry.affected && entry.tests.length > 0)) {
-          errors.push('Specialist memory/cloud/sync review does not identify an affected domain and focused tests.');
+        if (!hasFocusedMemoryCloudSyncTests(scope)) {
+          errors.push('Specialist memory/cloud/sync review must include focused tests for the assessed domains, even when none are affected.');
         }
       } catch (error) {
         errors.push(error.message);

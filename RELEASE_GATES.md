@@ -115,8 +115,9 @@ required by the derived plan:
 
 For a memory/cloud/sync specialist domain, include `memoryScope` and absolute
 fingerprinted `sources`. Each data domain records an affected decision and
-specific rationale; affected domains list focused tests. At least one affected
-memory/cloud/sync domain must name test evidence. Other specialist domains name
+specific rationale; each affected domain lists focused tests. A fully
+unaffected assessment is valid when it includes at least one focused
+preservation test across the assessed domains. Other specialist domains name
 their exact domain list and relevant test evidence in the specialist report.
 The owner always reviews the full diff, including when one or two independent
 reviews are also required.
