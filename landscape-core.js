@@ -184,7 +184,7 @@
     // Pick travel speed once at arrival. Duration is its inverse so every
     // visitor still completes the full route, while later fast traffic can
     // visibly catch and pass a slower visitor without frame-time randomness.
-    const travels=!RARE_TYPES.includes(type);
+    const travels=type!=='abduction'&&type!=='fireworks';
     const speed=travels?startingSpeed(r()):1,duration=base/speed;
     const age=initial?duration*(.15+r()*.45):0,lane=r(),seed=r(),reverse=r()>.5;
     w.events.push({type,...(skywriterWord?{skywriterWord}:{}),age,duration,speed,lane,seed,reverse,

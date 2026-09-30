@@ -42,7 +42,7 @@
 
   const EVENT_DURATIONS = freeze({
     snowman: 180, skier: 75, snowangel: 100, dogwalker: 70, skateboarder: 65,
-    rollerskater: 75, hoverboard: 65, scooter: 70, windsurfer: 95, fireworks: 9, festival: 96,
+    rollerskater: 75, hoverboard: 65, scooter: 70, windsurfer: 95, fireworks: 9, festival: 150,
     flock: 65, dolphin: 8, duck: 80, fish: 5, butterfly: 35, rabbit: 22,
     deer: 55, kite: 90, reader: 220, picnic: 240, couple: 200, walker: 60,
     airshow: 40, banner: 100, skywriter: 90, hangglider: 90, meteor: 1.8, jetski: 32,

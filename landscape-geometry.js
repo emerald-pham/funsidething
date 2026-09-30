@@ -2,7 +2,7 @@
 (function(root){
   'use strict';
   function create(W,H){
-    const FIXED_X_TYPES=new Set(['cyclist','train','metro','plane','balloon','airshow','banner','hangglider','jetski','sailboat','cruise','yacht','skateboarder','rollerskater','hoverboard','scooter','windsurfer']);
+    const FIXED_X_TYPES=new Set(['festival','cyclist','train','metro','plane','balloon','airshow','banner','hangglider','jetski','sailboat','cruise','yacht','skateboarder','rollerskater','hoverboard','scooter','windsurfer']);
     const clamp=value=>Math.max(0,Math.min(1,Number.isFinite(Number(value))?Number(value):0));
     const unit=value=>((value%1)+1)%1;
     const rawProgress=event=>{
@@ -88,6 +88,7 @@
     }
     function waterDepth(e,t){
       // Sort at the waterline, not at a mast top or an animal's airborne height.
+      if(e.type==='festival')return festival(e).y;
       if(e.type==='fish')return waterTop+H*.035;
       if(e.type==='dolphin')return dolphin(motionProgress(e,'x'),e.lane,e.reverse,motionProgress(e,'y')).waterY;
       const progress=e.reverse?1-routeProgress(e,'x'):routeProgress(e,'x');
@@ -255,34 +256,56 @@
       const rank=Math.ceil(i/2);return {x:x-rank*15*(reverse?-1:1),y:y+(i%2?1:-1)*rank*7};
     });
     function festival(event){
-      const age=Math.max(0,Number(event.age)||0),duration=Number(event.duration)||96;
-      const ease=n=>{const q=clamp(n);return q*q*(3-2*q);};
-      return {x:W*(.28+clamp(event.seed)*.44),y:waterTop-2,
-        width:Math.min(156,W*.32),height:Math.min(45,H*.074),
-        alpha:ease(age/6)*(1-ease((age-(duration-12))/12)),
-        beamAngle:Math.sin(age*.16)*.24,crowdPhase:age*2.1};
+      const duration=Math.max(1,Number(event.duration)||150),progress=routeProgress({...event,type:'festival'},'x');
+      const width=Math.min(180,W*.36),height=Math.min(45,H*.074),margin=width+28;
+      const direction=event.reverse?-1:1,x=-margin+(event.reverse?1-progress:progress)*(W+2*margin);
+      // It is a vessel: complete physical entry/exit replaces a setup fade,
+      // while a small bob leaves the hull comfortably inside the shallow lake.
+      const y=waterTop+Math.min(9,Math.max(2,(shore-waterTop)*.25))+Math.sin((event.age||0)*.8)*.3;
+      return {x,y,width,height,hullDepth:Math.min(6,H*.014),direction,
+        velocity:direction*(W+2*margin)/duration,alpha:1,
+        beamAngle:Math.sin((event.age||0)*.16)*.24,crowdPhase:(event.age||0)*2.1};
     }
-    function fireworks(age,seed,atFestival=false){
-      const dots=[];
-      for(let burst=0;burst<(atFestival?19:3);burst++){
-        const time=age-(atFestival?8+burst*3.8:burst*2.1);
+    function fireworks(age,seed,atFestival=false,event={duration:150,seed}){
+      const dots=[],duration=atFestival?(Number(event.duration)||150):9;
+      if(age<=0||age>=duration)return dots;
+      const count=atFestival?Math.max(0,Math.floor((duration-16)/3.8)):3;
+      for(let burst=0;burst<count;burst++){
+        const launch=atFestival?8+burst*3.8:burst*2.1,time=age-launch;
         if(time<=0||time>=3.7)continue;
-        const cx=atFestival?W*(.28+seed*.44)+(burst%5-2)*Math.min(34,W*.055):W*(.25+seed*.3+burst*.13);
-        // Low waterfront shells leave room for their real mirrored sparks in
-        // the narrow lake. High sky bursts were entirely hidden by the shore.
-        const rise=Math.max(30,Math.min(horizon*.55,(far(cx)-waterTop)*.74));
-        const cy=waterTop-rise,launchY=waterTop-2;
+        const deck=atFestival?festival({...event,age:launch}):null;
+        const originX=deck?deck.x+(burst%2?1:-1)*deck.width*.52:W*(.25+seed*.3+burst*.13);
+        if(originX<3||originX>W-3)continue;
+        const launchY=deck?deck.y-deck.height*.10:waterTop-2;
+        // Waterfront bursts retain visible mirrored sparks. Each shell takes
+        // its launch position and velocity from the deck at ignition; moving
+        // the ship later cannot drag an already airborne bloom across the sky.
+        const rise=Math.max(32,Math.min(horizon*.6,(far(originX)-waterTop)*1.05));
+        const cy=waterTop-rise,vx=deck?.velocity||0;
+        const drift=t=>vx*(t<1?t:1+.4*(1-Math.exp(-(t-1)*.9)));
         if(time<1){
-          const q=1-(1-time)**2,y=launchY+(cy-launchY)*q;
-          dots.push({kind:'rocket',x:cx,y,tailX:cx,tailY:Math.min(launchY,y+rise*.16),alpha:Math.min(1,time/.3)*Math.min(1,(1-time)/.18),burst});
+          const flight=t=>({x:originX+drift(t),y:launchY+(cy-launchY)*(1-(1-t)**2)});
+          const tip=flight(time),tail=flight(Math.max(0,time-.13));
+          dots.push({kind:'rocket',...tip,tailX:tail.x,tailY:tail.y,alpha:Math.min(1,time/.25)*Math.min(1,(1-time)/.16),burst});
           continue;
         }
-        const t=time-1,radius=Math.min(36,rise*.42)*(1-Math.exp(-t*1.6));
-        const alpha=Math.min(1,t/.25)*(1-t/2.7)**1.5;
-        for(let i=0;i<24;i++){
-          const angle=i*Math.PI/12+seed*6,stretch=burst%3===1?.76:1;
-          const dx=Math.cos(angle)*radius,dy=Math.sin(angle)*radius*stretch,fall=t*t*1.5;
-          dots.push({kind:'spark',x:cx+dx,y:Math.min(waterTop-1,cy+dy+fall),tailX:cx+dx*.73,tailY:Math.min(waterTop-1,cy+dy*.73+fall),alpha,burst});
+        const t=time-1,radius=Math.min(48,rise*.55),willow=burst%3===2;
+        for(let i=0;i<40;i++){
+          const noise=unit(Math.sin((i+1)*127.1+seed*311.7+burst*17.3)*43758.5453);
+          const lag=noise*.075,life=2.15+noise*.55,age=t-lag;
+          if(age<=0||age>=life)continue;
+          const angle=i*Math.PI/20+seed*6+(noise-.5)*.11,speed=radius*(.48+.52*noise);
+          const position=at=>{
+            const travel=speed*(1-Math.exp(-at*1.55));
+            return {x:originX+drift(1+at+lag)+Math.cos(angle)*travel,
+              y:Math.min(launchY-1,cy+Math.sin(angle)*travel*(willow?.8:1)+at*at*(willow?5:3))};
+          };
+          const alpha=Math.min(1,age/.2)*(1-age/life)**1.25,tip=position(age),trail=[];
+          for(let k=0;k<6;k++){
+            const at=Math.max(0,age-(5-k)*.105),point=position(at);
+            trail.push({...point,alpha:alpha*(.10+.9*k/5)});
+          }
+          dots.push({kind:'spark',...tip,tailX:trail[0].x,tailY:trail[0].y,trail,alpha,burst,willow,size:.7+noise*.65});
         }
       }
       return dots;

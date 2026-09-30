@@ -17653,30 +17653,33 @@ test('RISK night shows: festival odds are lower than standalone fireworks with f
  assert.ok(!run(.07).events.some(e=>e.type==='festival'),'the festival chance is only six percent per minute');
  assert.ok(run(.3).events.some(e=>e.type==='fireworks'),'standalone shows have forty percent checks');
  const w=run(.05),festival=w.events.find(e=>e.type==='festival');
- assert.equal(festival.duration,96);assert.equal(festival.speed,1);
- w.nextFireworks=Infinity;w.nextFestival=Infinity;sky.advance(w,96,{sun:{altitude:-20,azimuth:0}});
+ assert.equal(festival.duration,150/sky.startingSpeed(.05));assert.equal(festival.speed,sky.startingSpeed(.05));
+ w.nextFireworks=Infinity;w.nextFestival=Infinity;sky.advance(w,festival.duration+1,{sun:{altitude:-20,azimuth:0}});
  assert.ok(!w.events.some(e=>e.type==='festival'),'the final fade retires the event');
  assert.ok(run(0,20).events.length===0);
 });
 
-test('RISK night shows: launches lead to bounded fading bursts and the festival enters and exits gently',()=>{
+test('RISK night shows: launches lead to bounded fading bursts and the festival sails fully on and off screen',()=>{
  const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
  for(const [w,h] of [[320,568],[568,320],[768,1024],[1440,900]]){
-  const g=ctx.LandscapeGeometry.create(w,h),event={age:0,duration:96,seed:.4};
+  const g=ctx.LandscapeGeometry.create(w,h),event={type:'festival',age:0,duration:150,seed:.4};
   assert.equal(typeof g.festival,'function','festival lifecycle geometry exists');
-  assert.equal(g.festival(event).alpha,0);assert.equal(g.festival({...event,age:96}).alpha,0);
-  assert.ok(g.festival({...event,age:.01}).alpha<.001);assert.ok(g.festival({...event,age:95.99}).alpha<.001);
-  assert.equal(g.festival({...event,age:20}).alpha,1);
+  for(const reverse of [false,true]){
+   const enter=g.festival({...event,reverse}),leave=g.festival({...event,age:150,reverse});
+   assert.ok(reverse?enter.x-enter.width>w:enter.x+enter.width<0,'entire barge and lighting start offscreen');
+   assert.ok(reverse?leave.x+leave.width<0:leave.x-leave.width>w,'entire barge and lighting exit offscreen');
+   const mid=g.festival({...event,age:75,reverse});assert.ok(Math.abs(mid.x-w/2)<1e-6);assert.ok(mid.y>g.waterTop&&mid.y+mid.hullDepth<g.far(mid.x));
+  }
   assert.ok(g.fireworks(.4,.4).some(dot=>dot.kind==='rocket'),'shells visibly rise from the waterfront');
   for(const festival of [false,true]){
-   const end=festival?96:9;
-   assert.equal(g.fireworks(0,.4,festival).length,0);assert.equal(g.fireworks(end,.4,festival).length,0);
+   const end=festival?150:9;
+   assert.equal(g.fireworks(0,.4,festival,event).length,0);assert.equal(g.fireworks(end,.4,festival,event).length,0);
    let reflected=false,burst=false;
    for(let age=0;age<=end;age+=.1){
-    const dots=g.fireworks(age,.4,festival);assert.ok(dots.length<=96,'bounded particle budget');
+    const dots=g.fireworks(age,.4,festival,event);assert.ok(dots.length<=96,'bounded particle budget');
     for(const dot of dots){
      for(const n of [dot.x,dot.y,dot.tailX,dot.tailY,dot.alpha])assert.ok(Number.isFinite(n));
-     assert.ok(dot.x>=0&&dot.x<=w&&dot.y>=0&&dot.y<=g.waterTop);
+     assert.ok(dot.x>=-128&&dot.x<=w+128&&dot.y>=0&&dot.y<=g.waterTop+12);
      assert.ok(dot.alpha>=0&&dot.alpha<=1);
      if(dot.kind==='spark'){burst=true;const y=g.reflectionSurface(1).mirrorY(dot.y);if(y<g.far(dot.x)-1&&y>g.waterTop)reflected=true;}
     }
@@ -17715,10 +17718,10 @@ test('RISK night shows: festival and standalone sparks enter the shared mirror b
  const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
  const life=source.slice(source.indexOf('  function paintLife(t){'),source.indexOf('  function paintWeatherOn('));
  const capture=life.indexOf('reflectionContext.drawImage(front');
- assert.ok(life.indexOf('paintFestival(e)')>=0&&life.indexOf('paintFestival(e)')<capture);
+ assert.ok(life.indexOf('paintFestivalBarge(e)')>capture,'the hull and its own waterline reflection join the depth-sorted boat pass');
  assert.match(life.slice(0,capture),/e\.type==='fireworks'\|\|e\.type==='festival'/);
- assert.match(life.slice(0,capture),/geometry\.fireworks\(e\.age,e\.seed,e\.type==='festival'\)/);
- const start=source.indexOf('  function paintFestival('),end=source.indexOf('  function paintLife(t){');
+ assert.match(life.slice(0,capture),/geometry\.fireworks\(e\.age,e\.seed,e\.type==='festival',e\)/);
+ const start=source.indexOf('  function paintFestivalBarge('),end=source.indexOf('  function paintLife(t){');
  assert.ok(start>=0&&end>start);
  assert.doesNotMatch(source.slice(start,end),/Date\.now|Math\.random|setInterval|globalCompositeOperation\s*=\s*['"](?:lighter|screen)/,'show motion uses the pausable event clock and no flash compositing');
 });
@@ -17738,7 +17741,7 @@ test('RISK Landscape browser: both night shows reflect actual sparks and exposed
      stop();reduced=true;world.events=[];paintBackground();
      const read=()=>new Uint8ClampedArray(g.getImageData(0,0,W,H).data),shows=[];
      for(const type of ['fireworks','festival']){
-      world.events=[{type,age:type==='festival'?13.7:1.6,duration:type==='festival'?96:9,seed:.4,lane:.4,reverse:false}];
+      world.events=[{type,age:type==='festival'?78.2:1.6,duration:type==='festival'?150:9,seed:.4,lane:.4,reverse:false}];
       const shells=geometry.fireworks;geometry.fireworks=()=>[];paintLife(20);const without=read();geometry.fireworks=shells;paintLife(20);const withSparks=read();let pixels=0;
       for(let x=0;x<W;x++)for(let y=Math.ceil(geometry.waterTop+2);y<Math.min(H,geometry.far(x)-2);y++){
        const j=(y*W+x)*4;if(Math.abs(withSparks[j]-without[j])+Math.abs(withSparks[j+1]-without[j+1])+Math.abs(withSparks[j+2]-without[j+2])>6)pixels++;
@@ -17764,4 +17767,34 @@ test('RISK Landscape browser: both night shows reflect actual sparks and exposed
   assert.ok(probe.lights.returned<probe.lights.changed*.08+30,'the next switch restores the original window color within canvas rounding');
   assert.deepEqual(errors,[]);await page.close();
  }}finally{await browser.close();}
+});
+
+
+test('RISK festival barge: shell launches follow the moving deck and fireworks have varied ballistic trails',()=>{
+ const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
+ for(const [w,h] of [[320,568],[568,320],[1440,900]])for(const reverse of [false,true]){
+  const g=ctx.LandscapeGeometry.create(w,h),e={type:'festival',duration:150,seed:.4,reverse};
+  const p=g.festival({...e,age:50}),q=g.festival({...e,age:60}),r=g.festival({...e,age:70});
+  assert.ok(Math.abs((q.x-p.x)-(r.x-q.x))<1e-6,'barge has constant horizontal travel speed');
+  assert.equal(Math.sign(q.x-p.x),reverse?-1:1,'barge actually moves in its chosen direction');
+  assert.equal(g.waterDepth({...e,age:60},60),q.y,'barge participates in physical water depth ordering');
+  for(const launch of [65,84]){
+   const age=launch+.12,deck=g.festival({...e,age});
+   const rocket=g.fireworks(age,.4,true,e).find(dot=>dot.kind==='rocket');
+   assert.ok(rocket,'a shell rises while its deck is on screen');
+   assert.ok(Math.abs(rocket.x-deck.x)<deck.width*.65,'launch stays attached to the traveling deck');
+  }
+ }
+});
+
+test('RISK fireworks realism: uneven blooms leave ballistic trails and fading embers',()=>{
+ const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
+ const g=ctx.LandscapeGeometry.create(1440,900),sparks=g.fireworks(1.8,.4).filter(dot=>dot.kind==='spark');
+ assert.ok(sparks.length>=30,'fuller bursts use multiple spark lengths');
+ const cx=sparks.reduce((n,d)=>n+d.x,0)/sparks.length,cy=sparks.reduce((n,d)=>n+d.y,0)/sparks.length;
+ const radii=sparks.map(d=>Math.hypot(d.x-cx,d.y-cy));
+ assert.ok(Math.max(...radii)-Math.min(...radii)>Math.max(...radii)*.3,'sparks fill the bloom instead of making a tidy ring');
+ for(const spark of sparks){assert.ok(spark.trail.length>=4);for(const point of spark.trail)for(const value of [point.x,point.y,point.alpha])assert.ok(Number.isFinite(value));}
+ const late=g.fireworks(3.1,.4).filter(dot=>dot.kind==='spark');
+ assert.ok(late.some(d=>d.trail.at(-1).y>d.trail[0].y),'gravity curves trails down as embers fade');
 });

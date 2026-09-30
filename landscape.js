@@ -501,14 +501,36 @@
     }
     g.restore();
   }
+  function paintFestivalBarge(e){
+    if(sky.sun.altitude>=-6)return;
+    const pose=geometry.festival(e);
+    // The whole stage mirrors about its own floating hull, using the same
+    // shoreline clipping and depth-sorted pass as the other vessels.
+    reflectWaterObject(pose.y,()=>paintFestival(e));
+    g.save();path(g,far);g.lineTo(W,geometry.waterTop);g.lineTo(0,geometry.waterTop);g.closePath();g.clip();
+    for(let i=0;i<5;i++){
+      const phase=(e.age*.35+i*.19)%1,xx=pose.x-pose.direction*(pose.width*.62+i*4);
+      g.globalAlpha=(1-phase)*.22;
+      line(g,xx,pose.y+1+phase*3,xx-pose.direction*(12+phase*9),pose.y+1+phase*3,p.sky[2],.7);
+    }
+    g.restore();paintFestival(e);
+  }
   function paintFestival(e){
     const pose=geometry.festival(e),night=1-S.smooth(-12,-6,sky.sun.altitude);
     if(!pose.alpha||!night)return;
     const {x,y,width:w,height:h}=pose,inks=['#7be5ed','#bd9af6','#f4b982'];
     const ink=inks[Math.floor(e.seed*3)%3],second=inks[(Math.floor(e.seed*3)+1)%3];
-    g.save();g.translate(x,y);g.globalAlpha=pose.alpha*night;
-    // A complete distant setup eases into view. Steady colored light and
-    // slow beam sweeps suggest a show without strobes or brightness pulses.
+    g.save();g.translate(x,y);g.globalAlpha*=pose.alpha*night;
+    // The stage, crowd, launch racks and hull travel as one vehicle. Steady
+    // colored light and slow beam sweeps never pulse the scene brightness.
+    g.fillStyle='#172b39';g.beginPath();g.moveTo(-w*.64,-3);g.lineTo(w*.64,-3);
+    g.lineTo(w*.56,pose.hullDepth);g.lineTo(-w*.56,pose.hullDepth);g.closePath();g.fill();
+    line(g,-w*.61,-3,w*.61,-3,'#889cac',1.6);
+    line(g,-w*.56,pose.hullDepth-1,w*.56,pose.hullDepth-1,'#4b687a',1);
+    for(const side of [-1,1]){
+      line(g,side*w*.52,-h*.10,side*w*.52,-h*.21,'#677c89',2);
+      for(let i=0;i<3;i++)ellipse(g,side*(w*.51-i*5),1,1.2,1.2,'#a9baca');
+    }
     for(const side of [-1,1]){
       g.save();g.translate(side*w*.35,-h*.75);g.rotate(side*.27+pose.beamAngle);
       const beam=g.createLinearGradient(0,0,0,-h*2.1);
@@ -540,8 +562,7 @@
     line(g,-w*.16,-h*.27,w*.16,-h*.27,second,1);
     ellipse(g,0,-h*.35,1.6,1.7,'#d8b596');line(g,0,-h*.33,0,-h*.27,'#c4d3d3',2);
     line(g,-w*.46,-h*.1,w*.46,-h*.1,ink,.8);
-    // An anchored crowd sways gently; the finite setup fade also covers all
-    // people and flags, leaving no stranded props at expiry.
+    // All passengers remain attached to the deck throughout the crossing.
     for(let i=0;i<26;i++){
       const xx=(i/25-.5)*w*.82,yy=-2-(i%3)*1.8,bob=Math.sin(pose.crowdPhase+i*1.7)*.6;
       const shirt=i%4===0?S.mixHex(ink,'#182936',.55):'#243440';
@@ -553,8 +574,8 @@
   function paintLife(t){
     visibleBanners=[];
     g.clearRect(0,0,W,H);
-    const waterEvents=new Set(['jetski','sailboat','cruise','yacht','windsurfer','duck','fish','dolphin']);
-    const airborne=new Set(['duck','fish','plane','balloon','airshow','banner','skywriter','hangglider','jetski','sailboat','cruise','yacht','windsurfer','dolphin','flock']);
+    const waterEvents=new Set(['festival','jetski','sailboat','cruise','yacht','windsurfer','duck','fish','dolphin']);
+    const airborne=new Set(['festival','duck','fish','plane','balloon','airshow','banner','skywriter','hangglider','jetski','sailboat','cruise','yacht','windsurfer','dolphin','flock']);
     for(const e of world.events)if(e.type==='meteor'&&p.night>.3){
       const fx=geometry.motionProgress(e,'x'),fy=geometry.motionProgress(e,'y'),dx=(e.reverse?-1:1)*(85+e.seed*70),dy=24+e.lane*20;
       const sx=W*(.2+e.seed*.6),sy=hy*(.08+e.lane*.3),x=sx+dx*fx,y=sy+dy*fy;
@@ -563,13 +584,19 @@
       line(g,x-dx*.35,y-dy*.35,x,y,tail,1.1);ellipse(g,x,y,1.2,1.2,'#f9ffe8');g.restore();
     }
     if(sky.sun.altitude < -6)for(const e of world.events)if(e.type==='fireworks'||e.type==='festival'){
-      if(e.type==='festival')paintFestival(e);
       g.save();
-      for(const dot of geometry.fireworks(e.age,e.seed,e.type==='festival')){
-        g.globalAlpha=dot.alpha*(1-S.smooth(-12,-6,sky.sun.altitude));
-        const ink=['#ffd38d','#7de5ef','#cf9fff','#ffa8c5'][(dot.burst+Math.floor(e.seed*4))%4];
-        line(g,dot.tailX,dot.tailY,dot.x,dot.y,ink,dot.kind==='rocket'?1.1:1.25);
-        ellipse(g,dot.x,dot.y,dot.kind==='rocket'?.9:1.15,dot.kind==='rocket'?.9:1.15,ink);
+      for(const dot of geometry.fireworks(e.age,e.seed,e.type==='festival',e)){
+        const night=1-S.smooth(-12,-6,sky.sun.altitude);
+        const ink=dot.willow?'#ffce88':['#ffd38d','#7de5ef','#cf9fff','#ffa8c5'][(dot.burst+Math.floor(e.seed*4))%4];
+        if(dot.trail){
+          for(let i=1;i<dot.trail.length;i++){
+            const a=dot.trail[i-1],z=dot.trail[i];g.globalAlpha=z.alpha*night*.7;
+            line(g,a.x,a.y,z.x,z.y,ink,.45+i*.10);
+          }
+        }else{g.globalAlpha=dot.alpha*night;line(g,dot.tailX,dot.tailY,dot.x,dot.y,ink,1);}
+        const size=dot.size||.9;
+        g.globalAlpha=dot.alpha*night*.12;ellipse(g,dot.x,dot.y,size*2.3,size*2.3,ink);
+        g.globalAlpha=dot.alpha*night;ellipse(g,dot.x,dot.y,size,size,ink);
       }
       g.restore();
     }
@@ -655,10 +682,11 @@
       g.globalAlpha=wave.alpha*.20;line(g,x,y,x+(7+rand(i+480)*22)*wave.width,y,S.mixHex(p.sky[1],'#ffffff',.6),.8);
     }
     g.restore();
-    const water=new Set(['jetski','sailboat','cruise','yacht','windsurfer','duck','fish','dolphin']);
+    const water=new Set(['festival','jetski','sailboat','cruise','yacht','windsurfer','duck','fish','dolphin']);
     // Arrival order cannot decide which overlapping boat or animal is in front.
     for(const e of world.events.filter(e=>water.has(e.type)).sort((a,b)=>geometry.waterDepth(a,t)-geometry.waterDepth(b,t))){
-      if(['duck','fish','dolphin'].includes(e.type))paintEvent(e,t);else paintVessel(e,t);
+      if(e.type==='festival')paintFestivalBarge(e);
+      else if(['duck','fish','dolphin'].includes(e.type))paintEvent(e,t);else paintVessel(e,t);
     }
     // The metro runs below the reflection source but in front of the lake.
     // Painting it here keeps the water overlay from darkening its visible cars.
