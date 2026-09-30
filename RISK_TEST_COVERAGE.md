@@ -278,3 +278,14 @@ The editor hook blocks app or enforcement edits while tests.js has no staged or 
 - RISK TrueSkill truncation: inverse-Mills tails match references through the former cutoff and extreme upset
 - RISK rating bounds: hydration and frozen chance opponents normalize extremes without changing healthy ratings
 - RISK Diagnostics download: Settings and save directions retain current-board recovery actions
+
+## Returning-user first upload
+
+- RISK FIRST SIGN IN: an existing clean board cannot restart failed upload retries after each empty cloud read
+- RISK FIRST SIGN IN: a differing same-revision board is pending until its exact upload is acknowledged
+- RISK FIRST SIGN IN: legacy local tasks stay unsynced on failure and only a confirmed upload clears them
+- RISK CLOUD LOOP: a conflict followed by an unusable read cannot release another write
+- RISK CLOUD LOOP: a rejected write stays visibly paused through focus reads and edits until explicit retry
+- RISK CLOUD RECOVERY UI: reload waits for a durable unchanged board and explicit sign out remains available
+- RISK PWA recovery: cloud compatibility failures can request the normal safe update check
+- RISK CLOUD LOOP: repeated revision conflicts cannot spin even when every read succeeds

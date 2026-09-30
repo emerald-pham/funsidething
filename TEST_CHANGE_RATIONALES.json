@@ -680,5 +680,29 @@
       "failure": "All six TrueSkill and Settings tests failed on unmodified origin/main 8d9f6a52b23c7c2cbd0051ebb35ed1830d3e62dc. pJudged was 0.8313758117 versus pBeats 0.7884670740; the five-candidate shared-benchmark fixture returned 0.9687500002 versus independent erfc/Simpson reference 0.6934877296; one candidate did not match pBeats; truncGaussVW returned v=5.999 at t=-5.999 instead of 6.1575066 and w=1 at the old cutoff and extreme tail; the rating-limit constant was absent; and Settings still rendered Current board recovery instead of Diagnostics download. The new release-process test then failed on the old gate with 'Missing expected exception': a receipt with the required memory/cloud/sync scope omitted was accepted. After implementation, the full suite also exposed the old actual-order assertion requiring this same fixture to stay below 0.001; its two weak tasks have shared-BETA chance 0.08690077. The assertion now pins the corrected 0.08–0.1 range, so moving the later strong task ahead still fails. The separate iPad geometry test failed before implementation at 768x1024 because the tower body ended at y=491 while geometry.waterTop was y=495. Exact-candidate review then reproduced a supported extreme ratio where one-candidate Simpson output was 0.4916353511033019 versus pBeats 0.4800614781973719, plus a two-candidate narrow transition returning 0.49367183892578004 instead of the independent math.erfc adaptive reference 0.49800533217659593; the new single-candidate and two-case integration tests failed 2/4 before repair."
     },
     "testChangesSha256": "ba029e81c834b3fe9400e6f5c1453932378bbac073481409b4f39eb06083a678"
+  },
+  {
+    "testChangesSha256": "cc4fc53d58f27b13a924f2a335f3aeebee340ccaf5593b5469f56aead2cb7f33",
+    "reason": "Historical pre-September-23 clients omit the now-required server timestamp, while successful reads advertise synced. Production recorded permission-denied commits. Reproduction also exposed a current conflict-to-failed-read request storm, denied writes repeated on focus, and the missing recovery action.",
+    "previousBehavior": "Clean first uploads replenished retry budgets (25/24 instead of 5 writes). Conflict followed by failed or invalid reads reused stale authority (21 instead of 1 writes). Focus and edits repeated a denied write 5 times. Clicking the error signed out; no safe reload or update-check action existed.",
+    "intendedBehavior": "Hold write authority during fresh reads until usable reconciliation succeeds; keep rejected writes paused across focus/edits and retain a visible error until explicit retry or content confirmation. Mark older pending boards dirty, bound transient retries, check for updates, and offer safe reload and explicit sign out.",
+    "replacementTests": [
+      "RISK FIRST SIGN IN: an existing clean board cannot restart failed upload retries after each empty cloud read",
+      "RISK FIRST SIGN IN: a differing same-revision board is pending until its exact upload is acknowledged",
+      "RISK FIRST SIGN IN: legacy local tasks stay unsynced on failure and only a confirmed upload clears them",
+      "RISK CLOUD LOOP: a conflict followed by an unusable read cannot release another write",
+      "RISK CLOUD LOOP: a rejected write stays visibly paused through focus reads and edits until explicit retry",
+      "RISK CLOUD RECOVERY UI: reload waits for a durable unchanged board and explicit sign out remains available",
+      "RISK PWA recovery: cloud compatibility failures can request the normal safe update check",
+      "RISK CLOUD LOOP: repeated revision conflicts cannot spin even when every read succeeds"
+    ],
+    "preservedCoverage": [
+      "No prior executable tests are weakened or removed: account boundaries, conditional revisions, mandatory backups, cloud adoption, Undo, Restore and Reset protections remain.",
+      "Existing service-worker editor guards, durable reload protections, offline shell fingerprints and state comparison assertions remain unchanged."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK FIRST SIGN IN:|RISK CLOUD LOOP:|RISK CLOUD RECOVERY UI:|RISK PWA recovery:' tests.js",
+      "failure": "Two pre-implementation red runs retained: google-signin-sync-red.log recorded 25/24 !== 5 and undefined !== true; google-signin-sync-loop-red.log recorded 21 !== 1 (all failed-read variants), 5 !== 1 (permanent denial), 0 !== 1 (reload), and missing checkForAppUpdate. Existing adoption evidence assertions were preserved when the fix reused the hold gate. A third pre-implementation red run (google-signin-sync-conflict-red.log) recorded 31 !== 6 when repeated revision conflicts reached the deliberate safety cutoff. Independent review found an incomplete recovery-test backend leaving a delayed callback after completion; full4 logged an unhandled pull-is-not-a-function rejection. The mock now implements the read boundary and signs out realistically, and the test settles callbacks. The new mobile recovery layout assertion failed before replacing the unstyled row with the existing spaced, wrapping modal actions (google-signin-sync-review-red.log)."
+    }
   }
 ]

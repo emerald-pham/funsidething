@@ -16756,6 +16756,166 @@ test('RISK CLOUD STARTUP: repeated unavailable writes keep one bounded retry bud
  assert.equal(loaded.shim.window.CloudSync.status,'error');assert.equal(loaded.ctx.state.syncDirty,true);
 });
 
+test('RISK FIRST SIGN IN: an existing clean board cannot restart failed upload retries after each empty cloud read',async(t)=>{
+ const local=syncState({tasks:[syncTask('old','Board saved before signing in')],syncRev:0,syncDirty:false});
+ let pulls=0,pushes=0;
+ const factory=window=>{
+  const ping=()=>window.dispatchEvent({type:'cloudsync'}),CS={configured:true,ready:true,user:'e@example.com',status:'ok',errorStage:null,errorCode:null,signIn(){},signOut(){},
+   async pull(){pulls++;CS.status='syncing';ping();await flush();CS.status='ok';CS.errorStage=null;CS.errorCode=null;ping();return {empty:true};},
+   async push(){pushes++;CS.status='syncing';ping();await flush();CS.status='error';CS.errorStage='push';CS.errorCode='unavailable';ping();return {error:true};},
+  };return CS;
+ };
+ const storage=sharedScannerStorage({[LOCAL_HEAD_KEY]:JSON.stringify(local),[SYNC_STORE_KEY]:JSON.stringify(local)});
+ const loaded=await loadApp({sharedStorage:storage,cloudSyncFactory:factory});
+ t.after(()=>{loaded.shim.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',loaded.ctx);});
+ loaded.shim.window.CLOUD_RETRY_DELAY_MS=2;loaded.shim.window.CLOUD_PUSH_DELAY_MS=2;
+ await loaded.ctx.cloudPull();await syncSettle(180);
+ assert.equal(pushes,5,'first sign-in must stop after the initial upload and four retries');
+ assert.equal(pulls,5,'a successful empty read does not acknowledge the unsent board or reset its retry budget');
+ assert.equal(loaded.ctx.state.syncDirty,true,'the existing board remains explicitly unsynced');
+ assert.equal(loaded.shim.document.getElementById('syncBtn').textContent,'☁ error');
+ assert.equal(loaded.ctx.state.tasks[0].title,'Board saved before signing in');
+});
+
+test('RISK FIRST SIGN IN: a differing same-revision board is pending until its exact upload is acknowledged',async(t)=>{
+ const local=syncState({tasks:[syncTask('old','Local saved edit')],syncRev:4,syncDirty:false,syncAccount:'e@example.com'});
+ const remote=syncState({...local,tasks:[syncTask('old','Earlier cloud copy')]});
+ let pushes=0;
+ const factory=window=>{
+  const ping=()=>window.dispatchEvent({type:'cloudsync'}),CS={configured:true,ready:true,user:'e@example.com',status:'ok',errorStage:null,errorCode:null,signIn(){},signOut(){},
+   async pull(){CS.status='syncing';ping();await flush();CS.status='ok';CS.errorStage=null;CS.errorCode=null;ping();return {payload:JSON.stringify(remote),rev:4};},
+   async push(){pushes++;CS.status='syncing';ping();await flush();CS.status='error';CS.errorStage='push';CS.errorCode='unavailable';ping();return {error:true};},
+  };return CS;
+ };
+ const loaded=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(local)},cloudSyncFactory:factory});
+ t.after(()=>{loaded.shim.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',loaded.ctx);});
+ loaded.shim.window.CLOUD_RETRY_DELAY_MS=2;loaded.shim.window.CLOUD_PUSH_DELAY_MS=2;
+ await loaded.ctx.cloudPull();await syncSettle(180);
+ assert.equal(pushes,5,'a read of the older payload cannot replenish the failed-write retry budget');
+ assert.equal(loaded.ctx.state.syncDirty,true);
+ assert.equal(loaded.ctx.state.tasks[0].title,'Local saved edit');
+ assert.equal(loaded.shim.document.getElementById('syncBtn').textContent,'☁ error');
+});
+
+test('RISK FIRST SIGN IN: legacy local tasks stay unsynced on failure and only a confirmed upload clears them',async(t)=>{
+ for(const code of ['unavailable','permission-denied'])await t.test(code,async(t)=>{
+  const local=syncState({tasks:[syncTask('old','Never uploaded legacy task')],syncRev:0});
+  delete local.syncDirty;
+  let pushes=0,remote=null;
+  const factory=window=>{
+   const ping=()=>window.dispatchEvent({type:'cloudsync'}),CS={configured:true,ready:true,user:'e@example.com',status:'ok',errorStage:null,errorCode:null,signIn(){},signOut(){},
+    async pull(){CS.status='syncing';ping();await flush();CS.status='ok';CS.errorStage=null;CS.errorCode=null;ping();return remote?{payload:remote,rev:1}:{empty:true};},
+    async push(payload){pushes++;CS.status='syncing';ping();await flush();if(pushes===1){CS.status='error';CS.errorStage='push';CS.errorCode=code;ping();return {error:true};}remote=payload;CS.status='ok';CS.errorStage=null;CS.errorCode=null;ping();return {ok:true,rev:1};},
+   };return CS;
+  };
+  const loaded=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(local)},cloudSyncFactory:factory});
+  t.after(()=>{loaded.shim.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',loaded.ctx);});
+  loaded.shim.window.CLOUD_RETRY_DELAY_MS=50;loaded.shim.window.CLOUD_PUSH_DELAY_MS=2;
+  await loaded.ctx.cloudPull();
+  assert.equal(loaded.ctx.state.syncDirty,true,'a successful empty read must mark an old board pending before the first upload');
+  await syncSettle(20);
+  assert.equal(pushes,1);assert.equal(loaded.ctx.state.syncDirty,true);
+  assert.equal(loaded.shim.document.getElementById('syncBtn').textContent,'☁ error');
+  await syncSettle(100);
+  if(code==='unavailable'){
+   assert.equal(pushes,2);assert.equal(JSON.parse(remote).tasks[0].title,'Never uploaded legacy task');
+   assert.equal(loaded.ctx.state.syncDirty,false);assert.equal(loaded.ctx.state.syncRev,1);
+   assert.equal(loaded.shim.document.getElementById('syncBtn').textContent,'☁ synced');
+  }else{
+   assert.equal(pushes,1,'permission failures are held without automatic retry');
+   assert.equal(remote,null);assert.equal(loaded.ctx.state.syncDirty,true);
+   assert.equal(loaded.ctx.state.tasks[0].title,'Never uploaded legacy task');
+  }
+ });
+});
+
+
+test('RISK CLOUD LOOP: a conflict followed by an unusable read cannot release another write',async(t)=>{
+ for(const failure of ['permission-denied','unavailable','malformed','invalid-payload'])await t.test(failure,async(t)=>{
+  const loaded=await loadApp();const {ctx,shim}=loaded;let pulls=0,pushes=0;
+  const base=ctx.cloudPayload(),ping=()=>shim.window.dispatchEvent({type:'cloudsync'});
+  const CS=shim.window.CloudSync={configured:true,ready:true,user:'owner@example.test',status:'ok',
+   async pull(){pulls++;await flush();if(pulls===1){CS.status='ok';ping();return {payload:base,rev:1};}
+    if(failure==='malformed')return {unexpected:true};
+    if(failure==='invalid-payload')return {payload:'{"tasks":false}',rev:2};
+    CS.status='error';CS.errorStage='pull';CS.errorCode=failure;ping();return {error:true};},
+   async push(){pushes++;if(pushes>20)CS.user=null;await flush();return {conflict:true,rev:2};}};
+  t.after(()=>{CS.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',ctx);});
+  shim.window.CLOUD_RETRY_DELAY_MS=10000;
+  await ctx.cloudPull();ctx.addTask('Preserve conflicted local edit');await ctx.persist();ctx.cloudPushNow();await syncSettle(60);
+  assert.equal(pushes,1,'a failed follow-up read must not reuse the previous successful read to write again');
+  assert.equal(pulls,2,'recoverable read retries must respect backoff; other failures remain stopped');
+  assert.equal(ctx.reconciled(),false);assert.equal(ctx.state.syncDirty,true);
+  assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ error');
+  assert.ok(ctx.state.tasks.some(task=>task.title==='Preserve conflicted local edit'));
+ });
+});
+
+test('RISK CLOUD LOOP: a rejected write stays visibly paused through focus reads and edits until explicit retry',async(t)=>{
+ const local=syncState({tasks:[syncTask('old','Older saved task')],syncRev:0,syncDirty:false});
+ const {ctx,shim}=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(local)}});
+ let pushes=0,pulls=0,checks=0,signouts=0,allow=false,remote=null;
+ const ping=()=>shim.window.dispatchEvent({type:'cloudsync'}),CS=shim.window.CloudSync={configured:true,ready:true,user:'owner@example.test',status:'ok',
+  signOut(){signouts++;},async pull(){pulls++;CS.status='syncing';ping();await flush();CS.status='ok';CS.errorStage=null;CS.errorCode=null;ping();return remote?{payload:remote,rev:1}:{empty:true};},
+  async push(payload){pushes++;await flush();if(allow){remote=payload;CS.status='ok';CS.errorStage=null;CS.errorCode=null;ping();return {ok:true,rev:1};}CS.status='error';CS.errorStage='push';CS.errorCode='permission-denied';ping();return {error:true};}};
+ t.after(()=>{CS.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',ctx);});
+ shim.window.CLOUD_PUSH_DELAY_MS=2;shim.window.checkForAppUpdate=async()=>{checks++;};
+ await ctx.cloudPull();await syncSettle(25);assert.equal(pushes,1);
+ for(let i=0;i<3;i++){await ctx.cloudPull();await syncSettle(10);}
+ ctx.addTask('Edit while paused');await ctx.persist();ctx.cloudPushNow();await syncSettle(15);
+ assert.equal(pushes,1,'focus events and later local edits cannot repeat a write known to be denied');
+ assert.equal(checks,1,'a compatibility failure checks for an updated shell once, without reloading unsaved work');
+ assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ error');
+ assert.match(shim.document.getElementById('syncBtn').title,/permission denied/i);
+ await ctx.onAction('sync',{});
+ assert.equal(signouts,0,'clicking an error opens recovery actions instead of silently signing out');
+ assert.match(shim.document.getElementById('modalRoot').innerHTML,/Retry sync/);
+ assert.match(shim.document.getElementById('modalRoot').innerHTML,/Reload app/);
+ assert.match(shim.document.getElementById('modalRoot').innerHTML,/Sign out/);
+ assert.match(shim.document.getElementById('modalRoot').innerHTML,/<div class="mbtns"><button[^>]*data-act="sync-retry"/,'recovery actions use the wrapping, spaced, mobile touch-target layout');
+ allow=true;await ctx.onAction('sync-retry',{});await syncSettle(35);
+ assert.equal(pushes,2);assert.equal(ctx.state.syncDirty,false);
+ assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ synced');
+ assert.ok(JSON.parse(remote).tasks.some(task=>task.title==='Edit while paused'));
+});
+
+test('RISK CLOUD RECOVERY UI: reload waits for a durable unchanged board and explicit sign out remains available',async(t)=>{
+ const {ctx,shim}=await loadApp();let reloads=0,signouts=0;
+ shim.window.location={reload(){reloads++;}};
+ const CS=shim.window.CloudSync={configured:true,ready:true,user:'owner@example.test',status:'error',errorStage:'push',errorCode:'permission-denied',async pull(){return {error:true};},signOut(){signouts++;CS.user=null;}};
+ t.after(()=>{CS.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',ctx);});
+ ctx.addTask('Draft to preserve');const savedPersist=ctx.persist;
+ ctx.persist=async()=>false;await ctx.onAction('sync-reload',{});assert.equal(reloads,0);
+ ctx.persist=async()=>{ctx.state.tasks[0].title='Changed during save';return true;};
+ await ctx.onAction('sync-reload',{});assert.equal(reloads,0,'a new in-memory draft must not be discarded after an asynchronous save');
+ ctx.persist=savedPersist;await ctx.onAction('sync-reload',{});assert.equal(reloads,1,'the recovery action actually reloads after saving');
+ assert.equal(JSON.parse(shim.localStorage.getItem(SYNC_STORE_KEY)).tasks[0].title,'Changed during save');
+ await ctx.onAction('sync-signout',{});assert.equal(signouts,1);
+ await syncSettle(15);
+});
+
+test('RISK PWA recovery: cloud compatibility failures can request the normal safe update check',async()=>{
+ const h=pwaUpdateHarness();await h.ready();
+ assert.equal(typeof h.box.window.checkForAppUpdate,'function','sync recovery needs the existing worker update path');
+ await h.box.window.checkForAppUpdate();assert.equal(h.counts().updates,2);
+ assert.equal(h.counts().reloads,0,'a check does not reload without an activated update');
+});
+
+test('RISK CLOUD LOOP: repeated revision conflicts cannot spin even when every read succeeds',async(t)=>{
+ const {ctx,shim}=await loadApp();const base=ctx.cloudPayload();let pushes=0,pulls=0;
+ const ping=()=>shim.window.dispatchEvent({type:'cloudsync'}),CS=shim.window.CloudSync={configured:true,ready:true,user:'owner@example.test',status:'ok',
+  async pull(){pulls++;await flush();CS.status='ok';CS.errorStage=null;CS.errorCode=null;ping();return {payload:base,rev:1};},
+  async push(){pushes++;if(pushes>30)CS.user=null;await flush();return {conflict:true,rev:2};}};
+ t.after(()=>{CS.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',ctx);});
+ shim.window.CLOUD_PUSH_DELAY_MS=2;shim.window.CLOUD_RETRY_DELAY_MS=2;
+ await ctx.cloudPull();ctx.addTask('Keep through repeated conflicts');await ctx.persist();ctx.cloudPushNow();await syncSettle(160);
+ assert.equal(pushes,6,'one immediate conflict reconciliation plus four delayed retries must eventually stop');
+ assert.equal(pulls,6);assert.equal(ctx.reconciled(),false);assert.equal(ctx.state.syncDirty,true);
+ assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ error');
+ assert.equal(CS.errorCode,'revision-conflict');
+ assert.ok(ctx.state.tasks.some(task=>task.title==='Keep through repeated conflicts'));
+});
+
 function loadStorageV2({indexedDB}={}){
  const file=path.join(__dirname,'device-store-v2.js');
  assert.ok(fs.existsSync(file),'the scalable local/cloud storage module must ship with the offline app');
