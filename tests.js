@@ -6290,6 +6290,7 @@ const ALLOWED_NON_ASCII = new Set([
   "\u201c", "\u201d",                                     // English quotation marks in Quick start
   "\u2019",                                                   // English apostrophe ("Can't")
   "\u2601",                                                   // cloud-sync icon
+  "\u{1f329}", "\ufe0f",                                     // requested thundercloud and emoji presentation
 ]);
 
 function decodeEscapes(src) {
@@ -7254,7 +7255,7 @@ async function loadCloudBackendV2({rootData=null,batchFailureAt=Infinity,failure
  const snap=reference=>({id:reference.id,ref:reference,exists:()=>docs.has(reference.path),data:()=>clone(docs.get(reference.path))});
  const directRows=collectionRef=>[...docs].filter(([key])=>key.startsWith(collectionRef.path+'/')&&
   !key.slice(collectionRef.path.length+1).includes('/')).map(([key])=>snap(ref(...key.split('/'))));
- const writes=[],popupProviders=[];let batchCommits=0,transactionCalls=0;
+ const writes=[],popupProviders=[],queries=[];let batchCommits=0,transactionCalls=0;
  const normalize=value=>Object.fromEntries(Object.entries(value).map(([key,item])=>[key,item?.__serverTimestamp?{toMillis:()=>1234}:item]));
  const apply=(operation)=>{
   if(operation.type==='set'){docs.set(operation.ref.path,normalize(clone(operation.value)));if(operation.ref.path===rootPath)writes.push(clone(docs.get(rootPath)));}
@@ -7263,7 +7264,7 @@ async function loadCloudBackendV2({rootData=null,batchFailureAt=Infinity,failure
  };
  const F={
   getFirestore:()=>({}),doc:(_db,...parts)=>ref(...parts),collection:(_db,...parts)=>ref(...parts),
-  getDoc:async reference=>{if(reference.path===rootPath&&docs.get(rootPath)?.schemaVersion===2&&failures.stampPending)return failures.stampPending;if(reference.path===rootPath&&failures.pullPending)return failures.pullPending;if(reference.path===rootPath&&failures.pull)throw failures.pull;return snap(reference);},getDocs:async collectionRef=>({docs:directRows(collectionRef)}),
+  getDoc:async reference=>{if(reference.path===rootPath&&docs.get(rootPath)?.schemaVersion===2&&failures.stampPending)return failures.stampPending;if(reference.path===rootPath&&failures.pullPending)return failures.pullPending;if(reference.path===rootPath&&failures.pull)throw failures.pull;return snap(reference);},getDocs:async collectionRef=>{queries.push(collectionRef.path);return {docs:directRows(collectionRef)};},
   serverTimestamp:()=>({__serverTimestamp:true}),
   runTransaction:async(_db,fn)=>{transactionCalls++;if(failures.pushPending)return failures.pushPending;if(failures.push)throw failures.push;const operations=[],tx={get:async reference=>snap(reference),set:(reference,value)=>operations.push({type:'set',ref:reference,value}),update:(reference,value)=>operations.push({type:'update',ref:reference,value}),delete:reference=>operations.push({type:'delete',ref:reference})};const result=await fn(tx);for(const operation of operations)apply(operation);return result;},
   writeBatch:()=>{const operations=[];return {set:(reference,value)=>operations.push({type:'set',ref:reference,value}),delete:reference=>operations.push({type:'delete',ref:reference}),async commit(){batchCommits++;if(batchCommits===batchFailureAt)throw Object.assign(Error('batch unavailable'),{code:'unavailable'});for(const operation of operations)apply(operation);}};},
@@ -7282,7 +7283,7 @@ async function loadCloudBackendV2({rootData=null,batchFailureAt=Infinity,failure
  for(const file of ['device-store-v2.js','cloud-store-v2.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,file),'utf8'),context,{filename:file});
  window.ChainStorageV2=context.ChainStorageV2;window.ChainCloudV2=context.ChainCloudV2;
  await vm.runInContext(`(async()=>{${moduleSource}\n})()`,context,{filename:'index.html#cloud-v2-backend'});
- return {CS:window.CloudSync,auth,docs,pending,events,batchCommits,writes,popupProviders,transactionCalls};
+ return {CS:window.CloudSync,auth,docs,pending,events,batchCommits,writes,popupProviders,transactionCalls,queries};
 }
 
 test('RISK CLOUD V2 ADAPTER: production migrates a legacy root to verified chunks and pulls the exact multi-megabyte board',async()=>{
@@ -17909,4 +17910,129 @@ test('RISK SYNC ERROR LOG: older tabs retain newer diagnostics and share the ten
  setFakeTime(a.ctx,start+3000);a.ctx.openSettings();
  assert.match(a.shim.document.getElementById('modalRoot').innerHTML,/deadline-exceeded/);
  assert.equal(JSON.parse(storage.getItem(key)).length,2,'opening older Settings cannot erase another tab error');
+});
+
+test('RISK SYNC ERROR LOG: concurrent tab writes converge without loss or same-code duplicates',async()=>{
+ for(const sameCode of [false,true]){
+  const storage=sharedScannerStorage(),a=await loadApp({sharedStorage:storage}),b=await loadApp({sharedStorage:storage});
+  const key='fvp:chain-scanner:sync-error-log:v1',start=Date.now(),read=storage.getItem,write=storage.setItem,events=[];
+  let racing=true,writes=0;
+  storage.getItem=k=>k===key&&racing?null:read(k);
+  storage.setItem=(k,value)=>{const previous=read(k);write(k,value);if(k===key&&previous!==String(value)){writes++;events.push({type:'storage',key:k,newValue:String(value),oldValue:previous,storageArea:storage});}};
+  setFakeTime(a.ctx,start);a.ctx.recordSyncError('pull','unavailable');
+  setFakeTime(b.ctx,start+1);b.ctx.recordSyncError('push',sameCode?'unavailable':'deadline-exceeded');
+  racing=false;setFakeTime(a.ctx,start+2);setFakeTime(b.ctx,start+2);
+  for(let turn=0;events.length&&turn<10;turn++){
+   const event=events.shift();a.shim.window.dispatchEvent(event);b.shim.window.dispatchEvent(event);
+  }
+  assert.equal(events.length,0,'storage reconciliation must settle rather than ping-pong');
+  const rows=JSON.parse(read(key));
+  assert.equal(rows.length,sameCode?1:2,'concurrent errors must converge without losing distinct codes or retaining duplicates');
+  assert.equal(rows.find(row=>row.code==='unavailable').at,start,'the earliest occurrence keeps its original expiry');
+  assert.ok(writes<6,'unchanged canonical history must not write repeatedly');
+ }
+});
+
+test('RISK SYNC ERROR LOG: queued storage events retain an error after its originating tab closes',async()=>{
+ const storage=sharedScannerStorage(),a=await loadApp({sharedStorage:storage}),b=await loadApp({sharedStorage:storage});
+ const key='fvp:chain-scanner:sync-error-log:v1',start=Date.now(),read=storage.getItem,write=storage.setItem,events=[];
+ let racing=true;
+ storage.getItem=k=>k===key&&racing?null:read(k);
+ storage.setItem=(k,value)=>{write(k,value);if(k===key)events.push({type:'storage',key:k,newValue:String(value),storageArea:storage});};
+ setFakeTime(a.ctx,start);a.ctx.recordSyncError('pull','unavailable');
+ setFakeTime(b.ctx,start+1);b.ctx.recordSyncError('push','deadline-exceeded');
+ racing=false;setFakeTime(b.ctx,start+2);
+ // The first tab is no longer executing. Its queued event is the remaining
+ // evidence of its error after the second tab overwrote the shared value.
+ b.shim.window.dispatchEvent(events[0]);
+ const rows=JSON.parse(read(key));
+ assert.equal(rows.length,2,'the surviving tab must merge the queued event value as well as current storage');
+ assert.equal(rows.find(row=>row.code==='unavailable').at,start);
+});
+
+test('RISK CLOUD LATENCY: ordinary edits retain the two-second debounce and stay dirty until server acknowledgement',async()=>{
+ const {ctx,shim}=await loadApp();let calls=0,ack;
+ const CS=shim.window.CloudSync={configured:true,ready:true,user:'latency@example.test',status:'ok',pull:async()=>({empty:true}),
+  push:async()=>{calls++;CS.status='syncing';return new Promise(resolve=>{ack=result=>{CS.status='ok';resolve(result);};});}};
+ await ctx.cloudPull();ctx.addTask('Prompt upload');
+ await syncSettle(50);
+ const earlyCalls=calls;
+ const until=Date.now()+2500;while(!calls&&Date.now()<until)await syncSettle(20);
+ assert.equal(calls,1,'a committed edit must start after the ordinary debounce');
+ assert.equal(ctx.state.syncDirty,true);ctx.renderSync();assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ syncing');
+ ack({ok:true,rev:1});for(let i=0;i<20;i++)await flush();
+ assert.equal(ctx.state.syncDirty,false);assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ synced');
+ assert.equal(earlyCalls,0,'the user retained the two-second debounce for batching ordinary edits');
+});
+
+test('RISK CLOUD LATENCY: confirmed writes do not wait seconds for optional timestamp metadata',async()=>{
+ let finishStamp;const backend=await loadCloudBackendV2({rootData:{rev:4,payload:'{}'},timeoutMs:5000,
+  failures:{stampPending:new Promise(resolve=>{finishStamp=resolve;})}});
+ const pending=backend.CS.push('{"tasks":[]}',1,4);
+ const result=await Promise.race([pending,new Promise(resolve=>setTimeout(()=>resolve({late:true}),250))]);
+ finishStamp({exists:()=>true,data:()=>({rev:5,serverUpdatedAt:{toMillis:()=>1234}})});await pending;
+ assert.equal(result.late,undefined,'optional metadata must not hold an already-published board in syncing');
+ assert.equal(result.ok,true);assert.equal(result.rev,5);assert.equal(backend.docs.get('users/owner').rev,5);
+ assert.equal(backend.CS.status,'ok');
+});
+
+test('RISK CLOUD LATENCY: snapshot reads overlap while validation and account cancellation remain mandatory',async()=>{
+ for(const cancel of [false,true]){
+  const adapter=cloudV2Adapter(),store=loadCloudV2().createCloudStore({adapter,crypto:webcrypto});
+  const payload=JSON.stringify({tasks:[{id:'parallel-read',title:'Keep verified'}]});
+  assert.equal((await store.push('owner',payload,1,0)).ok,true);
+  const readHeader=adapter.readGeneration,readChunks=adapter.readChunks;let releaseHeader,headerStarted=false,chunksStarted=false,current=true;
+  const barrier=new Promise(resolve=>{releaseHeader=resolve;});
+  adapter.readGeneration=async(...args)=>{headerStarted=true;await barrier;return readHeader(...args);};
+  adapter.readChunks=async(...args)=>{chunksStarted=true;return readChunks(...args);};
+  const pending=store.pull('owner',{stillCurrent:()=>current});
+  for(let i=0;i<10&&!headerStarted;i++)await flush();
+  const overlapped=chunksStarted;
+  if(cancel)current=false;
+  releaseHeader();const result=await pending;
+  assert.equal(overlapped,true,'chunk download must start without waiting for the independent header download');
+  if(cancel){assert.equal(result.cancelled,true);assert.equal(result.payload,undefined);}
+  else{
+   assert.equal(result.payload,payload);assert.equal(result.rev,1);
+   const root=adapter.roots.get('owner'),generation=adapter.generations.get('owner/'+root.activeGeneration);
+   generation.chunks.get(0).text+='corrupt';
+   assert.equal((await store.pull('owner')).code,'corrupt-generation','parallel downloads still require complete hash verification');
+  }
+ }
+});
+
+test('RISK CLOUD LATENCY: fresh uploads omit the empty resume query but resumed uploads still verify existing chunks',async()=>{
+ const payload=JSON.stringify({tasks:[{id:'safe-fast-upload'}]});
+ const fresh=await loadCloudBackendV2({rootData:null,timeoutMs:5000});
+ assert.equal((await fresh.CS.push(payload,1,0)).ok,true);
+ assert.equal(fresh.queries.filter(path=>path.endsWith('/chunks')).length,1,'a newly created generation needs only its post-write verification read');
+ assert.equal((await fresh.CS.pull()).payload,payload);
+
+ const resumed=await loadCloudBackendV2({rootData:null,batchFailureAt:1,timeoutMs:5000});
+ assert.equal((await resumed.CS.push(payload,1,0)).error,true);
+ const generationId=resumed.pending.get('owner').generationId;
+ assert.equal((await resumed.CS.push(payload,1,0)).ok,true);
+ assert.equal(resumed.docs.get('users/owner').activeGeneration,generationId,'a retry resumes its exact durable generation');
+ assert.equal(resumed.queries.filter(path=>path.endsWith('/chunks')).length,2,'an existing generation requires both resume validation and post-write verification');
+ assert.equal((await resumed.CS.pull()).payload,payload);
+
+ const corrupt=await loadCloudBackendV2({rootData:null,batchFailureAt:1,timeoutMs:5000});
+ assert.equal((await corrupt.CS.push(payload,1,0)).error,true);
+ const id=corrupt.pending.get('owner').generationId;
+ corrupt.docs.set(`users/owner/generations/${id}/chunks/00000000`,{index:0,byteLength:1,hash:'wrong',text:'x'});
+ const rejected=await corrupt.CS.push(payload,1,0);
+ assert.equal(rejected.code,'chunk-mismatch');assert.equal(corrupt.docs.has('users/owner'),false,'an existing corrupt chunk must never be published');
+});
+
+test('RISK SYNC ERROR ICON: the small thundercloud appears only beside a current error',async()=>{
+ const {ctx,shim}=await loadApp(),button=shim.document.getElementById('syncBtn');
+ const CS=shim.window.CloudSync={configured:true,ready:true,user:'icon@example.test',status:'error',errorStage:'pull',errorCode:'unavailable',pull:async()=>({empty:true})};
+ ctx.recordSyncError('pull','unavailable');ctx.renderSync();
+ assert.match(button.className,/\berr\b/);assert.equal(button.textContent,'☁ error');
+ const rule=html.match(/\.syncbtn\.err::after\s*\{([^}]+)\}/)?.[1]||'';
+ assert.match(rule,/content:\s*["'] 🌩️["']/,'the active error needs a small adjacent thundercloud');
+ assert.match(rule,/font-size:\s*12px/);
+ CS.status='syncing';ctx.renderSync();assert.doesNotMatch(button.className,/\berr\b/);
+ CS.status='ok';await ctx.cloudPull();ctx.renderSync();assert.doesNotMatch(button.className,/\berr\b/);
+ ctx.openSettings();assert.match(shim.document.getElementById('modalRoot').innerHTML,/pull: unavailable/,'the retained error remains available after the icon clears');
 });

@@ -39,11 +39,14 @@
         if(typeof generationId!=="string"||!Number.isSafeInteger(manifest.rev)||manifest.rev<1)
           return {error:true,code:"invalid-manifest"};
         try{
-          const header=await adapter.readGeneration(uid,generationId);
+          // Both immutable reads use the same manifest generation. Download
+          // together, then verify the complete snapshot and recheck the root;
+          // overlapping network waits must never bypass those safety gates.
+          const [header,chunks]=await Promise.all([
+            adapter.readGeneration(uid,generationId),adapter.readChunks(uid,generationId)
+          ]);
           if(!current(stillCurrent)) return {cancelled:true};
           if(!header||!["sealed","published"].includes(header.state)) throw new Error("active generation is unavailable");
-          const chunks=await adapter.readChunks(uid,generationId);
-          if(!current(stillCurrent)) return {cancelled:true};
           const payload=await root.ChainStorageV2.decodeSnapshot(header,chunks);
           if(!current(stillCurrent)) return {cancelled:true};
           const latest=await adapter.readRoot(uid);
@@ -84,7 +87,10 @@
         const existing=await adapter.beginGeneration(uid,generationId,header);
         if(!current(stillCurrent)) return {cancelled:true,generationId};
         if(!sameGeneration(existing,encoded,baseRev)) return {error:true,code:"generation-mismatch",generationId};
-        const present=await adapter.readChunks(uid,generationId);
+        // Only the acknowledged create transaction can prove this generation
+        // began empty. Resumed/unknown generations still read every old chunk;
+        // every path retains the full post-write verification before sealing.
+        const present=existing.freshlyCreated===true ? [] : await adapter.readChunks(uid,generationId);
         if(!current(stillCurrent)) return {cancelled:true,generationId};
         const byIndex=new Map();
         for(const chunk of present){
