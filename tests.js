@@ -15506,7 +15506,7 @@ function releaseGateReseal(receipt){
  receipt.receiptSha256=createHash('sha256').update(releaseGateCanonicalJson(payload)).digest('hex');
  return receipt;
 }
-function makeReleaseGateFixture(){
+function makeReleaseGateFixture(options={}){
  const root=fs.mkdtempSync(path.join(process.env.TMPDIR||'/tmp','funsidething-release-gate-'));
  const repo=path.join(root,'repo');
  fs.mkdirSync(repo);
@@ -15515,21 +15515,32 @@ function makeReleaseGateFixture(){
  releaseGateGit(repo,['config','user.name','Release Owner']);
  releaseGateGit(repo,['config','user.email','release-owner@example.test']);
  releaseGateGit(repo,['remote','add','origin','https://github.com/emerald-pham/funsidething.git']);
- fs.writeFileSync(path.join(repo,'app.js'),'const value = 1;\n');
- releaseGateGit(repo,['add','app.js']);
+ const changedPath=options.changedPath||'app.js';
+ const changedFile=path.join(repo,changedPath);
+ fs.mkdirSync(path.dirname(changedFile),{recursive:true});
+ fs.writeFileSync(changedFile,options.baseText??'const value = 1;\n');
+ releaseGateGit(repo,['add','--all']);
  releaseGateGit(repo,['commit','-m','Create release base']);
  const baseSha=releaseGateGit(repo,['rev-parse','HEAD']);
- fs.writeFileSync(path.join(repo,'app.js'),'const value = 2;\n');
- releaseGateGit(repo,['commit','-am','Change release behavior']);
+ fs.writeFileSync(changedFile,options.candidateText??'const value = 2;\n');
+ releaseGateGit(repo,['add','--all']);
+ releaseGateGit(repo,['commit','-m','Change release behavior']);
  const candidateSha=releaseGateGit(repo,['rev-parse','HEAD']);
  const treeSha=releaseGateGit(repo,['rev-parse',candidateSha+'^{tree}']);
  const sourcePath=path.join(root,'MEMORY.md');
  const memoryEvidencePath=path.join(root,'memory-audit.md');
  const reviewEvidencePath=path.join(root,'independent-review.md');
+ const ownerEvidencePath=path.join(root,'owner-review.md');
+ const codeEvidencePath=path.join(root,'code-review.md');
+ const specialistEvidencePath=path.join(root,'specialist-review.md');
  fs.writeFileSync(sourcePath,'Memory source snapshot\n');
  fs.writeFileSync(memoryEvidencePath,'Audited memory sources against current project behavior.\n');
  fs.writeFileSync(reviewEvidencePath,'Reviewed the full diff, tests, and user-visible and data-safety effects.\n');
- return {root,repo,baseSha,candidateSha,treeSha,sourcePath,memoryEvidencePath,reviewEvidencePath};
+ fs.writeFileSync(ownerEvidencePath,'The owner inspected the exact candidate diff and found no unaddressed issue.\n');
+ fs.writeFileSync(codeEvidencePath,'The independent reviewer inspected the full diff, tests, and user impact.\n');
+ fs.writeFileSync(specialistEvidencePath,'The specialist inspected the affected risk domain and focused tests.\n');
+ return {root,repo,baseSha,candidateSha,treeSha,changedPath,sourcePath,memoryEvidencePath,reviewEvidencePath,
+  ownerEvidencePath,codeEvidencePath,specialistEvidencePath};
 }
 function releaseGateInput(fixture,overrides={}){
  const now=new Date().toISOString();
@@ -15558,6 +15569,280 @@ function releaseGateInput(fixture,overrides={}){
 function cleanupReleaseGateFixture(fixture){
  fs.rmSync(fixture.root,{recursive:true,force:true});
 }
+
+function riskBasedReleaseInput(fixture,options={}){
+ const now=new Date().toISOString();
+ const input={
+  schemaVersion:2,
+  candidate:{commitSha:fixture.candidateSha,treeSha:fixture.treeSha,baseSha:fixture.baseSha},
+  ownerReview:{task:'/root/release-owner',outcome:'approved',reviewedSha:fixture.candidateSha,
+   completedAt:now,summary:'The owner inspected the exact final diff and checked for unaddressed issues.',
+   scope:{fullDiff:true,rationale:'The owner checked every changed path against the release review policy.'},
+   evidencePath:fixture.ownerEvidencePath,evidenceSha256:releaseGateHash(fixture.ownerEvidencePath)}
+ };
+ if(options.codeReview!==false)input.independentReview={task:'/root/exact-code-review',outcome:'approved',
+  reviewedSha:fixture.candidateSha,completedAt:now,
+  summary:'The independent reviewer inspected the full diff, relevant tests, and user-visible effects.',
+  scope:{fullDiff:true,relevantTests:true,userVisibleAndDataSafety:true},
+  evidencePath:fixture.codeEvidencePath,evidenceSha256:releaseGateHash(fixture.codeEvidencePath)};
+ if(options.specialistReview!==false){
+  const specialistDomains=options.domains||['memory-cloud-sync'];
+  const affectsMemoryCloudSync=specialistDomains.includes('memory-cloud-sync');
+  input.specialistReview={task:'/root/exact-specialist-review',outcome:'approved',
+  reviewedSha:fixture.candidateSha,completedAt:now,domains:specialistDomains,
+  summary:'The specialist reviewed the affected domain, failure modes, and focused tests.',
+  scope:{fullDiff:true,relevantTests:true,userVisibleAndDataSafety:true},
+  memoryScope:{
+   memory:{affected:false,rationale:'This candidate does not change saved device memory behavior.',tests:[]},
+   cloud:{affected:affectsMemoryCloudSync,rationale:'This candidate changes a cloud-related implementation path.',
+    tests:affectsMemoryCloudSync?['RISK repository process: risk-based receipts require the derived exact-final reviewer roles']:[]},
+   sync:{affected:affectsMemoryCloudSync&&fixture.changedPath.includes('sync'),
+    rationale:'This candidate changes synchronization only when its exact changed path is sync-related.',
+    tests:affectsMemoryCloudSync&&fixture.changedPath.includes('sync')
+     ?['RISK repository process: risk-based receipts require the derived exact-final reviewer roles']:[]}
+  },
+  sources:[{path:fixture.sourcePath,sha256:releaseGateHash(fixture.sourcePath)}],
+  evidencePath:fixture.specialistEvidencePath,evidenceSha256:releaseGateHash(fixture.specialistEvidencePath)};
+ }
+ return {...input,...options.input,
+  candidate:{...input.candidate,...options.input?.candidate},
+  ownerReview:{...input.ownerReview,...options.input?.ownerReview},
+  ...(input.independentReview?{independentReview:{...input.independentReview,...options.input?.independentReview}}:{}),
+  ...(input.specialistReview?{specialistReview:{...input.specialistReview,...options.input?.specialistReview}}:{})};
+}
+
+test('RISK repository process: review policy derives code and specialist roles from the exact diff',async()=>{
+ const {deriveReleaseReviewPlan}=await import('./scripts/release-evidence.mjs');
+ assert.equal(typeof deriveReleaseReviewPlan,'function','the release gate must expose its exact-diff policy classifier');
+ const docs=makeReleaseGateFixture({changedPath:'README.md',baseText:'Old setup note.\n',candidateText:'Clearer setup note.\n'});
+ const ordinary=makeReleaseGateFixture({changedPath:'src/landscape.mjs'});
+ const cloud=makeReleaseGateFixture({changedPath:'src/cloud-sync.mjs'});
+ const rules=makeReleaseGateFixture({changedPath:'firestore.rules'});
+ const callable=makeReleaseGateFixture({changedPath:'src/handlers.mjs',
+  baseText:'exports.limit = https.onCall((request) => checkOwner(request));\n',
+  candidateText:'exports.limit = https.onCall((request) => checkTeam(request));\n'});
+ const inlineStorage=makeReleaseGateFixture({changedPath:'index.html',
+  baseText:"localStorage.setItem('board', 1);\n",candidateText:"localStorage.setItem('board', 2);\n"});
+ const inlineAuth=makeReleaseGateFixture({changedPath:'index.html',
+  baseText:'firebase.auth().signInAnonymously();\n',candidateText:'firebase.auth().signInWithPopup();\n'});
+ const cssSelector=makeReleaseGateFixture({changedPath:'styles.css',
+  baseText:'#status { color: red; }\n',candidateText:'#status { color: blue; }\n'});
+ const policyComment=makeReleaseGateFixture({changedPath:'tools/release-evidence.mjs',
+  baseText:'// old release-gate explanation\n',candidateText:'// clarified release-gate explanation\n'});
+ const templateCode=makeReleaseGateFixture({changedPath:'src/landscape.mjs',
+  baseText:'eval(`\n// oldBehavior();\n`);\n',candidateText:'eval(`\n// newBehavior();\n`);\n'});
+ const blockComments=makeReleaseGateFixture({changedPath:'src/landscape.mjs',
+  baseText:'/* old explanation\n * unchanged second line\n */\nconst value = 1;\n',
+  candidateText:'/* revised explanation\n * unchanged second line\n */\nconst value = 1;\n'});
+ const addedComment=makeReleaseGateFixture({changedPath:'src/landscape.mjs',
+  baseText:'const value = 1;\n',candidateText:'// explains the existing value\nconst value = 1;\n'});
+ const comments=makeReleaseGateFixture({changedPath:'src/landscape.mjs',baseText:'// old explanation\n',candidateText:'// clearer explanation\n'});
+ try{
+  const plan=(fixture)=>deriveReleaseReviewPlan(fixture.repo,fixture.candidateSha,fixture.baseSha);
+  assert.deepEqual(plan(docs),{schemaVersion:1,changedFiles:['README.md'],mode:'owner-self-review',
+   requiresCodeReview:false,requiresSpecialistReview:false,specialistDomains:[]});
+  assert.equal(plan(ordinary).mode,'independent-review');
+  assert.equal(plan(ordinary).requiresCodeReview,true);
+  assert.equal(plan(ordinary).requiresSpecialistReview,false);
+  assert.deepEqual(plan(cloud).specialistDomains,['memory-cloud-sync']);
+  assert.equal(plan(cloud).mode,'dual-review','a cloud behavior change affects code and specialist domains');
+  assert.deepEqual(plan(rules).specialistDomains,['memory-cloud-sync','security-deployment']);
+  assert.equal(plan(rules).requiresCodeReview,true);
+  assert.equal(plan(rules).requiresSpecialistReview,true);
+  assert.deepEqual(plan(callable).specialistDomains,['security-deployment'],
+   'callable endpoint behavior receives its security specialist even in a generic source file');
+  assert.equal(plan(callable).mode,'dual-review');
+  assert.deepEqual(plan(inlineStorage).specialistDomains,['memory-cloud-sync'],
+   'central app files still classify changed persisted-data lines as high risk');
+  assert.deepEqual(plan(inlineAuth).specialistDomains,['security-deployment'],
+   'central app files still classify changed authentication lines as high risk');
+  assert.equal(plan(cssSelector).mode,'independent-review',
+   'a CSS ID selector beginning with # is executable styling, not a shell comment');
+  assert.deepEqual(plan(policyComment).specialistDomains,['release-process'],
+   'comment-only edits to release-gate policy remain specialist scoped');
+  assert.equal(plan(policyComment).requiresCodeReview,true,
+   'release-gate tooling is never downgraded by comment syntax');
+  assert.equal(plan(templateCode).mode,'independent-review',
+   'comment-shaped lines inside executable template strings are not JavaScript comments');
+  assert.equal(plan(blockComments).mode,'owner-self-review',
+   'a valid multiline block-comment edit with unchanged code stays owner-only');
+  assert.equal(plan(addedComment).mode,'owner-self-review',
+   'adding an unambiguous standalone comment without changing code stays owner-only');
+  assert.equal(plan(comments).mode,'owner-self-review','comment-only edits do not become behavior reviews');
+ }finally{
+  for(const fixture of [docs,ordinary,cloud,rules,callable,inlineStorage,inlineAuth,cssSelector,policyComment,templateCode,blockComments,addedComment,comments])cleanupReleaseGateFixture(fixture);
+ }
+});
+
+test('RISK repository process: a generic role guard requires a security specialist',async()=>{
+ const {deriveReleaseReviewPlan}=await import('./scripts/release-evidence.mjs');
+ const roleGuard=makeReleaseGateFixture({changedPath:'src/guards.mjs',
+  baseText:'export function canEnter(role) { return role === "owner"; }\n',
+  candidateText:'export function canEnter(role) { return true; }\n'});
+ try{
+  assert.deepEqual(deriveReleaseReviewPlan(roleGuard.repo,roleGuard.candidateSha,roleGuard.baseSha).specialistDomains,
+   ['security-deployment'],
+   'removing a generic role check fails closed to a security specialist without auth-named paths');
+ }finally{cleanupReleaseGateFixture(roleGuard);}
+});
+
+test('RISK repository process: generic state persistence requires a memory specialist',async()=>{
+ const {deriveReleaseReviewPlan}=await import('./scripts/release-evidence.mjs');
+ const genericPersistence=makeReleaseGateFixture({changedPath:'src/repository.mjs',
+  baseText:'export function saveState(state) { return adapter.write(state); }\n',
+  candidateText:'export function saveState(state) { return adapter.clear(state); }\n'});
+ const genericPersistedMutation=makeReleaseGateFixture({changedPath:'src/repository.mjs',
+  baseText:'export function replaceTasks(state) { return adapter.write({...state,tasks:state.tasks}); }\n',
+  candidateText:'export function replaceTasks(state) { return adapter.write({...state,tasks:[]}); }\n'});
+ const genericRemove=makeReleaseGateFixture({changedPath:'src/repository.mjs',
+  baseText:'export function replaceTasks(state) { return adapter.remove({...state,tasks:state.tasks}); }\n',
+  candidateText:'export function replaceTasks(state) { return adapter.remove({...state,tasks:[]}); }\n'});
+ const genericClear=makeReleaseGateFixture({changedPath:'src/repository.mjs',
+  baseText:'export function replaceTasks(state) { return adapter.clear({...state,tasks:state.tasks}); }\n',
+  candidateText:'export function replaceTasks(state) { return adapter.clear({...state,tasks:[]}); }\n'});
+ try{
+  assert.deepEqual(deriveReleaseReviewPlan(genericPersistence.repo,genericPersistence.candidateSha,genericPersistence.baseSha).specialistDomains,
+   ['memory-cloud-sync'],
+   'generic state persistence changes receive a data-safety specialist without storage-named paths');
+  assert.deepEqual(deriveReleaseReviewPlan(genericPersistedMutation.repo,genericPersistedMutation.candidateSha,genericPersistedMutation.baseSha).specialistDomains,
+   ['memory-cloud-sync'],
+   'mutating an adapter-written persisted record fails closed to a data-safety specialist');
+  assert.deepEqual({
+   remove:deriveReleaseReviewPlan(genericRemove.repo,genericRemove.candidateSha,genericRemove.baseSha).specialistDomains,
+   clear:deriveReleaseReviewPlan(genericClear.repo,genericClear.candidateSha,genericClear.baseSha).specialistDomains,
+  },{
+   remove:['memory-cloud-sync'],
+   clear:['memory-cloud-sync'],
+  },'adapter remove and clear operations that mutate persisted records fail closed to a data-safety specialist');
+ }finally{
+  cleanupReleaseGateFixture(genericPersistence);
+  cleanupReleaseGateFixture(genericPersistedMutation);
+  cleanupReleaseGateFixture(genericRemove);
+  cleanupReleaseGateFixture(genericClear);
+ }
+});
+
+test('RISK repository process: persisting generic sessions requires both affected specialists',async()=>{
+ const {deriveReleaseReviewPlan}=await import('./scripts/release-evidence.mjs');
+ const persistedSession=makeReleaseGateFixture({changedPath:'src/current-context.mjs',
+  baseText:'export function saveSession(session) { return adapter.write(session); }\n',
+  candidateText:'export function saveSession(session) { return adapter.remove(session); }\n'});
+ try{
+  assert.deepEqual(deriveReleaseReviewPlan(persistedSession.repo,persistedSession.candidateSha,persistedSession.baseSha).specialistDomains,
+   ['memory-cloud-sync','shared-session-state'],
+   'generic session persistence requires both data-safety and shared-session specialists');
+ }finally{cleanupReleaseGateFixture(persistedSession);}
+});
+
+test('RISK repository process: TypeScript tooling directives cannot use comment-only exemption',async()=>{
+ const {deriveReleaseReviewPlan}=await import('./scripts/release-evidence.mjs');
+ const typecheckDirective=makeReleaseGateFixture({changedPath:'src/types.ts',
+  baseText:'const value: number = 1;\n',candidateText:'// @ts-nocheck\nconst value: number = 1;\n'});
+ const typecheckEnabled=makeReleaseGateFixture({changedPath:'src/legacy.js',
+  baseText:'const value = 1;\n',candidateText:'// @ts-check\nconst value = 1;\n'});
+ try{
+  assert.equal(deriveReleaseReviewPlan(typecheckDirective.repo,typecheckDirective.candidateSha,typecheckDirective.baseSha).mode,'independent-review',
+   'a behavior-changing TypeScript directive is never exempted as a comment-only edit');
+  assert.equal(deriveReleaseReviewPlan(typecheckEnabled.repo,typecheckEnabled.candidateSha,typecheckEnabled.baseSha).mode,'independent-review',
+   'enabling JavaScript type checking is a tooling change and cannot be owner-only');
+ }finally{
+  cleanupReleaseGateFixture(typecheckDirective);
+  cleanupReleaseGateFixture(typecheckEnabled);
+ }
+});
+
+test('RISK repository process: CSS comment removal cannot join selector tokens under owner-only review',async()=>{
+ const {deriveReleaseReviewPlan}=await import('./scripts/release-evidence.mjs');
+ const cssTokenJoin=makeReleaseGateFixture({changedPath:'styles.css',
+  baseText:'a b { color: red; }\n',candidateText:'a/**/b { color: red; }\n'});
+ try{
+  assert.equal(deriveReleaseReviewPlan(cssTokenJoin.repo,cssTokenJoin.candidateSha,cssTokenJoin.baseSha).mode,'independent-review',
+   'removing a CSS comment that joins selector tokens is executable behavior');
+ }finally{cleanupReleaseGateFixture(cssTokenJoin);}
+});
+
+test('RISK repository process: risk-based receipts require the derived exact-final reviewer roles',async()=>{
+ const {recordReleaseEvidence,verifyReleaseEvidence}=await import('./scripts/release-evidence.mjs');
+ const docs=makeReleaseGateFixture({changedPath:'README.md',baseText:'Old copy.\n',candidateText:'Updated copy.\n'});
+ const ordinary=makeReleaseGateFixture({changedPath:'src/landscape.mjs'});
+ const cloud=makeReleaseGateFixture({changedPath:'src/cloud-sync.mjs'});
+ try{
+  const docsReceipt=recordReleaseEvidence(docs.repo,riskBasedReleaseInput(docs,{codeReview:false,specialistReview:false}));
+  assert.equal(docsReceipt.receipt.reviewPlan.mode,'owner-self-review');
+  assert.equal(verifyReleaseEvidence(docs.repo,docs.candidateSha).ok,true,
+   'pure documentation needs only the owner exact-diff review');
+  assert.throws(()=>recordReleaseEvidence(ordinary.repo,
+   riskBasedReleaseInput(ordinary,{codeReview:false,specialistReview:false})),/code|independent|review/i,
+   'a caller cannot classify changed code as owner-only');
+  const ordinaryReceipt=recordReleaseEvidence(ordinary.repo,
+   riskBasedReleaseInput(ordinary,{specialistReview:false}));
+  assert.equal(ordinaryReceipt.receipt.reviewPlan.mode,'independent-review');
+  assert.equal(verifyReleaseEvidence(ordinary.repo,ordinary.candidateSha).ok,true,
+   'ordinary behavior needs exactly one independent reviewer');
+  assert.throws(()=>recordReleaseEvidence(cloud.repo,
+   riskBasedReleaseInput(cloud,{specialistReview:false})),/specialist|domain|review/i,
+   'high-risk cloud behavior cannot omit its specialist');
+  assert.throws(()=>recordReleaseEvidence(cloud.repo,
+   riskBasedReleaseInput(cloud,{domains:['security-deployment']})),/domain|classification|specialist/i,
+   'a specialist receipt cannot substitute an unrelated risk domain');
+  const cloudReceipt=recordReleaseEvidence(cloud.repo,riskBasedReleaseInput(cloud));
+  assert.equal(cloudReceipt.receipt.reviewPlan.mode,'dual-review');
+  assert.notEqual(cloudReceipt.receipt.independentReview.task,cloudReceipt.receipt.specialistReview.task,
+   'code and specialist reviews must be independent task identities');
+  assert.equal(verifyReleaseEvidence(cloud.repo,cloud.candidateSha).ok,true);
+  const tampered=JSON.parse(fs.readFileSync(cloudReceipt.receiptPath,'utf8'));
+  tampered.reviewPlan={schemaVersion:1,changedFiles:['src/cloud-sync.mjs'],mode:'owner-self-review',
+   requiresCodeReview:false,requiresSpecialistReview:false,specialistDomains:[]};
+  releaseGateReseal(tampered);
+  fs.writeFileSync(cloudReceipt.receiptPath,JSON.stringify(tampered,null,2)+'\n');
+  const rejected=verifyReleaseEvidence(cloud.repo,cloud.candidateSha);
+  assert.equal(rejected.ok,false,'a checksum-valid low-risk classification cannot authorize a high-risk exact diff');
+  assert.match(rejected.errors.join(' '),/classification|review plan|risk/i);
+ }finally{
+  for(const fixture of [docs,ordinary,cloud])cleanupReleaseGateFixture(fixture);
+ }
+});
+
+test('RISK repository process: caller-declared specialist domains can only raise the derived plan',async()=>{
+ const {deriveReleaseReviewPlan,recordReleaseEvidence}=await import('./scripts/release-evidence.mjs');
+ const roleGuard=makeReleaseGateFixture({changedPath:'src/guards.mjs',
+  baseText:'export function canEnter(role) { return role === "owner"; }\n',
+  candidateText:'export function canEnter(role) { return true; }\n'});
+ try{
+  const derived=deriveReleaseReviewPlan(roleGuard.repo,roleGuard.candidateSha,roleGuard.baseSha);
+  assert.deepEqual(derived.specialistDomains,['security-deployment'],
+   'the source-derived security domain remains mandatory even when a caller supplies an empty escalation list');
+  assert.throws(()=>recordReleaseEvidence(roleGuard.repo,
+   riskBasedReleaseInput(roleGuard,{specialistReview:false,input:{additionalSpecialistDomains:[]}})),
+   /specialist|review/i,'an empty caller declaration cannot remove an automatically derived specialist requirement');
+ }finally{cleanupReleaseGateFixture(roleGuard);}
+});
+
+test('RISK repository process: caller-declared specialist domains raise and bind the exact review plan',async()=>{
+ const {recordReleaseEvidence,verifyReleaseEvidence}=await import('./scripts/release-evidence.mjs');
+ const escalation=makeReleaseGateFixture({changedPath:'src/opaque.mjs'});
+ try{
+  const input=riskBasedReleaseInput(escalation,{domains:['security-deployment'],
+   input:{additionalSpecialistDomains:['security-deployment']}});
+  const recorded=recordReleaseEvidence(escalation.repo,input);
+  assert.deepEqual(recorded.receipt.additionalSpecialistDomains,['security-deployment'],
+   'caller-declared specialist scope is bound into the exact receipt');
+  assert.deepEqual(recorded.receipt.reviewPlan.specialistDomains,['security-deployment'],
+   'caller declarations may raise the derived plan for an otherwise ordinary code change');
+  assert.equal(verifyReleaseEvidence(escalation.repo,escalation.candidateSha).ok,true,
+   'a checksum-bound caller escalation remains verifiable against the exact diff');
+ }finally{cleanupReleaseGateFixture(escalation);}
+});
+
+test('RISK repository process: caller-declared specialist domains reject unknown values',async()=>{
+ const {recordReleaseEvidence}=await import('./scripts/release-evidence.mjs');
+ const fixture=makeReleaseGateFixture({changedPath:'src/landscape.mjs'});
+ try{
+  assert.throws(()=>recordReleaseEvidence(fixture.repo,
+   riskBasedReleaseInput(fixture,{specialistReview:false,input:{additionalSpecialistDomains:['unrecognized-domain']}})),
+   /domain|allowed|recognized/i,'caller escalation accepts only known specialist domains');
+ }finally{cleanupReleaseGateFixture(fixture);}
+});
 
 test('RISK repository process: exact-SHA receipts bind audit and review evidence outside the git tree',async()=>{
  const {recordReleaseEvidence,verifyReleaseEvidence}=await import('./scripts/release-evidence.mjs');
@@ -15720,10 +16005,63 @@ test('RISK repository process: status publication needs a valid exact-SHA receip
   const recorded=recordReleaseEvidence(fixture.repo,releaseGateInput(fixture));
   await publishReleaseStatuses(fixture.repo,fixture.candidateSha,async status=>calls.push(status));
   assert.deepEqual(calls.map(status=>status.context).sort(),
-   ['funsidething/independent-review','funsidething/memory-audit']);
+   ['funsidething/independent-review','funsidething/memory-audit','funsidething/specialist-review'],
+   'schema-v1 publication includes the compatibility context required by current branch protection');
   assert.ok(calls.every(status=>status.state==='success'&&status.description.includes(recorded.receipt.receiptSha256)));
   assert.ok(calls.every(status=>status.commitSha===fixture.candidateSha&&status.baseSha===fixture.baseSha));
  }finally{cleanupReleaseGateFixture(fixture);}
+});
+
+test('RISK repository process: risk-based statuses bind required roles and keep legacy receipts valid',async()=>{
+ const {recordReleaseEvidence,publishReleaseStatuses,verifyDeploymentEvidence}=await import('./scripts/release-evidence.mjs');
+ const docs=makeReleaseGateFixture({changedPath:'README.md',baseText:'Old note.\n',candidateText:'Updated note.\n'});
+ const ordinary=makeReleaseGateFixture({changedPath:'src/landscape.mjs'});
+ const mainSha='c'.repeat(40);
+ const deployment=(fixture,statuses)=>async input=>{
+  const pathname=new URL(typeof input==='string'?input:input.url).pathname;
+  let body;
+  if(pathname.endsWith('/commits/'+mainSha+'/pulls'))body=[{number:31,state:'closed',merged_at:'2026-09-29T12:00:00Z',
+   merge_commit_sha:mainSha,head:{sha:fixture.candidateSha},base:{ref:'main'}}];
+  else if(pathname.endsWith('/commits/'+mainSha))body={sha:mainSha,commit:{tree:{sha:fixture.treeSha}},parents:[{sha:fixture.baseSha}]};
+  else if(pathname.endsWith('/commits/'+fixture.candidateSha))body={sha:fixture.candidateSha,commit:{tree:{sha:fixture.treeSha}}};
+  else if(pathname.endsWith('/compare/'+fixture.baseSha+'...'+fixture.candidateSha))body={status:'ahead'};
+  else if(pathname.endsWith('/commits/'+fixture.candidateSha+'/statuses'))body=statuses.map((status,index)=>
+   ({...status,created_at:`2026-09-29T12:0${index}:00Z`}));
+  else throw new Error('Unexpected GitHub API request: '+pathname);
+  return {ok:true,status:200,json:async()=>body};
+ };
+ try{
+  recordReleaseEvidence(docs.repo,riskBasedReleaseInput(docs,{codeReview:false,specialistReview:false}));
+  const docsStatuses=[];
+  await publishReleaseStatuses(docs.repo,docs.candidateSha,async status=>docsStatuses.push(status));
+  assert.deepEqual(docsStatuses.map(status=>status.context).sort(),[
+   'funsidething/independent-review','funsidething/memory-audit','funsidething/specialist-review'],
+   'existing required contexts remain published alongside the conditional specialist context');
+  assert.ok(docsStatuses.every(status=>status.state==='success'&&/;c=0;s=0;v=2$/.test(status.description)),
+   'self-reviewed documentation marks both optional independent roles as not required');
+  assert.equal((await verifyDeploymentEvidence({repository:'emerald-pham/funsidething',deployedSha:mainSha,
+   beforeSha:docs.baseSha,token:'test-token',fetchImpl:deployment(docs,docsStatuses)})).ok,true,
+   'deployment accepts owner-only evidence only when the exact receipt policy marks external reviews not required');
+
+  recordReleaseEvidence(ordinary.repo,riskBasedReleaseInput(ordinary,{specialistReview:false}));
+  const ordinaryStatuses=[];
+  await publishReleaseStatuses(ordinary.repo,ordinary.candidateSha,async status=>ordinaryStatuses.push(status));
+  const codeStatus=ordinaryStatuses.find(status=>status.context==='funsidething/independent-review');
+  const specialistStatus=ordinaryStatuses.find(status=>status.context==='funsidething/specialist-review');
+  assert.match(codeStatus.description,/;c=1;s=0;v=2$/);
+  assert.match(specialistStatus.description,/;c=1;s=0;v=2$/);
+  assert.equal((await verifyDeploymentEvidence({repository:'emerald-pham/funsidething',deployedSha:mainSha,
+   beforeSha:ordinary.baseSha,token:'test-token',fetchImpl:deployment(ordinary,ordinaryStatuses)})).ok,true,
+   'deployment requires the code reviewer but accepts the unneeded specialist role');
+  const misbound=ordinaryStatuses.map(status=>status.context==='funsidething/specialist-review'
+   ?{...status,description:status.description.replace(';s=0;v=2',';s=1;v=2')}:status);
+  assert.equal((await verifyDeploymentEvidence({repository:'emerald-pham/funsidething',deployedSha:mainSha,
+   beforeSha:ordinary.baseSha,token:'test-token',fetchImpl:deployment(ordinary,misbound)})).ok,false,
+   'status contexts cannot overstate or disagree about the exact review plan');
+ }finally{
+  cleanupReleaseGateFixture(docs);
+  cleanupReleaseGateFixture(ordinary);
+ }
 });
 
 test('RISK repository process: main deployment requires the merged reviewed head, full tree parity, and latest statuses',async()=>{
@@ -15740,8 +16078,9 @@ test('RISK repository process: main deployment requires the merged reviewed head
    else if(pathname.endsWith('/commits/'+fixture.candidateSha))body={sha:fixture.candidateSha,commit:{tree:{sha:fixture.treeSha}}};
    else if(pathname.endsWith('/compare/'+fixture.baseSha+'...'+fixture.candidateSha))body={status:options.compare||'ahead'};
    else if(pathname.endsWith('/commits/'+fixture.candidateSha+'/statuses'))body=options.reviewStatuses||[
-    {context:'funsidething/memory-audit',state:'success',description:'receipt-sha256='+receiptHash+';base='+fixture.baseSha,created_at:'2026-09-28T21:02:00Z'},
-    {context:'funsidething/independent-review',state:'success',description:'receipt-sha256='+receiptHash+';base='+fixture.baseSha,created_at:'2026-09-28T21:03:00Z'}];
+   {context:'funsidething/memory-audit',state:'success',description:'receipt-sha256='+receiptHash+';base='+fixture.baseSha,created_at:'2026-09-28T21:02:00Z'},
+    {context:'funsidething/independent-review',state:'success',description:'receipt-sha256='+receiptHash+';base='+fixture.baseSha,created_at:'2026-09-28T21:03:00Z'},
+    {context:'funsidething/specialist-review',state:'success',description:'receipt-sha256='+receiptHash+';base='+fixture.baseSha,created_at:'2026-09-28T21:03:30Z'}];
    else throw new Error('Unexpected GitHub API request: '+pathname);
    return {ok:true,status:200,json:async()=>body};
   };
@@ -15756,9 +16095,17 @@ test('RISK repository process: main deployment requires the merged reviewed head
   const latestStatuses=[
    {context:'funsidething/memory-audit',state:'success',description:'receipt-sha256='+receiptHash+';base='+fixture.baseSha,created_at:'2026-09-28T21:01:00Z'},
    {context:'funsidething/memory-audit',state:'failure',description:'receipt-sha256='+receiptHash+';base='+fixture.baseSha,created_at:'2026-09-28T21:04:00Z'},
-   {context:'funsidething/independent-review',state:'success',description:'receipt-sha256='+receiptHash+';base='+fixture.baseSha,created_at:'2026-09-28T21:03:00Z'}];
+   {context:'funsidething/independent-review',state:'success',description:'receipt-sha256='+receiptHash+';base='+fixture.baseSha,created_at:'2026-09-28T21:03:00Z'},
+   {context:'funsidething/specialist-review',state:'success',description:'receipt-sha256='+receiptHash+';base='+fixture.baseSha,created_at:'2026-09-28T21:03:30Z'}];
   assert.equal((await verify(await api({merged:true,reviewStatuses:latestStatuses}))).ok,false,
    'the latest status for each exact-head context controls');
+  const missingSpecialistContext=await api({merged:true,reviewStatuses:[
+   {context:'funsidething/memory-audit',state:'success',description:'receipt-sha256='+receiptHash+';base='+fixture.baseSha,created_at:'2026-09-28T21:02:00Z'},
+   {context:'funsidething/independent-review',state:'success',description:'receipt-sha256='+receiptHash+';base='+fixture.baseSha,created_at:'2026-09-28T21:03:00Z'}]});
+  const missingCompatibility=await verify(missingSpecialistContext);
+  assert.equal(missingCompatibility.ok,false,
+   'schema-v1 deployment evidence cannot bypass the new specialist compatibility context');
+  assert.match(missingCompatibility.errors.join(' '),/specialist-review/i);
   assert.equal((await verify(await api({merged:false}))).ok,false,
    'a main push without an associated merged PR cannot deploy');
  }finally{cleanupReleaseGateFixture(fixture);}

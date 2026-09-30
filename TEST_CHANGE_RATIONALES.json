@@ -1,5 +1,37 @@
 [
   {
+    "reason": "The release gate previously required a memory audit and independent code review for every candidate, while the requested policy scales independent review to the exact candidate diff. New process contracts distinguish pure documentation and comment edits, ordinary behavior changes, and high-risk specialist domains; they also bind conditional GitHub statuses and deployment checks to the same exact receipt.",
+    "previousBehavior": "Only schemaVersion 1 receipts were accepted, and every receipt required separate memory-audit and code-review evidence regardless of the changed files. The status publisher and deployment verifier likewise required both contexts for all candidates. Generic role guards and state/session persistence could evade specialist classification, including adapter writes or removals that mutated persisted records under generic filenames; caller declarations were ignored, and some behavior-changing comments received owner-only review.",
+    "intendedBehavior": "SchemaVersion 2 receipts derive the minimum review plan from the exact base-to-candidate diff, require owner exact-diff self-review for every candidate, and require a code reviewer and/or specialist only for the affected domains. Generic auth, state persistence, and session persistence fail closed to their relevant specialists. Calls to generic persistence objects using set, put, update, write, mutate, remove, clear, delete, or erase require the memory/cloud/sync specialist even when the path and surrounding names are generic. Caller-declared specialist domains may only raise the derived plan, are limited to known domains, and remain bound in the exact receipt. Behavior-changing directives, including @ts-check, and CSS token-joining comment removal cannot use owner-only review. Underclassification, mismatched reviewer domains, stale receipts, or inconsistent status descriptions fail closed. SchemaVersion 1 retains its original two-review requirement and publishes the third specialist-compatibility context under the same receipt binding.",
+    "replacementTests": [
+      "RISK repository process: review policy derives code and specialist roles from the exact diff",
+      "RISK repository process: a generic role guard requires a security specialist",
+      "RISK repository process: generic state persistence requires a memory specialist",
+      "RISK repository process: persisting generic sessions requires both affected specialists",
+      "RISK repository process: TypeScript tooling directives cannot use comment-only exemption",
+      "RISK repository process: CSS comment removal cannot join selector tokens under owner-only review",
+      "RISK repository process: risk-based receipts require the derived exact-final reviewer roles",
+      "RISK repository process: caller-declared specialist domains can only raise the derived plan",
+      "RISK repository process: caller-declared specialist domains raise and bind the exact review plan",
+      "RISK repository process: caller-declared specialist domains reject unknown values",
+      "RISK repository process: risk-based statuses bind required roles and keep legacy receipts valid"
+    ],
+    "preservedCoverage": [
+      "Existing schemaVersion 1 exact-SHA receipts still require distinct memory-auditor and code-review identities and keep their immutable evidence bindings.",
+      "Existing pre-push checks, stale or malformed receipt rejection, future timestamp rejection, and latest-status deployment checks remain protected.",
+      "The new policy remains fail closed when a code or specialist reviewer is missing, misidentified, mismatched to the exact SHA, or inconsistent with the diff-derived plan.",
+      "SchemaVersion 1 retains its required audit and independent review while publishing a receipt-bound specialist compatibility status required by current deployment checks."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='RISK repository process: a generic role guard|RISK repository process: generic state persistence|RISK repository process: persisting generic sessions|RISK repository process: TypeScript no-check|RISK repository process: CSS comment removal|RISK repository process: caller-declared specialist domains|RISK repository process: status publication needs|RISK repository process: main deployment requires' tests.js",
+      "followUpCommand": "node --test --test-reporter=spec --test-name-pattern='RISK repository process: TypeScript tooling directives cannot use comment-only exemption' tests.js",
+      "persistenceMutationCommand": "node --test --test-reporter=spec --test-name-pattern='RISK repository process: generic state persistence requires a memory specialist' tests.js",
+      "persistenceObjectRemovalCommand": "node --test --test-reporter=spec --test-name-pattern='RISK repository process: generic state persistence requires a memory specialist' tests.js",
+      "failure": "Before the first implementation, the exact ten-pattern repair-red command above exited 1 with all 10 selected tests failing. The role-check-to-true fixture derived no security specialist; generic `saveState` derived no memory/cloud specialist; `saveSession` derived only shared-session-state and omitted memory/cloud review. Adding `// @ts-nocheck` and changing CSS `a b` to `a/**/b` both incorrectly produced owner-only review. A caller escalation was ignored and rejected as an unnecessary specialist, an unknown caller domain was accepted, schema-v1 status publication emitted only the two old contexts, and schema-v1 deployment verification accepted statuses with the required specialist-compatibility context removed. For the TypeScript follow-up, the command in `followUpCommand` exited 1 before implementation: adding `// @ts-check` to a JavaScript source returned `owner-self-review` instead of `independent-review`, while the existing `@ts-nocheck` assertion passed. For the first persistence-mutation repair, `persistenceMutationCommand` exited 1 before implementation: the generic `adapter.write({...state,tasks:state.tasks})` to `adapter.write({...state,tasks:[]})` change derived no specialist (`[]`, expected `['memory-cloud-sync']`), while the existing generic saveState case passed. For this final operation-family repair, `persistenceObjectRemovalCommand` exited 1 before implementation: task-array removal through both `adapter.remove({...state,tasks:...})` and `adapter.clear({...state,tasks:...})` derived no specialist (`{remove: [], clear: []}`, expected `memory-cloud-sync` for both)."
+    },
+    "testChangesSha256": "218810b764b0e9a4decf9c6f18ed6269d63aab505aa321c99965f12c7df23352"
+  },
+  {
     "reason": "The user explicitly rejected synchronized reflection sway and reported a regression at the horizon. Local distortion replaces only that obsolete motion expectation; the three-pixel contact fade was a demonstrated source of the visible horizon rule. The old ceiling-buffer assertion was explicitly replaced because its partial-alpha terminal row contributes a seam at fractional pixel density; only whole opaque source rows are now sampled.",
     "previousBehavior": "The entire reflected scene used one affine shear, and opacity fell linearly within three pixels of the waterline.",
     "intendedBehavior": "Reflected patches distort independently with continuous pixel sampling. Horizon contact starts with a flat opacity slope and fades gradually without a straight rule.",
