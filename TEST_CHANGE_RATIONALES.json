@@ -1020,7 +1020,7 @@
     ]
   },
   {
-    "testChangesSha256": "d91ae310324197bc5f817275dab8d7caac614e87faf629b288bcf47f2f1bf093",
+    "testChangesSha256": "135d0e8f07ea86f5a71c1bb562dc473261343592114b547cb462c76f35103987",
     "reason": "The user reported an evergreen task still displayed an 18-hour rest countdown after Undo and could not be returned as a candidate after Done. Nine behavioral risk tests cover the persisted completion, editor control, causal reconciliation, prior sessions, edited fields, durable backends, cloud acknowledgement, and legacy saved data. Help now describes the requested early-return behavior; the pre-existing disabled-control fixture is explicitly an ordinary task with an orphaned done mark. Independent exact-commit reviews found a causal replay gap when an editor gesture changes Evergreen; the added contract exercises both flag directions, merge directions, stale browser and IndexedDB winners, and cloud acknowledgement.",
     "previousBehavior": "Evergreen Done leaves done=false, so replacement failed to record reopening intent and preservation merges restored lastDoneAt. Return as candidate only accepted skip marks and excluded a real evergreen rest period.",
     "intendedBehavior": "Undo reverses only the latest completion and keeps the chain and cooldown consistent through persistence, reload, and cloud reconciliation. Return as candidate ends an active evergreen rest period without erasing History or changing ratings, including a gesture that edits the interval or Evergreen setting. Undo restores the prior fields and rest.",
@@ -1039,7 +1039,8 @@
       "Ordinary done tasks and orphaned done marks remain unavailable for Return as candidate; No, Cannot, Worked on it, Dislodged, and disabled-control placement remain protected.",
       "Real newer completions still count after a return; prior evergreen sessions remain intact, Undo removes the reversed session, and early return retains History without a rank signal.",
       "Both merge directions and a cloud acknowledgement are checked; local browser storage, IndexedDB, host storage, reload, legacy cooldown data, and deletion Undo retain the intended task state.",
-      "Changing Evergreen in the same completion or return gesture cannot bypass cancellation intent; open ordinary copies share the same causal timestamp proof while completed ordinary runs still use the existing done-state reconciliation."
+      "Changing Evergreen in the same completion or return gesture cannot bypass cancellation intent; open ordinary copies share the same causal timestamp proof while completed ordinary runs still use the existing done-state reconciliation.",
+      "The browser saved-winner fixture explicitly replaces both the protected LOCAL_HEAD_KEY and shared STORE_KEY with stale completion bytes and proves the protected head is stale before persistence; IndexedDB also receives an actual stale winning head."
     ],
     "redEvidence": {
       "command": "node --test --test-reporter=spec --test-name-pattern='RISK evergreen|Help:.*FAQ' tests.js",

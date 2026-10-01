@@ -18859,7 +18859,12 @@ test('RISK evergreen flag changes: completion cancellation survives both merge d
     if(backend==='indexedDB'){
       const store=readConst(ctx,'deviceStore'),head=await store.readHead();
       assert.equal((await store.commitHead({expectedHash:head.hash,payload:JSON.stringify(completed),account:completed.syncAccount})).ok,true,'another durable writer installs the stale winning head');
-    }else shim.localStorage.setItem(STORE_KEY,JSON.stringify(completed));
+    }else{
+      const stale=JSON.stringify(completed),protectedKey=readConst(ctx,'LOCAL_HEAD_KEY');
+      shim.localStorage.setItem(STORE_KEY,stale);shim.localStorage.setItem(protectedKey,stale);
+      assert.ok(JSON.parse(shim.localStorage.getItem(protectedKey)).tasks.find(x=>x.id===t.id).lastDoneAt,
+        'another browser writer installs the stale protected winning head as well as its shared copy');
+    }
     await ctx.persist();
     assert.equal(ctx.state.tasks.find(x=>x.id===t.id).lastDoneAt,null,'a stale saved winner cannot reinstate the cooldown');
     h.writeBehindBack(completed);await ctx.cloudPull();ctx.cloudPushNow();await syncSettle(40);
