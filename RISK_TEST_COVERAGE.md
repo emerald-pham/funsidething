@@ -346,6 +346,7 @@ The editor hook blocks app or enforcement edits while tests.js has no staged or 
 - RISK skyline materials: short buildings favor brick while tall towers favor stable modern colors
 - RISK skyline lights: only exposed windows can be selected so both on and off are visible
 - RISK skyline lights: garden roofs start independently, stay stable, and change slowly at night
+- RISK skyline lights: each garden has a one-in-six state through independent resamples
 - RISK night shows: festival and standalone sparks enter the shared mirror before foreground hills
 - RISK Landscape browser: both night shows reflect actual sparks and exposed windows visibly switch on and off
 - RISK fireworks realism: uneven blooms leave ballistic trails and fading embers

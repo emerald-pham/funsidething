@@ -135,17 +135,18 @@
     const index=visible?visible[slot]:slot;
     state.windows[index]=!state.windows[index];return true;
   }
-  const GARDEN_LIGHT_INTERVAL=120;
+  const GARDEN_LIGHT_INTERVAL=120,GARDEN_LIGHT_CHANCE=1/6;
+  const sampleGardenLight=random=>clamp(Number(random())||0,0,.999999)<GARDEN_LIGHT_CHANCE;
   function createGardenLights(roofIndices=[],random=Math.random){
     const state={elapsed:0,next:GARDEN_LIGHT_INTERVAL,roofs:[],lit:{}};
     return syncGardenLights(state,roofIndices,random);
   }
   function syncGardenLights(state,roofIndices=[],random=Math.random){
     if(!state||typeof state!=='object')return state;
-    const lit={},roofs=[];
+    const lit={...(state.lit||{})},roofs=[];
     for(const index of new Set(roofIndices.filter(Number.isInteger))){
       roofs.push(index);
-      lit[index]=Object.hasOwn(state.lit||{},index)?state.lit[index]:clamp(Number(random())||0,0,.999999)>.5;
+      if(!Object.hasOwn(lit,index))lit[index]=sampleGardenLight(random);
     }
     state.roofs=roofs;state.lit=lit;return state;
   }
@@ -155,8 +156,8 @@
     if(state.elapsed<state.next)return false;
     state.next=state.elapsed+GARDEN_LIGHT_INTERVAL;
     if(!night||!state.roofs.length)return false;
-    const slot=Math.floor(clamp(Number(random())||0,0,.999999)*state.roofs.length),index=state.roofs[slot];
-    state.lit[index]=!state.lit[index];return true;
+    const slot=Math.floor(clamp(Number(random())||0,0,.999999)*state.roofs.length),index=state.roofs[slot],wasLit=state.lit[index];
+    state.lit[index]=sampleGardenLight(random);return state.lit[index]!==wasLit;
   }
   function activity(sky){return sky.sun.altitude < -6?.24:sky.sun.azimuth<180?1:.65;}
   const MAX_EVENTS=14,RARE_COOLDOWN=420;
