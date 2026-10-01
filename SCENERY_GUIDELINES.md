@@ -8,7 +8,7 @@ This file records visual constraints from recent skyline work. A former attempt 
 - Do not add separate tiny foreground trees around the metropolis. They were explicitly removed. This does not remove or change the established trees on the rolling hills or in the woodland.
 - Do not fill the former housing gap by raising individual structures or extending the skyline. The horizon and existing skyline composition remain as they are.
 - Rooftop gardens and patios may appear only on eligible shorter towers. Exclude the tallest tier and every lightning-rod tower from both types. Read the tower's shared deterministic `hasLightningRod` value for both selection and painting.
-- Garden lamps start with independent random on/off choices, so all-on and all-off skylines remain possible. Keep each roof's choice stable between paints and toggle just one garden every two minutes of visible nighttime. Patio fairy strings keep their existing behavior.
+- Garden lamps start with independent random on/off choices, so all-on and all-off skylines remain possible. Keep each roof's choice stable between paints and toggle just one garden at nighttime opportunities spaced two minutes apart on the visible scene clock. Patio fairy strings keep their existing behavior.
 
 ## Rooftop patios and motion
 
