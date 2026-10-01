@@ -11104,31 +11104,153 @@ test('RISK landscape city: clock tower meets the waterline on tablet, phone, and
  }
 });
 
-test('RISK landscape metropolis: seeded low-rise city, gardens, and microtrees stay behind the skyline',()=>{
+test('RISK landscape metropolis: no added background housing or foreground metropolis microtrees',()=>{
  const context=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),context);
  const seed=value=>{const v=Math.sin(value*127.1+311.7)*43758.5453;return v-Math.floor(v);};
- for(const [width,height] of [[320,568],[390,844],[568,320],[768,1024],[1280,720],[1440,900]]){
-  const scene=context.LandscapeGeometry.create(width,height),plan=scene.cityscape(seed),again=scene.cityscape(seed);
-  assert.deepEqual(plan,again,`${width}x${height}: city details are stable across repaints`);
-  assert.equal(plan.groundY,scene.horizon+12,'every city layer meets the same distant-bank baseline');
-  assert.ok(plan.backfill.length>=Math.ceil(width/8),`${width}x${height}: small buildings fill the skyline gaps`);
-  const coverage=plan.backfill.reduce((sum,building)=>sum+building.width,0)/width;
-  assert.ok(coverage>.80&&coverage<=1,`${width}x${height}: low-rise roofs form a dense field, got ${coverage}`);
-  assert.ok(plan.backfill.every(building=>building.x>=0&&building.x+building.width<=width+1&&Math.abs(building.y+building.height-plan.groundY)<1e-6&&building.height<=7),`${width}x${height}: one- and two-story infill stays much shorter than the skyline`);
-  assert.ok(plan.backfill.some(building=>building.height>=(width<600?5.2:6)),`${width}x${height}: some rooflines remain distinct through the shoreline haze`);
-  assert.ok(plan.backfill.every(building=>building.stories===1||building.stories===2)&&plan.backfill.some(building=>building.stories===1)&&plan.backfill.some(building=>building.stories===2),`${width}x${height}: the field contains one- and two-story buildings`);
-  const tallest=Math.max(...plan.towers.map(tower=>tower.height));
-  assert.ok(plan.gardens.length>0,`${width}x${height}: a few shorter towers carry rooftop gardens`);
-  assert.ok(plan.gardens.every(garden=>garden.height<tallest*.78&&garden.height>=(width<600?14:20)),`${width}x${height}: the very tallest towers stay clear of rooftop gardens`);
-  assert.ok(plan.trees.length>=4&&plan.trees.every(tree=>tree.x>=0&&tree.x<=width&&tree.baseY===plan.groundY&&tree.height<=4),`${width}x${height}: foreground trees stay random, grounded, and tiny`);
+ for(const [width,height] of [[320,568],[390,844],[568,320],[1280,720]]){
+  const scene=context.LandscapeGeometry.create(width,height),plan=scene.cityscape(seed);
+  assert.equal(plan.backfill,undefined,`${width}x${height}: rejected low-rise infill is not added behind the skyline`);
+  assert.equal(plan.trees,undefined,`${width}x${height}: the metropolis adds no separate foreground microtrees`);
+  assert.ok(plan.towers.length>0&&plan.towers.every(tower=>Math.abs(tower.y+tower.height-plan.groundY)<.001),`${width}x${height}: established skyline towers keep their original ground line`);
+  assert.equal(plan.groundY,scene.horizon+12,`${width}x${height}: the distant-bank baseline remains unchanged`);
  }
  const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),background=source.slice(source.indexOf('  function paintBackground(){'),source.indexOf('  function paintWoodland('));
- assert.match(background,/geometry\.cityscape\(rand\)/,'the renderer paints the tested responsive city plan');
- assert.ok(background.indexOf('plan.backfill')<background.indexOf('for(let i=0;i<count;i++)'),'low-rise buildings paint behind the existing skyline');
- assert.ok(background.indexOf('plan.trees')>background.indexOf('for(let i=0;i<count;i++)'),'tiny foreground trees paint over the distant city base');
+ assert.match(background,/geometry\.cityscape\(rand\)/,'the renderer keeps using the tested existing skyline plan');
+ assert.doesNotMatch(background,/plan\.backfill|neighborhoodPalette|sapling/,'the rejected added city housing and city-edge microtrees stay removed');
+ assert.doesNotMatch(background,/plan\.trees/,'the skyline renderer does not add foreground metropolis trees');
 });
 
-test('RISK landscape metropolis: gardens skip towers with lightning rods',()=>{
+test('RISK landscape metropolis: patio strings persist while party fixtures stay event-only',()=>{
+ const context=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),context);
+ const seed=value=>{const v=Math.sin(value*127.1+311.7)*43758.5453;return v-Math.floor(v);};
+ const scene=context.LandscapeGeometry.create(1280,720),plan=scene.cityscape(seed),again=scene.cityscape(seed),tallest=Math.max(...plan.towers.map(tower=>tower.height));
+ assert.deepEqual(plan,again,'eligible rooftop details remain deterministic across repaints');
+ assert.ok(Array.isArray(plan.patios)&&plan.patios.length>0,'some eligible garden roofs become patios');
+ assert.ok(plan.gardens.length>0,'other eligible roofs remain planted gardens');
+ assert.ok([...plan.gardens,...plan.patios].every(roof=>roof.height<tallest*.78&&roof.height>=22&&!roof.hasLightningRod),'both rooftop types exclude the tallest tier and every lightning-rod tower');
+ assert.ok(plan.patios.every(patio=>Array.isArray(patio.partyColors)&&patio.partyColors.length>=3&&Number.isFinite(patio.partyPhase)),'patios carry deterministic, restrained colored party lights');
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ assert.match(source,/function paintRooftopPatio\(/,'patio roofs get their own renderer instead of planting being drawn underneath');
+ const patioStart=source.indexOf('function paintRooftopPatio('),beamStart=source.indexOf('function paintRooftopParty()'),shadowStart=source.indexOf('function paintGroundShadow(');
+ const patioPaint=source.slice(patioStart,beamStart),beamPaint=source.slice(beamStart,shadowStart);
+ assert.match(patioPaint,/quadraticCurveTo\(\(left\+right\)\/2,wireY\+sag,right,wireY\)/,'warm fairy lights hang from a gently sagging roof wire');
+ assert.match(patioPaint,/wireY\+2\*sag\*fraction\*\(1-fraction\)/,'each warm bulb sits on the same quadratic curve as its wire');
+ assert.doesNotMatch(patioPaint,/partyColors|partyColor|coloredParty/,'colored party fixtures are temporary and do not run on every patio');
+ assert.match(beamPaint,/function paintRooftopParty\(\)/,'party beams draw dynamically for the one selected roof event');
+ assert.match(beamPaint,/const pose=geometry\.partyBeamPose\(roof,rooftopParty\.active\.age,fixture,reduced\),color=pose\.color/,'the selected roof supplies the party color through its shared pose');
+ assert.match(beamPaint,/createLinearGradient\(pose\.originX,pose\.originY,pose\.tipX,pose\.tipY\)/,'party lights paint a fading spotlight cone from each fixture');
+ assert.match(beamPaint,/moveTo\(pose\.originX,pose\.originY\)[\s\S]*?pose\.tipX\+normalX\*spread[\s\S]*?pose\.tipX-normalX\*spread/,'the spotlight stays narrow at its fixture and widens along the beam');
+ assert.doesNotMatch(beamPaint,/line\(g,pose\.originX,pose\.originY,pose\.tipX/,'spotlights do not read as thin laser center-lines');
+ assert.doesNotMatch(beamPaint,/ellipse\(g,pose\.tipX/,'spotlights have no bright far-tip dot');
+ assert.match(beamPaint,/ellipse\(partyCtx,pose\.originX,pose\.originY/,'the brightest party-light point stays at the rooftop fixture');
+});
+
+test('RISK landscape metropolis: rooftop party beams scan vertically and freeze for reduced motion',()=>{
+ const context=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),context);
+ const seed=value=>{const v=Math.sin(value*127.1+311.7)*43758.5453;return v-Math.floor(v);};
+ const scene=context.LandscapeGeometry.create(1280,720),plan=scene.cityscape(seed);
+ assert.equal(typeof scene.partyBeamPose,'function','the scene geometry gives party beams a deterministic rooftop origin and scan pose');
+ if(typeof scene.partyBeamPose==='function'&&plan.partyRoofs?.length){
+  const roof=plan.partyRoofs[0],stillA=scene.partyBeamPose(roof,0,0,true),stillB=scene.partyBeamPose(roof,9,0,true);
+  assert.deepEqual(stillA,stillB,'reduced motion keeps a static attractive light pose');
+  const peakTime=((Math.PI/2-roof.partyPhase)%(Math.PI*2)+Math.PI*2)%(Math.PI*2)/1.2;
+  const first=scene.partyBeamPose(roof,peakTime,0,false),later=scene.partyBeamPose(roof,peakTime+Math.PI/1.2,0,false);
+  assert.ok(first.originX>=roof.x&&first.originX<=roof.x+roof.bw&&first.originY<roof.y,'each beam starts on its own eligible event rooftop fixture');
+  assert.ok(first.tipY<first.originY&&later.tipY<later.originY&&Math.abs(first.tipY-later.tipY)>3,'the colored beam visibly scans its elevation up and down');
+  assert.ok(Math.abs(first.tipX-later.tipX)>3&&Math.abs(first.length-later.length)<1e-9,'the beam pivots around its fixture instead of growing and shrinking');
+  assert.ok(Math.abs(first.elevation-later.elevation)>.9,'the pivot angle moves through a readable arc');
+  assert.ok(first.spread>=3&&first.spread<=5.2,'spotlight cones open visibly while staying compact around each tower');
+  assert.ok(roof.partyColors.includes(first.color),'the moving beam keeps its selected rooftop color');
+ }
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),start=source.indexOf('  function paintLife(t){'),end=source.indexOf('  function paintWeatherOn(',start),life=source.slice(start,end);
+ assert.ok(life.indexOf('paintRooftopParty()')>=0&&life.indexOf('paintRooftopParty()')<life.indexOf('const reflectionHeight='),'dynamic beams join the existing reflection source instead of repainting the cached skyline');
+ assert.match(source,/geometry\.partyBeamPose\(roof,rooftopParty\.active\.age,fixture,reduced\)/,'the renderer shares event time and reduced-motion state with geometry');
+ assert.match(source,/if\(p\.night<=\.12\|\|!rooftopParty\.active\)return/,'sweeping beams remain a night-only, event-owned rooftop effect');
+});
+
+test('RISK landscape metropolis: rare rooftop parties are single, temporary, and reachable on every eligible roof',()=>{
+ const context=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),context);
+ const seed=value=>{const v=Math.sin(value*127.1+311.7)*43758.5453;return v-Math.floor(v);};
+ const scene=context.LandscapeGeometry.create(1280,720),plan=scene.cityscape(seed),tallest=Math.max(...plan.towers.map(tower=>tower.height));
+ const expected=plan.towers.filter(tower=>tower.height>=22&&tower.height<tallest*.78&&!tower.hasLightningRod).map(tower=>tower.index);
+ assert.deepEqual(plan.partyRoofs?.map(roof=>roof.index),expected,'every structurally eligible short, non-rod roof can host a party regardless of patio/garden assignment');
+ assert.equal(typeof scene.createRooftopPartyScheduler,'function','the city has its own seeded low-frequency party scheduler');
+ assert.equal(typeof scene.advanceRooftopParty,'function','party timing advances by visible scene time');
+ assert.equal(scene.rooftopPartySchedule.interval,30,'one opportunity roll follows each 30 eligible night seconds');
+ assert.equal(scene.rooftopPartySchedule.chance,.02,'each opportunity has a two percent start chance');
+ assert.equal(scene.rooftopPartySchedule.duration,24,'each successful event lasts 24 active seconds');
+ if(typeof scene.createRooftopPartyScheduler==='function'&&typeof scene.advanceRooftopParty==='function'&&plan.partyRoofs?.length){
+  let calls=0;const quiet=scene.createRooftopPartyScheduler(()=>{calls++;return .5;});
+  for(let i=0;i<30;i++)scene.advanceRooftopParty(quiet,1,plan.partyRoofs,true);
+  assert.equal(quiet.active,null,'low-probability rolls leave most intervals without a party');
+  assert.equal(calls,1,'one seeded opportunity roll occurs per interval, not once per frame');
+  const state=scene.createRooftopPartyScheduler(()=>0);
+  scene.advanceRooftopParty(state,29.99,plan.partyRoofs,true);
+  assert.equal(state.active,null,'no party can start before its scheduled opportunity');
+  scene.advanceRooftopParty(state,.02,plan.partyRoofs,true);
+  assert.ok(state.active&&Number.isFinite(state.active.roofIndex),'one event starts on a single eligible roof');
+  assert.equal(state.active.duration,24,'each event uses the documented bounded duration');
+  const running=scene.createRooftopPartyScheduler(()=>0);scene.advanceRooftopParty(running,30,plan.partyRoofs,true);
+  for(let i=0;i<24;i++)scene.advanceRooftopParty(running,1,plan.partyRoofs,true);
+  assert.equal(running.active,null,'party lighting turns off at event expiry rather than accumulating');
+  scene.advanceRooftopParty(running,29.99,plan.partyRoofs,true);
+  assert.equal(running.active,null,'the next opportunity waits for a full 30-second quiet interval after a party');
+  scene.advanceRooftopParty(running,.02,plan.partyRoofs,true);
+  assert.ok(running.active,'a later independent opportunity may start one new party');
+  const frozen=scene.createRooftopPartyScheduler(()=>0);scene.advanceRooftopParty(frozen,30,plan.partyRoofs,true);
+  const age=frozen.active.age,elapsed=frozen.elapsed;
+  scene.advanceRooftopParty(frozen,10,plan.partyRoofs,true);
+  assert.equal(frozen.active.age,age+10,'reduced motion can show a static event while its visible-time duration expires');
+  const hiddenElapsed=frozen.elapsed;
+  scene.advanceRooftopParty(frozen,0,plan.partyRoofs,true);
+  assert.equal(frozen.elapsed,hiddenElapsed,'hidden time does not accrue missed schedule rolls');
+  let daytimeCalls=0;const day=scene.createRooftopPartyScheduler(()=>{daytimeCalls++;return 0;});
+  scene.advanceRooftopParty(day,30,plan.partyRoofs,false);
+  assert.equal(day.active,null,'daytime suppresses new parties');
+  const ending=scene.createRooftopPartyScheduler(()=>0);scene.advanceRooftopParty(ending,30,plan.partyRoofs,true);
+  scene.advanceRooftopParty(ending,1,plan.partyRoofs,false);
+  assert.equal(ending.active,null,'daylight cancels a running party cleanly');
+  const invalid=scene.createRooftopPartyScheduler(()=>0);scene.advanceRooftopParty(invalid,30,plan.partyRoofs,true);
+  scene.advanceRooftopParty(invalid,1,plan.partyRoofs.filter(roof=>roof.index!==invalid.active.roofIndex),true);
+  assert.equal(invalid.active,null,'a resize that removes roof eligibility cancels its active event');
+  const roofCount=plan.partyRoofs.length;
+  for(let roof=0;roof<roofCount;roof++){
+   let draws=0;const selector=(roof+.5)/roofCount,reach=scene.createRooftopPartyScheduler(()=>draws++===0?0:selector);
+   scene.advanceRooftopParty(reach,30,plan.partyRoofs,true);
+   assert.equal(reach.active?.roofIndex,plan.partyRoofs[roof].index,`structurally eligible roof ${roof} has nonzero equal selection chance`);
+  }
+ }
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),background=source.slice(source.indexOf('function paintRooftopPatio('),source.indexOf('function paintGroundShadow('));
+ assert.match(source,/if\(!rooftopParty\)rooftopParty=geometry\.createRooftopPartyScheduler\(Math\.random\)/,'scene startup creates the scheduler from the active geometry instance and resize preserves its state');
+ assert.match(source,/advanceRooftopParty\(rooftopParty,dt,rooftopRoofs,p\.night>\.2\)/,'party schedule advances independently on the existing active scene clock');
+ assert.match(source,/rooftopParty\.active/,'only one selected city event owns the colored fixtures and scanning beams');
+ assert.match(background,/rooftopParty\.active[\s\S]*?rooftopRoofs\.find\(candidate=>candidate\.index===rooftopParty\.active\.roofIndex\)/,'the dynamic painter resolves exactly the active roof from the full eligible pool');
+ assert.doesNotMatch(background,/for\(const patio of rooftopPatios\)for\(let fixture=0;fixture<2;fixture\+\+\)/,'party beams never run simultaneously across every patio');
+ assert.match(source,/else partyTimer=setInterval\(\(\)=>advanceRooftopParty\(1\),1000\)/,'reduced-motion scenes still select and expire a static party on visible time');
+ assert.match(source,/clearInterval\(partyTimer\)/,'hidden tabs pause the reduced-motion party timer without catch-up');
+ assert.match(source,/if\(document\.hidden\|\|!geometry\|\|!p\)return/,'neither normal nor reduced-motion callbacks advance the scheduler while hidden or before scene setup');
+});
+
+test('RISK landscape metropolis: city silhouettes occlude selected-party spotlights',()=>{
+ const context=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),context);
+ const seed=value=>{const v=Math.sin(value*127.1+311.7)*43758.5453;return v-Math.floor(v);};
+ const width=390,scene=context.LandscapeGeometry.create(width,844),plan=scene.cityscape(seed),roof=plan.partyRoofs.find(candidate=>candidate.index===19);
+ assert.ok(roof,'the known eligible short non-rod roof stays reachable by the event selector');
+ const pose=scene.partyBeamPose(roof,0,0,false),clockX=width*.71,clockTop=scene.horizon-72;
+ const clockTower={left:clockX-12,right:clockX+12,top:clockTop,bottom:scene.waterTop};
+ assert.ok(pose.originX>=clockTower.left&&pose.originX<=clockTower.right,'the selected .3-width party fixture sits inside the clock tower body for this reproducible seed');
+ assert.ok(pose.originY>=clockTower.top&&pose.originY<=clockTower.bottom,'the selected party fixture would otherwise shine through the opaque clock tower facade');
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ assert.ok(/partyLayer=document\.createElement\('canvas'\)/.test(source),'dynamic party lights render on an isolated overlay before they join the scene');
+ const partyStart=source.indexOf('  function paintRooftopParty(){'),partyEnd=source.indexOf('  function paintGroundShadow(',partyStart),party=source.slice(partyStart,partyEnd);
+ const subtract=party.indexOf("partyCtx.globalCompositeOperation='destination-out'"),mask=party.indexOf('partyCtx.drawImage(cityLayer',subtract),composite=party.indexOf('g.drawImage(partyLayer',mask);
+ assert.ok(subtract>=0&&mask>subtract&&composite>mask,'the completed city alpha union subtracts foreground towers before the party layer reaches the dynamic reflection source');
+ const background=source.slice(source.indexOf('  function paintBackground(){'),source.indexOf('  function paintWoodland('));
+ assert.match(background,/const cityTarget=b;[\s\S]*?const tx=W\*\.71,ty=hy-72;[\s\S]*?b=cityTarget;b\.drawImage\(cityLayer/,'the clock tower and skyline share the exact city layer used to occlude the party beams');
+ assert.match(background,/b\.fillRect\(tx-9,ty,18,geometry\.waterTop-ty\)/,'the clock tower body is opaque in the silhouette mask beneath a hidden party fixture');
+});
+
+test('RISK landscape metropolis: gardens and patios both skip towers with lightning rods',()=>{
  const context=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),context);
  const seed=value=>{const v=Math.sin(value*127.1+311.7)*43758.5453;return v-Math.floor(v);};
  const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),background=source.slice(source.indexOf('  function paintBackground(){'),source.indexOf('  function paintWoodland('));
@@ -11136,8 +11258,9 @@ test('RISK landscape metropolis: gardens skip towers with lightning rods',()=>{
   const city=context.LandscapeGeometry.create(width,height).cityscape(seed),towers=city.towers;
   assert.ok(towers.every(tower=>typeof tower.hasLightningRod==='boolean'),`${width}x${height}: roof hardware comes from the shared tower plan`);
   assert.ok(city.gardens.every(garden=>garden.hasLightningRod===false),`${width}x${height}: gardens never sit under a lightning rod`);
+  assert.ok(city.patios.every(patio=>patio.hasLightningRod===false),`${width}x${height}: patios never sit under a lightning rod`);
  }
- assert.match(background,/if\(buildings\[i\]\.hasLightningRod\)/,'the renderer uses the same tower hardware flag as garden selection');
+ assert.match(background,/if\(buildings\[i\]\.hasLightningRod\)/,'the renderer uses the same tower hardware flag as rooftop selection');
 });
 
 test('RISK landscape city and aircraft: current changelog names the skyline and plane details',()=>{
@@ -11145,9 +11268,10 @@ test('RISK landscape city and aircraft: current changelog names the skyline and 
  assert.ok(entry,'the current changelog stays available in Settings and offline');
  assert.match(entry,/shaded wings, a cockpit and clearer body detail/i);
  assert.match(entry,/biplanes use a single landing-gear set/i);
- assert.match(entry,/dense one- and two-story buildings behind the towers/i);
- assert.match(entry,/lit roof gardens on selected shorter skyscrapers without lightning rods/i);
- assert.match(entry,/tiny trees along the city's near edge/i);
+ assert.match(entry,/no new low-rise backdrop or metropolis-edge trees/i);
+ assert.match(entry,/rooftop patios with warm fairy lights/i);
+ assert.match(entry,/rarely, one eligible shorter roof at a time hosts a brief party with colored spotlights that sweep slowly at night/i);
+ assert.match(entry,/the tallest towers and all lightning-rod towers stay clear/i);
 });
 
 test('Landscape waterfront: vessels fit the water, and trees and landmarks share safe anchors',()=>{
@@ -12318,11 +12442,14 @@ test('RISK Animation audit: water and visitors keep a thirty-fps paint cap while
  const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
  const tick=source.slice(source.indexOf('  function tick(now){'),source.indexOf('  function stop(){'));
  for(const hz of [60,90,120,144]){
-  const paints=[],ctx=vm.createContext({reduced:false,document:{hidden:false},frame:0,last:0,nextPaint:0,world:{elapsed:0},woodland:{},sky:{},cityLights:{},p:{night:0},Math,requestAnimationFrame(){return 1;},S:{advance(w,dt){w.elapsed+=dt;},advanceWoodland(){},advanceLights(){return false;}},paintLife(){paints.push(ctx.now);}});
+  const paints=[];let scheduledSeconds=0,scheduledCalls=0;
+  const ctx=vm.createContext({reduced:false,document:{hidden:false},frame:0,last:0,nextPaint:0,world:{elapsed:0},woodland:{},sky:{},cityLights:{},p:{night:0},rooftopParty:{active:null},rooftopRoofs:[],geometry:{advanceRooftopParty(state,dt){scheduledSeconds+=dt;scheduledCalls++;}},Math,requestAnimationFrame(){return 1;},S:{advance(w,dt){w.elapsed+=dt;},advanceWoodland(){},advanceLights(){return false;}},paintLife(){paints.push(ctx.now);}});
   vm.runInContext(tick,ctx);
   for(let i=1;i<=hz*2;i++){ctx.now=i*1000/hz;vm.runInContext('tick(now)',ctx);}
   assert.ok(paints.length>=59&&paints.length<=61,`${hz}Hz produced ${paints.length} paints in two seconds; the reflection should paint at about 30fps`);
   assert.ok(ctx.world.elapsed>1.9&&ctx.world.elapsed<=2,'motion keeps real elapsed time');
+  assert.equal(scheduledCalls,paints.length,`${hz}Hz advances the rooftop scheduler exactly once for each logical paint tick`);
+  assert.ok(Math.abs(scheduledSeconds-ctx.world.elapsed)<.001,`${hz}Hz gives the rooftop scheduler the same capped visible-time delta as other scene events`);
  }
 });
 

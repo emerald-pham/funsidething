@@ -49,19 +49,62 @@
         return {index,x,y:groundY-height,width,height,bw:width,bh:height,hasLightningRod:random(index+33)>.68};
       });
       const tallest=Math.max(...towers.map(tower=>tower.height));
-      const gardens=towers.filter(tower=>tower.height>=(W<600?14:22)&&tower.height<tallest*.78&&!tower.hasLightningRod&&random(tower.index+702)>.55)
-        .map(tower=>({...tower,lights:1+Math.floor(random(tower.index+951)*2)}));
-      const backfillCount=Math.ceil(W/7),cell=W/backfillCount;
-      const backfill=Array.from({length:backfillCount},(_,index)=>{
-        const width=cell*(.82+random(index+981)*.16),height=(3+random(index+721)*4)*(W<600?.8:1),x=index*cell;
-        return {index,x,y:groundY-height,width,height,stories:height>=(W<600?4.2:5.2)?2:1,seed:random(index+1111)};
-      });
-      const treeCount=Math.max(4,Math.round(W/82)),treeCell=W/treeCount;
-      const trees=Array.from({length:treeCount},(_,index)=>({
-        index,x:clamp((index+.5)*treeCell+(random(index+1301)-.5)*treeCell*.5,0,W),
-        baseY:groundY,height:1.8+random(index+1471)*1.7,seed:random(index+1559),
-      }));
-      return {groundY,backfill,towers,gardens,trees};
+      const partyPalettes=[['#ff65aa','#5de0eb','#ffd16b'],['#bd8bff','#65e5a8','#ff9b69'],['#59c7ff','#ff78d1','#f4d76c']];
+      const partyRoofs=towers.filter(tower=>tower.height>=(W<600?14:22)&&tower.height<tallest*.78&&!tower.hasLightningRod)
+        .map(tower=>({...tower,partyPhase:random(tower.index+1411)*Math.PI*2,partyColors:partyPalettes[Math.floor(random(tower.index+1531)*partyPalettes.length)]}));
+      const eligible=partyRoofs.filter(tower=>random(tower.index+702)>.55);
+      const gardens=[],patios=[];
+      for(const tower of eligible){
+        const details={...tower,lights:1+Math.floor(random(tower.index+951)*2)};
+        if(random(tower.index+1307)>.5)patios.push(details);
+        else gardens.push(details);
+      }
+      return {groundY,towers,gardens,patios,partyRoofs};
+    }
+    const rooftopPartySchedule=Object.freeze({interval:30,chance:.02,duration:24});
+    function createRooftopPartyScheduler(random=Math.random){
+      return {random,elapsed:0,untilOpportunity:rooftopPartySchedule.interval,active:null};
+    }
+    function advanceRooftopParty(state,dt,roofs=[],night=false){
+      if(!state||!Number.isFinite(dt)||dt<=0)return state?.active||null;
+      const step=dt;
+      state.elapsed+=step;
+      if(!night){
+        state.active=null;
+        state.untilOpportunity=rooftopPartySchedule.interval;
+        return null;
+      }
+      if(state.active){
+        if(!roofs.some(roof=>roof.index===state.active.roofIndex)){
+          state.active=null;
+          state.untilOpportunity=rooftopPartySchedule.interval;
+          return null;
+        }
+        state.active.age+=step;
+        if(state.active.age>=state.active.duration){
+          state.active=null;
+          state.untilOpportunity=rooftopPartySchedule.interval;
+        }
+        return state.active;
+      }
+      if(!roofs.length)return null;
+      state.untilOpportunity-=step;
+      if(state.untilOpportunity>0)return null;
+      // Reset after one roll; long frames never replay the missed opportunities.
+      state.untilOpportunity=rooftopPartySchedule.interval;
+      if(state.random()>=rooftopPartySchedule.chance)return null;
+      const slot=Math.floor(Math.min(.999999,clamp(state.random()))*roofs.length),roof=roofs[slot];
+      state.active={roofIndex:roof.index,age:0,duration:rooftopPartySchedule.duration};
+      return state.active;
+    }
+    function partyBeamPose(patio,time=0,fixture=0,frozen=false){
+      const phase=Number(patio.partyPhase)||0,slot=fixture===0?.3:.7;
+      const originX=patio.x+patio.bw*slot,originY=patio.y-2.2;
+      const clock=frozen?0:Number(time)||0,scan=clock*1.2+phase+fixture*.43;
+      const elevation=-1.1+.6*Math.sin(scan),length=Math.max(8,Math.min(15,patio.bh*.24));
+      const direction=fixture===0?-1:1;
+      const spread=Math.max(3,Math.min(5.2,length*.32));
+      return {originX,originY,tipX:originX+direction*Math.cos(elevation)*length,tipY:originY+Math.sin(elevation)*length,length,elevation,spread,color:patio.partyColors?.[fixture%patio.partyColors.length]||'#ff65aa'};
     }
     function railCars(x,count,spacing=26,reverse=false){
       const cars=[{x,y:lowerRail(x),angle:tangent(lowerRail,x)}],direction=reverse?1:-1;
@@ -347,7 +390,7 @@
       const field=packet*.68+detail*.32;
       return {dx:envelope*(.33*field+.1*Math.sin(x*.071+depth*.24-phase*.63)),dy:envelope*1.25*field};
     };
-    return {routeProgress,motionProgress,motionAge,verticalOffset,visitPose,woodlandPose,duckPose,waterDepth,cycleLeg,deerLeg,nestVisit,eventDepth,dogPose,skater,festival,fireworks,flock,dolphin,starReflection,reflectionSurface,reflectionMotion,castShadow,grassBand,sunReflection,depthBand,groundAnchor,groundTravelX,groundPose,strideArm,strideFoot,wingFold,balloonDrift,vessel,foregroundTree,nest,ripple,skyPoint,horizon,waterTop,far,middle,near,rail,trail,lowerRail,railCars,tangent,rider,pack,cityscape};
+    return {routeProgress,motionProgress,motionAge,verticalOffset,visitPose,woodlandPose,duckPose,waterDepth,cycleLeg,deerLeg,nestVisit,eventDepth,dogPose,skater,festival,fireworks,flock,dolphin,starReflection,reflectionSurface,reflectionMotion,castShadow,grassBand,sunReflection,depthBand,groundAnchor,groundTravelX,groundPose,strideArm,strideFoot,wingFold,balloonDrift,vessel,foregroundTree,nest,ripple,skyPoint,horizon,waterTop,far,middle,near,rail,trail,lowerRail,railCars,tangent,rider,pack,cityscape,partyBeamPose,rooftopPartySchedule,createRooftopPartyScheduler,advanceRooftopParty};
   }
   root.LandscapeGeometry={create};
 })(globalThis);
