@@ -4168,7 +4168,7 @@ test("UI: Quick start keeps task-state explanations in a collapsed More FAQs sec
   assert.match(answers.get("What does Worked on it mean?"), /History.*Settings.*16 hours.*2 AM.*no per-task hour field.*distinct from/);
   assert.match(answers.get("What does Dislodge do?"), /current scan.*negative rank signal.*next fresh scan.*every eligible card/);
   assert.match(answers.get("What do the countdown tags mean?"), /hours.*eligible candidate again.*minutes.*next pass/);
-  assert.match(answers.get("Can I return a task early?"), /All Tasks.*Return as candidate.*No.*Can.t.*Worked on it.*Dislodged.*disabled.*evergreen completion/);
+  assert.match(answers.get("Can I return a task early?"), /All Tasks.*Return as candidate.*No.*Can.t.*Worked on it.*Dislodged.*evergreen.*rest period/);
   assert.match(answers.get("What happens around 2 AM?"), /2 AM.*No.*Can.t.*Worked on it.*Dislodged.*Evergreen Done.*day reset/);
   assert.match(faq, /<h3>What the machinery does<\/h3>/, "advanced rank details belong in the disclosure too");
 });
@@ -5595,7 +5595,7 @@ test("UI: 'Return as candidate' stays visible but disabled when the task has no 
   assert.match(html, new RegExp(`<button[^>]*data-act="return-candidate" data-id="${t.id}"[^>]* disabled[^>]*>Return as candidate</button>`));
 });
 
-test("UI: 'Return as candidate' stays visible but disabled for a 'done' mark (evergreen rest, not a skip)", async () => {
+test("UI: 'Return as candidate' stays disabled for an ordinary task with an orphaned done mark", async () => {
   const { ctx, shim } = await loadApp({ seed: 322 });
   const t = ctx.addTask("Water the plants", false);
   ctx.state.considered[t.id] = "done";
@@ -18665,4 +18665,210 @@ test('RISK PWA SYNC RESUME: a timed-out reconnect cannot poison later online or 
   assert.equal(h.network.filter(row=>row==='disable').length,2,'one new reset replaces the expired attempt');
   finishOld();await syncSettle(5);assert.equal(h.CS.status,'ok','late completion of the expired reset cannot change sync status');
  }
+});
+
+/* Evergreen completions keep done=false. Their Undo must revoke the completion
+   evidence too, or persistence puts lastDoneAt back onto the restored chain. */
+test('RISK evergreen Undo: all Done entry points clear a persisted rest period and countdown', async()=>{
+  for(const action of ['bench-done','cand-done','done-task']){
+    const {ctx,shim}=await loadApp({seed:614});
+    const t=ctx.addTask('Duolingo',action==='bench-done');
+    t.evergreen=true;t.evergreenResetAtDay=false;
+    ctx.addTask('Next task',false);
+    if(action==='cand-done'){ctx.addTask('Benchmark',true);ctx.state.candidateId=t.id;}
+    if(action==='done-task'){ctx.openEdit(t.id);shim.document.getElementById('etTitle').value=t.title;shim.document.getElementById('etEver').checked=true;shim.document.getElementById('etEverReset').checked=false;}
+    await ctx.persist();
+    ctx.onAction(action,{dataset:{id:t.id}});
+    await ctx.persist();
+    assert.ok(ctx.state.tasks.find(x=>x.id===t.id).lastDoneAt,'Done reached the saved board');
+    ctx.onAction('undo',{dataset:{}});
+    await ctx.persist();
+    const undone=ctx.state.tasks.find(x=>x.id===t.id);
+    assert.equal(undone.lastDoneAt,null,action+': Undo clears completion evidence');
+    assert.equal(ctx.isEligible(undone),true,action+': Undo clears the rest period');
+    assert.doesNotMatch(ctx.chipHTML(undone),/ever-countdown/,action+': no contradictory 18h badge');
+    assert.equal(ctx.state.workLog.some(x=>x.taskId===t.id),false,'Undo removes the reversed session');
+    if(action==='bench-done')assert.equal(ctx.benchmark().id,t.id,'the prior chain is restored');
+    const raw=shim.localStorage.getItem(STORE_KEY);
+    const reloaded=await loadApp({seedStorage:{[STORE_KEY]:raw}});
+    assert.equal(reloaded.ctx.state.tasks.find(x=>x.id===t.id).lastDoneAt,null,'reload preserves Undo');
+  }
+});
+
+test('RISK evergreen return: the editor ends rest early durably while keeping History and ratings', async()=>{
+  const {ctx,shim}=await loadApp({seed:615});
+  const t=ctx.addTask('Duolingo',false);t.evergreen=true;t.evergreenResetAtDay=false;
+  ctx.addTask('Benchmark',true);
+  ctx.doneTask(t.id);await ctx.persist();
+  const completed=JSON.parse(JSON.stringify(ctx.state)),rating=[t.mu,t.sigma];
+  ctx.openEdit(t.id);
+  const button=shim.elements.get('modalRoot').innerHTML.match(/<button[^>]*data-act="return-candidate"[^>]*>Return as candidate<\/button>/)[0];
+  assert.doesNotMatch(button,/\bdisabled\b/,'a resting evergreen can return early');
+  shim.document.getElementById('etTitle').value=t.title;
+  shim.document.getElementById('etEver').checked=true;
+  shim.document.getElementById('etEverReset').checked=false;
+  ctx.onAction('return-candidate',{dataset:{id:t.id}});await ctx.persist();
+  const returned=ctx.state.tasks.find(x=>x.id===t.id);
+  assert.equal(returned.lastDoneAt,null,'return clears the rest timer');
+  assert.equal(ctx.pool().some(x=>x.id===t.id),true,'return restores scanner eligibility');
+  assert.doesNotMatch(ctx.chipHTML(returned),/ever-countdown/);
+  assert.deepEqual([returned.mu,returned.sigma],rating,'return is not a rank signal');
+  assert.equal(ctx.state.workLog.length,completed.workLog.length,'actual completed sessions stay in History');
+  const raw=shim.localStorage.getItem(STORE_KEY);
+  const reloaded=await loadApp({seedStorage:{[STORE_KEY]:raw}});
+  assert.equal(reloaded.ctx.state.tasks.find(x=>x.id===t.id).lastDoneAt,null,'return survives reload');
+  ctx.undo();await ctx.persist();
+  const resting=ctx.state.tasks.find(x=>x.id===t.id);
+  assert.equal(resting.lastDoneAt,completed.tasks.find(x=>x.id===t.id).lastDoneAt,'Undo return restores the exact rest period');
+  assert.equal(ctx.isEligible(resting),false);
+  assert.match(ctx.chipHTML(resting),/ever-countdown/);
+});
+
+test('RISK evergreen reconciliation: stale completions cannot reinstate cancelled rest in either merge direction',async()=>{
+  for(const action of ['undo','return']){
+    const {ctx}=await loadApp({seed:616});
+    const t=ctx.addTask('Duolingo',false);t.evergreen=true;t.evergreenResetAtDay=false;
+    ctx.doneTask(t.id);await ctx.persist();
+    const completed=JSON.parse(JSON.stringify(ctx.state));
+    if(action==='undo')ctx.undo();else ctx.returnAsCandidate(t.id);
+    await ctx.persist();
+    const reopened=JSON.parse(JSON.stringify(ctx.state));
+    for(const [winner,other] of [[reopened,completed],[completed,reopened]]){
+      const merged=structuredClone(winner);
+      ctx.mergeUndeletedTasks(merged,structuredClone(other));
+      assert.equal(merged.tasks.find(x=>x.id===t.id).lastDoneAt,null,action+': stale completion must lose to explicit reopen');
+    }
+    ctx.doneTask(t.id);await ctx.persist();
+    const later=JSON.parse(JSON.stringify(ctx.state));
+    for(const [winner,other] of [[reopened,later],[later,reopened]]){
+      const merged=structuredClone(winner);
+      ctx.mergeUndeletedTasks(merged,structuredClone(other));
+      assert.equal(merged.tasks.find(x=>x.id===t.id).lastDoneAt,later.tasks.find(x=>x.id===t.id).lastDoneAt,'a new Done after reopen still counts');
+    }
+  }
+});
+
+test('RISK evergreen Undo: an older session and unrelated edits survive reversing a later Done',async()=>{
+  const {ctx}=await loadApp({seed:617});
+  const t=ctx.addTask('Duolingo',true);t.evergreen=true;t.evergreenResetAtDay=false;
+  const prior=Date.now()-20*3600000;t.lastDoneAt=prior;
+  ctx.state.workLog.push({id:'prior-session',taskId:t.id,title:t.title,kind:'evergreen-done',at:prior});
+  await ctx.persist();ctx.benchDone();await ctx.persist();ctx.undo();await ctx.persist();
+  assert.equal(ctx.state.tasks.find(x=>x.id===t.id).lastDoneAt,prior,'only the latest session is undone');
+  assert.deepEqual(Array.from(ctx.state.workLog,x=>x.id),['prior-session']);
+  ctx.addTask('Unrelated edit',false);ctx.undo();await ctx.persist();
+  assert.equal(ctx.state.tasks.find(x=>x.id===t.id).lastDoneAt,prior,'later unrelated Undo does not cancel or revive a session');
+});
+
+test('RISK evergreen return: saving a shorter interval or disabling evergreen still returns the resting task',async()=>{
+  for(const edit of ['interval','evergreen']){
+    const {ctx,shim}=await loadApp();
+    const t=ctx.addTask('Duolingo');t.evergreen=true;t.evergreenResetAtDay=false;
+    ctx.doneTask(t.id);await ctx.persist();
+    setFakeTime(ctx,t.lastDoneAt+2*3600000);
+    ctx.openEdit(t.id);
+    shim.document.getElementById('etTitle').value='Edited Duolingo';
+    shim.document.getElementById('etEver').checked=edit!=='evergreen';
+    shim.document.getElementById('etEverHours').value=edit==='interval'?'1':'18';
+    shim.document.getElementById('etEverUnit').value='hours';
+    shim.document.getElementById('etEverReset').checked=false;
+    ctx.onAction('return-candidate',{dataset:{id:t.id}});await ctx.persist();
+    assert.equal(ctx.state.tasks.find(x=>x.id===t.id).lastDoneAt,null,'return clears the original hold even when edited eligibility changed');
+    assert.equal(ctx.state.tasks.find(x=>x.id===t.id).title,'Edited Duolingo','the same gesture saves edited fields');
+    ctx.undo();await ctx.persist();
+    assert.equal(ctx.state.tasks.find(x=>x.id===t.id).title,'Duolingo','one Undo restores fields and rest');
+    assert.equal(ctx.isEligible(ctx.state.tasks.find(x=>x.id===t.id)),false);
+  }
+});
+
+test('RISK evergreen Undo: durable IndexedDB and host storage keep the cancelled completion after reload',async()=>{
+  const {indexedDB}=await import('fake-indexeddb');
+  for(const backend of ['indexedDB','host']){
+    const options=backend==='indexedDB'?{indexedDBProvider:indexedDB,deviceDbName:'evergreen-undo-'+Date.now()+'-'+Math.random()}:{hostStorage:{}};
+    const {ctx,shim}=await loadApp(options);
+    const t=ctx.addTask('Duolingo',true);t.evergreen=true;t.evergreenResetAtDay=false;
+    await ctx.persist();ctx.benchDone();await ctx.persist();ctx.undo();await ctx.persist();
+    assert.equal(ctx.state.tasks.find(x=>x.id===t.id).lastDoneAt,null,backend+': Undo clears stored evidence');
+    const reloadOptions=backend==='indexedDB'?options:{hostStorage:Object.fromEntries(shim.window.storage._map)};
+    const reloaded=await loadApp(reloadOptions);
+    assert.equal(reloaded.ctx.state.tasks.find(x=>x.id===t.id).lastDoneAt,null,backend+': reload remains eligible');
+    assert.doesNotMatch(reloaded.ctx.chipHTML(reloaded.ctx.state.tasks.find(x=>x.id===t.id)),/ever-countdown/);
+  }
+});
+
+test('RISK evergreen cloud: Undo and early return publish cleared cooldowns and reject a later stale completion',async()=>{
+  for(const action of ['undo','return']){
+    const h=makeSyncHarness({delayMs:1}),{ctx}=await loadApp({cloudSyncFactory:h.factory});
+    await syncSettle(30);
+    const t=ctx.addTask('Duolingo');t.evergreen=true;t.evergreenResetAtDay=false;
+    await ctx.persist();ctx.cloudPushNow();await syncSettle(30); // bind the account before recording an undoable Done
+    ctx.doneTask(t.id);await ctx.persist();ctx.cloudPushNow();await syncSettle(30);
+    const completed=h.remoteState();
+    assert.ok(completed.tasks.find(x=>x.id===t.id).lastDoneAt,'the original Done was acknowledged');
+    if(action==='undo')ctx.undo();else ctx.returnAsCandidate(t.id);
+    await ctx.persist();ctx.cloudPushNow();await syncSettle(30);
+    assert.equal(h.remoteState().tasks.find(x=>x.id===t.id).lastDoneAt,null,'the cloud acknowledges the cancelled rest');
+    h.writeBehindBack(completed);await ctx.cloudPull();ctx.cloudPushNow();await syncSettle(40);
+    assert.equal(ctx.state.tasks.find(x=>x.id===t.id).lastDoneAt,null,'a stale remote completion cannot revive rest locally');
+    assert.equal(h.remoteState().tasks.find(x=>x.id===t.id).lastDoneAt,null,'reconciliation publishes the retained early-return intent');
+    assert.equal(ctx.state.workLog.length,action==='undo'?0:1,'Undo removes its session; early return retains History');
+  }
+});
+
+test('RISK evergreen legacy: a saved cooldown without a done mark can return early and deletion Undo preserves it',async()=>{
+  const {ctx:seed}=await loadApp();
+  const t=seed.addTask('Legacy evergreen');t.evergreen=true;t.evergreenResetAtDay=false;seed.doneTask(t.id);await seed.persist();
+  const saved=JSON.parse(JSON.stringify(seed.state));delete saved.considered[t.id];
+  const {ctx}=await loadApp({seedStorage:{[STORE_KEY]:JSON.stringify(saved)}});
+  ctx.deleteTask(t.id);await ctx.persist();ctx.undo();await ctx.persist();
+  assert.equal(ctx.state.tasks.find(x=>x.id===t.id).lastDoneAt,t.lastDoneAt,'Undo Delete restores the existing rest, not a new completion');
+  ctx.returnAsCandidate(t.id);await ctx.persist();
+  assert.equal(ctx.state.tasks.find(x=>x.id===t.id).lastDoneAt,null,'eligibility uses the saved timestamp even without a considered mark');
+  assert.equal(ctx.pool().some(x=>x.id===t.id),true);
+});
+
+test('RISK evergreen flag changes: completion cancellation survives both merge directions durable replay and cloud',async()=>{
+  const {indexedDB}=await import('fake-indexeddb');
+  for(const gesture of ['return-disable','done-enable'])for(const backend of ['browser','indexedDB']){
+    const h=makeSyncHarness({delayMs:1});
+    const options=backend==='indexedDB'?{indexedDBProvider:indexedDB,deviceDbName:'evergreen-flags-'+Date.now()+'-'+Math.random()}:{};
+    const {ctx,shim}=await loadApp({...options,cloudSyncFactory:h.factory});await syncSettle(30);
+    const t=ctx.addTask('Duolingo');t.evergreen=gesture==='return-disable';t.evergreenResetAtDay=false;
+    await ctx.persist();ctx.cloudPushNow();await syncSettle(30);
+    if(gesture==='return-disable')ctx.doneTask(t.id);
+    else{
+      ctx.openEdit(t.id);shim.document.getElementById('etTitle').value=t.title;
+      shim.document.getElementById('etEver').checked=true;shim.document.getElementById('etEverReset').checked=false;
+      ctx.onAction('done-task',{dataset:{id:t.id}});
+    }
+    await ctx.persist();ctx.cloudPushNow();await syncSettle(30);
+    const completed=JSON.parse(JSON.stringify(ctx.state));
+    if(gesture==='return-disable'){
+      ctx.openEdit(t.id);shim.document.getElementById('etTitle').value=t.title;
+      shim.document.getElementById('etEver').checked=false;
+      ctx.onAction('return-candidate',{dataset:{id:t.id}});
+    }else ctx.undo();
+    await ctx.persist();
+    const reopened=JSON.parse(JSON.stringify(ctx.state));
+    assert.equal(reopened.tasks.find(x=>x.id===t.id).evergreen,false,'the atomic gesture leaves an ordinary open task');
+    assert.equal(reopened.tasks.find(x=>x.id===t.id).lastDoneAt,null,'completion cancellation clears its timestamp locally');
+    for(const [winner,other] of [[completed,reopened],[reopened,completed]]){
+      const merged=structuredClone(winner);ctx.mergeUndeletedTasks(merged,structuredClone(other));
+      assert.equal(merged.tasks.find(x=>x.id===t.id).lastDoneAt,null,gesture+': changing Evergreen cannot bypass reopening intent');
+    }
+    if(backend==='indexedDB'){
+      const store=readConst(ctx,'deviceStore'),head=await store.readHead();
+      assert.equal((await store.commitHead({expectedHash:head.hash,payload:JSON.stringify(completed),account:completed.syncAccount})).ok,true,'another durable writer installs the stale winning head');
+    }else{
+      const stale=JSON.stringify(completed),protectedKey=readConst(ctx,'LOCAL_HEAD_KEY');
+      shim.localStorage.setItem(STORE_KEY,stale);shim.localStorage.setItem(protectedKey,stale);
+      assert.ok(JSON.parse(shim.localStorage.getItem(protectedKey)).tasks.find(x=>x.id===t.id).lastDoneAt,
+        'another browser writer installs the stale protected winning head as well as its shared copy');
+    }
+    await ctx.persist();
+    assert.equal(ctx.state.tasks.find(x=>x.id===t.id).lastDoneAt,null,'a stale saved winner cannot reinstate the cooldown');
+    h.writeBehindBack(completed);await ctx.cloudPull();ctx.cloudPushNow();await syncSettle(40);
+    assert.equal(ctx.state.tasks.find(x=>x.id===t.id).lastDoneAt,null,'cloud adoption respects cancellation across a flag change');
+    assert.equal(h.remoteState().tasks.find(x=>x.id===t.id).lastDoneAt,null,'the cloud acknowledges the retained cancellation');
+  }
 });

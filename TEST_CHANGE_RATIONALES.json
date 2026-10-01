@@ -1018,5 +1018,33 @@
       "Weather browser: separate devices agree despite different local scene settings",
       "RISK browser layout matrix: native dates respect pane insets, rank evidence stays aligned, and enabled Undo remains pinned"
     ]
+  },
+  {
+    "testChangesSha256": "135d0e8f07ea86f5a71c1bb562dc473261343592114b547cb462c76f35103987",
+    "reason": "The user reported an evergreen task still displayed an 18-hour rest countdown after Undo and could not be returned as a candidate after Done. Nine behavioral risk tests cover the persisted completion, editor control, causal reconciliation, prior sessions, edited fields, durable backends, cloud acknowledgement, and legacy saved data. Help now describes the requested early-return behavior; the pre-existing disabled-control fixture is explicitly an ordinary task with an orphaned done mark. Independent exact-commit reviews found a causal replay gap when an editor gesture changes Evergreen; the added contract exercises both flag directions, merge directions, stale browser and IndexedDB winners, and cloud acknowledgement.",
+    "previousBehavior": "Evergreen Done leaves done=false, so replacement failed to record reopening intent and preservation merges restored lastDoneAt. Return as candidate only accepted skip marks and excluded a real evergreen rest period.",
+    "intendedBehavior": "Undo reverses only the latest completion and keeps the chain and cooldown consistent through persistence, reload, and cloud reconciliation. Return as candidate ends an active evergreen rest period without erasing History or changing ratings, including a gesture that edits the interval or Evergreen setting. Undo restores the prior fields and rest.",
+    "replacementTests": [
+      "RISK evergreen Undo: all Done entry points clear a persisted rest period and countdown",
+      "RISK evergreen return: the editor ends rest early durably while keeping History and ratings",
+      "RISK evergreen reconciliation: stale completions cannot reinstate cancelled rest in either merge direction",
+      "RISK evergreen Undo: an older session and unrelated edits survive reversing a later Done",
+      "RISK evergreen return: saving a shorter interval or disabling evergreen still returns the resting task",
+      "RISK evergreen Undo: durable IndexedDB and host storage keep the cancelled completion after reload",
+      "RISK evergreen cloud: Undo and early return publish cleared cooldowns and reject a later stale completion",
+      "RISK evergreen legacy: a saved cooldown without a done mark can return early and deletion Undo preserves it",
+      "RISK evergreen flag changes: completion cancellation survives both merge directions durable replay and cloud"
+    ],
+    "preservedCoverage": [
+      "Ordinary done tasks and orphaned done marks remain unavailable for Return as candidate; No, Cannot, Worked on it, Dislodged, and disabled-control placement remain protected.",
+      "Real newer completions still count after a return; prior evergreen sessions remain intact, Undo removes the reversed session, and early return retains History without a rank signal.",
+      "Both merge directions and a cloud acknowledgement are checked; local browser storage, IndexedDB, host storage, reload, legacy cooldown data, and deletion Undo retain the intended task state.",
+      "Changing Evergreen in the same completion or return gesture cannot bypass cancellation intent; open ordinary copies share the same causal timestamp proof while completed ordinary runs still use the existing done-state reconciliation.",
+      "The browser saved-winner fixture explicitly replaces both the protected LOCAL_HEAD_KEY and shared STORE_KEY with stale completion bytes and proves the protected head is stale before persistence; IndexedDB also receives an actual stale winning head."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='RISK evergreen|Help:.*FAQ' tests.js",
+      "failure": "The initial run before implementation failed four contracts: bench-done Undo retained lastDoneAt, the evergreen Return button was disabled, stale reconciliation reinstated completion, and Undo replaced the earlier session with the new timestamp. Saved in /Users/emeraldpham/.codex/task-artifacts/undo-evergreen-cooldown-20261001/red.txt. The editor-field regression subsequently failed before its repair (red-edited-return.txt). Corrected and expanded final fixtures were also run against the unchanged origin/main app and all eight contracts failed (red-final-fixtures.txt), including the account-bound cloud case and durable backend reload. Reload fixtures were corrected to use the existing STORE_KEY; cloud setup explicitly binds the test account before an undoable Done. Independent review reproduction was converted to an observed red test in red-flag-changes.txt: Return while disabling Evergreen allowed the stale merge winner to retain lastDoneAt. The repair also covers enabling Evergreen in a Done gesture and reversing it."
+    }
   }
 ]
