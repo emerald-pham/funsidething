@@ -894,5 +894,92 @@
       "followUpCommand": "node --test --test-reporter=spec --test-name-pattern='schema-v2 specialist scope accepts unaffected assessments with preservation evidence|memory cloud and sync review scope scales evidence to impact|risk-based receipts require the derived exact-final reviewer roles' tests.js"
     },
     "testChangesSha256": "ae6c00a36be314d21c451ab0ae8bcba1eeff86e11044f61a7cb1c0e3e1a8ffbd"
+  },
+  {
+    "reason": "The user reported that the metropolis foreground trees were not visible, the background buildings looked like a uniform strip, and a large gap remained against the horizon. These tests replace that acceptance with short, varied one- and two-story houses and continuous ridge-to-shore coverage, and stop treating extra city trees as desirable.",
+    "previousBehavior": "The city plan added a separate 1–4 pixel metropolis-tree layer and one pale row of 3–7 pixel houses on a fixed baseline. At normal scale the trees disappeared and the single row neither varied enough in color and roof shape nor followed the uneven ridge down to the shoreline; the app changelog still advertised those trees.",
+    "intendedBehavior": "Remove only the metropolis microtree layer. Use deterministic small houses with several muted color families and roof silhouettes, and arrange layered short rows so the neighborhood follows the actual backdrop ridge continuously to the waterline without making individual houses taller than one or two stories or the shortest tower. Keep the hill trees, tower baseline, garden and lightning-rod exclusions, skyline reflection, aircraft, and offline behavior intact.",
+    "replacementTests": [
+      "RISK landscape metropolis: varied short houses replace the metropolis microtrees",
+      "RISK landscape metropolis: neighborhood layers bridge the painted ridge to the shoreline"
+    ],
+    "preservedCoverage": [
+      "Existing tower scale, rod-linked rooftop-garden eligibility, skyline reflection, aircraft detail, and reduced-motion behavior remain covered.",
+      "Existing foreground hill and woodland trees remain in the renderer; only the separately added city-edge saplings are removed.",
+      "Responsive city plans remain deterministic and the added ridge-to-shore regression checks desktop, phone, and short-landscape geometry without fixing the exact packing width."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='RISK landscape metropolis: (varied short houses|neighborhood layers bridge)|RISK landscape city and aircraft: current changelog' tests.js",
+      "failure": "Against origin/main 23729e2, all three selected tests failed before implementation for the intended reasons: the plan still owned a separate trees layer; houses had no depth-column metadata to cover the actual painted ridge through to the shoreline; and the visible changelog still advertised tiny metropolis trees instead of varied colors, roof shapes, and ridge-to-water coverage. Full output is retained at /Users/emeraldpham/.codex/task-artifacts/aircraft-metropolis-2026-09-30/reports/red-metropolis-followup-final-tests.txt.",
+      "followUpCommand": "node --test --test-reporter=spec --test-name-pattern='RISK landscape metropolis: (varied short houses|gardens skip towers|neighborhood layers bridge)|RISK landscape city and aircraft: current changelog' tests.js"
+    },
+    "testChangesSha256": "1c6c5c90efd0ca5fa6735003576cfab8f306e3427b38dc6b101252f7d8f04324"
+  },
+  {
+    "reason": "The first layered neighborhood followed the ridge but vertically aligned each house footprint, so several tiny roofs read as colored floors of one block. Keep the ridge-to-shore continuity while making each depth row read as a separate little house.",
+    "previousBehavior": "Every short house in a ridge column shared the same x position. The combined stack looked like one narrow multistory block, especially in the visible desktop and phone tower gaps.",
+    "intendedBehavior": "Stagger short house footprints and roof widths between depth rows, soften the farthest row for distance, and overlap neighboring walls enough to preserve continuous ridge-to-shore and edge-to-edge coverage. Keep one- and two-story heights, muted color variety, waterline contact, and no metropolis foreground trees.",
+    "replacementTests": [
+      "RISK landscape metropolis: varied short houses replace the metropolis microtrees",
+      "RISK landscape metropolis: neighborhood layers bridge the painted ridge to the shoreline"
+    ],
+    "preservedCoverage": [
+      "Each house remains 3–7 desktop pixels tall, below even the shortest skyline tower; garden and lightning-rod exclusions remain separately covered.",
+      "Coverage is derived from the resulting horizontal footprints and actual vertical overlaps so row offsets can change without pinning a fixed column pitch."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='RISK landscape metropolis: (varied short houses|neighborhood layers bridge)' tests.js",
+      "failure": "Before changing geometry, the varied-house risk regression failed at 320x568 because neighboring depth rows had identical x footprints, reproducing the stacked-floor appearance. The red output is retained at /Users/emeraldpham/.codex/task-artifacts/aircraft-metropolis-2026-09-30/reports/red-metropolis-stagger-before-implementation.txt.",
+      "followUpCommand": "node --test --test-reporter=spec --test-name-pattern='RISK landscape metropolis: (varied short houses|gardens skip towers|neighborhood layers bridge)|RISK landscape city and aircraft: current changelog|PWA cache contract: CACHE_NAME|Settings changelog: every app asset' tests.js"
+    },
+    "testChangesSha256": "2d335a52c4d68caab2289d367413cd72ed38681c7fbeeff810e4c2a6b8dd724e"
+  },
+  {
+    "reason": "The user explicitly rejected the added metropolis housing as horrifying in daytime and asked that it be removed. The follow-up adds rooftop patios with warm fairy lights and a restrained angular party-light sweep while preserving the already released skyline and aircraft details.",
+    "previousBehavior": "The prior scenery release included a dense low-rise neighborhood behind the skyline and tiny metropolis-edge trees. Rooftops offered gardens but no patios, string-light wire, colored party bulbs, or moving party beams.",
+    "intendedBehavior": "Remove all added background housing and metropolis-edge microtrees; keep existing skyline, hill and woodland trees, paths, reflections, and aircraft. On some eligible shorter towers, replace gardens with compact patios that have two posts, a gently sagging warm fairy-light string, and restrained colored bulbs. At night, fixed-length colored beams pivot smoothly through a visible elevation arc from each patio fixture, join the existing dynamic scene and reflection path, pause with hidden tabs, and hold a static pose under reduced motion. Both garden and patio selection exclude the tallest tier and every lightning-rod tower.",
+    "replacementTests": [
+      "RISK landscape metropolis: no added background housing or foreground metropolis microtrees",
+      "RISK landscape metropolis: selected rooftop patios keep warm string and party lights",
+      "RISK landscape metropolis: rooftop party beams scan vertically and freeze for reduced motion",
+      "RISK landscape metropolis: gardens and patios both skip towers with lightning rods",
+      "RISK landscape city and aircraft: current changelog names the skyline and plane details"
+    ],
+    "preservedCoverage": [
+      "The existing skyline tower plan, baseline, facade materials, exposed windows, civic clock tower, hill and woodland trees, paths, water, and skyline reflection remain covered and visible.",
+      "The user-requested airplane shading and single biplane landing-gear contracts remain intact.",
+      "Garden and patio selection share each tower's deterministic lightning-rod property and exclude the tallest tier; no new background houses or city-edge trees are drawn.",
+      "Party-light geometry keeps a fixed beam length while its angular elevation changes, and reduced motion returns the same static pose regardless of elapsed time."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='RISK landscape metropolis|RISK landscape city and aircraft: current changelog' tests.js",
+      "failure": "Before the removal/patio implementation, five selected contracts failed for the intended reasons: the city plan still returned rejected backfill; patios were absent; the party-beam geometry and dynamic painter were absent; patio eligibility and shared rod exclusions were incomplete; and the changelog still advertised housing. The exact output is retained at /Users/emeraldpham/.codex/task-artifacts/aircraft-metropolis-2026-09-30/reports/red-metropolis-no-backfill-patio-before-implementation.txt. A focused follow-up for the user-requested angular sweep failed before that implementation because the beam changed length instead of pivoting around its fixture; exact output is retained at /Users/emeraldpham/.codex/task-artifacts/aircraft-metropolis-2026-09-30/reports/red-metropolis-angular-scan-before-implementation.txt. Two bounded paint regressions were then observed red before their corrections: the string/spotlight test first failed because the bulb positions did not follow the quadratic wire and the renderer had an inverted laser-like cone; its output is retained at /Users/emeraldpham/.codex/task-artifacts/aircraft-metropolis-2026-09-30/reports/red-metropolis-spotlight-and-string-alignment-before-implementation.txt. The spread contract then failed because the beam pose exposed no compact, visibly opening cone width; its output is retained at /Users/emeraldpham/.codex/task-artifacts/aircraft-metropolis-2026-09-30/reports/red-metropolis-spotlight-spread-before-implementation.txt.",
+      "followUpCommand": "node --test --test-reporter=spec --test-name-pattern='RISK landscape metropolis: (no added background housing|selected rooftop patios|rooftop party beams|gardens and patios)|RISK landscape city and aircraft: current changelog' tests.js"
+    },
+    "testChangesSha256": "0635c90e2c48e5047de4475a7bfb86cb7b459369a201086365f42e308ef04c98"
+  },
+  {
+    "reason": "The user clarified that rooftop parties must be rare and city-wide single events, with any structurally eligible short non-rod roof able to host one. This changes party lights from persistent patio decorations to temporary, uniformly selected rooftop events. A deterministic phone-size overlap also showed an eligible party fixture shining through the civic clock tower; the skyline must occlude temporary lights.",
+    "previousBehavior": "Every patio carried colored party bulbs and every eligible patio painted two moving spotlights continuously at night. The feature had no event duration, city-wide concurrency limit, or party chance for garden/plain roofs. The dynamic party overlay was composited after the skyline with no occlusion mask, so a selected rooftop behind the clock tower could show through its facade.",
+    "intendedBehavior": "Keep permanent patio fairy strings warm and static. Roll independently of festival/firework cooldowns every 30 visible night seconds with a 2% chance. A selected event lasts 24 visible seconds; after it expires, wait another 30 nighttime seconds before rolling again. Store one active roof only and select uniformly from all short, usable, non-rod roofs below the tallest tier, including gardens and plain roofs. Reduced-motion mode still selects and expires events with a static pose; hidden tabs pause without catch-up; daylight or resize invalidation cancels the event. Draw event effects on a separate transparent layer, subtract the completed opaque city silhouette as a union mask, then join the masked layer to the existing dynamic reflection source.",
+    "replacementTests": [
+      "RISK landscape metropolis: patio strings persist while party fixtures stay event-only",
+      "RISK landscape metropolis: rooftop party beams scan vertically and freeze for reduced motion",
+      "RISK landscape metropolis: rare rooftop parties are single, temporary, and reachable on every eligible roof",
+      "RISK landscape metropolis: city silhouettes occlude selected-party spotlights"
+    ],
+    "preservedCoverage": [
+      "Warm strings remain on permanent patios; colored sources and beams are drawn only for one active roof and remain in the dynamic reflection path.",
+      "The independent schedule is seeded, one event is globally active at most, all eligible roofs have equal selection probability, and every event expires after 24 active seconds followed by a 30-second quiet interval.",
+      "Night eligibility, reduced-motion static painting, hidden-tab pausing, daytime cancellation, resize eligibility, garden and lightning-rod exclusions, and no-backfill/no-microtree scope remain covered.",
+      "At 390×844, deterministic eligible roof 19 overlaps the clock tower; the city alpha union mask removes fixture/cone pixels before the dynamic layer is composited, including overlapping silhouettes."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='RISK landscape metropolis: city silhouettes occlude selected-party spotlights' tests.js",
+      "failure": "Before scheduler implementation, the focused contracts failed because patio-colored bulbs and beams were always on, paint iterated over all patios, and the geometry exposed no structural party-roof pool or rare event scheduler. The preserved output is /Users/emeraldpham/.codex/task-artifacts/aircraft-metropolis-2026-09-30/reports/red-metropolis-rare-single-party-before-implementation.txt. A later integration regression caught incorrect top-level scheduler construction before runtime validation; it failed before initialization was corrected and is saved at /Users/emeraldpham/.codex/task-artifacts/aircraft-metropolis-2026-09-30/reports/red-metropolis-party-scheduler-startup-before-fix.txt. The new deterministic clock-tower overlap regression also failed before the isolated party overlay and city-alpha occlusion mask were implemented; the exact missing-overlay red is retained at /Users/emeraldpham/.codex/task-artifacts/aircraft-metropolis-2026-09-30/reports/red-metropolis-party-clocktower-occlusion-before-implementation.txt.",
+      "followUpCommand": "node --test --test-reporter=spec --test-name-pattern='RISK landscape metropolis: (patio strings persist|rooftop party beams|rare rooftop parties|gardens and patios)|RISK landscape city and aircraft: current changelog' tests.js"
+    },
+    "testChangesSha256": "981f3a0e8de608d9c253fd8dc1820da6c68c68c03cd391e4b20b751f5dce71a9",
+    "followUpCommand": "node --test --test-reporter=spec --test-name-pattern='RISK landscape metropolis: (no added background housing|patio strings persist|rooftop party beams|rare rooftop parties|city silhouettes occlude|gardens and patios)|RISK Animation audit: water and visitors keep a thirty-fps paint cap while time advances|RISK landscape city and aircraft: current changelog|PWA cache contract: CACHE_NAME|Settings changelog: every app asset' tests.js"
   }
 ]

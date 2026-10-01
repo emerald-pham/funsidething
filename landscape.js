@@ -14,7 +14,7 @@
   const back=host.querySelector('[data-scenery]'),front=host.querySelector('[data-life]');
   let b=back.getContext('2d',{alpha:false});const base=b,g=front.getContext('2d');
   const layers={};let geometry;
-  const cityLayer=document.createElement('canvas'),skyCity=document.createElement('canvas'),skyReflection=document.createElement('canvas'),blurredReflection=document.createElement('canvas'),softenedReflection=document.createElement('canvas'),reflectionCanvas=document.createElement('canvas');
+  const cityLayer=document.createElement('canvas'),partyLayer=document.createElement('canvas'),skyCity=document.createElement('canvas'),skyReflection=document.createElement('canvas'),blurredReflection=document.createElement('canvas'),softenedReflection=document.createElement('canvas'),reflectionCanvas=document.createElement('canvas');
   if(!b||!g){host.hidden=true;return;}
   const mq=window.matchMedia('(prefers-reduced-motion: reduce)');
   let storage;try{storage=window.localStorage;}catch{storage=null;}
@@ -56,6 +56,7 @@
     document.addEventListener(type,observeSceneInteraction,{capture:true,passive:true});
   let preference=S.readMotion(storage),reduced=S.motionReduced(preference,mq.matches);
   const cityLights={next:30,windows:[]},woodland=S.createWoodland();
+  let rooftopRoofs=[],rooftopParty=null,partyTimer=0;
   let sceneSeason=S.readSceneSeason(sceneStorage)||LandscapeMood.season(new Date(),globalThis.LivingLocation?.current()).name,treeOrigins=[];
   let W=0,H=0,hy=0,dpr=1,frame=0,last=0,nextPaint=0,sky,p,world=S.createWorld(Math.random,sceneSeason);
   let skyTimer=0,resizeTimer=0,returnFocus=null;
@@ -176,6 +177,56 @@
   function hill(ctx,fn,color){path(ctx,fn);ctx.lineTo(W,H);ctx.lineTo(0,H);ctx.closePath();ctx.fillStyle=color;ctx.fill();}
   function ellipse(ctx,x,y,rx,ry,color){ctx.beginPath();ctx.ellipse(x,y,rx,ry,0,0,TAU);ctx.fillStyle=color;ctx.fill();}
   function line(ctx,x,y,x2,y2,color,width=1){ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x2,y2);ctx.strokeStyle=color;ctx.lineWidth=width;ctx.stroke();}
+  function paintRooftopPatio(ctx,patio){
+    const {x,y,bw}=patio,deckWidth=Math.max(4,bw*.84),deckX=x+(bw-deckWidth)/2,deckY=y-1.8;
+    const postHeight=Math.min(3,Math.max(1.5,bw*.16)),left=deckX+deckWidth*.16,right=deckX+deckWidth*.84,sag=1.15;
+    const wireY=deckY-postHeight,lightAlpha=.28+p.night*.52;
+    ctx.save();ctx.globalAlpha=.8;
+    ctx.fillStyle=S.mixHex(p.hill,p.front,.42);ctx.fillRect(deckX,deckY,deckWidth,1.8);
+    line(ctx,deckX,deckY,deckX+deckWidth,deckY,S.mixHex(p.front,p.sky[2],.36),.55);
+    line(ctx,left,deckY,left,wireY,S.mixHex(p.front,p.sky[2],.28),.55);
+    line(ctx,right,deckY,right,wireY,S.mixHex(p.front,p.sky[2],.28),.55);
+    ctx.beginPath();ctx.moveTo(left,wireY);ctx.quadraticCurveTo((left+right)/2,wireY+sag,right,wireY);
+    ctx.strokeStyle=`rgba(255,222,160,${lightAlpha})`;ctx.lineWidth=.7;ctx.stroke();
+    for(let bulb=0;bulb<5;bulb++){
+      const fraction=bulb/4,bx=left+(right-left)*fraction,wireBulbY=wireY+2*sag*fraction*(1-fraction),bulbY=wireBulbY+.55;
+      line(ctx,bx,wireBulbY,bx,bulbY,`rgba(255,220,143,${lightAlpha})`,.45);
+      ellipse(ctx,bx,bulbY,.58,.58,`rgba(255,220,143,${lightAlpha})`);
+    }
+    ctx.restore();
+  }
+  function paintRooftopParty(){
+    if(p.night<=.12||!rooftopParty.active)return;
+    const roof=rooftopRoofs.find(candidate=>candidate.index===rooftopParty.active.roofIndex);
+    if(!roof)return;
+    const partyCtx=partyLayer.getContext('2d');
+    partyCtx.clearRect(0,0,W,H);
+    for(let fixture=0;fixture<2;fixture++){
+      const pose=geometry.partyBeamPose(roof,rooftopParty.active.age,fixture,reduced),color=pose.color;
+      const [red,green,blue]=color.match(/^#(..)(..)(..)$/).slice(1).map(channel=>parseInt(channel,16));
+      const beam=partyCtx.createLinearGradient(pose.originX,pose.originY,pose.tipX,pose.tipY);
+      beam.addColorStop(0,`rgba(${red},${green},${blue},0)`);
+      beam.addColorStop(.32,`rgba(${red},${green},${blue},.055)`);
+      beam.addColorStop(.72,`rgba(${red},${green},${blue},.22)`);
+      beam.addColorStop(1,`rgba(${red},${green},${blue},.42)`);
+      const normalX=-(pose.tipY-pose.originY)/pose.length,normalY=(pose.tipX-pose.originX)/pose.length;
+      const spread=pose.spread;
+      partyCtx.save();partyCtx.globalAlpha=p.night*(reduced?.78:.72);
+      partyCtx.fillStyle=S.mixHex(p.front,color,.42);partyCtx.fillRect(pose.originX-.45,pose.originY+.2,.9,.65);
+      partyCtx.beginPath();partyCtx.moveTo(pose.originX,pose.originY);
+      partyCtx.lineTo(pose.tipX+normalX*spread,pose.tipY+normalY*spread);
+      partyCtx.lineTo(pose.tipX-normalX*spread,pose.tipY-normalY*spread);
+      partyCtx.closePath();partyCtx.fillStyle=beam;partyCtx.fill();
+      partyCtx.globalAlpha=p.night*.9;ellipse(partyCtx,pose.originX,pose.originY,1.1,1.1,color);
+      partyCtx.globalAlpha=p.night*.82;ellipse(partyCtx,pose.originX,pose.originY,.45,.45,'#fff8d7');partyCtx.restore();
+    }
+    // Use the already-composited skyline's alpha as one union mask. This hides
+    // beams behind overlapping towers and the clock tower without even-odd
+    // path holes or cutting into any other dynamic foreground layer.
+    partyCtx.save();partyCtx.globalCompositeOperation='destination-out';
+    partyCtx.drawImage(cityLayer,0,0,cityLayer.width/dpr,cityLayer.height/dpr);partyCtx.restore();
+    g.drawImage(partyLayer,0,0,W,H);
+  }
   function paintGroundShadow(ctx,x,y,height,width,ground=p.front,strength=1){
     const shade=geometry.castShadow(sky,height,width,x,y);
     ctx.save();ctx.globalAlpha*=shade.alpha*strength;
@@ -287,27 +338,10 @@
     cityLayer.width=Math.floor(W*dpr);cityLayer.height=Math.ceil(geometry.waterTop*dpr);
     b=cityLayer.getContext('2d');b.setTransform(dpr,0,0,dpr,0,0);
     const plan=geometry.cityscape(rand),buildings=plan.towers,count=buildings.length;let windowIndex=0;
-    // A close packed, pale neighborhood sits on the same far bank. Painting it
-    // first lets the taller skyline naturally hide roofs and windows behind it.
-    b.save();b.globalAlpha=.98;
-    for(const low of plan.backfill){
-      const wall=S.mixHex(p.city,p.front,.28+low.seed*.1),shade=S.mixHex(wall,p.front,.42);
-      b.fillStyle=wall;b.fillRect(low.x,low.y,low.width,low.height+1);
-      b.fillStyle=shade;b.fillRect(low.x+low.width*.82,low.y+1,Math.max(.6,low.width*.18),Math.max(.5,low.height));
-      line(b,low.x,low.y,low.x+low.width,low.y,shade,.8);
-      if(low.seed>.66){
-        b.fillStyle=shade;
-        b.fillRect(low.x+low.width*.16,low.y-1,Math.max(.8,low.width*.2),1);
-      }
-      const lit=night>.2&&rand(low.index+2020)>.55;
-      b.fillStyle=lit?`rgba(255,225,162,${night*.82})`:shade;
-      for(let row=0;row<low.stories;row++){
-        const windowY=low.y+low.height*(row+1)/(low.stories+1);
-        b.fillRect(low.x+low.width*.28,windowY,Math.min(1.2,low.width*.18),.7);
-      }
-    }
-    b.restore();
+    rooftopRoofs=plan.partyRoofs;
+    if(rooftopParty.active&&!rooftopRoofs.some(roof=>roof.index===rooftopParty.active.roofIndex))rooftopParty.active=null;
     const gardens=new Map(plan.gardens.map(garden=>[garden.index,garden]));
+    const patios=new Map(plan.patios.map(patio=>[patio.index,patio]));
     cityLights.visible=[];
     for(let i=0;i<count;i++){
       const {x,y,bw,bh}=buildings[i],facade=LandscapeAppearance.building(rand(i+113),bh/(W<600?66.4:83),night,p.city);
@@ -341,14 +375,7 @@
         if(night>.12)for(let light=0;light<garden.lights;light++)
           ellipse(b,deckX+deckWidth*(.44+light*.22),deckY-1.1,.55,.55,`rgba(255,228,157,${night*.92})`);
       }
-    }
-    // These small tree crowns sit on the city's near edge, separate from the
-    // much larger forest trees painted on the rolling hills below.
-    for(const sapling of plan.trees){
-      const foliage=S.mixHex(p.front,p.far,.15+sapling.seed*.08),crown=sapling.height*.42;
-      line(b,sapling.x,sapling.baseY,sapling.x,sapling.baseY-sapling.height,S.mixHex(p.front,p.city,.08),.7);
-      ellipse(b,sapling.x,sapling.baseY-sapling.height*.62,crown,crown*.72,foliage);
-      if(sapling.seed>.45)ellipse(b,sapling.x+crown*.55,sapling.baseY-sapling.height*.7,crown*.55,crown*.55,S.mixHex(foliage,p.front,.24));
+      if(patios.has(i))paintRooftopPatio(b,patios.get(i));
     }
     // A small clock tower and civic dome give the distant city a recognizable heart.
     const tx=W*.71,ty=hy-72;
@@ -648,6 +675,7 @@
     // the horizon. New visitors and weather can enter the lake without a
     // separate reflection rule for each type.
     for(const e of world.events)if(airborne.has(e.type)&&!waterEvents.has(e.type))paintEvent(e,t);
+    paintRooftopParty();
     const weather=S.weatherAt(new Date(),sceneSeason),weatherPhase=reduced?0:Date.now()/1000;
     const reflectionHeight=Math.max(1,Math.floor(geometry.waterTop*dpr));
     if(skyReflection.width!==front.width)skyReflection.width=front.width;
@@ -1269,9 +1297,10 @@
   function resize(){
     cityLights.windows=[];
     W=host.clientWidth;H=host.clientHeight;geometry=LandscapeGeometry.create(W,H);hy=geometry.horizon;
+    if(!rooftopParty)rooftopParty=geometry.createRooftopPartyScheduler(Math.random);
     // Pixel budget prevents high-DPR phones from allocating desktop-size canvases.
     dpr=Math.min(window.devicePixelRatio||1,1.5,Math.sqrt(3000000/(W*H)));
-    for(const canvas of [back,front]){canvas.width=Math.floor(W*dpr);canvas.height=Math.floor(H*dpr);canvas.getContext('2d').setTransform(dpr,0,0,dpr,0,0);}
+    for(const canvas of [back,front,partyLayer]){canvas.width=Math.floor(W*dpr);canvas.height=Math.floor(H*dpr);canvas.getContext('2d').setTransform(dpr,0,0,dpr,0,0);}
     refreshSky();
   }
   function tick(now){
@@ -1283,11 +1312,17 @@
     nextPaint+=1000/30;
     if(nextPaint<=now)nextPaint=now+1000/30;
     const dt=last?Math.min((now-last)/1000,.12):0;
-    last=now;S.advance(world,dt,sky);S.advanceWoodland(woodland,dt);
+    last=now;S.advance(world,dt,sky);S.advanceWoodland(woodland,dt);advanceRooftopParty(dt);
     if(S.advanceLights(cityLights,world.elapsed,p.night>.2))paintBackground();
     paintLife(world.elapsed);
   }
-  function stop(){if(frame)cancelAnimationFrame(frame);frame=0;last=0;nextPaint=0;clearTimeout(skyTimer);clearTimeout(resizeTimer);skyTimer=0;resizeTimer=0;}
+  function advanceRooftopParty(dt){
+    if(document.hidden||!geometry||!p)return;
+    const previous=rooftopParty.active?.roofIndex??null;
+    geometry.advanceRooftopParty(rooftopParty,dt,rooftopRoofs,p.night>.2);
+    if(reduced&&previous!==(rooftopParty.active?.roofIndex??null))paintLife(world.elapsed);
+  }
+  function stop(){if(frame)cancelAnimationFrame(frame);frame=0;last=0;nextPaint=0;clearTimeout(skyTimer);clearTimeout(resizeTimer);clearInterval(partyTimer);skyTimer=0;resizeTimer=0;partyTimer=0;}
   function scheduleSky(){
     clearTimeout(skyTimer);if(document.hidden)return;
     const now=Date.now(),weather=S.weatherAt(new Date(now),sceneSeason);
@@ -1299,7 +1334,7 @@
   function start(){
     stop();if(document.hidden)return;
     if(W!==window.innerWidth||H!==window.innerHeight)resize();else refreshSky();
-    scheduleSky();if(!reduced)frame=requestAnimationFrame(tick);
+    scheduleSky();if(!reduced)frame=requestAnimationFrame(tick);else partyTimer=setInterval(()=>advanceRooftopParty(1),1000);
   }
   function updateMotion(){
     reduced=S.motionReduced(preference,mq.matches);

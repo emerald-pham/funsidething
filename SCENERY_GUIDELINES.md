@@ -1,0 +1,28 @@
+# Skyline and metropolis scenery guidance
+
+This file records visual constraints from recent skyline work. A former attempt to add dense low-rise housing behind the metropolis looked horrifying in daytime and was rejected by the user. Do not add that background housing again unless the user explicitly requests it. Keep the accepted skyline and its existing depth intact.
+
+## Metropolis boundaries
+
+- Add no neighborhood, house row, building strip, or other new housing behind the existing metropolis. Keep the existing skyline towers, distant horizon, hill and woodland trees, paths, and lake reflection.
+- Do not add separate tiny foreground trees around the metropolis. They were explicitly removed. This does not remove or change the established trees on the rolling hills or in the woodland.
+- Do not fill the former housing gap by raising individual structures or extending the skyline. The horizon and existing skyline composition remain as they are.
+- Rooftop gardens and patios may appear only on eligible shorter towers. Exclude the tallest tier and every lightning-rod tower from both types. Read the tower's shared deterministic `hasLightningRod` value for both selection and painting.
+
+## Rooftop patios and motion
+
+- Some eligible rooftop gardens may be replaced by patios; retain planted gardens on other eligible roofs. Party eligibility is structural and independent of patio/garden assignment: every shorter usable roof below the tallest tier and without a lightning rod can host an event.
+- A permanent patio has two small posts, one gently sagging string, and warm fairy-light dots. Colored party fixtures are temporary; do not leave party bulbs or beams running on every patio.
+- Schedule one rooftop party at most for the entire city. Make one independent 2% start roll after each 30 seconds of visible nighttime, then keep the event active for 24 visible seconds. After it ends, wait a fresh 30 nighttime seconds before the next roll. This yields about one party per 25 active night minutes on average. Select uniformly from every structurally eligible short, non-rod roof, including gardens and plain terraces; permanent patio assignment must not limit reachability. The runtime uses normal randomness, while tests inject deterministic draws to check reachability for each roof. Keep this schedule independent from festival/firework cooldowns and never replay missed rolls.
+- At night, the selected event's filled spotlight cones rise from that roof and scan smoothly up and down over a short distance. Each cone starts narrow at its fixture, widens softly outward, and fades naturally; thin laser-like center-lines or bright far-tip dots do not satisfy this request. Keep the beams close to their own roof. At most one roof may have colored party lights and beams at a time. Daylight cancels the event; a resize that makes its roof ineligible cancels it as well.
+- Opaque foreground towers and the civic clock tower must hide any part of a party fixture or cone behind their silhouettes. Treat overlapping buildings as a true union mask; one even-odd path can reopen overlaps and let beams show through a facade. Keep the deterministic 390×844 roof-19/clock-tower overlap in the occlusion regression.
+- Advance the scheduler once per visible scene tick. Hidden tabs pause without catch-up. Reduced motion still permits event selection and its normal visible-time expiry, but holds the beams at one static pose. Paint party lights through the dynamic scene/reflection path, not in the cached background.
+- Daylight patio hardware and warm bulbs stay subtle; at night, string lights and the rare single-roof party remain readable without competing with the skyline.
+
+## Visual review
+
+Inspect the real, composed `#landscape` in `Enjoy the view` mode at native scale. Capture both `[data-scenery]` and `[data-life]` together: a backdrop-only canvas omits established trees, paths, visitors, and reflections. Keep the preview date, season, weather, and random seed consistent when comparing renders; use the same green summer foliage for before/after evidence unless the task specifically changes season behavior.
+
+For candidate-art review, use a fresh isolated preview origin and verify the served candidate asset bytes/build before judging an unchanged render; an older service worker can keep stale scene code active and make a new draft appear unchanged. Treat this as a candidate visual check only. Final release verification must separately exercise the real service worker, deployed assets, and an actual offline reload.
+
+Review at least desktop (about 1280×720) and phone (about 390×844) in daytime and night, plus short landscape when vertical placement or motion changes. Confirm the rejected housing and city-edge microtrees are absent, established hill/woodland trees and skyline reflection remain, eligible gardens/patios/events avoid tall or rod-equipped towers, and warm patio strings stay attached to their own roofs. Confirm that no more than one temporary party is active, that party lights are absent between events, and that every structurally eligible roof can be selected. For moving beams, compare two night frames of the same selected event at different times and verify a visible vertical sweep in normal motion plus a fixed reduced-motion pose and expiry. A close-up helps diagnose roof detail but cannot replace full-scene acceptance.
