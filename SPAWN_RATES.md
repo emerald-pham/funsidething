@@ -14,8 +14,9 @@ Standalone fireworks check every 30 seconds of active nighttime viewing with a
 40% chance at rate 1, then rest for 60 seconds after the nine-second show. The
 first check is after 20 active seconds. This averages about two minutes between
 shows when space is available; it is random, not a guarantee.
-Festivals check once per active minute at a 6% chance, share the seven-minute
-rare cooldown with alien visits, and cross the lake on a barge in about 127–183 seconds, depending on the
+Festivals check once per active minute at a 0.6% chance, wait at least 30 active
+minutes between visits, share the seven-minute rare cooldown with alien visits,
+and cross the lake on a barge in about 127–183 seconds, depending on the
 assigned travel speed (150-second baseline). A festival owns its
 fireworks; standalone shows and festivals do not overlap. Both require the Sun
 below civil twilight. Rates scale these chances, capped at 100%.

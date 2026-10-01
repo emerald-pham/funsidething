@@ -322,14 +322,48 @@
     });
     function festival(event){
       const duration=Math.max(1,Number(event.duration)||150),progress=routeProgress({...event,type:'festival'},'x');
-      const width=Math.min(180,W*.36),height=Math.min(45,H*.074),margin=width+28;
+      const lane=Number.isFinite(Number(event.lane))?Number(event.lane):.5;
+      const cruise=vessel('cruise',lane,W/2,event.age||0,event.reverse),scale=cruise.scale;
+      const width=72*scale,height=28*scale,margin=width+28*scale;
+      // Launch coordinates and painted rack dimensions share this scaled
+      // geometry so every shell starts on the visible deck.
+      const launcherOffset=56*.49*scale,launcherTop=-height*.21,launcherBottom=-height*.10;
+      const launcherPadOffsets=[0,5*scale,10*scale];
       const direction=event.reverse?-1:1,x=-margin+(event.reverse?1-progress:progress)*(W+2*margin);
       // It is a vessel: complete physical entry/exit replaces a setup fade,
       // while a small bob leaves the hull comfortably inside the shallow lake.
-      const y=waterTop+Math.min(9,Math.max(2,(shore-waterTop)*.25))+Math.sin((event.age||0)*.8)*.3;
-      return {x,y,width,height,hullDepth:Math.min(6,H*.014),direction,
+      const y=waterTop+Math.min(9,Math.max(2,(shore-waterTop)*.25))+Math.sin((event.age||0)*.8)*.3*scale;
+      return {x,y,width,height,scale,hullDepth:3*scale,direction,launcherOffset,
+        launcherTop,launcherBottom,launcherRailWidth:2*scale,launcherPadRadius:1.2*scale,launcherPadOffsets,
         velocity:direction*(W+2*margin)/duration,alpha:1,
         beamAngle:Math.sin((event.age||0)*.16)*.24,crowdPhase:(event.age||0)*2.1};
+    }
+    function bannerLayout(text,planeX,planeY,direction,measureText){
+      const maxWidth=Math.max(64,Math.min(144,W*.44)),padding=8,fontSize=7,maxTextWidth=maxWidth-padding;
+      const measure=value=>{
+        try{const width=Number(measureText(value,fontSize));return Number.isFinite(width)&&width>=0?width:Infinity;}
+        catch{return Infinity;}
+      };
+      const words=String(text??'').trim().split(/\s+/).filter(Boolean),lines=[];let line='';
+      for(const word of words){
+        const candidate=line?line+' '+word:word;
+        if(measure(candidate)<=maxTextWidth){line=candidate;continue;}
+        if(line){lines.push(line);line='';}
+        if(measure(word)<=maxTextWidth){line=word;continue;}
+        let fragment='';
+        for(const character of Array.from(word)){
+          const next=fragment+character;
+          if(fragment&&measure(next)>maxTextWidth){lines.push(fragment);fragment=character;}
+          else fragment=next;
+        }
+        line=fragment;
+      }
+      if(line||!lines.length)lines.push(line);
+      const textWidth=Math.max(0,...lines.map(measure)),width=Math.min(maxWidth,Math.max(64,Math.ceil(textWidth+padding)));
+      const lineHeight=fontSize*1.25,height=Math.max(12,Math.ceil(lines.length*lineHeight+4)),y=planeY+3;
+      const x=planeX-direction*(47+width/2);
+      return {x,y,width,height,fontSize,lineHeight,lines,direction,
+        towStartX:planeX-direction*18,towStartY:planeY,towEndX:x+direction*width/2,towEndY:y};
     }
     function fireworks(age,seed,atFestival=false,event={duration:150,seed}){
       const dots=[],duration=atFestival?(Number(event.duration)||150):9;
@@ -339,13 +373,15 @@
         const launch=atFestival?8+burst*3.8:burst*2.1,time=age-launch;
         if(time<=0||time>=3.7)continue;
         const deck=atFestival?festival({...event,age:launch}):null;
-        const originX=deck?deck.x+(burst%2?1:-1)*deck.width*.52:W*(.25+seed*.3+burst*.13);
+        const originX=deck?deck.x+(burst%2?1:-1)*deck.launcherOffset:W*(.25+seed*.3+burst*.13);
         if(originX<3||originX>W-3)continue;
         const launchY=deck?deck.y-deck.height*.10:waterTop-2;
         // Waterfront bursts retain visible mirrored sparks. Each shell takes
         // its launch position and velocity from the deck at ignition; moving
         // the ship later cannot drag an already airborne bloom across the sky.
-        const rise=Math.max(32,Math.min(horizon*.6,(far(originX)-waterTop)*1.05));
+        // A short landscape viewport has a shallow lake. Keep its bloom low
+        // enough to mirror visible sparks after the launch deck shrinks.
+        const rise=Math.max(10,Math.min(horizon*.6,(far(originX)-waterTop)*1.05));
         const cy=waterTop-rise,vx=deck?.velocity||0;
         const drift=t=>vx*(t<1?t:1+.4*(1-Math.exp(-(t-1)*.9)));
         if(time<1){
@@ -390,7 +426,7 @@
       const field=packet*.68+detail*.32;
       return {dx:envelope*(.33*field+.1*Math.sin(x*.071+depth*.24-phase*.63)),dy:envelope*1.25*field};
     };
-    return {routeProgress,motionProgress,motionAge,verticalOffset,visitPose,woodlandPose,duckPose,waterDepth,cycleLeg,deerLeg,nestVisit,eventDepth,dogPose,skater,festival,fireworks,flock,dolphin,starReflection,reflectionSurface,reflectionMotion,castShadow,grassBand,sunReflection,depthBand,groundAnchor,groundTravelX,groundPose,strideArm,strideFoot,wingFold,balloonDrift,vessel,foregroundTree,nest,ripple,skyPoint,horizon,waterTop,far,middle,near,rail,trail,lowerRail,railCars,tangent,rider,pack,cityscape,partyBeamPose,rooftopPartySchedule,createRooftopPartyScheduler,advanceRooftopParty};
+    return {routeProgress,motionProgress,motionAge,verticalOffset,visitPose,woodlandPose,duckPose,waterDepth,cycleLeg,deerLeg,nestVisit,eventDepth,dogPose,skater,festival,bannerLayout,fireworks,flock,dolphin,starReflection,reflectionSurface,reflectionMotion,castShadow,grassBand,sunReflection,depthBand,groundAnchor,groundTravelX,groundPose,strideArm,strideFoot,wingFold,balloonDrift,vessel,foregroundTree,nest,ripple,skyPoint,horizon,waterTop,far,middle,near,rail,trail,lowerRail,railCars,tangent,rider,pack,cityscape,partyBeamPose,rooftopPartySchedule,createRooftopPartyScheduler,advanceRooftopParty};
   }
   root.LandscapeGeometry={create};
 })(globalThis);

@@ -6,6 +6,14 @@ The named-contract test in tests.js checks that every top-level test whose title
 
 ## Task state, eligibility, and scanner controls
 
+- RISK DATE DISPLAY: noncurrent years remain visible in task and history labels across New Year
+- RISK DATE FORMAT: legacy and corrupt preferences default to System and overrides preserve calendar days
+- RISK DATE FORMAT: Settings saves a changed format immediately through close reload Undo and cloud serialization
+- RISK DATE FORMAT: task chips history backups and diagnostics share the chosen date order
+- RISK DATE FORMAT: the sky-calendar label follows the chosen order without losing the observers timezone
+- RISK AUTH RESTORE: configured startup stays syncing until Firebase resolves the actual session
+- RISK AUTH RESTORE: remembered boards show syncing in header and Settings while restoration is pending
+
 - RISK IMPORT RENDERING: restored identifiers cannot inject attributes or break task reveal
 - RISK rating drift: Done and Worked on it stay neutral on every completion route and recurrence type
 - RISK false preference evidence: All Tasks Dot compares only with the current benchmark and a first dot stays neutral
@@ -318,12 +326,17 @@ The editor hook blocks app or enforcement edits while tests.js has no staged or 
 - RISK landscape aircraft: scheduled planes keep a shaded body and night navigation lights
 - RISK night shows: standalone fireworks recur independently of the rare cooldown and stay bounded
 - RISK night shows: festival odds are lower than standalone fireworks with finite visits and rate controls
+- RISK night shows: festivals keep a thirty-minute cooldown while fireworks stay independent
 - RISK night shows: launches lead to bounded fading bursts and the festival sails fully on and off screen
+- RISK festival barge: hull, stage, and crowd follow the cruise-vessel scale
+- RISK festival barge: scaled deck fireworks remain visible in the shallow short-screen lake
+- RISK festival barge: shell launches follow the moving deck and fireworks have varied ballistic trails
+- RISK landscape banners: the longest human airplane prompt fits measured fabric in both directions
 - RISK skyline materials: short buildings favor brick while tall towers favor stable modern colors
 - RISK skyline lights: only exposed windows can be selected so both on and off are visible
+- RISK skyline lights: garden roofs start independently, stay stable, and change slowly at night
 - RISK night shows: festival and standalone sparks enter the shared mirror before foreground hills
 - RISK Landscape browser: both night shows reflect actual sparks and exposed windows visibly switch on and off
-- RISK festival barge: shell launches follow the moving deck and fireworks have varied ballistic trails
 - RISK fireworks realism: uneven blooms leave ballistic trails and fading embers
 
 ## Retained sync diagnostics
