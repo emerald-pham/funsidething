@@ -18826,3 +18826,44 @@ test('RISK evergreen legacy: a saved cooldown without a done mark can return ear
   assert.equal(ctx.state.tasks.find(x=>x.id===t.id).lastDoneAt,null,'eligibility uses the saved timestamp even without a considered mark');
   assert.equal(ctx.pool().some(x=>x.id===t.id),true);
 });
+
+test('RISK evergreen flag changes: completion cancellation survives both merge directions durable replay and cloud',async()=>{
+  const {indexedDB}=await import('fake-indexeddb');
+  for(const gesture of ['return-disable','done-enable'])for(const backend of ['browser','indexedDB']){
+    const h=makeSyncHarness({delayMs:1});
+    const options=backend==='indexedDB'?{indexedDBProvider:indexedDB,deviceDbName:'evergreen-flags-'+Date.now()+'-'+Math.random()}:{};
+    const {ctx,shim}=await loadApp({...options,cloudSyncFactory:h.factory});await syncSettle(30);
+    const t=ctx.addTask('Duolingo');t.evergreen=gesture==='return-disable';t.evergreenResetAtDay=false;
+    await ctx.persist();ctx.cloudPushNow();await syncSettle(30);
+    if(gesture==='return-disable')ctx.doneTask(t.id);
+    else{
+      ctx.openEdit(t.id);shim.document.getElementById('etTitle').value=t.title;
+      shim.document.getElementById('etEver').checked=true;shim.document.getElementById('etEverReset').checked=false;
+      ctx.onAction('done-task',{dataset:{id:t.id}});
+    }
+    await ctx.persist();ctx.cloudPushNow();await syncSettle(30);
+    const completed=JSON.parse(JSON.stringify(ctx.state));
+    if(gesture==='return-disable'){
+      ctx.openEdit(t.id);shim.document.getElementById('etTitle').value=t.title;
+      shim.document.getElementById('etEver').checked=false;
+      ctx.onAction('return-candidate',{dataset:{id:t.id}});
+    }else ctx.undo();
+    await ctx.persist();
+    const reopened=JSON.parse(JSON.stringify(ctx.state));
+    assert.equal(reopened.tasks.find(x=>x.id===t.id).evergreen,false,'the atomic gesture leaves an ordinary open task');
+    assert.equal(reopened.tasks.find(x=>x.id===t.id).lastDoneAt,null,'completion cancellation clears its timestamp locally');
+    for(const [winner,other] of [[completed,reopened],[reopened,completed]]){
+      const merged=structuredClone(winner);ctx.mergeUndeletedTasks(merged,structuredClone(other));
+      assert.equal(merged.tasks.find(x=>x.id===t.id).lastDoneAt,null,gesture+': changing Evergreen cannot bypass reopening intent');
+    }
+    if(backend==='indexedDB'){
+      const store=readConst(ctx,'deviceStore'),head=await store.readHead();
+      assert.equal((await store.commitHead({expectedHash:head.hash,payload:JSON.stringify(completed),account:completed.syncAccount})).ok,true,'another durable writer installs the stale winning head');
+    }else shim.localStorage.setItem(STORE_KEY,JSON.stringify(completed));
+    await ctx.persist();
+    assert.equal(ctx.state.tasks.find(x=>x.id===t.id).lastDoneAt,null,'a stale saved winner cannot reinstate the cooldown');
+    h.writeBehindBack(completed);await ctx.cloudPull();ctx.cloudPushNow();await syncSettle(40);
+    assert.equal(ctx.state.tasks.find(x=>x.id===t.id).lastDoneAt,null,'cloud adoption respects cancellation across a flag change');
+    assert.equal(h.remoteState().tasks.find(x=>x.id===t.id).lastDoneAt,null,'the cloud acknowledges the retained cancellation');
+  }
+});

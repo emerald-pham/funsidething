@@ -6,6 +6,8 @@ The named-contract test in tests.js checks that every top-level test whose title
 
 ## Task state, eligibility, and scanner controls
 
+- RISK evergreen flag changes: completion cancellation survives both merge directions durable replay and cloud
+
 - RISK evergreen Undo: all Done entry points clear a persisted rest period and countdown
 - RISK evergreen return: the editor ends rest early durably while keeping History and ratings
 - RISK evergreen reconciliation: stale completions cannot reinstate cancelled rest in either merge direction
