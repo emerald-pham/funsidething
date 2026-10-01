@@ -55,7 +55,7 @@
   for(const type of ['pointerdown','keydown','wheel','touchstart'])
     document.addEventListener(type,observeSceneInteraction,{capture:true,passive:true});
   let preference=S.readMotion(storage),reduced=S.motionReduced(preference,mq.matches);
-  const cityLights={next:30,windows:[]},woodland=S.createWoodland();
+  const cityLights={next:30,windows:[],gardens:S.createGardenLights([],Math.random)},woodland=S.createWoodland();
   let rooftopRoofs=[],rooftopParty=null,partyTimer=0;
   let sceneSeason=S.readSceneSeason(sceneStorage)||LandscapeMood.season(new Date(),globalThis.LivingLocation?.current()).name,treeOrigins=[];
   let W=0,H=0,hy=0,dpr=1,frame=0,last=0,nextPaint=0,sky,p,world=S.createWorld(Math.random,sceneSeason);
@@ -340,7 +340,8 @@
     const plan=geometry.cityscape(rand),buildings=plan.towers,count=buildings.length;let windowIndex=0;
     rooftopRoofs=plan.partyRoofs;
     if(rooftopParty.active&&!rooftopRoofs.some(roof=>roof.index===rooftopParty.active.roofIndex))rooftopParty.active=null;
-    const gardens=new Map(plan.gardens.map(garden=>[garden.index,garden]));
+    S.syncGardenLights(cityLights.gardens,plan.gardens.map(garden=>garden.index),Math.random);
+    const gardenLights=cityLights.gardens,gardens=new Map(plan.gardens.map(garden=>[garden.index,garden]));
     const patios=new Map(plan.patios.map(patio=>[patio.index,patio]));
     cityLights.visible=[];
     for(let i=0;i<count;i++){
@@ -372,7 +373,7 @@
           b.fillStyle=S.mixHex(p.far,p.hill,.38+rand(i+pot+1100)*.2);b.fillRect(px,deckY-1,Math.max(1,deckWidth*.18),1.1);
           ellipse(b,px+deckWidth*.08,deckY-1.2,.8,.65,S.mixHex(p.far,p.front,.28));
         }
-        if(night>.12)for(let light=0;light<garden.lights;light++)
+        if(night>.12&&gardenLights.lit[garden.index])for(let light=0;light<garden.lights;light++)
           ellipse(b,deckX+deckWidth*(.44+light*.22),deckY-1.1,.55,.55,`rgba(255,228,157,${night*.92})`);
       }
       if(patios.has(i))paintRooftopPatio(b,patios.get(i));
@@ -573,27 +574,29 @@
     reflectWaterObject(pose.y,()=>paintFestival(e));
     g.save();path(g,far);g.lineTo(W,geometry.waterTop);g.lineTo(0,geometry.waterTop);g.closePath();g.clip();
     for(let i=0;i<5;i++){
-      const phase=(e.age*.35+i*.19)%1,xx=pose.x-pose.direction*(pose.width*.62+i*4);
+      const phase=(e.age*.35+i*.19)%1,xx=pose.x-pose.direction*(pose.width*.62+i*4*pose.scale);
       g.globalAlpha=(1-phase)*.22;
-      line(g,xx,pose.y+1+phase*3,xx-pose.direction*(12+phase*9),pose.y+1+phase*3,p.sky[2],.7);
+      line(g,xx,pose.y+pose.scale+phase*3*pose.scale,xx-pose.direction*(12+phase*9)*pose.scale,pose.y+pose.scale+phase*3*pose.scale,p.sky[2],.7*pose.scale);
     }
     g.restore();paintFestival(e);
   }
   function paintFestival(e){
     const pose=geometry.festival(e),night=1-S.smooth(-12,-6,sky.sun.altitude);
     if(!pose.alpha||!night)return;
-    const {x,y,width:w,height:h}=pose,inks=['#7be5ed','#bd9af6','#f4b982'];
+    const {x,y,scale}=pose,w=56,h=28,hullDepth=3,inks=['#7be5ed','#bd9af6','#f4b982'];
+    const launcherOffset=pose.launcherOffset/scale,launcherTop=pose.launcherTop/scale,launcherBottom=pose.launcherBottom/scale;
     const ink=inks[Math.floor(e.seed*3)%3],second=inks[(Math.floor(e.seed*3)+1)%3];
-    g.save();g.translate(x,y);g.globalAlpha*=pose.alpha*night;
+    g.save();g.translate(x,y);g.scale(scale,scale);g.globalAlpha*=pose.alpha*night;
     // The stage, crowd, launch racks and hull travel as one vehicle. Steady
     // colored light and slow beam sweeps never pulse the scene brightness.
     g.fillStyle='#172b39';g.beginPath();g.moveTo(-w*.64,-3);g.lineTo(w*.64,-3);
-    g.lineTo(w*.56,pose.hullDepth);g.lineTo(-w*.56,pose.hullDepth);g.closePath();g.fill();
+    g.lineTo(w*.56,hullDepth);g.lineTo(-w*.56,hullDepth);g.closePath();g.fill();
     line(g,-w*.61,-3,w*.61,-3,'#889cac',1.6);
-    line(g,-w*.56,pose.hullDepth-1,w*.56,pose.hullDepth-1,'#4b687a',1);
+    line(g,-w*.56,hullDepth-1,w*.56,hullDepth-1,'#4b687a',1);
     for(const side of [-1,1]){
-      line(g,side*w*.52,-h*.10,side*w*.52,-h*.21,'#677c89',2);
-      for(let i=0;i<3;i++)ellipse(g,side*(w*.51-i*5),1,1.2,1.2,'#a9baca');
+      line(g,side*launcherOffset,launcherBottom,side*launcherOffset,launcherTop,'#677c89',pose.launcherRailWidth/scale);
+      for(const offset of pose.launcherPadOffsets)ellipse(g,side*(launcherOffset-offset/scale),1,
+        pose.launcherPadRadius/scale,pose.launcherPadRadius/scale,'#a9baca');
     }
     for(const side of [-1,1]){
       g.save();g.translate(side*w*.35,-h*.75);g.rotate(side*.27+pose.beamAngle);
@@ -627,8 +630,8 @@
     ellipse(g,0,-h*.35,1.6,1.7,'#d8b596');line(g,0,-h*.33,0,-h*.27,'#c4d3d3',2);
     line(g,-w*.46,-h*.1,w*.46,-h*.1,ink,.8);
     // All passengers remain attached to the deck throughout the crossing.
-    for(let i=0;i<26;i++){
-      const xx=(i/25-.5)*w*.82,yy=-2-(i%3)*1.8,bob=Math.sin(pose.crowdPhase+i*1.7)*.6;
+    for(let i=0;i<12;i++){
+      const xx=(i/11-.5)*w*.82,yy=-2-(i%3)*1.8,bob=Math.sin(pose.crowdPhase+i*1.7)*.6;
       const shirt=i%4===0?S.mixHex(ink,'#182936',.55):'#243440';
       line(g,xx,yy,xx,yy-3.5+bob,shirt,1.7);ellipse(g,xx,yy-5+bob,1.2,1.25,'#788c99');
       if(i%3===0){line(g,xx,yy-3,xx-2,yy-5.5+bob,shirt,.8);line(g,xx,yy-3,xx+2,yy-6+bob,shirt,.8);}
@@ -1261,14 +1264,20 @@
       return true;
     }
     if(e.type==='banner'){
-      const y=hy*.3+e.lane*hy*.18+geometry.verticalOffset(e,18),bx=x-dir*86;
+      const y=hy*.3+e.lane*hy*.18+geometry.verticalOffset(e,18);
       if(e.bannerText===undefined)e.bannerText=LandscapeMood.airplaneMessage(e.seed);
       if(!e.bannerText){airplane(x,y,dir,e.seed,t,true);return true;}
       const bannerPalette=LandscapeAppearance.bannerColors(p.night,c,p.city);
-      visibleBanners.push({event:e,x:bx,y:y+3});
-      airplane(x,y,dir,e.seed,t,true);line(g,x-dir*18,y,bx+dir*39,y+3,bannerPalette.tow,.7);
-      g.save();g.translate(bx,y+3);g.rotate(Math.sin(verticalClock)*.025);g.fillStyle=bannerPalette.fabric;g.fillRect(-39,-6,78,12);
-      g.fillStyle=bannerPalette.ink;g.font='7px sans-serif';g.textAlign='center';g.fillText(e.bannerText,0,2.5);g.restore();return true;
+      const layout=geometry.bannerLayout(e.bannerText,x,y,dir,(text,size)=>{
+        g.save();g.font=`${size}px sans-serif`;const width=g.measureText(text).width;g.restore();return width;
+      });
+      visibleBanners.push({event:e,x:layout.x,y:layout.y});
+      airplane(x,y,dir,e.seed,t,true);line(g,layout.towStartX,layout.towStartY,layout.towEndX,layout.towEndY,bannerPalette.tow,.7);
+      g.save();g.translate(layout.x,layout.y);g.rotate(Math.sin(verticalClock)*.025);g.fillStyle=bannerPalette.fabric;
+      g.fillRect(-layout.width/2,-layout.height/2,layout.width,layout.height);
+      g.fillStyle=bannerPalette.ink;g.font=`${layout.fontSize}px sans-serif`;g.textAlign='center';g.textBaseline='middle';
+      layout.lines.forEach((lineText,index)=>g.fillText(lineText,0,(index-(layout.lines.length-1)/2)*layout.lineHeight));
+      g.restore();return true;
     }
     return false;
   }
@@ -1313,13 +1322,15 @@
     if(nextPaint<=now)nextPaint=now+1000/30;
     const dt=last?Math.min((now-last)/1000,.12):0;
     last=now;S.advance(world,dt,sky);S.advanceWoodland(woodland,dt);advanceRooftopParty(dt);
-    if(S.advanceLights(cityLights,world.elapsed,p.night>.2))paintBackground();
+    const gardenChanged=S.advanceGardenLights(cityLights.gardens,dt,p.night>.2,Math.random);
+    if(S.advanceLights(cityLights,world.elapsed,p.night>.2)||gardenChanged)paintBackground();
     paintLife(world.elapsed);
   }
   function advanceRooftopParty(dt){
     if(document.hidden||!geometry||!p)return;
     const previous=rooftopParty.active?.roofIndex??null;
     geometry.advanceRooftopParty(rooftopParty,dt,rooftopRoofs,p.night>.2);
+    if(reduced&&S.advanceGardenLights(cityLights.gardens,dt,p.night>.2,Math.random))paintBackground();
     if(reduced&&previous!==(rooftopParty.active?.roofIndex??null))paintLife(world.elapsed);
   }
   function stop(){if(frame)cancelAnimationFrame(frame);frame=0;last=0;nextPaint=0;clearTimeout(skyTimer);clearTimeout(resizeTimer);clearInterval(partyTimer);skyTimer=0;resizeTimer=0;partyTimer=0;}
@@ -1370,8 +1381,9 @@
     // Preview a selected season before saving it; all labels use the observer's
     // calendar and zone, even when this device is on the other side of Earth.
     const preview={getItem:()=>seasonInput.value||null};
-    const schedule=S.solarSchedule(S.sceneSolarDate(new Date(),preview,location),location);
-    document.getElementById('sceneSolarDate').textContent=schedule.dateLabel+' · '+schedule.timeZone;
+    const solarDate=S.sceneSolarDate(new Date(),preview,location),schedule=S.solarSchedule(solarDate,location);
+    const dateLabel=window.formatScannerCalendarDate?.(solarDate,schedule.timeZone)||schedule.dateLabel;
+    document.getElementById('sceneSolarDate').textContent=dateLabel+' · '+schedule.timeZone;
     for(const entry of schedule.events){
       const button=timeDialog.querySelector('[data-scene-preset="'+entry.preset+'"]');
       button.replaceChildren();

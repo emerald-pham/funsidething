@@ -30,6 +30,100 @@ test("Default contexts: saved custom contexts and task assignments survive reloa
   assert.deepEqual(Array.from(restored.ctx.state.tasks[0].ctx), ["custom"]);
 });
 
+test('RISK DATE DISPLAY: noncurrent years remain visible in task and history labels across New Year', async()=>{
+  const {ctx}=await loadApp();
+  vm.runInContext(`const CalendarDate=Date; Date=class extends CalendarDate {
+    constructor(...args){super(...(args.length?args:[new CalendarDate(2026,11,31,12).getTime()]));}
+    static now(){return new CalendarDate(2026,11,31,12).getTime();}
+  };`,ctx);
+  assert.match(ctx.dueInfo('2027-01-01').txt,/2027/,'even tomorrow must name its next calendar year');
+  assert.match(ctx.dueInfo('2027-02-03').txt,/2027/);
+  assert.match(ctx.dueInfo('2025-12-30').txt,/2025/,'overdue dates retain their year too');
+  const task=ctx.addTask('Next-year task',false,[],{due:'2027-02-03',startsAt:'2027-01-01'});
+  assert.equal((ctx.chipHTML(task).match(/2027/g)||[]).length,2,'Start and Due each name the year');
+  assert.match(ctx.fmtWhen(new Date(2025,11,30,12).getTime()),/2025/);
+  assert.match(ctx.fmtWhen(new Date(2027,0,1,12).getTime()),/2027/,'future history dates cannot fall through to a weekday');
+  assert.doesNotMatch(ctx.dueInfo('2026-12-30').txt,/2026/,'system current-year labels stay compact');
+});
+
+test('RISK DATE FORMAT: legacy and corrupt preferences default to System and overrides preserve calendar days', async()=>{
+  const {ctx}=await loadApp();
+  assert.equal(ctx.state.settings.dateFormat,'system');
+  for(const bad of [undefined,null,4,'xx','en-US',{},[]])assert.equal(ctx.normalizeSettings({dateFormat:bad}).dateFormat,'system');
+  for(const [preference,expected] of [['mdy','02/03/2027'],['dmy','03/02/2027'],['ymd','2027-02-03']]){
+    ctx.state.settings.dateFormat=preference;
+    assert.equal(ctx.formatCalendarDate('2027-02-03'),expected);
+    assert.equal(ctx.normalizeSettings({dateFormat:preference}).dateFormat,preference);
+  }
+  assert.equal(ctx.formatCalendarDate('2027-02-30'),'','invalid calendar dates never silently roll over');
+  ctx.state.settings.dateFormat='system';
+  const expected=vm.runInContext(`new Intl.DateTimeFormat(undefined,{month:'numeric',day:'numeric',year:'numeric'}).format(new Date(2027,1,3))`,ctx);
+  assert.equal(ctx.formatCalendarDate('2027-02-03',{year:true}),expected,'System follows Intl, using local calendar dates rather than UTC parsing');
+  vm.runInContext(`const SystemFormatter=Intl.DateTimeFormat; Intl.DateTimeFormat=function(_locale,options){return new SystemFormatter('en-GB',options);};`,ctx);
+  assert.equal(ctx.formatCalendarDate('2027-02-03',{year:true}),'03/02/2027','a day-first system locale remains day-first');
+});
+
+test('RISK DATE FORMAT: Settings saves a changed format immediately through close reload Undo and cloud serialization', async()=>{
+  const storage=sharedScannerStorage(),{ctx,shim}=await loadApp({sharedStorage:storage});
+  ctx.addTask('Keep my schedule',false,[],{due:'2027-02-03',startsAt:'2027-01-01'});
+  ctx.openSettings();
+  assert.match(shim.document.getElementById('modalRoot').innerHTML,/label for="stDateFormat">Date format/);
+  assert.match(shim.document.getElementById('modalRoot').innerHTML,/<option value="system" selected>System/);
+  for(const value of ['mdy','dmy','ymd'])assert.match(shim.document.getElementById('modalRoot').innerHTML,new RegExp('option value="'+value+'"'));
+  const field=shim.document.getElementById('stDateFormat');field.id='stDateFormat';field.value='dmy';field.matches=()=>false;
+  shim.document.dispatchEvent({type:'change',target:field});
+  assert.equal(ctx.state.settings.dateFormat,'dmy');
+  assert.match(shim.document.getElementById('stDatePreview').textContent,/\d{2}\/\d{2}\/\d{4}/);
+  ctx.closeModal();await ctx.persist();
+  const reopened=await loadApp({sharedStorage:storage});
+  assert.equal(reopened.ctx.state.settings.dateFormat,'dmy');
+  assert.equal(reopened.ctx.state.tasks[0].due,'2027-02-03','display preferences never change ISO task storage');
+  assert.equal(JSON.parse(reopened.ctx.cloudPayload()).settings.dateFormat,'dmy');
+  ctx.undo();assert.equal(ctx.state.settings.dateFormat,'system','format preference participates in ordinary Undo');
+});
+
+test('RISK DATE FORMAT: task chips history backups and diagnostics share the chosen date order',async()=>{
+  const {ctx,shim}=await loadApp();ctx.state.settings.dateFormat='dmy';
+  const task=ctx.addTask('Schedule',false,[],{due:'2027-02-03',startsAt:'2027-01-04'});
+  assert.match(ctx.chipHTML(task),/03\/02\/2027/);assert.match(ctx.chipHTML(task),/04\/01\/2027/);
+  assert.match(ctx.fmtWhen(new Date(2025,1,3,12).getTime()),/03\/02\/2025/);
+  await ctx.saveDurableBackup('manual',JSON.stringify(ctx.state));
+  ctx.recordSyncError('pull','unavailable');ctx.openSettings();
+  const label=ctx.formatCalendarDate(new Date(),{year:true}),pane=shim.document.getElementById('modalRoot').innerHTML;
+  assert.ok(pane.includes(label),'full-year backup labels follow the same preference');
+  assert.ok(ctx.syncErrorLogHtml().includes(label),'diagnostic timestamps follow the same preference');
+});
+
+test('RISK DATE FORMAT: the sky-calendar label follows the chosen order without losing the observers timezone',async()=>{
+  const {ctx,shim}=await loadApp();ctx.state.settings.dateFormat='ymd';
+  const date=new Date('2026-12-31T23:30:00Z');
+  assert.equal(typeof shim.window.formatScannerCalendarDate,'function','the scene renderer can share the board date preference');
+  assert.equal(shim.window.formatScannerCalendarDate(date,'Pacific/Kiritimati'),'2027-01-01');
+  assert.equal(shim.window.formatScannerCalendarDate(date,'America/New_York'),'2026-12-31');
+  const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),start=source.indexOf('  function refreshSolarTimes(){'),end=source.indexOf('    return schedule;\n  }',start)+'    return schedule;\n  }'.length;
+  const label={textContent:''},probe=vm.createContext({window:shim.window,Date,document:{getElementById:()=>label},seasonInput:{value:''},S:{sceneSolarDate:()=>date,solarSchedule:()=>({timeZone:'Pacific/Kiritimati',dateLabel:'Jan 1, 2027',events:[]})},renderSceneTimeChoice(){}});
+  vm.runInContext(source.slice(start,end)+';refreshSolarTimes();',probe);
+  assert.equal(label.textContent,'2027-01-01 · Pacific/Kiritimati','the actual scene-time label uses the shared formatter');
+});
+
+test('RISK AUTH RESTORE: configured startup stays syncing until Firebase resolves the actual session',async()=>{
+  const h=await loadCloudBackendV2({failures:{authPending:true}});
+  assert.equal(h.CS.ready,false);assert.equal(h.CS.status,'syncing','restoring authentication is pending rather than signed out');
+  h.emitAuth(h.auth.currentUser);assert.equal(h.CS.ready,true);assert.equal(h.CS.user,'owner@example.test');
+  h.emitAuth(null);assert.equal(h.CS.status,'signed-out','a resolved signed-out session still offers sign in');
+});
+
+test('RISK AUTH RESTORE: remembered boards show syncing in header and Settings while restoration is pending',async()=>{
+  const {ctx,shim}=await loadApp();ctx.state.syncAccount='previous@example.test';let prompts=0;
+  const CS=shim.window.CloudSync={configured:true,ready:false,user:null,status:'signed-out',signIn(){prompts++;}};
+  ctx.renderSync();const button=shim.document.getElementById('syncBtn');
+  assert.equal(button.textContent,'☁ syncing');assert.equal(button.disabled,true);
+  ctx.onAction('sync',button);assert.equal(prompts,0,'tapping pending restoration cannot open another sign-in flow');
+  ctx.openSettings();assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/sign in from the header/);
+  CS.ready=true;ctx.renderSync();assert.equal(button.textContent,'☁ sign in');assert.equal(button.disabled,false);
+  CS.status='error';CS.errorStage='auth-storage';ctx.renderSync();assert.equal(button.textContent,'☁ error','real auth failures remain visible');
+});
+
 /* The landscape computes its sky locally from offline scene mirrors. It never
    makes a location-service request to decide what the sky looks like. */
 function livingSky() {
@@ -7275,8 +7369,9 @@ async function loadCloudBackendV2({rootData=null,batchFailureAt=Infinity,failure
  F.getDocsFromServer=async reference=>{network.push('server:'+reference.path);if(failures.serverOffline)throw Object.assign(Error('offline'),{code:'unavailable'});return readDocs(reference);};
  F.disableNetwork=async()=>{network.push('disable');if(failures.disable)throw failures.disable;};
  F.enableNetwork=async()=>{network.push('enable');if(failures.enablePending)await failures.enablePending;};
+ let authListener=null;
  const auth={currentUser:{uid:'owner',email:'owner@example.test'}},A={browserLocalPersistence:{},getAuth:()=>auth,setPersistence:async()=>{if(failures.persistence)throw failures.persistence;},
-  signInWithPopup:async(_auth,provider)=>{popupProviders.push(provider);if(failures.signIn)throw failures.signIn;},signOut:async()=>{if(failures.signOut)throw failures.signOut;},GoogleAuthProvider:class{setCustomParameters(value){this.customParameters=value;}},onAuthStateChanged(_auth,listener){listener(auth.currentUser);}};
+  signInWithPopup:async(_auth,provider)=>{popupProviders.push(provider);if(failures.signIn)throw failures.signIn;},signOut:async()=>{if(failures.signOut)throw failures.signOut;},GoogleAuthProvider:class{setCustomParameters(value){this.customParameters=value;}},onAuthStateChanged(_auth,listener){authListener=listener;if(!failures.authPending)listener(auth.currentUser);}};
  const events=[],pending=new Map(),window={FIREBASE_CONFIG:{apiKey:'test-key'},CLOUD_SYNC_TIMEOUT_MS:timeoutMs,dispatchEvent:event=>{events.push(event);return true;}};window.window=window;
  window.ScannerDeviceStore={
   async getPendingUpload(account){return clone(pending.get(account)||null);},
@@ -7289,7 +7384,7 @@ async function loadCloudBackendV2({rootData=null,batchFailureAt=Infinity,failure
  for(const file of ['device-store-v2.js','cloud-store-v2.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,file),'utf8'),context,{filename:file});
  window.ChainStorageV2=context.ChainStorageV2;window.ChainCloudV2=context.ChainCloudV2;
  await vm.runInContext(`(async()=>{${moduleSource}\n})()`,context,{filename:'index.html#cloud-v2-backend'});
- return {CS:window.CloudSync,auth,docs,pending,events,batchCommits,writes,popupProviders,transactionCalls,queries,network};
+ return {CS:window.CloudSync,auth,docs,pending,events,batchCommits,writes,popupProviders,transactionCalls,queries,network,emitAuth(user){auth.currentUser=user;authListener?.(user);}};
 }
 
 test('RISK CLOUD V2 ADAPTER: production migrates a legacy root to verified chunks and pulls the exact multi-megabyte board',async()=>{
@@ -12443,7 +12538,7 @@ test('RISK Animation audit: water and visitors keep a thirty-fps paint cap while
  const tick=source.slice(source.indexOf('  function tick(now){'),source.indexOf('  function stop(){'));
  for(const hz of [60,90,120,144]){
   const paints=[];let scheduledSeconds=0,scheduledCalls=0;
-  const ctx=vm.createContext({reduced:false,document:{hidden:false},frame:0,last:0,nextPaint:0,world:{elapsed:0},woodland:{},sky:{},cityLights:{},p:{night:0},rooftopParty:{active:null},rooftopRoofs:[],geometry:{advanceRooftopParty(state,dt){scheduledSeconds+=dt;scheduledCalls++;}},Math,requestAnimationFrame(){return 1;},S:{advance(w,dt){w.elapsed+=dt;},advanceWoodland(){},advanceLights(){return false;}},paintLife(){paints.push(ctx.now);}});
+  const ctx=vm.createContext({reduced:false,document:{hidden:false},frame:0,last:0,nextPaint:0,world:{elapsed:0},woodland:{},sky:{},cityLights:{},p:{night:0},rooftopParty:{active:null},rooftopRoofs:[],geometry:{advanceRooftopParty(state,dt){scheduledSeconds+=dt;scheduledCalls++;}},Math,requestAnimationFrame(){return 1;},S:{advance(w,dt){w.elapsed+=dt;},advanceWoodland(){},advanceLights(){return false;},advanceGardenLights(){return false;}},paintLife(){paints.push(ctx.now);}});
   vm.runInContext(tick,ctx);
   for(let i=1;i<=hz*2;i++){ctx.now=i*1000/hz;vm.runInContext('tick(now)',ctx);}
   assert.ok(paints.length>=59&&paints.length<=61,`${hz}Hz produced ${paints.length} paints in two seconds; the reflection should paint at about 30fps`);
@@ -13073,7 +13168,7 @@ test('Weather browser: separate devices agree despite different local scene sett
   for(const [timezoneId,sceneTime] of [['America/New_York','00:00'],['Asia/Tokyo','12:00']]){
    const context=await browser.newContext({timezoneId,reducedMotion:'reduce'}),page=await context.newPage();
    await page.clock.setFixedTime(new Date(instant));await page.addInitScript(time=>{localStorage.setItem('fvp:chain-scanner:scene-time',time);localStorage.setItem('fvp:chain-scanner:scene-season','summer');localStorage.setItem('fvp:chain-scanner:landscape-motion','reduced');},sceneTime);
-   await page.goto(process.env.LANDSCAPE_BROWSER_URL);assert.equal(await page.evaluate(()=>document.documentElement.dataset.sceneWeather),'rain');
+   await page.goto(process.env.LANDSCAPE_BROWSER_URL);await page.waitForFunction(()=>document.documentElement.dataset.sceneWeather!==undefined);assert.equal(await page.evaluate(()=>document.documentElement.dataset.sceneWeather),'rain');
    const before=await page.locator('[data-life]').evaluate(c=>c.toDataURL());await page.waitForTimeout(100);assert.equal(await page.locator('[data-life]').evaluate(c=>c.toDataURL()),before,'reduced rain stays still');pages.push(page);
   }
   for(const page of pages){await page.clock.setFixedTime(new Date(episode.end+1000));await page.evaluate(()=>window.dispatchEvent(new StorageEvent('storage',{key:null})));assert.equal(await page.evaluate(()=>document.documentElement.dataset.sceneWeather),'clear');}
@@ -13422,7 +13517,7 @@ test('Banner aircraft: propeller craft has a tail tow point and animated blades 
  const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),code=source.slice(source.indexOf('  function airplane('),source.indexOf('  function paintGuest('));
  const render=(time,propeller)=>{const calls=[],g={save(){},restore(){},translate(){},scale(){},beginPath(){},moveTo(...v){calls.push(['m',...v]);},lineTo(...v){calls.push(['l',...v]);},closePath(){},fill(){}};vm.runInNewContext(code+`;airplane(0,0,1,.2,${time},${propeller})`,{g,Math,color:()=> '#123456',S:livingSky(),p:{sky:['#abc','#bcd','#def'],front:'#789abc',city:'#345678',night:0},line(g,...v){calls.push(['line',...v]);},ellipse(g,...v){calls.push(['ellipse',...v]);}});return calls;};
  assert.notDeepEqual(render(0,true),render(.07,true),'propeller visibly spins');assert.deepEqual(render(0,false),render(.07,false),'airshow silhouette stays unchanged');
- const banner=source.slice(source.indexOf("    if(e.type==='banner'){"));assert.match(banner,/airplane\(x,y,dir,e.seed,t,true\)/);assert.match(banner,/line\(g,x-dir\*18,y/,'tow starts at the tail');
+ const banner=source.slice(source.indexOf("    if(e.type==='banner'){"));assert.match(banner,/airplane\(x,y,dir,e.seed,t,true\)/);assert.match(banner,/layout\.towStartX,layout\.towStartY,layout\.towEndX,layout\.towEndY/,'the measured tow layout begins at the tail and meets the fabric edge');
  assert.match(banner,/LandscapeAppearance\.bannerColors\(p\.night,c,p\.city\)/,'banner colors follow the actual sky rather than the UI theme');
  const appearance=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-appearance.js'),'utf8'),appearance);
  const day=appearance.LandscapeAppearance.bannerColors(0,'#cb8d80','#416b68'),night=appearance.LandscapeAppearance.bannerColors(1,'#cb8d80','#416b68');
@@ -14724,7 +14819,7 @@ test('RISK browser layout matrix: native dates respect pane insets, rank evidenc
     const stop=document.querySelector('[data-act="start-working"]'),rank=document.querySelector('.decide-finish .sparkbox');
     return {controls,content,stop:rect(stop),rank:rect(rank),touch:getComputedStyle(document.documentElement).touchAction,overflow:document.documentElement.scrollWidth>innerWidth};
    });
-   assert.equal(layout.touch,'manipulation');assert.equal(layout.overflow,false,`${spec.risk}: no page overflow at ${spec.width}x${spec.height}`);
+   assert.equal(layout.touch,'pan-x pan-y','scrolling stays available while pinch zoom remains disabled');assert.equal(layout.overflow,false,`${spec.risk}: no page overflow at ${spec.width}x${spec.height}`);
    for(const control of layout.controls){assert.ok(control.left>=layout.content.left-1&&control.right<=layout.content.right+1,`${spec.risk}: ${control.id} stays inside the Add pane's padded content boundary`);assert.ok(control.scrollWidth<=control.clientWidth+1,`${spec.risk}: ${control.id} has no clipped intrinsic content box`);}
    assert.ok(layout.stop.top<layout.rank.bottom&&layout.rank.top<layout.stop.bottom,`${spec.risk}: done adding and rank summary remain on one line`);
   }
@@ -17924,20 +18019,21 @@ test('RISK night shows: standalone fireworks recur independently of the rare coo
 test('RISK night shows: festival odds are lower than standalone fireworks with finite visits and rate controls',()=>{
  const ctx=vm.createContext({Date,Math,console});
  for(const file of ['landscape-config.js','vendor/astronomy.min.js','stars.js','landscape-core.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,file),'utf8'),ctx);
- const sky=ctx.LivingSky;
- assert.ok(sky.rareTypes.includes('festival'));
- assert.equal(ctx.LandscapeConfig.setSpawnRates('| Event | Rate |\n| festival | 0 |\n| fireworks | 0 |'),true);
+  const sky=ctx.LivingSky;
+  assert.ok(sky.rareTypes.includes('festival'));
+  assert.equal(ctx.LandscapeConfig.nightShows.festival.chance,.006,'festival chance is one tenth of the previous six-percent check');
+  assert.equal(ctx.LandscapeConfig.setSpawnRates('| Event | Rate |\n| festival | 0 |\n| fireworks | 0 |'),true);
  const run=(roll,altitude=-20)=>{
   const w=sky.createWorld(()=>roll);w.events=[];w.next=Infinity;w.railNext={train:Infinity,metro:Infinity};w.nextFireworks=0;w.nextFestival=0;
   sky.advance(w,1,{sun:{altitude,azimuth:0}});return w;
  };
  assert.equal(run(0).events.length,0,'zero rates disable both shows');
  ctx.LandscapeConfig.setSpawnRates('| Event | Rate |\n| festival | 1 |\n| fireworks | 1 |');
- assert.ok(run(.05).events.some(e=>e.type==='festival'),'a low successful festival roll enters');
- assert.ok(!run(.07).events.some(e=>e.type==='festival'),'the festival chance is only six percent per minute');
- assert.ok(run(.3).events.some(e=>e.type==='fireworks'),'standalone shows have forty percent checks');
- const w=run(.05),festival=w.events.find(e=>e.type==='festival');
- assert.equal(festival.duration,150/sky.startingSpeed(.05));assert.equal(festival.speed,sky.startingSpeed(.05));
+  assert.ok(run(.005).events.some(e=>e.type==='festival'),'a roll below the one-minute .006 chance enters');
+  assert.ok(!run(.007).events.some(e=>e.type==='festival'),'rolls above the one-minute .006 chance wait');
+  assert.ok(run(.3).events.some(e=>e.type==='fireworks'),'standalone shows have forty percent checks');
+  const w=run(.005),festival=w.events.find(e=>e.type==='festival');
+ assert.equal(festival.duration,150/sky.startingSpeed(.005));assert.equal(festival.speed,sky.startingSpeed(.005));
  w.nextFireworks=Infinity;w.nextFestival=Infinity;sky.advance(w,festival.duration+1,{sun:{altitude:-20,azimuth:0}});
  assert.ok(!w.events.some(e=>e.type==='festival'),'the final fade retires the event');
  assert.ok(run(0,20).events.length===0);
@@ -18008,6 +18104,128 @@ test('RISK night shows: festival and standalone sparks enter the shared mirror b
  const start=source.indexOf('  function paintFestivalBarge('),end=source.indexOf('  function paintLife(t){');
  assert.ok(start>=0&&end>start);
  assert.doesNotMatch(source.slice(start,end),/Date\.now|Math\.random|setInterval|globalCompositeOperation\s*=\s*['"](?:lighter|screen)/,'show motion uses the pausable event clock and no flash compositing');
+});
+
+test('RISK night shows: festivals keep a thirty-minute cooldown while fireworks stay independent',()=>{
+ const ctx=vm.createContext({Date,Math,console});
+ for(const file of ['landscape-config.js','vendor/astronomy.min.js','stars.js','landscape-core.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,file),'utf8'),ctx);
+ const sky=ctx.LivingSky,night={sun:{altitude:-20,azimuth:0}},show=ctx.LandscapeConfig.nightShows.festival;
+ assert.ok(show.cooldown>=1800,'festival configuration requires at least thirty minutes between launches');
+ ctx.LandscapeConfig.setSpawnRates('| Event | Rate |\n| festival | 1 |\n| fireworks | 1 |');
+ const world=sky.createWorld(()=>0);world.events=[];world.next=Infinity;world.railNext={train:Infinity,metro:Infinity};
+ world.nextFestival=0;world.nextFireworks=Infinity;
+ sky.advance(world,1,night);
+ assert.equal(world.events.filter(event=>event.type==='festival').length,1);
+ assert.equal(world.lastFestival,1,'the cooldown begins at the actual launch time');
+ for(let elapsed=1;elapsed<1800;elapsed++)sky.advance(world,1,night);
+ assert.equal(world.elapsed,1800);
+ assert.equal(world.events.filter(event=>event.type==='festival').length,0,'a successful random source cannot bypass the thirty-minute quiet period');
+ sky.advance(world,1,night);
+ assert.equal(world.events.filter(event=>event.type==='festival').length,1,'a fresh festival opportunity opens once the cooldown expires');
+ const recentlyRare=sky.createWorld(()=>0);recentlyRare.events=[];recentlyRare.next=Infinity;recentlyRare.railNext={train:Infinity,metro:Infinity};
+ recentlyRare.elapsed=1000;recentlyRare.lastRare=1000;recentlyRare.lastFestival=-1000;recentlyRare.nextFestival=1000;recentlyRare.nextFireworks=Infinity;
+ sky.advance(recentlyRare,1,night);
+ assert.equal(recentlyRare.events.filter(event=>event.type==='festival').length,0,'the new festival cooldown preserves the existing shared rare-event quiet period');
+ const fireworks=sky.createWorld(()=>.3);fireworks.events=[];fireworks.next=Infinity;fireworks.railNext={train:Infinity,metro:Infinity};
+ fireworks.nextFestival=0;fireworks.nextFireworks=0;
+ sky.advance(fireworks,1,night);
+ assert.ok(fireworks.events.some(event=>event.type==='fireworks'),'the festival cooldown does not suppress the frequent standalone fireworks roll');
+});
+
+test('RISK festival barge: hull, stage, and crowd follow the cruise-vessel scale',()=>{
+ const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),start=source.indexOf('  function paintFestival(e){'),end=source.indexOf('  function paintLife(t){',start),paint=source.slice(start,end);
+ for(const [width,height] of [[320,568],[568,320],[768,1024],[1440,900]]){
+  const scene=ctx.LandscapeGeometry.create(width,height),lane=.55,event={type:'festival',age:75,duration:150,lane,seed:.4};
+  const cruise=scene.vessel('cruise',lane,width/2,0),festival=scene.festival(event);
+  assert.equal(festival.scale,cruise.scale,`${width}x${height}: the barge shares the responsive cruise-vessel scale`);
+  assert.equal(festival.width,72*cruise.scale,`${width}x${height}: its hull stays near the existing cruise length`);
+  assert.equal(festival.height,28*cruise.scale,`${width}x${height}: vertical stage geometry scales with the hull`);
+  assert.equal(festival.hullDepth,3*cruise.scale,`${width}x${height}: draft scales with the hull`);
+  const launchAge=8+3.8*15,launcher=scene.festival({...event,age:launchAge}),rocket=scene.fireworks(launchAge+.001,.4,true,event).find(dot=>dot.kind==='rocket'&&dot.burst===15);
+  assert.equal(launcher.launcherOffset,56*.49*launcher.scale,`${width}x${height}: launch origins share the painted scaled rack position`);
+  assert.equal(launcher.launcherTop,-launcher.height*.21,`${width}x${height}: rack mast height follows the scaled stage`);
+  assert.equal(launcher.launcherBottom,-launcher.height*.10,`${width}x${height}: rack mast base follows the scaled stage`);
+  assert.equal(launcher.launcherRailWidth,2*launcher.scale,`${width}x${height}: rack line width follows the vessel scale`);
+  assert.ok(Math.abs(rocket.x-(launcher.x+launcher.launcherOffset+launcher.velocity*.001))<1e-6,`${width}x${height}: shell ignition starts at its painted rack`);
+  assert.ok(festival.width<=width*.24,`${width}x${height}: the floating show stays small in the scene`);
+ }
+ assert.match(paint,/g\.scale\(scale,scale\)/,'one uniform transform keeps stage lines and people in proportion');
+ assert.match(paint,/pose\.launcherOffset\/scale/,'the painted rack consumes the same launch offset as shell geometry');
+ assert.match(paint,/pose\.launcherTop\/scale/,'the painted rack mast uses scaled geometry dimensions');
+ assert.doesNotMatch(paint,/w\*\.52/,'rack placement does not drift from the shell launch position');
+ assert.match(paint,/for\(let i=0;i<12;i\+\+\)/,'a compact crowd follows the smaller deck');
+});
+
+test('RISK festival barge: scaled deck fireworks remain visible in the shallow short-screen lake',()=>{
+ const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
+ const scene=ctx.LandscapeGeometry.create(568,320),event={type:'festival',age:78.2,duration:150,seed:.4,lane:.4,reverse:false};
+ const sparks=scene.fireworks(event.age,event.seed,true,event).filter(dot=>dot.kind==='spark'&&dot.alpha>.05);
+ assert.ok(sparks.some(dot=>{
+  const y=scene.reflectionSurface(1).mirrorY(dot.y);
+  return y>scene.waterTop+2&&y<scene.far(dot.x)-2;
+ }),'the smaller launch rack still sends a bright spark into visible lake geometry');
+});
+
+test('RISK landscape banners: the longest human airplane prompt fits measured fabric in both directions',()=>{
+ const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
+ const markdown=fs.readFileSync(path.join(__dirname,'HUMAN_WRITTEN_HOURLY_TAGS.md'),'utf8');
+ const airplaneSection=markdown.split(/^## Airplanes\s*$/m)[1]?.split(/^## /m)[0]||'';
+ const configured=[...airplaneSection.matchAll(/^\s*-\s+(.+)\s*$/gm)].map(match=>match[1]);
+ const stressPrompt='Remember that taking a moment to look around can turn an ordinary flight into a peaceful reminder that there is time to breathe';
+ const prompt=(configured.length?configured:[stressPrompt]).sort((a,b)=>b.length-a.length)[0];
+ const mood=moodRuntime();mood.setHumanText(`## Airplanes\n- ${prompt}`);
+ assert.equal(mood.airplaneMessage(()=>0),prompt,'the layout uses the same editable human airplane-message path as the renderer');
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ assert.ok(source.includes('geometry.bannerLayout('),'the painter consumes the measured banner geometry');
+ assert.ok(source.includes('g.measureText('),'fabric width uses the active canvas font metrics');
+ for(const [width,height] of [[320,568],[568,320],[768,1024],[1440,900]]){
+  const scene=ctx.LandscapeGeometry.create(width,height),maxWidth=Math.min(144,width*.44);
+  const measure=(line,fontSize)=>Array.from(line).reduce((sum,letter)=>sum+fontSize*(letter===' '?0.28:/[il.,'!]/.test(letter)?0.27:/[MW]/.test(letter)?0.82:0.57),0);
+  for(const direction of [-1,1]){
+   const layout=scene.bannerLayout(prompt,width/2,40,direction,measure);
+   assert.equal(layout.direction,direction);
+   assert.ok(layout.lines.length>1,'long human copy wraps instead of running past the fabric');
+   assert.equal(layout.lines.join(' '),prompt,'wrapping preserves every character and word');
+   assert.ok(layout.width<=maxWidth,`${width}x${height}: fabric stays within the viewport allowance`);
+   assert.ok(layout.fontSize>=6,`${width}x${height}: wrapped copy remains legible`);
+   for(const line of layout.lines)assert.ok(measure(line,layout.fontSize)<=layout.width-8,`${width}x${height}: measured line fits inside fabric padding`);
+   assert.ok(layout.height>=layout.lines.length*layout.fontSize*1.2+4,'fabric height contains every measured text row');
+   assert.equal(layout.towEndX,layout.x+direction*layout.width/2,'tow line meets the near edge for forward and reverse travel');
+   assert.equal(layout.towStartX,width/2-direction*18,'tow line begins at the biplane tail in either direction');
+  }
+ }
+});
+
+test('RISK skyline lights: garden roofs start independently, stay stable, and change slowly at night',()=>{
+ const sky=livingSky(),context=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),context);
+ const seed=value=>{const v=Math.sin(value*127.1+311.7)*43758.5453;return v-Math.floor(v);};
+ for(const [width,height] of [[320,568],[568,320],[768,1024],[1440,900]]){
+  const gardens=context.LandscapeGeometry.create(width,height).cityscape(seed).gardens.map(garden=>garden.index);
+  assert.ok(gardens.length>0,`${width}x${height}: eligible planted roofs exist`);
+  let draws=0;const alternating=sky.createGardenLights(gardens,()=>draws++%2===0?.9:.1);
+  assert.equal(draws,gardens.length,`${width}x${height}: each eligible roof receives an independent initial draw`);
+  assert.ok(gardens.some(index=>alternating.lit[index])&&gardens.some(index=>!alternating.lit[index]),`${width}x${height}: roofs can have different light states together`);
+  const before={...alternating.lit};
+  sky.syncGardenLights(alternating,gardens,()=>{throw new Error('unchanged roofs must not be rerolled during paint');});
+  assert.deepEqual(JSON.parse(JSON.stringify(alternating.lit)),before,'repainting the same plan keeps every roof state stable');
+ }
+ const ids=[1,2,3,4],allOn=sky.createGardenLights(ids,()=>.99),allOff=sky.createGardenLights(ids,()=>0);
+ assert.ok(ids.every(index=>allOn.lit[index]),'independent outcomes allow all eligible garden roofs to be lit');
+ assert.ok(ids.every(index=>!allOff.lit[index]),'independent outcomes allow every garden roof to be dark');
+ const state=sky.createGardenLights(ids,()=>.99),initial={...state.lit};
+ assert.equal(sky.advanceGardenLights(state,119,true,()=>0),false,'garden lights remain steady between scheduled changes');
+ assert.deepEqual(JSON.parse(JSON.stringify(state.lit)),initial);
+ assert.equal(sky.advanceGardenLights(state,1,true,()=>0),true,'a night opportunity changes one roof at a time');
+ assert.equal(ids.filter(index=>state.lit[index]!==initial[index]).length,1);
+ const day=sky.createGardenLights(ids,()=>.99),dayState={...day.lit};
+ assert.equal(sky.advanceGardenLights(day,300,false,()=>0),false,'daylight never switches garden lights');
+ assert.deepEqual(JSON.parse(JSON.stringify(day.lit)),dayState);
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),background=source.slice(source.indexOf('  function paintBackground(){'),source.indexOf('  function paintWoodland('));
+ assert.match(background,/gardenLights\.lit\[garden\.index\]/,'only the selected roof states control visible garden fixtures');
+ assert.ok(source.includes('S.advanceGardenLights(cityLights.gardens,dt,p.night>.2,Math.random)'),'normal motion advances on the active scene clock');
+ assert.ok(source.includes('if(reduced&&S.advanceGardenLights(cityLights.gardens,dt,p.night>.2,Math.random))'),'reduced motion advances the slow state without animated flicker');
+ assert.ok(source.includes('else partyTimer=setInterval(()=>advanceRooftopParty(1),1000)'),'reduced motion uses its visible-time timer instead of animated frames');
 });
 
 test('RISK Landscape browser: both night shows reflect actual sparks and exposed windows visibly switch on and off', {skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{

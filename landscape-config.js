@@ -135,7 +135,7 @@
     durations: EVENT_DURATIONS,
     eventDurations: EVENT_DURATIONS,
     woodland: WOODLAND,
-    nightShows: freeze({fireworks: freeze({interval:30,chance:.4,rest:60}),festival: freeze({interval:60,chance:.06})}),
+    nightShows: freeze({fireworks: freeze({interval:30,chance:.4,rest:60}),festival: freeze({interval:60,chance:.006,cooldown:1800})}),
     pickEvent,
     eventsForSeason: season => (seasonConfig[season] || seasonConfig.summer).events.slice(),
   });

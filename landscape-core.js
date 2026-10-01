@@ -135,6 +135,29 @@
     const index=visible?visible[slot]:slot;
     state.windows[index]=!state.windows[index];return true;
   }
+  const GARDEN_LIGHT_INTERVAL=120;
+  function createGardenLights(roofIndices=[],random=Math.random){
+    const state={elapsed:0,next:GARDEN_LIGHT_INTERVAL,roofs:[],lit:{}};
+    return syncGardenLights(state,roofIndices,random);
+  }
+  function syncGardenLights(state,roofIndices=[],random=Math.random){
+    if(!state||typeof state!=='object')return state;
+    const lit={},roofs=[];
+    for(const index of new Set(roofIndices.filter(Number.isInteger))){
+      roofs.push(index);
+      lit[index]=Object.hasOwn(state.lit||{},index)?state.lit[index]:clamp(Number(random())||0,0,.999999)>.5;
+    }
+    state.roofs=roofs;state.lit=lit;return state;
+  }
+  function advanceGardenLights(state,dt,night,random=Math.random){
+    if(!state||!Number.isFinite(dt)||dt<=0)return false;
+    state.elapsed+=dt;
+    if(state.elapsed<state.next)return false;
+    state.next=state.elapsed+GARDEN_LIGHT_INTERVAL;
+    if(!night||!state.roofs.length)return false;
+    const slot=Math.floor(clamp(Number(random())||0,0,.999999)*state.roofs.length),index=state.roofs[slot];
+    state.lit[index]=!state.lit[index];return true;
+  }
   function activity(sky){return sky.sun.altitude < -6?.24:sky.sun.azimuth<180?1:.65;}
   const MAX_EVENTS=14,RARE_COOLDOWN=420;
   const EVENT_TYPES=CONFIG.eventTypes;
@@ -160,7 +183,7 @@
     return type==='flock'?3+index*2:type==='cyclist'?1+index:1;
   };
   function createWorld(random=Math.random,season='summer'){
-    const world={random,season,railNext:{train:0,metro:12},nextFireworks:20,nextFestival:60,elapsed:0,events:[],next:3+random()*6,lastRare:-RARE_COOLDOWN,rareCount:0,wind:.6+random()*1.2};
+    const world={random,season,railNext:{train:0,metro:12},nextFireworks:20,nextFestival:60,elapsed:0,events:[],next:3+random()*6,lastRare:-RARE_COOLDOWN,lastFestival:-CONFIG.nightShows.festival.cooldown,rareCount:0,wind:.6+random()*1.2};
     // Start mid-journey so returning never waits for a first event. Pick three
     // distinct ordinary visitors; the rare abduction is never in the opening cast.
     const pool=(season==='winter'?WINTER_EVENTS:INITIAL_TYPES).filter(type=>CONFIG.spawnRate(type)>0);
@@ -211,10 +234,10 @@
       if(w.elapsed<w[key])continue;
       w[key]=w.elapsed+show.interval;
       if(sky.sun.altitude>=-6||!CONFIG.spawnRate(type)||w.events.length>=MAX_EVENTS-2||w.events.some(e=>e.type==='festival'||e.type==='fireworks'))continue;
-      if(type==='festival'&&w.elapsed-w.lastRare<RARE_COOLDOWN)continue;
+      if(type==='festival'&&(w.elapsed-w.lastRare<RARE_COOLDOWN||w.elapsed-w.lastFestival<show.cooldown))continue;
       if(w.random()>=Math.min(1,show.chance*CONFIG.spawnRate(type)))continue;
       spawn(w,type);
-      if(type==='festival'){w.lastRare=w.elapsed;w.rareCount++;}
+      if(type==='festival'){w.lastRare=w.elapsed;w.lastFestival=w.elapsed;w.rareCount++;}
       else w[key]=w.elapsed+EVENT_DURATIONS.fireworks+show.rest;
     }
     if(w.elapsed>=w.next){
@@ -340,6 +363,6 @@
   function readMotion(storage){try{return normalizeMotion(storage.getItem(MOTION_KEY));}catch{return null;}}
   function saveMotion(storage,value){try{storage.setItem(MOTION_KEY,value);return true;}catch{return false;}}
   function motionReduced(value,osReduced){return !!osReduced||normalizeMotion(value)!=='normal';}
-  root.LivingSky={setSeason,eventsForSeason,sceneSolarDate,weatherAt,createWoodland,advanceWoodland,woodlandTypes,startingSpeed,groupSize,readSceneSeason,saveSceneSeason,createSceneMirror,advanceLights,skinTone,sceneDate,readSceneTime,saveSceneTime,skyAt,sunTimes,solarSchedule,solarPresets,starAt,starCount:root.SKY_STARS.length,palette,activity,createWorld,advance,
+  root.LivingSky={setSeason,eventsForSeason,sceneSolarDate,weatherAt,createWoodland,advanceWoodland,woodlandTypes,startingSpeed,groupSize,readSceneSeason,saveSceneSeason,createSceneMirror,advanceLights,createGardenLights,syncGardenLights,advanceGardenLights,skinTone,sceneDate,readSceneTime,saveSceneTime,skyAt,sunTimes,solarSchedule,solarPresets,starAt,starCount:root.SKY_STARS.length,palette,activity,createWorld,advance,
     nightEventTypes:NIGHT_TYPES.slice(),eventTypes:[...EVENT_TYPES,...WINTER_VISITORS],rareTypes:RARE_TYPES.slice(),eventDurations:Object.assign({},EVENT_DURATIONS),MAX_EVENTS,RARE_COOLDOWN,readMotion,saveMotion,motionReduced,clamp,lerp,smooth,mixHex};
 })(globalThis);
