@@ -6,6 +6,15 @@ The named-contract test in tests.js checks that every top-level test whose title
 
 ## Task state, eligibility, and scanner controls
 
+- RISK evergreen Undo: all Done entry points clear a persisted rest period and countdown
+- RISK evergreen return: the editor ends rest early durably while keeping History and ratings
+- RISK evergreen reconciliation: stale completions cannot reinstate cancelled rest in either merge direction
+- RISK evergreen Undo: an older session and unrelated edits survive reversing a later Done
+- RISK evergreen return: saving a shorter interval or disabling evergreen still returns the resting task
+- RISK evergreen Undo: durable IndexedDB and host storage keep the cancelled completion after reload
+- RISK evergreen cloud: Undo and early return publish cleared cooldowns and reject a later stale completion
+- RISK evergreen legacy: a saved cooldown without a done mark can return early and deletion Undo preserves it
+
 - RISK DATE DISPLAY: noncurrent years remain visible in task and history labels across New Year
 - RISK DATE FORMAT: legacy and corrupt preferences default to System and overrides preserve calendar days
 - RISK DATE FORMAT: Settings saves a changed format immediately through close reload Undo and cloud serialization
