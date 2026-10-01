@@ -1046,5 +1046,28 @@
       "command": "node --test --test-reporter=spec --test-name-pattern='RISK evergreen|Help:.*FAQ' tests.js",
       "failure": "The initial run before implementation failed four contracts: bench-done Undo retained lastDoneAt, the evergreen Return button was disabled, stale reconciliation reinstated completion, and Undo replaced the earlier session with the new timestamp. Saved in /Users/emeraldpham/.codex/task-artifacts/undo-evergreen-cooldown-20261001/red.txt. The editor-field regression subsequently failed before its repair (red-edited-return.txt). Corrected and expanded final fixtures were also run against the unchanged origin/main app and all eight contracts failed (red-final-fixtures.txt), including the account-bound cloud case and durable backend reload. Reload fixtures were corrected to use the existing STORE_KEY; cloud setup explicitly binds the test account before an undoable Done. Independent review reproduction was converted to an observed red test in red-flag-changes.txt: Return while disabling Evergreen allowed the stale merge winner to retain lastDoneAt. The repair also covers enabling Evergreen in a Done gesture and reversing it."
     }
+  },
+  {
+    "reason": "The user clarified that garden lights should occur one-third as often as before, making each eligible roof lit with probability 1/6 rather than 1/2. Each scheduled 120-second night opportunity must independently resample one roof, and the caller repaints only when its visible state changes.",
+    "previousBehavior": "Eligible gardens were lit on half of initial random draws and each night opportunity blindly toggled one roof, producing a long-run one-half lit rate. Garden states that disappeared from the eligible plan during a resize were discarded and rerolled when those roofs returned.",
+    "intendedBehavior": "Every new eligible roof and every selected roof at an existing 120-second night opportunity draws an independent one-in-six lit state. All-on and all-off remain possible, repeated paints and viewport resizes preserve prior roof outcomes, a same-state sample reports no visible change, and daylight, hidden tabs, and reduced-motion clocks retain their existing timing boundaries.",
+    "replacementTests": [
+      "RISK skyline lights: each garden has a one-in-six state through independent resamples"
+    ],
+    "updatedTests": [
+      "RISK skyline lights: garden roofs start independently, stay stable, and change slowly at night"
+    ],
+    "preservedCoverage": [
+      "Independent per-roof initial draws retain possible all-lit and all-dark outcomes and remain stable across painting and resize eligibility changes.",
+      "The exact one-sixth boundary is pinned, each selected 120-second night update consumes one roof-selection draw and one state draw, and deterministic long-run samples keep each roof near one-sixth rather than one-half.",
+      "The helper returns false when its selected roof remains dark and true only when its visible state changes; one roof is selected per opportunity and daytime never changes it.",
+      "Normal active-scene timing, reduced-motion timing, hidden-tab pausing, existing patio/window/party behavior, and the original responsive garden eligibility exclusions remain covered."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='RISK skyline lights: (garden roofs start independently|each garden has a one-in-six state through independent resamples)' tests.js",
+      "failure": "Before probability implementation, both selected contracts failed: the prior .99-seeded all-on fixture no longer represented lit under the requested lower-bound event, and a draw just below one sixth stayed dark under the old greater-than-one-half rule. Exact red output: /Users/emeraldpham/.codex/task-artifacts/garden-light-probability-20261001/red-garden-light-prevalence-before-implementation.txt. The resize-preservation assertion then failed because a temporarily ineligible roof's sampled state was removed; exact red output: /Users/emeraldpham/.codex/task-artifacts/garden-light-probability-20261001/red-garden-resize-stability-before-fix.txt. After the core change, the existing Settings app-fingerprint contract also failed for stale release metadata; observed output is /Users/emeraldpham/.codex/task-artifacts/garden-light-probability-20261001/red-current-changelog-fingerprint-before-update.txt.",
+      "followUpCommand": "node --test --test-reporter=spec --test-name-pattern='RISK skyline lights: (garden roofs start independently|each garden has a one-in-six state through independent resamples)' tests.js"
+    },
+    "testChangesSha256": "bade1714a3c8612419bc0cc5882ed88a10da8b64585d5e2642b15018774e6b28"
   }
 ]
