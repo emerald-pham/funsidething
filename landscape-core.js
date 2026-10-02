@@ -135,7 +135,7 @@
     const index=visible?visible[slot]:slot;
     state.windows[index]=!state.windows[index];return true;
   }
-  const GARDEN_LIGHT_INTERVAL=120,GARDEN_LIGHT_CHANCE=1/6;
+  const GARDEN_LIGHT_INTERVAL=120,GARDEN_LIGHT_CHANCE=1/12;
   const sampleGardenLight=random=>clamp(Number(random())||0,0,.999999)<GARDEN_LIGHT_CHANCE;
   function createGardenLights(roofIndices=[],random=Math.random){
     const state={elapsed:0,next:GARDEN_LIGHT_INTERVAL,roofs:[],lit:{}};

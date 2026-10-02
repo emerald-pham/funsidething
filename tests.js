@@ -18203,7 +18203,7 @@ test('RISK skyline lights: garden roofs start independently, stay stable, and ch
  for(const [width,height] of [[320,568],[568,320],[768,1024],[1440,900]]){
   const gardens=context.LandscapeGeometry.create(width,height).cityscape(seed).gardens.map(garden=>garden.index);
   assert.ok(gardens.length>0,`${width}x${height}: eligible planted roofs exist`);
-  let draws=0;const alternating=sky.createGardenLights(gardens,()=>draws++%2===0?.9:.1);
+  let draws=0;const alternating=sky.createGardenLights(gardens,()=>draws++%2===0?.99:.01);
   assert.equal(draws,gardens.length,`${width}x${height}: each eligible roof receives an independent initial draw`);
   assert.ok(gardens.some(index=>alternating.lit[index])&&gardens.some(index=>!alternating.lit[index]),`${width}x${height}: roofs can have different light states together`);
   const before={...alternating.lit};
@@ -18219,7 +18219,7 @@ test('RISK skyline lights: garden roofs start independently, stay stable, and ch
  assert.deepEqual(JSON.parse(JSON.stringify(state.lit)),initial);
  assert.equal(sky.advanceGardenLights(state,1,true,random),false,'a resample that remains dark does not request a repaint');
  assert.deepEqual(JSON.parse(JSON.stringify(state.lit)),initial,'the selected roof retains its sampled state when the next outcome matches');
- assert.equal(sky.advanceGardenLights(state,120,true,random),true,'a later one-in-six resample can light one roof');
+ assert.equal(sky.advanceGardenLights(state,120,true,random),true,'a later one-in-twelve resample can light one roof');
  assert.equal(ids.filter(index=>state.lit[index]!==initial[index]).length,1);
  const day=sky.createGardenLights(ids,()=>.99),dayState={...day.lit};
  assert.equal(sky.advanceGardenLights(day,300,false,()=>0),false,'daylight never switches garden lights');
@@ -18876,15 +18876,16 @@ test('RISK evergreen flag changes: completion cancellation survives both merge d
   }
 });
 
-test('RISK skyline lights: each garden has a one-in-six state through independent resamples',()=>{
- const sky=livingSky(),chance=1/6,roof=[17];
- assert.equal(sky.createGardenLights(roof,()=>chance-Number.EPSILON).lit[17],true,'values just below one sixth light a garden');
- assert.equal(sky.createGardenLights(roof,()=>chance).lit[17],false,'the exact one-sixth boundary stays dark');
- assert.equal(sky.createGardenLights(roof,()=>chance+Number.EPSILON).lit[17],false,'values above one sixth stay dark');
+test('RISK skyline lights: each garden has a one-in-twelve state through independent resamples',()=>{
+ const sky=livingSky(),chance=1/12,roof=[17];
+ assert.equal(sky.createGardenLights(roof,()=>chance-Number.EPSILON).lit[17],true,'values just below one twelfth light a garden');
+ assert.equal(sky.createGardenLights(roof,()=>chance).lit[17],false,'the exact one-twelfth boundary stays dark');
+ assert.equal(sky.createGardenLights(roof,()=>chance+Number.EPSILON).lit[17],false,'values above one twelfth stay dark');
+ assert.equal(sky.createGardenLights(roof,()=>1/6-Number.EPSILON).lit[17],false,'values near the former one-sixth boundary now stay dark');
  const resized=sky.createGardenLights([21,22],()=>0),beforeResize={...resized.lit};
  sky.syncGardenLights(resized,[22,23],()=>.99);
  assert.equal(resized.lit[21],beforeResize[21],'temporarily ineligible roofs retain their state across a resize');
- assert.equal(resized.lit[23],false,'a newly eligible roof receives a fresh independent one-in-six draw');
+ assert.equal(resized.lit[23],false,'a newly eligible roof receives a fresh independent one-in-twelve draw');
  sky.syncGardenLights(resized,[21,22],()=>{throw new Error('returning roofs must retain their sampled state');});
  assert.deepEqual(JSON.parse(JSON.stringify(resized.lit)),{...beforeResize,23:false},'returning to an earlier viewport restores prior roof states and retains the newly seen roof');
 
@@ -18898,14 +18899,14 @@ test('RISK skyline lights: each garden has a one-in-six state through independen
   const random=()=>draws++===0?roofDraw:stateDraw;
   const expected=stateDraw<chance,changed=sky.advanceGardenLights(state,120,true,random);
   assert.equal(draws,2,`opportunity ${step}: choose one garden, then independently sample its next state`);
-  assert.equal(state.lit[selected],expected,`opportunity ${step}: the selected garden follows the one-in-six draw`);
+  assert.equal(state.lit[selected],expected,`opportunity ${step}: the selected garden follows the one-in-twelve draw`);
   assert.equal(changed,before!==expected,`opportunity ${step}: report only a visible state change`);
   attempts[selected]++;litSamples[selected]+=Number(expected);
   for(const index of roofs)occupancy[index]+=Number(state.lit[index]);
  }
  for(const index of roofs){
   const sampled=litSamples[index]/attempts[index],longRun=occupancy[index]/6000;
-  assert.ok(Math.abs(sampled-chance)<.04,`roof ${index}: its independent resamples average near one sixth (${sampled})`);
+  assert.ok(Math.abs(sampled-chance)<.04,`roof ${index}: its independent resamples average near one twelfth (${sampled})`);
   assert.ok(Math.abs(longRun-chance)<.055,`roof ${index}: its persistent scene state does not drift to one half (${longRun})`);
  }
  const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),tick=source.slice(source.indexOf('  function tick(now){'),source.indexOf('  function stop(){'));

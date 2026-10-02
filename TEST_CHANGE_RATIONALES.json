@@ -1069,5 +1069,28 @@
       "followUpCommand": "node --test --test-reporter=spec --test-name-pattern='RISK skyline lights: (garden roofs start independently|each garden has a one-in-six state through independent resamples)' tests.js"
     },
     "testChangesSha256": "bade1714a3c8612419bc0cc5882ed88a10da8b64585d5e2642b15018774e6b28"
+  },
+  {
+    "reason": "The user clarified “Half that further, please,” reducing each roof’s independent garden-light chance from one in six to one in twelve while preserving the existing cadence and resampling behavior.",
+    "previousBehavior": "Each eligible garden had a one-in-six chance of being lit on its initial independent draw and each selected roof received the same one-in-six chance at the existing 120-second nighttime opportunity.",
+    "intendedBehavior": "Each eligible garden has an independent one-in-twelve chance of being lit initially and when selected for resampling at the existing 120-second nighttime opportunity. All-on and all-off remain possible, repaint and resize retain sampled outcomes, and resampling never drifts toward a one-half lit rate.",
+    "replacementTests": [
+      "RISK skyline lights: each garden has a one-in-twelve state through independent resamples"
+    ],
+    "updatedTests": [
+      "RISK skyline lights: garden roofs start independently, stay stable, and change slowly at night"
+    ],
+    "preservedCoverage": [
+      "Eligible roofs still receive independent initial draws, including the possible all-on and all-off states; sampled outcomes remain stable across paint and resize eligibility changes.",
+      "The exact one-twelfth cutoff is tested together with values around the former one-sixth cutoff, and deterministic repeated resamples keep both sampled and persistent rates near one twelfth.",
+      "Each scheduled opportunity still chooses one roof, consumes one selection draw and one independent state draw, and requests repaint only when the visible state changes.",
+      "The two-minute visible-scene cadence, night-only changes, hidden-tab pause, reduced-motion timing, daytime behavior, and patio/window/party behavior remain covered."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='RISK skyline lights: (garden roofs start independently|each garden has a one-in-twelve state through independent resamples)' tests.js",
+      "failure": "With the one-in-six implementation still present, the exact one-in-twelve boundary incorrectly produced a lit roof (true !== false). The test failed on “the exact one-twelfth boundary stays dark”; complete observed output is /Users/emeraldpham/.codex/task-artifacts/garden-light-one-in-twelve-20261001/red-one-in-twelve-before-implementation.txt.",
+      "followUpCommand": "node --test --test-reporter=spec --test-name-pattern='RISK skyline lights: (garden roofs start independently|each garden has a one-in-twelve state through independent resamples)' tests.js"
+    },
+    "testChangesSha256": "cee9fc3397d8514f3945811a423df9450b818a3c42f46998741fbebf4051861d"
   }
 ]
