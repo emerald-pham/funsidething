@@ -539,7 +539,8 @@ test("Landscape browser: first launch, motion lifecycle, theme independence and 
     assert.equal(await page.evaluate(()=>!!document.activeElement.closest('#modalRoot')),true,"choice restores focus to the still-open first-run help");
     await page.locator('#modalRoot [data-act="close-modal"]').click();
     await page.locator('#addInput').fill('Keep this task during scenery controls');
-    await page.locator('[data-act="add-dot"]').click();
+    await page.locator('[data-act="add"]').click();
+    await page.locator('[data-act="start-scan"]').click();
     const tasksBefore=await page.evaluate(()=>JSON.stringify(state.tasks));
     const still=await page.evaluate(()=>lifePaints);await page.waitForTimeout(250);
     assert.equal(await page.evaluate(()=>lifePaints),still,"reduced motion has no frame loop");
@@ -2337,46 +2338,64 @@ test("quick-add: multiple selected chips all apply to the new task", async () =>
   assert.ok(t.ctx.includes(home.id) && t.ctx.includes(laptop.id));
 });
 
-test("quick-add: 'Add & dot' also tags with the selected context", async () => {
-  const { ctx } = await loadApp({ seed: 64 });
-  const home = { id: "ctx_home_t5", name: "At home", active: true };
-  ctx.state.contexts.push(home);
-  ctx.onAction("qctx", { dataset: { id: home.id } });
-
-  setInput(ctx, "addInput", "Urgent tagged task");
-  ctx.onAction("add-dot", {});
-  const t = ctx.state.tasks.find((x) => x.title === "Urgent tagged task");
-  assert.deepEqual([...t.ctx], [home.id]);
-  assert.ok(ctx.state.chain.includes(t.id));
+test('RISK quick Add: retired Add and dot is absent while ordinary Add preserves contexts and the current chain', async () => {
+  assert.doesNotMatch(html, /<button\b[^>]*(?:id="addDotBtn"|data-act="add-dot")/, 'the retired button must be removed, including before a chain exists');
+  for(const active of [false,true]){
+    const {ctx,shim}=await loadApp({seed:64});
+    const home={id:'ctx_home_t5',name:'At home',active:true};ctx.state.contexts.push(home);
+    if(active)ctx.addTask('Existing benchmark',true);
+    const chain=Array.from(ctx.state.chain),ratings=ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma]);
+    ctx.onAction('qctx',{dataset:{id:home.id}});setInput(ctx,'addInput','Normally added task');
+    ctx.onAction('add',{});const t=ctx.state.tasks.find(x=>x.title==='Normally added task');
+    assert.deepEqual(Array.from(t.ctx),[home.id],'ordinary Add retains the selected context');
+    assert.deepEqual(Array.from(ctx.state.chain),chain,'ordinary Add never chooses a task to do next');
+    assert.deepEqual(ctx.state.tasks.filter(x=>x.id!==t.id).map(x=>[x.id,x.mu,x.sigma]),ratings,'existing preference ratings stay intact');
+    assert.equal(shim.elements.has('addDotBtn'),false,'rendering must not retain a lookup for the removed control');
+    ctx.undo();assert.equal(ctx.state.tasks.some(x=>x.id===t.id),false);assert.deepEqual(Array.from(ctx.state.chain),chain);
+  }
 });
 
-/* ---------- "Add & dot" hides once a chain is active ----------
-   Rule 8 urgency (dotting straight from the quick-add bar) only makes sense
-   before a chain exists — once one's running, cutting a new task onto the
-   TOP of it from the add bar bypasses the scan/compare flow entirely. Plain
-   "Add" (into the pool) stays available regardless. */
-
-test("Add & dot is visible when no chain is active", async () => {
-  const { ctx, shim } = await loadApp({ seed: 66 });
-  assert.equal(ctx.state.chain.length, 0, "precondition: no chain yet");
-  assert.equal(shim.elements.get("addDotBtn").hidden, false);
+test('RISK quick Add: retired add-dot actions cannot create a task or discard an unsaved draft', async () => {
+  for(const active of [false,true]){
+    const {ctx,shim}=await loadApp();if(active)ctx.addTask('Existing benchmark',true);
+    setInput(ctx,'addInput','Keep this draft');setInput(ctx,'addStart','2099-01-01');setInput(ctx,'addDue','2099-01-03');
+    const before=JSON.stringify(ctx.state);ctx.onAction('add-dot',{});
+    assert.equal(JSON.stringify(ctx.state),before,'a retired action cannot mutate the board');
+    assert.equal(shim.document.getElementById('addInput').value,'Keep this draft');
+    assert.equal(shim.document.getElementById('addStart').value,'2099-01-01');
+    assert.equal(shim.document.getElementById('addDue').value,'2099-01-03');
+  }
 });
 
-test("Add & dot hides once a chain is active", async () => {
-  const { ctx, shim } = await loadApp({ seed: 67 });
-  ctx.addTask("Task A", true); // dots it, starting the chain
-  assert.ok(ctx.state.chain.length > 0, "precondition: chain is active");
-  assert.equal(shim.elements.get("addDotBtn").hidden, true);
+test('RISK quick Add: help removes the retired shortcut and retains task-editor Dot as a rank decision', async () => {
+  const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+  assert.doesNotMatch(help,/Add &amp; dot|Add & dot/,'current help cannot advertise the removed shortcut');
+  assert.match(help,/<b>Rank signals:<\/b> Yes, No, Dot from the All Tasks editor, and Dislodge/);
+  const bench=ctx.addTask('Benchmark'),selected=ctx.addTask('Select in editor');ctx.state.chain=[bench.id];
+  const before=[selected.mu,bench.mu];ctx.dotTask(selected.id);
+  assert.ok(selected.mu>before[0]&&bench.mu<before[1],'editor Dot still records a win over the current benchmark');
 });
 
-test("Add & dot reappears once the chain empties back out", async () => {
-  const { ctx, shim } = await loadApp({ seed: 68 });
-  const t = ctx.addTask("Task A", true);
-  assert.equal(shim.elements.get("addDotBtn").hidden, true, "precondition: hidden while chained");
-
-  ctx.doneTask(t.id); // completing the only dot empties the chain
-  assert.equal(ctx.state.chain.length, 0);
-  assert.equal(shim.elements.get("addDotBtn").hidden, false);
+test('RISK quick Add browser: the retired button stays absent on phone tablet and desktop through chain changes', {skip:!process.env.LANDSCAPE_BROWSER_URL}, async () => {
+  const {chromium}=await import(process.env.LANDSCAPE_PLAYWRIGHT);
+  const browser=await chromium.launch({headless:true,channel:process.env.LANDSCAPE_BROWSER_CHANNEL||'chrome'});
+  try{
+    for(const [width,height] of [[320,568],[390,844],[768,1024],[1366,768]]){
+      const page=await browser.newPage({viewport:{width,height},reducedMotion:'reduce'}),errors=[];
+      page.on('pageerror',error=>errors.push(error.message));
+      await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'networkidle'});
+      await page.evaluate(()=>{closeModal();document.getElementById('motionDialog')?.close();state.addOpen=true;render();});
+      assert.equal(await page.locator('#addDotBtn,[data-act="add-dot"]').count(),0);
+      await page.locator('#addInput').fill('Ordinary addition');await page.locator('[data-act="add"]').click();
+      assert.deepEqual(await page.evaluate(()=>({tasks:state.tasks.map(t=>t.title),chain:state.chain})),{tasks:['Ordinary addition'],chain:[]});
+      await page.evaluate(()=>startScan());
+      assert.equal(await page.locator('#addDotBtn,[data-act="add-dot"]').count(),0);
+      await page.evaluate(()=>doneTask(state.chain[0]));
+      assert.equal(await page.locator('#addDotBtn,[data-act="add-dot"]').count(),0,'emptying a chain cannot bring the button back');
+      const box=await page.locator('[data-act="add"]').boundingBox();assert.ok(box&&box.x>=0&&box.x+box.width<=width,'ordinary Add remains within the viewport');
+      assert.deepEqual(errors,[]);await page.close();
+    }
+  }finally{await browser.close();}
 });
 
 test("quick-add: pasting/typing a multi-line list through the bar tags every resulting task", async () => {
@@ -14713,13 +14732,13 @@ test('RISK false preference evidence: All Tasks Dot compares only with the curre
  const empty=await loadApp();const first=empty.ctx.addTask('First');const before={mu:first.mu,sigma:first.sigma};empty.ctx.dotTask(first.id);
  assert.deepEqual({mu:first.mu,sigma:first.sigma},before,'without a current benchmark the first dot carries no invented comparison');
 });
-test('RISK lost scheduling metadata: both Add routes save and clear Start and Due together',async()=>{
- for(const action of ['add','add-dot']){
+test('RISK lost scheduling metadata: ordinary Add saves and clears Start and Due together without dotting',async()=>{
+ {
   const {ctx,shim}=await loadApp();shim.document.getElementById('addInput').value='Dated';
   shim.document.getElementById('addStart').value='2099-01-01';shim.document.getElementById('addDue').value='2099-01-03';
-  ctx.onAction(action,{});const t=ctx.state.tasks[0];assert.equal(t.startsAt,'2099-01-01');assert.equal(t.due,'2099-01-03');
+  ctx.onAction('add',{});const t=ctx.state.tasks[0];assert.equal(t.startsAt,'2099-01-01');assert.equal(t.due,'2099-01-03');
   assert.equal(shim.document.getElementById('addStart').value,'');assert.equal(shim.document.getElementById('addDue').value,'');
-  assert.equal(ctx.isEligible(t),false);assert.equal(ctx.state.chain.includes(t.id),action==='add-dot');
+  assert.equal(ctx.isEligible(t),false);assert.equal(ctx.state.chain.includes(t.id),false);
   ctx.undo();assert.equal(ctx.state.tasks.length,0);
  }
  assert.match(html,/class="add-dates"[\s\S]*class="add-date-field"[\s\S]*<label for="addStart">Starts<\/label>[\s\S]*<input id="addStart" type="date"/);

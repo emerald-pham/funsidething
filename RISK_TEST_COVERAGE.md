@@ -6,6 +6,11 @@ The named-contract test in tests.js checks that every top-level test whose title
 
 ## Task state, eligibility, and scanner controls
 
+- RISK quick Add: retired Add and dot is absent while ordinary Add preserves contexts and the current chain
+- RISK quick Add: retired add-dot actions cannot create a task or discard an unsaved draft
+- RISK quick Add: help removes the retired shortcut and retains task-editor Dot as a rank decision
+- RISK quick Add browser: the retired button stays absent on phone tablet and desktop through chain changes
+
 - RISK evergreen flag changes: completion cancellation survives both merge directions durable replay and cloud
 
 - RISK evergreen Undo: all Done entry points clear a persisted rest period and countdown
@@ -28,7 +33,7 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK IMPORT RENDERING: restored identifiers cannot inject attributes or break task reveal
 - RISK rating drift: Done and Worked on it stay neutral on every completion route and recurrence type
 - RISK false preference evidence: All Tasks Dot compares only with the current benchmark and a first dot stays neutral
-- RISK lost scheduling metadata: both Add routes save and clear Start and Due together
+- RISK lost scheduling metadata: ordinary Add saves and clears Start and Due together without dotting
 - RISK recurrence-default loss: quick Add preserves 18-hour and 2 AM defaults across single and pasted tasks
 - RISK unreachable Undo and lost preference: floating header defaults off, saves on toggle, and survives close and reload
 - RISK prerequisites: completion, evergreen Done, restore, and deletion govern scan eligibility by ID

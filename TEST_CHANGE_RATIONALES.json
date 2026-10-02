@@ -1092,5 +1092,27 @@
       "followUpCommand": "node --test --test-reporter=spec --test-name-pattern='RISK skyline lights: (garden roofs start independently|each garden has a one-in-twelve state through independent resamples)' tests.js"
     },
     "testChangesSha256": "cee9fc3397d8514f3945811a423df9450b818a3c42f46998741fbebf4051861d"
+  },
+  {
+    "reason": "The user explicitly requested removal of the Add & dot button after auditing its origin and rating-neutral bypass. Tests that require this removed control are obsolete by that instruction; their ordinary Add context, scheduling, Undo, editor Dot, and scenery lifecycle protections remain covered.",
+    "previousBehavior": "The Add & dot button appeared before a chain existed, could reappear when it emptied, and its action immediately added and dotted a task without a preference comparison. Current help advertised this shortcut, and one scenery browser fixture used it to start a chain.",
+    "intendedBehavior": "The quick-add UI exposes only ordinary Add, with no Add & dot control or retired add-dot action. A stale retired action leaves the board and unsaved title/date draft untouched. Add preserves selected contexts, dates, existing chains and preference ratings; task-editor Dot still teaches its current-benchmark comparison. The scenery lifecycle fixture starts a chain using Add then Start scanning.",
+    "replacementTests": [
+      "RISK quick Add: retired Add and dot is absent while ordinary Add preserves contexts and the current chain",
+      "RISK quick Add: retired add-dot actions cannot create a task or discard an unsaved draft",
+      "RISK quick Add: help removes the retired shortcut and retains task-editor Dot as a rank decision",
+      "RISK quick Add browser: the retired button stays absent on phone tablet and desktop through chain changes",
+      "RISK lost scheduling metadata: ordinary Add saves and clears Start and Due together without dotting"
+    ],
+    "preservedCoverage": [
+      "Plain Add retains selected contexts, start and due dates, recurrence, prerequisites, multi-line imports and ordinary Undo without automatically dotting the new task.",
+      "Task-editor Dot remains a comparison against only the current benchmark, with initial Dot neutral; existing rank, completed-task, chance-order and Undo tests remain intact.",
+      "Internal direct chain-root creation retains its existing pass clock and cloud tests; the changed scenery browser fixture preserves all motion, theme, navigation, shortcut-blocking and reload assertions."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='^RISK quick Add:|^RISK lost scheduling metadata:|^RISK false preference evidence:' tests.js; LANDSCAPE_BROWSER_URL=http://127.0.0.1:8767 LANDSCAPE_PLAYWRIGHT=/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs node --test --test-reporter=spec --test-name-pattern='^RISK quick Add browser:' tests.js",
+      "failure": "Before implementation, all three new non-browser contracts failed for the intended reasons: the retired button exists, add-dot mutates the board and clears the draft, and current help advertises Add & dot. The browser contract independently failed at 320x568 because the removed-control selector counted 1 instead of 0. Existing task-editor Dot and ordinary Add scheduling preservation contracts passed. Full outputs retained in external release evidence red.log and browser-red.log."
+    },
+    "testChangesSha256": "2faccf54d0303a4f6f4c7116393d3952a68de415c8169e904429ae5778f312da"
   }
 ]
