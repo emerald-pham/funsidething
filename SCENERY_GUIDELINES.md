@@ -22,6 +22,8 @@ This file records visual constraints from recent skyline work. A former attempt 
 
 ## Visual review
 
+The user rejected the enlarged colored airplane redesign and requested the previous design. Ordinary scheduled planes keep their compact ivory silhouette, original small wings, contrail, and night navigation lights. Preserve the classic message biplanes and their centered landing gear. Do not bring back the rejected enlarged shaded wings, colored fuselage, cockpit dots, or panel detail without a new explicit request.
+
 Inspect the real, composed `#landscape` in `Enjoy the view` mode at native scale. Capture both `[data-scenery]` and `[data-life]` together: a backdrop-only canvas omits established trees, paths, visitors, and reflections. Keep the preview date, season, weather, and random seed consistent when comparing renders; use the same green summer foliage for before/after evidence unless the task specifically changes season behavior.
 
 For candidate-art review, use a fresh isolated preview origin and verify the served candidate asset bytes/build before judging an unchanged render; an older service worker can keep stale scene code active and make a new draft appear unchanged. Treat this as a candidate visual check only. Final release verification must separately exercise the real service worker, deployed assets, and an actual offline reload.

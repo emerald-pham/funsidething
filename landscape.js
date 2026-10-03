@@ -1003,18 +1003,7 @@
         const y=hy*.18+e.lane*hy*.18+geometry.verticalOffset(e,14);
         g.save();g.translate(x,y);g.scale(e.reverse?-1:1,1);
         g.globalAlpha=.45;const tail=g.createLinearGradient(-90,0,-6,0);tail.addColorStop(0,'rgba(248,246,225,0)');tail.addColorStop(1,'rgba(248,246,225,.65)');g.fillStyle=tail;g.fillRect(-90,1,83,.7);g.globalAlpha=1;
-        const hull=S.mixHex(color(e.seed),'#f6f1db',p.night*.28),upper=S.mixHex(hull,'#fff0d2',.34),lower=S.mixHex(hull,p.city,.42),glass=S.mixHex('#5f9eaa',p.sky[2],p.night*.22);
-        // The swept wings, tailplane and fuselage remain separate painted
-        // surfaces, so changing sky light can shape the craft instead of
-        // leaving a single flat arrow across the scene.
-        g.fillStyle=lower;g.beginPath();g.moveTo(-4,-1);g.lineTo(-12,-14);g.lineTo(-5,-17);g.lineTo(5,-1);g.closePath();g.fill();
-        g.fillStyle=upper;g.beginPath();g.moveTo(-3,1);g.lineTo(-10,13);g.lineTo(-4,15);g.lineTo(6,1);g.closePath();g.fill();
-        g.fillStyle=lower;g.beginPath();g.moveTo(-13,-1);g.lineTo(-18,-4);g.lineTo(-17,-1);g.lineTo(-12,1);g.closePath();g.fill();
-        g.fillStyle=lower;g.beginPath();g.moveTo(-17,-1.7);g.lineTo(-20,-7);g.lineTo(-15,-4.2);g.lineTo(-13,-1.6);g.closePath();g.fill();
-        g.fillStyle=hull;g.beginPath();g.moveTo(10,0);g.lineTo(4,-.8);g.lineTo(-7,-1.8);g.lineTo(-15,-3.7);g.lineTo(-18,-3);g.lineTo(-16,1.7);g.lineTo(-5,2);g.lineTo(-9,7);g.lineTo(-6,7);g.lineTo(1,2);g.lineTo(8,1);g.closePath();g.fill();
-        line(g,8,-.2,-12,-1.7,upper,1);line(g,7,1.1,-8,1.6,lower,.95);
-        line(g,-7,-12,-3,-2,upper,.85);line(g,-6,11,-2,2,lower,.85);line(g,-13,-2,-16,-3,upper,.7);
-        ellipse(g,4,-.7,2.8,1.05,glass);g.fillStyle=glass;for(let window=0;window<4;window++)g.fillRect(-5+window*2.2,-.15,1.15,.7);
+        g.fillStyle=S.mixHex('#f6f1db',p.sky[1],p.night*.7);g.beginPath();g.moveTo(9,0);g.lineTo(0,-2);g.lineTo(-7,-8);g.lineTo(-10,-8);g.lineTo(-5,-1);g.lineTo(-13,-1);g.lineTo(-17,-4);g.lineTo(-18,-3);g.lineTo(-16,2);g.lineTo(-5,2);g.lineTo(-10,8);g.lineTo(-7,8);g.lineTo(0,2);g.closePath();g.fill();
         if(p.night>.4){ellipse(g,0,-2,1,1,'#ed8976');ellipse(g,0,2,1,1,'#abcdaa');}g.restore();return;
       }
       if(e.type==='balloon'){
@@ -1084,22 +1073,8 @@
       line(g,15,-blade,15,blade,'#6c7770',.9);ellipse(g,15,0,.7,.7,'#6c7770');
       g.restore();return;
     }
-    g.save();g.translate(x,y);g.scale(dir,1);
-    const hull=color(seed),upper=color(seed,1),lower=color(seed,2),glass=S.mixHex('#b9dcdf',p.sky[2],p.night*.25),shade=S.mixHex(hull,p.city,.34);
-    // Far and near wings use separate filled planes. Their unequal highlights
-    // keep a small aircraft from reading as one flat arrow in the open sky.
-    g.fillStyle=lower;g.beginPath();g.moveTo(-3,-1);g.lineTo(-12,-15);g.lineTo(-4,-18);g.lineTo(7,-1);g.closePath();g.fill();
-    g.fillStyle=upper;g.beginPath();g.moveTo(-2,1);g.lineTo(-10,14);g.lineTo(-3,16);g.lineTo(8,1);g.closePath();g.fill();
-    g.fillStyle=lower;g.beginPath();g.moveTo(-13,-1);g.lineTo(-20,-6);g.lineTo(-17,-2);g.lineTo(-11,1);g.closePath();g.fill();
-    g.fillStyle=upper;g.beginPath();g.moveTo(-16,-1.7);g.lineTo(-20,-8);g.lineTo(-14,-4);g.lineTo(-12,-1.4);g.closePath();g.fill();
-    g.fillStyle=hull;g.beginPath();g.moveTo(13,0);g.lineTo(10,-.6);g.lineTo(1,-1.3);g.lineTo(-11,-2);g.lineTo(-17,-6);g.lineTo(-20,-6);g.lineTo(-17,1.4);g.lineTo(-5,2);g.lineTo(-9,8);g.lineTo(-5,8);g.lineTo(2,2);g.lineTo(10,1.2);g.closePath();g.fill();
-    line(g,9,-.2,-10,-1.7,upper,1);line(g,8,1.1,-6,1.6,shade,1);
-    line(g,-7,-13,-2,-2,upper,.9);line(g,-6,12,-1,2,shade,.9);
-    line(g,-12,-3,-17,-5,upper,.8);line(g,-8,5,-5,2,lower,.75);
-    line(g,-4,-.2,8,-.1,shade,.65);
-    ellipse(g,3.5,-.65,2.8,1.05,glass);
-    for(let window=0;window<4;window++)ellipse(g,-3+window*2.5,.25,.68,.48,glass);
-    g.restore();
+    g.save();g.translate(x,y);g.scale(dir,1);g.fillStyle=color(seed);
+    g.beginPath();g.moveTo(12,0);g.lineTo(-12,-2);g.lineTo(-17,-7);g.lineTo(-20,-7);g.lineTo(-17,3);g.lineTo(-4,3);g.lineTo(-9,10);g.lineTo(-4,10);g.lineTo(3,3);g.closePath();g.fill();line(g,0,0,-7,-10,color(seed,2),3);g.restore();
   }
   function paintGuest(e,x,f,t){
 

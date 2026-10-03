@@ -1,5 +1,24 @@
 [
   {
+    "testChangesSha256": "db7af4639750551c47553983f4d2fcda2a1ee968cc772e93ecab08a8c2fed4dc",
+    "reason": "The user explicitly rejected the newly enlarged shaded airplane shown in their screenshot and requested restoration of the previous airplane design. The two design-specific expectations are replaced with exact previous-profile paint contracts while all other feature protections stay intact.",
+    "previousBehavior": "Ordinary and scheduled planes required five broad colored surfaces, cockpit dots and panel details introduced in the recent redesign; the scheduled plane had replaced its previous small ivory silhouette.",
+    "intendedBehavior": "Restore the exact pre-redesign compact body and wing geometry and scheduled ivory color, retaining existing contrail, mirrored direction, vertical route, night lights and classic message biplane behavior.",
+    "replacementTests": [
+      "RISK landscape aircraft: ordinary planes restore their previous compact profile",
+      "RISK landscape aircraft: scheduled planes restore the compact ivory silhouette in both directions"
+    ],
+    "preservedCoverage": [
+      "The centered biplane landing gear, stacked wings, spinning propeller, banner tow and wrapped messages retain their unchanged tests.",
+      "Existing plane route lifecycle, horizontal speed, vertical offset, contrail and navigation-light threshold remain asserted across phone, tablet, desktop, short landscape, directions and both motion modes.",
+      "All scanner, saved board, account, cloud reconciliation, weather, skyline, fireworks and offline lifecycle protections remain intact."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=tap --test-name-pattern='RISK landscape aircraft: ordinary planes restore|RISK landscape aircraft: scheduled planes restore' tests.js",
+      "failure": "Observed before implementation: both new profile tests failed for the intended oversized design mismatch, receiving five filled surfaces instead of one. The scheduled regression first failed at 390x844. Full red output is saved in restore-airplane-20261003/red-tests.log."
+    }
+  },
+  {
     "reason": "The user reported incorrect sparse reflected rain and all-on daylight patio lights on iOS widths, then explicitly requested random fireworks behind the city for one to five minutes while retaining foreground barge fireworks. New canvas, sampling, clock, duration, and geometry tests cover each boundary. Prior nine-second and mirrored-rain assertions are obsolete under those requested changes; all unrelated contracts remain intact.",
     "previousBehavior": "Rain had a width-only particle budget and duplicated inverted streaks in the lake. Every patio string glowed without independent sampling, including daylight. Random fireworks painted over the city and lasted only nine seconds with three bursts.",
     "intendedBehavior": "Rain paints once at dense bounded coverage. Gardens and patio strings independently retain one-in-twelve samples and illuminated fixtures hide in daylight. Random shows use sampled 60-300 second durations with repeating bounded bursts behind the city; foreground barge fireworks and their existing crossing remain.",
