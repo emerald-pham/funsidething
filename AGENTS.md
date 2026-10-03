@@ -33,14 +33,51 @@ Fix actionable findings and recheck changed areas before release. If the
 candidate changes after review, repeat the affected review on the new exact
 commit. A review of an earlier draft is not a review of the final commit.
 
-## Branch and worktree hygiene
+## Branch and worktree cleanup policy
 
-At the start and end of repository work, fetch and prune `origin`, inspect local
-and remote branches plus all worktrees, and check for open pull requests. Delete
-only branch tips proven reachable from `origin/main`; preserve branches with
-unique commits, dirty or ignored worktree data, an open pull request, or active
-coordination ownership. Before deleting a remote branch, capture its exact SHA
-and use an exact-SHA force-with-lease. Do not remove another task's worktree or
-branch while that task is running or pending. Keep `main` aligned with
-`origin/main` when its worktree is clean, and report anything intentionally
-retained.
+Perform cleanup at the start and end of repository work, including after a
+successful merge. The change owner completes this work before handing off.
+
+1. Run `git fetch origin --prune`. Inspect `git branch -vv`,
+   `git branch -r`, `git worktree list --porcelain`, and open pull requests.
+   Check each worktree's tracked changes, untracked files, ignored files,
+   detached HEAD, and locks before deciding what can be removed.
+2. Inspect the host-wide coordination ledger and task state for live ownership.
+   Use the shared absolute `CODEX_COORDINATION_FILE` when configured; do not
+   create a separate repository ledger. Record absolute worktree paths. Leave
+   running or pending tasks, their branches and worktrees, and other projects'
+   reservations alone. An old timestamp alone does not establish inactivity.
+3. Delete a non-`main` local branch only after checking its exact tip with
+   `git merge-base --is-ancestor <tip-sha> origin/main`, and confirming it has
+   no open pull request, live ownership, or dirty or unarchived ignored data
+   in an associated checkout. Prefer `git branch -d`; use `-D`
+   only if that exact ancestry check passed and Git refuses solely because of
+   the branch's upstream. Preserve every tip that fails the ancestry check,
+   including squash-merged or patch-equivalent commits.
+4. Remove an inactive linked worktree with `git worktree remove <absolute-path>`
+   only when its tracked and untracked files are clean and its commits remain
+   reachable from `origin/main` or a retained local branch, and it has no open
+   pull request or deliberate lock. Keep a branch with
+   unique commits even when removing its clean checkout. Give a unique detached
+   HEAD a named recovery ref before removing its checkout. Preserve dirty
+   worktrees. Preserve ignored data too: retain the checkout, or move its
+   ignored files to a dated recovery directory outside the repository and
+   verify their preservation before removal. Record source paths, destinations,
+   branch names, and exact SHAs; preserve symlinks without following them.
+   Do not force-remove a worktree to bypass these checks. Never remove the
+   primary checkout. Prune stale worktree metadata only after confirming the
+   checkout is missing, inactive, and not deliberately locked or offline.
+5. Before deleting a remote branch, capture its current full SHA, prove that
+   exact tip is an ancestor of fetched `origin/main`, and check for open pull
+   requests, live ownership, and associated checkout data again. Delete with
+   `git push --force-with-lease=refs/heads/<branch>:<expected-sha> origin :refs/heads/<branch>`.
+   If the lease fails, fetch and reassess; do not retry with an unrestricted
+   force push. Preserve `main` and the remote default branch.
+6. When safe, return the primary checkout to `main` and fast-forward it to
+   `origin/main`. If another worktree holds `main`, release that checkout only
+   after the same preservation checks. Preserve local instruction edits and
+   settings before switching; never reset away unsaved work.
+7. Repeat the inventory after cleanup. Report removed branch/worktree counts,
+   alignment with `origin/main`, every intentionally retained branch or
+   checkout and its reason, and any recovery directory. A completed product
+   change does not justify leaving its safely removable checkout behind.
