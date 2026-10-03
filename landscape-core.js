@@ -204,7 +204,11 @@
     const skywriterWord=type==='skywriter'?root.LandscapeMood?.skywriterMessage(r):undefined;
     if(type==='skywriter'&&!skywriterWord)return;
     if(type==='dolphin'&&r()>.35)return; // A short, occasional surprise, never an opening attraction.
-    const base=CONFIG.rail[type]?.duration||EVENT_DURATIONS[type]|| (type==='abduction'?24:type==='bird'?28:type==='balloon'?150:type==='plane'?95:48+r()*50);
+    // Choose one duration for the whole stationary show. Reusing the old
+    // nine-second default expired it after just three bursts.
+    const showRange=CONFIG.nightShows.fireworks.duration;
+    const base=type==='fireworks'?showRange[0]+clamp(r(),0,1)*(showRange[1]-showRange[0]):
+      CONFIG.rail[type]?.duration||EVENT_DURATIONS[type]|| (type==='abduction'?24:type==='bird'?28:type==='balloon'?150:type==='plane'?95:48+r()*50);
     // Pick travel speed once at arrival. Duration is its inverse so every
     // visitor still completes the full route, while later fast traffic can
     // visibly catch and pass a slower visitor without frame-time randomness.
@@ -239,7 +243,7 @@
       if(w.random()>=Math.min(1,show.chance*CONFIG.spawnRate(type)))continue;
       spawn(w,type);
       if(type==='festival'){w.lastRare=w.elapsed;w.lastFestival=w.elapsed;w.rareCount++;}
-      else w[key]=w.elapsed+EVENT_DURATIONS.fireworks+show.rest;
+      else w[key]=w.elapsed+w.events.find(e=>e.type==='fireworks').duration+show.rest;
     }
     if(w.elapsed>=w.next){
       const r=w.random,a=activity(sky);

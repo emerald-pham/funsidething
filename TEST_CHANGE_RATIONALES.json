@@ -1,5 +1,31 @@
 [
   {
+    "reason": "The user reported incorrect sparse reflected rain and all-on daylight patio lights on iOS widths, then explicitly requested random fireworks behind the city for one to five minutes while retaining foreground barge fireworks. New canvas, sampling, clock, duration, and geometry tests cover each boundary. Prior nine-second and mirrored-rain assertions are obsolete under those requested changes; all unrelated contracts remain intact.",
+    "previousBehavior": "Rain had a width-only particle budget and duplicated inverted streaks in the lake. Every patio string glowed without independent sampling, including daylight. Random fireworks painted over the city and lasted only nine seconds with three bursts.",
+    "intendedBehavior": "Rain paints once at dense bounded coverage. Gardens and patio strings independently retain one-in-twelve samples and illuminated fixtures hide in daylight. Random shows use sampled 60-300 second durations with repeating bounded bursts behind the city; foreground barge fireworks and their existing crossing remain.",
+    "replacementTests": [
+      "RISK rain density: phone tablet and short screens retain a dense bounded curtain in either motion mode",
+      "RISK fairy lights: unlit patio strings and every daylight bulb are hidden on phone and desktop",
+      "RISK rain reflection: removing mirrored rainfall preserves snow and the distant lightning bolt",
+      "RISK fairy lights: gardens and patios share independent stable one-in-twelve roof samples",
+      "RISK fireworks duration: each standalone show samples one to five minutes once and rests after its actual end",
+      "RISK fireworks duration: repeated bursts span long shows with bounded particles and a complete final fade",
+      "RISK fireworks layering: city silhouettes mask random shows while barge shells remain foreground",
+      "RISK scenery browser: phone fairy lights rain and both firework depths match their actual canvas pixels"
+    ],
+    "preservedCoverage": [
+      "Garden one-in-twelve odds, independent all-on and all-off outcomes, two-minute resampling, hidden-time pause and resize retention remain covered.",
+      "Existing snow and distant lightning reflections remain unchanged; the preservation follow-up guards both while removing only mirrored rainfall.",
+      "Both show types continue to enter the shared water mirror, with existing barge deck launch geometry, scale, cooldown, finite traversal and spark reflection coverage.",
+      "Existing scanner, task ordering, saved board, account, cloud reconciliation, offline lifecycle, and recovery tests remain unchanged."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=tap --test-name-pattern='RISK rain density:|RISK fairy lights:|RISK fireworks duration:|RISK fireworks layering:|reflected clouds remain visible|Landscape fireworks:|festival and standalone sparks enter' tests.js; node --test --test-reporter=tap --test-name-pattern='RISK rain reflection:' tests.js",
+      "failure": "Before implementation, all nine selected cases failed for the relevant behavior: 320x568 rain was below the threefold density floor; an unlit patio painted five bulbs; only two garden roofs were sampled instead of four gardens and patios; sampled duration was nine seconds instead of 60-300; no late sparks existed at 21.6 seconds; no separate depth-aware firework painter existed; the former duration was 9 instead of 60; 43 inverted rain streaks entered the mirror instead of zero; and the shared reflection path lacked separate depth passes. Before the preservation repair, the new reflection follow-up failed on 0 mirrored snowflakes instead of 18. The browser fixture was refined to use a deterministic CPU-backed canvas because GPU readback changed one hardware antialias pixel; bulb absence and foreground/background pixel assertions remain exact. The first full suite also caught the unchanged snowstorm contract failing because 45 flakes replaced its original 125-flake storm budget at width 1000; the existing test passed after restoring storm snow density without changing that assertion."
+    },
+    "testChangesSha256": "b5df2e3314226a6f44e32777d1875ef04230a178834e253cabba58753f52b65a"
+  },
+  {
     "reason": "The release gate previously required a memory audit and independent code review for every candidate, while the requested policy scales independent review to the exact candidate diff. New process contracts distinguish pure documentation and comment edits, ordinary behavior changes, and high-risk specialist domains; they also bind conditional GitHub statuses and deployment checks to the same exact receipt.",
     "previousBehavior": "Only schemaVersion 1 receipts were accepted, and every receipt required separate memory-audit and code-review evidence regardless of the changed files. The status publisher and deployment verifier likewise required both contexts for all candidates. Generic role guards and state/session persistence could evade specialist classification, including adapter writes or removals that mutated persisted records under generic filenames; caller declarations were ignored, and some behavior-changing comments received owner-only review.",
     "intendedBehavior": "SchemaVersion 2 receipts derive the minimum review plan from the exact base-to-candidate diff, require owner exact-diff self-review for every candidate, and require a code reviewer and/or specialist only for the affected domains. Generic auth, state persistence, and session persistence fail closed to their relevant specialists. Calls to generic persistence objects using set, put, update, write, mutate, remove, clear, delete, or erase require the memory/cloud/sync specialist even when the path and surrounding names are generic. Caller-declared specialist domains may only raise the derived plan, are limited to known domains, and remain bound in the exact receipt. Behavior-changing directives, including @ts-check, and CSS token-joining comment removal cannot use owner-only review. Underclassification, mismatched reviewer domains, stale receipts, or inconsistent status descriptions fail closed. SchemaVersion 1 retains its original two-review requirement and publishes the third specialist-compatibility context under the same receipt binding.",

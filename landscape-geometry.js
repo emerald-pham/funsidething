@@ -365,15 +365,18 @@
       return {x,y,width,height,fontSize,lineHeight,lines,direction,
         towStartX:planeX-direction*18,towStartY:planeY,towEndX:x+direction*width/2,towEndY:y};
     }
-    function fireworks(age,seed,atFestival=false,event={duration:150,seed}){
-      const dots=[],duration=atFestival?(Number(event.duration)||150):9;
+    function fireworks(age,seed,atFestival=false,event={}){
+      const dots=[],duration=Number(event.duration)||(atFestival?150:60);
       if(age<=0||age>=duration)return dots;
-      const count=atFestival?Math.max(0,Math.floor((duration-16)/3.8)):3;
-      for(let burst=0;burst<count;burst++){
-        const launch=atFestival?8+burst*3.8:burst*2.1,time=age-launch;
+      const start=atFestival?8:0,interval=atFestival?3.8:2.1;
+      const count=atFestival?Math.max(0,Math.floor((duration-16)/interval)):Math.max(0,Math.floor((duration-3.7)/interval)+1);
+      // Only shells still in flight need geometry, even in a five-minute show.
+      const first=Math.max(0,Math.floor((age-start-3.7)/interval)+1),last=Math.min(count-1,Math.floor((age-start)/interval));
+      for(let burst=first;burst<=last;burst++){
+        const launch=start+burst*interval,time=age-launch;
         if(time<=0||time>=3.7)continue;
         const deck=atFestival?festival({...event,age:launch}):null;
-        const originX=deck?deck.x+(burst%2?1:-1)*deck.launcherOffset:W*(.25+seed*.3+burst*.13);
+        const originX=deck?deck.x+(burst%2?1:-1)*deck.launcherOffset:W*(.25+seed*.3+(burst%3)*.13);
         if(originX<3||originX>W-3)continue;
         const launchY=deck?deck.y-deck.height*.10:waterTop-2;
         // Waterfront bursts retain visible mirrored sparks. Each shell takes

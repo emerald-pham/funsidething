@@ -383,3 +383,14 @@ The editor hook blocks app or enforcement edits while tests.js has no staged or 
 - RISK PWA SYNC RESUME: visibility before pageshow shares one reconnect and genuine reconnect failures stay bounded
 - RISK PWA SYNC RESUME: a publication committed during sleep is read back without a duplicate write
 - RISK PWA SYNC RESUME: a timed-out reconnect cannot poison later online or wake recovery
+
+## Rain, roof lights, and fireworks depth
+
+- RISK rain density: phone tablet and short screens retain a dense bounded curtain in either motion mode
+- RISK fairy lights: unlit patio strings and every daylight bulb are hidden on phone and desktop
+- RISK fairy lights: gardens and patios share independent stable one-in-twelve roof samples
+- RISK fireworks duration: each standalone show samples one to five minutes once and rests after its actual end
+- RISK fireworks duration: repeated bursts span long shows with bounded particles and a complete final fade
+- RISK fireworks layering: city silhouettes mask random shows while barge shells remain foreground
+- RISK scenery browser: phone fairy lights rain and both firework depths match their actual canvas pixels
+- RISK rain reflection: removing mirrored rainfall preserves snow and the distant lightning bolt
