@@ -15731,35 +15731,40 @@ test('RISK landscape aircraft: the biplane has one centered landing gear set',()
  assert.equal(lines.filter(item=>item.y1===item.y2&&Math.abs(item.y1-5.4)<.2&&item.x1<0&&item.x2>0).length,1,'one axle joins the paired wheels');
 });
 
-test('RISK landscape aircraft: ordinary planes show shaded wings, a cockpit, and panel detail',()=>{
+test('RISK landscape aircraft: ordinary planes restore their previous compact profile',()=>{
  const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),plane=source.slice(source.indexOf('  function airplane('),source.indexOf('  function paintGuest('));
- const lines=[],ellipses=[],fills=[];let current=null;const g={save(){},restore(){},translate(){},scale(){},beginPath(){current=[];},moveTo(x,y){current.push([x,y]);},lineTo(x,y){current.push([x,y]);},closePath(){},fill(){fills.push({paint:this.fillStyle,path:current});}};
- vm.runInNewContext(`${plane};airplane(100,100,-1,.43,0,false)`,{g,color:(seed,shade=0)=>shade?shade===1?'#789abc':'#9dbbd5':'#345678',line(_g,x1,y1,x2,y2,paint,width){lines.push({x1,y1,x2,y2,paint,width});},ellipse(_g,x,y,rx,ry,paint){ellipses.push({x,y,rx,ry,paint});},S:{mixHex:(a,b,amount)=>amount>.5?b:a},p:{sky:['#abc','#bcd','#def'],front:'#789abc',night:0}});
- assert.ok(fills.length>=2,'the fuselage and wing receive separate shaded surfaces');
- assert.ok(fills.some(item=>item.path?.some(point=>Math.abs(point[1])>=15)),'wing surfaces have a broad, readable span');
- assert.ok(lines.length>=5&&new Set(lines.map(item=>item.paint)).size>=2,'highlight, shadow, and panel strokes give the wing and body depth');
- assert.ok(ellipses.some(item=>item.rx>=2.5&&item.ry>=1&&item.ry<=2),'a clear cockpit canopy breaks up the fuselage silhouette');
+ const silhouette=[[12,0],[-12,-2],[-17,-7],[-20,-7],[-17,3],[-4,3],[-9,10],[-4,10],[3,3]];
+ for(const dir of [-1,1]){
+  const lines=[],ellipses=[],fills=[],transforms=[];let current=null;const g={save(){},restore(){},translate(...args){transforms.push(['translate',...args]);},scale(...args){transforms.push(['scale',...args]);},beginPath(){current=[];},moveTo(x,y){current.push([x,y]);},lineTo(x,y){current.push([x,y]);},closePath(){},fill(){fills.push({paint:this.fillStyle,path:current});}};
+  vm.runInNewContext(`${plane};airplane(100,100,${dir},.43,0,false)`,{g,color:(_seed,shade=0)=>shade?'#9dbbd5':'#345678',line(_g,...args){lines.push(args);},ellipse(_g,...args){ellipses.push(args);},S:{mixHex:(a,b,amount)=>amount>.5?b:a},p:{sky:['#abc','#bcd','#def'],city:'#789abc',night:0}});
+  assert.equal(fills.length,1,'the previous plane has one compact body instead of the rejected oversized wing surfaces');
+  assert.deepEqual(fills[0],{paint:'#345678',path:silhouette});
+  assert.deepEqual(lines,[[0,0,-7,-10,'#9dbbd5',3]],'the previous upper wing is retained');
+  assert.deepEqual(ellipses,[],'the previous profile has no added cockpit or cabin dots');
+  assert.deepEqual(transforms,[['translate',100,100],['scale',dir,1]]);
+ }
 });
 
-test('RISK landscape aircraft: scheduled planes keep a shaded body and night navigation lights',()=>{
+test('RISK landscape aircraft: scheduled planes restore the compact ivory silhouette in both directions',()=>{
  const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),start=source.indexOf("      if(e.type==='plane'){"),end=source.indexOf("      if(e.type==='balloon')",start),branch=source.slice(start,end);
  assert.ok(start>=0&&end>start,'the exercised code is the ordinary scheduled-plane visitor');
- const render=night=>{
-  const paths=[],fills=[],lines=[],ellipses=[],rectangles=[];let current=null;
-  const g={globalAlpha:1,save(){},restore(){},translate(){},scale(){},beginPath(){current=[];paths.push(current);},moveTo(x,y){current.push([x,y]);},lineTo(x,y){current.push([x,y]);},closePath(){},fill(){fills.push({paint:this.fillStyle,path:current});},fillRect(...rect){rectangles.push({rect,paint:this.fillStyle,alpha:this.globalAlpha});},createLinearGradient(...from){return {from,stops:[],addColorStop(at,paint){this.stops.push({at,paint});}};}};
-  const context={g,W:1280,hy:338,p:{night,sky:['#123','#456','#789'],city:'#abc'},geometry:{verticalOffset:()=>0},color:(seed,shade=0)=>`aircraft-${shade}`,S:{mixHex:(a,b,amount)=>[a,b,amount].join(':')},ellipse(_g,x,y,rx,ry,paint){ellipses.push({x,y,rx,ry,paint});},line(_g,x1,y1,x2,y2,paint,width){lines.push({x1,y1,x2,y2,paint,width});}};
+ const silhouette=[[9,0],[0,-2],[-7,-8],[-10,-8],[-5,-1],[-13,-1],[-17,-4],[-18,-3],[-16,2],[-5,2],[-10,8],[-7,8],[0,2]];
+ for(const [W,H] of [[390,844],[768,1024],[568,320],[1280,720]])for(const reduced of [false,true])for(const reverse of [false,true])for(const night of [0,.4,.8]){
+  const hy=Math.min(H*(W<600?.37:.47),W<600?310:480),fills=[],lines=[],ellipses=[],rectangles=[],transforms=[],offsets=[];let current=null;
+  const g={globalAlpha:1,save(){},restore(){},translate(...args){transforms.push(['translate',...args]);},scale(...args){transforms.push(['scale',...args]);},beginPath(){current=[];},moveTo(x,y){current.push([x,y]);},lineTo(x,y){current.push([x,y]);},closePath(){},fill(){fills.push({paint:this.fillStyle,path:current});},fillRect(...rect){rectangles.push({rect,paint:this.fillStyle,alpha:this.globalAlpha});},createLinearGradient(...from){return {from,stops:[],addColorStop(at,paint){this.stops.push([at,paint]);}};}};
+  const context={g,W,H,hy,reduced,p:{night,sky:['#123','#456','#789'],city:'#abc'},geometry:{verticalOffset(e,amplitude){offsets.push([e.type,amplitude]);return reduced?0:3;}},color:()=> '#cb8d80',S:{mixHex:(a,b,amount)=>[a,b,amount].join(':')},ellipse(_g,x,y,rx,ry,paint){ellipses.push({x,y,rx,ry,paint});},line(_g,...args){lines.push(args);}};
   const paint=vm.runInNewContext(`(function(e,x){${branch}\n})`,context);
-  paint({type:'plane',lane:.5,reverse:false},100);
-  return {paths,fills,lines,ellipses,rectangles,g};
- };
- const day=render(0),night=render(.8);
- assert.ok(day.fills.length>=3&&new Set(day.fills.map(item=>item.paint)).size>=3,'the scheduled plane separates its fuselage, wing, and tail into shaded surfaces');
- assert.ok(day.fills.some(item=>String(item.paint).startsWith('aircraft-0:')),'the daytime fuselage keeps an aircraft hue that reads against the pale sky');
- assert.ok(day.fills.some(item=>item.path?.some(point=>Math.abs(point[1])>=13)),'scheduled plane wings have a broad silhouette at scene scale');
- assert.ok(day.ellipses.some(item=>item.rx>=2.7&&item.ry>=1),'scheduled planes keep a readable cockpit canopy');
- assert.ok(day.lines.length>=5,'short panel and highlight strokes add shape detail');
- assert.ok(day.rectangles.some(item=>item.rect[0]===-90&&item.rect[2]===83),'the existing contrail remains attached to the scheduled plane');
- assert.equal(night.ellipses.filter(item=>item.paint==='#ed8976'||item.paint==='#abcdaa').length,2,'both night navigation lights remain visible');
+  paint({type:'plane',lane:.5,seed:.4,reverse},W/2);
+  assert.equal(fills.length,1,`${W}x${H}: the previous compact silhouette has one filled surface`);
+  assert.deepEqual(fills[0],{paint:['#f6f1db','#456',night*.7].join(':'),path:silhouette},'the previous ivory finish blends into the night sky');
+  assert.deepEqual(lines,[],'oversized wings and added panel strokes are absent');
+  assert.deepEqual(transforms,[['translate',W/2,hy*.18+.5*hy*.18+(reduced?0:3)],['scale',reverse?-1:1,1]]);
+  assert.deepEqual(offsets,[['plane',14]],'the existing vertical flight route is preserved');
+  assert.equal(rectangles.length,1,'only the original contrail paints a rectangle');
+  assert.deepEqual(rectangles[0].rect,[-90,1,83,.7]);assert.equal(rectangles[0].alpha,.45);
+  assert.deepEqual(rectangles[0].paint.stops,[[0,'rgba(248,246,225,0)'],[1,'rgba(248,246,225,.65)']]);
+  assert.deepEqual(ellipses,night>.4?[{x:0,y:-2,rx:1,ry:1,paint:'#ed8976'},{x:0,y:2,rx:1,ry:1,paint:'#abcdaa'}]:[],'night navigation lights retain their existing threshold and positions');
+ }
  assert.match(source,/const f=geometry\.routeProgress\(e,'x'\)/,'aircraft keep their existing event lifecycle and horizontal route');
  assert.match(branch,/geometry\.verticalOffset\(e,14\)/,'aircraft keep their existing vertical flight motion');
 });
