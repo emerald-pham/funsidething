@@ -180,12 +180,15 @@
   function paintRooftopPatio(ctx,patio){
     const {x,y,bw}=patio,deckWidth=Math.max(4,bw*.84),deckX=x+(bw-deckWidth)/2,deckY=y-1.8;
     const postHeight=Math.min(3,Math.max(1.5,bw*.16)),left=deckX+deckWidth*.16,right=deckX+deckWidth*.84,sag=1.15;
-    const wireY=deckY-postHeight,lightAlpha=.28+p.night*.52;
+    const wireY=deckY-postHeight,lightAlpha=p.night*.8;
     ctx.save();ctx.globalAlpha=.8;
     ctx.fillStyle=S.mixHex(p.hill,p.front,.42);ctx.fillRect(deckX,deckY,deckWidth,1.8);
     line(ctx,deckX,deckY,deckX+deckWidth,deckY,S.mixHex(p.front,p.sky[2],.36),.55);
     line(ctx,left,deckY,left,wireY,S.mixHex(p.front,p.sky[2],.28),.55);
     line(ctx,right,deckY,right,wireY,S.mixHex(p.front,p.sky[2],.28),.55);
+    // Patio strings used to bypass the garden sampler and light every roof,
+    // including daylight. Keep the hardware, but show only this roof's sample.
+    if(sky.sun.altitude>=0||!cityLights.gardens.lit[patio.index]){ctx.restore();return;}
     ctx.beginPath();ctx.moveTo(left,wireY);ctx.quadraticCurveTo((left+right)/2,wireY+sag,right,wireY);
     ctx.strokeStyle=`rgba(255,222,160,${lightAlpha})`;ctx.lineWidth=.7;ctx.stroke();
     for(let bulb=0;bulb<5;bulb++){
@@ -340,7 +343,7 @@
     const plan=geometry.cityscape(rand),buildings=plan.towers,count=buildings.length;let windowIndex=0;
     rooftopRoofs=plan.partyRoofs;
     if(rooftopParty.active&&!rooftopRoofs.some(roof=>roof.index===rooftopParty.active.roofIndex))rooftopParty.active=null;
-    S.syncGardenLights(cityLights.gardens,plan.gardens.map(garden=>garden.index),Math.random);
+    S.syncGardenLights(cityLights.gardens,[...plan.gardens,...plan.patios].map(roof=>roof.index),Math.random);
     const gardenLights=cityLights.gardens,gardens=new Map(plan.gardens.map(garden=>[garden.index,garden]));
     const patios=new Map(plan.patios.map(patio=>[patio.index,patio]));
     cityLights.visible=[];
@@ -373,7 +376,7 @@
           b.fillStyle=S.mixHex(p.far,p.hill,.38+rand(i+pot+1100)*.2);b.fillRect(px,deckY-1,Math.max(1,deckWidth*.18),1.1);
           ellipse(b,px+deckWidth*.08,deckY-1.2,.8,.65,S.mixHex(p.far,p.front,.28));
         }
-        if(night>.12&&gardenLights.lit[garden.index])for(let light=0;light<garden.lights;light++)
+        if(sky.sun.altitude<0&&night>.12&&gardenLights.lit[garden.index])for(let light=0;light<garden.lights;light++)
           ellipse(b,deckX+deckWidth*(.44+light*.22),deckY-1.1,.55,.55,`rgba(255,228,157,${night*.92})`);
       }
       if(patios.has(i))paintRooftopPatio(b,patios.get(i));
@@ -638,19 +641,10 @@
     }
     g.restore();
   }
-  function paintLife(t){
-    visibleBanners=[];
-    g.clearRect(0,0,W,H);
-    const waterEvents=new Set(['festival','jetski','sailboat','cruise','yacht','windsurfer','duck','fish','dolphin']);
-    const airborne=new Set(['festival','duck','fish','plane','balloon','airshow','banner','skywriter','hangglider','jetski','sailboat','cruise','yacht','windsurfer','dolphin','flock']);
-    for(const e of world.events)if(e.type==='meteor'&&p.night>.3){
-      const fx=geometry.motionProgress(e,'x'),fy=geometry.motionProgress(e,'y'),dx=(e.reverse?-1:1)*(85+e.seed*70),dy=24+e.lane*20;
-      const sx=W*(.2+e.seed*.6),sy=hy*(.08+e.lane*.3),x=sx+dx*fx,y=sy+dy*fy;
-      g.save();g.globalAlpha=p.night*S.smooth(0,.08,fx)*(1-S.smooth(.55,1,fx));
-      const tail=g.createLinearGradient(x-dx*.35,y-dy*.35,x,y);tail.addColorStop(0,'#e7f5ee00');tail.addColorStop(1,'#effbf5');
-      line(g,x-dx*.35,y-dy*.35,x,y,tail,1.1);ellipse(g,x,y,1.2,1.2,'#f9ffe8');g.restore();
-    }
-    if(sky.sun.altitude < -6)for(const e of world.events)if(e.type==='fireworks'||e.type==='festival'){
+  function paintFireworks(type){
+    if(sky.sun.altitude>=-6)return;
+    g.save();
+    for(const e of world.events)if(e.type===type){
       g.save();
       for(const dot of geometry.fireworks(e.age,e.seed,e.type==='festival',e)){
         const night=1-S.smooth(-12,-6,sky.sun.altitude);
@@ -667,6 +661,28 @@
       }
       g.restore();
     }
+    // Cut only random shows with the actual opaque city, including overlapping
+    // towers and the clock. Barge shells have their own foreground pass.
+    if(type==='fireworks'){
+      g.globalCompositeOperation='destination-out';
+      g.drawImage(cityLayer,0,0,cityLayer.width/dpr,cityLayer.height/dpr);
+    }
+    g.restore();
+  }
+  function paintLife(t){
+    visibleBanners=[];
+    g.clearRect(0,0,W,H);
+    paintFireworks('fireworks');
+    const waterEvents=new Set(['festival','jetski','sailboat','cruise','yacht','windsurfer','duck','fish','dolphin']);
+    const airborne=new Set(['festival','duck','fish','plane','balloon','airshow','banner','skywriter','hangglider','jetski','sailboat','cruise','yacht','windsurfer','dolphin','flock']);
+    for(const e of world.events)if(e.type==='meteor'&&p.night>.3){
+      const fx=geometry.motionProgress(e,'x'),fy=geometry.motionProgress(e,'y'),dx=(e.reverse?-1:1)*(85+e.seed*70),dy=24+e.lane*20;
+      const sx=W*(.2+e.seed*.6),sy=hy*(.08+e.lane*.3),x=sx+dx*fx,y=sy+dy*fy;
+      g.save();g.globalAlpha=p.night*S.smooth(0,.08,fx)*(1-S.smooth(.55,1,fx));
+      const tail=g.createLinearGradient(x-dx*.35,y-dy*.35,x,y);tail.addColorStop(0,'#e7f5ee00');tail.addColorStop(1,'#effbf5');
+      line(g,x-dx*.35,y-dy*.35,x,y,tail,1.1);ellipse(g,x,y,1.2,1.2,'#f9ffe8');g.restore();
+    }
+    paintFireworks('festival');
     // Persistent drift guarantees life even between scheduled arrivals. In reduced
     // motion these exact same shapes are drawn once, with no animation loop.
     for(let i=0;i<7;i++){
@@ -689,7 +705,7 @@
     reflectionContext.setTransform(dpr,0,0,dpr,0,0);
     reflectionContext.drawImage(skyCity,0,0,skyCity.width,skyCity.height,0,0,W,geometry.waterTop);
     reflectionContext.drawImage(front,0,0,front.width,skyReflection.height,0,0,W,geometry.waterTop);
-    paintWeatherOn(reflectionContext,weather,weatherPhase,false,false);
+    paintWeatherOn(reflectionContext,weather,weatherPhase,false,false,false);
     // Downsampling makes a faint soft copy; deeper water blends in a little
     // more of it without moving or shrinking any reflected object.
     const softWidth=Math.max(1,Math.ceil(skyReflection.width/3)),softHeight=Math.max(1,Math.ceil(skyReflection.height/3));
@@ -787,7 +803,7 @@
       g.globalAlpha=(.2+.6*(.5+.5*Math.sin(t*1.4+i)))*p.night;ellipse(g,x,y,1.5,1.5,'#eff7b7');g.globalAlpha=1;
     }
   }
-  function paintWeatherOn(ctx,weather,phase,updateStatus=false,includeTint=true){
+  function paintWeatherOn(ctx,weather,phase,updateStatus=false,includeTint=true,includeRain=true){
     if(updateStatus)document.documentElement.dataset.sceneWeather=weather.status;
     LandscapeSeasonal.paint(ctx,treeOrigins,geometry,W,H,world.elapsed,sceneSeason,p,reduced,weather);
     if(!weather.intensity)return;
@@ -796,7 +812,7 @@
     ctx.save();
     // A sky-only rectangle left a straight grey boundary across the water and
     // hills. Carry the weather tint down the whole scene and let it disappear.
-    // The reflection receives clouds and rain, but not a second lake tint.
+    // The reflection receives clouds, without a second tint or inverted rain.
     if(includeTint){
       ctx.globalAlpha=weather.intensity*(snow?.08:storm?.32:.22);
       const tint=ctx.createLinearGradient(0,0,0,H);
@@ -833,14 +849,18 @@
       ctx.bezierCurveTo(x-w*.47,y+h*.34,x-w*.49,y+h*.31,x-w*.5,y+h*.25);
       ctx.closePath();ctx.fill();
     }
-    ctx.globalAlpha=weather.intensity*(snow?.55:storm?.72:.62);
-    const count=Math.round(W/(storm?8:snow?22:9));
-    for(let i=0;i<count;i++){
-      const speed=snow?10+rand(i+4500)*15:75+rand(i+4500)*50;
-      const y=(rand(i+4600)*H+phase*speed)%H;
-      const x=((rand(i+4700)*W+y*.12*wind+(snow?phase*(storm?18:4)+Math.sin(phase*.22)*12+Math.sin(phase*.071)*8+Math.sin(phase*.5+i)*5:0))%W+W)%W;
-      if(snow)ellipse(ctx,x,y,.8+rand(i+4800),.8+rand(i+4800),'#f4f4e8');
-      else line(ctx,x,y,x+1.2*wind,y+9+rand(i+4800)*7,'#e4f2f6',.9);
+    if(snow||includeRain){
+      ctx.globalAlpha=weather.intensity*(snow?.55:storm?.72:.62);
+      // Width alone left tall phone scenes nearly empty. Preserve the snow
+      // budget while giving rain a dense floor and coverage for taller screens.
+      const count=snow?Math.round(W/(storm?8:22)):Math.min(900,Math.ceil(Math.max(W/(storm?2.5:3),W*H/(storm?2200:3000))));
+      for(let i=0;i<count;i++){
+        const speed=snow?10+rand(i+4500)*15:75+rand(i+4500)*50;
+        const y=(rand(i+4600)*H+phase*speed)%H;
+        const x=((rand(i+4700)*W+y*.12*wind+(snow?phase*(storm?18:4)+Math.sin(phase*.22)*12+Math.sin(phase*.071)*8+Math.sin(phase*.5+i)*5:0))%W+W)%W;
+        if(snow)ellipse(ctx,x,y,.8+rand(i+4800),.8+rand(i+4800),'#f4f4e8');
+        else line(ctx,x,y,x+1.2*wind,y+9+rand(i+4800)*7,'#e4f2f6',.9);
+      }
     }
     // An occasional distant bolt, never a full-screen flash or a reduced-motion effect.
     const flash=(phase+rand(weather.slot)*40)%47;

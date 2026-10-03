@@ -11,9 +11,10 @@ Train and metro have dedicated service: about 65 and 50 seconds crossing,
 respectively, followed by 12 and 8 seconds of rest at rate 1. Their rate divides
 that rest time; only one vehicle per track runs at once. Motion pauses offscreen.
 Standalone fireworks check every 30 seconds of active nighttime viewing with a
-40% chance at rate 1, then rest for 60 seconds after the nine-second show. The
-first check is after 20 active seconds. This averages about two minutes between
-shows when space is available; it is random, not a guarantee.
+40% chance at rate 1. Each show independently samples a duration from 60 to
+300 seconds, continues bursting behind the city, then rests for 60 seconds
+after its actual end. The first check is after 20 active seconds. Arrival
+timing stays random and respects the scene budget.
 Festivals check once per active minute at a 0.6% chance, wait at least 30 active
 minutes between visits, share the seven-minute rare cooldown with alien visits,
 and cross the lake on a barge in about 127–183 seconds, depending on the

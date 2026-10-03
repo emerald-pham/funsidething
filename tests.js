@@ -12,6 +12,190 @@ const HTML_PATH = path.join(__dirname, "index.html");
 const html = fs.readFileSync(HTML_PATH, "utf8");
 const lzStringSrc = fs.readFileSync(path.join(__dirname, "vendor/lz-string-1.5.0.min.js"), "utf8");
 
+test('RISK rain density: phone tablet and short screens retain a dense bounded curtain in either motion mode',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ const paint=source.slice(source.indexOf('  function paintWeatherOn('),source.indexOf('  function paintWoodland('));
+ for(const [W,H] of [[320,568],[390,844],[568,320],[768,1024],[1440,900]])for(const reduced of [false,true]){
+  const draw=(storm,phase)=>{
+   const streaks=[],g={save(){},restore(){},beginPath(){},moveTo(){},bezierCurveTo(){},closePath(){},fill(){},fillRect(){},createLinearGradient(){return {addColorStop(){}}}};
+   vm.runInNewContext(`${paint};paintWeatherOn(g,weather,phase)`,{g,W,H,hy:Math.min(H*.37,310),phase,reduced,weather:{status:storm?'thunderstorm':'rain',intensity:1,storm,slot:1},sceneSeason:'summer',world:{elapsed:0},p:{night:.7},S:{mixHex:day=>day},rand:n=>(Math.sin(n)+1)/2,LandscapeSeasonal:{paint(){}},treeOrigins:[],geometry:{},line(_g,...args){streaks.push(args)}});
+   return streaks.filter(streak=>streak[4]==='#e4f2f6');
+  };
+  const rain=draw(false,0),storm=draw(true,0);
+  assert.ok(rain.length>=Math.ceil(W/3),`${W}x${H}: at least three times the former width-only rain density`);
+  assert.ok(rain.length>=W*H/4000,`${W}x${H}: tall screens receive enough rain for their area`);
+  assert.ok(storm.length>=rain.length&&storm.length<=900,'storms stay denser within a fixed particle budget');
+  assert.ok(rain.every(([x,y,x2,y2])=>x>=0&&x<W&&y>=0&&y<H&&y2>y),'rain falls down across the entire scene');
+  if(reduced)assert.deepEqual(draw(false,0),rain,'the reduced-motion pose remains deterministic');
+  else assert.notDeepEqual(draw(false,.5),rain,'normal-motion rain advances smoothly');
+ }
+});
+
+test('RISK fairy lights: unlit patio strings and every daylight bulb are hidden on phone and desktop',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),start=source.indexOf('  function paintRooftopPatio('),end=source.indexOf('  function paintRooftopParty(',start),paint=source.slice(start,end);
+ const context=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),context);
+ const seed=n=>{const x=Math.sin(n*127.1+311.7)*43758.5453;return x-Math.floor(x);};
+ for(const [W,H] of [[320,568],[390,844],[568,320],[768,1024],[1440,900]]){
+  const patios=context.LandscapeGeometry.create(W,H).cityscape(seed).patios;
+  assert.ok(patios.length>0,`${W}x${H}: patio fixtures exist`);
+  const draw=(lit,altitude)=>{
+   const bulbs=[],wires=[],ctx={save(){},restore(){},fillRect(){},beginPath(){},moveTo(){},quadraticCurveTo(){},stroke(){wires.push(this.strokeStyle)}};
+   vm.runInNewContext(`${paint};paintRooftopPatio(ctx,patio)`,{ctx,patio:patios[0],p:{night:altitude<0?1:.4,hill:'#567',front:'#345',sky:['#123','#234','#456']},sky:{sun:{altitude}},cityLights:{gardens:{lit:{[patios[0].index]:lit}}},S:{mixHex:day=>day},line(){},ellipse(_g,...args){bulbs.push(args)}});
+   return {bulbs,wires};
+  };
+  assert.equal(draw(false,-20).bulbs.length,0,'an unlit sampled patio has no warm fairy bulbs');
+  assert.equal(draw(false,-20).wires.length,0,'the glowing string is also hidden on an unlit patio');
+  for(const altitude of [0,1,40]){
+   assert.equal(draw(true,altitude).bulbs.length,0,'daylight hides even a patio whose retained state is lit');
+   assert.equal(draw(true,altitude).wires.length,0,'daylight never paints an illuminated string');
+  }
+  assert.equal(draw(true,-20).bulbs.length,5,'a sampled lit patio retains all five attached nighttime bulbs');
+  assert.equal(draw(true,-20).wires.length,1,'a sampled lit patio retains its sagging string');
+ }
+});
+
+test('RISK rain reflection: removing mirrored rainfall preserves snow and the distant lightning bolt',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ const paint=source.slice(source.indexOf('  function paintWeatherOn('),source.indexOf('  function paintWoodland('));
+ const draw=(status,storm)=>{
+  const strokes=[],flakes=[],ctx={save(){},restore(){},beginPath(){},moveTo(){},bezierCurveTo(){},closePath(){},fill(){},fillRect(){},createLinearGradient(){return {addColorStop(){}}}};
+  vm.runInNewContext(`${paint};paintWeatherOn(ctx,weather,.14,false,false,false)`,{ctx,weather:{status,storm,intensity:1,slot:1},W:390,H:844,hy:300,reduced:false,sceneSeason:'winter',world:{elapsed:0},p:{night:0},S:{mixHex:day=>day},rand:()=>0,treeOrigins:[],geometry:{},LandscapeSeasonal:{paint(){}},line(_g,...args){strokes.push(args)},ellipse(_g,...args){flakes.push(args)}});
+  return {strokes,flakes};
+ };
+ assert.equal(draw('rain',false).strokes.length,0,'falling rain stays outside the mirror source');
+ assert.equal(draw('snow',false).flakes.length,Math.round(390/22),'the existing drifting snow reflection is preserved');
+ assert.equal(draw('thunderstorm',true).strokes.filter(stroke=>stroke[4]==='#fff4d1').length,3,'the distant bolt still reflects with the storm clouds');
+});
+
+test('RISK fairy lights: gardens and patios share independent stable one-in-twelve roof samples',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ const sync=source.match(/S\.syncGardenLights\(cityLights\.gardens,[^;]+;/)?.[0];assert.ok(sync);
+ const sky=livingSky(),cityLights={gardens:sky.createGardenLights([],()=>.99)},plan={gardens:[{index:1},{index:3}],patios:[{index:2},{index:4}]};
+ let draws=0;const math=Object.create(Math);math.random=()=>draws++%2?.99:0;
+ vm.runInNewContext(sync,{S:sky,cityLights,plan,Math:math});
+ assert.equal(draws,4,'every garden and patio gets its own draw');
+ assert.deepEqual([...cityLights.gardens.roofs].sort(),[1,2,3,4],'the slow night sampler includes patio strings');
+ assert.equal(Object.values(cityLights.gardens.lit).filter(Boolean).length,2,'lit and unlit roofs coexist independently');
+ const saved={...cityLights.gardens.lit};math.random=()=>{throw new Error('repaint cannot reroll sampled roofs');};
+ vm.runInNewContext(sync,{S:sky,cityLights,plan,Math:math});
+ vm.runInNewContext(sync,{S:sky,cityLights,plan:{gardens:[{index:1}],patios:[]},Math:math});
+ vm.runInNewContext(sync,{S:sky,cityLights,plan,Math:math});
+ assert.deepEqual({...cityLights.gardens.lit},saved,'samples survive repaint and temporary resize ineligibility');
+});
+
+test('RISK fireworks duration: each standalone show samples one to five minutes once and rests after its actual end',()=>{
+ const sky=livingSky(),night={sun:{altitude:-20,azimuth:0}};
+ for(const [sample,expected] of [[0,60],[.25,120],[.5,180],[.999,299.76],[1,300]]){
+  const w=sky.createWorld(()=>0);w.events=[];w.next=Infinity;w.railNext={train:Infinity,metro:Infinity};w.nextFestival=Infinity;w.nextFireworks=0;
+  const draws=[0,sample,.5,.4,.2];w.random=()=>draws.shift()??0;
+  sky.advance(w,1,night);const show=w.events.find(e=>e.type==='fireworks');
+  assert.ok(show);assert.ok(Math.abs(show.duration-expected)<1e-9,'show duration uses its own bounded arrival sample');
+  assert.equal(show.speed,1,'stationary fireworks never speed up their sampled duration');
+  assert.equal(w.nextFireworks,w.elapsed+show.duration+60,'rest starts after this show finishes');
+  sky.advance(w,expected/2,night);assert.equal(show.duration,expected,'frames never resample duration');
+  assert.equal(w.events.filter(e=>e.type==='fireworks').length,1,'a long show cannot overlap another show');
+  sky.advance(w,expected/2,night);assert.ok(!w.events.includes(show),'the event retires at its sampled end');
+  sky.advance(w,59,night);assert.equal(w.events.filter(e=>e.type==='fireworks').length,0,'the full rest is preserved after retirement');
+  sky.advance(w,1,night);assert.equal(w.events.filter(e=>e.type==='fireworks').length,1,'a successful later roll starts another bounded show');
+ }
+});
+
+test('RISK fireworks duration: repeated bursts span long shows with bounded particles and a complete final fade',()=>{
+ const context=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),context);
+ for(const [W,H] of [[320,568],[390,844],[568,320],[768,1024],[1440,900]])for(const duration of [60,180,300]){
+  const geometry=context.LandscapeGeometry.create(W,H),event={type:'fireworks',duration,seed:.4};
+  for(const age of [1.6,21.6,duration/2+1.6,duration-5]){
+   const dots=geometry.fireworks(age,event.seed,false,event);
+   assert.ok(dots.some(dot=>dot.kind==='spark'),`${W}x${H}: bursts remain visible ${age}s into a ${duration}s show`);
+   assert.ok(dots.length<=96,'only the currently airborne bursts need particles');
+   assert.ok(dots.every(dot=>[dot.x,dot.y,dot.alpha].every(Number.isFinite)&&dot.alpha>0&&dot.alpha<=1),'all long-show particles remain finite and fading');
+   assert.ok(dots.every(dot=>dot.x>=-128&&dot.x<=W+128&&dot.y>=0&&dot.y<geometry.waterTop),'late launch sites stay within the skyline');
+  }
+  assert.equal(geometry.fireworks(0,.4,false,event).length,0);
+  assert.equal(geometry.fireworks(duration,.4,false,event).length,0,'nothing remains at the exact event end');
+ }
+});
+
+test('RISK fireworks layering: city silhouettes mask random shows while barge shells remain foreground',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),start=source.indexOf('  function paintFireworks('),end=source.indexOf('  function paintLife(',start);
+ assert.ok(start>=0&&end>start,'the two firework sources have an explicit depth-aware painter');
+ const paint=source.slice(start,end),cityLayer={width:390,height:320},events=[{type:'fireworks',age:1.6,seed:.4},{type:'festival',age:30,seed:.4}];
+ for(const type of ['fireworks','festival']){
+  const masks=[],calls=[],stack=[],g={globalAlpha:1,globalCompositeOperation:'source-over',save(){stack.push([this.globalAlpha,this.globalCompositeOperation])},restore(){[this.globalAlpha,this.globalCompositeOperation]=stack.pop()},drawImage(layer){masks.push({layer,operation:this.globalCompositeOperation})}};
+  vm.runInNewContext(`${paint};paintFireworks(type)`,{g,type,W:390,H:844,dpr:1,cityLayer,sky:{sun:{altitude:-20}},world:{events},S:{smooth:()=>0},geometry:{fireworks(age,seed,barge,event){calls.push(event.type);return [{x:150,y:290,tailX:148,tailY:292,alpha:1,burst:0}] }},line(){},ellipse(){}});
+  assert.deepEqual(calls,[type],'each depth pass draws only its own show');
+  assert.equal(masks.length,type==='fireworks'?1:0,'only random fireworks are hidden by city pixels');
+  if(masks.length){assert.equal(masks[0].layer,cityLayer);assert.equal(masks[0].operation,'destination-out','the real opaque city mask hides overlapping tower and clock silhouettes');}
+  assert.equal(g.globalCompositeOperation,'source-over','mask compositing cannot erase later foreground objects');
+ }
+ const life=source.slice(source.indexOf('  function paintLife('),source.indexOf('  function paintWeatherOn('));
+ assert.ok(life.indexOf("paintFireworks('fireworks')")<life.indexOf("e.type==='meteor'"),'city masking runs before other dynamic visitors');
+ assert.ok(life.indexOf("paintFireworks('festival')")<life.indexOf('reflectionContext.drawImage(front'),'foreground barge shells still enter the shared reflection source');
+});
+
+test('RISK scenery browser: phone fairy lights rain and both firework depths match their actual canvas pixels',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT);
+ for(const engine of [chromium,webkit]){
+  const browser=await engine.launch({headless:true,...(engine===chromium?{channel:process.env.LANDSCAPE_BROWSER_CHANNEL||'chrome'}:{})});
+  try{for(const [width,height] of [[390,844],[568,320],[768,1024],[1440,900]]){
+   const page=await browser.newPage({viewport:{width,height},deviceScaleFactor:1,serviceWorkers:'block'}),errors=[];
+   page.on('pageerror',error=>errors.push(error.message));
+   await page.clock.setFixedTime(new Date('2026-09-30T03:00:00Z'));
+   await page.addInitScript(()=>localStorage.setItem('fvp:chain-scanner:landscape-motion','reduced'));
+   await page.route('**/landscape.js',async route=>{
+    const response=await route.fetch();let body=await response.text();
+    const anchor='  resize();updateMotion();if(preference===null)openMotion();';assert.ok(body.includes(anchor));
+    body=body.replace(anchor,anchor+`
+     globalThis.sceneryRegressionProbe=()=>{
+      stop();reduced=true;world.events=[];sky.sun.altitude=-20;
+      const plan=geometry.cityscape(rand),roof=plan.patios[0],samples={...cityLights.gardens.lit};
+      const patioCanvas=document.createElement('canvas');patioCanvas.width=front.width;patioCanvas.height=front.height;
+      const patioCtx=patioCanvas.getContext('2d',{willReadFrequently:true});patioCtx.setTransform(dpr,0,0,dpr,0,0);
+      const countAlpha=()=>{const bytes=patioCtx.getImageData(0,0,front.width,front.height).data;let count=0;for(let i=3;i<bytes.length;i+=4)if(bytes[i])count++;return count;};
+      const patio=(lit,altitude)=>{patioCtx.clearRect(0,0,W,H);cityLights.gardens.lit[roof.index]=lit;sky.sun.altitude=altitude;paintRooftopPatio(patioCtx,roof);return countAlpha();};
+      const unlit=patio(false,-20),lit=patio(true,-20),day=patio(true,40);
+      sky.sun.altitude=-20;paintBackground();
+      const city=cityLayer.getContext('2d').getImageData(0,0,cityLayer.width,cityLayer.height).data;
+      let covered=null,open=null;
+      for(let y=15;y<Math.floor(hy);y++)for(let x=5;x<W-5;x++){
+       const alpha=city[(y*cityLayer.width+x)*4+3];
+       if(!covered&&alpha===255&&[-2,2].every(dx=>city[(y*cityLayer.width+x+dx)*4+3]===255)&&[-2,2].every(dy=>city[((y+dy)*cityLayer.width+x)*4+3]===255))covered={x,y};
+       if(!open&&alpha===0&&y<hy*.3)open={x,y};
+      }
+      if(!covered||!open)throw Error('missing city occlusion fixture');
+      const fireworks=geometry.fireworks;
+      geometry.fireworks=()=>[covered,open].map(point=>({...point,tailX:point.x,tailY:point.y,alpha:1,burst:0,size:1}));
+      const depths={};
+      for(const type of ['fireworks','festival']){
+       world.events=[{type,age:30,duration:180,seed:.4}];g.clearRect(0,0,W,H);paintFireworks(type);
+       const alphaAt=point=>g.getImageData(point.x,point.y,1,1).data[3];
+       depths[type]={covered:alphaAt(covered),open:alphaAt(open)};
+      }
+      geometry.fireworks=fireworks;world.events=[];
+      const weatherAt=S.weatherAt,originalLine=line;let sceneRain=0,mirrorRain=0;
+      S.weatherAt=()=>({status:'rain',intensity:1,storm:false,slot:1});
+      line=(ctx,...args)=>{if(args[4]==='#e4f2f6'){if(ctx===g)sceneRain++;else mirrorRain++;}originalLine(ctx,...args);};
+      paintLife(20);line=originalLine;S.weatherAt=weatherAt;cityLights.gardens.lit=samples;
+      return {unlit,lit,day,depths,sceneRain,mirrorRain,roofs:cityLights.gardens.roofs.length,eligible:plan.gardens.length+plan.patios.length};
+     };
+    `);
+    await route.fulfill({response,body});
+   });
+   await page.goto(process.env.LANDSCAPE_BROWSER_URL);await page.waitForFunction(()=>globalThis.sceneryRegressionProbe);
+   const result=await page.evaluate(()=>sceneryRegressionProbe());
+   assert.ok(result.lit>result.unlit,'an independently lit patio adds visible nighttime pixels');
+   assert.equal(result.day,result.unlit,'daylight hides every illuminated string pixel');
+   assert.equal(result.depths.fireworks.covered,0,'a real opaque tower hides random sparks');
+   assert.ok(result.depths.fireworks.open>0,'random sparks remain visible above the city');
+   assert.ok(result.depths.festival.covered>0&&result.depths.festival.open>0,'barge shells remain in front of both city and sky');
+   assert.ok(result.sceneRain>=Math.ceil(width/3),'the composed phone scene receives the dense rain curtain');
+   assert.equal(result.mirrorRain,0,'the source sampled by the GPU mirror has no inverted rainfall');
+   assert.equal(result.roofs,result.eligible,'every eligible garden and patio participates in independent sampling');
+   assert.deepEqual(errors,[]);await page.close();
+  }}finally{await browser.close();}
+ }
+});
+
 test("Default contexts: fresh starts contain only Errands and Home Only, enabled in order", async () => {
   const { ctx } = await loadApp();
   assert.deepEqual(JSON.parse(JSON.stringify(ctx.state.contexts)), [
@@ -12268,11 +12452,11 @@ test('Landscape fireworks: rare nighttime bursts fade completely and stay within
   const world=sky.createWorld(()=>0);world.events=[];world.elapsed=sky.RARE_COOLDOWN;world.lastRare=0;world.next=0;world.nextFestival=Infinity;
   sky.advance(world,1,{sun:{altitude,azimuth:90}});
   assert.equal(world.events.some(e=>e.type==='fireworks'),altitude<0,'fireworks only enter the night sky');
-  if(altitude<0)assert.equal(world.events.find(e=>e.type==='fireworks').duration,9,'allow the final burst to finish fading');
+  if(altitude<0)assert.equal(world.events.find(e=>e.type==='fireworks').duration,60,'a minimum-length show still allows its final burst to fade');
  }
  const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
  for(const [w,h] of [[320,568],[844,390],[1440,900]]){
-  const g=ctx.LandscapeGeometry.create(w,h);assert.equal(g.fireworks(0,.4).length,0);assert.equal(g.fireworks(10,.4).length,0);
+  const g=ctx.LandscapeGeometry.create(w,h);assert.equal(g.fireworks(0,.4).length,0);assert.equal(g.fireworks(60,.4).length,0);
   const dots=g.fireworks(1.6,.4);assert.ok(dots.length>0&&dots.length<=48);
   for(const dot of dots){assert.ok(dot.x>=0&&dot.x<=w&&dot.y>=0&&dot.y<g.horizon);assert.ok(dot.alpha>0&&dot.alpha<=1);}
  }
@@ -15618,11 +15802,12 @@ test('RISK landscape weather: rainclouds have rounded layered contours and the t
 test('RISK landscape weather: reflected clouds remain visible without doubling the lake tint',()=>{
  const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
  const rain=source.slice(source.indexOf('  function paintWeatherOn('),source.indexOf('  function paintWoodland('));
- const rects=[],streaks=[],g={save(){},restore(){},fillRect(...args){rects.push(args)},createLinearGradient(){return {addColorStop(){}}},beginPath(){},moveTo(){},bezierCurveTo(){},closePath(){},fill(){}};
- vm.runInNewContext(`${rain};paintWeatherOn(g,{status:'rain',intensity:1,storm:false,slot:1},0,false,false)`,{g,W:390,H:844,hy:300,sceneSeason:'autumn',world:{elapsed:0},reduced:true,rand:n=>(Math.sin(n)+1)/2,ellipse(){},line(_g,...args){streaks.push(args)},document:{documentElement:{dataset:{}}},LandscapeSeasonal:{paint(){}},geometry:{},treeOrigins:[],p:{night:0,city:'#345',sky:['#abc','#bcd','#def']},S:{mixHex:(day)=>day}});
+ const rects=[],streaks=[],gradients=[],g={save(){},restore(){},fillRect(...args){rects.push(args)},createLinearGradient(){gradients.push(true);return {addColorStop(){}}},beginPath(){},moveTo(){},bezierCurveTo(){},closePath(){},fill(){}};
+ vm.runInNewContext(`${rain};paintWeatherOn(g,{status:'rain',intensity:1,storm:false,slot:1},0,false,false,false)`,{g,W:390,H:844,hy:300,sceneSeason:'autumn',world:{elapsed:0},reduced:true,rand:n=>(Math.sin(n)+1)/2,ellipse(){},line(_g,...args){streaks.push(args)},document:{documentElement:{dataset:{}}},LandscapeSeasonal:{paint(){}},geometry:{},treeOrigins:[],p:{night:0,city:'#345',sky:['#abc','#bcd','#def']},S:{mixHex:(day)=>day}});
  assert.equal(rects.length,0,'reflection does not darken the lake a second time with a full-scene tint');
- assert.ok(streaks.length>=30,'rain and its cloud layer still enter the reflected source');
- assert.match(source,/paintWeatherOn\(reflectionContext,weather,weatherPhase,false,false\)/);
+ assert.equal(streaks.length,0,'falling rain is painted once over the lake instead of mirrored into upward streaks');
+ assert.equal(gradients.length,6,'the weather cloud layer still enters the reflected source');
+ assert.match(source,/paintWeatherOn\(reflectionContext,weather,weatherPhase,false,false,false\)/);
 });
 
 test('RISK landscape weather: organic rain storm and snow clouds darken smoothly with the night sky',()=>{
@@ -18026,7 +18211,9 @@ test('RISK night shows: standalone fireworks recur independently of the rare coo
  assert.equal(w.events.filter(e=>e.type==='fireworks').length,1,'standalone fireworks do not wait seven minutes');
  assert.equal(w.lastRare,0,'standalone shows do not delay the festival or alien visit');
  for(let i=0;i<70;i++)sky.advance(w,1,night);
- assert.equal(w.events.filter(e=>e.type==='fireworks').length,1,'a second independent show occurs within seventy seconds on successful rolls');
+ assert.equal(w.events.filter(e=>e.type==='fireworks').length,0,'the minimum-minute show finishes before its full rest');
+ for(let i=0;i<50;i++)sky.advance(w,1,night);
+ assert.equal(w.events.filter(e=>e.type==='fireworks').length,1,'a second independent show starts after its sampled duration and full rest');
  assert.ok(w.events.length<=sky.MAX_EVENTS);
  const day=sky.createWorld(()=>0);day.events=[];day.next=Infinity;day.railNext=w.railNext;day.nextFireworks=0;day.nextFestival=0;
  sky.advance(day,100,{sun:{altitude:-6,azimuth:0}});
@@ -18071,7 +18258,7 @@ test('RISK night shows: launches lead to bounded fading bursts and the festival 
   }
   assert.ok(g.fireworks(.4,.4).some(dot=>dot.kind==='rocket'),'shells visibly rise from the waterfront');
   for(const festival of [false,true]){
-   const end=festival?150:9;
+   const end=150;
    assert.equal(g.fireworks(0,.4,festival,event).length,0);assert.equal(g.fireworks(end,.4,festival,event).length,0);
    let reflected=false,burst=false;
    for(let age=0;age<=end;age+=.1){
@@ -18118,8 +18305,10 @@ test('RISK night shows: festival and standalone sparks enter the shared mirror b
  const life=source.slice(source.indexOf('  function paintLife(t){'),source.indexOf('  function paintWeatherOn('));
  const capture=life.indexOf('reflectionContext.drawImage(front');
  assert.ok(life.indexOf('paintFestivalBarge(e)')>capture,'the hull and its own waterline reflection join the depth-sorted boat pass');
- assert.match(life.slice(0,capture),/e\.type==='fireworks'\|\|e\.type==='festival'/);
- assert.match(life.slice(0,capture),/geometry\.fireworks\(e\.age,e\.seed,e\.type==='festival',e\)/);
+ assert.ok(life.slice(0,capture).includes("paintFireworks('fireworks')"));
+ assert.ok(life.slice(0,capture).includes("paintFireworks('festival')"));
+ const shells=source.slice(source.indexOf('  function paintFireworks('),source.indexOf('  function paintLife('));
+ assert.match(shells,/geometry\.fireworks\(e\.age,e\.seed,e\.type==='festival',e\)/);
  const start=source.indexOf('  function paintFestivalBarge('),end=source.indexOf('  function paintLife(t){');
  assert.ok(start>=0&&end>start);
  assert.doesNotMatch(source.slice(start,end),/Date\.now|Math\.random|setInterval|globalCompositeOperation\s*=\s*['"](?:lighter|screen)/,'show motion uses the pausable event clock and no flash compositing');
