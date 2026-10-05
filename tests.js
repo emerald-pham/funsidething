@@ -8990,12 +8990,15 @@ test('RISK CLOUD BACKUP: clean adoption frees automatic history for the next ord
  assert.doesNotMatch(shim.document.getElementById('toast')?.textContent||'',/Couldn't save this edit on this device/);
 });
 
-test('RISK CLOUD BACKUP: clean adoption promotes every conflicting row that shares a recovery ID',async()=>{
+test('RISK CLOUD BACKUP: clean adoption promotes every conflicting row sharing a recovery ID under a stable fixture clock',async()=>{
  const local=syncState({tasks:[syncTask('local','Already in cloud')],syncRev:1,syncAccount:'e@example.com',syncDirty:true});
  const remote=syncState({tasks:[syncTask('local','Already in cloud'),syncTask('remote','Newer remote task')]});
  const storage=sharedScannerStorage({[SYNC_STORE_KEY]:JSON.stringify(local)});
  const h=makeSyncHarness({remote,rev:2});
  const {ctx}=await loadApp({sharedStorage:storage,cloudSyncFactory:h.factory});
+ // Exercise duplicate-ID promotion before ordinary seven-day expiry; the
+ // fixed legacy dates must not depend on the day this suite happens to run.
+ setFakeTime(ctx,Date.parse('2026-09-28T12:00:00Z'));
  const priorBoard=JSON.stringify(ctx.state),displaced=JSON.parse(priorBoard);
  displaced.tasks[0].title='Sole overwritten offline title';
  const sharedId='legacy-shared-id';
@@ -9003,6 +9006,8 @@ test('RISK CLOUD BACKUP: clean adoption promotes every conflicting row that shar
   {id:sharedId,day:'2026-09-27',at:Date.parse('2026-09-27T12:00:00Z'),kind:'daily',payload:priorBoard},
   {id:sharedId,day:'2026-09-26',at:Date.parse('2026-09-26T12:00:00Z'),kind:'daily',payload:JSON.stringify(displaced)},
  ]));
+ assert.equal(ctx.readLocalBackups().filter(row=>row.id===sharedId).length,2,
+  'precondition: both duplicate-ID fixture rows are inside automatic retention');
  await ctx.cloudPull();
  const rows=ctx.readLocalBackups().filter(row=>row.id===sharedId);
  const conflicting=rows.find(row=>row.payload===JSON.stringify(displaced));
