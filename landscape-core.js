@@ -127,7 +127,7 @@
   }
   function advanceLights(state,elapsed,night,random=Math.random){
     if(elapsed<state.next)return false;
-    state.next=elapsed+30;
+    state.next=elapsed+15;
     const visible=state.visible;
     if(!night||!state.windows.length||(visible&&!visible.length))return false;
     // A window behind another building is real state, but not visible motion.
@@ -135,7 +135,7 @@
     const index=visible?visible[slot]:slot;
     state.windows[index]=!state.windows[index];return true;
   }
-  const GARDEN_LIGHT_INTERVAL=120,GARDEN_LIGHT_CHANCE=1/12;
+  const GARDEN_LIGHT_INTERVAL=60,GARDEN_LIGHT_CHANCE=1/12;
   const sampleGardenLight=random=>clamp(Number(random())||0,0,.999999)<GARDEN_LIGHT_CHANCE;
   function createGardenLights(roofIndices=[],random=Math.random){
     const state={elapsed:0,next:GARDEN_LIGHT_INTERVAL,roofs:[],lit:{}};

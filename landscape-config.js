@@ -74,7 +74,7 @@
 
   // Markdown is data, never executable code. Validate the whole table before
   // replacing rates so a typo cannot partially change a scene's schedule.
-  const spawnRateNames=freeze([...new Set([...BASE_EVENTS,...WINTER_EVENTS,'meteor','abduction','fireworks','festival',
+  const spawnRateNames=freeze([...new Set([...BASE_EVENTS,...WINTER_EVENTS,'meteor','abduction','fireworks','festival','clocktower-visit',
     ...WOODLAND.types.map(type=>'woodland-'+type),'rain','thunderstorm','snow','snowstorm',
     ...['spring','summer','autumn','winter'].map(season=>'ambience-'+season)])]);
   let rates=Object.create(null);

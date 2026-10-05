@@ -55,8 +55,8 @@
   for(const type of ['pointerdown','keydown','wheel','touchstart'])
     document.addEventListener(type,observeSceneInteraction,{capture:true,passive:true});
   let preference=S.readMotion(storage),reduced=S.motionReduced(preference,mq.matches);
-  const cityLights={next:30,windows:[],gardens:S.createGardenLights([],Math.random)},woodland=S.createWoodland();
-  let rooftopRoofs=[],rooftopParty=null,partyTimer=0;
+  const cityLights={next:15,windows:[],gardens:S.createGardenLights([],Math.random)},woodland=S.createWoodland();
+  let rooftopRoofs=[],rooftopParty=null,clocktowerVisit=null,partyTimer=0;
   let sceneSeason=S.readSceneSeason(sceneStorage)||LandscapeMood.season(new Date(),globalThis.LivingLocation?.current()).name,treeOrigins=[];
   let W=0,H=0,hy=0,dpr=1,frame=0,last=0,nextPaint=0,sky,p,world=S.createWorld(Math.random,sceneSeason);
   let skyTimer=0,resizeTimer=0,returnFocus=null;
@@ -384,7 +384,8 @@
     // A small clock tower and civic dome give the distant city a recognizable heart.
     const tx=W*.71,ty=hy-72;
     b.fillStyle=p.city;b.fillRect(tx-9,ty,18,geometry.waterTop-ty);b.fillRect(tx-12,ty-4,24,5);
-    b.beginPath();b.moveTo(tx-11,ty-4);b.lineTo(tx,ty-19);b.lineTo(tx+11,ty-4);b.fill();
+    const clockRoof=geometry.clocktowerRoof();
+    b.beginPath();b.moveTo(clockRoof.left.x,clockRoof.left.y);b.lineTo(clockRoof.apex.x,clockRoof.apex.y);b.lineTo(clockRoof.right.x,clockRoof.right.y);b.fill();
     ellipse(b,tx,ty+12,5,5,S.mixHex('#fff0c9',p.city,.18));
     const hands=globalThis.LandscapeMood?.clock(sky.date)||{minuteAngle:0,hourAngle:0};
     line(b,tx,ty+12,tx+Math.sin(hands.minuteAngle)*4,ty+12-Math.cos(hands.minuteAngle)*4,'#577581',.9);
@@ -669,6 +670,33 @@
     }
     g.restore();
   }
+  function paintClocktowerVisit(){
+    if(!clocktowerVisit?.active)return;
+    if(sky.sun.altitude>=0){geometry.advanceClocktowerVisit(clocktowerVisit,0,false);return;}
+    for(const pose of geometry.clocktowerVisitPoses(clocktowerVisit.active,reduced)){
+      if(!pose.visible||pose.alpha<=0)continue;
+      const scale=pose.height/7,flight=1-pose.stand,dir=pose.direction;
+      const ink=S.mixHex({peter:'#72967b',wendy:'#b1c5ce',john:'#9cabb9',michael:'#bea992'}[pose.character],p.sky[0],.18);
+      const headX=pose.x+dir*3.5*flight,headY=pose.y-scale*(3+3*pose.stand);
+      const hipX=pose.x-dir*1.6*flight,hipY=pose.y-scale*(1.8+.7*pose.stand),neckY=headY+1.2*scale;
+      g.save();g.globalAlpha*=pose.alpha;
+      line(g,headX,neckY,hipX,hipY,ink,1.5*scale);
+      if(pose.character==='wendy'){
+        g.fillStyle=ink;g.beginPath();g.moveTo(headX,neckY);g.lineTo(hipX-1.3*scale,hipY+.2);g.lineTo(hipX+1.3*scale,hipY+.2);g.fill();
+      }
+      for(const foot of pose.feet)line(g,hipX,hipY,foot.x,foot.y,ink,.7*scale);
+      const armX=headX+dir*scale*(.8+3*flight),armY=neckY+scale*(1.6-2.1*flight);
+      line(g,headX,neckY,armX,armY,ink,.65*scale);
+      line(g,headX,neckY,headX-dir*1.5*scale,neckY+scale*(1.5-.8*flight),ink,.65*scale);
+      ellipse(g,headX,headY,.8*scale,.9*scale,ink);
+      if(pose.character==='peter'){
+        g.fillStyle=ink;g.beginPath();g.moveTo(headX-1*scale,headY-.4);g.lineTo(headX+dir*2*scale,headY-1.7*scale);g.lineTo(headX+1*scale,headY-.4);g.fill();
+      }else if(pose.character==='john'){
+        g.fillStyle=ink;g.fillRect(headX-.6*scale,headY-1.8*scale,1.2*scale,1*scale);line(g,headX-1.2*scale,headY-.8*scale,headX+1.2*scale,headY-.8*scale,ink,.5);
+      }else if(pose.character==='michael')ellipse(g,armX,armY+.4,.55,.65,ink);
+      g.restore();
+    }
+  }
   function paintLife(t){
     visibleBanners=[];
     g.clearRect(0,0,W,H);
@@ -695,6 +723,7 @@
     // separate reflection rule for each type.
     for(const e of world.events)if(airborne.has(e.type)&&!waterEvents.has(e.type))paintEvent(e,t);
     paintRooftopParty();
+    paintClocktowerVisit();
     const weather=S.weatherAt(new Date(),sceneSeason),weatherPhase=reduced?0:Date.now()/1000;
     const reflectionHeight=Math.max(1,Math.floor(geometry.waterTop*dpr));
     if(skyReflection.width!==front.width)skyReflection.width=front.width;
@@ -1302,6 +1331,7 @@
     cityLights.windows=[];
     W=host.clientWidth;H=host.clientHeight;geometry=LandscapeGeometry.create(W,H);hy=geometry.horizon;
     if(!rooftopParty)rooftopParty=geometry.createRooftopPartyScheduler(Math.random);
+    if(!clocktowerVisit)clocktowerVisit=geometry.createClocktowerVisitScheduler(Math.random);
     // Pixel budget prevents high-DPR phones from allocating desktop-size canvases.
     dpr=Math.min(window.devicePixelRatio||1,1.5,Math.sqrt(3000000/(W*H)));
     for(const canvas of [back,front,partyLayer]){canvas.width=Math.floor(W*dpr);canvas.height=Math.floor(H*dpr);canvas.getContext('2d').setTransform(dpr,0,0,dpr,0,0);}
@@ -1326,7 +1356,13 @@
     const previous=rooftopParty.active?.roofIndex??null;
     geometry.advanceRooftopParty(rooftopParty,dt,rooftopRoofs,p.night>.2);
     if(reduced&&S.advanceGardenLights(cityLights.gardens,dt,p.night>.2,Math.random))paintBackground();
-    if(reduced&&previous!==(rooftopParty.active?.roofIndex??null))paintLife(world.elapsed);
+    let visitChanged=false;
+    if(geometry.advanceClocktowerVisit){
+      const previousVisit=clocktowerVisit.active;
+      geometry.advanceClocktowerVisit(clocktowerVisit,dt,sky.sun.altitude<0);
+      visitChanged=!!(previousVisit||clocktowerVisit.active);
+    }
+    if(reduced&&(previous!==(rooftopParty.active?.roofIndex??null)||visitChanged))paintLife(world.elapsed);
   }
   function stop(){if(frame)cancelAnimationFrame(frame);frame=0;last=0;nextPaint=0;clearTimeout(skyTimer);clearTimeout(resizeTimer);clearInterval(partyTimer);skyTimer=0;resizeTimer=0;partyTimer=0;}
   function scheduleSky(){

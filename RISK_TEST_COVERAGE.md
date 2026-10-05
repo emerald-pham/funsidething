@@ -2,6 +2,11 @@
 
 This map records the current named RISK contracts in tests.js. It lets reviewers see which costly feature boundaries already have explicit protection before changing nearby behavior. Related non-RISK regression tests remain part of the contract too; the focused companions below call those out where they matter.
 
+- RISK skyline light cadence: twice as many opportunities keep single-roof samples and visible-window toggles
+- RISK clocktower visit geometry: four staggered visitors stand on both actual roof slopes at every viewport
+- RISK clocktower visit scheduler: rare night-only rolls pause expire cancel and never replay a backlog
+- RISK clocktower reduced motion: four fixed roof contacts fade gently without flight or posture animation
+
 The named-contract test in tests.js checks that every top-level test whose title starts with RISK appears in this inventory. Add or rename the inventory entry in the same test-first change. If a future feature adds a new risk area, add a heading and place its concrete test names under it.
 
 ## Task state, eligibility, and scanner controls
