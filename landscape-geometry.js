@@ -61,6 +61,61 @@
       }
       return {groundY,towers,gardens,patios,partyRoofs};
     }
+    function clocktowerRoof(){
+      const x=W*.71,baseY=horizon-76;
+      return {left:{x:x-11,y:baseY},apex:{x,y:horizon-91},right:{x:x+11,y:baseY}};
+    }
+    const clocktowerVisitSchedule=Object.freeze({interval:60,chance:.02,duration:50});
+    function createClocktowerVisitScheduler(random=Math.random){
+      return {random,elapsed:0,untilOpportunity:clocktowerVisitSchedule.interval,active:null};
+    }
+    function advanceClocktowerVisit(state,dt,night=false,rate=root.LandscapeConfig?.spawnRate('clocktower-visit')??1){
+      if(!state)return null;
+      // Dawn and a disabled rate cancel immediately, including a static repaint.
+      if(!night||!(rate>0)){state.active=null;state.untilOpportunity=clocktowerVisitSchedule.interval;return null;}
+      if(!Number.isFinite(dt)||dt<=0)return state.active;
+      state.elapsed+=dt;
+      if(state.active){
+        state.active.age+=dt;
+        if(state.active.age>=state.active.duration){state.active=null;state.untilOpportunity=clocktowerVisitSchedule.interval;}
+        return state.active;
+      }
+      state.untilOpportunity-=dt;
+      if(state.untilOpportunity>0)return null;
+      state.untilOpportunity=clocktowerVisitSchedule.interval; // One roll, never a missed-frame backlog.
+      if(state.random()>=Math.min(1,clocktowerVisitSchedule.chance*rate))return null;
+      const seed=clamp(state.random());
+      state.active={age:0,duration:clocktowerVisitSchedule.duration,seed,direction:seed<.5?1:-1};
+      return state.active;
+    }
+    function clocktowerVisitPoses(event,reduced=false){
+      const roof=clocktowerRoof(),age=Math.max(0,Number(event?.age)||0),duration=Number(event?.duration)||50;
+      const direction=event?.direction===-1?-1:1,seed=clamp(event?.seed??.5);
+      const ease=value=>{const t=clamp(value);return t*t*(3-2*t);};
+      const roofY=x=>roof.left.y-(1-Math.abs(x-roof.apex.x)/11)*15;
+      const curve=(a,b,c,d,t)=>({x:(1-t)**3*a.x+3*(1-t)**2*t*b.x+3*(1-t)*t*t*c.x+t**3*d.x,
+        y:(1-t)**3*a.y+3*(1-t)**2*t*b.y+3*(1-t)*t*t*c.y+t**3*d.y});
+      return ['peter','wendy','john','michael'].map((character,index)=>{
+        const offset=[-3,3,-8,8][index],target={x:roof.apex.x+offset,y:roofY(roof.apex.x+offset)};
+        const delay=[0,.9,1.9,3][index],landing=delay+12+index*.6,takeoff=29+[0,1.2,2.6,4][index],exit=takeoff+12+index*.4;
+        const entry={x:direction===1?-40:W+40,y:Math.max(24,roof.apex.y-Math.min(46,H*.12))-index*4};
+        const away={x:direction===1?W+40:-40,y:Math.max(24,roof.apex.y-Math.min(56,H*.15))-index*3};
+        let position=target,stand=1,phase='perched',visible=age<duration,alpha=1;
+        if(reduced)alpha=ease(age/2)*(1-ease((age-duration+2)/2));
+        else if(age<landing){
+          const t=ease((age-delay)/(landing-delay));phase='arriving';visible=age>=delay;stand=ease((t-.7)/.3);
+          position=curve(entry,{x:entry.x+direction*W*.28,y:entry.y-12-index*2},{x:target.x-direction*(30+index*4),y:target.y-22},target,t);
+          position.y+=Math.sin(Math.PI*t)*Math.sin(t*Math.PI*2+index*.9+seed)*3;
+        }else if(age>=takeoff){
+          const t=ease((age-takeoff)/(exit-takeoff));phase='departing';visible=age<exit&&age<duration;stand=1-ease(t/.3);
+          position=curve(target,{x:target.x+direction*(26+index*3),y:target.y-24},{x:away.x-direction*W*.16,y:away.y+12},away,t);
+          position.y+=Math.sin(Math.PI*t)*Math.sin(t*Math.PI*2+index*.8+seed)*3;
+        }
+        // Both feet, rather than only the body's center, touch the roof's two hypotenuses.
+        const feet=[-.55,.55].map(dx=>({x:position.x+dx,y:position.y+stand*(roofY(target.x+dx)-target.y)}));
+        return {character,x:position.x,y:position.y,feet,stand,phase,visible,alpha,direction,height:[7,7,6.6,5.7][index]};
+      });
+    }
     const rooftopPartySchedule=Object.freeze({interval:30,chance:.02,duration:24});
     function createRooftopPartyScheduler(random=Math.random){
       return {random,elapsed:0,untilOpportunity:rooftopPartySchedule.interval,active:null};
@@ -429,7 +484,7 @@
       const field=packet*.68+detail*.32;
       return {dx:envelope*(.33*field+.1*Math.sin(x*.071+depth*.24-phase*.63)),dy:envelope*1.25*field};
     };
-    return {routeProgress,motionProgress,motionAge,verticalOffset,visitPose,woodlandPose,duckPose,waterDepth,cycleLeg,deerLeg,nestVisit,eventDepth,dogPose,skater,festival,bannerLayout,fireworks,flock,dolphin,starReflection,reflectionSurface,reflectionMotion,castShadow,grassBand,sunReflection,depthBand,groundAnchor,groundTravelX,groundPose,strideArm,strideFoot,wingFold,balloonDrift,vessel,foregroundTree,nest,ripple,skyPoint,horizon,waterTop,far,middle,near,rail,trail,lowerRail,railCars,tangent,rider,pack,cityscape,partyBeamPose,rooftopPartySchedule,createRooftopPartyScheduler,advanceRooftopParty};
+    return {routeProgress,motionProgress,motionAge,verticalOffset,visitPose,woodlandPose,duckPose,waterDepth,cycleLeg,deerLeg,nestVisit,eventDepth,dogPose,skater,festival,bannerLayout,fireworks,flock,dolphin,starReflection,reflectionSurface,reflectionMotion,castShadow,grassBand,sunReflection,depthBand,groundAnchor,groundTravelX,groundPose,strideArm,strideFoot,wingFold,balloonDrift,vessel,foregroundTree,nest,ripple,skyPoint,horizon,waterTop,far,middle,near,rail,trail,lowerRail,railCars,tangent,rider,pack,cityscape,partyBeamPose,rooftopPartySchedule,createRooftopPartyScheduler,advanceRooftopParty,clocktowerRoof,clocktowerVisitSchedule,createClocktowerVisitScheduler,advanceClocktowerVisit,clocktowerVisitPoses};
   }
   root.LandscapeGeometry={create};
 })(globalThis);

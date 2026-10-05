@@ -8990,12 +8990,15 @@ test('RISK CLOUD BACKUP: clean adoption frees automatic history for the next ord
  assert.doesNotMatch(shim.document.getElementById('toast')?.textContent||'',/Couldn't save this edit on this device/);
 });
 
-test('RISK CLOUD BACKUP: clean adoption promotes every conflicting row that shares a recovery ID',async()=>{
+test('RISK CLOUD BACKUP: clean adoption promotes every conflicting row sharing a recovery ID under a stable fixture clock',async()=>{
  const local=syncState({tasks:[syncTask('local','Already in cloud')],syncRev:1,syncAccount:'e@example.com',syncDirty:true});
  const remote=syncState({tasks:[syncTask('local','Already in cloud'),syncTask('remote','Newer remote task')]});
  const storage=sharedScannerStorage({[SYNC_STORE_KEY]:JSON.stringify(local)});
  const h=makeSyncHarness({remote,rev:2});
  const {ctx}=await loadApp({sharedStorage:storage,cloudSyncFactory:h.factory});
+ // Exercise duplicate-ID promotion before ordinary seven-day expiry; the
+ // fixed legacy dates must not depend on the day this suite happens to run.
+ setFakeTime(ctx,Date.parse('2026-09-28T12:00:00Z'));
  const priorBoard=JSON.stringify(ctx.state),displaced=JSON.parse(priorBoard);
  displaced.tasks[0].title='Sole overwritten offline title';
  const sharedId='legacy-shared-id';
@@ -9003,6 +9006,8 @@ test('RISK CLOUD BACKUP: clean adoption promotes every conflicting row that shar
   {id:sharedId,day:'2026-09-27',at:Date.parse('2026-09-27T12:00:00Z'),kind:'daily',payload:priorBoard},
   {id:sharedId,day:'2026-09-26',at:Date.parse('2026-09-26T12:00:00Z'),kind:'daily',payload:JSON.stringify(displaced)},
  ]));
+ assert.equal(ctx.readLocalBackups().filter(row=>row.id===sharedId).length,2,
+  'precondition: both duplicate-ID fixture rows are inside automatic retention');
  await ctx.cloudPull();
  const rows=ctx.readLocalBackups().filter(row=>row.id===sharedId);
  const conflicting=rows.find(row=>row.payload===JSON.stringify(displaced));
@@ -12614,13 +12619,15 @@ test('Landscape companions: dogs remain near their owners and follow the trail i
  }
 });
 
-test('Landscape city: only one window changes per thirty seconds of active night',()=>{
- const sky=livingSky(),state={next:30,windows:[true,false,true,false]};
- assert.equal(sky.advanceLights(state,29,true,()=>.3),false);assert.deepEqual(state.windows,[true,false,true,false]);
- assert.equal(sky.advanceLights(state,30,true,()=>.3),true);assert.deepEqual(state.windows,[true,true,true,false]);
- assert.equal(sky.advanceLights(state,31,true,()=>.3),false);
+test('Landscape city: only one window changes per fifteen seconds of active night',()=>{
+ const sky=livingSky(),state={next:15,windows:[true,false,true,false]};
+ assert.equal(sky.advanceLights(state,14,true,()=>.3),false);assert.deepEqual(state.windows,[true,false,true,false]);
+ assert.equal(sky.advanceLights(state,15,true,()=>.3),true);assert.deepEqual(state.windows,[true,true,true,false]);
+ assert.equal(state.next,30);
+ assert.equal(sky.advanceLights(state,16,true,()=>.3),false);
+ assert.equal(sky.advanceLights(state,30,true,()=>.3),true);assert.deepEqual(state.windows,[true,false,true,false]);
  assert.equal(sky.advanceLights(state,60,false,()=>.3),false);
- assert.equal(sky.advanceLights(state,100,true,()=>.3),true);assert.deepEqual(state.windows,[true,false,true,false],'no catch-up burst after a pause');
+ assert.equal(sky.advanceLights(state,100,true,()=>.3),true);assert.deepEqual(state.windows,[true,true,true,false],'no catch-up burst after a pause');
  assert.equal(sky.advanceLights({next:0,windows:[]},1,true,()=>0),false);
 });
 
@@ -15369,6 +15376,200 @@ test('RISK prerequisites: pasted Add tasks keep the chosen prerequisite',async()
  assert.equal(pasted.length,2);
  assert.ok(pasted.every(task=>task.prerequisiteId===prerequisite.id),'multiline Add must preserve the same scheduling choice as single Add');
  assert.ok(pasted.every(task=>ctx.isEligible(task)===false));
+});
+
+test('RISK skyline light cadence: twice as many opportunities keep single-roof samples and visible-window toggles',()=>{
+ const sky=livingSky(),gardens=sky.createGardenLights([0,1,2,3],()=>.99);
+ assert.equal(gardens.next,60,'only the garden opportunity cadence doubles');
+ assert.equal(sky.advanceGardenLights(gardens,59,true,()=>0),false);
+ assert.equal(sky.advanceGardenLights(gardens,1,true,()=>0),true);
+ assert.deepEqual({...gardens.lit},{0:true,1:false,2:false,3:false});
+ assert.equal(sky.advanceGardenLights(gardens,60,true,()=>.99),false,'unchanged resamples retain their old repaint contract');
+ assert.equal(sky.createGardenLights([0],()=>1/12).lit[0],false,'population and one-in-twelve odds do not double');
+ const windows={next:15,windows:[false,false,true],visible:[1]};
+ assert.equal(sky.advanceLights(windows,15,true,()=>0),true);assert.equal(windows.next,30);
+ assert.deepEqual(windows.windows,[false,true,true]);
+ assert.equal(sky.advanceLights(windows,30,true,()=>0),true);assert.deepEqual(windows.windows,[false,false,true]);
+ assert.equal(sky.advanceLights(windows,100,true,()=>0),true);assert.equal(windows.next,115,'long frames never replay missed toggles');
+ assert.equal(sky.advanceLights(windows,115,false,()=>0),false,'daylight never turns on a city window');
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ assert.match(source,/const cityLights=\{next:15,windows:/,'the first window transition also follows the fifteen-second cadence');
+});
+
+test('RISK clocktower visit geometry: four staggered visitors stand on both actual roof slopes at every viewport',()=>{
+ const context=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),context);
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ for(const [W,H] of [[320,568],[390,844],[568,320],[768,1024],[1280,720],[1440,900]]){
+  const geometry=context.LandscapeGeometry.create(W,H);
+  assert.equal(typeof geometry.clocktowerRoof,'function','landing and painting need the same roof geometry');
+  const roof=geometry.clocktowerRoof();assert.equal(roof.apex.x,W*.71);assert.equal(roof.apex.y,geometry.horizon-91);
+  assert.equal(roof.left.x,roof.apex.x-11);assert.equal(roof.right.x,roof.apex.x+11);assert.equal(roof.left.y,geometry.horizon-76);
+  assert.match(source,/const clockRoof=geometry\.clocktowerRoof\(\);[\s\S]*b\.moveTo\(clockRoof\.left\.x,clockRoof\.left\.y\)/,'the unchanged painted triangle uses the shared roof');
+  const onRoof=x=>roof.left.y-(1-Math.abs(x-roof.apex.x)/11)*15;
+  for(const direction of [-1,1]){
+   const event={age:22,duration:50,direction,seed:.4},poses=geometry.clocktowerVisitPoses(event);
+   assert.equal(poses.length,4);assert.equal(new Set(poses.map(pose=>pose.character)).size,4);
+   assert.deepEqual(Array.from(poses,pose=>pose.character),['peter','wendy','john','michael']);
+   assert.equal(poses.filter(pose=>pose.x<roof.apex.x).length,2);assert.equal(poses.filter(pose=>pose.x>roof.apex.x).length,2);
+   for(const pose of poses){
+    assert.equal(pose.phase,'perched');assert.equal(pose.stand,1);assert.equal(pose.visible,true);
+    for(const foot of pose.feet){assert.ok(foot.x>roof.left.x&&foot.x<roof.right.x);assert.ok(Math.abs(foot.y-onRoof(foot.x))<1e-9,'each foot touches a sloped hypotenuse');}
+   }
+   const arrivals=new Set(),departures=new Set();
+   for(let index=0;index<4;index++){
+    let arrival=null,departure=null;
+    for(let age=0;age<=50;age+=.1){
+     const pose=geometry.clocktowerVisitPoses({...event,age})[index];
+     assert.ok([pose.x,pose.y,pose.alpha,pose.stand,...pose.feet.flatMap(foot=>[foot.x,foot.y])].every(Number.isFinite));
+     if(pose.phase==='perched'&&arrival===null)arrival=age;
+     if(pose.phase==='departing'&&departure===null)departure=age;
+     const next=geometry.clocktowerVisitPoses({...event,age:age+.001})[index];
+     assert.ok(Math.hypot(next.x-pose.x,next.y-pose.y)<1,'motion stays continuous across landing and takeoff');
+    }
+    arrivals.add(arrival);departures.add(departure);
+   }
+   assert.equal(arrivals.size,4,'arrivals are staggered');assert.equal(departures.size,4,'departures are staggered');
+   if(H===320)assert.ok(geometry.clocktowerVisitPoses({...event,age:6})[0].y>8,'short landscape keeps an arriving silhouette inside the visible sky');
+   assert.ok(geometry.clocktowerVisitPoses({...event,age:50}).every(pose=>!pose.visible),'all four have flown completely away before expiry');
+  }
+ }
+});
+
+test('RISK clocktower visit scheduler: rare night-only rolls pause expire cancel and never replay a backlog',()=>{
+ const context=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),context);
+ const geometry=context.LandscapeGeometry.create(390,844);
+ assert.equal(typeof geometry.createClocktowerVisitScheduler,'function');
+ assert.deepEqual({...geometry.clocktowerVisitSchedule},{interval:60,chance:.02,duration:50});
+ let draws=0;const state=geometry.createClocktowerVisitScheduler(()=>{draws++;return 0;});
+ assert.equal(geometry.advanceClocktowerVisit(state,59,true),null);assert.equal(draws,0);
+ const event=geometry.advanceClocktowerVisit(state,1,true);assert.ok(event);assert.equal(event.age,0);
+ const snapshot=JSON.stringify(state);geometry.advanceClocktowerVisit(state,0,true);assert.equal(JSON.stringify(state),snapshot,'a paused scene does not accumulate time');
+ geometry.advanceClocktowerVisit(state,25,true);assert.equal(state.active,event);assert.equal(event.age,25);
+ geometry.advanceClocktowerVisit(state,25,true);assert.equal(state.active,null);assert.equal(state.untilOpportunity,60);
+ geometry.advanceClocktowerVisit(state,600,true);assert.ok(state.active);assert.equal(state.active.age,0,'one roll starts one fresh event after a long step');
+ geometry.advanceClocktowerVisit(state,0,false);assert.equal(state.active,null,'daylight cancels even without advancing time');
+ const before=draws;geometry.advanceClocktowerVisit(state,600,false);assert.equal(draws,before,'daylight makes no rare rolls');
+ const boundary=geometry.createClocktowerVisitScheduler(()=>.02);assert.equal(geometry.advanceClocktowerVisit(boundary,60,true),null,'the exact two-percent boundary does not start a visit');
+ geometry.advanceClocktowerVisit(boundary,60,true,0);assert.equal(boundary.active,null,'rate zero disables this event independently');
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ assert.match(source,/geometry\.advanceClocktowerVisit\(clocktowerVisit,dt,sky\.sun\.altitude<0\)/);
+ assert.ok(source.indexOf('if(document.hidden||!geometry||!p)return;')<source.indexOf('geometry.advanceClocktowerVisit(clocktowerVisit,dt'),'hidden tabs cannot advance the visit');
+});
+
+test('RISK clocktower reduced motion: four fixed roof contacts fade gently without flight or posture animation',()=>{
+ const context=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),context);
+ const geometry=context.LandscapeGeometry.create(568,320);
+ assert.equal(typeof geometry.clocktowerVisitPoses,'function');
+ const at=age=>geometry.clocktowerVisitPoses({age,duration:50,direction:1,seed:.2},true);
+ const first=at(.5),middle=at(25),last=at(49.5);
+ for(let i=0;i<4;i++){
+  assert.deepEqual({...first[i],alpha:1},{...middle[i],alpha:1});assert.deepEqual({...last[i],alpha:1},{...middle[i],alpha:1});
+  assert.equal(middle[i].phase,'perched');assert.equal(middle[i].stand,1);assert.ok(first[i].alpha<middle[i].alpha&&last[i].alpha<middle[i].alpha);
+ }
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),life=source.slice(source.indexOf('  function paintLife('),source.indexOf('  function paintWeatherOn('));
+ assert.ok(life.includes('paintClocktowerVisit();'),'visitors paint through the composed dynamic scene');
+ assert.ok(life.indexOf('paintClocktowerVisit();')<life.indexOf('reflectionContext.drawImage(front'),'their silhouettes enter the established reflection');
+ assert.match(source,/clocktowerVisitPoses\(clocktowerVisit\.active,reduced\)/,'the renderer follows the actual motion preference');
+ assert.ok(source.includes('else partyTimer=setInterval(()=>advanceRooftopParty(1),1000)'),'reduced mode keeps its existing one-second ambient timer');
+});
+
+function changeQuickEvergreen(shim,id,value,type='change'){
+ shim.document.getElementById('addEverHours').id='addEverHours';
+ const field=shim.document.getElementById(id);Object.assign(field,{id,value,matches:()=>false});
+ shim.document.dispatchEvent({type,target:field});
+ return field;
+}
+
+test('RISK quick Add evergreen: untouched hours default to seven days with no reverse reset',async()=>{
+ const {ctx,shim}=await loadApp();ctx.render();
+ const hours=shim.document.getElementById('addEverHours'),reset=shim.document.getElementById('addEverReset');
+ const board=JSON.stringify(ctx.state);
+ assert.equal(hours.value,'18');assert.equal(reset.checked,true);
+ for(const [unit,value,resetAtDay] of [['days','7',false],['hours','7',true],['days','7',false],['hours','7',true]]){
+  changeQuickEvergreen(shim,'addEverUnit',unit);
+  assert.equal(hours.value,value,'unit toggles replace only the untouched initial 18-hour default');
+  assert.equal(reset.checked,resetAtDay,'the existing 2 AM suggestion uses the resulting duration');
+ }
+ assert.equal(JSON.stringify(ctx.state),board,'editing a draft never changes tasks, chain, settings or saved board state');
+});
+
+test('RISK quick Add evergreen: edited durations and custom defaults survive unit changes',async()=>{
+ for(const edits of [['24'],['0.5'],['0'],[''],['24','18'],['7','18']]){
+  const {ctx,shim}=await loadApp();ctx.render();
+  for(const value of edits)changeQuickEvergreen(shim,'addEverHours',value,'input');
+  const expected=edits.at(-1),hours=shim.document.getElementById('addEverHours');
+  for(const unit of ['days','hours','days']){
+   changeQuickEvergreen(shim,'addEverUnit',unit);assert.equal(hours.value,expected,'an intentional edit stays even when it returns to 18');
+  }
+  ctx.clearQuickAddDraft();changeQuickEvergreen(shim,'addEverUnit','days');
+  assert.equal(hours.value,'7','clearing a draft releases its edit protection');
+ }
+ for(const customHours of [12,36,168]){
+  const {ctx,shim}=await loadApp();ctx.render();ctx.state.settings.evergreenHours=customHours;ctx.clearQuickAddDraft();
+  const hours=shim.document.getElementById('addEverHours'),expected=hours.value;
+  for(const unit of ['hours','days','hours']){
+   changeQuickEvergreen(shim,'addEverUnit',unit);assert.equal(hours.value,expected,'a custom default is never replaced with seven');
+  }
+ }
+});
+
+test('RISK quick Add evergreen: an eighteen-day custom default never becomes the seven-day suggestion',async()=>{
+ const original=await loadApp(),saved=JSON.parse(JSON.stringify(original.ctx.state));
+ saved.settings.evergreenHours=432;
+ for(const resetDraft of [false,true]){
+  const {ctx,shim}=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(saved)}});ctx.render();
+  if(resetDraft){changeQuickEvergreen(shim,'addEverHours','24','input');ctx.clearQuickAddDraft();}
+  const hours=shim.document.getElementById('addEverHours'),unit=shim.document.getElementById('addEverUnit');
+  assert.equal(hours.value,'18');assert.equal(unit.value,'days');
+  const board=JSON.stringify(ctx.state);
+  for(const value of ['hours','days','hours','days']){
+   changeQuickEvergreen(shim,'addEverUnit',value);assert.equal(hours.value,'18','custom eighteen-day defaults retain their numeric draft');
+  }
+  assert.equal(JSON.stringify(ctx.state),board,'draft toggles leave the saved custom recurrence untouched');
+  ctx.state.settings.evergreenHours=18;
+  changeQuickEvergreen(shim,'addEverUnit','hours');changeQuickEvergreen(shim,'addEverUnit','days');
+  assert.equal(hours.value,'18','a later Settings change does not replace the open custom draft');
+  ctx.clearQuickAddDraft();changeQuickEvergreen(shim,'addEverUnit','days');
+  assert.equal(hours.value,'7','a fresh draft uses the newly selected eighteen-hour default');
+ }
+});
+
+test('RISK quick Add evergreen: closing or cancelling preserves the draft and its edit history',async()=>{
+ for(const edited of [false,true]){
+  const {ctx,shim}=await loadApp();ctx.render();
+  const hours=shim.document.getElementById('addEverHours'),toggle=shim.document.getElementById('addEver');
+  toggle.checked=true;ctx.toggleQuickEvergreenOptions(true);
+  if(edited)for(const value of ['24','18'])changeQuickEvergreen(shim,'addEverHours',value,'input');
+  for(let i=0;i<2;i++){
+   ctx.onAction('toggle-add',{});ctx.onAction('toggle-add',{});
+   toggle.checked=false;ctx.toggleQuickEvergreenOptions(false);toggle.checked=true;ctx.toggleQuickEvergreenOptions(true);
+   ctx.openSettings();ctx.closeModal();ctx.render();
+   shim.document.getElementById('addInput').value='';ctx.onAction('add',{});
+   assert.equal(hours.value,'18','collapse, modal cancellation, renders and rejected Add keep the draft');
+  }
+  changeQuickEvergreen(shim,'addEverUnit','days');assert.equal(hours.value,edited?'18':'7');
+  assert.equal(ctx.state.tasks.length,0);assert.equal(ctx.state.chain.length,0);
+ }
+});
+
+test('RISK quick Add evergreen: single list and paste capture reset editing for the next draft',async()=>{
+ for(const capture of ['single','list','paste']){
+  const {ctx,shim}=await loadApp();ctx.render();
+  const hours=shim.document.getElementById('addEverHours'),unit=shim.document.getElementById('addEverUnit');
+  for(const value of ['24','18'])changeQuickEvergreen(shim,'addEverHours',value,'input');
+  changeQuickEvergreen(shim,'addEverUnit','days');assert.equal(hours.value,'18','capture retains an explicitly restored duration');
+  shim.document.getElementById('addEver').checked=true;
+  const title=capture==='single'?'Custom recurrence':'First recurrence\nSecond recurrence';
+  if(capture==='paste')shim.document.dispatchEvent({type:'paste',target:{id:'addInput',value:''},clipboardData:{getData:()=>title},preventDefault(){}});
+  else{shim.document.getElementById('addInput').value=title;ctx.onAction('add',{});}
+  assert.equal(ctx.state.tasks.length,capture==='single'?1:2);
+  assert.ok(ctx.state.tasks.every(task=>task.evergreen&&task.evergreenHours===432));
+  assert.equal(hours.value,'18');assert.equal(unit.value,'hours');assert.equal(shim.document.getElementById('addEver').checked,false);
+  changeQuickEvergreen(shim,'addEverUnit','days');assert.equal(hours.value,'7','a fresh post-capture draft gets the seven-day default again');
+  shim.document.getElementById('addEver').checked=true;shim.document.getElementById('addInput').value='Weekly';ctx.onAction('add',{});
+  const weekly=ctx.state.tasks.at(-1);assert.equal(weekly.evergreenHours,168);assert.equal(weekly.evergreenResetAtDay,false);
+  assert.equal(ctx.state.chain.length,0,'ordinary capture never dots the test tasks');
+ }
 });
 
 test('RISK evergreen hours or days: stored hours survive conversion, UI save, and 2 AM reset suggestion',async()=>{
@@ -18428,11 +18629,11 @@ test('RISK skyline lights: garden roofs start independently, stay stable, and ch
  assert.ok(ids.every(index=>!allOff.lit[index]),'independent outcomes allow every garden roof to be dark');
  const state=sky.createGardenLights(ids,()=>.99),initial={...state.lit},samples=[0,.99,0,0];
  const random=()=>samples.shift()??.99;
- assert.equal(sky.advanceGardenLights(state,119,true,()=>0),false,'garden lights remain steady between scheduled changes');
+ assert.equal(sky.advanceGardenLights(state,59,true,()=>0),false,'garden lights remain steady between scheduled changes');
  assert.deepEqual(JSON.parse(JSON.stringify(state.lit)),initial);
  assert.equal(sky.advanceGardenLights(state,1,true,random),false,'a resample that remains dark does not request a repaint');
  assert.deepEqual(JSON.parse(JSON.stringify(state.lit)),initial,'the selected roof retains its sampled state when the next outcome matches');
- assert.equal(sky.advanceGardenLights(state,120,true,random),true,'a later one-in-twelve resample can light one roof');
+ assert.equal(sky.advanceGardenLights(state,60,true,random),true,'a later one-in-twelve resample can light one roof');
  assert.equal(ids.filter(index=>state.lit[index]!==initial[index]).length,1);
  const day=sky.createGardenLights(ids,()=>.99),dayState={...day.lit};
  assert.equal(sky.advanceGardenLights(day,300,false,()=>0),false,'daylight never switches garden lights');

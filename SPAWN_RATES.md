@@ -22,6 +22,12 @@ assigned travel speed (150-second baseline). A festival owns its
 fireworks; standalone shows and festivals do not overlap. Both require the Sun
 below civil twilight. Rates scale these chances, capped at 100%.
 Woodland rows control the separate animal pool (default: 1% chance per 30 seconds).
+Clocktower visits check once per visible nighttime minute with a 2% chance at
+rate 1, about one visit per 50 active night minutes. Peter Pan, Wendy, John and
+Michael arrive separately, rest on the sloped roof, and depart within 50 seconds.
+Daylight cancels the visit; hidden tabs pause it. Reduced motion keeps the four
+roof silhouettes stationary with a gentle fade. The rate scales only the rare
+start chance; it never changes their flight speed or the number of children.
 Weather rows scale episode chances, capped at 100%; durations remain unchanged.
 Ambience rows scale seasonal particle cycle speed (0 hides particles).
 All safety caps, reduced-motion preferences, and season rules remain in effect.
@@ -76,6 +82,7 @@ and deploy this file with the app so installed offline copies receive it.
 | abduction | 1 |
 | fireworks | 1 |
 | festival | 1 |
+| clocktower-visit | 1 |
 | woodland-deer | 1 |
 | woodland-fox | 1 |
 | woodland-rabbit | 1 |

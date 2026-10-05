@@ -2,9 +2,20 @@
 
 This map records the current named RISK contracts in tests.js. It lets reviewers see which costly feature boundaries already have explicit protection before changing nearby behavior. Related non-RISK regression tests remain part of the contract too; the focused companions below call those out where they matter.
 
+- RISK skyline light cadence: twice as many opportunities keep single-roof samples and visible-window toggles
+- RISK clocktower visit geometry: four staggered visitors stand on both actual roof slopes at every viewport
+- RISK clocktower visit scheduler: rare night-only rolls pause expire cancel and never replay a backlog
+- RISK clocktower reduced motion: four fixed roof contacts fade gently without flight or posture animation
+
 The named-contract test in tests.js checks that every top-level test whose title starts with RISK appears in this inventory. Add or rename the inventory entry in the same test-first change. If a future feature adds a new risk area, add a heading and place its concrete test names under it.
 
 ## Task state, eligibility, and scanner controls
+
+- RISK quick Add evergreen: untouched hours default to seven days with no reverse reset
+- RISK quick Add evergreen: edited durations and custom defaults survive unit changes
+- RISK quick Add evergreen: an eighteen-day custom default never becomes the seven-day suggestion
+- RISK quick Add evergreen: closing or cancelling preserves the draft and its edit history
+- RISK quick Add evergreen: single list and paste capture reset editing for the next draft
 
 - RISK quick Add: retired Add and dot is absent while ordinary Add preserves contexts and the current chain
 - RISK quick Add: retired add-dot actions cannot create a task or discard an unsaved draft
@@ -139,7 +150,7 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK CLOUD BACKUP: acknowledgement frees disk pins before saving a larger in-flight draft
 - RISK CLOUD BACKUP: a clean adoption releases redundant recovery without waiting for a write
 - RISK CLOUD BACKUP: clean adoption frees automatic history for the next ordinary save
-- RISK CLOUD BACKUP: clean adoption promotes every conflicting row that shares a recovery ID
+- RISK CLOUD BACKUP: clean adoption promotes every conflicting row sharing a recovery ID under a stable fixture clock
 - RISK CLOUD BACKUP: overwritten same-task edits outlive equal cloud pulls when a daily row was reused
 - RISK CLOUD BACKUP: a legacy ambiguous daily pin becomes durable before equal-cloud release
 - RISK CLOUD BACKUP: a tight legacy store releases a user-equivalent daily pin without growing the index
