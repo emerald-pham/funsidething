@@ -1,5 +1,26 @@
 [
   {
+    "testChangesSha256": "f9bfd71548ea812ccb321ceb3e37ee0f5562791add9fe6cc05f1fbca69581680",
+    "reason": "The user requested that Add a task use seven days when switching the untouched eighteen-hour evergreen duration to Days, while retaining deliberate duration edits and avoiding a reverse reset on Hours.",
+    "previousBehavior": "The Add recurrence selector changed only the unit, so the initial eighteen-hour duration became eighteen days. The draft had no record of deliberate duration editing.",
+    "intendedBehavior": "Only the untouched initial eighteen-hour Add draft becomes seven when Days is selected. Edited durations, including an edit restored to eighteen, survive unit toggles and draft cancellation or collapse. Successful capture clears editing for the next draft; Hours keeps the displayed number.",
+    "replacementTests": [
+      "RISK quick Add evergreen: untouched hours default to seven days with no reverse reset",
+      "RISK quick Add evergreen: edited durations and custom defaults survive unit changes",
+      "RISK quick Add evergreen: closing or cancelling preserves the draft and its edit history",
+      "RISK quick Add evergreen: single list and paste capture reset editing for the next draft"
+    ],
+    "preservedCoverage": [
+      "Existing eighteen-hour and 2 AM defaults, hours/day storage conversion, custom settings defaults, task editor and Settings unit controls remain protected.",
+      "The new coverage retains deliberate eighteen-day values, fractional and temporarily invalid drafts, successful single/list/paste capture, and the existing 2 AM suggestion after unit changes.",
+      "No existing tests are altered. Draft-only changes cannot modify tasks, chain, saved board settings, account, cloud synchronization, history or ranking."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=tap --test-name-pattern='RISK quick Add evergreen:' tests.js",
+      "failure": "Observed before implementation: all four new tests failed with actual 18 versus expected 7 at the initial Days selection, cleared draft, cancelled/collapsed draft, and fresh post-capture draft. Zero passed, four failed, zero skipped. Full output is retained at ../evidence/red-tests.log."
+    }
+  },
+  {
     "testChangesSha256": "db7af4639750551c47553983f4d2fcda2a1ee968cc772e93ecab08a8c2fed4dc",
     "reason": "The user explicitly rejected the newly enlarged shaded airplane shown in their screenshot and requested restoration of the previous airplane design. The two design-specific expectations are replaced with exact previous-profile paint contracts while all other feature protections stay intact.",
     "previousBehavior": "Ordinary and scheduled planes required five broad colored surfaces, cockpit dots and panel details introduced in the recent redesign; the scheduled plane had replaced its previous small ivory silhouette.",

@@ -6,6 +6,11 @@ The named-contract test in tests.js checks that every top-level test whose title
 
 ## Task state, eligibility, and scanner controls
 
+- RISK quick Add evergreen: untouched hours default to seven days with no reverse reset
+- RISK quick Add evergreen: edited durations and custom defaults survive unit changes
+- RISK quick Add evergreen: closing or cancelling preserves the draft and its edit history
+- RISK quick Add evergreen: single list and paste capture reset editing for the next draft
+
 - RISK quick Add: retired Add and dot is absent while ordinary Add preserves contexts and the current chain
 - RISK quick Add: retired add-dot actions cannot create a task or discard an unsaved draft
 - RISK quick Add: help removes the retired shortcut and retains task-editor Dot as a rank decision

@@ -15371,6 +15371,84 @@ test('RISK prerequisites: pasted Add tasks keep the chosen prerequisite',async()
  assert.ok(pasted.every(task=>ctx.isEligible(task)===false));
 });
 
+function changeQuickEvergreen(shim,id,value,type='change'){
+ shim.document.getElementById('addEverHours').id='addEverHours';
+ const field=shim.document.getElementById(id);Object.assign(field,{id,value,matches:()=>false});
+ shim.document.dispatchEvent({type,target:field});
+ return field;
+}
+
+test('RISK quick Add evergreen: untouched hours default to seven days with no reverse reset',async()=>{
+ const {ctx,shim}=await loadApp();ctx.render();
+ const hours=shim.document.getElementById('addEverHours'),reset=shim.document.getElementById('addEverReset');
+ const board=JSON.stringify(ctx.state);
+ assert.equal(hours.value,'18');assert.equal(reset.checked,true);
+ for(const [unit,value,resetAtDay] of [['days','7',false],['hours','7',true],['days','7',false],['hours','7',true]]){
+  changeQuickEvergreen(shim,'addEverUnit',unit);
+  assert.equal(hours.value,value,'unit toggles replace only the untouched initial 18-hour default');
+  assert.equal(reset.checked,resetAtDay,'the existing 2 AM suggestion uses the resulting duration');
+ }
+ assert.equal(JSON.stringify(ctx.state),board,'editing a draft never changes tasks, chain, settings or saved board state');
+});
+
+test('RISK quick Add evergreen: edited durations and custom defaults survive unit changes',async()=>{
+ for(const edits of [['24'],['0.5'],['0'],[''],['24','18'],['7','18']]){
+  const {ctx,shim}=await loadApp();ctx.render();
+  for(const value of edits)changeQuickEvergreen(shim,'addEverHours',value,'input');
+  const expected=edits.at(-1),hours=shim.document.getElementById('addEverHours');
+  for(const unit of ['days','hours','days']){
+   changeQuickEvergreen(shim,'addEverUnit',unit);assert.equal(hours.value,expected,'an intentional edit stays even when it returns to 18');
+  }
+  ctx.clearQuickAddDraft();changeQuickEvergreen(shim,'addEverUnit','days');
+  assert.equal(hours.value,'7','clearing a draft releases its edit protection');
+ }
+ for(const customHours of [12,36,168]){
+  const {ctx,shim}=await loadApp();ctx.render();ctx.state.settings.evergreenHours=customHours;ctx.clearQuickAddDraft();
+  const hours=shim.document.getElementById('addEverHours'),expected=hours.value;
+  for(const unit of ['hours','days','hours']){
+   changeQuickEvergreen(shim,'addEverUnit',unit);assert.equal(hours.value,expected,'a custom default is never replaced with seven');
+  }
+ }
+});
+
+test('RISK quick Add evergreen: closing or cancelling preserves the draft and its edit history',async()=>{
+ for(const edited of [false,true]){
+  const {ctx,shim}=await loadApp();ctx.render();
+  const hours=shim.document.getElementById('addEverHours'),toggle=shim.document.getElementById('addEver');
+  toggle.checked=true;ctx.toggleQuickEvergreenOptions(true);
+  if(edited)for(const value of ['24','18'])changeQuickEvergreen(shim,'addEverHours',value,'input');
+  for(let i=0;i<2;i++){
+   ctx.onAction('toggle-add',{});ctx.onAction('toggle-add',{});
+   toggle.checked=false;ctx.toggleQuickEvergreenOptions(false);toggle.checked=true;ctx.toggleQuickEvergreenOptions(true);
+   ctx.openSettings();ctx.closeModal();ctx.render();
+   shim.document.getElementById('addInput').value='';ctx.onAction('add',{});
+   assert.equal(hours.value,'18','collapse, modal cancellation, renders and rejected Add keep the draft');
+  }
+  changeQuickEvergreen(shim,'addEverUnit','days');assert.equal(hours.value,edited?'18':'7');
+  assert.equal(ctx.state.tasks.length,0);assert.equal(ctx.state.chain.length,0);
+ }
+});
+
+test('RISK quick Add evergreen: single list and paste capture reset editing for the next draft',async()=>{
+ for(const capture of ['single','list','paste']){
+  const {ctx,shim}=await loadApp();ctx.render();
+  const hours=shim.document.getElementById('addEverHours'),unit=shim.document.getElementById('addEverUnit');
+  for(const value of ['24','18'])changeQuickEvergreen(shim,'addEverHours',value,'input');
+  changeQuickEvergreen(shim,'addEverUnit','days');assert.equal(hours.value,'18','capture retains an explicitly restored duration');
+  shim.document.getElementById('addEver').checked=true;
+  const title=capture==='single'?'Custom recurrence':'First recurrence\nSecond recurrence';
+  if(capture==='paste')shim.document.dispatchEvent({type:'paste',target:{id:'addInput',value:''},clipboardData:{getData:()=>title},preventDefault(){}});
+  else{shim.document.getElementById('addInput').value=title;ctx.onAction('add',{});}
+  assert.equal(ctx.state.tasks.length,capture==='single'?1:2);
+  assert.ok(ctx.state.tasks.every(task=>task.evergreen&&task.evergreenHours===432));
+  assert.equal(hours.value,'18');assert.equal(unit.value,'hours');assert.equal(shim.document.getElementById('addEver').checked,false);
+  changeQuickEvergreen(shim,'addEverUnit','days');assert.equal(hours.value,'7','a fresh post-capture draft gets the seven-day default again');
+  shim.document.getElementById('addEver').checked=true;shim.document.getElementById('addInput').value='Weekly';ctx.onAction('add',{});
+  const weekly=ctx.state.tasks.at(-1);assert.equal(weekly.evergreenHours,168);assert.equal(weekly.evergreenResetAtDay,false);
+  assert.equal(ctx.state.chain.length,0,'ordinary capture never dots the test tasks');
+ }
+});
+
 test('RISK evergreen hours or days: stored hours survive conversion, UI save, and 2 AM reset suggestion',async()=>{
  const {ctx,shim}=await loadApp();
  assert.equal(ctx.evergreenDurationHours('7','days'),168);
