@@ -13,6 +13,7 @@ The named-contract test in tests.js checks that every top-level test whose title
 
 - RISK quick Add evergreen: untouched hours default to seven days with no reverse reset
 - RISK quick Add evergreen: edited durations and custom defaults survive unit changes
+- RISK quick Add evergreen: an eighteen-day custom default never becomes the seven-day suggestion
 - RISK quick Add evergreen: closing or cancelling preserves the draft and its edit history
 - RISK quick Add evergreen: single list and paste capture reset editing for the next draft
 

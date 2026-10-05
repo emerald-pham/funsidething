@@ -1,5 +1,57 @@
 [
   {
+    "reason": "The user explicitly requested twice the rate of nighttime garden-light opportunities and city-window transitions, plus a rare Peter Pan and Darling children visit that flies in, lands on the two sloped clocktower roof edges, pauses and leaves. Existing cadence expectations change only to implement that request. This combined origin/main diff also retains the separately committed Add evergreen default fix, whose four failing-before-implementation tests and exact original rationale appear below. A narrow fixture-only correction also freezes the pre-existing duplicate-ID backup test clock after reproducing its expiry failure on unchanged main; no production backup code or existing assertions change. The independent code review also found the numeric18 custom-day default boundary; initial-default provenance fixes it without changing any earlier assertion.",
+    "previousBehavior": "Garden lights had one independent one-in-twelve resample every 120 visible seconds and city windows toggled one visible window every 30 seconds. No clocktower visit, shared roof contact geometry or staggered landing choreography existed. On origin/main, an untouched eighteen-hour Add draft also remained eighteen on Days selection. The duplicate-ID recovery fixture depended on the host date and failed after its fixed daily rows expired. An eighteen-day custom default was also mistaken for the untouched eighteen-hour default after reverse unit toggles.",
+    "intendedBehavior": "Garden opportunities use 60 seconds and city windows use 15 seconds without brighter fixtures or more lit roofs. Four small visitors follow separate continuous routes and exact sloped-roof feet, with one rare night-only event, daylight cancellation, hidden-time pause and stationary reduced-motion poses. The Add draft now defaults to seven on Days only while untouched, preserves deliberate edits, and never resets on the reverse Hours switch. That independent backup test now uses a VM-local September 28 clock and proves both fixture rows are initially readable while preserving all promotion and pin-release requirements. The weekly replacement is now restricted to drafts that actually began from the eighteen-hour default; open custom drafts survive later Settings changes.",
+    "replacementTests": [
+      "Landscape city: only one window changes per fifteen seconds of active night",
+      "RISK skyline light cadence: twice as many opportunities keep single-roof samples and visible-window toggles",
+      "RISK clocktower visit geometry: four staggered visitors stand on both actual roof slopes at every viewport",
+      "RISK clocktower visit scheduler: rare night-only rolls pause expire cancel and never replay a backlog",
+      "RISK clocktower reduced motion: four fixed roof contacts fade gently without flight or posture animation",
+      "RISK quick Add evergreen: untouched hours default to seven days with no reverse reset",
+      "RISK quick Add evergreen: edited durations and custom defaults survive unit changes",
+      "RISK quick Add evergreen: closing or cancelling preserves the draft and its edit history",
+      "RISK quick Add evergreen: single list and paste capture reset editing for the next draft",
+      "RISK CLOUD BACKUP: clean adoption promotes every conflicting row sharing a recovery ID under a stable fixture clock",
+      "RISK quick Add evergreen: an eighteen-day custom default never becomes the seven-day suggestion"
+    ],
+    "preservedCoverage": [
+      "Existing one-in-twelve boundary, independent roof state, visible-window selection, daylight darkness, single-change opportunities, hidden-time pause and no catch-up behavior remain asserted.",
+      "The clocktower keeps its original roof coordinates, opaque body, clock face, waterline, skyline composition and union party occlusion; existing transit and rare fireworks/festival schedules are unaffected.",
+      "The separate evergreen fix remains protected, and all existing task, account, storage, recovery, rating and synchronization boundaries are unchanged.",
+      "Every existing assertion in the duplicate-ID cloud-adoption test is retained; an additional precondition requires both source rows to be readable before adoption.",
+      "The production seven-day automatic retention, durable displaced-edit recovery, account isolation, cloud revision ordering and synchronization implementation remain unchanged.",
+      "The fixture clock is replaced only inside its own VM context and cannot change the outer process clock, other tests or any production data.",
+      "All earlier default, intentional edit-back-to18, reverse-unit, cancellation, collapse, successful capture and hours/day conversion assertions remain unchanged.",
+      "The new test exercises persisted custom preferences on cold boot, reset after a deliberate edit, repeated toggles and later Settings changes without changing tasks or chain.",
+      "The added eligibility flag is transient Add UI state outside every saved board, recovery copy, account payload, migration and synchronization codec."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=tap --test-name-pattern='RISK skyline light cadence:|RISK clocktower|Landscape city: only one window|RISK skyline lights: garden roofs' tests.js; node --test --test-reporter=tap --test-name-pattern='RISK clocktower visit geometry:' tests.js; node --test --test-reporter=tap --test-name-pattern='RISK quick Add evergreen:' tests.js; node --test --test-reporter=tap --test-name-pattern='RISK CLOUD BACKUP: clean adoption promotes every conflicting row' tests.js; node --test --test-reporter=tap --test-name-pattern='RISK quick Add evergreen: an eighteen-day custom' tests.js",
+      "failure": "Observed before scenery implementation: all six selected tests failed. Garden opportunities were 120 instead of 60 seconds, the city deadline was 45 instead of 30 after a transition at 15, shared roof geometry and visit APIs were absent, and the second sixty-second garden sample did not light a roof. Full output is retained in ../evidence/night-scene-red.log. The later short-landscape refinement first failed because the arriving Peter Pan silhouette was above the viewport at six seconds; bounding the entrance and exit height restored visibility. That red output is retained in ../evidence/short-flight-red.log. The independent evergreen red run against original main failed all four cases with 18 rather than 7; ../evidence/red-tests.log preserves it. Before adding the VM-local clock, the renamed test failed at the preserved conflicting-row precondition with expected true; one failed, zero passed, zero skipped. The same failure was independently reproduced against unchanged origin/main. Full outputs are ../evidence/backup-fixture-red.log and ../evidence/baseline-backup-failure.log; the corrected isolated test passes with every original assertion intact. Before adding initial-default provenance, the new test failed on the custom preference after Hours then Days: actual7 differed from expected18. Zero passed, one failed, zero skipped; ../evidence/custom-default-red.log preserves the full output. All original tests and the new test pass after the narrow guard, with no weakened assertion."
+    },
+    "testChangesSha256": "2be5b2499bee266d0f560afec60dcb7ed4976c7b81e5544e9090faacd9674c5e"
+  },
+  {
+    "testChangesSha256": "605dbc1332c0a325635f4df9d5b7b0d475d6fbf117c6b6cbd289943726dfdf89",
+    "reason": "The independent code reviewer and owner reproduced a custom-default boundary: an eighteen-day saved default displays numeric18, so Hours then Days incorrectly invoked the weekly suggestion. Draft initialization/reset now remembers whether it actually began from the eighteen-hour default; every earlier assertion and existing custom preference remains protected.",
+    "previousBehavior": "A fresh Add draft initialized from a custom eighteen-day default became seven days after Hours then Days because the draft number18 was mistaken for the standard eighteen-hour default.",
+    "intendedBehavior": "Only drafts initialized or reset from the eighteen-hour default can receive the seven-day suggestion. Eighteen-day custom defaults survive cold boot, draft reset and repeated unit toggles; later Settings changes leave the open draft alone. A fresh reset captures the new preference.",
+    "replacementTests": [
+      "RISK quick Add evergreen: an eighteen-day custom default never becomes the seven-day suggestion"
+    ],
+    "preservedCoverage": [
+      "All earlier default, intentional edit-back-to18, reverse-unit, cancellation, collapse, successful capture and hours/day conversion assertions remain unchanged.",
+      "The new test exercises persisted custom preferences on cold boot, reset after a deliberate edit, repeated toggles and later Settings changes without changing tasks or chain.",
+      "The added eligibility flag is transient Add UI state outside every saved board, recovery copy, account payload, migration and synchronization codec."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=tap --test-name-pattern='RISK quick Add evergreen: an eighteen-day custom' tests.js",
+      "failure": "Before adding initial-default provenance, the new test failed on the custom preference after Hours then Days: actual7 differed from expected18. Zero passed, one failed, zero skipped; ../evidence/custom-default-red.log preserves the full output. All original tests and the new test pass after the narrow guard, with no weakened assertion."
+    }
+  },
+  {
     "reason": "The user explicitly requested twice the rate of nighttime garden-light opportunities and city-window transitions, plus a rare Peter Pan and Darling children visit that flies in, lands on the two sloped clocktower roof edges, pauses and leaves. Existing cadence expectations change only to implement that request. This combined origin/main diff also retains the separately committed Add evergreen default fix, whose four failing-before-implementation tests and exact original rationale appear below. A narrow fixture-only correction also freezes the pre-existing duplicate-ID backup test clock after reproducing its expiry failure on unchanged main; no production backup code or existing assertions change.",
     "previousBehavior": "Garden lights had one independent one-in-twelve resample every 120 visible seconds and city windows toggled one visible window every 30 seconds. No clocktower visit, shared roof contact geometry or staggered landing choreography existed. On origin/main, an untouched eighteen-hour Add draft also remained eighteen on Days selection. The duplicate-ID recovery fixture depended on the host date and failed after its fixed daily rows expired.",
     "intendedBehavior": "Garden opportunities use 60 seconds and city windows use 15 seconds without brighter fixtures or more lit roofs. Four small visitors follow separate continuous routes and exact sloped-roof feet, with one rare night-only event, daylight cancellation, hidden-time pause and stationary reduced-motion poses. The Add draft now defaults to seven on Days only while untouched, preserves deliberate edits, and never resets on the reverse Hours switch. That independent backup test now uses a VM-local September 28 clock and proves both fixture rows are initially readable while preserving all promotion and pin-release requirements.",

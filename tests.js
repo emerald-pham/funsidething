@@ -15513,6 +15513,27 @@ test('RISK quick Add evergreen: edited durations and custom defaults survive uni
  }
 });
 
+test('RISK quick Add evergreen: an eighteen-day custom default never becomes the seven-day suggestion',async()=>{
+ const original=await loadApp(),saved=JSON.parse(JSON.stringify(original.ctx.state));
+ saved.settings.evergreenHours=432;
+ for(const resetDraft of [false,true]){
+  const {ctx,shim}=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(saved)}});ctx.render();
+  if(resetDraft){changeQuickEvergreen(shim,'addEverHours','24','input');ctx.clearQuickAddDraft();}
+  const hours=shim.document.getElementById('addEverHours'),unit=shim.document.getElementById('addEverUnit');
+  assert.equal(hours.value,'18');assert.equal(unit.value,'days');
+  const board=JSON.stringify(ctx.state);
+  for(const value of ['hours','days','hours','days']){
+   changeQuickEvergreen(shim,'addEverUnit',value);assert.equal(hours.value,'18','custom eighteen-day defaults retain their numeric draft');
+  }
+  assert.equal(JSON.stringify(ctx.state),board,'draft toggles leave the saved custom recurrence untouched');
+  ctx.state.settings.evergreenHours=18;
+  changeQuickEvergreen(shim,'addEverUnit','hours');changeQuickEvergreen(shim,'addEverUnit','days');
+  assert.equal(hours.value,'18','a later Settings change does not replace the open custom draft');
+  ctx.clearQuickAddDraft();changeQuickEvergreen(shim,'addEverUnit','days');
+  assert.equal(hours.value,'7','a fresh draft uses the newly selected eighteen-hour default');
+ }
+});
+
 test('RISK quick Add evergreen: closing or cancelling preserves the draft and its edit history',async()=>{
  for(const edited of [false,true]){
   const {ctx,shim}=await loadApp();ctx.render();
