@@ -19499,6 +19499,56 @@ test('RISK live scan sync: an editor opened after a queued revision still drains
  assert.equal(b.ctx.state.mode,'work','the pending revision cannot be stranded by a newly opened editor');
 });
 
+test('RISK tablet date fields: empty native editor dates have usable width outside the phone breakpoint',async()=>{
+ const style=html.match(/<style>([\s\S]*?)<\/style>/)[1],base=style.split(/@media\s*\(max-width:/)[0];
+ const dateRules=[...base.matchAll(/([^{}]+)\{([^{}]+)\}/g)].filter(m=>m[1].includes('.frow input[type=date]'));
+ assert.ok(dateRules.some(m=>/flex\s*:\s*1\b/.test(m[2])&&/min-width\s*:\s*(?:1[6-9]\d|[2-9]\d\d)px/.test(m[2])),
+  'empty WebKit dates must share usable flex width with Title and Link at tablet and desktop widths');
+ assert.match(style,/\.frow input\[type=text\],\.frow input\[type=url\],\.frow input\[type=date\]\{width:100%;min-width:0\}/,'phone dates retain the existing stacked full-width contract');
+ const {ctx,shim}=await loadApp();const t=ctx.addTask('Synthetic date fixture');ctx.openEdit(t.id);
+ assert.match(shim.document.getElementById('modalRoot').innerHTML,/id="etDue" type="date"/);assert.match(shim.document.getElementById('modalRoot').innerHTML,/id="etStart" type="date"/);
+});
+
+test('RISK tablet date fields browser: empty filled and focused dates remain touchable with unclipped neighboring controls',
+ {skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const {chromium,webkit}=await import(process.env.PLAYWRIGHT_MODULE||'playwright');
+ const origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+ const results=[];
+ for(const [engine,type] of [['chrome',chromium],['webkit',webkit]]){
+  const browser=await type.launch({headless:true,...(engine==='chrome'?{channel:'chrome'}:{})});
+  try{
+   const context=await browser.newContext({viewport:{width:1024,height:706},deviceScaleFactor:2,hasTouch:true,serviceWorkers:'block'});
+   await context.addInitScript(()=>{
+    Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});
+    localStorage.setItem('fvp:chain-scanner:landscape-motion','reduced');
+   });
+   await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
+   const page=await context.newPage();await page.goto(process.env.LANDSCAPE_BROWSER_URL);await page.waitForFunction(()=>typeof state!=='undefined'&&state?.tasks);
+   const id=await page.evaluate(()=>{closeModal();document.getElementById('motionDialog')?.close();return addTask('Synthetic tablet date fixture').id;});
+   for(const [width,height] of [[1024,706],[1024,768],[768,1024],[621,800],[620,800],[619,800],[390,844],[568,320],[1280,800]]){
+    await page.setViewportSize({width,height});await page.evaluate(id=>openEdit(id),id);
+    for(const field of ['etDue','etStart']){
+     const control=page.locator('#'+field);assert.equal(await control.inputValue(),'','the empty native control is the reported boundary');
+     const bounds=await control.evaluate(el=>{const r=el.getBoundingClientRect(),pane=el.closest('.modal').getBoundingClientRect();return {left:r.left,right:r.right,width:r.width,height:r.height,paneLeft:pane.left,paneRight:pane.right};});
+     assert.ok(bounds.width>=180,`${engine} ${width}: ${field} is readable and touchable while empty (${bounds.width}px)`);
+     assert.ok(bounds.left>=bounds.paneLeft&&bounds.right<=bounds.paneRight,`${engine} ${width}: ${field} stays inside the dialog`);
+     await control.tap();await control.fill('2026-10-06');assert.equal(await control.inputValue(),'2026-10-06');
+     assert.equal(await control.evaluate(el=>el.type),'date','native date-picker behavior remains available');
+     await control.focus();assert.equal(await control.evaluate(el=>document.activeElement===el),true);await control.fill('');
+    }
+    const peers=await page.evaluate(()=>{const modal=document.querySelector('.modal'),rect=el=>{const r=el.getBoundingClientRect();return {left:r.left,right:r.right,width:r.width};};return {title:rect(document.getElementById('etTitle')),link:rect(document.getElementById('etUrl')),checkbox:rect(document.getElementById('etEver').closest('label')),pane:rect(modal),overflow:modal.scrollWidth>modal.clientWidth};});
+    assert.ok(peers.title.width>=180&&peers.link.width>=180,'Title and Link retain usable widths');assert.equal(peers.overflow,false);
+    assert.ok(peers.checkbox.left>=peers.pane.left&&peers.checkbox.right<=peers.pane.right,'the Evergreen checkbox remains inside the row');
+    await page.locator('#etEver').check();await page.locator('#etEver').uncheck();
+    if(width===1024&&height===706&&process.env.DATE_FIELD_SCREENSHOTS){await page.screenshot({path:path.join(process.env.DATE_FIELD_SCREENSHOTS,`date-fields-${engine}-1024x706.png`)});}
+    results.push({engine,width,height,passed:true});await page.evaluate(()=>closeModal());
+   }
+   assert.equal(await page.evaluate(()=>window.CloudSync.configured),false,'no production backend is enabled');await context.close();
+  }finally{await browser.close();}
+ }
+ if(process.env.DATE_FIELD_SCREENSHOTS)fs.writeFileSync(path.join(process.env.DATE_FIELD_SCREENSHOTS,'date-fields-results.json'),JSON.stringify(results,null,2)+'\n');
+});
+
 test('RISK live scan sync: the second physical click of one double-click cannot complete the newly rendered candidate',async()=>{
  const {ctx,shim}=await loadApp({seed:618});const bench=ctx.addTask('Tail'),candidate=ctx.addTask('First'),next=ctx.addTask('Next');
  Object.assign(ctx.state,{chain:[bench.id],candidateId:candidate.id,mode:'scan',snooze:100});ctx.render();

@@ -421,3 +421,8 @@ The editor hook blocks app or enforcement edits while tests.js has no staged or 
 - RISK live scan sync: an editor opened after a queued revision still drains that revision on close
 - RISK live scan sync: the second physical click of one double-click cannot complete the newly rendered candidate
 - RISK live scan sync: Settings describes live revision refresh while retaining draft protection
+
+## Open-device scan updates and tablet editor dates
+
+- RISK tablet date fields: empty native editor dates have usable width outside the phone breakpoint
+- RISK tablet date fields browser: empty filled and focused dates remain touchable with unclipped neighboring controls
