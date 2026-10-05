@@ -1,5 +1,89 @@
 [
   {
+    "testChangesSha256": "839e4edf7f192dbbff9edb4cb422de743ca16b66c36e561630ed686f349a393b",
+    "reason": "The screenshot shows empty native Due and Starts controls collapsing on tablets. The two new tests directly protect readable native date widths, focus, fill, neighboring controls and unchanged phone stacking.",
+    "previousBehavior": "Outside the phone breakpoint, empty WebKit date controls could shrink to a narrow sliver because the base flexible row sized only text and URL inputs.",
+    "intendedBehavior": "Date inputs share the existing base flexible 180-pixel minimum, with native pickers and mobile full-width stacking preserved.",
+    "replacementTests": [
+      "RISK tablet date fields: empty native editor dates have usable width outside the phone breakpoint",
+      "RISK tablet date fields browser: empty filled and focused dates remain touchable with unclipped neighboring controls"
+    ],
+    "preservedCoverage": [
+      "All pre-existing tests and assertions remain unchanged, including revision conflicts, account switching, durable recovery, rejected-write status, imports, deletion and causal evergreen completion cancellation.",
+      "Completion remains rating-neutral, Chance and ranking algorithms remain untouched, and all normal task, chain, candidate, mode and history fields retain the existing protocol and authoritative merge rules.",
+      "Snapshot hints contain only account identity and revision and never carry a board or write acknowledgement. Synthetic separate client stores and fake authenticated accounts avoid production storage.",
+      "The optional native date case is run explicitly with zero skips in both Chrome and WebKit across nine viewports each; the always-on structural case protects tablet sizing and existing phone stacking."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK tablet date fields:' --test-reporter=spec tests.js",
+      "failure": "The structural test failed before the CSS change because no base .frow input[type=date] rule supplied usable flex width. Actual output is ../sync-evidence/date-fields-red.log; Chrome/WebKit native tests were subsequently run explicitly at all eighteen layouts with zero skips."
+    }
+  },
+  {
+    "testChangesSha256": "a30e711e8d607e3da5c6bb1353759b713a1d4ac31068a0e1f30285505164a81f",
+    "reason": "The owner requested open-device completion and scan-pause synchronization plus usable tablet date fields. New isolated client and backend fixtures exercise live root-revision notifications through existing canonical reads. Existing assertions stay intact; the cloud backend test helper gains snapshot instrumentation and event detail only.",
+    "previousBehavior": "Open devices reconciled only on load or focus, candidate and editor completion waited for ordinary debounce, and empty tablet native date controls had no usable flex width. Remote replacement was unsafe under a held click; repeated clicks could complete the newly rendered next task.",
+    "intendedBehavior": "Server-confirmed revisions wake canonical read-before-write reconciliation, drafts and pressed gestures delay adoption, stale controls carry their displayed identities, and one physical completion gesture remains one completion. Done and pause publish after durable local save. Tablet dates receive the same flex minimum as Title and Link while phone stacking is preserved.",
+    "replacementTests": [
+      "RISK live scan sync: candidate Done publishes promptly and reaches another open device without focus",
+      "RISK live scan sync: done adding for now shares the existing work mode and survives reload and reconnect",
+      "RISK live scan sync: revision hints wake canonical reads without trusting foreign duplicate or malformed notifications",
+      "RISK live scan sync: a form draft defers live adoption then receives completion when editing ends",
+      "RISK live scan sync: an in-progress click survives a remote pause and its completion is retained through the conflict",
+      "RISK live scan sync: stale Done comparison and pause controls never act on replacement tasks",
+      "RISK live scan sync: duplicate Done and held keyboard repeats cannot complete another task or duplicate an evergreen session",
+      "RISK live scan sync: evergreen Done Undo propagates once and stale concurrent writes preserve its cancellation",
+      "RISK live scan sync backend: only server-confirmed root revisions notify and listeners follow account and visibility lifetimes",
+      "RISK live scan sync backend: a listener error stays bounded and reopens through ordinary recovery",
+      "RISK live scan sync: an editor opened after a queued revision still drains that revision on close",
+      "RISK tablet date fields: empty native editor dates have usable width outside the phone breakpoint",
+      "RISK tablet date fields browser: empty filled and focused dates remain touchable with unclipped neighboring controls",
+      "RISK live scan sync: the second physical click of one double-click cannot complete the newly rendered candidate",
+      "RISK live scan sync: Settings describes live revision refresh while retaining draft protection"
+    ],
+    "preservedCoverage": [
+      "All pre-existing tests and assertions remain unchanged, including revision conflicts, account switching, durable recovery, rejected-write status, imports, deletion and causal evergreen completion cancellation.",
+      "Completion remains rating-neutral, Chance and ranking algorithms remain untouched, and all normal task, chain, candidate, mode and history fields retain the existing protocol and authoritative merge rules.",
+      "Snapshot hints contain only account identity and revision and never carry a board or write acknowledgement. Synthetic separate client stores and fake authenticated accounts avoid production storage.",
+      "The optional native date case is run explicitly with zero skips in both Chrome and WebKit across nine viewports each; the always-on structural case protects tablet sizing and existing phone stacking."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK live scan sync|RISK tablet date fields:' --test-reporter=spec tests.js; separate queued-editor, physical double-click and Settings focused red commands are preserved in ../sync-evidence/",
+      "failure": "Before implementation, all ten initial live-sync risk tests failed (0 passed, 10 failed). The queued-editor boundary and physical replacement double-click each failed their added test before their narrow guards. The date structural case failed before base flex sizing, and Settings copy failed before live-refresh wording. Actual logs: live-sync-red.log, queued-editor-red.log, double-click-red.log, date-fields-red.log and settings-sync-red.log. Existing regression assertions were not weakened."
+    }
+  },
+  {
+    "testChangesSha256": "4779df5abaebd533bff435e2ab4e97003c100bb1eec6daf9d2e50c7375e32b18",
+    "reason": "The owner requested open-device completion and scan-pause synchronization plus usable tablet date fields. New isolated client and backend fixtures exercise live root-revision notifications through existing canonical reads. Existing assertions stay intact; the cloud backend test helper gains snapshot instrumentation and event detail only.",
+    "previousBehavior": "Open devices reconciled only on load or focus, candidate and editor completion waited for ordinary debounce, and empty tablet native date controls had no usable flex width. Remote replacement was unsafe under a held click; repeated clicks could complete the newly rendered next task.",
+    "intendedBehavior": "Server-confirmed revisions wake canonical read-before-write reconciliation, drafts and pressed gestures delay adoption, stale controls carry their displayed identities, and one physical completion gesture remains one completion. Done and pause publish after durable local save. Tablet dates receive the same flex minimum as Title and Link while phone stacking is preserved.",
+    "replacementTests": [
+      "RISK live scan sync: candidate Done publishes promptly and reaches another open device without focus",
+      "RISK live scan sync: done adding for now shares the existing work mode and survives reload and reconnect",
+      "RISK live scan sync: revision hints wake canonical reads without trusting foreign duplicate or malformed notifications",
+      "RISK live scan sync: a form draft defers live adoption then receives completion when editing ends",
+      "RISK live scan sync: an in-progress click survives a remote pause and its completion is retained through the conflict",
+      "RISK live scan sync: stale Done comparison and pause controls never act on replacement tasks",
+      "RISK live scan sync: duplicate Done and held keyboard repeats cannot complete another task or duplicate an evergreen session",
+      "RISK live scan sync: evergreen Done Undo propagates once and stale concurrent writes preserve its cancellation",
+      "RISK live scan sync backend: only server-confirmed root revisions notify and listeners follow account and visibility lifetimes",
+      "RISK live scan sync backend: a listener error stays bounded and reopens through ordinary recovery",
+      "RISK live scan sync: an editor opened after a queued revision still drains that revision on close",
+      "RISK live scan sync: the second physical click of one double-click cannot complete the newly rendered candidate",
+      "RISK live scan sync: Settings describes live revision refresh while retaining draft protection"
+    ],
+    "preservedCoverage": [
+      "All pre-existing tests and assertions remain unchanged, including revision conflicts, account switching, durable recovery, rejected-write status, imports, deletion and causal evergreen completion cancellation.",
+      "Completion remains rating-neutral, Chance and ranking algorithms remain untouched, and all normal task, chain, candidate, mode and history fields retain the existing protocol and authoritative merge rules.",
+      "Snapshot hints contain only account identity and revision and never carry a board or write acknowledgement. Synthetic separate client stores and fake authenticated accounts avoid production storage.",
+      "The optional native date case is run explicitly with zero skips in both Chrome and WebKit across nine viewports each; the always-on structural case protects tablet sizing and existing phone stacking."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK live scan sync|RISK tablet date fields:' --test-reporter=spec tests.js; separate queued-editor, physical double-click and Settings focused red commands are preserved in ../sync-evidence/",
+      "failure": "Before implementation, all ten initial live-sync risk tests failed (0 passed, 10 failed). The queued-editor boundary and physical replacement double-click each failed their added test before their narrow guards. The date structural case failed before base flex sizing, and Settings copy failed before live-refresh wording. Actual logs: live-sync-red.log, queued-editor-red.log, double-click-red.log, date-fields-red.log and settings-sync-red.log. Existing regression assertions were not weakened."
+    }
+  },
+  {
     "reason": "The user explicitly requested twice the rate of nighttime garden-light opportunities and city-window transitions, plus a rare Peter Pan and Darling children visit that flies in, lands on the two sloped clocktower roof edges, pauses and leaves. Existing cadence expectations change only to implement that request. This combined origin/main diff also retains the separately committed Add evergreen default fix, whose four failing-before-implementation tests and exact original rationale appear below. A narrow fixture-only correction also freezes the pre-existing duplicate-ID backup test clock after reproducing its expiry failure on unchanged main; no production backup code or existing assertions change. The independent code review also found the numeric18 custom-day default boundary; initial-default provenance fixes it without changing any earlier assertion.",
     "previousBehavior": "Garden lights had one independent one-in-twelve resample every 120 visible seconds and city windows toggled one visible window every 30 seconds. No clocktower visit, shared roof contact geometry or staggered landing choreography existed. On origin/main, an untouched eighteen-hour Add draft also remained eighteen on Days selection. The duplicate-ID recovery fixture depended on the host date and failed after its fixed daily rows expired. An eighteen-day custom default was also mistaken for the untouched eighteen-hour default after reverse unit toggles.",
     "intendedBehavior": "Garden opportunities use 60 seconds and city windows use 15 seconds without brighter fixtures or more lit roofs. Four small visitors follow separate continuous routes and exact sloped-roof feet, with one rare night-only event, daylight cancellation, hidden-time pause and stationary reduced-motion poses. The Add draft now defaults to seven on Days only while untouched, preserves deliberate edits, and never resets on the reverse Hours switch. That independent backup test now uses a VM-local September 28 clock and proves both fixture rows are initially readable while preserving all promotion and pin-release requirements. The weekly replacement is now restricted to drafts that actually began from the eighteen-hour default; open custom drafts survive later Settings changes.",

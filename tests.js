@@ -7572,6 +7572,11 @@ async function loadCloudBackendV2({rootData=null,batchFailureAt=Infinity,failure
  F.getDocsFromServer=async reference=>{network.push('server:'+reference.path);if(failures.serverOffline)throw Object.assign(Error('offline'),{code:'unavailable'});return readDocs(reference);};
  F.disableNetwork=async()=>{network.push('disable');if(failures.disable)throw failures.disable;};
  F.enableNetwork=async()=>{network.push('enable');if(failures.enablePending)await failures.enablePending;};
+ const subscriptions=[];
+ F.onSnapshot=(reference,options,next,error)=>{
+  const entry={reference,options,next,error,active:true};subscriptions.push(entry);
+  return ()=>{entry.active=false;};
+ };
  let authListener=null;
  const auth={currentUser:{uid:'owner',email:'owner@example.test'}},A={browserLocalPersistence:{},getAuth:()=>auth,setPersistence:async()=>{if(failures.persistence)throw failures.persistence;},
   signInWithPopup:async(_auth,provider)=>{popupProviders.push(provider);if(failures.signIn)throw failures.signIn;},signOut:async()=>{if(failures.signOut)throw failures.signOut;},GoogleAuthProvider:class{setCustomParameters(value){this.customParameters=value;}},onAuthStateChanged(_auth,listener){authListener=listener;if(!failures.authPending)listener(auth.currentUser);}};
@@ -7582,12 +7587,14 @@ async function loadCloudBackendV2({rootData=null,batchFailureAt=Infinity,failure
   async clearPendingUpload(account,generationId){if(pending.get(account)?.generationId!==generationId)return false;pending.delete(account);return true;},
  };
  window.recordSyncError=recordSyncError;
- const context=vm.createContext({window,CustomEvent:class{constructor(type){this.type=type;}},__cloudModules:[{initializeApp:()=>({})},A,F],
+ const context=vm.createContext({window,CustomEvent:class{constructor(type,options){this.type=type;this.detail=options?.detail;}},__cloudModules:[{initializeApp:()=>({})},A,F],
   console,crypto:webcrypto,TextEncoder,TextDecoder,structuredClone,setTimeout,clearTimeout});context.globalThis=context;
  for(const file of ['device-store-v2.js','cloud-store-v2.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,file),'utf8'),context,{filename:file});
  window.ChainStorageV2=context.ChainStorageV2;window.ChainCloudV2=context.ChainCloudV2;
  await vm.runInContext(`(async()=>{${moduleSource}\n})()`,context,{filename:'index.html#cloud-v2-backend'});
- return {CS:window.CloudSync,auth,docs,pending,events,batchCommits,writes,popupProviders,transactionCalls,queries,network,emitAuth(user){auth.currentUser=user;authListener?.(user);}};
+ return {CS:window.CloudSync,auth,docs,pending,events,batchCommits,writes,popupProviders,transactionCalls,queries,network,subscriptions,
+  emitSnapshot(entry,data,{fromCache=false,hasPendingWrites=false}={}){entry.next({exists:()=>data!==null,data:()=>clone(data),metadata:{fromCache,hasPendingWrites}});},
+  emitAuth(user){auth.currentUser=user;authListener?.(user);}};
 }
 
 test('RISK CLOUD V2 ADAPTER: production migrates a legacy root to verified chunks and pulls the exact multi-megabyte board',async()=>{
@@ -19326,4 +19333,233 @@ test('RISK skyline lights: each garden has a one-in-twelve state through indepen
  const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),tick=source.slice(source.indexOf('  function tick(now){'),source.indexOf('  function stop(){'));
  assert.ok(tick.indexOf('if(reduced||document.hidden)')<tick.indexOf('S.advanceGardenLights('),'hidden tabs and reduced mode do not advance the normal scene clock');
  assert.ok(source.includes('if(reduced&&S.advanceGardenLights(cityLights.gardens,dt,p.night>.2,Math.random))'),'reduced motion uses the slow active-time resampler');
+});
+
+/* Separate device stores share only the synthetic revision-checked cloud.
+   Notifications contain account/revision hints, never trusted board bytes. */
+async function liveScanSyncClients({evergreen=false,hostStorage=false}={}){
+ const prepared=await loadApp({seed:615});
+ const bench=prepared.ctx.addTask('Existing chain tail'),candidate=prepared.ctx.addTask('Scanned task'),next=prepared.ctx.addTask('Next scanned task');
+ candidate.evergreen=evergreen;
+ Object.assign(prepared.ctx.state,{chain:[bench.id],candidateId:candidate.id,mode:'scan',scanMode:'descending',snooze:100});
+ const board=JSON.parse(prepared.ctx.cloudPayload()),h=makeSyncHarness({remote:board,rev:5,delayMs:1}),clients=[];
+ const factory=win=>{
+  const CS=h.factory();clients.push({win,CS});
+  const push=CS.push;
+  CS.push=async(...args)=>{const result=await push(...args);if(result?.ok)notify();return result;};
+  return CS;
+ };
+ function notify(user='e@example.com',rev=h.doc.rev){for(const {win} of clients)win.dispatchEvent({type:'cloudboardchange',detail:{user,rev}});}
+ const bytes=JSON.stringify({...board,syncRev:5,syncAccount:'e@example.com',syncDirty:false});
+ const options={cloudSyncFactory:factory,[hostStorage?'hostStorage':'seedStorage']:{[SYNC_STORE_KEY]:bytes}};
+ const a=await loadApp(options),b=await loadApp(options);await syncSettle(40);
+ assert.equal(a.ctx.state.syncRev,5);assert.equal(b.ctx.state.syncRev,5);
+ return {a,b,h,notify,benchId:bench.id,candidateId:candidate.id,nextId:next.id};
+}
+
+test('RISK live scan sync: candidate Done publishes promptly and reaches another open device without focus',async()=>{
+ for(const evergreen of [false,true]){
+  const {a,b,h,candidateId,nextId,benchId}=await liveScanSyncClients({evergreen});
+  const ratings=JSON.stringify(a.ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma]));
+  a.ctx.onAction('cand-done',{dataset:{candidate:candidateId,benchmark:benchId}});
+  await syncSettle(100);
+  assert.ok(h.remoteState().tasks.find(t=>t.id===candidateId).lastDoneAt,'Done bypasses the ordinary two-second edit debounce');
+  const remoteTask=b.ctx.state.tasks.find(t=>t.id===candidateId);
+  assert.ok(remoteTask.lastDoneAt,'a server revision wakes the other already-open client');
+  assert.equal(remoteTask.done,!evergreen);assert.equal(b.ctx.isEligible(remoteTask),false);
+  assert.equal(b.ctx.state.mode,'scan','candidate Done keeps scanning');
+  assert.equal(b.ctx.state.candidateId,nextId);assert.equal(JSON.stringify(b.ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma])),ratings);
+  assert.equal(b.ctx.state.workLog.filter(e=>e.taskId===candidateId).length,evergreen?1:0);
+ }
+});
+
+test('RISK live scan sync: done adding for now shares the existing work mode and survives reload and reconnect',async()=>{
+ for(const hostStorage of [false,true]){
+  const {a,b,h,candidateId,benchId}=await liveScanSyncClients({hostStorage});
+  a.ctx.onAction('start-working',{dataset:{candidate:candidateId,benchmark:benchId}});await syncSettle(100);
+  assert.equal(h.remoteState().mode,'work','finishing the scan publishes immediately');
+  assert.equal(b.ctx.state.mode,'work','the open second platform pauses without a focus event');
+  assert.deepEqual([...b.ctx.state.chain],[benchId]);assert.ok(b.shim.document.getElementById('scan').innerHTML.includes('Scanning paused'));
+  const bytes=JSON.stringify(b.ctx.state),reloaded=await loadApp({[hostStorage?'hostStorage':'seedStorage']:{[SYNC_STORE_KEY]:bytes}});
+  assert.equal(reloaded.ctx.state.mode,'work');assert.deepEqual([...reloaded.ctx.state.chain],[benchId]);
+  b.shim.document.hidden=true;b.shim.document.dispatchEvent({type:'visibilitychange'});
+  a.ctx.onAction('resume-scan',{dataset:{}});a.ctx.cloudPushNow();await syncSettle(30);
+  assert.equal(b.ctx.state.mode,'work','hidden clients wait for a fresh server read');
+  b.shim.document.hidden=false;b.shim.document.dispatchEvent({type:'visibilitychange'});await syncSettle(80);
+  assert.equal(b.ctx.state.mode,'scan','returning or reconnecting receives the later explicit resume');
+ }
+});
+
+test('RISK live scan sync: revision hints wake canonical reads without trusting foreign duplicate or malformed notifications',async()=>{
+ const {a,b,h,notify,candidateId,benchId}=await liveScanSyncClients();
+ a.ctx.onAction('cand-done',{dataset:{candidate:candidateId,benchmark:benchId}});a.ctx.cloudPushNow();await syncSettle(80);
+ assert.equal(b.ctx.state.tasks.find(t=>t.id===candidateId).done,true,'the valid hint is reconciled first');
+ const before=JSON.stringify(b.ctx.state),reads=h.calls.filter(x=>x==='pull').length;
+ for(const rev of [h.doc.rev,h.doc.rev-1,-1,NaN,'999',Infinity])notify('e@example.com',rev);
+ notify('another@example.test',h.doc.rev+100);await syncSettle(30);
+ assert.equal(JSON.stringify(b.ctx.state),before);assert.equal(h.calls.filter(x=>x==='pull').length,reads,'irrelevant hints cannot cause a read/write loop');
+ assert.equal(Object.hasOwn(JSON.parse(b.ctx.cloudPayload()),'pendingCloudRevision'),false,'notification bookkeeping is device-only');
+});
+
+test('RISK live scan sync: a form draft defers live adoption then receives completion when editing ends',async()=>{
+ const {a,b,candidateId,benchId}=await liveScanSyncClients();
+ const editor={matches:selector=>selector.includes('input')};b.shim.document.activeElement=editor;
+ a.ctx.onAction('cand-done',{dataset:{candidate:candidateId,benchmark:benchId}});a.ctx.cloudPushNow();await syncSettle(50);
+ assert.equal(b.ctx.state.tasks.find(t=>t.id===candidateId).done,false,'the current DOM-only draft cannot be replaced');
+ b.shim.document.activeElement=null;b.shim.document.dispatchEvent({type:'focusout'});await syncSettle(80);
+ assert.equal(b.ctx.state.tasks.find(t=>t.id===candidateId).done,true,'closing the edit drains the server revision without another focus');
+});
+
+test('RISK live scan sync: an in-progress click survives a remote pause and its completion is retained through the conflict',async()=>{
+ const {a,b,h,candidateId,benchId}=await liveScanSyncClients();
+ b.shim.document.dispatchEvent({type:'pointerdown',target:{closest:()=>({})}});
+ a.ctx.onAction('start-working',{dataset:{candidate:candidateId,benchmark:benchId}});a.ctx.cloudPushNow();await syncSettle(50);
+ assert.equal(b.ctx.state.mode,'scan','a server reply cannot remove the pressed scanner card');
+ b.ctx.onAction('cand-done',{dataset:{candidate:candidateId,benchmark:benchId}});
+ b.shim.document.dispatchEvent({type:'click',target:{closest:()=>null}});
+ await syncSettle(150);
+ assert.equal(h.remoteState().tasks.find(t=>t.id===candidateId).done,true,'the click remains completed after revision-conflict reconciliation');
+ assert.equal(a.ctx.state.tasks.find(t=>t.id===candidateId).done,true);assert.equal(b.ctx.state.tasks.find(t=>t.id===candidateId).done,true);
+ assert.equal(h.remoteState().mode,'work','the accepted remote pause remains the canonical session mode');
+ assert.equal(h.remoteState().tasks.length,3,'no task is lost or resurrected');
+});
+
+test('RISK live scan sync: stale Done comparison and pause controls never act on replacement tasks',async()=>{
+ for(const action of ['cand-done','yes','no','cant','start-working']){
+  const {ctx,shim}=await loadApp({seed:616});const bench=ctx.addTask('Tail'),old=ctx.addTask('Old candidate'),next=ctx.addTask('Replacement');
+  Object.assign(ctx.state,{chain:[bench.id],candidateId:old.id,mode:'scan',snooze:100});ctx.render();
+  assert.match(shim.document.getElementById('scan').innerHTML,new RegExp('data-act="'+action+'"[^>]*data-candidate="'+old.id+'"'),'the real control captures its displayed candidate');
+  const element={dataset:{candidate:old.id,benchmark:bench.id}};ctx.state.candidateId=next.id;
+  const before=JSON.stringify(ctx.state);ctx.onAction(action,element);
+  assert.equal(JSON.stringify(ctx.state),before,action+': a stale click cannot apply to the replacement');
+ }
+});
+
+test('RISK live scan sync: duplicate Done and held keyboard repeats cannot complete another task or duplicate an evergreen session',async()=>{
+ for(const evergreen of [false,true]){
+  const {ctx,shim}=await loadApp({seed:617});const bench=ctx.addTask('Tail'),candidate=ctx.addTask('Candidate'),next=ctx.addTask('Next');candidate.evergreen=evergreen;
+  Object.assign(ctx.state,{chain:[bench.id],candidateId:candidate.id,mode:'scan',snooze:100});ctx.render();
+  const element={dataset:{candidate:candidate.id,benchmark:bench.id}};
+  ctx.onAction('cand-done',element);ctx.onAction('cand-done',element);
+  assert.equal(next.lastDoneAt,null,'a double click never completes the next scanned task');
+  assert.equal(ctx.state.workLog.filter(e=>e.taskId===candidate.id).length,evergreen?1:0);
+  shim.document.dispatchEvent({type:'keydown',key:'d',repeat:true,preventDefault(){}});
+  assert.equal(next.lastDoneAt,null,'holding d is one gesture, not several completions');
+  ctx.undo();assert.equal(ctx.state.tasks.find(t=>t.id===candidate.id).lastDoneAt,null);assert.equal(ctx.state.workLog.filter(e=>e.taskId===candidate.id).length,0);
+ }
+});
+
+test('RISK live scan sync: evergreen Done Undo propagates once and stale concurrent writes preserve its cancellation',async()=>{
+ const {a,b,h,notify,candidateId,benchId}=await liveScanSyncClients({evergreen:true});
+ a.ctx.onAction('cand-done',{dataset:{candidate:candidateId,benchmark:benchId}});a.ctx.cloudPushNow();await syncSettle(80);
+ assert.ok(b.ctx.state.tasks.find(t=>t.id===candidateId).lastDoneAt,'completion reached the other client');
+ const completed=JSON.parse(h.doc.payload);a.ctx.undo();a.ctx.cloudPushNow();await syncSettle(100);
+ assert.equal(b.ctx.state.tasks.find(t=>t.id===candidateId).lastDoneAt,null,'Undo cancels the rest on the other device');
+ assert.equal(b.ctx.state.workLog.some(e=>e.taskId===candidateId),false);
+ completed.tasks.find(t=>t.id===benchId).title='Concurrent unrelated title';h.writeBehindBack(completed);notify();await syncSettle(120);
+ assert.equal(a.ctx.state.tasks.find(t=>t.id===candidateId).lastDoneAt,null);assert.equal(b.ctx.state.tasks.find(t=>t.id===candidateId).lastDoneAt,null);
+ assert.equal(h.remoteState().tasks.find(t=>t.id===candidateId).lastDoneAt,null,'canonical causal completion cancellation defeats the stale copy');
+ assert.equal(b.ctx.state.tasks.find(t=>t.id===benchId).title,'Concurrent unrelated title','the accepted unrelated edit is retained');
+});
+
+test('RISK live scan sync backend: only server-confirmed root revisions notify and listeners follow account and visibility lifetimes',async()=>{
+ const h=await loadCloudBackendV2({rootData:{rev:5}}),events=()=>h.events.filter(e=>e.type==='cloudboardchange');
+ assert.equal(h.subscriptions.length,1,'the signed-in client subscribes to its existing root');
+ const first=h.subscriptions[0];assert.equal(first.reference.path,'users/owner');assert.equal(first.options.includeMetadataChanges,true);
+ for(const data of [{rev:6},{rev:7}]){
+  h.emitSnapshot(first,data,{fromCache:true});h.emitSnapshot(first,data,{hasPendingWrites:true});
+ }
+ for(const data of [null,{rev:-1},{rev:'8'},{rev:NaN},{}])h.emitSnapshot(first,data);
+ assert.equal(events().length,0,'cache pending writes empty roots and invalid revisions never authorize reconciliation');
+ h.emitSnapshot(first,{rev:8});h.emitSnapshot(first,{rev:8});h.emitSnapshot(first,{rev:7});
+ assert.deepEqual(events().map(e=>JSON.parse(JSON.stringify(e.detail))),[{user:'owner@example.test',rev:8}]);
+ h.emitAuth({uid:'other',email:'other@example.test'});assert.equal(first.active,false);
+ h.emitSnapshot(first,{rev:99});assert.equal(events().length,1,'late old-account callbacks are ignored');
+ const second=h.subscriptions.at(-1);assert.equal(second.reference.path,'users/other');h.emitSnapshot(second,{rev:1});assert.equal(events().at(-1).detail.user,'other@example.test');
+ h.CS.suspend();assert.equal(second.active,false);h.emitSnapshot(second,{rev:2});assert.equal(events().length,2);
+ h.CS.resume();await syncSettle(5);const resumed=h.subscriptions.at(-1);assert.notEqual(resumed,second);assert.equal(resumed.active,true);
+ h.emitAuth(null);assert.equal(resumed.active,false);h.emitSnapshot(resumed,{rev:100});assert.equal(events().length,2,'sign-out disconnects live account data');
+});
+
+test('RISK live scan sync backend: a listener error stays bounded and reopens through ordinary recovery',async()=>{
+ const h=await loadCloudBackendV2({rootData:{rev:5}});
+ assert.equal(h.subscriptions.length,1);const first=h.subscriptions[0];
+ first.error(Object.assign(Error('listen denied'),{code:'permission-denied'}));
+ assert.equal(h.CS.status,'error');assert.equal(h.CS.errorStage,'pull');assert.equal(h.CS.errorCode,'permission-denied');
+ assert.equal(first.active,false);await syncSettle(30);assert.equal(h.subscriptions.length,1,'a denied subscription cannot spin');
+ h.CS.resume();await syncSettle(5);assert.equal(h.subscriptions.length,2,'the normal explicit recovery can open one fresh listener');
+});
+
+test('RISK live scan sync: an editor opened after a queued revision still drains that revision on close',async()=>{
+ const {b,h,notify}=await liveScanSyncClients();
+ const paused=h.remoteState();paused.mode='work';h.writeBehindBack(paused);notify();
+ b.shim.document.activeElement={matches:selector=>selector.includes('input')};
+ await syncSettle(35);assert.equal(b.ctx.state.mode,'scan','the newly opened draft holds the queued replacement');
+ b.shim.document.activeElement=null;b.shim.document.dispatchEvent({type:'focusout'});await syncSettle(80);
+ assert.equal(b.ctx.state.mode,'work','the pending revision cannot be stranded by a newly opened editor');
+});
+
+test('RISK tablet date fields: empty native editor dates have usable width outside the phone breakpoint',async()=>{
+ const style=html.match(/<style>([\s\S]*?)<\/style>/)[1],base=style.split(/@media\s*\(max-width:/)[0];
+ const dateRules=[...base.matchAll(/([^{}]+)\{([^{}]+)\}/g)].filter(m=>m[1].includes('.frow input[type=date]'));
+ assert.ok(dateRules.some(m=>/flex\s*:\s*1\b/.test(m[2])&&/min-width\s*:\s*(?:1[6-9]\d|[2-9]\d\d)px/.test(m[2])),
+  'empty WebKit dates must share usable flex width with Title and Link at tablet and desktop widths');
+ assert.match(style,/\.frow input\[type=text\],\.frow input\[type=url\],\.frow input\[type=date\]\{width:100%;min-width:0\}/,'phone dates retain the existing stacked full-width contract');
+ const {ctx,shim}=await loadApp();const t=ctx.addTask('Synthetic date fixture');ctx.openEdit(t.id);
+ assert.match(shim.document.getElementById('modalRoot').innerHTML,/id="etDue" type="date"/);assert.match(shim.document.getElementById('modalRoot').innerHTML,/id="etStart" type="date"/);
+});
+
+test('RISK tablet date fields browser: empty filled and focused dates remain touchable with unclipped neighboring controls',
+ {skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const {chromium,webkit}=await import(process.env.PLAYWRIGHT_MODULE||'playwright');
+ const origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+ const results=[];
+ for(const [engine,type] of [['chrome',chromium],['webkit',webkit]]){
+  const browser=await type.launch({headless:true,...(engine==='chrome'?{channel:'chrome'}:{})});
+  try{
+   const context=await browser.newContext({viewport:{width:1024,height:706},deviceScaleFactor:2,hasTouch:true,serviceWorkers:'block'});
+   await context.addInitScript(()=>{
+    Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});
+    localStorage.setItem('fvp:chain-scanner:landscape-motion','reduced');
+   });
+   await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
+   const page=await context.newPage();await page.goto(process.env.LANDSCAPE_BROWSER_URL);await page.waitForFunction(()=>typeof state!=='undefined'&&state?.tasks);
+   const id=await page.evaluate(()=>{closeModal();document.getElementById('motionDialog')?.close();return addTask('Synthetic tablet date fixture').id;});
+   for(const [width,height] of [[1024,706],[1024,768],[768,1024],[621,800],[620,800],[619,800],[390,844],[568,320],[1280,800]]){
+    await page.setViewportSize({width,height});await page.evaluate(id=>openEdit(id),id);
+    for(const field of ['etDue','etStart']){
+     const control=page.locator('#'+field);assert.equal(await control.inputValue(),'','the empty native control is the reported boundary');
+     const bounds=await control.evaluate(el=>{const r=el.getBoundingClientRect(),pane=el.closest('.modal').getBoundingClientRect();return {left:r.left,right:r.right,width:r.width,height:r.height,paneLeft:pane.left,paneRight:pane.right};});
+     assert.ok(bounds.width>=180,`${engine} ${width}: ${field} is readable and touchable while empty (${bounds.width}px)`);
+     assert.ok(bounds.left>=bounds.paneLeft&&bounds.right<=bounds.paneRight,`${engine} ${width}: ${field} stays inside the dialog`);
+     await control.tap();await control.fill('2026-10-06');assert.equal(await control.inputValue(),'2026-10-06');
+     assert.equal(await control.evaluate(el=>el.type),'date','native date-picker behavior remains available');
+     await control.focus();assert.equal(await control.evaluate(el=>document.activeElement===el),true);await control.fill('');
+    }
+    const peers=await page.evaluate(()=>{const modal=document.querySelector('.modal'),rect=el=>{const r=el.getBoundingClientRect();return {left:r.left,right:r.right,width:r.width};};return {title:rect(document.getElementById('etTitle')),link:rect(document.getElementById('etUrl')),checkbox:rect(document.getElementById('etEver').closest('label')),pane:rect(modal),overflow:modal.scrollWidth>modal.clientWidth};});
+    assert.ok(peers.title.width>=180&&peers.link.width>=180,'Title and Link retain usable widths');assert.equal(peers.overflow,false);
+    assert.ok(peers.checkbox.left>=peers.pane.left&&peers.checkbox.right<=peers.pane.right,'the Evergreen checkbox remains inside the row');
+    await page.locator('#etEver').check();await page.locator('#etEver').uncheck();
+    if(width===1024&&height===706&&process.env.DATE_FIELD_SCREENSHOTS){await page.screenshot({path:path.join(process.env.DATE_FIELD_SCREENSHOTS,`date-fields-${engine}-1024x706.png`)});}
+    results.push({engine,width,height,passed:true});await page.evaluate(()=>closeModal());
+   }
+   assert.equal(await page.evaluate(()=>window.CloudSync.configured),false,'no production backend is enabled');await context.close();
+  }finally{await browser.close();}
+ }
+ if(process.env.DATE_FIELD_SCREENSHOTS)fs.writeFileSync(path.join(process.env.DATE_FIELD_SCREENSHOTS,'date-fields-results.json'),JSON.stringify(results,null,2)+'\n');
+});
+
+test('RISK live scan sync: the second physical click of one double-click cannot complete the newly rendered candidate',async()=>{
+ const {ctx,shim}=await loadApp({seed:618});const bench=ctx.addTask('Tail'),candidate=ctx.addTask('First'),next=ctx.addTask('Next');
+ Object.assign(ctx.state,{chain:[bench.id],candidateId:candidate.id,mode:'scan',snooze:100});ctx.render();
+ ctx.onAction('cand-done',{dataset:{candidate:candidate.id,benchmark:bench.id}});
+ const replacement={dataset:{act:'cand-done',candidate:next.id,benchmark:bench.id}};
+ shim.document.dispatchEvent({type:'click',detail:2,target:{closest:()=>replacement}});
+ assert.equal(next.lastDoneAt,null,'a physical double click remains one completion even when the DOM has replaced the control');
+});
+
+test('RISK live scan sync: Settings describes live revision refresh while retaining draft protection',async()=>{
+ const {a}=await liveScanSyncClients();a.ctx.openSettings();
+ assert.match(a.shim.document.getElementById('modalRoot').innerHTML,/when another device saves/,'Settings must describe the new open-device refresh');
+ assert.match(a.shim.document.getElementById('modalRoot').innerHTML,/Drafts wait until you finish/,'the draft boundary remains visible to the user');
 });

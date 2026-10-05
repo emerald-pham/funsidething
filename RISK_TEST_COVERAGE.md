@@ -405,3 +405,24 @@ The editor hook blocks app or enforcement edits while tests.js has no staged or 
 - RISK fireworks layering: city silhouettes mask random shows while barge shells remain foreground
 - RISK scenery browser: phone fairy lights rain and both firework depths match their actual canvas pixels
 - RISK rain reflection: removing mirrored rainfall preserves snow and the distant lightning bolt
+
+## Open-device scan updates and tablet editor dates
+
+- RISK live scan sync: candidate Done publishes promptly and reaches another open device without focus
+- RISK live scan sync: done adding for now shares the existing work mode and survives reload and reconnect
+- RISK live scan sync: revision hints wake canonical reads without trusting foreign duplicate or malformed notifications
+- RISK live scan sync: a form draft defers live adoption then receives completion when editing ends
+- RISK live scan sync: an in-progress click survives a remote pause and its completion is retained through the conflict
+- RISK live scan sync: stale Done comparison and pause controls never act on replacement tasks
+- RISK live scan sync: duplicate Done and held keyboard repeats cannot complete another task or duplicate an evergreen session
+- RISK live scan sync: evergreen Done Undo propagates once and stale concurrent writes preserve its cancellation
+- RISK live scan sync backend: only server-confirmed root revisions notify and listeners follow account and visibility lifetimes
+- RISK live scan sync backend: a listener error stays bounded and reopens through ordinary recovery
+- RISK live scan sync: an editor opened after a queued revision still drains that revision on close
+- RISK live scan sync: the second physical click of one double-click cannot complete the newly rendered candidate
+- RISK live scan sync: Settings describes live revision refresh while retaining draft protection
+
+## Open-device scan updates and tablet editor dates
+
+- RISK tablet date fields: empty native editor dates have usable width outside the phone breakpoint
+- RISK tablet date fields browser: empty filled and focused dates remain touchable with unclipped neighboring controls
