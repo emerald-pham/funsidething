@@ -1412,5 +1412,29 @@
       "failure": "Before implementation, all three new non-browser contracts failed for the intended reasons: the retired button exists, add-dot mutates the board and clears the draft, and current help advertises Add & dot. The browser contract independently failed at 320x568 because the removed-control selector counted 1 instead of 0. Existing task-editor Dot and ordinary Add scheduling preservation contracts passed. Full outputs retained in external release evidence red.log and browser-red.log."
     },
     "testChangesSha256": "2faccf54d0303a4f6f4c7116393d3952a68de415c8169e904429ae5778f312da"
+  },
+  {
+    "reason": "The reported cross-browser completion screenshot shows an evergreen task still at the scanner benchmark with an 18-hour countdown after cloud adoption. Existing candidate coverage did not distinguish stale chained membership from correctly merged completion evidence.",
+    "previousBehavior": "Reconciliation swept only permanently done tasks from the shared chain. Evergreen Done retains done=false, so newer stale chains could keep resting tasks as crumbs or benchmarks although pool eligibility excluded them.",
+    "intendedBehavior": "Reconciliation removes only actively resting evergreen completion IDs from the chain and candidate, preserves task records, History, ratings and scan mode, and retains eligible expired or reopened dots and unrelated context/start-date holds.",
+    "replacementTests": [
+      "RISK evergreen scan reconciliation: merged completion removes resting crumbs tails and candidates without losing evidence",
+      "RISK evergreen scan reconciliation: a newer stale cloud chain cannot revive another browsers completed task",
+      "RISK evergreen scan reconciliation: held editor and pointer delay resting chain adoption then stale benchmark controls stay inert",
+      "RISK evergreen scan reconciliation: cooldown expiry day reset and explicit return preserve eligible and unrelated chain membership",
+      "RISK evergreen scan reconciliation: offline cold reload clears legacy resting dots and Undo retains completion history",
+      "RISK evergreen scan reconciliation: a delayed stale read and later revision converge without restoring completed membership"
+    ],
+    "preservedCoverage": [
+      "Ordinary completions retain their existing cleanup and task records; evergreen timestamps, session History, Undo of unrelated edits and actual durable local/host reload remain intact.",
+      "Candidate selection and pool eligibility, ordinary and evergreen chain positions, paused and intervention modes, stale benchmark action identities, and held editor/pointer cloud deferral remain protected.",
+      "Cooldown expiration uses the same strict boundary as eligibility at elapsed hours and the 2 AM reset; early returns and context/date chain behavior retain existing semantics.",
+      "Real synthetic two-client revision reconciliation preserves unrelated changes and completion evidence through a newer stale winner, delayed reads and later notifications without touching real account or production data."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='^RISK evergreen scan reconciliation:' tests.js",
+      "failure": "All six final regression tests were observed failing on the original reconcileHistory implementation before reinstating the app fix. Failures were assertions of resting task IDs remaining in chain membership (crumb/benchmark, stale remote winner, interaction release, legacy/rest boundary, offline cold reload and delayed read). Full raw red output is /Users/emeraldpham/Documents/Codex/2026-10-04/task-5/evergreen-sync-evidence/red-final-tests-before-app-fix.log; initial four-case raw red is red-discriminating-before-app-fix.log in that directory."
+    },
+    "testChangesSha256": "00d37b532d35eb58a1620e586f75b57c654ab1fb97342c742913a30c9c36baeb"
   }
 ]
