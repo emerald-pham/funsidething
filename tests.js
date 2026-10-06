@@ -19847,7 +19847,7 @@ test('RISK multiple dependencies sync: simultaneous edits converge and offline r
  assert.equal(h.remoteState().mode,'work','done adding for now still shares pause state');
 });
 
-test('RISK Chance labels: frozen weight shares describe a fresh draw and never change saved order ratings or seed',async()=>{
+test('RISK overall Chance shares: full eligible weights retain scanned and chained tasks without changing order ratings or seed',async()=>{
  const {ctx,shim}=await loadApp({seed:714});const bench=ctx.addTask('Oldest'),a=ctx.addTask('A'),b=ctx.addTask('B');
  Object.assign(ctx.state,{chain:[bench.id],scanMode:'chance',candidateId:a.id,listOpen:true,mode:'scan'});
  ctx.resetChance();ctx.state.chance.weights[a.id]=.25;ctx.state.chance.weights[b.id]=.75;
@@ -19855,31 +19855,36 @@ test('RISK Chance labels: frozen weight shares describe a fresh draw and never c
 
  const unchangedAlgorithms={"updatePair":"a31c20a18454d735731d5e02bdf0767292e790a992725d7d35b02380cbf2568b","pBeats":"6003c75326298698b27f2ae691bed18928d6f96396da30ca9113a34463d3a3d9","chanceWeight":"96381985597245b65e9d26fa410c13ac801ce6a618e76665f69d049cc9485582","chanceHash":"012f3e461e84956335324e12c2646860bc6ed68ac31456dfb0d9bb231c0d4947","resetChance":"36f9f2a46730bc3e3bb068bea2b07d57d29c8cadf8184b9914733f2bfcc90b1a","chanceScore":"b033af5b0cbae63742983121a674ecd99aceabead078d6c7d8067bd3bf49c38f","candidateOrder":"14eb77f7bd0dbedae664aade1d050631264784e52f1ab2d69374c5e339993d16","chancePick":"d2a64e3f4e9a8431dc5439b5945f651f66521f4674aec6ef1b321bb4c1b8bf10","oldestFirst":"da6def7759fd3997881fa299c8b92324d49217c9534381d5c3c3be750d6d46aa"};
  for(const [name,expected] of Object.entries(unchangedAlgorithms)){const start=html.indexOf("function "+name+"("),end=html.indexOf("\nfunction ",start+1);assert.equal(createHash("sha256").update(html.slice(start,end)).digest("hex"),expected,name+" selection and rating code stays byte-exact");}
- const stats=ctx.chanceDisplayStats();assert.equal(stats.get(a.id).probability,.25);assert.equal(stats.get(b.id).probability,.75);
- assert.equal(ctx.taskSelectionSummary(a,stats).label,'25% next draw');
- assert.match(ctx.taskSelectionSummary(a,stats).title,/estimate.*fresh draw/i);
- ctx.renderList();ctx.renderScan();assert.match(shim.document.getElementById('listBody').innerHTML,/25% next draw/);
- assert.match(shim.document.getElementById('scan').innerHTML,/25% next draw/);
+ const stats=ctx.chanceDisplayStats();for(const task of [bench,a,b])assert.ok(Math.abs(stats.get(task.id).probability-1/3)<1e-12,'equal current ratings share the full eligible set, including the chain');
+ assert.equal(ctx.taskSelectionSummary(a,stats).label,'33.33% overall');
+ assert.match(ctx.taskSelectionSummary(a,stats).title,/full eligible/i);
+ ctx.renderList();ctx.renderScan();assert.match(shim.document.getElementById('listBody').innerHTML,/33.33% overall/);
+ assert.match(shim.document.getElementById('scan').innerHTML,/33.33% overall/);
  assert.doesNotMatch(shim.document.getElementById('scan').innerHTML,/top-\d/);
  assert.equal(JSON.stringify(ctx.state),before,'displaying probabilities cannot generate a draw or write the board');
  assert.deepEqual(Array.from(ctx.candidateOrder(ctx.pool()).map(t=>t.id)),Array.from(order));
  ctx.state.scanMode='descending';ctx.renderList();ctx.renderScan();
  assert.match(shim.document.getElementById('listBody').innerHTML,/top-\d/);assert.match(shim.document.getElementById('scan').innerHTML,/top-\d/);
- assert.doesNotMatch(shim.document.getElementById('listBody').innerHTML,/next draw|scanned after/);
+ assert.doesNotMatch(shim.document.getElementById('listBody').innerHTML,/overall|scanned after/);
+ ctx.state.scanMode='chance';const shares=()=>JSON.stringify([...ctx.chanceDisplayStats()].map(([id,entry])=>[id,entry.probability]));const initial=shares();
+ ctx.state.considered[a.id]='no';ctx.state.candidateId=b.id;assert.equal(shares(),initial,'passing a task without a rating update retains every global share');
+ ctx.state.chain.push(a.id);assert.equal(shares(),initial,'adding to the chain without a comparison cannot shrink the global denominator');
+ ctx.state.considered[b.id]='cant';assert.equal(shares(),initial,'pass exclusions do not redefine the full eligible set');
 });
 
 test('RISK Chance labels: exact numerical fallback and tiny positive candidates stay distinct while excluded tasks show zero',async()=>{
  const {ctx}=await loadApp();const bench=ctx.addTask('Oldest'),positive=ctx.addTask('Tiny'),zero=ctx.addTask('Zero'),overflow=ctx.addTask('Overflow'),excluded=ctx.addTask('Blocked');
  Object.assign(ctx.state,{chain:[bench.id],scanMode:'chance'});ctx.resetChance();
  Object.assign(ctx.state.chance.weights,{[positive.id]:1e-200,[zero.id]:0,[overflow.id]:Number.MIN_VALUE,[excluded.id]:.9,[bench.id]:.5});
+ const weights=new Map(Object.entries(ctx.state.chance.weights));ctx.chanceWeight=task=>weights.get(task.id)??.8;
  excluded.startsAt=ctx.todayISO(10);const stats=ctx.chanceDisplayStats();
  assert.equal(ctx.taskSelectionSummary(zero,stats).label,'scanned after');assert.equal(ctx.taskSelectionSummary(overflow,stats).label,'scanned after');
  assert.equal(Number.isFinite(ctx.chanceScore(overflow)),false,'the tiny-overflow label follows actual fallback membership');
- assert.notEqual(ctx.taskSelectionSummary(positive,stats).label,'scanned after');assert.equal(ctx.taskSelectionSummary(positive,stats).label,'100% next draw','the sole available weighted task owns the next weighted draw');
- assert.equal(ctx.taskSelectionSummary(excluded,stats).label,'0% next draw');
- assert.match(ctx.taskSelectionSummary(excluded,stats).title,/outside the current/i);
+ assert.notEqual(ctx.taskSelectionSummary(positive,stats).label,'scanned after');assert.equal(ctx.taskSelectionSummary(positive,stats).label,'<0.01% overall','a positive tail shares the full eligible pool with the chain task');
+ assert.equal(ctx.taskSelectionSummary(excluded,stats).label,'0% overall');
+ assert.match(ctx.taskSelectionSummary(excluded,stats).title,/outside the full eligible/i);
  const other=ctx.addTask('Ordinary weight');ctx.state.chance.weights[other.id]=.8;
- const tiny=ctx.taskSelectionSummary(positive,ctx.chanceDisplayStats());assert.equal(tiny.label,'<0.01% next draw');
+ const tiny=ctx.taskSelectionSummary(positive,ctx.chanceDisplayStats());assert.equal(tiny.label,'<0.01% overall');
  assert.ok(ctx.chanceDisplayStats().get(positive.id).weight>0);
 });
 
@@ -19902,8 +19907,8 @@ test('RISK Chance labels: an empty-chain preview excludes positive tails that ov
  assert.equal(-Math.log(bestU)/weight,Infinity,'even the most favorable possible 32-bit draw cannot enter the weighted pool');
  const before=JSON.stringify(ctx.state),preview=ctx.chanceDisplayStats();
  assert.equal(ctx.taskSelectionSummary(weak,preview).label,'scanned after','the seedless preview must not advertise an impossible weighted draw');
- assert.equal(ctx.taskSelectionSummary(strong,preview).label,'100% next draw');
- assert.equal(ctx.taskSelectionSummary(oldest,preview).label,'first dot · by age');
+ assert.equal(ctx.taskSelectionSummary(strong,preview).label,'50% overall');
+ assert.equal(ctx.taskSelectionSummary(oldest,preview).label,'50% overall');assert.match(ctx.taskSelectionSummary(oldest,preview).title,/first dot.*age/i);
  assert.equal(JSON.stringify(ctx.state),before,'classifying preview overflow cannot create a seed or change ratings');
  ctx.startScan('chance');assert.deepEqual(Array.from(ctx.state.chain),[oldest.id]);
  assert.equal(ctx.chanceScore(weak),Infinity);assert.equal(ctx.taskSelectionSummary(weak,ctx.chanceDisplayStats()).label,'scanned after','starting the scan preserves the truthful fallback label');
@@ -19911,7 +19916,7 @@ test('RISK Chance labels: an empty-chain preview excludes positive tails that ov
 
 test('RISK multiple dependencies FAQ: extended help explains progressive links saved cycles live sync and scoped Chance labels',async()=>{
  const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
- for(const text of [/up to ten dependencies/i,/\+ dependency/,/blocked by/i,/cycle.*warning/i,/fresh draw/i,/scanned after/i,/open devices/i,/draft/i,/offline/i,/top-K/])assert.match(help,text);
+ for(const text of [/up to ten dependencies/i,/\+ dependency/,/blocked by/i,/cycle.*warning/i,/full eligible/i,/scanned after/i,/open devices/i,/draft/i,/offline/i,/top-K/])assert.match(help,text);
  assert.doesNotMatch(help,/first dot in either mode is labeled/i,'the age label belongs to Chance presentation; descending retains its top-K summary');
  assert.match(help,/older (?:tabs|clients).*refresh/i,'older single-link controls must disclose their complex-dependency boundary');
  const instructions=fs.readFileSync(path.join(__dirname,'AGENTS.md'),'utf8');
@@ -20127,22 +20132,107 @@ test('RISK Chance labels: disabled presentation flags retain their hidden summar
  const {ctx,shim}=await loadApp();const first=ctx.addTask('First'),second=ctx.addTask('Second');
  Object.assign(ctx.state,{chain:[first.id],candidateId:second.id,listOpen:true,scanMode:'chance'});ctx.resetChance();
  vm.runInContext('FEATURE_FLAGS.topKLanguage=false;FEATURE_FLAGS.rankSparklines=false',ctx);
- ctx.render();assert.doesNotMatch(shim.document.getElementById('scan').innerHTML,/topkchip|next draw|scanned after/);
- assert.doesNotMatch(shim.document.getElementById('listBody').innerHTML,/class="tk"|next draw|scanned after/);
+ ctx.render();assert.doesNotMatch(shim.document.getElementById('scan').innerHTML,/topkchip|overall|scanned after/);
+ assert.doesNotMatch(shim.document.getElementById('listBody').innerHTML,/class="tk"|overall|scanned after/);
  ctx.openHelp();assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/top-K/i);
  vm.runInContext('FEATURE_FLAGS.topKLanguage=true',ctx);ctx.openHelp();assert.match(shim.document.getElementById('modalRoot').innerHTML,/top-K/i);
 });
 
-test('RISK Chance labels: the deterministic oldest first dot has an age label and is excluded from the following weighted draw',async()=>{
+test('RISK overall Chance shares: the age-first explanation retains its global percentage before and after dotting',async()=>{
  const {ctx,shim}=await loadApp();const oldest=ctx.addTask('Oldest'),a=ctx.addTask('A'),b=ctx.addTask('B');
  oldest.createdAt=1;a.createdAt=2;b.createdAt=3;ctx.state.scanMode='chance';ctx.state.listOpen=true;ctx.resetChance();
  Object.assign(ctx.state.chance.weights,{[oldest.id]:.9,[a.id]:.25,[b.id]:.75});
  const before=JSON.stringify(ctx.state),stats=ctx.chanceDisplayStats();
- assert.equal(ctx.taskSelectionSummary(oldest,stats).label,'first dot · by age','the next dot is deterministic, never labeled as a random draw');
- assert.equal(ctx.taskSelectionSummary(a,stats).label,'50% next draw','starting the empty chain will freeze current ratings rather than reuse stale weights');
- assert.equal(ctx.taskSelectionSummary(b,stats).label,'50% next draw');
- ctx.renderList();assert.match(shim.document.getElementById('listBody').innerHTML,/first dot · by age/);
+ for(const task of [oldest,a,b])assert.equal(ctx.taskSelectionSummary(task,stats).label,'33.33% overall');
+ assert.match(ctx.taskSelectionSummary(oldest,stats).title,/first dot.*age/i,'overall share never claims that the first dot is randomized');
+ ctx.renderList();assert.match(shim.document.getElementById('listBody').innerHTML,/first dot.*age/i);
  assert.equal(JSON.stringify(ctx.state),before,'the projection cannot create a dot or a seed');
  ctx.startScan('chance');assert.deepEqual(Array.from(ctx.state.chain),[oldest.id]);
- assert.equal(ctx.taskSelectionSummary(oldest,ctx.chanceDisplayStats()).label,'0% next draw','the dotted benchmark is then outside the candidate pool');
+ assert.equal(ctx.taskSelectionSummary(oldest,ctx.chanceDisplayStats()).label,'33.33% overall','dotting cannot remove the task from its overall share');
+});
+
+test('RISK overall Chance shares: current ratings and genuine eligibility update shares while the saved pass remains frozen',async()=>{
+ const {ctx}=await loadApp();const a=ctx.addTask('A'),b=ctx.addTask('B'),c=ctx.addTask('C');ctx.state.scanMode='chance';ctx.resetChance();
+ const frozen=JSON.stringify(ctx.state.chance);a.mu=30;b.mu=25;c.mu=20;for(const task of [a,b,c])task.sigma=5;
+ const weights=[a,b,c].map(task=>ctx.chanceWeight(task)),sum=weights.reduce((total,weight)=>total+weight,0),stats=ctx.chanceDisplayStats();
+ for(const [i,task] of [a,b,c].entries())assert.ok(Math.abs(stats.get(task.id).probability-weights[i]/sum)<1e-12,'current existing TrueSkill formula supplies the overall weight');
+ assert.equal(JSON.stringify(ctx.state.chance),frozen,'display cannot rewrite saved opponents weights or seed');assert.ok(stats.get(a.id).probability>stats.get(b.id).probability);
+ c.startsAt=ctx.todayISO(1);const restricted=ctx.chanceDisplayStats();assert.equal(restricted.get(c.id).probability,0);assert.ok(Math.abs(restricted.get(a.id).probability-weights[0]/(weights[0]+weights[1]))<1e-12);
+ c.startsAt=null;const context={id:'inactive-overall-share',name:'Inactive',active:false};ctx.state.contexts.push(context);c.ctx=[context.id];assert.equal(ctx.chanceDisplayStats().get(c.id).probability,0);c.ctx=[];
+ ctx.setTaskPrerequisites(c.id,[b.id]);assert.equal(ctx.chanceDisplayStats().get(c.id).probability,0);ctx.setTaskPrerequisites(c.id,[]);
+ c.evergreen=true;c.evergreenResetAtDay=false;c.lastDoneAt=Date.now();c.evergreenHours=18;assert.equal(ctx.chanceDisplayStats().get(c.id).probability,0);c.lastDoneAt=null;
+ const changed=ctx.chanceDisplayStats();assert.ok(Math.abs([...changed.values()].reduce((n,entry)=>n+entry.probability,0)-1)<1e-12);assert.equal(JSON.stringify(ctx.state.chance),frozen);
+});
+
+test('RISK overall Chance shares: normalizable totals rounding and all-zero or empty eligible sets stay finite and read-only',async()=>{
+ const {ctx}=await loadApp();const tasks=Array.from({length:7},(_,i)=>ctx.addTask('Global '+i));ctx.state.scanMode='chance';ctx.chanceWeight=()=>.5;
+ const before=JSON.stringify(ctx.state),stats=ctx.chanceDisplayStats();assert.ok(Math.abs([...stats.values()].reduce((sum,entry)=>sum+entry.probability,0)-1)<1e-12);
+ const total=tasks.reduce((sum,task)=>sum+parseFloat(ctx.taskSelectionSummary(task,stats).label),0);assert.ok(Math.abs(total-100)<=tasks.length*.005,'two-decimal labels sum100 within rounding');assert.equal(JSON.stringify(ctx.state),before);
+ ctx.chanceWeight=()=>0;for(const task of tasks){const entry=ctx.chanceDisplayStats().get(task.id);assert.equal(entry.probability,0);assert.equal(ctx.taskSelectionSummary(task).label,'scanned after');}
+ for(const task of tasks)task.startsAt=ctx.todayISO(1);for(const task of tasks){assert.equal(ctx.chanceDisplayStats().get(task.id).probability,0);assert.equal(ctx.taskSelectionSummary(task).label,'0% overall');}
+ ctx.state.tasks=[];assert.equal(ctx.chanceDisplayStats().size,0);assert.doesNotThrow(()=>ctx.renderList());
+});
+
+test('RISK overall Chance shares: saved-pass fallback remains explicit when live global ratings differ from frozen weights',async()=>{
+ const {ctx}=await loadApp();const a=ctx.addTask('A'),b=ctx.addTask('B');Object.assign(ctx.state,{scanMode:'chance',chain:[a.id]});ctx.resetChance();ctx.state.chance.weights[b.id]=0;
+ const before=JSON.stringify(ctx.state),stats=ctx.chanceDisplayStats();assert.equal(stats.get(b.id).probability,.5,'the global calculation uses current equal ratings');
+ assert.equal(ctx.taskSelectionSummary(b,stats).label,'scanned after');assert.match(ctx.taskSelectionSummary(b,stats).title,/saved pass.*50% overall/i);assert.equal(JSON.stringify(ctx.state),before);
+});
+
+test('RISK overall Chance shares: an empty chain ignores stale pass fallback and keeps the age-first global share',async()=>{
+ const {ctx}=await loadApp();const oldest=ctx.addTask('Oldest'),other=ctx.addTask('Other');oldest.createdAt=1;other.createdAt=2;
+ ctx.state.scanMode='chance';ctx.resetChance();ctx.state.chance.weights[oldest.id]=0;const staleSeed=ctx.state.chance.seed,before=JSON.stringify(ctx.state);
+ const stats=ctx.chanceDisplayStats(),summary=ctx.taskSelectionSummary(oldest,stats);assert.equal(stats.get(oldest.id).probability,.5);
+ assert.equal(summary.label,'50% overall','starting an empty chain resets the stale pass before its deterministic first dot');assert.equal(summary.fill,50);
+ assert.match(summary.title,/first dot.*age/i);assert.doesNotMatch(summary.title,/saved pass uses descending fallback/);assert.equal(JSON.stringify(ctx.state),before);
+ ctx.startScan('chance');assert.deepEqual(Array.from(ctx.state.chain),[oldest.id]);assert.notEqual(ctx.state.chance.seed,staleSeed);
+ assert.ok(ctx.state.chance.weights[oldest.id]>0);assert.equal(ctx.taskSelectionSummary(oldest).label,'50% overall');
+});
+
+test('RISK overall Chance shares FAQ: full-pool percentages explain position independence current ratings and deterministic first dots',async()=>{
+ const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ for(const text of [/full eligible/i,/already scanned/i,/current.*ratings/i,/first dot.*age/i,/rounding/i,/scanned after/i,/top-K/])assert.match(help,text);
+ assert.doesNotMatch(help,/percentage estimates the next candidate|current eligible, unscanned weighted pool/);
+});
+
+test('RISK overall Chance list order: full-pool percentages descend without changing saved pass scan order ratings or filtered scope',async()=>{
+ const {ctx,shim}=await loadApp();const low=ctx.addTask('Low share'),high=ctx.addTask('High share'),middle=ctx.addTask('Middle share');
+ const weights=new Map([[low.id,.1],[high.id,.8],[middle.id,.4]]);ctx.chanceWeight=task=>weights.get(task.id);Object.assign(ctx.state,{scanMode:'chance',listOpen:true,chain:[low.id]});ctx.resetChance();
+ for(const [task,topK,mu] of [[low,1,10],[high,3,5],[middle,2,2]]){task.mu=mu;vm.runInContext(`rankCache.set(${JSON.stringify(task.id)},{...rankCache.get(${JSON.stringify(task.id)}),topK:${topK},n:3})`,ctx);}
+ const before=JSON.stringify(ctx.state),order=Array.from(ctx.candidateOrder(ctx.pool()).map(task=>task.id));ctx.renderList();
+ assert.deepEqual(rowTitles(shim),['High share','Middle share','Low share'],'Chance rows follow their overall percentages rather than estimated top-K');
+ const labels=[...shim.document.getElementById('listBody').innerHTML.matchAll(/class="tkl">([^<]+)<\/span>/g)].map(match=>parseFloat(match[1]));assert.deepEqual(labels,[61.54,30.77,7.69]);
+ assert.equal(JSON.stringify(ctx.state),before);assert.deepEqual(Array.from(ctx.candidateOrder(ctx.pool()).map(task=>task.id)),order);
+ ctx.state.considered[high.id]='cant';ctx.renderList();assert.deepEqual(rowTitles(shim),['High share','Middle share','Low share'],'pass marks do not change global order');
+ ctx.setListQuery('High');assert.deepEqual(rowTitles(shim),['High share']);assert.match(shim.document.getElementById('listBody').innerHTML,/61.54% overall/,'filtering the view cannot renormalize global shares');
+ ctx.clearListFilters();vm.runInContext('FEATURE_FLAGS.topKLanguage=false;FEATURE_FLAGS.rankSparklines=false',ctx);ctx.renderList();assert.deepEqual(rowTitles(shim),['High share','Middle share','Low share']);assert.doesNotMatch(shim.document.getElementById('listBody').innerHTML,/class="tk"|overall|scanned after/);
+ ctx.state.scanMode='descending';ctx.renderList();assert.deepEqual(rowTitles(shim),['Low share','Middle share','High share'],'descending likelihood retains its existing estimated-rank order');
+});
+
+test('RISK overall Chance list order: equal shares retain existing top-K mean and stable insertion ties',async()=>{
+ const {ctx,shim}=await loadApp();const lateRank=ctx.addTask('Late rank'),lowMean=ctx.addTask('Low mean'),firstTie=ctx.addTask('First tie'),secondTie=ctx.addTask('Second tie'),largest=ctx.addTask('Largest share');
+ ctx.chanceWeight=task=>task.id===largest.id?1:.5;Object.assign(ctx.state,{scanMode:'chance',listOpen:true});
+ for(const [task,topK,mu] of [[lateRank,3,100],[lowMean,1,1],[firstTie,1,5],[secondTie,1,5],[largest,9,-10]]){task.mu=mu;vm.runInContext(`rankCache.set(${JSON.stringify(task.id)},{...rankCache.get(${JSON.stringify(task.id)}),topK:${topK},n:5})`,ctx);}
+ const before=JSON.stringify(ctx.state);for(let i=0;i<3;i++){ctx.renderList();assert.deepEqual(rowTitles(shim),['Largest share','First tie','Second tie','Low mean','Late rank']);}
+ assert.equal(JSON.stringify(ctx.state),before,'stable display sorting cannot rewrite the task array or seed');
+ ctx.state.scanMode='descending';ctx.renderList();assert.deepEqual(rowTitles(shim),['First tie','Second tie','Low mean','Late rank','Largest share']);
+});
+
+test('RISK overall Chance list order: tiny positive shares precede descending fallback then genuine ineligible rows without changing filters',async()=>{
+ const {ctx,shim}=await loadApp();const normal=ctx.addTask('Normal'),tiny=ctx.addTask('Tiny'),zero=ctx.addTask('Zero'),overflow=ctx.addTask('Overflow'),stale=ctx.addTask('Saved fallback'),future=ctx.addTask('Future'),blocked=ctx.addTask('Blocked');
+ future.startsAt=ctx.todayISO(1);ctx.setTaskPrerequisites(blocked.id,[normal.id]);Object.assign(ctx.state,{scanMode:'chance',listOpen:true,chain:[normal.id]});ctx.resetChance();
+ const weights=new Map([[normal.id,.8],[tiny.id,1e-200],[zero.id,0],[overflow.id,Number.MIN_VALUE],[stale.id,.4],[future.id,.99],[blocked.id,.95]]);ctx.chanceWeight=task=>weights.get(task.id);
+ Object.assign(ctx.state.chance.weights,{[zero.id]:0,[overflow.id]:Number.MIN_VALUE,[stale.id]:0});
+ for(const [task,topK,mu] of [[normal,9,10],[tiny,8,2],[zero,1,30],[overflow,2,40],[stale,3,50],[future,0,100],[blocked,1,90]]){task.mu=mu;vm.runInContext(`rankCache.set(${JSON.stringify(task.id)},{...rankCache.get(${JSON.stringify(task.id)}),topK:${topK},n:7})`,ctx);}
+ ctx.state.considered[tiny.id]='cant';ctx.state.cantAt[tiny.id]=Date.now();const before=JSON.stringify(ctx.state);ctx.renderList();
+ assert.deepEqual(rowTitles(shim),['Normal','Tiny','Saved fallback','Overflow','Zero','Future','Blocked']);
+ const stats=ctx.chanceDisplayStats();assert.equal(ctx.taskSelectionSummary(tiny,stats).label,'<0.01% overall');for(const task of [stale,overflow,zero])assert.equal(ctx.taskSelectionSummary(task,stats).label,'scanned after');
+ for(const task of [future,blocked])assert.equal(ctx.taskSelectionSummary(task,stats).label,'0% overall');assert.match(ctx.taskSelectionSummary(stale,stats).title,/current full-pool share is 33.33% overall/);
+ assert.equal(JSON.stringify(ctx.state),before);ctx.onAction('list-eligibility',{dataset:{id:'eligible'}});assert.deepEqual(rowTitles(shim),['Normal','Saved fallback','Overflow','Zero']);
+ ctx.onAction('list-eligibility',{dataset:{id:'ineligible'}});assert.deepEqual(rowTitles(shim),['Tiny','Future','Blocked'],'the existing pass-mark filter remains distinct from genuine global eligibility');
+});
+
+test('RISK overall Chance list order FAQ: overall shares explain highest-first rows stable ties fallback and unchanged descending mode',async()=>{
+ const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ for(const pattern of [/ordered by overall share, highest first/i,/equal shares.*existing rank order/i,/fallback rows follow.*descending likelihood/i,/ineligible rows.*last/i,/descending mode.*top-K/i])assert.match(help,pattern);
 });

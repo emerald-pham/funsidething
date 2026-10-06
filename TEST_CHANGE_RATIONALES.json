@@ -1,5 +1,83 @@
 [
   {
+    "testChangesSha256": "06516fc8f901320eb2bb494fb3f8e3590f774d2527baa57cbe20061d8f6a2429",
+    "reason": "The user explicitly corrected next-draw presentation, confirmed normalized overall draw share across the full eligible pool, and requested that Chance-mode All Tasks descend by those percentages. Replace only obsolete pass-exclusion/first-dot expectations and add direct display ordering contracts; keep the existing TrueSkill formula and all selection/rating source fingerprints.",
+    "previousBehavior": "Chance displayed the eligible unscanned candidate pool, removed the chained benchmark from normalization, reused frozen pass weights, and replaced the deterministic first dot percentage with an age label. Scanning past a task therefore changed other displayed shares.",
+    "intendedBehavior": "Normalize current existing TrueSkill-derived weights over all eligible tasks, including scanned and chained tasks. Scanning alone does not alter shares; current ratings and genuine eligibility do. Order Chance-mode All Tasks by highest overall share, preserving existing rank/mean/stable ties, followed by descending numerical fallback and genuine ineligible rows. View filters retain their existing pass-mark scope and never renormalize global percentages. Keep the oldest first dot deterministic and explain it beside its global share. Preserve descending-mode Top x/rank order, tiny-positive labels and finite all-zero/empty behavior without changing saved data, seed, weights, scan order or ratings.",
+    "replacementTests": [
+      "RISK overall Chance shares: full eligible weights retain scanned and chained tasks without changing order ratings or seed",
+      "RISK overall Chance shares: the age-first explanation retains its global percentage before and after dotting",
+      "RISK overall Chance shares: current ratings and genuine eligibility update shares while the saved pass remains frozen",
+      "RISK overall Chance shares: normalizable totals rounding and all-zero or empty eligible sets stay finite and read-only",
+      "RISK overall Chance shares: saved-pass fallback remains explicit when live global ratings differ from frozen weights",
+      "RISK overall Chance shares: an empty chain ignores stale pass fallback and keeps the age-first global share",
+      "RISK overall Chance shares FAQ: full-pool percentages explain position independence current ratings and deterministic first dots",
+      "RISK overall Chance list order: full-pool percentages descend without changing saved pass scan order ratings or filtered scope",
+      "RISK overall Chance list order: equal shares retain existing top-K mean and stable insertion ties",
+      "RISK overall Chance list order: tiny positive shares precede descending fallback then genuine ineligible rows without changing filters",
+      "RISK overall Chance list order FAQ: overall shares explain highest-first rows stable ties fallback and unchanged descending mode"
+    ],
+    "preservedCoverage": [
+      "Nine unchanged rating, ranking, deterministic age-first, weighting and selection functions are asserted by their existing exact SHA-256 source fingerprints. Display snapshots retain saved seed, opponents, weights, candidate ordering, ratings and the complete board.",
+      "Existing zero/overflow versus tiny-positive contracts still distinguish truthful numerical fallback. Full-pool current shares use scaled normalization; saved-pass fallback remains explicitly explained when frozen pass weights differ from current ratings.",
+      "Existing Done, History, evergreen default/edit/repeated-toggle/cancel, resting-evergreen reconciliation, ten causal prerequisites, saved-cycle warnings, Undo, cloud compatibility, offline persistence, account isolation, backup age styling, fireworks and selected-night fairy-light behavior remain protected.",
+      "The extended FAQ and current changelog retain unrelated guidance and explain full-pool scope, highest-first display order, stable ties, fallback/ineligible placement, filter scope, scan-position independence, current rating/eligibility changes, rounding and age-first determinism. Disabled presentation flags still hide the summaries."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='RISK overall Chance shares|RISK Chance labels|RISK multiple dependencies FAQ' tests.js; node --test --test-reporter=spec --test-name-pattern='RISK overall Chance list order' tests.js",
+      "failure": "overall-share-red.log records nine actual assertion failures before implementation: the chained task was absent from the denominator; labels and first-dot projection retained next-draw scope; current rating/global fallback/normalization/FAQ contracts failed. Two preservation contracts already passed and were retained. A newly reached nonexistent fixture helper was corrected without changing implementation. overall-share-metadata-red.log records three stale metadata failures before refresh. Independent review found an empty-chain stale-pass boundary: empty-chain-stale-pass-red.log records scanned after instead of 50% overall before the minimum correction; empty-chain-fix-metadata-red.log retains twelve passing Chance contracts with three stale metadata failures. The user then requested descending-percentage list presentation. Initial sort fixtures omitted existing spark histogram fields; chance-list-order-fixture-red.log retains that fixture error before app changes. Corrected fixtures preserve those fields, and chance-list-order-red.log records four real pre-implementation assertion failures: percentages appeared ascending/mixed under Top x order, largest-share placement/ties were wrong, fallback and ineligible rows preceded numeric shares, and FAQ guidance was absent. chance-list-order-metadata-red.log records three stale metadata failures before the mechanical refresh."
+    }
+  },
+  {
+    "testChangesSha256": "c65aa4a304adcdf188589d91850c16a20227681d0577b2882ca38fb88599949a",
+    "reason": "The user explicitly corrected next-draw presentation and confirmed normalized overall draw share across the full eligible pool. Replace only the now-obsolete pass-exclusion and first-dot percentage expectations; keep the existing TrueSkill formula and all selection/rating source fingerprints.",
+    "previousBehavior": "Chance displayed the eligible unscanned candidate pool, removed the chained benchmark from normalization, reused frozen pass weights, and replaced the deterministic first dot percentage with an age label. Scanning past a task therefore changed other displayed shares.",
+    "intendedBehavior": "Normalize current existing TrueSkill-derived weights over all eligible tasks, including scanned and chained tasks. Scanning alone does not alter shares; current ratings and genuine eligibility do. Keep the oldest first dot deterministic and explain it beside its global share. Preserve descending top-K and saved-pass descending numerical fallback, tiny-positive labels, and finite all-zero/empty behavior without changing saved data, seed, weights, scan order or ratings.",
+    "replacementTests": [
+      "RISK overall Chance shares: full eligible weights retain scanned and chained tasks without changing order ratings or seed",
+      "RISK overall Chance shares: the age-first explanation retains its global percentage before and after dotting",
+      "RISK overall Chance shares: current ratings and genuine eligibility update shares while the saved pass remains frozen",
+      "RISK overall Chance shares: normalizable totals rounding and all-zero or empty eligible sets stay finite and read-only",
+      "RISK overall Chance shares: saved-pass fallback remains explicit when live global ratings differ from frozen weights",
+      "RISK overall Chance shares: an empty chain ignores stale pass fallback and keeps the age-first global share",
+      "RISK overall Chance shares FAQ: full-pool percentages explain position independence current ratings and deterministic first dots"
+    ],
+    "preservedCoverage": [
+      "Nine unchanged rating, ranking, deterministic age-first, weighting and selection functions are asserted by their existing exact SHA-256 source fingerprints. Display snapshots retain saved seed, opponents, weights, candidate ordering, ratings and the complete board.",
+      "Existing zero/overflow versus tiny-positive contracts still distinguish truthful numerical fallback. Full-pool current shares use scaled normalization; saved-pass fallback remains explicitly explained when frozen pass weights differ from current ratings.",
+      "Existing Done, History, evergreen default/edit/repeated-toggle/cancel, resting-evergreen reconciliation, ten causal prerequisites, saved-cycle warnings, Undo, cloud compatibility, offline persistence, account isolation, backup age styling, fireworks and selected-night fairy-light behavior remain protected.",
+      "The extended FAQ and current changelog retain unrelated guidance and explain full-pool scope, scan-position independence, current rating/eligibility changes, rounding and age-first determinism. Disabled presentation flags still hide the summaries."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='RISK overall Chance shares|RISK Chance labels|RISK multiple dependencies FAQ' tests.js",
+      "failure": "overall-share-red.log records nine actual assertion failures before implementation: the chained task was absent from the denominator; labels and first-dot projection retained next-draw scope; current rating/global fallback/normalization/FAQ contracts failed. Two unrelated preservation contracts already passed and were retained. After implementation one newly reached eligibility fixture used a nonexistent helper; correcting only that fixture yielded eleven passes. overall-share-metadata-red.log then records the existing inventory, changelog fingerprint and PWA cache contracts failing before their mechanical refresh. Independent exact-candidate review found an empty-chain stale saved-pass boundary: empty-chain-stale-pass-red.log records scanned after instead of50% overall before restoring the existing empty-chain rule that ignores the old pass; empty-chain-fix-metadata-red.log retains12 passing Chance contracts alongside3 metadata failures before their mechanical refresh."
+    }
+  },
+  {
+    "testChangesSha256": "b47bd0ee69d1f89fa68af37730135a5618f9f1f06f61eb3120446c4b51b51cd4",
+    "reason": "The user explicitly corrected next-draw presentation and confirmed normalized overall draw share across the full eligible pool. Replace only the now-obsolete pass-exclusion and first-dot percentage expectations; keep the existing TrueSkill formula and all selection/rating source fingerprints.",
+    "previousBehavior": "Chance displayed the eligible unscanned candidate pool, removed the chained benchmark from normalization, reused frozen pass weights, and replaced the deterministic first dot percentage with an age label. Scanning past a task therefore changed other displayed shares.",
+    "intendedBehavior": "Normalize current existing TrueSkill-derived weights over all eligible tasks, including scanned and chained tasks. Scanning alone does not alter shares; current ratings and genuine eligibility do. Keep the oldest first dot deterministic and explain it beside its global share. Preserve descending top-K and saved-pass descending numerical fallback, tiny-positive labels, and finite all-zero/empty behavior without changing saved data, seed, weights, scan order or ratings.",
+    "replacementTests": [
+      "RISK overall Chance shares: full eligible weights retain scanned and chained tasks without changing order ratings or seed",
+      "RISK overall Chance shares: the age-first explanation retains its global percentage before and after dotting",
+      "RISK overall Chance shares: current ratings and genuine eligibility update shares while the saved pass remains frozen",
+      "RISK overall Chance shares: normalizable totals rounding and all-zero or empty eligible sets stay finite and read-only",
+      "RISK overall Chance shares: saved-pass fallback remains explicit when live global ratings differ from frozen weights",
+      "RISK overall Chance shares FAQ: full-pool percentages explain position independence current ratings and deterministic first dots"
+    ],
+    "preservedCoverage": [
+      "Nine unchanged rating, ranking, deterministic age-first, weighting and selection functions are asserted by their existing exact SHA-256 source fingerprints. Display snapshots retain saved seed, opponents, weights, candidate ordering, ratings and the complete board.",
+      "Existing zero/overflow versus tiny-positive contracts still distinguish truthful numerical fallback. Full-pool current shares use scaled normalization; saved-pass fallback remains explicitly explained when frozen pass weights differ from current ratings.",
+      "Existing Done, History, evergreen default/edit/repeated-toggle/cancel, resting-evergreen reconciliation, ten causal prerequisites, saved-cycle warnings, Undo, cloud compatibility, offline persistence, account isolation, backup age styling, fireworks and selected-night fairy-light behavior remain protected.",
+      "The extended FAQ and current changelog retain unrelated guidance and explain full-pool scope, scan-position independence, current rating/eligibility changes, rounding and age-first determinism. Disabled presentation flags still hide the summaries."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='RISK overall Chance shares|RISK Chance labels|RISK multiple dependencies FAQ' tests.js",
+      "failure": "overall-share-red.log records nine actual assertion failures before implementation: the chained task was absent from the denominator; labels and first-dot projection retained next-draw scope; current rating/global fallback/normalization/FAQ contracts failed. Two unrelated preservation contracts already passed and were retained. After implementation one newly reached eligibility fixture used a nonexistent helper; correcting only that fixture yielded eleven passes. overall-share-metadata-red.log then records the existing inventory, changelog fingerprint and PWA cache contracts failing before their mechanical refresh."
+    }
+  },
+  {
     "testChangesSha256": "5d435edf95c49bc060940211bc0e8650ce6eec296628a967f8e051425f6056a5",
     "reason": "Native two-browser validation exposed a real false recovery notification that replaced the promised saved-cycle warning. Add direct idempotence and actual local/IndexedDB save regressions before the narrow legacy-mirror repair.",
     "previousBehavior": "Joining an identical saved cycle briefly exposed its deliberately hidden legacy first-link mirror. The whole-board projection hid it again, but the merge returned true and persistence posted a misleading missing-task recovery toast over the cycle warning.",
