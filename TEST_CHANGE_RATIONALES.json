@@ -1974,7 +1974,7 @@
     }
   },
   {
-    "testChangesSha256": "d47afbe5286795b6649510fb8f35d8aad6bba7bb9298f01a03d7b61aee5adc36",
+    "testChangesSha256": "ec49d8249df76483233ee9b37077ae350f3b4a4b3e1e1c2261f9b2f78cbb8f0c",
     "reason": "The user requested durable task rating history. Add direct event, observation, Undo, concurrent merge, legacy data, device reload, export and responsive UI coverage while preserving every original feature assertion. The existing Dislodge Undo whole-task equality now checks all original fields exactly and separately requires retained Dislodge/Undo observations, as explicitly required by the history request.",
     "previousBehavior": "Saved tasks contained only current μ and σ; there was no timestamped comparison posterior, overall draw-share or sampled Top x observation. Opening the editor was read-only.",
     "intendedBehavior": "Record immutable per-task observations at real rating or task actions and changed explicit editor Saves. Preserve actual event identity, original time and before/after values, without backfilling history, new selection signals or render/open writes.",
