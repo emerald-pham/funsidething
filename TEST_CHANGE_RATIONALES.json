@@ -1974,7 +1974,7 @@
     }
   },
   {
-    "testChangesSha256": "ec49d8249df76483233ee9b37077ae350f3b4a4b3e1e1c2261f9b2f78cbb8f0c",
+    "testChangesSha256": "e3047425015e4ec490f2b717121bf0d9a230ec89c0c26b9d853aadb2cc3018db",
     "reason": "The user requested durable task rating history. Add direct event, observation, Undo, concurrent merge, legacy data, device reload, export and responsive UI coverage while preserving every original feature assertion. The existing Dislodge Undo whole-task equality now checks all original fields exactly and separately requires retained Dislodge/Undo observations, as explicitly required by the history request.",
     "previousBehavior": "Saved tasks contained only current μ and σ; there was no timestamped comparison posterior, overall draw-share or sampled Top x observation. Opening the editor was read-only.",
     "intendedBehavior": "Record immutable per-task observations at real rating or task actions and changed explicit editor Saves. Preserve actual event identity, original time and before/after values, without backfilling history, new selection signals or render/open writes.",
@@ -1988,6 +1988,7 @@
       "RISK task rating history: Edit shows accessible timestamped observations and honest metric and retention explanations",
       "RISK task rating history: malformed and future records remain recoverable without blocking actions or injecting markup",
       "RISK task rating history: Undo records evergreen interval and day-reset eligibility reversals without changing MMR",
+      "RISK task rating history: Undo keeps the latest observation head so restored relative values are observed on the next Save",
       "RISK task rating history: real cloud glue preserves offline concurrent events replay old writes and completion Undo across reload",
       "RISK task rating history browser: phone tablet and desktop disclosures pagination drafts and offline Undo preserve actual observations"
     ],
@@ -1998,7 +1999,7 @@
     ],
     "redEvidence": {
       "command": "node --test --test-reporter=spec --test-name-pattern='RISK task rating history:' tests.js",
-      "failure": "Observed seven failures before app edits in /tmp/chain-rating-history-evidence-20261006/history-red.log: comparison history absent, editor Save observation absent, No signal history absent, offline union absent, replacement source observation absent, 2200 retained entries did not append the editor observation, and Edit lacked Rating history. Fixture corrections retained the same before-implementation discriminating failures. Later malformed-cloud-red.log observed null entries blocking a comparison before the guard repair; pagination-focus-red.log observed lost focus before the fallback repair. The first full-native.log observed the existing Dislodge whole-task equality failing solely on the new retained audit fields; the revised assertion retains exact restoration of all previous task fields and verifies both observed reversals. Independent code and persistence reviewers found evergreen interval/reset eligibility reversal missing from Undo participant detection; evergreen-history-red.log observed both subcases retaining Editor Save instead of an Undo row before adding those exact task fields. Browser coverage will be exercised on the reconciled candidate under the coordinated runtime window."
+      "failure": "Observed seven failures before app edits in /tmp/chain-rating-history-evidence-20261006/history-red.log: comparison history absent, editor Save observation absent, No signal history absent, offline union absent, replacement source observation absent, 2200 retained entries did not append the editor observation, and Edit lacked Rating history. Fixture corrections retained the same before-implementation discriminating failures. Later malformed-cloud-red.log observed null entries blocking a comparison before the guard repair; pagination-focus-red.log observed lost focus before the fallback repair. The first full-native.log observed the existing Dislodge whole-task equality failing solely on the new retained audit fields; the revised assertion retains exact restoration of all previous task fields and verifies both observed reversals. Independent code and persistence reviewers found evergreen interval/reset eligibility reversal missing from Undo participant detection; evergreen-history-red.log observed both subcases retaining Editor Save instead of an Undo row before adding those exact task fields. Context reconciliation then exposed an observation-head rewind after Undo of an otherwise unchanged editor Save. observation-head-red.log observed both No context exclusion and another task completion subcases failing because Undo restored the old pointer despite retaining the newer observations, before preserving the supported current head through Undo. Later explicit Saves must capture return-to-prior relative values with a new time rather than suppressing them. Browser coverage will be exercised on the final reconciled candidate under the coordinated runtime window."
     }
   }
 ]

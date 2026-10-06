@@ -296,6 +296,21 @@ test('RISK task rating history: Undo records evergreen interval and day-reset el
   ctx.undo();const restored=ratingHistoryTask(ctx,b.id);assert.equal(ctx.chanceDisplayStats().get(b.id).available,false);assert.equal(restored.ratingHistory.at(-1).kind,'undo','each actual task-field eligibility reversal needs its own observation');assert.equal(restored.ratingHistory.at(-1).before.eligible,true);assert.equal(restored.ratingHistory.at(-1).after.eligible,false);assert.equal(restored.ratingHistory.at(-1).change,'relative');assert.equal(restored.mu,mu);assert.equal(restored.sigma,sigma);assert.ok(restored.ratingHistory.some(r=>r.id===row.id&&r.at===row.at));
  });
 });
+test('RISK task rating history: Undo keeps the latest observation head so restored relative values are observed on the next Save',async(t)=>{
+ for(const poolChange of ['No context exclusion','another task completion'])await t.test(poolChange,async()=>{
+  const {ctx,shim,a,c}=await ratingHistoryFixture(628),id=c.id,mu=c.mu,sigma=c.sigma,at=vm.runInContext('Date.now()',ctx);
+  function save(){const task=ratingHistoryTask(ctx,id);ctx.openEdit(id);shim.document.getElementById('etTitle').value=task.title;ctx.onAction('save-edit',{dataset:{id}});}
+  save();const first=ratingHistoryCopy(c.ratingHistory[0]);
+  if(poolChange==='No context exclusion')ctx.toggleNoContext();else ctx.doneTask(a.id);
+  setFakeTime(ctx,at+1000);save();const observed=ratingHistoryCopy(ratingHistoryTask(ctx,id).ratingHistory),last=observed.at(-1);assert.equal(observed.length,2);assert.equal(last.change,'relative');
+  ctx.undo();let current=ratingHistoryTask(ctx,id);assert.deepEqual(ratingHistoryCopy(current.ratingHistory),observed,'Undo of the otherwise unchanged Save keeps every original fact');assert.equal(current.ratingHistoryHead,last.id,'Undo must not rewind the latest retained observation pointer');
+  if(poolChange==='No context exclusion')ctx.toggleNoContext();else ctx.undo();
+  setFakeTime(ctx,at+2000);save();current=ratingHistoryTask(ctx,id);assert.equal(current.ratingHistory.length,3,'returning to a previously observed pool still needs its later observation');
+  const row=current.ratingHistory.at(-1);assert.equal(row.at,at+2000);assert.equal(row.change,'relative');assert.equal(row.after.eligible,true);assert.equal(row.after.likelihood,ctx.chanceDisplayStats().get(id).probability);assert.equal(row.after.n,3);assert.equal(row.after.mu,mu);assert.equal(row.after.sigma,sigma);assert.ok(current.ratingHistory.some(r=>JSON.stringify(r)===JSON.stringify(first)));
+  ctx.recomputeRanks();save();assert.equal(current.ratingHistory.length,3,'unchanged values and sample noise remain deduplicated');assert.equal(await ctx.persist(),true);
+  const reload=await loadApp({seedStorage:{[STORE_KEY]:JSON.stringify(ctx.state)}}),loaded=ratingHistoryTask(reload.ctx,id);assert.equal(loaded.ratingHistoryHead,row.id);assert.deepEqual(ratingHistoryCopy(loaded.ratingHistory),ratingHistoryCopy(current.ratingHistory));
+ });
+});
 test('RISK task rating history: real cloud glue preserves offline concurrent events replay old writes and completion Undo across reload',async()=>{
  const {ctx,a,b}=await ratingHistoryFixture(623);const base=ratingHistoryCopy(ctx.state);base.syncAccount='e@example.com';base.updatedAt=Date.now();base.syncRev=1;base.syncDirty=false;
  const cloud=makeSyncHarness({remote:base,rev:1}),left=await loadApp({seed:624,cryptoProvider:webcrypto,seedStorage:{[STORE_KEY]:JSON.stringify(base)},cloudSyncFactory:cloud.factory}),right=await loadApp({seed:625,cryptoProvider:webcrypto,seedStorage:{[STORE_KEY]:JSON.stringify(base)},cloudSyncFactory:cloud.factory});

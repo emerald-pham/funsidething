@@ -532,6 +532,8 @@ The editor hook blocks app or enforcement edits while tests.js has no staged or 
 - RISK context marker browser: green checks and red exclusions retain readable symbols in both themes
 ## Task rating observations and preservation
 
+- RISK task rating history: Undo keeps the latest observation head so restored relative values are observed on the next Save
+
 
 ## Scanner lifecycle repairs
 

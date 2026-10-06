@@ -3495,6 +3495,12 @@ function undo(){
   // Undo is a deliberate replacement. Carry the deletion evidence forward
   // and record which removed tasks/history were explicitly brought back.
   markReplacementDeletes(next);
+  // Observations survive Undo, so their supported latest pointer must survive
+  // too. Rewinding it could hide a later relative change back to an old value.
+  for(const task of next.tasks){
+    const head=taskById(task.id)?.ratingHistoryHead;
+    if(typeof head==="string" && Array.isArray(task.ratingHistory) && task.ratingHistory.some(row=>row?.id===head&&validRatingHistoryRow(row)))task.ratingHistoryHead=head;
+  }
   replaceState(next);
   // Undo restores ratings and decisions, but a fresh-pass/day boundary keeps
   // its already-generated draw. Decision undos within a pass share the seed.
