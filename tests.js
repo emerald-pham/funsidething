@@ -7,6 +7,196 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 
+test('RISK context exclusions: real selectors cycle included excluded neutral with durable Undo and explicit red precedence',async()=>{
+ const {ctx,shim}=await loadApp({seed:911});const c=ctx.state.contexts[0],task=ctx.addTask('Private required task',false,[c.id]);
+ const protectedTasks=JSON.stringify(ctx.state.tasks);
+ ctx.toggleContext(c.id);assert.equal(c.excluded,true,'the second click changes an existing green check to a red exclusion');assert.equal(c.active,false,'released clients still see the excluded requirement disabled');
+ ctx.renderCtx();let markup=shim.document.getElementById('ctxPanel').innerHTML;
+ assert.match(markup,/data-filter-state="excluded"/);assert.match(markup,/aria-label="Errands: excluded\. Next: neutral\."/);assert.match(markup,/aria-hidden="true">✕/);
+ ctx.undo();assert.equal(ctx.state.contexts[0].active,true);assert.equal(ctx.state.contexts[0].excluded===true,false);
+ ctx.toggleContext(c.id);ctx.toggleContext(c.id);assert.equal(ctx.state.contexts[0].active,false);assert.equal(ctx.state.contexts[0].excluded===true,false,'red returns to neutral');
+ ctx.toggleContext(c.id);assert.equal(ctx.state.contexts[0].active,true);assert.equal(ctx.state.contexts[0].excluded===true,false,'neutral returns to included');
+ ctx.state.contexts[0].excluded=true;ctx.state.contexts[0].active=true;
+ assert.equal(ctx.isEligible(task,new Set([c.id])),false,'an explicit exclusion wins over green or a supplied active set');
+ const undoCount=vm.runInContext('undoStack.length',ctx);ctx.toggleContext('missing');assert.equal(vm.runInContext('undoStack.length',ctx),undoCount,'a stale control creates no Undo entry');
+ assert.equal(JSON.stringify(ctx.state.tasks),protectedTasks,'cycling and Undo never rewrite task contexts or ratings');
+ await ctx.persist();const reloaded=await loadApp({seedStorage:{[SYNC_STORE_KEY]:shim.localStorage.getItem(SYNC_STORE_KEY)}});
+ assert.equal(reloaded.ctx.state.contexts[0].excluded,true);assert.equal(reloaded.ctx.state.contexts[0].active,false,'hydrate makes red safe for released clients');
+});
+
+test('RISK context rendering: an imported empty context ID retains its real selector state and unknown fields in Settings',async()=>{
+ const {ctx,shim}=await loadApp(),c={id:'',name:'Private imported context',active:true,privateUnknown:'retained'};ctx.state.contexts=[c];
+ const button=makeFakeElement();button.dataset={ctx:'',ctxScope:'settings',act:'cycle-context'};button.setAttribute('data-ctx','');
+ shim.document.getElementById('modalRoot').querySelectorAll=()=>[button];ctx.toggleContext('');
+ assert.equal(c.excluded,true);assert.equal(button.getAttribute('aria-label'),'Private imported context: excluded. Next: neutral.','an empty imported ID is a real context, not the synthetic filter');
+ assert.equal(button.dataset.filterState,'excluded');assert.equal(c.privateUnknown,'retained');assert.equal(ctx.state.settings.excludeNoContext,false);
+});
+
+test('RISK context exclusions: scan and All Tasks preserve all required contexts dotted classification and full-pool shares',async()=>{
+ const {ctx,shim}=await loadApp({seed:912}),[a,b]=ctx.state.contexts;
+ const zero=ctx.addTask('Private no context'),one=ctx.addTask('Private one',false,[a.id]),many=ctx.addTask('Private multiple',false,[a.id,b.id]),unknown=ctx.addTask('Private unknown',false,['deleted-private-id']);
+ ctx.state.listOpen=true;ctx.state.candidateId=one.id;ctx.toggleContext(a.id);
+ assert.deepEqual(Array.from(ctx.eligibleTasks(),t=>t.id),[zero.id,unknown.id]);assert.ok(![one.id,many.id].includes(ctx.state.candidateId),'excluded candidates leave the scanner');
+ vm.runInContext("listEligibilityFilter='ineligible'",ctx);ctx.renderList();assert.deepEqual(Array.from(ctx.filteredListTasks(),t=>t.id),[one.id,many.id]);assert.equal(shim.document.getElementById('listCount').textContent,'(2 of 4)');
+ ctx.toggleContext(a.id);assert.deepEqual(Array.from(ctx.eligibleTasks(),t=>t.id),[zero.id,unknown.id],'neutral remains an inactive requirement, preserving existing empty-selection behavior');
+ ctx.toggleContext(a.id);ctx.state.chain=[one.id];vm.runInContext("listEligibilityFilter='eligible'",ctx);
+ assert.deepEqual(Array.from(ctx.filteredListTasks(),t=>t.id),[zero.id,many.id,unknown.id]);assert.equal(ctx.isEligible(one),true,'dotting is only a list eligibility distinction');
+ const poolShares=()=>JSON.stringify([...ctx.chanceDisplayStats()].map(([id,{weight,probability,available,fallback}])=>[id,{weight,probability,available,fallback}]));const shares=poolShares();ctx.state.chain=[];assert.equal(poolShares(),shares,'undotting alone preserves full-pool weights');
+ ctx.toggleContext(b.id);ctx.toggleContext(a.id);ctx.toggleContext(a.id);ctx.toggleContext(b.id);
+ assert.deepEqual(Array.from(ctx.eligibleTasks(),t=>t.id),[zero.id,unknown.id],'all neutral still admits tasks without any known assigned context');
+});
+
+test('RISK No context filter: exclude-only synthetic control never becomes an assignment and tracks rename deletion and unknown IDs',async()=>{
+ const {ctx,shim}=await loadApp({seed:913}),[a,b]=ctx.state.contexts;
+ const zero=ctx.addTask('Private zero'),unknown=ctx.addTask('Private unknown',false,['retired-id']),known=ctx.addTask('Private assigned',false,[a.id]),both=ctx.addTask('Private both',false,[a.id,b.id]);
+ ctx.renderCtx();assert.match(shim.document.getElementById('ctxPanel').innerHTML,/data-act="toggle-no-context"/);
+ const ids=JSON.stringify(ctx.state.contexts.map(c=>c.id)),tasks=JSON.stringify(ctx.state.tasks);
+ ctx.onAction('toggle-no-context',{});assert.equal(ctx.state.settings.excludeNoContext,true);
+ assert.equal(ctx.isEligible(zero),false);assert.equal(ctx.isEligible(unknown),false);assert.equal(ctx.isEligible(known),true);assert.equal(ctx.isEligible(both),true);
+ ctx.renderCtx();assert.match(shim.document.getElementById('ctxPanel').innerHTML,/No context: excluded\. Next: neutral\./);assert.match(shim.document.getElementById('ctxPanel').innerHTML,/2 active, 1 excluded, 0 inactive/);
+ ctx.renderQuickCtx();assert.doesNotMatch(shim.document.getElementById('quickCtxRow').innerHTML,/No context/);
+ ctx.openEdit(zero.id);assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/data-editctx="[^\"]*no.context/i);
+ assert.equal(JSON.stringify(ctx.state.contexts.map(c=>c.id)),ids);assert.equal(JSON.stringify(ctx.state.tasks),tasks);
+ a.name='Private renamed';ctx.toggleContext(a.id);ctx.renderCtx();assert.match(shim.document.getElementById('ctxPanel').innerHTML,/Private renamed: excluded/);
+ ctx.onAction('del-ctx',{dataset:{id:a.id}});assert.equal(ctx.isEligible(known),false,'deleting its last context makes a task match No context');assert.equal(ctx.isEligible(both),true,'the remaining known active requirement still applies');
+ ctx.onAction('del-ctx',{dataset:{id:b.id}});ctx.renderCtx();assert.doesNotMatch(shim.document.getElementById('ctxPanel').innerHTML,/toggle-no-context/);assert.equal(ctx.isEligible(zero),true,'the synthetic filter has no effect when there are no real contexts');
+ const before=JSON.stringify(ctx.state);ctx.onAction('toggle-no-context',{});assert.equal(JSON.stringify(ctx.state),before,'a stale synthetic control cannot change a context-free board');
+});
+
+test('RISK context saved data: absent invalid and released settings preserve assignments exclusions unknown fields and completion Undo',async()=>{
+ const {ctx}=await loadApp(),c=ctx.state.contexts[0],task=ctx.addTask('Private evergreen',false,[c.id]);task.evergreen=true;task.evergreenResetAtDay=false;
+ for(const value of [undefined,null,'true',1,{},[]])assert.equal(ctx.normalizeSettings({excludeNoContext:value}).excludeNoContext,false);
+ ctx.toggleContext(c.id);ctx.onAction('toggle-no-context',{});ctx.state.settings.privateUnknown={kept:'exact'};
+ const raw=ctx.cloudPayload(),reloaded=await loadApp({seedStorage:{[SYNC_STORE_KEY]:raw}});assert.equal(reloaded.ctx.state.settings.excludeNoContext,true);assert.equal(reloaded.ctx.state.contexts[0].excluded,true);assert.deepEqual(JSON.parse(JSON.stringify(reloaded.ctx.state.tasks)),JSON.parse(raw).tasks);
+ const legacy=JSON.parse(raw);delete legacy.settings.excludeNoContext;delete legacy.contexts[0].excluded;
+ const old=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(legacy)}});assert.equal(old.ctx.state.settings.excludeNoContext,false);assert.equal(old.ctx.isEligible(old.ctx.state.tasks[0]),false,'saved inactive contexts remain inactive');
+ const released=spawnSync('git',['show','d2c7156a1594a1e419b5f7942f2c6796ffea8425:index.html'],{cwd:__dirname,encoding:'utf8'});assert.equal(released.status,0,released.stderr);
+ const defaults=released.stdout.match(/const DEFAULT_SETTINGS = (.*);/)[1],first=released.stdout.indexOf('function normalizeSettings('),end=released.stdout.indexOf('const SCENE_SOLAR_PRESETS',first);
+ const normalize=released.stdout.slice(first,end).replace('function normalizeSettings(','function privateReleasedContextSettings(').replaceAll('DEFAULT_SETTINGS','privateReleasedContextDefaults');
+ vm.runInContext('const privateReleasedContextDefaults='+defaults+';'+normalize,ctx);
+ assert.equal(ctx.privateReleasedContextSettings(ctx.state.settings).excludeNoContext,true,'released ordinary settings saves retain the unknown boolean');
+ ctx.pushUndo();ctx.completeTask(task);await ctx.persist();assert.ok(ctx.state.tasks.find(t=>t.id===task.id).lastDoneAt);ctx.undo();await ctx.persist();
+ assert.equal(ctx.state.tasks.find(t=>t.id===task.id).lastDoneAt,null);assert.equal(ctx.state.contexts[0].excluded,true);assert.equal(ctx.state.settings.excludeNoContext,true);assert.deepEqual(JSON.parse(JSON.stringify(ctx.state.settings.privateUnknown)),{kept:'exact'});
+ const imported=JSON.parse(raw);ctx.hydrateState(imported);assert.equal(imported.contexts[0].excluded,true);assert.equal(imported.settings.excludeNoContext,true);
+});
+
+test('RISK context sync: concurrent clients offline reload reconnect and remote completion preserve revisioned filters and recovery',async()=>{
+ const initial=await loadApp({seed:914}),c=initial.ctx.state.contexts[0],task=initial.ctx.addTask('Private shared evergreen',false,[c.id]);task.evergreen=true;task.evergreenHours=18;task.evergreenResetAtDay=false;
+ const base=JSON.parse(initial.ctx.cloudPayload()),h=makeSyncHarness({remote:base,rev:3});
+ const a=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(base)},cloudSyncFactory:h.factory}),b=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(base)},cloudSyncFactory:h.factory});
+ await syncSettle(40);await a.ctx.cloudPull();await b.ctx.cloudPull();a.ctx.toggleContext(c.id);a.ctx.onAction('toggle-no-context',{});await a.ctx.persist();await a.ctx.cloudPushNow();await syncSettle(40);
+ assert.equal(h.remoteState().settings.excludeNoContext,true);assert.equal(h.remoteState().contexts[0].excluded,true);
+ h.failPull=true;const local=b.ctx.addTask('Private offline addition');await b.ctx.persist();const offlineRaw=b.shim.localStorage.getItem(SYNC_STORE_KEY);
+ const offline=await loadApp({seedStorage:{[SYNC_STORE_KEY]:offlineRaw}});assert.ok(offline.ctx.state.tasks.some(t=>t.id===local.id));
+ h.failPull=false;await b.ctx.cloudPull();await b.ctx.cloudPushNow();await syncSettle(40);await a.ctx.cloudPull();
+ for(const client of [a,b]){assert.equal(client.ctx.state.settings.excludeNoContext,true);assert.equal(client.ctx.state.contexts[0].excluded,true);assert.ok(client.ctx.state.tasks.some(t=>t.id===local.id));assert.ok(client.ctx.state.tasks.some(t=>t.id===task.id));}
+ assert.ok(b.ctx.readLocalBackups().some(row=>row.payload&&JSON.parse(row.payload).tasks?.some(t=>t.id===local.id)),'the concurrent local version retains a recovery copy before adoption');
+ b.ctx.state.chain=[task.id];b.ctx.pushUndo();b.ctx.completeTask(b.ctx.state.tasks.find(t=>t.id===task.id));await b.ctx.persist();await b.ctx.cloudPushNow();await syncSettle(40);await a.ctx.cloudPull();
+ assert.ok(a.ctx.state.tasks.find(t=>t.id===task.id).lastDoneAt);assert.equal(a.ctx.state.chain.includes(task.id),false,'remote evergreen Done remains out of the chain');
+ b.ctx.undo();await b.ctx.persist();await b.ctx.cloudPushNow();await syncSettle(40);await a.ctx.cloudPull();assert.equal(a.ctx.state.tasks.find(t=>t.id===task.id).lastDoneAt,null);assert.equal(a.ctx.state.contexts[0].excluded,true);assert.equal(a.ctx.state.settings.excludeNoContext,true);
+});
+
+test('RISK Settings hierarchy: Changelog uses existing sections and Save settings follows every section without changing validation',async()=>{
+ const {ctx,shim}=await loadApp();
+ for(const id of ['appChangelogCurrent','appChangelog'])shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
+ ctx.openSettings();const markup=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(markup,/<details class="settings-section"[^>]*><summary>Changelog<\/summary><div class="kv">/,'Changelog shares Settings disclosure surface and body typography');
+ const save=markup.indexOf('data-act="save-settings"');assert.ok(save>markup.lastIndexOf('</details>'),'Save settings is after every disclosure, including backups');assert.equal((markup.match(/data-act="save-settings"/g)||[]).length,1);
+ for(const entry of html.match(/<template id="appChangelog">([\s\S]*?)<\/template>/)[1].matchAll(/<li>([\s\S]*?)<\/li>/g))assert.ok(markup.includes(entry[0]),'all historical entries remain present');
+ for(const [id,value] of Object.entries({stHorizon:'999',stCantMin:'',stWorkedHrs:'17',stThresh:'0',stSamples:'50',stEverHours:'21',stEverUnit:'hours',stScanMode:'both',stListMetric:'chance',stDateFormat:'ymd'}))shim.document.getElementById(id).value=value;
+ ctx.onAction('save-settings',{});await ctx.persist();assert.equal(ctx.state.settings.horizonMin,480);assert.equal(ctx.state.settings.cantMin,30);assert.equal(ctx.state.settings.workedHours,17);assert.equal(ctx.state.settings.thresholdPct,25);assert.equal(ctx.state.settings.evergreenHours,21);
+ const reloaded=await loadApp({seedStorage:{[SYNC_STORE_KEY]:shim.localStorage.getItem(SYNC_STORE_KEY)}});assert.equal(reloaded.ctx.state.settings.workedHours,17);assert.equal(reloaded.ctx.state.settings.scanMode,'both');assert.equal(reloaded.ctx.state.settings.listMetric,'chance');assert.equal(reloaded.ctx.state.settings.dateFormat,'ymd');
+});
+
+test('RISK context and Settings FAQ: extended guidance explains cycle empty selections synthetic scope sync limitations and bottom save',async()=>{
+ const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ for(const pattern of [/neutral.*green check.*red X.*neutral/i,/every assigned.*context.*active/i,/No context.*only.*neutral.*excluded/i,/unknown or deleted/i,/no contexts.*no effect/i,/older.*refresh/i,/Save settings.*bottom/i])assert.match(help,pattern);
+ const current=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];for(const pattern of [/red X/i,/No context/i,/Changelog.*Settings/i,/Save settings.*bottom/i])assert.match(current,pattern);
+});
+
+test('RISK context and Settings browser: touch keyboard filter counts disclosure scrolling and saved controls work on Chrome and WebKit',
+ {skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+ for(const [name,engine] of [['chrome',chromium],['webkit',webkit]]){
+  const browser=await engine.launch({headless:true,...(name==='chrome'?{channel:'chrome'}:{})});
+  try{for(const [width,height] of [[320,568],[390,844],[568,320],[768,1024],[1440,900]]){
+   const context=await browser.newContext({viewport:{width,height},hasTouch:width<1000,serviceWorkers:'block'});
+   try{
+    await context.addInitScript(()=>{Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});localStorage.setItem('fvp:chain-scanner:landscape-motion','reduced');});
+    await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
+    const page=await context.newPage();await page.goto(process.env.LANDSCAPE_BROWSER_URL);await page.waitForFunction(()=>typeof state!=='undefined'&&state?.tasks);
+    await page.evaluate(()=>{document.getElementById('motionDialog')?.close();closeModal();state.seenQuickStart=true;state.listOpen=true;addTask('Private no context');addTask('Private required',false,['c_errand']);addTask('Private multiple',false,['c_errand','c_home']);render();});
+    const selector=page.locator('#ctxPanel [data-ctx="c_errand"]');assert.equal(await selector.getAttribute('data-filter-state'),'included');
+    if(width<1000)await selector.tap();else await selector.click();assert.equal(await selector.getAttribute('data-filter-state'),'excluded');assert.match(await selector.getAttribute('aria-label'),/excluded\. Next: neutral/);
+    await page.locator('[data-act="list-eligibility"][data-id="ineligible"]').click();assert.equal(await page.locator('[data-row]').count(),2);assert.equal(await page.locator('#listCount').innerText(),'(2 of 3)');
+    await selector.focus();await page.keyboard.press('Space');assert.equal(await selector.getAttribute('data-filter-state'),'neutral');assert.equal(await selector.evaluate(e=>document.activeElement===e),true,'rerender retains keyboard focus');
+    await page.keyboard.press('Enter');assert.equal(await selector.getAttribute('data-filter-state'),'included');
+    const none=page.locator('#ctxPanel [data-act="toggle-no-context"]');await none.click();assert.equal(await none.getAttribute('data-filter-state'),'excluded');await none.click();assert.equal(await none.getAttribute('data-filter-state'),'neutral');
+    await page.locator('[data-act="settings"]').click();const modal=page.locator('#modalRoot .modal'),sections=modal.locator('details.settings-section'),log=sections.filter({has:page.locator('summary').filter({hasText:/^Changelog$/})});
+    assert.equal(await log.count(),1);await log.locator('summary').click();assert.ok(await log.locator('li').count()>50,'long history remains intact');
+    const styles=await modal.evaluate(e=>{const section=[...e.querySelectorAll('.settings-section')],first=section[0],next=section[1],save=e.querySelector('[data-act="save-settings"]');return {font:getComputedStyle(first.querySelector('.kv')).fontSize,otherFont:getComputedStyle(next.querySelector('.kv')).fontSize,surface:getComputedStyle(first).backgroundColor,otherSurface:getComputedStyle(next).backgroundColor,summary:getComputedStyle(first.querySelector('summary')).padding,otherSummary:getComputedStyle(next.querySelector('summary')).padding,last:e.lastElementChild.contains(save),overflow:e.scrollWidth<=e.clientWidth+1};});
+    assert.equal(styles.font,styles.otherFont);assert.equal(styles.surface,styles.otherSurface);assert.equal(styles.summary,styles.otherSummary);assert.equal(styles.last,true);assert.equal(styles.overflow,true);
+    await modal.locator('summary').filter({hasText:/^Scanning and recurrence$/}).click();await page.locator('#stWorkedHrs').fill('19');await page.locator('#stHorizon').fill('999');
+    await modal.locator('summary').filter({hasText:/^Contexts$/}).click();const manager=modal.locator('[data-ctx="c_errand"]');await manager.click();assert.equal(await manager.getAttribute('data-filter-state'),'excluded');assert.equal(await page.locator('#stWorkedHrs').inputValue(),'19','cycling a context does not discard other Settings drafts');
+    const save=modal.locator('[data-act="save-settings"]');await save.scrollIntoViewIfNeeded();if(width<1000)await save.tap();else await save.click();assert.equal(await page.locator('#modalRoot .modal').count(),0);
+    await page.evaluate(()=>persist());await page.reload();await page.waitForFunction(()=>state?.tasks?.length===3);assert.equal(await page.evaluate(()=>state.settings.workedHours),19);assert.equal(await page.evaluate(()=>state.settings.horizonMin),480);assert.equal(await page.evaluate(()=>state.contexts[0].excluded),true);
+    await page.evaluate(()=>openSettings());await page.locator('#modalRoot [data-act="close-modal"]').click();assert.equal(await page.evaluate(()=>state.settings.workedHours),19,'closing Settings retains the saved value');
+    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+    if(process.env.CONTEXT_EVIDENCE_DIR)await page.screenshot({path:path.join(process.env.CONTEXT_EVIDENCE_DIR,`${name}-${width}x${height}-contexts.png`)});
+   }finally{await context.close();}
+  }}finally{await browser.close();}
+ }
+});
+
+test('RISK context marker browser: green checks and red exclusions retain readable symbols in both themes',
+ {skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+ const channels=color=>color.match(/[\d.]+/g).slice(0,3).map(Number);
+ const luminance=rgb=>rgb.map(v=>{v/=255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4;}).reduce((sum,v,i)=>sum+v*[.2126,.7152,.0722][i],0);
+ const failures=[];
+ for(const [name,engine] of [['chrome',chromium],['webkit',webkit]]){
+  const browser=await engine.launch({headless:true,...(name==='chrome'?{channel:'chrome'}:{})});
+  try{for(const colorScheme of ['light','dark']){
+   const context=await browser.newContext({viewport:{width:390,height:844},colorScheme,serviceWorkers:'block'});
+   try{
+    await context.addInitScript(()=>{Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});localStorage.setItem('fvp:chain-scanner:landscape-motion','reduced');});
+    await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
+    const page=await context.newPage();await page.goto(process.env.LANDSCAPE_BROWSER_URL);await page.waitForFunction(()=>typeof state!=='undefined'&&state?.contexts);
+    await page.evaluate(()=>{closeModal();document.getElementById('motionDialog')?.close();state.seenQuickStart=true;render();});
+    for(const [mode,symbol] of [['included','✓'],['excluded','✕']]){
+     if(mode==='excluded')await page.locator('#ctxPanel [data-ctx="c_errand"]').click();
+     const mark=page.locator('#ctxPanel [data-ctx="c_errand"] .ctxmark');assert.equal(await mark.innerText(),symbol);
+     const paint=await mark.evaluate(e=>({background:getComputedStyle(e).backgroundColor,ink:getComputedStyle(e).color})),rgb=channels(paint.background),fg=luminance(channels(paint.ink)),bg=luminance(rgb);
+     const contrast=(Math.max(fg,bg)+.05)/(Math.min(fg,bg)+.05);
+     if(contrast<4.5)failures.push(`${name} ${colorScheme} ${mode} symbol contrast ${contrast.toFixed(2)} must stay readable over the scenery palette`);
+     if(!(mode==='included'?rgb[1]>rgb[0]+30&&rgb[1]>rgb[2]+10:rgb[0]>rgb[1]+60&&rgb[0]>rgb[2]+40))failures.push(`${name} ${colorScheme} ${mode} needs its distinct green or red marker`);
+     await page.evaluate(()=>openSettings());await page.locator('#modalRoot summary').filter({hasText:/^Contexts$/}).click();
+     assert.equal(await page.locator('#modalRoot [data-ctx="c_errand"] .ctxmark').evaluate(e=>getComputedStyle(e).backgroundColor),paint.background,'Settings uses the same readable marker');await page.evaluate(()=>closeModal());
+    }
+   }finally{await context.close();}
+  }}finally{await browser.close();}
+ }
+ assert.deepEqual(failures,[]);
+});
+
+test('RISK context offline browser: installed shell reload retains exclusions settings tasks and completion Undo through reconnect',
+ {skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const {chromium}=await import(process.env.LANDSCAPE_PLAYWRIGHT),browser=await chromium.launch({headless:true,channel:'chrome'}),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+ try{
+  const context=await browser.newContext({viewport:{width:390,height:844}});
+  try{
+   await context.addInitScript(()=>{Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});localStorage.setItem('fvp:chain-scanner:landscape-motion','reduced');});
+   await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
+   const page=await context.newPage();await page.goto(process.env.LANDSCAPE_BROWSER_URL);await page.waitForFunction(()=>typeof state!=='undefined'&&state?.tasks);
+   const id=await page.evaluate(async()=>{closeModal();document.getElementById('motionDialog')?.close();state.seenQuickStart=true;const t=addTask('Private offline evergreen');t.evergreen=true;t.evergreenResetAtDay=false;toggleContext('c_errand');onAction('toggle-no-context',{});await persist();return t.id;});
+   await page.evaluate(()=>navigator.serviceWorker.ready);await page.waitForFunction(()=>!!navigator.serviceWorker.controller);await context.setOffline(true);await page.reload();await page.waitForFunction(()=>state?.tasks?.length===1);
+   assert.equal(await page.evaluate(()=>state.settings.excludeNoContext),true);assert.equal(await page.evaluate(()=>state.contexts[0].excluded),true);
+   await page.evaluate(async id=>{pushUndo();completeTask(taskById(id));await persist();undo();await persist();},id);assert.equal(await page.evaluate(id=>taskById(id).lastDoneAt,id),null);
+   await context.setOffline(false);await page.reload();await page.waitForFunction(()=>state?.tasks?.length===1);assert.equal(await page.evaluate(id=>taskById(id).lastDoneAt,id),null);assert.equal(await page.evaluate(()=>state.settings.excludeNoContext),true);
+  }finally{await context.close();}
+ }finally{await browser.close();}
+});
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const HTML_PATH = path.join(__dirname, "index.html");
 const html = fs.readFileSync(HTML_PATH, "utf8");

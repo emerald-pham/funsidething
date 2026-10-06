@@ -516,3 +516,17 @@ The editor hook blocks app or enforcement edits while tests.js has no staged or 
 - RISK list metric preference: supported older clients preserve the unknown choice and offline completion Undo keeps it intact
 
 - RISK shared scenery reduced motion: the ambient timer repaints isolated woodland arrival and expiry at the current UTC instant
+
+## Context exclusions and Settings layout
+
+- RISK context exclusions: real selectors cycle included excluded neutral with durable Undo and explicit red precedence
+- RISK context exclusions: scan and All Tasks preserve all required contexts dotted classification and full-pool shares
+- RISK No context filter: exclude-only synthetic control never becomes an assignment and tracks rename deletion and unknown IDs
+- RISK context saved data: absent invalid and released settings preserve assignments exclusions unknown fields and completion Undo
+- RISK context sync: concurrent clients offline reload reconnect and remote completion preserve revisioned filters and recovery
+- RISK Settings hierarchy: Changelog uses existing sections and Save settings follows every section without changing validation
+- RISK context and Settings FAQ: extended guidance explains cycle empty selections synthetic scope sync limitations and bottom save
+- RISK context and Settings browser: touch keyboard filter counts disclosure scrolling and saved controls work on Chrome and WebKit
+- RISK context offline browser: installed shell reload retains exclusions settings tasks and completion Undo through reconnect
+- RISK context rendering: an imported empty context ID retains its real selector state and unknown fields in Settings
+- RISK context marker browser: green checks and red exclusions retain readable symbols in both themes
