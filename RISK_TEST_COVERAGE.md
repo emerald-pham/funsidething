@@ -11,6 +11,10 @@ The named-contract test in tests.js checks that every top-level test whose title
 
 ## Task state, eligibility, and scanner controls
 
+- RISK All Tasks mobile layout: names and every metadata badge wrap inside the task column without changing saved state
+- RISK All Tasks mobile layout FAQ: existing list guidance explains wrapped names and badges
+- RISK All Tasks mobile layout browser: WebKit and Chrome keep names badges blockers and taps usable across viewport and text sizes
+
 - RISK quick Add evergreen: untouched hours default to seven days with no reverse reset
 - RISK quick Add evergreen: edited durations and custom defaults survive unit changes
 - RISK quick Add evergreen: an eighteen-day custom default never becomes the seven-day suggestion

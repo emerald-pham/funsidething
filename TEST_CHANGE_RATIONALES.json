@@ -1,5 +1,25 @@
 [
   {
+    "testChangesSha256": "84c51404dbba35c539f29c462f1284dc21c59c7f20eea7609c5724e8002c813e",
+    "reason": "The inspected iPhone screenshot shows All Tasks names collapsing into single-letter lines beside fixed date and evergreen badges. Broaden the old dependency-only wrap assertion and add direct style, rendered-data, FAQ and real-browser geometry protection for the reported layout.",
+    "previousBehavior": "Only rows with dependency blockers could wrap metadata. Other rows placed task names beside nonshrinking date, evergreen and imported status badges, squeezing names and creating horizontal list scrolling on narrow phones.",
+    "intendedBehavior": "Every All Tasks row allows wrapping; titles and metadata remain bounded by the existing task column. Names retain readable width, all dates/status/blockers remain visible, and tapping still opens the editor at normal and enlarged text across rank presentation modes. Rendering and list presentation remain read-only.",
+    "replacementTests": [
+      "RISK All Tasks mobile layout: names and every metadata badge wrap inside the task column without changing saved state",
+      "RISK All Tasks mobile layout FAQ: existing list guidance explains wrapped names and badges",
+      "RISK All Tasks mobile layout browser: WebKit and Chrome keep names badges blockers and taps usable across viewport and text sizes"
+    ],
+    "preservedCoverage": [
+      "Existing full-width wrapping blocker and touchable dependency select assertions remain intact. Only the old dependency-only wrapping assumption is broadened by concrete screenshot evidence.",
+      "The nine frozen selection/rating functions, Chance share labels/order, dependency controls, completion/Undo, evergreen reconciliation, local/cloud persistence, account isolation and every existing test remain protected.",
+      "Private WebKit and Chrome fixtures cover 320–1280px phone, tablet, desktop and short landscape dimensions, normal/enlarged text, all four rank presentation combinations, bounded metadata and editor taps. Production accounts and saved boards are never fixtures."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='RISK All Tasks mobile layout|RISK multiple dependencies layout' tests.js; node --test --test-reporter=spec tests.js",
+      "failure": "layout-source-red.log records three expected pre-implementation failures: dependency-only flex wrapping cannot satisfy ordinary rows, no bounded all-row title/metadata contract, and missing FAQ explanation. layout-source-green-metadata-red.log and full-suite-before-metadata.log retain stale changelog/cache failures before their mechanical refresh. browser-fixture-initial-red.log and browser-green.log preserve an empty addStyleTag fixture error; changing the inert style content to a comment corrected only that fixture. browser-layout-red.log then failed the actual frozen PR56 WebKit geometry on horizontal scrolling at 320px, with before screenshots showing single-letter names. Visual review found an orphaned chain marker; chain-marker-red.log failed its new adjacency assertion on the initial wrap fix before giving titles a readable flex basis. Final fixtures use Chance labels, exercise all four rank presentation combinations, and retain every existing data/selection assertion."
+    }
+  },
+  {
     "testChangesSha256": "06516fc8f901320eb2bb494fb3f8e3590f774d2527baa57cbe20061d8f6a2429",
     "reason": "The user explicitly corrected next-draw presentation, confirmed normalized overall draw share across the full eligible pool, and requested that Chance-mode All Tasks descend by those percentages. Replace only obsolete pass-exclusion/first-dot expectations and add direct display ordering contracts; keep the existing TrueSkill formula and all selection/rating source fingerprints.",
     "previousBehavior": "Chance displayed the eligible unscanned candidate pool, removed the chained benchmark from normalization, reused frozen pass weights, and replaced the deterministic first dot percentage with an age label. Scanning past a task therefore changed other displayed shares.",
