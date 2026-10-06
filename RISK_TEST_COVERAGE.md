@@ -484,3 +484,7 @@ The editor hook blocks app or enforcement edits while tests.js has no staged or 
 - RISK overall Chance shares: saved-pass fallback remains explicit when live global ratings differ from frozen weights
 - RISK overall Chance shares FAQ: full-pool percentages explain position independence current ratings and deterministic first dots
 - RISK overall Chance shares: an empty chain ignores stale pass fallback and keeps the age-first global share
+- RISK overall Chance list order: full-pool percentages descend without changing saved pass scan order ratings or filtered scope
+- RISK overall Chance list order: equal shares retain existing top-K mean and stable insertion ties
+- RISK overall Chance list order: tiny positive shares precede descending fallback then genuine ineligible rows without changing filters
+- RISK overall Chance list order FAQ: overall shares explain highest-first rows stable ties fallback and unchanged descending mode

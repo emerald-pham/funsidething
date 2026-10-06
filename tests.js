@@ -20194,3 +20194,45 @@ test('RISK overall Chance shares FAQ: full-pool percentages explain position ind
  for(const text of [/full eligible/i,/already scanned/i,/current.*ratings/i,/first dot.*age/i,/rounding/i,/scanned after/i,/top-K/])assert.match(help,text);
  assert.doesNotMatch(help,/percentage estimates the next candidate|current eligible, unscanned weighted pool/);
 });
+
+test('RISK overall Chance list order: full-pool percentages descend without changing saved pass scan order ratings or filtered scope',async()=>{
+ const {ctx,shim}=await loadApp();const low=ctx.addTask('Low share'),high=ctx.addTask('High share'),middle=ctx.addTask('Middle share');
+ const weights=new Map([[low.id,.1],[high.id,.8],[middle.id,.4]]);ctx.chanceWeight=task=>weights.get(task.id);Object.assign(ctx.state,{scanMode:'chance',listOpen:true,chain:[low.id]});ctx.resetChance();
+ for(const [task,topK,mu] of [[low,1,10],[high,3,5],[middle,2,2]]){task.mu=mu;vm.runInContext(`rankCache.set(${JSON.stringify(task.id)},{...rankCache.get(${JSON.stringify(task.id)}),topK:${topK},n:3})`,ctx);}
+ const before=JSON.stringify(ctx.state),order=Array.from(ctx.candidateOrder(ctx.pool()).map(task=>task.id));ctx.renderList();
+ assert.deepEqual(rowTitles(shim),['High share','Middle share','Low share'],'Chance rows follow their overall percentages rather than estimated top-K');
+ const labels=[...shim.document.getElementById('listBody').innerHTML.matchAll(/class="tkl">([^<]+)<\/span>/g)].map(match=>parseFloat(match[1]));assert.deepEqual(labels,[61.54,30.77,7.69]);
+ assert.equal(JSON.stringify(ctx.state),before);assert.deepEqual(Array.from(ctx.candidateOrder(ctx.pool()).map(task=>task.id)),order);
+ ctx.state.considered[high.id]='cant';ctx.renderList();assert.deepEqual(rowTitles(shim),['High share','Middle share','Low share'],'pass marks do not change global order');
+ ctx.setListQuery('High');assert.deepEqual(rowTitles(shim),['High share']);assert.match(shim.document.getElementById('listBody').innerHTML,/61.54% overall/,'filtering the view cannot renormalize global shares');
+ ctx.clearListFilters();vm.runInContext('FEATURE_FLAGS.topKLanguage=false;FEATURE_FLAGS.rankSparklines=false',ctx);ctx.renderList();assert.deepEqual(rowTitles(shim),['High share','Middle share','Low share']);assert.doesNotMatch(shim.document.getElementById('listBody').innerHTML,/class="tk"|overall|scanned after/);
+ ctx.state.scanMode='descending';ctx.renderList();assert.deepEqual(rowTitles(shim),['Low share','Middle share','High share'],'descending likelihood retains its existing estimated-rank order');
+});
+
+test('RISK overall Chance list order: equal shares retain existing top-K mean and stable insertion ties',async()=>{
+ const {ctx,shim}=await loadApp();const lateRank=ctx.addTask('Late rank'),lowMean=ctx.addTask('Low mean'),firstTie=ctx.addTask('First tie'),secondTie=ctx.addTask('Second tie'),largest=ctx.addTask('Largest share');
+ ctx.chanceWeight=task=>task.id===largest.id?1:.5;Object.assign(ctx.state,{scanMode:'chance',listOpen:true});
+ for(const [task,topK,mu] of [[lateRank,3,100],[lowMean,1,1],[firstTie,1,5],[secondTie,1,5],[largest,9,-10]]){task.mu=mu;vm.runInContext(`rankCache.set(${JSON.stringify(task.id)},{...rankCache.get(${JSON.stringify(task.id)}),topK:${topK},n:5})`,ctx);}
+ const before=JSON.stringify(ctx.state);for(let i=0;i<3;i++){ctx.renderList();assert.deepEqual(rowTitles(shim),['Largest share','First tie','Second tie','Low mean','Late rank']);}
+ assert.equal(JSON.stringify(ctx.state),before,'stable display sorting cannot rewrite the task array or seed');
+ ctx.state.scanMode='descending';ctx.renderList();assert.deepEqual(rowTitles(shim),['First tie','Second tie','Low mean','Late rank','Largest share']);
+});
+
+test('RISK overall Chance list order: tiny positive shares precede descending fallback then genuine ineligible rows without changing filters',async()=>{
+ const {ctx,shim}=await loadApp();const normal=ctx.addTask('Normal'),tiny=ctx.addTask('Tiny'),zero=ctx.addTask('Zero'),overflow=ctx.addTask('Overflow'),stale=ctx.addTask('Saved fallback'),future=ctx.addTask('Future'),blocked=ctx.addTask('Blocked');
+ future.startsAt=ctx.todayISO(1);ctx.setTaskPrerequisites(blocked.id,[normal.id]);Object.assign(ctx.state,{scanMode:'chance',listOpen:true,chain:[normal.id]});ctx.resetChance();
+ const weights=new Map([[normal.id,.8],[tiny.id,1e-200],[zero.id,0],[overflow.id,Number.MIN_VALUE],[stale.id,.4],[future.id,.99],[blocked.id,.95]]);ctx.chanceWeight=task=>weights.get(task.id);
+ Object.assign(ctx.state.chance.weights,{[zero.id]:0,[overflow.id]:Number.MIN_VALUE,[stale.id]:0});
+ for(const [task,topK,mu] of [[normal,9,10],[tiny,8,2],[zero,1,30],[overflow,2,40],[stale,3,50],[future,0,100],[blocked,1,90]]){task.mu=mu;vm.runInContext(`rankCache.set(${JSON.stringify(task.id)},{...rankCache.get(${JSON.stringify(task.id)}),topK:${topK},n:7})`,ctx);}
+ ctx.state.considered[tiny.id]='cant';ctx.state.cantAt[tiny.id]=Date.now();const before=JSON.stringify(ctx.state);ctx.renderList();
+ assert.deepEqual(rowTitles(shim),['Normal','Tiny','Saved fallback','Overflow','Zero','Future','Blocked']);
+ const stats=ctx.chanceDisplayStats();assert.equal(ctx.taskSelectionSummary(tiny,stats).label,'<0.01% overall');for(const task of [stale,overflow,zero])assert.equal(ctx.taskSelectionSummary(task,stats).label,'scanned after');
+ for(const task of [future,blocked])assert.equal(ctx.taskSelectionSummary(task,stats).label,'0% overall');assert.match(ctx.taskSelectionSummary(stale,stats).title,/current full-pool share is 33.33% overall/);
+ assert.equal(JSON.stringify(ctx.state),before);ctx.onAction('list-eligibility',{dataset:{id:'eligible'}});assert.deepEqual(rowTitles(shim),['Normal','Saved fallback','Overflow','Zero']);
+ ctx.onAction('list-eligibility',{dataset:{id:'ineligible'}});assert.deepEqual(rowTitles(shim),['Tiny','Future','Blocked'],'the existing pass-mark filter remains distinct from genuine global eligibility');
+});
+
+test('RISK overall Chance list order FAQ: overall shares explain highest-first rows stable ties fallback and unchanged descending mode',async()=>{
+ const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ for(const pattern of [/ordered by overall share, highest first/i,/equal shares.*existing rank order/i,/fallback rows follow.*descending likelihood/i,/ineligible rows.*last/i,/descending mode.*top-K/i])assert.match(help,pattern);
+});
