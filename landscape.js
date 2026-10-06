@@ -55,16 +55,18 @@
   for(const type of ['pointerdown','keydown','wheel','touchstart'])
     document.addEventListener(type,observeSceneInteraction,{capture:true,passive:true});
   let preference=S.readMotion(storage),reduced=S.motionReduced(preference,mq.matches);
-  const cityLights={next:15,windows:[],gardens:S.createGardenLights([],Math.random)},woodland=S.createWoodland();
+  const T=globalThis.LandscapeTimeline,sceneSeed=T.DEFAULT_SEED;
+  const cityLights={next:15,windows:[],gardens:S.createGardenLights([],()=>.99)},woodland={events:[]};
+  let timeline=null,timelineKey='',sceneSnapshot=null,lastCitySlot=null;
   let rooftopRoofs=[],rooftopParty=null,clocktowerVisit=null,partyTimer=0;
   let sceneSeason=S.readSceneSeason(sceneStorage)||LandscapeMood.season(new Date(),globalThis.LivingLocation?.current()).name,treeOrigins=[];
-  let W=0,H=0,hy=0,dpr=1,frame=0,last=0,nextPaint=0,sky,p,world=S.createWorld(Math.random,sceneSeason);
+  let W=0,H=0,hy=0,dpr=1,frame=0,last=0,nextPaint=0,sky,p,world={elapsed:0,events:[]};
   let skyTimer=0,resizeTimer=0,returnFocus=null;
   const dialog=document.getElementById('motionDialog');
   const status=document.getElementById('sceneStatus');
   const motionButton=document.getElementById('motionButton');
-  const TAU=Math.PI*2,visitSeed=Math.random(),wind=.6+Math.random()*1.2;
-  const rand=n=>{const v=Math.sin(n*127.1+311.7)*43758.5453;return v-Math.floor(v);};
+  const TAU=Math.PI*2,visitSeed=T.sample(sceneSeed,'visitors'),wind=.6+T.sample(sceneSeed,'wind')*1.2;
+  const rand=n=>T.terrainSample(n,sceneSeed);
   const far=x=>geometry.far(x),middle=x=>geometry.middle(x),near=x=>geometry.near(x);
   const rail=x=>geometry.rail(x),trail=x=>geometry.trail(x);
   const colors=['#db947e','#a4c9bd','#e6c680','#ada9ce','#88b9cf','#e8b6c4'];
@@ -343,7 +345,12 @@
     const plan=geometry.cityscape(rand),buildings=plan.towers,count=buildings.length;let windowIndex=0;
     rooftopRoofs=plan.partyRoofs;
     if(rooftopParty.active&&!rooftopRoofs.some(roof=>roof.index===rooftopParty.active.roofIndex))rooftopParty.active=null;
-    S.syncGardenLights(cityLights.gardens,[...plan.gardens,...plan.patios].map(roof=>roof.index),Math.random);
+    S.syncGardenLights(cityLights.gardens,[...plan.gardens,...plan.patios].map(roof=>roof.index),()=>.99);
+    const sharedRoofs=Object.keys(sceneSnapshot.gardens).map(Number);
+    for(const roof of [...plan.gardens,...plan.patios]){
+      const position=roof.index/count,nearest=sharedRoofs.reduce((best,index)=>Math.abs(index/96-position)<Math.abs(best/96-position)?index:best,sharedRoofs[0]);
+      cityLights.gardens.lit[roof.index]=sceneSnapshot.gardens[nearest]??false;
+    }
     const gardenLights=cityLights.gardens,gardens=new Map(plan.gardens.map(garden=>[garden.index,garden]));
     const patios=new Map(plan.patios.map(patio=>[patio.index,patio]));
     cityLights.visible=[];
@@ -360,7 +367,8 @@
       if(buildings[i].hasLightningRod){b.fillRect(x+bw*.25,y-5,bw*.5,6);line(b,x+bw*.5,y-5,x+bw*.5,y-12,p.city,.7);}
       for(let yy=y+5;yy<hy+8;yy+=7)for(let xx=x+3;xx<x+bw-2;xx+=5){
         const lightIndex=windowIndex++;
-        if(cityLights.windows[lightIndex]===undefined)cityLights.windows[lightIndex]=rand(xx+yy)>.42;
+        const normalizedWindow=`${Math.round(i/count*96)}:${Math.round((xx-x-3)/5)}:${Math.round((yy-y-5)/7)}`;
+        cityLights.windows[lightIndex]=T.windowLit(sceneSeed,normalizedWindow,sceneSnapshot.windowsSlot);
         const behindTower=xx+1.6>W*.71-12&&xx<W*.71+12&&yy+2.7>hy-91;
         const covered=buildings.slice(i+1).some(other=>xx+1.6>other.x&&xx<other.x+other.bw&&yy+2.7>other.y-12);
         if(xx+1.6<W&&!behindTower&&!covered)cityLights.visible.push(lightIndex);
@@ -482,7 +490,10 @@
     }
     const vignette=b.createLinearGradient(0,hy,0,H);vignette.addColorStop(0,'rgba(5,25,27,0)');vignette.addColorStop(1,'rgba(5,25,27,.035)');b.fillStyle=vignette;b.fillRect(0,hy,W,H-hy);
   }
-  function cloud(x,y,size,opacity){
+  function cloud(x,y,size,opacity,weather){
+    if(weather?.status==='rain'||weather?.status==='thunderstorm'){
+      paintRainCloud(g,x,y,size*3.6,size*.72,weather,opacity);g.globalAlpha=1;return;
+    }
     g.globalAlpha=opacity;
     const color=S.mixHex('#f8f1dd',p.sky[1],.22+p.night*.62);
     g.beginPath();
@@ -645,7 +656,7 @@
   function paintFireworks(type){
     if(sky.sun.altitude>=-6)return;
     g.save();
-    for(const e of world.events)if(e.type===type){
+    for(const e of world.events.map(scenePose))if(e.type===type){
       g.save();
       for(const dot of geometry.fireworks(e.age,e.seed,e.type==='festival',e)){
         const night=1-S.smooth(-12,-6,sky.sun.altitude);
@@ -698,12 +709,14 @@
     }
   }
   function paintLife(t){
-    visibleBanners=[];
+    visibleBanners=[];if(reduced)t=0;
+    const paintEvents=world.events.map(scenePose);
+    const weather=S.weatherAt(new Date(),sceneSeason),weatherPhase=reduced?0:Date.now()/1000;
     g.clearRect(0,0,W,H);
     paintFireworks('fireworks');
     const waterEvents=new Set(['festival','jetski','sailboat','cruise','yacht','windsurfer','duck','fish','dolphin']);
     const airborne=new Set(['festival','duck','fish','plane','balloon','airshow','banner','skywriter','hangglider','jetski','sailboat','cruise','yacht','windsurfer','dolphin','flock']);
-    for(const e of world.events)if(e.type==='meteor'&&p.night>.3){
+    for(const e of paintEvents)if(e.type==='meteor'&&p.night>.3){
       const fx=geometry.motionProgress(e,'x'),fy=geometry.motionProgress(e,'y'),dx=(e.reverse?-1:1)*(85+e.seed*70),dy=24+e.lane*20;
       const sx=W*(.2+e.seed*.6),sy=hy*(.08+e.lane*.3),x=sx+dx*fx,y=sy+dy*fy;
       g.save();g.globalAlpha=p.night*S.smooth(0,.08,fx)*(1-S.smooth(.55,1,fx));
@@ -713,18 +726,17 @@
     paintFireworks('festival');
     // Persistent drift guarantees life even between scheduled arrivals. In reduced
     // motion these exact same shapes are drawn once, with no animation loop.
-    for(let i=0;i<7;i++){
-      const size=(W<600?18:27)+rand(i+101)*30;
-      const x=((rand(i+71)*W+t*wind*(1.2+rand(i+2)*1.5)+size*3)%(W+size*6))-size*3;
-      cloud(x,25+rand(i+82)*(hy*.68),size,.22+rand(i+54)*.18);
+    for(const pose of sceneSnapshot.clouds){
+      const size=(W<600?18:27)+pose.size*30;
+      const x=reduced?(rand(pose.index+71)*1.2-.1)*W:pose.x*W;
+      cloud(x,25+pose.y*hy,size,pose.opacity,weather);
     }
     // Paint moving sky visitors once, then collect every visible layer above
     // the horizon. New visitors and weather can enter the lake without a
     // separate reflection rule for each type.
-    for(const e of world.events)if(airborne.has(e.type)&&!waterEvents.has(e.type))paintEvent(e,t);
+    for(const e of paintEvents)if(airborne.has(e.type)&&!waterEvents.has(e.type))paintEvent(e,t);
     paintRooftopParty();
     paintClocktowerVisit();
-    const weather=S.weatherAt(new Date(),sceneSeason),weatherPhase=reduced?0:Date.now()/1000;
     const reflectionHeight=Math.max(1,Math.floor(geometry.waterTop*dpr));
     if(skyReflection.width!==front.width)skyReflection.width=front.width;
     if(skyReflection.height!==reflectionHeight)skyReflection.height=reflectionHeight;
@@ -797,16 +809,16 @@
     g.restore();
     const water=new Set(['festival','jetski','sailboat','cruise','yacht','windsurfer','duck','fish','dolphin']);
     // Arrival order cannot decide which overlapping boat or animal is in front.
-    for(const e of world.events.filter(e=>water.has(e.type)).sort((a,b)=>geometry.waterDepth(a,t)-geometry.waterDepth(b,t))){
+    for(const e of paintEvents.filter(e=>water.has(e.type)).sort((a,b)=>geometry.waterDepth(a,t)-geometry.waterDepth(b,t))){
       if(e.type==='festival')paintFestivalBarge(e);
       else if(['duck','fish','dolphin'].includes(e.type))paintEvent(e,t);else paintVessel(e,t);
     }
     // The metro runs below the reflection source but in front of the lake.
     // Painting it here keeps the water overlay from darkening its visible cars.
-    for(const e of world.events)if(e.type==='metro')paintEvent(e,t);
+    for(const e of paintEvents)if(e.type==='metro')paintEvent(e,t);
     composite('middle');
     // Ground contact determines occlusion, including props previously baked into the hill.
-    const groundPass=world.events.filter(e=>!airborne.has(e.type)&&e.type!=='metro'&&e.type!=='train'&&e.type!=='snowangel').map(e=>{
+    const groundPass=paintEvents.filter(e=>!airborne.has(e.type)&&e.type!=='metro'&&e.type!=='train'&&e.type!=='snowangel').map(e=>{
       const depth=globalThis.LandscapeWinter?.types.includes(e.type)?LandscapeWinter.pose(e.type,e,geometry,W,H).y:geometry.eventDepth(e);
       return {depth,draw:()=>{paintGroundEventShadow(e,depth);paintEvent(e,t);}};
     });
@@ -819,11 +831,11 @@
     }
     composite('front');
     composite('trees-ground');
-    for(const e of world.events)if(e.type==='snowangel')paintEvent(e,t);
+    for(const e of paintEvents)if(e.type==='snowangel')paintEvent(e,t);
     for(let i=0;i<12;i++){const x=rand(i+1700)*W,y=Math.min(H+5,near(x)+85+rand(i+1710)*100);line(g,x,y,x+Math.sin(t*.8+i)*3,y-16,S.mixHex(p.front,'#bdd8a5',.4));}
     composite('trees-back');
-    for(const e of world.events)if(e.type==='train')paintEvent(e,t);
-    for(const e of woodland.events)paintWoodland(e);
+    for(const e of paintEvents)if(e.type==='train')paintEvent(e,t);
+    for(const e of woodland.events)paintWoodland(scenePose(e));
     composite('trees-front');
     paintWeatherOn(g,weather,weatherPhase,true);
     if(sceneSeason!=='winter'&&p.night>.15)for(let i=0;i<32;i++){
@@ -852,31 +864,10 @@
       ctx.fillStyle=tint;ctx.fillRect(0,0,W,H);
     }
     ctx.globalAlpha=weather.intensity*(snow?.43:storm?.70:.58)*(1-.12*p.night);
-    // Pale daytime highlights became luminous stickers after sunset. Blend
-    // every lobe shade with the sky's continuous night fraction instead.
-    const daylight=snow?['#eef0e9','#c7d2d2','#a6bac1']:
-      storm?['#b7c9ca','#8fa8b0','#6d8996']:['#d0ded8','#adc5c7','#8eabb3'];
-    const afterDark=snow?['#687a85','#526875','#405866']:
-      storm?['#4b5f70','#394e60','#253c4e']:['#5d7180','#43596b','#31495b'];
-    const cloudShades=daylight.map((ink,index)=>S.mixHex(ink,afterDark[index],p.night));
     for(let i=0;i<6;i++){
-      const x=((i+.3)*W/6+phase*(storm?3:1))%(W+180)-90;
+      const x=( ((i+.3)/6+phase*(storm?3:1)/1440/1.125)%1.125)*W-W*.0625;
       const y=hy*(.13+rand(i+6100)*.22),w=W*(.18+rand(i+6200)*.11),h=hy*(.075+rand(i+6300)*.05);
-      // Uneven lobes and a bowed underside read as a single cloud, while the
-      // vertical shading keeps its weight without opaque floating discs.
-      const shade=ctx.createLinearGradient(0,y-h,0,y+h*.65);
-      shade.addColorStop(0,cloudShades[0]);
-      shade.addColorStop(.55,cloudShades[1]);
-      shade.addColorStop(1,cloudShades[2]);
-      ctx.fillStyle=shade;ctx.beginPath();ctx.moveTo(x-w*.5,y+h*.25);
-      ctx.bezierCurveTo(x-w*.63,y-h*.10,x-w*.47,y-h*.32,x-w*.35,y-h*.30);
-      ctx.bezierCurveTo(x-w*.34,y-h*.80,x-w*.12,y-h*.91,x+w*.01,y-h*.57);
-      ctx.bezierCurveTo(x+w*.13,y-h*.97,x+w*.35,y-h*.78,x+w*.37,y-h*.39);
-      ctx.bezierCurveTo(x+w*.56,y-h*.38,x+w*.64,y-h*.08,x+w*.49,y+h*.25);
-      ctx.bezierCurveTo(x+w*.34,y+h*.49,x+w*.22,y+h*.38,x+w*.08,y+h*.42);
-      ctx.bezierCurveTo(x-w*.08,y+h*.54,x-w*.26,y+h*.40,x-w*.38,y+h*.37);
-      ctx.bezierCurveTo(x-w*.47,y+h*.34,x-w*.49,y+h*.31,x-w*.5,y+h*.25);
-      ctx.closePath();ctx.fill();
+      paintRainCloud(ctx,x,y,w,h,weather,ctx.globalAlpha);
     }
     if(snow||includeRain){
       ctx.globalAlpha=weather.intensity*(snow?.55:storm?.72:.62);
@@ -898,6 +889,33 @@
       const x=W*(.15+rand(Math.floor(phase/47))* .7),y=hy*.13;
       line(ctx,x,y,x-5,y+12,'#fff4d1',1);line(ctx,x-5,y+12,x+2,y+10,'#fff4d1',1);line(ctx,x+2,y+10,x-6,y+24,'#fff4d1',1);
     }
+    ctx.restore();
+  }
+  function paintRainCloud(ctx,x,y,w,h,weather,opacity){
+    const snow=weather.status==='snow'||weather.status==='snowstorm',storm=weather.storm;
+    ctx.save();ctx.globalAlpha=opacity;
+    // Pale daytime highlights became luminous stickers after sunset. Blend
+    // every lobe shade with the sky's continuous night fraction instead.
+    const daylight=snow?['#eef0e9','#c7d2d2','#a6bac1']:
+      storm?['#b7c9ca','#8fa8b0','#6d8996']:['#d0ded8','#adc5c7','#8eabb3'];
+    const afterDark=snow?['#687a85','#526875','#405866']:
+      storm?['#4b5f70','#394e60','#253c4e']:['#5d7180','#43596b','#31495b'];
+    const cloudShades=daylight.map((ink,index)=>S.mixHex(ink,afterDark[index],p.night));
+      // Uneven lobes and a bowed underside read as a single cloud, while the
+      // vertical shading keeps its weight without opaque floating discs.
+      const shade=ctx.createLinearGradient(0,y-h,0,y+h*.65);
+      shade.addColorStop(0,cloudShades[0]);
+      shade.addColorStop(.55,cloudShades[1]);
+      shade.addColorStop(1,cloudShades[2]);
+      ctx.fillStyle=shade;ctx.beginPath();ctx.moveTo(x-w*.5,y+h*.25);
+      ctx.bezierCurveTo(x-w*.63,y-h*.10,x-w*.47,y-h*.32,x-w*.35,y-h*.30);
+      ctx.bezierCurveTo(x-w*.34,y-h*.80,x-w*.12,y-h*.91,x+w*.01,y-h*.57);
+      ctx.bezierCurveTo(x+w*.13,y-h*.97,x+w*.35,y-h*.78,x+w*.37,y-h*.39);
+      ctx.bezierCurveTo(x+w*.56,y-h*.38,x+w*.64,y-h*.08,x+w*.49,y+h*.25);
+      ctx.bezierCurveTo(x+w*.34,y+h*.49,x+w*.22,y+h*.38,x+w*.08,y+h*.42);
+      ctx.bezierCurveTo(x-w*.08,y+h*.54,x-w*.26,y+h*.40,x-w*.38,y+h*.37);
+      ctx.bezierCurveTo(x-w*.47,y+h*.34,x-w*.49,y+h*.31,x-w*.5,y+h*.25);
+      ctx.closePath();ctx.fill();
     ctx.restore();
   }
   function paintWoodland(e){
@@ -1266,6 +1284,7 @@
       }return true;
     }
     if(e.type==='skywriter'){
+      if(!e.skywriterWord)return true;
       const drawing=e.skywriterPath ||= LandscapeSkywriter.wordPath(e.skywriterWord);
       if(!drawing)return true;
       // Reduced motion presents the completed word. Normal motion follows every
@@ -1316,22 +1335,22 @@
   themeQuery.addEventListener('change',updateChrome);
   function refreshSky(){
     const location=globalThis.LivingLocation?.current();
-    sky=S.skyAt(S.sceneDate(new Date(),sceneStorage,location),location);p=S.palette(sky.sun.altitude);
+    sky=S.skyAt(S.sceneDate(new Date(Math.floor(Date.now()/60000)*60000),sceneStorage,location),location);p=S.palette(sky.sun.altitude);
     if(globalThis.LandscapeMood){sceneSeason=LandscapeMood.season(sky.date,location).name;p=LandscapeMood.palette(p,sky.date,location);}
-    document.documentElement.dataset.sceneSeason=sceneSeason;S.setSeason(world,sceneSeason);updateChrome();
+    document.documentElement.dataset.sceneSeason=sceneSeason;syncScene(Date.now());updateChrome();
     document.documentElement.style.setProperty('--scene-tint',p.tint);
     document.documentElement.dataset.scenePeriod=sky.period;
-    const entry=LandscapeMood.messageEntry(sky.date,{...location,sunAltitude:sky.sun.altitude},Math.random);
+    const entry=LandscapeMood.messageEntry(sky.date,{...location,sunAltitude:sky.sun.altitude},T.random(sceneSeed,'hourly-text',Math.floor(+sky.date/3600000)));
     currentEntry=entry;
     status.textContent=entry.text+(entry.author==='Human'?' · Human written':'');
-    paintBackground();paintLife(world.elapsed);
+    paintBackground();syncScene(Date.now());paintLife(world.elapsed);
     if(timeDialog.open)refreshSolarTimes();
   }
   function resize(){
     cityLights.windows=[];
     W=host.clientWidth;H=host.clientHeight;geometry=LandscapeGeometry.create(W,H);hy=geometry.horizon;
-    if(!rooftopParty)rooftopParty=geometry.createRooftopPartyScheduler(Math.random);
-    if(!clocktowerVisit)clocktowerVisit=geometry.createClocktowerVisitScheduler(Math.random);
+    if(!rooftopParty)rooftopParty={active:null};
+    if(!clocktowerVisit)clocktowerVisit={active:null};
     // Pixel budget prevents high-DPR phones from allocating desktop-size canvases.
     dpr=Math.min(window.devicePixelRatio||1,1.5,Math.sqrt(3000000/(W*H)));
     for(const canvas of [back,front,partyLayer]){canvas.width=Math.floor(W*dpr);canvas.height=Math.floor(H*dpr);canvas.getContext('2d').setTransform(dpr,0,0,dpr,0,0);}
@@ -1345,24 +1364,49 @@
     if(now+.5<nextPaint)return;
     nextPaint+=1000/30;
     if(nextPaint<=now)nextPaint=now+1000/30;
-    const dt=last?Math.min((now-last)/1000,.12):0;
-    last=now;S.advance(world,dt,sky);S.advanceWoodland(woodland,dt);advanceRooftopParty(dt);
-    const gardenChanged=S.advanceGardenLights(cityLights.gardens,dt,p.night>.2,Math.random);
-    if(S.advanceLights(cityLights,world.elapsed,p.night>.2)||gardenChanged)paintBackground();
+    last=now;syncScene(Date.now());
+    if(lastCitySlot!==sceneSnapshot.windowsSlot){lastCitySlot=sceneSnapshot.windowsSlot;paintBackground();}
     paintLife(world.elapsed);
+  }
+  function scenePose(e){return reduced?{...e,age:e.duration*.5}:e;}
+  function syncScene(now){
+    const location=globalThis.LivingLocation?.current();
+    const key=JSON.stringify([sceneSeason,location,S.readSceneTime(sceneStorage),S.readSceneSeason(sceneStorage)]);
+    if(key!==timelineKey){
+      timelineKey=key;
+      const lock=S.readSceneTime(sceneStorage),lockedSun=new Map();
+      const calendar=new Intl.DateTimeFormat('en-CA',{timeZone:location?.timezone||'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'});
+      timeline=T.create({seed:sceneSeed,season:sceneSeason,location,sunAt:at=>{
+        const date=new Date(at),day=lock?calendar.format(date):null;
+        if(day&&lockedSun.has(day))return lockedSun.get(day);
+        const sun=S.sunAt(S.sceneDate(date,sceneStorage,location),location);
+        if(day)lockedSun.set(day,sun);return sun;
+      }});
+    }
+    sceneSnapshot=timeline.at(now);
+    // Keep only local reading/paint memoization on an event with the same ID.
+    // These fields never influence another event's seed, time, or admission.
+    const retained=new Map(world.events.map(e=>[e.id,e]));
+    world.elapsed=sceneSnapshot.elapsed;
+    world.events=sceneSnapshot.events.map(e=>{
+      const previous=retained.get(e.id);
+      for(const field of ['bannerText','textSeen','skywriterWord','skywriterPath'])if(previous?.[field]!==undefined)e[field]=previous[field];
+      if(e.type==='skywriter'&&e.skywriterWord===undefined)e.skywriterWord=LandscapeMood.skywriterMessage(e.seed);
+      return e;
+    });
+    woodland.events=sceneSnapshot.woodland;
+    const selected=sceneSnapshot.party;
+    const roof=selected&&rooftopRoofs.reduce((best,candidate)=>!best||Math.abs(candidate.x/W-selected.roofIndex/96)<Math.abs(best.x/W-selected.roofIndex/96)?candidate:best,null);
+    rooftopParty.active=roof?{...selected,roofIndex:roof.index}:null;
+    clocktowerVisit.active=sceneSnapshot.clocktower;
   }
   function advanceRooftopParty(dt){
     if(document.hidden||!geometry||!p)return;
-    const previous=rooftopParty.active?.roofIndex??null;
-    geometry.advanceRooftopParty(rooftopParty,dt,rooftopRoofs,p.night>.2);
-    if(reduced&&S.advanceGardenLights(cityLights.gardens,dt,p.night>.2,Math.random))paintBackground();
-    let visitChanged=false;
-    if(geometry.advanceClocktowerVisit){
-      const previousVisit=clocktowerVisit.active;
-      geometry.advanceClocktowerVisit(clocktowerVisit,dt,sky.sun.altitude<0);
-      visitChanged=!!(previousVisit||clocktowerVisit.active);
-    }
-    if(reduced&&(previous!==(rooftopParty.active?.roofIndex??null)||visitChanged))paintLife(world.elapsed);
+    const before=JSON.stringify([world.events.map(e=>e.id),woodland.events.map(e=>e.id),rooftopParty.active?.roofIndex,clocktowerVisit.active,lastCitySlot]);
+    syncScene(Date.now());
+    if(lastCitySlot!==sceneSnapshot.windowsSlot){lastCitySlot=sceneSnapshot.windowsSlot;paintBackground();}
+    const after=JSON.stringify([world.events.map(e=>e.id),woodland.events.map(e=>e.id),rooftopParty.active?.roofIndex,clocktowerVisit.active,lastCitySlot]);
+    if(reduced&&before!==after)paintLife(world.elapsed);
   }
   function stop(){if(frame)cancelAnimationFrame(frame);frame=0;last=0;nextPaint=0;clearTimeout(skyTimer);clearTimeout(resizeTimer);clearInterval(partyTimer);skyTimer=0;resizeTimer=0;partyTimer=0;}
   function scheduleSky(){
@@ -1395,6 +1439,10 @@
   }
   const timeDialog=document.getElementById('sceneTimeDialog'),timeInput=document.getElementById('sceneTimeInput'),timeStatus=document.getElementById('sceneTimeStatus'),seasonInput=document.getElementById('sceneSeasonInput');
   let timeReturnFocus=null;
+  function sceneTimeInputValue(){
+    const zone=globalThis.LivingLocation?.current()?.timezone||'America/New_York';
+    return new Intl.DateTimeFormat('en-GB',{timeZone:zone,hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(S.sceneDate(new Date(),sceneStorage,globalThis.LivingLocation?.current()));
+  }
   function renderSceneTimeChoice(){
     const saved=S.readSceneTime(sceneStorage);
     for(const button of timeDialog.querySelectorAll('[data-scene-preset], [data-scene-time="live"], [data-scene-time="lock"]')){
@@ -1438,7 +1486,7 @@
   document.addEventListener('click',event=>{
     const control=event.target.closest('[data-act="scene-time-settings"], [data-scene-time], [data-scene-preset]');if(!control)return;
     if(control.dataset.act==='scene-time-settings'){
-      seasonInput.value=S.readSceneSeason(sceneStorage)||'';timeReturnFocus=document.activeElement;const saved=S.readSceneTime(sceneStorage);timeInput.value=S.sceneDate(new Date(),sceneStorage,globalThis.LivingLocation?.current()).toTimeString().slice(0,5);
+      seasonInput.value=S.readSceneSeason(sceneStorage)||'';timeReturnFocus=document.activeElement;const saved=S.readSceneTime(sceneStorage);timeInput.value=sceneTimeInputValue();
       timeStatus.textContent=saved?'Scene time locked to '+saved.replaceAll('-',' ')+'.':'Following live time.';refreshSolarTimes();timeDialog.showModal();timeInput.focus();return;
     }
     if(control.dataset.sceneTime==='close'){timeDialog.close();return;}
@@ -1447,7 +1495,7 @@
     if(value!==null&&!control.dataset.scenePreset&&!timeInput.reportValidity())return;
     if(!S.saveSceneSeason(storage,control.dataset.sceneTime==='live'?null:seasonInput.value||null)||!S.saveSceneTime(storage,value)){timeStatus.textContent='Could not save this time on this device. Please try again.';return;}
     sceneStorage.recordDeviceChoice(value,control.dataset.sceneTime==='live'?null:seasonInput.value||null);
-    timeInput.value=S.sceneDate(new Date(),sceneStorage,globalThis.LivingLocation?.current()).toTimeString().slice(0,5);
+    timeInput.value=sceneTimeInputValue();
     if(control.dataset.sceneTime==='live')seasonInput.value='';
     timeStatus.textContent=value?'Scene time locked to '+value.replaceAll('-',' ')+'.':'Following live time.';
     const selected=refreshSolarTimes().events.find(entry=>entry.preset===value);
@@ -1485,8 +1533,8 @@
   window.addEventListener('storage',event=>{if(event.key==='fvp:chain-scanner:landscape-motion'||event.key===null){preference=S.readMotion(storage);updateMotion();}});
   window.addEventListener('resize',()=>{clearTimeout(resizeTimer);if(!document.hidden)resizeTimer=setTimeout(resize,120);});
   document.addEventListener('visibilitychange',()=>{
-    // Pause the existing scene: replacing its visitors on return visibly teleports
-    // people and vehicles. start() resets the clock so hidden time never catches up.
+    // Hidden tabs do no rendering. Returning reconstructs only the current
+    // UTC scene; missed arrivals are never animated as a catch-up burst.
     if(document.hidden)stop();else start();
   });
   document.addEventListener('landscape-location-change',()=>{refreshSky();});

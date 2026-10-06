@@ -492,3 +492,27 @@ The editor hook blocks app or enforcement edits while tests.js has no staged or 
 - RISK overall Chance list order: equal shares retain existing top-K mean and stable insertion ties
 - RISK overall Chance list order: tiny positive shares precede descending fallback then genuine ineligible rows without changing filters
 - RISK overall Chance list order FAQ: overall shares explain highest-first rows stable ties fallback and unchanged descending mode
+
+## Shared scenery and independent list presentation
+
+- RISK shared scenery: the same seed and UTC instant select identical events after different open frame and interruption histories
+- RISK shared scenery: normalized clouds and bounded schedules survive midnight viewport season and reduced motion changes
+- RISK shared scenery: deterministic opportunities preserve rail rare-show refractory periods and finite complete lifetimes
+- RISK rain cloud consistency: every drifting cloud uses the shaded rain contour while clear daytime clouds retain their paint
+- RISK shared scene time: numeric locks and selected seasons use the synced sky zone rather than the device zone
+- RISK shared scenery runtime: every scene owner consumes the UTC snapshot without random frame draws or board writes
+- RISK dotted list filter: dot undot Done evergreen and dependencies classify rows without changing scanner eligibility or Chance shares
+- RISK dotted list filter: a remote chain update changes visible classification and counts without changing the board
+- RISK list metric preference: Top x is the stable default and Settings switches display and ordering without changing scan algorithms
+- RISK list metric preference: reload old payload and remote settings reconciliation retain the chosen metric and task data
+- RISK scene and list FAQ: shared UTC scenery rain style and independent list presentation explain current behavior
+- RISK shared scenery lights: one-minute independent roof samples remain stable between opportunities in normalized space
+- RISK shared scenery browser: isolated Chrome and WebKit devices reconstruct UTC objects and rain paint through reload resize and reduced motion
+- RISK list presentation browser: Top x default percent toggle dotted filters and reload work on actual phone tablet and desktop controls
+- RISK eligibility: boundary
+- RISK replacement: preserve feature
+- RISK landscape colors: dawn hue stays warm
+
+- RISK list metric preference: supported older clients preserve the unknown choice and offline completion Undo keeps it intact
+
+- RISK shared scenery reduced motion: the ambient timer repaints isolated woodland arrival and expiry at the current UTC instant

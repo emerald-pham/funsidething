@@ -51,6 +51,7 @@
     const h=A.Horizon(date,obs,eq.ra,eq.dec,'normal');
     return {altitude:h.altitude,azimuth:h.azimuth,visible:h.altitude>-.3};
   }
+  function sunAt(date,location){validDate(date);return bodyAt('Sun',date,locationObserver(location).observer);}
   function sunTimes(date,location){
     validDate(date);
     const config=locationObserver(location),start=localMidnight(date,config.timeZone);
@@ -358,20 +359,23 @@
   function sceneDate(now,storage,location){
     const date=new Date(now),time=readSceneTime(storage);
     const season=readSceneSeason(storage);
-    // Dates comfortably inside each season keep palette and daylight in agreement.
-    // Use the observer's hemisphere, while preserving device-local clock selection.
-    if(season)date.setMonth(([3,6,9,0][seasons.indexOf(season)]+(location?.latitude<0?6:0))%12,15);
     if(Object.hasOwn(solarPresets,time)){
       return sunTimes(sceneSolarDate(now,storage,location),location)[solarPresets[time]]||new Date(now);
     }
-    if(time){const [hour,minute]=time.split(':').map(Number);date.setHours(hour,minute,0,0);}
-    return date;
+    if(!time&&!season)return date;
+    // A synced numeric lock must mean the same instant on a phone in Tokyo
+    // and a laptop in Orlando. Resolve both calendar and clock in the shared
+    // sky zone; device time zones remain available for real task dates.
+    const zone=locationObserver(location).timeZone,parts=partsInZone(now,zone);
+    const month=season?(([3,6,9,0][seasons.indexOf(season)]+(location?.latitude<0?6:0))%12)+1:+parts.month;
+    const [hour,minute]=time?time.split(':').map(Number):[+parts.hour,+parts.minute];
+    return new Date(+dateInZone(+parts.year,month,season?15:+parts.day,zone,hour)+minute*60000+(time?0:+parts.second*1000+date.getUTCMilliseconds()));
   }
   const MOTION_KEY='fvp:chain-scanner:landscape-motion';
   const normalizeMotion=v=>v==='normal'||v==='reduced'?v:null;
   function readMotion(storage){try{return normalizeMotion(storage.getItem(MOTION_KEY));}catch{return null;}}
   function saveMotion(storage,value){try{storage.setItem(MOTION_KEY,value);return true;}catch{return false;}}
   function motionReduced(value,osReduced){return !!osReduced||normalizeMotion(value)!=='normal';}
-  root.LivingSky={setSeason,eventsForSeason,sceneSolarDate,weatherAt,createWoodland,advanceWoodland,woodlandTypes,startingSpeed,groupSize,readSceneSeason,saveSceneSeason,createSceneMirror,advanceLights,createGardenLights,syncGardenLights,advanceGardenLights,skinTone,sceneDate,readSceneTime,saveSceneTime,skyAt,sunTimes,solarSchedule,solarPresets,starAt,starCount:root.SKY_STARS.length,palette,activity,createWorld,advance,
+  root.LivingSky={setSeason,eventsForSeason,sceneSolarDate,weatherAt,createWoodland,advanceWoodland,woodlandTypes,startingSpeed,groupSize,readSceneSeason,saveSceneSeason,createSceneMirror,advanceLights,createGardenLights,syncGardenLights,advanceGardenLights,skinTone,sceneDate,readSceneTime,saveSceneTime,skyAt,sunAt,sunTimes,solarSchedule,solarPresets,starAt,starCount:root.SKY_STARS.length,palette,activity,createWorld,advance,
     nightEventTypes:NIGHT_TYPES.slice(),eventTypes:[...EVENT_TYPES,...WINTER_VISITORS],rareTypes:RARE_TYPES.slice(),eventDurations:Object.assign({},EVENT_DURATIONS),MAX_EVENTS,RARE_COOLDOWN,readMotion,saveMotion,motionReduced,clamp,lerp,smooth,mixHex};
 })(globalThis);
