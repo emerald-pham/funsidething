@@ -1,5 +1,80 @@
 [
   {
+    "testChangesSha256": "67c23f2e1cb85379dbcc4ec467b11404c64fead3f7964ed99f5c57a5e0ae3b7e",
+    "reason": "This exact candidate diff implements the requested ten dependencies and Chance presentation, backup age styling, less frequent paired fireworks with a restrained finale, and selected-night-only fairy-light poles. Independent review found two legacy dependency compatibility defects; the new tests expose and repair them. Existing cycle rejection and firework intensity/frequency expectations change only as explicitly requested.",
+    "previousBehavior": "Tasks had one prerequisite and rejected cycles; Chance showed top-K. The first dependency draft confused separately published old-client additions and lost cycle links during old hydration. Backup Delete stayed neutral regardless of age. Standalone show starts followed the earlier schedule, regular volleys fired one shell, and patio poles stayed visible without their lights.",
+    "intendedBehavior": "Ten causal links and saved-cycle warnings survive old clients, concurrent publications, Undo and reconnect; Chance reports current fresh-draw shares without changing selection. Delete uses the existing red style only after seven elapsed days. Sampled standalone starts are doubled with original durations and barge scheduling; both displays have paired shells and an eight-shell naturally fading finale. Fairy-light supports share the existing selected night-only bulb visibility.",
+    "replacementTests": [
+      "RISK fairy light poles: only a selected nighttime string paints its supports through day and spawn transitions",
+      "RISK backup age styling: Delete turns destructive strictly after seven elapsed days for either storage source without changing bytes",
+      "RISK fireworks occurrence: standalone sampled starts are exactly twice as far apart while duration odds budgets and festival timing stay intact",
+      "RISK fireworks density and finale: paired regular shells lead to eight visible finale shells within a fixed budget and natural fade",
+      "RISK product FAQ: backup age fireworks and resting remote completions match the shipped controls",
+      "RISK multiple dependencies legacy publications: distinct accepted edits survive an unobserved removal and repeated reads stay idempotent",
+      "RISK multiple dependencies legacy publications: cloud conversion uses the accepted server revision rather than local revision or clocks",
+      "RISK multiple dependencies legacy mirrors: saved self short and long cycles survive actual supported hydrate and unrelated edits",
+      "RISK multiple dependencies legacy mirrors: exposed removals and hidden first-link replacement preserve the other nine selections",
+      "RISK multiple dependencies legacy mirrors: merge replacement Undo Restore and every persistence projection retain causal graph bytes"
+    ],
+    "preservedCoverage": [
+      "All nine rating, ranking, age-first, weighted selection and deterministic-order functions retain their frozen source fingerprints. Existing context/date/evergreen eligibility, completion, History, deletion, causal cancellation and Undo protections stay active.",
+      "Authoritative server revision and account identity remain the cloud ordering boundary. Actual immutable released hydrators protect legacy cycle mirrors; independent operation additions, observed removals, capacity limits and recovery source bytes have direct coverage.",
+      "Backup styling never deletes or rewrites backup data. Firework intensity tests retain finite geometry, depth masking, clipping margins, natural fades and deterministic repaint while their old particle caps are updated for the expressly requested paired shells and bounded eight-shell finale.",
+      "Garden and patio sampling retains its sixty-second clock, independent one-in-twelve odds and selected geometry. New pole tests preserve ordinary deck paint, attached supports/bulbs, painter state and day/night retained samples across phone, tablet, desktop and reduced-motion fixtures.",
+      "Cloud compatibility, strict revision errors, account isolation, durable recovery and device storage gates remain mandatory. Browser proof uses isolated local accounts/stores with the production backend disabled."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK multiple dependencies|RISK Chance labels|RISK prerequisites: invalid links' tests.js; focused legacy publication/mirror, backup age, firework occurrence/finale, product FAQ and fairy pole commands recorded in ../dependency-evidence/",
+      "failure": "The initial dependency/Chance run failed thirteen tests before app edits, followed by genuine FAQ, layout, dangling-link Undo, hidden-presentation and first-dot failures before their fixes. Exact logs: initial-red.log, faq-red.log, layout-and-missing-undo-red.log, presentation-flag-red.log, first-dot-red.log and first-dot-fresh-weights-red.log. Legacy review regressions then failed six cases (FAQ mode text, distinct accepted publications, actual cloud ingress, released-cycle hydration, hidden first-link replacement and safe projections) in legacy-review-findings-red.log. backup-fireworks-red.log has three requested-behavior failures before implementation; product-faq-red.log records missing user-facing guidance. fairy-poles-red.log observed two supports instead of zero on an unselected roof before moving poles behind the existing gate; fairy-poles-faq-red.log observed missing FAQ copy. final-metadata-red.log and pwa-metadata-red.log preserve stale inventory/changelog/cache failures before their mechanical refresh. Geometry fixtures initially sampled offscreen entering barge launchers and imposed a narrower bound than the unchanged old spark margin; those fixtures were corrected without changing runtime behavior, with both original failing logs retained."
+    }
+  },
+  {
+    "testChangesSha256": "179a6eb920266944f67eadc2a38a68c0997892033dad9195a7dc11ffbc2dd197",
+    "reason": "This exact candidate diff implements the requested ten dependencies and Chance presentation, backup age styling, less frequent paired fireworks with a restrained finale, and selected-night-only fairy-light poles. Independent review found two legacy dependency compatibility defects; the new tests expose and repair them. Existing cycle rejection and firework intensity/frequency expectations change only as explicitly requested.",
+    "previousBehavior": "Tasks had one prerequisite and rejected cycles; Chance showed top-K. The first dependency draft confused separately published old-client additions and lost cycle links during old hydration. Backup Delete stayed neutral regardless of age. Standalone show starts followed the earlier schedule, regular volleys fired one shell, and patio poles stayed visible without their lights.",
+    "intendedBehavior": "Ten causal links and saved-cycle warnings survive old clients, concurrent publications, Undo and reconnect; Chance reports current fresh-draw shares without changing selection. Delete uses the existing red style only after seven elapsed days. Sampled standalone starts are doubled with original durations and barge scheduling; both displays have paired shells and an eight-shell naturally fading finale. Fairy-light supports share the existing selected night-only bulb visibility.",
+    "replacementTests": [
+      "RISK fairy light poles: only a selected nighttime string paints its supports through day and spawn transitions",
+      "RISK prerequisites: invalid links are rejected and cycles warn without discarding saved links",
+      "RISK multiple dependencies: ten links require every prerequisite while completion deletion and Undo retain their rules",
+      "RISK multiple dependencies: old single links migrate and legacy edits preserve the other selected dependencies",
+      "RISK multiple dependencies: concurrent additions removals repeated readds and replacement Undo reconcile causally",
+      "RISK multiple dependencies: concurrent capacity conflicts retain the canonical ten and causal removal evidence",
+      "RISK multiple dependencies: direct indirect and overlapping cycles warn but completed cycles and large acyclic graphs do not",
+      "RISK multiple dependencies: progressive Add and Edit controls cap at ten preserve drafts and reset on cancel or save",
+      "RISK multiple dependencies: pasted tasks retain all selected links and All Tasks names only unresolved blockers safely",
+      "RISK multiple dependencies sync: simultaneous edits converge and offline reload reconnect keeps Done and pause behavior",
+      "RISK Chance labels: frozen weight shares describe a fresh draw and never change saved order ratings or seed",
+      "RISK Chance labels: exact numerical fallback and tiny positive candidates stay distinct while excluded tasks show zero",
+      "RISK Chance labels: new task defaults normally draw but extreme TrueSkill tails have no positive guarantee",
+      "RISK multiple dependencies FAQ: extended help explains progressive links saved cycles live sync and scoped Chance labels",
+      "RISK backup age styling: Delete turns destructive strictly after seven elapsed days for either storage source without changing bytes",
+      "RISK fireworks occurrence: standalone sampled starts are exactly twice as far apart while duration odds budgets and festival timing stay intact",
+      "RISK fireworks density and finale: paired regular shells lead to eight visible finale shells within a fixed budget and natural fade",
+      "RISK product FAQ: backup age fireworks and resting remote completions match the shipped controls",
+      "RISK multiple dependencies legacy publications: distinct accepted edits survive an unobserved removal and repeated reads stay idempotent",
+      "RISK multiple dependencies legacy publications: cloud conversion uses the accepted server revision rather than local revision or clocks",
+      "RISK multiple dependencies legacy mirrors: saved self short and long cycles survive actual supported hydrate and unrelated edits",
+      "RISK multiple dependencies legacy mirrors: exposed removals and hidden first-link replacement preserve the other nine selections",
+      "RISK multiple dependencies legacy mirrors: merge replacement Undo Restore and every persistence projection retain causal graph bytes",
+      "RISK multiple dependencies layout: long blockers wrap within their row and dependency selects keep touchable widths",
+      "RISK multiple dependencies: Undo restores a deleted task link as intent without reviving it from stale copies",
+      "RISK Chance labels: disabled presentation flags retain their hidden summaries and matching FAQ language",
+      "RISK Chance labels: the deterministic oldest first dot has an age label and is excluded from the following weighted draw"
+    ],
+    "preservedCoverage": [
+      "All nine rating, ranking, age-first, weighted selection and deterministic-order functions retain their frozen source fingerprints. Existing context/date/evergreen eligibility, completion, History, deletion, causal cancellation and Undo protections stay active.",
+      "Authoritative server revision and account identity remain the cloud ordering boundary. Actual immutable released hydrators protect legacy cycle mirrors; independent operation additions, observed removals, capacity limits and recovery source bytes have direct coverage.",
+      "Backup styling never deletes or rewrites backup data. Firework intensity tests retain finite geometry, depth masking, clipping margins, natural fades and deterministic repaint while their old particle caps are updated for the expressly requested paired shells and bounded eight-shell finale.",
+      "Garden and patio sampling retains its sixty-second clock, independent one-in-twelve odds and selected geometry. New pole tests preserve ordinary deck paint, attached supports/bulbs, painter state and day/night retained samples across phone, tablet, desktop and reduced-motion fixtures.",
+      "Cloud compatibility, strict revision errors, account isolation, durable recovery and device storage gates remain mandatory. Browser proof uses isolated local accounts/stores with the production backend disabled."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK multiple dependencies|RISK Chance labels|RISK prerequisites: invalid links' tests.js; focused legacy publication/mirror, backup age, firework occurrence/finale, product FAQ and fairy pole commands recorded in ../dependency-evidence/",
+      "failure": "The initial dependency/Chance run failed thirteen tests before app edits, followed by genuine FAQ, layout, dangling-link Undo, hidden-presentation and first-dot failures before their fixes. Exact logs: initial-red.log, faq-red.log, layout-and-missing-undo-red.log, presentation-flag-red.log, first-dot-red.log and first-dot-fresh-weights-red.log. Legacy review regressions then failed six cases (FAQ mode text, distinct accepted publications, actual cloud ingress, released-cycle hydration, hidden first-link replacement and safe projections) in legacy-review-findings-red.log. backup-fireworks-red.log has three requested-behavior failures before implementation; product-faq-red.log records missing user-facing guidance. fairy-poles-red.log observed two supports instead of zero on an unselected roof before moving poles behind the existing gate; fairy-poles-faq-red.log observed missing FAQ copy. final-metadata-red.log and pwa-metadata-red.log preserve stale inventory/changelog/cache failures before their mechanical refresh. Geometry fixtures initially sampled offscreen entering barge launchers and imposed a narrower bound than the unchanged old spark margin; those fixtures were corrected without changing runtime behavior, with both original failing logs retained."
+    }
+  },
+  {
     "testChangesSha256": "3c3286eba856a216a860c47db8218eb98dc49cdc747a6299db9ee642c4328411",
     "reason": "The owner explicitly requested multiple dependencies with saved-cycle warnings and mode-specific Chance labels. The single dependency rejection contract is intentionally changed only for cycles; missing links, eligibility, deletion, completion and old selectors stay protected.",
     "previousBehavior": "Each task held one prerequisite. Cycles were rejected or silently cleared during hydration. Chance mode showed top-K and had no truthful current-pool percentage or fallback label.",

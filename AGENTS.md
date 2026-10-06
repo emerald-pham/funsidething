@@ -10,6 +10,11 @@ Chain Scanner is a live product used with real saved boards. Preserve existing
 local work and user data; exercise edits with isolated fixtures and browser
 profiles. Never use production tasks, accounts, or storage as test data.
 
+User-requested repository changes, including documentation, are authorized to
+commit, push, merge, and release to this existing live deployment after the
+applicable checks pass, unless the user specifies a narrower scope. Honor any
+current task-specific hold or limit before publication.
+
 Every user-facing behavior change must update the corresponding **extended FAQ**
 in Quick start before release, retaining its structure and unrelated content.
 Keep its explanation consistent with the actual controls, saved-data behavior,

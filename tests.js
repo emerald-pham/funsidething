@@ -83,6 +83,33 @@ test('RISK fairy lights: gardens and patios share independent stable one-in-twel
  assert.deepEqual({...cityLights.gardens.lit},saved,'samples survive repaint and temporary resize ineligibility');
 });
 
+test('RISK fairy light poles: only a selected nighttime string paints its supports through day and spawn transitions',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),start=source.indexOf('  function paintRooftopPatio('),end=source.indexOf('  function paintRooftopParty(',start),paint=source.slice(start,end);
+ const context=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),context);
+ const seed=n=>{const x=Math.sin(n*127.1+311.7)*43758.5453;return x-Math.floor(x);},sampler=livingSky();
+ for(const [W,H] of [[320,568],[390,844],[568,320],[768,1024],[1440,900]])for(const reduced of [false,true]){
+  const roof=context.LandscapeGeometry.create(W,H).cityscape(seed).patios[0];assert.ok(roof);
+  const lights=sampler.createGardenLights([roof.index,100000],()=>.99),math=Object.create(Math);math.random=()=>{throw Error('painting cannot reroll selected lights');};
+  const draw=altitude=>{
+   const lines=[],bulbs=[],decks=[],wires=[],stack=[],ctx={globalAlpha:1,save(){stack.push(this.globalAlpha);},restore(){this.globalAlpha=stack.pop();},fillRect(...args){decks.push(args);},beginPath(){},moveTo(){},quadraticCurveTo(){},stroke(){wires.push(this.strokeStyle);}};
+   vm.runInNewContext(`${paint};paintRooftopPatio(ctx,patio)`,{Math:math,ctx,patio:roof,reduced,p:{night:altitude<0?1:.4,hill:'#567',front:'#345',sky:['#123','#234','#456']},sky:{sun:{altitude}},cityLights:{gardens:lights},S:{mixHex:day=>day},line(_g,...args){lines.push(args);},ellipse(_g,...args){bulbs.push(args);}});
+   assert.equal(stack.length,0);assert.equal(ctx.globalAlpha,1,'hidden strings and selected strings both restore painter state');
+   return {poles:lines.filter(([x,y,x2,y2])=>x===x2&&y2<y),deck:decks,bulbs,wires};
+  };
+  const dark=draw(-20);assert.equal(dark.poles.length,0,`${W}x${H}/${reduced}: unselected roofs have no bare poles`);assert.equal(dark.bulbs.length,0);
+  assert.equal(sampler.advanceGardenLights(lights,59,true,()=>0),false,'the existing sixty-second sampler remains unchanged');assert.equal(draw(-20).poles.length,0);
+  let rolls=[0,0];assert.equal(sampler.advanceGardenLights(lights,1,true,()=>rolls.shift()),true);
+  const lit=draw(-20);assert.equal(lit.poles.length,2,'the selected string retains both original supports');assert.equal(lit.bulbs.length,5);assert.equal(lit.wires.length,1);assert.deepEqual(lit.deck,dark.deck,'ordinary patio decking is preserved');
+  assert.equal(lights.lit[100000],false,'selecting one roof never lights the other roof');
+  const retained=JSON.stringify(lights);
+  for(const altitude of [0,.001,40]){const day=draw(altitude);assert.equal(day.poles.length,0,'daylight hides poles even while the retained sample is lit');assert.equal(day.bulbs.length,0);assert.equal(day.wires.length,0);assert.deepEqual(day.deck,dark.deck);}
+  assert.equal(JSON.stringify(lights),retained,'day/night repaint preserves the light schedule and retained selection');assert.deepEqual(draw(-20),lit,'returning to night restores only the retained selected string');
+  rolls=[0,.99];assert.equal(sampler.advanceGardenLights(lights,60,true,()=>rolls.shift()),true);
+  const retired=draw(-20);assert.equal(retired.poles.length,0,'a sample that retires the light immediately retires its poles');assert.equal(retired.bulbs.length,0);assert.equal(retired.wires.length,0);
+  rolls=[0,0];assert.equal(sampler.advanceGardenLights(lights,60,true,()=>rolls.shift()),true);assert.deepEqual(draw(-20),lit,'a later selected spawn keeps the original attached geometry');
+ }
+});
+
 test('RISK fireworks duration: each standalone show samples one to five minutes once and rests after its actual end',()=>{
  const sky=livingSky(),night={sun:{altitude:-20,azimuth:0}};
  for(const [sample,expected] of [[0,60],[.25,120],[.5,180],[.999,299.76],[1,300]]){
@@ -91,11 +118,11 @@ test('RISK fireworks duration: each standalone show samples one to five minutes 
   sky.advance(w,1,night);const show=w.events.find(e=>e.type==='fireworks');
   assert.ok(show);assert.ok(Math.abs(show.duration-expected)<1e-9,'show duration uses its own bounded arrival sample');
   assert.equal(show.speed,1,'stationary fireworks never speed up their sampled duration');
-  assert.equal(w.nextFireworks,w.elapsed+show.duration+60,'rest starts after this show finishes');
+  assert.equal(w.nextFireworks,w.elapsed+2*(show.duration+60),'doubling the sampled start-to-next-opportunity interval halves show occurrences without lengthening the visible show');
   sky.advance(w,expected/2,night);assert.equal(show.duration,expected,'frames never resample duration');
   assert.equal(w.events.filter(e=>e.type==='fireworks').length,1,'a long show cannot overlap another show');
   sky.advance(w,expected/2,night);assert.ok(!w.events.includes(show),'the event retires at its sampled end');
-  sky.advance(w,59,night);assert.equal(w.events.filter(e=>e.type==='fireworks').length,0,'the full rest is preserved after retirement');
+  sky.advance(w,expected+119,night);assert.equal(w.events.filter(e=>e.type==='fireworks').length,0,'the doubled occurrence interval includes the sampled duration and full quiet period');
   sky.advance(w,1,night);assert.equal(w.events.filter(e=>e.type==='fireworks').length,1,'a successful later roll starts another bounded show');
  }
 });
@@ -104,10 +131,10 @@ test('RISK fireworks duration: repeated bursts span long shows with bounded part
  const context=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),context);
  for(const [W,H] of [[320,568],[390,844],[568,320],[768,1024],[1440,900]])for(const duration of [60,180,300]){
   const geometry=context.LandscapeGeometry.create(W,H),event={type:'fireworks',duration,seed:.4};
-  for(const age of [1.6,21.6,duration/2+1.6,duration-5]){
+  for(const age of [1.6,21.6,duration/2+1.6,duration-2.4]){
    const dots=geometry.fireworks(age,event.seed,false,event);
    assert.ok(dots.some(dot=>dot.kind==='spark'),`${W}x${H}: bursts remain visible ${age}s into a ${duration}s show`);
-   assert.ok(dots.length<=96,'only the currently airborne bursts need particles');
+   assert.ok(dots.length<=320,'only airborne paired shells and the bounded finale need particles');
    assert.ok(dots.every(dot=>[dot.x,dot.y,dot.alpha].every(Number.isFinite)&&dot.alpha>0&&dot.alpha<=1),'all long-show particles remain finite and fading');
    assert.ok(dots.every(dot=>dot.x>=-128&&dot.x<=W+128&&dot.y>=0&&dot.y<geometry.waterTop),'late launch sites stay within the skyline');
   }
@@ -12469,7 +12496,7 @@ test('Landscape fireworks: rare nighttime bursts fade completely and stay within
  const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
  for(const [w,h] of [[320,568],[844,390],[1440,900]]){
   const g=ctx.LandscapeGeometry.create(w,h);assert.equal(g.fireworks(0,.4).length,0);assert.equal(g.fireworks(60,.4).length,0);
-  const dots=g.fireworks(1.6,.4);assert.ok(dots.length>0&&dots.length<=48);
+  const dots=g.fireworks(1.6,.4);assert.ok(dots.length>0&&dots.length<=96,'a paired opening volley stays bounded');
   for(const dot of dots){assert.ok(dot.x>=0&&dot.x<=w&&dot.y>=0&&dot.y<g.horizon);assert.ok(dot.alpha>0&&dot.alpha<=1);}
  }
  assert.match(fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),/geometry\.fireworks\(/);
@@ -18429,7 +18456,7 @@ test('RISK night shows: standalone fireworks recur independently of the rare coo
  assert.equal(w.lastRare,0,'standalone shows do not delay the festival or alien visit');
  for(let i=0;i<70;i++)sky.advance(w,1,night);
  assert.equal(w.events.filter(e=>e.type==='fireworks').length,0,'the minimum-minute show finishes before its full rest');
- for(let i=0;i<50;i++)sky.advance(w,1,night);
+ for(let i=0;i<170;i++)sky.advance(w,1,night);
  assert.equal(w.events.filter(e=>e.type==='fireworks').length,1,'a second independent show starts after its sampled duration and full rest');
  assert.ok(w.events.length<=sky.MAX_EVENTS);
  const day=sky.createWorld(()=>0);day.events=[];day.next=Infinity;day.railNext=w.railNext;day.nextFireworks=0;day.nextFestival=0;
@@ -18479,7 +18506,7 @@ test('RISK night shows: launches lead to bounded fading bursts and the festival 
    assert.equal(g.fireworks(0,.4,festival,event).length,0);assert.equal(g.fireworks(end,.4,festival,event).length,0);
    let reflected=false,burst=false;
    for(let age=0;age<=end;age+=.1){
-    const dots=g.fireworks(age,.4,festival,event);assert.ok(dots.length<=96,'bounded particle budget');
+    const dots=g.fireworks(age,.4,festival,event);assert.ok(dots.length<=320,'paired shells and finale share a fixed bounded particle budget');
     for(const dot of dots){
      for(const n of [dot.x,dot.y,dot.tailX,dot.tailY,dot.alpha])assert.ok(Number.isFinite(n));
      assert.ok(dot.x>=-128&&dot.x<=w+128&&dot.y>=0&&dot.y<=g.waterTop+12);
@@ -18567,7 +18594,7 @@ test('RISK festival barge: hull, stage, and crowd follow the cruise-vessel scale
   assert.equal(festival.width,72*cruise.scale,`${width}x${height}: its hull stays near the existing cruise length`);
   assert.equal(festival.height,28*cruise.scale,`${width}x${height}: vertical stage geometry scales with the hull`);
   assert.equal(festival.hullDepth,3*cruise.scale,`${width}x${height}: draft scales with the hull`);
-  const launchAge=8+3.8*15,launcher=scene.festival({...event,age:launchAge}),rocket=scene.fireworks(launchAge+.001,.4,true,event).find(dot=>dot.kind==='rocket'&&dot.burst===15);
+  const launchAge=8+3.8*15,launcher=scene.festival({...event,age:launchAge}),rocket=scene.fireworks(launchAge+.001,.4,true,event).find(dot=>dot.kind==='rocket'&&dot.burst===30);
   assert.equal(launcher.launcherOffset,56*.49*launcher.scale,`${width}x${height}: launch origins share the painted scaled rack position`);
   assert.equal(launcher.launcherTop,-launcher.height*.21,`${width}x${height}: rack mast height follows the scaled stage`);
   assert.equal(launcher.launcherBottom,-launcher.height*.10,`${width}x${height}: rack mast base follows the scaled stage`);
@@ -19743,8 +19770,163 @@ test('RISK Chance labels: new task defaults normally draw but extreme TrueSkill 
 test('RISK multiple dependencies FAQ: extended help explains progressive links saved cycles live sync and scoped Chance labels',async()=>{
  const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
  for(const text of [/up to ten dependencies/i,/\+ dependency/,/blocked by/i,/cycle.*warning/i,/fresh draw/i,/scanned after/i,/open devices/i,/draft/i,/offline/i,/top-K/])assert.match(help,text);
+ assert.doesNotMatch(help,/first dot in either mode is labeled/i,'the age label belongs to Chance presentation; descending retains its top-K summary');
+ assert.match(help,/older (?:tabs|clients).*refresh/i,'older single-link controls must disclose their complex-dependency boundary');
  const instructions=fs.readFileSync(path.join(__dirname,'AGENTS.md'),'utf8');
  assert.match(instructions,/live product/i);assert.match(instructions,/extended FAQ/i);assert.match(instructions,/regression/i);
+});
+
+function releasedDependencyHydrator(ctx,sha){
+ const result=spawnSync('git',['show',sha+':index.html'],{cwd:__dirname,encoding:'utf8'});
+ assert.equal(result.status,0,'actual supported released source must exist');
+ const start=result.stdout.indexOf('function hydrateState(st){'),end=result.stdout.indexOf('\nfunction ',start+1);
+ assert.ok(start>=0&&end>start);
+ return vm.runInContext('('+result.stdout.slice(start,end)+')',ctx);
+}
+
+test('RISK backup age styling: Delete turns destructive strictly after seven elapsed days for either storage source without changing bytes',async()=>{
+ const now=Date.parse('2026-10-06T12:00:00Z'),week=7*24*HOUR;
+ for(const source of ['legacy','device']){
+  const {ctx,shim}=await loadApp();setFakeTime(ctx,now);
+  const payload=JSON.stringify(ctx.state),cases=[['younger',week-1,false],['boundary',week,false],['older',week+1,true],['future',-HOUR,false],['unknown',null,false]];
+  const rows=cases.map(([id,age])=>({id,kind:'manual',day:'2026-10-01',at:age===null?null:now-age,payload}));
+  if(source==='legacy')shim.localStorage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify(rows));
+  else{ctx.backupAgeFixtures=rows;vm.runInContext('deviceStorageAuthority=true;deviceBackupCacheReadable=true;deviceBackupCache=backupAgeFixtures',ctx);}
+  const before=source==='legacy'?shim.localStorage.getItem(LOCAL_BACKUPS_KEY):JSON.stringify(rows);
+  ctx.openSettings();const markup=shim.document.getElementById('modalRoot').innerHTML;
+  for(const [id,,red] of cases){const tag=[...markup.matchAll(/<button class="([^"]+)" data-act="delete-local-backup" data-id="([^"]+)"[^>]*>/g)].find(m=>m[2]===id);assert.ok(tag,id+' remains visible');assert.equal(tag[1].split(/\s+/).includes('danger'),red,source+'/'+id+': timestamp age uses a strict seven-day boundary');}
+  assert.equal(source==='legacy'?shim.localStorage.getItem(LOCAL_BACKUPS_KEY):JSON.stringify(rows),before,'opening Settings must not delete or rewrite any backup');
+ }
+});
+
+test('RISK fireworks occurrence: standalone sampled starts are exactly twice as far apart while duration odds budgets and festival timing stay intact',()=>{
+ const load=(released=false)=>{const context=vm.createContext({Date,Math,console});for(const file of ['landscape-config.js','vendor/astronomy.min.js','stars.js','landscape-core.js']){let source=fs.readFileSync(path.join(__dirname,file),'utf8');if(released){const r=spawnSync('git',['show','d4ceaaa74f9494538d16044b968f8cfcfe75fb5b:'+file],{cwd:__dirname,encoding:'utf8'});assert.equal(r.status,0);source=r.stdout;}vm.runInContext(source,context);}return context;};
+ for(const rate of [0,1,2,10]){
+  const trace=context=>{let seed=97631;const random=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/2**32;},sky=context.LivingSky;
+   context.LandscapeConfig.setSpawnRates('| Event | Rate |\n| fireworks | '+rate+' |');
+   const world=sky.createWorld(random);world.events=[];world.next=Infinity;world.nextFestival=Infinity;world.railNext={train:Infinity,metro:Infinity};
+   const shows=[];for(let i=0;i<100&&shows.length<5;i++){sky.advance(world,world.nextFireworks-world.elapsed,{sun:{altitude:-20,azimuth:0}});const show=world.events.find(e=>e.type==='fireworks');if(show)shows.push({start:world.elapsed,duration:show.duration});assert.ok(world.events.length<=sky.MAX_EVENTS);}return shows;};
+  const legacy=load(true),current=load(),before=trace(legacy),after=trace(current);
+  assert.deepEqual(after.map(e=>e.duration),before.map(e=>e.duration),'only occurrence timing changes, never sampled show duration');
+  assert.deepEqual(after.map(e=>e.start),before.map(e=>e.start*2),'every same-sample start, including failed chances, is spaced by exactly twice the released schedule');
+  assert.equal(current.LandscapeConfig.nightShows.fireworks.chance,legacy.LandscapeConfig.nightShows.fireworks.chance,'do not confuse opportunity frequency with conditional odds');
+  assert.deepEqual(JSON.parse(JSON.stringify(current.LandscapeConfig.nightShows.festival)),JSON.parse(JSON.stringify(legacy.LandscapeConfig.nightShows.festival)),'the barge visit and rare-event cooldown stay intact');
+  assert.equal(current.LivingSky.MAX_EVENTS,legacy.LivingSky.MAX_EVENTS);
+ }
+});
+
+test('RISK fireworks density and finale: paired regular shells lead to eight visible finale shells within a fixed budget and natural fade',()=>{
+ const load=(released=false)=>{const context=vm.createContext({Math});let source=fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8');if(released){const r=spawnSync('git',['show','d4ceaaa74f9494538d16044b968f8cfcfe75fb5b:landscape-geometry.js'],{cwd:__dirname,encoding:'utf8'});assert.equal(r.status,0);source=r.stdout;}vm.runInContext(source,context);return context.LandscapeGeometry;};
+ const previous=load(true),current=load();
+ for(const [width,height] of [[320,568],[390,844],[568,320],[768,1024],[1440,900]])for(const festival of [false,true]){
+  const old=previous.create(width,height),geometry=current.create(width,height),duration=festival?150:180,event={type:festival?'festival':'fireworks',duration,seed:.4};
+  const shells=dots=>new Set(dots.map(dot=>dot.burst)).size;
+  for(const age of festival?[61.6,71.6,81.6]:[1.6,21.6,61.6])assert.equal(shells(geometry.fireworks(age,.4,festival,event)),2*shells(old.fireworks(age,.4,festival,event)),`${width}x${height}/${festival?'barge':'standalone'}/${age}: twice the regular shells are airborne while both launchers are on screen`);
+  const finaleAt=festival?duration*.65:duration-4,peak=geometry.fireworks(finaleAt+1.6,.4,festival,event);
+  assert.equal(shells(peak.filter(dot=>dot.finale)),8,'the chosen eight-shell finale is visibly larger than a normal paired volley');
+  assert.ok(peak.some(dot=>dot.kind==='spark'));
+  const alpha=age=>geometry.fireworks(age,.4,festival,event).reduce((total,dot)=>total+dot.alpha,0);
+  assert.ok(alpha(finaleAt+1.6)>alpha(finaleAt+2.6));assert.ok(alpha(finaleAt+2.6)>alpha(finaleAt+3.6));assert.equal(alpha(finaleAt+3.7),0,'remaining embers fully fade rather than cutting off at the event boundary');
+  for(const age of [0,.4,1.6,21.6,finaleAt+.4,finaleAt+1.6,finaleAt+2.6,finaleAt+3.6,duration]){
+   const dots=geometry.fireworks(age,.4,festival,event);assert.ok(dots.length<=320,'eight shells share the fixed 320-particle ceiling');
+   assert.ok(dots.every(dot=>[dot.x,dot.y,dot.alpha].every(Number.isFinite)&&dot.alpha>0&&dot.alpha<=1));assert.ok(dots.every(dot=>dot.x>=(dot.finale?0:-128)&&dot.x<=width+(dot.finale?0:128)&&dot.y>=0&&dot.y<=geometry.waterTop+12),'finale sparks stay visible while ordinary entering/departing barge sparks keep the existing bounded canvas-clipping margin');
+   assert.deepEqual(geometry.fireworks(age,.4,festival,event),dots,'repaint does not resample particles or launch timing');
+  }
+  assert.equal(geometry.fireworks(duration,.4,festival,event).length,0);
+ }
+ const renderer=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');assert.match(renderer,/if\(reduced\|\|document\.hidden\)\{frame=0;return;\}/,'reduced or hidden scenes keep the existing stopped animation clock');assert.doesNotMatch(renderer.slice(renderer.indexOf('  function paintFireworks('),renderer.indexOf('  function paintClocktowerVisit(')),/setInterval|Date\.now|Math\.random|(?:lighter|screen)/,'fireworks retain deterministic pausable geometry and avoid flash compositing');
+});
+
+test('RISK product FAQ: backup age fireworks and resting remote completions match the shipped controls',async()=>{
+ const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(help,/Delete.*red.*more than seven days/i);
+ assert.match(help,/twice as far apart/i);assert.match(help,/paired shells/i);assert.match(help,/eight-shell finale/i);
+ assert.match(help,/fairy.light poles.*selected.*night/i,'the scenery FAQ explains event-only supports');
+ assert.match(help,/completed on another device.*scanner chain/i);
+ const instructions=fs.readFileSync(path.join(__dirname,'AGENTS.md'),'utf8');assert.match(instructions,/commit, push, merge, and release/i);
+});
+
+test('RISK multiple dependencies legacy publications: distinct accepted edits survive an unobserved removal and repeated reads stay idempotent',async()=>{
+ for(const alreadySelected of [false,true]){
+  const {ctx}=await loadApp(),a=ctx.addTask('A'),b=ctx.addTask('B'),task=ctx.addTask('Dependent');
+  ctx.setTaskPrerequisites(task.id,alreadySelected?[a.id,b.id]:[a.id]);
+  const raw=JSON.parse(JSON.stringify(ctx.state));raw.tasks.find(t=>t.id===task.id).prerequisiteId=b.id;
+  const first=JSON.parse(JSON.stringify(raw)),second=JSON.parse(JSON.stringify(raw));
+  ctx.hydrateState(first,{account:'e@example.com',rev:6});ctx.hydrateState(second,{account:'e@example.com',rev:7});
+  const tokens=board=>board.tasks.find(t=>t.id===task.id).prerequisiteOps[b.id].adds;
+  assert.notDeepEqual(tokens(first),tokens(second),'distinct accepted publications must record distinct legacy edit intent, including a selected second link');
+  const replay=JSON.parse(JSON.stringify(raw));ctx.hydrateState(replay,{account:'e@example.com',rev:6});assert.deepEqual(replay,first);
+  const bytes=JSON.stringify(first);ctx.hydrateState(first);assert.equal(JSON.stringify(first),bytes,'normalized local reload must not synthesize a new operation');
+  ctx.replaceState(first);ctx.setTaskPrerequisites(task.id,[]);
+  const removed=JSON.parse(JSON.stringify(ctx.state));ctx.mergeUndeletedTasks(removed,second);
+  assert.deepEqual(Array.from(ctx.taskPrerequisiteIds(removed.tasks.find(t=>t.id===task.id))),[b.id],'a later independently published addition was not observed by the earlier removal');
+  const foreign=JSON.parse(JSON.stringify(raw));ctx.hydrateState(foreign,{account:'other@example.com',rev:6});assert.notDeepEqual(tokens(foreign),tokens(first),'publication identity is account scoped');
+ }
+});
+
+test('RISK multiple dependencies legacy publications: cloud conversion uses the accepted server revision rather than local revision or clocks',async()=>{
+ const prepared=await loadApp(),a=prepared.ctx.addTask('A'),b=prepared.ctx.addTask('B'),task=prepared.ctx.addTask('Dependent');
+ prepared.ctx.setTaskPrerequisites(task.id,[a.id]);const base=JSON.parse(JSON.stringify(prepared.ctx.state));
+ Object.assign(base,{syncRev:5,syncAccount:'e@example.com',syncDirty:false});
+ const raw=JSON.parse(JSON.stringify(base));raw.tasks.find(t=>t.id===task.id).prerequisiteId=b.id;
+ const edits=[];
+ for(const rev of [6,7]){
+  const h=makeSyncHarness({remote:raw,rev});const {ctx}=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(base)},cloudSyncFactory:h.factory});
+  await ctx.cloudPull();await syncSettle(40);
+  edits.push([...ctx.state.tasks.find(t=>t.id===task.id).prerequisiteOps[b.id].adds]);
+ }
+ assert.notDeepEqual(edits[0],edits[1],'actual cloudPull must bind the authoritative publication before hydration changes the unknown metadata');
+ for(const syncRev of [1,999]){
+  const local=JSON.parse(JSON.stringify(raw));local.syncRev=syncRev;prepared.ctx.hydrateState(local);
+  if(syncRev===1)edits[2]=local.tasks.find(t=>t.id===task.id).prerequisiteOps[b.id].adds;
+  else assert.deepEqual(local.tasks.find(t=>t.id===task.id).prerequisiteOps[b.id].adds,edits[2],'local revision fields do not impersonate an accepted publication');
+ }
+});
+
+test('RISK multiple dependencies legacy mirrors: saved self short and long cycles survive actual supported hydrate and unrelated edits',async()=>{
+ for(const sha of ['7b9c92a41999a44a12f92b7d6d1c8d02758c635e','d4ceaaa74f9494538d16044b968f8cfcfe75fb5b'])for(const length of [1,2,6]){
+  const {ctx}=await loadApp(),nodes=Array.from({length},(_,i)=>ctx.addTask('Cycle '+i));
+  for(let i=0;i<length;i++)ctx.setTaskPrerequisites(nodes[i].id,[nodes[(i+1)%length].id]);
+  const prior=JSON.parse(JSON.stringify(ctx.state)),legacy=JSON.parse(JSON.stringify(prior));
+  releasedDependencyHydrator(ctx,sha)(legacy);legacy.tasks[0].title='Unrelated legacy title edit';ctx.hydrateState(legacy);
+  for(const task of prior.tasks){const restored=legacy.tasks.find(t=>t.id===task.id);assert.deepEqual(Array.from(ctx.taskPrerequisiteIds(restored)),Array.from(ctx.taskPrerequisiteIds(task)),'released hydration must not become removal intent');assert.deepEqual(JSON.parse(JSON.stringify(restored.prerequisiteOps)),task.prerequisiteOps);assert.equal(restored.prerequisiteRevision,task.prerequisiteRevision);}
+  assert.equal(legacy.tasks[0].title,'Unrelated legacy title edit');
+  const stable=JSON.stringify(legacy);ctx.hydrateState(legacy);assert.equal(JSON.stringify(legacy),stable);
+ }
+});
+
+test('RISK multiple dependencies legacy mirrors: exposed removals and hidden first-link replacement preserve the other nine selections',async()=>{
+ const {ctx}=await loadApp(),roots=Array.from({length:11},(_,i)=>ctx.addTask('Root '+i)),task=ctx.addTask('Dependent');
+ ctx.setTaskPrerequisites(task.id,roots.slice(0,10).map(t=>t.id));ctx.setTaskPrerequisites(roots[0].id,[task.id]);
+ const raw=JSON.parse(JSON.stringify(ctx.state)),suppressed=raw.tasks.find(t=>t.prerequisiteIds.length&&t.prerequisiteId===null);
+ assert.ok(suppressed,'at least one first-field cycle edge is hidden from old sanitizers');
+ const hidden=raw.tasks.find(t=>t.id===task.id);
+ // Explicitly present this task's first stored link through a cycle-safe null mirror.
+ hidden.prerequisiteId=null;hidden.prerequisiteMirror=null;
+ hidden.prerequisiteId=roots[10].id;ctx.hydrateState(raw,{account:'e@example.com',rev:8});
+ assert.deepEqual(Array.from(ctx.taskPrerequisiteIds(hidden)),[roots[10].id,...roots.slice(1,10).map(t=>t.id)],'an older selection changes the first stored link without displacing an unseen last link at capacity');
+ const ordinary=JSON.parse(JSON.stringify(raw)),edited=ordinary.tasks.find(t=>t.id===roots[0].id);assert.equal(edited.prerequisiteMirror,task.id,'the broken cycle exposes this ordinary link again without recording new intent');edited.prerequisiteId=null;ctx.hydrateState(ordinary);
+ assert.deepEqual(Array.from(ctx.taskPrerequisiteIds(edited)),[],'an exposed noncycle legacy null remains intentional removal');
+});
+
+test('RISK multiple dependencies legacy mirrors: merge replacement Undo Restore and every persistence projection retain causal graph bytes',async()=>{
+ const {ctx,shim}=await loadApp(),a=ctx.addTask('A'),b=ctx.addTask('B');
+ ctx.setTaskPrerequisites(a.id,[b.id]);const left=JSON.parse(JSON.stringify(ctx.state));
+ const other=JSON.parse(JSON.stringify(left));other.tasks=other.tasks.filter(t=>t.id===b.id);other.tasks[0].prerequisiteIds=[a.id];
+ for(const key of ['prerequisiteId','prerequisiteMirror','prerequisiteOps'])delete other.tasks[0][key];ctx.hydrateState(other);
+ left.tasks=left.tasks.filter(t=>t.id===a.id);const incoming=JSON.stringify(other);
+ ctx.mergeUndeletedTasks(left,other);assert.equal(JSON.stringify(other),incoming,'projecting a newly merged cycle never mutates its recovery source');
+ const expected=left.tasks.map(t=>[t.id,Array.from(ctx.taskPrerequisiteIds(t)),JSON.stringify(t.prerequisiteOps),t.prerequisiteRevision]);
+ const assertSafe=board=>{const legacy=JSON.parse(JSON.stringify(board));releasedDependencyHydrator(ctx,'d4ceaaa74f9494538d16044b968f8cfcfe75fb5b')(legacy);for(const task of board.tasks)assert.equal(legacy.tasks.find(t=>t.id===task.id).prerequisiteId,task.prerequisiteId,'every emitted first-field graph must already be cycle safe');};
+ assertSafe(left);ctx.replaceState(left);ctx.initializeReplacedScan();
+ const snapshot=JSON.stringify(ctx.state),exported=JSON.parse(ctx.cloudPayload());assert.equal(JSON.stringify(ctx.state),snapshot,'export projection stays read-only');assertSafe(exported);
+ assert.equal(await ctx.persist(),true);assertSafe(JSON.parse(shim.localStorage.getItem(SYNC_STORE_KEY)));
+ const backup=await ctx.saveDurableBackup('manual',JSON.stringify(ctx.state));assert.ok(backup?.id);
+ ctx.setTaskPrerequisites(a.id,[]);ctx.undo();assertSafe(ctx.state);
+ ctx.setTaskPrerequisites(a.id,[]);ctx.openSettings();assert.equal(await ctx.restoreDurableBackupById(backup.id),true);assertSafe(ctx.state);
+ for(const [id,ids] of expected)assert.deepEqual(Array.from(ctx.taskPrerequisiteIds(ctx.state.tasks.find(t=>t.id===id))),ids);
+ const causal=ctx.state.tasks.map(t=>[t.id,JSON.stringify(t.prerequisiteOps),t.prerequisiteRevision]);
+ ctx.projectLegacyPrerequisites(ctx.state);assert.deepEqual(ctx.state.tasks.map(t=>[t.id,JSON.stringify(t.prerequisiteOps),t.prerequisiteRevision]),causal,'mirror projection never invents edge intent');
 });
 
 test('RISK multiple dependencies layout: long blockers wrap within their row and dependency selects keep touchable widths',()=>{

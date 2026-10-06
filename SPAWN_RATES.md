@@ -10,17 +10,23 @@ others' share of the same limited visitor budget. Seasonal eligibility still app
 Train and metro have dedicated service: about 65 and 50 seconds crossing,
 respectively, followed by 12 and 8 seconds of rest at rate 1. Their rate divides
 that rest time; only one vehicle per track runs at once. Motion pauses offscreen.
-Standalone fireworks check every 30 seconds of active nighttime viewing with a
+Standalone fireworks check every 60 seconds of active nighttime viewing with a
 40% chance at rate 1. Each show independently samples a duration from 60 to
-300 seconds, continues bursting behind the city, then rests for 60 seconds
-after its actual end. The first check is after 20 active seconds. Arrival
-timing stays random and respects the scene budget.
+300 seconds and bursts behind the city. Its next opportunity is twice the
+sampled duration plus 120 seconds after its start; the first check is after
+40 active seconds. Scaling the entire start interval, including failed checks,
+spaces same-sample shows twice as far apart without extending visible duration.
+Regular volleys fire two shells, then eight shells finish the show with fading
+embers. Geometry keeps at most 320 active particles. Arrival timing stays random
+and respects the existing scene budget and stopped hidden/reduced-motion clock.
 Festivals check once per active minute at a 0.6% chance, wait at least 30 active
 minutes between visits, share the seven-minute rare cooldown with alien visits,
 and cross the lake on a barge in about 127–183 seconds, depending on the
 assigned travel speed (150-second baseline). A festival owns its
 fireworks; standalone shows and festivals do not overlap. Both require the Sun
 below civil twilight. Rates scale these chances, capped at 100%.
+The barge also fires paired shells and an eight-shell finale while its launchers
+are still visible; its visit odds, cooldown, travel speed and duration stay unchanged.
 Woodland rows control the separate animal pool (default: 1% chance per 30 seconds).
 Clocktower visits check once per visible nighttime minute with a 2% chance at
 rate 1, about one visit per 50 active night minutes. Peter Pan, Wendy, John and

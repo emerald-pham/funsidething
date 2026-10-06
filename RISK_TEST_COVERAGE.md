@@ -445,3 +445,16 @@ The editor hook blocks app or enforcement edits while tests.js has no staged or 
 - RISK multiple dependencies: Undo restores a deleted task link as intent without reviving it from stale copies
 - RISK Chance labels: disabled presentation flags retain their hidden summaries and matching FAQ language
 - RISK Chance labels: the deterministic oldest first dot has an age label and is excluded from the following weighted draw
+
+## Backup age, night shows, and legacy dependency compatibility
+
+- RISK fairy light poles: only a selected nighttime string paints its supports through day and spawn transitions
+- RISK backup age styling: Delete turns destructive strictly after seven elapsed days for either storage source without changing bytes
+- RISK fireworks occurrence: standalone sampled starts are exactly twice as far apart while duration odds budgets and festival timing stay intact
+- RISK fireworks density and finale: paired regular shells lead to eight visible finale shells within a fixed budget and natural fade
+- RISK product FAQ: backup age fireworks and resting remote completions match the shipped controls
+- RISK multiple dependencies legacy publications: distinct accepted edits survive an unobserved removal and repeated reads stay idempotent
+- RISK multiple dependencies legacy publications: cloud conversion uses the accepted server revision rather than local revision or clocks
+- RISK multiple dependencies legacy mirrors: saved self short and long cycles survive actual supported hydrate and unrelated edits
+- RISK multiple dependencies legacy mirrors: exposed removals and hidden first-link replacement preserve the other nine selections
+- RISK multiple dependencies legacy mirrors: merge replacement Undo Restore and every persistence projection retain causal graph bytes
