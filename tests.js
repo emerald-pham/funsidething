@@ -286,6 +286,16 @@ test('RISK task rating history: malformed and future records remain recoverable 
  ctx.openEdit(b.id);const view=shim.document.getElementById('modalRoot').innerHTML;assert.doesNotMatch(view,/<img src=x/);assert.match(view,/4 unrecognized history items/);
  b.ratingHistory={v:99,data:'kept'};ctx.openEdit(b.id);assert.match(shim.document.getElementById('modalRoot').innerHTML,/cannot append/i);assert.deepEqual(ratingHistoryCopy(b.ratingHistory),{v:99,data:'kept'});
 });
+test('RISK task rating history: Undo records evergreen interval and day-reset eligibility reversals without changing MMR',async(t)=>{
+ for(const field of ['evergreenHours','evergreenResetAtDay'])await t.test(field,async()=>{
+  const {ctx,shim,b}=await ratingHistoryFixture(627);b.evergreen=true;b.evergreenHours=18;b.evergreenResetAtDay=false;b.lastDoneAt=vm.runInContext('Date.now()',ctx)-2*3600000;
+  if(field==='evergreenResetAtDay'){setFakeTime(ctx,+new Date(2026,9,6,3));b.lastDoneAt=+new Date(2026,9,5,23);}
+  const mu=b.mu,sigma=b.sigma;assert.equal(ctx.chanceDisplayStats().get(b.id).available,false);
+  ctx.openEdit(b.id);shim.document.getElementById('etTitle').value=b.title;shim.document.getElementById('etEver').checked=true;shim.document.getElementById('etEverHours').value=field==='evergreenHours'?'1':'18';shim.document.getElementById('etEverUnit').value='hours';shim.document.getElementById('etEverReset').checked=field==='evergreenResetAtDay';ctx.onAction('save-edit',{dataset:{id:b.id}});
+  assert.equal(ctx.chanceDisplayStats().get(b.id).available,true);const row=ratingHistoryCopy(b.ratingHistory.at(-1));assert.equal(row.after.eligible,true);
+  ctx.undo();const restored=ratingHistoryTask(ctx,b.id);assert.equal(ctx.chanceDisplayStats().get(b.id).available,false);assert.equal(restored.ratingHistory.at(-1).kind,'undo','each actual task-field eligibility reversal needs its own observation');assert.equal(restored.ratingHistory.at(-1).before.eligible,true);assert.equal(restored.ratingHistory.at(-1).after.eligible,false);assert.equal(restored.ratingHistory.at(-1).change,'relative');assert.equal(restored.mu,mu);assert.equal(restored.sigma,sigma);assert.ok(restored.ratingHistory.some(r=>r.id===row.id&&r.at===row.at));
+ });
+});
 test('RISK task rating history: real cloud glue preserves offline concurrent events replay old writes and completion Undo across reload',async()=>{
  const {ctx,a,b}=await ratingHistoryFixture(623);const base=ratingHistoryCopy(ctx.state);base.syncAccount='e@example.com';base.updatedAt=Date.now();base.syncRev=1;base.syncDirty=false;
  const cloud=makeSyncHarness({remote:base,rev:1}),left=await loadApp({seed:624,cryptoProvider:webcrypto,seedStorage:{[STORE_KEY]:JSON.stringify(base)},cloudSyncFactory:cloud.factory}),right=await loadApp({seed:625,cryptoProvider:webcrypto,seedStorage:{[STORE_KEY]:JSON.stringify(base)},cloudSyncFactory:cloud.factory});

@@ -3488,7 +3488,7 @@ function undo(){
   const frame = undoStack.at(-1);
   const next=JSON.parse(frame.snapshot);
   if(!sameListOwner(next,state)){ undoStack=[]; return; }
-  const inputs=t=>t&&[t.mu,t.sigma,t.done,t.ctx,t.startsAt,t.evergreen,t.lastDoneAt,taskPrerequisiteIds(t)];
+  const inputs=t=>t&&[t.mu,t.sigma,t.done,t.ctx,t.startsAt,t.evergreen,t.evergreenHours,t.evergreenResetAtDay,t.lastDoneAt,taskPrerequisiteIds(t)];
   const ids=next.tasks.filter(t=>JSON.stringify(inputs(t))!==JSON.stringify(inputs(taskById(t.id)))).map(t=>t.id);
   const observation=captureRatingObservation("undo",ids);
   undoStack.pop();
