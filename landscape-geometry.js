@@ -424,14 +424,20 @@
       const dots=[],duration=Number(event.duration)||(atFestival?150:60);
       if(age<=0||age>=duration)return dots;
       const start=atFestival?8:0,interval=atFestival?3.8:2.1;
-      const count=atFestival?Math.max(0,Math.floor((duration-16)/interval)):Math.max(0,Math.floor((duration-3.7)/interval)+1);
+      // Finish the barge display while its launchers are still on screen.
+      // The normal shell lifetime provides a gradual finale fade in both shows.
+      const finaleAt=atFestival?duration*.65:duration-4;
+      const count=Math.max(0,Math.floor((finaleAt-3.7-start)/interval)+1);
       // Only shells still in flight need geometry, even in a five-minute show.
-      const first=Math.max(0,Math.floor((age-start-3.7)/interval)+1),last=Math.min(count-1,Math.floor((age-start)/interval));
-      for(let burst=first;burst<=last;burst++){
-        const launch=start+burst*interval,time=age-launch;
+      const first=Math.max(0,Math.floor((age-start-3.7)/interval)+1),last=Math.min(count-1,Math.floor((age-start)/interval)),shells=[];
+      for(let wave=first;wave<=last;wave++)for(let lane=0;lane<2;lane++)shells.push({launch:start+wave*interval,burst:wave*2+lane,wave,lane,finale:false});
+      if(age>=finaleAt&&age<finaleAt+3.7)for(let lane=0;lane<8;lane++)shells.push({launch:finaleAt,burst:count*2+lane,wave:count,lane,finale:true});
+      for(const shell of shells){
+        const {launch,burst,wave,lane,finale}=shell,time=age-launch;
         if(time<=0||time>=3.7)continue;
         const deck=atFestival?festival({...event,age:launch}):null;
-        const originX=deck?deck.x+(burst%2?1:-1)*deck.launcherOffset:W*(.25+seed*.3+(burst%3)*.13);
+        const originX=deck?deck.x+((wave+lane)%2?1:-1)*deck.launcherOffset
+          :finale?W*(.15+lane*.10):W*(.25+seed*.3+(wave%3)*.13+lane*.07);
         if(originX<3||originX>W-3)continue;
         const launchY=deck?deck.y-deck.height*.10:waterTop-2;
         // Waterfront bursts retain visible mirrored sparks. Each shell takes
@@ -445,7 +451,7 @@
         if(time<1){
           const flight=t=>({x:originX+drift(t),y:launchY+(cy-launchY)*(1-(1-t)**2)});
           const tip=flight(time),tail=flight(Math.max(0,time-.13));
-          dots.push({kind:'rocket',...tip,tailX:tail.x,tailY:tail.y,alpha:Math.min(1,time/.25)*Math.min(1,(1-time)/.16),burst});
+          dots.push({kind:'rocket',...tip,tailX:tail.x,tailY:tail.y,alpha:Math.min(1,time/.25)*Math.min(1,(1-time)/.16),burst,finale});
           continue;
         }
         const t=time-1,radius=Math.min(48,rise*.55),willow=burst%3===2;
@@ -464,7 +470,7 @@
             const at=Math.max(0,age-(5-k)*.105),point=position(at);
             trail.push({...point,alpha:alpha*(.10+.9*k/5)});
           }
-          dots.push({kind:'spark',...tip,tailX:trail[0].x,tailY:trail[0].y,trail,alpha,burst,willow,size:.7+noise*.65});
+          dots.push({kind:'spark',...tip,tailX:trail[0].x,tailY:trail[0].y,trail,alpha,burst,finale,willow,size:.7+noise*.65});
         }
       }
       return dots;

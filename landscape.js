@@ -184,11 +184,11 @@
     ctx.save();ctx.globalAlpha=.8;
     ctx.fillStyle=S.mixHex(p.hill,p.front,.42);ctx.fillRect(deckX,deckY,deckWidth,1.8);
     line(ctx,deckX,deckY,deckX+deckWidth,deckY,S.mixHex(p.front,p.sky[2],.36),.55);
+    // The poles belong to the selected string: leaving dormant hardware above
+    // the deck drew bare poles in daylight and after a nighttime sample ended.
+    if(sky.sun.altitude>=0||!cityLights.gardens.lit[patio.index]){ctx.restore();return;}
     line(ctx,left,deckY,left,wireY,S.mixHex(p.front,p.sky[2],.28),.55);
     line(ctx,right,deckY,right,wireY,S.mixHex(p.front,p.sky[2],.28),.55);
-    // Patio strings used to bypass the garden sampler and light every roof,
-    // including daylight. Keep the hardware, but show only this roof's sample.
-    if(sky.sun.altitude>=0||!cityLights.gardens.lit[patio.index]){ctx.restore();return;}
     ctx.beginPath();ctx.moveTo(left,wireY);ctx.quadraticCurveTo((left+right)/2,wireY+sag,right,wireY);
     ctx.strokeStyle=`rgba(255,222,160,${lightAlpha})`;ctx.lineWidth=.7;ctx.stroke();
     for(let bulb=0;bulb<5;bulb++){

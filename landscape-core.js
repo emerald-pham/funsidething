@@ -184,7 +184,7 @@
     return type==='flock'?3+index*2:type==='cyclist'?1+index:1;
   };
   function createWorld(random=Math.random,season='summer'){
-    const world={random,season,railNext:{train:0,metro:12},nextFireworks:20,nextFestival:60,elapsed:0,events:[],next:3+random()*6,lastRare:-RARE_COOLDOWN,lastFestival:-CONFIG.nightShows.festival.cooldown,rareCount:0,wind:.6+random()*1.2};
+    const world={random,season,railNext:{train:0,metro:12},nextFireworks:20*CONFIG.nightShows.fireworks.occurrenceScale,nextFestival:60,elapsed:0,events:[],next:3+random()*6,lastRare:-RARE_COOLDOWN,lastFestival:-CONFIG.nightShows.festival.cooldown,rareCount:0,wind:.6+random()*1.2};
     // Start mid-journey so returning never waits for a first event. Pick three
     // distinct ordinary visitors; the rare abduction is never in the opening cast.
     const pool=(season==='winter'?WINTER_EVENTS:INITIAL_TYPES).filter(type=>CONFIG.spawnRate(type)>0);
@@ -237,13 +237,17 @@
     for(const type of ['festival','fireworks']){
       const key=type==='festival'?'nextFestival':'nextFireworks',show=CONFIG.nightShows[type];
       if(w.elapsed<w[key])continue;
-      w[key]=w.elapsed+show.interval;
+      const occurrenceScale=show.occurrenceScale||1;
+      w[key]=w.elapsed+show.interval*occurrenceScale;
       if(sky.sun.altitude>=-6||!CONFIG.spawnRate(type)||w.events.length>=MAX_EVENTS-2||w.events.some(e=>e.type==='festival'||e.type==='fireworks'))continue;
       if(type==='festival'&&(w.elapsed-w.lastRare<RARE_COOLDOWN||w.elapsed-w.lastFestival<show.cooldown))continue;
       if(w.random()>=Math.min(1,show.chance*CONFIG.spawnRate(type)))continue;
       spawn(w,type);
       if(type==='festival'){w.lastRare=w.elapsed;w.lastFestival=w.elapsed;w.rareCount++;}
-      else w[key]=w.elapsed+w.events.find(e=>e.type==='fireworks').duration+show.rest;
+      // Scale the entire sampled start interval, including the quiet portion
+      // occupied by the preceding show. Scaling only failed-roll odds would
+      // not halve show frequency because visible durations are unchanged.
+      else w[key]=w.elapsed+(w.events.find(e=>e.type==='fireworks').duration+show.rest)*occurrenceScale;
     }
     if(w.elapsed>=w.next){
       const r=w.random,a=activity(sky);

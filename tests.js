@@ -83,6 +83,33 @@ test('RISK fairy lights: gardens and patios share independent stable one-in-twel
  assert.deepEqual({...cityLights.gardens.lit},saved,'samples survive repaint and temporary resize ineligibility');
 });
 
+test('RISK fairy light poles: only a selected nighttime string paints its supports through day and spawn transitions',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),start=source.indexOf('  function paintRooftopPatio('),end=source.indexOf('  function paintRooftopParty(',start),paint=source.slice(start,end);
+ const context=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),context);
+ const seed=n=>{const x=Math.sin(n*127.1+311.7)*43758.5453;return x-Math.floor(x);},sampler=livingSky();
+ for(const [W,H] of [[320,568],[390,844],[568,320],[768,1024],[1440,900]])for(const reduced of [false,true]){
+  const roof=context.LandscapeGeometry.create(W,H).cityscape(seed).patios[0];assert.ok(roof);
+  const lights=sampler.createGardenLights([roof.index,100000],()=>.99),math=Object.create(Math);math.random=()=>{throw Error('painting cannot reroll selected lights');};
+  const draw=altitude=>{
+   const lines=[],bulbs=[],decks=[],wires=[],stack=[],ctx={globalAlpha:1,save(){stack.push(this.globalAlpha);},restore(){this.globalAlpha=stack.pop();},fillRect(...args){decks.push(args);},beginPath(){},moveTo(){},quadraticCurveTo(){},stroke(){wires.push(this.strokeStyle);}};
+   vm.runInNewContext(`${paint};paintRooftopPatio(ctx,patio)`,{Math:math,ctx,patio:roof,reduced,p:{night:altitude<0?1:.4,hill:'#567',front:'#345',sky:['#123','#234','#456']},sky:{sun:{altitude}},cityLights:{gardens:lights},S:{mixHex:day=>day},line(_g,...args){lines.push(args);},ellipse(_g,...args){bulbs.push(args);}});
+   assert.equal(stack.length,0);assert.equal(ctx.globalAlpha,1,'hidden strings and selected strings both restore painter state');
+   return {poles:lines.filter(([x,y,x2,y2])=>x===x2&&y2<y),deck:decks,bulbs,wires};
+  };
+  const dark=draw(-20);assert.equal(dark.poles.length,0,`${W}x${H}/${reduced}: unselected roofs have no bare poles`);assert.equal(dark.bulbs.length,0);
+  assert.equal(sampler.advanceGardenLights(lights,59,true,()=>0),false,'the existing sixty-second sampler remains unchanged');assert.equal(draw(-20).poles.length,0);
+  let rolls=[0,0];assert.equal(sampler.advanceGardenLights(lights,1,true,()=>rolls.shift()),true);
+  const lit=draw(-20);assert.equal(lit.poles.length,2,'the selected string retains both original supports');assert.equal(lit.bulbs.length,5);assert.equal(lit.wires.length,1);assert.deepEqual(lit.deck,dark.deck,'ordinary patio decking is preserved');
+  assert.equal(lights.lit[100000],false,'selecting one roof never lights the other roof');
+  const retained=JSON.stringify(lights);
+  for(const altitude of [0,.001,40]){const day=draw(altitude);assert.equal(day.poles.length,0,'daylight hides poles even while the retained sample is lit');assert.equal(day.bulbs.length,0);assert.equal(day.wires.length,0);assert.deepEqual(day.deck,dark.deck);}
+  assert.equal(JSON.stringify(lights),retained,'day/night repaint preserves the light schedule and retained selection');assert.deepEqual(draw(-20),lit,'returning to night restores only the retained selected string');
+  rolls=[0,.99];assert.equal(sampler.advanceGardenLights(lights,60,true,()=>rolls.shift()),true);
+  const retired=draw(-20);assert.equal(retired.poles.length,0,'a sample that retires the light immediately retires its poles');assert.equal(retired.bulbs.length,0);assert.equal(retired.wires.length,0);
+  rolls=[0,0];assert.equal(sampler.advanceGardenLights(lights,60,true,()=>rolls.shift()),true);assert.deepEqual(draw(-20),lit,'a later selected spawn keeps the original attached geometry');
+ }
+});
+
 test('RISK fireworks duration: each standalone show samples one to five minutes once and rests after its actual end',()=>{
  const sky=livingSky(),night={sun:{altitude:-20,azimuth:0}};
  for(const [sample,expected] of [[0,60],[.25,120],[.5,180],[.999,299.76],[1,300]]){
@@ -91,11 +118,11 @@ test('RISK fireworks duration: each standalone show samples one to five minutes 
   sky.advance(w,1,night);const show=w.events.find(e=>e.type==='fireworks');
   assert.ok(show);assert.ok(Math.abs(show.duration-expected)<1e-9,'show duration uses its own bounded arrival sample');
   assert.equal(show.speed,1,'stationary fireworks never speed up their sampled duration');
-  assert.equal(w.nextFireworks,w.elapsed+show.duration+60,'rest starts after this show finishes');
+  assert.equal(w.nextFireworks,w.elapsed+2*(show.duration+60),'doubling the sampled start-to-next-opportunity interval halves show occurrences without lengthening the visible show');
   sky.advance(w,expected/2,night);assert.equal(show.duration,expected,'frames never resample duration');
   assert.equal(w.events.filter(e=>e.type==='fireworks').length,1,'a long show cannot overlap another show');
   sky.advance(w,expected/2,night);assert.ok(!w.events.includes(show),'the event retires at its sampled end');
-  sky.advance(w,59,night);assert.equal(w.events.filter(e=>e.type==='fireworks').length,0,'the full rest is preserved after retirement');
+  sky.advance(w,expected+119,night);assert.equal(w.events.filter(e=>e.type==='fireworks').length,0,'the doubled occurrence interval includes the sampled duration and full quiet period');
   sky.advance(w,1,night);assert.equal(w.events.filter(e=>e.type==='fireworks').length,1,'a successful later roll starts another bounded show');
  }
 });
@@ -104,10 +131,10 @@ test('RISK fireworks duration: repeated bursts span long shows with bounded part
  const context=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),context);
  for(const [W,H] of [[320,568],[390,844],[568,320],[768,1024],[1440,900]])for(const duration of [60,180,300]){
   const geometry=context.LandscapeGeometry.create(W,H),event={type:'fireworks',duration,seed:.4};
-  for(const age of [1.6,21.6,duration/2+1.6,duration-5]){
+  for(const age of [1.6,21.6,duration/2+1.6,duration-2.4]){
    const dots=geometry.fireworks(age,event.seed,false,event);
    assert.ok(dots.some(dot=>dot.kind==='spark'),`${W}x${H}: bursts remain visible ${age}s into a ${duration}s show`);
-   assert.ok(dots.length<=96,'only the currently airborne bursts need particles');
+   assert.ok(dots.length<=320,'only airborne paired shells and the bounded finale need particles');
    assert.ok(dots.every(dot=>[dot.x,dot.y,dot.alpha].every(Number.isFinite)&&dot.alpha>0&&dot.alpha<=1),'all long-show particles remain finite and fading');
    assert.ok(dots.every(dot=>dot.x>=-128&&dot.x<=W+128&&dot.y>=0&&dot.y<geometry.waterTop),'late launch sites stay within the skyline');
   }
@@ -12469,7 +12496,7 @@ test('Landscape fireworks: rare nighttime bursts fade completely and stay within
  const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
  for(const [w,h] of [[320,568],[844,390],[1440,900]]){
   const g=ctx.LandscapeGeometry.create(w,h);assert.equal(g.fireworks(0,.4).length,0);assert.equal(g.fireworks(60,.4).length,0);
-  const dots=g.fireworks(1.6,.4);assert.ok(dots.length>0&&dots.length<=48);
+  const dots=g.fireworks(1.6,.4);assert.ok(dots.length>0&&dots.length<=96,'a paired opening volley stays bounded');
   for(const dot of dots){assert.ok(dot.x>=0&&dot.x<=w&&dot.y>=0&&dot.y<g.horizon);assert.ok(dot.alpha>0&&dot.alpha<=1);}
  }
  assert.match(fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),/geometry\.fireworks\(/);
@@ -15349,13 +15376,17 @@ test('RISK prerequisites: completion, evergreen Done, restore, and deletion gove
  ctx.undo();assert.equal(ctx.isEligible(ctx.state.tasks.find(t=>t.id===gene.id)),true,'undo restores completed evergreen evidence');
 });
 
-test('RISK prerequisites: invalid links and cycles are rejected; missing imported references are eligible',async()=>{
- const {ctx}=await loadApp();const a=ctx.addTask('A'),b=ctx.addTask('B'),c=ctx.addTask('C');
- assert.equal(ctx.setTaskPrerequisite(a.id,a.id),false);
+test('RISK prerequisites: invalid links are rejected and cycles warn without discarding saved links',async()=>{
+ const {ctx,shim}=await loadApp();const a=ctx.addTask('A'),b=ctx.addTask('B'),c=ctx.addTask('C');
+ assert.equal(ctx.setTaskPrerequisite(a.id,a.id),true,'the requested self-cycle is saved with a warning');
+ assert.match(shim.document.getElementById('toast').textContent,/dependency cycle/i);
  assert.equal(ctx.setTaskPrerequisite(a.id,'unknown'),false);
  assert.equal(ctx.setTaskPrerequisite(a.id,b.id),true);
  assert.equal(ctx.setTaskPrerequisite(b.id,c.id),true);
- assert.equal(ctx.setTaskPrerequisite(c.id,a.id),false,'a task chain cannot become a deadlock');
+ assert.equal(ctx.setTaskPrerequisite(c.id,a.id),true,'indirect cycles are allowed and explained');
+ assert.match(shim.document.getElementById('toast').textContent,/cannot be scanned/i);
+ const cyclic=JSON.parse(JSON.stringify(ctx.state));ctx.hydrateState(cyclic);
+ assert.equal(cyclic.tasks.find(t=>t.id===c.id).prerequisiteId,a.id,'reload must not silently break a saved cycle');
  assert.equal(ctx.setTaskPrerequisite(a.id,null),true);assert.equal(ctx.isEligible(a),true);
  const saved=JSON.parse(JSON.stringify(ctx.state));saved.tasks.find(t=>t.id===a.id).prerequisiteId='deleted-on-another-device';
  ctx.hydrateState(saved);assert.equal(saved.tasks.find(t=>t.id===a.id).prerequisiteId,'deleted-on-another-device');
@@ -18425,7 +18456,7 @@ test('RISK night shows: standalone fireworks recur independently of the rare coo
  assert.equal(w.lastRare,0,'standalone shows do not delay the festival or alien visit');
  for(let i=0;i<70;i++)sky.advance(w,1,night);
  assert.equal(w.events.filter(e=>e.type==='fireworks').length,0,'the minimum-minute show finishes before its full rest');
- for(let i=0;i<50;i++)sky.advance(w,1,night);
+ for(let i=0;i<170;i++)sky.advance(w,1,night);
  assert.equal(w.events.filter(e=>e.type==='fireworks').length,1,'a second independent show starts after its sampled duration and full rest');
  assert.ok(w.events.length<=sky.MAX_EVENTS);
  const day=sky.createWorld(()=>0);day.events=[];day.next=Infinity;day.railNext=w.railNext;day.nextFireworks=0;day.nextFestival=0;
@@ -18475,7 +18506,7 @@ test('RISK night shows: launches lead to bounded fading bursts and the festival 
    assert.equal(g.fireworks(0,.4,festival,event).length,0);assert.equal(g.fireworks(end,.4,festival,event).length,0);
    let reflected=false,burst=false;
    for(let age=0;age<=end;age+=.1){
-    const dots=g.fireworks(age,.4,festival,event);assert.ok(dots.length<=96,'bounded particle budget');
+    const dots=g.fireworks(age,.4,festival,event);assert.ok(dots.length<=320,'paired shells and finale share a fixed bounded particle budget');
     for(const dot of dots){
      for(const n of [dot.x,dot.y,dot.tailX,dot.tailY,dot.alpha])assert.ok(Number.isFinite(n));
      assert.ok(dot.x>=-128&&dot.x<=w+128&&dot.y>=0&&dot.y<=g.waterTop+12);
@@ -18563,7 +18594,7 @@ test('RISK festival barge: hull, stage, and crowd follow the cruise-vessel scale
   assert.equal(festival.width,72*cruise.scale,`${width}x${height}: its hull stays near the existing cruise length`);
   assert.equal(festival.height,28*cruise.scale,`${width}x${height}: vertical stage geometry scales with the hull`);
   assert.equal(festival.hullDepth,3*cruise.scale,`${width}x${height}: draft scales with the hull`);
-  const launchAge=8+3.8*15,launcher=scene.festival({...event,age:launchAge}),rocket=scene.fireworks(launchAge+.001,.4,true,event).find(dot=>dot.kind==='rocket'&&dot.burst===15);
+  const launchAge=8+3.8*15,launcher=scene.festival({...event,age:launchAge}),rocket=scene.fireworks(launchAge+.001,.4,true,event).find(dot=>dot.kind==='rocket'&&dot.burst===30);
   assert.equal(launcher.launcherOffset,56*.49*launcher.scale,`${width}x${height}: launch origins share the painted scaled rack position`);
   assert.equal(launcher.launcherTop,-launcher.height*.21,`${width}x${height}: rack mast height follows the scaled stage`);
   assert.equal(launcher.launcherBottom,-launcher.height*.10,`${width}x${height}: rack mast base follows the scaled stage`);
@@ -19687,4 +19718,431 @@ test('RISK live scan sync: Settings describes live revision refresh while retain
  const {a}=await liveScanSyncClients();a.ctx.openSettings();
  assert.match(a.shim.document.getElementById('modalRoot').innerHTML,/when another device saves/,'Settings must describe the new open-device refresh');
  assert.match(a.shim.document.getElementById('modalRoot').innerHTML,/Drafts wait until you finish/,'the draft boundary remains visible to the user');
+});
+
+/* Dependencies are saved by task ID; fixtures never use an account or a real board. */
+test('RISK multiple dependencies: ten links require every prerequisite while completion deletion and Undo retain their rules',async()=>{
+ const {ctx}=await loadApp({seed:710});
+ const roots=Array.from({length:11},(_,i)=>ctx.addTask('Root '+i)),task=ctx.addTask('Dependent');
+ assert.equal(ctx.setTaskPrerequisites(task.id,roots.slice(0,10).map(t=>t.id)),true);
+ assert.equal(ctx.taskPrerequisiteIds(task).length,10);
+ const saved=JSON.stringify(task);
+ assert.equal(ctx.setTaskPrerequisites(task.id,roots.map(t=>t.id)),false,'eleven selections are refused without a partial save');
+ assert.equal(JSON.stringify(task),saved);
+ assert.equal(ctx.setTaskPrerequisites(task.id,['missing']),false,'new unknown IDs are still invalid');
+ for(const root of roots.slice(0,9))ctx.completeTask(root);
+ assert.equal(ctx.isEligible(task),false,'one unresolved link still blocks');
+ roots[9].evergreen=true;ctx.completeTask(roots[9]);assert.equal(ctx.isEligible(task),true);
+ ctx.reopenTask(roots[9]);assert.equal(ctx.isEligible(task),false,'returning an evergreen prerequisite cancels its completion');
+ ctx.deleteTask(roots[9].id);assert.equal(ctx.isEligible(task),true,'missing IDs release, rather than destroy, the saved link');
+ ctx.undo();assert.equal(ctx.isEligible(ctx.state.tasks.find(t=>t.id===task.id)),false);
+ assert.equal(ctx.taskPrerequisiteIds(ctx.state.tasks.find(t=>t.id===task.id)).length,10);
+});
+
+test('RISK multiple dependencies: old single links migrate and legacy edits preserve the other selected dependencies',async()=>{
+ const {ctx}=await loadApp();const a=ctx.addTask('A'),b=ctx.addTask('B'),c=ctx.addTask('C'),task=ctx.addTask('Dependent');
+ const old={...task,prerequisiteId:a.id};
+ for(const key of ['prerequisiteIds','prerequisiteOps','prerequisiteMirror','prerequisiteRevision'])delete old[key];
+ const board={...JSON.parse(JSON.stringify(ctx.state)),tasks:[a,b,c,old]};ctx.hydrateState(board);
+ const migrated=board.tasks.at(-1);assert.deepEqual(Array.from(ctx.taskPrerequisiteIds(migrated)),[a.id]);
+ ctx.setTaskPrerequisites(task.id,[a.id,b.id]);
+ const released=JSON.parse(JSON.stringify(ctx.state));const edited=released.tasks.find(t=>t.id===task.id);
+ edited.prerequisiteId=c.id;ctx.hydrateState(released);
+ assert.deepEqual(Array.from(ctx.taskPrerequisiteIds(edited)),[c.id,b.id],'an old single-field edit changes the first link only');
+ edited.prerequisiteId=null;ctx.hydrateState(released);
+ assert.deepEqual(Array.from(ctx.taskPrerequisiteIds(edited)),[b.id]);
+ const stable=JSON.stringify(released);ctx.hydrateState(released);assert.equal(JSON.stringify(released),stable,'repeated migration is idempotent');
+});
+
+test('RISK multiple dependencies: concurrent additions removals repeated readds and replacement Undo reconcile causally',async()=>{
+ const {ctx}=await loadApp({seed:711});const a=ctx.addTask('A'),b=ctx.addTask('B'),c=ctx.addTask('C'),task=ctx.addTask('Dependent');
+ ctx.setTaskPrerequisites(task.id,[a.id]);const base=JSON.parse(JSON.stringify(ctx.state));
+ const load=()=>loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(base)}});
+ const left=await load(),right=await load();
+ left.ctx.setTaskPrerequisites(task.id,[a.id,b.id]);right.ctx.setTaskPrerequisites(task.id,[a.id,c.id]);
+ const lhs=JSON.parse(JSON.stringify(left.ctx.state)),rhs=JSON.parse(JSON.stringify(right.ctx.state));
+ ctx.mergeUndeletedTasks(lhs,rhs);ctx.mergeUndeletedTasks(rhs,lhs);
+ assert.deepEqual([...ctx.taskPrerequisiteIds(lhs.tasks.find(t=>t.id===task.id))].sort(),[a.id,b.id,c.id].sort());
+ assert.deepEqual([...ctx.taskPrerequisiteIds(rhs.tasks.find(t=>t.id===task.id))].sort(),[a.id,b.id,c.id].sort());
+ left.ctx.setTaskPrerequisites(task.id,[]);const removed=JSON.parse(JSON.stringify(left.ctx.state));
+ ctx.mergeUndeletedTasks(removed,base);assert.deepEqual(Array.from(ctx.taskPrerequisiteIds(removed.tasks.find(t=>t.id===task.id))),[],'a stale copy cannot revive a removed link');
+ left.ctx.setTaskPrerequisites(task.id,[a.id]);const readded=JSON.parse(JSON.stringify(left.ctx.state));
+ ctx.mergeUndeletedTasks(readded,removed);assert.deepEqual(Array.from(ctx.taskPrerequisiteIds(readded.tasks.find(t=>t.id===task.id))),[a.id],'a deliberate readd survives the older removal');
+ left.ctx.undo();const undone=JSON.parse(JSON.stringify(left.ctx.state));ctx.mergeUndeletedTasks(undone,readded);
+ assert.deepEqual(Array.from(ctx.taskPrerequisiteIds(undone.tasks.find(t=>t.id===task.id))),[],'Undo carries a fresh observed removal across sync');
+ left.ctx.undo();const restored=JSON.parse(JSON.stringify(left.ctx.state));ctx.mergeUndeletedTasks(restored,removed);
+ assert.deepEqual([...ctx.taskPrerequisiteIds(restored.tasks.find(t=>t.id===task.id))].sort(),[a.id,b.id].sort(),'Undo removal deliberately restores both links');
+});
+
+test('RISK multiple dependencies: concurrent capacity conflicts retain the canonical ten and causal removal evidence',async()=>{
+ const {ctx}=await loadApp();const roots=Array.from({length:12},(_,i)=>ctx.addTask('Root '+i)),task=ctx.addTask('Dependent');
+ const base=JSON.parse(JSON.stringify(ctx.state));const left=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(base)}}),right=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(base)}});
+ const winning=roots.slice(0,10).map(t=>t.id),losing=roots.slice(2,12).map(t=>t.id);
+ left.ctx.setTaskPrerequisites(task.id,winning);right.ctx.setTaskPrerequisites(task.id,losing);
+ const winner=JSON.parse(JSON.stringify(left.ctx.state)),other=JSON.parse(JSON.stringify(right.ctx.state));
+ ctx.mergeUndeletedTasks(winner,other);
+ assert.deepEqual(Array.from(ctx.taskPrerequisiteIds(winner.tasks.find(t=>t.id===task.id))),winning,'capacity conflicts keep the canonical selections');
+ const first=JSON.stringify(winner);ctx.mergeUndeletedTasks(winner,other);assert.equal(JSON.stringify(winner),first,'a stale overflow cannot repeatedly reappear');
+ assert.ok(winner.tasks.find(t=>t.id===task.id).prerequisiteOps[roots[11].id].removes.length,'overflow intent remains recorded rather than silently forgotten');
+ assert.deepEqual(Array.from(ctx.taskPrerequisiteIds(other.tasks.find(t=>t.id===task.id))),losing,'merging never mutates the displaced recovery source');
+});
+
+test('RISK multiple dependencies: direct indirect and overlapping cycles warn but completed cycles and large acyclic graphs do not',async()=>{
+ const {ctx,shim}=await loadApp();const a=ctx.addTask('A'),b=ctx.addTask('B'),c=ctx.addTask('C'),d=ctx.addTask('Downstream');
+ ctx.setTaskPrerequisites(a.id,[b.id,c.id]);ctx.setTaskPrerequisites(b.id,[a.id]);ctx.setTaskPrerequisites(c.id,[b.id]);ctx.setTaskPrerequisites(d.id,[a.id]);
+ const cycles=ctx.blockingDependencyCycles(ctx.state).flat();assert.deepEqual([...cycles].sort(),[a.id,b.id,c.id].sort(),'overlapping cycles include every involved task and exclude merely downstream blockers');
+ assert.match(shim.document.getElementById('toast').textContent,/dependency cycle/i);
+ assert.equal(ctx.isEligible(d),false);
+ ctx.completeTask(a);assert.equal(ctx.blockingDependencyCycles(ctx.state).length,0,'a completed edge no longer prevents scanning');
+ const large={tasks:Array.from({length:12000},(_,i)=>({id:'node-'+i,title:'Node '+i,done:false,prerequisiteIds:i?['node-'+(i-1)]:[]}))};
+ assert.equal(ctx.blockingDependencyCycles(large).length,0,'deep chains use bounded iterative graph traversal');
+ large.tasks[0].prerequisiteIds=['node-11999'];assert.equal(ctx.blockingDependencyCycles(large)[0].length,12000);
+});
+
+test('RISK multiple dependencies: progressive Add and Edit controls cap at ten preserve drafts and reset on cancel or save',async()=>{
+ const {ctx,shim}=await loadApp();const a=ctx.addTask('A'),b=ctx.addTask('B');ctx.renderAddPanel();
+ const add=shim.document.getElementById('addDependencies');assert.doesNotMatch(add.innerHTML,/>\+ dependency</);
+ shim.document.getElementById('addPrerequisite').value=a.id;ctx.renderDependencyFields('add',ctx.readDependencyDraft('add'));
+ assert.match(add.innerHTML,/id="addPrerequisite"[\s\S]*>\+ dependency</,'the add button follows the selected first dependency');
+ ctx.onAction('add-dependency',{dataset:{scope:'add'}});shim.document.getElementById('addPrerequisite1').value=b.id;
+ shim.document.getElementById('addInput').value='Dependent';shim.document.getElementById('addEver').checked=true;
+ shim.document.getElementById('addEverHours').value='2';shim.document.getElementById('addEverUnit').value='days';
+ ctx.onAction('add',{});const task=ctx.state.tasks.find(t=>t.title==='Dependent');
+ assert.deepEqual(Array.from(ctx.taskPrerequisiteIds(task)),[a.id,b.id]);assert.equal(task.evergreenHours,48);
+ assert.doesNotMatch(add.innerHTML,/>\+ dependency</,'a saved Add starts a clean dependency draft');
+ ctx.openEdit(task.id);shim.document.getElementById('etPrerequisite').value='';
+ ctx.onAction('close-modal',{});ctx.openEdit(task.id);
+ assert.deepEqual(Array.from(ctx.readDependencyDraft('edit')),[a.id,b.id],'cancel/reopen restores the saved selections');
+ ctx.onAction('remove-dependency',{dataset:{scope:'edit',index:'0'}});
+ shim.document.getElementById('etTitle').value='Renamed';ctx.onAction('save-edit',{dataset:{id:task.id}});
+ assert.deepEqual(Array.from(ctx.taskPrerequisiteIds(task)),[b.id]);assert.equal(task.title,'Renamed');
+ ctx.openEdit(task.id);assert.deepEqual(Array.from(ctx.readDependencyDraft('edit')),[b.id]);
+ const ten=Array.from({length:10},(_,i)=>'selected-'+i);assert.doesNotMatch(ctx.dependencyFieldsHTML('add',ten),/>\+ dependency</);
+});
+
+test('RISK multiple dependencies: pasted tasks retain all selected links and All Tasks names only unresolved blockers safely',async()=>{
+ const {ctx,shim}=await loadApp();const a=ctx.addTask('<A & B>'),b=ctx.addTask('Other root');
+ ctx.importList('Pasted one\nPasted two',[],{}, {prerequisiteIds:[a.id,b.id]});
+ const added=ctx.state.tasks.filter(t=>t.id!==a.id&&t.id!==b.id);assert.ok(added.every(t=>ctx.taskPrerequisiteIds(t).length===2));
+ ctx.state.listOpen=true;ctx.renderList();let rows=shim.document.getElementById('listBody').innerHTML;
+ assert.match(rows,/Blocked by:.*&lt;A &amp; B&gt;.*Other root/);assert.doesNotMatch(rows,/<A & B>/);
+ ctx.completeTask(a);ctx.renderList();rows=shim.document.getElementById('listBody').innerHTML;
+ assert.match(rows,/Blocked by: Other root/);assert.doesNotMatch(rows,/Blocked by:.*&lt;A &amp; B&gt;/);
+ ctx.deleteTask(b.id);ctx.renderList();assert.doesNotMatch(shim.document.getElementById('listBody').innerHTML,/Blocked by:/);
+});
+
+test('RISK multiple dependencies sync: simultaneous edits converge and offline reload reconnect keeps Done and pause behavior',async()=>{
+ const {a,b,h,notify,candidateId,nextId,benchId}=await liveScanSyncClients();
+ a.ctx.setTaskPrerequisites(nextId,[benchId]);b.ctx.setTaskPrerequisites(nextId,[candidateId]);
+ a.ctx.cloudPushNow();b.ctx.cloudPushNow();await syncSettle(140);notify();await syncSettle(140);
+ for(const client of [a,b])assert.deepEqual([...client.ctx.taskPrerequisiteIds(client.ctx.state.tasks.find(t=>t.id===nextId))].sort(),[benchId,candidateId].sort());
+ h.failPull=true;a.ctx.setTaskPrerequisites(nextId,[candidateId]);await a.ctx.persist();a.ctx.cloudPushNow();
+ const offline=await loadApp({seedStorage:{[SYNC_STORE_KEY]:a.shim.localStorage.getItem(SYNC_STORE_KEY)},cloudSyncFactory:h.factory});
+ await syncSettle(40);assert.deepEqual(Array.from(offline.ctx.taskPrerequisiteIds(offline.ctx.state.tasks.find(t=>t.id===nextId))),[candidateId]);
+ h.failPull=false;await offline.ctx.cloudPull();offline.ctx.cloudPushNow();notify();await syncSettle(160);
+ b.ctx.onAction('cand-done',{dataset:{candidate:candidateId,benchmark:benchId}});await syncSettle(160);
+ assert.equal(h.remoteState().tasks.find(t=>t.id===candidateId).done,true,'Done remains an immediate cloud completion');
+ assert.deepEqual(Array.from(b.ctx.taskPrerequisiteIds(b.ctx.state.tasks.find(t=>t.id===nextId))),[candidateId],'the removed bench link stays removed after reconnect');
+ b.ctx.onAction('start-working',{dataset:{candidate:nextId,benchmark:benchId}});await syncSettle(160);
+ assert.equal(h.remoteState().mode,'work','done adding for now still shares pause state');
+});
+
+test('RISK Chance labels: frozen weight shares describe a fresh draw and never change saved order ratings or seed',async()=>{
+ const {ctx,shim}=await loadApp({seed:714});const bench=ctx.addTask('Oldest'),a=ctx.addTask('A'),b=ctx.addTask('B');
+ Object.assign(ctx.state,{chain:[bench.id],scanMode:'chance',candidateId:a.id,listOpen:true,mode:'scan'});
+ ctx.resetChance();ctx.state.chance.weights[a.id]=.25;ctx.state.chance.weights[b.id]=.75;
+ const before=JSON.stringify(ctx.state),order=ctx.candidateOrder(ctx.pool()).map(t=>t.id);
+
+ const unchangedAlgorithms={"updatePair":"a31c20a18454d735731d5e02bdf0767292e790a992725d7d35b02380cbf2568b","pBeats":"6003c75326298698b27f2ae691bed18928d6f96396da30ca9113a34463d3a3d9","chanceWeight":"96381985597245b65e9d26fa410c13ac801ce6a618e76665f69d049cc9485582","chanceHash":"012f3e461e84956335324e12c2646860bc6ed68ac31456dfb0d9bb231c0d4947","resetChance":"36f9f2a46730bc3e3bb068bea2b07d57d29c8cadf8184b9914733f2bfcc90b1a","chanceScore":"b033af5b0cbae63742983121a674ecd99aceabead078d6c7d8067bd3bf49c38f","candidateOrder":"14eb77f7bd0dbedae664aade1d050631264784e52f1ab2d69374c5e339993d16","chancePick":"d2a64e3f4e9a8431dc5439b5945f651f66521f4674aec6ef1b321bb4c1b8bf10","oldestFirst":"da6def7759fd3997881fa299c8b92324d49217c9534381d5c3c3be750d6d46aa"};
+ for(const [name,expected] of Object.entries(unchangedAlgorithms)){const start=html.indexOf("function "+name+"("),end=html.indexOf("\nfunction ",start+1);assert.equal(createHash("sha256").update(html.slice(start,end)).digest("hex"),expected,name+" selection and rating code stays byte-exact");}
+ const stats=ctx.chanceDisplayStats();assert.equal(stats.get(a.id).probability,.25);assert.equal(stats.get(b.id).probability,.75);
+ assert.equal(ctx.taskSelectionSummary(a,stats).label,'25% next draw');
+ assert.match(ctx.taskSelectionSummary(a,stats).title,/estimate.*fresh draw/i);
+ ctx.renderList();ctx.renderScan();assert.match(shim.document.getElementById('listBody').innerHTML,/25% next draw/);
+ assert.match(shim.document.getElementById('scan').innerHTML,/25% next draw/);
+ assert.doesNotMatch(shim.document.getElementById('scan').innerHTML,/top-\d/);
+ assert.equal(JSON.stringify(ctx.state),before,'displaying probabilities cannot generate a draw or write the board');
+ assert.deepEqual(Array.from(ctx.candidateOrder(ctx.pool()).map(t=>t.id)),Array.from(order));
+ ctx.state.scanMode='descending';ctx.renderList();ctx.renderScan();
+ assert.match(shim.document.getElementById('listBody').innerHTML,/top-\d/);assert.match(shim.document.getElementById('scan').innerHTML,/top-\d/);
+ assert.doesNotMatch(shim.document.getElementById('listBody').innerHTML,/next draw|scanned after/);
+});
+
+test('RISK Chance labels: exact numerical fallback and tiny positive candidates stay distinct while excluded tasks show zero',async()=>{
+ const {ctx}=await loadApp();const bench=ctx.addTask('Oldest'),positive=ctx.addTask('Tiny'),zero=ctx.addTask('Zero'),overflow=ctx.addTask('Overflow'),excluded=ctx.addTask('Blocked');
+ Object.assign(ctx.state,{chain:[bench.id],scanMode:'chance'});ctx.resetChance();
+ Object.assign(ctx.state.chance.weights,{[positive.id]:1e-200,[zero.id]:0,[overflow.id]:Number.MIN_VALUE,[excluded.id]:.9,[bench.id]:.5});
+ excluded.startsAt=ctx.todayISO(10);const stats=ctx.chanceDisplayStats();
+ assert.equal(ctx.taskSelectionSummary(zero,stats).label,'scanned after');assert.equal(ctx.taskSelectionSummary(overflow,stats).label,'scanned after');
+ assert.equal(Number.isFinite(ctx.chanceScore(overflow)),false,'the tiny-overflow label follows actual fallback membership');
+ assert.notEqual(ctx.taskSelectionSummary(positive,stats).label,'scanned after');assert.equal(ctx.taskSelectionSummary(positive,stats).label,'100% next draw','the sole available weighted task owns the next weighted draw');
+ assert.equal(ctx.taskSelectionSummary(excluded,stats).label,'0% next draw');
+ assert.match(ctx.taskSelectionSummary(excluded,stats).title,/outside the current/i);
+ const other=ctx.addTask('Ordinary weight');ctx.state.chance.weights[other.id]=.8;
+ const tiny=ctx.taskSelectionSummary(positive,ctx.chanceDisplayStats());assert.equal(tiny.label,'<0.01% next draw');
+ assert.ok(ctx.chanceDisplayStats().get(positive.id).weight>0);
+});
+
+test('RISK Chance labels: new task defaults normally draw but extreme TrueSkill tails have no positive guarantee',async()=>{
+ const {ctx}=await loadApp();const opponent=ctx.addTask('Opponent'),fresh=ctx.addTask('Fresh');
+ assert.equal(fresh.mu,25);assert.equal(fresh.sigma,25/3);assert.ok(ctx.chanceWeight(fresh)>0);
+ opponent.mu=100000;opponent.sigma=.8;assert.equal(ctx.chanceWeight(fresh),0,'the existing floating-point tail can underflow even for a new task');
+ ctx.state.scanMode='chance';ctx.state.chain=[opponent.id];ctx.resetChance();
+ assert.equal(ctx.taskSelectionSummary(fresh,ctx.chanceDisplayStats()).label,'scanned after');
+ const seed=ctx.state.chance.seed;ctx.openHelp();assert.equal(ctx.state.chance.seed,seed);
+});
+
+test('RISK Chance labels: an empty-chain preview excludes positive tails that overflow for every possible saved hash',async()=>{
+ const {ctx}=await loadApp(),oldest=ctx.addTask('Oldest'),strong=ctx.addTask('Strong'),weak=ctx.addTask('Weak');
+ oldest.createdAt=1;strong.createdAt=2;weak.createdAt=3;
+ for(const task of [oldest,strong,weak])task.sigma=.8;
+ oldest.mu=strong.mu=229.7;weak.mu=0;ctx.state.scanMode='chance';
+ const weight=ctx.chanceWeight(weak),bestU=(4294967295+.5)/4294967296;
+ assert.ok(weight>0,'the actual supported rating fixture has a positive numerical tail');
+ assert.equal(-Math.log(bestU)/weight,Infinity,'even the most favorable possible 32-bit draw cannot enter the weighted pool');
+ const before=JSON.stringify(ctx.state),preview=ctx.chanceDisplayStats();
+ assert.equal(ctx.taskSelectionSummary(weak,preview).label,'scanned after','the seedless preview must not advertise an impossible weighted draw');
+ assert.equal(ctx.taskSelectionSummary(strong,preview).label,'100% next draw');
+ assert.equal(ctx.taskSelectionSummary(oldest,preview).label,'first dot · by age');
+ assert.equal(JSON.stringify(ctx.state),before,'classifying preview overflow cannot create a seed or change ratings');
+ ctx.startScan('chance');assert.deepEqual(Array.from(ctx.state.chain),[oldest.id]);
+ assert.equal(ctx.chanceScore(weak),Infinity);assert.equal(ctx.taskSelectionSummary(weak,ctx.chanceDisplayStats()).label,'scanned after','starting the scan preserves the truthful fallback label');
+});
+
+test('RISK multiple dependencies FAQ: extended help explains progressive links saved cycles live sync and scoped Chance labels',async()=>{
+ const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ for(const text of [/up to ten dependencies/i,/\+ dependency/,/blocked by/i,/cycle.*warning/i,/fresh draw/i,/scanned after/i,/open devices/i,/draft/i,/offline/i,/top-K/])assert.match(help,text);
+ assert.doesNotMatch(help,/first dot in either mode is labeled/i,'the age label belongs to Chance presentation; descending retains its top-K summary');
+ assert.match(help,/older (?:tabs|clients).*refresh/i,'older single-link controls must disclose their complex-dependency boundary');
+ const instructions=fs.readFileSync(path.join(__dirname,'AGENTS.md'),'utf8');
+ assert.match(instructions,/live product/i);assert.match(instructions,/extended FAQ/i);assert.match(instructions,/regression/i);
+});
+
+function releasedDependencyHydrator(ctx,sha){
+ const result=spawnSync('git',['show',sha+':index.html'],{cwd:__dirname,encoding:'utf8'});
+ assert.equal(result.status,0,'actual supported released source must exist');
+ const start=result.stdout.indexOf('function hydrateState(st){'),end=result.stdout.indexOf('\nfunction ',start+1);
+ assert.ok(start>=0&&end>start);
+ return vm.runInContext('('+result.stdout.slice(start,end)+')',ctx);
+}
+
+test('RISK backup age styling: Delete turns destructive strictly after seven elapsed days for either storage source without changing bytes',async()=>{
+ const now=Date.parse('2026-10-06T12:00:00Z'),week=7*24*HOUR;
+ for(const source of ['legacy','device']){
+  const {ctx,shim}=await loadApp();setFakeTime(ctx,now);
+  const payload=JSON.stringify(ctx.state),cases=[['younger',week-1,false],['boundary',week,false],['older',week+1,true],['future',-HOUR,false],['unknown',null,false]];
+  const rows=cases.map(([id,age])=>({id,kind:'manual',day:'2026-10-01',at:age===null?null:now-age,payload}));
+  if(source==='legacy')shim.localStorage.setItem(LOCAL_BACKUPS_KEY,JSON.stringify(rows));
+  else{ctx.backupAgeFixtures=rows;vm.runInContext('deviceStorageAuthority=true;deviceBackupCacheReadable=true;deviceBackupCache=backupAgeFixtures',ctx);}
+  const before=source==='legacy'?shim.localStorage.getItem(LOCAL_BACKUPS_KEY):JSON.stringify(rows);
+  ctx.openSettings();const markup=shim.document.getElementById('modalRoot').innerHTML;
+  for(const [id,,red] of cases){const tag=[...markup.matchAll(/<button class="([^"]+)" data-act="delete-local-backup" data-id="([^"]+)"[^>]*>/g)].find(m=>m[2]===id);assert.ok(tag,id+' remains visible');assert.equal(tag[1].split(/\s+/).includes('danger'),red,source+'/'+id+': timestamp age uses a strict seven-day boundary');}
+  assert.equal(source==='legacy'?shim.localStorage.getItem(LOCAL_BACKUPS_KEY):JSON.stringify(rows),before,'opening Settings must not delete or rewrite any backup');
+ }
+});
+
+test('RISK fireworks occurrence: standalone sampled starts are exactly twice as far apart while duration odds budgets and festival timing stay intact',()=>{
+ const load=(released=false)=>{const context=vm.createContext({Date,Math,console});for(const file of ['landscape-config.js','vendor/astronomy.min.js','stars.js','landscape-core.js']){let source=fs.readFileSync(path.join(__dirname,file),'utf8');if(released){const r=spawnSync('git',['show','d4ceaaa74f9494538d16044b968f8cfcfe75fb5b:'+file],{cwd:__dirname,encoding:'utf8'});assert.equal(r.status,0);source=r.stdout;}vm.runInContext(source,context);}return context;};
+ for(const rate of [0,1,2,10]){
+  const trace=context=>{let seed=97631;const random=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/2**32;},sky=context.LivingSky;
+   context.LandscapeConfig.setSpawnRates('| Event | Rate |\n| fireworks | '+rate+' |');
+   const world=sky.createWorld(random);world.events=[];world.next=Infinity;world.nextFestival=Infinity;world.railNext={train:Infinity,metro:Infinity};
+   const shows=[];for(let i=0;i<100&&shows.length<5;i++){sky.advance(world,world.nextFireworks-world.elapsed,{sun:{altitude:-20,azimuth:0}});const show=world.events.find(e=>e.type==='fireworks');if(show)shows.push({start:world.elapsed,duration:show.duration});assert.ok(world.events.length<=sky.MAX_EVENTS);}return shows;};
+  const legacy=load(true),current=load(),before=trace(legacy),after=trace(current);
+  assert.deepEqual(after.map(e=>e.duration),before.map(e=>e.duration),'only occurrence timing changes, never sampled show duration');
+  assert.deepEqual(after.map(e=>e.start),before.map(e=>e.start*2),'every same-sample start, including failed chances, is spaced by exactly twice the released schedule');
+  assert.equal(current.LandscapeConfig.nightShows.fireworks.chance,legacy.LandscapeConfig.nightShows.fireworks.chance,'do not confuse opportunity frequency with conditional odds');
+  assert.deepEqual(JSON.parse(JSON.stringify(current.LandscapeConfig.nightShows.festival)),JSON.parse(JSON.stringify(legacy.LandscapeConfig.nightShows.festival)),'the barge visit and rare-event cooldown stay intact');
+  assert.equal(current.LivingSky.MAX_EVENTS,legacy.LivingSky.MAX_EVENTS);
+ }
+});
+
+test('RISK fireworks density and finale: paired regular shells lead to eight visible finale shells within a fixed budget and natural fade',()=>{
+ const load=(released=false)=>{const context=vm.createContext({Math});let source=fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8');if(released){const r=spawnSync('git',['show','d4ceaaa74f9494538d16044b968f8cfcfe75fb5b:landscape-geometry.js'],{cwd:__dirname,encoding:'utf8'});assert.equal(r.status,0);source=r.stdout;}vm.runInContext(source,context);return context.LandscapeGeometry;};
+ const previous=load(true),current=load();
+ for(const [width,height] of [[320,568],[390,844],[568,320],[768,1024],[1440,900]])for(const festival of [false,true]){
+  const old=previous.create(width,height),geometry=current.create(width,height),duration=festival?150:180,event={type:festival?'festival':'fireworks',duration,seed:.4};
+  const shells=dots=>new Set(dots.map(dot=>dot.burst)).size;
+  for(const age of festival?[61.6,71.6,81.6]:[1.6,21.6,61.6])assert.equal(shells(geometry.fireworks(age,.4,festival,event)),2*shells(old.fireworks(age,.4,festival,event)),`${width}x${height}/${festival?'barge':'standalone'}/${age}: twice the regular shells are airborne while both launchers are on screen`);
+  const finaleAt=festival?duration*.65:duration-4,peak=geometry.fireworks(finaleAt+1.6,.4,festival,event);
+  assert.equal(shells(peak.filter(dot=>dot.finale)),8,'the chosen eight-shell finale is visibly larger than a normal paired volley');
+  assert.ok(peak.some(dot=>dot.kind==='spark'));
+  const alpha=age=>geometry.fireworks(age,.4,festival,event).reduce((total,dot)=>total+dot.alpha,0);
+  assert.ok(alpha(finaleAt+1.6)>alpha(finaleAt+2.6));assert.ok(alpha(finaleAt+2.6)>alpha(finaleAt+3.6));assert.equal(alpha(finaleAt+3.7),0,'remaining embers fully fade rather than cutting off at the event boundary');
+  for(const age of [0,.4,1.6,21.6,finaleAt+.4,finaleAt+1.6,finaleAt+2.6,finaleAt+3.6,duration]){
+   const dots=geometry.fireworks(age,.4,festival,event);assert.ok(dots.length<=320,'eight shells share the fixed 320-particle ceiling');
+   assert.ok(dots.every(dot=>[dot.x,dot.y,dot.alpha].every(Number.isFinite)&&dot.alpha>0&&dot.alpha<=1));assert.ok(dots.every(dot=>dot.x>=(dot.finale?0:-128)&&dot.x<=width+(dot.finale?0:128)&&dot.y>=0&&dot.y<=geometry.waterTop+12),'finale sparks stay visible while ordinary entering/departing barge sparks keep the existing bounded canvas-clipping margin');
+   assert.deepEqual(geometry.fireworks(age,.4,festival,event),dots,'repaint does not resample particles or launch timing');
+  }
+  assert.equal(geometry.fireworks(duration,.4,festival,event).length,0);
+ }
+ const renderer=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');assert.match(renderer,/if\(reduced\|\|document\.hidden\)\{frame=0;return;\}/,'reduced or hidden scenes keep the existing stopped animation clock');assert.doesNotMatch(renderer.slice(renderer.indexOf('  function paintFireworks('),renderer.indexOf('  function paintClocktowerVisit(')),/setInterval|Date\.now|Math\.random|(?:lighter|screen)/,'fireworks retain deterministic pausable geometry and avoid flash compositing');
+});
+
+test('RISK product FAQ: backup age fireworks and resting remote completions match the shipped controls',async()=>{
+ const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(help,/Delete.*red.*more than seven days/i);
+ assert.match(help,/twice as far apart/i);assert.match(help,/paired shells/i);assert.match(help,/eight-shell finale/i);
+ assert.match(help,/fairy.light poles.*selected.*night/i,'the scenery FAQ explains event-only supports');
+ assert.match(help,/completed on another device.*scanner chain/i);
+ const instructions=fs.readFileSync(path.join(__dirname,'AGENTS.md'),'utf8');assert.match(instructions,/commit, push, merge, and release/i);
+});
+
+test('RISK multiple dependencies legacy publications: distinct accepted edits survive an unobserved removal and repeated reads stay idempotent',async()=>{
+ for(const alreadySelected of [false,true]){
+  const {ctx}=await loadApp(),a=ctx.addTask('A'),b=ctx.addTask('B'),task=ctx.addTask('Dependent');
+  ctx.setTaskPrerequisites(task.id,alreadySelected?[a.id,b.id]:[a.id]);
+  const raw=JSON.parse(JSON.stringify(ctx.state));raw.tasks.find(t=>t.id===task.id).prerequisiteId=b.id;
+  const first=JSON.parse(JSON.stringify(raw)),second=JSON.parse(JSON.stringify(raw));
+  ctx.hydrateState(first,{account:'e@example.com',rev:6});ctx.hydrateState(second,{account:'e@example.com',rev:7});
+  const tokens=board=>board.tasks.find(t=>t.id===task.id).prerequisiteOps[b.id].adds;
+  assert.notDeepEqual(tokens(first),tokens(second),'distinct accepted publications must record distinct legacy edit intent, including a selected second link');
+  const replay=JSON.parse(JSON.stringify(raw));ctx.hydrateState(replay,{account:'e@example.com',rev:6});assert.deepEqual(replay,first);
+  const bytes=JSON.stringify(first);ctx.hydrateState(first);assert.equal(JSON.stringify(first),bytes,'normalized local reload must not synthesize a new operation');
+  ctx.replaceState(first);ctx.setTaskPrerequisites(task.id,[]);
+  const removed=JSON.parse(JSON.stringify(ctx.state));ctx.mergeUndeletedTasks(removed,second);
+  assert.deepEqual(Array.from(ctx.taskPrerequisiteIds(removed.tasks.find(t=>t.id===task.id))),[b.id],'a later independently published addition was not observed by the earlier removal');
+  const foreign=JSON.parse(JSON.stringify(raw));ctx.hydrateState(foreign,{account:'other@example.com',rev:6});assert.notDeepEqual(tokens(foreign),tokens(first),'publication identity is account scoped');
+ }
+});
+
+test('RISK multiple dependencies legacy publications: cloud conversion uses the accepted server revision rather than local revision or clocks',async()=>{
+ const prepared=await loadApp(),a=prepared.ctx.addTask('A'),b=prepared.ctx.addTask('B'),task=prepared.ctx.addTask('Dependent');
+ prepared.ctx.setTaskPrerequisites(task.id,[a.id]);const base=JSON.parse(JSON.stringify(prepared.ctx.state));
+ Object.assign(base,{syncRev:5,syncAccount:'e@example.com',syncDirty:false});
+ const raw=JSON.parse(JSON.stringify(base));raw.tasks.find(t=>t.id===task.id).prerequisiteId=b.id;
+ const edits=[];
+ for(const rev of [6,7]){
+  const h=makeSyncHarness({remote:raw,rev});const {ctx}=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(base)},cloudSyncFactory:h.factory});
+  await ctx.cloudPull();await syncSettle(40);
+  edits.push([...ctx.state.tasks.find(t=>t.id===task.id).prerequisiteOps[b.id].adds]);
+ }
+ assert.notDeepEqual(edits[0],edits[1],'actual cloudPull must bind the authoritative publication before hydration changes the unknown metadata');
+ for(const syncRev of [1,999]){
+  const local=JSON.parse(JSON.stringify(raw));local.syncRev=syncRev;prepared.ctx.hydrateState(local);
+  if(syncRev===1)edits[2]=local.tasks.find(t=>t.id===task.id).prerequisiteOps[b.id].adds;
+  else assert.deepEqual(local.tasks.find(t=>t.id===task.id).prerequisiteOps[b.id].adds,edits[2],'local revision fields do not impersonate an accepted publication');
+ }
+});
+
+test('RISK multiple dependencies legacy mirrors: saved self short and long cycles survive actual supported hydrate and unrelated edits',async()=>{
+ for(const sha of ['7b9c92a41999a44a12f92b7d6d1c8d02758c635e','d4ceaaa74f9494538d16044b968f8cfcfe75fb5b'])for(const length of [1,2,6]){
+  const {ctx}=await loadApp(),nodes=Array.from({length},(_,i)=>ctx.addTask('Cycle '+i));
+  for(let i=0;i<length;i++)ctx.setTaskPrerequisites(nodes[i].id,[nodes[(i+1)%length].id]);
+  const prior=JSON.parse(JSON.stringify(ctx.state)),legacy=JSON.parse(JSON.stringify(prior));
+  releasedDependencyHydrator(ctx,sha)(legacy);legacy.tasks[0].title='Unrelated legacy title edit';ctx.hydrateState(legacy);
+  for(const task of prior.tasks){const restored=legacy.tasks.find(t=>t.id===task.id);assert.deepEqual(Array.from(ctx.taskPrerequisiteIds(restored)),Array.from(ctx.taskPrerequisiteIds(task)),'released hydration must not become removal intent');assert.deepEqual(JSON.parse(JSON.stringify(restored.prerequisiteOps)),task.prerequisiteOps);assert.equal(restored.prerequisiteRevision,task.prerequisiteRevision);}
+  assert.equal(legacy.tasks[0].title,'Unrelated legacy title edit');
+  const stable=JSON.stringify(legacy);ctx.hydrateState(legacy);assert.equal(JSON.stringify(legacy),stable);
+ }
+});
+
+test('RISK multiple dependencies legacy mirrors: exposed removals and hidden first-link replacement preserve the other nine selections',async()=>{
+ const {ctx}=await loadApp(),roots=Array.from({length:11},(_,i)=>ctx.addTask('Root '+i)),task=ctx.addTask('Dependent');
+ ctx.setTaskPrerequisites(task.id,roots.slice(0,10).map(t=>t.id));ctx.setTaskPrerequisites(roots[0].id,[task.id]);
+ const raw=JSON.parse(JSON.stringify(ctx.state)),suppressed=raw.tasks.find(t=>t.prerequisiteIds.length&&t.prerequisiteId===null);
+ assert.ok(suppressed,'at least one first-field cycle edge is hidden from old sanitizers');
+ const hidden=raw.tasks.find(t=>t.id===task.id);
+ // Explicitly present this task's first stored link through a cycle-safe null mirror.
+ hidden.prerequisiteId=null;hidden.prerequisiteMirror=null;
+ hidden.prerequisiteId=roots[10].id;ctx.hydrateState(raw,{account:'e@example.com',rev:8});
+ assert.deepEqual(Array.from(ctx.taskPrerequisiteIds(hidden)),[roots[10].id,...roots.slice(1,10).map(t=>t.id)],'an older selection changes the first stored link without displacing an unseen last link at capacity');
+ const ordinary=JSON.parse(JSON.stringify(raw)),edited=ordinary.tasks.find(t=>t.id===roots[0].id);assert.equal(edited.prerequisiteMirror,task.id,'the broken cycle exposes this ordinary link again without recording new intent');edited.prerequisiteId=null;ctx.hydrateState(ordinary);
+ assert.deepEqual(Array.from(ctx.taskPrerequisiteIds(edited)),[],'an exposed noncycle legacy null remains intentional removal');
+});
+
+test('RISK multiple dependencies legacy mirrors: merge replacement Undo Restore and every persistence projection retain causal graph bytes',async()=>{
+ const {ctx,shim}=await loadApp(),a=ctx.addTask('A'),b=ctx.addTask('B');
+ ctx.setTaskPrerequisites(a.id,[b.id]);const left=JSON.parse(JSON.stringify(ctx.state));
+ const other=JSON.parse(JSON.stringify(left));other.tasks=other.tasks.filter(t=>t.id===b.id);other.tasks[0].prerequisiteIds=[a.id];
+ for(const key of ['prerequisiteId','prerequisiteMirror','prerequisiteOps'])delete other.tasks[0][key];ctx.hydrateState(other);
+ left.tasks=left.tasks.filter(t=>t.id===a.id);const incoming=JSON.stringify(other);
+ ctx.mergeUndeletedTasks(left,other);assert.equal(JSON.stringify(other),incoming,'projecting a newly merged cycle never mutates its recovery source');
+ const expected=left.tasks.map(t=>[t.id,Array.from(ctx.taskPrerequisiteIds(t)),JSON.stringify(t.prerequisiteOps),t.prerequisiteRevision]);
+ const assertSafe=board=>{const legacy=JSON.parse(JSON.stringify(board));releasedDependencyHydrator(ctx,'d4ceaaa74f9494538d16044b968f8cfcfe75fb5b')(legacy);for(const task of board.tasks)assert.equal(legacy.tasks.find(t=>t.id===task.id).prerequisiteId,task.prerequisiteId,'every emitted first-field graph must already be cycle safe');};
+ assertSafe(left);ctx.replaceState(left);ctx.initializeReplacedScan();
+ const snapshot=JSON.stringify(ctx.state),exported=JSON.parse(ctx.cloudPayload());assert.equal(JSON.stringify(ctx.state),snapshot,'export projection stays read-only');assertSafe(exported);
+ assert.equal(await ctx.persist(),true);assertSafe(JSON.parse(shim.localStorage.getItem(SYNC_STORE_KEY)));
+ const backup=await ctx.saveDurableBackup('manual',JSON.stringify(ctx.state));assert.ok(backup?.id);
+ ctx.setTaskPrerequisites(a.id,[]);ctx.undo();assertSafe(ctx.state);
+ ctx.setTaskPrerequisites(a.id,[]);ctx.openSettings();assert.equal(await ctx.restoreDurableBackupById(backup.id),true);assertSafe(ctx.state);
+ for(const [id,ids] of expected)assert.deepEqual(Array.from(ctx.taskPrerequisiteIds(ctx.state.tasks.find(t=>t.id===id))),ids);
+ const causal=ctx.state.tasks.map(t=>[t.id,JSON.stringify(t.prerequisiteOps),t.prerequisiteRevision]);
+ ctx.projectLegacyPrerequisites(ctx.state);assert.deepEqual(ctx.state.tasks.map(t=>[t.id,JSON.stringify(t.prerequisiteOps),t.prerequisiteRevision]),causal,'mirror projection never invents edge intent');
+});
+
+test('RISK multiple dependencies legacy mirrors: repeated identical cycle merges report no recovered data while real removals remain changes',async()=>{
+ for(const size of [1,2,8]){
+  const {ctx}=await loadApp(),tasks=Array.from({length:size},(_,i)=>ctx.addTask('Cycle '+i));
+  for(let i=0;i<size;i++)ctx.setTaskPrerequisites(tasks[i].id,[tasks[(i+1)%size].id]);
+  vm.runInContext('if(saveTimer)clearTimeout(saveTimer);saveTimer=null',ctx);
+  const winner=JSON.parse(JSON.stringify(ctx.state)),peer=JSON.parse(JSON.stringify(winner)),before=JSON.stringify(winner),source=JSON.stringify(peer);
+  assert.ok(winner.tasks.some(t=>t.prerequisiteIds.length&&t.prerequisiteId===null),'the old-client projection hides a closing cycle edge');
+  for(let repeat=0;repeat<3;repeat++){
+   assert.equal(ctx.mergeUndeletedTasks(winner,peer),false,'identical saved cycle bytes must not report recovered data');
+   assert.equal(JSON.stringify(winner),before,'the entire board stays byte-identical');assert.equal(JSON.stringify(peer),source,'the recovery source is never mutated');
+  }
+  ctx.setTaskPrerequisites(tasks[0].id,[]);vm.runInContext('if(saveTimer)clearTimeout(saveTimer);saveTimer=null',ctx);
+  const removal=JSON.parse(JSON.stringify(ctx.state));assert.equal(ctx.mergeUndeletedTasks(winner,removal),true,'a real observed edge removal still requests persistence');
+  assert.deepEqual(Array.from(ctx.taskPrerequisiteIds(winner.tasks.find(t=>t.id===tasks[0].id))),[]);
+  const removed=JSON.stringify(winner);assert.equal(ctx.mergeUndeletedTasks(winner,removal),false);assert.equal(JSON.stringify(winner),removed);
+ }
+});
+
+test('RISK multiple dependencies legacy mirrors: local and IndexedDB saves retain cycle warnings without false recovery messages',async()=>{
+ const {indexedDB}=await import('fake-indexeddb');
+ for(const durable of [false,true]){
+  const {ctx,shim}=await loadApp(durable?{indexedDBProvider:indexedDB,deviceDbName:'cycle-warning-'+Date.now()+'-'+Math.random()}:{}),task=ctx.addTask('Saved cycle');
+  ctx.setTaskPrerequisites(task.id,[task.id]);vm.runInContext('if(saveTimer)clearTimeout(saveTimer);saveTimer=null;warnedDependencyCycle=""',ctx);
+  const calls=[],original=ctx.toast;ctx.toast=(message,duration)=>{original(message,duration);calls.push({message,duration});};ctx.render();
+  assert.equal(calls.length,1);assert.match(calls[0].message,/Dependency cycle/);assert.equal(calls[0].duration,8000);
+  for(let repeat=0;repeat<2;repeat++)assert.equal(await ctx.persist(),true,'ordinary saves remain successful');
+  assert.deepEqual(calls,[calls[0]],'idempotent saves must not replace the displayed cycle warning with a missing-task message');
+  assert.match(shim.document.getElementById('toast').textContent,/Dependency cycle/);
+  const stored=JSON.parse(durable?(await shim.window.ScannerDeviceStore.readHead()).payload:shim.localStorage.getItem(SYNC_STORE_KEY));
+  assert.deepEqual(stored.tasks,JSON.parse(JSON.stringify(ctx.state.tasks)),'all saved task fields and causal graph evidence remain intact');
+  ctx.openHelp();assert.match(shim.document.getElementById('modalRoot').innerHTML,/warning stays visible through ordinary background saves/,'the extended FAQ describes the retained warning');
+  if(durable)shim.window.ScannerDeviceStore.close();
+ }
+});
+
+test('RISK multiple dependencies layout: long blockers wrap within their row and dependency selects keep touchable widths',()=>{
+ assert.match(html,/\.tmain:has\(\.dependency-blockers\)\s*\{[^}]*flex-wrap:wrap/,'only rows with blockers gain the extra line');
+ assert.match(html,/\.dependency-blockers\s*\{[^}]*flex-basis:100%[^}]*overflow-wrap:anywhere/,'long task names wrap independently of the title and rank summary');
+ assert.match(html,/\.dependency-row select\s*\{[^}]*flex:1[^}]*min-width:min\(180px,100%\)/,'native selects stay touchable while fitting short phone rows');
+});
+
+test('RISK multiple dependencies: Undo restores a deleted task link as intent without reviving it from stale copies',async()=>{
+ const {ctx}=await loadApp();const root=ctx.addTask('Root'),task=ctx.addTask('Dependent');
+ ctx.setTaskPrerequisites(task.id,[root.id]);ctx.deleteTask(root.id);
+ ctx.setTaskPrerequisites(task.id,[]);const removed=JSON.parse(JSON.stringify(ctx.state));
+ ctx.undo();const restored=JSON.parse(JSON.stringify(ctx.state));
+ assert.deepEqual(Array.from(ctx.taskPrerequisiteIds(restored.tasks.find(t=>t.id===task.id))),[root.id],'Undo preserves the deliberately restored dangling ID');
+ ctx.mergeUndeletedTasks(restored,removed);
+ assert.deepEqual(Array.from(ctx.taskPrerequisiteIds(restored.tasks.find(t=>t.id===task.id))),[root.id],'fresh restore intent survives the older removal');
+ assert.equal(ctx.isEligible(restored.tasks.find(t=>t.id===task.id)),true);
+});
+
+test('RISK Chance labels: disabled presentation flags retain their hidden summaries and matching FAQ language',async()=>{
+ const {ctx,shim}=await loadApp();const first=ctx.addTask('First'),second=ctx.addTask('Second');
+ Object.assign(ctx.state,{chain:[first.id],candidateId:second.id,listOpen:true,scanMode:'chance'});ctx.resetChance();
+ vm.runInContext('FEATURE_FLAGS.topKLanguage=false;FEATURE_FLAGS.rankSparklines=false',ctx);
+ ctx.render();assert.doesNotMatch(shim.document.getElementById('scan').innerHTML,/topkchip|next draw|scanned after/);
+ assert.doesNotMatch(shim.document.getElementById('listBody').innerHTML,/class="tk"|next draw|scanned after/);
+ ctx.openHelp();assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/top-K/i);
+ vm.runInContext('FEATURE_FLAGS.topKLanguage=true',ctx);ctx.openHelp();assert.match(shim.document.getElementById('modalRoot').innerHTML,/top-K/i);
+});
+
+test('RISK Chance labels: the deterministic oldest first dot has an age label and is excluded from the following weighted draw',async()=>{
+ const {ctx,shim}=await loadApp();const oldest=ctx.addTask('Oldest'),a=ctx.addTask('A'),b=ctx.addTask('B');
+ oldest.createdAt=1;a.createdAt=2;b.createdAt=3;ctx.state.scanMode='chance';ctx.state.listOpen=true;ctx.resetChance();
+ Object.assign(ctx.state.chance.weights,{[oldest.id]:.9,[a.id]:.25,[b.id]:.75});
+ const before=JSON.stringify(ctx.state),stats=ctx.chanceDisplayStats();
+ assert.equal(ctx.taskSelectionSummary(oldest,stats).label,'first dot · by age','the next dot is deterministic, never labeled as a random draw');
+ assert.equal(ctx.taskSelectionSummary(a,stats).label,'50% next draw','starting the empty chain will freeze current ratings rather than reuse stale weights');
+ assert.equal(ctx.taskSelectionSummary(b,stats).label,'50% next draw');
+ ctx.renderList();assert.match(shim.document.getElementById('listBody').innerHTML,/first dot · by age/);
+ assert.equal(JSON.stringify(ctx.state),before,'the projection cannot create a dot or a seed');
+ ctx.startScan('chance');assert.deepEqual(Array.from(ctx.state.chain),[oldest.id]);
+ assert.equal(ctx.taskSelectionSummary(oldest,ctx.chanceDisplayStats()).label,'0% next draw','the dotted benchmark is then outside the candidate pool');
 });

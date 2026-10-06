@@ -4,11 +4,36 @@ Read [CLAUDE.md](CLAUDE.md) before working in this repository. It is the
 authoritative source for the project’s architecture, TDD workflow, testing
 requirements, and conventions.
 
+## Live product maintenance
+
+Chain Scanner is a live product used with real saved boards. Preserve existing
+local work and user data; exercise edits with isolated fixtures and browser
+profiles. Never use production tasks, accounts, or storage as test data.
+
+User-requested repository changes, including documentation, are authorized to
+commit, push, merge, and release to this existing live deployment after the
+applicable checks pass, unless the user specifies a narrower scope. Honor any
+current task-specific hold or limit before publication.
+
+Every user-facing behavior change must update the corresponding **extended FAQ**
+in Quick start before release, retaining its structure and unrelated content.
+Keep its explanation consistent with the actual controls, saved-data behavior,
+and current limitations, and document the change in the Settings changelog.
+
+Apply the mandatory regression, cloud compatibility, data preservation, and
+exact-candidate review gates in [CLAUDE.md](CLAUDE.md) and
+[RELEASE_GATES.md](RELEASE_GATES.md). For persisted or sync changes, include old
+saved data, concurrent clients, offline/reload/reconnect, and completion/Undo.
+For controls or layout, inspect real phone, tablet, and desktop browsers.
+Publication requires applicable user authorization, successful required CI on
+the reviewed commit, Pages deployment, and an exact live-asset and behavior
+check. Record local tests, reviews, CI, deployment, and live results separately;
+a local pass alone does not establish that a fix has shipped.
+
 ## Allowed delegated agents
 
-- Only `gpt-5.6-sol` and `gpt-6-luna` may be delegated as subagents.
-- Use `gpt-5.6-sol` with `low`, `medium`, `high`, or `xhigh` reasoning; `max`
-  and `ultra` are not allowed for this model.
+- Only `gpt-6.1-sol` and `gpt-6-luna` may be delegated as subagents.
+- Use `gpt-6.1-sol` at normal speed for code and specialist reviews.
 - Use `gpt-6-luna` at `max` reasoning.
 - The coordinator model and reasoning effort remain unchanged.
 
