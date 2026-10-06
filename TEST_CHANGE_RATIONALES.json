@@ -1972,5 +1972,32 @@
       "command": "node --test --test-reporter=spec --test-name-pattern='RISK scan lifecycle' tests.js",
       "failure": "Before implementation all nine new regressions failed: offered resting Dot and discarded pair mutation, exact-expiry first Start, old day anchor, unsaved legacy remote seed, no automatic competing repair publication, unsaved retry, and missing FAQ. Full output: /tmp/chain-mode-fixes-evidence-20261006.Ke4YJT/red-native.log The finalized concurrency barrier and matching-preference Resume fixture also produced nine failures on an isolated unchanged 06cae95 archive: /tmp/chain-mode-fixes-evidence-20261006.Ke4YJT/red-finalized-tests-original.log."
     }
+  },
+  {
+    "testChangesSha256": "483b5016381878ccee7f3209b543f87b46fdae0041ccc0d973dc289973837a1e",
+    "reason": "The user requested durable task rating history. Add direct event, observation, Undo, concurrent merge, legacy data, device reload, export and responsive UI coverage while preserving every original feature assertion. The existing Dislodge Undo whole-task equality now checks all original fields exactly and separately requires retained Dislodge/Undo observations, as explicitly required by the history request.",
+    "previousBehavior": "Saved tasks contained only current μ and σ; there was no timestamped comparison posterior, overall draw-share or sampled Top x observation. Opening the editor was read-only.",
+    "intendedBehavior": "Record immutable per-task observations at real rating or task actions and changed explicit editor Saves. Preserve actual event identity, original time and before/after values, without backfilling history, new selection signals or render/open writes.",
+    "replacementTests": [
+      "RISK task rating history: actual comparisons retain timestamped before and after values without backfilling or changing signals",
+      "RISK task rating history: editor observations distinguish relative movement and never write on open render or resampling",
+      "RISK task rating history: No Dot Dislodge completion and Undo retain honest rating versus pool changes",
+      "RISK task rating history: concurrent offline and older missing-field copies union immutable facts idempotently without retimestamping",
+      "RISK task rating history: legacy import restore export deletion and unknown future facts preserve recorded evidence",
+      "RISK task rating history: device reload and chunked Unicode exports retain all observations without silent retention limits",
+      "RISK task rating history: Edit shows accessible timestamped observations and honest metric and retention explanations",
+      "RISK task rating history: malformed and future records remain recoverable without blocking actions or injecting markup",
+      "RISK task rating history: real cloud glue preserves offline concurrent events replay old writes and completion Undo across reload",
+      "RISK task rating history browser: phone tablet and desktop disclosures pagination drafts and offline Undo preserve actual observations"
+    ],
+    "preservedCoverage": [
+      "TrueSkill formulas, Yes/No/Dot/Dislodge signals, neutral Done/Worked/Can’t and saved scan selection remain protected by the existing complete suite.",
+      "Legacy/unknown board fields, accounts, completion and dependency intent, Undo/Restore/import, transactional device storage and revisioned cloud chunks retain existing protections.",
+      "Existing phone/tablet layouts, settings/context batch, FAQ structure, UTC scenery and offline shell protections remain intact."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='RISK task rating history:' tests.js",
+      "failure": "Observed seven failures before app edits in /tmp/chain-rating-history-evidence-20261006/history-red.log: comparison history absent, editor Save observation absent, No signal history absent, offline union absent, replacement source observation absent, 2200 retained entries did not append the editor observation, and Edit lacked Rating history. Fixture corrections retained the same before-implementation discriminating failures. Later malformed-cloud-red.log observed null entries blocking a comparison before the guard repair; pagination-focus-red.log observed lost focus before the fallback repair. The first full-native.log observed the existing Dislodge whole-task equality failing solely on the new retained audit fields; the revised assertion retains exact restoration of all previous task fields and verifies both observed reversals. Browser coverage will be exercised on the reconciled candidate under the coordinated runtime window."
+    }
   }
 ]

@@ -197,6 +197,138 @@ test('RISK context offline browser: installed shell reload retains exclusions se
  }finally{await browser.close();}
 });
 
+const ratingHistoryCopy = value => JSON.parse(JSON.stringify(value));
+const ratingHistoryTask=(ctx,id)=>ctx.state.tasks.find(t=>t.id===id)||null;
+async function ratingHistoryFixture(seed=613){
+ const h=await loadApp({seed,cryptoProvider:webcrypto});
+ setFakeTime(h.ctx,Date.parse('2026-10-06T12:34:56.789Z'));
+ const a=h.ctx.addTask('Private benchmark'),b=h.ctx.addTask('Private candidate'),c=h.ctx.addTask('Unrelated private task');
+ h.ctx.state.chain=[a.id];h.ctx.state.candidateId=b.id;h.ctx.recomputeRanks();
+ return {...h,a,b,c};
+}
+test('RISK task rating history: actual comparisons retain timestamped before and after values without backfilling or changing signals',async()=>{
+ const {ctx,a,b,c}=await ratingHistoryFixture();
+ const at=vm.runInContext('Date.now()',ctx),before=ratingHistoryCopy({mu:b.mu,sigma:b.sigma}),chance=ctx.chanceDisplayStats().get(b.id).probability;
+ const top=vm.runInContext('rankCache.get('+JSON.stringify(b.id)+').topK',ctx);
+ const engine=loadEngine(613),win={mu:b.mu,sigma:b.sigma},lose={mu:a.mu,sigma:a.sigma};engine.updatePair(win,lose);
+ ctx.decide('yes');
+ assert.ok(Array.isArray(b.ratingHistory),'a real comparison must leave durable rating history');
+ assert.equal(b.ratingHistory.length,1);assert.equal(a.ratingHistory.length,1);assert.equal(c.ratingHistory,undefined,'do not copy the entire board for each decision');
+ const row=b.ratingHistory[0];assert.equal(row.at,at);assert.equal(row.id,a.ratingHistory[0].id);assert.equal(row.kind,'yes');assert.equal(row.change,'rating');
+ assert.equal(row.before.mu,before.mu);assert.equal(row.before.sigma,before.sigma);assert.equal(row.before.likelihood,chance);assert.equal(row.before.topK,top);
+ assert.equal(row.after.mu,win.mu);assert.equal(row.after.sigma,win.sigma);assert.equal(a.mu,lose.mu);assert.equal(a.sigma,lose.sigma);
+ assert.equal(row.after.likelihood,ctx.chanceDisplayStats().get(b.id).probability);assert.equal(row.after.n,3);assert.equal(row.after.samples,ctx.state.settings.samples);
+ assert.ok(row.at>b.createdAt-1);assert.equal(row.v,1);
+});
+test('RISK task rating history: editor observations distinguish relative movement and never write on open render or resampling',async()=>{
+ const {ctx,shim,a,b,c}=await ratingHistoryFixture(614);c.mu=40;ctx.recomputeRanks();
+ const oldPayload=ctx.cloudPayload();ctx.openEdit(c.id);ctx.openEdit(c.id);ctx.render();assert.equal(ctx.cloudPayload(),oldPayload,'opening the editor must remain read only');
+ function saveTask(t){ctx.openEdit(t.id);shim.document.getElementById('etTitle').value=t.title;ctx.onAction('save-edit',{dataset:{id:t.id}});}
+ saveTask(c);assert.equal(c.ratingHistory?.length,1,'Save establishes an honest observation at its own time');
+ const first=ratingHistoryCopy(c.ratingHistory[0]),mu=c.mu,sigma=c.sigma;
+ ctx.recomputeRanks();saveTask(c);assert.equal(c.ratingHistory.length,1,'sample noise alone cannot grow the board');
+ ctx.state.chain=[a.id];ctx.state.candidateId=b.id;ctx.decide('yes');setFakeTime(ctx,first.at+1000);saveTask(c);
+ assert.equal(c.ratingHistory.length,2,'a changed relative share gets a later observed timestamp');
+ const row=c.ratingHistory.at(-1);assert.equal(row.change,'relative');assert.equal(c.mu,mu);assert.equal(c.sigma,sigma);assert.notEqual(row.after.likelihood,first.after.likelihood);assert.equal(row.at,first.at+1000);
+ assert.equal(first.kind,'edit');assert.equal(first.before,undefined,'do not manufacture an old initial observation');
+});
+test('RISK task rating history: No Dot Dislodge completion and Undo retain honest rating versus pool changes',async()=>{
+ const {ctx,a,b}=await ratingHistoryFixture(615);ctx.decide('no');assert.equal(b.ratingHistory?.[0]?.kind,'no');
+ ctx.dotTask(b.id);assert.equal(b.ratingHistory.at(-1).kind,'dot');ctx.dislodge();assert.equal(b.ratingHistory.at(-1).kind,'dislodge');
+ const before=ratingHistoryCopy(b.ratingHistory),mu=b.mu,sigma=b.sigma;
+ ctx.doneTask(b.id);assert.equal(b.mu,mu);assert.equal(b.sigma,sigma);assert.equal(b.ratingHistory.at(-1).change,'relative');assert.equal(b.ratingHistory.at(-1).after.likelihood,0);assert.equal(b.ratingHistory.at(-1).after.topK,null);
+ const completed=ratingHistoryCopy(b.ratingHistory);ctx.undo();const restored=ratingHistoryTask(ctx,b.id);
+ assert.equal(restored.done,false);assert.equal(restored.ratingHistory.length,completed.length+1,'Undo retains the original event and appends its observed reversal');
+ assert.ok(before.every(row=>restored.ratingHistory.some(r=>JSON.stringify(r)===JSON.stringify(row))));assert.equal(restored.ratingHistory.at(-1).kind,'undo');
+ ctx.undo();const undone=ratingHistoryTask(ctx,b.id);assert.equal(undone.ratingHistory.at(-1).change,'rating','Undo Dislodge restores actual posterior values');
+});
+test('RISK task rating history: concurrent offline and older missing-field copies union immutable facts idempotently without retimestamping',async()=>{
+ const h=await ratingHistoryFixture(616),base=ratingHistoryCopy(h.ctx.state);h.ctx.decide('yes');const left=ratingHistoryCopy(h.ctx.state);
+ const r=await loadApp({seed:617,cryptoProvider:webcrypto,seedStorage:{[STORE_KEY]:JSON.stringify(base)}});setFakeTime(r.ctx,Date.parse('2026-10-05T01:02:03Z'));r.ctx.state.chain=[h.a.id];r.ctx.state.candidateId=h.b.id;r.ctx.decide('no');const right=ratingHistoryCopy(r.ctx.state);
+ const l=ratingHistoryCopy(left),q=ratingHistoryCopy(right);h.ctx.mergeUndeletedTasks(l,right);h.ctx.mergeUndeletedTasks(q,left);
+ const rows=st=>st.tasks.find(t=>t.id===h.b.id).ratingHistory;
+ assert.equal(rows(l)?.length,2,'both devices keep their actual comparison observations');assert.deepEqual(ratingHistoryCopy(rows(l)),ratingHistoryCopy(rows(q)),'merge direction cannot change observation facts');
+ const facts=ratingHistoryCopy(rows(l));assert.equal(h.ctx.mergeUndeletedTasks(l,right),false,'a replay is not another event');assert.deepEqual(ratingHistoryCopy(rows(l)),facts);
+ const older=ratingHistoryCopy(base);h.ctx.mergeUndeletedTasks(older,l);assert.deepEqual(rows(older),facts,'an older task that lacks the field cannot erase it');
+ assert.deepEqual(facts.map(row=>row.at).sort(),[Date.parse('2026-10-05T01:02:03Z'),Date.parse('2026-10-06T12:34:56.789Z')].sort(),'device clock skew does not rewrite original event times');
+});
+test('RISK task rating history: legacy import restore export deletion and unknown future facts preserve recorded evidence',async()=>{
+ const {ctx,a,b}=await ratingHistoryFixture(618),old=ratingHistoryCopy(ctx.state);ctx.decide('yes');const recorded=ratingHistoryCopy(b.ratingHistory);
+ const future={v:77,id:'future-private-event',at:1234,extra:{opaque:['kept','verbatim']}};b.ratingHistory.push(future);b.ratingHistory[0].futureField={x:'kept'};b.futureTaskField={y:8};
+ const next=ratingHistoryCopy(old);ctx.markReplacementDeletes(next);ctx.replaceState(next);ctx.recomputeRanks();ctx.commit();
+ const task=ratingHistoryTask(ctx,b.id);assert.equal(task.ratingHistory?.length,2,'replacement does not erase observations the device has seen');assert.deepEqual(ratingHistoryCopy(task.ratingHistory.find(row=>row.v===77)),future);
+ const exported=JSON.parse(ctx.cloudPayload());ctx.hydrateState(exported);assert.deepEqual(exported.tasks.find(t=>t.id===b.id).ratingHistory,ratingHistoryCopy(task.ratingHistory));
+ assert.ok(task.ratingHistory.some(row=>row.id===recorded[0].id&&row.at===recorded[0].at));
+ ctx.deleteTask(b.id);assert.equal(ratingHistoryTask(ctx,b.id),null);ctx.undo();assert.equal(ratingHistoryTask(ctx,b.id).ratingHistory.length,task.ratingHistory.length,'Undo deletion restores attached history');
+ const unknown=ratingHistoryCopy(ctx.state),peer=ratingHistoryCopy(ctx.state);unknown.tasks.find(t=>t.id===a.id).ratingHistory={v:99,data:'untouched'};
+ ctx.mergeUndeletedTasks(unknown,peer);assert.deepEqual(unknown.tasks.find(t=>t.id===a.id).ratingHistory,{v:99,data:'untouched'});assert.ok(unknown.tasks.find(t=>t.id===a.id).ratingHistoryRecovery.some(Array.isArray),'unrecognized formats keep the conflicting facts for recovery');
+});
+test('RISK task rating history: device reload and chunked Unicode exports retain all observations without silent retention limits',async()=>{
+ const {indexedDB}=await import('fake-indexeddb');const name='private-rating-history-'+Date.now(),h=await loadApp({seed:619,cryptoProvider:webcrypto,indexedDBProvider:indexedDB,deviceDbName:name});
+ const a=h.ctx.addTask('Private persisted task');const old={v:99,id:'old-original',at:Date.parse('2022-01-02T03:04:05Z'),raw:'履歴🌱'.repeat(100)};
+ a.ratingHistory=Array.from({length:2200},(_,i)=>({...old,id:'original-'+i}));a.futureTaskField={opaque:'kept'};h.ctx.openEdit(a.id);h.shim.document.getElementById('etTitle').value=a.title;h.ctx.onAction('save-edit',{dataset:{id:a.id}});assert.equal(a.ratingHistory.length,2201,'an editor observation appends without trimming original facts');assert.equal(await h.ctx.persist(),true);
+ const raw=h.ctx.cloudPayload(),codec=h.shim.window.ChainStorageV2,packed=await codec.encodeSnapshot(raw,{crypto:webcrypto,targetBytes:256*1024});assert.ok(packed.chunks.length>1,'history remains supported beyond one-document limits');assert.equal(await codec.decodeSnapshot(packed,packed.chunks,{crypto:webcrypto}),raw);
+ const r=await loadApp({seed:620,cryptoProvider:webcrypto,indexedDBProvider:indexedDB,deviceDbName:name});assert.equal(ratingHistoryTask(r.ctx,a.id).ratingHistory.length,2201);assert.deepEqual(ratingHistoryCopy(ratingHistoryTask(r.ctx,a.id).futureTaskField),{opaque:'kept'});assert.equal(ratingHistoryTask(r.ctx,a.id).ratingHistory[0].at,old.at);
+});
+test('RISK task rating history: Edit shows accessible timestamped observations and honest metric and retention explanations',async()=>{
+ const {ctx,shim,a,b}=await ratingHistoryFixture(621);ctx.decide('yes');ctx.openEdit(b.id);const rendered=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(rendered,/Rating history/);assert.match(rendered,/<time datetime="2026-10-06T12:34:56\.789Z"/);assert.match(rendered,/MMR/);assert.match(rendered,/uncertainty/);assert.match(rendered,/Overall likelihood/);assert.match(rendered,/Estimated Top x/);assert.match(rendered,/Own rating/);assert.match(rendered,/observations/);assert.match(rendered,/not a complete/);
+ const row=ratingHistoryCopy(b.ratingHistory[0]);b.ratingHistory=Array.from({length:43},(_,i)=>({...row,id:'stored-'+i,at:row.at-i*1000}));b.ratingHistory.push({v:78,raw:'<img src=x onerror=evil()>'});ctx.openEdit(b.id);
+ const recent=shim.document.getElementById('modalRoot').innerHTML;assert.equal((recent.match(/class="rating-event"/g)||[]).length,20);assert.match(recent,/Show 20 more/);assert.doesNotMatch(recent,/<img src=x/);assert.equal(b.ratingHistory.length,44,'pagination cannot purge data');
+ let focused=false;const query=shim.document.querySelector;shim.document.querySelector=selector=>selector==='#taskRatingHistory details'?{open:false}:selector==='#taskRatingHistory summary'?{focus(){focused=true;}}:null;
+ ctx.onAction('more-rating-history',{dataset:{id:b.id,limit:'60'}});assert.equal(focused,true,'the last page retains keyboard focus on the disclosure');shim.document.querySelector=query;
+ ctx.openHelp();assert.match(shim.document.getElementById('modalRoot').innerHTML,/rating history/i);assert.match(shim.document.getElementById('modalRoot').innerHTML,/earlier.*not recorded/i);
+ assert.match(html,/\.rating-values\s*\{[^}]*grid-template-columns/);assert.match(html,/\.rating-event\s*\{[^}]*overflow-wrap:anywhere/);
+});
+test('RISK task rating history: malformed and future records remain recoverable without blocking actions or injecting markup',async()=>{
+ const {ctx,shim,b}=await ratingHistoryFixture(622);b.ratingHistory=[null,7,{v:88,raw:'<img src=x onerror=evil()>'}];b.ratingHistoryRecovery={v:88,length:'<img src=x onerror=evil()>'};
+ assert.doesNotThrow(()=>ctx.decide('no'),'unknown array items cannot stop a real rating decision');assert.equal(b.ratingHistory.length,4);assert.equal(b.ratingHistory[0],null);assert.equal(b.ratingHistory[1],7);
+ ctx.openEdit(b.id);const view=shim.document.getElementById('modalRoot').innerHTML;assert.doesNotMatch(view,/<img src=x/);assert.match(view,/4 unrecognized history items/);
+ b.ratingHistory={v:99,data:'kept'};ctx.openEdit(b.id);assert.match(shim.document.getElementById('modalRoot').innerHTML,/cannot append/i);assert.deepEqual(ratingHistoryCopy(b.ratingHistory),{v:99,data:'kept'});
+});
+test('RISK task rating history: real cloud glue preserves offline concurrent events replay old writes and completion Undo across reload',async()=>{
+ const {ctx,a,b}=await ratingHistoryFixture(623);const base=ratingHistoryCopy(ctx.state);base.syncAccount='e@example.com';base.updatedAt=Date.now();base.syncRev=1;base.syncDirty=false;
+ const cloud=makeSyncHarness({remote:base,rev:1}),left=await loadApp({seed:624,cryptoProvider:webcrypto,seedStorage:{[STORE_KEY]:JSON.stringify(base)},cloudSyncFactory:cloud.factory}),right=await loadApp({seed:625,cryptoProvider:webcrypto,seedStorage:{[STORE_KEY]:JSON.stringify(base)},cloudSyncFactory:cloud.factory});
+ for(const h of [left,right]){h.shim.window.CLOUD_PUSH_DELAY_MS=2;h.shim.window.CLOUD_RETRY_DELAY_MS=2;await h.ctx.cloudPull();}
+ cloud.failPull=true;left.ctx.suspendCloudSync();right.ctx.suspendCloudSync();
+ for(const [h,kind] of [[left,'yes'],[right,'no']]){h.ctx.state.chain=[a.id];h.ctx.state.candidateId=b.id;h.ctx.decide(kind);assert.equal(await h.ctx.persist(),true);}
+ const facts=[ratingHistoryTask(left.ctx,b.id).ratingHistory[0],ratingHistoryTask(right.ctx,b.id).ratingHistory[0]].map(ratingHistoryCopy);
+ cloud.failPull=false;left.ctx.resumeCloudSync();await syncSettle(120);right.ctx.resumeCloudSync();await syncSettle(160);await left.ctx.cloudPull();await syncSettle(80);
+ const ids=st=>st.tasks.find(t=>t.id===b.id).ratingHistory.map(row=>row.id).sort();assert.deepEqual(ids(cloud.remoteState()),facts.map(row=>row.id).sort());
+ const older=ratingHistoryCopy(cloud.remoteState());for(const t of older.tasks){delete t.ratingHistory;delete t.ratingHistoryHead;}older.updatedAt=Date.now()+1;cloud.writeBehindBack(older);
+ await left.ctx.cloudPull();await syncSettle(140);assert.deepEqual(ids(cloud.remoteState()),facts.map(row=>row.id).sort(),'a newer old-tab board cannot erase this device’s recorded facts');
+ left.ctx.doneTask(b.id);await left.ctx.persist();left.ctx.undo();await left.ctx.persist();left.ctx.cloudPushNow();await syncSettle(140);await right.ctx.cloudPull();await syncSettle(60);
+ assert.equal(ratingHistoryTask(right.ctx,b.id).done,false);const stable=ratingHistoryCopy(ratingHistoryTask(right.ctx,b.id).ratingHistory);assert.ok(facts.every(f=>stable.some(r=>r.id===f.id&&r.at===f.at)));
+ const reload=await loadApp({seed:626,cryptoProvider:webcrypto,seedStorage:{[STORE_KEY]:JSON.stringify(right.ctx.state)},cloudSyncFactory:cloud.factory});await reload.ctx.cloudPull();assert.deepEqual(ratingHistoryCopy(ratingHistoryTask(reload.ctx,b.id).ratingHistory),stable);assert.equal(ratingHistoryTask(reload.ctx,b.id).done,false);
+});
+test('RISK task rating history browser: phone tablet and desktop disclosures pagination drafts and offline Undo preserve actual observations',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT);
+ for(const [name,type,options] of [['chrome',chromium,{channel:'chrome'}],['webkit',webkit,{}]]){
+  const browser=await type.launch(options);
+  try{for(const [width,height] of [[320,568],[568,320],[768,1024],[1440,900]])for(const colorScheme of ['light','dark']){
+   const context=await browser.newContext({viewport:{width,height},hasTouch:width<1000,isMobile:width<1000,colorScheme,reducedMotion:'reduce'}),page=await context.newPage();
+   try{
+    await page.route('https://**/*',route=>route.abort());await page.goto(process.env.LANDSCAPE_BROWSER_URL);await page.waitForFunction(()=>typeof state!=='undefined'&&state!==null);
+    const fixture=await page.evaluate(()=>{const a=addTask('Private browser benchmark'),b=addTask('Private browser rating history');state.chain=[a.id];state.candidateId=b.id;recomputeRanks();decide('yes');const row=JSON.parse(JSON.stringify(b.ratingHistory[0]));b.ratingHistory=Array.from({length:45},(_,i)=>({...row,id:'private-browser-event-'+i,seq:45-i,at:row.at-i*1000}));b.ratingHistoryHead=b.ratingHistory[0].id;state.listOpen=true;render();return {id:b.id,raw:JSON.stringify(b.ratingHistory)};});
+    const row=page.locator('[data-row]').filter({has:page.locator('[data-act="edit"][data-id="'+fixture.id+'"]')});await row.locator('[data-act="edit"]').click();
+    const summary=page.locator('.task-rating-history summary');await summary.focus();await summary.press('Enter');await page.locator('.rating-event').first().waitFor();assert.equal(await page.locator('.rating-event').count(),20);
+    await page.locator('#etTitle').fill('Unsaved private history draft');await page.getByRole('button',{name:/Show 20 more/}).click();assert.equal(await page.locator('.rating-event').count(),40);assert.equal(await page.locator('#etTitle').inputValue(),'Unsaved private history draft');
+    await page.getByRole('button',{name:/Show 20 more/}).click();assert.equal(await page.locator('.rating-event').count(),45);assert.equal(await summary.evaluate(e=>document.activeElement===e),true,'the last pagination click must retain keyboard focus on the disclosure');
+    assert.equal(await page.evaluate(id=>JSON.stringify(taskById(id).ratingHistory),fixture.id),fixture.raw,'opening and paging do not edit facts');
+    const layout=await page.locator('.modal').evaluate(el=>({width:el.clientWidth,scroll:el.scrollWidth,children:[...el.querySelectorAll('.rating-values dt,.rating-values dd,.rating-event time')].map(x=>{const a=x.getBoundingClientRect(),p=el.getBoundingClientRect();return {left:a.left-p.left,right:a.right-p.left};})}));assert.ok(layout.scroll<=layout.width+1,'history must fit the pane');assert.ok(layout.children.every(box=>box.left>=0&&box.right<=layout.width+3),'timestamps and values stay inside the phone/tablet pane');
+    if(process.env.RATING_HISTORY_SCREENSHOTS){const fs=await import('node:fs/promises');await fs.mkdir(process.env.RATING_HISTORY_SCREENSHOTS,{recursive:true});await page.screenshot({path:path.join(process.env.RATING_HISTORY_SCREENSHOTS,`${name}-${width}x${height}-${colorScheme}.png`)});}
+    if(width===320&&colorScheme==='light'){
+     await page.locator('#etTitle').fill('Private browser rating history');await page.locator('[data-act="save-edit"]').click();await page.evaluate(()=>persist());
+     await page.waitForFunction(()=>!!navigator.serviceWorker.controller);await context.setOffline(true);await page.reload();await page.waitForFunction(id=>typeof state!=='undefined'&&state?.tasks.some(t=>t.id===id),fixture.id);
+     assert.equal(await page.evaluate(id=>JSON.stringify(taskById(id).ratingHistory),fixture.id),fixture.raw,'offline cold reload retains original timestamps and does not record resampled rank noise');
+     await page.evaluate(id=>doneTask(id),fixture.id);await page.locator('[data-act="undo"]').click();await page.evaluate(()=>persist());assert.equal(await page.evaluate(id=>taskById(id).done,fixture.id),false);
+     const reversed=await page.evaluate(id=>JSON.stringify(taskById(id).ratingHistory),fixture.id);assert.ok(JSON.parse(reversed).some(r=>r.kind==='undo'));await context.setOffline(false);await page.reload();await page.waitForFunction(id=>typeof state!=='undefined'&&state?.tasks.some(t=>t.id===id),fixture.id);assert.equal(await page.evaluate(id=>JSON.stringify(taskById(id).ratingHistory),fixture.id),reversed,'reconnect reload keeps completion and Undo observations');
+    }
+   }finally{await context.close();}
+  }}finally{await browser.close();}
+ }
+});
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const HTML_PATH = path.join(__dirname, "index.html");
 const html = fs.readFileSync(HTML_PATH, "utf8");
@@ -15386,7 +15518,9 @@ test('Dislodge signal: one loss to a fresh default reference, other tasks and ch
  ctx.dislodge();assert.equal(a.mu,expected.mu);assert.equal(a.sigma,expected.sigma);
  assert.ok(a.mu<25);assert.equal(JSON.stringify(b),other);assert.equal(JSON.stringify(ctx.state.chance),draw);
  assert.equal(ctx.state.considered[a.id],'dislodged');assert.equal(ctx.state.chain.length,0);
- ctx.undo();assert.equal(JSON.stringify(ctx.state.tasks.find(t=>t.id===a.id)),before);
+ ctx.undo();const restored=ctx.state.tasks.find(t=>t.id===a.id),priorFields={...restored};delete priorFields.ratingHistory;delete priorFields.ratingHistoryHead;delete priorFields.ratingHistoryRecovery;
+ assert.equal(JSON.stringify(priorFields),before,'Undo restores every original task field while retaining the requested audit observations');
+ assert.deepEqual(Array.from(restored.ratingHistory,row=>row.kind),['dislodge','undo']);assert.equal(restored.ratingHistory.at(-1).after.mu,JSON.parse(before).mu);assert.equal(restored.ratingHistory.at(-1).after.sigma,JSON.parse(before).sigma);
  ctx.state.chain=[a.id];ctx.dislodge();assert.equal(ctx.state.tasks.find(t=>t.id===a.id).mu,expected.mu);
 });
 
