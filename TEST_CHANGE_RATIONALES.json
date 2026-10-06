@@ -1,5 +1,76 @@
 [
   {
+    "testChangesSha256": "5d435edf95c49bc060940211bc0e8650ce6eec296628a967f8e051425f6056a5",
+    "reason": "Native two-browser validation exposed a real false recovery notification that replaced the promised saved-cycle warning. Add direct idempotence and actual local/IndexedDB save regressions before the narrow legacy-mirror repair.",
+    "previousBehavior": "Joining an identical saved cycle briefly exposed its deliberately hidden legacy first-link mirror. The whole-board projection hid it again, but the merge returned true and persistence posted a misleading missing-task recovery toast over the cycle warning.",
+    "intendedBehavior": "Keep the existing hidden mirror when the selected edges remain identical; the whole-board projection still recalculates real graph edits. Identical merges remain byte-preserving and report no recovered data, ordinary saves retain the existing cycle warning, and real observed removals still report changes.",
+    "replacementTests": [
+      "RISK multiple dependencies legacy mirrors: repeated identical cycle merges report no recovered data while real removals remain changes",
+      "RISK multiple dependencies legacy mirrors: local and IndexedDB saves retain cycle warnings without false recovery messages"
+    ],
+    "preservedCoverage": [
+      "Saved self, two-task and eight-task cycles retain all authoritative IDs, causal operation evidence, revisions and recovery-source bytes through repeated joins. Actual edge removals still propagate and become stable on repetition.",
+      "Both localStorage and actual fake-IndexedDB device heads remain successful and contain all task fields. The original eight-second warning persists through ordinary idempotent saves. Existing old-client hydration, capacity, observed removal/readd, Undo/Restore, accepted revision/account publication and completion/offline boundaries remain active.",
+      "The extended FAQ and current changelog describe the retained warning. The original native failure and actual pre-fix red output are retained separately; no test assertion was removed or weakened."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK multiple dependencies legacy mirrors: repeated identical|RISK multiple dependencies legacy mirrors: local and IndexedDB saves' tests.js",
+      "failure": "cycle-warning-idempotence-red.log records2 actual pre-fix failures: an identical cycle merge returned true instead of false, and ordinary saves appended the missing-task toast after the cycle warning. cycle-warning-faq-red.log captures absent FAQ guidance; cycle-warning-metadata-red.log records3 stale inventory/changelog/cache failures before their mechanical refresh. sync-attempt1-failure.json preserves the native receiving-browser toast failure."
+    }
+  },
+  {
+    "testChangesSha256": "5c718a47f25f2c8b824a996ffad974604700302dd696894b1516509750c323b6",
+    "reason": "This exact candidate diff implements the requested ten dependencies and Chance presentation, backup age styling, less frequent paired fireworks with a restrained finale, and selected-night-only fairy-light poles. Independent review found two legacy dependency compatibility defects; the new tests expose and repair them. Existing cycle rejection and firework intensity/frequency expectations change only as explicitly requested. Native validation also exposed and repaired false cyclic-merge recovery notifications.",
+    "previousBehavior": "Tasks had one prerequisite and rejected cycles; Chance showed top-K. The first dependency draft confused separately published old-client additions and lost cycle links during old hydration. Backup Delete stayed neutral regardless of age. Standalone show starts followed the earlier schedule, regular volleys fired one shell, and patio poles stayed visible without their lights.",
+    "intendedBehavior": "Ten causal links and saved-cycle warnings survive old clients, concurrent publications, Undo and reconnect; Chance reports current fresh-draw shares without changing selection. Delete uses the existing red style only after seven elapsed days. Sampled standalone starts are doubled with original durations and barge scheduling; both displays have paired shells and an eight-shell naturally fading finale. Fairy-light supports share the existing selected night-only bulb visibility. Identical saved-cycle merges report no recovered data and ordinary background saves retain the cycle warning.",
+    "replacementTests": [
+      "RISK fairy light poles: only a selected nighttime string paints its supports through day and spawn transitions",
+      "RISK prerequisites: invalid links are rejected and cycles warn without discarding saved links",
+      "RISK multiple dependencies: ten links require every prerequisite while completion deletion and Undo retain their rules",
+      "RISK multiple dependencies: old single links migrate and legacy edits preserve the other selected dependencies",
+      "RISK multiple dependencies: concurrent additions removals repeated readds and replacement Undo reconcile causally",
+      "RISK multiple dependencies: concurrent capacity conflicts retain the canonical ten and causal removal evidence",
+      "RISK multiple dependencies: direct indirect and overlapping cycles warn but completed cycles and large acyclic graphs do not",
+      "RISK multiple dependencies: progressive Add and Edit controls cap at ten preserve drafts and reset on cancel or save",
+      "RISK multiple dependencies: pasted tasks retain all selected links and All Tasks names only unresolved blockers safely",
+      "RISK multiple dependencies sync: simultaneous edits converge and offline reload reconnect keeps Done and pause behavior",
+      "RISK Chance labels: frozen weight shares describe a fresh draw and never change saved order ratings or seed",
+      "RISK Chance labels: exact numerical fallback and tiny positive candidates stay distinct while excluded tasks show zero",
+      "RISK Chance labels: new task defaults normally draw but extreme TrueSkill tails have no positive guarantee",
+      "RISK Chance labels: an empty-chain preview excludes positive tails that overflow for every possible saved hash",
+      "RISK multiple dependencies FAQ: extended help explains progressive links saved cycles live sync and scoped Chance labels",
+      "RISK backup age styling: Delete turns destructive strictly after seven elapsed days for either storage source without changing bytes",
+      "RISK fireworks occurrence: standalone sampled starts are exactly twice as far apart while duration odds budgets and festival timing stay intact",
+      "RISK fireworks density and finale: paired regular shells lead to eight visible finale shells within a fixed budget and natural fade",
+      "RISK product FAQ: backup age fireworks and resting remote completions match the shipped controls",
+      "RISK multiple dependencies legacy publications: distinct accepted edits survive an unobserved removal and repeated reads stay idempotent",
+      "RISK multiple dependencies legacy publications: cloud conversion uses the accepted server revision rather than local revision or clocks",
+      "RISK multiple dependencies legacy mirrors: saved self short and long cycles survive actual supported hydrate and unrelated edits",
+      "RISK multiple dependencies legacy mirrors: exposed removals and hidden first-link replacement preserve the other nine selections",
+      "RISK multiple dependencies legacy mirrors: merge replacement Undo Restore and every persistence projection retain causal graph bytes",
+      "RISK multiple dependencies legacy mirrors: repeated identical cycle merges report no recovered data while real removals remain changes",
+      "RISK multiple dependencies legacy mirrors: local and IndexedDB saves retain cycle warnings without false recovery messages",
+      "RISK multiple dependencies layout: long blockers wrap within their row and dependency selects keep touchable widths",
+      "RISK multiple dependencies: Undo restores a deleted task link as intent without reviving it from stale copies",
+      "RISK Chance labels: disabled presentation flags retain their hidden summaries and matching FAQ language",
+      "RISK Chance labels: the deterministic oldest first dot has an age label and is excluded from the following weighted draw"
+    ],
+    "preservedCoverage": [
+      "All nine rating, ranking, age-first, weighted selection and deterministic-order functions retain their frozen source fingerprints. Existing context/date/evergreen eligibility, completion, History, deletion, causal cancellation and Undo protections stay active.",
+      "Authoritative server revision and account identity remain the cloud ordering boundary. Actual immutable released hydrators protect legacy cycle mirrors; independent operation additions, observed removals, capacity limits and recovery source bytes have direct coverage.",
+      "Backup styling never deletes or rewrites backup data. Firework intensity tests retain finite geometry, depth masking, clipping margins, natural fades and deterministic repaint while their old particle caps are updated for the expressly requested paired shells and bounded eight-shell finale.",
+      "Garden and patio sampling retains its sixty-second clock, independent one-in-twelve odds and selected geometry. New pole tests preserve ordinary deck paint, attached supports/bulbs, painter state and day/night retained samples across phone, tablet, desktop and reduced-motion fixtures.",
+      "Cloud compatibility, strict revision errors, account isolation, durable recovery and device storage gates remain mandatory. Browser proof uses isolated local accounts/stores with the production backend disabled.",
+      "Saved self, two-task and eight-task cycles retain all authoritative IDs, causal operation evidence, revisions and recovery-source bytes through repeated joins. Actual edge removals still propagate and become stable on repetition.",
+      "Both localStorage and actual fake-IndexedDB device heads remain successful and contain all task fields. The original eight-second warning persists through ordinary idempotent saves. Existing old-client hydration, capacity, observed removal/readd, Undo/Restore, accepted revision/account publication and completion/offline boundaries remain active.",
+      "The extended FAQ and current changelog describe the retained warning. The original native failure and actual pre-fix red output are retained separately; no test assertion was removed or weakened."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK multiple dependencies|RISK Chance labels|RISK prerequisites: invalid links' tests.js; focused legacy publication/mirror, backup age, firework occurrence/finale, product FAQ and fairy pole commands recorded in ../dependency-evidence/",
+      "failure": "The initial dependency/Chance run failed thirteen tests before app edits, followed by genuine FAQ, layout, dangling-link Undo, hidden-presentation and first-dot failures before their fixes. Exact logs: initial-red.log, faq-red.log, layout-and-missing-undo-red.log, presentation-flag-red.log, first-dot-red.log and first-dot-fresh-weights-red.log. Legacy review regressions then failed six cases (FAQ mode text, distinct accepted publications, actual cloud ingress, released-cycle hydration, hidden first-link replacement and safe projections) in legacy-review-findings-red.log. backup-fireworks-red.log has three requested-behavior failures before implementation; product-faq-red.log records missing user-facing guidance. fairy-poles-red.log observed two supports instead of zero on an unselected roof before moving poles behind the existing gate; fairy-poles-faq-red.log observed missing FAQ copy. final-metadata-red.log and pwa-metadata-red.log preserve stale inventory/changelog/cache failures before their mechanical refresh. Geometry fixtures initially sampled offscreen entering barge launchers and imposed a narrower bound than the unchanged old spark margin; those fixtures were corrected without changing runtime behavior, with both original failing logs retained. cycle-warning-idempotence-red.log records2 actual pre-fix failures: an identical cycle merge returned true instead of false, and ordinary saves appended the missing-task toast after the cycle warning. cycle-warning-faq-red.log captures absent FAQ guidance; cycle-warning-metadata-red.log records3 stale inventory/changelog/cache failures before their mechanical refresh. sync-attempt1-failure.json preserves the native receiving-browser toast failure."
+    }
+  },
+  {
     "testChangesSha256": "e6f4f2c4444c873ad9c6a7377130ff8b61b2281d02350d9e0989c03190e09259",
     "reason": "Independent code review exposed a display-only numerical boundary before Start: a positive supported TrueSkill tail can overflow for every possible 32-bit hash, but the seedless preview labeled it drawable. The new regression fails on that claim before the narrow display fix.",
     "previousBehavior": "Before an empty chain had a seed, every positive Chance weight was treated as a finite drawable score. A normal supported extreme rating fixture showed <0.01% next draw before Start and scanned after immediately afterward despite unchanged ratings.",

@@ -471,3 +471,8 @@ The editor hook blocks app or enforcement edits while tests.js has no staged or 
 ## Backup age, night shows, and legacy dependency compatibility
 
 - RISK Chance labels: an empty-chain preview excludes positive tails that overflow for every possible saved hash
+
+## Backup age, night shows, and legacy dependency compatibility
+
+- RISK multiple dependencies legacy mirrors: repeated identical cycle merges report no recovered data while real removals remain changes
+- RISK multiple dependencies legacy mirrors: local and IndexedDB saves retain cycle warnings without false recovery messages

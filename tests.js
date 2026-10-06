@@ -20071,6 +20071,41 @@ test('RISK multiple dependencies legacy mirrors: merge replacement Undo Restore 
  ctx.projectLegacyPrerequisites(ctx.state);assert.deepEqual(ctx.state.tasks.map(t=>[t.id,JSON.stringify(t.prerequisiteOps),t.prerequisiteRevision]),causal,'mirror projection never invents edge intent');
 });
 
+test('RISK multiple dependencies legacy mirrors: repeated identical cycle merges report no recovered data while real removals remain changes',async()=>{
+ for(const size of [1,2,8]){
+  const {ctx}=await loadApp(),tasks=Array.from({length:size},(_,i)=>ctx.addTask('Cycle '+i));
+  for(let i=0;i<size;i++)ctx.setTaskPrerequisites(tasks[i].id,[tasks[(i+1)%size].id]);
+  vm.runInContext('if(saveTimer)clearTimeout(saveTimer);saveTimer=null',ctx);
+  const winner=JSON.parse(JSON.stringify(ctx.state)),peer=JSON.parse(JSON.stringify(winner)),before=JSON.stringify(winner),source=JSON.stringify(peer);
+  assert.ok(winner.tasks.some(t=>t.prerequisiteIds.length&&t.prerequisiteId===null),'the old-client projection hides a closing cycle edge');
+  for(let repeat=0;repeat<3;repeat++){
+   assert.equal(ctx.mergeUndeletedTasks(winner,peer),false,'identical saved cycle bytes must not report recovered data');
+   assert.equal(JSON.stringify(winner),before,'the entire board stays byte-identical');assert.equal(JSON.stringify(peer),source,'the recovery source is never mutated');
+  }
+  ctx.setTaskPrerequisites(tasks[0].id,[]);vm.runInContext('if(saveTimer)clearTimeout(saveTimer);saveTimer=null',ctx);
+  const removal=JSON.parse(JSON.stringify(ctx.state));assert.equal(ctx.mergeUndeletedTasks(winner,removal),true,'a real observed edge removal still requests persistence');
+  assert.deepEqual(Array.from(ctx.taskPrerequisiteIds(winner.tasks.find(t=>t.id===tasks[0].id))),[]);
+  const removed=JSON.stringify(winner);assert.equal(ctx.mergeUndeletedTasks(winner,removal),false);assert.equal(JSON.stringify(winner),removed);
+ }
+});
+
+test('RISK multiple dependencies legacy mirrors: local and IndexedDB saves retain cycle warnings without false recovery messages',async()=>{
+ const {indexedDB}=await import('fake-indexeddb');
+ for(const durable of [false,true]){
+  const {ctx,shim}=await loadApp(durable?{indexedDBProvider:indexedDB,deviceDbName:'cycle-warning-'+Date.now()+'-'+Math.random()}:{}),task=ctx.addTask('Saved cycle');
+  ctx.setTaskPrerequisites(task.id,[task.id]);vm.runInContext('if(saveTimer)clearTimeout(saveTimer);saveTimer=null;warnedDependencyCycle=""',ctx);
+  const calls=[],original=ctx.toast;ctx.toast=(message,duration)=>{original(message,duration);calls.push({message,duration});};ctx.render();
+  assert.equal(calls.length,1);assert.match(calls[0].message,/Dependency cycle/);assert.equal(calls[0].duration,8000);
+  for(let repeat=0;repeat<2;repeat++)assert.equal(await ctx.persist(),true,'ordinary saves remain successful');
+  assert.deepEqual(calls,[calls[0]],'idempotent saves must not replace the displayed cycle warning with a missing-task message');
+  assert.match(shim.document.getElementById('toast').textContent,/Dependency cycle/);
+  const stored=JSON.parse(durable?(await shim.window.ScannerDeviceStore.readHead()).payload:shim.localStorage.getItem(SYNC_STORE_KEY));
+  assert.deepEqual(stored.tasks,JSON.parse(JSON.stringify(ctx.state.tasks)),'all saved task fields and causal graph evidence remain intact');
+  ctx.openHelp();assert.match(shim.document.getElementById('modalRoot').innerHTML,/warning stays visible through ordinary background saves/,'the extended FAQ describes the retained warning');
+  if(durable)shim.window.ScannerDeviceStore.close();
+ }
+});
+
 test('RISK multiple dependencies layout: long blockers wrap within their row and dependency selects keep touchable widths',()=>{
  assert.match(html,/\.tmain:has\(\.dependency-blockers\)\s*\{[^}]*flex-wrap:wrap/,'only rows with blockers gain the extra line');
  assert.match(html,/\.dependency-blockers\s*\{[^}]*flex-basis:100%[^}]*overflow-wrap:anywhere/,'long task names wrap independently of the title and rank summary');
