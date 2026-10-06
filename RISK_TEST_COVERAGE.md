@@ -458,3 +458,12 @@ The editor hook blocks app or enforcement edits while tests.js has no staged or 
 - RISK multiple dependencies legacy mirrors: saved self short and long cycles survive actual supported hydrate and unrelated edits
 - RISK multiple dependencies legacy mirrors: exposed removals and hidden first-link replacement preserve the other nine selections
 - RISK multiple dependencies legacy mirrors: merge replacement Undo Restore and every persistence projection retain causal graph bytes
+
+## Evergreen remote completion and scanner membership
+
+- RISK evergreen scan reconciliation: merged completion removes resting crumbs tails and candidates without losing evidence
+- RISK evergreen scan reconciliation: a newer stale cloud chain cannot revive another browsers completed task
+- RISK evergreen scan reconciliation: held editor and pointer delay resting chain adoption then stale benchmark controls stay inert
+- RISK evergreen scan reconciliation: cooldown expiry day reset and explicit return preserve eligible and unrelated chain membership
+- RISK evergreen scan reconciliation: offline cold reload clears legacy resting dots and Undo retains completion history
+- RISK evergreen scan reconciliation: a delayed stale read and later revision converge without restoring completed membership

@@ -19388,6 +19388,131 @@ async function liveScanSyncClients({evergreen=false,hostStorage=false}={}){
  return {a,b,h,notify,benchId:bench.id,candidateId:candidate.id,nextId:next.id};
 }
 
+test('RISK evergreen scan reconciliation: merged completion removes resting crumbs tails and candidates without losing evidence',async()=>{
+ for(const evergreen of [false,true])for(const position of ['crumb','tail','candidate'])for(const mode of ['scan','work','intervention']){
+  const {ctx,shim}=await loadApp({seed:618});
+  const anchor=ctx.addTask('Unaffected anchor'),completed=ctx.addTask('Completed elsewhere'),next=ctx.addTask('Next eligible');
+  Object.assign(completed,{evergreen,evergreenHours:18,evergreenResetAtDay:false});
+  Object.assign(ctx.state,{chain:position==='crumb'?[completed.id,anchor.id]:position==='tail'?[anchor.id,completed.id]:[anchor.id],
+   candidateId:position==='candidate'?completed.id:next.id,mode:mode==='work'?'work':'scan',interventionActive:mode==='intervention',snooze:100});
+  const stale=JSON.parse(ctx.cloudPayload()),ratings=JSON.stringify(stale.tasks.map(t=>[t.id,t.mu,t.sigma]));
+  ctx.doneTask(completed.id);const completion=JSON.parse(ctx.cloudPayload());
+  ctx.mergeUndeletedTasks(stale,completion);ctx.replaceState(stale);ctx.initializeReplacedScan();ctx.render();
+  assert.deepEqual([...ctx.state.chain],[anchor.id],`${evergreen}/${position}/${mode}: completed membership leaves the chain`);
+  assert.notEqual(ctx.state.candidateId,completed.id,'a completion cannot remain the current choice');
+  assert.equal(ctx.isEligible(ctx.state.tasks.find(t=>t.id===completed.id)),false);assert.equal(ctx.pool().some(t=>t.id===completed.id),false);
+  assert.doesNotMatch(shim.document.getElementById('scan').innerHTML,/Completed elsewhere/,'a resting task never displays its countdown in a scanner card or crumb');
+  assert.equal(ctx.state.tasks.length,3);assert.equal(ctx.state.tasks.find(t=>t.id===completed.id).done,!evergreen);
+  assert.equal(ctx.state.tasks.find(t=>t.id===completed.id).lastDoneAt,completion.tasks.find(t=>t.id===completed.id).lastDoneAt);
+  assert.equal(ctx.state.workLog.filter(e=>e.taskId===completed.id).length,evergreen?1:0);
+  assert.equal(JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma])),ratings,'completion reconciliation teaches no ranking preference');
+  assert.equal(ctx.state.mode,mode==='work'?'work':'scan');
+ }
+});
+
+test('RISK evergreen scan reconciliation: a newer stale cloud chain cannot revive another browsers completed task',async()=>{
+ for(const evergreen of [false,true])for(const hostStorage of [false,true]){
+  const {a,b,h,notify,candidateId,benchId,nextId}=await liveScanSyncClients({evergreen,hostStorage});
+  const stale=h.remoteState();stale.chain=[benchId,candidateId];stale.candidateId=nextId;
+  a.ctx.onAction('cand-done',{dataset:{candidate:candidateId,benchmark:benchId}});await syncSettle(100);
+  const doneAt=b.ctx.state.tasks.find(t=>t.id===candidateId).lastDoneAt;assert.ok(doneAt,'the real completion reaches the other browser first');
+  stale.tasks.find(t=>t.id===nextId).title='Concurrent unrelated title';h.writeBehindBack(stale);notify();await syncSettle(150);
+  for(const client of [a,b]){
+   assert.deepEqual([...client.ctx.state.chain],[benchId],'the accepted remote winner merges completion before repairing its stale chain');
+   assert.equal(client.ctx.state.tasks.find(t=>t.id===candidateId).lastDoneAt,doneAt);assert.equal(client.ctx.isEligible(client.ctx.state.tasks.find(t=>t.id===candidateId)),false);
+   assert.doesNotMatch(client.shim.document.getElementById('scan').innerHTML,/Scanned task/);
+   assert.equal(client.ctx.state.tasks.find(t=>t.id===nextId).title,'Concurrent unrelated title');
+   assert.equal(client.ctx.state.workLog.filter(e=>e.taskId===candidateId).length,evergreen?1:0);
+  }
+  assert.deepEqual(h.remoteChain(),[benchId],'the repair is included in the acknowledged union rather than republishing the impossible membership');
+  const stored=hostStorage?b.shim.window.storage:b.shim.localStorage;
+  const bytes=hostStorage?(await stored.get(SYNC_STORE_KEY)).value:stored.getItem(SYNC_STORE_KEY);
+  const reopened=await loadApp({[hostStorage?'hostStorage':'seedStorage']:{[SYNC_STORE_KEY]:bytes}});
+  assert.deepEqual([...reopened.ctx.state.chain],[benchId]);assert.equal(reopened.ctx.state.tasks.find(t=>t.id===candidateId).lastDoneAt,doneAt);
+ }
+});
+
+test('RISK evergreen scan reconciliation: held editor and pointer delay resting chain adoption then stale benchmark controls stay inert',async()=>{
+ for(const hold of ['editor','pointer']){
+  const {b,h,notify,benchId,candidateId,nextId}=await liveScanSyncClients({evergreen:true});
+  const remote=h.remoteState(),task=remote.tasks.find(t=>t.id===benchId);Object.assign(task,{evergreen:true,evergreenHours:18,evergreenResetAtDay:false,lastDoneAt:Date.now()});
+  remote.workLog.push({id:'external-completion',taskId:benchId,title:task.title,kind:'evergreen-done',at:task.lastDoneAt});
+  if(hold==='editor')b.shim.document.activeElement={matches:selector=>selector.includes('input')};
+  else b.shim.document.dispatchEvent({type:'pointerdown',target:{closest:()=>({})}});
+  h.writeBehindBack(remote);notify();await syncSettle(50);
+  assert.deepEqual([...b.ctx.state.chain],[benchId],'drafts and pressed controls keep their displayed board until the gesture ends');
+  if(hold==='editor'){b.shim.document.activeElement=null;b.shim.document.dispatchEvent({type:'focusout'});}
+  else b.shim.document.dispatchEvent({type:'pointercancel'});
+  await syncSettle(100);assert.deepEqual([...b.ctx.state.chain],[],'released interaction accepts the completion and removes its benchmark');
+  assert.doesNotMatch(b.shim.document.getElementById('scan').innerHTML,/Existing chain tail/);
+  const before=JSON.stringify(b.ctx.state);
+  for(const action of ['bench-done','worked','bench-cant','dislodge','yes','start-working'])b.ctx.onAction(action,{dataset:{benchmark:benchId,candidate:candidateId}});
+  assert.equal(JSON.stringify(b.ctx.state),before,'stale controls cannot change a replacement card or append a duplicate session');
+  assert.equal(b.ctx.state.tasks.find(t=>t.id===nextId).lastDoneAt,null);
+ }
+});
+
+test('RISK evergreen scan reconciliation: cooldown expiry day reset and explicit return preserve eligible and unrelated chain membership',async()=>{
+ const now=Date.now();
+ for(const boundary of ['hours-expired','day-expired','early-return','context','future-start']){
+  const {ctx}=await loadApp({seed:619}),anchor=ctx.addTask('Anchor'),task=ctx.addTask('Boundary task');
+  Object.assign(task,{evergreen:true,evergreenHours:18,evergreenResetAtDay:false,lastDoneAt:now-18*HOUR});
+  if(boundary==='day-expired')Object.assign(task,{evergreenHours:168,evergreenResetAtDay:true,lastDoneAt:now-24*HOUR});
+  if(boundary==='early-return'){task.lastDoneAt=now;ctx.reopenTask(task);}
+  if(boundary==='context'){task.lastDoneAt=null;task.ctx=['c_home'];ctx.state.contexts.find(c=>c.id==='c_home').active=false;}
+  if(boundary==='future-start'){task.lastDoneAt=null;task.startsAt='2099-01-01';}
+  ctx.state.chain=[anchor.id,task.id];ctx.initializeReplacedScan();
+  assert.deepEqual([...ctx.state.chain],[anchor.id,task.id],boundary+': only an active completion rest removes evergreen membership');
+  assert.equal(ctx.isEligible(task),!['context','future-start'].includes(boundary));
+ }
+ const {ctx}=await loadApp(),task=ctx.addTask('Legacy resting task');
+ Object.assign(task,{evergreen:true,evergreenHours:18,evergreenResetAtDay:false,lastDoneAt:now});ctx.state.chain=[task.id];
+ ctx.initializeReplacedScan();assert.deepEqual([...ctx.state.chain],[],'legacy saved rest without a considered Done mark is still completion evidence');
+ for(const dayReset of [false,true])for(const offset of [-1,0,1]){
+  const {ctx}=await loadApp(),anchor=ctx.addTask('Boundary anchor'),task=ctx.addTask('Exact boundary');
+  const at=new Date(2026,9,6,10).getTime();
+  Object.assign(task,{evergreen:true,evergreenHours:18,evergreenResetAtDay:dayReset,lastDoneAt:at});
+  const until=ctx.evergreenUntil(task);setFakeTime(ctx,until+offset);ctx.state.chain=[anchor.id,task.id];
+  ctx.initializeReplacedScan();assert.deepEqual([...ctx.state.chain],offset<0?[anchor.id]:[anchor.id,task.id],`day reset ${dayReset}, expiry offset ${offset}: use the exact eligibility boundary`);
+ }
+});
+
+test('RISK evergreen scan reconciliation: offline cold reload clears legacy resting dots and Undo retains completion history',async()=>{
+ for(const hostStorage of [false,true]){
+  const prepared=await loadApp(),anchor=prepared.ctx.addTask('Anchor'),task=prepared.ctx.addTask('Legacy resting task');
+  Object.assign(task,{evergreen:true,evergreenHours:18,evergreenResetAtDay:false,lastDoneAt:Date.now()});
+  prepared.ctx.state.chain=[anchor.id,task.id];prepared.ctx.state.workLog.push({id:'legacy-session',taskId:task.id,title:task.title,kind:'evergreen-done',at:task.lastDoneAt});
+  const bytes=JSON.stringify(prepared.ctx.state),{ctx,shim}=await loadApp({[hostStorage?'hostStorage':'seedStorage']:{[SYNC_STORE_KEY]:bytes}});
+  assert.deepEqual([...ctx.state.chain],[anchor.id],'offline startup does not display a resting legacy dot');
+  assert.doesNotMatch(shim.document.getElementById('scan').innerHTML,/Legacy resting task/);
+  ctx.pushUndo();ctx.addTask('Unrelated offline edit');ctx.undo();await ctx.persist();
+  assert.deepEqual([...ctx.state.chain],[anchor.id]);assert.equal(ctx.state.tasks.length,2);assert.equal(ctx.state.workLog.length,1);
+  assert.equal(ctx.state.tasks.find(t=>t.id===task.id).lastDoneAt,task.lastDoneAt,'Undo of unrelated work does not cancel completion');
+  const durable=hostStorage?(await shim.window.storage.get(SYNC_STORE_KEY)).value:shim.localStorage.getItem(SYNC_STORE_KEY);
+  const reopened=await loadApp({[hostStorage?'hostStorage':'seedStorage']:{[SYNC_STORE_KEY]:durable}});
+  assert.deepEqual([...reopened.ctx.state.chain],[anchor.id]);assert.equal(reopened.ctx.state.workLog[0].id,'legacy-session');
+ }
+});
+
+test('RISK evergreen scan reconciliation: a delayed stale read and later revision converge without restoring completed membership',async()=>{
+ const {a,b,h,notify,candidateId,benchId,nextId}=await liveScanSyncClients({evergreen:true});
+ const stale=h.remoteState();stale.chain=[benchId,candidateId];stale.candidateId=nextId;
+ a.ctx.onAction('cand-done',{dataset:{candidate:candidateId,benchmark:benchId}});await syncSettle(100);
+ const completed=h.remoteState(),doneAt=completed.tasks.find(t=>t.id===candidateId).lastDoneAt;
+ const CS=b.shim.window.CloudSync,ordinaryPull=CS.pull;let release,started;
+ const reading=new Promise(resolve=>{started=resolve;});
+ CS.pull=async()=>{CS.pull=ordinaryPull;const reply={...h.doc};started();return new Promise(resolve=>{release=()=>resolve(reply);});};
+ h.writeBehindBack(stale);const delayed=b.ctx.cloudPull();await reading;
+ completed.chain=[benchId,candidateId];completed.candidateId=nextId;completed.tasks.find(t=>t.id===nextId).title='Newest independent edit';
+ h.writeBehindBack(completed);notify();release();await delayed;await syncSettle(180);
+ for(const client of [a,b]){
+  assert.deepEqual([...client.ctx.state.chain],[benchId],'neither delayed nor latest shared chain can override completion evidence');
+  assert.equal(client.ctx.state.tasks.find(t=>t.id===candidateId).lastDoneAt,doneAt);
+  assert.equal(client.ctx.state.tasks.find(t=>t.id===nextId).title,'Newest independent edit');
+  assert.equal(client.ctx.state.workLog.filter(e=>e.taskId===candidateId).length,1);
+ }
+});
+
 test('RISK live scan sync: candidate Done publishes promptly and reaches another open device without focus',async()=>{
  for(const evergreen of [false,true]){
   const {a,b,h,candidateId,nextId,benchId}=await liveScanSyncClients({evergreen});
