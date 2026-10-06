@@ -19892,6 +19892,23 @@ test('RISK Chance labels: new task defaults normally draw but extreme TrueSkill 
  const seed=ctx.state.chance.seed;ctx.openHelp();assert.equal(ctx.state.chance.seed,seed);
 });
 
+test('RISK Chance labels: an empty-chain preview excludes positive tails that overflow for every possible saved hash',async()=>{
+ const {ctx}=await loadApp(),oldest=ctx.addTask('Oldest'),strong=ctx.addTask('Strong'),weak=ctx.addTask('Weak');
+ oldest.createdAt=1;strong.createdAt=2;weak.createdAt=3;
+ for(const task of [oldest,strong,weak])task.sigma=.8;
+ oldest.mu=strong.mu=229.7;weak.mu=0;ctx.state.scanMode='chance';
+ const weight=ctx.chanceWeight(weak),bestU=(4294967295+.5)/4294967296;
+ assert.ok(weight>0,'the actual supported rating fixture has a positive numerical tail');
+ assert.equal(-Math.log(bestU)/weight,Infinity,'even the most favorable possible 32-bit draw cannot enter the weighted pool');
+ const before=JSON.stringify(ctx.state),preview=ctx.chanceDisplayStats();
+ assert.equal(ctx.taskSelectionSummary(weak,preview).label,'scanned after','the seedless preview must not advertise an impossible weighted draw');
+ assert.equal(ctx.taskSelectionSummary(strong,preview).label,'100% next draw');
+ assert.equal(ctx.taskSelectionSummary(oldest,preview).label,'first dot · by age');
+ assert.equal(JSON.stringify(ctx.state),before,'classifying preview overflow cannot create a seed or change ratings');
+ ctx.startScan('chance');assert.deepEqual(Array.from(ctx.state.chain),[oldest.id]);
+ assert.equal(ctx.chanceScore(weak),Infinity);assert.equal(ctx.taskSelectionSummary(weak,ctx.chanceDisplayStats()).label,'scanned after','starting the scan preserves the truthful fallback label');
+});
+
 test('RISK multiple dependencies FAQ: extended help explains progressive links saved cycles live sync and scoped Chance labels',async()=>{
  const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
  for(const text of [/up to ten dependencies/i,/\+ dependency/,/blocked by/i,/cycle.*warning/i,/fresh draw/i,/scanned after/i,/open devices/i,/draft/i,/offline/i,/top-K/])assert.match(help,text);

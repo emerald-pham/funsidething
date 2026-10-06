@@ -467,3 +467,7 @@ The editor hook blocks app or enforcement edits while tests.js has no staged or 
 - RISK evergreen scan reconciliation: cooldown expiry day reset and explicit return preserve eligible and unrelated chain membership
 - RISK evergreen scan reconciliation: offline cold reload clears legacy resting dots and Undo retains completion history
 - RISK evergreen scan reconciliation: a delayed stale read and later revision converge without restoring completed membership
+
+## Backup age, night shows, and legacy dependency compatibility
+
+- RISK Chance labels: an empty-chain preview excludes positive tails that overflow for every possible saved hash
