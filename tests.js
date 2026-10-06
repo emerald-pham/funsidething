@@ -20112,9 +20112,97 @@ test('RISK multiple dependencies legacy mirrors: local and IndexedDB saves retai
 });
 
 test('RISK multiple dependencies layout: long blockers wrap within their row and dependency selects keep touchable widths',()=>{
- assert.match(html,/\.tmain:has\(\.dependency-blockers\)\s*\{[^}]*flex-wrap:wrap/,'only rows with blockers gain the extra line');
+ assert.match(html,/\.tmain\s*\{[^}]*flex-wrap:wrap/,'task metadata and blockers can wrap without squeezing names into a narrow strip');
  assert.match(html,/\.dependency-blockers\s*\{[^}]*flex-basis:100%[^}]*overflow-wrap:anywhere/,'long task names wrap independently of the title and rank summary');
  assert.match(html,/\.dependency-row select\s*\{[^}]*flex:1[^}]*min-width:min\(180px,100%\)/,'native selects stay touchable while fitting short phone rows');
+});
+
+test('RISK All Tasks mobile layout: names and every metadata badge wrap inside the task column without changing saved state',async()=>{
+ assert.match(html,/\.tmain\s*\{[^}]*flex-wrap:wrap/,'all rows must wrap, including rows without dependencies');
+ assert.match(html,/\.tmain \.tt\s*\{[^}]*max-width:100%[^}]*overflow-wrap:anywhere/,'long and unbroken task names stay within their column');
+ for(const selector of ['chip','skipped']){
+  const rule=new RegExp('\\.tmain \\.'+selector+'\\s*\\{([^}]+)\\}').exec(html)?.[1]||'';
+  assert.match(rule,/max-width:100%/,'metadata cannot exceed the task column');
+  assert.match(rule,/overflow-wrap:anywhere/,'long imported labels can wrap instead of widening the list');
+ }
+ const {ctx,shim}=await loadApp(),root=ctx.addTask('Synthetic prerequisite with a deliberately long unbroken suffix '+ 'X'.repeat(80));
+ const task=ctx.addTask('Synthetic long task name with dates and evergreen status');
+ task.evergreen=true;task.startsAt='2099-12-31';task.due='2099-12-30';
+ ctx.setTaskPrerequisites(task.id,[root.id]);ctx.state.considered[task.id]='SyntheticImportedStatus'+ 'Y'.repeat(80);
+ ctx.state.listOpen=true;ctx.render();const before=JSON.stringify(ctx.state);ctx.renderList();
+ assert.equal(JSON.stringify(ctx.state),before,'layout and list rendering preserve every saved field and scan decision');
+ const markup=shim.document.getElementById('listBody').innerHTML;
+ for(const text of [task.title,root.title,'not started','evergreen','Blocked by:',ctx.state.considered[task.id]])assert.ok(markup.includes(text),text+' remains readable content');
+});
+
+test('RISK All Tasks mobile layout FAQ: existing list guidance explains wrapped names and badges',async()=>{
+ const {ctx,shim}=await loadApp();ctx.openHelp();
+ const markup=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(markup,/Long task names and date or status tags wrap to fit each row/);
+ assert.match(markup,/All Tasks can search and filter[\s\S]*without changing the scan/,'existing filter scope remains documented');
+});
+
+test('RISK All Tasks mobile layout browser: WebKit and Chrome keep names badges blockers and taps usable across viewport and text sizes',
+ {skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const {webkit,chromium,devices}=await import(process.env.PLAYWRIGHT_MODULE||'playwright');
+ const origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+ for(const [engine,type] of [['webkit',webkit],['chrome',chromium]]){
+  const browser=await type.launch({headless:true,...(engine==='chrome'?{channel:'chrome'}:{})});
+  try{
+   const context=await browser.newContext({...devices['iPhone 13'],serviceWorkers:'block'});
+   await context.addInitScript(()=>{
+    Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});
+    localStorage.setItem('fvp:chain-scanner:landscape-motion','reduced');
+   });
+   await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
+   const page=await context.newPage();await page.goto(process.env.LANDSCAPE_BROWSER_URL);
+   await page.waitForFunction(()=>typeof state!=='undefined'&&state?.tasks);
+   const id=await page.evaluate(()=>{
+    closeModal();document.getElementById('motionDialog')?.close();state.listOpen=true;state.addOpen=false;
+    const root=addTask('Synthetic prerequisite with a long label '+ 'X'.repeat(90));
+    const task=addTask('Synthetic short name');task.evergreen=true;task.startsAt='2099-12-31';task.due='2099-12-30';
+    const long=addTask('Synthetic long task name with several words and a suffix '+ 'Y'.repeat(90));
+    long.evergreen=true;long.startsAt='2099-12-31';long.due='2099-12-30';setTaskPrerequisites(long.id,[root.id]);
+    state.considered[long.id]='SyntheticImportedStatus'+ 'Z'.repeat(90);
+    state.settings.dateFormat='mdy';state.scanMode='chance';render();return task.id;
+   });
+   if(process.env.LAYOUT_SCREENSHOT_DIR)await page.locator('.listwrap').screenshot({path:path.join(process.env.LAYOUT_SCREENSHOT_DIR,engine+'-task-list.png')});
+   const scale=await page.addStyleTag({content:'/* normal text */'});
+   for(const [width,height] of [[320,568],[390,844],[393,852],[402,874],[568,320],[844,390],[768,1024],[1024,768],[1280,800]]){
+    await page.setViewportSize({width,height});
+    for(const large of [false,true]){
+     await scale.evaluate((e,large)=>e.textContent=large?'.tmain .tt{font-size:24px!important}.tmain .chip,.tmain .skipped,.dependency-blockers{font-size:18px!important}':'',large);
+     for(const [spark,summary] of [[true,true],[true,false],[false,true],[false,false]]){
+      const geometry=await page.evaluate(({spark,summary})=>{
+       FEATURE_FLAGS.rankSparklines=spark;FEATURE_FLAGS.topKLanguage=summary;
+       const before=JSON.stringify(state);renderList();const body=document.getElementById('listBody');
+       const rect=e=>{const r=e.getBoundingClientRect();return {left:r.left,right:r.right,width:r.width,top:r.top,bottom:r.bottom};};
+       return {same:JSON.stringify(state)===before,pageWidth:document.documentElement.scrollWidth,viewport:innerWidth,
+        scroll:body.scrollWidth,client:body.clientWidth,rows:[...body.querySelectorAll('.trow')].map(row=>{
+         const main=row.querySelector('.tmain'),title=main.querySelector('.tt');
+         return {main:rect(main),title:rect(title),children:[...main.children].map(e=>({text:e.textContent,marker:e.matches('.inchain,.chainind'),...rect(e)}))};
+        })};
+      },{spark,summary});
+      const label=`${engine} ${width}x${height} ${large?'large':'normal'} text ${spark}/${summary}`;
+      assert.equal(geometry.same,true,label+': rendering is read-only');
+      assert.ok(geometry.pageWidth<=geometry.viewport+1,label+': no page overflow');
+      assert.ok(geometry.scroll<=geometry.client+1,label+': no horizontal list scrolling');
+      for(const row of geometry.rows){
+       assert.ok(row.title.width>=Math.min(120,row.main.width-32),label+': task name keeps a readable width instead of single-letter lines');
+       for(const child of row.children){
+        assert.ok(child.left>=row.main.left-1&&child.right<=row.main.right+1,label+': '+child.text+' fits its task column');
+        if(child.marker)assert.ok(child.top<row.title.bottom&&row.title.top<child.bottom,label+': the chain marker stays beside its task name');
+       }
+      }
+     }
+    }
+    await scale.evaluate(e=>e.textContent='');
+    await page.locator('.tt[data-id="'+id+'"]').tap();assert.equal(await page.locator('#etTitle').inputValue(),'Synthetic short name');
+    await page.getByRole('button',{name:'Close',exact:true}).tap();
+   }
+   await context.close();
+  }finally{await browser.close();}
+ }
 });
 
 test('RISK multiple dependencies: Undo restores a deleted task link as intent without reviving it from stale copies',async()=>{
