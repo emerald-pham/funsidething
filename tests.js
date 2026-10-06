@@ -24,6 +24,14 @@ test('RISK context exclusions: real selectors cycle included excluded neutral wi
  assert.equal(reloaded.ctx.state.contexts[0].excluded,true);assert.equal(reloaded.ctx.state.contexts[0].active,false,'hydrate makes red safe for released clients');
 });
 
+test('RISK context rendering: an imported empty context ID retains its real selector state and unknown fields in Settings',async()=>{
+ const {ctx,shim}=await loadApp(),c={id:'',name:'Private imported context',active:true,privateUnknown:'retained'};ctx.state.contexts=[c];
+ const button=makeFakeElement();button.dataset={ctx:'',ctxScope:'settings',act:'cycle-context'};button.setAttribute('data-ctx','');
+ shim.document.getElementById('modalRoot').querySelectorAll=()=>[button];ctx.toggleContext('');
+ assert.equal(c.excluded,true);assert.equal(button.getAttribute('aria-label'),'Private imported context: excluded. Next: neutral.','an empty imported ID is a real context, not the synthetic filter');
+ assert.equal(button.dataset.filterState,'excluded');assert.equal(c.privateUnknown,'retained');assert.equal(ctx.state.settings.excludeNoContext,false);
+});
+
 test('RISK context exclusions: scan and All Tasks preserve all required contexts dotted classification and full-pool shares',async()=>{
  const {ctx,shim}=await loadApp({seed:912}),[a,b]=ctx.state.contexts;
  const zero=ctx.addTask('Private no context'),one=ctx.addTask('Private one',false,[a.id]),many=ctx.addTask('Private multiple',false,[a.id,b.id]),unknown=ctx.addTask('Private unknown',false,['deleted-private-id']);

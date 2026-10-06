@@ -1,11 +1,12 @@
 [
   {
-    "testChangesSha256": "a54f39302d1f9ec08af270ea3206655e90dd5a857994371c760c135220ff0392",
+    "testChangesSha256": "45e85869588f2c91e92e1ebc2ef0fad291e9243372a2060ad447fb6bbf7f650e",
     "reason": "The user explicitly requested neutral/green/red context controls, an exclude-only No context filter, consistent Settings changelog styling and bottom Save settings. Add exact behavior and safety contracts without modifying existing passing assertions.",
     "previousBehavior": "Contexts toggled only active/inactive; no synthetic unassigned-task filter existed. Changelog lacked Settings disclosure styling and Save settings preceded Contexts and Data/backups.",
     "intendedBehavior": "Preserve every-known-context active inclusion, make red exclusions override inclusion and treat neutral as existing inactive. Offer a nonassignable No context exclusion only with real contexts; retain revisions, backups, ratings and unknown fields. Use existing section/kv styles and put Save after all sections.",
     "replacementTests": [
       "RISK context exclusions: real selectors cycle included excluded neutral with durable Undo and explicit red precedence",
+      "RISK context rendering: an imported empty context ID retains its real selector state and unknown fields in Settings",
       "RISK context exclusions: scan and All Tasks preserve all required contexts dotted classification and full-pool shares",
       "RISK No context filter: exclude-only synthetic control never becomes an assignment and tracks rename deletion and unknown IDs",
       "RISK context saved data: absent invalid and released settings preserve assignments exclusions unknown fields and completion Undo",
@@ -20,8 +21,8 @@
       "Native isolated fixtures cover missing/invalid settings, known/unknown/multiple contexts, explicit exclusion precedence, nonassignable synthetic scope, rename/delete, no real contexts, filter counts, dot/undot, completion/Undo, two clients/offline reload/reconnect and recoverable displaced settings. Actual Chrome/WebKit/PWA fixtures cover phone/tablet/desktop touch and keyboard states, draft retention, scrolling and persisted Settings."
     ],
     "redEvidence": {
-      "command": "node --test --test-reporter=spec --test-name-pattern='RISK context exclusions|RISK No context filter|RISK context saved data|RISK context sync|RISK Settings hierarchy|RISK context and Settings FAQ' tests.js",
-      "failure": "Before index.html or sw.js implementation, red-native-final.log recorded all seven selected contracts failing: absent red excluded field, two-state rather than three-state cycling, absent synthetic control/default/persisted flag, old unstyled Changelog disclosure and absent FAQ. Initial green fixture correction compared weight/probability/availability instead of first-dot annotations and used existing syncSettle rather than flush, which accepts no duration; no product assertions were weakened. The initial full-native.log also caught the unchanged RISK IMPORT RENDERING reveal contract querying outside its scope; before correction, the original test failed. Limiting the button refresh query to modalRoot restored it without changing that protected test."
+      "command": "node --test --test-reporter=spec --test-name-pattern='RISK context exclusions|RISK No context filter|RISK context saved data|RISK context sync|RISK Settings hierarchy|RISK context and Settings FAQ' tests.js; node --test --test-reporter=spec --test-name-pattern='RISK context rendering' tests.js",
+      "failure": "Before index.html or sw.js implementation, red-native-final.log recorded all seven selected contracts failing: absent red excluded field, two-state rather than three-state cycling, absent synthetic control/default/persisted flag, old unstyled Changelog disclosure and absent FAQ. Initial green fixture correction compared weight/probability/availability instead of first-dot annotations and used existing syncSettle rather than flush, which accepts no duration; no product assertions were weakened. The initial full-native.log also caught the unchanged RISK IMPORT RENDERING reveal contract querying outside its scope; before correction, the original test failed. Limiting the button refresh query to modalRoot restored it without changing that protected test. Final source inspection found an accepted empty imported context ID was mislabeled as synthetic No context in an open Settings selector. Before the attribute-presence fix, empty-id-red.log records its real context name/excluded label differing from No context neutral; an additive regression protects that legacy edge without rewriting IDs or unknown fields."
     }
   },
   {
