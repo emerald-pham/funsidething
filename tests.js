@@ -20179,6 +20179,16 @@ test('RISK overall Chance shares: saved-pass fallback remains explicit when live
  assert.equal(ctx.taskSelectionSummary(b,stats).label,'scanned after');assert.match(ctx.taskSelectionSummary(b,stats).title,/saved pass.*50% overall/i);assert.equal(JSON.stringify(ctx.state),before);
 });
 
+test('RISK overall Chance shares: an empty chain ignores stale pass fallback and keeps the age-first global share',async()=>{
+ const {ctx}=await loadApp();const oldest=ctx.addTask('Oldest'),other=ctx.addTask('Other');oldest.createdAt=1;other.createdAt=2;
+ ctx.state.scanMode='chance';ctx.resetChance();ctx.state.chance.weights[oldest.id]=0;const staleSeed=ctx.state.chance.seed,before=JSON.stringify(ctx.state);
+ const stats=ctx.chanceDisplayStats(),summary=ctx.taskSelectionSummary(oldest,stats);assert.equal(stats.get(oldest.id).probability,.5);
+ assert.equal(summary.label,'50% overall','starting an empty chain resets the stale pass before its deterministic first dot');assert.equal(summary.fill,50);
+ assert.match(summary.title,/first dot.*age/i);assert.doesNotMatch(summary.title,/saved pass uses descending fallback/);assert.equal(JSON.stringify(ctx.state),before);
+ ctx.startScan('chance');assert.deepEqual(Array.from(ctx.state.chain),[oldest.id]);assert.notEqual(ctx.state.chance.seed,staleSeed);
+ assert.ok(ctx.state.chance.weights[oldest.id]>0);assert.equal(ctx.taskSelectionSummary(oldest).label,'50% overall');
+});
+
 test('RISK overall Chance shares FAQ: full-pool percentages explain position independence current ratings and deterministic first dots',async()=>{
  const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
  for(const text of [/full eligible/i,/already scanned/i,/current.*ratings/i,/first dot.*age/i,/rounding/i,/scanned after/i,/top-K/])assert.match(help,text);

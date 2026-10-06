@@ -483,3 +483,4 @@ The editor hook blocks app or enforcement edits while tests.js has no staged or 
 - RISK overall Chance shares: normalizable totals rounding and all-zero or empty eligible sets stay finite and read-only
 - RISK overall Chance shares: saved-pass fallback remains explicit when live global ratings differ from frozen weights
 - RISK overall Chance shares FAQ: full-pool percentages explain position independence current ratings and deterministic first dots
+- RISK overall Chance shares: an empty chain ignores stale pass fallback and keeps the age-first global share
