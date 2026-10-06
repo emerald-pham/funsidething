@@ -437,14 +437,14 @@ The editor hook blocks app or enforcement edits while tests.js has no staged or 
 - RISK multiple dependencies: progressive Add and Edit controls cap at ten preserve drafts and reset on cancel or save
 - RISK multiple dependencies: pasted tasks retain all selected links and All Tasks names only unresolved blockers safely
 - RISK multiple dependencies sync: simultaneous edits converge and offline reload reconnect keeps Done and pause behavior
-- RISK Chance labels: frozen weight shares describe a fresh draw and never change saved order ratings or seed
+- RISK overall Chance shares: full eligible weights retain scanned and chained tasks without changing order ratings or seed
 - RISK Chance labels: exact numerical fallback and tiny positive candidates stay distinct while excluded tasks show zero
 - RISK Chance labels: new task defaults normally draw but extreme TrueSkill tails have no positive guarantee
 - RISK multiple dependencies FAQ: extended help explains progressive links saved cycles live sync and scoped Chance labels
 - RISK multiple dependencies layout: long blockers wrap within their row and dependency selects keep touchable widths
 - RISK multiple dependencies: Undo restores a deleted task link as intent without reviving it from stale copies
 - RISK Chance labels: disabled presentation flags retain their hidden summaries and matching FAQ language
-- RISK Chance labels: the deterministic oldest first dot has an age label and is excluded from the following weighted draw
+- RISK overall Chance shares: the age-first explanation retains its global percentage before and after dotting
 
 ## Backup age, night shows, and legacy dependency compatibility
 
@@ -476,3 +476,10 @@ The editor hook blocks app or enforcement edits while tests.js has no staged or 
 
 - RISK multiple dependencies legacy mirrors: repeated identical cycle merges report no recovered data while real removals remain changes
 - RISK multiple dependencies legacy mirrors: local and IndexedDB saves retain cycle warnings without false recovery messages
+
+## Overall Chance share presentation
+
+- RISK overall Chance shares: current ratings and genuine eligibility update shares while the saved pass remains frozen
+- RISK overall Chance shares: normalizable totals rounding and all-zero or empty eligible sets stay finite and read-only
+- RISK overall Chance shares: saved-pass fallback remains explicit when live global ratings differ from frozen weights
+- RISK overall Chance shares FAQ: full-pool percentages explain position independence current ratings and deterministic first dots
