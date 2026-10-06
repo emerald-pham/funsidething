@@ -2,8 +2,8 @@
   {
     "testChangesSha256": "8b8f782e3249a54611227d9d2f5b0df1d96880a0270673f85e8e306de7326270",
     "reason": "Integrate the already reviewed and released resting-evergreen scanner repair into the current feature branch without changing its reconciliation code or125 test lines. The exact first-parent merge diff adds its six named risk contracts; original pre-implementation red output and fresh integrated preservation checks remain available.",
-    "previousBehavior": "Outside the phone breakpoint, empty WebKit date controls could shrink to a narrow sliver because the base flexible row sized only text and URL inputs.",
-    "intendedBehavior": "Date inputs share the existing base flexible 180-pixel minimum, with native pickers and mobile full-width stacking preserved.",
+    "previousBehavior": "Reconciliation swept only permanently done tasks from the shared chain. Evergreen Done retains done=false, so newer stale chains could keep resting tasks as crumbs or benchmarks although pool eligibility excluded them.",
+    "intendedBehavior": "Reconciliation removes only actively resting evergreen completion IDs from the chain and candidate, preserves task records, History, ratings and scan mode, and retains eligible expired or reopened dots and unrelated context/start-date holds.",
     "replacementTests": [
       "RISK evergreen scan reconciliation: merged completion removes resting crumbs tails and candidates without losing evidence",
       "RISK evergreen scan reconciliation: a newer stale cloud chain cannot revive another browsers completed task",
@@ -13,14 +13,14 @@
       "RISK evergreen scan reconciliation: a delayed stale read and later revision converge without restoring completed membership"
     ],
     "preservedCoverage": [
-      "All pre-existing tests and assertions remain unchanged, including revision conflicts, account switching, durable recovery, rejected-write status, imports, deletion and causal evergreen completion cancellation.",
-      "Completion remains rating-neutral, Chance and ranking algorithms remain untouched, and all normal task, chain, candidate, mode and history fields retain the existing protocol and authoritative merge rules.",
-      "Snapshot hints contain only account identity and revision and never carry a board or write acknowledgement. Synthetic separate client stores and fake authenticated accounts avoid production storage.",
-      "The optional native date case is run explicitly with zero skips in both Chrome and WebKit across nine viewports each; the always-on structural case protects tablet sizing and existing phone stacking."
+      "Ordinary completions retain their existing cleanup and task records; evergreen timestamps, session History, Undo of unrelated edits and actual durable local/host reload remain intact.",
+      "Candidate selection and pool eligibility, ordinary and evergreen chain positions, paused and intervention modes, stale benchmark action identities, and held editor/pointer cloud deferral remain protected.",
+      "Cooldown expiration uses the same strict boundary as eligibility at elapsed hours and the 2 AM reset; early returns and context/date chain behavior retain existing semantics.",
+      "Real synthetic two-client revision reconciliation preserves unrelated changes and completion evidence through a newer stale winner, delayed reads and later notifications without touching real account or production data."
     ],
     "redEvidence": {
-      "command": "node --test --test-name-pattern='RISK tablet date fields:' --test-reporter=spec tests.js",
-      "failure": "The structural test failed before the CSS change because no base .frow input[type=date] rule supplied usable flex width. Actual output is ../sync-evidence/date-fields-red.log; Chrome/WebKit native tests were subsequently run explicitly at all eighteen layouts with zero skips. Integration retains the exact live reconcileHistory function and all125 added test lines; verified in ../dependency-evidence/integration-preservation.json."
+      "command": "node --test --test-reporter=spec --test-name-pattern='^RISK evergreen scan reconciliation:' tests.js",
+      "failure": "All six final regression tests were observed failing on the original reconcileHistory implementation before reinstating the app fix. Failures were assertions of resting task IDs remaining in chain membership (crumb/benchmark, stale remote winner, interaction release, legacy/rest boundary, offline cold reload and delayed read). Full raw red output is /Users/emeraldpham/Documents/Codex/2026-10-04/task-5/evergreen-sync-evidence/red-final-tests-before-app-fix.log; initial four-case raw red is red-discriminating-before-app-fix.log in that directory. Integration retains the exact live reconcileHistory function and all125 added test lines; verified in ../dependency-evidence/integration-preservation.json."
     }
   },
   {
