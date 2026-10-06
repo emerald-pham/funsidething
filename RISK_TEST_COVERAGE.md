@@ -48,7 +48,7 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK recurrence-default loss: quick Add preserves 18-hour and 2 AM defaults across single and pasted tasks
 - RISK unreachable Undo and lost preference: floating header defaults off, saves on toggle, and survives close and reload
 - RISK prerequisites: completion, evergreen Done, restore, and deletion govern scan eligibility by ID
-- RISK prerequisites: invalid links and cycles are rejected; missing imported references are eligible
+- RISK prerequisites: invalid links are rejected and cycles warn without discarding saved links
 - RISK prerequisites: Add and each task editor expose stable selectors and removal
 - RISK prerequisites: pasted Add tasks keep the chosen prerequisite
 - RISK eligibility filter: Worked on it remains ineligible until its hold clears
@@ -426,3 +426,22 @@ The editor hook blocks app or enforcement edits while tests.js has no staged or 
 
 - RISK tablet date fields: empty native editor dates have usable width outside the phone breakpoint
 - RISK tablet date fields browser: empty filled and focused dates remain touchable with unclipped neighboring controls
+
+## Multiple dependencies and Chance display
+
+- RISK multiple dependencies: ten links require every prerequisite while completion deletion and Undo retain their rules
+- RISK multiple dependencies: old single links migrate and legacy edits preserve the other selected dependencies
+- RISK multiple dependencies: concurrent additions removals repeated readds and replacement Undo reconcile causally
+- RISK multiple dependencies: concurrent capacity conflicts retain the canonical ten and causal removal evidence
+- RISK multiple dependencies: direct indirect and overlapping cycles warn but completed cycles and large acyclic graphs do not
+- RISK multiple dependencies: progressive Add and Edit controls cap at ten preserve drafts and reset on cancel or save
+- RISK multiple dependencies: pasted tasks retain all selected links and All Tasks names only unresolved blockers safely
+- RISK multiple dependencies sync: simultaneous edits converge and offline reload reconnect keeps Done and pause behavior
+- RISK Chance labels: frozen weight shares describe a fresh draw and never change saved order ratings or seed
+- RISK Chance labels: exact numerical fallback and tiny positive candidates stay distinct while excluded tasks show zero
+- RISK Chance labels: new task defaults normally draw but extreme TrueSkill tails have no positive guarantee
+- RISK multiple dependencies FAQ: extended help explains progressive links saved cycles live sync and scoped Chance labels
+- RISK multiple dependencies layout: long blockers wrap within their row and dependency selects keep touchable widths
+- RISK multiple dependencies: Undo restores a deleted task link as intent without reviving it from stale copies
+- RISK Chance labels: disabled presentation flags retain their hidden summaries and matching FAQ language
+- RISK Chance labels: the deterministic oldest first dot has an age label and is excluded from the following weighted draw

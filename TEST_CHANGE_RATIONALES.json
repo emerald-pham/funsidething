@@ -1,5 +1,39 @@
 [
   {
+    "testChangesSha256": "3c3286eba856a216a860c47db8218eb98dc49cdc747a6299db9ee642c4328411",
+    "reason": "The owner explicitly requested multiple dependencies with saved-cycle warnings and mode-specific Chance labels. The single dependency rejection contract is intentionally changed only for cycles; missing links, eligibility, deletion, completion and old selectors stay protected.",
+    "previousBehavior": "Each task held one prerequisite. Cycles were rejected or silently cleared during hydration. Chance mode showed top-K and had no truthful current-pool percentage or fallback label.",
+    "intendedBehavior": "Up to ten links are preserved by ID, progressive Add/Edit controls reveal additional rows, All Tasks names blockers, cycles save with a warning, and causal edge edits survive concurrent sync, Undo and offline reconnect. Chance labels estimate a fresh draw without altering the frozen selection algorithms.",
+    "replacementTests": [
+      "RISK prerequisites: invalid links are rejected and cycles warn without discarding saved links",
+      "RISK multiple dependencies: ten links require every prerequisite while completion deletion and Undo retain their rules",
+      "RISK multiple dependencies: old single links migrate and legacy edits preserve the other selected dependencies",
+      "RISK multiple dependencies: concurrent additions removals repeated readds and replacement Undo reconcile causally",
+      "RISK multiple dependencies: concurrent capacity conflicts retain the canonical ten and causal removal evidence",
+      "RISK multiple dependencies: direct indirect and overlapping cycles warn but completed cycles and large acyclic graphs do not",
+      "RISK multiple dependencies: progressive Add and Edit controls cap at ten preserve drafts and reset on cancel or save",
+      "RISK multiple dependencies: pasted tasks retain all selected links and All Tasks names only unresolved blockers safely",
+      "RISK multiple dependencies sync: simultaneous edits converge and offline reload reconnect keeps Done and pause behavior",
+      "RISK Chance labels: frozen weight shares describe a fresh draw and never change saved order ratings or seed",
+      "RISK Chance labels: exact numerical fallback and tiny positive candidates stay distinct while excluded tasks show zero",
+      "RISK Chance labels: new task defaults normally draw but extreme TrueSkill tails have no positive guarantee",
+      "RISK multiple dependencies FAQ: extended help explains progressive links saved cycles live sync and scoped Chance labels",
+      "RISK multiple dependencies layout: long blockers wrap within their row and dependency selects keep touchable widths",
+      "RISK multiple dependencies: Undo restores a deleted task link as intent without reviving it from stale copies",
+      "RISK Chance labels: disabled presentation flags retain their hidden summaries and matching FAQ language",
+      "RISK Chance labels: the deterministic oldest first dot has an age label and is excluded from the following weighted draw"
+    ],
+    "preservedCoverage": [
+      "Only the old explicit cycle rejection assertion is changed by user authorization. Existing unknown-link, missing imported reference, one-link Add/paste/edit, completion, evergreen, restore and deletion assertions remain active.",
+      "All rating updates, first-dot selection, weighted scores, Chance freezing, descending ordering, cloud revision authority, account isolation, durable backups and rejection handling remain protected by existing regressions and required compatibility gates.",
+      "Synthetic independent client stores test concurrent edge additions/removals, a bounded capacity conflict, offline reload/reconnect and immediate Task Done/Done Adding sync. Browser proof uses separate private contexts and local-only or synthetic cloud fixtures."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK multiple dependencies|RISK Chance labels|RISK prerequisites: invalid links' --test-reporter=spec tests.js; focused FAQ, layout and missing-link Undo commands",
+      "failure": "Before app edits thirteen initial contracts failed. The FAQ fixture was corrected to existing openHelp, then failed on missing dependency copy. Later layout and dangling-link Undo tests both failed before their fixes. The full suite found a real hidden-presentation-flag FAQ regression, followed by its focused failing new risk test. First-dot tests failed before age-label/projection fixes and before discarding stale old-pass weights for a new empty chain. Actual logs in ../dependency-evidence/: initial-red.log, faq-red.log, layout-and-missing-undo-red.log, full-tests-first.log, presentation-flag-red.log, first-dot-red.log, first-dot-fresh-weights-red.log, updated-shell-red.log. The synthetic cloud fixture explicitly flushes via existing cloudPushNow rather than pretending the two-second debounce elapsed. Nine existing selection/rating functions are fingerprinted byte-exactly in the new display risk test."
+    }
+  },
+  {
     "testChangesSha256": "839e4edf7f192dbbff9edb4cb422de743ca16b66c36e561630ed686f349a393b",
     "reason": "The screenshot shows empty native Due and Starts controls collapsing on tablets. The two new tests directly protect readable native date widths, focus, fill, neighboring controls and unchanged phone stacking.",
     "previousBehavior": "Outside the phone breakpoint, empty WebKit date controls could shrink to a narrow sliver because the base flexible row sized only text and URL inputs.",

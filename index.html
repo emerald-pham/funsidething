@@ -236,6 +236,8 @@ input[type=date]::-webkit-date-and-time-value{min-width:0;text-align:left}
 .tk .tkbar{height:7px;border-radius:99px;background:var(--track);overflow:hidden}
 .tk .tkbar i{display:block;height:100%;background:var(--chain-deep);border-radius:99px}
 .tmain{display:flex;align-items:center;gap:8px;min-width:0}
+.tmain:has(.dependency-blockers){flex-wrap:wrap}
+.dependency-blockers{flex-basis:100%;overflow-wrap:anywhere;color:var(--mut);font-size:11px}
 .tmain .tt{font-size:14.5px;text-align:left;overflow-wrap:anywhere}
 .tmain .tt:hover{color:var(--accent)}
 .tmain a.ext{font-size:12px;text-decoration:none;flex:none}
@@ -298,6 +300,7 @@ input[type=date]::-webkit-date-and-time-value{min-width:0;text-align:left}
 .modal .x{margin-left:auto;color:var(--mut);font-size:18px;padding:2px 8px}
 .frow{display:flex;gap:10px;align-items:center;margin:9px 0;flex-wrap:wrap}
 .frow select{min-width:0;max-width:100%}
+.dependency-row select{flex:1;min-width:min(180px,100%)}
 .frow label{min-width:96px;font-size:13.5px;color:var(--mut)}
 /* Empty native dates can have almost no intrinsic width on tablet WebKit. */
 .frow input[type=text],.frow input[type=url],.frow input[type=date]{flex:1;min-width:180px}
@@ -425,7 +428,7 @@ input[type=date]::-webkit-date-and-time-value{min-width:0;text-align:left}
         <div class="add-date-field"><label for="addStart">Starts</label><input id="addStart" type="date"/></div>
         <div class="add-date-field"><label for="addDue">Due</label><input id="addDue" type="date"/></div>
       </div>
-      <div class="frow"><label for="addPrerequisite">Prerequisite task</label><select id="addPrerequisite"><option value="">None</option></select></div>
+      <div id="addDependencies"><div class="frow"><label for="addPrerequisite">Dependencies</label><select id="addPrerequisite" data-dependency-scope="add"><option value="">None</option></select></div></div>
       <label class="cbox add-ever-toggle"><input id="addEver" type="checkbox"/> Evergreen</label>
       <div class="add-ever-options" id="addEverOptions" hidden>
         <div class="frow"><label for="addEverHours">Recurrence</label><input id="addEverHours" type="number" min="0.01" max="87600" step="any" value="18"/><select id="addEverUnit" aria-label="Recurrence unit"><option value="hours">Hours</option><option value="days">Days</option></select></div>
@@ -464,8 +467,8 @@ input[type=date]::-webkit-date-and-time-value{min-width:0;text-align:left}
   <p>You can change this anytime in Settings. The sun and Moon follow their real paths, even when the scenery is still.</p>
 </dialog>
 <!-- changelog:start -->
-<template id="appChangelogCurrent"><div data-app-fingerprint="034c34b5b182b30297bab6861c24095f6206ee404084c2075817bcf64fb45faf"><h3>October 5, 2026</h3><ul><li>Empty Due and Starts date fields stay readable and touchable on tablets, with the existing stacked phone layout.</li><li>Done and done adding for now now reach other open devices promptly. Refresh waits for unfinished edits and pressed controls, and repeated Done clicks stay one completion.</li><li>Nighttime garden-light opportunities and city-window changes happen twice as often, with the same brightness and lighting odds.</li><li>Rarely at night, Peter Pan and the Darling children fly to the clocktower, rest on its sloped roof, and fly away. Reduced motion keeps their silhouettes still.</li><li>In Add a task, choosing Days changes the untouched 18-hour evergreen duration to 7 days. Edited durations stay as entered, and switching back to Hours keeps the number.</li></ul><h3>October 3, 2026</h3><ul><li>Restored the previous airplane design.</li></ul><h3>October 2, 2026</h3><ul><li>Rain is denser and falls cleanly over the lake. Fairy lights switch independently and stay hidden in daylight.</li><li>Random fireworks last one to five minutes behind the city. Barge fireworks stay in the foreground.</li><li>The Add &amp; dot button has been removed. Ordinary Add and Dot in each task’s editor remain available.</li><li>Rooftop garden lights now appear half as often: each eligible roof independently has a one-in-twelve chance of being lit.</li></ul><h3>October 1, 2026</h3><ul><li>Undoing evergreen Done clears its rest period and countdown, including after saving or reloading.</li><li>Rooftop garden lights now appear less often, with an independent one-in-six chance for each roof.</li><li>Return as candidate can end an evergreen rest period early. Completed sessions stay in History; Undo restores the rest period.</li></ul><h3>September 30, 2026</h3><ul><li>Biplane messages wrap to fit their banners. The party barge is ten times rarer, waits at least half an hour between visits, and matches the scale of other boats. Rooftop garden lights switch independently; every garden can be lit or dark by chance.</li><li>Returning sessions show syncing while sign-in is restored. Dates outside the current year now name the year, including Start, Due and History. Settings offers a date format that follows the system by default, with month/day/year, day/month/year and year-month-day overrides saved immediately.</li><li>Reopening the installed app now releases cloud requests interrupted by sleep, refreshes the connection, and checks the server before resuming a save. Interrupted attempts no longer wait for an old timeout or create a false error; real connection failures still appear in Diagnostics.</li><li>Cloud sync now overlaps independent downloads and avoids an empty resume read for newly created uploads, while still verifying every complete snapshot. A confirmed save no longer waits through a full network timeout for optional timestamp metadata. The two-second edit debounce remains, and the synced badge still requires a server acknowledgement.</li><li>Settings now keeps timestamped sync error codes beneath Diagnostics download for one hour, even after sync recovers. The same code is logged at most once every ten minutes, and expired entries clear automatically. A small thundercloud appears beside the current error indicator and clears when the error resolves.</li><li>Nighttime fireworks now launch more often, with colored trails reflected in the lake. A rare festival barge floats across the lake with a stage, dancing crowd, slow lighting and a longer fireworks show, without strobes. Fireworks bloom into varied sparks, curved trails and fading embers.</li><li>Short buildings favor subtle brick colors while tall towers favor modern facades. Nighttime window changes now select visible windows.</li><li>Airplanes now show shaded wings, a cockpit and clearer body detail, while message biplanes use a single landing-gear set. The skyline adds no new low-rise backdrop or metropolis-edge trees. Some eligible short towers keep rooftop gardens; others have rooftop patios with warm fairy lights. Rarely, one eligible shorter roof at a time hosts a brief party with colored spotlights that sweep slowly at night. The tallest towers and all lightning-rod towers stay clear.</li></ul><h3>September 29, 2026</h3><ul><li>Restore and Reset now stop safely if your board or signed-in account changes while their recovery copy is saving. Your newer work stays open, and the completed recovery copy remains available.</li><li>Cloud sync now stops rejected writes instead of repeating them after every read. The error button offers Retry sync, Reload app, and Sign out; reload waits for your latest edits to save. Failed reads cannot release another conflicted write, and older saved boards keep their first upload pending until confirmed.</li><li>Temporary failures while reading cloud board chunks now retry automatically instead of being mistaken for damaged data. Genuine permission errors and corrupt snapshots still stop safely.</li><li>Boards now move automatically into verified transactional browser storage that can keep edits, Undo, Restore, Reset backups, manual recovery copies, and unknown board fields beyond the old local-storage ceiling. The retained older browser bytes are never deleted during migration; if the new store is temporarily unavailable, they stay recovery data instead of being mistaken for the current board.</li><li>Cloud sync now stores large boards as verified UTF-8 chunks behind one revisioned manifest. An interrupted or corrupt upload stays invisible, concurrent devices still use revision comparison, and automatic cleanup retains the current and previous complete generations while retiring older published data.</li><li>Existing one-document cloud boards remain readable and migrate on their next successful save. After migration, older clients cannot replace the new manifest. Automatic device history keeps one stable daily copy and one latest copy while manual, displaced-edit, account-switch, and protected recovery copies remain explicit.</li><li>Edits made while device storage is finishing another save now follow that save without being marked durable too early. Old app tabs are checked through both retained browser keys, blocked device storage fails closed without hanging startup, and optional automatic history cannot block a primary save that fits.</li><li>TrueSkill chance forecasts now integrate candidates against one shared uncertain benchmark even when rating uncertainties differ greatly, and Yes/No judgments use the same performance noise as rank updates. Imported ratings are bounded before calculations. Settings labels the current-board view, copy, and download area Diagnostics download; all recovery controls and backups remain available.</li><li>The distant clocktower now meets the lake edge on tablets, phones, and short landscape screens.</li></ul><h3>September 28, 2026</h3><ul><li>Cloud sync now resumes automatically when startup repairs two browser copies left by different app versions. A stalled Firestore read or write becomes a visible timed-out attempt and retries through a fresh read, while unreadable local data, account changes, and real permission errors remain blocked.</li><li>Boards whose deletion history grew past the cloud limit now repair themselves automatically. Only byte-for-byte duplicate deletion facts are removed; distinct recovery evidence remains intact, and the smaller board is saved on this device before cloud sync retries.</li><li>After a device save recovers, the app now retries the matching cloud read or write automatically. A successful read clears the old error, pending edits stay marked syncing until their write is acknowledged, and a real backend or permission failure remains visible.</li><li>Reset everything now asks for a second explicit tap and first keeps an exact restorable copy of the current board. If that device backup cannot be saved, the reset stops without changing the board.</li><li>When retained recovery copies fill browser storage, the app now losslessly compacts their archive and retries the save automatically. Manual, displaced, protected, and unreadable recovery bytes remain intact; ordinary edits and cloud adoption no longer require manual backup deletion when compaction creates room. The cloud button also stops saying synced while the latest edit is not saved on this device.</li><li>When a newer cloud board already contains every local task, its redundant safety copy no longer stays protected while waiting for a cloud write that will never be needed. The copy remains in local history, while later edits can rotate it when browser space is full; displaced or conflicting edits remain protected.</li><li>Cloud errors now identify whether sign-in, reading, writing, or local reconciliation failed and show a safe error code. Invalid cloud revisions stop before writing, and signing back into the same account reads its current board before sending a local edit.</li><li>Signing in now opens the Google account chooser, so signing out can actually switch to a different board and account.</li><li>Settings can now view, copy, or download the board currently open in this tab, including an edit that device storage could not save. Device-save warnings also include a stable stage and code that Settings repeats without exposing board contents.</li><li>Pasted tasks now keep their chosen prerequisite, Worked on it tasks stay under Ineligible until their hold clears, and restored identifiers remain plain data in every task and context control.</li><li>Cloud-confirmed recovery copies now stop consuming protected device storage after their exact sync is acknowledged. An overwritten offline edit remains a durable recovery copy until you remove it, even when it had reused that day’s automatic backup. A full iPhone or iPad store still opens its readable saved board, and later edits can rotate released automatic history instead of failing.</li><li>Saving an ordinary edit now uses the available board storage even when optional automatic backup history is full. Manual and protected recovery copies remain untouched, and automatic history resumes when space returns.</li><li>Downloaded app updates now open immediately when this board is already saved, without making another backup write. If an edit is unsaved, the update stays pending with a visible notice while update checks continue.</li><li>Cloud sync on opening now keeps offline tasks alongside newer tasks from another device and saves the merged board before sending it. The earlier board stays in Settings backups; if this device cannot save a recovery copy, sync stays paused without replacing it. Settings now shows unreadable backups and lets you view or download their original data; deleting one copy leaves every other recovery copy untouched.</li><li>The Sun and Moon now act as the visible origin for each object's shadow, including railway spans, while starlight stays diffuse. The water keeps its clean earlier surface while local ripples distort different parts of the reflection with fine, irregular vertical shimmer instead of swinging buildings sideways; the waterline stays continuous, without striping or pixelation.</li><li>Rainclouds now have softly shaded, rounded contours that darken with the night sky. Rain and snow dim the scene gradually without a straight grey band or a darker lake strip, and shadows draw close to their objects as the Sun climbs high.</li><li>Lower trains cast shallow shadows along their tracks, and floating objects’ reflections meet their hulls without a visible seam.</li><li>Elevated electric metro cars no longer cast ground shadows; railway support shadows remain.</li><li>Elevated railway keeps its visible track and individual support shadows, without a second continuous shadow band.</li><li>Older automatic backups now clear as new ones arrive or browser space gets tight, so routine saves can continue. Manual copies, displaced local edits, stale-tab drafts, other-browser copies, and unsynced account-switch copies stay until you remove them.</li><li>Undo now clears older automatic backup history when needed to save your edit, while keeping manual and protected recovery copies. Restoring a backup also keeps the exact board it replaces through a storage-quota retry.</li></ul><h3>September 27, 2026</h3><ul><li>Chosen sky coordinates, their label and time zone, and scene time and season now sync with the signed-in board across devices. The device keeps an offline copy, and switching accounts clears the previous account’s scene.</li><li>Tasks can now wait for one prerequisite task to be completed. Evergreen Done counts, and a deleted prerequisite releases its dependent task. Add and each task’s editor can set or remove the link.</li><li>Evergreen intervals can be entered in hours or days, with a countdown tag while a task rests.</li><li>Settings has collapsible sections. Scene time is green for live time and red for a chosen time; location is green when set and red when unset. Pass reset and bulk import are removed from Settings. Previously saved custom hourly quotes still play, and the FAQ explains the main controls.</li><li>Autumn leaves are smaller. Message planes now have classic biplane wings and wheels. Daytime water mirrors the skyline, and everything above the horizon can reflect in the lake by day and night. The sky and skyline now mirror at their original vertical scale, with the existing far shore naturally hiding higher reflections. The water grows a little softer farther from its horizon line. The Moon and skyline now reflect without horizontal striping while the water keeps its 30-frame-per-second animation pace. The reflected scene stays put while small surface ripples move independently. The waterline joins cleanly, metro cars keep their color as they cross in front of the lake, the road continues past mobile edges, and the railway keeps its deck, supports, and overhead electrical at night, sized to the metro cars. Rain is darker and easier to see, and fireflies gather in the foreground.</li><li>Floating boats and water wildlife now reflect their complete visible shapes at natural height in daylight and at night. Railway and ground shadows follow the Sun or Moon, while starlit nights keep faint diffuse shade. Far, middle, and foreground grass now share depth-scaled detail and density.</li><li>Pinch and other page zoom gestures are disabled while normal scrolling stays available. Footer text now uses a consistent size.</li><li>Bird flocks and bicycle packs vary in size, trams keep even spacing across screen sizes, and airborne visitors move more visibly up and down.</li></ul><h3>September 24, 2026</h3><ul><li>Older tabs can no longer bring back a task after you complete or delete it following multiple restores. Backup imports and restores now keep the history needed for sync to respect those choices.</li></ul><h3>September 23, 2026</h3><ul><li>Old tabs can no longer roll back tasks and History without keeping a recoverable copy. Cloud refresh also stops when the browser’s saved copy is unreadable.</li><li>Settings now keeps seven days of local backups and manual copies you can restore or delete. Restoring saves your current board first and keeps later tasks without a recorded deletion.</li><li>Cloud saves follow revision order and keep tasks unless you deleted them.</li><li>Account switches keep unsynced work in a local recovery copy, and Undo cannot move one account’s tasks into another. Backup restore warns before crossing accounts.</li><li>Quick edits from one tab wait for the previous cloud save, so an older confirmation cannot replace a newer change. If another device updates the same task first, this tab warns you and keeps a restorable copy.</li><li>Return as candidate stays visible in the task editor and greys out when unavailable.</li><li>Quick start now has a collapsed More FAQs section explaining Done, Worked on it, Dislodge, cooldowns, and early returns to scanning.</li></ul><h3>September 21, 2026</h3><ul><li>Separate tasks with the same name now keep their own completed and worked-on History entries.</li><li>A damaged backup, saved board, or cloud copy can no longer replace healthy tasks or stop the app from opening.</li><li>Start and Due use consistent field borders on iPhone in both Add and Edit, while keeping the date picker.</li><li>Keep the header visible now saves as soon as it is checked and reliably keeps Undo in reach while scrolling; the option remains off by default.</li><li>The top-K summary and sparkline stay aligned with done adding for now.</li><li>Double-tap zoom was disabled.</li><li>Add a task can now capture Evergreen recurrence hours and the 2 AM reset, starting at 18 hours with the day reset checked.</li><li>Start, Due, Evergreen, and neighboring Add controls now respect the pane's inner margins across narrow phones and short landscape layouts.</li><li>Dot from the All Tasks editor now ranks that task above the current benchmark. Done and Evergreen Done no longer change ratings.</li></ul></div></template>
-<template id="appChangelog"><details data-app-fingerprint="034c34b5b182b30297bab6861c24095f6206ee404084c2075817bcf64fb45faf"><summary>Changelog</summary><h3>September 29, 2026</h3><ul><li>The first dot prefers the oldest eligible task that has never been marked Done. Worked on it does not count as Done. If all eligible tasks have been done before, scanning starts with the oldest eligible task.</li></ul><h3>September 19, 2026</h3><ul><li>At night, boats and nearby objects above the horizon reflect naturally in the water, including airplanes, the Moon, and stars.</li><li>The Add a task panel can be minimized and remembers that choice.</li><li>Every visitor starts with an individual travel speed, so faster arrivals can overtake slower ones. Vehicles hold that speed horizontally while vertical movement can still vary, the existing lower tram cars remain linked, and airplane banners switch to a dark, light-lettered night palette.</li><li>Tasks marked No, Can’t, or Dislodged appear under Ineligible until their marks clear.</li><li>First light, sunrise, sunset, and last light now have separate scenery controls and show times for the sky location. Solar times were checked across seasons, time zones, and polar days.</li><li>Jet skis and small water creatures are easier to see. Daytime visitors arrive twice as often.</li><li>Readers and groups linger longer, leave at varied times, and carry books by their sides.</li><li>Add tasks with start and due dates. Selecting Eligible clears other filters to show every eligible task.</li><li>Both scan modes start with the oldest eligible task. Done raises its preference rating; Worked on it leaves ratings unchanged.</li></ul><h3>September 16, 2026</h3><ul><li>Updates announce themselves with a toast pointing to this changelog.</li><li>Task editors show evergreen interval and day-reset controls only when Evergreen is checked.</li><li>Chance mode is the default for new scan preferences. Dislodge now lowers the task’s preference rating; Undo restores it.</li><li>Signing in while the app is loading now brings synced tasks into view without a manual refresh.</li><li>All Tasks has a separate All / Eligible / Ineligible filter row that combines with search and task-status filters.</li><li>Chance scans use TrueSkill win probabilities, including rating uncertainty, with no rating floor or offset. If no candidate can draw, scanning falls back to descending likelihood.</li><li>The scan-mode dropdown saves immediately, including when you close Settings without pressing Save.</li><li>Account switching keeps task lists separate after a cloud refresh. Cloud refreshes wait for edits, and Undo restores an imported scan correctly.</li><li>Add &amp; dot now starts the daily reset clock. Tasks with a start date wake at midnight, and stop-scanning guidance uses the candidates actually ahead.</li><li>Changing the scan-mode setting now takes effect in the current scan. Choosing both modes also offers both buttons when resuming.</li><li>The installed app checks for updates whenever it opens or returns to the foreground. Available updates load automatically after you finish editing, without reinstalling.</li><li>Choose descending scans, TrueSkill-weighted chance scans, or both scan buttons in Settings. Chance order stays steady through undo and refreshes on a fresh pass or at 2 AM; decisions still update ratings immediately.</li><li>Set an evergreen interval for each task, with an optional 2 AM reset. New tasks default to 18 hours or the next day marker, whichever comes first; Settings lets you change those defaults.</li></ul><h3>September 14, 2026</h3><ul><li>Skywriters trace single human-written words in smoke, then fly away as the letters fade.</li><li>Hourly messages appear only when human-written copy is available. Anytime prompts show the current hour, such as 5 AM. Sky messages keep their existing behavior.</li><li>Trains and metros now run regularly throughout the day and night.</li><li>Event rates can be adjusted in SPAWN_RATES.md.</li></ul><h3>September 13, 2026 — Seasonal details</h3><ul><li>Rain showers last 20–45 minutes; thunderstorms last 30–60 minutes. Winter brings snow and snowstorms on the same shared weather schedule.</li><li>Winter visitors build snowmen, ski downhill, and make snow angels. Warm-weather outings wait for warmer seasons.</li><li>Autumn turns the landscape amber and brown, with leaves falling from trees and blowing in storms.</li><li>Spring brings scattered flowers and tree blossoms. Occasional gusts lift petals; rain and storms bring more petals and pollen.</li><li>Winter trees gather snow and occasionally shed small clumps. Seasonal debris gets livelier during storms.</li><li>Birds have individual plumage: distant sky birds look dark with hints of color, while nearby birds show more color.</li><li>People have varied hairstyles and hair colors, with helmets and hats kept clear.</li><li>Little propeller planes tow the messages overhead. Hot air balloons appear more often during the day.</li><li>More trains, riders, and people walking pass through the scene, including new scooter and hoverboard riders.</li><li>Season rules, weather timing, and visitor odds now share an expandable configuration; seasonal effects keep their own small budgets and visitor lifetimes.</li></ul><h3>September 13, 2026</h3><ul><li>One Sunrise / Sunset button switches between dawn and dusk.</li><li>Choose a season when locking the scenery, or follow the current season.</li><li>Cyclists pedal with connected hips and naturally bending knees.</li><li>Distant boats shrink with depth; windsurfers and small craft stay smaller than ships, and the far metro is smaller than the foreground train.</li><li>Ducks sometimes lift off from the lake and fly away.</li><li>Seasons now follow the actual equinox and solstice, with hemisphere and local date handling. Solar locks use the sky location’s calendar.</li><li>Choose the sky location’s time zone when it differs from your device. The Moon’s illuminated side now follows the Sun, and the midnight sun stays daylight.</li><li>Deer, foxes, rabbits, and raccoons occasionally wander through the foreground: a 1% chance every 30 seconds, up to four animals, independent of other visitors.</li><li>Picnic groups fold their blanket and gather their things; readers, couples, and kite flyers also finish up and walk away.</li><li>Occasional gentle rain follows the same real-time schedule across devices, including offline. Reduced motion keeps the rain still.</li><li>Settings now includes this changelog, with a check that catches undocumented app changes.</li></ul></details></template>
+<template id="appChangelogCurrent"><div data-app-fingerprint="dbdb409edd464b1b48488bbb14419a04fe4570934ca38890e8fab6695c3f136b"><h3>October 6, 2026</h3><ul><li>Add and Edit support up to ten dependencies, with + dependency appearing after the first choice. All Tasks names unresolved blockers. Dependency cycles warn but remain saved, and simultaneous edits retain added and removed links.</li><li>Chance mode shows an estimated next-candidate share for a fresh draw from the current eligible, unscanned pool. Numerical fallback tasks show scanned after. Descending likelihood keeps top-K; ratings and scan order are unchanged.</li><li>The extended FAQ explains dependencies, cycles, scoped Chance labels, live sync, and current date and evergreen controls.</li></ul><h3>October 5, 2026</h3><ul><li>Empty Due and Starts date fields stay readable and touchable on tablets, with the existing stacked phone layout.</li><li>Done and done adding for now now reach other open devices promptly. Refresh waits for unfinished edits and pressed controls, and repeated Done clicks stay one completion.</li><li>Nighttime garden-light opportunities and city-window changes happen twice as often, with the same brightness and lighting odds.</li><li>Rarely at night, Peter Pan and the Darling children fly to the clocktower, rest on its sloped roof, and fly away. Reduced motion keeps their silhouettes still.</li><li>In Add a task, choosing Days changes the untouched 18-hour evergreen duration to 7 days. Edited durations stay as entered, and switching back to Hours keeps the number.</li></ul><h3>October 3, 2026</h3><ul><li>Restored the previous airplane design.</li></ul><h3>October 2, 2026</h3><ul><li>Rain is denser and falls cleanly over the lake. Fairy lights switch independently and stay hidden in daylight.</li><li>Random fireworks last one to five minutes behind the city. Barge fireworks stay in the foreground.</li><li>The Add &amp; dot button has been removed. Ordinary Add and Dot in each task’s editor remain available.</li><li>Rooftop garden lights now appear half as often: each eligible roof independently has a one-in-twelve chance of being lit.</li></ul><h3>October 1, 2026</h3><ul><li>Undoing evergreen Done clears its rest period and countdown, including after saving or reloading.</li><li>Rooftop garden lights now appear less often, with an independent one-in-six chance for each roof.</li><li>Return as candidate can end an evergreen rest period early. Completed sessions stay in History; Undo restores the rest period.</li></ul><h3>September 30, 2026</h3><ul><li>Biplane messages wrap to fit their banners. The party barge is ten times rarer, waits at least half an hour between visits, and matches the scale of other boats. Rooftop garden lights switch independently; every garden can be lit or dark by chance.</li><li>Returning sessions show syncing while sign-in is restored. Dates outside the current year now name the year, including Start, Due and History. Settings offers a date format that follows the system by default, with month/day/year, day/month/year and year-month-day overrides saved immediately.</li><li>Reopening the installed app now releases cloud requests interrupted by sleep, refreshes the connection, and checks the server before resuming a save. Interrupted attempts no longer wait for an old timeout or create a false error; real connection failures still appear in Diagnostics.</li><li>Cloud sync now overlaps independent downloads and avoids an empty resume read for newly created uploads, while still verifying every complete snapshot. A confirmed save no longer waits through a full network timeout for optional timestamp metadata. The two-second edit debounce remains, and the synced badge still requires a server acknowledgement.</li><li>Settings now keeps timestamped sync error codes beneath Diagnostics download for one hour, even after sync recovers. The same code is logged at most once every ten minutes, and expired entries clear automatically. A small thundercloud appears beside the current error indicator and clears when the error resolves.</li><li>Nighttime fireworks now launch more often, with colored trails reflected in the lake. A rare festival barge floats across the lake with a stage, dancing crowd, slow lighting and a longer fireworks show, without strobes. Fireworks bloom into varied sparks, curved trails and fading embers.</li><li>Short buildings favor subtle brick colors while tall towers favor modern facades. Nighttime window changes now select visible windows.</li><li>Airplanes now show shaded wings, a cockpit and clearer body detail, while message biplanes use a single landing-gear set. The skyline adds no new low-rise backdrop or metropolis-edge trees. Some eligible short towers keep rooftop gardens; others have rooftop patios with warm fairy lights. Rarely, one eligible shorter roof at a time hosts a brief party with colored spotlights that sweep slowly at night. The tallest towers and all lightning-rod towers stay clear.</li></ul><h3>September 29, 2026</h3><ul><li>Restore and Reset now stop safely if your board or signed-in account changes while their recovery copy is saving. Your newer work stays open, and the completed recovery copy remains available.</li><li>Cloud sync now stops rejected writes instead of repeating them after every read. The error button offers Retry sync, Reload app, and Sign out; reload waits for your latest edits to save. Failed reads cannot release another conflicted write, and older saved boards keep their first upload pending until confirmed.</li><li>Temporary failures while reading cloud board chunks now retry automatically instead of being mistaken for damaged data. Genuine permission errors and corrupt snapshots still stop safely.</li><li>Boards now move automatically into verified transactional browser storage that can keep edits, Undo, Restore, Reset backups, manual recovery copies, and unknown board fields beyond the old local-storage ceiling. The retained older browser bytes are never deleted during migration; if the new store is temporarily unavailable, they stay recovery data instead of being mistaken for the current board.</li><li>Cloud sync now stores large boards as verified UTF-8 chunks behind one revisioned manifest. An interrupted or corrupt upload stays invisible, concurrent devices still use revision comparison, and automatic cleanup retains the current and previous complete generations while retiring older published data.</li><li>Existing one-document cloud boards remain readable and migrate on their next successful save. After migration, older clients cannot replace the new manifest. Automatic device history keeps one stable daily copy and one latest copy while manual, displaced-edit, account-switch, and protected recovery copies remain explicit.</li><li>Edits made while device storage is finishing another save now follow that save without being marked durable too early. Old app tabs are checked through both retained browser keys, blocked device storage fails closed without hanging startup, and optional automatic history cannot block a primary save that fits.</li><li>TrueSkill chance forecasts now integrate candidates against one shared uncertain benchmark even when rating uncertainties differ greatly, and Yes/No judgments use the same performance noise as rank updates. Imported ratings are bounded before calculations. Settings labels the current-board view, copy, and download area Diagnostics download; all recovery controls and backups remain available.</li><li>The distant clocktower now meets the lake edge on tablets, phones, and short landscape screens.</li></ul><h3>September 28, 2026</h3><ul><li>Cloud sync now resumes automatically when startup repairs two browser copies left by different app versions. A stalled Firestore read or write becomes a visible timed-out attempt and retries through a fresh read, while unreadable local data, account changes, and real permission errors remain blocked.</li><li>Boards whose deletion history grew past the cloud limit now repair themselves automatically. Only byte-for-byte duplicate deletion facts are removed; distinct recovery evidence remains intact, and the smaller board is saved on this device before cloud sync retries.</li><li>After a device save recovers, the app now retries the matching cloud read or write automatically. A successful read clears the old error, pending edits stay marked syncing until their write is acknowledged, and a real backend or permission failure remains visible.</li><li>Reset everything now asks for a second explicit tap and first keeps an exact restorable copy of the current board. If that device backup cannot be saved, the reset stops without changing the board.</li><li>When retained recovery copies fill browser storage, the app now losslessly compacts their archive and retries the save automatically. Manual, displaced, protected, and unreadable recovery bytes remain intact; ordinary edits and cloud adoption no longer require manual backup deletion when compaction creates room. The cloud button also stops saying synced while the latest edit is not saved on this device.</li><li>When a newer cloud board already contains every local task, its redundant safety copy no longer stays protected while waiting for a cloud write that will never be needed. The copy remains in local history, while later edits can rotate it when browser space is full; displaced or conflicting edits remain protected.</li><li>Cloud errors now identify whether sign-in, reading, writing, or local reconciliation failed and show a safe error code. Invalid cloud revisions stop before writing, and signing back into the same account reads its current board before sending a local edit.</li><li>Signing in now opens the Google account chooser, so signing out can actually switch to a different board and account.</li><li>Settings can now view, copy, or download the board currently open in this tab, including an edit that device storage could not save. Device-save warnings also include a stable stage and code that Settings repeats without exposing board contents.</li><li>Pasted tasks now keep their chosen prerequisite, Worked on it tasks stay under Ineligible until their hold clears, and restored identifiers remain plain data in every task and context control.</li><li>Cloud-confirmed recovery copies now stop consuming protected device storage after their exact sync is acknowledged. An overwritten offline edit remains a durable recovery copy until you remove it, even when it had reused that day’s automatic backup. A full iPhone or iPad store still opens its readable saved board, and later edits can rotate released automatic history instead of failing.</li><li>Saving an ordinary edit now uses the available board storage even when optional automatic backup history is full. Manual and protected recovery copies remain untouched, and automatic history resumes when space returns.</li><li>Downloaded app updates now open immediately when this board is already saved, without making another backup write. If an edit is unsaved, the update stays pending with a visible notice while update checks continue.</li><li>Cloud sync on opening now keeps offline tasks alongside newer tasks from another device and saves the merged board before sending it. The earlier board stays in Settings backups; if this device cannot save a recovery copy, sync stays paused without replacing it. Settings now shows unreadable backups and lets you view or download their original data; deleting one copy leaves every other recovery copy untouched.</li><li>The Sun and Moon now act as the visible origin for each object's shadow, including railway spans, while starlight stays diffuse. The water keeps its clean earlier surface while local ripples distort different parts of the reflection with fine, irregular vertical shimmer instead of swinging buildings sideways; the waterline stays continuous, without striping or pixelation.</li><li>Rainclouds now have softly shaded, rounded contours that darken with the night sky. Rain and snow dim the scene gradually without a straight grey band or a darker lake strip, and shadows draw close to their objects as the Sun climbs high.</li><li>Lower trains cast shallow shadows along their tracks, and floating objects’ reflections meet their hulls without a visible seam.</li><li>Elevated electric metro cars no longer cast ground shadows; railway support shadows remain.</li><li>Elevated railway keeps its visible track and individual support shadows, without a second continuous shadow band.</li><li>Older automatic backups now clear as new ones arrive or browser space gets tight, so routine saves can continue. Manual copies, displaced local edits, stale-tab drafts, other-browser copies, and unsynced account-switch copies stay until you remove them.</li><li>Undo now clears older automatic backup history when needed to save your edit, while keeping manual and protected recovery copies. Restoring a backup also keeps the exact board it replaces through a storage-quota retry.</li></ul><h3>September 27, 2026</h3><ul><li>Chosen sky coordinates, their label and time zone, and scene time and season now sync with the signed-in board across devices. The device keeps an offline copy, and switching accounts clears the previous account’s scene.</li><li>Tasks can now wait for one prerequisite task to be completed. Evergreen Done counts, and a deleted prerequisite releases its dependent task. Add and each task’s editor can set or remove the link.</li><li>Evergreen intervals can be entered in hours or days, with a countdown tag while a task rests.</li><li>Settings has collapsible sections. Scene time is green for live time and red for a chosen time; location is green when set and red when unset. Pass reset and bulk import are removed from Settings. Previously saved custom hourly quotes still play, and the FAQ explains the main controls.</li><li>Autumn leaves are smaller. Message planes now have classic biplane wings and wheels. Daytime water mirrors the skyline, and everything above the horizon can reflect in the lake by day and night. The sky and skyline now mirror at their original vertical scale, with the existing far shore naturally hiding higher reflections. The water grows a little softer farther from its horizon line. The Moon and skyline now reflect without horizontal striping while the water keeps its 30-frame-per-second animation pace. The reflected scene stays put while small surface ripples move independently. The waterline joins cleanly, metro cars keep their color as they cross in front of the lake, the road continues past mobile edges, and the railway keeps its deck, supports, and overhead electrical at night, sized to the metro cars. Rain is darker and easier to see, and fireflies gather in the foreground.</li><li>Floating boats and water wildlife now reflect their complete visible shapes at natural height in daylight and at night. Railway and ground shadows follow the Sun or Moon, while starlit nights keep faint diffuse shade. Far, middle, and foreground grass now share depth-scaled detail and density.</li><li>Pinch and other page zoom gestures are disabled while normal scrolling stays available. Footer text now uses a consistent size.</li><li>Bird flocks and bicycle packs vary in size, trams keep even spacing across screen sizes, and airborne visitors move more visibly up and down.</li></ul><h3>September 24, 2026</h3><ul><li>Older tabs can no longer bring back a task after you complete or delete it following multiple restores. Backup imports and restores now keep the history needed for sync to respect those choices.</li></ul><h3>September 23, 2026</h3><ul><li>Old tabs can no longer roll back tasks and History without keeping a recoverable copy. Cloud refresh also stops when the browser’s saved copy is unreadable.</li><li>Settings now keeps seven days of local backups and manual copies you can restore or delete. Restoring saves your current board first and keeps later tasks without a recorded deletion.</li><li>Cloud saves follow revision order and keep tasks unless you deleted them.</li><li>Account switches keep unsynced work in a local recovery copy, and Undo cannot move one account’s tasks into another. Backup restore warns before crossing accounts.</li><li>Quick edits from one tab wait for the previous cloud save, so an older confirmation cannot replace a newer change. If another device updates the same task first, this tab warns you and keeps a restorable copy.</li><li>Return as candidate stays visible in the task editor and greys out when unavailable.</li><li>Quick start now has a collapsed More FAQs section explaining Done, Worked on it, Dislodge, cooldowns, and early returns to scanning.</li></ul><h3>September 21, 2026</h3><ul><li>Separate tasks with the same name now keep their own completed and worked-on History entries.</li><li>A damaged backup, saved board, or cloud copy can no longer replace healthy tasks or stop the app from opening.</li><li>Start and Due use consistent field borders on iPhone in both Add and Edit, while keeping the date picker.</li><li>Keep the header visible now saves as soon as it is checked and reliably keeps Undo in reach while scrolling; the option remains off by default.</li><li>The top-K summary and sparkline stay aligned with done adding for now.</li><li>Double-tap zoom was disabled.</li><li>Add a task can now capture Evergreen recurrence hours and the 2 AM reset, starting at 18 hours with the day reset checked.</li><li>Start, Due, Evergreen, and neighboring Add controls now respect the pane's inner margins across narrow phones and short landscape layouts.</li><li>Dot from the All Tasks editor now ranks that task above the current benchmark. Done and Evergreen Done no longer change ratings.</li></ul></div></template>
+<template id="appChangelog"><details data-app-fingerprint="dbdb409edd464b1b48488bbb14419a04fe4570934ca38890e8fab6695c3f136b"><summary>Changelog</summary><h3>September 29, 2026</h3><ul><li>The first dot prefers the oldest eligible task that has never been marked Done. Worked on it does not count as Done. If all eligible tasks have been done before, scanning starts with the oldest eligible task.</li></ul><h3>September 19, 2026</h3><ul><li>At night, boats and nearby objects above the horizon reflect naturally in the water, including airplanes, the Moon, and stars.</li><li>The Add a task panel can be minimized and remembers that choice.</li><li>Every visitor starts with an individual travel speed, so faster arrivals can overtake slower ones. Vehicles hold that speed horizontally while vertical movement can still vary, the existing lower tram cars remain linked, and airplane banners switch to a dark, light-lettered night palette.</li><li>Tasks marked No, Can’t, or Dislodged appear under Ineligible until their marks clear.</li><li>First light, sunrise, sunset, and last light now have separate scenery controls and show times for the sky location. Solar times were checked across seasons, time zones, and polar days.</li><li>Jet skis and small water creatures are easier to see. Daytime visitors arrive twice as often.</li><li>Readers and groups linger longer, leave at varied times, and carry books by their sides.</li><li>Add tasks with start and due dates. Selecting Eligible clears other filters to show every eligible task.</li><li>Both scan modes start with the oldest eligible task. Done raises its preference rating; Worked on it leaves ratings unchanged.</li></ul><h3>September 16, 2026</h3><ul><li>Updates announce themselves with a toast pointing to this changelog.</li><li>Task editors show evergreen interval and day-reset controls only when Evergreen is checked.</li><li>Chance mode is the default for new scan preferences. Dislodge now lowers the task’s preference rating; Undo restores it.</li><li>Signing in while the app is loading now brings synced tasks into view without a manual refresh.</li><li>All Tasks has a separate All / Eligible / Ineligible filter row that combines with search and task-status filters.</li><li>Chance scans use TrueSkill win probabilities, including rating uncertainty, with no rating floor or offset. If no candidate can draw, scanning falls back to descending likelihood.</li><li>The scan-mode dropdown saves immediately, including when you close Settings without pressing Save.</li><li>Account switching keeps task lists separate after a cloud refresh. Cloud refreshes wait for edits, and Undo restores an imported scan correctly.</li><li>Add &amp; dot now starts the daily reset clock. Tasks with a start date wake at midnight, and stop-scanning guidance uses the candidates actually ahead.</li><li>Changing the scan-mode setting now takes effect in the current scan. Choosing both modes also offers both buttons when resuming.</li><li>The installed app checks for updates whenever it opens or returns to the foreground. Available updates load automatically after you finish editing, without reinstalling.</li><li>Choose descending scans, TrueSkill-weighted chance scans, or both scan buttons in Settings. Chance order stays steady through undo and refreshes on a fresh pass or at 2 AM; decisions still update ratings immediately.</li><li>Set an evergreen interval for each task, with an optional 2 AM reset. New tasks default to 18 hours or the next day marker, whichever comes first; Settings lets you change those defaults.</li></ul><h3>September 14, 2026</h3><ul><li>Skywriters trace single human-written words in smoke, then fly away as the letters fade.</li><li>Hourly messages appear only when human-written copy is available. Anytime prompts show the current hour, such as 5 AM. Sky messages keep their existing behavior.</li><li>Trains and metros now run regularly throughout the day and night.</li><li>Event rates can be adjusted in SPAWN_RATES.md.</li></ul><h3>September 13, 2026 — Seasonal details</h3><ul><li>Rain showers last 20–45 minutes; thunderstorms last 30–60 minutes. Winter brings snow and snowstorms on the same shared weather schedule.</li><li>Winter visitors build snowmen, ski downhill, and make snow angels. Warm-weather outings wait for warmer seasons.</li><li>Autumn turns the landscape amber and brown, with leaves falling from trees and blowing in storms.</li><li>Spring brings scattered flowers and tree blossoms. Occasional gusts lift petals; rain and storms bring more petals and pollen.</li><li>Winter trees gather snow and occasionally shed small clumps. Seasonal debris gets livelier during storms.</li><li>Birds have individual plumage: distant sky birds look dark with hints of color, while nearby birds show more color.</li><li>People have varied hairstyles and hair colors, with helmets and hats kept clear.</li><li>Little propeller planes tow the messages overhead. Hot air balloons appear more often during the day.</li><li>More trains, riders, and people walking pass through the scene, including new scooter and hoverboard riders.</li><li>Season rules, weather timing, and visitor odds now share an expandable configuration; seasonal effects keep their own small budgets and visitor lifetimes.</li></ul><h3>September 13, 2026</h3><ul><li>One Sunrise / Sunset button switches between dawn and dusk.</li><li>Choose a season when locking the scenery, or follow the current season.</li><li>Cyclists pedal with connected hips and naturally bending knees.</li><li>Distant boats shrink with depth; windsurfers and small craft stay smaller than ships, and the far metro is smaller than the foreground train.</li><li>Ducks sometimes lift off from the lake and fly away.</li><li>Seasons now follow the actual equinox and solstice, with hemisphere and local date handling. Solar locks use the sky location’s calendar.</li><li>Choose the sky location’s time zone when it differs from your device. The Moon’s illuminated side now follows the Sun, and the midnight sun stays daylight.</li><li>Deer, foxes, rabbits, and raccoons occasionally wander through the foreground: a 1% chance every 30 seconds, up to four animals, independent of other visitors.</li><li>Picnic groups fold their blanket and gather their things; readers, couples, and kite flyers also finish up and walk away.</li><li>Occasional gentle rain follows the same real-time schedule across devices, including offline. Reduced motion keeps the rain still.</li><li>Settings now includes this changelog, with a check that catches undocumented app changes.</li></ul></details></template>
 <!-- changelog:end -->
 <dialog id="sceneTimeDialog" class="motion-dialog" aria-labelledby="sceneTimeTitle">
   <h2 id="sceneTimeTitle">Stay a little longer.</h2>
@@ -927,6 +930,102 @@ function exactDeletionLogUnion(...logs){
   return rows;
 }
 
+const MAX_DEPENDENCIES=10;
+function cleanPrerequisiteIds(ids){
+  return [...new Set((Array.isArray(ids)?ids:[]).filter(id=>typeof id==="string" && id.trim() && !Object.hasOwn(Object.prototype,id)))];
+}
+function taskPrerequisiteIds(task){
+  const ids=cleanPrerequisiteIds(Array.isArray(task.prerequisiteIds)?task.prerequisiteIds:[task.prerequisiteId]);
+  const first=typeof task.prerequisiteId==="string" && task.prerequisiteId.trim()?task.prerequisiteId:null;
+  // Released single-link editors preserve unknown fields. If one changes its
+  // mirror, replace only that first link, retaining the new editor's others.
+  if(Object.hasOwn(task,"prerequisiteMirror") && first!==task.prerequisiteMirror){
+    return cleanPrerequisiteIds([first,...ids.filter(id=>id!==task.prerequisiteMirror)]).slice(0,MAX_DEPENDENCIES);
+  }
+  return ids.slice(0,MAX_DEPENDENCIES);
+}
+function prerequisiteOperationMap(task){
+  const ops=Object.create(null),raw=task.prerequisiteOps;
+  if(raw && typeof raw==="object" && !Array.isArray(raw))for(const [id,entry] of Object.entries(raw)){
+    if(!cleanPrerequisiteIds([id]).length || !entry || typeof entry!=="object")continue;
+    const tokens=value=>[...new Set((Array.isArray(value)?value:[]).filter(op=>typeof op==="string"&&op))].sort();
+    ops[id]={adds:tokens(entry.adds),removes:tokens(entry.removes)};
+  }
+  // Stable legacy tokens make repeated reads of the same old board idempotent.
+  if(!raw)for(const id of taskPrerequisiteIds(task))ops[id]={adds:["legacy:"+task.id+":"+id],removes:[]};
+  return ops;
+}
+function activePrerequisiteIds(ops){
+  return Object.keys(ops).filter(id=>ops[id].adds.some(op=>!ops[id].removes.includes(op)));
+}
+function writePrerequisiteProjection(task,ids,ops){
+  task.prerequisiteIds=ids;
+  task.prerequisiteId=ids[0]||null;
+  task.prerequisiteMirror=task.prerequisiteId;
+  task.prerequisiteOps=ops;
+}
+function normalizeTaskPrerequisites(task){
+  const desired=taskPrerequisiteIds(task),ops=prerequisiteOperationMap(task);
+  task.prerequisiteRevision=Number.isSafeInteger(task.prerequisiteRevision)&&task.prerequisiteRevision>=0?task.prerequisiteRevision:0;
+  const first=typeof task.prerequisiteId==="string"&&task.prerequisiteId.trim()?task.prerequisiteId:null;
+  if(Object.hasOwn(task,"prerequisiteMirror") && first!==task.prerequisiteMirror){
+    task.prerequisiteRevision++;
+    const old=task.prerequisiteMirror;
+    if(ops[old])ops[old].removes=[...new Set([...ops[old].removes,...ops[old].adds])].sort();
+    if(first && !activePrerequisiteIds(ops).includes(first)){
+      ops[first] ||= {adds:[],removes:[]};
+      ops[first].adds.push("legacy-edit:"+task.id+":"+task.prerequisiteRevision+":"+first);
+    }
+  }
+  const active=activePrerequisiteIds(ops);
+  const ids=cleanPrerequisiteIds([...desired,...active.slice().sort()]).filter(id=>active.includes(id)).slice(0,MAX_DEPENDENCIES);
+  // The canonical head owns capacity if concurrent devices select >10 links.
+  // Keep discarded operations as removals; the displaced board is still kept
+  // by the existing conflict-recovery gate, and stale copies cannot revive them.
+  for(const id of active)if(!ids.includes(id))ops[id].removes=[...new Set([...ops[id].removes,...ops[id].adds])].sort();
+  writePrerequisiteProjection(task,ids,ops);
+}
+function writeTaskPrerequisites(task,ids,allowMissing=false){
+  ids=cleanPrerequisiteIds(ids);
+  if(ids.length>MAX_DEPENDENCIES)return false;
+  const existing=taskPrerequisiteIds(task);
+  if(!allowMissing && ids.some(id=>!taskById(id)&&!existing.includes(id)))return false;
+  normalizeTaskPrerequisites(task);
+  const ops=prerequisiteOperationMap(task),active=activePrerequisiteIds(ops);
+  if(JSON.stringify(task.prerequisiteIds)===JSON.stringify(ids))return true;
+  for(const id of active)if(!ids.includes(id))ops[id].removes=[...new Set([...ops[id].removes,...ops[id].adds])].sort();
+  for(const id of ids)if(!active.includes(id)){
+    ops[id] ||= {adds:[],removes:[]};ops[id].adds.push(uid());ops[id].adds.sort();
+  }
+  task.prerequisiteRevision++;
+  writePrerequisiteProjection(task,ids,ops);return true;
+}
+function mergeTaskPrerequisites(winner,other){
+  if(!winner.prerequisiteOps && !other.prerequisiteOps && !Array.isArray(winner.prerequisiteIds) && !Array.isArray(other.prerequisiteIds))return false;
+  const before=JSON.stringify([winner.prerequisiteIds,winner.prerequisiteId,winner.prerequisiteMirror,winner.prerequisiteOps,winner.prerequisiteRevision]);
+  const source=JSON.parse(JSON.stringify(other));normalizeTaskPrerequisites(winner);normalizeTaskPrerequisites(source);
+  const ops=prerequisiteOperationMap(winner);
+  for(const [id,entry] of Object.entries(prerequisiteOperationMap(source))){
+    ops[id] ||= {adds:[],removes:[]};
+    for(const key of ["adds","removes"])ops[id][key]=[...new Set([...ops[id][key],...entry[key]])].sort();
+  }
+  const active=activePrerequisiteIds(ops);
+  const ids=cleanPrerequisiteIds([...winner.prerequisiteIds,...source.prerequisiteIds,...active.slice().sort()]).filter(id=>active.includes(id)).slice(0,MAX_DEPENDENCIES);
+  for(const id of active)if(!ids.includes(id))ops[id].removes=[...new Set([...ops[id].removes,...ops[id].adds])].sort();
+  winner.prerequisiteRevision=Math.max(winner.prerequisiteRevision,source.prerequisiteRevision);
+  writePrerequisiteProjection(winner,ids,ops);
+  return before!==JSON.stringify([winner.prerequisiteIds,winner.prerequisiteId,winner.prerequisiteMirror,winner.prerequisiteOps,winner.prerequisiteRevision]);
+}
+function replaceTaskPrerequisites(task,current){
+  // Undo/Restore chooses a selection, rather than unioning the saved arrays.
+  // Retain observed tokens, remove newly undone edges, and give restored edges
+  // fresh tokens so neither stale additions nor stale removals override intent.
+  const desired=taskPrerequisiteIds(task);
+  if(!current)return;
+  mergeTaskPrerequisites(task,current);
+  writeTaskPrerequisites(task,desired,true);
+}
+
 function hydrateState(st){
   if(!st || typeof st !== "object" || Array.isArray(st) || !Array.isArray(st.tasks)) throw new TypeError("Valid state required");
   const taskIds = new Set();
@@ -940,7 +1039,7 @@ function hydrateState(st){
     t.due = normalizedISODate(t.due);
     t.startsAt = normalizedISODate(t.startsAt);
     t.evergreen = t.evergreen === true;
-    t.prerequisiteId = typeof t.prerequisiteId === "string" && t.prerequisiteId.trim() ? t.prerequisiteId : null;
+    normalizeTaskPrerequisites(t);
     const rating=normalizeRating(t);
     t.mu=rating.mu; t.sigma=rating.sigma;
     if(!Number.isFinite(t.createdAt)) t.createdAt = Date.now();
@@ -950,16 +1049,6 @@ function hydrateState(st){
     if(typeof t.restoredRunOp!=="string") delete t.restoredRunOp;
     if(typeof t.completedAfterRestoreOp!=="string") delete t.completedAfterRestoreOp;
     t.done = t.done === true;
-  }
-  // Imported or older synced boards can contain a cycle no UI would allow.
-  // Break the closing edge instead of leaving a permanent ineligible island.
-  const byId=new Map(st.tasks.map(t=>[t.id,t]));
-  for(const t of st.tasks){
-    const seen=new Set([t.id]);let next=t.prerequisiteId;
-    while(next && byId.has(next)){
-      if(seen.has(next)){ t.prerequisiteId=null; break; }
-      seen.add(next);next=byId.get(next).prerequisiteId;
-    }
   }
   st.contexts = Array.isArray(st.contexts)
     ? st.contexts.filter(c=>c && typeof c === "object" && typeof c.id === "string" && typeof c.name === "string")
@@ -1650,6 +1739,7 @@ function mergeUndeletedTasks(winner, other){
     if(!current){
       winner.tasks.push(task); present.set(task.id,task); changed=true;
     }else{
+      changed=mergeTaskPrerequisites(current,task)||changed;
       // Completion and work dates are evidence, even when both copies still
       // contain the same ID. A stale whole-board write must not turn a done
       // task back into an open task or erase an evergreen completion.
@@ -1763,6 +1853,7 @@ function markReplacementDeletes(next){
   for(const id of retained) if(state.deletedTaskIds?.[id]) noteRestoreIntent(next,id,"deletedTaskIds","restoredTaskIds","restoredTaskOps","deletedAfterRestoreOps");
   for(const task of next.tasks){
     const current=state.tasks.find(t=>t.id===task.id);
+    replaceTaskPrerequisites(task,current);
     if(current?.done && !task.done) reopenTask(task,current);
     else if(current && !task.done && task.lastDoneAt!==current.lastDoneAt){
       // Replacing an evergreen completion is intentional in either direction:
@@ -3352,31 +3443,70 @@ function undo(){
 const taskById = id => state.tasks.find(t=>t.id===id) || null;
 const openTasks = ()=> state.tasks.filter(t=>!t.done);
 function activeCtxSet(){ const s=new Set(); for(const c of state.contexts) if(c.active) s.add(c.id); return s; }
-function isEligible(t, act){
+function unresolvedPrerequisites(task,byId){
+  const ids=taskPrerequisiteIds(task);if(!ids.length)return [];
+  byId ||= new Map(state.tasks.map(t=>[t.id,t]));
+  return ids.map(id=>byId.get(id)).filter(t=>t && !t.done && !(t.evergreen && t.lastDoneAt));
+}
+function blockingDependencyCycles(board){
+  const byId=new Map(board.tasks.map(t=>[t.id,t]));
+  const pending=board.tasks.filter(t=>!t.done && !(t.evergreen&&t.lastDoneAt));
+  const edges=new Map(pending.map(t=>[t.id,unresolvedPrerequisites(t,byId).map(t=>t.id)]));
+  const reverse=new Map(pending.map(t=>[t.id,[]]));
+  for(const [id,needs] of edges)for(const next of needs)reverse.get(next)?.push(id);
+  // Two iterative passes find entire strongly connected components, including
+  // overlapping cycles, without recursion on a long imported task graph.
+  const seen=new Set(),finished=[];
+  for(const {id} of pending){
+    if(seen.has(id))continue;
+    seen.add(id);const stack=[[id,0]];
+    while(stack.length){
+      const frame=stack.at(-1),needs=edges.get(frame[0])||[];
+      if(frame[1]===needs.length){finished.push(frame[0]);stack.pop();continue;}
+      const next=needs[frame[1]++];if(!seen.has(next)){seen.add(next);stack.push([next,0]);}
+    }
+  }
+  seen.clear();const cycles=[];
+  for(const id of finished.reverse()){
+    if(seen.has(id))continue;
+    const component=[],stack=[id];seen.add(id);
+    while(stack.length){const current=stack.pop();component.push(current);for(const next of reverse.get(current)||[])if(!seen.has(next)){seen.add(next);stack.push(next);}}
+    if(component.length>1 || edges.get(id)?.includes(id))cycles.push(component.sort());
+  }
+  return cycles;
+}
+let warnedDependencyCycle="";
+function warnDependencyCycles(){
+  const cycles=blockingDependencyCycles(state);
+  const signature=JSON.stringify(cycles.map(ids=>ids.map(id=>[id,taskPrerequisiteIds(taskById(id))])).sort());
+  if(!cycles.length){warnedDependencyCycle="";return;}
+  if(signature===warnedDependencyCycle)return;
+  warnedDependencyCycle=signature;
+  const names=cycles.flat().slice(0,3).map(id=>taskById(id).title).join(", ");
+  toast("Dependency cycle: "+names+". These tasks cannot be scanned until a dependency is removed or completed.",8000);
+}
+function isEligible(t, act, byId){
   if(t.done) return false;
   const now = Date.now();
   if(t.evergreen && t.lastDoneAt && now < evergreenUntil(t)) return false;
   // A missing ID is an intentional release: deletion, clear History, and old
   // imports must never leave a dependent waiting for a task that no longer exists.
-  const prerequisite=taskById(t.prerequisiteId);
-  if(prerequisite && !prerequisite.done && !(prerequisite.evergreen && prerequisite.lastDoneAt)) return false;
+  if(unresolvedPrerequisites(t,byId).length) return false;
   if(t.startsAt && isoToDate(t.startsAt) > isoToDate(todayISO(0))) return false;  // not started yet — can't be queued
   act = act || activeCtxSet();
   for(const c of t.ctx){ if(state.contexts.some(x=>x.id===c) && !act.has(c)) return false; }
   return true;
 }
 function setTaskPrerequisite(taskId,prerequisiteId){
-  const task=taskById(taskId),needed=prerequisiteId?taskById(prerequisiteId):null;
-  if(!task || (prerequisiteId && !needed) || prerequisiteId===taskId) return false;
-  let cursor=needed;const seen=new Set([taskId]);
-  while(cursor){
-    if(seen.has(cursor.id)) return false;
-    seen.add(cursor.id);cursor=taskById(cursor.prerequisiteId);
-  }
-  if((task.prerequisiteId||null)===(prerequisiteId||null)) return true;
-  pushUndo();task.prerequisiteId=prerequisiteId||null;commit();return true;
+  return setTaskPrerequisites(taskId,prerequisiteId?[prerequisiteId]:[]);
 }
-function eligibleTasks(){ const act=activeCtxSet(); return state.tasks.filter(t=>isEligible(t,act)); }
+function setTaskPrerequisites(taskId,ids){
+  const task=taskById(taskId),clean=cleanPrerequisiteIds(ids);
+  if(!task || clean.length>MAX_DEPENDENCIES || clean.some(id=>!taskById(id)&&!taskPrerequisiteIds(task).includes(id)))return false;
+  if(JSON.stringify(taskPrerequisiteIds(task))===JSON.stringify(clean))return true;
+  pushUndo();writeTaskPrerequisites(task,clean);commit();return true;
+}
+function eligibleTasks(){ const act=activeCtxSet(),byId=new Map(state.tasks.map(t=>[t.id,t])); return state.tasks.filter(t=>isEligible(t,act,byId)); }
 function benchmark(){ return state.chain.length ? taskById(state.chain[state.chain.length-1]) : null; }
 function expireCants(){ // a "can't" mark is bulletproof until cantMin elapses, then it clears itself
   const now = Date.now();
@@ -3821,12 +3951,7 @@ function applyEditFields(t){
   const reset = document.getElementById("etEverReset");
   if(hours) t.evergreenHours = evergreenDurationHours(hours.value, unit?.value, t.evergreenHours);
   if(reset) t.evergreenResetAtDay = !!reset.checked;
-  const prerequisiteId=document.getElementById("etPrerequisite")?.value||null;
-  if(!prerequisiteId || (taskById(prerequisiteId) && prerequisiteId!==t.id)){
-    let cursor=taskById(prerequisiteId),cycle=false;const seen=new Set([t.id]);
-    while(cursor){if(seen.has(cursor.id)){cycle=true;break;}seen.add(cursor.id);cursor=taskById(cursor.prerequisiteId);}
-    if(!cycle)t.prerequisiteId=prerequisiteId;
-  }
+  writeTaskPrerequisites(t,readDependencyDraft("edit"));
   t.ctx = [...document.querySelectorAll("[data-editctx]")].filter(x=>x.checked).map(x=>x.dataset.editctx);
   return true;
 }
@@ -4012,7 +4137,7 @@ function importList(text, ctx, dates = {}, taskOptions = {}){
   const open = new Set(openTasks().map(t => normTitle(t.title)));
   const done = new Set(state.tasks.filter(t=>t.done).map(t => normTitle(t.title)));
   const c = Array.isArray(ctx) ? ctx.slice() : [];
-  const prerequisiteId=taskById(taskOptions.prerequisiteId)?.id||null;
+  const prerequisiteIds=cleanPrerequisiteIds(Array.isArray(taskOptions.prerequisiteIds)?taskOptions.prerequisiteIds:[taskOptions.prerequisiteId]).filter(id=>taskById(id)).slice(0,MAX_DEPENDENCIES);
   let added = 0, skipped = 0, completed = 0;
   pushUndo();
   for(const r of rows){
@@ -4021,13 +4146,14 @@ function importList(text, ctx, dates = {}, taskOptions = {}){
     if(done.has(k)){ completed++; continue; }
     open.add(k);
     const defaults = evergreenDefaults();
-    state.tasks.push({ id:uid(), title:r.title, url:r.url, due:dates.due || null, startsAt:dates.startsAt || null,
+    const task={ id:uid(), title:r.title, url:r.url, due:dates.due || null, startsAt:dates.startsAt || null,
       evergreen:taskOptions.evergreen === true,
       evergreenHours:evergreenHours(taskOptions.evergreenHours, defaults.evergreenHours),
       evergreenResetAtDay:typeof taskOptions.evergreenResetAtDay === "boolean" ? taskOptions.evergreenResetAtDay : defaults.evergreenResetAtDay,
-      prerequisiteId,
+      prerequisiteIds:prerequisiteIds.slice(),
       ctx:c.slice(),
-      mu:PRIOR_MU, sigma:PRIOR_SIGMA, done:false, createdAt:Date.now(), completedAt:null, lastDoneAt:null });
+      mu:PRIOR_MU, sigma:PRIOR_SIGMA, done:false, createdAt:Date.now(), completedAt:null, lastDoneAt:null };
+    normalizeTaskPrerequisites(task);state.tasks.push(task);
     added++;
   }
   if(added){ recomputeRanks(); commit(); } else { undoStack.pop(); }
@@ -4090,7 +4216,7 @@ function quickAddTaskOptions(){
     evergreen,
     evergreenHours:evergreenDurationHours(document.getElementById("addEverHours")?.value,document.getElementById("addEverUnit")?.value,state.settings.evergreenHours),
     evergreenResetAtDay:document.getElementById("addEverReset")?.checked ?? state.settings.evergreenResetAtDay,
-    prerequisiteId:document.getElementById("addPrerequisite")?.value||null
+    prerequisiteIds:readDependencyDraft("add").filter(Boolean)
   };
 }
 function clearQuickAddDates(){
@@ -4107,7 +4233,7 @@ function clearQuickAddEvergreen(){
   if(reset) reset.checked=state.settings.evergreenResetAtDay;
   toggleQuickEvergreenOptions(false);
 }
-function clearQuickAddDraft(){ clearQuickAddDates(); clearQuickAddEvergreen();const prerequisite=document.getElementById("addPrerequisite");if(prerequisite)prerequisite.value=""; }
+function clearQuickAddDraft(){ clearQuickAddDates(); clearQuickAddEvergreen();renderDependencyFields("add",[""]); }
 function addTask(title, dot, ctx, dates = {}, taskOptions = {}){
   title = (title||"").trim(); if(!title) return null;
   pushUndo();
@@ -4116,10 +4242,10 @@ function addTask(title, dot, ctx, dates = {}, taskOptions = {}){
               evergreen:taskOptions.evergreen === true,
               evergreenHours:evergreenHours(taskOptions.evergreenHours, defaults.evergreenHours),
               evergreenResetAtDay:typeof taskOptions.evergreenResetAtDay === "boolean" ? taskOptions.evergreenResetAtDay : defaults.evergreenResetAtDay,
-              prerequisiteId:taskById(taskOptions.prerequisiteId)?.id||null,
+              prerequisiteIds:cleanPrerequisiteIds(Array.isArray(taskOptions.prerequisiteIds)?taskOptions.prerequisiteIds:[taskOptions.prerequisiteId]).filter(id=>taskById(id)).slice(0,MAX_DEPENDENCIES),
               ctx: Array.isArray(ctx) ? ctx.slice() : [],
               mu:PRIOR_MU, sigma:PRIOR_SIGMA, done:false, createdAt:Date.now(), completedAt:null, lastDoneAt:null };
-  state.tasks.push(t);
+  normalizeTaskPrerequisites(t);state.tasks.push(t);
   if(dot){
     if(chainStart()){ state.passStartedAt = Date.now(); applyScanPreference(); }
     state.chain.push(t.id); state.interventionActive=false;
@@ -4227,6 +4353,43 @@ function sparkSVG(id, w, hgt){
 }
 function topKlabel(id){ const st = rankCache.get(id); return st ? "top-"+st.topK : ""; }
 
+function chanceDisplayStats(){
+  const candidates=pool(),firstDot=chainStart()?oldestFirst(candidates):null;
+  // Start scanning freezes current ratings for a new empty chain. Project
+  // that next draw instead of reusing a completed pass's saved weights.
+  const available=new Set(candidates.filter(t=>t.id!==firstDot?.id).map(t=>t.id)),draw=chainStart()?null:state.chance,stats=new Map();
+  let max=0;
+  for(const task of openTasks()){
+    const saved=draw?.weights?.[task.id];
+    const weight=Number.isFinite(saved)&&saved>=0?saved:chanceWeight(task,draw?.opponents);
+    // Read the score without calling chanceScore: rendering must not create a
+    // seed, freeze new weights, or write a board. Match numerical overflow as
+    // well as exact zero; both already enter descending fallback in this pass.
+    const score=draw?.seed?-Math.log((chanceHash(draw.seed+":"+task.id)+.5)/4294967296)/weight:weight===0?Infinity:0;
+    const fallback=!Number.isFinite(score),included=available.has(task.id);
+    stats.set(task.id,{weight,fallback,available:included,firstDot:task.id===firstDot?.id,probability:0});
+    if(included&&!fallback)max=Math.max(max,weight);
+  }
+  // Normalize after scaling so positive numerical tails do not disappear
+  // merely because adding several tiny weights underflowed the denominator.
+  const sum=max?[...stats.values()].reduce((n,s)=>n+(s.available&&!s.fallback?s.weight/max:0),0):0;
+  for(const entry of stats.values())if(entry.available&&!entry.fallback&&sum)entry.probability=(entry.weight/max)/sum;
+  return stats;
+}
+function taskSelectionSummary(task,stats){
+  if(state.scanMode!=="chance"){
+    const rank=rankCache.get(task.id);
+    return {label:rank?"top-"+rank.topK:"—",title:"Estimated rank cutoff in descending likelihood mode",fill:rank?Math.max(2,Math.round(rank.topK/rank.n*100)):2};
+  }
+  const entry=(stats||chanceDisplayStats()).get(task.id);
+  if(entry?.firstDot)return {label:"first dot · by age",title:"The oldest eligible task never marked Done becomes the first dot. If none remain, the oldest eligible task starts. This dot is chosen by age, not by a weighted random draw.",fill:100};
+  if(!entry?.available)return {label:"0% next draw",title:"Outside the current eligible, unscanned pool: blocked, resting, skipped, or already in the chain.",fill:0};
+  if(entry.fallback)return {label:"scanned after",title:"Scanned after weighted candidates, in descending likelihood order. The saved numerical Chance score cannot draw.",fill:0};
+  const pct=entry.probability*100;
+  const text=pct<.01?"<0.01%":Number(pct.toFixed(2))+"%";
+  return {label:text+" next draw",title:"An estimate for the next candidate on a fresh draw from the current eligible, unscanned weighted pool. The saved order stays fixed this pass; the first dot is chosen by age.",fill:Number(pct.toFixed(2))};
+}
+
 /* ================================================================
    RENDER
    ================================================================ */
@@ -4272,7 +4435,7 @@ function refreshScanClock(){
 }
 window.addEventListener("focus", refreshScanClock);
 document.addEventListener("visibilitychange", ()=>{ if(!document.hidden) refreshScanClock(); });
-function render(){ renderedCalendarDay = todayISO(0); scheduleScanClock(); renderPass(); renderCtx(); renderScan(); renderList(); renderHistory(); renderQuickCtx(); renderAddPanel(); renderSync(); renderTheme(); renderFloatingHeader(); syncPersonalHourlyQuotes(); }
+function render(){ renderedCalendarDay = todayISO(0); scheduleScanClock(); renderPass(); renderCtx(); renderScan(); renderList(); renderHistory(); renderQuickCtx(); renderAddPanel(); renderSync(); renderTheme(); renderFloatingHeader(); syncPersonalHourlyQuotes(); warnDependencyCycles(); }
 function syncPersonalHourlyQuotes(){
   const quotes=state?.settings?.hourlyQuotes||{},signature=JSON.stringify(quotes);
   if(signature===appliedHourlyQuotes)return;
@@ -4307,18 +4470,36 @@ function renderAddPanel(){
   toggle.setAttribute("aria-expanded",String(state.addOpen));
   document.getElementById("addCaret").textContent=state.addOpen?"▾":"▸";
   toggleQuickEvergreenOptions(!!document.getElementById("addEver")?.checked);
-  const prerequisite=document.getElementById("addPrerequisite");
-  if(prerequisite){
-    const selected=prerequisite.value;
-    prerequisite.innerHTML=prerequisiteOptions(null);
-    prerequisite.value=state.tasks.some(t=>t.id===selected)?selected:"";
-  }
+  renderDependencyFields("add",readDependencyDraft("add").map(id=>taskById(id)?id:""));
 }
-function prerequisiteOptions(excludeId,selectedId=null){
+function prerequisiteOptions(excludeId,selectedId=null,selectedOthers=[]){
   const missing=selectedId && !state.tasks.some(t=>t.id===selectedId);
   return '<option value="">None</option>'+(missing?'<option value="'+esc(selectedId)+'" selected>deleted task</option>':'')
-    +state.tasks.filter(t=>t.id!==excludeId).map(t=>
+    +state.tasks.filter(t=>t.id!==excludeId && !selectedOthers.includes(t.id)).map(t=>
     '<option value="'+esc(t.id)+'"'+(t.id===selectedId?' selected':'')+'>'+esc(t.title)+(t.done?' (done)':'')+'</option>').join('');
+}
+const dependencyDraftRows={add:1,edit:1};
+function dependencyFieldId(scope,index){return (scope==="add"?"addPrerequisite":"etPrerequisite")+(index||"");}
+function readDependencyDraft(scope){
+  return Array.from({length:dependencyDraftRows[scope]||1},(_,index)=>document.getElementById(dependencyFieldId(scope,index))?.value||"");
+}
+function dependencyFieldsHTML(scope,values){
+  const ids=(values.length?values:[""]).slice(0,MAX_DEPENDENCIES);
+  return ids.map((selected,index)=>{
+    const field=dependencyFieldId(scope,index),others=ids.filter((id,i)=>id&&i!==index);
+    return '<div class="frow dependency-row"><label for="'+field+'">'+(index?'Dependency '+(index+1):'Dependencies')+'</label>'
+      +'<select id="'+field+'" data-dependency-scope="'+scope+'">'+prerequisiteOptions(null,selected,others)+'</select>'
+      +(selected||ids.length>1?'<button type="button" class="btn sm subtle" data-act="remove-dependency" data-scope="'+scope+'" data-index="'+index+'" aria-label="Remove dependency '+(index+1)+'">Remove</button>':'')+'</div>';
+  }).join('')+(ids.some(Boolean)&&ids.every(Boolean)&&ids.length<MAX_DEPENDENCIES?'<div class="frow"><button type="button" class="btn sm subtle" data-act="add-dependency" data-scope="'+scope+'">+ dependency</button></div>':'');
+}
+function renderDependencyFields(scope,values){
+  if(!["add","edit"].includes(scope))return;
+  const ids=(values.length?values:[""]).slice(0,MAX_DEPENDENCIES),root=document.getElementById(scope==="add"?"addDependencies":"editDependencies");
+  if(!root)return;
+  const focus=document.activeElement?.id;
+  dependencyDraftRows[scope]=ids.length;root.innerHTML=dependencyFieldsHTML(scope,ids);
+  ids.forEach((id,index)=>{document.getElementById(dependencyFieldId(scope,index)).value=id;});
+  if(ids.some((_,index)=>dependencyFieldId(scope,index)===focus))document.getElementById(focus)?.focus({preventScroll:true});
 }
 
 /* One tap cycles Auto -> Light -> Dark -> Auto. The label says which state
@@ -4549,7 +4730,7 @@ function renderScan(){
            + (state.mode==="scan" && b ? '<button class="btn subtle" data-act="start-working"'+choiceBinding+' title="Stop suggesting new candidates — just work through what\u2019s already dotted">done adding for now</button>' : '')
            + '<span class="sparkbox">'
            + (featureEnabled("rankSparklines") ? sparkSVG(cand.id,84,20) : '')
-           + (featureEnabled("topKLanguage") ? '<span class="topkchip mono">'+topKlabel(cand.id)+'</span>' : '')
+           + (featureEnabled("topKLanguage") ? '<span class="topkchip mono" title="'+esc(taskSelectionSummary(cand).title)+'">'+esc(taskSelectionSummary(cand).label)+'</span>' : '')
            + '<button class="iconbtn" data-act="toggle-list" title="Show the full ranked list">▦</button></span></span>'
            + '</div>';
     }
@@ -4604,10 +4785,11 @@ function normalizeListFilters(){
 function listFiltersActive(){ normalizeListFilters(); return !!(listQuery || listTagFilter || listEligibilityFilter !== "all"); }
 function filteredListTasks(){
   normalizeListFilters();
+  const byId=new Map(state.tasks.map(t=>[t.id,t]));
   const tag = listTagFilter ? listTagOptions().find(o=>o.key===listTagFilter) : null;
   return openTasks().filter(t=>{
     // A task declined for this pass belongs in Ineligible until its mark clears.
-    const eligible = isEligible(t) && !["no","cant","dislodged","worked"].includes(state.considered[t.id]);
+    const eligible = isEligible(t,null,byId) && !["no","cant","dislodged","worked"].includes(state.considered[t.id]);
     if(listEligibilityFilter !== "all" && eligible !== (listEligibilityFilter === "eligible")) return false;
     if(tag && !tag.match(t)) return false;
     if(listQuery && !t.title.toLowerCase().includes(listQuery)) return false;
@@ -4680,17 +4862,19 @@ function renderList(){
   const nextDotted = chainStart() ? oldestFirst(pool()) : null;
   const showSparklines = featureEnabled("rankSparklines");
   const showTopK = featureEnabled("topKLanguage");
+  const selectionStats=showTopK&&state.scanMode==="chance"?chanceDisplayStats():null;
+  const byId=new Map(state.tasks.map(t=>[t.id,t]));
   const rankColumns = showSparklines ? (showTopK ? "rank-both" : "rank-spark") : (showTopK ? "rank-topk" : "rank-none");
   let html = "";
   for(const t of rows){
-    const st = rankCache.get(t.id);
-    const fill = st ? Math.max(2, Math.round(st.topK/st.n*100)) : 2;
+    const summary=showTopK?taskSelectionSummary(t,selectionStats):null;
     const consid = state.considered[t.id];
-    const dim = !isEligible(t, act);
+    const dim = !isEligible(t, act, byId);
+    const blockers=unresolvedPrerequisites(t,byId);
     const rankSummary = (showSparklines || showTopK)
       ? '<div class="rank-summary">'
         + (showSparklines ? sparkSVG(t.id, 88, 22) : '')
-        + (showTopK ? '<div class="tk"><span class="tkl">'+(st?("top-"+st.topK):"—")+'</span><div class="tkbar"><i style="width:'+fill+'%"></i></div></div>' : '')
+        + (showTopK ? '<div class="tk" title="'+esc(summary.title)+'"><span class="tkl">'+esc(summary.label)+'</span><div class="tkbar"><i style="width:'+summary.fill+'%"></i></div></div>' : '')
         + '</div>'
       : '';
     html += '<div class="trow '+rankColumns+'" data-row="'+esc(t.id)+'" style="'+(dim?"opacity:.45":"")+'">'
@@ -4700,6 +4884,7 @@ function renderList(){
          + '<button class="tt" data-act="edit" data-id="'+esc(t.id)+'">'+esc(t.title)+'</button>'
          + (safeUrl(t.url) ? '<a class="ext" href="'+esc(safeUrl(t.url))+'" target="_blank" rel="noopener noreferrer" title="Open link">↗</a>' : '')
          + chipHTML(t)
+         + (blockers.length?'<span class="dependency-blockers">Blocked by: '+blockers.map(t=>esc(t.title)).join(', ')+'</span>':'')
          // esc(): skippedLabel() returns plain text, and for a mark it doesn't
          // recognise that text is the mark itself — which is a plain string in
          // the payload, so an import or another build can put anything there.
@@ -4802,12 +4987,13 @@ function openHelp(){
     + '<dt>Can I return a task early?</dt><dd>In All Tasks, click a task to open its editor, then choose Return as candidate. This clears its No, Can’t, Worked on it, or Dislodged mark, or ends an evergreen rest period early, so it can be scanned if its other eligibility rules allow it. Completed sessions stay in History. The button is disabled when there is nothing to return; Undo reverses an early return.</dd>'
     + '<dt>What happens around 2 AM?</dt><dd>A hidden local 2 AM day marker refreshes the scan and clears most old scan marks, so yesterday’s No, Can’t, Worked on it, and Dislodged choices do not leave you stuck. Evergreen Done follows its own interval unless that task’s day reset is enabled.</dd>'
     + '<dt>How do I add tasks, dates, and links?</dt><dd>Use Add a task for one title or paste a numbered, bulleted, or Obsidian list. Starts delays scan eligibility until that date; Due adds a reminder tag. Open a task in All Tasks to edit its title, dates, and optional link.</dd>'
-    + '<dt>What is a prerequisite task?</dt><dd>Choose one prerequisite while adding a task or in that task\u2019s editor. The dependent task can enter the scan after its prerequisite is Done. An Evergreen Done counts as completion even while that evergreen task rests or returns. Deleting the prerequisite also releases the dependent. Renaming either task keeps the link.</dd>'
-    + '<dt>How do Evergreen Hours or Days work?</dt><dd>Choose a number and Hours or Days in Add, Edit, or Settings defaults. A resting evergreen task shows a countdown such as 7d, then hours and minutes as it gets close. The optional 2 AM reset can make it eligible sooner; turn it off for a full multi-day interval.</dd>'
+    + '<dt>What is a prerequisite task?</dt><dd>A task can have up to ten dependencies. Choose the first in Add or Edit; then + dependency appears underneath it. All Tasks shows Blocked by and names the unfinished dependencies. Every selected prerequisite must be Done before the dependent can scan. An Evergreen Done counts even while that task rests or returns; returning it early or Undoing Done can block the dependent again. Deleting a prerequisite releases its link, and renaming keeps the link. A dependency cycle shows a warning because its tasks cannot scan, but you can still save it and remove a link or complete a task later. Simultaneous edits keep added links and respect removed links; if they exceed ten, the cloud copy keeps its ten and the other edit stays in a recovery backup.</dd>'
+    + '<dt>How do Evergreen Hours or Days work?</dt><dd>Choose a number and Hours or Days in Add, Edit, or Settings defaults. In Add, switching the untouched 18-hour default to Days starts at 7 days. Editing the number keeps your choice, and switching back to Hours keeps that number. A resting evergreen task shows a countdown such as 7d, then hours and minutes as it gets close. The optional 2 AM reset can make it eligible sooner; turn it off for a full multi-day interval.</dd>'
     + '<dt>How do contexts and list filters work?</dt><dd>Contexts include a task only while every assigned context is active. All Tasks can search and filter by eligible, ineligible, task state, or context without changing the scan. Settings can add, rename, or remove contexts.</dd>'
-    + '<dt>What is chance mode?</dt><dd>Chance mode draws from TrueSkill win probabilities; descending mode offers the strongest estimate first. Settings can show either mode or both scan buttons. The first dot prefers the oldest eligible task never marked Done; Worked on it is fine. If none remain, it uses the oldest eligible task. A chance order stays fixed until a fresh pass.</dd>'
+    + '<dt>What is chance mode?</dt><dd>Chance mode uses a saved random order weighted by TrueSkill win probabilities. Its percentage estimates the next candidate on a fresh draw from the current eligible, unscanned weighted pool. The order stays fixed this pass, so it is not a probability for every click or a promise of when a task appears. Tasks outside that pool show 0%; small positive shares show &lt;0.01% instead of rounding to zero. Scanned after means the numerical Chance score falls back to descending order after weighted candidates. New tasks normally have positive weight, but extreme rating differences can make the numerical probability zero. Descending mode offers the strongest estimate first.'+(featureEnabled("topKLanguage")?' It still shows top-K.':'')+' Settings can offer either mode or both scan buttons. The first dot in either mode is labeled first dot · by age, and is left out of the following weighted draw. It prefers the oldest eligible task never marked Done; Worked on it is fine. If none remain, it uses the oldest eligible task.</dd>'
     + '<dt>Can I undo, restore, or remove a task?</dt><dd>Use Undo in the header for your last change. Ordinary Done tasks appear in History and can be restored; Delete removes a task entirely. Settings offers daily local backups, manual backups, and Reset everything.</dd>'
-    + '<dt>Can I use the app offline or on another device?</dt><dd>The installed app keeps its shell and editable scenery files available offline. Tasks save in this browser; if cloud sync is configured and you sign in, your board can reconcile across devices. Settings shows backup and sync status.</dd>'
+    + '<dt>Can I use the app offline or on another device?</dt><dd>The installed app keeps its shell and editable scenery files available offline. Tasks save in this browser, and signed-in open devices receive Done and done adding for now promptly. A refresh waits for a draft or a pressed control to finish. Offline edits save locally and reconcile when you reconnect; the synced badge requires the server to confirm the save. Settings shows backups, sync status, and recovery options.</dd>'
+    + '<dt>How do task dates display?</dt><dd>Start and Due keep native date pickers, with room to read and tap them on phones and tablets. Dates outside the current year show their year, including in History. Settings follows your system format by default, or you can choose month/day/year, day/month/year, or year-month-day; the choice saves immediately.</dd>'
     + '<dt>How do I change the scenery?</dt><dd>Settings opens motion, scene time, and location controls. Green scene time follows the live clock; red means the scene is locked to a chosen time. Your chosen scene time, season, and sky coordinates sync with your signed-in board and remain available offline on this device; real task dates stay live. Previously saved custom hourly quotes continue to appear alongside the editable human-written quotes.</dd>'
     + '</dl><h3>What the machinery does</h3>'
     + '<p class="kv">Every Yes/No is a pairwise match; each task keeps a <b>strength posterior</b> (a bell curve, not a number). Candidates appear highest estimated likelihood first, or in a saved random order weighted by TrueSkill strength in chance mode. Yes/No still updates ratings immediately; the chance order stays fixed until a fresh pass or 2 AM. Resume excludes tasks already scanned in this pass; the local 2 AM date marker returns them to the eligible pool.</p>'
@@ -4841,7 +5027,7 @@ function openEdit(id){
     + '<p class="kv">More than 18 hours turns the day reset off; you can change the checkbox afterward.</p></div>'
     + '<div class="frow"><label for="etStart">Starts</label><input id="etStart" type="date" value="'+esc(t.startsAt||"")+'"/>'
     + '<span class="kv">(not eligible for the queue until this date)</span></div>'
-    + '<div class="frow"><label for="etPrerequisite">Prerequisite task</label><select id="etPrerequisite">'+prerequisiteOptions(t.id,t.prerequisiteId)+'</select><span class="kv">Eligible after this task is done or deleted.</span></div>'
+    + '<div id="editDependencies">'+dependencyFieldsHTML("edit",taskPrerequisiteIds(t))+'</div><p class="kv">All selected dependencies must be done or deleted. Up to ten dependencies.</p>'
     + '<h3>Needs these contexts</h3><div class="ctxpick">'+ctxHtml+'</div>'
     + '<div class="kv">strength ≈ <b class="mono">'+t.mu.toFixed(1)+'</b> ± '+t.sigma.toFixed(1)
     + (featureEnabled("topKLanguage") ? ' · '+topKlabel(t.id) : '')+'</div>'
@@ -4859,6 +5045,7 @@ function openEdit(id){
     + '<button class="btn subtle" data-act="close-modal">Cancel</button>'
     + '<button class="btn danger" data-act="delete-task" data-id="'+esc(t.id)+'" style="margin-left:auto">Delete</button></div>'
   );
+  renderDependencyFields("edit",taskPrerequisiteIds(t));
 }
 function openInstallHelp(){
   const native = deferredInstallPrompt
@@ -5055,7 +5242,7 @@ async function restoreDurableBackupById(id){
     for(const task of next.tasks)if(state.deletedTaskIds?.[task.id])noteRestoreIntent(next,task.id,"deletedTaskIds","restoredTaskIds","restoredTaskOps","deletedAfterRestoreOps");
     next.restoredHistoryIds||={};next.restoredHistoryOps||={};
     for(const row of next.workLog)if(state.clearedHistoryIds?.[historyEntryKey(row)])noteRestoreIntent(next,historyEntryKey(row),"clearedHistoryIds","restoredHistoryIds","restoredHistoryOps","clearedAfterRestoreOps");
-    for(const task of next.tasks){const current=state.tasks.find(t=>t.id===task.id);if(current?.done&&!task.done)reopenTask(task,current);}
+    for(const task of next.tasks){const current=state.tasks.find(t=>t.id===task.id);replaceTaskPrerequisites(task,current);if(current?.done&&!task.done)reopenTask(task,current);}
     mergeUndeletedTasks(next,state);pushUndo();replaceState(next);applyTheme();baseUpdatedAt=Date.now();initializeReplacedScan();recomputeRanks();render();
     state.updatedAt=Date.now();state.syncDirty=true;
     if(!await persist(deviceStorageAuthority,safetyCopy.id)){
@@ -5187,10 +5374,24 @@ function onAction(act, el){
     case "set-prerequisite": {
       const taskId=document.getElementById("stPrerequisiteTask")?.value;
       const neededId=document.getElementById("stPrerequisiteNeeds")?.value;
-      if(!setTaskPrerequisite(taskId,neededId||null)){ toast("Choose two different tasks without a prerequisite loop."); break; }
+      if(!setTaskPrerequisite(taskId,neededId||null)){ toast("Choose an existing task dependency."); break; }
       openSettings(); break;
     }
     case "remove-prerequisite": setTaskPrerequisite(el.dataset.id,null);openSettings();break;
+    case "add-dependency": {
+      const scope=el.dataset.scope;if(!["add","edit"].includes(scope))break;
+      const ids=readDependencyDraft(scope);
+      if(ids.length<MAX_DEPENDENCIES&&ids.every(Boolean)){
+        renderDependencyFields(scope,[...ids,""]);
+        document.getElementById(dependencyFieldId(scope,ids.length))?.focus();
+      }
+      break;
+    }
+    case "remove-dependency": {
+      const scope=el.dataset.scope,index=Number(el.dataset.index);if(!["add","edit"].includes(scope)||!Number.isInteger(index))break;
+      const ids=readDependencyDraft(scope);if(index<0||index>=ids.length)break;
+      ids.splice(index,1);renderDependencyFields(scope,ids);break;
+    }
     case "edit": openEdit(el.dataset.id); break;
     case "save-edit": {
       const t=taskById(el.dataset.id); if(!t) break;
@@ -5422,6 +5623,7 @@ document.addEventListener("click", e=>{
 document.addEventListener("change", e=>{
   const el = e.target;
   if(!el || !el.matches) return;
+  if(["add","edit"].includes(el.dataset?.dependencyScope)){renderDependencyFields(el.dataset.dependencyScope,readDependencyDraft(el.dataset.dependencyScope));return;}
   if(el.id === "etEver"){ toggleEvergreenOptions(el.checked); return; }
   if(el.id === "addEver"){ toggleQuickEvergreenOptions(el.checked); return; }
   if(el.id === "stScanMode"){ setScanPreference(el.value); return; }

@@ -15349,13 +15349,17 @@ test('RISK prerequisites: completion, evergreen Done, restore, and deletion gove
  ctx.undo();assert.equal(ctx.isEligible(ctx.state.tasks.find(t=>t.id===gene.id)),true,'undo restores completed evergreen evidence');
 });
 
-test('RISK prerequisites: invalid links and cycles are rejected; missing imported references are eligible',async()=>{
- const {ctx}=await loadApp();const a=ctx.addTask('A'),b=ctx.addTask('B'),c=ctx.addTask('C');
- assert.equal(ctx.setTaskPrerequisite(a.id,a.id),false);
+test('RISK prerequisites: invalid links are rejected and cycles warn without discarding saved links',async()=>{
+ const {ctx,shim}=await loadApp();const a=ctx.addTask('A'),b=ctx.addTask('B'),c=ctx.addTask('C');
+ assert.equal(ctx.setTaskPrerequisite(a.id,a.id),true,'the requested self-cycle is saved with a warning');
+ assert.match(shim.document.getElementById('toast').textContent,/dependency cycle/i);
  assert.equal(ctx.setTaskPrerequisite(a.id,'unknown'),false);
  assert.equal(ctx.setTaskPrerequisite(a.id,b.id),true);
  assert.equal(ctx.setTaskPrerequisite(b.id,c.id),true);
- assert.equal(ctx.setTaskPrerequisite(c.id,a.id),false,'a task chain cannot become a deadlock');
+ assert.equal(ctx.setTaskPrerequisite(c.id,a.id),true,'indirect cycles are allowed and explained');
+ assert.match(shim.document.getElementById('toast').textContent,/cannot be scanned/i);
+ const cyclic=JSON.parse(JSON.stringify(ctx.state));ctx.hydrateState(cyclic);
+ assert.equal(cyclic.tasks.find(t=>t.id===c.id).prerequisiteId,a.id,'reload must not silently break a saved cycle');
  assert.equal(ctx.setTaskPrerequisite(a.id,null),true);assert.equal(ctx.isEligible(a),true);
  const saved=JSON.parse(JSON.stringify(ctx.state));saved.tasks.find(t=>t.id===a.id).prerequisiteId='deleted-on-another-device';
  ctx.hydrateState(saved);assert.equal(saved.tasks.find(t=>t.id===a.id).prerequisiteId,'deleted-on-another-device');
@@ -19562,4 +19566,224 @@ test('RISK live scan sync: Settings describes live revision refresh while retain
  const {a}=await liveScanSyncClients();a.ctx.openSettings();
  assert.match(a.shim.document.getElementById('modalRoot').innerHTML,/when another device saves/,'Settings must describe the new open-device refresh');
  assert.match(a.shim.document.getElementById('modalRoot').innerHTML,/Drafts wait until you finish/,'the draft boundary remains visible to the user');
+});
+
+/* Dependencies are saved by task ID; fixtures never use an account or a real board. */
+test('RISK multiple dependencies: ten links require every prerequisite while completion deletion and Undo retain their rules',async()=>{
+ const {ctx}=await loadApp({seed:710});
+ const roots=Array.from({length:11},(_,i)=>ctx.addTask('Root '+i)),task=ctx.addTask('Dependent');
+ assert.equal(ctx.setTaskPrerequisites(task.id,roots.slice(0,10).map(t=>t.id)),true);
+ assert.equal(ctx.taskPrerequisiteIds(task).length,10);
+ const saved=JSON.stringify(task);
+ assert.equal(ctx.setTaskPrerequisites(task.id,roots.map(t=>t.id)),false,'eleven selections are refused without a partial save');
+ assert.equal(JSON.stringify(task),saved);
+ assert.equal(ctx.setTaskPrerequisites(task.id,['missing']),false,'new unknown IDs are still invalid');
+ for(const root of roots.slice(0,9))ctx.completeTask(root);
+ assert.equal(ctx.isEligible(task),false,'one unresolved link still blocks');
+ roots[9].evergreen=true;ctx.completeTask(roots[9]);assert.equal(ctx.isEligible(task),true);
+ ctx.reopenTask(roots[9]);assert.equal(ctx.isEligible(task),false,'returning an evergreen prerequisite cancels its completion');
+ ctx.deleteTask(roots[9].id);assert.equal(ctx.isEligible(task),true,'missing IDs release, rather than destroy, the saved link');
+ ctx.undo();assert.equal(ctx.isEligible(ctx.state.tasks.find(t=>t.id===task.id)),false);
+ assert.equal(ctx.taskPrerequisiteIds(ctx.state.tasks.find(t=>t.id===task.id)).length,10);
+});
+
+test('RISK multiple dependencies: old single links migrate and legacy edits preserve the other selected dependencies',async()=>{
+ const {ctx}=await loadApp();const a=ctx.addTask('A'),b=ctx.addTask('B'),c=ctx.addTask('C'),task=ctx.addTask('Dependent');
+ const old={...task,prerequisiteId:a.id};
+ for(const key of ['prerequisiteIds','prerequisiteOps','prerequisiteMirror','prerequisiteRevision'])delete old[key];
+ const board={...JSON.parse(JSON.stringify(ctx.state)),tasks:[a,b,c,old]};ctx.hydrateState(board);
+ const migrated=board.tasks.at(-1);assert.deepEqual(Array.from(ctx.taskPrerequisiteIds(migrated)),[a.id]);
+ ctx.setTaskPrerequisites(task.id,[a.id,b.id]);
+ const released=JSON.parse(JSON.stringify(ctx.state));const edited=released.tasks.find(t=>t.id===task.id);
+ edited.prerequisiteId=c.id;ctx.hydrateState(released);
+ assert.deepEqual(Array.from(ctx.taskPrerequisiteIds(edited)),[c.id,b.id],'an old single-field edit changes the first link only');
+ edited.prerequisiteId=null;ctx.hydrateState(released);
+ assert.deepEqual(Array.from(ctx.taskPrerequisiteIds(edited)),[b.id]);
+ const stable=JSON.stringify(released);ctx.hydrateState(released);assert.equal(JSON.stringify(released),stable,'repeated migration is idempotent');
+});
+
+test('RISK multiple dependencies: concurrent additions removals repeated readds and replacement Undo reconcile causally',async()=>{
+ const {ctx}=await loadApp({seed:711});const a=ctx.addTask('A'),b=ctx.addTask('B'),c=ctx.addTask('C'),task=ctx.addTask('Dependent');
+ ctx.setTaskPrerequisites(task.id,[a.id]);const base=JSON.parse(JSON.stringify(ctx.state));
+ const load=()=>loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(base)}});
+ const left=await load(),right=await load();
+ left.ctx.setTaskPrerequisites(task.id,[a.id,b.id]);right.ctx.setTaskPrerequisites(task.id,[a.id,c.id]);
+ const lhs=JSON.parse(JSON.stringify(left.ctx.state)),rhs=JSON.parse(JSON.stringify(right.ctx.state));
+ ctx.mergeUndeletedTasks(lhs,rhs);ctx.mergeUndeletedTasks(rhs,lhs);
+ assert.deepEqual([...ctx.taskPrerequisiteIds(lhs.tasks.find(t=>t.id===task.id))].sort(),[a.id,b.id,c.id].sort());
+ assert.deepEqual([...ctx.taskPrerequisiteIds(rhs.tasks.find(t=>t.id===task.id))].sort(),[a.id,b.id,c.id].sort());
+ left.ctx.setTaskPrerequisites(task.id,[]);const removed=JSON.parse(JSON.stringify(left.ctx.state));
+ ctx.mergeUndeletedTasks(removed,base);assert.deepEqual(Array.from(ctx.taskPrerequisiteIds(removed.tasks.find(t=>t.id===task.id))),[],'a stale copy cannot revive a removed link');
+ left.ctx.setTaskPrerequisites(task.id,[a.id]);const readded=JSON.parse(JSON.stringify(left.ctx.state));
+ ctx.mergeUndeletedTasks(readded,removed);assert.deepEqual(Array.from(ctx.taskPrerequisiteIds(readded.tasks.find(t=>t.id===task.id))),[a.id],'a deliberate readd survives the older removal');
+ left.ctx.undo();const undone=JSON.parse(JSON.stringify(left.ctx.state));ctx.mergeUndeletedTasks(undone,readded);
+ assert.deepEqual(Array.from(ctx.taskPrerequisiteIds(undone.tasks.find(t=>t.id===task.id))),[],'Undo carries a fresh observed removal across sync');
+ left.ctx.undo();const restored=JSON.parse(JSON.stringify(left.ctx.state));ctx.mergeUndeletedTasks(restored,removed);
+ assert.deepEqual([...ctx.taskPrerequisiteIds(restored.tasks.find(t=>t.id===task.id))].sort(),[a.id,b.id].sort(),'Undo removal deliberately restores both links');
+});
+
+test('RISK multiple dependencies: concurrent capacity conflicts retain the canonical ten and causal removal evidence',async()=>{
+ const {ctx}=await loadApp();const roots=Array.from({length:12},(_,i)=>ctx.addTask('Root '+i)),task=ctx.addTask('Dependent');
+ const base=JSON.parse(JSON.stringify(ctx.state));const left=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(base)}}),right=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(base)}});
+ const winning=roots.slice(0,10).map(t=>t.id),losing=roots.slice(2,12).map(t=>t.id);
+ left.ctx.setTaskPrerequisites(task.id,winning);right.ctx.setTaskPrerequisites(task.id,losing);
+ const winner=JSON.parse(JSON.stringify(left.ctx.state)),other=JSON.parse(JSON.stringify(right.ctx.state));
+ ctx.mergeUndeletedTasks(winner,other);
+ assert.deepEqual(Array.from(ctx.taskPrerequisiteIds(winner.tasks.find(t=>t.id===task.id))),winning,'capacity conflicts keep the canonical selections');
+ const first=JSON.stringify(winner);ctx.mergeUndeletedTasks(winner,other);assert.equal(JSON.stringify(winner),first,'a stale overflow cannot repeatedly reappear');
+ assert.ok(winner.tasks.find(t=>t.id===task.id).prerequisiteOps[roots[11].id].removes.length,'overflow intent remains recorded rather than silently forgotten');
+ assert.deepEqual(Array.from(ctx.taskPrerequisiteIds(other.tasks.find(t=>t.id===task.id))),losing,'merging never mutates the displaced recovery source');
+});
+
+test('RISK multiple dependencies: direct indirect and overlapping cycles warn but completed cycles and large acyclic graphs do not',async()=>{
+ const {ctx,shim}=await loadApp();const a=ctx.addTask('A'),b=ctx.addTask('B'),c=ctx.addTask('C'),d=ctx.addTask('Downstream');
+ ctx.setTaskPrerequisites(a.id,[b.id,c.id]);ctx.setTaskPrerequisites(b.id,[a.id]);ctx.setTaskPrerequisites(c.id,[b.id]);ctx.setTaskPrerequisites(d.id,[a.id]);
+ const cycles=ctx.blockingDependencyCycles(ctx.state).flat();assert.deepEqual([...cycles].sort(),[a.id,b.id,c.id].sort(),'overlapping cycles include every involved task and exclude merely downstream blockers');
+ assert.match(shim.document.getElementById('toast').textContent,/dependency cycle/i);
+ assert.equal(ctx.isEligible(d),false);
+ ctx.completeTask(a);assert.equal(ctx.blockingDependencyCycles(ctx.state).length,0,'a completed edge no longer prevents scanning');
+ const large={tasks:Array.from({length:12000},(_,i)=>({id:'node-'+i,title:'Node '+i,done:false,prerequisiteIds:i?['node-'+(i-1)]:[]}))};
+ assert.equal(ctx.blockingDependencyCycles(large).length,0,'deep chains use bounded iterative graph traversal');
+ large.tasks[0].prerequisiteIds=['node-11999'];assert.equal(ctx.blockingDependencyCycles(large)[0].length,12000);
+});
+
+test('RISK multiple dependencies: progressive Add and Edit controls cap at ten preserve drafts and reset on cancel or save',async()=>{
+ const {ctx,shim}=await loadApp();const a=ctx.addTask('A'),b=ctx.addTask('B');ctx.renderAddPanel();
+ const add=shim.document.getElementById('addDependencies');assert.doesNotMatch(add.innerHTML,/>\+ dependency</);
+ shim.document.getElementById('addPrerequisite').value=a.id;ctx.renderDependencyFields('add',ctx.readDependencyDraft('add'));
+ assert.match(add.innerHTML,/id="addPrerequisite"[\s\S]*>\+ dependency</,'the add button follows the selected first dependency');
+ ctx.onAction('add-dependency',{dataset:{scope:'add'}});shim.document.getElementById('addPrerequisite1').value=b.id;
+ shim.document.getElementById('addInput').value='Dependent';shim.document.getElementById('addEver').checked=true;
+ shim.document.getElementById('addEverHours').value='2';shim.document.getElementById('addEverUnit').value='days';
+ ctx.onAction('add',{});const task=ctx.state.tasks.find(t=>t.title==='Dependent');
+ assert.deepEqual(Array.from(ctx.taskPrerequisiteIds(task)),[a.id,b.id]);assert.equal(task.evergreenHours,48);
+ assert.doesNotMatch(add.innerHTML,/>\+ dependency</,'a saved Add starts a clean dependency draft');
+ ctx.openEdit(task.id);shim.document.getElementById('etPrerequisite').value='';
+ ctx.onAction('close-modal',{});ctx.openEdit(task.id);
+ assert.deepEqual(Array.from(ctx.readDependencyDraft('edit')),[a.id,b.id],'cancel/reopen restores the saved selections');
+ ctx.onAction('remove-dependency',{dataset:{scope:'edit',index:'0'}});
+ shim.document.getElementById('etTitle').value='Renamed';ctx.onAction('save-edit',{dataset:{id:task.id}});
+ assert.deepEqual(Array.from(ctx.taskPrerequisiteIds(task)),[b.id]);assert.equal(task.title,'Renamed');
+ ctx.openEdit(task.id);assert.deepEqual(Array.from(ctx.readDependencyDraft('edit')),[b.id]);
+ const ten=Array.from({length:10},(_,i)=>'selected-'+i);assert.doesNotMatch(ctx.dependencyFieldsHTML('add',ten),/>\+ dependency</);
+});
+
+test('RISK multiple dependencies: pasted tasks retain all selected links and All Tasks names only unresolved blockers safely',async()=>{
+ const {ctx,shim}=await loadApp();const a=ctx.addTask('<A & B>'),b=ctx.addTask('Other root');
+ ctx.importList('Pasted one\nPasted two',[],{}, {prerequisiteIds:[a.id,b.id]});
+ const added=ctx.state.tasks.filter(t=>t.id!==a.id&&t.id!==b.id);assert.ok(added.every(t=>ctx.taskPrerequisiteIds(t).length===2));
+ ctx.state.listOpen=true;ctx.renderList();let rows=shim.document.getElementById('listBody').innerHTML;
+ assert.match(rows,/Blocked by:.*&lt;A &amp; B&gt;.*Other root/);assert.doesNotMatch(rows,/<A & B>/);
+ ctx.completeTask(a);ctx.renderList();rows=shim.document.getElementById('listBody').innerHTML;
+ assert.match(rows,/Blocked by: Other root/);assert.doesNotMatch(rows,/Blocked by:.*&lt;A &amp; B&gt;/);
+ ctx.deleteTask(b.id);ctx.renderList();assert.doesNotMatch(shim.document.getElementById('listBody').innerHTML,/Blocked by:/);
+});
+
+test('RISK multiple dependencies sync: simultaneous edits converge and offline reload reconnect keeps Done and pause behavior',async()=>{
+ const {a,b,h,notify,candidateId,nextId,benchId}=await liveScanSyncClients();
+ a.ctx.setTaskPrerequisites(nextId,[benchId]);b.ctx.setTaskPrerequisites(nextId,[candidateId]);
+ a.ctx.cloudPushNow();b.ctx.cloudPushNow();await syncSettle(140);notify();await syncSettle(140);
+ for(const client of [a,b])assert.deepEqual([...client.ctx.taskPrerequisiteIds(client.ctx.state.tasks.find(t=>t.id===nextId))].sort(),[benchId,candidateId].sort());
+ h.failPull=true;a.ctx.setTaskPrerequisites(nextId,[candidateId]);await a.ctx.persist();a.ctx.cloudPushNow();
+ const offline=await loadApp({seedStorage:{[SYNC_STORE_KEY]:a.shim.localStorage.getItem(SYNC_STORE_KEY)},cloudSyncFactory:h.factory});
+ await syncSettle(40);assert.deepEqual(Array.from(offline.ctx.taskPrerequisiteIds(offline.ctx.state.tasks.find(t=>t.id===nextId))),[candidateId]);
+ h.failPull=false;await offline.ctx.cloudPull();offline.ctx.cloudPushNow();notify();await syncSettle(160);
+ b.ctx.onAction('cand-done',{dataset:{candidate:candidateId,benchmark:benchId}});await syncSettle(160);
+ assert.equal(h.remoteState().tasks.find(t=>t.id===candidateId).done,true,'Done remains an immediate cloud completion');
+ assert.deepEqual(Array.from(b.ctx.taskPrerequisiteIds(b.ctx.state.tasks.find(t=>t.id===nextId))),[candidateId],'the removed bench link stays removed after reconnect');
+ b.ctx.onAction('start-working',{dataset:{candidate:nextId,benchmark:benchId}});await syncSettle(160);
+ assert.equal(h.remoteState().mode,'work','done adding for now still shares pause state');
+});
+
+test('RISK Chance labels: frozen weight shares describe a fresh draw and never change saved order ratings or seed',async()=>{
+ const {ctx,shim}=await loadApp({seed:714});const bench=ctx.addTask('Oldest'),a=ctx.addTask('A'),b=ctx.addTask('B');
+ Object.assign(ctx.state,{chain:[bench.id],scanMode:'chance',candidateId:a.id,listOpen:true,mode:'scan'});
+ ctx.resetChance();ctx.state.chance.weights[a.id]=.25;ctx.state.chance.weights[b.id]=.75;
+ const before=JSON.stringify(ctx.state),order=ctx.candidateOrder(ctx.pool()).map(t=>t.id);
+
+ const unchangedAlgorithms={"updatePair":"a31c20a18454d735731d5e02bdf0767292e790a992725d7d35b02380cbf2568b","pBeats":"6003c75326298698b27f2ae691bed18928d6f96396da30ca9113a34463d3a3d9","chanceWeight":"96381985597245b65e9d26fa410c13ac801ce6a618e76665f69d049cc9485582","chanceHash":"012f3e461e84956335324e12c2646860bc6ed68ac31456dfb0d9bb231c0d4947","resetChance":"36f9f2a46730bc3e3bb068bea2b07d57d29c8cadf8184b9914733f2bfcc90b1a","chanceScore":"b033af5b0cbae63742983121a674ecd99aceabead078d6c7d8067bd3bf49c38f","candidateOrder":"14eb77f7bd0dbedae664aade1d050631264784e52f1ab2d69374c5e339993d16","chancePick":"d2a64e3f4e9a8431dc5439b5945f651f66521f4674aec6ef1b321bb4c1b8bf10","oldestFirst":"da6def7759fd3997881fa299c8b92324d49217c9534381d5c3c3be750d6d46aa"};
+ for(const [name,expected] of Object.entries(unchangedAlgorithms)){const start=html.indexOf("function "+name+"("),end=html.indexOf("\nfunction ",start+1);assert.equal(createHash("sha256").update(html.slice(start,end)).digest("hex"),expected,name+" selection and rating code stays byte-exact");}
+ const stats=ctx.chanceDisplayStats();assert.equal(stats.get(a.id).probability,.25);assert.equal(stats.get(b.id).probability,.75);
+ assert.equal(ctx.taskSelectionSummary(a,stats).label,'25% next draw');
+ assert.match(ctx.taskSelectionSummary(a,stats).title,/estimate.*fresh draw/i);
+ ctx.renderList();ctx.renderScan();assert.match(shim.document.getElementById('listBody').innerHTML,/25% next draw/);
+ assert.match(shim.document.getElementById('scan').innerHTML,/25% next draw/);
+ assert.doesNotMatch(shim.document.getElementById('scan').innerHTML,/top-\d/);
+ assert.equal(JSON.stringify(ctx.state),before,'displaying probabilities cannot generate a draw or write the board');
+ assert.deepEqual(Array.from(ctx.candidateOrder(ctx.pool()).map(t=>t.id)),Array.from(order));
+ ctx.state.scanMode='descending';ctx.renderList();ctx.renderScan();
+ assert.match(shim.document.getElementById('listBody').innerHTML,/top-\d/);assert.match(shim.document.getElementById('scan').innerHTML,/top-\d/);
+ assert.doesNotMatch(shim.document.getElementById('listBody').innerHTML,/next draw|scanned after/);
+});
+
+test('RISK Chance labels: exact numerical fallback and tiny positive candidates stay distinct while excluded tasks show zero',async()=>{
+ const {ctx}=await loadApp();const bench=ctx.addTask('Oldest'),positive=ctx.addTask('Tiny'),zero=ctx.addTask('Zero'),overflow=ctx.addTask('Overflow'),excluded=ctx.addTask('Blocked');
+ Object.assign(ctx.state,{chain:[bench.id],scanMode:'chance'});ctx.resetChance();
+ Object.assign(ctx.state.chance.weights,{[positive.id]:1e-200,[zero.id]:0,[overflow.id]:Number.MIN_VALUE,[excluded.id]:.9,[bench.id]:.5});
+ excluded.startsAt=ctx.todayISO(10);const stats=ctx.chanceDisplayStats();
+ assert.equal(ctx.taskSelectionSummary(zero,stats).label,'scanned after');assert.equal(ctx.taskSelectionSummary(overflow,stats).label,'scanned after');
+ assert.equal(Number.isFinite(ctx.chanceScore(overflow)),false,'the tiny-overflow label follows actual fallback membership');
+ assert.notEqual(ctx.taskSelectionSummary(positive,stats).label,'scanned after');assert.equal(ctx.taskSelectionSummary(positive,stats).label,'100% next draw','the sole available weighted task owns the next weighted draw');
+ assert.equal(ctx.taskSelectionSummary(excluded,stats).label,'0% next draw');
+ assert.match(ctx.taskSelectionSummary(excluded,stats).title,/outside the current/i);
+ const other=ctx.addTask('Ordinary weight');ctx.state.chance.weights[other.id]=.8;
+ const tiny=ctx.taskSelectionSummary(positive,ctx.chanceDisplayStats());assert.equal(tiny.label,'<0.01% next draw');
+ assert.ok(ctx.chanceDisplayStats().get(positive.id).weight>0);
+});
+
+test('RISK Chance labels: new task defaults normally draw but extreme TrueSkill tails have no positive guarantee',async()=>{
+ const {ctx}=await loadApp();const opponent=ctx.addTask('Opponent'),fresh=ctx.addTask('Fresh');
+ assert.equal(fresh.mu,25);assert.equal(fresh.sigma,25/3);assert.ok(ctx.chanceWeight(fresh)>0);
+ opponent.mu=100000;opponent.sigma=.8;assert.equal(ctx.chanceWeight(fresh),0,'the existing floating-point tail can underflow even for a new task');
+ ctx.state.scanMode='chance';ctx.state.chain=[opponent.id];ctx.resetChance();
+ assert.equal(ctx.taskSelectionSummary(fresh,ctx.chanceDisplayStats()).label,'scanned after');
+ const seed=ctx.state.chance.seed;ctx.openHelp();assert.equal(ctx.state.chance.seed,seed);
+});
+
+test('RISK multiple dependencies FAQ: extended help explains progressive links saved cycles live sync and scoped Chance labels',async()=>{
+ const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ for(const text of [/up to ten dependencies/i,/\+ dependency/,/blocked by/i,/cycle.*warning/i,/fresh draw/i,/scanned after/i,/open devices/i,/draft/i,/offline/i,/top-K/])assert.match(help,text);
+ const instructions=fs.readFileSync(path.join(__dirname,'AGENTS.md'),'utf8');
+ assert.match(instructions,/live product/i);assert.match(instructions,/extended FAQ/i);assert.match(instructions,/regression/i);
+});
+
+test('RISK multiple dependencies layout: long blockers wrap within their row and dependency selects keep touchable widths',()=>{
+ assert.match(html,/\.tmain:has\(\.dependency-blockers\)\s*\{[^}]*flex-wrap:wrap/,'only rows with blockers gain the extra line');
+ assert.match(html,/\.dependency-blockers\s*\{[^}]*flex-basis:100%[^}]*overflow-wrap:anywhere/,'long task names wrap independently of the title and rank summary');
+ assert.match(html,/\.dependency-row select\s*\{[^}]*flex:1[^}]*min-width:min\(180px,100%\)/,'native selects stay touchable while fitting short phone rows');
+});
+
+test('RISK multiple dependencies: Undo restores a deleted task link as intent without reviving it from stale copies',async()=>{
+ const {ctx}=await loadApp();const root=ctx.addTask('Root'),task=ctx.addTask('Dependent');
+ ctx.setTaskPrerequisites(task.id,[root.id]);ctx.deleteTask(root.id);
+ ctx.setTaskPrerequisites(task.id,[]);const removed=JSON.parse(JSON.stringify(ctx.state));
+ ctx.undo();const restored=JSON.parse(JSON.stringify(ctx.state));
+ assert.deepEqual(Array.from(ctx.taskPrerequisiteIds(restored.tasks.find(t=>t.id===task.id))),[root.id],'Undo preserves the deliberately restored dangling ID');
+ ctx.mergeUndeletedTasks(restored,removed);
+ assert.deepEqual(Array.from(ctx.taskPrerequisiteIds(restored.tasks.find(t=>t.id===task.id))),[root.id],'fresh restore intent survives the older removal');
+ assert.equal(ctx.isEligible(restored.tasks.find(t=>t.id===task.id)),true);
+});
+
+test('RISK Chance labels: disabled presentation flags retain their hidden summaries and matching FAQ language',async()=>{
+ const {ctx,shim}=await loadApp();const first=ctx.addTask('First'),second=ctx.addTask('Second');
+ Object.assign(ctx.state,{chain:[first.id],candidateId:second.id,listOpen:true,scanMode:'chance'});ctx.resetChance();
+ vm.runInContext('FEATURE_FLAGS.topKLanguage=false;FEATURE_FLAGS.rankSparklines=false',ctx);
+ ctx.render();assert.doesNotMatch(shim.document.getElementById('scan').innerHTML,/topkchip|next draw|scanned after/);
+ assert.doesNotMatch(shim.document.getElementById('listBody').innerHTML,/class="tk"|next draw|scanned after/);
+ ctx.openHelp();assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/top-K/i);
+ vm.runInContext('FEATURE_FLAGS.topKLanguage=true',ctx);ctx.openHelp();assert.match(shim.document.getElementById('modalRoot').innerHTML,/top-K/i);
+});
+
+test('RISK Chance labels: the deterministic oldest first dot has an age label and is excluded from the following weighted draw',async()=>{
+ const {ctx,shim}=await loadApp();const oldest=ctx.addTask('Oldest'),a=ctx.addTask('A'),b=ctx.addTask('B');
+ oldest.createdAt=1;a.createdAt=2;b.createdAt=3;ctx.state.scanMode='chance';ctx.state.listOpen=true;ctx.resetChance();
+ Object.assign(ctx.state.chance.weights,{[oldest.id]:.9,[a.id]:.25,[b.id]:.75});
+ const before=JSON.stringify(ctx.state),stats=ctx.chanceDisplayStats();
+ assert.equal(ctx.taskSelectionSummary(oldest,stats).label,'first dot · by age','the next dot is deterministic, never labeled as a random draw');
+ assert.equal(ctx.taskSelectionSummary(a,stats).label,'50% next draw','starting the empty chain will freeze current ratings rather than reuse stale weights');
+ assert.equal(ctx.taskSelectionSummary(b,stats).label,'50% next draw');
+ ctx.renderList();assert.match(shim.document.getElementById('listBody').innerHTML,/first dot · by age/);
+ assert.equal(JSON.stringify(ctx.state),before,'the projection cannot create a dot or a seed');
+ ctx.startScan('chance');assert.deepEqual(Array.from(ctx.state.chain),[oldest.id]);
+ assert.equal(ctx.taskSelectionSummary(oldest,ctx.chanceDisplayStats()).label,'0% next draw','the dotted benchmark is then outside the candidate pool');
 });
