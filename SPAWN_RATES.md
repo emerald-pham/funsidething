@@ -9,17 +9,17 @@ Ordinary visitors use relative selection weights, so increasing one reduces
 others' share of the same limited visitor budget. Seasonal eligibility still applies.
 Train and metro have dedicated service: about 65 and 50 seconds crossing,
 respectively, followed by 12 and 8 seconds of rest at rate 1. Their rate divides
-that rest time; only one vehicle per track runs at once. Motion pauses offscreen.
-Standalone fireworks check every 60 seconds of active nighttime viewing with a
+that rest time; only one vehicle per track runs at once. Painting pauses offscreen; arrivals and age follow the shared UTC schedule. Crossing periods include the maximum sampled duration plus the configured minimum rest.
+Standalone fireworks check every 60 seconds of UTC nighttime with a
 40% chance at rate 1. Each show independently samples a duration from 60 to
 300 seconds and bursts behind the city. Its next opportunity is twice the
 sampled duration plus 120 seconds after its start; the first check is after
-40 active seconds. Scaling the entire start interval, including failed checks,
+40 UTC seconds. Scaling the entire start interval, including failed checks,
 spaces same-sample shows twice as far apart without extending visible duration.
 Regular volleys fire two shells, then eight shells finish the show with fading
 embers. Geometry keeps at most 320 active particles. Arrival timing stays random
-and respects the existing scene budget and stopped hidden/reduced-motion clock.
-Festivals check once per active minute at a 0.6% chance, wait at least 30 active
+and respects the existing scene budget and shared UTC clock; hidden tabs do no painting and reduced motion uses still poses.
+Festivals check once per UTC minute at a 0.6% chance, wait at least 30 UTC
 minutes between visits, share the seven-minute rare cooldown with alien visits,
 and cross the lake on a barge in about 127–183 seconds, depending on the
 assigned travel speed (150-second baseline). A festival owns its
@@ -28,10 +28,10 @@ below civil twilight. Rates scale these chances, capped at 100%.
 The barge also fires paired shells and an eight-shell finale while its launchers
 are still visible; its visit odds, cooldown, travel speed and duration stay unchanged.
 Woodland rows control the separate animal pool (default: 1% chance per 30 seconds).
-Clocktower visits check once per visible nighttime minute with a 2% chance at
-rate 1, about one visit per 50 active night minutes. Peter Pan, Wendy, John and
+Clocktower visits check once per UTC nighttime minute with a 2% chance at
+rate 1, about one visit per 50 UTC night minutes. Peter Pan, Wendy, John and
 Michael arrive separately, rest on the sloped roof, and depart within 50 seconds.
-Daylight cancels the visit; hidden tabs pause it. Reduced motion keeps the four
+Daylight hides the visit; hidden tabs pause painting and reconstruct current visits on return. Reduced motion keeps the four
 roof silhouettes stationary with a gentle fade. The rate scales only the rare
 start chance; it never changes their flight speed or the number of children.
 Weather rows scale episode chances, capped at 100%; durations remain unchanged.
