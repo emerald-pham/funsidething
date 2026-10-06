@@ -148,6 +148,37 @@ test('RISK context and Settings browser: touch keyboard filter counts disclosure
  }
 });
 
+test('RISK context marker browser: green checks and red exclusions retain readable symbols in both themes',
+ {skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+ const channels=color=>color.match(/[\d.]+/g).slice(0,3).map(Number);
+ const luminance=rgb=>rgb.map(v=>{v/=255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4;}).reduce((sum,v,i)=>sum+v*[.2126,.7152,.0722][i],0);
+ const failures=[];
+ for(const [name,engine] of [['chrome',chromium],['webkit',webkit]]){
+  const browser=await engine.launch({headless:true,...(name==='chrome'?{channel:'chrome'}:{})});
+  try{for(const colorScheme of ['light','dark']){
+   const context=await browser.newContext({viewport:{width:390,height:844},colorScheme,serviceWorkers:'block'});
+   try{
+    await context.addInitScript(()=>{Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});localStorage.setItem('fvp:chain-scanner:landscape-motion','reduced');});
+    await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
+    const page=await context.newPage();await page.goto(process.env.LANDSCAPE_BROWSER_URL);await page.waitForFunction(()=>typeof state!=='undefined'&&state?.contexts);
+    await page.evaluate(()=>{closeModal();document.getElementById('motionDialog')?.close();state.seenQuickStart=true;render();});
+    for(const [mode,symbol] of [['included','✓'],['excluded','✕']]){
+     if(mode==='excluded')await page.locator('#ctxPanel [data-ctx="c_errand"]').click();
+     const mark=page.locator('#ctxPanel [data-ctx="c_errand"] .ctxmark');assert.equal(await mark.innerText(),symbol);
+     const paint=await mark.evaluate(e=>({background:getComputedStyle(e).backgroundColor,ink:getComputedStyle(e).color})),rgb=channels(paint.background),fg=luminance(channels(paint.ink)),bg=luminance(rgb);
+     const contrast=(Math.max(fg,bg)+.05)/(Math.min(fg,bg)+.05);
+     if(contrast<4.5)failures.push(`${name} ${colorScheme} ${mode} symbol contrast ${contrast.toFixed(2)} must stay readable over the scenery palette`);
+     if(!(mode==='included'?rgb[1]>rgb[0]+30&&rgb[1]>rgb[2]+10:rgb[0]>rgb[1]+60&&rgb[0]>rgb[2]+40))failures.push(`${name} ${colorScheme} ${mode} needs its distinct green or red marker`);
+     await page.evaluate(()=>openSettings());await page.locator('#modalRoot summary').filter({hasText:/^Contexts$/}).click();
+     assert.equal(await page.locator('#modalRoot [data-ctx="c_errand"] .ctxmark').evaluate(e=>getComputedStyle(e).backgroundColor),paint.background,'Settings uses the same readable marker');await page.evaluate(()=>closeModal());
+    }
+   }finally{await context.close();}
+  }}finally{await browser.close();}
+ }
+ assert.deepEqual(failures,[]);
+});
+
 test('RISK context offline browser: installed shell reload retains exclusions settings tasks and completion Undo through reconnect',
  {skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
  const {chromium}=await import(process.env.LANDSCAPE_PLAYWRIGHT),browser=await chromium.launch({headless:true,channel:'chrome'}),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;

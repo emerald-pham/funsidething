@@ -529,3 +529,4 @@ The editor hook blocks app or enforcement edits while tests.js has no staged or 
 - RISK context and Settings browser: touch keyboard filter counts disclosure scrolling and saved controls work on Chrome and WebKit
 - RISK context offline browser: installed shell reload retains exclusions settings tasks and completion Undo through reconnect
 - RISK context rendering: an imported empty context ID retains its real selector state and unknown fields in Settings
+- RISK context marker browser: green checks and red exclusions retain readable symbols in both themes
