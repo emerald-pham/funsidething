@@ -514,3 +514,5 @@ The editor hook blocks app or enforcement edits while tests.js has no staged or 
 - RISK landscape colors: dawn hue stays warm
 
 - RISK list metric preference: supported older clients preserve the unknown choice and offline completion Undo keeps it intact
+
+- RISK shared scenery reduced motion: the ambient timer repaints isolated woodland arrival and expiry at the current UTC instant

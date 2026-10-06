@@ -124,6 +124,23 @@ test('RISK shared scenery runtime: every scene owner consumes the UTC snapshot w
  assert.match(serviceWorkerSource(),/"\.\/landscape-timeline\.js"/,'the deterministic scheduler is available on installed offline reloads');
 });
 
+test('RISK shared scenery reduced motion: the ambient timer repaints isolated woodland arrival and expiry at the current UTC instant',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ const functionSource=source.slice(source.indexOf('  function advanceRooftopParty('),source.indexOf('  function stop()',source.indexOf('  function advanceRooftopParty(')));
+ for(const [previous,next] of [[[],[{id:'private-woodland-arrival'}]],[[{id:'private-woodland-expiry'}],[]]]){
+  for(const reduced of [true,false]){
+   let paints=0,backgrounds=0,syncs=0;
+   const woodland={events:previous},context={document:{hidden:false},geometry:{},p:{},world:{events:[{id:'unchanged-train'}],elapsed:1},woodland,
+    rooftopParty:{active:null},clocktowerVisit:{active:null},lastCitySlot:42,sceneSnapshot:{windowsSlot:42},reduced,
+    syncScene(){syncs++;woodland.events=next;},paintBackground(){backgrounds++;},paintLife(){paints++;},Date};
+   vm.runInNewContext(functionSource+';advanceRooftopParty(1)',context);
+   assert.equal(syncs,1);assert.equal(backgrounds,0,'a woodland-only transition does not repaint the skyline');
+   assert.equal(paints,reduced?1:0,'a reduced-motion animal must arrive and retire without waiting for unrelated events or the next window slot');
+   vm.runInNewContext(functionSource+';advanceRooftopParty(1)',context);assert.equal(paints,reduced?1:0,'unchanged membership does not start animated repainting');
+  }
+ }
+});
+
 test('RISK dotted list filter: dot undot Done evergreen and dependencies classify rows without changing scanner eligibility or Chance shares',async()=>{
  const {ctx,shim}=await loadApp({seed:884});const a=ctx.addTask('Dotted'),b=ctx.addTask('Available'),dependent=ctx.addTask('Dependent'),resting=ctx.addTask('Resting');
  dependent.prerequisiteId=a.id;Object.assign(resting,{evergreen:true,evergreenHours:18,evergreenResetAtDay:false,lastDoneAt:Date.now()});
