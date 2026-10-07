@@ -1,5 +1,41 @@
 [
   {
+    "testChangesSha256": "7e6dcd8a0941f55bfcf73df53cd322e956dfa9373f2512da5c56542332132d98",
+    "reason": "User authorized a fixture repair after released-base same-weather redraws reproduced the exact candidate pixel variants. Preserve the exact accepted-backdrop weather assertion while separating unrelated independent rasterization.",
+    "previousBehavior": "Every clear/rain probe refreshed and repainted the backdrop independently; released Chrome Metal produced 29-pixel differences during identical clear-only redraws with identical logical inputs. This conflated backdrop preservation with browser rasterization stability.",
+    "intendedBehavior": "Prepare the canonical backdrop once, then execute clear and rain life paints synchronously against it, retaining exact bytes and zero background paint calls. Independent reload and resize preparations still redraw once and preserve the logical seed/UTC scene. A deliberately corrupted backdrop fails the actual browser assertion.",
+    "replacementTests": [
+      "RISK scenery rain preservation fixture: one accepted backdrop survives exact weather comparisons and detects a mutated backdrop"
+    ],
+    "preservedCoverage": [
+      "The original exact backdrop assertion, changed front pixels, nineteen shaded cloud calls, reduced-motion frame behavior and full preparation/weather performance bounds remain enforced.",
+      "Cross-device UTC logical objects, opening histories, random consumption, native seeded rain numerical geometry, reload reconstruction, independent resize redraw and page-error checks remain protected.",
+      "Full earlier 29-pixel and 10-pixel candidate captures plus released-base 49-pixel weather and 29-pixel same-weather captures remain preserved; no production renderer or privacy setting changed."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='RISK scenery rain preservation fixture:' tests.js",
+      "failure": "/tmp/chain-rain-evidence/retained-backdrop-red.log observed six background paints versus the required one before the fixture repair. Native mutation control executes the retained browser equality expression and requires its assertion failure. Released-base matrix-base-fixed independently decoded clear-only first/seventh redraws reproduce the exact original candidate hashes; original raster assertion is retained unchanged."
+    }
+  },
+  {
+    "testChangesSha256": "edb0e9ec0822b461da6ced6c0408fe0b50d146bee6e009f4b93a773a64dcfdc7",
+    "reason": "User authorized a fixture repair after released-base same-weather redraws reproduced the exact candidate pixel variants. Preserve the exact accepted-backdrop weather assertion while separating unrelated independent rasterization.",
+    "previousBehavior": "Every clear/rain probe refreshed and repainted the backdrop independently; released Chrome Metal produced 29-pixel differences during identical clear-only redraws with identical logical inputs. This conflated backdrop preservation with browser rasterization stability.",
+    "intendedBehavior": "Prepare the canonical backdrop once, then execute clear and rain life paints synchronously against it, retaining exact bytes and zero background paint calls. Independent reload and resize preparations still redraw once and preserve the logical seed/UTC scene. A deliberately corrupted backdrop fails the actual browser assertion.",
+    "replacementTests": [
+      "RISK scenery rain preservation fixture: one accepted backdrop survives exact weather comparisons and detects a mutated backdrop"
+    ],
+    "preservedCoverage": [
+      "The original exact backdrop assertion, changed front pixels, nineteen shaded cloud calls, reduced-motion frame behavior and full preparation/weather performance bounds remain enforced.",
+      "Cross-device UTC logical objects, opening histories, random consumption, native seeded rain numerical geometry, reload reconstruction, independent resize redraw and page-error checks remain protected.",
+      "Full earlier 29-pixel and 10-pixel candidate captures plus released-base 49-pixel weather and 29-pixel same-weather captures remain preserved; no production renderer or privacy setting changed."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='RISK scenery rain preservation fixture:' tests.js",
+      "failure": "/tmp/chain-rain-evidence/retained-backdrop-red.log observed six background paints versus the required one before the fixture repair. Native mutation control executes the retained browser equality expression and requires its assertion failure. Released-base matrix-base-fixed independently decoded clear-only first/seventh redraws reproduce the exact original candidate hashes; original raster assertion is retained unchanged."
+    }
+  },
+  {
     "testChangesSha256": "91673d2bb5a09431683087c4349d3b688b7b29c89df4d0b6b847527ed209b5b2",
     "reason": "User explicitly requested double rain velocity and half rain opacity in day and night, with doubled night particle density. Add numerical contracts and update only the superseded 900-particle night ceiling. User additionally requests selected-mode wording in the empty-chain notice, preserving exact first-dot algorithms. Reconcile onto exact history candidate 08bf3b2, retaining every history and lifecycle implementation, assertion and FAQ. The retained browser evidence exposed an uncontrolled stale sky palette and a conditional reload probe response. Repair only diagnostic fixture preparation; preserve every existing scenery assertion.",
     "previousBehavior": "Rain used 75–125 pixels/second with unchanged .62/.72 opacity and a maximum 900 particles in all sky phases. The empty-chain notice claimed both modes even with only one selected. sharedSceneProbe synchronized event time but retained the earlier sky palette until a late copy-file refresh; route.fetch forwarded conditional headers that can yield an empty304 source.",

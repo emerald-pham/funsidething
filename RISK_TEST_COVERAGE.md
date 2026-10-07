@@ -572,6 +572,7 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK empty-chain explanation: selected Chance and Descending views name only their mode and preserve first-dot age rules
 
 - RISK scenery browser fixture: conditional reloads retain executable probes and late sky refresh cannot change the controlled background
+- RISK scenery rain preservation fixture: one accepted backdrop survives exact weather comparisons and detects a mutated backdrop
 
 ## Migrated backup deletion safety
 

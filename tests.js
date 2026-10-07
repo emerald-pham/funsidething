@@ -631,10 +631,29 @@ test('RISK scenery browser fixture: conditional reloads retain executable probes
  const context={Date:{now:()=>instant},performance:{now:()=>paints++},S:{weatherAt:()=>({status:'clear'})},sceneSnapshot:{},world:{elapsed:0},frame:0,
   stop(){},syncScene(at){sceneInstant=at;context.sceneSnapshot={instant:at};},refreshSky(){paletteInstant=instant;},paintRainCloud(){},paintBackground(){},paintLife(){},back:{toDataURL:()=>String(paletteInstant)},front:{toDataURL:()=>String(sceneInstant)}};
  vm.runInNewContext(injection,context);
- const clear=context.sharedSceneProbe('clear');context.refreshSky();const rain=context.sharedSceneProbe('rain');
+ context.sharedScenePrepare();const clear=context.sharedSceneProbe('clear');context.refreshSky();const rain=context.sharedSceneProbe('rain');
  assert.equal(clear.back,String(instant),'the probe resolves the sky palette at the chosen clock before painting');
  assert.equal(rain.back,clear.back,'a late authored-copy sky refresh cannot alter the controlled backdrop');
  assert.deepEqual(rain.scene,clear.scene,'object timing remains identical too');
+});
+
+test('RISK scenery rain preservation fixture: one accepted backdrop survives exact weather comparisons and detects a mutated backdrop',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'tests.js'),'utf8'),start=source.indexOf("\ntest('RISK shared scenery browser:"),fragment=source.slice(start,source.indexOf("test('RISK list presentation browser:",start));
+ const injection=fragment.match(/body=body\.replace\(anchor,anchor\+`([\s\S]*?)`\)/)[1];
+ let background=0,backgroundPaints=0,lifePaints=0,mutate=false;const instant=200;
+ const context={Date:{now:()=>instant},performance:{now:()=>lifePaints},S:{weatherAt:()=>({status:'clear'})},sceneSnapshot:{},world:{elapsed:0},frame:0,
+  stop(){},syncScene(at){context.sceneSnapshot={instant:at,seed:'private-seed'};},refreshSky(){context.syncScene(instant);context.paintBackground();},
+  paintRainCloud(){},paintBackground(){backgroundPaints++;background++;},paintLife(){lifePaints++;if(mutate)background++;},back:{toDataURL:()=>String(background)},front:{toDataURL:()=>String(lifePaints)}};
+ vm.runInNewContext(injection,context);
+ const prepared=context.sharedScenePrepare?.()||context.sharedSceneProbe('clear'),clear=context.sharedSceneProbe('clear'),rain=context.sharedSceneProbe('rain');
+ assert.equal(backgroundPaints,1,'prepare one accepted backdrop rather than rerasterizing it for each weather');
+ assert.equal(prepared.backgroundPaints,1,'preparation explicitly proves the background redraw contract');
+ assert.equal(clear.backgroundPaints,0);assert.equal(rain.backgroundPaints,0,'weather paints never repaint the cached backdrop');
+ assert.equal(clear.back,prepared.back);assert.equal(rain.back,clear.back,'exact bytes remain protected');assert.deepEqual(rain.scene,clear.scene);
+ mutate=true;const corrupt=context.sharedSceneProbe('rain');
+ const preservationAssertion=fragment.match(/assert\.equal\(rain\.back,clear\.back,'accepted skyline\/hills remain unchanged by the rain painter'\);/)[0];
+ assert.throws(()=>vm.runInNewContext(preservationAssertion,{assert,rain:corrupt,clear}),/accepted skyline/,'a deliberately mutated backdrop must fail the actual browser assertion');
+ mutate=false;const redrawn=context.sharedScenePrepare();assert.equal(backgroundPaints,2,'a separate preparation really redraws the scene');assert.notEqual(redrawn.back,prepared.back,'the negative raster fixture changes every redraw');assert.deepEqual(redrawn.scene,prepared.scene,'independent redraw retains the logical seed and instant');
 });
 
 test('RISK shared scenery browser: isolated Chrome and WebKit devices reconstruct UTC objects and rain paint through reload resize and reduced motion',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
@@ -651,29 +670,38 @@ test('RISK shared scenery browser: isolated Chrome and WebKit devices reconstruc
      const headers={...route.request().headers()};delete headers['if-modified-since'];delete headers['if-none-match'];
      const response=await route.fetch({headers});assert.equal(response.status(),200,'the diagnostic route requires a complete executable response');let body=await response.text();const anchor='  resize();updateMotion();if(preference===null)openMotion();';assert.ok(body.includes(anchor));
      body=body.replace(anchor,anchor+`
+      globalThis.sharedScenePrepare=()=>{
+       const original=paintBackground;let backgroundPaints=0;paintBackground=(...args)=>{backgroundPaints++;return original(...args);};
+       const started=performance.now();
+       try{if(typeof W==='number'&&(W!==host.clientWidth||H!==host.clientHeight))resize();else refreshSky();stop();syncScene(Date.now());
+        return {scene:JSON.parse(JSON.stringify(sceneSnapshot)),backgroundPaints,paintMs:performance.now()-started,back:back.toDataURL()};
+       }finally{paintBackground=original;}
+      };
       globalThis.sharedSceneProbe=(status='clear')=>{
-       refreshSky();stop();syncScene(Date.now());const weatherAt=S.weatherAt;
+       stop();syncScene(Date.now());const weatherAt=S.weatherAt;
        S.weatherAt=()=>({status,intensity:status==='clear'?0:1,storm:status==='thunderstorm',slot:1});
-       const original=paintRainCloud;let shaded=0;paintRainCloud=(...args)=>{shaded++;return original(...args);};
-       const started=performance.now();paintBackground();paintLife(world.elapsed);const paintMs=performance.now()-started;
-       paintRainCloud=original;S.weatherAt=weatherAt;
-       return {scene:JSON.parse(JSON.stringify(sceneSnapshot)),shaded,paintMs,back:back.toDataURL(),front:front.toDataURL(),frame};
+       const original=paintRainCloud,originalBackground=paintBackground;let shaded=0,backgroundPaints=0;
+       paintRainCloud=(...args)=>{shaded++;return original(...args);};paintBackground=(...args)=>{backgroundPaints++;return originalBackground(...args);};
+       const started=performance.now();
+       try{paintLife(world.elapsed);
+        return {scene:JSON.parse(JSON.stringify(sceneSnapshot)),shaded,backgroundPaints,paintMs:performance.now()-started,back:back.toDataURL(),front:front.toDataURL(),frame};
+       }finally{paintRainCloud=original;paintBackground=originalBackground;S.weatherAt=weatherAt;}
       };
      `);await route.fulfill({response,body});
     });
     await page.goto(process.env.LANDSCAPE_BROWSER_URL);await page.waitForFunction(()=>typeof sharedSceneProbe==='function');
     await page.evaluate(()=>{document.getElementById('motionDialog')?.close();closeModal();document.documentElement.classList.add('viewing-scene');document.querySelector('.wrap').inert=true;});
     await page.evaluate(()=>{for(let i=0;i<1000;i++)Math.random();});await page.clock.setFixedTime(instant);
-    const clear=await page.evaluate(()=>sharedSceneProbe('clear'));
+    const {prepared,clear,rain}=await page.evaluate(()=>{const prepared=sharedScenePrepare(),clear=sharedSceneProbe('clear'),rain=sharedSceneProbe('rain');return {prepared,clear,rain};});
+    assert.equal(prepared.backgroundPaints,1,'preparation redraws the accepted seeded scene exactly once');assert.equal(clear.backgroundPaints,0);assert.equal(rain.backgroundPaints,0);assert.equal(clear.back,prepared.back,'clear weather also preserves the accepted backdrop exactly');assert.deepEqual(prepared.scene,clear.scene);assert.ok(prepared.paintMs<500,'a complete prepared scene paint remains bounded');
     if(!expected)expected=clear.scene;else assert.deepEqual(clear.scene,expected,'device zone viewport open time and motion preference select the same UTC scene');
     assert.equal(clear.shaded,0,'clear daytime-style clouds retain the ordinary painter');
-    const rain=await page.evaluate(()=>sharedSceneProbe('rain'));
     assert.equal(rain.shaded,19,'all seven persistent clouds and both six-cloud weather/reflection passes use the same shaded painter');
     assert.notEqual(rain.front,clear.front,'the composed cloud/rain canvas actually changes');assert.equal(rain.back,clear.back,'accepted skyline/hills remain unchanged by the rain painter');
     assert.ok(rain.paintMs<500,'a complete diagnostic scene paint remains bounded');assert.equal(rain.frame,0,'a stopped/reduced diagnostic has no frame loop');
     if(process.env.SCENE_EVIDENCE_DIR){await page.locator('#landscape').screenshot({path:path.join(process.env.SCENE_EVIDENCE_DIR,`${engine===chromium?'chrome':'webkit'}-${width}x${height}-rain.png`)});await page.evaluate(()=>sharedSceneProbe('clear'));await page.locator('#landscape').screenshot({path:path.join(process.env.SCENE_EVIDENCE_DIR,`${engine===chromium?'chrome':'webkit'}-${width}x${height}-clear.png`)});}
-    await page.reload();await page.waitForFunction(()=>typeof sharedSceneProbe==='function');assert.deepEqual((await page.evaluate(()=>sharedSceneProbe())).scene,expected,'an interrupted/reloaded page reconstructs the exact instant');
-    await page.setViewportSize({width:width+31,height:height+19});assert.deepEqual((await page.evaluate(()=>sharedSceneProbe())).scene,expected,'resize cannot consume event random draws');
+    await page.reload();await page.waitForFunction(()=>typeof sharedSceneProbe==='function');assert.deepEqual((await page.evaluate(()=>{const prepared=sharedScenePrepare();if(prepared.backgroundPaints!==1)throw Error('expected one independent background redraw');return sharedSceneProbe();})).scene,expected,'an interrupted/reloaded page reconstructs the exact instant');
+    await page.setViewportSize({width:width+31,height:height+19});assert.deepEqual((await page.evaluate(()=>{const prepared=sharedScenePrepare();if(prepared.backgroundPaints!==1)throw Error('expected one independent background redraw');return sharedSceneProbe();})).scene,expected,'resize cannot consume event random draws');
     assert.deepEqual(errors,[]);await page.close();
    }
   }finally{await browser.close();}
