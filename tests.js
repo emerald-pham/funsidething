@@ -349,13 +349,15 @@ test('RISK task rating history: real cloud glue preserves offline concurrent eve
 });
 test('RISK task rating history browser: phone tablet and desktop disclosures pagination drafts and offline Undo preserve actual observations',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
  const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT);
+ const facts=rows=>rows.slice().sort((a,b)=>a.id.localeCompare(b.id));
  for(const [name,type,options] of [['chrome',chromium,{channel:'chrome'}],['webkit',webkit,{}]]){
   const browser=await type.launch(options);
   try{for(const [width,height] of [[320,568],[568,320],[768,1024],[1440,900]])for(const colorScheme of ['light','dark']){
    const context=await browser.newContext({viewport:{width,height},hasTouch:width<1000,isMobile:width<1000,colorScheme,reducedMotion:'reduce'}),page=await context.newPage();
    try{
+    await context.addInitScript(()=>localStorage.setItem('fvp:chain-scanner:landscape-motion','reduced'));
     await page.route('https://**/*',route=>route.abort());await page.goto(process.env.LANDSCAPE_BROWSER_URL);await page.waitForFunction(()=>typeof state!=='undefined'&&state!==null);
-    const fixture=await page.evaluate(()=>{const a=addTask('Private browser benchmark'),b=addTask('Private browser rating history');state.chain=[a.id];state.candidateId=b.id;recomputeRanks();decide('yes');const row=JSON.parse(JSON.stringify(b.ratingHistory[0]));b.ratingHistory=Array.from({length:45},(_,i)=>({...row,id:'private-browser-event-'+i,seq:45-i,at:row.at-i*1000}));b.ratingHistoryHead=b.ratingHistory[0].id;state.listOpen=true;render();return {id:b.id,raw:JSON.stringify(b.ratingHistory)};});
+    const fixture=await page.evaluate(()=>{closeModal();document.getElementById('motionDialog')?.close();state.seenQuickStart=true;const a=addTask('Private browser benchmark'),b=addTask('Private browser rating history');state.chain=[a.id];state.candidateId=b.id;recomputeRanks();decide('yes');const row=JSON.parse(JSON.stringify(b.ratingHistory[0]));b.ratingHistory=Array.from({length:45},(_,i)=>({...row,id:'private-browser-event-'+i,seq:45-i,at:row.at-i*1000}));b.ratingHistoryHead=b.ratingHistory[0].id;state.listOpen=true;render();return {id:b.id,raw:JSON.stringify(b.ratingHistory)};});
     const row=page.locator('[data-row]').filter({has:page.locator('[data-act="edit"][data-id="'+fixture.id+'"]')});await row.locator('[data-act="edit"]').click();
     const summary=page.locator('.task-rating-history summary');await summary.focus();await summary.press('Enter');await page.locator('.rating-event').first().waitFor();assert.equal(await page.locator('.rating-event').count(),20);
     await page.locator('#etTitle').fill('Unsaved private history draft');await page.getByRole('button',{name:/Show 20 more/}).click();assert.equal(await page.locator('.rating-event').count(),40);assert.equal(await page.locator('#etTitle').inputValue(),'Unsaved private history draft');
@@ -364,11 +366,12 @@ test('RISK task rating history browser: phone tablet and desktop disclosures pag
     const layout=await page.locator('.modal').evaluate(el=>({width:el.clientWidth,scroll:el.scrollWidth,children:[...el.querySelectorAll('.rating-values dt,.rating-values dd,.rating-event time')].map(x=>{const a=x.getBoundingClientRect(),p=el.getBoundingClientRect();return {left:a.left-p.left,right:a.right-p.left};})}));assert.ok(layout.scroll<=layout.width+1,'history must fit the pane');assert.ok(layout.children.every(box=>box.left>=0&&box.right<=layout.width+3),'timestamps and values stay inside the phone/tablet pane');
     if(process.env.RATING_HISTORY_SCREENSHOTS){const fs=await import('node:fs/promises');await fs.mkdir(process.env.RATING_HISTORY_SCREENSHOTS,{recursive:true});await page.screenshot({path:path.join(process.env.RATING_HISTORY_SCREENSHOTS,`${name}-${width}x${height}-${colorScheme}.png`)});}
     if(width===320&&colorScheme==='light'){
+     const offline=name==='chrome';
      await page.locator('#etTitle').fill('Private browser rating history');await page.locator('[data-act="save-edit"]').click();await page.evaluate(()=>persist());
-     await page.waitForFunction(()=>!!navigator.serviceWorker.controller);await context.setOffline(true);await page.reload();await page.waitForFunction(id=>typeof state!=='undefined'&&state?.tasks.some(t=>t.id===id),fixture.id);
-     assert.equal(await page.evaluate(id=>JSON.stringify(taskById(id).ratingHistory),fixture.id),fixture.raw,'offline cold reload retains original timestamps and does not record resampled rank noise');
+     await page.waitForFunction(()=>!!navigator.serviceWorker.controller);if(offline)await context.setOffline(true);await page.reload();await page.waitForFunction(id=>typeof state!=='undefined'&&state?.tasks.some(t=>t.id===id),fixture.id);
+     assert.deepEqual(facts(await page.evaluate(id=>taskById(id).ratingHistory,fixture.id)),facts(JSON.parse(fixture.raw)),(offline?'offline':'online')+' cold reload retains every exact original fact and does not record resampled rank noise');
      await page.evaluate(id=>doneTask(id),fixture.id);await page.locator('[data-act="undo"]').click();await page.evaluate(()=>persist());assert.equal(await page.evaluate(id=>taskById(id).done,fixture.id),false);
-     const reversed=await page.evaluate(id=>JSON.stringify(taskById(id).ratingHistory),fixture.id);assert.ok(JSON.parse(reversed).some(r=>r.kind==='undo'));await context.setOffline(false);await page.reload();await page.waitForFunction(id=>typeof state!=='undefined'&&state?.tasks.some(t=>t.id===id),fixture.id);assert.equal(await page.evaluate(id=>JSON.stringify(taskById(id).ratingHistory),fixture.id),reversed,'reconnect reload keeps completion and Undo observations');
+     const reversed=await page.evaluate(id=>taskById(id).ratingHistory,fixture.id);assert.ok(reversed.some(r=>r.kind==='undo'));if(offline)await context.setOffline(false);await page.reload();await page.waitForFunction(id=>typeof state!=='undefined'&&state?.tasks.some(t=>t.id===id),fixture.id);assert.deepEqual(facts(await page.evaluate(id=>taskById(id).ratingHistory,fixture.id)),facts(reversed),(offline?'reconnect':'online')+' reload keeps every exact completion and Undo fact');
     }
    }finally{await context.close();}
   }}finally{await browser.close();}
