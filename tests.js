@@ -286,6 +286,27 @@ test('RISK task rating history: malformed and future records remain recoverable 
  ctx.openEdit(b.id);const view=shim.document.getElementById('modalRoot').innerHTML;assert.doesNotMatch(view,/<img src=x/);assert.match(view,/4 unrecognized history items/);
  b.ratingHistory={v:99,data:'kept'};ctx.openEdit(b.id);assert.match(shim.document.getElementById('modalRoot').innerHTML,/cannot append/i);assert.deepEqual(ratingHistoryCopy(b.ratingHistory),{v:99,data:'kept'});
 });
+test('RISK task rating history: a Dot interval edit that renews rest records saved eligibility without inventing a comparison',async(t)=>{
+ for(const mode of ['chance','descending'])await t.test(mode,async()=>{
+  const app=await modeLifecycleApp(),{ctx}=app,anchor=ctx.addTask('Private anchor'),task=ctx.addTask('Private expired recurring task');
+  Object.assign(task,{evergreen:true,evergreenHours:1,evergreenResetAtDay:false,lastDoneAt:MODE_LIFECYCLE_NOW-2*HOUR});
+  ctx.startScan(mode);assert.equal(ctx.benchmark().id,anchor.id);assert.equal(ctx.chanceDisplayStats().get(task.id).available,true);
+  const ratings=JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma])),before=JSON.parse(JSON.stringify(ctx.state)),undos=vm.runInContext('undoStack.length',ctx);
+  modeLifecycleEdit(app,task,{hours:18,title:'Private renewed recurring task'});ctx.onAction('dot-task',{dataset:{id:task.id}});
+  assert.equal(task.title,'Private renewed recurring task');assert.equal(task.evergreenHours,18);assert.equal(ctx.benchmark().id,anchor.id);
+  assert.equal(JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma])),ratings,'the saved edit does not teach a discarded Dot');
+  assert.equal(task.ratingHistory?.length,1,'the actual interval and eligibility change still needs its saved observation');
+  const row=ratingHistoryCopy(task.ratingHistory[0]);assert.equal(row.kind,'edit');assert.equal(row.change,'relative');assert.equal(row.at,MODE_LIFECYCLE_NOW);
+  assert.equal(row.before.eligible,true);assert.equal(row.after.eligible,false);assert.equal(row.after.likelihood,0);assert.equal(row.before.mu,row.after.mu);assert.equal(row.before.sigma,row.after.sigma);
+  assert.equal(anchor.ratingHistory,undefined,'there was no benchmark comparison to record');assert.equal(vm.runInContext('undoStack.length',ctx),undos+1,'saving the interval retains one-gesture Undo');
+  assert.equal(await ctx.persist(),true);const reload=await loadApp({seedStorage:{[SYNC_STORE_KEY]:app.shim.localStorage.getItem(SYNC_STORE_KEY)}});
+  assert.ok(ratingHistoryTask(reload.ctx,task.id).ratingHistory.some(r=>JSON.stringify(r)===JSON.stringify(row)),'reload preserves the actual original event and timestamp');
+  setFakeTime(ctx,MODE_LIFECYCLE_NOW+1000);ctx.undo();const restored=ratingHistoryTask(ctx,task.id);
+  assert.equal(restored.title,before.tasks.find(t=>t.id===task.id).title);assert.equal(restored.evergreenHours,1);assert.equal(ctx.chanceDisplayStats().get(task.id).available,true);
+  assert.equal(JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma])),ratings);assert.ok(restored.ratingHistory.some(r=>JSON.stringify(r)===JSON.stringify(row)));
+  assert.equal(restored.ratingHistory.at(-1).kind,'undo');assert.equal(restored.ratingHistory.at(-1).change,'relative');assert.equal(restored.ratingHistory.at(-1).before.eligible,false);assert.equal(restored.ratingHistory.at(-1).after.eligible,true);
+ });
+});
 test('RISK task rating history: Undo records evergreen interval and day-reset eligibility reversals without changing MMR',async(t)=>{
  for(const field of ['evergreenHours','evergreenResetAtDay'])await t.test(field,async()=>{
   const {ctx,shim,b}=await ratingHistoryFixture(627);b.evergreen=true;b.evergreenHours=18;b.evergreenResetAtDay=false;b.lastDoneAt=vm.runInContext('Date.now()',ctx)-2*3600000;
