@@ -565,3 +565,5 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK task rating history: Undo records evergreen interval and day-reset eligibility reversals without changing MMR
 
 - RISK task rating history: a Dot interval edit that renews rest records saved eligibility without inventing a comparison
+
+- RISK task rating history: immutable fact union and observation fingerprints are independent of device locale

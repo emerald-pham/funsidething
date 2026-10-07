@@ -252,6 +252,22 @@ test('RISK task rating history: concurrent offline and older missing-field copie
  const older=ratingHistoryCopy(base);h.ctx.mergeUndeletedTasks(older,l);assert.deepEqual(rows(older),facts,'an older task that lacks the field cannot erase it');
  assert.deepEqual(facts.map(row=>row.at).sort(),[Date.parse('2026-10-05T01:02:03Z'),Date.parse('2026-10-06T12:34:56.789Z')].sort(),'device clock skew does not rewrite original event times');
 });
+test('RISK task rating history: immutable fact union and observation fingerprints are independent of device locale',async(t)=>{
+ const localized=async language=>{const app=await ratingHistoryFixture(631);vm.runInContext('String.prototype.localeCompare=function(other){return new Intl.Collator('+JSON.stringify(language)+').compare(String(this),String(other));}',app.ctx);return app;};
+ await t.test('immutable fact union',async()=>{
+  const english=await localized('en'),swedish=await localized('sv'),rows=[{v:78,raw:'Å'},{v:78,raw:'Z'}],source={ratingHistory:ratingHistoryCopy(rows)};
+  const left={ratingHistory:ratingHistoryCopy(rows)},right={ratingHistory:ratingHistoryCopy(rows)};
+  english.ctx.mergeTaskRatingHistory(left,source);swedish.ctx.mergeTaskRatingHistory(right,source);
+  assert.deepEqual(ratingHistoryCopy(left.ratingHistory),ratingHistoryCopy(right.ratingHistory),'identical immutable facts need one canonical persisted order across device locales');
+  const canonical=ratingHistoryCopy(left.ratingHistory);assert.equal(swedish.ctx.mergeTaskRatingHistory(left,source),false);assert.equal(english.ctx.mergeTaskRatingHistory(left,source),false,'alternating replay must not rewrite only the array order');
+  assert.deepEqual(ratingHistoryCopy(left.ratingHistory),canonical);assert.equal(left.ratingHistory.length,rows.length);assert.deepEqual(ratingHistoryCopy(left.ratingHistory).map(row=>row.raw).sort(),rows.map(row=>row.raw).sort(),'unsupported Unicode facts remain exact');
+ });
+ await t.test('observation input fingerprint',async()=>{
+  const bases=[];for(const language of ['en','sv']){const {ctx,a,b,c}=await localized(language);a.id='Å';b.id='Z';c.id='Ω';ctx.state.chain=[a.id];ctx.state.candidateId=b.id;ctx.recomputeRanks();bases.push(ctx.ratingObservationBasis(ctx.chanceDisplayStats()));}
+  assert.equal(bases[0],bases[1],'the same task IDs ratings and eligibility must not look changed solely because the device locale differs');
+ });
+ await t.test('extended FAQ',async()=>{const {ctx,shim}=await localized('en');ctx.openHelp();assert.match(shim.document.getElementById('modalRoot').innerHTML,/without replay duplicates or dependence on device language/);});
+});
 test('RISK task rating history: legacy import restore export deletion and unknown future facts preserve recorded evidence',async()=>{
  const {ctx,a,b}=await ratingHistoryFixture(618),old=ratingHistoryCopy(ctx.state);ctx.decide('yes');const recorded=ratingHistoryCopy(b.ratingHistory);
  const future={v:77,id:'future-private-event',at:1234,extra:{opaque:['kept','verbatim']}};b.ratingHistory.push(future);b.ratingHistory[0].futureField={x:'kept'};b.futureTaskField={y:8};
