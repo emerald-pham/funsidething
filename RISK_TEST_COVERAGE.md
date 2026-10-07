@@ -611,3 +611,4 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - `RISK Squared Weighting migration durability: old default is marked for device/cloud repair and later Chance is not` — quadratic math, saved mode and preserved eligibility/data contracts.
 - `RISK Squared Weighting preserves original Chance: frozen ordering and recorded model likelihood stay proportional to raw weights` — quadratic math, saved mode and preserved eligibility/data contracts.
 - `RISK Squared Weighting sync: explicit old mode survives concurrent clients offline reload reconnect completion and Undo` — quadratic math, saved mode and preserved eligibility/data contracts.
+- `RISK Squared Weighting joins: newly eligible tasks share one frozen scale regardless of input ordering` — joined tasks use one common scale and rendering remains read-only.

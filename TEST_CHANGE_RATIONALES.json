@@ -1,6 +1,6 @@
 [
   {
-    "testChangesSha256": "6190011ce9bb95a91fcbdd4873d68f821d9ba5222a24cdec2ee8f62ef09a526e",
+    "testChangesSha256": "8000ec374236c6929a6dd9e6316b33734c37c243743b57cb3d959759415b4f05",
     "reason": "User requested a third quadratic scanning mode, its actual normalized percentages, and a once-only migration of the old Chance default while preserving later explicit choices.",
     "previousBehavior": "Only Chance and Descending were accepted; new and invalid settings selected Chance; squaredPercentageWeight was absent and original shares stayed linear.",
     "intendedBehavior": "Squared Weighting uses full precision quadratic relative weights with frozen seeded order; old Chance defaults migrate once, nondefaults and post-rollout choices persist. Original Chance, TrueSkill and recorded model likelihood remain protected.",
@@ -12,7 +12,8 @@
       "RISK Squared Weighting numerical pools: tiny weights normalize without all-zero underflow and ineligible tasks stay zero",
       "RISK Squared Weighting migration durability: old default is marked for device/cloud repair and later Chance is not",
       "RISK Squared Weighting preserves original Chance: frozen ordering and recorded model likelihood stay proportional to raw weights",
-      "RISK Squared Weighting sync: explicit old mode survives concurrent clients offline reload reconnect completion and Undo"
+      "RISK Squared Weighting sync: explicit old mode survives concurrent clients offline reload reconnect completion and Undo",
+      "RISK Squared Weighting joins: newly eligible tasks share one frozen scale regardless of input ordering"
     ],
     "preservedCoverage": [
       "All existing rating, eligibility, completion, storage, history, cloud revision, offline and Undo assertions are retained. Quick start and default expectations change only for the user-authorized third-mode rollout.",
@@ -20,7 +21,7 @@
     ],
     "redEvidence": {
       "command": "node --test --test-name-pattern='RISK Squared Weighting' tests.js; node --test tests.js",
-      "failure": "Observed /tmp/squared-red.txt (missing squaredPercentageWeight and rejected squared preference), /tmp/squared-default-red.txt (Chance fresh default), /tmp/squared-migration-red.txt (old default not migrated), /tmp/squared-preservation-red.txt (migration repair false and squared history likelihood). Initial full suite also discriminated changed Quick start text and candidateOrder byte contract. Expanded sync coverage was added after implementation and passed once an inconsistent fixture was corrected; it is preservation evidence, not a claimed preimplementation red."
+      "failure": "Observed /tmp/squared-red.txt (missing squaredPercentageWeight and rejected squared preference), /tmp/squared-default-red.txt (Chance fresh default), /tmp/squared-migration-red.txt (old default not migrated), /tmp/squared-preservation-red.txt (migration repair false and squared history likelihood). Initial full suite also discriminated changed Quick start text and candidateOrder byte contract. Expanded sync coverage was added after implementation and passed once an inconsistent fixture was corrected; it is preservation evidence, not a claimed preimplementation red. New join regression /tmp/squared-join-red.txt observed 112.074 versus 5.534 for an already scored key before the join-scale repair. Expanded sync regression later discriminated the released base in /tmp/squared-sync-baseline-red.txt (Chance versus Squared); this retrospective check does not establish preimplementation chronology."
     }
   },
   {

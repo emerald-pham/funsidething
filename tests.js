@@ -20659,7 +20659,7 @@ test('RISK overall Chance shares: full eligible weights retain scanned and chain
  ctx.resetChance();ctx.state.chance.weights[a.id]=.25;ctx.state.chance.weights[b.id]=.75;
  const before=JSON.stringify(ctx.state),order=ctx.candidateOrder(ctx.pool()).map(t=>t.id);
 
- const unchangedAlgorithms={"updatePair":"a31c20a18454d735731d5e02bdf0767292e790a992725d7d35b02380cbf2568b","pBeats":"6003c75326298698b27f2ae691bed18928d6f96396da30ca9113a34463d3a3d9","chanceWeight":"96381985597245b65e9d26fa410c13ac801ce6a618e76665f69d049cc9485582","chanceHash":"012f3e461e84956335324e12c2646860bc6ed68ac31456dfb0d9bb231c0d4947","resetChance":"36f9f2a46730bc3e3bb068bea2b07d57d29c8cadf8184b9914733f2bfcc90b1a","chanceScore":"b033af5b0cbae63742983121a674ecd99aceabead078d6c7d8067bd3bf49c38f","candidateOrder":"65599f6ca97b9392e34352c4e876b305ca2f77c9f895c4fbb5440d87b7de06c8","chancePick":"d2a64e3f4e9a8431dc5439b5945f651f66521f4674aec6ef1b321bb4c1b8bf10","oldestFirst":"da6def7759fd3997881fa299c8b92324d49217c9534381d5c3c3be750d6d46aa"};
+ const unchangedAlgorithms={"updatePair":"a31c20a18454d735731d5e02bdf0767292e790a992725d7d35b02380cbf2568b","pBeats":"6003c75326298698b27f2ae691bed18928d6f96396da30ca9113a34463d3a3d9","chanceWeight":"96381985597245b65e9d26fa410c13ac801ce6a618e76665f69d049cc9485582","chanceHash":"012f3e461e84956335324e12c2646860bc6ed68ac31456dfb0d9bb231c0d4947","resetChance":"36f9f2a46730bc3e3bb068bea2b07d57d29c8cadf8184b9914733f2bfcc90b1a","chanceScore":"b033af5b0cbae63742983121a674ecd99aceabead078d6c7d8067bd3bf49c38f","candidateOrder":"e5186892a1025b57548b9bcf9e9ed232a54e30905d97a225968e6e2db6e561fd","chancePick":"d2a64e3f4e9a8431dc5439b5945f651f66521f4674aec6ef1b321bb4c1b8bf10","oldestFirst":"da6def7759fd3997881fa299c8b92324d49217c9534381d5c3c3be750d6d46aa"};
  for(const [name,expected] of Object.entries(unchangedAlgorithms)){const start=html.indexOf("function "+name+"("),end=html.indexOf("\nfunction ",start+1);assert.equal(createHash("sha256").update(html.slice(start,end)).digest("hex"),expected,name+" selection and rating code stays byte-exact");}
  const stats=ctx.chanceDisplayStats();for(const task of [bench,a,b])assert.ok(Math.abs(stats.get(task.id).probability-1/3)<1e-12,'equal current ratings share the full eligible set, including the chain');
  assert.equal(ctx.taskSelectionSummary(a,stats).label,'33.33% overall');
@@ -21742,4 +21742,16 @@ test('RISK Squared Weighting sync: explicit old mode survives concurrent clients
  offline.ctx.onAction('cand-done',{dataset:{candidate:candidateId,benchmark:benchId}});await syncSettle(160);
  assert.equal(h.remoteState().tasks.find(t=>t.id===candidateId).done,true);
  offline.ctx.undo();await syncSettle(160);assert.equal(offline.ctx.state.tasks.find(t=>t.id===candidateId).done,false);
+});
+
+
+test('RISK Squared Weighting joins: newly eligible tasks share one frozen scale regardless of input ordering',async()=>{
+ const {ctx}=await loadApp({seed:947});const a=ctx.addTask('A'),b=ctx.addTask('B');ctx.state.scanMode='squared';ctx.chanceWeight=t=>t.id===a.id?.1:t.id===b.id?.2:.9;ctx.resetChance();
+ const fresh=ctx.addTask('Join');delete ctx.state.chance.weights[fresh.id];const seed=ctx.state.chance.seed;
+ const expected=[a,b,fresh].sort((x,y)=>{const score=t=>-Math.log((ctx.chanceHash(seed+':'+t.id)+.5)/4294967296)/((ctx.chanceWeight(t)/.9)**2);return score(x)-score(y);}).map(t=>t.id);
+ const originalWeights=JSON.stringify(ctx.state.chance.weights),stats=ctx.chanceDisplayStats();assert.equal(JSON.stringify(ctx.state.chance.weights),originalWeights,'display cannot lazily rewrite the frozen pass');
+ assert.deepEqual(Array.from(ctx.candidateOrder([a,b,fresh]),t=>t.id),expected);
+ assert.equal(stats.get(fresh.id).passFallback,false,'a positive frozen-field join is not falsely labeled fallback');
+ const scores=[a,b,fresh].map(t=>ctx.squaredScore(t));delete ctx.state.chance.weights[fresh.id];const beforeJoin=ctx.squaredScore(a);ctx.squaredScore(fresh);assert.equal(ctx.squaredScore(a),beforeJoin,'one late join cannot change previously scored keys');const other=[fresh,b,a].map(t=>ctx.squaredScore(t));
+ assert.deepEqual(other.slice().reverse(),scores,'a new weight cannot change the scale midway through one ordering');
 });
