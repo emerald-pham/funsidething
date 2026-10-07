@@ -21526,3 +21526,125 @@ test('RISK fireworks ascent paint: only the launch trail glows while explosion p
   if(kind==='spark'){assert.equal(heads[0].alpha,.8*.12);assert.equal(heads[1].alpha,.8);assert.deepEqual(heads.map(h=>h.args.slice(0,4)),[[10,20,2.3,2.3],[10,20,1,1]]);}
  }
 });
+
+const PRIVATE_EXPIRY_NOW=+new Date(2026,9,7,0,1),PRIVATE_EXPIRY_OLD='2026-09-30';
+async function privateLegacyExpiryFixture({packed=false,protectedIds=[],makeRows=null}={}){
+ const {indexedDB}=await import('fake-indexeddb'),dbName='chain-scanner-legacy-expiry-'+Date.now()+'-'+Math.random();
+ const task={...syncTask('private-expiry-board','Private retained board'),futureHistory:{facts:['😀',{unknown:true}]}};
+ const raw=JSON.stringify(syncState({tasks:[task],mode:'work',protectedBackupIds:protectedIds,futureData:{keep:'exact board facts'}}));
+ const row=(id,kind='daily',day=PRIVATE_EXPIRY_OLD,extra={})=>({id,day,at:PRIVATE_EXPIRY_NOW-60*1000,kind,payload:raw,...extra});
+ const rows=makeRows?makeRows(row,raw):[row('private-expired'),row('private-manual','manual'),row('private-unknown','future-recovery')];
+ // An existing daily row prevents the released boot-time daily write from
+ // rotating a readable fixture before the successful save under test.
+ rows.push(row('private-today-daily','daily','2026-10-07'));
+ const plain='[ '+rows.map(item=>JSON.stringify(item)).join(' ,\n ')+' ]',storage=sharedScannerStorage({[LOCAL_HEAD_KEY]:raw,[SYNC_STORE_KEY]:raw,[LOCAL_BACKUPS_KEY]:plain});
+ const loaded=await loadApp({sharedStorage:storage,indexedDBProvider:indexedDB,deviceDbName:dbName,beforeStateReady:ctx=>setFakeTime(ctx,PRIVATE_EXPIRY_NOW)});
+ setFakeTime(loaded.ctx,PRIVATE_EXPIRY_NOW);const store=loaded.shim.window.ScannerDeviceStore;
+ assert.equal(loaded.ctx.deviceStorageActive(),true);if(packed)storage.setItem(LOCAL_BACKUPS_KEY,loaded.ctx.packBackupIndex(plain));
+ const index=storage.getItem(LOCAL_BACKUPS_KEY),archives=JSON.stringify(await store.listOpaqueArchives());
+ assert.ok(loaded.ctx.parseBackupIndex(index).some(item=>item.id.startsWith('private-expired')),'fixture retains an expired automatic entry before the save under test');
+ return {...loaded,indexedDB,dbName,storage,store,row,rows,raw,plain,index,archives};
+}
+function privateExpiryLegacyRows(f){return f.ctx.parseBackupIndex(f.storage.getItem(LOCAL_BACKUPS_KEY));}
+async function privateExpirySave(f){f.ctx.state.tasks[0].title+=' saved';return f.ctx.persist();}
+async function privateExpiryAssertCurrentBoard(f){assert.equal((await f.store.readHead()).payload,JSON.stringify(f.ctx.state));assert.deepEqual(f.ctx.state.tasks[0].futureHistory,{facts:['😀',{unknown:true}]});}
+
+// The retention contract removes active legacy entries; the opaque migration
+// archive remains separate, immutable recovery evidence rather than live history.
+test('RISK legacy automatic expiry: a successful save rotates both active stores by seven local calendar days and preserves exact neighbor bytes',async()=>{
+ for(const packed of [false,true]){const f=await privateLegacyExpiryFixture({packed,makeRows:row=>[
+  ...['daily','latest','before-restore','before-cloud-adoption','cloud-merged'].map(kind=>row('private-expired-'+kind,kind)),
+  ...['daily','latest','before-restore','before-cloud-adoption','cloud-merged'].map(kind=>row('private-current-'+kind,kind,'2026-10-01')),
+  row('private-manual','manual'),row('private-unknown','future-recovery'),row('private-unreadable','daily',PRIVATE_EXPIRY_OLD,{payload:'unreadable old recovery 😀'})]});try{
+  assert.equal(f.ctx.oldestBackupDay(),'2026-10-01');assert.ok(PRIVATE_EXPIRY_NOW-f.rows[0].at<7*24*3600000,'calendar expiry is independent of the elapsed timestamp age');
+  f.ctx.openSettings();assert.equal(f.storage.getItem(LOCAL_BACKUPS_KEY),f.index,'opening Settings and migration never purge recovery copies');
+  assert.equal(await privateExpirySave(f),true);const legacy=privateExpiryLegacyRows(f);
+  assert.ok(!legacy.some(row=>row.id.startsWith('private-expired-')),'recognized expired automatic entries leave the physical legacy index after a successful rotation');
+  assert.ok(!(await f.store.listBackups()).some(row=>row.id.startsWith('private-expired-')),'the already-established durable rotation remains intact');
+  const text=f.ctx.unpackBackupIndex(f.storage.getItem(LOCAL_BACKUPS_KEY));for(const row of f.rows.filter(row=>!row.id.startsWith('private-expired-')))assert.ok(text.includes(JSON.stringify(row)),'every retained row keeps its lexical bytes, payload and unknown metadata');
+  assert.equal(f.ctx.packedBackupIndex(f.storage.getItem(LOCAL_BACKUPS_KEY)),packed);assert.equal(f.storage.getItem(LOCAL_HEAD_KEY),f.raw);assert.equal(f.storage.getItem(SYNC_STORE_KEY),f.raw,'old primary shells remain recovery data');
+  assert.equal(JSON.stringify(await f.store.listOpaqueArchives()),f.archives,'migration recovery archives are not active backup lists and remain intact');await privateExpiryAssertCurrentBoard(f);
+ }finally{await f.store.close();}}
+});
+
+test('RISK legacy automatic expiry safety: manual recovery unknown unreadable malformed ambiguous and pinned copies survive rotation',async()=>{
+ const f=await privateLegacyExpiryFixture({protectedIds:['private-state-pin'],makeRows:row=>[
+  row('private-expired'),...['manual','before-account-switch','before-cloud-local-edit','stale-tab-draft','other-browser-copy','future-recovery'].map(kind=>row('private-keep-'+kind,kind)),
+  ...['state','legacy','restore','adoption','argument','durable-manual'].map(kind=>row('private-'+kind+'-pin')),
+  row('private-unreadable','daily',PRIVATE_EXPIRY_OLD,{payload:'bad recovery'}),row('private-invalid-day','daily','2026-02-30'),row('private-noncalendar-day','daily','old'),
+  row('private-ambiguous'),row('private-ambiguous','daily',PRIVATE_EXPIRY_OLD,{futureData:{distinct:true}})]});try{
+  const old=JSON.parse(f.raw);old.protectedBackupIds.push('private-legacy-pin');f.storage.setItem(LOCAL_HEAD_KEY,JSON.stringify(old));f.storage.setItem(SYNC_STORE_KEY,JSON.stringify(old));
+  vm.runInContext("pendingRestoreSafetyIds.set('private-restore-pin','private protected board');adoptedSafety={backupId:'private-adoption-pin'}",f.ctx);
+  assert.equal(await f.store.updateBackupKind('private-durable-manual-pin',f.raw,'manual'),true);await f.ctx.refreshDeviceBackupCache();
+  assert.equal(await f.ctx.persist(false,'private-argument-pin'),true);const rows=privateExpiryLegacyRows(f);
+  assert.ok(!rows.some(row=>row.id==='private-expired'),'ordinary expiry happens while every explicit safety exception remains');
+  for(const row of f.rows.filter(row=>row.id!=='private-expired'))assert.ok(rows.some(other=>JSON.stringify(other)===JSON.stringify(row)),row.id+' remains exact recovery data');
+  assert.equal(rows.filter(row=>row.id==='private-ambiguous').length,2);await privateExpiryAssertCurrentBoard(f);
+ }finally{await f.store.close();}
+});
+
+test('RISK legacy automatic expiry races: peer index appends and a newer pinned durable head defer cleanup until a fresh successful save',async()=>{
+ for(const race of ['legacy-index','durable-head']){const f=await privateLegacyExpiryFixture();try{
+  const original=f.store.commitHead.bind(f.store);let armed=true,peerIndex=null;
+  f.store.commitHead=async options=>{const result=await original(options);if(result.ok&&armed){armed=false;if(race==='legacy-index'){peerIndex=JSON.stringify([...privateExpiryLegacyRows(f),f.row('private-peer-manual','manual')]);f.storage.setItem(LOCAL_BACKUPS_KEY,peerIndex);}else{const head=await f.store.readHead(),peer=JSON.parse(head.payload);peer.protectedBackupIds=['private-expired'];await original({expectedHash:head.hash,payload:JSON.stringify(peer)});}}return result;};
+  assert.equal(await privateExpirySave(f),true);assert.ok(privateExpiryLegacyRows(f).some(row=>row.id==='private-expired'),'stale source/head observations never authorize cleanup');
+  if(peerIndex)assert.equal(f.storage.getItem(LOCAL_BACKUPS_KEY),peerIndex,'peer bytes are not overwritten');
+  f.store.commitHead=original;if(race==='durable-head'){const head=await f.store.readHead(),peer=JSON.parse(head.payload);peer.protectedBackupIds=[];await original({expectedHash:head.hash,payload:JSON.stringify(peer)});}
+  assert.equal(await f.ctx.persist(),true);assert.ok(!privateExpiryLegacyRows(f).some(row=>row.id==='private-expired'),'the next fresh, successful save retries deferred expiry');
+ }finally{await f.store.close();}}
+});
+
+test('RISK legacy automatic expiry failures: failed primary commits and quota-refused cleanup keep recovery bytes and a later save retries',async()=>{
+ for(const failure of ['primary','legacy-quota']){const f=await privateLegacyExpiryFixture({packed:true});try{
+  const commit=f.store.commitHead.bind(f.store),write=f.storage.setItem.bind(f.storage);
+  if(failure==='primary')f.store.commitHead=async()=>({error:true,code:'private-primary-failure'});
+  else f.storage.setItem=(key,value)=>{if(key===LOCAL_BACKUPS_KEY)throw Object.assign(Error('private cleanup quota'),{name:'QuotaExceededError'});return write(key,value);};
+  assert.equal(await privateExpirySave(f),failure!=='primary');assert.equal(f.storage.getItem(LOCAL_BACKUPS_KEY),f.index,'failure leaves the original raw index exact');
+  if(failure==='legacy-quota')await privateExpiryAssertCurrentBoard(f);
+  f.store.commitHead=commit;f.storage.setItem=write;assert.equal(await f.ctx.persist(),true);assert.ok(!privateExpiryLegacyRows(f).some(row=>row.id==='private-expired'),'failed optional expiry retries without blocking a primary save');
+ }finally{await f.store.close();}}
+});
+
+test('RISK legacy automatic expiry guard: final transaction abort compensates only unchanged index bytes and never replaces a peer append',async()=>{
+ for(const peer of [false,true]){const f=await privateLegacyExpiryFixture({packed:true});try{
+  assert.equal(typeof f.store.withCurrentHead,'function','cleanup requires a locked current-head guard');const guard=f.store.withCurrentHead.bind(f.store);
+  const db=await new Promise(resolve=>{const request=f.indexedDB.open(f.dbName);request.onsuccess=()=>resolve(request.result);}),prototype=Object.getPrototypeOf(db),transaction=prototype.transaction;db.close();let changed=null;
+  f.store.withCurrentHead=async(hash,work)=>{let active;prototype.transaction=function(...args){const tx=transaction.apply(this,args);if(args[1]==='readwrite')active=tx;return tx;};try{return await guard(hash,(...args)=>{const ok=work(...args);assert.equal(ok,true);if(peer){changed=f.ctx.packBackupIndex(JSON.stringify([...privateExpiryLegacyRows(f),f.row('private-after-guard','manual')]));f.storage.setItem(LOCAL_BACKUPS_KEY,changed);}active.abort();return ok;});}finally{prototype.transaction=transaction;}};
+  assert.equal(await privateExpirySave(f),true,'optional cleanup abort never rejects an already-durable board');assert.equal(f.storage.getItem(LOCAL_BACKUPS_KEY),changed||f.index,'compensation restores only its own unchanged shortened index');await privateExpiryAssertCurrentBoard(f);
+  f.store.withCurrentHead=guard;assert.equal(await f.ctx.persist(),true);assert.ok(!privateExpiryLegacyRows(f).some(row=>row.id==='private-expired'));if(peer)assert.ok(privateExpiryLegacyRows(f).some(row=>row.id==='private-after-guard'));
+ }finally{await f.store.close();}}
+});
+
+test('RISK device current-head guard: stale heads non-synchronous approvals and queued peers cannot authorize legacy retirement',async()=>{
+ const f=await privateLegacyExpiryFixture();try{
+  assert.equal(typeof f.store.withCurrentHead,'function');const head=await f.store.readHead();let calls=0;
+  assert.equal(await f.store.withCurrentHead('0'.repeat(64),()=>{calls++;return true;}),false);assert.equal(calls,0);
+  for(const work of [()=>false,()=>Promise.resolve(true)])assert.equal(await f.store.withCurrentHead(head.hash,work),false);
+  await assert.rejects(f.store.withCurrentHead(head.hash,()=>{throw Error('private guard fault');}),/private guard fault/);
+  let writer;const peer=JSON.parse(head.payload);peer.futureData={peer:'retained'};
+  assert.equal(await f.store.withCurrentHead(head.hash,(actual,backups)=>{assert.equal(actual.payload,head.payload);assert.ok(backups.some(row=>row.id==='private-manual'));writer=f.store.commitHead({expectedHash:head.hash,payload:JSON.stringify(peer)});return true;}),true);
+  assert.equal((await writer).ok,true);assert.equal((await f.store.readHead()).payload,JSON.stringify(peer));assert.equal(f.storage.getItem(LOCAL_BACKUPS_KEY),f.index,'the guard itself never writes board or recovery data');
+ }finally{await f.store.close();}
+});
+
+test('RISK legacy automatic expiry lifecycle: a draft arriving during cleanup is saved and completion Undo manual restore and offline reload retain facts',async()=>{
+ const f=await privateLegacyExpiryFixture();try{
+  assert.equal(typeof f.store.withCurrentHead,'function');const guard=f.store.withCurrentHead.bind(f.store);let armed=true;
+  f.store.withCurrentHead=(hash,work)=>guard(hash,(...args)=>{if(armed){armed=false;f.ctx.state.tasks.push(syncTask('private-late-edit','Private late edit'));}return work(...args);});
+  assert.equal(await privateExpirySave(f),true);assert.ok(JSON.parse((await f.store.readHead()).payload).tasks.some(row=>row.id==='private-late-edit'),'the await added for cleanup cannot lose a newer unsaved edit');
+  f.store.withCurrentHead=guard;f.ctx.pushUndo();f.ctx.completeTask(f.ctx.state.tasks[0]);assert.equal(await f.ctx.persist(),true);f.ctx.undo();assert.equal(await f.ctx.persist(),true);assert.equal(f.ctx.state.tasks[0].done,false);
+  const manual=(await f.store.listBackups()).find(row=>row.id==='private-manual');assert.ok(manual&&manual.payload===f.raw);await f.ctx.restoreDurableBackupById(manual.id);assert.equal(await f.ctx.persist(),true);
+  assert.ok(f.ctx.state.tasks.some(row=>row.id==='private-late-edit'),'manual Restore keeps later undeleted facts');await privateExpiryAssertCurrentBoard(f);
+  const reopened=await loadApp({sharedStorage:f.storage,indexedDBProvider:f.indexedDB,deviceDbName:f.dbName,beforeStateReady:ctx=>setFakeTime(ctx,PRIVATE_EXPIRY_NOW)});try{
+   assert.ok(!reopened.ctx.parseBackupIndex(f.storage.getItem(LOCAL_BACKUPS_KEY)).some(row=>row.id==='private-expired'),'offline cold reload never reactivates expired entries');assert.ok((await reopened.shim.window.ScannerDeviceStore.listBackups()).some(row=>row.id==='private-manual'));assert.deepEqual(reopened.ctx.state.tasks[0].futureHistory,{facts:['😀',{unknown:true}]});
+  }finally{await reopened.shim.window.ScannerDeviceStore.close();}
+ }finally{await f.store.close();}
+});
+
+test('RISK legacy automatic expiry FAQ: save rotation permanently removes expired upgrade copies while safety exceptions and Settings age cues remain clear',async()=>{
+ const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(help,/Automatic backup entries.*seven local calendar days/);assert.match(help,/storage upgrade.*permanently.*successful save/);assert.match(help,/Manual.*protected recovery.*unreadable.*unknown/i);assert.match(help,/opening Settings does not delete a backup/);assert.match(help,/exactly seven days stays neutral/);
+ assert.match(help,/permanently removed from the active backup list.*successful save/);assert.match(help,/entry removal has no Undo/);assert.match(help,/Separate recovery archives kept by a storage upgrade remain intact/);
+ ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;assert.match(settings,/removed permanently from the active backup list.*successful save/);assert.match(settings,/Separate recovery archives kept by a storage upgrade remain intact/);
+ const current=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];assert.match(current,/Expired automatic.*legacy.*save rotation/i);
+});

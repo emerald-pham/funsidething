@@ -2224,5 +2224,31 @@
       "command": "node --test --test-reporter=spec --test-name-pattern='RISK scenery reload diagnostics:' tests.js",
       "failure": "/tmp/chain-rain-evidence/reload-diagnostics-red.log failed because probe waits did not capture startup errors before reporting a timeout. Added native fixtures verify navigation/module/error capture and exact original-error rethrow even when execution-context capture and evidence writes fail. reload-listeners-red.log observed missing network event callback before wiring it; the callback regression also checks console filtering and navigation-tagged page errors."
     }
+  },
+  {
+    "testChangesSha256": "43f0ea338bdb7b81ffd91306f7ef27ae3a4cb31bf5d077f8414c393b5af7a6a8",
+    "reason": "The user explicitly authorized expiry of automatic legacy upgrade copies while preserving manual backups and existing safety exceptions. Add discriminating private storage regressions for physical active-index rotation and its cross-store data-safety boundary. All released test bytes remain untouched; only eight new contracts and isolated fixtures append. Independent review required explicit active-list deletion wording and preserved separate migration recovery archives; the owned FAQ test adds direct Help and Settings assertions.",
+    "previousBehavior": "Durable saves retire expired automatic IndexedDB references, but an existing daily row or unreadable neighbor can leave matching legacy entries physically stored and visible in Settings. There is no transaction-held head/reference guard for optional post-save retirement.",
+    "intendedBehavior": "A successful ordinary durable save retires recognized readable unique expired automatic entries from the captured active legacy index only while its verified current head and recovery references stay locked. Manual, protected, ambiguous, malformed, unknown and unreadable data survives. Peers or failures defer optional cleanup, failed guards compensate only unchanged shortened bytes, and new edits still follow the existing durable retry.",
+    "replacementTests": [
+      "RISK legacy automatic expiry: a successful save rotates both active stores by seven local calendar days and preserves exact neighbor bytes",
+      "RISK legacy automatic expiry safety: manual recovery unknown unreadable malformed ambiguous and pinned copies survive rotation",
+      "RISK legacy automatic expiry races: peer index appends and a newer pinned durable head defer cleanup until a fresh successful save",
+      "RISK legacy automatic expiry failures: failed primary commits and quota-refused cleanup keep recovery bytes and a later save retries",
+      "RISK legacy automatic expiry guard: final transaction abort compensates only unchanged index bytes and never replaces a peer append",
+      "RISK device current-head guard: stale heads non-synchronous approvals and queued peers cannot authorize legacy retirement",
+      "RISK legacy automatic expiry lifecycle: a draft arriving during cleanup is saved and completion Undo manual restore and offline reload retain facts",
+      "RISK legacy automatic expiry FAQ: save rotation permanently removes expired upgrade copies while safety exceptions and Settings age cues remain clear"
+    ],
+    "preservedCoverage": [
+      "All released tests are a byte-exact prefix; no existing passing assertions, skips, fixtures or test framework changed. Ranking formulas, scan modes, rating history, cloud codecs/protocols, rules and scenery are unchanged.",
+      "Seven local calendar days and existing durable automatic rotation retain their established cutoff. Old primary keys and opaque migration recovery archives remain byte-exact; only active expired entries retire. Manual Restore, completion/Undo, shared payloads, unknown fields and offline reload remain protected.",
+      "New tests first observed eight discriminating failures against exact released4128b8d before implementation. A first-green fixture correction adds the existing completion primitive caller’s required Undo snapshot; no implementation or existing test changed to satisfy that correction. Final corrected fixtures again produce eight failures on the immutable released base.",
+      "After reconciliation onto merged fireworks f5574f0, that release’s tests remain a byte-exact prefix and its scenery modules are unchanged. Eight final tests again failed against its immutable tree. The FAQ assertion also independently failed against fe5d427 before the copy correction."
+    ],
+    "redEvidence": {
+      "command": "/opt/local/bin/node --test --test-reporter=spec --test-name-pattern='RISK legacy automatic expiry|RISK device current-head guard' tests.js",
+      "failure": "/tmp/chain-legacy-retention-evidence-20261007.u86nikoq/red-discriminating-contracts.log: eight failed, zero passed, zero skipped before app changes, for missing physical legacy retirement, missing locked guard and missing FAQ. First fixture run is retained separately. /tmp/chain-legacy-retention-evidence-20261007.u86nikoq/red-final-fixture-on-released-base.log: all eight final fixtures still fail on immutable released base. /tmp/chain-legacy-retention-evidence-20261007.u86nikoq/red-final-fixture-on-fireworks-base.log: all eight final contracts fail on merged fireworks f5574f0. red-active-list-copy.log: the new active-backup-list assertion fails against fe5d427 before the wording change."
+    }
   }
 ]

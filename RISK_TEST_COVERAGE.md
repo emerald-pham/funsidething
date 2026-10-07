@@ -589,3 +589,14 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - `RISK fireworks pair delay: seeded second launches span zero to one hundred milliseconds without shifting first shells or finale` — deterministic per-pair stagger and responsive ignition preservation.
 - `RISK fireworks frequency again: released scale two becomes four in live UTC scheduling and legacy advancement` — repeat frequency reduction and midnight reservations.
 - `RISK fireworks ascent paint: only the launch trail glows while explosion particle paint stays identical` — trail-only ascent and unchanged bloom tip rendering.
+
+## Automatic legacy backup expiry
+
+- RISK legacy automatic expiry: a successful save rotates both active stores by seven local calendar days and preserves exact neighbor bytes
+- RISK legacy automatic expiry safety: manual recovery unknown unreadable malformed ambiguous and pinned copies survive rotation
+- RISK legacy automatic expiry races: peer index appends and a newer pinned durable head defer cleanup until a fresh successful save
+- RISK legacy automatic expiry failures: failed primary commits and quota-refused cleanup keep recovery bytes and a later save retries
+- RISK legacy automatic expiry guard: final transaction abort compensates only unchanged index bytes and never replaces a peer append
+- RISK device current-head guard: stale heads non-synchronous approvals and queued peers cannot authorize legacy retirement
+- RISK legacy automatic expiry lifecycle: a draft arriving during cleanup is saved and completion Undo manual restore and offline reload retain facts
+- RISK legacy automatic expiry FAQ: save rotation permanently removes expired upgrade copies while safety exceptions and Settings age cues remain clear
