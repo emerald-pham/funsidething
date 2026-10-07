@@ -5038,6 +5038,23 @@ test("UI: with nothing dotted the scan offers Start scanning — no benchmark, n
   assert.ok(!/class="decide"/.test(scanHtml), "so there's no decide row either");
 });
 
+test('RISK empty-chain explanation: selected Chance and Descending views name only their mode and preserve first-dot age rules',async()=>{
+ for(const mode of ['chance','descending','both']){
+  const {ctx,shim}=await loadApp({seed:91});
+  const oldest=addTaskAged(ctx,'Oldest',900000),newer=addTaskAged(ctx,'Newer',1000);
+  ctx.state.settings.scanMode=mode;ctx.state.scanMode=mode==='chance'?'descending':'chance';
+  const before=JSON.stringify(ctx.state),markup=scanHtmlOf(ctx,shim);
+  const name=mode==='chance'?'Chance mode':mode==='descending'?'Descending mode':'Scanning';
+  assert.ok(markup.includes('Nothing dotted yet — '+name+' starts on the oldest eligible task never marked Done, or the oldest eligible task if all have been done before.'),'the visible explanation names the selected mode');
+  assert.doesNotMatch(markup,/both modes start/i,'one selected view must not claim both modes');
+  assert.equal(JSON.stringify(ctx.state),before,'explaining the mode does not mutate tasks settings or saved scan order');
+  assert.equal(ctx.oldestFirst(ctx.pool()).id,oldest.id,'the explanation preserves first-dot selection by age');
+  ctx.state.tasks.find(t=>t.id===oldest.id).restoredAt=Date.now();assert.equal(ctx.oldestFirst(ctx.pool()).id,newer.id,'never-Done preference stays intact');
+  ctx.state.tasks.find(t=>t.id===newer.id).restoredAt=Date.now();assert.equal(ctx.oldestFirst(ctx.pool()).id,oldest.id,'all-Done fallback stays oldest');
+  ctx.openHelp();assert.match(shim.elements.get('modalRoot').innerHTML,/empty-chain explanation names the selected mode/i,'extended FAQ documents the selected-view explanation');
+ }
+});
+
 test("UI: once scanning starts it's Yes/No — no Can button, no chain-start question", async () => {
   const { ctx, shim } = await loadApp({ seed: 91 });
   addTaskAged(ctx, "Oldest", 900000);

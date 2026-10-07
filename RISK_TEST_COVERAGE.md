@@ -569,6 +569,8 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 
 - RISK task rating history: immutable fact union and observation fingerprints are independent of device locale
 
+- RISK empty-chain explanation: selected Chance and Descending views name only their mode and preserve first-dot age rules
+
 ## Migrated backup deletion safety
 
 - RISK backup mirror deletion: one confirmation removes exact migrated mirrors with reordered metadata and packed legacy neighbors

@@ -1,5 +1,39 @@
 [
   {
+    "testChangesSha256": "9bd1c2cdd904d299e4190d2ef4170f761da2ebbeffc71c9f8eee4937087515e7",
+    "reason": "User explicitly requested double rain velocity and half rain opacity in day and night, with doubled night particle density. Add numerical contracts and update only the superseded 900-particle night ceiling. User additionally requests selected-mode wording in the empty-chain notice, preserving exact first-dot algorithms. Reconcile onto exact history candidate 08bf3b2, retaining every history and lifecycle implementation, assertion and FAQ.",
+    "previousBehavior": "Rain used 75–125 pixels/second with unchanged .62/.72 opacity and a maximum 900 particles in all sky phases. The empty-chain notice claimed both modes even with only one selected.",
+    "intendedBehavior": "Rain uses 150–250 pixels/second with .31/.36 opacity and unchanged daylight counts, blending to double counts at full night with a maximum 1800 particles. Snow, seeds, time-based poses and reduced motion stay unchanged. Name the configured Chance or Descending mode for single-mode buttons and use Scanning with both buttons; preserve first-dot age semantics.",
+    "replacementTests": [
+      "RISK rain intensity: day and night double velocity halve opacity and only night doubles seeded density",
+      "RISK empty-chain explanation: selected Chance and Descending views name only their mode and preserve first-dot age rules"
+    ],
+    "preservedCoverage": [
+      "All existing assertions remain except the explicitly superseded night particle ceiling. Existing rain geometry, storm density ordering, reduced motion, cloud shading, reflection suppression, seed/UTC schedules, cloud/sync, task data and offline shell contracts remain intact."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='RISK rain intensity:' tests.js; node --test --test-reporter=spec --test-name-pattern=\"RISK empty-chain explanation:\" tests.js",
+      "failure": "After correcting the canvas fixture, /tmp/chain-rain-red.log observed expected night double density failing with 107 actual versus 214 expected before any renderer change. The initial native full suite also observed the mechanical PWA cache-key contract fail before refreshing asset fingerprints. Before index.html copy changes, /tmp/chain-rain-copy-red.log observed the selected-mode visible explanation assertion fail against the old both modes start markup. After the copy change all three settings, nonmutation and oldest/never-Done/all-Done rules pass. After reconciliation /tmp/chain-rain-reconcile-red.log observed the existing app/cache fingerprints reject the changed shell before refreshing them."
+    }
+  },
+  {
+    "testChangesSha256": "c2a9587c78b860dc8edc903df04599749b5eb5d68d2725cc8669f7e50b75f3f1",
+    "reason": "User explicitly requested double rain velocity and half rain opacity in day and night, with doubled night particle density. Add numerical contracts and update only the superseded 900-particle night ceiling. User additionally requests selected-mode wording in the empty-chain notice, preserving exact first-dot algorithms.",
+    "previousBehavior": "Rain used 75–125 pixels/second with unchanged .62/.72 opacity and a maximum 900 particles in all sky phases. The empty-chain notice claimed both modes even with only one selected.",
+    "intendedBehavior": "Rain uses 150–250 pixels/second with .31/.36 opacity and unchanged daylight counts, blending to double counts at full night with a maximum 1800 particles. Snow, seeds, time-based poses and reduced motion stay unchanged. Name the configured Chance or Descending mode for single-mode buttons and use Scanning with both buttons; preserve first-dot age semantics.",
+    "replacementTests": [
+      "RISK rain intensity: day and night double velocity halve opacity and only night doubles seeded density",
+      "RISK empty-chain explanation: selected Chance and Descending views name only their mode and preserve first-dot age rules"
+    ],
+    "preservedCoverage": [
+      "All existing assertions remain except the explicitly superseded night particle ceiling. Existing rain geometry, storm density ordering, reduced motion, cloud shading, reflection suppression, seed/UTC schedules, cloud/sync, task data and offline shell contracts remain intact."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='RISK rain intensity:' tests.js; node --test --test-reporter=spec --test-name-pattern=\"RISK empty-chain explanation:\" tests.js",
+      "failure": "After correcting the canvas fixture, /tmp/chain-rain-red.log observed expected night double density failing with 107 actual versus 214 expected before any renderer change. The initial native full suite also observed the mechanical PWA cache-key contract fail before refreshing asset fingerprints. Before index.html copy changes, /tmp/chain-rain-copy-red.log observed the selected-mode visible explanation assertion fail against the old both modes start markup. After the copy change all three settings, nonmutation and oldest/never-Done/all-Done rules pass."
+    }
+  },
+  {
     "testChangesSha256": "635ffe9f49d75feab899bd1f9f6cd3cde06fce126b5fd9bc9287ec0395def57d",
     "reason": "User explicitly requested double rain velocity and half rain opacity in day and night, with doubled night particle density. Add numerical contracts and update only the superseded 900-particle night ceiling.",
     "previousBehavior": "Rain used 75\u2013125 pixels/second with unchanged .62/.72 opacity and a maximum 900 particles in all sky phases.",
