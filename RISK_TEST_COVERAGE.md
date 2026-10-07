@@ -530,6 +530,10 @@ The editor hook blocks app or enforcement edits while tests.js has no staged or 
 - RISK context offline browser: installed shell reload retains exclusions settings tasks and completion Undo through reconnect
 - RISK context rendering: an imported empty context ID retains its real selector state and unknown fields in Settings
 - RISK context marker browser: green checks and red exclusions retain readable symbols in both themes
+## Task rating observations and preservation
+
+- RISK task rating history: Undo keeps the latest observation head so restored relative values are observed on the next Save
+
 
 ## Scanner lifecycle repairs
 
@@ -544,3 +548,22 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK scan lifecycle sync: concurrent old-pass repairs converge by revision without replaying ratings or Done
 - RISK scan lifecycle sync: failed local repair persistence holds adoption and a newer cloud revision cannot be overwritten
 - RISK scan lifecycle FAQ: Dot rest boundary current Start eligibility and durable remote refresh are explained
+
+- RISK task rating history: actual comparisons retain timestamped before and after values without backfilling or changing signals
+- RISK task rating history: editor observations distinguish relative movement and never write on open render or resampling
+- RISK task rating history: No Dot Dislodge completion and Undo retain honest rating versus pool changes
+- RISK task rating history: concurrent offline and older missing-field copies union immutable facts idempotently without retimestamping
+- RISK task rating history: legacy import restore export deletion and unknown future facts preserve recorded evidence
+- RISK task rating history: device reload and chunked Unicode exports retain all observations without silent retention limits
+- RISK task rating history: Edit shows accessible timestamped observations and honest metric and retention explanations
+
+- RISK task rating history: malformed and future records remain recoverable without blocking actions or injecting markup
+- RISK task rating history: real cloud glue preserves offline concurrent events replay old writes and completion Undo across reload
+
+- RISK task rating history browser: phone tablet and desktop disclosures pagination drafts and offline Undo preserve actual observations
+
+- RISK task rating history: Undo records evergreen interval and day-reset eligibility reversals without changing MMR
+
+- RISK task rating history: a Dot interval edit that renews rest records saved eligibility without inventing a comparison
+
+- RISK task rating history: immutable fact union and observation fingerprints are independent of device locale
