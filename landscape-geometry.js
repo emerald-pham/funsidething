@@ -429,8 +429,16 @@
       const finaleAt=atFestival?duration*.65:duration-4;
       const count=Math.max(0,Math.floor((finaleAt-3.7-start)/interval)+1);
       // Only shells still in flight need geometry, even in a five-minute show.
-      const first=Math.max(0,Math.floor((age-start-3.7)/interval)+1),last=Math.min(count-1,Math.floor((age-start)/interval)),shells=[];
-      for(let wave=first;wave<=last;wave++)for(let lane=0;lane<2;lane++)shells.push({launch:start+wave*interval,burst:wave*2+lane,wave,lane,finale:false});
+      const first=Math.max(0,Math.floor((age-start-3.8)/interval)+1),last=Math.min(count-1,Math.floor((age-start)/interval)),shells=[];
+      // An independent seeded sample delays only the second regular shell.
+      // No mutable random stream or timer can drift between devices or repaint.
+      const pairDelay=wave=>{
+        let hash=2166136261;
+        for(const character of `${seed}|firework-pair|${wave}`)hash=Math.imul(hash^character.charCodeAt(0),16777619);
+        hash=Math.imul(hash^(hash>>>16),0x7feb352d);hash=Math.imul(hash^(hash>>>15),0x846ca68b);
+        return ((hash^(hash>>>16))>>>0)/4294967296*.1;
+      };
+      for(let wave=first;wave<=last;wave++)for(let lane=0;lane<2;lane++)shells.push({launch:start+wave*interval+(lane?pairDelay(wave):0),burst:wave*2+lane,wave,lane,finale:false});
       if(age>=finaleAt&&age<finaleAt+3.7)for(let lane=0;lane<8;lane++)shells.push({launch:finaleAt,burst:count*2+lane,wave:count,lane,finale:true});
       for(const shell of shells){
         const {launch,burst,wave,lane,finale}=shell,time=age-launch;

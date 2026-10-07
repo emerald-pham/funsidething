@@ -69,7 +69,7 @@
       if(showCache.has(day))return showCache.get(day);
       const out=[],show=C.nightShows.fireworks,scale=show.occurrenceScale||1,r=random(seed,'fireworks',day);
       // Each UTC day's immutable proposal plan samples the existing duration
-      // and doubled start interval. Previous-day reservations bridge midnight.
+      // and configured start interval. Previous-day reservations bridge midnight.
       let start=day*DAY+20*scale;
       while(start<(day+1)*DAY){
         const roll=r();
@@ -95,7 +95,7 @@
       const barges=rare.filter(e=>e.type==='festival');
       const day=Math.floor(from/DAY),proposals=[...fireworks(day-1),...fireworks(day)].sort((a,b)=>a.start-b.start);
       const shows=proposals.filter((e,index)=>e.start<to&&e.start+e.duration>from&&
-        (!index||e.start>=proposals[index-1].start+2*(proposals[index-1].duration+C.nightShows.fireworks.rest))&&
+        (!index||e.start>=proposals[index-1].start+(C.nightShows.fireworks.occurrenceScale||1)*(proposals[index-1].duration+C.nightShows.fireworks.rest))&&
         !barges.some(barge=>overlaps(e,barge)));
       const pool=[...raw.filter(e=>e.type!=='abduction'),...rare,...shows].sort((a,b)=>a.start-b.start||a.id.localeCompare(b.id));
       const events=pool.filter(e=>{

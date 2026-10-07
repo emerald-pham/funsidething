@@ -1,5 +1,24 @@
 [
   {
+    "testChangesSha256": "28950f7437ee2ad85c68a4abc0f7a13082ab49c82f31ad43625b6b823a1c5d41",
+    "reason": "Emerald requested another halving of standalone show frequency, seeded per-pair ignition staggering and trail-only shell ascent.",
+    "previousBehavior": "Released scale two schedules paired simultaneous ignitions and paints shell-tip glow during ascent.",
+    "intendedBehavior": "Scale four halves released opportunity frequency again; only second regular shells receive independent uniform seeded 0–100ms delays; ascent preserves trail and explosion rendering.",
+    "replacementTests": [
+      "RISK fireworks pair delay: seeded second launches span zero to one hundred milliseconds without shifting first shells or finale",
+      "RISK fireworks frequency again: released scale two becomes four in live UTC scheduling and legacy advancement",
+      "RISK fireworks ascent paint: only the launch trail glows while explosion particle paint stays identical"
+    ],
+    "preservedCoverage": [
+      "One-to-five-minute duration, nighttime gating, spawn odds, event and particle budgets, barge timing and eight-shell finale remain protected.",
+      "Existing task storage, cloud sync, Undo, import and recovery tests are unchanged; renderer uses no timer or mutable random state."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='RISK fireworks (pair delay|frequency again|occurrence|duration: each|ascent paint)' tests.js",
+      "failure": "/tmp/chain-fireworks-red.log observed scale 2 rather than 4 and half-length sampled intervals; /tmp/chain-fireworks-paint-red.log observed simultaneous pairs and two tip ellipses rather than zero during ascent."
+    }
+  },
+  {
     "testChangesSha256": "68d60b965b08e6e2822493e388e0dc209b2487ca5551b31edc9c11b6e99852d0",
     "reason": "Independent source diagnoses found recurring reload timeouts hide collected startup errors. Add failure-only fixture evidence rather than infer a product cache or dependency defect.",
     "previousBehavior": "The probe wait failed before the final pageerror assertion; the error lacked navigation tuple, delivered payload provenance, bootstrap stage and failed-document globals. Retained server logs alone could not identify the missing initializer phase.",
