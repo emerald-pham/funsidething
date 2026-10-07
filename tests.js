@@ -21214,3 +21214,145 @@ test('RISK scan lifecycle FAQ: Dot rest boundary current Start eligibility and d
  const changelog=html.match(/<!-- changelog:start -->([\s\S]*?)<!-- changelog:end -->/)[1];
  for(const pattern of [/resting evergreen.*Dot/i,/expired.*holds.*Start/i,/remote.*Chance.*reload/i])assert.match(changelog,pattern);
 });
+
+async function privateMigratedDeleteFixture({payloadFirst=false,packed=false}={}){
+ const {indexedDB}=await import('fake-indexeddb'),dbName='chain-scanner-delete-mirror-'+Date.now()+'-'+Math.random();
+ const raw=JSON.stringify(syncState({tasks:[syncTask('private-delete-board','Private current board')]}));
+ const metadata={id:'private-selected-mirror',day:'2026-10-01',at:Date.parse('2026-10-01T12:00Z'),kind:'manual',futureData:{z:1,a:[2,{z:3,a:4}]}};
+ const selected=payloadFirst?{payload:raw,...metadata}:{...metadata,payload:raw};
+ const hidden={id:'private-unreadable-neighbor',day:'2020-01-01',at:1,kind:'future-recovery',payload:'unreadable',futureData:{keep:'exact bytes'}};
+ const hiddenBytes=JSON.stringify(hidden),storage=sharedScannerStorage({[LOCAL_HEAD_KEY]:raw,[SYNC_STORE_KEY]:raw,[LOCAL_BACKUPS_KEY]:'[ '+hiddenBytes+' , '+JSON.stringify(selected)+' ]'});
+ const loaded=await loadApp({sharedStorage:storage,indexedDBProvider:indexedDB,deviceDbName:dbName});
+ if(packed)storage.setItem(LOCAL_BACKUPS_KEY,loaded.ctx.packBackupIndex(storage.getItem(LOCAL_BACKUPS_KEY)));
+ const store=loaded.shim.window.ScannerDeviceStore,head=await store.readHead(),stateRaw=JSON.stringify(loaded.ctx.state);
+ const copy={...selected,id:'private-shared-payload-neighbor'};assert.equal((await store.putBackup({expectedHash:head.hash,backup:copy})).ok,true);
+ await loaded.ctx.refreshDeviceBackupCache();
+ return {...loaded,indexedDB,dbName,storage,store,selected,hidden,hiddenBytes,head,stateRaw};
+}
+
+async function privateRewriteDurableBackup(fixture,change){
+ const db=await new Promise((resolve,reject)=>{const request=fixture.indexedDB.open(fixture.dbName);request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});
+ try{await new Promise((resolve,reject)=>{
+  const tx=db.transaction('backups','readwrite'),store=tx.objectStore('backups'),request=store.get(fixture.selected.id);
+  request.onsuccess=()=>store.put(change(request.result),fixture.selected.id);
+  tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error||Error('private rewrite aborted'));
+ });}finally{db.close();}
+}
+
+function privateVisibleBackupRows(fixture){
+ return Array.from(vm.runInContext('backupRowsShown',fixture.ctx)).filter(row=>row.id===fixture.selected.id);
+}
+
+async function privateClickBackupDelete(fixture){
+ await fixture.ctx.onAction('delete-local-backup',{dataset:{id:fixture.selected.id}});
+ for(let i=0;i<10;i++)await flush();
+}
+
+async function privateAssertBackupSurvives(fixture){
+ assert.ok((await fixture.store.listBackups()).some(row=>row.id===fixture.selected.id),'the durable selected recovery copy remains');
+ assert.equal((await fixture.store.readHead()).payload,fixture.head.payload,'deleting a backup never writes the durable board');
+ assert.equal(JSON.stringify(fixture.ctx.state),fixture.stateRaw,'the in-memory board remains untouched');
+}
+
+test('RISK backup mirror deletion: one confirmation removes exact migrated mirrors with reordered metadata and packed legacy neighbors',async()=>{
+ for(const [payloadFirst,packed] of [[false,false],[true,false],[true,true]]){
+  const f=await privateMigratedDeleteFixture({payloadFirst,packed});try{
+   f.ctx.openSettings();assert.equal(privateVisibleBackupRows(f).length,1,'matching cross-store mirrors form one restore point independent of property order');
+   const before=f.storage.getItem(LOCAL_BACKUPS_KEY);let confirms=0;f.ctx.confirm=()=>{confirms++;return true;};
+   await privateClickBackupDelete(f);assert.equal(confirms,1,'exactly one explicit confirmation covers the mirrored restore point');
+   assert.ok(!(await f.store.listBackups()).some(row=>row.id===f.selected.id),'the chosen durable reference is gone');
+   assert.ok(!f.ctx.parseBackupIndex(f.storage.getItem(LOCAL_BACKUPS_KEY)).some(row=>row.id===f.selected.id),'the matching active legacy reference is gone too');
+   const remaining=f.ctx.unpackBackupIndex(f.storage.getItem(LOCAL_BACKUPS_KEY));assert.ok(remaining.includes(f.hiddenBytes),'unreadable neighboring metadata and payload bytes remain exact');
+   assert.ok((await f.store.listBackups()).some(row=>row.id==='private-shared-payload-neighbor'&&row.payload===f.selected.payload),'a shared immutable payload stays available for its other reference');
+   assert.equal((await f.store.readHead()).payload,f.head.payload);assert.equal(JSON.stringify(f.ctx.state),f.stateRaw);
+   assert.notEqual(f.storage.getItem(LOCAL_BACKUPS_KEY),before);f.ctx.openSettings();assert.equal(privateVisibleBackupRows(f).length,0);
+   const reopened=await loadApp({sharedStorage:f.storage,indexedDBProvider:f.indexedDB,deviceDbName:f.dbName});
+   assert.ok(!(await reopened.shim.window.ScannerDeviceStore.listBackups()).some(row=>row.id===f.selected.id),'offline reload does not revive the deleted active mirror');
+   assert.ok(reopened.ctx.state.tasks.some(task=>task.id==='private-delete-board'));await reopened.shim.window.ScannerDeviceStore.close();
+  }finally{await f.store.close();}
+ }
+});
+
+test('RISK backup mirror identity: divergent payload kinds dates and unknown metadata remain separate and fail closed',async()=>{
+ const changes=[row=>({...row,payload:JSON.stringify({...JSON.parse(row.payload),updatedAt:9})}),row=>({...row,kind:'before-account-switch'}),row=>({...row,day:'2026-10-02'}),row=>({...row,at:row.at+1}),row=>({...row,futureData:{z:1,a:[2,{z:3,a:5}]}}),row=>({...row,futureData:{z:1,a:[{z:3,a:4},2]}})];
+ for(const change of changes){const f=await privateMigratedDeleteFixture();try{
+  const original=f.storage.getItem(LOCAL_BACKUPS_KEY),rows=f.ctx.parseBackupIndex(original),next=JSON.stringify(rows.map(row=>row.id===f.selected.id?change(row):row));f.storage.setItem(LOCAL_BACKUPS_KEY,next);
+  f.ctx.openSettings();assert.equal(privateVisibleBackupRows(f).length,2,'same ID with any differing fact is not a verified mirror');
+  let confirms=0;f.ctx.confirm=()=>{confirms++;return true;};await privateClickBackupDelete(f);assert.equal(confirms,0);assert.equal(f.storage.getItem(LOCAL_BACKUPS_KEY),next);await privateAssertBackupSurvives(f);
+  f.storage.setItem(LOCAL_BACKUPS_KEY,original);f.ctx.openSettings();await privateClickBackupDelete(f);assert.equal(confirms,1,'repair still permits the exact confirmed mirror after the divergent source is resolved');
+  assert.ok(!(await f.store.listBackups()).some(row=>row.id===f.selected.id));
+ }finally{await f.store.close();}}
+});
+
+test('RISK backup mirror duplicates: identical same-source IDs stay ambiguous rather than coalescing into a deletable row',async()=>{
+ const f=await privateMigratedDeleteFixture();try{
+  const rows=f.ctx.parseBackupIndex(f.storage.getItem(LOCAL_BACKUPS_KEY)),original=JSON.stringify(rows),duplicate=JSON.stringify([...rows,f.selected]);f.storage.setItem(LOCAL_BACKUPS_KEY,duplicate);
+  f.ctx.openSettings();assert.equal(privateVisibleBackupRows(f).length,3,'two physical legacy rows and their durable copy remain visibly ambiguous');
+  const markup=f.shim.document.getElementById('modalRoot').innerHTML;assert.match(markup,/deletion unavailable|Duplicate backup ID/);
+  let confirms=0;f.ctx.confirm=()=>{confirms++;return true;};await privateClickBackupDelete(f);assert.equal(confirms,0);assert.equal(f.storage.getItem(LOCAL_BACKUPS_KEY),duplicate);await privateAssertBackupSurvives(f);
+  f.storage.setItem(LOCAL_BACKUPS_KEY,original);f.ctx.openSettings();await privateClickBackupDelete(f);assert.equal(confirms,1);assert.ok(!(await f.store.listBackups()).some(row=>row.id===f.selected.id));
+ }finally{await f.store.close();}
+});
+
+test('RISK backup mirror confirmation: cancel stale Settings and confirmation-time rewrites preserve both copies',async()=>{
+ const f=await privateMigratedDeleteFixture({payloadFirst:true});try{
+  f.ctx.openSettings();let confirms=0;f.ctx.confirm=()=>{confirms++;return false;};const original=f.storage.getItem(LOCAL_BACKUPS_KEY);
+  await privateClickBackupDelete(f);assert.equal(confirms,1,'a valid mirrored entry reaches confirmation');assert.equal(f.storage.getItem(LOCAL_BACKUPS_KEY),original);await privateAssertBackupSurvives(f);
+  const changed=JSON.stringify(f.ctx.parseBackupIndex(original).map(row=>row.id===f.selected.id?{...row,at:row.at+1}:row));f.storage.setItem(LOCAL_BACKUPS_KEY,changed);f.ctx.confirm=()=>{confirms++;return true;};
+  await privateClickBackupDelete(f);assert.equal(confirms,1,'a stale Settings identity aborts before confirmation');assert.equal(f.storage.getItem(LOCAL_BACKUPS_KEY),changed);await privateAssertBackupSurvives(f);
+  f.storage.setItem(LOCAL_BACKUPS_KEY,original);f.ctx.openSettings();f.ctx.confirm=()=>{confirms++;f.storage.setItem(LOCAL_BACKUPS_KEY,changed);return true;};
+  await privateClickBackupDelete(f);assert.equal(confirms,2);assert.equal(f.storage.getItem(LOCAL_BACKUPS_KEY),changed);await privateAssertBackupSurvives(f);
+  f.storage.setItem(LOCAL_BACKUPS_KEY,original);f.ctx.openSettings();f.ctx.confirm=()=>{confirms++;return true;};await privateClickBackupDelete(f);assert.equal(confirms,3);assert.ok(!(await f.store.listBackups()).some(row=>row.id===f.selected.id));
+ }finally{await f.store.close();}
+});
+
+test('RISK backup mirror concurrent deletion: fresh durable metadata and concurrent legacy appends are rechecked inside the delete transaction',async()=>{
+ for(const race of ['durable-metadata','legacy-append']){const f=await privateMigratedDeleteFixture();try{
+  f.ctx.openSettings();let confirms=0;f.ctx.confirm=()=>{confirms++;return true;};const original=f.store.deleteBackup.bind(f.store),before=f.storage.getItem(LOCAL_BACKUPS_KEY);
+  let changed=null;f.store.deleteBackup=async(...args)=>{
+   if(race==='durable-metadata')await privateRewriteDurableBackup(f,row=>({...row,futureData:{peer:'new fact'}}));
+   else{changed=JSON.stringify([...f.ctx.parseBackupIndex(before),{...f.selected,id:'private-peer-append'}]);f.storage.setItem(LOCAL_BACKUPS_KEY,changed);}
+   return original(...args);
+  };
+  await privateClickBackupDelete(f);assert.equal(confirms,1);await privateAssertBackupSurvives(f);assert.equal(f.storage.getItem(LOCAL_BACKUPS_KEY),changed||before,'a refused delete never overwrites a peer index');
+  if(race==='durable-metadata')assert.equal((await f.store.listBackups()).find(row=>row.id===f.selected.id).futureData.peer,'new fact');
+ }finally{await f.store.close();}}
+});
+
+test('RISK backup mirror storage failure: quota rejection and IndexedDB abort preserve recoverability and allow an explicit retry',async()=>{
+ for(const failure of ['legacy-write','durable-abort','durable-abort-peer']){const f=await privateMigratedDeleteFixture({packed:true});let undoFailure=()=>{},peerIndex=null;try{
+  f.ctx.openSettings();let confirms=0;f.ctx.confirm=()=>{confirms++;return true;};const before=f.storage.getItem(LOCAL_BACKUPS_KEY);
+  if(failure==='legacy-write'){
+   const write=f.storage.setItem.bind(f.storage);f.storage.setItem=(key,value)=>{if(key===LOCAL_BACKUPS_KEY)throw Object.assign(Error('private quota failure'),{name:'QuotaExceededError'});return write(key,value);};undoFailure=()=>{f.storage.setItem=write;};
+  }else{
+   const db=await new Promise(resolve=>{const request=f.indexedDB.open(f.dbName);request.onsuccess=()=>resolve(request.result);}),prototype=Object.getPrototypeOf(db),transaction=prototype.transaction;db.close();
+   prototype.transaction=function(...args){const tx=transaction.apply(this,args);if(args[1]==='readwrite'&&tx.objectStoreNames.contains('backups')){const store=tx.objectStore('backups'),remove=store.delete;store.delete=function(id){const request=remove.call(this,id);if(id===f.selected.id){if(failure==='durable-abort-peer'){peerIndex=f.ctx.packBackupIndex(JSON.stringify([...f.ctx.parseBackupIndex(f.storage.getItem(LOCAL_BACKUPS_KEY)),{...f.selected,id:'private-peer-after-guard'}]));f.storage.setItem(LOCAL_BACKUPS_KEY,peerIndex);}tx.abort();}return request;};}return tx;};undoFailure=()=>{prototype.transaction=transaction;};
+  }
+  await privateClickBackupDelete(f);assert.equal(confirms,1);await privateAssertBackupSurvives(f);assert.equal(f.storage.getItem(LOCAL_BACKUPS_KEY),peerIndex||before,'failed deletion restores the unchanged legacy index only when that cannot replace peer work');
+  undoFailure();undoFailure=()=>{};f.ctx.openSettings();await privateClickBackupDelete(f);assert.equal(confirms,2);assert.ok(!(await f.store.listBackups()).some(row=>row.id===f.selected.id));assert.ok(!f.ctx.parseBackupIndex(f.storage.getItem(LOCAL_BACKUPS_KEY)).some(row=>row.id===f.selected.id));
+ }finally{undoFailure();await f.store.close();}}
+});
+
+test('RISK device backup final guard: rejected throwing and asynchronous guards abort before deleting a verified reference',async()=>{
+ const {indexedDB}=await import('fake-indexeddb'),storageV2=loadStorageV2({indexedDB}),store=storageV2.createDeviceStore({indexedDB,crypto:webcrypto,dbName:'chain-scanner-delete-final-guard-'+Date.now()+'-'+Math.random()});
+ const payload='{"tasks":[{"id":"private-final-guard"}]}',backup={id:'private-final-guard',day:'2026-10-01',at:1,kind:'manual',futureData:{keep:true},payload};
+ await store.open();try{
+  await store.migrateLegacy({headPayload:payload,backups:[backup],opaqueArchives:[]});
+  for(const beforeDelete of [()=>false,()=>{throw Error('private guard failure');},()=>Promise.resolve(true)]){
+   let failed=false;try{failed=await store.deleteBackup(backup.id,{payload,allowedKinds:['manual'],beforeDelete})===false;}catch(error){failed=true;}
+   assert.equal(failed,true,'the final guard must synchronously approve the actual transaction row');assert.ok((await store.listBackups()).some(row=>row.id===backup.id));assert.equal((await store.readHead()).payload,payload);
+  }
+  let checked=false;assert.equal(await store.deleteBackup(backup.id,{payload,allowedKinds:['manual'],beforeDelete:row=>{checked=true;assert.equal(row.futureData.keep,true);assert.equal(row.payloadHash.length,64);return true;}}),true);assert.equal(checked,true);assert.equal((await store.readHead()).payload,payload);
+ }finally{await store.close();}
+});
+
+
+test('RISK backup mirror FAQ: confirmed matching-copy deletion and ambiguous recovery preserve the seven-day age cue',async()=>{
+ const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(help,/Identical copies retained during a storage upgrade appear as one backup/);
+ assert.match(help,/Confirming Delete removes both matching backup entries and keeps the current board/);
+ assert.match(help,/Different copies with the same ID stay separate, with deletion unavailable/);
+ assert.match(help,/If a copy changes while you confirm, reopen Settings and try again/);
+ assert.match(help,/more than seven days old; exactly seven days stays neutral/);assert.match(help,/opening Settings does not delete a backup/);
+ const current=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];assert.match(current,/Identical migrated backup copies appear once and can be deleted after one confirmation/);
+});

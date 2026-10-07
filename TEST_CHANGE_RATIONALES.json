@@ -1,5 +1,30 @@
 [
   {
+    "testChangesSha256": "0fc3c9c7b10ba3b8c4351fcdba1a32f3892ac12a2c9f11e1df2c2bc0b64308d0",
+    "reason": "Fix the user-reported safe-identification error for a confirmed manual deletion of a verified migration mirror. Append coverage only; automatic legacy pruning remains pending an explicit retention decision.",
+    "previousBehavior": "Identical IndexedDB and retained legacy backup rows either displayed as false duplicate IDs due to property order or were rejected before confirmation. The adapter lacked a final synchronous cross-store identity guard.",
+    "intendedBehavior": "Only one identical readable reference in each storage source coalesces, comparing every JSON metadata fact and exact payload with key order ignored and array order retained. Confirmed deletion rechecks the actual locked durable row and captured legacy bytes; storage errors, stale consent and concurrent data remain recoverable. No automatic retention changes.",
+    "replacementTests": [
+      "RISK backup mirror deletion: one confirmation removes exact migrated mirrors with reordered metadata and packed legacy neighbors",
+      "RISK backup mirror identity: divergent payload kinds dates and unknown metadata remain separate and fail closed",
+      "RISK backup mirror duplicates: identical same-source IDs stay ambiguous rather than coalescing into a deletable row",
+      "RISK backup mirror confirmation: cancel stale Settings and confirmation-time rewrites preserve both copies",
+      "RISK backup mirror concurrent deletion: fresh durable metadata and concurrent legacy appends are rechecked inside the delete transaction",
+      "RISK backup mirror storage failure: quota rejection and IndexedDB abort preserve recoverability and allow an explicit retry",
+      "RISK device backup final guard: rejected throwing and asynchronous guards abort before deleting a verified reference",
+      "RISK backup mirror FAQ: confirmed matching-copy deletion and ambiguous recovery preserve the seven-day age cue"
+    ],
+    "preservedCoverage": [
+      "All existing tests and assertions remain byte-exact to the base; legacy unique unreadable deletion/raw-byte fidelity, duplicate/ambiguous IDs, cross-tab append, automatic retirement exceptions, protected Restore/cloud adoption, old clients, completion/Undo and offline reload retain their existing coverage.",
+      "New private fixtures cover reordered metadata and payload placement, packed legacy recovery, shared immutable payload/head references, full unknown-field divergence and array order, same-source duplicates, cancellation/stale popup/confirmation rewrite, fresh durable metadata and legacy append, quota/transaction abort plus peer append during rollback, explicit retry and offline reload.",
+      "FAQ and changelog retain the strict >7 elapsed-day styling cue and opening Settings has no deletion side effects. Tests use isolated fake IndexedDB names and private localStorage maps."
+    ],
+    "redEvidence": {
+      "command": "/opt/local/bin/node --test --test-reporter=spec --test-name-pattern='RISK backup mirror|RISK device backup final guard' tests.js; /opt/local/bin/node --test --test-reporter=spec --test-name-pattern='RISK backup mirror FAQ' tests.js; /opt/local/bin/node --test --test-reporter=spec --test-name-pattern='RISK backup mirror|RISK device backup final guard' /tmp/chain-backup-evidence-20261006.y13_owu3/history-base-red/tests.js",
+      "failure": "red-delete-native.log captured all seven new selected contracts failing before index.html/device-store-v2.js implementation: valid mirror never reached confirmation, safe resolution remained blocked, identical same-source duplicates were invisibly coalesced, cancel/race/failure fixtures never reached the guarded delete, and the adapter ignored a refused final guard. red-delete-faq.log captured the absent verified-mirror explanation before FAQ/changelog edits. The peer-append-during-abort case adds preservation coverage to the already discriminating storage-failure regression; existing protected assertions were not modified. Before applying the unchanged fix to released history PR61, red-delete-on-history-base.log recorded all eight appended contracts failing for the same missing mirror identification, guard and FAQ behavior against exact base 39da9e861c7b02498ece45df5c9426e1f88e5cd2. Reconciliation preserves every released history test byte and excludes unshipped rain; only additive FAQ/changelog/map and mechanical fingerprints resolve conflicts."
+    }
+  },
+  {
     "testChangesSha256": "46cf2811be7db64c0d60d7f1b369c2c610c6672bc083279ff5f40ca491add362",
     "reason": "The user explicitly requested neutral/green/red context controls, an exclude-only No context filter, consistent Settings changelog styling and bottom Save settings. Add exact behavior and safety contracts without modifying existing passing assertions.",
     "previousBehavior": "Contexts toggled only active/inactive; no synthetic unassigned-task filter existed. Changelog lacked Settings disclosure styling and Save settings preceded Contexts and Data/backups.",

@@ -247,20 +247,26 @@
       store.put({...row,kind},id);await done;return true;
     }
 
-    async function deleteBackup(id,{payload,allowedKinds=[]}={}){
+    async function deleteBackup(id,{payload,allowedKinds=[],beforeDelete=null}={}){
       ensureOpen();
       const payloadHash=typeof payload==="string"?await sha(payload):null;
       const tx=db.transaction(["meta","snapshots","backups"],"readwrite"),done=transactionDone(tx),store=tx.objectStore("backups"),snapshotStore=tx.objectStore("snapshots");
-      const [row,head,rows]=await Promise.all([
-        requestResult(store.get(id)),requestResult(tx.objectStore("meta").get("head")),requestResult(store.getAll()),
-      ]);
-      if(!row||(payloadHash&&row.payloadHash!==payloadHash)||(allowedKinds.length&&!allowedKinds.includes(row.kind))){
-        tx.abort();try{await done;}catch(e){}return false;
-      }
-      store.delete(id);
-      if(head?.hash!==row.payloadHash&&!rows.some(other=>other.id!==id&&other.payloadHash===row.payloadHash))
-        snapshotStore.delete(row.payloadHash);
-      await done;return true;
+      try{
+        const [row,head,rows]=await Promise.all([
+          requestResult(store.get(id)),requestResult(tx.objectStore("meta").get("head")),requestResult(store.getAll()),
+        ]);
+        // A UI may also own an exact legacy mirror. Recheck its identity and
+        // retire that reference synchronously while this transaction holds the
+        // durable backup. A refused guard or failed commit keeps this copy.
+        if(!row||(payloadHash&&row.payloadHash!==payloadHash)||(allowedKinds.length&&!allowedKinds.includes(row.kind))||
+           (beforeDelete!==null&&(typeof beforeDelete!=="function"||beforeDelete({...row})!==true))){
+          tx.abort();try{await done;}catch(e){}return false;
+        }
+        store.delete(id);
+        if(head?.hash!==row.payloadHash&&!rows.some(other=>other.id!==id&&other.payloadHash===row.payloadHash))
+          snapshotStore.delete(row.payloadHash);
+        await done;return true;
+      }catch(error){try{tx.abort();}catch(e){}try{await done;}catch(e){}throw error;}
     }
 
     const pendingKey=account=>"pending:"+account;
