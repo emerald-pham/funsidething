@@ -571,6 +571,8 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 
 - RISK empty-chain explanation: selected Chance and Descending views name only their mode and preserve first-dot age rules
 
+- RISK scenery browser fixture: conditional reloads retain executable probes and late sky refresh cannot change the controlled background
+
 ## Migrated backup deletion safety
 
 - RISK backup mirror deletion: one confirmation removes exact migrated mirrors with reordered metadata and packed legacy neighbors

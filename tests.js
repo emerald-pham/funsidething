@@ -615,6 +615,28 @@ test('RISK shared scenery lights: one-minute independent roof samples remain sta
  for(const {on,total} of samples.values())assert.ok(on/total>.02&&on/total<.2,'independent one-in-twelve samples do not become all-on or a fifty-percent toggle');
 });
 
+test('RISK scenery browser fixture: conditional reloads retain executable probes and late sky refresh cannot change the controlled background',async()=>{
+ const source=fs.readFileSync(path.join(__dirname,'tests.js'),'utf8');
+ const start=source.indexOf("\ntest('RISK shared scenery browser:"),fragment=source.slice(start,source.indexOf("test('RISK list presentation browser:",start));
+ const routeBody=fragment.match(/await page\.route\('\*\*\/landscape\.js',async route=>\{([\s\S]*?)\n    \}\);/)[1];
+ const anchor='  resize();updateMotion();if(preference===null)openMotion();',requests=[],fulfills=[];
+ const route={request:()=>({headers:()=>({'if-modified-since':'Wed, 07 Oct 2026 00:00:00 GMT','if-none-match':'"private-fixture"','accept':'*/*'})}),
+  async fetch(options){requests.push(options);const conditional=!options?.headers||options.headers['if-modified-since']||options.headers['if-none-match'];return {status:()=>conditional?304:200,text:async()=>conditional?'':anchor};},async fulfill(value){fulfills.push(value);}};
+ await vm.runInNewContext(`(async()=>{${routeBody}})()`,{route,assert});
+ assert.equal(requests.length,1);assert.equal(requests[0].headers.accept,'*/*','retain ordinary request headers');
+ assert.equal(fulfills[0].response.status(),200,'a reload must receive executable source rather than an empty conditional response');
+ assert.match(fulfills[0].body,/globalThis\.sharedSceneProbe/);
+ const injection=fragment.match(/body=body\.replace\(anchor,anchor\+`([\s\S]*?)`\)/)[1];
+ let paletteInstant=100,sceneInstant=100,paints=0;const instant=200;
+ const context={Date:{now:()=>instant},performance:{now:()=>paints++},S:{weatherAt:()=>({status:'clear'})},sceneSnapshot:{},world:{elapsed:0},frame:0,
+  stop(){},syncScene(at){sceneInstant=at;context.sceneSnapshot={instant:at};},refreshSky(){paletteInstant=instant;},paintRainCloud(){},paintBackground(){},paintLife(){},back:{toDataURL:()=>String(paletteInstant)},front:{toDataURL:()=>String(sceneInstant)}};
+ vm.runInNewContext(injection,context);
+ const clear=context.sharedSceneProbe('clear');context.refreshSky();const rain=context.sharedSceneProbe('rain');
+ assert.equal(clear.back,String(instant),'the probe resolves the sky palette at the chosen clock before painting');
+ assert.equal(rain.back,clear.back,'a late authored-copy sky refresh cannot alter the controlled backdrop');
+ assert.deepEqual(rain.scene,clear.scene,'object timing remains identical too');
+});
+
 test('RISK shared scenery browser: isolated Chrome and WebKit devices reconstruct UTC objects and rain paint through reload resize and reduced motion',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
  const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT),instant=new Date('2026-10-06T03:23:42.125Z');
  for(const engine of [chromium,webkit]){
@@ -626,10 +648,11 @@ test('RISK shared scenery browser: isolated Chrome and WebKit devices reconstruc
     page.on('pageerror',error=>errors.push(error.message));await page.clock.setFixedTime(new Date(opened));
     await page.addInitScript(motion=>localStorage.setItem('fvp:chain-scanner:landscape-motion',motion),motion);
     await page.route('**/landscape.js',async route=>{
-     const response=await route.fetch();let body=await response.text();const anchor='  resize();updateMotion();if(preference===null)openMotion();';assert.ok(body.includes(anchor));
+     const headers={...route.request().headers()};delete headers['if-modified-since'];delete headers['if-none-match'];
+     const response=await route.fetch({headers});assert.equal(response.status(),200,'the diagnostic route requires a complete executable response');let body=await response.text();const anchor='  resize();updateMotion();if(preference===null)openMotion();';assert.ok(body.includes(anchor));
      body=body.replace(anchor,anchor+`
       globalThis.sharedSceneProbe=(status='clear')=>{
-       stop();syncScene(Date.now());const weatherAt=S.weatherAt;
+       refreshSky();stop();syncScene(Date.now());const weatherAt=S.weatherAt;
        S.weatherAt=()=>({status,intensity:status==='clear'?0:1,storm:status==='thunderstorm',slot:1});
        const original=paintRainCloud;let shaded=0;paintRainCloud=(...args)=>{shaded++;return original(...args);};
        const started=performance.now();paintBackground();paintLife(world.elapsed);const paintMs=performance.now()-started;
