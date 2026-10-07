@@ -108,6 +108,27 @@
       return {...meta,payload:snapshot.payload};
     }
 
+    async function withCurrentHead(expectedHash,visit){
+      ensureOpen();
+      if(typeof expectedHash!=="string"||!/^[0-9a-f]{64}$/.test(expectedHash)||typeof visit!=="function") return false;
+      // Optional legacy retirement must see the head and recovery references
+      // together. Keep peer head/reclassification writes queued until its
+      // synchronous decision finishes; this operation never changes IDB data.
+      const tx=db.transaction(["meta","snapshots","backups"],"readwrite"),done=transactionDone(tx);
+      try{
+        const [head,snapshot,backups]=await Promise.all([
+          requestResult(tx.objectStore("meta").get("head")),
+          requestResult(tx.objectStore("snapshots").get(expectedHash)),
+          requestResult(tx.objectStore("backups").getAll()),
+        ]);
+        if(head?.hash!==expectedHash||snapshot?.hash!==expectedHash||typeof snapshot?.payload!=="string"||
+           visit({...head,payload:snapshot.payload},backups.map(row=>({...row})))!==true){
+          tx.abort();try{await done;}catch(e){}return false;
+        }
+        await done;return true;
+      }catch(error){try{tx.abort();}catch(e){}try{await done;}catch(e){}throw error;}
+    }
+
     async function listBackups(){
       ensureOpen();
       const tx=db.transaction(["backups","snapshots"],"readonly"),backupStore=tx.objectStore("backups"),snapshotStore=tx.objectStore("snapshots");
@@ -298,7 +319,7 @@
     }
 
     async function close(){if(db){db.close();db=null;}}
-    const api={open,close,readHead,listBackups,listOpaqueArchives,migrateLegacy,commitHead,putBackup,
+    const api={open,close,readHead,withCurrentHead,listBackups,listOpaqueArchives,migrateLegacy,commitHead,putBackup,
       updateBackupKind,deleteBackup,getPendingUpload,setPendingUpload,clearPendingUpload,setLegacyFingerprint};
     return api;
   }
