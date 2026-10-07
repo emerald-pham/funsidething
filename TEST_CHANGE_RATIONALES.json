@@ -1946,5 +1946,31 @@
       "failure": "All six final regression tests were observed failing on the original reconcileHistory implementation before reinstating the app fix. Failures were assertions of resting task IDs remaining in chain membership (crumb/benchmark, stale remote winner, interaction release, legacy/rest boundary, offline cold reload and delayed read). Full raw red output is /Users/emeraldpham/Documents/Codex/2026-10-04/task-5/evergreen-sync-evidence/red-final-tests-before-app-fix.log; initial four-case raw red is red-discriminating-before-app-fix.log in that directory."
     },
     "testChangesSha256": "00d37b532d35eb58a1620e586f75b57c654ab1fb97342c742913a30c9c36baeb"
+  },
+  {
+    "testChangesSha256": "9d384430b4bf82002712f0a74bf73990bc963ee3e6ccc5cb775d0f208eec2ad8",
+    "reason": "The user requested fixes for the three independently reproduced scan lifecycle bugs while preserving the existing ranking algorithms.",
+    "previousBehavior": "Resting evergreen Dot silently learned a pair then lost its dot; old remote Chance draws were refreshed only after saving; Start picked an age anchor before expired exclusions were cleared.",
+    "intendedBehavior": "Reject resting Dot before mutation, save an adopted repaired pass before conditional cloud publication, and reconcile current eligibility before the neutral first dot.",
+    "replacementTests": [
+      "RISK scan lifecycle: resting evergreen Dot is absent and stale controls cannot mutate ratings edits or Undo",
+      "RISK scan lifecycle: Return before Dot and expired rests retain pair learning manual overrides and one-gesture Undo",
+      "RISK scan lifecycle: interval edits that revive an evergreen rest save once without a discarded Dot comparison",
+      "RISK scan lifecycle: first Start reconciles timed holds at their exact boundary in both modes without teaching rank",
+      "RISK scan lifecycle: first Start sweeps stale day marks and evergreen rest while retaining oldest never-done priority",
+      "RISK scan lifecycle sync: repaired old remote Chance draw is durable across all stores and offline reload",
+      "RISK scan lifecycle sync: concurrent old-pass repairs converge by revision without replaying ratings or Done",
+      "RISK scan lifecycle sync: failed local repair persistence holds adoption and a newer cloud revision cannot be overwritten",
+      "RISK scan lifecycle FAQ: Dot rest boundary current Start eligibility and durable remote refresh are explained"
+    ],
+    "preservedCoverage": [
+      "Accepted manual Dot still compares only to its benchmark and overrides context, date, and dependency filters; completion, timed housekeeping, and first dots stay neutral.",
+      "Chance formula, weighted frozen ordering, fallback and tie rules, descending mean ordering, oldest never-done priority, and ordinary matching-preference Resume remain intact.",
+      "Existing completion History, Undo, all three storage backends, conditional cloud revision conflicts, newer remote edits, and failed local adoption remain protected."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='RISK scan lifecycle' tests.js",
+      "failure": "Before implementation all nine new regressions failed: offered resting Dot and discarded pair mutation, exact-expiry first Start, old day anchor, unsaved legacy remote seed, no automatic competing repair publication, unsaved retry, and missing FAQ. Full output: /tmp/chain-mode-fixes-evidence-20261006.Ke4YJT/red-native.log The finalized concurrency barrier and matching-preference Resume fixture also produced nine failures on an isolated unchanged 06cae95 archive: /tmp/chain-mode-fixes-evidence-20261006.Ke4YJT/red-finalized-tests-original.log."
+    }
   }
 ]

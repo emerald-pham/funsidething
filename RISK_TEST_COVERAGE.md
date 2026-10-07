@@ -530,3 +530,17 @@ The editor hook blocks app or enforcement edits while tests.js has no staged or 
 - RISK context offline browser: installed shell reload retains exclusions settings tasks and completion Undo through reconnect
 - RISK context rendering: an imported empty context ID retains its real selector state and unknown fields in Settings
 - RISK context marker browser: green checks and red exclusions retain readable symbols in both themes
+
+## Scanner lifecycle repairs
+
+Resting completion cannot teach a discarded Dot, first Start uses current eligibility, and adopted Chance repairs save before conditional publication. Both modes retain the neutral oldest never-done first dot and accepted manual Dot signals.
+
+- RISK scan lifecycle: resting evergreen Dot is absent and stale controls cannot mutate ratings edits or Undo
+- RISK scan lifecycle: Return before Dot and expired rests retain pair learning manual overrides and one-gesture Undo
+- RISK scan lifecycle: interval edits that revive an evergreen rest save once without a discarded Dot comparison
+- RISK scan lifecycle: first Start reconciles timed holds at their exact boundary in both modes without teaching rank
+- RISK scan lifecycle: first Start sweeps stale day marks and evergreen rest while retaining oldest never-done priority
+- RISK scan lifecycle sync: repaired old remote Chance draw is durable across all stores and offline reload
+- RISK scan lifecycle sync: concurrent old-pass repairs converge by revision without replaying ratings or Done
+- RISK scan lifecycle sync: failed local repair persistence holds adoption and a newer cloud revision cannot be overwritten
+- RISK scan lifecycle FAQ: Dot rest boundary current Start eligibility and durable remote refresh are explained

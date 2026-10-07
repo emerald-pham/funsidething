@@ -20800,3 +20800,218 @@ test('RISK overall Chance list order FAQ: overall shares explain highest-first r
  const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
  for(const pattern of [/ordered by overall share, highest first/i,/equal shares.*existing rank order/i,/fallback rows follow.*descending likelihood/i,/ineligible rows.*last/i,/descending mode.*top-K/i])assert.match(help,pattern);
 });
+
+const MODE_LIFECYCLE_NOW=new Date(2026,9,6,12).getTime();
+const modeLifecycleCopy=value=>JSON.parse(JSON.stringify(value));
+let modeLifecycleSerial=0;
+async function modeLifecycleApp(options={}){
+ const serial=++modeLifecycleSerial;
+ const app=await loadApp({seed:8800+serial,beforeStateReady:ctx=>setFakeTime(ctx,MODE_LIFECYCLE_NOW),...options});
+ setFakeTime(app.ctx,MODE_LIFECYCLE_NOW);
+ return app;
+}
+function modeLifecycleEdit(app,task,{hours=18,title=task.title}={}){
+ app.ctx.openEdit(task.id);
+ fillEditPane(app.ctx,app.shim,{title,evergreen:task.evergreen,ctxIds:task.ctx});
+ app.shim.document.getElementById('etEverHours').value=String(hours);
+ app.shim.document.getElementById('etEverUnit').value='hours';
+ app.shim.document.getElementById('etEverReset').checked=false;
+}
+async function modeLifecycleRemoteFixture(){
+ const app=await modeLifecycleApp();
+ for(let i=0;i<8;i++)app.ctx.addTask('Private selection fixture '+i);
+ app.ctx.startScan('chance');app.ctx.state.snooze=100;
+ const base=modeLifecycleCopy(app.ctx.state);
+ Object.assign(base,{syncRev:20,syncDirty:false,syncAccount:'e@example.com'});
+ const remote=modeLifecycleCopy(base);
+ remote.passStartedAt=MODE_LIFECYCLE_NOW-48*HOUR;
+ remote.chance.at=MODE_LIFECYCLE_NOW-48*HOUR;
+ remote.chance.seed='private-stale-remote-draw';
+ return {base,remote};
+}
+async function modeLifecycleWaitFor(predicate,message){
+ for(let i=0;i<160;i++){if(predicate())return;await syncSettle(5);}
+ assert.ok(predicate(),message);
+}
+
+test('RISK scan lifecycle: resting evergreen Dot is absent and stale controls cannot mutate ratings edits or Undo',async()=>{
+ for(const mode of ['chance','descending']){
+  const app=await modeLifecycleApp(),{ctx,shim}=app;
+  const anchor=ctx.addTask('Anchor'),rest=ctx.addTask('Resting evergreen');
+  Object.assign(rest,{evergreen:true,evergreenHours:18,evergreenResetAtDay:false});
+  ctx.startScan(mode);ctx.doneTask(rest.id);modeLifecycleEdit(app,rest,{title:'Unsaved stale title'});
+  assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/data-act="dot-task"/,'a resting evergreen has Return as candidate, not Dot');
+  const before=JSON.stringify(ctx.state),undoDepth=vm.runInContext('undoStack.length',ctx);
+  ctx.onAction('dot-task',{dataset:{id:rest.id}});ctx.dotTask(rest.id);
+  assert.equal(JSON.stringify(ctx.state),before,'a stale or direct Dot cannot save form fields, teach a preference, or cancel rest');
+  assert.equal(vm.runInContext('undoStack.length',ctx),undoDepth,'rejected Dot creates no Undo gesture');
+  assert.equal(ctx.benchmark().id,anchor.id);assert.equal(ctx.state.workLog.length,1);
+ }
+});
+
+test('RISK scan lifecycle: Return before Dot and expired rests retain pair learning manual overrides and one-gesture Undo',async()=>{
+ for(const mode of ['chance','descending']){
+  const app=await modeLifecycleApp(),{ctx,shim}=app,anchor=ctx.addTask('Anchor'),task=ctx.addTask('Recurring task');
+  Object.assign(task,{evergreen:true,evergreenHours:18,evergreenResetAtDay:false});
+  ctx.startScan(mode);ctx.doneTask(task.id);
+  const resting=JSON.stringify(ctx.state),ratings=JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma]));
+  ctx.dotTask(task.id);assert.equal(JSON.stringify(ctx.state),resting,'rest cannot produce a comparison that reconciliation discards');
+  ctx.returnAsCandidate(task.id);assert.equal(task.lastDoneAt,null);assert.equal(ctx.state.workLog.length,1);
+  task.startsAt=ctx.todayISO(1);task.ctx=['private-inactive'];ctx.state.contexts.push({id:'private-inactive',name:'Inactive',active:false});
+  ctx.writeTaskPrerequisites(task,[anchor.id]);assert.equal(ctx.isEligible(task),false);
+  modeLifecycleEdit(app,task);shim.document.getElementById('etStart').value=task.startsAt;
+  const beforeDot=JSON.stringify(ctx.state);
+  ctx.onAction('dot-task',{dataset:{id:task.id}});
+  assert.equal(ctx.benchmark().id,task.id,'manual Dot still overrides context, date and unresolved dependencies');
+  assert.notEqual(JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma])),ratings,'an accepted Dot teaches its actual benchmark pair');
+  assert.equal(ctx.state.workLog.length,1);ctx.undo();
+  assert.equal(JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma])),ratings);
+  assert.deepEqual([...ctx.state.chain],JSON.parse(beforeDot).chain);
+  Object.assign(ctx.state.tasks.find(t=>t.id===task.id),{lastDoneAt:MODE_LIFECYCLE_NOW-18*HOUR});
+  ctx.openEdit(task.id);assert.match(shim.document.getElementById('modalRoot').innerHTML,/data-act="dot-task"/,'exactly expired rest permits Dot');
+  ctx.dotTask(task.id);assert.equal(ctx.benchmark().id,task.id);assert.equal(ctx.state.workLog.length,1);
+ }
+});
+
+test('RISK scan lifecycle: interval edits that revive an evergreen rest save once without a discarded Dot comparison',async()=>{
+ const app=await modeLifecycleApp(),{ctx}=app,anchor=ctx.addTask('Anchor'),task=ctx.addTask('Expired recurring task');
+ Object.assign(task,{evergreen:true,evergreenHours:1,evergreenResetAtDay:false,lastDoneAt:MODE_LIFECYCLE_NOW-2*HOUR});
+ ctx.startScan('chance');modeLifecycleEdit(app,task,{hours:18,title:'Longer recurring task'});
+ const ratings=JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma]));
+ ctx.onAction('dot-task',{dataset:{id:task.id}});
+ assert.equal(task.title,'Longer recurring task');assert.equal(task.evergreenHours,18);
+ assert.equal(ctx.benchmark().id,anchor.id);assert.equal(task.lastDoneAt,MODE_LIFECYCLE_NOW-2*HOUR);
+ assert.equal(JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma])),ratings,'saving an interval does not teach an impossible Dot');
+ await ctx.persist();const saved=JSON.parse(app.shim.localStorage.getItem(SYNC_STORE_KEY));
+ assert.equal(saved.tasks.find(t=>t.id===task.id).evergreenHours,18,'the deliberate field edits still save');
+ ctx.undo();const restored=ctx.state.tasks.find(t=>t.id===task.id);
+ assert.equal(restored.title,'Expired recurring task');assert.equal(restored.evergreenHours,1);
+ assert.equal(JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma])),ratings);
+});
+
+test('RISK scan lifecycle: first Start reconciles timed holds at their exact boundary in both modes without teaching rank',async()=>{
+ for(const mode of ['chance','descending'])for(const kind of ['cant','worked'])for(const offset of [-1,0,1]){
+  const {ctx}=await modeLifecycleApp(),task=ctx.addTask('Private timed hold');
+  ctx.state.considered[task.id]=kind;
+  ctx.state.settings.cantMin=1;ctx.state.settings.workedHours=1;
+  const duration=kind==='cant'?60000:HOUR;
+  ctx.state[kind==='cant'?'cantAt':'workedAt'][task.id]=MODE_LIFECYCLE_NOW;
+  setFakeTime(ctx,MODE_LIFECYCLE_NOW+duration+offset);
+  const ratings=JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma]));
+  ctx.startScan(mode);
+  assert.equal(ctx.benchmark()?.id,offset<0?undefined:task.id,`${mode} ${kind} ${offset}: the first click uses current eligibility`);
+  assert.equal(JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma])),ratings,'the first dot and timer housekeeping are neutral');
+  assert.equal(ctx.state.candidateId,null);
+  if(offset>=0)assert.equal(ctx.state.passStartedAt,MODE_LIFECYCLE_NOW+duration+offset);
+ }
+});
+
+test('RISK scan lifecycle: first Start sweeps stale day marks and evergreen rest while retaining oldest never-done priority',async()=>{
+ for(const mode of ['chance','descending'])for(const kind of ['day','evergreen']){
+  const {ctx}=await modeLifecycleApp(),doneBefore=ctx.addTask('Earlier completed task'),neverDone=ctx.addTask('Oldest never done'),newer=ctx.addTask('Newer never done');
+  ctx.state.settings.scanMode=mode;
+  Object.assign(doneBefore,{createdAt:MODE_LIFECYCLE_NOW-3*HOUR,lastDoneAt:MODE_LIFECYCLE_NOW-2*HOUR,mu:100});
+  Object.assign(neverDone,{createdAt:MODE_LIFECYCLE_NOW-2*HOUR,mu:-20});
+  Object.assign(newer,{createdAt:MODE_LIFECYCLE_NOW-HOUR,mu:200,startsAt:ctx.todayISO(1)});
+  if(kind==='day'){
+   ctx.state.considered[neverDone.id]='no';ctx.state.passStartedAt=MODE_LIFECYCLE_NOW-48*HOUR;
+  }else{
+   doneBefore.evergreen=true;doneBefore.evergreenHours=1;doneBefore.evergreenResetAtDay=false;
+   ctx.state.considered[doneBefore.id]='done';ctx.state.considered[neverDone.id]='cant';
+   ctx.state.cantAt[neverDone.id]=MODE_LIFECYCLE_NOW-60000;ctx.state.settings.cantMin=1;
+  }
+  const ratings=JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma]));ctx.startScan(mode);
+  assert.equal(ctx.benchmark()?.id,neverDone.id,'a stale exclusion cannot replace the never-done age exception with a higher mean');
+  assert.equal(JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma])),ratings);
+  const seed=ctx.state.chance?.seed,candidate=ctx.state.candidateId;
+  ctx.onAction('resume-scan',{dataset:{}});
+  assert.equal(ctx.state.chance?.seed,seed,'ordinary same-pass Resume remains frozen');assert.equal(ctx.state.candidateId,candidate);
+ }
+});
+
+test('RISK scan lifecycle sync: repaired old remote Chance draw is durable across all stores and offline reload',async()=>{
+ const {indexedDB}=await import('fake-indexeddb');
+ for(const backend of ['legacy','transactional','host']){
+  const {base,remote}=await modeLifecycleRemoteFixture(),h=makeSyncHarness({remote,rev:21,delayMs:1});
+  const dbName='private-mode-lifecycle-'+(++modeLifecycleSerial);
+  const storageOptions=backend==='host'?{hostStorage:{[SYNC_STORE_KEY]:JSON.stringify(base)}}:
+   {seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(base)},...(backend==='transactional'?{indexedDBProvider:indexedDB,deviceDbName:dbName}:{})};
+  const app=await modeLifecycleApp({...storageOptions,cloudSyncFactory:h.factory}),{ctx,shim}=app;
+  await ctx.cloudPull();await modeLifecycleWaitFor(()=>ctx.state.syncRev>=21,'the higher remote revision must be adopted');
+  const seed=ctx.state.chance.seed,order=Array.from(ctx.candidateOrder(ctx.pool()),t=>t.id);
+  assert.notEqual(seed,remote.chance.seed,'the old local 2 AM boundary needs a fresh draw');
+  let bytes;
+  if(backend==='transactional'){
+   assert.ok(shim.window.ScannerDeviceStore,'the transactional case must actually use the production IndexedDB adapter');
+   bytes=(await shim.window.ScannerDeviceStore.readHead()).payload;
+  }else bytes=backend==='host'?(await shim.window.storage.get(SYNC_STORE_KEY)).value:shim.localStorage.getItem(SYNC_STORE_KEY);
+  const saved=JSON.parse(bytes);
+  assert.equal(saved.chance.seed,seed,`${backend}: the adopted visible draw must be saved before returning`);
+  assert.equal(saved.passStartedAt,MODE_LIFECYCLE_NOW);
+  const reloaded=await modeLifecycleApp(backend==='transactional'?{sharedStorage:shim.localStorage,indexedDBProvider:indexedDB,deviceDbName:dbName}:
+   backend==='host'?{hostStorage:{[SYNC_STORE_KEY]:bytes}}:{seedStorage:{[SYNC_STORE_KEY]:bytes}});
+  assert.equal(reloaded.ctx.state.chance.seed,seed);assert.deepEqual(Array.from(reloaded.ctx.candidateOrder(reloaded.ctx.pool()),t=>t.id),order);
+  assert.deepEqual(modeLifecycleCopy(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma])),remote.tasks.map(t=>[t.id,t.mu,t.sigma]),'adoption and refresh teach no preference');
+  ctx.cloudPushNow();await modeLifecycleWaitFor(()=>h.remoteState().chance.seed===seed,'the durable repair must be acknowledged by the cloud');
+  const writes=h.calls.filter(call=>call==='push').length;
+  await ctx.cloudPull();await ctx.cloudPull();await syncSettle(25);
+  assert.equal(ctx.state.chance.seed,seed);assert.equal(h.calls.filter(call=>call==='push').length,writes,'equal reads do not reseed or republish an acknowledged repair');
+ }
+});
+
+test('RISK scan lifecycle sync: concurrent old-pass repairs converge by revision without replaying ratings or Done',async()=>{
+ const {base,remote}=await modeLifecycleRemoteFixture(),rest=remote.tasks[2];
+ Object.assign(rest,{evergreen:true,evergreenHours:18,evergreenResetAtDay:false,lastDoneAt:MODE_LIFECYCLE_NOW});
+ remote.workLog.push({id:'private-completion',taskId:rest.id,title:rest.title,kind:'evergreen-done',at:MODE_LIFECYCLE_NOW});
+ remote.chain.push(rest.id);
+ const h=makeSyncHarness({remote,rev:21,delayMs:8});
+ let writesStarted=0,releaseWrites;const bothWrites=new Promise(resolve=>{releaseWrites=resolve;});
+ const factory=()=>{
+  const CS=h.factory(),push=CS.push;
+  CS.push=async(...args)=>{if(++writesStarted===2)releaseWrites();await bothWrites;return push(...args);};
+  return CS;
+ };
+ const options={seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(base)},cloudSyncFactory:factory};
+ const [a,b]=await Promise.all([modeLifecycleApp(options),modeLifecycleApp(options)]);
+ await Promise.all([a.ctx.cloudPull(),b.ctx.cloudPull()]);
+ await modeLifecycleWaitFor(()=>a.ctx.state.syncRev>=21&&b.ctx.state.syncRev>=21,'both clients adopt the same old document');
+ await modeLifecycleWaitFor(()=>h.remoteState().chance.seed!==remote.chance.seed,'adoption itself must publish its durable repair without an unrelated edit');
+ await syncSettle(80);
+ await Promise.all([a.ctx.cloudPull(),b.ctx.cloudPull()]);await syncSettle(100);
+ const canonical=h.remoteState();assert.notEqual(canonical.chance.seed,remote.chance.seed,'one durable repair must replace the stale seed');
+ for(const app of [a,b]){
+  assert.equal(app.ctx.state.chance.seed,canonical.chance.seed,'revision conflicts converge on one frozen draw');
+  assert.equal(app.ctx.state.tasks.find(t=>t.id===rest.id).lastDoneAt,MODE_LIFECYCLE_NOW);
+  assert.equal(app.ctx.state.workLog.filter(e=>e.taskId===rest.id).length,1);assert.ok(!app.ctx.state.chain.includes(rest.id));
+  assert.deepEqual(modeLifecycleCopy(app.ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma])),remote.tasks.map(t=>[t.id,t.mu,t.sigma]));
+  assert.equal(JSON.parse(app.shim.localStorage.getItem(SYNC_STORE_KEY)).chance.seed,canonical.chance.seed,'the converged canonical draw is durable on both devices');
+ }
+ assert.ok(h.conflicts>0,'the fixture must exercise competing conditional writes');
+});
+
+test('RISK scan lifecycle sync: failed local repair persistence holds adoption and a newer cloud revision cannot be overwritten',async()=>{
+ const {base,remote}=await modeLifecycleRemoteFixture(),h=makeSyncHarness({remote:base,rev:20,delayMs:1});
+ const app=await modeLifecycleApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(base)},cloudSyncFactory:h.factory}),{ctx,shim}=app;
+ await ctx.cloudPull();await syncSettle(15);
+ const before=modeLifecycleCopy(ctx.state),write=shim.localStorage.setItem.bind(shim.localStorage);
+ shim.localStorage.setItem=(key,value)=>{if(key===SYNC_STORE_KEY||key===SYNC_HEAD_KEY)throw Error('private modeled quota');write(key,value);};
+ h.writeBehindBack(remote);await ctx.cloudPull();await syncSettle(20);
+ assert.equal(ctx.state.chance.seed,before.chance.seed,'an unsaved adoption keeps the previous visible pass');
+ assert.equal(h.calls.filter(call=>call==='push').length,0,'a failed durable save cannot publish a fresh seed');
+ shim.localStorage.setItem=write;await ctx.cloudPull();
+ await modeLifecycleWaitFor(()=>ctx.state.syncRev>=21,'retry adopts the still-current revision');
+ const repairedSeed=ctx.state.chance.seed;
+ assert.equal(JSON.parse(shim.localStorage.getItem(SYNC_STORE_KEY)).chance.seed,repairedSeed,'the successful retry saves its repair');
+ const latest=modeLifecycleCopy(remote);latest.tasks[0].title='Newest independent title';latest.passStartedAt=MODE_LIFECYCLE_NOW;
+ latest.chance.at=MODE_LIFECYCLE_NOW;latest.chance.seed='private-newest-draw';h.writeBehindBack(latest);
+ ctx.cloudPushNow();await syncSettle(50);await ctx.cloudPull();await syncSettle(50);
+ assert.equal(h.remoteState().tasks[0].title,'Newest independent title');assert.equal(ctx.state.tasks[0].title,'Newest independent title');
+ assert.equal(ctx.state.chance.seed,'private-newest-draw','a later canonical draw wins over the local repair');
+});
+
+test('RISK scan lifecycle FAQ: Dot rest boundary current Start eligibility and durable remote refresh are explained',async()=>{
+ const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ for(const pattern of [/Dot.*unavailable.*evergreen.*rest/i,/Return as candidate.*before.*Dot/i,/Start.*expired.*can.t.*worked/i,/remote.*fresh.*draw.*saved.*reload/i])assert.match(help,pattern);
+ const changelog=html.match(/<!-- changelog:start -->([\s\S]*?)<!-- changelog:end -->/)[1];
+ for(const pattern of [/resting evergreen.*Dot/i,/expired.*holds.*Start/i,/remote.*Chance.*reload/i])assert.match(changelog,pattern);
+});
