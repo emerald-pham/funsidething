@@ -470,7 +470,7 @@ test('RISK shared scenery: deterministic opportunities preserve rail rare-show r
  for(const event of seen.values())assert.ok(!timeline.at(event.start+event.duration*1000+.001).events.some(e=>e.id===event.id),'every finite visitor retires at its own complete exit');
  const shows=[...seen.values()].filter(e=>e.type==='fireworks').sort((a,b)=>a.start-b.start);
  assert.ok(shows.length>=2,'the deterministic private night includes repeated shows');
- for(let i=1;i<shows.length;i++)assert.ok(shows[i].start-shows[i-1].start>=2*(shows[i-1].duration+60)*1000-1,'the existing doubled sampled start interval is preserved');
+ for(let i=1;i<shows.length;i++)assert.ok(shows[i].start-shows[i-1].start>=4*(shows[i-1].duration+60)*1000-1,'the released sampled start interval is doubled again');
 });
 
 test('RISK rain cloud consistency: every drifting cloud uses the shaded rain contour while clear daytime clouds retain their paint',()=>{
@@ -897,11 +897,11 @@ test('RISK fireworks duration: each standalone show samples one to five minutes 
   sky.advance(w,1,night);const show=w.events.find(e=>e.type==='fireworks');
   assert.ok(show);assert.ok(Math.abs(show.duration-expected)<1e-9,'show duration uses its own bounded arrival sample');
   assert.equal(show.speed,1,'stationary fireworks never speed up their sampled duration');
-  assert.equal(w.nextFireworks,w.elapsed+2*(show.duration+60),'doubling the sampled start-to-next-opportunity interval halves show occurrences without lengthening the visible show');
+  assert.equal(w.nextFireworks,w.elapsed+4*(show.duration+60),'quadrupling the original sampled start-to-next-opportunity interval halves the released show occurrences again without lengthening the visible show');
   sky.advance(w,expected/2,night);assert.equal(show.duration,expected,'frames never resample duration');
   assert.equal(w.events.filter(e=>e.type==='fireworks').length,1,'a long show cannot overlap another show');
   sky.advance(w,expected/2,night);assert.ok(!w.events.includes(show),'the event retires at its sampled end');
-  sky.advance(w,expected+119,night);assert.equal(w.events.filter(e=>e.type==='fireworks').length,0,'the doubled occurrence interval includes the sampled duration and full quiet period');
+  sky.advance(w,3*expected+239,night);assert.equal(w.events.filter(e=>e.type==='fireworks').length,0,'the quadrupled occurrence interval includes the sampled duration and full quiet period');
   sky.advance(w,1,night);assert.equal(w.events.filter(e=>e.type==='fireworks').length,1,'a successful later roll starts another bounded show');
  }
 });
@@ -19257,7 +19257,7 @@ test('RISK night shows: standalone fireworks recur independently of the rare coo
  assert.equal(w.lastRare,0,'standalone shows do not delay the festival or alien visit');
  for(let i=0;i<70;i++)sky.advance(w,1,night);
  assert.equal(w.events.filter(e=>e.type==='fireworks').length,0,'the minimum-minute show finishes before its full rest');
- for(let i=0;i<170;i++)sky.advance(w,1,night);
+ for(let i=0;i<410;i++)sky.advance(w,1,night);
  assert.equal(w.events.filter(e=>e.type==='fireworks').length,1,'a second independent show starts after its sampled duration and full rest');
  assert.ok(w.events.length<=sky.MAX_EVENTS);
  const day=sky.createWorld(()=>0);day.events=[];day.next=Infinity;day.railNext=w.railNext;day.nextFireworks=0;day.nextFestival=0;
@@ -20752,7 +20752,7 @@ test('RISK backup age styling: Delete turns destructive strictly after seven ela
  }
 });
 
-test('RISK fireworks occurrence: standalone sampled starts are exactly twice as far apart while duration odds budgets and festival timing stay intact',()=>{
+test('RISK fireworks occurrence: standalone sampled starts are exactly four times the original interval while duration odds budgets and festival timing stay intact',()=>{
  const load=(released=false)=>{const context=vm.createContext({Date,Math,console});for(const file of ['landscape-config.js','vendor/astronomy.min.js','stars.js','landscape-core.js']){let source=fs.readFileSync(path.join(__dirname,file),'utf8');if(released){const r=spawnSync('git',['show','d4ceaaa74f9494538d16044b968f8cfcfe75fb5b:'+file],{cwd:__dirname,encoding:'utf8'});assert.equal(r.status,0);source=r.stdout;}vm.runInContext(source,context);}return context;};
  for(const rate of [0,1,2,10]){
   const trace=context=>{let seed=97631;const random=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/2**32;},sky=context.LivingSky;
@@ -20761,7 +20761,7 @@ test('RISK fireworks occurrence: standalone sampled starts are exactly twice as 
    const shows=[];for(let i=0;i<100&&shows.length<5;i++){sky.advance(world,world.nextFireworks-world.elapsed,{sun:{altitude:-20,azimuth:0}});const show=world.events.find(e=>e.type==='fireworks');if(show)shows.push({start:world.elapsed,duration:show.duration});assert.ok(world.events.length<=sky.MAX_EVENTS);}return shows;};
   const legacy=load(true),current=load(),before=trace(legacy),after=trace(current);
   assert.deepEqual(after.map(e=>e.duration),before.map(e=>e.duration),'only occurrence timing changes, never sampled show duration');
-  assert.deepEqual(after.map(e=>e.start),before.map(e=>e.start*2),'every same-sample start, including failed chances, is spaced by exactly twice the released schedule');
+  assert.deepEqual(after.map(e=>e.start),before.map(e=>e.start*4),'every same-sample start, including failed chances, is spaced by exactly four times the original schedule');
   assert.equal(current.LandscapeConfig.nightShows.fireworks.chance,legacy.LandscapeConfig.nightShows.fireworks.chance,'do not confuse opportunity frequency with conditional odds');
   assert.deepEqual(JSON.parse(JSON.stringify(current.LandscapeConfig.nightShows.festival)),JSON.parse(JSON.stringify(legacy.LandscapeConfig.nightShows.festival)),'the barge visit and rare-event cooldown stay intact');
   assert.equal(current.LivingSky.MAX_EVENTS,legacy.LivingSky.MAX_EVENTS);
@@ -20793,7 +20793,7 @@ test('RISK fireworks density and finale: paired regular shells lead to eight vis
 test('RISK product FAQ: backup age fireworks and resting remote completions match the shipped controls',async()=>{
  const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
  assert.match(help,/Delete.*red.*more than seven days/i);
- assert.match(help,/twice as far apart/i);assert.match(help,/paired shells/i);assert.match(help,/eight-shell finale/i);
+ assert.match(help,/half as often again/i);assert.match(help,/0–100 milliseconds/i);assert.match(help,/illuminate only their trails/i);assert.match(help,/paired shells/i);assert.match(help,/eight-shell finale/i);
  assert.match(help,/fairy.light poles.*selected.*night/i,'the scenery FAQ explains event-only supports');
  assert.match(help,/completed on another device.*scanner chain/i);
  const instructions=fs.readFileSync(path.join(__dirname,'AGENTS.md'),'utf8');assert.match(instructions,/commit, push, merge, and release/i);
@@ -21486,4 +21486,43 @@ test('RISK backup mirror FAQ: confirmed matching-copy deletion and ambiguous rec
  assert.match(help,/If a copy changes while you confirm, reopen Settings and try again/);
  assert.match(help,/more than seven days old; exactly seven days stays neutral/);assert.match(help,/opening Settings does not delete a backup/);
  const current=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];assert.match(current,/Identical migrated backup copies appear once and can be deleted after one confirmation/);
+});
+
+
+test('RISK fireworks pair delay: seeded second launches span zero to one hundred milliseconds without shifting first shells or finale',()=>{
+ const context=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),context);
+ const delays=[];
+ for(const festival of [false,true])for(const seed of [0,.01,.17,.4,.73,.99])for(const wave of (festival?[15,18,20,24]:[0,1,7,15])){
+  const start=(festival?8:0)+wave*(festival?3.8:2.1),event={duration:festival?150:180,seed},g=context.LandscapeGeometry.create(1440,900);
+  const burst=wave*2,first=g.fireworks(start+.000001,seed,festival,event);
+  assert.ok(first.some(d=>d.burst===burst),'first shell launches at the original wave time');
+  let lo=0,hi=.100001;
+  for(let i=0;i<30;i++){const mid=(lo+hi)/2;if(g.fireworks(start+mid,seed,festival,event).some(d=>d.burst===burst+1))hi=mid;else lo=mid;}
+  assert.ok(hi<=.100001,'second shell launches within 100 ms');delays.push(hi);
+  const at=g.fireworks(start+.4,seed,festival,event);assert.deepEqual(g.fireworks(start+.4,seed,festival,event),at,'repaint never resamples launch delay');
+  const other=context.LandscapeGeometry.create(390,844).fireworks(start+hi+.000001,seed,festival,event);
+  assert.ok(other.some(d=>d.burst===burst+1),'responsive geometry keeps the same launch instant');
+ }
+ assert.ok(delays.some(d=>d>.01),'pairs must not launch simultaneously');assert.ok(delays.some(d=>d<.02)&&delays.some(d=>d>.08),'samples cover both ends of the uniform interval');
+ const source=fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8');assert.doesNotMatch(source.slice(source.indexOf('    function fireworks('),source.indexOf('    const sunReflection=')),/Math\.random|setTimeout/,'launch timing is a pure seeded time function');
+});
+
+test('RISK fireworks frequency again: released scale two becomes four in live UTC scheduling and legacy advancement',()=>{
+ const context=sceneTimeline();assert.equal(context.LandscapeConfig.nightShows.fireworks.occurrenceScale,4);
+ const released=vm.createContext({Math});vm.runInContext(spawnSync('git',['show','4128b8def8979a288659c821cf086cc2bb4f656c:landscape-config.js'],{encoding:'utf8',cwd:__dirname}).stdout,released);assert.equal(released.LandscapeConfig.nightShows.fireworks.occurrenceScale,2,'immutable actual released baseline has already been halved once');
+ const source=fs.readFileSync(path.join(__dirname,'landscape-timeline.js'),'utf8');assert.doesNotMatch(source,/start\+2\*\(proposals/,'midnight reservations must use the configured occurrence scale');
+ const options={seed:'fireworks-half-again',sunAt:()=>({altitude:-20,azimuth:0})};const a=context.LandscapeTimeline.create(options),b=context.LandscapeTimeline.create(options);
+ for(const at of [86399000,86480000,86560000,172880000])assert.deepEqual(a.at(at),b.at(at),'reload and midnight remain history independent');
+});
+
+
+test('RISK fireworks ascent paint: only the launch trail glows while explosion particle paint stays identical',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),paint=source.slice(source.indexOf('  function paintFireworks('),source.indexOf('  function paintClocktowerVisit('));
+ for(const kind of ['rocket','spark']){
+  const strokes=[],heads=[],g={save(){},restore(){},drawImage(){}};
+  vm.runInNewContext(`${paint};paintFireworks('festival')`,{g,sky:{sun:{altitude:-20}},world:{events:[{type:'festival',age:.4,seed:.4}]},scenePose:e=>e,S:{smooth:()=>0},geometry:{fireworks:()=>[{kind,x:10,y:20,tailX:9,tailY:22,alpha:.8,burst:0,size:1}]},line(...args){strokes.push(args.slice(1));},ellipse(...args){heads.push({args:args.slice(1),alpha:g.globalAlpha});}});
+  assert.equal(strokes.length,1,'ascent and explosion tails retain their stroke');
+  assert.equal(heads.length,kind==='rocket'?0:2,'only an ascending shell loses its tip and halo');
+  if(kind==='spark'){assert.equal(heads[0].alpha,.8*.12);assert.equal(heads[1].alpha,.8);assert.deepEqual(heads.map(h=>h.args.slice(0,4)),[[10,20,2.3,2.3],[10,20,1,1]]);}
+ }
 });

@@ -667,6 +667,7 @@
             line(g,a.x,a.y,z.x,z.y,ink,.45+i*.10);
           }
         }else{g.globalAlpha=dot.alpha*night;line(g,dot.tailX,dot.tailY,dot.x,dot.y,ink,1);}
+        if(dot.kind==='rocket')continue;
         const size=dot.size||.9;
         g.globalAlpha=dot.alpha*night*.12;ellipse(g,dot.x,dot.y,size*2.3,size*2.3,ink);
         g.globalAlpha=dot.alpha*night;ellipse(g,dot.x,dot.y,size,size,ink);

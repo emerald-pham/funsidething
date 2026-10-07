@@ -455,7 +455,7 @@ The editor hook blocks app or enforcement edits while tests.js has no staged or 
 
 - RISK fairy light poles: only a selected nighttime string paints its supports through day and spawn transitions
 - RISK backup age styling: Delete turns destructive strictly after seven elapsed days for either storage source without changing bytes
-- RISK fireworks occurrence: standalone sampled starts are exactly twice as far apart while duration odds budgets and festival timing stay intact
+- RISK fireworks occurrence: standalone sampled starts are exactly four times the original interval while duration odds budgets and festival timing stay intact
 - RISK fireworks density and finale: paired regular shells lead to eight visible finale shells within a fixed budget and natural fade
 - RISK product FAQ: backup age fireworks and resting remote completions match the shipped controls
 - RISK multiple dependencies legacy publications: distinct accepted edits survive an unobserved removal and repeated reads stay idempotent
@@ -585,3 +585,7 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK backup mirror storage failure: quota rejection and IndexedDB abort preserve recoverability and allow an explicit retry
 - RISK device backup final guard: rejected throwing and asynchronous guards abort before deleting a verified reference
 - RISK backup mirror FAQ: confirmed matching-copy deletion and ambiguous recovery preserve the seven-day age cue
+
+- `RISK fireworks pair delay: seeded second launches span zero to one hundred milliseconds without shifting first shells or finale` — deterministic per-pair stagger and responsive ignition preservation.
+- `RISK fireworks frequency again: released scale two becomes four in live UTC scheduling and legacy advancement` — repeat frequency reduction and midnight reservations.
+- `RISK fireworks ascent paint: only the launch trail glows while explosion particle paint stays identical` — trail-only ascent and unchanged bloom tip rendering.
