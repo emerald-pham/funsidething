@@ -1,5 +1,41 @@
 [
   {
+    "testChangesSha256": "68d60b965b08e6e2822493e388e0dc209b2487ca5551b31edc9c11b6e99852d0",
+    "reason": "Independent source diagnoses found recurring reload timeouts hide collected startup errors. Add failure-only fixture evidence rather than infer a product cache or dependency defect.",
+    "previousBehavior": "The probe wait failed before the final pageerror assertion; the error lacked navigation tuple, delivered payload provenance, bootstrap stage and failed-document globals. Retained server logs alone could not identify the missing initializer phase.",
+    "intendedBehavior": "Preserve the original timeout and every eight-context assertion while reporting navigation-tagged errors, request/route failures, exact original/injected payload hashes and headers, delivery marker, dependency/host state and bootstrap checkpoints. Capture/write failures cannot replace the original timeout.",
+    "replacementTests": [
+      "RISK scenery reload diagnostics: missing probes retain navigation errors delivery and bootstrap state without replacing the original timeout"
+    ],
+    "preservedCoverage": [
+      "Exact backdrop preservation and deliberate mutation rejection, seeded UTC logical scenes, full paint bounds, cloud counts, reduced motion, independent reload/resize redraws and zero page errors remain unchanged.",
+      "Service workers stay blocked; privacy, renderer, cache behavior, clock setup and timeout duration are unchanged. Diagnostic state contains isolated fixture metadata and no production tasks or account storage.",
+      "No product bootstrap fix is inferred from missing server requests. Failure provenance is recorded to discriminate delivered script, guard, spawn fetch and initializer paths."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='RISK scenery reload diagnostics:' tests.js",
+      "failure": "/tmp/chain-rain-evidence/reload-diagnostics-red.log failed because probe waits did not capture startup errors before reporting a timeout. Added native fixtures verify navigation/module/error capture and exact original-error rethrow even when execution-context capture and evidence writes fail."
+    }
+  },
+  {
+    "testChangesSha256": "496feedb18c85607ac2135b54787af76e3162b146bfbca810b3925c2dce6315c",
+    "reason": "Independent source diagnoses found recurring reload timeouts hide collected startup errors. Add failure-only fixture evidence rather than infer a product cache or dependency defect.",
+    "previousBehavior": "The probe wait failed before the final pageerror assertion; the error lacked navigation tuple, delivered payload provenance, bootstrap stage and failed-document globals. Retained server logs alone could not identify the missing initializer phase.",
+    "intendedBehavior": "Preserve the original timeout and every eight-context assertion while reporting navigation-tagged errors, request/route failures, exact original/injected payload hashes and headers, delivery marker, dependency/host state and bootstrap checkpoints. Capture/write failures cannot replace the original timeout.",
+    "replacementTests": [
+      "RISK scenery reload diagnostics: missing probes retain navigation errors delivery and bootstrap state without replacing the original timeout"
+    ],
+    "preservedCoverage": [
+      "Exact backdrop preservation and deliberate mutation rejection, seeded UTC logical scenes, full paint bounds, cloud counts, reduced motion, independent reload/resize redraws and zero page errors remain unchanged.",
+      "Service workers stay blocked; privacy, renderer, cache behavior, clock setup and timeout duration are unchanged. Diagnostic state contains isolated fixture metadata and no production tasks or account storage.",
+      "No product bootstrap fix is inferred from missing server requests. Failure provenance is recorded to discriminate delivered script, guard, spawn fetch and initializer paths."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='RISK scenery reload diagnostics:' tests.js",
+      "failure": "/tmp/chain-rain-evidence/reload-diagnostics-red.log failed because probe waits did not capture startup errors before reporting a timeout. Added native fixtures verify navigation/module/error capture and exact original-error rethrow even when execution-context capture and evidence writes fail."
+    }
+  },
+  {
     "testChangesSha256": "7e6dcd8a0941f55bfcf73df53cd322e956dfa9373f2512da5c56542332132d98",
     "reason": "User authorized a fixture repair after released-base same-weather redraws reproduced the exact candidate pixel variants. Preserve the exact accepted-backdrop weather assertion while separating unrelated independent rasterization.",
     "previousBehavior": "Every clear/rain probe refreshed and repainted the backdrop independently; released Chrome Metal produced 29-pixel differences during identical clear-only redraws with identical logical inputs. This conflated backdrop preservation with browser rasterization stability.",

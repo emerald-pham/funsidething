@@ -621,14 +621,14 @@ test('RISK scenery browser fixture: conditional reloads retain executable probes
  const routeBody=fragment.match(/await page\.route\('\*\*\/landscape\.js',async route=>\{([\s\S]*?)\n    \}\);/)[1];
  const anchor='  resize();updateMotion();if(preference===null)openMotion();',requests=[],fulfills=[];
  const route={request:()=>({headers:()=>({'if-modified-since':'Wed, 07 Oct 2026 00:00:00 GMT','if-none-match':'"private-fixture"','accept':'*/*'})}),
-  async fetch(options){requests.push(options);const conditional=!options?.headers||options.headers['if-modified-since']||options.headers['if-none-match'];return {status:()=>conditional?304:200,text:async()=>conditional?'':anchor};},async fulfill(value){fulfills.push(value);}};
- await vm.runInNewContext(`(async()=>{${routeBody}})()`,{route,assert});
+  async fetch(options){requests.push(options);const conditional=!options?.headers||options.headers['if-modified-since']||options.headers['if-none-match'];return {status:()=>conditional?304:200,headers:()=>({'content-type':'application/javascript'}),text:async()=>conditional?'':anchor};},async fulfill(value){fulfills.push(value);}};
+ await vm.runInNewContext(`(async()=>{${routeBody}})()`,{route,assert,routeEvidence:[],navigation:'native fixture',createHash,Buffer});
  assert.equal(requests.length,1);assert.equal(requests[0].headers.accept,'*/*','retain ordinary request headers');
  assert.equal(fulfills[0].response.status(),200,'a reload must receive executable source rather than an empty conditional response');
  assert.match(fulfills[0].body,/globalThis\.sharedSceneProbe/);
  const injection=fragment.match(/body=body\.replace\(anchor,anchor\+`([\s\S]*?)`\)/)[1];
  let paletteInstant=100,sceneInstant=100,paints=0;const instant=200;
- const context={Date:{now:()=>instant},performance:{now:()=>paints++},S:{weatherAt:()=>({status:'clear'})},sceneSnapshot:{},world:{elapsed:0},frame:0,
+ const context={Date:{now:()=>instant},performance:{now:()=>paints++},S:{weatherAt:()=>({status:'clear'})},sceneSnapshot:{},world:{elapsed:0},frame:0,sharedSceneBootstrap:{},
   stop(){},syncScene(at){sceneInstant=at;context.sceneSnapshot={instant:at};},refreshSky(){paletteInstant=instant;},paintRainCloud(){},paintBackground(){},paintLife(){},back:{toDataURL:()=>String(paletteInstant)},front:{toDataURL:()=>String(sceneInstant)}};
  vm.runInNewContext(injection,context);
  context.sharedScenePrepare();const clear=context.sharedSceneProbe('clear');context.refreshSky();const rain=context.sharedSceneProbe('rain');
@@ -641,7 +641,7 @@ test('RISK scenery rain preservation fixture: one accepted backdrop survives exa
  const source=fs.readFileSync(path.join(__dirname,'tests.js'),'utf8'),start=source.indexOf("\ntest('RISK shared scenery browser:"),fragment=source.slice(start,source.indexOf("test('RISK list presentation browser:",start));
  const injection=fragment.match(/body=body\.replace\(anchor,anchor\+`([\s\S]*?)`\)/)[1];
  let background=0,backgroundPaints=0,lifePaints=0,mutate=false;const instant=200;
- const context={Date:{now:()=>instant},performance:{now:()=>lifePaints},S:{weatherAt:()=>({status:'clear'})},sceneSnapshot:{},world:{elapsed:0},frame:0,
+ const context={Date:{now:()=>instant},performance:{now:()=>lifePaints},S:{weatherAt:()=>({status:'clear'})},sceneSnapshot:{},world:{elapsed:0},frame:0,sharedSceneBootstrap:{},
   stop(){},syncScene(at){context.sceneSnapshot={instant:at,seed:'private-seed'};},refreshSky(){context.syncScene(instant);context.paintBackground();},
   paintRainCloud(){},paintBackground(){backgroundPaints++;background++;},paintLife(){lifePaints++;if(mutate)background++;},back:{toDataURL:()=>String(background)},front:{toDataURL:()=>String(lifePaints)}};
  vm.runInNewContext(injection,context);
@@ -656,6 +656,20 @@ test('RISK scenery rain preservation fixture: one accepted backdrop survives exa
  mutate=false;const redrawn=context.sharedScenePrepare();assert.equal(backgroundPaints,2,'a separate preparation really redraws the scene');assert.notEqual(redrawn.back,prepared.back,'the negative raster fixture changes every redraw');assert.deepEqual(redrawn.scene,prepared.scene,'independent redraw retains the logical seed and instant');
 });
 
+test('RISK scenery reload diagnostics: missing probes retain navigation errors delivery and bootstrap state without replacing the original timeout',async()=>{
+ const source=fs.readFileSync(path.join(__dirname,'tests.js'),'utf8'),start=source.indexOf("\ntest('RISK shared scenery browser:"),fragment=source.slice(start,source.indexOf("test('RISK list presentation browser:",start));
+ const begin=fragment.indexOf('    const awaitProbe=async stage=>');assert.ok(begin>=0,'probe waits must capture startup errors before reporting a timeout');
+ const helper=fragment.slice(begin,fragment.indexOf('    await page.goto',begin));
+ for(const failedCapture of [false,true]){
+  const original=new Error('private original reload timeout'),writes=[];
+  const context={page:{waitForFunction:async()=>{throw original;},evaluate:async()=>{if(failedCapture)throw Error('private missing execution context');return {delivery:true,probe:'undefined',bootstrap:{stage:'guard'},modules:{LivingSky:'undefined'},host:true};}},
+   engine:1,chromium:1,width:768,height:1024,zone:'America/Los_Angeles',motion:'reduced',opened:'private',navigation:'reload',errors:[{navigation:'reload',message:'private initializer error'}],consoleErrors:[],requestFailures:[],routeEvidence:[{navigation:'reload',status:200,injectedBytes:123}],process:{env:{}},path,
+   fs:{mkdirSync(){if(failedCapture)throw Error('private evidence write failure');},writeFileSync(file,data){writes.push(JSON.parse(data));}}};
+  await assert.rejects(vm.runInNewContext('(async()=>{'+helper+"await awaitProbe('reload');})()",context),error=>error===original,'diagnostics never replace the original timeout');
+  if(!failedCapture){assert.equal(writes.length,1);assert.equal(writes[0].stage,'reload');assert.equal(writes[0].errors[0].message,'private initializer error');assert.equal(writes[0].routeEvidence[0].navigation,'reload');assert.equal(writes[0].state.modules.LivingSky,'undefined');}
+ }
+});
+
 test('RISK shared scenery browser: isolated Chrome and WebKit devices reconstruct UTC objects and rain paint through reload resize and reduced motion',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
  const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT),instant=new Date('2026-10-06T03:23:42.125Z');
  for(const engine of [chromium,webkit]){
@@ -663,12 +677,18 @@ test('RISK shared scenery browser: isolated Chrome and WebKit devices reconstruc
   try{
    let expected=null;
    for(const [width,height,zone,motion,opened] of [[390,844,'Asia/Tokyo','normal','2026-10-05T22:20Z'],[768,1024,'America/Los_Angeles','reduced','2026-10-06T03:20Z'],[1440,900,'UTC','normal','2026-10-06T03:23Z'],[568,320,'America/New_York','reduced','2026-10-05T23:59Z']]){
-    const page=await browser.newPage({viewport:{width,height},timezoneId:zone,serviceWorkers:'block',deviceScaleFactor:1}),errors=[];
+    const page=await browser.newPage({viewport:{width,height},timezoneId:zone,serviceWorkers:'block',deviceScaleFactor:1}),errors=[],requestFailures=[],routeEvidence=[],consoleErrors=[];let navigation='initial';
     page.on('pageerror',error=>errors.push(error.message));await page.clock.setFixedTime(new Date(opened));
     await page.addInitScript(motion=>localStorage.setItem('fvp:chain-scanner:landscape-motion',motion),motion);
-    await page.route('**/landscape.js',async route=>{
+    await page.route('**/landscape.js',async route=>{try{
      const headers={...route.request().headers()};delete headers['if-modified-since'];delete headers['if-none-match'];
      const response=await route.fetch({headers});assert.equal(response.status(),200,'the diagnostic route requires a complete executable response');let body=await response.text();const anchor='  resize();updateMotion();if(preference===null)openMotion();';assert.ok(body.includes(anchor));
+     routeEvidence.push({navigation,status:response.status(),headers:response.headers(),originalSha:createHash('sha256').update(body).digest('hex'),originalBytes:Buffer.byteLength(body)});
+     body="globalThis.sharedSceneDelivery=true;\n"+body;
+     body=body.replace("  const S=globalThis.LivingSky,host=document.getElementById('landscape');","  globalThis.sharedSceneBootstrap={stage:'entered'};const S=globalThis.LivingSky,host=document.getElementById('landscape');globalThis.sharedSceneBootstrap={stage:'guard',hasHost:!!host,hasSky:!!S};");
+     body=body.replace("  // Apply local rates before creating the opening cast, including zero rates.","  globalThis.sharedSceneBootstrap.stage='spawn-pending';// Apply local rates before creating the opening cast, including zero rates.");
+     body=body.replace("  const back=host.querySelector('[data-scenery]'),front=host.querySelector('[data-life]');","  globalThis.sharedSceneBootstrap.stage='spawn-ready';const back=host.querySelector('[data-scenery]'),front=host.querySelector('[data-life]');");
+     body=body.replace(anchor,"globalThis.sharedSceneBootstrap.stage='before-initial-paint';"+anchor);
      body=body.replace(anchor,anchor+`
       globalThis.sharedScenePrepare=()=>{
        const original=paintBackground;let backgroundPaints=0;paintBackground=(...args)=>{backgroundPaints++;return original(...args);};
@@ -686,10 +706,16 @@ test('RISK shared scenery browser: isolated Chrome and WebKit devices reconstruc
        try{paintLife(world.elapsed);
         return {scene:JSON.parse(JSON.stringify(sceneSnapshot)),shaded,backgroundPaints,paintMs:performance.now()-started,back:back.toDataURL(),front:front.toDataURL(),frame};
        }finally{paintRainCloud=original;paintBackground=originalBackground;S.weatherAt=weatherAt;}
-      };
-     `);await route.fulfill({response,body});
+      };globalThis.sharedSceneBootstrap.stage='probe-installed';
+     `);routeEvidence.at(-1).injectedSha=createHash('sha256').update(body).digest('hex');routeEvidence.at(-1).injectedBytes=Buffer.byteLength(body);await route.fulfill({response,body});
+    }catch(routeError){routeEvidence.push({navigation,failure:routeError.message});throw routeError;}
     });
-    await page.goto(process.env.LANDSCAPE_BROWSER_URL);await page.waitForFunction(()=>typeof sharedSceneProbe==='function');
+
+    const awaitProbe=async stage=>{try{await page.waitForFunction(()=>typeof sharedSceneProbe==='function');}catch(error){
+     let state;try{state=await page.evaluate(()=>({url:location.href,delivery:globalThis.sharedSceneDelivery,readyState:document.readyState,hidden:document.hidden,bootstrap:globalThis.sharedSceneBootstrap,probe:typeof globalThis.sharedSceneProbe,prepare:typeof globalThis.sharedScenePrepare,host:!!document.getElementById('landscape'),modules:Object.fromEntries(['LivingSky','Astronomy','LandscapeConfig','LandscapeTimeline','LandscapeMood','LandscapeGeometry','LandscapeAppearance'].map(key=>[key,typeof globalThis[key]])),scripts:[...document.scripts].filter(script=>script.src).map(script=>({src:script.src,defer:script.defer,async:script.async,type:script.type})),resources:performance.getEntriesByType('resource').map(entry=>({name:entry.name,duration:entry.duration,transferSize:entry.transferSize}))}));}catch(captureError){state={captureError:captureError.message};}
+     const evidence={stage,engine:engine===chromium?'chrome':'webkit',width,height,zone,motion,opened,errors,consoleErrors,requestFailures,routeEvidence,state,originalError:error.message};try{fs.mkdirSync(process.env.SCENE_TRACE_DIR||'/tmp/chain-rain-evidence/reload-diagnostic',{recursive:true});fs.writeFileSync(path.join(process.env.SCENE_TRACE_DIR||'/tmp/chain-rain-evidence/reload-diagnostic','reload-timeout.json'),JSON.stringify(evidence,null,2));}catch(writeError){error.message+=' (diagnostic write failed: '+writeError.message+')';}throw error;
+    }};
+    await page.goto(process.env.LANDSCAPE_BROWSER_URL);await awaitProbe('initial');
     await page.evaluate(()=>{document.getElementById('motionDialog')?.close();closeModal();document.documentElement.classList.add('viewing-scene');document.querySelector('.wrap').inert=true;});
     await page.evaluate(()=>{for(let i=0;i<1000;i++)Math.random();});await page.clock.setFixedTime(instant);
     const {prepared,clear,rain}=await page.evaluate(()=>{const prepared=sharedScenePrepare(),clear=sharedSceneProbe('clear'),rain=sharedSceneProbe('rain');return {prepared,clear,rain};});
@@ -700,7 +726,7 @@ test('RISK shared scenery browser: isolated Chrome and WebKit devices reconstruc
     assert.notEqual(rain.front,clear.front,'the composed cloud/rain canvas actually changes');assert.equal(rain.back,clear.back,'accepted skyline/hills remain unchanged by the rain painter');
     assert.ok(rain.paintMs<500,'a complete diagnostic scene paint remains bounded');assert.equal(rain.frame,0,'a stopped/reduced diagnostic has no frame loop');
     if(process.env.SCENE_EVIDENCE_DIR){await page.locator('#landscape').screenshot({path:path.join(process.env.SCENE_EVIDENCE_DIR,`${engine===chromium?'chrome':'webkit'}-${width}x${height}-rain.png`)});await page.evaluate(()=>sharedSceneProbe('clear'));await page.locator('#landscape').screenshot({path:path.join(process.env.SCENE_EVIDENCE_DIR,`${engine===chromium?'chrome':'webkit'}-${width}x${height}-clear.png`)});}
-    await page.reload();await page.waitForFunction(()=>typeof sharedSceneProbe==='function');assert.deepEqual((await page.evaluate(()=>{const prepared=sharedScenePrepare();if(prepared.backgroundPaints!==1)throw Error('expected one independent background redraw');return sharedSceneProbe();})).scene,expected,'an interrupted/reloaded page reconstructs the exact instant');
+    navigation='reload';await page.reload();await awaitProbe('reload');assert.deepEqual((await page.evaluate(()=>{const prepared=sharedScenePrepare();if(prepared.backgroundPaints!==1)throw Error('expected one independent background redraw');return sharedSceneProbe();})).scene,expected,'an interrupted/reloaded page reconstructs the exact instant');
     await page.setViewportSize({width:width+31,height:height+19});assert.deepEqual((await page.evaluate(()=>{const prepared=sharedScenePrepare();if(prepared.backgroundPaints!==1)throw Error('expected one independent background redraw');return sharedSceneProbe();})).scene,expected,'resize cannot consume event random draws');
     assert.deepEqual(errors,[]);await page.close();
    }
