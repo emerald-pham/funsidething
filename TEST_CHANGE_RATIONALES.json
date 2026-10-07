@@ -1,5 +1,22 @@
 [
   {
+    "testChangesSha256": "f263ce5f2aee044fbb511413ad87652cee7c535b7de7f4b82bcdcb412ed0feb1",
+    "reason": "User approved the audited held-key bug fix; repeated decision events must not act on replacement candidates.",
+    "previousBehavior": "Held Yes and No recorded preferences for successive candidates, and held Cant skipped successive candidates without a fresh keypress.",
+    "intendedBehavior": "Ignore repeat Y N C decision events while preserving fresh decisions, comparison orientation, neutral Cant, saved chance ordering and exact-rating Undo.",
+    "replacementTests": [
+      "RISK held decision keys: Yes No and Cant repeats cannot judge or skip replacement candidates while fresh presses still work",
+      "RISK held decision keys FAQ: keyboard guidance names one fresh keypress per Yes No or Cant decision"
+    ],
+    "preservedCoverage": [
+      "Existing TrueSkill math, eligibility, mouse identity guards, Done repeat handling, storage, cloud sync and historical observation tests remain intact."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK held decision keys' tests.js",
+      "failure": "/tmp/chain-held-key-red.txt: both tests failed; repeated y in descending mode changed replacement ratings and observation history, and keyboard FAQ guidance was absent."
+    }
+  },
+  {
     "testChangesSha256": "28950f7437ee2ad85c68a4abc0f7a13082ab49c82f31ad43625b6b823a1c5d41",
     "reason": "Emerald requested another halving of standalone show frequency, seeded per-pair ignition staggering and trail-only shell ascent.",
     "previousBehavior": "Released scale two schedules paired simultaneous ignitions and paints shell-tip glow during ascent.",
