@@ -615,6 +615,67 @@ test('RISK shared scenery lights: one-minute independent roof samples remain sta
  for(const {on,total} of samples.values())assert.ok(on/total>.02&&on/total<.2,'independent one-in-twelve samples do not become all-on or a fifty-percent toggle');
 });
 
+test('RISK scenery browser fixture: conditional reloads retain executable probes and late sky refresh cannot change the controlled background',async()=>{
+ const source=fs.readFileSync(path.join(__dirname,'tests.js'),'utf8');
+ const start=source.indexOf("\ntest('RISK shared scenery browser:"),fragment=source.slice(start,source.indexOf("test('RISK list presentation browser:",start));
+ const routeBody=fragment.match(/await page\.route\('\*\*\/landscape\.js',async route=>\{([\s\S]*?)\n    \}\);/)[1];
+ const anchor='  resize();updateMotion();if(preference===null)openMotion();',requests=[],fulfills=[];
+ const route={request:()=>({headers:()=>({'if-modified-since':'Wed, 07 Oct 2026 00:00:00 GMT','if-none-match':'"private-fixture"','accept':'*/*'})}),
+  async fetch(options){requests.push(options);const conditional=!options?.headers||options.headers['if-modified-since']||options.headers['if-none-match'];return {status:()=>conditional?304:200,headers:()=>({'content-type':'application/javascript'}),text:async()=>conditional?'':anchor};},async fulfill(value){fulfills.push(value);}};
+ await vm.runInNewContext(`(async()=>{${routeBody}})()`,{route,assert,routeEvidence:[],navigation:'native fixture',createHash,Buffer});
+ assert.equal(requests.length,1);assert.equal(requests[0].headers.accept,'*/*','retain ordinary request headers');
+ assert.equal(fulfills[0].response.status(),200,'a reload must receive executable source rather than an empty conditional response');
+ assert.match(fulfills[0].body,/globalThis\.sharedSceneProbe/);
+ const injection=fragment.match(/body=body\.replace\(anchor,anchor\+`([\s\S]*?)`\)/)[1];
+ let paletteInstant=100,sceneInstant=100,paints=0;const instant=200;
+ const context={Date:{now:()=>instant},performance:{now:()=>paints++},S:{weatherAt:()=>({status:'clear'})},sceneSnapshot:{},world:{elapsed:0},frame:0,sharedSceneBootstrap:{},
+  stop(){},syncScene(at){sceneInstant=at;context.sceneSnapshot={instant:at};},refreshSky(){paletteInstant=instant;},paintRainCloud(){},paintBackground(){},paintLife(){},back:{toDataURL:()=>String(paletteInstant)},front:{toDataURL:()=>String(sceneInstant)}};
+ vm.runInNewContext(injection,context);
+ context.sharedScenePrepare();const clear=context.sharedSceneProbe('clear');context.refreshSky();const rain=context.sharedSceneProbe('rain');
+ assert.equal(clear.back,String(instant),'the probe resolves the sky palette at the chosen clock before painting');
+ assert.equal(rain.back,clear.back,'a late authored-copy sky refresh cannot alter the controlled backdrop');
+ assert.deepEqual(rain.scene,clear.scene,'object timing remains identical too');
+});
+
+test('RISK scenery rain preservation fixture: one accepted backdrop survives exact weather comparisons and detects a mutated backdrop',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'tests.js'),'utf8'),start=source.indexOf("\ntest('RISK shared scenery browser:"),fragment=source.slice(start,source.indexOf("test('RISK list presentation browser:",start));
+ const injection=fragment.match(/body=body\.replace\(anchor,anchor\+`([\s\S]*?)`\)/)[1];
+ let background=0,backgroundPaints=0,lifePaints=0,mutate=false;const instant=200;
+ const context={Date:{now:()=>instant},performance:{now:()=>lifePaints},S:{weatherAt:()=>({status:'clear'})},sceneSnapshot:{},world:{elapsed:0},frame:0,sharedSceneBootstrap:{},
+  stop(){},syncScene(at){context.sceneSnapshot={instant:at,seed:'private-seed'};},refreshSky(){context.syncScene(instant);context.paintBackground();},
+  paintRainCloud(){},paintBackground(){backgroundPaints++;background++;},paintLife(){lifePaints++;if(mutate)background++;},back:{toDataURL:()=>String(background)},front:{toDataURL:()=>String(lifePaints)}};
+ vm.runInNewContext(injection,context);
+ const prepared=context.sharedScenePrepare?.()||context.sharedSceneProbe('clear'),clear=context.sharedSceneProbe('clear'),rain=context.sharedSceneProbe('rain');
+ assert.equal(backgroundPaints,1,'prepare one accepted backdrop rather than rerasterizing it for each weather');
+ assert.equal(prepared.backgroundPaints,1,'preparation explicitly proves the background redraw contract');
+ assert.equal(clear.backgroundPaints,0);assert.equal(rain.backgroundPaints,0,'weather paints never repaint the cached backdrop');
+ assert.equal(clear.back,prepared.back);assert.equal(rain.back,clear.back,'exact bytes remain protected');assert.deepEqual(rain.scene,clear.scene);
+ mutate=true;const corrupt=context.sharedSceneProbe('rain');
+ const preservationAssertion=fragment.match(/assert\.equal\(rain\.back,clear\.back,'accepted skyline\/hills remain unchanged by the rain painter'\);/)[0];
+ assert.throws(()=>vm.runInNewContext(preservationAssertion,{assert,rain:corrupt,clear}),/accepted skyline/,'a deliberately mutated backdrop must fail the actual browser assertion');
+ mutate=false;const redrawn=context.sharedScenePrepare();assert.equal(backgroundPaints,2,'a separate preparation really redraws the scene');assert.notEqual(redrawn.back,prepared.back,'the negative raster fixture changes every redraw');assert.deepEqual(redrawn.scene,prepared.scene,'independent redraw retains the logical seed and instant');
+});
+
+test('RISK scenery reload diagnostics: missing probes retain navigation errors delivery and bootstrap state without replacing the original timeout and capture actual browser events',async()=>{
+ const source=fs.readFileSync(path.join(__dirname,'tests.js'),'utf8'),start=source.indexOf("\ntest('RISK shared scenery browser:"),fragment=source.slice(start,source.indexOf("test('RISK list presentation browser:",start));
+ const handlers={},eventContext={page:{on:(name,callback)=>{handlers[name]=callback;}},errors:[],requestFailures:[],consoleErrors:[],navigation:'reload'};
+ const listeners=fragment.slice(fragment.indexOf("    page.on('pageerror'"),fragment.indexOf('await page.clock.setFixedTime'));
+ vm.runInNewContext(listeners,eventContext);
+ assert.equal(typeof handlers.requestfailed,'function','network failures must be captured by the real listener');assert.equal(typeof handlers.console,'function','console errors must be captured by the real listener');
+ handlers.pageerror(Error('private initializer error'));handlers.requestfailed({url:()=>'/private/module.js',failure:()=>({errorText:'private network failure'})});handlers.console({type:()=> 'error',text:()=> 'private console error'});handlers.console({type:()=> 'log',text:()=> 'ignored'});
+ assert.deepEqual(JSON.parse(JSON.stringify(eventContext.errors)),[{navigation:'reload',message:'private initializer error'}]);assert.deepEqual(JSON.parse(JSON.stringify(eventContext.requestFailures)),[{navigation:'reload',url:'/private/module.js',error:'private network failure'}]);assert.deepEqual(JSON.parse(JSON.stringify(eventContext.consoleErrors)),[{navigation:'reload',message:'private console error'}]);
+ const begin=fragment.indexOf('    const awaitProbe=async stage=>');assert.ok(begin>=0,'probe waits must capture startup errors before reporting a timeout');
+ const helper=fragment.slice(begin,fragment.indexOf('    await page.goto',begin));
+ for(const failedCapture of [false,true]){
+  const original=new Error('private original reload timeout'),writes=[];
+  const context={page:{waitForFunction:async()=>{throw original;},evaluate:async()=>{if(failedCapture)throw Error('private missing execution context');return {delivery:true,probe:'undefined',bootstrap:{stage:'guard'},modules:{LivingSky:'undefined'},host:true};}},
+   engine:1,chromium:1,width:768,height:1024,zone:'America/Los_Angeles',motion:'reduced',opened:'private',navigation:'reload',errors:[{navigation:'reload',message:'private initializer error'}],consoleErrors:[],requestFailures:[],routeEvidence:[{navigation:'reload',status:200,injectedBytes:123}],process:{env:{}},path,
+   fs:{mkdirSync(){if(failedCapture)throw Error('private evidence write failure');},writeFileSync(file,data){writes.push(JSON.parse(data));}}};
+  await assert.rejects(vm.runInNewContext('(async()=>{'+helper+"await awaitProbe('reload');})()",context),error=>error===original,'diagnostics never replace the original timeout');
+  if(!failedCapture){assert.equal(writes.length,1);assert.equal(writes[0].stage,'reload');assert.equal(writes[0].errors[0].message,'private initializer error');assert.equal(writes[0].routeEvidence[0].navigation,'reload');assert.equal(writes[0].state.modules.LivingSky,'undefined');}
+ }
+});
+
 test('RISK shared scenery browser: isolated Chrome and WebKit devices reconstruct UTC objects and rain paint through reload resize and reduced motion',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
  const {chromium,webkit}=await import(process.env.LANDSCAPE_PLAYWRIGHT),instant=new Date('2026-10-06T03:23:42.125Z');
  for(const engine of [chromium,webkit]){
@@ -622,35 +683,59 @@ test('RISK shared scenery browser: isolated Chrome and WebKit devices reconstruc
   try{
    let expected=null;
    for(const [width,height,zone,motion,opened] of [[390,844,'Asia/Tokyo','normal','2026-10-05T22:20Z'],[768,1024,'America/Los_Angeles','reduced','2026-10-06T03:20Z'],[1440,900,'UTC','normal','2026-10-06T03:23Z'],[568,320,'America/New_York','reduced','2026-10-05T23:59Z']]){
-    const page=await browser.newPage({viewport:{width,height},timezoneId:zone,serviceWorkers:'block',deviceScaleFactor:1}),errors=[];
-    page.on('pageerror',error=>errors.push(error.message));await page.clock.setFixedTime(new Date(opened));
+    const page=await browser.newPage({viewport:{width,height},timezoneId:zone,serviceWorkers:'block',deviceScaleFactor:1}),errors=[],requestFailures=[],routeEvidence=[],consoleErrors=[];let navigation='initial';
+    page.on('pageerror',error=>errors.push({navigation,message:error.message}));
+    page.on('requestfailed',request=>requestFailures.push({navigation,url:request.url(),error:request.failure()?.errorText}));
+    page.on('console',message=>{if(message.type()==='error')consoleErrors.push({navigation,message:message.text()});});await page.clock.setFixedTime(new Date(opened));
     await page.addInitScript(motion=>localStorage.setItem('fvp:chain-scanner:landscape-motion',motion),motion);
-    await page.route('**/landscape.js',async route=>{
-     const response=await route.fetch();let body=await response.text();const anchor='  resize();updateMotion();if(preference===null)openMotion();';assert.ok(body.includes(anchor));
+    await page.route('**/landscape.js',async route=>{try{
+     const headers={...route.request().headers()};delete headers['if-modified-since'];delete headers['if-none-match'];
+     const response=await route.fetch({headers});assert.equal(response.status(),200,'the diagnostic route requires a complete executable response');let body=await response.text();const anchor='  resize();updateMotion();if(preference===null)openMotion();';assert.ok(body.includes(anchor));
+     routeEvidence.push({navigation,status:response.status(),headers:response.headers(),originalSha:createHash('sha256').update(body).digest('hex'),originalBytes:Buffer.byteLength(body)});
+     body="globalThis.sharedSceneDelivery=true;\n"+body;
+     body=body.replace("  const S=globalThis.LivingSky,host=document.getElementById('landscape');","  globalThis.sharedSceneBootstrap={stage:'entered'};const S=globalThis.LivingSky,host=document.getElementById('landscape');globalThis.sharedSceneBootstrap={stage:'guard',hasHost:!!host,hasSky:!!S};");
+     body=body.replace("  // Apply local rates before creating the opening cast, including zero rates.","  globalThis.sharedSceneBootstrap.stage='spawn-pending';// Apply local rates before creating the opening cast, including zero rates.");
+     body=body.replace("  const back=host.querySelector('[data-scenery]'),front=host.querySelector('[data-life]');","  globalThis.sharedSceneBootstrap.stage='spawn-ready';const back=host.querySelector('[data-scenery]'),front=host.querySelector('[data-life]');");
+     body=body.replace(anchor,"globalThis.sharedSceneBootstrap.stage='before-initial-paint';"+anchor);
      body=body.replace(anchor,anchor+`
+      globalThis.sharedScenePrepare=()=>{
+       const original=paintBackground;let backgroundPaints=0;paintBackground=(...args)=>{backgroundPaints++;return original(...args);};
+       const started=performance.now();
+       try{if(typeof W==='number'&&(W!==host.clientWidth||H!==host.clientHeight))resize();else refreshSky();stop();syncScene(Date.now());
+        return {scene:JSON.parse(JSON.stringify(sceneSnapshot)),backgroundPaints,paintMs:performance.now()-started,back:back.toDataURL()};
+       }finally{paintBackground=original;}
+      };
       globalThis.sharedSceneProbe=(status='clear')=>{
        stop();syncScene(Date.now());const weatherAt=S.weatherAt;
        S.weatherAt=()=>({status,intensity:status==='clear'?0:1,storm:status==='thunderstorm',slot:1});
-       const original=paintRainCloud;let shaded=0;paintRainCloud=(...args)=>{shaded++;return original(...args);};
-       const started=performance.now();paintBackground();paintLife(world.elapsed);const paintMs=performance.now()-started;
-       paintRainCloud=original;S.weatherAt=weatherAt;
-       return {scene:JSON.parse(JSON.stringify(sceneSnapshot)),shaded,paintMs,back:back.toDataURL(),front:front.toDataURL(),frame};
-      };
-     `);await route.fulfill({response,body});
+       const original=paintRainCloud,originalBackground=paintBackground;let shaded=0,backgroundPaints=0;
+       paintRainCloud=(...args)=>{shaded++;return original(...args);};paintBackground=(...args)=>{backgroundPaints++;return originalBackground(...args);};
+       const started=performance.now();
+       try{paintLife(world.elapsed);
+        return {scene:JSON.parse(JSON.stringify(sceneSnapshot)),shaded,backgroundPaints,paintMs:performance.now()-started,back:back.toDataURL(),front:front.toDataURL(),frame};
+       }finally{paintRainCloud=original;paintBackground=originalBackground;S.weatherAt=weatherAt;}
+      };globalThis.sharedSceneBootstrap.stage='probe-installed';
+     `);routeEvidence.at(-1).injectedSha=createHash('sha256').update(body).digest('hex');routeEvidence.at(-1).injectedBytes=Buffer.byteLength(body);await route.fulfill({response,body});
+    }catch(routeError){routeEvidence.push({navigation,failure:routeError.message});throw routeError;}
     });
-    await page.goto(process.env.LANDSCAPE_BROWSER_URL);await page.waitForFunction(()=>typeof sharedSceneProbe==='function');
+
+    const awaitProbe=async stage=>{try{await page.waitForFunction(()=>typeof sharedSceneProbe==='function');}catch(error){
+     let state;try{state=await page.evaluate(()=>({url:location.href,delivery:globalThis.sharedSceneDelivery,readyState:document.readyState,hidden:document.hidden,bootstrap:globalThis.sharedSceneBootstrap,probe:typeof globalThis.sharedSceneProbe,prepare:typeof globalThis.sharedScenePrepare,host:!!document.getElementById('landscape'),modules:Object.fromEntries(['LivingSky','Astronomy','LandscapeConfig','LandscapeTimeline','LandscapeMood','LandscapeGeometry','LandscapeAppearance'].map(key=>[key,typeof globalThis[key]])),scripts:[...document.scripts].filter(script=>script.src).map(script=>({src:script.src,defer:script.defer,async:script.async,type:script.type})),resources:performance.getEntriesByType('resource').map(entry=>({name:entry.name,duration:entry.duration,transferSize:entry.transferSize}))}));}catch(captureError){state={captureError:captureError.message};}
+     const evidence={stage,engine:engine===chromium?'chrome':'webkit',width,height,zone,motion,opened,errors,consoleErrors,requestFailures,routeEvidence,state,originalError:error.message};try{fs.mkdirSync(process.env.SCENE_TRACE_DIR||'/tmp/chain-rain-evidence/reload-diagnostic',{recursive:true});fs.writeFileSync(path.join(process.env.SCENE_TRACE_DIR||'/tmp/chain-rain-evidence/reload-diagnostic','reload-timeout.json'),JSON.stringify(evidence,null,2));}catch(writeError){error.message+=' (diagnostic write failed: '+writeError.message+')';}throw error;
+    }};
+    await page.goto(process.env.LANDSCAPE_BROWSER_URL);await awaitProbe('initial');
     await page.evaluate(()=>{document.getElementById('motionDialog')?.close();closeModal();document.documentElement.classList.add('viewing-scene');document.querySelector('.wrap').inert=true;});
     await page.evaluate(()=>{for(let i=0;i<1000;i++)Math.random();});await page.clock.setFixedTime(instant);
-    const clear=await page.evaluate(()=>sharedSceneProbe('clear'));
+    const {prepared,clear,rain}=await page.evaluate(()=>{const prepared=sharedScenePrepare(),clear=sharedSceneProbe('clear'),rain=sharedSceneProbe('rain');return {prepared,clear,rain};});
+    assert.equal(prepared.backgroundPaints,1,'preparation redraws the accepted seeded scene exactly once');assert.equal(clear.backgroundPaints,0);assert.equal(rain.backgroundPaints,0);assert.equal(clear.back,prepared.back,'clear weather also preserves the accepted backdrop exactly');assert.deepEqual(prepared.scene,clear.scene);assert.ok(prepared.paintMs<500,'a complete prepared scene paint remains bounded');
     if(!expected)expected=clear.scene;else assert.deepEqual(clear.scene,expected,'device zone viewport open time and motion preference select the same UTC scene');
     assert.equal(clear.shaded,0,'clear daytime-style clouds retain the ordinary painter');
-    const rain=await page.evaluate(()=>sharedSceneProbe('rain'));
     assert.equal(rain.shaded,19,'all seven persistent clouds and both six-cloud weather/reflection passes use the same shaded painter');
     assert.notEqual(rain.front,clear.front,'the composed cloud/rain canvas actually changes');assert.equal(rain.back,clear.back,'accepted skyline/hills remain unchanged by the rain painter');
     assert.ok(rain.paintMs<500,'a complete diagnostic scene paint remains bounded');assert.equal(rain.frame,0,'a stopped/reduced diagnostic has no frame loop');
     if(process.env.SCENE_EVIDENCE_DIR){await page.locator('#landscape').screenshot({path:path.join(process.env.SCENE_EVIDENCE_DIR,`${engine===chromium?'chrome':'webkit'}-${width}x${height}-rain.png`)});await page.evaluate(()=>sharedSceneProbe('clear'));await page.locator('#landscape').screenshot({path:path.join(process.env.SCENE_EVIDENCE_DIR,`${engine===chromium?'chrome':'webkit'}-${width}x${height}-clear.png`)});}
-    await page.reload();await page.waitForFunction(()=>typeof sharedSceneProbe==='function');assert.deepEqual((await page.evaluate(()=>sharedSceneProbe())).scene,expected,'an interrupted/reloaded page reconstructs the exact instant');
-    await page.setViewportSize({width:width+31,height:height+19});assert.deepEqual((await page.evaluate(()=>sharedSceneProbe())).scene,expected,'resize cannot consume event random draws');
+    navigation='reload';await page.reload();await awaitProbe('reload');assert.deepEqual((await page.evaluate(()=>{const prepared=sharedScenePrepare();if(prepared.backgroundPaints!==1)throw Error('expected one independent background redraw');return sharedSceneProbe();})).scene,expected,'an interrupted/reloaded page reconstructs the exact instant');
+    await page.setViewportSize({width:width+31,height:height+19});assert.deepEqual((await page.evaluate(()=>{const prepared=sharedScenePrepare();if(prepared.backgroundPaints!==1)throw Error('expected one independent background redraw');return sharedSceneProbe();})).scene,expected,'resize cannot consume event random draws');
     assert.deepEqual(errors,[]);await page.close();
    }
   }finally{await browser.close();}
@@ -677,6 +762,35 @@ test('RISK list presentation browser: Top x default percent toggle dotted filter
  }
 });
 
+test('RISK rain intensity: day and night double velocity halve opacity and only night doubles seeded density',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ const paint=source.slice(source.indexOf('  function paintWeatherOn('),source.indexOf('  function paintWoodland('));
+ for(const [W,H] of [[320,568],[390,844],[568,320],[768,1024],[1440,900],[3840,2160]])for(const storm of [false,true])for(const reduced of [false,true]){
+  const draw=(night,phase,status=storm?'thunderstorm':'rain')=>{
+   const streaks=[],flakes=[],g={save(){},restore(){},beginPath(){},moveTo(){},bezierCurveTo(){},closePath(){},fill(){},fillRect(){},createLinearGradient(){return {addColorStop(){}}}};
+   vm.runInNewContext(`${paint};paintWeatherOn(g,weather,phase)`,{g,W,H,hy:Math.min(H*.37,310),phase,reduced,weather:{status,intensity:.8,storm,slot:1},sceneSeason:'summer',world:{elapsed:0},p:{night},S:{mixHex:day=>day},paintRainCloud(){},rand:n=>((n*17)%101)/101,LandscapeSeasonal:{paint(){}},treeOrigins:[],geometry:{},line(_g,...args){if(args[4]==='#e4f2f6')streaks.push({args,alpha:g.globalAlpha});},ellipse(_g,...args){flakes.push({args,alpha:g.globalAlpha});}});
+   return {streaks,flakes};
+  };
+  const day=draw(0,0),night=draw(1,0),twilight=draw(.5,0),base=Math.min(900,Math.ceil(Math.max(W/(storm?2.5:3),W*H/(storm?2200:3000))));
+  assert.equal(day.streaks.length,base,'daytime density retains the existing bounded budget');
+  assert.equal(night.streaks.length,base*2,'night doubles the existing density including capped screens');
+  assert.equal(twilight.streaks.length,Math.ceil(base*1.5),'twilight changes density smoothly');
+  assert.deepEqual(night.streaks.slice(0,base),day.streaks,'added night particles preserve every existing seeded particle');
+  for(const n of [0,.5,1]){
+   const first=draw(n,0).streaks[0],later=draw(n,.01).streaks[0];
+   assert.equal(first.alpha,.8*(storm?.72:.62)*.5,'rain opacity is halved in all sky phases');
+   const expected=(75+((4500*17)%101)/101*50)*2*.01;
+   assert.ok(Math.abs(later.args[1]-first.args[1]-expected)<1e-9,'rain uses twice the released time-based velocity');
+   assert.deepEqual(draw(n,.01),draw(n,.01),'reload and motion preference reconstruct deterministic poses');
+  }
+  assert.deepEqual(draw(0,.2,'snow'),draw(1,.2,'snow'),'snow density velocity and opacity stay unchanged');
+  assert.deepEqual(draw(0,0),day,'day-night-day repaint restores the identical daytime particles');
+ }
+ const help=fs.readFileSync(path.join(__dirname,'index.html'),'utf8').match(/<dt>What lives in the landscape[\s\S]*?<\/dd>/)?.[0]||fs.readFileSync(path.join(__dirname,'index.html'),'utf8');
+ assert.match(help,/rain.*twice.*fast.*half.*opacity/i);
+ assert.match(help,/twice.*(?:density|particles).*night/i);
+});
+
 test('RISK rain density: phone tablet and short screens retain a dense bounded curtain in either motion mode',()=>{
  const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
  const paint=source.slice(source.indexOf('  function paintWeatherOn('),source.indexOf('  function paintWoodland('));
@@ -689,7 +803,7 @@ test('RISK rain density: phone tablet and short screens retain a dense bounded c
   const rain=draw(false,0),storm=draw(true,0);
   assert.ok(rain.length>=Math.ceil(W/3),`${W}x${H}: at least three times the former width-only rain density`);
   assert.ok(rain.length>=W*H/4000,`${W}x${H}: tall screens receive enough rain for their area`);
-  assert.ok(storm.length>=rain.length&&storm.length<=900,'storms stay denser within a fixed particle budget');
+  assert.ok(storm.length>=rain.length&&storm.length<=1800,'storms stay denser within the doubled nighttime particle budget');
   assert.ok(rain.every(([x,y,x2,y2])=>x>=0&&x<W&&y>=0&&y<H&&y2>y),'rain falls down across the entire scene');
   if(reduced)assert.deepEqual(draw(false,0),rain,'the reduced-motion pose remains deterministic');
   else assert.notDeepEqual(draw(false,.5),rain,'normal-motion rain advances smoothly');
@@ -5007,6 +5121,23 @@ test("UI: with nothing dotted the scan offers Start scanning — no benchmark, n
   assert.ok(!/class="card bench"/.test(scanHtml), "nothing has gone purple yet");
   assert.ok(!/class="card cand"/.test(scanHtml), "and no candidate is offered yet");
   assert.ok(!/class="decide"/.test(scanHtml), "so there's no decide row either");
+});
+
+test('RISK empty-chain explanation: selected Chance and Descending views name only their mode and preserve first-dot age rules',async()=>{
+ for(const mode of ['chance','descending','both']){
+  const {ctx,shim}=await loadApp({seed:91});
+  const oldest=addTaskAged(ctx,'Oldest',900000),newer=addTaskAged(ctx,'Newer',1000);
+  ctx.state.settings.scanMode=mode;ctx.state.scanMode=mode==='chance'?'descending':'chance';
+  const before=JSON.stringify(ctx.state),markup=scanHtmlOf(ctx,shim);
+  const name=mode==='chance'?'Chance mode':mode==='descending'?'Descending mode':'Scanning';
+  assert.ok(markup.includes('Nothing dotted yet — '+name+' starts on the oldest eligible task never marked Done, or the oldest eligible task if all have been done before.'),'the visible explanation names the selected mode');
+  assert.doesNotMatch(markup,/both modes start/i,'one selected view must not claim both modes');
+  assert.equal(JSON.stringify(ctx.state),before,'explaining the mode does not mutate tasks settings or saved scan order');
+  assert.equal(ctx.oldestFirst(ctx.pool()).id,oldest.id,'the explanation preserves first-dot selection by age');
+  ctx.state.tasks.find(t=>t.id===oldest.id).restoredAt=Date.now();assert.equal(ctx.oldestFirst(ctx.pool()).id,newer.id,'never-Done preference stays intact');
+  ctx.state.tasks.find(t=>t.id===newer.id).restoredAt=Date.now();assert.equal(ctx.oldestFirst(ctx.pool()).id,oldest.id,'all-Done fallback stays oldest');
+  ctx.openHelp();assert.match(shim.elements.get('modalRoot').innerHTML,/empty-chain explanation names the selected mode/i,'extended FAQ documents the selected-view explanation');
+ }
 });
 
 test("UI: once scanning starts it's Yes/No — no Can button, no chain-start question", async () => {

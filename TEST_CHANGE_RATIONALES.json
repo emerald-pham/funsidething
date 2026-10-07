@@ -1,5 +1,146 @@
 [
   {
+    "testChangesSha256": "68d60b965b08e6e2822493e388e0dc209b2487ca5551b31edc9c11b6e99852d0",
+    "reason": "Independent source diagnoses found recurring reload timeouts hide collected startup errors. Add failure-only fixture evidence rather than infer a product cache or dependency defect.",
+    "previousBehavior": "The probe wait failed before the final pageerror assertion; the error lacked navigation tuple, delivered payload provenance, bootstrap stage and failed-document globals. Retained server logs alone could not identify the missing initializer phase.",
+    "intendedBehavior": "Preserve the original timeout and every eight-context assertion while reporting navigation-tagged errors, request/route failures, exact original/injected payload hashes and headers, delivery marker, dependency/host state and bootstrap checkpoints. Capture/write failures cannot replace the original timeout.",
+    "replacementTests": [
+      "RISK scenery reload diagnostics: missing probes retain navigation errors delivery and bootstrap state without replacing the original timeout"
+    ],
+    "preservedCoverage": [
+      "Exact backdrop preservation and deliberate mutation rejection, seeded UTC logical scenes, full paint bounds, cloud counts, reduced motion, independent reload/resize redraws and zero page errors remain unchanged.",
+      "Service workers stay blocked; privacy, renderer, cache behavior, clock setup and timeout duration are unchanged. Diagnostic state contains isolated fixture metadata and no production tasks or account storage.",
+      "No product bootstrap fix is inferred from missing server requests. Failure provenance is recorded to discriminate delivered script, guard, spawn fetch and initializer paths."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='RISK scenery reload diagnostics:' tests.js",
+      "failure": "/tmp/chain-rain-evidence/reload-diagnostics-red.log failed because probe waits did not capture startup errors before reporting a timeout. Added native fixtures verify navigation/module/error capture and exact original-error rethrow even when execution-context capture and evidence writes fail."
+    }
+  },
+  {
+    "testChangesSha256": "496feedb18c85607ac2135b54787af76e3162b146bfbca810b3925c2dce6315c",
+    "reason": "Independent source diagnoses found recurring reload timeouts hide collected startup errors. Add failure-only fixture evidence rather than infer a product cache or dependency defect.",
+    "previousBehavior": "The probe wait failed before the final pageerror assertion; the error lacked navigation tuple, delivered payload provenance, bootstrap stage and failed-document globals. Retained server logs alone could not identify the missing initializer phase.",
+    "intendedBehavior": "Preserve the original timeout and every eight-context assertion while reporting navigation-tagged errors, request/route failures, exact original/injected payload hashes and headers, delivery marker, dependency/host state and bootstrap checkpoints. Capture/write failures cannot replace the original timeout.",
+    "replacementTests": [
+      "RISK scenery reload diagnostics: missing probes retain navigation errors delivery and bootstrap state without replacing the original timeout"
+    ],
+    "preservedCoverage": [
+      "Exact backdrop preservation and deliberate mutation rejection, seeded UTC logical scenes, full paint bounds, cloud counts, reduced motion, independent reload/resize redraws and zero page errors remain unchanged.",
+      "Service workers stay blocked; privacy, renderer, cache behavior, clock setup and timeout duration are unchanged. Diagnostic state contains isolated fixture metadata and no production tasks or account storage.",
+      "No product bootstrap fix is inferred from missing server requests. Failure provenance is recorded to discriminate delivered script, guard, spawn fetch and initializer paths."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='RISK scenery reload diagnostics:' tests.js",
+      "failure": "/tmp/chain-rain-evidence/reload-diagnostics-red.log failed because probe waits did not capture startup errors before reporting a timeout. Added native fixtures verify navigation/module/error capture and exact original-error rethrow even when execution-context capture and evidence writes fail."
+    }
+  },
+  {
+    "testChangesSha256": "7e6dcd8a0941f55bfcf73df53cd322e956dfa9373f2512da5c56542332132d98",
+    "reason": "User authorized a fixture repair after released-base same-weather redraws reproduced the exact candidate pixel variants. Preserve the exact accepted-backdrop weather assertion while separating unrelated independent rasterization.",
+    "previousBehavior": "Every clear/rain probe refreshed and repainted the backdrop independently; released Chrome Metal produced 29-pixel differences during identical clear-only redraws with identical logical inputs. This conflated backdrop preservation with browser rasterization stability.",
+    "intendedBehavior": "Prepare the canonical backdrop once, then execute clear and rain life paints synchronously against it, retaining exact bytes and zero background paint calls. Independent reload and resize preparations still redraw once and preserve the logical seed/UTC scene. A deliberately corrupted backdrop fails the actual browser assertion.",
+    "replacementTests": [
+      "RISK scenery rain preservation fixture: one accepted backdrop survives exact weather comparisons and detects a mutated backdrop"
+    ],
+    "preservedCoverage": [
+      "The original exact backdrop assertion, changed front pixels, nineteen shaded cloud calls, reduced-motion frame behavior and full preparation/weather performance bounds remain enforced.",
+      "Cross-device UTC logical objects, opening histories, random consumption, native seeded rain numerical geometry, reload reconstruction, independent resize redraw and page-error checks remain protected.",
+      "Full earlier 29-pixel and 10-pixel candidate captures plus released-base 49-pixel weather and 29-pixel same-weather captures remain preserved; no production renderer or privacy setting changed."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='RISK scenery rain preservation fixture:' tests.js",
+      "failure": "/tmp/chain-rain-evidence/retained-backdrop-red.log observed six background paints versus the required one before the fixture repair. Native mutation control executes the retained browser equality expression and requires its assertion failure. Released-base matrix-base-fixed independently decoded clear-only first/seventh redraws reproduce the exact original candidate hashes; original raster assertion is retained unchanged."
+    }
+  },
+  {
+    "testChangesSha256": "edb0e9ec0822b461da6ced6c0408fe0b50d146bee6e009f4b93a773a64dcfdc7",
+    "reason": "User authorized a fixture repair after released-base same-weather redraws reproduced the exact candidate pixel variants. Preserve the exact accepted-backdrop weather assertion while separating unrelated independent rasterization.",
+    "previousBehavior": "Every clear/rain probe refreshed and repainted the backdrop independently; released Chrome Metal produced 29-pixel differences during identical clear-only redraws with identical logical inputs. This conflated backdrop preservation with browser rasterization stability.",
+    "intendedBehavior": "Prepare the canonical backdrop once, then execute clear and rain life paints synchronously against it, retaining exact bytes and zero background paint calls. Independent reload and resize preparations still redraw once and preserve the logical seed/UTC scene. A deliberately corrupted backdrop fails the actual browser assertion.",
+    "replacementTests": [
+      "RISK scenery rain preservation fixture: one accepted backdrop survives exact weather comparisons and detects a mutated backdrop"
+    ],
+    "preservedCoverage": [
+      "The original exact backdrop assertion, changed front pixels, nineteen shaded cloud calls, reduced-motion frame behavior and full preparation/weather performance bounds remain enforced.",
+      "Cross-device UTC logical objects, opening histories, random consumption, native seeded rain numerical geometry, reload reconstruction, independent resize redraw and page-error checks remain protected.",
+      "Full earlier 29-pixel and 10-pixel candidate captures plus released-base 49-pixel weather and 29-pixel same-weather captures remain preserved; no production renderer or privacy setting changed."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='RISK scenery rain preservation fixture:' tests.js",
+      "failure": "/tmp/chain-rain-evidence/retained-backdrop-red.log observed six background paints versus the required one before the fixture repair. Native mutation control executes the retained browser equality expression and requires its assertion failure. Released-base matrix-base-fixed independently decoded clear-only first/seventh redraws reproduce the exact original candidate hashes; original raster assertion is retained unchanged."
+    }
+  },
+  {
+    "testChangesSha256": "91673d2bb5a09431683087c4349d3b688b7b29c89df4d0b6b847527ed209b5b2",
+    "reason": "User explicitly requested double rain velocity and half rain opacity in day and night, with doubled night particle density. Add numerical contracts and update only the superseded 900-particle night ceiling. User additionally requests selected-mode wording in the empty-chain notice, preserving exact first-dot algorithms. Reconcile onto exact history candidate 08bf3b2, retaining every history and lifecycle implementation, assertion and FAQ. The retained browser evidence exposed an uncontrolled stale sky palette and a conditional reload probe response. Repair only diagnostic fixture preparation; preserve every existing scenery assertion.",
+    "previousBehavior": "Rain used 75–125 pixels/second with unchanged .62/.72 opacity and a maximum 900 particles in all sky phases. The empty-chain notice claimed both modes even with only one selected. sharedSceneProbe synchronized event time but retained the earlier sky palette until a late copy-file refresh; route.fetch forwarded conditional headers that can yield an empty304 source.",
+    "intendedBehavior": "Rain uses 150–250 pixels/second with .31/.36 opacity and unchanged daylight counts, blending to double counts at full night with a maximum 1800 particles. Snow, seeds, time-based poses and reduced motion stay unchanged. Name the configured Chance or Descending mode for single-mode buttons and use Scanning with both buttons; preserve first-dot age semantics. Refresh the palette at the selected clock before freezing the renderer, and fetch a full200 source for injection on every navigation, while retaining normal request headers and all scene/pixel/reload/performance checks.",
+    "replacementTests": [
+      "RISK rain intensity: day and night double velocity halve opacity and only night doubles seeded density",
+      "RISK empty-chain explanation: selected Chance and Descending views name only their mode and preserve first-dot age rules",
+      "RISK scenery browser fixture: conditional reloads retain executable probes and late sky refresh cannot change the controlled background"
+    ],
+    "preservedCoverage": [
+      "All existing assertions remain except the explicitly superseded night particle ceiling. Existing rain geometry, storm density ordering, reduced motion, cloud shading, reflection suppression, seed/UTC schedules, cloud/sync, task data and offline shell contracts remain intact.",
+      "The broader scenery browser assertions are retained exactly: identical UTC scenes across devices,19 shaded clouds, front-canvas change, exact background bytes, sub500ms paint, frame0, reload reconstruction, resize consistency and zero page errors. Only preparation becomes controlled. Production source remains byte-identical to d09448a."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='RISK rain intensity:' tests.js; node --test --test-reporter=spec --test-name-pattern=\"RISK empty-chain explanation:\" tests.js; node --test --test-reporter=spec --test-name-pattern=\"RISK scenery browser fixture:\" tests.js",
+      "failure": "After correcting the canvas fixture, /tmp/chain-rain-red.log observed expected night double density failing with 107 actual versus 214 expected before any renderer change. The initial native full suite also observed the mechanical PWA cache-key contract fail before refreshing asset fingerprints. Before index.html copy changes, /tmp/chain-rain-copy-red.log observed the selected-mode visible explanation assertion fail against the old both modes start markup. After the copy change all three settings, nonmutation and oldest/never-Done/all-Done rules pass. After reconciliation /tmp/chain-rain-reconcile-red.log observed the existing app/cache fingerprints reject the changed shell before refreshing them. Before route repair fixture-red.log observed anchor assertion failure because conditional304 returned no source. After removing conditional headers but before sky preparation repair, fixture-palette-red.log observed stale palette100 versus selected200. Both native discriminators pass after test-only repairs; actual browser confirmation is still required. Existing candidate browser log failed accepted skyline/hills byte equality; history baseline failed post-reload probe readiness, so no claim of identical actual failure is made."
+    }
+  },
+  {
+    "testChangesSha256": "9bd1c2cdd904d299e4190d2ef4170f761da2ebbeffc71c9f8eee4937087515e7",
+    "reason": "User explicitly requested double rain velocity and half rain opacity in day and night, with doubled night particle density. Add numerical contracts and update only the superseded 900-particle night ceiling. User additionally requests selected-mode wording in the empty-chain notice, preserving exact first-dot algorithms. Reconcile onto exact history candidate 08bf3b2, retaining every history and lifecycle implementation, assertion and FAQ.",
+    "previousBehavior": "Rain used 75–125 pixels/second with unchanged .62/.72 opacity and a maximum 900 particles in all sky phases. The empty-chain notice claimed both modes even with only one selected.",
+    "intendedBehavior": "Rain uses 150–250 pixels/second with .31/.36 opacity and unchanged daylight counts, blending to double counts at full night with a maximum 1800 particles. Snow, seeds, time-based poses and reduced motion stay unchanged. Name the configured Chance or Descending mode for single-mode buttons and use Scanning with both buttons; preserve first-dot age semantics.",
+    "replacementTests": [
+      "RISK rain intensity: day and night double velocity halve opacity and only night doubles seeded density",
+      "RISK empty-chain explanation: selected Chance and Descending views name only their mode and preserve first-dot age rules"
+    ],
+    "preservedCoverage": [
+      "All existing assertions remain except the explicitly superseded night particle ceiling. Existing rain geometry, storm density ordering, reduced motion, cloud shading, reflection suppression, seed/UTC schedules, cloud/sync, task data and offline shell contracts remain intact."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='RISK rain intensity:' tests.js; node --test --test-reporter=spec --test-name-pattern=\"RISK empty-chain explanation:\" tests.js",
+      "failure": "After correcting the canvas fixture, /tmp/chain-rain-red.log observed expected night double density failing with 107 actual versus 214 expected before any renderer change. The initial native full suite also observed the mechanical PWA cache-key contract fail before refreshing asset fingerprints. Before index.html copy changes, /tmp/chain-rain-copy-red.log observed the selected-mode visible explanation assertion fail against the old both modes start markup. After the copy change all three settings, nonmutation and oldest/never-Done/all-Done rules pass. After reconciliation /tmp/chain-rain-reconcile-red.log observed the existing app/cache fingerprints reject the changed shell before refreshing them."
+    }
+  },
+  {
+    "testChangesSha256": "c2a9587c78b860dc8edc903df04599749b5eb5d68d2725cc8669f7e50b75f3f1",
+    "reason": "User explicitly requested double rain velocity and half rain opacity in day and night, with doubled night particle density. Add numerical contracts and update only the superseded 900-particle night ceiling. User additionally requests selected-mode wording in the empty-chain notice, preserving exact first-dot algorithms.",
+    "previousBehavior": "Rain used 75–125 pixels/second with unchanged .62/.72 opacity and a maximum 900 particles in all sky phases. The empty-chain notice claimed both modes even with only one selected.",
+    "intendedBehavior": "Rain uses 150–250 pixels/second with .31/.36 opacity and unchanged daylight counts, blending to double counts at full night with a maximum 1800 particles. Snow, seeds, time-based poses and reduced motion stay unchanged. Name the configured Chance or Descending mode for single-mode buttons and use Scanning with both buttons; preserve first-dot age semantics.",
+    "replacementTests": [
+      "RISK rain intensity: day and night double velocity halve opacity and only night doubles seeded density",
+      "RISK empty-chain explanation: selected Chance and Descending views name only their mode and preserve first-dot age rules"
+    ],
+    "preservedCoverage": [
+      "All existing assertions remain except the explicitly superseded night particle ceiling. Existing rain geometry, storm density ordering, reduced motion, cloud shading, reflection suppression, seed/UTC schedules, cloud/sync, task data and offline shell contracts remain intact."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='RISK rain intensity:' tests.js; node --test --test-reporter=spec --test-name-pattern=\"RISK empty-chain explanation:\" tests.js",
+      "failure": "After correcting the canvas fixture, /tmp/chain-rain-red.log observed expected night double density failing with 107 actual versus 214 expected before any renderer change. The initial native full suite also observed the mechanical PWA cache-key contract fail before refreshing asset fingerprints. Before index.html copy changes, /tmp/chain-rain-copy-red.log observed the selected-mode visible explanation assertion fail against the old both modes start markup. After the copy change all three settings, nonmutation and oldest/never-Done/all-Done rules pass."
+    }
+  },
+  {
+    "testChangesSha256": "635ffe9f49d75feab899bd1f9f6cd3cde06fce126b5fd9bc9287ec0395def57d",
+    "reason": "User explicitly requested double rain velocity and half rain opacity in day and night, with doubled night particle density. Add numerical contracts and update only the superseded 900-particle night ceiling.",
+    "previousBehavior": "Rain used 75–125 pixels/second with unchanged .62/.72 opacity and a maximum 900 particles in all sky phases.",
+    "intendedBehavior": "Rain uses 150–250 pixels/second with .31/.36 opacity and unchanged daylight counts, blending to double counts at full night with a maximum 1800 particles. Snow, seeds, time-based poses and reduced motion stay unchanged.",
+    "replacementTests": [
+      "RISK rain intensity: day and night double velocity halve opacity and only night doubles seeded density"
+    ],
+    "preservedCoverage": [
+      "All existing assertions remain except the explicitly superseded night particle ceiling. Existing rain geometry, storm density ordering, reduced motion, cloud shading, reflection suppression, seed/UTC schedules, cloud/sync, task data and offline shell contracts remain intact."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='RISK rain intensity:' tests.js",
+      "failure": "After correcting the canvas fixture, /tmp/chain-rain-red.log observed expected night double density failing with 107 actual versus 214 expected before any renderer change. The initial native full suite also observed the mechanical PWA cache-key contract fail before refreshing asset fingerprints."
+    }
+  },
+  {
     "testChangesSha256": "0fc3c9c7b10ba3b8c4351fcdba1a32f3892ac12a2c9f11e1df2c2bc0b64308d0",
     "reason": "Fix the user-reported safe-identification error for a confirmed manual deletion of a verified migration mirror. Append coverage only; automatic legacy pruning remains pending an explicit retention decision.",
     "previousBehavior": "Identical IndexedDB and retained legacy backup rows either displayed as false duplicate IDs due to property order or were rejected before confirmation. The adapter lacked a final synchronous cross-store identity guard.",
@@ -2027,6 +2168,42 @@
     "redEvidence": {
       "command": "node --test --test-reporter=spec --test-name-pattern='RISK task rating history:' tests.js",
       "failure": "Observed seven failures before app edits in /tmp/chain-rating-history-evidence-20261006/history-red.log: comparison history absent, editor Save observation absent, No signal history absent, offline union absent, replacement source observation absent, 2200 retained entries did not append the editor observation, and Edit lacked Rating history. Fixture corrections retained the same before-implementation discriminating failures. Later malformed-cloud-red.log observed null entries blocking a comparison before the guard repair; pagination-focus-red.log observed lost focus before the fallback repair. The first full-native.log observed the existing Dislodge whole-task equality failing solely on the new retained audit fields; the revised assertion retains exact restoration of all previous task fields and verifies both observed reversals. Independent code and persistence reviewers found evergreen interval/reset eligibility reversal missing from Undo participant detection; evergreen-history-red.log observed both subcases retaining Editor Save instead of an Undo row before adding those exact task fields. Context reconciliation then exposed an observation-head rewind after Undo of an otherwise unchanged editor Save. observation-head-red.log observed both No context exclusion and another task completion subcases failing because Undo restored the old pointer despite retaining the newer observations, before preserving the supported current head through Undo. Later explicit Saves must capture return-to-prior relative values with a new time rather than suppressing them. Selection reconciliation then exposed the intentionally saved interval edit that renews evergreen rest: selection-rest-edit-history-red.log observed both modes lacking the actual edit observation before appending only the edited task eligibility fact, without a benchmark comparison. Granted private browser run browser-first.log observed the fresh native motion dialog intercepting the Edit click; browser-second.log then observed canonical stored ordering differing from the deliberately reverse-ordered pagination fixture. The test-only setup now seeds reduced motion and dismisses onboarding; offline/reconnect assertions compare every exact fact including identity, time, sequence, original before/after metrics and count independent of canonical array order. Opening/paging raw equality, keyboard focus, drafts, layout, pagination and completion/Undo assertions remain intact. browser-final.log passed four preserved browser families and Chrome history/offline, then WebKit setOffline+reload raised its internal navigation error. The final matrix retains all WebKit online reload and completion/Undo fact assertions; Chrome alone exercises the emulated offline/reconnect path, consistent with the existing installed-shell test. This limitation is explicit runtime evidence, not a WebKit offline pass or physical iOS qualification. A final multilingual preservation check reproduced different fact ordering and observation input fingerprints under English versus Swedish collation. locale-history-red.log observed both data assertions and missing FAQ language guidance before replacing only history tie/basis sorting with deterministic lexical comparisons; all original Unicode facts and replay cardinality remain exact. The first post-fix focused run caught only the final test comparison between VM and host array prototypes, retained in locale-history-green.log; JSON fixture normalization preserves strict equality of every value. The partial native run was stopped and retained as incomplete in locale-fixture-partial-native.json; neither failed stage is presented as a pass. Runtime evidence is recorded separately from source, native, CI and release."
+    }
+  },
+  {
+    "testChangesSha256": "0d14e96189fa43ae024e4038481e890d1b3db0a2700e52411a3ab5906d70983c",
+    "reason": "Independent source diagnoses found recurring reload timeouts hide collected startup errors. Add failure-only fixture evidence rather than infer a product cache or dependency defect. Independent exact-candidate review found the diagnostic event arrays were unwired. Register actual pageerror, requestfailed and console callbacks, with navigation attribution, and execute those same registrations in the native regression.",
+    "previousBehavior": "The probe wait failed before the final pageerror assertion; the error lacked navigation tuple, delivered payload provenance, bootstrap stage and failed-document globals. Retained server logs alone could not identify the missing initializer phase.",
+    "intendedBehavior": "Preserve the original timeout and every eight-context assertion while reporting navigation-tagged errors, request/route failures, exact original/injected payload hashes and headers, delivery marker, dependency/host state and bootstrap checkpoints. Capture/write failures cannot replace the original timeout.",
+    "replacementTests": [
+      "RISK scenery reload diagnostics: missing probes retain navigation errors delivery and bootstrap state without replacing the original timeout and capture actual browser events"
+    ],
+    "preservedCoverage": [
+      "Exact backdrop preservation and deliberate mutation rejection, seeded UTC logical scenes, full paint bounds, cloud counts, reduced motion, independent reload/resize redraws and zero page errors remain unchanged.",
+      "Service workers stay blocked; privacy, renderer, cache behavior, clock setup and timeout duration are unchanged. Diagnostic state contains isolated fixture metadata and no production tasks or account storage.",
+      "No product bootstrap fix is inferred from missing server requests. Failure provenance is recorded to discriminate delivered script, guard, spawn fetch and initializer paths."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='RISK scenery reload diagnostics:' tests.js",
+      "failure": "/tmp/chain-rain-evidence/reload-diagnostics-red.log failed because probe waits did not capture startup errors before reporting a timeout. Added native fixtures verify navigation/module/error capture and exact original-error rethrow even when execution-context capture and evidence writes fail. reload-listeners-red.log observed missing network event callback before wiring it; the callback regression also checks console filtering and navigation-tagged page errors."
+    }
+  },
+  {
+    "testChangesSha256": "13ceacd8036a6dc2ee4c2cc16fbe6f3f209a3c5ec390bddcca5a9d39e1110a72",
+    "reason": "Independent source diagnoses found recurring reload timeouts hide collected startup errors. Add failure-only fixture evidence rather than infer a product cache or dependency defect. Independent exact-candidate review found the diagnostic event arrays were unwired. Register actual pageerror, requestfailed and console callbacks, with navigation attribution, and execute those same registrations in the native regression.",
+    "previousBehavior": "The probe wait failed before the final pageerror assertion; the error lacked navigation tuple, delivered payload provenance, bootstrap stage and failed-document globals. Retained server logs alone could not identify the missing initializer phase.",
+    "intendedBehavior": "Preserve the original timeout and every eight-context assertion while reporting navigation-tagged errors, request/route failures, exact original/injected payload hashes and headers, delivery marker, dependency/host state and bootstrap checkpoints. Capture/write failures cannot replace the original timeout.",
+    "replacementTests": [
+      "RISK scenery reload diagnostics: missing probes retain navigation errors delivery and bootstrap state without replacing the original timeout and capture actual browser events"
+    ],
+    "preservedCoverage": [
+      "Exact backdrop preservation and deliberate mutation rejection, seeded UTC logical scenes, full paint bounds, cloud counts, reduced motion, independent reload/resize redraws and zero page errors remain unchanged.",
+      "Service workers stay blocked; privacy, renderer, cache behavior, clock setup and timeout duration are unchanged. Diagnostic state contains isolated fixture metadata and no production tasks or account storage.",
+      "No product bootstrap fix is inferred from missing server requests. Failure provenance is recorded to discriminate delivered script, guard, spawn fetch and initializer paths."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='RISK scenery reload diagnostics:' tests.js",
+      "failure": "/tmp/chain-rain-evidence/reload-diagnostics-red.log failed because probe waits did not capture startup errors before reporting a timeout. Added native fixtures verify navigation/module/error capture and exact original-error rethrow even when execution-context capture and evidence writes fail. reload-listeners-red.log observed missing network event callback before wiring it; the callback regression also checks console filtering and navigation-tagged page errors."
     }
   }
 ]

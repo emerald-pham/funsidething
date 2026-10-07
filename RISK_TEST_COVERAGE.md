@@ -401,6 +401,7 @@ The editor hook blocks app or enforcement edits while tests.js has no staged or 
 
 ## Rain, roof lights, and fireworks depth
 
+- RISK rain intensity: day and night double velocity halve opacity and only night doubles seeded density
 - RISK rain density: phone tablet and short screens retain a dense bounded curtain in either motion mode
 - RISK fairy lights: unlit patio strings and every daylight bulb are hidden on phone and desktop
 - RISK fairy lights: gardens and patios share independent stable one-in-twelve roof samples
@@ -567,6 +568,12 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK task rating history: a Dot interval edit that renews rest records saved eligibility without inventing a comparison
 
 - RISK task rating history: immutable fact union and observation fingerprints are independent of device locale
+
+- RISK empty-chain explanation: selected Chance and Descending views name only their mode and preserve first-dot age rules
+
+- RISK scenery browser fixture: conditional reloads retain executable probes and late sky refresh cannot change the controlled background
+- RISK scenery rain preservation fixture: one accepted backdrop survives exact weather comparisons and detects a mutated backdrop
+- RISK scenery reload diagnostics: missing probes retain navigation errors delivery and bootstrap state without replacing the original timeout and capture actual browser events
 
 ## Migrated backup deletion safety
 
