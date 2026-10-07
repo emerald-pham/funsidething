@@ -870,12 +870,15 @@
       paintRainCloud(ctx,x,y,w,h,weather,ctx.globalAlpha);
     }
     if(snow||includeRain){
-      ctx.globalAlpha=weather.intensity*(snow?.55:storm?.72:.62);
+      ctx.globalAlpha=weather.intensity*(snow?.55:(storm?.72:.62)*.5);
       // Width alone left tall phone scenes nearly empty. Preserve the snow
       // budget while giving rain a dense floor and coverage for taller screens.
-      const count=snow?Math.round(W/(storm?8:22)):Math.min(900,Math.ceil(Math.max(W/(storm?2.5:3),W*H/(storm?2200:3000))));
+      // Scale the existing capped rain budget through twilight. Seeded prefixes
+      // survive day/night repaint; the doubled night ceiling remains bounded.
+      const rainCount=Math.min(900,Math.ceil(Math.max(W/(storm?2.5:3),W*H/(storm?2200:3000))));
+      const count=snow?Math.round(W/(storm?8:22)):Math.ceil(rainCount*(1+p.night));
       for(let i=0;i<count;i++){
-        const speed=snow?10+rand(i+4500)*15:75+rand(i+4500)*50;
+        const speed=snow?10+rand(i+4500)*15:(75+rand(i+4500)*50)*2;
         const y=(rand(i+4600)*H+phase*speed)%H;
         const x=((rand(i+4700)*W+y*.12*wind+(snow?phase*(storm?18:4)+Math.sin(phase*.22)*12+Math.sin(phase*.071)*8+Math.sin(phase*.5+i)*5:0))%W+W)%W;
         if(snow)ellipse(ctx,x,y,.8+rand(i+4800),.8+rand(i+4800),'#f4f4e8');

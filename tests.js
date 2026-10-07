@@ -677,6 +677,35 @@ test('RISK list presentation browser: Top x default percent toggle dotted filter
  }
 });
 
+test('RISK rain intensity: day and night double velocity halve opacity and only night doubles seeded density',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ const paint=source.slice(source.indexOf('  function paintWeatherOn('),source.indexOf('  function paintWoodland('));
+ for(const [W,H] of [[320,568],[390,844],[568,320],[768,1024],[1440,900],[3840,2160]])for(const storm of [false,true])for(const reduced of [false,true]){
+  const draw=(night,phase,status=storm?'thunderstorm':'rain')=>{
+   const streaks=[],flakes=[],g={save(){},restore(){},beginPath(){},moveTo(){},bezierCurveTo(){},closePath(){},fill(){},fillRect(){},createLinearGradient(){return {addColorStop(){}}}};
+   vm.runInNewContext(`${paint};paintWeatherOn(g,weather,phase)`,{g,W,H,hy:Math.min(H*.37,310),phase,reduced,weather:{status,intensity:.8,storm,slot:1},sceneSeason:'summer',world:{elapsed:0},p:{night},S:{mixHex:day=>day},paintRainCloud(){},rand:n=>((n*17)%101)/101,LandscapeSeasonal:{paint(){}},treeOrigins:[],geometry:{},line(_g,...args){if(args[4]==='#e4f2f6')streaks.push({args,alpha:g.globalAlpha});},ellipse(_g,...args){flakes.push({args,alpha:g.globalAlpha});}});
+   return {streaks,flakes};
+  };
+  const day=draw(0,0),night=draw(1,0),twilight=draw(.5,0),base=Math.min(900,Math.ceil(Math.max(W/(storm?2.5:3),W*H/(storm?2200:3000))));
+  assert.equal(day.streaks.length,base,'daytime density retains the existing bounded budget');
+  assert.equal(night.streaks.length,base*2,'night doubles the existing density including capped screens');
+  assert.equal(twilight.streaks.length,Math.ceil(base*1.5),'twilight changes density smoothly');
+  assert.deepEqual(night.streaks.slice(0,base),day.streaks,'added night particles preserve every existing seeded particle');
+  for(const n of [0,.5,1]){
+   const first=draw(n,0).streaks[0],later=draw(n,.01).streaks[0];
+   assert.equal(first.alpha,.8*(storm?.72:.62)*.5,'rain opacity is halved in all sky phases');
+   const expected=(75+((4500*17)%101)/101*50)*2*.01;
+   assert.ok(Math.abs(later.args[1]-first.args[1]-expected)<1e-9,'rain uses twice the released time-based velocity');
+   assert.deepEqual(draw(n,.01),draw(n,.01),'reload and motion preference reconstruct deterministic poses');
+  }
+  assert.deepEqual(draw(0,.2,'snow'),draw(1,.2,'snow'),'snow density velocity and opacity stay unchanged');
+  assert.deepEqual(draw(0,0),day,'day-night-day repaint restores the identical daytime particles');
+ }
+ const help=fs.readFileSync(path.join(__dirname,'index.html'),'utf8').match(/<dt>What lives in the landscape[\s\S]*?<\/dd>/)?.[0]||fs.readFileSync(path.join(__dirname,'index.html'),'utf8');
+ assert.match(help,/rain.*twice.*fast.*half.*opacity/i);
+ assert.match(help,/twice.*(?:density|particles).*night/i);
+});
+
 test('RISK rain density: phone tablet and short screens retain a dense bounded curtain in either motion mode',()=>{
  const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
  const paint=source.slice(source.indexOf('  function paintWeatherOn('),source.indexOf('  function paintWoodland('));
@@ -689,7 +718,7 @@ test('RISK rain density: phone tablet and short screens retain a dense bounded c
   const rain=draw(false,0),storm=draw(true,0);
   assert.ok(rain.length>=Math.ceil(W/3),`${W}x${H}: at least three times the former width-only rain density`);
   assert.ok(rain.length>=W*H/4000,`${W}x${H}: tall screens receive enough rain for their area`);
-  assert.ok(storm.length>=rain.length&&storm.length<=900,'storms stay denser within a fixed particle budget');
+  assert.ok(storm.length>=rain.length&&storm.length<=1800,'storms stay denser within the doubled nighttime particle budget');
   assert.ok(rain.every(([x,y,x2,y2])=>x>=0&&x<W&&y>=0&&y<H&&y2>y),'rain falls down across the entire scene');
   if(reduced)assert.deepEqual(draw(false,0),rain,'the reduced-motion pose remains deterministic');
   else assert.notDeepEqual(draw(false,.5),rain,'normal-motion rain advances smoothly');

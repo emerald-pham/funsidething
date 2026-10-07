@@ -401,6 +401,7 @@ The editor hook blocks app or enforcement edits while tests.js has no staged or 
 
 ## Rain, roof lights, and fireworks depth
 
+- RISK rain intensity: day and night double velocity halve opacity and only night doubles seeded density
 - RISK rain density: phone tablet and short screens retain a dense bounded curtain in either motion mode
 - RISK fairy lights: unlit patio strings and every daylight bulb are hidden on phone and desktop
 - RISK fairy lights: gardens and patios share independent stable one-in-twelve roof samples
