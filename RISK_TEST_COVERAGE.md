@@ -567,3 +567,14 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK task rating history: a Dot interval edit that renews rest records saved eligibility without inventing a comparison
 
 - RISK task rating history: immutable fact union and observation fingerprints are independent of device locale
+
+## Migrated backup deletion safety
+
+- RISK backup mirror deletion: one confirmation removes exact migrated mirrors with reordered metadata and packed legacy neighbors
+- RISK backup mirror identity: divergent payload kinds dates and unknown metadata remain separate and fail closed
+- RISK backup mirror duplicates: identical same-source IDs stay ambiguous rather than coalescing into a deletable row
+- RISK backup mirror confirmation: cancel stale Settings and confirmation-time rewrites preserve both copies
+- RISK backup mirror concurrent deletion: fresh durable metadata and concurrent legacy appends are rechecked inside the delete transaction
+- RISK backup mirror storage failure: quota rejection and IndexedDB abort preserve recoverability and allow an explicit retry
+- RISK device backup final guard: rejected throwing and asynchronous guards abort before deleting a verified reference
+- RISK backup mirror FAQ: confirmed matching-copy deletion and ambiguous recovery preserve the seven-day age cue
