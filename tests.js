@@ -5124,12 +5124,12 @@ test("UI: with nothing dotted the scan offers Start scanning — no benchmark, n
 });
 
 test('RISK empty-chain explanation: selected Chance and Descending views name only their mode and preserve first-dot age rules',async()=>{
- for(const mode of ['chance','descending','both']){
+ for(const mode of ['chance','descending','both','squared']){
   const {ctx,shim}=await loadApp({seed:91});
   const oldest=addTaskAged(ctx,'Oldest',900000),newer=addTaskAged(ctx,'Newer',1000);
   ctx.state.settings.scanMode=mode;ctx.state.scanMode=mode==='chance'?'descending':'chance';
   const before=JSON.stringify(ctx.state),markup=scanHtmlOf(ctx,shim);
-  const name=mode==='chance'?'Chance mode':mode==='descending'?'Descending mode':'Scanning';
+  const name=mode==='squared'?'Squared Weighting':mode==='chance'?'Chance mode':mode==='descending'?'Descending mode':'Scanning';
   assert.ok(markup.includes('Nothing dotted yet — '+name+' starts on the oldest eligible task never marked Done, or the oldest eligible task if all have been done before.'),'the visible explanation names the selected mode');
   assert.doesNotMatch(markup,/both modes start/i,'one selected view must not claim both modes');
   assert.equal(JSON.stringify(ctx.state),before,'explaining the mode does not mutate tasks settings or saved scan order');
@@ -5170,7 +5170,7 @@ test("UI: Quick start displays the requested seven steps in order", async () => 
   assert.deepEqual(steps, [
     "Add tasks. You can tag them with contexts and enable contexts so that todos that NEED to match that context are surfaced. If the context is not enabled, those todos are not surfaced.",
     "Then hit start scanning.",
-    "In both modes, the oldest eligible task never marked Done becomes the first dot. Worked on it is fine. If all eligible tasks have been done before, the oldest eligible task starts the chain. Chance mode then draws subsequent candidates using TrueSkill win probabilities.",
+    "In all three modes, the oldest eligible task never marked Done becomes the first dot. Worked on it is fine. If all eligible tasks have been done before, the oldest eligible task starts the chain. Chance mode then draws subsequent candidates using TrueSkill win probabilities.",
     "Then compare candidates with the newest dot. Descending mode orders them by estimated TrueSkill strength; chance mode uses a saved weighted random order. Yes/No updates ratings immediately. In chance mode, those updates affect the next fresh ordering.",
     "You can also hit can’t, which will snooze the task for a duration you’ve configured in settings.",
     "You will continue until either you hit done scanning, or the app recognizes the chances of you finding a better task dips below 25% (percentage configurable in settings menu) in which case it will gently nudge you to stop searching for a new todo.",
@@ -5205,7 +5205,7 @@ test("UI: help describes Start scanning rather than a Can/Can't step", async () 
   const helpHtml = shim.elements.get("modalRoot").innerHTML;
 
   assert.match(helpHtml, /start scanning/i, "help should name the button that starts a chain");
-  assert.match(helpHtml, /both modes, the oldest eligible task/, "normal mode retains the oldest eligible anchor");
+  assert.match(helpHtml, /all three modes, the oldest eligible task/, "normal mode retains the oldest eligible anchor");
   assert.ok(!/Answer <b>Can<\/b>/.test(helpHtml), "the Can/Can't instruction should be gone");
 });
 
@@ -15101,9 +15101,9 @@ test('Skywriters: scheduler requires a human word, respects its rate, and allows
 });
 
 // Chance order is part of the pass, not a side effect of rendering or voting.
-test('Chance scan: settings select one default button or two explicit buttons', async()=>{
+test('Chance scan: settings select squared default or three explicit buttons', async()=>{
  const {ctx}=await loadApp();
- assert.equal(ctx.state.settings.scanMode,'chance');
+ assert.equal(ctx.state.settings.scanMode,'squared');
  assert.match(ctx.scanStartButtons(),/>Start scanning</);
  ctx.state.settings.scanMode='both';
  assert.match(ctx.scanStartButtons(),/Scan in chance mode/);
@@ -15208,7 +15208,7 @@ test('Evergreen and chance settings: malformed persisted values normalize withou
  const {ctx}=await loadApp();const st=ctx.defaultState();
  st.settings={evergreenHours:-5,evergreenResetAtDay:false,scanMode:'invalid'};
  st.tasks=[{...syncTask('a','a'),evergreenHours:'junk',evergreenResetAtDay:'false'}];
- ctx.hydrateState(st);assert.ok(st.settings.evergreenHours>0);assert.equal(st.settings.evergreenResetAtDay,false);assert.equal(st.settings.scanMode,'chance');
+ ctx.hydrateState(st);assert.ok(st.settings.evergreenHours>0);assert.equal(st.settings.evergreenResetAtDay,false);assert.equal(st.settings.scanMode,'squared');
  assert.ok(Number.isFinite(st.tasks[0].evergreenHours));assert.equal(typeof st.tasks[0].evergreenResetAtDay,'boolean');
 });
 test('Chance scan: live TrueSkill ratings still change on Yes and No',async()=>{
@@ -15392,7 +15392,7 @@ test('Consistency repair: Starts eligibility gets a midnight wake as well as the
 });
 test('Consistency repair: quick start distinguishes chance from the oldest normal anchor',async()=>{
  const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
- assert.match(help,/both modes.*oldest/i);assert.match(help,/Chance mode.*subsequent/i);
+ assert.match(help,/all three modes.*oldest/i);assert.match(help,/Chance mode.*subsequent/i);
  assert.doesNotMatch(help,/candidates to add to the todo list in descending order of your likelihood/);
 });
 test('Consistency repair: undoing an old backup import restores today\'s original chance pass',async()=>{
@@ -15699,11 +15699,11 @@ test('Evergreen controls: task editor hides interval and reset until evergreen i
  assert.match(appSrc,/el.id === "etEver"[\s\S]{0,100}toggleEvergreenOptions\(el.checked\)/);
 });
 
-test('Scan default: chance is used for new or missing preferences, while saved choices survive',async()=>{
- const {ctx}=await loadApp();assert.equal(ctx.normalizeSettings({}).scanMode,'chance');
- assert.equal(ctx.normalizeSettings({scanMode:'invalid'}).scanMode,'chance');
+test('Scan default: squared is used for new or missing preferences, while saved choices survive',async()=>{
+ const {ctx}=await loadApp();assert.equal(ctx.normalizeSettings({}).scanMode,'squared');
+ assert.equal(ctx.normalizeSettings({scanMode:'invalid'}).scanMode,'squared');
  for(const mode of ['descending','chance','both'])assert.equal(ctx.normalizeSettings({scanMode:mode}).scanMode,mode);
- ctx.addTask('A');ctx.addTask('B');ctx.startScan();assert.equal(ctx.state.scanMode,'chance');
+ ctx.addTask('A');ctx.addTask('B');ctx.startScan();assert.equal(ctx.state.scanMode,'squared');
 });
 
 test('Dislodge signal: one loss to a fresh default reference, other tasks and chance draw untouched, undo restores rating',async()=>{
@@ -20659,7 +20659,7 @@ test('RISK overall Chance shares: full eligible weights retain scanned and chain
  ctx.resetChance();ctx.state.chance.weights[a.id]=.25;ctx.state.chance.weights[b.id]=.75;
  const before=JSON.stringify(ctx.state),order=ctx.candidateOrder(ctx.pool()).map(t=>t.id);
 
- const unchangedAlgorithms={"updatePair":"a31c20a18454d735731d5e02bdf0767292e790a992725d7d35b02380cbf2568b","pBeats":"6003c75326298698b27f2ae691bed18928d6f96396da30ca9113a34463d3a3d9","chanceWeight":"96381985597245b65e9d26fa410c13ac801ce6a618e76665f69d049cc9485582","chanceHash":"012f3e461e84956335324e12c2646860bc6ed68ac31456dfb0d9bb231c0d4947","resetChance":"36f9f2a46730bc3e3bb068bea2b07d57d29c8cadf8184b9914733f2bfcc90b1a","chanceScore":"b033af5b0cbae63742983121a674ecd99aceabead078d6c7d8067bd3bf49c38f","candidateOrder":"14eb77f7bd0dbedae664aade1d050631264784e52f1ab2d69374c5e339993d16","chancePick":"d2a64e3f4e9a8431dc5439b5945f651f66521f4674aec6ef1b321bb4c1b8bf10","oldestFirst":"da6def7759fd3997881fa299c8b92324d49217c9534381d5c3c3be750d6d46aa"};
+ const unchangedAlgorithms={"updatePair":"a31c20a18454d735731d5e02bdf0767292e790a992725d7d35b02380cbf2568b","pBeats":"6003c75326298698b27f2ae691bed18928d6f96396da30ca9113a34463d3a3d9","chanceWeight":"96381985597245b65e9d26fa410c13ac801ce6a618e76665f69d049cc9485582","chanceHash":"012f3e461e84956335324e12c2646860bc6ed68ac31456dfb0d9bb231c0d4947","resetChance":"36f9f2a46730bc3e3bb068bea2b07d57d29c8cadf8184b9914733f2bfcc90b1a","chanceScore":"b033af5b0cbae63742983121a674ecd99aceabead078d6c7d8067bd3bf49c38f","candidateOrder":"65599f6ca97b9392e34352c4e876b305ca2f77c9f895c4fbb5440d87b7de06c8","chancePick":"d2a64e3f4e9a8431dc5439b5945f651f66521f4674aec6ef1b321bb4c1b8bf10","oldestFirst":"da6def7759fd3997881fa299c8b92324d49217c9534381d5c3c3be750d6d46aa"};
  for(const [name,expected] of Object.entries(unchangedAlgorithms)){const start=html.indexOf("function "+name+"("),end=html.indexOf("\nfunction ",start+1);assert.equal(createHash("sha256").update(html.slice(start,end)).digest("hex"),expected,name+" selection and rating code stays byte-exact");}
  const stats=ctx.chanceDisplayStats();for(const task of [bench,a,b])assert.ok(Math.abs(stats.get(task.id).probability-1/3)<1e-12,'equal current ratings share the full eligible set, including the chain');
  assert.equal(ctx.taskSelectionSummary(a,stats).label,'33.33% overall');
@@ -21647,4 +21647,99 @@ test('RISK legacy automatic expiry FAQ: save rotation permanently removes expire
  assert.match(help,/permanently removed from the active backup list.*successful save/);assert.match(help,/entry removal has no Undo/);assert.match(help,/Separate recovery archives kept by a storage upgrade remain intact/);
  ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;assert.match(settings,/removed permanently from the active backup list.*successful save/);assert.match(settings,/Separate recovery archives kept by a storage upgrade remain intact/);
  const current=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];assert.match(current,/Expired automatic.*legacy.*save rotation/i);
+});
+
+
+test('RISK Squared Weighting: exact percentage math full precision and frozen quadratic ordering',async()=>{
+ const {ctx}=await loadApp({seed:941});
+ assert.equal(ctx.squaredPercentageWeight(.5),25);
+ assert.equal(ctx.squaredPercentageWeight(1),100);
+ assert.equal(ctx.squaredPercentageWeight(2)/ctx.squaredPercentageWeight(1),4);
+ for(const invalid of [0,-1,NaN,Infinity])assert.equal(ctx.squaredPercentageWeight(invalid),0);
+ const tasks=[ctx.addTask('A'),ctx.addTask('B'),ctx.addTask('C')];
+ const weights=new Map(tasks.map((t,i)=>[t.id,[.1,.2,.7][i]]));ctx.chanceWeight=t=>weights.get(t.id);
+ ctx.state.scanMode='squared';ctx.resetChance();const seed=ctx.state.chance.seed;
+ const stats=ctx.chanceDisplayStats();
+ for(let i=0;i<tasks.length;i++)assert.ok(Math.abs(stats.get(tasks[i].id).probability-[1/54,4/54,49/54][i])<1e-12);
+ const order=Array.from(ctx.candidateOrder(tasks),t=>t.id);
+ for(const task of tasks){const u=(ctx.chanceHash(seed+':'+task.id)+.5)/4294967296;assert.ok(Math.abs(ctx.squaredScore(task)-(-Math.log(u)/((weights.get(task.id)/.7)**2)))<1e-12);}
+ weights.set(tasks[0].id,.99);assert.deepEqual(Array.from(ctx.candidateOrder(tasks),t=>t.id),order,'live ratings never reroll this pass');
+ assert.equal(ctx.state.chance.seed,seed);
+ assert.deepEqual(Array.from(ctx.candidateOrder([])),[]);
+ ctx.state.chance.weights=Object.fromEntries(tasks.map(t=>[t.id,0]));assert.deepEqual(Array.from(ctx.candidateOrder(tasks),t=>t.id),tasks.map(t=>t.id).sort());
+});
+
+test('RISK Squared Weighting saved mode: settings hydration reload eligibility and first dot retain existing protections',async()=>{
+ const {ctx,shim}=await loadApp({seed:942});
+ assert.equal(ctx.normalizeSettings({scanMode:'squared'}).scanMode,'squared');
+ const oldest=ctx.addTask('Oldest'),next=ctx.addTask('Next'),blocked=ctx.addTask('Blocked');ctx.setTaskPrerequisites(blocked.id,[next.id]);
+ ctx.setScanPreference('squared');ctx.startScan();assert.equal(ctx.state.scanMode,'squared');assert.equal(ctx.state.chain[0],oldest.id);
+ assert.equal(ctx.state.candidateId,next.id);assert.ok(!ctx.pool().some(t=>t.id===blocked.id));
+ const seed=ctx.state.chance.seed,order=Array.from(ctx.candidateOrder(ctx.pool()),t=>t.id);await ctx.persist();
+ const reload=await loadApp({seedStorage:{[SYNC_STORE_KEY]:shim.localStorage.getItem(SYNC_STORE_KEY)}});
+ assert.equal(reload.ctx.state.settings.scanMode,'squared');assert.equal(reload.ctx.state.scanMode,'squared');assert.equal(reload.ctx.state.chance.seed,seed);
+ assert.deepEqual(Array.from(reload.ctx.candidateOrder(reload.ctx.pool()),t=>t.id),order);
+ ctx.openSettings();assert.match(shim.document.getElementById('modalRoot').innerHTML,/Squared Weighting/);
+});
+
+
+test('RISK Squared Weighting default: fresh missing invalid settings use squared and explicit saved preferences survive',async()=>{
+ const {ctx}=await loadApp();assert.equal(ctx.state.settings.scanMode,'squared');
+ for(const value of [undefined,null,'invalid'])assert.equal(ctx.normalizeSettings({scanMode:value}).scanMode,'squared');
+ for(const mode of ['chance','descending','both','squared'])assert.equal(ctx.normalizeSettings({scanMode:mode}).scanMode,mode);
+});
+
+
+test('RISK Squared Weighting migration: old default moves once nondefault and later explicit Chance survive reload import and sync payload',async()=>{
+ const {ctx}=await loadApp();const task=ctx.addTask('Retained');const board=JSON.parse(ctx.cloudPayload());
+ delete board.settings.squaredDefaultVersion;board.settings.scanMode='chance';board.scanMode='chance';
+ const migrated=JSON.parse(JSON.stringify(board));ctx.hydrateState(migrated);assert.equal(migrated.settings.scanMode,'squared');assert.equal(migrated.settings.squaredDefaultVersion,1);assert.equal(migrated.scanMode,'squared');
+ assert.deepEqual(JSON.parse(JSON.stringify(migrated.tasks)),board.tasks,'migration preserves task and rating data');
+ for(const mode of ['descending','both']){board.settings.scanMode=mode;const copy=JSON.parse(JSON.stringify(board));ctx.hydrateState(copy);assert.equal(copy.settings.scanMode,mode);}
+ migrated.settings.scanMode='chance';migrated.scanMode='chance';
+ for(let i=0;i<3;i++){const next=JSON.parse(JSON.stringify(migrated));ctx.hydrateState(next);assert.equal(next.settings.scanMode,'chance');assert.equal(next.scanMode,'chance');}
+ const reload=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(migrated)}});assert.equal(reload.ctx.state.settings.scanMode,'chance');
+ assert.equal(JSON.parse(reload.ctx.cloudPayload()).settings.squaredDefaultVersion,1);assert.equal(reload.ctx.state.tasks[0].id,task.id);
+});
+
+test('RISK Squared Weighting numerical pools: tiny weights normalize without all-zero underflow and ineligible tasks stay zero',async()=>{
+ const {ctx}=await loadApp();const a=ctx.addTask('Tiny'),b=ctx.addTask('Twice tiny'),future=ctx.addTask('Future');future.startsAt='2099-01-01';
+ ctx.state.scanMode='squared';ctx.chanceWeight=t=>t.id===a.id?1e-200:t.id===b.id?2e-200:1;ctx.resetChance();
+ const stats=ctx.chanceDisplayStats();assert.ok(Math.abs(stats.get(a.id).probability-.2)<1e-12);assert.ok(Math.abs(stats.get(b.id).probability-.8)<1e-12);assert.equal(stats.get(future.id).probability,0);
+});
+
+
+test('RISK Squared Weighting migration durability: old default is marked for device/cloud repair and later Chance is not',async()=>{
+ const {ctx}=await loadApp();const old=ctx.defaultState();old.settings.scanMode='chance';delete old.settings.squaredDefaultVersion;
+ assert.equal(ctx.hydrateState(old),true,'migration must trigger the existing durable repair before cloud acknowledgement');
+ old.settings.scanMode='chance';old.scanMode='chance';assert.equal(ctx.hydrateState(old),false,'an explicit post-rollout preference must not be migrated again');
+});
+
+test('RISK Squared Weighting preserves original Chance: frozen ordering and recorded model likelihood stay proportional to raw weights',async()=>{
+ const {ctx}=await loadApp({seed:944});const a=ctx.addTask('A'),b=ctx.addTask('B');ctx.chanceWeight=t=>t.id===a.id?.1:.2;
+ ctx.state.scanMode='chance';ctx.resetChance();const seed=ctx.state.chance.seed;
+ const expected=[a,b].sort((x,y)=>ctx.chanceScore(x)-ctx.chanceScore(y));assert.deepEqual(Array.from(ctx.candidateOrder([a,b]),t=>t.id),expected.map(t=>t.id));
+ const before=ctx.ratingObservationValues(a,ctx.chanceDisplayStats());
+ ctx.state.scanMode='squared';const observation=ctx.captureRatingObservation('edit',[a.id]);
+ assert.equal(observation.before.get(a.id).likelihood,before.likelihood,'history retains the original model Chance semantics');assert.equal(ctx.state.chance.seed,seed);
+});
+
+
+test('RISK Squared Weighting sync: explicit old mode survives concurrent clients offline reload reconnect completion and Undo',async()=>{
+ const {a,b,h,notify,candidateId,benchId}=await liveScanSyncClients();
+ a.ctx.setScanPreference('descending');a.ctx.setScanPreference('squared');a.ctx.cloudPushNow();await syncSettle(160);notify();await syncSettle(160);
+ assert.equal(h.remoteState().settings.scanMode,'squared');assert.equal(b.ctx.state.settings.scanMode,'squared');assert.equal(b.ctx.state.scanMode,'squared');
+ a.ctx.setScanPreference('chance');a.ctx.cloudPushNow();await syncSettle(160);notify();await syncSettle(160);
+ assert.equal(b.ctx.state.settings.scanMode,'chance');assert.equal(b.ctx.state.settings.squaredDefaultVersion,1);
+ h.failPull=true;b.ctx.setScanPreference('squared');await b.ctx.persist();
+ const offline=await loadApp({seedStorage:{[SYNC_STORE_KEY]:b.shim.localStorage.getItem(SYNC_STORE_KEY)},cloudSyncFactory:h.factory});await syncSettle(40);
+ assert.equal(offline.ctx.state.settings.scanMode,'squared');const seed=offline.ctx.state.chance.seed;
+ offline.ctx.ensureCandidate();assert.equal(offline.ctx.state.chance.seed,seed,'offline reload retains the draw');
+ h.failPull=false;await offline.ctx.cloudPull();offline.ctx.cloudPushNow();notify();await syncSettle(160);
+ assert.equal(h.remoteState().settings.scanMode,'squared');
+ const before=offline.ctx.state.tasks.find(t=>t.id===candidateId);assert.ok(before&&!before.done);
+ offline.ctx.state.candidateId=candidateId;offline.ctx.state.chain=[benchId];offline.ctx.state.interventionActive=false;
+ offline.ctx.onAction('cand-done',{dataset:{candidate:candidateId,benchmark:benchId}});await syncSettle(160);
+ assert.equal(h.remoteState().tasks.find(t=>t.id===candidateId).done,true);
+ offline.ctx.undo();await syncSettle(160);assert.equal(offline.ctx.state.tasks.find(t=>t.id===candidateId).done,false);
 });

@@ -1,5 +1,29 @@
 [
   {
+    "testChangesSha256": "6190011ce9bb95a91fcbdd4873d68f821d9ba5222a24cdec2ee8f62ef09a526e",
+    "reason": "User requested a third quadratic scanning mode, its actual normalized percentages, and a once-only migration of the old Chance default while preserving later explicit choices.",
+    "previousBehavior": "Only Chance and Descending were accepted; new and invalid settings selected Chance; squaredPercentageWeight was absent and original shares stayed linear.",
+    "intendedBehavior": "Squared Weighting uses full precision quadratic relative weights with frozen seeded order; old Chance defaults migrate once, nondefaults and post-rollout choices persist. Original Chance, TrueSkill and recorded model likelihood remain protected.",
+    "replacementTests": [
+      "RISK Squared Weighting: exact percentage math full precision and frozen quadratic ordering",
+      "RISK Squared Weighting saved mode: settings hydration reload eligibility and first dot retain existing protections",
+      "RISK Squared Weighting default: fresh missing invalid settings use squared and explicit saved preferences survive",
+      "RISK Squared Weighting migration: old default moves once nondefault and later explicit Chance survive reload import and sync payload",
+      "RISK Squared Weighting numerical pools: tiny weights normalize without all-zero underflow and ineligible tasks stay zero",
+      "RISK Squared Weighting migration durability: old default is marked for device/cloud repair and later Chance is not",
+      "RISK Squared Weighting preserves original Chance: frozen ordering and recorded model likelihood stay proportional to raw weights",
+      "RISK Squared Weighting sync: explicit old mode survives concurrent clients offline reload reconnect completion and Undo"
+    ],
+    "preservedCoverage": [
+      "All existing rating, eligibility, completion, storage, history, cloud revision, offline and Undo assertions are retained. Quick start and default expectations change only for the user-authorized third-mode rollout.",
+      "The candidateOrder exact hash changes only to include a distinct squared branch; the original Chance branch and every other algorithm hash remain byte exact, with an additional raw-weight proportionality regression."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK Squared Weighting' tests.js; node --test tests.js",
+      "failure": "Observed /tmp/squared-red.txt (missing squaredPercentageWeight and rejected squared preference), /tmp/squared-default-red.txt (Chance fresh default), /tmp/squared-migration-red.txt (old default not migrated), /tmp/squared-preservation-red.txt (migration repair false and squared history likelihood). Initial full suite also discriminated changed Quick start text and candidateOrder byte contract. Expanded sync coverage was added after implementation and passed once an inconsistent fixture was corrected; it is preservation evidence, not a claimed preimplementation red."
+    }
+  },
+  {
     "testChangesSha256": "28950f7437ee2ad85c68a4abc0f7a13082ab49c82f31ad43625b6b823a1c5d41",
     "reason": "Emerald requested another halving of standalone show frequency, seeded per-pair ignition staggering and trail-only shell ascent.",
     "previousBehavior": "Released scale two schedules paired simultaneous ignitions and paints shell-tip glow during ascent.",

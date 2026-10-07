@@ -600,3 +600,14 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK device current-head guard: stale heads non-synchronous approvals and queued peers cannot authorize legacy retirement
 - RISK legacy automatic expiry lifecycle: a draft arriving during cleanup is saved and completion Undo manual restore and offline reload retain facts
 - RISK legacy automatic expiry FAQ: save rotation permanently removes expired upgrade copies while safety exceptions and Settings age cues remain clear
+
+## Squared Weighting
+
+- `RISK Squared Weighting: exact percentage math full precision and frozen quadratic ordering` — quadratic math, saved mode and preserved eligibility/data contracts.
+- `RISK Squared Weighting saved mode: settings hydration reload eligibility and first dot retain existing protections` — quadratic math, saved mode and preserved eligibility/data contracts.
+- `RISK Squared Weighting default: fresh missing invalid settings use squared and explicit saved preferences survive` — quadratic math, saved mode and preserved eligibility/data contracts.
+- `RISK Squared Weighting migration: old default moves once nondefault and later explicit Chance survive reload import and sync payload` — quadratic math, saved mode and preserved eligibility/data contracts.
+- `RISK Squared Weighting numerical pools: tiny weights normalize without all-zero underflow and ineligible tasks stay zero` — quadratic math, saved mode and preserved eligibility/data contracts.
+- `RISK Squared Weighting migration durability: old default is marked for device/cloud repair and later Chance is not` — quadratic math, saved mode and preserved eligibility/data contracts.
+- `RISK Squared Weighting preserves original Chance: frozen ordering and recorded model likelihood stay proportional to raw weights` — quadratic math, saved mode and preserved eligibility/data contracts.
+- `RISK Squared Weighting sync: explicit old mode survives concurrent clients offline reload reconnect completion and Undo` — quadratic math, saved mode and preserved eligibility/data contracts.
