@@ -573,7 +573,7 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 
 - RISK scenery browser fixture: conditional reloads retain executable probes and late sky refresh cannot change the controlled background
 - RISK scenery rain preservation fixture: one accepted backdrop survives exact weather comparisons and detects a mutated backdrop
-- RISK scenery reload diagnostics: missing probes retain navigation errors delivery and bootstrap state without replacing the original timeout
+- RISK scenery reload diagnostics: missing probes retain navigation errors delivery and bootstrap state without replacing the original timeout and capture actual browser events
 
 ## Migrated backup deletion safety
 

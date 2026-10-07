@@ -656,8 +656,14 @@ test('RISK scenery rain preservation fixture: one accepted backdrop survives exa
  mutate=false;const redrawn=context.sharedScenePrepare();assert.equal(backgroundPaints,2,'a separate preparation really redraws the scene');assert.notEqual(redrawn.back,prepared.back,'the negative raster fixture changes every redraw');assert.deepEqual(redrawn.scene,prepared.scene,'independent redraw retains the logical seed and instant');
 });
 
-test('RISK scenery reload diagnostics: missing probes retain navigation errors delivery and bootstrap state without replacing the original timeout',async()=>{
+test('RISK scenery reload diagnostics: missing probes retain navigation errors delivery and bootstrap state without replacing the original timeout and capture actual browser events',async()=>{
  const source=fs.readFileSync(path.join(__dirname,'tests.js'),'utf8'),start=source.indexOf("\ntest('RISK shared scenery browser:"),fragment=source.slice(start,source.indexOf("test('RISK list presentation browser:",start));
+ const handlers={},eventContext={page:{on:(name,callback)=>{handlers[name]=callback;}},errors:[],requestFailures:[],consoleErrors:[],navigation:'reload'};
+ const listeners=fragment.slice(fragment.indexOf("    page.on('pageerror'"),fragment.indexOf('await page.clock.setFixedTime'));
+ vm.runInNewContext(listeners,eventContext);
+ assert.equal(typeof handlers.requestfailed,'function','network failures must be captured by the real listener');assert.equal(typeof handlers.console,'function','console errors must be captured by the real listener');
+ handlers.pageerror(Error('private initializer error'));handlers.requestfailed({url:()=>'/private/module.js',failure:()=>({errorText:'private network failure'})});handlers.console({type:()=> 'error',text:()=> 'private console error'});handlers.console({type:()=> 'log',text:()=> 'ignored'});
+ assert.deepEqual(JSON.parse(JSON.stringify(eventContext.errors)),[{navigation:'reload',message:'private initializer error'}]);assert.deepEqual(JSON.parse(JSON.stringify(eventContext.requestFailures)),[{navigation:'reload',url:'/private/module.js',error:'private network failure'}]);assert.deepEqual(JSON.parse(JSON.stringify(eventContext.consoleErrors)),[{navigation:'reload',message:'private console error'}]);
  const begin=fragment.indexOf('    const awaitProbe=async stage=>');assert.ok(begin>=0,'probe waits must capture startup errors before reporting a timeout');
  const helper=fragment.slice(begin,fragment.indexOf('    await page.goto',begin));
  for(const failedCapture of [false,true]){
@@ -678,7 +684,9 @@ test('RISK shared scenery browser: isolated Chrome and WebKit devices reconstruc
    let expected=null;
    for(const [width,height,zone,motion,opened] of [[390,844,'Asia/Tokyo','normal','2026-10-05T22:20Z'],[768,1024,'America/Los_Angeles','reduced','2026-10-06T03:20Z'],[1440,900,'UTC','normal','2026-10-06T03:23Z'],[568,320,'America/New_York','reduced','2026-10-05T23:59Z']]){
     const page=await browser.newPage({viewport:{width,height},timezoneId:zone,serviceWorkers:'block',deviceScaleFactor:1}),errors=[],requestFailures=[],routeEvidence=[],consoleErrors=[];let navigation='initial';
-    page.on('pageerror',error=>errors.push(error.message));await page.clock.setFixedTime(new Date(opened));
+    page.on('pageerror',error=>errors.push({navigation,message:error.message}));
+    page.on('requestfailed',request=>requestFailures.push({navigation,url:request.url(),error:request.failure()?.errorText}));
+    page.on('console',message=>{if(message.type()==='error')consoleErrors.push({navigation,message:message.text()});});await page.clock.setFixedTime(new Date(opened));
     await page.addInitScript(motion=>localStorage.setItem('fvp:chain-scanner:landscape-motion',motion),motion);
     await page.route('**/landscape.js',async route=>{try{
      const headers={...route.request().headers()};delete headers['if-modified-since'];delete headers['if-none-match'];
