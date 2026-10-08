@@ -22282,3 +22282,56 @@ test('RISK snowangel departing shadow: actual winter painter follows the standin
   }
  }
 });
+
+test('RISK date clear controls: Add and Edit clear independently through actions with cancel save and durable reopen',async()=>{
+ for(const [field,other] of [['Start','Due'],['Due','Start']]){
+  const {ctx,shim}=await loadApp();
+  for(const prefix of ['add','et']){
+   const task=ctx.addTask('Private dated fixture');Object.assign(task,{startsAt:'2028-02-29',due:'2029-01-01',privateUnknown:'retained'});
+   if(prefix==='et')mountPrivateEditInterval(ctx,shim,task);
+   for(const [suffix,value] of [['Start',task.startsAt],['Due',task.due]])shim.document.getElementById(prefix+suffix).value=value;
+   const before=JSON.stringify(task),untouched=shim.document.getElementById(prefix+other).value;
+   ctx.onAction('clear-task-date',{dataset:{field:prefix+field}});
+   assert.equal(shim.document.getElementById(prefix+field).value,'','clear action empties only the selected draft');
+   assert.equal(shim.document.getElementById(prefix+other).value,untouched);
+   assert.equal(JSON.stringify(task),before,'clearing does not save before the existing save action');
+   ctx.onAction('clear-task-date',{dataset:{field:prefix+field}});
+   if(prefix==='et'){
+    ctx.closeModal();assert.equal(JSON.stringify(task),before,'Cancel preserves dates');mountPrivateEditInterval(ctx,shim,task);
+    shim.document.getElementById('etStart').value=task.startsAt;shim.document.getElementById('etDue').value=task.due;
+    ctx.onAction('clear-task-date',{dataset:{field:prefix+field}});ctx.onAction('save-edit',{dataset:{id:task.id}});
+    assert.equal(task[field==='Start'?'startsAt':'due'],null);assert.equal(task[field==='Start'?'due':'startsAt'],untouched);assert.equal(task.privateUnknown,'retained');
+    await ctx.persist();const reload=await loadApp({seedStorage:{[SYNC_STORE_KEY]:shim.localStorage.getItem(SYNC_STORE_KEY)}});
+    const saved=reload.ctx.state.tasks.find(t=>t.id===task.id);assert.equal(saved[field==='Start'?'startsAt':'due'],null);assert.equal(saved[field==='Start'?'due':'startsAt'],untouched);
+    reload.ctx.openEdit(saved.id);assert.match(reload.shim.document.getElementById('modalRoot').innerHTML,new RegExp('id="et'+field+'"[^>]*value=""'));
+   }else{
+    assert.equal(ctx.quickAddDates()[field==='Start'?'startsAt':'due'],'');assert.equal(ctx.quickAddDates()[field==='Start'?'due':'startsAt'],untouched);
+   }
+  }
+ }
+});
+test('RISK date clear accessibility: native labeled buttons accompany all date fields with bounded touch targets',async()=>{
+ const {ctx,shim}=await loadApp();const task=ctx.addTask('Private controls');ctx.openEdit(task.id);
+ const html=fs.readFileSync(path.join(__dirname,'index.html'),'utf8'),edit=shim.document.getElementById('modalRoot').innerHTML;
+ for(const [prefix,markup] of [['add',html],['et',edit]])for(const [suffix,label] of [['Start','start'],['Due','due']])assert.match(markup,new RegExp('<button[^>]*type="button"[^>]*data-act="clear-task-date"[^>]*data-field="'+prefix+suffix+'"[^>]*aria-label="Clear '+label+' date"'));
+ assert.match(html,/\.date-clear\{[^}]*min-height:44px[^}]*min-width:44px/);
+});
+test('RISK date clear persistence: pasted Add dates and offline concurrent sync retain the other date and task data',async()=>{
+ const initial=await loadApp();initial.shim.document.getElementById('addInput').value='Private first\nPrivate second';
+ initial.shim.document.getElementById('addStart').value='2028-02-29';initial.shim.document.getElementById('addDue').value='2029-01-01';
+ initial.ctx.onAction('clear-task-date',{dataset:{field:'addDue'}});initial.ctx.onAction('add',{});
+ assert.equal(initial.ctx.state.tasks.length,2);for(const task of initial.ctx.state.tasks){assert.equal(task.due,null);assert.equal(task.startsAt,'2028-02-29');}
+ const base=JSON.parse(initial.ctx.cloudPayload()),h=makeSyncHarness({remote:base,rev:3});
+ const a=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(base)},cloudSyncFactory:h.factory}),b=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(base)},cloudSyncFactory:h.factory});
+ await syncSettle(40);await a.ctx.cloudPull();await b.ctx.cloudPull();
+ const task=a.ctx.state.tasks[0];mountPrivateEditInterval(a.ctx,a.shim,task);a.shim.document.getElementById('etStart').value=task.startsAt;a.shim.document.getElementById('etDue').value='';
+ a.ctx.onAction('clear-task-date',{dataset:{field:'etStart'}});a.ctx.onAction('save-edit',{dataset:{id:task.id}});await a.ctx.persist();
+ const offline=await loadApp({seedStorage:{[SYNC_STORE_KEY]:a.shim.localStorage.getItem(SYNC_STORE_KEY)}});assert.equal(offline.ctx.state.tasks[0].startsAt,null);
+ await a.ctx.cloudPushNow();await syncSettle(40);await b.ctx.cloudPull();
+ b.ctx.addTask('Private concurrent addition');await b.ctx.persist();await b.ctx.cloudPushNow();await syncSettle(40);
+ await a.ctx.cloudPushNow();await syncSettle(40);await a.ctx.cloudPull();await a.ctx.cloudPushNow();await syncSettle(40);
+ assert.equal(h.remoteState().tasks.find(t=>t.id===task.id).startsAt,null);assert.ok(h.remoteState().tasks.some(t=>t.title==='Private concurrent addition'));
+});
+test('RISK date clear tablet geometry: Edit wrapper overrides generic date minimum to reserve the Clear target',()=>{
+ assert.match(html,/\.frow \.date-control input\[type=date\]\{[^}]*min-width:0/,'tablet wrapper must beat generic frow date minimum');
+});

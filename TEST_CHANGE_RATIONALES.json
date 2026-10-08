@@ -2595,5 +2595,25 @@
       "command": "node --test --test-reporter=spec --test-name-pattern='RISK All Tasks duration' tests.js",
       "failure": "/tmp/chain-duration-red.log actual All Tasks can’t61m != can’t1h1m. The original per-selector border-box assertion also failed,but global * border-box already applied; that redundant implementation and misleading assertion were corrected. Browser test gated pending allocation. Earlier red logs retained."
     }
+  },
+  {
+    "testChangesSha256": "89ce08cc5f6361b7e86de9148945e9cec13a2a49ecab5b0be9302119e3c314b3",
+    "reason": "Add independently accessible date clear controls requested by the user without changing persistence rules.",
+    "previousBehavior": "Date inputs had no explicit clear action; the action left the populated draft unchanged.",
+    "intendedBehavior": "Each clear action empties only its draft date and saves through existing Add Edit and sync paths.",
+    "replacementTests": [
+      "RISK date clear controls: Add and Edit clear independently through actions with cancel save and durable reopen",
+      "RISK date clear accessibility: native labeled buttons accompany all date fields with bounded touch targets",
+      "RISK date clear persistence: pasted Add dates and offline concurrent sync retain the other date and task data",
+      "RISK date clear tablet geometry: Edit wrapper overrides generic date minimum to reserve the Clear target"
+    ],
+    "preservedCoverage": [
+      "Existing eligibility date boundaries and evergreen timestamp rules remain intact.",
+      "Existing Save Cancel Undo and sync conflict recovery contracts remain intact."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK date clear' tests.js",
+      "failure": "Observed clear action retained 2028-02-29 instead of empty draft; native labeled clear buttons absent. Full output: date-red.log outside checkout. Tablet geometry assertion then failed before the higher-specificity CSS override; date-tablet-red.log records it."
+    }
   }
 ]
