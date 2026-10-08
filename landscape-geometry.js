@@ -421,29 +421,31 @@
         towStartX:planeX-direction*18,towStartY:planeY,towEndX:x+direction*width/2,towEndY:y};
     }
     function fireworks(age,seed,atFestival=false,event={}){
-      const dots=[],duration=Number(event.duration)||(atFestival?150:60);
+      const dots=[],visitDuration=Number(event.duration)||(atFestival?150:60),duration=Math.min(60,visitDuration);
       if(age<=0||age>=duration)return dots;
-      const start=atFestival?8:0,interval=atFestival?3.8:2.1;
+      const start=atFestival?8:0,interval=atFestival?3.8:2.1,shellLife=1+.075+2.7,pairLife=shellLife+.3;
       // Finish the barge display while its launchers are still on screen.
-      // The normal shell lifetime provides a gradual finale fade in both shows.
-      const finaleAt=atFestival?duration*.65:duration-4;
-      const count=Math.max(0,Math.floor((finaleAt-3.7-start)/interval)+1);
-      // Only shells still in flight need geometry, even in a five-minute show.
-      const first=Math.max(0,Math.floor((age-start-3.8)/interval)+1),last=Math.min(count-1,Math.floor((age-start)/interval)),shells=[];
+      // Reserve the full flight and bloom lifetime before the one-minute limit.
+      // Include the maximum paired delay when clearing regular shells before
+      // the finale, so all eight lanes retain the fixed particle budget.
+      const finaleAt=atFestival?Math.min(visitDuration*.65,duration-shellLife):duration-4;
+      const count=Math.max(0,Math.floor((finaleAt-pairLife-start)/interval)+1);
+      // Only shells still in flight need geometry, through the final fade.
+      const first=Math.max(0,Math.floor((age-start-pairLife)/interval)+1),last=Math.min(count-1,Math.floor((age-start)/interval)),shells=[];
       // An independent seeded sample delays only the second regular shell.
       // No mutable random stream or timer can drift between devices or repaint.
       const pairDelay=wave=>{
         let hash=2166136261;
         for(const character of `${seed}|firework-pair|${wave}`)hash=Math.imul(hash^character.charCodeAt(0),16777619);
         hash=Math.imul(hash^(hash>>>16),0x7feb352d);hash=Math.imul(hash^(hash>>>15),0x846ca68b);
-        return ((hash^(hash>>>16))>>>0)/4294967296*.1;
+        return ((hash^(hash>>>16))>>>0)/4294967296*.3;
       };
       for(let wave=first;wave<=last;wave++)for(let lane=0;lane<2;lane++)shells.push({launch:start+wave*interval+(lane?pairDelay(wave):0),burst:wave*2+lane,wave,lane,finale:false});
-      if(age>=finaleAt&&age<finaleAt+3.7)for(let lane=0;lane<8;lane++)shells.push({launch:finaleAt,burst:count*2+lane,wave:count,lane,finale:true});
+      if(age>=finaleAt&&age<finaleAt+shellLife)for(let lane=0;lane<8;lane++)shells.push({launch:finaleAt,burst:count*2+lane,wave:count,lane,finale:true});
       for(const shell of shells){
         const {launch,burst,wave,lane,finale}=shell,time=age-launch;
-        if(time<=0||time>=3.7)continue;
-        const deck=atFestival?festival({...event,age:launch}):null;
+        if(time<=0||time>=shellLife)continue;
+        const deck=atFestival?festival({...event,age:event.fireworkDeckAge??launch}):null;
         const originX=deck?deck.x+((wave+lane)%2?1:-1)*deck.launcherOffset
           :finale?W*(.15+lane*.10):W*(.25+seed*.3+(wave%3)*.13+lane*.07);
         if(originX<3||originX>W-3)continue;

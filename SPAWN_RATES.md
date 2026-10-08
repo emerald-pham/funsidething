@@ -10,14 +10,16 @@ others' share of the same limited visitor budget. Seasonal eligibility still app
 Train and metro have dedicated service: about 65 and 50 seconds crossing,
 respectively, followed by 12 and 8 seconds of rest at rate 1. Their rate divides
 that rest time; only one vehicle per track runs at once. Painting pauses offscreen; arrivals and age follow the shared UTC schedule. Crossing periods include the maximum sampled duration plus the configured minimum rest.
-Standalone fireworks check every 60 seconds of UTC nighttime with a
-40% chance at rate 1. Each show independently samples a duration from 60 to
-300 seconds and bursts behind the city. Its next opportunity is twice the
-sampled duration plus 120 seconds after its start; the first check is after
-40 UTC seconds. Scaling the entire start interval, including failed checks,
-spaces same-sample shows twice as far apart without extending visible duration.
-Regular volleys fire two shells, then eight shells finish the show with fading
-embers. Geometry keeps at most 320 active particles. Arrival timing stays random
+Standalone fireworks check every 120 seconds of UTC nighttime with a
+40% chance at rate 1; the first check is after 80 UTC seconds. Each show keeps
+its original sampled 60–300-second scheduling reservation, but its visible
+shells, flights and bloom tails finish within 60 seconds. The next opportunity
+is four times the sampled reservation plus 240 seconds after its start.
+Scaling the entire interval, including failed checks, retains the current
+four-times-original spacing independently of the shorter display window.
+Regular volleys fire two shells; the second has a deterministic seeded
+0–300 ms delay. Eight simultaneous finale shells finish with naturally fading
+embers before the 60-second display limit. Geometry keeps at most 320 active particles. Arrival timing stays random
 and respects the existing scene budget and shared UTC clock; hidden tabs do no painting and reduced motion uses still poses.
 Festivals check once per UTC minute at a 0.6% chance, wait at least 30 UTC
 minutes between visits, share the seven-minute rare cooldown with alien visits,
@@ -25,7 +27,8 @@ and cross the lake on a barge in about 127–183 seconds, depending on the
 assigned travel speed (150-second baseline). A festival owns its
 fireworks; standalone shows and festivals do not overlap. Both require the Sun
 below civil twilight. Rates scale these chances, capped at 100%.
-The barge also fires paired shells and an eight-shell finale while its launchers
+The barge also finishes its paired shells and simultaneous eight-shell finale
+within its first 60 seconds, preserving full transit time, while its launchers
 are still visible; its visit odds, cooldown, travel speed and duration stay unchanged.
 Woodland rows control the separate animal pool (default: 1% chance per 30 seconds).
 Clocktower visits check once per UTC nighttime minute with a 2% chance at

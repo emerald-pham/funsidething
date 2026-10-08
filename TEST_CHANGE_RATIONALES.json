@@ -1,5 +1,83 @@
 [
   {
+    "testChangesSha256": "3010f979e94342f365bbb66a0e24cbbb2dd83b07d09d3d65f94c113deedbd78c",
+    "reason": "User requests displays at most one minute and regular paired ignition variance widened to300ms, preserving event frequency and finale appearance.",
+    "previousBehavior": "Standalone shows persisted60–300seconds; barge shells ran through65percent of transit; second regular ignitions used0–100ms.",
+    "intendedBehavior": "Cap standalone events and all shell geometry at60seconds with complete finale tails; preserve sampled opportunity spacing and full barge transit; use0–300ms seeded regular delay. Full1s flight+.075s lag+2.7s bloom lifetime expires naturally; reservation horizons retain old admissions as well as proposal spacing.",
+    "replacementTests": [
+      "RISK fireworks minute cap: complete standalone and barge flight bloom and finale tails finish within sixty seconds",
+      "RISK fireworks minute schedule: capped visible events preserve seeded opportunity spacing and UTC late join reload across midnight",
+      "RISK fireworks pair endpoints: zero and maximum seeded samples bound regular pairs without delaying eight finale lanes",
+      "RISK fireworks pair delay: seeded second launches span zero to three hundred milliseconds without shifting first shells or finale",
+      "RISK fireworks natural tails: final embers retain their complete formula lifetime",
+      "RISK fireworks reservations: shortening visibility preserves previously suppressed shows and visitor admissions",
+      "RISK fireworks legacy reservations: invisible remainder keeps old festival random draws and admission budgets",
+      "RISK fireworks reduced motion: capped static blooms stay on the stationary barge only during the real first minute",
+      "RISK fireworks reduced deadline: static scheduler clears a persistent barge bloom at the actual sixty-second boundary without animated repaints",
+      "RISK fireworks cached guidance: installed spawn-rate prose matches the bounded display and its exact offline shell"
+    ],
+    "preservedCoverage": [
+      "Occurrence-scale four, spawn odds, budgets, trail-only ascent and original spark formulas, simultaneous eight-lane finale and fading, reduced/hidden renderer, task storage/sync untouched. Existing density tests now sample within the explicitly requested shorter display; exact old schedule start comparisons remain.",
+      "Original duration contract now asserts60s visible duration and all five original spacing sample endpoints; barge rack, reflection and moving-deck assertions use equivalent earlier launch waves inside the requested cap. No geometry or paint assertions removed.",
+      "Explicit old3.7s cutoff assertions change to3.775s formula lifetime so faint live embers can fade completely; all particle shape, lag, alpha and life formulas remain identical.",
+      "Legacy advance keeps its invisible reservation admission slot and blocks old-window festival draws, preserving its original random stream without retaining any visible particles.",
+      "Reduced-motion barge transit midpoint stays unchanged; a separate bounded static shell pose uses that stationary deck only before the actual UTC60s deadline. No saved preferences or animation clocks change.",
+      "One existing reduced-motion timer callback invalidates static canvas at the fireworks deadline; unchanged membership stays still and hidden scenes remain paused.",
+      "Installed cached spawn-rate guidance now describes actual60s/300ms/scale4 behavior and gets its exact shell-byte key; its spawn-rate table remains unchanged."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='RISK fireworks (pair delay|minute|occurrence|density)|RISK product FAQ' tests.js; node --test --test-reporter=spec --test-name-pattern='RISK fireworks pair endpoints' tests.js (released geometry)",
+      "failure": "/tmp/chain-fireworks-minute-red.log: five failures, sampled visible duration exceeds60, shortened finale absent, FAQ old0–100ms, seeded delays never exceed240ms; /tmp/chain-fireworks-minute-endpoints-max-red.log: maximum partner ignites early against released geometry. Original /tmp/chain-fireworks-minute-endpoints-red.log failed earlier on the newly positioned finale at zero hash. Review follow-up discriminating reds: /tmp/chain-fireworks-minute-tails-red.log showed no formula-live embers atfinale+3.74; /tmp/chain-fireworks-minute-reservations-red.log showed extra fireworks:0:3 at3120s versus releasednone. /tmp/chain-fireworks-minute-legacy-red.log observed5 new random draws instead of0 when an invisible remainder should still reserve its former show slot. /tmp/chain-fireworks-minute-reduced-red.log showed zero static bloom particles because the unchanged frozen barge age75 lay beyond the capped window. /tmp/chain-fireworks-minute-deadline-red.log showed0 scheduler repaint calls at real60s for an unchanged festivalID; the oldstaticcanvas retained the bloom. /tmp/chain-fireworks-minute-cache-red.log and specialist-doc62-fingerprints.log show changed precached SPAWN_RATES prose with stale shell/current-changelog digests; generated fingerprints refreshed. Chronology correction: the admissions repair first had a diagnostic mismatch and a formal cross-realm assertion failure for the wrong reason. The corrected -reservations-red.log was recorded AFTER reservationDuration code existed by restoring the prior committed timeline; it is retrospective, not proof of contemporaneous RED. Both endpoint red logs were also later base-versus-fixed boundary checks after the initial cap/delay implementation; initial delay RED remains contemporaneous. Preserve original commits/logs and hold process acceptance for the admission repair. Reconciliation onto merged editor 0f6aaed: /tmp/chain-fireworks-reconcile-red.log observed nine meaningful failures before application integration; reservation preservation already passed. This new integration RED does not change original chronology."
+    },
+    "chronologyAudit": {
+      "compliantContemporaneousChanges": [
+        {
+          "scope": "initial cap, schedule/display separation and seeded0–300ms widening",
+          "red": "/tmp/chain-fireworks-minute-red.log",
+          "green": "/tmp/chain-fireworks-minute-focused.log",
+          "note": "Five meaningful failures were observed before the initial app implementation. Exact endpoint checks were later supplemental validation."
+        },
+        {
+          "scope": "complete3.775s natural tail and regular retention horizon",
+          "red": "/tmp/chain-fireworks-minute-tails-red.log",
+          "green": "/tmp/chain-fireworks-minute-focus-repair.log"
+        },
+        {
+          "scope": "legacy invisible reservation slot and blocked festival RNG",
+          "red": "/tmp/chain-fireworks-minute-legacy-red.log",
+          "green": "/tmp/chain-fireworks-minute-focus-repair.log"
+        },
+        {
+          "scope": "reduced-motion static shell pose on unchanged stationary deck",
+          "red": "/tmp/chain-fireworks-minute-reduced-red.log",
+          "green": "/tmp/chain-fireworks-minute-focus-final27.log"
+        },
+        {
+          "scope": "reduced-motion persistent-ID canvas deadline invalidation",
+          "red": "/tmp/chain-fireworks-minute-deadline-red.log",
+          "green": "/tmp/chain-fireworks-minute-focus-final28.log"
+        },
+        {
+          "scope": "cached guidance fingerprint refresh",
+          "red": "/tmp/chain-fireworks-minute-cache-red.log",
+          "green": "/tmp/chain-fireworks-minute-focus-final29.log"
+        }
+      ],
+      "retrospectiveCoverageOnly": [
+        "/tmp/chain-fireworks-minute-endpoints-red.log",
+        "/tmp/chain-fireworks-minute-endpoints-max-red.log",
+        "/tmp/chain-fireworks-minute-reservations-red.log"
+      ],
+      "orderingGap": {
+        "scope": "UTC reservationDuration admission preservation repair",
+        "diagnosticBeforeImplementation": "/tmp/fireworks-admission-probe.mjs reported extrafireworks:0:3 at3120s before the repair, but exitedsuccess rather than formalassertion RED.",
+        "invalidFirstFormalRed": "Cross-realm deep equality failed on identical train IDs; wrong reason.",
+        "correctedFormalRed": "Corrected Array.from comparison then ran against restored pre-repair timeline after repair code had already been written.",
+        "releaseStatus": "held pending parent process decision; current focused and independent regression passes validate final behavior but cannot restore historical ordering."
+      }
+    }
+  },
+  {
     "testChangesSha256": "5b12f121f7791692ee5407e8d54a9adc364ac429a8b7083a419e5c09d5f56c39",
     "reason": "Reconcile requested UI batch onto released Squared Weighting without losing released controls/tests/history; real saved-board consumer regression and discriminating shell-delivery integration red.",
     "previousBehavior": "Released base has Squared Weighting/held-key fixes but lacks editor visibility/dividers/seven-day default and Cant hour-minute notation; initial rebase retained prior base shell fingerprint.",

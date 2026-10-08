@@ -26,7 +26,8 @@
       (type==='abduction'?24:type==='bird'?28:type==='balloon'?150:type==='plane'?95:48+r()*50);
     const speed=type==='abduction'||type==='fireworks'?1:S.startingSpeed(r());
     const lane=r(),seed=r(),reverse=r()>.5;
-    return {id,type,start:Math.round(start*1000)/1000,duration:Math.round(base/speed*1000)/1000,speed,lane,seed,reverse,
+    return {id,type,start:Math.round(start*1000)/1000,duration:Math.round((type==='fireworks'?Math.min(base,60):base/speed)*1000)/1000,speed,lane,seed,reverse,
+      ...(type==='fireworks'?{scheduleDuration:Math.round(base*1000)/1000}:{}),
       ...(['cyclist','flock'].includes(type)?{count:S.groupSize(type,seed)}:{})};
   }
   function create(options={}){
@@ -68,20 +69,23 @@
     function fireworks(day){
       if(showCache.has(day))return showCache.get(day);
       const out=[],show=C.nightShows.fireworks,scale=show.occurrenceScale||1,r=random(seed,'fireworks',day);
-      // Each UTC day's immutable proposal plan samples the existing duration
+      // Each UTC day's immutable proposal plan samples the existing spacing duration
       // and configured start interval. Previous-day reservations bridge midnight.
       let start=day*DAY+20*scale;
       while(start<(day+1)*DAY){
         const roll=r();
         if(sunAt(start).altitude<-6&&roll<Math.min(1,show.chance*C.spawnRate('fireworks'))){
           const candidate=event('fireworks',start,r,`fireworks:${day}:${out.length}`);out.push(candidate);
-          start+=(candidate.duration+show.rest)*scale;
+          start+=(candidate.scheduleDuration+show.rest)*scale;
         }else start+=show.interval*scale;
       }
       showCache.set(day,out);if(showCache.size>3)showCache.delete(showCache.keys().next().value);
       return out;
     }
-    const overlaps=(a,b)=>a.start<b.start+b.duration&&b.start<a.start+a.duration;
+    // Admission reservations keep the old show horizon; a shorter display must
+    // not increase occurrence frequency or admit a different shared scene.
+    const reservationDuration=e=>e.scheduleDuration||e.duration;
+    const overlaps=(a,b)=>a.start<b.start+reservationDuration(b)&&b.start<a.start+reservationDuration(a);
     function build(bucket){
       const from=bucket*8,to=from+8;
       // At most five minutes of ordinary lifetimes and thirty minutes of rare
@@ -94,13 +98,13 @@
         e.start-prior.start<(e.type==='festival'&&prior.type==='festival'?C.nightShows.festival.cooldown:S.RARE_COOLDOWN)));
       const barges=rare.filter(e=>e.type==='festival');
       const day=Math.floor(from/DAY),proposals=[...fireworks(day-1),...fireworks(day)].sort((a,b)=>a.start-b.start);
-      const shows=proposals.filter((e,index)=>e.start<to&&e.start+e.duration>from&&
-        (!index||e.start>=proposals[index-1].start+(C.nightShows.fireworks.occurrenceScale||1)*(proposals[index-1].duration+C.nightShows.fireworks.rest))&&
+      const shows=proposals.filter((e,index)=>e.start<to&&e.start+reservationDuration(e)>from&&
+        (!index||e.start>=proposals[index-1].start+(C.nightShows.fireworks.occurrenceScale||1)*(proposals[index-1].scheduleDuration+C.nightShows.fireworks.rest))&&
         !barges.some(barge=>overlaps(e,barge)));
       const pool=[...raw.filter(e=>e.type!=='abduction'),...rare,...shows].sort((a,b)=>a.start-b.start||a.id.localeCompare(b.id));
       const events=pool.filter(e=>{
-        if(e.start>=to||e.start+e.duration<=from)return false;
-        const prior=pool.filter(other=>(other.start<e.start||other.start===e.start&&other.id<e.id)&&other.start+other.duration>e.start);
+        if(e.start>=to||e.start+reservationDuration(e)<=from)return false;
+        const prior=pool.filter(other=>(other.start<e.start||other.start===e.start&&other.id<e.id)&&other.start+reservationDuration(other)>e.start);
         if(prior.length>=S.MAX_EVENTS-2)return false;
         if(['banner','skywriter','meteor','bird','dolphin'].includes(e.type)&&prior.some(other=>other.type===e.type))return false;
         return !C.waterEvents.includes(e.type)||prior.filter(other=>C.waterEvents.includes(other.type)).length<2;
@@ -120,7 +124,7 @@
         let cursor=r()*total,index=0;while(index<weights.length-1&&cursor>=weights[index])cursor-=weights[index++];
         const speed=S.startingSpeed(r());woods.push({id:`woodland:${slot}`,type:C.woodland.types[index],start,duration:C.woodland.duration/speed,speed,seed:r(),lane:r(),reverse:r()>.5});
       }
-      const woodland=woods.filter(e=>e.start<to&&e.start+e.duration>from&&woods.filter(prior=>prior.start<e.start&&prior.start+prior.duration>e.start).length<C.woodland.maxActive);
+      const woodland=woods.filter(e=>e.start<to&&e.start+reservationDuration(e)>from&&woods.filter(prior=>prior.start<e.start&&prior.start+prior.duration>e.start).length<C.woodland.maxActive);
       return {events,woodland};
     }
     function rareVisit(seconds,stream,interval,duration,chance,rate=1){
