@@ -23041,6 +23041,11 @@ test('RISK Last task WOOP: future conflicting and cyclic operation evidence is p
  ctx.writeTaskWoop(task,null);assert.deepEqual(JSON.parse(JSON.stringify(task.woopPlanOps)),future,'direct writes preserve future operations');
  const snapshot={...task};delete snapshot.woopPlanOps;ctx.replaceTaskWoop(snapshot,task);assert.deepEqual(JSON.parse(JSON.stringify(snapshot.woopPlanOps)),future,'deliberate replacement preserves future causal evidence');
  const futureRecovery={id:task.id,woopEvidenceRecovery:{v:99,payload:'exact recovery'}};const healthy={id:task.id};ctx.mergeTaskWoop(healthy,futureRecovery);assert.deepEqual(JSON.parse(JSON.stringify(healthy.woopEvidenceRecovery)),futureRecovery.woopEvidenceRecovery,'incoming future recovery stays exact and read-only');
+ for(const key of ['woopEvidenceRecovery','woopOpaqueRecovery']){
+  const unknown={v:99,payload:{private:'exact future recovery'}},incoming={id:task.id,[key]:unknown},base={id:task.id};ctx.mergeTaskWoop(base,incoming);assert.equal(JSON.stringify(base[key]),JSON.stringify(unknown),'incoming '+key+' stays exact');assert.equal(ctx.supportedWoopEvidence(base),false);
+  const other={id:task.id,[key]:[{private:'peer known bundle'}]},winner={id:task.id,[key]:unknown};ctx.mergeTaskWoop(winner,other);assert.equal(JSON.stringify(winner[key]),JSON.stringify(unknown),'existing '+key+' never overwritten');const once=JSON.stringify(winner);ctx.mergeTaskWoop(winner,other);assert.equal(JSON.stringify(winner),once,'replay is idempotent');assert.ok(JSON.stringify(winner).includes('peer known bundle'),'both facts remain');
+ }
+
  const plan={v:1,id:'plan-a',outcome:'Outcome',obstacle:'Obstacle',plan:'If obstacle, then act'},a={v:1,id:'op-a',observed:[],value:plan},b={v:1,id:'op-a',observed:[],value:null};
  const winner={...task,woopPlan:plan,woopHead:'op-a',woopPlanOps:[a]},other={...task,woopPlan:null,woopHead:'op-a',woopPlanOps:[b]};ctx.mergeTaskWoop(winner,other);assert.equal(winner.woopPlanOps.length,2,'immutable ID conflicts retain both facts');assert.equal(JSON.stringify(winner.woopPlan),JSON.stringify(plan));
  task.woopPlanOps=[a,b];task.woopPlan=plan;ctx.renderScan();assert.doesNotMatch(shim.document.getElementById('scan').innerHTML,/Delete WOOP plan/,'ambiguous evidence is read-only');
