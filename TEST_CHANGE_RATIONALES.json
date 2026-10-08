@@ -2653,5 +2653,33 @@
       "command": "node --test --test-name-pattern='RISK date clear' tests.js; node --test tests.js; node --test --test-name-pattern='RISK UI batch integration' tests.js; LANDSCAPE_BROWSER_URL=http://127.0.0.1:18822/ LANDSCAPE_PLAYWRIGHT=<bundled playwright> node --test --test-name-pattern=\"RISK date clear rendered geometry\" tests.js",
       "failure": "Observed clear action retained 2028-02-29 instead of empty draft; native labeled clear buttons absent. Full output: date-red.log outside checkout. Tablet geometry assertion then failed before the higher-specificity CSS override; date-tablet-red.log records it. Frozen dbe1442 full suite: 1359 tests, 1331 pass, 1 fail, 27 skipped; original RISK UI batch integration lost can’t · 1h30m after startup expired its historical 90-minute hold. Untouched e5eaecc focused test reproduces it; controlled preboot clock makes all original assertions pass on both. date-duration-diagnosis.md and date-duration-review.md record independent evidence. Tablet geometry assertion then failed before the higher-specificity CSS override; date-tablet-red.log records it. Observed actual browser RED: 768px etStart reserves room for native day month year and picker failed; rendered-geometry-red.log. Same actual test then GREEN after wrapping repair."
     }
+  },
+  {
+    "testChangesSha256": "12c938844f02f445f612ef4bc1d5a54d943f1936225fbc044070d84e0bfd16ae",
+    "reason": "Discriminating synthetic concurrent-tab tests exposed scalar overwrite and lost independent actions during browser, IndexedDB and cloud adoption awaits.",
+    "previousBehavior": "CAS recovery could republish obsolete titles, drop unrelated dates, settings, context and effective rating actions, or roll back edits made during cloud safety saves.",
+    "intendedBehavior": "Rebase independent field deltas against observed saved bytes; newer same-field changes and explicit deletion evidence prevail, and awaited adoption never erases a later gesture.",
+    "preservedCoverage": [
+      "All previous deletion, restoration, completion, rating-history, prerequisite and recovery-pin assertions remain unchanged.",
+      "Existing account and revision guards, CAS failures, offline saved-data and supported released-client boundaries remain required."
+    ],
+    "replacementTests": [
+      "RISK STALE TAB: CAS repair preserves newer fields and independent edits through an awaiting third action",
+      "RISK STALE TAB: browser rebase keeps disjoint fields but newer conflicts and deletions win",
+      "RISK STALE TAB: cloud adoption does not replace edits made while its safety backup awaits",
+      "RISK STALE TAB: cloud rebase retains independent edits against an observed revision",
+      "RISK STALE TAB: a settings action during CAS repair survives without reviving peer fields",
+      "RISK STALE TAB: failed cloud adoption save keeps an edit arriving during persistence",
+      "RISK STALE TAB: failed matching-cloud revision save cannot roll back a later gesture",
+      "RISK STALE TAB: rating and context actions during CAS repair retain their complete effects",
+      "RISK STALE TAB: legacy coexistence retains independent live fields before durable reconciliation",
+      "RISK STALE TAB: recovery guidance explains independent edits conflicts and unobserved cloud bases",
+      "RISK STALE TAB: rebasing never combines cached Chance data from different passes",
+      "RISK STALE TAB: a conflicting edit during awaited CAS repair retains its exact recovery bytes"
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK STALE TAB:' tests.js (individual additions run before their implementation)",
+      "failure": "Observed actual Original title instead of Newer peer title; null instead of independent due date; missing later live gesture after cloud rollback; system instead of ymd; rating mu=25 instead of 20.7944; context membership mismatch; legacy rename lost. Original chronological logs preserved in task-7/evidence/chain-*-red*.log. Further observed cross-pass extra cached weight and missing exact late CAS recovery snapshot, preserved in chain-final-safety-red.log."
+    }
   }
 ]

@@ -22406,3 +22406,188 @@ test('RISK date clear guidance: Quick start explains disabled empty date control
  assert.match(markup,/Clear stays visible but greyed out and disabled while its field is empty/);
  assert.match(markup,/Add or Save commits the change; closing Edit without saving keeps the saved dates/);
 });
+
+test('RISK STALE TAB: CAS repair preserves newer fields and independent edits through an awaiting third action',async()=>{
+ const {indexedDB}=await import('fake-indexeddb'),dbName='chain-scanner-field-race-'+Date.now()+'-'+Math.random();
+ const initial=syncState({tasks:[syncTask('base','Original title'),syncTask('other','Other original')]});
+ const raw=JSON.stringify(initial),storage=sharedScannerStorage({[LOCAL_HEAD_KEY]:raw,[SYNC_STORE_KEY]:raw});
+ const {ctx,shim}=await loadApp({sharedStorage:storage,indexedDBProvider:indexedDB,deviceDbName:dbName});
+ const store=shim.window.ScannerDeviceStore,original=store.commitHead.bind(store);
+ let calls=0,entered,release;const started=new Promise(resolve=>entered=resolve),gate=new Promise(resolve=>release=resolve);
+ store.commitHead=async options=>{
+  calls++;
+  if(calls===1){
+   const peer=JSON.parse((await store.readHead()).payload);peer.tasks[0].title='Newer peer title';peer.tasks[0].due='2026-11-01';
+   assert.equal((await original({expectedHash:options.expectedHash,payload:JSON.stringify(peer)})).ok,true);
+   return {conflict:true};
+  }
+  if(calls===2){entered();await gate;}
+  return original(options);
+ };
+ ctx.state.tasks[1].title='Independent local title';ctx.commit();const saving=ctx.persist();await started;
+ ctx.addTask('Third local addition');release();assert.equal(await saving,true);
+ for(const board of [ctx.state,JSON.parse((await store.readHead()).payload)]){
+  assert.equal(board.tasks.find(t=>t.id==='base').title,'Newer peer title','a later unrelated action cannot republish a stale title');
+  assert.equal(board.tasks.find(t=>t.id==='base').due,'2026-11-01','the newer peer date remains');
+  assert.equal(board.tasks.find(t=>t.id==='other').title,'Independent local title','independent valid edits are retained');
+  assert.ok(board.tasks.some(t=>t.title==='Third local addition'));
+ }
+ assert.ok((await store.listBackups()).some(row=>row.kind==='stale-tab-draft'));
+ await store.close();
+});
+
+test('RISK STALE TAB: browser rebase keeps disjoint fields but newer conflicts and deletions win',async()=>{
+ const initial=syncState({tasks:[syncTask('base','Original'),syncTask('other','Other'),syncTask('deleted','Delete me')]});
+ const raw=JSON.stringify(initial),storage=sharedScannerStorage({[LOCAL_HEAD_KEY]:raw,[SYNC_STORE_KEY]:raw});
+ const a=await loadApp({sharedStorage:storage}),b=await loadApp({sharedStorage:storage});
+ a.ctx.state.tasks.find(t=>t.id==='base').title='Peer title';a.ctx.state.tasks.find(t=>t.id==='other').due='2026-12-01';a.ctx.onAction('delete-task',{dataset:{id:'deleted'}});
+ // Use the actual deletion command so tombstones, not missing membership, prove intent.
+ await a.ctx.persist();
+ b.ctx.state.tasks.find(t=>t.id==='base').title='Conflicting stale title';b.ctx.state.tasks.find(t=>t.id==='base').due='2026-11-01';
+ b.ctx.state.tasks.find(t=>t.id==='other').title='Independent rename';b.ctx.state.tasks.find(t=>t.id==='deleted').title='Stale deleted rename';b.ctx.commit();
+ await b.ctx.persist();
+ const board=JSON.parse(storage.getItem(SYNC_STORE_KEY));
+ assert.equal(board.tasks.find(t=>t.id==='base').title,'Peer title');
+ assert.equal(board.tasks.find(t=>t.id==='base').due,'2026-11-01','disjoint same-task date is a valid independent action');
+ assert.equal(board.tasks.find(t=>t.id==='other').title,'Independent rename');
+ assert.equal(board.tasks.find(t=>t.id==='other').due,'2026-12-01');
+ assert.ok(!board.tasks.some(t=>t.id==='deleted'),'explicit newer deletion defeats stale editing');
+ assert.ok(b.ctx.readLocalBackups().some(row=>row.kind==='stale-tab-draft'&&row.payload.includes('Conflicting stale title')));
+});
+
+test('RISK STALE TAB: cloud adoption does not replace edits made while its safety backup awaits',async()=>{
+ const local=syncState({tasks:[syncTask('base','Original')],syncRev:1,syncAccount:'e@example.com',syncDirty:false});
+ const h=makeSyncHarness({remote:local,rev:1});
+ const {indexedDB}=await import('fake-indexeddb');
+ const raw=JSON.stringify(local),storage=sharedScannerStorage({[LOCAL_HEAD_KEY]:raw,[SYNC_STORE_KEY]:raw});
+ const {ctx,shim}=await loadApp({sharedStorage:storage,indexedDBProvider:indexedDB,deviceDbName:'cloud-await-'+Date.now()+'-'+Math.random(),cloudSyncFactory:h.factory});
+ await syncSettle(40);await ctx.cloudPull();
+ const peer=JSON.parse(JSON.stringify(local));peer.tasks[0].title='Peer newer';h.writeBehindBack(peer);
+ const store=shim.window.ScannerDeviceStore,put=store.putBackup.bind(store);
+ let entered,release;const started=new Promise(resolve=>entered=resolve),gate=new Promise(resolve=>release=resolve);
+ store.putBackup=async options=>{entered();await gate;return put(options);};
+ const pulling=ctx.cloudPull();await started;ctx.state.tasks[0].due='2026-11-01';ctx.commit();release();await pulling;
+ assert.equal(ctx.state.tasks[0].due,'2026-11-01','an edit made after safety capture remains live for the next reconcile');
+ await store.close();
+});
+
+test('RISK STALE TAB: cloud rebase retains independent edits against an observed revision',async()=>{
+ const local=syncState({tasks:[syncTask('base','Original'),syncTask('other','Other')],syncRev:1,syncAccount:'e@example.com',syncDirty:false});
+ const h=makeSyncHarness({remote:local,rev:1});
+ const {ctx}=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(local)},cloudSyncFactory:h.factory});
+ await syncSettle(30);await ctx.cloudPull();
+ const peer=JSON.parse(JSON.stringify(h.remoteState()));peer.tasks.find(t=>t.id==='base').title='Peer title';h.writeBehindBack(peer);
+ ctx.state.tasks.find(t=>t.id==='base').due='2026-11-01';ctx.state.tasks.find(t=>t.id==='other').title='Independent local rename';ctx.commit();await ctx.persist();
+ await ctx.cloudPull();await ctx.cloudPushNow();await syncSettle(40);
+ for(const board of [ctx.state,h.remoteState()]){
+  assert.equal(board.tasks.find(t=>t.id==='base').title,'Peer title');
+  assert.equal(board.tasks.find(t=>t.id==='base').due,'2026-11-01','an observed common cloud revision proves the independent field delta');
+  assert.equal(board.tasks.find(t=>t.id==='other').title,'Independent local rename');
+ }
+});
+
+test('RISK STALE TAB: a settings action during CAS repair survives without reviving peer fields',async()=>{
+ const {indexedDB}=await import('fake-indexeddb'),raw=JSON.stringify(syncState({tasks:[syncTask('base','Original')]}));
+ const {ctx,shim}=await loadApp({sharedStorage:sharedScannerStorage({[LOCAL_HEAD_KEY]:raw,[SYNC_STORE_KEY]:raw}),indexedDBProvider:indexedDB,deviceDbName:'settings-cas-'+Date.now()+'-'+Math.random()});
+ const store=shim.window.ScannerDeviceStore,original=store.commitHead.bind(store);let calls=0,entered,release;
+ const started=new Promise(resolve=>entered=resolve),gate=new Promise(resolve=>release=resolve);
+ store.commitHead=async options=>{
+  if(++calls===1){const peer=JSON.parse((await store.readHead()).payload);peer.tasks[0].title='Peer newer';await original({expectedHash:options.expectedHash,payload:JSON.stringify(peer)});return {conflict:true};}
+  if(calls===2){entered();await gate;}return original(options);
+ };
+ ctx.addTask('First addition');const saving=ctx.persist();await started;ctx.setDateFormatPreference('ymd');release();assert.equal(await saving,true);
+ for(const board of [ctx.state,JSON.parse((await store.readHead()).payload)]){assert.equal(board.settings.dateFormat,'ymd');assert.equal(board.tasks[0].title,'Peer newer');}
+ await store.close();
+});
+
+test('RISK STALE TAB: failed cloud adoption save keeps an edit arriving during persistence',async()=>{
+ const local=syncState({tasks:[syncTask('base','Original')],syncRev:1,syncAccount:'e@example.com',syncDirty:false}),raw=JSON.stringify(local);
+ const h=makeSyncHarness({remote:local,rev:1}),{indexedDB}=await import('fake-indexeddb');
+ const {ctx,shim}=await loadApp({sharedStorage:sharedScannerStorage({[LOCAL_HEAD_KEY]:raw,[SYNC_STORE_KEY]:raw}),indexedDBProvider:indexedDB,deviceDbName:'cloud-fail-await-'+Date.now()+'-'+Math.random(),cloudSyncFactory:h.factory});
+ await syncSettle(40);await ctx.cloudPull();const peer=JSON.parse(JSON.stringify(h.remoteState()));peer.tasks[0].title='Peer newer';h.writeBehindBack(peer);
+ const store=shim.window.ScannerDeviceStore,original=store.commitHead.bind(store);let entered,release;
+ const started=new Promise(resolve=>entered=resolve),gate=new Promise(resolve=>release=resolve);
+ store.commitHead=async options=>{if(JSON.parse(options.payload).tasks[0].title==='Peer newer'){entered();await gate;return {error:true,code:'write-failed'};}return original(options);};
+ const pulling=ctx.cloudPull();await started;ctx.addTask('Later live edit');release();await pulling;
+ assert.ok(ctx.state.tasks.some(t=>t.title==='Later live edit'),'failure rollback cannot erase a later gesture');
+ assert.equal(ctx.reconciled(),false,'the failed adoption has no write authority');
+ await store.close();
+});
+
+test('RISK STALE TAB: failed matching-cloud revision save cannot roll back a later gesture',async()=>{
+ const local=syncState({tasks:[syncTask('base','Original')],syncRev:1,syncAccount:'e@example.com',syncDirty:false}),raw=JSON.stringify(local);
+ const h=makeSyncHarness({remote:local,rev:1}),{indexedDB}=await import('fake-indexeddb');
+ const {ctx,shim}=await loadApp({sharedStorage:sharedScannerStorage({[LOCAL_HEAD_KEY]:raw,[SYNC_STORE_KEY]:raw}),indexedDBProvider:indexedDB,deviceDbName:'cloud-match-await-'+Date.now()+'-'+Math.random(),cloudSyncFactory:h.factory});
+ await syncSettle(40);await ctx.cloudPull();h.doc={...h.doc,payload:ctx.cloudPayload(),rev:ctx.state.syncRev+1};
+ const store=shim.window.ScannerDeviceStore;let entered,release;
+ const started=new Promise(resolve=>entered=resolve),gate=new Promise(resolve=>release=resolve);
+ store.commitHead=async()=>{entered();await gate;return {error:true,code:'write-failed'};};
+ const pulling=ctx.cloudPull();await started;ctx.addTask('Later matching-save edit');release();await pulling;
+ assert.ok(ctx.state.tasks.some(t=>t.title==='Later matching-save edit'),'bookkeeping rollback cannot erase later work');
+ assert.equal(ctx.reconciled(),false);await store.close();
+});
+
+test('RISK STALE TAB: rating and context actions during CAS repair retain their complete effects',async t=>{
+ const {indexedDB}=await import('fake-indexeddb');
+ for(const action of ['rating','delete-context','add-context'])await t.test(action,async()=>{
+  const initial=syncState({tasks:[syncTask('base','Original'),syncTask('other','Other')],contexts:[{id:'private-context',name:'Private',active:true}]});
+  const raw=JSON.stringify(initial),{ctx,shim}=await loadApp({sharedStorage:sharedScannerStorage({[LOCAL_HEAD_KEY]:raw,[SYNC_STORE_KEY]:raw}),indexedDBProvider:indexedDB,deviceDbName:'action-cas-'+action+Date.now()+'-'+Math.random()});
+  const store=shim.window.ScannerDeviceStore,original=store.commitHead.bind(store);let calls=0,entered,release;
+  const started=new Promise(resolve=>entered=resolve),gate=new Promise(resolve=>release=resolve);
+  store.commitHead=async options=>{
+   if(++calls===1){const peer=JSON.parse((await store.readHead()).payload);peer.tasks[0].title='Peer newer';await original({expectedHash:options.expectedHash,payload:JSON.stringify(peer)});return {conflict:true};}
+   if(calls===2){entered();await gate;}return original(options);
+  };
+  ctx.addTask('First addition');const saving=ctx.persist();await started;
+  if(action==='rating'){ctx.state.chain=['base'];ctx.state.candidateId='other';ctx.decide('yes');}
+  if(action==='delete-context')ctx.onAction('del-ctx',{dataset:{id:'private-context'}});
+  if(action==='add-context'){ctx.prompt=()=> 'New private context';ctx.onAction('add-ctx',{});}
+  const expected=JSON.parse(JSON.stringify(ctx.state));release();assert.equal(await saving,true);
+  for(const board of [ctx.state,JSON.parse((await store.readHead()).payload)]){
+   assert.equal(board.tasks.find(t=>t.id==='base').title,'Peer newer');
+   if(action==='rating')for(const id of ['base','other'])for(const key of ['mu','sigma'])assert.equal(board.tasks.find(t=>t.id===id)[key],expected.tasks.find(t=>t.id===id)[key],action+' '+key);
+   else assert.deepEqual(JSON.parse(JSON.stringify(board.contexts)),expected.contexts,action+' membership');
+  }
+  await store.close();
+ });
+});
+
+test('RISK STALE TAB: legacy coexistence retains independent live fields before durable reconciliation',async()=>{
+ const {indexedDB}=await import('fake-indexeddb');
+ const initial=syncState({tasks:[syncTask('base','Original'),syncTask('other','Other')]}),raw=JSON.stringify(initial);
+ const storage=sharedScannerStorage({[LOCAL_HEAD_KEY]:raw,[SYNC_STORE_KEY]:raw}),{ctx,shim}=await loadApp({sharedStorage:storage,indexedDBProvider:indexedDB,deviceDbName:'legacy-rebase-'+Date.now()+'-'+Math.random()});
+ const legacy=JSON.parse(raw);legacy.tasks.push(syncTask('legacy','Legacy addition'));storage.setItem(SYNC_STORE_KEY,JSON.stringify(legacy));
+ ctx.state.tasks.find(t=>t.id==='other').title='Independent live rename';ctx.commit();assert.equal(await ctx.persist(),true);
+ for(const board of [ctx.state,JSON.parse((await shim.window.ScannerDeviceStore.readHead()).payload)]){
+  assert.equal(board.tasks.find(t=>t.id==='other').title,'Independent live rename');assert.ok(board.tasks.some(t=>t.id==='legacy'));
+ }
+ await shim.window.ScannerDeviceStore.close();
+});
+
+test('RISK STALE TAB: recovery guidance explains independent edits conflicts and unobserved cloud bases',async()=>{
+ const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(help,/independent edits.*newer.*same field/i);
+ assert.match(help,/common saved copy.*recovery/i);
+ const log=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];assert.match(log,/stale.tab.*independent.*edits/i);
+});
+
+test('RISK STALE TAB: rebasing never combines cached Chance data from different passes',async()=>{
+ const {ctx}=await loadApp();const base=JSON.parse(JSON.stringify(ctx.state));base.chance={seed:1,opponents:['base'],weights:{base:1},order:['base'],idx:0};
+ const peer=JSON.parse(JSON.stringify(base)),local=JSON.parse(JSON.stringify(base));peer.chance={seed:2,opponents:['other'],weights:{base:9},order:['base'],idx:0};local.chance.weights.extra=4;
+ ctx.rebasePendingBoardFields(peer,local,base);
+ assert.deepEqual(peer.chance,{seed:2,opponents:['other'],weights:{base:9},order:['base'],idx:0},'peer pass keeps its own weight cache; missing members recalculate in that pass');
+});
+
+test('RISK STALE TAB: a conflicting edit during awaited CAS repair retains its exact recovery bytes',async()=>{
+ const {indexedDB}=await import('fake-indexeddb'),raw=JSON.stringify(syncState({tasks:[syncTask('base','Original')]}));
+ const {ctx,shim}=await loadApp({sharedStorage:sharedScannerStorage({[LOCAL_HEAD_KEY]:raw,[SYNC_STORE_KEY]:raw}),indexedDBProvider:indexedDB,deviceDbName:'tail-recovery-'+Date.now()+'-'+Math.random()});
+ const store=shim.window.ScannerDeviceStore,original=store.commitHead.bind(store);let calls=0,entered,release;
+ const started=new Promise(resolve=>entered=resolve),gate=new Promise(resolve=>release=resolve);
+ store.commitHead=async options=>{
+  if(++calls===1){const peer=JSON.parse((await store.readHead()).payload);peer.tasks[0].title='Peer newer';await original({expectedHash:options.expectedHash,payload:JSON.stringify(peer)});return {conflict:true};}
+  if(calls===2){entered();await gate;}return original(options);
+ };
+ ctx.addTask('First addition');const saving=ctx.persist();await started;ctx.state.tasks[0].title='Later conflicting local title';ctx.commit();const exact=JSON.stringify(ctx.state);release();assert.equal(await saving,true);
+ assert.equal(ctx.state.tasks[0].title,'Peer newer');
+ assert.ok((await store.listBackups()).some(row=>row.kind==='stale-tab-draft'&&row.payload===exact),'the late conflicting draft has its own exact protected recovery snapshot');await store.close();
+});
