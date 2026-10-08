@@ -1,5 +1,22 @@
 [
   {
+    "testChangesSha256": "f9da1af561e9fcfa26e709563dce8187e66ec1c7d56374cc851c1bc0ef2c867a",
+    "reason": "Repair four pre-existing Chance probability fixtures whose bare task objects omit context arrays and throw when their retained real scanner timer wakes at the local 2 AM boundary.",
+    "previousBehavior": "Main CI attempt1 crossed 2 AM and reported seven asynchronous t.ctx is not iterable exceptions after all individual tests passed; baseline and candidate actual scanner callbacks reproduce the same schema defect.",
+    "intendedBehavior": "Probability fixtures provide a title and empty context array; actual scheduled scanner callback can render them without changing frozen weights. Production code, algorithms and timer semantics are unchanged.",
+    "replacementTests": [
+      "RISK Chance fixture wake: actual scheduled scanner callback handles probability fixture schema"
+    ],
+    "preservedCoverage": [
+      "All original four mathematical assertions, sampled frequencies, uncertainty/zero handling and malformed opponent hydration assertions remain intact. Only fixture task schema fields are added.",
+      "No timers are globally disabled and the regression captures and invokes the actual bootstrap-registered scanner callback; product asset bytes remain unchanged."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK Chance fixture wake' tests.js",
+      "failure": "/tmp/chain-ui-runtime/chance-fixture-repair-red.log: unwanted exception t.ctx is not iterable from actual registered refreshScanClock -> renderPass -> eligibleTasks -> isEligible before ctx/title fixture fields added; independent baseline/candidate diagnostic RED logs also retained."
+    }
+  },
+  {
     "testChangesSha256": "5b12f121f7791692ee5407e8d54a9adc364ac429a8b7083a419e5c09d5f56c39",
     "reason": "Reconcile requested UI batch onto released Squared Weighting without losing released controls/tests/history; real saved-board consumer regression and discriminating shell-delivery integration red.",
     "previousBehavior": "Released base has Squared Weighting/held-key fixes but lacks editor visibility/dividers/seven-day default and Cant hour-minute notation; initial rebase retained prior base shell fingerprint.",

@@ -15112,9 +15112,10 @@ test('Chance scan: settings select squared default or three explicit buttons', a
  ctx.addTask('one');ctx.addTask('two');ctx.startScan();
  assert.equal(ctx.state.scanMode,'chance');
 });
+function chanceProbabilityFixture(fields){return {title:fields.id,ctx:[],...fields};}
 test('Chance scan: weights are mean TrueSkill win probabilities, including negative ratings',async()=>{
  const {ctx}=await loadApp();
- const tasks=[{id:'a',mu:-10,sigma:3},{id:'b',mu:-5,sigma:7},{id:'c',mu:20,sigma:2}];
+ const tasks=[chanceProbabilityFixture({id:'a',mu:-10,sigma:3}),chanceProbabilityFixture({id:'b',mu:-5,sigma:7}),chanceProbabilityFixture({id:'c',mu:20,sigma:2})];
  ctx.state.tasks=tasks;const before=JSON.stringify(tasks);ctx.resetChance();
  for(const t of tasks){
   const others=tasks.filter(o=>o.id!==t.id);
@@ -15125,7 +15126,7 @@ test('Chance scan: weights are mean TrueSkill win probabilities, including negat
  const weights={...ctx.state.chance.weights};
  tasks.forEach(t=>t.mu+=100);ctx.resetChance();
  for(const t of tasks)assert.ok(Math.abs(ctx.state.chance.weights[t.id]-weights[t.id])<1e-12);
- let high=0;const pair=[{id:'a',mu:10,sigma:5},{id:'b',mu:20,sigma:5}];ctx.state.tasks=pair;
+ let high=0;const pair=[chanceProbabilityFixture({id:'a',mu:10,sigma:5}),chanceProbabilityFixture({id:'b',mu:20,sigma:5})];ctx.state.tasks=pair;
  const expected=ctx.pBeats(pair[1],pair[0]);
  for(let i=0;i<5000;i++){
   ctx.state.chance={seed:String(i),at:Date.now(),weights:{}};
@@ -15135,11 +15136,11 @@ test('Chance scan: weights are mean TrueSkill win probabilities, including negat
 });
 test('Chance probabilities: uncertainty matters, completed opponents do not, and new entrants use the frozen field',async()=>{
  const {ctx}=await loadApp();
- const a={id:'a',mu:-5,sigma:2},b={id:'b',mu:5,sigma:2};
- ctx.state.tasks=[a,b,{id:'done',mu:1000,sigma:1,done:true}];ctx.resetChance();
+ const a=chanceProbabilityFixture({id:'a',mu:-5,sigma:2}),b=chanceProbabilityFixture({id:'b',mu:5,sigma:2});
+ ctx.state.tasks=[a,b,chanceProbabilityFixture({id:'done',mu:1000,sigma:1,done:true})];ctx.resetChance();
  assert.equal(ctx.state.chance.weights.a,ctx.pBeats(a,b));
  const low=ctx.state.chance.weights.a;a.sigma=20;ctx.resetChance();assert.ok(ctx.state.chance.weights.a>low);
- const newcomer={id:'new',mu:0,sigma:3};
+ const newcomer=chanceProbabilityFixture({id:'new',mu:0,sigma:3});
  const expected=(ctx.pBeats(newcomer,a)+ctx.pBeats(newcomer,b))/2;
  a.mu=100;b.mu=200;ctx.state.tasks.push(newcomer);ctx.chanceScore(newcomer);
  assert.equal(ctx.state.chance.weights.new,expected);
@@ -15147,11 +15148,11 @@ test('Chance probabilities: uncertainty matters, completed opponents do not, and
  assert.equal(ctx.chancePick([]),null);
 });
 test('Chance probabilities: a computed zero is retained without a positive floor',async()=>{
- const {ctx}=await loadApp();const a={id:'a',mu:-10000,sigma:1},b={id:'b',mu:10000,sigma:1};
+ const {ctx}=await loadApp();const a=chanceProbabilityFixture({id:'a',mu:-10000,sigma:1}),b=chanceProbabilityFixture({id:'b',mu:10000,sigma:1});
  ctx.state.tasks=[a,b];ctx.resetChance();assert.equal(ctx.state.chance.weights.a,0);
  assert.equal(ctx.chanceScore(a),Infinity);assert.equal(ctx.chancePick([a,b]).id,'b');
  assert.equal(ctx.chancePick([a]).id,'a');
- const c={id:'c',mu:-9000,sigma:1};ctx.state.tasks.push(c);
+ const c=chanceProbabilityFixture({id:'c',mu:-9000,sigma:1});ctx.state.tasks.push(c);
  ctx.state.chance.weights.c=0;
  assert.equal(ctx.chancePick([a,c]).id,'c');
 });
@@ -15629,7 +15630,7 @@ test('Chance probabilities: legacy and malformed opponent snapshots hydrate safe
   const restored=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(saved)}});
   const c=restored.ctx;assert.ok(Array.isArray(c.state.chance.opponents));
   assert.equal(JSON.stringify(c.state.chance.weights),originalWeights);
-  const newcomer={id:'new',mu:20,sigma:3};const expected=c.chanceWeight(newcomer,c.state.chance.opponents);
+  const newcomer=chanceProbabilityFixture({id:'new',mu:20,sigma:3});const expected=c.chanceWeight(newcomer,c.state.chance.opponents);
   c.state.tasks[0].mu=100;c.state.tasks.push(newcomer);c.chanceScore(newcomer);
   assert.equal(c.state.chance.weights.new,expected);
  }
@@ -21952,4 +21953,11 @@ test('RISK UI batch integration: saved Squared board retains context selector ed
  const saved=restored.ctx.state.tasks.find(t=>t.id===task.id),change=mountPrivateEditInterval(restored.ctx,restored.shim,saved);
  assert.doesNotMatch(restored.shim.document.getElementById('modalRoot').innerHTML,/Needs these contexts/);change('etEverUnit','days');assert.equal(restored.shim.document.getElementById('etEverHours').value,'7');assert.equal(saved.evergreenHours,18,'editor draft keeps stored hours intact');
  const {cacheName,fingerprint}=appShellContract(serviceWorkerSource());assert.equal(cacheName,'chain-scanner-shell-'+fingerprint,'combined UI cannot ship behind the previous release shell key');
+});
+
+test('RISK Chance fixture wake: actual scheduled scanner callback handles probability fixture schema',async()=>{
+ const wakes=[];const {ctx}=await loadApp({beforeStateReady:sandbox=>{const real=sandbox.setTimeout;sandbox.setTimeout=(fn,ms,...args)=>{if(fn.name==='refreshScanClock'){wakes.push(fn);return {unref(){}};}return real(fn,ms,...args);};}});
+ ctx.state.tasks=[chanceProbabilityFixture({id:'a',mu:-10,sigma:3}),chanceProbabilityFixture({id:'b',mu:20,sigma:2})];ctx.resetChance();
+ const before=JSON.stringify(ctx.state.chance.weights);assert.ok(wakes.length,'bootstrap registers actual scanner wake');assert.doesNotThrow(()=>wakes[0](),'scanner wake must safely consume probability fixtures');assert.equal(JSON.stringify(ctx.state.chance.weights),before,'scanner repaint preserves frozen probability values');
+ assert.deepEqual(Array.from(ctx.state.tasks,t=>Array.from(t.ctx)),[[],[]]);
 });
