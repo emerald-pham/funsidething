@@ -1085,11 +1085,11 @@
   }
   function person(x,y,seed,motion){
     const shirt=color(seed),skin=skinColor(seed);
-    const arm=hand=>{line(g,x,y-8+motion.bob,x+hand.x*.5,y-5.5+motion.bob,skin,1.3);line(g,x+hand.x*.5,y-5.5+motion.bob,x+hand.x,y+hand.y,skin,1.3);};
+    const arm=hand=>{const elbowX=x+(motion.hipX+hand.x)*.5;line(g,x+motion.hipX,y-8+motion.bob,elbowX,y-5.5+motion.bob,skin,1.3);line(g,elbowX,y-5.5+motion.bob,x+hand.x,y+hand.y,skin,1.3);};
     arm(motion.arms[1]);
-    personHead(g,x,y-12+motion.bob,2,2,seed,skin);line(g,x,y-9+motion.bob,x,y+motion.hipY,shirt,3);
+    personHead(g,x+motion.hipX,y-12+motion.bob,2,2,seed,skin);line(g,x+motion.hipX,y-9+motion.bob,x+motion.hipX,y+motion.hipY,shirt,3);
     for(const leg of motion.legs){
-      line(g,x,y+motion.hipY,x+leg.kneeX,y+leg.kneeY,'#647779',1.4);
+      line(g,x+motion.hipX,y+motion.hipY,x+leg.kneeX,y+leg.kneeY,'#647779',1.4);
       line(g,x+leg.kneeX,y+leg.kneeY,x+leg.footX,y+leg.footY,'#647779',1.4);
     }
     arm({x:motion.hand.x,y:motion.hand.y});
@@ -1157,7 +1157,7 @@
         if(e.type==='kite'||visit.stand>0){
           const carrying=e.type==='kite'?0:S.smooth(.4,.7,visit.pack);
           const motion=geometry.humanWalkPose(px,py,visit.distance,visit.direction,x=>groundAt(x)+1,carrying);
-          if(e.type==='kite')motion.hand={x:5,y:-6};
+          if(e.type==='kite')motion.hand={x:motion.hipX+5,y:-6+motion.bob};
           g.save();g.globalAlpha*=e.type==='kite'?1:visit.stand;g.translate(px,py);g.scale(visit.direction,1);const hand=person(0,0,seed,motion);
           if(e.type==='kite')kiteHand={x:px+visit.direction*hand.x,y:py+hand.y};
           if(visit.pack>.7&&e.type!=='kite'){
@@ -1197,15 +1197,15 @@
       const pose=geometry.groundPose('walker',e);g.save();g.globalAlpha=S.smooth(0,.06,f)*(1-S.smooth(.94,1,f));
       const skin=skinColor(e.seed),motion=geometry.humanWalkPose(pose.x,pose.y,pose.distance,dir,x=>geometry.groundAnchor('walker',x));
       // The far arm passes behind the torso; both arms share the leg stride.
-      const armAt=offset=>{const arm=geometry.strideArm(pose.distance,10,offset),elbowX=pose.x+dir*arm.x*.5,elbowY=pose.y-5.5+motion.bob;line(g,pose.x,pose.y-8+motion.bob,elbowX,elbowY,skin,1.3);line(g,elbowX,elbowY,pose.x+dir*arm.x,pose.y-8+arm.y+motion.bob,skin,1.3);};
-      armAt(.5);
-      personHead(g,pose.x,pose.y-12+motion.bob,2,2,e.seed,skin);line(g,pose.x,pose.y-9+motion.bob,pose.x,pose.y+motion.hipY,c,3);
-      for(const leg of motion.legs){line(g,pose.x,pose.y+motion.hipY,pose.x+dir*leg.kneeX,pose.y+leg.kneeY,'#647779',1.4);line(g,pose.x+dir*leg.kneeX,pose.y+leg.kneeY,pose.x+dir*leg.footX,pose.y+leg.footY,'#647779',1.4);}
+      const armAt=index=>{const arm=motion.arms[index],elbowX=pose.x+dir*(motion.hipX+arm.x)*.5,elbowY=pose.y-5.5+motion.bob;line(g,pose.x+dir*motion.hipX,pose.y-8+motion.bob,elbowX,elbowY,skin,1.3);line(g,elbowX,elbowY,pose.x+dir*arm.x,pose.y+arm.y,skin,1.3);};
+      armAt(1);
+      personHead(g,pose.x+dir*motion.hipX,pose.y-12+motion.bob,2,2,e.seed,skin);line(g,pose.x+dir*motion.hipX,pose.y-9+motion.bob,pose.x+dir*motion.hipX,pose.y+motion.hipY,c,3);
+      for(const leg of motion.legs){line(g,pose.x+dir*motion.hipX,pose.y+motion.hipY,pose.x+dir*leg.kneeX,pose.y+leg.kneeY,'#647779',1.4);line(g,pose.x+dir*leg.kneeX,pose.y+leg.kneeY,pose.x+dir*leg.footX,pose.y+leg.footY,'#647779',1.4);}
       armAt(0);
       if(e.type==='dogwalker'){
-        const dog=geometry.dogPose(pose.x,pose.distance,dir),fur=S.mixHex(color(e.seed,2),p.city,.4),hand=geometry.strideArm(pose.distance,10,0);
+        const dog=geometry.dogPose(pose.x,pose.distance,dir),fur=S.mixHex(color(e.seed,2),p.city,.4),hand=motion.hand;
         // A loose lead keeps the companion visibly paired with this owner.
-        g.beginPath();g.moveTo(pose.x+dir*hand.x,pose.y-8+hand.y+motion.bob);g.quadraticCurveTo((pose.x+dog.x)/2,dog.y+1,dog.x-dir*2,dog.y-5);g.strokeStyle=fur;g.lineWidth=.55;g.stroke();
+        g.beginPath();g.moveTo(pose.x+dir*hand.x,pose.y+hand.y);g.quadraticCurveTo((pose.x+dog.x)/2,dog.y+1,dog.x-dir*2,dog.y-5);g.strokeStyle=fur;g.lineWidth=.55;g.stroke();
         for(const [hip,offset] of [[-3,0],[3,.5]]){
           const foot=geometry.strideFoot(dog.distance,6,offset),fx=dog.x+dir*(hip+foot.x);
           line(g,dog.x+dir*hip,dog.y-3,fx,geometry.groundAnchor('walker',fx)-foot.lift,fur,1);

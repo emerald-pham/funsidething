@@ -744,3 +744,12 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK Last task WOOP browser: mounted controls responsive saved revisit delete and offline reload
 
 - RISK repository process: deployment fetches deleted squash PR head and rejects ref identity mismatch
+
+## Upright walking and carrying
+
+- RISK upright human gait: full cycles extend stance knees with modest swing flexion and preserved terrain contact
+- RISK upright gait guidance: scenery FAQ and changelog explain upright support and carrying without changing task controls
+- RISK upright torso travel: flat-ground pelvis travels steadily while terrain adaptation stays continuous
+- RISK upright pelvis consumer: torso head thighs and carrying arms follow the terrain hip
+- RISK upright gait consumer: every human painter consumes upright full cycles in both directions at responsive scales
+- RISK upright settled visitors: arrival endpoint rests both feet on terrain before eased departure

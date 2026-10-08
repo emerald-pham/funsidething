@@ -257,33 +257,48 @@
     function humanWalkPose(x,y,distance,direction,ground,carrying=false,scale=1){
       // Travel, not elapsed time, drives stance so eased arrivals can stop with
       // a planted foot. Keep this pose local to the actor's mirrored frame.
-      const localDistance=distance/scale,phase=localDistance/10*Math.PI*2;
-      let bob=.18*Math.cos(phase*2),hipY=-4.4+bob;
+      // Eight units divide the visitor’s forty-unit arrival, so a stopped
+      // visit ends in double support instead of freezing a lifted swing toe.
+      const localDistance=distance/scale,stride=8,phase=localDistance/stride*Math.PI*2;
       // Settled visits retain their last stride pose; a walking boolean must
       // never swap planted feet before eased departure has actually moved.
       const feet=[0,.5].map(offset=>{
-        const step=strideFoot(localDistance,10,offset);
-        const footX=step.x,footY=(ground(x+direction*footX*scale)-y)/scale-step.lift;
-        return {footX,footY,lift:step.lift};
+        const step=strideFoot(localDistance,stride,offset),lift=step.lift*.45;
+        const footX=step.x,footY=(ground(x+direction*footX*scale)-y)/scale-lift;
+        return {footX,footY,lift};
       });
-      // A short actor on a steep phone trail must lower the pelvis rather
-      // than stretch a shin to reach its planted downhill foot.
-      const lower=Math.max(...feet.map(foot=>foot.footY-Math.sqrt(6.4**2-foot.footX**2)));
-      const upper=Math.min(...feet.map(foot=>foot.footY+Math.sqrt(6.4**2-foot.footX**2)));
-      hipY=Math.max(lower,Math.min(upper,hipY));bob=hipY+4.4;
+      // A vertical hip over the route center forced the uphill knee into a
+      // squat whenever the downhill foot limited reach. Center the pelvis on
+      // support contacts, then lift along the terrain normal. Swing toes keep
+      // their original world path; the torso, arms and grip move with the hip.
+      const slope=direction*(ground(x+.5*scale)-ground(x-.5*scale))/scale;
+      const weights=feet.map(foot=>(1-foot.lift/.9)**2),weight=weights[0]+weights[1];
+      // On level ground the pelvis follows the route steadily. Only terrain
+      // needs a partial shift toward support; following a planted toe fully
+      // would stop the torso mid-step and make it surge at the next contact.
+      const support=.95*Math.abs(slope)/(.1+Math.abs(slope));
+      const baseX=feet.reduce((sum,foot,i)=>sum+foot.footX*weights[i],0)/weight*support;
+      const baseY=(ground(x+direction*baseX*scale)-y)/scale;
+      const normalLength=Math.hypot(slope,1),nx=slope/normalLength,ny=-1/normalLength;
+      const reach=feet.map(foot=>{
+        const dx=baseX-foot.footX,dy=baseY-foot.footY,dot=dx*nx+dy*ny;
+        return -dot+Math.sqrt(Math.max(0,dot*dot+6.4**2-dx*dx-dy*dy));
+      });
+      const height=Math.min(6.3+.06*Math.cos(phase*2),...reach);
+      const hipX=baseX+nx*height,hipY=baseY+ny*height,bob=hipY+4.4;
       const legs=feet.map(({footX,footY,lift})=>{
-        const dy=footY-hipY,d=Math.hypot(footX,dy),bend=Math.sqrt(Math.max(0,3.2**2-d*d/4));
-        return {footX,footY,lift,kneeX:footX/2+dy/d*bend,kneeY:hipY+dy/2-footX/d*bend};
+        const dx=footX-hipX,dy=footY-hipY,d=Math.hypot(dx,dy),bend=Math.sqrt(Math.max(0,3.2**2-d*d/4));
+        return {footX,footY,lift,kneeX:hipX+dx/2+dy/d*bend,kneeY:hipY+dy/2-dx/d*bend};
       });
       const arms=[0,.5].map(offset=>{
-        const swing=strideArm(localDistance,10,offset);
-        return {x:swing.x,y:-8+bob+swing.y};
+        const swing=strideArm(localDistance,stride,offset);
+        return {x:hipX+swing.x,y:-8+bob+swing.y};
       });
       // Gathering reaches the grip before the object appears; switching a
       // carrying boolean at that frame would visibly snap the forearm.
       const grip=Math.max(0,Math.min(1,Number(carrying)||0));
-      const hand={x:arms[0].x+(4-arms[0].x)*grip,y:arms[0].y+(-3+bob-arms[0].y)*grip};
-      return {bob,hipY,legs,arms,hand,carrying};
+      const hand={x:arms[0].x+(hipX+4-arms[0].x)*grip,y:arms[0].y+(-3+bob-arms[0].y)*grip};
+      return {bob,hipX,hipY,legs,arms,hand,carrying};
     }
     function woodlandPose(e){
       // Pick a clearing with room for a short stroll on the darkest near hill.

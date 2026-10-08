@@ -164,17 +164,17 @@
       const skin=skinColor(poseValue.seed);
       g.save();g.translate(x,y);g.scale(poseValue.direction*scaleValue,scaleValue);
       const arm=(hand,side)=>{
-        const workX=side===0?5*smoothValue(.14,.72,poseValue.progress):-3.2;
+        const workX=motion.hipX+(side===0?5*smoothValue(.14,.72,poseValue.progress):-3.2);
         const workY=side===0?-7.9:-6.1;
         const hx=hand.x+(workX-hand.x)*working,hy=hand.y+(workY-hand.y)*working;
-        drawLine(0,-8+motion.bob,hx*.5,(-8+motion.bob+hy)/2,skin,1.1);
-        drawLine(hx*.5,(-8+motion.bob+hy)/2,hx,hy,skin,1.1);
+        drawLine(motion.hipX,-8+motion.bob,(motion.hipX+hx)*.5,(-8+motion.bob+hy)/2,skin,1.1);
+        drawLine((motion.hipX+hx)*.5,(-8+motion.bob+hy)/2,hx,hy,skin,1.1);
       };
       arm(motion.arms[1],1);
-      drawHead(0,headY+motion.bob,2,2,poseValue.seed,skin,false);
-      drawLine(0,-9+motion.bob,0,motion.hipY,color(poseValue.seed),2.7);
+      drawHead(motion.hipX,headY+motion.bob,2,2,poseValue.seed,skin,false);
+      drawLine(motion.hipX,-9+motion.bob,motion.hipX,motion.hipY,color(poseValue.seed),2.7);
       for(const leg of motion.legs){
-        drawLine(0,motion.hipY,leg.kneeX,leg.kneeY,ink,1.3);
+        drawLine(motion.hipX,motion.hipY,leg.kneeX,leg.kneeY,ink,1.3);
         drawLine(leg.kneeX,leg.kneeY,leg.footX,leg.footY,ink,1.3);
       }
       arm(motion.hand,0);g.restore();
