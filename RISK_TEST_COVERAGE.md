@@ -674,3 +674,6 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK date clear tablet geometry: Edit wrapper overrides generic date minimum to reserve the Clear target
 - RISK date clear rendered geometry: native date segments remain readable beside Clear and long Starts hints at larger text
 - RISK changelog dates: Settings combines repeated dates in descending order without losing history categories or links
+- RISK date clear availability: empty Add and Edit controls disable independently through typing clearing resets and reopening
+- RISK date clear programmatic values: direct assignments stay synchronized without events and preserve unrelated drafts
+- RISK date clear guidance: Quick start explains disabled empty date controls and retained save semantics

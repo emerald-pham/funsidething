@@ -1,5 +1,24 @@
 [
   {
+    "testChangesSha256": "6d20a6d3d92e82fd2e163879b9dadcc2dbb20d762b8a45103c91ed7eca76d36d",
+    "reason": "User asks each date Clear button to remain visible but disabled while its field is empty. Add actual draft assignment, input/change, clear, reset and reopen transitions with isolated native-style value descriptors; existing assertions are unchanged.",
+    "previousBehavior": "All four Clear buttons stayed enabled for empty fields and after clearing.",
+    "intendedBehavior": "Each native button is disabled and visibly greyed while its own date is empty, immediately enabled by date edits or programmatic value assignments, disabled after clearing/reset, and correct on reopen.",
+    "replacementTests": [
+      "RISK date clear availability: empty Add and Edit controls disable independently through typing clearing resets and reopening",
+      "RISK date clear programmatic values: direct assignments stay synchronized without events and preserve unrelated drafts",
+      "RISK date clear guidance: Quick start explains disabled empty date controls and retained save semantics"
+    ],
+    "preservedCoverage": [
+      "Existing independent clear/save/Cancel/durable reopen, paste/offline/concurrent sync and responsive native date geometry assertions remain unchanged.",
+      "Task dates, other task fields, schema, persistence and cloud algorithms are unchanged."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK date clear (availability|programmatic)' tests.js; node --test --test-name-pattern='RISK date clear guidance|PWA cache contract|Settings changelog: every' tests.js",
+      "failure": "Observed before implementation: addStart starts disabled (undefined vs true); programmatic assignment enables immediately (undefined vs false). Confirmed with native-style fixture before implementation in ../empty-date-red-native-descriptor.log. Guidance missing and stale shell fingerprint failures recorded before FAQ/cache updates in ../empty-date-guidance-shell-red-corrected.log; original mistaken help-function run retained separately."
+    }
+  },
+  {
     "testChangesSha256": "9e249481bbc8ed02d19f44d7c74ecd7cf91c0971535f32077433415143f23267",
     "reason": "User requested combined date headings and prevention of future duplicate dates. Add a Settings consumer regression without changing existing feature assertions.",
     "previousBehavior": "Current and archived templates rendered independently, splitting October 8 and September 29 and placing archived September 29 out of date order.",

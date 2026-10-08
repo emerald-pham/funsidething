@@ -22363,3 +22363,46 @@ test('RISK date clear rendered geometry: native date segments remain readable be
   for(const f of geometry.fields){assert.ok(f.width>=(large?240:180),width+'px '+f.id+' reserves room for native day month year and picker');assert.ok(f.button>=44,'Clear retains its target');}assert.ok(geometry.page<=geometry.viewport+1,'readable controls fit without page overflow');await context.close();
  }}finally{await browser.close();}
 });
+
+function installPrivateDateValueDescriptors(shim){
+ for(const id of ['addStart','addDue','etStart','etDue']){
+  const input=shim.document.getElementById(id);let value=input.value;
+  Object.defineProperty(input,'value',{configurable:true,get(){return value;},set(next){value=String(next);}});
+ }
+}
+test('RISK date clear availability: empty Add and Edit controls disable independently through typing clearing resets and reopening',async()=>{
+ const {ctx,shim}=await loadApp({beforeStateReady:(_,shim)=>installPrivateDateValueDescriptors(shim)}),doc=shim.document;
+ const field=id=>{const e=doc.getElementById(id);e.id=id;e.matches=()=>false;return e;};
+ const button=id=>doc.getElementById(id+'Clear');
+ for(const id of ['addStart','addDue'])assert.equal(button(id).disabled,true,id+' starts disabled');
+ for(const [id,other] of [['addStart','addDue'],['addDue','addStart']]){
+  field(id).value='2028-02-29';doc.dispatchEvent({type:'input',target:field(id)});
+  assert.equal(button(id).disabled,false,'typing a date enables its own button');assert.equal(button(other).disabled,true,'the empty other field stays disabled');
+  ctx.onAction('clear-task-date',{dataset:{field:id}});assert.equal(field(id).value,'');assert.equal(button(id).disabled,true,'clearing disables again');
+ }
+ field('addStart').value='2028-02-29';field('addDue').value='2029-01-01';ctx.clearQuickAddDates();
+ assert.equal(button('addStart').disabled,true);assert.equal(button('addDue').disabled,true,'programmatic Add reset disables both');
+ const task=ctx.addTask('Private availability');task.startsAt='2028-02-29';task.due=null;ctx.openEdit(task.id);
+ field('etStart').value=task.startsAt;field('etDue').value='';
+ assert.equal(button('etStart').disabled,false);assert.equal(button('etDue').disabled,true);
+ field('etDue').value='2029-01-01';doc.dispatchEvent({type:'change',target:field('etDue')});assert.equal(button('etDue').disabled,false,'date picker change enables due');
+ ctx.onAction('clear-task-date',{dataset:{field:'etStart'}});assert.equal(button('etStart').disabled,true);assert.equal(button('etDue').disabled,false);
+ ctx.closeModal();assert.equal(task.startsAt,'2028-02-29');assert.equal(task.due,null,'Cancel preserves saved dates');ctx.openEdit(task.id);field('etStart').value=task.startsAt;field('etDue').value='';
+ assert.equal(button('etStart').disabled,false);assert.equal(button('etDue').disabled,true,'reopening derives availability from saved dates');
+});
+test('RISK date clear programmatic values: direct assignments stay synchronized without events and preserve unrelated drafts',async()=>{
+ const {ctx,shim}=await loadApp({beforeStateReady:(_,shim)=>installPrivateDateValueDescriptors(shim)});const task=ctx.addTask('Private programmatic');ctx.openEdit(task.id);
+ for(const id of ['addStart','addDue','etStart','etDue']){
+  const input=shim.document.getElementById(id),button=shim.document.getElementById(id+'Clear');
+  input.value='2028-02-29';assert.equal(button.disabled,false,id+' programmatic assignment enables immediately');
+  input.value='';assert.equal(button.disabled,true,id+' programmatic empty disables immediately');
+ }
+ assert.equal(task.startsAt,null);assert.equal(task.due,null,'draft assignments do not persist');
+ assert.match(html,/\.date-clear:disabled\{[^}]*opacity:[^;}]+[^}]*cursor:default/,'empty controls visibly grey out without changing geometry');
+ for(const id of ['addStart','addDue'])assert.match(html,new RegExp('id="'+id+'Clear"[^>]* disabled'),'empty Add is disabled even before initialization');
+});
+test('RISK date clear guidance: Quick start explains disabled empty date controls and retained save semantics',async()=>{
+ const {ctx,shim}=await loadApp();ctx.openHelp();const markup=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(markup,/Clear stays visible but greyed out and disabled while its field is empty/);
+ assert.match(markup,/Add or Save commits the change; closing Edit without saving keeps the saved dates/);
+});
