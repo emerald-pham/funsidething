@@ -621,3 +621,14 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK held decision keys FAQ: keyboard guidance names one fresh keypress per Yes No or Cant decision
 
 - RISK Squared Weighting held keys: real keyboard repeats preserve the newly dealt candidate while fresh presses and Undo still work
+- `RISK context editor visibility: real contexts govern requirements and filters without mutating assignments` — empty/one/multiple/deleted contexts; creation entrypoint and sentinel preservation.
+- `RISK task edit section dividers: semantic rules separate requirements ratings and actions` — semantic separators and responsive theme color/spacing contract.
+
+- `RISK Edit evergreen unit default: mounted Hours to Days suggests seven then saves and reopens weekly` — registered change handler, repeated toggles, draft isolation and save/reopen.
+- `RISK Edit evergreen unit preservation: explicit drafts custom intervals and Cancel keep their values` — explicit values, eighteen-day custom interval and canceled draft protection.
+
+- `RISK All Tasks duration formatting: rendered Cant badges cross sixty minutes without changing other time rules or saved values` — actual consumer minute boundaries and unchanged Worked/evergreen roundings.
+- `RISK All Tasks duration wrapping: badges include their padding in the available column and preserve readable title width` — bounded badge box model and existing title-width contract.
+- `RISK All Tasks duration browser: long titles tags and hour-minute badges fit narrow enlarged text columns` — isolated WebKit/Chrome phone/tablet/desktop enlarged text geometry and actual duration rendering.
+
+- `RISK UI batch integration: saved Squared board retains context selector editor defaults duration badges and exact shell delivery` — released-mode offline reopen, Edit draft/All Tasks consumers and integrated PWA fingerprint.

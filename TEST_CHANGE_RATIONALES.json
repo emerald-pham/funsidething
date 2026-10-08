@@ -1,5 +1,29 @@
 [
   {
+    "testChangesSha256": "5b12f121f7791692ee5407e8d54a9adc364ac429a8b7083a419e5c09d5f56c39",
+    "reason": "Reconcile requested UI batch onto released Squared Weighting without losing released controls/tests/history; real saved-board consumer regression and discriminating shell-delivery integration red.",
+    "previousBehavior": "Released base has Squared Weighting/held-key fixes but lacks editor visibility/dividers/seven-day default and Cant hour-minute notation; initial rebase retained prior base shell fingerprint.",
+    "intendedBehavior": "Retain all released behavior while adding scoped UI fixes and fresh exact shell fingerprint. Main context selector stays visible; editor/context/default/duration tests all remain.",
+    "replacementTests": [
+      "RISK UI batch integration: saved Squared board retains context selector editor defaults duration badges and exact shell delivery",
+      "RISK context editor visibility: real contexts govern requirements and filters without mutating assignments",
+      "RISK task edit section dividers: semantic rules separate requirements ratings and actions",
+      "RISK Edit evergreen unit default: mounted Hours to Days suggests seven then saves and reopens weekly",
+      "RISK Edit evergreen unit preservation: explicit drafts custom intervals and Cancel keep their values",
+      "RISK All Tasks duration formatting: rendered Cant badges cross sixty minutes without changing other time rules or saved values",
+      "RISK All Tasks duration wrapping: badges include their padding in the available column and preserve readable title width",
+      "RISK All Tasks duration browser: long titles tags and hour-minute badges fit narrow enlarged text columns"
+    ],
+    "preservedCoverage": [
+      "f38ac4f tests.js preserved byte-for-byte as prefix; all UI tests appended. Squared, held-key, cloud, ratings, Undo/import, existing layout and PWA tests unchanged.",
+      "Contemporaneous original feature red evidence retained; integration red is explicitly newer reconciliation evidence, not rewritten feature chronology."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='RISK UI batch integration|PWA cache contract|Settings changelog: every' tests.js",
+      "failure": "/tmp/chain-ui-integrated-red.log: all three fail on stale base cache/fingerprint before mechanical integration refresh. Registered UI consumers and saved Squared preference pass before final cache assertion. Earlier feature reds /tmp/chain-context-ui-red.log,/tmp/chain-context-ui-scope-red.log,/tmp/chain-edit-unit-red.log,/tmp/chain-duration-red.log retained."
+    }
+  },
+  {
     "testChangesSha256": "5fa54f74bbe539cd03182a832ba5b1aff191d0863ac9cbf4fc61d4d0b6e16e27",
     "reason": "User requested a third quadratic scanning mode, its actual normalized percentages, and a once-only migration of the old Chance default while preserving later explicit choices. Follow-up user guidance asks for real consumer transitions rather than fixtures pre-set to final values. Reconcile the feature with released held-key PR66 and test the new mode through the keyboard consumer.",
     "previousBehavior": "Only Chance and Descending were accepted; new and invalid settings selected Chance; squaredPercentageWeight was absent and original shares stayed linear.",
@@ -2296,6 +2320,95 @@
     "redEvidence": {
       "command": "/opt/local/bin/node --test --test-reporter=spec --test-name-pattern='RISK legacy automatic expiry|RISK device current-head guard' tests.js",
       "failure": "/tmp/chain-legacy-retention-evidence-20261007.u86nikoq/red-discriminating-contracts.log: eight failed, zero passed, zero skipped before app changes, for missing physical legacy retirement, missing locked guard and missing FAQ. First fixture run is retained separately. /tmp/chain-legacy-retention-evidence-20261007.u86nikoq/red-final-fixture-on-released-base.log: all eight final fixtures still fail on immutable released base. /tmp/chain-legacy-retention-evidence-20261007.u86nikoq/red-final-fixture-on-fireworks-base.log: all eight final contracts fail on merged fireworks f5574f0. red-active-list-copy.log: the new active-backup-list assertion fails against fe5d427 before the wording change."
+    }
+  },
+  {
+    "testChangesSha256": "a4cd63aea491bc999835890312ba6f77a2ba9ece450136d75aabf3ba0148285f",
+    "reason": "Requested edit-only empty context suppression and semantic rating section separators; main context selector must remain visible.",
+    "previousBehavior": "Empty Needs these contexts renders; task fields blend with ratings/history.",
+    "intendedBehavior": "Only Edit requirements hide at zero real contexts; main selector remains; hr elements separate logical editor sections.",
+    "replacementTests": [
+      "RISK context editor visibility: real contexts govern requirements and filters without mutating assignments",
+      "RISK task edit section dividers: semantic rules separate requirements ratings and actions"
+    ],
+    "preservedCoverage": [
+      "Existing context filter, assignment, cloud, import, Undo, rating and completion tests remain unchanged."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='RISK (context editor visibility|task edit section dividers)' tests.js",
+      "failure": "/tmp/chain-context-ui-red.log: empty heading rendered and semantic hr absent. /tmp/chain-context-ui-scope-red.log: main selector assertion fails before reverting broadened draft scope."
+    }
+  },
+  {
+    "testChangesSha256": "f676848b1ef0f521bb2435031651cfc2475a43d224190aa8902359a9c5fc0ff2",
+    "reason": "User reported Edit Hours to Days never suggests seven; Add-only interaction coverage and direct Edit Save setup missed this handler path.",
+    "previousBehavior": "Edit unit change preserves eighteen on untouched eighteen-hour default; only Add has seven-day substitution.",
+    "intendedBehavior": "Untouched eighteen-hour Edit draft suggests seven days; explicit input and saved custom intervals stay entered; repeated toggles, Cancel and Save/reopen preserve documented semantics.",
+    "replacementTests": [
+      "RISK Edit evergreen unit default: mounted Hours to Days suggests seven then saves and reopens weekly",
+      "RISK Edit evergreen unit preservation: explicit drafts custom intervals and Cancel keep their values",
+      "RISK context editor visibility: real contexts govern requirements and filters without mutating assignments",
+      "RISK task edit section dividers: semantic rules separate requirements ratings and actions"
+    ],
+    "preservedCoverage": [
+      "Existing Add default and Edit conversion/serialization tests stay unchanged. Main context selector visibility, ratings, completion, Undo, cloud and sync tests remain intact."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='RISK Edit evergreen unit' tests.js",
+      "failure": "/tmp/chain-edit-unit-red.log: both mounted handler tests fail 18 !== 7. Prior context/divider red remains /tmp/chain-context-ui-red.log and scope correction /tmp/chain-context-ui-scope-red.log."
+    }
+  },
+  {
+    "testChangesSha256": "4979a56beb0b34a94a70a4e24c579043a044ca08095c9f6b556cc035d4963b91",
+    "reason": "User reported Edit Hours to Days never suggests seven; Add-only interaction coverage and direct Edit Save setup missed this handler path.",
+    "previousBehavior": "Edit unit change preserves eighteen on untouched eighteen-hour default; only Add has seven-day substitution.",
+    "intendedBehavior": "Untouched eighteen-hour Edit draft suggests seven days; explicit input and saved custom intervals stay entered; repeated toggles, Cancel and Save/reopen preserve documented semantics.",
+    "replacementTests": [
+      "RISK Edit evergreen unit default: mounted Hours to Days suggests seven then saves and reopens weekly",
+      "RISK Edit evergreen unit preservation: explicit drafts custom intervals and Cancel keep their values"
+    ],
+    "preservedCoverage": [
+      "Existing Add default and Edit conversion/serialization tests stay unchanged. Main context selector visibility, ratings, completion, Undo, cloud and sync tests remain intact."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='RISK Edit evergreen unit' tests.js",
+      "failure": "/tmp/chain-edit-unit-red.log: both mounted handler tests fail 18 !== 7. Prior context/divider red remains /tmp/chain-context-ui-red.log and scope correction /tmp/chain-context-ui-scope-red.log."
+    }
+  },
+  {
+    "testChangesSha256": "6a9b8e42bd637953b57f7924640e81c39fcf6972c99fe8314f73b342590da4f8",
+    "reason": "Requested All Tasks durations above sixty minutes in hour/minute notation and no overflow; actual rendered badge consumer boundaries plus preservation of existing global box model and wrapping.",
+    "previousBehavior": "Cant badge renders61m/90m/120m; existing global border-box and wrapped readable-width titles already bound metadata.",
+    "intendedBehavior": "Cant badge displays1h1m/1h30m/2h above60, retaining exact60m and minute ceiling. Existing layout,Worked/evergreen roundings,stored values and editor units remain unchanged.",
+    "replacementTests": [
+      "RISK All Tasks duration formatting: rendered Cant badges cross sixty minutes without changing other time rules or saved values",
+      "RISK All Tasks duration wrapping: badges include their padding in the available column and preserve readable title width",
+      "RISK All Tasks duration browser: long titles tags and hour-minute badges fit narrow enlarged text columns"
+    ],
+    "preservedCoverage": [
+      "All prior context/editor weekly-default,Add interval,ratings,Undo,cloud,sync,layout and conversion protections retained unchanged. Wrapping test is explicitly existing-layout preservation,not evidence of a preexisting overflow defect."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='RISK All Tasks duration' tests.js",
+      "failure": "/tmp/chain-duration-red.log actual All Tasks can’t61m != can’t1h1m. The original per-selector border-box assertion also failed,but global * border-box already applied; that redundant implementation and misleading assertion were corrected. Browser test gated pending allocation. Earlier red logs retained."
+    }
+  },
+  {
+    "testChangesSha256": "59e626c520037f453b4aad19f28dd9905ec9ed32baebad3bf50ce2360fe1e3bc",
+    "reason": "Requested All Tasks durations above sixty minutes in hour/minute notation and no overflow; actual rendered badge consumer boundaries plus preservation of existing global box model and wrapping.",
+    "previousBehavior": "Cant badge renders61m/90m/120m; existing global border-box and wrapped readable-width titles already bound metadata.",
+    "intendedBehavior": "Cant badge displays1h1m/1h30m/2h above60, retaining exact60m and minute ceiling. Existing layout,Worked/evergreen roundings,stored values and editor units remain unchanged.",
+    "replacementTests": [
+      "RISK All Tasks duration formatting: rendered Cant badges cross sixty minutes without changing other time rules or saved values",
+      "RISK All Tasks duration wrapping: badges include their padding in the available column and preserve readable title width",
+      "RISK All Tasks duration browser: long titles tags and hour-minute badges fit narrow enlarged text columns"
+    ],
+    "preservedCoverage": [
+      "All prior context/editor weekly-default,Add interval,ratings,Undo,cloud,sync,layout and conversion protections retained unchanged. Wrapping test is explicitly existing-layout preservation,not evidence of a preexisting overflow defect."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='RISK All Tasks duration' tests.js",
+      "failure": "/tmp/chain-duration-red.log actual All Tasks can’t61m != can’t1h1m. The original per-selector border-box assertion also failed,but global * border-box already applied; that redundant implementation and misleading assertion were corrected. Browser test gated pending allocation. Earlier red logs retained."
     }
   }
 ]

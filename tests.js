@@ -21847,3 +21847,109 @@ test('RISK Squared Weighting held keys: real keyboard repeats preserve the newly
   ctx.undo();assert.equal(ctx.state.candidateId,first);assert.equal(JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma])),original);
  }
 });
+
+test('RISK context editor visibility: real contexts govern requirements and filters without mutating assignments',async()=>{
+ const {ctx,shim}=await loadApp();
+ const task={id:'private-context-ui',title:'Private fixture',ctx:['missing'],mu:25,sigma:8,done:false,createdAt:1};ctx.state.tasks=[task];
+ for(const contexts of [[],[{id:'one',name:'Office',active:true}],[{id:'one',name:'Office',active:true},{id:'two',name:'Home',active:false}],[]]){
+  ctx.state.contexts=contexts;const before=JSON.stringify(task);ctx.openEdit(task.id);ctx.renderCtx();
+  const edit=shim.document.getElementById('modalRoot').innerHTML,panel=shim.document.getElementById('ctxPanel').innerHTML;
+  assert.equal(edit.includes('Needs these contexts'),contexts.length>0);
+  assert.equal(panel.includes('toggle-ctx'),true,'main selector stays visible even with zero contexts');
+  ctx.state.ctxOpen=true;ctx.renderCtx();const expanded=shim.document.getElementById('ctxPanel').innerHTML;
+  assert.ok(expanded.includes('add-ctx'),'first context creation remains available');
+  assert.equal(edit.includes('data-editctx="one"'),contexts.length>0);
+  assert.equal(JSON.stringify(task),before,'rendering leaves unknown/deleted assignment IDs intact');
+  assert.equal(edit.includes('data-editctx="null"'),false,'No context sentinel cannot become an assignment');
+ }
+});
+test('RISK task edit section dividers: semantic rules separate requirements ratings and actions',async()=>{
+ const {ctx,shim}=await loadApp();ctx.state.tasks=[{id:'private-divider',title:'Private fixture',ctx:[],mu:25,sigma:8,done:false,createdAt:1}];ctx.state.contexts=[{id:'one',name:'Office',active:true}];ctx.openEdit('private-divider');
+ const edit=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(edit,/<hr class="edit-divider">\s*<h3>Needs these contexts/);
+ assert.match(edit,/<hr class="edit-divider">\s*<div class="kv">strength/);
+ assert.match(edit,/<\/div><hr class="edit-divider"><div class="mbtns">/);
+ const html=fs.readFileSync(path.join(__dirname,'index.html'),'utf8');assert.match(html,/\.edit-divider\{[^}]*border-top:1px solid var\(--[^)]+\)[^}]*margin:18px 0/);
+});
+
+function mountPrivateEditInterval(ctx,shim,task){
+ ctx.openEdit(task.id);
+ const markup=shim.document.getElementById('modalRoot').innerHTML;
+ // The shim does not parse modal innerHTML: hydrate the emitted controls, then
+ // dispatch through the app's registered listener rather than a copied helper.
+ const value=markup.match(/id="etEverHours"[^>]*value="([^"]+)"/)[1];
+ const unit=markup.match(/value="(hours|days)" selected/)[1];
+ for(const [id,v] of [['etEverHours',value],['etEverUnit',unit]])Object.assign(shim.document.getElementById(id),{id,value:v,matches:()=>false});
+ shim.document.getElementById('etEver').checked=true;
+ shim.document.getElementById('etEverReset').checked=task.evergreenResetAtDay!==false;
+ shim.document.getElementById('etTitle').value=task.title;
+ return (id,value,type='change')=>{const field=shim.document.getElementById(id);field.value=value;shim.document.dispatchEvent({type,target:field});return field;};
+}
+test('RISK Edit evergreen unit default: mounted Hours to Days suggests seven then saves and reopens weekly',async()=>{
+ const {ctx,shim}=await loadApp();const task=ctx.addTask('Private weekly editor');Object.assign(task,{evergreen:true,evergreenHours:18,evergreenResetAtDay:true});
+ const change=mountPrivateEditInterval(ctx,shim,task),before=JSON.stringify(task);
+ for(const [unit,value,reset] of [['days','7',false],['hours','7',true],['days','7',false]]){
+  change('etEverUnit',unit);assert.equal(shim.document.getElementById('etEverHours').value,value,'untouched 18-hour editor default becomes seven days');assert.equal(shim.document.getElementById('etEverReset').checked,reset);
+ }
+ assert.equal(JSON.stringify(task),before,'draft unit changes do not save task data');
+ ctx.onAction('save-edit',{dataset:{id:task.id}});assert.equal(task.evergreenHours,168);assert.equal(task.evergreenResetAtDay,false);
+ mountPrivateEditInterval(ctx,shim,task);assert.equal(shim.document.getElementById('etEverHours').value,'7');assert.equal(shim.document.getElementById('etEverUnit').value,'days');
+});
+test('RISK Edit evergreen unit preservation: explicit drafts custom intervals and Cancel keep their values',async()=>{
+ for(const duration of [12,36,168,432]){
+  const {ctx,shim}=await loadApp();const task=ctx.addTask('Private interval');Object.assign(task,{evergreen:true,evergreenHours:duration});
+  const change=mountPrivateEditInterval(ctx,shim,task),value=shim.document.getElementById('etEverHours').value;
+  for(const unit of ['hours','days','hours','days']){change('etEverUnit',unit);assert.equal(shim.document.getElementById('etEverHours').value,value,'saved custom values including eighteen days remain explicit');}
+ }
+ for(const values of [['24','18'],['7'],[''],['0.5']]){
+  const {ctx,shim}=await loadApp();const task=ctx.addTask('Private draft');Object.assign(task,{evergreen:true,evergreenHours:18});
+  let change=mountPrivateEditInterval(ctx,shim,task);for(const value of values)change('etEverHours',value,'input');
+  for(const unit of ['days','hours','days']){change('etEverUnit',unit);assert.equal(shim.document.getElementById('etEverHours').value,values.at(-1),'typed values stay intentional even when restored to eighteen');}
+  ctx.closeModal();assert.equal(task.evergreenHours,18);change=mountPrivateEditInterval(ctx,shim,task);change('etEverUnit','days');assert.equal(shim.document.getElementById('etEverHours').value,'7','reopening resets draft edit protection');
+ }
+});
+
+test('RISK All Tasks duration formatting: rendered Cant badges cross sixty minutes without changing other time rules or saved values',async()=>{
+ const {ctx,shim}=await loadApp();const now=new Date(2026,9,8,3).getTime();setFakeTime(ctx,now);ctx.state.listOpen=true;
+ const task=ctx.addTask('Private timed task');ctx.state.considered[task.id]='cant';ctx.state.cantAt[task.id]=now;
+ for(const [minutes,label] of [[59,'59m'],[60,'60m'],[61,'1h1m'],[90,'1h30m'],[120,'2h'],[480,'8h'],[1441,'24h1m'],[60.01,'1h1m'],[.01,'1m'],[0,'']]){
+  ctx.state.settings.cantMin=minutes;const before=JSON.stringify(ctx.state);ctx.renderList();
+  const badge=shim.document.getElementById('listBody').innerHTML.match(/<span class="skipped">([^<]*)<\/span>/)[1];
+  assert.equal(badge,'can’t'+(label?' · '+label:''),'All Tasks renders '+minutes+' minutes with the requested boundary');
+  assert.equal(JSON.stringify(ctx.state),before,'duration display never rewrites timing values');
+ }
+ ctx.state.considered[task.id]='worked';ctx.state.workedAt[task.id]=now;ctx.state.settings.workedHours=1.5;ctx.renderList();assert.match(shim.document.getElementById('listBody').innerHTML,/worked · 2h/,'Worked keeps existing hour ceiling');
+ Object.assign(task,{evergreen:true,evergreenHours:25,lastDoneAt:now,evergreenResetAtDay:false});ctx.renderList();assert.match(shim.document.getElementById('listBody').innerHTML,/class="chip ever-countdown"[^>]*>2d</,'Evergreen keeps existing day ceiling');
+ task.evergreenHours=1.5;ctx.renderList();assert.match(shim.document.getElementById('listBody').innerHTML,/class="chip ever-countdown"[^>]*>2h</,'Evergreen keeps existing hour ceiling');
+});
+test('RISK All Tasks duration wrapping: badges include their padding in the available column and preserve readable title width',()=>{
+ assert.match(html,/\*\{box-sizing:border-box\}/,'the existing global box model includes badge padding/borders');
+ for(const selector of ['chip','skipped']){const rule=new RegExp('\\.tmain \\.'+selector+'\\s*\\{([^}]+)\\}').exec(html)?.[1]||'';assert.match(rule,/max-width:100%/);assert.match(rule,/overflow-wrap:anywhere/);}
+ assert.match(html,/\.tmain \.tt\s*\{[^}]*min-width:min\(120px,100%\)/,'titles keep readable width when durations wrap');
+});
+test('RISK All Tasks duration browser: long titles tags and hour-minute badges fit narrow enlarged text columns',
+ {skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const {webkit,chromium}=await import(process.env.PLAYWRIGHT_MODULE||'playwright'),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+ for(const [name,engine] of [['webkit',webkit],['chrome',chromium]]){
+  const browser=await engine.launch({headless:true,...(name==='chrome'?{channel:'chrome'}:{})});try{
+   const context=await browser.newContext({viewport:{width:320,height:568},serviceWorkers:'block'});await context.addInitScript(()=>{Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});localStorage.setItem('fvp:chain-scanner:landscape-motion','reduced');});await context.route('**/*',r=>new URL(r.request().url()).origin===origin?r.continue():r.abort());const page=await context.newPage();await page.goto(process.env.LANDSCAPE_BROWSER_URL);await page.waitForFunction(()=>typeof state!=='undefined'&&state?.tasks);
+   await page.evaluate(()=>{closeModal();document.getElementById('motionDialog')?.close();state.listOpen=true;state.settings.cantMin=90;const timed=addTask('Private long title with several words '+ 'Title'.repeat(25));timed.due='2099-12-30';state.considered[timed.id]='cant';state.cantAt[timed.id]=Date.now();const tagged=addTask('Private long imported status');state.considered[tagged.id]='LongImportedStatus'+ 'Tag'.repeat(60);render();});
+   await page.addStyleTag({content:'.tmain .tt{font-size:24px!important}.tmain .chip,.tmain .skipped{font-size:18px!important}'});
+   for(const [width,height] of [[320,568],[390,844],[768,1024],[1280,800]]){
+    await page.setViewportSize({width,height});const geometry=await page.evaluate(()=>{renderList();const body=document.getElementById('listBody');return {viewport:innerWidth,pageWidth:document.documentElement.scrollWidth,bodyWidth:body.clientWidth,scroll:body.scrollWidth,rows:[...body.querySelectorAll('.trow')].map(row=>{const main=row.querySelector('.tmain'),mr=main.getBoundingClientRect();return {main:mr.width,title:main.querySelector('.tt').getBoundingClientRect().width,children:[...main.children].map(el=>{const r=el.getBoundingClientRect();return {text:el.textContent,left:r.left,right:r.right,within:r.left>=mr.left-1&&r.right<=mr.right+1};})};})};});assert.ok(geometry.pageWidth<=geometry.viewport+1,name+' '+width+' page overflow');assert.ok(geometry.scroll<=geometry.bodyWidth+1,name+' '+width+' list overflow');for(const row of geometry.rows){assert.ok(row.title>=Math.min(120,row.main-32),'readable title width');for(const child of row.children)assert.ok(child.within,child.text+' fits column');}assert.ok(geometry.rows.some(row=>row.children.some(child=>child.text.includes('1h30m'))),'actual duration consumer renders');
+   }await context.close();
+  }finally{await browser.close();}
+ }
+});
+
+test('RISK UI batch integration: saved Squared board retains context selector editor defaults duration badges and exact shell delivery',async()=>{
+ const {ctx,shim}=await loadApp();const now=new Date(2026,9,8,3).getTime();setFakeTime(ctx,now);
+ const task=ctx.addTask('Private integration task');Object.assign(task,{evergreen:true,evergreenHours:18});ctx.state.contexts=[];ctx.state.settings.scanMode='squared';ctx.state.scanMode='squared';ctx.state.settings.cantMin=90;ctx.state.considered[task.id]='cant';ctx.state.cantAt[task.id]=now;ctx.state.listOpen=true;
+ const restored=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(ctx.state)}});setFakeTime(restored.ctx,now);restored.ctx.render();
+ assert.equal(restored.ctx.state.settings.scanMode,'squared','saved released Squared preference survives the UI batch');
+ assert.match(restored.shim.document.getElementById('ctxPanel').innerHTML,/toggle-ctx/,'main selector stays visible');
+ assert.match(restored.shim.document.getElementById('listBody').innerHTML,/can’t · 1h30m/,'actual restored All Tasks renders hour-minute duration');
+ const saved=restored.ctx.state.tasks.find(t=>t.id===task.id),change=mountPrivateEditInterval(restored.ctx,restored.shim,saved);
+ assert.doesNotMatch(restored.shim.document.getElementById('modalRoot').innerHTML,/Needs these contexts/);change('etEverUnit','days');assert.equal(restored.shim.document.getElementById('etEverHours').value,'7');assert.equal(saved.evergreenHours,18,'editor draft keeps stored hours intact');
+ const {cacheName,fingerprint}=appShellContract(serviceWorkerSource());assert.equal(cacheName,'chain-scanner-shell-'+fingerprint,'combined UI cannot ship behind the previous release shell key');
+});
