@@ -673,3 +673,4 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK date clear persistence: pasted Add dates and offline concurrent sync retain the other date and task data
 - RISK date clear tablet geometry: Edit wrapper overrides generic date minimum to reserve the Clear target
 - RISK date clear rendered geometry: native date segments remain readable beside Clear and long Starts hints at larger text
+- RISK changelog dates: Settings combines repeated dates in descending order without losing history categories or links
