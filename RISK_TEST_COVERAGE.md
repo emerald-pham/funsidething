@@ -630,3 +630,5 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - `RISK All Tasks duration formatting: rendered Cant badges cross sixty minutes without changing other time rules or saved values` — actual consumer minute boundaries and unchanged Worked/evergreen roundings.
 - `RISK All Tasks duration wrapping: badges include their padding in the available column and preserve readable title width` — bounded badge box model and existing title-width contract.
 - `RISK All Tasks duration browser: long titles tags and hour-minute badges fit narrow enlarged text columns` — isolated WebKit/Chrome phone/tablet/desktop enlarged text geometry and actual duration rendering.
+
+- `RISK UI batch integration: saved Squared board retains context selector editor defaults duration badges and exact shell delivery` — released-mode offline reopen, Edit draft/All Tasks consumers and integrated PWA fingerprint.

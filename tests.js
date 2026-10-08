@@ -21846,6 +21846,8 @@ test('RISK Squared Weighting held keys: real keyboard repeats preserve the newly
   assert.equal(JSON.stringify(ctx.state),after,'held '+key+' cannot decide the squared replacement');assert.equal(vm.runInContext('undoStack.length',ctx),depth);
   ctx.undo();assert.equal(ctx.state.candidateId,first);assert.equal(JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma])),original);
  }
+});
+
 test('RISK context editor visibility: real contexts govern requirements and filters without mutating assignments',async()=>{
  const {ctx,shim}=await loadApp();
  const task={id:'private-context-ui',title:'Private fixture',ctx:['missing'],mu:25,sigma:8,done:false,createdAt:1};ctx.state.tasks=[task];
@@ -21938,4 +21940,16 @@ test('RISK All Tasks duration browser: long titles tags and hour-minute badges f
    }await context.close();
   }finally{await browser.close();}
  }
+});
+
+test('RISK UI batch integration: saved Squared board retains context selector editor defaults duration badges and exact shell delivery',async()=>{
+ const {ctx,shim}=await loadApp();const now=new Date(2026,9,8,3).getTime();setFakeTime(ctx,now);
+ const task=ctx.addTask('Private integration task');Object.assign(task,{evergreen:true,evergreenHours:18});ctx.state.contexts=[];ctx.state.settings.scanMode='squared';ctx.state.scanMode='squared';ctx.state.settings.cantMin=90;ctx.state.considered[task.id]='cant';ctx.state.cantAt[task.id]=now;ctx.state.listOpen=true;
+ const restored=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(ctx.state)}});setFakeTime(restored.ctx,now);restored.ctx.render();
+ assert.equal(restored.ctx.state.settings.scanMode,'squared','saved released Squared preference survives the UI batch');
+ assert.match(restored.shim.document.getElementById('ctxPanel').innerHTML,/toggle-ctx/,'main selector stays visible');
+ assert.match(restored.shim.document.getElementById('listBody').innerHTML,/can’t · 1h30m/,'actual restored All Tasks renders hour-minute duration');
+ const saved=restored.ctx.state.tasks.find(t=>t.id===task.id),change=mountPrivateEditInterval(restored.ctx,restored.shim,saved);
+ assert.doesNotMatch(restored.shim.document.getElementById('modalRoot').innerHTML,/Needs these contexts/);change('etEverUnit','days');assert.equal(restored.shim.document.getElementById('etEverHours').value,'7');assert.equal(saved.evergreenHours,18,'editor draft keeps stored hours intact');
+ const {cacheName,fingerprint}=appShellContract(serviceWorkerSource());assert.equal(cacheName,'chain-scanner-shell-'+fingerprint,'combined UI cannot ship behind the previous release shell key');
 });

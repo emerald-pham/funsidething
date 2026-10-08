@@ -1,5 +1,29 @@
 [
   {
+    "testChangesSha256": "5b12f121f7791692ee5407e8d54a9adc364ac429a8b7083a419e5c09d5f56c39",
+    "reason": "Reconcile requested UI batch onto released Squared Weighting without losing released controls/tests/history; real saved-board consumer regression and discriminating shell-delivery integration red.",
+    "previousBehavior": "Released base has Squared Weighting/held-key fixes but lacks editor visibility/dividers/seven-day default and Cant hour-minute notation; initial rebase retained prior base shell fingerprint.",
+    "intendedBehavior": "Retain all released behavior while adding scoped UI fixes and fresh exact shell fingerprint. Main context selector stays visible; editor/context/default/duration tests all remain.",
+    "replacementTests": [
+      "RISK UI batch integration: saved Squared board retains context selector editor defaults duration badges and exact shell delivery",
+      "RISK context editor visibility: real contexts govern requirements and filters without mutating assignments",
+      "RISK task edit section dividers: semantic rules separate requirements ratings and actions",
+      "RISK Edit evergreen unit default: mounted Hours to Days suggests seven then saves and reopens weekly",
+      "RISK Edit evergreen unit preservation: explicit drafts custom intervals and Cancel keep their values",
+      "RISK All Tasks duration formatting: rendered Cant badges cross sixty minutes without changing other time rules or saved values",
+      "RISK All Tasks duration wrapping: badges include their padding in the available column and preserve readable title width",
+      "RISK All Tasks duration browser: long titles tags and hour-minute badges fit narrow enlarged text columns"
+    ],
+    "preservedCoverage": [
+      "f38ac4f tests.js preserved byte-for-byte as prefix; all UI tests appended. Squared, held-key, cloud, ratings, Undo/import, existing layout and PWA tests unchanged.",
+      "Contemporaneous original feature red evidence retained; integration red is explicitly newer reconciliation evidence, not rewritten feature chronology."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='RISK UI batch integration|PWA cache contract|Settings changelog: every' tests.js",
+      "failure": "/tmp/chain-ui-integrated-red.log: all three fail on stale base cache/fingerprint before mechanical integration refresh. Registered UI consumers and saved Squared preference pass before final cache assertion. Earlier feature reds /tmp/chain-context-ui-red.log,/tmp/chain-context-ui-scope-red.log,/tmp/chain-edit-unit-red.log,/tmp/chain-duration-red.log retained."
+    }
+  },
+  {
     "testChangesSha256": "5fa54f74bbe539cd03182a832ba5b1aff191d0863ac9cbf4fc61d4d0b6e16e27",
     "reason": "User requested a third quadratic scanning mode, its actual normalized percentages, and a once-only migration of the old Chance default while preserving later explicit choices. Follow-up user guidance asks for real consumer transitions rather than fixtures pre-set to final values. Reconcile the feature with released held-key PR66 and test the new mode through the keyboard consumer.",
     "previousBehavior": "Only Chance and Descending were accepted; new and invalid settings selected Chance; squaredPercentageWeight was absent and original shares stayed linear.",

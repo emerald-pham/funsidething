@@ -22,16 +22,6 @@ boundaries, invalid input, failure modes, ordering effects) → write the tests 
 run them and show the red output → minimum implementation →
 run and show the green output.
 
-For controls shared by Add, Edit, or Settings, enumerate the actual surfaces
-and state transitions before assuming a passing test covers them all. Exercise
-the registered interaction handler with controls from the rendered surface;
-directly assigning a final value and calling Save proves serialization, not the
-unit-change behavior. For defaults, distinguish an untouched draft from typed
-values and saved custom values, then check repeated toggles and Save/reopen or
-Cancel. The seven-day evergreen suggestion originally tested only Add; Edit's
-conversion/Save test never dispatched its Hours → Days change. Keep those
-interaction and storage contracts separate and retain both.
-
 Watch for a new test that passes *before* the implementation exists. That test is
 broken, not finished — strengthen it until it discriminates, then continue.
 
@@ -59,7 +49,10 @@ assert the displayed draft before saving and the persisted result afterward;
 retain custom-duration and return-to-default cases when prior edits matter.
 Use an isolated board. When closing a gap in established
 behavior, verify that an isolated broken-handler negative control fails and
-record its actual chronology rather than calling it preimplementation red.
+record its actual chronology rather than calling it preimplementation red. The
+seven-day suggestion originally tested only Add; Edit's conversion/Save test
+never dispatched its Hours → Days change. Keep interaction and serialization
+contracts separate and retain both.
 
 Choose cases by failure cost. For persisted task rules, include old saved data,
 undo, import or restore, deletion, and cross-device reconciliation when those
