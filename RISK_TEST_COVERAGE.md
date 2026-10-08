@@ -621,3 +621,5 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK held decision keys FAQ: keyboard guidance names one fresh keypress per Yes No or Cant decision
 
 - RISK Squared Weighting held keys: real keyboard repeats preserve the newly dealt candidate while fresh presses and Undo still work
+- `RISK context editor visibility: real contexts govern requirements and filters without mutating assignments` — empty/one/multiple/deleted contexts; creation entrypoint and sentinel preservation.
+- `RISK task edit section dividers: semantic rules separate requirements ratings and actions` — semantic separators and responsive theme color/spacing contract.

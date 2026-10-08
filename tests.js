@@ -21846,4 +21846,26 @@ test('RISK Squared Weighting held keys: real keyboard repeats preserve the newly
   assert.equal(JSON.stringify(ctx.state),after,'held '+key+' cannot decide the squared replacement');assert.equal(vm.runInContext('undoStack.length',ctx),depth);
   ctx.undo();assert.equal(ctx.state.candidateId,first);assert.equal(JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma])),original);
  }
+test('RISK context editor visibility: real contexts govern requirements and filters without mutating assignments',async()=>{
+ const {ctx,shim}=await loadApp();
+ const task={id:'private-context-ui',title:'Private fixture',ctx:['missing'],mu:25,sigma:8,done:false,createdAt:1};ctx.state.tasks=[task];
+ for(const contexts of [[],[{id:'one',name:'Office',active:true}],[{id:'one',name:'Office',active:true},{id:'two',name:'Home',active:false}],[]]){
+  ctx.state.contexts=contexts;const before=JSON.stringify(task);ctx.openEdit(task.id);ctx.renderCtx();
+  const edit=shim.document.getElementById('modalRoot').innerHTML,panel=shim.document.getElementById('ctxPanel').innerHTML;
+  assert.equal(edit.includes('Needs these contexts'),contexts.length>0);
+  assert.equal(panel.includes('toggle-ctx'),true,'main selector stays visible even with zero contexts');
+  ctx.state.ctxOpen=true;ctx.renderCtx();const expanded=shim.document.getElementById('ctxPanel').innerHTML;
+  assert.ok(expanded.includes('add-ctx'),'first context creation remains available');
+  assert.equal(edit.includes('data-editctx="one"'),contexts.length>0);
+  assert.equal(JSON.stringify(task),before,'rendering leaves unknown/deleted assignment IDs intact');
+  assert.equal(edit.includes('data-editctx="null"'),false,'No context sentinel cannot become an assignment');
+ }
+});
+test('RISK task edit section dividers: semantic rules separate requirements ratings and actions',async()=>{
+ const {ctx,shim}=await loadApp();ctx.state.tasks=[{id:'private-divider',title:'Private fixture',ctx:[],mu:25,sigma:8,done:false,createdAt:1}];ctx.state.contexts=[{id:'one',name:'Office',active:true}];ctx.openEdit('private-divider');
+ const edit=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(edit,/<hr class="edit-divider">\s*<h3>Needs these contexts/);
+ assert.match(edit,/<hr class="edit-divider">\s*<div class="kv">strength/);
+ assert.match(edit,/<\/div><hr class="edit-divider"><div class="mbtns">/);
+ const html=fs.readFileSync(path.join(__dirname,'index.html'),'utf8');assert.match(html,/\.edit-divider\{[^}]*border-top:1px solid var\(--[^)]+\)[^}]*margin:18px 0/);
 });

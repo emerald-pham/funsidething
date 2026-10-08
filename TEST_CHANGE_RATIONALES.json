@@ -2297,5 +2297,22 @@
       "command": "/opt/local/bin/node --test --test-reporter=spec --test-name-pattern='RISK legacy automatic expiry|RISK device current-head guard' tests.js",
       "failure": "/tmp/chain-legacy-retention-evidence-20261007.u86nikoq/red-discriminating-contracts.log: eight failed, zero passed, zero skipped before app changes, for missing physical legacy retirement, missing locked guard and missing FAQ. First fixture run is retained separately. /tmp/chain-legacy-retention-evidence-20261007.u86nikoq/red-final-fixture-on-released-base.log: all eight final fixtures still fail on immutable released base. /tmp/chain-legacy-retention-evidence-20261007.u86nikoq/red-final-fixture-on-fireworks-base.log: all eight final contracts fail on merged fireworks f5574f0. red-active-list-copy.log: the new active-backup-list assertion fails against fe5d427 before the wording change."
     }
+  },
+  {
+    "testChangesSha256": "a4cd63aea491bc999835890312ba6f77a2ba9ece450136d75aabf3ba0148285f",
+    "reason": "Requested edit-only empty context suppression and semantic rating section separators; main context selector must remain visible.",
+    "previousBehavior": "Empty Needs these contexts renders; task fields blend with ratings/history.",
+    "intendedBehavior": "Only Edit requirements hide at zero real contexts; main selector remains; hr elements separate logical editor sections.",
+    "replacementTests": [
+      "RISK context editor visibility: real contexts govern requirements and filters without mutating assignments",
+      "RISK task edit section dividers: semantic rules separate requirements ratings and actions"
+    ],
+    "preservedCoverage": [
+      "Existing context filter, assignment, cloud, import, Undo, rating and completion tests remain unchanged."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='RISK (context editor visibility|task edit section dividers)' tests.js",
+      "failure": "/tmp/chain-context-ui-red.log: empty heading rendered and semantic hr absent. /tmp/chain-context-ui-scope-red.log: main selector assertion fails before reverting broadened draft scope."
+    }
   }
 ]
