@@ -677,3 +677,18 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK date clear availability: empty Add and Edit controls disable independently through typing clearing resets and reopening
 - RISK date clear programmatic values: direct assignments stay synchronized without events and preserve unrelated drafts
 - RISK date clear guidance: Quick start explains disabled empty date controls and retained save semantics
+
+## Stale-tab reconciliation
+
+- RISK STALE TAB: CAS repair preserves newer fields and independent edits through an awaiting third action
+- RISK STALE TAB: browser rebase keeps disjoint fields but newer conflicts and deletions win
+- RISK STALE TAB: cloud adoption does not replace edits made while its safety backup awaits
+- RISK STALE TAB: cloud rebase retains independent edits against an observed revision
+- RISK STALE TAB: a settings action during CAS repair survives without reviving peer fields
+- RISK STALE TAB: failed cloud adoption save keeps an edit arriving during persistence
+- RISK STALE TAB: failed matching-cloud revision save cannot roll back a later gesture
+- RISK STALE TAB: rating and context actions during CAS repair retain their complete effects
+- RISK STALE TAB: legacy coexistence retains independent live fields before durable reconciliation
+- RISK STALE TAB: recovery guidance explains independent edits conflicts and unobserved cloud bases
+- RISK STALE TAB: rebasing never combines cached Chance data from different passes
+- RISK STALE TAB: a conflicting edit during awaited CAS repair retains its exact recovery bytes
