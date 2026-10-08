@@ -21953,7 +21953,8 @@ test('RISK All Tasks duration browser: long titles tags and hour-minute badges f
 test('RISK UI batch integration: saved Squared board retains context selector editor defaults duration badges and exact shell delivery',async()=>{
  const {ctx,shim}=await loadApp();const now=new Date(2026,9,8,3).getTime();setFakeTime(ctx,now);
  const task=ctx.addTask('Private integration task');Object.assign(task,{evergreen:true,evergreenHours:18});ctx.state.contexts=[];ctx.state.settings.scanMode='squared';ctx.state.scanMode='squared';ctx.state.settings.cantMin=90;ctx.state.considered[task.id]='cant';ctx.state.cantAt[task.id]=now;ctx.state.listOpen=true;
- const restored=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(ctx.state)}});setFakeTime(restored.ctx,now);restored.ctx.render();
+ // Startup sweeps elapsed holds: install the fixture clock before awaiting reload.
+ const restored=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(ctx.state)},beforeStateReady:sandbox=>setFakeTime(sandbox,now)});setFakeTime(restored.ctx,now);restored.ctx.render();
  assert.equal(restored.ctx.state.settings.scanMode,'squared','saved released Squared preference survives the UI batch');
  assert.match(restored.shim.document.getElementById('ctxPanel').innerHTML,/toggle-ctx/,'main selector stays visible');
  assert.match(restored.shim.document.getElementById('listBody').innerHTML,/can’t · 1h30m/,'actual restored All Tasks renders hour-minute duration');
