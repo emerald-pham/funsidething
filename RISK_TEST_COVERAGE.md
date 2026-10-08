@@ -703,3 +703,5 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - `RISK Add draft durable reset: failed device save retains draft and retry does not duplicate accepted tasks` — actual device rejection/retry preserves input and task membership.
 - `RISK Add draft durable reset: pending repeated Add and newer edits or reset survive an awaiting save` — submission confirmation remains bound to draft and account.
 - `RISK Add draft durable reset: multiline paste preserves failed capture and saves retained tasks on retry` — bulk capture uses the same durable reset gate.
+
+- Dependency search typography uses shared text-input styling; narrow normal/enlarged Add/Edit native rendering and actual Chrome font identity: `RISK dependency search styling: Add and Edit share text input typography borders and spacing`; `RISK dependency search rendered styling: Add and Edit resolved fonts borders spacing and enlarged sizing match text controls`.

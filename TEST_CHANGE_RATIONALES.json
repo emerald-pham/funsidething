@@ -2870,5 +2870,39 @@
       "command": "node --test --test-name-pattern='RISK STALE TAB:' tests.js (individual additions run before their implementation)",
       "failure": "Observed actual Original title instead of Newer peer title; null instead of independent due date; missing later live gesture after cloud rollback; system instead of ymd; rating mu=25 instead of 20.7944; context membership mismatch; legacy rename lost. Original chronological logs preserved in task-7/evidence/chain-*-red*.log. Further observed cross-pass extra cached weight and missing exact late CAS recovery snapshot, preserved in chain-final-safety-red.log."
     }
+  },
+  {
+    "reason": "Independent actual rendered review found dependency type=search excluded from the shared typography border and padding contract; add direct and allocated browser regressions before the narrow repair.",
+    "previousBehavior": "Add and Edit search fields resolved ArialMT with browser borders and cramped 34px height at enlarged24px text.",
+    "intendedBehavior": "Both search scopes participate in established shared text-control styling; native search semantics and all selection persistence behavior remain unchanged.",
+    "replacementTests": [
+      "RISK dependency search styling: Add and Edit share text input typography borders and spacing",
+      "RISK dependency search rendered styling: Add and Edit resolved fonts borders spacing and enlarged sizing match text controls"
+    ],
+    "preservedCoverage": [
+      "All previous dependency eligibility selection composition Add durability and protected sync tests remain intact. Actual rendered browser test requires fresh runtime allocation and is not claimed as passed."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='RISK dependency search styling:' tests.js",
+      "failure": "Contemporaneous preimplementation missing input[type=search] shared selector assertion observed in ../search-styling-red.log. Earlier actual Chrome pixels and resolved ArialMT fonts preserved in ../combined-rendered-review-9fdbb2b.md and runtime artifacts. No postrepair runtime has run."
+    },
+    "testChangesSha256": "e99623d84d85051a4c71446c3430708573bd5fc4c84d90bb01f4566045240fa4"
+  },
+  {
+    "reason": "Independent actual rendered review found dependency type=search excluded from the shared typography border and padding contract; add direct and allocated browser regressions before the narrow repair.",
+    "previousBehavior": "Add and Edit search fields resolved ArialMT with browser borders and cramped 34px height at enlarged24px text.",
+    "intendedBehavior": "Both search scopes participate in established shared text-control styling; native search semantics and all selection persistence behavior remain unchanged.",
+    "replacementTests": [
+      "RISK dependency search styling: Add and Edit share text input typography borders and spacing",
+      "RISK dependency search rendered styling: Add and Edit resolved fonts borders spacing and enlarged sizing match text controls"
+    ],
+    "preservedCoverage": [
+      "All previous dependency eligibility selection composition Add durability and protected sync tests remain intact. Actual rendered browser test requires fresh runtime allocation and is not claimed as passed."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='RISK dependency search styling:' tests.js",
+      "failure": "Contemporaneous preimplementation missing input[type=search] shared selector assertion observed in ../search-styling-red.log. Earlier actual Chrome pixels and resolved ArialMT fonts preserved in ../combined-rendered-review-9fdbb2b.md and runtime artifacts. No postrepair runtime has run."
+    },
+    "testChangesSha256": "3aa3da4ac060efa93412729acc528a10c195ddd4bb9e5029623c7e0cb1dff921"
   }
 ]

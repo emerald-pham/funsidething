@@ -22708,3 +22708,52 @@ test('RISK Add draft durable reset: multiline paste preserves failed capture and
  await vm.runInContext('typeof quickAddSubmission === "undefined" ? undefined : quickAddSubmission?.saving',ctx);assert.notEqual(input.value,'','failed paste retains visible capture');assert.equal(ctx.state.tasks.length,2);
  shim.localStorage.setItem=original;await ctx.onAction('add',{});assert.equal(input.value,'');assert.equal(ctx.state.tasks.length,2,'retry retains existing paste membership');
 });
+
+test('RISK dependency search styling: Add and Edit share text input typography borders and spacing',async()=>{
+ const rule=html.match(/([^{}]+)\{\s*font:inherit;color:var\(--ink\);background:var\(--surface\);border:1px solid var\(--line\);border-radius:8px;padding:7px 10px\}/);
+ assert.ok(rule,'established text control visual contract exists');
+ assert.match(rule[1],/input\[type=search\]/,'dependency search must participate in the shared typography, border and padding rule');
+ const {ctx}=await loadApp();
+ for(const scope of ['add','edit'])assert.match(ctx.dependencyFieldsHTML(scope,[]),new RegExp('type="search" id="'+scope+'DependencySearch"'),'both scopes retain native search semantics');
+});
+
+test('RISK dependency search rendered styling: Add and Edit resolved fonts borders spacing and enlarged sizing match text controls',
+ {skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const {chromium,webkit}=await import(process.env.PLAYWRIGHT_MODULE||process.env.LANDSCAPE_PLAYWRIGHT||'playwright');
+ const origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+ for(const [engine,type] of [['chrome',chromium],['webkit',webkit]]){
+  const browser=await type.launch({headless:true,...(engine==='chrome'?{channel:'chrome'}:{})});
+  try{
+   const context=await browser.newContext({viewport:{width:320,height:568},serviceWorkers:'block'});
+   await context.addInitScript(()=>{Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});localStorage.setItem('fvp:chain-scanner:landscape-motion','reduced');});
+   await context.route('**/*',r=>new URL(r.request().url()).origin===origin?r.continue():r.abort());
+   const page=await context.newPage();await page.goto(process.env.LANDSCAPE_BROWSER_URL);await page.waitForFunction(()=>typeof state!=='undefined'&&state?.tasks);
+   await page.evaluate(()=>{closeModal();document.querySelectorAll('dialog[open]').forEach(d=>d.close());state.addOpen=true;render();});
+   const scale=await page.addStyleTag({content:''});
+   for(const large of [false,true]){
+    await scale.evaluate((e,large)=>e.textContent=large?'input{font-size:24px!important}':'',large);
+    for(const scope of ['add','edit']){
+     if(scope==='edit')await page.evaluate(()=>{openEdit(addTask('Synthetic typography task').id);});
+     else await page.evaluate(()=>{closeModal();state.addOpen=true;render();});
+     const search='#'+scope+'DependencySearch',reference=scope==='add'?'#addInput':'#etTitle';
+     const sample=await page.evaluate(({search,reference})=>{
+      const inspect=selector=>{const e=document.querySelector(selector),s=getComputedStyle(e),r=e.getBoundingClientRect();return {style:Object.fromEntries(['fontFamily','fontSize','fontWeight','lineHeight','color','backgroundColor','borderTopWidth','borderTopStyle','borderTopColor','borderRadius','paddingTop','paddingRight','paddingBottom','paddingLeft'].map(k=>[k,s[k]])),height:r.height,left:r.left,right:r.right};};
+      return {search:inspect(search),reference:inspect(reference),viewport:innerWidth,page:document.documentElement.scrollWidth};
+     },{search,reference});
+     const label=engine+' '+scope+' '+(large?'enlarged':'normal');
+     assert.deepEqual(sample.search.style,sample.reference.style,label+' shares the established input visual contract');
+     assert.ok(Math.abs(sample.search.height-sample.reference.height)<1,label+' retains the same text and padding height');
+     assert.ok(sample.search.left>=0&&sample.search.right<=sample.viewport+1&&sample.page<=sample.viewport+1,label+' fits the narrow viewport');
+     if(engine==='chrome'){
+      const cdp=await context.newCDPSession(page);await cdp.send('DOM.enable');await cdp.send('CSS.enable');
+      const {root}=await cdp.send('DOM.getDocument');
+      const fonts=async selector=>{const {nodeId}=await cdp.send('DOM.querySelector',{nodeId:root.nodeId,selector});const {fonts}=await cdp.send('CSS.getPlatformFontsForNode',{nodeId});return [...new Set(fonts.map(f=>f.familyName))].sort();};
+      await page.locator(search).fill('Synthetic typography');
+      assert.deepEqual(await fonts(search),await fonts(reference),label+' actual resolved font identity matches');await cdp.detach();
+     }
+    }
+   }
+   await context.close();
+  }finally{await browser.close();}
+ }
+});
