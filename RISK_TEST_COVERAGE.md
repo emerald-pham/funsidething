@@ -632,3 +632,5 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - `RISK All Tasks duration browser: long titles tags and hour-minute badges fit narrow enlarged text columns` — isolated WebKit/Chrome phone/tablet/desktop enlarged text geometry and actual duration rendering.
 
 - `RISK UI batch integration: saved Squared board retains context selector editor defaults duration badges and exact shell delivery` — released-mode offline reopen, Edit draft/All Tasks consumers and integrated PWA fingerprint.
+
+- `RISK Chance fixture wake: actual scheduled scanner callback handles probability fixture schema` — Probability fixtures supply empty context arrays and titles so the real bootstrap-registered scanner wake can render them at the daily boundary. Preserves frozen weight assertions and leaves production timer and Chance algorithms unchanged. RED: `/tmp/chain-ui-runtime/chance-fixture-repair-red.log`; focused cohort: five passed, zero skipped.
