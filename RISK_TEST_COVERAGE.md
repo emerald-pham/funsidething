@@ -692,3 +692,18 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK STALE TAB: recovery guidance explains independent edits conflicts and unobserved cloud bases
 - RISK STALE TAB: rebasing never combines cached Chance data from different passes
 - RISK STALE TAB: a conflicting edit during awaited CAS repair retains its exact recovery bytes
+
+- `RISK dependency picker search: Add and Edit input filtering preserves hidden selections and excludes completed ordinary choices` — native dependency filtering and retained saved links.
+
+- `RISK dependency picker input identity: search updates choices without replacing the focused search or its composition` — stable native input identity during filtering.
+
+- `RISK Add draft color: all task data controls turn Add green and clearing restores grey without changing validity` — draft appearance across all task-data controls.
+- `RISK Add draft color: search navigation repeated keyboard adds sticky contexts and failure retention follow actual handlers` — submission/reset and rejected-action retention.
+
+- `RISK Add draft durable reset: failed device save retains draft and retry does not duplicate accepted tasks` — actual device rejection/retry preserves input and task membership.
+- `RISK Add draft durable reset: pending repeated Add and newer edits or reset survive an awaiting save` — submission confirmation remains bound to draft and account.
+- `RISK Add draft durable reset: multiline paste preserves failed capture and saves retained tasks on retry` — bulk capture uses the same durable reset gate.
+
+- Dependency search typography uses shared text-input styling; narrow normal/enlarged Add/Edit native rendering and actual Chrome font identity: `RISK dependency search styling: Add and Edit share text input typography borders and spacing`; `RISK dependency search rendered styling: Add and Edit resolved fonts borders spacing and enlarged sizing match text controls`.
+
+- Dependency rendered fixture rejects empty style initialization and verifies the app’s actual theme after startup: `RISK dependency rendered runner: style initialization is nonempty and dark samples apply and verify the real theme`.

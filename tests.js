@@ -15778,7 +15778,7 @@ test('RISK lost scheduling metadata: ordinary Add saves and clears Start and Due
  {
   const {ctx,shim}=await loadApp();shim.document.getElementById('addInput').value='Dated';
   shim.document.getElementById('addStart').value='2099-01-01';shim.document.getElementById('addDue').value='2099-01-03';
-  ctx.onAction('add',{});const t=ctx.state.tasks[0];assert.equal(t.startsAt,'2099-01-01');assert.equal(t.due,'2099-01-03');
+  await ctx.onAction('add',{});const t=ctx.state.tasks[0];assert.equal(t.startsAt,'2099-01-01');assert.equal(t.due,'2099-01-03');
   assert.equal(shim.document.getElementById('addStart').value,'');assert.equal(shim.document.getElementById('addDue').value,'');
   assert.equal(ctx.isEligible(t),false);assert.equal(ctx.state.chain.includes(t.id),false);
   ctx.undo();assert.equal(ctx.state.tasks.length,0);
@@ -15796,7 +15796,7 @@ test('RISK recurrence-default loss: quick Add preserves 18-hour and 2 AM default
   const options=shim.document.getElementById('addEverOptions'),hours=shim.document.getElementById('addEverHours'),reset=shim.document.getElementById('addEverReset');
   assert.equal(toggle.checked,false);assert.equal(hours.value,'18');assert.equal(reset.checked,true);assert.equal(options.hidden,true);
   toggle.checked=true;ctx.toggleQuickEvergreenOptions(true);assert.equal(options.hidden,false);
-  hours.value='24';reset.checked=false;shim.document.getElementById('addInput').value=title;ctx.onAction('add',{});
+  hours.value='24';reset.checked=false;shim.document.getElementById('addInput').value=title;await ctx.onAction('add',{});
   assert.equal(ctx.state.tasks.length,title.includes('\n')?2:1);
   for(const task of ctx.state.tasks){assert.equal(task.evergreen,true);assert.equal(task.evergreenHours,24);assert.equal(task.evergreenResetAtDay,false);}
   assert.equal(toggle.checked,false,'successful capture resets the evergreen draft');
@@ -16009,10 +16009,17 @@ test('Landscape guest durations: readers and groups stay long enough before depa
 test('Add dates: list capture honors the date fields for each new task',async()=>{
  const {ctx,shim}=await loadApp();shim.document.getElementById('addInput').value='First\nSecond';
  shim.document.getElementById('addStart').value='2099-01-01';shim.document.getElementById('addDue').value='2099-01-03';
- ctx.onAction('add',{});assert.equal(ctx.state.tasks.length,2);
+ await ctx.onAction('add',{});assert.equal(ctx.state.tasks.length,2);
  for(const t of ctx.state.tasks){assert.equal(t.startsAt,'2099-01-01');assert.equal(t.due,'2099-01-03');}
  assert.equal(shim.document.getElementById('addStart').value,'');
- assert.match(appSrc,/importList\(txt, quickAddCtx, quickAddDates\(\), quickAddTaskOptions\(\)\)/,'paste capture uses the same draft dates and recurrence');
+ assert.match(appSrc,/submitQuickAdd\(txt\)/,'paste capture uses the common durable submission consumer');
+ const input=shim.document.getElementById('addInput');input.id='addInput';
+ shim.document.getElementById('addStart').value='2099-02-01';shim.document.getElementById('addDue').value='2099-02-03';
+ shim.document.dispatchEvent({type:'paste',target:input,clipboardData:{getData:()=> 'Pasted first\nPasted second'},preventDefault(){}});
+ await vm.runInContext('quickAddSubmission?.saving',ctx);
+ const pasted=ctx.state.tasks.filter(t=>t.title.startsWith('Pasted'));assert.equal(pasted.length,2);
+ for(const t of pasted){assert.equal(t.startsAt,'2099-02-01');assert.equal(t.due,'2099-02-03');}
+ assert.equal(shim.document.getElementById('addStart').value,'');assert.equal(shim.document.getElementById('addDue').value,'');
 });
 
 // USNO one-day API reference observations retrieved 2026-09-19; no runtime network dependency.
@@ -16423,12 +16430,13 @@ test('RISK quick Add evergreen: single list and paste capture reset editing for 
   shim.document.getElementById('addEver').checked=true;
   const title=capture==='single'?'Custom recurrence':'First recurrence\nSecond recurrence';
   if(capture==='paste')shim.document.dispatchEvent({type:'paste',target:{id:'addInput',value:''},clipboardData:{getData:()=>title},preventDefault(){}});
-  else{shim.document.getElementById('addInput').value=title;ctx.onAction('add',{});}
+  else{shim.document.getElementById('addInput').value=title;await ctx.onAction('add',{});}
+  await vm.runInContext('quickAddSubmission?.saving',ctx);
   assert.equal(ctx.state.tasks.length,capture==='single'?1:2);
   assert.ok(ctx.state.tasks.every(task=>task.evergreen&&task.evergreenHours===432));
   assert.equal(hours.value,'18');assert.equal(unit.value,'hours');assert.equal(shim.document.getElementById('addEver').checked,false);
   changeQuickEvergreen(shim,'addEverUnit','days');assert.equal(hours.value,'7','a fresh post-capture draft gets the seven-day default again');
-  shim.document.getElementById('addEver').checked=true;shim.document.getElementById('addInput').value='Weekly';ctx.onAction('add',{});
+  shim.document.getElementById('addEver').checked=true;shim.document.getElementById('addInput').value='Weekly';await ctx.onAction('add',{});
   const weekly=ctx.state.tasks.at(-1);assert.equal(weekly.evergreenHours,168);assert.equal(weekly.evergreenResetAtDay,false);
   assert.equal(ctx.state.chain.length,0,'ordinary capture never dots the test tasks');
  }
@@ -20635,7 +20643,7 @@ test('RISK multiple dependencies: progressive Add and Edit controls cap at ten p
  ctx.onAction('add-dependency',{dataset:{scope:'add'}});shim.document.getElementById('addPrerequisite1').value=b.id;
  shim.document.getElementById('addInput').value='Dependent';shim.document.getElementById('addEver').checked=true;
  shim.document.getElementById('addEverHours').value='2';shim.document.getElementById('addEverUnit').value='days';
- ctx.onAction('add',{});const task=ctx.state.tasks.find(t=>t.title==='Dependent');
+ await ctx.onAction('add',{});const task=ctx.state.tasks.find(t=>t.title==='Dependent');
  assert.deepEqual(Array.from(ctx.taskPrerequisiteIds(task)),[a.id,b.id]);assert.equal(task.evergreenHours,48);
  assert.doesNotMatch(add.innerHTML,/>\+ dependency</,'a saved Add starts a clean dependency draft');
  ctx.openEdit(task.id);shim.document.getElementById('etPrerequisite').value='';
@@ -22590,4 +22598,180 @@ test('RISK STALE TAB: a conflicting edit during awaited CAS repair retains its e
  ctx.addTask('First addition');const saving=ctx.persist();await started;ctx.state.tasks[0].title='Later conflicting local title';ctx.commit();const exact=JSON.stringify(ctx.state);release();assert.equal(await saving,true);
  assert.equal(ctx.state.tasks[0].title,'Peer newer');
  assert.ok((await store.listBackups()).some(row=>row.kind==='stale-tab-draft'&&row.payload===exact),'the late conflicting draft has its own exact protected recovery snapshot');await store.close();
+});
+
+test('RISK dependency picker search: Add and Edit input filtering preserves hidden selections and excludes completed ordinary choices',async()=>{
+ const {ctx,shim}=await loadApp();const active=ctx.addTask('Alpha active'),done=ctx.addTask('Alpha done'),ever=ctx.addTask('Beta evergreen'),owner=ctx.addTask('Owner'),deleted=ctx.addTask('Deleted');
+ ctx.setTaskPrerequisites(owner.id,[done.id,deleted.id]);ctx.deleteTask(deleted.id);
+ done.done=true;ever.done=true;ever.evergreen=true;
+ for(const scope of ['add','edit']){
+  if(scope==='edit'){ctx.openEdit(owner.id);}else ctx.renderAddPanel();
+  const root=shim.document.getElementById(scope==='add'?'addDependencies':'editDependencies');
+  assert.match(root.innerHTML,/type="search"/,'dependency selection needs a usable search field');
+  const field=shim.document.getElementById(scope+'DependencySearch');field.id=scope+'DependencySearch';field.dataset={dependencySearch:scope};field.value=' beta ';
+  shim.document.dispatchEvent({type:'input',target:field});
+  assert.match(root.innerHTML,/Beta evergreen/);assert.doesNotMatch(root.innerHTML,/Alpha active/);
+  if(scope==='edit'){
+   assert.match(root.innerHTML,/Alpha done/);assert.match(root.innerHTML,/deleted task/);
+   assert.deepEqual(Array.from(ctx.readDependencyDraft(scope)),[done.id,deleted.id]);
+  }else assert.doesNotMatch(root.innerHTML,/Alpha done/);
+  field.value='';shim.document.dispatchEvent({type:'input',target:field});
+  assert.match(root.innerHTML,/Alpha active/);assert.match(root.innerHTML,/Beta evergreen/);
+  if(scope==='edit'){
+   ctx.onAction('save-edit',{dataset:{id:owner.id}});ctx.openEdit(owner.id);
+   assert.deepEqual(Array.from(ctx.readDependencyDraft('edit')),[done.id,deleted.id]);
+   ctx.onAction('remove-dependency',{dataset:{scope:'edit',index:'0'}});
+   ctx.onAction('save-edit',{dataset:{id:owner.id}});assert.deepEqual(Array.from(ctx.taskPrerequisiteIds(owner)),[deleted.id]);
+  }
+ }
+ assert.doesNotMatch(ctx.prerequisiteOptions(null),/Alpha done/);ever.done=false;assert.match(ctx.prerequisiteOptions(null),/Beta evergreen/);
+ assert.doesNotMatch(ctx.prerequisiteOptions(active.id),/Alpha active/);
+ await ctx.persist();const reload=await loadApp({seedStorage:{[SYNC_STORE_KEY]:shim.localStorage.getItem(SYNC_STORE_KEY)}});
+ const saved=reload.ctx.state.tasks.find(t=>t.id===owner.id);assert.deepEqual(Array.from(reload.ctx.taskPrerequisiteIds(saved)),[deleted.id]);
+ reload.ctx.openEdit(owner.id);assert.deepEqual(Array.from(reload.ctx.readDependencyDraft('edit')),[deleted.id]);
+});
+
+test('RISK dependency picker input identity: search updates choices without replacing the focused search or its composition',async()=>{
+ const {ctx,shim}=await loadApp();ctx.addTask('Alpha');ctx.addTask('Beta');ctx.renderAddPanel();
+ const root=shim.document.getElementById('addDependencies'),choices={innerHTML:''};
+ root.querySelector=selector=>selector==='.dependency-choices'?choices:null;
+ const before=root.innerHTML,field=shim.document.getElementById('addDependencySearch');
+ Object.assign(field,{id:'addDependencySearch',dataset:{dependencySearch:'add'},value:'Beta',selectionStart:1,selectionEnd:3,selectionDirection:'backward'});
+ shim.document.dispatchEvent({type:'input',target:field,isComposing:true});
+ assert.equal(root.innerHTML,before,'input events must retain the search node, selection and ongoing native composition');
+ assert.match(choices.innerHTML,/Beta/);assert.doesNotMatch(choices.innerHTML,/Alpha/);
+});
+
+test('RISK Add draft color: all task data controls turn Add green and clearing restores grey without changing validity',async()=>{
+ const scenarios=[['addInput','title','input'],['addInput','   ','input'],['addStart','2028-02-29','change'],['addDue','2028-02-29','input'],['addEver',true,'change'],['addEverHours','24','input'],['addEverUnit','days','change'],['addEverReset',false,'change'],['dependency','selected','change'],['context','selected','click']];
+ for(const [id,value,type] of scenarios){
+  const {ctx,shim}=await loadApp();ctx.renderAddPanel();const doc=shim.document,button=doc.getElementById('addButton');
+  assert.equal(button.classList.contains('yes'),false,'untouched presets are grey');const disabled=button.disabled;
+  if(id==='context'){
+   ctx.state.contexts.push({id:'private-context',name:'Private',active:true});ctx.onAction('qctx',{dataset:{id:'private-context'}});
+  }else if(id==='dependency'){
+   const task=ctx.addTask('Private prerequisite');const field=doc.getElementById('addPrerequisite');Object.assign(field,{id:'addPrerequisite',dataset:{dependencyScope:'add'},value:task.id,matches:()=>false});doc.dispatchEvent({type:'change',target:field});
+  }else{
+   const field=doc.getElementById(id);field.id=id;field.matches=()=>false;if(typeof value==='boolean')field.checked=value;else field.value=value;doc.dispatchEvent({type,target:field});
+  }
+  assert.equal(button.classList.contains('yes'),true,id+' is task data, including an invalid title');assert.equal(button.disabled,disabled,'color must not alter disabled or submission semantics');
+  if(id==='context')ctx.onAction('qctx',{dataset:{id:'private-context'}});
+  else {doc.getElementById('addInput').value='';ctx.clearQuickAddDraft();}
+  assert.equal(button.classList.contains('yes'),false,id+' full reset is grey');
+ }
+});
+
+test('RISK Add draft color: search navigation repeated keyboard adds sticky contexts and failure retention follow actual handlers',async()=>{
+ const {ctx,shim}=await loadApp();ctx.renderAddPanel();const doc=shim.document,button=doc.getElementById('addButton');
+ const input=doc.getElementById('addInput');input.id='addInput';input.matches=()=>true;
+ const search=doc.getElementById('addDependencySearch');Object.assign(search,{id:'addDependencySearch',dataset:{dependencySearch:'add'},value:'query'});doc.dispatchEvent({type:'input',target:search});assert.equal(button.classList.contains('yes'),false,'search alone is not task data');
+ ctx.state.contexts.push({id:'sticky',name:'Sticky',active:true});ctx.onAction('qctx',{dataset:{id:'sticky'}});
+ for(const title of ['First private keyboard task','Second private keyboard task']){
+  input.value=title;doc.dispatchEvent({type:'input',target:input});assert.equal(button.classList.contains('yes'),true);
+  doc.dispatchEvent({type:'keydown',target:input,key:'Enter'});await vm.runInContext('quickAddSubmission?.saving',ctx);assert.equal(input.value,'');assert.equal(button.classList.contains('yes'),false,'accepted Add resets grey despite sticky context');
+  assert.ok(ctx.state.tasks.find(t=>t.title===title).ctx.includes('sticky'));
+ }
+ input.value='   ';doc.dispatchEvent({type:'input',target:input});await ctx.onAction('add',{});assert.equal(input.value,'   ');assert.equal(button.classList.contains('yes'),true,'rejected empty title keeps entered draft');
+ input.value='Failed private save';doc.dispatchEvent({type:'input',target:input});const original=ctx.save;ctx.save=()=>{throw new Error('private save rejection');};
+ assert.throws(()=>ctx.onAction('add',{}),/private save rejection/);ctx.save=original;assert.equal(input.value,'Failed private save');assert.equal(button.classList.contains('yes'),true,'synchronous save failure never clears the draft');
+ await ctx.onAction('add',{});assert.equal(ctx.state.tasks.filter(t=>t.title==='Failed private save').length,1,'retry after a synchronous save error reuses its accepted task');assert.equal(input.value,'');
+ input.value='';doc.dispatchEvent({type:'input',target:input});assert.equal(button.classList.contains('yes'),false,'manual return to reset values is grey');
+});
+
+test('RISK Add draft durable reset: failed device save retains draft and retry does not duplicate accepted tasks',async()=>{
+ const {ctx,shim}=await loadApp();ctx.renderAddPanel();const doc=shim.document,input=doc.getElementById('addInput');input.id='addInput';input.matches=()=>false;input.value='Private durable Add';doc.dispatchEvent({type:'input',target:input});
+ const original=shim.localStorage.setItem;shim.localStorage.setItem=()=>{throw new Error('private device write rejection');};
+ await ctx.onAction('add',{});assert.equal(input.value,'Private durable Add','actual asynchronous device save failure must preserve the form');assert.equal(doc.getElementById('addButton').classList.contains('yes'),true);
+ assert.equal(ctx.state.tasks.filter(t=>t.title==='Private durable Add').length,1);
+ shim.localStorage.setItem=original;await ctx.onAction('add',{});assert.equal(input.value,'');assert.equal(doc.getElementById('addButton').classList.contains('yes'),false);assert.equal(ctx.state.tasks.filter(t=>t.title==='Private durable Add').length,1,'retry saves the accepted task, never creates a duplicate');
+});
+
+test('RISK Add draft durable reset: pending repeated Add and newer edits or reset survive an awaiting save',async()=>{
+ for(const next of ['newer','reset','account','same-after-reset','same-after-edit']){
+  const {ctx,shim}=await loadApp();ctx.renderAddPanel();const input=shim.document.getElementById('addInput');input.id='addInput';input.matches=()=>false;input.value='Private pending Add';shim.document.dispatchEvent({type:'input',target:input});
+  let release;ctx.persist=()=>new Promise(resolve=>release=resolve);
+  const saving=ctx.onAction('add',{}),repeated=ctx.onAction('add',{});assert.equal(input.value,'Private pending Add','pending save must not clear form');assert.equal(ctx.state.tasks.length,1,'repeated pending submit does not add twice');
+  if(next==='newer'){input.value='Newer task draft';shim.document.dispatchEvent({type:'input',target:input});}
+  if(next==='reset'){input.value='';ctx.clearQuickAddDraft();}
+  if(next==='account'){ctx.state.syncAccount='other-private-owner';}
+  if(next==='same-after-reset'){input.value='';ctx.clearQuickAddDraft();input.value='Private pending Add';shim.document.dispatchEvent({type:'input',target:input});}
+  if(next==='same-after-edit'){input.value='Different task';shim.document.dispatchEvent({type:'input',target:input});input.value='Private pending Add';shim.document.dispatchEvent({type:'input',target:input});}
+  release(true);await saving;await repeated;
+  assert.equal(input.value,next==='newer'?'Newer task draft':next==='reset'?'':'Private pending Add','confirmation cannot clear a later edit/reset or another owner draft');
+ }
+});
+
+test('RISK Add draft durable reset: multiline paste preserves failed capture and saves retained tasks on retry',async()=>{
+ const {ctx,shim}=await loadApp();ctx.renderAddPanel();const input=shim.document.getElementById('addInput');input.id='addInput';input.matches=()=>false;
+ const original=shim.localStorage.setItem;shim.localStorage.setItem=()=>{throw new Error('private paste save rejection');};
+ shim.document.dispatchEvent({type:'paste',target:input,clipboardData:{getData:()=> 'Private paste one\nPrivate paste two'},preventDefault(){}});
+ await vm.runInContext('typeof quickAddSubmission === "undefined" ? undefined : quickAddSubmission?.saving',ctx);assert.notEqual(input.value,'','failed paste retains visible capture');assert.equal(ctx.state.tasks.length,2);
+ shim.localStorage.setItem=original;await ctx.onAction('add',{});assert.equal(input.value,'');assert.equal(ctx.state.tasks.length,2,'retry retains existing paste membership');
+});
+
+test('RISK dependency search styling: Add and Edit share text input typography borders and spacing',async()=>{
+ const rule=html.match(/([^{}]+)\{\s*font:inherit;color:var\(--ink\);background:var\(--surface\);border:1px solid var\(--line\);border-radius:8px;padding:7px 10px\}/);
+ assert.ok(rule,'established text control visual contract exists');
+ assert.match(rule[1],/input\[type=search\]/,'dependency search must participate in the shared typography, border and padding rule');
+ const {ctx}=await loadApp();
+ for(const scope of ['add','edit'])assert.match(ctx.dependencyFieldsHTML(scope,[]),new RegExp('type="search" id="'+scope+'DependencySearch"'),'both scopes retain native search semantics');
+});
+
+test('RISK dependency search rendered styling: Add and Edit resolved fonts borders spacing and enlarged sizing match text controls',
+ {skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const {chromium,webkit}=await import(process.env.PLAYWRIGHT_MODULE||process.env.LANDSCAPE_PLAYWRIGHT||'playwright');
+ const origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+ for(const [engine,type] of [['chrome',chromium],['webkit',webkit]]){
+  const browser=await type.launch({headless:true,...(engine==='chrome'?{channel:'chrome'}:{})});
+  try{
+   const context=await browser.newContext({viewport:{width:320,height:568},serviceWorkers:'block'});
+   await context.addInitScript(()=>{Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});localStorage.setItem('fvp:chain-scanner:landscape-motion','reduced');});
+   await context.route('**/*',r=>new URL(r.request().url()).origin===origin?r.continue():r.abort());
+   const page=await context.newPage();await page.goto(process.env.LANDSCAPE_BROWSER_URL);await page.waitForFunction(()=>typeof state!=='undefined'&&state?.tasks);
+   await page.evaluate(()=>{closeModal();document.querySelectorAll('dialog[open]').forEach(d=>d.close());state.addOpen=true;render();});
+   const scale=await page.addStyleTag({content:'/* normal text */'});
+   for(const theme of ['light','dark']){
+    await page.evaluate(theme=>setTheme(theme),theme);
+    assert.equal(await page.evaluate(()=>document.documentElement.dataset.theme),theme,'actual initialized app theme');
+    assert.equal(await page.evaluate(()=>getComputedStyle(document.documentElement).colorScheme),theme,'actual rendered color scheme');
+   for(const large of [false,true]){
+    await scale.evaluate((e,large)=>e.textContent=large?'input{font-size:24px!important}':'',large);
+    for(const scope of ['add','edit']){
+     if(scope==='edit')await page.evaluate(()=>{openEdit(addTask('Synthetic typography task').id);});
+     else await page.evaluate(()=>{closeModal();state.addOpen=true;render();});
+     const search='#'+scope+'DependencySearch',reference=scope==='add'?'#addInput':'#etTitle';
+     const sample=await page.evaluate(({search,reference})=>{
+      const inspect=selector=>{const e=document.querySelector(selector),s=getComputedStyle(e),r=e.getBoundingClientRect();return {style:Object.fromEntries(['fontFamily','fontSize','fontWeight','lineHeight','color','backgroundColor','borderTopWidth','borderTopStyle','borderTopColor','borderRadius','paddingTop','paddingRight','paddingBottom','paddingLeft'].map(k=>[k,s[k]])),height:r.height,left:r.left,right:r.right};};
+      return {search:inspect(search),reference:inspect(reference),viewport:innerWidth,page:document.documentElement.scrollWidth};
+     },{search,reference});
+     const label=engine+' '+theme+' '+scope+' '+(large?'enlarged':'normal');
+     assert.deepEqual(sample.search.style,sample.reference.style,label+' shares the established input visual contract');
+     assert.ok(Math.abs(sample.search.height-sample.reference.height)<1,label+' retains the same text and padding height');
+     assert.ok(sample.search.left>=0&&sample.search.right<=sample.viewport+1&&sample.page<=sample.viewport+1,label+' fits the narrow viewport');
+     if(engine==='chrome'){
+      const cdp=await context.newCDPSession(page);await cdp.send('DOM.enable');await cdp.send('CSS.enable');
+      const {root}=await cdp.send('DOM.getDocument');
+      const fonts=async selector=>{const {nodeId}=await cdp.send('DOM.querySelector',{nodeId:root.nodeId,selector});const {fonts}=await cdp.send('CSS.getPlatformFontsForNode',{nodeId});return [...new Set(fonts.map(f=>f.familyName))].sort();};
+      const resolved=await fonts(search),labelFonts=await fonts(scope==='add'?'label[for=addDependencySearch]':'label[for=etTitle]');
+      assert.ok(resolved.length&&labelFonts.length,label+' font reports contain actual rendered glyphs');
+      assert.deepEqual(resolved,labelFonts,label+' actual resolved font identity matches');await cdp.detach();
+     }
+    }
+   }
+   }
+   await context.close();
+  }finally{await browser.close();}
+ }
+});
+
+test('RISK dependency rendered runner: style initialization is nonempty and dark samples apply and verify the real theme',()=>{
+ const source=fs.readFileSync(fileURLToPath(import.meta.url),'utf8');
+ const start=source.indexOf("test('RISK dependency search rendered styling:");
+ const fixture=source.slice(start,source.indexOf("test('RISK dependency rendered runner:",start));
+ const initial=fixture.match(/const scale=await page\.addStyleTag\(\{content:'([^']*)'\}\)/);
+ assert.ok(initial?.[1].trim(),'Playwright requires nonempty initial style content before the normal/enlarged transition');
+ assert.match(fixture,/for\(const theme of \['light','dark'\]\)/,'both palettes are actually exercised');
+ assert.match(fixture,/page\.evaluate\(theme=>setTheme\(theme\),theme\)/,'restored board initialization must be followed by the real app theme setter');
+ assert.match(fixture,/document\.documentElement\.dataset\.theme/,'theme identity must be checked rather than inferred from a screenshot filename');
+ assert.match(fixture,/getComputedStyle\(document\.documentElement\)\.colorScheme/,'the actual rendered palette must be checked');
 });
