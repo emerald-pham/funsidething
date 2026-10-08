@@ -22633,3 +22633,38 @@ test('RISK dependency picker input identity: search updates choices without repl
  assert.equal(root.innerHTML,before,'input events must retain the search node, selection and ongoing native composition');
  assert.match(choices.innerHTML,/Beta/);assert.doesNotMatch(choices.innerHTML,/Alpha/);
 });
+
+test('RISK Add draft color: all task data controls turn Add green and clearing restores grey without changing validity',async()=>{
+ const scenarios=[['addInput','title','input'],['addInput','   ','input'],['addStart','2028-02-29','change'],['addDue','2028-02-29','input'],['addEver',true,'change'],['addEverHours','24','input'],['addEverUnit','days','change'],['addEverReset',false,'change'],['dependency','selected','change'],['context','selected','click']];
+ for(const [id,value,type] of scenarios){
+  const {ctx,shim}=await loadApp();ctx.renderAddPanel();const doc=shim.document,button=doc.getElementById('addButton');
+  assert.equal(button.classList.contains('yes'),false,'untouched presets are grey');const disabled=button.disabled;
+  if(id==='context'){
+   ctx.state.contexts.push({id:'private-context',name:'Private',active:true});ctx.onAction('qctx',{dataset:{id:'private-context'}});
+  }else if(id==='dependency'){
+   const task=ctx.addTask('Private prerequisite');const field=doc.getElementById('addPrerequisite');Object.assign(field,{id:'addPrerequisite',dataset:{dependencyScope:'add'},value:task.id,matches:()=>false});doc.dispatchEvent({type:'change',target:field});
+  }else{
+   const field=doc.getElementById(id);field.id=id;field.matches=()=>false;if(typeof value==='boolean')field.checked=value;else field.value=value;doc.dispatchEvent({type,target:field});
+  }
+  assert.equal(button.classList.contains('yes'),true,id+' is task data, including an invalid title');assert.equal(button.disabled,disabled,'color must not alter disabled or submission semantics');
+  if(id==='context')ctx.onAction('qctx',{dataset:{id:'private-context'}});
+  else {doc.getElementById('addInput').value='';ctx.clearQuickAddDraft();}
+  assert.equal(button.classList.contains('yes'),false,id+' full reset is grey');
+ }
+});
+
+test('RISK Add draft color: search navigation repeated keyboard adds sticky contexts and failure retention follow actual handlers',async()=>{
+ const {ctx,shim}=await loadApp();ctx.renderAddPanel();const doc=shim.document,button=doc.getElementById('addButton');
+ const input=doc.getElementById('addInput');input.id='addInput';input.matches=()=>true;
+ const search=doc.getElementById('addDependencySearch');Object.assign(search,{id:'addDependencySearch',dataset:{dependencySearch:'add'},value:'query'});doc.dispatchEvent({type:'input',target:search});assert.equal(button.classList.contains('yes'),false,'search alone is not task data');
+ ctx.state.contexts.push({id:'sticky',name:'Sticky',active:true});ctx.onAction('qctx',{dataset:{id:'sticky'}});
+ for(const title of ['First private keyboard task','Second private keyboard task']){
+  input.value=title;doc.dispatchEvent({type:'input',target:input});assert.equal(button.classList.contains('yes'),true);
+  doc.dispatchEvent({type:'keydown',target:input,key:'Enter'});assert.equal(input.value,'');assert.equal(button.classList.contains('yes'),false,'accepted Add resets grey despite sticky context');
+  assert.ok(ctx.state.tasks.find(t=>t.title===title).ctx.includes('sticky'));
+ }
+ input.value='   ';doc.dispatchEvent({type:'input',target:input});ctx.onAction('add',{});assert.equal(input.value,'   ');assert.equal(button.classList.contains('yes'),true,'rejected empty title keeps entered draft');
+ input.value='Failed private save';doc.dispatchEvent({type:'input',target:input});const original=ctx.save;ctx.save=()=>{throw new Error('private save rejection');};
+ assert.throws(()=>ctx.onAction('add',{}),/private save rejection/);ctx.save=original;assert.equal(input.value,'Failed private save');assert.equal(button.classList.contains('yes'),true,'synchronous save failure never clears the draft');
+ input.value='';doc.dispatchEvent({type:'input',target:input});assert.equal(button.classList.contains('yes'),false,'manual return to reset values is grey');
+});

@@ -1,5 +1,43 @@
 [
   {
+    "testChangesSha256": "d7a02d64f90d9f9c07586e239ca34dba397c033632344d18726f5b64b4fd8f58",
+    "reason": "User requests a green Add button for entered task data, grey on accepted Add/reset, while presets/sticky defaults/search do not imply an edited draft.",
+    "previousBehavior": "The Add button stayed grey for every draft; dependency-only predecessor retains independent RED evidence and all tests.",
+    "intendedBehavior": "All Add task-data controls update visual draft state through their actual consumers; rejected submission and synchronous save errors retain the draft; accepted adds reset appearance while contexts remain sticky.",
+    "replacementTests": [
+      "RISK Add draft color: all task data controls turn Add green and clearing restores grey without changing validity",
+      "RISK Add draft color: search navigation repeated keyboard adds sticky contexts and failure retention follow actual handlers"
+    ],
+    "preservedCoverage": [
+      "Dependency search/selected-value preservation and native input identity remain covered without weakening assertions.",
+      "Existing PR75 sync/persistence algorithms, validity semantics, keyboard entry and sticky defaults remain unchanged."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK Add draft color:' tests.js",
+      "failure": "Observed both new tests fail: Add class yes remained false after entering title and before keyboard Add (add-color-red.log); GREEN after visual draft implementation. Dependency-only RED/review evidence is retained separately."
+    }
+  },
+  {
+    "testChangesSha256": "13949f057312da0e50e6fc98b9c56bd40fccba2fc0bb4ea96cd454d472fd4539",
+    "reason": "User requests a green Add button for entered task data, grey on accepted Add/reset, while presets/sticky defaults/search do not imply an edited draft.",
+    "previousBehavior": "The Add button stayed grey for every draft; dependency-only predecessor retains independent RED evidence and all tests.",
+    "intendedBehavior": "All Add task-data controls update visual draft state through their actual consumers; rejected submission and synchronous save errors retain the draft; accepted adds reset appearance while contexts remain sticky.",
+    "replacementTests": [
+      "RISK dependency picker search: Add and Edit input filtering preserves hidden selections and excludes completed ordinary choices",
+      "RISK dependency picker input identity: search updates choices without replacing the focused search or its composition",
+      "RISK Add draft color: all task data controls turn Add green and clearing restores grey without changing validity",
+      "RISK Add draft color: search navigation repeated keyboard adds sticky contexts and failure retention follow actual handlers"
+    ],
+    "preservedCoverage": [
+      "Dependency search/selected-value preservation and native input identity remain covered without weakening assertions.",
+      "Existing PR75 sync/persistence algorithms, validity semantics, keyboard entry and sticky defaults remain unchanged."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK Add draft color:' tests.js",
+      "failure": "Observed both new tests fail: Add class yes remained false after entering title and before keyboard Add (add-color-red.log); GREEN after visual draft implementation. Dependency-only RED/review evidence is retained separately."
+    }
+  },
+  {
     "testChangesSha256": "23451426af9156541dd163655f7298c5488408af1f0a8dc3ab193716404f0491",
     "reason": "User requests searchable dependency choices excluding completed ordinary tasks while preserving all existing links.",
     "previousBehavior": "Native dependency selects offered completed ordinary tasks and had no text filter.",

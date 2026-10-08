@@ -696,3 +696,6 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - `RISK dependency picker search: Add and Edit input filtering preserves hidden selections and excludes completed ordinary choices` — native dependency filtering and retained saved links.
 
 - `RISK dependency picker input identity: search updates choices without replacing the focused search or its composition` — stable native input identity during filtering.
+
+- `RISK Add draft color: all task data controls turn Add green and clearing restores grey without changing validity` — draft appearance across all task-data controls.
+- `RISK Add draft color: search navigation repeated keyboard adds sticky contexts and failure retention follow actual handlers` — submission/reset and rejected-action retention.
