@@ -21953,7 +21953,8 @@ test('RISK All Tasks duration browser: long titles tags and hour-minute badges f
 test('RISK UI batch integration: saved Squared board retains context selector editor defaults duration badges and exact shell delivery',async()=>{
  const {ctx,shim}=await loadApp();const now=new Date(2026,9,8,3).getTime();setFakeTime(ctx,now);
  const task=ctx.addTask('Private integration task');Object.assign(task,{evergreen:true,evergreenHours:18});ctx.state.contexts=[];ctx.state.settings.scanMode='squared';ctx.state.scanMode='squared';ctx.state.settings.cantMin=90;ctx.state.considered[task.id]='cant';ctx.state.cantAt[task.id]=now;ctx.state.listOpen=true;
- const restored=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(ctx.state)}});setFakeTime(restored.ctx,now);restored.ctx.render();
+ // Startup sweeps elapsed holds: install the fixture clock before awaiting reload.
+ const restored=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(ctx.state)},beforeStateReady:sandbox=>setFakeTime(sandbox,now)});setFakeTime(restored.ctx,now);restored.ctx.render();
  assert.equal(restored.ctx.state.settings.scanMode,'squared','saved released Squared preference survives the UI batch');
  assert.match(restored.shim.document.getElementById('ctxPanel').innerHTML,/toggle-ctx/,'main selector stays visible');
  assert.match(restored.shim.document.getElementById('listBody').innerHTML,/can’t · 1h30m/,'actual restored All Tasks renders hour-minute duration');
@@ -22281,4 +22282,69 @@ test('RISK snowangel departing shadow: actual winter painter follows the standin
    }else if(pose.standingAlpha>0)assert.ok(ellipses.some(s=>s.x===pose.x&&s.y===pose.groundY+.5*pose.scale&&s.rx===3.4*pose.scale&&s.ry===.9*pose.scale),'fallback painter retains visible contact ellipse at the departing feet');
   }
  }
+});
+
+test('RISK date clear controls: Add and Edit clear independently through actions with cancel save and durable reopen',async()=>{
+ for(const [field,other] of [['Start','Due'],['Due','Start']]){
+  const {ctx,shim}=await loadApp();
+  for(const prefix of ['add','et']){
+   const task=ctx.addTask('Private dated fixture');Object.assign(task,{startsAt:'2028-02-29',due:'2029-01-01',privateUnknown:'retained'});
+   if(prefix==='et')mountPrivateEditInterval(ctx,shim,task);
+   for(const [suffix,value] of [['Start',task.startsAt],['Due',task.due]])shim.document.getElementById(prefix+suffix).value=value;
+   const before=JSON.stringify(task),untouched=shim.document.getElementById(prefix+other).value;
+   ctx.onAction('clear-task-date',{dataset:{field:prefix+field}});
+   assert.equal(shim.document.getElementById(prefix+field).value,'','clear action empties only the selected draft');
+   assert.equal(shim.document.getElementById(prefix+other).value,untouched);
+   assert.equal(JSON.stringify(task),before,'clearing does not save before the existing save action');
+   ctx.onAction('clear-task-date',{dataset:{field:prefix+field}});
+   if(prefix==='et'){
+    ctx.closeModal();assert.equal(JSON.stringify(task),before,'Cancel preserves dates');mountPrivateEditInterval(ctx,shim,task);
+    shim.document.getElementById('etStart').value=task.startsAt;shim.document.getElementById('etDue').value=task.due;
+    ctx.onAction('clear-task-date',{dataset:{field:prefix+field}});ctx.onAction('save-edit',{dataset:{id:task.id}});
+    assert.equal(task[field==='Start'?'startsAt':'due'],null);assert.equal(task[field==='Start'?'due':'startsAt'],untouched);assert.equal(task.privateUnknown,'retained');
+    await ctx.persist();const reload=await loadApp({seedStorage:{[SYNC_STORE_KEY]:shim.localStorage.getItem(SYNC_STORE_KEY)}});
+    const saved=reload.ctx.state.tasks.find(t=>t.id===task.id);assert.equal(saved[field==='Start'?'startsAt':'due'],null);assert.equal(saved[field==='Start'?'due':'startsAt'],untouched);
+    reload.ctx.openEdit(saved.id);assert.match(reload.shim.document.getElementById('modalRoot').innerHTML,new RegExp('id="et'+field+'"[^>]*value=""'));
+   }else{
+    assert.equal(ctx.quickAddDates()[field==='Start'?'startsAt':'due'],'');assert.equal(ctx.quickAddDates()[field==='Start'?'due':'startsAt'],untouched);
+   }
+  }
+ }
+});
+test('RISK date clear accessibility: native labeled buttons accompany all date fields with bounded touch targets',async()=>{
+ const {ctx,shim}=await loadApp();const task=ctx.addTask('Private controls');ctx.openEdit(task.id);
+ const html=fs.readFileSync(path.join(__dirname,'index.html'),'utf8'),edit=shim.document.getElementById('modalRoot').innerHTML;
+ for(const [prefix,markup] of [['add',html],['et',edit]])for(const [suffix,label] of [['Start','start'],['Due','due']])assert.match(markup,new RegExp('<button[^>]*type="button"[^>]*data-act="clear-task-date"[^>]*data-field="'+prefix+suffix+'"[^>]*aria-label="Clear '+label+' date"'));
+ assert.match(html,/\.date-clear\{[^}]*min-height:44px[^}]*min-width:44px/);
+});
+test('RISK date clear persistence: pasted Add dates and offline concurrent sync retain the other date and task data',async()=>{
+ const initial=await loadApp();initial.shim.document.getElementById('addInput').value='Private first\nPrivate second';
+ initial.shim.document.getElementById('addStart').value='2028-02-29';initial.shim.document.getElementById('addDue').value='2029-01-01';
+ initial.ctx.onAction('clear-task-date',{dataset:{field:'addDue'}});initial.ctx.onAction('add',{});
+ assert.equal(initial.ctx.state.tasks.length,2);for(const task of initial.ctx.state.tasks){assert.equal(task.due,null);assert.equal(task.startsAt,'2028-02-29');}
+ const base=JSON.parse(initial.ctx.cloudPayload()),h=makeSyncHarness({remote:base,rev:3});
+ const a=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(base)},cloudSyncFactory:h.factory}),b=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(base)},cloudSyncFactory:h.factory});
+ await syncSettle(40);await a.ctx.cloudPull();await b.ctx.cloudPull();
+ const task=a.ctx.state.tasks[0];mountPrivateEditInterval(a.ctx,a.shim,task);a.shim.document.getElementById('etStart').value=task.startsAt;a.shim.document.getElementById('etDue').value='';
+ a.ctx.onAction('clear-task-date',{dataset:{field:'etStart'}});a.ctx.onAction('save-edit',{dataset:{id:task.id}});await a.ctx.persist();
+ const offline=await loadApp({seedStorage:{[SYNC_STORE_KEY]:a.shim.localStorage.getItem(SYNC_STORE_KEY)}});assert.equal(offline.ctx.state.tasks[0].startsAt,null);
+ await a.ctx.cloudPushNow();await syncSettle(40);await b.ctx.cloudPull();
+ b.ctx.addTask('Private concurrent addition');await b.ctx.persist();await b.ctx.cloudPushNow();await syncSettle(40);
+ await a.ctx.cloudPushNow();await syncSettle(40);await a.ctx.cloudPull();await a.ctx.cloudPushNow();await syncSettle(40);
+ assert.equal(h.remoteState().tasks.find(t=>t.id===task.id).startsAt,null);assert.ok(h.remoteState().tasks.some(t=>t.title==='Private concurrent addition'));
+});
+test('RISK date clear tablet geometry: Edit wrapper overrides generic date minimum to reserve the Clear target',()=>{
+ assert.match(html,/\.frow \.date-control input\[type=date\]\{[^}]*min-width:0/,'tablet wrapper must beat generic frow date minimum');
+});
+
+test('RISK date clear rendered geometry: native date segments remain readable beside Clear and long Starts hints at larger text', {skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const {chromium}=await import(process.env.LANDSCAPE_PLAYWRIGHT),browser=await chromium.launch({headless:true,channel:process.env.LANDSCAPE_BROWSER_CHANNEL||'chrome'}),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+ try{for(const [width,height,large] of [[768,1024,false],[1280,800,false],[568,320,false],[320,568,true]]){
+  const context=await browser.newContext({viewport:{width,height},serviceWorkers:'block',reducedMotion:'reduce'});await context.addInitScript(()=>{Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false});localStorage.setItem('fvp:chain-scanner:landscape-motion','reduced');});await context.route('**/*',r=>new URL(r.request().url()).origin===origin?r.continue():r.abort());
+  const page=await context.newPage();await page.goto(process.env.LANDSCAPE_BROWSER_URL);await page.waitForFunction(()=>typeof state!=='undefined'&&state?.tasks);await page.evaluate(()=>{closeModal();document.getElementById('motionDialog')?.close();});
+  await page.locator('#addInput').fill('Private rendered date geometry');await page.locator('#addStart').fill('2028-02-29');await page.locator('#addDue').fill('2029-01-01');await page.locator('button[data-act="add"]').click();await page.locator('.lhead').click();await page.getByRole('button',{name:'Private rendered date geometry',exact:true}).click();
+  if(large)await page.addStyleTag({content:'.date-control input[type=date]{font-size:30px!important}.date-clear{font-size:27px!important}.frow label{font-size:27px!important}'});
+  const geometry=await page.evaluate(()=>({viewport:innerWidth,page:document.documentElement.scrollWidth,fields:[...document.querySelectorAll('#modalRoot input[type=date]')].map(e=>({id:e.id,width:e.getBoundingClientRect().width,button:e.closest('.date-control').querySelector('button').getBoundingClientRect().width}))}));
+  for(const f of geometry.fields){assert.ok(f.width>=(large?240:180),width+'px '+f.id+' reserves room for native day month year and picker');assert.ok(f.button>=44,'Clear retains its target');}assert.ok(geometry.page<=geometry.viewport+1,'readable controls fit without page overflow');await context.close();
+ }}finally{await browser.close();}
 });

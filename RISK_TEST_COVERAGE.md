@@ -666,3 +666,10 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK motion harness controls: nonfinite actual painter commands are rejected and foreground deer use their real travel anchor
 
 - RISK snowangel departing shadow: actual winter painter follows the standing person and preserves the fixed imprint
+
+## Independent date clear controls
+- RISK date clear controls: Add and Edit clear independently through actions with cancel save and durable reopen
+- RISK date clear accessibility: native labeled buttons accompany all date fields with bounded touch targets
+- RISK date clear persistence: pasted Add dates and offline concurrent sync retain the other date and task data
+- RISK date clear tablet geometry: Edit wrapper overrides generic date minimum to reserve the Clear target
+- RISK date clear rendered geometry: native date segments remain readable beside Clear and long Starts hints at larger text
