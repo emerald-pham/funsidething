@@ -656,7 +656,7 @@
   function paintFireworks(type){
     if(sky.sun.altitude>=-6)return;
     g.save();
-    for(const e of world.events.map(scenePose))if(e.type===type){
+    for(const e of world.events.map(e=>scenePose(e,true)))if(e.type===type&&e.fireworkActive!==false){
       g.save();
       for(const dot of geometry.fireworks(e.age,e.seed,e.type==='festival',e)){
         const night=1-S.smooth(-12,-6,sky.sun.altitude);
@@ -1372,7 +1372,7 @@
     if(lastCitySlot!==sceneSnapshot.windowsSlot){lastCitySlot=sceneSnapshot.windowsSlot;paintBackground();}
     paintLife(world.elapsed);
   }
-  function scenePose(e){return reduced?{...e,age:e.duration*.5}:e;}
+  function scenePose(e,firework=false){return reduced?{...e,age:firework===true?Math.min(e.duration,60)*.5:e.duration*.5,...(firework===true?{fireworkDeckAge:e.duration*.5,fireworkActive:e.age<60}:{})}:e;}
   function syncScene(now){
     const location=globalThis.LivingLocation?.current();
     const key=JSON.stringify([sceneSeason,location,S.readSceneTime(sceneStorage),S.readSceneSeason(sceneStorage)]);
@@ -1406,10 +1406,12 @@
   }
   function advanceRooftopParty(dt){
     if(document.hidden||!geometry||!p)return;
-    const before=JSON.stringify([world.events.map(e=>e.id),woodland.events.map(e=>e.id),rooftopParty.active?.roofIndex,clocktowerVisit.active,lastCitySlot]);
+    // A barge keeps its ID after its fireworks end; invalidate the static
+    // canvas once at that boundary so old blooms cannot remain until a minute refresh.
+    const before=JSON.stringify([world.events.map(e=>[e.id,e.type==='festival'&&e.age<60]),woodland.events.map(e=>e.id),rooftopParty.active?.roofIndex,clocktowerVisit.active,lastCitySlot]);
     syncScene(Date.now());
     if(lastCitySlot!==sceneSnapshot.windowsSlot){lastCitySlot=sceneSnapshot.windowsSlot;paintBackground();}
-    const after=JSON.stringify([world.events.map(e=>e.id),woodland.events.map(e=>e.id),rooftopParty.active?.roofIndex,clocktowerVisit.active,lastCitySlot]);
+    const after=JSON.stringify([world.events.map(e=>[e.id,e.type==='festival'&&e.age<60]),woodland.events.map(e=>e.id),rooftopParty.active?.roofIndex,clocktowerVisit.active,lastCitySlot]);
     if(reduced&&before!==after)paintLife(world.elapsed);
   }
   function stop(){if(frame)cancelAnimationFrame(frame);frame=0;last=0;nextPaint=0;clearTimeout(skyTimer);clearTimeout(resizeTimer);clearInterval(partyTimer);skyTimer=0;resizeTimer=0;partyTimer=0;}

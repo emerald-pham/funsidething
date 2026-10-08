@@ -405,8 +405,8 @@ The editor hook blocks app or enforcement edits while tests.js has no staged or 
 - RISK rain density: phone tablet and short screens retain a dense bounded curtain in either motion mode
 - RISK fairy lights: unlit patio strings and every daylight bulb are hidden on phone and desktop
 - RISK fairy lights: gardens and patios share independent stable one-in-twelve roof samples
-- RISK fireworks duration: each standalone show samples one to five minutes once and rests after its actual end
-- RISK fireworks duration: repeated bursts span long shows with bounded particles and a complete final fade
+- RISK fireworks duration: each standalone show caps visibility at one minute while retaining its sampled rest schedule
+- RISK fireworks duration: repeated bursts fill the capped show with bounded particles and a complete final fade
 - RISK fireworks layering: city silhouettes mask random shows while barge shells remain foreground
 - RISK scenery browser: phone fairy lights rain and both firework depths match their actual canvas pixels
 - RISK rain reflection: removing mirrored rainfall preserves snow and the distant lightning bolt
@@ -586,7 +586,7 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK device backup final guard: rejected throwing and asynchronous guards abort before deleting a verified reference
 - RISK backup mirror FAQ: confirmed matching-copy deletion and ambiguous recovery preserve the seven-day age cue
 
-- `RISK fireworks pair delay: seeded second launches span zero to one hundred milliseconds without shifting first shells or finale` — deterministic per-pair stagger and responsive ignition preservation.
+- `RISK fireworks pair delay: seeded second launches span zero to three hundred milliseconds without shifting first shells or finale` — deterministic per-pair stagger and responsive ignition preservation.
 - `RISK fireworks frequency again: released scale two becomes four in live UTC scheduling and legacy advancement` — repeat frequency reduction and midnight reservations.
 - `RISK fireworks ascent paint: only the launch trail glows while explosion particle paint stays identical` — trail-only ascent and unchanged bloom tip rendering.
 
@@ -632,5 +632,20 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - `RISK All Tasks duration browser: long titles tags and hour-minute badges fit narrow enlarged text columns` — isolated WebKit/Chrome phone/tablet/desktop enlarged text geometry and actual duration rendering.
 
 - `RISK UI batch integration: saved Squared board retains context selector editor defaults duration badges and exact shell delivery` — released-mode offline reopen, Edit draft/All Tasks consumers and integrated PWA fingerprint.
+
+- RISK fireworks minute cap: complete standalone and barge flight bloom and finale tails finish within sixty seconds
+- RISK fireworks minute schedule: capped visible events preserve seeded opportunity spacing and UTC late join reload across midnight
+- RISK fireworks pair endpoints: zero and maximum seeded samples bound regular pairs without delaying eight finale lanes
+
+- RISK fireworks natural tails: final embers retain their complete formula lifetime
+- RISK fireworks reservations: shortening visibility preserves previously suppressed shows and visitor admissions
+
+- RISK fireworks legacy reservations: invisible remainder keeps old festival random draws and admission budgets
+
+- RISK fireworks reduced motion: capped static blooms stay on the stationary barge only during the real first minute
+
+- RISK fireworks reduced deadline: static scheduler clears a persistent barge bloom at the actual sixty-second boundary without animated repaints
+
+- RISK fireworks cached guidance: installed spawn-rate prose matches the bounded display and its exact offline shell
 
 - `RISK Chance fixture wake: actual scheduled scanner callback handles probability fixture schema` — Probability fixtures supply empty context arrays and titles so the real bootstrap-registered scanner wake can render them at the daily boundary. Preserves frozen weight assertions and leaves production timer and Chance algorithms unchanged. RED: `/tmp/chain-ui-runtime/chance-fixture-repair-red.log`; focused cohort: five passed, zero skipped.

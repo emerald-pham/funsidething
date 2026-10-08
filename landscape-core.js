@@ -196,6 +196,9 @@
     }
     return world;
   }
+  // Retain one admission slot after visible fireworks expire. This ephemeral
+  // reservation preserves the old opportunity/RNG stream without painting tails.
+  const reservedEventCount=w=>w.events.length+(w.elapsed<w.fireworksReservedUntil&&!w.events.some(e=>e.type==='fireworks')?1:0);
   function spawn(w,type,initial=false){
     if(!type||!CONFIG.spawnRate(type))return;
     if(CONFIG.rail[type]&&w.events.some(e=>e.type===type))return;
@@ -214,9 +217,11 @@
     // visitor still completes the full route, while later fast traffic can
     // visibly catch and pass a slower visitor without frame-time randomness.
     const travels=type!=='abduction'&&type!=='fireworks';
-    const speed=travels?startingSpeed(r()):1,duration=base/speed;
+    // Keep the old sampled spacing independently of the shorter visible show.
+    const speed=travels?startingSpeed(r()):1,duration=type==='fireworks'?Math.min(60,base):base/speed;
     const age=initial?duration*(.15+r()*.45):0,lane=r(),seed=r(),reverse=r()>.5;
-    w.events.push({type,...(skywriterWord?{skywriterWord}:{}),age,duration,speed,lane,seed,reverse,
+    if(type==='fireworks')w.fireworksReservedUntil=w.elapsed+base-age;
+    w.events.push({type,...(type==='fireworks'?{scheduleDuration:base}:{}),...(skywriterWord?{skywriterWord}:{}),age,duration,speed,lane,seed,reverse,
       ...(['flock','cyclist'].includes(type)?{count:groupSize(type,seed)}:{})});
   }
   function advance(w,dt,sky){
@@ -228,7 +233,7 @@
     for(const type of ['train','metro']){
       const rate=CONFIG.spawnRate(type),active=w.events.find(e=>e.type===type);
       if(active){w.railNext[type]=w.elapsed+Math.max(0,active.duration-active.age)+CONFIG.rail[type].gap/(rate||1);continue;}
-      if(rate&&w.elapsed>=w.railNext[type]&&w.events.length<MAX_EVENTS){
+      if(rate&&w.elapsed>=w.railNext[type]&&reservedEventCount(w)<MAX_EVENTS){
         spawn(w,type);w.railNext[type]=w.elapsed+CONFIG.rail[type].gap/rate;
       }
     }
@@ -240,15 +245,15 @@
       if(w.elapsed<w[key])continue;
       const occurrenceScale=show.occurrenceScale||1;
       w[key]=w.elapsed+show.interval*occurrenceScale;
-      if(sky.sun.altitude>=-6||!CONFIG.spawnRate(type)||w.events.length>=MAX_EVENTS-2||w.events.some(e=>e.type==='festival'||e.type==='fireworks'))continue;
+      if(sky.sun.altitude>=-6||!CONFIG.spawnRate(type)||reservedEventCount(w)>=MAX_EVENTS-2||(w.elapsed<w.fireworksReservedUntil||w.events.some(e=>e.type==='festival'||e.type==='fireworks')))continue;
       if(type==='festival'&&(w.elapsed-w.lastRare<RARE_COOLDOWN||w.elapsed-w.lastFestival<show.cooldown))continue;
       if(w.random()>=Math.min(1,show.chance*CONFIG.spawnRate(type)))continue;
       spawn(w,type);
       if(type==='festival'){w.lastRare=w.elapsed;w.lastFestival=w.elapsed;w.rareCount++;}
       // Scale the entire sampled start interval, including the quiet portion
       // occupied by the preceding show. Scaling only failed-roll odds would
-      // not halve show frequency because visible durations are unchanged.
-      else w[key]=w.elapsed+(w.events.find(e=>e.type==='fireworks').duration+show.rest)*occurrenceScale;
+      // not preserve show frequency when the visible duration is shortened.
+      else w[key]=w.elapsed+(w.events.find(e=>e.type==='fireworks').scheduleDuration+show.rest)*occurrenceScale;
     }
     if(w.elapsed>=w.next){
       const r=w.random,a=activity(sky);
@@ -257,7 +262,7 @@
       // nighttime rhythm for the same seeded visitors.
       const interval=sky.sun.altitude < -6 ? 7+r()*18 : 3.5+r()*9;
       w.next=w.elapsed+interval/a;
-      if(w.events.length<MAX_EVENTS-2){
+      if(reservedEventCount(w)<MAX_EVENTS-2){
         const rareRate=CONFIG.spawnRate('abduction')*(sky.sun.altitude < -6?.5:1);
         if(w.elapsed-w.lastRare>=RARE_COOLDOWN && r()<.025*rareRate){
           spawn(w,'abduction');w.lastRare=w.elapsed;w.rareCount++;
