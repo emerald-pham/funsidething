@@ -13627,8 +13627,23 @@ test('Landscape walker: arms swing opposite the legs through a full repeatable s
  assert.ok(geo.strideArm(0,10).x<0);assert.ok(geo.strideArm(5,10).x>0);
  const runtime=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
  const walker=runtime.slice(runtime.indexOf("    if(e.type==='walker'||e.type==='dogwalker'){"),runtime.indexOf("    if(e.type==='dolphin'){"));
- assert.match(walker,/geometry\.strideArm\(pose.distance,10,offset\)/);
- assert.match(walker,/pose.x\+dir\*arm.x/,'mirror the swing with travel direction');
+ let cadenceControls=0;
+ for(const reverse of [false,true])for(const age of [0,.2,.4,.6,.8,1,1.2]){
+  const e={type:'walker',age,duration:70,lane:.5,seed:.4,reverse},dir=reverse?-1:1,ground=geo.groundPose('walker',e),motion=geo.humanWalkPose(ground.x,ground.y,ground.distance,dir,x=>geo.groundAnchor('walker',x));
+  const check=code=>{
+   const lines=[];Object.assign(ctx,{geometry:geo,e,dir,f:.4,c:'shirt',g:{save(){},restore(){}},skinColor:()=> 'skin',S:{smooth:()=>1},personHead(){},line(g,...v){lines.push(v);}});
+   vm.runInContext('(function(){'+code+'})()',ctx);
+   for(const arm of motion.arms)assert.ok(lines.some(v=>v[4]==='skin'&&Math.hypot(v[2]-ground.x-dir*arm.x,v[3]-ground.y-arm.y)<1e-8),'actual walker paints the mirrored shared-cadence hand');
+  };
+  check(walker);
+  for(const arm of motion.arms)assert.ok(Math.abs(Math.hypot(arm.x-motion.hipX,arm.y-(-8+motion.bob))-5)<1e-8,'rendered free arm reach remains five units');
+  const carrying=geo.humanWalkPose(ground.x,ground.y,ground.distance,dir,x=>geo.groundAnchor('walker',x),1);assert.ok(Math.abs(carrying.hand.x-carrying.hipX-4)<1e-8);assert.ok(Math.abs(carrying.hand.y-carrying.hipY-1.4)<1e-8,'carrying grip keeps its prior pelvis offset');
+  const broken=walker.replace('const arm=motion.arms[index]','const arm={x:motion.hipX+geometry.strideArm(pose.distance,10,index*.5).x,y:-8+motion.bob+geometry.strideArm(pose.distance,10,index*.5).y}');
+  assert.notEqual(broken,walker);
+  const old=geo.strideArm(ground.distance,10,0),arm=motion.arms[0];
+  if(Math.abs(Math.abs(old.x)-Math.abs(arm.x-motion.hipX))>1e-6){cadenceControls++;assert.throws(()=>check(broken),/actual walker paints/,'a separate obsolete ten-unit arm cadence must be detected');}
+ }
+ assert.ok(cadenceControls>=4,'negative control must discriminate multiple actual mirrored frames');
 });
 
 test('Landscape bird: nesting twig stays smaller than the bird and disappears when perched',()=>{
