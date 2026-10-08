@@ -1,5 +1,139 @@
 [
   {
+    "testChangesSha256": "d496545ab705139b8b02207443191acd8815fce0ef0431ad66c80e1cf2301087",
+    "reason": "Literal delegated failed-save draft retention requires Add form reset only after the existing durable save gate succeeds. Waiting tests retain every existing reset assertion; no validity or graph assertions are weakened.",
+    "previousBehavior": "Add accepted in-memory tasks and cleared fields before asynchronous device persistence could fail; rapid repeated submission could not be distinguished from retry.",
+    "intendedBehavior": "Device failure preserves entered fields and green button; repeated pending submit/retry reuses accepted task IDs, successful persistence clears only the unchanged same-account draft, and later edits/reset survive confirmations.",
+    "replacementTests": [
+      "RISK Add draft durable reset: failed device save retains draft and retry does not duplicate accepted tasks",
+      "RISK Add draft durable reset: pending repeated Add and newer edits or reset survive an awaiting save",
+      "RISK Add draft durable reset: multiline paste preserves failed capture and saves retained tasks on retry"
+    ],
+    "preservedCoverage": [
+      "Dependency choice eligibility and selected-link/native input identity protections are unchanged.",
+      "Four existing capture/reset tests await durable completion before the same assertions; observed timing failures retained in add-await-regression-red.log.",
+      "PR75 persistence/rebase algorithms remain unchanged; focused stale-tab tests preserve concurrent field and account behavior.",
+      "Two scheduling capture tests also await the same durable reset; obsolete paste direct-import source assertion is replaced with common-consumer ownership plus actual pasted Start/Due/reset assertions for both new tasks."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK Add draft durable reset:' tests.js",
+      "failure": "Observed real device storage rejection left input empty, awaiting save cleared input and repeated Add added twice, and failed paste lost visible capture (add-durable-red.log) before submitQuickAdd implementation. Existing reset timing failures observed after asynchronous behavior repair and before adding await only, in add-await-regression-red.log. Fresh independent probes identified synchronous-error duplicate retry and reset/retype same-value confirmation; strengthened actual handler tests observed both RED (add-identity-retry-red.log) before acceptance bookkeeping and draft-generation fixes, then GREEN. Fresh independent probes identified synchronous-error duplicate retry and reset/retype same-value confirmation; strengthened actual handler tests observed both RED (add-identity-retry-red.log) before acceptance bookkeeping and draft-generation fixes, then GREEN. Subsequent full/focused scheduling tests observed premature reset assertion failures (add-date-await-red.log) before awaiting the same preserved assertions; obsolete direct paste import source pattern failed after wait update before replacing it with stronger actual paste date coverage."
+    }
+  },
+  {
+    "testChangesSha256": "c3571f5d13b34f796b35bc6f359ec3806b3629a9e225ffc13d956b6f64e43726",
+    "reason": "Literal delegated failed-save draft retention requires Add form reset only after the existing durable save gate succeeds. Waiting tests retain every existing reset assertion; no validity or graph assertions are weakened.",
+    "previousBehavior": "Add accepted in-memory tasks and cleared fields before asynchronous device persistence could fail; rapid repeated submission could not be distinguished from retry.",
+    "intendedBehavior": "Device failure preserves entered fields and green button; repeated pending submit/retry reuses accepted task IDs, successful persistence clears only the unchanged same-account draft, and later edits/reset survive confirmations.",
+    "replacementTests": [
+      "RISK dependency picker search: Add and Edit input filtering preserves hidden selections and excludes completed ordinary choices",
+      "RISK dependency picker input identity: search updates choices without replacing the focused search or its composition",
+      "RISK Add draft color: all task data controls turn Add green and clearing restores grey without changing validity",
+      "RISK Add draft color: search navigation repeated keyboard adds sticky contexts and failure retention follow actual handlers",
+      "RISK Add draft durable reset: failed device save retains draft and retry does not duplicate accepted tasks",
+      "RISK Add draft durable reset: pending repeated Add and newer edits or reset survive an awaiting save",
+      "RISK Add draft durable reset: multiline paste preserves failed capture and saves retained tasks on retry"
+    ],
+    "preservedCoverage": [
+      "Dependency choice eligibility and selected-link/native input identity protections are unchanged.",
+      "Four existing capture/reset tests await durable completion before the same assertions; observed timing failures retained in add-await-regression-red.log.",
+      "PR75 persistence/rebase algorithms remain unchanged; focused stale-tab tests preserve concurrent field and account behavior.",
+      "Two scheduling capture tests also await the same durable reset; obsolete paste direct-import source assertion is replaced with common-consumer ownership plus actual pasted Start/Due/reset assertions for both new tasks."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK Add draft durable reset:' tests.js",
+      "failure": "Observed real device storage rejection left input empty, awaiting save cleared input and repeated Add added twice, and failed paste lost visible capture (add-durable-red.log) before submitQuickAdd implementation. Existing reset timing failures observed after asynchronous behavior repair and before adding await only, in add-await-regression-red.log. Fresh independent probes identified synchronous-error duplicate retry and reset/retype same-value confirmation; strengthened actual handler tests observed both RED (add-identity-retry-red.log) before acceptance bookkeeping and draft-generation fixes, then GREEN. Subsequent full/focused scheduling tests observed premature reset assertion failures (add-date-await-red.log) before awaiting the same preserved assertions; obsolete direct paste import source pattern failed after wait update before replacing it with stronger actual paste date coverage."
+    }
+  },
+  {
+    "testChangesSha256": "04e4cebd0af581a6d315597d74cf662b58acd8ca915e935074060ba71133da27",
+    "reason": "Literal delegated failed-save draft retention requires Add form reset only after the existing durable save gate succeeds. Waiting tests retain every existing reset assertion; no validity or graph assertions are weakened.",
+    "previousBehavior": "Add accepted in-memory tasks and cleared fields before asynchronous device persistence could fail; rapid repeated submission could not be distinguished from retry.",
+    "intendedBehavior": "Device failure preserves entered fields and green button; repeated pending submit/retry reuses accepted task IDs, successful persistence clears only the unchanged same-account draft, and later edits/reset survive confirmations.",
+    "replacementTests": [
+      "RISK Add draft durable reset: failed device save retains draft and retry does not duplicate accepted tasks",
+      "RISK Add draft durable reset: pending repeated Add and newer edits or reset survive an awaiting save",
+      "RISK Add draft durable reset: multiline paste preserves failed capture and saves retained tasks on retry"
+    ],
+    "preservedCoverage": [
+      "Dependency choice eligibility and selected-link/native input identity protections are unchanged.",
+      "Four existing capture/reset tests await durable completion before the same assertions; observed timing failures retained in add-await-regression-red.log.",
+      "PR75 persistence/rebase algorithms remain unchanged; focused stale-tab tests preserve concurrent field and account behavior."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK Add draft durable reset:' tests.js",
+      "failure": "Observed real device storage rejection left input empty, awaiting save cleared input and repeated Add added twice, and failed paste lost visible capture (add-durable-red.log) before submitQuickAdd implementation. Existing reset timing failures observed after asynchronous behavior repair and before adding await only, in add-await-regression-red.log. Fresh independent probes identified synchronous-error duplicate retry and reset/retype same-value confirmation; strengthened actual handler tests observed both RED (add-identity-retry-red.log) before acceptance bookkeeping and draft-generation fixes, then GREEN. Fresh independent probes identified synchronous-error duplicate retry and reset/retype same-value confirmation; strengthened actual handler tests observed both RED (add-identity-retry-red.log) before acceptance bookkeeping and draft-generation fixes, then GREEN."
+    }
+  },
+  {
+    "testChangesSha256": "eb2ef93d28dcc840add9f31d438eb0030bbe52adf1ec101e38bac553231f6ed8",
+    "reason": "Literal delegated failed-save draft retention requires Add form reset only after the existing durable save gate succeeds. Waiting tests retain every existing reset assertion; no validity or graph assertions are weakened.",
+    "previousBehavior": "Add accepted in-memory tasks and cleared fields before asynchronous device persistence could fail; rapid repeated submission could not be distinguished from retry.",
+    "intendedBehavior": "Device failure preserves entered fields and green button; repeated pending submit/retry reuses accepted task IDs, successful persistence clears only the unchanged same-account draft, and later edits/reset survive confirmations.",
+    "replacementTests": [
+      "RISK dependency picker search: Add and Edit input filtering preserves hidden selections and excludes completed ordinary choices",
+      "RISK dependency picker input identity: search updates choices without replacing the focused search or its composition",
+      "RISK Add draft color: all task data controls turn Add green and clearing restores grey without changing validity",
+      "RISK Add draft color: search navigation repeated keyboard adds sticky contexts and failure retention follow actual handlers",
+      "RISK Add draft durable reset: failed device save retains draft and retry does not duplicate accepted tasks",
+      "RISK Add draft durable reset: pending repeated Add and newer edits or reset survive an awaiting save",
+      "RISK Add draft durable reset: multiline paste preserves failed capture and saves retained tasks on retry"
+    ],
+    "preservedCoverage": [
+      "Dependency choice eligibility and selected-link/native input identity protections are unchanged.",
+      "Four existing capture/reset tests await durable completion before the same assertions; observed timing failures retained in add-await-regression-red.log.",
+      "PR75 persistence/rebase algorithms remain unchanged; focused stale-tab tests preserve concurrent field and account behavior."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK Add draft durable reset:' tests.js",
+      "failure": "Observed real device storage rejection left input empty, awaiting save cleared input and repeated Add added twice, and failed paste lost visible capture (add-durable-red.log) before submitQuickAdd implementation. Existing reset timing failures observed after asynchronous behavior repair and before adding await only, in add-await-regression-red.log. Fresh independent probes identified synchronous-error duplicate retry and reset/retype same-value confirmation; strengthened actual handler tests observed both RED (add-identity-retry-red.log) before acceptance bookkeeping and draft-generation fixes, then GREEN."
+    }
+  },
+  {
+    "testChangesSha256": "52228cdd8ac465e0d80ffb26b516ad60554b6ef9a05b9ec8714561bc3ad0ac76",
+    "reason": "Literal delegated failed-save draft retention requires Add form reset only after the existing durable save gate succeeds. Waiting tests retain every existing reset assertion; no validity or graph assertions are weakened.",
+    "previousBehavior": "Add accepted in-memory tasks and cleared fields before asynchronous device persistence could fail; rapid repeated submission could not be distinguished from retry.",
+    "intendedBehavior": "Device failure preserves entered fields and green button; repeated pending submit/retry reuses accepted task IDs, successful persistence clears only the unchanged same-account draft, and later edits/reset survive confirmations.",
+    "replacementTests": [
+      "RISK Add draft durable reset: failed device save retains draft and retry does not duplicate accepted tasks",
+      "RISK Add draft durable reset: pending repeated Add and newer edits or reset survive an awaiting save",
+      "RISK Add draft durable reset: multiline paste preserves failed capture and saves retained tasks on retry"
+    ],
+    "preservedCoverage": [
+      "Dependency choice eligibility and selected-link/native input identity protections are unchanged.",
+      "Four existing capture/reset tests await durable completion before the same assertions; observed timing failures retained in add-await-regression-red.log.",
+      "PR75 persistence/rebase algorithms remain unchanged; focused stale-tab tests preserve concurrent field and account behavior."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK Add draft durable reset:' tests.js",
+      "failure": "Observed real device storage rejection left input empty, awaiting save cleared input and repeated Add added twice, and failed paste lost visible capture (add-durable-red.log) before submitQuickAdd implementation. Existing reset timing failures observed after asynchronous behavior repair and before adding await only, in add-await-regression-red.log."
+    }
+  },
+  {
+    "testChangesSha256": "5694b31a9966e48e542991394d23956691c036b9f00cd8a6a09b955c7ae36aac",
+    "reason": "Literal delegated failed-save draft retention requires Add form reset only after the existing durable save gate succeeds. Waiting tests retain every existing reset assertion; no validity or graph assertions are weakened.",
+    "previousBehavior": "Add accepted in-memory tasks and cleared fields before asynchronous device persistence could fail; rapid repeated submission could not be distinguished from retry.",
+    "intendedBehavior": "Device failure preserves entered fields and green button; repeated pending submit/retry reuses accepted task IDs, successful persistence clears only the unchanged same-account draft, and later edits/reset survive confirmations.",
+    "replacementTests": [
+      "RISK dependency picker search: Add and Edit input filtering preserves hidden selections and excludes completed ordinary choices",
+      "RISK dependency picker input identity: search updates choices without replacing the focused search or its composition",
+      "RISK Add draft color: all task data controls turn Add green and clearing restores grey without changing validity",
+      "RISK Add draft color: search navigation repeated keyboard adds sticky contexts and failure retention follow actual handlers",
+      "RISK Add draft durable reset: failed device save retains draft and retry does not duplicate accepted tasks",
+      "RISK Add draft durable reset: pending repeated Add and newer edits or reset survive an awaiting save",
+      "RISK Add draft durable reset: multiline paste preserves failed capture and saves retained tasks on retry"
+    ],
+    "preservedCoverage": [
+      "Dependency choice eligibility and selected-link/native input identity protections are unchanged.",
+      "Four existing capture/reset tests await durable completion before the same assertions; observed timing failures retained in add-await-regression-red.log.",
+      "PR75 persistence/rebase algorithms remain unchanged; focused stale-tab tests preserve concurrent field and account behavior."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK Add draft durable reset:' tests.js",
+      "failure": "Observed real device storage rejection left input empty, awaiting save cleared input and repeated Add added twice, and failed paste lost visible capture (add-durable-red.log) before submitQuickAdd implementation. Existing reset timing failures observed after asynchronous behavior repair and before adding await only, in add-await-regression-red.log."
+    }
+  },
+  {
     "testChangesSha256": "d7a02d64f90d9f9c07586e239ca34dba397c033632344d18726f5b64b4fd8f58",
     "reason": "User requests a green Add button for entered task data, grey on accepted Add/reset, while presets/sticky defaults/search do not imply an edited draft.",
     "previousBehavior": "The Add button stayed grey for every draft; dependency-only predecessor retains independent RED evidence and all tests.",

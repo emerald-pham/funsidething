@@ -15778,7 +15778,7 @@ test('RISK lost scheduling metadata: ordinary Add saves and clears Start and Due
  {
   const {ctx,shim}=await loadApp();shim.document.getElementById('addInput').value='Dated';
   shim.document.getElementById('addStart').value='2099-01-01';shim.document.getElementById('addDue').value='2099-01-03';
-  ctx.onAction('add',{});const t=ctx.state.tasks[0];assert.equal(t.startsAt,'2099-01-01');assert.equal(t.due,'2099-01-03');
+  await ctx.onAction('add',{});const t=ctx.state.tasks[0];assert.equal(t.startsAt,'2099-01-01');assert.equal(t.due,'2099-01-03');
   assert.equal(shim.document.getElementById('addStart').value,'');assert.equal(shim.document.getElementById('addDue').value,'');
   assert.equal(ctx.isEligible(t),false);assert.equal(ctx.state.chain.includes(t.id),false);
   ctx.undo();assert.equal(ctx.state.tasks.length,0);
@@ -15796,7 +15796,7 @@ test('RISK recurrence-default loss: quick Add preserves 18-hour and 2 AM default
   const options=shim.document.getElementById('addEverOptions'),hours=shim.document.getElementById('addEverHours'),reset=shim.document.getElementById('addEverReset');
   assert.equal(toggle.checked,false);assert.equal(hours.value,'18');assert.equal(reset.checked,true);assert.equal(options.hidden,true);
   toggle.checked=true;ctx.toggleQuickEvergreenOptions(true);assert.equal(options.hidden,false);
-  hours.value='24';reset.checked=false;shim.document.getElementById('addInput').value=title;ctx.onAction('add',{});
+  hours.value='24';reset.checked=false;shim.document.getElementById('addInput').value=title;await ctx.onAction('add',{});
   assert.equal(ctx.state.tasks.length,title.includes('\n')?2:1);
   for(const task of ctx.state.tasks){assert.equal(task.evergreen,true);assert.equal(task.evergreenHours,24);assert.equal(task.evergreenResetAtDay,false);}
   assert.equal(toggle.checked,false,'successful capture resets the evergreen draft');
@@ -16009,10 +16009,17 @@ test('Landscape guest durations: readers and groups stay long enough before depa
 test('Add dates: list capture honors the date fields for each new task',async()=>{
  const {ctx,shim}=await loadApp();shim.document.getElementById('addInput').value='First\nSecond';
  shim.document.getElementById('addStart').value='2099-01-01';shim.document.getElementById('addDue').value='2099-01-03';
- ctx.onAction('add',{});assert.equal(ctx.state.tasks.length,2);
+ await ctx.onAction('add',{});assert.equal(ctx.state.tasks.length,2);
  for(const t of ctx.state.tasks){assert.equal(t.startsAt,'2099-01-01');assert.equal(t.due,'2099-01-03');}
  assert.equal(shim.document.getElementById('addStart').value,'');
- assert.match(appSrc,/importList\(txt, quickAddCtx, quickAddDates\(\), quickAddTaskOptions\(\)\)/,'paste capture uses the same draft dates and recurrence');
+ assert.match(appSrc,/submitQuickAdd\(txt\)/,'paste capture uses the common durable submission consumer');
+ const input=shim.document.getElementById('addInput');input.id='addInput';
+ shim.document.getElementById('addStart').value='2099-02-01';shim.document.getElementById('addDue').value='2099-02-03';
+ shim.document.dispatchEvent({type:'paste',target:input,clipboardData:{getData:()=> 'Pasted first\nPasted second'},preventDefault(){}});
+ await vm.runInContext('quickAddSubmission?.saving',ctx);
+ const pasted=ctx.state.tasks.filter(t=>t.title.startsWith('Pasted'));assert.equal(pasted.length,2);
+ for(const t of pasted){assert.equal(t.startsAt,'2099-02-01');assert.equal(t.due,'2099-02-03');}
+ assert.equal(shim.document.getElementById('addStart').value,'');assert.equal(shim.document.getElementById('addDue').value,'');
 });
 
 // USNO one-day API reference observations retrieved 2026-09-19; no runtime network dependency.
@@ -16423,12 +16430,13 @@ test('RISK quick Add evergreen: single list and paste capture reset editing for 
   shim.document.getElementById('addEver').checked=true;
   const title=capture==='single'?'Custom recurrence':'First recurrence\nSecond recurrence';
   if(capture==='paste')shim.document.dispatchEvent({type:'paste',target:{id:'addInput',value:''},clipboardData:{getData:()=>title},preventDefault(){}});
-  else{shim.document.getElementById('addInput').value=title;ctx.onAction('add',{});}
+  else{shim.document.getElementById('addInput').value=title;await ctx.onAction('add',{});}
+  await vm.runInContext('quickAddSubmission?.saving',ctx);
   assert.equal(ctx.state.tasks.length,capture==='single'?1:2);
   assert.ok(ctx.state.tasks.every(task=>task.evergreen&&task.evergreenHours===432));
   assert.equal(hours.value,'18');assert.equal(unit.value,'hours');assert.equal(shim.document.getElementById('addEver').checked,false);
   changeQuickEvergreen(shim,'addEverUnit','days');assert.equal(hours.value,'7','a fresh post-capture draft gets the seven-day default again');
-  shim.document.getElementById('addEver').checked=true;shim.document.getElementById('addInput').value='Weekly';ctx.onAction('add',{});
+  shim.document.getElementById('addEver').checked=true;shim.document.getElementById('addInput').value='Weekly';await ctx.onAction('add',{});
   const weekly=ctx.state.tasks.at(-1);assert.equal(weekly.evergreenHours,168);assert.equal(weekly.evergreenResetAtDay,false);
   assert.equal(ctx.state.chain.length,0,'ordinary capture never dots the test tasks');
  }
@@ -20635,7 +20643,7 @@ test('RISK multiple dependencies: progressive Add and Edit controls cap at ten p
  ctx.onAction('add-dependency',{dataset:{scope:'add'}});shim.document.getElementById('addPrerequisite1').value=b.id;
  shim.document.getElementById('addInput').value='Dependent';shim.document.getElementById('addEver').checked=true;
  shim.document.getElementById('addEverHours').value='2';shim.document.getElementById('addEverUnit').value='days';
- ctx.onAction('add',{});const task=ctx.state.tasks.find(t=>t.title==='Dependent');
+ await ctx.onAction('add',{});const task=ctx.state.tasks.find(t=>t.title==='Dependent');
  assert.deepEqual(Array.from(ctx.taskPrerequisiteIds(task)),[a.id,b.id]);assert.equal(task.evergreenHours,48);
  assert.doesNotMatch(add.innerHTML,/>\+ dependency</,'a saved Add starts a clean dependency draft');
  ctx.openEdit(task.id);shim.document.getElementById('etPrerequisite').value='';
@@ -22660,11 +22668,43 @@ test('RISK Add draft color: search navigation repeated keyboard adds sticky cont
  ctx.state.contexts.push({id:'sticky',name:'Sticky',active:true});ctx.onAction('qctx',{dataset:{id:'sticky'}});
  for(const title of ['First private keyboard task','Second private keyboard task']){
   input.value=title;doc.dispatchEvent({type:'input',target:input});assert.equal(button.classList.contains('yes'),true);
-  doc.dispatchEvent({type:'keydown',target:input,key:'Enter'});assert.equal(input.value,'');assert.equal(button.classList.contains('yes'),false,'accepted Add resets grey despite sticky context');
+  doc.dispatchEvent({type:'keydown',target:input,key:'Enter'});await vm.runInContext('quickAddSubmission?.saving',ctx);assert.equal(input.value,'');assert.equal(button.classList.contains('yes'),false,'accepted Add resets grey despite sticky context');
   assert.ok(ctx.state.tasks.find(t=>t.title===title).ctx.includes('sticky'));
  }
- input.value='   ';doc.dispatchEvent({type:'input',target:input});ctx.onAction('add',{});assert.equal(input.value,'   ');assert.equal(button.classList.contains('yes'),true,'rejected empty title keeps entered draft');
+ input.value='   ';doc.dispatchEvent({type:'input',target:input});await ctx.onAction('add',{});assert.equal(input.value,'   ');assert.equal(button.classList.contains('yes'),true,'rejected empty title keeps entered draft');
  input.value='Failed private save';doc.dispatchEvent({type:'input',target:input});const original=ctx.save;ctx.save=()=>{throw new Error('private save rejection');};
  assert.throws(()=>ctx.onAction('add',{}),/private save rejection/);ctx.save=original;assert.equal(input.value,'Failed private save');assert.equal(button.classList.contains('yes'),true,'synchronous save failure never clears the draft');
+ await ctx.onAction('add',{});assert.equal(ctx.state.tasks.filter(t=>t.title==='Failed private save').length,1,'retry after a synchronous save error reuses its accepted task');assert.equal(input.value,'');
  input.value='';doc.dispatchEvent({type:'input',target:input});assert.equal(button.classList.contains('yes'),false,'manual return to reset values is grey');
+});
+
+test('RISK Add draft durable reset: failed device save retains draft and retry does not duplicate accepted tasks',async()=>{
+ const {ctx,shim}=await loadApp();ctx.renderAddPanel();const doc=shim.document,input=doc.getElementById('addInput');input.id='addInput';input.matches=()=>false;input.value='Private durable Add';doc.dispatchEvent({type:'input',target:input});
+ const original=shim.localStorage.setItem;shim.localStorage.setItem=()=>{throw new Error('private device write rejection');};
+ await ctx.onAction('add',{});assert.equal(input.value,'Private durable Add','actual asynchronous device save failure must preserve the form');assert.equal(doc.getElementById('addButton').classList.contains('yes'),true);
+ assert.equal(ctx.state.tasks.filter(t=>t.title==='Private durable Add').length,1);
+ shim.localStorage.setItem=original;await ctx.onAction('add',{});assert.equal(input.value,'');assert.equal(doc.getElementById('addButton').classList.contains('yes'),false);assert.equal(ctx.state.tasks.filter(t=>t.title==='Private durable Add').length,1,'retry saves the accepted task, never creates a duplicate');
+});
+
+test('RISK Add draft durable reset: pending repeated Add and newer edits or reset survive an awaiting save',async()=>{
+ for(const next of ['newer','reset','account','same-after-reset','same-after-edit']){
+  const {ctx,shim}=await loadApp();ctx.renderAddPanel();const input=shim.document.getElementById('addInput');input.id='addInput';input.matches=()=>false;input.value='Private pending Add';shim.document.dispatchEvent({type:'input',target:input});
+  let release;ctx.persist=()=>new Promise(resolve=>release=resolve);
+  const saving=ctx.onAction('add',{}),repeated=ctx.onAction('add',{});assert.equal(input.value,'Private pending Add','pending save must not clear form');assert.equal(ctx.state.tasks.length,1,'repeated pending submit does not add twice');
+  if(next==='newer'){input.value='Newer task draft';shim.document.dispatchEvent({type:'input',target:input});}
+  if(next==='reset'){input.value='';ctx.clearQuickAddDraft();}
+  if(next==='account'){ctx.state.syncAccount='other-private-owner';}
+  if(next==='same-after-reset'){input.value='';ctx.clearQuickAddDraft();input.value='Private pending Add';shim.document.dispatchEvent({type:'input',target:input});}
+  if(next==='same-after-edit'){input.value='Different task';shim.document.dispatchEvent({type:'input',target:input});input.value='Private pending Add';shim.document.dispatchEvent({type:'input',target:input});}
+  release(true);await saving;await repeated;
+  assert.equal(input.value,next==='newer'?'Newer task draft':next==='reset'?'':'Private pending Add','confirmation cannot clear a later edit/reset or another owner draft');
+ }
+});
+
+test('RISK Add draft durable reset: multiline paste preserves failed capture and saves retained tasks on retry',async()=>{
+ const {ctx,shim}=await loadApp();ctx.renderAddPanel();const input=shim.document.getElementById('addInput');input.id='addInput';input.matches=()=>false;
+ const original=shim.localStorage.setItem;shim.localStorage.setItem=()=>{throw new Error('private paste save rejection');};
+ shim.document.dispatchEvent({type:'paste',target:input,clipboardData:{getData:()=> 'Private paste one\nPrivate paste two'},preventDefault(){}});
+ await vm.runInContext('typeof quickAddSubmission === "undefined" ? undefined : quickAddSubmission?.saving',ctx);assert.notEqual(input.value,'','failed paste retains visible capture');assert.equal(ctx.state.tasks.length,2);
+ shim.localStorage.setItem=original;await ctx.onAction('add',{});assert.equal(input.value,'');assert.equal(ctx.state.tasks.length,2,'retry retains existing paste membership');
 });

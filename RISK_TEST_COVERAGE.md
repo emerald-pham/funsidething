@@ -699,3 +699,7 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 
 - `RISK Add draft color: all task data controls turn Add green and clearing restores grey without changing validity` — draft appearance across all task-data controls.
 - `RISK Add draft color: search navigation repeated keyboard adds sticky contexts and failure retention follow actual handlers` — submission/reset and rejected-action retention.
+
+- `RISK Add draft durable reset: failed device save retains draft and retry does not duplicate accepted tasks` — actual device rejection/retry preserves input and task membership.
+- `RISK Add draft durable reset: pending repeated Add and newer edits or reset survive an awaiting save` — submission confirmation remains bound to draft and account.
+- `RISK Add draft durable reset: multiline paste preserves failed capture and saves retained tasks on retry` — bulk capture uses the same durable reset gate.
