@@ -22876,3 +22876,12 @@ test('RISK Halving weighting likelihood estimate: uncertainty-sensitive existing
  Object.assign(a,{mu:1000,sigma:1});assert.equal(ctx.candidateOrder([a,b,c])[0].id,b.id,'likelihood ordering remains frozen for this pass');
  ctx.state.scanMode='descending';assert.equal(ctx.candidateOrder([a,b,c])[0].id,a.id,'existing Descending remains mean-based');
 });
+
+test('RISK Halving weighting open Settings: mode transitions refresh the likelihood label and retire the legacy chooser without losing drafts',async()=>{
+ const {ctx,shim}=await loadApp();ctx.setScanPreference('both');ctx.openSettings();
+ const field=shim.document.getElementById('stScanMode'),metric=shim.document.getElementById('stListMetric'),option={textContent:'Overall percent chance'};let removed=false;const legacy={remove(){removed=true;}};
+ field.id='stScanMode';field.matches=()=>true;field.querySelector=()=>removed?null:legacy;metric.querySelector=()=>option;
+ shim.document.getElementById('stEverHours').value='37';field.value='halving';shim.document.dispatchEvent({type:'change',target:field});
+ assert.equal(option.textContent,'Underlying likelihood percent','the current mounted Settings control updates immediately');assert.equal(removed,true,'switching away retires the legacy chooser in the same open selector');assert.equal(shim.document.getElementById('stEverHours').value,'37','unrelated settings drafts survive');
+ field.value='chance';shim.document.dispatchEvent({type:'change',target:field});assert.equal(option.textContent,'Overall percent chance');assert.equal(removed,true);assert.equal(shim.document.getElementById('stEverHours').value,'37');
+});

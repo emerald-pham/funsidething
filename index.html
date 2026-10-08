@@ -4103,6 +4103,12 @@ function scanStartButtons(action = "start-scan"){
     ? '<button class="btn primary" data-act="'+action+'" data-mode="descending">Scan in descending likelihood</button><button class="btn primary" data-act="'+action+'" data-mode="chance">Scan in chance mode</button><button class="btn primary" data-act="'+action+'" data-mode="squared">Squared Weighting</button>'
     : '<button class="btn '+(action === "resume-scan" ? 'subtle' : 'primary')+'" data-act="'+action+'">'+(action === "resume-scan" ? 'Resume scanning' : 'Start scanning')+'</button>';
 }
+function syncScanPreferenceControls(){
+  // Update only the mounted options: rebuilding Settings would discard drafts.
+  const metric=document.getElementById("stListMetric")?.querySelector('option[value="chance"]');
+  if(metric)metric.textContent=state.settings.scanMode==="halving"?"Underlying likelihood percent":"Overall percent chance";
+  if(state.settings.scanMode!=="both")document.getElementById("stScanMode")?.querySelector('option[value="both"]')?.remove();
+}
 function setScanPreference(value){
   const mode = normalizeSettings({scanMode:value}).scanMode;
   if(state.settings.scanMode === mode) return;
@@ -4110,6 +4116,7 @@ function setScanPreference(value){
   state.settings.scanMode = mode;
   applyScanPreference();
   commit();
+  syncScanPreferenceControls();
   persist(); // this selection saves on change, including an immediate close/reload
 }
 function setFloatingHeaderPreference(enabled){

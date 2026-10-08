@@ -718,3 +718,4 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK Halving weighting concurrent joins: same-pass frozen likelihood ranks survive peer adoption and reload without mixing generations
 - RISK Halving weighting likelihood sorting: current underlying shares ignore obsolete Chance pass fallback
 - RISK Halving weighting likelihood estimate: uncertainty-sensitive existing Chance scores define frozen positional order
+- RISK Halving weighting open Settings: mode transitions refresh the likelihood label and retire the legacy chooser without losing drafts
