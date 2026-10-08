@@ -623,3 +623,6 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK Squared Weighting held keys: real keyboard repeats preserve the newly dealt candidate while fresh presses and Undo still work
 - `RISK context editor visibility: real contexts govern requirements and filters without mutating assignments` — empty/one/multiple/deleted contexts; creation entrypoint and sentinel preservation.
 - `RISK task edit section dividers: semantic rules separate requirements ratings and actions` — semantic separators and responsive theme color/spacing contract.
+
+- `RISK Edit evergreen unit default: mounted Hours to Days suggests seven then saves and reopens weekly` — registered change handler, repeated toggles, draft isolation and save/reopen.
+- `RISK Edit evergreen unit preservation: explicit drafts custom intervals and Cancel keep their values` — explicit values, eighteen-day custom interval and canceled draft protection.

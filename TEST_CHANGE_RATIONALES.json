@@ -2314,5 +2314,41 @@
       "command": "node --test --test-reporter=spec --test-name-pattern='RISK (context editor visibility|task edit section dividers)' tests.js",
       "failure": "/tmp/chain-context-ui-red.log: empty heading rendered and semantic hr absent. /tmp/chain-context-ui-scope-red.log: main selector assertion fails before reverting broadened draft scope."
     }
+  },
+  {
+    "testChangesSha256": "f676848b1ef0f521bb2435031651cfc2475a43d224190aa8902359a9c5fc0ff2",
+    "reason": "User reported Edit Hours to Days never suggests seven; Add-only interaction coverage and direct Edit Save setup missed this handler path.",
+    "previousBehavior": "Edit unit change preserves eighteen on untouched eighteen-hour default; only Add has seven-day substitution.",
+    "intendedBehavior": "Untouched eighteen-hour Edit draft suggests seven days; explicit input and saved custom intervals stay entered; repeated toggles, Cancel and Save/reopen preserve documented semantics.",
+    "replacementTests": [
+      "RISK Edit evergreen unit default: mounted Hours to Days suggests seven then saves and reopens weekly",
+      "RISK Edit evergreen unit preservation: explicit drafts custom intervals and Cancel keep their values",
+      "RISK context editor visibility: real contexts govern requirements and filters without mutating assignments",
+      "RISK task edit section dividers: semantic rules separate requirements ratings and actions"
+    ],
+    "preservedCoverage": [
+      "Existing Add default and Edit conversion/serialization tests stay unchanged. Main context selector visibility, ratings, completion, Undo, cloud and sync tests remain intact."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='RISK Edit evergreen unit' tests.js",
+      "failure": "/tmp/chain-edit-unit-red.log: both mounted handler tests fail 18 !== 7. Prior context/divider red remains /tmp/chain-context-ui-red.log and scope correction /tmp/chain-context-ui-scope-red.log."
+    }
+  },
+  {
+    "testChangesSha256": "4979a56beb0b34a94a70a4e24c579043a044ca08095c9f6b556cc035d4963b91",
+    "reason": "User reported Edit Hours to Days never suggests seven; Add-only interaction coverage and direct Edit Save setup missed this handler path.",
+    "previousBehavior": "Edit unit change preserves eighteen on untouched eighteen-hour default; only Add has seven-day substitution.",
+    "intendedBehavior": "Untouched eighteen-hour Edit draft suggests seven days; explicit input and saved custom intervals stay entered; repeated toggles, Cancel and Save/reopen preserve documented semantics.",
+    "replacementTests": [
+      "RISK Edit evergreen unit default: mounted Hours to Days suggests seven then saves and reopens weekly",
+      "RISK Edit evergreen unit preservation: explicit drafts custom intervals and Cancel keep their values"
+    ],
+    "preservedCoverage": [
+      "Existing Add default and Edit conversion/serialization tests stay unchanged. Main context selector visibility, ratings, completion, Undo, cloud and sync tests remain intact."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='RISK Edit evergreen unit' tests.js",
+      "failure": "/tmp/chain-edit-unit-red.log: both mounted handler tests fail 18 !== 7. Prior context/divider red remains /tmp/chain-context-ui-red.log and scope correction /tmp/chain-context-ui-scope-red.log."
+    }
   }
 ]

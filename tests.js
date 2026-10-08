@@ -21869,3 +21869,40 @@ test('RISK task edit section dividers: semantic rules separate requirements rati
  assert.match(edit,/<\/div><hr class="edit-divider"><div class="mbtns">/);
  const html=fs.readFileSync(path.join(__dirname,'index.html'),'utf8');assert.match(html,/\.edit-divider\{[^}]*border-top:1px solid var\(--[^)]+\)[^}]*margin:18px 0/);
 });
+
+function mountPrivateEditInterval(ctx,shim,task){
+ ctx.openEdit(task.id);
+ const markup=shim.document.getElementById('modalRoot').innerHTML;
+ // The shim does not parse modal innerHTML: hydrate the emitted controls, then
+ // dispatch through the app's registered listener rather than a copied helper.
+ const value=markup.match(/id="etEverHours"[^>]*value="([^"]+)"/)[1];
+ const unit=markup.match(/value="(hours|days)" selected/)[1];
+ for(const [id,v] of [['etEverHours',value],['etEverUnit',unit]])Object.assign(shim.document.getElementById(id),{id,value:v,matches:()=>false});
+ shim.document.getElementById('etEver').checked=true;
+ shim.document.getElementById('etEverReset').checked=task.evergreenResetAtDay!==false;
+ shim.document.getElementById('etTitle').value=task.title;
+ return (id,value,type='change')=>{const field=shim.document.getElementById(id);field.value=value;shim.document.dispatchEvent({type,target:field});return field;};
+}
+test('RISK Edit evergreen unit default: mounted Hours to Days suggests seven then saves and reopens weekly',async()=>{
+ const {ctx,shim}=await loadApp();const task=ctx.addTask('Private weekly editor');Object.assign(task,{evergreen:true,evergreenHours:18,evergreenResetAtDay:true});
+ const change=mountPrivateEditInterval(ctx,shim,task),before=JSON.stringify(task);
+ for(const [unit,value,reset] of [['days','7',false],['hours','7',true],['days','7',false]]){
+  change('etEverUnit',unit);assert.equal(shim.document.getElementById('etEverHours').value,value,'untouched 18-hour editor default becomes seven days');assert.equal(shim.document.getElementById('etEverReset').checked,reset);
+ }
+ assert.equal(JSON.stringify(task),before,'draft unit changes do not save task data');
+ ctx.onAction('save-edit',{dataset:{id:task.id}});assert.equal(task.evergreenHours,168);assert.equal(task.evergreenResetAtDay,false);
+ mountPrivateEditInterval(ctx,shim,task);assert.equal(shim.document.getElementById('etEverHours').value,'7');assert.equal(shim.document.getElementById('etEverUnit').value,'days');
+});
+test('RISK Edit evergreen unit preservation: explicit drafts custom intervals and Cancel keep their values',async()=>{
+ for(const duration of [12,36,168,432]){
+  const {ctx,shim}=await loadApp();const task=ctx.addTask('Private interval');Object.assign(task,{evergreen:true,evergreenHours:duration});
+  const change=mountPrivateEditInterval(ctx,shim,task),value=shim.document.getElementById('etEverHours').value;
+  for(const unit of ['hours','days','hours','days']){change('etEverUnit',unit);assert.equal(shim.document.getElementById('etEverHours').value,value,'saved custom values including eighteen days remain explicit');}
+ }
+ for(const values of [['24','18'],['7'],[''],['0.5']]){
+  const {ctx,shim}=await loadApp();const task=ctx.addTask('Private draft');Object.assign(task,{evergreen:true,evergreenHours:18});
+  let change=mountPrivateEditInterval(ctx,shim,task);for(const value of values)change('etEverHours',value,'input');
+  for(const unit of ['days','hours','days']){change('etEverUnit',unit);assert.equal(shim.document.getElementById('etEverHours').value,values.at(-1),'typed values stay intentional even when restored to eighteen');}
+  ctx.closeModal();assert.equal(task.evergreenHours,18);change=mountPrivateEditInterval(ctx,shim,task);change('etEverUnit','days');assert.equal(shim.document.getElementById('etEverHours').value,'7','reopening resets draft edit protection');
+ }
+});
