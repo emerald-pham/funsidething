@@ -22336,3 +22336,15 @@ test('RISK date clear persistence: pasted Add dates and offline concurrent sync 
 test('RISK date clear tablet geometry: Edit wrapper overrides generic date minimum to reserve the Clear target',()=>{
  assert.match(html,/\.frow \.date-control input\[type=date\]\{[^}]*min-width:0/,'tablet wrapper must beat generic frow date minimum');
 });
+
+test('RISK date clear rendered geometry: native date segments remain readable beside Clear and long Starts hints at larger text', {skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const {chromium}=await import(process.env.LANDSCAPE_PLAYWRIGHT),browser=await chromium.launch({headless:true,channel:process.env.LANDSCAPE_BROWSER_CHANNEL||'chrome'}),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+ try{for(const [width,height,large] of [[768,1024,false],[1280,800,false],[568,320,false],[320,568,true]]){
+  const context=await browser.newContext({viewport:{width,height},serviceWorkers:'block',reducedMotion:'reduce'});await context.addInitScript(()=>{Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false});localStorage.setItem('fvp:chain-scanner:landscape-motion','reduced');});await context.route('**/*',r=>new URL(r.request().url()).origin===origin?r.continue():r.abort());
+  const page=await context.newPage();await page.goto(process.env.LANDSCAPE_BROWSER_URL);await page.waitForFunction(()=>typeof state!=='undefined'&&state?.tasks);await page.evaluate(()=>{closeModal();document.getElementById('motionDialog')?.close();});
+  await page.locator('#addInput').fill('Private rendered date geometry');await page.locator('#addStart').fill('2028-02-29');await page.locator('#addDue').fill('2029-01-01');await page.locator('button[data-act="add"]').click();await page.locator('.lhead').click();await page.getByRole('button',{name:'Private rendered date geometry',exact:true}).click();
+  if(large)await page.addStyleTag({content:'.date-control input[type=date]{font-size:30px!important}.date-clear{font-size:27px!important}.frow label{font-size:27px!important}'});
+  const geometry=await page.evaluate(()=>({viewport:innerWidth,page:document.documentElement.scrollWidth,fields:[...document.querySelectorAll('#modalRoot input[type=date]')].map(e=>({id:e.id,width:e.getBoundingClientRect().width,button:e.closest('.date-control').querySelector('button').getBoundingClientRect().width}))}));
+  for(const f of geometry.fields){assert.ok(f.width>=(large?240:180),width+'px '+f.id+' reserves room for native day month year and picker');assert.ok(f.button>=44,'Clear retains its target');}assert.ok(geometry.page<=geometry.viewport+1,'readable controls fit without page overflow');await context.close();
+ }}finally{await browser.close();}
+});

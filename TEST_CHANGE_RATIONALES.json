@@ -2597,15 +2597,16 @@
     }
   },
   {
-    "testChangesSha256": "abf7f73368f0bf75775fadc85603db823ffa6388db518599fd3db453195aea9a",
-    "reason": "Add independently accessible date clear controls requested by the user without changing persistence rules. Full exact-candidate suite also demonstrated an existing duration reload fixture uses the real clock before its late fake time; independent diagnosis and exact released-base reproduction confirm the required test-only startup-clock repair.",
-    "previousBehavior": "Date inputs had no explicit clear action; the action left the populated draft unchanged. The existing duration integration fixture installed its clock after loadApp startup had correctly expired the historical hold.",
-    "intendedBehavior": "Each clear action empties only its draft date and saves through existing Add Edit and sync paths. The reload fixture initializes its clock through beforeStateReady, retaining every original duration, editor, saved-state and shell assertion.",
+    "testChangesSha256": "b6eb1c7a2581d861012c0922074ee90e0c235b5f74f78e823edf87e9ed879cc8",
+    "reason": "Add independently accessible date clear controls requested by the user without changing persistence rules. Full exact-candidate suite also demonstrated an existing duration reload fixture uses the real clock before its late fake time; independent diagnosis and exact released-base reproduction confirm the required test-only startup-clock repair. Independent rendered review demonstrated native date clipping on tablet/desktop/short-landscape and doubled phone text; reserve date space and allow Clear/hint wrapping.",
+    "previousBehavior": "Date inputs had no explicit clear action; the action left the populated draft unchanged. The existing duration integration fixture installed its clock after loadApp startup had correctly expired the historical hold. Draft Clear geometry allowed the Starts hint to squeeze the native input to86px and larger-text dates lost their year.",
+    "intendedBehavior": "Each clear action empties only its draft date and saves through existing Add Edit and sync paths. The reload fixture initializes its clock through beforeStateReady, retaining every original duration, editor, saved-state and shell assertion. Date input flex basis and wrapped Clear/Starts hints retain readable native segments in bounded rows.",
     "replacementTests": [
       "RISK date clear controls: Add and Edit clear independently through actions with cancel save and durable reopen",
       "RISK date clear accessibility: native labeled buttons accompany all date fields with bounded touch targets",
       "RISK date clear persistence: pasted Add dates and offline concurrent sync retain the other date and task data",
-      "RISK date clear tablet geometry: Edit wrapper overrides generic date minimum to reserve the Clear target"
+      "RISK date clear tablet geometry: Edit wrapper overrides generic date minimum to reserve the Clear target",
+      "RISK date clear rendered geometry: native date segments remain readable beside Clear and long Starts hints at larger text"
     ],
     "preservedCoverage": [
       "Existing eligibility date boundaries and evergreen timestamp rules remain intact.",
@@ -2613,8 +2614,8 @@
       "The existing RISK UI batch integration assertions all remain intact; only the startup clock setup moves before state readiness."
     ],
     "redEvidence": {
-      "command": "node --test --test-name-pattern='RISK date clear' tests.js; node --test tests.js; node --test --test-name-pattern='RISK UI batch integration' tests.js",
-      "failure": "Observed clear action retained 2028-02-29 instead of empty draft; native labeled clear buttons absent. Full output: date-red.log outside checkout. Tablet geometry assertion then failed before the higher-specificity CSS override; date-tablet-red.log records it. Frozen dbe1442 full suite: 1359 tests, 1331 pass, 1 fail, 27 skipped; original RISK UI batch integration lost can’t · 1h30m after startup expired its historical 90-minute hold. Untouched e5eaecc focused test reproduces it; controlled preboot clock makes all original assertions pass on both. date-duration-diagnosis.md and date-duration-review.md record independent evidence."
+      "command": "node --test --test-name-pattern='RISK date clear' tests.js; node --test tests.js; node --test --test-name-pattern='RISK UI batch integration' tests.js; LANDSCAPE_BROWSER_URL=http://127.0.0.1:18822/ LANDSCAPE_PLAYWRIGHT=<bundled playwright> node --test --test-name-pattern=\"RISK date clear rendered geometry\" tests.js",
+      "failure": "Observed clear action retained 2028-02-29 instead of empty draft; native labeled clear buttons absent. Full output: date-red.log outside checkout. Tablet geometry assertion then failed before the higher-specificity CSS override; date-tablet-red.log records it. Frozen dbe1442 full suite: 1359 tests, 1331 pass, 1 fail, 27 skipped; original RISK UI batch integration lost can’t · 1h30m after startup expired its historical 90-minute hold. Untouched e5eaecc focused test reproduces it; controlled preboot clock makes all original assertions pass on both. date-duration-diagnosis.md and date-duration-review.md record independent evidence. Tablet geometry assertion then failed before the higher-specificity CSS override; date-tablet-red.log records it. Observed actual browser RED: 768px etStart reserves room for native day month year and picker failed; rendered-geometry-red.log. Same actual test then GREEN after wrapping repair."
     }
   }
 ]
