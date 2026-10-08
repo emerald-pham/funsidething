@@ -20691,7 +20691,7 @@ test('RISK overall Chance shares: full eligible weights retain scanned and chain
  const before=JSON.stringify(ctx.state),order=ctx.candidateOrder(ctx.pool()).map(t=>t.id);
 
  const unchangedAlgorithms={"updatePair":"a31c20a18454d735731d5e02bdf0767292e790a992725d7d35b02380cbf2568b","pBeats":"6003c75326298698b27f2ae691bed18928d6f96396da30ca9113a34463d3a3d9","chanceWeight":"96381985597245b65e9d26fa410c13ac801ce6a618e76665f69d049cc9485582","chanceHash":"012f3e461e84956335324e12c2646860bc6ed68ac31456dfb0d9bb231c0d4947","resetChance":"36f9f2a46730bc3e3bb068bea2b07d57d29c8cadf8184b9914733f2bfcc90b1a","chanceScore":"b033af5b0cbae63742983121a674ecd99aceabead078d6c7d8067bd3bf49c38f","candidateOrder":"e5186892a1025b57548b9bcf9e9ed232a54e30905d97a225968e6e2db6e561fd","chancePick":"d2a64e3f4e9a8431dc5439b5945f651f66521f4674aec6ef1b321bb4c1b8bf10","oldestFirst":"da6def7759fd3997881fa299c8b92324d49217c9534381d5c3c3be750d6d46aa"};
- for(const [name,expected] of Object.entries(unchangedAlgorithms)){const start=html.indexOf("function "+name+"("),end=html.indexOf("\nfunction ",start+1);assert.equal(createHash("sha256").update(html.slice(start,end)).digest("hex"),expected,name+" selection and rating code stays byte-exact");}
+ for(const [name,expected] of Object.entries(unchangedAlgorithms)){const start=html.indexOf("function "+name+"("),end=html.indexOf("\nfunction ",start+1);assert.equal(createHash("sha256").update(name==="candidateOrder"?html.slice(start,end).replace('\n  if(state.scanMode === "halving")return halvingOrder(tasks);',''):html.slice(start,end)).digest("hex"),expected,name+" selection and rating code stays byte-exact");}
  const stats=ctx.chanceDisplayStats();for(const task of [bench,a,b])assert.ok(Math.abs(stats.get(task.id).probability-1/3)<1e-12,'equal current ratings share the full eligible set, including the chain');
  assert.equal(ctx.taskSelectionSummary(a,stats).label,'33.33% overall');
  assert.match(ctx.taskSelectionSummary(a,stats).title,/full eligible/i);
@@ -22774,4 +22774,129 @@ test('RISK dependency rendered runner: style initialization is nonempty and dark
  assert.match(fixture,/page\.evaluate\(theme=>setTheme\(theme\),theme\)/,'restored board initialization must be followed by the real app theme setter');
  assert.match(fixture,/document\.documentElement\.dataset\.theme/,'theme identity must be checked rather than inferred from a screenshot filename');
  assert.match(fixture,/getComputedStyle\(document\.documentElement\)\.colorScheme/,'the actual rendered palette must be checked');
+});
+
+test('RISK Halving weighting distribution: exact finite tails boundaries ties and large pools',async()=>{
+ const {ctx}=await loadApp();
+ assert.equal(typeof ctx.halvingIndex,'function');
+ for(const [n,u,want] of [[4,.5-Number.EPSILON/4,0],[4,.75-Number.EPSILON/2,1],[1,0,0],[1,1,0],[2,0,0],[2,.5,1],[3,.5,1],[3,.75,2],[4,.875,3],[10000,1,9999],[10000,0,0]])assert.equal(ctx.halvingIndex(n,u),want);
+ assert.equal(ctx.halvingIndex(0,.5),-1);
+ for(const n of [2,3,4,12]){
+  const counts=Array(n).fill(0),size=2**12;
+  for(let i=0;i<size;i++)counts[ctx.halvingIndex(n,(i+.5)/size)]++;
+  assert.deepEqual(counts,Array.from({length:n},(_,i)=>size/2**Math.min(i+1,n-1)));
+ }
+ const tasks=[ctx.addTask('Low'),ctx.addTask('High'),ctx.addTask('Tie')];tasks[0].mu=1;tasks[1].mu=tasks[2].mu=9;
+ ctx.state.scanMode='halving';ctx.resetChance();ctx.chanceHash=()=>0;
+ assert.deepEqual(Array.from(ctx.candidateOrder(tasks),t=>t.id),[tasks[1].id,tasks[2].id,tasks[0].id]);
+ tasks[0].mu=100;assert.equal(ctx.candidateOrder(tasks)[0].id,tasks[1].id,'pass likelihood is frozen');
+ ctx.chanceHash=()=>0xffffffff;assert.equal(ctx.candidateOrder(tasks)[0].id,tasks[0].id,'tail belongs to final remaining task');
+ const large=Array.from({length:80},(_,i)=>({id:'large-'+i,mu:80-i,sigma:1}));assert.equal(ctx.candidateOrder(large)[0].id,'large-79','large pool tails do not vanish at the 32-bit draw boundary');
+});
+
+test('RISK Halving weighting consumer state: selector legacy preference filtering no replacement Undo and reload',async()=>{
+ const {ctx,shim}=await loadApp({seed:973});
+ ctx.openSettings();assert.match(shim.document.getElementById('modalRoot').innerHTML,/<option value="halving"/);
+ assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/<option value="both"/);
+ assert.equal(ctx.state.settings.scanMode,'squared');
+ for(const mode of ['chance','squared','descending','both'])assert.equal(ctx.normalizeSettings({scanMode:mode}).scanMode,mode);
+ ctx.setScanPreference('both');ctx.openSettings();assert.match(shim.document.getElementById('modalRoot').innerHTML,/<option value="both" selected>.*legacy/i);assert.match(ctx.scanStartButtons(),/data-mode="chance"/);
+ const oldest=ctx.addTask('Oldest'),a=ctx.addTask('A'),b=ctx.addTask('B'),blocked=ctx.addTask('Blocked'),done=ctx.addTask('Done'),rest=ctx.addTask('Rest'),excluded=ctx.addTask('Excluded'),future=ctx.addTask('Future');
+ ctx.setTaskPrerequisites(blocked.id,[a.id]);done.done=true;rest.evergreen=true;rest.lastDoneAt=Date.now();excluded.ctx=[ctx.state.contexts[0].id];ctx.state.contexts[0].excluded=true;future.startsAt='2099-01-01';
+ ctx.openSettings();const field=shim.document.getElementById('stScanMode');field.id='stScanMode';field.matches=()=>true;field.value='halving';shim.document.dispatchEvent({type:'change',target:field});
+ assert.equal(ctx.state.settings.scanMode,'halving');assert.equal(ctx.state.scanMode,'halving');ctx.closeModal();ctx.startScan();assert.equal(ctx.state.chain[0],oldest.id);
+ const candidate=ctx.state.candidateId,seed=ctx.state.chance.seed;assert.ok([a.id,b.id].includes(candidate));
+ const order=Array.from(ctx.candidateOrder(ctx.pool()),t=>t.id);assert.equal(new Set(order).size,order.length);assert.ok(!order.some(id=>[blocked.id,done.id,rest.id,oldest.id,excluded.id,future.id].includes(id)));
+ ctx.state.settings.thresholdPct=0;ctx.decide('no');assert.notEqual(ctx.state.candidateId,candidate);ctx.undo();assert.equal(ctx.state.candidateId,candidate);assert.equal(ctx.state.chance.seed,seed);
+ await ctx.persist();const reload=await loadApp({seedStorage:{[SYNC_STORE_KEY]:shim.localStorage.getItem(SYNC_STORE_KEY)}});assert.equal(reload.ctx.state.settings.scanMode,'halving');assert.equal(reload.ctx.state.scanMode,'halving');assert.equal(reload.ctx.state.candidateId,candidate);assert.equal(reload.ctx.state.chance.seed,seed);assert.deepEqual(Array.from(reload.ctx.candidateOrder(reload.ctx.pool()),t=>t.id),order);
+ ctx.openHelp();assert.match(shim.document.getElementById('modalRoot').innerHTML,/What is Halving weighting/);assert.match(shim.document.getElementById('modalRoot').innerHTML,/50%, 25%, 25%/);
+});
+
+test('RISK Halving weighting pass: suffixes remain reproducible across input order joins resume and day boundaries',async()=>{
+ const {ctx}=await loadApp({seed:974});const tasks=Array.from({length:24},(_,i)=>ctx.addTask('Task '+i));
+ tasks.forEach((t,i)=>t.mu=i%5);ctx.setScanPreference('halving');ctx.startScan();
+ const seed=ctx.state.chance.seed,available=ctx.pool(),before=JSON.stringify(ctx.state.tasks),order=Array.from(ctx.candidateOrder(available),t=>t.id);
+ assert.deepEqual(Array.from(ctx.candidateOrder([...available].reverse()),t=>t.id),order);
+ let remaining=[...available];for(const id of order){assert.equal(ctx.candidateOrder(remaining)[0].id,id);remaining=remaining.filter(t=>t.id!==id);}
+ assert.equal(JSON.stringify(ctx.state.tasks),before,'drawing does not teach ratings or complete tasks');
+ ctx.onAction('resume-scan',{dataset:{}});assert.equal(ctx.state.chance.seed,seed);
+ const join=ctx.addTask('New join');join.mu=100;const joined=Array.from(ctx.candidateOrder(ctx.pool()),t=>t.id);assert.equal(new Set(joined).size,joined.length);assert.ok(joined.includes(join.id));
+ const stable=Array.from(ctx.candidateOrder(ctx.pool()),t=>t.id);join.mu=-100;assert.deepEqual(Array.from(ctx.candidateOrder(ctx.pool()),t=>t.id),stable);
+ ctx.newPass(false,true);assert.notEqual(ctx.state.chance.seed,seed);assert.equal(ctx.state.scanMode,'halving');
+});
+
+test('RISK Halving weighting stale tab: offline mode change survives peer deletion and reload without restoring a deleted task',async()=>{
+ const initial=syncState({tasks:[syncTask('base','Original'),syncTask('other','Other')]}),raw=JSON.stringify(initial),storage=sharedScannerStorage({[LOCAL_HEAD_KEY]:raw,[SYNC_STORE_KEY]:raw});
+ const a=await loadApp({sharedStorage:storage}),b=await loadApp({sharedStorage:storage});
+ a.ctx.onAction('delete-task',{dataset:{id:'base'}});await a.ctx.persist();
+ b.ctx.setScanPreference('halving');await b.ctx.persist();
+ const board=JSON.parse(storage.getItem(SYNC_STORE_KEY));assert.equal(board.settings.scanMode,'halving');assert.equal(board.scanMode,'halving');assert.ok(!board.tasks.some(t=>t.id==='base'));assert.ok(board.tasks.some(t=>t.id==='other'));
+ const reload=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(board)}});assert.equal(reload.ctx.state.settings.scanMode,'halving');assert.ok(!reload.ctx.state.tasks.some(t=>t.id==='base'));
+});
+
+test('RISK Halving weighting displayed likelihood: actual list and editor distinguish underlying Chance shares from positional draws',async()=>{
+ const {ctx,shim}=await loadApp();ctx.addTask('Oldest');const task=ctx.addTask('Remaining');ctx.setScanPreference('halving');ctx.startScan();ctx.state.settings.listMetric='chance';ctx.state.listOpen=true;ctx.render();
+ const summary=ctx.taskSelectionSummary(task,ctx.chanceDisplayStats(),'chance');assert.match(summary.label,/likelihood$/);assert.match(summary.title,/Chance-mode share.*not.*Halving.*selection probability/i);assert.doesNotMatch(summary.label,/scanned after/);
+ assert.match(shim.document.getElementById('listBody').innerHTML,/likelihood/);
+ ctx.openSettings();assert.match(shim.document.getElementById('modalRoot').innerHTML,/Likelihood \(%\)/);
+ ctx.openEdit(task.id);assert.match(shim.document.getElementById('modalRoot').innerHTML,/Likelihood values.*not Halving weighting selection odds/);
+ ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;assert.match(help,/50%, 25%, 25%/);assert.match(help,/Likelihood \(%\) display.*underlying Chance-mode likelihood.*not Halving weighting selection odds/);
+});
+
+test('RISK Halving weighting concurrent joins: same-pass frozen likelihood ranks survive peer adoption and reload without mixing generations',async()=>{
+ const {ctx}=await loadApp();ctx.addTask('Base');ctx.setScanPreference('halving');const base=JSON.parse(JSON.stringify(ctx.state));
+ const local=JSON.parse(JSON.stringify(base)),peer=JSON.parse(JSON.stringify(base));const joined=syncTask('local-join','Local');joined.mu=100;local.tasks.push(joined);local.chance.weights[joined.id]=.1;
+ peer.tasks.push(syncTask('peer-join','Peer'));peer.chance.weights['peer-join']=.8;
+ ctx.rebasePendingBoardFields(peer,local,base);ctx.mergeUndeletedTasks(peer,local);
+ assert.equal(peer.chance.weights[joined.id],.1,'same-pass joins preserve frozen rank despite live learning');
+ const reload=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(peer)}});assert.equal(reload.ctx.state.chance.weights[joined.id],.1);
+ const different=JSON.parse(JSON.stringify(base));different.chance.seed='new-pass';ctx.rebasePendingBoardFields(different,local,base);assert.ok(!Object.hasOwn(different.chance.weights,joined.id),'different pass remains indivisible');
+ // Exercise the actual browser-save consumer after concurrent additions.
+ ctx.startScan();const raw=JSON.stringify(ctx.state),storage=sharedScannerStorage({[LOCAL_HEAD_KEY]:raw,[SYNC_STORE_KEY]:raw});
+ const a=await loadApp({sharedStorage:storage}),b=await loadApp({sharedStorage:storage});
+ const localTask=syncTask('save-local-join','Save local');localTask.mu=-10;a.ctx.state.tasks.push(localTask);a.ctx.commit();a.ctx.candidateOrder(a.ctx.pool());const localWeight=a.ctx.state.chance.weights[localTask.id];localTask.mu=100;a.ctx.commit();
+ const peerTask=syncTask('save-peer-join','Save peer');peerTask.mu=5;b.ctx.state.tasks.push(peerTask);b.ctx.commit();b.ctx.candidateOrder(b.ctx.pool());const peerWeight=b.ctx.state.chance.weights[peerTask.id];await b.ctx.persist();await a.ctx.persist();
+ const saved=JSON.parse(storage.getItem(SYNC_STORE_KEY));assert.equal(saved.chance.weights[localTask.id],localWeight);assert.equal(saved.chance.weights[peerTask.id],peerWeight);
+ const savedReload=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(saved)}});assert.equal(savedReload.ctx.state.chance.weights[localTask.id],localWeight);
+
+});
+
+test('RISK Halving weighting likelihood sorting: current underlying shares ignore obsolete Chance pass fallback',async()=>{
+ const {ctx,shim}=await loadApp();const root=ctx.addTask('Root'),a=ctx.addTask('A'),b=ctx.addTask('B');root.mu=0;a.mu=-10000;b.mu=100;for(const t of [root,a,b])t.sigma=1;
+ ctx.setScanPreference('halving');ctx.startScan();a.mu=10000;ctx.state.settings.listMetric='chance';ctx.state.listOpen=true;ctx.renderList();
+ const rows=shim.document.getElementById('listBody').innerHTML;assert.ok(rows.indexOf('data-row="'+a.id+'"')<rows.indexOf('data-row="'+b.id+'"'),'higher current underlying likelihood appears first even if its frozen Chance weight was zero');
+});
+
+test('RISK Halving weighting likelihood estimate: uncertainty-sensitive existing Chance scores define frozen positional order',async()=>{
+ const {ctx}=await loadApp();const a=ctx.addTask('Higher mean uncertain'),b=ctx.addTask('Lower mean certain'),c=ctx.addTask('Low opponent');
+ Object.assign(a,{mu:100,sigma:1000});Object.assign(b,{mu:90,sigma:1});Object.assign(c,{mu:0,sigma:1});
+ const wa=ctx.chanceWeight(a),wb=ctx.chanceWeight(b);assert.ok(wb>wa,'existing likelihood score reverses mean-only order with uncertainty');
+ console.log('Uncertainty witness',JSON.stringify({a:{mu:a.mu,sigma:a.sigma,likelihood:wa},b:{mu:b.mu,sigma:b.sigma,likelihood:wb}}));
+ ctx.state.scanMode='halving';ctx.resetChance();ctx.chanceHash=()=>0;assert.equal(ctx.candidateOrder([a,b,c])[0].id,b.id,'Halving ranks the exposed likelihood estimate, not mean alone');
+ Object.assign(a,{mu:1000,sigma:1});assert.equal(ctx.candidateOrder([a,b,c])[0].id,b.id,'likelihood ordering remains frozen for this pass');
+ ctx.state.scanMode='descending';assert.equal(ctx.candidateOrder([a,b,c])[0].id,a.id,'existing Descending remains mean-based');
+});
+
+test('RISK Halving weighting open Settings: mode transitions refresh the likelihood label and retire the legacy chooser without losing drafts',async()=>{
+ const {ctx,shim}=await loadApp();ctx.setScanPreference('both');ctx.openSettings();
+ const field=shim.document.getElementById('stScanMode'),metric=shim.document.getElementById('stListMetric'),option={textContent:'Overall percent chance'};let removed=false;const legacy={remove(){removed=true;}};
+ field.id='stScanMode';field.matches=()=>true;field.querySelector=()=>removed?null:legacy;metric.querySelector=()=>option;
+ shim.document.getElementById('stEverHours').value='37';field.value='halving';shim.document.dispatchEvent({type:'change',target:field});
+ assert.equal(option.textContent,'Likelihood (%)','the current mounted Settings control updates immediately');assert.equal(removed,true,'switching away retires the legacy chooser in the same open selector');assert.equal(shim.document.getElementById('stEverHours').value,'37','unrelated settings drafts survive');
+ field.value='chance';shim.document.dispatchEvent({type:'change',target:field});assert.equal(option.textContent,'Overall percent chance');assert.equal(removed,true);assert.equal(shim.document.getElementById('stEverHours').value,'37');
+});
+
+test('RISK Halving weighting enlarged metric: real Settings transition keeps a compact label and wrapping underlying likelihood explanation',async()=>{
+ const {ctx,shim}=await loadApp();ctx.openSettings();
+ const field=shim.document.getElementById('stScanMode'),metric=shim.document.getElementById('stListMetric'),option={textContent:'Overall percent chance'},help=shim.document.getElementById('stListMetricHelp');
+ field.id='stScanMode';field.matches=()=>true;metric.querySelector=()=>option;shim.document.getElementById('stEverHours').value='37';
+ field.value='halving';shim.document.dispatchEvent({type:'change',target:field});
+ assert.equal(option.textContent,'Likelihood (%)','the selected native option stays compact at enlarged text sizes');
+ assert.match(help.textContent,/underlying Chance-mode likelihood.*not Halving.*selection odds/i,'the full meaning moves to visible wrapping copy');
+ assert.equal(shim.document.getElementById('stEverHours').value,'37','unrelated draft remains');
+ ctx.openSettings();let html=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(html,/<select id="stListMetric" aria-describedby="stListMetricHelp">/,'the native selector exposes its explanation');
+ assert.match(html,/id="stListMetricHelp" class="kv settings-metric-help"/,'the explanation has its dedicated full-row wrapping consumer');
+ field.value='chance';shim.document.dispatchEvent({type:'change',target:field});assert.equal(option.textContent,'Overall percent chance');assert.doesNotMatch(help.textContent,/Halving/,'other modes keep their established copy');
+ const source=fs.readFileSync(new URL('index.html',import.meta.url),'utf8');assert.match(source,/\.settings-metric-help\{[^}]*flex:1 1 100%[^}]*min-width:0[^}]*overflow-wrap:anywhere/,'full explanation wraps without reducing font size');
 });

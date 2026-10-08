@@ -2937,5 +2937,56 @@
       "failure": "Allocated runtime/search-styling-native-a285b6f.log fails at page.addStyleTag content empty before assertions. New runner guard first fails nonempty content in rendered-runner-red-empty.log, then fails both palettes actually exercised in rendered-runner-red-theme.log before theme loop repair. Original dark fixture limitation recorded in combined-rendered-review-a285b6f.md. No runtime rerun yet."
     },
     "testChangesSha256": "9095ddffbbf4d076fc6d02b16722cebe37bf635a771642ebc93e8ce380507a4f"
+  },
+  {
+    "testChangesSha256": "10fd6ed65b1d67eb277a326306f1af975f495676666a36ff7ea0a00e5083b6e5",
+    "reason": "Add deterministic finite geometric ranking and saved-mode consumer protections without replacing any established ranking contracts. Preserve the original candidateOrder body fingerprint by stripping only the new one-line Halving dispatch before its established digest assertion; every other protected function digest is unchanged.",
+    "previousBehavior": "Halving weighting did not exist and the all-buttons chooser was offered to every board.",
+    "intendedBehavior": "Add halving among actual methods, keep saved modes and default, retain legacy chooser only for saved users and preserve pass/reload/Undo state. Per explicit semantic clarification, rank the existing uncertainty-sensitive Chance likelihood estimate, with frozen likelihood weights rather than frozen mean values. Concurrent-join coverage now protects frozen scores through actual persistence.",
+    "preservedCoverage": [
+      "Existing Chance and Squared algorithms and migrations remain unchanged.",
+      "All existing rating signals, eligibility, oldest-first, concurrent data preservation and Undo protections remain unchanged."
+    ],
+    "replacementTests": [
+      "RISK Halving weighting distribution: exact finite tails boundaries ties and large pools",
+      "RISK Halving weighting consumer state: selector legacy preference filtering no replacement Undo and reload",
+      "RISK Halving weighting pass: suffixes remain reproducible across input order joins resume and day boundaries",
+      "RISK Halving weighting stale tab: offline mode change survives peer deletion and reload without restoring a deleted task",
+      "RISK Halving weighting displayed likelihood: actual list and editor distinguish underlying Chance shares from positional draws",
+      "RISK Halving weighting concurrent joins: same-pass frozen likelihood ranks survive peer adoption and reload without mixing generations",
+      "RISK Halving weighting likelihood sorting: current underlying shares ignore obsolete Chance pass fallback",
+      "RISK Halving weighting likelihood estimate: uncertainty-sensitive existing Chance scores define frozen positional order",
+      "RISK Halving weighting open Settings: mode transitions refresh the likelihood label and retire the legacy chooser without losing drafts"
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK Halving weighting' tests.js; node --test --test-name-pattern='RISK Halving weighting distribution' tests.js; node --test --test-name-pattern='RISK Halving weighting likelihood estimate' tests.js",
+      "failure": "Observed missing halvingIndex function and missing halving Settings option before implementation (halving-red.log). Boundary test then observed 1 instead of 0 immediately below 50% with logarithmic inversion; corrected using exact binary interval subtraction (halving-boundary-red.log). Added pass and stale-tab tests pass as preservation coverage; no preimplementation red claimed for those. Further observed RED: max32-bit hash truncated80-task tail at33 instead of79 (halving-large-red.log); actual list displayed50% overall (halving-display-red.log); same-pass peer adoption lost frozen mu=-10 and list sorted obsolete saved Chance fallback (halving-review-red.log). First full run also caught original candidateOrder byte assertion; the original digest now still applies after removing exactly the new authorized dispatch line. Metadata RED recorded in halving-metadata-red.log and halving-shell-red.log before fingerprint refresh. Actual concurrent browser persistence consumer subsequently added and passed after repair (halving-concurrent-consumer.log); no preimplementation RED claimed for that supplementary consumer. Parent-directed uncertainty-sensitive RED showed mu100/sigma1000 with Chance likelihood.521908 being selected ahead of mu90/sigma1 with.748005, then GREEN after ranking frozen existing Chance weights (halving-uncertainty-red.log). Mode-specific Settings list metric label RED observed missing Underlying likelihood percent (halving-settings-label-red.log); original modes retain their original label. Mounted Settings transition RED observed stale Overall percent chance after actual mode change (halving-mounted-settings-red.log). Fix updates only mounted options, removes legacy chooser immediately after switching away, and preserves other drafts; nine Halving tests GREEN. Reconciled onto released PR76 64914b8a6a9c0011aa981ff07199482c7eaa4577; predecessor assertions and Add/dependency code preserved; stale metadata RED observed before refreshing fingerprints (halving-rebase-metadata-red.log)."
+    }
+  },
+  {
+    "testChangesSha256": "cb178ca802ede7a6b05d4cc1afbd151c06e8c2630ebdd28415116f3356ea84f3",
+    "reason": "Add deterministic finite geometric ranking and saved-mode consumer protections without replacing any established ranking contracts. Preserve the original candidateOrder body fingerprint by stripping only the new one-line Halving dispatch before its established digest assertion; every other protected function digest is unchanged. Independent rendered review observed native select label clipping at390px/24px; compact equivalent and wrapping accessible explanation preserve the full likelihood meaning.",
+    "previousBehavior": "Halving weighting did not exist and the all-buttons chooser was offered to every board.",
+    "intendedBehavior": "Add halving among actual methods, keep saved modes and default, retain legacy chooser only for saved users and preserve pass/reload/Undo state. Per explicit semantic clarification, rank the existing uncertainty-sensitive Chance likelihood estimate, with frozen likelihood weights rather than frozen mean values. Concurrent-join coverage now protects frozen scores through actual persistence. Use Likelihood (%) in the native option and put the complete underlying/not-Halving-odds explanation below it, updating the mounted control without discarding drafts.",
+    "preservedCoverage": [
+      "Existing Chance and Squared algorithms and migrations remain unchanged.",
+      "All existing rating signals, eligibility, oldest-first, concurrent data preservation and Undo protections remain unchanged."
+    ],
+    "replacementTests": [
+      "RISK Halving weighting distribution: exact finite tails boundaries ties and large pools",
+      "RISK Halving weighting consumer state: selector legacy preference filtering no replacement Undo and reload",
+      "RISK Halving weighting pass: suffixes remain reproducible across input order joins resume and day boundaries",
+      "RISK Halving weighting stale tab: offline mode change survives peer deletion and reload without restoring a deleted task",
+      "RISK Halving weighting displayed likelihood: actual list and editor distinguish underlying Chance shares from positional draws",
+      "RISK Halving weighting concurrent joins: same-pass frozen likelihood ranks survive peer adoption and reload without mixing generations",
+      "RISK Halving weighting likelihood sorting: current underlying shares ignore obsolete Chance pass fallback",
+      "RISK Halving weighting likelihood estimate: uncertainty-sensitive existing Chance scores define frozen positional order",
+      "RISK Halving weighting open Settings: mode transitions refresh the likelihood label and retire the legacy chooser without losing drafts",
+      "RISK Halving weighting enlarged metric: real Settings transition keeps a compact label and wrapping underlying likelihood explanation"
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK Halving weighting' tests.js; node --test --test-name-pattern='RISK Halving weighting distribution' tests.js; node --test --test-name-pattern='RISK Halving weighting likelihood estimate' tests.js; node --test --test-name-pattern=\"RISK Halving weighting enlarged metric:\" tests.js",
+      "failure": "Observed missing halvingIndex function and missing halving Settings option before implementation (halving-red.log). Boundary test then observed 1 instead of 0 immediately below 50% with logarithmic inversion; corrected using exact binary interval subtraction (halving-boundary-red.log). Added pass and stale-tab tests pass as preservation coverage; no preimplementation red claimed for those. Further observed RED: max32-bit hash truncated80-task tail at33 instead of79 (halving-large-red.log); actual list displayed50% overall (halving-display-red.log); same-pass peer adoption lost frozen mu=-10 and list sorted obsolete saved Chance fallback (halving-review-red.log). First full run also caught original candidateOrder byte assertion; the original digest now still applies after removing exactly the new authorized dispatch line. Metadata RED recorded in halving-metadata-red.log and halving-shell-red.log before fingerprint refresh. Actual concurrent browser persistence consumer subsequently added and passed after repair (halving-concurrent-consumer.log); no preimplementation RED claimed for that supplementary consumer. Parent-directed uncertainty-sensitive RED showed mu100/sigma1000 with Chance likelihood.521908 being selected ahead of mu90/sigma1 with.748005, then GREEN after ranking frozen existing Chance weights (halving-uncertainty-red.log). Mode-specific Settings list metric label RED observed missing Underlying likelihood percent (halving-settings-label-red.log); original modes retain their original label. Mounted Settings transition RED observed stale Overall percent chance after actual mode change (halving-mounted-settings-red.log). Fix updates only mounted options, removes legacy chooser immediately after switching away, and preserves other drafts; nine Halving tests GREEN. Reconciled onto released PR76 64914b8a6a9c0011aa981ff07199482c7eaa4577; predecessor assertions and Add/dependency code preserved; stale metadata RED observed before refreshing fingerprints (halving-rebase-metadata-red.log). Actual pixel typography HOLD on both engines/themes preceded new consumer RED: expected Likelihood (%) but actual Underlying likelihood percent (halving-label-red.log), then10 Halving tests GREEN. Existing two copy assertions updated only for the observed repair; every probability/persistence/learning assertion remains."
+    }
   }
 ]
