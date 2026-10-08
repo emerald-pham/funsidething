@@ -1,6 +1,6 @@
 [
   {
-    "testChangesSha256": "3010f979e94342f365bbb66a0e24cbbb2dd83b07d09d3d65f94c113deedbd78c",
+    "testChangesSha256": "b35bda73a781953e1b90ec9651a78547d4b599516fbd0c42d7b67ff00ce504bb",
     "reason": "User requests displays at most one minute and regular paired ignition variance widened to300ms, preserving event frequency and finale appearance.",
     "previousBehavior": "Standalone shows persisted60–300seconds; barge shells ran through65percent of transit; second regular ignitions used0–100ms.",
     "intendedBehavior": "Cap standalone events and all shell geometry at60seconds with complete finale tails; preserve sampled opportunity spacing and full barge transit; use0–300ms seeded regular delay. Full1s flight+.075s lag+2.7s bloom lifetime expires naturally; reservation horizons retain old admissions as well as proposal spacing.",
@@ -75,6 +75,23 @@
         "correctedFormalRed": "Corrected Array.from comparison then ran against restored pre-repair timeline after repair code had already been written.",
         "releaseStatus": "Parent explicitly clarified: preserve the historical ordering gap without artificial reimplementation; corrected regression and fault controls validate current behavior but cannot restore chronology. Release remains held for editor live verification and actual runtime, rendered typography, compatibility, CI, deployment and live gates. Every new functional change still requires meaningful observed RED before implementation."
       }
+    }
+  },
+  {
+    "testChangesSha256": "f9da1af561e9fcfa26e709563dce8187e66ec1c7d56374cc851c1bc0ef2c867a",
+    "reason": "Repair four pre-existing Chance probability fixtures whose bare task objects omit context arrays and throw when their retained real scanner timer wakes at the local 2 AM boundary.",
+    "previousBehavior": "Main CI attempt1 crossed 2 AM and reported seven asynchronous t.ctx is not iterable exceptions after all individual tests passed; baseline and candidate actual scanner callbacks reproduce the same schema defect.",
+    "intendedBehavior": "Probability fixtures provide a title and empty context array; actual scheduled scanner callback can render them without changing frozen weights. Production code, algorithms and timer semantics are unchanged.",
+    "replacementTests": [
+      "RISK Chance fixture wake: actual scheduled scanner callback handles probability fixture schema"
+    ],
+    "preservedCoverage": [
+      "All original four mathematical assertions, sampled frequencies, uncertainty/zero handling and malformed opponent hydration assertions remain intact. Only fixture task schema fields are added.",
+      "No timers are globally disabled and the regression captures and invokes the actual bootstrap-registered scanner callback; product asset bytes remain unchanged."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK Chance fixture wake' tests.js",
+      "failure": "/tmp/chain-ui-runtime/chance-fixture-repair-red.log: unwanted exception t.ctx is not iterable from actual registered refreshScanClock -> renderPass -> eligibleTasks -> isEligible before ctx/title fixture fields added; independent baseline/candidate diagnostic RED logs also retained."
     }
   },
   {
