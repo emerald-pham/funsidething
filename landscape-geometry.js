@@ -257,35 +257,44 @@
     function humanWalkPose(x,y,distance,direction,ground,carrying=false,scale=1){
       // Travel, not elapsed time, drives stance so eased arrivals can stop with
       // a planted foot. Keep this pose local to the actor's mirrored frame.
-      // Eight units divide the visitor’s forty-unit arrival, so a stopped
-      // visit ends in double support instead of freezing a lifted swing toe.
-      const localDistance=distance/scale,stride=8,phase=localDistance/stride*Math.PI*2;
-      // Settled visits retain their last stride pose; a walking boolean must
-      // never swap planted feet before eased departure has actually moved.
+      // Plan a constant cadence for this ground profile, rather than change
+      // stride length as each toe crosses a hill. A shorter horizontal step on
+      // steep terrain leaves enough vertical reach for a gravity-upright hip.
+      // Integer arrivals still end their forty-unit approach in double support.
+      let grade=0;
+      for(let index=0;index<=32;index++){
+        const at=W*index/32;
+        grade=Math.max(grade,Math.abs(ground(at+.5)-ground(at-.5)));
+      }
+      const clearance=5.32,reachFloor=6.32;
+      const extent=(-clearance*grade+Math.sqrt(reachFloor**2*(1+grade**2)-clearance**2))/(1+grade**2);
+      const steps=Math.max(5,Math.ceil(40/(extent/.3)-1e-9)),stride=40/steps;
+      const localDistance=distance/scale,phase=localDistance/stride*Math.PI*2;
       const feet=[0,.5].map(offset=>{
-        const step=strideFoot(localDistance,stride,offset),lift=step.lift*.45;
-        const footX=step.x,footY=(ground(x+direction*footX*scale)-y)/scale-lift;
-        return {footX,footY,lift};
+        const step=strideFoot(localDistance,stride,offset),rawLift=step.lift*.2;
+        const lift=rawLift<1e-12?0:rawLift,footX=step.x;
+        const groundY=(ground(x+direction*footX*scale)-y)/scale;
+        return {footX,footY:groundY-lift,groundY,lift};
       });
-      // A vertical hip over the route center forced the uphill knee into a
-      // squat whenever the downhill foot limited reach. Center the pelvis on
-      // support contacts, then lift along the terrain normal. Swing toes keep
-      // their original world path; the torso, arms and grip move with the hip.
-      const slope=direction*(ground(x+.5*scale)-ground(x-.5*scale))/scale;
-      const weights=feet.map(foot=>(1-foot.lift/.9)**2),weight=weights[0]+weights[1];
-      // On level ground the pelvis follows the route steadily. Only terrain
-      // needs a partial shift toward support; following a planted toe fully
-      // would stop the torso mid-step and make it surge at the next contact.
-      const support=.95*Math.abs(slope)/(.1+Math.abs(slope));
-      const baseX=feet.reduce((sum,foot,i)=>sum+foot.footX*weights[i],0)/weight*support;
-      const baseY=(ground(x+direction*baseX*scale)-y)/scale;
-      const normalLength=Math.hypot(slope,1),nx=slope/normalLength,ny=-1/normalLength;
-      const reach=feet.map(foot=>{
-        const dx=baseX-foot.footX,dy=baseY-foot.footY,dot=dx*nx+dy*ny;
-        return -dot+Math.sqrt(Math.max(0,dot*dot+6.4**2-dx*dx-dy*dy));
-      });
-      const height=Math.min(6.3+.06*Math.cos(phase*2),...reach);
-      const hipX=baseX+nx*height,hipY=baseY+ny*height,bob=hipY+4.4;
+      // The torso remains vertical above the route. Lifting along the terrain
+      // normal had put its pelvis downhill of both toes, producing a seated
+      // silhouette even when the IK knees were almost straight.
+      const hipX=0,slope=direction*(ground(x+.5*scale)-ground(x-.5*scale))/scale;
+      // Broad support weighting starts the transfer while the other toe is
+      // still swinging; a high power delayed it until just before touchdown.
+      const weights=feet.map(foot=>(1-foot.lift/.4)**2),weight=weights[0]+weights[1];
+      const targetReach=6.39+.005*Math.cos(phase*2);
+      const desiredHipY=feet.reduce((sum,foot,index)=>sum+weights[index]*(foot.groundY-Math.sqrt(targetReach**2-foot.footX**2)),0)/weight;
+      // A departing toe can rise to clear a steeper step as weight transfers.
+      // The allowance vanishes smoothly at both contacts, so a planted foot
+      // remains fixed and the pelvis cannot jump when support changes legs.
+      const bounds=feet.map(foot=>foot.footY-Math.sqrt(6.4**2-foot.footX**2)-Math.abs(slope)*stride*2*foot.lift/.4);
+      const hipY=Math.max(desiredHipY,...bounds),bob=hipY+4.4;
+      for(const foot of feet)if(foot.lift>0){
+        const swingReach=6.4-.6*foot.lift/.4;
+        foot.footY=Math.min(foot.footY,hipY+Math.sqrt(swingReach**2-foot.footX**2));
+        foot.lift=foot.groundY-foot.footY;
+      }
       const legs=feet.map(({footX,footY,lift})=>{
         const dx=footX-hipX,dy=footY-hipY,d=Math.hypot(dx,dy),bend=Math.sqrt(Math.max(0,3.2**2-d*d/4));
         return {footX,footY,lift,kneeX:hipX+dx/2+dy/d*bend,kneeY:hipY+dy/2-dx/d*bend};
@@ -298,7 +307,7 @@
       // carrying boolean at that frame would visibly snap the forearm.
       const grip=Math.max(0,Math.min(1,Number(carrying)||0));
       const hand={x:arms[0].x+(hipX+4-arms[0].x)*grip,y:arms[0].y+(-3+bob-arms[0].y)*grip};
-      return {bob,hipX,hipY,legs,arms,hand,carrying};
+      return {bob,hipX,hipY,legs,arms,hand,carrying,stride};
     }
     function woodlandPose(e){
       // Pick a clearing with room for a short stroll on the darkest near hill.

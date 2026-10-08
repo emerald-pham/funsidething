@@ -1,5 +1,31 @@
 [
   {
+    "testChangesSha256": "ea3aca0fcf2ae22870455a640047dfad08b7e8a22ff59c3e6a987ade60429539",
+    "reason": "Full-cycle gait regression detects persistent crouch despite correct leg segment lengths. Terrain-relative clearance and actual painter hip attachment protect steep phone trails without stretching limbs. Full native suite caught the old source regex requiring direct ten-unit arm calls. All existing helper10 behavioral assertions remain; actual painter coverage now checks mirrored shared-cadence endpoints, five-unit free-hand reach and unchanged carrying grip offset, with a discriminating obsolete-cadence negative control. Independent actual-motion rejection showed the normal-lift hip projected downhill beyond both toes. Add gravity-support regression and full-profile phase/seek/arrival coverage; preserve every prior numerical and actual-consumer assertion.",
+    "previousBehavior": "Fixed low pelvis and two-unit toe lift forced deep knees. Reach clamp on steep terrain lowered pelvis further; old tests checked connection and planting but accepted crouching.",
+    "intendedBehavior": "Upright torso follows a terrain-aware hip, support legs extend through most frames, modest swing lift remains continuous, and carrying grips stay attached in both directions and responsive scales. The hip remains vertically above the route, with a constant profile-planned shorter stride on steep terrain and broad support transfer. Natural-motion acceptance remains an independent browser gate.",
+    "replacementTests": [
+      "RISK upright human gait: full cycles extend stance knees with modest swing flexion and preserved terrain contact",
+      "RISK upright gait guidance: scenery FAQ and changelog explain upright support and carrying without changing task controls",
+      "RISK upright settled visitors: arrival endpoint rests both feet on terrain before eased departure",
+      "RISK upright torso travel: flat-ground pelvis travels steadily while terrain adaptation stays continuous",
+      "RISK upright pelvis consumer: torso head thighs and carrying arms follow the terrain hip",
+      "RISK upright gait consumer: every human painter consumes upright full cycles in both directions at responsive scales",
+      "RISK human support balance: rejected steep phone walks keep the vertical torso over a usable planted support",
+      "RISK human terrain cadence: a whole curved crossing retains one stride and deterministic planted arrivals"
+    ],
+    "preservedCoverage": [
+      "Existing thigh/calf 3.2-unit length assertions remain exact, now measured from the terrain hip x instead of an assumed zero origin.",
+      "Winter and walker consumer tests gain actual thigh-origin checks; all existing foot contact, leash, grip and reduced-motion checks remain.",
+      "No task state, persistence, scene schedules, animal gait, body segment lengths, or reduced-motion preference behavior changes.",
+      "Old arm opposition, five-unit length, below-shoulder, repeatability and phase sign assertions remain unchanged; actual consumer checks strengthen the former source-call regex."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK upright human gait:' tests.js; node --test --test-name-pattern='RISK upright' tests.js; node --test --test-name-pattern='RISK upright pelvis consumer|RISK winter walking|RISK walker anatomy' tests.js; node --test --test-name-pattern='RISK human support balance:' tests.js",
+      "failure": "Contemporaneous upright-red.log failed on crouched pelvis before functional changes. Terrain-pelvis-red.log retained actual phone reader failure before support-normal repair. Renderer-hip-red.log failed torso/thigh consumer origins before painter edits. Torso-travel-red.log failed frozen flat-ground torso before terrain-only support weighting. Settled-feet-red.log failed stopped visitor toe before eight-unit cadence. Guidance-red.log failed missing matching FAQ before prose edit. Logs retained outside repo in task evidence. Full-native-tests.log:1405 tests,1375 pass,1 fail,29 explicit runtime skips; sole failure old ten-unit source regex, observed before test replacement. Final actual-cadence negative control exercises differing phases (phase0 intentionally coincides) and multiple mirrored samples. Observed support-balance-red.log before successor functional changes: phone walker frame3 hip-to-planted-support2.700 exceeds2.5. The rejected candidate numerical tests passed while independent motion review blocked its sitting silhouette; neither count is acceptance. Supplementary full-profile test was added after correction, with no retrospective RED claim. Successor-metadata-red.log observes both stale fingerprints before refreshing them after WOOP rebase."
+    }
+  },
+  {
     "testChangesSha256": "994b821a2ae876d7d1e74bc2484527eed18659fa6d45d68bfcf9d8f4bf4d2cf0",
     "reason": "Full-cycle gait regression detects persistent crouch despite correct leg segment lengths. Terrain-relative clearance and actual painter hip attachment protect steep phone trails without stretching limbs. Full native suite caught the old source regex requiring direct ten-unit arm calls. All existing helper10 behavioral assertions remain; actual painter coverage now checks mirrored shared-cadence endpoints, five-unit free-hand reach and unchanged carrying grip offset, with a discriminating obsolete-cadence negative control.",
     "previousBehavior": "Fixed low pelvis and two-unit toe lift forced deep knees. Reach clamp on steep terrain lowered pelvis further; old tests checked connection and planting but accepted crouching.",

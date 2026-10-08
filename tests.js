@@ -110,6 +110,39 @@ test('RISK Last task WOOP: unsupported data survives reload and replacement and 
  ctx.renderScan();assert.doesNotMatch(shim.document.getElementById('scan').innerHTML,/Walk Thru WOOP|Delete WOOP plan/);ctx.onAction('woop-start',{dataset:{benchmark:task.id}});assert.equal(vm.runInContext('woopDraft',ctx),null);
  delete task.woopPlan;ctx.onAction('woop-start',{dataset:{benchmark:task.id}});woopStep(app,'Outcome');woopStep(app,'Obstacle');ctx.replaceState(JSON.parse(ctx.cloudPayload()));woopStep(app,'If replaced, then act');assert.equal(ctx.state.tasks.find(t=>t.id===task.id).woopPlan,undefined,'same-account same-ID replacement invalidates draft');
 });
+test('RISK human support balance: rejected steep phone walks keep the vertical torso over a usable planted support',()=>{
+ const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
+ const geo=ctx.LandscapeGeometry.create(390,844);
+ // The independent browser rejection traversed this exact lane, seed and raw
+ // age interval. Knee-angle/terrain-clearance passes previously hid a pelvis
+ // projected downhill beyond both toes beneath an otherwise vertical torso.
+ for(const type of ['walker','dogwalker'])for(const reverse of [false,true])for(let frame=0;frame<=180;frame++){
+  const e={type,age:(.45+frame/180*.08)*70,duration:70,seed:.4,lane:.02,reverse},pose=geo.groundPose('walker',e),direction=reverse?-1:1,ground=x=>geo.groundAnchor('walker',x);
+  const motion=geo.humanWalkPose(pose.x,pose.y,pose.distance,direction,ground),contacts=motion.legs.filter(leg=>leg.lift===0);
+  assert.ok(contacts.length>0,'a walking frame always retains a planted support');
+  const lateralSupport=Math.min(...contacts.map(leg=>Math.abs(leg.footX-motion.hipX)));
+  assert.ok(lateralSupport<=2.5,`${type} reverse=${reverse}, frame=${frame}, x=${pose.x}: vertical torso is ${lateralSupport.toFixed(3)} units away from its nearest planted support; raised hips must not make a sitting silhouette`);
+  for(const leg of contacts){const nextDistance=pose.distance+1e-5,nextX=pose.x+direction*1e-5,next=geo.humanWalkPose(nextX,ground(nextX),nextDistance,direction,ground),other=next.legs[motion.legs.indexOf(leg)];if(other.lift===0)assert.ok(Math.abs(pose.x+direction*leg.footX-nextX-direction*other.footX)<1e-8,'balance repair must retain real world foot planting');}
+ }
+});
+
+test('RISK human terrain cadence: a whole curved crossing retains one stride and deterministic planted arrivals',()=>{
+ const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
+ for(const [width,height] of [[390,844],[844,390],[820,1180],[1440,900]])for(const direction of [-1,1]){
+  const geo=ctx.LandscapeGeometry.create(width,height);
+  for(const name of ['middle','near','trail']){
+   const ground=x=>geo[name](x),initial=geo.humanWalkPose(0,ground(0),0,direction,ground);
+   for(let index=0;index<=80;index++){
+    const x=width*index/80,distance=index*.371,p=geo.humanWalkPose(x,ground(x),distance,direction,ground,.5);
+    assert.equal(p.stride,initial.stride,'terrain curvature must not change phase and move a planted foot');
+    assert.deepEqual(p,geo.humanWalkPose(x,ground(x),distance,direction,ground,.5),'a sought frame has no smoothing history');
+   }
+   const arrival=geo.humanWalkPose(width/2,ground(width/2),40,direction,ground,1);
+   assert.ok(arrival.legs.every(leg=>leg.lift===0),'forty-unit visitor approach ends with both feet resting on each responsive ground');
+  }
+ }
+});
+
 test('RISK upright human gait: full cycles extend stance knees with modest swing flexion and preserved terrain contact',()=>{
  const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
  for(const [w,h] of [[390,844],[844,390],[820,1180],[1440,900]])for(const direction of [-1,1])for(const scale of [.65,1,1.2])for(const carrying of [0,.5,1]){

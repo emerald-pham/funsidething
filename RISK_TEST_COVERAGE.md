@@ -753,3 +753,7 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK upright pelvis consumer: torso head thighs and carrying arms follow the terrain hip
 - RISK upright gait consumer: every human painter consumes upright full cycles in both directions at responsive scales
 - RISK upright settled visitors: arrival endpoint rests both feet on terrain before eased departure
+
+- RISK human support balance: rejected steep phone walks keep the vertical torso over a usable planted support
+
+- RISK human terrain cadence: a whole curved crossing retains one stride and deterministic planted arrivals
