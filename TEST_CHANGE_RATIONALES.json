@@ -10,8 +10,7 @@
       "RISK upright settled visitors: arrival endpoint rests both feet on terrain before eased departure",
       "RISK upright torso travel: flat-ground pelvis travels steadily while terrain adaptation stays continuous",
       "RISK upright pelvis consumer: torso head thighs and carrying arms follow the terrain hip",
-      "RISK upright gait consumer: every human painter consumes upright full cycles in both directions at responsive scales",
-      "Landscape walker: arms swing opposite the legs through a full repeatable stride"
+      "RISK upright gait consumer: every human painter consumes upright full cycles in both directions at responsive scales"
     ],
     "preservedCoverage": [
       "Existing thigh/calf 3.2-unit length assertions remain exact, now measured from the terrain hip x instead of an assumed zero origin.",
