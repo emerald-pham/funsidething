@@ -908,9 +908,20 @@ export async function verifyDeploymentEvidence({ repository, deployedSha, before
     // CI checks out complete history: derive the same exact plan as the local
     // recorder, including the prose-only exemption and a removed base policy.
     // Real deployed checkouts fail closed when their review objects are absent.
-    const localHead=spawnSync('git',['-C',repoRoot,'cat-file','-e',headSha+'^{commit}']).status===0;
+    let localHead=spawnSync('git',['-C',repoRoot,'cat-file','-e',headSha+'^{commit}']).status===0;
     const localDeployment=spawnSync('git',['-C',repoRoot,'cat-file','-e',deployedSha+'^{commit}']).status===0;
-    if(localDeployment&&!localHead)throw new Error('Exact FAQ policy review head is unavailable; use a full release-evidence checkout.');
+    if(localDeployment&&!localHead){
+      // Squash merges do not retain the reviewed head in main history, and
+      // automatic branch deletion removes it from ordinary full checkouts.
+      // Fetch the immutable PR ref, then require the exact API-reported SHA.
+      const number=merged[0].number;
+      if(!Number.isSafeInteger(number)||number<1)throw new Error('Exact review head is unavailable and the merged PR number is invalid.');
+      const fetched=spawnSync('git',['-C',repoRoot,'fetch','--no-tags','origin','refs/pull/'+number+'/head'],{encoding:'utf8'});
+      const fetchedHead=spawnSync('git',['-C',repoRoot,'rev-parse','FETCH_HEAD'],{encoding:'utf8'});
+      if(fetched.status!==0 || fetchedHead.status!==0 || fetchedHead.stdout.trim()!==headSha)throw new Error('Fetched PR ref does not match the exact reviewed head.');
+      localHead=spawnSync('git',['-C',repoRoot,'cat-file','-e',headSha+'^{commit}']).status===0;
+      if(!localHead)throw new Error('Exact review head remains unavailable after fetching its PR ref.');
+    }
     const faqPolicy=localHead ? !!deriveReleaseReviewPlan(repoRoot,headSha,baseSha).requiresFaqReview : false;
     const reviewedCommit = await githubJson(fetchImpl, api + '/commits/' + headSha, token);
     if (!treeSha || reviewedCommit.commit?.tree?.sha !== treeSha) {

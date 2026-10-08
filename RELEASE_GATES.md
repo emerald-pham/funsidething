@@ -204,3 +204,9 @@ and Pages reject older publisher bindings for candidates carrying this FAQ
 policy. The policy is read from exact committed AGENTS.md, including the
 exact head and base in CI’s full release-evidence checkout; missing review
 objects fail closed.
+
+Full main history does not include a squashed PR head after automatic branch
+deletion. Deployment verification fetches the associated merged PR's retained
+`refs/pull/<number>/head` when that exact object is absent, then requires its SHA
+to match GitHub's reviewed head before deriving policy. A missing, invalid, or
+moved ref fails closed; fetching does not replace the deployed checkout.

@@ -742,3 +742,5 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK Last task WOOP: delayed CAS repair keeps newer peer plan and title plus concurrent local intent
 - RISK Last task WOOP: imported long causal chains validate without recursive stack failure
 - RISK Last task WOOP browser: mounted controls responsive saved revisit delete and offline reload
+
+- RISK repository process: deployment fetches deleted squash PR head and rejects ref identity mismatch
