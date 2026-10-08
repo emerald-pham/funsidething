@@ -616,3 +616,8 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - `RISK Squared Weighting consumer transitions: actual Settings change and Save clicks switch modes without changing ratings or pass marks` — real consumer transitions, equivalent controls, preservation and isolated negative controls.
 - `RISK Squared Weighting consumer buttons: rendered Start and Resume modes reach the click dispatcher and preserve resumed seeds` — real consumer transitions, equivalent controls, preservation and isolated negative controls.
 - `RISK Squared Weighting consumer import: actual JSON import click migrates old default once and preserves later explicit Chance` — real consumer transitions, equivalent controls, preservation and isolated negative controls.
+
+- RISK held decision keys: Yes No and Cant repeats cannot judge or skip replacement candidates while fresh presses still work
+- RISK held decision keys FAQ: keyboard guidance names one fresh keypress per Yes No or Cant decision
+
+- RISK Squared Weighting held keys: real keyboard repeats preserve the newly dealt candidate while fresh presses and Undo still work

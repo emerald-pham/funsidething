@@ -1,7 +1,7 @@
 [
   {
-    "testChangesSha256": "bcfd5384d49b2bdde476d89808545eb2e1aaad050e36110032fcf463a3f507ae",
-    "reason": "User requested a third quadratic scanning mode, its actual normalized percentages, and a once-only migration of the old Chance default while preserving later explicit choices. Follow-up user guidance asks for real consumer transitions rather than fixtures pre-set to final values.",
+    "testChangesSha256": "5fa54f74bbe539cd03182a832ba5b1aff191d0863ac9cbf4fc61d4d0b6e16e27",
+    "reason": "User requested a third quadratic scanning mode, its actual normalized percentages, and a once-only migration of the old Chance default while preserving later explicit choices. Follow-up user guidance asks for real consumer transitions rather than fixtures pre-set to final values. Reconcile the feature with released held-key PR66 and test the new mode through the keyboard consumer.",
     "previousBehavior": "Only Chance and Descending were accepted; new and invalid settings selected Chance; squaredPercentageWeight was absent and original shares stayed linear.",
     "intendedBehavior": "Squared Weighting uses full precision quadratic relative weights with frozen seeded order; old Chance defaults migrate once, nondefaults and post-rollout choices persist. Original Chance, TrueSkill and recorded model likelihood remain protected.",
     "replacementTests": [
@@ -16,7 +16,8 @@
       "RISK Squared Weighting joins: newly eligible tasks share one frozen scale regardless of input ordering",
       "RISK Squared Weighting consumer transitions: actual Settings change and Save clicks switch modes without changing ratings or pass marks",
       "RISK Squared Weighting consumer buttons: rendered Start and Resume modes reach the click dispatcher and preserve resumed seeds",
-      "RISK Squared Weighting consumer import: actual JSON import click migrates old default once and preserves later explicit Chance"
+      "RISK Squared Weighting consumer import: actual JSON import click migrates old default once and preserves later explicit Chance",
+      "RISK Squared Weighting held keys: real keyboard repeats preserve the newly dealt candidate while fresh presses and Undo still work"
     ],
     "preservedCoverage": [
       "All existing rating, eligibility, completion, storage, history, cloud revision, offline and Undo assertions are retained. Quick start and default expectations change only for the user-authorized third-mode rollout.",
@@ -25,7 +26,24 @@
     ],
     "redEvidence": {
       "command": "node --test --test-name-pattern='RISK Squared Weighting' tests.js; node --test tests.js; node --test --test-name-pattern=\"RISK Squared Weighting consumer\" /tmp/squared-consumer-negative/tests.js",
-      "failure": "Observed /tmp/squared-red.txt (missing squaredPercentageWeight and rejected squared preference), /tmp/squared-default-red.txt (Chance fresh default), /tmp/squared-migration-red.txt (old default not migrated), /tmp/squared-preservation-red.txt (migration repair false and squared history likelihood). Initial full suite also discriminated changed Quick start text and candidateOrder byte contract. Expanded sync coverage was added after implementation and passed once an inconsistent fixture was corrected; it is preservation evidence, not a claimed preimplementation red. New join regression /tmp/squared-join-red.txt observed 112.074 versus 5.534 for an already scored key before the join-scale repair. Expanded sync regression later discriminated the released base in /tmp/squared-sync-baseline-red.txt (Chance versus Squared); this retrospective check does not establish preimplementation chronology. Follow-up preservation tests pass the current product and fail isolated broken-handler mutations: /tmp/squared-consumer-change-negative.txt (3 fails), /tmp/squared-consumer-save-negative.txt (1 fail), /tmp/squared-consumer-buttons-negative.txt (1 fail), /tmp/squared-consumer-resume-negative.txt (1 fail). These are explicitly retrospective mutation controls for established behavior, not claimed preimplementation red."
+      "failure": "Observed /tmp/squared-red.txt (missing squaredPercentageWeight and rejected squared preference), /tmp/squared-default-red.txt (Chance fresh default), /tmp/squared-migration-red.txt (old default not migrated), /tmp/squared-preservation-red.txt (migration repair false and squared history likelihood). Initial full suite also discriminated changed Quick start text and candidateOrder byte contract. Expanded sync coverage was added after implementation and passed once an inconsistent fixture was corrected; it is preservation evidence, not a claimed preimplementation red. New join regression /tmp/squared-join-red.txt observed 112.074 versus 5.534 for an already scored key before the join-scale repair. Expanded sync regression later discriminated the released base in /tmp/squared-sync-baseline-red.txt (Chance versus Squared); this retrospective check does not establish preimplementation chronology. Follow-up preservation tests pass the current product and fail isolated broken-handler mutations: /tmp/squared-consumer-change-negative.txt (3 fails), /tmp/squared-consumer-save-negative.txt (1 fail), /tmp/squared-consumer-buttons-negative.txt (1 fail), /tmp/squared-consumer-resume-negative.txt (1 fail). These are explicitly retrospective mutation controls for established behavior, not claimed preimplementation red. /tmp/squared-held-integration-red.txt: the pre-reconciliation feature1889f85 still judged squared replacement candidates on held Y; new integration regression observed red before resolving merged app/template assets. Reconciliation retains released repeat guards and both full risk inventories/history."
+    }
+  },
+  {
+    "testChangesSha256": "f263ce5f2aee044fbb511413ad87652cee7c535b7de7f4b82bcdcb412ed0feb1",
+    "reason": "User approved the audited held-key bug fix; repeated decision events must not act on replacement candidates.",
+    "previousBehavior": "Held Yes and No recorded preferences for successive candidates, and held Cant skipped successive candidates without a fresh keypress.",
+    "intendedBehavior": "Ignore repeat Y N C decision events while preserving fresh decisions, comparison orientation, neutral Cant, saved chance ordering and exact-rating Undo.",
+    "replacementTests": [
+      "RISK held decision keys: Yes No and Cant repeats cannot judge or skip replacement candidates while fresh presses still work",
+      "RISK held decision keys FAQ: keyboard guidance names one fresh keypress per Yes No or Cant decision"
+    ],
+    "preservedCoverage": [
+      "Existing TrueSkill math, eligibility, mouse identity guards, Done repeat handling, storage, cloud sync and historical observation tests remain intact."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK held decision keys' tests.js",
+      "failure": "/tmp/chain-held-key-red.txt: both tests failed; repeated y in descending mode changed replacement ratings and observation history, and keyboard FAQ guidance was absent."
     }
   },
   {
