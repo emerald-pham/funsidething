@@ -23047,6 +23047,7 @@ test('RISK Last task WOOP: future conflicting and cyclic operation evidence is p
  }
 
  const plan={v:1,id:'plan-a',outcome:'Outcome',obstacle:'Obstacle',plan:'If obstacle, then act'},a={v:1,id:'op-a',observed:[],value:plan},b={v:1,id:'op-a',observed:[],value:null};
+ const archived={id:task.id,woopPlan:plan,woopHead:'op-a',woopPlanOps:[a],ratingHistoryRecovery:[{woopRecovery:1,evidence:{woopPlan:{v:99,private:'preserved archive'}}}]},replacement={id:task.id,woopPlan:null};ctx.replaceTaskWoop(replacement,archived);assert.equal(ctx.supportedWoopEvidence(replacement),false,'replacement carries read-only peer archive before writes');assert.equal(replacement.woopPlanOps.length,1,'replacement cannot mint a successor over unknown evidence');assert.equal(JSON.stringify(replacement.ratingHistoryRecovery),JSON.stringify(archived.ratingHistoryRecovery));
  const winner={...task,woopPlan:plan,woopHead:'op-a',woopPlanOps:[a]},other={...task,woopPlan:null,woopHead:'op-a',woopPlanOps:[b]};ctx.mergeTaskWoop(winner,other);assert.equal(winner.woopPlanOps.length,2,'immutable ID conflicts retain both facts');assert.equal(JSON.stringify(winner.woopPlan),JSON.stringify(plan));
  task.woopPlanOps=[a,b];task.woopPlan=plan;ctx.renderScan();assert.doesNotMatch(shim.document.getElementById('scan').innerHTML,/Delete WOOP plan/,'ambiguous evidence is read-only');
  task.woopPlanOps=[{...a,observed:['op-b']},{v:1,id:'op-b',observed:['op-a'],value:null}];ctx.writeTaskWoop(task,null);assert.equal(task.woopPlanOps.length,2,'cycles do not mint new operations');
@@ -23099,6 +23100,7 @@ test('RISK Last task WOOP: Restore and Undo express deliberate successors withou
  const restored=ctx.state.tasks.find(t=>t.id===task.id);assert.equal(restored.woopPlan.outcome,'Saved outcome');assert.ok(ctx.state.tasks.some(t=>t.id===later.id));assert.ok(restored.woopPlanOps.length>=3,'restoration supersedes creation and deletion');
  const stable=JSON.stringify(restored.woopPlanOps),old=JSON.parse(snapshot);ctx.mergeUndeletedTasks(ctx.state,old);assert.equal(JSON.stringify(restored.woopPlanOps),stable,'replayed snapshot creates no extra operation');
  ctx.undo();await ctx.persist();assert.equal(ctx.state.tasks.find(t=>t.id===task.id).woopPlan,null,'Undo Restore is a successor deletion');assert.ok(ctx.state.tasks.some(t=>t.id===later.id));
+ const guarded=ctx.state.tasks.find(t=>t.id===task.id);guarded.ratingHistoryRecovery=[{woopRecovery:1,evidence:{woopPlan:{v:99,private:'peer archive'}}}];await ctx.persist();const beforeOps=JSON.stringify(guarded.woopPlanOps);ctx.openSettings();assert.equal(await ctx.restoreDurableBackupById(backup.id),true);const readOnly=ctx.state.tasks.find(t=>t.id===task.id);assert.equal(ctx.supportedWoopEvidence(readOnly),false,'actual Restore preserves read-only archive');assert.equal(JSON.stringify(readOnly.woopPlanOps),beforeOps,'actual Restore mints no operation against archived unknown evidence');assert.ok(JSON.stringify(readOnly.ratingHistoryRecovery).includes('peer archive'));
 });
 
 test('RISK Last task WOOP: delayed CAS repair keeps newer peer plan and title plus concurrent local intent',async()=>{

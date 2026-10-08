@@ -2990,7 +2990,7 @@
     }
   },
   {
-    "testChangesSha256": "b414eb692a868bfc6abd231b3a0031606a2cf92d716553362cfa8df93c79c3a6",
+    "testChangesSha256": "47e0b70f13f131fb13a243d08e0d9f6d6121b1028a31cfa5d2ea7cf92723d88a",
     "reason": "Implement user-authorized final-task WOOP with task-owned causal persistence, mounted settings and workflow gates, dependency filter label/order, and independent FAQ coverage release enforcement. Expand lifecycle acceptance without weakening existing behavior.",
     "previousBehavior": "The released app had no Last task WOOP control or saved plan; dependency filtering appeared before choices and below Evergreen in Edit; FAQ was unsectioned and release receipts had no independent FAQ check. Quick-start tests retained obsolete all-three-modes prose.",
     "intendedBehavior": "Off-default WOOP offers a three-step walkthrough only on the final paused task after two unique recorded dislodgements. Saved plans revisit/delete safely across offline, stale tab, sync, Restore and Undo. Filter dependencies follows choices and precedes Evergreen. Settings-aligned FAQs and distinct exact-candidate FAQ evidence are required by local and Pages gates.",
@@ -3022,7 +3022,7 @@
       "Existing typography feature flags and seven Quick-start steps retain their exact semantic assertions; only authorized stale mode-count copy expectations change."
     ],
     "redEvidence": {
-      "command": "node --test --test-name-pattern='RISK Last task WOOP:' tests.js; separate mounted dependency/FAQ/process and reviewer regression RED runs (logs ../woop-red.txt, ../faq-filter-red.txt, ../faq-sections-red.txt, ../woop-future-red.txt, ../woop-delete-binding-red.txt, ../faq-legacy-red.txt, ../faq-verify-red.txt, ../faq-deployment-docs-red.txt, ../woop-replacement-future-red.txt, ../woop-opaque-recovery-red.txt, ../woop-intervention-red.txt, ../woop-long-chain-red.txt). Latest recovery repair RED: ../woop-opaque-both-directions-red.txt; GREEN: ../woop-recovery-green.txt.",
+      "command": "node --test --test-name-pattern='RISK Last task WOOP:' tests.js; separate mounted dependency/FAQ/process and reviewer regression RED runs (logs ../woop-red.txt, ../faq-filter-red.txt, ../faq-sections-red.txt, ../woop-future-red.txt, ../woop-delete-binding-red.txt, ../faq-legacy-red.txt, ../faq-verify-red.txt, ../faq-deployment-docs-red.txt, ../woop-replacement-future-red.txt, ../woop-opaque-recovery-red.txt, ../woop-intervention-red.txt, ../woop-long-chain-red.txt). Latest recovery repair RED: ../woop-opaque-both-directions-red.txt; GREEN: ../woop-recovery-green.txt. Peer archive replacement RED ../woop-archive-replacement-red.txt; GREEN ../woop-archive-replacement-green.txt.",
       "failure": "Observed before initial implementation: five WOOP failures for missing default, walkthrough and atomic preservation; missing Filter dependencies mounted label/order; missing FAQ headings and required reviewer. Reviewer repair REDs reproduced future evidence loss, stale Delete, legacy receipt bypass, prose exemption/deployment shallow-history gaps, interruption boundary and recursive graph overflow. Additional lifecycle and browser acceptance tests added after initial implementation are preservation coverage, not retrospective preimplementation RED claims."
     }
   }
