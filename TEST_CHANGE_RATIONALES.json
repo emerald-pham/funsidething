@@ -2350,5 +2350,41 @@
       "command": "node --test --test-reporter=spec --test-name-pattern='RISK Edit evergreen unit' tests.js",
       "failure": "/tmp/chain-edit-unit-red.log: both mounted handler tests fail 18 !== 7. Prior context/divider red remains /tmp/chain-context-ui-red.log and scope correction /tmp/chain-context-ui-scope-red.log."
     }
+  },
+  {
+    "testChangesSha256": "6a9b8e42bd637953b57f7924640e81c39fcf6972c99fe8314f73b342590da4f8",
+    "reason": "Requested All Tasks durations above sixty minutes in hour/minute notation and no overflow; actual rendered badge consumer boundaries plus preservation of existing global box model and wrapping.",
+    "previousBehavior": "Cant badge renders61m/90m/120m; existing global border-box and wrapped readable-width titles already bound metadata.",
+    "intendedBehavior": "Cant badge displays1h1m/1h30m/2h above60, retaining exact60m and minute ceiling. Existing layout,Worked/evergreen roundings,stored values and editor units remain unchanged.",
+    "replacementTests": [
+      "RISK All Tasks duration formatting: rendered Cant badges cross sixty minutes without changing other time rules or saved values",
+      "RISK All Tasks duration wrapping: badges include their padding in the available column and preserve readable title width",
+      "RISK All Tasks duration browser: long titles tags and hour-minute badges fit narrow enlarged text columns"
+    ],
+    "preservedCoverage": [
+      "All prior context/editor weekly-default,Add interval,ratings,Undo,cloud,sync,layout and conversion protections retained unchanged. Wrapping test is explicitly existing-layout preservation,not evidence of a preexisting overflow defect."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='RISK All Tasks duration' tests.js",
+      "failure": "/tmp/chain-duration-red.log actual All Tasks can’t61m != can’t1h1m. The original per-selector border-box assertion also failed,but global * border-box already applied; that redundant implementation and misleading assertion were corrected. Browser test gated pending allocation. Earlier red logs retained."
+    }
+  },
+  {
+    "testChangesSha256": "59e626c520037f453b4aad19f28dd9905ec9ed32baebad3bf50ce2360fe1e3bc",
+    "reason": "Requested All Tasks durations above sixty minutes in hour/minute notation and no overflow; actual rendered badge consumer boundaries plus preservation of existing global box model and wrapping.",
+    "previousBehavior": "Cant badge renders61m/90m/120m; existing global border-box and wrapped readable-width titles already bound metadata.",
+    "intendedBehavior": "Cant badge displays1h1m/1h30m/2h above60, retaining exact60m and minute ceiling. Existing layout,Worked/evergreen roundings,stored values and editor units remain unchanged.",
+    "replacementTests": [
+      "RISK All Tasks duration formatting: rendered Cant badges cross sixty minutes without changing other time rules or saved values",
+      "RISK All Tasks duration wrapping: badges include their padding in the available column and preserve readable title width",
+      "RISK All Tasks duration browser: long titles tags and hour-minute badges fit narrow enlarged text columns"
+    ],
+    "preservedCoverage": [
+      "All prior context/editor weekly-default,Add interval,ratings,Undo,cloud,sync,layout and conversion protections retained unchanged. Wrapping test is explicitly existing-layout preservation,not evidence of a preexisting overflow defect."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='RISK All Tasks duration' tests.js",
+      "failure": "/tmp/chain-duration-red.log actual All Tasks can’t61m != can’t1h1m. The original per-selector border-box assertion also failed,but global * border-box already applied; that redundant implementation and misleading assertion were corrected. Browser test gated pending allocation. Earlier red logs retained."
+    }
   }
 ]

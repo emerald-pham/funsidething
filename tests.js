@@ -21906,3 +21906,36 @@ test('RISK Edit evergreen unit preservation: explicit drafts custom intervals an
   ctx.closeModal();assert.equal(task.evergreenHours,18);change=mountPrivateEditInterval(ctx,shim,task);change('etEverUnit','days');assert.equal(shim.document.getElementById('etEverHours').value,'7','reopening resets draft edit protection');
  }
 });
+
+test('RISK All Tasks duration formatting: rendered Cant badges cross sixty minutes without changing other time rules or saved values',async()=>{
+ const {ctx,shim}=await loadApp();const now=new Date(2026,9,8,3).getTime();setFakeTime(ctx,now);ctx.state.listOpen=true;
+ const task=ctx.addTask('Private timed task');ctx.state.considered[task.id]='cant';ctx.state.cantAt[task.id]=now;
+ for(const [minutes,label] of [[59,'59m'],[60,'60m'],[61,'1h1m'],[90,'1h30m'],[120,'2h'],[480,'8h'],[1441,'24h1m'],[60.01,'1h1m'],[.01,'1m'],[0,'']]){
+  ctx.state.settings.cantMin=minutes;const before=JSON.stringify(ctx.state);ctx.renderList();
+  const badge=shim.document.getElementById('listBody').innerHTML.match(/<span class="skipped">([^<]*)<\/span>/)[1];
+  assert.equal(badge,'can’t'+(label?' · '+label:''),'All Tasks renders '+minutes+' minutes with the requested boundary');
+  assert.equal(JSON.stringify(ctx.state),before,'duration display never rewrites timing values');
+ }
+ ctx.state.considered[task.id]='worked';ctx.state.workedAt[task.id]=now;ctx.state.settings.workedHours=1.5;ctx.renderList();assert.match(shim.document.getElementById('listBody').innerHTML,/worked · 2h/,'Worked keeps existing hour ceiling');
+ Object.assign(task,{evergreen:true,evergreenHours:25,lastDoneAt:now,evergreenResetAtDay:false});ctx.renderList();assert.match(shim.document.getElementById('listBody').innerHTML,/class="chip ever-countdown"[^>]*>2d</,'Evergreen keeps existing day ceiling');
+ task.evergreenHours=1.5;ctx.renderList();assert.match(shim.document.getElementById('listBody').innerHTML,/class="chip ever-countdown"[^>]*>2h</,'Evergreen keeps existing hour ceiling');
+});
+test('RISK All Tasks duration wrapping: badges include their padding in the available column and preserve readable title width',()=>{
+ assert.match(html,/\*\{box-sizing:border-box\}/,'the existing global box model includes badge padding/borders');
+ for(const selector of ['chip','skipped']){const rule=new RegExp('\\.tmain \\.'+selector+'\\s*\\{([^}]+)\\}').exec(html)?.[1]||'';assert.match(rule,/max-width:100%/);assert.match(rule,/overflow-wrap:anywhere/);}
+ assert.match(html,/\.tmain \.tt\s*\{[^}]*min-width:min\(120px,100%\)/,'titles keep readable width when durations wrap');
+});
+test('RISK All Tasks duration browser: long titles tags and hour-minute badges fit narrow enlarged text columns',
+ {skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const {webkit,chromium}=await import(process.env.PLAYWRIGHT_MODULE||'playwright'),origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+ for(const [name,engine] of [['webkit',webkit],['chrome',chromium]]){
+  const browser=await engine.launch({headless:true,...(name==='chrome'?{channel:'chrome'}:{})});try{
+   const context=await browser.newContext({viewport:{width:320,height:568},serviceWorkers:'block'});await context.addInitScript(()=>{Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});localStorage.setItem('fvp:chain-scanner:landscape-motion','reduced');});await context.route('**/*',r=>new URL(r.request().url()).origin===origin?r.continue():r.abort());const page=await context.newPage();await page.goto(process.env.LANDSCAPE_BROWSER_URL);await page.waitForFunction(()=>typeof state!=='undefined'&&state?.tasks);
+   await page.evaluate(()=>{closeModal();document.getElementById('motionDialog')?.close();state.listOpen=true;state.settings.cantMin=90;const timed=addTask('Private long title with several words '+ 'Title'.repeat(25));timed.due='2099-12-30';state.considered[timed.id]='cant';state.cantAt[timed.id]=Date.now();const tagged=addTask('Private long imported status');state.considered[tagged.id]='LongImportedStatus'+ 'Tag'.repeat(60);render();});
+   await page.addStyleTag({content:'.tmain .tt{font-size:24px!important}.tmain .chip,.tmain .skipped{font-size:18px!important}'});
+   for(const [width,height] of [[320,568],[390,844],[768,1024],[1280,800]]){
+    await page.setViewportSize({width,height});const geometry=await page.evaluate(()=>{renderList();const body=document.getElementById('listBody');return {viewport:innerWidth,pageWidth:document.documentElement.scrollWidth,bodyWidth:body.clientWidth,scroll:body.scrollWidth,rows:[...body.querySelectorAll('.trow')].map(row=>{const main=row.querySelector('.tmain'),mr=main.getBoundingClientRect();return {main:mr.width,title:main.querySelector('.tt').getBoundingClientRect().width,children:[...main.children].map(el=>{const r=el.getBoundingClientRect();return {text:el.textContent,left:r.left,right:r.right,within:r.left>=mr.left-1&&r.right<=mr.right+1};})};})};});assert.ok(geometry.pageWidth<=geometry.viewport+1,name+' '+width+' page overflow');assert.ok(geometry.scroll<=geometry.bodyWidth+1,name+' '+width+' list overflow');for(const row of geometry.rows){assert.ok(row.title>=Math.min(120,row.main-32),'readable title width');for(const child of row.children)assert.ok(child.within,child.text+' fits column');}assert.ok(geometry.rows.some(row=>row.children.some(child=>child.text.includes('1h30m'))),'actual duration consumer renders');
+   }await context.close();
+  }finally{await browser.close();}
+ }
+});
