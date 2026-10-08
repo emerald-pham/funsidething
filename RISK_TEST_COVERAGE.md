@@ -707,3 +707,14 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - Dependency search typography uses shared text-input styling; narrow normal/enlarged Add/Edit native rendering and actual Chrome font identity: `RISK dependency search styling: Add and Edit share text input typography borders and spacing`; `RISK dependency search rendered styling: Add and Edit resolved fonts borders spacing and enlarged sizing match text controls`.
 
 - Dependency rendered fixture rejects empty style initialization and verifies the app’s actual theme after startup: `RISK dependency rendered runner: style initialization is nonempty and dark samples apply and verify the real theme`.
+
+## Halving weighting ranking and saved preferences
+
+- RISK Halving weighting distribution: exact finite tails boundaries ties and large pools
+- RISK Halving weighting consumer state: selector legacy preference filtering no replacement Undo and reload
+- RISK Halving weighting pass: suffixes remain reproducible across input order joins resume and day boundaries
+- RISK Halving weighting stale tab: offline mode change survives peer deletion and reload without restoring a deleted task
+- RISK Halving weighting displayed likelihood: actual list and editor distinguish underlying Chance shares from positional draws
+- RISK Halving weighting concurrent joins: same-pass frozen likelihood ranks survive peer adoption and reload without mixing generations
+- RISK Halving weighting likelihood sorting: current underlying shares ignore obsolete Chance pass fallback
+- RISK Halving weighting likelihood estimate: uncertainty-sensitive existing Chance scores define frozen positional order
