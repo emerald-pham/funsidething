@@ -720,3 +720,25 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK Halving weighting likelihood estimate: uncertainty-sensitive existing Chance scores define frozen positional order
 - RISK Halving weighting open Settings: mode transitions refresh the likelihood label and retire the legacy chooser without losing drafts
 - RISK Halving weighting enlarged metric: real Settings transition keeps a compact label and wrapping underlying likelihood explanation
+
+## Last task WOOP, dependency filter, and independent FAQ release review
+
+- RISK Last task WOOP: mounted preference and final paused boundary use unique recorded dislodgements
+- RISK Last task WOOP: walkthrough saves escaped outcome obstacle plan to bound task and revisits deletes reloads
+- RISK Last task WOOP: cancel empty repeated stale interrupted and peer-plan actions never mutate replacement tasks
+- RISK Last task WOOP: atomic stale-tab rebase preserves newer fields peer plans and deletion tombstones
+- RISK Last task WOOP: causal plan evidence defeats old-client-carried plans and deliberate Undo records successor
+- RISK Last task WOOP: real stale-tab saves preserve newer title plan and deletion plus offline reload
+- RISK Last task WOOP: cloud offline failed pull reconnect completion and Undo retain task-owned causal plan
+- RISK Last task WOOP: unsupported data survives reload and replacement and interrupted board ownership blocks save
+- RISK dependency filter placement: mounted Add and Edit put Filter dependencies after choices and before Evergreen
+- RISK repository process: FAQ coverage needs a distinct exact-candidate reviewer and bound evidence
+- RISK FAQ sections: mounted Quick start matches Settings groups and covers WOOP lifecycle and dependency filter
+- RISK Last task WOOP: future conflicting and cyclic operation evidence is preserved read-only
+- RISK Last task WOOP: rendered Delete binding rejects same-ID board replacement and restored head
+- RISK repository process: FAQ policy rejects legacy verified receipts and old deployment descriptions
+- RISK repository process: Pages FAQ policy reads exact head and base from a full release-evidence checkout
+- RISK Last task WOOP: Restore and Undo express deliberate successors without deleting later independent tasks
+- RISK Last task WOOP: delayed CAS repair keeps newer peer plan and title plus concurrent local intent
+- RISK Last task WOOP: imported long causal chains validate without recursive stack failure
+- RISK Last task WOOP browser: mounted controls responsive saved revisit delete and offline reload

@@ -2988,5 +2988,42 @@
       "command": "node --test --test-name-pattern='RISK Halving weighting' tests.js; node --test --test-name-pattern='RISK Halving weighting distribution' tests.js; node --test --test-name-pattern='RISK Halving weighting likelihood estimate' tests.js; node --test --test-name-pattern=\"RISK Halving weighting enlarged metric:\" tests.js",
       "failure": "Observed missing halvingIndex function and missing halving Settings option before implementation (halving-red.log). Boundary test then observed 1 instead of 0 immediately below 50% with logarithmic inversion; corrected using exact binary interval subtraction (halving-boundary-red.log). Added pass and stale-tab tests pass as preservation coverage; no preimplementation red claimed for those. Further observed RED: max32-bit hash truncated80-task tail at33 instead of79 (halving-large-red.log); actual list displayed50% overall (halving-display-red.log); same-pass peer adoption lost frozen mu=-10 and list sorted obsolete saved Chance fallback (halving-review-red.log). First full run also caught original candidateOrder byte assertion; the original digest now still applies after removing exactly the new authorized dispatch line. Metadata RED recorded in halving-metadata-red.log and halving-shell-red.log before fingerprint refresh. Actual concurrent browser persistence consumer subsequently added and passed after repair (halving-concurrent-consumer.log); no preimplementation RED claimed for that supplementary consumer. Parent-directed uncertainty-sensitive RED showed mu100/sigma1000 with Chance likelihood.521908 being selected ahead of mu90/sigma1 with.748005, then GREEN after ranking frozen existing Chance weights (halving-uncertainty-red.log). Mode-specific Settings list metric label RED observed missing Underlying likelihood percent (halving-settings-label-red.log); original modes retain their original label. Mounted Settings transition RED observed stale Overall percent chance after actual mode change (halving-mounted-settings-red.log). Fix updates only mounted options, removes legacy chooser immediately after switching away, and preserves other drafts; nine Halving tests GREEN. Reconciled onto released PR76 64914b8a6a9c0011aa981ff07199482c7eaa4577; predecessor assertions and Add/dependency code preserved; stale metadata RED observed before refreshing fingerprints (halving-rebase-metadata-red.log). Actual pixel typography HOLD on both engines/themes preceded new consumer RED: expected Likelihood (%) but actual Underlying likelihood percent (halving-label-red.log), then10 Halving tests GREEN. Existing two copy assertions updated only for the observed repair; every probability/persistence/learning assertion remains."
     }
+  },
+  {
+    "testChangesSha256": "a2b2fa0e42943663fd4d57e4755453a2ce70d6d32d4a930ead0e7f4a32584c2a",
+    "reason": "Implement user-authorized final-task WOOP with task-owned causal persistence, mounted settings and workflow gates, dependency filter label/order, and independent FAQ coverage release enforcement. Expand lifecycle acceptance without weakening existing behavior.",
+    "previousBehavior": "The released app had no Last task WOOP control or saved plan; dependency filtering appeared before choices and below Evergreen in Edit; FAQ was unsectioned and release receipts had no independent FAQ check. Quick-start tests retained obsolete all-three-modes prose.",
+    "intendedBehavior": "Off-default WOOP offers a three-step walkthrough only on the final paused task after two unique recorded dislodgements. Saved plans revisit/delete safely across offline, stale tab, sync, Restore and Undo. Filter dependencies follows choices and precedes Evergreen. Settings-aligned FAQs and distinct exact-candidate FAQ evidence are required by local and Pages gates.",
+    "replacementTests": [
+      "RISK Last task WOOP: mounted preference and final paused boundary use unique recorded dislodgements",
+      "RISK Last task WOOP: walkthrough saves escaped outcome obstacle plan to bound task and revisits deletes reloads",
+      "RISK Last task WOOP: cancel empty repeated stale interrupted and peer-plan actions never mutate replacement tasks",
+      "RISK Last task WOOP: atomic stale-tab rebase preserves newer fields peer plans and deletion tombstones",
+      "RISK Last task WOOP: causal plan evidence defeats old-client-carried plans and deliberate Undo records successor",
+      "RISK Last task WOOP: real stale-tab saves preserve newer title plan and deletion plus offline reload",
+      "RISK Last task WOOP: cloud offline failed pull reconnect completion and Undo retain task-owned causal plan",
+      "RISK Last task WOOP: unsupported data survives reload and replacement and interrupted board ownership blocks save",
+      "RISK dependency filter placement: mounted Add and Edit put Filter dependencies after choices and before Evergreen",
+      "RISK repository process: FAQ coverage needs a distinct exact-candidate reviewer and bound evidence",
+      "RISK FAQ sections: mounted Quick start matches Settings groups and covers WOOP lifecycle and dependency filter",
+      "RISK Last task WOOP: future conflicting and cyclic operation evidence is preserved read-only",
+      "RISK Last task WOOP: rendered Delete binding rejects same-ID board replacement and restored head",
+      "RISK repository process: FAQ policy rejects legacy verified receipts and old deployment descriptions",
+      "RISK repository process: Pages FAQ policy reads exact head and base from a full release-evidence checkout",
+      "RISK Last task WOOP: Restore and Undo express deliberate successors without deleting later independent tasks",
+      "RISK Last task WOOP: delayed CAS repair keeps newer peer plan and title plus concurrent local intent",
+      "RISK Last task WOOP: imported long causal chains validate without recursive stack failure",
+      "RISK Last task WOOP browser: mounted controls responsive saved revisit delete and offline reload"
+    ],
+    "preservedCoverage": [
+      "Existing learning signals, initial task rules, Squared default and all explicit saved ranking mode choices remain protected by unchanged mode tests.",
+      "Existing context, dependency selection eligibility, input focus and IME behavior, completion, Undo, storage recovery and backward compatibility assertions remain intact.",
+      "Existing exact-SHA release receipt, historic pre-policy legacy evidence, independent code and specialist roles and pure-documentation owner-review exemption remain protected.",
+      "Existing typography feature flags and seven Quick-start steps retain their exact semantic assertions; only authorized stale mode-count copy expectations change."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK Last task WOOP:' tests.js; separate mounted dependency/FAQ/process and reviewer regression RED runs (logs ../woop-red.txt, ../faq-filter-red.txt, ../faq-sections-red.txt, ../woop-future-red.txt, ../woop-delete-binding-red.txt, ../faq-legacy-red.txt, ../faq-verify-red.txt, ../faq-deployment-docs-red.txt, ../woop-replacement-future-red.txt, ../woop-opaque-recovery-red.txt, ../woop-intervention-red.txt, ../woop-long-chain-red.txt).",
+      "failure": "Observed before initial implementation: five WOOP failures for missing default, walkthrough and atomic preservation; missing Filter dependencies mounted label/order; missing FAQ headings and required reviewer. Reviewer repair REDs reproduced future evidence loss, stale Delete, legacy receipt bypass, prose exemption/deployment shallow-history gaps, interruption boundary and recursive graph overflow. Additional lifecycle and browser acceptance tests added after initial implementation are preservation coverage, not retrospective preimplementation RED claims."
+    }
   }
 ]

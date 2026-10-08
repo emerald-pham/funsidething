@@ -7,6 +7,109 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 
+// Last task WOOP exercises mounted handlers and real task history, not guessed pass marks.
+async function woopFixture(){
+ const app=await loadApp({seed:971});const {ctx}=app;
+ const task=ctx.addTask('Private final task');ctx.state.mode='work';ctx.state.chain=[task.id];
+ return {...app,task};
+}
+function woopStep(app,value){
+ const {ctx,shim}=app;shim.document.getElementById('woopAnswer').value=value;
+ const session=vm.runInContext('woopDraft',ctx);
+ ctx.onAction('woop-next',{dataset:{session:session.id,step:String(session.step)}});
+}
+function woopDislodgeTwice(app){
+ const {ctx,task}=app;
+ for(let i=0;i<2;i++){ctx.state.chain=[task.id];ctx.dislodge();}
+ ctx.state.chain=[task.id];ctx.state.mode='work';ctx.state.settings.lastTaskWoop=true;
+}
+test('RISK Last task WOOP: mounted preference and final paused boundary use unique recorded dislodgements',async()=>{
+ const app=await woopFixture(),{ctx,shim,task}=app;
+ assert.equal(ctx.state.settings.lastTaskWoop,false,'new boards default off');
+ for(const value of [undefined,null,'true',1,{},[]])assert.equal(ctx.normalizeSettings({lastTaskWoop:value}).lastTaskWoop,false);
+ ctx.openSettings();assert.match(shim.document.getElementById('modalRoot').innerHTML,/Last task WOOP/);
+ const field=shim.document.getElementById('stLastTaskWoop');field.id='stLastTaskWoop';field.checked=true;field.matches=()=>false;
+ shim.document.dispatchEvent({type:'change',target:field});assert.equal(ctx.state.settings.lastTaskWoop,true);ctx.closeModal();
+ for(let count=0;count<3;count++){
+  ctx.state.chain=[task.id];ctx.state.mode='work';ctx.renderScan();
+  assert.equal(shim.document.getElementById('scan').innerHTML.includes('Walk Thru WOOP for Final Task'),count===2);
+  if(count<2)ctx.dislodge();
+ }
+ const history=JSON.parse(JSON.stringify(task.ratingHistory));task.ratingHistory.push(...history);ctx.renderScan();assert.equal(ctx.taskDislodgeCount(task),2,'sync duplicates do not inflate actions');
+ const other=ctx.addTask('Private other');ctx.state.chain=[other.id,task.id];ctx.renderScan();assert.doesNotMatch(shim.document.getElementById('scan').innerHTML,/Walk Thru WOOP/);
+ ctx.state.chain=[task.id];ctx.state.mode='scan';ctx.renderScan();assert.doesNotMatch(shim.document.getElementById('scan').innerHTML,/Walk Thru WOOP/);
+ ctx.state.mode='work';ctx.state.interventionActive=true;ctx.renderScan();assert.doesNotMatch(shim.document.getElementById('scan').innerHTML,/Walk Thru WOOP/,'an active scan intervention is not the paused scanner');ctx.state.interventionActive=false;
+ ctx.state.mode='work';ctx.state.settings.lastTaskWoop=false;ctx.renderScan();assert.doesNotMatch(shim.document.getElementById('scan').innerHTML,/Walk Thru WOOP/);
+});
+test('RISK Last task WOOP: walkthrough saves escaped outcome obstacle plan to bound task and revisits deletes reloads',async()=>{
+ const app=await woopFixture(),{ctx,shim,task}=app;woopDislodgeTwice(app);const twin=ctx.addTask(task.title);
+ ctx.onAction('woop-start',{dataset:{benchmark:task.id}});assert.match(shim.document.getElementById('modalRoot').innerHTML,/best outcome/i);
+ woopStep(app,'<Best outcome>');assert.match(shim.document.getElementById('modalRoot').innerHTML,/obstacle/i);
+ woopStep(app,'Private obstacle');assert.match(shim.document.getElementById('modalRoot').innerHTML,/if.*then/i);
+ woopStep(app,'If blocked, then take one small step.');await ctx.persist();
+ assert.equal(task.woopPlan.outcome,'<Best outcome>');assert.equal(task.woopPlan.obstacle,'Private obstacle');assert.equal(task.woopPlan.plan,'If blocked, then take one small step.');assert.equal(twin.woopPlan,undefined);
+ ctx.renderScan();let markup=shim.document.getElementById('scan').innerHTML;assert.match(markup,/&lt;Best outcome&gt;/);assert.match(markup,/Delete WOOP plan/);assert.doesNotMatch(markup,/Walk Thru WOOP/);
+ const saved=shim.localStorage.getItem(SYNC_STORE_KEY),reloaded=await loadApp({seedStorage:{[SYNC_STORE_KEY]:saved}});assert.equal(reloaded.ctx.state.tasks.find(t=>t.id===task.id).woopPlan.plan,task.woopPlan.plan);
+ ctx.state.settings.lastTaskWoop=false;ctx.renderScan();assert.doesNotMatch(shim.document.getElementById('scan').innerHTML,/Best outcome|WOOP plan/);assert.ok(task.woopPlan);
+ ctx.state.settings.lastTaskWoop=true;ctx.state.chain=[twin.id];ctx.renderScan();assert.doesNotMatch(shim.document.getElementById('scan').innerHTML,/Best outcome/);
+ ctx.state.chain=[task.id];ctx.onAction('woop-delete',{dataset:{benchmark:task.id,plan:task.woopPlan.id}});assert.equal(task.woopPlan,null,'null is a durable deletion tombstone');await ctx.persist();ctx.renderScan();assert.match(shim.document.getElementById('scan').innerHTML,/Walk Thru WOOP/);
+ const deleted=await loadApp({seedStorage:{[SYNC_STORE_KEY]:shim.localStorage.getItem(SYNC_STORE_KEY)}});assert.equal(deleted.ctx.state.tasks.find(t=>t.id===task.id).woopPlan,null);
+});
+test('RISK Last task WOOP: cancel empty repeated stale interrupted and peer-plan actions never mutate replacement tasks',async()=>{
+ const app=await woopFixture(),{ctx,task,shim}=app;woopDislodgeTwice(app);
+ ctx.onAction('woop-start',{dataset:{benchmark:task.id}});woopStep(app,' ');assert.equal(vm.runInContext('woopDraft.step',ctx),0);ctx.closeModal();assert.equal(task.woopPlan,undefined);
+ ctx.onAction('woop-start',{dataset:{benchmark:task.id}});const old=vm.runInContext('({session:woopDraft.id,step:String(woopDraft.step)})',ctx);woopStep(app,'Outcome');ctx.onAction('woop-next',{dataset:old});assert.equal(vm.runInContext('woopDraft.step',ctx),1);
+ woopStep(app,'Obstacle');const peer={v:1,id:'peer',outcome:'Peer outcome',obstacle:'Peer obstacle',plan:'If peer, then act'};task.woopPlan=peer;woopStep(app,'If local, then act');assert.equal(task.woopPlan.id,'peer');
+ ctx.onAction('woop-delete',{dataset:{benchmark:task.id,plan:'old-plan'}});assert.equal(task.woopPlan.id,'peer');
+ task.woopPlan=null;ctx.onAction('woop-start',{dataset:{benchmark:task.id}});woopStep(app,'Outcome');woopStep(app,'Obstacle');const replacement=ctx.addTask('Replacement');ctx.state.chain=[replacement.id];woopStep(app,'If replaced, then act');assert.equal(task.woopPlan,null);assert.equal(replacement.woopPlan,undefined);
+ ctx.state.chain=[task.id];ctx.onAction('woop-start',{dataset:{benchmark:task.id}});woopStep(app,'Outcome');woopStep(app,'Obstacle');ctx.state.settings.lastTaskWoop=false;woopStep(app,'If off, then act');assert.equal(task.woopPlan,null);
+});
+test('RISK Last task WOOP: atomic stale-tab rebase preserves newer fields peer plans and deletion tombstones',async()=>{
+ const {ctx,task}=await woopFixture();const base=JSON.parse(ctx.cloudPayload()),local=JSON.parse(JSON.stringify(base)),peer=JSON.parse(JSON.stringify(base));
+ const plan={v:1,id:'local',outcome:'Outcome',obstacle:'Obstacle',plan:'If obstacle, then action'};local.tasks[0].woopPlan=plan;peer.tasks[0].title='Newer title';ctx.rebaseTaskEditorFields(peer,local,base);assert.equal(peer.tasks[0].title,'Newer title');assert.equal(peer.tasks[0].woopPlan.id,'local');
+ const newer=JSON.parse(JSON.stringify(base));newer.tasks[0].woopPlan={...plan,id:'peer'};ctx.rebaseTaskEditorFields(newer,local,base);ctx.mergeUndeletedTasks(newer,local);assert.equal(newer.tasks[0].woopPlan.id,'peer','peer plan wins conflict');
+ const deleted=JSON.parse(JSON.stringify(base));deleted.tasks[0].woopPlan=null;ctx.mergeUndeletedTasks(deleted,local);assert.equal(deleted.tasks[0].woopPlan,null,'stale copy never resurrects deleted plan');
+ const released=JSON.parse(JSON.stringify(base));ctx.mergeUndeletedTasks(released,local);assert.equal(released.tasks[0].woopPlan.id,'local','old-client omission preserves unknown task plan');
+});
+test('RISK Last task WOOP: causal plan evidence defeats old-client-carried plans and deliberate Undo records successor',async()=>{
+ const app=await woopFixture(),{ctx,task}=app;woopDislodgeTwice(app);
+ ctx.onAction('woop-start',{dataset:{benchmark:task.id}});woopStep(app,'Outcome');woopStep(app,'Obstacle');woopStep(app,'If obstacle, then act');await ctx.persist();
+ const old=JSON.parse(ctx.cloudPayload()),first=task.woopPlan.id;
+ ctx.onAction('woop-delete',{dataset:{benchmark:task.id,plan:first}});await ctx.persist();const latest=JSON.parse(ctx.cloudPayload());
+ ctx.mergeUndeletedTasks(old,latest);assert.equal(old.tasks[0].woopPlan,null,'newer old shell carrying stale defined plan cannot defeat deletion');
+ ctx.undo();await ctx.persist();assert.equal(ctx.state.tasks.find(t=>t.id===task.id).woopPlan.outcome,'Outcome','deliberate Undo creates a successor to deletion');
+ const restored=JSON.parse(ctx.cloudPayload());ctx.mergeUndeletedTasks(latest,restored);assert.equal(latest.tasks[0].woopPlan.outcome,'Outcome');
+});
+test('RISK Last task WOOP: real stale-tab saves preserve newer title plan and deletion plus offline reload',async()=>{
+ const app=await woopFixture();woopDislodgeTwice(app);await app.ctx.persist();const raw=app.shim.localStorage.getItem(SYNC_STORE_KEY),storage=sharedScannerStorage({[LOCAL_HEAD_KEY]:raw,[SYNC_STORE_KEY]:raw});
+ const a=await loadApp({sharedStorage:storage}),b=await loadApp({sharedStorage:storage}),id=app.task.id;
+ a.ctx.onAction('woop-start',{dataset:{benchmark:id}});woopStep(a,'Local outcome');woopStep(a,'Local obstacle');
+ b.ctx.state.tasks.find(t=>t.id===id).title='Newer peer title';b.ctx.commit();await b.ctx.persist();
+ woopStep(a,'If blocked, then start small');await a.ctx.persist();let saved=JSON.parse(storage.getItem(SYNC_STORE_KEY)),task=saved.tasks.find(t=>t.id===id);
+ assert.equal(task.title,'Newer peer title');assert.equal(task.woopPlan.outcome,'Local outcome');
+ const stale=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(saved)}}),current=await loadApp({sharedStorage:storage});
+ current.ctx.onAction('woop-delete',{dataset:{benchmark:id,plan:task.woopPlan.id}});await current.ctx.persist();
+ const latest=JSON.parse(storage.getItem(SYNC_STORE_KEY));stale.ctx.mergeUndeletedTasks(stale.ctx.state,latest);assert.equal(stale.ctx.state.tasks.find(t=>t.id===id).woopPlan,null);
+ const reload=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(latest)}});assert.equal(reload.ctx.state.tasks.find(t=>t.id===id).woopPlan,null);assert.equal(reload.ctx.state.tasks.find(t=>t.id===id).title,'Newer peer title');
+});
+test('RISK Last task WOOP: cloud offline failed pull reconnect completion and Undo retain task-owned causal plan',async()=>{
+ const app=await woopFixture();woopDislodgeTwice(app);const base=JSON.parse(app.ctx.cloudPayload()),h=makeSyncHarness({remote:base,rev:4}),id=app.task.id;
+ const a=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(base)},cloudSyncFactory:h.factory}),b=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(base)},cloudSyncFactory:h.factory});
+ await syncSettle(40);await a.ctx.cloudPull();await b.ctx.cloudPull();
+ h.failPull=true;a.ctx.state.mode='work';a.ctx.state.chain=[id];a.ctx.onAction('woop-start',{dataset:{benchmark:id}});woopStep(a,'Offline outcome');woopStep(a,'Offline obstacle');woopStep(a,'If offline, then take a small step');await a.ctx.persist();
+ const offlineRaw=a.shim.localStorage.getItem(SYNC_STORE_KEY),offline=await loadApp({seedStorage:{[SYNC_STORE_KEY]:offlineRaw}});assert.equal(offline.ctx.state.tasks.find(t=>t.id===id).woopPlan.outcome,'Offline outcome');
+ h.failPull=false;await a.ctx.cloudPull();await a.ctx.cloudPushNow();await syncSettle(60);await b.ctx.cloudPull();
+ assert.equal(h.remoteState().tasks.find(t=>t.id===id).woopPlan.outcome,'Offline outcome');assert.equal(b.ctx.state.tasks.find(t=>t.id===id).woopPlan.outcome,'Offline outcome');
+ const task=b.ctx.state.tasks.find(t=>t.id===id),ops=JSON.stringify(task.woopPlanOps);task.evergreen=true;task.evergreenResetAtDay=false;b.ctx.state.chain=[id];b.ctx.pushUndo();b.ctx.completeTask(task);await b.ctx.persist();await b.ctx.cloudPushNow();await syncSettle(40);await a.ctx.cloudPull();
+ assert.ok(a.ctx.state.tasks.find(t=>t.id===id).lastDoneAt);assert.equal(a.ctx.state.tasks.find(t=>t.id===id).woopPlan.outcome,'Offline outcome');assert.equal(JSON.stringify(a.ctx.state.tasks.find(t=>t.id===id).woopPlanOps),ops,'automatic adoption mints no plan operations');
+ b.ctx.undo();await b.ctx.persist();assert.equal(b.ctx.state.tasks.find(t=>t.id===id).woopPlan.outcome,'Offline outcome');
+});
+test('RISK Last task WOOP: unsupported data survives reload and replacement and interrupted board ownership blocks save',async()=>{
+ const app=await woopFixture(),{ctx,task,shim}=app;woopDislodgeTwice(app);
+ const unknown={v:99,payload:{private:'future plan'}};task.woopPlan=unknown;await ctx.persist();const reload=await loadApp({seedStorage:{[SYNC_STORE_KEY]:shim.localStorage.getItem(SYNC_STORE_KEY)}});assert.deepEqual(JSON.parse(JSON.stringify(reload.ctx.state.tasks.find(t=>t.id===task.id).woopPlan)),unknown);
+ ctx.renderScan();assert.doesNotMatch(shim.document.getElementById('scan').innerHTML,/Walk Thru WOOP|Delete WOOP plan/);ctx.onAction('woop-start',{dataset:{benchmark:task.id}});assert.equal(vm.runInContext('woopDraft',ctx),null);
+ delete task.woopPlan;ctx.onAction('woop-start',{dataset:{benchmark:task.id}});woopStep(app,'Outcome');woopStep(app,'Obstacle');ctx.replaceState(JSON.parse(ctx.cloudPayload()));woopStep(app,'If replaced, then act');assert.equal(ctx.state.tasks.find(t=>t.id===task.id).woopPlan,undefined,'same-account same-ID replacement invalidates draft');
+});
 test('RISK context exclusions: real selectors cycle included excluded neutral with durable Undo and explicit red precedence',async()=>{
  const {ctx,shim}=await loadApp({seed:911});const c=ctx.state.contexts[0],task=ctx.addTask('Private required task',false,[c.id]);
  const protectedTasks=JSON.stringify(ctx.state.tasks);
@@ -5185,8 +5288,8 @@ test("UI: Quick start displays the requested seven steps in order", async () => 
   assert.deepEqual(steps, [
     "Add tasks. You can tag them with contexts and enable contexts so that todos that NEED to match that context are surfaced. If the context is not enabled, those todos are not surfaced.",
     "Then hit start scanning.",
-    "In all three modes, the oldest eligible task never marked Done becomes the first dot. Worked on it is fine. If all eligible tasks have been done before, the oldest eligible task starts the chain. Chance mode then draws subsequent candidates using TrueSkill win probabilities.",
-    "Then compare candidates with the newest dot. Descending mode orders them by estimated TrueSkill strength; chance mode uses a saved weighted random order. Yes/No updates ratings immediately. In chance mode, those updates affect the next fresh ordering.",
+    "In every scan mode, the oldest eligible task never marked Done becomes the first dot. Worked on it is fine. If all eligible tasks have been done before, the oldest eligible task starts the chain. Chance mode then draws subsequent candidates using TrueSkill win probabilities.",
+    "Then compare candidates with the newest dot. Descending mode orders them by estimated TrueSkill strength; chance mode uses a saved weighted random order. Squared Weighting and Halving weighting have their own draw rules explained below. Yes/No updates ratings immediately. In chance mode, those updates affect the next fresh ordering.",
     "You can also hit can’t, which will snooze the task for a duration you’ve configured in settings.",
     "You will continue until either you hit done scanning, or the app recognizes the chances of you finding a better task dips below 25% (percentage configurable in settings menu) in which case it will gently nudge you to stop searching for a new todo.",
     "Once you’re done scanning, you will be presented with a chain of todos you will need to complete from the bottom of the “chain” up to the top, marking tasks as done, worked on (sends it back to the todo list for later) or can’t / dislodge."
@@ -5220,7 +5323,7 @@ test("UI: help describes Start scanning rather than a Can/Can't step", async () 
   const helpHtml = shim.elements.get("modalRoot").innerHTML;
 
   assert.match(helpHtml, /start scanning/i, "help should name the button that starts a chain");
-  assert.match(helpHtml, /all three modes, the oldest eligible task/, "normal mode retains the oldest eligible anchor");
+  assert.match(helpHtml, /every scan mode, the oldest eligible task/, "normal mode retains the oldest eligible anchor");
   assert.ok(!/Answer <b>Can<\/b>/.test(helpHtml), "the Can/Can't instruction should be gone");
 });
 
@@ -15408,7 +15511,7 @@ test('Consistency repair: Starts eligibility gets a midnight wake as well as the
 });
 test('Consistency repair: quick start distinguishes chance from the oldest normal anchor',async()=>{
  const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
- assert.match(help,/all three modes.*oldest/i);assert.match(help,/Chance mode.*subsequent/i);
+ assert.match(help,/every scan mode.*oldest/i);assert.match(help,/Chance mode.*subsequent/i);
  assert.doesNotMatch(help,/candidates to add to the todo list in descending order of your likelihood/);
 });
 test('Consistency repair: undoing an old backup import restores today\'s original chance pass',async()=>{
@@ -22899,4 +23002,174 @@ test('RISK Halving weighting enlarged metric: real Settings transition keeps a c
  assert.match(html,/id="stListMetricHelp" class="kv settings-metric-help"/,'the explanation has its dedicated full-row wrapping consumer');
  field.value='chance';shim.document.dispatchEvent({type:'change',target:field});assert.equal(option.textContent,'Overall percent chance');assert.doesNotMatch(help.textContent,/Halving/,'other modes keep their established copy');
  const source=fs.readFileSync(new URL('index.html',import.meta.url),'utf8');assert.match(source,/\.settings-metric-help\{[^}]*flex:1 1 100%[^}]*min-width:0[^}]*overflow-wrap:anywhere/,'full explanation wraps without reducing font size');
+});
+
+test('RISK dependency filter placement: mounted Add and Edit put Filter dependencies after choices and before Evergreen',async()=>{
+ const {ctx,shim}=await loadApp(),task=ctx.addTask('Private task');
+ ctx.renderDependencyFields('add',[]);const add=shim.document.getElementById('addDependencies').innerHTML;
+ assert.match(add,/Filter dependencies/);assert.ok(add.indexOf('dependency-choices')<add.indexOf('Filter dependencies'),'Add choices precede filter');
+ const source=fs.readFileSync(path.join(__dirname,'index.html'),'utf8');assert.ok(source.indexOf('id="addDependencies"')<source.indexOf('id="addEver"'));
+ ctx.openEdit(task.id);const edit=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(edit,/Filter dependencies/);assert.ok(edit.indexOf('dependency-choices')<edit.indexOf('Filter dependencies'));assert.ok(edit.indexOf('Filter dependencies')<edit.indexOf('id="etEver"'),'Edit filter precedes Evergreen');
+});
+test('RISK repository process: FAQ coverage needs a distinct exact-candidate reviewer and bound evidence',async()=>{
+ const {deriveReleaseReviewPlan,recordReleaseEvidence,verifyReleaseEvidence}=await import('./scripts/release-evidence.mjs');
+ const fixture=makeReleaseGateFixture({changedPath:'index.html',baseText:'<p>Old control</p>',candidateText:'<p>New control</p>'});
+ try{
+  fs.writeFileSync(path.join(fixture.repo,'AGENTS.md'),'Independent FAQ coverage review is required for every product release.\n');releaseGateGit(fixture.repo,['add','--all']);releaseGateGit(fixture.repo,['commit','-m','Require independent FAQ review']);fixture.candidateSha=releaseGateGit(fixture.repo,['rev-parse','HEAD']);fixture.treeSha=releaseGateGit(fixture.repo,['rev-parse','HEAD^{tree}']);
+  const plan=deriveReleaseReviewPlan(fixture.repo,fixture.candidateSha,fixture.baseSha);assert.equal(plan.requiresFaqReview,true);
+  const input=riskBasedReleaseInput(fixture,{domains:plan.specialistDomains});assert.throws(()=>recordReleaseEvidence(fixture.repo,input),/FAQ/);
+  assert.throws(()=>recordReleaseEvidence(fixture.repo,releaseGateInput(fixture)),/FAQ.*schemaVersion 2/);
+  const faqPath=path.join(fixture.root,'faq-review.md');fs.writeFileSync(faqPath,'Reviewed all changed controls and audited Settings-aligned FAQ coverage.\n');
+  input.faqReview={task:'/root/faq-review',outcome:'approved',reviewedSha:fixture.candidateSha,completedAt:new Date().toISOString(),summary:'Reviewed changed user controls and past feature coverage in the Settings-aligned FAQ.',scope:{fullDiff:true,relevantTests:true,userVisibleAndDataSafety:true},evidencePath:faqPath,evidenceSha256:releaseGateHash(faqPath)};
+  const bad=JSON.parse(JSON.stringify(input));bad.faqReview.task=input.independentReview.task;assert.throws(()=>recordReleaseEvidence(fixture.repo,bad),/distinct/);
+  const stale=JSON.parse(JSON.stringify(input));stale.faqReview.reviewedSha=fixture.baseSha;assert.throws(()=>recordReleaseEvidence(fixture.repo,stale),/exact candidate/);
+  recordReleaseEvidence(fixture.repo,input);assert.equal(verifyReleaseEvidence(fixture.repo,fixture.candidateSha).ok,true);
+ }finally{cleanupReleaseGateFixture(fixture);}
+});
+
+test('RISK FAQ sections: mounted Quick start matches Settings groups and covers WOOP lifecycle and dependency filter',async()=>{
+ const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ for(const section of ['Scene and appearance','Scanning and recurrence','Contexts','Data and backups','Changelog'])assert.match(help,new RegExp('<h3>'+section+'</h3>'));
+ for(const text of ['Last task WOOP','Filter dependencies','two recorded','Delete WOOP plan','Turning it off','Diagnostics'])assert.ok(help.includes(text),text);
+ assert.doesNotMatch(help,/In all three modes/);
+});
+
+test('RISK Last task WOOP: future conflicting and cyclic operation evidence is preserved read-only',async()=>{
+ const app=await woopFixture(),{ctx,task,shim}=app;woopDislodgeTwice(app);
+ const future={v:99,private:['exact evidence']};task.woopPlanOps=future;ctx.onAction('woop-start',{dataset:{benchmark:task.id}});assert.equal(vm.runInContext('woopDraft',ctx),null,'unsupported operation format blocks new writes');
+ ctx.writeTaskWoop(task,null);assert.deepEqual(JSON.parse(JSON.stringify(task.woopPlanOps)),future,'direct writes preserve future operations');
+ const snapshot={...task};delete snapshot.woopPlanOps;ctx.replaceTaskWoop(snapshot,task);assert.deepEqual(JSON.parse(JSON.stringify(snapshot.woopPlanOps)),future,'deliberate replacement preserves future causal evidence');
+ const futureRecovery={id:task.id,woopEvidenceRecovery:{v:99,payload:'exact recovery'}};const healthy={id:task.id};ctx.mergeTaskWoop(healthy,futureRecovery);assert.deepEqual(JSON.parse(JSON.stringify(healthy.woopEvidenceRecovery)),futureRecovery.woopEvidenceRecovery,'incoming future recovery stays exact and read-only');
+ const plan={v:1,id:'plan-a',outcome:'Outcome',obstacle:'Obstacle',plan:'If obstacle, then act'},a={v:1,id:'op-a',observed:[],value:plan},b={v:1,id:'op-a',observed:[],value:null};
+ const winner={...task,woopPlan:plan,woopHead:'op-a',woopPlanOps:[a]},other={...task,woopPlan:null,woopHead:'op-a',woopPlanOps:[b]};ctx.mergeTaskWoop(winner,other);assert.equal(winner.woopPlanOps.length,2,'immutable ID conflicts retain both facts');assert.equal(JSON.stringify(winner.woopPlan),JSON.stringify(plan));
+ task.woopPlanOps=[a,b];task.woopPlan=plan;ctx.renderScan();assert.doesNotMatch(shim.document.getElementById('scan').innerHTML,/Delete WOOP plan/,'ambiguous evidence is read-only');
+ task.woopPlanOps=[{...a,observed:['op-b']},{v:1,id:'op-b',observed:['op-a'],value:null}];ctx.writeTaskWoop(task,null);assert.equal(task.woopPlanOps.length,2,'cycles do not mint new operations');
+});
+
+test('RISK Last task WOOP: rendered Delete binding rejects same-ID board replacement and restored head',async()=>{
+ const app=await woopFixture(),{ctx,task,shim}=app;woopDislodgeTwice(app);ctx.onAction('woop-start',{dataset:{benchmark:task.id}});woopStep(app,'Outcome');woopStep(app,'Obstacle');woopStep(app,'If obstacle, then act');ctx.renderScan();
+ const html=shim.document.getElementById('scan').innerHTML,control=html.match(/<button[^>]*data-act="woop-delete"[^>]*>/)[0];
+ const dataset={benchmark:task.id,plan:task.woopPlan.id,head:task.woopHead};for(const [,key,value]of control.matchAll(/data-([a-z]+)="([^"]*)"/g))dataset[key]=value;
+ ctx.replaceState(JSON.parse(ctx.cloudPayload()));ctx.onAction('woop-delete',{dataset});assert.ok(ctx.state.tasks.find(t=>t.id===task.id).woopPlan,'detached delete cannot change replaced board');
+});
+
+test('RISK repository process: FAQ policy rejects legacy verified receipts and old deployment descriptions',async()=>{
+ const {deriveReleaseReviewPlan,recordReleaseEvidence,verifyReleaseEvidence,publishReleaseStatuses,verifyDeploymentEvidence}=await import('./scripts/release-evidence.mjs');
+ const f=makeReleaseGateFixture();
+ try{
+  const original=recordReleaseEvidence(f.repo,releaseGateInput(f));assert.equal(verifyReleaseEvidence(f.repo,f.candidateSha).ok,true);
+  fs.writeFileSync(path.join(f.repo,'AGENTS.md'),'Independent FAQ coverage review is required for every product release.\n');releaseGateGit(f.repo,['add','--all']);releaseGateGit(f.repo,['commit','-m','Require FAQ coverage']);f.candidateSha=releaseGateGit(f.repo,['rev-parse','HEAD']);f.treeSha=releaseGateGit(f.repo,['rev-parse','HEAD^{tree}']);
+  const target=path.join(f.repo,'.git','funsidething-release-evidence',f.candidateSha);fs.cpSync(path.dirname(original.receiptPath),target,{recursive:true});
+  const receipt=JSON.parse(fs.readFileSync(original.receiptPath,'utf8'));receipt.candidate={commitSha:f.candidateSha,treeSha:f.treeSha,baseSha:f.baseSha};receipt.independentReview.reviewedSha=f.candidateSha;releaseGateReseal(receipt);fs.writeFileSync(path.join(target,'receipt.json'),JSON.stringify(receipt));
+  assert.equal(verifyReleaseEvidence(f.repo,f.candidateSha).ok,false,'old publisher cannot authorize new policy candidate');fs.rmSync(target,{recursive:true});
+  const required=deriveReleaseReviewPlan(f.repo,f.candidateSha,f.baseSha);const input=riskBasedReleaseInput(f,{specialistReview:required.requiresSpecialistReview,domains:required.specialistDomains});const faqPath=path.join(f.root,'faq.md');fs.writeFileSync(faqPath,'Reviewed changed controls, saved data, defaults and complete FAQ coverage.');
+  input.faqReview={...input.independentReview,task:'/root/faq-distinct-reviewer',evidencePath:faqPath,evidenceSha256:releaseGateHash(faqPath)};recordReleaseEvidence(f.repo,input);
+  const published=[];await publishReleaseStatuses(f.repo,f.candidateSha,async status=>published.push(status));assert.ok(published.every(status=>/;v=3$/.test(status.description)),'FAQ-approved binding distinguishes older policy publishers');assert.ok(published.every(status=>status.description.length<=140));
+  const mainSha='c'.repeat(40),fetchFor=statuses=>async url=>{
+   const pathname=new URL(url).pathname;let body;
+   if(pathname.endsWith('/commits/'+mainSha+'/pulls'))body=[{merge_commit_sha:mainSha,merged_at:new Date().toISOString(),base:{ref:'main'},head:{sha:f.candidateSha}}];
+   else if(pathname.endsWith('/commits/'+mainSha))body={parents:[{sha:f.baseSha}],commit:{tree:{sha:f.treeSha}}};
+   else if(pathname.endsWith('/commits/'+f.candidateSha+'/statuses'))body=statuses.map((row,i)=>({...row,created_at:new Date(Date.now()+i).toISOString()}));
+   else if(pathname.endsWith('/commits/'+f.candidateSha))body={commit:{tree:{sha:f.treeSha}}};
+   else if(pathname.includes('/compare/'))body={status:'ahead'};else throw Error(pathname);
+   return {ok:true,status:200,json:async()=>body};
+  };
+  const verify=statuses=>verifyDeploymentEvidence({repoRoot:f.repo,repository:'emerald-pham/funsidething',deployedSha:mainSha,beforeSha:f.baseSha,token:'fixture',fetchImpl:fetchFor(statuses)});
+  assert.equal((await verify(published)).ok,true);assert.equal((await verify(published.map(row=>({...row,description:row.description.replace(';v=3',';v=2')})))).ok,false,'Pages rejects old normal publisher for FAQ-policy candidate');
+  f.baseSha=f.candidateSha;fs.writeFileSync(path.join(f.repo,'README.md'),'Documentation only after FAQ policy.');releaseGateGit(f.repo,['add','--all']);releaseGateGit(f.repo,['commit','-m','Prose only']);f.candidateSha=releaseGateGit(f.repo,['rev-parse','HEAD']);f.treeSha=releaseGateGit(f.repo,['rev-parse','HEAD^{tree}']);
+  recordReleaseEvidence(f.repo,riskBasedReleaseInput(f,{codeReview:false,specialistReview:false}));const docs=[];await publishReleaseStatuses(f.repo,f.candidateSha,async status=>docs.push(status));assert.equal((await verify(docs)).ok,true,'prose-only release retains owner-review exemption');
+
+ }finally{cleanupReleaseGateFixture(f);}
+});
+
+test('RISK repository process: Pages FAQ policy reads exact head and base from a full release-evidence checkout',()=>{
+ const workflow=fs.readFileSync(path.join(__dirname,'.github/workflows/data-safety.yml'),'utf8');const release=workflow.split('  release-evidence:')[1].split('  deploy-pages:')[0];assert.match(release,/actions\/checkout@v4\s+with:\s+fetch-depth: 0/,'Pages must not infer missing policy objects from a shallow checkout');
+});
+
+test('RISK Last task WOOP: Restore and Undo express deliberate successors without deleting later independent tasks',async()=>{
+ const app=await woopFixture(),{ctx,task,shim}=app;woopDislodgeTwice(app);ctx.onAction('woop-start',{dataset:{benchmark:task.id}});woopStep(app,'Saved outcome');woopStep(app,'Saved obstacle');woopStep(app,'If obstacle, then act');await ctx.persist();
+ const snapshot=ctx.cloudPayload();assert.equal(ctx.saveLocalBackup('manual',snapshot),true);const backup=ctx.readLocalBackups().find(row=>row.kind==='manual'&&row.payload===snapshot);
+ ctx.onAction('woop-delete',{dataset:{benchmark:task.id,plan:task.woopPlan.id}});const later=ctx.addTask('Later independent task');await ctx.persist();ctx.openSettings();assert.equal(await ctx.restoreDurableBackupById(backup.id),true);
+ const restored=ctx.state.tasks.find(t=>t.id===task.id);assert.equal(restored.woopPlan.outcome,'Saved outcome');assert.ok(ctx.state.tasks.some(t=>t.id===later.id));assert.ok(restored.woopPlanOps.length>=3,'restoration supersedes creation and deletion');
+ const stable=JSON.stringify(restored.woopPlanOps),old=JSON.parse(snapshot);ctx.mergeUndeletedTasks(ctx.state,old);assert.equal(JSON.stringify(restored.woopPlanOps),stable,'replayed snapshot creates no extra operation');
+ ctx.undo();await ctx.persist();assert.equal(ctx.state.tasks.find(t=>t.id===task.id).woopPlan,null,'Undo Restore is a successor deletion');assert.ok(ctx.state.tasks.some(t=>t.id===later.id));
+});
+
+test('RISK Last task WOOP: delayed CAS repair keeps newer peer plan and title plus concurrent local intent',async()=>{
+ const fixture=await woopFixture();woopDislodgeTwice(fixture);const raw=fixture.ctx.cloudPayload(),{indexedDB}=await import('fake-indexeddb'),storage=sharedScannerStorage({[LOCAL_HEAD_KEY]:raw,[SYNC_STORE_KEY]:raw});
+ const app=await loadApp({sharedStorage:storage,indexedDBProvider:indexedDB,deviceDbName:'woop-cas-'+Date.now()+'-'+Math.random()}),{ctx,shim}=app,id=fixture.task.id;
+ const store=shim.window.ScannerDeviceStore,original=store.commitHead.bind(store);let calls=0,entered,release;const started=new Promise(resolve=>entered=resolve),gate=new Promise(resolve=>release=resolve);
+ store.commitHead=async options=>{
+  if(++calls===1){const peer=JSON.parse((await store.readHead()).payload);peer.tasks[0].title='Newer peer title';ctx.writeTaskWoop(peer.tasks[0],{v:1,id:'peer-plan',outcome:'Peer outcome',obstacle:'Peer obstacle',plan:'If peer obstacle, then act'});assert.equal((await original({expectedHash:options.expectedHash,payload:JSON.stringify(peer)})).ok,true);return {conflict:true};}
+  if(calls===2){entered();await gate;}return original(options);
+ };
+ const extra=ctx.addTask('Independent local task');const saving=ctx.persist();await started;
+ ctx.state.mode='work';ctx.state.chain=[id];ctx.onAction('woop-start',{dataset:{benchmark:id}});woopStep(app,'Concurrent local outcome');woopStep(app,'Concurrent local obstacle');woopStep(app,'If local obstacle, then act');release();assert.equal(await saving,true);await ctx.persist();
+ for(const board of [ctx.state,JSON.parse((await store.readHead()).payload)]){const task=board.tasks.find(t=>t.id===id);assert.equal(task.title,'Newer peer title');assert.equal(task.woopPlan.id,'peer-plan','durable peer plan remains selected on conflict');assert.ok(task.woopPlanOps.some(op=>op.value?.outcome==='Concurrent local outcome'),'concurrent local plan stays exact in causal evidence');assert.ok(board.tasks.some(t=>t.id===extra.id));}
+ await store.close();
+});
+
+test('RISK Last task WOOP: imported long causal chains validate without recursive stack failure',async()=>{
+ const {ctx}=await loadApp();const count=10000,ops=Array.from({length:count},(_,i)=>({v:1,id:'private-op-'+i,observed:i+1<count?['private-op-'+(i+1)]:[],value:null}));assert.equal(ctx.supportedWoopEvidence({woopPlanOps:ops}),true,'valid imported causal chains cannot interrupt rendering or persistence');
+});
+
+test('RISK Last task WOOP browser: mounted controls responsive saved revisit delete and offline reload',
+ {skip:!process.env.WOOP_BROWSER_URL},async()=>{
+ const {chromium,webkit}=await import(process.env.PLAYWRIGHT_MODULE||'playwright'),origin=new URL(process.env.WOOP_BROWSER_URL).origin;
+ const output=process.env.WOOP_SCREENSHOT_DIR;if(output)fs.mkdirSync(output,{recursive:true});const samples=[];
+ for(const [engine,type,sizes]of [['chrome',chromium,[[390,844],[768,1024],[1366,768],[568,320]]],['webkit',webkit,[[390,844],[768,1024]]]]){
+  const browser=await type.launch({headless:true,...(engine==='chrome'?{channel:'chrome'}:{})});
+  try{
+   for(const [width,height]of sizes){
+    const context=await browser.newContext({viewport:{width,height},reducedMotion:'reduce'}),errors=[];
+    await context.addInitScript(()=>{Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});localStorage.setItem('fvp:chain-scanner:landscape-motion','reduced');});
+    await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
+    const page=await context.newPage();page.on('pageerror',error=>errors.push(error.message));await page.goto(process.env.WOOP_BROWSER_URL);await page.waitForFunction(()=>typeof state!=='undefined'&&state?.tasks);
+    const id=await page.evaluate(()=>{closeModal();document.querySelectorAll('dialog[open]').forEach(d=>d.close());state.addOpen=true;const task=addTask('Synthetic final task with a long title for responsive wrapping');state.chain=[task.id];state.mode='work';render();return task.id;});
+    assert.equal(await page.locator('[data-act=woop-start]').count(),0,'off by default');
+    const setting=async enabled=>{await page.evaluate(()=>openSettings());await page.locator('summary').filter({hasText:'Scanning and recurrence'}).click();await page.locator('#stLastTaskWoop').setChecked(enabled);await page.locator('[data-act=close-modal]').click();};
+    await setting(true);
+    for(let count=0;count<3;count++){
+     assert.equal(await page.locator('[data-act=woop-start]').count(),count===2?1:0,'recorded dislodge boundary '+count);
+     if(count<2){await page.locator('[data-act=dislodge]').click();await page.evaluate(id=>dotTask(id),id);}
+    }
+    await page.locator('[data-act=woop-start]').click();await page.locator('#woopAnswer').fill('Cancelled private draft');await page.locator('[data-act=woop-next]').click();await page.getByRole('button',{name:'Cancel',exact:true}).click();assert.equal(await page.evaluate(id=>taskById(id).woopPlan,id),undefined);
+    await page.locator('[data-act=woop-start]').click();
+    for(const [step,answer]of ['Best outcome: take a useful first step.','Obstacle: uncertainty about where to begin.','If I feel uncertain, then I will write one concrete next action.'].entries()){
+     await page.locator('#woopAnswer').fill(answer);
+     if(step===2&&output)await page.screenshot({path:path.join(output,engine+'-'+width+'-walkthrough.png'),fullPage:true});
+     await page.locator('[data-act=woop-next]').click();
+    }
+    assert.equal(await page.locator('[data-act=woop-start]').count(),0);assert.equal(await page.locator('[data-act=woop-delete]').count(),1);
+    await page.evaluate(()=>persist());
+    for(const theme of ['light','dark']){
+     await page.evaluate(theme=>setTheme(theme),theme);
+     const sample=await page.evaluate(()=>{
+      const inspect=selector=>{const e=document.querySelector(selector),s=getComputedStyle(e),r=e.getBoundingClientRect();return {fontFamily:s.fontFamily,fontSize:s.fontSize,fontWeight:s.fontWeight,lineHeight:s.lineHeight,color:s.color,backgroundColor:s.backgroundColor,left:r.left,right:r.right,width:r.width};};
+      return {plan:inspect('.woop-saved dd'),delete:inspect('[data-act=woop-delete]'),viewport:innerWidth,pageWidth:document.documentElement.scrollWidth,theme:document.documentElement.dataset.theme};
+     });
+     assert.equal(sample.theme,theme);assert.ok(sample.pageWidth<=width+1,'no page overflow');assert.ok(sample.delete.left>=0&&sample.delete.right<=width+1,'Delete fits');assert.equal(sample.delete.backgroundColor,'rgb(255, 255, 255)','Delete stays white in supported themes');
+     if(engine==='chrome'){
+      const cdp=await context.newCDPSession(page);await cdp.send('DOM.enable');await cdp.send('CSS.enable');const {root}=await cdp.send('DOM.getDocument');const {nodeId}=await cdp.send('DOM.querySelector',{nodeId:root.nodeId,selector:'.woop-saved dd'});sample.resolvedFonts=(await cdp.send('CSS.getPlatformFontsForNode',{nodeId})).fonts.map(font=>font.familyName);assert.ok(sample.resolvedFonts.length);await cdp.detach();
+     }
+     samples.push({engine,width,height,theme,...sample});if(output)await page.screenshot({path:path.join(output,engine+'-'+width+'-'+theme+'-saved.png'),fullPage:true});
+    }
+    await setting(false);assert.equal(await page.locator('.woop-saved').count(),0);assert.ok(await page.evaluate(id=>taskById(id).woopPlan,id));await setting(true);assert.equal(await page.locator('.woop-saved').count(),1);
+    await page.reload();await page.waitForFunction(id=>typeof state!=='undefined'&&taskById(id)?.woopPlan,id);await page.evaluate(id=>{state.mode='work';state.chain=[id];render();},id);assert.equal(await page.locator('.woop-saved').count(),1);
+    // Actual mounted order in both task forms, with the search node retained.
+    for(const scope of ['add','edit']){
+     if(scope==='edit')await page.evaluate(id=>openEdit(id),id);else await page.evaluate(()=>{closeModal();state.addOpen=true;render();});
+     const search=page.locator('#'+scope+'DependencySearch');await search.fill('Synthetic');await search.focus();
+     const geometry=await page.evaluate(scope=>{const filter=document.getElementById(scope+'DependencySearch'),choices=filter.parentElement.parentElement.querySelector('.dependency-choices'),ever=document.getElementById(scope==='add'?'addEver':'etEver');return {choices:choices.getBoundingClientRect().bottom,filter:filter.getBoundingClientRect().top,filterBottom:filter.getBoundingClientRect().bottom,ever:ever.getBoundingClientRect().top,focused:document.activeElement===filter};},scope);
+     assert.ok(geometry.choices<=geometry.filter+1);assert.ok(geometry.filterBottom<=geometry.ever+1);assert.equal(geometry.focused,true);assert.equal(await page.locator('label[for='+scope+'DependencySearch]').textContent(),'Filter dependencies');
+     if(output)await page.screenshot({path:path.join(output,engine+'-'+width+'-'+scope+'-dependencies.png'),fullPage:true});
+    }
+    await page.evaluate(()=>closeModal());await page.locator('[data-act=woop-delete]').click();await page.evaluate(()=>persist());assert.equal(await page.locator('[data-act=woop-start]').count(),1);
+    if(engine==='chrome'&&width===390){await page.evaluate(()=>navigator.serviceWorker.ready);await page.reload();await page.waitForFunction(()=>!!navigator.serviceWorker.controller);await context.setOffline(true);await page.reload();await page.waitForFunction(id=>typeof state!=='undefined'&&taskById(id),id);assert.equal(await page.evaluate(id=>taskById(id).woopPlan,id),null,'offline reload preserves deletion');await context.setOffline(false);}
+    assert.deepEqual(errors,[]);await context.close();
+   }
+  }finally{await browser.close();}
+ }
+ if(output)fs.writeFileSync(path.join(output,'typography-samples.json'),JSON.stringify({candidate:spawnSync('git',['rev-parse','HEAD'],{cwd:__dirname,encoding:'utf8'}).stdout.trim(),samples},null,2));
 });

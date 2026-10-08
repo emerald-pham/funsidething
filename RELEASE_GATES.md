@@ -185,3 +185,22 @@ statuses, or an administrator who can bypass repository protections, can forge
 those statuses. The validator checks exact diffs and receipts locally, but no
 status can prove that a person actually read or reviewed them. Retain owner,
 code, and specialist reports as evidence of those human actions.
+
+## FAQ coverage evidence
+
+Product candidates also require `faqReview` with the same approved exact-SHA,
+completedAt, summary, scope, external evidencePath and evidenceSha256 shape as
+`independentReview`. Use a reviewer task distinct from owner, code, and specialist
+reviewers. The immutable receipt copies `faq-review.md`; verification checks its
+bytes and exact candidate. The derived plan includes `requiresFaqReview`, which
+is bound into the published review-plan digest and deployment status checks.
+Review Settings-aligned sections, all changed behavior, and past feature gaps.
+Unverified runtime or persisted-data claims must remain qualified.
+
+FAQ-approved schema-version-2 receipts publish compact `v=3` status bindings
+within GitHub’s 140-character limit. Earlier schema-version-2 receipts retain
+`v=2`; historical pre-policy legacy evidence stays supported. Local verification
+and Pages reject older publisher bindings for candidates carrying this FAQ
+policy. The policy is read from exact committed AGENTS.md, including the
+exact head and base in CI’s full release-evidence checkout; missing review
+objects fail closed.
