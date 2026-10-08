@@ -306,6 +306,7 @@ export function deriveReleaseReviewPlan(repoRoot, commitSha, baseSha, options = 
     changedFiles,
     mode,
     requiresCodeReview,
+    ...(requiresCodeReview && [commitSha,baseSha].some(sha=>(gitShow(repoRoot,sha,"AGENTS.md")||"").includes("Independent FAQ coverage review is required")) ? { requiresFaqReview: true } : {}),
     requiresSpecialistReview,
     specialistDomains: domains,
   };
@@ -330,6 +331,7 @@ function validateInput(repoRoot, input) {
   const actualTree = candidateTree(repoRoot, commitSha);
   if (!SHA1.test(treeSha || '') || actualTree !== treeSha) throw new Error('Candidate tree SHA does not match the exact commit.');
   assertAncestor(repoRoot, baseSha, commitSha);
+  if(deriveReleaseReviewPlan(repoRoot,commitSha,baseSha).requiresFaqReview)throw new Error('FAQ coverage policy requires schemaVersion 2 evidence.');
   const ownerTask = taskId(input.ownerTask, 'ownerTask');
   const auditorTask = taskId(input.memoryAudit?.task, 'memoryAudit.task');
   const reviewerTask = taskId(input.independentReview?.task, 'independentReview.task');
@@ -502,6 +504,19 @@ function validateRiskBasedInput(repoRoot, input) {
   } else if (input.specialistReview) {
     throw new Error('This exact diff does not require a specialist reviewer; omit specialistReview from the receipt.');
   }
+  let faqReview,faqBytes;
+  if(reviewPlan.requiresFaqReview){
+    const review=input.faqReview;
+    const task=taskId(review?.task,'FAQ review task');
+    if(review.outcome!=='approved')throw new Error('Required FAQ review must be approved.');
+    if(review.reviewedSha!==commitSha)throw new Error('FAQ review must name the exact candidate SHA.');
+    const completedAt=validTime(review.completedAt,'FAQ review');
+    if(typeof review.summary!=='string'||review.summary.trim().length<20)throw new Error('FAQ review must record a specific coverage summary.');
+    const scope=exactReviewScope(review.scope,'FAQ review');
+    faqBytes=evidenceFile(repoRoot,review.evidencePath,review.evidenceSha256,'FAQ review');
+    faqReview={task,outcome:'approved',reviewedSha:commitSha,completedAt,summary:review.summary.trim(),scope,evidence:{file:'faq-review.md',sha256:sha256(faqBytes)}};
+    identities.push(task);
+  }else if(input.faqReview)throw new Error('This exact diff does not require FAQ review.');
   if (new Set(identities.map(value => value.toLocaleLowerCase())).size !== identities.length) {
     throw new Error('Owner, code reviewer, and specialist reviewer need distinct task identities.');
   }
@@ -521,6 +536,7 @@ function validateRiskBasedInput(repoRoot, input) {
     },
     ...(independentReview ? { independentReview } : {}),
     ...(specialistReview ? { specialistReview } : {}),
+    ...(faqReview ? { faqReview } : {}),
   };
   return {
     receipt,
@@ -528,6 +544,7 @@ function validateRiskBasedInput(repoRoot, input) {
       { name: 'owner-review.md', bytes: ownerBytes },
       ...(independentBytes ? [{ name: 'independent-review.md', bytes: independentBytes }] : []),
       ...(specialistBytes ? [{ name: 'specialist-review.md', bytes: specialistBytes }] : []),
+      ...(faqBytes ? [{ name: 'faq-review.md', bytes: faqBytes }] : []),
     ],
   };
 }
@@ -685,9 +702,11 @@ function verifyRiskBasedReceipt(repoRoot, commitSha, receipt, receiptPath) {
   };
   if (plan) {
     checkIndependent('independentReview', plan.requiresCodeReview);
+    checkIndependent('faqReview', Boolean(plan.requiresFaqReview));
     checkSpecialist(plan.requiresSpecialistReview, plan.specialistDomains);
   } else {
     checkIndependent('independentReview', Boolean(receipt?.independentReview));
+    checkIndependent('faqReview', Boolean(receipt?.faqReview));
     checkSpecialist(Boolean(receipt?.specialistReview), Array.isArray(receipt?.specialistReview?.domains) ? receipt.specialistReview.domains : []);
   }
   if (new Set(identities).size !== identities.length) errors.push('Owner, code reviewer, and specialist reviewer need distinct task identities.');
@@ -695,6 +714,7 @@ function verifyRiskBasedReceipt(repoRoot, commitSha, receipt, receiptPath) {
     ['ownerReview', 'owner-review.md'],
     ...(receipt?.independentReview ? [['independentReview', 'independent-review.md']] : []),
     ...(receipt?.specialistReview ? [['specialistReview', 'specialist-review.md']] : []),
+    ...(receipt?.faqReview ? [['faqReview', 'faq-review.md']] : []),
   ];
   for (const [key, file] of evidenceBindings) {
     const evidence = receipt?.[key]?.evidence;
@@ -726,6 +746,7 @@ export function verifyReleaseEvidence(repoRoot, commitSha) {
     return { ok: false, errors: ['Missing or malformed exact-SHA release receipt: ' + error.message], receiptPath };
   }
   if (receipt?.schemaVersion === 2) return verifyRiskBasedReceipt(repoRoot, commitSha, receipt, receiptPath);
+  try{if(deriveReleaseReviewPlan(repoRoot,commitSha,receipt?.candidate?.baseSha).requiresFaqReview)errors.push('FAQ coverage policy requires schemaVersion 2 evidence.');}catch(error){errors.push(error.message);}
   if (!receipt || typeof receipt !== 'object' || receipt.schemaVersion !== 1) errors.push('Release receipt schemaVersion must be 1.');
   if (receipt?.candidate?.commitSha !== commitSha) errors.push('Release receipt is stale or names a different candidate SHA.');
   if (receipt?.candidate?.commitSha && SHA1.test(receipt.candidate.commitSha)) {
@@ -831,7 +852,7 @@ export async function publishReleaseStatuses(repoRoot, commitSha, postStatus) {
     ? 'r=' + result.receipt.receiptSha256 + ';b=' + result.receipt.candidate.baseSha +
       ';p=' + sha256(Buffer.from(canonicalJson(result.receipt.reviewPlan))).slice(0, 12) +
       ';c=' + (result.receipt.reviewPlan.requiresCodeReview ? '1' : '0') +
-      ';s=' + (result.receipt.reviewPlan.requiresSpecialistReview ? '1' : '0') + ';v=2'
+      ';s=' + (result.receipt.reviewPlan.requiresSpecialistReview ? '1' : '0') + (result.receipt.reviewPlan.requiresFaqReview ? ';v=3' : ';v=2')
     : 'receipt-sha256=' + result.receipt.receiptSha256 + ';base=' + result.receipt.candidate.baseSha;
   const targetUrl = 'https://github.com/' + git(repoRoot, ['remote', 'get-url', 'origin']).replace(/^.*github\.com[:/]/, '').replace(/\.git$/, '') + '/commit/' + commitSha;
   const base = result.receipt.candidate.baseSha;
@@ -867,7 +888,7 @@ function latestByContext(statuses) {
   return latest;
 }
 
-export async function verifyDeploymentEvidence({ repository, deployedSha, beforeSha, token, fetchImpl = fetch }) {
+export async function verifyDeploymentEvidence({ repository, deployedSha, beforeSha, token, fetchImpl = fetch, repoRoot = process.cwd() }) {
   try {
     if (typeof repository !== 'string' || !/^[^/]+\/[^/]+$/.test(repository)) throw new Error('GITHUB_REPOSITORY must identify owner/repository.');
     if (!SHA1.test(deployedSha || '') || !SHA1.test(beforeSha || '') || beforeSha === '0'.repeat(40)) {
@@ -884,6 +905,13 @@ export async function verifyDeploymentEvidence({ repository, deployedSha, before
       pr?.merge_commit_sha === deployedSha && pr?.merged_at && pr?.base?.ref === 'main' && SHA1.test(pr?.head?.sha || '')) : [];
     if (merged.length !== 1) throw new Error('Deployment must resolve to exactly one merged main pull request.');
     const headSha = merged[0].head.sha;
+    // CI checks out complete history: derive the same exact plan as the local
+    // recorder, including the prose-only exemption and a removed base policy.
+    // Real deployed checkouts fail closed when their review objects are absent.
+    const localHead=spawnSync('git',['-C',repoRoot,'cat-file','-e',headSha+'^{commit}']).status===0;
+    const localDeployment=spawnSync('git',['-C',repoRoot,'cat-file','-e',deployedSha+'^{commit}']).status===0;
+    if(localDeployment&&!localHead)throw new Error('Exact FAQ policy review head is unavailable; use a full release-evidence checkout.');
+    const faqPolicy=localHead ? !!deriveReleaseReviewPlan(repoRoot,headSha,baseSha).requiresFaqReview : false;
     const reviewedCommit = await githubJson(fetchImpl, api + '/commits/' + headSha, token);
     if (!treeSha || reviewedCommit.commit?.tree?.sha !== treeSha) {
       throw new Error('The reviewed pull request head tree does not exactly match the deployed main tree.');
@@ -897,12 +925,13 @@ export async function verifyDeploymentEvidence({ repository, deployedSha, before
     const latest = latestByContext(statuses);
     const riskBasedDescription = latest.get('funsidething/specialist-review')?.status?.description ||
       latest.get('funsidething/independent-review')?.status?.description || '';
-    if (/;v=2$/.test(riskBasedDescription)) {
+    if(faqPolicy&&!/;v=3$/.test(riskBasedDescription))throw new Error('FAQ coverage policy requires FAQ-approved exact-head deployment evidence.');
+    if (/;v=[23]$/.test(riskBasedDescription)) {
       const statusPlan = new Map();
       for (const context of RISK_BASED_RELEASE_STATUS_CONTEXTS) {
         const status = latest.get(context)?.status;
         if (!status || status.state !== 'success') throw new Error('Latest exact-head status is missing or unsuccessful: ' + context + '.');
-        const match = status.description?.match(/^r=([0-9a-f]{64});b=([0-9a-f]{40});p=([0-9a-f]{12});c=([01]);s=([01]);v=2$/);
+        const match = status.description?.match(/^r=([0-9a-f]{64});b=([0-9a-f]{40});p=([0-9a-f]{12});c=([01]);s=([01]);v=([23])$/);
         if (!match || match[2] !== baseSha) throw new Error('Risk-based exact-head status is not bound to the deployed base and receipt: ' + context + '.');
         statusPlan.set(context, match.slice(1));
       }

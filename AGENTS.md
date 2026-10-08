@@ -106,3 +106,16 @@ successful merge. The change owner completes this work before handing off.
    alignment with `origin/main`, every intentionally retained branch or
    checkout and its reason, and any recovery directory. A completed product
    change does not justify leaving its safely removable checkout behind.
+
+## Independent FAQ coverage release check
+
+Independent FAQ coverage review is required for every product release. The
+reviewer must be distinct from the implementation owner, code reviewer, and
+state/sync specialist. Review the exact candidate against the Settings-aligned
+extended FAQ, including changed controls, defaults, saved-data lifecycle, and
+known limitations. Audit existing features for omissions when reorganizing it.
+Record the exact-SHA `faqReview` and fingerprinted report in the release receipt.
+The release validator requires this evidence for executable candidates under
+this policy and binds it into the existing required release statuses.
+Pure documentation housekeeping retains owner review. Typography review remains
+a separate required check of final rendered evidence.
