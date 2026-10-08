@@ -15968,12 +15968,19 @@ test('Landscape guest visits: departure timing varies and high seeds stay longer
     'the long stay eventually walks fully away');
 });
 
-test('Landscape readers: carried books hang at the walker side during departure', () => {
+test('Landscape readers: carried books hang at the walker side during departure',()=>{
   const source = fs.readFileSync(path.join(__dirname, 'landscape.js'), 'utf8');
   const guest = source.slice(source.indexOf('  function paintGuest('), source.indexOf("    if(e.type==='skateboarder'", source.indexOf('  function paintGuest(')));
   assert.match(guest, /book\s*&&\s*visit\.pack/);
-  assert.match(guest, /fillRect\(4,-3,book\?4:6,book\?3:4\)/,
+  assert.match(guest, /fillRect\(hand\.x,hand\.y,book\?4:6,book\?3:4\)/,
     'departure books sit by the hand and hip instead of across the chest');
+  const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
+  const geo=ctx.LandscapeGeometry.create(820,1180);
+  for(const direction of [-1,1])for(const distance of [40,42,45,48,50]){
+    const motion=geo.humanWalkPose(410,0,distance,direction,()=>0,1);
+    assert.equal(motion.hand.x,4,'book retains its side-of-body horizontal position');
+    assert.ok(Math.abs(motion.hand.y-motion.hipY-1.4)<1e-8,'book follows the hip vertically rather than moving onto the chest');
+  }
 });
 test('Landscape guest durations: readers and groups stay long enough before departure', () => {
   const sky = livingSky();
@@ -22066,4 +22073,90 @@ test('RISK Chance fixture wake: actual scheduled scanner callback handles probab
  ctx.state.tasks=[chanceProbabilityFixture({id:'a',mu:-10,sigma:3}),chanceProbabilityFixture({id:'b',mu:20,sigma:2})];ctx.resetChance();
  const before=JSON.stringify(ctx.state.chance.weights);assert.ok(wakes.length,'bootstrap registers actual scanner wake');assert.doesNotThrow(()=>wakes[0](),'scanner wake must safely consume probability fixtures');assert.equal(JSON.stringify(ctx.state.chance.weights),before,'scanner repaint preserves frozen probability values');
  assert.deepEqual(Array.from(ctx.state.tasks,t=>Array.from(t.ctx)),[[],[]]);
+});
+
+test('RISK visitor gait: eased arrivals and departures plant terrain feet with connected knees in both directions',()=>{
+ const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
+ for(const [w,h] of [[390,844],[820,1180],[1440,900]])for(const reverse of [false,true]){
+  const geo=ctx.LandscapeGeometry.create(w,h),e={lane:.5,seed:.4,reverse};
+  for(const f of [.03,.07,.9,.95]){
+   const a=geo.visitPose(e,f),b=geo.visitPose(e,f+1e-5);
+   assert.ok(Number.isFinite(a.distance),'visitors expose actual accumulated path displacement');
+   assert.ok(Math.abs((b.distance-a.distance)-Math.abs(b.x-a.x))<1e-8,'cadence follows eased travel rather than time');
+   const ground=x=>geo.trail(x)+20;
+   const p=geo.humanWalkPose(a.x,ground(a.x),a.distance,a.direction,ground,false);
+   const q=geo.humanWalkPose(b.x,ground(b.x),b.distance,b.direction,ground,false);
+   for(let i=0;i<2;i++){
+    const leg=p.legs[i];assert.ok(Number.isFinite(leg.kneeX)&&Number.isFinite(leg.kneeY));
+    assert.ok(Math.abs(Math.hypot(leg.kneeX,leg.kneeY-p.hipY)-3.2)<1e-7);
+    assert.ok(Math.abs(Math.hypot(leg.footX-leg.kneeX,leg.footY-leg.kneeY)-3.2)<1e-7);
+    if(leg.lift===0&&q.legs[i].lift===0){
+     assert.ok(Math.abs(a.x+a.direction*leg.footX-b.x-b.direction*q.legs[i].footX)<1e-7,'stance foot stays at its world contact');
+     assert.ok(Math.abs(ground(a.x+a.direction*leg.footX)-(ground(a.x)+leg.footY))<1e-7);
+    }
+   }
+  }
+  const still=geo.visitPose(e,.5),p=geo.humanWalkPose(still.x,still.y,still.distance,still.direction,x=>geo.trail(x)+19,true);
+  assert.deepEqual(JSON.parse(JSON.stringify(p)),JSON.parse(JSON.stringify(geo.humanWalkPose(still.x,still.y,still.distance,still.direction,x=>geo.trail(x)+19,true))));
+ }
+});
+
+test('RISK visitor carrying consumer: rendered books and picnic items meet the carrying hand while feet consume the travel pose',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ const personCode=source.slice(source.indexOf('  function person('),source.indexOf('  function seated('));
+ const guestCode=source.slice(source.indexOf('  function paintGuest('),source.indexOf('  const themeQuery='));
+ for(const type of ['reader','couple','picnic'])for(const reverse of [false,true]){
+  const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
+  const geometry=ctx.LandscapeGeometry.create(820,1180),lines=[],rects=[];
+  const g={save(){},restore(){},translate(){},scale(){},fillRect(...v){rects.push(v);}};
+  Object.assign(ctx,{g,geometry,W:820,trail:geometry.trail,p:{},color:()=> 'shirt',skinColor:()=> 'skin',personHead(){},seated(){},line(g,...v){lines.push(v);},S:{smooth:(a,b,v)=>Math.max(0,Math.min(1,(v-a)/(b-a)))}});
+  vm.runInContext(personCode+guestCode,ctx);
+  const e={type,lane:.5,seed:.4,reverse,duration:100,age:95};ctx.e=e;
+  vm.runInContext('paintGuest(e,0,.95,12)',ctx);
+  assert.equal(rects.length,type==='reader'?1:2);
+  for(const rect of rects)assert.ok(lines.some(v=>v[4]==='skin'&&Math.abs(v[2]-rect[0])<1e-8&&Math.abs(v[3]-rect[1])<1e-8),'painted item begins at an actual hand endpoint');
+  assert.ok(lines.filter(v=>v[4]==='#647779').length>=4,'walking consumer renders two segments for each leg');
+  const broken=personCode.replace('motion.hand.x','motion.hand.x+2');
+  assert.notEqual(broken,personCode,'negative control must displace the rendered carrying grip');
+  lines.length=0;rects.length=0;vm.runInContext(broken,ctx);vm.runInContext('paintGuest(e,0,.95,12)',ctx);
+  assert.ok(rects.some(rect=>!lines.some(v=>v[4]==='skin'&&Math.abs(v[2]-rect[0])<1e-8&&Math.abs(v[3]-rect[1])<1e-8)),'broken grip is detected through the actual consumer');
+ }
+});
+
+test('RISK visitor motion guidance: extended scenery FAQ and Settings changelog explain travel cadence and held items',()=>{
+ const html=fs.readFileSync(path.join(__dirname,'index.html'),'utf8');
+ const faq=html.split('<dt>How do I change the scenery?</dt>')[1].split('</dd>')[0];
+ assert.match(faq,/Visiting people step with their traveled distance/);
+ assert.match(faq,/Books and gathered picnic items meet the carrying hand/);
+ const changelog=html.split('<template id="appChangelogCurrent">')[1].split('</template>')[0];
+ assert.match(changelog,/Visiting people now plant their feet/);
+});
+
+test('RISK visitor offline shell: travel pose and carrying renderer changes reach the fingerprinted installed shell',()=>{
+ const {cacheName,fingerprint,localPaths}=appShellContract(serviceWorkerSource());
+ assert.ok(localPaths.includes('landscape-geometry.js')&&localPaths.includes('landscape.js'));
+ assert.equal(cacheName,`chain-scanner-shell-${fingerprint}`,'installed clients must receive the new visitor pose bytes');
+});
+
+test('RISK visitor departure continuity: settled feet and hands do not pop when eased travel starts',()=>{
+ const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
+ for(const reverse of [false,true])for(const seed of [.02,.4,.98]){
+  const geo=ctx.LandscapeGeometry.create(390,844),e={lane:.5,seed,reverse},start=.82+seed*.12;
+  for(const boundary of [.12,start]){
+   const poses=[boundary-1e-7,boundary+1e-7].map(f=>{const v=geo.visitPose(e,f),ground=x=>geo.trail(x)+20;return geo.humanWalkPose(v.x,ground(v.x),v.distance,v.direction,ground,true);});
+   for(let i=0;i<2;i++)assert.ok(Math.hypot(poses[0].legs[i].footX-poses[1].legs[i].footX,poses[0].legs[i].footY-poses[1].legs[i].footY)<.001,'changing walking state cannot teleport feet');
+   assert.ok(Math.hypot(poses[0].hand.x-poses[1].hand.x,poses[0].hand.y-poses[1].hand.y)<.001,'carried grip remains continuous');
+  }
+ }
+});
+
+test('RISK visitor gathering continuity: the actual consumer reaches the grip before a carried item appears',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),guestCode=source.slice(source.indexOf('  function paintGuest('),source.indexOf('  const themeQuery='));
+ const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
+ const geometry=ctx.LandscapeGeometry.create(820,1180),e={type:'reader',lane:.5,seed:.4,reverse:false,duration:100},hands=[];
+ let lo=.768,hi=.868;for(let i=0;i<50;i++){const mid=(lo+hi)/2;if(geometry.visitPose(e,mid).pack<.7)lo=mid;else hi=mid;}const boundary=(lo+hi)/2;
+ Object.assign(ctx,{geometry,W:820,trail:geometry.trail,p:{},color:()=> 'shirt',g:{save(){},restore(){},translate(){},scale(){},fillRect(){}},person(x,y,seed,motion){hands.push(motion.hand);return motion.hand;},seated(){},S:{smooth:(a,b,v)=>{const q=Math.max(0,Math.min(1,(v-a)/(b-a)));return q*q*(3-2*q);}}});
+ vm.runInContext(guestCode,ctx);
+ for(const f of [boundary-1e-7,boundary+1e-7]){ctx.e={...e,age:f*100};ctx.f=f;vm.runInContext('paintGuest(e,0,f,12)',ctx);}
+ assert.equal(hands.length,2);assert.ok(Math.hypot(hands[0].x-hands[1].x,hands[0].y-hands[1].y)<.001,'gathering cannot snap the arm when the book appears');
 });

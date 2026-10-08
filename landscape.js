@@ -1081,13 +1081,17 @@
       }
 
   }
-  function person(x,y,seed,pose='standing',t=0,walkAmount=1){
+  function person(x,y,seed,motion){
     const shirt=color(seed),skin=skinColor(seed);
-    personHead(g,x,y-12,2,2,seed,skin);line(g,x,y-9,x+1,y-4,shirt,3);
-    const step=pose==='walk'?2+(Math.sin(t*4)*3-2)*walkAmount:2;
-    line(g,x+1,y-4,x-step,y,'#647779',1.4);line(g,x+1,y-4,x+3+step,y,'#647779',1.4);
-    line(g,x,y-8,x+5,y-6,skin,1.3);
-    if(pose==='read'){g.fillStyle='#fff0cf';g.fillRect(x+3,y-8,6,4);line(g,x+6,y-8,x+6,y-4,shirt,.5);}
+    const arm=hand=>{line(g,x,y-8+motion.bob,x+hand.x*.5,y-5.5+motion.bob,skin,1.3);line(g,x+hand.x*.5,y-5.5+motion.bob,x+hand.x,y+hand.y,skin,1.3);};
+    arm(motion.arms[1]);
+    personHead(g,x,y-12+motion.bob,2,2,seed,skin);line(g,x,y-9+motion.bob,x,y+motion.hipY,shirt,3);
+    for(const leg of motion.legs){
+      line(g,x,y+motion.hipY,x+leg.kneeX,y+leg.kneeY,'#647779',1.4);
+      line(g,x+leg.kneeX,y+leg.kneeY,x+leg.footX,y+leg.footY,'#647779',1.4);
+    }
+    arm({x:motion.hand.x,y:motion.hand.y});
+    return motion.hand;
   }
   function seated(x,y,seed,direction,book){
     const skin=skinColor(seed);
@@ -1149,11 +1153,14 @@
         const px=visit.x+offset,py=groundAt(px)+1,seed=(e.seed+i*.3)%1,book=e.type==='reader'||e.type==='couple'&&i===1;
         if(e.type!=='kite'&&visit.stand<1){g.save();g.globalAlpha*=1-visit.stand;seated(px,py,seed,i?-1:1,book&&visit.pack<.8);g.restore();}
         if(e.type==='kite'||visit.stand>0){
-          g.save();g.globalAlpha*=e.type==='kite'?1:visit.stand;g.translate(px,py);g.scale(visit.direction,1);person(0,0,seed,'walk',t,visit.walkAmount);
+          const carrying=e.type==='kite'?0:S.smooth(.4,.7,visit.pack);
+          const motion=geometry.humanWalkPose(px,py,visit.distance,visit.direction,x=>groundAt(x)+1,carrying);
+          if(e.type==='kite')motion.hand={x:5,y:-6};
+          g.save();g.globalAlpha*=e.type==='kite'?1:visit.stand;g.translate(px,py);g.scale(visit.direction,1);const hand=person(0,0,seed,motion);
           if(visit.pack>.7&&e.type!=='kite'){
             // Once a reader stands, keep the cover down by the carrying hand
             // at the hip instead of drawing it over the torso.
-            g.fillStyle=book?'#fff0cf':color(e.seed,2);g.fillRect(4,-3,book?4:6,book?3:4);
+            g.fillStyle=book?'#fff0cf':color(e.seed,2);g.fillRect(hand.x,hand.y,book?4:6,book?3:4);
           }
           g.restore();
         }

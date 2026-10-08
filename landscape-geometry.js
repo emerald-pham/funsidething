@@ -252,7 +252,38 @@
       const departureStart=seeded?.82+seed*.12:.82,packStart=departureStart-.1,standStart=departureStart-.06;
       const departure=smooth(departureStart,1,f),arrival=smooth(0,.12,f);
       const x=anchor-direction*40*(1-arrival)+((e.reverse?-80:W+80)-anchor)*departure;
-      return {x,y:trail(x)+19,anchor,direction,pack:smooth(packStart,departureStart,f),stand:Math.max(1-arrival,smooth(standStart,departureStart,f)),walkAmount:Math.max(1-smooth(.08,.12,f),smooth(departureStart,departureStart+.03,f)),walking:f<.12||f>departureStart};
+      return {x,y:trail(x)+19,anchor,direction,distance:40*arrival+Math.abs((e.reverse?-80:W+80)-anchor)*departure,pack:smooth(packStart,departureStart,f),stand:Math.max(1-arrival,smooth(standStart,departureStart,f)),walkAmount:Math.max(1-smooth(.08,.12,f),smooth(departureStart,departureStart+.03,f)),walking:f<.12||f>departureStart};
+    }
+    function humanWalkPose(x,y,distance,direction,ground,carrying=false){
+      // Travel, not elapsed time, drives stance so eased arrivals can stop with
+      // a planted foot. Keep this pose local to the actor's mirrored frame.
+      const phase=distance/10*Math.PI*2;
+      let bob=.18*Math.cos(phase*2),hipY=-4.4+bob;
+      // Settled visits retain their last stride pose; a walking boolean must
+      // never swap planted feet before eased departure has actually moved.
+      const feet=[0,.5].map(offset=>{
+        const step=strideFoot(distance,10,offset);
+        const footX=step.x,footY=ground(x+direction*footX)-y-step.lift;
+        return {footX,footY,lift:step.lift};
+      });
+      // A short actor on a steep phone trail must lower the pelvis rather
+      // than stretch a shin to reach its planted downhill foot.
+      const lower=Math.max(...feet.map(foot=>foot.footY-Math.sqrt(6.4**2-foot.footX**2)));
+      const upper=Math.min(...feet.map(foot=>foot.footY+Math.sqrt(6.4**2-foot.footX**2)));
+      hipY=Math.max(lower,Math.min(upper,hipY));bob=hipY+4.4;
+      const legs=feet.map(({footX,footY,lift})=>{
+        const dy=footY-hipY,d=Math.hypot(footX,dy),bend=Math.sqrt(Math.max(0,3.2**2-d*d/4));
+        return {footX,footY,lift,kneeX:footX/2+dy/d*bend,kneeY:hipY+dy/2-footX/d*bend};
+      });
+      const arms=[0,.5].map(offset=>{
+        const swing=strideArm(distance,10,offset);
+        return {x:swing.x,y:-8+bob+swing.y};
+      });
+      // Gathering reaches the grip before the object appears; switching a
+      // carrying boolean at that frame would visibly snap the forearm.
+      const grip=Math.max(0,Math.min(1,Number(carrying)||0));
+      const hand={x:arms[0].x+(4-arms[0].x)*grip,y:arms[0].y+(-3+bob-arms[0].y)*grip};
+      return {bob,hipY,legs,arms,hand,carrying};
     }
     function woodlandPose(e){
       // Pick a clearing with room for a short stroll on the darkest near hill.
@@ -500,7 +531,7 @@
       const field=packet*.68+detail*.32;
       return {dx:envelope*(.33*field+.1*Math.sin(x*.071+depth*.24-phase*.63)),dy:envelope*1.25*field};
     };
-    return {routeProgress,motionProgress,motionAge,verticalOffset,visitPose,woodlandPose,duckPose,waterDepth,cycleLeg,deerLeg,nestVisit,eventDepth,dogPose,skater,festival,bannerLayout,fireworks,flock,dolphin,starReflection,reflectionSurface,reflectionMotion,castShadow,grassBand,sunReflection,depthBand,groundAnchor,groundTravelX,groundPose,strideArm,strideFoot,wingFold,balloonDrift,vessel,foregroundTree,nest,ripple,skyPoint,horizon,waterTop,far,middle,near,rail,trail,lowerRail,railCars,tangent,rider,pack,cityscape,partyBeamPose,rooftopPartySchedule,createRooftopPartyScheduler,advanceRooftopParty,clocktowerRoof,clocktowerVisitSchedule,createClocktowerVisitScheduler,advanceClocktowerVisit,clocktowerVisitPoses};
+    return {routeProgress,motionProgress,motionAge,verticalOffset,visitPose,humanWalkPose,woodlandPose,duckPose,waterDepth,cycleLeg,deerLeg,nestVisit,eventDepth,dogPose,skater,festival,bannerLayout,fireworks,flock,dolphin,starReflection,reflectionSurface,reflectionMotion,castShadow,grassBand,sunReflection,depthBand,groundAnchor,groundTravelX,groundPose,strideArm,strideFoot,wingFold,balloonDrift,vessel,foregroundTree,nest,ripple,skyPoint,horizon,waterTop,far,middle,near,rail,trail,lowerRail,railCars,tangent,rider,pack,cityscape,partyBeamPose,rooftopPartySchedule,createRooftopPartyScheduler,advanceRooftopParty,clocktowerRoof,clocktowerVisitSchedule,createClocktowerVisitScheduler,advanceClocktowerVisit,clocktowerVisitPoses};
   }
   root.LandscapeGeometry={create};
 })(globalThis);

@@ -1,5 +1,28 @@
 [
   {
+    "testChangesSha256": "3403df6e13afac0450cbd952aecd501673ecdbeae9a6dac7326cbfd1eb7a77de",
+    "reason": "User requests less awkward walking and carrying; first bounded visitor slice protects contact and actual rendered grip. Migrate the fixed-coordinate source assertion to the requested dynamic hand anchor while strengthening its side/hip geometry protections.",
+    "previousBehavior": "Eased visitor travel used time-based flat straight legs; gathered items did not meet the hand.",
+    "intendedBehavior": "Travel distance drives planted terrain feet with connected knees and a shared rendered grip anchor.",
+    "replacementTests": [
+      "RISK visitor gait: eased arrivals and departures plant terrain feet with connected knees in both directions",
+      "RISK visitor carrying consumer: rendered books and picnic items meet the carrying hand while feet consume the travel pose",
+      "RISK visitor motion guidance: extended scenery FAQ and Settings changelog explain travel cadence and held items",
+      "RISK visitor offline shell: travel pose and carrying renderer changes reach the fingerprinted installed shell",
+      "RISK visitor departure continuity: settled feet and hands do not pop when eased travel starts",
+      "RISK visitor gathering continuity: the actual consumer reaches the grip before a carried item appears",
+      "Landscape readers: carried books hang at the walker side during departure"
+    ],
+    "preservedCoverage": [
+      "Existing walker/dog stride, species silhouettes, event identity/UTC/reduced motion, fireworks cap/jitter and task data unchanged.",
+      "Reader book remains x4 beside the body and hip+1.4 vertically, with original item sizes and seated pack assertion retained; actual carrying consumer checks rendered grip."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK visitor (gait|carrying)' tests.js; node --test --test-name-pattern='RISK visitor motion guidance' tests.js; node --test --test-name-pattern='RISK visitor offline shell' tests.js; node --test --test-name-pattern='RISK visitor departure continuity' tests.js; node --test --test-name-pattern='RISK visitor gathering continuity' tests.js",
+      "failure": "Observed before implementation: visitors expose actual accumulated path displacement failed; painted item begins at an actual hand endpoint failed. Guidance failed on missing travel wording. Logs /tmp/visitor-motion-red.log and /tmp/visitor-guidance-red.log. Offline test observed stale installed shell fingerprint before worker update (/tmp/visitor-offline-red.log). Independent draft review found resting-to-stride foot snaps; observed changing walking state cannot teleport feet failure before continuity fix (/tmp/visitor-boundary-red.log). Owner boundary audit observed gathering cannot snap the arm when the book appears failure before blending the grip (/tmp/visitor-gathering-red.log). Retrospective broken-contact control also detects stance sliding (/tmp/visitor-contact-negative-control.log), not claimed as preimplementation red. Affected regression cohort caught the obsolete fixed fillRect(4,-3) source assertion before expectation migration; /tmp/visitor-regression-initial-failure.log (initial failing cohort). No previous feature assertion discarded without replacement."
+    }
+  },
+  {
     "testChangesSha256": "b35bda73a781953e1b90ec9651a78547d4b599516fbd0c42d7b67ff00ce504bb",
     "reason": "User requests displays at most one minute and regular paired ignition variance widened to300ms, preserving event frequency and finale appearance.",
     "previousBehavior": "Standalone shows persisted60–300seconds; barge shells ran through65percent of transit; second regular ignitions used0–100ms.",
