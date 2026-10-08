@@ -601,5 +601,23 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK legacy automatic expiry lifecycle: a draft arriving during cleanup is saved and completion Undo manual restore and offline reload retain facts
 - RISK legacy automatic expiry FAQ: save rotation permanently removes expired upgrade copies while safety exceptions and Settings age cues remain clear
 
+## Squared Weighting
+
+- `RISK Squared Weighting: exact percentage math full precision and frozen quadratic ordering` — quadratic math, saved mode and preserved eligibility/data contracts.
+- `RISK Squared Weighting saved mode: settings hydration reload eligibility and first dot retain existing protections` — quadratic math, saved mode and preserved eligibility/data contracts.
+- `RISK Squared Weighting default: fresh missing invalid settings use squared and explicit saved preferences survive` — quadratic math, saved mode and preserved eligibility/data contracts.
+- `RISK Squared Weighting migration: old default moves once nondefault and later explicit Chance survive reload import and sync payload` — quadratic math, saved mode and preserved eligibility/data contracts.
+- `RISK Squared Weighting numerical pools: tiny weights normalize without all-zero underflow and ineligible tasks stay zero` — quadratic math, saved mode and preserved eligibility/data contracts.
+- `RISK Squared Weighting migration durability: old default is marked for device/cloud repair and later Chance is not` — quadratic math, saved mode and preserved eligibility/data contracts.
+- `RISK Squared Weighting preserves original Chance: frozen ordering and recorded model likelihood stay proportional to raw weights` — quadratic math, saved mode and preserved eligibility/data contracts.
+- `RISK Squared Weighting sync: explicit old mode survives concurrent clients offline reload reconnect completion and Undo` — quadratic math, saved mode and preserved eligibility/data contracts.
+- `RISK Squared Weighting joins: newly eligible tasks share one frozen scale regardless of input ordering` — joined tasks use one common scale and rendering remains read-only.
+
+- `RISK Squared Weighting consumer transitions: actual Settings change and Save clicks switch modes without changing ratings or pass marks` — real consumer transitions, equivalent controls, preservation and isolated negative controls.
+- `RISK Squared Weighting consumer buttons: rendered Start and Resume modes reach the click dispatcher and preserve resumed seeds` — real consumer transitions, equivalent controls, preservation and isolated negative controls.
+- `RISK Squared Weighting consumer import: actual JSON import click migrates old default once and preserves later explicit Chance` — real consumer transitions, equivalent controls, preservation and isolated negative controls.
+
 - RISK held decision keys: Yes No and Cant repeats cannot judge or skip replacement candidates while fresh presses still work
 - RISK held decision keys FAQ: keyboard guidance names one fresh keypress per Yes No or Cant decision
+
+- RISK Squared Weighting held keys: real keyboard repeats preserve the newly dealt candidate while fresh presses and Undo still work
