@@ -22838,9 +22838,9 @@ test('RISK Halving weighting displayed likelihood: actual list and editor distin
  const {ctx,shim}=await loadApp();ctx.addTask('Oldest');const task=ctx.addTask('Remaining');ctx.setScanPreference('halving');ctx.startScan();ctx.state.settings.listMetric='chance';ctx.state.listOpen=true;ctx.render();
  const summary=ctx.taskSelectionSummary(task,ctx.chanceDisplayStats(),'chance');assert.match(summary.label,/likelihood$/);assert.match(summary.title,/Chance-mode share.*not.*Halving.*selection probability/i);assert.doesNotMatch(summary.label,/scanned after/);
  assert.match(shim.document.getElementById('listBody').innerHTML,/likelihood/);
- ctx.openSettings();assert.match(shim.document.getElementById('modalRoot').innerHTML,/Underlying likelihood percent/);
+ ctx.openSettings();assert.match(shim.document.getElementById('modalRoot').innerHTML,/Likelihood \(%\)/);
  ctx.openEdit(task.id);assert.match(shim.document.getElementById('modalRoot').innerHTML,/Likelihood values.*not Halving weighting selection odds/);
- ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;assert.match(help,/50%, 25%, 25%/);assert.match(help,/overall percent display.*underlying Chance-mode likelihood.*not Halving weighting selection odds/);
+ ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;assert.match(help,/50%, 25%, 25%/);assert.match(help,/Likelihood \(%\) display.*underlying Chance-mode likelihood.*not Halving weighting selection odds/);
 });
 
 test('RISK Halving weighting concurrent joins: same-pass frozen likelihood ranks survive peer adoption and reload without mixing generations',async()=>{
@@ -22882,6 +22882,21 @@ test('RISK Halving weighting open Settings: mode transitions refresh the likelih
  const field=shim.document.getElementById('stScanMode'),metric=shim.document.getElementById('stListMetric'),option={textContent:'Overall percent chance'};let removed=false;const legacy={remove(){removed=true;}};
  field.id='stScanMode';field.matches=()=>true;field.querySelector=()=>removed?null:legacy;metric.querySelector=()=>option;
  shim.document.getElementById('stEverHours').value='37';field.value='halving';shim.document.dispatchEvent({type:'change',target:field});
- assert.equal(option.textContent,'Underlying likelihood percent','the current mounted Settings control updates immediately');assert.equal(removed,true,'switching away retires the legacy chooser in the same open selector');assert.equal(shim.document.getElementById('stEverHours').value,'37','unrelated settings drafts survive');
+ assert.equal(option.textContent,'Likelihood (%)','the current mounted Settings control updates immediately');assert.equal(removed,true,'switching away retires the legacy chooser in the same open selector');assert.equal(shim.document.getElementById('stEverHours').value,'37','unrelated settings drafts survive');
  field.value='chance';shim.document.dispatchEvent({type:'change',target:field});assert.equal(option.textContent,'Overall percent chance');assert.equal(removed,true);assert.equal(shim.document.getElementById('stEverHours').value,'37');
+});
+
+test('RISK Halving weighting enlarged metric: real Settings transition keeps a compact label and wrapping underlying likelihood explanation',async()=>{
+ const {ctx,shim}=await loadApp();ctx.openSettings();
+ const field=shim.document.getElementById('stScanMode'),metric=shim.document.getElementById('stListMetric'),option={textContent:'Overall percent chance'},help=shim.document.getElementById('stListMetricHelp');
+ field.id='stScanMode';field.matches=()=>true;metric.querySelector=()=>option;shim.document.getElementById('stEverHours').value='37';
+ field.value='halving';shim.document.dispatchEvent({type:'change',target:field});
+ assert.equal(option.textContent,'Likelihood (%)','the selected native option stays compact at enlarged text sizes');
+ assert.match(help.textContent,/underlying Chance-mode likelihood.*not Halving.*selection odds/i,'the full meaning moves to visible wrapping copy');
+ assert.equal(shim.document.getElementById('stEverHours').value,'37','unrelated draft remains');
+ ctx.openSettings();let html=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(html,/<select id="stListMetric" aria-describedby="stListMetricHelp">/,'the native selector exposes its explanation');
+ assert.match(html,/id="stListMetricHelp" class="kv settings-metric-help"/,'the explanation has its dedicated full-row wrapping consumer');
+ field.value='chance';shim.document.dispatchEvent({type:'change',target:field});assert.equal(option.textContent,'Overall percent chance');assert.doesNotMatch(help.textContent,/Halving/,'other modes keep their established copy');
+ const source=fs.readFileSync(new URL('index.html',import.meta.url),'utf8');assert.match(source,/\.settings-metric-help\{[^}]*flex:1 1 100%[^}]*min-width:0[^}]*overflow-wrap:anywhere/,'full explanation wraps without reducing font size');
 });
