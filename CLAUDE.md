@@ -6,6 +6,12 @@ live in `tests.js`, run with `node --test tests.js`.
 
 ## Test-first, without exception
 
+Every functional change requires a meaningful, contemporaneously observed RED
+before implementation, then GREEN afterward. Risk determines test selection,
+execution breadth and regression depth; it never permits implementation-first
+for a low-risk control, layout, default, parser, provider path or other behavior.
+Pure prose and nonfunctional housekeeping use consistency review.
+
 No implementation code goes into `index.html`, `sw.js`, `manifest.webmanifest`, or
 the PWA icon assets until a test for that behavior exists in `tests.js`, has been run,
 and has been **seen to fail for the right reason**. A test written after the code is
@@ -61,8 +67,9 @@ paths touch the change. For a visual or motion change, cover the numerical
 geometry or paint contract, reduced motion, and relevant phone, tablet, and
 short-landscape viewports. For offline changes, check the asset fingerprint and
 offline reload. A text or styling fix needs a direct UI assertion that would
-have failed before the edit. Run the full suite after the change, then inspect
-the rendered result when pixels or controls changed. Record test, browser,
+have failed before the edit. Run the focused tests and affected regression
+cohort; broaden to the full suite when risk or a required release gate warrants
+it. Inspect the rendered result when pixels or controls changed. Record test, browser,
 offline, CI, and live results separately.
 
 A `PreToolUse` hook (`.claude/hooks/test-first-guard.sh`) enforces the ordering: an edit
@@ -81,12 +88,15 @@ The hook and CI gate enforce structural requirements: tests appear in the app
 diff, a new risk case is named, and test changes carry a rationale with red
 command/failure evidence. They cannot independently prove that the command ran
 before implementation or that the recorded failure was observed. Keep the real
-red output with task or release evidence, then run the focused test and the full
-suite after the fix. Treat the rationale as a review aid, not proof of chronology.
+red output with task or release evidence, then run focused tests and the
+risk-selected regression cohort after the fix. Distinguish contemporaneous RED
+from retrospective base-versus-fixed validation; the latter does not establish
+test-first chronology. Treat the rationale as a review aid, not proof of chronology.
 
-Exceptions, and only these: config, dependency manifests, pure documentation
-(`README.md`, `SETUP.md`), and deleting code. Everything else — bug fixes, "trivial"
-glue, one-line changes — gets a test first.
+Only pure prose, comments and nonfunctional housekeeping are exempt from a
+functional RED/GREEN loop. Configuration, dependencies and code deletion need
+the same test-first evidence whenever they change functionality. Keep focused
+cohorts; do not expand into blanket account matrices without a changed risk.
 
 ## Conventions
 
@@ -94,7 +104,8 @@ glue, one-line changes — gets a test first.
   (see the cloud-sync block). Match that density and voice; a fix without its reasoning
   invites the same bug back.
 - Cloud sync orders writes by a revision counter, never by wall-clock timestamps.
-- Run the full suite after every change, not just the tests you added.
+- Select local regression breadth by the affected risk; run the full suite when
+  warranted, and complete mandatory CI, compatibility and release gates.
 
 ## Backward compatibility before release
 
