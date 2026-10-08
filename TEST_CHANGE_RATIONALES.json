@@ -2904,5 +2904,38 @@
       "failure": "Contemporaneous preimplementation missing input[type=search] shared selector assertion observed in ../search-styling-red.log. Earlier actual Chrome pixels and resolved ArialMT fonts preserved in ../combined-rendered-review-9fdbb2b.md and runtime artifacts. No postrepair runtime has run."
     },
     "testChangesSha256": "3aa3da4ac060efa93412729acc528a10c195ddd4bb9e5029623c7e0cb1dff921"
+  },
+  {
+    "reason": "Allocated committed rendered test failed because installed Playwright rejects empty style content; independent dark screenshot fixture actually restored light. Repair test runners only and preserve product evidence boundaries.",
+    "previousBehavior": "The browser regression stopped before assertions at an empty addStyleTag initializer. External dark samples remained light because asynchronous board initialization replaced the boot hint.",
+    "intendedBehavior": "Nonempty inert initial CSS enables unchanged normal/enlarged transitions. Light/dark loops call actual setTheme after startup and assert DOM theme plus computed colorScheme. Resolved font comparison requires nonempty glyph family reports.",
+    "replacementTests": [
+      "RISK dependency rendered runner: style initialization is nonempty and dark samples apply and verify the real theme"
+    ],
+    "preservedCoverage": [
+      "Every original border spacing font size geometry overflow and native input assertion remains. Product/protected sources stay byte-identical. Prior32 captured light states are not relabeled dark or claimed as fixture test pass."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK dependency search rendered styling:' tests.js (allocated browser); node --test --test-reporter=spec --test-name-pattern='RISK dependency rendered runner:' tests.js",
+      "failure": "Allocated runtime/search-styling-native-a285b6f.log fails at page.addStyleTag content empty before assertions. New runner guard first fails nonempty content in rendered-runner-red-empty.log, then fails both palettes actually exercised in rendered-runner-red-theme.log before theme loop repair. Original dark fixture limitation recorded in combined-rendered-review-a285b6f.md. No runtime rerun yet."
+    },
+    "testChangesSha256": "67dda8608e5eceda0f29d4b40ba41b2c7889c43dd9fc2871487760df06ad9447"
+  },
+  {
+    "reason": "Allocated committed rendered test failed because installed Playwright rejects empty style content; independent dark screenshot fixture actually restored light. Repair test runners only and preserve product evidence boundaries.",
+    "previousBehavior": "The browser regression stopped before assertions at an empty addStyleTag initializer. External dark samples remained light because asynchronous board initialization replaced the boot hint.",
+    "intendedBehavior": "Nonempty inert initial CSS enables unchanged normal/enlarged transitions. Light/dark loops call actual setTheme after startup and assert DOM theme plus computed colorScheme. Resolved font comparison requires nonempty glyph family reports.",
+    "replacementTests": [
+      "RISK dependency search rendered styling: Add and Edit resolved fonts borders spacing and enlarged sizing match text controls",
+      "RISK dependency rendered runner: style initialization is nonempty and dark samples apply and verify the real theme"
+    ],
+    "preservedCoverage": [
+      "Every original border spacing font size geometry overflow and native input assertion remains. Product/protected sources stay byte-identical. Prior32 captured light states are not relabeled dark or claimed as fixture test pass."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK dependency search rendered styling:' tests.js (allocated browser); node --test --test-reporter=spec --test-name-pattern='RISK dependency rendered runner:' tests.js",
+      "failure": "Allocated runtime/search-styling-native-a285b6f.log fails at page.addStyleTag content empty before assertions. New runner guard first fails nonempty content in rendered-runner-red-empty.log, then fails both palettes actually exercised in rendered-runner-red-theme.log before theme loop repair. Original dark fixture limitation recorded in combined-rendered-review-a285b6f.md. No runtime rerun yet."
+    },
+    "testChangesSha256": "9095ddffbbf4d076fc6d02b16722cebe37bf635a771642ebc93e8ce380507a4f"
   }
 ]

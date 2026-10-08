@@ -22729,7 +22729,11 @@ test('RISK dependency search rendered styling: Add and Edit resolved fonts borde
    await context.route('**/*',r=>new URL(r.request().url()).origin===origin?r.continue():r.abort());
    const page=await context.newPage();await page.goto(process.env.LANDSCAPE_BROWSER_URL);await page.waitForFunction(()=>typeof state!=='undefined'&&state?.tasks);
    await page.evaluate(()=>{closeModal();document.querySelectorAll('dialog[open]').forEach(d=>d.close());state.addOpen=true;render();});
-   const scale=await page.addStyleTag({content:''});
+   const scale=await page.addStyleTag({content:'/* normal text */'});
+   for(const theme of ['light','dark']){
+    await page.evaluate(theme=>setTheme(theme),theme);
+    assert.equal(await page.evaluate(()=>document.documentElement.dataset.theme),theme,'actual initialized app theme');
+    assert.equal(await page.evaluate(()=>getComputedStyle(document.documentElement).colorScheme),theme,'actual rendered color scheme');
    for(const large of [false,true]){
     await scale.evaluate((e,large)=>e.textContent=large?'input{font-size:24px!important}':'',large);
     for(const scope of ['add','edit']){
@@ -22740,7 +22744,7 @@ test('RISK dependency search rendered styling: Add and Edit resolved fonts borde
       const inspect=selector=>{const e=document.querySelector(selector),s=getComputedStyle(e),r=e.getBoundingClientRect();return {style:Object.fromEntries(['fontFamily','fontSize','fontWeight','lineHeight','color','backgroundColor','borderTopWidth','borderTopStyle','borderTopColor','borderRadius','paddingTop','paddingRight','paddingBottom','paddingLeft'].map(k=>[k,s[k]])),height:r.height,left:r.left,right:r.right};};
       return {search:inspect(search),reference:inspect(reference),viewport:innerWidth,page:document.documentElement.scrollWidth};
      },{search,reference});
-     const label=engine+' '+scope+' '+(large?'enlarged':'normal');
+     const label=engine+' '+theme+' '+scope+' '+(large?'enlarged':'normal');
      assert.deepEqual(sample.search.style,sample.reference.style,label+' shares the established input visual contract');
      assert.ok(Math.abs(sample.search.height-sample.reference.height)<1,label+' retains the same text and padding height');
      assert.ok(sample.search.left>=0&&sample.search.right<=sample.viewport+1&&sample.page<=sample.viewport+1,label+' fits the narrow viewport');
@@ -22748,12 +22752,26 @@ test('RISK dependency search rendered styling: Add and Edit resolved fonts borde
       const cdp=await context.newCDPSession(page);await cdp.send('DOM.enable');await cdp.send('CSS.enable');
       const {root}=await cdp.send('DOM.getDocument');
       const fonts=async selector=>{const {nodeId}=await cdp.send('DOM.querySelector',{nodeId:root.nodeId,selector});const {fonts}=await cdp.send('CSS.getPlatformFontsForNode',{nodeId});return [...new Set(fonts.map(f=>f.familyName))].sort();};
-      await page.locator(search).fill('Synthetic typography');
-      assert.deepEqual(await fonts(search),await fonts(reference),label+' actual resolved font identity matches');await cdp.detach();
+      const resolved=await fonts(search),labelFonts=await fonts(scope==='add'?'label[for=addDependencySearch]':'label[for=etTitle]');
+      assert.ok(resolved.length&&labelFonts.length,label+' font reports contain actual rendered glyphs');
+      assert.deepEqual(resolved,labelFonts,label+' actual resolved font identity matches');await cdp.detach();
      }
     }
+   }
    }
    await context.close();
   }finally{await browser.close();}
  }
+});
+
+test('RISK dependency rendered runner: style initialization is nonempty and dark samples apply and verify the real theme',()=>{
+ const source=fs.readFileSync(fileURLToPath(import.meta.url),'utf8');
+ const start=source.indexOf("test('RISK dependency search rendered styling:");
+ const fixture=source.slice(start,source.indexOf("test('RISK dependency rendered runner:",start));
+ const initial=fixture.match(/const scale=await page\.addStyleTag\(\{content:'([^']*)'\}\)/);
+ assert.ok(initial?.[1].trim(),'Playwright requires nonempty initial style content before the normal/enlarged transition');
+ assert.match(fixture,/for\(const theme of \['light','dark'\]\)/,'both palettes are actually exercised');
+ assert.match(fixture,/page\.evaluate\(theme=>setTheme\(theme\),theme\)/,'restored board initialization must be followed by the real app theme setter');
+ assert.match(fixture,/document\.documentElement\.dataset\.theme/,'theme identity must be checked rather than inferred from a screenshot filename');
+ assert.match(fixture,/getComputedStyle\(document\.documentElement\)\.colorScheme/,'the actual rendered palette must be checked');
 });

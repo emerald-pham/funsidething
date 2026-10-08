@@ -705,3 +705,5 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - `RISK Add draft durable reset: multiline paste preserves failed capture and saves retained tasks on retry` — bulk capture uses the same durable reset gate.
 
 - Dependency search typography uses shared text-input styling; narrow normal/enlarged Add/Edit native rendering and actual Chrome font identity: `RISK dependency search styling: Add and Edit share text input typography borders and spacing`; `RISK dependency search rendered styling: Add and Edit resolved fonts borders spacing and enlarged sizing match text controls`.
+
+- Dependency rendered fixture rejects empty style initialization and verifies the app’s actual theme after startup: `RISK dependency rendered runner: style initialization is nonempty and dark samples apply and verify the real theme`.
