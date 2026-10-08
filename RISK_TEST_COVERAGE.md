@@ -600,3 +600,6 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK device current-head guard: stale heads non-synchronous approvals and queued peers cannot authorize legacy retirement
 - RISK legacy automatic expiry lifecycle: a draft arriving during cleanup is saved and completion Undo manual restore and offline reload retain facts
 - RISK legacy automatic expiry FAQ: save rotation permanently removes expired upgrade copies while safety exceptions and Settings age cues remain clear
+
+- RISK held decision keys: Yes No and Cant repeats cannot judge or skip replacement candidates while fresh presses still work
+- RISK held decision keys FAQ: keyboard guidance names one fresh keypress per Yes No or Cant decision

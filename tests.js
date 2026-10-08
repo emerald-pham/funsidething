@@ -21648,3 +21648,34 @@ test('RISK legacy automatic expiry FAQ: save rotation permanently removes expire
  ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;assert.match(settings,/removed permanently from the active backup list.*successful save/);assert.match(settings,/Separate recovery archives kept by a storage upgrade remain intact/);
  const current=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];assert.match(current,/Expired automatic.*legacy.*save rotation/i);
 });
+
+
+test('RISK held decision keys: Yes No and Cant repeats cannot judge or skip replacement candidates while fresh presses still work',async()=>{
+ for(const key of ['y','n','c'])for(const scanMode of ['descending','chance']){
+  const {ctx,shim}=await loadApp({seed:618});const bench=ctx.addTask('Synthetic benchmark'),candidate=ctx.addTask('Synthetic candidate'),next=ctx.addTask('Synthetic next');
+  Object.assign(ctx.state,{chain:[bench.id],candidateId:candidate.id,mode:'scan',scanMode,snooze:100});ctx.render();
+  const initial=JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma]));
+  shim.document.dispatchEvent({type:'keydown',key,repeat:false});
+  assert.equal(ctx.state.candidateId,next.id,'the ordinary first press advances to the next candidate');
+  if(key==='y')assert.ok(candidate.mu>25&&bench.mu<25,'Yes retains candidate-over-benchmark orientation');
+  if(key==='n')assert.ok(candidate.mu<25&&bench.mu>25,'No retains benchmark-over-candidate orientation');
+  if(key==='c')assert.equal(JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma])),initial,'Cant stays neutral');
+  const after=JSON.stringify(ctx.state),undoDepth=vm.runInContext('undoStack.length',ctx);
+  for(let repeat=0;repeat<3;repeat++)shim.document.dispatchEvent({type:'keydown',key:key.toUpperCase(),repeat:true});
+  assert.equal(JSON.stringify(ctx.state),after,key+' '+scanMode+': a held key cannot act on the replacement or record another observation');
+  assert.equal(vm.runInContext('undoStack.length',ctx),undoDepth,'ignored repeats add no Undo frame');
+  shim.document.dispatchEvent({type:'keydown',key,repeat:false});
+  assert.notEqual(JSON.stringify(ctx.state),after,'a fresh keypress can judge the replacement');
+  ctx.undo();assert.equal(ctx.state.candidateId,next.id,'one Undo reverses the second fresh decision');
+  ctx.undo();assert.equal(ctx.state.candidateId,candidate.id,'a second Undo reverses the first decision');
+  assert.equal(JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma])),initial,'Undo restores exact original ratings');
+ }
+});
+
+test('RISK held decision keys FAQ: keyboard guidance names one fresh keypress per Yes No or Cant decision',async()=>{
+ const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(help,/fresh keypress.*Yes.*No.*Can.t/i);
+ assert.match(help,/holding.*key.*next candidate/i);
+ const current=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];
+ assert.match(current,/holding.*Yes.*No.*Can.t.*next candidate/i);
+});
