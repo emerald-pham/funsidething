@@ -23180,3 +23180,15 @@ test('RISK Last task WOOP browser: mounted controls responsive saved revisit del
  }
  if(output)fs.writeFileSync(path.join(output,'typography-samples.json'),JSON.stringify({candidate:spawnSync('git',['rev-parse','HEAD'],{cwd:__dirname,encoding:'utf8'}).stdout.trim(),samples},null,2));
 });
+
+test('RISK repository process: deployment fetches deleted squash PR head and rejects ref identity mismatch',async()=>{
+ const {recordReleaseEvidence,publishReleaseStatuses,verifyDeploymentEvidence}=await import('./scripts/release-evidence.mjs'),f=makeReleaseGateFixture();
+ try{
+  recordReleaseEvidence(f.repo,releaseGateInput(f));const statuses=[];await publishReleaseStatuses(f.repo,f.candidateSha,async row=>statuses.push({...row,created_at:new Date().toISOString()}));
+  releaseGateGit(f.repo,['update-ref','refs/pull/78/head',f.candidateSha]);const squash=releaseGateGit(f.repo,['commit-tree',f.treeSha,'-p',f.baseSha,'-m','Squash reviewed change']);const checkout=path.join(f.root,'deployed');fs.mkdirSync(checkout);releaseGateGit(checkout,['init','-q']);releaseGateGit(checkout,['remote','add','origin',f.repo]);releaseGateGit(checkout,['fetch','-q','origin',squash]);releaseGateGit(checkout,['checkout','-q','--detach','FETCH_HEAD']);
+  assert.notEqual(spawnSync('git',['-C',checkout,'cat-file','-e',f.candidateSha+'^{commit}']).status,0,'squashed full main history lacks deleted PR head');
+  const fetchImpl=async url=>{const p=new URL(url).pathname;let body;if(p.endsWith('/commits/'+squash+'/pulls'))body=[{number:78,merge_commit_sha:squash,merged_at:new Date().toISOString(),base:{ref:'main'},head:{sha:f.candidateSha}}];else if(p.endsWith('/commits/'+squash))body={parents:[{sha:f.baseSha}],commit:{tree:{sha:f.treeSha}}};else if(p.endsWith('/commits/'+f.candidateSha+'/statuses'))body=statuses;else if(p.endsWith('/commits/'+f.candidateSha))body={commit:{tree:{sha:f.treeSha}}};else if(p.includes('/compare/'))body={status:'ahead'};else throw Error(p);return{ok:true,status:200,json:async()=>body};};
+  const result=await verifyDeploymentEvidence({repoRoot:checkout,repository:'emerald-pham/funsidething',deployedSha:squash,beforeSha:f.baseSha,token:'fixture',fetchImpl});assert.equal(result.ok,true,result.errors.join('; '));assert.equal(releaseGateGit(checkout,['rev-parse',f.candidateSha+'^{commit}']),f.candidateSha);
+  const wrong=path.join(f.root,'wrong');fs.mkdirSync(wrong);releaseGateGit(wrong,['init','-q']);releaseGateGit(wrong,['remote','add','origin',f.repo]);releaseGateGit(wrong,['fetch','-q','origin',squash]);releaseGateGit(wrong,['checkout','-q','--detach','FETCH_HEAD']);releaseGateGit(f.repo,['update-ref','refs/pull/78/head',f.baseSha]);const rejected=await verifyDeploymentEvidence({repoRoot:wrong,repository:'emerald-pham/funsidething',deployedSha:squash,beforeSha:f.baseSha,token:'fixture',fetchImpl});assert.equal(rejected.ok,false,'moved PR ref must not authorize another head');assert.match(rejected.errors.join(' '),/exact|match|head/i);
+ }finally{cleanupReleaseGateFixture(f);}
+});

@@ -3025,5 +3025,22 @@
       "command": "node --test --test-name-pattern='RISK Last task WOOP:' tests.js; separate mounted dependency/FAQ/process and reviewer regression RED runs (logs ../woop-red.txt, ../faq-filter-red.txt, ../faq-sections-red.txt, ../woop-future-red.txt, ../woop-delete-binding-red.txt, ../faq-legacy-red.txt, ../faq-verify-red.txt, ../faq-deployment-docs-red.txt, ../woop-replacement-future-red.txt, ../woop-opaque-recovery-red.txt, ../woop-intervention-red.txt, ../woop-long-chain-red.txt). Latest recovery repair RED: ../woop-opaque-both-directions-red.txt; GREEN: ../woop-recovery-green.txt. Peer archive replacement RED ../woop-archive-replacement-red.txt; GREEN ../woop-archive-replacement-green.txt. Runtime polling guard RED ../woop-browser-first.txt; GREEN ../woop-browser-second.txt.",
       "failure": "Observed before initial implementation: five WOOP failures for missing default, walkthrough and atomic preservation; missing Filter dependencies mounted label/order; missing FAQ headings and required reviewer. Reviewer repair REDs reproduced future evidence loss, stale Delete, legacy receipt bypass, prose exemption/deployment shallow-history gaps, interruption boundary and recursive graph overflow. Additional lifecycle and browser acceptance tests added after initial implementation are preservation coverage, not retrospective preimplementation RED claims. Browser reload initially polled a null startup board; polling now explicitly waits for state.tasks while retaining every functional assertion."
     }
+  },
+  {
+    "testChangesSha256": "a5cda20e9e87ae07154df538306650b545392531262c8db3ab4753d579d88656",
+    "reason": "Repair the observed deployment release-evidence gate after automatic branch deletion leaves a full-history squash checkout without its reviewed PR head.",
+    "previousBehavior": "The verifier failed closed on missing reviewed head despite full main history, blocking the qualified WOOP deployment after its squash merge.",
+    "intendedBehavior": "Fetch only the associated merged PR retained head when absent, require exact API-reported SHA, derive exact policy and preserve all prior tree/base/status validations.",
+    "replacementTests": [
+      "RISK repository process: deployment fetches deleted squash PR head and rejects ref identity mismatch"
+    ],
+    "preservedCoverage": [
+      "Existing exact main parent, reviewed tree, base ancestry, receipt digest and FAQ v3 status checks remain unchanged.",
+      "A moved or wrong PR ref cannot authorize another reviewed head, and the deployed checkout remains unmodified."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK repository process: deployment fetches' tests.js; log ../woop-squash-head-red.txt",
+      "failure": "Observed missing exact reviewed head in a real isolated squash checkout with deleted branch; verifyDeploymentEvidence returned false before implementation. Deployment CI failure retained in ../woop-deploy-evidence-job-log.txt."
+    }
   }
 ]
