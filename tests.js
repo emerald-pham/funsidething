@@ -23163,7 +23163,7 @@ test('RISK Last task WOOP browser: mounted controls responsive saved revisit del
      samples.push({engine,width,height,theme,...sample});if(output)await page.screenshot({path:path.join(output,engine+'-'+width+'-'+theme+'-saved.png'),fullPage:true});
     }
     await setting(false);assert.equal(await page.locator('.woop-saved').count(),0);assert.ok(await page.evaluate(id=>taskById(id).woopPlan,id));await setting(true);assert.equal(await page.locator('.woop-saved').count(),1);
-    await page.reload();await page.waitForFunction(id=>typeof state!=='undefined'&&taskById(id)?.woopPlan,id);await page.evaluate(id=>{state.mode='work';state.chain=[id];render();},id);assert.equal(await page.locator('.woop-saved').count(),1);
+    await page.reload();await page.waitForFunction(id=>typeof state!=='undefined'&&state?.tasks&&taskById(id)?.woopPlan,id);await page.evaluate(id=>{state.mode='work';state.chain=[id];render();},id);assert.equal(await page.locator('.woop-saved').count(),1);
     // Actual mounted order in both task forms, with the search node retained.
     for(const scope of ['add','edit']){
      if(scope==='edit')await page.evaluate(id=>openEdit(id),id);else await page.evaluate(()=>{closeModal();state.addOpen=true;render();});
@@ -23173,7 +23173,7 @@ test('RISK Last task WOOP browser: mounted controls responsive saved revisit del
      if(output)await page.screenshot({path:path.join(output,engine+'-'+width+'-'+scope+'-dependencies.png'),fullPage:true});
     }
     await page.evaluate(()=>closeModal());await page.locator('[data-act=woop-delete]').click();await page.evaluate(()=>persist());assert.equal(await page.locator('[data-act=woop-start]').count(),1);
-    if(engine==='chrome'&&width===390){await page.evaluate(()=>navigator.serviceWorker.ready);await page.reload();await page.waitForFunction(()=>!!navigator.serviceWorker.controller);await context.setOffline(true);await page.reload();await page.waitForFunction(id=>typeof state!=='undefined'&&taskById(id),id);assert.equal(await page.evaluate(id=>taskById(id).woopPlan,id),null,'offline reload preserves deletion');await context.setOffline(false);}
+    if(engine==='chrome'&&width===390){await page.evaluate(()=>navigator.serviceWorker.ready);await page.reload();await page.waitForFunction(()=>!!navigator.serviceWorker.controller);await context.setOffline(true);await page.reload();await page.waitForFunction(id=>typeof state!=='undefined'&&state?.tasks&&taskById(id),id);assert.equal(await page.evaluate(id=>taskById(id).woopPlan,id),null,'offline reload preserves deletion');await context.setOffline(false);}
     assert.deepEqual(errors,[]);await context.close();
    }
   }finally{await browser.close();}
