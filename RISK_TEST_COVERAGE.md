@@ -692,3 +692,7 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK STALE TAB: recovery guidance explains independent edits conflicts and unobserved cloud bases
 - RISK STALE TAB: rebasing never combines cached Chance data from different passes
 - RISK STALE TAB: a conflicting edit during awaited CAS repair retains its exact recovery bytes
+
+- `RISK dependency picker search: Add and Edit input filtering preserves hidden selections and excludes completed ordinary choices` — native dependency filtering and retained saved links.
+
+- `RISK dependency picker input identity: search updates choices without replacing the focused search or its composition` — stable native input identity during filtering.

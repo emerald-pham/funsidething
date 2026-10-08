@@ -22591,3 +22591,45 @@ test('RISK STALE TAB: a conflicting edit during awaited CAS repair retains its e
  assert.equal(ctx.state.tasks[0].title,'Peer newer');
  assert.ok((await store.listBackups()).some(row=>row.kind==='stale-tab-draft'&&row.payload===exact),'the late conflicting draft has its own exact protected recovery snapshot');await store.close();
 });
+
+test('RISK dependency picker search: Add and Edit input filtering preserves hidden selections and excludes completed ordinary choices',async()=>{
+ const {ctx,shim}=await loadApp();const active=ctx.addTask('Alpha active'),done=ctx.addTask('Alpha done'),ever=ctx.addTask('Beta evergreen'),owner=ctx.addTask('Owner'),deleted=ctx.addTask('Deleted');
+ ctx.setTaskPrerequisites(owner.id,[done.id,deleted.id]);ctx.deleteTask(deleted.id);
+ done.done=true;ever.done=true;ever.evergreen=true;
+ for(const scope of ['add','edit']){
+  if(scope==='edit'){ctx.openEdit(owner.id);}else ctx.renderAddPanel();
+  const root=shim.document.getElementById(scope==='add'?'addDependencies':'editDependencies');
+  assert.match(root.innerHTML,/type="search"/,'dependency selection needs a usable search field');
+  const field=shim.document.getElementById(scope+'DependencySearch');field.id=scope+'DependencySearch';field.dataset={dependencySearch:scope};field.value=' beta ';
+  shim.document.dispatchEvent({type:'input',target:field});
+  assert.match(root.innerHTML,/Beta evergreen/);assert.doesNotMatch(root.innerHTML,/Alpha active/);
+  if(scope==='edit'){
+   assert.match(root.innerHTML,/Alpha done/);assert.match(root.innerHTML,/deleted task/);
+   assert.deepEqual(Array.from(ctx.readDependencyDraft(scope)),[done.id,deleted.id]);
+  }else assert.doesNotMatch(root.innerHTML,/Alpha done/);
+  field.value='';shim.document.dispatchEvent({type:'input',target:field});
+  assert.match(root.innerHTML,/Alpha active/);assert.match(root.innerHTML,/Beta evergreen/);
+  if(scope==='edit'){
+   ctx.onAction('save-edit',{dataset:{id:owner.id}});ctx.openEdit(owner.id);
+   assert.deepEqual(Array.from(ctx.readDependencyDraft('edit')),[done.id,deleted.id]);
+   ctx.onAction('remove-dependency',{dataset:{scope:'edit',index:'0'}});
+   ctx.onAction('save-edit',{dataset:{id:owner.id}});assert.deepEqual(Array.from(ctx.taskPrerequisiteIds(owner)),[deleted.id]);
+  }
+ }
+ assert.doesNotMatch(ctx.prerequisiteOptions(null),/Alpha done/);ever.done=false;assert.match(ctx.prerequisiteOptions(null),/Beta evergreen/);
+ assert.doesNotMatch(ctx.prerequisiteOptions(active.id),/Alpha active/);
+ await ctx.persist();const reload=await loadApp({seedStorage:{[SYNC_STORE_KEY]:shim.localStorage.getItem(SYNC_STORE_KEY)}});
+ const saved=reload.ctx.state.tasks.find(t=>t.id===owner.id);assert.deepEqual(Array.from(reload.ctx.taskPrerequisiteIds(saved)),[deleted.id]);
+ reload.ctx.openEdit(owner.id);assert.deepEqual(Array.from(reload.ctx.readDependencyDraft('edit')),[deleted.id]);
+});
+
+test('RISK dependency picker input identity: search updates choices without replacing the focused search or its composition',async()=>{
+ const {ctx,shim}=await loadApp();ctx.addTask('Alpha');ctx.addTask('Beta');ctx.renderAddPanel();
+ const root=shim.document.getElementById('addDependencies'),choices={innerHTML:''};
+ root.querySelector=selector=>selector==='.dependency-choices'?choices:null;
+ const before=root.innerHTML,field=shim.document.getElementById('addDependencySearch');
+ Object.assign(field,{id:'addDependencySearch',dataset:{dependencySearch:'add'},value:'Beta',selectionStart:1,selectionEnd:3,selectionDirection:'backward'});
+ shim.document.dispatchEvent({type:'input',target:field,isComposing:true});
+ assert.equal(root.innerHTML,before,'input events must retain the search node, selection and ongoing native composition');
+ assert.match(choices.innerHTML,/Beta/);assert.doesNotMatch(choices.innerHTML,/Alpha/);
+});

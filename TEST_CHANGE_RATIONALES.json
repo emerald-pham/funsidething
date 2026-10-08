@@ -1,5 +1,22 @@
 [
   {
+    "testChangesSha256": "23451426af9156541dd163655f7298c5488408af1f0a8dc3ab193716404f0491",
+    "reason": "User requests searchable dependency choices excluding completed ordinary tasks while preserving all existing links.",
+    "previousBehavior": "Native dependency selects offered completed ordinary tasks and had no text filter.",
+    "intendedBehavior": "Add and Edit input handlers filter new task choices while selected completed and deleted links remain visible, saved and removable.",
+    "replacementTests": [
+      "RISK dependency picker search: Add and Edit input filtering preserves hidden selections and excludes completed ordinary choices",
+      "RISK dependency picker input identity: search updates choices without replacing the focused search or its composition"
+    ],
+    "preservedCoverage": [
+      "Existing multi-link graph, cycle warning, native select, legacy persistence and concurrent sync contracts remain unchanged."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK dependency picker search:' tests.js",
+      "failure": "Observed failure: dependency selection needs a usable search field; baseline markup also contained Alpha done as an unselected option. Full output retained in dependency-red.log. Final expanded test also failed against an archived released baseline with the same missing-search assertion (dependency-final-test-red.log); save/reload coverage then passed against candidate. Independent review found input replacement; new input-identity test observed RED (dependency-input-red.log) before stable-input implementation, then GREEN."
+    }
+  },
+  {
     "testChangesSha256": "6d20a6d3d92e82fd2e163879b9dadcc2dbb20d762b8a45103c91ed7eca76d36d",
     "reason": "User asks each date Clear button to remain visible but disabled while its field is empty. Add actual draft assignment, input/change, clear, reset and reopen transitions with isolated native-style value descriptors; existing assertions are unchanged.",
     "previousBehavior": "All four Clear buttons stayed enabled for empty fields and after clearing.",
