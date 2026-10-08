@@ -96,6 +96,21 @@ test('RISK context sync: concurrent clients offline reload reconnect and remote 
  b.ctx.undo();await b.ctx.persist();await b.ctx.cloudPushNow();await syncSettle(40);await a.ctx.cloudPull();assert.equal(a.ctx.state.tasks.find(t=>t.id===task.id).lastDoneAt,null);assert.equal(a.ctx.state.contexts[0].excluded,true);assert.equal(a.ctx.state.settings.excludeNoContext,true);
 });
 
+test('RISK changelog dates: Settings combines repeated dates in descending order without losing history categories or links',async()=>{
+ const {ctx,shim}=await loadApp();
+ const sources=['appChangelogCurrent','appChangelog'].map(id=>html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1]);
+ function rendered(current,archive){shim.document.getElementById('appChangelogCurrent').innerHTML=current;shim.document.getElementById('appChangelog').innerHTML=archive;ctx.openSettings();return shim.document.getElementById('modalRoot').innerHTML.split('<summary>Changelog</summary>')[1].split('</details>')[0];}
+ const log=rendered(...sources),dates=Array.from(log.matchAll(/<h3>(.*?)<\/h3>/g),m=>m[1]);
+ assert.equal(new Set(dates).size,dates.length,'one date heading per day across current and archived entries');
+ assert.deepEqual(dates,[...dates].sort((a,b)=>Date.parse(b)-Date.parse(a)),'archived September 29 rejoins its chronological group');
+ const bullets=s=>Array.from(s.matchAll(/<li>([\s\S]*?)<\/li>/g),m=>m[0]).sort();assert.deepEqual(bullets(log),bullets(sources.join('')),'every authored bullet remains byte-for-byte, including repeated content');
+ assert.match(log,/<h4>Seasonal details<\/h4>/,'the category remains under its date');
+ const next=rendered('<div><h3>January 2, 2027</h3><ul><li><a href="https://example.com/release">Future release</a></li></ul><h3>January 2, 2027</h3><ul><li>Another release</li></ul></div>','<details><summary>Changelog</summary><h3>December 31, 2026</h3><ul><li>Year end</li></ul><h3>January 2, 2027 — Seasonal details</h3><ul><li>Future category</li></ul></details>');
+ assert.deepEqual(Array.from(next.matchAll(/<h3>(.*?)<\/h3>/g),m=>m[1]),['January 2, 2027','December 31, 2026'],'future duplicates and year boundaries use the same renderer');
+ assert.match(next,/<a href="https:\/\/example.com\/release">Future release<\/a>/);assert.match(next,/<h4>Seasonal details<\/h4>/);assert.equal(bullets(next).length,4);
+ ctx.openHelp();assert.match(shim.document.getElementById('modalRoot').innerHTML,/one heading per date.*newest.*oldest/i);
+});
+
 test('RISK Settings hierarchy: Changelog uses existing sections and Save settings follows every section without changing validation',async()=>{
  const {ctx,shim}=await loadApp();
  for(const id of ['appChangelogCurrent','appChangelog'])shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];

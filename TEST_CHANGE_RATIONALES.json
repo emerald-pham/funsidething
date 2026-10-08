@@ -1,5 +1,22 @@
 [
   {
+    "testChangesSha256": "9e249481bbc8ed02d19f44d7c74ecd7cf91c0971535f32077433415143f23267",
+    "reason": "User requested combined date headings and prevention of future duplicate dates. Add a Settings consumer regression without changing existing feature assertions.",
+    "previousBehavior": "Current and archived templates rendered independently, splitting October 8 and September 29 and placing archived September 29 out of date order.",
+    "intendedBehavior": "Settings renders one descending chronological date group across both sources while retaining all bullets, categories and embedded links, including future releases.",
+    "replacementTests": [
+      "RISK changelog dates: Settings combines repeated dates in descending order without losing history categories or links"
+    ],
+    "preservedCoverage": [
+      "Existing Settings save validation and hierarchy assertions remain untouched.",
+      "All authored historical bullets remain byte-for-byte; task data, cloud and scanner behavior are unchanged."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK changelog dates:' tests.js",
+      "failure": "Observed before implementation: one date heading per day across current and archived entries; 19 !== 21. Full red output saved in ../changelog-red.log."
+    }
+  },
+  {
     "testChangesSha256": "8bcd3e5445fc4776ef9245fd712c61b9f999082e5a7beed17adb9e5c1cf3da9c",
     "reason": "User requests less awkward walking/carrying across actor families. Extend the tested visitor slice to scaled winter and woodland travel, connected walker limbs and smooth shared foot contact. Preserve actual consumer and data boundaries; the harness is isolated diagnostic evidence, not visual approval. Runtime independent raster review found the snowangel standing/departing shadow absent; preserve imprint separately and restore terrain-following body shadow.",
     "previousBehavior": "Visiting/winter people used straight time-wave legs; woodland scaled stance slid; ordinary walkers had straight legs; swing velocity/lift changed abruptly at contact; kite string was offset from the rendered hand; no frozen before-after motion fixture existed.",
