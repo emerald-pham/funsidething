@@ -1,5 +1,39 @@
 [
   {
+    "testChangesSha256": "8bcd3e5445fc4776ef9245fd712c61b9f999082e5a7beed17adb9e5c1cf3da9c",
+    "reason": "User requests less awkward walking/carrying across actor families. Extend the tested visitor slice to scaled winter and woodland travel, connected walker limbs and smooth shared foot contact. Preserve actual consumer and data boundaries; the harness is isolated diagnostic evidence, not visual approval. Runtime independent raster review found the snowangel standing/departing shadow absent; preserve imprint separately and restore terrain-following body shadow.",
+    "previousBehavior": "Visiting/winter people used straight time-wave legs; woodland scaled stance slid; ordinary walkers had straight legs; swing velocity/lift changed abruptly at contact; kite string was offset from the rendered hand; no frozen before-after motion fixture existed.",
+    "intendedBehavior": "Travel-based connected human limbs preserve terrain contact at actor scale, gathered objects and held lines share their hand anchors, woodland feet cancel scaled displacement, and swing velocity/lift join stance continuously. Freeze actual released/candidate painters for later allocated motion review.",
+    "replacementTests": [
+      "Guest departure: gait eases into walking and a reverse kite stays attached to the mirrored hand",
+      "Landscape readers: carried books hang at the walker side during departure",
+      "RISK visitor gait: eased arrivals and departures plant terrain feet with connected knees in both directions",
+      "RISK visitor carrying consumer: rendered books and picnic items meet the carrying hand while feet consume the travel pose",
+      "RISK visitor motion guidance: extended scenery FAQ and Settings changelog explain travel cadence and held items",
+      "RISK visitor offline shell: travel pose and carrying renderer changes reach the fingerprinted installed shell",
+      "RISK visitor departure continuity: settled feet and hands do not pop when eased travel starts",
+      "RISK visitor gathering continuity: the actual consumer reaches the grip before a carried item appears",
+      "RISK winter walking: departures consume scaled traveled-distance terrain feet instead of a wall-clock leg wave",
+      "RISK woodland stride: actual scaled animal paint holds stance paws on its clearing in both directions",
+      "RISK walking contact transitions: foot swing meets planted stance with continuous velocity and zero lift slope",
+      "RISK walker anatomy consumer: ordinary and dog walkers use connected knees while keeping mirrored feet and leash attached",
+      "RISK kite grip consumer: gathering and reverse travel keep the string at the actual rendered hand",
+      "RISK motion review harness: frozen actual actor painters reconstruct repeatable before-after sequences across direction viewport and reduced motion",
+      "RISK walking scope guidance: extended FAQ and changelog describe walker winter woodland and held-line improvements",
+      "RISK motion harness controls: nonfinite actual painter commands are rejected and foreground deer use their real travel anchor",
+      "RISK snowangel departing shadow: actual winter painter follows the standing person and preserves the fixed imprint"
+    ],
+    "preservedCoverage": [
+      "All existing walker/dog/deer stance, meadow rabbit hops, cyclist connected pedals, silhouettes/identity, UTC schedules, reduced motion and fireworks duration/jitter tests retained. Task data/cloud/auth untouched.",
+      "Reader fixed-coordinate source assertion now checks actual dynamic hand anchor plus original sizes and side/hip geometry. Guest departure retains original eased walkAmount assertions while its obsolete time-wave regex becomes a distance/actual-hand consumer assertion.",
+      "Harness excludes app startup, task accounts, storage, full scene composition and runtime performance. Numerical command checks are not pixel or naturalness proof."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK visitor (gait|carrying)|RISK visitor motion guidance|RISK visitor offline shell|RISK visitor departure continuity|RISK visitor gathering continuity' tests.js; node --test --test-name-pattern='RISK (winter walking|woodland stride|walking contact|walker anatomy|kite grip|motion review harness|motion harness controls|walking scope guidance)' tests.js; /opt/local/bin/node --test --test-name-pattern=\"RISK snowangel departing shadow\" tests.js",
+      "failure": "Contemporaneous RED logs: visitor-motion-red/guidance-red/offline-red/boundary-red/gathering-red under /tmp capture missing distance, detached grip, absent copy, stale shell, departure/gathering snaps. /tmp/motion-winter-woodland-red.log captures missing traveled displacement and scaled foot sliding; motion-walker-swing-red.log captures velocity snap and missing calf; motion-kite-red.log captures detached string and obsolete time-wave consumer regex; motion-harness-red.log captures unavailable required fixture; motion-harness-controls-red.log and motion-harness-deer-red.log capture nonfinite masking and incorrect foreground camera; motion-scope-guidance-red.log captures missing FAQ scope. Initial regression source assertion failure preserved /tmp/visitor-regression-initial-failure.log. Retrospective broken-contact control explicitly labeled, not contemporaneous RED. Generated script syntax assertions were added after implementation as preservation checks; not claimed as preimplementation RED. /tmp/chain-motion-review-5387021/evidence/snowangel-shadow-red.log: observed actual painter lacks departing feet fallback ellipse before fix. Retained failing actual raster2-after-053.png and baseline2-before-053.png demonstrate the visual failure."
+    }
+  },
+  {
     "testChangesSha256": "057a4891feed1115cd578aba16dd630ebdc52e3aa92d4a652a099702bcb15d78",
     "reason": "User requests less awkward walking/carrying across actor families. Extend the tested visitor slice to scaled winter and woodland travel, connected walker limbs and smooth shared foot contact. Preserve actual consumer and data boundaries; the harness is isolated diagnostic evidence, not visual approval.",
     "previousBehavior": "Visiting/winter people used straight time-wave legs; woodland scaled stance slid; ordinary walkers had straight legs; swing velocity/lift changed abruptly at contact; kite string was offset from the rendered hand; no frozen before-after motion fixture existed.",

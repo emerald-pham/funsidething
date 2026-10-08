@@ -22265,3 +22265,20 @@ test('RISK motion harness controls: nonfinite actual painter commands are reject
   const options={actor,reverse,progress:.5,duration:55,seed:.4,lane:.5,zoom:6},frame=createMotionProbe(build).sample(options),pose=geo.groundPose(actor,{type:actor,age:27.5,duration:55,seed:.4,lane:.5,reverse});assert.equal(frame.metadata.x,pose.x,'foreground animals use groundPose rather than visitor camera geometry');
  }
 });
+
+test('RISK snowangel departing shadow: actual winter painter follows the standing person and preserves the fixed imprint',()=>{
+ const ctx=vm.createContext({Date,Math,console});for(const file of ['landscape-geometry.js','landscape-winter.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,file),'utf8'),ctx);
+ for(const [W,H]of [[390,844],[844,390],[820,1180],[1440,900]])for(const reverse of [false,true])for(const age of [70,78,90,97]){
+  const geometry=ctx.LandscapeGeometry.create(W,H),event={type:'snowangel',duration:100,age,seed:.4,lane:.5,reverse},pose=ctx.LandscapeWinter.pose('snowangel',event,geometry,W,H);
+  for(const projected of [false,true]){
+   const shadows=[],ellipses=[],stack=[];const g={globalAlpha:1,save(){stack.push(this.globalAlpha);},restore(){this.globalAlpha=stack.pop();},translate(){},scale(){},rotate(){}};
+   const helpers={ellipse:(g,x,y,rx,ry)=>ellipses.push({x,y,rx,ry,alpha:g.globalAlpha}),line(){},...(projected?{groundShadow:(g,x,y,height,width)=>shadows.push({x,y,height,width,alpha:g.globalAlpha})}:{})};
+   assert.equal(ctx.LandscapeWinter.paint(g,geometry,W,H,event,0,{front:'#abcdef',sky:['#123456','#234567','#345678']},helpers),true);
+   if(projected){
+    assert.ok(shadows.some(s=>s.x===pose.imprintX&&s.y===pose.imprintGroundY),'activity shadow remains at the fixed imprint');
+    const moving=shadows.filter(s=>s.x===pose.x&&s.y===pose.groundY&&s.width===7*pose.scale);
+    if(pose.standingAlpha>0){assert.equal(moving.length,1,'standing/departing person has one terrain-anchored projected shadow');assert.equal(moving[0].alpha,pose.alpha*pose.standingAlpha,'shadow follows standing crossfade and final fade');}else assert.equal(moving.length,0,'lying person does not gain a standing shadow');
+   }else if(pose.standingAlpha>0)assert.ok(ellipses.some(s=>s.x===pose.x&&s.y===pose.groundY+.5*pose.scale&&s.rx===3.4*pose.scale&&s.ry===.9*pose.scale),'fallback painter retains visible contact ellipse at the departing feet');
+  }
+ }
+});

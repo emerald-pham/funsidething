@@ -286,6 +286,11 @@
       if (poseValue.standingAlpha > 0) {
         g.save();
         g.globalAlpha = sceneAlpha * clamp(poseValue.standingAlpha);
+        // The imprint stays behind; its shadow cannot ground the person who
+        // stands and leaves. Follow the same terrain contact and body fade.
+        if (typeof helpers.groundShadow === 'function')
+          helpers.groundShadow(g, poseValue.x, poseValue.groundY, 14 * s, 7 * s, snowShadow);
+        else drawEllipse(poseValue.x, poseValue.groundY + .5 * s, 3.4 * s, .9 * s, snowShadow);
         // Do not rotate planted feet with the body: sample their actual hill
         // contacts in world space, then render the connected local joints.
         drawWalker(poseValue.x,poseValue.groundY,s,x=>geometry.near(x)+poseValue.snowOffset);
