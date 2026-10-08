@@ -656,3 +656,11 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK visitor offline shell: travel pose and carrying renderer changes reach the fingerprinted installed shell
 - RISK visitor departure continuity: settled feet and hands do not pop when eased travel starts
 - RISK visitor gathering continuity: the actual consumer reaches the grip before a carried item appears
+- RISK winter walking: departures consume scaled traveled-distance terrain feet instead of a wall-clock leg wave
+- RISK woodland stride: actual scaled animal paint holds stance paws on its clearing in both directions
+- RISK walking contact transitions: foot swing meets planted stance with continuous velocity and zero lift slope
+- RISK walker anatomy consumer: ordinary and dog walkers use connected knees while keeping mirrored feet and leash attached
+- RISK kite grip consumer: gathering and reverse travel keep the string at the actual rendered hand
+- RISK motion review harness: frozen actual actor painters reconstruct repeatable before-after sequences across direction viewport and reduced motion
+- RISK walking scope guidance: extended FAQ and changelog describe walker winter woodland and held-line improvements
+- RISK motion harness controls: nonfinite actual painter commands are rejected and foreground deer use their real travel anchor

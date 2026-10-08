@@ -103,7 +103,7 @@
       const builderAlpha = smooth(.05, .14, progress) * (1 - smooth(.90, .99, progress));
       return {
         type, x: anchor, y: groundY, groundY, snowOffset,
-        builderX, builderGroundY, builderScale: scale, structureAlpha, patchAlpha: structureAlpha,
+        builderX, builderGroundY, builderScale: scale, walkDistance: W * .24 * builderWalk, structureAlpha, patchAlpha: structureAlpha,
         finalFadeAlpha, angle: geometry.tangent(geometry.middle, anchor), scale, alpha,
         progress, verticalProgress, clock, lane, seed, direction, build,
         building: progress >= .08 && progress < .78,
@@ -122,6 +122,7 @@
     const walking = progress >= .84;
     return {
       type, x: activity.x, y: bodyGroundY, groundY: bodyGroundY,
+      walkDistance: Math.abs(activity.x - anchor),
       imprintX: anchor, imprintGroundY, imprintAlpha, patchAlpha: imprintAlpha,
       snowOffset: 9 + lane * 2, angle: geometry.tangent(geometry.near, activity.x),
       scale: scale * .96, alpha, progress, verticalProgress, clock, lane, seed, direction,
@@ -151,12 +152,32 @@
     const snow = mixHex(sky[1] || '#d4f5f2', '#ffffff', .7);
     const snowShadow = mixHex(sky[2] || '#f6fbe2', '#9bbcc5', .35);
     const ink = mixHex(palette && palette.city || '#bbdce1', '#4c6870', .3);
-    const tValue = Number.isFinite(poseValue.clock) ? poseValue.clock : (Number.isFinite(t) ? t : 0);
     const drawEllipse = (x, y, rx, ry, fill) => ellipse(g, x, y, Math.max(0, rx), Math.max(0, ry), fill);
     const drawLine = (x, y, x2, y2, stroke, width = 1) => line(g, x, y, x2, y2, stroke, width);
     const drawHead = (x, y, rx, ry, seed, skin, hat = false) => {
       if (personHead) return personHead(g, x, y, rx, ry, seed, skin, hat);
       return drawEllipse(x, y, rx, ry, skin);
+    };
+
+    const drawWalker = (x,y,scaleValue,ground,headY=-12,working=0) => {
+      const motion=geometry.humanWalkPose(x,y,poseValue.walkDistance,poseValue.direction,ground,0,scaleValue);
+      const skin=skinColor(poseValue.seed);
+      g.save();g.translate(x,y);g.scale(poseValue.direction*scaleValue,scaleValue);
+      const arm=(hand,side)=>{
+        const workX=side===0?5*smoothValue(.14,.72,poseValue.progress):-3.2;
+        const workY=side===0?-7.9:-6.1;
+        const hx=hand.x+(workX-hand.x)*working,hy=hand.y+(workY-hand.y)*working;
+        drawLine(0,-8+motion.bob,hx*.5,(-8+motion.bob+hy)/2,skin,1.1);
+        drawLine(hx*.5,(-8+motion.bob+hy)/2,hx,hy,skin,1.1);
+      };
+      arm(motion.arms[1],1);
+      drawHead(0,headY+motion.bob,2,2,poseValue.seed,skin,false);
+      drawLine(0,-9+motion.bob,0,motion.hipY,color(poseValue.seed),2.7);
+      for(const leg of motion.legs){
+        drawLine(0,motion.hipY,leg.kneeX,leg.kneeY,ink,1.3);
+        drawLine(leg.kneeX,leg.kneeY,leg.footX,leg.footY,ink,1.3);
+      }
+      arm(motion.hand,0);g.restore();
     };
 
     g.save();
@@ -198,17 +219,10 @@
         const builderY = poseValue.builderGroundY;
         const s = poseValue.builderScale;
         drawEllipse(builderX, builderY + .5 * s, 3.4 * s, .9 * s, mixHex(front, '#315d55', .35));
-        const headY = builderY - 11 * s;
-        drawHead(builderX, headY, 2.1 * s, 2.1 * s, poseValue.seed, skinColor(poseValue.seed), false);
-        drawLine(builderX, builderY - 8.9 * s, builderX, builderY - 3.7 * s, color(poseValue.seed), 2.2 * s);
-        const reach = 5 * s * smoothValue(.14, .72, poseValue.progress);
-        drawLine(builderX, builderY - 7.2 * s, builderX + poseValue.direction * reach, builderY - 7.9 * s, skinColor(poseValue.seed), 1.1 * s);
-        drawLine(builderX, builderY - 7.1 * s, builderX - poseValue.direction * 3.2 * s, builderY - 6.1 * s, skinColor(poseValue.seed), 1.1 * s);
-        // Full body: both legs remain connected to the torso as the builder
-        // walks away from the completed snowman.
-        const stride = poseValue.builderLeaving ? Math.sin(tValue * 5 + poseValue.seed * 5) * 1.3 * s : 0;
-        drawLine(builderX, builderY - 3.7 * s, builderX - 1.8 * s + stride, builderY, color(poseValue.seed), 1.4 * s);
-        drawLine(builderX, builderY - 3.7 * s, builderX + 1.8 * s - stride, builderY, color(poseValue.seed), 1.4 * s);
+        // Building arms blend into the shared walking pose as the builder
+        // leaves; scaled feet follow the snowy ground rather than scene time.
+        drawWalker(builderX,builderY,s,x=>geometry.middle(x)+poseValue.snowOffset,-11,
+          1-smoothValue(.68,.78,poseValue.progress));
         g.restore();
       }
     } else if (type === 'skier') {
@@ -272,16 +286,9 @@
       if (poseValue.standingAlpha > 0) {
         g.save();
         g.globalAlpha = sceneAlpha * clamp(poseValue.standingAlpha);
-        g.translate(poseValue.x, poseValue.groundY);
-        g.rotate(poseValue.angle);
-        g.scale(dir * s, s);
-        drawEllipse(0, 1, 4.2, 1.2, mixHex(front, hill, .5));
-        drawHead(0, -12, 2, 2, poseValue.seed, skinColor(poseValue.seed), false);
-        drawLine(0, -9, 0, -4, color(poseValue.seed), 2.7);
-        const stride = 2 + Math.sin(tValue * 4 + poseValue.seed * 5) * 2 * poseValue.walkAmount;
-        drawLine(0, -4, -stride, 0, ink, 1.3);
-        drawLine(0, -4, 3 + stride, 0, ink, 1.3);
-        drawLine(0, -8, 5, -6, skinColor(poseValue.seed), 1.1);
+        // Do not rotate planted feet with the body: sample their actual hill
+        // contacts in world space, then render the connected local joints.
+        drawWalker(poseValue.x,poseValue.groundY,s,x=>geometry.near(x)+poseValue.snowOffset);
         g.restore();
       }
     }

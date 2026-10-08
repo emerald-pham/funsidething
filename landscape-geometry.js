@@ -254,16 +254,16 @@
       const x=anchor-direction*40*(1-arrival)+((e.reverse?-80:W+80)-anchor)*departure;
       return {x,y:trail(x)+19,anchor,direction,distance:40*arrival+Math.abs((e.reverse?-80:W+80)-anchor)*departure,pack:smooth(packStart,departureStart,f),stand:Math.max(1-arrival,smooth(standStart,departureStart,f)),walkAmount:Math.max(1-smooth(.08,.12,f),smooth(departureStart,departureStart+.03,f)),walking:f<.12||f>departureStart};
     }
-    function humanWalkPose(x,y,distance,direction,ground,carrying=false){
+    function humanWalkPose(x,y,distance,direction,ground,carrying=false,scale=1){
       // Travel, not elapsed time, drives stance so eased arrivals can stop with
       // a planted foot. Keep this pose local to the actor's mirrored frame.
-      const phase=distance/10*Math.PI*2;
+      const localDistance=distance/scale,phase=localDistance/10*Math.PI*2;
       let bob=.18*Math.cos(phase*2),hipY=-4.4+bob;
       // Settled visits retain their last stride pose; a walking boolean must
       // never swap planted feet before eased departure has actually moved.
       const feet=[0,.5].map(offset=>{
-        const step=strideFoot(distance,10,offset);
-        const footX=step.x,footY=ground(x+direction*footX)-y-step.lift;
+        const step=strideFoot(localDistance,10,offset);
+        const footX=step.x,footY=(ground(x+direction*footX*scale)-y)/scale-step.lift;
         return {footX,footY,lift:step.lift};
       });
       // A short actor on a steep phone trail must lower the pelvis rather
@@ -276,7 +276,7 @@
         return {footX,footY,lift,kneeX:footX/2+dy/d*bend,kneeY:hipY+dy/2-footX/d*bend};
       });
       const arms=[0,.5].map(offset=>{
-        const swing=strideArm(distance,10,offset);
+        const swing=strideArm(localDistance,10,offset);
         return {x:swing.x,y:-8+bob+swing.y};
       });
       // Gathering reaches the grip before the object appears; switching a
@@ -331,7 +331,10 @@
       const phase=((distance/stride+offset)%1+1)%1;
       if(phase<.6)return {x:(.3-phase)*stride,lift:0};
       const swing=(phase-.6)/.4;
-      return {x:(-.3+.6*swing)*stride,lift:Math.sin(swing*Math.PI)*2};
+      // Match the stance's backward local velocity at both contacts. World
+      // toe velocity is then zero as the foot lifts or settles, rather than
+      // reversing abruptly; squared sine also removes the vertical snap.
+      return {x:(-.3-.4*swing+3*swing*swing-2*swing*swing*swing)*stride,lift:Math.sin(swing*Math.PI)**2*2};
     }
     const wingFold=(t,seed)=>{const right=.12+.88*Math.abs(Math.sin(t*7+seed*12));return {left:-right,right};};
     const balloonDrift=(seed,t,wind=1,verticalTime=t)=>({
