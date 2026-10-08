@@ -930,8 +930,10 @@
     paintGroundShadow(g,pose.x,pose.y,deer?19:rabbit?8:11,(half+2)*pose.scale*2,p.front);
     g.translate(pose.x,pose.y);g.scale(pose.direction*pose.scale,pose.scale);
     for(const [hip,offset] of [[-half*.65,0],[half*.65,.5]]){
-      const step=geometry.strideFoot(pose.distance,5,offset),kneeX=hip+step.x*.45;
-      line(g,hip,hipY,kneeX,hipY*.5,fur,deer?1.5:1.8);line(g,kneeX,hipY*.5,hip+step.x,-step.lift*.4,fur,deer?1.2:1.6);
+      const step=geometry.strideFoot(pose.distance/pose.scale,5,offset),kneeX=hip+step.x*.45;
+      const footX=pose.x+pose.direction*pose.scale*(hip+step.x);
+      const footY=(Math.max(geometry.near(footX)+18,H-28-e.seed*25)-pose.y)/pose.scale-step.lift*.4;
+      line(g,hip,hipY,kneeX,hipY*.5,fur,deer?1.5:1.8);line(g,kneeX,hipY*.5,hip+step.x,footY,fur,deer?1.2:1.6);
     }
     if(fox){line(g,-half,bodyY,-half-7,bodyY+3,fur,4);line(g,-half-7,bodyY+3,-half-9,bodyY+2,'#ddd0b6',2.5);}
     if(e.type==='raccoon'){line(g,-half,bodyY,-half-6,bodyY+3,fur,3);for(let i=1;i<4;i++)line(g,-half-i*1.6,bodyY+i*.7,-half-i*1.6,bodyY+i*.7+1.5,p.city,1.3);}
@@ -1081,13 +1083,17 @@
       }
 
   }
-  function person(x,y,seed,pose='standing',t=0,walkAmount=1){
+  function person(x,y,seed,motion){
     const shirt=color(seed),skin=skinColor(seed);
-    personHead(g,x,y-12,2,2,seed,skin);line(g,x,y-9,x+1,y-4,shirt,3);
-    const step=pose==='walk'?2+(Math.sin(t*4)*3-2)*walkAmount:2;
-    line(g,x+1,y-4,x-step,y,'#647779',1.4);line(g,x+1,y-4,x+3+step,y,'#647779',1.4);
-    line(g,x,y-8,x+5,y-6,skin,1.3);
-    if(pose==='read'){g.fillStyle='#fff0cf';g.fillRect(x+3,y-8,6,4);line(g,x+6,y-8,x+6,y-4,shirt,.5);}
+    const arm=hand=>{line(g,x,y-8+motion.bob,x+hand.x*.5,y-5.5+motion.bob,skin,1.3);line(g,x+hand.x*.5,y-5.5+motion.bob,x+hand.x,y+hand.y,skin,1.3);};
+    arm(motion.arms[1]);
+    personHead(g,x,y-12+motion.bob,2,2,seed,skin);line(g,x,y-9+motion.bob,x,y+motion.hipY,shirt,3);
+    for(const leg of motion.legs){
+      line(g,x,y+motion.hipY,x+leg.kneeX,y+leg.kneeY,'#647779',1.4);
+      line(g,x+leg.kneeX,y+leg.kneeY,x+leg.footX,y+leg.footY,'#647779',1.4);
+    }
+    arm({x:motion.hand.x,y:motion.hand.y});
+    return motion.hand;
   }
   function seated(x,y,seed,direction,book){
     const skin=skinColor(seed);
@@ -1144,16 +1150,20 @@
           ellipse(g,ax,ay+2,3.2,1.5,'#fff4d8');ellipse(g,ax,ay+1.5,1.8,.9,'#dc9e7d');g.fillStyle='#c8a87c';g.fillRect(ax+4,ay-1,4,4);g.restore();
         }
       }
-      const offsets=paired?[-11,11]:[0];
+      const offsets=paired?[-11,11]:[0];let kiteHand;
       offsets.forEach((offset,i)=>{
         const px=visit.x+offset,py=groundAt(px)+1,seed=(e.seed+i*.3)%1,book=e.type==='reader'||e.type==='couple'&&i===1;
         if(e.type!=='kite'&&visit.stand<1){g.save();g.globalAlpha*=1-visit.stand;seated(px,py,seed,i?-1:1,book&&visit.pack<.8);g.restore();}
         if(e.type==='kite'||visit.stand>0){
-          g.save();g.globalAlpha*=e.type==='kite'?1:visit.stand;g.translate(px,py);g.scale(visit.direction,1);person(0,0,seed,'walk',t,visit.walkAmount);
+          const carrying=e.type==='kite'?0:S.smooth(.4,.7,visit.pack);
+          const motion=geometry.humanWalkPose(px,py,visit.distance,visit.direction,x=>groundAt(x)+1,carrying);
+          if(e.type==='kite')motion.hand={x:5,y:-6};
+          g.save();g.globalAlpha*=e.type==='kite'?1:visit.stand;g.translate(px,py);g.scale(visit.direction,1);const hand=person(0,0,seed,motion);
+          if(e.type==='kite')kiteHand={x:px+visit.direction*hand.x,y:py+hand.y};
           if(visit.pack>.7&&e.type!=='kite'){
             // Once a reader stands, keep the cover down by the carrying hand
             // at the hip instead of drawing it over the torso.
-            g.fillStyle=book?'#fff0cf':color(e.seed,2);g.fillRect(4,-3,book?4:6,book?3:4);
+            g.fillStyle=book?'#fff0cf':color(e.seed,2);g.fillRect(hand.x,hand.y,book?4:6,book?3:4);
           }
           g.restore();
         }
@@ -1161,7 +1171,7 @@
       if(e.type==='kite'){
         const ax=visit.x,ay=groundAt(ax),reach=1-visit.pack;
         const kx=ax+visit.direction*5+visit.direction*(23+Math.sin(t*.3)*12)*reach,ky=ay-8+(-67+Math.sin(verticalClock*.5)*6)*reach;
-        g.beginPath();g.moveTo(ax+visit.direction*5,ay-6);g.quadraticCurveTo(ax+visit.direction*(5+30*reach),ay-6-19*reach,kx,ky);g.strokeStyle='#8c9585';g.lineWidth=.65;g.stroke();
+        g.beginPath();g.moveTo(kiteHand.x,kiteHand.y);g.quadraticCurveTo(kiteHand.x+visit.direction*30*reach,kiteHand.y-19*reach,kx,ky);g.strokeStyle='#8c9585';g.lineWidth=.65;g.stroke();
         const size=1-.7*visit.pack;g.save();g.translate(kx,ky);g.scale(size,size);
         g.beginPath();g.moveTo(0,-12);g.lineTo(8,0);g.lineTo(0,10);g.lineTo(-8,0);g.closePath();g.fillStyle=c;g.fill();line(g,0,-12,0,10,color(e.seed,2));
         for(let i=0;i<4;i++)line(g,Math.sin(verticalClock+i)*3,10+i*4,Math.sin(verticalClock+i+1)*3,14+i*4,c,.7);g.restore();
@@ -1185,17 +1195,17 @@
     }
     if(e.type==='walker'||e.type==='dogwalker'){
       const pose=geometry.groundPose('walker',e);g.save();g.globalAlpha=S.smooth(0,.06,f)*(1-S.smooth(.94,1,f));
-      const skin=skinColor(e.seed);
+      const skin=skinColor(e.seed),motion=geometry.humanWalkPose(pose.x,pose.y,pose.distance,dir,x=>geometry.groundAnchor('walker',x));
       // The far arm passes behind the torso; both arms share the leg stride.
-      const armAt=offset=>{const arm=geometry.strideArm(pose.distance,10,offset);line(g,pose.x,pose.y-8,pose.x+dir*arm.x,pose.y-8+arm.y,skin,1.3);};
+      const armAt=offset=>{const arm=geometry.strideArm(pose.distance,10,offset),elbowX=pose.x+dir*arm.x*.5,elbowY=pose.y-5.5+motion.bob;line(g,pose.x,pose.y-8+motion.bob,elbowX,elbowY,skin,1.3);line(g,elbowX,elbowY,pose.x+dir*arm.x,pose.y-8+arm.y+motion.bob,skin,1.3);};
       armAt(.5);
-      personHead(g,pose.x,pose.y-12,2,2,e.seed,skin);line(g,pose.x,pose.y-9,pose.x,pose.y-4,c,3);
-      for(const offset of [0,.5]){const foot=geometry.strideFoot(pose.distance,10,offset),fx=pose.x+dir*foot.x;line(g,pose.x,pose.y-4,fx,geometry.groundAnchor('walker',fx)-foot.lift,'#647779',1.4);}
+      personHead(g,pose.x,pose.y-12+motion.bob,2,2,e.seed,skin);line(g,pose.x,pose.y-9+motion.bob,pose.x,pose.y+motion.hipY,c,3);
+      for(const leg of motion.legs){line(g,pose.x,pose.y+motion.hipY,pose.x+dir*leg.kneeX,pose.y+leg.kneeY,'#647779',1.4);line(g,pose.x+dir*leg.kneeX,pose.y+leg.kneeY,pose.x+dir*leg.footX,pose.y+leg.footY,'#647779',1.4);}
       armAt(0);
       if(e.type==='dogwalker'){
         const dog=geometry.dogPose(pose.x,pose.distance,dir),fur=S.mixHex(color(e.seed,2),p.city,.4),hand=geometry.strideArm(pose.distance,10,0);
         // A loose lead keeps the companion visibly paired with this owner.
-        g.beginPath();g.moveTo(pose.x+dir*hand.x,pose.y-8+hand.y);g.quadraticCurveTo((pose.x+dog.x)/2,dog.y+1,dog.x-dir*2,dog.y-5);g.strokeStyle=fur;g.lineWidth=.55;g.stroke();
+        g.beginPath();g.moveTo(pose.x+dir*hand.x,pose.y-8+hand.y+motion.bob);g.quadraticCurveTo((pose.x+dog.x)/2,dog.y+1,dog.x-dir*2,dog.y-5);g.strokeStyle=fur;g.lineWidth=.55;g.stroke();
         for(const [hip,offset] of [[-3,0],[3,.5]]){
           const foot=geometry.strideFoot(dog.distance,6,offset),fx=dog.x+dir*(hip+foot.x);
           line(g,dog.x+dir*hip,dog.y-3,fx,geometry.groundAnchor('walker',fx)-foot.lift,fur,1);

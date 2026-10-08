@@ -649,3 +649,20 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK fireworks cached guidance: installed spawn-rate prose matches the bounded display and its exact offline shell
 
 - `RISK Chance fixture wake: actual scheduled scanner callback handles probability fixture schema` — Probability fixtures supply empty context arrays and titles so the real bootstrap-registered scanner wake can render them at the daily boundary. Preserves frozen weight assertions and leaves production timer and Chance algorithms unchanged. RED: `/tmp/chain-ui-runtime/chance-fixture-repair-red.log`; focused cohort: five passed, zero skipped.
+
+- RISK visitor gait: eased arrivals and departures plant terrain feet with connected knees in both directions
+- RISK visitor carrying consumer: rendered books and picnic items meet the carrying hand while feet consume the travel pose
+- RISK visitor motion guidance: extended scenery FAQ and Settings changelog explain travel cadence and held items
+- RISK visitor offline shell: travel pose and carrying renderer changes reach the fingerprinted installed shell
+- RISK visitor departure continuity: settled feet and hands do not pop when eased travel starts
+- RISK visitor gathering continuity: the actual consumer reaches the grip before a carried item appears
+- RISK winter walking: departures consume scaled traveled-distance terrain feet instead of a wall-clock leg wave
+- RISK woodland stride: actual scaled animal paint holds stance paws on its clearing in both directions
+- RISK walking contact transitions: foot swing meets planted stance with continuous velocity and zero lift slope
+- RISK walker anatomy consumer: ordinary and dog walkers use connected knees while keeping mirrored feet and leash attached
+- RISK kite grip consumer: gathering and reverse travel keep the string at the actual rendered hand
+- RISK motion review harness: frozen actual actor painters reconstruct repeatable before-after sequences across direction viewport and reduced motion
+- RISK walking scope guidance: extended FAQ and changelog describe walker winter woodland and held-line improvements
+- RISK motion harness controls: nonfinite actual painter commands are rejected and foreground deer use their real travel anchor
+
+- RISK snowangel departing shadow: actual winter painter follows the standing person and preserves the fixed imprint

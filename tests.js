@@ -14189,10 +14189,10 @@ test('Moon: illuminated fraction is physical and its bright limb points toward t
  assert.match(fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),/sky.moon.brightLimbAngle/);
 });
 
-test('Guest departure: gait eases into walking and a reverse kite stays attached to the mirrored hand',()=>{
+test('Guest departure: gait eases into walking and a reverse kite stays attached to the mirrored hand', () => {
  const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);const g=ctx.LandscapeGeometry.create(1440,900);
  const e={lane:.5,reverse:true};assert.equal(g.visitPose(e,.82).walkAmount,0);assert.ok(g.visitPose(e,.84).walkAmount>0);assert.equal(g.visitPose(e,.86).walkAmount,1);
- const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');assert.match(source,/ax\+visit.direction\*5/);assert.match(source,/t,visit.walkAmount/);
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');assert.match(source,/ax\+visit.direction\*5/);assert.match(source,/geometry\.humanWalkPose\(px,py,visit.distance/,'eased travel distance controls the gait');assert.match(source,/g\.moveTo\(kiteHand.x,kiteHand.y\)/,'string uses the rendered hand in either direction');
 });
 
 test('Astronomy polar day: the midnight sun remains daylight, not a fictitious sunrise or sunset',()=>{
@@ -15968,12 +15968,19 @@ test('Landscape guest visits: departure timing varies and high seeds stay longer
     'the long stay eventually walks fully away');
 });
 
-test('Landscape readers: carried books hang at the walker side during departure', () => {
+test('Landscape readers: carried books hang at the walker side during departure',()=>{
   const source = fs.readFileSync(path.join(__dirname, 'landscape.js'), 'utf8');
   const guest = source.slice(source.indexOf('  function paintGuest('), source.indexOf("    if(e.type==='skateboarder'", source.indexOf('  function paintGuest(')));
   assert.match(guest, /book\s*&&\s*visit\.pack/);
-  assert.match(guest, /fillRect\(4,-3,book\?4:6,book\?3:4\)/,
+  assert.match(guest, /fillRect\(hand\.x,hand\.y,book\?4:6,book\?3:4\)/,
     'departure books sit by the hand and hip instead of across the chest');
+  const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
+  const geo=ctx.LandscapeGeometry.create(820,1180);
+  for(const direction of [-1,1])for(const distance of [40,42,45,48,50]){
+    const motion=geo.humanWalkPose(410,0,distance,direction,()=>0,1);
+    assert.equal(motion.hand.x,4,'book retains its side-of-body horizontal position');
+    assert.ok(Math.abs(motion.hand.y-motion.hipY-1.4)<1e-8,'book follows the hip vertically rather than moving onto the chest');
+  }
 });
 test('Landscape guest durations: readers and groups stay long enough before departure', () => {
   const sky = livingSky();
@@ -22066,4 +22073,212 @@ test('RISK Chance fixture wake: actual scheduled scanner callback handles probab
  ctx.state.tasks=[chanceProbabilityFixture({id:'a',mu:-10,sigma:3}),chanceProbabilityFixture({id:'b',mu:20,sigma:2})];ctx.resetChance();
  const before=JSON.stringify(ctx.state.chance.weights);assert.ok(wakes.length,'bootstrap registers actual scanner wake');assert.doesNotThrow(()=>wakes[0](),'scanner wake must safely consume probability fixtures');assert.equal(JSON.stringify(ctx.state.chance.weights),before,'scanner repaint preserves frozen probability values');
  assert.deepEqual(Array.from(ctx.state.tasks,t=>Array.from(t.ctx)),[[],[]]);
+});
+
+test('RISK visitor gait: eased arrivals and departures plant terrain feet with connected knees in both directions',()=>{
+ const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
+ for(const [w,h] of [[390,844],[820,1180],[1440,900]])for(const reverse of [false,true]){
+  const geo=ctx.LandscapeGeometry.create(w,h),e={lane:.5,seed:.4,reverse};
+  for(const f of [.03,.07,.9,.95]){
+   const a=geo.visitPose(e,f),b=geo.visitPose(e,f+1e-5);
+   assert.ok(Number.isFinite(a.distance),'visitors expose actual accumulated path displacement');
+   assert.ok(Math.abs((b.distance-a.distance)-Math.abs(b.x-a.x))<1e-8,'cadence follows eased travel rather than time');
+   const ground=x=>geo.trail(x)+20;
+   const p=geo.humanWalkPose(a.x,ground(a.x),a.distance,a.direction,ground,false);
+   const q=geo.humanWalkPose(b.x,ground(b.x),b.distance,b.direction,ground,false);
+   for(let i=0;i<2;i++){
+    const leg=p.legs[i];assert.ok(Number.isFinite(leg.kneeX)&&Number.isFinite(leg.kneeY));
+    assert.ok(Math.abs(Math.hypot(leg.kneeX,leg.kneeY-p.hipY)-3.2)<1e-7);
+    assert.ok(Math.abs(Math.hypot(leg.footX-leg.kneeX,leg.footY-leg.kneeY)-3.2)<1e-7);
+    if(leg.lift===0&&q.legs[i].lift===0){
+     assert.ok(Math.abs(a.x+a.direction*leg.footX-b.x-b.direction*q.legs[i].footX)<1e-7,'stance foot stays at its world contact');
+     assert.ok(Math.abs(ground(a.x+a.direction*leg.footX)-(ground(a.x)+leg.footY))<1e-7);
+    }
+   }
+  }
+  const still=geo.visitPose(e,.5),p=geo.humanWalkPose(still.x,still.y,still.distance,still.direction,x=>geo.trail(x)+19,true);
+  assert.deepEqual(JSON.parse(JSON.stringify(p)),JSON.parse(JSON.stringify(geo.humanWalkPose(still.x,still.y,still.distance,still.direction,x=>geo.trail(x)+19,true))));
+ }
+});
+
+test('RISK visitor carrying consumer: rendered books and picnic items meet the carrying hand while feet consume the travel pose',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ const personCode=source.slice(source.indexOf('  function person('),source.indexOf('  function seated('));
+ const guestCode=source.slice(source.indexOf('  function paintGuest('),source.indexOf('  const themeQuery='));
+ for(const type of ['reader','couple','picnic'])for(const reverse of [false,true]){
+  const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
+  const geometry=ctx.LandscapeGeometry.create(820,1180),lines=[],rects=[];
+  const g={save(){},restore(){},translate(){},scale(){},fillRect(...v){rects.push(v);}};
+  Object.assign(ctx,{g,geometry,W:820,trail:geometry.trail,p:{},color:()=> 'shirt',skinColor:()=> 'skin',personHead(){},seated(){},line(g,...v){lines.push(v);},S:{smooth:(a,b,v)=>Math.max(0,Math.min(1,(v-a)/(b-a)))}});
+  vm.runInContext(personCode+guestCode,ctx);
+  const e={type,lane:.5,seed:.4,reverse,duration:100,age:95};ctx.e=e;
+  vm.runInContext('paintGuest(e,0,.95,12)',ctx);
+  assert.equal(rects.length,type==='reader'?1:2);
+  for(const rect of rects)assert.ok(lines.some(v=>v[4]==='skin'&&Math.abs(v[2]-rect[0])<1e-8&&Math.abs(v[3]-rect[1])<1e-8),'painted item begins at an actual hand endpoint');
+  assert.ok(lines.filter(v=>v[4]==='#647779').length>=4,'walking consumer renders two segments for each leg');
+  const broken=personCode.replace('motion.hand.x','motion.hand.x+2');
+  assert.notEqual(broken,personCode,'negative control must displace the rendered carrying grip');
+  lines.length=0;rects.length=0;vm.runInContext(broken,ctx);vm.runInContext('paintGuest(e,0,.95,12)',ctx);
+  assert.ok(rects.some(rect=>!lines.some(v=>v[4]==='skin'&&Math.abs(v[2]-rect[0])<1e-8&&Math.abs(v[3]-rect[1])<1e-8)),'broken grip is detected through the actual consumer');
+ }
+});
+
+test('RISK visitor motion guidance: extended scenery FAQ and Settings changelog explain travel cadence and held items',()=>{
+ const html=fs.readFileSync(path.join(__dirname,'index.html'),'utf8');
+ const faq=html.split('<dt>How do I change the scenery?</dt>')[1].split('</dd>')[0];
+ assert.match(faq,/Visiting people step with their traveled distance/);
+ assert.match(faq,/Books and gathered picnic items meet the carrying hand/);
+ const changelog=html.split('<template id="appChangelogCurrent">')[1].split('</template>')[0];
+ assert.match(changelog,/Visiting people now plant their feet/);
+});
+
+test('RISK visitor offline shell: travel pose and carrying renderer changes reach the fingerprinted installed shell',()=>{
+ const {cacheName,fingerprint,localPaths}=appShellContract(serviceWorkerSource());
+ assert.ok(localPaths.includes('landscape-geometry.js')&&localPaths.includes('landscape.js'));
+ assert.equal(cacheName,`chain-scanner-shell-${fingerprint}`,'installed clients must receive the new visitor pose bytes');
+});
+
+test('RISK visitor departure continuity: settled feet and hands do not pop when eased travel starts',()=>{
+ const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
+ for(const reverse of [false,true])for(const seed of [.02,.4,.98]){
+  const geo=ctx.LandscapeGeometry.create(390,844),e={lane:.5,seed,reverse},start=.82+seed*.12;
+  for(const boundary of [.12,start]){
+   const poses=[boundary-1e-7,boundary+1e-7].map(f=>{const v=geo.visitPose(e,f),ground=x=>geo.trail(x)+20;return geo.humanWalkPose(v.x,ground(v.x),v.distance,v.direction,ground,true);});
+   for(let i=0;i<2;i++)assert.ok(Math.hypot(poses[0].legs[i].footX-poses[1].legs[i].footX,poses[0].legs[i].footY-poses[1].legs[i].footY)<.001,'changing walking state cannot teleport feet');
+   assert.ok(Math.hypot(poses[0].hand.x-poses[1].hand.x,poses[0].hand.y-poses[1].hand.y)<.001,'carried grip remains continuous');
+  }
+ }
+});
+
+test('RISK visitor gathering continuity: the actual consumer reaches the grip before a carried item appears',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),guestCode=source.slice(source.indexOf('  function paintGuest('),source.indexOf('  const themeQuery='));
+ const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
+ const geometry=ctx.LandscapeGeometry.create(820,1180),e={type:'reader',lane:.5,seed:.4,reverse:false,duration:100},hands=[];
+ let lo=.768,hi=.868;for(let i=0;i<50;i++){const mid=(lo+hi)/2;if(geometry.visitPose(e,mid).pack<.7)lo=mid;else hi=mid;}const boundary=(lo+hi)/2;
+ Object.assign(ctx,{geometry,W:820,trail:geometry.trail,p:{},color:()=> 'shirt',g:{save(){},restore(){},translate(){},scale(){},fillRect(){}},person(x,y,seed,motion){hands.push(motion.hand);return motion.hand;},seated(){},S:{smooth:(a,b,v)=>{const q=Math.max(0,Math.min(1,(v-a)/(b-a)));return q*q*(3-2*q);}}});
+ vm.runInContext(guestCode,ctx);
+ for(const f of [boundary-1e-7,boundary+1e-7]){ctx.e={...e,age:f*100};ctx.f=f;vm.runInContext('paintGuest(e,0,f,12)',ctx);}
+ assert.equal(hands.length,2);assert.ok(Math.hypot(hands[0].x-hands[1].x,hands[0].y-hands[1].y)<.001,'gathering cannot snap the arm when the book appears');
+});
+
+test('RISK winter walking: departures consume scaled traveled-distance terrain feet instead of a wall-clock leg wave',()=>{
+ const ctx=vm.createContext({Math});for(const file of ['landscape-geometry.js','landscape-winter.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,file),'utf8'),ctx);
+ for(const [w,h] of [[390,844],[844,390],[820,1180],[1440,900]])for(const reverse of [false,true])for(const type of ['snowman','snowangel']){
+  const geo=ctx.LandscapeGeometry.create(w,h),e={type,age:90,duration:100,seed:.4,lane:.5,reverse},a=ctx.LandscapeWinter.pose(type,e,geo,w,h),b=ctx.LandscapeWinter.pose(type,{...e,age:90.00001},geo,w,h);
+  assert.ok(Number.isFinite(a.walkDistance),'winter departures expose actual traveled displacement');
+  const x=type==='snowman'?a.builderX:a.x,y=type==='snowman'?a.builderGroundY:a.groundY,scale=type==='snowman'?a.builderScale:a.scale;
+  const bx=type==='snowman'?b.builderX:b.x,by=type==='snowman'?b.builderGroundY:b.groundY;
+  assert.ok(Math.abs((b.walkDistance-a.walkDistance)-Math.abs(bx-x))<1e-8);
+  const ground=fx=>geo[type==='snowman'?'middle':'near'](fx)+a.snowOffset;
+  const p=geo.humanWalkPose(x,y,a.walkDistance,a.direction,ground,0,scale),q=geo.humanWalkPose(bx,by,b.walkDistance,b.direction,ground,0,scale);
+  for(let i=0;i<2;i++)if(p.legs[i].lift===0&&q.legs[i].lift===0)assert.ok(Math.abs(x+a.direction*scale*p.legs[i].footX-bx-b.direction*scale*q.legs[i].footX)<1e-7,'scaled winter stance contact remains planted');
+  const lines=[],calls=[],original=geo.humanWalkPose;geo.humanWalkPose=(...args)=>{calls.push(args);return original(...args);};
+  const g={save(){},restore(){},translate(){},rotate(){},scale(){}};
+  ctx.LandscapeWinter.paint(g,geo,w,h,e,999,{city:'#334455',front:'#556655',sky:['#aabbcc','#bbccdd','#ccddee']},{line(g,...v){lines.push(v);},ellipse(){},color:()=> '#123456',skinColor:()=> '#abcdef'});
+  assert.equal(calls.length,1,'the winter paint consumer must use shared terrain pose');assert.equal(calls[0][2],a.walkDistance);assert.equal(calls[0][6],scale);
+  for(const leg of p.legs)assert.ok(lines.some(v=>Math.abs(v[0]-leg.kneeX)<1e-8&&Math.abs(v[1]-leg.kneeY)<1e-8&&Math.abs(v[2]-leg.footX)<1e-8&&Math.abs(v[3]-leg.footY)<1e-8),'actual winter calf reaches the computed contact');
+ }
+});
+
+test('RISK woodland stride: actual scaled animal paint holds stance paws on its clearing in both directions',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),code=source.slice(source.indexOf('  function paintWoodland('),source.indexOf('  function reflectWaterObject('));
+ for(const [w,h] of [[390,844],[844,390],[820,1180],[1440,900]])for(const reverse of [false,true])for(const type of ['deer','fox','rabbit','raccoon']){
+  const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);const geometry=ctx.LandscapeGeometry.create(w,h),e={type,age:12,duration:180,seed:.4,lane:.5,reverse};
+  const paint=event=>{const pose=geometry.woodlandPose(event),lines=[];Object.assign(ctx,{geometry,H:h,p:{front:'#556655',city:'#334455',night:0},S:{smooth:(a,b,v)=>Math.max(0,Math.min(1,(v-a)/(b-a))),mixHex:()=> '#abcdef'},color:()=> '#abcdef',g:{save(){},restore(){},translate(){},scale(){}},paintGroundShadow(){},ellipse(){},line(g,...v){lines.push(v);},e:event});vm.runInContext(code+';paintWoodland(e)',ctx);return {pose,feet:[lines[1],lines[3]].map(v=>({x:pose.x+pose.direction*pose.scale*v[2],y:pose.y+pose.scale*v[3]}))};};
+  const a=paint(e),b=paint({...e,age:12.0001});
+  assert.ok(Math.abs(a.feet[0].x-b.feet[0].x)<1e-7,'world stance foot cancels body displacement even inside actor scale');
+  assert.ok(Math.abs(a.feet[0].y-b.feet[0].y)<1e-7,'world contact height follows the clearing rather than the moving body');
+ }
+});
+
+test('RISK walking contact transitions: foot swing meets planted stance with continuous velocity and zero lift slope',()=>{
+ const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);const geo=ctx.LandscapeGeometry.create(820,1180);
+ for(const stride of [5,6,10,12])for(const boundary of [.6,1]){
+  const d=boundary*stride,h=1e-5,a=geo.strideFoot(d-h,stride),b=geo.strideFoot(d,stride),c=geo.strideFoot(d+h,stride);
+  assert.ok(Math.abs((b.x-a.x)/h-(c.x-b.x)/h)<.001,'toe horizontal velocity must not jump at lift-off or landing');
+  assert.ok(Math.abs((b.lift-a.lift)/h)<.001&&Math.abs((c.lift-b.lift)/h)<.001,'toe height meets the ground gently');
+ }
+ for(const stride of [5,6,10,12])for(let distance=0;distance<stride;distance+=stride/40){const a=geo.strideFoot(distance,stride),b=geo.strideFoot(distance+stride,stride);assert.ok(Math.abs(a.x-b.x)<1e-8&&Math.abs(a.lift-b.lift)<1e-8);assert.ok(a.lift>=0&&a.lift<=2);}
+});
+
+test('RISK walker anatomy consumer: ordinary and dog walkers use connected knees while keeping mirrored feet and leash attached',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),code=source.slice(source.indexOf("    if(e.type==='walker'||e.type==='dogwalker'){"),source.indexOf("    if(e.type==='dolphin'){"));
+ for(const type of ['walker','dogwalker'])for(const reverse of [false,true]){
+  const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);const geometry=ctx.LandscapeGeometry.create(390,844),e={type,age:12,duration:70,seed:.4,lane:.5,reverse},dir=reverse?-1:1,lines=[],heads=[],leash=[];
+  Object.assign(ctx,{geometry,e,dir,g:{save(){},restore(){},translate(){},scale(){},beginPath(){},moveTo(x,y){leash.push([x,y]);},quadraticCurveTo(){},stroke(){}},f:.4,c:'#123456',skinColor:()=> '#abcdef',color:()=> '#123456',p:{city:'#334455'},S:{smooth:()=>1,mixHex:()=> '#555555'},line(g,...v){lines.push(v);},personHead(g,...v){heads.push(v);},ellipse(){}});
+  vm.runInContext('(function(){'+code+'})()',ctx);
+  const legs=lines.filter(v=>v[4]==='#647779');assert.equal(legs.length,4,'each walker leg has a thigh and calf');
+  const ground=geometry.groundPose('walker',e),motion=geometry.humanWalkPose(ground.x,ground.y,ground.distance,dir,x=>geometry.groundAnchor('walker',x));
+  for(const leg of motion.legs)assert.ok(legs.some(v=>Math.abs(v[2]-(ground.x+dir*leg.footX))<1e-8&&Math.abs(v[3]-(ground.y+leg.footY))<1e-8),'actual calf preserves the terrain foot');
+  if(type==='dogwalker'){assert.equal(leash.length,1);assert.ok(lines.some(v=>v[4]==='#abcdef'&&Math.hypot(v[2]-leash[0][0],v[3]-leash[0][1])<1e-8),'leash attaches to an actual rendered hand');}
+ }
+});
+
+test('RISK kite grip consumer: gathering and reverse travel keep the string at the actual rendered hand',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),code=source.slice(source.indexOf('  function paintGuest('),source.indexOf('  const themeQuery='));
+ for(const reverse of [false,true])for(const age of [5,50,90]){
+  const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);const geometry=ctx.LandscapeGeometry.create(390,844),e={type:'kite',age,duration:100,seed:.4,lane:.5,reverse};
+  const stack=[],moves=[],hands=[];let transform={x:0,y:0,dir:1};const g={save(){stack.push({...transform});},restore(){transform=stack.pop();},translate(x,y){transform.x+=transform.dir*x;transform.y+=y;},scale(x){transform.dir*=x;},beginPath(){},moveTo(x,y){moves.push({x:transform.x+transform.dir*x,y:transform.y+y});},quadraticCurveTo(){},lineTo(){},closePath(){},fill(){},stroke(){}};
+  Object.assign(ctx,{geometry,W:390,H:844,e,trail:geometry.trail,p:{},S:{smooth:(a,b,v)=>Math.max(0,Math.min(1,(v-a)/(b-a)))},g,color:()=> '#123456',line(){},seated(){},person(x,y,seed,motion){hands.push({x:transform.x+transform.dir*motion.hand.x,y:transform.y+motion.hand.y});return motion.hand;}});
+  ctx.f=geometry.motionProgress(e,'x');vm.runInContext(code+';paintGuest(e,0,f,12)',ctx);
+  assert.equal(hands.length,1);assert.ok(Math.hypot(moves[0].x-hands[0].x,moves[0].y-hands[0].y)<1e-8,'kite string must meet the painted hand rather than an independently offset origin');
+ }
+});
+
+test('RISK motion review harness: frozen actual actor painters reconstruct repeatable before-after sequences across direction viewport and reduced motion',async()=>{
+ const {readMotionBuild,createMotionProbe,writeMotionReview}=await import('./scripts/motion-review-harness.mjs');
+ const before=readMotionBuild(__dirname,'22d039b2c27019badbb4cc9c92ebf03f5e8c4f6c'),after=readMotionBuild(__dirname,'WORKTREE');
+ assert.notEqual(before.sourcesHash,after.sourcesHash);
+ for(const [width,height] of [[390,844],[844,390],[820,1180],[1440,900]]){
+  const probe=createMotionProbe(after,{width,height});
+  for(const actor of ['walker','dogwalker','deer','rabbit','reader','couple','picnic','kite','snowman','snowangel','woodland:deer','woodland:fox','woodland:rabbit','woodland:raccoon'])for(const reverse of [false,true]){
+   const options={actor,reverse,progress:.9,seed:.4,lane:.5,zoom:6};
+   const first=probe.sample(options),again=probe.sample(options);assert.deepEqual(first,again,'same frozen painter inputs must produce the same command sequence');
+   assert.ok(first.commands.length>20);assert.ok(first.commands.every(c=>c.every(v=>typeof v!=='number'||Number.isFinite(v))),'actual canvas commands stay finite');
+   assert.deepEqual(probe.sample({...options,reduced:true,progress:.1}),probe.sample({...options,reduced:true,progress:.9}),'reduced motion holds the real midpoint pose');
+  }
+ }
+ const dir=fs.mkdtempSync('/tmp/chain-motion-harness-test-');try{
+  const artifact=writeMotionReview({repository:__dirname,beforeRef:before.ref,afterRef:'WORKTREE',outputDir:dir});
+  assert.ok(fs.existsSync(artifact.htmlPath));assert.ok(fs.existsSync(artifact.manifestPath));
+  const html=fs.readFileSync(artifact.htmlPath,'utf8');assert.ok(html.includes('motionHarness')&&html.includes('captureSequence')&&html.includes('Playback speed'));assert.ok(!html.includes('localStorage'),'fixture never touches saved boards');
+  const outer=html.match(/<script>([\s\S]*)<\/script>/)[1];new vm.Script(outer);
+  const pages=JSON.parse(outer.match(/,pages=(.*);document.getElementById/)[1]);for(const page of pages)new vm.Script(page.match(/<script>([\s\S]*)<\/script>/)[1]);
+ }finally{fs.rmSync(dir,{recursive:true,force:true});}
+});
+
+test('RISK walking scope guidance: extended FAQ and changelog describe walker winter woodland and held-line improvements',()=>{
+ const html=fs.readFileSync(path.join(__dirname,'index.html'),'utf8'),faq=html.split('<dt>How do I change the scenery?</dt>')[1].split('</dd>')[0];
+ assert.match(faq,/Ordinary walkers and winter departures share connected knees/);
+ assert.match(faq,/Woodland paws account for each animal’s scale/);
+ assert.match(faq,/Kite strings and dog leads meet their rendered hands/);
+ const changelog=html.split('<template id="appChangelogCurrent">')[1].split('</template>')[0];assert.match(changelog,/Winter departures and ordinary walkers/);
+});
+
+test('RISK motion harness controls: nonfinite actual painter commands are rejected and foreground deer use their real travel anchor',async()=>{
+ const {readMotionBuild,createMotionProbe}=await import('./scripts/motion-review-harness.mjs'),build=readMotionBuild(__dirname,'WORKTREE');
+ const broken={...build,sources:{...build.sources,'landscape.js':build.sources['landscape.js'].replace('ctx.moveTo(x,y);ctx.lineTo(x2,y2);','ctx.moveTo(NaN,y);ctx.lineTo(x2,y2);')}};
+ assert.notEqual(broken.sources['landscape.js'],build.sources['landscape.js']);
+ assert.throws(()=>createMotionProbe(broken).sample({actor:'walker',progress:.5,zoom:6}),/Nonfinite canvas command/,'a broken painter must not turn NaN into a passing null');
+ const ctx=vm.createContext({Math});vm.runInContext(build.sources['landscape-geometry.js'],ctx);const geo=ctx.LandscapeGeometry.create(820,1180);
+ for(const actor of ['deer','rabbit'])for(const reverse of [false,true]){
+  const options={actor,reverse,progress:.5,duration:55,seed:.4,lane:.5,zoom:6},frame=createMotionProbe(build).sample(options),pose=geo.groundPose(actor,{type:actor,age:27.5,duration:55,seed:.4,lane:.5,reverse});assert.equal(frame.metadata.x,pose.x,'foreground animals use groundPose rather than visitor camera geometry');
+ }
+});
+
+test('RISK snowangel departing shadow: actual winter painter follows the standing person and preserves the fixed imprint',()=>{
+ const ctx=vm.createContext({Date,Math,console});for(const file of ['landscape-geometry.js','landscape-winter.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,file),'utf8'),ctx);
+ for(const [W,H]of [[390,844],[844,390],[820,1180],[1440,900]])for(const reverse of [false,true])for(const age of [70,78,90,97]){
+  const geometry=ctx.LandscapeGeometry.create(W,H),event={type:'snowangel',duration:100,age,seed:.4,lane:.5,reverse},pose=ctx.LandscapeWinter.pose('snowangel',event,geometry,W,H);
+  for(const projected of [false,true]){
+   const shadows=[],ellipses=[],stack=[];const g={globalAlpha:1,save(){stack.push(this.globalAlpha);},restore(){this.globalAlpha=stack.pop();},translate(){},scale(){},rotate(){}};
+   const helpers={ellipse:(g,x,y,rx,ry)=>ellipses.push({x,y,rx,ry,alpha:g.globalAlpha}),line(){},...(projected?{groundShadow:(g,x,y,height,width)=>shadows.push({x,y,height,width,alpha:g.globalAlpha})}:{})};
+   assert.equal(ctx.LandscapeWinter.paint(g,geometry,W,H,event,0,{front:'#abcdef',sky:['#123456','#234567','#345678']},helpers),true);
+   if(projected){
+    assert.ok(shadows.some(s=>s.x===pose.imprintX&&s.y===pose.imprintGroundY),'activity shadow remains at the fixed imprint');
+    const moving=shadows.filter(s=>s.x===pose.x&&s.y===pose.groundY&&s.width===7*pose.scale);
+    if(pose.standingAlpha>0){assert.equal(moving.length,1,'standing/departing person has one terrain-anchored projected shadow');assert.equal(moving[0].alpha,pose.alpha*pose.standingAlpha,'shadow follows standing crossfade and final fade');}else assert.equal(moving.length,0,'lying person does not gain a standing shadow');
+   }else if(pose.standingAlpha>0)assert.ok(ellipses.some(s=>s.x===pose.x&&s.y===pose.groundY+.5*pose.scale&&s.rx===3.4*pose.scale&&s.ry===.9*pose.scale),'fallback painter retains visible contact ellipse at the departing feet');
+  }
+ }
 });
