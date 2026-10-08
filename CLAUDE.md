@@ -31,6 +31,17 @@ by file type, so a newly added module cannot avoid the gate by using a new
 filename. CSS and static image edits still need a direct test in the same diff;
 they use a `RISK` case when the failure cost warrants one.
 
+For behavior-changing controls, begin with the prior state and exercise the
+transition through the actual consumer: the change/click handler, command, or
+import path. A helper test or fixture already set to the final value cannot
+prove that the control reaches the rule. Check equivalent entry points where
+they should share that rule (for example, Add and Edit Hours → Days, or a scan
+preference change and Save settings). Cover only the relevant transitions and
+saved-data consequences for the change; do not expand this into a blanket
+matrix or introduce another test framework. When closing a gap in established
+behavior, verify that an isolated broken-handler negative control fails and
+record its actual chronology rather than calling it preimplementation red.
+
 Choose cases by failure cost. For persisted task rules, include old saved data,
 undo, import or restore, deletion, and cross-device reconciliation when those
 paths touch the change. For a visual or motion change, cover the numerical

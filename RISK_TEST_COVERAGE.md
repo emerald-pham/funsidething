@@ -612,3 +612,7 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - `RISK Squared Weighting preserves original Chance: frozen ordering and recorded model likelihood stay proportional to raw weights` — quadratic math, saved mode and preserved eligibility/data contracts.
 - `RISK Squared Weighting sync: explicit old mode survives concurrent clients offline reload reconnect completion and Undo` — quadratic math, saved mode and preserved eligibility/data contracts.
 - `RISK Squared Weighting joins: newly eligible tasks share one frozen scale regardless of input ordering` — joined tasks use one common scale and rendering remains read-only.
+
+- `RISK Squared Weighting consumer transitions: actual Settings change and Save clicks switch modes without changing ratings or pass marks` — real consumer transitions, equivalent controls, preservation and isolated negative controls.
+- `RISK Squared Weighting consumer buttons: rendered Start and Resume modes reach the click dispatcher and preserve resumed seeds` — real consumer transitions, equivalent controls, preservation and isolated negative controls.
+- `RISK Squared Weighting consumer import: actual JSON import click migrates old default once and preserves later explicit Chance` — real consumer transitions, equivalent controls, preservation and isolated negative controls.

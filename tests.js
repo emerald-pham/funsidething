@@ -21755,3 +21755,51 @@ test('RISK Squared Weighting joins: newly eligible tasks share one frozen scale 
  const scores=[a,b,fresh].map(t=>ctx.squaredScore(t));delete ctx.state.chance.weights[fresh.id];const beforeJoin=ctx.squaredScore(a);ctx.squaredScore(fresh);assert.equal(ctx.squaredScore(a),beforeJoin,'one late join cannot change previously scored keys');const other=[fresh,b,a].map(t=>ctx.squaredScore(t));
  assert.deepEqual(other.slice().reverse(),scores,'a new weight cannot change the scale midway through one ordering');
 });
+
+test('RISK Squared Weighting consumer transitions: actual Settings change and Save clicks switch modes without changing ratings or pass marks',async()=>{
+ for(const entry of ['change','save-settings']){
+  const {ctx,shim}=await loadApp({seed:952});const root=ctx.addTask('Oldest'),next=ctx.addTask('Next'),blocked=ctx.addTask('Blocked');ctx.setTaskPrerequisites(blocked.id,[next.id]);
+  const click=(act,mode)=>{const control=makeFakeElement();control.dataset={act,...(mode?{mode}:{})};control.closest=()=>control;shim.document.dispatchEvent({type:'click',detail:1,target:control});};
+  ctx.openSettings();const select=shim.document.getElementById('stScanMode');select.id='stScanMode';select.matches=()=>true;select.value='descending';shim.document.dispatchEvent({type:'change',target:select});
+  assert.equal(ctx.state.settings.scanMode,'descending');click('close-modal');click('start-scan');assert.equal(ctx.state.scanMode,'descending');assert.equal(ctx.state.chain[0],root.id);
+  ctx.state.considered[blocked.id]='no';const tasks=JSON.stringify(ctx.state.tasks),marks=JSON.stringify(ctx.state.considered);
+  for(const mode of ['squared','chance','descending','squared']){
+   ctx.openSettings();assert.match(shim.document.getElementById('modalRoot').innerHTML,new RegExp('<option value="'+mode+'"'));
+   select.value=mode;
+   if(entry==='change')shim.document.dispatchEvent({type:'change',target:select});else click('save-settings');
+   assert.equal(ctx.state.settings.scanMode,mode,entry+' reaches the shared preference rule');assert.equal(ctx.state.scanMode,mode);
+   assert.equal(JSON.stringify(ctx.state.tasks),tasks,'presentation transitions invent no rating decisions');assert.equal(JSON.stringify(ctx.state.considered),marks);
+   assert.equal(ctx.state.settings.squaredDefaultVersion,1);
+   if(entry==='change')click('close-modal');
+   await ctx.persist();const reload=await loadApp({seedStorage:{[SYNC_STORE_KEY]:shim.localStorage.getItem(SYNC_STORE_KEY)}});assert.equal(reload.ctx.state.settings.scanMode,mode);assert.equal(reload.ctx.state.scanMode,mode,'saved explicit choice survives consumer reload');
+   assert.ok(!ctx.pool().some(t=>t.id===blocked.id));
+  }
+ }
+});
+
+test('RISK Squared Weighting consumer buttons: rendered Start and Resume modes reach the click dispatcher and preserve resumed seeds',async()=>{
+ const {ctx,shim}=await loadApp({seed:953});ctx.addTask('Oldest');ctx.addTask('Next');
+ const click=(act,mode)=>{const markup=ctx.scanStartButtons(act);assert.match(markup,new RegExp('data-act="'+act+'" data-mode="'+mode+'"'),'requested mode comes from an actual rendered control');const el=makeFakeElement();el.dataset={act,mode};el.closest=()=>el;shim.document.dispatchEvent({type:'click',detail:1,target:el});};
+ ctx.openSettings();const field=shim.document.getElementById('stScanMode');field.id='stScanMode';field.matches=()=>true;field.value='both';shim.document.dispatchEvent({type:'change',target:field});ctx.closeModal();
+ for(const mode of ['squared','chance','descending']){
+  click('start-scan',mode);assert.equal(ctx.state.scanMode,mode);assert.equal(ctx.state.settings.scanMode,'both','explicit button does not overwrite the all-buttons preference');
+  if(mode==='descending')assert.equal(ctx.state.chance,null);else assert.ok(ctx.state.chance?.seed);
+  const seed=ctx.state.chance?.seed,ratings=JSON.stringify(ctx.state.tasks);ctx.onAction('start-working',{});click('resume-scan',mode);
+  assert.equal(ctx.state.scanMode,mode);assert.equal(ctx.state.chance?.seed,seed,'ordinary same-mode Resume keeps the saved order');assert.equal(JSON.stringify(ctx.state.tasks),ratings);
+ }
+ for(const [from,to] of [['descending','squared'],['squared','chance'],['chance','descending']]){
+  click('start-scan',from);const ratings=JSON.stringify(ctx.state.tasks),seed=ctx.state.chance?.seed;ctx.onAction('start-working',{});click('resume-scan',to);
+  assert.equal(ctx.state.scanMode,to,'Resume selecting a different rendered mode changes the active algorithm');assert.equal(ctx.state.settings.scanMode,'both');assert.equal(JSON.stringify(ctx.state.tasks),ratings);
+  if(to==='descending')assert.equal(ctx.state.chance,null);else {assert.ok(ctx.state.chance?.seed);assert.notEqual(ctx.state.chance.seed,seed,'an explicit different mode creates its fresh saved ordering');}
+ }
+
+});
+
+test('RISK Squared Weighting consumer import: actual JSON import click migrates old default once and preserves later explicit Chance',async()=>{
+ const {ctx,shim}=await loadApp({seed:954});ctx.addTask('Imported synthetic task');const board=JSON.parse(ctx.cloudPayload());board.settings.scanMode='chance';board.scanMode='chance';delete board.settings.squaredDefaultVersion;
+ const clickImport=bytes=>{shim.document.getElementById('jsonBox').value=bytes;const el=makeFakeElement();el.dataset={act:'import-json'};el.closest=()=>el;shim.document.dispatchEvent({type:'click',detail:1,target:el});};
+ clickImport(JSON.stringify(board));assert.equal(ctx.state.settings.scanMode,'squared');assert.equal(ctx.state.scanMode,'squared');assert.equal(ctx.state.settings.squaredDefaultVersion,1);assert.equal(JSON.stringify(ctx.state.tasks),JSON.stringify(board.tasks));
+ ctx.openSettings();const field=shim.document.getElementById('stScanMode');field.id='stScanMode';field.matches=()=>true;field.value='chance';shim.document.dispatchEvent({type:'change',target:field});ctx.closeModal();
+ const explicit=ctx.cloudPayload();clickImport(explicit);assert.equal(ctx.state.settings.scanMode,'chance');assert.equal(ctx.state.scanMode,'chance');
+ await ctx.persist();const reload=await loadApp({seedStorage:{[SYNC_STORE_KEY]:shim.localStorage.getItem(SYNC_STORE_KEY)}});assert.equal(reload.ctx.state.settings.scanMode,'chance');
+});
