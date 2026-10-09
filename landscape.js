@@ -1156,7 +1156,7 @@
         if(e.type!=='kite'&&visit.stand<1){g.save();g.globalAlpha*=1-visit.stand;seated(px,py,seed,i?-1:1,book&&visit.pack<.8);g.restore();}
         if(e.type==='kite'||visit.stand>0){
           const carrying=e.type==='kite'?0:S.smooth(.4,.7,visit.pack);
-          const motion=geometry.humanWalkPose(px,py,visit.distance,visit.direction,x=>groundAt(x)+1,carrying);
+          const motion=geometry.humanWalkPose(px,py,visit.distance,visit.direction,geometry.humanGround('trail',20),carrying,1,visit.travel);
           if(e.type==='kite')motion.hand={x:motion.hipX+5,y:-6+motion.bob};
           g.save();g.globalAlpha*=e.type==='kite'?1:visit.stand;g.translate(px,py);g.scale(visit.direction,1);const hand=person(0,0,seed,motion);
           if(e.type==='kite')kiteHand={x:px+visit.direction*hand.x,y:py+hand.y};
@@ -1195,7 +1195,7 @@
     }
     if(e.type==='walker'||e.type==='dogwalker'){
       const pose=geometry.groundPose('walker',e);g.save();g.globalAlpha=S.smooth(0,.06,f)*(1-S.smooth(.94,1,f));
-      const skin=skinColor(e.seed),motion=geometry.humanWalkPose(pose.x,pose.y,pose.distance,dir,x=>geometry.groundAnchor('walker',x));
+      const skin=skinColor(e.seed),motion=geometry.humanWalkPose(pose.x,pose.y,pose.distance,dir,geometry.humanGround('trail',5),false,1,pose.travel);
       // The far arm passes behind the torso; both arms share the leg stride.
       const armAt=index=>{const arm=motion.arms[index],elbowX=pose.x+dir*(motion.hipX+arm.x)*.5,elbowY=pose.y-5.5+motion.bob;line(g,pose.x+dir*motion.hipX,pose.y-8+motion.bob,elbowX,elbowY,skin,1.3);line(g,elbowX,elbowY,pose.x+dir*arm.x,pose.y+arm.y,skin,1.3);};
       armAt(1);

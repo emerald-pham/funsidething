@@ -110,6 +110,109 @@ test('RISK Last task WOOP: unsupported data survives reload and replacement and 
  ctx.renderScan();assert.doesNotMatch(shim.document.getElementById('scan').innerHTML,/Walk Thru WOOP|Delete WOOP plan/);ctx.onAction('woop-start',{dataset:{benchmark:task.id}});assert.equal(vm.runInContext('woopDraft',ctx),null);
  delete task.woopPlan;ctx.onAction('woop-start',{dataset:{benchmark:task.id}});woopStep(app,'Outcome');woopStep(app,'Obstacle');ctx.replaceState(JSON.parse(ctx.cloudPayload()));woopStep(app,'If replaced, then act');assert.equal(ctx.state.tasks.find(t=>t.id===task.id).woopPlan,undefined,'same-account same-ID replacement invalidates draft');
 });
+test('RISK local human cadence: recorded phone flat controls do not inherit a distant steep hill stride',()=>{
+ const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
+ const geo=ctx.LandscapeGeometry.create(390,844),ground=x=>geo.groundAnchor('walker',x);
+ // Exact actual-consumer input from the rejected flat-control capture. Its
+ // ordered frames show 22 contacts in five seconds, despite moderate local
+ // terrain. The old maximum-grade scan applied a distant cliff here.
+ const x=178.60649260872106,distance=228.60649260872106;
+ const p=geo.humanWalkPose(x,ground(x),distance,1,ground,false,1,{kind:'constant',startDistance:0,speed:7});
+ assert.ok(p.stride>=5.6,'seven-unit/second travel needs a cycle of at least .8 seconds rather than the rejected rapid shuffle');
+ const flat=()=>0,q=geo.humanWalkPose(x,0,distance,1,flat,false,1,{kind:'constant',startDistance:0,speed:7});
+ assert.ok(q.stride>=9,'a truly flat route retains a full walking stride');
+});
+test('RISK human route isolation: different terrain functions cannot share a sampled-profile contact cache',()=>{
+ const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
+ const geo=ctx.LandscapeGeometry.create(390,844),other=ctx.LandscapeGeometry.create(390,844);
+ const flat=()=>0,curved=x=>x===0||x===195||x===390?0:30*Math.sin(x/390*Math.PI*2);
+ geo.humanWalkPose(50,0,50,1,flat);
+ assert.deepEqual(geo.humanWalkPose(50,curved(50),50,1,curved),other.humanWalkPose(50,curved(50),50,1,curved),'equal profile samples do not establish identical terrain or permit stale contact spacing');
+});
+test('RISK human support transfer: recorded steep phone frames avoid the rejected abrupt pelvis bob',()=>{
+ const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
+ const geo=ctx.LandscapeGeometry.create(390,844),ground=x=>geo.groundAnchor('walker',x);
+ // These ordered rendered inputs straddle the independently rejected
+ // transfer, not a fixture seek. Reproduce the source geometry exactly.
+ const a=geo.humanWalkPose(76.38280855647272,ground(76.38280855647272),246.19080855647272,1,ground);
+ const b=geo.humanWalkPose(76.88228924025705,ground(76.88228924025705),246.69028924025704,1,ground);
+ assert.ok(Math.abs(b.hipY-a.hipY)<.4,'a half-unit advance must not recreate the observed one-unit support-transfer bob');
+});
+test('RISK whole human transfer: both ordered rendered phone traversals bound pelvis bob throughout each cycle',()=>{
+ const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
+ const cases=JSON.parse(fs.readFileSync(path.join(__dirname,'scripts/fixtures/gait-rendered-walker-inputs.json'),'utf8'));
+ assert.equal(cases.length,4,'retain steep and flatter controls in both directions, with the final fixture seek excluded');
+ for(const c of cases){
+  const geo=ctx.LandscapeGeometry.create(390,844),ground=geo.humanGround('trail',5);let previous;
+  for(const input of c.inputs){
+   const pose=geo.humanWalkPose(input.x,ground(input.x),input.distance,input.direction,ground,false,1,{kind:'constant',startDistance:0,speed:7});
+   if(previous){
+    const advance=input.distance-previous.input.distance;
+    assert.ok(advance>0&&input.elapsed>previous.input.elapsed,'actual temporal inputs retain their ordered clocks');
+    assert.ok(Math.abs(pose.hipY-previous.pose.hipY)<=.7*advance+1e-8,`${c.direction} lane ${c.lane}: support transfer must not shift the same abrupt bob to another rendered frame`);
+   }
+   previous={input,pose};
+  }
+ }
+});
+test('RISK running seek isolation: future route queries cannot revise fast departure contacts',()=>{
+ const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
+ for(const direction of [-1,1])for(const distance of [60,100,200,300,500]){
+  const a=ctx.LandscapeGeometry.create(1440,900),b=ctx.LandscapeGeometry.create(1440,900),ground=a.humanGround('trail',20),other=b.humanGround('trail',20),travel={startDistance:40,length:1500,duration:18},x=400+direction*distance;
+  const first=a.humanWalkPose(x,ground(x),distance,direction,ground,1,1,travel);
+  a.humanWalkPose(400+direction*1000,ground(400+direction*1000),1000,direction,ground,1,1,travel);
+  const warm=a.humanWalkPose(x,ground(x),distance,direction,ground,1,1,travel),cold=b.humanWalkPose(x,other(x),distance,direction,other,1,1,travel);
+  assert.deepEqual(warm,first,'a later future seek cannot move an already reconstructed foot');
+  assert.deepEqual(warm,cold,'fast departure poses retain deterministic cold and warm seeking');
+ }
+});
+test('RISK actual human pose observer: native consumer traces preserve painter commands and returned poses',async()=>{
+ const {readMotionBuild,createMotionProbe}=await import('./scripts/motion-review-harness.mjs'),build=readMotionBuild(__dirname,'WORKTREE'),poses=[];
+ const options={actor:'reader',progress:.885,duration:100,seed:.4,lane:.02},plain=createMotionProbe(build,{width:390,height:844}),traced=createMotionProbe(build,{width:390,height:844,onHumanPose:(pose,args)=>poses.push({pose,args})});
+ assert.deepEqual(traced.sample(options),plain.sample(options),'observing the actual geometry must not replace or change the painter');
+ assert.equal(poses.length,1,'actual reader painter must supply a geometry pose to the native observer');
+ assert.equal(poses[0].args[5],1,'the actual painter has reached its carrying grip');
+ assert.ok(poses[0].pose.legs.every(leg=>Number.isFinite(leg.kneeX)));
+});
+test('RISK carrying locomotion: actual fast departure painters avoid aliased walking cadence and preserve every limb and grip',async()=>{
+ const {readMotionBuild,createMotionProbe}=await import('./scripts/motion-review-harness.mjs'),build=readMotionBuild(__dirname,'WORKTREE');
+ for(const [width,height] of [[390,844],[1440,900]])for(const reverse of [false,true])for(const actor of ['reader','couple','picnic','kite','snowman','snowangel']){
+  let current=[],previous=[],contacts=0,observed=0;
+  const probe=createMotionProbe(build,{width,height,onHumanPose:(pose,args)=>current.push({pose,args})});
+  for(let frame=0;frame<=150;frame++){
+   current=[];probe.sample({actor,progress:.885+frame/30/100,duration:100,seed:.4,lane:.02,reverse});
+   current.forEach(({pose,args},person)=>{
+    observed++;
+    pose.legs.forEach((leg,index)=>{
+     const prior=previous[person]?.legs[index];if(prior&&prior.lift>0&&leg.lift===0)contacts++;
+     assert.ok(Math.abs(Math.hypot(leg.kneeX-pose.hipX,leg.kneeY-pose.hipY)-3.2)<1e-7,'fast travel preserves thigh length');
+     assert.ok(Math.abs(Math.hypot(leg.footX-leg.kneeX,leg.footY-leg.kneeY)-3.2)<1e-7,'fast travel preserves shin length');
+    });
+    if(actor==='reader'||actor==='couple'||actor==='picnic'){
+     assert.equal(args[5],1,'departure actual painter keeps its carrying grip');
+     assert.ok(Math.abs(pose.hand.x-pose.hipX-4)<1e-8);
+     assert.ok(Math.abs(pose.hand.y-pose.bob+3)<1e-8);
+    }
+   });
+   previous=current.map(record=>record.pose);
+  }
+  assert.ok(observed>0,'each actual standing departure painter must be observed');
+  const people=['couple','picnic'].includes(actor)?2:1;
+  assert.ok(contacts/people<=18,`${actor} ${width} reverse=${reverse}: ${contacts/people} contact changes in five seconds must not repeat the observed flickering walking pose at running speed`);
+ }
+});
+test('RISK terrain locomotion: actual steep phone walkers keep a human contact rhythm without slowing their route',async()=>{
+ const {readMotionBuild,createMotionProbe}=await import('./scripts/motion-review-harness.mjs'),build=readMotionBuild(__dirname,'WORKTREE');
+ for(const actor of ['walker','dogwalker'])for(const reverse of [false,true]){
+  let pose,previous,contacts=0;const probe=createMotionProbe(build,{width:390,height:844,onHumanPose:p=>{pose=p;}});
+  for(let frame=0;frame<=150;frame++){
+   pose=null;probe.sample({actor,progress:.45+frame/30/70,duration:70,seed:.4,lane:.02,reverse});
+   assert.ok(pose,'actual consumer supplies its pose throughout the clip');
+   pose.legs.forEach((leg,index)=>{if(previous?.legs[index].lift>0&&leg.lift===0)contacts++;});previous=pose;
+  }
+  assert.ok(contacts<=18,`${actor} reverse=${reverse}: ${contacts} contacts in five seconds must not repeat steep-phone shuffling`);
+ }
+});
 test('RISK human support balance: rejected steep phone walks keep the vertical torso over a usable planted support',()=>{
  const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
  const geo=ctx.LandscapeGeometry.create(390,844);
@@ -118,23 +221,25 @@ test('RISK human support balance: rejected steep phone walks keep the vertical t
  // projected downhill beyond both toes beneath an otherwise vertical torso.
  for(const type of ['walker','dogwalker'])for(const reverse of [false,true])for(let frame=0;frame<=180;frame++){
   const e={type,age:(.45+frame/180*.08)*70,duration:70,seed:.4,lane:.02,reverse},pose=geo.groundPose('walker',e),direction=reverse?-1:1,ground=x=>geo.groundAnchor('walker',x);
-  const motion=geo.humanWalkPose(pose.x,pose.y,pose.distance,direction,ground),contacts=motion.legs.filter(leg=>leg.lift===0);
-  assert.ok(contacts.length>0,'a walking frame always retains a planted support');
+  const motion=geo.humanWalkPose(pose.x,pose.y,pose.distance,direction,ground,false,1,pose.travel),contacts=motion.legs.filter(leg=>leg.lift===0);
+  if(motion.locomotion==='walk')assert.ok(contacts.length>0,'a walking frame always retains a planted support');
+  if(!contacts.length)continue;
   const lateralSupport=Math.min(...contacts.map(leg=>Math.abs(leg.footX-motion.hipX)));
   assert.ok(lateralSupport<=2.5,`${type} reverse=${reverse}, frame=${frame}, x=${pose.x}: vertical torso is ${lateralSupport.toFixed(3)} units away from its nearest planted support; raised hips must not make a sitting silhouette`);
-  for(const leg of contacts){const nextDistance=pose.distance+1e-5,nextX=pose.x+direction*1e-5,next=geo.humanWalkPose(nextX,ground(nextX),nextDistance,direction,ground),other=next.legs[motion.legs.indexOf(leg)];if(other.lift===0)assert.ok(Math.abs(pose.x+direction*leg.footX-nextX-direction*other.footX)<1e-8,'balance repair must retain real world foot planting');}
+  for(const leg of contacts){const nextDistance=pose.distance+1e-5,nextX=pose.x+direction*1e-5,next=geo.humanWalkPose(nextX,ground(nextX),nextDistance,direction,ground,false,1,pose.travel),other=next.legs[motion.legs.indexOf(leg)];if(other.lift===0)assert.ok(Math.abs(pose.x+direction*leg.footX-nextX-direction*other.footX)<1e-8,'balance repair must retain real world foot planting');}
  }
 });
 
-test('RISK human terrain cadence: a whole curved crossing retains one stride and deterministic planted arrivals',()=>{
+test('RISK human terrain cadence: local contact spacing preserves world planting and deterministic arrivals',()=>{
  const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
  for(const [width,height] of [[390,844],[844,390],[820,1180],[1440,900]])for(const direction of [-1,1]){
   const geo=ctx.LandscapeGeometry.create(width,height);
   for(const name of ['middle','near','trail']){
-   const ground=x=>geo[name](x),initial=geo.humanWalkPose(0,ground(0),0,direction,ground);
+   const ground=geo.humanGround(name);
    for(let index=0;index<=80;index++){
-    const x=width*index/80,distance=index*.371,p=geo.humanWalkPose(x,ground(x),distance,direction,ground,.5);
-    assert.equal(p.stride,initial.stride,'terrain curvature must not change phase and move a planted foot');
+    const distance=width*index/80,x=direction===1?distance:width-distance,p=geo.humanWalkPose(x,ground(x),distance,direction,ground,.5);
+    const step=1e-5,nextX=x+direction*step,next=geo.humanWalkPose(nextX,ground(nextX),distance+step,direction,ground,.5);
+    for(let leg=0;leg<2;leg++)if(p.legs[leg].lift===0&&next.legs[leg].lift===0)assert.ok(Math.abs(x+direction*p.legs[leg].footX-nextX-direction*next.legs[leg].footX)<1e-8,'local stride adaptation cannot slide a planted world foot');
     assert.deepEqual(p,geo.humanWalkPose(x,ground(x),distance,direction,ground,.5),'a sought frame has no smoothing history');
    }
    const arrival=geo.humanWalkPose(width/2,ground(width/2),40,direction,ground,1);
@@ -148,31 +253,57 @@ test('RISK upright human gait: full cycles extend stance knees with modest swing
  for(const [w,h] of [[390,844],[844,390],[820,1180],[1440,900]])for(const direction of [-1,1])for(const scale of [.65,1,1.2])for(const carrying of [0,.5,1]){
   const geo=ctx.LandscapeGeometry.create(w,h);
   for(const slope of [0,-.15,.15,-.9,.9,-1.4,1.4]){
-   let extended=0,stance=0;
+   let extended=0,stance=0,centralSupports=0,completedSupports=0;const intervals=[null,null],completedByLeg=[0,0];const ground=fx=>h/2+slope*(fx-w/2),travel={kind:'constant',startDistance:0,speed:7};
    for(let frame=0;frame<120;frame++){
-    const distance=frame/120*14*scale,x=w/2+direction*distance,ground=fx=>h/2+slope*(fx-w/2),y=ground(x);
-    const p=geo.humanWalkPose(x,y,distance,direction,ground,carrying,scale);
+    const distance=frame/120*14*scale,x=w/2+direction*distance,y=ground(x);
+    const p=geo.humanWalkPose(x,y,distance,direction,ground,carrying,scale,travel);
     if(Math.abs(slope)<.2)assert.ok(p.hipY < -5.3,'pelvis must stay upright rather than shorten the six-unit legs to a crouch');
     assert.ok((ground(x+direction*scale*(p.hipX||0))-y)/scale-p.hipY>5.3,'terrain beneath the pelvis must leave upright clearance');
-    for(const leg of p.legs){
+    assert.ok(!(p.legs.every(leg=>leg.lift===0)&&p.legs.every(leg=>2*Math.acos(Math.min(1,Math.hypot(leg.footX-p.hipX,leg.footY-p.hipY)/6.4))*180/Math.PI>60)),'grounded double support cannot collapse both knees into a crouch');
+    for(const [legIndex,leg] of p.legs.entries()){
      const reach=Math.hypot(leg.footX-(p.hipX||0),leg.footY-p.hipY),flex=2*Math.acos(Math.min(1,reach/6.4))*180/Math.PI;
+     assert.ok(reach<=6.4+1e-8,'leg endpoints must remain physically reachable');
+     assert.ok(Math.abs(Math.hypot(leg.footX-leg.kneeX,leg.footY-leg.kneeY)-3.2)<1e-7,'shin length remains fixed');
      assert.ok(flex<85,'swing knee must bend modestly rather than fold into a squat');
      if(leg.lift===0){stance++;if(flex<35)extended++;
+      if(!intervals[legIndex])intervals[legIndex]={completeStart:frame>0,central:false};
+      if(Math.abs(leg.footX-p.hipX)<.12){centralSupports++;intervals[legIndex].central=true;assert.ok(flex<60,'the active planted leg beneath the pelvis cannot remain deeply crouched');}
       assert.ok(Math.abs(y+scale*leg.footY-ground(x+direction*scale*leg.footX))<1e-8);
-      const nextDistance=distance+1e-5,nextX=x+direction*1e-5,q=geo.humanWalkPose(nextX,ground(nextX),nextDistance,direction,ground,carrying,scale),other=q.legs[p.legs.indexOf(leg)];
+      const nextDistance=distance+1e-5,nextX=x+direction*1e-5,q=geo.humanWalkPose(nextX,ground(nextX),nextDistance,direction,ground,carrying,scale,travel),other=q.legs[p.legs.indexOf(leg)];
       if(other.lift===0)assert.ok(Math.abs(x+direction*scale*leg.footX-nextX-direction*scale*other.footX)<1e-8,'stance remains planted');
+     }else if(intervals[legIndex]){
+      const interval=intervals[legIndex];if(interval.completeStart){completedSupports++;completedByLeg[legIndex]++;assert.ok(interval.central,'each completed planted interval on each leg crosses beneath the pelvis');}intervals[legIndex]=null;
      }
     }
    }
-   assert.ok(extended/stance>.65,'most stance frames need an extended support knee');
+   if(Math.abs(slope)<.2)assert.ok(extended/stance>.65,'most flat and gentle walking stance frames need an extended support knee');
+   else assert.ok(centralSupports>0&&completedSupports>0&&completedByLeg.every(count=>count>0),'steep speed-appropriate travel must include an independently located planted central support');
   }
  }
 });
 
+test('RISK dense human contact corridor: final blended pelvis and limbs remain feasible at contact and window seams',()=>{
+ const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
+ for(const slope of [0,.1999,.2001,.9,1.4,-.9,-1.4])for(const direction of [-1,1]){
+  const geo=ctx.LandscapeGeometry.create(390,844),ground=x=>422+slope*(x-195),travel={kind:'constant',startDistance:0,speed:7};let previous;
+  for(let i=0;i<=14000;i++){
+   const distance=i*.001,x=195+direction*distance,p=geo.humanWalkPose(x,ground(x),distance,direction,ground,1,1,travel);
+   assert.ok(-p.hipY>5.3,'the final blended pelvis retains upright local clearance');
+   if(previous)assert.ok(Math.abs(p.hipY-previous.hipY)<=.0007+1e-8,'overlapping clearance windows must not exceed the transfer gradient at their four-unit seams');
+   for(const leg of p.legs){
+    assert.ok(Math.hypot(leg.footX-p.hipX,leg.footY-p.hipY)<=6.4+1e-8,'final endpoints must fit the actual two-link leg without acos clipping');
+    assert.ok(Math.abs(Math.hypot(leg.kneeX-p.hipX,leg.kneeY-p.hipY)-3.2)<1e-7);
+    assert.ok(Math.abs(Math.hypot(leg.footX-leg.kneeX,leg.footY-leg.kneeY)-3.2)<1e-7);
+    if(leg.lift===0)assert.ok(Math.abs(ground(x)+leg.footY-ground(x+direction*leg.footX))<1e-8,'a planted support stays on actual terrain');
+   }
+   previous=p;
+  }
+ }
+});
 test('RISK upright gait guidance: scenery FAQ and changelog explain upright support and carrying without changing task controls',()=>{
  const html=fs.readFileSync(path.join(__dirname,'index.html'),'utf8'),faq=html.split('<dt>How do I change the scenery?</dt>')[1].split('</dd>')[0],changelog=html.split('<template id="appChangelogCurrent">')[1].split('</template>')[0];
- assert.match(faq,/Upright walking keeps support knees extended/);assert.match(faq,/Pelvis and carrying hands follow the terrain together/);
- assert.match(changelog,/Upright walking now extends the support leg/);
+ assert.match(faq,/Faster travel uses jogging or running/);assert.match(faq,/Pelvis and carrying hands move together/);
+ assert.match(changelog,/local terrain/);assert.match(changelog,/jogging or running/);
 });
 
 test('RISK upright settled visitors: arrival endpoint rests both feet on terrain before eased departure',()=>{
@@ -215,10 +346,10 @@ test('RISK upright gait consumer: every human painter consumes upright full cycl
   for(const actor of ['walker','dogwalker','reader','couple','picnic','kite','snowman','snowangel'])for(const offset of ['couple','picnic'].includes(actor)?[-11,11]:[0])for(let frame=0;frame<60;frame++){
    const progress=.9+frame/60*.06,e={type:actor,age:progress*100,duration:100,seed:.4,lane:.5,reverse};
    let pose,ground,scale=1;
-   if(['walker','dogwalker'].includes(actor)){pose=geo.groundPose('walker',e);ground=x=>geo.groundAnchor('walker',x);}
-   else if(['snowman','snowangel'].includes(actor)){const winter=ctx.LandscapeWinter.pose(actor,e,geo,width,height);pose={x:actor==='snowman'?winter.builderX:winter.x,y:actor==='snowman'?winter.builderGroundY:winter.groundY,distance:winter.walkDistance};scale=actor==='snowman'?winter.builderScale:winter.scale;ground=x=>geo[actor==='snowman'?'middle':'near'](x)+winter.snowOffset;}
-   else {pose=geo.visitPose(e,progress);pose.x+=offset;ground=x=>geo.trail(x)+20;pose.y=ground(pose.x);}
-   const p=geo.humanWalkPose(pose.x,pose.y,pose.distance,reverse?-1:1,ground,actor==='reader'||actor==='picnic'||actor==='couple',scale);
+   if(['walker','dogwalker'].includes(actor)){pose=geo.groundPose('walker',e);ground=geo.humanGround('trail',5);}
+   else if(['snowman','snowangel'].includes(actor)){const winter=ctx.LandscapeWinter.pose(actor,e,geo,width,height);pose={x:actor==='snowman'?winter.builderX:winter.x,y:actor==='snowman'?winter.builderGroundY:winter.groundY,distance:winter.walkDistance,travel:winter.travel};scale=actor==='snowman'?winter.builderScale:winter.scale;ground=geo.humanGround(actor==='snowman'?'middle':'near',winter.snowOffset);}
+   else {pose=geo.visitPose(e,progress);pose.x+=offset;ground=geo.humanGround('trail',20);pose.y=ground(pose.x);}
+   const p=geo.humanWalkPose(pose.x,pose.y,pose.distance,reverse?-1:1,ground,actor==='reader'||actor==='picnic'||actor==='couple',scale,pose.travel);
    const hipClearance=(ground(pose.x+(reverse?-1:1)*scale*(p.hipX||0))-pose.y)/scale-p.hipY;
    if(pose.x>=0&&pose.x<=width)assert.ok(hipClearance>5.3,`${actor} at ${width}, frame ${frame}, x ${pose.x}, hip ${p.hipY} must retain upright terrain posture`);
    for(const leg of p.legs)assert.ok(Math.abs(Math.hypot(leg.kneeX-(p.hipX||0),leg.kneeY-p.hipY)-3.2)<1e-7,'existing thigh proportions stay fixed');
@@ -13662,7 +13793,7 @@ test('Landscape walker: arms swing opposite the legs through a full repeatable s
  const walker=runtime.slice(runtime.indexOf("    if(e.type==='walker'||e.type==='dogwalker'){"),runtime.indexOf("    if(e.type==='dolphin'){"));
  let cadenceControls=0;
  for(const reverse of [false,true])for(const age of [0,.2,.4,.6,.8,1,1.2]){
-  const e={type:'walker',age,duration:70,lane:.5,seed:.4,reverse},dir=reverse?-1:1,ground=geo.groundPose('walker',e),motion=geo.humanWalkPose(ground.x,ground.y,ground.distance,dir,x=>geo.groundAnchor('walker',x));
+  const e={type:'walker',age,duration:70,lane:.5,seed:.4,reverse},dir=reverse?-1:1,ground=geo.groundPose('walker',e),motion=geo.humanWalkPose(ground.x,ground.y,ground.distance,dir,geo.humanGround('trail',5),false,1,ground.travel);
   const check=code=>{
    const lines=[];Object.assign(ctx,{geometry:geo,e,dir,f:.4,c:'shirt',g:{save(){},restore(){}},skinColor:()=> 'skin',S:{smooth:()=>1},personHead(){},line(g,...v){lines.push(v);}});
    vm.runInContext('(function(){'+code+'})()',ctx);
@@ -13670,7 +13801,7 @@ test('Landscape walker: arms swing opposite the legs through a full repeatable s
   };
   check(walker);
   for(const arm of motion.arms)assert.ok(Math.abs(Math.hypot(arm.x-motion.hipX,arm.y-(-8+motion.bob))-5)<1e-8,'rendered free arm reach remains five units');
-  const carrying=geo.humanWalkPose(ground.x,ground.y,ground.distance,dir,x=>geo.groundAnchor('walker',x),1);assert.ok(Math.abs(carrying.hand.x-carrying.hipX-4)<1e-8);assert.ok(Math.abs(carrying.hand.y-carrying.hipY-1.4)<1e-8,'carrying grip keeps its prior pelvis offset');
+  const carrying=geo.humanWalkPose(ground.x,ground.y,ground.distance,dir,geo.humanGround('trail',5),1,1,ground.travel);assert.ok(Math.abs(carrying.hand.x-carrying.hipX-4)<1e-8);assert.ok(Math.abs(carrying.hand.y-carrying.hipY-1.4)<1e-8,'carrying grip keeps its prior pelvis offset');
   const broken=walker.replace('const arm=motion.arms[index]','const arm={x:motion.hipX+geometry.strideArm(pose.distance,10,index*.5).x,y:-8+motion.bob+geometry.strideArm(pose.distance,10,index*.5).y}');
   assert.notEqual(broken,walker);
   const old=geo.strideArm(ground.distance,10,0),arm=motion.arms[0];
@@ -22430,13 +22561,13 @@ test('RISK winter walking: departures consume scaled traveled-distance terrain f
   const x=type==='snowman'?a.builderX:a.x,y=type==='snowman'?a.builderGroundY:a.groundY,scale=type==='snowman'?a.builderScale:a.scale;
   const bx=type==='snowman'?b.builderX:b.x,by=type==='snowman'?b.builderGroundY:b.groundY;
   assert.ok(Math.abs((b.walkDistance-a.walkDistance)-Math.abs(bx-x))<1e-8);
-  const ground=fx=>geo[type==='snowman'?'middle':'near'](fx)+a.snowOffset;
-  const p=geo.humanWalkPose(x,y,a.walkDistance,a.direction,ground,0,scale),q=geo.humanWalkPose(bx,by,b.walkDistance,b.direction,ground,0,scale);
+  const ground=geo.humanGround(type==='snowman'?'middle':'near',a.snowOffset);
+  const p=geo.humanWalkPose(x,y,a.walkDistance,a.direction,ground,0,scale,a.travel),q=geo.humanWalkPose(bx,by,b.walkDistance,b.direction,ground,0,scale,b.travel);
   for(let i=0;i<2;i++)if(p.legs[i].lift===0&&q.legs[i].lift===0)assert.ok(Math.abs(x+a.direction*scale*p.legs[i].footX-bx-b.direction*scale*q.legs[i].footX)<1e-7,'scaled winter stance contact remains planted');
   const lines=[],calls=[],original=geo.humanWalkPose;geo.humanWalkPose=(...args)=>{calls.push(args);return original(...args);};
   const g={save(){},restore(){},translate(){},rotate(){},scale(){}};
   ctx.LandscapeWinter.paint(g,geo,w,h,e,999,{city:'#334455',front:'#556655',sky:['#aabbcc','#bbccdd','#ccddee']},{line(g,...v){lines.push(v);},ellipse(){},color:()=> '#123456',skinColor:()=> '#abcdef'});
-  assert.equal(calls.length,1,'the winter paint consumer must use shared terrain pose');assert.equal(calls[0][2],a.walkDistance);assert.equal(calls[0][6],scale);
+  assert.equal(calls.length,1,'the winter paint consumer must use shared terrain pose');assert.equal(calls[0][2],a.walkDistance);assert.equal(calls[0][6],scale);assert.deepEqual(calls[0][7],a.travel,'actual winter consumer carries its existing eased travel speed into locomotion');
   assert.ok(lines.some(v=>Math.abs(v[0]-p.hipX)<1e-8&&Math.abs(v[1]-p.hipY)<1e-8),'winter thigh starts at the terrain hip');
   for(const leg of p.legs)assert.ok(lines.some(v=>Math.abs(v[0]-leg.kneeX)<1e-8&&Math.abs(v[1]-leg.kneeY)<1e-8&&Math.abs(v[2]-leg.footX)<1e-8&&Math.abs(v[3]-leg.footY)<1e-8),'actual winter calf reaches the computed contact');
  }
@@ -22470,7 +22601,7 @@ test('RISK walker anatomy consumer: ordinary and dog walkers use connected knees
   Object.assign(ctx,{geometry,e,dir,g:{save(){},restore(){},translate(){},scale(){},beginPath(){},moveTo(x,y){leash.push([x,y]);},quadraticCurveTo(){},stroke(){}},f:.4,c:'#123456',skinColor:()=> '#abcdef',color:()=> '#123456',p:{city:'#334455'},S:{smooth:()=>1,mixHex:()=> '#555555'},line(g,...v){lines.push(v);},personHead(g,...v){heads.push(v);},ellipse(){}});
   vm.runInContext('(function(){'+code+'})()',ctx);
   const legs=lines.filter(v=>v[4]==='#647779');assert.equal(legs.length,4,'each walker leg has a thigh and calf');
-  const ground=geometry.groundPose('walker',e),motion=geometry.humanWalkPose(ground.x,ground.y,ground.distance,dir,x=>geometry.groundAnchor('walker',x));
+  const ground=geometry.groundPose('walker',e),motion=geometry.humanWalkPose(ground.x,ground.y,ground.distance,dir,geometry.humanGround('trail',5),false,1,ground.travel);
   assert.ok(legs.some(v=>Math.abs(v[0]-(ground.x+dir*motion.hipX))<1e-8&&Math.abs(v[1]-(ground.y+motion.hipY))<1e-8),'walker thigh starts at terrain hip');
   for(const leg of motion.legs)assert.ok(legs.some(v=>Math.abs(v[2]-(ground.x+dir*leg.footX))<1e-8&&Math.abs(v[3]-(ground.y+leg.footY))<1e-8),'actual calf preserves the terrain foot');
   if(type==='dogwalker'){assert.equal(leash.length,1);assert.ok(lines.some(v=>v[4]==='#abcdef'&&Math.hypot(v[2]-leash[0][0],v[3]-leash[0][1])<1e-8),'leash attaches to an actual rendered hand');}

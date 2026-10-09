@@ -756,4 +756,14 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 
 - RISK human support balance: rejected steep phone walks keep the vertical torso over a usable planted support
 
-- RISK human terrain cadence: a whole curved crossing retains one stride and deterministic planted arrivals
+- RISK human terrain cadence: local contact spacing preserves world planting and deterministic arrivals
+
+- RISK local human cadence: recorded phone flat controls do not inherit a distant steep hill stride
+- RISK human route isolation: different terrain functions cannot share a sampled-profile contact cache
+- RISK human support transfer: recorded steep phone frames avoid the rejected abrupt pelvis bob
+- RISK whole human transfer: both ordered rendered phone traversals bound pelvis bob throughout each cycle
+- RISK running seek isolation: future route queries cannot revise fast departure contacts
+- RISK actual human pose observer: native consumer traces preserve painter commands and returned poses
+- RISK carrying locomotion: actual fast departure painters avoid aliased walking cadence and preserve every limb and grip
+- RISK terrain locomotion: actual steep phone walkers keep a human contact rhythm without slowing their route
+- RISK dense human contact corridor: final blended pelvis and limbs remain feasible at contact and window seams

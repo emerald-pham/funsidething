@@ -50,13 +50,24 @@ function painterProgram(build){
  }};
 })`;
 }
-function loadProbe(build,width,height){
+function loadProbe(build,width,height,onHumanPose){
  const context=vm.createContext({Math,Date,Intl,JSON,console});
  for(const file of files.filter(f=>f!=='landscape.js'))vm.runInContext(build.sources[file],context,{filename:file});
+ if(onHumanPose){
+  context.observeHumanPose=onHumanPose;
+  vm.runInContext(`{
+   const create=LandscapeGeometry.create;
+   LandscapeGeometry.create=(...dimensions)=>{
+    const geometry=create(...dimensions),walk=geometry.humanWalkPose;
+    geometry.humanWalkPose=(...args)=>{const pose=walk(...args);observeHumanPose(pose,args);return pose;};
+    return geometry;
+   };
+  }`,context);
+ }
  return vm.runInContext(painterProgram(build),context)(width,height);
 }
-export function createMotionProbe(build,{width=820,height=1180}={}){
- const renderer=loadProbe(build,width,height);
+export function createMotionProbe(build,{width=820,height=1180,onHumanPose}={}){
+ const renderer=loadProbe(build,width,height,onHumanPose);
  return {sample(options){const commands=[],state={globalAlpha:1},g=new Proxy(state,{get(target,key){if(key in target)return target[key];return (...args)=>commands.push([key,...args]);},set(target,key,value){target[key]=value;commands.push(['set',key,value]);return true;}});const metadata=renderer.draw(g,options);if(commands.some(command=>command.some(value=>typeof value==='number'&&!Number.isFinite(value))))throw new Error('Nonfinite canvas command');return JSON.parse(JSON.stringify({metadata,commands}));}};
 }
 const safeJson=value=>JSON.stringify(value).replace(/</g,'\\u003c');

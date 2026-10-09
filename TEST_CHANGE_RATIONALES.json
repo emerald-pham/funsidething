@@ -1,5 +1,41 @@
 [
   {
+    "testChangesSha256": "6c5769bb81a4b72052312dbae5aaa0e2da4707ad1450d0aa4e2d4f2cb6a3a06e",
+    "reason": "Independent full-motion review rejected profile-wide compact walking cadence and support-transfer pelvis bob despite passing numerical checks. Local terrain contact planning and speed-appropriate running replace those behaviors. Exact actual-consumer observer coverage catches fast carrying flicker. Flat and gentle pooled35-degree extension remains greater than65%; only steep speed-appropriate travel replaces the pooled double-support statistic with each completed planted interval crossing beneath the pelvis under60 degrees, with no grounded double-knee collapse. Future-seek regression independently caught running contact table extrapolation and was repaired before GREEN.",
+    "previousBehavior": "Released low pelvis caused crouching. The rejected upright draft used viewport-wide compact strides, abrupt load transfer and fast departure walking flicker. A fixed-stride implementation assertion incorrectly prohibited deterministic local terrain planning.",
+    "intendedBehavior": "Upright human legs retain exact3.2-unit thigh and shin lengths, real world-planted feet, deterministic cold/warm seeking and stationary approach endpoints. Local terrain reserves comfortable clearance; jogging/running matches existing faster routes without modifying timing. Full independent motion acceptance remains required.",
+    "replacementTests": [
+      "RISK local human cadence: recorded phone flat controls do not inherit a distant steep hill stride",
+      "RISK human route isolation: different terrain functions cannot share a sampled-profile contact cache",
+      "RISK human support transfer: recorded steep phone frames avoid the rejected abrupt pelvis bob",
+      "RISK whole human transfer: both ordered rendered phone traversals bound pelvis bob throughout each cycle",
+      "RISK running seek isolation: future route queries cannot revise fast departure contacts",
+      "RISK actual human pose observer: native consumer traces preserve painter commands and returned poses",
+      "RISK carrying locomotion: actual fast departure painters avoid aliased walking cadence and preserve every limb and grip",
+      "RISK terrain locomotion: actual steep phone walkers keep a human contact rhythm without slowing their route",
+      "RISK human support balance: rejected steep phone walks keep the vertical torso over a usable planted support",
+      "RISK human terrain cadence: local contact spacing preserves world planting and deterministic arrivals",
+      "RISK upright human gait: full cycles extend stance knees with modest swing flexion and preserved terrain contact",
+      "RISK dense human contact corridor: final blended pelvis and limbs remain feasible at contact and window seams",
+      "RISK upright gait guidance: scenery FAQ and changelog explain upright support and carrying without changing task controls",
+      "RISK upright settled visitors: arrival endpoint rests both feet on terrain before eased departure",
+      "RISK upright torso travel: flat-ground pelvis travels steadily while terrain adaptation stays continuous",
+      "RISK upright pelvis consumer: torso head thighs and carrying arms follow the terrain hip",
+      "RISK upright gait consumer: every human painter consumes upright full cycles in both directions at responsive scales"
+    ],
+    "preservedCoverage": [
+      "All existing task controls, WOOP, persistence, security, scene route/timing/seed and animal behavior protections remain intact.",
+      "Flat/gentle35-degree stance extension threshold stays above65%; all scales/directions/carrying weights remain covered with hard endpoint reach and fixed shin checks.",
+      "The removed constant-stride equality is replaced by actual world planting across a consistent curved route and deterministic seeks, preserving forty-unit resting arrival checks.",
+      "Consumer observer returns original pose identity and identical painter commands; all eight human families, paired people, grip offsets, reduced motion and four responsive scales retain coverage.",
+      "Existing walker arm and winter thigh/calf consumer assertions still compare exact rendered endpoints; expected poses now receive the identical speed metadata as the actual painter, and winter explicitly checks that metadata argument."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK local human cadence|RISK human support transfer|RISK whole human transfer|RISK carrying locomotion|RISK terrain locomotion|RISK actual human pose observer|RISK upright gait guidance' tests.js; native recorded running cold/warm seek reproduction and gentle35-degree stance assertion",
+      "failure": "Contemporaneous evidence retained outside repo: successor-local-cadence-transfer-red.log(local cadence+1.063 transfer bob), successor-route-cache-red.log(profile cache alias), successor-whole-transfer-red.log(four ordered traversal failures), successor-consumer-observer-red.log(missing observer), successor-carrying-locomotion-red.log(81contacts/5sec), successor-terrain-locomotion-red.log(steep mincing), successor-running-seek-observed-red.log(distance200 future seek revises foot), successor-gentle-extension-red.log(.62<.65 before stricter planning clearance), successor-locomotion-guidance-red.log(missing accurate guidance), successor-local-planner-metadata-red.log(stale both fingerprints). Dense final limb/seam coverage and completed-support interval strengthening were supplementary after source repairs and do not claim retrospective RED. Earlier upright/renderer/reduced-motion/support-balance RED chronology remains in preserved prior rationale/evidence. Native successor-cadence-consumer-expectation-red.log and successor-winter-consumer-expectation-red.log observed mismatched endpoints before expectation metadata repair; existing exact paint/arm/leash/planting assertions remain, not weakened."
+    }
+  },
+  {
     "testChangesSha256": "ea3aca0fcf2ae22870455a640047dfad08b7e8a22ff59c3e6a987ade60429539",
     "reason": "Full-cycle gait regression detects persistent crouch despite correct leg segment lengths. Terrain-relative clearance and actual painter hip attachment protect steep phone trails without stretching limbs. Full native suite caught the old source regex requiring direct ten-unit arm calls. All existing helper10 behavioral assertions remain; actual painter coverage now checks mirrored shared-cadence endpoints, five-unit free-hand reach and unchanged carrying grip offset, with a discriminating obsolete-cadence negative control. Independent actual-motion rejection showed the normal-lift hip projected downhill beyond both toes. Add gravity-support regression and full-profile phase/seek/arrival coverage; preserve every prior numerical and actual-consumer assertion.",
     "previousBehavior": "Fixed low pelvis and two-unit toe lift forced deep knees. Reach clamp on steep terrain lowered pelvis further; old tests checked connection and planting but accepted crouching.",
