@@ -23539,12 +23539,12 @@ test('RISK repository process: deployment fetches deleted squash PR head and rej
  }finally{cleanupReleaseGateFixture(f);}
 });
 
-test('RISK per-edge dependency controls: Add and Edit checkbox transitions persist hard soft and legacy without losing search selections',async()=>{
+test('RISK per-edge dependency controls: Add and Edit binary checkbox transitions persist hard and soft without losing search selections',async()=>{
  const {ctx,shim}=await loadApp();const root=ctx.addTask('Recurring root'),owner=ctx.addTask('Owner');root.evergreen=true;
  ctx.setTaskPrerequisites(owner.id,[root.id]);
  ctx.openEdit(owner.id);
  assert.match(shim.document.getElementById('modalRoot').innerHTML,/Hard dependency/,'selected links require the requested checkbox');
- assert.equal(ctx.taskDependencyMode(owner,root.id),'legacy');
+ assert.equal(ctx.taskDependencyMode(owner,root.id),'soft');
  const checkbox=shim.document.getElementById('editDependencyHard0');Object.assign(checkbox,{id:'editDependencyHard0',dataset:{dependencyHard:'edit',dependencyId:root.id},matches:()=>false,checked:true});
  shim.document.dispatchEvent({type:'change',target:checkbox});ctx.onAction('save-edit',{dataset:{id:owner.id}});
  assert.equal(ctx.taskDependencyMode(owner,root.id),'hard');ctx.completeTask(root);assert.equal(ctx.isEligible(owner),false,'evergreen Done never clears hard');
@@ -23572,7 +23572,7 @@ test('RISK per-edge dependency sync: explicit modes survive stale clients while 
  const reverse=JSON.parse(JSON.stringify(hard));ctx.mergeTaskPrerequisites(reverse,soft);assert.equal(ctx.taskDependencyMode(reverse,root.id),'soft');
  ctx.mergeTaskPrerequisites(owner,legacy);assert.equal(ctx.taskDependencyMode(owner,root.id),'soft');
  ctx.undo();const restored=ctx.state.tasks.find(t=>t.id===owner.id);assert.equal(ctx.taskDependencyMode(restored,root.id),'hard');ctx.mergeTaskPrerequisites(restored,soft);assert.equal(ctx.taskDependencyMode(restored,root.id),'hard','stale soft does not undo Undo');
- ctx.replaceTaskPrerequisites(legacy,restored);assert.equal(ctx.taskDependencyMode(legacy,root.id),'legacy','Restore explicitly chooses old behavior with fresh causal evidence');ctx.mergeTaskPrerequisites(legacy,restored);assert.equal(ctx.taskDependencyMode(legacy,root.id),'legacy');
+ ctx.replaceTaskPrerequisites(legacy,restored);assert.equal(ctx.taskDependencyMode(legacy,root.id),'soft','Restore of old links explicitly chooses the binary soft default with fresh causal evidence');ctx.mergeTaskPrerequisites(legacy,restored);assert.equal(ctx.taskDependencyMode(legacy,root.id),'soft');
  ctx.setTaskPrerequisites(restored.id,[]);ctx.openEdit(restored.id);
  ctx.writeTaskPrerequisites(restored,[root.id]);ctx.writeTaskDependencyModes(restored,{[root.id]:'soft'});ctx.mergeTaskPrerequisites(restored,hard);assert.equal(ctx.taskDependencyMode(restored,root.id),'soft');
  const board=JSON.parse(JSON.stringify(ctx.state)),before=JSON.stringify(board);ctx.hydrateState(board);assert.equal(JSON.stringify(board),before,'existing normalized boards do not acquire mode edits on load');
@@ -23606,13 +23606,13 @@ test('RISK per-edge dependency real saves: stale tabs keep peer title explicit m
 
 test('RISK per-edge dependency opaque map: unsupported top-level mode data is retained by writes and merges',async()=>{
  const {ctx}=await loadApp();const root=ctx.addTask('Root'),owner=ctx.addTask('Owner');ctx.setTaskPrerequisites(owner.id,[root.id]);owner.dependencyModes=['future-opaque-map'];const raw=JSON.stringify(owner.dependencyModes);
- ctx.writeTaskDependencyModes(owner,{[root.id]:'hard'});assert.equal(JSON.stringify(owner.dependencyModes),raw,'unsupported entire map is preserved');assert.equal(ctx.taskDependencyMode(owner,root.id),'unsupported');
+ ctx.writeTaskDependencyModes(owner,{[root.id]:'hard'});assert.equal(JSON.stringify(owner.dependencyModes),raw,'unsupported entire map is preserved');assert.equal(ctx.taskDependencyMode(owner,root.id),'soft');assert.equal(ctx.dependencyModeEditable(owner,root.id),false);
  const other=JSON.parse(JSON.stringify(owner));delete other.dependencyModes;ctx.mergeTaskPrerequisites(other,owner);assert.equal(JSON.stringify(other.dependencyModes),raw,'missing client metadata adopts exact future map');
 });
 
 test('RISK per-edge dependency recovery: future recovery shape remains safe through merges and unsupported controls',async()=>{
  const {ctx,shim}=await loadApp();const root=ctx.addTask('Root'),owner=ctx.addTask('Owner');ctx.setTaskPrerequisites(owner.id,[root.id]);owner.dependencyModes={[root.id]:'future'};owner.dependencyModeRecovery={opaque:'retain'};const peer=JSON.parse(JSON.stringify(owner));peer.dependencyModes[root.id]='other-future';
- assert.doesNotThrow(()=>ctx.mergeTaskPrerequisites(owner,peer));assert.ok(JSON.stringify(owner.dependencyModeRecovery).includes('retain'));ctx.openEdit(owner.id);assert.match(shim.document.getElementById('modalRoot').innerHTML,/unsupported saved rule/);assert.match(shim.document.getElementById('modalRoot').innerHTML,/disabled>Hard dependency/);
+ assert.doesNotThrow(()=>ctx.mergeTaskPrerequisites(owner,peer));assert.ok(JSON.stringify(owner.dependencyModeRecovery).includes('retain'));ctx.openEdit(owner.id);assert.match(shim.document.getElementById('modalRoot').innerHTML,/saved data protected/);assert.match(shim.document.getElementById('modalRoot').innerHTML,/disabled>Hard dependency/);
 });
 
 test('RISK per-edge dependency rendered controls: phone enlarged tablet desktop labels keyboard search and saved rules fit real browsers',
@@ -23669,4 +23669,15 @@ test('RISK per-edge dependency recovery union: mode omission adoption and opaque
 test('RISK per-edge dependency rendered isolation: fixtures disable production cloud before navigation and constrain external requests',()=>{
  const source=fs.readFileSync(path.join(__dirname,'tests.js'),'utf8'),start=source.indexOf("test('RISK per-edge dependency rendered controls:"),end=source.indexOf("test('RISK per-edge dependency released clients:",start),fixture=source.slice(start,end);
  assert.match(fixture,/Object\.defineProperty\(window,'FIREBASE_CONFIG'/,'isolated fixtures disable Firebase config before loading production source');assert.match(fixture,/context\.route\('\*\*\/\*'/,'isolated fixtures constrain network requests');assert.ok(fixture.indexOf('Object.defineProperty')<fixture.indexOf('page.goto'));
+});
+
+test('RISK binary dependency migration: old links default soft without rewriting identity evidence and recurrence blocks again',async()=>{
+ const {ctx,shim}=await loadApp();const root=ctx.addTask('Old evergreen target'),owner=ctx.addTask('Saved dependent');ctx.setTaskPrerequisites(owner.id,[root.id]);
+ const edgeEvidence=JSON.stringify([owner.prerequisiteIds,owner.prerequisiteOps,owner.prerequisiteRevision]);
+ assert.equal(ctx.taskDependencyMode(owner,root.id),'soft','old links use the requested unchecked soft default, not a third behavior');
+ Object.assign(root,{evergreen:true,evergreenHours:18,evergreenResetAtDay:false,lastDoneAt:Date.now()});assert.equal(ctx.isEligible(owner),true);root.lastDoneAt=Date.now()-19*3600000;assert.equal(ctx.isEligible(owner),false,'old recurring dependencies block again after the rest ends');
+ ctx.openEdit(owner.id);const checkbox=shim.document.getElementById('editDependencyHard0');assert.equal(checkbox.indeterminate,false);assert.equal(checkbox.checked,false);assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/previous rule|Mixed keeps/);ctx.onAction('save-edit',{dataset:{id:owner.id}});assert.equal(JSON.stringify([owner.prerequisiteIds,owner.prerequisiteOps,owner.prerequisiteRevision]),edgeEvidence);
+ owner.dependencyModes={[root.id]:{choices:[{token:'preserved-old-choice',mode:'legacy',opaque:'retain'}],removes:[]}};const old=JSON.stringify(owner.dependencyModes);assert.equal(ctx.taskDependencyMode(owner,root.id),'soft','deprecated evidence is read as soft while original facts remain');ctx.openEdit(owner.id);ctx.onAction('save-edit',{dataset:{id:owner.id}});assert.equal(JSON.stringify(owner.dependencyModes),old);
+ ctx.writeTaskDependencyModes(owner,{[root.id]:'hard'});const explicit=JSON.stringify(owner.dependencyModes);const stale=JSON.parse(JSON.stringify(owner));delete stale.dependencyModes;ctx.mergeTaskPrerequisites(owner,stale);assert.equal(ctx.taskDependencyMode(owner,root.id),'hard');assert.equal(JSON.stringify(owner.dependencyModes),explicit,'old-client omission cannot replace an explicit choice');
+ await ctx.persist();const reload=await loadApp({seedStorage:{[SYNC_STORE_KEY]:shim.localStorage.getItem(SYNC_STORE_KEY)}});assert.equal(reload.ctx.taskDependencyMode(reload.ctx.state.tasks.find(t=>t.id===owner.id),root.id),'hard');
 });

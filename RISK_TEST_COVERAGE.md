@@ -774,7 +774,7 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 
 - RISK carrying continuity: stable actor capability preserves resting grip transitions and deterministic departure seeks
 
-- RISK per-edge dependency controls: Add and Edit checkbox transitions persist hard soft and legacy without losing search selections
+- RISK per-edge dependency controls: Add and Edit binary checkbox transitions persist hard and soft without losing search selections
 - RISK per-edge dependency semantics: mixed edges intrinsic eligibility deletion Undo and cyclic chains remain bounded
 - RISK per-edge dependency sync: explicit modes survive stale clients while Undo Restore and readd express fresh intent
 - RISK per-edge dependency eligibility: search pass marks contexts dates and evergreen expiry use the same bounded rule
@@ -793,3 +793,5 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 
 - RISK per-edge dependency rendered isolation: fixtures disable production cloud before navigation and constrain external requests
 - RISK per-edge dependency rendered controls:"),end=source.indexOf("test(
+
+- RISK binary dependency migration: old links default soft without rewriting identity evidence and recurrence blocks again
