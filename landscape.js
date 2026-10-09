@@ -56,7 +56,7 @@
     document.addEventListener(type,observeSceneInteraction,{capture:true,passive:true});
   let preference=S.readMotion(storage),reduced=S.motionReduced(preference,mq.matches);
   const T=globalThis.LandscapeTimeline,sceneSeed=T.DEFAULT_SEED;
-  const cityLights={next:15,windows:[],gardens:S.createGardenLights([],()=>.99)},woodland={events:[]};
+  const cityLights={next:7.5,windows:[],gardens:S.createGardenLights([],()=>.99)},woodland={events:[]};
   let timeline=null,timelineKey='',sceneSnapshot=null,lastCitySlot=null;
   let rooftopRoofs=[],rooftopParty=null,clocktowerVisit=null,partyTimer=0;
   let sceneSeason=S.readSceneSeason(sceneStorage)||LandscapeMood.season(new Date(),globalThis.LivingLocation?.current()).name,treeOrigins=[];
@@ -1382,7 +1382,7 @@
     if(lastCitySlot!==sceneSnapshot.windowsSlot){lastCitySlot=sceneSnapshot.windowsSlot;paintBackground();}
     paintLife(world.elapsed);
   }
-  function scenePose(e,firework=false){return reduced?{...e,age:firework===true?Math.min(e.duration,60)*.5:e.duration*.5,...(firework===true?{fireworkDeckAge:e.duration*.5,fireworkActive:e.age<60}:{})}:e;}
+  function scenePose(e,firework=false){return reduced?{...e,age:firework===true?(e.type==='festival'?e.duration:Math.min(e.duration,60))*.5:e.duration*.5,...(firework===true?{fireworkDeckAge:e.duration*.5,fireworkActive:e.age<(e.type==='festival'?e.duration:60)}:{})}:e;}
   function syncScene(now){
     const location=globalThis.LivingLocation?.current();
     const key=JSON.stringify([sceneSeason,location,S.readSceneTime(sceneStorage),S.readSceneSeason(sceneStorage)]);
@@ -1416,12 +1416,12 @@
   }
   function advanceRooftopParty(dt){
     if(document.hidden||!geometry||!p)return;
-    // A barge keeps its ID after its fireworks end; invalidate the static
-    // canvas once at that boundary so old blooms cannot remain until a minute refresh.
-    const before=JSON.stringify([world.events.map(e=>[e.id,e.type==='festival'&&e.age<60]),woodland.events.map(e=>e.id),rooftopParty.active?.roofIndex,clocktowerVisit.active,lastCitySlot]);
+    // Static scenery repaints on membership changes, including the complete
+    // barge crossing, without turning reduced motion into continuous animation.
+    const before=JSON.stringify([world.events.map(e=>[e.id,e.type==='festival'&&e.age<e.duration]),woodland.events.map(e=>e.id),rooftopParty.active?.roofIndex,clocktowerVisit.active,lastCitySlot]);
     syncScene(Date.now());
     if(lastCitySlot!==sceneSnapshot.windowsSlot){lastCitySlot=sceneSnapshot.windowsSlot;paintBackground();}
-    const after=JSON.stringify([world.events.map(e=>[e.id,e.type==='festival'&&e.age<60]),woodland.events.map(e=>e.id),rooftopParty.active?.roofIndex,clocktowerVisit.active,lastCitySlot]);
+    const after=JSON.stringify([world.events.map(e=>[e.id,e.type==='festival'&&e.age<e.duration]),woodland.events.map(e=>e.id),rooftopParty.active?.roofIndex,clocktowerVisit.active,lastCitySlot]);
     if(reduced&&before!==after)paintLife(world.elapsed);
   }
   function stop(){if(frame)cancelAnimationFrame(frame);frame=0;last=0;nextPaint=0;clearTimeout(skyTimer);clearTimeout(resizeTimer);clearInterval(partyTimer);skyTimer=0;resizeTimer=0;partyTimer=0;}

@@ -18,7 +18,13 @@ current task-specific hold or limit before publication.
 Every user-facing behavior change must update the corresponding **extended FAQ**
 in Quick start before release, retaining its structure and unrelated content.
 Keep its explanation consistent with the actual controls, saved-data behavior,
-and current limitations, and document the change in the Settings changelog.
+and current limitations, and document the change in the Settings changelog, except for the silent tuning preference below.
+
+Routine animation-frequency tuning is omitted from public patch notes and the
+Settings changelog by user preference. Keep tests, independent reviews, release
+receipts, and internal change records truthful. This preference does not suppress
+reporting bugs, blockers, safety or accessibility changes, or material acceptance
+limits. Keep the extended FAQ accurate where behavior explanations change.
 
 Apply the mandatory regression, cloud compatibility, data preservation, and
 exact-candidate review gates in [CLAUDE.md](CLAUDE.md) and

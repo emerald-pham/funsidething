@@ -147,9 +147,9 @@
       for(let opportunity=slot;opportunity>slot-4096&&pending.size;opportunity--){
         if(sunAt(opportunity*60).altitude>=-6)continue;
         const index=gardens[Math.floor(sample(seed,'garden-roof',opportunity)*gardens.length)];
-        if(pending.delete(index))gardenSamples[index]=sample(seed,'garden-light',opportunity)<1/12;
+        if(pending.delete(index))gardenSamples[index]=sample(seed,'garden-light',opportunity)<1/6;
       }
-      for(const index of pending)gardenSamples[index]=sample(seed,'garden-initial',index)<1/12;
+      for(const index of pending)gardenSamples[index]=sample(seed,'garden-initial',index)<1/6;
       return {...gardenSamples};
     }
     return {
@@ -166,7 +166,7 @@
             y:terrain(index+82)*.68,size:terrain(index+101),opacity:.22+terrain(index+54)*.18})),
           party:night&&roofs.length?rareVisit(seconds,'party',30,24,.02):null,
           clocktower:currentSun.altitude<0?rareVisit(seconds,'clocktower',60,50,.02,C.spawnRate('clocktower-visit')):null,
-          gardens:lightsAt(seconds),windowsSlot:Math.floor(seconds/15)};
+          gardens:lightsAt(seconds),windowsSlot:Math.floor(seconds/7.5)};
       }
     };
   }
