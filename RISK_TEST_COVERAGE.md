@@ -366,7 +366,7 @@ The editor hook blocks app or enforcement edits while tests.js has no staged or 
 - RISK skyline materials: short buildings favor brick while tall towers favor stable modern colors
 - RISK skyline lights: only exposed windows can be selected so both on and off are visible
 - RISK skyline lights: garden roofs start independently, stay stable, and change slowly at night
-- RISK skyline lights: each garden has a one-in-twelve state through independent resamples
+- RISK skyline lights: each garden has a one-in-six state through independent resamples
 - RISK night shows: festival and standalone sparks enter the shared mirror before foreground hills
 - RISK Landscape browser: both night shows reflect actual sparks and exposed windows visibly switch on and off
 - RISK fireworks realism: uneven blooms leave ballistic trails and fading embers
@@ -404,7 +404,7 @@ The editor hook blocks app or enforcement edits while tests.js has no staged or 
 - RISK rain intensity: day and night double velocity halve opacity and only night doubles seeded density
 - RISK rain density: phone tablet and short screens retain a dense bounded curtain in either motion mode
 - RISK fairy lights: unlit patio strings and every daylight bulb are hidden on phone and desktop
-- RISK fairy lights: gardens and patios share independent stable one-in-twelve roof samples
+- RISK fairy lights: gardens and patios share independent stable one-in-six roof samples
 - RISK fireworks duration: each standalone show caps visibility at one minute while retaining its sampled rest schedule
 - RISK fireworks duration: repeated bursts fill the capped show with bounded particles and a complete final fade
 - RISK fireworks layering: city silhouettes mask random shows while barge shells remain foreground
@@ -633,7 +633,7 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 
 - `RISK UI batch integration: saved Squared board retains context selector editor defaults duration badges and exact shell delivery` — released-mode offline reopen, Edit draft/All Tasks consumers and integrated PWA fingerprint.
 
-- RISK fireworks minute cap: complete standalone and barge flight bloom and finale tails finish within sixty seconds
+- RISK fireworks minute cap: standalone tails finish within sixty seconds and barge tails follow crossing
 - RISK fireworks minute schedule: capped visible events preserve seeded opportunity spacing and UTC late join reload across midnight
 - RISK fireworks pair endpoints: zero and maximum seeded samples bound regular pairs without delaying eight finale lanes
 
@@ -642,9 +642,9 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 
 - RISK fireworks legacy reservations: invisible remainder keeps old festival random draws and admission budgets
 
-- RISK fireworks reduced motion: capped static blooms stay on the stationary barge only during the real first minute
+- RISK fireworks reduced motion: static blooms stay on the stationary barge throughout its crossing
 
-- RISK fireworks reduced deadline: static scheduler clears a persistent barge bloom at the actual sixty-second boundary without animated repaints
+- RISK fireworks reduced deadline: static scheduler preserves a persistent barge bloom across sixty seconds without animated repaints
 
 - RISK fireworks cached guidance: installed spawn-rate prose matches the bounded display and its exact offline shell
 
@@ -795,3 +795,8 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK per-edge dependency rendered controls:"),end=source.indexOf("test(
 
 - RISK binary dependency migration: old links default soft without rewriting identity evidence and recurrence blocks again
+
+- RISK scenery tuning: barge crossing lifetime restores historical finale without standalone cap regression
+- RISK scenery tuning: doubled barge odds preserve interval cooldown duration and standalone frequency
+- RISK scenery tuning: fairy activation doubles probability with unchanged sampling duration and daylight guard
+- RISK scenery tuning: windows switch on half-length UTC ticks with unchanged seeded lit proportion

@@ -672,11 +672,11 @@
         towStartX:planeX-direction*18,towStartY:planeY,towEndX:x+direction*width/2,towEndY:y};
     }
     function fireworks(age,seed,atFestival=false,event={}){
-      const dots=[],visitDuration=Number(event.duration)||(atFestival?150:60),duration=Math.min(60,visitDuration);
+      const dots=[],visitDuration=Number(event.duration)||(atFestival?150:60),duration=atFestival?visitDuration:Math.min(60,visitDuration);
       if(age<=0||age>=duration)return dots;
       const start=atFestival?8:0,interval=atFestival?3.8:2.1,shellLife=1+.075+2.7,pairLife=shellLife+.3;
       // Finish the barge display while its launchers are still on screen.
-      // Reserve the full flight and bloom lifetime before the one-minute limit.
+      // Reserve the full flight and bloom lifetime before the standalone limit or crossing-relative barge finale.
       // Include the maximum paired delay when clearing regular shells before
       // the finale, so all eight lanes retain the fixed particle budget.
       const finaleAt=atFestival?Math.min(visitDuration*.65,duration-shellLife):duration-4;

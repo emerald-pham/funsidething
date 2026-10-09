@@ -25,6 +25,34 @@
       "command": "node --test --test-name-pattern=\"RISK binary dependency migration\" tests.js",
       "failure": "Observed legacy !== soft before binary implementation; updated binary control tests also failed before source changes. Logs retained in dependency-binary-red.txt and dependency-binary-controls-red.txt."
     },
+    "testChangesSha256": "9af9a608773a6d527e53d247cceed681a00bdfe76e0b7f3795ed216450dcdabb"
+  },
+  {
+    "reason": "Replace the superseded third legacy mode with the user-requested binary controls. Missing and historical legacy choices default soft without rewriting identity or recovery evidence.",
+    "previousBehavior": "Released evergreen completion permanently cleared existing dependencies; the first candidate retained that bug as a mixed third state.",
+    "intendedBehavior": "Checked hard clears only for deletion or Done non-evergreen. Unchecked soft clears on intrinsic scan ineligibility and reblocks on return. Existing missing choices use soft; explicit hard and soft remain intact.",
+    "replacementTests": [
+      "RISK per-edge dependency controls: Add and Edit binary checkbox transitions persist hard and soft without losing search selections",
+      "RISK per-edge dependency semantics: mixed edges intrinsic eligibility deletion Undo and cyclic chains remain bounded",
+      "RISK per-edge dependency sync: explicit modes survive stale clients while Undo Restore and readd express fresh intent",
+      "RISK per-edge dependency eligibility: search pass marks contexts dates and evergreen expiry use the same bounded rule",
+      "RISK per-edge dependency future evidence: untouched editor preserves opaque choices and conflicting identity is deterministic",
+      "RISK per-edge dependency real saves: stale tabs keep peer title explicit mode offline reload and completion Undo",
+      "RISK per-edge dependency opaque map: unsupported top-level mode data is retained by writes and merges",
+      "RISK per-edge dependency recovery: future recovery shape remains safe through merges and unsupported controls",
+      "RISK per-edge dependency rendered controls: phone enlarged tablet desktop labels keyboard search and saved rules fit real browsers",
+      "RISK per-edge dependency released clients: real supported hydration preserves modes and single-link edits retain explicit choices",
+      "RISK per-edge dependency recovery union: mode omission adoption and opaque conflicts retain both clients recovery evidence",
+      "RISK per-edge dependency rendered isolation: fixtures disable production cloud before navigation and constrain external requests",
+      "RISK binary dependency migration: old links default soft without rewriting identity evidence and recurrence blocks again"
+    ],
+    "preservedCoverage": [
+      "Retain all existing membership, stale-client, opaque-data, Undo, Restore, deletion, cycles, completion and eligibility protections."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern=\"RISK binary dependency migration\" tests.js",
+      "failure": "Observed legacy !== soft before binary implementation; updated binary control tests also failed before source changes. Logs retained in dependency-binary-red.txt and dependency-binary-controls-red.txt."
+    },
     "testChangesSha256": "8b29e2a212081c123fd52894c3e7f15f08293ecdbfc76afea4ee46a6f344f129"
   },
   {
@@ -82,6 +110,78 @@
     "redEvidence": {
       "command": "node --test --test-name-pattern=\"RISK per-edge dependency controls\" tests.js; node --test --test-name-pattern=\"RISK per-edge dependency future evidence|RISK per-edge dependency opaque map\" tests.js",
       "failure": "Observed preimplementation control RED: selected links require requested checkbox. Initial helpers were absent. Later independent-review RED caught ordinary Save discarding future choices and opaque fields; opaque-map RED caught replacement of an unsupported array. Supplemental sync/eligibility tests added after initial GREEN and are not claimed as preimplementation RED; baseline negative-control chronology separately recorded. Exact specialist recovery-union RED: omission retains peer recovery failed before fixing all early-return branches. Native isolation guard RED detected missing pre-navigation cloud-disable and network-bound fixture configuration; browser fixtures now freeze empty Firebase configuration and allow only local origin plus font providers."
+    }
+  },
+  {
+    "testChangesSha256": "461ec28d5b929610c835ca9d4aa05d17b86a695771ff6dabf4ce975534704986",
+    "reason": "Explicit user scenery tuning restores crossing-relative barge fireworks and doubles barge and fairy odds and window cadence. Update only intentional rate/lifetime expectations and preserve all particle, schedule and data contracts. Final full-suite1413pass/1failure/30runtime-skips exposed the remaining old normalized-space population upper bound .2. Retain per-frame stability, one-roof-per-opportunity, strict1/6 boundary, exact seeded UTC samples and6000-resample accuracy tests; use the sparse one-in-six occupancy bound below1/3 to continue rejecting fifty-percent toggles. This is an explicitly requested probability change, not an unrelated weakened regression. The exact final base-to-head fingerprint binds the complete protected-test diff; the prior intermediate fingerprint had no replacement declarations and was not final-gate evidence.",
+    "previousBehavior": "Barge fireworks stopped at sixty seconds; festival chance .006, fairy chance one-in-twelve and window ticks fifteen seconds.",
+    "intendedBehavior": "Historical 65%-crossing barge finale, .012 festival chance, one-in-six fairy activation and7.5-second window ticks. Standalone cap and frequency unchanged.",
+    "replacementTests": [
+      "RISK fairy lights: gardens and patios share independent stable one-in-six roof samples",
+      "RISK skyline lights: each garden has a one-in-six state through independent resamples",
+      "RISK fireworks minute cap: standalone tails finish within sixty seconds and barge tails follow crossing",
+      "RISK fireworks reduced motion: static blooms stay on the stationary barge throughout its crossing",
+      "RISK fireworks reduced deadline: static scheduler preserves a persistent barge bloom across sixty seconds without animated repaints",
+      "RISK scenery tuning: barge crossing lifetime restores historical finale without standalone cap regression",
+      "RISK scenery tuning: doubled barge odds preserve interval cooldown duration and standalone frequency",
+      "RISK scenery tuning: fairy activation doubles probability with unchanged sampling duration and daylight guard",
+      "RISK scenery tuning: windows switch on half-length UTC ticks with unchanged seeded lit proportion"
+    ],
+    "preservedCoverage": [
+      "Standalone sixty-second maximum, four-times-original spacing and reservations, paired0–300ms seeded delay, explosion and finale particles, independent roof sampling, daylight guards and all task storage/sync protections remain."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK scenery tuning:' tests.js (before functional implementation), /tmp/barge-observed-red.log",
+      "failure": "Observed four intended failures: crossing-relative finale absent; .006 instead of .012; .1 fairy sample dark; UTC tick at7500ms was0 rather than1. Subsequent fixture correction uses actual normalized roof pool and is recorded separately. Full-source failure /tmp/barge-full-source.log at shared scenery lights oldone-in-twelve population upper bound. Both failed outputs retained."
+    }
+  },
+  {
+    "testChangesSha256": "899dae88cd55004d64756f9e60b9e2f33568c2c48b044107a61d8048d1bfb235",
+    "reason": "Explicit user scenery tuning restores crossing-relative barge fireworks and doubles barge and fairy odds and window cadence. Update only intentional rate/lifetime expectations and preserve all particle, schedule and data contracts.",
+    "previousBehavior": "Barge fireworks stopped at sixty seconds; festival chance .006, fairy chance one-in-twelve and window ticks fifteen seconds.",
+    "intendedBehavior": "Historical 65%-crossing barge finale, .012 festival chance, one-in-six fairy activation and7.5-second window ticks. Standalone cap and frequency unchanged.",
+    "replacementTests": [
+      "RISK fairy lights: gardens and patios share independent stable one-in-six roof samples",
+      "RISK skyline lights: each garden has a one-in-six state through independent resamples",
+      "RISK fireworks minute cap: standalone tails finish within sixty seconds and barge tails follow crossing",
+      "RISK fireworks reduced motion: static blooms stay on the stationary barge throughout its crossing",
+      "RISK fireworks reduced deadline: static scheduler preserves a persistent barge bloom across sixty seconds without animated repaints",
+      "RISK scenery tuning: barge crossing lifetime restores historical finale without standalone cap regression",
+      "RISK scenery tuning: doubled barge odds preserve interval cooldown duration and standalone frequency",
+      "RISK scenery tuning: fairy activation doubles probability with unchanged sampling duration and daylight guard",
+      "RISK scenery tuning: windows switch on half-length UTC ticks with unchanged seeded lit proportion"
+    ],
+    "preservedCoverage": [
+      "Standalone sixty-second maximum, four-times-original spacing and reservations, paired0–300ms seeded delay, explosion and finale particles, independent roof sampling, daylight guards and all task storage/sync protections remain."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK scenery tuning:' tests.js (before functional implementation), /tmp/barge-observed-red.log",
+      "failure": "Observed four intended failures: crossing-relative finale absent; .006 instead of .012; .1 fairy sample dark; UTC tick at7500ms was0 rather than1. Subsequent fixture correction uses actual normalized roof pool and is recorded separately."
+    }
+  },
+  {
+    "testChangesSha256": "51466545d2e3040968d2fbc376967131ced64fc7d34bb37cf93aaa6751af2516",
+    "reason": "Explicit user scenery tuning restores crossing-relative barge fireworks and doubles barge and fairy odds and window cadence. Update only intentional rate/lifetime expectations and preserve all particle, schedule and data contracts.",
+    "previousBehavior": "Barge fireworks stopped at sixty seconds; festival chance .006, fairy chance one-in-twelve and window ticks fifteen seconds.",
+    "intendedBehavior": "Historical 65%-crossing barge finale, .012 festival chance, one-in-six fairy activation and7.5-second window ticks. Standalone cap and frequency unchanged.",
+    "replacementTests": [
+      "RISK fairy lights: gardens and patios share independent stable one-in-six roof samples",
+      "RISK skyline lights: each garden has a one-in-six state through independent resamples",
+      "RISK fireworks minute cap: standalone tails finish within sixty seconds and barge tails follow crossing",
+      "RISK fireworks reduced motion: static blooms stay on the stationary barge throughout its crossing",
+      "RISK fireworks reduced deadline: static scheduler preserves a persistent barge bloom across sixty seconds without animated repaints",
+      "RISK scenery tuning: barge crossing lifetime restores historical finale without standalone cap regression",
+      "RISK scenery tuning: doubled barge odds preserve interval cooldown duration and standalone frequency",
+      "RISK scenery tuning: fairy activation doubles probability with unchanged sampling duration and daylight guard",
+      "RISK scenery tuning: windows switch on half-length UTC ticks with unchanged seeded lit proportion"
+    ],
+    "preservedCoverage": [
+      "Standalone sixty-second maximum, four-times-original spacing and reservations, paired0–300ms seeded delay, explosion and finale particles, independent roof sampling, daylight guards and all task storage/sync protections remain."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK scenery tuning:' tests.js (before functional implementation), /tmp/barge-observed-red.log",
+      "failure": "Observed four intended failures: crossing-relative finale absent; .006 instead of .012; .1 fairy sample dark; UTC tick at7500ms was0 rather than1. Subsequent fixture correction uses actual normalized roof pool and is recorded separately."
     }
   },
   {
