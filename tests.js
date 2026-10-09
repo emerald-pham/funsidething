@@ -1059,7 +1059,7 @@ test('RISK shared scenery lights: one-minute independent roof samples remain sta
   for(const index of Object.keys(a.gardens)){const count=samples.get(index);count.total++;count.on+=Number(a.gardens[index]);}
   previous=a.gardens;now+=60000;
  }
- for(const {on,total} of samples.values())assert.ok(on/total>.02&&on/total<.2,'independent one-in-twelve samples do not become all-on or a fifty-percent toggle');
+ for(const {on,total} of samples.values())assert.ok(on/total>.02&&on/total<1/3,'independent one-in-six samples remain sparse rather than all-on or a fifty-percent toggle');
 });
 
 test('RISK scenery browser fixture: conditional reloads retain executable probes and late sky refresh cannot change the controlled background',async()=>{
