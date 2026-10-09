@@ -22070,7 +22070,7 @@ test('RISK fireworks ascent paint: only the launch trail glows while explosion p
  const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),paint=source.slice(source.indexOf('  function paintFireworks('),source.indexOf('  function paintClocktowerVisit('));
  for(const kind of ['rocket','spark']){
   const strokes=[],heads=[],g={save(){},restore(){},drawImage(){}};
-  vm.runInNewContext(`${paint};paintFireworks('festival')`,{g,sky:{sun:{altitude:-20}},world:{events:[{type:'festival',age:.4,seed:.4}]},scenePose:e=>e,S:{smooth:()=>0},geometry:{fireworks:()=>[{kind,x:10,y:20,tailX:9,tailY:22,alpha:.8,burst:0,size:1}]},line(...args){strokes.push(args.slice(1));},ellipse(...args){heads.push({args:args.slice(1),alpha:g.globalAlpha});}});
+  vm.runInNewContext(`${paint};paintFireworks('festival')`,{g,sky:{sun:{altitude:-20}},world:{events:[{type:'festival',age:.4,seed:.4}]},scenePose:e=>e,S:{smooth:()=>0,fireworksAllowed:livingSky().fireworksAllowed},geometry:{fireworks:()=>[{kind,x:10,y:20,tailX:9,tailY:22,alpha:.8,burst:0,size:1}]},line(...args){strokes.push(args.slice(1));},ellipse(...args){heads.push({args:args.slice(1),alpha:g.globalAlpha});}});
   assert.equal(strokes.length,1,'ascent and explosion tails retain their stroke');
   assert.equal(heads.length,kind==='rocket'?0:2,'only an ascending shell loses its tip and halo');
   if(kind==='spark'){assert.equal(heads[0].alpha,.8*.12);assert.equal(heads[1].alpha,.8);assert.deepEqual(heads.map(h=>h.args.slice(0,4)),[[10,20,2.3,2.3],[10,20,1,1]]);}
@@ -22586,7 +22586,7 @@ test('RISK fireworks legacy reservations: invisible remainder keeps old festival
 test('RISK fireworks reduced motion: static blooms stay on the stationary barge throughout its crossing',()=>{
  const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),paint=source.slice(source.indexOf('  function paintFireworks('),source.indexOf('  function paintClocktowerVisit(')),pose=source.match(/  function scenePose\([^\n]+/)[0];
  const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);const original=ctx.LandscapeGeometry.create(1440,900),paints=[];
- const context={reduced:true,sky:{sun:{altitude:-20}},world:{events:[{type:'festival',age:20,duration:150,seed:.4}]},g:{save(){},restore(){}},S:{smooth:()=>0},geometry:{fireworks(...args){const dots=original.fireworks(...args);paints.push({args,dots});return dots;}},line(){},ellipse(){}};
+ const context={reduced:true,sky:{sun:{altitude:-20}},world:{events:[{type:'festival',age:20,duration:150,seed:.4}]},g:{save(){},restore(){}},S:{smooth:()=>0,fireworksAllowed:livingSky().fireworksAllowed},geometry:{fireworks(...args){const dots=original.fireworks(...args);paints.push({args,dots});return dots;}},line(){},ellipse(){}};
  vm.runInNewContext(`${pose};${paint};paintFireworks('festival')`,context);
  assert.ok(paints[0].dots.some(d=>d.kind==='spark'),'reduced motion retains a static bloom inside the shortened display');
  assert.equal(paints[0].args[3].fireworkDeckAge,75,'static shells use the same stationary deck pose as the painted barge');
