@@ -826,3 +826,9 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 
 - RISK dependency form presentation: Add Edit explanation lives in FAQ and controls keep named protected binary choices
 - RISK dependency form presentation: Hard heading follows active rows across selection removal filter reset and Edit reopen
+
+- Quick start user guidance: `RISK Quick start content: essential steps stay brief and detailed help remains user-facing in existing sections`.
+
+- Quick start chapters: `RISK Quick start chapters: mounted help uses native named disclosures with essential chapter first and detailed chapters closed`.
+
+- Quick start compact disclosure headings: `RISK Quick start chapter layout: disclosure headings share the native summary line without extra margins`.

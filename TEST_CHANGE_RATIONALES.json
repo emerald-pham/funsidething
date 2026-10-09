@@ -1,5 +1,55 @@
 [
   {
+    "testChangesSha256": "6bec197efada5d5c904547c8ee1a22f8b0142a26e4dfd998d2e039e10532f7d0",
+    "reason": "Rename the updated help-only test to describe its current user-facing ordering contract; preserve its actual assertions and all runtime tests. Record exact incremental push rationale as required by unchanged gate.",
+    "previousBehavior": "Help wording assertions expected technical details intentionally removed at user request.",
+    "intendedBehavior": "Current user-facing FAQ facts asserted without changing task/runtime/sync/render implementations.",
+    "replacementTests": [
+      "Consistency repair: detailed help distinguishes weighted ordering from the oldest first dot"
+    ],
+    "preservedCoverage": [
+      "Executable behavior tests unchanged. Historical changelog and Settings backup-safety assertions retained. FAQ text-only assertions updated for approved concise wording."
+    ],
+    "redEvidence": {
+      "command": "gh run view 37970784411 --log-failed; node --test --test-name-pattern=\"changelog dates|immutable fact union|accessible timestamped|rank presentation tutorial|empty-chain explanation|quick start|multiple dependencies legacy mirrors|fireworks minute schedule|displayed likelihood\" tests.js",
+      "failure": "Actual required CI10failedcount from9obsoletehelpassertions; failedci-pr-failed.log retained. Expanded54checks pass aftertext-onlyrepair."
+    }
+  },
+  {
+    "testChangesSha256": "6b3f64918d64778f95002de7b527c620500d8f25b058d2d18381b9ffce1c21f8",
+    "reason": "Required CI observed obsolete help wording embedded in9behavior tests (10failurecount with subtest parent); this incremental record covers only3003..c348 repair. Replace copy-only assertions; retain all executable behavior assertions and unchanged app bytes.",
+    "previousBehavior": "Help wording assertions expected technical details intentionally removed at user request.",
+    "intendedBehavior": "Current user-facing FAQ facts asserted without changing task/runtime/sync/render implementations.",
+    "replacementTests": [
+      "Consistency repair: detailed help distinguishes weighted ordering from the oldest first dot"
+    ],
+    "preservedCoverage": [
+      "Executable behavior tests unchanged. Historical changelog and Settings backup-safety assertions retained. FAQ text-only assertions updated for approved concise wording."
+    ],
+    "redEvidence": {
+      "command": "gh run view 37970784411 --log-failed; node --test --test-name-pattern=\"changelog dates|immutable fact union|accessible timestamped|rank presentation tutorial|empty-chain explanation|quick start|multiple dependencies legacy mirrors|fireworks minute schedule|displayed likelihood\" tests.js",
+      "failure": "Actual required CI10failedcount from9obsoletehelpassertions; failedci-pr-failed.log retained. Expanded54checks pass aftertext-onlyrepair."
+    }
+  },
+  {
+    "testChangesSha256": "d2f0608b944c9ad59db89f70b710ea9b3a781ad6ed1493c6101a37e1093a9d71",
+    "reason": "Explicit user requests essential-only Quick start help and accessible collapsible chapters matching Settings. Replace historical implementation-copy assertions with user-facing consequences while retaining executable behavior, Settings safety and historical changelog assertions.",
+    "previousBehavior": "Seven dense intro steps and one More FAQs disclosure containing long duplicated rules and internal release details.",
+    "intendedBehavior": "Four essential steps, native Quick start disclosure initially open and five Settings-aligned detailed chapters initially closed. All37 topics remain concise and accurate; detailed rules and recovery guidance stay in their chapters.",
+    "replacementTests": [
+      "RISK Quick start content: essential steps stay brief and detailed help remains user-facing in existing sections",
+      "RISK Quick start chapters: mounted help uses native named disclosures with essential chapter first and detailed chapters closed",
+      "RISK Quick start chapter layout: disclosure headings share the native summary line without extra margins"
+    ],
+    "preservedCoverage": [
+      "Executable behavior tests unchanged. Historical changelog and Settings backup-safety assertions retained. FAQ text-only assertions updated for approved concise wording."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern=\"RISK Quick start content|RISK Quick start chapters|collapsed scanning chapter\" tests.js; PROBE_PHASE=red node ../quickstart-evidence/window-runner.mjs",
+      "failure": "Observed intro length RED before prose changes; chapter names and scanning disclosure RED before markup; actual Chrome Enter on old first disclosure opened it instead of closing initially visible Quick start, observed17:58:20UTC before applying chapter markup. Logs observed-red.log, chapters-red.log, chapter-consumer-red.log and browser-red.log. Independent visual finding then observed actual 43.75px separated heading RED before scoped inline CSS, plus native heading-native-red.log. Final responsive GREEN complete18:02:39UTC. Required CI then observed10failures including one failing subtest parent from9 obsolete help wording assertions embedded in behavior tests; changed only help assertions, all behavioral statements retained. ActualCIfailedlog preserved ci-pr-failed.log; expanded focused54pass0fail in ci-copy-repair-green.log."
+    }
+  },
+  {
     "testChangesSha256": "21478d60c205547acd17bdfcc0c0f5e46004b9ef3b77c44bd2eb2602cde00079",
     "reason": "Urgent user presentation request moves quoted dependency explanation into FAQ and shows Hard heading only with actual listed rows. Persisted choices and binary rules unchanged.",
     "previousBehavior": "Forms always showed a long rule paragraph and an empty Hard heading.",
