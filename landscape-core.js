@@ -245,7 +245,7 @@
       if(w.elapsed<w[key])continue;
       const occurrenceScale=show.occurrenceScale||1;
       w[key]=w.elapsed+show.interval*occurrenceScale;
-      if(sky.sun.altitude>=-6||!CONFIG.spawnRate(type)||reservedEventCount(w)>=MAX_EVENTS-2||(w.elapsed<w.fireworksReservedUntil||w.events.some(e=>e.type==='festival'||e.type==='fireworks')))continue;
+      if(sky.sun.altitude>=8||!CONFIG.spawnRate(type)||reservedEventCount(w)>=MAX_EVENTS-2||(w.elapsed<w.fireworksReservedUntil||w.events.some(e=>e.type==='festival'||e.type==='fireworks')))continue;
       if(type==='festival'&&(w.elapsed-w.lastRare<RARE_COOLDOWN||w.elapsed-w.lastFestival<show.cooldown))continue;
       if(w.random()>=Math.min(1,show.chance*CONFIG.spawnRate(type)))continue;
       spawn(w,type);

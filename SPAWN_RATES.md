@@ -10,7 +10,7 @@ others' share of the same limited visitor budget. Seasonal eligibility still app
 Train and metro have dedicated service: about 65 and 50 seconds crossing,
 respectively, followed by 12 and 8 seconds of rest at rate 1. Their rate divides
 that rest time; only one vehicle per track runs at once. Painting pauses offscreen; arrivals and age follow the shared UTC schedule. Crossing periods include the maximum sampled duration plus the configured minimum rest.
-Standalone fireworks check every 120 seconds of UTC nighttime with a
+Standalone fireworks check every 120 seconds of eligible UTC twilight/nighttime with a
 40% chance at rate 1; the first check is after 80 UTC seconds. Each show keeps
 its original sampled 60–300-second scheduling reservation, but its visible
 shells, flights and bloom tails finish within 60 seconds. The next opportunity
@@ -25,8 +25,9 @@ Festivals check once per UTC minute at a 1.2% chance, wait at least 30 UTC
 minutes between visits, share the seven-minute rare cooldown with alien visits,
 and cross the lake on a barge in about 127–183 seconds, depending on the
 assigned travel speed (150-second baseline). A festival owns its
-fireworks; standalone shows and festivals do not overlap. Both require the Sun
-below civil twilight. Rates scale these chances, capped at 100%.
+fireworks; standalone shows and festivals do not overlap. Both admit sunrise, sunset, and nighttime below the existing +8-degree
+full-day boundary, independent of solar direction. Their particle brightness
+fades smoothly from full night at -12 degrees to zero at +8 degrees. Rates scale these chances, capped at 100%.
 The barge display follows its actual crossing duration. Its simultaneous
 eight-shell finale begins at 65% of that crossing while its launchers are
 still visible. Travel speed, duration and cooldown stay unchanged. Fairy lights

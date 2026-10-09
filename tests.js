@@ -1336,6 +1336,57 @@ test('RISK fairy light poles: only a selected nighttime string paints its suppor
  }
 });
 
+for(const type of ['fireworks','festival'])test(`RISK fireworks twilight: legacy ${type} admits dawn and dusk while excluding full daytime`,()=>{
+ const sampler=livingSky();
+ for(const azimuth of [90,270])for(const altitude of [-20,-6,0,4,7.999,8,20]){
+  const w=sampler.createWorld(()=>0);w.events=[];w.next=Infinity;w.railNext={train:Infinity,metro:Infinity};w.nextFestival=type==='festival'?0:Infinity;w.nextFireworks=type==='fireworks'?0:Infinity;
+  sampler.advance(w,1,{sun:{altitude,azimuth}});
+  assert.equal(w.events.some(e=>e.type===type),altitude<8,`${type} eligibility at altitude ${altitude}, azimuth ${azimuth}`);
+ }
+});
+
+for(const type of ['fireworks','festival'])test(`RISK fireworks twilight: UTC ${type} opportunities admit both twilight directions and reload exactly`,()=>{
+ const context=sceneTimeline(),original=context.LandscapeConfig;
+ // Isolate the two show actors so unrelated daytime traffic cannot consume admission capacity.
+ context.LandscapeConfig={...original,spawnRate:actor=>['fireworks','festival'].includes(actor)?original.spawnRate(actor):0};
+ vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-timeline.js'),'utf8'),context);
+ const options={seed:'private-phase-boundaries',season:'summer'},T=context.LandscapeTimeline,night=T.create({...options,sunAt:()=>({altitude:-20,azimuth:90})});
+ let instant;
+ for(let minute=0;minute<1440&&instant===undefined;minute++)if(night.at(minute*60000+1000).events.some(e=>e.type===type))instant=minute*60000+1000;
+ assert.notEqual(instant,undefined,'the fixed UTC fixture contains this show source');
+ for(const azimuth of [90,270])for(const altitude of [-6,0,4,7.999,8,20]){
+  const fixed={...options,sunAt:()=>({altitude,azimuth})},a=T.create(fixed).at(instant),b=T.create(fixed).at(instant);
+  assert.equal(a.events.some(e=>e.type===type),altitude<8,`${type} UTC admission at ${altitude}, azimuth ${azimuth}`);
+  assert.deepEqual(JSON.parse(JSON.stringify(a)),JSON.parse(JSON.stringify(b)),'reload rebuilds the exact same UTC scene');
+ }
+});
+
+for(const type of ['fireworks','festival'])test(`RISK fireworks twilight: actual ${type} painter keeps sunrise and sunset particles visible below daytime`,()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),start=source.indexOf('  function paintFireworks('),end=source.indexOf('\n  function paintClocktowerVisit(',start),paint=source.slice(start,end);
+ const sampler=livingSky();
+ for(const azimuth of [90,270])for(const altitude of [-20,-6,0,4,7.999,8,20]){
+  const alphas=[],g={globalAlpha:1,save(){},restore(){},drawImage(){}};
+  vm.runInNewContext(`${paint};paintFireworks(type)`,{type,g,sky:{sun:{altitude,azimuth}},world:{events:[{type,age:1.6,seed:.4}]},scenePose:e=>e,geometry:{fireworks:()=>[{x:100,y:100,tailX:99,tailY:101,alpha:1,burst:0}]},S:sampler,cityLayer:{width:390,height:844},dpr:1,line(){alphas.push(g.globalAlpha);},ellipse(){alphas.push(g.globalAlpha);}});
+  assert.equal(alphas.some(alpha=>alpha>0),altitude<8,`${type} visible paint at altitude ${altitude}, azimuth ${azimuth}`);
+ }
+});
+
+test('RISK fireworks twilight: actual reduced-motion painter holds its pose across dawn and dusk and expires at the source lifetime',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),paint=source.slice(source.indexOf('  function paintFireworks('),source.indexOf('\n  function paintClocktowerVisit(')),pose=source.slice(source.indexOf('  function scenePose('),source.indexOf('\n  function syncScene('));
+ const sampler=livingSky();
+ for(const [type,duration] of [['fireworks',60],['festival',150]]){
+  const ages=[],g={globalAlpha:1,save(){},restore(){},drawImage(){}},world={events:[]},sky={sun:{altitude:4,azimuth:90}};
+  const context={g,world,sky,reduced:true,S:sampler,type,cityLayer:{width:390,height:844},dpr:1,line(){},ellipse(){},geometry:{fireworks(age){ages.push(age);return [{x:100,y:100,tailX:99,tailY:101,alpha:1,burst:0}];}}};
+  vm.createContext(context);vm.runInContext(pose+paint,context);
+  for(const azimuth of [90,270])for(const age of [1,duration-1]){
+   sky.sun.azimuth=azimuth;world.events=[{type,duration,age,seed:.4}];vm.runInContext('paintFireworks(type)',context);
+  }
+  assert.deepEqual(ages,[duration*.5,duration*.5,duration*.5,duration*.5],'both twilight directions retain the same stationary display pose');
+  world.events=[{type,duration,age:duration,seed:.4}];vm.runInContext('paintFireworks(type)',context);assert.equal(ages.length,4,'reduced display retires at its actual source deadline');
+  sky.sun.altitude=8;world.events=[{type,duration,age:1,seed:.4}];vm.runInContext('paintFireworks(type)',context);assert.equal(ages.length,4,'full daytime suppresses even a retained reduced pose');
+ }
+});
+
 test('RISK fireworks duration: each standalone show caps visibility at one minute while retaining its sampled rest schedule',()=>{
  const sky=livingSky(),night={sun:{altitude:-20,azimuth:0}};
  for(const [sample,expected] of [[0,60],[.25,120],[.5,180],[.999,299.76],[1,300]]){

@@ -654,12 +654,13 @@
     g.restore();
   }
   function paintFireworks(type){
-    if(sky.sun.altitude>=-6)return;
+    // The sky labels both solar directions as dawn/dusk below the +8-degree day boundary.
+    if(sky.sun.altitude>=8)return;
     g.save();
     for(const e of world.events.map(e=>scenePose(e,true)))if(e.type===type&&e.fireworkActive!==false){
       g.save();
       for(const dot of geometry.fireworks(e.age,e.seed,e.type==='festival',e)){
-        const night=1-S.smooth(-12,-6,sky.sun.altitude);
+        const night=1-S.smooth(-12,8,sky.sun.altitude);
         const ink=dot.willow?'#ffce88':['#ffd38d','#7de5ef','#cf9fff','#ffa8c5'][(dot.burst+Math.floor(e.seed*4))%4];
         if(dot.trail){
           for(let i=1;i<dot.trail.length;i++){

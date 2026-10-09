@@ -804,3 +804,12 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK frozen header clearance: actual preference transition reserves responsive header geometry through resize and text growth
 - RISK frozen header clearance browser: freeze unfreeze and responsive text retain document headroom
 - RISK frozen header wrapping: enlarged controls fit without font changes or hiding Settings
+## Fireworks sunrise and sunset eligibility
+
+- RISK fireworks twilight: legacy fireworks admits dawn and dusk while excluding full daytime
+- RISK fireworks twilight: UTC fireworks opportunities admit both twilight directions and reload exactly
+- RISK fireworks twilight: actual fireworks painter keeps sunrise and sunset particles visible below daytime
+- RISK fireworks twilight: legacy festival admits dawn and dusk while excluding full daytime
+- RISK fireworks twilight: UTC festival opportunities admit both twilight directions and reload exactly
+- RISK fireworks twilight: actual festival painter keeps sunrise and sunset particles visible below daytime
+- RISK fireworks twilight: actual reduced-motion painter holds its pose across dawn and dusk and expires at the source lifetime
