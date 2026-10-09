@@ -23867,3 +23867,13 @@ test('RISK fireworks twilight barge: actual hull stage and crowd remain visible 
   assert.equal(alphas.some(alpha=>alpha>0),altitude<8&&!polarDay,`${width}x${height}: hull stage and crowd visibility at ${altitude}, azimuth ${azimuth}, polar ${polarDay}`);
  }
 });
+
+test('RISK fireworks twilight barge entry: actual depth-sorted vessel consumer preserves twilight hull and reflection',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),paint=source.slice(source.indexOf('  function paintFestivalBarge(e){'),source.indexOf('  function paintFireworks(')),sampler=livingSky(),context=sceneTimeline();
+ for(const [width,height] of [[390,844],[568,320],[768,1024],[1440,900]])for(const azimuth of [90,270])for(const [altitude,polarDay] of [[-20,false],[-6,false],[0,false],[4,false],[7.999,false],[8,false],[20,false],[3.645,true]]){
+  const alphas=[],stack=[],target={globalAlpha:1,save(){stack.push(this.globalAlpha);},restore(){this.globalAlpha=stack.pop();},createLinearGradient(){return {addColorStop(){}};},fill(){alphas.push(this.globalAlpha);},fillRect(){alphas.push(this.globalAlpha);},stroke(){alphas.push(this.globalAlpha);}},g=new Proxy(target,{get:(object,key)=>key in object?object[key]:()=>{}});
+  const geometry=context.LandscapeGeometry.create(width,height),event={type:'festival',age:75,duration:150,lane:.55,seed:.4};
+  vm.runInNewContext(`${paint};paintFestivalBarge(event)`,{g,event,geometry,S:sampler,W:width,far:[],p:{sky:["#111111","#222222","#333333"]},path(){},reflectWaterObject(y,paint){paint();},sky:{sun:{altitude,azimuth},polarDay,period:polarDay||altitude>=8?'day':altitude<-12?'night':azimuth<180?'dawn':'dusk'},line(){alphas.push(g.globalAlpha);},ellipse(){alphas.push(g.globalAlpha);}});
+  assert.equal(alphas.some(alpha=>alpha>0),altitude<8&&!polarDay,`${width}x${height}: hull stage and crowd visibility at ${altitude}, azimuth ${azimuth}, polar ${polarDay}`);
+ }
+});

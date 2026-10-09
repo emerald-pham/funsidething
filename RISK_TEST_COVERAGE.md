@@ -818,3 +818,5 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK fireworks polar UTC: real Arctic daylight never schedules either source across a complete day
 
 - RISK fireworks twilight barge: actual hull stage and crowd remain visible with their fireworks through both twilight directions
+
+- RISK fireworks twilight barge entry: actual depth-sorted vessel consumer preserves twilight hull and reflection

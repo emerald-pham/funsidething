@@ -582,7 +582,7 @@
     g.restore();
   }
   function paintFestivalBarge(e){
-    if(sky.sun.altitude>=-6)return;
+    if(!S.fireworksAllowed(sky))return;
     const pose=geometry.festival(e);
     // The whole stage mirrors about its own floating hull, using the same
     // shoreline clipping and depth-sorted pass as the other vessels.
