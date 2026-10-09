@@ -1336,6 +1336,78 @@ test('RISK fairy light poles: only a selected nighttime string paints its suppor
  }
 });
 
+for(const type of ['fireworks','festival'])test(`RISK fireworks twilight: legacy ${type} admits dawn and dusk while excluding full daytime`,()=>{
+ const sampler=livingSky();
+ for(const azimuth of [90,270])for(const altitude of [-20,-6,0,4,7.999,8,20]){
+  const w=sampler.createWorld(()=>0);w.events=[];w.next=Infinity;w.railNext={train:Infinity,metro:Infinity};w.nextFestival=type==='festival'?0:Infinity;w.nextFireworks=type==='fireworks'?0:Infinity;
+  sampler.advance(w,1,{sun:{altitude,azimuth}});
+  assert.equal(w.events.some(e=>e.type===type),altitude<8,`${type} eligibility at altitude ${altitude}, azimuth ${azimuth}`);
+ }
+});
+
+for(const type of ['fireworks','festival'])test(`RISK fireworks twilight: UTC ${type} opportunities admit both twilight directions and reload exactly`,()=>{
+ const context=sceneTimeline(),original=context.LandscapeConfig;
+ // Isolate the two show actors so unrelated daytime traffic cannot consume admission capacity.
+ context.LandscapeConfig={...original,spawnRate:actor=>['fireworks','festival'].includes(actor)?original.spawnRate(actor):0};
+ vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-timeline.js'),'utf8'),context);
+ const options={seed:'private-phase-boundaries',season:'summer'},T=context.LandscapeTimeline,night=T.create({...options,sunAt:()=>({altitude:-20,azimuth:90})});
+ let instant;
+ for(let minute=0;minute<1440&&instant===undefined;minute++)if(night.at(minute*60000+1000).events.some(e=>e.type===type))instant=minute*60000+1000;
+ assert.notEqual(instant,undefined,'the fixed UTC fixture contains this show source');
+ for(const azimuth of [90,270])for(const altitude of [-6,0,4,7.999,8,20]){
+  const fixed={...options,sunAt:()=>({altitude,azimuth})},a=T.create(fixed).at(instant),b=T.create(fixed).at(instant);
+  assert.equal(a.events.some(e=>e.type===type),altitude<8,`${type} UTC admission at ${altitude}, azimuth ${azimuth}`);
+  assert.deepEqual(JSON.parse(JSON.stringify(a)),JSON.parse(JSON.stringify(b)),'reload rebuilds the exact same UTC scene');
+ }
+});
+
+for(const type of ['fireworks','festival'])test(`RISK fireworks twilight: actual ${type} painter keeps sunrise and sunset particles visible below daytime`,()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),start=source.indexOf('  function paintFireworks('),end=source.indexOf('\n  function paintClocktowerVisit(',start),paint=source.slice(start,end);
+ const sampler=livingSky();
+ for(const azimuth of [90,270])for(const altitude of [-20,-6,0,4,7.999,8,20]){
+  const alphas=[],g={globalAlpha:1,save(){},restore(){},drawImage(){}};
+  vm.runInNewContext(`${paint};paintFireworks(type)`,{type,g,sky:{sun:{altitude,azimuth}},world:{events:[{type,age:1.6,seed:.4}]},scenePose:e=>e,geometry:{fireworks:()=>[{x:100,y:100,tailX:99,tailY:101,alpha:1,burst:0}]},S:sampler,cityLayer:{width:390,height:844},dpr:1,line(){alphas.push(g.globalAlpha);},ellipse(){alphas.push(g.globalAlpha);}});
+  assert.equal(alphas.some(alpha=>alpha>0),altitude<8,`${type} visible paint at altitude ${altitude}, azimuth ${azimuth}`);
+ }
+});
+
+test('RISK fireworks twilight: actual reduced-motion painter holds its pose across dawn and dusk and expires at the source lifetime',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),paint=source.slice(source.indexOf('  function paintFireworks('),source.indexOf('\n  function paintClocktowerVisit(')),pose=source.slice(source.indexOf('  function scenePose('),source.indexOf('\n  function syncScene('));
+ const sampler=livingSky();
+ for(const [type,duration] of [['fireworks',60],['festival',150]]){
+  const ages=[],g={globalAlpha:1,save(){},restore(){},drawImage(){}},world={events:[]},sky={sun:{altitude:4,azimuth:90}};
+  const context={g,world,sky,reduced:true,S:sampler,type,cityLayer:{width:390,height:844},dpr:1,line(){},ellipse(){},geometry:{fireworks(age){ages.push(age);return [{x:100,y:100,tailX:99,tailY:101,alpha:1,burst:0}];}}};
+  vm.createContext(context);vm.runInContext(pose+paint,context);
+  for(const azimuth of [90,270])for(const age of [1,duration-1]){
+   sky.sun.azimuth=azimuth;world.events=[{type,duration,age,seed:.4}];vm.runInContext('paintFireworks(type)',context);
+  }
+  assert.deepEqual(ages,[duration*.5,duration*.5,duration*.5,duration*.5],'both twilight directions retain the same stationary display pose');
+  world.events=[{type,duration,age:duration,seed:.4}];vm.runInContext('paintFireworks(type)',context);assert.equal(ages.length,4,'reduced display retires at its actual source deadline');
+  sky.sun.altitude=8;world.events=[{type,duration,age:1,seed:.4}];vm.runInContext('paintFireworks(type)',context);assert.equal(ages.length,4,'full daytime suppresses even a retained reduced pose');
+ }
+});
+
+test('RISK fireworks polar day: real Arctic midnight remains excluded in solar sampling legacy admission and actual painting',()=>{
+ const sampler=livingSky(),date=new Date('2026-06-21T00:00:00Z'),location={latitude:70,longitude:0,timezone:'UTC'},sky=sampler.skyAt(date,location);
+ assert.equal(sky.polarDay,true);assert.equal(sky.period,'day');assert.ok(sky.sun.altitude>0&&sky.sun.altitude<8,'actual midnight Sun lies within the ordinary twilight altitude range');
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),paint=source.slice(source.indexOf('  function paintFireworks('),source.indexOf('\n  function paintClocktowerVisit('));
+ const admitted=[],painted=[];
+ for(const type of ['fireworks','festival']){
+  const w=sampler.createWorld(()=>0);w.events=[];w.next=Infinity;w.railNext={train:Infinity,metro:Infinity};w.nextFestival=type==='festival'?0:Infinity;w.nextFireworks=type==='fireworks'?0:Infinity;sampler.advance(w,1,sky);if(w.events.some(e=>e.type===type))admitted.push(type);
+  const g={globalAlpha:1,save(){},restore(){},drawImage(){}};vm.runInNewContext(`${paint};paintFireworks(type)`,{type,g,sky,world:{events:[{type,age:1.6,seed:.4}]},scenePose:e=>e,geometry:{fireworks:()=>[{x:100,y:100,tailX:99,tailY:101,alpha:1,burst:0}]},S:sampler,cityLayer:{width:390,height:844},dpr:1,line(){painted.push(type);},ellipse(){painted.push(type);}});
+ }
+ assert.deepEqual(admitted,[],'full polar daylight never admits either show source');assert.deepEqual(painted,[],'retained events cannot paint during polar daytime');
+ assert.equal(sampler.sunAt(date,location).polarDay,true,'bare UTC solar sampling retains the same polar-day exclusion');
+});
+
+test('RISK fireworks polar UTC: real Arctic daylight never schedules either source across a complete day',()=>{
+ const context=sceneTimeline(),original=context.LandscapeConfig;
+ context.LandscapeConfig={...original,spawnRate:actor=>['fireworks','festival'].includes(actor)?original.spawnRate(actor):0};vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-timeline.js'),'utf8'),context);
+ const location={latitude:70,longitude:0,timezone:'UTC'},start=Date.parse('2026-06-21T00:00:00Z'),options={seed:'private-polar-midnight',location},timeline=context.LandscapeTimeline.create(options);
+ for(let minute=0;minute<1440;minute++)assert.ok(!timeline.at(start+minute*60000).events.some(e=>['fireworks','festival'].includes(e.type)),`polar daylight excludes both UTC show sources at minute ${minute}`);
+ assert.deepEqual(JSON.parse(JSON.stringify(timeline.at(start))),JSON.parse(JSON.stringify(context.LandscapeTimeline.create(options).at(start))),'real-location polar exclusion is reproducible after reload');
+});
+
 test('RISK fireworks duration: each standalone show caps visibility at one minute while retaining its sampled rest schedule',()=>{
  const sky=livingSky(),night={sun:{altitude:-20,azimuth:0}};
  for(const [sample,expected] of [[0,60],[.25,120],[.5,180],[.999,299.76],[1,300]]){
@@ -1375,7 +1447,7 @@ test('RISK fireworks layering: city silhouettes mask random shows while barge sh
  const paint=source.slice(start,end),cityLayer={width:390,height:320},events=[{type:'fireworks',age:1.6,seed:.4},{type:'festival',age:30,seed:.4}];
  for(const type of ['fireworks','festival']){
   const masks=[],calls=[],stack=[],g={globalAlpha:1,globalCompositeOperation:'source-over',save(){stack.push([this.globalAlpha,this.globalCompositeOperation])},restore(){[this.globalAlpha,this.globalCompositeOperation]=stack.pop()},drawImage(layer){masks.push({layer,operation:this.globalCompositeOperation})}};
-  vm.runInNewContext(`${paint};paintFireworks(type)`,{g,type,scenePose:e=>e,W:390,H:844,dpr:1,cityLayer,sky:{sun:{altitude:-20}},world:{events},S:{smooth:()=>0},geometry:{fireworks(age,seed,barge,event){calls.push(event.type);return [{x:150,y:290,tailX:148,tailY:292,alpha:1,burst:0}] }},line(){},ellipse(){}});
+  vm.runInNewContext(`${paint};paintFireworks(type)`,{g,type,scenePose:e=>e,W:390,H:844,dpr:1,cityLayer,sky:{sun:{altitude:-20}},world:{events},S:{smooth:()=>0,fireworksAllowed:livingSky().fireworksAllowed},geometry:{fireworks(age,seed,barge,event){calls.push(event.type);return [{x:150,y:290,tailX:148,tailY:292,alpha:1,burst:0}] }},line(){},ellipse(){}});
   assert.deepEqual(calls,[type],'each depth pass draws only its own show');
   assert.equal(masks.length,type==='fireworks'?1:0,'only random fireworks are hidden by city pixels');
   if(masks.length){assert.equal(masks[0].layer,cityLayer);assert.equal(masks[0].operation,'destination-out','the real opaque city mask hides overlapping tower and clock silhouettes');}
@@ -19739,8 +19811,8 @@ test('RISK night shows: standalone fireworks recur independently of the rare coo
  assert.equal(w.events.filter(e=>e.type==='fireworks').length,1,'a second independent show starts after its sampled duration and full rest');
  assert.ok(w.events.length<=sky.MAX_EVENTS);
  const day=sky.createWorld(()=>0);day.events=[];day.next=Infinity;day.railNext=w.railNext;day.nextFireworks=0;day.nextFestival=0;
- sky.advance(day,100,{sun:{altitude:-6,azimuth:0}});
- assert.ok(day.events.every(e=>!['fireworks','festival'].includes(e.type)),'both shows need the Sun below civil twilight');
+ sky.advance(day,100,{sun:{altitude:8,azimuth:0}});
+ assert.ok(day.events.every(e=>!['fireworks','festival'].includes(e.type)),'full daytime remains excluded for both show sources');
  const full=sky.createWorld(()=>0);full.events=Array.from({length:sky.MAX_EVENTS},()=>({type:'walker',age:0,duration:100}));full.nextFireworks=0;full.nextFestival=0;
  sky.advance(full,1,night);assert.equal(full.events.length,sky.MAX_EVENTS,'shows cannot bypass the scene budget');
 });
@@ -21998,7 +22070,7 @@ test('RISK fireworks ascent paint: only the launch trail glows while explosion p
  const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),paint=source.slice(source.indexOf('  function paintFireworks('),source.indexOf('  function paintClocktowerVisit('));
  for(const kind of ['rocket','spark']){
   const strokes=[],heads=[],g={save(){},restore(){},drawImage(){}};
-  vm.runInNewContext(`${paint};paintFireworks('festival')`,{g,sky:{sun:{altitude:-20}},world:{events:[{type:'festival',age:.4,seed:.4}]},scenePose:e=>e,S:{smooth:()=>0},geometry:{fireworks:()=>[{kind,x:10,y:20,tailX:9,tailY:22,alpha:.8,burst:0,size:1}]},line(...args){strokes.push(args.slice(1));},ellipse(...args){heads.push({args:args.slice(1),alpha:g.globalAlpha});}});
+  vm.runInNewContext(`${paint};paintFireworks('festival')`,{g,sky:{sun:{altitude:-20}},world:{events:[{type:'festival',age:.4,seed:.4}]},scenePose:e=>e,S:{smooth:()=>0,fireworksAllowed:livingSky().fireworksAllowed},geometry:{fireworks:()=>[{kind,x:10,y:20,tailX:9,tailY:22,alpha:.8,burst:0,size:1}]},line(...args){strokes.push(args.slice(1));},ellipse(...args){heads.push({args:args.slice(1),alpha:g.globalAlpha});}});
   assert.equal(strokes.length,1,'ascent and explosion tails retain their stroke');
   assert.equal(heads.length,kind==='rocket'?0:2,'only an ascending shell loses its tip and halo');
   if(kind==='spark'){assert.equal(heads[0].alpha,.8*.12);assert.equal(heads[1].alpha,.8);assert.deepEqual(heads.map(h=>h.args.slice(0,4)),[[10,20,2.3,2.3],[10,20,1,1]]);}
@@ -22514,7 +22586,7 @@ test('RISK fireworks legacy reservations: invisible remainder keeps old festival
 test('RISK fireworks reduced motion: static blooms stay on the stationary barge throughout its crossing',()=>{
  const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),paint=source.slice(source.indexOf('  function paintFireworks('),source.indexOf('  function paintClocktowerVisit(')),pose=source.match(/  function scenePose\([^\n]+/)[0];
  const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);const original=ctx.LandscapeGeometry.create(1440,900),paints=[];
- const context={reduced:true,sky:{sun:{altitude:-20}},world:{events:[{type:'festival',age:20,duration:150,seed:.4}]},g:{save(){},restore(){}},S:{smooth:()=>0},geometry:{fireworks(...args){const dots=original.fireworks(...args);paints.push({args,dots});return dots;}},line(){},ellipse(){}};
+ const context={reduced:true,sky:{sun:{altitude:-20}},world:{events:[{type:'festival',age:20,duration:150,seed:.4}]},g:{save(){},restore(){}},S:{smooth:()=>0,fireworksAllowed:livingSky().fireworksAllowed},geometry:{fireworks(...args){const dots=original.fireworks(...args);paints.push({args,dots});return dots;}},line(){},ellipse(){}};
  vm.runInNewContext(`${pose};${paint};paintFireworks('festival')`,context);
  assert.ok(paints[0].dots.some(d=>d.kind==='spark'),'reduced motion retains a static bloom inside the shortened display');
  assert.equal(paints[0].args[3].fireworkDeckAge,75,'static shells use the same stationary deck pose as the painted barge');
@@ -23784,4 +23856,86 @@ test('RISK frozen header wrapping: enlarged controls fit without font changes or
  const base=spawnSync('git',['show','6852dfac2c900d84b550090877515dcece8707f4:index.html'],{cwd:__dirname,encoding:'utf8'});assert.equal(base.status,0,base.stderr);
  const fonts=(source,selector)=>source.match(new RegExp('\\.'+selector+'\\{([^}]+)\\}'))?.[1].split(';').filter(declaration=>/^(?:font(?:-|:)|line-height:)/.test(declaration)).join(';');
  for(const selector of ['titles h1','ghost','syncbtn','plabel'])assert.equal(fonts(html,selector),fonts(base.stdout,selector),'wrapping must not shrink or restyle '+selector);
+});
+
+test('RISK fireworks twilight barge: actual hull stage and crowd remain visible with their fireworks through both twilight directions',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),paint=source.slice(source.indexOf('  function paintFestival(e){'),source.indexOf('  function paintFireworks(')),sampler=livingSky(),context=sceneTimeline();
+ for(const [width,height] of [[390,844],[568,320],[768,1024],[1440,900]])for(const azimuth of [90,270])for(const [altitude,polarDay] of [[-20,false],[-6,false],[0,false],[4,false],[7.999,false],[8,false],[20,false],[3.645,true]]){
+  const alphas=[],stack=[],target={globalAlpha:1,save(){stack.push(this.globalAlpha);},restore(){this.globalAlpha=stack.pop();},createLinearGradient(){return {addColorStop(){}};},fill(){alphas.push(this.globalAlpha);},fillRect(){alphas.push(this.globalAlpha);},stroke(){alphas.push(this.globalAlpha);}},g=new Proxy(target,{get:(object,key)=>key in object?object[key]:()=>{}});
+  const geometry=context.LandscapeGeometry.create(width,height),event={type:'festival',age:75,duration:150,lane:.55,seed:.4};
+  vm.runInNewContext(`${paint};paintFestival(event)`,{g,event,geometry,S:sampler,sky:{sun:{altitude,azimuth},polarDay,period:polarDay||altitude>=8?'day':altitude<-12?'night':azimuth<180?'dawn':'dusk'},line(){alphas.push(g.globalAlpha);},ellipse(){alphas.push(g.globalAlpha);}});
+  assert.equal(alphas.some(alpha=>alpha>0),altitude<8&&!polarDay,`${width}x${height}: hull stage and crowd visibility at ${altitude}, azimuth ${azimuth}, polar ${polarDay}`);
+ }
+});
+
+test('RISK fireworks twilight barge entry: actual depth-sorted vessel consumer preserves twilight hull and reflection',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),paint=source.slice(source.indexOf('  function paintFestivalBarge(e){'),source.indexOf('  function paintFireworks(')),sampler=livingSky(),context=sceneTimeline();
+ for(const [width,height] of [[390,844],[568,320],[768,1024],[1440,900]])for(const azimuth of [90,270])for(const [altitude,polarDay] of [[-20,false],[-6,false],[0,false],[4,false],[7.999,false],[8,false],[20,false],[3.645,true]]){
+  const alphas=[],stack=[],target={globalAlpha:1,save(){stack.push(this.globalAlpha);},restore(){this.globalAlpha=stack.pop();},createLinearGradient(){return {addColorStop(){}};},fill(){alphas.push(this.globalAlpha);},fillRect(){alphas.push(this.globalAlpha);},stroke(){alphas.push(this.globalAlpha);}},g=new Proxy(target,{get:(object,key)=>key in object?object[key]:()=>{}});
+  const geometry=context.LandscapeGeometry.create(width,height),event={type:'festival',age:75,duration:150,lane:.55,seed:.4};
+  vm.runInNewContext(`${paint};paintFestivalBarge(event)`,{g,event,geometry,S:sampler,W:width,far:[],p:{sky:["#111111","#222222","#333333"]},path(){},reflectWaterObject(y,paint){paint();},sky:{sun:{altitude,azimuth},polarDay,period:polarDay||altitude>=8?'day':altitude<-12?'night':azimuth<180?'dawn':'dusk'},line(){alphas.push(g.globalAlpha);},ellipse(){alphas.push(g.globalAlpha);}});
+  assert.equal(alphas.some(alpha=>alpha>0),altitude<8&&!polarDay,`${width}x${height}: hull stage and crowd visibility at ${altitude}, azimuth ${azimuth}, polar ${polarDay}`);
+ }
+});
+
+test('RISK Landscape browser: public twilight scenery retains opaque physical barge hull in the final composite',{skip:!process.env.LANDSCAPE_BROWSER_URL||!process.env.LANDSCAPE_PLAYWRIGHT},async()=>{
+ const {chromium}=await import(process.env.LANDSCAPE_PLAYWRIGHT),browser=await chromium.launch({channel:'chrome'});
+ try{
+  for(const width of [390,1440]){
+   const context=await browser.newContext({viewport:{width,height:width===390?844:900},timezoneId:'America/New_York',reducedMotion:'reduce',serviceWorkers:'block'}),page=await context.newPage();
+   await page.clock.install({time:new Date('2026-06-15T04:00:00Z')});
+   await page.addInitScript(()=>{Object.defineProperty(window,'FIREBASE_CONFIG',{value:null,configurable:true});localStorage.setItem('fvp:chain-scanner:landscape-motion','reduced');});
+   const origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+   await page.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
+   await page.goto(process.env.LANDSCAPE_BROWSER_URL);await page.waitForFunction(()=>globalThis.LivingSky&&globalThis.LandscapeTimeline&&typeof state!=='undefined'&&state?.tasks&&document.querySelector('[data-life]')?.width>0);
+   // Observe the public scheduler without replacing renderer state, time sampling,
+   // event admission, canvas entry points, or any delivered source bytes.
+   const fixture=await page.evaluate(()=>{
+    const S=LivingSky,T=LandscapeTimeline,location=LivingLocation.current(),values=new Map(),storage={getItem:key=>values.get(key)||null,setItem:(key,value)=>values.set(key,value)};
+    S.saveSceneSeason(storage,'summer');let time,sun;
+    for(let minute=0;minute<720;minute++){
+     const choice=String(Math.floor(minute/60)).padStart(2,'0')+':'+String(minute%60).padStart(2,'0');S.saveSceneTime(storage,choice);
+     const sampled=S.sunAt(S.sceneDate(new Date(),storage,location),location);
+     if(sampled.altitude>=3.8&&sampled.altitude<=4.2){time=choice;sun=sampled;break;}
+    }
+    if(!time)throw Error('A real +4 degree sunrise clock fixture is required');
+    const timeline=T.create({seed:T.DEFAULT_SEED,season:'summer',location,sunAt:at=>S.sunAt(S.sceneDate(new Date(at),storage,location),location)}),start=Date.now();
+    for(let minute=0;minute<1440;minute++){
+     const at=start+minute*60000,event=timeline.at(at).events.find(e=>e.type==='festival');
+     const actualSun=S.sunAt(S.sceneDate(new Date(at),storage,location),location);
+     if(event&&actualSun.altitude>=3.8&&actualSun.altitude<=4.2&&!actualSun.polarDay&&S.weatherAt(new Date(at),'summer').status==='clear')return {time,at,event,sun:actualSun,location};
+    }
+    throw Error('A native clear-weather barge opportunity is required');
+   });
+   await page.clock.fastForward(fixture.at-Date.parse('2026-06-15T04:00:00Z'));
+   const welcome=page.locator('#modalRoot [data-act="close-modal"]');if(await welcome.isVisible())await welcome.click();
+   await page.locator('[title="Settings, contexts, and backups"]').click();await page.locator('[data-act="scene-time-settings"]').click();
+   await page.locator('#sceneSeasonInput').selectOption('summer');await page.locator('#sceneTimeInput').fill(fixture.time);await page.locator('[data-scene-time="lock"]').click();
+   await page.locator('[data-scene-time="close"]').click();await page.locator('#modalRoot [data-act="close-modal"]').click();await page.locator('#viewScene').click();await page.clock.runFor(50);
+   assert.equal(await page.evaluate(()=>document.documentElement.dataset.scenePeriod),'dawn');
+   const observed=await page.evaluate(event=>{
+    const S=LivingSky,location=LivingLocation.current(),sun=S.sunAt(S.sceneDate(new Date(),localStorage,location),location),native=LandscapeTimeline.create({seed:LandscapeTimeline.DEFAULT_SEED,season:'summer',location,sunAt:at=>S.sunAt(S.sceneDate(new Date(at),localStorage,location),location)}).at(Date.now()).events.find(e=>e.type==='festival');
+    const front=document.querySelector('[data-life]'),back=document.querySelector('[data-scenery]'),canvas=document.createElement('canvas');canvas.width=front.width;canvas.height=front.height;
+    const ctx=canvas.getContext('2d');ctx.drawImage(back,0,0);ctx.drawImage(front,0,0);
+    const pose=LandscapeGeometry.create(innerWidth,innerHeight).festival({...event,age:event.duration*.5}),ratio=front.width/innerWidth,y=Math.floor(pose.y*ratio),pixels=[];
+    for(let dx=-2;dx<=2;dx++)pixels.push(Array.from(ctx.getImageData(Math.floor(pose.x*ratio)+dx,y,1,1).data));
+    return {pose,pixels,sun,nativeId:native?.id,storedTime:LivingSky.readSceneTime(localStorage)};
+   },fixture.event);
+   if(process.env.LANDSCAPE_EVIDENCE_DIR)await page.screenshot({path:path.join(process.env.LANDSCAPE_EVIDENCE_DIR,`${width}-public-twilight-composite.png`)});
+   assert.equal(observed.storedTime,fixture.time);assert.equal(observed.nativeId,fixture.event.id);assert.ok(observed.sun.altitude>=3.8&&observed.sun.altitude<=4.2&&!observed.sun.polarDay);
+   if(process.env.LANDSCAPE_EVIDENCE_DIR)fs.writeFileSync(path.join(process.env.LANDSCAPE_EVIDENCE_DIR,`${width}-public-fixture.json`),JSON.stringify({fixture,observed},null,2));
+   assert.ok(observed.pixels.some(pixel=>pixel.slice(0,3).every((v,i)=>Math.abs(v-[23,43,57][i])<=2)),`public final composite retains the physical #172b39 hull at ${width}px: ${JSON.stringify(observed)}`);
+   await context.close();
+  }
+ }finally{await browser.close();}
+});
+
+test('RISK fireworks physical vessel: twilight hull opacity follows the ordinary crossing pose',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),paint=source.slice(source.indexOf('  function paintFestival(e){'),source.indexOf('  function paintFireworks(')),sampler=livingSky(),context=sceneTimeline();
+ for(const [width,height] of [[390,844],[568,320],[768,1024],[1440,900]])for(const azimuth of [90,270])for(const [altitude,polarDay] of [[-20,false],[-6,false],[0,false],[4,false],[7.999,false],[8,false],[20,false],[3.645,true]]){
+  const alphas=[],stack=[],target={globalAlpha:1,save(){stack.push(this.globalAlpha);},restore(){this.globalAlpha=stack.pop();},createLinearGradient(){return {addColorStop(){}};},fill(){alphas.push(this.globalAlpha);},fillRect(){alphas.push(this.globalAlpha);},stroke(){alphas.push(this.globalAlpha);}},g=new Proxy(target,{get:(object,key)=>key in object?object[key]:()=>{}});
+  const geometry=context.LandscapeGeometry.create(width,height),event={type:'festival',age:75,duration:150,lane:.55,seed:.4};
+  vm.runInNewContext(`${paint};paintFestival(event)`,{g,event,geometry,S:sampler,sky:{sun:{altitude,azimuth},polarDay,period:polarDay||altitude>=8?'day':altitude<-12?'night':azimuth<180?'dawn':'dusk'},line(){alphas.push(g.globalAlpha);},ellipse(){alphas.push(g.globalAlpha);}});
+  assert.equal(alphas[0]||0,altitude<8&&!polarDay?geometry.festival(event).alpha:0,`${width}x${height}: hull stage and crowd visibility at ${altitude}, azimuth ${azimuth}, polar ${polarDay}`);
+ }
 });

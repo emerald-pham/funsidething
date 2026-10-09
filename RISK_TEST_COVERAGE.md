@@ -804,3 +804,22 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK frozen header clearance: actual preference transition reserves responsive header geometry through resize and text growth
 - RISK frozen header clearance browser: freeze unfreeze and responsive text retain document headroom
 - RISK frozen header wrapping: enlarged controls fit without font changes or hiding Settings
+## Fireworks sunrise and sunset eligibility
+
+- RISK fireworks twilight: legacy fireworks admits dawn and dusk while excluding full daytime
+- RISK fireworks twilight: UTC fireworks opportunities admit both twilight directions and reload exactly
+- RISK fireworks twilight: actual fireworks painter keeps sunrise and sunset particles visible below daytime
+- RISK fireworks twilight: legacy festival admits dawn and dusk while excluding full daytime
+- RISK fireworks twilight: UTC festival opportunities admit both twilight directions and reload exactly
+- RISK fireworks twilight: actual festival painter keeps sunrise and sunset particles visible below daytime
+- RISK fireworks twilight: actual reduced-motion painter holds its pose across dawn and dusk and expires at the source lifetime
+
+- RISK fireworks polar day: real Arctic midnight remains excluded in solar sampling legacy admission and actual painting
+- RISK fireworks polar UTC: real Arctic daylight never schedules either source across a complete day
+
+- RISK fireworks twilight barge: actual hull stage and crowd remain visible with their fireworks through both twilight directions
+
+- RISK fireworks twilight barge entry: actual depth-sorted vessel consumer preserves twilight hull and reflection
+
+- RISK Landscape browser: public twilight scenery retains opaque physical barge hull in the final composite
+- RISK fireworks physical vessel: twilight hull opacity follows the ordinary crossing pose

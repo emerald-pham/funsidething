@@ -582,7 +582,7 @@
     g.restore();
   }
   function paintFestivalBarge(e){
-    if(sky.sun.altitude>=-6)return;
+    if(!S.fireworksAllowed(sky))return;
     const pose=geometry.festival(e);
     // The whole stage mirrors about its own floating hull, using the same
     // shoreline clipping and depth-sorted pass as the other vessels.
@@ -596,12 +596,12 @@
     g.restore();paintFestival(e);
   }
   function paintFestival(e){
-    const pose=geometry.festival(e),night=1-S.smooth(-12,-6,sky.sun.altitude);
-    if(!pose.alpha||!night)return;
+    const pose=geometry.festival(e);
+    if(!pose.alpha||!S.fireworksAllowed(sky))return;
     const {x,y,scale}=pose,w=56,h=28,hullDepth=3,inks=['#7be5ed','#bd9af6','#f4b982'];
     const launcherOffset=pose.launcherOffset/scale,launcherTop=pose.launcherTop/scale,launcherBottom=pose.launcherBottom/scale;
     const ink=inks[Math.floor(e.seed*3)%3],second=inks[(Math.floor(e.seed*3)+1)%3];
-    g.save();g.translate(x,y);g.scale(scale,scale);g.globalAlpha*=pose.alpha*night;
+    g.save();g.translate(x,y);g.scale(scale,scale);g.globalAlpha*=pose.alpha;
     // The stage, crowd, launch racks and hull travel as one vehicle. Steady
     // colored light and slow beam sweeps never pulse the scene brightness.
     g.fillStyle='#172b39';g.beginPath();g.moveTo(-w*.64,-3);g.lineTo(w*.64,-3);
@@ -654,12 +654,13 @@
     g.restore();
   }
   function paintFireworks(type){
-    if(sky.sun.altitude>=-6)return;
+    // The sky labels both solar directions as dawn/dusk below the +8-degree day boundary.
+    if(!S.fireworksAllowed(sky))return;
     g.save();
     for(const e of world.events.map(e=>scenePose(e,true)))if(e.type===type&&e.fireworkActive!==false){
       g.save();
       for(const dot of geometry.fireworks(e.age,e.seed,e.type==='festival',e)){
-        const night=1-S.smooth(-12,-6,sky.sun.altitude);
+        const night=1-S.smooth(-12,8,sky.sun.altitude);
         const ink=dot.willow?'#ffce88':['#ffd38d','#7de5ef','#cf9fff','#ffa8c5'][(dot.burst+Math.floor(e.seed*4))%4];
         if(dot.trail){
           for(let i=1;i<dot.trail.length;i++){

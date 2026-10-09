@@ -51,7 +51,7 @@
     const h=A.Horizon(date,obs,eq.ra,eq.dec,'normal');
     return {altitude:h.altitude,azimuth:h.azimuth,visible:h.altitude>-.3};
   }
-  function sunAt(date,location){validDate(date);return bodyAt('Sun',date,locationObserver(location).observer);}
+  function sunAt(date,location){validDate(date);const sun=bodyAt('Sun',date,locationObserver(location).observer);return {...sun,polarDay:polarDayAt(date,location,sun)};}
   function sunTimes(date,location){
     validDate(date);
     const config=locationObserver(location),start=localMidnight(date,config.timeZone);
@@ -85,15 +85,20 @@
     validDate(date); return projectStar(date,row,rotation,locationObserver(location).observer);
   }
   const polarDayCache=new Map();
-  function skyAt(date,location){
-    validDate(date);
-    const config=locationObserver(location),sun=bodyAt('Sun',date,config.observer),moon=bodyAt('Moon',date,config.observer),phase=A.MoonPhase(date);
-    let polarDay=false;
+  function polarDayAt(date,location,sun){
+    const config=locationObserver(location);let polarDay=false;
     if(Math.abs(config.observer.latitude)>66&&sun.visible){
       const parts=partsInZone(date,config.timeZone),key=[config.observer.latitude,config.observer.longitude,config.timeZone,parts.year,parts.month,parts.day].join(':');
       if(!polarDayCache.has(key)){const times=sunTimes(date,location);polarDayCache.set(key,!times.rise&&!times.set);if(polarDayCache.size>8)polarDayCache.delete(polarDayCache.keys().next().value);}
       polarDay=polarDayCache.get(key);
     }
+    return polarDay;
+  }
+  function fireworksAllowed(sky){const sun=sky.sun||sky;return !sky.polarDay&&!sun.polarDay&&sky.period!=='day'&&sun.altitude<8;}
+  function skyAt(date,location){
+    validDate(date);
+    const config=locationObserver(location),sun=bodyAt('Sun',date,config.observer),moon=bodyAt('Moon',date,config.observer),phase=A.MoonPhase(date);
+    const polarDay=polarDayAt(date,location,sun);
     const rotation=A.Rotation_EQJ_EQD(date);
     const delta=(sun.azimuth-moon.azimuth)*RAD,sa=sun.altitude*RAD,ma=moon.altitude*RAD;
     // Project sunlight onto the Moon's local sky tangent plane. This follows
@@ -245,7 +250,7 @@
       if(w.elapsed<w[key])continue;
       const occurrenceScale=show.occurrenceScale||1;
       w[key]=w.elapsed+show.interval*occurrenceScale;
-      if(sky.sun.altitude>=-6||!CONFIG.spawnRate(type)||reservedEventCount(w)>=MAX_EVENTS-2||(w.elapsed<w.fireworksReservedUntil||w.events.some(e=>e.type==='festival'||e.type==='fireworks')))continue;
+      if(!fireworksAllowed(sky)||!CONFIG.spawnRate(type)||reservedEventCount(w)>=MAX_EVENTS-2||(w.elapsed<w.fireworksReservedUntil||w.events.some(e=>e.type==='festival'||e.type==='fireworks')))continue;
       if(type==='festival'&&(w.elapsed-w.lastRare<RARE_COOLDOWN||w.elapsed-w.lastFestival<show.cooldown))continue;
       if(w.random()>=Math.min(1,show.chance*CONFIG.spawnRate(type)))continue;
       spawn(w,type);
@@ -381,6 +386,6 @@
   function readMotion(storage){try{return normalizeMotion(storage.getItem(MOTION_KEY));}catch{return null;}}
   function saveMotion(storage,value){try{storage.setItem(MOTION_KEY,value);return true;}catch{return false;}}
   function motionReduced(value,osReduced){return !!osReduced||normalizeMotion(value)!=='normal';}
-  root.LivingSky={setSeason,eventsForSeason,sceneSolarDate,weatherAt,createWoodland,advanceWoodland,woodlandTypes,startingSpeed,groupSize,readSceneSeason,saveSceneSeason,createSceneMirror,advanceLights,createGardenLights,syncGardenLights,advanceGardenLights,skinTone,sceneDate,readSceneTime,saveSceneTime,skyAt,sunAt,sunTimes,solarSchedule,solarPresets,starAt,starCount:root.SKY_STARS.length,palette,activity,createWorld,advance,
+  root.LivingSky={setSeason,eventsForSeason,sceneSolarDate,weatherAt,createWoodland,advanceWoodland,woodlandTypes,startingSpeed,groupSize,readSceneSeason,saveSceneSeason,createSceneMirror,advanceLights,createGardenLights,syncGardenLights,advanceGardenLights,skinTone,sceneDate,readSceneTime,saveSceneTime,skyAt,sunAt,sunTimes,fireworksAllowed,solarSchedule,solarPresets,starAt,starCount:root.SKY_STARS.length,palette,activity,createWorld,advance,
     nightEventTypes:NIGHT_TYPES.slice(),eventTypes:[...EVENT_TYPES,...WINTER_VISITORS],rareTypes:RARE_TYPES.slice(),eventDurations:Object.assign({},EVENT_DURATIONS),MAX_EVENTS,RARE_COOLDOWN,readMotion,saveMotion,motionReduced,clamp,lerp,smooth,mixHex};
 })(globalThis);
