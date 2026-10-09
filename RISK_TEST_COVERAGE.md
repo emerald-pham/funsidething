@@ -823,3 +823,6 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 
 - RISK Landscape browser: public twilight scenery retains opaque physical barge hull in the final composite
 - RISK fireworks physical vessel: twilight hull opacity follows the ordinary crossing pose
+
+- RISK dependency form presentation: Add Edit explanation lives in FAQ and controls keep named protected binary choices
+- RISK dependency form presentation: Hard heading follows active rows across selection removal filter reset and Edit reopen

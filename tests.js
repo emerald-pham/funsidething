@@ -23711,7 +23711,7 @@ test('RISK per-edge dependency rendered controls: phone enlarged tablet desktop 
      const samples=['#etPrerequisite','.dependency-hard','.dependency-hard-heading','#editDependencyModeHint','#editDependencySearch'].map(selector=>{const el=document.querySelector(selector),s=getComputedStyle(el),r=el.getBoundingClientRect();return {selector,family:s.fontFamily,size:s.fontSize,weight:s.fontWeight,lineHeight:s.lineHeight,left:r.left,right:r.right,scrollWidth:el.scrollWidth,clientWidth:el.clientWidth};});
      return {samples,overflow:document.documentElement.scrollWidth>innerWidth,description:document.getElementById('editDependencyModeHint').textContent,configured:window.CloudSync?.configured};
     });assert.equal(info.configured,false);assert.equal(info.overflow,false);for(const sample of info.samples){assert.ok(sample.left>=-1&&sample.right<=width+1,sample.selector+' stays in viewport');if(sample.selector!== '#etPrerequisite')assert.ok(sample.scrollWidth<=sample.clientWidth+1,sample.selector+' does not overflow');}
-    const aria=await editBox.ariaSnapshot();assert.match(aria,/Hard dependency:/);assert.match(info.description,/Evergreen off/);
+    const aria=await editBox.ariaSnapshot();assert.match(aria,/Hard dependency:/);assert.match(info.description,/dependency FAQ/);
     let resolvedFonts=[];if(engine==='chrome'){const cdp=await context.newCDPSession(page);await cdp.send('DOM.enable');await cdp.send('CSS.enable');const {root}=await cdp.send('DOM.getDocument');const {nodeId}=await cdp.send('DOM.querySelector',{nodeId:root.nodeId,selector:'.dependency-hard'});resolvedFonts=(await cdp.send('CSS.getPlatformFontsForNode',{nodeId})).fonts;assert.ok(resolvedFonts.length);await cdp.detach();}
     if(output)await page.screenshot({path:path.join(output,engine+'-'+width+'-'+(large?'large':'normal')+'.png')});
     await page.getByRole('button',{name:'Save',exact:true}).click();assert.equal(await page.evaluate(({id,root})=>taskDependencyMode(taskById(id),root),{id,root:fixture.root}),'soft');assert.deepEqual(errors,[]);records.push({engine,version:browser.version(),width,height,large,aria,resolvedFonts,...info});
@@ -23938,4 +23938,27 @@ test('RISK fireworks physical vessel: twilight hull opacity follows the ordinary
   vm.runInNewContext(`${paint};paintFestival(event)`,{g,event,geometry,S:sampler,sky:{sun:{altitude,azimuth},polarDay,period:polarDay||altitude>=8?'day':altitude<-12?'night':azimuth<180?'dawn':'dusk'},line(){alphas.push(g.globalAlpha);},ellipse(){alphas.push(g.globalAlpha);}});
   assert.equal(alphas[0]||0,altitude<8&&!polarDay?geometry.festival(event).alpha:0,`${width}x${height}: hull stage and crowd visibility at ${altitude}, azimuth ${azimuth}, polar ${polarDay}`);
  }
+});
+
+test('RISK dependency form presentation: Add Edit explanation lives in FAQ and controls keep named protected binary choices',async()=>{
+ const {ctx,shim}=await loadApp(),target=ctx.addTask('Named target'),owner=ctx.addTask('Owner');ctx.setTaskPrerequisites(owner.id,[target.id]);ctx.writeTaskDependencyModes(owner,{[target.id]:'hard'});
+ for(const scope of ['add','edit']){
+  if(scope==='edit')ctx.openEdit(owner.id);else ctx.renderDependencyFields('add',[target.id]);
+  const html=ctx.dependencyFieldsHTML(scope,[target.id]);assert.doesNotMatch(html,/Hard dependency clears only after deletion/,'quoted explanation must leave task forms');assert.match(html,/aria-label="Hard dependency: Named target"/);assert.match(html,/DependencyModeHint" hidden>See dependency FAQ/);
+ }
+ owner.dependencyModes={[target.id]:'future'};ctx.openEdit(owner.id);assert.match(shim.document.getElementById('modalRoot').innerHTML,/disabled>Hard dependency \(saved data protected\)/);
+ ctx.openHelp();assert.match(shim.document.getElementById('modalRoot').innerHTML,/Hard dependency clears only after deletion or Done with Evergreen off/,'full explanation belongs to prerequisite FAQ');
+});
+test('RISK dependency form presentation: Hard heading follows active rows across selection removal filter reset and Edit reopen',async()=>{
+ const {ctx,shim}=await loadApp(),target=ctx.addTask('Target'),owner=ctx.addTask('Owner');
+ for(const scope of ['add','edit']){
+  if(scope==='edit')ctx.openEdit(owner.id);else ctx.renderDependencyFields(scope,[]);
+  assert.doesNotMatch(ctx.dependencyRowsHTML(scope,ctx.readDependencyDraft(scope)),/dependency-hard-heading/,'empty picker has no Hard column');
+  const select=shim.document.getElementById(scope==='add'?'addPrerequisite':'etPrerequisite');Object.assign(select,{value:target.id,dataset:{dependencyScope:scope},matches:()=>false});shim.document.dispatchEvent({type:'change',target:select});
+  assert.match(ctx.dependencyRowsHTML(scope,ctx.readDependencyDraft(scope)),/dependency-hard-heading">Hard/);
+  const search=shim.document.getElementById(scope+'DependencySearch');Object.assign(search,{value:'no match',dataset:{dependencySearch:scope},matches:()=>false});shim.document.dispatchEvent({type:'input',target:search});assert.deepEqual(Array.from(ctx.readDependencyDraft(scope)),[target.id]);assert.match(ctx.dependencyRowsHTML(scope,ctx.readDependencyDraft(scope)),/dependency-hard-heading/,'filter preserves selected active row');
+  ctx.onAction('remove-dependency',{dataset:{scope,index:'0'}});assert.doesNotMatch(ctx.dependencyRowsHTML(scope,ctx.readDependencyDraft(scope)),/dependency-hard-heading/,'last row removal hides Hard');
+ }
+ ctx.renderDependencyFields('add',[target.id]);ctx.clearQuickAddDraft();assert.doesNotMatch(ctx.dependencyRowsHTML('add',ctx.readDependencyDraft('add')),/dependency-hard-heading/);
+ ctx.setTaskPrerequisites(owner.id,[target.id]);ctx.openEdit(owner.id);assert.match(ctx.dependencyRowsHTML('edit',ctx.readDependencyDraft('edit')),/dependency-hard-heading/);ctx.setTaskPrerequisites(owner.id,[]);ctx.openEdit(owner.id);assert.doesNotMatch(ctx.dependencyRowsHTML('edit',ctx.readDependencyDraft('edit')),/dependency-hard-heading/);
 });
