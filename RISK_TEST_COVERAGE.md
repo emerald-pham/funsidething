@@ -800,3 +800,7 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK scenery tuning: doubled barge odds preserve interval cooldown duration and standalone frequency
 - RISK scenery tuning: fairy activation doubles probability with unchanged sampling duration and daylight guard
 - RISK scenery tuning: windows switch on half-length UTC ticks with unchanged seeded lit proportion
+
+- RISK frozen header clearance: actual preference transition reserves responsive header geometry through resize and text growth
+- RISK frozen header clearance browser: freeze unfreeze and responsive text retain document headroom
+- RISK frozen header wrapping: enlarged controls fit without font changes or hiding Settings
