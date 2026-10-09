@@ -23538,3 +23538,120 @@ test('RISK repository process: deployment fetches deleted squash PR head and rej
   const wrong=path.join(f.root,'wrong');fs.mkdirSync(wrong);releaseGateGit(wrong,['init','-q']);releaseGateGit(wrong,['remote','add','origin',f.repo]);releaseGateGit(wrong,['fetch','-q','origin',squash]);releaseGateGit(wrong,['checkout','-q','--detach','FETCH_HEAD']);releaseGateGit(f.repo,['update-ref','refs/pull/78/head',f.baseSha]);const rejected=await verifyDeploymentEvidence({repoRoot:wrong,repository:'emerald-pham/funsidething',deployedSha:squash,beforeSha:f.baseSha,token:'fixture',fetchImpl});assert.equal(rejected.ok,false,'moved PR ref must not authorize another head');assert.match(rejected.errors.join(' '),/exact|match|head/i);
  }finally{cleanupReleaseGateFixture(f);}
 });
+
+test('RISK per-edge dependency controls: Add and Edit checkbox transitions persist hard soft and legacy without losing search selections',async()=>{
+ const {ctx,shim}=await loadApp();const root=ctx.addTask('Recurring root'),owner=ctx.addTask('Owner');root.evergreen=true;
+ ctx.setTaskPrerequisites(owner.id,[root.id]);
+ ctx.openEdit(owner.id);
+ assert.match(shim.document.getElementById('modalRoot').innerHTML,/Hard dependency/,'selected links require the requested checkbox');
+ assert.equal(ctx.taskDependencyMode(owner,root.id),'legacy');
+ const checkbox=shim.document.getElementById('editDependencyHard0');Object.assign(checkbox,{id:'editDependencyHard0',dataset:{dependencyHard:'edit',dependencyId:root.id},matches:()=>false,checked:true});
+ shim.document.dispatchEvent({type:'change',target:checkbox});ctx.onAction('save-edit',{dataset:{id:owner.id}});
+ assert.equal(ctx.taskDependencyMode(owner,root.id),'hard');ctx.completeTask(root);assert.equal(ctx.isEligible(owner),false,'evergreen Done never clears hard');
+ ctx.openEdit(owner.id);checkbox.checked=false;shim.document.dispatchEvent({type:'change',target:checkbox});ctx.onAction('save-edit',{dataset:{id:owner.id}});
+ assert.equal(ctx.taskDependencyMode(owner,root.id),'soft');assert.equal(ctx.isEligible(owner),true,'rest clears soft');ctx.reopenTask(root);assert.equal(ctx.isEligible(owner),false,'recurrence blocks again');
+ ctx.renderAddPanel();const select=shim.document.getElementById('addPrerequisite');Object.assign(select,{dataset:{dependencyScope:'add'},matches:()=>false,value:root.id});shim.document.dispatchEvent({type:'change',target:select});
+ assert.equal(ctx.quickAddTaskOptions().dependencyModes[root.id],'soft');
+ const addBox=shim.document.getElementById('addDependencyHard0');Object.assign(addBox,{dataset:{dependencyHard:'add',dependencyId:root.id},matches:()=>false,checked:true});shim.document.dispatchEvent({type:'change',target:addBox});
+ const added=ctx.addTask('New owner',false,[],{},ctx.quickAddTaskOptions());assert.equal(ctx.taskDependencyMode(added,root.id),'hard');
+ await ctx.persist();const reload=await loadApp({seedStorage:{[SYNC_STORE_KEY]:shim.localStorage.getItem(SYNC_STORE_KEY)}});assert.equal(reload.ctx.taskDependencyMode(reload.ctx.state.tasks.find(t=>t.id===owner.id),root.id),'soft');
+});
+
+test('RISK per-edge dependency semantics: mixed edges intrinsic eligibility deletion Undo and cyclic chains remain bounded',async()=>{
+ const {ctx}=await loadApp();const a=ctx.addTask('A'),b=ctx.addTask('B'),c=ctx.addTask('C');ctx.setTaskPrerequisites(c.id,[a.id,b.id]);ctx.writeTaskDependencyModes(c,{[a.id]:'hard',[b.id]:'soft'});
+ b.startsAt='2999-01-01';assert.equal(ctx.isEligible(c),false);ctx.completeTask(a);assert.equal(ctx.isEligible(c),true);b.startsAt=null;assert.equal(ctx.isEligible(c),false);
+ ctx.deleteTask(b.id);assert.equal(ctx.isEligible(c),true);ctx.undo();assert.equal(ctx.isEligible(ctx.state.tasks.find(t=>t.id===c.id)),false);
+ ctx.setTaskPrerequisites(a.id,[c.id]);ctx.reopenTask(ctx.state.tasks.find(t=>t.id===a.id));ctx.writeTaskDependencyModes(ctx.state.tasks.find(t=>t.id===a.id),{[c.id]:'soft'});assert.equal(ctx.isEligible(ctx.state.tasks.find(t=>t.id===a.id)),false);assert.equal(ctx.isEligible(ctx.state.tasks.find(t=>t.id===c.id)),false,'cycles use intrinsic target eligibility and never recurse');
+ const stale=JSON.parse(JSON.stringify(ctx.state.tasks.find(t=>t.id===c.id)));ctx.writeTaskDependencyModes(ctx.state.tasks.find(t=>t.id===c.id),{[a.id]:'soft'});ctx.mergeTaskPrerequisites(ctx.state.tasks.find(t=>t.id===c.id),stale);assert.equal(ctx.taskDependencyMode(ctx.state.tasks.find(t=>t.id===c.id),a.id),'soft','stale mode cannot replace explicit change');
+});
+
+test('RISK per-edge dependency sync: explicit modes survive stale clients while Undo Restore and readd express fresh intent',async()=>{
+ const {ctx}=await loadApp();const root=ctx.addTask('Root'),owner=ctx.addTask('Owner');ctx.setTaskPrerequisites(owner.id,[root.id]);
+ const legacy=JSON.parse(JSON.stringify(owner));ctx.writeTaskDependencyModes(owner,{[root.id]:'hard'});const hard=JSON.parse(JSON.stringify(owner));ctx.pushUndo();ctx.writeTaskDependencyModes(owner,{[root.id]:'soft'});
+ const soft=JSON.parse(JSON.stringify(owner));ctx.mergeTaskPrerequisites(owner,hard);assert.equal(ctx.taskDependencyMode(owner,root.id),'soft');
+ const reverse=JSON.parse(JSON.stringify(hard));ctx.mergeTaskPrerequisites(reverse,soft);assert.equal(ctx.taskDependencyMode(reverse,root.id),'soft');
+ ctx.mergeTaskPrerequisites(owner,legacy);assert.equal(ctx.taskDependencyMode(owner,root.id),'soft');
+ ctx.undo();const restored=ctx.state.tasks.find(t=>t.id===owner.id);assert.equal(ctx.taskDependencyMode(restored,root.id),'hard');ctx.mergeTaskPrerequisites(restored,soft);assert.equal(ctx.taskDependencyMode(restored,root.id),'hard','stale soft does not undo Undo');
+ ctx.replaceTaskPrerequisites(legacy,restored);assert.equal(ctx.taskDependencyMode(legacy,root.id),'legacy','Restore explicitly chooses old behavior with fresh causal evidence');ctx.mergeTaskPrerequisites(legacy,restored);assert.equal(ctx.taskDependencyMode(legacy,root.id),'legacy');
+ ctx.setTaskPrerequisites(restored.id,[]);ctx.openEdit(restored.id);
+ ctx.writeTaskPrerequisites(restored,[root.id]);ctx.writeTaskDependencyModes(restored,{[root.id]:'soft'});ctx.mergeTaskPrerequisites(restored,hard);assert.equal(ctx.taskDependencyMode(restored,root.id),'soft');
+ const board=JSON.parse(JSON.stringify(ctx.state)),before=JSON.stringify(board);ctx.hydrateState(board);assert.equal(JSON.stringify(board),before,'existing normalized boards do not acquire mode edits on load');
+});
+
+test('RISK per-edge dependency eligibility: search pass marks contexts dates and evergreen expiry use the same bounded rule',async()=>{
+ const {ctx}=await loadApp();const target=ctx.addTask('Target'),owner=ctx.addTask('Owner');ctx.setTaskPrerequisites(owner.id,[target.id]);ctx.writeTaskDependencyModes(owner,{[target.id]:'soft'});
+ ctx.state.considered[target.id]='cant';ctx.state.chain=[target.id];assert.equal(ctx.isEligible(owner),false,'pass marks and dot position do not make soft targets intrinsically ineligible');
+ ctx.state.contexts=[{id:'context',name:'Context',active:false}];target.ctx=['context'];assert.equal(ctx.isEligible(owner),true);ctx.state.contexts[0].active=true;assert.equal(ctx.isEligible(owner),false);ctx.state.contexts[0].excluded=true;assert.equal(ctx.isEligible(owner),true);
+ target.ctx=[];target.startsAt='2999-01-01';assert.equal(ctx.isEligible(owner),true);target.startsAt=null;target.evergreen=true;target.evergreenHours=18;target.evergreenResetAtDay=false;ctx.completeTask(target);assert.equal(ctx.isEligible(owner),true);
+ target.lastDoneAt=Date.now()-19*3600000;assert.equal(ctx.isEligible(owner),false,'automatic recurrence blocks soft without removing edge');
+ ctx.writeTaskDependencyModes(owner,{[target.id]:'hard'});target.done=true;assert.equal(ctx.isEligible(owner),false,'even imported Done evergreen blocks hard');target.evergreen=false;assert.equal(ctx.isEligible(owner),true);
+});
+
+test('RISK per-edge dependency future evidence: untouched editor preserves opaque choices and conflicting identity is deterministic',async()=>{
+ const {ctx}=await loadApp();const root=ctx.addTask('Root'),owner=ctx.addTask('Owner');ctx.setTaskPrerequisites(owner.id,[root.id]);owner.dependencyModes={[root.id]:{choices:[{token:'future',mode:'future-mode',opaque:42}],removes:[],futureField:{keep:true}},opaque:'retain'};
+ const exact=JSON.stringify(owner.dependencyModes);ctx.openEdit(owner.id);ctx.onAction('save-edit',{dataset:{id:owner.id}});assert.equal(JSON.stringify(owner.dependencyModes),exact,'ordinary Save preserves unsupported dependency evidence');
+ const a={...owner,dependencyModes:{[root.id]:{choices:[{token:'same',mode:'hard'}],removes:[]}}},b={...owner,dependencyModes:{[root.id]:{choices:[{token:'same',mode:'soft'}],removes:[]}}};
+ const left=JSON.parse(JSON.stringify(a)),right=JSON.parse(JSON.stringify(b));ctx.mergeTaskPrerequisites(left,b);ctx.mergeTaskPrerequisites(right,a);assert.equal(ctx.taskDependencyMode(left,root.id),ctx.taskDependencyMode(right,root.id),'conflicting immutable operation identity converges');
+});
+
+test('RISK per-edge dependency real saves: stale tabs keep peer title explicit mode offline reload and completion Undo',async()=>{
+ const initial=await loadApp();const root=initial.ctx.addTask('Root'),owner=initial.ctx.addTask('Owner');root.evergreen=true;initial.ctx.setTaskPrerequisites(owner.id,[root.id]);initial.ctx.writeTaskDependencyModes(owner,{[root.id]:'hard'});await initial.ctx.persist();
+ const raw=initial.shim.localStorage.getItem(SYNC_STORE_KEY),storage=sharedScannerStorage({[LOCAL_HEAD_KEY]:raw,[SYNC_STORE_KEY]:raw});const a=await loadApp({sharedStorage:storage}),b=await loadApp({sharedStorage:storage});
+ const local=a.ctx.state.tasks.find(t=>t.id===owner.id);a.ctx.openEdit(local.id);const checkbox=a.shim.document.getElementById('editDependencyHard0');Object.assign(checkbox,{dataset:{dependencyHard:'edit',dependencyId:root.id},matches:()=>false,checked:false});a.shim.document.dispatchEvent({type:'change',target:checkbox});
+ const search=a.shim.document.getElementById('editDependencySearch');Object.assign(search,{dataset:{dependencySearch:'edit'},value:'nothing matches'});a.shim.document.dispatchEvent({type:'input',target:search});assert.deepEqual(Array.from(a.ctx.readDependencyDraft('edit')),[root.id]);assert.equal(vm.runInContext('dependencyDraftModes.edit',a.ctx)[root.id],'soft');
+ b.ctx.state.tasks.find(t=>t.id===owner.id).title='Peer title';b.ctx.commit();await b.ctx.persist();a.ctx.onAction('save-edit',{dataset:{id:owner.id}});await a.ctx.persist();
+ const saved=JSON.parse(storage.getItem(SYNC_STORE_KEY)),task=saved.tasks.find(t=>t.id===owner.id);assert.equal(task.title,'Peer title');assert.equal(a.ctx.taskDependencyMode(task,root.id),'soft');
+ b.ctx.state.tasks.find(t=>t.id===root.id).title='Peer root';b.ctx.commit();await b.ctx.persist();const reload=await loadApp({seedStorage:{[SYNC_STORE_KEY]:storage.getItem(SYNC_STORE_KEY)}});const target=reload.ctx.state.tasks.find(t=>t.id===root.id),dependent=reload.ctx.state.tasks.find(t=>t.id===owner.id);assert.equal(reload.ctx.taskDependencyMode(dependent,root.id),'soft');assert.equal(reload.ctx.isEligible(dependent),false);reload.ctx.pushUndo();reload.ctx.completeTask(target);await reload.ctx.persist();assert.equal(reload.ctx.isEligible(dependent),true);reload.ctx.undo();assert.equal(reload.ctx.isEligible(reload.ctx.state.tasks.find(t=>t.id===owner.id)),false);
+});
+
+test('RISK per-edge dependency opaque map: unsupported top-level mode data is retained by writes and merges',async()=>{
+ const {ctx}=await loadApp();const root=ctx.addTask('Root'),owner=ctx.addTask('Owner');ctx.setTaskPrerequisites(owner.id,[root.id]);owner.dependencyModes=['future-opaque-map'];const raw=JSON.stringify(owner.dependencyModes);
+ ctx.writeTaskDependencyModes(owner,{[root.id]:'hard'});assert.equal(JSON.stringify(owner.dependencyModes),raw,'unsupported entire map is preserved');assert.equal(ctx.taskDependencyMode(owner,root.id),'unsupported');
+ const other=JSON.parse(JSON.stringify(owner));delete other.dependencyModes;ctx.mergeTaskPrerequisites(other,owner);assert.equal(JSON.stringify(other.dependencyModes),raw,'missing client metadata adopts exact future map');
+});
+
+test('RISK per-edge dependency recovery: future recovery shape remains safe through merges and unsupported controls',async()=>{
+ const {ctx,shim}=await loadApp();const root=ctx.addTask('Root'),owner=ctx.addTask('Owner');ctx.setTaskPrerequisites(owner.id,[root.id]);owner.dependencyModes={[root.id]:'future'};owner.dependencyModeRecovery={opaque:'retain'};const peer=JSON.parse(JSON.stringify(owner));peer.dependencyModes[root.id]='other-future';
+ assert.doesNotThrow(()=>ctx.mergeTaskPrerequisites(owner,peer));assert.ok(JSON.stringify(owner.dependencyModeRecovery).includes('retain'));ctx.openEdit(owner.id);assert.match(shim.document.getElementById('modalRoot').innerHTML,/unsupported saved rule/);assert.match(shim.document.getElementById('modalRoot').innerHTML,/disabled>Hard dependency/);
+});
+
+test('RISK per-edge dependency rendered controls: phone enlarged tablet desktop labels keyboard search and saved rules fit real browsers',
+ {skip:!process.env.DEPENDENCY_BROWSER_URL},async()=>{
+ const {chromium,webkit}=await import(process.env.PLAYWRIGHT_MODULE||'playwright'),records=[],output=process.env.DEPENDENCY_SCREENSHOTS;
+ if(output)fs.mkdirSync(output,{recursive:true});
+ for(const [engine,type] of [['chrome',chromium],['webkit',webkit]]){
+  const browser=await type.launch({headless:true,...(engine==='chrome'?{channel:'chrome'}:{})});
+  try{for(const [width,height,large] of [[320,568,true],[390,844,false],[768,1024,false],[1440,900,false]]){
+   const context=await browser.newContext({viewport:{width,height},serviceWorkers:'block'});
+   try{
+    await context.addInitScript(()=>localStorage.setItem('fvp:chain-scanner:landscape-motion','reduced'));
+    const page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));await page.goto(process.env.DEPENDENCY_BROWSER_URL);await page.waitForFunction(()=>typeof state!=='undefined'&&state?.tasks);
+    const fixture=await page.evaluate(()=>{closeModal();document.getElementById('motionDialog')?.close();replaceState(defaultState());const root=addTask('A long recurring dependency name that wraps safely on small screens'),other=addTask('Other choice');root.evergreen=true;state.addOpen=true;renderAddPanel();return {root:root.id,other:other.id,title:root.title};});
+    if(large)await page.addStyleTag({content:'body{font-size:24px!important}.dependency-row label,.dependency-mode-hint,.dependency-hard-heading,.dependency-search label{font-size:18px!important}input,select,button{font-size:18px!important}'});
+    await page.locator('#addPrerequisite').selectOption(fixture.root);const box=page.getByRole('checkbox',{name:'Hard dependency: '+fixture.title,exact:true});await box.check();await box.focus();await page.keyboard.press('Space');assert.equal(await box.isChecked(),false);await box.check();
+    await page.locator('#addDependencySearch').fill('no match');assert.equal(await page.locator('#addPrerequisite').inputValue(),fixture.root);assert.equal(await box.isChecked(),true);
+    await page.locator('#addInput').fill('New dependent');await page.locator('#addButton').click();await page.waitForFunction(()=>document.getElementById('addInput').value==='');
+    const id=await page.evaluate(()=>state.tasks.find(t=>t.title==='New dependent').id);await page.evaluate(id=>openEdit(id),id);
+    const editBox=page.getByRole('checkbox',{name:'Hard dependency: '+fixture.title,exact:true});assert.equal(await editBox.isChecked(),true);await editBox.focus();await page.keyboard.press('Space');assert.equal(await editBox.isChecked(),false);await page.locator('#editDependencySearch').fill('no match');assert.equal(await page.locator('#etPrerequisite').inputValue(),fixture.root);
+    await editBox.scrollIntoViewIfNeeded();const info=await page.evaluate(()=>{
+     const samples=['#etPrerequisite','.dependency-hard','.dependency-hard-heading','#editDependencyModeHint','#editDependencySearch'].map(selector=>{const el=document.querySelector(selector),s=getComputedStyle(el),r=el.getBoundingClientRect();return {selector,family:s.fontFamily,size:s.fontSize,weight:s.fontWeight,lineHeight:s.lineHeight,left:r.left,right:r.right,scrollWidth:el.scrollWidth,clientWidth:el.clientWidth};});
+     return {samples,overflow:document.documentElement.scrollWidth>innerWidth,description:document.getElementById('editDependencyModeHint').textContent,configured:window.CloudSync?.configured};
+    });assert.equal(info.configured,false);assert.equal(info.overflow,false);for(const sample of info.samples){assert.ok(sample.left>=-1&&sample.right<=width+1,sample.selector+' stays in viewport');if(sample.selector!== '#etPrerequisite')assert.ok(sample.scrollWidth<=sample.clientWidth+1,sample.selector+' does not overflow');}
+    const aria=await editBox.ariaSnapshot();assert.match(aria,/Hard dependency:/);assert.match(info.description,/Evergreen off/);
+    let resolvedFonts=[];if(engine==='chrome'){const cdp=await context.newCDPSession(page);await cdp.send('DOM.enable');await cdp.send('CSS.enable');const {root}=await cdp.send('DOM.getDocument');const {nodeId}=await cdp.send('DOM.querySelector',{nodeId:root.nodeId,selector:'.dependency-hard'});resolvedFonts=(await cdp.send('CSS.getPlatformFontsForNode',{nodeId})).fonts;assert.ok(resolvedFonts.length);await cdp.detach();}
+    if(output)await page.screenshot({path:path.join(output,engine+'-'+width+'-'+(large?'large':'normal')+'.png')});
+    await page.getByRole('button',{name:'Save',exact:true}).click();assert.equal(await page.evaluate(({id,root})=>taskDependencyMode(taskById(id),root),{id,root:fixture.root}),'soft');assert.deepEqual(errors,[]);records.push({engine,version:browser.version(),width,height,large,aria,resolvedFonts,...info});
+   }finally{await context.close();}
+  }}finally{await browser.close();}
+ }
+ if(output)fs.writeFileSync(path.join(output,'results.json'),JSON.stringify(records,null,2)+'\n');
+});
+
+test('RISK per-edge dependency released clients: real supported hydration preserves modes and single-link edits retain explicit choices',async()=>{
+ const {ctx}=await loadApp();const root=ctx.addTask('Root'),other=ctx.addTask('Other'),owner=ctx.addTask('Owner');ctx.setTaskPrerequisites(owner.id,[root.id,other.id]);ctx.writeTaskDependencyModes(owner,{[root.id]:'hard',[other.id]:'soft'});
+ for(const sha of ['7b9c92a41999a44a12f92b7d6d1c8d02758c635e','d4ceaaa74f9494538d16044b968f8cfcfe75fb5b','6852dfac2c900d84b550090877515dcece8707f4']){
+  const board=JSON.parse(JSON.stringify(ctx.state)),task=board.tasks.find(t=>t.id===owner.id),evidence=JSON.stringify(task.dependencyModes);
+  const released=spawnSync('git',['show',sha+':index.html'],{cwd:__dirname,encoding:'utf8'});assert.equal(released.status,0);const start=released.stdout.indexOf('function hydrateState('),end=released.stdout.indexOf('\nfunction ',start+1);assert.ok(start>=0&&end>start);vm.runInContext('('+released.stdout.slice(start,end)+')',ctx)(board);task.title='Old client title';ctx.hydrateState(board);assert.equal(JSON.stringify(task.dependencyModes),evidence);assert.equal(ctx.taskDependencyMode(task,root.id),'hard');assert.equal(ctx.taskDependencyMode(task,other.id),'soft');
+  task.prerequisiteId=null;ctx.hydrateState(board);assert.equal(ctx.taskDependencyMode(task,other.id),'soft');task.prerequisiteId=root.id;ctx.hydrateState(board);assert.equal(ctx.taskDependencyMode(task,root.id),'hard','released mirror replacement retains an explicitly saved mode for that ID');
+ }
+});

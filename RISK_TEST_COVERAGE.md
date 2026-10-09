@@ -773,3 +773,18 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK carrying isolation: immutable accepted renderer commands match exactly on the same runtime
 
 - RISK carrying continuity: stable actor capability preserves resting grip transitions and deterministic departure seeks
+
+- RISK per-edge dependency controls: Add and Edit checkbox transitions persist hard soft and legacy without losing search selections
+- RISK per-edge dependency semantics: mixed edges intrinsic eligibility deletion Undo and cyclic chains remain bounded
+- RISK per-edge dependency sync: explicit modes survive stale clients while Undo Restore and readd express fresh intent
+- RISK per-edge dependency eligibility: search pass marks contexts dates and evergreen expiry use the same bounded rule
+
+- RISK per-edge dependency future evidence: untouched editor preserves opaque choices and conflicting identity is deterministic
+- RISK per-edge dependency real saves: stale tabs keep peer title explicit mode offline reload and completion Undo
+- RISK per-edge dependency opaque map: unsupported top-level mode data is retained by writes and merges
+
+- RISK per-edge dependency recovery: future recovery shape remains safe through merges and unsupported controls
+
+- RISK per-edge dependency rendered controls: phone enlarged tablet desktop labels keyboard search and saved rules fit real browsers
+
+- RISK per-edge dependency released clients: real supported hydration preserves modes and single-link edits retain explicit choices
