@@ -1,10 +1,20 @@
 [
   {
-    "testChangesSha256": "e948963654a947a9527b962208d3a481f1d32a60ff7952d67746d1677bb71eb6",
-    "reason": "Explicit user scenery tuning restores crossing-relative barge fireworks and doubles barge and fairy odds and window cadence. Update only intentional rate/lifetime expectations and preserve all particle, schedule and data contracts. Final full-suite1413pass/1failure/30runtime-skips exposed the remaining old normalized-space population upper bound .2. Retain per-frame stability, one-roof-per-opportunity, strict1/6 boundary, exact seeded UTC samples and6000-resample accuracy tests; use the sparse one-in-six occupancy bound below1/3 to continue rejecting fifty-percent toggles. This is an explicitly requested probability change, not an unrelated weakened regression.",
+    "testChangesSha256": "461ec28d5b929610c835ca9d4aa05d17b86a695771ff6dabf4ce975534704986",
+    "reason": "Explicit user scenery tuning restores crossing-relative barge fireworks and doubles barge and fairy odds and window cadence. Update only intentional rate/lifetime expectations and preserve all particle, schedule and data contracts. Final full-suite1413pass/1failure/30runtime-skips exposed the remaining old normalized-space population upper bound .2. Retain per-frame stability, one-roof-per-opportunity, strict1/6 boundary, exact seeded UTC samples and6000-resample accuracy tests; use the sparse one-in-six occupancy bound below1/3 to continue rejecting fifty-percent toggles. This is an explicitly requested probability change, not an unrelated weakened regression. The exact final base-to-head fingerprint binds the complete protected-test diff; the prior intermediate fingerprint had no replacement declarations and was not final-gate evidence.",
     "previousBehavior": "Barge fireworks stopped at sixty seconds; festival chance .006, fairy chance one-in-twelve and window ticks fifteen seconds.",
     "intendedBehavior": "Historical 65%-crossing barge finale, .012 festival chance, one-in-six fairy activation and7.5-second window ticks. Standalone cap and frequency unchanged.",
-    "replacementTests": [],
+    "replacementTests": [
+      "RISK fairy lights: gardens and patios share independent stable one-in-six roof samples",
+      "RISK skyline lights: each garden has a one-in-six state through independent resamples",
+      "RISK fireworks minute cap: standalone tails finish within sixty seconds and barge tails follow crossing",
+      "RISK fireworks reduced motion: static blooms stay on the stationary barge throughout its crossing",
+      "RISK fireworks reduced deadline: static scheduler preserves a persistent barge bloom across sixty seconds without animated repaints",
+      "RISK scenery tuning: barge crossing lifetime restores historical finale without standalone cap regression",
+      "RISK scenery tuning: doubled barge odds preserve interval cooldown duration and standalone frequency",
+      "RISK scenery tuning: fairy activation doubles probability with unchanged sampling duration and daylight guard",
+      "RISK scenery tuning: windows switch on half-length UTC ticks with unchanged seeded lit proportion"
+    ],
     "preservedCoverage": [
       "Standalone sixty-second maximum, four-times-original spacing and reservations, paired0–300ms seeded delay, explosion and finale particles, independent roof sampling, daylight guards and all task storage/sync protections remain."
     ],
