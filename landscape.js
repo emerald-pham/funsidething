@@ -1156,7 +1156,7 @@
         if(e.type!=='kite'&&visit.stand<1){g.save();g.globalAlpha*=1-visit.stand;seated(px,py,seed,i?-1:1,book&&visit.pack<.8);g.restore();}
         if(e.type==='kite'||visit.stand>0){
           const carrying=e.type==='kite'?0:S.smooth(.4,.7,visit.pack);
-          const motion=geometry.humanWalkPose(px,py,visit.distance,visit.direction,geometry.humanGround('trail',20),carrying,1,visit.travel);
+          const motion=geometry.humanWalkPose(px,py,visit.distance,visit.direction,geometry.humanGround('trail',20),carrying,1,e.type==='kite'?visit.travel:{...visit.travel,runStyle:'carrying'});
           if(e.type==='kite')motion.hand={x:motion.hipX+5,y:-6+motion.bob};
           g.save();g.globalAlpha*=e.type==='kite'?1:visit.stand;g.translate(px,py);g.scale(visit.direction,1);const hand=person(0,0,seed,motion);
           if(e.type==='kite')kiteHand={x:px+visit.direction*hand.x,y:py+hand.y};

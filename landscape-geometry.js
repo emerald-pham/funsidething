@@ -270,7 +270,7 @@
     }
     function humanRoute(x,distance,direction,ground,scale,travel){
       const origin=Math.round((x-direction*distance)*1e8)/1e8;
-      const key=[origin,direction,scale,travel?.kind??'',travel?.speed??'',travel?.startDistance??'',travel?.length??'',travel?.duration??''].join('|');
+      const key=[origin,direction,scale,travel?.kind??'',travel?.speed??'',travel?.startDistance??'',travel?.length??'',travel?.duration??'',travel?.runStyle??''].join('|');
       let routes=humanRoutes.get(ground);
       if(!routes){routes=new Map();humanRoutes.set(ground,routes);}
       let route=routes.get(key);
@@ -295,7 +295,8 @@
         };
         // Cap fast departures at a running contact rhythm. A longer aerial
         // stride does not lengthen either leg or change the existing route.
-        const strideAt=d=>Math.max(walkStrideAt(d),speedAt(d)*.8);
+        const carrierAt=d=>{if(travel?.runStyle!=='carrying')return 0;const t=Math.max(0,Math.min(1,(d-travel.startDistance/scale)/12));return t*t*(3-2*t);};
+        const strideAt=d=>Math.max(walkStrideAt(d),speedAt(d)*(.8-.3*carrierAt(d)));
         const density=d=>1/strideAt(d),approach=(travel?travel.startDistance:40)/scale;
         // Preserve the existing forty-unit approach's resting endpoint. Only
         // this route interval is normalized, never the entire viewport hill.
@@ -306,7 +307,7 @@
         const nodes=[{distance:0,phase:0}];
         let phase=0;
         for(let d=-1;d>=-32;d--){phase-=rate(d,d+1);nodes.unshift({distance:d,phase});}
-        route={nodes,rate,strideAt,walkStrideAt,approach,factor,clearances:new Map()};routes.set(key,route);
+        route={nodes,rate,strideAt,walkStrideAt,carrierAt,approach,factor,clearances:new Map()};routes.set(key,route);
       }
       humanRouteOrder.delete(route);humanRouteOrder.set(route,{routes,key});
       if(humanRouteOrder.size>32){
@@ -339,7 +340,7 @@
         const a=nodes[low],b=nodes[high],t=(value-a[field])/(b[field]-a[field]);
         return a[result]+t*(b[result]-a[result]);
       };
-      return {phaseAt:d=>interpolate(d,'distance','phase'),distanceAt:p=>interpolate(p,'phase','distance'),strideAt:route.strideAt,walkStrideAt:route.walkStrideAt,clearances:route.clearances};
+      return {phaseAt:d=>interpolate(d,'distance','phase'),distanceAt:p=>interpolate(p,'phase','distance'),strideAt:route.strideAt,walkStrideAt:route.walkStrideAt,carrierAt:route.carrierAt,clearances:route.clearances};
     }
     function humanWalkPose(x,y,distance,direction,ground,carrying=false,scale=1,travel=null){
       // Terrain changes the spacing of future contacts, never an already
@@ -347,13 +348,30 @@
       // route origin and touchdown phase at every deterministic seek.
       const localDistance=distance/scale,route=humanRoute(x,distance,direction,ground,scale,travel);
       const cycles=route.phaseAt(localDistance),phase=cycles*Math.PI*2,stride=route.strideAt(localDistance);
-      const anchor=p=>{const d=route.distanceAt(p);return d+.3*route.walkStrideAt(d);};
+      // Carrying is an actor capability, not the continuously changing grip.
+      // Preserve approach/rest contacts and ease the departure plan in space.
+      const extentAt=d=>{
+        const at=x+direction*(d-localDistance)*scale;
+        const grade=Math.max(...[-3,0,3].map(offset=>Math.abs(ground(at+(offset+.5)*scale)-ground(at+(offset-.5)*scale))/scale));
+        const c=5.54,r=6.32;
+        return (-c*grade+Math.sqrt(r*r*(1+grade*grade)-c*c))/(1+grade*grade);
+      };
+      const contactAt=p=>{
+        const d=route.distanceAt(p),walk=.3*route.walkStrideAt(d),running=route.distanceAt(p+1)-d>walk/.3*1.15,amount=running?route.carrierAt(d):0;
+        return {distance:d,extent:amount?walk+(extentAt(d)-walk)*amount:walk,amount};
+      };
+      const anchor=p=>{const c=contactAt(p);return c.distance+c.extent;};
+      const stanceAt=p=>{
+        const c=contactAt(p);
+        if(!c.amount)return travel?Math.min(route.distanceAt(p+.6),c.distance+.6*route.walkStrideAt(c.distance)):route.distanceAt(p+.6);
+        return Math.min(route.distanceAt(p+.6-.2*c.amount),c.distance+2*c.extent);
+      };
       const stepAt=(d,offset)=>{
         const legPhase=route.phaseAt(d)+offset,cycle=Math.floor(legPhase),fraction=legPhase-cycle;
         const touchdownPhase=cycle-offset,touchdown=route.distanceAt(touchdownPhase),next=route.distanceAt(touchdownPhase+1);
         const start=anchor(touchdownPhase),end=anchor(touchdownPhase+1),walkStride=route.walkStrideAt(touchdown);
         const running=!!travel&&next-touchdown>walkStride*1.15;
-        const stanceEnd=travel?Math.min(route.distanceAt(touchdownPhase+.6),touchdown+.6*walkStride):route.distanceAt(touchdownPhase+.6);
+        const stanceEnd=stanceAt(touchdownPhase),carrier=running?contactAt(touchdownPhase).amount:0;
         let position=start,lift=0;
         if(d>stanceEnd){
           const swing=(route.phaseAt(d)-route.phaseAt(stanceEnd))/(touchdownPhase+1-route.phaseAt(stanceEnd));
@@ -371,12 +389,15 @@
               const a=route.phaseAt(stanceEnd+buffer),b=route.phaseAt(next-buffer),t=(route.phaseAt(d)-a)/(b-a),smooth=t*t*(3-2*t);
               footX=oldX-buffer/2+(newX+buffer/2-oldX+buffer/2)*smooth;
             }
+            // A running recovery visibly travels behind and then ahead of the
+            // pelvis; the envelope has zero displacement/velocity at contacts.
+            footX-=2.4*carrier*Math.sin(2*Math.PI*swing)*Math.sin(Math.PI*swing)**2;
             position=d+footX;
           }
-          lift=.4*Math.sin(swing*Math.PI)**2;
+          lift=(.4+1.1*carrier)*Math.sin(swing*Math.PI)**2;
         }
         if(lift<1e-12)lift=0;
-        return {position,lift,fraction,start,end,running,stanceEnd,touchdownPhase};
+        return {position,lift,fraction,start,end,running,carrier,maxLift:.4+1.1*carrier,stanceEnd,touchdownPhase};
       };
       const feet=[0,.5].map(offset=>{
         const step=stepAt(localDistance,offset),footX=step.position-localDistance;
@@ -399,15 +420,16 @@
         for(let cycle=Math.floor(firstPhase)-1;cycle<=Math.ceil(lastPhase)+1;cycle++)for(const p of [cycle,cycle+.1,cycle+.25,cycle+.35,cycle+.5,cycle+.6,cycle+.75,cycle+.85]){
           const d=route.distanceAt(p);if(d>start&&d<end)distances.push(d);
           if(travel&&(p===cycle||p===cycle+.5)){
-            const lift=Math.min(route.distanceAt(p+.6),d+.6*route.walkStrideAt(d));
+            const lift=stanceAt(p);
             if(lift>start&&lift<end)distances.push(lift);
           }
         }
         distances.sort((a,b)=>a-b);
         const samples=distances.filter((d,i)=>!i||d-distances[i-1]>1e-8).map(d=>{
           const bodyX=x+direction*(d-localDistance)*scale,bodyGround=ground(bodyX)/scale,p=route.phaseAt(d);
-          const contacts=[0,.5].map(offset=>{
-            const step=stepAt(d,offset);if(step.lift>0)return null;
+          const steps=[0,.5].map(offset=>stepAt(d,offset));
+          const contacts=steps.map(step=>{
+            if(step.lift>0)return null;
             const contact=step.position,dx=contact-d;
             return {ground:ground(x+direction*(contact-localDistance)*scale)/scale,dx};
           }).filter(Boolean);
@@ -420,7 +442,16 @@
           }
           const grade=Math.abs(ground(bodyX+.5*scale)-ground(bodyX-.5*scale))/scale;
           if(contacts.length&&grade<.2&&[0,.5].some(offset=>{const f=((p+offset)%1+1)%1;return f>=.25&&f<=.35;})){const extension=Math.max(...contacts.map(foot=>foot.ground-Math.sqrt(Math.max(0,6.12**2-foot.dx**2))));lo=Math.max(lo,bodyGround-extension);}
-          return {distance:d,lo,hi};
+          // The same flight interval drives body rise and the toe recovery.
+          // Solve the pelvis inside the contact corridor before deriving each
+          // toe's required reach, rather than moving the body after the IK.
+          let rise=0;
+          if(!contacts.length&&steps.every(step=>step.running&&step.carrier>0)){
+            const from=Math.max(...steps.map(step=>route.phaseAt(step.stanceEnd))),to=Math.min(...steps.map(step=>step.touchdownPhase+1));
+            const t=Math.max(0,Math.min(1,(p-from)/(to-from)));
+            rise=.55*16*t*t*(1-t)*(1-t)*Math.min(...steps.map(step=>step.carrier));
+          }
+          return {distance:d,lo,hi,target:6.25+rise};
         });
         const rate=.7;
         for(let i=1;i<samples.length;i++){
@@ -433,7 +464,7 @@
         }
         for(const sample of samples){
           if(sample.lo>sample.hi+1e-7)throw new Error('Human contact plan has no upright clearance corridor');
-          sample.clearance=Math.max(sample.lo,Math.min(sample.hi,6.25));
+          sample.clearance=Math.max(sample.lo,Math.min(sample.hi,sample.target));
         }
         route.clearances.set(center,samples);
         if(route.clearances.size>16)route.clearances.delete(route.clearances.keys().next().value);
@@ -449,7 +480,7 @@
       const blend=(localDistance-center)/4,clearance=clearanceAt(center)*(1-blend)+clearanceAt(center+4)*blend;
       const hipY=-clearance,bob=hipY+4.4;
       for(const foot of feet)if(foot.lift>0){
-        const swingReach=6.4-.6*foot.lift/.4;
+        const swingReach=6.4-.6*foot.lift/foot.maxLift;
         if(Math.abs(foot.footX)>swingReach)throw new Error('Human swing exceeds horizontal limb reach');
         const radius=Math.sqrt(swingReach**2-foot.footX**2);
         foot.footY=Math.max(hipY-radius,Math.min(foot.footY,hipY+radius));

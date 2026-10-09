@@ -110,6 +110,67 @@ test('RISK Last task WOOP: unsupported data survives reload and replacement and 
  ctx.renderScan();assert.doesNotMatch(shim.document.getElementById('scan').innerHTML,/Walk Thru WOOP|Delete WOOP plan/);ctx.onAction('woop-start',{dataset:{benchmark:task.id}});assert.equal(vm.runInContext('woopDraft',ctx),null);
  delete task.woopPlan;ctx.onAction('woop-start',{dataset:{benchmark:task.id}});woopStep(app,'Outcome');woopStep(app,'Obstacle');ctx.replaceState(JSON.parse(ctx.cloudPayload()));woopStep(app,'If replaced, then act');assert.equal(ctx.state.tasks.find(t=>t.id===task.id).woopPlan,undefined,'same-account same-ID replacement invalidates draft');
 });
+test('RISK carrying recovery: rejected actual phone sequence requires strikes opposed swing and a coherent flight arc',async()=>{
+ const {readMotionBuild,createMotionProbe}=await import('./scripts/motion-review-harness.mjs'),build=readMotionBuild(__dirname,'WORKTREE');
+ const fixture=JSON.parse(fs.readFileSync(path.join(__dirname,'scripts/fixtures/gait-carrying-sentinel.json'))),frames=[];
+ let current;const probe=createMotionProbe(build,{width:390,height:844,onHumanPose:(pose,args)=>{current={pose,args};}});
+ for(const input of fixture.inputs){
+  probe.sample({actor:'reader',progress:input.age/100,duration:100,seed:.4,lane:.02});
+  assert.equal(current.args[0],input.x,'retain the exact visible browser route and clock');assert.equal(current.args[2],input.distance);
+  const p=current.pose;assert.equal(p.hand.x,p.hipX+4);assert.equal(p.hand.y,p.bob-3);
+  for(const leg of p.legs){assert.ok(Math.abs(Math.hypot(leg.kneeX-p.hipX,leg.kneeY-p.hipY)-3.2)<1e-7);assert.ok(Math.abs(Math.hypot(leg.footX-leg.kneeX,leg.footY-leg.kneeY)-3.2)<1e-7);}
+  frames.push({...input,...current});
+ }
+ // These are discriminating guards for the observed hover, not a claim of
+ // natural motion. The .25s bound includes one 30Hz observation interval;
+ // independent full-cycle pixels remain the acceptance gate.
+ let flightStart=null,longest=0,separation=0;const arcs=[];
+ const opposed=poses=>[0,1].map(front=>poses.filter(p=>p.legs.every(l=>l.lift>0)&&p.legs[front].footX-p.hipX>.75&&p.legs[1-front].footX-p.hipX<-.75).length);const strikes=[0,0],support=[0,0];
+ frames.forEach((frame,i)=>{
+  const p=frame.pose,air=p.legs.every(l=>l.lift>0);separation=Math.max(separation,Math.abs(p.legs[0].footX-p.legs[1].footX));
+  p.legs.forEach((leg,j)=>{if(leg.lift===0){support[j]++;if(i&&frames[i-1].pose.legs[j].lift>0)strikes[j]++;if(i&&frames[i-1].pose.legs[j].lift===0)assert.ok(Math.abs(frame.x+leg.footX-frames[i-1].x-frames[i-1].pose.legs[j].footX)<1e-7,'support toe stays world planted while the torso propels forward');}});
+  if(air&&flightStart===null)flightStart=i;
+  if(!air&&flightStart!==null){
+   longest=Math.max(longest,frame.elapsed-frames[flightStart].elapsed);
+   if(flightStart>0){let arc=0;const a=frames[flightStart-1],b=frame;for(let k=flightStart;k<i;k++){const f=frames[k],t=(f.elapsed-a.elapsed)/(b.elapsed-a.elapsed),chord=a.pose.hipY*(1-t)+b.pose.hipY*t;arc=Math.max(arc,chord-f.pose.hipY);}arcs.push(arc);}
+   flightStart=null;
+  }
+ });
+ assert.ok(strikes.every(n=>n>=2)&&support.every(n=>n>=4),'both feet must deliver multiple visible strikes and support frames');
+ assert.ok(longest<.25,`prolonged hover: ${longest}s without a strike`);
+ assert.ok(opposed(frames.map(f=>f.pose)).every(n=>n>=3),'both legs alternate in front of and behind the actual pelvis during flight');
+ const shifted=frames.map(f=>({...f.pose,legs:f.pose.legs.map(l=>({...l,footX:l.footX+10}))}));
+ assert.ok(!opposed(shifted).every(n=>n>=3),'negative control: separated toes gliding together on one side fail opposed recovery');
+ assert.ok(separation>4,`recovery must oppose fore/aft legs rather than the rejected ${separation}-unit tiny shuffle`);
+ assert.ok(arcs.length>=3&&arcs.every(arc=>arc>.12),`each full flight must rise above its landing chord: ${arcs}`);
+});
+test('RISK carrying isolation: exact accepted walking free visitors gathering and reduced-motion canvas commands remain unchanged',async()=>{
+ const {readMotionBuild,createMotionProbe}=await import('./scripts/motion-review-harness.mjs'),build=readMotionBuild(__dirname,'WORKTREE');
+ const fixture=JSON.parse(fs.readFileSync(path.join(__dirname,'scripts/fixtures/gait-carrying-sentinel.json')));
+ for(const c of fixture.controls){const frame=createMotionProbe(build,{width:c.width,height:c.height}).sample(c.options);assert.equal(createHash('sha256').update(JSON.stringify(frame)).digest('hex'),c.sha256,`${c.options.actor} ${c.width} reverse=${c.options.reverse} progress=${c.options.progress} reduced=${c.options.reduced}: preserve exact196 painter output`);}
+ for(const sequence of fixture.walkingSequences){const probe=createMotionProbe(build,sequence);for(const c of sequence.frames)assert.equal(createHash('sha256').update(JSON.stringify(probe.sample(c.options))).digest('hex'),c.sha256,'every recorded frame of the three accepted walking cycles retains its exact196 painter output');}
+});
+test('RISK carrying continuity: stable actor capability preserves resting grip transitions and deterministic departure seeks',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8');
+ for(const [width,height] of [[390,844],[1440,900]])for(const direction of [-1,1]){
+  const ctx=vm.createContext({Math});vm.runInContext(source,ctx);const geo=ctx.LandscapeGeometry.create(width,height),cold=ctx.LandscapeGeometry.create(width,height);
+  const ground=geo.humanGround('trail',20),other=cold.humanGround('trail',20),origin=width*.116-40*direction;
+  const travel={startDistance:40,length:width+80-width*.116,duration:13.2,runStyle:'carrying'};
+  const at=(g,terrain,d,grip)=>g.humanWalkPose(origin+direction*d,terrain(origin+direction*d),d,direction,terrain,grip,1,travel);
+  const rest=at(geo,ground,40,0),epsilon=at(geo,ground,40,1e-8),full=at(geo,ground,40,1);
+  assert.deepEqual(rest.legs,epsilon.legs);assert.deepEqual(rest.legs,full.legs);assert.equal(rest.hipY,full.hipY,'gathering changes only the grip');
+  // The capability envelope is C1; the existing terrain corridor itself is
+  // piecewise linear. Preserve its bounded kink instead of claiming that the
+  // final constrained pelvis has globally continuous derivatives.
+  for(const boundary of [40,52]){
+   const poses=[boundary-1e-5,boundary,boundary+1e-5].map(d=>at(geo,ground,d,1));
+   const baseline=[boundary-1e-5,boundary,boundary+1e-5].map(d=>geo.humanWalkPose(origin+direction*d,ground(origin+direction*d),d,direction,ground,1,1,{...travel,runStyle:undefined}));
+   for(const key of ['hipY','bob'])assert.ok(Math.abs(poses[0][key]-2*poses[1][key]+poses[2][key])<=Math.abs(baseline[0][key]-2*baseline[1][key]+baseline[2][key])+1e-7,'carrier boundary does not introduce an additional pelvis derivative jump');
+   for(let leg=0;leg<2;leg++)assert.ok(Math.abs(poses[0].legs[leg].footX-2*poses[1].legs[leg].footX+poses[2].legs[leg].footX)<1e-6,'contact plan has no departure snap');
+  }
+  for(const distance of [40,42,52,60,100,200]){const first=at(geo,ground,distance,1);at(geo,ground,600,1);assert.deepEqual(at(geo,ground,distance,1),first);assert.deepEqual(first,at(cold,other,distance,1),'carrier route is reproducible without animation history');}
+ }
+});
 test('RISK local human cadence: recorded phone flat controls do not inherit a distant steep hill stride',()=>{
  const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
  const geo=ctx.LandscapeGeometry.create(390,844),ground=x=>geo.groundAnchor('walker',x);
