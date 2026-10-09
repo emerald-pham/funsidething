@@ -540,7 +540,7 @@ test('RISK changelog dates: Settings combines repeated dates in descending order
  const next=rendered('<div><h3>January 2, 2027</h3><ul><li><a href="https://example.com/release">Future release</a></li></ul><h3>January 2, 2027</h3><ul><li>Another release</li></ul></div>','<details><summary>Changelog</summary><h3>December 31, 2026</h3><ul><li>Year end</li></ul><h3>January 2, 2027 — Seasonal details</h3><ul><li>Future category</li></ul></details>');
  assert.deepEqual(Array.from(next.matchAll(/<h3>(.*?)<\/h3>/g),m=>m[1]),['January 2, 2027','December 31, 2026'],'future duplicates and year boundaries use the same renderer');
  assert.match(next,/<a href="https:\/\/example.com\/release">Future release<\/a>/);assert.match(next,/<h4>Seasonal details<\/h4>/);assert.equal(bullets(next).length,4);
- ctx.openHelp();assert.match(shim.document.getElementById('modalRoot').innerHTML,/one heading per date.*newest.*oldest/i);
+ ctx.openHelp();assert.match(shim.document.getElementById('modalRoot').innerHTML,/one heading per date, newest first/i);
 });
 
 test('RISK Settings hierarchy: Changelog uses existing sections and Save settings follows every section without changing validation',async()=>{
@@ -713,7 +713,7 @@ test('RISK task rating history: immutable fact union and observation fingerprint
   const bases=[];for(const language of ['en','sv']){const {ctx,a,b,c}=await localized(language);a.id='Å';b.id='Z';c.id='Ω';ctx.state.chain=[a.id];ctx.state.candidateId=b.id;ctx.recomputeRanks();bases.push(ctx.ratingObservationBasis(ctx.chanceDisplayStats()));}
   assert.equal(bases[0],bases[1],'the same task IDs ratings and eligibility must not look changed solely because the device locale differs');
  });
- await t.test('extended FAQ',async()=>{const {ctx,shim}=await localized('en');ctx.openHelp();assert.match(shim.document.getElementById('modalRoot').innerHTML,/without replay duplicates or dependence on device language/);});
+ await t.test('extended FAQ',async()=>{const {ctx,shim}=await localized('en');ctx.openHelp();assert.match(shim.document.getElementById('modalRoot').innerHTML,/Observations stay in exports and backups/);});
 });
 test('RISK task rating history: legacy import restore export deletion and unknown future facts preserve recorded evidence',async()=>{
  const {ctx,a,b}=await ratingHistoryFixture(618),old=ratingHistoryCopy(ctx.state);ctx.decide('yes');const recorded=ratingHistoryCopy(b.ratingHistory);
@@ -740,7 +740,7 @@ test('RISK task rating history: Edit shows accessible timestamped observations a
  const recent=shim.document.getElementById('modalRoot').innerHTML;assert.equal((recent.match(/class="rating-event"/g)||[]).length,20);assert.match(recent,/Show 20 more/);assert.doesNotMatch(recent,/<img src=x/);assert.equal(b.ratingHistory.length,44,'pagination cannot purge data');
  let focused=false;const query=shim.document.querySelector;shim.document.querySelector=selector=>selector==='#taskRatingHistory details'?{open:false}:selector==='#taskRatingHistory summary'?{focus(){focused=true;}}:null;
  ctx.onAction('more-rating-history',{dataset:{id:b.id,limit:'60'}});assert.equal(focused,true,'the last page retains keyboard focus on the disclosure');shim.document.querySelector=query;
- ctx.openHelp();assert.match(shim.document.getElementById('modalRoot').innerHTML,/rating history/i);assert.match(shim.document.getElementById('modalRoot').innerHTML,/earlier.*not recorded/i);
+ ctx.openHelp();assert.match(shim.document.getElementById('modalRoot').innerHTML,/rating history/i);assert.match(shim.document.getElementById('modalRoot').innerHTML,/Earlier values and every intervening change are unavailable/i);
  assert.match(html,/\.rating-values\s*\{[^}]*grid-template-columns/);assert.match(html,/\.rating-event\s*\{[^}]*overflow-wrap:anywhere/);
 });
 test('RISK task rating history: malformed and future records remain recoverable without blocking actions or injecting markup',async()=>{
@@ -5360,7 +5360,7 @@ test("rank presentation tutorial explains sampled sparklines and top-K in plain 
   assert.match(help, /each left-to-right position is a possible rank/i);
   assert.match(help, /taller bump means more .* samples/i);
   assert.match(help, /spread across many ranks means more uncertainty/i);
-  assert.match(help, /smallest K .* first K positions/i);
+  assert.match(help, /confidence cutoff among unfinished tasks/i);
   assert.match(help, /top-3 means at least a 2\/3/i);
   assert.match(help, /bar shows K out of the unfinished tasks/i);
   assert.match(help, /not an exact rank or deadline/i);
@@ -5655,7 +5655,7 @@ test('RISK empty-chain explanation: selected Chance and Descending views name on
   assert.equal(ctx.oldestFirst(ctx.pool()).id,oldest.id,'the explanation preserves first-dot selection by age');
   ctx.state.tasks.find(t=>t.id===oldest.id).restoredAt=Date.now();assert.equal(ctx.oldestFirst(ctx.pool()).id,newer.id,'never-Done preference stays intact');
   ctx.state.tasks.find(t=>t.id===newer.id).restoredAt=Date.now();assert.equal(ctx.oldestFirst(ctx.pool()).id,oldest.id,'all-Done fallback stays oldest');
-  ctx.openHelp();assert.match(shim.elements.get('modalRoot').innerHTML,/empty-chain explanation names the selected mode/i,'extended FAQ documents the selected-view explanation');
+  ctx.openHelp();assert.match(shim.elements.get('modalRoot').innerHTML,/Every mode chooses the first dot by age/i,'FAQ distinguishes age-first anchor from candidate ranking');
  }
 });
 
@@ -15924,7 +15924,7 @@ test('Consistency repair: Starts eligibility gets a midnight wake as well as the
 });
 test('Consistency repair: quick start distinguishes chance from the oldest normal anchor',async()=>{
  const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
- assert.match(help,/every scan mode.*oldest/i);assert.match(help,/Chance mode.*subsequent/i);
+ assert.match(help,/Every mode.*first dot by age.*oldest/i);assert.match(help,/Chance mode uses a weighted random order/i);
  assert.doesNotMatch(help,/candidates to add to the todo list in descending order of your likelihood/);
 });
 test('Consistency repair: undoing an old backup import restores today\'s original chance pass',async()=>{
@@ -21459,7 +21459,7 @@ test('RISK multiple dependencies legacy mirrors: local and IndexedDB saves retai
   assert.match(shim.document.getElementById('toast').textContent,/Dependency cycle/);
   const stored=JSON.parse(durable?(await shim.window.ScannerDeviceStore.readHead()).payload:shim.localStorage.getItem(SYNC_STORE_KEY));
   assert.deepEqual(stored.tasks,JSON.parse(JSON.stringify(ctx.state.tasks)),'all saved task fields and causal graph evidence remain intact');
-  ctx.openHelp();assert.match(shim.document.getElementById('modalRoot').innerHTML,/warning stays visible through ordinary background saves/,'the extended FAQ describes the retained warning');
+  ctx.openHelp();assert.match(shim.document.getElementById('modalRoot').innerHTML,/cycle warning means you must change a blocking link or its target/i,'FAQ gives the action needed to resolve a cycle warning');
   if(durable)shim.window.ScannerDeviceStore.close();
  }
 });
@@ -22528,7 +22528,7 @@ test('RISK fireworks minute schedule: capped visible events preserve seeded oppo
  }
  assert.ok(found>0,'exercise real midnight-adjacent shows');
  const help=html.slice(html.indexOf('function openHelp'),html.indexOf('function openInstallHelp'));
- assert.match(help,/at most (?:one minute|60 seconds)/i);assert.match(help,/0–300 milliseconds/i);
+ assert.match(help,/Sunrise, sunset and nighttime can show fireworks/i);assert.match(help,/Reduced motion keeps scenery still/i);
 });
 
 
@@ -23359,7 +23359,7 @@ test('RISK Halving weighting displayed likelihood: actual list and editor distin
  assert.match(shim.document.getElementById('listBody').innerHTML,/likelihood/);
  ctx.openSettings();assert.match(shim.document.getElementById('modalRoot').innerHTML,/Likelihood \(%\)/);
  ctx.openEdit(task.id);assert.match(shim.document.getElementById('modalRoot').innerHTML,/Likelihood values.*not Halving weighting selection odds/);
- ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;assert.match(help,/50%, 25%, 25%/);assert.match(help,/Likelihood \(%\) display.*underlying Chance-mode likelihood.*not Halving weighting selection odds/);
+ ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;assert.match(help,/50%, 25%, 25%/);assert.match(help,/Likelihood \(%\) shows underlying Chance-mode likelihood, not Halving weighting selection odds/);
 });
 
 test('RISK Halving weighting concurrent joins: same-pass frozen likelihood ranks survive peer adoption and reload without mixing generations',async()=>{

@@ -1,6 +1,6 @@
 [
   {
-    "testChangesSha256": "cbcf8f38dcd1bd950d8e0c20bcea7f76c1cc0a886fbfa303d65d3ac4370f85ed",
+    "testChangesSha256": "c0bd9dc38cd733242f3ad97020235f262534ec53cadfcc16bc281c351c513072",
     "reason": "Explicit user requests essential-only Quick start help and accessible collapsible chapters matching Settings. Replace historical implementation-copy assertions with user-facing consequences while retaining executable behavior, Settings safety and historical changelog assertions.",
     "previousBehavior": "Seven dense intro steps and one More FAQs disclosure containing long duplicated rules and internal release details.",
     "intendedBehavior": "Four essential steps, native Quick start disclosure initially open and five Settings-aligned detailed chapters initially closed. All37 topics remain concise and accurate; detailed rules and recovery guidance stay in their chapters.",
@@ -14,7 +14,7 @@
     ],
     "redEvidence": {
       "command": "node --test --test-name-pattern=\"RISK Quick start content|RISK Quick start chapters|collapsed scanning chapter\" tests.js; PROBE_PHASE=red node ../quickstart-evidence/window-runner.mjs",
-      "failure": "Observed intro length RED before prose changes; chapter names and scanning disclosure RED before markup; actual Chrome Enter on old first disclosure opened it instead of closing initially visible Quick start, observed17:58:20UTC before applying chapter markup. Logs observed-red.log, chapters-red.log, chapter-consumer-red.log and browser-red.log. Independent visual finding then observed actual 43.75px separated heading RED before scoped inline CSS, plus native heading-native-red.log. Final responsive GREEN complete18:02:39UTC."
+      "failure": "Observed intro length RED before prose changes; chapter names and scanning disclosure RED before markup; actual Chrome Enter on old first disclosure opened it instead of closing initially visible Quick start, observed17:58:20UTC before applying chapter markup. Logs observed-red.log, chapters-red.log, chapter-consumer-red.log and browser-red.log. Independent visual finding then observed actual 43.75px separated heading RED before scoped inline CSS, plus native heading-native-red.log. Final responsive GREEN complete18:02:39UTC. Required CI then observed10failures including one failing subtest parent from9 obsolete help wording assertions embedded in behavior tests; changed only help assertions, all behavioral statements retained. ActualCIfailedlog preserved ci-pr-failed.log; expanded focused54pass0fail in ci-copy-repair-green.log."
     }
   },
   {
