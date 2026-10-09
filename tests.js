@@ -23774,3 +23774,14 @@ test('RISK frozen header clearance browser: freeze unfreeze and responsive text 
   }
  }finally{await browser.close();}
 });
+
+test('RISK frozen header wrapping: enlarged controls fit without font changes or hiding Settings',()=>{
+ const brand=html.match(/\.brand\{([^}]+)\}/)?.[1]||'',buttons=html.match(/\.topbtns\{([^}]+)\}/)?.[1]||'';
+ assert.match(brand,/(?:^|;)flex-wrap:wrap(?:;|$)/,'the observed320px enlarged title plus controls must be allowed onto separate rows');
+ assert.match(buttons,/(?:^|;)flex-wrap:wrap(?:;|$)/,'an enlarged control group may wrap within its available row');
+ assert.match(buttons,/(?:^|;)max-width:100%(?:;|$)/,'controls cannot expand the header beyond the responsive content width');
+ assert.doesNotMatch(brand+';'+buttons,/(?:^|;)overflow:hidden/,'Settings remains visible rather than clipping the overflowing controls');
+ const base=spawnSync('git',['show','6852dfac2c900d84b550090877515dcece8707f4:index.html'],{cwd:__dirname,encoding:'utf8'});assert.equal(base.status,0,base.stderr);
+ const fonts=(source,selector)=>source.match(new RegExp('\\.'+selector+'\\{([^}]+)\\}'))?.[1].split(';').filter(declaration=>/^(?:font(?:-|:)|line-height:)/.test(declaration)).join(';');
+ for(const selector of ['titles h1','ghost','syncbtn','plabel'])assert.equal(fonts(html,selector),fonts(base.stdout,selector),'wrapping must not shrink or restyle '+selector);
+});
