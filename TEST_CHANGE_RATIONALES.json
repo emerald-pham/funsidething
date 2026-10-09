@@ -1,5 +1,22 @@
 [
   {
+    "testChangesSha256": "21478d60c205547acd17bdfcc0c0f5e46004b9ef3b77c44bd2eb2602cde00079",
+    "reason": "Urgent user presentation request moves quoted dependency explanation into FAQ and shows Hard heading only with actual listed rows. Persisted choices and binary rules unchanged.",
+    "previousBehavior": "Forms always showed a long rule paragraph and an empty Hard heading.",
+    "intendedBehavior": "Forms retain short hidden FAQ reference and named binary checkbox controls. Header follows selected rows through filter/remove/reset/reopen; complete explanation is in prerequisite FAQ.",
+    "replacementTests": [
+      "RISK dependency form presentation: Add Edit explanation lives in FAQ and controls keep named protected binary choices",
+      "RISK dependency form presentation: Hard heading follows active rows across selection removal filter reset and Edit reopen"
+    ],
+    "preservedCoverage": [
+      "Existing per-edge semantics sync opaque evidence and selected-edge search tests retained; prior rendered description assertion now checks the shorter FAQ reference."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern=\"RISK dependency form presentation\" tests.js",
+      "failure": "Two observed failures before implementation: quoted explanation remains in Add form; empty picker still renders Hard heading. Log dependency-ui-evidence/observed-red.log."
+    }
+  },
+  {
     "testChangesSha256": "3acf7ead0f3ac7eb148ce0224da85dccb2777a2036bf4e80fc98b61b0c7a7630",
     "reason": "Independent final rendered review rejected the physical vessel at twilight: its whole body inherited firework brightness. Add public-control final-composite coverage before changing opacity; preserve every earlier assertion and all failed evidence.",
     "previousBehavior": "At sunrise altitude +3.804 degrees the real publicly scheduled barge hull blended into the reflected city; physical vessel opacity followed the particle solar fade.",
