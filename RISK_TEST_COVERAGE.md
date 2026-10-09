@@ -788,3 +788,5 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK per-edge dependency rendered controls: phone enlarged tablet desktop labels keyboard search and saved rules fit real browsers
 
 - RISK per-edge dependency released clients: real supported hydration preserves modes and single-link edits retain explicit choices
+
+- RISK per-edge dependency recovery union: mode omission adoption and opaque conflicts retain both clients recovery evidence

@@ -23655,3 +23655,12 @@ test('RISK per-edge dependency released clients: real supported hydration preser
   task.prerequisiteId=null;ctx.hydrateState(board);assert.equal(ctx.taskDependencyMode(task,other.id),'soft');task.prerequisiteId=root.id;ctx.hydrateState(board);assert.equal(ctx.taskDependencyMode(task,root.id),'hard','released mirror replacement retains an explicitly saved mode for that ID');
  }
 });
+
+test('RISK per-edge dependency recovery union: mode omission adoption and opaque conflicts retain both clients recovery evidence',async()=>{
+ const {ctx}=await loadApp();const root=ctx.addTask('Root'),owner=ctx.addTask('Owner');ctx.setTaskPrerequisites(owner.id,[root.id]);ctx.writeTaskDependencyModes(owner,{[root.id]:'hard'});
+ for(const shape of ['omission','adoption','opaque']){
+  const winner=JSON.parse(JSON.stringify(owner)),other=JSON.parse(JSON.stringify(owner));winner.dependencyModeRecovery=[{from:'winner'}];other.dependencyModeRecovery=[{from:'other'}];
+  if(shape==='omission')delete other.dependencyModes;if(shape==='adoption')delete winner.dependencyModes;if(shape==='opaque')other.dependencyModes=['future map'];
+  ctx.mergeTaskPrerequisites(winner,other);const saved=JSON.stringify(winner.dependencyModeRecovery);assert.ok(saved.includes('winner'),shape+' retains winner recovery');assert.ok(saved.includes('other'),shape+' retains peer recovery');const exact=JSON.stringify(winner);ctx.mergeTaskPrerequisites(winner,other);assert.equal(JSON.stringify(winner),exact,'repeated recovery merge is idempotent');
+ }
+});
