@@ -774,6 +774,28 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 
 - RISK carrying continuity: stable actor capability preserves resting grip transitions and deterministic departure seeks
 
+- RISK per-edge dependency controls: Add and Edit binary checkbox transitions persist hard and soft without losing search selections
+- RISK per-edge dependency semantics: mixed edges intrinsic eligibility deletion Undo and cyclic chains remain bounded
+- RISK per-edge dependency sync: explicit modes survive stale clients while Undo Restore and readd express fresh intent
+- RISK per-edge dependency eligibility: search pass marks contexts dates and evergreen expiry use the same bounded rule
+
+- RISK per-edge dependency future evidence: untouched editor preserves opaque choices and conflicting identity is deterministic
+- RISK per-edge dependency real saves: stale tabs keep peer title explicit mode offline reload and completion Undo
+- RISK per-edge dependency opaque map: unsupported top-level mode data is retained by writes and merges
+
+- RISK per-edge dependency recovery: future recovery shape remains safe through merges and unsupported controls
+
+- RISK per-edge dependency rendered controls: phone enlarged tablet desktop labels keyboard search and saved rules fit real browsers
+
+- RISK per-edge dependency released clients: real supported hydration preserves modes and single-link edits retain explicit choices
+
+- RISK per-edge dependency recovery union: mode omission adoption and opaque conflicts retain both clients recovery evidence
+
+- RISK per-edge dependency rendered isolation: fixtures disable production cloud before navigation and constrain external requests
+- RISK per-edge dependency rendered controls:"),end=source.indexOf("test(
+
+- RISK binary dependency migration: old links default soft without rewriting identity evidence and recurrence blocks again
+
 - RISK scenery tuning: barge crossing lifetime restores historical finale without standalone cap regression
 - RISK scenery tuning: doubled barge odds preserve interval cooldown duration and standalone frequency
 - RISK scenery tuning: fairy activation doubles probability with unchanged sampling duration and daylight guard
