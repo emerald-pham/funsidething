@@ -146,9 +146,18 @@ test('RISK carrying recovery: rejected actual phone sequence requires strikes op
 });
 test('RISK carrying isolation: exact accepted walking free visitors gathering and reduced-motion canvas commands remain unchanged',async()=>{
  const {readMotionBuild,createMotionProbe}=await import('./scripts/motion-review-harness.mjs'),build=readMotionBuild(__dirname,'WORKTREE');
- const fixture=JSON.parse(fs.readFileSync(path.join(__dirname,'scripts/fixtures/gait-carrying-sentinel.json')));
- for(const c of fixture.controls){const frame=createMotionProbe(build,{width:c.width,height:c.height}).sample(c.options);assert.equal(createHash('sha256').update(JSON.stringify(frame)).digest('hex'),c.sha256,`${c.options.actor} ${c.width} reverse=${c.options.reverse} progress=${c.options.progress} reduced=${c.options.reduced}: preserve exact196 painter output`);}
- for(const sequence of fixture.walkingSequences){const probe=createMotionProbe(build,sequence);for(const c of sequence.frames)assert.equal(createHash('sha256').update(JSON.stringify(probe.sample(c.options))).digest('hex'),c.sha256,'every recorded frame of the three accepted walking cycles retains its exact196 painter output');}
+ const bytes=fs.readFileSync(path.join(__dirname,'scripts/fixtures/gait-carrying-sentinel.json')),fixture=JSON.parse(bytes);
+ assert.equal(createHash('sha256').update(bytes).digest('hex'),'740faa80ea8862bf7d1d65f4d9c3090bff6169d241b00acd3f7f2c142a06223d','preserve every original accepted input, reference hash and control');
+ assert.equal(fixture.source,'19643f4369dacc74abe5a417d4c8898561d4f2f1');
+ const baseline=readMotionBuild(__dirname,fixture.source);
+ assert.equal(baseline.sourcesHash,'399c351a9b4550670bf2dafb2cf64bad2b155efe7a6b79c5a2dc60543f98e84e','frozen accepted renderer sources cannot be regenerated from the candidate');
+ // libm/V8 architecture differences can change a final decimal in a saved
+ // macOS hash. Compare both immutable builds on this same runtime, with exact
+ // command equality and no numeric tolerance; retain the original fixture.
+ for(const c of fixture.controls){const expected=createMotionProbe(baseline,c).sample(c.options),frame=createMotionProbe(build,c).sample(c.options);assert.deepEqual(frame,expected,`${c.options.actor} ${c.width} reverse=${c.options.reverse} progress=${c.options.progress} reduced=${c.options.reduced}: preserve exact196 painter output`);}
+ for(const sequence of fixture.walkingSequences){const expected=createMotionProbe(baseline,sequence),probe=createMotionProbe(build,sequence);for(const c of sequence.frames)assert.deepEqual(probe.sample(c.options),expected.sample(c.options),'every recorded frame of the three accepted walking cycles retains exact196 painter output');}
+ const control=fixture.controls[0],expected=createMotionProbe(baseline,control).sample(control.options),broken=JSON.parse(JSON.stringify(expected));broken.commands.push(['moveTo',1e-12,0]);
+ assert.throws(()=>assert.deepEqual(broken,expected),'negative control: even a tiny extra renderer command fails exact comparison');
 });
 test('RISK carrying continuity: stable actor capability preserves resting grip transitions and deterministic departure seeks',()=>{
  const source=fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8');

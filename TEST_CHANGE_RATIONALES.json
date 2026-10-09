@@ -1,5 +1,45 @@
 [
   {
+    "testChangesSha256": "59d7d923e6cdaa5fa05503ffe8f1edba2f343a9b251c2a4d5a7b4d9a22983cfa",
+    "reason": "Independent full-motion review rejected profile-wide compact walking cadence and support-transfer pelvis bob despite passing numerical checks. Local terrain contact planning and speed-appropriate running replace those behaviors. Exact actual-consumer observer coverage catches fast carrying flicker. Flat and gentle pooled35-degree extension remains greater than65%; only steep speed-appropriate travel replaces the pooled double-support statistic with each completed planted interval crossing beneath the pelvis under60 degrees, with no grounded double-knee collapse. Future-seek regression independently caught running contact table extrapolation and was repaired before GREEN. Existing exact carrying endpoint assertion revealed floating-point interpolation at a completed grip; the complete blend now directly returns its endpoint without weakening strict equality. Actual independent196 carrying review subsequently rejected level hovering and tiny recovery. Stable carrying actor metadata now selects a space-eased fast-running plan, with physically bounded contacts, opposed recovery and a flight-derived feasible pelvis target. The latest regression retains all exact196 frames from the three accepted walking clips and216 unaffected control frames. Final Linux Node22 CI exposed the cross-runtime saved canvas hash for an unchanged snowangel frame. Preserve the entire original fixture and bind immutable196 renderer sources; compare every661 unaffected frame against that same-runtime predecessor using exact deep command equality without tolerance. Added tiny extra-command negative control. Product source and all accepted visual inputs unchanged.",
+    "previousBehavior": "Released low pelvis caused crouching. The rejected upright draft used viewport-wide compact strides, abrupt load transfer and fast departure walking flicker. A fixed-stride implementation assertion incorrectly prohibited deterministic local terrain planning.",
+    "intendedBehavior": "Upright human legs retain exact3.2-unit thigh and shin lengths, real world-planted feet, deterministic cold/warm seeking and stationary approach endpoints. Local terrain reserves comfortable clearance; jogging/running matches existing faster routes without modifying timing. Full independent motion acceptance remains required.",
+    "replacementTests": [
+      "RISK local human cadence: recorded phone flat controls do not inherit a distant steep hill stride",
+      "RISK human route isolation: different terrain functions cannot share a sampled-profile contact cache",
+      "RISK human support transfer: recorded steep phone frames avoid the rejected abrupt pelvis bob",
+      "RISK whole human transfer: both ordered rendered phone traversals bound pelvis bob throughout each cycle",
+      "RISK running seek isolation: future route queries cannot revise fast departure contacts",
+      "RISK actual human pose observer: native consumer traces preserve painter commands and returned poses",
+      "RISK carrying locomotion: actual fast departure painters avoid aliased walking cadence and preserve every limb and grip",
+      "RISK terrain locomotion: actual steep phone walkers keep a human contact rhythm without slowing their route",
+      "RISK human support balance: rejected steep phone walks keep the vertical torso over a usable planted support",
+      "RISK human terrain cadence: local contact spacing preserves world planting and deterministic arrivals",
+      "RISK upright human gait: full cycles extend stance knees with modest swing flexion and preserved terrain contact",
+      "RISK dense human contact corridor: final blended pelvis and limbs remain feasible at contact and window seams",
+      "RISK upright gait guidance: scenery FAQ and changelog explain upright support and carrying without changing task controls",
+      "RISK upright settled visitors: arrival endpoint rests both feet on terrain before eased departure",
+      "RISK upright torso travel: flat-ground pelvis travels steadily while terrain adaptation stays continuous",
+      "RISK upright pelvis consumer: torso head thighs and carrying arms follow the terrain hip",
+      "RISK upright gait consumer: every human painter consumes upright full cycles in both directions at responsive scales",
+      "RISK human grip endpoints: complete carrying retains its exact hip offset across every cadence",
+      "RISK carrying recovery: rejected actual phone sequence requires strikes opposed swing and a coherent flight arc",
+      "RISK carrying isolation: exact accepted walking free visitors gathering and reduced-motion canvas commands remain unchanged",
+      "RISK carrying continuity: stable actor capability preserves resting grip transitions and deterministic departure seeks"
+    ],
+    "preservedCoverage": [
+      "All existing task controls, WOOP, persistence, security, scene route/timing/seed and animal behavior protections remain intact.",
+      "Flat/gentle35-degree stance extension threshold stays above65%; all scales/directions/carrying weights remain covered with hard endpoint reach and fixed shin checks.",
+      "The removed constant-stride equality is replaced by actual world planting across a consistent curved route and deterministic seeks, preserving forty-unit resting arrival checks.",
+      "Consumer observer returns original pose identity and identical painter commands; all eight human families, paired people, grip offsets, reduced motion and four responsive scales retain coverage.",
+      "Existing walker arm and winter thigh/calf consumer assertions still compare exact rendered endpoints; expected poses now receive the identical speed metadata as the actual painter, and winter explicitly checks that metadata argument."
+    ],
+    "redEvidence": {
+      "command": "GitHub Actions PR80 exact4dc15eb run37876981128 npm test",
+      "failure": "Observed actual Linux Node22 snowangel390 forward progress.045 hash a7ce4f69 versus original macOS fixture92add57f; single test failed, release held. Final predecessor/candidate comparison on same runtime retains all commands and immutable source/fixture SHA; fresh Linux CI must verify portability. Prior functional RED history retained in earlier rationale."
+    }
+  },
+  {
     "testChangesSha256": "7624cd6df5ccbe030b0bd768abb7a2e5900dc7182b062d132812c8bb063e4a60",
     "reason": "Independent full-motion review rejected profile-wide compact walking cadence and support-transfer pelvis bob despite passing numerical checks. Local terrain contact planning and speed-appropriate running replace those behaviors. Exact actual-consumer observer coverage catches fast carrying flicker. Flat and gentle pooled35-degree extension remains greater than65%; only steep speed-appropriate travel replaces the pooled double-support statistic with each completed planted interval crossing beneath the pelvis under60 degrees, with no grounded double-knee collapse. Future-seek regression independently caught running contact table extrapolation and was repaired before GREEN. Existing exact carrying endpoint assertion revealed floating-point interpolation at a completed grip; the complete blend now directly returns its endpoint without weakening strict equality. Actual independent196 carrying review subsequently rejected level hovering and tiny recovery. Stable carrying actor metadata now selects a space-eased fast-running plan, with physically bounded contacts, opposed recovery and a flight-derived feasible pelvis target. The latest regression retains all exact196 frames from the three accepted walking clips and216 unaffected control frames.",
     "previousBehavior": "Released low pelvis caused crouching. The rejected upright draft used viewport-wide compact strides, abrupt load transfer and fast departure walking flicker. A fixed-stride implementation assertion incorrectly prohibited deterministic local terrain planning.",
