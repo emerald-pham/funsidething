@@ -3480,5 +3480,23 @@
       "command": "node --test --test-name-pattern='RISK repository process: deployment fetches' tests.js; log ../woop-squash-head-red.txt",
       "failure": "Observed missing exact reviewed head in a real isolated squash checkout with deleted branch; verifyDeploymentEvidence returned false before implementation. Deployment CI failure retained in ../woop-deploy-evidence-job-log.txt."
     }
+  },
+  {
+    "testChangesSha256": "9e7f9ad957d4fa767a9ba3a7a45dd1f95a12586debcf4e75524f1d9bf4a6aa16",
+    "reason": "Protect consistent frozen-header headroom after an actual Settings checkbox browser reproduction moved the scene up six pixels; add focused consumer/observer and rendered matrix coverage without changing existing tests.",
+    "previousBehavior": "Freezing used smaller padding and a different width contract, removed the normal flow box and only refreshed its height during app rendering. Browser RED at390x844 measured scene document top112.234375 to106.234375; unfreeze restored it.",
+    "intendedBehavior": "Freeze/unfreeze preserve normal responsive header geometry and original bottom margin in a dedicated flow slot; resize and header/font/container changes refresh only the reserved geometry.",
+    "replacementTests": [
+      "RISK frozen header clearance: actual preference transition reserves responsive header geometry through resize and text growth",
+      "RISK frozen header clearance browser: freeze unfreeze and responsive text retain document headroom"
+    ],
+    "preservedCoverage": [
+      "Existing immediate preference save, reopening settings, reload and legacy defaults remain asserted by the existing unreachable Undo test.",
+      "No task, scan, theme, font, cloud payload or sync protocol changes; original unrelated behavior assertions remain unchanged."
+    ],
+    "redEvidence": {
+      "command": "HEADER_BROWSER_GRANTED=1 node ../evidence/header-red.mjs; node --test --test-reporter=spec --test-name-pattern=\"RISK frozen header clearance:\" tests.js",
+      "failure": "Preimplementation real browser RED: AssertionError freezing must retain headroom: scene jumped -6px (header-red.log). Preimplementation tests.js RED: fixed header must retain its original available width; undefined rather than366px (header-source-red.log). Follow-up source RED before slot observation: observe header height and flow width, including scrollbar or container changes (header-slot-observer-red.log). Browser matrix was added after the initial implementation as supplemental coverage; not claimed as a preimplementation native matrix RED."
+    }
   }
 ]

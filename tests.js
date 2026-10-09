@@ -23723,3 +23723,54 @@ test('RISK scenery tuning: windows switch on half-length UTC ticks with unchange
  assert.equal(sky.advanceLights(windows,7.5,true,()=>0),true);assert.equal(windows.next,15);assert.deepEqual(windows.windows,[true,true]);
  assert.equal(sky.advanceLights(windows,15,false,()=>0),false,'daylight cannot toggle');
 });
+
+test('RISK frozen header clearance: actual preference transition reserves responsive header geometry through resize and text growth',async()=>{
+ const {ctx,shim}=await loadApp(),header=shim.document.getElementById('appHeader'),slot=shim.document.getElementById('headerSlot'),properties=new Map();
+ shim.documentElement.style={setProperty:(key,value)=>properties.set(key,value),removeProperty:key=>properties.delete(key)};
+ let rect={left:12,top:12,width:366},height=88.234375,observe;const observed=[];
+ slot.getBoundingClientRect=()=>({...rect});header.getBoundingClientRect=()=>({height});
+ ctx.ResizeObserver=class{constructor(callback){observe=callback;}observe(target){observed.push(target);}};
+ ctx.window.scrollY=0;ctx.renderFloatingHeader();ctx.setFloatingHeaderPreference(true);
+ assert.equal(properties.get('--floating-header-width'),'366px','fixed header must retain its original available width');
+ assert.equal(properties.get('--floating-header-left'),'12px');assert.equal(properties.get('--floating-header-top'),'12px','preserve normal top inset including safe area');
+ assert.equal(properties.get('--floating-header-height'),'88.234375px','reserve the rendered header height');
+ assert.ok(slot.classList.contains('floating'),'a flow slot reserves the header and original bottom margin');
+ assert.equal(typeof observe,'function','text, font and wrapped-header changes need size observation');
+ assert.ok(observed.includes(header)&&observed.includes(slot),'observe header height and flow width, including scrollbar or container changes');
+ rect={left:24,top:-1956,width:296};height=116;ctx.window.scrollY=2000;
+ for(const listener of shim.winListeners.resize||[])listener();
+ assert.equal(properties.get('--floating-header-width'),'296px','orientation/resize uses current flow-slot width');
+ assert.equal(properties.get('--floating-header-top'),'44px','deep scroll cannot shift the fixed header off its safe-area inset');
+ height=168;observe();assert.equal(properties.get('--floating-header-height'),'168px','enlarged text updates reserved clearance without a setting change');
+ ctx.setFloatingHeaderPreference(false);assert.equal(slot.classList.contains('floating'),false);assert.equal(header.classList.contains('floating'),false);
+ for(const property of ['height','width','left','top'])assert.equal(properties.has('--floating-header-'+property),false,'unfreeze releases only header geometry');
+ const frozen=html.match(/\.top\.floating\{([^}]+)\}/)?.[1]||'';
+ assert.doesNotMatch(frozen,/(?:^|;)padding:|(?:^|;)max-width:/,'freeze keeps responsive padding and width geometry');
+ assert.match(html,/id="headerSlot"[\s\S]{0,60}<header class="top" id="appHeader"/);
+ assert.match(html,/\.header-slot\{[^}]*display:flow-root/,'the existing bottom margin cannot collapse out of the slot');
+ assert.match(html,/\.header-slot\.floating\{[^}]*height:calc\(var\(--floating-header-height[^}]*\+ 12px\)/);
+ assert.doesNotMatch(html,/\.top\.floating \+ \.scene-intro/,'the scene must not acquire a second header-height margin');
+});
+
+test('RISK frozen header clearance browser: freeze unfreeze and responsive text retain document headroom',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const {chromium}=await import(process.env.LANDSCAPE_PLAYWRIGHT),browser=await chromium.launch({headless:true});
+ try{
+  const page=await browser.newPage({serviceWorkers:'block',reducedMotion:'reduce'});
+  await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'load'});
+  await page.evaluate(()=>{closeModal();for(let i=0;i<24;i++)addTask('Isolated header regression '+i);state.listOpen=true;render();});
+  const geometry=()=>page.evaluate(()=>{const h=document.getElementById('appHeader').getBoundingClientRect(),s=document.querySelector('.scene-intro').getBoundingClientRect();return {sceneTop:s.top+scrollY,headerTop:h.top,headerBottom:h.bottom,height:h.height,width:h.width,overflow:document.documentElement.scrollWidth>innerWidth};});
+  const freeze=async enabled=>{await page.getByTitle('Settings, contexts, and backups').click();await page.locator('.settings-section summary').filter({hasText:'Scanning and recurrence'}).click();await page.locator('#stFloatingHeader').setChecked(enabled);await page.locator('[data-act="close-modal"]').click();await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));};
+  for(const viewport of [{width:390,height:844},{width:320,height:568},{width:768,height:1024},{width:844,height:390},{width:1280,height:900}]){
+   await page.setViewportSize(viewport);
+   for(const enlarged of [false,true]){
+    await page.evaluate(enlarged=>{let style=document.getElementById('header-enlargement-fixture');if(!style){style=document.createElement('style');style.id='header-enlargement-fixture';document.head.append(style);}style.textContent=enlarged?'#appHeader .titles h1{font-size:34px}#appHeader button,#appHeader .plabel{font-size:26px}':'';window.scrollTo(0,0);},enlarged);
+    const before=await geometry();await freeze(true);const frozen=await geometry();
+    assert.ok(Math.abs(frozen.sceneTop-before.sceneTop)<=1,`${viewport.width}px enlarged=${enlarged}: freeze moved content`);
+    assert.ok(Math.abs(frozen.height-before.height)<=1&&Math.abs(frozen.width-before.width)<=1,'responsive header geometry remains the same');
+    await page.evaluate(()=>window.scrollTo(0,document.scrollingElement.scrollHeight));const deep=await geometry();assert.ok(deep.headerTop>=0&&deep.headerBottom<viewport.height,'frozen header stays visible while scrolling');
+    assert.ok(Math.abs(deep.sceneTop-before.sceneTop)<=1,'scrolling cannot grow reserved document space');
+    await freeze(false);const after=await geometry();assert.ok(Math.abs(after.sceneTop-before.sceneTop)<=1,'unfreeze restores the same reserved space');assert.equal(after.overflow,false,'no page overflow');
+   }
+  }
+ }finally{await browser.close();}
+});
