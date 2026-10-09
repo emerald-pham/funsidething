@@ -790,3 +790,6 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK per-edge dependency released clients: real supported hydration preserves modes and single-link edits retain explicit choices
 
 - RISK per-edge dependency recovery union: mode omission adoption and opaque conflicts retain both clients recovery evidence
+
+- RISK per-edge dependency rendered isolation: fixtures disable production cloud before navigation and constrain external requests
+- RISK per-edge dependency rendered controls:"),end=source.indexOf("test(

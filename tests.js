@@ -23624,7 +23624,8 @@ test('RISK per-edge dependency rendered controls: phone enlarged tablet desktop 
   try{for(const [width,height,large] of [[320,568,true],[390,844,false],[768,1024,false],[1440,900,false]]){
    const context=await browser.newContext({viewport:{width,height},serviceWorkers:'block'});
    try{
-    await context.addInitScript(()=>localStorage.setItem('fvp:chain-scanner:landscape-motion','reduced'));
+    await context.addInitScript(()=>{Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});localStorage.setItem('fvp:chain-scanner:landscape-motion','reduced');});
+    const origin=new URL(process.env.DEPENDENCY_BROWSER_URL).origin;await context.route('**/*',route=>{const url=new URL(route.request().url());return url.origin===origin||['fonts.googleapis.com','fonts.gstatic.com'].includes(url.hostname)?route.continue():route.abort();});
     const page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));await page.goto(process.env.DEPENDENCY_BROWSER_URL);await page.waitForFunction(()=>typeof state!=='undefined'&&state?.tasks);
     const fixture=await page.evaluate(()=>{closeModal();document.getElementById('motionDialog')?.close();replaceState(defaultState());const root=addTask('A long recurring dependency name that wraps safely on small screens'),other=addTask('Other choice');root.evergreen=true;state.addOpen=true;renderAddPanel();return {root:root.id,other:other.id,title:root.title};});
     if(large)await page.addStyleTag({content:'body{font-size:24px!important}.dependency-row label,.dependency-mode-hint,.dependency-hard-heading,.dependency-search label{font-size:18px!important}input,select,button{font-size:18px!important}'});
@@ -23663,4 +23664,9 @@ test('RISK per-edge dependency recovery union: mode omission adoption and opaque
   if(shape==='omission')delete other.dependencyModes;if(shape==='adoption')delete winner.dependencyModes;if(shape==='opaque')other.dependencyModes=['future map'];
   ctx.mergeTaskPrerequisites(winner,other);const saved=JSON.stringify(winner.dependencyModeRecovery);assert.ok(saved.includes('winner'),shape+' retains winner recovery');assert.ok(saved.includes('other'),shape+' retains peer recovery');const exact=JSON.stringify(winner);ctx.mergeTaskPrerequisites(winner,other);assert.equal(JSON.stringify(winner),exact,'repeated recovery merge is idempotent');
  }
+});
+
+test('RISK per-edge dependency rendered isolation: fixtures disable production cloud before navigation and constrain external requests',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'tests.js'),'utf8'),start=source.indexOf("test('RISK per-edge dependency rendered controls:"),end=source.indexOf("test('RISK per-edge dependency released clients:",start),fixture=source.slice(start,end);
+ assert.match(fixture,/Object\.defineProperty\(window,'FIREBASE_CONFIG'/,'isolated fixtures disable Firebase config before loading production source');assert.match(fixture,/context\.route\('\*\*\/\*'/,'isolated fixtures constrain network requests');assert.ok(fixture.indexOf('Object.defineProperty')<fixture.indexOf('page.goto'));
 });

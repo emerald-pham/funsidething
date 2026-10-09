@@ -1,6 +1,6 @@
 [
   {
-    "testChangesSha256": "504a9c23ebba50b8770cb2ce213a54b1c28d7bc80b4e45ace82ba5cac8165c44",
+    "testChangesSha256": "26e564304b9e3d905a3324e7c27060f8f08d750c71db31b0852571e26256d718",
     "reason": "Add per-edge hard and soft dependency controls while preserving released legacy edges and causal sync evidence. Independent specialists reproduced future metadata loss and conflicting identity divergence; new tests protect these repairs.",
     "previousBehavior": "All dependency links cleared permanently after evergreen Done. Add/Edit had no edge checkbox; recurrence did not reblock dependents.",
     "intendedBehavior": "New Add/Edit links default soft; hard clears only on deletion or non-evergreen Done. Existing links retain legacy behavior until explicitly changed. Saved modes converge without stale resurrection or loss of opaque evidence.",
@@ -15,7 +15,9 @@
       "RISK per-edge dependency recovery: future recovery shape remains safe through merges and unsupported controls",
       "RISK per-edge dependency rendered controls: phone enlarged tablet desktop labels keyboard search and saved rules fit real browsers",
       "RISK per-edge dependency released clients: real supported hydration preserves modes and single-link edits retain explicit choices",
-      "RISK per-edge dependency recovery union: mode omission adoption and opaque conflicts retain both clients recovery evidence"
+      "RISK per-edge dependency recovery union: mode omission adoption and opaque conflicts retain both clients recovery evidence",
+      "RISK per-edge dependency rendered isolation: fixtures disable production cloud before navigation and constrain external requests",
+      "RISK per-edge dependency rendered controls:\"),end=source.indexOf(\"test("
     ],
     "preservedCoverage": [
       "Existing completion deletion Undo cycle projection selected-link search and cloud protocol tests remain intact; all original executable assertions are retained.",
@@ -23,7 +25,7 @@
     ],
     "redEvidence": {
       "command": "node --test --test-name-pattern=\"RISK per-edge dependency controls\" tests.js; node --test --test-name-pattern=\"RISK per-edge dependency future evidence|RISK per-edge dependency opaque map\" tests.js",
-      "failure": "Observed preimplementation control RED: selected links require requested checkbox. Initial helpers were absent. Later independent-review RED caught ordinary Save discarding future choices and opaque fields; opaque-map RED caught replacement of an unsupported array. Supplemental sync/eligibility tests added after initial GREEN and are not claimed as preimplementation RED; baseline negative-control chronology separately recorded. Exact specialist review recovery-union RED: omission retains peer recovery failed before fixing all three early-return branches. Prior failures and supplemental chronology remain in preserved native logs."
+      "failure": "Observed preimplementation control RED: selected links require requested checkbox. Initial helpers were absent. Later independent-review RED caught ordinary Save discarding future choices and opaque fields; opaque-map RED caught replacement of an unsupported array. Supplemental sync/eligibility tests added after initial GREEN and are not claimed as preimplementation RED; baseline negative-control chronology separately recorded. Exact specialist recovery-union RED: omission retains peer recovery failed before fixing all early-return branches. Native isolation guard RED detected missing pre-navigation cloud-disable and network-bound fixture configuration; browser fixtures now freeze empty Firebase configuration and allow only local origin plus font providers."
     }
   },
   {
