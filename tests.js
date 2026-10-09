@@ -1387,6 +1387,27 @@ test('RISK fireworks twilight: actual reduced-motion painter holds its pose acro
  }
 });
 
+test('RISK fireworks polar day: real Arctic midnight remains excluded in solar sampling legacy admission and actual painting',()=>{
+ const sampler=livingSky(),date=new Date('2026-06-21T00:00:00Z'),location={latitude:70,longitude:0,timezone:'UTC'},sky=sampler.skyAt(date,location);
+ assert.equal(sky.polarDay,true);assert.equal(sky.period,'day');assert.ok(sky.sun.altitude>0&&sky.sun.altitude<8,'actual midnight Sun lies within the ordinary twilight altitude range');
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),paint=source.slice(source.indexOf('  function paintFireworks('),source.indexOf('\n  function paintClocktowerVisit('));
+ const admitted=[],painted=[];
+ for(const type of ['fireworks','festival']){
+  const w=sampler.createWorld(()=>0);w.events=[];w.next=Infinity;w.railNext={train:Infinity,metro:Infinity};w.nextFestival=type==='festival'?0:Infinity;w.nextFireworks=type==='fireworks'?0:Infinity;sampler.advance(w,1,sky);if(w.events.some(e=>e.type===type))admitted.push(type);
+  const g={globalAlpha:1,save(){},restore(){},drawImage(){}};vm.runInNewContext(`${paint};paintFireworks(type)`,{type,g,sky,world:{events:[{type,age:1.6,seed:.4}]},scenePose:e=>e,geometry:{fireworks:()=>[{x:100,y:100,tailX:99,tailY:101,alpha:1,burst:0}]},S:sampler,cityLayer:{width:390,height:844},dpr:1,line(){painted.push(type);},ellipse(){painted.push(type);}});
+ }
+ assert.deepEqual(admitted,[],'full polar daylight never admits either show source');assert.deepEqual(painted,[],'retained events cannot paint during polar daytime');
+ assert.equal(sampler.sunAt(date,location).polarDay,true,'bare UTC solar sampling retains the same polar-day exclusion');
+});
+
+test('RISK fireworks polar UTC: real Arctic daylight never schedules either source across a complete day',()=>{
+ const context=sceneTimeline(),original=context.LandscapeConfig;
+ context.LandscapeConfig={...original,spawnRate:actor=>['fireworks','festival'].includes(actor)?original.spawnRate(actor):0};vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-timeline.js'),'utf8'),context);
+ const location={latitude:70,longitude:0,timezone:'UTC'},start=Date.parse('2026-06-21T00:00:00Z'),options={seed:'private-polar-midnight',location},timeline=context.LandscapeTimeline.create(options);
+ for(let minute=0;minute<1440;minute++)assert.ok(!timeline.at(start+minute*60000).events.some(e=>['fireworks','festival'].includes(e.type)),`polar daylight excludes both UTC show sources at minute ${minute}`);
+ assert.deepEqual(JSON.parse(JSON.stringify(timeline.at(start))),JSON.parse(JSON.stringify(context.LandscapeTimeline.create(options).at(start))),'real-location polar exclusion is reproducible after reload');
+});
+
 test('RISK fireworks duration: each standalone show caps visibility at one minute while retaining its sampled rest schedule',()=>{
  const sky=livingSky(),night={sun:{altitude:-20,azimuth:0}};
  for(const [sample,expected] of [[0,60],[.25,120],[.5,180],[.999,299.76],[1,300]]){
@@ -1426,7 +1447,7 @@ test('RISK fireworks layering: city silhouettes mask random shows while barge sh
  const paint=source.slice(start,end),cityLayer={width:390,height:320},events=[{type:'fireworks',age:1.6,seed:.4},{type:'festival',age:30,seed:.4}];
  for(const type of ['fireworks','festival']){
   const masks=[],calls=[],stack=[],g={globalAlpha:1,globalCompositeOperation:'source-over',save(){stack.push([this.globalAlpha,this.globalCompositeOperation])},restore(){[this.globalAlpha,this.globalCompositeOperation]=stack.pop()},drawImage(layer){masks.push({layer,operation:this.globalCompositeOperation})}};
-  vm.runInNewContext(`${paint};paintFireworks(type)`,{g,type,scenePose:e=>e,W:390,H:844,dpr:1,cityLayer,sky:{sun:{altitude:-20}},world:{events},S:{smooth:()=>0},geometry:{fireworks(age,seed,barge,event){calls.push(event.type);return [{x:150,y:290,tailX:148,tailY:292,alpha:1,burst:0}] }},line(){},ellipse(){}});
+  vm.runInNewContext(`${paint};paintFireworks(type)`,{g,type,scenePose:e=>e,W:390,H:844,dpr:1,cityLayer,sky:{sun:{altitude:-20}},world:{events},S:{smooth:()=>0,fireworksAllowed:livingSky().fireworksAllowed},geometry:{fireworks(age,seed,barge,event){calls.push(event.type);return [{x:150,y:290,tailX:148,tailY:292,alpha:1,burst:0}] }},line(){},ellipse(){}});
   assert.deepEqual(calls,[type],'each depth pass draws only its own show');
   assert.equal(masks.length,type==='fireworks'?1:0,'only random fireworks are hidden by city pixels');
   if(masks.length){assert.equal(masks[0].layer,cityLayer);assert.equal(masks[0].operation,'destination-out','the real opaque city mask hides overlapping tower and clock silhouettes');}

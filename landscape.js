@@ -655,7 +655,7 @@
   }
   function paintFireworks(type){
     // The sky labels both solar directions as dawn/dusk below the +8-degree day boundary.
-    if(sky.sun.altitude>=8)return;
+    if(!S.fireworksAllowed(sky))return;
     g.save();
     for(const e of world.events.map(e=>scenePose(e,true)))if(e.type===type&&e.fireworkActive!==false){
       g.save();

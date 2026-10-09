@@ -26,7 +26,7 @@ minutes between visits, share the seven-minute rare cooldown with alien visits,
 and cross the lake on a barge in about 127–183 seconds, depending on the
 assigned travel speed (150-second baseline). A festival owns its
 fireworks; standalone shows and festivals do not overlap. Both admit sunrise, sunset, and nighttime below the existing +8-degree
-full-day boundary, independent of solar direction. Their particle brightness
+full-day boundary, independent of solar direction. Polar daylight remains excluded. Their particle brightness
 fades smoothly from full night at -12 degrees to zero at +8 degrees. Rates scale these chances, capped at 100%.
 The barge display follows its actual crossing duration. Its simultaneous
 eight-shell finale begins at 65% of that crossing while its launchers are

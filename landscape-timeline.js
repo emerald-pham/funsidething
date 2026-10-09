@@ -61,7 +61,7 @@
       const out=[],show=C.nightShows.festival;
       for(let slot=Math.floor(from/show.interval);slot<=Math.ceil(to/show.interval);slot++){
         const start=slot*show.interval,r=random(seed,'festival',slot);
-        if(start<from||start>to||sunAt(start).altitude>=8||r()>=Math.min(1,show.chance*C.spawnRate('festival')))continue;
+        if(start<from||start>to||!S.fireworksAllowed(sunAt(start))||r()>=Math.min(1,show.chance*C.spawnRate('festival')))continue;
         out.push(event('festival',start,r,`festival:${slot}`));
       }
       return out;
@@ -74,7 +74,7 @@
       let start=day*DAY+20*scale;
       while(start<(day+1)*DAY){
         const roll=r();
-        if(sunAt(start).altitude<8&&roll<Math.min(1,show.chance*C.spawnRate('fireworks'))){
+        if(S.fireworksAllowed(sunAt(start))&&roll<Math.min(1,show.chance*C.spawnRate('fireworks'))){
           const candidate=event('fireworks',start,r,`fireworks:${day}:${out.length}`);out.push(candidate);
           start+=(candidate.scheduleDuration+show.rest)*scale;
         }else start+=show.interval*scale;

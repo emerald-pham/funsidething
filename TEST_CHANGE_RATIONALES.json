@@ -1,18 +1,38 @@
 [
   {
-    "testChangesSha256": "d9b2bb6348ec85eb61e6ec473f8d6b87bbb9bb96cfd2db3c821415becdc310b0",
-    "reason": "The corrected explicit request admits both sunrise and sunset fireworks in addition to nighttime. Add narrow scheduler and real private painter contracts, without weakening existing duration frequency or particle tests.",
+    "testChangesSha256": "599c29cb02224f8f5eb6555e820b7978658a49b974d326664f47b9bfb1fad827",
+    "reason": "The corrected explicit request admits both sunrise and sunset fireworks in addition to nighttime. Add narrow scheduler and real private painter contracts, without weakening existing duration frequency or particle tests. Independent code review found that real polar daylight has low solar altitude. Add the actual Arctic midnight and complete-day UTC contracts, preserve the authoritative polar-day classification in bare solar sampling, and replace the existing painter test stub with the shared eligibility helper so the unchanged layer assertion still executes.",
     "previousBehavior": "Both firework sources were admitted and painted only below Sun altitude -6 degrees, with particle fade ending there.",
-    "intendedBehavior": "Both firework sources are eligible during sunrise sunset and night below the existing +8-degree full-day boundary; visible fade reaches zero at that boundary with no solar-direction exclusion.",
+    "intendedBehavior": "Both firework sources are eligible during sunrise sunset and night below the existing +8-degree full-day boundary; visible fade reaches zero at that boundary with no solar-direction exclusion. Polar daylight remains fully excluded in every scheduler and the actual painter.",
     "replacementTests": [
-      "RISK fireworks twilight: actual reduced-motion painter holds its pose across dawn and dusk and expires at the source lifetime"
+      "RISK fireworks twilight: actual reduced-motion painter holds its pose across dawn and dusk and expires at the source lifetime",
+      "RISK fireworks polar day: real Arctic midnight remains excluded in solar sampling legacy admission and actual painting",
+      "RISK fireworks polar UTC: real Arctic daylight never schedules either source across a complete day"
     ],
     "preservedCoverage": [
       "Standalone sixty-second maximum and sampled occurrence spacing, crossing-relative barge finale, seeded paired delay, trail-only ascent, explosion particles, layer masks, UTC reload and stationary reduced-motion deadlines remain."
     ],
     "redEvidence": {
-      "command": "node --test --test-name-pattern='RISK fireworks twilight:' tests.js before functional changes; /tmp/fireworks-phase-observed-red-all.log",
-      "failure": "Observed six failures: standalone and festival legacy admission, UTC admission, and actual private painter rejected altitude -6 with sunrise azimuth90. Product files were unchanged until these failures were observed."
+      "command": "node --test --test-name-pattern='RISK fireworks twilight:' tests.js before functional changes; /tmp/fireworks-phase-observed-red-all.log; before polar repair: node --test --test-name-pattern=\"RISK fireworks polar day:\" tests.js, /tmp/fireworks-polar-observed-red.log",
+      "failure": "Observed six failures: standalone and festival legacy admission, UTC admission, and actual private painter rejected altitude -6 with sunrise azimuth90. Product files were unchanged until these failures were observed. A separate actual polar-midnight RED failed full polar daylight exclusion before its functional repair."
+    }
+  },
+  {
+    "testChangesSha256": "d9b2bb6348ec85eb61e6ec473f8d6b87bbb9bb96cfd2db3c821415becdc310b0",
+    "reason": "The corrected explicit request admits both sunrise and sunset fireworks in addition to nighttime. Add narrow scheduler and real private painter contracts, without weakening existing duration frequency or particle tests.",
+    "previousBehavior": "Both firework sources were admitted and painted only below Sun altitude -6 degrees, with particle fade ending there.",
+    "intendedBehavior": "Both firework sources are eligible during sunrise sunset and night below the existing +8-degree full-day boundary; visible fade reaches zero at that boundary with no solar-direction exclusion.",
+    "replacementTests": [
+      "RISK fireworks twilight: actual reduced-motion painter holds its pose across dawn and dusk and expires at the source lifetime",
+      "RISK fireworks polar day: real Arctic midnight remains excluded in solar sampling legacy admission and actual painting",
+      "RISK fireworks polar UTC: real Arctic daylight never schedules either source across a complete day"
+    ],
+    "preservedCoverage": [
+      "Standalone sixty-second maximum and sampled occurrence spacing, crossing-relative barge finale, seeded paired delay, trail-only ascent, explosion particles, layer masks, UTC reload and stationary reduced-motion deadlines remain."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK fireworks twilight:' tests.js before functional changes; /tmp/fireworks-phase-observed-red-all.log; before polar repair: node --test --test-name-pattern=\"RISK fireworks polar day:\" tests.js, /tmp/fireworks-polar-observed-red.log",
+      "failure": "Observed six failures: standalone and festival legacy admission, UTC admission, and actual private painter rejected altitude -6 with sunrise azimuth90. Product files were unchanged until these failures were observed. A separate actual polar-midnight RED failed full polar daylight exclusion before its functional repair."
     }
   },
   {

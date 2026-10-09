@@ -813,3 +813,6 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK fireworks twilight: UTC festival opportunities admit both twilight directions and reload exactly
 - RISK fireworks twilight: actual festival painter keeps sunrise and sunset particles visible below daytime
 - RISK fireworks twilight: actual reduced-motion painter holds its pose across dawn and dusk and expires at the source lifetime
+
+- RISK fireworks polar day: real Arctic midnight remains excluded in solar sampling legacy admission and actual painting
+- RISK fireworks polar UTC: real Arctic daylight never schedules either source across a complete day
