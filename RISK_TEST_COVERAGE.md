@@ -744,3 +744,32 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK Last task WOOP browser: mounted controls responsive saved revisit delete and offline reload
 
 - RISK repository process: deployment fetches deleted squash PR head and rejects ref identity mismatch
+
+## Upright walking and carrying
+
+- RISK upright human gait: full cycles extend stance knees with modest swing flexion and preserved terrain contact
+- RISK upright gait guidance: scenery FAQ and changelog explain upright support and carrying without changing task controls
+- RISK upright torso travel: flat-ground pelvis travels steadily while terrain adaptation stays continuous
+- RISK upright pelvis consumer: torso head thighs and carrying arms follow the terrain hip
+- RISK upright gait consumer: every human painter consumes upright full cycles in both directions at responsive scales
+- RISK upright settled visitors: arrival endpoint rests both feet on terrain before eased departure
+
+- RISK human support balance: rejected steep phone walks keep the vertical torso over a usable planted support
+
+- RISK human terrain cadence: local contact spacing preserves world planting and deterministic arrivals
+
+- RISK local human cadence: recorded phone flat controls do not inherit a distant steep hill stride
+- RISK human route isolation: different terrain functions cannot share a sampled-profile contact cache
+- RISK human support transfer: recorded steep phone frames avoid the rejected abrupt pelvis bob
+- RISK whole human transfer: both ordered rendered phone traversals bound pelvis bob throughout each cycle
+- RISK running seek isolation: future route queries cannot revise fast departure contacts
+- RISK actual human pose observer: native consumer traces preserve painter commands and returned poses
+- RISK carrying locomotion: actual fast departure painters avoid aliased walking cadence and preserve every limb and grip
+- RISK terrain locomotion: actual steep phone walkers keep a human contact rhythm without slowing their route
+- RISK dense human contact corridor: final blended pelvis and limbs remain feasible at contact and window seams
+- RISK human grip endpoints: complete carrying retains its exact hip offset across every cadence
+
+- RISK carrying recovery: rejected actual phone sequence requires strikes opposed swing and a coherent flight arc
+- RISK carrying isolation: immutable accepted renderer commands match exactly on the same runtime
+
+- RISK carrying continuity: stable actor capability preserves resting grip transitions and deterministic departure seeks

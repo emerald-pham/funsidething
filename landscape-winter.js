@@ -72,7 +72,7 @@
     if (!TYPES.includes(type)) throw new RangeError('Unknown winter visitor');
     requireGeometry(geometry, W, H);
     const values = eventValues(event || {}, geometry, W);
-    const { progress, verticalProgress, clock, lane, seed, direction, scale } = values;
+    const { duration, progress, verticalProgress, clock, lane, seed, direction, scale } = values;
     const alpha = smooth(0, .06, progress) * (1 - smooth(.94, 1, progress));
 
     if (type === 'skier') {
@@ -103,7 +103,7 @@
       const builderAlpha = smooth(.05, .14, progress) * (1 - smooth(.90, .99, progress));
       return {
         type, x: anchor, y: groundY, groundY, snowOffset,
-        builderX, builderGroundY, builderScale: scale, walkDistance: W * .24 * builderWalk, structureAlpha, patchAlpha: structureAlpha,
+        builderX, builderGroundY, builderScale: scale, travel:{startDistance:0,length:W*.24,duration:duration*.30}, walkDistance: W * .24 * builderWalk, structureAlpha, patchAlpha: structureAlpha,
         finalFadeAlpha, angle: geometry.tangent(geometry.middle, anchor), scale, alpha,
         progress, verticalProgress, clock, lane, seed, direction, build,
         building: progress >= .08 && progress < .78,
@@ -123,6 +123,7 @@
     return {
       type, x: activity.x, y: bodyGroundY, groundY: bodyGroundY,
       walkDistance: Math.abs(activity.x - anchor),
+      travel:{startDistance:0,length:Math.abs((direction>0?W*1.22:-W*.22)-anchor),duration:duration*.16},
       imprintX: anchor, imprintGroundY, imprintAlpha, patchAlpha: imprintAlpha,
       snowOffset: 9 + lane * 2, angle: geometry.tangent(geometry.near, activity.x),
       scale: scale * .96, alpha, progress, verticalProgress, clock, lane, seed, direction,
@@ -160,21 +161,21 @@
     };
 
     const drawWalker = (x,y,scaleValue,ground,headY=-12,working=0) => {
-      const motion=geometry.humanWalkPose(x,y,poseValue.walkDistance,poseValue.direction,ground,0,scaleValue);
+      const motion=geometry.humanWalkPose(x,y,poseValue.walkDistance,poseValue.direction,ground,0,scaleValue,poseValue.travel);
       const skin=skinColor(poseValue.seed);
       g.save();g.translate(x,y);g.scale(poseValue.direction*scaleValue,scaleValue);
       const arm=(hand,side)=>{
-        const workX=side===0?5*smoothValue(.14,.72,poseValue.progress):-3.2;
+        const workX=motion.hipX+(side===0?5*smoothValue(.14,.72,poseValue.progress):-3.2);
         const workY=side===0?-7.9:-6.1;
         const hx=hand.x+(workX-hand.x)*working,hy=hand.y+(workY-hand.y)*working;
-        drawLine(0,-8+motion.bob,hx*.5,(-8+motion.bob+hy)/2,skin,1.1);
-        drawLine(hx*.5,(-8+motion.bob+hy)/2,hx,hy,skin,1.1);
+        drawLine(motion.hipX,-8+motion.bob,(motion.hipX+hx)*.5,(-8+motion.bob+hy)/2,skin,1.1);
+        drawLine((motion.hipX+hx)*.5,(-8+motion.bob+hy)/2,hx,hy,skin,1.1);
       };
       arm(motion.arms[1],1);
-      drawHead(0,headY+motion.bob,2,2,poseValue.seed,skin,false);
-      drawLine(0,-9+motion.bob,0,motion.hipY,color(poseValue.seed),2.7);
+      drawHead(motion.hipX,headY+motion.bob,2,2,poseValue.seed,skin,false);
+      drawLine(motion.hipX,-9+motion.bob,motion.hipX,motion.hipY,color(poseValue.seed),2.7);
       for(const leg of motion.legs){
-        drawLine(0,motion.hipY,leg.kneeX,leg.kneeY,ink,1.3);
+        drawLine(motion.hipX,motion.hipY,leg.kneeX,leg.kneeY,ink,1.3);
         drawLine(leg.kneeX,leg.kneeY,leg.footX,leg.footY,ink,1.3);
       }
       arm(motion.hand,0);g.restore();
@@ -221,7 +222,7 @@
         drawEllipse(builderX, builderY + .5 * s, 3.4 * s, .9 * s, mixHex(front, '#315d55', .35));
         // Building arms blend into the shared walking pose as the builder
         // leaves; scaled feet follow the snowy ground rather than scene time.
-        drawWalker(builderX,builderY,s,x=>geometry.middle(x)+poseValue.snowOffset,-11,
+        drawWalker(builderX,builderY,s,geometry.humanGround('middle',poseValue.snowOffset),-11,
           1-smoothValue(.68,.78,poseValue.progress));
         g.restore();
       }
@@ -293,7 +294,7 @@
         else drawEllipse(poseValue.x, poseValue.groundY + .5 * s, 3.4 * s, .9 * s, snowShadow);
         // Do not rotate planted feet with the body: sample their actual hill
         // contacts in world space, then render the connected local joints.
-        drawWalker(poseValue.x,poseValue.groundY,s,x=>geometry.near(x)+poseValue.snowOffset);
+        drawWalker(poseValue.x,poseValue.groundY,s,geometry.humanGround('near',poseValue.snowOffset));
         g.restore();
       }
     }
