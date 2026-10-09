@@ -820,3 +820,6 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK fireworks twilight barge: actual hull stage and crowd remain visible with their fireworks through both twilight directions
 
 - RISK fireworks twilight barge entry: actual depth-sorted vessel consumer preserves twilight hull and reflection
+
+- RISK Landscape browser: public twilight scenery retains opaque physical barge hull in the final composite
+- RISK fireworks physical vessel: twilight hull opacity follows the ordinary crossing pose

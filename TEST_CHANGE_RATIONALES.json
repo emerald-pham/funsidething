@@ -1,5 +1,39 @@
 [
   {
+    "testChangesSha256": "3acf7ead0f3ac7eb148ce0224da85dccb2777a2036bf4e80fc98b61b0c7a7630",
+    "reason": "Independent final rendered review rejected the physical vessel at twilight: its whole body inherited firework brightness. Add public-control final-composite coverage before changing opacity; preserve every earlier assertion and all failed evidence.",
+    "previousBehavior": "At sunrise altitude +3.804 degrees the real publicly scheduled barge hull blended into the reflected city; physical vessel opacity followed the particle solar fade.",
+    "intendedBehavior": "Physical barge hull stage and crowd use the existing ordinary vessel crossing pose alpha, while fireworks retain their solar brightness fade and both full daytime and polar daylight remain excluded.",
+    "replacementTests": [
+      "RISK Landscape browser: public twilight scenery retains opaque physical barge hull in the final composite",
+      "RISK fireworks physical vessel: twilight hull opacity follows the ordinary crossing pose"
+    ],
+    "preservedCoverage": [
+      "Original phase and polar admission contracts, standalone sixty-second cap and occurrence frequency, barge screen-crossing lifetime and paired0–300ms delay, trail-only ascent and explosion/finale particles remain unchanged. All released rationale objects and existing test assertions remain intact."
+    ],
+    "redEvidence": {
+      "command": "FIREWORKS_PUBLIC_RED=1 node /tmp/fireworks-phase-window-fb5eb8c.mjs motion 2026-10-09T13:27:00Z 2026-10-09T13:30:00Z; supporting node --test --test-name-pattern=\"RISK fireworks physical vessel:\" tests.js",
+      "failure": "Contemporaneous public final-composite RED13:27 reached the hull-colour assertion at390px, native eventfestival:29691846, actual Sun3.803668 degrees and saved07:00. Central pixels[175,184,181] differed from physical hull[23,43,57]; saved original PNG and JSON under /tmp/fireworks-phase-public-composite-red-fb5eb8c and log /tmp/fireworks-phase-public-composite-red-run.log. Supporting native RED0pass/1fail observed0.784!=1 at-6; no opacity source change until both failures were observed. Subsequent same public test GREEN at390/1440 and12 focused native passes zero skips."
+    }
+  },
+  {
+    "testChangesSha256": "31374277ef0a93ad42e1a605dcfb5745de5bb7660f44696007746c99ec7d948e",
+    "reason": "Independent final rendered review rejected the physical vessel at twilight: its whole body inherited firework brightness. Add public-control final-composite coverage before changing opacity; preserve every earlier assertion and all failed evidence.",
+    "previousBehavior": "At sunrise altitude +3.804 degrees the real publicly scheduled barge hull blended into the reflected city; physical vessel opacity followed the particle solar fade.",
+    "intendedBehavior": "Physical barge hull stage and crowd use the existing ordinary vessel crossing pose alpha, while fireworks retain their solar brightness fade and both full daytime and polar daylight remain excluded.",
+    "replacementTests": [
+      "RISK Landscape browser: public twilight scenery retains opaque physical barge hull in the final composite",
+      "RISK fireworks physical vessel: twilight hull opacity follows the ordinary crossing pose"
+    ],
+    "preservedCoverage": [
+      "Original phase and polar admission contracts, standalone sixty-second cap and occurrence frequency, barge screen-crossing lifetime and paired0–300ms delay, trail-only ascent and explosion/finale particles remain unchanged. All released rationale objects and existing test assertions remain intact."
+    ],
+    "redEvidence": {
+      "command": "FIREWORKS_PUBLIC_RED=1 node /tmp/fireworks-phase-window-fb5eb8c.mjs motion 2026-10-09T13:27:00Z 2026-10-09T13:30:00Z; supporting node --test --test-name-pattern=\"RISK fireworks physical vessel:\" tests.js",
+      "failure": "Contemporaneous public final-composite RED13:27 reached the hull-colour assertion at390px, native eventfestival:29691846, actual Sun3.803668 degrees and saved07:00. Central pixels[175,184,181] differed from physical hull[23,43,57]; saved original PNG and JSON under /tmp/fireworks-phase-public-composite-red-fb5eb8c and log /tmp/fireworks-phase-public-composite-red-run.log. Supporting native RED0pass/1fail observed0.784!=1 at-6; no opacity source change until both failures were observed. Subsequent same public test GREEN at390/1440 and12 focused native passes zero skips."
+    }
+  },
+  {
     "testChangesSha256": "eec21e08b3b26e514d5f5bb28939a0854c0169f159130b58d3f7388c0c426777",
     "reason": "The corrected explicit request admits both sunrise and sunset fireworks in addition to nighttime. Add narrow scheduler and real private painter contracts, without weakening existing duration frequency or particle tests. Independent code review found that real polar daylight has low solar altitude. Add the actual Arctic midnight and complete-day UTC contracts, preserve the authoritative polar-day classification in bare solar sampling, and replace the existing painter test stub with the shared eligibility helper so the unchanged layer assertion still executes. Expanded independent preservation tests found a pre-existing reduced-motion painter stub missing the new helper. Wire that stub and the matching ascent painter stub to the real shared eligibility helper, without changing any existing assertions. Final additive comparison base is released header/dependency345892c; released changelog, FAQ, source and all prior rationale objects are preserved. Expanded independent preservation tests found a pre-existing reduced-motion painter stub missing the new helper. Wire that stub and the matching ascent painter stub to the real shared eligibility helper, without changing any existing assertions. Full native suite1436pass/1failure/32runtime-skips exposed one obsolete civil-twilight exclusion at altitude -6. Move only that full-day fixture to the existing+8day boundary and correct its explanation, retaining its standalone recurrence, rare cooldown, rest, maximum scene budget and festival controls assertions. Separate new phase tests retain explicit -6 sunrise and sunset eligibility. Independent actual rendered review found a barge with invisible hull/stage/crowd during newly admitted twilight. A new actual paintFestival consumer test failed at -6 before the painter repair; preserve all earlier assertions and add phone, short-landscape, tablet and desktop phase/polar visibility checks. A second independent rendered rejection found the outer paintFestivalBarge still guarded at -6. Preserve the inner painter test and add an actual outer consumer test with clipping/reflection invocation before repairing the entry guard. This is a distinct observed functional RED; neither prior rejected movie is acceptance evidence.",
     "previousBehavior": "Both firework sources were admitted and painted only below Sun altitude -6 degrees, with particle fade ending there.",

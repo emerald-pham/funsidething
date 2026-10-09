@@ -23877,3 +23877,65 @@ test('RISK fireworks twilight barge entry: actual depth-sorted vessel consumer p
   assert.equal(alphas.some(alpha=>alpha>0),altitude<8&&!polarDay,`${width}x${height}: hull stage and crowd visibility at ${altitude}, azimuth ${azimuth}, polar ${polarDay}`);
  }
 });
+
+test('RISK Landscape browser: public twilight scenery retains opaque physical barge hull in the final composite',{skip:!process.env.LANDSCAPE_BROWSER_URL||!process.env.LANDSCAPE_PLAYWRIGHT},async()=>{
+ const {chromium}=await import(process.env.LANDSCAPE_PLAYWRIGHT),browser=await chromium.launch({channel:'chrome'});
+ try{
+  for(const width of [390,1440]){
+   const context=await browser.newContext({viewport:{width,height:width===390?844:900},timezoneId:'America/New_York',reducedMotion:'reduce',serviceWorkers:'block'}),page=await context.newPage();
+   await page.clock.install({time:new Date('2026-06-15T04:00:00Z')});
+   await page.addInitScript(()=>{Object.defineProperty(window,'FIREBASE_CONFIG',{value:null,configurable:true});localStorage.setItem('fvp:chain-scanner:landscape-motion','reduced');});
+   const origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+   await page.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
+   await page.goto(process.env.LANDSCAPE_BROWSER_URL);await page.waitForFunction(()=>globalThis.LivingSky&&globalThis.LandscapeTimeline&&typeof state!=='undefined'&&state?.tasks&&document.querySelector('[data-life]')?.width>0);
+   // Observe the public scheduler without replacing renderer state, time sampling,
+   // event admission, canvas entry points, or any delivered source bytes.
+   const fixture=await page.evaluate(()=>{
+    const S=LivingSky,T=LandscapeTimeline,location=LivingLocation.current(),values=new Map(),storage={getItem:key=>values.get(key)||null,setItem:(key,value)=>values.set(key,value)};
+    S.saveSceneSeason(storage,'summer');let time,sun;
+    for(let minute=0;minute<720;minute++){
+     const choice=String(Math.floor(minute/60)).padStart(2,'0')+':'+String(minute%60).padStart(2,'0');S.saveSceneTime(storage,choice);
+     const sampled=S.sunAt(S.sceneDate(new Date(),storage,location),location);
+     if(sampled.altitude>=3.8&&sampled.altitude<=4.2){time=choice;sun=sampled;break;}
+    }
+    if(!time)throw Error('A real +4 degree sunrise clock fixture is required');
+    const timeline=T.create({seed:T.DEFAULT_SEED,season:'summer',location,sunAt:at=>S.sunAt(S.sceneDate(new Date(at),storage,location),location)}),start=Date.now();
+    for(let minute=0;minute<1440;minute++){
+     const at=start+minute*60000,event=timeline.at(at).events.find(e=>e.type==='festival');
+     const actualSun=S.sunAt(S.sceneDate(new Date(at),storage,location),location);
+     if(event&&actualSun.altitude>=3.8&&actualSun.altitude<=4.2&&!actualSun.polarDay&&S.weatherAt(new Date(at),'summer').status==='clear')return {time,at,event,sun:actualSun,location};
+    }
+    throw Error('A native clear-weather barge opportunity is required');
+   });
+   await page.clock.fastForward(fixture.at-Date.parse('2026-06-15T04:00:00Z'));
+   const welcome=page.locator('#modalRoot [data-act="close-modal"]');if(await welcome.isVisible())await welcome.click();
+   await page.locator('[title="Settings, contexts, and backups"]').click();await page.locator('[data-act="scene-time-settings"]').click();
+   await page.locator('#sceneSeasonInput').selectOption('summer');await page.locator('#sceneTimeInput').fill(fixture.time);await page.locator('[data-scene-time="lock"]').click();
+   await page.locator('[data-scene-time="close"]').click();await page.locator('#modalRoot [data-act="close-modal"]').click();await page.locator('#viewScene').click();await page.clock.runFor(50);
+   assert.equal(await page.evaluate(()=>document.documentElement.dataset.scenePeriod),'dawn');
+   const observed=await page.evaluate(event=>{
+    const S=LivingSky,location=LivingLocation.current(),sun=S.sunAt(S.sceneDate(new Date(),localStorage,location),location),native=LandscapeTimeline.create({seed:LandscapeTimeline.DEFAULT_SEED,season:'summer',location,sunAt:at=>S.sunAt(S.sceneDate(new Date(at),localStorage,location),location)}).at(Date.now()).events.find(e=>e.type==='festival');
+    const front=document.querySelector('[data-life]'),back=document.querySelector('[data-scenery]'),canvas=document.createElement('canvas');canvas.width=front.width;canvas.height=front.height;
+    const ctx=canvas.getContext('2d');ctx.drawImage(back,0,0);ctx.drawImage(front,0,0);
+    const pose=LandscapeGeometry.create(innerWidth,innerHeight).festival({...event,age:event.duration*.5}),ratio=front.width/innerWidth,y=Math.floor(pose.y*ratio),pixels=[];
+    for(let dx=-2;dx<=2;dx++)pixels.push(Array.from(ctx.getImageData(Math.floor(pose.x*ratio)+dx,y,1,1).data));
+    return {pose,pixels,sun,nativeId:native?.id,storedTime:LivingSky.readSceneTime(localStorage)};
+   },fixture.event);
+   if(process.env.LANDSCAPE_EVIDENCE_DIR)await page.screenshot({path:path.join(process.env.LANDSCAPE_EVIDENCE_DIR,`${width}-public-twilight-composite.png`)});
+   assert.equal(observed.storedTime,fixture.time);assert.equal(observed.nativeId,fixture.event.id);assert.ok(observed.sun.altitude>=3.8&&observed.sun.altitude<=4.2&&!observed.sun.polarDay);
+   if(process.env.LANDSCAPE_EVIDENCE_DIR)fs.writeFileSync(path.join(process.env.LANDSCAPE_EVIDENCE_DIR,`${width}-public-fixture.json`),JSON.stringify({fixture,observed},null,2));
+   assert.ok(observed.pixels.some(pixel=>pixel.slice(0,3).every((v,i)=>Math.abs(v-[23,43,57][i])<=2)),`public final composite retains the physical #172b39 hull at ${width}px: ${JSON.stringify(observed)}`);
+   await context.close();
+  }
+ }finally{await browser.close();}
+});
+
+test('RISK fireworks physical vessel: twilight hull opacity follows the ordinary crossing pose',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),paint=source.slice(source.indexOf('  function paintFestival(e){'),source.indexOf('  function paintFireworks(')),sampler=livingSky(),context=sceneTimeline();
+ for(const [width,height] of [[390,844],[568,320],[768,1024],[1440,900]])for(const azimuth of [90,270])for(const [altitude,polarDay] of [[-20,false],[-6,false],[0,false],[4,false],[7.999,false],[8,false],[20,false],[3.645,true]]){
+  const alphas=[],stack=[],target={globalAlpha:1,save(){stack.push(this.globalAlpha);},restore(){this.globalAlpha=stack.pop();},createLinearGradient(){return {addColorStop(){}};},fill(){alphas.push(this.globalAlpha);},fillRect(){alphas.push(this.globalAlpha);},stroke(){alphas.push(this.globalAlpha);}},g=new Proxy(target,{get:(object,key)=>key in object?object[key]:()=>{}});
+  const geometry=context.LandscapeGeometry.create(width,height),event={type:'festival',age:75,duration:150,lane:.55,seed:.4};
+  vm.runInNewContext(`${paint};paintFestival(event)`,{g,event,geometry,S:sampler,sky:{sun:{altitude,azimuth},polarDay,period:polarDay||altitude>=8?'day':altitude<-12?'night':azimuth<180?'dawn':'dusk'},line(){alphas.push(g.globalAlpha);},ellipse(){alphas.push(g.globalAlpha);}});
+  assert.equal(alphas[0]||0,altitude<8&&!polarDay?geometry.festival(event).alpha:0,`${width}x${height}: hull stage and crowd visibility at ${altitude}, azimuth ${azimuth}, polar ${polarDay}`);
+ }
+});
