@@ -15922,7 +15922,7 @@ test('Consistency repair: stop estimate uses actual chance order without reshuff
 test('Consistency repair: Starts eligibility gets a midnight wake as well as the day marker',async()=>{
  const {ctx}=await loadApp();const at=new Date(2026,8,16,23,59).getTime();setFakeTime(ctx,at);const t=ctx.addTask('Tomorrow');t.startsAt='2026-09-17';assert.equal(ctx.nextScanWakeAt(),new Date(2026,8,17,0).getTime());
 });
-test('Consistency repair: quick start distinguishes chance from the oldest normal anchor',async()=>{
+test('Consistency repair: detailed help distinguishes weighted ordering from the oldest first dot',async()=>{
  const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
  assert.match(help,/Every mode.*first dot by age.*oldest/i);assert.match(help,/Chance mode uses a weighted random order/i);
  assert.doesNotMatch(help,/candidates to add to the todo list in descending order of your likelihood/);
