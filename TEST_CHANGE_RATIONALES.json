@@ -1,5 +1,77 @@
 [
   {
+    "testChangesSha256": "461ec28d5b929610c835ca9d4aa05d17b86a695771ff6dabf4ce975534704986",
+    "reason": "Explicit user scenery tuning restores crossing-relative barge fireworks and doubles barge and fairy odds and window cadence. Update only intentional rate/lifetime expectations and preserve all particle, schedule and data contracts. Final full-suite1413pass/1failure/30runtime-skips exposed the remaining old normalized-space population upper bound .2. Retain per-frame stability, one-roof-per-opportunity, strict1/6 boundary, exact seeded UTC samples and6000-resample accuracy tests; use the sparse one-in-six occupancy bound below1/3 to continue rejecting fifty-percent toggles. This is an explicitly requested probability change, not an unrelated weakened regression. The exact final base-to-head fingerprint binds the complete protected-test diff; the prior intermediate fingerprint had no replacement declarations and was not final-gate evidence.",
+    "previousBehavior": "Barge fireworks stopped at sixty seconds; festival chance .006, fairy chance one-in-twelve and window ticks fifteen seconds.",
+    "intendedBehavior": "Historical 65%-crossing barge finale, .012 festival chance, one-in-six fairy activation and7.5-second window ticks. Standalone cap and frequency unchanged.",
+    "replacementTests": [
+      "RISK fairy lights: gardens and patios share independent stable one-in-six roof samples",
+      "RISK skyline lights: each garden has a one-in-six state through independent resamples",
+      "RISK fireworks minute cap: standalone tails finish within sixty seconds and barge tails follow crossing",
+      "RISK fireworks reduced motion: static blooms stay on the stationary barge throughout its crossing",
+      "RISK fireworks reduced deadline: static scheduler preserves a persistent barge bloom across sixty seconds without animated repaints",
+      "RISK scenery tuning: barge crossing lifetime restores historical finale without standalone cap regression",
+      "RISK scenery tuning: doubled barge odds preserve interval cooldown duration and standalone frequency",
+      "RISK scenery tuning: fairy activation doubles probability with unchanged sampling duration and daylight guard",
+      "RISK scenery tuning: windows switch on half-length UTC ticks with unchanged seeded lit proportion"
+    ],
+    "preservedCoverage": [
+      "Standalone sixty-second maximum, four-times-original spacing and reservations, paired0–300ms seeded delay, explosion and finale particles, independent roof sampling, daylight guards and all task storage/sync protections remain."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK scenery tuning:' tests.js (before functional implementation), /tmp/barge-observed-red.log",
+      "failure": "Observed four intended failures: crossing-relative finale absent; .006 instead of .012; .1 fairy sample dark; UTC tick at7500ms was0 rather than1. Subsequent fixture correction uses actual normalized roof pool and is recorded separately. Full-source failure /tmp/barge-full-source.log at shared scenery lights oldone-in-twelve population upper bound. Both failed outputs retained."
+    }
+  },
+  {
+    "testChangesSha256": "899dae88cd55004d64756f9e60b9e2f33568c2c48b044107a61d8048d1bfb235",
+    "reason": "Explicit user scenery tuning restores crossing-relative barge fireworks and doubles barge and fairy odds and window cadence. Update only intentional rate/lifetime expectations and preserve all particle, schedule and data contracts.",
+    "previousBehavior": "Barge fireworks stopped at sixty seconds; festival chance .006, fairy chance one-in-twelve and window ticks fifteen seconds.",
+    "intendedBehavior": "Historical 65%-crossing barge finale, .012 festival chance, one-in-six fairy activation and7.5-second window ticks. Standalone cap and frequency unchanged.",
+    "replacementTests": [
+      "RISK fairy lights: gardens and patios share independent stable one-in-six roof samples",
+      "RISK skyline lights: each garden has a one-in-six state through independent resamples",
+      "RISK fireworks minute cap: standalone tails finish within sixty seconds and barge tails follow crossing",
+      "RISK fireworks reduced motion: static blooms stay on the stationary barge throughout its crossing",
+      "RISK fireworks reduced deadline: static scheduler preserves a persistent barge bloom across sixty seconds without animated repaints",
+      "RISK scenery tuning: barge crossing lifetime restores historical finale without standalone cap regression",
+      "RISK scenery tuning: doubled barge odds preserve interval cooldown duration and standalone frequency",
+      "RISK scenery tuning: fairy activation doubles probability with unchanged sampling duration and daylight guard",
+      "RISK scenery tuning: windows switch on half-length UTC ticks with unchanged seeded lit proportion"
+    ],
+    "preservedCoverage": [
+      "Standalone sixty-second maximum, four-times-original spacing and reservations, paired0–300ms seeded delay, explosion and finale particles, independent roof sampling, daylight guards and all task storage/sync protections remain."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK scenery tuning:' tests.js (before functional implementation), /tmp/barge-observed-red.log",
+      "failure": "Observed four intended failures: crossing-relative finale absent; .006 instead of .012; .1 fairy sample dark; UTC tick at7500ms was0 rather than1. Subsequent fixture correction uses actual normalized roof pool and is recorded separately."
+    }
+  },
+  {
+    "testChangesSha256": "51466545d2e3040968d2fbc376967131ced64fc7d34bb37cf93aaa6751af2516",
+    "reason": "Explicit user scenery tuning restores crossing-relative barge fireworks and doubles barge and fairy odds and window cadence. Update only intentional rate/lifetime expectations and preserve all particle, schedule and data contracts.",
+    "previousBehavior": "Barge fireworks stopped at sixty seconds; festival chance .006, fairy chance one-in-twelve and window ticks fifteen seconds.",
+    "intendedBehavior": "Historical 65%-crossing barge finale, .012 festival chance, one-in-six fairy activation and7.5-second window ticks. Standalone cap and frequency unchanged.",
+    "replacementTests": [
+      "RISK fairy lights: gardens and patios share independent stable one-in-six roof samples",
+      "RISK skyline lights: each garden has a one-in-six state through independent resamples",
+      "RISK fireworks minute cap: standalone tails finish within sixty seconds and barge tails follow crossing",
+      "RISK fireworks reduced motion: static blooms stay on the stationary barge throughout its crossing",
+      "RISK fireworks reduced deadline: static scheduler preserves a persistent barge bloom across sixty seconds without animated repaints",
+      "RISK scenery tuning: barge crossing lifetime restores historical finale without standalone cap regression",
+      "RISK scenery tuning: doubled barge odds preserve interval cooldown duration and standalone frequency",
+      "RISK scenery tuning: fairy activation doubles probability with unchanged sampling duration and daylight guard",
+      "RISK scenery tuning: windows switch on half-length UTC ticks with unchanged seeded lit proportion"
+    ],
+    "preservedCoverage": [
+      "Standalone sixty-second maximum, four-times-original spacing and reservations, paired0–300ms seeded delay, explosion and finale particles, independent roof sampling, daylight guards and all task storage/sync protections remain."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK scenery tuning:' tests.js (before functional implementation), /tmp/barge-observed-red.log",
+      "failure": "Observed four intended failures: crossing-relative finale absent; .006 instead of .012; .1 fairy sample dark; UTC tick at7500ms was0 rather than1. Subsequent fixture correction uses actual normalized roof pool and is recorded separately."
+    }
+  },
+  {
     "testChangesSha256": "e782bf7cf1cf6b03dd727a5a10508511f46115c7429b8350dceb385ea7558d30",
     "reason": "Independent full-motion review rejected profile-wide compact walking cadence and support-transfer pelvis bob despite passing numerical checks. Local terrain contact planning and speed-appropriate running replace those behaviors. Exact actual-consumer observer coverage catches fast carrying flicker. Flat and gentle pooled35-degree extension remains greater than65%; only steep speed-appropriate travel replaces the pooled double-support statistic with each completed planted interval crossing beneath the pelvis under60 degrees, with no grounded double-knee collapse. Future-seek regression independently caught running contact table extrapolation and was repaired before GREEN. Existing exact carrying endpoint assertion revealed floating-point interpolation at a completed grip; the complete blend now directly returns its endpoint without weakening strict equality. Actual independent196 carrying review subsequently rejected level hovering and tiny recovery. Stable carrying actor metadata now selects a space-eased fast-running plan, with physically bounded contacts, opposed recovery and a flight-derived feasible pelvis target. The latest regression retains all exact196 frames from the three accepted walking clips and216 unaffected control frames. Final Linux Node22 CI exposed the cross-runtime saved canvas hash for an unchanged snowangel frame. Preserve the entire original fixture and bind immutable196 renderer sources; compare every661 unaffected frame against that same-runtime predecessor using exact deep command equality without tolerance. Added tiny extra-command negative control. Product source and all accepted visual inputs unchanged. This exact 3bbc0cd3b3683c0c2a50447f4c9fd192a5660b8a comparison has its own protected-test fingerprint. The isolation test title now names immutable same-runtime comparison, making the updated regression declaration explicit; actual assertions are unchanged from3bbc.",
     "previousBehavior": "Released low pelvis caused crouching. The rejected upright draft used viewport-wide compact strides, abrupt load transfer and fast departure walking flicker. A fixed-stride implementation assertion incorrectly prohibited deterministic local terrain planning.",

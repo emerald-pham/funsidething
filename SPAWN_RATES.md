@@ -21,15 +21,18 @@ Regular volleys fire two shells; the second has a deterministic seeded
 0–300 ms delay. Eight simultaneous finale shells finish with naturally fading
 embers before the 60-second display limit. Geometry keeps at most 320 active particles. Arrival timing stays random
 and respects the existing scene budget and shared UTC clock; hidden tabs do no painting and reduced motion uses still poses.
-Festivals check once per UTC minute at a 0.6% chance, wait at least 30 UTC
+Festivals check once per UTC minute at a 1.2% chance, wait at least 30 UTC
 minutes between visits, share the seven-minute rare cooldown with alien visits,
 and cross the lake on a barge in about 127–183 seconds, depending on the
 assigned travel speed (150-second baseline). A festival owns its
 fireworks; standalone shows and festivals do not overlap. Both require the Sun
 below civil twilight. Rates scale these chances, capped at 100%.
-The barge also finishes its paired shells and simultaneous eight-shell finale
-within its first 60 seconds, preserving full transit time, while its launchers
-are still visible; its visit odds, cooldown, travel speed and duration stay unchanged.
+The barge display follows its actual crossing duration. Its simultaneous
+eight-shell finale begins at 65% of that crossing while its launchers are
+still visible. Travel speed, duration and cooldown stay unchanged. Fairy lights
+retain independent one-minute nighttime sampling with one-in-six activation
+odds. Skyline windows switch on 7.5-second UTC ticks with the same seeded
+lighting distribution; daylight eligibility and brightness stay unchanged.
 Woodland rows control the separate animal pool (default: 1% chance per 30 seconds).
 Clocktower visits check once per UTC nighttime minute with a 2% chance at
 rate 1, about one visit per 50 UTC night minutes. Peter Pan, Wendy, John and

@@ -1059,7 +1059,7 @@ test('RISK shared scenery lights: one-minute independent roof samples remain sta
   for(const index of Object.keys(a.gardens)){const count=samples.get(index);count.total++;count.on+=Number(a.gardens[index]);}
   previous=a.gardens;now+=60000;
  }
- for(const {on,total} of samples.values())assert.ok(on/total>.02&&on/total<.2,'independent one-in-twelve samples do not become all-on or a fifty-percent toggle');
+ for(const {on,total} of samples.values())assert.ok(on/total>.02&&on/total<1/3,'independent one-in-six samples remain sparse rather than all-on or a fifty-percent toggle');
 });
 
 test('RISK scenery browser fixture: conditional reloads retain executable probes and late sky refresh cannot change the controlled background',async()=>{
@@ -1293,7 +1293,7 @@ test('RISK rain reflection: removing mirrored rainfall preserves snow and the di
  assert.equal(draw('thunderstorm',true).strokes.filter(stroke=>stroke[4]==='#fff4d1').length,3,'the distant bolt still reflects with the storm clouds');
 });
 
-test('RISK fairy lights: gardens and patios share independent stable one-in-twelve roof samples',()=>{
+test('RISK fairy lights: gardens and patios share independent stable one-in-six roof samples',()=>{
  const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
  assert.match(source,/sceneSnapshot\.gardens/);const sync='S.syncGardenLights(cityLights.gardens,[...plan.gardens,...plan.patios].map(roof=>roof.index),Math.random);';
  const sky=livingSky(),cityLights={gardens:sky.createGardenLights([],()=>.99)},plan={gardens:[{index:1},{index:3}],patios:[{index:2},{index:4}]};
@@ -13911,13 +13911,13 @@ test('Landscape companions: dogs remain near their owners and follow the trail i
  }
 });
 
-test('Landscape city: only one window changes per fifteen seconds of active night',()=>{
- const sky=livingSky(),state={next:15,windows:[true,false,true,false]};
- assert.equal(sky.advanceLights(state,14,true,()=>.3),false);assert.deepEqual(state.windows,[true,false,true,false]);
- assert.equal(sky.advanceLights(state,15,true,()=>.3),true);assert.deepEqual(state.windows,[true,true,true,false]);
- assert.equal(state.next,30);
- assert.equal(sky.advanceLights(state,16,true,()=>.3),false);
- assert.equal(sky.advanceLights(state,30,true,()=>.3),true);assert.deepEqual(state.windows,[true,false,true,false]);
+test('Landscape city: only one window changes per seven-and-a-half seconds of active night',()=>{
+ const sky=livingSky(),state={next:7.5,windows:[true,false,true,false]};
+ assert.equal(sky.advanceLights(state,7,true,()=>.3),false);assert.deepEqual(state.windows,[true,false,true,false]);
+ assert.equal(sky.advanceLights(state,7.5,true,()=>.3),true);assert.deepEqual(state.windows,[true,true,true,false]);
+ assert.equal(state.next,15);
+ assert.equal(sky.advanceLights(state,8,true,()=>.3),false);
+ assert.equal(sky.advanceLights(state,15,true,()=>.3),true);assert.deepEqual(state.windows,[true,false,true,false]);
  assert.equal(sky.advanceLights(state,60,false,()=>.3),false);
  assert.equal(sky.advanceLights(state,100,true,()=>.3),true);assert.deepEqual(state.windows,[true,true,true,false],'no catch-up burst after a pause');
  assert.equal(sky.advanceLights({next:0,windows:[]},1,true,()=>0),false);
@@ -16701,15 +16701,15 @@ test('RISK skyline light cadence: twice as many opportunities keep single-roof s
  assert.equal(sky.advanceGardenLights(gardens,1,true,()=>0),true);
  assert.deepEqual({...gardens.lit},{0:true,1:false,2:false,3:false});
  assert.equal(sky.advanceGardenLights(gardens,60,true,()=>.99),false,'unchanged resamples retain their old repaint contract');
- assert.equal(sky.createGardenLights([0],()=>1/12).lit[0],false,'population and one-in-twelve odds do not double');
+ assert.equal(sky.createGardenLights([0],()=>1/6).lit[0],false,'new one-in-six boundary remains exclusive');
  const windows={next:15,windows:[false,false,true],visible:[1]};
- assert.equal(sky.advanceLights(windows,15,true,()=>0),true);assert.equal(windows.next,30);
+ assert.equal(sky.advanceLights(windows,15,true,()=>0),true);assert.equal(windows.next,22.5);
  assert.deepEqual(windows.windows,[false,true,true]);
  assert.equal(sky.advanceLights(windows,30,true,()=>0),true);assert.deepEqual(windows.windows,[false,false,true]);
- assert.equal(sky.advanceLights(windows,100,true,()=>0),true);assert.equal(windows.next,115,'long frames never replay missed toggles');
+ assert.equal(sky.advanceLights(windows,100,true,()=>0),true);assert.equal(windows.next,107.5,'long frames never replay missed toggles');
  assert.equal(sky.advanceLights(windows,115,false,()=>0),false,'daylight never turns on a city window');
  const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
- assert.match(source,/const cityLights=\{next:15,windows:/,'the first window transition also follows the fifteen-second cadence');
+ assert.match(source,/const cityLights=\{next:7\.5,windows:/,'the first window transition also follows the seven-and-a-half-second cadence');
 });
 
 test('RISK clocktower visit geometry: four staggered visitors stand on both actual roof slopes at every viewport',()=>{
@@ -19750,7 +19750,7 @@ test('RISK night shows: festival odds are lower than standalone fireworks with f
  for(const file of ['landscape-config.js','vendor/astronomy.min.js','stars.js','landscape-core.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,file),'utf8'),ctx);
   const sky=ctx.LivingSky;
   assert.ok(sky.rareTypes.includes('festival'));
-  assert.equal(ctx.LandscapeConfig.nightShows.festival.chance,.006,'festival chance is one tenth of the previous six-percent check');
+  assert.equal(ctx.LandscapeConfig.nightShows.festival.chance,.012,'festival chance doubles the released six-tenths-percent check');
   assert.equal(ctx.LandscapeConfig.setSpawnRates('| Event | Rate |\n| festival | 0 |\n| fireworks | 0 |'),true);
  const run=(roll,altitude=-20)=>{
   const w=sky.createWorld(()=>roll);w.events=[];w.next=Infinity;w.railNext={train:Infinity,metro:Infinity};w.nextFireworks=0;w.nextFestival=0;
@@ -19758,8 +19758,8 @@ test('RISK night shows: festival odds are lower than standalone fireworks with f
  };
  assert.equal(run(0).events.length,0,'zero rates disable both shows');
  ctx.LandscapeConfig.setSpawnRates('| Event | Rate |\n| festival | 1 |\n| fireworks | 1 |');
-  assert.ok(run(.005).events.some(e=>e.type==='festival'),'a roll below the one-minute .006 chance enters');
-  assert.ok(!run(.007).events.some(e=>e.type==='festival'),'rolls above the one-minute .006 chance wait');
+  assert.ok(run(.005).events.some(e=>e.type==='festival'),'a roll below the one-minute .012 chance enters');
+  assert.ok(!run(.013).events.some(e=>e.type==='festival'),'rolls above the one-minute .012 chance wait');
   assert.ok(run(.3).events.some(e=>e.type==='fireworks'),'standalone shows have forty percent checks');
   const w=run(.005),festival=w.events.find(e=>e.type==='festival');
  assert.equal(festival.duration,150/sky.startingSpeed(.005));assert.equal(festival.speed,sky.startingSpeed(.005));
@@ -20611,16 +20611,16 @@ test('RISK evergreen flag changes: completion cancellation survives both merge d
   }
 });
 
-test('RISK skyline lights: each garden has a one-in-twelve state through independent resamples',()=>{
- const sky=livingSky(),chance=1/12,roof=[17];
- assert.equal(sky.createGardenLights(roof,()=>chance-Number.EPSILON).lit[17],true,'values just below one twelfth light a garden');
- assert.equal(sky.createGardenLights(roof,()=>chance).lit[17],false,'the exact one-twelfth boundary stays dark');
- assert.equal(sky.createGardenLights(roof,()=>chance+Number.EPSILON).lit[17],false,'values above one twelfth stay dark');
- assert.equal(sky.createGardenLights(roof,()=>1/6-Number.EPSILON).lit[17],false,'values near the former one-sixth boundary now stay dark');
+test('RISK skyline lights: each garden has a one-in-six state through independent resamples',()=>{
+ const sky=livingSky(),chance=1/6,roof=[17];
+ assert.equal(sky.createGardenLights(roof,()=>chance-Number.EPSILON).lit[17],true,'values just below one sixth light a garden');
+ assert.equal(sky.createGardenLights(roof,()=>chance).lit[17],false,'the exact one-sixth boundary stays dark');
+ assert.equal(sky.createGardenLights(roof,()=>chance+Number.EPSILON).lit[17],false,'values above one sixth stay dark');
+ assert.equal(sky.createGardenLights(roof,()=>1/12).lit[17],true,'the former one-twelfth boundary now lights');
  const resized=sky.createGardenLights([21,22],()=>0),beforeResize={...resized.lit};
  sky.syncGardenLights(resized,[22,23],()=>.99);
  assert.equal(resized.lit[21],beforeResize[21],'temporarily ineligible roofs retain their state across a resize');
- assert.equal(resized.lit[23],false,'a newly eligible roof receives a fresh independent one-in-twelve draw');
+ assert.equal(resized.lit[23],false,'a newly eligible roof receives a fresh independent one-in-six draw');
  sky.syncGardenLights(resized,[21,22],()=>{throw new Error('returning roofs must retain their sampled state');});
  assert.deepEqual(JSON.parse(JSON.stringify(resized.lit)),{...beforeResize,23:false},'returning to an earlier viewport restores prior roof states and retains the newly seen roof');
 
@@ -20634,14 +20634,14 @@ test('RISK skyline lights: each garden has a one-in-twelve state through indepen
   const random=()=>draws++===0?roofDraw:stateDraw;
   const expected=stateDraw<chance,changed=sky.advanceGardenLights(state,120,true,random);
   assert.equal(draws,2,`opportunity ${step}: choose one garden, then independently sample its next state`);
-  assert.equal(state.lit[selected],expected,`opportunity ${step}: the selected garden follows the one-in-twelve draw`);
+  assert.equal(state.lit[selected],expected,`opportunity ${step}: the selected garden follows the one-in-six draw`);
   assert.equal(changed,before!==expected,`opportunity ${step}: report only a visible state change`);
   attempts[selected]++;litSamples[selected]+=Number(expected);
   for(const index of roofs)occupancy[index]+=Number(state.lit[index]);
  }
  for(const index of roofs){
   const sampled=litSamples[index]/attempts[index],longRun=occupancy[index]/6000;
-  assert.ok(Math.abs(sampled-chance)<.04,`roof ${index}: its independent resamples average near one twelfth (${sampled})`);
+  assert.ok(Math.abs(sampled-chance)<.04,`roof ${index}: its independent resamples average near one sixth (${sampled})`);
   assert.ok(Math.abs(longRun-chance)<.055,`roof ${index}: its persistent scene state does not drift to one half (${longRun})`);
  }
  const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),tick=source.slice(source.indexOf('  function tick(now){'),source.indexOf('  function stop(){'));
@@ -21241,7 +21241,7 @@ test('RISK fireworks occurrence: standalone sampled starts are exactly four time
   assert.deepEqual(after.map(e=>e.duration),before.map(e=>Math.min(60,e.duration)),'the requested cap changes visible duration without changing start frequency');
   assert.deepEqual(after.map(e=>e.start),before.map(e=>e.start*4),'every same-sample start, including failed chances, is spaced by exactly four times the original schedule');
   assert.equal(current.LandscapeConfig.nightShows.fireworks.chance,legacy.LandscapeConfig.nightShows.fireworks.chance,'do not confuse opportunity frequency with conditional odds');
-  assert.deepEqual(JSON.parse(JSON.stringify(current.LandscapeConfig.nightShows.festival)),JSON.parse(JSON.stringify(legacy.LandscapeConfig.nightShows.festival)),'the barge visit and rare-event cooldown stay intact');
+  assert.deepEqual(JSON.parse(JSON.stringify(current.LandscapeConfig.nightShows.festival)),{...JSON.parse(JSON.stringify(legacy.LandscapeConfig.nightShows.festival)),chance:.012},'the barge visit and rare-event cooldown stay intact');
   assert.equal(current.LivingSky.MAX_EVENTS,legacy.LivingSky.MAX_EVENTS);
  }
 });
@@ -21253,7 +21253,7 @@ test('RISK fireworks density and finale: paired regular shells lead to eight vis
   const old=previous.create(width,height),geometry=current.create(width,height),duration=festival?150:180,event={type:festival?'festival':'fireworks',duration,seed:.4};
   const shells=dots=>new Set(dots.map(dot=>dot.burst)).size;
   for(const age of festival?[41.6,45.4,49.2]:[1.6,21.6,41.6])assert.equal(shells(geometry.fireworks(age,.4,festival,event)),2*shells(old.fireworks(age,.4,festival,event)),`${width}x${height}/${festival?'barge':'standalone'}/${age}: twice the regular shells are airborne while both launchers are on screen`);
-  const finaleAt=festival?Math.min(duration*.65,60-3.775):Math.min(duration,60)-4,peak=geometry.fireworks(finaleAt+1.6,.4,festival,event);
+  const finaleAt=festival?Math.min(duration*.65,duration-3.775):Math.min(duration,60)-4,peak=geometry.fireworks(finaleAt+1.6,.4,festival,event);
   assert.equal(shells(peak.filter(dot=>dot.finale)),8,'the chosen eight-shell finale is visibly larger than a normal paired volley');
   assert.ok(peak.some(dot=>dot.kind==='spark'));
   const alpha=age=>geometry.fireworks(age,.4,festival,event).reduce((total,dot)=>total+dot.alpha,0);
@@ -22433,15 +22433,15 @@ test('RISK UI batch integration: saved Squared board retains context selector ed
  const {cacheName,fingerprint}=appShellContract(serviceWorkerSource());assert.equal(cacheName,'chain-scanner-shell-'+fingerprint,'combined UI cannot ship behind the previous release shell key');
 });
 
-test('RISK fireworks minute cap: complete standalone and barge flight bloom and finale tails finish within sixty seconds',()=>{
+test('RISK fireworks minute cap: standalone tails finish within sixty seconds and barge tails follow crossing',()=>{
  const context=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),context);
  for(const [width,height] of [[390,844],[768,1024],[1440,900],[568,320]])for(const festival of [false,true])for(const duration of [60,150,300]){
-  const geometry=context.LandscapeGeometry.create(width,height),event={duration,seed:.4},finaleAt=festival?Math.min(duration*.65,56.225):Math.min(duration,60)-4;
+  const geometry=context.LandscapeGeometry.create(width,height),event={duration,seed:.4},finaleAt=festival?Math.min(duration*.65,duration-3.775):Math.min(duration,60)-4;
   const peak=geometry.fireworks(finaleAt+1.6,.4,festival,event);
   assert.equal(new Set(peak.filter(d=>d.finale).map(d=>d.burst)).size,8,'all eight finale lanes remain simultaneous and visible');
   const alpha=age=>geometry.fireworks(age,.4,festival,event).reduce((n,d)=>n+d.alpha,0);
   assert.ok(alpha(finaleAt+1.6)>alpha(finaleAt+2.6));assert.ok(alpha(finaleAt+2.6)>alpha(finaleAt+3.6));
-  for(const age of [60,60.001,61,90,149,299])assert.equal(geometry.fireworks(age,.4,festival,event).length,0,'no shell or tail remains after one minute');
+  for(const age of (festival?[duration,duration+.001]:[60,60.001,61,90,149,299]))assert.equal(geometry.fireworks(age,.4,festival,event).length,0,'no shell or tail remains after the applicable lifetime');
   assert.equal(alpha(finaleAt+3.775),0,'the existing shell lifetime completes before the cap');
  }
 });
@@ -22473,7 +22473,7 @@ test('RISK fireworks pair endpoints: zero and maximum seeded samples bound regul
    const has=age=>g.fireworks(start+age,.4,festival,event).some(d=>d.burst===burst+1);
    if(delay)assert.equal(has(delay-.000001),false,'maximum sample cannot ignite its partner early');
    assert.equal(has(delay+.000001),true,'zero and maximum delay launch at their exact bound');
-   const finaleAt=festival?56.225:56,rockets=g.fireworks(finaleAt+.001,.4,festival,event).filter(d=>d.finale);
+   const finaleAt=festival?97.5:56,rockets=g.fireworks(finaleAt+.001,.4,festival,event).filter(d=>d.finale);
    assert.equal(new Set(rockets.map(d=>d.burst)).size,8,'finale lanes are simultaneous even at the maximum paired delay');
   }
  }
@@ -22483,7 +22483,7 @@ test('RISK fireworks pair endpoints: zero and maximum seeded samples bound regul
 test('RISK fireworks natural tails: final embers retain their complete formula lifetime',()=>{
  const context=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),context);
  for(const festival of [false,true]){
-  const g=context.LandscapeGeometry.create(1440,900),event={duration:150,seed:.4},finaleAt=festival?56.225:56;
+  const g=context.LandscapeGeometry.create(1440,900),event={duration:150,seed:.4},finaleAt=festival?97.5:56;
   const afterOldCut=g.fireworks(finaleAt+3.74,.4,festival,event).filter(d=>d.finale);
   assert.ok(afterOldCut.length>0,'formula-live embers must not disappear at the previous3.7s cutoff');
   assert.equal(g.fireworks(finaleAt+3.775,.4,festival,event).filter(d=>d.finale).length,0,'all original lag plus bloom lifetimes naturally expire');
@@ -22493,7 +22493,7 @@ test('RISK fireworks natural tails: final embers retain their complete formula l
 test('RISK fireworks reservations: shortening visibility preserves previously suppressed shows and visitor admissions',()=>{
  const current=sceneTimeline(),released=vm.createContext({Math,Date,console});
  for(const file of ['landscape-config.js','vendor/astronomy.min.js','stars.js','landscape-core.js','landscape-geometry.js','landscape-timeline.js'])vm.runInContext(spawnSync('git',['show','4d495cd58d9c6cc6f7d0bcb3812b7027a266d36a:'+file],{cwd:__dirname,encoding:'utf8'}).stdout,released);
- for(const c of [current,released])c.LandscapeConfig.setSpawnRates('| Event | Rate |\n| festival | 10 |');
+ current.LandscapeConfig.setSpawnRates('| Event | Rate |\n| festival | 5 |');released.LandscapeConfig.setSpawnRates('| Event | Rate |\n| festival | 10 |');
  const options={seed:'reservation-cap',sunAt:()=>({altitude:-20,azimuth:0})},a=current.LandscapeTimeline.create(options),old=released.LandscapeTimeline.create(options);
  for(let seconds=3080;seconds<=3160;seconds+=10){
   const ids=events=>Array.from(events,e=>e.id).sort();
@@ -22511,7 +22511,7 @@ test('RISK fireworks legacy reservations: invisible remainder keeps old festival
  assert.ok(!capacity.events.some(e=>e.type==='train'),'the invisible reservation retains its original admission slot');
 });
 
-test('RISK fireworks reduced motion: capped static blooms stay on the stationary barge only during the real first minute',()=>{
+test('RISK fireworks reduced motion: static blooms stay on the stationary barge throughout its crossing',()=>{
  const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),paint=source.slice(source.indexOf('  function paintFireworks('),source.indexOf('  function paintClocktowerVisit(')),pose=source.match(/  function scenePose\([^\n]+/)[0];
  const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);const original=ctx.LandscapeGeometry.create(1440,900),paints=[];
  const context={reduced:true,sky:{sun:{altitude:-20}},world:{events:[{type:'festival',age:20,duration:150,seed:.4}]},g:{save(){},restore(){}},S:{smooth:()=>0},geometry:{fireworks(...args){const dots=original.fireworks(...args);paints.push({args,dots});return dots;}},line(){},ellipse(){}};
@@ -22520,15 +22520,16 @@ test('RISK fireworks reduced motion: capped static blooms stay on the stationary
  assert.equal(paints[0].args[3].fireworkDeckAge,75,'static shells use the same stationary deck pose as the painted barge');
  assert.equal(context.scenePose(context.world.events[0]).age,75,'general vessel pose keeps its full-transit midpoint');
  const frozen=JSON.stringify(paints[0].dots);context.world.events[0].age=40;context.paintFireworks('festival');assert.equal(JSON.stringify(paints[1].dots),frozen,'UTC event age cannot animate a reduced-motion bloom');
- for(const age of [60,75,149]){context.world.events[0].age=age;const count=paints.length;context.paintFireworks('festival');assert.equal(paints.length,count,'static shells disappear by the real sixty-second boundary');}
+ for(const age of [60,75,149]){context.world.events[0].age=age;context.paintFireworks('festival');assert.equal(JSON.stringify(paints.at(-1).dots),frozen,'static barge bloom remains stable throughout crossing');}
+ context.world.events[0].age=150;const count=paints.length;context.paintFireworks('festival');assert.equal(paints.length,count,'static shells disappear at actual crossing end');
 });
 
-test('RISK fireworks reduced deadline: static scheduler clears a persistent barge bloom at the actual sixty-second boundary without animated repaints',()=>{
+test('RISK fireworks reduced deadline: static scheduler preserves a persistent barge bloom across sixty seconds without animated repaints',()=>{
  const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),code=source.slice(source.indexOf('  function advanceRooftopParty('),source.indexOf('  function stop()',source.indexOf('  function advanceRooftopParty('))),paints=[];
  const context={reduced:true,document:{hidden:false},geometry:{},p:{},world:{elapsed:59,events:[{id:'festival:unchanged',type:'festival',age:59,duration:150}]},woodland:{events:[]},rooftopParty:{active:null},clocktowerVisit:{active:null},lastCitySlot:0,sceneSnapshot:{windowsSlot:0},Date:{now:()=>60000},syncScene(){context.world.events[0].age=60;context.world.elapsed=60;},paintBackground(){throw Error('unrelated background must stay unchanged');},paintLife(age){paints.push(age);}};
  vm.runInNewContext(code+';advanceRooftopParty(1)',context);
- assert.deepEqual(paints,[60],'the same barge ID still needs one repaint when its fireworks expire');
- context.advanceRooftopParty(1);assert.deepEqual(paints,[60],'unchanged static membership cannot start continuous animation');
+ assert.deepEqual(paints,[],'sixty seconds no longer expires barge fireworks');
+ context.advanceRooftopParty(1);assert.deepEqual(paints,[],'unchanged static membership cannot start continuous animation');
  context.document.hidden=true;context.world.events[0].age=59;context.advanceRooftopParty(1);assert.equal(context.world.events[0].age,59,'hidden scenes retain the existing paused timer guard');
 });
 
@@ -23537,4 +23538,45 @@ test('RISK repository process: deployment fetches deleted squash PR head and rej
   const result=await verifyDeploymentEvidence({repoRoot:checkout,repository:'emerald-pham/funsidething',deployedSha:squash,beforeSha:f.baseSha,token:'fixture',fetchImpl});assert.equal(result.ok,true,result.errors.join('; '));assert.equal(releaseGateGit(checkout,['rev-parse',f.candidateSha+'^{commit}']),f.candidateSha);
   const wrong=path.join(f.root,'wrong');fs.mkdirSync(wrong);releaseGateGit(wrong,['init','-q']);releaseGateGit(wrong,['remote','add','origin',f.repo]);releaseGateGit(wrong,['fetch','-q','origin',squash]);releaseGateGit(wrong,['checkout','-q','--detach','FETCH_HEAD']);releaseGateGit(f.repo,['update-ref','refs/pull/78/head',f.baseSha]);const rejected=await verifyDeploymentEvidence({repoRoot:wrong,repository:'emerald-pham/funsidething',deployedSha:squash,beforeSha:f.baseSha,token:'fixture',fetchImpl});assert.equal(rejected.ok,false,'moved PR ref must not authorize another head');assert.match(rejected.errors.join(' '),/exact|match|head/i);
  }finally{cleanupReleaseGateFixture(f);}
+});
+
+
+test('RISK scenery tuning: barge crossing lifetime restores historical finale without standalone cap regression',()=>{
+ const c=sceneTimeline();
+ for(const [w,h] of [[390,844],[1440,900],[568,320]])for(const duration of [127,150,183]){
+  const g=c.LandscapeGeometry.create(w,h),e={duration,seed:.4,lane:.5};
+  const peak=g.fireworks(duration*.65+1.6,.4,true,e);
+  assert.equal(new Set(peak.filter(d=>d.finale).map(d=>d.burst)).size,8,'historical crossing-relative finale survives past sixty seconds');
+  assert.ok(g.fireworks(65,.4,true,e).length>0,'barge regular shells continue during crossing');
+  assert.equal(g.fireworks(duration,.4,true,e).length,0);
+  assert.equal(g.fireworks(60,.4,false,e).length,0,'standalone maximum stays sixty seconds');
+ }
+});
+
+test('RISK scenery tuning: doubled barge odds preserve interval cooldown duration and standalone frequency',()=>{
+ const c=sceneTimeline();assert.equal(c.LandscapeConfig.nightShows.festival.chance,.012);
+ assert.equal(c.LandscapeConfig.nightShows.festival.interval,60);assert.equal(c.LandscapeConfig.nightShows.festival.cooldown,1800);
+ assert.equal(c.LandscapeConfig.eventDurations.festival,150);assert.equal(c.LandscapeConfig.nightShows.fireworks.occurrenceScale,4);
+});
+
+test('RISK scenery tuning: fairy activation doubles probability with unchanged sampling duration and daylight guard',()=>{
+ const sky=livingSky(),roof=sky.createGardenLights([17],()=>.1);
+ assert.equal(roof.lit[17],true,'sample between one-in-twelve and one-in-six must now light');
+ assert.equal(sky.createGardenLights([17],()=>1/6).lit[17],false,'upper probability boundary stays exclusive');
+ assert.equal(roof.next,60);assert.equal(sky.advanceGardenLights(roof,60,false,()=>.99),false);assert.equal(roof.lit[17],true);
+ const c=sceneTimeline(),options={seed:'doubled-fairy',sunAt:()=>({altitude:-20,azimuth:0})},a=c.LandscapeTimeline.create(options),b=c.LandscapeTimeline.create(options);
+ for(let slot=0;slot<100;slot++){
+  const actual=a.at(slot*60000).gardens,indices=Object.keys(actual).map(Number).sort((x,y)=>x-y),roof=indices[Math.floor(c.LandscapeTimeline.sample(options.seed,'garden-roof',slot)*indices.length)];
+  const expected=c.LandscapeTimeline.sample(options.seed,'garden-light',slot)<1/6;
+  assert.equal(actual[roof],expected,'actual UTC sampler uses doubled independent odds');
+  assert.deepEqual(JSON.parse(JSON.stringify(a.at(slot*60000))),JSON.parse(JSON.stringify(b.at(slot*60000))),'reload is deterministic');
+ }
+});
+
+test('RISK scenery tuning: windows switch on half-length UTC ticks with unchanged seeded lit proportion',()=>{
+ const c=sceneTimeline(),t=c.LandscapeTimeline.create({seed:'window-double',sunAt:()=>({altitude:-20,azimuth:0})});
+ assert.equal(t.at(7499).windowsSlot,0);assert.equal(t.at(7500).windowsSlot,1);assert.equal(t.at(15000).windowsSlot,2);
+ const sky=livingSky(),windows={next:7.5,windows:[false,true],visible:[0]};
+ assert.equal(sky.advanceLights(windows,7.5,true,()=>0),true);assert.equal(windows.next,15);assert.deepEqual(windows.windows,[true,true]);
+ assert.equal(sky.advanceLights(windows,15,false,()=>0),false,'daylight cannot toggle');
 });
