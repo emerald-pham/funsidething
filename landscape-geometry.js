@@ -468,7 +468,7 @@
       // Gathering reaches the grip before the object appears; switching a
       // carrying boolean at that frame would visibly snap the forearm.
       const grip=Math.max(0,Math.min(1,Number(carrying)||0));
-      const hand={x:arms[0].x+(hipX+4-arms[0].x)*grip,y:arms[0].y+(-3+bob-arms[0].y)*grip};
+      const hand=grip===1?{x:hipX+4,y:-3+bob}:{x:arms[0].x+(hipX+4-arms[0].x)*grip,y:arms[0].y+(-3+bob-arms[0].y)*grip};
       return {bob,hipX,hipY,legs,arms,hand,carrying,stride,locomotion:feet.some(foot=>foot.running)?'run':'walk'};
     }
     function woodlandPose(e){

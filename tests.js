@@ -166,6 +166,15 @@ test('RISK running seek isolation: future route queries cannot revise fast depar
   assert.deepEqual(warm,cold,'fast departure poses retain deterministic cold and warm seeking');
  }
 });
+test('RISK human grip endpoints: complete carrying retains its exact hip offset across every cadence',()=>{
+ const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
+ const geo=ctx.LandscapeGeometry.create(820,1180),ground=()=>0;
+ for(const direction of [-1,1])for(const distance of [40,42,45,48,50]){
+  const p=geo.humanWalkPose(410,0,distance,direction,ground,1);
+  assert.equal(p.hand.x,p.hipX+4,'the completed carrying blend equals the existing grip endpoint exactly');
+  assert.equal(p.hand.y,-3+p.bob,'vertical carrying offset also reaches its exact endpoint');
+ }
+});
 test('RISK actual human pose observer: native consumer traces preserve painter commands and returned poses',async()=>{
  const {readMotionBuild,createMotionProbe}=await import('./scripts/motion-review-harness.mjs'),build=readMotionBuild(__dirname,'WORKTREE'),poses=[];
  const options={actor:'reader',progress:.885,duration:100,seed:.4,lane:.02},plain=createMotionProbe(build,{width:390,height:844}),traced=createMotionProbe(build,{width:390,height:844,onHumanPose:(pose,args)=>poses.push({pose,args})});

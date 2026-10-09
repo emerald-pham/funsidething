@@ -767,3 +767,4 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK carrying locomotion: actual fast departure painters avoid aliased walking cadence and preserve every limb and grip
 - RISK terrain locomotion: actual steep phone walkers keep a human contact rhythm without slowing their route
 - RISK dense human contact corridor: final blended pelvis and limbs remain feasible at contact and window seams
+- RISK human grip endpoints: complete carrying retains its exact hip offset across every cadence
