@@ -1,5 +1,22 @@
 [
   {
+    "testChangesSha256": "81478aded679a898b6ce53a3b1857471720ba34bed5a4776fede668470fd6e46",
+    "reason": "Explicit user requests essential-only Quick start help and accessible collapsible chapters matching Settings. Replace historical implementation-copy assertions with user-facing consequences while retaining executable behavior, Settings safety and historical changelog assertions.",
+    "previousBehavior": "Seven dense intro steps and one More FAQs disclosure containing long duplicated rules and internal release details.",
+    "intendedBehavior": "Four essential steps, native Quick start disclosure initially open and five Settings-aligned detailed chapters initially closed. All37 topics remain concise and accurate; detailed rules and recovery guidance stay in their chapters.",
+    "replacementTests": [
+      "RISK Quick start content: essential steps stay brief and detailed help remains user-facing in existing sections",
+      "RISK Quick start chapters: mounted help uses native named disclosures with essential chapter first and detailed chapters closed"
+    ],
+    "preservedCoverage": [
+      "Executable behavior tests unchanged. Historical changelog and Settings backup-safety assertions retained. FAQ text-only assertions updated for approved concise wording."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern=\"RISK Quick start content|RISK Quick start chapters|collapsed scanning chapter\" tests.js; PROBE_PHASE=red node ../quickstart-evidence/window-runner.mjs",
+      "failure": "Observed intro length RED before prose changes; chapter names and scanning disclosure RED before markup; actual Chrome Enter on old first disclosure opened it instead of closing initially visible Quick start, observed17:58:20UTC before applying chapter markup. Logs observed-red.log, chapters-red.log, chapter-consumer-red.log and browser-red.log."
+    }
+  },
+  {
     "testChangesSha256": "21478d60c205547acd17bdfcc0c0f5e46004b9ef3b77c44bd2eb2602cde00079",
     "reason": "Urgent user presentation request moves quoted dependency explanation into FAQ and shows Hard heading only with actual listed rows. Persisted choices and binary rules unchanged.",
     "previousBehavior": "Forms always showed a long rule paragraph and an empty Hard heading.",

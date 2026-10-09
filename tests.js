@@ -381,7 +381,7 @@ test('RISK dense human contact corridor: final blended pelvis and limbs remain f
 });
 test('RISK upright gait guidance: scenery FAQ and changelog explain upright support and carrying without changing task controls',()=>{
  const html=fs.readFileSync(path.join(__dirname,'index.html'),'utf8'),faq=html.split('<dt>How do I change the scenery?</dt>')[1].split('</dd>')[0],changelog=html.split('<template id="appChangelogCurrent">')[1].split('</template>')[0];
- assert.match(faq,/Faster travel uses jogging or running/);assert.match(faq,/Pelvis and carrying hands move together/);
+ assert.match(faq,/Settings.*motion.*scene time.*season.*sky location/);assert.match(faq,/Reduced motion.*still/);
  assert.match(changelog,/local terrain/);assert.match(changelog,/jogging or running/);
 });
 
@@ -557,7 +557,7 @@ test('RISK Settings hierarchy: Changelog uses existing sections and Save setting
 
 test('RISK context and Settings FAQ: extended guidance explains cycle empty selections synthetic scope sync limitations and bottom save',async()=>{
  const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
- for(const pattern of [/neutral.*green check.*red X.*neutral/i,/every assigned.*context.*active/i,/No context.*only.*neutral.*excluded/i,/unknown or deleted/i,/no contexts.*no effect/i,/older.*refresh/i,/Save settings.*bottom/i])assert.match(help,pattern);
+ for(const pattern of [/neutral.*green check.*red X.*neutral/i,/Every assigned.*context.*active/i,/No context excludes unassigned/i,/cannot be assigned/i,/Refresh all devices/i,/Save settings.*bottom/i])assert.match(help,pattern);
  const current=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];for(const pattern of [/red X/i,/No context/i,/Changelog.*Settings/i,/Save settings.*bottom/i])assert.match(current,pattern);
 });
 
@@ -1044,7 +1044,7 @@ test('RISK list metric preference: supported older clients preserve the unknown 
 
 test('RISK scene and list FAQ: shared UTC scenery rain style and independent list presentation explain current behavior',async()=>{
  const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
- for(const pattern of [/same initial seed/i,/UTC/i,/device clocks/i,/shaded.*rain/i,/sky location.*time zone/i,/dotted.*Ineligible/i,/Top x.*default/i,/Settings.*percent/i,/does not change.*scan mode/i])assert.match(help,pattern);
+ for(const pattern of [/scene choices sync/i,/work offline/i,/task dates stay live/i,/Reduced motion.*still/i,/sky location.*time zone/i,/dotted.*Ineligible/i,/Top x.*default/i,/Settings.*percent/i,/without changing the scan/i])assert.match(help,pattern);
  const changelog=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)?.[1];
  for(const pattern of [/rain.*cloud/i,/UTC/i,/dotted/i,/Top x/i])assert.match(changelog,pattern);
 });
@@ -5697,20 +5697,20 @@ test("UI: Quick start displays the requested seven steps in order", async () => 
   ]);
 });
 
-test("UI: Quick start keeps task-state explanations in a collapsed More FAQs section", async () => {
+test("UI: Quick start keeps task-state explanations in a collapsed scanning chapter", async () => {
   const { ctx, shim } = await loadApp();
   ctx.openHelp();
   const markup = shim.elements.get("modalRoot").innerHTML;
   const quickStartEnd = markup.indexOf("</ol>");
   const faqStart = markup.indexOf('<details class="help-faq">');
-  assert.ok(quickStartEnd > 0 && faqStart > quickStartEnd, "FAQs follow the seven quick-start steps");
-  const faq = markup.match(/<details class="help-faq">([\s\S]*?)<\/details>/)?.[1];
-  assert.ok(faq, "More FAQs is a separate native disclosure, closed by default");
-  assert.match(faq, /<summary>More FAQs<\/summary>/);
+  assert.ok(quickStartEnd > 0 && faqStart > quickStartEnd, "Detailed chapters follow essential quick-start steps");
+  const faq = markup.match(/<details class="help-faq"><summary><h3>Scanning and recurrence<\/h3><\/summary>([\s\S]*?)<\/details>/)?.[1];
+  assert.ok(faq, "Scanning is a separate native disclosure, closed by default");
+  assert.match(markup, /<summary><h3>Scanning and recurrence<\/h3><\/summary>/);
   const answers = new Map([...faq.matchAll(/<dt>(.*?)<\/dt><dd>(.*?)<\/dd>/g)].map(([, question, answer]) => [question, answer]));
   assert.match(answers.get("What happens when I choose Done?"), /ordinary task.*active task list.*crossed out in History/);
   assert.match(answers.get("What does Done mean for an evergreen task?"), /History.*per-task interval.*18 hours.*Settings.*2 AM/);
-  assert.match(answers.get("What does Worked on it mean?"), /History.*Settings.*16 hours.*2 AM.*no per-task hour field.*distinct from/);
+  assert.match(answers.get("What does Worked on it mean?"), /History.*Settings.*16 hours.*2 AM.*shared by all tasks.*distinct from/);
   assert.match(answers.get("What does Dislodge do?"), /current scan.*negative rank signal.*next fresh scan.*every eligible card/);
   assert.match(answers.get("What do the countdown tags mean?"), /hours.*eligible candidate again.*minutes.*next pass/);
   assert.match(answers.get("Can I return a task early?"), /All Tasks.*Return as candidate.*No.*Can.t.*Worked on it.*Dislodged.*evergreen.*rest period/);
@@ -5724,7 +5724,7 @@ test("UI: help describes Start scanning rather than a Can/Can't step", async () 
   const helpHtml = shim.elements.get("modalRoot").innerHTML;
 
   assert.match(helpHtml, /start scanning/i, "help should name the button that starts a chain");
-  assert.match(helpHtml, /every scan mode, the oldest eligible task/, "normal mode retains the oldest eligible anchor");
+  assert.match(helpHtml, /Every mode chooses the first dot by age: the oldest eligible task/, "normal mode retains the oldest eligible anchor");
   assert.ok(!/Answer <b>Can<\/b>/.test(helpHtml), "the Can/Can't instruction should be gone");
 });
 
@@ -21272,9 +21272,9 @@ test('RISK Chance labels: an empty-chain preview excludes positive tails that ov
 
 test('RISK multiple dependencies FAQ: extended help explains progressive links saved cycles live sync and scoped Chance labels',async()=>{
  const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
- for(const text of [/up to ten dependencies/i,/\+ dependency/,/blocked by/i,/cycle.*warning/i,/full eligible/i,/scanned after/i,/open devices/i,/draft/i,/offline/i,/top-K/])assert.match(help,text);
+ for(const text of [/up to ten dependencies/i,/\+ dependency/,/All Tasks names blockers/i,/cycle.*warning/i,/full eligible/i,/scanned after/i,/another device/i,/draft/i,/offline/i,/top-K/])assert.match(help,text);
  assert.doesNotMatch(help,/first dot in either mode is labeled/i,'the age label belongs to Chance presentation; descending retains its top-K summary');
- assert.match(help,/older (?:tabs|clients).*refresh/i,'older single-link controls must disclose their complex-dependency boundary');
+ assert.match(help,/Refresh all devices/i,'older single-link controls must disclose their complex-dependency boundary');
  const instructions=fs.readFileSync(path.join(__dirname,'AGENTS.md'),'utf8');
  assert.match(instructions,/live product/i);assert.match(instructions,/extended FAQ/i);assert.match(instructions,/regression/i);
 });
@@ -21343,9 +21343,9 @@ test('RISK fireworks density and finale: paired regular shells lead to eight vis
 test('RISK product FAQ: backup age fireworks and resting remote completions match the shipped controls',async()=>{
  const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
  assert.match(help,/Delete.*red.*more than seven days/i);
- assert.match(help,/half as often again/i);assert.match(help,/0–300 milliseconds/i);assert.match(help,/illuminate only their trails/i);assert.match(help,/paired shells/i);assert.match(help,/eight-shell finale/i);
- assert.match(help,/fairy.light poles.*selected.*night/i,'the scenery FAQ explains event-only supports');
- assert.match(help,/completed on another device.*scanner chain/i);
+ assert.match(help,/Sunrise, sunset and nighttime can show fireworks/i);assert.match(help,/Reduced motion keeps scenery still/i);
+ assert.match(help,/scene choices sync.*work offline/i,'scenery guidance explains user choices');
+ assert.match(help,/Evergreen Done.*rests the task/i);
  const instructions=fs.readFileSync(path.join(__dirname,'AGENTS.md'),'utf8');assert.match(instructions,/commit, push, merge, and release/i);
 });
 
@@ -21494,8 +21494,8 @@ test('RISK All Tasks mobile layout: names and every metadata badge wrap inside t
 test('RISK All Tasks mobile layout FAQ: existing list guidance explains wrapped names and badges',async()=>{
  const {ctx,shim}=await loadApp();ctx.openHelp();
  const markup=shim.document.getElementById('modalRoot').innerHTML;
- assert.match(markup,/Long task names and date or status tags wrap to fit each row/);
- assert.match(markup,/All Tasks can search and filter[\s\S]*without changing the scan/,'existing filter scope remains documented');
+ assert.match(markup,/Names, tags and countdowns wrap to fit/);
+ assert.match(markup,/All Tasks searches and filters[\s\S]*without changing the scan/,'existing filter scope remains documented');
 });
 
 test('RISK All Tasks mobile layout browser: WebKit and Chrome keep names badges blockers and taps usable across viewport and text sizes',
@@ -21678,7 +21678,7 @@ test('RISK overall Chance list order: tiny positive shares precede descending fa
 
 test('RISK overall Chance list order FAQ: overall shares explain highest-first rows stable ties fallback and unchanged descending mode',async()=>{
  const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
- for(const pattern of [/ordered by overall share, highest first/i,/equal shares.*existing rank order/i,/fallback rows follow.*descending likelihood/i,/ineligible rows.*last/i,/descending mode.*top-K/i])assert.match(help,pattern);
+ for(const pattern of [/order shares highest first/i,/stable ties/i,/fallback rows next/i,/ineligible tasks last/i,/Descending offers highest estimated likelihood first/i])assert.match(help,pattern);
 });
 
 const MODE_LIFECYCLE_NOW=new Date(2026,9,6,12).getTime();
@@ -21891,7 +21891,7 @@ test('RISK scan lifecycle sync: failed local repair persistence holds adoption a
 
 test('RISK scan lifecycle FAQ: Dot rest boundary current Start eligibility and durable remote refresh are explained',async()=>{
  const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
- for(const pattern of [/Dot.*unavailable.*evergreen.*rest/i,/Return as candidate.*before.*Dot/i,/Start.*expired.*can.t.*worked/i,/remote.*fresh.*draw.*saved.*reload/i])assert.match(help,pattern);
+ for(const pattern of [/Dot.*unavailable.*evergreen.*rest/i,/Return as candidate.*before.*Dot/i,/Start.*expired.*can.t.*worked/i,/ordering stays fixed.*pass.*reload/i])assert.match(help,pattern);
  const changelog=html.match(/<!-- changelog:start -->([\s\S]*?)<!-- changelog:end -->/)[1];
  for(const pattern of [/resting evergreen.*Dot/i,/expired.*holds.*Start/i,/remote.*Chance.*reload/i])assert.match(changelog,pattern);
 });
@@ -22030,11 +22030,11 @@ test('RISK device backup final guard: rejected throwing and asynchronous guards 
 
 test('RISK backup mirror FAQ: confirmed matching-copy deletion and ambiguous recovery preserve the seven-day age cue',async()=>{
  const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
- assert.match(help,/Identical copies retained during a storage upgrade appear as one backup/);
- assert.match(help,/Confirming Delete removes both matching backup entries and keeps the current board/);
- assert.match(help,/Different copies with the same ID stay separate, with deletion unavailable/);
- assert.match(help,/If a copy changes while you confirm, reopen Settings and try again/);
- assert.match(help,/more than seven days old; exactly seven days stays neutral/);assert.match(help,/opening Settings does not delete a backup/);
+ assert.match(help,/Matching duplicate backups appear once/);
+ assert.match(help,/Backup deletion asks for confirmation and keeps the current board/);
+ assert.match(help,/deletion is unavailable.*reopen Settings.*recovery options/);
+ assert.match(help,/copy changes during confirmation, reopen Settings/);
+ assert.match(help,/red Delete button.*more than seven days old/);assert.match(help,/opening Settings does not delete it/i);
  const current=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];assert.match(current,/Identical migrated backup copies appear once and can be deleted after one confirmation/);
 });
 
@@ -22193,8 +22193,8 @@ test('RISK legacy automatic expiry lifecycle: a draft arriving during cleanup is
 
 test('RISK legacy automatic expiry FAQ: save rotation permanently removes expired upgrade copies while safety exceptions and Settings age cues remain clear',async()=>{
  const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
- assert.match(help,/Automatic backup entries.*seven local calendar days/);assert.match(help,/storage upgrade.*permanently.*successful save/);assert.match(help,/Manual.*protected recovery.*unreadable.*unknown/i);assert.match(help,/opening Settings does not delete a backup/);assert.match(help,/exactly seven days stays neutral/);
- assert.match(help,/permanently removed from the active backup list.*successful save/);assert.match(help,/entry removal has no Undo/);assert.match(help,/Separate recovery archives kept by a storage upgrade remain intact/);
+ assert.match(help,/Automatic backups cover today and the previous six local dates/);assert.match(help,/older automatic entries.*successful save/);assert.match(help,/Manual and protected recovery copies remain/i);assert.match(help,/opening Settings does not delete it/i);assert.match(help,/more than seven days old/);
+ assert.match(help,/removed after a successful save, without Undo/);assert.match(help,/protected recovery copies remain until you delete/);
  ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;assert.match(settings,/removed permanently from the active backup list.*successful save/);assert.match(settings,/Separate recovery archives kept by a storage upgrade remain intact/);
  const current=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];assert.match(current,/Expired automatic.*legacy.*save rotation/i);
 });
@@ -22670,8 +22670,8 @@ test('RISK visitor carrying consumer: rendered books and picnic items meet the c
 test('RISK visitor motion guidance: extended scenery FAQ and Settings changelog explain travel cadence and held items',()=>{
  const html=fs.readFileSync(path.join(__dirname,'index.html'),'utf8');
  const faq=html.split('<dt>How do I change the scenery?</dt>')[1].split('</dd>')[0];
- assert.match(faq,/Visiting people step with their traveled distance/);
- assert.match(faq,/Books and gathered picnic items meet the carrying hand/);
+ assert.match(faq,/Settings.*motion.*scene time/);
+ assert.match(faq,/scene choices sync.*work offline/);
  const changelog=html.split('<template id="appChangelogCurrent">')[1].split('</template>')[0];
  assert.match(changelog,/Visiting people now plant their feet/);
 });
@@ -22795,9 +22795,9 @@ test('RISK motion review harness: frozen actual actor painters reconstruct repea
 
 test('RISK walking scope guidance: extended FAQ and changelog describe walker winter woodland and held-line improvements',()=>{
  const html=fs.readFileSync(path.join(__dirname,'index.html'),'utf8'),faq=html.split('<dt>How do I change the scenery?</dt>')[1].split('</dd>')[0];
- assert.match(faq,/Ordinary walkers and winter departures share connected knees/);
- assert.match(faq,/Woodland paws account for each animal’s scale/);
- assert.match(faq,/Kite strings and dog leads meet their rendered hands/);
+ assert.match(faq,/Reduced motion keeps scenery still/);
+ assert.match(faq,/Green scene time follows the live clock/);
+ assert.match(faq,/red means a locked time/);
  const changelog=html.split('<template id="appChangelogCurrent">')[1].split('</template>')[0];assert.match(changelog,/Winter departures and ordinary walkers/);
 });
 
@@ -23096,8 +23096,8 @@ test('RISK STALE TAB: legacy coexistence retains independent live fields before 
 
 test('RISK STALE TAB: recovery guidance explains independent edits conflicts and unobserved cloud bases',async()=>{
  const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
- assert.match(help,/independent edits.*newer.*same field/i);
- assert.match(help,/common saved copy.*recovery/i);
+ assert.match(help,/offline edits save locally and sync when you reconnect/i);
+ assert.match(help,/edits conflict.*Settings backups.*recovery/i);
  const log=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];assert.match(log,/stale.tab.*independent.*edits/i);
 });
 
@@ -23961,4 +23961,17 @@ test('RISK dependency form presentation: Hard heading follows active rows across
  }
  ctx.renderDependencyFields('add',[target.id]);ctx.clearQuickAddDraft();assert.doesNotMatch(ctx.dependencyRowsHTML('add',ctx.readDependencyDraft('add')),/dependency-hard-heading/);
  ctx.setTaskPrerequisites(owner.id,[target.id]);ctx.openEdit(owner.id);assert.match(ctx.dependencyRowsHTML('edit',ctx.readDependencyDraft('edit')),/dependency-hard-heading/);ctx.setTaskPrerequisites(owner.id,[]);ctx.openEdit(owner.id);assert.doesNotMatch(ctx.dependencyRowsHTML('edit',ctx.readDependencyDraft('edit')),/dependency-hard-heading/);
+});
+
+test('RISK Quick start content: essential steps stay brief and detailed help remains user-facing in existing sections',async()=>{
+ const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ const intro=help.split('<ol>')[1].split('</ol>')[0];assert.ok(intro.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=100,'getting-started steps should be brief');assert.doesNotMatch(intro,/TrueSkill|weighted random|25%|squared|Halving/i,'algorithm details belong in detailed help');
+ const answers=[...help.matchAll(/<dt>(.*?)<\/dt><dd>(.*?)<\/dd>/g)];assert.ok(answers.length>=35,'retain existing help topics');for(const [,question,answer]of answers)assert.ok(answer.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,question+' should focus on user actions and consequences');
+ const dependency=answers.find(x=>x[1]==='What is a prerequisite task?')[2];assert.match(dependency,/Hard dependency clears only after deletion or Done with Evergreen off/);assert.match(dependency,/recurring.*blocks again/i);assert.doesNotMatch(dependency,/saved edge evidence|operation identity|compatible app|future formats|old snapshots/);
+ const data=help.split('<h3>Data and backups</h3>')[1];assert.match(data,/refresh all devices/i);assert.match(data,/protected.*compatible app/i);
+});
+
+test('RISK Quick start chapters: mounted help uses native named disclosures with essential chapter first and detailed chapters closed',async()=>{
+ const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ const chapters=[...help.matchAll(/<details class="help-faq"([^>]*)><summary>(.*?)<\/summary>/g)];assert.deepEqual(chapters.map(x=>x[2].replace(/<[^>]+>/g,'')),['Quick start','Scene and appearance','Scanning and recurrence','Contexts','Data and backups','Changelog']);assert.match(chapters[0][1],/\bopen\b/);for(const c of chapters.slice(1))assert.doesNotMatch(c[1],/\bopen\b/);assert.equal((help.match(/<details/g)||[]).length,(help.match(/<\/details>/g)||[]).length);assert.doesNotMatch(help,/<summary>More FAQs<\/summary>/);
 });
