@@ -1,5 +1,23 @@
 [
   {
+    "testChangesSha256": "22e977f0b25e2e685f22260bb6cd7037e2f85c2d14639aa730989439f82de224",
+    "reason": "Required CI observed obsolete help wording embedded in9behavior tests (10failurecount with subtest parent); this incremental record covers only3003..c348 repair. Replace copy-only assertions; retain all executable behavior assertions and unchanged app bytes.",
+    "previousBehavior": "Help wording assertions expected technical details intentionally removed at user request.",
+    "intendedBehavior": "Current user-facing FAQ facts asserted without changing task/runtime/sync/render implementations.",
+    "replacementTests": [
+      "RISK Quick start content: essential steps stay brief and detailed help remains user-facing in existing sections",
+      "RISK Quick start chapters: mounted help uses native named disclosures with essential chapter first and detailed chapters closed",
+      "RISK Quick start chapter layout: disclosure headings share the native summary line without extra margins"
+    ],
+    "preservedCoverage": [
+      "Executable behavior tests unchanged. Historical changelog and Settings backup-safety assertions retained. FAQ text-only assertions updated for approved concise wording."
+    ],
+    "redEvidence": {
+      "command": "gh run view 37970784411 --log-failed; node --test --test-name-pattern=\"changelog dates|immutable fact union|accessible timestamped|rank presentation tutorial|empty-chain explanation|quick start|multiple dependencies legacy mirrors|fireworks minute schedule|displayed likelihood\" tests.js",
+      "failure": "Actual required CI10failedcount from9obsoletehelpassertions; failedci-pr-failed.log retained. Expanded54checks pass aftertext-onlyrepair."
+    }
+  },
+  {
     "testChangesSha256": "c0bd9dc38cd733242f3ad97020235f262534ec53cadfcc16bc281c351c513072",
     "reason": "Explicit user requests essential-only Quick start help and accessible collapsible chapters matching Settings. Replace historical implementation-copy assertions with user-facing consequences while retaining executable behavior, Settings safety and historical changelog assertions.",
     "previousBehavior": "Seven dense intro steps and one More FAQs disclosure containing long duplicated rules and internal release details.",
