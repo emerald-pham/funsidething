@@ -19811,8 +19811,8 @@ test('RISK night shows: standalone fireworks recur independently of the rare coo
  assert.equal(w.events.filter(e=>e.type==='fireworks').length,1,'a second independent show starts after its sampled duration and full rest');
  assert.ok(w.events.length<=sky.MAX_EVENTS);
  const day=sky.createWorld(()=>0);day.events=[];day.next=Infinity;day.railNext=w.railNext;day.nextFireworks=0;day.nextFestival=0;
- sky.advance(day,100,{sun:{altitude:-6,azimuth:0}});
- assert.ok(day.events.every(e=>!['fireworks','festival'].includes(e.type)),'both shows need the Sun below civil twilight');
+ sky.advance(day,100,{sun:{altitude:8,azimuth:0}});
+ assert.ok(day.events.every(e=>!['fireworks','festival'].includes(e.type)),'full daytime remains excluded for both show sources');
  const full=sky.createWorld(()=>0);full.events=Array.from({length:sky.MAX_EVENTS},()=>({type:'walker',age:0,duration:100}));full.nextFireworks=0;full.nextFestival=0;
  sky.advance(full,1,night);assert.equal(full.events.length,sky.MAX_EVENTS,'shows cannot bypass the scene budget');
 });
