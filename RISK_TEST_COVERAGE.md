@@ -816,3 +816,5 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 
 - RISK fireworks polar day: real Arctic midnight remains excluded in solar sampling legacy admission and actual painting
 - RISK fireworks polar UTC: real Arctic daylight never schedules either source across a complete day
+
+- RISK fireworks twilight barge: actual hull stage and crowd remain visible with their fireworks through both twilight directions

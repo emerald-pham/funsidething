@@ -596,8 +596,8 @@
     g.restore();paintFestival(e);
   }
   function paintFestival(e){
-    const pose=geometry.festival(e),night=1-S.smooth(-12,-6,sky.sun.altitude);
-    if(!pose.alpha||!night)return;
+    const pose=geometry.festival(e),night=1-S.smooth(-12,8,sky.sun.altitude);
+    if(!pose.alpha||!S.fireworksAllowed(sky)||!night)return;
     const {x,y,scale}=pose,w=56,h=28,hullDepth=3,inks=['#7be5ed','#bd9af6','#f4b982'];
     const launcherOffset=pose.launcherOffset/scale,launcherTop=pose.launcherTop/scale,launcherBottom=pose.launcherBottom/scale;
     const ink=inks[Math.floor(e.seed*3)%3],second=inks[(Math.floor(e.seed*3)+1)%3];
