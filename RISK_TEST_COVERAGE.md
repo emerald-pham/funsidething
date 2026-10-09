@@ -770,6 +770,6 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK human grip endpoints: complete carrying retains its exact hip offset across every cadence
 
 - RISK carrying recovery: rejected actual phone sequence requires strikes opposed swing and a coherent flight arc
-- RISK carrying isolation: exact accepted walking free visitors gathering and reduced-motion canvas commands remain unchanged
+- RISK carrying isolation: immutable accepted renderer commands match exactly on the same runtime
 
 - RISK carrying continuity: stable actor capability preserves resting grip transitions and deterministic departure seeks

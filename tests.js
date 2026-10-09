@@ -144,7 +144,7 @@ test('RISK carrying recovery: rejected actual phone sequence requires strikes op
  assert.ok(separation>4,`recovery must oppose fore/aft legs rather than the rejected ${separation}-unit tiny shuffle`);
  assert.ok(arcs.length>=3&&arcs.every(arc=>arc>.12),`each full flight must rise above its landing chord: ${arcs}`);
 });
-test('RISK carrying isolation: exact accepted walking free visitors gathering and reduced-motion canvas commands remain unchanged',async()=>{
+test('RISK carrying isolation: immutable accepted renderer commands match exactly on the same runtime',async()=>{
  const {readMotionBuild,createMotionProbe}=await import('./scripts/motion-review-harness.mjs'),build=readMotionBuild(__dirname,'WORKTREE');
  const bytes=fs.readFileSync(path.join(__dirname,'scripts/fixtures/gait-carrying-sentinel.json')),fixture=JSON.parse(bytes);
  assert.equal(createHash('sha256').update(bytes).digest('hex'),'740faa80ea8862bf7d1d65f4d9c3090bff6169d241b00acd3f7f2c142a06223d','preserve every original accepted input, reference hash and control');
