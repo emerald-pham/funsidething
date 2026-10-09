@@ -5678,7 +5678,7 @@ test("UI: once scanning starts it's Yes/No — no Can button, no chain-start que
   assert.match(scanHtml, /data-act="delete-task"/, "Delete should still be available");
 });
 
-test("UI: Quick start displays the requested seven steps in order", async () => {
+test("UI: Quick start displays four essential steps in order", async () => {
   const { ctx, shim } = await loadApp();
   ctx.openHelp();
   const markup = shim.elements.get("modalRoot").innerHTML;
@@ -5687,14 +5687,11 @@ test("UI: Quick start displays the requested seven steps in order", async () => 
   const steps = [...list.matchAll(/<li>([\s\S]*?)<\/li>/g)]
     .map(match => match[1].replace(/<[^>]+>/g, "").replace(/&amp;/g, "&"));
   assert.deepEqual(steps, [
-    "Add tasks. You can tag them with contexts and enable contexts so that todos that NEED to match that context are surfaced. If the context is not enabled, those todos are not surfaced.",
-    "Then hit start scanning.",
-    "In every scan mode, the oldest eligible task never marked Done becomes the first dot. Worked on it is fine. If all eligible tasks have been done before, the oldest eligible task starts the chain. Chance mode then draws subsequent candidates using TrueSkill win probabilities.",
-    "Then compare candidates with the newest dot. Descending mode orders them by estimated TrueSkill strength; chance mode uses a saved weighted random order. Squared Weighting and Halving weighting have their own draw rules explained below. Yes/No updates ratings immediately. In chance mode, those updates affect the next fresh ordering.",
-    "You can also hit can’t, which will snooze the task for a duration you’ve configured in settings.",
-    "You will continue until either you hit done scanning, or the app recognizes the chances of you finding a better task dips below 25% (percentage configurable in settings menu) in which case it will gently nudge you to stop searching for a new todo.",
-    "Once you’re done scanning, you will be presented with a chain of todos you will need to complete from the bottom of the “chain” up to the top, marking tasks as done, worked on (sends it back to the todo list for later) or can’t / dislodge."
-  ]);
+  "Add tasks. Optionally assign contexts, then enable the contexts needed for those tasks.",
+  "Choose Start scanning.",
+  "Compare each candidate with the newest dot. Choose Yes if you prefer it, No to keep the dot, or Can’t to put the candidate aside for now.",
+  "Choose done scanning when ready. Work the chain from the newest dot upward, using Done for finished tasks, Worked on it for progress, or Dislodge to set a task aside."
+]);
 });
 
 test("UI: Quick start keeps task-state explanations in a collapsed scanning chapter", async () => {
