@@ -23972,3 +23972,7 @@ test('RISK Quick start chapters: mounted help uses native named disclosures with
  const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
  const chapters=[...help.matchAll(/<details class="help-faq"([^>]*)><summary>(.*?)<\/summary>/g)];assert.deepEqual(chapters.map(x=>x[2].replace(/<[^>]+>/g,'')),['Quick start','Scene and appearance','Scanning and recurrence','Contexts','Data and backups','Changelog']);assert.match(chapters[0][1],/\bopen\b/);for(const c of chapters.slice(1))assert.doesNotMatch(c[1],/\bopen\b/);assert.equal((help.match(/<details/g)||[]).length,(help.match(/<\/details>/g)||[]).length);assert.doesNotMatch(help,/<summary>More FAQs<\/summary>/);
 });
+
+test('RISK Quick start chapter layout: disclosure headings share the native summary line without extra margins',()=>{
+ assert.match(html,/\.help-faq\s*>\s*summary\s*>\s*h3\s*\{[^}]*display\s*:\s*inline\s*;[^}]*margin\s*:\s*0\s*[;}]/,'chapter heading and disclosure marker stay together');
+});

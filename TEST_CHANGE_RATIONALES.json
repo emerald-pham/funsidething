@@ -1,19 +1,20 @@
 [
   {
-    "testChangesSha256": "8335918e613dc3c90cc6f5d47e6ffdb03ec7535535581a1f9d4474a33eda4f64",
+    "testChangesSha256": "cbcf8f38dcd1bd950d8e0c20bcea7f76c1cc0a886fbfa303d65d3ac4370f85ed",
     "reason": "Explicit user requests essential-only Quick start help and accessible collapsible chapters matching Settings. Replace historical implementation-copy assertions with user-facing consequences while retaining executable behavior, Settings safety and historical changelog assertions.",
     "previousBehavior": "Seven dense intro steps and one More FAQs disclosure containing long duplicated rules and internal release details.",
     "intendedBehavior": "Four essential steps, native Quick start disclosure initially open and five Settings-aligned detailed chapters initially closed. All37 topics remain concise and accurate; detailed rules and recovery guidance stay in their chapters.",
     "replacementTests": [
       "RISK Quick start content: essential steps stay brief and detailed help remains user-facing in existing sections",
-      "RISK Quick start chapters: mounted help uses native named disclosures with essential chapter first and detailed chapters closed"
+      "RISK Quick start chapters: mounted help uses native named disclosures with essential chapter first and detailed chapters closed",
+      "RISK Quick start chapter layout: disclosure headings share the native summary line without extra margins"
     ],
     "preservedCoverage": [
       "Executable behavior tests unchanged. Historical changelog and Settings backup-safety assertions retained. FAQ text-only assertions updated for approved concise wording."
     ],
     "redEvidence": {
       "command": "node --test --test-name-pattern=\"RISK Quick start content|RISK Quick start chapters|collapsed scanning chapter\" tests.js; PROBE_PHASE=red node ../quickstart-evidence/window-runner.mjs",
-      "failure": "Observed intro length RED before prose changes; chapter names and scanning disclosure RED before markup; actual Chrome Enter on old first disclosure opened it instead of closing initially visible Quick start, observed17:58:20UTC before applying chapter markup. Logs observed-red.log, chapters-red.log, chapter-consumer-red.log and browser-red.log."
+      "failure": "Observed intro length RED before prose changes; chapter names and scanning disclosure RED before markup; actual Chrome Enter on old first disclosure opened it instead of closing initially visible Quick start, observed17:58:20UTC before applying chapter markup. Logs observed-red.log, chapters-red.log, chapter-consumer-red.log and browser-red.log. Independent visual finding then observed actual 43.75px separated heading RED before scoped inline CSS, plus native heading-native-red.log. Final responsive GREEN complete18:02:39UTC."
     }
   },
   {

@@ -830,3 +830,5 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - Quick start user guidance: `RISK Quick start content: essential steps stay brief and detailed help remains user-facing in existing sections`.
 
 - Quick start chapters: `RISK Quick start chapters: mounted help uses native named disclosures with essential chapter first and detailed chapters closed`.
+
+- Quick start compact disclosure headings: `RISK Quick start chapter layout: disclosure headings share the native summary line without extra margins`.
