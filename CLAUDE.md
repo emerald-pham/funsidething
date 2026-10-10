@@ -203,3 +203,16 @@ findings, evidence and what was not checked. An inaccessible runtime is an
 unresolved review gap, not a pass inferred from unit, inference or source tests.
 Fix actionable typography findings and obtain the affected independent review
 before publication.
+
+For each added or restyled control, identify the established equivalent or
+adjacent reference control and the intended match or deliberate difference.
+Reuse its component classes and theme tokens. Compare the actual final controls
+side by side: font family, size, weight and line height; padding and height;
+radius, border, fill, ink and shadow; and hover, focus and disabled treatment
+where applicable. Inspect every affected surface, including the active
+candidate and paused or sole/final task, in both themes and relevant narrow,
+wide and enlarged views. Distinguish naturally disabled states from isolated
+paint probes. Record exact-candidate screenshots, computed styles, the reference
+and coverage limits. White paint, readable text and passing bounds alone do not
+establish a visual match. Unexplained drift is an actionable finding; fix it and
+repeat the affected final rendered comparison before approval.
