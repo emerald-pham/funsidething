@@ -848,3 +848,20 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK seeded trigger reading preservation: actual word replacement and trusted observer do not inherit stale read flags
 
 - RISK changelog editorial: public history omits internal housekeeping and routine frequency tuning
+
+## Postpone deferral
+
+- RISK Postpone: mounted scanner action defers without rating or task edits and expiry restores soft eligibility
+- RISK Postpone: Settings validates custom hours preserves old values and final task resumes coherently
+- RISK Postpone: causal sync preserves peer edits concurrent deferrals Undo deletion and old clients
+- RISK Postpone: revisioned cloud offline reconnect prunes stale dots without losing concurrent editor fields
+- RISK Postpone: unknown future deferral evidence is adopted archived and read-only through stale merge and Undo
+- RISK Postpone: actual backup Restore completion Undo and pass resets retain deferral intent
+
+- RISK Postpone: white control retains named theme palette colors
+
+- RISK Postpone layout: mounted duration field uses the bounded numeric Settings width
+
+- RISK Postpone layout: modal height preserves the viewport cap and fits the available backdrop
+
+- RISK Postpone layout: Settings numeric fields contain intrinsic widths in narrow recurrence rows
