@@ -22563,7 +22563,7 @@ test('RISK fireworks natural tails: final embers retain their complete formula l
  }
 });
 
-test('RISK fireworks reservations: shortening visibility preserves previously suppressed shows and visitor admissions',()=>{
+test('RISK fireworks reservations: shortening visibility preserves historical visitors and current seeded rail admissions',()=>{
  const current=sceneTimeline(),uncapped=sceneTimeline({'landscape-timeline.js':source=>{
   assert.equal(source.split('Math.min(base,60)').length,2,'the isolated comparison changes only the display cap');
   return source.replace('Math.min(base,60)','base');

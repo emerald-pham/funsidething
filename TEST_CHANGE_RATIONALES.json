@@ -1,5 +1,56 @@
 [
   {
+    "testChangesSha256": "d48470fe59f2ec105e40beeb1a45495c906f6dfe524de0369ac90f50c1a682d8",
+    "reason": "Authorized seeded-chance rail admission changes make old-release rail IDs an invalid oracle for fireworks display-cap preservation. Retain historical assertions for unchanged visitors and add full current-algorithm capped-versus-uncapped reservations coverage. Name now describes both preserved historical and expanded current seeded-rail coverage, satisfying unchanged validator requirements; risk inventory updated.",
+    "previousBehavior": "The fireworks reservation test compared all current visitor IDs against a release with compulsory periodic rails, conflating the independently authorized rail trigger change with fireworks reservations.",
+    "intendedBehavior": "Historical non-rail IDs stay exactly protected, while every current visitor including chance-admitted rails must be identical between capped visibility and an isolated uncapped display-only counterfactual.",
+    "replacementTests": [
+      "RISK fireworks reservations: shortening visibility preserves historical visitors and current seeded rail admissions"
+    ],
+    "preservedCoverage": [
+      "All previous unchanged-show and non-rail visitor ID assertions remain exact; current train and metro reservation/admission protection becomes an explicit same-algorithm counterfactual rather than deleted coverage.",
+      "Existing rail opportunity, mean spacing, track capacity and millisecond boundary tests remain intact. App, cloud, FAQ, release gates, baselines and rendered assets remain byte-identical."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK fireworks reservations:' tests.js",
+      "failure": "Observed exact25a41da PR CI failure and repeated local source RED at /tmp/fireworks-trigger-ci-pr-failure-25a41da.log and /tmp/fireworks-trigger-reservation-ci-red.log: historical train:33 differs from intentionally authorized seeded-chance train:38 and metro:50. This is a postimplementation historical-oracle incompatibility, not new preimplementation behavior RED. Prior functional RED evidence remains in existing records."
+    }
+  },
+  {
+    "testChangesSha256": "677334687b1ea0b7328f6a2c316ae98ffacfe3915225465b8c9c4d23d1b7afa9",
+    "reason": "Authorized seeded-chance rail admission changes make old-release rail IDs an invalid oracle for fireworks display-cap preservation. Retain historical assertions for unchanged visitors and add full current-algorithm capped-versus-uncapped reservations coverage. Name now describes both preserved historical and expanded current seeded-rail coverage, satisfying unchanged validator requirements; risk inventory updated.",
+    "previousBehavior": "The fireworks reservation test compared all current visitor IDs against a release with compulsory periodic rails, conflating the independently authorized rail trigger change with fireworks reservations.",
+    "intendedBehavior": "Historical non-rail IDs stay exactly protected, while every current visitor including chance-admitted rails must be identical between capped visibility and an isolated uncapped display-only counterfactual.",
+    "replacementTests": [
+      "RISK fireworks reservations: shortening visibility preserves historical visitors and current seeded rail admissions"
+    ],
+    "preservedCoverage": [
+      "All previous unchanged-show and non-rail visitor ID assertions remain exact; current train and metro reservation/admission protection becomes an explicit same-algorithm counterfactual rather than deleted coverage.",
+      "Existing rail opportunity, mean spacing, track capacity and millisecond boundary tests remain intact. App, cloud, FAQ, release gates, baselines and rendered assets remain byte-identical."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK fireworks reservations:' tests.js",
+      "failure": "Observed exact25a41da PR CI failure and repeated local source RED at /tmp/fireworks-trigger-ci-pr-failure-25a41da.log and /tmp/fireworks-trigger-reservation-ci-red.log: historical train:33 differs from intentionally authorized seeded-chance train:38 and metro:50. This is a postimplementation historical-oracle incompatibility, not new preimplementation behavior RED. Prior functional RED evidence remains in existing records."
+    }
+  },
+  {
+    "testChangesSha256": "7db4ffee1f6f5b38319f8dcaf10be1d8dedc15e9f8415770cc204589cffcf05d",
+    "reason": "Authorized seeded-chance rail admission changes make old-release rail IDs an invalid oracle for fireworks display-cap preservation. Retain historical assertions for unchanged visitors and add full current-algorithm capped-versus-uncapped reservations coverage. Name now describes both preserved historical and expanded current seeded-rail coverage, satisfying unchanged validator requirements; risk inventory updated.",
+    "previousBehavior": "The fireworks reservation test compared all current visitor IDs against a release with compulsory periodic rails, conflating the independently authorized rail trigger change with fireworks reservations.",
+    "intendedBehavior": "Historical non-rail IDs stay exactly protected, while every current visitor including chance-admitted rails must be identical between capped visibility and an isolated uncapped display-only counterfactual.",
+    "replacementTests": [
+      "RISK fireworks reservations: shortening visibility preserves historical visitors and current seeded rail admissions"
+    ],
+    "preservedCoverage": [
+      "All previous unchanged-show and non-rail visitor ID assertions remain exact; current train and metro reservation/admission protection becomes an explicit same-algorithm counterfactual rather than deleted coverage.",
+      "Existing rail opportunity, mean spacing, track capacity and millisecond boundary tests remain intact. App, cloud, FAQ, release gates, baselines and rendered assets remain byte-identical."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK fireworks reservations:' tests.js",
+      "failure": "Observed exact25a41da PR CI failure and repeated local source RED at /tmp/fireworks-trigger-ci-pr-failure-25a41da.log and /tmp/fireworks-trigger-reservation-ci-red.log: historical train:33 differs from intentionally authorized seeded-chance train:38 and metro:50. This is a postimplementation historical-oracle incompatibility, not new preimplementation behavior RED. Prior functional RED evidence remains in existing records."
+    }
+  },
+  {
     "testChangesSha256": "cfb5ea280dd50092e978504f9b4951873b2a1875fea44d4ab2df5f611c119ec6",
     "reason": "Authorized seeded-chance rail admission changes make old-release rail IDs an invalid oracle for fireworks display-cap preservation. Retain historical assertions for unchanged visitors and add full current-algorithm capped-versus-uncapped reservations coverage.",
     "previousBehavior": "The fireworks reservation test compared all current visitor IDs against a release with compulsory periodic rails, conflating the independently authorized rail trigger change with fireworks reservations.",

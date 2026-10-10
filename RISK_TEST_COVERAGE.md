@@ -638,7 +638,7 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK fireworks pair endpoints: zero and maximum seeded samples bound regular pairs without delaying eight finale lanes
 
 - RISK fireworks natural tails: final embers retain their complete formula lifetime
-- RISK fireworks reservations: shortening visibility preserves previously suppressed shows and visitor admissions
+- RISK fireworks reservations: shortening visibility preserves historical visitors and current seeded rail admissions
 
 - RISK fireworks legacy reservations: invisible remainder keeps old festival random draws and admission budgets
 
