@@ -885,3 +885,5 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 
 - RISK pedestrian production half pace: scheduled ordinary and dog walkers halve the actual prior trajectory at every sampled seed and frame rate
 - RISK pedestrian reduced painter consumer: production-shaped static events use the same settled representative as the app
+
+- RISK pedestrian concise help: natural exit guidance has a short adjacent FAQ without lengthening the existing scenery answer

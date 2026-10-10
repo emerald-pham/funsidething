@@ -22591,7 +22591,7 @@ test('RISK fireworks reservations: shortening visibility preserves historical vi
  const rates='| Event | Rate |\n| festival | 5 |';current.LandscapeConfig.setSpawnRates(rates);uncapped.LandscapeConfig.setSpawnRates(rates);released.LandscapeConfig.setSpawnRates('| Event | Rate |\n| festival | 10 |');
  const options={seed:'reservation-cap',sunAt:()=>({altitude:-20,azimuth:0})},a=current.LandscapeTimeline.create(options),unclipped=uncapped.LandscapeTimeline.create(options),old=released.LandscapeTimeline.create(options);
  for(let seconds=3080;seconds<=3160;seconds+=10){
-  const ids=events=>Array.from(events,e=>e.id).sort(),visible=events=>events.filter(e=>e.type!=='fireworks'||e.age<60),unchanged=events=>events.filter(e=>!['train','metro'].includes(e.type)),actual=a.at(seconds*1000).events;
+  const ids=events=>Array.from(events,e=>e.id).sort(),visible=events=>events.filter(e=>e.type!=='fireworks'||e.age<60),unchanged=events=>events.filter(e=>!['train','metro'].includes(e.type)&&e.age<(e.activityDuration??e.duration)),actual=a.at(seconds*1000).events;
   assert.deepEqual(ids(actual),ids(visible(unclipped.at(seconds*1000).events)),'display cap cannot admit extra shows or resample any current visitors, including seeded-chance rails');
   // Rail admission was explicitly changed; the historical oracle still protects every unchanged visitor.
   assert.deepEqual(ids(unchanged(actual)),ids(unchanged(visible(old.at(seconds*1000).events))),'display cap preserves historical shows and unchanged visitor admissions');
@@ -24442,4 +24442,9 @@ test('RISK pedestrian reduced painter consumer: production-shaped static events 
   const staticFrame=probe.sample({actor,event,progress:.5,reduced:true,zoom:1}),age=g.stillWalkingAge(event),direct=probe.sample({actor,event:{...event,age},zoom:1});
   assert.deepEqual(staticFrame,direct,'actual static painter must choose the exact production representative');
  }
+});
+
+test('RISK pedestrian concise help: natural exit guidance has a short adjacent FAQ without lengthening the existing scenery answer',()=>{
+ const entry=html.split('<dt>How do walking visitors leave the scene?</dt>')[1];assert.ok(entry,'walking guidance has its own user-facing FAQ');
+ assert.match(entry.split('</dd>')[0],/Arrival chances and the shared visit schedule stay the same/);
 });
