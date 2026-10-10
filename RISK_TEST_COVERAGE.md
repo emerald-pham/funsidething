@@ -638,7 +638,7 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK fireworks pair endpoints: zero and maximum seeded samples bound regular pairs without delaying eight finale lanes
 
 - RISK fireworks natural tails: final embers retain their complete formula lifetime
-- RISK fireworks reservations: shortening visibility preserves previously suppressed shows and visitor admissions
+- RISK fireworks reservations: shortening visibility preserves historical visitors and current seeded rail admissions
 
 - RISK fireworks legacy reservations: invisible remainder keeps old festival random draws and admission budgets
 
@@ -832,3 +832,17 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - Quick start chapters: `RISK Quick start chapters: mounted help uses native named disclosures with essential chapter first and detailed chapters closed`.
 
 - Quick start compact disclosure headings: `RISK Quick start chapter layout: disclosure headings share the native summary line without extra margins`.
+
+- RISK fireworks crescendo: finale emits distinct overlapping volleys and a wider closing crown
+- RISK fireworks crescendo FAQ: scenery help explains widening finale and existing motion limits
+
+- RISK seeded trigger admissions: actual UTC rail consumer admits chance gaps with preserved mean and track capacity
+- RISK seeded trigger windows: actual light consumer uses independent state draws and can retain state across opportunities
+- RISK seeded trigger lightning: actual storm painter rejects strikes and preserves short bolts snow and reduced motion guards
+- RISK seeded trigger skywriters: actual snapshot and painter preserve visibility across reading history and missing private copy
+- RISK seeded trigger negative controls: bypassed actual admissions compulsory window parity and periodic bolts are detected
+- RISK seeded trigger FAQ: extended help explains shared chance visits and history-independent skywriter visibility without private sync
+- RISK seeded trigger precision: rail lifetime rounding cannot overlap at an exact successor millisecond
+- RISK seeded trigger precision: chance window states retain the former fifty-percent long-run occupancy
+- RISK seeded trigger cold copy: actual current-flight consumer adopts the loaded human bank without rereading or waiting for another event
+- RISK seeded trigger reading preservation: actual word replacement and trusted observer do not inherit stale read flags

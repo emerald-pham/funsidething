@@ -1,5 +1,243 @@
 [
   {
+    "testChangesSha256": "d48470fe59f2ec105e40beeb1a45495c906f6dfe524de0369ac90f50c1a682d8",
+    "reason": "Authorized seeded-chance rail admission changes make old-release rail IDs an invalid oracle for fireworks display-cap preservation. Retain historical assertions for unchanged visitors and add full current-algorithm capped-versus-uncapped reservations coverage. Name now describes both preserved historical and expanded current seeded-rail coverage, satisfying unchanged validator requirements; risk inventory updated.",
+    "previousBehavior": "The fireworks reservation test compared all current visitor IDs against a release with compulsory periodic rails, conflating the independently authorized rail trigger change with fireworks reservations.",
+    "intendedBehavior": "Historical non-rail IDs stay exactly protected, while every current visitor including chance-admitted rails must be identical between capped visibility and an isolated uncapped display-only counterfactual.",
+    "replacementTests": [
+      "RISK fireworks reservations: shortening visibility preserves historical visitors and current seeded rail admissions"
+    ],
+    "preservedCoverage": [
+      "All previous unchanged-show and non-rail visitor ID assertions remain exact; current train and metro reservation/admission protection becomes an explicit same-algorithm counterfactual rather than deleted coverage.",
+      "Existing rail opportunity, mean spacing, track capacity and millisecond boundary tests remain intact. App, cloud, FAQ, release gates, baselines and rendered assets remain byte-identical."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK fireworks reservations:' tests.js",
+      "failure": "Observed exact25a41da PR CI failure and repeated local source RED at /tmp/fireworks-trigger-ci-pr-failure-25a41da.log and /tmp/fireworks-trigger-reservation-ci-red.log: historical train:33 differs from intentionally authorized seeded-chance train:38 and metro:50. This is a postimplementation historical-oracle incompatibility, not new preimplementation behavior RED. Prior functional RED evidence remains in existing records."
+    }
+  },
+  {
+    "testChangesSha256": "677334687b1ea0b7328f6a2c316ae98ffacfe3915225465b8c9c4d23d1b7afa9",
+    "reason": "Authorized seeded-chance rail admission changes make old-release rail IDs an invalid oracle for fireworks display-cap preservation. Retain historical assertions for unchanged visitors and add full current-algorithm capped-versus-uncapped reservations coverage. Name now describes both preserved historical and expanded current seeded-rail coverage, satisfying unchanged validator requirements; risk inventory updated.",
+    "previousBehavior": "The fireworks reservation test compared all current visitor IDs against a release with compulsory periodic rails, conflating the independently authorized rail trigger change with fireworks reservations.",
+    "intendedBehavior": "Historical non-rail IDs stay exactly protected, while every current visitor including chance-admitted rails must be identical between capped visibility and an isolated uncapped display-only counterfactual.",
+    "replacementTests": [
+      "RISK fireworks reservations: shortening visibility preserves historical visitors and current seeded rail admissions"
+    ],
+    "preservedCoverage": [
+      "All previous unchanged-show and non-rail visitor ID assertions remain exact; current train and metro reservation/admission protection becomes an explicit same-algorithm counterfactual rather than deleted coverage.",
+      "Existing rail opportunity, mean spacing, track capacity and millisecond boundary tests remain intact. App, cloud, FAQ, release gates, baselines and rendered assets remain byte-identical."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK fireworks reservations:' tests.js",
+      "failure": "Observed exact25a41da PR CI failure and repeated local source RED at /tmp/fireworks-trigger-ci-pr-failure-25a41da.log and /tmp/fireworks-trigger-reservation-ci-red.log: historical train:33 differs from intentionally authorized seeded-chance train:38 and metro:50. This is a postimplementation historical-oracle incompatibility, not new preimplementation behavior RED. Prior functional RED evidence remains in existing records."
+    }
+  },
+  {
+    "testChangesSha256": "7db4ffee1f6f5b38319f8dcaf10be1d8dedc15e9f8415770cc204589cffcf05d",
+    "reason": "Authorized seeded-chance rail admission changes make old-release rail IDs an invalid oracle for fireworks display-cap preservation. Retain historical assertions for unchanged visitors and add full current-algorithm capped-versus-uncapped reservations coverage. Name now describes both preserved historical and expanded current seeded-rail coverage, satisfying unchanged validator requirements; risk inventory updated.",
+    "previousBehavior": "The fireworks reservation test compared all current visitor IDs against a release with compulsory periodic rails, conflating the independently authorized rail trigger change with fireworks reservations.",
+    "intendedBehavior": "Historical non-rail IDs stay exactly protected, while every current visitor including chance-admitted rails must be identical between capped visibility and an isolated uncapped display-only counterfactual.",
+    "replacementTests": [
+      "RISK fireworks reservations: shortening visibility preserves historical visitors and current seeded rail admissions"
+    ],
+    "preservedCoverage": [
+      "All previous unchanged-show and non-rail visitor ID assertions remain exact; current train and metro reservation/admission protection becomes an explicit same-algorithm counterfactual rather than deleted coverage.",
+      "Existing rail opportunity, mean spacing, track capacity and millisecond boundary tests remain intact. App, cloud, FAQ, release gates, baselines and rendered assets remain byte-identical."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK fireworks reservations:' tests.js",
+      "failure": "Observed exact25a41da PR CI failure and repeated local source RED at /tmp/fireworks-trigger-ci-pr-failure-25a41da.log and /tmp/fireworks-trigger-reservation-ci-red.log: historical train:33 differs from intentionally authorized seeded-chance train:38 and metro:50. This is a postimplementation historical-oracle incompatibility, not new preimplementation behavior RED. Prior functional RED evidence remains in existing records."
+    }
+  },
+  {
+    "testChangesSha256": "cfb5ea280dd50092e978504f9b4951873b2a1875fea44d4ab2df5f611c119ec6",
+    "reason": "Authorized seeded-chance rail admission changes make old-release rail IDs an invalid oracle for fireworks display-cap preservation. Retain historical assertions for unchanged visitors and add full current-algorithm capped-versus-uncapped reservations coverage.",
+    "previousBehavior": "The fireworks reservation test compared all current visitor IDs against a release with compulsory periodic rails, conflating the independently authorized rail trigger change with fireworks reservations.",
+    "intendedBehavior": "Historical non-rail IDs stay exactly protected, while every current visitor including chance-admitted rails must be identical between capped visibility and an isolated uncapped display-only counterfactual.",
+    "replacementTests": [
+      "RISK fireworks reservations: shortening visibility preserves previously suppressed shows and visitor admissions"
+    ],
+    "preservedCoverage": [
+      "All previous unchanged-show and non-rail visitor ID assertions remain exact; current train and metro reservation/admission protection becomes an explicit same-algorithm counterfactual rather than deleted coverage.",
+      "Existing rail opportunity, mean spacing, track capacity and millisecond boundary tests remain intact. App, cloud, FAQ, release gates, baselines and rendered assets remain byte-identical."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK fireworks reservations:' tests.js",
+      "failure": "Observed exact25a41da PR CI failure and repeated local source RED at /tmp/fireworks-trigger-ci-pr-failure-25a41da.log and /tmp/fireworks-trigger-reservation-ci-red.log: historical train:33 differs from intentionally authorized seeded-chance train:38 and metro:50. This is a postimplementation historical-oracle incompatibility, not new preimplementation behavior RED. Prior functional RED evidence remains in existing records."
+    }
+  },
+  {
+    "testChangesSha256": "a26ea0d170e038deab64d129b41bf8f1f7eb20c3782ff974e44c1cc28a48f3d1",
+    "reason": "Authorized seeded-chance rail admission changes make old-release rail IDs an invalid oracle for fireworks display-cap preservation. Retain historical assertions for unchanged visitors and add full current-algorithm capped-versus-uncapped reservations coverage.",
+    "previousBehavior": "The fireworks reservation test compared all current visitor IDs against a release with compulsory periodic rails, conflating the independently authorized rail trigger change with fireworks reservations.",
+    "intendedBehavior": "Historical non-rail IDs stay exactly protected, while every current visitor including chance-admitted rails must be identical between capped visibility and an isolated uncapped display-only counterfactual.",
+    "replacementTests": [
+      "RISK fireworks reservations: shortening visibility preserves previously suppressed shows and visitor admissions"
+    ],
+    "preservedCoverage": [
+      "All previous unchanged-show and non-rail visitor ID assertions remain exact; current train and metro reservation/admission protection becomes an explicit same-algorithm counterfactual rather than deleted coverage.",
+      "Existing rail opportunity, mean spacing, track capacity and millisecond boundary tests remain intact. App, cloud, FAQ, release gates, baselines and rendered assets remain byte-identical."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK fireworks reservations:' tests.js",
+      "failure": "Observed exact25a41da PR CI failure and repeated local source RED at /tmp/fireworks-trigger-ci-pr-failure-25a41da.log and /tmp/fireworks-trigger-reservation-ci-red.log: historical train:33 differs from intentionally authorized seeded-chance train:38 and metro:50. This is a postimplementation historical-oracle incompatibility, not new preimplementation behavior RED. Prior functional RED evidence remains in existing records."
+    }
+  },
+  {
+    "testChangesSha256": "1895524437beb3516da4b5b02638091dc5cf33bde1dd3cd312418bc382bee185",
+    "reason": "User requests seeded-chance triggers and same shared UTC events across browsers; exact review additionally proved rounded metro overlap, incorrect prior occupancy assumption and stale cold-load skywriter memoization.",
+    "previousBehavior": "Guaranteed periodic rails/windows/strikes and history-based skywriter suppression; first trigger draft also permitted1ms metro overlap, changed long-run window occupancy and retained empty words after bank load.",
+    "intendedBehavior": "Pure shared admission rolls with unchanged expected cadence, lifetime-safe rounded track spacing, preserved50percent long-run window occupancy, and current-flight words reconciling loaded human copy independently of local reads.",
+    "replacementTests": [
+      "RISK seeded trigger precision: rail lifetime rounding cannot overlap at an exact successor millisecond",
+      "RISK seeded trigger precision: chance window states retain the former fifty-percent long-run occupancy",
+      "RISK seeded trigger cold copy: actual current-flight consumer adopts the loaded human bank without rereading or waiting for another event",
+      "RISK seeded trigger reading preservation: actual word replacement and trusted observer do not inherit stale read flags"
+    ],
+    "preservedCoverage": [
+      "Existing finite lifetimes, track capacity, night/storm/reduced eligibility, fireworks choreography, local message nonrepeat, private content isolation and cloud/import/Undo/restore contracts remain protected.",
+      "Rain painter fixtures pin the new admission dependency while keeping density/velocity/opacity and reflected three-segment assertions; window browser fixture still asserts actual visible change and return colors at real chance transitions.",
+      "A catalog word change clears stale per-event banner/read flags while the actual trusted observer still records only visible trusted reads; matching-word and unrelated banner history remain preserved."
+    ],
+    "redEvidence": {
+      "command": "NODE_PATH=/Users/emeraldpham/Documents/GitHub/funsidething/node_modules node --test --test-name-pattern='RISK seeded trigger precision|RISK seeded trigger cold copy' tests.js",
+      "failure": "Observed3contemporaneousREDs before correction /tmp/fireworks-trigger-review-red.log: proven default-seed metro successor paints two vehicles, old parity50percent occupancy mismatches draftq.58, and actual cold loadedbank still selects empty vs warmHELLO. Earlier fourconsumerREDs before trigger implementation /tmp/fireworks-trigger-red-qualified.log; FAQRED /tmp/fireworks-trigger-faq-red.log. Initial wrong setHumanText fixture was corrected before implementation. Postimplementation targeted mutations explicitly not claimed contemporaneousRED. Separate finale RED /tmp/fireworks-crescendo-red.log and /tmp/fireworks-faq-red.log retained before2693413/23ec229. Additional actual completed-paint/trusted-observer RED before reading-memo fix /tmp/fireworks-trigger-reading-red.log: WORLD remains unread because inherited HELLO textSeen suppresses recording; GREEN /tmp/fireworks-trigger-reading-green.log after clearing only changed-skywriter read memo."
+    }
+  },
+  {
+    "testChangesSha256": "c17c6515e18e80690753d506b49fb7bfa0746ca88bb6105bccadfbe18d694e9a",
+    "reason": "User requests seeded-chance triggers and same shared UTC events across browsers; exact review additionally proved rounded metro overlap, incorrect prior occupancy assumption and stale cold-load skywriter memoization.",
+    "previousBehavior": "Guaranteed periodic rails/windows/strikes and history-based skywriter suppression; first trigger draft also permitted1ms metro overlap, changed long-run window occupancy and retained empty words after bank load.",
+    "intendedBehavior": "Pure shared admission rolls with unchanged expected cadence, lifetime-safe rounded track spacing, preserved50percent long-run window occupancy, and current-flight words reconciling loaded human copy independently of local reads.",
+    "replacementTests": [
+      "RISK seeded trigger admissions: actual UTC rail consumer admits chance gaps with preserved mean and track capacity",
+      "RISK seeded trigger windows: actual light consumer uses independent state draws and can retain state across opportunities",
+      "RISK seeded trigger lightning: actual storm painter rejects strikes and preserves short bolts snow and reduced motion guards",
+      "RISK seeded trigger skywriters: actual snapshot and painter preserve visibility across reading history and missing private copy",
+      "RISK seeded trigger negative controls: bypassed actual admissions compulsory window parity and periodic bolts are detected",
+      "RISK seeded trigger FAQ: extended help explains shared chance visits and history-independent skywriter visibility without private sync",
+      "RISK seeded trigger precision: rail lifetime rounding cannot overlap at an exact successor millisecond",
+      "RISK seeded trigger precision: chance window states retain the former fifty-percent long-run occupancy",
+      "RISK seeded trigger cold copy: actual current-flight consumer adopts the loaded human bank without rereading or waiting for another event",
+      "RISK seeded trigger reading preservation: actual word replacement and trusted observer do not inherit stale read flags"
+    ],
+    "preservedCoverage": [
+      "Existing finite lifetimes, track capacity, night/storm/reduced eligibility, fireworks choreography, local message nonrepeat, private content isolation and cloud/import/Undo/restore contracts remain protected.",
+      "Rain painter fixtures pin the new admission dependency while keeping density/velocity/opacity and reflected three-segment assertions; window browser fixture still asserts actual visible change and return colors at real chance transitions.",
+      "A catalog word change clears stale per-event banner/read flags while the actual trusted observer still records only visible trusted reads; matching-word and unrelated banner history remain preserved."
+    ],
+    "redEvidence": {
+      "command": "NODE_PATH=/Users/emeraldpham/Documents/GitHub/funsidething/node_modules node --test --test-name-pattern='RISK seeded trigger precision|RISK seeded trigger cold copy' tests.js",
+      "failure": "Observed3contemporaneousREDs before correction /tmp/fireworks-trigger-review-red.log: proven default-seed metro successor paints two vehicles, old parity50percent occupancy mismatches draftq.58, and actual cold loadedbank still selects empty vs warmHELLO. Earlier fourconsumerREDs before trigger implementation /tmp/fireworks-trigger-red-qualified.log; FAQRED /tmp/fireworks-trigger-faq-red.log. Initial wrong setHumanText fixture was corrected before implementation. Postimplementation targeted mutations explicitly not claimed contemporaneousRED. Separate finale RED /tmp/fireworks-crescendo-red.log and /tmp/fireworks-faq-red.log retained before2693413/23ec229. Additional actual completed-paint/trusted-observer RED before reading-memo fix /tmp/fireworks-trigger-reading-red.log: WORLD remains unread because inherited HELLO textSeen suppresses recording; GREEN /tmp/fireworks-trigger-reading-green.log after clearing only changed-skywriter read memo."
+    }
+  },
+  {
+    "testChangesSha256": "87a6d87066a5708cc7ca07a029f2310e4c547cb1c1bc25990c7cf37c8df51306",
+    "reason": "User requests seeded-chance triggers and same shared UTC events across browsers; exact review additionally proved rounded metro overlap, incorrect prior occupancy assumption and stale cold-load skywriter memoization.",
+    "previousBehavior": "Guaranteed periodic rails/windows/strikes and history-based skywriter suppression; first trigger draft also permitted1ms metro overlap, changed long-run window occupancy and retained empty words after bank load.",
+    "intendedBehavior": "Pure shared admission rolls with unchanged expected cadence, lifetime-safe rounded track spacing, preserved50percent long-run window occupancy, and current-flight words reconciling loaded human copy independently of local reads.",
+    "replacementTests": [
+      "RISK seeded trigger admissions: actual UTC rail consumer admits chance gaps with preserved mean and track capacity",
+      "RISK seeded trigger windows: actual light consumer uses independent state draws and can retain state across opportunities",
+      "RISK seeded trigger lightning: actual storm painter rejects strikes and preserves short bolts snow and reduced motion guards",
+      "RISK seeded trigger skywriters: actual snapshot and painter preserve visibility across reading history and missing private copy",
+      "RISK seeded trigger negative controls: bypassed actual admissions compulsory window parity and periodic bolts are detected",
+      "RISK seeded trigger FAQ: extended help explains shared chance visits and history-independent skywriter visibility without private sync",
+      "RISK seeded trigger precision: rail lifetime rounding cannot overlap at an exact successor millisecond",
+      "RISK seeded trigger precision: chance window states retain the former fifty-percent long-run occupancy",
+      "RISK seeded trigger cold copy: actual current-flight consumer adopts the loaded human bank without rereading or waiting for another event",
+      "RISK seeded trigger reading preservation: actual word replacement and trusted observer do not inherit stale read flags"
+    ],
+    "preservedCoverage": [
+      "Existing finite lifetimes, track capacity, night/storm/reduced eligibility, fireworks choreography, local message nonrepeat, private content isolation and cloud/import/Undo/restore contracts remain protected.",
+      "Rain painter fixtures pin the new admission dependency while keeping density/velocity/opacity and reflected three-segment assertions; window browser fixture still asserts actual visible change and return colors at real chance transitions.",
+      "A catalog word change clears stale per-event banner/read flags while the actual trusted observer still records only visible trusted reads; matching-word and unrelated banner history remain preserved."
+    ],
+    "redEvidence": {
+      "command": "NODE_PATH=/Users/emeraldpham/Documents/GitHub/funsidething/node_modules node --test --test-name-pattern='RISK seeded trigger precision|RISK seeded trigger cold copy' tests.js",
+      "failure": "Observed3contemporaneousREDs before correction /tmp/fireworks-trigger-review-red.log: proven default-seed metro successor paints two vehicles, old parity50percent occupancy mismatches draftq.58, and actual cold loadedbank still selects empty vs warmHELLO. Earlier fourconsumerREDs before trigger implementation /tmp/fireworks-trigger-red-qualified.log; FAQRED /tmp/fireworks-trigger-faq-red.log. Initial wrong setHumanText fixture was corrected before implementation. Postimplementation targeted mutations explicitly not claimed contemporaneousRED. Separate finale RED /tmp/fireworks-crescendo-red.log and /tmp/fireworks-faq-red.log retained before2693413/23ec229. Additional actual completed-paint/trusted-observer RED before reading-memo fix /tmp/fireworks-trigger-reading-red.log: WORLD remains unread because inherited HELLO textSeen suppresses recording; GREEN /tmp/fireworks-trigger-reading-green.log after clearing only changed-skywriter read memo."
+    }
+  },
+  {
+    "reason": "User explicitly replaces guaranteed periodic admissions with seeded chance and requires history-independent shared flight visibility, preserving mean frequency and privacy.",
+    "previousBehavior": "Rails are compulsory periodic arrivals, windows use compulsory parity and storm bolts recur each47s; local read history can suppress a skywriter.",
+    "intendedBehavior": "Independent pure seeded opportunities preserve mean frequencies and limits while permitting indefinite chance gaps; shared skywriters ignore reading history and empty human banks retain aircraft without invented words.",
+    "replacementTests": [
+      "RISK seeded trigger admissions: actual UTC rail consumer admits chance gaps with preserved mean and track capacity",
+      "RISK seeded trigger windows: actual light consumer uses independent state draws and can retain state across opportunities",
+      "RISK seeded trigger lightning: actual storm painter rejects strikes and preserves short bolts snow and reduced motion guards",
+      "RISK seeded trigger skywriters: actual snapshot and painter preserve visibility across reading history and missing private copy",
+      "RISK seeded trigger negative controls: bypassed actual admissions compulsory window parity and periodic bolts are detected",
+      "RISK seeded trigger FAQ: extended help explains shared chance visits and history-independent skywriter visibility without private sync"
+    ],
+    "preservedCoverage": [
+      "Existing rail capacity and lifetime, twilight fireworks scheduling, cloud/data isolation, reduced motion, finite weather, local nonrepeat messages and offline shell contracts retained.",
+      "Existing bolt-reflection test now pins an accepted deterministic strike fixture; browser window pixel test locates actual chance transitions rather than demanding periodic parity, preserving visible change and restored color assertions."
+    ],
+    "redEvidence": {
+      "command": "NODE_PATH=/Users/emeraldpham/Documents/GitHub/funsidething/node_modules node --test --test-name-pattern='RISK seeded trigger' tests.js",
+      "failure": "Four contemporaneous consumer REDs before implementation in /tmp/fireworks-trigger-red-qualified.log: rail seeded opportunity mismatch, independent window state mismatch, actual three-segment bolt mismatch, and read history changes HELLO to empty. Initial skywriter fixture used wrong setHumanText API and was corrected before implementation; preserve initial log. FAQ RED separately /tmp/fireworks-trigger-faq-red.log. Negative controls are postimplementation mutations, not claimed preimplementation RED."
+    },
+    "testChangesSha256": "012bb0ab5bfd6fc35ac27d285880d49c8f0ecfebbe258971fad7c740de6e6e3b"
+  },
+  {
+    "reason": "User explicitly replaces guaranteed periodic admissions with seeded chance and requires history-independent shared flight visibility, preserving mean frequency and privacy. Combined release also retains the separately test-first layered finale commits and their observed REDs.",
+    "previousBehavior": "Rails are compulsory periodic arrivals, windows use compulsory parity and storm bolts recur each47s; local read history can suppress a skywriter.",
+    "intendedBehavior": "Independent pure seeded opportunities preserve mean frequencies and limits while permitting indefinite chance gaps; shared skywriters ignore reading history and empty human banks retain aircraft without invented words.",
+    "replacementTests": [
+      "RISK seeded trigger admissions: actual UTC rail consumer admits chance gaps with preserved mean and track capacity",
+      "RISK seeded trigger windows: actual light consumer uses independent state draws and can retain state across opportunities",
+      "RISK seeded trigger lightning: actual storm painter rejects strikes and preserves short bolts snow and reduced motion guards",
+      "RISK seeded trigger skywriters: actual snapshot and painter preserve visibility across reading history and missing private copy",
+      "RISK seeded trigger negative controls: bypassed actual admissions compulsory window parity and periodic bolts are detected",
+      "RISK seeded trigger FAQ: extended help explains shared chance visits and history-independent skywriter visibility without private sync"
+    ],
+    "preservedCoverage": [
+      "Existing rail capacity and lifetime, twilight fireworks scheduling, cloud/data isolation, reduced motion, finite weather, local nonrepeat messages and offline shell contracts retained.",
+      "Existing bolt-reflection test now pins an accepted deterministic strike fixture; browser window pixel test locates actual chance transitions rather than demanding periodic parity, preserving visible change and restored color assertions."
+    ],
+    "redEvidence": {
+      "command": "NODE_PATH=/Users/emeraldpham/Documents/GitHub/funsidething/node_modules node --test --test-name-pattern='RISK seeded trigger' tests.js",
+      "failure": "Four contemporaneous consumer REDs before implementation in /tmp/fireworks-trigger-red-qualified.log: rail seeded opportunity mismatch, independent window state mismatch, actual three-segment bolt mismatch, and read history changes HELLO to empty. Initial skywriter fixture used wrong setHumanText API and was corrected before implementation; preserve initial log. FAQ RED separately /tmp/fireworks-trigger-faq-red.log. Negative controls are postimplementation mutations, not claimed preimplementation RED. Finale chronology retained in /tmp/fireworks-crescendo-red.log and /tmp/fireworks-faq-red.log, before commits2693413 and23ec229."
+    },
+    "testChangesSha256": "8a9f18c3e92e32803e7c97be22c1ebcca500e54f42a9236aef07e9394734701c"
+  },
+  {
+    "testChangesSha256": "32d787d17603d86dc926dad1d53bf70ccd93d0983ae86b4a3523b3dd3e1edca6",
+    "reason": "User explicitly requests a real-world inspired overlapping widening finale; replace only the historical single-volley finale expectation while retaining regular-pair endpoints and natural lifetime protections.",
+    "previousBehavior": "Eight finale shells ignite simultaneously with no staged crescendo; help and installed guidance describe that former choreography.",
+    "intendedBehavior": "Two, three and five-shell staged volleys overlap within the existing320particle cap and close with wider coverage, with unchanged regular pairs and full natural tails.",
+    "replacementTests": [
+      "RISK fireworks crescendo: finale emits distinct overlapping volleys and a wider closing crown",
+      "RISK fireworks crescendo FAQ: scenery help explains widening finale and existing motion limits"
+    ],
+    "preservedCoverage": [
+      "Existing standalone sixty-second limit, crossing-relative barge lifetime, regular0–300ms pair endpoints, seeded UTC scheduling, twilight admission, reduced motion and natural fading tests retained."
+    ],
+    "redEvidence": {
+      "command": "NODE_PATH=/Users/emeraldpham/Documents/GitHub/funsidething/node_modules node --test --test-name-pattern='RISK fireworks crescendo:' tests.js; then focused crescendo FAQ test before help edit",
+      "failure": "Observed contemporaneous geometry RED: a real crescendo needs at least three distinct ignition times; current single eight-shell volley cannot satisfy it. FAQ RED observed missing overlapping volleys and wider closing crown. Logs /tmp/fireworks-crescendo-red.log and /tmp/fireworks-faq-red.log. Independent FAQ review found stale barge paragraph; added negative assertion and observed1fail with barge guidance cannot retain superseded choreography before prose repair (/tmp/fireworks-barge-guidance-red.log)."
+    }
+  },
+  {
+    "testChangesSha256": "47da995eecee82790d3aa7cdf87723a674b834219d30fb783dce47904c32ebcb",
+    "reason": "User explicitly requests a real-world inspired overlapping widening finale; replace only the historical single-volley finale expectation while retaining regular-pair endpoints and natural lifetime protections.",
+    "previousBehavior": "Eight finale shells ignite simultaneously with no staged crescendo; help and installed guidance describe that former choreography.",
+    "intendedBehavior": "Two, three and five-shell staged volleys overlap within the existing320particle cap and close with wider coverage, with unchanged regular pairs and full natural tails.",
+    "replacementTests": [
+      "RISK fireworks crescendo: finale emits distinct overlapping volleys and a wider closing crown",
+      "RISK fireworks crescendo FAQ: scenery help explains widening finale and existing motion limits"
+    ],
+    "preservedCoverage": [
+      "Existing standalone sixty-second limit, crossing-relative barge lifetime, regular0–300ms pair endpoints, seeded UTC scheduling, twilight admission, reduced motion and natural fading tests retained."
+    ],
+    "redEvidence": {
+      "command": "NODE_PATH=/Users/emeraldpham/Documents/GitHub/funsidething/node_modules node --test --test-name-pattern='RISK fireworks crescendo:' tests.js; then focused crescendo FAQ test before help edit",
+      "failure": "Observed contemporaneous geometry RED: a real crescendo needs at least three distinct ignition times; current single eight-shell volley cannot satisfy it. FAQ RED observed missing overlapping volleys and wider closing crown. Logs /tmp/fireworks-crescendo-red.log and /tmp/fireworks-faq-red.log."
+    }
+  },
+  {
     "testChangesSha256": "6bec197efada5d5c904547c8ee1a22f8b0142a26e4dfd998d2e039e10532f7d0",
     "reason": "Rename the updated help-only test to describe its current user-facing ordering contract; preserve its actual assertions and all runtime tests. Record exact incremental push rationale as required by unchanged gate.",
     "previousBehavior": "Help wording assertions expected technical details intentionally removed at user request.",

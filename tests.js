@@ -846,11 +846,12 @@ const HTML_PATH = path.join(__dirname, "index.html");
 const html = fs.readFileSync(HTML_PATH, "utf8");
 const lzStringSrc = fs.readFileSync(path.join(__dirname, "vendor/lz-string-1.5.0.min.js"), "utf8");
 
-function sceneTimeline() {
+function sceneTimeline(transforms={}) {
  const context=vm.createContext({Date,Math,Intl,console});
  for(const file of ['landscape-config.js','vendor/astronomy.min.js','stars.js','landscape-core.js','landscape-geometry.js','landscape-timeline.js']){
   assert.ok(fs.existsSync(path.join(__dirname,file)),`deterministic scenery module missing: ${file}`);
-  vm.runInContext(fs.readFileSync(path.join(__dirname,file),'utf8'),context);
+  const source=fs.readFileSync(path.join(__dirname,file),'utf8');
+  vm.runInContext(transforms[file]?transforms[file](source):source,context);
  }
  return context;
 }
@@ -1215,7 +1216,7 @@ test('RISK rain intensity: day and night double velocity halve opacity and only 
  for(const [W,H] of [[320,568],[390,844],[568,320],[768,1024],[1440,900],[3840,2160]])for(const storm of [false,true])for(const reduced of [false,true]){
   const draw=(night,phase,status=storm?'thunderstorm':'rain')=>{
    const streaks=[],flakes=[],g={save(){},restore(){},beginPath(){},moveTo(){},bezierCurveTo(){},closePath(){},fill(){},fillRect(){},createLinearGradient(){return {addColorStop(){}}}};
-   vm.runInNewContext(`${paint};paintWeatherOn(g,weather,phase)`,{g,W,H,hy:Math.min(H*.37,310),phase,reduced,weather:{status,intensity:.8,storm,slot:1},sceneSeason:'summer',world:{elapsed:0},p:{night},S:{mixHex:day=>day},paintRainCloud(){},rand:n=>((n*17)%101)/101,LandscapeSeasonal:{paint(){}},treeOrigins:[],geometry:{},line(_g,...args){if(args[4]==='#e4f2f6')streaks.push({args,alpha:g.globalAlpha});},ellipse(_g,...args){flakes.push({args,alpha:g.globalAlpha});}});
+   vm.runInNewContext(`${paint};paintWeatherOn(g,weather,phase)`,{T:{sample:()=>0},sceneSeed:'rain-paint-fixture',g,W,H,hy:Math.min(H*.37,310),phase,reduced,weather:{status,intensity:.8,storm,slot:1},sceneSeason:'summer',world:{elapsed:0},p:{night},S:{mixHex:day=>day},paintRainCloud(){},rand:n=>((n*17)%101)/101,LandscapeSeasonal:{paint(){}},treeOrigins:[],geometry:{},line(_g,...args){if(args[4]==='#e4f2f6')streaks.push({args,alpha:g.globalAlpha});},ellipse(_g,...args){flakes.push({args,alpha:g.globalAlpha});}});
    return {streaks,flakes};
   };
   const day=draw(0,0),night=draw(1,0),twilight=draw(.5,0),base=Math.min(900,Math.ceil(Math.max(W/(storm?2.5:3),W*H/(storm?2200:3000))));
@@ -1244,7 +1245,7 @@ test('RISK rain density: phone tablet and short screens retain a dense bounded c
  for(const [W,H] of [[320,568],[390,844],[568,320],[768,1024],[1440,900]])for(const reduced of [false,true]){
   const draw=(storm,phase)=>{
    const streaks=[],g={save(){},restore(){},beginPath(){},moveTo(){},bezierCurveTo(){},closePath(){},fill(){},fillRect(){},createLinearGradient(){return {addColorStop(){}}}};
-   vm.runInNewContext(`${paint};paintWeatherOn(g,weather,phase)`,{g,W,H,hy:Math.min(H*.37,310),phase,reduced,weather:{status:storm?'thunderstorm':'rain',intensity:1,storm,slot:1},sceneSeason:'summer',world:{elapsed:0},p:{night:.7},S:{mixHex:day=>day},rand:n=>(Math.sin(n)+1)/2,LandscapeSeasonal:{paint(){}},treeOrigins:[],geometry:{},line(_g,...args){streaks.push(args)}});
+   vm.runInNewContext(`${paint};paintWeatherOn(g,weather,phase)`,{T:{sample:()=>0},sceneSeed:'rain-paint-fixture',g,W,H,hy:Math.min(H*.37,310),phase,reduced,weather:{status:storm?'thunderstorm':'rain',intensity:1,storm,slot:1},sceneSeason:'summer',world:{elapsed:0},p:{night:.7},S:{mixHex:day=>day},rand:n=>(Math.sin(n)+1)/2,LandscapeSeasonal:{paint(){}},treeOrigins:[],geometry:{},line(_g,...args){streaks.push(args)}});
    return streaks.filter(streak=>streak[4]==='#e4f2f6');
   };
   const rain=draw(false,0),storm=draw(true,0);
@@ -1285,7 +1286,7 @@ test('RISK rain reflection: removing mirrored rainfall preserves snow and the di
  const paint=source.slice(source.indexOf('  function paintWeatherOn('),source.indexOf('  function paintWoodland('));
  const draw=(status,storm)=>{
   const strokes=[],flakes=[],ctx={save(){},restore(){},beginPath(){},moveTo(){},bezierCurveTo(){},closePath(){},fill(){},fillRect(){},createLinearGradient(){return {addColorStop(){}}}};
-  vm.runInNewContext(`${paint};paintWeatherOn(ctx,weather,.14,false,false,false)`,{ctx,weather:{status,storm,intensity:1,slot:1},W:390,H:844,hy:300,reduced:false,sceneSeason:'winter',world:{elapsed:0},p:{night:0},S:{mixHex:day=>day},rand:()=>0,treeOrigins:[],geometry:{},LandscapeSeasonal:{paint(){}},line(_g,...args){strokes.push(args)},ellipse(_g,...args){flakes.push(args)}});
+  vm.runInNewContext(`${paint};paintWeatherOn(ctx,weather,.14,false,false,false)`,{T:{sample:()=>0},sceneSeed:'reflection-admitted-strike',ctx,weather:{status,storm,intensity:1,slot:1},W:390,H:844,hy:300,reduced:false,sceneSeason:'winter',world:{elapsed:0},p:{night:0},S:{mixHex:day=>day},rand:()=>0,treeOrigins:[],geometry:{},LandscapeSeasonal:{paint(){}},line(_g,...args){strokes.push(args)},ellipse(_g,...args){flakes.push(args)}});
   return {strokes,flakes};
  };
  assert.equal(draw('rain',false).strokes.length,0,'falling rain stays outside the mirror source');
@@ -20060,11 +20061,14 @@ test('RISK Landscape browser: both night shows reflect actual sparks and exposed
      }
      if(!patch)return {shows,lights:null};
      const readPatch=()=>Array.from(base.getImageData(...patch).data),difference=(a,b)=>a.reduce((n,v,i)=>n+Math.abs(v-b[i]),0);
-     const phase=Math.floor(T.sample(sceneSeed,'window-phase',windowKey)*1024),originalSlot=sceneSnapshot.windowsSlot;
-     const nextSlot=originalSlot+(phase-originalSlot%1024+1024)%1024;
-     sceneSnapshot.windowsSlot=nextSlot-1;paintBackground();const before=readPatch();
-     sceneSnapshot.windowsSlot=nextSlot;paintBackground();const after=readPatch();
-     sceneSnapshot.windowsSlot=nextSlot+1024;paintBackground();const restored=readPatch();sceneSnapshot.windowsSlot=originalSlot;
+     const originalSlot=sceneSnapshot.windowsSlot,slots=[originalSlot],initial=T.windowLit(sceneSeed,windowKey,originalSlot);
+     for(let slot=originalSlot+1;slot<originalSlot+20000&&slots.length<3;slot++){
+      const expected=slots.length===1?!initial:initial;
+      if(T.windowLit(sceneSeed,windowKey,slot)===expected)slots.push(slot);
+     }
+     sceneSnapshot.windowsSlot=slots[0];paintBackground();const before=readPatch();
+     sceneSnapshot.windowsSlot=slots[1];paintBackground();const after=readPatch();
+     sceneSnapshot.windowsSlot=slots[2];paintBackground();const restored=readPatch();sceneSnapshot.windowsSlot=originalSlot;
      return {shows,lights:{changed:difference(before,after),returned:difference(before,restored)}};
     };`);
    await route.fulfill({response,body});
@@ -22542,8 +22546,8 @@ test('RISK fireworks pair endpoints: zero and maximum seeded samples bound regul
    const has=age=>g.fireworks(start+age,.4,festival,event).some(d=>d.burst===burst+1);
    if(delay)assert.equal(has(delay-.000001),false,'maximum sample cannot ignite its partner early');
    assert.equal(has(delay+.000001),true,'zero and maximum delay launch at their exact bound');
-   const finaleAt=festival?97.5:56,rockets=g.fireworks(finaleAt+.001,.4,festival,event).filter(d=>d.finale);
-   assert.equal(new Set(rockets.map(d=>d.burst)).size,8,'finale lanes are simultaneous even at the maximum paired delay');
+   const finaleAt=festival?97.5:56,rockets=g.fireworks(finaleAt+.001,.4,festival,event).filter(d=>d.finale&&d.kind==='rocket');
+   assert.equal(new Set(rockets.map(d=>d.burst)).size,5,'closing crown ignition remains independent of the regular paired delay');
   }
  }
 });
@@ -22559,14 +22563,19 @@ test('RISK fireworks natural tails: final embers retain their complete formula l
  }
 });
 
-test('RISK fireworks reservations: shortening visibility preserves previously suppressed shows and visitor admissions',()=>{
- const current=sceneTimeline(),released=vm.createContext({Math,Date,console});
+test('RISK fireworks reservations: shortening visibility preserves historical visitors and current seeded rail admissions',()=>{
+ const current=sceneTimeline(),uncapped=sceneTimeline({'landscape-timeline.js':source=>{
+  assert.equal(source.split('Math.min(base,60)').length,2,'the isolated comparison changes only the display cap');
+  return source.replace('Math.min(base,60)','base');
+ }}),released=vm.createContext({Math,Date,console});
  for(const file of ['landscape-config.js','vendor/astronomy.min.js','stars.js','landscape-core.js','landscape-geometry.js','landscape-timeline.js'])vm.runInContext(spawnSync('git',['show','4d495cd58d9c6cc6f7d0bcb3812b7027a266d36a:'+file],{cwd:__dirname,encoding:'utf8'}).stdout,released);
- current.LandscapeConfig.setSpawnRates('| Event | Rate |\n| festival | 5 |');released.LandscapeConfig.setSpawnRates('| Event | Rate |\n| festival | 10 |');
- const options={seed:'reservation-cap',sunAt:()=>({altitude:-20,azimuth:0})},a=current.LandscapeTimeline.create(options),old=released.LandscapeTimeline.create(options);
+ const rates='| Event | Rate |\n| festival | 5 |';current.LandscapeConfig.setSpawnRates(rates);uncapped.LandscapeConfig.setSpawnRates(rates);released.LandscapeConfig.setSpawnRates('| Event | Rate |\n| festival | 10 |');
+ const options={seed:'reservation-cap',sunAt:()=>({altitude:-20,azimuth:0})},a=current.LandscapeTimeline.create(options),unclipped=uncapped.LandscapeTimeline.create(options),old=released.LandscapeTimeline.create(options);
  for(let seconds=3080;seconds<=3160;seconds+=10){
-  const ids=events=>Array.from(events,e=>e.id).sort();
-  assert.deepEqual(ids(a.at(seconds*1000).events),ids(old.at(seconds*1000).events.filter(e=>e.type!=='fireworks'||e.age<60)),'display cap cannot admit extra shows or resample other visitors');
+  const ids=events=>Array.from(events,e=>e.id).sort(),visible=events=>events.filter(e=>e.type!=='fireworks'||e.age<60),unchanged=events=>events.filter(e=>!['train','metro'].includes(e.type)),actual=a.at(seconds*1000).events;
+  assert.deepEqual(ids(actual),ids(visible(unclipped.at(seconds*1000).events)),'display cap cannot admit extra shows or resample any current visitors, including seeded-chance rails');
+  // Rail admission was explicitly changed; the historical oracle still protects every unchanged visitor.
+  assert.deepEqual(ids(unchanged(actual)),ids(unchanged(visible(old.at(seconds*1000).events))),'display cap preserves historical shows and unchanged visitor admissions');
  }
 });
 
@@ -22605,7 +22614,7 @@ test('RISK fireworks reduced deadline: static scheduler preserves a persistent b
 test('RISK fireworks cached guidance: installed spawn-rate prose matches the bounded display and its exact offline shell',()=>{
  const contract=appShellContract(serviceWorkerSource()),guidance=fs.readFileSync(path.join(__dirname,'SPAWN_RATES.md'),'utf8');
  assert.ok(contract.localPaths.includes('SPAWN_RATES.md'),'the installed guidance is an offline asset');
- assert.match(guidance,/visible[\s\S]*?finish within 60 seconds/);assert.match(guidance,/0–300 ms delay/);assert.match(guidance,/Eight simultaneous finale shells/);
+ assert.match(guidance,/visible[\s\S]*?finish within 60 seconds/);assert.match(guidance,/0–300 ms delay/);assert.match(guidance,/overlapping two-, three- and five-shell volleys/);assert.doesNotMatch(guidance,/simultaneous\s+eight-shell finale/,'barge guidance cannot retain the superseded choreography');
  assert.equal(contract.cacheName,'chain-scanner-shell-'+contract.fingerprint,'changed cached guidance must reach offline installations');
 });
 
@@ -23975,4 +23984,198 @@ test('RISK Quick start chapters: mounted help uses native named disclosures with
 
 test('RISK Quick start chapter layout: disclosure headings share the native summary line without extra margins',()=>{
  assert.match(html,/\.help-faq\s*>\s*summary\s*>\s*h3\s*\{[^}]*display\s*:\s*inline\s*;[^}]*margin\s*:\s*0\s*[;}]/,'chapter heading and disclosure marker stay together');
+});
+
+
+// A staged finale must be observable through emitted shells, not scheduling metadata.
+test('RISK fireworks crescendo: finale emits distinct overlapping volleys and a wider closing crown',()=>{
+ const context=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),context);
+ for(const [width,height] of [[390,844],[768,1024],[1440,900],[568,320]])for(const festival of [false,true]){
+ const duration=festival?150:60,g=context.LandscapeGeometry.create(width,height),event={duration,seed:.4},starts=new Map();
+ let overlap=false,peak=0;
+ for(let step=1;step<duration*50;step++){
+  const age=step/50,dots=g.fireworks(age,.4,festival,event),finale=dots.filter(d=>d.finale);
+  peak=Math.max(peak,dots.length);
+  for(const dot of finale)if(!starts.has(dot.burst))starts.set(dot.burst,{age,x:dot.x});
+  if(finale.some(d=>d.kind==='rocket')&&finale.some(d=>d.kind==='spark'))overlap=true;
+ }
+ const groups=new Map();for(const shell of starts.values()){const key=shell.age.toFixed(2);if(!groups.has(key))groups.set(key,[]);groups.get(key).push(shell.x);}
+ const volleys=[...groups.values()];
+ assert.ok(volleys.length>=3,'a real crescendo needs at least three distinct ignition times; current single eight-shell volley cannot satisfy it');
+ assert.ok(overlap,'later finale ascents overlap earlier blooms');
+ assert.ok(volleys.at(-1).length>volleys[0].length,'closing crown fires more shells than the opening volley');
+ const span=xs=>Math.max(...xs)-Math.min(...xs);
+ assert.ok(span(volleys.at(-1))>span(volleys[0]),'closing crown expands sky coverage');
+ assert.ok(peak<=320,'overlapping choreography retains the existing active particle cap');
+ assert.equal(g.fireworks(duration,.4,festival,event).length,0,'all tails finish within the standalone cap or barge crossing');
+ }
+});
+
+ test('RISK fireworks crescendo FAQ: scenery help explains widening finale and existing motion limits',()=>{
+ const help=html.slice(html.indexOf('function openHelp'),html.indexOf('function openInstallHelp'));
+ assert.match(help,/overlapping volleys[\s\S]*wider closing crown/);
+ assert.match(help,/Reduced motion keeps scenery still/);
+ });
+
+
+test('RISK seeded trigger admissions: actual UTC rail consumer admits chance gaps with preserved mean and track capacity',()=>{
+ const c=sceneTimeline(),T=c.LandscapeTimeline,C=c.LandscapeConfig,seed='chance-rails',options={seed,sunAt:()=>({altitude:-20,azimuth:0})};
+ const a=T.create(options),b=T.create(options);
+ for(const type of ['train','metro']){
+  const maximum=C.rail[type].duration/.82,interval=Math.ceil(maximum*1000)/1000,period=maximum+C.rail[type].gap/C.spawnRate(type),chance=interval/period;let admitted=0;
+  for(let slot=20000;slot<20512;slot++){
+   const at=Math.ceil(slot*interval*1000)+1,expected=T.sample(seed,`${type}-admission`,slot)<chance;
+   const scene=a.at(at),match=scene.events.find(e=>e.id===`${type}:${slot}`);
+   assert.equal(!!match,expected,`${type} slot ${slot}: actual admission must follow the seeded roll, including rejected opportunities`);
+   assert.ok(scene.events.filter(e=>e.type===type).length<=1,'one vehicle per track');
+   assert.deepEqual(JSON.parse(JSON.stringify(scene)),JSON.parse(JSON.stringify(b.at(at))),'fresh/reloaded consumer agrees');
+   if(match)admitted++;
+  }
+  assert.ok(admitted>512*(chance-.06)&&admitted<512*(chance+.06),'bounded sample retains expected average frequency');
+ }
+ C.setSpawnRates('| train | 0 |\n| metro | 0 |');
+ assert.ok(!T.create(options).at(1585366000).events.some(e=>['train','metro'].includes(e.type)),'zero rates disable both tracks');
+});
+
+test('RISK seeded trigger windows: actual light consumer uses independent state draws and can retain state across opportunities',()=>{
+ const T=sceneTimeline().LandscapeTimeline,seed='chance-window',index='42:1:3',q=.5,interval=1024*2*q*(1-q),phase=T.sample(seed,'window-phase',index)*interval;
+ let changed=0,held=0,lit=0;
+ for(let opportunity=2000;opportunity<2512;opportunity++){
+  const slot=Math.ceil(phase+opportunity*interval),expected=T.sample(seed,`window:${index}`,opportunity)>.5;
+  const actual=T.windowLit(seed,index,slot);
+  assert.equal(actual,expected,'paint consumer state comes from this opportunity, not compulsory parity');
+  assert.equal(T.windowLit(seed,index,slot+.1),actual,'no frame-cadence roll');
+  const prior=T.windowLit(seed,index,Math.floor(phase+opportunity*interval)-1);
+  actual===prior?held++:changed++;if(actual)lit++;
+ }
+ assert.ok(held>180&&changed>180,'independent opportunities allow both changes and unchanged windows');
+ assert.ok(lit>512*.42&&lit<512*.58,'existing seeded lit fraction is retained');
+});
+
+function chanceWeatherPaint(source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8')){
+ const start=source.indexOf('  function paintWeatherOn('),end=source.indexOf('\n  function paintRainCloud(',start),c=sceneTimeline(),strokes=[];
+ const context=vm.createContext({T:c.LandscapeTimeline,sceneSeed:'chance-bolts',Math,W:390,H:844,hy:410,p:{night:1},world:{elapsed:0},sceneSeason:'summer',treeOrigins:[],geometry:{},reduced:false,
+  LandscapeSeasonal:{paint(){}},document:{documentElement:{dataset:{}}},rand:()=>.2,paintRainCloud(){},ellipse(){},line(...args){strokes.push(args);}});
+ vm.runInContext(source.slice(start,end),context);
+ const ctx={save(){},restore(){},createLinearGradient(){return {addColorStop(){}};},fillRect(){}};
+ return {context,strokes,paint(weather,phase){strokes.length=0;context.paintWeatherOn(ctx,weather,phase,false,false,false);return strokes.length;}};
+}
+
+test('RISK seeded trigger lightning: actual storm painter rejects strikes and preserves short bolts snow and reduced motion guards',()=>{
+ const fixture=chanceWeatherPaint(),{context,paint}=fixture,T=context.T,weather={slot:777,status:'thunderstorm',storm:true,intensity:1};let strikes=0,misses=0;
+ const offset=T.sample(context.sceneSeed,'lightning-phase',weather.slot)*23.5;
+ for(let slot=100;slot<132;slot++){
+  const phase=slot*23.5-offset+.14,expected=T.sample(context.sceneSeed,'lightning',weather.slot,slot)<.5;
+  assert.equal(paint(weather,phase),expected?3:0,'actual three-segment bolt obeys admission draw');
+  expected?strikes++:misses++;
+  assert.equal(paint(weather,phase+.3),0,'bolt cannot survive beyond its .28-second lifetime');
+  context.reduced=true;assert.equal(paint(weather,phase),0,'reduced motion excludes lightning');context.reduced=false;
+  assert.equal(paint({...weather,status:'snowstorm'},phase),0,'snowstorms exclude lightning');
+  assert.equal(paint({...weather,storm:false,status:'rain'},phase),0,'rain alone cannot strike');
+ }
+ assert.ok(strikes&&misses,'both accepted and rejected opportunities observed');
+});
+
+function sharedSkywriterConsumer(seen=false,empty=false,source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8')){
+ const mood=moodRuntime();mood.setHumanText(empty?'## Skywriters':'## Skywriters\n- HELLO');if(seen)mood.recordSeen('HELLO');
+ const event={id:'arrival:123',type:'skywriter',age:35,duration:70,seed:.4,lane:.3,reverse:false},flights=[];
+ const start=source.indexOf('  function syncScene('),end=source.indexOf('\n  function advanceRooftopParty(',start);
+ const context=vm.createContext({LandscapeMood:mood,globalThis:{LivingLocation:{current:()=>null}},S:{readSceneTime:()=>null,readSceneSeason:()=>null},sceneStorage:{},sceneSeason:'summer',timelineKey:'["summer",null,null,null]',
+  timeline:{at:()=>({elapsed:123,events:[{...event}],woodland:[],party:null,clocktower:null})},world:{events:[]},woodland:{},rooftopRoofs:[],rooftopParty:{},clocktowerVisit:{},Intl,Date,Math});
+ vm.runInContext(source.slice(start,end),context);context.syncScene(123000);const selected=context.world.events[0];
+ const branch=source.slice(source.indexOf("    if(e.type==='skywriter'){"),source.indexOf("    if(e.type==='banner'){"));
+ const paint=vm.createContext({e:selected,reduced:false,f:.5,x:100,hy:410,W:390,dir:1,t:123,p:{night:0},S:{smooth:()=>0},g:{save(){},restore(){},translate(){},scale(){},beginPath(){},moveTo(){},lineTo(){},stroke(){},rotate(){}},visibleBanners:[],airplane(...args){flights.push(args);},LandscapeSkywriter:{wordPath:word=>word?{width:100}:null,trace:()=>({segments:[],x:10,y:10,angle:0,complete:false})}});
+ vm.runInContext(`(function(){${branch}})()`,paint);
+ return {selected,flights,context,paintContext:paint,paintSource:branch};
+}
+
+test('RISK seeded trigger skywriters: actual snapshot and painter preserve visibility across reading history and missing private copy',()=>{
+ const fresh=sharedSkywriterConsumer(),read=sharedSkywriterConsumer(true),empty=sharedSkywriterConsumer(false,true);
+ assert.equal(fresh.flights.length,1,'admitted flight is painted');
+ assert.equal(read.selected.skywriterWord,fresh.selected.skywriterWord,'read history cannot select different shared smoke geometry');
+ assert.equal(read.flights.length,1,'local history cannot suppress the admitted flight');
+ assert.equal(empty.selected.skywriterWord,'','missing private copy creates no fallback words');
+ assert.equal(empty.flights.length,1,'missing words still paint the admitted aircraft');
+ read.context.syncScene(123000);assert.equal(read.context.world.events[0].skywriterWord,fresh.selected.skywriterWord,'repeated consumer reconstruction is stable');
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),broken=source.replace("LandscapeMood.skywriterMessage(e.seed,{shared:true})","LandscapeMood.skywriterMessage(e.seed)");
+ assert.notEqual(sharedSkywriterConsumer(true,false,broken).selected.skywriterWord,fresh.selected.skywriterWord,'broken actual-consumer negative control restores history divergence');
+});
+
+
+test('RISK seeded trigger negative controls: bypassed actual admissions compulsory window parity and periodic bolts are detected',()=>{
+ const seed='chance-rails',options={seed,sunAt:()=>({altitude:-20,azimuth:0})},good=sceneTimeline(),broken=sceneTimeline({'landscape-timeline.js':source=>source.replace('if(sample(seed,`${type}-admission`,slot)>=chance)continue;','')});
+ const type='train',maximum=good.LandscapeConfig.rail[type].duration/.82,interval=Math.ceil(maximum*1000)/1000,chance=interval/(maximum+good.LandscapeConfig.rail[type].gap);let rejected;
+ for(let slot=20000;slot<20100;slot++)if(good.LandscapeTimeline.sample(seed,`${type}-admission`,slot)>=chance){rejected=slot;break;}
+ assert.ok(rejected);const at=Math.ceil(rejected*interval*1000)+1;
+ assert.equal(good.LandscapeTimeline.create(options).at(at).events.some(e=>e.id===`${type}:${rejected}`),false);
+ assert.equal(broken.LandscapeTimeline.create(options).at(at).events.some(e=>e.id===`${type}:${rejected}`),true,'removing actual admission restores the forbidden guaranteed visitor');
+ const parity=sceneTimeline({'landscape-timeline.js':source=>source.replace(/return sample\(seed,`window:\$\{index\}`,Math.floor\(\(slot-phase\)\/interval\)\)>\.5;/,'return !!(Math.floor((slot-phase)/interval)&1);')});
+ assert.ok(Array.from({length:32},(_,i)=>i*500).some(slot=>good.LandscapeTimeline.windowLit(seed,'42:1:3',slot)!==parity.LandscapeTimeline.windowLit(seed,'42:1:3',slot)),'compulsory parity fails independent sampled state');
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),goodPaint=chanceWeatherPaint(),badPaint=chanceWeatherPaint(source.replace("&&T.sample(sceneSeed,'lightning',weather.slot,strikeSlot)<.5",'')),weather={slot:777,status:'thunderstorm',storm:true,intensity:1};
+ let miss;for(let slot=100;slot<132;slot++)if(goodPaint.context.T.sample('chance-bolts','lightning',777,slot)>=.5){miss=slot;break;}
+ const phase=miss*23.5-goodPaint.context.T.sample('chance-bolts','lightning-phase',777)*23.5+.14;
+ assert.equal(goodPaint.paint(weather,phase),0);assert.equal(badPaint.paint(weather,phase),3,'removing actual strike admission restores compulsory lightning');
+});
+
+test('RISK seeded trigger FAQ: extended help explains shared chance visits and history-independent skywriter visibility without private sync',()=>{
+ const start=html.indexOf('<dt>How do I change the scenery?</dt>'),end=html.indexOf('<dt>',start+5),entry=html.slice(start,end);
+ assert.match(entry,/same shared seed.*matching clocks and sky settings/i);
+ assert.match(entry,/chance.*trains.*windows.*lightning/i);
+ assert.match(entry,/Skywriter flights.*reading history/i);
+ assert.match(entry,/no valid human word.*plane/i);
+ assert.match(entry,/reading history stays on this device/i);
+ const current=html.slice(html.indexOf('<template id="appChangelogCurrent">'),html.indexOf('<template id="appChangelog">'));
+ assert.match(current,/Skywriter flights stay visible after you read their words/,'history suppression is a synchronization bug and must be reported');
+});
+
+test('RISK seeded trigger precision: rail lifetime rounding cannot overlap at an exact successor millisecond',()=>{
+ const c=sceneTimeline(),T=c.LandscapeTimeline,options={seed:T.DEFAULT_SEED,sunAt:()=>({altitude:-20,azimuth:0})},timeline=T.create(options);
+ const historicalBoundary=1278108536585;
+ assert.ok(timeline.at(historicalBoundary).events.filter(e=>e.type==='metro').length<=1,'proven default-seed successor boundary cannot paint two metros for one millisecond');
+ for(const type of ['train','metro']){
+  const interval=Math.ceil(c.LandscapeConfig.rail[type].duration/.82*1000)/1000;
+  for(const slot of [20960979,20960980]){
+   const at=Math.round(slot*interval*1000),events=timeline.at(at).events.filter(e=>e.type===type);
+   assert.ok(events.length<=1,'exact rounded successor stays within track capacity');
+   for(const e of events)assert.ok(e.age<e.duration,'rounded lifetime retires before successor');
+  }
+ }
+});
+
+test('RISK seeded trigger precision: chance window states retain the former fifty-percent long-run occupancy',()=>{
+ const T=sceneTimeline().LandscapeTimeline,seed='chance-window',index='42:1:3',interval=512,phase=T.sample(seed,'window-phase',index)*interval;
+ for(let opportunity=2000;opportunity<2032;opportunity++){
+  const slot=Math.ceil(phase+opportunity*interval);
+  assert.equal(T.windowLit(seed,index,slot),T.sample(seed,`window:${index}`,opportunity)>.5,'former alternating parity is half lit over time, not its initial58percent sample');
+ }
+});
+
+test('RISK seeded trigger cold copy: actual current-flight consumer adopts the loaded human bank without rereading or waiting for another event',()=>{
+ const cold=sharedSkywriterConsumer(false,true),warm=sharedSkywriterConsumer();
+ assert.equal(cold.selected.skywriterWord,'','pending bank has no invented words');
+ cold.context.LandscapeMood.setHumanText('## Skywriters\n- HELLO');cold.context.syncScene(123000);
+ assert.equal(cold.context.world.events[0].skywriterWord,warm.selected.skywriterWord,'cold and warm clients with the same loaded bank select the same current-flight smoke');
+ cold.context.LandscapeMood.recordSeen('HELLO');cold.context.syncScene(123000);
+ assert.equal(cold.context.world.events[0].skywriterWord,'HELLO','subsequent local reads cannot change loaded smoke');
+ cold.context.LandscapeMood.setHumanText('## Skywriters');cold.context.syncScene(123000);
+ assert.equal(cold.context.world.events[0].skywriterWord,'','removing local copy cannot retain stale wording in the active memo');
+});
+
+
+test('RISK seeded trigger reading preservation: actual word replacement and trusted observer do not inherit stale read flags',()=>{
+ const flight=sharedSkywriterConsumer(),old=flight.context.world.events[0];
+ old.bannerText='HELLO';old.textSeen=true;old.skywriterPath={width:100};
+ flight.context.LandscapeMood.recordSeen('HELLO');flight.context.LandscapeMood.setHumanText('## Skywriters\n- WORLD');flight.context.syncScene(123000);
+ const next=flight.context.world.events[0],paint=flight.paintContext;paint.e=next;paint.f=.75;
+ paint.LandscapeSkywriter.trace=()=>({segments:[],x:10,y:10,angle:0,complete:true});
+ vm.runInContext(`(function(){${flight.paintSource}})()`,paint);
+ assert.equal(next.bannerText,'WORLD','actual completed smoke registers its new wording');
+ assert.equal(flight.context.LandscapeMood.skywriterMessage(0),'WORLD','new word was not read by merely loading or painting it');
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),start=source.indexOf('  function observeSceneInteraction('),end=source.indexOf('\n  for(const type',start);
+ Object.assign(flight.context,{currentEntry:null,visibleBanners:paint.visibleBanners,document:{hidden:false,hasFocus:()=>true},scenePointVisible:()=>true});
+ vm.runInContext(source.slice(start,end),flight.context);flight.context.observeSceneInteraction({isTrusted:false});
+ assert.equal(flight.context.LandscapeMood.skywriterMessage(0),'WORLD','synthetic interactions cannot read the new word');
+ flight.context.observeSceneInteraction({isTrusted:true});
+ assert.equal(flight.context.LandscapeMood.skywriterMessage(0),'','trusted visible interaction must record the new word despite the old word read flag');
+ assert.equal(next.textSeen,true);flight.context.syncScene(123000);assert.equal(flight.context.world.events[0].textSeen,true,'unchanged word retains its valid seen memo');
 });

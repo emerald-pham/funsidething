@@ -677,9 +677,11 @@
       const start=atFestival?8:0,interval=atFestival?3.8:2.1,shellLife=1+.075+2.7,pairLife=shellLife+.3;
       // Finish the barge display while its launchers are still on screen.
       // Reserve the full flight and bloom lifetime before the standalone limit or crossing-relative barge finale.
-      // Include the maximum paired delay when clearing regular shells before
-      // the finale, so all eight lanes retain the fixed particle budget.
-      const finaleAt=atFestival?Math.min(visitDuration*.65,duration-shellLife):duration-4;
+      // Widen from a mirrored pair to three positions, then a five-shell crown.
+      // The opening pair expires before the crown blooms: overlapping volleys
+      // retain the eight-shell paint budget and the complete natural ember tails.
+      const crownAt=atFestival?Math.min(visitDuration*.65,duration-shellLife):duration-4;
+      const finaleAt=crownAt-3.35;
       const count=Math.max(0,Math.floor((finaleAt-pairLife-start)/interval)+1);
       // Only shells still in flight need geometry, through the final fade.
       const first=Math.max(0,Math.floor((age-start-pairLife)/interval)+1),last=Math.min(count-1,Math.floor((age-start)/interval)),shells=[];
@@ -692,13 +694,18 @@
         return ((hash^(hash>>>16))>>>0)/4294967296*.3;
       };
       for(let wave=first;wave<=last;wave++)for(let lane=0;lane<2;lane++)shells.push({launch:start+wave*interval+(lane?pairDelay(wave):0),burst:wave*2+lane,wave,lane,finale:false});
-      if(age>=finaleAt&&age<finaleAt+shellLife)for(let lane=0;lane<8;lane++)shells.push({launch:finaleAt,burst:count*2+lane,wave:count,lane,finale:true});
+      const volleys=[{delay:0,positions:[.35,.65]},{delay:2,positions:[.25,.5,.75]},{delay:3.35,positions:[.15,.325,.5,.675,.85]}];
+      let finaleShell=0;
+      for(const volley of volleys)for(const position of volley.positions){
+        const lane=finaleShell++,launch=finaleAt+volley.delay;
+        if(age>=launch&&age<launch+shellLife)shells.push({launch,burst:count*2+lane,wave:count,lane,finale:true,position});
+      }
       for(const shell of shells){
-        const {launch,burst,wave,lane,finale}=shell,time=age-launch;
+        const {launch,burst,wave,lane,finale,position}=shell,time=age-launch;
         if(time<=0||time>=shellLife)continue;
         const deck=atFestival?festival({...event,age:event.fireworkDeckAge??launch}):null;
         const originX=deck?deck.x+((wave+lane)%2?1:-1)*deck.launcherOffset
-          :finale?W*(.15+lane*.10):W*(.25+seed*.3+(wave%3)*.13+lane*.07);
+          :finale?W*position:W*(.25+seed*.3+(wave%3)*.13+lane*.07);
         if(originX<3||originX>W-3)continue;
         const launchY=deck?deck.y-deck.height*.10:waterTop-2;
         // Waterfront bursts retain visible mirrored sparks. Each shell takes
@@ -708,9 +715,12 @@
         // enough to mirror visible sparks after the launch deck shrinks.
         const rise=Math.max(10,Math.min(horizon*.6,(far(originX)-waterTop)*1.05));
         const cy=waterTop-rise,vx=deck?.velocity||0;
+        // Barge shells fan from real launchers; standalone shells use the same
+        // positions directly. Regular flights keep their original trajectory.
+        const fan=deck&&finale?Math.max(56,Math.min(W-56,W*position))-originX-vx:0;
         const drift=t=>vx*(t<1?t:1+.4*(1-Math.exp(-(t-1)*.9)));
         if(time<1){
-          const flight=t=>({x:originX+drift(t),y:launchY+(cy-launchY)*(1-(1-t)**2)});
+          const flight=t=>({x:originX+drift(t)+fan*(1-(1-t)**2),y:launchY+(cy-launchY)*(1-(1-t)**2)});
           const tip=flight(time),tail=flight(Math.max(0,time-.13));
           dots.push({kind:'rocket',...tip,tailX:tail.x,tailY:tail.y,alpha:Math.min(1,time/.25)*Math.min(1,(1-time)/.16),burst,finale});
           continue;
@@ -723,7 +733,7 @@
           const angle=i*Math.PI/20+seed*6+(noise-.5)*.11,speed=radius*(.48+.52*noise);
           const position=at=>{
             const travel=speed*(1-Math.exp(-at*1.55));
-            return {x:originX+drift(1+at+lag)+Math.cos(angle)*travel,
+            return {x:originX+drift(1+at+lag)+fan+Math.cos(angle)*travel,
               y:Math.min(launchY-1,cy+Math.sin(angle)*travel*(willow?.8:1)+at*at*(willow?5:3))};
           };
           const alpha=Math.min(1,age/.2)*(1-age/life)**1.25,tip=position(age),trail=[];
