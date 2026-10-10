@@ -888,11 +888,17 @@
       }
     }
     // An occasional distant bolt, never a full-screen flash or a reduced-motion effect.
-    const flash=(phase+rand(weather.slot)*40)%47;
-    if(storm&&!snow&&!reduced&&flash<.28){
-      ctx.globalAlpha=weather.intensity*Math.sin(flash/.28*Math.PI)*.6;
-      const x=W*(.15+rand(Math.floor(phase/47))* .7),y=hy*.13;
-      line(ctx,x,y,x-5,y+12,'#fff4d1',1);line(ctx,x-5,y+12,x+2,y+10,'#fff4d1',1);line(ctx,x+2,y+10,x-6,y+24,'#fff4d1',1);
+    // Half-length opportunities with a 50% roll preserve the former 47s
+    // mean spacing. The episode/UTC phase and admission are pure shared draws,
+    // so a missed frame, reload, or private reading history cannot reroll it.
+    if(storm&&!snow&&!reduced){
+      const strikeClock=phase+T.sample(sceneSeed,'lightning-phase',weather.slot)*23.5;
+      const strikeSlot=Math.floor(strikeClock/23.5),flash=strikeClock-strikeSlot*23.5;
+      if(flash<.28&&T.sample(sceneSeed,'lightning',weather.slot,strikeSlot)<.5){
+        ctx.globalAlpha=weather.intensity*Math.sin(flash/.28*Math.PI)*.6;
+        const x=W*(.15+T.sample(sceneSeed,'lightning-position',weather.slot,strikeSlot)* .7),y=hy*.13;
+        line(ctx,x,y,x-5,y+12,'#fff4d1',1);line(ctx,x-5,y+12,x+2,y+10,'#fff4d1',1);line(ctx,x+2,y+10,x-6,y+24,'#fff4d1',1);
+      }
     }
     ctx.restore();
   }
@@ -1299,7 +1305,11 @@
       }return true;
     }
     if(e.type==='skywriter'){
-      if(!e.skywriterWord)return true;
+      if(!e.skywriterWord){
+        // An admitted flight remains visible even when this browser has no
+        // valid human word. Never invent wording or sync private reading data.
+        airplane(x,hy*(.16+e.lane*.16),e.reverse?-1:1,e.seed,t,true);return true;
+      }
       const drawing=e.skywriterPath ||= LandscapeSkywriter.wordPath(e.skywriterWord);
       if(!drawing)return true;
       // Reduced motion presents the completed word. Normal motion follows every
@@ -1406,7 +1416,7 @@
     world.events=sceneSnapshot.events.map(e=>{
       const previous=retained.get(e.id);
       for(const field of ['bannerText','textSeen','skywriterWord','skywriterPath'])if(previous?.[field]!==undefined)e[field]=previous[field];
-      if(e.type==='skywriter'&&e.skywriterWord===undefined)e.skywriterWord=LandscapeMood.skywriterMessage(e.seed);
+      if(e.type==='skywriter'&&e.skywriterWord===undefined)e.skywriterWord=LandscapeMood.skywriterMessage(e.seed,{shared:true});
       return e;
     });
     woodland.events=sceneSnapshot.woodland;

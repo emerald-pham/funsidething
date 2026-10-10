@@ -1,5 +1,49 @@
 [
   {
+    "reason": "User explicitly replaces guaranteed periodic admissions with seeded chance and requires history-independent shared flight visibility, preserving mean frequency and privacy.",
+    "previousBehavior": "Rails are compulsory periodic arrivals, windows use compulsory parity and storm bolts recur each47s; local read history can suppress a skywriter.",
+    "intendedBehavior": "Independent pure seeded opportunities preserve mean frequencies and limits while permitting indefinite chance gaps; shared skywriters ignore reading history and empty human banks retain aircraft without invented words.",
+    "replacementTests": [
+      "RISK seeded trigger admissions: actual UTC rail consumer admits chance gaps with preserved mean and track capacity",
+      "RISK seeded trigger windows: actual light consumer uses independent state draws and can retain state across opportunities",
+      "RISK seeded trigger lightning: actual storm painter rejects strikes and preserves short bolts snow and reduced motion guards",
+      "RISK seeded trigger skywriters: actual snapshot and painter preserve visibility across reading history and missing private copy",
+      "RISK seeded trigger negative controls: bypassed actual admissions compulsory window parity and periodic bolts are detected",
+      "RISK seeded trigger FAQ: extended help explains shared chance visits and history-independent skywriter visibility without private sync"
+    ],
+    "preservedCoverage": [
+      "Existing rail capacity and lifetime, twilight fireworks scheduling, cloud/data isolation, reduced motion, finite weather, local nonrepeat messages and offline shell contracts retained.",
+      "Existing bolt-reflection test now pins an accepted deterministic strike fixture; browser window pixel test locates actual chance transitions rather than demanding periodic parity, preserving visible change and restored color assertions."
+    ],
+    "redEvidence": {
+      "command": "NODE_PATH=/Users/emeraldpham/Documents/GitHub/funsidething/node_modules node --test --test-name-pattern='RISK seeded trigger' tests.js",
+      "failure": "Four contemporaneous consumer REDs before implementation in /tmp/fireworks-trigger-red-qualified.log: rail seeded opportunity mismatch, independent window state mismatch, actual three-segment bolt mismatch, and read history changes HELLO to empty. Initial skywriter fixture used wrong setHumanText API and was corrected before implementation; preserve initial log. FAQ RED separately /tmp/fireworks-trigger-faq-red.log. Negative controls are postimplementation mutations, not claimed preimplementation RED."
+    },
+    "testChangesSha256": "012bb0ab5bfd6fc35ac27d285880d49c8f0ecfebbe258971fad7c740de6e6e3b"
+  },
+  {
+    "reason": "User explicitly replaces guaranteed periodic admissions with seeded chance and requires history-independent shared flight visibility, preserving mean frequency and privacy. Combined release also retains the separately test-first layered finale commits and their observed REDs.",
+    "previousBehavior": "Rails are compulsory periodic arrivals, windows use compulsory parity and storm bolts recur each47s; local read history can suppress a skywriter.",
+    "intendedBehavior": "Independent pure seeded opportunities preserve mean frequencies and limits while permitting indefinite chance gaps; shared skywriters ignore reading history and empty human banks retain aircraft without invented words.",
+    "replacementTests": [
+      "RISK seeded trigger admissions: actual UTC rail consumer admits chance gaps with preserved mean and track capacity",
+      "RISK seeded trigger windows: actual light consumer uses independent state draws and can retain state across opportunities",
+      "RISK seeded trigger lightning: actual storm painter rejects strikes and preserves short bolts snow and reduced motion guards",
+      "RISK seeded trigger skywriters: actual snapshot and painter preserve visibility across reading history and missing private copy",
+      "RISK seeded trigger negative controls: bypassed actual admissions compulsory window parity and periodic bolts are detected",
+      "RISK seeded trigger FAQ: extended help explains shared chance visits and history-independent skywriter visibility without private sync"
+    ],
+    "preservedCoverage": [
+      "Existing rail capacity and lifetime, twilight fireworks scheduling, cloud/data isolation, reduced motion, finite weather, local nonrepeat messages and offline shell contracts retained.",
+      "Existing bolt-reflection test now pins an accepted deterministic strike fixture; browser window pixel test locates actual chance transitions rather than demanding periodic parity, preserving visible change and restored color assertions."
+    ],
+    "redEvidence": {
+      "command": "NODE_PATH=/Users/emeraldpham/Documents/GitHub/funsidething/node_modules node --test --test-name-pattern='RISK seeded trigger' tests.js",
+      "failure": "Four contemporaneous consumer REDs before implementation in /tmp/fireworks-trigger-red-qualified.log: rail seeded opportunity mismatch, independent window state mismatch, actual three-segment bolt mismatch, and read history changes HELLO to empty. Initial skywriter fixture used wrong setHumanText API and was corrected before implementation; preserve initial log. FAQ RED separately /tmp/fireworks-trigger-faq-red.log. Negative controls are postimplementation mutations, not claimed preimplementation RED. Finale chronology retained in /tmp/fireworks-crescendo-red.log and /tmp/fireworks-faq-red.log, before commits2693413 and23ec229."
+    },
+    "testChangesSha256": "8a9f18c3e92e32803e7c97be22c1ebcca500e54f42a9236aef07e9394734701c"
+  },
+  {
     "testChangesSha256": "32d787d17603d86dc926dad1d53bf70ccd93d0983ae86b4a3523b3dd3e1edca6",
     "reason": "User explicitly requests a real-world inspired overlapping widening finale; replace only the historical single-volley finale expectation while retaining regular-pair endpoints and natural lifetime protections.",
     "previousBehavior": "Eight finale shells ignite simultaneously with no staged crescendo; help and installed guidance describe that former choreography.",

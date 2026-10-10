@@ -846,11 +846,12 @@ const HTML_PATH = path.join(__dirname, "index.html");
 const html = fs.readFileSync(HTML_PATH, "utf8");
 const lzStringSrc = fs.readFileSync(path.join(__dirname, "vendor/lz-string-1.5.0.min.js"), "utf8");
 
-function sceneTimeline() {
+function sceneTimeline(transforms={}) {
  const context=vm.createContext({Date,Math,Intl,console});
  for(const file of ['landscape-config.js','vendor/astronomy.min.js','stars.js','landscape-core.js','landscape-geometry.js','landscape-timeline.js']){
   assert.ok(fs.existsSync(path.join(__dirname,file)),`deterministic scenery module missing: ${file}`);
-  vm.runInContext(fs.readFileSync(path.join(__dirname,file),'utf8'),context);
+  const source=fs.readFileSync(path.join(__dirname,file),'utf8');
+  vm.runInContext(transforms[file]?transforms[file](source):source,context);
  }
  return context;
 }
@@ -1215,7 +1216,7 @@ test('RISK rain intensity: day and night double velocity halve opacity and only 
  for(const [W,H] of [[320,568],[390,844],[568,320],[768,1024],[1440,900],[3840,2160]])for(const storm of [false,true])for(const reduced of [false,true]){
   const draw=(night,phase,status=storm?'thunderstorm':'rain')=>{
    const streaks=[],flakes=[],g={save(){},restore(){},beginPath(){},moveTo(){},bezierCurveTo(){},closePath(){},fill(){},fillRect(){},createLinearGradient(){return {addColorStop(){}}}};
-   vm.runInNewContext(`${paint};paintWeatherOn(g,weather,phase)`,{g,W,H,hy:Math.min(H*.37,310),phase,reduced,weather:{status,intensity:.8,storm,slot:1},sceneSeason:'summer',world:{elapsed:0},p:{night},S:{mixHex:day=>day},paintRainCloud(){},rand:n=>((n*17)%101)/101,LandscapeSeasonal:{paint(){}},treeOrigins:[],geometry:{},line(_g,...args){if(args[4]==='#e4f2f6')streaks.push({args,alpha:g.globalAlpha});},ellipse(_g,...args){flakes.push({args,alpha:g.globalAlpha});}});
+   vm.runInNewContext(`${paint};paintWeatherOn(g,weather,phase)`,{T:{sample:()=>0},sceneSeed:'rain-paint-fixture',g,W,H,hy:Math.min(H*.37,310),phase,reduced,weather:{status,intensity:.8,storm,slot:1},sceneSeason:'summer',world:{elapsed:0},p:{night},S:{mixHex:day=>day},paintRainCloud(){},rand:n=>((n*17)%101)/101,LandscapeSeasonal:{paint(){}},treeOrigins:[],geometry:{},line(_g,...args){if(args[4]==='#e4f2f6')streaks.push({args,alpha:g.globalAlpha});},ellipse(_g,...args){flakes.push({args,alpha:g.globalAlpha});}});
    return {streaks,flakes};
   };
   const day=draw(0,0),night=draw(1,0),twilight=draw(.5,0),base=Math.min(900,Math.ceil(Math.max(W/(storm?2.5:3),W*H/(storm?2200:3000))));
@@ -1244,7 +1245,7 @@ test('RISK rain density: phone tablet and short screens retain a dense bounded c
  for(const [W,H] of [[320,568],[390,844],[568,320],[768,1024],[1440,900]])for(const reduced of [false,true]){
   const draw=(storm,phase)=>{
    const streaks=[],g={save(){},restore(){},beginPath(){},moveTo(){},bezierCurveTo(){},closePath(){},fill(){},fillRect(){},createLinearGradient(){return {addColorStop(){}}}};
-   vm.runInNewContext(`${paint};paintWeatherOn(g,weather,phase)`,{g,W,H,hy:Math.min(H*.37,310),phase,reduced,weather:{status:storm?'thunderstorm':'rain',intensity:1,storm,slot:1},sceneSeason:'summer',world:{elapsed:0},p:{night:.7},S:{mixHex:day=>day},rand:n=>(Math.sin(n)+1)/2,LandscapeSeasonal:{paint(){}},treeOrigins:[],geometry:{},line(_g,...args){streaks.push(args)}});
+   vm.runInNewContext(`${paint};paintWeatherOn(g,weather,phase)`,{T:{sample:()=>0},sceneSeed:'rain-paint-fixture',g,W,H,hy:Math.min(H*.37,310),phase,reduced,weather:{status:storm?'thunderstorm':'rain',intensity:1,storm,slot:1},sceneSeason:'summer',world:{elapsed:0},p:{night:.7},S:{mixHex:day=>day},rand:n=>(Math.sin(n)+1)/2,LandscapeSeasonal:{paint(){}},treeOrigins:[],geometry:{},line(_g,...args){streaks.push(args)}});
    return streaks.filter(streak=>streak[4]==='#e4f2f6');
   };
   const rain=draw(false,0),storm=draw(true,0);
@@ -1285,7 +1286,7 @@ test('RISK rain reflection: removing mirrored rainfall preserves snow and the di
  const paint=source.slice(source.indexOf('  function paintWeatherOn('),source.indexOf('  function paintWoodland('));
  const draw=(status,storm)=>{
   const strokes=[],flakes=[],ctx={save(){},restore(){},beginPath(){},moveTo(){},bezierCurveTo(){},closePath(){},fill(){},fillRect(){},createLinearGradient(){return {addColorStop(){}}}};
-  vm.runInNewContext(`${paint};paintWeatherOn(ctx,weather,.14,false,false,false)`,{ctx,weather:{status,storm,intensity:1,slot:1},W:390,H:844,hy:300,reduced:false,sceneSeason:'winter',world:{elapsed:0},p:{night:0},S:{mixHex:day=>day},rand:()=>0,treeOrigins:[],geometry:{},LandscapeSeasonal:{paint(){}},line(_g,...args){strokes.push(args)},ellipse(_g,...args){flakes.push(args)}});
+  vm.runInNewContext(`${paint};paintWeatherOn(ctx,weather,.14,false,false,false)`,{T:{sample:()=>0},sceneSeed:'reflection-admitted-strike',ctx,weather:{status,storm,intensity:1,slot:1},W:390,H:844,hy:300,reduced:false,sceneSeason:'winter',world:{elapsed:0},p:{night:0},S:{mixHex:day=>day},rand:()=>0,treeOrigins:[],geometry:{},LandscapeSeasonal:{paint(){}},line(_g,...args){strokes.push(args)},ellipse(_g,...args){flakes.push(args)}});
   return {strokes,flakes};
  };
  assert.equal(draw('rain',false).strokes.length,0,'falling rain stays outside the mirror source');
@@ -20060,11 +20061,14 @@ test('RISK Landscape browser: both night shows reflect actual sparks and exposed
      }
      if(!patch)return {shows,lights:null};
      const readPatch=()=>Array.from(base.getImageData(...patch).data),difference=(a,b)=>a.reduce((n,v,i)=>n+Math.abs(v-b[i]),0);
-     const phase=Math.floor(T.sample(sceneSeed,'window-phase',windowKey)*1024),originalSlot=sceneSnapshot.windowsSlot;
-     const nextSlot=originalSlot+(phase-originalSlot%1024+1024)%1024;
-     sceneSnapshot.windowsSlot=nextSlot-1;paintBackground();const before=readPatch();
-     sceneSnapshot.windowsSlot=nextSlot;paintBackground();const after=readPatch();
-     sceneSnapshot.windowsSlot=nextSlot+1024;paintBackground();const restored=readPatch();sceneSnapshot.windowsSlot=originalSlot;
+     const originalSlot=sceneSnapshot.windowsSlot,slots=[originalSlot],initial=T.windowLit(sceneSeed,windowKey,originalSlot);
+     for(let slot=originalSlot+1;slot<originalSlot+20000&&slots.length<3;slot++){
+      const expected=slots.length===1?!initial:initial;
+      if(T.windowLit(sceneSeed,windowKey,slot)===expected)slots.push(slot);
+     }
+     sceneSnapshot.windowsSlot=slots[0];paintBackground();const before=readPatch();
+     sceneSnapshot.windowsSlot=slots[1];paintBackground();const after=readPatch();
+     sceneSnapshot.windowsSlot=slots[2];paintBackground();const restored=readPatch();sceneSnapshot.windowsSlot=originalSlot;
      return {shows,lights:{changed:difference(before,after),returned:difference(before,restored)}};
     };`);
    await route.fulfill({response,body});
@@ -24007,3 +24011,114 @@ test('RISK fireworks crescendo: finale emits distinct overlapping volleys and a 
  assert.match(help,/overlapping volleys[\s\S]*wider closing crown/);
  assert.match(help,/Reduced motion keeps scenery still/);
  });
+
+
+test('RISK seeded trigger admissions: actual UTC rail consumer admits chance gaps with preserved mean and track capacity',()=>{
+ const c=sceneTimeline(),T=c.LandscapeTimeline,C=c.LandscapeConfig,seed='chance-rails',options={seed,sunAt:()=>({altitude:-20,azimuth:0})};
+ const a=T.create(options),b=T.create(options);
+ for(const type of ['train','metro']){
+  const interval=C.rail[type].duration/.82,period=interval+C.rail[type].gap/C.spawnRate(type),chance=interval/period;let admitted=0;
+  for(let slot=20000;slot<20512;slot++){
+   const at=Math.ceil(slot*interval*1000)+1,expected=T.sample(seed,`${type}-admission`,slot)<chance;
+   const scene=a.at(at),match=scene.events.find(e=>e.id===`${type}:${slot}`);
+   assert.equal(!!match,expected,`${type} slot ${slot}: actual admission must follow the seeded roll, including rejected opportunities`);
+   assert.ok(scene.events.filter(e=>e.type===type).length<=1,'one vehicle per track');
+   assert.deepEqual(JSON.parse(JSON.stringify(scene)),JSON.parse(JSON.stringify(b.at(at))),'fresh/reloaded consumer agrees');
+   if(match)admitted++;
+  }
+  assert.ok(admitted>512*(chance-.06)&&admitted<512*(chance+.06),'bounded sample retains expected average frequency');
+ }
+ C.setSpawnRates('| train | 0 |\n| metro | 0 |');
+ assert.ok(!T.create(options).at(1585366000).events.some(e=>['train','metro'].includes(e.type)),'zero rates disable both tracks');
+});
+
+test('RISK seeded trigger windows: actual light consumer uses independent state draws and can retain state across opportunities',()=>{
+ const T=sceneTimeline().LandscapeTimeline,seed='chance-window',index='42:1:3',q=.58,interval=1024*2*q*(1-q),phase=T.sample(seed,'window-phase',index)*interval;
+ let changed=0,held=0,lit=0;
+ for(let opportunity=2000;opportunity<2512;opportunity++){
+  const slot=Math.ceil(phase+opportunity*interval),expected=T.sample(seed,`window:${index}`,opportunity)>.42;
+  const actual=T.windowLit(seed,index,slot);
+  assert.equal(actual,expected,'paint consumer state comes from this opportunity, not compulsory parity');
+  assert.equal(T.windowLit(seed,index,slot+.1),actual,'no frame-cadence roll');
+  const prior=T.windowLit(seed,index,Math.floor(phase+opportunity*interval)-1);
+  actual===prior?held++:changed++;if(actual)lit++;
+ }
+ assert.ok(held>180&&changed>180,'independent opportunities allow both changes and unchanged windows');
+ assert.ok(lit>512*.50&&lit<512*.66,'existing seeded lit fraction is retained');
+});
+
+function chanceWeatherPaint(source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8')){
+ const start=source.indexOf('  function paintWeatherOn('),end=source.indexOf('\n  function paintRainCloud(',start),c=sceneTimeline(),strokes=[];
+ const context=vm.createContext({T:c.LandscapeTimeline,sceneSeed:'chance-bolts',Math,W:390,H:844,hy:410,p:{night:1},world:{elapsed:0},sceneSeason:'summer',treeOrigins:[],geometry:{},reduced:false,
+  LandscapeSeasonal:{paint(){}},document:{documentElement:{dataset:{}}},rand:()=>.2,paintRainCloud(){},ellipse(){},line(...args){strokes.push(args);}});
+ vm.runInContext(source.slice(start,end),context);
+ const ctx={save(){},restore(){},createLinearGradient(){return {addColorStop(){}};},fillRect(){}};
+ return {context,strokes,paint(weather,phase){strokes.length=0;context.paintWeatherOn(ctx,weather,phase,false,false,false);return strokes.length;}};
+}
+
+test('RISK seeded trigger lightning: actual storm painter rejects strikes and preserves short bolts snow and reduced motion guards',()=>{
+ const fixture=chanceWeatherPaint(),{context,paint}=fixture,T=context.T,weather={slot:777,status:'thunderstorm',storm:true,intensity:1};let strikes=0,misses=0;
+ const offset=T.sample(context.sceneSeed,'lightning-phase',weather.slot)*23.5;
+ for(let slot=100;slot<132;slot++){
+  const phase=slot*23.5-offset+.14,expected=T.sample(context.sceneSeed,'lightning',weather.slot,slot)<.5;
+  assert.equal(paint(weather,phase),expected?3:0,'actual three-segment bolt obeys admission draw');
+  expected?strikes++:misses++;
+  assert.equal(paint(weather,phase+.3),0,'bolt cannot survive beyond its .28-second lifetime');
+  context.reduced=true;assert.equal(paint(weather,phase),0,'reduced motion excludes lightning');context.reduced=false;
+  assert.equal(paint({...weather,status:'snowstorm'},phase),0,'snowstorms exclude lightning');
+  assert.equal(paint({...weather,storm:false,status:'rain'},phase),0,'rain alone cannot strike');
+ }
+ assert.ok(strikes&&misses,'both accepted and rejected opportunities observed');
+});
+
+function sharedSkywriterConsumer(seen=false,empty=false,source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8')){
+ const mood=moodRuntime();mood.setHumanText(empty?'## Skywriters':'## Skywriters\n- HELLO');if(seen)mood.recordSeen('HELLO');
+ const event={id:'arrival:123',type:'skywriter',age:35,duration:70,seed:.4,lane:.3,reverse:false},flights=[];
+ const start=source.indexOf('  function syncScene('),end=source.indexOf('\n  function advanceRooftopParty(',start);
+ const context=vm.createContext({LandscapeMood:mood,globalThis:{LivingLocation:{current:()=>null}},S:{readSceneTime:()=>null,readSceneSeason:()=>null},sceneStorage:{},sceneSeason:'summer',timelineKey:'["summer",null,null,null]',
+  timeline:{at:()=>({elapsed:123,events:[{...event}],woodland:[],party:null,clocktower:null})},world:{events:[]},woodland:{},rooftopRoofs:[],rooftopParty:{},clocktowerVisit:{},Intl,Date,Math});
+ vm.runInContext(source.slice(start,end),context);context.syncScene(123000);const selected=context.world.events[0];
+ const branch=source.slice(source.indexOf("    if(e.type==='skywriter'){"),source.indexOf("    if(e.type==='banner'){"));
+ const paint=vm.createContext({e:selected,reduced:false,f:.5,x:100,hy:410,W:390,dir:1,t:123,p:{night:0},S:{smooth:()=>0},g:{save(){},restore(){},translate(){},scale(){},beginPath(){},moveTo(){},lineTo(){},stroke(){},rotate(){}},visibleBanners:[],airplane(...args){flights.push(args);},LandscapeSkywriter:{wordPath:word=>word?{width:100}:null,trace:()=>({segments:[],x:10,y:10,angle:0,complete:false})}});
+ vm.runInContext(`(function(){${branch}})()`,paint);
+ return {selected,flights,context};
+}
+
+test('RISK seeded trigger skywriters: actual snapshot and painter preserve visibility across reading history and missing private copy',()=>{
+ const fresh=sharedSkywriterConsumer(),read=sharedSkywriterConsumer(true),empty=sharedSkywriterConsumer(false,true);
+ assert.equal(fresh.flights.length,1,'admitted flight is painted');
+ assert.equal(read.selected.skywriterWord,fresh.selected.skywriterWord,'read history cannot select different shared smoke geometry');
+ assert.equal(read.flights.length,1,'local history cannot suppress the admitted flight');
+ assert.equal(empty.selected.skywriterWord,'','missing private copy creates no fallback words');
+ assert.equal(empty.flights.length,1,'missing words still paint the admitted aircraft');
+ read.context.syncScene(123000);assert.equal(read.context.world.events[0].skywriterWord,fresh.selected.skywriterWord,'repeated consumer reconstruction is stable');
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),broken=source.replace("LandscapeMood.skywriterMessage(e.seed,{shared:true})","LandscapeMood.skywriterMessage(e.seed)");
+ assert.notEqual(sharedSkywriterConsumer(true,false,broken).selected.skywriterWord,fresh.selected.skywriterWord,'broken actual-consumer negative control restores history divergence');
+});
+
+
+test('RISK seeded trigger negative controls: bypassed actual admissions compulsory window parity and periodic bolts are detected',()=>{
+ const seed='chance-rails',options={seed,sunAt:()=>({altitude:-20,azimuth:0})},good=sceneTimeline(),broken=sceneTimeline({'landscape-timeline.js':source=>source.replace('if(sample(seed,`${type}-admission`,slot)>=chance)continue;','')});
+ const type='train',interval=good.LandscapeConfig.rail[type].duration/.82,chance=interval/(interval+good.LandscapeConfig.rail[type].gap);let rejected;
+ for(let slot=20000;slot<20100;slot++)if(good.LandscapeTimeline.sample(seed,`${type}-admission`,slot)>=chance){rejected=slot;break;}
+ assert.ok(rejected);const at=Math.ceil(rejected*interval*1000)+1;
+ assert.equal(good.LandscapeTimeline.create(options).at(at).events.some(e=>e.id===`${type}:${rejected}`),false);
+ assert.equal(broken.LandscapeTimeline.create(options).at(at).events.some(e=>e.id===`${type}:${rejected}`),true,'removing actual admission restores the forbidden guaranteed visitor');
+ const parity=sceneTimeline({'landscape-timeline.js':source=>source.replace(/return sample\(seed,`window:\$\{index\}`,Math.floor\(\(slot-phase\)\/interval\)\)>\.42;/,'return !!(Math.floor((slot-phase)/interval)&1);')});
+ assert.ok(Array.from({length:32},(_,i)=>i*500).some(slot=>good.LandscapeTimeline.windowLit(seed,'42:1:3',slot)!==parity.LandscapeTimeline.windowLit(seed,'42:1:3',slot)),'compulsory parity fails independent sampled state');
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),goodPaint=chanceWeatherPaint(),badPaint=chanceWeatherPaint(source.replace("&&T.sample(sceneSeed,'lightning',weather.slot,strikeSlot)<.5",'')),weather={slot:777,status:'thunderstorm',storm:true,intensity:1};
+ let miss;for(let slot=100;slot<132;slot++)if(goodPaint.context.T.sample('chance-bolts','lightning',777,slot)>=.5){miss=slot;break;}
+ const phase=miss*23.5-goodPaint.context.T.sample('chance-bolts','lightning-phase',777)*23.5+.14;
+ assert.equal(goodPaint.paint(weather,phase),0);assert.equal(badPaint.paint(weather,phase),3,'removing actual strike admission restores compulsory lightning');
+});
+
+test('RISK seeded trigger FAQ: extended help explains shared chance visits and history-independent skywriter visibility without private sync',()=>{
+ const start=html.indexOf('<dt>How do I change the scenery?</dt>'),end=html.indexOf('<dt>',start+5),entry=html.slice(start,end);
+ assert.match(entry,/same shared seed.*matching clocks and sky settings/i);
+ assert.match(entry,/chance.*trains.*windows.*lightning/i);
+ assert.match(entry,/Skywriter flights.*reading history/i);
+ assert.match(entry,/no valid human word.*plane/i);
+ assert.match(entry,/reading history stays on this device/i);
+ const current=html.slice(html.indexOf('<template id="appChangelogCurrent">'),html.indexOf('<template id="appChangelog">'));
+ assert.match(current,/Skywriter flights stay visible after you read their words/,'history suppression is a synchronization bug and must be reported');
+});

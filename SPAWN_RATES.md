@@ -7,9 +7,15 @@ An invalid table is rejected as a whole; missing rows use 1.
 
 Ordinary visitors use relative selection weights, so increasing one reduces
 others' share of the same limited visitor budget. Seasonal eligibility still applies.
-Train and metro have dedicated service: about 65 and 50 seconds crossing,
-respectively, followed by 12 and 8 seconds of rest at rate 1. Their rate divides
-that rest time; only one vehicle per track runs at once. Painting pauses offscreen; arrivals and age follow the shared UTC schedule. Crossing periods include the maximum sampled duration plus the configured minimum rest.
+Train and metro have dedicated seeded-chance service: 65 and 50 seconds baseline
+crossing, respectively. Opportunities are one maximum sampled crossing apart
+(65/.82 and 50/.82 seconds). Admission probability is that interval divided by
+itself plus the configured 12 or 8 seconds divided by the rate. Consequently,
+expected start spacing equals the former maximum crossing plus rate-scaled rest;
+rest is now an average contribution, not a minimum after every crossing. Only
+one vehicle per track runs at once; rate 0 disables admission. A rejection does
+not force a later arrival or impose a maximum wait. Painting pauses offscreen;
+arrivals and age follow the shared UTC schedule.
 Standalone fireworks check every 120 seconds of eligible UTC twilight/nighttime with a
 40% chance at rate 1; the first check is after 80 UTC seconds. Each show keeps
 its original sampled 60–300-second scheduling reservation, but its visible
@@ -32,8 +38,19 @@ The barge display follows its actual crossing duration. Its staged finale
 builds to the five-shell closing crown at 65% of that crossing while its
 launchers are still visible. Travel speed, duration and cooldown stay unchanged. Fairy lights
 retain independent one-minute nighttime sampling with one-in-six activation
-odds. Skyline windows switch on 7.5-second UTC ticks with the same seeded
-lighting distribution; daylight eligibility and brightness stay unchanged.
+odds. Skyline windows use independent seeded state samples in normalized window
+space. The current 7.5-second UTC tick is retained. A per-window seeded phase
+spreads opportunities; each opportunity samples 58% lit, 42% dark. Opportunities
+are 1024 * 2 * .58 * .42 ticks apart (3741.696 seconds), so a change probability
+of 2 * .58 * .42 preserves the existing doubled mean toggle spacing of 7680
+seconds and the lit fraction. Equal successive states are valid: no parity flip,
+backwards-search fallback or maximum-wait transition forces a change. Daylight
+eligibility and brightness stay unchanged.
+Distant rain-storm lightning uses 23.5-second opportunities with a 50% seeded
+admission chance, retaining the previous 47-second mean strike spacing. Each
+weather episode has a seeded phase and independent strike/position draws.
+The .28-second three-segment bolt, storm intensity, snow exclusion, reduced-motion
+exclusion and absence of full-screen flashes remain unchanged.
 Woodland rows control the separate animal pool (default: 1% chance per 30 seconds).
 Clocktower visits check once per UTC nighttime minute with a 2% chance at
 rate 1, about one visit per 50 UTC night minutes. Peter Pan, Wendy, John and
@@ -46,8 +63,12 @@ Ambience rows scale seasonal particle cycle speed (0 hides particles).
 All safety caps, reduced-motion preferences, and season rules remain in effect.
 
 The banner event is the message-towing biplane; airshow is the aerobatic plane.
-Skywriters trace one human word in smoke. They appear only when the Skywriters
-bank has an unseen valid word; the skywriter rate cannot create fallback words.
+Skywriters trace one valid human word from the local Skywriters bank in smoke.
+The shared renderer samples this bank without filtering private reading history,
+so reading cannot suppress an admitted aircraft or change its smoke geometry.
+With no valid word, the admitted aircraft crosses without smoke lettering; the
+skywriter rate cannot create fallback words. Other local message selection retains
+its nonrepeat history. Neither reading history nor human wording is newly synced.
 Cloud movement, astronomical objects, and the clock are continuous scenery,
 not spawned visitors. Text itself is edited in HUMAN_WRITTEN_HOURLY_TAGS.md.
 

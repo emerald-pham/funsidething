@@ -730,7 +730,12 @@
   function airplaneMessage(random) { return pick(unseen(humanText.Airplanes || AI_AIRPLANE_LINES), random); }
   // Skywriting uses a bounded stroke alphabet; phrases and unsupported glyphs
   // are ignored rather than truncating or inventing a human-authored word.
-  function skywriterMessage(random) { return pick(unseen((humanText.Skywriters || []).filter(word=>/^[a-z]{1,16}$/i.test(word))), random); }
+  function skywriterMessage(random,options={}) {
+    const words=(humanText.Skywriters || []).filter(word=>/^[a-z]{1,16}$/i.test(word));
+    // Shared flights must not disappear or change their smoke path because one
+    // browser read the word already. Other local message pools keep nonrepeat.
+    return pick(options.shared?unique(words):unseen(words),random);
+  }
   function messageEntry(date, location, random) {
     validDate(date);
     const context = normalizedLocation(location);
