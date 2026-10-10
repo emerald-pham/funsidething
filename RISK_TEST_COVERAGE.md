@@ -846,3 +846,5 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK seeded trigger precision: chance window states retain the former fifty-percent long-run occupancy
 - RISK seeded trigger cold copy: actual current-flight consumer adopts the loaded human bank without rereading or waiting for another event
 - RISK seeded trigger reading preservation: actual word replacement and trusted observer do not inherit stale read flags
+
+- RISK changelog editorial: public history omits internal housekeeping and routine frequency tuning
