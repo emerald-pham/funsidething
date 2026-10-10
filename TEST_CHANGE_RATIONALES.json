@@ -1,6 +1,6 @@
 [
   {
-    "testChangesSha256": "298d1772fd8f3829f79d235c53ad592c3e77f89ed5a794aa894a19f8de79db36",
+    "testChangesSha256": "349c5d52d0be92b53024b1d4c6f17b08cb6d3b404d401f7804ebd3396ac027d3",
     "reason": "Protect the requested persisted task deferral across actual scanner controls, Settings, expiry, causal reconciliation and Undo without weakening existing contracts.",
     "previousBehavior": "The scanner had no Postpone action or configurable one-hour deferral; tasks could not be temporarily deferred independently of pass marks and rating actions.",
     "intendedBehavior": "Postpone excludes the displayed task until its saved deadline, preserves unrelated task and rating fields, and merges safely across current clients.",
@@ -8,14 +8,16 @@
       "RISK Postpone: mounted scanner action defers without rating or task edits and expiry restores soft eligibility",
       "RISK Postpone: Settings validates custom hours preserves old values and final task resumes coherently",
       "RISK Postpone: causal sync preserves peer edits concurrent deferrals Undo deletion and old clients",
-      "RISK Postpone: revisioned cloud offline reconnect prunes stale dots without losing concurrent editor fields"
+      "RISK Postpone: revisioned cloud offline reconnect prunes stale dots without losing concurrent editor fields",
+      "RISK Postpone: unknown future deferral evidence is adopted archived and read-only through stale merge and Undo",
+      "RISK Postpone: actual backup Restore completion Undo and pass resets retain deferral intent"
     ],
     "preservedCoverage": [
       "All existing scanner, recurrence, dependencies, completion, editor, cloud, storage and rating assertions remain unchanged. Older clients preserve opaque deferral evidence but do not enforce it until updated."
     ],
     "redEvidence": {
       "command": "node --test --test-name-pattern='RISK Postpone:' tests.js",
-      "failure": "Observed before implementation: mounted Postpone control missing; postponeHours undefined; peer task remained eligible after ignored action. /tmp/postpone-red.log. Later new stale-chain consumer test failed true !== false before chain-pruning fix: /tmp/postpone-cloud-red.log."
+      "failure": "Observed before implementation: mounted Postpone control missing; postponeHours undefined; peer task remained eligible after ignored action. /tmp/postpone-red.log. Later new stale-chain consumer test failed true !== false before chain-pruning fix: /tmp/postpone-cloud-red.log. Specialist finding RED before opaque-preservation fix: old winner adopts opaque peer bytes failed with undefined at /tmp/postpone-opaque-red.log. Completion/Restore/pass-reset coverage was added as supplementary postimplementation validation, not claimed as a new preimplementation RED."
     }
   },
   {

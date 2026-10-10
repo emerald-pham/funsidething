@@ -855,3 +855,5 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK Postpone: Settings validates custom hours preserves old values and final task resumes coherently
 - RISK Postpone: causal sync preserves peer edits concurrent deferrals Undo deletion and old clients
 - RISK Postpone: revisioned cloud offline reconnect prunes stale dots without losing concurrent editor fields
+- RISK Postpone: unknown future deferral evidence is adopted archived and read-only through stale merge and Undo
+- RISK Postpone: actual backup Restore completion Undo and pass resets retain deferral intent
