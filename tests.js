@@ -24235,3 +24235,9 @@ test('RISK Postpone: actual backup Restore completion Undo and pass resets retai
 test('RISK Postpone: white control retains named theme palette colors',async()=>{
  assert.match(fs.readFileSync(new URL('./index.html',import.meta.url),'utf8'),/\.btn\.postpone\{background:light-dark\(#fff,#fff\);color:light-dark\(#20242b,#20242b\);border:1px solid light-dark\(#999,#999\)\}/);
 });
+
+test('RISK Postpone layout: mounted duration field uses the bounded numeric Settings width',async()=>{
+ const {ctx,shim}=await loadApp();ctx.openSettings();const html=shim.document.getElementById('modalRoot').innerHTML;
+ const field=html.match(/<input id="stPostponeHours"[^>]*>/)?.[0];assert.ok(field,'actual Settings duration input exists');assert.match(field,/style="width:90px;max-width:100%"/,'Postpone must fit the row like adjacent numeric durations rather than retain the browser intrinsic width');
+ assert.match(html,/<input id="stWorkedHrs"[^>]*style="width:90px"/,'existing numeric duration width remains protected');
+});

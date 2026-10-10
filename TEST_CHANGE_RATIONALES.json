@@ -1,5 +1,21 @@
 [
   {
+    "testChangesSha256": "079481b9b52a3785551b6c6908920102c98af94d83886b990cbef6410e195d9b",
+    "reason": "Add direct mounted duration-field protection for the independently observed enlarged Settings clipping, retaining all existing tests.",
+    "previousBehavior": "Postpone duration used the native intrinsic numeric input width while neighboring numeric duration fields used90px; actual200%captures showed377/418physicalpixels beyond the visible modal.",
+    "intendedBehavior": "The Postpone numeric field uses the established90px width with100percentmaximum so it fits its available row at enlarged size without changing duration semantics.",
+    "replacementTests": [
+      "RISK Postpone layout: mounted duration field uses the bounded numeric Settings width"
+    ],
+    "preservedCoverage": [
+      "Every existing scanner, settings validation, exact deadline, reload, Undo, sync and palette assertion remains unchanged. New mounted width check also protects the existing Worked on it numeric control width."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK Postpone layout:' tests.js",
+      "failure": "Observed mounted Settings input lacked bounded style before repair: assertion Postpone must fit the row failed. /tmp/postpone-settings-width-red.log; earlier actual Chrome/WebKit200percentinput rectangles exceeded modal content width. Subsequent16targeted checks pass; full enlarged modal scroll/Save reachability is still unresolved pending bounded runtime."
+    }
+  },
+  {
     "testChangesSha256": "9bf92019de29031ca14742e82db1811195758842906ed17baa8033ff908bf2c8",
     "reason": "Protect the explicitly authorized seventh Postpone control while retaining original ordered actions and sizing; remove fixture wall-clock dependence and add direct palette regression coverage.",
     "previousBehavior": "Existing benchmark tests required exactly six actions before the requested Postpone addition; its new custom/reload deadline fixture relied on the wall clock and the new control escaped the required theme palette.",
@@ -17,7 +33,7 @@
     }
   },
   {
-    "testChangesSha256": "02f993128f89943f8db53f7be92397abb06d384f4a54fbbc56a5a17dcb8b41e2",
+    "testChangesSha256": "7eab1863a1e62c7202833950b2465526f995d397b12a4079e4b79336ede445dd",
     "reason": "Protect the requested persisted task deferral across actual scanner controls, Settings, expiry, causal reconciliation and Undo without weakening existing contracts.",
     "previousBehavior": "The scanner had no Postpone action or configurable one-hour deferral; tasks could not be temporarily deferred independently of pass marks and rating actions.",
     "intendedBehavior": "Postpone excludes the displayed task until its saved deadline, preserves unrelated task and rating fields, and merges safely across current clients.",
@@ -28,14 +44,15 @@
       "RISK Postpone: revisioned cloud offline reconnect prunes stale dots without losing concurrent editor fields",
       "RISK Postpone: unknown future deferral evidence is adopted archived and read-only through stale merge and Undo",
       "RISK Postpone: actual backup Restore completion Undo and pass resets retain deferral intent",
-      "RISK Postpone: white control retains named theme palette colors"
+      "RISK Postpone: white control retains named theme palette colors",
+      "RISK Postpone layout: mounted duration field uses the bounded numeric Settings width"
     ],
     "preservedCoverage": [
       "Existing ordered benchmark actions remain protected, adding only the authorized seventh Postpone action; every action still requires .sm sizing. Exact deadline assertions use a controlled fixture clock. Existing palette and FAQ-length contracts remain unchanged, as do recurrence, completion, editor, cloud, storage and rating assertions. Reload eligibility uses the same controlled instant as the postponement, avoiding a real-clock expiry race."
     ],
     "redEvidence": {
       "command": "node --test --test-name-pattern='RISK Postpone:' tests.js",
-      "failure": "Observed before implementation: mounted Postpone control missing; postponeHours undefined; peer task remained eligible after ignored action. /tmp/postpone-red.log. Later new stale-chain consumer test failed true !== false before chain-pruning fix: /tmp/postpone-cloud-red.log. Specialist finding RED before opaque-preservation fix: old winner adopts opaque peer bytes failed with undefined at /tmp/postpone-opaque-red.log. Completion/Restore/pass-reset coverage was added as supplementary postimplementation validation, not claimed as a new preimplementation RED. Required CI 38050059531 observed six-versus-seven action expectations, theme palette escape, FAQ answer length, and a one-millisecond real-clock test race. Focused FAQ RED /tmp/postpone-ci-fixes-red.log and actual palette assertion RED /tmp/postpone-palette-red.log preceded CSS/copy repairs. No functional deferral semantics changed in these repairs."
+      "failure": "Observed before implementation: mounted Postpone control missing; postponeHours undefined; peer task remained eligible after ignored action. /tmp/postpone-red.log. Later new stale-chain consumer test failed true !== false before chain-pruning fix: /tmp/postpone-cloud-red.log. Specialist finding RED before opaque-preservation fix: old winner adopts opaque peer bytes failed with undefined at /tmp/postpone-opaque-red.log. Completion/Restore/pass-reset coverage was added as supplementary postimplementation validation, not claimed as a new preimplementation RED. Required CI 38050059531 observed six-versus-seven action expectations, theme palette escape, FAQ answer length, and a one-millisecond real-clock test race. Focused FAQ RED /tmp/postpone-ci-fixes-red.log and actual palette assertion RED /tmp/postpone-palette-red.log preceded CSS/copy repairs. No functional deferral semantics changed in these repairs. Actual candidate200%Settings captures showed new input377/418physicalpixels exceeding visible modal width226; independent reassessment requires correction rather than preexisting waiver. Mounted Settings field width RED /tmp/postpone-settings-width-red.log preceded bounded numeric style repair. FAQ and Save reachability remain unproven pending focused runtime."
     }
   },
   {
