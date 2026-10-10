@@ -861,3 +861,5 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK Postpone: white control retains named theme palette colors
 
 - RISK Postpone layout: mounted duration field uses the bounded numeric Settings width
+
+- RISK Postpone layout: modal height preserves the viewport cap and fits the available backdrop

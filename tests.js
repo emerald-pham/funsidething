@@ -24241,3 +24241,7 @@ test('RISK Postpone layout: mounted duration field uses the bounded numeric Sett
  const field=html.match(/<input id="stPostponeHours"[^>]*>/)?.[0];assert.ok(field,'actual Settings duration input exists');assert.match(field,/style="width:90px;max-width:100%"/,'Postpone must fit the row like adjacent numeric durations rather than retain the browser intrinsic width');
  assert.match(html,/<input id="stWorkedHrs"[^>]*style="width:90px"/,'existing numeric duration width remains protected');
 });
+
+test('RISK Postpone layout: modal height preserves the viewport cap and fits the available backdrop',()=>{
+ const html=fs.readFileSync(new URL('./index.html',import.meta.url),'utf8');const modal=html.match(/\.modal\{[^}]+\}/)?.[0];assert.match(modal,/max-height:min\(88vh,100%\)/,'the scroll container must fit its fixed backdrop so bottom Save remains reachable at enlarged size');assert.match(modal,/overflow-y:auto/,'ordinary vertical scrolling remains available');
+});
