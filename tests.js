@@ -144,7 +144,7 @@ test('RISK carrying recovery: rejected actual phone sequence requires strikes op
  assert.ok(separation>4,`recovery must oppose fore/aft legs rather than the rejected ${separation}-unit tiny shuffle`);
  assert.ok(arcs.length>=3&&arcs.every(arc=>arc>.12),`each full flight must rise above its landing chord: ${arcs}`);
 });
-test('RISK carrying isolation: immutable accepted renderer commands match exactly on the same runtime',async()=>{
+test('RISK carrying isolation: immutable accepted renderer commands stay exact outside requested walker pace changes',async()=>{
  const {readMotionBuild,createMotionProbe}=await import('./scripts/motion-review-harness.mjs'),build=readMotionBuild(__dirname,'WORKTREE');
  const bytes=fs.readFileSync(path.join(__dirname,'scripts/fixtures/gait-carrying-sentinel.json')),fixture=JSON.parse(bytes);
  assert.equal(createHash('sha256').update(bytes).digest('hex'),'740faa80ea8862bf7d1d65f4d9c3090bff6169d241b00acd3f7f2c142a06223d','preserve every original accepted input, reference hash and control');
@@ -154,8 +154,19 @@ test('RISK carrying isolation: immutable accepted renderer commands match exactl
  // libm/V8 architecture differences can change a final decimal in a saved
  // macOS hash. Compare both immutable builds on this same runtime, with exact
  // command equality and no numeric tolerance; retain the original fixture.
- for(const c of fixture.controls){const expected=createMotionProbe(baseline,c).sample(c.options),frame=createMotionProbe(build,c).sample(c.options);assert.deepEqual(frame,expected,`${c.options.actor} ${c.width} reverse=${c.options.reverse} progress=${c.options.progress} reduced=${c.options.reduced}: preserve exact196 painter output`);}
- for(const sequence of fixture.walkingSequences){const expected=createMotionProbe(baseline,sequence),probe=createMotionProbe(build,sequence);for(const c of sequence.frames)assert.deepEqual(probe.sample(c.options),expected.sample(c.options),'every recorded frame of the three accepted walking cycles retains exact196 painter output');}
+ const compare=(expected,frame,options,width)=>{
+  if(['walker','dogwalker'].includes(options.actor)){
+   // The user explicitly changed these routes' pace and terminal opacity. Keep
+   // the frozen old bytes; compare their exact old geometry's halved travel,
+   // while the connected-leg/leash/contact regressions protect the new paint.
+   const anchor=width*(.18+(options.lane??.5)*.64);
+   assert.ok(Math.abs(frame.metadata.x-(anchor+(expected.metadata.x-anchor)*.5))<1e-7,'requested half pace retains the same deterministic local route');
+   assert.equal(frame.metadata.duration,expected.metadata.duration);assert.equal(frame.metadata.direction,expected.metadata.direction);
+   assert.equal(frame.commands.find(c=>c[0]==='set'&&c[1]==='globalAlpha')[2],1,'requested walker no longer fades while visible');
+  }else assert.deepEqual(frame,expected,'unaffected carrying/activity consumer retains exact196 painter output');
+ };
+ for(const c of fixture.controls){const expected=createMotionProbe(baseline,c).sample(c.options),frame=createMotionProbe(build,c).sample(c.options);compare(expected,frame,c.options,c.width);assert.deepEqual(frame,createMotionProbe(build,c).sample(c.options),'cold reconstruction matches actual candidate painter');}
+ for(const sequence of fixture.walkingSequences){const expected=createMotionProbe(baseline,sequence),probe=createMotionProbe(build,sequence);for(const c of sequence.frames)compare(expected.sample(c.options),probe.sample(c.options),c.options,sequence.width);}
  const control=fixture.controls[0],expected=createMotionProbe(baseline,control).sample(control.options),broken=JSON.parse(JSON.stringify(expected));broken.commands.push(['moveTo',1e-12,0]);
  assert.throws(()=>assert.deepEqual(broken,expected),'negative control: even a tiny extra renderer command fails exact comparison');
 });
@@ -882,8 +893,9 @@ test('RISK shared scenery: normalized clouds and bounded schedules survive midni
  for(const at of [Date.parse('2026-10-05T23:59:59.999Z'),Date.parse('2026-10-06T00:00:00Z'),Date.parse('2026-11-01T05:59:59Z'),Date.parse('2026-11-01T06:00:00Z')]){
   const scene=timeline.at(at),fresh=T.create(options).at(at);
   assert.deepEqual(JSON.parse(JSON.stringify(scene)),JSON.parse(JSON.stringify(fresh)),'midnight and DST do not depend on an earlier page');
-  assert.ok(scene.events.length<=context.LivingSky.MAX_EVENTS&&scene.woodland.length<=4,'existing event budgets remain bounded');
-  assert.ok(scene.events.every(e=>e.age>=0&&e.age<e.duration&&e.duration>0&&e.duration<=300&&Number.isFinite(e.seed)));
+  assert.ok(scene.events.filter(e=>e.age<(e.activityDuration||e.duration)).length<=context.LivingSky.MAX_EVENTS&&scene.woodland.length<=4,'existing admission budgets remain bounded');
+  assert.ok(scene.events.length<=context.LivingSky.MAX_EVENTS+Math.ceil((900+8392/1.4)/8),'extended visual tails retain a finite immutable proposal bound');
+  assert.ok(scene.events.every(e=>e.age>=0&&e.age<e.duration&&e.duration>0&&(e.activityDuration||e.duration)<=300&&e.duration<=900+8392/1.4&&Number.isFinite(e.seed)));
   for(const [width,height] of [[320,568],[390,844],[568,320],[768,1024],[1440,900]])for(const reduced of [false,true]){
    const other=T.create({...options,width,height,reduced}).at(at);
    assert.deepEqual(JSON.parse(JSON.stringify(other)),JSON.parse(JSON.stringify(scene)),'viewport and motion preference cannot select different logical objects');
@@ -24294,4 +24306,140 @@ test('RISK cloud self-echo: focus pull during own acknowledgement retains latest
  await ctx.sendPush();await syncSettle(40);
  assert.equal(h.remoteState().tasks.find(t=>t.id===task.id).title,'Latest edit','later intent reaches the cloud after its own acknowledgement');
  assert.equal(h.conflicts,0);
+});
+
+// Contemporaneous regression: inspect the real walker painter before changing its lifecycle.
+test('RISK pedestrian natural exit: ordinary and dog walkers stay opaque until their whole party clears the viewport',async()=>{
+ const {readMotionBuild,createMotionProbe}=await import('./scripts/motion-review-harness.mjs');
+ const build=readMotionBuild(__dirname,'WORKTREE');
+ for(const [width,height] of [[390,844],[844,390],[820,1180],[1440,900]])for(const actor of ['walker','dogwalker'])for(const reverse of [false,true]){
+  const frame=createMotionProbe(build,{width,height}).sample({actor,reverse,progress:.99,seed:.4,lane:.5,zoom:1});
+  const opacity=frame.commands.find(c=>c[0]==='set'&&c[1]==='globalAlpha')?.[2];
+  const {x}=frame.metadata,partyMargin=actor==='dogwalker'?27:9;
+  if(x+partyMargin>0&&x-partyMargin<width)assert.equal(opacity,1,`${actor} ${width} reverse=${reverse}: visible party at x=${x} fades before leaving`);
+ }
+});
+
+test('RISK pedestrian half pace: ordinary and dog walking translation uses half the prior local pace',()=>{
+ const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
+ for(const [width,height] of [[390,844],[844,390],[820,1180],[1440,900]])for(const reverse of [false,true])for(const type of ['walker','dogwalker']){
+  const geo=ctx.LandscapeGeometry.create(width,height),e={type,age:29,duration:70,lane:.5,seed:.4,reverse};
+  const a=geo.groundPose('walker',e),b=geo.groundPose('walker',{...e,age:30});
+  const priorDistance=7*(geo.motionAge({...e,age:30},'x')-geo.motionAge(e,'x'));
+  assert.ok(Math.abs(Math.abs(b.x-a.x)-priorDistance*.5)<1e-8,`${type} ${width}: displacement ${Math.abs(b.x-a.x)} should halve previous ${priorDistance}`);
+ }
+});
+
+test('RISK pedestrian departure pace: carrying and winter people leave at a walking pace without a lifetime sprint',()=>{
+ const ctx=vm.createContext({Math});for(const file of ['landscape-geometry.js','landscape-winter.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,file),'utf8'),ctx);
+ for(const [width,height] of [[390,844],[844,390],[820,1180],[1440,900]])for(const reverse of [false,true])for(const type of ['reader','couple','picnic','kite','snowman','snowangel']){
+  const geo=ctx.LandscapeGeometry.create(width,height),duration={reader:220,couple:200,picnic:240,kite:90,snowman:180,snowangel:100}[type];
+  const e={type,age:duration*.95,duration,activityDuration:duration,lane:.5,seed:.4,reverse};
+  const pose=event=>['snowman','snowangel'].includes(type)?ctx.LandscapeWinter.pose(type,event,geo,width,height):geo.visitPose(event,geo.motionProgress(event,'x'));
+  const a=pose(e),b=pose({...e,age:e.age+.05}),key=type==='snowman'?'builderX':'x',speed=Math.abs(b[key]-a[key])/.05;
+  assert.ok(speed<=4.3,`${type} ${width} reverse=${reverse}: departing person sprints at ${speed}px/s to meet lifetime`);
+ }
+});
+
+test('RISK pedestrian scheduled lifetime: accepted walkers retain admission duration and survive until a full viewport exit',()=>{
+ const context=sceneTimeline(),options={seed:'private-walking-exits',season:'summer',width:1440,height:900,sunAt:()=>({altitude:25,azimuth:100})};
+ const timeline=context.LandscapeTimeline.create(options),start=Date.parse('2026-10-10T10:00Z');let event;
+ for(let second=0;second<3600&&!event;second+=8)event=timeline.at(start+second*1000).events.find(e=>e.type==='walker'||e.type==='dogwalker');
+ assert.ok(event,'seeded fixture finds a naturally admitted walker');
+ assert.ok(event.activityDuration>0,'accepted event retains immutable original reservation duration');
+ assert.ok(event.duration>event.activityDuration,'visible route lifetime outlives the old reservation');
+ let seenAt;for(let second=0;second<3600;second+=8){const e=timeline.at(start+second*1000).events.find(e=>e.id===event.id);if(e){seenAt=start+second*1000;event=e;break;}}
+ const born=seenAt-event.age*1000,at=born+(event.activityDuration+1)*1000;
+ const extended=timeline.at(at).events.find(e=>e.id===event.id);assert.ok(extended,'walker remains after old cutoff without a replay queue');
+ assert.deepEqual(JSON.parse(JSON.stringify(timeline.at(at))),JSON.parse(JSON.stringify(context.LandscapeTimeline.create(options).at(at))),'cold reconstruction includes the same extended visits');
+ assert.ok(!timeline.at(born+event.duration*1000+.01).events.some(e=>e.id===event.id),'finite retirement follows complete route');
+});
+
+test('RISK pedestrian companion pace: walking deer and woodland paws halve translation and distance together while hopping stays unchanged',()=>{
+ const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);const g=ctx.LandscapeGeometry.create(820,1180),e={type:'deer',age:30,duration:180,seed:.4,lane:.5,reverse:false};
+ assert.equal(g.groundPose('deer',e).distance,g.motionAge(e,'x')*3,'walking deer use half prior six-pixel local pace');
+ for(const type of ['deer','fox','raccoon','rabbit'])assert.equal(g.woodlandPose({...e,type}).distance,g.motionAge(e,'x')*.11,'woodland stride distance follows its halved walk');
+ const rabbit=g.groundPose('rabbit',{...e,duration:22,age:.7});assert.ok(rabbit.hop>0,'explicit hopping remains a separate locomotion');
+});
+
+test('RISK pedestrian visual tail preservation: longer paint lifetimes never reroll released admission or nonwalking effects',()=>{
+ const baseline=spawnSync('git',['show','9d433f1e241130bb4510d17d7125a66bffb21244:landscape-timeline.js'],{cwd:__dirname,encoding:'utf8'});assert.equal(baseline.status,0);
+ const old=sceneTimeline({'landscape-timeline.js':()=>baseline.stdout}),candidate=sceneTimeline();
+ const facts=e=>({id:e.id,type:e.type,age:e.age,duration:e.activityDuration||e.duration,seed:e.seed,lane:e.lane,reverse:e.reverse,speed:e.speed});
+ for(const seed of ['private-halfpace','private-dog-exit'])for(const season of ['summer','winter']){
+  const options={seed,season,sunAt:()=>({altitude:25,azimuth:100})},a=old.LandscapeTimeline.create(options),b=candidate.LandscapeTimeline.create(options);
+  for(const seconds of [0,70,301,900,1801,3600]){
+   const at=Date.parse('2026-10-10T10:00Z')+seconds*1000,prior=a.at(at),next=b.at(at);
+   assert.deepEqual(JSON.parse(JSON.stringify(next.events.filter(e=>e.age<(e.activityDuration||e.duration)).map(facts))),JSON.parse(JSON.stringify(prior.events.map(facts))),'original admission identities and RNG metadata remain identical');
+   for(const key of ['clouds','woodland','party','clocktower','gardens','windowsSlot'])assert.deepEqual(JSON.parse(JSON.stringify(next[key])),JSON.parse(JSON.stringify(prior[key])),key+' remains unchanged');
+  }
+ }
+});
+
+test('RISK pedestrian complete parties: scheduled walking routes clear both edges at bounded pace and paint without terminal fade',async()=>{
+ const {readMotionBuild,createMotionProbe}=await import('./scripts/motion-review-harness.mjs'),build=readMotionBuild(__dirname,'WORKTREE');
+ const ctx=sceneTimeline();for(const file of ['landscape-winter.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,file),'utf8'),ctx);
+ const durations=ctx.LandscapeConfig.eventDurations;
+ for(const [width,height] of [[390,844],[844,390],[820,1180],[1440,900]])for(const reverse of [false,true])for(const type of ['walker','dogwalker','reader','couple','picnic','kite','snowman','snowangel']){
+  const geo=ctx.LandscapeGeometry.create(width,height),base={type,duration:durations[type],seed:.4,lane:.5,reverse,speed:1},plan=geo.walkingPlan(base);
+  const event={...base,activityDuration:base.duration,duration:ctx.LandscapeGeometry.create(8192,900).walkingLifetime(base)};
+  const at=age=>{const e={...event,age};if(['snowman','snowangel'].includes(type)){const p=ctx.LandscapeWinter.pose(type,e,geo,width,height);return {x:type==='snowman'?p.builderX:p.x,alpha:type==='snowman'?p.builderAlpha:p.alpha};}const p=['walker','dogwalker'].includes(type)?geo.groundPose('walker',e):geo.visitPose(e,geo.motionProgress(e,'x'));return {x:p.x,alpha:1};};
+  const gone=at(plan.duration);assert.ok(reverse?gone.x<=-80:gone.x>=width+80,`${type} full person/companion party clears edge before logical retirement`);
+  for(const fraction of [.25,.5,.75,.98]){
+   const age=plan.duration*fraction,a=at(age),b=at(age+.02);if(age>plan.begin+2)assert.ok(Math.abs(b.x-a.x)/.02<=4.3,`${type} exit cannot accelerate for a deadline`);
+   if(a.x>0&&a.x<width&&age>base.duration*.15){assert.equal(a.alpha,1,`${type} remains opaque in visible departure`);}
+  }
+  const age=Math.min(plan.duration-1,Math.max(plan.begin+1,plan.duration*.8)),frame=createMotionProbe(build,{width,height}).sample({actor:type,event:{...event,age},zoom:1});assert.ok(frame.commands.length>0,'actual painter executes complete production-shaped visit');
+ }
+});
+
+test('RISK pedestrian reduced motion: static production poses keep walkers on screen and winter activities settled',()=>{
+ const ctx=sceneTimeline();vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-winter.js'),'utf8'),ctx);
+ for(const [width,height] of [[390,844],[820,1180],[1440,900]])for(const reverse of [false,true])for(const type of ['walker','dogwalker','reader','couple','picnic','kite','snowman','snowangel']){
+  const g=ctx.LandscapeGeometry.create(width,height),duration=ctx.LandscapeConfig.eventDurations[type],e={type,activityDuration:duration,duration:2000,seed:.4,lane:.5,reverse,speed:1};
+  const still={...e,age:g.stillWalkingAge(e)};
+  const pose=['snowman','snowangel'].includes(type)?ctx.LandscapeWinter.pose(type,still,g,width,height):['walker','dogwalker'].includes(type)?g.groundPose('walker',still):g.visitPose(still,g.motionProgress(still,'x'));
+  const x=type==='snowman'?pose.builderX:pose.x;assert.ok(x>=0&&x<=width,'static representative remains within the viewport');
+  if(type==='snowangel')assert.equal(pose.bodyMode,0,'reduced motion retains its settled snow activity');
+ }
+ const runtime=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');assert.match(runtime,/e\.activityDuration\?geometry\.stillWalkingAge\(e\)/,'actual reduced-motion consumer selects the representative instead of a visual tail midpoint');
+});
+
+test('Pedestrian extended FAQ: accurate natural exits retain shared chance schedule and reduced motion explanation',()=>{
+ assert.match(html,/People and their companions walk fully beyond the visible scene/);
+ assert.match(html,/Walking pace does not speed up to meet a visit deadline/);
+ assert.match(html,/Reduced motion keeps scenery still/);
+});
+
+test('RISK pedestrian winter tail shadows: retired structures leave no ghost shadow while the walking person remains opaque',()=>{
+ const ctx=sceneTimeline();vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-winter.js'),'utf8'),ctx);const geo=ctx.LandscapeGeometry.create(1440,900);
+ for(const type of ['snowman','snowangel']){
+  const base={type,duration:100,activityDuration:100,seed:.4,lane:.5,reverse:false,speed:1},clock=type==='snowman'?120:(geo.walkingPlan(base).begin+20),e={...base,age:clock+20};
+  const p=ctx.LandscapeWinter.pose(type,e,geo,1440,900),stationaryX=type==='snowman'?p.x:p.imprintX,shadows=[],stack=[];
+  const g={globalAlpha:1,save(){stack.push(this.globalAlpha);},restore(){this.globalAlpha=stack.pop();},translate(){},scale(){},rotate(){}};
+  ctx.LandscapeWinter.paint(g,geo,1440,900,e,0,{city:'#334455',front:'#556655',sky:['#aabbcc','#bbccdd','#ccddee']},{ellipse(){},line(){},groundShadow(g,x,y,h,w){shadows.push({x,alpha:g.globalAlpha});}});
+  assert.ok(!shadows.some(s=>s.x===stationaryX&&s.alpha>0),'expired structure/imprint must not cast a persistent shadow through the extended walk');
+  assert.ok(shadows.some(s=>s.x!==stationaryX&&s.alpha===1),'visible departing person retains its own full shadow');
+ }
+});
+
+test('RISK pedestrian production half pace: scheduled ordinary and dog walkers halve the actual prior trajectory at every sampled seed and frame rate',()=>{
+ const ctx=sceneTimeline(),geo=ctx.LandscapeGeometry.create(1440,900);
+ for(const type of ['walker','dogwalker'])for(const reverse of [false,true])for(const speed of [.82,.93,1,1.18])for(const seed of [.02,.4,.98])for(const hz of [30,60,120]){
+  const base={type,duration:(type==='walker'?60:70)/speed,seed,lane:.5,reverse,speed},event={...base,activityDuration:base.duration,duration:ctx.LandscapeGeometry.create(8192,900).walkingLifetime(base)},age=base.duration*.43,step=1/hz;
+  const a=geo.groundPose('walker',{...event,age}),b=geo.groundPose('walker',{...event,age:age+step});
+  const previous=7*(geo.motionAge({...base,age:age+step})-geo.motionAge({...base,age}));
+  assert.ok(Math.abs(Math.abs(b.x-a.x)-previous*.5)<1e-8,`scheduled ${type} speed=${speed} seed=${seed} ${hz}Hz must halve prior actual pace rather than multiply it twice`);
+ }
+});
+
+test('RISK pedestrian reduced painter consumer: production-shaped static events use the same settled representative as the app',async()=>{
+ const {readMotionBuild,createMotionProbe}=await import('./scripts/motion-review-harness.mjs'),build=readMotionBuild(__dirname,'WORKTREE'),ctx=sceneTimeline();
+ vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-winter.js'),'utf8'),ctx);
+ for(const actor of ['walker','dogwalker','reader','snowman','snowangel']){
+  const g=ctx.LandscapeGeometry.create(390,844),duration=ctx.LandscapeConfig.eventDurations[actor],base={type:actor,duration,seed:.4,lane:.5,reverse:false,speed:.82};
+  const event={...base,activityDuration:duration,duration:ctx.LandscapeGeometry.create(8192,900).walkingLifetime(base)},probe=createMotionProbe(build,{width:390,height:844});
+  const staticFrame=probe.sample({actor,event,progress:.5,reduced:true,zoom:1}),age=g.stillWalkingAge(event),direct=probe.sample({actor,event:{...event,age},zoom:1});
+  assert.deepEqual(staticFrame,direct,'actual static painter must choose the exact production representative');
+ }
 });

@@ -12,14 +12,15 @@
     // Each visit keeps its exact entrance, exit and lifetime, but eases through
     // two or three gentle seeded pace changes. Independent axis phases stop
     // airborne and breaching visitors from tracing one mechanical diagonal.
-    function motionProgress(event,axis='x',offset=0){
-      const raw=rawProgress(event);
+    function motionProgress(event,axis='x',offset=0,unbounded=false){
+      const raw=unbounded?Math.max(0,(Number(event?.age)||0)/Math.max(.001,Number(event?.duration)||1)):rawProgress(event);
       if(raw===0||raw===1)return raw;
       const seed=clamp(event?.seed??.5),salt=axis==='y'?.417:.071;
       const character=unit(seed+Number(offset||0)*.61803398875+salt);
       const strength=.16+.06*unit(character*7.13+.29),cycles=2+(unit(character*5.37+.11)>.5?1:0);
       const phase=Math.PI*2*unit(character*11.71+.23),angle=Math.PI*2*cycles*raw;
-      return clamp(raw+strength/(Math.PI*2*cycles)*(Math.sin(angle+phase)-Math.sin(phase)));
+      const value=raw+strength/(Math.PI*2*cycles)*(Math.sin(angle+phase)-Math.sin(phase));
+      return unbounded?value:clamp(value);
     }
     const motionAge=(event,axis='x',offset=0)=>motionProgress(event,axis,offset)*Math.max(.001,Number(event?.duration)||1);
     // Vehicle silhouettes cross at a constant horizontal rate. Their bodies,
@@ -220,9 +221,44 @@
     const groundAnchor=(kind,x)=>trail(x)+(kind==='walker'?5:15);
     // Local meadow journeys keep speed independent of viewport width.
     const groundTravelX=(age,reverse=false,lane=.5,duration=22,speed=6)=>W*(.18+lane*.64)+(reverse?-1:1)*(age-duration/2)*speed;
+    const walkingTypes=new Set(['walker','dogwalker','reader','couple','picnic','kite','snowman','snowangel']);
+    const activityDuration=e=>Math.max(.001,Number(e.activityDuration??e.duration)||1);
+    // A walking clock may outlive its admission reservation. Its analytic wave
+    // stays monotone after the old endpoint; no frame history or deadline sprint.
+    const walkingClock=e=>motionProgress({...e,duration:activityDuration(e)},'x',0,true)*activityDuration(e);
+    const walkingSpeed=e=>e.type==='snowman'?Math.min(3.5,W*.4/activityDuration(e)):3.5;
+    const walkingPlans=new Map();
+    function walkingPlan(e){
+      const key=JSON.stringify([e.type,activityDuration(e),e.reverse,e.seed,e.lane,e.speed]);
+      if(walkingPlans.has(key))return walkingPlans.get(key);
+      const duration=activityDuration(e),direction=e.reverse?-1:1,seed=clamp(e.seed??.5),speed=walkingSpeed(e);
+      let anchor=W*(.1+(Number(e.lane)||0)*.8),start=direction>0?-32:W+32,begin=0;
+      if(['reader','couple','picnic','kite'].includes(e.type)){start=anchor;begin=duration*(.94+Math.min(.999999,seed)*.12);}
+      if(e.type==='snowman'){anchor=W*(.18+(Number(e.lane)||0)*.64);start=anchor-direction*13*Math.min(1,Math.max(.85,W/720));begin=duration*.68;}
+      if(e.type==='snowangel'){anchor=W*(.18+(Number(e.lane)||0)*.64);begin=Math.abs(anchor-start)/speed+duration*.72;start=anchor;}
+      const exit=direction>0?W+80:-80,length=Math.abs(exit-start);
+      const at=age=>Math.max(0,walkingClock({...e,age})-begin)*speed;
+      let low=0,high=begin+length/(speed*.75)+duration;
+      for(let i=0;i<48;i++){const mid=(low+high)/2;if(at(mid)<length)low=mid;else high=mid;}
+      const plan=Object.freeze({direction,speed,anchor,start,begin,length,duration:Math.ceil(high*1000)/1000});
+      walkingPlans.set(key,plan);if(walkingPlans.size>4096)walkingPlans.delete(walkingPlans.keys().next().value);
+      return plan;
+    }
+    function stillWalkingAge(e){
+      const duration=activityDuration(e),plan=walkingPlan(e);
+      let target=duration*.5;
+      if(['walker','dogwalker'].includes(e.type))target=(W/2+32)/plan.speed;
+      else if(['reader','couple','picnic','kite'].includes(e.type))target=duration*.62;
+      else if(e.type==='snowangel')target=Math.abs(plan.anchor-(e.reverse?W+32:-32))/plan.speed+duration*.38;
+      let low=0,high=target+duration;
+      for(let i=0;i<48;i++){const mid=(low+high)/2;if(walkingClock({...e,age:mid})<target)low=mid;else high=mid;}
+      return (low+high)/2;
+    }
+    function walkingLifetime(e){return walkingTypes.has(e.type)?walkingPlan(e).duration:e.duration;}
     function groundPose(kind,e){
-      const direction=e.reverse?-1:1,speed=kind==='walker'?7:6,age=motionAge(e,'x');
+      const direction=e.reverse?-1:1,speed=kind==='walker'?3.5:kind==='deer'?3:6,age=motionAge(e,'x');
       let x=groundTravelX(age,e.reverse,e.lane,e.duration,speed),hop=0;
+      if(kind==='walker'&&e.activityDuration){const plan=walkingPlan(e),distance=walkingClock(e)*plan.speed;return {x:plan.start+direction*distance,y:groundAnchor(kind,plan.start+direction*distance),direction,hop,distance,travel:{kind:'constant',startDistance:0,speed:plan.speed}};}
       if(kind==='rabbit'){
         const cycle=age/1.2,phase=cycle%1,flight=Math.max(0,(phase-.3)/.7),travel=Math.floor(cycle)*10+flight*10;
         x=W*(.18+e.lane*.64)+direction*(travel-e.duration/1.2*5);
@@ -243,6 +279,15 @@
       return {x,y:groundAnchor('walker',x),direction,distance:distance+Math.sin(distance*.15)*4};
     }
     function visitPose(e,f){
+      if(e.activityDuration){
+        const plan=walkingPlan(e),clock=walkingClock(e),duration=activityDuration(e),direction=plan.direction,anchor=plan.anchor;
+        const smooth=(a,b,v)=>{const q=clamp((v-a)/(b-a));return q*q*(3-2*q);};
+        const arrival=smooth(0,duration*.24,clock),activity=(clock-duration*.12)/duration;
+        const departureStart=.82+Math.min(.999999,clamp(e.seed??.5))*.12;
+        const leaving=Math.max(0,clock-plan.begin)*plan.speed;
+        const x=anchor-direction*40*(1-arrival)+direction*leaving;
+        return {x,y:trail(x)+19,anchor,direction,distance:40*arrival+leaving,travel:{kind:'constant',startDistance:40,speed:plan.speed},pack:smooth(departureStart-.1,departureStart,activity),stand:Math.max(1-arrival,smooth(departureStart-.06,departureStart,activity)),walkAmount:clock<duration*.24?1-arrival:leaving>0?1:0,walking:clock<duration*.24||leaving>0};
+      }
       const smooth=(a,b,v)=>{const q=Math.max(0,Math.min(1,(v-a)/(b-a)));return q*q*(3-2*q);};
       const direction=e.reverse?-1:1,anchor=W*(.1+e.lane*.8);
       // Seeded visitors no longer all stand at the same fraction of their
@@ -507,7 +552,7 @@
       // The clearings depend on terrain rather than a viewport-specific y value.
       const clearings=Array.from({length:12},(_,i)=>W*(.15+i*.7/11)).filter(x=>Math.max(near(x-24),near(x),near(x+24))<H-65);
       const anchor=clearings[Math.min(clearings.length-1,Math.floor(e.lane*clearings.length))]||W*.7;
-      const direction=e.reverse?-1:1,distance=motionAge(e,'x')*.22;
+      const direction=e.reverse?-1:1,distance=motionAge(e,'x')*.11;
       const x=anchor+direction*(distance-19.8),y=Math.max(near(x)+18,H-28-e.seed*25);
       return {x,y,direction,distance,scale:W<600?1.25:1.6};
     }
@@ -761,7 +806,7 @@
       const field=packet*.68+detail*.32;
       return {dx:envelope*(.33*field+.1*Math.sin(x*.071+depth*.24-phase*.63)),dy:envelope*1.25*field};
     };
-    return {routeProgress,motionProgress,motionAge,verticalOffset,visitPose,humanWalkPose,humanGround,woodlandPose,duckPose,waterDepth,cycleLeg,deerLeg,nestVisit,eventDepth,dogPose,skater,festival,bannerLayout,fireworks,flock,dolphin,starReflection,reflectionSurface,reflectionMotion,castShadow,grassBand,sunReflection,depthBand,groundAnchor,groundTravelX,groundPose,strideArm,strideFoot,wingFold,balloonDrift,vessel,foregroundTree,nest,ripple,skyPoint,horizon,waterTop,far,middle,near,rail,trail,lowerRail,railCars,tangent,rider,pack,cityscape,partyBeamPose,rooftopPartySchedule,createRooftopPartyScheduler,advanceRooftopParty,clocktowerRoof,clocktowerVisitSchedule,createClocktowerVisitScheduler,advanceClocktowerVisit,clocktowerVisitPoses};
+    return {stillWalkingAge,walkingLifetime,walkingPlan,walkingClock,walkingSpeed,routeProgress,motionProgress,motionAge,verticalOffset,visitPose,humanWalkPose,humanGround,woodlandPose,duckPose,waterDepth,cycleLeg,deerLeg,nestVisit,eventDepth,dogPose,skater,festival,bannerLayout,fireworks,flock,dolphin,starReflection,reflectionSurface,reflectionMotion,castShadow,grassBand,sunReflection,depthBand,groundAnchor,groundTravelX,groundPose,strideArm,strideFoot,wingFold,balloonDrift,vessel,foregroundTree,nest,ripple,skyPoint,horizon,waterTop,far,middle,near,rail,trail,lowerRail,railCars,tangent,rider,pack,cityscape,partyBeamPose,rooftopPartySchedule,createRooftopPartyScheduler,advanceRooftopParty,clocktowerRoof,clocktowerVisitSchedule,createClocktowerVisitScheduler,advanceClocktowerVisit,clocktowerVisitPoses};
   }
   root.LandscapeGeometry={create};
 })(globalThis);

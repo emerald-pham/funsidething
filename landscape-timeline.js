@@ -43,6 +43,13 @@
       return sunCache.get(minute);
     };
     const terrain=n=>terrainSample(n,seed),city=root.LandscapeGeometry.create(1440,900).cityscape(terrain);
+    // Keep logical lifetimes identical across browsers and resize. The shared
+    // finite travel budget covers canvases through 8192 CSS pixels; smaller
+    // canvases simply finish painting a visit earlier, without changing admission.
+    const walkingGeometry=root.LandscapeGeometry.create(8192,900);
+    const walkingLookback=MAX_LIFE*3+(8192+200)/1.4;
+    const visibleDuration=e=>walkingGeometry.walkingLifetime(e);
+    const extendWalk=e=>{const duration=visibleDuration(e);return duration===e.duration?e:{...e,activityDuration:e.duration,duration};};
     const roofs=city.partyRoofs,gardens=[...city.gardens,...city.patios].map(roof=>roof.index).sort((a,b)=>a-b);
     const wind=.6+sample(seed,'wind')*1.2,visitSeed=sample(seed,'visitors');
     function ordinary(from,to){
@@ -88,22 +95,24 @@
     const overlaps=(a,b)=>a.start<b.start+reservationDuration(b)&&b.start<a.start+reservationDuration(a);
     function build(bucket){
       const from=bucket*8,to=from+8;
-      // At most five minutes of ordinary lifetimes and thirty minutes of rare
-      // reservations influence an admission. This bound does not grow with age
-      // of the app, offline time, or the number of previously rendered frames.
-      const raw=ordinary(from-MAX_LIFE*2,to+MAX_LIFE);
-      const rareRaw=[...ordinary(from-MAX_LIFE-1800,to+MAX_LIFE).filter(e=>e.type==='abduction'),
-        ...festivals(from-MAX_LIFE-1800,to+MAX_LIFE)].sort((a,b)=>a.start-b.start);
+      // Visual walks need a viewport-bounded history; admission still uses only
+      // the original finite reservations. Extra history is immutable proposals,
+      // never a queue accumulated while the tab was asleep.
+      const raw=ordinary(from-walkingLookback-MAX_LIFE*2,to+MAX_LIFE);
+      const rareRaw=[...ordinary(from-walkingLookback-MAX_LIFE-1800,to+MAX_LIFE).filter(e=>e.type==='abduction'),
+        ...festivals(from-walkingLookback-MAX_LIFE-1800,to+MAX_LIFE)].sort((a,b)=>a.start-b.start);
       const rare=rareRaw.filter(e=>!rareRaw.some(prior=>prior.start<e.start&&
         e.start-prior.start<(e.type==='festival'&&prior.type==='festival'?C.nightShows.festival.cooldown:S.RARE_COOLDOWN)));
       const barges=rare.filter(e=>e.type==='festival');
-      const day=Math.floor(from/DAY),proposals=[...fireworks(day-1),...fireworks(day)].sort((a,b)=>a.start-b.start);
+      const day=Math.floor(from/DAY),proposals=[];
+      for(let d=Math.floor((from-walkingLookback)/DAY)-1;d<=day;d++)proposals.push(...fireworks(d));
+      proposals.sort((a,b)=>a.start-b.start);
       const shows=proposals.filter((e,index)=>e.start<to&&e.start+reservationDuration(e)>from&&
         (!index||e.start>=proposals[index-1].start+(C.nightShows.fireworks.occurrenceScale||1)*(proposals[index-1].scheduleDuration+C.nightShows.fireworks.rest))&&
         !barges.some(barge=>overlaps(e,barge)));
       const pool=[...raw.filter(e=>e.type!=='abduction'),...rare,...shows].sort((a,b)=>a.start-b.start||a.id.localeCompare(b.id));
       const events=pool.filter(e=>{
-        if(e.start>=to||e.start+reservationDuration(e)<=from)return false;
+        if(e.start>=to||e.start+visibleDuration(e)<=from)return false;
         const prior=pool.filter(other=>(other.start<e.start||other.start===e.start&&other.id<e.id)&&other.start+reservationDuration(other)>e.start);
         if(prior.length>=S.MAX_EVENTS-2)return false;
         if(['banner','skywriter','meteor','bird','dolphin'].includes(e.type)&&prior.some(other=>other.type===e.type))return false;
@@ -134,7 +143,9 @@
         const speed=S.startingSpeed(r());woods.push({id:`woodland:${slot}`,type:C.woodland.types[index],start,duration:C.woodland.duration/speed,speed,seed:r(),lane:r(),reverse:r()>.5});
       }
       const woodland=woods.filter(e=>e.start<to&&e.start+reservationDuration(e)>from&&woods.filter(prior=>prior.start<e.start&&prior.start+prior.duration>e.start).length<C.woodland.maxActive);
-      return {events,woodland};
+      // Admission always saw the original durations above. Only accepted visits
+      // receive a longer visual lifetime, so slowing a walk cannot reroll traffic.
+      return {events:events.map(extendWalk),woodland};
     }
     function rareVisit(seconds,stream,interval,duration,chance,rate=1){
       const slot=Math.floor(seconds/interval),start=slot*interval,r=random(seed,stream,slot);

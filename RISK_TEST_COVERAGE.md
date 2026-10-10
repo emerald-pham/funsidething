@@ -770,7 +770,7 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK human grip endpoints: complete carrying retains its exact hip offset across every cadence
 
 - RISK carrying recovery: rejected actual phone sequence requires strikes opposed swing and a coherent flight arc
-- RISK carrying isolation: immutable accepted renderer commands match exactly on the same runtime
+- RISK carrying isolation: immutable accepted renderer commands stay exact outside requested walker pace changes
 
 - RISK carrying continuity: stable actor capability preserves resting grip transitions and deterministic departure seeks
 
@@ -869,3 +869,19 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 ## Cloud acknowledgement ordering
 
 - RISK cloud self-echo: focus pull during own acknowledgement retains latest task edit without stale rejection
+
+## Pedestrian walking routes
+
+- RISK pedestrian natural exit: ordinary and dog walkers stay opaque until their whole party clears the viewport
+- RISK pedestrian half pace: ordinary and dog walking translation uses half the prior local pace
+- RISK pedestrian departure pace: carrying and winter people leave at a walking pace without a lifetime sprint
+- RISK pedestrian scheduled lifetime: accepted walkers retain admission duration and survive until a full viewport exit
+- RISK pedestrian companion pace: walking deer and woodland paws halve translation and distance together while hopping stays unchanged
+- RISK pedestrian visual tail preservation: longer paint lifetimes never reroll released admission or nonwalking effects
+- RISK pedestrian complete parties: scheduled walking routes clear both edges at bounded pace and paint without terminal fade
+- RISK pedestrian reduced motion: static production poses keep walkers on screen and winter activities settled
+
+- RISK pedestrian winter tail shadows: retired structures leave no ghost shadow while the walking person remains opaque
+
+- RISK pedestrian production half pace: scheduled ordinary and dog walkers halve the actual prior trajectory at every sampled seed and frame rate
+- RISK pedestrian reduced painter consumer: production-shaped static events use the same settled representative as the app
