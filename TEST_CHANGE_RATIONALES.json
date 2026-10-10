@@ -1,5 +1,21 @@
 [
   {
+    "testChangesSha256": "a8f77d9767d4ae43ef3f544998f7b44886ac32110f5c6c14441fdeda8d438832",
+    "reason": "User explicitly replaces the bespoke Postpone appearance with the established Edit component on ordinary and final scanner surfaces; preserve the action and theme contracts rather than test a now-rejected fixed-color skin.",
+    "previousBehavior": "Postpone used custom borders fixed colors weight700 and a shadow; ordinary Postpone also had larger type and padding. Previous white-color-only regression and rendered bounds review did not compare its equivalent Edit control.",
+    "intendedBehavior": "Both Postpone surfaces reuse exactly Edit btn sm subtle classes and theme tokens, including sizing font weight border shadow focus and disabled treatment. Light-theme white surface remains; dark treatment follows the latest Edit reference.",
+    "replacementTests": [
+      "RISK Postpone: every scanner surface reuses the established Edit control treatment"
+    ],
+    "preservedCoverage": [
+      "All existing Postpone action duration expiry dependency reload sync Undo Restore and unknown-format protections remain unchanged; existing Edit and palette controls retain their established component."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='every scanner surface reuses the established Edit control treatment' tests.js; parent-allocated rendered baseline13:49–13:50UTC via /tmp/postpone-edit-style-probe.mjs",
+      "failure": "Observed mounted RED /tmp/postpone-edit-style-red.log before app edit: class mismatch btn postpone vs btn sm subtle. Actual rendered RED /tmp/postpone-edit-style-browser-red.log and /tmp/postpone-edit-style-red/results.json completed13:49:13.227UTC:12cases mismatch normal/hover/focus/disabled ordinary/final light/dark phone/desktop/enlarged; actual typography,border,shadow,padding differ. Physicalhandback13:49:20.933UTC before minimal class/token correction."
+    }
+  },
+  {
     "testChangesSha256": "15182897813adc3e697958bf69656a88aabbb4ca62923b1ad14a25895f25a4e7",
     "reason": "Protect latest local intent against a verified one-client cloud acknowledgement/focus read race without relaxing conditional writes. Adapt the prior immediate cloud adoption assertion to the intentionally serialized read; retain revision 6 and lower-ACK protection through actual peer-browser adoption.",
     "previousBehavior": "A focus cloud read during an unacknowledged own write adopts First edit and discards the subsequent Latest edit as a field conflict.",

@@ -24239,8 +24239,20 @@ test('RISK Postpone: actual backup Restore completion Undo and pass resets retai
  ctx.pushUndo();ctx.writeTaskPostpone(ctx.state.tasks.find(t=>t.id===task.id),0);ctx.commit();const later=ctx.addTask('Later task');await ctx.persist();ctx.openSettings();assert.equal(await ctx.restoreDurableBackupById(backup.id),true);assert.equal(ctx.taskPostponeUntil(ctx.state.tasks.find(t=>t.id===task.id)),until);assert.ok(ctx.state.tasks.some(t=>t.id===later.id));const stable=JSON.stringify(ctx.state.tasks.find(t=>t.id===task.id).postponeOps);ctx.mergeUndeletedTasks(ctx.state,JSON.parse(snapshot));assert.equal(JSON.stringify(ctx.state.tasks.find(t=>t.id===task.id).postponeOps),stable);ctx.undo();assert.equal(ctx.taskPostponeUntil(ctx.state.tasks.find(t=>t.id===task.id)),0);assert.ok(ctx.state.tasks.some(t=>t.id===later.id));
 });
 
-test('RISK Postpone: white control retains named theme palette colors',async()=>{
- assert.match(fs.readFileSync(new URL('./index.html',import.meta.url),'utf8'),/\.btn\.postpone\{background:light-dark\(#fff,#fff\);color:light-dark\(#20242b,#20242b\);border:1px solid light-dark\(#999,#999\)\}/);
+test('RISK Postpone: every scanner surface reuses the established Edit control treatment',async()=>{
+ const assertShared=(html,action,editId)=>{
+  const buttons=[...html.matchAll(/<button class="([^"]+)" data-act="([^"]+)"([^>]*)>/g)];
+  const edit=buttons.find(m=>m[2]==='edit'&&m[3].includes('data-id="'+editId+'"'));
+  const postpone=buttons.find(m=>m[2]===action);assert.ok(edit&&postpone,'both actual controls must render');
+  assert.deepEqual(postpone[1].split(/\s+/).sort(),edit[1].split(/\s+/).sort(),'Postpone must share Edit shape size weight borders shadow and state selectors, rather than approximate its white paint');
+  assert.deepEqual(edit[1].split(/\s+/).sort(),['btn','sm','subtle'],'the established Edit component stays intact');
+ };
+ const scan=await loadApp({seed:997});addTaskAged(scan.ctx,'Oldest',900000);addTaskAged(scan.ctx,'Candidate',1000);scan.ctx.startScan('descending');scan.ctx.render();
+ assertShared(scan.shim.elements.get('scan').innerHTML,'postpone',scan.ctx.state.candidateId);
+ for(const woop of [false,true]){const {ctx,shim}=await loadApp({seed:998});const t=ctx.addTask('Only remaining task',true);ctx.state.settings.lastTaskWoop=woop;ctx.state.mode='work';ctx.render();assertShared(shim.elements.get('scan').innerHTML,'bench-postpone',t.id);}
+ const source=fs.readFileSync(new URL('./index.html',import.meta.url),'utf8');assert.doesNotMatch(source,/\.btn\.postpone\s*\{/,'no separate Postpone skin may drift from Edit');
+ assert.match(source,/\.btn\.subtle\{background:var\(--surface\);color:var\(--ink\);border:1px solid var\(--line\);box-shadow:none;font-weight:600\}/,'Edit surface remains white in the light palette and follows its established dark token');
+ assert.match(source,/\.btn\.subtle:disabled\{/,'shared disabled treatment remains available');
 });
 
 test('RISK Postpone layout: mounted duration field uses the bounded numeric Settings width',async()=>{
