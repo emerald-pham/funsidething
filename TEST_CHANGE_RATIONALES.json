@@ -1,5 +1,21 @@
 [
   {
+    "testChangesSha256": "a21cf83675b737398b0571a57e58f0c776dd9b70a8043e5075018c00f18c7168",
+    "reason": "Protect numeric Settings containment after independently observed enlarged recurrence-row horizontal overflow, retaining ordinary numeric widths and all behavior tests.",
+    "previousBehavior": "Native defaultEvergreen numeric intrinsic width widened the open recurrence row to right459/499.8 beyond its modalright362 at200percent in actual Chrome/WebKit captures.",
+    "intendedBehavior": "Settings numeric controls have min-width0 and max-width100percent so intrinsic widths cannot widen narrow rows; normal widths, duration semantics and save behavior remain unchanged.",
+    "replacementTests": [
+      "RISK Postpone layout: Settings numeric fields contain intrinsic widths in narrow recurrence rows"
+    ],
+    "preservedCoverage": [
+      "All Postpone/scanner/settings validation/recurrence/Undo/cloud/dependency tests remain unchanged. Only direct layout containment coverage is added; context controls with closed-disclosure measurement artifacts are not altered."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='numeric fields contain intrinsic' tests.js",
+      "failure": "Observed direct numericcontainment RED /tmp/postpone-numeric-containment-red.log beforeCSSrule. Actual8aSavedialog openrecurrence defaultEvergreeninput andlabel beyondmodalbounds were independently reviewed in /tmp/postpone-modal-final/results.json; finalrowfit/runtimeinteraction remainmandatory beforepublication."
+    }
+  },
+  {
     "testChangesSha256": "62b84038235fe32fb3bfe2ac8aa2bae3564adff3ca95bd71b39f358e6dbd066d",
     "reason": "Add direct modal available-height protection after actual baseline/candidate enlarged Settings Save proved unreachable, preserving ordinary viewport cap and existing scrolling.",
     "previousBehavior": "The modal88vh cap becomes1485physicalpixels at200percent enlargement despite an844pixel viewport, leaving Save1449–1537 at maximumscroll outside all hit-tested viewport points.",
@@ -49,7 +65,7 @@
     }
   },
   {
-    "testChangesSha256": "b446d795a1fde0deb6606b223092c18253acf8bda059c73ce45a063a9f14e969",
+    "testChangesSha256": "68d23399650969df2a86718a966ee26239f9d16d5e8e243594099c9102599a2e",
     "reason": "Protect the requested persisted task deferral across actual scanner controls, Settings, expiry, causal reconciliation and Undo without weakening existing contracts.",
     "previousBehavior": "The scanner had no Postpone action or configurable one-hour deferral; tasks could not be temporarily deferred independently of pass marks and rating actions.",
     "intendedBehavior": "Postpone excludes the displayed task until its saved deadline, preserves unrelated task and rating fields, and merges safely across current clients.",
@@ -62,14 +78,15 @@
       "RISK Postpone: actual backup Restore completion Undo and pass resets retain deferral intent",
       "RISK Postpone: white control retains named theme palette colors",
       "RISK Postpone layout: mounted duration field uses the bounded numeric Settings width",
-      "RISK Postpone layout: modal height preserves the viewport cap and fits the available backdrop"
+      "RISK Postpone layout: modal height preserves the viewport cap and fits the available backdrop",
+      "RISK Postpone layout: Settings numeric fields contain intrinsic widths in narrow recurrence rows"
     ],
     "preservedCoverage": [
       "Existing ordered benchmark actions remain protected, adding only the authorized seventh Postpone action; every action still requires .sm sizing. Exact deadline assertions use a controlled fixture clock. Existing palette and FAQ-length contracts remain unchanged, as do recurrence, completion, editor, cloud, storage and rating assertions. Reload eligibility uses the same controlled instant as the postponement, avoiding a real-clock expiry race."
     ],
     "redEvidence": {
       "command": "node --test --test-name-pattern='RISK Postpone:' tests.js",
-      "failure": "Observed before implementation: mounted Postpone control missing; postponeHours undefined; peer task remained eligible after ignored action. /tmp/postpone-red.log. Later new stale-chain consumer test failed true !== false before chain-pruning fix: /tmp/postpone-cloud-red.log. Specialist finding RED before opaque-preservation fix: old winner adopts opaque peer bytes failed with undefined at /tmp/postpone-opaque-red.log. Completion/Restore/pass-reset coverage was added as supplementary postimplementation validation, not claimed as a new preimplementation RED. Required CI 38050059531 observed six-versus-seven action expectations, theme palette escape, FAQ answer length, and a one-millisecond real-clock test race. Focused FAQ RED /tmp/postpone-ci-fixes-red.log and actual palette assertion RED /tmp/postpone-palette-red.log preceded CSS/copy repairs. No functional deferral semantics changed in these repairs. Actual candidate200%Settings captures showed new input377/418physicalpixels exceeding visible modal width226; independent reassessment requires correction rather than preexisting waiver. Mounted Settings field width RED /tmp/postpone-settings-width-red.log preceded bounded numeric style repair. FAQ and Save reachability remain unproven pending focused runtime. Actual8f08Chrome/WebKitzoom2atmaximumscroll still placedSave at y1449 beyond844viewport withnohitpoint, modalbottom1569, retainedoutsideviewporterrors andnoactualsave. /tmp/postpone-accessibility.log and results.json are meaningful observed RED before modalheight fix; directcapRED /tmp/postpone-modal-red.log preceded CSS repair. EntireFAQanswers and durationfieldfit passed in same run."
+      "failure": "Observed before implementation: mounted Postpone control missing; postponeHours undefined; peer task remained eligible after ignored action. /tmp/postpone-red.log. Later new stale-chain consumer test failed true !== false before chain-pruning fix: /tmp/postpone-cloud-red.log. Specialist finding RED before opaque-preservation fix: old winner adopts opaque peer bytes failed with undefined at /tmp/postpone-opaque-red.log. Completion/Restore/pass-reset coverage was added as supplementary postimplementation validation, not claimed as a new preimplementation RED. Required CI 38050059531 observed six-versus-seven action expectations, theme palette escape, FAQ answer length, and a one-millisecond real-clock test race. Focused FAQ RED /tmp/postpone-ci-fixes-red.log and actual palette assertion RED /tmp/postpone-palette-red.log preceded CSS/copy repairs. No functional deferral semantics changed in these repairs. Actual candidate200%Settings captures showed new input377/418physicalpixels exceeding visible modal width226; independent reassessment requires correction rather than preexisting waiver. Mounted Settings field width RED /tmp/postpone-settings-width-red.log preceded bounded numeric style repair. FAQ and Save reachability remain unproven pending focused runtime. Actual8f08Chrome/WebKitzoom2atmaximumscroll still placedSave at y1449 beyond844viewport withnohitpoint, modalbottom1569, retainedoutsideviewporterrors andnoactualsave. /tmp/postpone-accessibility.log and results.json are meaningful observed RED before modalheight fix; directcapRED /tmp/postpone-modal-red.log preceded CSS repair. EntireFAQanswers and durationfieldfit passed in same run. Independent final8aSettingsgeometry found defaultEvergreeninput/labelright459Chrome/499.8WebKit pastmodalright362 in openrecurrence section. DirectnumericcontainmentRED /tmp/postpone-numeric-containment-red.log preceded one sharedSettings numericmin0/max100 rule. Normal widths/values remain unchanged; finalenlargedrowrecapturepending."
     }
   },
   {

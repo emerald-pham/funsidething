@@ -24245,3 +24245,7 @@ test('RISK Postpone layout: mounted duration field uses the bounded numeric Sett
 test('RISK Postpone layout: modal height preserves the viewport cap and fits the available backdrop',()=>{
  const html=fs.readFileSync(new URL('./index.html',import.meta.url),'utf8');const modal=html.match(/\.modal\{[^}]+\}/)?.[0];assert.match(modal,/max-height:min\(88vh,100%\)/,'the scroll container must fit its fixed backdrop so bottom Save remains reachable at enlarged size');assert.match(modal,/overflow-y:auto/,'ordinary vertical scrolling remains available');
 });
+
+test('RISK Postpone layout: Settings numeric fields contain intrinsic widths in narrow recurrence rows',async()=>{
+ const {ctx,shim}=await loadApp();ctx.openSettings();assert.match(shim.document.getElementById('modalRoot').innerHTML,/<input id="stEverHours" type="number"/,'the existing recurrence duration shares this visible Settings section');const html=fs.readFileSync(new URL('./index.html',import.meta.url),'utf8');assert.match(html,/\.settings-section \.frow input\[type=number\]\{min-width:0;max-width:100%\}/,'native numeric intrinsic width must not widen the Settings row at enlarged size');
+});
