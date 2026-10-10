@@ -22564,13 +22564,18 @@ test('RISK fireworks natural tails: final embers retain their complete formula l
 });
 
 test('RISK fireworks reservations: shortening visibility preserves previously suppressed shows and visitor admissions',()=>{
- const current=sceneTimeline(),released=vm.createContext({Math,Date,console});
+ const current=sceneTimeline(),uncapped=sceneTimeline({'landscape-timeline.js':source=>{
+  assert.equal(source.split('Math.min(base,60)').length,2,'the isolated comparison changes only the display cap');
+  return source.replace('Math.min(base,60)','base');
+ }}),released=vm.createContext({Math,Date,console});
  for(const file of ['landscape-config.js','vendor/astronomy.min.js','stars.js','landscape-core.js','landscape-geometry.js','landscape-timeline.js'])vm.runInContext(spawnSync('git',['show','4d495cd58d9c6cc6f7d0bcb3812b7027a266d36a:'+file],{cwd:__dirname,encoding:'utf8'}).stdout,released);
- current.LandscapeConfig.setSpawnRates('| Event | Rate |\n| festival | 5 |');released.LandscapeConfig.setSpawnRates('| Event | Rate |\n| festival | 10 |');
- const options={seed:'reservation-cap',sunAt:()=>({altitude:-20,azimuth:0})},a=current.LandscapeTimeline.create(options),old=released.LandscapeTimeline.create(options);
+ const rates='| Event | Rate |\n| festival | 5 |';current.LandscapeConfig.setSpawnRates(rates);uncapped.LandscapeConfig.setSpawnRates(rates);released.LandscapeConfig.setSpawnRates('| Event | Rate |\n| festival | 10 |');
+ const options={seed:'reservation-cap',sunAt:()=>({altitude:-20,azimuth:0})},a=current.LandscapeTimeline.create(options),unclipped=uncapped.LandscapeTimeline.create(options),old=released.LandscapeTimeline.create(options);
  for(let seconds=3080;seconds<=3160;seconds+=10){
-  const ids=events=>Array.from(events,e=>e.id).sort();
-  assert.deepEqual(ids(a.at(seconds*1000).events),ids(old.at(seconds*1000).events.filter(e=>e.type!=='fireworks'||e.age<60)),'display cap cannot admit extra shows or resample other visitors');
+  const ids=events=>Array.from(events,e=>e.id).sort(),visible=events=>events.filter(e=>e.type!=='fireworks'||e.age<60),unchanged=events=>events.filter(e=>!['train','metro'].includes(e.type)),actual=a.at(seconds*1000).events;
+  assert.deepEqual(ids(actual),ids(visible(unclipped.at(seconds*1000).events)),'display cap cannot admit extra shows or resample any current visitors, including seeded-chance rails');
+  // Rail admission was explicitly changed; the historical oracle still protects every unchanged visitor.
+  assert.deepEqual(ids(unchanged(actual)),ids(unchanged(visible(old.at(seconds*1000).events))),'display cap preserves historical shows and unchanged visitor admissions');
  }
 });
 
