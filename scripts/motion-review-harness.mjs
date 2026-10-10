@@ -30,8 +30,9 @@ function painterProgram(build){
  ${snippets.join('\n')}
  return {draw(ctx,options){
   g=ctx;const woodland=options.actor.startsWith('woodland:'),type=options.actor.replace('woodland:','');
-  const duration=options.duration||S.eventDurations[type]||180;
-  const e={type,duration,age:(options.reduced?.5:options.progress)*duration,seed:options.seed??.4,lane:options.lane??.5,reverse:!!options.reverse};
+  const duration=options.event?.duration||options.duration||S.eventDurations[type]||180;
+  const e={type,duration,age:(options.reduced?.5:options.progress)*duration,seed:options.seed??.4,lane:options.lane??.5,reverse:!!options.reverse,...options.event};
+  if(options.reduced&&e.activityDuration)e.age=geometry.stillWalkingAge(e);
   let pose,ground;
   if(woodland){pose=geometry.woodlandPose(e);ground=x=>Math.max(near(x)+18,H-28-e.seed*25);}
   else if(LandscapeWinter.types.includes(type)){pose=LandscapeWinter.pose(type,e,geometry,W,H);ground=x=>geometry[type==='snowangel'?'near':'middle'](x)+pose.snowOffset;if(type==='snowman')pose={...pose,x:pose.builderX,y:pose.builderGroundY,scale:pose.builderScale};}

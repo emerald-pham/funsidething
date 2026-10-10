@@ -1142,11 +1142,15 @@
   }
   function paintGuest(e,x,f,t){
 
+    if(e.activityDuration){
+      const position=['walker','dogwalker'].includes(e.type)?geometry.groundPose('walker',e).x:['reader','couple','picnic','kite'].includes(e.type)?geometry.visitPose(e,f).x:null;
+      if(position!==null&&(position<-80||position>W+80))return true;
+    }
     const dir=e.reverse?-1:1,c=color(e.seed),anchor=W*(.1+e.lane*.8),ground=trail(anchor)+19;
     const fy=geometry.motionProgress(e,'y'),verticalClock=geometry.motionAge(e,'y');
     if(['reader','picnic','couple','kite'].includes(e.type)){
       const visit=geometry.visitPose(e,f),paired=e.type==='picnic'||e.type==='couple';
-      const fade=S.smooth(0,.04,f),groundAt=x=>trail(x)+19;
+      const fade=e.activityDuration?1:S.smooth(0,.04,f),groundAt=x=>trail(x)+19;
       g.save();g.globalAlpha=fade;
       if(paired&&visit.pack<1){
         // The blanket folds inward while food is gathered, before anyone leaves.
@@ -1201,7 +1205,7 @@
       g.restore();return true;
     }
     if(e.type==='walker'||e.type==='dogwalker'){
-      const pose=geometry.groundPose('walker',e);g.save();g.globalAlpha=S.smooth(0,.06,f)*(1-S.smooth(.94,1,f));
+      const pose=geometry.groundPose('walker',e);g.save();g.globalAlpha=1;
       const skin=skinColor(e.seed),motion=geometry.humanWalkPose(pose.x,pose.y,pose.distance,dir,geometry.humanGround('trail',5),false,1,pose.travel);
       // The far arm passes behind the torso; both arms share the leg stride.
       const armAt=index=>{const arm=motion.arms[index],elbowX=pose.x+dir*(motion.hipX+arm.x)*.5,elbowY=pose.y-5.5+motion.bob;line(g,pose.x+dir*motion.hipX,pose.y-8+motion.bob,elbowX,elbowY,skin,1.3);line(g,elbowX,elbowY,pose.x+dir*arm.x,pose.y+arm.y,skin,1.3);};
@@ -1393,7 +1397,7 @@
     if(lastCitySlot!==sceneSnapshot.windowsSlot){lastCitySlot=sceneSnapshot.windowsSlot;paintBackground();}
     paintLife(world.elapsed);
   }
-  function scenePose(e,firework=false){return reduced?{...e,age:firework===true?(e.type==='festival'?e.duration:Math.min(e.duration,60))*.5:e.duration*.5,...(firework===true?{fireworkDeckAge:e.duration*.5,fireworkActive:e.age<(e.type==='festival'?e.duration:60)}:{})}:e;}
+  function scenePose(e,firework=false){return reduced?{...e,age:firework===true?(e.type==='festival'?e.duration:Math.min(e.duration,60))*.5:(e.activityDuration?geometry.stillWalkingAge(e):e.duration*.5),...(firework===true?{fireworkDeckAge:e.duration*.5,fireworkActive:e.age<(e.type==='festival'?e.duration:60)}:{})}:e;}
   function syncScene(now){
     const location=globalThis.LivingLocation?.current();
     const key=JSON.stringify([sceneSeason,location,S.readSceneTime(sceneStorage),S.readSceneSeason(sceneStorage)]);

@@ -23,8 +23,10 @@
   const finite = (value, fallback) => Number.isFinite(Number(value)) ? Number(value) : fallback;
 
   function eventValues(event, geometry, W) {
-    const duration = Math.max(.001, finite(event && event.duration, 1));
-    const progress = geometry.motionProgress(event, 'x');
+    const duration = Math.max(.001, finite(event && (event.activityDuration || event.duration), 1));
+    const natural=!!event?.activityDuration&&event.type!=='skier',clock=natural?geometry.walkingClock(event):geometry.motionAge(event,'x');
+    const arrivalSeconds=event?.type==='snowangel'?Math.abs((event.reverse?W+32:-32)-W*(.18+finite(event.lane,.5)*.64))/geometry.walkingSpeed(event):0;
+    const progress = natural?clamp((clock-(event.type==='snowangel'?arrivalSeconds-duration*.12:0))/duration,0,1):geometry.motionProgress(event, 'x');
     const verticalProgress = geometry.motionProgress(event, 'y');
     const lane = clamp(finite(event && event.lane, .5));
     const seed = clamp(finite(event && event.seed, .5));
@@ -32,7 +34,7 @@
     // Winter visitors share the trail visitor's visual weight. Preserve a
     // readable minimum on phones while keeping desktop people close to 1x.
     const scale = Math.min(1, Math.max(.85, W / 720));
-    return { duration, progress, verticalProgress, clock: geometry.motionAge(event, 'x'), lane, seed, direction, scale };
+    return { duration, progress, verticalProgress, clock, lane, seed, direction, scale, natural, arrivalSeconds };
   }
 
   function requireGeometry(geometry, W, H) {
@@ -72,8 +74,8 @@
     if (!TYPES.includes(type)) throw new RangeError('Unknown winter visitor');
     requireGeometry(geometry, W, H);
     const values = eventValues(event || {}, geometry, W);
-    const { duration, progress, verticalProgress, clock, lane, seed, direction, scale } = values;
-    const alpha = smooth(0, .06, progress) * (1 - smooth(.94, 1, progress));
+    const { duration, progress, verticalProgress, clock, lane, seed, direction, scale, natural, arrivalSeconds } = values;
+    const alpha = natural ? 1 : smooth(0, .06, progress) * (1 - smooth(.94, 1, progress));
 
     if (type === 'skier') {
       const x = skierX(progress, direction, lane, W);
@@ -98,32 +100,40 @@
       const finalFadeAlpha = smooth(.94, 1, progress);
       const structureAlpha = 1 - finalFadeAlpha;
       const builderWalk = smooth(.68, .98, progress);
-      const builderX = anchor - direction * 13 * scale + direction * W * .24 * builderWalk;
+      const walkDistance=natural?Math.max(0,clock-duration*.68)*geometry.walkingSpeed(event):W*.24*builderWalk;
+      const builderX = anchor - direction * 13 * scale + direction * walkDistance;
       const builderGroundY = geometry.middle(builderX) + snowOffset;
-      const builderAlpha = smooth(.05, .14, progress) * (1 - smooth(.90, .99, progress));
+      const builderAlpha = smooth(.05, .14, progress) * (natural?1:1 - smooth(.90, .99, progress));
       return {
         type, x: anchor, y: groundY, groundY, snowOffset,
-        builderX, builderGroundY, builderScale: scale, travel:{startDistance:0,length:W*.24,duration:duration*.30}, walkDistance: W * .24 * builderWalk, structureAlpha, patchAlpha: structureAlpha,
+        builderX, builderGroundY, builderScale: scale, travel:natural?{kind:'constant',startDistance:0,speed:geometry.walkingSpeed(event)}:{startDistance:0,length:W*.24,duration:duration*.30}, walkDistance, structureAlpha, patchAlpha: structureAlpha,
         finalFadeAlpha, angle: geometry.tangent(geometry.middle, anchor), scale, alpha,
         progress, verticalProgress, clock, lane, seed, direction, build,
         building: progress >= .08 && progress < .78,
-        builderLeaving: progress >= .68 && progress < .99,
+        builderLeaving: progress >= .68 && (natural || progress < .99),
         builderVisible: builderAlpha > 0, builderAlpha, walking: progress >= .68,
       };
     }
 
+    if(natural){
+      // The imprint keeps its original presentation clock; its person walks
+      // independently until the entire silhouette has crossed the viewport.
+      const start=direction>0?-32:W+32,speed=geometry.walkingSpeed(event);
+      activity.x=clock<arrivalSeconds?start+direction*clock*speed:anchor+direction*Math.max(0,clock-geometry.walkingPlan(event).begin)*speed;
+    }
+    const arriving=natural&&clock<arrivalSeconds;
     const imprintGroundY = geometry.near(anchor) + 9 + lane * 2;
     const bodyGroundY = geometry.near(activity.x) + 9 + lane * 2;
-    const bodyMode = smooth(.68, .84, progress);
+    const bodyMode = arriving?1-smooth(Math.max(0,arrivalSeconds-6),arrivalSeconds,clock):smooth(.68, .84, progress);
     const finalFadeAlpha = smooth(.94, 1, progress);
     const imprintAlpha = 1 - finalFadeAlpha;
     const armSweep = smooth(.12, .72, progress);
     const legSweep = clamp(.5 + .5 * Math.sin(armSweep * Math.PI * 2 + seed * 4));
-    const walking = progress >= .84;
+    const walking = arriving || progress >= .84;
     return {
       type, x: activity.x, y: bodyGroundY, groundY: bodyGroundY,
-      walkDistance: Math.abs(activity.x - anchor),
-      travel:{startDistance:0,length:Math.abs((direction>0?W*1.22:-W*.22)-anchor),duration:duration*.16},
+      walkDistance: natural?(arriving?clock*geometry.walkingSpeed(event):Math.abs(anchor-(direction>0?-32:W+32))+Math.abs(activity.x-anchor)):Math.abs(activity.x - anchor),
+      travel:natural?{kind:'constant',startDistance:0,speed:geometry.walkingSpeed(event)}:{startDistance:0,length:Math.abs((direction>0?W*1.22:-W*.22)-anchor),duration:duration*.16},
       imprintX: anchor, imprintGroundY, imprintAlpha, patchAlpha: imprintAlpha,
       snowOffset: 9 + lane * 2, angle: geometry.tangent(geometry.near, activity.x),
       scale: scale * .96, alpha, progress, verticalProgress, clock, lane, seed, direction,
@@ -138,6 +148,8 @@
     const type = event && event.type;
     if (!TYPES.includes(type)) return false;
     const poseValue = pose(type, event, geometry, W, H);
+    const personX=type==='snowman'?poseValue.builderX:poseValue.x;
+    if(event.activityDuration&&poseValue.progress>=1&&(personX<-80||personX>W+80))return true;
     const ellipse = helpers.ellipse;
     const line = helpers.line;
     const color = helpers.color || (() => palette && palette.front || '#8b9f9a');
@@ -186,7 +198,7 @@
     const depthScale = poseValue.scale;
     const shadowX = type === 'snowangel' ? poseValue.imprintX : poseValue.x;
     const shadowY = type === 'snowangel' ? poseValue.imprintGroundY : poseValue.groundY;
-    g.globalAlpha = sceneAlpha;
+    g.globalAlpha = sceneAlpha * (event.activityDuration ? type==='snowman'?clamp(poseValue.structureAlpha):type==='snowangel'?clamp(poseValue.imprintAlpha):1 : 1);
     if (typeof helpers.groundShadow === 'function') {
       g.globalAlpha *= type === 'snowman' ? clamp(poseValue.build) : 1;
       helpers.groundShadow(g, shadowX, shadowY, type === 'snowman' ? 24 * depthScale :
