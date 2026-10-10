@@ -24186,3 +24186,36 @@ test('RISK changelog editorial: public history omits internal housekeeping and r
  assert.match(notes,/retained older browser bytes are never deleted during migration/);
  assert.match(notes,/Conflicting or repeated IDs remain protected/);
 });
+
+test('RISK Postpone: mounted scanner action defers without rating or task edits and expiry restores soft eligibility',async()=>{
+ const {ctx,shim}=await loadApp({seed:981});setFakeTime(ctx,Date.parse('2026-10-10T12:00:00Z'));
+ const a=ctx.addTask('Current'),b=ctx.addTask('Next'),soft=ctx.addTask('Soft'),hard=ctx.addTask('Hard');ctx.setTaskPrerequisites(soft.id,[a.id]);ctx.setTaskPrerequisites(hard.id,[a.id]);ctx.writeTaskDependencyModes(hard,{[a.id]:'hard'});
+ a.due='2026-10-12';a.startsAt='2026-10-01';const before=JSON.stringify([a.mu,a.sigma,a.due,a.startsAt,a.done,a.ratingHistory]);ctx.state.chain=[b.id];ctx.state.candidateId=a.id;ctx.state.mode='scan';
+ ctx.renderScan();assert.match(shim.document.getElementById('scan').innerHTML,/data-act="postpone"/);
+ ctx.onAction('postpone',{dataset:{candidate:a.id}});
+ assert.equal(ctx.taskPostponeUntil(a),Date.parse('2026-10-10T13:00:00Z'));assert.equal(ctx.isEligible(a),false);assert.equal(ctx.isEligible(soft),true);assert.equal(ctx.isEligible(hard),false);assert.notEqual(ctx.state.candidateId,a.id);assert.equal(JSON.stringify([a.mu,a.sigma,a.due,a.startsAt,a.done,a.ratingHistory]),before);
+ assert.equal(ctx.nextScanWakeAt(),ctx.taskPostponeUntil(a));setFakeTime(ctx,Date.parse('2026-10-10T12:59:59.999Z'));assert.equal(ctx.isEligible(a),false);setFakeTime(ctx,Date.parse('2026-10-10T13:00:00Z'));ctx.refreshScanClock();assert.equal(ctx.isEligible(a),true);assert.equal(ctx.isEligible(soft),false);
+});
+test('RISK Postpone: Settings validates custom hours preserves old values and final task resumes coherently',async()=>{
+ const {ctx,shim}=await loadApp({seed:982});assert.equal(ctx.state.settings.postponeHours,1);for(const v of [null,'',Infinity,NaN,-1,0])assert.equal(ctx.normalizeSettings({postponeHours:v,cantMin:47}).postponeHours,1);assert.equal(ctx.normalizeSettings({cantMin:47,workedHours:19}).workedHours,19);
+ ctx.openSettings();assert.match(shim.document.getElementById('modalRoot').innerHTML,/<label for="stPostponeHours">/);shim.document.getElementById('stPostponeHours').value='2.5';ctx.onAction('save-settings',{dataset:{}});assert.equal(ctx.state.settings.postponeHours,2.5);
+ const a=ctx.addTask('Sole');ctx.state.chain=[a.id];ctx.state.mode='work';const at=Date.now();ctx.onAction('bench-postpone',{dataset:{benchmark:a.id}});assert.equal(ctx.taskPostponeUntil(a),at+9000000);assert.equal(ctx.state.chain.length,0);assert.equal(ctx.state.candidateId,null);assert.equal(ctx.state.mode,'scan');
+ await ctx.persist();const reload=await loadApp({seedStorage:{[SYNC_STORE_KEY]:shim.localStorage.getItem(SYNC_STORE_KEY)}});assert.equal(reload.ctx.isEligible(reload.ctx.state.tasks.find(t=>t.id===a.id)),false);assert.equal(reload.ctx.state.settings.postponeHours,2.5);
+ ctx.undo();assert.equal(ctx.taskPostponeUntil(ctx.state.tasks.find(t=>t.id===a.id)),0);assert.equal(ctx.isEligible(ctx.state.tasks.find(t=>t.id===a.id)),true);
+});
+test('RISK Postpone: causal sync preserves peer edits concurrent deferrals Undo deletion and old clients',async()=>{
+ const initial=await loadApp({seed:983}),task=initial.ctx.addTask('Original');const base=JSON.parse(JSON.stringify(initial.ctx.state));
+ const left=await loadApp({seed:984,seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(base)}}),right=await loadApp({seed:985,seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(base)}});const a=left.ctx.state.tasks.find(t=>t.id===task.id),b=right.ctx.state.tasks.find(t=>t.id===task.id);
+ left.ctx.state.chain=[a.id];left.ctx.onAction('bench-postpone',{dataset:{benchmark:a.id}});b.title='Peer title';right.ctx.mergeUndeletedTasks(right.ctx.state,left.ctx.state);assert.equal(b.title,'Peer title');assert.equal(right.ctx.isEligible(b),false);
+ const postponed=JSON.parse(JSON.stringify(left.ctx.state));left.ctx.undo();left.ctx.mergeUndeletedTasks(left.ctx.state,postponed);assert.equal(left.ctx.taskPostponeUntil(left.ctx.state.tasks.find(t=>t.id===task.id)),0,'stale deferral cannot defeat observed Undo');
+ right.ctx.state.chain=[b.id];right.ctx.state.settings.postponeHours=3;right.ctx.onAction('bench-postpone',{dataset:{benchmark:b.id}});const rightUntil=right.ctx.taskPostponeUntil(b);left.ctx.mergeUndeletedTasks(left.ctx.state,right.ctx.state);assert.equal(left.ctx.taskPostponeUntil(left.ctx.state.tasks.find(t=>t.id===task.id)),rightUntil,'unobserved concurrent deferral survives Undo');
+ const old=JSON.parse(JSON.stringify(base));old.tasks[0].title='Old shell edit';right.ctx.mergeUndeletedTasks(old,right.ctx.state);assert.equal(right.ctx.taskPostponeUntil(old.tasks[0]),rightUntil);assert.equal(old.tasks[0].title,'Old shell edit');
+ right.ctx.deleteTask(b.id);right.ctx.mergeUndeletedTasks(right.ctx.state,postponed);assert.equal(right.ctx.state.tasks.find(t=>t.id===b.id),undefined);
+});
+test('RISK Postpone: revisioned cloud offline reconnect prunes stale dots without losing concurrent editor fields',async()=>{
+ const initial=await loadApp({seed:986}),task=initial.ctx.addTask('Cloud task'),next=initial.ctx.addTask('Next');initial.ctx.state.chain=[task.id];const base=JSON.parse(initial.ctx.cloudPayload()),h=makeSyncHarness({remote:base,rev:3});
+ const a=await loadApp({seed:987,seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(base)},cloudSyncFactory:h.factory}),b=await loadApp({seed:988,seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(base)},cloudSyncFactory:h.factory});await syncSettle(40);await a.ctx.cloudPull();await b.ctx.cloudPull();
+ h.failPull=true;b.ctx.state.tasks.find(t=>t.id===task.id).title='Offline peer title';b.ctx.save();await b.ctx.persist();a.ctx.onAction('bench-postpone',{dataset:{benchmark:task.id}});await a.ctx.persist();h.failPull=false;await a.ctx.cloudPushNow();await syncSettle(40);await b.ctx.cloudPull();await b.ctx.cloudPushNow();await syncSettle(40);await a.ctx.cloudPull();
+ for(const app of [a,b]){const t=app.ctx.state.tasks.find(t=>t.id===task.id);assert.equal(t.title,'Offline peer title');assert.equal(app.ctx.isEligible(t),false);assert.equal(app.ctx.state.chain.includes(task.id),false);assert.ok(app.ctx.state.tasks.some(t=>t.id===next.id));}
+ const stale=JSON.parse(JSON.stringify(b.ctx.state));stale.chain=[task.id];stale.candidateId=null;a.ctx.mergeUndeletedTasks(stale,a.ctx.state);a.ctx.hydrateState(stale);a.ctx.replaceState(stale);a.ctx.ensureCandidate();assert.equal(a.ctx.state.chain.includes(task.id),false,'stale shared chain cannot make a postponed task current');
+});
