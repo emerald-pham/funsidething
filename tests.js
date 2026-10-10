@@ -24017,7 +24017,7 @@ test('RISK seeded trigger admissions: actual UTC rail consumer admits chance gap
  const c=sceneTimeline(),T=c.LandscapeTimeline,C=c.LandscapeConfig,seed='chance-rails',options={seed,sunAt:()=>({altitude:-20,azimuth:0})};
  const a=T.create(options),b=T.create(options);
  for(const type of ['train','metro']){
-  const interval=C.rail[type].duration/.82,period=interval+C.rail[type].gap/C.spawnRate(type),chance=interval/period;let admitted=0;
+  const maximum=C.rail[type].duration/.82,interval=Math.ceil(maximum*1000)/1000,period=maximum+C.rail[type].gap/C.spawnRate(type),chance=interval/period;let admitted=0;
   for(let slot=20000;slot<20512;slot++){
    const at=Math.ceil(slot*interval*1000)+1,expected=T.sample(seed,`${type}-admission`,slot)<chance;
    const scene=a.at(at),match=scene.events.find(e=>e.id===`${type}:${slot}`);
@@ -24033,10 +24033,10 @@ test('RISK seeded trigger admissions: actual UTC rail consumer admits chance gap
 });
 
 test('RISK seeded trigger windows: actual light consumer uses independent state draws and can retain state across opportunities',()=>{
- const T=sceneTimeline().LandscapeTimeline,seed='chance-window',index='42:1:3',q=.58,interval=1024*2*q*(1-q),phase=T.sample(seed,'window-phase',index)*interval;
+ const T=sceneTimeline().LandscapeTimeline,seed='chance-window',index='42:1:3',q=.5,interval=1024*2*q*(1-q),phase=T.sample(seed,'window-phase',index)*interval;
  let changed=0,held=0,lit=0;
  for(let opportunity=2000;opportunity<2512;opportunity++){
-  const slot=Math.ceil(phase+opportunity*interval),expected=T.sample(seed,`window:${index}`,opportunity)>.42;
+  const slot=Math.ceil(phase+opportunity*interval),expected=T.sample(seed,`window:${index}`,opportunity)>.5;
   const actual=T.windowLit(seed,index,slot);
   assert.equal(actual,expected,'paint consumer state comes from this opportunity, not compulsory parity');
   assert.equal(T.windowLit(seed,index,slot+.1),actual,'no frame-cadence roll');
@@ -24044,7 +24044,7 @@ test('RISK seeded trigger windows: actual light consumer uses independent state 
   actual===prior?held++:changed++;if(actual)lit++;
  }
  assert.ok(held>180&&changed>180,'independent opportunities allow both changes and unchanged windows');
- assert.ok(lit>512*.50&&lit<512*.66,'existing seeded lit fraction is retained');
+ assert.ok(lit>512*.42&&lit<512*.58,'existing seeded lit fraction is retained');
 });
 
 function chanceWeatherPaint(source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8')){
@@ -24081,7 +24081,7 @@ function sharedSkywriterConsumer(seen=false,empty=false,source=fs.readFileSync(p
  const branch=source.slice(source.indexOf("    if(e.type==='skywriter'){"),source.indexOf("    if(e.type==='banner'){"));
  const paint=vm.createContext({e:selected,reduced:false,f:.5,x:100,hy:410,W:390,dir:1,t:123,p:{night:0},S:{smooth:()=>0},g:{save(){},restore(){},translate(){},scale(){},beginPath(){},moveTo(){},lineTo(){},stroke(){},rotate(){}},visibleBanners:[],airplane(...args){flights.push(args);},LandscapeSkywriter:{wordPath:word=>word?{width:100}:null,trace:()=>({segments:[],x:10,y:10,angle:0,complete:false})}});
  vm.runInContext(`(function(){${branch}})()`,paint);
- return {selected,flights,context};
+ return {selected,flights,context,paintContext:paint,paintSource:branch};
 }
 
 test('RISK seeded trigger skywriters: actual snapshot and painter preserve visibility across reading history and missing private copy',()=>{
@@ -24099,12 +24099,12 @@ test('RISK seeded trigger skywriters: actual snapshot and painter preserve visib
 
 test('RISK seeded trigger negative controls: bypassed actual admissions compulsory window parity and periodic bolts are detected',()=>{
  const seed='chance-rails',options={seed,sunAt:()=>({altitude:-20,azimuth:0})},good=sceneTimeline(),broken=sceneTimeline({'landscape-timeline.js':source=>source.replace('if(sample(seed,`${type}-admission`,slot)>=chance)continue;','')});
- const type='train',interval=good.LandscapeConfig.rail[type].duration/.82,chance=interval/(interval+good.LandscapeConfig.rail[type].gap);let rejected;
+ const type='train',maximum=good.LandscapeConfig.rail[type].duration/.82,interval=Math.ceil(maximum*1000)/1000,chance=interval/(maximum+good.LandscapeConfig.rail[type].gap);let rejected;
  for(let slot=20000;slot<20100;slot++)if(good.LandscapeTimeline.sample(seed,`${type}-admission`,slot)>=chance){rejected=slot;break;}
  assert.ok(rejected);const at=Math.ceil(rejected*interval*1000)+1;
  assert.equal(good.LandscapeTimeline.create(options).at(at).events.some(e=>e.id===`${type}:${rejected}`),false);
  assert.equal(broken.LandscapeTimeline.create(options).at(at).events.some(e=>e.id===`${type}:${rejected}`),true,'removing actual admission restores the forbidden guaranteed visitor');
- const parity=sceneTimeline({'landscape-timeline.js':source=>source.replace(/return sample\(seed,`window:\$\{index\}`,Math.floor\(\(slot-phase\)\/interval\)\)>\.42;/,'return !!(Math.floor((slot-phase)/interval)&1);')});
+ const parity=sceneTimeline({'landscape-timeline.js':source=>source.replace(/return sample\(seed,`window:\$\{index\}`,Math.floor\(\(slot-phase\)\/interval\)\)>\.5;/,'return !!(Math.floor((slot-phase)/interval)&1);')});
  assert.ok(Array.from({length:32},(_,i)=>i*500).some(slot=>good.LandscapeTimeline.windowLit(seed,'42:1:3',slot)!==parity.LandscapeTimeline.windowLit(seed,'42:1:3',slot)),'compulsory parity fails independent sampled state');
  const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),goodPaint=chanceWeatherPaint(),badPaint=chanceWeatherPaint(source.replace("&&T.sample(sceneSeed,'lightning',weather.slot,strikeSlot)<.5",'')),weather={slot:777,status:'thunderstorm',storm:true,intensity:1};
  let miss;for(let slot=100;slot<132;slot++)if(goodPaint.context.T.sample('chance-bolts','lightning',777,slot)>=.5){miss=slot;break;}
@@ -24121,4 +24121,56 @@ test('RISK seeded trigger FAQ: extended help explains shared chance visits and h
  assert.match(entry,/reading history stays on this device/i);
  const current=html.slice(html.indexOf('<template id="appChangelogCurrent">'),html.indexOf('<template id="appChangelog">'));
  assert.match(current,/Skywriter flights stay visible after you read their words/,'history suppression is a synchronization bug and must be reported');
+});
+
+test('RISK seeded trigger precision: rail lifetime rounding cannot overlap at an exact successor millisecond',()=>{
+ const c=sceneTimeline(),T=c.LandscapeTimeline,options={seed:T.DEFAULT_SEED,sunAt:()=>({altitude:-20,azimuth:0})},timeline=T.create(options);
+ const historicalBoundary=1278108536585;
+ assert.ok(timeline.at(historicalBoundary).events.filter(e=>e.type==='metro').length<=1,'proven default-seed successor boundary cannot paint two metros for one millisecond');
+ for(const type of ['train','metro']){
+  const interval=Math.ceil(c.LandscapeConfig.rail[type].duration/.82*1000)/1000;
+  for(const slot of [20960979,20960980]){
+   const at=Math.round(slot*interval*1000),events=timeline.at(at).events.filter(e=>e.type===type);
+   assert.ok(events.length<=1,'exact rounded successor stays within track capacity');
+   for(const e of events)assert.ok(e.age<e.duration,'rounded lifetime retires before successor');
+  }
+ }
+});
+
+test('RISK seeded trigger precision: chance window states retain the former fifty-percent long-run occupancy',()=>{
+ const T=sceneTimeline().LandscapeTimeline,seed='chance-window',index='42:1:3',interval=512,phase=T.sample(seed,'window-phase',index)*interval;
+ for(let opportunity=2000;opportunity<2032;opportunity++){
+  const slot=Math.ceil(phase+opportunity*interval);
+  assert.equal(T.windowLit(seed,index,slot),T.sample(seed,`window:${index}`,opportunity)>.5,'former alternating parity is half lit over time, not its initial58percent sample');
+ }
+});
+
+test('RISK seeded trigger cold copy: actual current-flight consumer adopts the loaded human bank without rereading or waiting for another event',()=>{
+ const cold=sharedSkywriterConsumer(false,true),warm=sharedSkywriterConsumer();
+ assert.equal(cold.selected.skywriterWord,'','pending bank has no invented words');
+ cold.context.LandscapeMood.setHumanText('## Skywriters\n- HELLO');cold.context.syncScene(123000);
+ assert.equal(cold.context.world.events[0].skywriterWord,warm.selected.skywriterWord,'cold and warm clients with the same loaded bank select the same current-flight smoke');
+ cold.context.LandscapeMood.recordSeen('HELLO');cold.context.syncScene(123000);
+ assert.equal(cold.context.world.events[0].skywriterWord,'HELLO','subsequent local reads cannot change loaded smoke');
+ cold.context.LandscapeMood.setHumanText('## Skywriters');cold.context.syncScene(123000);
+ assert.equal(cold.context.world.events[0].skywriterWord,'','removing local copy cannot retain stale wording in the active memo');
+});
+
+
+test('RISK seeded trigger reading preservation: actual word replacement and trusted observer do not inherit stale read flags',()=>{
+ const flight=sharedSkywriterConsumer(),old=flight.context.world.events[0];
+ old.bannerText='HELLO';old.textSeen=true;old.skywriterPath={width:100};
+ flight.context.LandscapeMood.recordSeen('HELLO');flight.context.LandscapeMood.setHumanText('## Skywriters\n- WORLD');flight.context.syncScene(123000);
+ const next=flight.context.world.events[0],paint=flight.paintContext;paint.e=next;paint.f=.75;
+ paint.LandscapeSkywriter.trace=()=>({segments:[],x:10,y:10,angle:0,complete:true});
+ vm.runInContext(`(function(){${flight.paintSource}})()`,paint);
+ assert.equal(next.bannerText,'WORLD','actual completed smoke registers its new wording');
+ assert.equal(flight.context.LandscapeMood.skywriterMessage(0),'WORLD','new word was not read by merely loading or painting it');
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),start=source.indexOf('  function observeSceneInteraction('),end=source.indexOf('\n  for(const type',start);
+ Object.assign(flight.context,{currentEntry:null,visibleBanners:paint.visibleBanners,document:{hidden:false,hasFocus:()=>true},scenePointVisible:()=>true});
+ vm.runInContext(source.slice(start,end),flight.context);flight.context.observeSceneInteraction({isTrusted:false});
+ assert.equal(flight.context.LandscapeMood.skywriterMessage(0),'WORLD','synthetic interactions cannot read the new word');
+ flight.context.observeSceneInteraction({isTrusted:true});
+ assert.equal(flight.context.LandscapeMood.skywriterMessage(0),'','trusted visible interaction must record the new word despite the old word read flag');
+ assert.equal(next.textSeen,true);flight.context.syncScene(123000);assert.equal(flight.context.world.events[0].textSeen,true,'unchanged word retains its valid seen memo');
 });

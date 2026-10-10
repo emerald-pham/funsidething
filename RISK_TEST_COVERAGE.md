@@ -842,3 +842,7 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK seeded trigger skywriters: actual snapshot and painter preserve visibility across reading history and missing private copy
 - RISK seeded trigger negative controls: bypassed actual admissions compulsory window parity and periodic bolts are detected
 - RISK seeded trigger FAQ: extended help explains shared chance visits and history-independent skywriter visibility without private sync
+- RISK seeded trigger precision: rail lifetime rounding cannot overlap at an exact successor millisecond
+- RISK seeded trigger precision: chance window states retain the former fifty-percent long-run occupancy
+- RISK seeded trigger cold copy: actual current-flight consumer adopts the loaded human bank without rereading or waiting for another event
+- RISK seeded trigger reading preservation: actual word replacement and trusted observer do not inherit stale read flags

@@ -1415,8 +1415,15 @@
     world.elapsed=sceneSnapshot.elapsed;
     world.events=sceneSnapshot.events.map(e=>{
       const previous=retained.get(e.id);
-      for(const field of ['bannerText','textSeen','skywriterWord','skywriterPath'])if(previous?.[field]!==undefined)e[field]=previous[field];
-      if(e.type==='skywriter'&&e.skywriterWord===undefined)e.skywriterWord=LandscapeMood.skywriterMessage(e.seed,{shared:true});
+      for(const field of ['bannerText','textSeen'])if(previous?.[field]!==undefined)e[field]=previous[field];
+      if(e.type==='skywriter'){
+        // Reconcile a newly loaded bank on the current flight too. Caching an
+        // empty choice from boot made cold and warm clients keep different
+        // smoke after both had the same bank. Only reuse matching geometry.
+        e.skywriterWord=LandscapeMood.skywriterMessage(e.seed,{shared:true});
+        if(previous?.skywriterWord!==e.skywriterWord){delete e.bannerText;delete e.textSeen;}
+        if(previous?.skywriterWord===e.skywriterWord&&previous.skywriterPath)e.skywriterPath=previous.skywriterPath;
+      }
       return e;
     });
     woodland.events=sceneSnapshot.woodland;

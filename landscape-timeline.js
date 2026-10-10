@@ -112,10 +112,14 @@
       for(const type of ['train','metro']){
         const rate=C.spawnRate(type);if(!rate)continue;
         // Bernoulli opportunities are one maximum crossing apart, so no
-        // accepted train can collide with its predecessor. interval / chance
+        // accepted train can collide with its predecessor. Round the opportunity
+        // interval upwards in the same millisecond domain as event lifetimes:
+        // fractional spacing once overlapped two metros for one millisecond.
+        // interval / chance
         // equals the former maximum crossing + rate-scaled rest: the mean
         // service frequency is retained, but missed slots have no deadline.
-        const interval=C.rail[type].duration/.82,period=interval+C.rail[type].gap/rate,chance=interval/period;
+        const maximum=C.rail[type].duration/.82,interval=Math.ceil(maximum*1000)/1000;
+        const period=maximum+C.rail[type].gap/rate,chance=interval/period;
         for(let slot=Math.floor((from-MAX_LIFE)/interval);slot<=Math.ceil(to/interval);slot++){
           if(sample(seed,`${type}-admission`,slot)>=chance)continue;
           const candidate=event(type,slot*interval,random(seed,type,slot),`${type}:${slot}`);
@@ -175,15 +179,14 @@
       }
     };
   }
-  // Each normalized window gets independent lit-state opportunities. With
-  // q=.58, successive states differ with probability 2*q*(1-q). Multiplying
-  // the existing 1024 half-length UTC ticks by that probability preserves
-  // the doubled mean toggle rate and lit fraction without compulsory flips.
+  // The former parity flips were half lit over the long run. Independent
+  // half-lit samples differ half the time, so half the old 1024 half-length
+  // ticks preserve the doubled mean toggle spacing and long-run occupancy.
   // Sampling the current slot is O(1), even after years offline; no history,
   // finite backwards search, or maximum-wait fallback can force a transition.
   function windowLit(seed,index,slot){
-    const interval=1024*2*.58*.42,phase=sample(seed,'window-phase',index)*interval;
-    return sample(seed,`window:${index}`,Math.floor((slot-phase)/interval))>.42;
+    const interval=512,phase=sample(seed,'window-phase',index)*interval;
+    return sample(seed,`window:${index}`,Math.floor((slot-phase)/interval))>.5;
   }
   root.LandscapeTimeline={create,DEFAULT_SEED,sample,random,terrainSample,windowLit};
 })(globalThis);

@@ -9,8 +9,10 @@ Ordinary visitors use relative selection weights, so increasing one reduces
 others' share of the same limited visitor budget. Seasonal eligibility still applies.
 Train and metro have dedicated seeded-chance service: 65 and 50 seconds baseline
 crossing, respectively. Opportunities are one maximum sampled crossing apart
-(65/.82 and 50/.82 seconds). Admission probability is that interval divided by
-itself plus the configured 12 or 8 seconds divided by the rate. Consequently,
+(65/.82 and 50/.82 seconds, rounded upwards to a millisecond to prevent
+rounded-lifetime overlap). Admission probability is that rounded interval
+divided by the unrounded maximum crossing plus the configured 12 or 8 seconds
+divided by the rate. Consequently,
 expected start spacing equals the former maximum crossing plus rate-scaled rest;
 rest is now an average contribution, not a minimum after every crossing. Only
 one vehicle per track runs at once; rate 0 disables admission. A rejection does
@@ -40,10 +42,10 @@ launchers are still visible. Travel speed, duration and cooldown stay unchanged.
 retain independent one-minute nighttime sampling with one-in-six activation
 odds. Skyline windows use independent seeded state samples in normalized window
 space. The current 7.5-second UTC tick is retained. A per-window seeded phase
-spreads opportunities; each opportunity samples 58% lit, 42% dark. Opportunities
-are 1024 * 2 * .58 * .42 ticks apart (3741.696 seconds), so a change probability
-of 2 * .58 * .42 preserves the existing doubled mean toggle spacing of 7680
-seconds and the lit fraction. Equal successive states are valid: no parity flip,
+spreads opportunities; each opportunity samples 50% lit, 50% dark. Opportunities
+are 512 ticks apart (3840 seconds); a 50% change probability preserves the
+existing doubled mean toggle spacing of 7680 seconds and the former parity
+rule’s 50% long-run lit occupancy. Equal successive states are valid: no parity flip,
 backwards-search fallback or maximum-wait transition forces a change. Daylight
 eligibility and brightness stay unchanged.
 Distant rain-storm lightning uses 23.5-second opportunities with a 50% seeded
@@ -67,7 +69,9 @@ Skywriters trace one valid human word from the local Skywriters bank in smoke.
 The shared renderer samples this bank without filtering private reading history,
 so reading cannot suppress an admitted aircraft or change its smoke geometry.
 With no valid word, the admitted aircraft crosses without smoke lettering; the
-skywriter rate cannot create fallback words. Other local message selection retains
+skywriter rate cannot create fallback words. The current flight reconciles a
+newly loaded human bank immediately rather than retaining empty boot copy;
+matching smoke geometry requires matching loaded banks. Other local message selection retains
 its nonrepeat history. Neither reading history nor human wording is newly synced.
 Cloud movement, astronomical objects, and the clock are continuous scenery,
 not spawned visitors. Text itself is edited in HUMAN_WRITTEN_HOURLY_TAGS.md.
