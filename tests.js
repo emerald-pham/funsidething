@@ -24179,3 +24179,10 @@ test('RISK seeded trigger reading preservation: actual word replacement and trus
  assert.equal(flight.context.LandscapeMood.skywriterMessage(0),'','trusted visible interaction must record the new word despite the old word read flag');
  assert.equal(next.textSeen,true);flight.context.syncScene(123000);assert.equal(flight.context.world.events[0].textSeen,true,'unchanged word retains its valid seen memo');
 });
+
+test('RISK changelog editorial: public history omits internal housekeeping and routine frequency tuning',()=>{
+ const notes=html.match(/<!-- changelog:start -->([\s\S]*?)<!-- changelog:end -->/)[1];
+ for(const text of ['Event rates can be adjusted in SPAWN_RATES.md.','Settings Changelog combines releases','Standalone fireworks now occur half as often again.','Nighttime garden-light opportunities and city-window changes happen twice as often'])assert.ok(!notes.includes(text),`omit low-information public note: ${text}`);
+ assert.match(notes,/retained older browser bytes are never deleted during migration/);
+ assert.match(notes,/Conflicting or repeated IDs remain protected/);
+});

@@ -1,5 +1,21 @@
 [
   {
+    "testChangesSha256": "f8482970eb41d69c698daa90802cf34a5713edbed9eb4ed0c5d9be096507e892",
+    "reason": "Protect the requested conservative editorial cleanup without altering any behavior assertion; structural app diff gate requires a direct content contract.",
+    "previousBehavior": "Public changelog included internal housekeeping and routine frequency tuning contrary to current user preference.",
+    "intendedBehavior": "Remove low-information entries while retaining migration and recovery safety history; application behavior stays unchanged.",
+    "replacementTests": [
+      "RISK changelog editorial: public history omits internal housekeeping and routine frequency tuning"
+    ],
+    "preservedCoverage": [
+      "All existing functional, persisted-data, FAQ, chronology and rendering contracts remain intact."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK changelog editorial' tests.js",
+      "failure": "Observed before prose edits: assertion failed on Event rates can be adjusted in SPAWN_RATES.md. Full output /tmp/changelog-red.log."
+    }
+  },
+  {
     "testChangesSha256": "d48470fe59f2ec105e40beeb1a45495c906f6dfe524de0369ac90f50c1a682d8",
     "reason": "Authorized seeded-chance rail admission changes make old-release rail IDs an invalid oracle for fireworks display-cap preservation. Retain historical assertions for unchanged visitors and add full current-algorithm capped-versus-uncapped reservations coverage. Name now describes both preserved historical and expanded current seeded-rail coverage, satisfying unchanged validator requirements; risk inventory updated.",
     "previousBehavior": "The fireworks reservation test compared all current visitor IDs against a release with compulsory periodic rails, conflating the independently authorized rail trigger change with fireworks reservations.",
