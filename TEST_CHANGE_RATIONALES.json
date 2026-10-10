@@ -1,5 +1,22 @@
 [
   {
+    "testChangesSha256": "9bf92019de29031ca14742e82db1811195758842906ed17baa8033ff908bf2c8",
+    "reason": "Protect the explicitly authorized seventh Postpone control while retaining original ordered actions and sizing; remove fixture wall-clock dependence and add direct palette regression coverage.",
+    "previousBehavior": "Existing benchmark tests required exactly six actions before the requested Postpone addition; its new custom/reload deadline fixture relied on the wall clock and the new control escaped the required theme palette.",
+    "intendedBehavior": "All original controls remain ordered and small, with Postpone as the seventh; origin and reload fixture clocks match and the white Postpone palette uses named theme colors.",
+    "replacementTests": [
+      "UI: the benchmark's seven actions sit in one row beneath the purple card",
+      "RISK Postpone: white control retains named theme palette colors"
+    ],
+    "preservedCoverage": [
+      "Original benchmark action order, exactly one row and .sm assertions remain protected; exact duration, reload eligibility, settings validation and Undo assertions remain intact. Existing global palette and FAQ brevity assertions are unchanged."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='white control|Quick start content|benchmark.*seven actions|same .sm sizing' tests.js",
+      "failure": "Required CI38050059531 observed outdated six-action expectations, palette escape, FAQ length and a one-millisecond test clock race. /tmp/postpone-ci-pr-failed.log; focused FAQ RED /tmp/postpone-ci-fixes-red.log and real palette assertion RED /tmp/postpone-palette-red.log preceded repairs. Source changes were subsequently tested15/15; this extra record binds the same repairs to the push previous-head base, without changing tests or app code."
+    }
+  },
+  {
     "testChangesSha256": "02f993128f89943f8db53f7be92397abb06d384f4a54fbbc56a5a17dcb8b41e2",
     "reason": "Protect the requested persisted task deferral across actual scanner controls, Settings, expiry, causal reconciliation and Undo without weakening existing contracts.",
     "previousBehavior": "The scanner had no Postpone action or configurable one-hour deferral; tasks could not be temporarily deferred independently of pass marks and rating actions.",
