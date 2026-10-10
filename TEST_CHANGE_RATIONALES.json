@@ -1,5 +1,22 @@
 [
   {
+    "testChangesSha256": "32d787d17603d86dc926dad1d53bf70ccd93d0983ae86b4a3523b3dd3e1edca6",
+    "reason": "User explicitly requests a real-world inspired overlapping widening finale; replace only the historical single-volley finale expectation while retaining regular-pair endpoints and natural lifetime protections.",
+    "previousBehavior": "Eight finale shells ignite simultaneously with no staged crescendo; help and installed guidance describe that former choreography.",
+    "intendedBehavior": "Two, three and five-shell staged volleys overlap within the existing320particle cap and close with wider coverage, with unchanged regular pairs and full natural tails.",
+    "replacementTests": [
+      "RISK fireworks crescendo: finale emits distinct overlapping volleys and a wider closing crown",
+      "RISK fireworks crescendo FAQ: scenery help explains widening finale and existing motion limits"
+    ],
+    "preservedCoverage": [
+      "Existing standalone sixty-second limit, crossing-relative barge lifetime, regular0–300ms pair endpoints, seeded UTC scheduling, twilight admission, reduced motion and natural fading tests retained."
+    ],
+    "redEvidence": {
+      "command": "NODE_PATH=/Users/emeraldpham/Documents/GitHub/funsidething/node_modules node --test --test-name-pattern='RISK fireworks crescendo:' tests.js; then focused crescendo FAQ test before help edit",
+      "failure": "Observed contemporaneous geometry RED: a real crescendo needs at least three distinct ignition times; current single eight-shell volley cannot satisfy it. FAQ RED observed missing overlapping volleys and wider closing crown. Logs /tmp/fireworks-crescendo-red.log and /tmp/fireworks-faq-red.log. Independent FAQ review found stale barge paragraph; added negative assertion and observed1fail with barge guidance cannot retain superseded choreography before prose repair (/tmp/fireworks-barge-guidance-red.log)."
+    }
+  },
+  {
     "testChangesSha256": "47da995eecee82790d3aa7cdf87723a674b834219d30fb783dce47904c32ebcb",
     "reason": "User explicitly requests a real-world inspired overlapping widening finale; replace only the historical single-volley finale expectation while retaining regular-pair endpoints and natural lifetime protections.",
     "previousBehavior": "Eight finale shells ignite simultaneously with no staged crescendo; help and installed guidance describe that former choreography.",

@@ -28,9 +28,9 @@ assigned travel speed (150-second baseline). A festival owns its
 fireworks; standalone shows and festivals do not overlap. Both admit sunrise, sunset, and nighttime below the existing +8-degree
 full-day boundary, independent of solar direction. Polar daylight remains excluded. Their particle brightness
 fades smoothly from full night at -12 degrees to zero at +8 degrees. Rates scale these chances, capped at 100%.
-The barge display follows its actual crossing duration. Its simultaneous
-eight-shell finale begins at 65% of that crossing while its launchers are
-still visible. Travel speed, duration and cooldown stay unchanged. Fairy lights
+The barge display follows its actual crossing duration. Its staged finale
+builds to the five-shell closing crown at 65% of that crossing while its
+launchers are still visible. Travel speed, duration and cooldown stay unchanged. Fairy lights
 retain independent one-minute nighttime sampling with one-in-six activation
 odds. Skyline windows switch on 7.5-second UTC ticks with the same seeded
 lighting distribution; daylight eligibility and brightness stay unchanged.

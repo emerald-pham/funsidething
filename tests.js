@@ -22605,7 +22605,7 @@ test('RISK fireworks reduced deadline: static scheduler preserves a persistent b
 test('RISK fireworks cached guidance: installed spawn-rate prose matches the bounded display and its exact offline shell',()=>{
  const contract=appShellContract(serviceWorkerSource()),guidance=fs.readFileSync(path.join(__dirname,'SPAWN_RATES.md'),'utf8');
  assert.ok(contract.localPaths.includes('SPAWN_RATES.md'),'the installed guidance is an offline asset');
- assert.match(guidance,/visible[\s\S]*?finish within 60 seconds/);assert.match(guidance,/0–300 ms delay/);assert.match(guidance,/overlapping two-, three- and five-shell volleys/);
+ assert.match(guidance,/visible[\s\S]*?finish within 60 seconds/);assert.match(guidance,/0–300 ms delay/);assert.match(guidance,/overlapping two-, three- and five-shell volleys/);assert.doesNotMatch(guidance,/simultaneous\s+eight-shell finale/,'barge guidance cannot retain the superseded choreography');
  assert.equal(contract.cacheName,'chain-scanner-shell-'+contract.fingerprint,'changed cached guidance must reach offline installations');
 });
 
