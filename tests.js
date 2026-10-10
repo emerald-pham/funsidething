@@ -16069,6 +16069,13 @@ test('CLOUD REVISION: a late acknowledgement cannot lower a newer adopted revisi
   newer.tasks.push(syncTask('remote-later','Remote later edit'));
   h.doc={payload:JSON.stringify(newer),updatedAt:Date.now(),rev:6};
   await ctx.cloudPull();
+  assert.equal(ctx.state.syncRev,4,'the cloud read waits for the pending own acknowledgement');
+  // A same-browser peer can still advance the durable head while the cloud
+  // request waits. Exercise that real adoption path to retain the lower-ack guard.
+  newer.syncRev=6;newer.syncAccount='e@example.com';
+  shim.localStorage.setItem(LOCAL_HEAD_KEY,JSON.stringify(newer));
+  shim.localStorage.setItem(SYNC_STORE_KEY,JSON.stringify(newer));
+  ctx.refreshBrowserCopy();
   assert.equal(ctx.state.syncRev,6);
   releaseFirst({ok:true,rev:5});await flush();
   assert.equal(ctx.state.syncRev,6,'the stale callback cannot rewind the device to revision 5');

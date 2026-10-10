@@ -1,18 +1,18 @@
 [
   {
-    "testChangesSha256": "c1ffa17658cc53a908ac7b6e91a3dfbcb095e66dd755a4121d7766276eb45edb",
-    "reason": "Protect latest local intent against a verified one-client cloud acknowledgement/focus read race without relaxing conditional writes.",
+    "testChangesSha256": "15182897813adc3e697958bf69656a88aabbb4ca62923b1ad14a25895f25a4e7",
+    "reason": "Protect latest local intent against a verified one-client cloud acknowledgement/focus read race without relaxing conditional writes. Adapt the prior immediate cloud adoption assertion to the intentionally serialized read; retain revision 6 and lower-ACK protection through actual peer-browser adoption.",
     "previousBehavior": "A focus cloud read during an unacknowledged own write adopts First edit and discards the subsequent Latest edit as a field conflict.",
     "intendedBehavior": "A read waits until the own push settles and its acknowledgement establishes the exact rebase ancestor; subsequent local intent survives and reaches the cloud.",
     "replacementTests": [
       "RISK cloud self-echo: focus pull during own acknowledgement retains latest task edit without stale rejection"
     ],
     "preservedCoverage": [
-      "Existing PR75 stale-tab rebase, genuine stale/concurrent cloud writers, failed-read bounded retry, old saved data, Postpone causal evidence, completion and Undo tests remain unchanged."
+      "Existing late acknowledgement revision-6 assertion remains: actual newer durable browser-head adoption advances revision while ACK waits, then revision-5 callback cannot lower it. Immediate cloud adoption during own push is intentionally replaced by a deferred-read assertion after verified self-echo data loss. Other stale/concurrent, failed-read bounded retry, old data, Postpone, completion and Undo tests remain unchanged."
     ],
     "redEvidence": {
       "command": "node --test --test-name-pattern='RISK cloud self-echo' tests.js",
-      "failure": "Observed before index.html implementation: AssertionError own cloud echo cannot contradict the subsequent local intent; actual First edit, expected Latest edit. Preserved /tmp/false-stale-red.log. Initial fixture typo failed separately and was corrected before this meaningful RED."
+      "failure": "Observed before index.html implementation: AssertionError own cloud echo cannot contradict the subsequent local intent; actual First edit, expected Latest edit. Preserved /tmp/false-stale-red.log. Initial fixture typo failed separately and was corrected before this meaningful RED. Existing late-ACK test independently exposed intentional scheduling change after implementation (4 vs6), /tmp/false-stale-late-ack.log; adapted consumer preserves late callback guard, /tmp/false-stale-late-ack-green.log."
     }
   },
   {
