@@ -16069,6 +16069,13 @@ test('CLOUD REVISION: a late acknowledgement cannot lower a newer adopted revisi
   newer.tasks.push(syncTask('remote-later','Remote later edit'));
   h.doc={payload:JSON.stringify(newer),updatedAt:Date.now(),rev:6};
   await ctx.cloudPull();
+  assert.equal(ctx.state.syncRev,4,'the cloud read waits for the pending own acknowledgement');
+  // A same-browser peer can still advance the durable head while the cloud
+  // request waits. Exercise that real adoption path to retain the lower-ack guard.
+  newer.syncRev=6;newer.syncAccount='e@example.com';
+  shim.localStorage.setItem(LOCAL_HEAD_KEY,JSON.stringify(newer));
+  shim.localStorage.setItem(SYNC_STORE_KEY,JSON.stringify(newer));
+  ctx.refreshBrowserCopy();
   assert.equal(ctx.state.syncRev,6);
   releaseFirst({ok:true,rev:5});await flush();
   assert.equal(ctx.state.syncRev,6,'the stale callback cannot rewind the device to revision 5');
@@ -24248,4 +24255,31 @@ test('RISK Postpone layout: modal height preserves the viewport cap and fits the
 
 test('RISK Postpone layout: Settings numeric fields contain intrinsic widths in narrow recurrence rows',async()=>{
  const {ctx,shim}=await loadApp();ctx.openSettings();assert.match(shim.document.getElementById('modalRoot').innerHTML,/<input id="stEverHours" type="number"/,'the existing recurrence duration shares this visible Settings section');const html=fs.readFileSync(new URL('./index.html',import.meta.url),'utf8');assert.match(html,/\.settings-section \.frow input\[type=number\]\{min-width:0;max-width:100%\}/,'native numeric intrinsic width must not widen the Settings row at enlarged size');
+});
+
+
+test('RISK cloud self-echo: focus pull during own acknowledgement retains latest task edit without stale rejection',async()=>{
+ const initial=await loadApp(),task=initial.ctx.addTask('Original');await initial.ctx.persist();
+ const base=JSON.parse(initial.ctx.cloudPayload()),h=makeSyncHarness({remote:base,rev:3});
+ const app=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(base)},cloudSyncFactory:h.factory}),{ctx,shim}=app;
+ await ctx.cloudPull();await syncSettle(40);
+ const originalPush=ctx.window.CloudSync.push;
+ let acknowledge,landed;
+ const written=new Promise(resolve=>landed=resolve);
+ ctx.window.CloudSync.push=async(payload,updatedAt,baseRev)=>{
+   assert.equal(baseRev,h.doc.rev,'write still uses the observed revision');
+   h.doc={payload,updatedAt,rev:baseRev+1};landed();
+   return await new Promise(resolve=>acknowledge=()=>resolve({ok:true,rev:baseRev+1}));
+ };
+ ctx.state.tasks.find(t=>t.id===task.id).title='First edit';ctx.commit();
+ const push=ctx.sendPush();await written;
+ ctx.state.tasks.find(t=>t.id===task.id).title='Latest edit';ctx.commit();
+ await ctx.cloudPull();
+ assert.equal(ctx.state.tasks.find(t=>t.id===task.id).title,'Latest edit','own cloud echo cannot contradict the subsequent local intent');
+ assert.doesNotMatch(shim.document.getElementById('toast').textContent,/out of date/i,'one client must not reject its own acknowledgement');
+ ctx.window.CloudSync.push=originalPush;acknowledge();await push;await syncSettle(80);
+ assert.equal(ctx.state.tasks.find(t=>t.id===task.id).title,'Latest edit');
+ await ctx.sendPush();await syncSettle(40);
+ assert.equal(h.remoteState().tasks.find(t=>t.id===task.id).title,'Latest edit','later intent reaches the cloud after its own acknowledgement');
+ assert.equal(h.conflicts,0);
 });

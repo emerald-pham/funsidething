@@ -865,3 +865,7 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK Postpone layout: modal height preserves the viewport cap and fits the available backdrop
 
 - RISK Postpone layout: Settings numeric fields contain intrinsic widths in narrow recurrence rows
+
+## Cloud acknowledgement ordering
+
+- RISK cloud self-echo: focus pull during own acknowledgement retains latest task edit without stale rejection
