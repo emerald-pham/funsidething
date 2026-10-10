@@ -6024,7 +6024,7 @@ test("undo: the header button reverses the last action through the normal onActi
 
 const benchAction = (scanHtml) => (scanHtml.match(/<div class="actionrow[^"]*">[\s\S]*?<\/div>/) || [])[0];
 
-test("UI: the benchmark's six actions sit in one row beneath the purple card", async () => {
+test("UI: the benchmark's seven actions sit in one row beneath the purple card", async () => {
   const { ctx, shim } = await loadApp({ seed: 270 });
   ctx.addTask("Dotted task", true);
   ctx.render();
@@ -6035,8 +6035,8 @@ test("UI: the benchmark's six actions sit in one row beneath the purple card", a
 
   const row = benchAction(scanHtml);
   const acts = [...row.matchAll(/data-act="([a-z-]+)"/g)].map((m) => m[1]);
-  assert.deepEqual(acts, ["bench-done", "edit", "worked", "bench-cant", "dislodge", "delete-task"],
-    "all six actions, in the order they were in the rail");
+  assert.deepEqual(acts, ["bench-done", "edit", "worked", "bench-cant", "bench-postpone", "dislodge", "delete-task"],
+    "all seven actions retain their scanner order");
 });
 
 test("UI: the action row comes after the purple card, not beside it", async () => {
@@ -6068,7 +6068,7 @@ test("UI: every action in the benchmark's row shares the same .sm sizing", async
   const row = benchAction(shim.elements.get("scan").innerHTML);
 
   const btns = row.match(/<button class="btn [^"]*"/g) || [];
-  assert.equal(btns.length, 6, `expected six buttons, found ${btns.length} in ${row}`);
+  assert.equal(btns.length, 7, `expected seven buttons, found ${btns.length} in ${row}`);
   const odd = btns.filter((b) => !/\bsm\b/.test(b));
   assert.deepEqual(odd, [], "a button without .sm would render a different size than its neighbours");
 });
@@ -24199,7 +24199,7 @@ test('RISK Postpone: mounted scanner action defers without rating or task edits 
 test('RISK Postpone: Settings validates custom hours preserves old values and final task resumes coherently',async()=>{
  const {ctx,shim}=await loadApp({seed:982});assert.equal(ctx.state.settings.postponeHours,1);for(const v of [null,'',Infinity,NaN,-1,0])assert.equal(ctx.normalizeSettings({postponeHours:v,cantMin:47}).postponeHours,1);assert.equal(ctx.normalizeSettings({cantMin:47,workedHours:19}).workedHours,19);
  ctx.openSettings();assert.match(shim.document.getElementById('modalRoot').innerHTML,/<label for="stPostponeHours">/);shim.document.getElementById('stPostponeHours').value='2.5';ctx.onAction('save-settings',{dataset:{}});assert.equal(ctx.state.settings.postponeHours,2.5);
- const a=ctx.addTask('Sole');ctx.state.chain=[a.id];ctx.state.mode='work';const at=Date.now();ctx.onAction('bench-postpone',{dataset:{benchmark:a.id}});assert.equal(ctx.taskPostponeUntil(a),at+9000000);assert.equal(ctx.state.chain.length,0);assert.equal(ctx.state.candidateId,null);assert.equal(ctx.state.mode,'scan');
+ setFakeTime(ctx,Date.parse('2026-10-10T12:00:00Z'));const a=ctx.addTask('Sole');ctx.state.chain=[a.id];ctx.state.mode='work';const at=realNow(ctx);ctx.onAction('bench-postpone',{dataset:{benchmark:a.id}});assert.equal(ctx.taskPostponeUntil(a),at+9000000);assert.equal(ctx.state.chain.length,0);assert.equal(ctx.state.candidateId,null);assert.equal(ctx.state.mode,'scan');
  await ctx.persist();const reload=await loadApp({seedStorage:{[SYNC_STORE_KEY]:shim.localStorage.getItem(SYNC_STORE_KEY)}});assert.equal(reload.ctx.isEligible(reload.ctx.state.tasks.find(t=>t.id===a.id)),false);assert.equal(reload.ctx.state.settings.postponeHours,2.5);
  ctx.undo();assert.equal(ctx.taskPostponeUntil(ctx.state.tasks.find(t=>t.id===a.id)),0);assert.equal(ctx.isEligible(ctx.state.tasks.find(t=>t.id===a.id)),true);
 });
@@ -24230,4 +24230,8 @@ test('RISK Postpone: actual backup Restore completion Undo and pass resets retai
  ctx.rescanSkipped();ctx.newPass();assert.equal(ctx.taskPostponeUntil(ctx.state.tasks.find(t=>t.id===task.id)),until);assert.equal(ctx.isEligible(ctx.state.tasks.find(t=>t.id===task.id)),false);
  ctx.pushUndo();ctx.completeTask(ctx.state.tasks.find(t=>t.id===task.id));await ctx.persist();assert.equal(ctx.state.tasks.find(t=>t.id===task.id).done,true);ctx.undo();assert.equal(ctx.taskPostponeUntil(ctx.state.tasks.find(t=>t.id===task.id)),until);assert.equal(ctx.isEligible(ctx.state.tasks.find(t=>t.id===task.id)),false);
  ctx.pushUndo();ctx.writeTaskPostpone(ctx.state.tasks.find(t=>t.id===task.id),0);ctx.commit();const later=ctx.addTask('Later task');await ctx.persist();ctx.openSettings();assert.equal(await ctx.restoreDurableBackupById(backup.id),true);assert.equal(ctx.taskPostponeUntil(ctx.state.tasks.find(t=>t.id===task.id)),until);assert.ok(ctx.state.tasks.some(t=>t.id===later.id));const stable=JSON.stringify(ctx.state.tasks.find(t=>t.id===task.id).postponeOps);ctx.mergeUndeletedTasks(ctx.state,JSON.parse(snapshot));assert.equal(JSON.stringify(ctx.state.tasks.find(t=>t.id===task.id).postponeOps),stable);ctx.undo();assert.equal(ctx.taskPostponeUntil(ctx.state.tasks.find(t=>t.id===task.id)),0);assert.ok(ctx.state.tasks.some(t=>t.id===later.id));
+});
+
+test('RISK Postpone: white control retains named theme palette colors',async()=>{
+ assert.match(fs.readFileSync(new URL('./index.html',import.meta.url),'utf8'),/\.btn\.postpone\{background:light-dark\(#fff,#fff\);color:light-dark\(#20242b,#20242b\);border:1px solid light-dark\(#999,#999\)\}/);
 });

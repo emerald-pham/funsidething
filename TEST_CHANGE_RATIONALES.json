@@ -1,6 +1,6 @@
 [
   {
-    "testChangesSha256": "349c5d52d0be92b53024b1d4c6f17b08cb6d3b404d401f7804ebd3396ac027d3",
+    "testChangesSha256": "59d874ba88c4466fd65eb260d0d0256c16f40df0b9985dc8dc7a43f6e7458d46",
     "reason": "Protect the requested persisted task deferral across actual scanner controls, Settings, expiry, causal reconciliation and Undo without weakening existing contracts.",
     "previousBehavior": "The scanner had no Postpone action or configurable one-hour deferral; tasks could not be temporarily deferred independently of pass marks and rating actions.",
     "intendedBehavior": "Postpone excludes the displayed task until its saved deadline, preserves unrelated task and rating fields, and merges safely across current clients.",
@@ -10,14 +10,15 @@
       "RISK Postpone: causal sync preserves peer edits concurrent deferrals Undo deletion and old clients",
       "RISK Postpone: revisioned cloud offline reconnect prunes stale dots without losing concurrent editor fields",
       "RISK Postpone: unknown future deferral evidence is adopted archived and read-only through stale merge and Undo",
-      "RISK Postpone: actual backup Restore completion Undo and pass resets retain deferral intent"
+      "RISK Postpone: actual backup Restore completion Undo and pass resets retain deferral intent",
+      "RISK Postpone: white control retains named theme palette colors"
     ],
     "preservedCoverage": [
-      "All existing scanner, recurrence, dependencies, completion, editor, cloud, storage and rating assertions remain unchanged. Older clients preserve opaque deferral evidence but do not enforce it until updated."
+      "Existing ordered benchmark actions remain protected, adding only the authorized seventh Postpone action; every action still requires .sm sizing. Exact deadline assertions use a controlled fixture clock. Existing palette and FAQ-length contracts remain unchanged, as do recurrence, completion, editor, cloud, storage and rating assertions."
     ],
     "redEvidence": {
       "command": "node --test --test-name-pattern='RISK Postpone:' tests.js",
-      "failure": "Observed before implementation: mounted Postpone control missing; postponeHours undefined; peer task remained eligible after ignored action. /tmp/postpone-red.log. Later new stale-chain consumer test failed true !== false before chain-pruning fix: /tmp/postpone-cloud-red.log. Specialist finding RED before opaque-preservation fix: old winner adopts opaque peer bytes failed with undefined at /tmp/postpone-opaque-red.log. Completion/Restore/pass-reset coverage was added as supplementary postimplementation validation, not claimed as a new preimplementation RED."
+      "failure": "Observed before implementation: mounted Postpone control missing; postponeHours undefined; peer task remained eligible after ignored action. /tmp/postpone-red.log. Later new stale-chain consumer test failed true !== false before chain-pruning fix: /tmp/postpone-cloud-red.log. Specialist finding RED before opaque-preservation fix: old winner adopts opaque peer bytes failed with undefined at /tmp/postpone-opaque-red.log. Completion/Restore/pass-reset coverage was added as supplementary postimplementation validation, not claimed as a new preimplementation RED. Required CI 38050059531 observed six-versus-seven action expectations, theme palette escape, FAQ answer length, and a one-millisecond real-clock test race. Focused FAQ RED /tmp/postpone-ci-fixes-red.log and actual palette assertion RED /tmp/postpone-palette-red.log preceded CSS/copy repairs. No functional deferral semantics changed in these repairs."
     }
   },
   {

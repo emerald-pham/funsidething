@@ -857,3 +857,5 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK Postpone: revisioned cloud offline reconnect prunes stale dots without losing concurrent editor fields
 - RISK Postpone: unknown future deferral evidence is adopted archived and read-only through stale merge and Undo
 - RISK Postpone: actual backup Restore completion Undo and pass resets retain deferral intent
+
+- RISK Postpone: white control retains named theme palette colors
