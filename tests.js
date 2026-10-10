@@ -22542,8 +22542,8 @@ test('RISK fireworks pair endpoints: zero and maximum seeded samples bound regul
    const has=age=>g.fireworks(start+age,.4,festival,event).some(d=>d.burst===burst+1);
    if(delay)assert.equal(has(delay-.000001),false,'maximum sample cannot ignite its partner early');
    assert.equal(has(delay+.000001),true,'zero and maximum delay launch at their exact bound');
-   const finaleAt=festival?97.5:56,rockets=g.fireworks(finaleAt+.001,.4,festival,event).filter(d=>d.finale);
-   assert.equal(new Set(rockets.map(d=>d.burst)).size,8,'finale lanes are simultaneous even at the maximum paired delay');
+   const finaleAt=festival?97.5:56,rockets=g.fireworks(finaleAt+.001,.4,festival,event).filter(d=>d.finale&&d.kind==='rocket');
+   assert.equal(new Set(rockets.map(d=>d.burst)).size,5,'closing crown ignition remains independent of the regular paired delay');
   }
  }
 });
@@ -22605,7 +22605,7 @@ test('RISK fireworks reduced deadline: static scheduler preserves a persistent b
 test('RISK fireworks cached guidance: installed spawn-rate prose matches the bounded display and its exact offline shell',()=>{
  const contract=appShellContract(serviceWorkerSource()),guidance=fs.readFileSync(path.join(__dirname,'SPAWN_RATES.md'),'utf8');
  assert.ok(contract.localPaths.includes('SPAWN_RATES.md'),'the installed guidance is an offline asset');
- assert.match(guidance,/visible[\s\S]*?finish within 60 seconds/);assert.match(guidance,/0–300 ms delay/);assert.match(guidance,/Eight simultaneous finale shells/);
+ assert.match(guidance,/visible[\s\S]*?finish within 60 seconds/);assert.match(guidance,/0–300 ms delay/);assert.match(guidance,/overlapping two-, three- and five-shell volleys/);
  assert.equal(contract.cacheName,'chain-scanner-shell-'+contract.fingerprint,'changed cached guidance must reach offline installations');
 });
 
@@ -23976,3 +23976,34 @@ test('RISK Quick start chapters: mounted help uses native named disclosures with
 test('RISK Quick start chapter layout: disclosure headings share the native summary line without extra margins',()=>{
  assert.match(html,/\.help-faq\s*>\s*summary\s*>\s*h3\s*\{[^}]*display\s*:\s*inline\s*;[^}]*margin\s*:\s*0\s*[;}]/,'chapter heading and disclosure marker stay together');
 });
+
+
+// A staged finale must be observable through emitted shells, not scheduling metadata.
+test('RISK fireworks crescendo: finale emits distinct overlapping volleys and a wider closing crown',()=>{
+ const context=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),context);
+ for(const [width,height] of [[390,844],[768,1024],[1440,900],[568,320]])for(const festival of [false,true]){
+ const duration=festival?150:60,g=context.LandscapeGeometry.create(width,height),event={duration,seed:.4},starts=new Map();
+ let overlap=false,peak=0;
+ for(let step=1;step<duration*50;step++){
+  const age=step/50,dots=g.fireworks(age,.4,festival,event),finale=dots.filter(d=>d.finale);
+  peak=Math.max(peak,dots.length);
+  for(const dot of finale)if(!starts.has(dot.burst))starts.set(dot.burst,{age,x:dot.x});
+  if(finale.some(d=>d.kind==='rocket')&&finale.some(d=>d.kind==='spark'))overlap=true;
+ }
+ const groups=new Map();for(const shell of starts.values()){const key=shell.age.toFixed(2);if(!groups.has(key))groups.set(key,[]);groups.get(key).push(shell.x);}
+ const volleys=[...groups.values()];
+ assert.ok(volleys.length>=3,'a real crescendo needs at least three distinct ignition times; current single eight-shell volley cannot satisfy it');
+ assert.ok(overlap,'later finale ascents overlap earlier blooms');
+ assert.ok(volleys.at(-1).length>volleys[0].length,'closing crown fires more shells than the opening volley');
+ const span=xs=>Math.max(...xs)-Math.min(...xs);
+ assert.ok(span(volleys.at(-1))>span(volleys[0]),'closing crown expands sky coverage');
+ assert.ok(peak<=320,'overlapping choreography retains the existing active particle cap');
+ assert.equal(g.fireworks(duration,.4,festival,event).length,0,'all tails finish within the standalone cap or barge crossing');
+ }
+});
+
+ test('RISK fireworks crescendo FAQ: scenery help explains widening finale and existing motion limits',()=>{
+ const help=html.slice(html.indexOf('function openHelp'),html.indexOf('function openInstallHelp'));
+ assert.match(help,/overlapping volleys[\s\S]*wider closing crown/);
+ assert.match(help,/Reduced motion keeps scenery still/);
+ });

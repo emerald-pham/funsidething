@@ -18,8 +18,8 @@ is four times the sampled reservation plus 240 seconds after its start.
 Scaling the entire interval, including failed checks, retains the current
 four-times-original spacing independently of the shorter display window.
 Regular volleys fire two shells; the second has a deterministic seeded
-0–300 ms delay. Eight simultaneous finale shells finish with naturally fading
-embers before the 60-second display limit. Geometry keeps at most 320 active particles. Arrival timing stays random
+0–300 ms delay. The finale widens through overlapping two-, three- and five-shell volleys,
+ending in a closing crown with naturally fading embers before the 60-second display limit. Geometry keeps at most 320 active particles. Arrival timing stays random
 and respects the existing scene budget and shared UTC clock; hidden tabs do no painting and reduced motion uses still poses.
 Festivals check once per UTC minute at a 1.2% chance, wait at least 30 UTC
 minutes between visits, share the seven-minute rare cooldown with alien visits,

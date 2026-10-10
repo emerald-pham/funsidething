@@ -832,3 +832,6 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - Quick start chapters: `RISK Quick start chapters: mounted help uses native named disclosures with essential chapter first and detailed chapters closed`.
 
 - Quick start compact disclosure headings: `RISK Quick start chapter layout: disclosure headings share the native summary line without extra margins`.
+
+- RISK fireworks crescendo: finale emits distinct overlapping volleys and a wider closing crown
+- RISK fireworks crescendo FAQ: scenery help explains widening finale and existing motion limits
