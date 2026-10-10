@@ -1,5 +1,36 @@
 [
   {
+    "testChangesSha256": "74771d7b1e42926233b37a6140810e3efba616ddaaf4b5a2cc089aafff726f60",
+    "reason": "Correct reproduced opaque-in-viewport pedestrian retirement and requested half walking pace, while keeping released admission identities and chance draws independent of extended visual tails. Preserve the old admission budget; replace only the disproven assumption that every visible route must expire within300seconds. CI exposed an older fireworks admission oracle comparing intentionally extended walking tails with old visible expiry; preserve its original admission-time domain using activityDuration. Keep every nonwalking identity and all cap/no-resampling assertions. Move added walking guidance into a short adjacent FAQ rather than lengthen the established scenery answer.",
+    "previousBehavior": "Observed real painter walker844 at99percent remained x627.902 with alpha0.07072; ordinary pace displacement8.385px per second had not halved. Reader390 departed10.708px/s and snowangel39017.849px/s; snowman builder faded in-scene. Shared scene test conflated original reservation budgets with visible expiry.",
+    "intendedBehavior": "People continue analytic distance-driven walking until full party exit; walking pace halves and forced departure sprint is removed. Admission reservations stay original and logical visual lifetime is identical across device widths/reload/frame histories, with a bounded8192CSSpixel travel budget. Reduced motion selects a settled visible representative. Nonwalking effects and tasks remain unchanged.",
+    "replacementTests": [
+      "RISK pedestrian natural exit: ordinary and dog walkers stay opaque until their whole party clears the viewport",
+      "RISK pedestrian half pace: ordinary and dog walking translation uses half the prior local pace",
+      "RISK pedestrian departure pace: carrying and winter people leave at a walking pace without a lifetime sprint",
+      "RISK pedestrian scheduled lifetime: accepted walkers retain admission duration and survive until a full viewport exit",
+      "RISK pedestrian companion pace: walking deer and woodland paws halve translation and distance together while hopping stays unchanged",
+      "RISK pedestrian visual tail preservation: longer paint lifetimes never reroll released admission or nonwalking effects",
+      "RISK pedestrian complete parties: scheduled walking routes clear both edges at bounded pace and paint without terminal fade",
+      "RISK pedestrian reduced motion: static production poses keep walkers on screen and winter activities settled",
+      "Pedestrian extended FAQ: accurate natural exits retain shared chance schedule and reduced motion explanation",
+      "RISK pedestrian winter tail shadows: retired structures leave no ghost shadow while the walking person remains opaque",
+      "RISK pedestrian production half pace: scheduled ordinary and dog walkers halve the actual prior trajectory at every sampled seed and frame rate",
+      "RISK pedestrian reduced painter consumer: production-shaped static events use the same settled representative as the app",
+      "RISK carrying isolation: immutable accepted renderer commands stay exact outside requested walker pace changes",
+      "RISK pedestrian concise help: natural exit guidance has a short adjacent FAQ without lengthening the existing scenery answer"
+    ],
+    "preservedCoverage": [
+      "Existing gait anatomy/contact/carrying/leash, reduced-motion, terrain/occlusion, rare/weather/show scheduling, task/ranking/persistence/sync and offline contracts remain. Existing shared scenery logical equality remains exact; only duration/budget assertions now distinguish original admission from finite visual tails.",
+      "Two preservation/complete-party tests were added after first implementation as regression evidence, not claimed as contemporaneous RED. Animal half-pace test was observed RED after restoring its old six/.22 speeds, before reapplying those two adjustments.",
+      "Original carrying sentinel JSON and immutable19643f4 build/hash remain unchanged. The user-requested ordinary/dog walking half pace and removed fade contradict their exact old render, as actually observed in sentinel.log. Those controls now assert the precise half geometry, retained direction/duration, full opacity and cold same-runtime identity; every unaffected reader/couple/picnic/kite/winter legacy consumer still matches every exact original command. Three old walker sequences retain this precise numerical comparison; connected gait/leash/contact tests remain unchanged."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK pedestrian (natural exit|half pace)' tests.js; node --test --test-name-pattern='RISK pedestrian' tests.js; node --test --test-name-pattern='pedestrian scheduled lifetime' tests.js; node --test --test-name-pattern='pedestrian reduced motion|Pedestrian extended FAQ' tests.js",
+      "failure": "Actual preimplementation logs /tmp/chain-pedestrian-motion-evidence-20261010/red.log and red-expanded.log record opacity/pace failures; red-timeline.log records missing preserved activityDuration before scheduler extension. red-winter.log records snowangel sprint before winter correction. red-animal.log records original deer distance202.782 vs101.391 before animal adjustment. red-reduced-faq.log records missing representative function and FAQ prose before edits. red-shell.log records outdated shell/changelog fingerprints before refreshing. Actual baseline browser capture used unchanged9d433f1, closed14:12:27UTC; report explains transparent diagnostic backdrop limitation. red-winter-shadow.log records ghost stationary shadows before their separate alpha correction; winter-shadow-green.log verifies the repaired retirement. Initial diagnostic full run was stopped after the candidate changed; it is not a final full-suite pass. Independent exact-b8e review found double-applied speed metadata and missing reduced-mode harness representative; red-review-findings.log records both actual failing regressions before repair. Exact39dd CI run38070021205 failed historical visible IDs (five arrival tails versus none) and the130word FAQ limit. red-ci-corrections.log contemporaneously records Quick start brevity and missing adjacent walking FAQ failures before markup correction; narrowed historical domain passes with original admission identities and new visual-tail protection retained."
+    }
+  },
+  {
     "testChangesSha256": "a8f77d9767d4ae43ef3f544998f7b44886ac32110f5c6c14441fdeda8d438832",
     "reason": "User explicitly replaces the bespoke Postpone appearance with the established Edit component on ordinary and final scanner surfaces; preserve the action and theme contracts rather than test a now-rejected fixed-color skin.",
     "previousBehavior": "Postpone used custom borders fixed colors weight700 and a shadow; ordinary Postpone also had larger type and padding. Previous white-color-only regression and rendered bounds review did not compare its equivalent Edit control.",
