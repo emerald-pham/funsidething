@@ -24759,3 +24759,10 @@ test('RISK motion safety resume: foreground and restored pages reread expiry bef
  assert.deepEqual(calls,['read','paint:reduced'],'restored page consumes valid remembered reduction without prompting');
  assert.equal(JSON.stringify(world),before,'foreground checks retain visitor progress');
 });
+
+test('RISK bulk task guidance: bounded answers retain distinct selection property conflict Undo and result instructions',async()=>{
+ const {ctx,shim}=await loadApp();ctx.openHelp();const faq=shim.document.getElementById('modalRoot').innerHTML,answers=[...faq.matchAll(/<dt>(.*?)<\/dt><dd>(.*?)<\/dd>/g)].filter(([,q])=>/several tasks together|Bulk Edit|selected tasks change|bulk result count/.test(q));
+ assert.equal(answers.length,5,'bulk guidance separates controls, properties, conflicts, Undo and result meanings');
+ for(const [,question,answer] of answers)assert.ok(answer.split(/\s+/).filter(Boolean).length<=130,question+' remains independently readable');
+ const combined=answers.map(a=>a[2]).join(' ');for(const guidance of ['current filtered list','Apply separately','Clear explicitly','later sync conflict','first Undo may leave batch values','not server confirmation','disappear on reload'])assert.ok(combined.includes(guidance),'retain '+guidance);
+});

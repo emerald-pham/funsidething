@@ -1,5 +1,53 @@
 [
   {
+    "testChangesSha256": "af5e37402602bc47e5baedbfd1c8b00be1163e9c68573187e70ec006c56be45d",
+    "reason": "User-requested filtered bulk task editing needs field-scoped preservation and atomic stale-form checks. New tests only; existing contracts retained.",
+    "previousBehavior": "All Tasks had only individual Edit and lacked bottom selection controls or explicit batch date clearing.",
+    "intendedBehavior": "Select visible filtered tasks, apply only opted properties, reject batch conflicts, explicitly clear and preserve identities/history/ratings and unrelated peer edits.",
+    "replacementTests": [
+      "RISK bulk task guidance: bounded answers retain distinct selection property conflict Undo and result instructions"
+    ],
+    "preservedCoverage": [
+      "Existing dependency self-link/cycle/limit/hard-soft handling remains exclusively in the individual editor; ratings and backup retention algorithms unchanged.",
+      "Existing recovery Undo remains whole-board replacement; explicit regression and FAQ distinguish first recovery Undo from uninterrupted batch reversal. Cloud tests protect newer peer fields, deletion, local retry and ACK semantics."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK bulk task editing:' tests.js",
+      "failure": "Before implementation, selection count assertion failed and explicit clearing retained old date (/tmp/chain-bulk-red.log). Before input handler changes, reset checkbox was undefined instead of false (/tmp/chain-bulk-red2.log). Two-tab/deletion checks added afterward truthfully provide preservation coverage, not preimplementation RED. Explicit reset opt-in then failed true !== false before removing automatic Apply (/tmp/chain-bulk-red3.log). Removed context option test failed 1 !== 0 before the save-time context validity guard (/tmp/chain-bulk-red4.log). FAQ observed RED before copy repair: lacked detected-before-Save qualification (/tmp/chain-bulk-copy-red.log). Additional cloud failure/reconnect/partial adoption/recovery Undo cases passed on existing sync paths; these are postimplementation preservation checks, not claimed as initial RED. Bulk result assertion failed before result UI existed (/tmp/chain-bulk-result-red.log); current-value result then passed without server-ACK claim or added Undo shortcut (/tmp/chain-bulk-result-green.log). Actual reconnect partial adoption now checks the rendered result. Actual Chrome390px200% modal overflow observed before style repair (/tmp/chain-bulk-physical.log), then new direct fieldset/native-number contract failed (/tmp/chain-bulk-layout-red.log), before min-width/max-width repair.13bulktests green /tmp/chain-bulk-layout-green.log. Independent rendered review bb816bf observed cropped Selected controls and unreadable title at Chrome390px200% (/tmp/chain-bulk-typography-review-bb816bf.md). Focused source contract also failed before layout repair (/tmp/chain-bulk-selection-layout-red.log); 14 bulk tests pass after selection-only stacked row repair (/tmp/chain-bulk-selection-layout-green.log). Actual repaired render remains pending runtime allocation. Independent source review caught later mobile rank selectors overriding the first repair; selector now includes listwrap ancestor so specificity exceeds mobile rank rules. Focused contract distinguishes this precedence. OriginalheadCI failed 130-word FAQanswer limit (/tmp/chain-bulk-ci-original-failed.log); current focused existing contract confirms RED (/tmp/chain-bulk-faq-length-red.log). New bounded-guidance test failed 1!==5 onunsplitFAQ (/tmp/chain-bulk-faq-structure-red.log). Splitfiveanswersretain everyprevioussentence, 22focused tests pass (/tmp/chain-bulk-faq-final-green.log)."
+    }
+  },
+  {
+    "testChangesSha256": "a3636fce570fd646dd342d2befe6a335755e35e5c5dd45ceab24596b61046de6",
+    "reason": "User-requested filtered bulk task editing needs field-scoped preservation and atomic stale-form checks. New tests only; existing contracts retained.",
+    "previousBehavior": "All Tasks had only individual Edit and lacked bottom selection controls or explicit batch date clearing.",
+    "intendedBehavior": "Select visible filtered tasks, apply only opted properties, reject batch conflicts, explicitly clear and preserve identities/history/ratings and unrelated peer edits.",
+    "replacementTests": [
+      "RISK bulk task editing: displayed selection and opted fields preserve identity and reject stale conflicts",
+      "RISK bulk task editing: blank fields do not delete and explicit clearing survives reload",
+      "RISK bulk task editing: clearing is reversible in the draft and interval changes use the Evergreen reset rule",
+      "RISK bulk task editing: filtered hidden deleted completed and replaced board selections cannot write",
+      "RISK bulk task editing: stale tab save preserves peer fields and durable field conflicts through reload",
+      "RISK bulk task editing: removed context options reject the whole batch rather than saving stale requirements",
+      "RISK bulk task editing: offline two-task cloud conflict preserves fresh peer fields and reconnects without resurrection",
+      "RISK bulk task editing: failed cloud publication retains local batch and retry acknowledges exact payload",
+      "RISK bulk task editing: failed browser pair save retains in-memory batch and retry saves without partial task loss",
+      "RISK bulk task editing: FAQ and editor qualify mixed Apply and later sync recovery limits",
+      "RISK bulk task editing: concurrent recovery keeps backups and existing board Undo boundary explicit",
+      "RISK bulk task editing: current batch result distinguishes partial reconciliation from sync success and offers no batch Undo",
+      "RISK bulk task editing: enlarged modal fieldsets shrink and native controls retain available width",
+      "RISK bulk task editing: enlarged selection rows give task controls full width",
+      "RISK bulk task guidance: bounded answers retain distinct selection property conflict Undo and result instructions"
+    ],
+    "preservedCoverage": [
+      "Existing dependency self-link/cycle/limit/hard-soft handling remains exclusively in the individual editor; ratings and backup retention algorithms unchanged.",
+      "Existing recovery Undo remains whole-board replacement; explicit regression and FAQ distinguish first recovery Undo from uninterrupted batch reversal. Cloud tests protect newer peer fields, deletion, local retry and ACK semantics."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK bulk task editing:' tests.js",
+      "failure": "Before implementation, selection count assertion failed and explicit clearing retained old date (/tmp/chain-bulk-red.log). Before input handler changes, reset checkbox was undefined instead of false (/tmp/chain-bulk-red2.log). Two-tab/deletion checks added afterward truthfully provide preservation coverage, not preimplementation RED. Explicit reset opt-in then failed true !== false before removing automatic Apply (/tmp/chain-bulk-red3.log). Removed context option test failed 1 !== 0 before the save-time context validity guard (/tmp/chain-bulk-red4.log). FAQ observed RED before copy repair: lacked detected-before-Save qualification (/tmp/chain-bulk-copy-red.log). Additional cloud failure/reconnect/partial adoption/recovery Undo cases passed on existing sync paths; these are postimplementation preservation checks, not claimed as initial RED. Bulk result assertion failed before result UI existed (/tmp/chain-bulk-result-red.log); current-value result then passed without server-ACK claim or added Undo shortcut (/tmp/chain-bulk-result-green.log). Actual reconnect partial adoption now checks the rendered result. Actual Chrome390px200% modal overflow observed before style repair (/tmp/chain-bulk-physical.log), then new direct fieldset/native-number contract failed (/tmp/chain-bulk-layout-red.log), before min-width/max-width repair.13bulktests green /tmp/chain-bulk-layout-green.log. Independent rendered review bb816bf observed cropped Selected controls and unreadable title at Chrome390px200% (/tmp/chain-bulk-typography-review-bb816bf.md). Focused source contract also failed before layout repair (/tmp/chain-bulk-selection-layout-red.log); 14 bulk tests pass after selection-only stacked row repair (/tmp/chain-bulk-selection-layout-green.log). Actual repaired render remains pending runtime allocation. Independent source review caught later mobile rank selectors overriding the first repair; selector now includes listwrap ancestor so specificity exceeds mobile rank rules. Focused contract distinguishes this precedence. OriginalheadCI failed 130-word FAQanswer limit (/tmp/chain-bulk-ci-original-failed.log); current focused existing contract confirms RED (/tmp/chain-bulk-faq-length-red.log). New bounded-guidance test failed 1!==5 onunsplitFAQ (/tmp/chain-bulk-faq-structure-red.log). Splitfiveanswersretain everyprevioussentence, 22focused tests pass (/tmp/chain-bulk-faq-final-green.log)."
+    }
+  },
+  {
     "testChangesSha256": "465d5094f606c0697ad5fe564de9dc95a8ca93012482235e0561976e5c449bd0",
     "reason": "Merge authorized motion main into bulk candidate preserving all main CI fixture repairs and added motion contracts without altering bulk tests.",
     "previousBehavior": "Prior bulk branch based on WOOP main predates independently reviewed motion safety and fixture corrections.",
