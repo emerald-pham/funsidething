@@ -24730,6 +24730,7 @@ test('RISK bulk toolbar guidance: extended FAQ describes frozen controls and ran
 test('RISK repository process boundary: actual visual tests compare every changed control with neighboring controls and scrolled states',()=>{
  for(const name of ['CLAUDE.md','RELEASE_GATES.md']){
   const guide=fs.readFileSync(path.join(__dirname,name),'utf8').replace(/\s+/g,' ');assert.match(guide,/Actual visual tests are mandatory/,'review guidance must require executed visual tests, not screenshot presence alone');
+  assert.match(guide,/computed color scheme and paint/i,'theme labels must not substitute for actual applied colors');assert.match(guide,/theme labels alone.*not.*coverage/i);
   assert.match(guide,/changed control.*established neighboring control/i);assert.match(guide,/top, middle and end.*scroll/i);assert.match(guide,/day and night.*enlarged/i);assert.match(guide,/screenshots in isolation.*not.*pass/i);
  }
 });

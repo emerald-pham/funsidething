@@ -1,5 +1,27 @@
 [
   {
+    "testChangesSha256": "acfbebfd6c292ab891fdd34627a9153d5a8663310e133028d959c3b5d197b195",
+    "reason": "User requests a pane-frozen toolbar matching existing compact controls and rank-slot selection without taller rows. Replace only the explicitly superseded full-width selection-row expectation; retain existing bulk mutations and sync assertions. New tests exercise real selection handlers, filter pruning, focus and help consumer. Independent actual image review found misleading dark labels on light-painted captures; user explicitly requires recording this harness lesson. New guide assertions fail before theme-verification prose.",
+    "previousBehavior": "Modal-sized footer controls scrolled with task rows. Selection added an extra title-line button and used full-width rows; keyboard rerender lost footer focus.",
+    "intendedBehavior": "Compact existing filter classes render outside task scroller, selection occupies the original rank slot and restores its format, keyboard focus survives rerender, with explicit filtered scope and updated review guidance.",
+    "replacementTests": [
+      "RISK bulk toolbar: mounted controls stay outside scrolling rows and retain filtered selection through filter changes",
+      "RISK bulk row selection: selected label replaces the existing rank slot and deselection restores its format",
+      "RISK bulk toolbar keyboard: rerender restores the focused toolbar action and row toggle",
+      "RISK bulk toolbar guidance: extended FAQ describes frozen controls and rank-slot selection",
+      "RISK repository process boundary: actual visual tests compare every changed control with neighboring controls and scrolled states"
+    ],
+    "preservedCoverage": [
+      "All existing bulk field opt-in, clearing, validation, identity/history/rating preservation, stale selections, offline conflicts, partial reconciliation, failed local/cloud saves and Undo assertions remain; only result/count DOM target moves from listBody to its sibling toolbar.",
+      "User explicitly supersedes enlarged selection rows give task controls full width. New rank-slot consumer coverage and required rendered before/after row-height comparison replace that layout expectation; no data or sync behavior changes.",
+      "Incoming PR107 cleanup source, tests, FAQ and changelog preserved during additive reconciliation to18e3eeb."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK bulk toolbar:|RISK repository process boundary: actual visual tests' tests.js; node --test --test-name-pattern='RISK bulk row selection:' tests.js; node --test --test-name-pattern='RISK bulk toolbar keyboard:|RISK bulk toolbar guidance:' tests.js; node --test --test-name-pattern='RISK repository process boundary: actual visual tests' tests.js",
+      "failure": "Contemporaneous /tmp/chain-bulk-toolbar-red.log: toolbar unexpectedly inside scroller; /tmp/chain-bulk-row-slot-red.log: actual rank slot lacked native selection control; /tmp/chain-bulk-visual-review-red.log: executed visual-review guidance missing before documentation edit; /tmp/chain-bulk-toolbar-focus-faq-red.log: keyboard Select lost focus before repair. Initial FAQ test had wrong consumer name; corrected openHelp failed required guidance before FAQ change in /tmp/chain-bulk-toolbar-faq-red.log. Shell fingerprint mismatch observed before regeneration in /tmp/chain-bulk-toolbar-shell-red.log. All21focused source cases pass zero skips after repair; actual rendered comparison remains pending runtime allocation. /tmp/chain-bulk-toolbar-theme-guidance-red.log missing computed scheme/paint requirement observed before guide repair; /tmp/chain-bulk-toolbar-theme-guidance-green.log1pass0skip."
+    }
+  },
+  {
     "testChangesSha256": "96acbe85808546824da284bf04195bc1308a8cb59aa8268027db7c1c744212c3",
     "reason": "User requests a pane-frozen toolbar matching existing compact controls and rank-slot selection without taller rows. Replace only the explicitly superseded full-width selection-row expectation; retain existing bulk mutations and sync assertions. New tests exercise real selection handlers, filter pruning, focus and help consumer.",
     "previousBehavior": "Modal-sized footer controls scrolled with task rows. Selection added an extra title-line button and used full-width rows; keyboard rerender lost footer focus.",
