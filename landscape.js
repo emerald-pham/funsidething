@@ -1057,13 +1057,18 @@
         const vertical=typeof fy==='number'?fy:f,flightClock=typeof clock==='number'?clock:t;
         // Finish the visit with a takeoff and an offscreen exit, so expiring the
         // event cannot make a perched bird abruptly disappear from its nest.
+        // Split ink at the exact source-capture edge, including crossing wings.
+        const partitioned=typeof birdPass==='string'&&(birdPass==='sky'||birdPass==='ground');
+        if(partitioned){
+          const boundary=Math.floor(geometry.waterTop*dpr)/dpr;
+          g.save();g.beginPath();
+          g.rect(0,birdPass==='sky'?0:boundary,W,birdPass==='sky'?boundary:Math.max(0,H-boundary));g.clip();
+        }
         for(let i=0;i<(e.seed>.4?2:1);i++){
           const pose=geometry.nestVisit(f,e.lane,e.reverse,nest.perches[i],i,vertical);
-          // Standalone shape consumers retain the full visit; the scene partitions
-          // these same poses into mutually exclusive sky and meadow passes.
-          if(typeof birdPass==='string'&&birdPass!=='all'&&(pose.y<geometry.waterTop)!==(birdPass==='sky'))continue;
           bird(pose.x,pose.y,i?3:3.5,flightClock+i*.6,pose.perched,pose.twig,(e.seed+i*.173)%1,S.smooth(hy*.4,nest.y,pose.y));
         }
+        if(partitioned)g.restore();
         return;
       }
       if(e.type==='plane'){
