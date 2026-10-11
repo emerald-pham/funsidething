@@ -4381,5 +4381,21 @@
       "command": "HEADER_BROWSER_GRANTED=1 node ../evidence/header-red.mjs; node --test --test-reporter=spec --test-name-pattern=\"RISK frozen header clearance:\" tests.js; node --test --test-reporter=spec --test-name-pattern=\"RISK frozen header wrapping:\" tests.js",
       "failure": "Preimplementation real browser RED: AssertionError freezing must retain headroom: scene jumped -6px (header-red.log). Preimplementation tests.js RED: fixed header must retain its original available width; undefined rather than366px (header-source-red.log). Follow-up source RED before slot observation: observe header height and flow width, including scrollbar or container changes (header-slot-observer-red.log). Browser matrix was added after the initial implementation as supplemental coverage; not claimed as a preimplementation native matrix RED. Additional observed browser RED: Settings x370.484375..398.140625 at320px enlarged frozen baseline; normal click timed out because it was outside the viewport (header-native-CPklJP/browser-run.log and header-final-CetQlj captures). d5143 retained identical brand/topbtns/mobile-nowrap/font rules, so no offline claim that it fixed this overflow. New source test failed: enlarged title plus controls must be allowed onto separate rows (header-wrap-source-red.log), before wrapping CSS repair."
     }
+  },
+  {
+    "testChangesSha256": "8cd12e82706f7c8bc46dad70149ed58bc3489f843018c9b050f37887bb7db685",
+    "reason": "User requests an explicit Likelihood label in compact historical metric summaries.",
+    "previousBehavior": "The recorded percentage had no name before Score and Uncertainty.",
+    "intendedBehavior": "Every applicable compact metric summary names Likelihood, including zero, tiny percentage and fallback states; values remain unchanged.",
+    "replacementTests": [
+      "RISK task history: compact Likelihood labels retain recorded values across metric boundaries"
+    ],
+    "preservedCoverage": [
+      "Dates, comparison provenance, plain Done summaries, expanded metrics, native disclosures and all historical records remain unchanged."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='compact Likelihood labels' tests.js",
+      "failure": "Observed before implementation: compact summary identifies the recorded likelihood: 1.08% failed. /tmp/history-likelihood-red.log retains actual output."
+    }
   }
 ]
