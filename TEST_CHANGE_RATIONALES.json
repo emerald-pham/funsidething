@@ -1,5 +1,22 @@
 [
   {
+    "testChangesSha256": "d60f169e0d0153e3251a0efc6ada551999340df213547ce500d3077bdeaf4d3f",
+    "reason": "Latest user instruction supersedes matching Edit’s small size: Postpone must match neighboring decision heights, preserving established neutral design and white paint without changing any action/data contract.",
+    "previousBehavior": "Ordinary Postpone reused btn sm subtle and measured32.84375px against neighboring Yes38.296875px; final row already matched32.84375px. Dark Postpone followed dark surface instead of the requested white treatment.",
+    "intendedBehavior": "Ordinary Postpone inherits the neighboring full btn geometry; final row retains sm like adjacent Done/Can’t. Scoped white neutral paint preserves shared disabled treatment and unchanged Edit styling.",
+    "replacementTests": [
+      "RISK Postpone: scan surfaces match neighboring decision button sizing without changing Edit",
+      "RISK Postpone: white treatment stays scoped to neutral controls on both scanner surfaces"
+    ],
+    "preservedCoverage": [
+      "All existing Postpone action routing, causal saved deferrals, duration, expiry, dependencies, reload, Undo, Restore, unknown-format and cloud ACK protection remain unchanged. Edit palette/sizing and unrelated controls are preserved."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='scan surfaces match neighboring|white treatment stays scoped' tests.js; HEIGHT_START=2026-10-11T02:22:00Z HEIGHT_END=2026-10-11T02:23:00Z HEIGHT_PHASE=red node /tmp/postpone-height-probe.mjs",
+      "failure": "Observed mounted RED before functional edit: true!==false sm mismatch and absent scoped white treatment, /tmp/postpone-height-source-red.log. Actual preimplementation Chrome24cases completed02:22:13.714UTC:12ordinary mismatches32.84375 vs38.296875px (200%65.6875 vs76.59375), all12final cases equal, /tmp/postpone-height-red/results.json. Physicalhandback02:22:21.690509UTC. Initial post-edit fingerprint checks failed until mechanical refresh; not misrepresented as behavioral RED."
+    }
+  },
+  {
     "testChangesSha256": "cb6ace8d47cf4d68c60a45eec49eee94b12982bea70f7d75cefe7cac5616edac",
     "reason": "Incremental CI correction preserves historical admission identities within original activityDuration and retains all complete visual exit protections, while adding a concise adjacent walking FAQ instead of exceeding the established help brevity limit.",
     "previousBehavior": "Exact39dd CI exposed historical visible-ID expectations that excluded newly retained walking tails and scenery help longer than130words.",

@@ -24251,20 +24251,34 @@ test('RISK Postpone: actual backup Restore completion Undo and pass resets retai
  ctx.pushUndo();ctx.writeTaskPostpone(ctx.state.tasks.find(t=>t.id===task.id),0);ctx.commit();const later=ctx.addTask('Later task');await ctx.persist();ctx.openSettings();assert.equal(await ctx.restoreDurableBackupById(backup.id),true);assert.equal(ctx.taskPostponeUntil(ctx.state.tasks.find(t=>t.id===task.id)),until);assert.ok(ctx.state.tasks.some(t=>t.id===later.id));const stable=JSON.stringify(ctx.state.tasks.find(t=>t.id===task.id).postponeOps);ctx.mergeUndeletedTasks(ctx.state,JSON.parse(snapshot));assert.equal(JSON.stringify(ctx.state.tasks.find(t=>t.id===task.id).postponeOps),stable);ctx.undo();assert.equal(ctx.taskPostponeUntil(ctx.state.tasks.find(t=>t.id===task.id)),0);assert.ok(ctx.state.tasks.some(t=>t.id===later.id));
 });
 
-test('RISK Postpone: every scanner surface reuses the established Edit control treatment',async()=>{
- const assertShared=(html,action,editId)=>{
-  const buttons=[...html.matchAll(/<button class="([^"]+)" data-act="([^"]+)"([^>]*)>/g)];
+test('RISK Postpone: scan surfaces match neighboring decision button sizing without changing Edit',async()=>{
+ const assertNeighbors=(markup,action,reference,editId)=>{
+  const buttons=[...markup.matchAll(/<button class="([^"]+)" data-act="([^"]+)"([^>]*)>/g)];
   const edit=buttons.find(m=>m[2]==='edit'&&m[3].includes('data-id="'+editId+'"'));
-  const postpone=buttons.find(m=>m[2]===action);assert.ok(edit&&postpone,'both actual controls must render');
-  assert.deepEqual(postpone[1].split(/\s+/).sort(),edit[1].split(/\s+/).sort(),'Postpone must share Edit shape size weight borders shadow and state selectors, rather than approximate its white paint');
-  assert.deepEqual(edit[1].split(/\s+/).sort(),['btn','sm','subtle'],'the established Edit component stays intact');
+  const postpone=buttons.find(m=>m[2]===action),neighbor=buttons.find(m=>m[2]===reference);
+  assert.ok(edit&&postpone&&neighbor,'actual Postpone, neighboring decision and Edit controls must render');
+  const classes=m=>m[1].split(/\s+/);
+  assert.equal(classes(postpone).includes('sm'),classes(neighbor).includes('sm'),'Postpone must match its neighboring decision button size, not the smaller Edit reference');
+  assert.ok(classes(postpone).includes('subtle'),'retain the established neutral border weight shadow and state vocabulary');
+  assert.deepEqual(classes(edit).sort(),['btn','sm','subtle'],'Edit sizing remains unchanged');
  };
  const scan=await loadApp({seed:997});addTaskAged(scan.ctx,'Oldest',900000);addTaskAged(scan.ctx,'Candidate',1000);scan.ctx.startScan('descending');scan.ctx.render();
- assertShared(scan.shim.elements.get('scan').innerHTML,'postpone',scan.ctx.state.candidateId);
- for(const woop of [false,true]){const {ctx,shim}=await loadApp({seed:998});const t=ctx.addTask('Only remaining task',true);ctx.state.settings.lastTaskWoop=woop;ctx.state.mode='work';ctx.render();assertShared(shim.elements.get('scan').innerHTML,'bench-postpone',t.id);}
- const source=fs.readFileSync(new URL('./index.html',import.meta.url),'utf8');assert.doesNotMatch(source,/\.btn\.postpone\s*\{/,'no separate Postpone skin may drift from Edit');
- assert.match(source,/\.btn\.subtle\{background:var\(--surface\);color:var\(--ink\);border:1px solid var\(--line\);box-shadow:none;font-weight:600\}/,'Edit surface remains white in the light palette and follows its established dark token');
+ assertNeighbors(scan.shim.elements.get('scan').innerHTML,'postpone','yes',scan.ctx.state.candidateId);
+ for(const woop of [false,true]){const {ctx,shim}=await loadApp({seed:998});const t=ctx.addTask('Only remaining task',true);ctx.state.settings.lastTaskWoop=woop;ctx.state.mode='work';ctx.render();assertNeighbors(shim.elements.get('scan').innerHTML,'bench-postpone','bench-done',t.id);}
+ const source=fs.readFileSync(new URL('./index.html',import.meta.url),'utf8');
+ assert.match(source,/\.btn\.subtle\{background:var\(--surface\);color:var\(--ink\);border:1px solid var\(--line\);box-shadow:none;font-weight:600\}/,'unrelated Edit palette stays intact');
  assert.match(source,/\.btn\.subtle:disabled\{/,'shared disabled treatment remains available');
+});
+
+test('RISK Postpone: white treatment stays scoped to neutral controls on both scanner surfaces',async()=>{
+ const scan=await loadApp({seed:999});addTaskAged(scan.ctx,'Oldest',900000);addTaskAged(scan.ctx,'Candidate',1000);scan.ctx.startScan('descending');scan.ctx.render();
+ const only=await loadApp();only.ctx.addTask('Final task',true);only.ctx.state.mode='work';only.ctx.render();
+ for(const [app,action]of [[scan,'postpone'],[only,'bench-postpone']]){
+  const markup=app.shim.elements.get('scan').innerHTML,classes=markup.match(new RegExp('<button class="([^"]+)" data-act="'+action+'"'))?.[1].split(/\s+/);
+  assert.ok(classes?.includes('subtle')&&classes.includes('postpone'),'both mounted Postpone surfaces use the scoped white neutral treatment');
+ }
+ assert.match(html,/\.btn\.subtle\.postpone\{background:light-dark\(#fff,#fff\);color:light-dark\(#20242b,#20242b\)\}/,'white paint and readable dark ink remain white in both themes, without overriding component geometry');
+ assert.ok(html.indexOf('.btn.subtle.postpone{')<html.indexOf('.btn.subtle:disabled{'),'shared disabled palette still takes precedence');
 });
 
 test('RISK Postpone layout: mounted duration field uses the bounded numeric Settings width',async()=>{
