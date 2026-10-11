@@ -1,5 +1,26 @@
 [
   {
+    "testChangesSha256": "6993e41cdd06ef905ab2b22133fecec0a09dabc54b59c302a259a91b6528990c",
+    "reason": "Repair the actual allocated browser RED by restoring included starting state before existing Settings included-to-excluded assertion. Preserve all previous checks and assertion strength. Normalize the reloaded private browser fixture by closing the setup-only motion dialog, matching its initial-load setup.",
+    "previousBehavior": "Prior Enter explicitly excluded Errands, so the next Settings click correctly included it while the legacy fixture expected excluded.",
+    "intendedBehavior": "Explicit keyboard Space restores included state before testing the unchanged Settings included-to-excluded transition.",
+    "replacementTests": [
+      "RISK Undo Z shortcut: real keyboard dispatch reverses only the latest action and retains durable Undo semantics",
+      "RISK Undo Z guards: U is retired and modified editable modal and scene keypresses leave board and native defaults alone",
+      "RISK Undo Z guidance: header hint tooltip and Quick start name Z while preserving editable native undo guidance",
+      "RISK Edit E shortcut: real keyboard dispatch edits only the offered scanner task without changing the board",
+      "RISK Edit E guards and hints: modifiers editable fields modal and scene focus do not dispatch and only the offered Edit advertises E",
+      "RISK Edit E guidance: Quick start explains the offered task editor and plain shortcut scope"
+    ],
+    "preservedCoverage": [
+      "All touch keyboard focus counts disclosure Settings draft Save reload and overflow assertions remain unchanged; context and shortcut implementation is unchanged."
+    ],
+    "redEvidence": {
+      "command": "LANDSCAPE_BROWSER_URL=http://127.0.0.1:8769/index.html node --test --test-name-pattern=\"RISK context and Settings browser:\" tests.js",
+      "failure": "Allocated browser observed included !== excluded at tests.js624 on candidate7866; original log /tmp/chain-context-browser-red.log. Restore intended fixture starting state only; no weakened assertion. Corrected transition then reached reload and observed motionDialog intercepting close-modal click at tests.js628; retained /tmp/chain-context-browser-green.log. Close setup dialog after reload without altering product or weakening assertions."
+    }
+  },
+  {
     "testChangesSha256": "9118558e9b1d9ac24c02c28be0a909e7ec84f2e32a96ea085d1963390038bbbc",
     "reason": "Repair the actual allocated browser RED by restoring included starting state before existing Settings included-to-excluded assertion. Preserve all previous checks and assertion strength.",
     "previousBehavior": "Prior Enter explicitly excluded Errands, so the next Settings click correctly included it while the legacy fixture expected excluded.",
