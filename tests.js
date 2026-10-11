@@ -477,6 +477,7 @@ test('RISK upright gait consumer: every human painter consumes upright full cycl
 
 test('RISK context exclusions: real selectors cycle included excluded neutral with durable Undo and explicit red precedence',async()=>{
  const {ctx,shim}=await loadApp({seed:911});const c=ctx.state.contexts[0],task=ctx.addTask('Private required task',false,[c.id]);
+ ctx.state.contexts[1].active=false; // Preserve the zero-active legacy cycle contract.
  const protectedTasks=JSON.stringify(ctx.state.tasks);
  ctx.toggleContext(c.id);assert.equal(c.excluded,true,'the second click changes an existing green check to a red exclusion');assert.equal(c.active,false,'released clients still see the excluded requirement disabled');
  ctx.renderCtx();let markup=shim.document.getElementById('ctxPanel').innerHTML;
@@ -506,8 +507,8 @@ test('RISK context exclusions: scan and All Tasks preserve all required contexts
  ctx.state.listOpen=true;ctx.state.candidateId=one.id;ctx.toggleContext(a.id);
  assert.deepEqual(Array.from(ctx.eligibleTasks(),t=>t.id),[zero.id,unknown.id]);assert.ok(![one.id,many.id].includes(ctx.state.candidateId),'excluded candidates leave the scanner');
  vm.runInContext("listEligibilityFilter='ineligible'",ctx);ctx.renderList();assert.deepEqual(Array.from(ctx.filteredListTasks(),t=>t.id),[one.id,many.id]);assert.equal(shim.document.getElementById('listCount').textContent,'(2 of 4)');
- ctx.toggleContext(a.id);assert.deepEqual(Array.from(ctx.eligibleTasks(),t=>t.id),[zero.id,unknown.id],'neutral remains an inactive requirement, preserving existing empty-selection behavior');
- ctx.toggleContext(a.id);ctx.state.chain=[one.id];vm.runInContext("listEligibilityFilter='eligible'",ctx);
+ ctx.toggleContext(b.id);ctx.toggleContext(a.id);assert.deepEqual(Array.from(ctx.eligibleTasks(),t=>t.id),[zero.id,unknown.id],'neutral remains an inactive requirement, preserving existing empty-selection behavior');
+ ctx.toggleContext(a.id);ctx.toggleContext(b.id);ctx.state.chain=[one.id];vm.runInContext("listEligibilityFilter='eligible'",ctx);
  assert.deepEqual(Array.from(ctx.filteredListTasks(),t=>t.id),[zero.id,many.id,unknown.id]);assert.equal(ctx.isEligible(one),true,'dotting is only a list eligibility distinction');
  const poolShares=()=>JSON.stringify([...ctx.chanceDisplayStats()].map(([id,{weight,probability,available,fallback}])=>[id,{weight,probability,available,fallback}]));const shares=poolShares();ctx.state.chain=[];assert.equal(poolShares(),shares,'undotting alone preserves full-pool weights');
  ctx.toggleContext(b.id);ctx.toggleContext(a.id);ctx.toggleContext(a.id);ctx.toggleContext(b.id);
@@ -610,11 +611,12 @@ test('RISK context and Settings browser: touch keyboard filter counts disclosure
     const page=await context.newPage();await page.goto(process.env.LANDSCAPE_BROWSER_URL);await page.waitForFunction(()=>typeof state!=='undefined'&&state?.tasks);
     await page.evaluate(()=>{document.getElementById('motionDialog')?.close();closeModal();state.seenQuickStart=true;state.listOpen=true;addTask('Private no context');addTask('Private required',false,['c_errand']);addTask('Private multiple',false,['c_errand','c_home']);render();});
     const selector=page.locator('#ctxPanel [data-ctx="c_errand"]');assert.equal(await selector.getAttribute('data-filter-state'),'included');
-    if(width<1000)await selector.tap();else await selector.click();assert.equal(await selector.getAttribute('data-filter-state'),'excluded');assert.match(await selector.getAttribute('aria-label'),/excluded\. Next: neutral/);
+    if(width<1000)await selector.tap();else await selector.click();assert.equal(await selector.getAttribute('data-filter-state'),'excluded');assert.match(await selector.getAttribute('aria-label'),/excluded\. Next: included/);
     await page.locator('[data-act="list-eligibility"][data-id="ineligible"]').click();assert.equal(await page.locator('[data-row]').count(),2);assert.equal(await page.locator('#listCount').innerText(),'(2 of 3)');
-    await selector.focus();await page.keyboard.press('Space');assert.equal(await selector.getAttribute('data-filter-state'),'neutral');assert.equal(await selector.evaluate(e=>document.activeElement===e),true,'rerender retains keyboard focus');
-    await page.keyboard.press('Enter');assert.equal(await selector.getAttribute('data-filter-state'),'included');
+    await selector.focus();await page.keyboard.press('Space');assert.equal(await selector.getAttribute('data-filter-state'),'included');assert.equal(await selector.evaluate(e=>document.activeElement===e),true,'rerender retains keyboard focus');
+    await page.keyboard.press('Enter');assert.equal(await selector.getAttribute('data-filter-state'),'excluded');
     const none=page.locator('#ctxPanel [data-act="toggle-no-context"]');await none.click();assert.equal(await none.getAttribute('data-filter-state'),'excluded');await none.click();assert.equal(await none.getAttribute('data-filter-state'),'neutral');
+    await selector.focus();await page.keyboard.press('Space');assert.equal(await selector.getAttribute('data-filter-state'),'included','restore green before testing Settings green-to-red transition');
     await page.locator('[data-act="settings"]').click();const modal=page.locator('#modalRoot .modal'),sections=modal.locator('details.settings-section'),log=sections.filter({has:page.locator('summary').filter({hasText:/^Changelog$/})});
     assert.equal(await log.count(),1);await log.locator('summary').click();assert.ok(await log.locator('li').count()>50,'long history remains intact');
     const styles=await modal.evaluate(e=>{const section=[...e.querySelectorAll('.settings-section')],first=section[0],next=section[1],save=e.querySelector('[data-act="save-settings"]');return {font:getComputedStyle(first.querySelector('.kv')).fontSize,otherFont:getComputedStyle(next.querySelector('.kv')).fontSize,surface:getComputedStyle(first).backgroundColor,otherSurface:getComputedStyle(next).backgroundColor,summary:getComputedStyle(first.querySelector('summary')).padding,otherSummary:getComputedStyle(next.querySelector('summary')).padding,last:e.lastElementChild.contains(save),overflow:e.scrollWidth<=e.clientWidth+1};});
@@ -622,7 +624,7 @@ test('RISK context and Settings browser: touch keyboard filter counts disclosure
     await modal.locator('summary').filter({hasText:/^Scanning and recurrence$/}).click();await page.locator('#stWorkedHrs').fill('19');await page.locator('#stHorizon').fill('999');
     await modal.locator('summary').filter({hasText:/^Contexts$/}).click();const manager=modal.locator('[data-ctx="c_errand"]');await manager.click();assert.equal(await manager.getAttribute('data-filter-state'),'excluded');assert.equal(await page.locator('#stWorkedHrs').inputValue(),'19','cycling a context does not discard other Settings drafts');
     const save=modal.locator('[data-act="save-settings"]');await save.scrollIntoViewIfNeeded();if(width<1000)await save.tap();else await save.click();assert.equal(await page.locator('#modalRoot .modal').count(),0);
-    await page.evaluate(()=>persist());await page.reload();await page.waitForFunction(()=>state?.tasks?.length===3);assert.equal(await page.evaluate(()=>state.settings.workedHours),19);assert.equal(await page.evaluate(()=>state.settings.horizonMin),480);assert.equal(await page.evaluate(()=>state.contexts[0].excluded),true);
+    await page.evaluate(()=>persist());await page.reload();await page.waitForFunction(()=>state?.tasks?.length===3);await page.evaluate(()=>document.getElementById('motionDialog')?.close());assert.equal(await page.evaluate(()=>state.settings.workedHours),19);assert.equal(await page.evaluate(()=>state.settings.horizonMin),480);assert.equal(await page.evaluate(()=>state.contexts[0].excluded),true);
     await page.evaluate(()=>openSettings());await page.locator('#modalRoot [data-act="close-modal"]').click();assert.equal(await page.evaluate(()=>state.settings.workedHours),19,'closing Settings retains the saved value');
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
     if(process.env.CONTEXT_EVIDENCE_DIR)await page.screenshot({path:path.join(process.env.CONTEXT_EVIDENCE_DIR,`${name}-${width}x${height}-contexts.png`)});
@@ -6098,26 +6100,26 @@ test("UI: the arrow disappears once scanning starts and a task is dotted", async
 });
 
 /* ---------- undo advertises its key like every other keyboard control ----------
-   Undo has always had a `u` hotkey, but the only place that said so was the
+   Undo's shortcut is now `z`; keep its hint beside the label rather than only in the
    tooltip — so the one control you reach for in a hurry was the one you had to
    hover to learn. It carries the same keyhint glyph as Yes/No/Done/Delete. */
 
-test("UI: the undo button carries its u keyhint glyph", () => {
+test("UI: the undo button carries its z keyhint glyph", () => {
   const m = html.match(/<button class="ghost" data-act="undo"[^>]*>([\s\S]*?)<\/button>/);
   assert.ok(m, "the undo button should still be a ghost button in the header");
-  assert.match(m[1], /<span class="keyhint">u<\/span>/,
-    `expected a u keyhint glyph inside the undo button, got: ${m[1]}`);
+  assert.match(m[1], /<span class="keyhint">z<\/span>/,
+    `expected a z keyhint glyph inside the undo button, got: ${m[1]}`);
 });
 
 test("UI: undo's keyhint glyph sits after its label, as it does on every other keyboard button", () => {
   const m = html.match(/<button class="ghost" data-act="undo"[^>]*>([\s\S]*?)<\/button>/);
-  assert.match(m[1], /^[^<]*\S[^<]*<span class="keyhint">u<\/span>$/,
+  assert.match(m[1], /^[^<]*\S[^<]*<span class="keyhint">z<\/span>$/,
     `the glyph should trail the label with nothing after it, got: ${m[1]}`);
 });
 
 test("UI: undo's tooltip still names the key, so glyph and tooltip agree", () => {
   const m = html.match(/<button class="ghost" data-act="undo"([^>]*)>/);
-  assert.match(m[1], /title="[^"]*\(u\)"/, `expected the key named in the tooltip, got: ${m[1]}`);
+  assert.match(m[1], /title="[^"]*\(z\)"/, `expected the key named in the tooltip, got: ${m[1]}`);
 });
 
 test("undo: the header button reverses the last action through the normal onAction path", async () => {
@@ -25063,6 +25065,121 @@ test('RISK Settings changelog reflow: actual archived notes retain readable toke
  ctx.openHelp();assert.match(shim.document.getElementById('modalRoot').innerHTML,/Release notes wrap long words in enlarged views/,'extended FAQ explains enlarged release-note reflow');
 });
 
+test('RISK binary context presentation: active filters derive excluded controls on both surfaces without changing saved choices',async()=>{
+ const {ctx,shim}=await loadApp();const [a,b]=ctx.state.contexts;b.active=false;delete b.excluded;ctx.state.ctxOpen=true;
+ const saved=JSON.stringify(ctx.state.contexts),settings=JSON.stringify(ctx.state.settings);
+ const button=makeFakeElement();button.dataset={ctx:b.id,ctxScope:'settings',act:'cycle-context'};button.setAttribute('data-ctx',b.id);
+ shim.document.getElementById('modalRoot').querySelectorAll=()=>[button];ctx.renderCtx();
+ assert.equal(ctx.contextControlInfo(b).mode,'excluded','a neutral requirement is visibly excluded while another context is included');
+ assert.equal(ctx.contextControlInfo(b).label,b.name+': excluded. Next: included.');
+ assert.equal(button.dataset.filterState,'excluded','Settings matches the main selector');assert.match(button.innerHTML,/✕/);
+ assert.match(ctx.contextControlHTML(b),/data-filter-state="excluded"/);assert.match(shim.document.getElementById('ctxPanel').innerHTML,/1 active, 1 excluded, 1 inactive/);
+ assert.equal(JSON.stringify(ctx.state.contexts),saved,'presentation never migrates saved neutral choices');assert.equal(JSON.stringify(ctx.state.settings),settings);
+ ctx.openSettings();assert.equal(JSON.stringify(ctx.state.contexts),saved,'opening Settings does not migrate');
+ assert.match(shim.document.getElementById('modalRoot').innerHTML,new RegExp('data-ctx="'+b.id+'"[^>]*data-filter-state="excluded"'));
+});
+
+test('RISK binary context interaction: real handlers include displayed exclusions immediately and preserve zero-active AND and No context rules',async()=>{
+ for(const scope of ['main','settings']){
+  const {ctx,shim}=await loadApp();const [a,b]=ctx.state.contexts;b.active=false;delete b.excluded;
+  const one=ctx.addTask('Private A',false,[a.id]),both=ctx.addTask('Private AB',false,[a.id,b.id]),none=ctx.addTask('Private none'),unknown=ctx.addTask('Private unknown',false,['retired']);
+  const tasks=JSON.stringify(ctx.state.tasks);assert.equal(ctx.isEligible(one),true);assert.equal(ctx.isEligible(both),false);
+  const button=makeFakeElement();button.dataset={id:b.id,ctx:b.id,ctxScope:scope,act:'cycle-context'};shim.document.activeElement=button;
+  ctx.onAction('cycle-context',button);assert.equal(ctx.contextFilterState(b),'included');assert.equal(ctx.isEligible(both),true);
+  ctx.undo();assert.equal(ctx.state.contexts[1].active,false);assert.equal(ctx.state.contexts[1].excluded===true,false,'Undo restores original neutral representation');assert.equal(ctx.contextControlInfo(ctx.state.contexts[1]).mode,'excluded');
+  ctx.onAction('cycle-context',button);ctx.onAction('cycle-context',button);assert.equal(ctx.state.contexts[1].excluded,true);
+  ctx.onAction('cycle-context',button);assert.equal(ctx.contextFilterState(ctx.state.contexts[1]),'included','explicit red also reaches green in one click while filtering active');
+  ctx.onAction('cycle-context',button);ctx.onAction('cycle-context',{dataset:{id:a.id}});
+  assert.equal(ctx.activeCtxSet().size,0);assert.equal(ctx.isEligible(one),false);assert.equal(ctx.isEligible(both),false);assert.equal(ctx.isEligible(none),true);assert.equal(ctx.isEligible(unknown),true);
+  assert.equal(ctx.contextControlInfo(ctx.state.contexts[0]).label,a.name+': excluded. Next: neutral.','last included exclusion returns to the established zero-active presentation');
+  ctx.onAction('cycle-context',{dataset:{id:a.id}});assert.equal(ctx.contextFilterState(ctx.state.contexts[0]),'neutral');assert.equal(ctx.isEligible(one),false);
+  ctx.onAction('cycle-context',{dataset:{id:a.id}});assert.equal(ctx.contextFilterState(ctx.state.contexts[0]),'included');
+  assert.equal(ctx.contextControlInfo(null).mode,'neutral');ctx.onAction('toggle-no-context',{});assert.equal(ctx.isEligible(none),false);assert.equal(ctx.isEligible(unknown),false);assert.equal(ctx.isEligible(one),true);
+  assert.equal(JSON.stringify(ctx.state.tasks),tasks,'controls and Undo preserve assignments and ratings');
+ }
+});
+
+test('RISK binary context saved data: reload and cloud adoption retain neutral choices and derive excluded presentation',async()=>{
+ const source=await loadApp();const [a,b]=source.ctx.state.contexts;b.active=false;delete b.excluded;const task=source.ctx.addTask('Private shared requirement',false,[a.id,b.id]);
+ await source.ctx.persist();const payload=source.ctx.cloudPayload();
+ const reloaded=await loadApp({seedStorage:{[SYNC_STORE_KEY]:payload}});assert.equal(reloaded.ctx.state.contexts[1].active,false);assert.equal(reloaded.ctx.state.contexts[1].excluded===true,false);
+ assert.equal(reloaded.ctx.contextControlInfo(reloaded.ctx.state.contexts[1]).mode,'excluded','reload derives red without a saved-data migration');assert.equal(reloaded.ctx.isEligible(reloaded.ctx.state.tasks.find(t=>t.id===task.id)),false);
+ const h=makeSyncHarness({remote:JSON.parse(payload),rev:3}),client=await loadApp({cloudSyncFactory:h.factory});await syncSettle(40);await client.ctx.cloudPull();
+ const adopted=client.ctx.state.contexts.find(c=>c.id===b.id);assert.equal(adopted.active,false);assert.equal(adopted.excluded===true,false);assert.equal(client.ctx.contextControlInfo(adopted).mode,'excluded');
+ assert.equal(h.remoteState().contexts.find(c=>c.id===b.id).excluded===true,false,'cloud adoption does not publish inferred exclusions');
+ client.ctx.state.contexts=[];client.ctx.state.settings.excludeNoContext=true;client.ctx.renderCtx();assert.match(client.shim.document.getElementById('ctxPanel').innerHTML,/toggle-ctx/);assert.equal(client.ctx.isEligible(client.ctx.state.tasks[0]),true,'zero contexts bypass the synthetic filter');
+});
+
+test('RISK binary context guidance: FAQ explains conditional two-state controls and unchanged zero-active matching',async()=>{
+ const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(help,/While any context is active,.*included.*excluded/i);assert.match(help,/With no active contexts, only tasks without a known context can scan/);assert.match(help,/No context excludes unassigned/);
+ assert.match(help,/No active contexts.*neutral/i);assert.match(help,/Every assigned known context must be active/);
+ assert.match(help,/red display does not change saved neutral choices/i);assert.match(help,/unknown or deleted contexts/i);assert.match(help,/Context changes save, sync and support Undo/i);assert.match(help,/selector stays visible without contexts/i);assert.match(help,/New contexts start active/i);assert.match(help,/<dt>How do I create contexts and filter All Tasks\?<\/dt>/);
+});
+
+test('RISK Undo Z shortcut: real keyboard dispatch reverses only the latest action and retains durable Undo semantics',async()=>{
+ for(const key of ['z','Z']){
+  const {ctx,shim}=await loadApp();ctx.closeModal();const keep=ctx.addTask('Private retained task');const before=JSON.stringify(ctx.state.tasks);ctx.addTask('Private undone task');await ctx.persist();
+  shim.document.dispatchEvent({type:'keydown',key,shiftKey:key==='Z',repeat:false});assert.equal(JSON.stringify(ctx.state.tasks),before,'plain Z uses the existing Undo consumer');
+  await ctx.persist();const reloaded=await loadApp({seedStorage:{[SYNC_STORE_KEY]:shim.localStorage.getItem(SYNC_STORE_KEY)}});assert.deepEqual(Array.from(reloaded.ctx.state.tasks,t=>t.id),[keep.id]);
+  ctx.addTask('Private second action');ctx.onAction('undo',{});assert.equal(JSON.stringify(ctx.state.tasks),before,'button Undo retains the same rule');
+ }
+});
+
+test('RISK Undo Z guards: U is retired and modified editable modal and scene keypresses leave board and native defaults alone',async()=>{
+ const {ctx,shim}=await loadApp();ctx.closeModal();ctx.addTask('Private retained');ctx.addTask('Private pending Undo');const saved=JSON.stringify(ctx.state),depth=vm.runInContext('undoStack.length',ctx);
+ let prevented=0;const dispatch=event=>shim.document.dispatchEvent({type:'keydown',key:'z',repeat:false,preventDefault(){prevented++;},...event});
+ for(const key of ['u','U'])dispatch({key});
+ for(const modifiers of [{ctrlKey:true},{metaKey:true},{altKey:true},{ctrlKey:true,shiftKey:true},{metaKey:true,shiftKey:true}])dispatch(modifiers);
+ for(const tag of ['input','textarea','select'])dispatch({target:{id:'private-'+tag,matches:selector=>selector==='input,textarea,select',isContentEditable:false}});
+ dispatch({target:{matches:()=>false,isContentEditable:true}});
+ const query=shim.document.querySelector.bind(shim.document);for(const selector of ['.mback','#motionDialog[open], #sceneTimeDialog[open], html.viewing-scene']){
+  shim.document.querySelector=s=>s===selector?{}:query(s);dispatch({});
+ }
+ shim.document.querySelector=query;
+ assert.equal(JSON.stringify(ctx.state),saved);assert.equal(vm.runInContext('undoStack.length',ctx),depth);assert.equal(prevented,0,'native text undo and modifier shortcuts are not cancelled');
+ dispatch({});assert.equal(ctx.state.tasks.length,1,'ordinary Z still works after guarded events');
+});
+
+test('RISK Undo Z guidance: header hint tooltip and Quick start name Z while preserving editable native undo guidance',async()=>{
+ const {ctx,shim}=await loadApp();ctx.closeModal();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(html,/<button class="ghost" data-act="undo" title="Undo last action \(z\)">↺ undo<span class="keyhint">z<\/span>/);
+ assert.match(help,/<b>z<\/b> to undo/);assert.doesNotMatch(help,/<b>u<\/b> to undo/);
+ assert.match(help,/Ctrl.*Z.*Command.*Z.*text fields/i);
+});
+
+test('RISK Edit E shortcut: real keyboard dispatch edits only the offered scanner task without changing the board',async()=>{
+ for(const scenario of ['candidate','paused','intervention','end','missing-candidate','no-offer']){
+  const {ctx,shim}=await loadApp();ctx.closeModal();const bench=ctx.addTask('Private benchmark'),candidate=ctx.addTask('Private candidate');
+  Object.assign(ctx.state,{chain:scenario==='no-offer'?[]:[bench.id],candidateId:candidate.id,mode:scenario==='paused'?'work':'scan',interventionActive:scenario==='intervention'});
+  if(scenario==='end')ctx.state.considered[candidate.id]='no';if(scenario==='missing-candidate')ctx.state.candidateId='retired-private';ctx.render();
+  const offered=scenario==='candidate'?candidate:bench;const scan=shim.document.getElementById('scan').innerHTML;
+  assert.equal((scan.match(/class="keyhint">e<\/span>/g)||[]).length,scenario==='no-offer'?0:1);
+  if(scenario!=='no-offer')assert.match(scan,new RegExp('data-act="edit" data-id="'+offered.id+'"[^>]*aria-label="Edit this task \\(e\\)"'));
+  const before=JSON.stringify(ctx.state),depth=vm.runInContext('undoStack.length',ctx);shim.document.dispatchEvent({type:'keydown',key:'e',repeat:false});
+  const modal=shim.document.getElementById('modalRoot').innerHTML;
+  if(scenario==='no-offer')assert.equal(modal,'','E cannot choose a task from an unstarted list');else{
+   const target=scenario==='candidate'?candidate:bench;assert.match(modal,new RegExp('data-act="save-edit" data-id="'+target.id+'"'),'opens the same existing individual editor as the offered Edit button');
+  }
+  assert.equal(JSON.stringify(ctx.state),before,'opening Edit does not save or change task state');assert.equal(vm.runInContext('undoStack.length',ctx),depth);
+ }
+});
+
+test('RISK Edit E guards and hints: modifiers editable fields modal and scene focus do not dispatch and only the offered Edit advertises E',async()=>{
+ const {ctx,shim}=await loadApp();ctx.closeModal();const bench=ctx.addTask('Private benchmark'),candidate=ctx.addTask('Private candidate');Object.assign(ctx.state,{chain:[bench.id],candidateId:candidate.id,mode:'scan'});ctx.render();
+ const scan=shim.document.getElementById('scan').innerHTML;assert.equal((scan.match(/class="keyhint">e<\/span>/g)||[]).length,1,'one offered Edit hint');assert.match(scan,new RegExp('data-act="edit" data-id="'+candidate.id+'"[^>]*aria-label="Edit this task \\(e\\)"'));
+ const before=JSON.stringify(ctx.state);let prevented=0;const dispatch=event=>shim.document.dispatchEvent({type:'keydown',key:'e',repeat:false,preventDefault(){prevented++;},...event});
+ for(const modifiers of [{ctrlKey:true},{metaKey:true},{altKey:true},{metaKey:true,shiftKey:true}])dispatch(modifiers);
+ for(const tag of ['input','textarea','select'])dispatch({target:{id:'private-'+tag,matches:s=>s==='input,textarea,select'}});dispatch({target:{matches:()=>false,isContentEditable:true}});
+ const query=shim.document.querySelector.bind(shim.document);for(const selector of ['.mback','#motionDialog[open], #sceneTimeDialog[open], html.viewing-scene']){shim.document.querySelector=s=>s===selector?{}:query(s);dispatch({});}shim.document.querySelector=query;
+ assert.equal(shim.document.getElementById('modalRoot').innerHTML,'');assert.equal(JSON.stringify(ctx.state),before);assert.equal(prevented,0);
+ dispatch({key:'E',shiftKey:true});assert.match(shim.document.getElementById('modalRoot').innerHTML,new RegExp('data-act="save-edit" data-id="'+candidate.id+'"'));
+});
+
+test('RISK Edit E guidance: Quick start explains the offered task editor and plain shortcut scope',async()=>{
+ const {ctx,shim}=await loadApp();ctx.closeModal();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(help,/<b>e<\/b> to edit/);assert.match(help,/E opens.*candidate.*benchmark/i);assert.match(help,/shortcuts.*text fields.*editable.*dialogs/i);
+});
 
 test('RISK CLOUD CLEANUP RESUME: interrupted deleting generation resumes without forbidden transition and preserves acknowledged board',async()=>{
  const h=await loadCloudBackendV2({rootData:null,timeoutMs:5000,failures:{enforceDeletingTransition:true}});
@@ -25125,4 +25242,20 @@ test('Firestore rules: production cleanup resumes deleting tombstones and protec
   assert.deepEqual(Array.from(cleanup.removed),['stranded']);
   for(const id of ['active','previous','pending','young'])assert.ok(await adapter.readGeneration(uid,id),id+' is retained');
  }finally{await env.cleanup();}
+});
+
+test('RISK context reconciliation FAQ: actual Help keeps each existing bulk and context question once',async()=>{
+ const {ctx,shim}=await loadApp();ctx.closeModal();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ for(const question of ['How do I edit several tasks together?','Which properties can I change in Bulk Edit?','What happens if selected tasks change before or during Save?','How does Undo work after Bulk Edit?','What does the bulk result count mean?','How do contexts and list filters work?','How do I create contexts and filter All Tasks?'])assert.equal(help.split('<dt>'+question+'</dt>').length-1,1,question+' appears once in rendered Help');
+});
+
+test('RISK context Settings reflow: actual manager name fields can shrink beside protected context and delete controls',async()=>{
+ const {ctx,shim}=await loadApp();ctx.closeModal();const saved=JSON.stringify(ctx.state);ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(settings,/<div class="mgr"><button[^>]*data-act="cycle-context"[\s\S]*?<input type="text" data-mgrname="[^"]+"[^>]*aria-label="Context name"\/[\s\S]*?data-act="del-ctx"/,'real Settings manager retains its state control, editable name and delete action');
+ const rule=html.match(/\.mgr input\[type=text\]\s*\{([^}]*)\}/)?.[1]||'';
+ assert.match(rule,/min-width\s*:\s*0(?:;|$)/,'manager name must shrink below native intrinsic width at enlarged phone size');
+ assert.match(rule,/max-width\s*:\s*100%(?:;|$)/,'name field remains bounded to its available row');
+ assert.match(rule,/flex\s*:\s*1\s+1\s+160px(?:;|$)/,'name field reserves a useful editing width and moves to its own line when needed');
+ const rowRule=html.match(/\.mgr\s*\{([^}]*)\}/)?.[1]||'';assert.match(rowRule,/flex-wrap\s*:\s*wrap/,'an enlarged manager row wraps rather than compressing text into padding');
+ assert.equal(JSON.stringify(ctx.state),saved,'opening the layout consumer never changes saved board choices');
 });

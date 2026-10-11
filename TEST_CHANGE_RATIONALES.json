@@ -1,63 +1,274 @@
 [
   {
-    "testChangesSha256": "acfbebfd6c292ab891fdd34627a9153d5a8663310e133028d959c3b5d197b195",
-    "reason": "User requests a pane-frozen toolbar matching existing compact controls and rank-slot selection without taller rows. Replace only the explicitly superseded full-width selection-row expectation; retain existing bulk mutations and sync assertions. New tests exercise real selection handlers, filter pruning, focus and help consumer. Independent actual image review found misleading dark labels on light-painted captures; user explicitly requires recording this harness lesson. New guide assertions fail before theme-verification prose.",
-    "previousBehavior": "Modal-sized footer controls scrolled with task rows. Selection added an extra title-line button and used full-width rows; keyboard rerender lost footer focus.",
-    "intendedBehavior": "Compact existing filter classes render outside task scroller, selection occupies the original rank slot and restores its format, keyboard focus survives rerender, with explicit filtered scope and updated review guidance.",
+    "testChangesSha256": "c0c9dd2225ff487dc7decf479ae2cd5f06c3b489635b1089f463679ad0dc82e0",
+    "reason": "Repair independently demonstrated enlarged-phone Settings context name-field overflow using only bounded shrink sizing. Released main518 and prior contextc064 share the same flex-only manager input rule and markup; baseline geometry will independently qualify attribution. Independent rendered795review rejected phone name editor compressed to23–25CSSpx. Allowmanagerrowswrapand160pxflexbasis rather than leaving a padding-only editor. Independent rendered795review rejected phone name editor compressed to23–25CSSpx. Allowmanagerrowswrapand160pxflexbasis rather than leaving a padding-only editor.",
+    "previousBehavior": "Initial min-width0 bound fixed overflow but compressed name text into padding on phone200%.",
+    "intendedBehavior": "Name input requests160px and wraps onto its own usable line on constrained manager rows, retaining DOM keyboard order and protected actions.",
     "replacementTests": [
-      "RISK bulk toolbar: mounted controls stay outside scrolling rows and retain filtered selection through filter changes",
-      "RISK bulk row selection: selected label replaces the existing rank slot and deselection restores its format",
-      "RISK bulk toolbar keyboard: rerender restores the focused toolbar action and row toggle",
-      "RISK bulk toolbar guidance: extended FAQ describes frozen controls and rank-slot selection",
-      "RISK repository process boundary: actual visual tests compare every changed control with neighboring controls and scrolled states"
+      "RISK context Settings reflow: actual manager name fields can shrink beside protected context and delete controls"
     ],
     "preservedCoverage": [
-      "All existing bulk field opt-in, clearing, validation, identity/history/rating preservation, stale selections, offline conflicts, partial reconciliation, failed local/cloud saves and Undo assertions remain; only result/count DOM target moves from listBody to its sibling toolbar.",
-      "User explicitly supersedes enlarged selection rows give task controls full width. New rank-slot consumer coverage and required rendered before/after row-height comparison replace that layout expectation; no data or sync behavior changes.",
-      "Incoming PR107 cleanup source, tests, FAQ and changelog preserved during additive reconciliation to18e3eeb."
+      "Existing context toggles Undo AND/exclusion NoContext saved-neutral/cloud handling and Z/E guards are unchanged. Prior controls/rules/compat native1548pass and alloriginalfail evidence remain separately bound to c064."
     ],
     "redEvidence": {
-      "command": "node --test --test-name-pattern='RISK bulk toolbar:|RISK repository process boundary: actual visual tests' tests.js; node --test --test-name-pattern='RISK bulk row selection:' tests.js; node --test --test-name-pattern='RISK bulk toolbar keyboard:|RISK bulk toolbar guidance:' tests.js; node --test --test-name-pattern='RISK repository process boundary: actual visual tests' tests.js",
-      "failure": "Contemporaneous /tmp/chain-bulk-toolbar-red.log: toolbar unexpectedly inside scroller; /tmp/chain-bulk-row-slot-red.log: actual rank slot lacked native selection control; /tmp/chain-bulk-visual-review-red.log: executed visual-review guidance missing before documentation edit; /tmp/chain-bulk-toolbar-focus-faq-red.log: keyboard Select lost focus before repair. Initial FAQ test had wrong consumer name; corrected openHelp failed required guidance before FAQ change in /tmp/chain-bulk-toolbar-faq-red.log. Shell fingerprint mismatch observed before regeneration in /tmp/chain-bulk-toolbar-shell-red.log. All21focused source cases pass zero skips after repair; actual rendered comparison remains pending runtime allocation. /tmp/chain-bulk-toolbar-theme-guidance-red.log missing computed scheme/paint requirement observed before guide repair; /tmp/chain-bulk-toolbar-theme-guidance-green.log1pass0skip."
+      "command": "node --test --test-name-pattern=\"RISK context Settings reflow:\" tests.js",
+      "failure": "BeforeCSSfix sourceconsumerRED observed actualflex:1 withoutmin-width0 /tmp/chain-context-settings-reflow-red.log, following independent actualphone2x rendered overflow report /tmp/chain-context-typography-review-c064.md. Minimalmin-width0/max-width100% fixes it; focused48/48 /tmp/chain-context-settings-reflow-green.log. Targeted actualbaseline/candidate geometry and expandedFAQ/EditE captures prepared; no newruntime started. StrongerconsumerRED observedflex1 withoutusefulflexbasis /tmp/chain-context-settings-usability-red.log beforewrappingrepair.48/48green /tmp/chain-context-settings-usability-green.log. Prior795renderrejection retained /tmp/chain-context-typography-review-795.md; nextcaptures awaitfreshparentallocation and wait for Appupdated toast opacity to clear. StrongerconsumerRED observedflex1 withoutusefulflexbasis /tmp/chain-context-settings-usability-red.log beforewrappingrepair.48/48green /tmp/chain-context-settings-usability-green.log. Prior795renderrejection retained /tmp/chain-context-typography-review-795.md; nextcaptures awaitfreshparentallocation and wait for Appupdated toast opacity to clear."
     }
   },
   {
-    "testChangesSha256": "96acbe85808546824da284bf04195bc1308a8cb59aa8268027db7c1c744212c3",
-    "reason": "User requests a pane-frozen toolbar matching existing compact controls and rank-slot selection without taller rows. Replace only the explicitly superseded full-width selection-row expectation; retain existing bulk mutations and sync assertions. New tests exercise real selection handlers, filter pruning, focus and help consumer.",
-    "previousBehavior": "Modal-sized footer controls scrolled with task rows. Selection added an extra title-line button and used full-width rows; keyboard rerender lost footer focus.",
-    "intendedBehavior": "Compact existing filter classes render outside task scroller, selection occupies the original rank slot and restores its format, keyboard focus survives rerender, with explicit filtered scope and updated review guidance.",
+    "testChangesSha256": "7841b384b0ab812ded3eb6fe28b3c90971f51095fc99e9ae0cfbb96d2a160506",
+    "reason": "Repair independently demonstrated enlarged-phone Settings context name-field overflow using only bounded shrink sizing. Released main518 and prior contextc064 share the same flex-only manager input rule and markup; baseline geometry will independently qualify attribution. Independent rendered795review rejected phone name editor compressed to23–25CSSpx. Allowmanagerrowswrapand160pxflexbasis rather than leaving a padding-only editor.",
+    "previousBehavior": "Initial min-width0 bound fixed overflow but compressed name text into padding on phone200%.",
+    "intendedBehavior": "Name input requests160px and wraps onto its own usable line on constrained manager rows, retaining DOM keyboard order and protected actions.",
     "replacementTests": [
-      "RISK bulk toolbar: mounted controls stay outside scrolling rows and retain filtered selection through filter changes",
-      "RISK bulk row selection: selected label replaces the existing rank slot and deselection restores its format",
-      "RISK bulk toolbar keyboard: rerender restores the focused toolbar action and row toggle",
-      "RISK bulk toolbar guidance: extended FAQ describes frozen controls and rank-slot selection",
-      "RISK repository process boundary: actual visual tests compare every changed control with neighboring controls and scrolled states"
+      "RISK context Settings reflow: actual manager name fields can shrink beside protected context and delete controls"
     ],
     "preservedCoverage": [
-      "All existing bulk field opt-in, clearing, validation, identity/history/rating preservation, stale selections, offline conflicts, partial reconciliation, failed local/cloud saves and Undo assertions remain; only result/count DOM target moves from listBody to its sibling toolbar.",
-      "User explicitly supersedes enlarged selection rows give task controls full width. New rank-slot consumer coverage and required rendered before/after row-height comparison replace that layout expectation; no data or sync behavior changes.",
-      "Incoming PR107 cleanup source, tests, FAQ and changelog preserved during additive reconciliation to18e3eeb."
+      "Existing context toggles Undo AND/exclusion NoContext saved-neutral/cloud handling and Z/E guards are unchanged. Prior controls/rules/compat native1548pass and alloriginalfail evidence remain separately bound to c064."
     ],
     "redEvidence": {
-      "command": "node --test --test-name-pattern='RISK bulk toolbar:|RISK repository process boundary: actual visual tests' tests.js; node --test --test-name-pattern='RISK bulk row selection:' tests.js; node --test --test-name-pattern='RISK bulk toolbar keyboard:|RISK bulk toolbar guidance:' tests.js",
-      "failure": "Contemporaneous /tmp/chain-bulk-toolbar-red.log: toolbar unexpectedly inside scroller; /tmp/chain-bulk-row-slot-red.log: actual rank slot lacked native selection control; /tmp/chain-bulk-visual-review-red.log: executed visual-review guidance missing before documentation edit; /tmp/chain-bulk-toolbar-focus-faq-red.log: keyboard Select lost focus before repair. Initial FAQ test had wrong consumer name; corrected openHelp failed required guidance before FAQ change in /tmp/chain-bulk-toolbar-faq-red.log. Shell fingerprint mismatch observed before regeneration in /tmp/chain-bulk-toolbar-shell-red.log. All21focused source cases pass zero skips after repair; actual rendered comparison remains pending runtime allocation."
+      "command": "node --test --test-name-pattern=\"RISK context Settings reflow:\" tests.js",
+      "failure": "BeforeCSSfix sourceconsumerRED observed actualflex:1 withoutmin-width0 /tmp/chain-context-settings-reflow-red.log, following independent actualphone2x rendered overflow report /tmp/chain-context-typography-review-c064.md. Minimalmin-width0/max-width100% fixes it; focused48/48 /tmp/chain-context-settings-reflow-green.log. Targeted actualbaseline/candidate geometry and expandedFAQ/EditE captures prepared; no newruntime started. StrongerconsumerRED observedflex1 withoutusefulflexbasis /tmp/chain-context-settings-usability-red.log beforewrappingrepair.48/48green /tmp/chain-context-settings-usability-green.log. Prior795renderrejection retained /tmp/chain-context-typography-review-795.md; nextcaptures awaitfreshparentallocation and wait for Appupdated toast opacity to clear."
     }
   },
   {
-    "testChangesSha256": "00ca23157e02b8d2d60c7cc8fc7c4654acbafb6c2d6f0ca071219dd8ecb53f0a",
-    "reason": "Add cleanup interruption coverage enforcing the deployed deleting-state rule in the adapter fake, without altering existing regression assertions. Add real-rules production-adapter interruption, concurrent collector and current/previous/pending/young-staging preservation coverage. The real-rules negative control is retrospective; the first VM regression supplied contemporaneous preimplementation RED.",
-    "previousBehavior": "The production adapter rewrote an existing deleting tombstone and cleanup failed closed on the forbidden transition, leaving repeated full backlog queries.",
-    "intendedBehavior": "Resume existing deletion without changing its timestamp after the existing root and explicit-protection checks; current and previous complete boards remain protected.",
+    "testChangesSha256": "b095f939ea7f9210396e86d67725cc4e35afcf0fd66a882049852215d58b3cac",
+    "reason": "Repair independently demonstrated enlarged-phone Settings context name-field overflow using only bounded shrink sizing. Released main518 and prior contextc064 share the same flex-only manager input rule and markup; baseline geometry will independently qualify attribution.",
+    "previousBehavior": "The manager name input retained native intrinsic minimum width; at phone200% it painted beyond the modal edge and hid the delete control.",
+    "intendedBehavior": "Manager input shrinks within its row while keeping the context state control editable name and delete action visible and saved board choices unchanged.",
     "replacementTests": [
-      "RISK CLOUD CLEANUP RESUME: interrupted deleting generation resumes without forbidden transition and preserves acknowledged board",
-      "RISK CLOUD CLEANUP GUIDANCE: sync FAQ distinguishes failed attempts from acknowledgement and explains resumable cleanup"
+      "RISK context Settings reflow: actual manager name fields can shrink beside protected context and delete controls"
     ],
     "preservedCoverage": [
-      "All existing chunk verification, manifest revision arbitration, account cancellation, bounded retry, local recovery, bulk Save and Undo assertions remain intact."
+      "Existing context toggles Undo AND/exclusion NoContext saved-neutral/cloud handling and Z/E guards are unchanged. Prior controls/rules/compat native1548pass and alloriginalfail evidence remain separately bound to c064."
     ],
     "redEvidence": {
-      "command": "node --test --test-name-pattern='RISK CLOUD CLEANUP RESUME:' tests.js; node --test --test-name-pattern='RISK CLOUD CLEANUP GUIDANCE:' tests.js",
-      "failure": "Contemporaneous preimplementation RED: stranded deleting header remained true instead of false after an acknowledged 94-task synthetic coalesced edit; /tmp/chain-sync-cleanup-red.log. Separate pre-FAQ RED: missing failed-attempt and cleanup-resume guidance; /tmp/chain-sync-guidance-red.log. Existing changelog fingerprint RED observed before fingerprint refresh: /tmp/chain-sync-shell-red.log. Real-rules retrospective base negative initially failed for VM realm SDK plain-object setup (not accepted as behavior evidence); normalized outer write objects preserving FieldValues. Corrected base negative then observed permission-denied for deleting->deleting, /tmp/chain-sync-rules-negative.log; candidate rules3/3 and compatibility15/15 zero skips, /tmp/chain-sync-rules-green.log and /tmp/chain-sync-compatibility.log. The adapter module is extracted from actual candidate HTML. This retrospective control supplements, rather than replaces, the original contemporaneous94task RED."
+      "command": "node --test --test-name-pattern=\"RISK context Settings reflow:\" tests.js",
+      "failure": "BeforeCSSfix sourceconsumerRED observed actualflex:1 withoutmin-width0 /tmp/chain-context-settings-reflow-red.log, following independent actualphone2x rendered overflow report /tmp/chain-context-typography-review-c064.md. Minimalmin-width0/max-width100% fixes it; focused48/48 /tmp/chain-context-settings-reflow-green.log. Targeted actualbaseline/candidate geometry and expandedFAQ/EditE captures prepared; no newruntime started."
+    }
+  },
+  {
+    "testChangesSha256": "f0360847dd0c1a61758c27ce37393cbf82f732430f2c769beede2fdf91dc032e",
+    "reason": "Repair independently demonstrated enlarged-phone Settings context name-field overflow using only bounded shrink sizing. Released main518 and prior contextc064 share the same flex-only manager input rule and markup; baseline geometry will independently qualify attribution.",
+    "previousBehavior": "The manager name input retained native intrinsic minimum width; at phone200% it painted beyond the modal edge and hid the delete control.",
+    "intendedBehavior": "Manager input shrinks within its row while keeping the context state control editable name and delete action visible and saved board choices unchanged.",
+    "replacementTests": [
+      "RISK context Settings reflow: actual manager name fields can shrink beside protected context and delete controls"
+    ],
+    "preservedCoverage": [
+      "Existing context toggles Undo AND/exclusion NoContext saved-neutral/cloud handling and Z/E guards are unchanged. Prior controls/rules/compat native1548pass and alloriginalfail evidence remain separately bound to c064."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern=\"RISK context Settings reflow:\" tests.js",
+      "failure": "BeforeCSSfix sourceconsumerRED observed actualflex:1 withoutmin-width0 /tmp/chain-context-settings-reflow-red.log, following independent actualphone2x rendered overflow report /tmp/chain-context-typography-review-c064.md. Minimalmin-width0/max-width100% fixes it; focused48/48 /tmp/chain-context-settings-reflow-green.log. Targeted actualbaseline/candidate geometry and expandedFAQ/EditE captures prepared; no newruntime started."
+    }
+  },
+  {
+    "testChangesSha256": "e1ed5fd0f855854bccc8af773668ca23ea813da37bdfd7b2ac5771dd15be96d7",
+    "reason": "Repair the actual allocated browser RED by restoring included starting state before existing Settings included-to-excluded assertion. Preserve all previous checks and assertion strength. Normalize the reloaded private browser fixture by closing the setup-only motion dialog, matching its initial-load setup. Reconcile exact toolbar main518c01f and sync PR107 additively, retain their unchanged tests and source; imported upstream RED is not newly claimed. Reconcile exact toolbar main518c01f and sync PR107 additively, retain their unchanged tests and source; imported upstream RED is not newly claimed. Independent review caught duplicated bulk FAQ during reconciliation; remove one byte-identical block while preserving toolbar answer. Independent review caught duplicated bulk FAQ during reconciliation; remove one byte-identical block while preserving toolbar answer.",
+    "previousBehavior": "Prior Enter explicitly excluded Errands, so the next Settings click correctly included it while the legacy fixture expected excluded.",
+    "intendedBehavior": "Explicit keyboard Space restores included state before testing the unchanged Settings included-to-excluded transition.",
+    "replacementTests": [
+      "RISK Undo Z shortcut: real keyboard dispatch reverses only the latest action and retains durable Undo semantics",
+      "RISK Undo Z guards: U is retired and modified editable modal and scene keypresses leave board and native defaults alone",
+      "RISK Undo Z guidance: header hint tooltip and Quick start name Z while preserving editable native undo guidance",
+      "RISK Edit E shortcut: real keyboard dispatch edits only the offered scanner task without changing the board",
+      "RISK Edit E guards and hints: modifiers editable fields modal and scene focus do not dispatch and only the offered Edit advertises E",
+      "RISK Edit E guidance: Quick start explains the offered task editor and plain shortcut scope",
+      "RISK context reconciliation FAQ: actual Help keeps each existing bulk and context question once",
+      "RISK context reconciliation FAQ: actual Help keeps each existing bulk and context question once"
+    ],
+    "preservedCoverage": [
+      "All touch keyboard focus counts disclosure Settings draft Save reload and overflow assertions remain unchanged; context and shortcut implementation is unchanged.",
+      "Released compact toolbar rank selection focus and sync-cleanup generation rules and regressions are retained unchanged.",
+      "Released compact toolbar rank selection focus and sync-cleanup generation rules and regressions are retained unchanged."
+    ],
+    "redEvidence": {
+      "command": "LANDSCAPE_BROWSER_URL=http://127.0.0.1:8769/index.html node --test --test-name-pattern=\"RISK context and Settings browser:\" tests.js",
+      "failure": "Allocated browser observed included !== excluded at tests.js624 on candidate7866; original log /tmp/chain-context-browser-red.log. Restore intended fixture starting state only; no weakened assertion. Corrected transition then reached reload and observed motionDialog intercepting close-modal click at tests.js628; retained /tmp/chain-context-browser-green.log. Close setup dialog after reload without altering product or weakening assertions. New actual Help consumer RED observed2!==1 on duplicated bulk question before copy correction /tmp/chain-context-reconcile-duplicate-red.log. New actual Help consumer RED observed2!==1 on duplicated bulk question before copy correction /tmp/chain-context-reconcile-duplicate-red.log."
+    }
+  },
+  {
+    "testChangesSha256": "fcd8f68674d1f64e78c6c20268c44740054a854b36892a157a4e8a9fd251def2",
+    "reason": "Repair the actual allocated browser RED by restoring included starting state before existing Settings included-to-excluded assertion. Preserve all previous checks and assertion strength. Normalize the reloaded private browser fixture by closing the setup-only motion dialog, matching its initial-load setup. Reconcile exact toolbar main518c01f and sync PR107 additively, retain their unchanged tests and source; imported upstream RED is not newly claimed. Reconcile exact toolbar main518c01f and sync PR107 additively, retain their unchanged tests and source; imported upstream RED is not newly claimed. Independent review caught duplicated bulk FAQ during reconciliation; remove one byte-identical block while preserving toolbar answer.",
+    "previousBehavior": "Prior Enter explicitly excluded Errands, so the next Settings click correctly included it while the legacy fixture expected excluded.",
+    "intendedBehavior": "Explicit keyboard Space restores included state before testing the unchanged Settings included-to-excluded transition.",
+    "replacementTests": [
+      "RISK Undo Z shortcut: real keyboard dispatch reverses only the latest action and retains durable Undo semantics",
+      "RISK Undo Z guards: U is retired and modified editable modal and scene keypresses leave board and native defaults alone",
+      "RISK Undo Z guidance: header hint tooltip and Quick start name Z while preserving editable native undo guidance",
+      "RISK Edit E shortcut: real keyboard dispatch edits only the offered scanner task without changing the board",
+      "RISK Edit E guards and hints: modifiers editable fields modal and scene focus do not dispatch and only the offered Edit advertises E",
+      "RISK Edit E guidance: Quick start explains the offered task editor and plain shortcut scope",
+      "RISK context reconciliation FAQ: actual Help keeps each existing bulk and context question once"
+    ],
+    "preservedCoverage": [
+      "All touch keyboard focus counts disclosure Settings draft Save reload and overflow assertions remain unchanged; context and shortcut implementation is unchanged.",
+      "Released compact toolbar rank selection focus and sync-cleanup generation rules and regressions are retained unchanged.",
+      "Released compact toolbar rank selection focus and sync-cleanup generation rules and regressions are retained unchanged."
+    ],
+    "redEvidence": {
+      "command": "LANDSCAPE_BROWSER_URL=http://127.0.0.1:8769/index.html node --test --test-name-pattern=\"RISK context and Settings browser:\" tests.js",
+      "failure": "Allocated browser observed included !== excluded at tests.js624 on candidate7866; original log /tmp/chain-context-browser-red.log. Restore intended fixture starting state only; no weakened assertion. Corrected transition then reached reload and observed motionDialog intercepting close-modal click at tests.js628; retained /tmp/chain-context-browser-green.log. Close setup dialog after reload without altering product or weakening assertions. New actual Help consumer RED observed2!==1 on duplicated bulk question before copy correction /tmp/chain-context-reconcile-duplicate-red.log."
+    }
+  },
+  {
+    "testChangesSha256": "781a682dcae684e73d153a456e3d9e71b27ce3213be3fe6f4278e2d92e4063fb",
+    "reason": "Repair the actual allocated browser RED by restoring included starting state before existing Settings included-to-excluded assertion. Preserve all previous checks and assertion strength. Normalize the reloaded private browser fixture by closing the setup-only motion dialog, matching its initial-load setup. Reconcile exact toolbar main518c01f and sync PR107 additively, retain their unchanged tests and source; imported upstream RED is not newly claimed. Reconcile exact toolbar main518c01f and sync PR107 additively, retain their unchanged tests and source; imported upstream RED is not newly claimed.",
+    "previousBehavior": "Prior Enter explicitly excluded Errands, so the next Settings click correctly included it while the legacy fixture expected excluded.",
+    "intendedBehavior": "Explicit keyboard Space restores included state before testing the unchanged Settings included-to-excluded transition.",
+    "replacementTests": [
+      "RISK Undo Z shortcut: real keyboard dispatch reverses only the latest action and retains durable Undo semantics",
+      "RISK Undo Z guards: U is retired and modified editable modal and scene keypresses leave board and native defaults alone",
+      "RISK Undo Z guidance: header hint tooltip and Quick start name Z while preserving editable native undo guidance",
+      "RISK Edit E shortcut: real keyboard dispatch edits only the offered scanner task without changing the board",
+      "RISK Edit E guards and hints: modifiers editable fields modal and scene focus do not dispatch and only the offered Edit advertises E",
+      "RISK Edit E guidance: Quick start explains the offered task editor and plain shortcut scope"
+    ],
+    "preservedCoverage": [
+      "All touch keyboard focus counts disclosure Settings draft Save reload and overflow assertions remain unchanged; context and shortcut implementation is unchanged.",
+      "Released compact toolbar rank selection focus and sync-cleanup generation rules and regressions are retained unchanged.",
+      "Released compact toolbar rank selection focus and sync-cleanup generation rules and regressions are retained unchanged."
+    ],
+    "redEvidence": {
+      "command": "LANDSCAPE_BROWSER_URL=http://127.0.0.1:8769/index.html node --test --test-name-pattern=\"RISK context and Settings browser:\" tests.js",
+      "failure": "Allocated browser observed included !== excluded at tests.js624 on candidate7866; original log /tmp/chain-context-browser-red.log. Restore intended fixture starting state only; no weakened assertion. Corrected transition then reached reload and observed motionDialog intercepting close-modal click at tests.js628; retained /tmp/chain-context-browser-green.log. Close setup dialog after reload without altering product or weakening assertions."
+    }
+  },
+  {
+    "testChangesSha256": "1e051386bca93242d90cc8768c4ae2f6d8be570b888c6cb409c32cb3486b8359",
+    "reason": "Repair the actual allocated browser RED by restoring included starting state before existing Settings included-to-excluded assertion. Preserve all previous checks and assertion strength. Normalize the reloaded private browser fixture by closing the setup-only motion dialog, matching its initial-load setup. Reconcile exact toolbar main518c01f and sync PR107 additively, retain their unchanged tests and source; imported upstream RED is not newly claimed.",
+    "previousBehavior": "Prior Enter explicitly excluded Errands, so the next Settings click correctly included it while the legacy fixture expected excluded.",
+    "intendedBehavior": "Explicit keyboard Space restores included state before testing the unchanged Settings included-to-excluded transition.",
+    "replacementTests": [
+      "RISK Undo Z shortcut: real keyboard dispatch reverses only the latest action and retains durable Undo semantics",
+      "RISK Undo Z guards: U is retired and modified editable modal and scene keypresses leave board and native defaults alone",
+      "RISK Undo Z guidance: header hint tooltip and Quick start name Z while preserving editable native undo guidance",
+      "RISK Edit E shortcut: real keyboard dispatch edits only the offered scanner task without changing the board",
+      "RISK Edit E guards and hints: modifiers editable fields modal and scene focus do not dispatch and only the offered Edit advertises E",
+      "RISK Edit E guidance: Quick start explains the offered task editor and plain shortcut scope"
+    ],
+    "preservedCoverage": [
+      "All touch keyboard focus counts disclosure Settings draft Save reload and overflow assertions remain unchanged; context and shortcut implementation is unchanged.",
+      "Released compact toolbar rank selection focus and sync-cleanup generation rules and regressions are retained unchanged."
+    ],
+    "redEvidence": {
+      "command": "LANDSCAPE_BROWSER_URL=http://127.0.0.1:8769/index.html node --test --test-name-pattern=\"RISK context and Settings browser:\" tests.js",
+      "failure": "Allocated browser observed included !== excluded at tests.js624 on candidate7866; original log /tmp/chain-context-browser-red.log. Restore intended fixture starting state only; no weakened assertion. Corrected transition then reached reload and observed motionDialog intercepting close-modal click at tests.js628; retained /tmp/chain-context-browser-green.log. Close setup dialog after reload without altering product or weakening assertions."
+    }
+  },
+  {
+    "testChangesSha256": "6993e41cdd06ef905ab2b22133fecec0a09dabc54b59c302a259a91b6528990c",
+    "reason": "Repair the actual allocated browser RED by restoring included starting state before existing Settings included-to-excluded assertion. Preserve all previous checks and assertion strength. Normalize the reloaded private browser fixture by closing the setup-only motion dialog, matching its initial-load setup.",
+    "previousBehavior": "Prior Enter explicitly excluded Errands, so the next Settings click correctly included it while the legacy fixture expected excluded.",
+    "intendedBehavior": "Explicit keyboard Space restores included state before testing the unchanged Settings included-to-excluded transition.",
+    "replacementTests": [
+      "RISK Undo Z shortcut: real keyboard dispatch reverses only the latest action and retains durable Undo semantics",
+      "RISK Undo Z guards: U is retired and modified editable modal and scene keypresses leave board and native defaults alone",
+      "RISK Undo Z guidance: header hint tooltip and Quick start name Z while preserving editable native undo guidance",
+      "RISK Edit E shortcut: real keyboard dispatch edits only the offered scanner task without changing the board",
+      "RISK Edit E guards and hints: modifiers editable fields modal and scene focus do not dispatch and only the offered Edit advertises E",
+      "RISK Edit E guidance: Quick start explains the offered task editor and plain shortcut scope"
+    ],
+    "preservedCoverage": [
+      "All touch keyboard focus counts disclosure Settings draft Save reload and overflow assertions remain unchanged; context and shortcut implementation is unchanged."
+    ],
+    "redEvidence": {
+      "command": "LANDSCAPE_BROWSER_URL=http://127.0.0.1:8769/index.html node --test --test-name-pattern=\"RISK context and Settings browser:\" tests.js",
+      "failure": "Allocated browser observed included !== excluded at tests.js624 on candidate7866; original log /tmp/chain-context-browser-red.log. Restore intended fixture starting state only; no weakened assertion. Corrected transition then reached reload and observed motionDialog intercepting close-modal click at tests.js628; retained /tmp/chain-context-browser-green.log. Close setup dialog after reload without altering product or weakening assertions."
+    }
+  },
+  {
+    "testChangesSha256": "9118558e9b1d9ac24c02c28be0a909e7ec84f2e32a96ea085d1963390038bbbc",
+    "reason": "Repair the actual allocated browser RED by restoring included starting state before existing Settings included-to-excluded assertion. Preserve all previous checks and assertion strength.",
+    "previousBehavior": "Prior Enter explicitly excluded Errands, so the next Settings click correctly included it while the legacy fixture expected excluded.",
+    "intendedBehavior": "Explicit keyboard Space restores included state before testing the unchanged Settings included-to-excluded transition.",
+    "replacementTests": [
+      "RISK context and Settings browser: touch keyboard filter counts disclosure scrolling and saved controls work on Chrome and WebKit"
+    ],
+    "preservedCoverage": [
+      "All touch keyboard focus counts disclosure Settings draft Save reload and overflow assertions remain unchanged; context and shortcut implementation is unchanged."
+    ],
+    "redEvidence": {
+      "command": "LANDSCAPE_BROWSER_URL=http://127.0.0.1:8769/index.html node --test --test-name-pattern=\"RISK context and Settings browser:\" tests.js",
+      "failure": "Allocated browser observed included !== excluded at tests.js624 on candidate7866; original log /tmp/chain-context-browser-red.log. Restore intended fixture starting state only; no weakened assertion."
+    }
+  },
+  {
+    "testChangesSha256": "6402c392dd6bfd1fb34d750fa8a723104b72e38760af765bf785048b1aa0b5b1",
+    "reason": "Repair the actual allocated browser RED by restoring included starting state before existing Settings included-to-excluded assertion. Preserve all previous checks and assertion strength.",
+    "previousBehavior": "Prior Enter explicitly excluded Errands, so the next Settings click correctly included it while the legacy fixture expected excluded.",
+    "intendedBehavior": "Explicit keyboard Space restores included state before testing the unchanged Settings included-to-excluded transition.",
+    "replacementTests": [
+      "RISK context and Settings browser: touch keyboard filter counts disclosure scrolling and saved controls work on Chrome and WebKit"
+    ],
+    "preservedCoverage": [
+      "All touch keyboard focus counts disclosure Settings draft Save reload and overflow assertions remain unchanged; context and shortcut implementation is unchanged."
+    ],
+    "redEvidence": {
+      "command": "LANDSCAPE_BROWSER_URL=http://127.0.0.1:8769/index.html node --test --test-name-pattern=\"RISK context and Settings browser:\" tests.js",
+      "failure": "Allocated browser observed included !== excluded at tests.js624 on candidate7866; original log /tmp/chain-context-browser-red.log. Restore intended fixture starting state only; no weakened assertion."
+    }
+  },
+  {
+    "testChangesSha256": "de265ba4402c1426dd7499b01edf00ff5dd5b62f99d3ae87ddff781221afbb85",
+    "reason": "User explicitly replaces plain U Undo with Z and adds E for only the offered scanner Edit action. Preserve modifier/native editable and modal guards; update prior U hint assertions as authorized and add real consumer preservation tests. This record protects the separate shortcut commit delta.",
+    "previousBehavior": "Plain U called existing Undo, Z and E had no app assignment, and scanner Edit controls did not advertise a keyboard key.",
+    "intendedBehavior": "Plain Z calls unchanged Undo, U is retired, and plain E opens existing individual Edit only for the rendered offered task; edited text, modifier shortcuts, dialogs and state remain protected.",
+    "replacementTests": [
+      "RISK Undo Z shortcut: real keyboard dispatch reverses only the latest action and retains durable Undo semantics",
+      "RISK Undo Z guards: U is retired and modified editable modal and scene keypresses leave board and native defaults alone",
+      "RISK Undo Z guidance: header hint tooltip and Quick start name Z while preserving editable native undo guidance",
+      "RISK Edit E shortcut: real keyboard dispatch edits only the offered scanner task without changing the board",
+      "RISK Edit E guards and hints: modifiers editable fields modal and scene focus do not dispatch and only the offered Edit advertises E",
+      "RISK Edit E guidance: Quick start explains the offered task editor and plain shortcut scope"
+    ],
+    "preservedCoverage": [
+      "Existing Undo button/worked-on/log/reload state semantics, decision-repeat guards, task data and context controls remain protected. Existing U glyph tests are explicitly updated to Z; no native modified shortcut is captured."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK Undo Z' tests.js; node --test --test-name-pattern='RISK Edit E' tests.js",
+      "failure": "Contemporaneous observed RED before shortcut implementation: Z3/3 (/tmp/chain-undo-z-red.log) for missing Undo dispatch, U still changing board, and absent Z hint/guidance; E3/3 (/tmp/chain-edit-e-red.log) for absent editor dispatch, absent offered hint and absent FAQ. After implementation, initial Help markup in no-offer/guard fixture was explicitly closed to normalize scanner focus; this fixture correction is not additional preimplementation RED. Shortcut/context27/27zero skips /tmp/chain-shortcuts-final-cohort.log. Prior context contemporaneous RED and native FAQ-length RED remain in their original exact rationale entries and logs; native1535/0/33 qualification applies to parent2ef only, not this new shortcut candidate."
+    }
+  },
+  {
+    "testChangesSha256": "acc21ac72a3ccc9a748bfbadd120d1793bf035bfbb42987e65f27caf262f7354",
+    "reason": "User explicitly replaces plain U Undo with Z and adds E for only the offered scanner Edit action. Preserve modifier/native editable and modal guards; update prior U hint assertions as authorized and add real consumer preservation tests. This cumulative record retains all prior context RED and preservation evidence without claiming those reviews cover the shortcut addition.",
+    "previousBehavior": "Plain U called existing Undo, Z and E had no app assignment, and scanner Edit controls did not advertise a keyboard key.",
+    "intendedBehavior": "Plain Z calls unchanged Undo, U is retired, and plain E opens existing individual Edit only for the rendered offered task; edited text, modifier shortcuts, dialogs and state remain protected.",
+    "replacementTests": [
+      "RISK Undo Z shortcut: real keyboard dispatch reverses only the latest action and retains durable Undo semantics",
+      "RISK Undo Z guards: U is retired and modified editable modal and scene keypresses leave board and native defaults alone",
+      "RISK Undo Z guidance: header hint tooltip and Quick start name Z while preserving editable native undo guidance",
+      "RISK Edit E shortcut: real keyboard dispatch edits only the offered scanner task without changing the board",
+      "RISK Edit E guards and hints: modifiers editable fields modal and scene focus do not dispatch and only the offered Edit advertises E",
+      "RISK Edit E guidance: Quick start explains the offered task editor and plain shortcut scope"
+    ],
+    "preservedCoverage": [
+      "Existing Undo button/worked-on/log/reload state semantics, decision-repeat guards, task data and context controls remain protected. Existing U glyph tests are explicitly updated to Z; no native modified shortcut is captured."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK Undo Z' tests.js; node --test --test-name-pattern='RISK Edit E' tests.js",
+      "failure": "Contemporaneous observed RED before shortcut implementation: Z3/3 (/tmp/chain-undo-z-red.log) for missing Undo dispatch, U still changing board, and absent Z hint/guidance; E3/3 (/tmp/chain-edit-e-red.log) for absent editor dispatch, absent offered hint and absent FAQ. After implementation, initial Help markup in no-offer/guard fixture was explicitly closed to normalize scanner focus; this fixture correction is not additional preimplementation RED. Shortcut/context27/27zero skips /tmp/chain-shortcuts-final-cohort.log. Prior context contemporaneous RED and native FAQ-length RED remain in their original exact rationale entries and logs; native1535/0/33 qualification applies to parent2ef only, not this new shortcut candidate."
+    }
+  },
+  {
+    "testChangesSha256": "2a7776eaae3379c2d8addd37eab26da22e52d1f938952abe9da1e11b6ded2df0",
+    "reason": "Implement the user-authorized conditional binary real-context controls while preserving stored neutral choices and every existing eligibility rule. Adapt prior zero-active-cycle fixtures and the browser keyboard expectation to the changed active-mode interaction, retaining their remaining assertions.",
+    "previousBehavior": "With another real context included, neutral requirements displayed neutral and explicit red exclusions needed a neutral click before inclusion.",
+    "intendedBehavior": "While any real context is included, blocked real contexts display excluded and include on one click; zero-included controls retain their stored-state cycle without making contextual tasks eligible.",
+    "replacementTests": [
+      "RISK binary context presentation: active filters derive excluded controls on both surfaces without changing saved choices",
+      "RISK binary context interaction: real handlers include displayed exclusions immediately and preserve zero-active AND and No context rules",
+      "RISK binary context saved data: reload and cloud adoption retain neutral choices and derive excluded presentation",
+      "RISK binary context guidance: FAQ explains conditional two-state controls and unchanged zero-active matching"
+    ],
+    "preservedCoverage": [
+      "All-context AND matching, explicit-exclusion precedence, No context scope, empty selector, unknown assignments, ratings, full-pool shares, Undo, saved fields, released settings preservation and concurrent sync recovery remain protected."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK binary context' tests.js; node --test --test-name-pattern='RISK binary context guidance' tests.js; npm test; node --test --test-name-pattern='RISK Quick start content:|RISK binary context guidance:' tests.js",
+      "failure": "Contemporaneous preimplementation RED 4/4: neutral instead of excluded presentation, real explicit-red handler reaches neutral instead of included, reload derives neutral instead of excluded, and FAQ lacks conditional binary explanation; /tmp/chain-context-binary-red.log. Initial guidance fixture typo corrected before the accepted RED. Existing changed interaction assertions then failed under the intended change; /tmp/chain-context-existing.log. PWA changelog fingerprint failed before shell refresh; /tmp/chain-context-shell-red.log. Independent FAQ source review requested preservation, unknown/deleted context, save/sync/Undo and empty-creation guidance. Observed focused guidance RED before copy update: /tmp/chain-context-faq-red.log. Dependency-qualified native run on44fbe330 completed1534pass1fail33environment skips434606ms; genuine Quick start content failure identified167word context answer exceeding130word limit. Observed focused2/2RED /tmp/chain-context-faq-length-red.log before splitting creation/list details into a second94/73word answer; all content retained, native contract not weakened."
     }
   },
   {
@@ -5061,6 +5272,67 @@
     "redEvidence": {
       "command": "node --test --test-name-pattern='RISK scenery depth' tests.js",
       "failure": "Contemporaneous fountain RED showed farther,closer,fountain instead of farther,fountain,closer (/tmp/chain-sailboat-depth-red.log). Before bird implementation, nest pass RED: meadow pass cannot duplicate flight silhouettes above reflection capture (/tmp/chain-bird-depth-red.log). Focused GREEN has 11 passing cases (/tmp/chain-depth-focused.log). Full local run exposed a legacy isolated bird-block ReferenceError and overlong FAQ answer; preserved all legacy assertions, retained standalone full-visit painter mode, explicitly partitioned the real scene consumers, and moved added copy into its own FAQ answer. Affected cases GREEN /tmp/chain-depth-regression-repair-green.log; original full result /tmp/chain-depth-full.log is not a pass. Independent source review withdrew center-based partition approval: actual wing/body boundary regression observed RED (ground 0 versus 6 shapes) before complementary clips, /tmp/chain-depth-boundary-red.log. Corrected clips and unchanged dense departure regression pass /tmp/chain-depth-boundary-green.log (2 pass, zero skips). Frozen prior candidate full suite:1504 pass,0 fail,33 optional runtime skips; not rendered verification."
+    }
+  },
+  {
+    "testChangesSha256": "acfbebfd6c292ab891fdd34627a9153d5a8663310e133028d959c3b5d197b195",
+    "reason": "User requests a pane-frozen toolbar matching existing compact controls and rank-slot selection without taller rows. Replace only the explicitly superseded full-width selection-row expectation; retain existing bulk mutations and sync assertions. New tests exercise real selection handlers, filter pruning, focus and help consumer. Independent actual image review found misleading dark labels on light-painted captures; user explicitly requires recording this harness lesson. New guide assertions fail before theme-verification prose.",
+    "previousBehavior": "Modal-sized footer controls scrolled with task rows. Selection added an extra title-line button and used full-width rows; keyboard rerender lost footer focus.",
+    "intendedBehavior": "Compact existing filter classes render outside task scroller, selection occupies the original rank slot and restores its format, keyboard focus survives rerender, with explicit filtered scope and updated review guidance.",
+    "replacementTests": [
+      "RISK bulk toolbar: mounted controls stay outside scrolling rows and retain filtered selection through filter changes",
+      "RISK bulk row selection: selected label replaces the existing rank slot and deselection restores its format",
+      "RISK bulk toolbar keyboard: rerender restores the focused toolbar action and row toggle",
+      "RISK bulk toolbar guidance: extended FAQ describes frozen controls and rank-slot selection",
+      "RISK repository process boundary: actual visual tests compare every changed control with neighboring controls and scrolled states"
+    ],
+    "preservedCoverage": [
+      "All existing bulk field opt-in, clearing, validation, identity/history/rating preservation, stale selections, offline conflicts, partial reconciliation, failed local/cloud saves and Undo assertions remain; only result/count DOM target moves from listBody to its sibling toolbar.",
+      "User explicitly supersedes enlarged selection rows give task controls full width. New rank-slot consumer coverage and required rendered before/after row-height comparison replace that layout expectation; no data or sync behavior changes.",
+      "Incoming PR107 cleanup source, tests, FAQ and changelog preserved during additive reconciliation to18e3eeb."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK bulk toolbar:|RISK repository process boundary: actual visual tests' tests.js; node --test --test-name-pattern='RISK bulk row selection:' tests.js; node --test --test-name-pattern='RISK bulk toolbar keyboard:|RISK bulk toolbar guidance:' tests.js; node --test --test-name-pattern='RISK repository process boundary: actual visual tests' tests.js",
+      "failure": "Contemporaneous /tmp/chain-bulk-toolbar-red.log: toolbar unexpectedly inside scroller; /tmp/chain-bulk-row-slot-red.log: actual rank slot lacked native selection control; /tmp/chain-bulk-visual-review-red.log: executed visual-review guidance missing before documentation edit; /tmp/chain-bulk-toolbar-focus-faq-red.log: keyboard Select lost focus before repair. Initial FAQ test had wrong consumer name; corrected openHelp failed required guidance before FAQ change in /tmp/chain-bulk-toolbar-faq-red.log. Shell fingerprint mismatch observed before regeneration in /tmp/chain-bulk-toolbar-shell-red.log. All21focused source cases pass zero skips after repair; actual rendered comparison remains pending runtime allocation. /tmp/chain-bulk-toolbar-theme-guidance-red.log missing computed scheme/paint requirement observed before guide repair; /tmp/chain-bulk-toolbar-theme-guidance-green.log1pass0skip."
+    }
+  },
+  {
+    "testChangesSha256": "96acbe85808546824da284bf04195bc1308a8cb59aa8268027db7c1c744212c3",
+    "reason": "User requests a pane-frozen toolbar matching existing compact controls and rank-slot selection without taller rows. Replace only the explicitly superseded full-width selection-row expectation; retain existing bulk mutations and sync assertions. New tests exercise real selection handlers, filter pruning, focus and help consumer.",
+    "previousBehavior": "Modal-sized footer controls scrolled with task rows. Selection added an extra title-line button and used full-width rows; keyboard rerender lost footer focus.",
+    "intendedBehavior": "Compact existing filter classes render outside task scroller, selection occupies the original rank slot and restores its format, keyboard focus survives rerender, with explicit filtered scope and updated review guidance.",
+    "replacementTests": [
+      "RISK bulk toolbar: mounted controls stay outside scrolling rows and retain filtered selection through filter changes",
+      "RISK bulk row selection: selected label replaces the existing rank slot and deselection restores its format",
+      "RISK bulk toolbar keyboard: rerender restores the focused toolbar action and row toggle",
+      "RISK bulk toolbar guidance: extended FAQ describes frozen controls and rank-slot selection",
+      "RISK repository process boundary: actual visual tests compare every changed control with neighboring controls and scrolled states"
+    ],
+    "preservedCoverage": [
+      "All existing bulk field opt-in, clearing, validation, identity/history/rating preservation, stale selections, offline conflicts, partial reconciliation, failed local/cloud saves and Undo assertions remain; only result/count DOM target moves from listBody to its sibling toolbar.",
+      "User explicitly supersedes enlarged selection rows give task controls full width. New rank-slot consumer coverage and required rendered before/after row-height comparison replace that layout expectation; no data or sync behavior changes.",
+      "Incoming PR107 cleanup source, tests, FAQ and changelog preserved during additive reconciliation to18e3eeb."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK bulk toolbar:|RISK repository process boundary: actual visual tests' tests.js; node --test --test-name-pattern='RISK bulk row selection:' tests.js; node --test --test-name-pattern='RISK bulk toolbar keyboard:|RISK bulk toolbar guidance:' tests.js",
+      "failure": "Contemporaneous /tmp/chain-bulk-toolbar-red.log: toolbar unexpectedly inside scroller; /tmp/chain-bulk-row-slot-red.log: actual rank slot lacked native selection control; /tmp/chain-bulk-visual-review-red.log: executed visual-review guidance missing before documentation edit; /tmp/chain-bulk-toolbar-focus-faq-red.log: keyboard Select lost focus before repair. Initial FAQ test had wrong consumer name; corrected openHelp failed required guidance before FAQ change in /tmp/chain-bulk-toolbar-faq-red.log. Shell fingerprint mismatch observed before regeneration in /tmp/chain-bulk-toolbar-shell-red.log. All21focused source cases pass zero skips after repair; actual rendered comparison remains pending runtime allocation."
+    }
+  },
+  {
+    "testChangesSha256": "00ca23157e02b8d2d60c7cc8fc7c4654acbafb6c2d6f0ca071219dd8ecb53f0a",
+    "reason": "Add cleanup interruption coverage enforcing the deployed deleting-state rule in the adapter fake, without altering existing regression assertions. Add real-rules production-adapter interruption, concurrent collector and current/previous/pending/young-staging preservation coverage. The real-rules negative control is retrospective; the first VM regression supplied contemporaneous preimplementation RED.",
+    "previousBehavior": "The production adapter rewrote an existing deleting tombstone and cleanup failed closed on the forbidden transition, leaving repeated full backlog queries.",
+    "intendedBehavior": "Resume existing deletion without changing its timestamp after the existing root and explicit-protection checks; current and previous complete boards remain protected.",
+    "replacementTests": [
+      "RISK CLOUD CLEANUP RESUME: interrupted deleting generation resumes without forbidden transition and preserves acknowledged board",
+      "RISK CLOUD CLEANUP GUIDANCE: sync FAQ distinguishes failed attempts from acknowledgement and explains resumable cleanup"
+    ],
+    "preservedCoverage": [
+      "All existing chunk verification, manifest revision arbitration, account cancellation, bounded retry, local recovery, bulk Save and Undo assertions remain intact."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK CLOUD CLEANUP RESUME:' tests.js; node --test --test-name-pattern='RISK CLOUD CLEANUP GUIDANCE:' tests.js",
+      "failure": "Contemporaneous preimplementation RED: stranded deleting header remained true instead of false after an acknowledged 94-task synthetic coalesced edit; /tmp/chain-sync-cleanup-red.log. Separate pre-FAQ RED: missing failed-attempt and cleanup-resume guidance; /tmp/chain-sync-guidance-red.log. Existing changelog fingerprint RED observed before fingerprint refresh: /tmp/chain-sync-shell-red.log. Real-rules retrospective base negative initially failed for VM realm SDK plain-object setup (not accepted as behavior evidence); normalized outer write objects preserving FieldValues. Corrected base negative then observed permission-denied for deleting->deleting, /tmp/chain-sync-rules-negative.log; candidate rules3/3 and compatibility15/15 zero skips, /tmp/chain-sync-rules-green.log and /tmp/chain-sync-compatibility.log. The adapter module is extracted from actual candidate HTML. This retrospective control supplements, rather than replaces, the original contemporaneous94task RED."
     }
   }
 ]
