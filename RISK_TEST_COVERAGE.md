@@ -910,3 +910,6 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK task history: comparison labels preserve initiating action without inventing historical participant roles
 
 - FAQ menu naming: `RISK FAQs menu label: help navigation and named dialog use FAQs while retaining Quick start chapter`.
+
+- `RISK motion safety: explicit local choices expire after seven elapsed days and corrupt records fail closed`
+- `RISK motion safety: actual choice handler remembers selection while dismissal never writes consent`

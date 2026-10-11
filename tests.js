@@ -2140,8 +2140,41 @@ test("Landscape: device motion preference fails safely and OS reduction always w
   assert.equal(sky.readMotion({getItem(){return "garbage"}}),null);
   let saved;
   assert.equal(sky.saveMotion({setItem(k,v){saved=v}},"normal"),true);
-  assert.equal(saved,"normal");
+  assert.equal(JSON.parse(saved).choice,"normal");
   assert.equal(sky.saveMotion({setItem(){throw Error("quota")}},"reduced"),false);
+});
+
+test('RISK motion safety: explicit local choices expire after seven elapsed days and corrupt records fail closed',()=>{
+ const sky=livingSky(),now=2000000000000,week=7*24*60*60*1000,data=new Map();
+ const storage={getItem:key=>data.get(key)??null,setItem:(key,value)=>data.set(key,value)};
+ for(const choice of ['normal','reduced']){
+  assert.equal(sky.saveMotion(storage,choice,now),true);
+  assert.equal(sky.readMotion(storage,now),choice);
+  assert.equal(sky.readMotion(storage,now+week-1),choice);
+  assert.equal(sky.readMotion(storage,now+week),null,'exact seven-day boundary asks again');
+  assert.equal(sky.readMotion(storage,now-1),null,'future timestamps do not consent');
+ }
+ for(const value of ['normal','reduced','{}','null','{"choice":"normal","savedAt":"2000000000000"}','{"choice":"normal","savedAt":-1}','{"choice":"invalid","savedAt":2000000000000}']){
+  data.set('fvp:chain-scanner:landscape-motion',value);
+  assert.equal(sky.readMotion(storage,now),null,'legacy or corrupt value requires explicit choice');
+ }
+ assert.equal(sky.saveMotion(storage,'invalid',now),false);
+ assert.equal(sky.motionReduced(sky.readMotion(storage,now),false),true);
+ assert.equal(sky.motionReduced('normal',true),true);
+});
+
+test('RISK motion safety: actual choice handler remembers selection while dismissal never writes consent',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),calls=[];
+ const choice=source.slice(source.indexOf('    preference=button.dataset.landscapeMotion;'),source.indexOf("  dialog.addEventListener('close'"));
+ const body=choice.slice(0,choice.lastIndexOf('  });'));
+ const run=new Function('button','S','storage','updateMotion','dialog','let preference=null;'+body+';return preference;');
+ const sky=livingSky(),data=new Map(),storage={getItem:k=>data.get(k)??null,setItem:(k,v)=>data.set(k,v)};
+ assert.equal(run({dataset:{landscapeMotion:'reduced'}},sky,storage,()=>calls.push('update'),{close:()=>calls.push('close')}),'reduced');
+ assert.equal(sky.readMotion(storage),'reduced','reload sees the explicit selection');
+ const cancel=source.match(/dialog\.addEventListener\('cancel',\(\)=>\{([\s\S]*?)\n  \}\);/)[1];
+ new Function('S','storage','updateMotion','let preference=null;'+cancel)(sky,{setItem(){throw Error('dismiss must not save')}},()=>{});
+ assert.doesNotMatch(cancel,/saveMotion/,'dismissal leaves no remembered choice');
+ assert.deepEqual(calls,['update','close']);
 });
 
 test("Landscape: local assets, decorative layers and accessible motion controls are integrated", () => {
