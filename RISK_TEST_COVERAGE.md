@@ -925,3 +925,9 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK bulk task editing: current batch result distinguishes partial reconciliation from sync success and offers no batch Undo
 - RISK bulk task editing: enlarged modal fieldsets shrink and native controls retain available width
 - RISK bulk task editing: enlarged selection rows give task controls full width
+- `RISK motion safety: explicit local choices expire after seven elapsed days and corrupt records fail closed`
+- `RISK motion safety: actual choice handler remembers selection while dismissal never writes consent`
+
+- `RISK motion safety accessibility: enlarged prompt fits the containing viewport and stacks intrinsic choice cards`
+
+- `RISK motion safety resume: foreground and restored pages reread expiry before painting without replacing visitors`
