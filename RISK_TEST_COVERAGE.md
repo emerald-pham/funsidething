@@ -915,3 +915,8 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK bulk task editing: filtered hidden deleted completed and replaced board selections cannot write
 - RISK bulk task editing: stale tab save preserves peer fields and durable field conflicts through reload
 - RISK bulk task editing: removed context options reject the whole batch rather than saving stale requirements
+- RISK bulk task editing: offline two-task cloud conflict preserves fresh peer fields and reconnects without resurrection
+- RISK bulk task editing: failed cloud publication retains local batch and retry acknowledges exact payload
+- RISK bulk task editing: failed browser pair save retains in-memory batch and retry saves without partial task loss
+- RISK bulk task editing: FAQ and editor qualify mixed Apply and later sync recovery limits
+- RISK bulk task editing: concurrent recovery keeps backups and existing board Undo boundary explicit
