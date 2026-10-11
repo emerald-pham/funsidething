@@ -1,5 +1,23 @@
 [
   {
+    "testChangesSha256": "d8b012792897a27cad7457ae4e841214468b132e0d6f8bc8ad93f2ef106bbec1",
+    "reason": "User requests substantially compact history and explanatory prose moved to a named FAQ chapter. Existing explanatory assertion relocates to FAQ; browser selector now targets outer disclosure because native record disclosures introduce nested summaries.",
+    "previousBehavior": "Every visible observation occupied three metric rows, with explanatory paragraphs before and after history.",
+    "intendedBehavior": "Task history shows compact native event disclosures, actual MM/DD/YYYY dates, and recorded percentage / score / uncertainty, retaining prior values and exact local times on expansion; explanatory prose lives in a named collapsible FAQ chapter.",
+    "replacementTests": [
+      "RISK task rating history: compact record disclosures retain dates and metrics with explanations in the FAQ",
+      "RISK task rating history: Edit shows accessible timestamped observations and honest metric and retention explanations",
+      "RISK task rating history browser: phone tablet and desktop disclosures pagination drafts and offline Undo preserve actual observations"
+    ],
+    "preservedCoverage": [
+      "All original timestamp, metric, pagination, focus, malformed data, retention, restore, reload, Undo and synchronization contracts remain. No rating or persistence code changed."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='compact record disclosures' tests.js",
+      "failure": "Observed before functional implementation: each record starts compact with native keyboard disclosure assertion failed; original history produced a bold heading and fully expanded metric rows. Output retained in /tmp/compact-history-red.log. Browser selector edit is compatibility maintenance, not separately claimed browser RED. Latest Task history/date/metric request also observed RED before its implementation, retained in /tmp/compact-history-task-log-red.log."
+    }
+  },
+  {
     "testChangesSha256": "702946daeb64178fb62494ed03151a798585a50d7ea6e9f402bc845573ef0238",
     "reason": "Latest user correction explicitly replaces white night paint with the unchanged Edit palette; preserve day paint, neighbor sizing and shared state treatments.",
     "previousBehavior": "Both mounted Postpone surfaces used white fill and dark ink at night while Edit used the dark surface/light ink tokens.",

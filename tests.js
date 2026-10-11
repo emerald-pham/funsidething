@@ -744,14 +744,28 @@ test('RISK task rating history: device reload and chunked Unicode exports retain
  const raw=h.ctx.cloudPayload(),codec=h.shim.window.ChainStorageV2,packed=await codec.encodeSnapshot(raw,{crypto:webcrypto,targetBytes:256*1024});assert.ok(packed.chunks.length>1,'history remains supported beyond one-document limits');assert.equal(await codec.decodeSnapshot(packed,packed.chunks,{crypto:webcrypto}),raw);
  const r=await loadApp({seed:620,cryptoProvider:webcrypto,indexedDBProvider:indexedDB,deviceDbName:name});assert.equal(ratingHistoryTask(r.ctx,a.id).ratingHistory.length,2201);assert.deepEqual(ratingHistoryCopy(ratingHistoryTask(r.ctx,a.id).futureTaskField),{opaque:'kept'});assert.equal(ratingHistoryTask(r.ctx,a.id).ratingHistory[0].at,old.at);
 });
+test('RISK task rating history: compact record disclosures retain dates and metrics with explanations in the FAQ',async()=>{
+ const {ctx,shim,b}=await ratingHistoryFixture(631);ctx.decide('yes');const original=JSON.stringify(b.ratingHistory);ctx.openEdit(b.id);
+ const view=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(view,/<details class="rating-record"><summary>/,'each record starts compact with native keyboard disclosure');
+ assert.match(view,/<time datetime="2026-10-06T12:34:56\.789Z"/);
+ assert.match(view,/Task history/);assert.match(view,/10\/06\/2026/);assert.match(view,/class="rating-change"/);assert.match(view,/Score/);assert.match(view,/Uncertainty/);assert.match(view,/46\.49%/);assert.match(view,/MMR/);assert.match(view,/Overall likelihood/);assert.match(view,/Estimated Top x/);
+ assert.doesNotMatch(view,/Recorded observations, not a complete timeline|MMR is strength|All recorded observations stay/,'explanations no longer occupy the editor');
+ assert.match(view,/Quick start → Task history/);
+ ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(help,/<details class="help-faq" id="ratingHistoryFaq">/);assert.match(help,/<h3>Task history<\/h3>/);
+ assert.match(help,/not a complete timeline/);assert.match(help,/recording device’s clock/);assert.match(help,/Clear history/);
+ assert.equal(JSON.stringify(b.ratingHistory),original,'rendering and FAQ navigation retain every historical fact');
+ b.ratingHistory=[{...b.ratingHistory[0],kind:'dislodge'}];ctx.openEdit(b.id);assert.match(shim.document.getElementById('modalRoot').innerHTML,/Dislodged/);
+});
 test('RISK task rating history: Edit shows accessible timestamped observations and honest metric and retention explanations',async()=>{
  const {ctx,shim,a,b}=await ratingHistoryFixture(621);ctx.decide('yes');ctx.openEdit(b.id);const rendered=shim.document.getElementById('modalRoot').innerHTML;
- assert.match(rendered,/Rating history/);assert.match(rendered,/<time datetime="2026-10-06T12:34:56\.789Z"/);assert.match(rendered,/MMR/);assert.match(rendered,/uncertainty/);assert.match(rendered,/Overall likelihood/);assert.match(rendered,/Estimated Top x/);assert.match(rendered,/Own rating/);assert.match(rendered,/observations/);assert.match(rendered,/not a complete/);
+ assert.match(rendered,/Task history/);assert.match(rendered,/<time datetime="2026-10-06T12:34:56\.789Z"/);assert.match(rendered,/MMR/);assert.match(rendered,/uncertainty/);assert.match(rendered,/Overall likelihood/);assert.match(rendered,/Estimated Top x/);assert.match(rendered,/Own rating/);assert.match(rendered,/observations/);assert.doesNotMatch(rendered,/not a complete/);
  const row=ratingHistoryCopy(b.ratingHistory[0]);b.ratingHistory=Array.from({length:43},(_,i)=>({...row,id:'stored-'+i,at:row.at-i*1000}));b.ratingHistory.push({v:78,raw:'<img src=x onerror=evil()>'});ctx.openEdit(b.id);
  const recent=shim.document.getElementById('modalRoot').innerHTML;assert.equal((recent.match(/class="rating-event"/g)||[]).length,20);assert.match(recent,/Show 20 more/);assert.doesNotMatch(recent,/<img src=x/);assert.equal(b.ratingHistory.length,44,'pagination cannot purge data');
  let focused=false;const query=shim.document.querySelector;shim.document.querySelector=selector=>selector==='#taskRatingHistory details'?{open:false}:selector==='#taskRatingHistory summary'?{focus(){focused=true;}}:null;
  ctx.onAction('more-rating-history',{dataset:{id:b.id,limit:'60'}});assert.equal(focused,true,'the last page retains keyboard focus on the disclosure');shim.document.querySelector=query;
- ctx.openHelp();assert.match(shim.document.getElementById('modalRoot').innerHTML,/rating history/i);assert.match(shim.document.getElementById('modalRoot').innerHTML,/Earlier values and every intervening change are unavailable/i);
+ ctx.openHelp();assert.match(shim.document.getElementById('modalRoot').innerHTML,/task history/i);assert.match(shim.document.getElementById('modalRoot').innerHTML,/Earlier values and every intervening change are unavailable/i);
  assert.match(html,/\.rating-values\s*\{[^}]*grid-template-columns/);assert.match(html,/\.rating-event\s*\{[^}]*overflow-wrap:anywhere/);
 });
 test('RISK task rating history: malformed and future records remain recoverable without blocking actions or injecting markup',async()=>{
@@ -833,7 +847,7 @@ test('RISK task rating history browser: phone tablet and desktop disclosures pag
     await page.route('https://**/*',route=>route.abort());await page.goto(process.env.LANDSCAPE_BROWSER_URL);await page.waitForFunction(()=>typeof state!=='undefined'&&state!==null);
     const fixture=await page.evaluate(()=>{closeModal();document.getElementById('motionDialog')?.close();state.seenQuickStart=true;const a=addTask('Private browser benchmark'),b=addTask('Private browser rating history');state.chain=[a.id];state.candidateId=b.id;recomputeRanks();decide('yes');const row=JSON.parse(JSON.stringify(b.ratingHistory[0]));b.ratingHistory=Array.from({length:45},(_,i)=>({...row,id:'private-browser-event-'+i,seq:45-i,at:row.at-i*1000}));b.ratingHistoryHead=b.ratingHistory[0].id;state.listOpen=true;render();return {id:b.id,raw:JSON.stringify(b.ratingHistory)};});
     const row=page.locator('[data-row]').filter({has:page.locator('[data-act="edit"][data-id="'+fixture.id+'"]')});await row.locator('[data-act="edit"]').click();
-    const summary=page.locator('.task-rating-history summary');await summary.focus();await summary.press('Enter');await page.locator('.rating-event').first().waitFor();assert.equal(await page.locator('.rating-event').count(),20);
+    const summary=page.locator('.task-rating-history > summary');await summary.focus();await summary.press('Enter');await page.locator('.rating-event').first().waitFor();assert.equal(await page.locator('.rating-event').count(),20);
     await page.locator('#etTitle').fill('Unsaved private history draft');await page.getByRole('button',{name:/Show 20 more/}).click();assert.equal(await page.locator('.rating-event').count(),40);assert.equal(await page.locator('#etTitle').inputValue(),'Unsaved private history draft');
     await page.getByRole('button',{name:/Show 20 more/}).click();assert.equal(await page.locator('.rating-event').count(),45);assert.equal(await summary.evaluate(e=>document.activeElement===e),true,'the last pagination click must retain keyboard focus on the disclosure');
     assert.equal(await page.evaluate(id=>JSON.stringify(taskById(id).ratingHistory),fixture.id),fixture.raw,'opening and paging do not edit facts');
