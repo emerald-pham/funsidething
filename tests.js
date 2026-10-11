@@ -24585,3 +24585,23 @@ test('RISK FAQs menu label: help navigation and named dialog use FAQs while reta
  assert.match(ctx.taskRatingHistoryHTML({ratingHistory:[]}),/Help: FAQs → Task history/);
  assert.match(ctx.dependencyFieldsHTML('edit',[]),/See dependency FAQ in FAQs\./);
 });
+
+test('RISK Last task WOOP: exhausted scan reaches walkthrough through real Start and Dislodge handlers',async()=>{
+ const app=await loadApp({seed:971}),{ctx,shim}=app,task=ctx.addTask('Private sole task');
+ const action=name=>ctx.onAction(name,{dataset:['dislodge','woop-start'].includes(name)?{benchmark:task.id}:{}});
+ ctx.openSettings();const field=shim.document.getElementById('stLastTaskWoop');field.id='stLastTaskWoop';field.checked=true;field.matches=()=>false;
+ shim.document.dispatchEvent({type:'change',target:field});ctx.closeModal();
+ action('start-scan');
+ for(let count=0;count<2;count++){action('dislodge');assert.equal(ctx.taskDislodgeCount(ctx.state.tasks.find(t=>t.id===task.id)),count+1);action('rescan');action('start-scan');}
+ assert.equal(ctx.state.mode,'scan');assert.equal(ctx.pool().length,0);assert.equal(ctx.state.chain.length,1);
+ assert.match(shim.document.getElementById('scan').innerHTML,/End of the list/);
+ assert.match(shim.document.getElementById('scan').innerHTML,/Walk Thru WOOP for Final Task/,'an exhausted sole-task scan must not require an unreachable pause control');
+ action('woop-start');assert.match(shim.document.getElementById('modalRoot').innerHTML,/best outcome/i);
+ woopStep(app,'Private outcome');woopStep(app,'Private obstacle');woopStep(app,'If blocked, then take one step');
+ assert.match(shim.document.getElementById('scan').innerHTML,/Delete WOOP plan/);
+ await ctx.persist();const reload=await loadApp({seedStorage:{[STORE_KEY]:JSON.stringify(ctx.state)}});
+ assert.equal(reload.ctx.state.settings.lastTaskWoop,true);assert.equal(reload.ctx.taskDislodgeCount(reload.ctx.state.tasks.find(t=>t.id===task.id)),2);
+ assert.match(reload.shim.document.getElementById('scan').innerHTML,/Private outcome/);
+ const peer=ctx.addTask('New eligible candidate');ctx.renderScan();assert.doesNotMatch(shim.document.getElementById('scan').innerHTML,/Private outcome|Delete WOOP plan/,'new arrivals rearm the scan and hide final-task plans');
+ assert.ok(peer);assert.equal(ctx.state.tasks.find(t=>t.id===task.id).woopPlan.outcome,'Private outcome');
+});

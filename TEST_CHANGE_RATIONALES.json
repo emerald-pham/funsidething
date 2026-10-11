@@ -1,5 +1,21 @@
 [
   {
+    "testChangesSha256": "0e1b1eb85260367171b57addc931b9034f6577eb4330f6475785b933969ccbc5",
+    "reason": "Actual Start/Dislodge/Rescan cycles reach exhausted scan with two recorded actions but no WOOP and no pause control; add this previously inaccessible final-dot path.",
+    "previousBehavior": "WOOP requires work mode; exhausted scan stays scan mode and provides no pause control for its sole dot.",
+    "intendedBehavior": "Enabled WOOP admits sole-dot exhausted scans while active candidates and multi-dot chains remain excluded; preserve saved plans and default-off setting.",
+    "replacementTests": [
+      "RISK Last task WOOP: exhausted scan reaches walkthrough through real Start and Dislodge handlers"
+    ],
+    "preservedCoverage": [
+      "Existing boundary, two unique recorded actions, causal plans, Undo, sync, unknown data and stale-control preservation assertions remain intact."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK Last task WOOP: exhausted scan' tests.js",
+      "failure": "Observed before implementation: real handler sequence reaches End of the list, count 2, mode scan; walkthrough assertion fails. /tmp/woop-trigger-red.log. Initial fixture handler mistakes repaired before this discriminating RED."
+    }
+  },
+  {
     "testChangesSha256": "3a4081e7ba73d2967dc41c615dcfcbe6eeb2cf0d910317e48ffdafcaeb62fc11",
     "reason": "Explicit user request renames only the FAQ menu and associated accessible names to FAQs; preserve Quick start onboarding chapter and all FAQ contents/behavior. Current menu references match the new name.",
     "previousBehavior": "Header help tooltip and modal heading said Quick start; button accessible name was question mark and dialog lacked its heading association.",

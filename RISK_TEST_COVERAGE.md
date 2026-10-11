@@ -735,6 +735,8 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 
 ## Last task WOOP, dependency filter, and independent FAQ release review
 
+- RISK Last task WOOP: exhausted scan reaches walkthrough through real Start and Dislodge handlers
+
 - RISK Last task WOOP: mounted preference and final paused boundary use unique recorded dislodgements
 - RISK Last task WOOP: walkthrough saves escaped outcome obstacle plan to bound task and revisits deletes reloads
 - RISK Last task WOOP: cancel empty repeated stale interrupted and peer-plan actions never mutate replacement tasks
