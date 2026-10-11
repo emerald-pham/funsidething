@@ -1,5 +1,43 @@
 [
   {
+    "testChangesSha256": "3f285aab97c6e61c81e96c46b61b7535ac1880e85acdbc49307babd18ca1dd52",
+    "reason": "Repair demonstrated enlarged-phone overflow in changed bulk FAQ and Settings copy using equivalent breakable task-status, sync and Undo wording. Reconcile released walk PR101 additively while preserving its exact geometry, FAQ and regression contract. Bind exact bulk branch reconciliation with independently approved rollback PR103; preserve all bulk consumer/data tests and copy the upstream replacement unchanged. Reconciliation does not claim a new functional RED. Bind the scenery push comparison from9c26445 to bulk-reconciled bf746df; all imported main tests are unchanged upstream tests, with no new implementation or claim of new RED.",
+    "previousBehavior": "At Chrome 390px and 200% the missing/completed FAQ token painted 39px beyond its answer; Settings confirmation and uninterrupted exceeded the bullet content width.",
+    "intendedBehavior": "Actual Help and Settings consumers show equivalent short breakable wording while retaining pre-Save conflict, fresh peer, sync acknowledgement and recovery Undo limitations.",
+    "replacementTests": [
+      "RISK bulk task guidance: enlarged conflict answer uses breakable task status wording",
+      "RISK bulk task guidance: enlarged Settings note uses short sync and Undo wording"
+    ],
+    "preservedCoverage": [
+      "All existing bulk selection, field opt-in, validation, persistence, cloud conflict, deleted task, recovery and Undo tests remain intact.",
+      "Titles, ratings, task history, dependency handling, backup retention and synchronization algorithms are unchanged; only three displayed prose phrases and generated shell fingerprints change.",
+      "Existing scenery depth tests and walking rollback are preserved exactly; this record documents imported reviewed bulk tests for the previous pushed branch tip."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK bulk task guidance: enlarged' tests.js",
+      "failure": "Two observed failures before copy changes: Help output contained missing/completed; Settings output contained server confirmation and uninterrupted. Real Chrome diagnostics retained all34 images and failed133>113 in FAQ and85>73 in Settings; logs /tmp/chain-bulk-faq-overflow-red.log and /tmp/chain-bulk-faq-render-error.log."
+    }
+  },
+  {
+    "testChangesSha256": "fb81f29e727f575ab6e367768faaa55820adac4c0f5969b9c3334d04d2b1f841",
+    "reason": "Observed actual paint consumers violate physical ground depth and omit flying nest visitors from reflection capture; retain all prior feature contracts.",
+    "previousBehavior": "Fountain painted after every ground body; visiting birds painted only after the lake mirror was captured.",
+    "intendedBehavior": "Fountain sorts at its basin contact; nest bird ink is partitioned with complementary pixel clips at the snapped reflection source boundary, preserving crossing wings and meadow occlusion.",
+    "replacementTests": [
+      "RISK scenery depth: fountain participates in actual ground actor paint order",
+      "RISK scenery depth: nest bird sky and meadow passes paint each silhouette once"
+    ],
+    "preservedCoverage": [
+      "Existing sailboats, water depth/scale, reflection masks, tree occlusion, weather tint and motion choices remain intact; no saved board or event-frequency changes.",
+      "Additively reconciled reviewed walking rollback c9b574f; geometry, immutable prior-rig test, original FAQ copy and rollback rationale retained. Frozen f3 full1504pass0fail33optional skips; integrated focused checks recorded separately.",
+      "Additive reconciliation with reviewed bulk editing main43824ceb: all its tests, current rationale records and prior FAQ dt/dd preserved. Scenery renderer unchanged from fully testedf3/9c; inherited walking geometry unchanged."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK scenery depth' tests.js",
+      "failure": "Contemporaneous fountain RED showed farther,closer,fountain instead of farther,fountain,closer (/tmp/chain-sailboat-depth-red.log). Before bird implementation, nest pass RED: meadow pass cannot duplicate flight silhouettes above reflection capture (/tmp/chain-bird-depth-red.log). Focused GREEN has 11 passing cases (/tmp/chain-depth-focused.log). Full local run exposed a legacy isolated bird-block ReferenceError and overlong FAQ answer; preserved all legacy assertions, retained standalone full-visit painter mode, explicitly partitioned the real scene consumers, and moved added copy into its own FAQ answer. Affected cases GREEN /tmp/chain-depth-regression-repair-green.log; original full result /tmp/chain-depth-full.log is not a pass. Independent source review withdrew center-based partition approval: actual wing/body boundary regression observed RED (ground 0 versus 6 shapes) before complementary clips, /tmp/chain-depth-boundary-red.log. Corrected clips and unchanged dense departure regression pass /tmp/chain-depth-boundary-green.log (2 pass, zero skips). Frozen prior candidate full suite:1504 pass,0 fail,33 optional runtime skips; not rendered verification."
+    }
+  },
+  {
     "testChangesSha256": "f4a4c574d3b15d7f4d9838e691db7b7d8bc05e85254e0a915adfc2e39c1eb098",
     "reason": "Repair demonstrated enlarged-phone overflow in changed bulk FAQ and Settings copy using equivalent breakable task-status, sync and Undo wording. Reconcile released walk PR101 additively while preserving its exact geometry, FAQ and regression contract. Bind exact bulk branch reconciliation with independently approved rollback PR103; preserve all bulk consumer/data tests and copy the upstream replacement unchanged. Reconciliation does not claim a new functional RED.",
     "previousBehavior": "At Chrome 390px and 200% the missing/completed FAQ token painted 39px beyond its answer; Settings confirmation and uninterrupted exceeded the bullet content width.",

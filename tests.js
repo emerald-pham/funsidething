@@ -24817,3 +24817,61 @@ test('RISK bulk task guidance: enlarged Settings note uses short sync and Undo w
  assert.match(note,/One Undo reverses a batch with no recovery/,'observed phone 200% uninterrupted exceeds narrow Settings bullet');
  assert.doesNotMatch(note,/confirmation|uninterrupted/);assert.match(note,/later sync conflicts keep newer peer fields/);assert.match(note,/after recovery, Undo restores an earlier board and may leave batch values in place/);
 });
+
+test('RISK scenery depth: fountain participates in actual ground actor paint order',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ const block=source.slice(source.indexOf("    composite('middle');"),source.indexOf("    composite('front');"));
+ for(const night of [0,1])for(const sceneSeason of ['summer','winter'])for(const W of [390,768,850,1440]){
+  const painted=[],events=[{type:'walker',id:'closer',depth:128},{type:'walker',id:'farther',depth:120}];
+  const g=new Proxy({},{get:()=>()=>{},set:()=>true});
+  vm.runInNewContext(block,{g,W,H:900,t:0,visitSeed:.8,sceneSeason,paintEvents:events,airborne:new Set(),geometry:{eventDepth:e=>e.depth},p:{night,city:'#334455',sky:['#aabbcc','#bbccdd','#ccddee']},S:{mixHex:x=>x},trail:()=>100,composite(){},paintGroundEventShadow(){},paintEvent:e=>painted.push(e.id),paintIceCreamStand(){},ellipse:(g,x,y,rx)=>{if(rx===11)painted.push('fountain');},wind:1});
+  assert.deepEqual(painted,W>850?['farther','fountain','closer']:['farther','closer'],'the fountain cannot overpaint a nearer person or sit in front of everyone');
+ }
+});
+
+
+test('RISK scenery depth: nest bird sky and meadow passes paint each silhouette once',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ const code=source.slice(source.indexOf('  function paintEvent('),source.indexOf('  function paintGuest('));
+ const birdCode=source.slice(source.indexOf('  function bird('),source.indexOf('  function cyclist('));
+ const ellipseCode=source.match(/^  function ellipse[^\n]+/m)[0];
+ const lineCode=source.match(/^  function line[^\n]+/m)[0];
+ const context=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),context);
+ for(const [W,H] of [[390,844],[768,1024],[1440,900],[844,390]])for(const dpr of [1,1.5]){
+  const geo=context.LandscapeGeometry.create(W,H),boundary=Math.floor(geo.waterTop*dpr)/dpr;
+  for(const offset of [-.25,0,.25])for(const perched of [false,true]){
+   const event={type:'bird',age:10,duration:28,lane:.3,seed:.7,reverse:false};
+   const geometry={...geo,nestVisit:(f,l,r,perch,index)=>({x:W*.5+index*8,y:boundary+offset,perched,twig:!perched})};
+   function paint(pass){
+    const ops=[],stack=[];let points=[],cursor=[0,0],pendingClip=null;
+    const g={globalAlpha:1,lineWidth:1,lineCap:'butt',clipBounds:null,
+     save(){stack.push({globalAlpha:this.globalAlpha,lineWidth:this.lineWidth,lineCap:this.lineCap,clipBounds:this.clipBounds});},restore(){assert.ok(stack.length,'paint state must remain balanced');Object.assign(this,stack.pop());},
+     beginPath(){points=[];pendingClip=null;},moveTo(x,y){cursor=[x,y];points.push(cursor);},lineTo(x,y){cursor=[x,y];points.push(cursor);},
+     quadraticCurveTo(cx,cy,x,y){const [ax,ay]=cursor;for(let i=1;i<=16;i++){const f=i/16;points.push([(1-f)**2*ax+2*(1-f)*f*cx+f*f*x,(1-f)**2*ay+2*(1-f)*f*cy+f*f*y]);}cursor=[x,y];},
+     ellipse(x,y,rx,ry){for(let i=0;i<=32;i++){const angle=i/32*Math.PI*2;points.push([x+Math.cos(angle)*rx,y+Math.sin(angle)*ry]);}},fill(){ops.push({points:[...points],width:0,clip:this.clipBounds});},
+     rect(x,y,w,h){pendingClip={top:y,bottom:y+h};},clip(){this.clipBounds=pendingClip;},stroke(){ops.push({points:[...points],width:this.lineWidth,clip:this.clipBounds});},
+    };
+    const vars={g,p:{night:0,sky:['#ffffff']},TAU:Math.PI*2,geometry,LandscapeRiders:{types:[]},LandscapeAppearance:{birdColor:()=> '#334455'},sky:{sun:{altitude:0}},hy:geo.horizon,W,H,dpr,S:{smooth:()=>1},event,pass};
+    vm.runInNewContext(ellipseCode+'\n'+lineCode+'\n'+birdCode+'\n'+code+';paintEvent(event,0,pass);',vars);
+    assert.equal(stack.length,0);assert.equal(g.globalAlpha,1);assert.equal(g.clipBounds,null,'clip cannot leak into later boats or ground actors');
+    return ops;
+   }
+   const all=paint('all'),sky=paint('sky'),ground=paint('ground');
+   assert.equal(sky.length,all.length,'above-crop ink cannot be omitted when its body center crosses the crop');
+   assert.equal(ground.length,all.length,'near-tree ink keeps the same complete source shapes under its complementary clip');
+   for(let i=0;i<all.length;i++){
+    assert.deepEqual(sky[i].points,all[i].points);assert.deepEqual(ground[i].points,all[i].points);
+    assert.deepEqual(sky[i].clip,{top:0,bottom:boundary});assert.deepEqual(ground[i].clip,{top:boundary,bottom:H});
+    for(const [,y]of all[i].points){
+     const top=y-all[i].width/2,bottom=y+all[i].width/2;
+     const span=(clip)=>Math.max(0,Math.min(bottom,clip.bottom)-Math.max(top,clip.top));
+     assert.ok(Math.abs(span(sky[i].clip)+span(ground[i].clip)-(bottom-top))<1e-7,'the stroke/body extent has complete exactly-once vertical coverage at the pixel-aligned split');
+    }
+   }
+   assert.ok(all.some(op=>op.points.some(([,y])=>y-op.width/2<boundary)),'the boundary fixture contains actual bird ink above the source crop');
+  }
+ }
+ const life=source.slice(source.indexOf('  function paintLife('),source.indexOf('  function paintWeatherOn('));
+ assert.ok(life.indexOf("paintEvent(e,t,'sky')")>=0&&life.indexOf("paintEvent(e,t,'sky')")<life.indexOf('reflectionContext.drawImage(front'),'actual sky consumer captures flying nest bird ink in the lake mirror');
+ assert.match(life,/paintGroundEventShadow\(e,depth\);paintEvent\(e,t,'ground'\)/,'actual ground consumer uses the complementary pixel mask');
+});

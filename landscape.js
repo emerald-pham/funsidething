@@ -737,6 +737,9 @@
     // the horizon. New visitors and weather can enter the lake without a
     // separate reflection rule for each type.
     for(const e of paintEvents)if(airborne.has(e.type)&&!waterEvents.has(e.type))paintEvent(e,t);
+    // Flying nest visitors share the sky mirror; near-tree birds keep the
+    // meadow pass so the cached shore and foliage retain their occlusion.
+    for(const e of paintEvents)if(e.type==='bird')paintEvent(e,t,'sky');
     paintRooftopParty();
     paintClocktowerVisit();
     const reflectionHeight=Math.max(1,Math.floor(geometry.waterTop*dpr));
@@ -822,15 +825,16 @@
     // Ground contact determines occlusion, including props previously baked into the hill.
     const groundPass=paintEvents.filter(e=>!airborne.has(e.type)&&e.type!=='metro'&&e.type!=='train'&&e.type!=='snowangel').map(e=>{
       const depth=globalThis.LandscapeWinter?.types.includes(e.type)?LandscapeWinter.pose(e.type,e,geometry,W,H).y:geometry.eventDepth(e);
-      return {depth,draw:()=>{paintGroundEventShadow(e,depth);paintEvent(e,t);}};
+      return {depth,draw:()=>{paintGroundEventShadow(e,depth);paintEvent(e,t,'ground');}};
     });
     if(sceneSeason!=='winter'&&W>650&&visitSeed>.25)groundPass.push({depth:trail(W*.43)+15,draw:paintIceCreamStand});
-    for(const item of groundPass.sort((a,b)=>a.depth-b.depth))item.draw();
-    if(W>850&&visitSeed>.45){
+    // The basin must cover farther visitors while nearer bodies cover it.
+    if(W>850&&visitSeed>.45)groundPass.push({depth:trail(W*.54)+24,draw:()=>{
       const fx=W*.54,fy=trail(fx)+24;
       ellipse(g,fx,fy,11,3,S.mixHex(p.city,'#e8e4d1',.6));ellipse(g,fx,fy-1,8,2,p.sky[1]);
       if(sceneSeason!=='winter')for(let i=-1;i<=1;i++){g.beginPath();g.moveTo(fx,fy);g.quadraticCurveTo(fx+i*7,fy-20+Math.sin(t*wind)*2,fx+i*7,fy-1);g.strokeStyle=S.mixHex(p.sky[1],'#ffffff',.6);g.lineWidth=1;g.stroke();}
-    }
+    }});
+    for(const item of groundPass.sort((a,b)=>a.depth-b.depth))item.draw();
     composite('front');
     composite('trees-ground');
     for(const e of paintEvents)if(e.type==='snowangel')paintEvent(e,t);
@@ -1026,7 +1030,7 @@
     for(let i=0;i<4;i++){g.fillStyle=i%2?'#fff0d6':color(visitSeed,2);g.fillRect(ax-11+i*5.5,ay-16,5.5,5);}
     ellipse(g,ax,ay-7,2,2,'#fff0d6');g.fillStyle='#c39877';g.fillRect(ax-1,ay-5,2,3);
   }
-  function paintEvent(e,t){
+  function paintEvent(e,t,birdPass='all'){
       if(LandscapeRiders.types.includes(e.type)){
         LandscapeRiders.paint(g,geometry,W,e,t,p,{ellipse,line,color,skinColor,personHead});return;
       }
@@ -1053,10 +1057,18 @@
         const vertical=typeof fy==='number'?fy:f,flightClock=typeof clock==='number'?clock:t;
         // Finish the visit with a takeoff and an offscreen exit, so expiring the
         // event cannot make a perched bird abruptly disappear from its nest.
+        // Split ink at the exact source-capture edge, including crossing wings.
+        const partitioned=typeof birdPass==='string'&&(birdPass==='sky'||birdPass==='ground');
+        if(partitioned){
+          const boundary=Math.floor(geometry.waterTop*dpr)/dpr;
+          g.save();g.beginPath();
+          g.rect(0,birdPass==='sky'?0:boundary,W,birdPass==='sky'?boundary:Math.max(0,H-boundary));g.clip();
+        }
         for(let i=0;i<(e.seed>.4?2:1);i++){
           const pose=geometry.nestVisit(f,e.lane,e.reverse,nest.perches[i],i,vertical);
           bird(pose.x,pose.y,i?3:3.5,flightClock+i*.6,pose.perched,pose.twig,(e.seed+i*.173)%1,S.smooth(hy*.4,nest.y,pose.y));
         }
+        if(partitioned)g.restore();
         return;
       }
       if(e.type==='plane'){
