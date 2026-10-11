@@ -24030,7 +24030,7 @@ test('RISK Quick start content: essential steps stay brief and detailed help rem
 
 test('RISK Quick start chapters: mounted help uses native named disclosures with essential chapter first and detailed chapters closed',async()=>{
  const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
- const chapters=[...help.matchAll(/<details class="help-faq"([^>]*)><summary>(.*?)<\/summary>/g)];assert.deepEqual(chapters.map(x=>x[2].replace(/<[^>]+>/g,'')),['Quick start','Scene and appearance','Scanning and recurrence','Contexts','Data and backups','Changelog']);assert.match(chapters[0][1],/\bopen\b/);for(const c of chapters.slice(1))assert.doesNotMatch(c[1],/\bopen\b/);assert.equal((help.match(/<details/g)||[]).length,(help.match(/<\/details>/g)||[]).length);assert.doesNotMatch(help,/<summary>More FAQs<\/summary>/);
+ const chapters=[...help.matchAll(/<details class="help-faq"([^>]*)><summary>(.*?)<\/summary>/g)];assert.deepEqual(chapters.map(x=>x[2].replace(/<[^>]+>/g,'')),['Quick start','Scene and appearance','Scanning and recurrence','Task history','Contexts','Data and backups','Changelog']);assert.match(chapters[0][1],/\bopen\b/);for(const c of chapters.slice(1))assert.doesNotMatch(c[1],/\bopen\b/);assert.equal((help.match(/<details/g)||[]).length,(help.match(/<\/details>/g)||[]).length);assert.doesNotMatch(help,/<summary>More FAQs<\/summary>/);
 });
 
 test('RISK Quick start chapter layout: disclosure headings share the native summary line without extra margins',()=>{

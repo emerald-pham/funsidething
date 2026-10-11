@@ -1,7 +1,7 @@
 [
   {
-    "testChangesSha256": "96a217ba26961995175575a5ec5683d86f3acdc94c7f9c91b2c76552cd66c8f7",
-    "reason": "User requests substantially compact history and explanatory prose moved to a named FAQ chapter. Existing explanatory assertion relocates to FAQ; browser selector now targets outer disclosure because native record disclosures introduce nested summaries. Ranking audit confirms initiating action is shared by both participants, with no saved roles; comparison labels remove misleading direct-action implication.",
+    "testChangesSha256": "72ddf7412f77b306639cce19e78cc89f0929bef94f24684c905174c971d9552c",
+    "reason": "User requests substantially compact history and explanatory prose moved to a named FAQ chapter. Existing explanatory assertion relocates to FAQ; browser selector now targets outer disclosure because native record disclosures introduce nested summaries. Ranking audit confirms initiating action is shared by both participants, with no saved roles; comparison labels remove misleading direct-action implication. Required CI found the prior mounted chapter-list assertion omitted the newly requested Task history chapter; retain its order, native disclosures and closed-state checks.",
     "previousBehavior": "Every visible observation occupied three metric rows, with explanatory paragraphs before and after history.",
     "intendedBehavior": "Task history shows compact native event disclosures, actual MM/DD/YYYY dates, and recorded percentage / score / uncertainty, retaining prior values and exact local times on expansion; explanatory prose lives in a named collapsible FAQ chapter. Done summaries retain just their action and date, with all recorded metrics still available on expansion. Yes/No comparison names retain action provenance without inferring opponent/role; FAQ documents this limit.",
     "replacementTests": [
@@ -10,11 +10,12 @@
       "RISK task history: comparison labels preserve initiating action without inventing historical participant roles"
     ],
     "preservedCoverage": [
-      "All original timestamp, metric, pagination, focus, malformed data, retention, restore, reload, Undo and synchronization contracts remain. No rating or persistence code changed."
+      "All original timestamp, metric, pagination, focus, malformed data, retention, restore, reload, Undo and synchronization contracts remain. No rating or persistence code changed.",
+      "Mounted Quick start chapter assertion now includes Task history in its exact order; all native disclosure, first-open and remaining-closed assertions retained: RISK Quick start chapters: mounted help uses native named disclosures with essential chapter first and detailed chapters closed"
     ],
     "redEvidence": {
       "command": "node --test --test-name-pattern='compact record disclosures' tests.js; node --test --test-name-pattern='Done stays a plain' tests.js; node --test --test-name-pattern='comparison labels preserve' tests.js",
-      "failure": "Observed before functional implementation: each record starts compact with native keyboard disclosure assertion failed; original history produced a bold heading and fully expanded metric rows. Output retained in /tmp/compact-history-red.log. Browser selector edit is compatibility maintenance, not separately claimed browser RED. Latest Task history/date/metric request also observed RED before its implementation, retained in /tmp/compact-history-task-log-red.log. Plain Done request observed RED before its edit: summary contained rating-change/Score/Uncertainty; /tmp/compact-history-plain-done-red.log. Observed label-clarity RED before edit: missing No comparison label on both participants, /tmp/compact-history-comparison-label-red.log."
+      "failure": "Observed before functional implementation: each record starts compact with native keyboard disclosure assertion failed; original history produced a bold heading and fully expanded metric rows. Output retained in /tmp/compact-history-red.log. Browser selector edit is compatibility maintenance, not separately claimed browser RED. Latest Task history/date/metric request also observed RED before its implementation, retained in /tmp/compact-history-task-log-red.log. Plain Done request observed RED before its edit: summary contained rating-change/Score/Uncertainty; /tmp/compact-history-plain-done-red.log. Observed label-clarity RED before edit: missing No comparison label on both participants, /tmp/compact-history-comparison-label-red.log. Required CI38132953442 failed only the stale expected chapter list; focused reproduction /tmp/compact-history-chapter-red.log observed the same Task history addition before correcting the expectation. No executable app code changed for this repair."
     }
   },
   {
