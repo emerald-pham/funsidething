@@ -496,16 +496,7 @@
             const t=Math.max(0,Math.min(1,(p-from)/(to-from)));
             rise=.55*16*t*t*(1-t)*(1-t)*Math.min(...steps.map(step=>step.carrier));
           }
-          // A reach corridor alone raises the hips immediately after contact.
-          // Briefly load the planted leg after each landing, then recover;
-          // this small down pose stays inside the same terrain/reach bounds.
-          const stepPhase=((p%.5)+.5)%.5,loading=(stepPhase-.1)/.14;
-          const runBlend=clamp((route.strideAt(d)/route.walkStrideAt(d)-1)/.15);
-          const walking=1-runBlend*runBlend*(3-2*runBlend);
-          // Terrain already supplies loading through its contact corridor;
-          // fade the extra dip on hills and into the existing running stride.
-          const down=Math.abs(loading)<1?.55*walking*Math.max(0,1-grade/.2)*(1-loading*loading)**2:0;
-          return {distance:d,lo,hi,target:6.25+rise-down};
+          return {distance:d,lo,hi,target:6.25+rise};
         });
         const rate=.7;
         for(let i=1;i<samples.length;i++){

@@ -1,5 +1,23 @@
 [
   {
+    "testChangesSha256": "742a2ef6743df83f24b33f5961c9ac420e688bda8de8e65f2bb26bd58fe3be1b",
+    "reason": "Restore the prior released terrain-driven walking silhouette after reopened rendered review found that the unshipped loading dip prolongs knee compression. Replace the extra-down requirement, which encoded the rejected aesthetic choice, with exact released-pose and preserved planting coverage.",
+    "previousBehavior": "PR101 added a .55 post-contact pelvis target dip. It passed physical contact tests but prolonged bent-knee support in reviewed flat walker, dogwalker and reader frames; its Pages deployment was cancelled before publication.",
+    "intendedBehavior": "The human rig matches immutable released c1d3b18 poses and constrained carrying grips again, retaining slower PR92 travel, deterministic seeds, terrain reach limits, reduced motion and complete offscreen exits.",
+    "replacementTests": [
+      "RISK walking rollback: terrain-driven loading preserves the prior upright silhouette and planted contacts"
+    ],
+    "preservedCoverage": [
+      "Both directions, three actor scales, free/half/full carrying grips, both leg contacts and sequential loading/recovery phases compare to the actual immutable released rig.",
+      "Existing fixed limb lengths, upright knee duty, terrain/contact transfer gradients, cadence, dog lead, source seed/lifetime, exit, reduced-motion and data/sync tests remain unchanged.",
+      "Original loading RED/review records remain retained as historical evidence; the invalid requirement to descend below touchdown is explicitly replaced rather than hidden."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK walking rollback:' tests.js",
+      "failure": "Observed contemporaneous pre-restoration failure: AssertionError do not prolong knee compression with an added pelvis dip, tests.js:354. /tmp/chain-walk-rollback-red.log retains output. Reopened actual frame review and prior public identity are separately retained; no new runtime or baseline live diagnosis is claimed."
+    }
+  },
+  {
     "testChangesSha256": "6bfbab8080708066342c327fe5ebb2aaa2e3711c68e1c37e5f8f3f4257901ebd",
     "reason": "Bind the actual incremental push comparison after additive reconciliation with separately reviewed motion PR99 and history PR100. Their upstream regression and rationale records are preserved; no new gait behavior beyond the original loading fix.",
     "previousBehavior": "Reach-only hip target rises after touchdown, without a down pose.",
