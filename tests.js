@@ -758,6 +758,13 @@ test('RISK task rating history: compact record disclosures retain dates and metr
  assert.equal(JSON.stringify(b.ratingHistory),original,'rendering and FAQ navigation retain every historical fact');
  b.ratingHistory=[{...b.ratingHistory[0],kind:'dislodge'}];ctx.openEdit(b.id);assert.match(shim.document.getElementById('modalRoot').innerHTML,/Dislodged/);
 });
+test('RISK task history: comparison labels preserve initiating action without inventing historical participant roles',async()=>{
+ const {ctx,shim,a,b}=await ratingHistoryFixture(633);ctx.decide('no');
+ const before=JSON.stringify([a.ratingHistory,b.ratingHistory]);
+ for(const task of [a,b]){const view=ctx.taskRatingHistoryHTML(task);assert.match(view,/<b>No comparison<\/b>/);assert.doesNotMatch(view,/<b>No<\/b>|opponent|incumbent won/);}
+ assert.equal(JSON.stringify([a.ratingHistory,b.ratingHistory]),before,'comparison rendering preserves recorded facts');ctx.state.candidateId=b.id;ctx.decide('yes');assert.match(ctx.taskRatingHistoryHTML(a),/<b>Yes comparison<\/b>/);assert.match(ctx.taskRatingHistoryHTML(b),/<b>Yes comparison<\/b>/);
+ const recorded=JSON.stringify([a.ratingHistory,b.ratingHistory]);ctx.taskRatingHistoryHTML(a);ctx.taskRatingHistoryHTML(b);assert.equal(JSON.stringify([a.ratingHistory,b.ratingHistory]),recorded);ctx.openHelp();assert.match(shim.document.getElementById('modalRoot').innerHTML,/Either participant may change/);
+});
 test('RISK task history: Done stays a plain dated event while recorded metrics and missing prior values remain expandable',async()=>{
  const {ctx,b}=await ratingHistoryFixture(632);ctx.decide('yes');ctx.doneTask(b.id);
  const original=JSON.stringify(b.ratingHistory),view=ctx.taskRatingHistoryHTML(b);

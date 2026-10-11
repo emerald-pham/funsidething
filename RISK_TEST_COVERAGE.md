@@ -892,3 +892,5 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK task rating history: compact record disclosures retain dates and metrics with explanations in the FAQ
 
 - RISK task history: Done stays a plain dated event while recorded metrics and missing prior values remain expandable
+
+- RISK task history: comparison labels preserve initiating action without inventing historical participant roles
