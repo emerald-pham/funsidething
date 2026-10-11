@@ -892,7 +892,7 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK pedestrian departure pace: carrying and winter people leave at a walking pace without a lifetime sprint
 - RISK pedestrian scheduled lifetime: accepted walkers retain admission duration and survive until a full viewport exit
 - RISK pedestrian companion pace: walking deer and woodland paws halve translation and distance together while hopping stays unchanged
-- RISK pedestrian visual tail preservation: longer paint lifetimes never reroll released admission or nonwalking effects
+- RISK pedestrian visual tail preservation: capacity skips only seeded opportunities while retaining their facts and independent scenery
 - RISK pedestrian complete parties: scheduled walking routes clear both edges at bounded pace and paint without terminal fade
 - RISK pedestrian reduced motion: static production poses keep walkers on screen and winter activities settled
 
@@ -951,7 +951,7 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 
 - RISK terrain walking cadence: steep production routes slow travel with reachable contacts across human variants
 - RISK terrain walking approach: actual carrying arrivals preserve planted contacts on their full offscreen route
-- RISK terrain walking guidance: extended FAQ explains terrain pacing without changing arrival chances or saved tasks
+- RISK terrain walking guidance: extended FAQ explains terrain pacing capacity and saved-task preservation
 
 - RISK terrain walking planner budget: flat canonical routes retain bounded analytic clock work
 
@@ -969,8 +969,15 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - `RISK pedestrian skate entry: wide-frame riders do not fade while already visible`
 - `RISK pedestrian entry contacts: actual carrying pose stays continuous across offscreen approach and settling boundaries`
 - `RISK pedestrian entry guidance: FAQ distinguishes offscreen ongoing entries from current-scene reconstruction`
-- `RISK pedestrian entry reconstruction: reload resize and seek retain seeded admission without an invented startup delay`
+- `RISK pedestrian entry reconstruction: reload resize and seek retain selected visits without an invented startup delay`
 - `RISK pedestrian ski transition: actual painted head moves continuously from carrying approach into the downhill pose`
 - `RISK pedestrian builder transition: painted working hands settle continuously after walking arrival`
 - `RISK pedestrian ski carry: approach skis intersect the actual carrying hand`
 - `RISK pedestrian ski tracks: approach transition introduces track ink continuously without a full-length pop`
+
+- `RISK pedestrian entry capacity: complete visitors retain the fourteen actor bound without eviction or seek-dependent admission`
+- `RISK pedestrian capacity planner budget: cached daily scheduling evaluates each immutable proposal lifetime once`
+- `RISK pedestrian capacity guidance: FAQ explains skipped crowded opportunities without changing underway visitors or saved tasks`
+
+- `RISK pedestrian capacity liveness: a busy day admits visitors while retaining the complete-life bound`
+- `RISK pedestrian capacity day boundary: admitted visits finish within their shared day while short late visitors remain possible`
