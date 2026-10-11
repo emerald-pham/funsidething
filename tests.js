@@ -14206,8 +14206,16 @@ test('Animation audit: tab resume preserves visitors and their progress',()=>{
  let listener,stops=0,starts=0;
  const world={elapsed:42,next:50,lastRare:12,events:[{type:'walker',age:8,duration:60}]};
  const before=JSON.stringify(world),document={hidden:true,addEventListener(type,fn){listener=fn;}};
- vm.runInNewContext(handler,{document,world,S:{createWorld:()=>({events:[],next:3})},stop(){stops++;},start(){starts++;}});
+ // Foreground now rereads the independent safety preference before restarting
+ // paint. Supply that consumer's dependencies while retaining the visitor proof.
+ const storage={},context={document,world,storage,preference:null,dialog:{open:false},
+  S:{createWorld:()=>({events:[],next:3}),readMotion(value){assert.equal(value,storage);return 'reduced';}},
+  stop(){stops++;},start(){starts++;},openMotion(){throw Error('valid remembered choice must not prompt');}};
+ // The real handler calls updateMotion as a plain function, like the renderer.
+ context.updateMotion=()=>context.start();
+ vm.runInNewContext(handler,context);
  listener();document.hidden=false;listener();
+ assert.equal(context.preference,'reduced','resume consumes the remembered local safety choice');
  assert.equal(stops,1);assert.equal(starts,1);
  assert.equal(JSON.stringify(world),before,'returning must not teleport or replace active visitors');
 });

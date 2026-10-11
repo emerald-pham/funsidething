@@ -1,5 +1,23 @@
 [
   {
+    "testChangesSha256": "70782fef1a22d4d9b7bedd55c2f9b95b19354a855b8b187d36e1110d612a4040",
+    "reason": "Complete initial seven-day motion and accessibility coverage, and repair the existing tab-resume isolated fixture after required CI exposed its missing new preference-consumer dependencies. All original visitor immutability and stop/start assertions remain.",
+    "previousBehavior": "Motion consent never expired, dismissal persisted reduced, and enlarged cards clipped. Old tab-resume fixture stubbed only start/stop and could not execute the new preference reread.",
+    "intendedBehavior": "Explicit local choice expires168h, safe dismissal/OS rules remain; prompt fits/stacks. Tab-resume fixture supplies storage/readMotion/updateMotion/dialog while still requiring exact world preservation and one restart; adds the selected-preference assertion.",
+    "replacementTests": [
+      "RISK motion safety: explicit local choices expire after seven elapsed days and corrupt records fail closed",
+      "RISK motion safety: actual choice handler remembers selection while dismissal never writes consent",
+      "RISK motion safety accessibility: enlarged prompt fits the containing viewport and stacks intrinsic choice cards"
+    ],
+    "preservedCoverage": [
+      "Unchanged world elapsed/event progress and stop/start counts; existing FAQsync/offline wording and130word cap assertions unchanged; cloud/board/WOOP/OS safety contracts retained."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK scene and list FAQ|Animation audit: tab resume|RISK product FAQ: backup age|RISK visitor motion guidance|RISK Quick start content:' tests.js",
+      "failure": "Five contemporaneous failures reproduced /tmp/motion-seven-days-ci-repro-red.log from requiredCI38148530292: fourFAQcopy contracts/132word scenery answer, and storage undefined in isolated actual resume handler. Repaired wording/fixture only, all11focused checksGREEN /tmp/motion-seven-days-ci-repair-green.log. Initial motion/CSS REDs retained in preceding rationale records."
+    }
+  },
+  {
     "testChangesSha256": "cab77329a8171ae3ecf899cc225fc708173b59ae56be76374d9d132f0f7aeec7",
     "reason": "Preserve the requested seven-day local explicit motion choice and repair observed release-blocking enlarged-prompt clipping found during mandatory independent rendered review.",
     "previousBehavior": "Untimed choices persisted indefinitely and Escape saved reduced. Native prompt at390px200% clipped Reduced card and exceeded viewport in baseline and candidate.",
