@@ -24732,7 +24732,7 @@ test('RISK scenery depth: nest bird sky and meadow passes paint each silhouette 
    vm.runInNewContext(code+";paintEvent(event,0,'sky');",vars);
    assert.ok(records.every(q=>q.y<geo.waterTop),'sky pass must not lift perched/near-tree birds over foreground terrain');
    const skyCount=records.length;records.length=0;
-   vm.runInNewContext(code+";paintEvent(event,0);",vars);
+   vm.runInNewContext(code+";paintEvent(event,0,'ground');",vars);
    assert.ok(records.every(q=>q.y>=geo.waterTop),'meadow pass cannot duplicate flight silhouettes above the reflection capture');
    assert.equal(records.length+skyCount,2,'each companion is painted exactly once across the two passes');
   }

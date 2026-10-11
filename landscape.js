@@ -825,7 +825,7 @@
     // Ground contact determines occlusion, including props previously baked into the hill.
     const groundPass=paintEvents.filter(e=>!airborne.has(e.type)&&e.type!=='metro'&&e.type!=='train'&&e.type!=='snowangel').map(e=>{
       const depth=globalThis.LandscapeWinter?.types.includes(e.type)?LandscapeWinter.pose(e.type,e,geometry,W,H).y:geometry.eventDepth(e);
-      return {depth,draw:()=>{paintGroundEventShadow(e,depth);paintEvent(e,t);}};
+      return {depth,draw:()=>{paintGroundEventShadow(e,depth);paintEvent(e,t,'ground');}};
     });
     if(sceneSeason!=='winter'&&W>650&&visitSeed>.25)groundPass.push({depth:trail(W*.43)+15,draw:paintIceCreamStand});
     // The basin must cover farther visitors while nearer bodies cover it.
@@ -1030,7 +1030,7 @@
     for(let i=0;i<4;i++){g.fillStyle=i%2?'#fff0d6':color(visitSeed,2);g.fillRect(ax-11+i*5.5,ay-16,5.5,5);}
     ellipse(g,ax,ay-7,2,2,'#fff0d6');g.fillStyle='#c39877';g.fillRect(ax-1,ay-5,2,3);
   }
-  function paintEvent(e,t,birdPass='ground'){
+  function paintEvent(e,t,birdPass='all'){
       if(LandscapeRiders.types.includes(e.type)){
         LandscapeRiders.paint(g,geometry,W,e,t,p,{ellipse,line,color,skinColor,personHead});return;
       }
@@ -1059,7 +1059,9 @@
         // event cannot make a perched bird abruptly disappear from its nest.
         for(let i=0;i<(e.seed>.4?2:1);i++){
           const pose=geometry.nestVisit(f,e.lane,e.reverse,nest.perches[i],i,vertical);
-          if((pose.y<geometry.waterTop)!==(birdPass==='sky'))continue;
+          // Standalone shape consumers retain the full visit; the scene partitions
+          // these same poses into mutually exclusive sky and meadow passes.
+          if(typeof birdPass==='string'&&birdPass!=='all'&&(pose.y<geometry.waterTop)!==(birdPass==='sky'))continue;
           bird(pose.x,pose.y,i?3:3.5,flightClock+i*.6,pose.perched,pose.twig,(e.seed+i*.173)%1,S.smooth(hy*.4,nest.y,pose.y));
         }
         return;

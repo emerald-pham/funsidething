@@ -1,6 +1,6 @@
 [
   {
-    "testChangesSha256": "c260616ab7f763222d081103aad26b19a3aa2076a8320dd222572ebd118e1a69",
+    "testChangesSha256": "106430b4d9071246d9c8ae97d24e95a8dd594e36bab10a74f7fa957c20f49c35",
     "reason": "Observed actual paint consumers violate physical ground depth and omit flying nest visitors from reflection capture; retain all prior feature contracts.",
     "previousBehavior": "Fountain painted after every ground body; visiting birds painted only after the lake mirror was captured.",
     "intendedBehavior": "Fountain sorts at its basin contact; above-waterline nest birds paint once before mirror capture and near-tree birds retain meadow occlusion.",
@@ -13,7 +13,7 @@
     ],
     "redEvidence": {
       "command": "node --test --test-name-pattern='RISK scenery depth' tests.js",
-      "failure": "Contemporaneous fountain RED showed farther,closer,fountain instead of farther,fountain,closer (/tmp/chain-sailboat-depth-red.log). Before bird implementation, nest pass RED: meadow pass cannot duplicate flight silhouettes above reflection capture (/tmp/chain-bird-depth-red.log). Focused GREEN has 11 passing cases (/tmp/chain-depth-focused.log)."
+      "failure": "Contemporaneous fountain RED showed farther,closer,fountain instead of farther,fountain,closer (/tmp/chain-sailboat-depth-red.log). Before bird implementation, nest pass RED: meadow pass cannot duplicate flight silhouettes above reflection capture (/tmp/chain-bird-depth-red.log). Focused GREEN has 11 passing cases (/tmp/chain-depth-focused.log). Full local run exposed a legacy isolated bird-block ReferenceError and overlong FAQ answer; preserved all legacy assertions, retained standalone full-visit painter mode, explicitly partitioned the real scene consumers, and moved added copy into its own FAQ answer. Affected cases GREEN /tmp/chain-depth-regression-repair-green.log; original full result /tmp/chain-depth-full.log is not a pass."
     }
   },
   {
