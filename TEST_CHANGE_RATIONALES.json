@@ -1,5 +1,41 @@
 [
   {
+    "testChangesSha256": "0cb50289153bfc5bc0b7a1056440ec2eac0c1023f3728449f53011d6ea80da12",
+    "reason": "Repair demonstrated enlarged-phone overflow in changed bulk FAQ and Settings copy using equivalent breakable task-status, sync and Undo wording. Reconcile released walk PR101 additively while preserving its exact geometry, FAQ and regression contract.",
+    "previousBehavior": "At Chrome 390px and 200% the missing/completed FAQ token painted 39px beyond its answer; Settings confirmation and uninterrupted exceeded the bullet content width.",
+    "intendedBehavior": "Actual Help and Settings consumers show equivalent short breakable wording while retaining pre-Save conflict, fresh peer, sync acknowledgement and recovery Undo limitations.",
+    "replacementTests": [
+      "RISK bulk task guidance: enlarged conflict answer uses breakable task status wording",
+      "RISK bulk task guidance: enlarged Settings note uses short sync and Undo wording"
+    ],
+    "preservedCoverage": [
+      "All existing bulk selection, field opt-in, validation, persistence, cloud conflict, deleted task, recovery and Undo tests remain intact.",
+      "Titles, ratings, task history, dependency handling, backup retention and synchronization algorithms are unchanged; only three displayed prose phrases and generated shell fingerprints change."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK bulk task guidance: enlarged' tests.js",
+      "failure": "Two observed failures before copy changes: Help output contained missing/completed; Settings output contained server confirmation and uninterrupted. Real Chrome diagnostics retained all34 images and failed133>113 in FAQ and85>73 in Settings; logs /tmp/chain-bulk-faq-overflow-red.log and /tmp/chain-bulk-faq-render-error.log."
+    }
+  },
+  {
+    "testChangesSha256": "4a55d20ed8341b3f4d6112d9faf6471e606654bef3fd219f2c775df0ca2dec1e",
+    "reason": "Repair demonstrated enlarged-phone overflow in changed bulk FAQ and Settings copy using equivalent breakable task-status, sync and Undo wording. Reconcile released walk PR101 additively while preserving its exact geometry, FAQ and regression contract.",
+    "previousBehavior": "At Chrome 390px and 200% the missing/completed FAQ token painted 39px beyond its answer; Settings confirmation and uninterrupted exceeded the bullet content width.",
+    "intendedBehavior": "Actual Help and Settings consumers show equivalent short breakable wording while retaining pre-Save conflict, fresh peer, sync acknowledgement and recovery Undo limitations.",
+    "replacementTests": [
+      "RISK bulk task guidance: enlarged conflict answer uses breakable task status wording",
+      "RISK bulk task guidance: enlarged Settings note uses short sync and Undo wording"
+    ],
+    "preservedCoverage": [
+      "All existing bulk selection, field opt-in, validation, persistence, cloud conflict, deleted task, recovery and Undo tests remain intact.",
+      "Titles, ratings, task history, dependency handling, backup retention and synchronization algorithms are unchanged; only three displayed prose phrases and generated shell fingerprints change."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK bulk task guidance: enlarged' tests.js",
+      "failure": "Two observed failures before copy changes: Help output contained missing/completed; Settings output contained server confirmation and uninterrupted. Real Chrome diagnostics retained all34 images and failed133>113 in FAQ and85>73 in Settings; logs /tmp/chain-bulk-faq-overflow-red.log and /tmp/chain-bulk-faq-render-error.log."
+    }
+  },
+  {
     "testChangesSha256": "df1d6972beffb6aba65d34ed86ebd775294c80a4d6da886cb3a8ded005045d83",
     "reason": "Repair demonstrated enlarged-phone overflow in changed bulk FAQ and Settings copy using equivalent breakable task-status, sync and Undo wording.",
     "previousBehavior": "At Chrome 390px and 200% the missing/completed FAQ token painted 39px beyond its answer; Settings confirmation and uninterrupted exceeded the bullet content width.",
@@ -1070,24 +1106,6 @@
     "redEvidence": {
       "command": "node --test --test-name-pattern='RISK fireworks twilight:' tests.js before functional changes; /tmp/fireworks-phase-observed-red-all.log; before polar repair: node --test --test-name-pattern=\"RISK fireworks polar day:\" tests.js, /tmp/fireworks-polar-observed-red.log; independent preservation cohort: /tmp/fireworks-phase-polar-independent.log; independent preservation cohort: /tmp/fireworks-phase-polar-independent.log; /tmp/fireworks-phase-native-899da0f.log full suite",
       "failure": "Observed six failures: standalone and festival legacy admission, UTC admission, and actual private painter rejected altitude -6 with sunrise azimuth90. Product files were unchanged until these failures were observed. A separate actual polar-midnight RED failed full polar daylight exclusion before its functional repair. Independent preservation cohort observed15pass/1failure because the old reduced-motion test stub lacked S.fireworksAllowed; all31nativefirework contracts passed after wiring existing stubs. Independent preservation cohort observed15pass/1failure because the old reduced-motion test stub lacked S.fireworksAllowed; all31nativefirework contracts passed after wiring existing stubs. Full native observed1436pass/1failure/32runtime-skips: existing night-shows test wrongly required both sources to be absent at -6, which the corrected explicit request now permits."
-    }
-  },
-  {
-    "testChangesSha256": "92bcb196c5eb79cba517f84dc727438cc99fae6628f206dfb0b638df6f429ddc",
-    "reason": "The corrected explicit request admits both sunrise and sunset fireworks in addition to nighttime. Add narrow scheduler and real private painter contracts, without weakening existing duration frequency or particle tests. Independent code review found that real polar daylight has low solar altitude. Add the actual Arctic midnight and complete-day UTC contracts, preserve the authoritative polar-day classification in bare solar sampling, and replace the existing painter test stub with the shared eligibility helper so the unchanged layer assertion still executes. Expanded independent preservation tests found a pre-existing reduced-motion painter stub missing the new helper. Wire that stub and the matching ascent painter stub to the real shared eligibility helper, without changing any existing assertions.",
-    "previousBehavior": "Both firework sources were admitted and painted only below Sun altitude -6 degrees, with particle fade ending there.",
-    "intendedBehavior": "Both firework sources are eligible during sunrise sunset and night below the existing +8-degree full-day boundary; visible fade reaches zero at that boundary with no solar-direction exclusion. Polar daylight remains fully excluded in every scheduler and the actual painter.",
-    "replacementTests": [
-      "RISK fireworks twilight: actual reduced-motion painter holds its pose across dawn and dusk and expires at the source lifetime",
-      "RISK fireworks polar day: real Arctic midnight remains excluded in solar sampling legacy admission and actual painting",
-      "RISK fireworks polar UTC: real Arctic daylight never schedules either source across a complete day"
-    ],
-    "preservedCoverage": [
-      "Standalone sixty-second maximum and sampled occurrence spacing, crossing-relative barge finale, seeded paired delay, trail-only ascent, explosion particles, layer masks, UTC reload and stationary reduced-motion deadlines remain."
-    ],
-    "redEvidence": {
-      "command": "node --test --test-name-pattern='RISK fireworks twilight:' tests.js before functional changes; /tmp/fireworks-phase-observed-red-all.log; before polar repair: node --test --test-name-pattern=\"RISK fireworks polar day:\" tests.js, /tmp/fireworks-polar-observed-red.log; independent preservation cohort: /tmp/fireworks-phase-polar-independent.log; independent preservation cohort: /tmp/fireworks-phase-polar-independent.log",
-      "failure": "Observed six failures: standalone and festival legacy admission, UTC admission, and actual private painter rejected altitude -6 with sunrise azimuth90. Product files were unchanged until these failures were observed. A separate actual polar-midnight RED failed full polar daylight exclusion before its functional repair. Independent preservation cohort observed15pass/1failure because the old reduced-motion test stub lacked S.fireworksAllowed; all31nativefirework contracts passed after wiring existing stubs. Independent preservation cohort observed15pass/1failure because the old reduced-motion test stub lacked S.fireworksAllowed; all31nativefirework contracts passed after wiring existing stubs."
     }
   },
   {
@@ -4697,6 +4715,39 @@
     "redEvidence": {
       "command": "node --test --test-name-pattern='compact Likelihood labels' tests.js",
       "failure": "Observed before implementation: compact summary identifies the recorded likelihood: 1.08% failed. /tmp/history-likelihood-red.log retains actual output."
+    }
+  },
+  {
+    "testChangesSha256": "6bfbab8080708066342c327fe5ebb2aaa2e3711c68e1c37e5f8f3f4257901ebd",
+    "reason": "Bind the actual incremental push comparison after additive reconciliation with separately reviewed motion PR99 and history PR100. Their upstream regression and rationale records are preserved; no new gait behavior beyond the original loading fix.",
+    "previousBehavior": "Reach-only hip target rises after touchdown, without a down pose.",
+    "intendedBehavior": "Flat slow walkers settle below touchdown before recovery while fixed limbs, real planted contacts, mirroring, carrying and deterministic seeking remain intact.",
+    "replacementTests": [
+      "RISK walking weight transfer: post-contact down precedes recovery without moving planted feet"
+    ],
+    "preservedCoverage": [
+      "Existing upright stance knee-duty and dense .7/distance gradient assertions remain intact; slower travel, exits, seeds, motion choices and task storage are untouched.",
+      "The comparison includes inherited motion-choice expiry, foreground resume, prompt accessibility and explicit history likelihood labels. Existing assertions and original upstream RED/rationale records remain intact."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK walking weight transfer' tests.js",
+      "failure": "Observed preimplementation AssertionError: weight settles below contact after landing, rather than rising immediately. /tmp/chain-walk-weight-red.log. Original pulse then failed two unchanged regression contracts; repaired bounded pulse passes all three in /tmp/chain-walk-weight-repair.log. The combined push-diff is integration bookkeeping, not a new preimplementation RED; upstream motion/history contemporaneous evidence remains in their retained rationale entries."
+    }
+  },
+  {
+    "testChangesSha256": "8ee6a080d5598f5546536e15564c147912afca780c3800f4078428205ccc420a",
+    "reason": "Source and independent animation audit demonstrated missing post-contact loading on the flat walking rig; observe RED before adding a bounded down pose. Rebound unchanged walking regression after additive integration with merged motion/history coverage; upstream assertions and controls remain intact.",
+    "previousBehavior": "Reach-only hip target rises after touchdown, without a down pose.",
+    "intendedBehavior": "Flat slow walkers settle below touchdown before recovery while fixed limbs, real planted contacts, mirroring, carrying and deterministic seeking remain intact.",
+    "replacementTests": [
+      "RISK walking weight transfer: post-contact down precedes recovery without moving planted feet"
+    ],
+    "preservedCoverage": [
+      "Existing upright stance knee-duty and dense .7/distance gradient assertions remain intact; slower travel, exits, seeds, motion choices and task storage are untouched."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK walking weight transfer' tests.js",
+      "failure": "Observed preimplementation AssertionError: weight settles below contact after landing, rather than rising immediately. /tmp/chain-walk-weight-red.log. Original pulse then failed two unchanged regression contracts; repaired bounded pulse passes all three in /tmp/chain-walk-weight-repair.log."
     }
   }
 ]

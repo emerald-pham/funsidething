@@ -937,3 +937,4 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 
 - RISK bulk task guidance: enlarged conflict answer uses breakable task status wording
 - RISK bulk task guidance: enlarged Settings note uses short sync and Undo wording
+- RISK walking weight transfer: post-contact down precedes recovery without moving planted feet
