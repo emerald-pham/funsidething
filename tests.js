@@ -24706,3 +24706,37 @@ test('RISK motion safety resume: foreground and restored pages reread expiry bef
  assert.deepEqual(calls,['read','paint:reduced'],'restored page consumes valid remembered reduction without prompting');
  assert.equal(JSON.stringify(world),before,'foreground checks retain visitor progress');
 });
+
+
+test('RISK scenery depth: fountain participates in actual ground actor paint order',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ const block=source.slice(source.indexOf("    composite('middle');"),source.indexOf("    composite('front');"));
+ for(const night of [0,1])for(const sceneSeason of ['summer','winter'])for(const W of [390,768,850,1440]){
+  const painted=[],events=[{type:'walker',id:'closer',depth:128},{type:'walker',id:'farther',depth:120}];
+  const g=new Proxy({},{get:()=>()=>{},set:()=>true});
+  vm.runInNewContext(block,{g,W,H:900,t:0,visitSeed:.8,sceneSeason,paintEvents:events,airborne:new Set(),geometry:{eventDepth:e=>e.depth},p:{night,city:'#334455',sky:['#aabbcc','#bbccdd','#ccddee']},S:{mixHex:x=>x},trail:()=>100,composite(){},paintGroundEventShadow(){},paintEvent:e=>painted.push(e.id),paintIceCreamStand(){},ellipse:(g,x,y,rx)=>{if(rx===11)painted.push('fountain');},wind:1});
+  assert.deepEqual(painted,W>850?['farther','fountain','closer']:['farther','closer'],'the fountain cannot overpaint a nearer person or sit in front of everyone');
+ }
+});
+
+
+test('RISK scenery depth: nest bird sky and meadow passes paint each silhouette once',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ const code=source.slice(source.indexOf('  function paintEvent('),source.indexOf('  function paintGuest('));
+ const context=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),context);
+ for(const [W,H] of [[390,844],[768,1024],[1440,900],[844,390]]){
+  const geo=context.LandscapeGeometry.create(W,H);
+  for(const progress of [.12,.35,.60,.80,.94])for(const reverse of [false,true]){
+   const event={type:'bird',age:progress*28,duration:28,lane:.3,seed:.7,reverse},records=[];
+   const vars={geometry:geo,LandscapeRiders:{types:[]},sky:{sun:{altitude:0}},hy:geo.horizon,W,H,S:{smooth:()=>1},bird:(x,y)=>records.push({x,y}),event};
+   vm.runInNewContext(code+";paintEvent(event,0,'sky');",vars);
+   assert.ok(records.every(q=>q.y<geo.waterTop),'sky pass must not lift perched/near-tree birds over foreground terrain');
+   const skyCount=records.length;records.length=0;
+   vm.runInNewContext(code+";paintEvent(event,0);",vars);
+   assert.ok(records.every(q=>q.y>=geo.waterTop),'meadow pass cannot duplicate flight silhouettes above the reflection capture');
+   assert.equal(records.length+skyCount,2,'each companion is painted exactly once across the two passes');
+  }
+ }
+ const life=source.slice(source.indexOf('  function paintLife('),source.indexOf('  function paintWeatherOn('));
+ assert.ok(life.indexOf("paintEvent(e,t,'sky')")>=0&&life.indexOf("paintEvent(e,t,'sky')")<life.indexOf('reflectionContext.drawImage(front'),'actual sky consumer captures flying nest birds in the lake mirror');
+});

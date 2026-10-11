@@ -1,5 +1,22 @@
 [
   {
+    "testChangesSha256": "c260616ab7f763222d081103aad26b19a3aa2076a8320dd222572ebd118e1a69",
+    "reason": "Observed actual paint consumers violate physical ground depth and omit flying nest visitors from reflection capture; retain all prior feature contracts.",
+    "previousBehavior": "Fountain painted after every ground body; visiting birds painted only after the lake mirror was captured.",
+    "intendedBehavior": "Fountain sorts at its basin contact; above-waterline nest birds paint once before mirror capture and near-tree birds retain meadow occlusion.",
+    "replacementTests": [
+      "RISK scenery depth: fountain participates in actual ground actor paint order",
+      "RISK scenery depth: nest bird sky and meadow passes paint each silhouette once"
+    ],
+    "preservedCoverage": [
+      "Existing sailboats, water depth/scale, reflection masks, tree occlusion, weather tint and motion choices remain intact; no saved board or event-frequency changes."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK scenery depth' tests.js",
+      "failure": "Contemporaneous fountain RED showed farther,closer,fountain instead of farther,fountain,closer (/tmp/chain-sailboat-depth-red.log). Before bird implementation, nest pass RED: meadow pass cannot duplicate flight silhouettes above reflection capture (/tmp/chain-bird-depth-red.log). Focused GREEN has 11 passing cases (/tmp/chain-depth-focused.log)."
+    }
+  },
+  {
     "testChangesSha256": "6bfbab8080708066342c327fe5ebb2aaa2e3711c68e1c37e5f8f3f4257901ebd",
     "reason": "Bind the actual incremental push comparison after additive reconciliation with separately reviewed motion PR99 and history PR100. Their upstream regression and rationale records are preserved; no new gait behavior beyond the original loading fix.",
     "previousBehavior": "Reach-only hip target rises after touchdown, without a down pose.",
