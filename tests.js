@@ -758,6 +758,17 @@ test('RISK task rating history: compact record disclosures retain dates and metr
  assert.equal(JSON.stringify(b.ratingHistory),original,'rendering and FAQ navigation retain every historical fact');
  b.ratingHistory=[{...b.ratingHistory[0],kind:'dislodge'}];ctx.openEdit(b.id);assert.match(shim.document.getElementById('modalRoot').innerHTML,/Dislodged/);
 });
+test('RISK task history: Done stays a plain dated event while recorded metrics and missing prior values remain expandable',async()=>{
+ const {ctx,b}=await ratingHistoryFixture(632);ctx.decide('yes');ctx.doneTask(b.id);
+ const original=JSON.stringify(b.ratingHistory),view=ctx.taskRatingHistoryHTML(b);
+ const summary=view.match(/<summary><b>Done<\/b>[\s\S]*?<\/summary>/)?.[0];
+ assert.ok(summary,'actual Done observation is displayed');assert.match(summary,/10\/06\/2026/);
+ assert.doesNotMatch(summary,/rating-change|Score|Uncertainty/,'Done is a plain action and date, retaining metrics only on expansion');
+ assert.match(view,/Overall likelihood/);assert.equal(JSON.stringify(b.ratingHistory),original);
+ const first={...b.ratingHistory[0],kind:'edit',after:{...b.ratingHistory[0].after,topK:null}};delete first.before;
+ const missing=ctx.taskRatingHistoryHTML({...b,ratingHistory:[first]});assert.match(missing,/Unavailable/);assert.doesNotMatch(missing,/changed to/,'missing previous values are never invented');
+ const unknown=ctx.taskRatingHistoryHTML({...b,ratingHistory:[{v:99,kind:'done',at:0}]});assert.match(unknown,/unrecognized/);assert.doesNotMatch(unknown,/<b>Done/,'unsupported data does not fabricate a valid event');
+});
 test('RISK task rating history: Edit shows accessible timestamped observations and honest metric and retention explanations',async()=>{
  const {ctx,shim,a,b}=await ratingHistoryFixture(621);ctx.decide('yes');ctx.openEdit(b.id);const rendered=shim.document.getElementById('modalRoot').innerHTML;
  assert.match(rendered,/Task history/);assert.match(rendered,/<time datetime="2026-10-06T12:34:56\.789Z"/);assert.match(rendered,/MMR/);assert.match(rendered,/uncertainty/);assert.match(rendered,/Overall likelihood/);assert.match(rendered,/Estimated Top x/);assert.match(rendered,/Own rating/);assert.match(rendered,/observations/);assert.doesNotMatch(rendered,/not a complete/);
