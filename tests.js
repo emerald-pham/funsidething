@@ -24679,3 +24679,6 @@ test('RISK bulk task editing: current batch result distinguishes partial reconci
  ctx.state.tasks.find(t=>t.id===a.id).due='2028-03-01';ctx.renderList();assert.match(shim.document.getElementById('listBody').innerHTML,/1 currently match in this tab; 1 have different values or are no longer open/);assert.match(shim.document.getElementById('listBody').innerHTML,/Check Settings recovery backups/);assert.doesNotMatch(shim.document.getElementById('listBody').innerHTML,/data-act="bulk-undo"/);
  ctx.state.syncAccount='another-private-account';ctx.renderList();assert.doesNotMatch(shim.document.getElementById('listBody').innerHTML,/Bulk edit requested/,'result does not leak across accounts');
 });
+test('RISK bulk task editing: enlarged modal fieldsets shrink and native controls retain available width',()=>{
+ assert.match(html,/\.bulk-fields\s*\{[^}]*min-width:0[^}]*max-width:100%/,'observed chrome 390px 200% overflow needs fieldsets to shrink');assert.match(html,/\.bulk-fields input\[type=number\]\s*\{[^}]*min-width:0[^}]*max-width:100%/,'native numeric control must fit enlarged modal');assert.match(html,/<fieldset class="bulk-fields">/);
+});
