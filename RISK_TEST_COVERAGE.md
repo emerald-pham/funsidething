@@ -2,6 +2,7 @@
 
 This map records the current named RISK contracts in tests.js. It lets reviewers see which costly feature boundaries already have explicit protection before changing nearby behavior. Related non-RISK regression tests remain part of the contract too; the focused companions below call those out where they matter.
 
+- RISK rooftop gardens: daylight hides paired plants while preserving decks and nighttime lights
 - RISK skyline light cadence: twice as many opportunities keep single-roof samples and visible-window toggles
 - RISK clocktower visit geometry: four staggered visitors stand on both actual roof slopes at every viewport
 - RISK clocktower visit scheduler: rare night-only rolls pause expire cancel and never replay a backlog
