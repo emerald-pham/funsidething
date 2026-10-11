@@ -1,8 +1,9 @@
 # Risk-based exact-SHA release gate
 
-Actual visual tests are mandatory for changed controls or layout. Independent
 Verify the applied theme attribute, computed color scheme and paint before
 accepting each theme capture; theme labels alone do not establish coverage.
+
+Actual visual tests are mandatory for changed controls or layout. Independent
 code and typography reviewers compare each changed control with its established
 neighboring control in actual final rendered evidence. Use day and night themes,
 ordinary and enlarged mobile/desktop views; check natural disabled/selected states,

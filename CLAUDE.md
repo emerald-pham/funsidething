@@ -217,9 +217,10 @@ and coverage limits. White paint, readable text and passing bounds alone do not
 establish a visual match. Unexplained drift is an actionable finding; fix it and
 repeat the affected final rendered comparison before approval.
 
-Actual visual tests are mandatory for changed controls or layout. Code and
 Verify the applied theme attribute, computed color scheme and paint before
 accepting each theme capture; theme labels alone do not establish coverage.
+
+Actual visual tests are mandatory for changed controls or layout. Code and
 typography reviewers inspect the final rendered visual-test evidence for every
 changed control and its established neighboring control. Compare the controls
 in the same pane, not a modal reference substituted for a list toolbar. Test
