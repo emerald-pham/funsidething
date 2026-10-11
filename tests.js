@@ -24585,3 +24585,44 @@ test('RISK FAQs menu label: help navigation and named dialog use FAQs while reta
  assert.match(ctx.taskRatingHistoryHTML({ratingHistory:[]}),/Help: FAQs → Task history/);
  assert.match(ctx.dependencyFieldsHTML('edit',[]),/See dependency FAQ in FAQs\./);
 });
+
+test('RISK bulk task editing: displayed selection and opted fields preserve identity and reject stale conflicts',async()=>{
+ const {ctx,shim}=await loadApp();const a=ctx.addTask('Selected A'),b=ctx.addTask('Selected B'),hidden=ctx.addTask('Hidden');ctx.state.listOpen=true;ctx.setListQuery('Selected');
+ ctx.onAction('bulk-select-all');assert.match(shim.document.getElementById('listBody').innerHTML,/2 selected/);
+ ctx.onAction('bulk-edit');assert.match(shim.document.getElementById('modalRoot').innerHTML,/Apply Due/);
+ const identity=JSON.stringify([a.title,a.mu,a.sigma,a.ratingHistory,b.title,b.mu,b.sigma,b.ratingHistory]);
+ shim.document.getElementById('bulkApplyDue').checked=true;shim.document.getElementById('bulkDue').value='2027-01-12';ctx.onAction('bulk-save');
+ assert.equal(a.due,'2027-01-12');assert.equal(b.due,'2027-01-12');assert.equal(hidden.due,null);assert.equal(JSON.stringify([a.title,a.mu,a.sigma,a.ratingHistory,b.title,b.mu,b.sigma,b.ratingHistory]),identity);
+ ctx.undo();assert.equal(ctx.state.tasks.find(t=>t.id===a.id).due,null);
+ ctx.onAction('bulk-select-all');ctx.onAction('bulk-edit');shim.document.getElementById('bulkApplyDue').checked=true;shim.document.getElementById('bulkDue').value='2027-02-01';ctx.state.tasks.find(t=>t.id===a.id).due='2027-03-01';ctx.onAction('bulk-save');assert.equal(ctx.state.tasks.find(t=>t.id===a.id).due,'2027-03-01');assert.equal(ctx.state.tasks.find(t=>t.id===b.id).due,null,'batch conflicts abort atomically');
+});
+test('RISK bulk task editing: blank fields do not delete and explicit clearing survives reload',async()=>{
+ const {ctx,shim}=await loadApp();const a=ctx.addTask('Private A'),b=ctx.addTask('Private B');a.due=b.due='2027-01-12';ctx.state.listOpen=true;ctx.onAction('bulk-select-all');ctx.onAction('bulk-edit');
+ shim.document.getElementById('bulkApplyDue').checked=true;shim.document.getElementById('bulkDue').value='';ctx.onAction('bulk-save');assert.equal(a.due,'2027-01-12');assert.equal(b.due,'2027-01-12');
+ ctx.onAction('bulk-clear',{dataset:{field:'due'}});ctx.onAction('bulk-save');assert.equal(a.due,null);assert.equal(b.due,null);await ctx.persist();const reloaded=await loadApp({seedStorage:{[SYNC_STORE_KEY]:shim.localStorage.getItem(SYNC_STORE_KEY)}});assert.equal(reloaded.ctx.state.tasks.find(t=>t.id===a.id).due,null);
+});
+test('RISK bulk task editing: clearing is reversible in the draft and interval changes use the Evergreen reset rule',async()=>{
+ const {ctx,shim}=await loadApp();ctx.addTask('Private recurring');ctx.state.listOpen=true;ctx.onAction('bulk-select-all');ctx.onAction('bulk-edit');
+ ctx.onAction('bulk-clear',{dataset:{field:'due'}});const due=shim.document.getElementById('bulkDue');due.id='bulkDue';due.value='2027-04-01';due.matches=()=>false;shim.document.dispatchEvent({type:'input',target:due});
+ shim.document.getElementById('bulkApplyReset').checked=false;const hours=shim.document.getElementById('bulkHours');hours.id='bulkHours';hours.value='48';hours.matches=()=>false;shim.document.dispatchEvent({type:'input',target:hours});assert.equal(shim.document.getElementById('bulkReset').checked,false);assert.equal(shim.document.getElementById('bulkApplyReset').checked,false,'reset requires its own explicit Apply opt in');shim.document.getElementById('bulkApplyReset').checked=true;
+ shim.document.getElementById('bulkApplyHours').checked=true;ctx.onAction('bulk-save');assert.equal(ctx.state.tasks[0].due,'2027-04-01');assert.equal(ctx.state.tasks[0].evergreenHours,48);assert.equal(ctx.state.tasks[0].evergreenResetAtDay,false);
+});
+test('RISK bulk task editing: filtered hidden deleted completed and replaced board selections cannot write',async()=>{
+ for(const action of ['filter','delete','complete','replace']){
+  const {ctx,shim}=await loadApp();const a=ctx.addTask('Private A'),b=ctx.addTask('Private B');ctx.state.listOpen=true;ctx.onAction('bulk-select-all');ctx.onAction('bulk-edit');shim.document.getElementById('bulkApplyDue').checked=true;shim.document.getElementById('bulkDue').value='2027-05-01';
+  if(action==='filter')ctx.setListQuery('Private B');if(action==='delete')ctx.state.tasks=ctx.state.tasks.filter(t=>t.id!==a.id);if(action==='complete')a.done=true;if(action==='replace')ctx.replaceState(JSON.parse(ctx.cloudPayload()));
+  ctx.onAction('bulk-save');assert.equal(ctx.state.tasks.find(t=>t.id===b.id).due,null,action+' invalidates batch');
+ }
+});
+test('RISK bulk task editing: stale tab save preserves peer fields and durable field conflicts through reload',async()=>{
+ const original=await loadApp();const task=original.ctx.addTask('Original private title');await original.ctx.persist();const raw=original.shim.localStorage.getItem(SYNC_STORE_KEY),storage=sharedScannerStorage({[LOCAL_HEAD_KEY]:raw,[SYNC_STORE_KEY]:raw});
+ for(const conflict of [false,true]){
+  const a=await loadApp({sharedStorage:storage}),b=await loadApp({sharedStorage:storage});a.ctx.state.listOpen=true;a.ctx.onAction('bulk-select-all');a.ctx.onAction('bulk-edit');a.shim.document.getElementById('bulkApplyDue').checked=true;a.shim.document.getElementById('bulkDue').value='2027-06-01';
+  const peer=b.ctx.state.tasks.find(t=>t.id===task.id);peer.title='Fresh private title';if(conflict)peer.due='2027-07-01';b.ctx.commit();await b.ctx.persist();a.ctx.onAction('bulk-save');await a.ctx.persist();
+  const reload=await loadApp({seedStorage:{[SYNC_STORE_KEY]:storage.getItem(SYNC_STORE_KEY)}}),saved=reload.ctx.state.tasks.find(t=>t.id===task.id);assert.equal(saved.title,'Fresh private title');assert.equal(saved.due,conflict?'2027-07-01':'2027-06-01');
+ }
+});
+test('RISK bulk task editing: removed context options reject the whole batch rather than saving stale requirements',async()=>{
+ const {ctx,shim}=await loadApp();const a=ctx.addTask('Private context task');ctx.state.contexts=[{id:'private-context',name:'Private context',active:true}];ctx.state.listOpen=true;ctx.onAction('bulk-select-all');ctx.onAction('bulk-edit');shim.document.getElementById('bulkApplyContexts').checked=true;
+ const old=shim.document.querySelectorAll;shim.document.querySelectorAll=selector=>selector==='[data-bulkctx]'?[{checked:true,dataset:{bulkctx:'private-context'}}]:old(selector);ctx.state.contexts=[];ctx.onAction('bulk-save');assert.equal(a.ctx.length,0);assert.match(shim.document.getElementById('bulkError').textContent,/context.*changed/i);
+});

@@ -908,3 +908,10 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK task history: comparison labels preserve initiating action without inventing historical participant roles
 
 - FAQ menu naming: `RISK FAQs menu label: help navigation and named dialog use FAQs while retaining Quick start chapter`.
+
+- RISK bulk task editing: displayed selection and opted fields preserve identity and reject stale conflicts
+- RISK bulk task editing: blank fields do not delete and explicit clearing survives reload
+- RISK bulk task editing: clearing is reversible in the draft and interval changes use the Evergreen reset rule
+- RISK bulk task editing: filtered hidden deleted completed and replaced board selections cannot write
+- RISK bulk task editing: stale tab save preserves peer fields and durable field conflicts through reload
+- RISK bulk task editing: removed context options reject the whole batch rather than saving stale requirements

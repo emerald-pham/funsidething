@@ -1,5 +1,26 @@
 [
   {
+    "testChangesSha256": "90d14a1d1d4d03695af3d54fc3aaa870cf7fb2c86e6852b0c2e36d83cf2d6738",
+    "reason": "User-requested filtered bulk task editing needs field-scoped preservation and atomic stale-form checks. New tests only; existing contracts retained.",
+    "previousBehavior": "All Tasks had only individual Edit and lacked bottom selection controls or explicit batch date clearing.",
+    "intendedBehavior": "Select visible filtered tasks, apply only opted properties, reject batch conflicts, explicitly clear and preserve identities/history/ratings and unrelated peer edits.",
+    "replacementTests": [
+      "RISK bulk task editing: displayed selection and opted fields preserve identity and reject stale conflicts",
+      "RISK bulk task editing: blank fields do not delete and explicit clearing survives reload",
+      "RISK bulk task editing: clearing is reversible in the draft and interval changes use the Evergreen reset rule",
+      "RISK bulk task editing: filtered hidden deleted completed and replaced board selections cannot write",
+      "RISK bulk task editing: stale tab save preserves peer fields and durable field conflicts through reload",
+      "RISK bulk task editing: removed context options reject the whole batch rather than saving stale requirements"
+    ],
+    "preservedCoverage": [
+      "Existing dependency self-link/cycle/limit/hard-soft handling remains exclusively in the individual editor; ratings and backup retention algorithms unchanged."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK bulk task editing:' tests.js",
+      "failure": "Before implementation, selection count assertion failed and explicit clearing retained old date (/tmp/chain-bulk-red.log). Before input handler changes, reset checkbox was undefined instead of false (/tmp/chain-bulk-red2.log). Two-tab/deletion checks added afterward truthfully provide preservation coverage, not preimplementation RED. Explicit reset opt-in then failed true !== false before removing automatic Apply (/tmp/chain-bulk-red3.log). Removed context option test failed 1 !== 0 before the save-time context validity guard (/tmp/chain-bulk-red4.log)."
+    }
+  },
+  {
     "testChangesSha256": "3a4081e7ba73d2967dc41c615dcfcbe6eeb2cf0d910317e48ffdafcaeb62fc11",
     "reason": "Explicit user request renames only the FAQ menu and associated accessible names to FAQs; preserve Quick start onboarding chapter and all FAQ contents/behavior. Current menu references match the new name.",
     "previousBehavior": "Header help tooltip and modal heading said Quick start; button accessible name was question mark and dialog lacked its heading association.",
