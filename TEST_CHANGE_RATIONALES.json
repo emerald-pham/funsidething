@@ -1,13 +1,46 @@
 [
   {
-    "testChangesSha256": "72ddf7412f77b306639cce19e78cc89f0929bef94f24684c905174c971d9552c",
+    "testChangesSha256": "f815c1eefa62e3582ab1ae9b4dd8c2c6782fa1e92a0ef837a7ae73b9f006918a",
+    "reason": "Required branch-push CI compares the exact incremental test repair against its previous pushed commit, requiring its own rationale while retaining the main-based complete-change record.",
+    "previousBehavior": "The previous chapter contract omitted Task history or retained a generic name; full main-based rationale did not bind this incremental push diff.",
+    "intendedBehavior": "Name the Task history chapter explicitly, include it in the exact mounted chapter list, preserve all existing native disclosure and open/closed assertions, and bind both comparison bases without changing release gates.",
+    "replacementTests": [
+      "RISK Quick start chapters: mounted help includes Task history with native disclosures and detailed chapters closed"
+    ],
+    "preservedCoverage": [
+      "Essential chapter stays first and open, all detailed chapters stay closed, named native disclosures remain balanced, and all original chapter order/content assertions remain. Product asset and rating/sync logic are unchanged."
+    ],
+    "redEvidence": {
+      "command": "node scripts/test-first-gate.mjs 012bde22fd71666274bf36a4f1e312264274d132; node --test --test-name-pattern=\"RISK Quick start chapters:\" tests.js",
+      "failure": "Observed required push CI38133628399 exact-diff rationale failure; focused gate reproduction /tmp/compact-history-incremental-gate-red.log. Earlier mounted chapter RED /tmp/compact-history-chapter-red.log rejected missing expected Task history; no app code changed."
+    }
+  },
+  {
+    "testChangesSha256": "ad38ff92831b823c6d978308caac12cc6943f57d74bef031b757030bfeabb9bd",
+    "reason": "Required branch-push CI compares the exact incremental test repair against its previous pushed commit, requiring its own rationale while retaining the main-based complete-change record.",
+    "previousBehavior": "The previous chapter contract omitted Task history or retained a generic name; full main-based rationale did not bind this incremental push diff.",
+    "intendedBehavior": "Name the Task history chapter explicitly, include it in the exact mounted chapter list, preserve all existing native disclosure and open/closed assertions, and bind both comparison bases without changing release gates.",
+    "replacementTests": [
+      "RISK Quick start chapters: mounted help includes Task history with native disclosures and detailed chapters closed"
+    ],
+    "preservedCoverage": [
+      "Essential chapter stays first and open, all detailed chapters stay closed, named native disclosures remain balanced, and all original chapter order/content assertions remain. Product asset and rating/sync logic are unchanged."
+    ],
+    "redEvidence": {
+      "command": "node scripts/test-first-gate.mjs 012bde22fd71666274bf36a4f1e312264274d132; node --test --test-name-pattern=\"RISK Quick start chapters:\" tests.js",
+      "failure": "Observed required push CI38133628399 exact-diff rationale failure; focused gate reproduction /tmp/compact-history-incremental-gate-red.log. Earlier mounted chapter RED /tmp/compact-history-chapter-red.log rejected missing expected Task history; no app code changed."
+    }
+  },
+  {
+    "testChangesSha256": "372a16dfd2564cfe9ec5633c7bf8c36fc926b786d70674aca3b6bff765541dcc",
     "reason": "User requests substantially compact history and explanatory prose moved to a named FAQ chapter. Existing explanatory assertion relocates to FAQ; browser selector now targets outer disclosure because native record disclosures introduce nested summaries. Ranking audit confirms initiating action is shared by both participants, with no saved roles; comparison labels remove misleading direct-action implication. Required CI found the prior mounted chapter-list assertion omitted the newly requested Task history chapter; retain its order, native disclosures and closed-state checks.",
     "previousBehavior": "Every visible observation occupied three metric rows, with explanatory paragraphs before and after history.",
     "intendedBehavior": "Task history shows compact native event disclosures, actual MM/DD/YYYY dates, and recorded percentage / score / uncertainty, retaining prior values and exact local times on expansion; explanatory prose lives in a named collapsible FAQ chapter. Done summaries retain just their action and date, with all recorded metrics still available on expansion. Yes/No comparison names retain action provenance without inferring opponent/role; FAQ documents this limit.",
     "replacementTests": [
       "RISK task rating history: compact record disclosures retain dates and metrics with explanations in the FAQ",
       "RISK task history: Done stays a plain dated event while recorded metrics and missing prior values remain expandable",
-      "RISK task history: comparison labels preserve initiating action without inventing historical participant roles"
+      "RISK task history: comparison labels preserve initiating action without inventing historical participant roles",
+      "RISK Quick start chapters: mounted help includes Task history with native disclosures and detailed chapters closed"
     ],
     "preservedCoverage": [
       "All original timestamp, metric, pagination, focus, malformed data, retention, restore, reload, Undo and synchronization contracts remain. No rating or persistence code changed.",

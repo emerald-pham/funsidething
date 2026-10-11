@@ -24028,7 +24028,7 @@ test('RISK Quick start content: essential steps stay brief and detailed help rem
  const data=help.split('<h3>Data and backups</h3>')[1];assert.match(data,/refresh all devices/i);assert.match(data,/protected.*compatible app/i);
 });
 
-test('RISK Quick start chapters: mounted help uses native named disclosures with essential chapter first and detailed chapters closed',async()=>{
+test('RISK Quick start chapters: mounted help includes Task history with native disclosures and detailed chapters closed',async()=>{
  const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
  const chapters=[...help.matchAll(/<details class="help-faq"([^>]*)><summary>(.*?)<\/summary>/g)];assert.deepEqual(chapters.map(x=>x[2].replace(/<[^>]+>/g,'')),['Quick start','Scene and appearance','Scanning and recurrence','Task history','Contexts','Data and backups','Changelog']);assert.match(chapters[0][1],/\bopen\b/);for(const c of chapters.slice(1))assert.doesNotMatch(c[1],/\bopen\b/);assert.equal((help.match(/<details/g)||[]).length,(help.match(/<\/details>/g)||[]).length);assert.doesNotMatch(help,/<summary>More FAQs<\/summary>/);
 });
