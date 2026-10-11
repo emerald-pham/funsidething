@@ -11,6 +11,12 @@ The named-contract test in tests.js checks that every top-level test whose title
 
 ## Task state, eligibility, and scanner controls
 
+- RISK neutral bootstrap: automatic oldest stays outside Yes No and Dot comparisons until explicitly chosen
+- RISK neutral bootstrap: device cloud codecs Undo and stale concurrent copies preserve exclusion and explicit choice
+- RISK neutral bootstrap: unknown evidence concurrent automatic placement completion and restart remain safe
+- RISK neutral bootstrap: offline reconnect real cloud glue retains neutral provenance through old copies and Undo
+- RISK neutral bootstrap: FAQ explains exclusion explicit choice legacy limits and standalone Dislodge
+
 - RISK All Tasks mobile layout: names and every metadata badge wrap inside the task column without changing saved state
 - RISK All Tasks mobile layout FAQ: existing list guidance explains wrapped names and badges
 - RISK All Tasks mobile layout browser: WebKit and Chrome keep names badges blockers and taps usable across viewport and text sizes
