@@ -24969,14 +24969,13 @@ test('RISK terrain walking cadence: steep production routes slow travel with rea
 });
 
 
-test('RISK terrain walking approach: actual carrying painters preserve released arrival contacts before terrain-paced departures',async()=>{
- const {readMotionBuild,createMotionProbe}=await import('./scripts/motion-review-harness.mjs');
- const current=readMotionBuild(__dirname,'WORKTREE'),prior=readMotionBuild(__dirname,'43824ceb6280b57ec33c530dfbfe60c40db8ba05');
- for(const actor of ['reader','couple','picnic','kite'])for(const reverse of [false,true])for(const fraction of [.03,.06,.1,.18]){
-  const duration={reader:220,couple:200,picnic:240,kite:90}[actor],event={type:actor,age:duration*fraction,duration:3000,activityDuration:duration,seed:.4,lane:.5,reverse},before=[],after=[];
-  createMotionProbe(prior,{width:390,height:844,onHumanPose:(pose)=>before.push(JSON.parse(JSON.stringify(pose)))}).sample({actor,event,zoom:1});
-  createMotionProbe(current,{width:390,height:844,onHumanPose:(pose)=>after.push(JSON.parse(JSON.stringify(pose)))}).sample({actor,event,zoom:1});
-  assert.deepEqual(after,before,`${actor} reverse=${reverse} arrival ${fraction}: terrain departure pacing must not accelerate existing approach contacts`);
+test('RISK terrain walking approach: actual carrying arrivals preserve planted contacts on their full offscreen route',async()=>{
+ const {readMotionBuild,createMotionProbe}=await import('./scripts/motion-review-harness.mjs'),build=readMotionBuild(__dirname,'WORKTREE');
+ for(const actor of ['reader','couple','picnic','kite'])for(const reverse of [false,true])for(const age of [1,3,7,12]){
+  const duration={reader:220,couple:200,picnic:240,kite:90}[actor],event={type:actor,age,duration:9000,activityDuration:duration,seed:.4,lane:.5,reverse},samples=[];
+  for(const offset of [0,.00001]){const poses=[],frame=createMotionProbe(build,{width:390,height:844,onHumanPose:pose=>poses.push(JSON.parse(JSON.stringify(pose)))}).sample({actor,event:{...event,age:age+offset},zoom:1});samples.push({poses,x:frame.metadata.x});}
+  assert.equal(samples[0].poses.length,actor==='couple'||actor==='picnic'?2:1,'actual constrained carrying painter executes every arriving person');
+  samples[0].poses.forEach((pose,i)=>{const next=samples[1].poses[i];for(let leg=0;leg<2;leg++)if(pose.legs[leg].lift===0&&next.legs[leg].lift===0)assert.ok(Math.abs(samples[0].x+(reverse?-1:1)*pose.legs[leg].footX-samples[1].x-(reverse?-1:1)*next.legs[leg].footX)<1e-7,'arrival stance toes stay fixed in world coordinates');});
  }
 });
 
@@ -25077,4 +25076,90 @@ test('Firestore rules: production cleanup resumes deleting tombstones and protec
   assert.deepEqual(Array.from(cleanup.removed),['stranded']);
   for(const id of ['active','previous','pending','young'])assert.ok(await adapter.readGeneration(uid,id),id+' is retained');
  }finally{await env.cleanup();}
+});
+
+// In-scene admission must start people beyond the frame, not at their activity anchor.
+test('RISK pedestrian entry: natural carrying and builder visits start opaque outside the frame and walk continuously to activity',()=>{
+ const ctx=vm.createContext({Math});for(const file of ['landscape-geometry.js','landscape-winter.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,file),'utf8'),ctx);
+ for(const [width,height] of [[390,844],[844,390],[820,1180],[1440,900]])for(const reverse of [false,true])for(const type of ['walker','dogwalker','reader','couple','picnic','kite','snowman','snowangel']){
+  const g=ctx.LandscapeGeometry.create(width,height),duration={walker:60,dogwalker:70,reader:220,couple:200,picnic:240,kite:90,snowman:180,snowangel:100}[type],e={type,duration:9000,activityDuration:duration,age:0,lane:.5,seed:.4,reverse};
+  const at=age=>{const event={...e,age};if(type==='snowman'||type==='snowangel'){const p=ctx.LandscapeWinter.pose(type,event,g,width,height);return {x:type==='snowman'?p.builderX:p.x,alpha:type==='snowman'?p.builderAlpha:p.alpha};}return {...(['walker','dogwalker'].includes(type)?g.groundPose('walker',event):g.visitPose(event,g.motionProgress(event,'x'))),alpha:1};};
+  const start=at(0),margin=type==='couple'||type==='picnic'?23:type==='dogwalker'?27:12;
+  assert.ok(reverse?start.x-margin>width:start.x+margin<0,`${type} ${width} reverse=${reverse}: initial human party x=${start.x} is inside the visible frame`);
+  assert.equal(start.alpha,1,'entry is movement, never a person alpha fade');
+  let prior=start;
+  for(let age=.25;age<=Math.min(g.walkingLifetime(e),1000);age+=.25){const current=at(age);assert.ok((current.x-prior.x)*(reverse?-1:1)>=-1e-7,'arrival/settling/departure never teleports backward');assert.ok(Math.abs(current.x-prior.x)<=4.4*.25+1e-6,'no speed-up or entry snap');if(current.x>0&&current.x<width)assert.equal(current.alpha,1,'visible person stays opaque');prior=current;}
+ }
+});
+
+test('RISK pedestrian skier entry: scheduled skier walks in opaque before retaining the downhill run and existing exit',()=>{
+ const ctx=vm.createContext({Math});for(const file of ['landscape-geometry.js','landscape-winter.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,file),'utf8'),ctx);
+ for(const [width,height] of [[390,844],[844,390],[820,1180],[1440,900]])for(const reverse of [false,true])for(const lane of [0,.5,1]){
+  const g=ctx.LandscapeGeometry.create(width,height),e={type:'skier',duration:9000,activityDuration:75,age:0,seed:.4,lane,reverse},initial=ctx.LandscapeWinter.pose('skier',e,g,width,height);
+  assert.ok(reverse?initial.x-12>width:initial.x+12<0,'scheduled skier must start outside the entire visible figure');assert.equal(initial.alpha,1);assert.equal(initial.walking,true);assert.equal(initial.skiing,false);
+  const plan=g.walkingPlan(e);assert.ok(plan.arrivalSeconds>0);let low=0,high=g.walkingLifetime(e);for(let i=0;i<48;i++){const age=(low+high)/2;if(g.walkingClock({...e,age})<plan.arrivalSeconds)low=age;else high=age;}
+  const boundary=(low+high)/2,a=ctx.LandscapeWinter.pose('skier',{...e,age:boundary-1e-5},g,width,height),b=ctx.LandscapeWinter.pose('skier',{...e,age:boundary+1e-5},g,width,height);assert.ok(Math.hypot(a.x-b.x,a.y-b.y)<.001,'walking/skiing transition position is continuous');assert.equal(b.alpha,1);
+ }
+});
+
+test('RISK pedestrian skate entry: wide-frame riders do not fade while already visible',async()=>{
+ const {readMotionBuild,createMotionProbe}=await import('./scripts/motion-review-harness.mjs'),build=readMotionBuild(__dirname,'WORKTREE');
+ for(const actor of ['skateboarder','rollerskater'])for(const reverse of [false,true]){
+  const frame=createMotionProbe(build,{width:3840,height:900}).sample({actor,reverse,progress:160/(3840+320),seed:.4,lane:.5,zoom:1});
+  const alpha=frame.commands.filter(c=>c[0]==='set'&&c[1]==='globalAlpha').at(-1)?.[2];assert.equal(alpha,1,'visible entry must not fade the person');
+ }
+});
+
+test('RISK pedestrian entry contacts: actual carrying pose stays continuous across offscreen approach and settling boundaries',async()=>{
+ const {readMotionBuild,createMotionProbe}=await import('./scripts/motion-review-harness.mjs'),build=readMotionBuild(__dirname,'WORKTREE'),ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
+ for(const actor of ['reader','couple','picnic','kite'])for(const reverse of [false,true]){
+  const g=ctx.LandscapeGeometry.create(390,844),duration={reader:220,couple:200,picnic:240,kite:90}[actor],e={type:actor,duration:9000,activityDuration:duration,seed:.4,lane:.5,reverse},plan=g.walkingPlan(e);
+  for(const clock of [plan.arrivalSeconds,plan.arrivalSeconds+duration*.24,plan.begin]){
+   let lo=0,hi=g.walkingLifetime(e);for(let i=0;i<48;i++){const mid=(lo+hi)/2;if(g.walkingClock({...e,age:mid})<clock)lo=mid;else hi=mid;}const age=(lo+hi)/2,poses=[];
+   for(const ageOffset of [-1e-7,1e-7]){const observed=[];createMotionProbe(build,{width:390,height:844,onHumanPose:p=>observed.push(JSON.parse(JSON.stringify(p)))}).sample({actor,event:{...e,age:age+ageOffset},zoom:1});poses.push(observed);}
+   assert.equal(poses[0].length,poses[1].length);poses[0].forEach((a,i)=>{const b=poses[1][i];for(const key of ['hipX','hipY','bob'])assert.ok(Math.abs(a[key]-b[key])<.001,`${actor} ${key} must not snap at entry clock ${clock}`);for(let leg=0;leg<2;leg++)for(const key of ['footX','footY','kneeX','kneeY'])assert.ok(Math.abs(a.legs[leg][key]-b.legs[leg][key])<.001,`${actor} ${key} must not replan at entry clock ${clock}`);});
+  }
+ }
+});
+
+test('RISK pedestrian entry guidance: FAQ distinguishes offscreen ongoing entries from current-scene reconstruction',()=>{
+ const entry=html.split('<dt>How do people enter the scene?</dt>')[1].split('</dd>')[0];
+ assert.match(entry,/Walking visitors enter from outside the visible frame/);assert.match(entry,/Skiers walk in before their downhill run/);assert.match(entry,/Skating visitors enter without fading/);assert.match(entry,/Opening, reloading, or resizing reconstructs the current shared moment/);assert.match(entry,/visitor already underway can be visible immediately/);assert.match(entry,/Reduced motion keeps scenery still/);
+});
+
+test('RISK pedestrian entry reconstruction: reload resize and seek retain seeded admission without an invented startup delay',()=>{
+ const base=spawnSync('git',['show','18e3eebaeac3e05d64177c97486d48d1ab1f84eb:landscape-geometry.js'],{cwd:__dirname,encoding:'utf8'});assert.equal(base.status,0);const prior=sceneTimeline({'landscape-geometry.js':()=>base.stdout}),ctx=sceneTimeline();vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-winter.js'),'utf8'),ctx);
+ const facts=e=>({id:e.id,type:e.type,age:e.age,duration:e.activityDuration||e.duration,seed:e.seed,lane:e.lane,reverse:e.reverse,speed:e.speed}),options={seed:'private-entry-reconstruction',season:'winter',sunAt:()=>({altitude:25,azimuth:100})},old=prior.LandscapeTimeline.create(options),current=ctx.LandscapeTimeline.create(options);
+ for(const seconds of [0,70,301,900,1801]){const at=Date.parse('2026-10-11T10:00Z')+seconds*1000,a=old.at(at),b=current.at(at),fresh=ctx.LandscapeTimeline.create(options).at(at);assert.deepEqual(JSON.parse(JSON.stringify(b)),JSON.parse(JSON.stringify(fresh)),'fresh reload reconstructs current scene immediately, including ongoing ages');assert.deepEqual(JSON.parse(JSON.stringify(b.events.filter(e=>e.age<(e.activityDuration||e.duration)).map(facts))),JSON.parse(JSON.stringify(a.events.filter(e=>e.age<(e.activityDuration||e.duration)).map(facts))),'entry lead-in never changes accepted arrival schedule or random draws');
+  for(const [width,height] of [[390,844],[844,390],[820,1180],[1440,900]])for(const e of b.events.filter(e=>['reader','couple','picnic','kite','snowman','skier'].includes(e.type))){const g=ctx.LandscapeGeometry.create(width,height),h=ctx.LandscapeGeometry.create(width,height),pose=(geo,event)=>['snowman','skier'].includes(e.type)?ctx.LandscapeWinter.pose(e.type,event,geo,width,height):geo.visitPose(event,geo.motionProgress(event,'x'));const expected=JSON.parse(JSON.stringify(pose(g,e)));pose(g,{...e,age:0});pose(g,{...e,age:e.age+100});assert.deepEqual(JSON.parse(JSON.stringify(pose(g,e))),expected,'backward seek is independent of previous frames');assert.deepEqual(JSON.parse(JSON.stringify(pose(h,e))),expected,'resize/fresh geometry at same dimensions reconstructs same current pose');}
+ }
+});
+
+test('RISK pedestrian ski transition: actual painted head moves continuously from carrying approach into the downhill pose',()=>{
+ const ctx=vm.createContext({Math});for(const file of ['landscape-geometry.js','landscape-winter.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,file),'utf8'),ctx);
+ for(const reverse of [false,true]){
+  const width=390,height=844,g=ctx.LandscapeGeometry.create(width,height),e={type:'skier',duration:9000,activityDuration:75,seed:.4,lane:.5,reverse},plan=g.walkingPlan(e);let lo=0,hi=g.walkingLifetime(e);for(let i=0;i<48;i++){const mid=(lo+hi)/2;if(g.walkingClock({...e,age:mid})<plan.arrivalSeconds)lo=mid;else hi=mid;}const age=(lo+hi)/2;
+  const headAt=age=>{let matrix=[1,0,0,1,0,0];const stack=[],heads=[],multiply=n=>{const[a,b,c,d,x,y]=matrix,[e,f,g,h,u,v]=n;matrix=[a*e+c*f,b*e+d*f,a*g+c*h,b*g+d*h,a*u+c*v+x,b*u+d*v+y];},canvas={save(){stack.push([...matrix]);},restore(){matrix=stack.pop();},translate(x,y){multiply([1,0,0,1,x,y]);},scale(x,y){multiply([x,0,0,y,0,0]);},rotate(angle){multiply([Math.cos(angle),Math.sin(angle),-Math.sin(angle),Math.cos(angle),0,0]);}};ctx.LandscapeWinter.paint(canvas,g,width,height,{...e,age},0,{city:'#334455',front:'#556655',sky:['#aabbcc','#bbccdd','#ccddee']},{line(){},ellipse(){},color:()=> '#112233',skinColor:()=> '#abcdef',personHead(canvas,x,y){heads.push({x:matrix[0]*x+matrix[2]*y+matrix[4],y:matrix[1]*x+matrix[3]*y+matrix[5]});}});assert.equal(heads.length,1,'one opaque person head is painted');return heads[0];};
+  const before=headAt(age-1e-7),after=headAt(age+1e-7);assert.ok(Math.hypot(before.x-after.x,before.y-after.y)<.001,'walking-to-ski head must not jump between unrelated rigs');
+ }
+});
+
+test('RISK pedestrian builder transition: painted working hands settle continuously after walking arrival',()=>{
+ const ctx=vm.createContext({Math});for(const file of ['landscape-geometry.js','landscape-winter.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,file),'utf8'),ctx);
+ for(const reverse of [false,true]){const g=ctx.LandscapeGeometry.create(390,844),e={type:'snowman',duration:9000,activityDuration:180,seed:.4,lane:.5,reverse},plan=g.walkingPlan(e);let lo=0,hi=g.walkingLifetime(e);for(let i=0;i<48;i++){const mid=(lo+hi)/2;if(g.walkingClock({...e,age:mid})<plan.arrivalSeconds)lo=mid;else hi=mid;}const age=(lo+hi)/2;
+  const armsAt=age=>{const lines=[],canvas={save(){},restore(){},translate(){},scale(){},rotate(){}};ctx.LandscapeWinter.paint(canvas,g,390,844,{...e,age},0,{city:'#334455',front:'#556655',sky:['#aabbcc','#bbccdd','#ccddee']},{ellipse(){},line(canvas,...args){if(args[4]==='#abcdef')lines.push(args.slice(0,4));},skinColor:()=> '#abcdef',color:()=> '#112233'});return lines;};const a=armsAt(age-1e-7),b=armsAt(age+1e-7);assert.equal(a.length,b.length);a.forEach((line,i)=>line.forEach((point,j)=>assert.ok(Math.abs(point-b[i][j])<.001,'builder arm must ease into working rather than jump')));
+ }
+});
+
+test('RISK pedestrian ski carry: approach skis intersect the actual carrying hand',()=>{
+ const ctx=vm.createContext({Math});for(const file of ['landscape-geometry.js','landscape-winter.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,file),'utf8'),ctx);
+ for(const reverse of [false,true]){const g=ctx.LandscapeGeometry.create(390,844),e={type:'skier',duration:9000,activityDuration:75,age:1,seed:.4,lane:.5,reverse},p=ctx.LandscapeWinter.pose('skier',e,g,390,844),motion=g.humanWalkPose(p.x,p.y,p.walkDistance,p.direction,g.humanGround('middle',p.snowOffset),0,p.scale,p.travel),hand={x:p.x+p.direction*p.scale*motion.hand.x,y:p.y+p.scale*motion.hand.y};let matrix=[1,0,0,1,0,0];const stack=[],lines=[],multiply=n=>{const[a,b,c,d,x,y]=matrix,[e,f,g,h,u,v]=n;matrix=[a*e+c*f,b*e+d*f,a*g+c*h,b*g+d*h,a*u+c*v+x,b*u+d*v+y];},point=(x,y)=>({x:matrix[0]*x+matrix[2]*y+matrix[4],y:matrix[1]*x+matrix[3]*y+matrix[5]}),canvas={save(){stack.push([...matrix]);},restore(){matrix=stack.pop();},translate(x,y){multiply([1,0,0,1,x,y]);},scale(x,y){multiply([x,0,0,y,0,0]);},rotate(angle){multiply([Math.cos(angle),Math.sin(angle),-Math.sin(angle),Math.cos(angle),0,0]);}};
+  ctx.LandscapeWinter.paint(canvas,g,390,844,e,0,{city:'#334455',front:'#556655',sky:['#aabbcc','#bbccdd','#ccddee']},{ellipse(){},skinColor:()=> '#abcdef',color:()=> '#112233',line(canvas,x,y,u,v,color,width){if(color==='#112233'&&width<2)lines.push([point(x,y),point(u,v)]);}});
+  assert.ok(lines.some(([a,b])=>{const dx=b.x-a.x,dy=b.y-a.y,t=Math.max(0,Math.min(1,((hand.x-a.x)*dx+(hand.y-a.y)*dy)/(dx*dx+dy*dy)));return Math.hypot(hand.x-a.x-t*dx,hand.y-a.y-t*dy)<.001;}),'carried ski is attached to the actual hand');
+ }
+});
+
+test('RISK pedestrian ski tracks: approach transition introduces track ink continuously without a full-length pop',()=>{
+ const ctx=vm.createContext({Math});for(const file of ['landscape-geometry.js','landscape-winter.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,file),'utf8'),ctx);const g=ctx.LandscapeGeometry.create(390,844),e={type:'skier',duration:9000,activityDuration:75,seed:.4,lane:.5,reverse:false},plan=g.walkingPlan(e);let lo=0,hi=g.walkingLifetime(e);for(let i=0;i<48;i++){const mid=(lo+hi)/2;if(g.walkingClock({...e,age:mid})<plan.arrivalSeconds)lo=mid;else hi=mid;}const age=(lo+hi)/2,stack=[],ink=[],canvas={globalAlpha:1,save(){stack.push(this.globalAlpha);},restore(){this.globalAlpha=stack.pop();},translate(){},scale(){},rotate(){}};
+ ctx.LandscapeWinter.paint(canvas,g,390,844,{...e,age:age+1e-7},0,{city:'#334455',front:'#556655',sky:['#aabbcc','#bbccdd','#ccddee']},{ellipse(){},line(canvas,x,y,u,v,color,width){if(Math.abs(width-.65*.85)<1e-9)ink.push(Math.hypot(u-x,v-y)*canvas.globalAlpha);},skinColor:()=> '#abcdef',color:()=> '#112233'});assert.ok(ink.reduce((sum,n)=>sum+n,0)<.001,'ski tracks cannot become fully visible in the first transition instant');
 });

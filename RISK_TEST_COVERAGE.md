@@ -950,7 +950,7 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - Scenery depth and lake capture: `RISK scenery depth: fountain participates in actual ground actor paint order`; `RISK scenery depth: nest bird sky and meadow passes paint each silhouette once`.
 
 - RISK terrain walking cadence: steep production routes slow travel with reachable contacts across human variants
-- RISK terrain walking approach: actual carrying painters preserve released arrival contacts before terrain-paced departures
+- RISK terrain walking approach: actual carrying arrivals preserve planted contacts on their full offscreen route
 - RISK terrain walking guidance: extended FAQ explains terrain pacing without changing arrival chances or saved tasks
 
 - RISK terrain walking planner budget: flat canonical routes retain bounded analytic clock work
@@ -961,3 +961,16 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 
 - `RISK CLOUD CLEANUP RESUME: interrupted deleting generation resumes without forbidden transition and preserves acknowledged board`
 - `RISK CLOUD CLEANUP GUIDANCE: sync FAQ distinguishes failed attempts from acknowledgement and explains resumable cleanup`
+
+## Pedestrian in-scene entry continuity
+
+- `RISK pedestrian entry: natural carrying and builder visits start opaque outside the frame and walk continuously to activity`
+- `RISK pedestrian skier entry: scheduled skier walks in opaque before retaining the downhill run and existing exit`
+- `RISK pedestrian skate entry: wide-frame riders do not fade while already visible`
+- `RISK pedestrian entry contacts: actual carrying pose stays continuous across offscreen approach and settling boundaries`
+- `RISK pedestrian entry guidance: FAQ distinguishes offscreen ongoing entries from current-scene reconstruction`
+- `RISK pedestrian entry reconstruction: reload resize and seek retain seeded admission without an invented startup delay`
+- `RISK pedestrian ski transition: actual painted head moves continuously from carrying approach into the downhill pose`
+- `RISK pedestrian builder transition: painted working hands settle continuously after walking arrival`
+- `RISK pedestrian ski carry: approach skis intersect the actual carrying hand`
+- `RISK pedestrian ski tracks: approach transition introduces track ink continuously without a full-length pop`

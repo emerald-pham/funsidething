@@ -221,7 +221,7 @@
     const groundAnchor=(kind,x)=>trail(x)+(kind==='walker'?5:15);
     // Local meadow journeys keep speed independent of viewport width.
     const groundTravelX=(age,reverse=false,lane=.5,duration=22,speed=6)=>W*(.18+lane*.64)+(reverse?-1:1)*(age-duration/2)*speed;
-    const walkingTypes=new Set(['walker','dogwalker','reader','couple','picnic','kite','snowman','snowangel']);
+    const walkingTypes=new Set(['walker','dogwalker','reader','couple','picnic','kite','snowman','snowangel','skier']);
     const activityDuration=e=>Math.max(.001,Number(e.activityDuration??e.duration)||1);
     // A walking clock may outlive its admission reservation. Its analytic wave
     // stays monotone after the old endpoint; no frame history or deadline sprint.
@@ -270,25 +270,35 @@
       let anchor=W*(.1+(Number(e.lane)||0)*.8),start=direction>0?-32:W+32,begin=0;
       if(['reader','couple','picnic','kite'].includes(e.type)){start=anchor;begin=duration*(.94+Math.min(.999999,seed)*.12);}
       if(e.type==='snowman'){anchor=W*(.18+(Number(e.lane)||0)*.64);start=anchor-direction*13*Math.min(1,Math.max(.85,W/720));begin=duration*.68;}
-      const scale=['snowman','snowangel'].includes(e.type)?Math.min(1,Math.max(.85,W/720))*(e.type==='snowangel'?.96:1):1;
-      const ground=humanGround(e.type==='snowangel'?'near':e.type==='snowman'?'middle':'trail');
+      const winterScale=Math.min(1,Math.max(.85,W/720));
+      const scale=e.type==='skier'?Math.max(.85,winterScale*(.98+(Number(e.lane)||0)*.02)):['snowman','snowangel'].includes(e.type)?winterScale*(e.type==='snowangel'?.96:1):1;
+      const ground=humanGround(e.type==='snowangel'?'near':['snowman','skier'].includes(e.type)?'middle':'trail');
       const offsets=['couple','picnic'].includes(e.type)?[-11,11]:[0];
+      if(e.type==='skier'){anchor=direction>0?W*(.08+(Number(e.lane)||0)*.05):W*(.82+(Number(e.lane)||0)*.02);start=anchor;}
       let arrival=null,arrivalSeconds=0;
       if(e.type==='snowangel'){anchor=W*(.18+(Number(e.lane)||0)*.64);arrival=terrainJourney(start,direction,speed,ground,scale);arrivalSeconds=arrival.timeAt(Math.abs(anchor-start));begin=arrivalSeconds+duration*.72;start=anchor;}
+      // Activity visitors first approach from outside the complete party's frame.
+      // Keep admission and their existing activity/departure clocks intact; the
+      // additional walk is a deterministic visual lead-in, never a spawn fade.
+      if(['reader','couple','picnic','kite','snowman','skier'].includes(e.type)){
+        const edge=direction>0?-32:W+32,destination=['snowman','skier'].includes(e.type)?start:anchor-direction*40;
+        arrival=terrainJourney(edge,direction,speed,ground,scale,offsets);
+        arrivalSeconds=arrival.timeAt(Math.abs(destination-edge));begin+=arrivalSeconds;
+      }
       const journey=terrainJourney(start,direction,speed,ground,scale,offsets);
       const exit=direction>0?W+80:-80,length=Math.abs(exit-start);
       const at=age=>journey.distanceAt(Math.max(0,walkingClock({...e,age})-begin));
       let low=0,high=(begin+journey.timeAt(length))/.75+duration;
-      for(let i=0;i<48;i++){const mid=(low+high)/2;if(at(mid)<length)low=mid;else high=mid;}
-      const plan=Object.freeze({direction,speed,anchor,start,begin,length,journey,arrival,arrivalSeconds,travel:{kind:'terrain',startDistance:['reader','couple','picnic','kite'].includes(e.type)?40:0,speed},duration:Math.ceil(high*1000)/1000});
+      for(let i=0;i<48;i++){const mid=(low+high)/2;if(e.type==='skier'?walkingClock({...e,age:mid})<arrivalSeconds+duration:at(mid)<length)low=mid;else high=mid;}
+      const plan=Object.freeze({direction,speed,anchor,start,begin,length,journey,arrival,arrivalSeconds,travel:{kind:'terrain',startDistance:0,speed},duration:Math.ceil(high*1000)/1000});
       walkingPlans.set(key,plan);if(walkingPlans.size>4096)walkingPlans.delete(walkingPlans.keys().next().value);
       return plan;
     }
     function stillWalkingAge(e){
       const duration=activityDuration(e),plan=walkingPlan(e);
-      let target=duration*.5;
+      let target=plan.arrivalSeconds+duration*.5;
       if(['walker','dogwalker'].includes(e.type))target=plan.journey.timeAt(W/2+32);
-      else if(['reader','couple','picnic','kite'].includes(e.type))target=duration*.62;
+      else if(['reader','couple','picnic','kite'].includes(e.type))target=plan.arrivalSeconds+duration*.62;
       else if(e.type==='snowangel')target=plan.arrivalSeconds+duration*.38;
       let low=0,high=target+duration;
       for(let i=0;i<48;i++){const mid=(low+high)/2;if(walkingClock({...e,age:mid})<target)low=mid;else high=mid;}
@@ -320,13 +330,14 @@
     }
     function visitPose(e,f){
       if(e.activityDuration){
-        const plan=walkingPlan(e),clock=walkingClock(e),duration=activityDuration(e),direction=plan.direction,anchor=plan.anchor;
+        const plan=walkingPlan(e),rawClock=walkingClock(e),clock=Math.max(0,rawClock-plan.arrivalSeconds),duration=activityDuration(e),direction=plan.direction,anchor=plan.anchor;
         const smooth=(a,b,v)=>{const q=clamp((v-a)/(b-a));return q*q*(3-2*q);};
         const arrival=smooth(0,duration*.24,clock),activity=(clock-duration*.12)/duration;
         const departureStart=.82+Math.min(.999999,clamp(e.seed??.5))*.12;
-        const leaving=plan.journey.distanceAt(Math.max(0,clock-plan.begin));
-        const x=anchor-direction*40*(1-arrival)+direction*leaving;
-        return {x,y:trail(x)+19,anchor,direction,distance:40*arrival+leaving,travel:plan.travel,pack:smooth(departureStart-.1,departureStart,activity),stand:Math.max(1-arrival,smooth(departureStart-.06,departureStart,activity)),walkAmount:clock<duration*.24?1-arrival:leaving>0?1:0,walking:clock<duration*.24||leaving>0};
+        const leaving=plan.journey.distanceAt(Math.max(0,rawClock-plan.begin));
+        const arriving=rawClock<plan.arrivalSeconds,leadDistance=plan.arrival.distanceAt(Math.min(rawClock,plan.arrivalSeconds));
+        const x=arriving?(direction>0?-32:W+32)+direction*leadDistance:anchor-direction*40*(1-arrival)+direction*leaving;
+        return {x,y:trail(x)+19,anchor,direction,distance:leadDistance+40*arrival+leaving,travel:plan.travel,pack:smooth(departureStart-.1,departureStart,activity),stand:Math.max(1-arrival,smooth(departureStart-.06,departureStart,activity)),walkAmount:clock<duration*.24?1-arrival:leaving>0?1:0,walking:clock<duration*.24||leaving>0};
       }
       const smooth=(a,b,v)=>{const q=Math.max(0,Math.min(1,(v-a)/(b-a)));return q*q*(3-2*q);};
       const direction=e.reverse?-1:1,anchor=W*(.1+e.lane*.8);
