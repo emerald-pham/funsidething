@@ -5018,5 +5018,28 @@
       "command": "node --test --test-name-pattern='RISK scenery depth' tests.js",
       "failure": "Contemporaneous fountain RED showed farther,closer,fountain instead of farther,fountain,closer (/tmp/chain-sailboat-depth-red.log). Before bird implementation, nest pass RED: meadow pass cannot duplicate flight silhouettes above reflection capture (/tmp/chain-bird-depth-red.log). Focused GREEN has 11 passing cases (/tmp/chain-depth-focused.log). Full local run exposed a legacy isolated bird-block ReferenceError and overlong FAQ answer; preserved all legacy assertions, retained standalone full-visit painter mode, explicitly partitioned the real scene consumers, and moved added copy into its own FAQ answer. Affected cases GREEN /tmp/chain-depth-regression-repair-green.log; original full result /tmp/chain-depth-full.log is not a pass. Independent source review withdrew center-based partition approval: actual wing/body boundary regression observed RED (ground 0 versus 6 shapes) before complementary clips, /tmp/chain-depth-boundary-red.log. Corrected clips and unchanged dense departure regression pass /tmp/chain-depth-boundary-green.log (2 pass, zero skips). Frozen prior candidate full suite:1504 pass,0 fail,33 optional runtime skips; not rendered verification."
     }
+  },
+  {
+    "testChangesSha256": "c3b8fa25cce416676562e3d173ff12e7fb873a0ecfed43750263bc35222b2e5b",
+    "reason": "Add a separately invoked overdue scanner WOOP action while preserving established final-task controls and task-owned plans.",
+    "previousBehavior": "Overdue offered tasks have no Run WOOP action.",
+    "intendedBehavior": "Only the currently eligible overdue candidate exposes Run WOOP; it uses explicit Dot once, pauses, and opens a new walkthrough or existing plan with explicit deletion.",
+    "replacementTests": [
+      "RISK overdue WOOP: offered action dots through existing comparison and saves with Last task WOOP off",
+      "RISK overdue WOOP: local due-day boundary stale eligibility and cancel retain the explicit dot",
+      "RISK overdue WOOP: existing and legacy plans show explicit delete without silent replacement",
+      "RISK overdue WOOP: peer plan account and same-ID board replacement invalidate drafts and controls",
+      "RISK overdue WOOP: neutral automatic benchmark stays neutral and Cancel can Undo only the dot",
+      "RISK overdue WOOP: unsupported plans remain read-only and interrupted scan hides the action"
+    ],
+    "preservedCoverage": [
+      "All existing final-task WOOP, causal persistence, old plans, Undo, stale-tab and cloud-sync protections remain unchanged.",
+      "Dot ranking comparisons and neutral automatic first-dot rules are reused. Completion, date/context/dependency holds remain scanner eligibility gates.",
+      "First four tests observed the missing actual Run WOOP control before app implementation. Two additional preservation cases were added after implementation; they are not claimed as contemporaneous RED. Fixture corrections after initial GREEN attempt established a participating benchmark and used actual exposed helpers; no existing assertions were weakened."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK overdue WOOP:' tests.js",
+      "failure": "Four observed failures before app edits: overdue offered task must expose Run WOOP. Log /tmp/overdue-woop-red.log. Initial postimplementation run exposed missing history on neutral benchmark and an unavailable test helper; fixture repaired and preserved assertions verified in /tmp/overdue-woop-focused.log (42 pass, zero skips)."
+    }
   }
 ]

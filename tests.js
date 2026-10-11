@@ -25078,3 +25078,74 @@ test('Firestore rules: production cleanup resumes deleting tombstones and protec
   for(const id of ['active','previous','pending','young'])assert.ok(await adapter.readGeneration(uid,id),id+' is retained');
  }finally{await env.cleanup();}
 });
+
+async function overdueWoopFixture(){
+ const app=await loadApp({seed:971}),{ctx}=app;
+ const base=ctx.addTask('Private benchmark'),task=ctx.addTask('Private overdue',false,[],{due:ctx.todayISO(-1)});
+ ctx.dotTask(base.id);ctx.onAction('start-scan',{dataset:{}});ctx.state.candidateId=task.id;ctx.renderScan();
+ return {...app,base,task};
+}
+function overdueWoopControl(app){
+ const html=app.shim.document.getElementById('scan').innerHTML;
+ const tag=html.match(/<button[^>]*data-act="run-woop"[^>]*>/)?.[0];assert.ok(tag,'overdue offered task must expose Run WOOP');
+ return {dataset:Object.fromEntries([...tag.matchAll(/data-([a-z]+)="([^"]*)"/g)].map(m=>[m[1],m[2]]))};
+}
+test('RISK overdue WOOP: offered action dots through existing comparison and saves with Last task WOOP off',async()=>{
+ const app=await overdueWoopFixture(),{ctx,shim,task,base}=app;
+ assert.equal(ctx.state.settings.lastTaskWoop,false);const control=overdueWoopControl(app);
+ const equivalent=await overdueWoopFixture();equivalent.ctx.dotTask(equivalent.task.id);
+ ctx.onAction('run-woop',control);
+ assert.equal(ctx.state.chain.at(-1),task.id);assert.equal(ctx.state.mode,'work');
+ assert.match(shim.document.getElementById('modalRoot').innerHTML,/best outcome/i);
+ assert.equal(task.mu,equivalent.task.mu);assert.equal(task.sigma,equivalent.task.sigma);assert.equal(base.mu,equivalent.base.mu);
+ assert.equal(task.ratingHistory.at(-1).kind,'dot','one existing explicit Dot signal, no WOOP reward');
+ woopStep(app,'Outcome');woopStep(app,'Obstacle');woopStep(app,'If blocked, then act');
+ assert.equal(task.woopPlan.plan,'If blocked, then act');assert.equal(ctx.state.settings.lastTaskWoop,false);
+ await ctx.persist();const reload=await loadApp({seedStorage:{[STORE_KEY]:JSON.stringify(ctx.state)}});
+ assert.equal(reload.ctx.state.tasks.find(t=>t.id===task.id).woopPlan.plan,'If blocked, then act');
+});
+test('RISK overdue WOOP: local due-day boundary stale eligibility and cancel retain the explicit dot',async()=>{
+ const app=await overdueWoopFixture(),{ctx,shim,task}=app;
+ for(const due of [null,ctx.todayISO(0),ctx.todayISO(1)]){task.due=due;ctx.renderScan();assert.doesNotMatch(shim.document.getElementById('scan').innerHTML,/data-act="run-woop"/);}
+ task.due=ctx.todayISO(-1);ctx.renderScan();const stale=overdueWoopControl(app),before=JSON.stringify(ctx.state);
+ ctx.state.mode='work';ctx.onAction('run-woop',stale);assert.equal(task.woopPlan,undefined);assert.equal(ctx.state.chain.includes(task.id),false);
+ ctx.state.mode='scan';task.done=true;ctx.onAction('run-woop',stale);assert.equal(ctx.state.chain.includes(task.id),false);task.done=false;
+ task.startsAt=ctx.todayISO(1);ctx.onAction('run-woop',stale);assert.equal(ctx.state.chain.includes(task.id),false);task.startsAt=null;
+ const prerequisite=ctx.addTask('Unfinished prerequisite');ctx.setTaskPrerequisites(task.id,[prerequisite.id]);ctx.onAction('run-woop',stale);assert.equal(ctx.state.chain.includes(task.id),false);
+ ctx.setTaskPrerequisites(task.id,[]);ctx.state.candidateId=task.id;ctx.renderScan();ctx.onAction('run-woop',overdueWoopControl(app));ctx.onAction('close-modal',{dataset:{}});
+ assert.equal(task.woopPlan,undefined);assert.equal(ctx.state.chain.at(-1),task.id,'Cancel discards answers, not the explicitly chosen dot');
+ const history=JSON.stringify(task.ratingHistory);ctx.onAction('run-woop',stale);assert.equal(JSON.stringify(task.ratingHistory),history,'repeated old click cannot dot twice');
+ assert.ok(before);
+});
+test('RISK overdue WOOP: existing and legacy plans show explicit delete without silent replacement',async()=>{
+ const app=await overdueWoopFixture(),{ctx,shim,task}=app;
+ task.woopPlan={v:1,id:'legacy-plan',outcome:'Saved outcome',obstacle:'Saved obstacle',plan:'If saved, then act'};
+ ctx.renderScan();ctx.onAction('run-woop',overdueWoopControl(app));
+ assert.match(shim.document.getElementById('modalRoot').innerHTML,/Saved outcome/);assert.match(shim.document.getElementById('modalRoot').innerHTML,/Delete WOOP plan/);
+ assert.equal(task.woopPlan.id,'legacy-plan');assert.equal(vm.runInContext('woopDraft',ctx),null);
+ const tag=shim.document.getElementById('modalRoot').innerHTML.match(/<button[^>]*data-act="woop-delete"[^>]*>/)[0];
+ const del={dataset:Object.fromEntries([...tag.matchAll(/data-([a-z]+)="([^"]*)"/g)].map(m=>[m[1],m[2]]))};ctx.onAction('woop-delete',del);
+ assert.equal(task.woopPlan,null);assert.match(shim.document.getElementById('modalRoot').innerHTML,/best outcome/i);ctx.closeModal();
+ assert.equal(task.woopPlan,null);assert.equal(ctx.state.chain.at(-1),task.id);
+});
+test('RISK overdue WOOP: peer plan account and same-ID board replacement invalidate drafts and controls',async()=>{
+ const app=await overdueWoopFixture(),{ctx,task}=app;const stale=overdueWoopControl(app);
+ const replacement=JSON.parse(JSON.stringify(ctx.state));vm.runInContext('state=JSON.parse('+JSON.stringify(JSON.stringify(replacement))+')',ctx);
+ ctx.onAction('run-woop',stale);assert.equal(ctx.state.chain.includes(task.id),false,'a same-ID replacement does not inherit the old rendered authority');
+ ctx.renderScan();ctx.onAction('run-woop',overdueWoopControl(app));woopStep(app,'Outcome');woopStep(app,'Obstacle');
+ const current=ctx.state.tasks.find(t=>t.id===task.id),peer={v:1,id:'peer',outcome:'Peer',obstacle:'Obstacle',plan:'If peer, then act'};current.woopPlan=peer;
+ woopStep(app,'If local, then act');assert.equal(current.woopPlan.id,'peer');
+ current.woopPlan=null;ctx.state.chain=ctx.state.chain.filter(id=>id!==task.id);ctx.state.mode='scan';ctx.state.candidateId=task.id;ctx.renderScan();
+ ctx.onAction('run-woop',overdueWoopControl(app));woopStep(app,'Outcome');woopStep(app,'Obstacle');ctx.window.CloudSync={user:'different-account'};
+ woopStep(app,'If changed account, then act');assert.equal(current.woopPlan,null);
+});
+test('RISK overdue WOOP: neutral automatic benchmark stays neutral and Cancel can Undo only the dot',async()=>{
+ const app=await overdueWoopFixture(),{ctx,task,base}=app;ctx.writeTaskComparison(base,true);const before=[task.mu,task.sigma,base.mu,base.sigma];
+ ctx.renderScan();ctx.onAction('run-woop',overdueWoopControl(app));assert.deepEqual([task.mu,task.sigma,base.mu,base.sigma],before);assert.equal(ctx.taskComparisonEligible(task),true);
+ ctx.closeModal();ctx.undo();assert.equal(ctx.state.chain.includes(task.id),false);assert.equal(ctx.state.tasks.find(t=>t.id===task.id).woopPlan,undefined);
+});
+test('RISK overdue WOOP: unsupported plans remain read-only and interrupted scan hides the action',async()=>{
+ const app=await overdueWoopFixture(),{ctx,shim,task}=app;ctx.state.interventionActive=true;ctx.renderScan();assert.doesNotMatch(shim.document.getElementById('scan').innerHTML,/data-act="run-woop"/);
+ ctx.state.interventionActive=false;task.woopPlan={v:9,future:'preserve'};ctx.renderScan();ctx.onAction('run-woop',overdueWoopControl(app));
+ assert.equal(ctx.state.chain.at(-1),task.id);assert.match(shim.document.getElementById('modalRoot').innerHTML,/unrecognized/);assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/data-act="woop-delete"|data-act="woop-next"/);assert.equal(task.woopPlan.future,'preserve');ctx.closeModal();
+});
