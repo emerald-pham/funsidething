@@ -24530,3 +24530,13 @@ test('RISK neutral bootstrap: restoring a deleted automatic task during pending 
  assert.equal(ctx.taskComparisonEligible(ctx.state.tasks.find(t=>t.id===a.id)),false,'restored automatic provenance must override prior saved explicit choice even while deletion save is pending');await ctx.persist();
  assert.equal(ctx.taskComparisonEligible(ctx.state.tasks.find(t=>t.id===a.id)),false,'the durable save must retain restored exclusion');
 });
+
+test('RISK neutral bootstrap: JSON replacement and Undo deletion cannot be promoted by stale chosen copies',async()=>{
+ for(const route of ['json','undo-delete']){
+  const {ctx,shim}=await loadApp();const a=ctx.addTask('Bootstrap'),b=ctx.addTask('Other');a.createdAt=1;b.createdAt=2;ctx.startScan();await ctx.persist();const neutral=JSON.parse(ctx.cloudPayload());
+  const peer=await loadApp({seedStorage:{[STORE_KEY]:JSON.stringify(neutral)}});peer.ctx.dislodge();peer.ctx.state.chain=[b.id];peer.ctx.dotTask(a.id);const chosen=JSON.parse(peer.ctx.cloudPayload());
+  ctx.deleteTask(a.id);await ctx.persist();if(route==='json'){shim.document.getElementById('jsonBox').value=JSON.stringify(neutral);ctx.onAction('import-json',{});}else ctx.undo();
+  assert.equal(ctx.taskComparisonEligible(ctx.state.tasks.find(t=>t.id===a.id)),false);ctx.mergeUndeletedTasks(ctx.state,chosen);
+  assert.equal(ctx.taskComparisonEligible(ctx.state.tasks.find(t=>t.id===a.id)),false,route+' restoration needs fresh exclusion independent of old choice replay');
+ }
+});

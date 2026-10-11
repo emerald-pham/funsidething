@@ -11,6 +11,8 @@ The named-contract test in tests.js checks that every top-level test whose title
 
 ## Task state, eligibility, and scanner controls
 
+- RISK neutral bootstrap: JSON replacement and Undo deletion cannot be promoted by stale chosen copies
+
 - RISK neutral bootstrap: restoring a deleted automatic task during pending saves keeps backup exclusion
 
 - RISK neutral bootstrap: Settings backup Restore restores causal exclusion and choice in both directions
