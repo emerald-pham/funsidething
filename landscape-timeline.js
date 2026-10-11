@@ -66,9 +66,10 @@
     }
     function festivals(from,to){
       const out=[],show=C.nightShows.festival;
+      // Rejected local draws cannot create a show; skip their unused sun query.
       for(let slot=Math.floor(from/show.interval);slot<=Math.ceil(to/show.interval);slot++){
         const start=slot*show.interval,r=random(seed,'festival',slot);
-        if(start<from||start>to||!S.fireworksAllowed(sunAt(start))||r()>=Math.min(1,show.chance*C.spawnRate('festival')))continue;
+        if(start<from||start>to||r()>=Math.min(1,show.chance*C.spawnRate('festival'))||!S.fireworksAllowed(sunAt(start)))continue;
         out.push(event('festival',start,r,`festival:${slot}`));
       }
       return out;
@@ -81,7 +82,7 @@
       let start=day*DAY+20*scale;
       while(start<(day+1)*DAY){
         const roll=r();
-        if(S.fireworksAllowed(sunAt(start))&&roll<Math.min(1,show.chance*C.spawnRate('fireworks'))){
+        if(roll<Math.min(1,show.chance*C.spawnRate('fireworks'))&&S.fireworksAllowed(sunAt(start))){
           const candidate=event('fireworks',start,r,`fireworks:${day}:${out.length}`);out.push(candidate);
           start+=(candidate.scheduleDuration+show.rest)*scale;
         }else start+=show.interval*scale;
@@ -100,8 +101,10 @@
       // A visit must finish its full reservation before the next UTC day. This
       // upfront admission guard gives cold clients a bounded, identical replay;
       // it never ends an underway visitor at midnight or stores tab history.
-      const raw=ordinary(from-MAX_LIFE*2,to);
-      const rareRaw=[...ordinary(from-MAX_LIFE*3-1800,to).filter(e=>e.type==='abduction'),
+      const raw=ordinary(from-MAX_LIFE*2,to),rawRare=raw.filter(e=>e.type==='abduction'),rareIds=new Set(rawRare.map(e=>e.id));
+      // The rare guard needs earlier draws, not a second copy of the same day.
+      // Deduplicate the inclusive join by immutable ID, including rounded starts.
+      const rareRaw=[...rawRare,...ordinary(from-MAX_LIFE*3-1800,from-MAX_LIFE*2).filter(e=>e.type==='abduction'&&!rareIds.has(e.id)),
         ...festivals(from-MAX_LIFE*3-1800,to)].sort((a,b)=>a.start-b.start);
       const rare=rareRaw.filter(e=>!rareRaw.some(prior=>prior.start<e.start&&
         e.start-prior.start<(e.type==='festival'&&prior.type==='festival'?C.nightShows.festival.cooldown:S.RARE_COOLDOWN)));

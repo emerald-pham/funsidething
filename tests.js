@@ -25300,3 +25300,37 @@ test('RISK pedestrian planner cold work: full capacity skips unnecessary lifetim
   }
  }
 });
+
+test('RISK pedestrian planner proposal work: rare admission reuses immutable day draws instead of generating the full day twice',()=>{
+ const count=source=>`{const c=LandscapeConfig;globalThis.proposalDraws=0;globalThis.LandscapeConfig={...c,pickEvent(...args){proposalDraws++;return c.pickEvent(...args);}};}\n`+source;
+ const context=sceneTimeline({'landscape-timeline.js':count}),timeline=context.LandscapeTimeline.create({seed:'private-schedule',season:'summer',sunAt:()=>({altitude:30,azimuth:90})});
+ const at=Date.parse('2026-10-06T12:00Z');timeline.at(at);assert.ok(context.proposalDraws>1000,'the actual consumer exercises a complete busy-day proposal stream');
+ assert.ok(context.proposalDraws<=11500,`cold planning performed ${context.proposalDraws} event-table draws, duplicating the same immutable day proposals`);
+ const before=context.proposalDraws;timeline.at(at+8000);timeline.at(at-8000);assert.equal(context.proposalDraws,before,'the bounded same-day memo remains effective');
+});
+
+test('RISK pedestrian planner rare reuse: guard join is unique and complete admitted scenes match prior across rare rates midnight and eviction',()=>{
+ const released=spawnSync('git',['show','f8fa176ddfaeedb9b2b7aeaf586b8e71a2e5ce3f:landscape-timeline.js'],{cwd:__dirname,encoding:'utf8'});assert.equal(released.status,0,released.stderr);
+ const epoch=Date.parse('2026-10-06T00:00Z'),day=86400000,snapshot=value=>JSON.parse(JSON.stringify(value));
+ for(const season of ['summer','winter'])for(const night of [false,true])for(const rareRate of [0,2]){
+  const actual=sceneTimeline(),prior=sceneTimeline({'landscape-timeline.js':()=>released.stdout});for(const c of[actual,prior])assert.equal(c.LandscapeConfig.setSpawnRates(`| abduction | ${rareRate} |\n| festival | ${rareRate} |`),true);
+  const options={seed:rareRate?'private-schedule':'chain-scanner-scene-v1',season,sunAt:()=>({altitude:night?-20:30,azimuth:night?0:90})},a=actual.LandscapeTimeline.create(options),b=prior.LandscapeTimeline.create(options);
+  for(const offset of[12*3600000,-1,0,1,day-1,day,day+1,2*day+1,12*3600000]){const value=a.at(epoch+offset);assert.deepEqual(snapshot(value),snapshot(b.at(epoch+offset)),'raw reuse retains accepted IDs, lifetimes, independent streams and cache/UTC reconstruction');assert.ok(value.events.length<=14);}
+ }
+ const boundarySlot=epoch/1000/8-75,inject=source=>source.replace('function sample(seed,stream,slot=0,salt=0){',`function sample(seed,stream,slot=0,salt=0){if(seed==='private-rare-boundary'&&stream==='arrival'&&slot===${boundarySlot})return 0;`).replace('const rare=rareRaw.filter','globalThis.rareIds=rareRaw.map(e=>e.id);const rare=rareRaw.filter');
+ const a=sceneTimeline({'landscape-timeline.js':inject}),b=sceneTimeline({'landscape-timeline.js':()=>inject(released.stdout)}),options={seed:'private-rare-boundary',season:'summer',sunAt:()=>({altitude:30,azimuth:90})};
+ assert.deepEqual(snapshot(a.LandscapeTimeline.create(options).at(epoch+3600000)),snapshot(b.LandscapeTimeline.create(options).at(epoch+3600000)));
+ assert.ok(a.rareIds.includes(`arrival:${boundarySlot}`),'fixture puts an actual abduction exactly at the raw/rare guard join');assert.equal(new Set(a.rareIds).size,a.rareIds.length,'inclusive ordinary range endpoints cannot duplicate the join proposal');
+});
+
+test('RISK pedestrian planner solar work: failed show chance draws do not request unused astronomy and exact scenes remain unchanged',()=>{
+ const old=spawnSync('git',['show','f8fa176ddfaeedb9b2b7aeaf586b8e71a2e5ce3f:landscape-timeline.js'],{cwd:__dirname,encoding:'utf8'});assert.equal(old.status,0,old.stderr);
+ for(const rate of[0,1]){
+  const current=sceneTimeline(),prior=sceneTimeline({'landscape-timeline.js':()=>old.stdout}),location={latitude:28.5383,longitude:-81.3792,timezone:'America/New_York',elevation:20},storage={getItem(){return null;}};let calls=0;
+  for(const c of[current,prior])assert.equal(c.LandscapeConfig.setSpawnRates(`| fireworks | ${rate} |\n| festival | ${rate} |`),true);
+  const options=c=>({seed:c.LandscapeTimeline.DEFAULT_SEED,season:'autumn',location,sunAt:at=>{if(c===current)calls++;return c.LivingSky.sunAt(c.LivingSky.sceneDate(new Date(at),storage,location),location);}}),a=current.LandscapeTimeline.create(options(current)),b=prior.LandscapeTimeline.create(options(prior)),at=Date.parse('2026-10-06T12:00Z'),value=a.at(at);
+  assert.deepEqual(JSON.parse(JSON.stringify(value)),JSON.parse(JSON.stringify(b.at(at))),'pure chance prechecks preserve the actual astronomy-derived admitted scene');
+  assert.ok(calls<=(rate?2100:1600),`show rate ${rate} unnecessarily queried ${calls} astronomical instants after already failed chance draws`);
+  const count=calls;a.at(at+8000);assert.ok(calls<=count+1,'same-day scheduling retains its bounded sun memo');
+ }
+});

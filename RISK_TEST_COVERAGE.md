@@ -989,3 +989,8 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK pedestrian ski preparation attachments: hat follows the painted head and poles stay in the painted grips throughout blending
 
 - `RISK pedestrian planner cold work: full capacity skips unnecessary lifetime solving without changing admitted scenes or reseeks`
+
+- `RISK pedestrian planner proposal work: rare admission reuses immutable day draws instead of generating the full day twice`
+- `RISK pedestrian planner rare reuse: guard join is unique and complete admitted scenes match prior across rare rates midnight and eviction`
+
+- `RISK pedestrian planner solar work: failed show chance draws do not request unused astronomy and exact scenes remain unchanged`
