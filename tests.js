@@ -24935,3 +24935,82 @@ test('RISK scenery depth: nest bird sky and meadow passes paint each silhouette 
  assert.ok(life.indexOf("paintEvent(e,t,'sky')")>=0&&life.indexOf("paintEvent(e,t,'sky')")<life.indexOf('reflectionContext.drawImage(front'),'actual sky consumer captures flying nest bird ink in the lake mirror');
  assert.match(life,/paintGroundEventShadow\(e,depth\);paintEvent\(e,t,'ground'\)/,'actual ground consumer uses the complementary pixel mask');
 });
+
+
+test('RISK terrain walking cadence: steep production routes slow travel with reachable contacts across human variants',async()=>{
+ const {readMotionBuild,createMotionProbe}=await import('./scripts/motion-review-harness.mjs'),build=readMotionBuild(__dirname,'WORKTREE');
+ const ctx=vm.createContext({Math});for(const file of ['landscape-geometry.js','landscape-winter.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,file),'utf8'),ctx);
+ for(const type of ['walker','dogwalker','reader','couple','picnic','kite','snowman','snowangel'])for(const reverse of [false,true]){
+  const g=ctx.LandscapeGeometry.create(390,844),duration={walker:60,dogwalker:70,reader:220,couple:200,picnic:240,kite:90,snowman:180,snowangel:100}[type];
+  const e={type,duration:3000,activityDuration:duration,seed:.4,lane:.5,reverse};
+  const pose=age=>{const event={...e,age};return ['snowman','snowangel'].includes(type)?ctx.LandscapeWinter.pose(type,event,g,390,844):['walker','dogwalker'].includes(type)?g.groundPose('walker',event):g.visitPose(event,g.motionProgress(event,'x'));};
+  const xpos=p=>type==='snowman'?p.builderX:p.x,target=reverse?150:245;
+  let lo=g.walkingPlan(e).begin,hi=g.walkingPlan(e).duration;
+  for(let i=0;i<48;i++){const mid=(lo+hi)/2;if((xpos(pose(mid))-target)*(reverse?-1:1)<0)lo=mid;else hi=mid;}
+  const age=(lo+hi)/2,a=pose(age),b=pose(age+.001),scale=type==='snowman'?a.builderScale:type==='snowangel'?a.scale:1;
+  const ground=g.humanGround(type==='snowman'?'middle':type==='snowangel'?'near':'trail',type==='snowman'?a.snowOffset:type==='snowangel'?a.snowOffset:['walker','dogwalker'].includes(type)?5:20);
+  const x=xpos(a),y=ground(x),m=g.humanWalkPose(x,y,a.distance??a.walkDistance,a.direction,ground,0,scale,a.travel);
+  const clockDelta=g.walkingClock({...e,age:age+.001})-g.walkingClock({...e,age});
+  const cadence=Math.abs(xpos(b)-x)/clockDelta/scale/m.stride;
+  assert.ok(cadence<=.64,`${type} reverse=${reverse}: ${cadence.toFixed(3)} cycles per walking-clock second exceeds the half-prior steep-route reference .625`);
+  const before=[],after=[],probe=createMotionProbe(build,{width:390,height:844,onHumanPose:pose=>before.push(JSON.parse(JSON.stringify(pose)))});
+  probe.sample({actor:type,event:{...e,age},zoom:1});
+  createMotionProbe(build,{width:390,height:844,onHumanPose:pose=>after.push(JSON.parse(JSON.stringify(pose)))}).sample({actor:type,event:{...e,age:age+.001},zoom:1});
+  assert.ok(before.length>0,'actual human painter must execute');assert.equal(before.length,after.length);
+  before.forEach((pose,i)=>{
+   const angle=p=>Math.acos(Math.max(-1,Math.min(1,-(p.arms[0].x-p.hipX)/3)));
+   const actualCadence=Math.abs(angle(after[i])-angle(pose))/(Math.PI*2*clockDelta);
+   assert.ok(actualCadence<=.65,`${type} partner${i}: actual painted limb phase advances ${actualCadence.toFixed(3)} cycles per clock second`);
+  });
+  const initial=JSON.parse(JSON.stringify(pose(age)));
+  for(let lane=0;lane<40;lane++)g.groundPose('walker',{...e,type:'walker',lane:lane/39,age:800});
+  assert.deepEqual(JSON.parse(JSON.stringify(pose(age))),initial,'terrain table eviction and reseek reconstruct the same route without frame history');
+ }
+});
+
+
+test('RISK terrain walking approach: actual carrying painters preserve released arrival contacts before terrain-paced departures',async()=>{
+ const {readMotionBuild,createMotionProbe}=await import('./scripts/motion-review-harness.mjs');
+ const current=readMotionBuild(__dirname,'WORKTREE'),prior=readMotionBuild(__dirname,'43824ceb6280b57ec33c530dfbfe60c40db8ba05');
+ for(const actor of ['reader','couple','picnic','kite'])for(const reverse of [false,true])for(const fraction of [.03,.06,.1,.18]){
+  const duration={reader:220,couple:200,picnic:240,kite:90}[actor],event={type:actor,age:duration*fraction,duration:3000,activityDuration:duration,seed:.4,lane:.5,reverse},before=[],after=[];
+  createMotionProbe(prior,{width:390,height:844,onHumanPose:(pose)=>before.push(JSON.parse(JSON.stringify(pose)))}).sample({actor,event,zoom:1});
+  createMotionProbe(current,{width:390,height:844,onHumanPose:(pose)=>after.push(JSON.parse(JSON.stringify(pose)))}).sample({actor,event,zoom:1});
+  assert.deepEqual(after,before,`${actor} reverse=${reverse} arrival ${fraction}: terrain departure pacing must not accelerate existing approach contacts`);
+ }
+});
+
+
+test('RISK terrain walking guidance: extended FAQ explains terrain pacing without changing arrival chances or saved tasks',()=>{
+ const entry=html.split('<dt>How do walking visitors leave the scene?</dt>')[1].split('</dd>')[0];
+ assert.match(entry,/Walkers and departing visitors slow their travel on steep ground/);
+ assert.match(entry,/Arrival chances and the shared visit schedule stay the same/);
+ assert.match(entry,/never change saved tasks/);
+});
+
+
+test('RISK terrain walking planner budget: flat canonical routes retain bounded analytic clock work',()=>{
+ let calls=0;const countingMath=Object.create(Math);countingMath.sin=value=>{calls++;return Math.sin(value);};
+ const ctx=vm.createContext({Math:countingMath});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
+ const g=ctx.LandscapeGeometry.create(8192,900);
+ for(const type of ['walker','dogwalker','reader','couple','picnic','kite','snowman','snowangel']){
+  calls=0;g.walkingPlan({type,duration:180,seed:.4,lane:.5,reverse:false});
+  assert.ok(calls<=256,`${type}: ${calls} sine evaluations for a wholly pace-unlimited canonical route should remain analytic rather than integrating thousands of units`);
+ }
+});
+
+
+test('RISK Settings changelog reflow: actual archived notes retain readable tokens in narrow enlarged release lists',async()=>{
+ const {ctx,shim}=await loadApp();
+ for(const id of ['appChangelogCurrent','appChangelog']){
+  const content=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))?.[1];assert.ok(content);
+  shim.document.getElementById(id).innerHTML=content;
+ }
+ ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(settings,/acknowledgement|reconciliation/,'the actual archived release consumer preserves long historical tokens rather than deleting notes');
+ const notes=settings.match(/<details([^>]*)><summary>Changelog<\/summary><div class="kv">/)?.[1];
+ assert.match(notes||'',/data-settings-changelog/,'the actual Settings consumer must scope enlarged release reflow without changing its section class');
+ const rule=html.match(/\.settings-section\[data-settings-changelog\]\s+\.kv\s*\{([^}]*)\}/)?.[1]||'';
+ assert.match(rule,/overflow-wrap\s*:\s*anywhere/,'73 CSS-pixel enlarged list items must permit long archived tokens to break without clipping or altering their text');
+ ctx.openHelp();assert.match(shim.document.getElementById('modalRoot').innerHTML,/Release notes wrap long words in enlarged views/,'extended FAQ explains enlarged release-note reflow');
+});

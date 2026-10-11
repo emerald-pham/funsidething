@@ -1,5 +1,25 @@
 [
   {
+    "testChangesSha256": "9142362051b35b9b4787c4057750bf803a776eea51fa4de59719f7ae4acc627c",
+    "reason": "Add discriminating terrain pacing coverage while preserving all released regression tests and the human pose rig. Additively reconcile Halving mainb561960 without changing its defaults or data tests. Observed effective200% Settings modal overflow; add narrowly scoped release-note word wrapping without rewriting historical notes. Actual offender attribution remains a rendered supplement requirement. Preserve the established Settings section class by using a dedicated data attribute for release-only reflow.",
+    "previousBehavior": "Phone walkers retained rapid short terrain-limited strides despite halved travel; the first experiment also replanned carrying arrivals.",
+    "intendedBehavior": "Slow steep-route translation deterministically, preserve released arrivals and flat half-speed travel, and extend opaque exits.",
+    "replacementTests": [
+      "RISK terrain walking cadence: steep production routes slow travel with reachable contacts across human variants",
+      "RISK terrain walking approach: actual carrying painters preserve released arrival contacts before terrain-paced departures",
+      "RISK terrain walking guidance: extended FAQ explains terrain pacing without changing arrival chances or saved tasks",
+      "RISK terrain walking planner budget: flat canonical routes retain bounded analytic clock work",
+      "RISK Settings changelog reflow: actual archived notes retain readable tokens in narrow enlarged release lists"
+    ],
+    "preservedCoverage": [
+      "All prior gait, planted contact, IK, natural exit, reduced motion, half-speed, scheduling and saved-data tests remain unchanged."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK terrain walking cadence:|RISK terrain walking approach:|RISK terrain walking guidance:' tests.js (each run independently before its corresponding edit); node --test --test-name-pattern='RISK terrain walking planner budget:' tests.js (before analytic shortcut); node --test --test-name-pattern=\"RISK Settings changelog reflow:\" tests.js",
+      "failure": "Observed cadence RED1.250 vs .625 before terrain code; actual painter approach RED stride2.8 to2.16475 before repair; guidance RED missing terrain explanation before FAQ edit. Logs /tmp/chain-terrain-walk-red.log, /tmp/chain-terrain-walk-approach-red.log, /tmp/chain-terrain-walk-guidance-red.log. Additional contemporary planner-work RED:105480 sine evaluations for a pace-unlimited canonical walker, before the analytic maximum-slope shortcut. /tmp/chain-terrain-walk-budget-red.log. Effective200% actual Chrome/WebKit Settings modal overflow preserved in /tmp/chain-terrain-typography-9a68503-zoom and -zoom-webkit; focused actual Settings consumer RED before code: missing scoped settings-changelog class, /tmp/chain-terrain-settings-reflow-red.log; GREEN /tmp/chain-terrain-settings-reflow-green.log. Source long-token diagnosis is an inference pending offender inventory, not a rendered approval. Reconciled full source run1530pass1fail33environment skips exposed the existing Settings hierarchy assertion; recorded focusedRED for unchanged hierarchy plus new consumer missing data scope before replacing the added class with data-settings-changelog. /tmp/chain-terrain-settings-scope-red.log; repaired focused2/2zero skips /tmp/chain-terrain-settings-scope-green.log. The first full run is not a pass."
+    }
+  },
+  {
     "testChangesSha256": "860bbf666a8ca14383b35ce2809669ba4b6c5df25ddb2e0b005735ecc77194a1",
     "reason": "Observed actual paint consumers violate physical ground depth and omit flying nest visitors from reflection capture; retain all prior feature contracts. Halving outgoing-tip comparison inherits these exact already-released scenery tests unchanged; retain their original owner RED evidence and all assertions. This integration claims no new functional RED.",
     "previousBehavior": "Fountain painted after every ground body; visiting birds painted only after the lake mirror was captured.",
