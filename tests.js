@@ -24683,6 +24683,89 @@ test('RISK Last task WOOP: exhausted scan reaches walkthrough through real Start
  assert.ok(peer);assert.equal(ctx.state.tasks.find(t=>t.id===task.id).woopPlan.outcome,'Private outcome');
 });
 
+test('RISK bulk task editing: displayed selection and opted fields preserve identity and reject stale conflicts',async()=>{
+ const {ctx,shim}=await loadApp();const a=ctx.addTask('Selected A'),b=ctx.addTask('Selected B'),hidden=ctx.addTask('Hidden');ctx.state.listOpen=true;ctx.setListQuery('Selected');
+ ctx.onAction('bulk-select-all');assert.match(shim.document.getElementById('listBody').innerHTML,/2 selected/);
+ ctx.onAction('bulk-edit');assert.match(shim.document.getElementById('modalRoot').innerHTML,/Apply Due/);
+ const identity=JSON.stringify([a.title,a.mu,a.sigma,a.ratingHistory,b.title,b.mu,b.sigma,b.ratingHistory]);
+ shim.document.getElementById('bulkApplyDue').checked=true;shim.document.getElementById('bulkDue').value='2027-01-12';ctx.onAction('bulk-save');
+ assert.equal(a.due,'2027-01-12');assert.equal(b.due,'2027-01-12');assert.equal(hidden.due,null);assert.equal(JSON.stringify([a.title,a.mu,a.sigma,a.ratingHistory,b.title,b.mu,b.sigma,b.ratingHistory]),identity);
+ ctx.undo();assert.equal(ctx.state.tasks.find(t=>t.id===a.id).due,null);
+ ctx.onAction('bulk-select-all');ctx.onAction('bulk-edit');shim.document.getElementById('bulkApplyDue').checked=true;shim.document.getElementById('bulkDue').value='2027-02-01';ctx.state.tasks.find(t=>t.id===a.id).due='2027-03-01';ctx.onAction('bulk-save');assert.equal(ctx.state.tasks.find(t=>t.id===a.id).due,'2027-03-01');assert.equal(ctx.state.tasks.find(t=>t.id===b.id).due,null,'batch conflicts abort atomically');
+});
+test('RISK bulk task editing: blank fields do not delete and explicit clearing survives reload',async()=>{
+ const {ctx,shim}=await loadApp();const a=ctx.addTask('Private A'),b=ctx.addTask('Private B');a.due=b.due='2027-01-12';ctx.state.listOpen=true;ctx.onAction('bulk-select-all');ctx.onAction('bulk-edit');
+ shim.document.getElementById('bulkApplyDue').checked=true;shim.document.getElementById('bulkDue').value='';ctx.onAction('bulk-save');assert.equal(a.due,'2027-01-12');assert.equal(b.due,'2027-01-12');
+ ctx.onAction('bulk-clear',{dataset:{field:'due'}});ctx.onAction('bulk-save');assert.equal(a.due,null);assert.equal(b.due,null);await ctx.persist();const reloaded=await loadApp({seedStorage:{[SYNC_STORE_KEY]:shim.localStorage.getItem(SYNC_STORE_KEY)}});assert.equal(reloaded.ctx.state.tasks.find(t=>t.id===a.id).due,null);
+});
+test('RISK bulk task editing: clearing is reversible in the draft and interval changes use the Evergreen reset rule',async()=>{
+ const {ctx,shim}=await loadApp();ctx.addTask('Private recurring');ctx.state.listOpen=true;ctx.onAction('bulk-select-all');ctx.onAction('bulk-edit');
+ ctx.onAction('bulk-clear',{dataset:{field:'due'}});const due=shim.document.getElementById('bulkDue');due.id='bulkDue';due.value='2027-04-01';due.matches=()=>false;shim.document.dispatchEvent({type:'input',target:due});
+ shim.document.getElementById('bulkApplyReset').checked=false;const hours=shim.document.getElementById('bulkHours');hours.id='bulkHours';hours.value='48';hours.matches=()=>false;shim.document.dispatchEvent({type:'input',target:hours});assert.equal(shim.document.getElementById('bulkReset').checked,false);assert.equal(shim.document.getElementById('bulkApplyReset').checked,false,'reset requires its own explicit Apply opt in');shim.document.getElementById('bulkApplyReset').checked=true;
+ shim.document.getElementById('bulkApplyHours').checked=true;ctx.onAction('bulk-save');assert.equal(ctx.state.tasks[0].due,'2027-04-01');assert.equal(ctx.state.tasks[0].evergreenHours,48);assert.equal(ctx.state.tasks[0].evergreenResetAtDay,false);
+});
+test('RISK bulk task editing: filtered hidden deleted completed and replaced board selections cannot write',async()=>{
+ for(const action of ['filter','delete','complete','replace']){
+  const {ctx,shim}=await loadApp();const a=ctx.addTask('Private A'),b=ctx.addTask('Private B');ctx.state.listOpen=true;ctx.onAction('bulk-select-all');ctx.onAction('bulk-edit');shim.document.getElementById('bulkApplyDue').checked=true;shim.document.getElementById('bulkDue').value='2027-05-01';
+  if(action==='filter')ctx.setListQuery('Private B');if(action==='delete')ctx.state.tasks=ctx.state.tasks.filter(t=>t.id!==a.id);if(action==='complete')a.done=true;if(action==='replace')ctx.replaceState(JSON.parse(ctx.cloudPayload()));
+  ctx.onAction('bulk-save');assert.equal(ctx.state.tasks.find(t=>t.id===b.id).due,null,action+' invalidates batch');
+ }
+});
+test('RISK bulk task editing: stale tab save preserves peer fields and durable field conflicts through reload',async()=>{
+ const original=await loadApp();const task=original.ctx.addTask('Original private title');await original.ctx.persist();const raw=original.shim.localStorage.getItem(SYNC_STORE_KEY),storage=sharedScannerStorage({[LOCAL_HEAD_KEY]:raw,[SYNC_STORE_KEY]:raw});
+ for(const conflict of [false,true]){
+  const a=await loadApp({sharedStorage:storage}),b=await loadApp({sharedStorage:storage});a.ctx.state.listOpen=true;a.ctx.onAction('bulk-select-all');a.ctx.onAction('bulk-edit');a.shim.document.getElementById('bulkApplyDue').checked=true;a.shim.document.getElementById('bulkDue').value='2027-06-01';
+  const peer=b.ctx.state.tasks.find(t=>t.id===task.id);peer.title='Fresh private title';if(conflict)peer.due='2027-07-01';b.ctx.commit();await b.ctx.persist();a.ctx.onAction('bulk-save');await a.ctx.persist();
+  const reload=await loadApp({seedStorage:{[SYNC_STORE_KEY]:storage.getItem(SYNC_STORE_KEY)}}),saved=reload.ctx.state.tasks.find(t=>t.id===task.id);assert.equal(saved.title,'Fresh private title');assert.equal(saved.due,conflict?'2027-07-01':'2027-06-01');
+ }
+});
+test('RISK bulk task editing: removed context options reject the whole batch rather than saving stale requirements',async()=>{
+ const {ctx,shim}=await loadApp();const a=ctx.addTask('Private context task');ctx.state.contexts=[{id:'private-context',name:'Private context',active:true}];ctx.state.listOpen=true;ctx.onAction('bulk-select-all');ctx.onAction('bulk-edit');shim.document.getElementById('bulkApplyContexts').checked=true;
+ const old=shim.document.querySelectorAll;shim.document.querySelectorAll=selector=>selector==='[data-bulkctx]'?[{checked:true,dataset:{bulkctx:'private-context'}}]:old(selector);ctx.state.contexts=[];ctx.onAction('bulk-save');assert.equal(a.ctx.length,0);assert.match(shim.document.getElementById('bulkError').textContent,/context.*changed/i);
+});
+test('RISK bulk task editing: offline two-task cloud conflict preserves fresh peer fields and reconnects without resurrection',async()=>{
+ const initial=await loadApp(),first=initial.ctx.addTask('Private A'),second=initial.ctx.addTask('Private B'),base=JSON.parse(initial.ctx.cloudPayload()),h=makeSyncHarness({remote:base,rev:4});
+ const app=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(base)},cloudSyncFactory:h.factory}),{ctx,shim}=app;await ctx.cloudPull();await syncSettle(30);h.failPull=true;
+ ctx.state.listOpen=true;ctx.onAction('bulk-select-all');ctx.onAction('bulk-edit');shim.document.getElementById('bulkApplyDue').checked=true;shim.document.getElementById('bulkDue').value='2027-08-01';ctx.onAction('bulk-save');assert.equal(await ctx.persist(),true);const offline=await loadApp({seedStorage:{[SYNC_STORE_KEY]:shim.localStorage.getItem(SYNC_STORE_KEY)}});assert.equal(offline.ctx.state.tasks.find(t=>t.id===second.id).due,'2027-08-01');
+ const peer=JSON.parse(JSON.stringify(base));peer.tasks.find(t=>t.id===first.id).due='2027-09-01';peer.tasks.find(t=>t.id===second.id).title='Fresh peer title';h.writeBehindBack(peer);h.failPull=false;await ctx.cloudPull();await ctx.cloudPushNow();await syncSettle(80);const saved=h.remoteState();assert.equal(saved.tasks.find(t=>t.id===first.id).due,'2027-09-01');assert.equal(saved.tasks.find(t=>t.id===second.id).due,'2027-08-01');assert.equal(saved.tasks.find(t=>t.id===second.id).title,'Fresh peer title');assert.match(shim.document.getElementById('listBody').innerHTML,/1 currently match in this tab; 1 have different values or are no longer open/,'actual two-task reconnect reports partial adoption');
+ const deleting=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(saved)},cloudSyncFactory:h.factory});await deleting.ctx.cloudPull();h.failPull=true;deleting.ctx.state.listOpen=true;deleting.ctx.onAction('bulk-select-all');deleting.ctx.onAction('bulk-edit');deleting.shim.document.getElementById('bulkApplyDue').checked=true;deleting.shim.document.getElementById('bulkDue').value='2027-10-01';deleting.ctx.onAction('bulk-save');await deleting.ctx.persist();
+ const peerDelete=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(saved)}});peerDelete.ctx.onAction('delete-task',{dataset:{id:first.id}});h.writeBehindBack(JSON.parse(peerDelete.ctx.cloudPayload()));h.failPull=false;await deleting.ctx.cloudPull();await deleting.ctx.cloudPushNow();await syncSettle(80);assert.equal(h.remoteState().tasks.some(t=>t.id===first.id),false,'stale batch does not resurrect deleted selected task');assert.equal(h.remoteState().tasks.find(t=>t.id===second.id).due,'2027-10-01');
+});
+test('RISK bulk task editing: failed cloud publication retains local batch and retry acknowledges exact payload',async()=>{
+ const original=await loadApp();original.ctx.addTask('Private A');original.ctx.addTask('Private B');const base=JSON.parse(original.ctx.cloudPayload()),h=makeSyncHarness({remote:base,rev:2}),{ctx,shim}=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(base)},cloudSyncFactory:h.factory});await ctx.cloudPull();await syncSettle(30);
+ const push=shim.window.CloudSync.push;let failing=true;shim.window.CloudSync.push=async(...args)=>failing?{error:true}:push(...args);
+ ctx.state.listOpen=true;ctx.onAction('bulk-select-all');ctx.onAction('bulk-edit');shim.document.getElementById('bulkApplyDue').checked=true;shim.document.getElementById('bulkDue').value='2027-11-01';ctx.onAction('bulk-save');await ctx.persist();await ctx.cloudPushNow();await syncSettle(50);assert.equal(h.remoteState().tasks.every(t=>t.due===null),true);assert.equal(ctx.state.syncDirty,true);assert.equal(ctx.state.tasks.every(t=>t.due==='2027-11-01'),true);
+ failing=false;await ctx.onAction('sync-retry');await ctx.cloudPushNow();await syncSettle(80);assert.equal(h.remoteState().tasks.every(t=>t.due==='2027-11-01'),true);assert.equal(ctx.state.syncDirty,false);ctx.undo();await ctx.persist();await ctx.cloudPushNow();await syncSettle(80);assert.equal(h.remoteState().tasks.every(t=>t.due===null),true,'one Undo reverses the retained batch');
+});
+test('RISK bulk task editing: failed browser pair save retains in-memory batch and retry saves without partial task loss',async()=>{
+ const {ctx,shim}=await loadApp();ctx.addTask('Private A');ctx.addTask('Private B');await ctx.persist();const before=shim.localStorage.getItem(SYNC_STORE_KEY),write=shim.localStorage.setItem;
+ shim.localStorage.setItem=(key,value)=>{if(key===SYNC_STORE_KEY)throw new Error('private pair write failure');write(key,value);};ctx.state.listOpen=true;ctx.onAction('bulk-select-all');ctx.onAction('bulk-edit');shim.document.getElementById('bulkApplyDue').checked=true;shim.document.getElementById('bulkDue').value='2027-12-01';ctx.onAction('bulk-save');assert.equal(await ctx.persist(),false);assert.equal(shim.localStorage.getItem(SYNC_STORE_KEY),before);assert.equal(ctx.state.tasks.every(t=>t.due==='2027-12-01'),true);
+ shim.localStorage.setItem=write;assert.equal(await ctx.persist(),true);const saved=JSON.parse(shim.localStorage.getItem(SYNC_STORE_KEY));assert.equal(saved.tasks.length,2);assert.equal(saved.tasks.every(t=>t.due==='2027-12-01'),true);
+});
+test('RISK bulk task editing: FAQ and editor qualify mixed Apply and later sync recovery limits',async()=>{
+ const {ctx,shim}=await loadApp();ctx.addTask('Private draft');ctx.openHelp();const faq=shim.document.getElementById('modalRoot').innerHTML;assert.match(faq,/conflicts detected before Save stop the whole batch/i);assert.match(faq,/later sync conflict.*newer peer values.*other selected tasks/i);assert.match(faq,/after recovery.*Undo.*earlier board/i);ctx.closeModal();ctx.state.listOpen=true;ctx.onAction('bulk-select-all');ctx.onAction('bulk-edit');assert.match(shim.document.getElementById('modalRoot').innerHTML,/mixed values stay unchanged until you check Apply/i);
+});
+test('RISK bulk task editing: concurrent recovery keeps backups and existing board Undo boundary explicit',async()=>{
+ const initial=await loadApp(),a=initial.ctx.addTask('Private A'),b=initial.ctx.addTask('Private B');await initial.ctx.persist();const raw=initial.shim.localStorage.getItem(SYNC_STORE_KEY),storage=sharedScannerStorage({[LOCAL_HEAD_KEY]:raw,[SYNC_STORE_KEY]:raw}),left=await loadApp({sharedStorage:storage}),right=await loadApp({sharedStorage:storage});
+ left.ctx.state.listOpen=true;left.ctx.onAction('bulk-select-all');left.ctx.onAction('bulk-edit');left.shim.document.getElementById('bulkApplyDue').checked=true;left.shim.document.getElementById('bulkDue').value='2028-01-01';right.ctx.state.tasks.find(t=>t.id===a.id).title='Fresh peer title';right.ctx.commit();await right.ctx.persist();left.ctx.onAction('bulk-save');await left.ctx.persist();assert.equal(left.ctx.state.tasks.find(t=>t.id===a.id).title,'Fresh peer title');
+ assert.ok(storage.getItem(LOCAL_BACKUPS_KEY),'concurrent recovery retains displaced board bytes');left.ctx.undo();await left.ctx.persist();assert.equal(left.ctx.state.tasks.find(t=>t.id===a.id).title,'Private A','existing recovery Undo deliberately replaces the board');assert.equal(left.ctx.state.tasks.find(t=>t.id===b.id).due,'2028-01-01','first recovery Undo does not claim field-scoped batch reversal');
+});
+test('RISK bulk task editing: current batch result distinguishes partial reconciliation from sync success and offers no batch Undo',async()=>{
+ const {ctx,shim}=await loadApp(),a=ctx.addTask('Private A'),b=ctx.addTask('Private B');ctx.state.listOpen=true;ctx.onAction('bulk-select-all');ctx.onAction('bulk-edit');shim.document.getElementById('bulkApplyDue').checked=true;shim.document.getElementById('bulkDue').value='2028-02-01';ctx.onAction('bulk-save');
+ assert.match(shim.document.getElementById('listBody').innerHTML,/Bulk edit requested for 2 tasks: 2 currently match in this tab; 0 have different values or are no longer open/);assert.match(shim.document.getElementById('listBody').innerHTML,/This is not a server save confirmation/);
+ ctx.state.tasks.find(t=>t.id===a.id).due='2028-03-01';ctx.renderList();assert.match(shim.document.getElementById('listBody').innerHTML,/1 currently match in this tab; 1 have different values or are no longer open/);assert.match(shim.document.getElementById('listBody').innerHTML,/Check Settings recovery backups/);assert.doesNotMatch(shim.document.getElementById('listBody').innerHTML,/data-act="bulk-undo"/);
+ ctx.state.syncAccount='another-private-account';ctx.renderList();assert.doesNotMatch(shim.document.getElementById('listBody').innerHTML,/Bulk edit requested/,'result does not leak across accounts');
+});
+test('RISK bulk task editing: enlarged modal fieldsets shrink and native controls retain available width',()=>{
+ assert.match(html,/\.bulk-fields\s*\{[^}]*min-width:0[^}]*max-width:100%/,'observed chrome 390px 200% overflow needs fieldsets to shrink');assert.match(html,/\.bulk-fields input\[type=number\]\s*\{[^}]*min-width:0[^}]*max-width:100%/,'native numeric control must fit enlarged modal');assert.match(html,/<fieldset class="bulk-fields">/);
+});
+
+test('RISK bulk task editing: enlarged selection rows give task controls full width',()=>{
+ assert.match(html,/\.listwrap \.trow\.bulk-selecting\s*\{grid-template-columns:minmax\(0,1fr\)\}/,'observed enlarged phone selection must not share the narrow rating column');
+ assert.match(html,/\.trow\.bulk-selecting \.tmain \[data-act=bulk-toggle\]\s*\{[^}]*max-width:100%[^}]*white-space:normal/,'selection button stays bounded and wraps');
+ assert.ok(html.includes("(bulkSelecting?' bulk-selecting':'')"),'full-width layout applies only during selection');
+});
+
 // Actual Chrome390px at200% clipped Reduced motion and put the native dialog
 // beyond the viewport; retain the fixed-height and intrinsic-grid contracts.
 test('RISK motion safety accessibility: enlarged prompt fits the containing viewport and stacks intrinsic choice cards',()=>{
@@ -24771,4 +24854,26 @@ test('RISK fresh Halving recovery boundary: retained backup bytes protected head
  }
  const blocked=await loadApp({indexedDBProvider:{open(){throw Error('blocked fixture');}},seedStorage:{'fvp:chain-scanner:device-store-v2':'1'}});
  assert.equal(blocked.ctx.state.settings.scanMode,'squared','unavailable durable data is not a fresh client');
+});
+
+test('RISK bulk task guidance: bounded answers retain distinct selection property conflict Undo and result instructions',async()=>{
+ const {ctx,shim}=await loadApp();ctx.openHelp();const faq=shim.document.getElementById('modalRoot').innerHTML,answers=[...faq.matchAll(/<dt>(.*?)<\/dt><dd>(.*?)<\/dd>/g)].filter(([,q])=>/several tasks together|Bulk Edit|selected tasks change|bulk result count/.test(q));
+ assert.equal(answers.length,5,'bulk guidance separates controls, properties, conflicts, Undo and result meanings');
+ for(const [,question,answer] of answers)assert.ok(answer.split(/\s+/).filter(Boolean).length<=130,question+' remains independently readable');
+ const combined=answers.map(a=>a[2]).join(' ');for(const guidance of ['current filtered list','Apply separately','Clear explicitly','later sync conflict','first Undo may leave batch values','not server confirmation','disappear on reload'])assert.ok(combined.includes(guidance),'retain '+guidance);
+});
+
+test('RISK bulk task guidance: enlarged conflict answer uses breakable task status wording',async()=>{
+ const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ const answer=help.match(/<dt>What happens if selected tasks change before or during Save\?<\/dt><dd>(.*?)<\/dd>/)?.[1];
+ assert.ok(answer);assert.match(answer,/missing or completed task stops Save/,'observed phone 200% missing/completed paints 39px beyond answer content');
+ assert.doesNotMatch(answer,/missing\/completed/);assert.match(answer,/conflicts detected before Save stop the whole batch/);assert.match(answer,/Unrelated fresh fields are preserved/);
+});
+test('RISK bulk task guidance: enlarged Settings note uses short sync and Undo wording',async()=>{
+ const {ctx,shim}=await loadApp();const current=html.match(/id="appChangelogCurrent"[^>]*>([\s\S]*?)<\/div>/)?.[1];assert.ok(current);
+ shim.document.getElementById('appChangelogCurrent').innerHTML=current;ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
+ const note=settings.match(/<li>(All Tasks now offers filtered selection.*?)<\/li>/)?.[1];assert.ok(note);
+ assert.match(note,/without claiming the server saved them/,'observed phone 200% confirmation exceeds narrow Settings bullet');
+ assert.match(note,/One Undo reverses a batch with no recovery/,'observed phone 200% uninterrupted exceeds narrow Settings bullet');
+ assert.doesNotMatch(note,/confirmation|uninterrupted/);assert.match(note,/later sync conflicts keep newer peer fields/);assert.match(note,/after recovery, Undo restores an earlier board and may leave batch values in place/);
 });
