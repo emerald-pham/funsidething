@@ -921,3 +921,21 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK task history: compact Likelihood labels retain recorded values across metric boundaries
 
 - RISK walking rollback: terrain-driven loading preserves the prior upright silhouette and planted contacts
+
+- RISK bulk task editing: displayed selection and opted fields preserve identity and reject stale conflicts
+- RISK bulk task editing: blank fields do not delete and explicit clearing survives reload
+- RISK bulk task editing: clearing is reversible in the draft and interval changes use the Evergreen reset rule
+- RISK bulk task editing: filtered hidden deleted completed and replaced board selections cannot write
+- RISK bulk task editing: stale tab save preserves peer fields and durable field conflicts through reload
+- RISK bulk task editing: removed context options reject the whole batch rather than saving stale requirements
+- RISK bulk task editing: offline two-task cloud conflict preserves fresh peer fields and reconnects without resurrection
+- RISK bulk task editing: failed cloud publication retains local batch and retry acknowledges exact payload
+- RISK bulk task editing: failed browser pair save retains in-memory batch and retry saves without partial task loss
+- RISK bulk task editing: FAQ and editor qualify mixed Apply and later sync recovery limits
+- RISK bulk task editing: concurrent recovery keeps backups and existing board Undo boundary explicit
+- RISK bulk task editing: current batch result distinguishes partial reconciliation from sync success and offers no batch Undo
+- RISK bulk task editing: enlarged modal fieldsets shrink and native controls retain available width
+- RISK bulk task editing: enlarged selection rows give task controls full width
+- RISK bulk task guidance: bounded answers retain distinct selection property conflict Undo and result instructions
+- RISK bulk task guidance: enlarged conflict answer uses breakable task status wording
+- RISK bulk task guidance: enlarged Settings note uses short sync and Undo wording
