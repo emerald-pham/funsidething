@@ -24998,3 +24998,19 @@ test('RISK terrain walking planner budget: flat canonical routes retain bounded 
   assert.ok(calls<=256,`${type}: ${calls} sine evaluations for a wholly pace-unlimited canonical route should remain analytic rather than integrating thousands of units`);
  }
 });
+
+
+test('RISK Settings changelog reflow: actual archived notes retain readable tokens in narrow enlarged release lists',async()=>{
+ const {ctx,shim}=await loadApp();
+ for(const id of ['appChangelogCurrent','appChangelog']){
+  const content=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))?.[1];assert.ok(content);
+  shim.document.getElementById(id).innerHTML=content;
+ }
+ ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(settings,/acknowledgement|reconciliation/,'the actual archived release consumer preserves long historical tokens rather than deleting notes');
+ const notes=settings.match(/<details class="([^"]*)"><summary>Changelog<\/summary><div class="kv">/)?.[1];
+ assert.ok(notes?.split(/\s+/).includes('settings-changelog'),'the actual Settings consumer must scope enlarged release reflow to its changelog');
+ const rule=html.match(/\.settings-changelog\s+\.kv\s*\{([^}]*)\}/)?.[1]||'';
+ assert.match(rule,/overflow-wrap\s*:\s*anywhere/,'73 CSS-pixel enlarged list items must permit long archived tokens to break without clipping or altering their text');
+ ctx.openHelp();assert.match(shim.document.getElementById('modalRoot').innerHTML,/Release notes wrap long words in enlarged views/,'extended FAQ explains enlarged release-note reflow');
+});

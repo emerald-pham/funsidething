@@ -954,3 +954,5 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK terrain walking guidance: extended FAQ explains terrain pacing without changing arrival chances or saved tasks
 
 - RISK terrain walking planner budget: flat canonical routes retain bounded analytic clock work
+
+- RISK Settings changelog reflow: actual archived notes retain readable tokens in narrow enlarged release lists
