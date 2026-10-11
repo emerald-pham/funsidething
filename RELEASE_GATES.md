@@ -13,6 +13,10 @@ cannot stand in for an All Tasks toolbar. Screenshots in isolation are not a pas
 record executed visual assertions, exact artifact, all visible changed surfaces,
 the reference controls and coverage limits. This uses the existing independent
 review and typography reports; it adds no receipt schema or approval stage.
+For narrow editable layouts, type a representative long value and check the
+caret, text and adjacent controls; containment alone does not establish usable
+editing. Inspect captures before closing the allocated session so transient
+overlays or hidden controls can be corrected within that window.
 
 Every release candidate receives an owner review of its exact diff. The release
 validator derives the minimum review plan from the candidate's exact
