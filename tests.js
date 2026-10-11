@@ -25248,3 +25248,12 @@ test('RISK context reconciliation FAQ: actual Help keeps each existing bulk and 
  const {ctx,shim}=await loadApp();ctx.closeModal();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
  for(const question of ['How do I edit several tasks together?','Which properties can I change in Bulk Edit?','What happens if selected tasks change before or during Save?','How does Undo work after Bulk Edit?','What does the bulk result count mean?','How do contexts and list filters work?','How do I create contexts and filter All Tasks?'])assert.equal(help.split('<dt>'+question+'</dt>').length-1,1,question+' appears once in rendered Help');
 });
+
+test('RISK context Settings reflow: actual manager name fields can shrink beside protected context and delete controls',async()=>{
+ const {ctx,shim}=await loadApp();ctx.closeModal();const saved=JSON.stringify(ctx.state);ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(settings,/<div class="mgr"><button[^>]*data-act="cycle-context"[\s\S]*?<input type="text" data-mgrname="[^"]+"[^>]*aria-label="Context name"\/[\s\S]*?data-act="del-ctx"/,'real Settings manager retains its state control, editable name and delete action');
+ const rule=html.match(/\.mgr input\[type=text\]\s*\{([^}]*)\}/)?.[1]||'';
+ assert.match(rule,/min-width\s*:\s*0(?:;|$)/,'manager name must shrink below native intrinsic width at enlarged phone size');
+ assert.match(rule,/max-width\s*:\s*100%(?:;|$)/,'name field remains bounded to its available row');
+ assert.equal(JSON.stringify(ctx.state),saved,'opening the layout consumer never changes saved board choices');
+});

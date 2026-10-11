@@ -982,3 +982,5 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK repository process boundary: actual visual tests compare every changed control with neighboring controls and scrolled states
 
 - `RISK context reconciliation FAQ: actual Help keeps each existing bulk and context question once`
+
+- RISK context Settings reflow: actual manager name fields can shrink beside protected context and delete controls

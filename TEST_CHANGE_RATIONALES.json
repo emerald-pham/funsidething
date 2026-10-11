@@ -1,5 +1,37 @@
 [
   {
+    "testChangesSha256": "b095f939ea7f9210396e86d67725cc4e35afcf0fd66a882049852215d58b3cac",
+    "reason": "Repair independently demonstrated enlarged-phone Settings context name-field overflow using only bounded shrink sizing. Released main518 and prior contextc064 share the same flex-only manager input rule and markup; baseline geometry will independently qualify attribution.",
+    "previousBehavior": "The manager name input retained native intrinsic minimum width; at phone200% it painted beyond the modal edge and hid the delete control.",
+    "intendedBehavior": "Manager input shrinks within its row while keeping the context state control editable name and delete action visible and saved board choices unchanged.",
+    "replacementTests": [
+      "RISK context Settings reflow: actual manager name fields can shrink beside protected context and delete controls"
+    ],
+    "preservedCoverage": [
+      "Existing context toggles Undo AND/exclusion NoContext saved-neutral/cloud handling and Z/E guards are unchanged. Prior controls/rules/compat native1548pass and alloriginalfail evidence remain separately bound to c064."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern=\"RISK context Settings reflow:\" tests.js",
+      "failure": "BeforeCSSfix sourceconsumerRED observed actualflex:1 withoutmin-width0 /tmp/chain-context-settings-reflow-red.log, following independent actualphone2x rendered overflow report /tmp/chain-context-typography-review-c064.md. Minimalmin-width0/max-width100% fixes it; focused48/48 /tmp/chain-context-settings-reflow-green.log. Targeted actualbaseline/candidate geometry and expandedFAQ/EditE captures prepared; no newruntime started."
+    }
+  },
+  {
+    "testChangesSha256": "f0360847dd0c1a61758c27ce37393cbf82f732430f2c769beede2fdf91dc032e",
+    "reason": "Repair independently demonstrated enlarged-phone Settings context name-field overflow using only bounded shrink sizing. Released main518 and prior contextc064 share the same flex-only manager input rule and markup; baseline geometry will independently qualify attribution.",
+    "previousBehavior": "The manager name input retained native intrinsic minimum width; at phone200% it painted beyond the modal edge and hid the delete control.",
+    "intendedBehavior": "Manager input shrinks within its row while keeping the context state control editable name and delete action visible and saved board choices unchanged.",
+    "replacementTests": [
+      "RISK context Settings reflow: actual manager name fields can shrink beside protected context and delete controls"
+    ],
+    "preservedCoverage": [
+      "Existing context toggles Undo AND/exclusion NoContext saved-neutral/cloud handling and Z/E guards are unchanged. Prior controls/rules/compat native1548pass and alloriginalfail evidence remain separately bound to c064."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern=\"RISK context Settings reflow:\" tests.js",
+      "failure": "BeforeCSSfix sourceconsumerRED observed actualflex:1 withoutmin-width0 /tmp/chain-context-settings-reflow-red.log, following independent actualphone2x rendered overflow report /tmp/chain-context-typography-review-c064.md. Minimalmin-width0/max-width100% fixes it; focused48/48 /tmp/chain-context-settings-reflow-green.log. Targeted actualbaseline/candidate geometry and expandedFAQ/EditE captures prepared; no newruntime started."
+    }
+  },
+  {
     "testChangesSha256": "e1ed5fd0f855854bccc8af773668ca23ea813da37bdfd7b2ac5771dd15be96d7",
     "reason": "Repair the actual allocated browser RED by restoring included starting state before existing Settings included-to-excluded assertion. Preserve all previous checks and assertion strength. Normalize the reloaded private browser fixture by closing the setup-only motion dialog, matching its initial-load setup. Reconcile exact toolbar main518c01f and sync PR107 additively, retain their unchanged tests and source; imported upstream RED is not newly claimed. Reconcile exact toolbar main518c01f and sync PR107 additively, retain their unchanged tests and source; imported upstream RED is not newly claimed. Independent review caught duplicated bulk FAQ during reconciliation; remove one byte-identical block while preserving toolbar answer. Independent review caught duplicated bulk FAQ during reconciliation; remove one byte-identical block while preserving toolbar answer.",
     "previousBehavior": "Prior Enter explicitly excluded Errands, so the next Settings click correctly included it while the legacy fixture expected excluded.",
