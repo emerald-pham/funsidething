@@ -24777,3 +24777,18 @@ test('RISK bulk task guidance: bounded answers retain distinct selection propert
  for(const [,question,answer] of answers)assert.ok(answer.split(/\s+/).filter(Boolean).length<=130,question+' remains independently readable');
  const combined=answers.map(a=>a[2]).join(' ');for(const guidance of ['current filtered list','Apply separately','Clear explicitly','later sync conflict','first Undo may leave batch values','not server confirmation','disappear on reload'])assert.ok(combined.includes(guidance),'retain '+guidance);
 });
+
+test('RISK bulk task guidance: enlarged conflict answer uses breakable task status wording',async()=>{
+ const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ const answer=help.match(/<dt>What happens if selected tasks change before or during Save\?<\/dt><dd>(.*?)<\/dd>/)?.[1];
+ assert.ok(answer);assert.match(answer,/missing or completed task stops Save/,'observed phone 200% missing/completed paints 39px beyond answer content');
+ assert.doesNotMatch(answer,/missing\/completed/);assert.match(answer,/conflicts detected before Save stop the whole batch/);assert.match(answer,/Unrelated fresh fields are preserved/);
+});
+test('RISK bulk task guidance: enlarged Settings note uses short sync and Undo wording',async()=>{
+ const {ctx,shim}=await loadApp();const current=html.match(/id="appChangelogCurrent"[^>]*>([\s\S]*?)<\/div>/)?.[1];assert.ok(current);
+ shim.document.getElementById('appChangelogCurrent').innerHTML=current;ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
+ const note=settings.match(/<li>(All Tasks now offers filtered selection.*?)<\/li>/)?.[1];assert.ok(note);
+ assert.match(note,/without claiming the server saved them/,'observed phone 200% confirmation exceeds narrow Settings bullet');
+ assert.match(note,/One Undo reverses a batch with no recovery/,'observed phone 200% uninterrupted exceeds narrow Settings bullet');
+ assert.doesNotMatch(note,/confirmation|uninterrupted/);assert.match(note,/later sync conflicts keep newer peer fields/);assert.match(note,/after recovery, Undo restores an earlier board and may leave batch values in place/);
+});

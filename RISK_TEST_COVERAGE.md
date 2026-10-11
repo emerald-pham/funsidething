@@ -934,3 +934,6 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 
 - RISK bulk task guidance: bounded answers retain distinct selection property conflict Undo and result instructions
 - RISK task history: compact Likelihood labels retain recorded values across metric boundaries
+
+- RISK bulk task guidance: enlarged conflict answer uses breakable task status wording
+- RISK bulk task guidance: enlarged Settings note uses short sync and Undo wording
