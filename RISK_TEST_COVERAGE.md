@@ -943,7 +943,6 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK bulk task editing: concurrent recovery keeps backups and existing board Undo boundary explicit
 - RISK bulk task editing: current batch result distinguishes partial reconciliation from sync success and offers no batch Undo
 - RISK bulk task editing: enlarged modal fieldsets shrink and native controls retain available width
-- RISK bulk task editing: enlarged selection rows give task controls full width
 - RISK bulk task guidance: bounded answers retain distinct selection property conflict Undo and result instructions
 - RISK bulk task guidance: enlarged conflict answer uses breakable task status wording
 - RISK bulk task guidance: enlarged Settings note uses short sync and Undo wording
@@ -958,7 +957,31 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 
 - RISK Settings changelog reflow: actual archived notes retain readable tokens in narrow enlarged release lists
 
+## Conditional binary context controls
+
+- RISK binary context presentation: active filters derive excluded controls on both surfaces without changing saved choices
+- RISK binary context interaction: real handlers include displayed exclusions immediately and preserve zero-active AND and No context rules
+- RISK binary context saved data: reload and cloud adoption retain neutral choices and derive excluded presentation
+- RISK binary context guidance: FAQ explains conditional two-state controls and unchanged zero-active matching
+
+## Requested keyboard Undo and Edit shortcuts
+
+- RISK Undo Z shortcut: real keyboard dispatch reverses only the latest action and retains durable Undo semantics
+- RISK Undo Z guards: U is retired and modified editable modal and scene keypresses leave board and native defaults alone
+- RISK Undo Z guidance: header hint tooltip and Quick start name Z while preserving editable native undo guidance
+- RISK Edit E shortcut: real keyboard dispatch edits only the offered scanner task without changing the board
+- RISK Edit E guards and hints: modifiers editable fields modal and scene focus do not dispatch and only the offered Edit advertises E
+- RISK Edit E guidance: Quick start explains the offered task editor and plain shortcut scope
 ## Cloud cleanup interruption regression
 
 - `RISK CLOUD CLEANUP RESUME: interrupted deleting generation resumes without forbidden transition and preserves acknowledged board`
 - `RISK CLOUD CLEANUP GUIDANCE: sync FAQ distinguishes failed attempts from acknowledgement and explains resumable cleanup`
+- RISK bulk toolbar: mounted controls stay outside scrolling rows and retain filtered selection through filter changes
+- RISK bulk row selection: selected label replaces the existing rank slot and deselection restores its format
+- RISK bulk toolbar keyboard: rerender restores the focused toolbar action and row toggle
+- RISK bulk toolbar guidance: extended FAQ describes frozen controls and rank-slot selection
+- RISK repository process boundary: actual visual tests compare every changed control with neighboring controls and scrolled states
+
+- `RISK context reconciliation FAQ: actual Help keeps each existing bulk and context question once`
+
+- RISK context Settings reflow: actual manager name fields can shrink beside protected context and delete controls

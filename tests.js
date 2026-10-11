@@ -477,6 +477,7 @@ test('RISK upright gait consumer: every human painter consumes upright full cycl
 
 test('RISK context exclusions: real selectors cycle included excluded neutral with durable Undo and explicit red precedence',async()=>{
  const {ctx,shim}=await loadApp({seed:911});const c=ctx.state.contexts[0],task=ctx.addTask('Private required task',false,[c.id]);
+ ctx.state.contexts[1].active=false; // Preserve the zero-active legacy cycle contract.
  const protectedTasks=JSON.stringify(ctx.state.tasks);
  ctx.toggleContext(c.id);assert.equal(c.excluded,true,'the second click changes an existing green check to a red exclusion');assert.equal(c.active,false,'released clients still see the excluded requirement disabled');
  ctx.renderCtx();let markup=shim.document.getElementById('ctxPanel').innerHTML;
@@ -506,8 +507,8 @@ test('RISK context exclusions: scan and All Tasks preserve all required contexts
  ctx.state.listOpen=true;ctx.state.candidateId=one.id;ctx.toggleContext(a.id);
  assert.deepEqual(Array.from(ctx.eligibleTasks(),t=>t.id),[zero.id,unknown.id]);assert.ok(![one.id,many.id].includes(ctx.state.candidateId),'excluded candidates leave the scanner');
  vm.runInContext("listEligibilityFilter='ineligible'",ctx);ctx.renderList();assert.deepEqual(Array.from(ctx.filteredListTasks(),t=>t.id),[one.id,many.id]);assert.equal(shim.document.getElementById('listCount').textContent,'(2 of 4)');
- ctx.toggleContext(a.id);assert.deepEqual(Array.from(ctx.eligibleTasks(),t=>t.id),[zero.id,unknown.id],'neutral remains an inactive requirement, preserving existing empty-selection behavior');
- ctx.toggleContext(a.id);ctx.state.chain=[one.id];vm.runInContext("listEligibilityFilter='eligible'",ctx);
+ ctx.toggleContext(b.id);ctx.toggleContext(a.id);assert.deepEqual(Array.from(ctx.eligibleTasks(),t=>t.id),[zero.id,unknown.id],'neutral remains an inactive requirement, preserving existing empty-selection behavior');
+ ctx.toggleContext(a.id);ctx.toggleContext(b.id);ctx.state.chain=[one.id];vm.runInContext("listEligibilityFilter='eligible'",ctx);
  assert.deepEqual(Array.from(ctx.filteredListTasks(),t=>t.id),[zero.id,many.id,unknown.id]);assert.equal(ctx.isEligible(one),true,'dotting is only a list eligibility distinction');
  const poolShares=()=>JSON.stringify([...ctx.chanceDisplayStats()].map(([id,{weight,probability,available,fallback}])=>[id,{weight,probability,available,fallback}]));const shares=poolShares();ctx.state.chain=[];assert.equal(poolShares(),shares,'undotting alone preserves full-pool weights');
  ctx.toggleContext(b.id);ctx.toggleContext(a.id);ctx.toggleContext(a.id);ctx.toggleContext(b.id);
@@ -610,11 +611,12 @@ test('RISK context and Settings browser: touch keyboard filter counts disclosure
     const page=await context.newPage();await page.goto(process.env.LANDSCAPE_BROWSER_URL);await page.waitForFunction(()=>typeof state!=='undefined'&&state?.tasks);
     await page.evaluate(()=>{document.getElementById('motionDialog')?.close();closeModal();state.seenQuickStart=true;state.listOpen=true;addTask('Private no context');addTask('Private required',false,['c_errand']);addTask('Private multiple',false,['c_errand','c_home']);render();});
     const selector=page.locator('#ctxPanel [data-ctx="c_errand"]');assert.equal(await selector.getAttribute('data-filter-state'),'included');
-    if(width<1000)await selector.tap();else await selector.click();assert.equal(await selector.getAttribute('data-filter-state'),'excluded');assert.match(await selector.getAttribute('aria-label'),/excluded\. Next: neutral/);
+    if(width<1000)await selector.tap();else await selector.click();assert.equal(await selector.getAttribute('data-filter-state'),'excluded');assert.match(await selector.getAttribute('aria-label'),/excluded\. Next: included/);
     await page.locator('[data-act="list-eligibility"][data-id="ineligible"]').click();assert.equal(await page.locator('[data-row]').count(),2);assert.equal(await page.locator('#listCount').innerText(),'(2 of 3)');
-    await selector.focus();await page.keyboard.press('Space');assert.equal(await selector.getAttribute('data-filter-state'),'neutral');assert.equal(await selector.evaluate(e=>document.activeElement===e),true,'rerender retains keyboard focus');
-    await page.keyboard.press('Enter');assert.equal(await selector.getAttribute('data-filter-state'),'included');
+    await selector.focus();await page.keyboard.press('Space');assert.equal(await selector.getAttribute('data-filter-state'),'included');assert.equal(await selector.evaluate(e=>document.activeElement===e),true,'rerender retains keyboard focus');
+    await page.keyboard.press('Enter');assert.equal(await selector.getAttribute('data-filter-state'),'excluded');
     const none=page.locator('#ctxPanel [data-act="toggle-no-context"]');await none.click();assert.equal(await none.getAttribute('data-filter-state'),'excluded');await none.click();assert.equal(await none.getAttribute('data-filter-state'),'neutral');
+    await selector.focus();await page.keyboard.press('Space');assert.equal(await selector.getAttribute('data-filter-state'),'included','restore green before testing Settings green-to-red transition');
     await page.locator('[data-act="settings"]').click();const modal=page.locator('#modalRoot .modal'),sections=modal.locator('details.settings-section'),log=sections.filter({has:page.locator('summary').filter({hasText:/^Changelog$/})});
     assert.equal(await log.count(),1);await log.locator('summary').click();assert.ok(await log.locator('li').count()>50,'long history remains intact');
     const styles=await modal.evaluate(e=>{const section=[...e.querySelectorAll('.settings-section')],first=section[0],next=section[1],save=e.querySelector('[data-act="save-settings"]');return {font:getComputedStyle(first.querySelector('.kv')).fontSize,otherFont:getComputedStyle(next.querySelector('.kv')).fontSize,surface:getComputedStyle(first).backgroundColor,otherSurface:getComputedStyle(next).backgroundColor,summary:getComputedStyle(first.querySelector('summary')).padding,otherSummary:getComputedStyle(next.querySelector('summary')).padding,last:e.lastElementChild.contains(save),overflow:e.scrollWidth<=e.clientWidth+1};});
@@ -622,7 +624,7 @@ test('RISK context and Settings browser: touch keyboard filter counts disclosure
     await modal.locator('summary').filter({hasText:/^Scanning and recurrence$/}).click();await page.locator('#stWorkedHrs').fill('19');await page.locator('#stHorizon').fill('999');
     await modal.locator('summary').filter({hasText:/^Contexts$/}).click();const manager=modal.locator('[data-ctx="c_errand"]');await manager.click();assert.equal(await manager.getAttribute('data-filter-state'),'excluded');assert.equal(await page.locator('#stWorkedHrs').inputValue(),'19','cycling a context does not discard other Settings drafts');
     const save=modal.locator('[data-act="save-settings"]');await save.scrollIntoViewIfNeeded();if(width<1000)await save.tap();else await save.click();assert.equal(await page.locator('#modalRoot .modal').count(),0);
-    await page.evaluate(()=>persist());await page.reload();await page.waitForFunction(()=>state?.tasks?.length===3);assert.equal(await page.evaluate(()=>state.settings.workedHours),19);assert.equal(await page.evaluate(()=>state.settings.horizonMin),480);assert.equal(await page.evaluate(()=>state.contexts[0].excluded),true);
+    await page.evaluate(()=>persist());await page.reload();await page.waitForFunction(()=>state?.tasks?.length===3);await page.evaluate(()=>document.getElementById('motionDialog')?.close());assert.equal(await page.evaluate(()=>state.settings.workedHours),19);assert.equal(await page.evaluate(()=>state.settings.horizonMin),480);assert.equal(await page.evaluate(()=>state.contexts[0].excluded),true);
     await page.evaluate(()=>openSettings());await page.locator('#modalRoot [data-act="close-modal"]').click();assert.equal(await page.evaluate(()=>state.settings.workedHours),19,'closing Settings retains the saved value');
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
     if(process.env.CONTEXT_EVIDENCE_DIR)await page.screenshot({path:path.join(process.env.CONTEXT_EVIDENCE_DIR,`${name}-${width}x${height}-contexts.png`)});
@@ -6135,26 +6137,26 @@ test("UI: the arrow disappears once scanning starts and a task is dotted", async
 });
 
 /* ---------- undo advertises its key like every other keyboard control ----------
-   Undo has always had a `u` hotkey, but the only place that said so was the
+   Undo's shortcut is now `z`; keep its hint beside the label rather than only in the
    tooltip — so the one control you reach for in a hurry was the one you had to
    hover to learn. It carries the same keyhint glyph as Yes/No/Done/Delete. */
 
-test("UI: the undo button carries its u keyhint glyph", () => {
+test("UI: the undo button carries its z keyhint glyph", () => {
   const m = html.match(/<button class="ghost" data-act="undo"[^>]*>([\s\S]*?)<\/button>/);
   assert.ok(m, "the undo button should still be a ghost button in the header");
-  assert.match(m[1], /<span class="keyhint">u<\/span>/,
-    `expected a u keyhint glyph inside the undo button, got: ${m[1]}`);
+  assert.match(m[1], /<span class="keyhint">z<\/span>/,
+    `expected a z keyhint glyph inside the undo button, got: ${m[1]}`);
 });
 
 test("UI: undo's keyhint glyph sits after its label, as it does on every other keyboard button", () => {
   const m = html.match(/<button class="ghost" data-act="undo"[^>]*>([\s\S]*?)<\/button>/);
-  assert.match(m[1], /^[^<]*\S[^<]*<span class="keyhint">u<\/span>$/,
+  assert.match(m[1], /^[^<]*\S[^<]*<span class="keyhint">z<\/span>$/,
     `the glyph should trail the label with nothing after it, got: ${m[1]}`);
 });
 
 test("UI: undo's tooltip still names the key, so glyph and tooltip agree", () => {
   const m = html.match(/<button class="ghost" data-act="undo"([^>]*)>/);
-  assert.match(m[1], /title="[^"]*\(u\)"/, `expected the key named in the tooltip, got: ${m[1]}`);
+  assert.match(m[1], /title="[^"]*\(z\)"/, `expected the key named in the tooltip, got: ${m[1]}`);
 });
 
 test("undo: the header button reverses the last action through the normal onAction path", async () => {
@@ -24720,9 +24722,61 @@ test('RISK Last task WOOP: exhausted scan reaches walkthrough through real Start
  assert.ok(peer);assert.equal(ctx.state.tasks.find(t=>t.id===task.id).woopPlan.outcome,'Private outcome');
 });
 
+test('RISK bulk toolbar: mounted controls stay outside scrolling rows and retain filtered selection through filter changes',async()=>{
+ const {ctx,shim}=await loadApp();const ids=[];for(let i=0;i<36;i++)ids.push(ctx.addTask('Private match '+i).id);const outside=ctx.addTask('Private outside');ctx.state.listOpen=true;ctx.setListQuery('Private match');
+ const body=shim.document.getElementById('listBody'),toolbar=shim.document.getElementById('listBulkToolbar');
+ assert.doesNotMatch(body.innerHTML,/data-act="bulk-select(?:-all)?"/,'selection toolbar must remain outside the task scroller rather than scrolling away with rows');
+ assert.match(toolbar.innerHTML,/class="ltag"[^>]*data-act="bulk-select"/,'toolbar reuses neighboring compact All Tasks control classes');assert.equal(toolbar.hidden,false);
+ body.scrollTop=420;ctx.onAction('bulk-select-all');assert.equal(body.scrollTop,420,'selection rerender preserves the task scroller position');assert.match(toolbar.innerHTML,/36 selected/,'Select all includes matching tasks below the fold');
+ assert.equal(vm.runInContext('bulkSelection.has('+JSON.stringify(outside.id)+')',ctx),false,'filtered-out board task stays unselected');
+ ctx.setListQuery('Private match 1');assert.match(toolbar.innerHTML,/11 selected/,'changing filters prunes only the newly hidden selection');
+ ctx.onAction('bulk-edit');assert.match(shim.document.getElementById('modalRoot').innerHTML,/Edit 11 selected tasks/);ctx.closeModal();
+ ctx.setListQuery('Private match');assert.match(toolbar.innerHTML,/11 selected/,'revealing hidden rows does not silently add them');ctx.onAction('bulk-select-all');assert.match(toolbar.innerHTML,/36 selected/);
+ ctx.onAction('bulk-cancel');assert.match(toolbar.innerHTML,/data-act="bulk-edit" disabled/);assert.doesNotMatch(toolbar.innerHTML,/\d+ selected/);assert.equal(JSON.stringify(ctx.state.tasks.map(t=>({id:t.id,title:t.title,due:t.due}))),JSON.stringify([...ids.map((id,i)=>({id,title:'Private match '+i,due:null})),{id:outside.id,title:'Private outside',due:null}]));
+ ctx.onAction('toggle-list');assert.equal(toolbar.hidden,true,'collapsed pane hides the toolbar');ctx.onAction('toggle-list');assert.equal(toolbar.hidden,false);
+ ctx.setListQuery('No private match');assert.match(toolbar.innerHTML,/data-act="bulk-select-all" disabled/);assert.match(body.innerHTML,/No tasks match/);
+ assert.match(html,/<div id="listBody" hidden><\/div>\s*<div[^>]*id="listBulkToolbar"[^>]*hidden/,'toolbar is a sibling below the actual scroll surface');
+ assert.match(html,/\.listbulk\s*\{[^}]*padding-bottom:max\(9px,env\(safe-area-inset-bottom\)\)/,'pane-frozen footer reserves its own safe-area space');
+});
+
+test('RISK bulk row selection: selected label replaces the existing rank slot and deselection restores its format',async()=>{
+ for(const metric of ['rank','chance']){
+  const {ctx,shim}=await loadApp();const task=ctx.addTask('Private long task title retains its existing line wrapping');ctx.addTask('Private other');ctx.state.listOpen=true;ctx.state.settings.listMetric=metric;ctx.renderList();const body=shim.document.getElementById('listBody');
+  const original=body.innerHTML.match(/<span class="tkl">([^<]+)<\/span>/)[1];ctx.onAction('bulk-select');
+  assert.match(body.innerHTML,/<button[^>]*class="rank-summary bulk-rank-toggle"[^>]*data-act="bulk-toggle"/,'actual rank slot must become the selection control, rather than adding a task-title control');
+  assert.doesNotMatch(body.innerHTML,/<div class="tmain">\s*<button[^>]*data-act="bulk-toggle"/,'no added title-line selection control');assert.doesNotMatch(body.innerHTML,/class="trow [^"]*bulk-selecting/,'selection must retain the existing rating and title grid');
+  ctx.onAction('bulk-toggle',{dataset:{id:task.id}});assert.match(body.innerHTML,/<span class="tkl">Selected<\/span>/);assert.match(body.innerHTML,/aria-pressed="true" aria-label="Deselect Private long task title/);
+  ctx.onAction('bulk-toggle',{dataset:{id:task.id}});assert.doesNotMatch(body.innerHTML,/<span class="tkl">Selected<\/span>/);assert.ok(body.innerHTML.includes('<span class="tkl">'+original+'</span>'),'deselect restores original rank or percent formatting');
+ }
+});
+
+test('RISK bulk toolbar keyboard: rerender restores the focused toolbar action and row toggle',async()=>{
+ const {ctx,shim}=await loadApp();const task=ctx.addTask('Private keyboard task');ctx.state.listOpen=true;ctx.renderList();
+ const toolbar=shim.document.getElementById('listBulkToolbar'),body=shim.document.getElementById('listBody');let focused='';
+ toolbar.querySelectorAll=()=>['bulk-select','bulk-select-all','bulk-edit','bulk-cancel'].map(act=>({dataset:{act},disabled:false,focus:()=>{focused=act;}}));
+ body.querySelectorAll=()=>[{dataset:{act:'bulk-toggle',id:task.id},focus:()=>{focused=task.id;}}];
+ shim.document.activeElement={dataset:{act:'bulk-select'}};ctx.onAction('bulk-select');assert.equal(focused,'bulk-select','keyboard Select must retain focus after its DOM is replaced');
+ shim.document.activeElement={dataset:{act:'bulk-select-all'}};ctx.onAction('bulk-select-all');assert.equal(focused,'bulk-select-all');
+ shim.document.activeElement={dataset:{act:'bulk-toggle',id:task.id}};ctx.onAction('bulk-toggle',{dataset:{id:task.id}});assert.equal(focused,task.id);
+ shim.document.activeElement={dataset:{act:'bulk-cancel'}};ctx.onAction('bulk-cancel');assert.equal(focused,'bulk-select','Cancel returns focus to the remaining Select control');
+});
+
+test('RISK bulk toolbar guidance: extended FAQ describes frozen controls and rank-slot selection',async()=>{
+ const {ctx,shim}=await loadApp();ctx.openHelp();const faq=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(faq,/controls stay at the bottom.*task rows scroll/i);assert.match(faq,/Selected.*click.*deselect/i);assert.match(faq,/rank slot.*row height/i);assert.doesNotMatch(faq,/Select adds a selection button to each row/);
+});
+
+test('RISK repository process boundary: actual visual tests compare every changed control with neighboring controls and scrolled states',()=>{
+ for(const name of ['CLAUDE.md','RELEASE_GATES.md']){
+  const guide=fs.readFileSync(path.join(__dirname,name),'utf8').replace(/\s+/g,' ');assert.match(guide,/Actual visual tests are mandatory/,'review guidance must require executed visual tests, not screenshot presence alone');
+  assert.match(guide,/computed color scheme and paint/i,'theme labels must not substitute for actual applied colors');assert.match(guide,/theme labels alone.*not.*coverage/i);
+  assert.match(guide,/changed control.*established neighboring control/i);assert.match(guide,/top, middle and end.*scroll/i);assert.match(guide,/day and night.*enlarged/i);assert.match(guide,/screenshots in isolation.*not.*pass/i);
+ }
+});
+
 test('RISK bulk task editing: displayed selection and opted fields preserve identity and reject stale conflicts',async()=>{
  const {ctx,shim}=await loadApp();const a=ctx.addTask('Selected A'),b=ctx.addTask('Selected B'),hidden=ctx.addTask('Hidden');ctx.state.listOpen=true;ctx.setListQuery('Selected');
- ctx.onAction('bulk-select-all');assert.match(shim.document.getElementById('listBody').innerHTML,/2 selected/);
+ ctx.onAction('bulk-select-all');assert.match(shim.document.getElementById('listBulkToolbar').innerHTML,/2 selected/);
  ctx.onAction('bulk-edit');assert.match(shim.document.getElementById('modalRoot').innerHTML,/Apply Due/);
  const identity=JSON.stringify([a.title,a.mu,a.sigma,a.ratingHistory,b.title,b.mu,b.sigma,b.ratingHistory]);
  shim.document.getElementById('bulkApplyDue').checked=true;shim.document.getElementById('bulkDue').value='2027-01-12';ctx.onAction('bulk-save');
@@ -24764,7 +24818,7 @@ test('RISK bulk task editing: offline two-task cloud conflict preserves fresh pe
  const initial=await loadApp(),first=initial.ctx.addTask('Private A'),second=initial.ctx.addTask('Private B'),base=JSON.parse(initial.ctx.cloudPayload()),h=makeSyncHarness({remote:base,rev:4});
  const app=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(base)},cloudSyncFactory:h.factory}),{ctx,shim}=app;await ctx.cloudPull();await syncSettle(30);h.failPull=true;
  ctx.state.listOpen=true;ctx.onAction('bulk-select-all');ctx.onAction('bulk-edit');shim.document.getElementById('bulkApplyDue').checked=true;shim.document.getElementById('bulkDue').value='2027-08-01';ctx.onAction('bulk-save');assert.equal(await ctx.persist(),true);const offline=await loadApp({seedStorage:{[SYNC_STORE_KEY]:shim.localStorage.getItem(SYNC_STORE_KEY)}});assert.equal(offline.ctx.state.tasks.find(t=>t.id===second.id).due,'2027-08-01');
- const peer=JSON.parse(JSON.stringify(base));peer.tasks.find(t=>t.id===first.id).due='2027-09-01';peer.tasks.find(t=>t.id===second.id).title='Fresh peer title';h.writeBehindBack(peer);h.failPull=false;await ctx.cloudPull();await ctx.cloudPushNow();await syncSettle(80);const saved=h.remoteState();assert.equal(saved.tasks.find(t=>t.id===first.id).due,'2027-09-01');assert.equal(saved.tasks.find(t=>t.id===second.id).due,'2027-08-01');assert.equal(saved.tasks.find(t=>t.id===second.id).title,'Fresh peer title');assert.match(shim.document.getElementById('listBody').innerHTML,/1 currently match in this tab; 1 have different values or are no longer open/,'actual two-task reconnect reports partial adoption');
+ const peer=JSON.parse(JSON.stringify(base));peer.tasks.find(t=>t.id===first.id).due='2027-09-01';peer.tasks.find(t=>t.id===second.id).title='Fresh peer title';h.writeBehindBack(peer);h.failPull=false;await ctx.cloudPull();await ctx.cloudPushNow();await syncSettle(80);const saved=h.remoteState();assert.equal(saved.tasks.find(t=>t.id===first.id).due,'2027-09-01');assert.equal(saved.tasks.find(t=>t.id===second.id).due,'2027-08-01');assert.equal(saved.tasks.find(t=>t.id===second.id).title,'Fresh peer title');assert.match(shim.document.getElementById('listBulkToolbar').innerHTML,/1 currently match in this tab; 1 have different values or are no longer open/,'actual two-task reconnect reports partial adoption');
  const deleting=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(saved)},cloudSyncFactory:h.factory});await deleting.ctx.cloudPull();h.failPull=true;deleting.ctx.state.listOpen=true;deleting.ctx.onAction('bulk-select-all');deleting.ctx.onAction('bulk-edit');deleting.shim.document.getElementById('bulkApplyDue').checked=true;deleting.shim.document.getElementById('bulkDue').value='2027-10-01';deleting.ctx.onAction('bulk-save');await deleting.ctx.persist();
  const peerDelete=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(saved)}});peerDelete.ctx.onAction('delete-task',{dataset:{id:first.id}});h.writeBehindBack(JSON.parse(peerDelete.ctx.cloudPayload()));h.failPull=false;await deleting.ctx.cloudPull();await deleting.ctx.cloudPushNow();await syncSettle(80);assert.equal(h.remoteState().tasks.some(t=>t.id===first.id),false,'stale batch does not resurrect deleted selected task');assert.equal(h.remoteState().tasks.find(t=>t.id===second.id).due,'2027-10-01');
 });
@@ -24789,19 +24843,15 @@ test('RISK bulk task editing: concurrent recovery keeps backups and existing boa
 });
 test('RISK bulk task editing: current batch result distinguishes partial reconciliation from sync success and offers no batch Undo',async()=>{
  const {ctx,shim}=await loadApp(),a=ctx.addTask('Private A'),b=ctx.addTask('Private B');ctx.state.listOpen=true;ctx.onAction('bulk-select-all');ctx.onAction('bulk-edit');shim.document.getElementById('bulkApplyDue').checked=true;shim.document.getElementById('bulkDue').value='2028-02-01';ctx.onAction('bulk-save');
- assert.match(shim.document.getElementById('listBody').innerHTML,/Bulk edit requested for 2 tasks: 2 currently match in this tab; 0 have different values or are no longer open/);assert.match(shim.document.getElementById('listBody').innerHTML,/This is not a server save confirmation/);
- ctx.state.tasks.find(t=>t.id===a.id).due='2028-03-01';ctx.renderList();assert.match(shim.document.getElementById('listBody').innerHTML,/1 currently match in this tab; 1 have different values or are no longer open/);assert.match(shim.document.getElementById('listBody').innerHTML,/Check Settings recovery backups/);assert.doesNotMatch(shim.document.getElementById('listBody').innerHTML,/data-act="bulk-undo"/);
- ctx.state.syncAccount='another-private-account';ctx.renderList();assert.doesNotMatch(shim.document.getElementById('listBody').innerHTML,/Bulk edit requested/,'result does not leak across accounts');
+ assert.match(shim.document.getElementById('listBulkToolbar').innerHTML,/Bulk edit requested for 2 tasks: 2 currently match in this tab; 0 have different values or are no longer open/);assert.match(shim.document.getElementById('listBulkToolbar').innerHTML,/This is not a server save confirmation/);
+ ctx.state.tasks.find(t=>t.id===a.id).due='2028-03-01';ctx.renderList();assert.match(shim.document.getElementById('listBulkToolbar').innerHTML,/1 currently match in this tab; 1 have different values or are no longer open/);assert.match(shim.document.getElementById('listBulkToolbar').innerHTML,/Check Settings recovery backups/);assert.doesNotMatch(shim.document.getElementById('listBulkToolbar').innerHTML,/data-act="bulk-undo"/);
+ ctx.state.syncAccount='another-private-account';ctx.renderList();assert.doesNotMatch(shim.document.getElementById('listBulkToolbar').innerHTML,/Bulk edit requested/,'result does not leak across accounts');
 });
 test('RISK bulk task editing: enlarged modal fieldsets shrink and native controls retain available width',()=>{
  assert.match(html,/\.bulk-fields\s*\{[^}]*min-width:0[^}]*max-width:100%/,'observed chrome 390px 200% overflow needs fieldsets to shrink');assert.match(html,/\.bulk-fields input\[type=number\]\s*\{[^}]*min-width:0[^}]*max-width:100%/,'native numeric control must fit enlarged modal');assert.match(html,/<fieldset class="bulk-fields">/);
 });
 
-test('RISK bulk task editing: enlarged selection rows give task controls full width',()=>{
- assert.match(html,/\.listwrap \.trow\.bulk-selecting\s*\{grid-template-columns:minmax\(0,1fr\)\}/,'observed enlarged phone selection must not share the narrow rating column');
- assert.match(html,/\.trow\.bulk-selecting \.tmain \[data-act=bulk-toggle\]\s*\{[^}]*max-width:100%[^}]*white-space:normal/,'selection button stays bounded and wraps');
- assert.ok(html.includes("(bulkSelecting?' bulk-selecting':'')"),'full-width layout applies only during selection');
-});
+
 
 // Actual Chrome390px at200% clipped Reduced motion and put the native dialog
 // beyond the viewport; retain the fixed-height and intrinsic-grid contracts.
@@ -25052,6 +25102,121 @@ test('RISK Settings changelog reflow: actual archived notes retain readable toke
  ctx.openHelp();assert.match(shim.document.getElementById('modalRoot').innerHTML,/Release notes wrap long words in enlarged views/,'extended FAQ explains enlarged release-note reflow');
 });
 
+test('RISK binary context presentation: active filters derive excluded controls on both surfaces without changing saved choices',async()=>{
+ const {ctx,shim}=await loadApp();const [a,b]=ctx.state.contexts;b.active=false;delete b.excluded;ctx.state.ctxOpen=true;
+ const saved=JSON.stringify(ctx.state.contexts),settings=JSON.stringify(ctx.state.settings);
+ const button=makeFakeElement();button.dataset={ctx:b.id,ctxScope:'settings',act:'cycle-context'};button.setAttribute('data-ctx',b.id);
+ shim.document.getElementById('modalRoot').querySelectorAll=()=>[button];ctx.renderCtx();
+ assert.equal(ctx.contextControlInfo(b).mode,'excluded','a neutral requirement is visibly excluded while another context is included');
+ assert.equal(ctx.contextControlInfo(b).label,b.name+': excluded. Next: included.');
+ assert.equal(button.dataset.filterState,'excluded','Settings matches the main selector');assert.match(button.innerHTML,/✕/);
+ assert.match(ctx.contextControlHTML(b),/data-filter-state="excluded"/);assert.match(shim.document.getElementById('ctxPanel').innerHTML,/1 active, 1 excluded, 1 inactive/);
+ assert.equal(JSON.stringify(ctx.state.contexts),saved,'presentation never migrates saved neutral choices');assert.equal(JSON.stringify(ctx.state.settings),settings);
+ ctx.openSettings();assert.equal(JSON.stringify(ctx.state.contexts),saved,'opening Settings does not migrate');
+ assert.match(shim.document.getElementById('modalRoot').innerHTML,new RegExp('data-ctx="'+b.id+'"[^>]*data-filter-state="excluded"'));
+});
+
+test('RISK binary context interaction: real handlers include displayed exclusions immediately and preserve zero-active AND and No context rules',async()=>{
+ for(const scope of ['main','settings']){
+  const {ctx,shim}=await loadApp();const [a,b]=ctx.state.contexts;b.active=false;delete b.excluded;
+  const one=ctx.addTask('Private A',false,[a.id]),both=ctx.addTask('Private AB',false,[a.id,b.id]),none=ctx.addTask('Private none'),unknown=ctx.addTask('Private unknown',false,['retired']);
+  const tasks=JSON.stringify(ctx.state.tasks);assert.equal(ctx.isEligible(one),true);assert.equal(ctx.isEligible(both),false);
+  const button=makeFakeElement();button.dataset={id:b.id,ctx:b.id,ctxScope:scope,act:'cycle-context'};shim.document.activeElement=button;
+  ctx.onAction('cycle-context',button);assert.equal(ctx.contextFilterState(b),'included');assert.equal(ctx.isEligible(both),true);
+  ctx.undo();assert.equal(ctx.state.contexts[1].active,false);assert.equal(ctx.state.contexts[1].excluded===true,false,'Undo restores original neutral representation');assert.equal(ctx.contextControlInfo(ctx.state.contexts[1]).mode,'excluded');
+  ctx.onAction('cycle-context',button);ctx.onAction('cycle-context',button);assert.equal(ctx.state.contexts[1].excluded,true);
+  ctx.onAction('cycle-context',button);assert.equal(ctx.contextFilterState(ctx.state.contexts[1]),'included','explicit red also reaches green in one click while filtering active');
+  ctx.onAction('cycle-context',button);ctx.onAction('cycle-context',{dataset:{id:a.id}});
+  assert.equal(ctx.activeCtxSet().size,0);assert.equal(ctx.isEligible(one),false);assert.equal(ctx.isEligible(both),false);assert.equal(ctx.isEligible(none),true);assert.equal(ctx.isEligible(unknown),true);
+  assert.equal(ctx.contextControlInfo(ctx.state.contexts[0]).label,a.name+': excluded. Next: neutral.','last included exclusion returns to the established zero-active presentation');
+  ctx.onAction('cycle-context',{dataset:{id:a.id}});assert.equal(ctx.contextFilterState(ctx.state.contexts[0]),'neutral');assert.equal(ctx.isEligible(one),false);
+  ctx.onAction('cycle-context',{dataset:{id:a.id}});assert.equal(ctx.contextFilterState(ctx.state.contexts[0]),'included');
+  assert.equal(ctx.contextControlInfo(null).mode,'neutral');ctx.onAction('toggle-no-context',{});assert.equal(ctx.isEligible(none),false);assert.equal(ctx.isEligible(unknown),false);assert.equal(ctx.isEligible(one),true);
+  assert.equal(JSON.stringify(ctx.state.tasks),tasks,'controls and Undo preserve assignments and ratings');
+ }
+});
+
+test('RISK binary context saved data: reload and cloud adoption retain neutral choices and derive excluded presentation',async()=>{
+ const source=await loadApp();const [a,b]=source.ctx.state.contexts;b.active=false;delete b.excluded;const task=source.ctx.addTask('Private shared requirement',false,[a.id,b.id]);
+ await source.ctx.persist();const payload=source.ctx.cloudPayload();
+ const reloaded=await loadApp({seedStorage:{[SYNC_STORE_KEY]:payload}});assert.equal(reloaded.ctx.state.contexts[1].active,false);assert.equal(reloaded.ctx.state.contexts[1].excluded===true,false);
+ assert.equal(reloaded.ctx.contextControlInfo(reloaded.ctx.state.contexts[1]).mode,'excluded','reload derives red without a saved-data migration');assert.equal(reloaded.ctx.isEligible(reloaded.ctx.state.tasks.find(t=>t.id===task.id)),false);
+ const h=makeSyncHarness({remote:JSON.parse(payload),rev:3}),client=await loadApp({cloudSyncFactory:h.factory});await syncSettle(40);await client.ctx.cloudPull();
+ const adopted=client.ctx.state.contexts.find(c=>c.id===b.id);assert.equal(adopted.active,false);assert.equal(adopted.excluded===true,false);assert.equal(client.ctx.contextControlInfo(adopted).mode,'excluded');
+ assert.equal(h.remoteState().contexts.find(c=>c.id===b.id).excluded===true,false,'cloud adoption does not publish inferred exclusions');
+ client.ctx.state.contexts=[];client.ctx.state.settings.excludeNoContext=true;client.ctx.renderCtx();assert.match(client.shim.document.getElementById('ctxPanel').innerHTML,/toggle-ctx/);assert.equal(client.ctx.isEligible(client.ctx.state.tasks[0]),true,'zero contexts bypass the synthetic filter');
+});
+
+test('RISK binary context guidance: FAQ explains conditional two-state controls and unchanged zero-active matching',async()=>{
+ const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(help,/While any context is active,.*included.*excluded/i);assert.match(help,/With no active contexts, only tasks without a known context can scan/);assert.match(help,/No context excludes unassigned/);
+ assert.match(help,/No active contexts.*neutral/i);assert.match(help,/Every assigned known context must be active/);
+ assert.match(help,/red display does not change saved neutral choices/i);assert.match(help,/unknown or deleted contexts/i);assert.match(help,/Context changes save, sync and support Undo/i);assert.match(help,/selector stays visible without contexts/i);assert.match(help,/New contexts start active/i);assert.match(help,/<dt>How do I create contexts and filter All Tasks\?<\/dt>/);
+});
+
+test('RISK Undo Z shortcut: real keyboard dispatch reverses only the latest action and retains durable Undo semantics',async()=>{
+ for(const key of ['z','Z']){
+  const {ctx,shim}=await loadApp();ctx.closeModal();const keep=ctx.addTask('Private retained task');const before=JSON.stringify(ctx.state.tasks);ctx.addTask('Private undone task');await ctx.persist();
+  shim.document.dispatchEvent({type:'keydown',key,shiftKey:key==='Z',repeat:false});assert.equal(JSON.stringify(ctx.state.tasks),before,'plain Z uses the existing Undo consumer');
+  await ctx.persist();const reloaded=await loadApp({seedStorage:{[SYNC_STORE_KEY]:shim.localStorage.getItem(SYNC_STORE_KEY)}});assert.deepEqual(Array.from(reloaded.ctx.state.tasks,t=>t.id),[keep.id]);
+  ctx.addTask('Private second action');ctx.onAction('undo',{});assert.equal(JSON.stringify(ctx.state.tasks),before,'button Undo retains the same rule');
+ }
+});
+
+test('RISK Undo Z guards: U is retired and modified editable modal and scene keypresses leave board and native defaults alone',async()=>{
+ const {ctx,shim}=await loadApp();ctx.closeModal();ctx.addTask('Private retained');ctx.addTask('Private pending Undo');const saved=JSON.stringify(ctx.state),depth=vm.runInContext('undoStack.length',ctx);
+ let prevented=0;const dispatch=event=>shim.document.dispatchEvent({type:'keydown',key:'z',repeat:false,preventDefault(){prevented++;},...event});
+ for(const key of ['u','U'])dispatch({key});
+ for(const modifiers of [{ctrlKey:true},{metaKey:true},{altKey:true},{ctrlKey:true,shiftKey:true},{metaKey:true,shiftKey:true}])dispatch(modifiers);
+ for(const tag of ['input','textarea','select'])dispatch({target:{id:'private-'+tag,matches:selector=>selector==='input,textarea,select',isContentEditable:false}});
+ dispatch({target:{matches:()=>false,isContentEditable:true}});
+ const query=shim.document.querySelector.bind(shim.document);for(const selector of ['.mback','#motionDialog[open], #sceneTimeDialog[open], html.viewing-scene']){
+  shim.document.querySelector=s=>s===selector?{}:query(s);dispatch({});
+ }
+ shim.document.querySelector=query;
+ assert.equal(JSON.stringify(ctx.state),saved);assert.equal(vm.runInContext('undoStack.length',ctx),depth);assert.equal(prevented,0,'native text undo and modifier shortcuts are not cancelled');
+ dispatch({});assert.equal(ctx.state.tasks.length,1,'ordinary Z still works after guarded events');
+});
+
+test('RISK Undo Z guidance: header hint tooltip and Quick start name Z while preserving editable native undo guidance',async()=>{
+ const {ctx,shim}=await loadApp();ctx.closeModal();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(html,/<button class="ghost" data-act="undo" title="Undo last action \(z\)">↺ undo<span class="keyhint">z<\/span>/);
+ assert.match(help,/<b>z<\/b> to undo/);assert.doesNotMatch(help,/<b>u<\/b> to undo/);
+ assert.match(help,/Ctrl.*Z.*Command.*Z.*text fields/i);
+});
+
+test('RISK Edit E shortcut: real keyboard dispatch edits only the offered scanner task without changing the board',async()=>{
+ for(const scenario of ['candidate','paused','intervention','end','missing-candidate','no-offer']){
+  const {ctx,shim}=await loadApp();ctx.closeModal();const bench=ctx.addTask('Private benchmark'),candidate=ctx.addTask('Private candidate');
+  Object.assign(ctx.state,{chain:scenario==='no-offer'?[]:[bench.id],candidateId:candidate.id,mode:scenario==='paused'?'work':'scan',interventionActive:scenario==='intervention'});
+  if(scenario==='end')ctx.state.considered[candidate.id]='no';if(scenario==='missing-candidate')ctx.state.candidateId='retired-private';ctx.render();
+  const offered=scenario==='candidate'?candidate:bench;const scan=shim.document.getElementById('scan').innerHTML;
+  assert.equal((scan.match(/class="keyhint">e<\/span>/g)||[]).length,scenario==='no-offer'?0:1);
+  if(scenario!=='no-offer')assert.match(scan,new RegExp('data-act="edit" data-id="'+offered.id+'"[^>]*aria-label="Edit this task \\(e\\)"'));
+  const before=JSON.stringify(ctx.state),depth=vm.runInContext('undoStack.length',ctx);shim.document.dispatchEvent({type:'keydown',key:'e',repeat:false});
+  const modal=shim.document.getElementById('modalRoot').innerHTML;
+  if(scenario==='no-offer')assert.equal(modal,'','E cannot choose a task from an unstarted list');else{
+   const target=scenario==='candidate'?candidate:bench;assert.match(modal,new RegExp('data-act="save-edit" data-id="'+target.id+'"'),'opens the same existing individual editor as the offered Edit button');
+  }
+  assert.equal(JSON.stringify(ctx.state),before,'opening Edit does not save or change task state');assert.equal(vm.runInContext('undoStack.length',ctx),depth);
+ }
+});
+
+test('RISK Edit E guards and hints: modifiers editable fields modal and scene focus do not dispatch and only the offered Edit advertises E',async()=>{
+ const {ctx,shim}=await loadApp();ctx.closeModal();const bench=ctx.addTask('Private benchmark'),candidate=ctx.addTask('Private candidate');Object.assign(ctx.state,{chain:[bench.id],candidateId:candidate.id,mode:'scan'});ctx.render();
+ const scan=shim.document.getElementById('scan').innerHTML;assert.equal((scan.match(/class="keyhint">e<\/span>/g)||[]).length,1,'one offered Edit hint');assert.match(scan,new RegExp('data-act="edit" data-id="'+candidate.id+'"[^>]*aria-label="Edit this task \\(e\\)"'));
+ const before=JSON.stringify(ctx.state);let prevented=0;const dispatch=event=>shim.document.dispatchEvent({type:'keydown',key:'e',repeat:false,preventDefault(){prevented++;},...event});
+ for(const modifiers of [{ctrlKey:true},{metaKey:true},{altKey:true},{metaKey:true,shiftKey:true}])dispatch(modifiers);
+ for(const tag of ['input','textarea','select'])dispatch({target:{id:'private-'+tag,matches:s=>s==='input,textarea,select'}});dispatch({target:{matches:()=>false,isContentEditable:true}});
+ const query=shim.document.querySelector.bind(shim.document);for(const selector of ['.mback','#motionDialog[open], #sceneTimeDialog[open], html.viewing-scene']){shim.document.querySelector=s=>s===selector?{}:query(s);dispatch({});}shim.document.querySelector=query;
+ assert.equal(shim.document.getElementById('modalRoot').innerHTML,'');assert.equal(JSON.stringify(ctx.state),before);assert.equal(prevented,0);
+ dispatch({key:'E',shiftKey:true});assert.match(shim.document.getElementById('modalRoot').innerHTML,new RegExp('data-act="save-edit" data-id="'+candidate.id+'"'));
+});
+
+test('RISK Edit E guidance: Quick start explains the offered task editor and plain shortcut scope',async()=>{
+ const {ctx,shim}=await loadApp();ctx.closeModal();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(help,/<b>e<\/b> to edit/);assert.match(help,/E opens.*candidate.*benchmark/i);assert.match(help,/shortcuts.*text fields.*editable.*dialogs/i);
+});
 
 test('RISK CLOUD CLEANUP RESUME: interrupted deleting generation resumes without forbidden transition and preserves acknowledged board',async()=>{
  const h=await loadCloudBackendV2({rootData:null,timeoutMs:5000,failures:{enforceDeletingTransition:true}});
@@ -25114,4 +25279,20 @@ test('Firestore rules: production cleanup resumes deleting tombstones and protec
   assert.deepEqual(Array.from(cleanup.removed),['stranded']);
   for(const id of ['active','previous','pending','young'])assert.ok(await adapter.readGeneration(uid,id),id+' is retained');
  }finally{await env.cleanup();}
+});
+
+test('RISK context reconciliation FAQ: actual Help keeps each existing bulk and context question once',async()=>{
+ const {ctx,shim}=await loadApp();ctx.closeModal();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ for(const question of ['How do I edit several tasks together?','Which properties can I change in Bulk Edit?','What happens if selected tasks change before or during Save?','How does Undo work after Bulk Edit?','What does the bulk result count mean?','How do contexts and list filters work?','How do I create contexts and filter All Tasks?'])assert.equal(help.split('<dt>'+question+'</dt>').length-1,1,question+' appears once in rendered Help');
+});
+
+test('RISK context Settings reflow: actual manager name fields can shrink beside protected context and delete controls',async()=>{
+ const {ctx,shim}=await loadApp();ctx.closeModal();const saved=JSON.stringify(ctx.state);ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(settings,/<div class="mgr"><button[^>]*data-act="cycle-context"[\s\S]*?<input type="text" data-mgrname="[^"]+"[^>]*aria-label="Context name"\/[\s\S]*?data-act="del-ctx"/,'real Settings manager retains its state control, editable name and delete action');
+ const rule=html.match(/\.mgr input\[type=text\]\s*\{([^}]*)\}/)?.[1]||'';
+ assert.match(rule,/min-width\s*:\s*0(?:;|$)/,'manager name must shrink below native intrinsic width at enlarged phone size');
+ assert.match(rule,/max-width\s*:\s*100%(?:;|$)/,'name field remains bounded to its available row');
+ assert.match(rule,/flex\s*:\s*1\s+1\s+160px(?:;|$)/,'name field reserves a useful editing width and moves to its own line when needed');
+ const rowRule=html.match(/\.mgr\s*\{([^}]*)\}/)?.[1]||'';assert.match(rowRule,/flex-wrap\s*:\s*wrap/,'an enlarged manager row wraps rather than compressing text into padding');
+ assert.equal(JSON.stringify(ctx.state),saved,'opening the layout consumer never changes saved board choices');
 });
