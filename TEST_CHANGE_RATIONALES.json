@@ -1,5 +1,21 @@
 [
   {
+    "testChangesSha256": "e404a960a4ba10b01c2469b3091d2cf147d3ea6a45e9e697da5cfda77c2ebfc1",
+    "reason": "Add actual rooftop garden paint coverage before gating the two potted plants in daylight; preserve all existing assertions.",
+    "previousBehavior": "Both potted plants painted at every sun altitude.",
+    "intendedBehavior": "Hide both pots and canopies at nonnegative sun altitude, retaining deck and all nighttime plant and light behavior.",
+    "replacementTests": [
+      "RISK rooftop gardens: daylight hides paired plants while preserving decks and nighttime lights"
+    ],
+    "preservedCoverage": [
+      "Existing garden/patio light sampling, weather, actor depth, sailboat schedules, data and walking contracts remain intact."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK rooftop gardens:' tests.js",
+      "failure": "Observed preimplementation RED: daylight painted 2 canopy ellipses when 0 expected, /tmp/chain-rooftop-foliage-red.log; three focused tests subsequently GREEN with zero skips."
+    }
+  },
+  {
     "testChangesSha256": "00ca23157e02b8d2d60c7cc8fc7c4654acbafb6c2d6f0ca071219dd8ecb53f0a",
     "reason": "Add cleanup interruption coverage enforcing the deployed deleting-state rule in the adapter fake, without altering existing regression assertions. Add real-rules production-adapter interruption, concurrent collector and current/previous/pending/young-staging preservation coverage. The real-rules negative control is retrospective; the first VM regression supplied contemporaneous preimplementation RED.",
     "previousBehavior": "The production adapter rewrote an existing deleting tombstone and cleanup failed closed on the forbidden transition, leaving repeated full backlog queries.",

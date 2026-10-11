@@ -1338,6 +1338,43 @@ test('RISK rain density: phone tablet and short screens retain a dense bounded c
  }
 });
 
+test('RISK rooftop gardens: daylight hides paired plants while preserving decks and nighttime lights',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ const start=source.indexOf('      if(gardens.has(i)){'),end=source.indexOf('      if(patios.has(i))',start),paint=source.slice(start,end);
+ assert.ok(start>=0&&end>start,'extract the actual city garden paint consumer');
+ const context=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),context);
+ const rand=n=>{const x=Math.sin(n*127.1+311.7)*43758.5453;return x-Math.floor(x);};
+ for(const [W,H] of [[320,568],[390,844],[568,320],[768,1024],[1440,900]]){
+  const plan=context.LandscapeGeometry.create(W,H).cityscape(rand);
+  assert.ok(plan.gardens.length>0,`${W}x${H}: real seeded garden fixtures exist`);
+  for(const garden of plan.gardens){
+   const roof=plan.towers[garden.index],i=garden.index;
+   const draw=(altitude,lit,night=.8)=>{
+    const rectangles=[],ellipses=[],lines=[],gardenLights={lit:{[i]:lit}},before=JSON.stringify(gardenLights);
+    const b={fillRect(...args){rectangles.push([...args,this.fillStyle]);}};
+    vm.runInNewContext(paint,{b,i,gardens:new Map([[i,garden]]),x:roof.x,y:roof.y,bw:roof.bw,rand,sky:{sun:{altitude}},night,gardenLights,p:{hill:'#345',front:'#123',far:'#567',sky:['#123','#234','#456']},S:{mixHex:(...args)=>args.join(':')},line(_b,...args){lines.push(args)},ellipse(_b,...args){ellipses.push(args)}});
+    assert.equal(JSON.stringify(gardenLights),before,'painting never changes retained lighting state');
+    return {rectangles,ellipses,lines};
+   };
+   const unlit=draw(-20,false),lit=draw(-20,true);
+   assert.equal(unlit.rectangles.length,3,'night retains deck and both pots');
+   assert.equal(unlit.ellipses.length,2,'night retains both plant canopies');
+   assert.deepEqual(lit.rectangles,unlit.rectangles,'lighting does not change pot geometry or colors');
+   assert.deepEqual(lit.ellipses.slice(0,2),unlit.ellipses,'lit roofs retain identical plants');
+   assert.equal(lit.ellipses.length,2+garden.lights,'night retains every sampled garden bulb');
+   assert.deepEqual(draw(-.0001,false,.1),draw(-20,false,.1),'plants remain at negative sun altitude without bright bulbs');
+   for(const altitude of [0,.0001,40]){
+    for(const retainedLit of [false,true]){
+     const day=draw(altitude,retainedLit);
+     assert.equal(day.ellipses.length,0,'daylight hides the paired foliage and retained bulbs');
+     assert.deepEqual(day.rectangles,[unlit.rectangles[0]],'daylight retains only the unchanged garden deck');
+     assert.deepEqual(day.lines,unlit.lines,'daylight preserves the deck edge');
+    }
+   }
+  }
+ }
+});
+
 test('RISK fairy lights: unlit patio strings and every daylight bulb are hidden on phone and desktop',()=>{
  const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),start=source.indexOf('  function paintRooftopPatio('),end=source.indexOf('  function paintRooftopParty(',start),paint=source.slice(start,end);
  const context=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),context);
