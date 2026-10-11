@@ -924,3 +924,4 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK bulk task editing: concurrent recovery keeps backups and existing board Undo boundary explicit
 - RISK bulk task editing: current batch result distinguishes partial reconciliation from sync success and offers no batch Undo
 - RISK bulk task editing: enlarged modal fieldsets shrink and native controls retain available width
+- RISK bulk task editing: enlarged selection rows give task controls full width
