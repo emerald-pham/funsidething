@@ -1,5 +1,53 @@
 [
   {
+    "testChangesSha256": "3d9ec978de0a228371d44f82fb15bd0611e1c7ebadee51c5fea46cc2a690af4b",
+    "reason": "Reconcile released history Likelihood label and its recorded-value boundary test without altering bulk task mutation or rating history data.",
+    "previousBehavior": "All Tasks had only individual Edit and lacked bottom selection controls or explicit batch date clearing.",
+    "intendedBehavior": "Select visible filtered tasks, apply only opted properties, reject batch conflicts, explicitly clear and preserve identities/history/ratings and unrelated peer edits.",
+    "replacementTests": [
+      "RISK task history: compact Likelihood labels retain recorded values across metric boundaries"
+    ],
+    "preservedCoverage": [
+      "Existing dependency self-link/cycle/limit/hard-soft handling remains exclusively in the individual editor; ratings and backup retention algorithms unchanged.",
+      "Existing recovery Undo remains whole-board replacement; explicit regression and FAQ distinguish first recovery Undo from uninterrupted batch reversal. Cloud tests protect newer peer fields, deletion, local retry and ACK semantics."
+    ],
+    "redEvidence": {
+      "command": "Inspect released PR100 exact history label contract and run focused bulk/history/FAQ/inventory cohort",
+      "failure": "History PR100 separately reviewed observed unlabeled compact percentage; this merge retains its independently reviewed test and source unchanged, without claiming bulk owner replayed unrelated RED. Original bulk and FAQ observed RED logs retained; /tmp/chain-bulk-history-reconcile-green.log confirms focused coexistence."
+    }
+  },
+  {
+    "testChangesSha256": "999a1152bd51e9f6a4bf5b88b0150170109f89aae1914cd15e24ca756f571352",
+    "reason": "User-requested filtered bulk task editing needs field-scoped preservation and atomic stale-form checks. New tests only; existing contracts retained.",
+    "previousBehavior": "All Tasks had only individual Edit and lacked bottom selection controls or explicit batch date clearing.",
+    "intendedBehavior": "Select visible filtered tasks, apply only opted properties, reject batch conflicts, explicitly clear and preserve identities/history/ratings and unrelated peer edits.",
+    "replacementTests": [
+      "RISK bulk task editing: displayed selection and opted fields preserve identity and reject stale conflicts",
+      "RISK bulk task editing: blank fields do not delete and explicit clearing survives reload",
+      "RISK bulk task editing: clearing is reversible in the draft and interval changes use the Evergreen reset rule",
+      "RISK bulk task editing: filtered hidden deleted completed and replaced board selections cannot write",
+      "RISK bulk task editing: stale tab save preserves peer fields and durable field conflicts through reload",
+      "RISK bulk task editing: removed context options reject the whole batch rather than saving stale requirements",
+      "RISK bulk task editing: offline two-task cloud conflict preserves fresh peer fields and reconnects without resurrection",
+      "RISK bulk task editing: failed cloud publication retains local batch and retry acknowledges exact payload",
+      "RISK bulk task editing: failed browser pair save retains in-memory batch and retry saves without partial task loss",
+      "RISK bulk task editing: FAQ and editor qualify mixed Apply and later sync recovery limits",
+      "RISK bulk task editing: concurrent recovery keeps backups and existing board Undo boundary explicit",
+      "RISK bulk task editing: current batch result distinguishes partial reconciliation from sync success and offers no batch Undo",
+      "RISK bulk task editing: enlarged modal fieldsets shrink and native controls retain available width",
+      "RISK bulk task editing: enlarged selection rows give task controls full width",
+      "RISK bulk task guidance: bounded answers retain distinct selection property conflict Undo and result instructions"
+    ],
+    "preservedCoverage": [
+      "Existing dependency self-link/cycle/limit/hard-soft handling remains exclusively in the individual editor; ratings and backup retention algorithms unchanged.",
+      "Existing recovery Undo remains whole-board replacement; explicit regression and FAQ distinguish first recovery Undo from uninterrupted batch reversal. Cloud tests protect newer peer fields, deletion, local retry and ACK semantics."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK Quick start content: essential steps' tests.js; node --test --test-name-pattern='RISK bulk task guidance:' tests.js (original feature RED command retained in failure chronology: RISK bulk task editing:)",
+      "failure": "Before implementation, selection count assertion failed and explicit clearing retained old date (/tmp/chain-bulk-red.log). Before input handler changes, reset checkbox was undefined instead of false (/tmp/chain-bulk-red2.log). Two-tab/deletion checks added afterward truthfully provide preservation coverage, not preimplementation RED. Explicit reset opt-in then failed true !== false before removing automatic Apply (/tmp/chain-bulk-red3.log). Removed context option test failed 1 !== 0 before the save-time context validity guard (/tmp/chain-bulk-red4.log). FAQ observed RED before copy repair: lacked detected-before-Save qualification (/tmp/chain-bulk-copy-red.log). Additional cloud failure/reconnect/partial adoption/recovery Undo cases passed on existing sync paths; these are postimplementation preservation checks, not claimed as initial RED. Bulk result assertion failed before result UI existed (/tmp/chain-bulk-result-red.log); current-value result then passed without server-ACK claim or added Undo shortcut (/tmp/chain-bulk-result-green.log). Actual reconnect partial adoption now checks the rendered result. Actual Chrome390px200% modal overflow observed before style repair (/tmp/chain-bulk-physical.log), then new direct fieldset/native-number contract failed (/tmp/chain-bulk-layout-red.log), before min-width/max-width repair.13bulktests green /tmp/chain-bulk-layout-green.log. Independent rendered review bb816bf observed cropped Selected controls and unreadable title at Chrome390px200% (/tmp/chain-bulk-typography-review-bb816bf.md). Focused source contract also failed before layout repair (/tmp/chain-bulk-selection-layout-red.log); 14 bulk tests pass after selection-only stacked row repair (/tmp/chain-bulk-selection-layout-green.log). Actual repaired render remains pending runtime allocation. Independent source review caught later mobile rank selectors overriding the first repair; selector now includes listwrap ancestor so specificity exceeds mobile rank rules. Focused contract distinguishes this precedence. OriginalheadCI failed 130-word FAQanswer limit (/tmp/chain-bulk-ci-original-failed.log); current focused existing contract confirms RED (/tmp/chain-bulk-faq-length-red.log). New bounded-guidance test failed 1!==5 onunsplitFAQ (/tmp/chain-bulk-faq-structure-red.log). Splitfiveanswersretain everyprevioussentence, 22focused tests pass (/tmp/chain-bulk-faq-final-green.log)."
+    }
+  },
+  {
     "testChangesSha256": "af5e37402602bc47e5baedbfd1c8b00be1163e9c68573187e70ec006c56be45d",
     "reason": "User-requested filtered bulk task editing needs field-scoped preservation and atomic stale-form checks. New tests only; existing contracts retained.",
     "previousBehavior": "All Tasks had only individual Edit and lacked bottom selection controls or explicit batch date clearing.",
@@ -4578,6 +4626,41 @@
     "redEvidence": {
       "command": "HEADER_BROWSER_GRANTED=1 node ../evidence/header-red.mjs; node --test --test-reporter=spec --test-name-pattern=\"RISK frozen header clearance:\" tests.js; node --test --test-reporter=spec --test-name-pattern=\"RISK frozen header wrapping:\" tests.js",
       "failure": "Preimplementation real browser RED: AssertionError freezing must retain headroom: scene jumped -6px (header-red.log). Preimplementation tests.js RED: fixed header must retain its original available width; undefined rather than366px (header-source-red.log). Follow-up source RED before slot observation: observe header height and flow width, including scrollbar or container changes (header-slot-observer-red.log). Browser matrix was added after the initial implementation as supplemental coverage; not claimed as a preimplementation native matrix RED. Additional observed browser RED: Settings x370.484375..398.140625 at320px enlarged frozen baseline; normal click timed out because it was outside the viewport (header-native-CPklJP/browser-run.log and header-final-CetQlj captures). d5143 retained identical brand/topbtns/mobile-nowrap/font rules, so no offline claim that it fixed this overflow. New source test failed: enlarged title plus controls must be allowed onto separate rows (header-wrap-source-red.log), before wrapping CSS repair."
+    }
+  },
+  {
+    "testChangesSha256": "7057e8c23a99423b38c7b92a14b982e8d0748ec5615f3a0698eeea29d377b2b1",
+    "reason": "Reconcile the reviewed Likelihood presentation candidate with released motionPR99 main247f842. This incremental push imports its exact already-reviewed tests without weakening them; original Likelihood test and rationale remain intact for main comparison.",
+    "previousBehavior": "Previous pushed5da5217 was based on30afbf4 and therefore lacked the independently reviewed seven-day motion, enlarged prompt and foreground/pageshow tests now released in main.",
+    "intendedBehavior": "Retain all motionPR99 tests exactly from mergedmain, plus unchanged explicit Likelihood boundary/preservation coverage. No new motion implementation or test expectation is introduced by this reconciliation.",
+    "replacementTests": [
+      "RISK motion safety: explicit local choices expire after seven elapsed days and corrupt records fail closed",
+      "RISK motion safety: actual choice handler remembers selection while dismissal never writes consent",
+      "RISK motion safety accessibility: enlarged prompt fits the containing viewport and stacks intrinsic choice cards",
+      "RISK motion safety resume: foreground and restored pages reread expiry before painting without replacing visitors"
+    ],
+    "preservedCoverage": [
+      "All incoming seven-day consent, dismissal, OS preference, prompt sizing, foreground visitor/progress and tab-resume assertions are retained exactly as released main; all history dates, comparison roles, Done and persisted values remain protected."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='compact Likelihood labels' tests.js; motion owner recorded focused motion and foreground test-first commands in retained main rationale entries",
+      "failure": "Own preimplementation missing Likelihood1.08% failure retained /tmp/history-likelihood-red.log. Incoming released motion tests retain their observedRED evidence in main TEST_CHANGE_RATIONALES.json and /tmp/motion-seven-days-ci-repro-red.log and foreground negative-control evidence. Exact motionhead14126be requiredCI38150243908/38150241181 passed before merge; this is unchanged upstream evidence reuse, not a new RED claim."
+    }
+  },
+  {
+    "testChangesSha256": "8cd12e82706f7c8bc46dad70149ed58bc3489f843018c9b050f37887bb7db685",
+    "reason": "User requests an explicit Likelihood label in compact historical metric summaries.",
+    "previousBehavior": "The recorded percentage had no name before Score and Uncertainty.",
+    "intendedBehavior": "Every applicable compact metric summary names Likelihood, including zero, tiny percentage and fallback states; values remain unchanged.",
+    "replacementTests": [
+      "RISK task history: compact Likelihood labels retain recorded values across metric boundaries"
+    ],
+    "preservedCoverage": [
+      "Dates, comparison provenance, plain Done summaries, expanded metrics, native disclosures and all historical records remain unchanged."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='compact Likelihood labels' tests.js",
+      "failure": "Observed before implementation: compact summary identifies the recorded likelihood: 1.08% failed. /tmp/history-likelihood-red.log retains actual output."
     }
   }
 ]

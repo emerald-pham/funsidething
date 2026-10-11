@@ -933,3 +933,4 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - `RISK motion safety resume: foreground and restored pages reread expiry before painting without replacing visitors`
 
 - RISK bulk task guidance: bounded answers retain distinct selection property conflict Undo and result instructions
+- RISK task history: compact Likelihood labels retain recorded values across metric boundaries
