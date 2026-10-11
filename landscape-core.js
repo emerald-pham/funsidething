@@ -383,8 +383,21 @@
   }
   const MOTION_KEY='fvp:chain-scanner:landscape-motion';
   const normalizeMotion=v=>v==='normal'||v==='reduced'?v:null;
-  function readMotion(storage){try{return normalizeMotion(storage.getItem(MOTION_KEY));}catch{return null;}}
-  function saveMotion(storage,value){try{storage.setItem(MOTION_KEY,value);return true;}catch{return false;}}
+  const MOTION_REMEMBER_MS=7*24*60*60*1000;
+  // Safety consent belongs to this browser, never the synced board. Legacy
+  // untimed choices ask again; clock rollback cannot extend consent into future.
+  function readMotion(storage,now=Date.now()){
+    try{
+      const record=JSON.parse(storage.getItem(MOTION_KEY));
+      if(!record||!normalizeMotion(record.choice)||!Number.isFinite(record.savedAt)||record.savedAt<0||!Number.isFinite(now))return null;
+      const age=now-record.savedAt;
+      return age>=0&&age<MOTION_REMEMBER_MS?record.choice:null;
+    }catch{return null;}
+  }
+  function saveMotion(storage,value,now=Date.now()){
+    if(!normalizeMotion(value)||!Number.isFinite(now)||now<0)return false;
+    try{storage.setItem(MOTION_KEY,JSON.stringify({choice:value,savedAt:now}));return true;}catch{return false;}
+  }
   function motionReduced(value,osReduced){return !!osReduced||normalizeMotion(value)!=='normal';}
   root.LivingSky={setSeason,eventsForSeason,sceneSolarDate,weatherAt,createWoodland,advanceWoodland,woodlandTypes,startingSpeed,groupSize,readSceneSeason,saveSceneSeason,createSceneMirror,advanceLights,createGardenLights,syncGardenLights,advanceGardenLights,skinTone,sceneDate,readSceneTime,saveSceneTime,skyAt,sunAt,sunTimes,fireworksAllowed,solarSchedule,solarPresets,starAt,starCount:root.SKY_STARS.length,palette,activity,createWorld,advance,
     nightEventTypes:NIGHT_TYPES.slice(),eventTypes:[...EVENT_TYPES,...WINTER_VISITORS],rareTypes:RARE_TYPES.slice(),eventDurations:Object.assign({},EVENT_DURATIONS),MAX_EVENTS,RARE_COOLDOWN,readMotion,saveMotion,motionReduced,clamp,lerp,smooth,mixHex};

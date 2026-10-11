@@ -1564,8 +1564,9 @@
     else if(returnFocus?.isConnected)returnFocus.focus();else motionButton.focus();
   });
   dialog.addEventListener('cancel',()=>{
-    // Escape is a safe reduced-motion choice, never an implicit animation opt-in.
-    if(preference===null){preference='reduced';S.saveMotion(storage,preference);updateMotion();}
+    // Dismissal is not a selected choice. Unanswered prompts remain safely still
+    // and ask again on reopen instead of remembering inferred consent.
+    updateMotion();
   });
   mq.addEventListener('change',updateMotion);
   window.addEventListener('storage',event=>{if(event.key==='fvp:chain-scanner:landscape-motion'||event.key===null){preference=S.readMotion(storage);updateMotion();}});
@@ -1573,11 +1574,11 @@
   document.addEventListener('visibilitychange',()=>{
     // Hidden tabs do no rendering. Returning reconstructs only the current
     // UTC scene; missed arrivals are never animated as a catch-up burst.
-    if(document.hidden)stop();else start();
+    if(document.hidden)stop();else {preference=S.readMotion(storage);updateMotion();if(preference===null&&!dialog.open)openMotion();}
   });
   document.addEventListener('landscape-location-change',()=>{refreshSky();});
   window.addEventListener('pagehide',stop);
-  window.addEventListener('pageshow',start);
+  window.addEventListener('pageshow',()=>{preference=S.readMotion(storage);updateMotion();if(preference===null&&!dialog.open)openMotion();});
   resize();updateMotion();if(preference===null)openMotion();
   // Spawn-rate loading can finish after scanner boot. Tell the board when
   // this renderer is ready to receive its synced time and season choice.
