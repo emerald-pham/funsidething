@@ -1,5 +1,27 @@
 [
   {
+    "testChangesSha256": "143ce23c28be10fde7f35b7b52c3aaeda27ce88ca02f749169df148b3c84c627",
+    "reason": "User authorized Halving only for genuinely new clients. Preserve legacy normalization/migrations and old Squared-to-Halving consumer transitions by making their existing prior-mode fixtures explicit, while new tests exercise actual boot, Start, storage recovery and cloud adoption. Reconciled verified rollback main c9b574f; incoming prior-rig regression, map and rationale are retained, app assets unchanged.",
+    "previousBehavior": "Verified empty stores started Squared; equal-revision zero cloud documents could lose their saved mode to the empty client. Three Halving tests relied on the fresh Squared default as their transition precondition.",
+    "intendedBehavior": "Only verified empty clients start Halving. Saved empty boards, missing preferences, supported modes, unknown setting fields and recovery evidence keep prior behavior; fresh first reconcile adopts saved cloud modes at zero, higher or legacy revisions. Established transition assertions remain unchanged after an explicit prior Squared fixture.",
+    "replacementTests": [
+      "Scan default: fresh clients use Halving while missing saved preferences retain Squared",
+      "RISK fresh Halving default: new clients use Halving while legacy normalization and saved choices survive",
+      "RISK fresh Halving startup: successful empty stores choose Halving and actual Start persists it across reload",
+      "RISK fresh Halving preservation: saved empty boards missing preferences supported modes and unknown settings are not fresh clients",
+      "RISK fresh Halving cloud adoption: saved modes at zero newer and legacy revisions win over browser defaults without a settings write",
+      "RISK fresh Halving copy: Settings and extended FAQ distinguish new-client defaults from saved board modes",
+      "RISK fresh Halving recovery boundary: retained backup bytes protected heads and unavailable durable stores keep the legacy fallback"
+    ],
+    "preservedCoverage": [
+      "All existing math, task/rating, filtering, first-dot, Undo, reload, shared-pass joins, immediate Settings control and Chance migration assertions remain. The three transition fixtures explicitly select Squared before their unchanged transitions; no coverage is removed."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='fresh Halving|Scan default:' tests.js",
+      "failure": "Observed before app edits: 7 selected tests, 5 FAIL/2 PASS at /tmp/fresh-halving-red-final.log; fresh startup and Start produced squared instead of halving; cloud saved descending revision0 produced squared; Settings had Squared default selected. Postimplementation cohort observed three fixture-precondition failures; explicitly restored prior Squared setup rather than weakening transition assertions. Legacy missing-mode publication still normalizes Squared, as before. Independent FAQ review found the Reset factory distinction omitted; added direct Help copy assertion and observed contemporaneous copy RED at /tmp/fresh-halving-reset-copy-red.log before correcting the Reset FAQ; 4 focused GREEN in /tmp/fresh-halving-reset-copy-green.log."
+    }
+  },
+  {
     "testChangesSha256": "31113756fd4fce28d89e8d56a088d35fc5f1d8aa76d35e109d0a8ea554b42d91",
     "reason": "User authorized Halving only for genuinely new clients. Preserve legacy normalization/migrations and old Squared-to-Halving consumer transitions by making their existing prior-mode fixtures explicit, while new tests exercise actual boot, Start, storage recovery and cloud adoption.",
     "previousBehavior": "Verified empty stores started Squared; equal-revision zero cloud documents could lose their saved mode to the empty client. Three Halving tests relied on the fresh Squared default as their transition precondition.",
@@ -4538,6 +4560,57 @@
     "redEvidence": {
       "command": "node --test --test-name-pattern='compact Likelihood labels' tests.js",
       "failure": "Observed before implementation: compact summary identifies the recorded likelihood: 1.08% failed. /tmp/history-likelihood-red.log retains actual output."
+    }
+  },
+  {
+    "testChangesSha256": "742a2ef6743df83f24b33f5961c9ac420e688bda8de8e65f2bb26bd58fe3be1b",
+    "reason": "Restore the prior released terrain-driven walking silhouette after reopened rendered review found that the unshipped loading dip prolongs knee compression. Replace the extra-down requirement, which encoded the rejected aesthetic choice, with exact released-pose and preserved planting coverage.",
+    "previousBehavior": "PR101 added a .55 post-contact pelvis target dip. It passed physical contact tests but prolonged bent-knee support in reviewed flat walker, dogwalker and reader frames; its Pages deployment was cancelled before publication.",
+    "intendedBehavior": "The human rig matches immutable released c1d3b18 poses and constrained carrying grips again, retaining slower PR92 travel, deterministic seeds, terrain reach limits, reduced motion and complete offscreen exits.",
+    "replacementTests": [
+      "RISK walking rollback: terrain-driven loading preserves the prior upright silhouette and planted contacts"
+    ],
+    "preservedCoverage": [
+      "Both directions, three actor scales, free/half/full carrying grips, both leg contacts and sequential loading/recovery phases compare to the actual immutable released rig.",
+      "Existing fixed limb lengths, upright knee duty, terrain/contact transfer gradients, cadence, dog lead, source seed/lifetime, exit, reduced-motion and data/sync tests remain unchanged.",
+      "Original loading RED/review records remain retained as historical evidence; the invalid requirement to descend below touchdown is explicitly replaced rather than hidden."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK walking rollback:' tests.js",
+      "failure": "Observed contemporaneous pre-restoration failure: AssertionError do not prolong knee compression with an added pelvis dip, tests.js:354. /tmp/chain-walk-rollback-red.log retains output. Reopened actual frame review and prior public identity are separately retained; no new runtime or baseline live diagnosis is claimed."
+    }
+  },
+  {
+    "testChangesSha256": "6bfbab8080708066342c327fe5ebb2aaa2e3711c68e1c37e5f8f3f4257901ebd",
+    "reason": "Bind the actual incremental push comparison after additive reconciliation with separately reviewed motion PR99 and history PR100. Their upstream regression and rationale records are preserved; no new gait behavior beyond the original loading fix.",
+    "previousBehavior": "Reach-only hip target rises after touchdown, without a down pose.",
+    "intendedBehavior": "Flat slow walkers settle below touchdown before recovery while fixed limbs, real planted contacts, mirroring, carrying and deterministic seeking remain intact.",
+    "replacementTests": [
+      "RISK walking weight transfer: post-contact down precedes recovery without moving planted feet"
+    ],
+    "preservedCoverage": [
+      "Existing upright stance knee-duty and dense .7/distance gradient assertions remain intact; slower travel, exits, seeds, motion choices and task storage are untouched.",
+      "The comparison includes inherited motion-choice expiry, foreground resume, prompt accessibility and explicit history likelihood labels. Existing assertions and original upstream RED/rationale records remain intact."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK walking weight transfer' tests.js",
+      "failure": "Observed preimplementation AssertionError: weight settles below contact after landing, rather than rising immediately. /tmp/chain-walk-weight-red.log. Original pulse then failed two unchanged regression contracts; repaired bounded pulse passes all three in /tmp/chain-walk-weight-repair.log. The combined push-diff is integration bookkeeping, not a new preimplementation RED; upstream motion/history contemporaneous evidence remains in their retained rationale entries."
+    }
+  },
+  {
+    "testChangesSha256": "8ee6a080d5598f5546536e15564c147912afca780c3800f4078428205ccc420a",
+    "reason": "Source and independent animation audit demonstrated missing post-contact loading on the flat walking rig; observe RED before adding a bounded down pose. Rebound unchanged walking regression after additive integration with merged motion/history coverage; upstream assertions and controls remain intact.",
+    "previousBehavior": "Reach-only hip target rises after touchdown, without a down pose.",
+    "intendedBehavior": "Flat slow walkers settle below touchdown before recovery while fixed limbs, real planted contacts, mirroring, carrying and deterministic seeking remain intact.",
+    "replacementTests": [
+      "RISK walking weight transfer: post-contact down precedes recovery without moving planted feet"
+    ],
+    "preservedCoverage": [
+      "Existing upright stance knee-duty and dense .7/distance gradient assertions remain intact; slower travel, exits, seeds, motion choices and task storage are untouched."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK walking weight transfer' tests.js",
+      "failure": "Observed preimplementation AssertionError: weight settles below contact after landing, rather than rising immediately. /tmp/chain-walk-weight-red.log. Original pulse then failed two unchanged regression contracts; repaired bounded pulse passes all three in /tmp/chain-walk-weight-repair.log."
     }
   }
 ]

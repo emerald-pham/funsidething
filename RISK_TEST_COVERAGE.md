@@ -927,3 +927,4 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - `RISK fresh Halving cloud adoption: saved modes at zero newer and legacy revisions win over browser defaults without a settings write` — verified-empty startup, legacy recovery, saved preference and cloud adoption boundaries.
 - `RISK fresh Halving copy: Settings and extended FAQ distinguish new-client defaults from saved board modes` — verified-empty startup, legacy recovery, saved preference and cloud adoption boundaries.
 - `RISK fresh Halving recovery boundary: retained backup bytes protected heads and unavailable durable stores keep the legacy fallback` — verified-empty startup, legacy recovery, saved preference and cloud adoption boundaries.
+- RISK walking rollback: terrain-driven loading preserves the prior upright silhouette and planted contacts

@@ -338,6 +338,31 @@ test('RISK human terrain cadence: local contact spacing preserves world planting
  }
 });
 
+test('RISK walking rollback: terrain-driven loading preserves the prior upright silhouette and planted contacts',()=>{
+ const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
+ const released=spawnSync('git',['show','c1d3b180c93e55cbeb6f2afab99a889a8ac687cb:landscape-geometry.js'],{cwd:__dirname,encoding:'utf8'});
+ assert.equal(released.status,0,'the immutable prior released geometry must remain available');
+ const before=vm.createContext({Math});vm.runInContext(released.stdout,before);
+ for(const direction of [-1,1])for(const scale of [.65,1,1.2])for(const carrying of [0,.5,1]){
+  const geo=ctx.LandscapeGeometry.create(390,844),baseline=before.LandscapeGeometry.create(390,844),ground=()=>0,travel={kind:'constant',startDistance:0,speed:3.5};
+  const at=distance=>geo.humanWalkPose(195+direction*distance,0,distance,direction,ground,carrying,scale,travel);
+  const prior=distance=>baseline.humanWalkPose(195+direction*distance,0,distance,direction,ground,carrying,scale,travel);
+  const contact=at(0),stride=contact.stride*scale;
+  for(const half of [0,.5]){
+   for(const phase of [0,.0625,.1,.125,.2,.25,.375]){
+    const distance=(half+phase)*stride,pose=at(distance),reference=prior(distance);
+    assert.ok(Math.abs(pose.hipY-reference.hipY)<1e-9,'do not prolong knee compression with an added pelvis dip');
+    assert.equal(JSON.stringify(pose),JSON.stringify(reference),'restored contacts, arms, carrying grips and cadence match the released rig');
+    assert.deepEqual(pose,at(distance),'restored pose remains seekable without frame history');
+   }
+   const start=at(half*stride),loading=at((half+.1)*stride),leg=half===0?0:1,world=p=>direction*scale*p.legs[leg].footX;
+   assert.equal(start.legs[leg].lift,0);assert.equal(loading.legs[leg].lift,0);
+   assert.ok(Math.abs(world(start)-direction*.1*stride-world(loading))<1e-8,'terrain-driven loading retains its planted contact');
+   assert.ok(loading.legs.every(l=>Math.abs(Math.hypot(l.kneeX-loading.hipX,l.kneeY-loading.hipY)-3.2)<1e-8),'restoration cannot stretch thigh segments');
+  }
+ }
+});
+
 test('RISK upright human gait: full cycles extend stance knees with modest swing flexion and preserved terrain contact',()=>{
  const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
  for(const [w,h] of [[390,844],[844,390],[820,1180],[1440,900]])for(const direction of [-1,1])for(const scale of [.65,1,1.2])for(const carrying of [0,.5,1]){
