@@ -216,3 +216,15 @@ paint probes. Record exact-candidate screenshots, computed styles, the reference
 and coverage limits. White paint, readable text and passing bounds alone do not
 establish a visual match. Unexplained drift is an actionable finding; fix it and
 repeat the affected final rendered comparison before approval.
+
+Actual visual tests are mandatory for changed controls or layout. Code and
+typography reviewers inspect the final rendered visual-test evidence for every
+changed control and its established neighboring control. Compare the controls
+in the same pane, not a modal reference substituted for a list toolbar. Test
+day and night themes, ordinary and enlarged relevant mobile/desktop views,
+natural disabled and selected states, native keyboard focus, and top, middle and end
+task scrolling. Check row height before/after selection, group spacing, pane
+insets, safe-area spacing and unobscured content as well as individual styles.
+Screenshots in isolation are not a pass: record executed assertions, exact
+artifact and visible changed surfaces together with the named reference and
+coverage limits. Missing relevant runtime evidence remains a review gap.

@@ -1,5 +1,16 @@
 # Risk-based exact-SHA release gate
 
+Actual visual tests are mandatory for changed controls or layout. Independent
+code and typography reviewers compare each changed control with its established
+neighboring control in actual final rendered evidence. Use day and night themes,
+ordinary and enlarged mobile/desktop views; check natural disabled/selected states,
+native keyboard focus, top, middle and end task scrolling, before/after row
+heights, group/pane spacing, safe areas and unobscured content. A modal footer
+cannot stand in for an All Tasks toolbar. Screenshots in isolation are not a pass:
+record executed visual assertions, exact artifact, all visible changed surfaces,
+the reference controls and coverage limits. This uses the existing independent
+review and typography reports; it adds no receipt schema or approval stage.
+
 Every release candidate receives an owner review of its exact diff. The release
 validator derives the minimum review plan from the candidate's exact
 base-to-commit diff; the input cannot choose a lower-risk plan. An optional
