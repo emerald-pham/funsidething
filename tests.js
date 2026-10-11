@@ -475,16 +475,16 @@ test('RISK upright gait consumer: every human painter consumes upright full cycl
  }
 });
 
-test('RISK context exclusions: real selectors cycle included excluded neutral with durable Undo and explicit red precedence',async()=>{
+test('RISK context exclusions: real selectors switch included excluded with durable Undo and explicit red precedence',async()=>{
  const {ctx,shim}=await loadApp({seed:911});const c=ctx.state.contexts[0],task=ctx.addTask('Private required task',false,[c.id]);
- ctx.state.contexts[1].active=false; // Preserve the zero-active legacy cycle contract.
+ ctx.state.contexts[1].active=false; // Exercise the last included real context.
  const protectedTasks=JSON.stringify(ctx.state.tasks);
  ctx.toggleContext(c.id);assert.equal(c.excluded,true,'the second click changes an existing green check to a red exclusion');assert.equal(c.active,false,'released clients still see the excluded requirement disabled');
  ctx.renderCtx();let markup=shim.document.getElementById('ctxPanel').innerHTML;
- assert.match(markup,/data-filter-state="excluded"/);assert.match(markup,/aria-label="Errands: excluded\. Next: neutral\."/);assert.match(markup,/aria-hidden="true">✕/);
+ assert.match(markup,/data-filter-state="excluded"/);assert.match(markup,/aria-label="Errands: excluded\. Next: included\."/);assert.match(markup,/aria-hidden="true">✕/);
  ctx.undo();assert.equal(ctx.state.contexts[0].active,true);assert.equal(ctx.state.contexts[0].excluded===true,false);
- ctx.toggleContext(c.id);ctx.toggleContext(c.id);assert.equal(ctx.state.contexts[0].active,false);assert.equal(ctx.state.contexts[0].excluded===true,false,'red returns to neutral');
- ctx.toggleContext(c.id);assert.equal(ctx.state.contexts[0].active,true);assert.equal(ctx.state.contexts[0].excluded===true,false,'neutral returns to included');
+ ctx.toggleContext(c.id);ctx.toggleContext(c.id);assert.equal(ctx.state.contexts[0].active,true);assert.equal(ctx.state.contexts[0].excluded===true,false,'red returns directly to included');
+ ctx.toggleContext(c.id);assert.equal(ctx.state.contexts[0].active,false);assert.equal(ctx.state.contexts[0].excluded,true,'green returns directly to excluded');
  ctx.state.contexts[0].excluded=true;ctx.state.contexts[0].active=true;
  assert.equal(ctx.isEligible(task,new Set([c.id])),false,'an explicit exclusion wins over green or a supplied active set');
  const undoCount=vm.runInContext('undoStack.length',ctx);ctx.toggleContext('missing');assert.equal(vm.runInContext('undoStack.length',ctx),undoCount,'a stale control creates no Undo entry');
@@ -497,7 +497,7 @@ test('RISK context rendering: an imported empty context ID retains its real sele
  const {ctx,shim}=await loadApp(),c={id:'',name:'Private imported context',active:true,privateUnknown:'retained'};ctx.state.contexts=[c];
  const button=makeFakeElement();button.dataset={ctx:'',ctxScope:'settings',act:'cycle-context'};button.setAttribute('data-ctx','');
  shim.document.getElementById('modalRoot').querySelectorAll=()=>[button];ctx.toggleContext('');
- assert.equal(c.excluded,true);assert.equal(button.getAttribute('aria-label'),'Private imported context: excluded. Next: neutral.','an empty imported ID is a real context, not the synthetic filter');
+ assert.equal(c.excluded,true);assert.equal(button.getAttribute('aria-label'),'Private imported context: excluded. Next: included.','an empty imported ID is a real context, not the synthetic filter');
  assert.equal(button.dataset.filterState,'excluded');assert.equal(c.privateUnknown,'retained');assert.equal(ctx.state.settings.excludeNoContext,false);
 });
 
@@ -507,22 +507,22 @@ test('RISK context exclusions: scan and All Tasks preserve all required contexts
  ctx.state.listOpen=true;ctx.state.candidateId=one.id;ctx.toggleContext(a.id);
  assert.deepEqual(Array.from(ctx.eligibleTasks(),t=>t.id),[zero.id,unknown.id]);assert.ok(![one.id,many.id].includes(ctx.state.candidateId),'excluded candidates leave the scanner');
  vm.runInContext("listEligibilityFilter='ineligible'",ctx);ctx.renderList();assert.deepEqual(Array.from(ctx.filteredListTasks(),t=>t.id),[one.id,many.id]);assert.equal(shim.document.getElementById('listCount').textContent,'(2 of 4)');
- ctx.toggleContext(b.id);ctx.toggleContext(a.id);assert.deepEqual(Array.from(ctx.eligibleTasks(),t=>t.id),[zero.id,unknown.id],'neutral remains an inactive requirement, preserving existing empty-selection behavior');
+ ctx.toggleContext(b.id);assert.deepEqual(Array.from(ctx.eligibleTasks(),t=>t.id),[zero.id,unknown.id],'all excluded requirements preserve existing empty-selection eligibility');
  ctx.toggleContext(a.id);ctx.toggleContext(b.id);ctx.state.chain=[one.id];vm.runInContext("listEligibilityFilter='eligible'",ctx);
  assert.deepEqual(Array.from(ctx.filteredListTasks(),t=>t.id),[zero.id,many.id,unknown.id]);assert.equal(ctx.isEligible(one),true,'dotting is only a list eligibility distinction');
  const poolShares=()=>JSON.stringify([...ctx.chanceDisplayStats()].map(([id,{weight,probability,available,fallback}])=>[id,{weight,probability,available,fallback}]));const shares=poolShares();ctx.state.chain=[];assert.equal(poolShares(),shares,'undotting alone preserves full-pool weights');
- ctx.toggleContext(b.id);ctx.toggleContext(a.id);ctx.toggleContext(a.id);ctx.toggleContext(b.id);
- assert.deepEqual(Array.from(ctx.eligibleTasks(),t=>t.id),[zero.id,unknown.id],'all neutral still admits tasks without any known assigned context');
+ ctx.toggleContext(b.id);ctx.toggleContext(a.id);
+ assert.deepEqual(Array.from(ctx.eligibleTasks(),t=>t.id),[zero.id,unknown.id],'all excluded still admits tasks without any known assigned context');
 });
 
-test('RISK No context filter: exclude-only synthetic control never becomes an assignment and tracks rename deletion and unknown IDs',async()=>{
+test('RISK No context filter: binary synthetic control never becomes an assignment and tracks rename deletion and unknown IDs',async()=>{
  const {ctx,shim}=await loadApp({seed:913}),[a,b]=ctx.state.contexts;
  const zero=ctx.addTask('Private zero'),unknown=ctx.addTask('Private unknown',false,['retired-id']),known=ctx.addTask('Private assigned',false,[a.id]),both=ctx.addTask('Private both',false,[a.id,b.id]);
  ctx.renderCtx();assert.match(shim.document.getElementById('ctxPanel').innerHTML,/data-act="toggle-no-context"/);
  const ids=JSON.stringify(ctx.state.contexts.map(c=>c.id)),tasks=JSON.stringify(ctx.state.tasks);
  ctx.onAction('toggle-no-context',{});assert.equal(ctx.state.settings.excludeNoContext,true);
  assert.equal(ctx.isEligible(zero),false);assert.equal(ctx.isEligible(unknown),false);assert.equal(ctx.isEligible(known),true);assert.equal(ctx.isEligible(both),true);
- ctx.renderCtx();assert.match(shim.document.getElementById('ctxPanel').innerHTML,/No context: excluded\. Next: neutral\./);assert.match(shim.document.getElementById('ctxPanel').innerHTML,/2 active, 1 excluded, 0 inactive/);
+ ctx.renderCtx();assert.match(shim.document.getElementById('ctxPanel').innerHTML,/No context: excluded\. Next: included\./);assert.match(shim.document.getElementById('ctxPanel').innerHTML,/2 active, 1 excluded, 0 inactive/);
  ctx.renderQuickCtx();assert.doesNotMatch(shim.document.getElementById('quickCtxRow').innerHTML,/No context/);
  ctx.openEdit(zero.id);assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/data-editctx="[^\"]*no.context/i);
  assert.equal(JSON.stringify(ctx.state.contexts.map(c=>c.id)),ids);assert.equal(JSON.stringify(ctx.state.tasks),tasks);
@@ -594,7 +594,7 @@ test('RISK Settings hierarchy: Changelog uses existing sections and Save setting
 
 test('RISK context and Settings FAQ: extended guidance explains cycle empty selections synthetic scope sync limitations and bottom save',async()=>{
  const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
- for(const pattern of [/neutral.*green check.*red X.*neutral/i,/Every assigned.*context.*active/i,/No context excludes unassigned/i,/cannot be assigned/i,/Refresh all devices/i,/Save settings.*bottom/i])assert.match(help,pattern);
+ for(const pattern of [/Whenever contexts exist,.*green check.*red X/i,/Every assigned.*context.*active/i,/No context.*green.*unassigned/i,/cannot be assigned/i,/Refresh all devices/i,/Save settings.*bottom/i])assert.match(help,pattern);
  const current=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];for(const pattern of [/red X/i,/No context/i,/Changelog.*Settings/i,/Save settings.*bottom/i])assert.match(current,pattern);
 });
 
@@ -615,7 +615,7 @@ test('RISK context and Settings browser: touch keyboard filter counts disclosure
     await page.locator('[data-act="list-eligibility"][data-id="ineligible"]').click();assert.equal(await page.locator('[data-row]').count(),2);assert.equal(await page.locator('#listCount').innerText(),'(2 of 3)');
     await selector.focus();await page.keyboard.press('Space');assert.equal(await selector.getAttribute('data-filter-state'),'included');assert.equal(await selector.evaluate(e=>document.activeElement===e),true,'rerender retains keyboard focus');
     await page.keyboard.press('Enter');assert.equal(await selector.getAttribute('data-filter-state'),'excluded');
-    const none=page.locator('#ctxPanel [data-act="toggle-no-context"]');await none.click();assert.equal(await none.getAttribute('data-filter-state'),'excluded');await none.click();assert.equal(await none.getAttribute('data-filter-state'),'neutral');
+    const none=page.locator('#ctxPanel [data-act="toggle-no-context"]');await none.click();assert.equal(await none.getAttribute('data-filter-state'),'excluded');await none.click();assert.equal(await none.getAttribute('data-filter-state'),'included');
     await selector.focus();await page.keyboard.press('Space');assert.equal(await selector.getAttribute('data-filter-state'),'included','restore green before testing Settings green-to-red transition');
     await page.locator('[data-act="settings"]').click();const modal=page.locator('#modalRoot .modal'),sections=modal.locator('details.settings-section'),log=sections.filter({has:page.locator('summary').filter({hasText:/^Changelog$/})});
     assert.equal(await log.count(),1);await log.locator('summary').click();assert.ok(await log.locator('li').count()>50,'long history remains intact');
@@ -25110,7 +25110,7 @@ test('RISK binary context presentation: active filters derive excluded controls 
  assert.equal(ctx.contextControlInfo(b).mode,'excluded','a neutral requirement is visibly excluded while another context is included');
  assert.equal(ctx.contextControlInfo(b).label,b.name+': excluded. Next: included.');
  assert.equal(button.dataset.filterState,'excluded','Settings matches the main selector');assert.match(button.innerHTML,/✕/);
- assert.match(ctx.contextControlHTML(b),/data-filter-state="excluded"/);assert.match(shim.document.getElementById('ctxPanel').innerHTML,/1 active, 1 excluded, 1 inactive/);
+ assert.match(ctx.contextControlHTML(b),/data-filter-state="excluded"/);assert.match(shim.document.getElementById('ctxPanel').innerHTML,/1 active, 1 excluded, 0 inactive/);
  assert.equal(JSON.stringify(ctx.state.contexts),saved,'presentation never migrates saved neutral choices');assert.equal(JSON.stringify(ctx.state.settings),settings);
  ctx.openSettings();assert.equal(JSON.stringify(ctx.state.contexts),saved,'opening Settings does not migrate');
  assert.match(shim.document.getElementById('modalRoot').innerHTML,new RegExp('data-ctx="'+b.id+'"[^>]*data-filter-state="excluded"'));
@@ -25128,10 +25128,9 @@ test('RISK binary context interaction: real handlers include displayed exclusion
   ctx.onAction('cycle-context',button);assert.equal(ctx.contextFilterState(ctx.state.contexts[1]),'included','explicit red also reaches green in one click while filtering active');
   ctx.onAction('cycle-context',button);ctx.onAction('cycle-context',{dataset:{id:a.id}});
   assert.equal(ctx.activeCtxSet().size,0);assert.equal(ctx.isEligible(one),false);assert.equal(ctx.isEligible(both),false);assert.equal(ctx.isEligible(none),true);assert.equal(ctx.isEligible(unknown),true);
-  assert.equal(ctx.contextControlInfo(ctx.state.contexts[0]).label,a.name+': excluded. Next: neutral.','last included exclusion returns to the established zero-active presentation');
-  ctx.onAction('cycle-context',{dataset:{id:a.id}});assert.equal(ctx.contextFilterState(ctx.state.contexts[0]),'neutral');assert.equal(ctx.isEligible(one),false);
-  ctx.onAction('cycle-context',{dataset:{id:a.id}});assert.equal(ctx.contextFilterState(ctx.state.contexts[0]),'included');
-  assert.equal(ctx.contextControlInfo(null).mode,'neutral');ctx.onAction('toggle-no-context',{});assert.equal(ctx.isEligible(none),false);assert.equal(ctx.isEligible(unknown),false);assert.equal(ctx.isEligible(one),true);
+  assert.equal(ctx.contextControlInfo(ctx.state.contexts[0]).label,a.name+': excluded. Next: included.','last included exclusion retains binary presentation');
+  ctx.onAction('cycle-context',{dataset:{id:a.id}});assert.equal(ctx.contextFilterState(ctx.state.contexts[0]),'included');assert.equal(ctx.isEligible(one),true);
+  assert.equal(ctx.contextControlInfo(null).mode,'included');ctx.onAction('toggle-no-context',{});assert.equal(ctx.isEligible(none),false);assert.equal(ctx.isEligible(unknown),false);assert.equal(ctx.isEligible(one),true);
   assert.equal(JSON.stringify(ctx.state.tasks),tasks,'controls and Undo preserve assignments and ratings');
  }
 });
@@ -25147,10 +25146,10 @@ test('RISK binary context saved data: reload and cloud adoption retain neutral c
  client.ctx.state.contexts=[];client.ctx.state.settings.excludeNoContext=true;client.ctx.renderCtx();assert.match(client.shim.document.getElementById('ctxPanel').innerHTML,/toggle-ctx/);assert.equal(client.ctx.isEligible(client.ctx.state.tasks[0]),true,'zero contexts bypass the synthetic filter');
 });
 
-test('RISK binary context guidance: FAQ explains conditional two-state controls and unchanged zero-active matching',async()=>{
+test('RISK binary context guidance: FAQ explains always two-state controls and unchanged zero-active matching',async()=>{
  const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
- assert.match(help,/While any context is active,.*included.*excluded/i);assert.match(help,/With no active contexts, only tasks without a known context can scan/);assert.match(help,/No context excludes unassigned/);
- assert.match(help,/No active contexts.*neutral/i);assert.match(help,/Every assigned known context must be active/);
+ assert.match(help,/Whenever contexts exist,.*included.*excluded/i);assert.match(help,/With no active contexts, only tasks without a known context can scan/);assert.match(help,/No context.*green.*unassigned/);
+ assert.doesNotMatch(help,/No active contexts.*neutral/i);assert.match(help,/Every assigned known context must be active/);
  assert.match(help,/red display does not change saved neutral choices/i);assert.match(help,/unknown or deleted contexts/i);assert.match(help,/Context changes save, sync and support Undo/i);assert.match(help,/selector stays visible without contexts/i);assert.match(help,/New contexts start active/i);assert.match(help,/<dt>How do I create contexts and filter All Tasks\?<\/dt>/);
 });
 
@@ -25295,4 +25294,44 @@ test('RISK context Settings reflow: actual manager name fields can shrink beside
  assert.match(rule,/flex\s*:\s*1\s+1\s+160px(?:;|$)/,'name field reserves a useful editing width and moves to its own line when needed');
  const rowRule=html.match(/\.mgr\s*\{([^}]*)\}/)?.[1]||'';assert.match(rowRule,/flex-wrap\s*:\s*wrap/,'an enlarged manager row wraps rather than compressing text into padding');
  assert.equal(JSON.stringify(ctx.state),saved,'opening the layout consumer never changes saved board choices');
+});
+
+test('RISK always binary contexts: legacy neutral and all-excluded controls render green or red on both surfaces without saved writes',async()=>{
+ for(const excluded of [false,true]){
+  const {ctx,shim}=await loadApp();for(const c of ctx.state.contexts){c.active=false;if(excluded)c.excluded=true;else delete c.excluded;}ctx.state.ctxOpen=true;ctx.state.settings.excludeNoContext=false;
+  const before=JSON.stringify(ctx.state),payload=ctx.cloudPayload();ctx.renderCtx();
+  for(const c of ctx.state.contexts){assert.equal(ctx.contextControlInfo(c).mode,'excluded');assert.equal(ctx.contextControlInfo(c).label,c.name+': excluded. Next: included.');assert.match(ctx.contextControlHTML(c),/>✕<\/span>/);}
+  assert.equal(ctx.contextControlInfo(null).mode,'included');assert.match(ctx.contextControlHTML(null),/>✓<\/span>/);assert.match(shim.document.getElementById('ctxPanel').innerHTML,/0 active, 2 excluded, 0 inactive/);
+  ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;assert.match(settings,/data-act="toggle-no-context"[^>]*data-filter-state="included"/);for(const c of ctx.state.contexts)assert.match(settings,new RegExp('data-ctx="'+c.id+'"[^>]*data-filter-state="excluded"'));
+  assert.equal(JSON.stringify(ctx.state),before);assert.equal(ctx.cloudPayload(),payload,'rendering both surfaces does not migrate saved choices');
+ }
+});
+
+test('RISK always binary context interactions: last-green and all-red clicks stay binary and Undo preserves assignments and AND eligibility',async()=>{
+ for(const scope of ['main','settings']){
+  const {ctx,shim}=await loadApp();const [a,b]=ctx.state.contexts;b.active=false;delete b.excluded;const one=ctx.addTask('Private one',false,[a.id]),both=ctx.addTask('Private both',false,[a.id,b.id]),none=ctx.addTask('Private unassigned'),unknown=ctx.addTask('Private unknown',false,['deleted']);const tasks=JSON.stringify(ctx.state.tasks);
+  const button=makeFakeElement();button.dataset={id:a.id,ctx:a.id,ctxScope:scope,act:'cycle-context'};shim.document.activeElement=button;ctx.onAction('cycle-context',button);
+  assert.equal(ctx.activeCtxSet().size,0);assert.equal(ctx.contextControlInfo(a).label,a.name+': excluded. Next: included.');assert.equal(ctx.contextControlInfo(b).mode,'excluded');assert.equal(ctx.isEligible(one),false);assert.equal(ctx.isEligible(both),false);assert.equal(ctx.isEligible(none),true);assert.equal(ctx.isEligible(unknown),true);
+  ctx.onAction('cycle-context',button);assert.equal(ctx.contextFilterState(a),'included','all-red to green takes one click');assert.equal(ctx.isEligible(one),true);assert.equal(ctx.isEligible(both),false);ctx.undo();assert.equal(ctx.contextFilterState(ctx.state.contexts[0]),'excluded');ctx.undo();assert.equal(ctx.contextFilterState(ctx.state.contexts[0]),'included');
+  const other=makeFakeElement();other.dataset={id:b.id,ctx:b.id,ctxScope:scope,act:'cycle-context'};ctx.onAction('cycle-context',other);assert.equal(ctx.isEligible(both),true);ctx.undo();assert.equal(ctx.state.contexts[1].active,false);assert.equal(ctx.state.contexts[1].excluded===true,false);assert.equal(ctx.contextControlInfo(ctx.state.contexts[1]).mode,'excluded');assert.equal(JSON.stringify(ctx.state.tasks),tasks);
+ }
+});
+
+test('RISK always binary No Context: visible green and red dispatch immediately on both surfaces with Undo and zero-context guard',async()=>{
+ for(const scope of ['main','settings']){
+  const {ctx,shim}=await loadApp();for(const c of ctx.state.contexts)c.active=false;ctx.state.settings.excludeNoContext=false;const none=ctx.addTask('Private unassigned'),unknown=ctx.addTask('Private unknown',false,['deleted']),known=ctx.addTask('Private known',false,[ctx.state.contexts[0].id]);const saved=JSON.stringify({...ctx.state,updatedAt:0});
+  assert.equal(ctx.contextControlInfo(null).mode,'included');assert.equal(ctx.isEligible(none),true);assert.equal(ctx.isEligible(unknown),true);assert.equal(ctx.isEligible(known),false);
+  const button=makeFakeElement();button.dataset={ctxScope:scope,act:'toggle-no-context'};shim.document.activeElement=button;ctx.onAction('toggle-no-context',button);assert.equal(ctx.contextControlInfo(null).mode,'excluded');assert.equal(ctx.isEligible(none),false);assert.equal(ctx.isEligible(unknown),false);ctx.onAction('toggle-no-context',button);assert.equal(ctx.contextControlInfo(null).mode,'included');assert.equal(ctx.isEligible(none),true);ctx.undo();assert.equal(ctx.contextControlInfo(null).mode,'excluded');ctx.undo();assert.equal(JSON.stringify({...ctx.state,updatedAt:0}),saved);
+  ctx.state.contexts=[];ctx.state.settings.excludeNoContext=true;ctx.renderCtx();const before=JSON.stringify(ctx.state);ctx.onAction('toggle-no-context',button);assert.equal(JSON.stringify(ctx.state),before);assert.equal(ctx.isEligible(known),true);assert.match(shim.document.getElementById('ctxPanel').innerHTML,/toggle-ctx/);assert.match(shim.document.getElementById('ctxPanel').innerHTML,/add-ctx/);
+ }
+});
+
+test('RISK always binary saved contexts: reload and cloud adoption derive red real and green No Context without migration',async()=>{
+ const source=await loadApp();for(const c of source.ctx.state.contexts){c.active=false;delete c.excluded;}source.ctx.state.settings.excludeNoContext=false;const task=source.ctx.addTask('Private old assignment',false,[source.ctx.state.contexts[0].id]);const none=source.ctx.addTask('Private old unassigned');await source.ctx.persist();const payload=source.ctx.cloudPayload();
+ const reload=await loadApp({seedStorage:{[SYNC_STORE_KEY]:payload}});for(const c of reload.ctx.state.contexts){assert.equal(c.active,false);assert.equal(c.excluded===true,false);assert.equal(reload.ctx.contextControlInfo(c).mode,'excluded');}assert.equal(reload.ctx.contextControlInfo(null).mode,'included');assert.equal(reload.ctx.isEligible(reload.ctx.state.tasks.find(t=>t.id===task.id)),false);assert.equal(reload.ctx.isEligible(reload.ctx.state.tasks.find(t=>t.id===none.id)),true);
+ const h=makeSyncHarness({remote:JSON.parse(payload),rev:3}),client=await loadApp({cloudSyncFactory:h.factory});await syncSettle(40);await client.ctx.cloudPull();client.ctx.renderCtx();client.ctx.openSettings();assert.equal(client.ctx.contextControlInfo(client.ctx.state.contexts[0]).mode,'excluded');assert.equal(client.ctx.contextControlInfo(null).mode,'included');for(const c of h.remoteState().contexts){assert.equal(c.active,false);assert.equal(c.excluded===true,false);}assert.equal(h.remoteState().settings.excludeNoContext,false);
+});
+
+test('RISK always binary context guidance: FAQ explains context-presence rule and separate green No Context eligibility',async()=>{
+ const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;assert.match(help,/Whenever contexts exist,.*green.*red/i);assert.match(help,/No context.*green.*unassigned/i);assert.match(help,/With no active contexts, only tasks without a known context can scan/);assert.doesNotMatch(help,/No active contexts.*neutral/i);assert.match(help,/does not change saved neutral choices/i);
 });
