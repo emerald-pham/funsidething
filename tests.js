@@ -24638,3 +24638,12 @@ test('RISK Last task WOOP: exhausted scan reaches walkthrough through real Start
  const peer=ctx.addTask('New eligible candidate');ctx.renderScan();assert.doesNotMatch(shim.document.getElementById('scan').innerHTML,/Private outcome|Delete WOOP plan/,'new arrivals rearm the scan and hide final-task plans');
  assert.ok(peer);assert.equal(ctx.state.tasks.find(t=>t.id===task.id).woopPlan.outcome,'Private outcome');
 });
+
+// Actual Chrome390px at200% clipped Reduced motion and put the native dialog
+// beyond the viewport; retain the fixed-height and intrinsic-grid contracts.
+test('RISK motion safety accessibility: enlarged prompt fits the containing viewport and stacks intrinsic choice cards',()=>{
+ const css=fs.readFileSync(path.join(__dirname,'landscape.css'),'utf8');
+ assert.match(css,/#motionDialog\s*\{[^}]*max-height\s*:\s*min\(calc\(100dvh - 40px\),\s*calc\(100% - 40px\)\)/,'top-layer dialog height must also respect its zoomed containing viewport');
+ assert.match(css,/#motionDialog \.motion-choices\s*\{[^}]*grid-template-columns\s*:\s*repeat\(auto-fit,\s*minmax\(min\(100%,\s*180px\),\s*1fr\)\)/,'choice grid must collapse to one column when enlarged content leaves less than two intrinsic cards');
+ assert.match(css,/#motionDialog \.motion-choices button\s*\{[^}]*min-width\s*:\s*0[^}]*overflow-wrap\s*:\s*anywhere/,'choice labels must wrap inside the card instead of overflowing the dialog');
+});

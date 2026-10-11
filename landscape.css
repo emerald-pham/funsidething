@@ -51,6 +51,11 @@ body{background:transparent;isolation:isolate}
 .themebtn{min-height:36px}
 .landscape-controls{display:flex;flex-wrap:wrap;justify-content:center;gap:7px;margin-top:10px}
 .motion-dialog{max-width:440px;width:calc(100% - 32px);max-height:calc(100dvh - 40px);overflow:auto;padding:28px;border:1px solid var(--line);border-radius:22px;color:var(--ink);background:var(--panel);box-shadow:0 24px 100px #081c2855}
+/* The native prompt must fit its containing viewport when text is enlarged.
+   Intrinsic cards stack before either explicit safety choice gets clipped. */
+#motionDialog{max-height:min(calc(100dvh - 40px),calc(100% - 40px))}
+#motionDialog .motion-choices{grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr))}
+#motionDialog .motion-choices button{min-width:0;overflow-wrap:anywhere}
 .motion-dialog::backdrop{background:#102b3955;backdrop-filter:blur(3px)}
 .motion-dialog h2{font-family:var(--font-q);font-size:32px;font-weight:400;letter-spacing:-.03em;line-height:1.1;margin:7px 0 13px}
 .motion-dialog p{font-size:14px;line-height:1.6;color:var(--mut)}

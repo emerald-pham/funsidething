@@ -1,5 +1,23 @@
 [
   {
+    "testChangesSha256": "cab77329a8171ae3ecf899cc225fc708173b59ae56be76374d9d132f0f7aeec7",
+    "reason": "Preserve the requested seven-day local explicit motion choice and repair observed release-blocking enlarged-prompt clipping found during mandatory independent rendered review.",
+    "previousBehavior": "Untimed choices persisted indefinitely and Escape saved reduced. Native prompt at390px200% clipped Reduced card and exceeded viewport in baseline and candidate.",
+    "intendedBehavior": "Explicit device choices expire after168h; dismissal saves nothing; safety prompt respects its containing viewport and stacks intrinsic choice cards with wrapping.",
+    "replacementTests": [
+      "RISK motion safety: explicit local choices expire after seven elapsed days and corrupt records fail closed",
+      "RISK motion safety: actual choice handler remembers selection while dismissal never writes consent",
+      "RISK motion safety accessibility: enlarged prompt fits the containing viewport and stacks intrinsic choice cards"
+    ],
+    "preservedCoverage": [
+      "OS reduced motion override, choice timestamp boundaries, device storage failures, cloud/account/WOOP preservation and unchanged other dialogs/control styling."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK motion safety accessibility' tests.js; earlier motion RED command in prior record",
+      "failure": "Observed /tmp/motion-seven-days-accessibility-red.log: no containing viewport max-height contract before CSS repair. Actual preceding browser RED /tmp/motion-seven-days-runtime-remaining.log: Reduced card clipped, scrollWidth217/clientWidth161,326x1608 at y-382. Initial seven-day RED remains /tmp/motion-seven-days-red.log."
+    }
+  },
+  {
     "testChangesSha256": "ed20686fe224be0d2601da2bf53e40c3dae4866155a6b19d6c00e015406546d8",
     "reason": "User requests remembering explicit device motion safety choice for seven days; dismissal is not consent.",
     "previousBehavior": "Local raw choices never expire and Escape persists reduced choice.",
