@@ -1,6 +1,6 @@
 [
   {
-    "testChangesSha256": "821f39e2241f2e0921481d07aa813a3a79455e7df77f370f54ae438db9967157",
+    "testChangesSha256": "1c142e12064ef24acb57e3d600d1929a224b23652bb7a75df26ba5302b05d29c",
     "reason": "Observed actual paint consumers violate physical ground depth and omit flying nest visitors from reflection capture; retain all prior feature contracts.",
     "previousBehavior": "Fountain painted after every ground body; visiting birds painted only after the lake mirror was captured.",
     "intendedBehavior": "Fountain sorts at its basin contact; nest bird ink is partitioned with complementary pixel clips at the snapped reflection source boundary, preserving crossing wings and meadow occlusion.",
@@ -9,11 +9,30 @@
       "RISK scenery depth: nest bird sky and meadow passes paint each silhouette once"
     ],
     "preservedCoverage": [
-      "Existing sailboats, water depth/scale, reflection masks, tree occlusion, weather tint and motion choices remain intact; no saved board or event-frequency changes."
+      "Existing sailboats, water depth/scale, reflection masks, tree occlusion, weather tint and motion choices remain intact; no saved board or event-frequency changes.",
+      "Additively reconciled reviewed walking rollback c9b574f; geometry, immutable prior-rig test, original FAQ copy and rollback rationale retained. Frozen f3 full1504pass0fail33optional skips; integrated focused checks recorded separately."
     ],
     "redEvidence": {
       "command": "node --test --test-name-pattern='RISK scenery depth' tests.js",
       "failure": "Contemporaneous fountain RED showed farther,closer,fountain instead of farther,fountain,closer (/tmp/chain-sailboat-depth-red.log). Before bird implementation, nest pass RED: meadow pass cannot duplicate flight silhouettes above reflection capture (/tmp/chain-bird-depth-red.log). Focused GREEN has 11 passing cases (/tmp/chain-depth-focused.log). Full local run exposed a legacy isolated bird-block ReferenceError and overlong FAQ answer; preserved all legacy assertions, retained standalone full-visit painter mode, explicitly partitioned the real scene consumers, and moved added copy into its own FAQ answer. Affected cases GREEN /tmp/chain-depth-regression-repair-green.log; original full result /tmp/chain-depth-full.log is not a pass. Independent source review withdrew center-based partition approval: actual wing/body boundary regression observed RED (ground 0 versus 6 shapes) before complementary clips, /tmp/chain-depth-boundary-red.log. Corrected clips and unchanged dense departure regression pass /tmp/chain-depth-boundary-green.log (2 pass, zero skips). Frozen prior candidate full suite:1504 pass,0 fail,33 optional runtime skips; not rendered verification."
+    }
+  },
+  {
+    "testChangesSha256": "742a2ef6743df83f24b33f5961c9ac420e688bda8de8e65f2bb26bd58fe3be1b",
+    "reason": "Restore the prior released terrain-driven walking silhouette after reopened rendered review found that the unshipped loading dip prolongs knee compression. Replace the extra-down requirement, which encoded the rejected aesthetic choice, with exact released-pose and preserved planting coverage.",
+    "previousBehavior": "PR101 added a .55 post-contact pelvis target dip. It passed physical contact tests but prolonged bent-knee support in reviewed flat walker, dogwalker and reader frames; its Pages deployment was cancelled before publication.",
+    "intendedBehavior": "The human rig matches immutable released c1d3b18 poses and constrained carrying grips again, retaining slower PR92 travel, deterministic seeds, terrain reach limits, reduced motion and complete offscreen exits.",
+    "replacementTests": [
+      "RISK walking rollback: terrain-driven loading preserves the prior upright silhouette and planted contacts"
+    ],
+    "preservedCoverage": [
+      "Both directions, three actor scales, free/half/full carrying grips, both leg contacts and sequential loading/recovery phases compare to the actual immutable released rig.",
+      "Existing fixed limb lengths, upright knee duty, terrain/contact transfer gradients, cadence, dog lead, source seed/lifetime, exit, reduced-motion and data/sync tests remain unchanged.",
+      "Original loading RED/review records remain retained as historical evidence; the invalid requirement to descend below touchdown is explicitly replaced rather than hidden."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK walking rollback:' tests.js",
+      "failure": "Observed contemporaneous pre-restoration failure: AssertionError do not prolong knee compression with an added pelvis dip, tests.js:354. /tmp/chain-walk-rollback-red.log retains output. Reopened actual frame review and prior public identity are separately retained; no new runtime or baseline live diagnosis is claimed."
     }
   },
   {

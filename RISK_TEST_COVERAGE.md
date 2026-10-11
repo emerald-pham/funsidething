@@ -920,6 +920,6 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 
 - RISK task history: compact Likelihood labels retain recorded values across metric boundaries
 
-- RISK walking weight transfer: post-contact down precedes recovery without moving planted feet
+- RISK walking rollback: terrain-driven loading preserves the prior upright silhouette and planted contacts
 
 - Scenery depth and lake capture: `RISK scenery depth: fountain participates in actual ground actor paint order`; `RISK scenery depth: nest bird sky and meadow passes paint each silhouette once`.
