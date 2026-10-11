@@ -751,7 +751,7 @@ test('RISK task rating history: compact record disclosures retain dates and metr
  assert.match(view,/<time datetime="2026-10-06T12:34:56\.789Z"/);
  assert.match(view,/Task history/);assert.match(view,/10\/06\/2026/);assert.match(view,/class="rating-change"/);assert.match(view,/Score/);assert.match(view,/Uncertainty/);assert.match(view,/46\.49%/);assert.match(view,/MMR/);assert.match(view,/Overall likelihood/);assert.match(view,/Estimated Top x/);
  assert.doesNotMatch(view,/Recorded observations, not a complete timeline|MMR is strength|All recorded observations stay/,'explanations no longer occupy the editor');
- assert.match(view,/Quick start → Task history/);
+ assert.match(view,/FAQs → Task history/);
  ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
  assert.match(help,/<details class="help-faq" id="ratingHistoryFaq">/);assert.match(help,/<h3>Task history<\/h3>/);
  assert.match(help,/not a complete timeline/);assert.match(help,/recording device’s clock/);assert.match(help,/Clear history/);
@@ -5730,7 +5730,7 @@ test("UI: Quick start displays four essential steps in order", async () => {
   const { ctx, shim } = await loadApp();
   ctx.openHelp();
   const markup = shim.elements.get("modalRoot").innerHTML;
-  assert.match(markup, /<h2>Quick start<\/h2>/);
+  assert.match(markup, /<h2 id="faqsTitle">FAQs<\/h2>/);
   const list = markup.match(/<ol>([\s\S]*?)<\/ol>/)[1];
   const steps = [...list.matchAll(/<li>([\s\S]*?)<\/li>/g)]
     .map(match => match[1].replace(/<[^>]+>/g, "").replace(/&amp;/g, "&"));
@@ -24573,4 +24573,15 @@ test('RISK neutral bootstrap: JSON replacement and Undo deletion cannot be promo
   assert.equal(ctx.taskComparisonEligible(ctx.state.tasks.find(t=>t.id===a.id)),false);ctx.mergeUndeletedTasks(ctx.state,chosen);
   assert.equal(ctx.taskComparisonEligible(ctx.state.tasks.find(t=>t.id===a.id)),false,route+' restoration needs fresh exclusion independent of old choice replay');
  }
+});
+
+test('RISK FAQs menu label: help navigation and named dialog use FAQs while retaining Quick start chapter',async()=>{
+ assert.match(html,/<button class="ghost" data-act="help" title="FAQs" aria-label="FAQs">\?<\/button>/);
+ const {ctx,shim}=await loadApp();const before=JSON.stringify(ctx.state);ctx.onAction('help',{});
+ const markup=shim.elements.get('modalRoot').innerHTML;assert.match(markup,/<h2 id="faqsTitle">FAQs<\/h2>/);
+ assert.match(markup,/<details class="help-faq" open><summary>Quick start<\/summary>/);
+ assert.equal(JSON.stringify(ctx.state),before,'opening FAQs preserves board state');
+ assert.match(html,/querySelector\('#modalRoot \.modal'\)\?\.setAttribute\('aria-labelledby','faqsTitle'\)/);
+ assert.match(ctx.taskRatingHistoryHTML({ratingHistory:[]}),/Help: FAQs → Task history/);
+ assert.match(ctx.dependencyFieldsHTML('edit',[]),/See dependency FAQ in FAQs\./);
 });
