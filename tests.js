@@ -24734,7 +24734,7 @@ test('RISK fresh Halving copy: Settings and extended FAQ distinguish new-client 
  assert.match(settings,/<option value="squared">Squared Weighting always<\/option>/);
  ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
  assert.match(help,/Halving weighting is the default for new clients/);assert.match(help,/Existing saved boards keep their mode/);assert.match(help,/saved cloud board/);
- assert.doesNotMatch(help,/Squared Weighting is the default\./);
+ assert.doesNotMatch(help,/Squared Weighting is the default\./);assert.match(help,/Reset selects Squared Weighting/,'Reset retains its established factory and needs an explicit explanation');
 });
 
 

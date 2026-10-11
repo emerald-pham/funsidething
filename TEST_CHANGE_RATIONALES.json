@@ -1,6 +1,6 @@
 [
   {
-    "testChangesSha256": "d08e7cfba5b93ffe95e3936556b2a277140f617317b9277884c5ee4fdf385ec5",
+    "testChangesSha256": "31113756fd4fce28d89e8d56a088d35fc5f1d8aa76d35e109d0a8ea554b42d91",
     "reason": "User authorized Halving only for genuinely new clients. Preserve legacy normalization/migrations and old Squared-to-Halving consumer transitions by making their existing prior-mode fixtures explicit, while new tests exercise actual boot, Start, storage recovery and cloud adoption.",
     "previousBehavior": "Verified empty stores started Squared; equal-revision zero cloud documents could lose their saved mode to the empty client. Three Halving tests relied on the fresh Squared default as their transition precondition.",
     "intendedBehavior": "Only verified empty clients start Halving. Saved empty boards, missing preferences, supported modes, unknown setting fields and recovery evidence keep prior behavior; fresh first reconcile adopts saved cloud modes at zero, higher or legacy revisions. Established transition assertions remain unchanged after an explicit prior Squared fixture.",
@@ -18,7 +18,7 @@
     ],
     "redEvidence": {
       "command": "node --test --test-name-pattern='fresh Halving|Scan default:' tests.js",
-      "failure": "Observed before app edits: 7 selected tests, 5 FAIL/2 PASS at /tmp/fresh-halving-red-final.log; fresh startup and Start produced squared instead of halving; cloud saved descending revision0 produced squared; Settings had Squared default selected. Postimplementation cohort observed three fixture-precondition failures; explicitly restored prior Squared setup rather than weakening transition assertions. Legacy missing-mode publication still normalizes Squared, as before."
+      "failure": "Observed before app edits: 7 selected tests, 5 FAIL/2 PASS at /tmp/fresh-halving-red-final.log; fresh startup and Start produced squared instead of halving; cloud saved descending revision0 produced squared; Settings had Squared default selected. Postimplementation cohort observed three fixture-precondition failures; explicitly restored prior Squared setup rather than weakening transition assertions. Legacy missing-mode publication still normalizes Squared, as before. Independent FAQ review found the Reset factory distinction omitted; added direct Help copy assertion and observed contemporaneous copy RED at /tmp/fresh-halving-reset-copy-red.log before correcting the Reset FAQ; 4 focused GREEN in /tmp/fresh-halving-reset-copy-green.log."
     }
   },
   {
