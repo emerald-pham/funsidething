@@ -24683,9 +24683,61 @@ test('RISK Last task WOOP: exhausted scan reaches walkthrough through real Start
  assert.ok(peer);assert.equal(ctx.state.tasks.find(t=>t.id===task.id).woopPlan.outcome,'Private outcome');
 });
 
+test('RISK bulk toolbar: mounted controls stay outside scrolling rows and retain filtered selection through filter changes',async()=>{
+ const {ctx,shim}=await loadApp();const ids=[];for(let i=0;i<36;i++)ids.push(ctx.addTask('Private match '+i).id);const outside=ctx.addTask('Private outside');ctx.state.listOpen=true;ctx.setListQuery('Private match');
+ const body=shim.document.getElementById('listBody'),toolbar=shim.document.getElementById('listBulkToolbar');
+ assert.doesNotMatch(body.innerHTML,/data-act="bulk-select(?:-all)?"/,'selection toolbar must remain outside the task scroller rather than scrolling away with rows');
+ assert.match(toolbar.innerHTML,/class="ltag"[^>]*data-act="bulk-select"/,'toolbar reuses neighboring compact All Tasks control classes');assert.equal(toolbar.hidden,false);
+ body.scrollTop=420;ctx.onAction('bulk-select-all');assert.equal(body.scrollTop,420,'selection rerender preserves the task scroller position');assert.match(toolbar.innerHTML,/36 selected/,'Select all includes matching tasks below the fold');
+ assert.equal(vm.runInContext('bulkSelection.has('+JSON.stringify(outside.id)+')',ctx),false,'filtered-out board task stays unselected');
+ ctx.setListQuery('Private match 1');assert.match(toolbar.innerHTML,/11 selected/,'changing filters prunes only the newly hidden selection');
+ ctx.onAction('bulk-edit');assert.match(shim.document.getElementById('modalRoot').innerHTML,/Edit 11 selected tasks/);ctx.closeModal();
+ ctx.setListQuery('Private match');assert.match(toolbar.innerHTML,/11 selected/,'revealing hidden rows does not silently add them');ctx.onAction('bulk-select-all');assert.match(toolbar.innerHTML,/36 selected/);
+ ctx.onAction('bulk-cancel');assert.match(toolbar.innerHTML,/data-act="bulk-edit" disabled/);assert.doesNotMatch(toolbar.innerHTML,/\d+ selected/);assert.equal(JSON.stringify(ctx.state.tasks.map(t=>({id:t.id,title:t.title,due:t.due}))),JSON.stringify([...ids.map((id,i)=>({id,title:'Private match '+i,due:null})),{id:outside.id,title:'Private outside',due:null}]));
+ ctx.onAction('toggle-list');assert.equal(toolbar.hidden,true,'collapsed pane hides the toolbar');ctx.onAction('toggle-list');assert.equal(toolbar.hidden,false);
+ ctx.setListQuery('No private match');assert.match(toolbar.innerHTML,/data-act="bulk-select-all" disabled/);assert.match(body.innerHTML,/No tasks match/);
+ assert.match(html,/<div id="listBody" hidden><\/div>\s*<div[^>]*id="listBulkToolbar"[^>]*hidden/,'toolbar is a sibling below the actual scroll surface');
+ assert.match(html,/\.listbulk\s*\{[^}]*padding-bottom:max\(9px,env\(safe-area-inset-bottom\)\)/,'pane-frozen footer reserves its own safe-area space');
+});
+
+test('RISK bulk row selection: selected label replaces the existing rank slot and deselection restores its format',async()=>{
+ for(const metric of ['rank','chance']){
+  const {ctx,shim}=await loadApp();const task=ctx.addTask('Private long task title retains its existing line wrapping');ctx.addTask('Private other');ctx.state.listOpen=true;ctx.state.settings.listMetric=metric;ctx.renderList();const body=shim.document.getElementById('listBody');
+  const original=body.innerHTML.match(/<span class="tkl">([^<]+)<\/span>/)[1];ctx.onAction('bulk-select');
+  assert.match(body.innerHTML,/<button[^>]*class="rank-summary bulk-rank-toggle"[^>]*data-act="bulk-toggle"/,'actual rank slot must become the selection control, rather than adding a task-title control');
+  assert.doesNotMatch(body.innerHTML,/<div class="tmain">\s*<button[^>]*data-act="bulk-toggle"/,'no added title-line selection control');assert.doesNotMatch(body.innerHTML,/class="trow [^"]*bulk-selecting/,'selection must retain the existing rating and title grid');
+  ctx.onAction('bulk-toggle',{dataset:{id:task.id}});assert.match(body.innerHTML,/<span class="tkl">Selected<\/span>/);assert.match(body.innerHTML,/aria-pressed="true" aria-label="Deselect Private long task title/);
+  ctx.onAction('bulk-toggle',{dataset:{id:task.id}});assert.doesNotMatch(body.innerHTML,/<span class="tkl">Selected<\/span>/);assert.ok(body.innerHTML.includes('<span class="tkl">'+original+'</span>'),'deselect restores original rank or percent formatting');
+ }
+});
+
+test('RISK bulk toolbar keyboard: rerender restores the focused toolbar action and row toggle',async()=>{
+ const {ctx,shim}=await loadApp();const task=ctx.addTask('Private keyboard task');ctx.state.listOpen=true;ctx.renderList();
+ const toolbar=shim.document.getElementById('listBulkToolbar'),body=shim.document.getElementById('listBody');let focused='';
+ toolbar.querySelectorAll=()=>['bulk-select','bulk-select-all','bulk-edit','bulk-cancel'].map(act=>({dataset:{act},disabled:false,focus:()=>{focused=act;}}));
+ body.querySelectorAll=()=>[{dataset:{act:'bulk-toggle',id:task.id},focus:()=>{focused=task.id;}}];
+ shim.document.activeElement={dataset:{act:'bulk-select'}};ctx.onAction('bulk-select');assert.equal(focused,'bulk-select','keyboard Select must retain focus after its DOM is replaced');
+ shim.document.activeElement={dataset:{act:'bulk-select-all'}};ctx.onAction('bulk-select-all');assert.equal(focused,'bulk-select-all');
+ shim.document.activeElement={dataset:{act:'bulk-toggle',id:task.id}};ctx.onAction('bulk-toggle',{dataset:{id:task.id}});assert.equal(focused,task.id);
+ shim.document.activeElement={dataset:{act:'bulk-cancel'}};ctx.onAction('bulk-cancel');assert.equal(focused,'bulk-select','Cancel returns focus to the remaining Select control');
+});
+
+test('RISK bulk toolbar guidance: extended FAQ describes frozen controls and rank-slot selection',async()=>{
+ const {ctx,shim}=await loadApp();ctx.openHelp();const faq=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(faq,/controls stay at the bottom.*task rows scroll/i);assert.match(faq,/Selected.*click.*deselect/i);assert.match(faq,/rank slot.*row height/i);assert.doesNotMatch(faq,/Select adds a selection button to each row/);
+});
+
+test('RISK repository process boundary: actual visual tests compare every changed control with neighboring controls and scrolled states',()=>{
+ for(const name of ['CLAUDE.md','RELEASE_GATES.md']){
+  const guide=fs.readFileSync(path.join(__dirname,name),'utf8').replace(/\s+/g,' ');assert.match(guide,/Actual visual tests are mandatory/,'review guidance must require executed visual tests, not screenshot presence alone');
+  assert.match(guide,/computed color scheme and paint/i,'theme labels must not substitute for actual applied colors');assert.match(guide,/theme labels alone.*not.*coverage/i);
+  assert.match(guide,/changed control.*established neighboring control/i);assert.match(guide,/top, middle and end.*scroll/i);assert.match(guide,/day and night.*enlarged/i);assert.match(guide,/screenshots in isolation.*not.*pass/i);
+ }
+});
+
 test('RISK bulk task editing: displayed selection and opted fields preserve identity and reject stale conflicts',async()=>{
  const {ctx,shim}=await loadApp();const a=ctx.addTask('Selected A'),b=ctx.addTask('Selected B'),hidden=ctx.addTask('Hidden');ctx.state.listOpen=true;ctx.setListQuery('Selected');
- ctx.onAction('bulk-select-all');assert.match(shim.document.getElementById('listBody').innerHTML,/2 selected/);
+ ctx.onAction('bulk-select-all');assert.match(shim.document.getElementById('listBulkToolbar').innerHTML,/2 selected/);
  ctx.onAction('bulk-edit');assert.match(shim.document.getElementById('modalRoot').innerHTML,/Apply Due/);
  const identity=JSON.stringify([a.title,a.mu,a.sigma,a.ratingHistory,b.title,b.mu,b.sigma,b.ratingHistory]);
  shim.document.getElementById('bulkApplyDue').checked=true;shim.document.getElementById('bulkDue').value='2027-01-12';ctx.onAction('bulk-save');
@@ -24727,7 +24779,7 @@ test('RISK bulk task editing: offline two-task cloud conflict preserves fresh pe
  const initial=await loadApp(),first=initial.ctx.addTask('Private A'),second=initial.ctx.addTask('Private B'),base=JSON.parse(initial.ctx.cloudPayload()),h=makeSyncHarness({remote:base,rev:4});
  const app=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(base)},cloudSyncFactory:h.factory}),{ctx,shim}=app;await ctx.cloudPull();await syncSettle(30);h.failPull=true;
  ctx.state.listOpen=true;ctx.onAction('bulk-select-all');ctx.onAction('bulk-edit');shim.document.getElementById('bulkApplyDue').checked=true;shim.document.getElementById('bulkDue').value='2027-08-01';ctx.onAction('bulk-save');assert.equal(await ctx.persist(),true);const offline=await loadApp({seedStorage:{[SYNC_STORE_KEY]:shim.localStorage.getItem(SYNC_STORE_KEY)}});assert.equal(offline.ctx.state.tasks.find(t=>t.id===second.id).due,'2027-08-01');
- const peer=JSON.parse(JSON.stringify(base));peer.tasks.find(t=>t.id===first.id).due='2027-09-01';peer.tasks.find(t=>t.id===second.id).title='Fresh peer title';h.writeBehindBack(peer);h.failPull=false;await ctx.cloudPull();await ctx.cloudPushNow();await syncSettle(80);const saved=h.remoteState();assert.equal(saved.tasks.find(t=>t.id===first.id).due,'2027-09-01');assert.equal(saved.tasks.find(t=>t.id===second.id).due,'2027-08-01');assert.equal(saved.tasks.find(t=>t.id===second.id).title,'Fresh peer title');assert.match(shim.document.getElementById('listBody').innerHTML,/1 currently match in this tab; 1 have different values or are no longer open/,'actual two-task reconnect reports partial adoption');
+ const peer=JSON.parse(JSON.stringify(base));peer.tasks.find(t=>t.id===first.id).due='2027-09-01';peer.tasks.find(t=>t.id===second.id).title='Fresh peer title';h.writeBehindBack(peer);h.failPull=false;await ctx.cloudPull();await ctx.cloudPushNow();await syncSettle(80);const saved=h.remoteState();assert.equal(saved.tasks.find(t=>t.id===first.id).due,'2027-09-01');assert.equal(saved.tasks.find(t=>t.id===second.id).due,'2027-08-01');assert.equal(saved.tasks.find(t=>t.id===second.id).title,'Fresh peer title');assert.match(shim.document.getElementById('listBulkToolbar').innerHTML,/1 currently match in this tab; 1 have different values or are no longer open/,'actual two-task reconnect reports partial adoption');
  const deleting=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(saved)},cloudSyncFactory:h.factory});await deleting.ctx.cloudPull();h.failPull=true;deleting.ctx.state.listOpen=true;deleting.ctx.onAction('bulk-select-all');deleting.ctx.onAction('bulk-edit');deleting.shim.document.getElementById('bulkApplyDue').checked=true;deleting.shim.document.getElementById('bulkDue').value='2027-10-01';deleting.ctx.onAction('bulk-save');await deleting.ctx.persist();
  const peerDelete=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(saved)}});peerDelete.ctx.onAction('delete-task',{dataset:{id:first.id}});h.writeBehindBack(JSON.parse(peerDelete.ctx.cloudPayload()));h.failPull=false;await deleting.ctx.cloudPull();await deleting.ctx.cloudPushNow();await syncSettle(80);assert.equal(h.remoteState().tasks.some(t=>t.id===first.id),false,'stale batch does not resurrect deleted selected task');assert.equal(h.remoteState().tasks.find(t=>t.id===second.id).due,'2027-10-01');
 });
@@ -24752,19 +24804,15 @@ test('RISK bulk task editing: concurrent recovery keeps backups and existing boa
 });
 test('RISK bulk task editing: current batch result distinguishes partial reconciliation from sync success and offers no batch Undo',async()=>{
  const {ctx,shim}=await loadApp(),a=ctx.addTask('Private A'),b=ctx.addTask('Private B');ctx.state.listOpen=true;ctx.onAction('bulk-select-all');ctx.onAction('bulk-edit');shim.document.getElementById('bulkApplyDue').checked=true;shim.document.getElementById('bulkDue').value='2028-02-01';ctx.onAction('bulk-save');
- assert.match(shim.document.getElementById('listBody').innerHTML,/Bulk edit requested for 2 tasks: 2 currently match in this tab; 0 have different values or are no longer open/);assert.match(shim.document.getElementById('listBody').innerHTML,/This is not a server save confirmation/);
- ctx.state.tasks.find(t=>t.id===a.id).due='2028-03-01';ctx.renderList();assert.match(shim.document.getElementById('listBody').innerHTML,/1 currently match in this tab; 1 have different values or are no longer open/);assert.match(shim.document.getElementById('listBody').innerHTML,/Check Settings recovery backups/);assert.doesNotMatch(shim.document.getElementById('listBody').innerHTML,/data-act="bulk-undo"/);
- ctx.state.syncAccount='another-private-account';ctx.renderList();assert.doesNotMatch(shim.document.getElementById('listBody').innerHTML,/Bulk edit requested/,'result does not leak across accounts');
+ assert.match(shim.document.getElementById('listBulkToolbar').innerHTML,/Bulk edit requested for 2 tasks: 2 currently match in this tab; 0 have different values or are no longer open/);assert.match(shim.document.getElementById('listBulkToolbar').innerHTML,/This is not a server save confirmation/);
+ ctx.state.tasks.find(t=>t.id===a.id).due='2028-03-01';ctx.renderList();assert.match(shim.document.getElementById('listBulkToolbar').innerHTML,/1 currently match in this tab; 1 have different values or are no longer open/);assert.match(shim.document.getElementById('listBulkToolbar').innerHTML,/Check Settings recovery backups/);assert.doesNotMatch(shim.document.getElementById('listBulkToolbar').innerHTML,/data-act="bulk-undo"/);
+ ctx.state.syncAccount='another-private-account';ctx.renderList();assert.doesNotMatch(shim.document.getElementById('listBulkToolbar').innerHTML,/Bulk edit requested/,'result does not leak across accounts');
 });
 test('RISK bulk task editing: enlarged modal fieldsets shrink and native controls retain available width',()=>{
  assert.match(html,/\.bulk-fields\s*\{[^}]*min-width:0[^}]*max-width:100%/,'observed chrome 390px 200% overflow needs fieldsets to shrink');assert.match(html,/\.bulk-fields input\[type=number\]\s*\{[^}]*min-width:0[^}]*max-width:100%/,'native numeric control must fit enlarged modal');assert.match(html,/<fieldset class="bulk-fields">/);
 });
 
-test('RISK bulk task editing: enlarged selection rows give task controls full width',()=>{
- assert.match(html,/\.listwrap \.trow\.bulk-selecting\s*\{grid-template-columns:minmax\(0,1fr\)\}/,'observed enlarged phone selection must not share the narrow rating column');
- assert.match(html,/\.trow\.bulk-selecting \.tmain \[data-act=bulk-toggle\]\s*\{[^}]*max-width:100%[^}]*white-space:normal/,'selection button stays bounded and wraps');
- assert.ok(html.includes("(bulkSelecting?' bulk-selecting':'')"),'full-width layout applies only during selection');
-});
+
 
 // Actual Chrome390px at200% clipped Reduced motion and put the native dialog
 // beyond the viewport; retain the fixed-height and intrinsic-grid contracts.
