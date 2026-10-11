@@ -1,5 +1,46 @@
 [
   {
+    "testChangesSha256": "4e4bdacb661c3edd9432b75d3874080721143bcd83d559d0d70fa93971104cc2",
+    "reason": "Repair stale ordinary comparison fixtures found by required CI without weakening lifecycle or retired-shortcut contracts.",
+    "previousBehavior": "The tests assumed automatic benchmarks can learn and the old Rank signals sentence remains exact, conflicting with the approved automatic exclusion behavior.",
+    "intendedBehavior": "Use an explicitly chosen benchmark for ordinary pair-learning assertions and verify the actual participating-pair FAQ plus independent Dislodge signal.",
+    "replacementTests": [
+      "RISK quick Add: help removes the retired shortcut and retains participating editor Dot as a rank decision",
+      "RISK scan lifecycle: Return before Dot and expired rests retain chosen pair learning manual overrides and one-gesture Undo"
+    ],
+    "preservedCoverage": [
+      "All existing lifecycle rating-change/reversal, manual date/context/dependency overrides, expired rest, work-log count and one-gesture Undo assertions remain unchanged. Retired shortcut absence and direct editor Dot direction assertions remain unchanged."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK quick Add: help removes|RISK scan lifecycle: Return before Dot' tests.js",
+      "failure": "Required head CI38136323435 failed two stale fixtures: obsolete Rank signals copy regex and automatic benchmark Dot learning. Focused actual reproduction /tmp/neutral-bootstrap-ci-fixtures-red.log observed both RED before repair. FAQ assertion now checks participating-pair exclusion plus standalone Dislodge. Return/Dot fixture explicitly chooses anchor before Start, retaining every existing rating, rest, override, work log and one-gesture Undo assertion. Focused cohort /tmp/neutral-bootstrap-ci-fixtures-green.log passed. App assets unchanged."
+    }
+  },
+  {
+    "testChangesSha256": "bfbdce1facd34cf42ace2d1e18aa50a611c78be30a8eb15290d1c9ac2e5babd2",
+    "reason": "User explicitly requires auto-selected oldest bootstrap tasks to remain outside pairwise ranking until explicitly chosen; preserve independent Dislodge and all recorded historical ratings.",
+    "previousBehavior": "Automatic placement was initially neutral but subsequent Yes and No comparisons credited or penalized the automatic benchmark, including after reload.",
+    "intendedBehavior": "Persist causal task provenance, exclude both sides of comparisons involving an unchosen automatic task, promote only explicit Yes or Dot, and restore exclusion through Undo and stale or concurrent merges without retroactive rating rewrites. Existing Yes/No direction tests now explicitly Dot the benchmark before scanning, retaining every directional assertion; new tests protect automatic exclusion.",
+    "replacementTests": [
+      "RISK neutral bootstrap: automatic oldest stays outside Yes No and Dot comparisons until explicitly chosen",
+      "RISK neutral bootstrap: device cloud codecs Undo and stale concurrent copies preserve exclusion and explicit choice",
+      "RISK neutral bootstrap: unknown evidence concurrent automatic placement completion and restart remain safe",
+      "RISK neutral bootstrap: offline reconnect real cloud glue retains neutral provenance through old copies and Undo",
+      "RISK neutral bootstrap: FAQ explains exclusion explicit choice legacy limits and standalone Dislodge",
+      "RISK neutral bootstrap: Settings backup Restore restores causal exclusion and choice in both directions",
+      "RISK neutral bootstrap: restoring a deleted automatic task during pending saves keeps backup exclusion",
+      "RISK neutral bootstrap: JSON replacement and Undo deletion cannot be promoted by stale chosen copies"
+    ],
+    "preservedCoverage": [
+      "All existing rating-direction assertions retained. Oldest eligibility, explicit Yes No Dot, standalone Dislodge, history, deletion, export, completion and Undo remain protected. Focused real cloud glue covers offline/reconnect and missing-field copies; browser and emulator compatibility remain separate pending allocated gates.",
+      "Required head CI38136323435 failed two stale fixtures: obsolete Rank signals copy regex and automatic benchmark Dot learning. Focused actual reproduction /tmp/neutral-bootstrap-ci-fixtures-red.log observed both RED before repair. FAQ assertion now checks participating-pair exclusion plus standalone Dislodge. Return/Dot fixture explicitly chooses anchor before Start, retaining every existing rating, rest, override, work log and one-gesture Undo assertion. Focused cohort /tmp/neutral-bootstrap-ci-fixtures-green.log passed. App assets unchanged."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK neutral bootstrap:' tests.js",
+      "failure": "Before implementation, 2/2 failed: automatic incumbent fell25→20.794415817248392 on Yes and reload raised25→29.205584182751608 on No (/tmp/neutral-bootstrap-red.log). Subsequent focused observed RED caught Undo startup falsely promoting eligibility; fixed with prior-choice proof. FAQ RED preceded copy changes. Real cloud Undo fixture initially reached a cloud-adoption Undo frame; fixture now reverses bounded adoption frames before the explicit Dot. Focused regression observed the prior Yes/No fixtures fail because they used an automatic bootstrap; authorized new behavior is covered separately, and their ordinary-direction assertions now use explicit Dot. No full suite/browser/emulator run is claimed. Specialist review found missing Settings backup Restore provenance replacement; observed actual-handler RED (true eligible after neutral Restore) before repair, /tmp/neutral-bootstrap-restore-red.log. New test retains both directions, Undo and deleted-task restoration; sequential Undo/delete transitions await their durable saves before Restore so prior queued browser saves cannot stand in for the tested snapshot. Source FAQ review requested precise post-choice eligibility and concurrent/unknown-provenance limits, now corrected. Further minimal observed actual-handler RED caught deletion followed by Restore during a pending save reintroducing historical choice ops (/tmp/neutral-bootstrap-pending-restore-red.log). Before repair, restored eligible=true instead of false. Missing-current restoration now writes fresh recorded exclusion; pending-save and durable-save assertions pass without changing persistence or rating semantics. Specialist source analysis also identified deleted-task JSON replacement/Undo as the same missing-current causal boundary. Observed actual JSON handler RED (stale chosen replay promoted restored excluded task) in /tmp/neutral-bootstrap-json-restore-red.log before moving provenance replacement outside the existing-current guard. Both JSON replacement and Undo deletion now retain fresh exclusion against stale chosen replay. Parent requested independent legacy-current-dot diagnosis. Private actual-handler probe verified absent provenance remains comparison-eligible and pause→Can’t→Return as candidate→Start (sole chain and still oldest eligible) establishes exclusion without changing any ratings: /tmp/neutral-bootstrap-legacy-transition.log. Direct FAQ RED /tmp/neutral-bootstrap-legacy-faq-red.log preceded explicit text that already dotted missing-provenance tasks still compare and only empty-chain Start creates a new automatic first dot. Final source audit observed the existing Chance-mode live-rating fixture fail on automatic bootstrap (/tmp/neutral-bootstrap-chance-red.log). Explicit Dot now establishes the ordinary comparison benchmark; both original directional assertions remain unchanged. All nine Chance scan cases pass (/tmp/neutral-bootstrap-chance-green.log). Reconciled PR95 main3c3e1f9b. Expanded actual mounted FAQ cohort caught the new automatic-exclusion answer exceeding the existing130-word per-answer limit (/tmp/neutral-bootstrap-reconciled-regression.log); split the answer into three short questions while preserving all limitations and the unchanged brevity assertion.69focused cases pass (/tmp/neutral-bootstrap-reconciled-green.log). Required head CI38136323435 failed two stale fixtures: obsolete Rank signals copy regex and automatic benchmark Dot learning. Focused actual reproduction /tmp/neutral-bootstrap-ci-fixtures-red.log observed both RED before repair. FAQ assertion now checks participating-pair exclusion plus standalone Dislodge. Return/Dot fixture explicitly chooses anchor before Start, retaining every existing rating, rest, override, work log and one-gesture Undo assertion. Focused cohort /tmp/neutral-bootstrap-ci-fixtures-green.log passed. App assets unchanged."
+    }
+  },
+  {
     "testChangesSha256": "f815c1eefa62e3582ab1ae9b4dd8c2c6782fa1e92a0ef837a7ae73b9f006918a",
     "reason": "Required branch-push CI compares the exact incremental test repair against its previous pushed commit, requiring its own rationale while retaining the main-based complete-change record.",
     "previousBehavior": "The previous chapter contract omitted Task history or retained a generic name; full main-based rationale did not bind this incremental push diff.",

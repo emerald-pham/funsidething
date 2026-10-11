@@ -2811,6 +2811,7 @@ test("decide('yes'): still records the candidate outranking the benchmark", asyn
   const { ctx } = await loadApp({ seed: 4 });
   ctx.addTask("Task A", false);
   ctx.addTask("Task B", false);
+  ctx.dotTask(ctx.state.tasks[0].id); // Explicit choice: automatic bootstrap now has separate exclusion coverage.
   ctx.startScan('descending');
   const candId = ctx.state.candidateId;
   const benchId = ctx.state.chain[ctx.state.chain.length - 1];
@@ -2828,6 +2829,7 @@ test("decide('no'): still records the benchmark outranking the candidate", async
   const { ctx } = await loadApp({ seed: 5 });
   ctx.addTask("Task A", false);
   ctx.addTask("Task B", false);
+  ctx.dotTask(ctx.state.tasks[0].id); // Explicit choice: automatic bootstrap now has separate exclusion coverage.
   ctx.startScan('descending');
   const candId = ctx.state.candidateId;
   const cand = ctx.state.tasks.find((t) => t.id === candId);
@@ -3921,10 +3923,11 @@ test('RISK quick Add: retired add-dot actions cannot create a task or discard an
   }
 });
 
-test('RISK quick Add: help removes the retired shortcut and retains task-editor Dot as a rank decision', async () => {
+test('RISK quick Add: help removes the retired shortcut and retains participating editor Dot as a rank decision', async () => {
   const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
   assert.doesNotMatch(help,/Add &amp; dot|Add & dot/,'current help cannot advertise the removed shortcut');
-  assert.match(help,/<b>Rank signals:<\/b> Yes, No, Dot from the All Tasks editor, and Dislodge/);
+  assert.match(help,/<b>Rank signals:<\/b> Yes, No and Dot from the All Tasks editor compare participating tasks only when neither is excluded by automatic first-dot placement/);
+  assert.match(help,/Dislodge gives a standalone negative signal/);
   const bench=ctx.addTask('Benchmark'),selected=ctx.addTask('Select in editor');ctx.state.chain=[bench.id];
   const before=[selected.mu,bench.mu];ctx.dotTask(selected.id);
   assert.ok(selected.mu>before[0]&&bench.mu<before[1],'editor Dot still records a win over the current benchmark');
@@ -15789,7 +15792,7 @@ test('Evergreen and chance settings: malformed persisted values normalize withou
  assert.ok(Number.isFinite(st.tasks[0].evergreenHours));assert.equal(typeof st.tasks[0].evergreenResetAtDay,'boolean');
 });
 test('Chance scan: live TrueSkill ratings still change on Yes and No',async()=>{
- const {ctx}=await loadApp();for(let i=0;i<5;i++)ctx.addTask('task '+i);ctx.startScan('chance');ctx.state.snooze=100;
+ const {ctx}=await loadApp();for(let i=0;i<5;i++)ctx.addTask('task '+i);ctx.dotTask(ctx.state.tasks[0].id);ctx.startScan('chance');ctx.state.snooze=100;
  const t=ctx.state.tasks.find(t=>t.id===ctx.state.candidateId);const mu=t.mu;ctx.decide('no');assert.ok(t.mu<mu);
  ctx.undo();const restored=ctx.state.tasks.find(t=>t.id===ctx.state.candidateId);ctx.decide('yes');assert.ok(restored.mu>mu);
 });
@@ -21781,10 +21784,11 @@ test('RISK scan lifecycle: resting evergreen Dot is absent and stale controls ca
  }
 });
 
-test('RISK scan lifecycle: Return before Dot and expired rests retain pair learning manual overrides and one-gesture Undo',async()=>{
+test('RISK scan lifecycle: Return before Dot and expired rests retain chosen pair learning manual overrides and one-gesture Undo',async()=>{
  for(const mode of ['chance','descending']){
   const app=await modeLifecycleApp(),{ctx,shim}=app,anchor=ctx.addTask('Anchor'),task=ctx.addTask('Recurring task');
   Object.assign(task,{evergreen:true,evergreenHours:18,evergreenResetAtDay:false});
+  ctx.dotTask(anchor.id); // Ordinary pair-learning fixture needs an explicitly chosen benchmark.
   ctx.startScan(mode);ctx.doneTask(task.id);
   const resting=JSON.stringify(ctx.state),ratings=JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma]));
   ctx.dotTask(task.id);assert.equal(JSON.stringify(ctx.state),resting,'rest cannot produce a comparison that reconciliation discards');
@@ -24493,4 +24497,80 @@ test('RISK pedestrian reduced painter consumer: production-shaped static events 
 test('RISK pedestrian concise help: natural exit guidance has a short adjacent FAQ without lengthening the existing scenery answer',()=>{
  const entry=html.split('<dt>How do walking visitors leave the scene?</dt>')[1];assert.ok(entry,'walking guidance has its own user-facing FAQ');
  assert.match(entry.split('</dd>')[0],/Arrival chances and the shared visit schedule stay the same/);
+});
+
+test('RISK neutral bootstrap: automatic oldest stays outside Yes No and Dot comparisons until explicitly chosen',async()=>{
+ for(const action of ['yes','no','dot']){
+  const {ctx}=await loadApp();const a=ctx.addTask('Automatic oldest'),b=ctx.addTask('Explicit next'),c=ctx.addTask('Later');a.createdAt=1;b.createdAt=2;c.createdAt=3;
+  const before=JSON.stringify(ctx.state.tasks.map(t=>[t.mu,t.sigma,t.ratingHistory]));ctx.startScan();assert.equal(ctx.state.chain[0],a.id);
+  assert.equal(JSON.stringify(ctx.state.tasks.map(t=>[t.mu,t.sigma,t.ratingHistory])),before,'startup remains entirely neutral');
+  ctx.state.candidateId=b.id;if(action==='dot')ctx.dotTask(b.id);else ctx.decide(action);
+  assert.equal(a.mu,25,'automatic incumbent cannot gain or lose from another candidate');assert.equal(a.sigma,25/3);assert.equal(b.mu,25,'excluded pair supplies no comparison evidence for either side');assert.equal(b.sigma,25/3);
+  assert.equal(a.ratingHistory,undefined);assert.equal(b.ratingHistory,undefined);
+  if(action!=='no'){ctx.state.candidateId=c.id;ctx.decide('no');assert.ok(b.mu>25,'explicit replacement becomes an ordinary benchmark');assert.ok(c.mu<25);}
+ }
+ const {ctx}=await loadApp();const a=ctx.addTask('Bootstrap'),b=ctx.addTask('Other');a.createdAt=1;b.createdAt=2;ctx.startScan();ctx.dislodge();const lost=a.mu;assert.ok(lost<25,'explicit standalone Dislodge still teaches a loss');
+ ctx.state.chain=[b.id];ctx.dotTask(a.id);assert.ok(a.mu>lost,'explicit Dot promotes the automatic task and compares it');assert.ok(b.mu<25);
+});
+
+test('RISK neutral bootstrap: device cloud codecs Undo and stale concurrent copies preserve exclusion and explicit choice',async()=>{
+ const h=await loadApp(),{ctx,shim}=h;const a=ctx.addTask('Bootstrap'),b=ctx.addTask('Other');a.createdAt=1;b.createdAt=2;ctx.startScan();await ctx.persist();
+ const automatic=JSON.parse(ctx.cloudPayload());const reload=await loadApp({seedStorage:{[SYNC_STORE_KEY]:shim.localStorage.getItem(SYNC_STORE_KEY)}});reload.ctx.state.candidateId=b.id;reload.ctx.decide('no');assert.equal(reload.ctx.state.tasks.find(t=>t.id===a.id).mu,25,'reload must not promote the automatic dot');
+ ctx.dislodge();ctx.state.chain=[b.id];ctx.dotTask(a.id);const chosen=JSON.parse(ctx.cloudPayload());ctx.undo();const restored=ctx.state.tasks.find(t=>t.id===a.id);assert.equal(ctx.taskComparisonEligible(restored),false,'Undo explicit Dot restores exclusion');
+ for(const [left,right] of [[automatic,chosen],[chosen,automatic]]){const merged=JSON.parse(JSON.stringify(left));ctx.mergeUndeletedTasks(merged,JSON.parse(JSON.stringify(right)));assert.equal(ctx.taskComparisonEligible(merged.tasks.find(t=>t.id===a.id)),true,'observed explicit choice survives either stale merge direction');}
+ const undo=JSON.parse(ctx.cloudPayload());for(const [left,right] of [[chosen,undo],[undo,chosen]]){const merged=JSON.parse(JSON.stringify(left));ctx.mergeUndeletedTasks(merged,JSON.parse(JSON.stringify(right)));assert.equal(ctx.taskComparisonEligible(merged.tasks.find(t=>t.id===a.id)),false,'new Undo must defeat older choice');}
+ const older=JSON.parse(JSON.stringify(automatic));delete older.tasks.find(t=>t.id===a.id).comparisonOps;ctx.mergeUndeletedTasks(older,automatic);assert.equal(ctx.taskComparisonEligible(older.tasks.find(t=>t.id===a.id)),false,'missing-field legacy copy cannot erase recorded exclusion');
+ const legacy=ctx.addTask('Legacy');assert.equal(ctx.taskComparisonEligible(legacy),true,'unrecorded historical provenance is not guessed');
+});
+
+test('RISK neutral bootstrap: unknown evidence concurrent automatic placement completion and restart remain safe',async()=>{
+ const {ctx}=await loadApp();const a=ctx.addTask('Bootstrap'),b=ctx.addTask('Other');a.createdAt=1;b.createdAt=2;ctx.startScan();const auto=JSON.parse(ctx.cloudPayload());
+ ctx.undo();assert.equal(ctx.taskComparisonEligible(ctx.state.tasks.find(t=>t.id===a.id)),false,'Undo navigation must not fabricate explicit choice');
+ ctx.state.chain=[b.id];ctx.dotTask(a.id);const chosen=JSON.parse(ctx.cloudPayload());const concurrent=JSON.parse(JSON.stringify(auto));const pending=concurrent.tasks.find(t=>t.id===a.id);pending.comparisonOps.push({v:1,id:'private-concurrent-auto',observed:[],neutral:true});
+ for(const [left,right] of [[chosen,concurrent],[concurrent,chosen]]){const merged=JSON.parse(JSON.stringify(left));ctx.mergeUndeletedTasks(merged,JSON.parse(JSON.stringify(right)));assert.equal(ctx.taskComparisonEligible(merged.tasks.find(t=>t.id===a.id)),false,'unseen automatic placement remains excluded');ctx.mergeUndeletedTasks(merged,JSON.parse(JSON.stringify(right)));assert.equal(ctx.taskComparisonEligible(merged.tasks.find(t=>t.id===a.id)),false);}
+ ctx.doneTask(a.id);ctx.undo();assert.equal(ctx.taskComparisonEligible(ctx.state.tasks.find(t=>t.id===a.id)),true,'completion Undo retains prior explicit choice');ctx.state.chain=[];ctx.state.tasks.find(t=>t.id===b.id).lastDoneAt=1;ctx.startScan();assert.equal(ctx.state.chain[0],a.id);assert.equal(ctx.taskComparisonEligible(ctx.state.tasks.find(t=>t.id===a.id)),false,'new automatic placement is neutral again');
+ const unknown=ctx.state.tasks.find(t=>t.id===a.id);unknown.comparisonOps={v:99,opaque:'future'};const raw=JSON.stringify(unknown.comparisonOps);ctx.state.chain=[b.id];ctx.dotTask(a.id);assert.equal(ctx.taskComparisonEligible(unknown),false);assert.equal(JSON.stringify(unknown.comparisonOps),raw,'unknown data is preserved without choosing its meaning');
+});
+
+test('RISK neutral bootstrap: offline reconnect real cloud glue retains neutral provenance through old copies and Undo',async()=>{
+ const initial=await loadApp();const a=initial.ctx.addTask('Bootstrap'),b=initial.ctx.addTask('Other');a.createdAt=1;b.createdAt=2;initial.ctx.startScan();
+ const base=JSON.parse(initial.ctx.cloudPayload());base.syncAccount='e@example.com';base.updatedAt=Date.now();base.syncRev=1;base.syncDirty=false;
+ const cloud=makeSyncHarness({remote:base,rev:1}),left=await loadApp({seedStorage:{[STORE_KEY]:JSON.stringify(base)},cloudSyncFactory:cloud.factory}),right=await loadApp({seedStorage:{[STORE_KEY]:JSON.stringify(base)},cloudSyncFactory:cloud.factory});
+ for(const h of [left,right]){h.shim.window.CLOUD_PUSH_DELAY_MS=2;h.shim.window.CLOUD_RETRY_DELAY_MS=2;await h.ctx.cloudPull();}
+ cloud.failPull=true;left.ctx.suspendCloudSync();left.ctx.state.candidateId=b.id;left.ctx.decide('no');await left.ctx.persist();assert.equal(left.ctx.state.tasks.find(t=>t.id===a.id).mu,25);
+ cloud.failPull=false;left.ctx.resumeCloudSync();await syncSettle(100);await right.ctx.cloudPull();assert.equal(right.ctx.taskComparisonEligible(right.ctx.state.tasks.find(t=>t.id===a.id)),false);
+ const old=cloud.remoteState();delete old.tasks.find(t=>t.id===a.id).comparisonOps;old.updatedAt=Date.now()+1;cloud.writeBehindBack(old);await left.ctx.cloudPull();await syncSettle(100);assert.equal(left.ctx.taskComparisonEligible(left.ctx.state.tasks.find(t=>t.id===a.id)),false,'newer missing-field copy retains local exclusion');
+ left.ctx.dislodge();left.ctx.state.chain=[b.id];left.ctx.dotTask(a.id);const choiceUndoDepth=vm.runInContext('undoStack.length',left.ctx);await left.ctx.persist();left.ctx.cloudPushNow();await syncSettle(100);await right.ctx.cloudPull();assert.equal(right.ctx.taskComparisonEligible(right.ctx.state.tasks.find(t=>t.id===a.id)),true);
+ const adoptionFrames=vm.runInContext('undoStack.length',left.ctx)-choiceUndoDepth;assert.ok(adoptionFrames>=0&&adoptionFrames<=3,'only bounded cloud-adoption frames can follow the choice');for(let i=0;i<adoptionFrames;i++)left.ctx.undo();left.ctx.undo();await left.ctx.persist();left.ctx.cloudPushNow();await syncSettle(100);await right.ctx.cloudPull();assert.equal(right.ctx.taskComparisonEligible(right.ctx.state.tasks.find(t=>t.id===a.id)),false);
+ const reload=await loadApp({seedStorage:{[STORE_KEY]:JSON.stringify(right.ctx.state)},cloudSyncFactory:cloud.factory});await reload.ctx.cloudPull();assert.equal(reload.ctx.taskComparisonEligible(reload.ctx.state.tasks.find(t=>t.id===a.id)),false);
+});
+
+test('RISK neutral bootstrap: FAQ explains exclusion explicit choice legacy limits and standalone Dislodge',async()=>{
+ const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(help,/automatically dotted task stays outside ranking comparisons/i);assert.match(help,/Yes or Dot explicitly chooses/i);assert.match(help,/neither task.*rating/i);assert.match(help,/before this update.*provenance/i);assert.match(help,/Existing dotted tasks without this evidence still take part in comparisons/i);assert.match(help,/Dislodge still gives.*negative/i);
+});
+
+test('RISK neutral bootstrap: Settings backup Restore restores causal exclusion and choice in both directions',async()=>{
+ const {ctx}=await loadApp();const a=ctx.addTask('Bootstrap'),b=ctx.addTask('Other');a.createdAt=1;b.createdAt=2;ctx.startScan();await ctx.persist();const neutral=await ctx.saveDurableBackup('manual',JSON.stringify(ctx.state));assert.ok(neutral?.id);
+ ctx.dislodge();ctx.state.chain=[b.id];ctx.dotTask(a.id);await ctx.persist();const chosen=await ctx.saveDurableBackup('manual',JSON.stringify(ctx.state));assert.ok(chosen?.id);assert.equal(ctx.taskComparisonEligible(ctx.state.tasks.find(t=>t.id===a.id)),true);
+ ctx.openSettings();assert.equal(await ctx.restoreDurableBackupById(neutral.id),true);assert.equal(ctx.taskComparisonEligible(ctx.state.tasks.find(t=>t.id===a.id)),false,'actual Settings Restore cannot silently promote automatic placement');
+ ctx.openSettings();assert.equal(await ctx.restoreDurableBackupById(chosen.id),true);assert.equal(ctx.taskComparisonEligible(ctx.state.tasks.find(t=>t.id===a.id)),true,'restoring recorded explicit choice supersedes the newer neutral evidence');
+ ctx.undo();assert.equal(ctx.taskComparisonEligible(ctx.state.tasks.find(t=>t.id===a.id)),false,'Undo restored explicit choice restores exclusion');await ctx.persist();ctx.deleteTask(a.id);await ctx.persist();ctx.openSettings();assert.equal(await ctx.restoreDurableBackupById(neutral.id),true);assert.equal(ctx.taskComparisonEligible(ctx.state.tasks.find(t=>t.id===a.id)),false,'restoring deleted task preserves its saved exclusion');
+});
+
+test('RISK neutral bootstrap: restoring a deleted automatic task during pending saves keeps backup exclusion',async()=>{
+ const {ctx}=await loadApp();const a=ctx.addTask('Bootstrap'),b=ctx.addTask('Other');a.createdAt=1;b.createdAt=2;ctx.startScan();await ctx.persist();const neutral=await ctx.saveDurableBackup('manual',JSON.stringify(ctx.state));
+ ctx.dislodge();ctx.state.chain=[b.id];ctx.dotTask(a.id);await ctx.persist();ctx.deleteTask(a.id);ctx.openSettings();assert.equal(await ctx.restoreDurableBackupById(neutral.id),true);
+ assert.equal(ctx.taskComparisonEligible(ctx.state.tasks.find(t=>t.id===a.id)),false,'restored automatic provenance must override prior saved explicit choice even while deletion save is pending');await ctx.persist();
+ assert.equal(ctx.taskComparisonEligible(ctx.state.tasks.find(t=>t.id===a.id)),false,'the durable save must retain restored exclusion');
+});
+
+test('RISK neutral bootstrap: JSON replacement and Undo deletion cannot be promoted by stale chosen copies',async()=>{
+ for(const route of ['json','undo-delete']){
+  const {ctx,shim}=await loadApp();const a=ctx.addTask('Bootstrap'),b=ctx.addTask('Other');a.createdAt=1;b.createdAt=2;ctx.startScan();await ctx.persist();const neutral=JSON.parse(ctx.cloudPayload());
+  const peer=await loadApp({seedStorage:{[STORE_KEY]:JSON.stringify(neutral)}});peer.ctx.dislodge();peer.ctx.state.chain=[b.id];peer.ctx.dotTask(a.id);const chosen=JSON.parse(peer.ctx.cloudPayload());
+  ctx.deleteTask(a.id);await ctx.persist();if(route==='json'){shim.document.getElementById('jsonBox').value=JSON.stringify(neutral);ctx.onAction('import-json',{});}else ctx.undo();
+  assert.equal(ctx.taskComparisonEligible(ctx.state.tasks.find(t=>t.id===a.id)),false);ctx.mergeUndeletedTasks(ctx.state,chosen);
+  assert.equal(ctx.taskComparisonEligible(ctx.state.tasks.find(t=>t.id===a.id)),false,route+' restoration needs fresh exclusion independent of old choice replay');
+ }
 });

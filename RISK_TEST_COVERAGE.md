@@ -11,6 +11,18 @@ The named-contract test in tests.js checks that every top-level test whose title
 
 ## Task state, eligibility, and scanner controls
 
+- RISK neutral bootstrap: JSON replacement and Undo deletion cannot be promoted by stale chosen copies
+
+- RISK neutral bootstrap: restoring a deleted automatic task during pending saves keeps backup exclusion
+
+- RISK neutral bootstrap: Settings backup Restore restores causal exclusion and choice in both directions
+
+- RISK neutral bootstrap: automatic oldest stays outside Yes No and Dot comparisons until explicitly chosen
+- RISK neutral bootstrap: device cloud codecs Undo and stale concurrent copies preserve exclusion and explicit choice
+- RISK neutral bootstrap: unknown evidence concurrent automatic placement completion and restart remain safe
+- RISK neutral bootstrap: offline reconnect real cloud glue retains neutral provenance through old copies and Undo
+- RISK neutral bootstrap: FAQ explains exclusion explicit choice legacy limits and standalone Dislodge
+
 - RISK All Tasks mobile layout: names and every metadata badge wrap inside the task column without changing saved state
 - RISK All Tasks mobile layout FAQ: existing list guidance explains wrapped names and badges
 - RISK All Tasks mobile layout browser: WebKit and Chrome keep names badges blockers and taps usable across viewport and text sizes
@@ -23,7 +35,7 @@ The named-contract test in tests.js checks that every top-level test whose title
 
 - RISK quick Add: retired Add and dot is absent while ordinary Add preserves contexts and the current chain
 - RISK quick Add: retired add-dot actions cannot create a task or discard an unsaved draft
-- RISK quick Add: help removes the retired shortcut and retains task-editor Dot as a rank decision
+- RISK quick Add: help removes the retired shortcut and retains participating editor Dot as a rank decision
 - RISK quick Add browser: the retired button stays absent on phone tablet and desktop through chain changes
 
 - RISK evergreen flag changes: completion cancellation survives both merge directions durable replay and cloud
@@ -541,7 +553,7 @@ The editor hook blocks app or enforcement edits while tests.js has no staged or 
 Resting completion cannot teach a discarded Dot, first Start uses current eligibility, and adopted Chance repairs save before conditional publication. Both modes retain the neutral oldest never-done first dot and accepted manual Dot signals.
 
 - RISK scan lifecycle: resting evergreen Dot is absent and stale controls cannot mutate ratings edits or Undo
-- RISK scan lifecycle: Return before Dot and expired rests retain pair learning manual overrides and one-gesture Undo
+- RISK scan lifecycle: Return before Dot and expired rests retain chosen pair learning manual overrides and one-gesture Undo
 - RISK scan lifecycle: interval edits that revive an evergreen rest save once without a discarded Dot comparison
 - RISK scan lifecycle: first Start reconciles timed holds at their exact boundary in both modes without teaching rank
 - RISK scan lifecycle: first Start sweeps stale day marks and evergreen rest while retaining oldest never-done priority
