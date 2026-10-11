@@ -193,8 +193,9 @@
         const shoulder=blend(motion.hipX,-8+motion.bob,skiPoint(side===0?1:0,-11));
         drawLine(shoulder.x,shoulder.y,(shoulder.x+grip.x)*.5,(shoulder.y+grip.y)*.5,skin,1.1);
         drawLine((shoulder.x+grip.x)*.5,(shoulder.y+grip.y)*.5,grip.x,grip.y,skin,1.1);
+        return grip;
       };
-      arm(motion.arms[1],1);
+      const backGrip=arm(motion.arms[1],1);
       const head=blend(motion.hipX,headY+motion.bob,skiPoint(2,-16));
       drawHead(head.x,head.y,2,2,poseValue.seed,skin,false);
       const shoulder=blend(motion.hipX,-9+motion.bob,skiPoint(1,-14));
@@ -204,7 +205,7 @@
         drawLine(hip.x,hip.y,knee.x,knee.y,ink,1.3+.2*skiBlend);
         drawLine(knee.x,knee.y,foot.x,foot.y,ink,1.3+.2*skiBlend);
       });
-      arm(motion.hand,0);g.restore();return motion.hand;
+      const frontGrip=arm(motion.hand,0);g.restore();return {...motion.hand,head,grips:[backGrip,frontGrip]};
     };
 
     g.save();
@@ -233,11 +234,11 @@
         drawLine(a.x,a.y,b.x,b.y,mixHex(color(poseValue.seed),offset?ink:snowShadow,amount),1.1-(offset?.3*amount:0));
       }
       g.save();g.globalAlpha*=amount;
-      const hat={x:Math.cos(poseValue.angle+poseValue.lean)*2-dir*Math.sin(poseValue.angle+poseValue.lean)*-17,y:dir*Math.sin(poseValue.angle+poseValue.lean)*2+Math.cos(poseValue.angle+poseValue.lean)*-17};
+      const hatAngle=(poseValue.angle+poseValue.lean)*amount,hat={x:hand.head.x+dir*Math.sin(hatAngle),y:hand.head.y-Math.cos(hatAngle)};
       drawEllipse(hat.x,hat.y,2.2,1.2,color(poseValue.seed));
-      for(const points of [[-6,-7,-10,1],[7,-7,11,1]]){
-        const angle=poseValue.angle+poseValue.lean,rotate=(x,y)=>({x:Math.cos(angle)*x-dir*Math.sin(angle)*y,y:dir*Math.sin(angle)*x+Math.cos(angle)*y});
-        const a=rotate(points[0],points[1]),b=rotate(points[2],points[3]);drawLine(a.x,a.y,b.x,b.y,ink,.7);
+      for(const [index,offset] of [[0,-4],[1,4]]){
+        const angle=poseValue.angle+poseValue.lean,delta={x:Math.cos(angle)*offset-dir*Math.sin(angle)*8,y:dir*Math.sin(angle)*offset+Math.cos(angle)*8};
+        const a=hand.grips[index];drawLine(a.x,a.y,a.x+delta.x,a.y+delta.y,ink,.7);
       }
       g.restore();g.restore();
       g.save();g.globalAlpha*=amount;

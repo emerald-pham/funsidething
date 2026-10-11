@@ -25271,3 +25271,15 @@ test('RISK pedestrian ski tracks: approach transition introduces track ink conti
  const ctx=vm.createContext({Math});for(const file of ['landscape-geometry.js','landscape-winter.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,file),'utf8'),ctx);const g=ctx.LandscapeGeometry.create(390,844),e={type:'skier',duration:9000,activityDuration:75,seed:.4,lane:.5,reverse:false},plan=g.walkingPlan(e);let lo=0,hi=g.walkingLifetime(e);for(let i=0;i<48;i++){const mid=(lo+hi)/2;if(g.walkingClock({...e,age:mid})<plan.arrivalSeconds)lo=mid;else hi=mid;}const age=(lo+hi)/2,stack=[],ink=[],canvas={globalAlpha:1,save(){stack.push(this.globalAlpha);},restore(){this.globalAlpha=stack.pop();},translate(){},scale(){},rotate(){}};
  ctx.LandscapeWinter.paint(canvas,g,390,844,{...e,age:age+1e-7},0,{city:'#334455',front:'#556655',sky:['#aabbcc','#bbccdd','#ccddee']},{ellipse(){},line(canvas,x,y,u,v,color,width){if(Math.abs(width-.65*.85)<1e-9)ink.push(Math.hypot(u-x,v-y)*canvas.globalAlpha);},skinColor:()=> '#abcdef',color:()=> '#112233'});assert.ok(ink.reduce((sum,n)=>sum+n,0)<.001,'ski tracks cannot become fully visible in the first transition instant');
 });
+
+
+test('RISK pedestrian ski preparation attachments: hat follows the painted head and poles stay in the painted grips throughout blending',()=>{
+ const ctx=vm.createContext({Math});for(const file of ['landscape-geometry.js','landscape-winter.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,file),'utf8'),ctx);
+ for(const [width,height]of[[390,844],[1440,900]])for(const reverse of[false,true])for(const progress of[.02,.06,.10,.12]){
+  const g=ctx.LandscapeGeometry.create(width,height),e={type:'skier',duration:9000,activityDuration:75,seed:.4,lane:.5,reverse},plan=g.walkingPlan(e),target=plan.arrivalSeconds+75*progress;let lo=0,hi=g.walkingLifetime(e);for(let i=0;i<48;i++){const mid=(lo+hi)/2;if(g.walkingClock({...e,age:mid})<target)lo=mid;else hi=mid;}
+  const heads=[],hats=[],arms=[],poles=[],stack=[],canvas={globalAlpha:1,save(){stack.push(this.globalAlpha);},restore(){this.globalAlpha=stack.pop();},translate(){},scale(){},rotate(){}};
+  ctx.LandscapeWinter.paint(canvas,g,width,height,{...e,age:(lo+hi)/2},0,{city:'#334455',front:'#556655',sky:['#aabbcc','#bbccdd','#ccddee']},{skinColor:()=> '#abcdef',color:()=> '#112233',personHead(canvas,x,y){heads.push({x,y});},ellipse(canvas,x,y,rx,ry){if(rx===2.2&&ry===1.2)hats.push({x,y});},line(canvas,x,y,u,v,color,width){if(color==='#abcdef')arms.push({x:u,y:v});if(width===.7)poles.push({x,y});}});
+  assert.equal(heads.length,1);assert.equal(hats.length,1);assert.ok(Math.hypot(hats[0].x-heads[0].x,hats[0].y-heads[0].y)<=1.15,'preparation hat must stay on current painted head rather than its future skiing location');
+  assert.equal(arms.length,4);assert.equal(poles.length,2);for(let i=0;i<2;i++)assert.ok(Math.hypot(poles[i].x-arms[2*i+1].x,poles[i].y-arms[2*i+1].y)<1e-8,'each preparation pole starts in the actual currently painted grip');
+ }
+});
