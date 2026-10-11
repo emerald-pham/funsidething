@@ -15757,8 +15757,8 @@ test('Skywriters: scheduler requires a human word, respects its rate, and allows
 });
 
 // Chance order is part of the pass, not a side effect of rendering or voting.
-test('Chance scan: settings select squared default or three explicit buttons', async()=>{
- const {ctx}=await loadApp();
+test('Chance scan: saved Squared setting or explicit legacy buttons select their modes', async()=>{
+ const {ctx}=await loadApp();ctx.setScanPreference('squared'); // Preserve this established prior-mode button fixture.
  assert.equal(ctx.state.settings.scanMode,'squared');
  assert.match(ctx.scanStartButtons(),/>Start scanning</);
  ctx.state.settings.scanMode='both';

@@ -1,5 +1,44 @@
 [
   {
+    "testChangesSha256": "c3df76ec02eb1d30d612ad9156d61684d473d62c45e309104a3e68a0ed2cb84a",
+    "reason": "User authorized Halving only for genuinely new clients. Preserve legacy normalization/migrations and old Squared-to-Halving consumer transitions by making their existing prior-mode fixtures explicit, while new tests exercise actual boot, Start, storage recovery and cloud adoption. Reconciled verified rollback main c9b574f; incoming prior-rig regression, map and rationale are retained, app assets unchanged. Reconcile released bulk main43824ce additively: preserve all incoming bulk tests, controls, FAQ and changelog; test locations shift, so bind the unchanged Halving evidence to the exact new base. No new functional RED is claimed for this integration. Required CI exposed one additional old fresh-Squared assumption in the Chance button-selection fixture. Reproduced focused RED before repair; explicitly select prior Squared and retain every original assertion. App assets unchanged by this fixture repair. Required CI exposed one additional old fresh-Squared assumption in the Chance button-selection fixture. Reproduced focused RED before repair; explicitly select prior Squared and retain every original assertion. App assets unchanged by this fixture repair.",
+    "previousBehavior": "Verified empty stores started Squared; equal-revision zero cloud documents could lose their saved mode to the empty client. Three Halving tests relied on the fresh Squared default as their transition precondition.",
+    "intendedBehavior": "Only verified empty clients start Halving. Saved empty boards, missing preferences, supported modes, unknown setting fields and recovery evidence keep prior behavior; fresh first reconcile adopts saved cloud modes at zero, higher or legacy revisions. Established transition assertions remain unchanged after an explicit prior Squared fixture.",
+    "replacementTests": [
+      "Chance scan: saved Squared setting or explicit legacy buttons select their modes"
+    ],
+    "preservedCoverage": [
+      "All existing math, task/rating, filtering, first-dot, Undo, reload, shared-pass joins, immediate Settings control and Chance migration assertions remain. The three transition fixtures explicitly select Squared before their unchanged transitions; no coverage is removed."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='Chance scan: settings select squared default or three explicit buttons' tests.js",
+      "failure": "Observed required CI38157853829 onefailure (1506pass,33environment skips), reproduced in /tmp/fresh-halving-ci-fixture-red.log: fresh actualhalving expected squared at tests.js15762. All original Start button, both legacy buttons and actualChance-start assertions remain; only prior-mode fixture and descriptive name repaired. No additional functional RED claimed for additive bulk integration."
+    }
+  },
+  {
+    "testChangesSha256": "d0cbd93f6b2fe6fe0e5af692244a263c6d6f3f8e5c119b6bc485fd744924fb76",
+    "reason": "User authorized Halving only for genuinely new clients. Preserve legacy normalization/migrations and old Squared-to-Halving consumer transitions by making their existing prior-mode fixtures explicit, while new tests exercise actual boot, Start, storage recovery and cloud adoption. Reconciled verified rollback main c9b574f; incoming prior-rig regression, map and rationale are retained, app assets unchanged. Reconcile released bulk main43824ce additively: preserve all incoming bulk tests, controls, FAQ and changelog; test locations shift, so bind the unchanged Halving evidence to the exact new base. No new functional RED is claimed for this integration. Required CI exposed one additional old fresh-Squared assumption in the Chance button-selection fixture. Reproduced focused RED before repair; explicitly select prior Squared and retain every original assertion. App assets unchanged by this fixture repair.",
+    "previousBehavior": "Verified empty stores started Squared; equal-revision zero cloud documents could lose their saved mode to the empty client. Three Halving tests relied on the fresh Squared default as their transition precondition.",
+    "intendedBehavior": "Only verified empty clients start Halving. Saved empty boards, missing preferences, supported modes, unknown setting fields and recovery evidence keep prior behavior; fresh first reconcile adopts saved cloud modes at zero, higher or legacy revisions. Established transition assertions remain unchanged after an explicit prior Squared fixture.",
+    "replacementTests": [
+      "Chance scan: saved Squared setting or explicit legacy buttons select their modes",
+      "Scan default: fresh clients use Halving while missing saved preferences retain Squared",
+      "RISK fresh Halving default: new clients use Halving while legacy normalization and saved choices survive",
+      "RISK fresh Halving startup: successful empty stores choose Halving and actual Start persists it across reload",
+      "RISK fresh Halving preservation: saved empty boards missing preferences supported modes and unknown settings are not fresh clients",
+      "RISK fresh Halving cloud adoption: saved modes at zero newer and legacy revisions win over browser defaults without a settings write",
+      "RISK fresh Halving copy: Settings and extended FAQ distinguish new-client defaults from saved board modes",
+      "RISK fresh Halving recovery boundary: retained backup bytes protected heads and unavailable durable stores keep the legacy fallback"
+    ],
+    "preservedCoverage": [
+      "All existing math, task/rating, filtering, first-dot, Undo, reload, shared-pass joins, immediate Settings control and Chance migration assertions remain. The three transition fixtures explicitly select Squared before their unchanged transitions; no coverage is removed."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='Chance scan: settings select squared default or three explicit buttons' tests.js",
+      "failure": "Observed required CI38157853829 onefailure (1506pass,33environment skips), reproduced in /tmp/fresh-halving-ci-fixture-red.log: fresh actualhalving expected squared at tests.js15762. All original Start button, both legacy buttons and actualChance-start assertions remain; only prior-mode fixture and descriptive name repaired. No additional functional RED claimed for additive bulk integration."
+    }
+  },
+  {
     "testChangesSha256": "1ac8a26d7647506e5d598e423dba194f67022ff2b8bee069f1dbd4d810b769db",
     "reason": "User authorized Halving only for genuinely new clients. Preserve legacy normalization/migrations and old Squared-to-Halving consumer transitions by making their existing prior-mode fixtures explicit, while new tests exercise actual boot, Start, storage recovery and cloud adoption. Reconciled verified rollback main c9b574f; incoming prior-rig regression, map and rationale are retained, app assets unchanged. Reconcile released bulk main43824ce additively: preserve all incoming bulk tests, controls, FAQ and changelog; test locations shift, so bind the unchanged Halving evidence to the exact new base. No new functional RED is claimed for this integration.",
     "previousBehavior": "Verified empty stores started Squared; equal-revision zero cloud documents could lose their saved mode to the empty client. Three Halving tests relied on the fresh Squared default as their transition precondition.",
