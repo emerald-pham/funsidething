@@ -758,6 +758,17 @@ test('RISK task rating history: compact record disclosures retain dates and metr
  assert.equal(JSON.stringify(b.ratingHistory),original,'rendering and FAQ navigation retain every historical fact');
  b.ratingHistory=[{...b.ratingHistory[0],kind:'dislodge'}];ctx.openEdit(b.id);assert.match(shim.document.getElementById('modalRoot').innerHTML,/Dislodged/);
 });
+test('RISK task history: compact Likelihood labels retain recorded values across metric boundaries',async()=>{
+ const {ctx,shim,b}=await ratingHistoryFixture(637);ctx.decide('yes');
+ const row=b.ratingHistory[0];
+ for(const [patch,label] of [[{eligible:true,fallback:false,likelihood:.0108},'1.08%'],[{eligible:false},'0%'],[{eligible:true,fallback:false,likelihood:.00001},'&lt;0.01%'],[{eligible:true,fallback:true},'Numerical fallback']]){
+  const task={...b,ratingHistory:[{...row,after:{...row.after,...patch,mu:33.51,sigma:5.27}}]};
+  const original=JSON.stringify(task);const view=ctx.taskRatingHistoryHTML(task);
+  assert.ok(view.includes('<span class="rating-change">Likelihood '+label+' / Score 33.51 / Uncertainty 5.27</span>'),'compact summary identifies the recorded likelihood: '+label);
+  assert.equal(JSON.stringify(task),original,'display preserves every recorded field');
+ }
+ ctx.openHelp();assert.match(shim.document.getElementById('modalRoot').innerHTML,/Likelihood percentage \/ Score \/ Uncertainty/);
+});
 test('RISK task history: comparison labels preserve initiating action without inventing historical participant roles',async()=>{
  const {ctx,shim,a,b}=await ratingHistoryFixture(633);ctx.decide('no');
  const before=JSON.stringify([a.ratingHistory,b.ratingHistory]);

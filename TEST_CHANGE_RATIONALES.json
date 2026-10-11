@@ -1,5 +1,24 @@
 [
   {
+    "testChangesSha256": "7057e8c23a99423b38c7b92a14b982e8d0748ec5615f3a0698eeea29d377b2b1",
+    "reason": "Reconcile the reviewed Likelihood presentation candidate with released motionPR99 main247f842. This incremental push imports its exact already-reviewed tests without weakening them; original Likelihood test and rationale remain intact for main comparison.",
+    "previousBehavior": "Previous pushed5da5217 was based on30afbf4 and therefore lacked the independently reviewed seven-day motion, enlarged prompt and foreground/pageshow tests now released in main.",
+    "intendedBehavior": "Retain all motionPR99 tests exactly from mergedmain, plus unchanged explicit Likelihood boundary/preservation coverage. No new motion implementation or test expectation is introduced by this reconciliation.",
+    "replacementTests": [
+      "RISK motion safety: explicit local choices expire after seven elapsed days and corrupt records fail closed",
+      "RISK motion safety: actual choice handler remembers selection while dismissal never writes consent",
+      "RISK motion safety accessibility: enlarged prompt fits the containing viewport and stacks intrinsic choice cards",
+      "RISK motion safety resume: foreground and restored pages reread expiry before painting without replacing visitors"
+    ],
+    "preservedCoverage": [
+      "All incoming seven-day consent, dismissal, OS preference, prompt sizing, foreground visitor/progress and tab-resume assertions are retained exactly as released main; all history dates, comparison roles, Done and persisted values remain protected."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='compact Likelihood labels' tests.js; motion owner recorded focused motion and foreground test-first commands in retained main rationale entries",
+      "failure": "Own preimplementation missing Likelihood1.08% failure retained /tmp/history-likelihood-red.log. Incoming released motion tests retain their observedRED evidence in main TEST_CHANGE_RATIONALES.json and /tmp/motion-seven-days-ci-repro-red.log and foreground negative-control evidence. Exact motionhead14126be requiredCI38150243908/38150241181 passed before merge; this is unchanged upstream evidence reuse, not a new RED claim."
+    }
+  },
+  {
     "testChangesSha256": "1bee3094ccef72543d5bc330f80644c66b2443acc5159c211510bcc4476b8d12",
     "reason": "Bind exact main and incremental push test diffs to focused foreground expiry regression coverage and preserved resume fixture assertions.",
     "previousBehavior": "The original foreground/pageshow consumer could paint an expired Normal choice without rereading storage; required push CI also lacked an incremental exact-diff rationale.",
@@ -4481,6 +4500,22 @@
     "redEvidence": {
       "command": "HEADER_BROWSER_GRANTED=1 node ../evidence/header-red.mjs; node --test --test-reporter=spec --test-name-pattern=\"RISK frozen header clearance:\" tests.js; node --test --test-reporter=spec --test-name-pattern=\"RISK frozen header wrapping:\" tests.js",
       "failure": "Preimplementation real browser RED: AssertionError freezing must retain headroom: scene jumped -6px (header-red.log). Preimplementation tests.js RED: fixed header must retain its original available width; undefined rather than366px (header-source-red.log). Follow-up source RED before slot observation: observe header height and flow width, including scrollbar or container changes (header-slot-observer-red.log). Browser matrix was added after the initial implementation as supplemental coverage; not claimed as a preimplementation native matrix RED. Additional observed browser RED: Settings x370.484375..398.140625 at320px enlarged frozen baseline; normal click timed out because it was outside the viewport (header-native-CPklJP/browser-run.log and header-final-CetQlj captures). d5143 retained identical brand/topbtns/mobile-nowrap/font rules, so no offline claim that it fixed this overflow. New source test failed: enlarged title plus controls must be allowed onto separate rows (header-wrap-source-red.log), before wrapping CSS repair."
+    }
+  },
+  {
+    "testChangesSha256": "8cd12e82706f7c8bc46dad70149ed58bc3489f843018c9b050f37887bb7db685",
+    "reason": "User requests an explicit Likelihood label in compact historical metric summaries.",
+    "previousBehavior": "The recorded percentage had no name before Score and Uncertainty.",
+    "intendedBehavior": "Every applicable compact metric summary names Likelihood, including zero, tiny percentage and fallback states; values remain unchanged.",
+    "replacementTests": [
+      "RISK task history: compact Likelihood labels retain recorded values across metric boundaries"
+    ],
+    "preservedCoverage": [
+      "Dates, comparison provenance, plain Done summaries, expanded metrics, native disclosures and all historical records remain unchanged."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='compact Likelihood labels' tests.js",
+      "failure": "Observed before implementation: compact summary identifies the recorded likelihood: 1.08% failed. /tmp/history-likelihood-red.log retains actual output."
     }
   }
 ]
