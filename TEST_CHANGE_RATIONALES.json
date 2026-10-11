@@ -1,5 +1,53 @@
 [
   {
+    "testChangesSha256": "1bee3094ccef72543d5bc330f80644c66b2443acc5159c211510bcc4476b8d12",
+    "reason": "Bind exact main and incremental push test diffs to focused foreground expiry regression coverage and preserved resume fixture assertions.",
+    "previousBehavior": "The original foreground/pageshow consumer could paint an expired Normal choice without rereading storage; required push CI also lacked an incremental exact-diff rationale.",
+    "intendedBehavior": "Foreground and restored pages reread current local consent before paint, prompt once when absent and preserve visitor progress; no new runtime changes in this supplemental test commit.",
+    "replacementTests": [
+      "RISK motion safety resume: foreground and restored pages reread expiry before painting without replacing visitors"
+    ],
+    "preservedCoverage": [
+      "Original visitor world immutability and stop/start counts remain; all existing FAQ assertions, motion interval, storage safety, OS enforcement and cloud boundaries remain unchanged."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern=\"RISK motion safety resume:\" tests.js with actual baseline30afbf4 landscape restored only for comparison",
+      "failure": "Supplemental regression baseline RED observed paint:normal rather than read/paint:null/prompt; /tmp/motion-seven-days-resume-supplement-baseline-red.log. Current consumer GREEN /tmp/motion-seven-days-resume-supplement-green.log. This supplemental baseline RED is not claimed as initial preimplementation evidence; original contemporaneous motion/CSS and CI failure evidence retained."
+    }
+  },
+  {
+    "testChangesSha256": "7e67f25557bd9c6b6f3e701407a0e323121f520805eed3a1db17da322fd7f150",
+    "reason": "Bind exact main and incremental push test diffs to focused foreground expiry regression coverage and preserved resume fixture assertions.",
+    "previousBehavior": "The original foreground/pageshow consumer could paint an expired Normal choice without rereading storage; required push CI also lacked an incremental exact-diff rationale.",
+    "intendedBehavior": "Foreground and restored pages reread current local consent before paint, prompt once when absent and preserve visitor progress; no new runtime changes in this supplemental test commit.",
+    "replacementTests": [
+      "RISK motion safety resume: foreground and restored pages reread expiry before painting without replacing visitors"
+    ],
+    "preservedCoverage": [
+      "Original visitor world immutability and stop/start counts remain; all existing FAQ assertions, motion interval, storage safety, OS enforcement and cloud boundaries remain unchanged."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern=\"RISK motion safety resume:\" tests.js with actual baseline30afbf4 landscape restored only for comparison",
+      "failure": "Supplemental regression baseline RED observed paint:normal rather than read/paint:null/prompt; /tmp/motion-seven-days-resume-supplement-baseline-red.log. Current consumer GREEN /tmp/motion-seven-days-resume-supplement-green.log. This supplemental baseline RED is not claimed as initial preimplementation evidence; original contemporaneous motion/CSS and CI failure evidence retained."
+    }
+  },
+  {
+    "testChangesSha256": "1410d7569c7b0d774a467dfa5e6fbe66ef0c4a9ee04d9286b1109cf990cc97de",
+    "reason": "Bind exact main and incremental push test diffs to focused foreground expiry regression coverage and preserved resume fixture assertions.",
+    "previousBehavior": "The original foreground/pageshow consumer could paint an expired Normal choice without rereading storage; required push CI also lacked an incremental exact-diff rationale.",
+    "intendedBehavior": "Foreground and restored pages reread current local consent before paint, prompt once when absent and preserve visitor progress; no new runtime changes in this supplemental test commit.",
+    "replacementTests": [
+      "RISK motion safety resume: foreground and restored pages reread expiry before painting without replacing visitors"
+    ],
+    "preservedCoverage": [
+      "Original visitor world immutability and stop/start counts remain; all existing FAQ assertions, motion interval, storage safety, OS enforcement and cloud boundaries remain unchanged."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern=\"RISK motion safety resume:\" tests.js with actual baseline30afbf4 landscape restored only for comparison",
+      "failure": "Supplemental regression baseline RED observed paint:normal rather than read/paint:null/prompt; /tmp/motion-seven-days-resume-supplement-baseline-red.log. Current consumer GREEN /tmp/motion-seven-days-resume-supplement-green.log. This supplemental baseline RED is not claimed as initial preimplementation evidence; original contemporaneous motion/CSS and CI failure evidence retained."
+    }
+  },
+  {
     "testChangesSha256": "70782fef1a22d4d9b7bedd55c2f9b95b19354a855b8b187d36e1110d612a4040",
     "reason": "Complete initial seven-day motion and accessibility coverage, and repair the existing tab-resume isolated fixture after required CI exposed its missing new preference-consumer dependencies. All original visitor immutability and stop/start assertions remain.",
     "previousBehavior": "Motion consent never expired, dismissal persisted reduced, and enlarged cards clipped. Old tab-resume fixture stubbed only start/stop and could not execute the new preference reread.",

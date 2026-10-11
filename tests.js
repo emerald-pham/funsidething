@@ -24655,3 +24655,24 @@ test('RISK motion safety accessibility: enlarged prompt fits the containing view
  assert.match(css,/#motionDialog \.motion-choices\s*\{[^}]*grid-template-columns\s*:\s*repeat\(auto-fit,\s*minmax\(min\(100%,\s*180px\),\s*1fr\)\)/,'choice grid must collapse to one column when enlarged content leaves less than two intrinsic cards');
  assert.match(css,/#motionDialog \.motion-choices button\s*\{[^}]*min-width\s*:\s*0[^}]*overflow-wrap\s*:\s*anywhere/,'choice labels must wrap inside the card instead of overflowing the dialog');
 });
+
+test('RISK motion safety resume: foreground and restored pages reread expiry before painting without replacing visitors',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ const visibility=source.slice(source.indexOf("  document.addEventListener('visibilitychange'"),source.indexOf("  document.addEventListener('landscape-location-change'"));
+ const pageshow=source.split('\n').find(line=>line.includes("window.addEventListener('pageshow'"));
+ const handlers={},calls=[],world={elapsed:42,events:[{type:'walker',age:8}]},before=JSON.stringify(world),storage={};
+ let choice='normal';
+ const context={world,storage,preference:'normal',dialog:{open:false},document:{hidden:true,addEventListener:(type,fn)=>handlers[type]=fn},window:{addEventListener:(type,fn)=>handlers[type]=fn},
+  S:{readMotion(value){assert.equal(value,storage);calls.push('read');return choice;}},stop(){calls.push('stop');}};
+ context.start=()=>calls.push('paint:'+context.preference);
+ context.updateMotion=context.start;
+ context.openMotion=()=>{calls.push('prompt');context.dialog.open=true;};
+ vm.runInNewContext(visibility+'\n'+pageshow,context);
+ handlers.visibilitychange();assert.deepEqual(calls,['stop'],'hidden tabs do not consume or paint');calls.length=0;
+ choice=null;context.document.hidden=false;handlers.visibilitychange();
+ assert.deepEqual(calls,['read','paint:null','prompt'],'expired choice becomes safe before painting and prompts');calls.length=0;
+ handlers.pageshow();assert.deepEqual(calls,['read','paint:null'],'an open check is not duplicated');calls.length=0;
+ choice='reduced';context.dialog.open=false;handlers.pageshow();
+ assert.deepEqual(calls,['read','paint:reduced'],'restored page consumes valid remembered reduction without prompting');
+ assert.equal(JSON.stringify(world),before,'foreground checks retain visitor progress');
+});
