@@ -919,3 +919,5 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - `RISK motion safety resume: foreground and restored pages reread expiry before painting without replacing visitors`
 
 - RISK task history: compact Likelihood labels retain recorded values across metric boundaries
+
+- RISK walking weight transfer: post-contact down precedes recovery without moving planted feet

@@ -1,5 +1,38 @@
 [
   {
+    "testChangesSha256": "6bfbab8080708066342c327fe5ebb2aaa2e3711c68e1c37e5f8f3f4257901ebd",
+    "reason": "Bind the actual incremental push comparison after additive reconciliation with separately reviewed motion PR99 and history PR100. Their upstream regression and rationale records are preserved; no new gait behavior beyond the original loading fix.",
+    "previousBehavior": "Reach-only hip target rises after touchdown, without a down pose.",
+    "intendedBehavior": "Flat slow walkers settle below touchdown before recovery while fixed limbs, real planted contacts, mirroring, carrying and deterministic seeking remain intact.",
+    "replacementTests": [
+      "RISK walking weight transfer: post-contact down precedes recovery without moving planted feet"
+    ],
+    "preservedCoverage": [
+      "Existing upright stance knee-duty and dense .7/distance gradient assertions remain intact; slower travel, exits, seeds, motion choices and task storage are untouched.",
+      "The comparison includes inherited motion-choice expiry, foreground resume, prompt accessibility and explicit history likelihood labels. Existing assertions and original upstream RED/rationale records remain intact."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK walking weight transfer' tests.js",
+      "failure": "Observed preimplementation AssertionError: weight settles below contact after landing, rather than rising immediately. /tmp/chain-walk-weight-red.log. Original pulse then failed two unchanged regression contracts; repaired bounded pulse passes all three in /tmp/chain-walk-weight-repair.log. The combined push-diff is integration bookkeeping, not a new preimplementation RED; upstream motion/history contemporaneous evidence remains in their retained rationale entries."
+    }
+  },
+  {
+    "testChangesSha256": "8ee6a080d5598f5546536e15564c147912afca780c3800f4078428205ccc420a",
+    "reason": "Source and independent animation audit demonstrated missing post-contact loading on the flat walking rig; observe RED before adding a bounded down pose. Rebound unchanged walking regression after additive integration with merged motion/history coverage; upstream assertions and controls remain intact.",
+    "previousBehavior": "Reach-only hip target rises after touchdown, without a down pose.",
+    "intendedBehavior": "Flat slow walkers settle below touchdown before recovery while fixed limbs, real planted contacts, mirroring, carrying and deterministic seeking remain intact.",
+    "replacementTests": [
+      "RISK walking weight transfer: post-contact down precedes recovery without moving planted feet"
+    ],
+    "preservedCoverage": [
+      "Existing upright stance knee-duty and dense .7/distance gradient assertions remain intact; slower travel, exits, seeds, motion choices and task storage are untouched."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK walking weight transfer' tests.js",
+      "failure": "Observed preimplementation AssertionError: weight settles below contact after landing, rather than rising immediately. /tmp/chain-walk-weight-red.log. Original pulse then failed two unchanged regression contracts; repaired bounded pulse passes all three in /tmp/chain-walk-weight-repair.log."
+    }
+  },
+  {
     "testChangesSha256": "7057e8c23a99423b38c7b92a14b982e8d0748ec5615f3a0698eeea29d377b2b1",
     "reason": "Reconcile the reviewed Likelihood presentation candidate with released motionPR99 main247f842. This incremental push imports its exact already-reviewed tests without weakening them; original Likelihood test and rationale remain intact for main comparison.",
     "previousBehavior": "Previous pushed5da5217 was based on30afbf4 and therefore lacked the independently reviewed seven-day motion, enlarged prompt and foreground/pageshow tests now released in main.",
