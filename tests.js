@@ -9019,7 +9019,7 @@ async function loadCloudBackendV2({rootData=null,batchFailureAt=Infinity,failure
   getFirestore:()=>({}),doc:(_db,...parts)=>ref(...parts),collection:(_db,...parts)=>ref(...parts),
   getDoc:async reference=>{if(reference.path===rootPath&&docs.get(rootPath)?.schemaVersion===2&&failures.stampPending)return failures.stampPending;if(reference.path===rootPath&&failures.pullPending)return failures.pullPending;if(reference.path===rootPath&&failures.pull)throw failures.pull;return snap(reference);},getDocs:async collectionRef=>{queries.push(collectionRef.path);return {docs:directRows(collectionRef)};},
   serverTimestamp:()=>({__serverTimestamp:true}),
-  runTransaction:async(_db,fn)=>{transactionCalls++;if(failures.pushPending)return failures.pushPending;if(failures.push)throw failures.push;const operations=[],tx={get:async reference=>snap(reference),set:(reference,value)=>operations.push({type:'set',ref:reference,value}),update:(reference,value)=>operations.push({type:'update',ref:reference,value}),delete:reference=>operations.push({type:'delete',ref:reference})};const result=await fn(tx);if(failures.publishPending&&operations.some(op=>op.ref.path===rootPath)){failures.publicationStarted=true;await failures.publishPending;}for(const operation of operations)apply(operation);return result;},
+  runTransaction:async(_db,fn)=>{transactionCalls++;if(failures.pushPending)return failures.pushPending;if(failures.push)throw failures.push;const operations=[],tx={get:async reference=>snap(reference),set:(reference,value)=>operations.push({type:'set',ref:reference,value}),update:(reference,value)=>operations.push({type:'update',ref:reference,value}),delete:reference=>operations.push({type:'delete',ref:reference})};const result=await fn(tx);if(failures.publishPending&&operations.some(op=>op.ref.path===rootPath)){failures.publicationStarted=true;await failures.publishPending;}for(const operation of operations){if(failures.enforceDeletingTransition&&operation.type==='update'&&operation.value.state==='deleting'&&docs.get(operation.ref.path)?.state==='deleting')throw Object.assign(Error('rules reject deleting to deleting'),{code:'permission-denied'});apply(operation);}return result;},
   writeBatch:()=>{const operations=[];return {set:(reference,value)=>operations.push({type:'set',ref:reference,value}),delete:reference=>operations.push({type:'delete',ref:reference}),async commit(){batchCommits++;if(batchCommits===batchFailureAt)throw Object.assign(Error('batch unavailable'),{code:'unavailable'});for(const operation of operations)apply(operation);}};},
  };
  const readDoc=F.getDoc,readDocs=F.getDocs;
@@ -25013,4 +25013,62 @@ test('RISK Settings changelog reflow: actual archived notes retain readable toke
  const rule=html.match(/\.settings-section\[data-settings-changelog\]\s+\.kv\s*\{([^}]*)\}/)?.[1]||'';
  assert.match(rule,/overflow-wrap\s*:\s*anywhere/,'73 CSS-pixel enlarged list items must permit long archived tokens to break without clipping or altering their text');
  ctx.openHelp();assert.match(shim.document.getElementById('modalRoot').innerHTML,/Release notes wrap long words in enlarged views/,'extended FAQ explains enlarged release-note reflow');
+});
+
+
+test('RISK CLOUD CLEANUP RESUME: interrupted deleting generation resumes without forbidden transition and preserves acknowledged board',async()=>{
+ const h=await loadCloudBackendV2({rootData:null,timeoutMs:5000,failures:{enforceDeletingTransition:true}});
+ const board={tasks:Array.from({length:94},(_,i)=>({...syncTask('synthetic-'+i,'Synthetic task '+i),due:null,ratingHistory:[]}))};
+ assert.equal((await h.CS.push(JSON.stringify(board),1,0)).ok,true);
+ for(let i=0;i<10;i++)await flush();
+ const stranded='users/owner/generations/interrupted-cleanup';
+ h.docs.set(stranded,{schemaVersion:2,state:'deleting',encoding:'utf8',chunkCount:1,byteLength:2,hash:'a'.repeat(64),baseRev:0,createdAt:1,deletingAt:2});
+ h.docs.set(stranded+'/chunks/00000000',{index:0,text:'{}',byteLength:2,hash:'b'.repeat(64)});
+ for(const task of board.tasks)task.due='2026-11-01';
+ assert.equal((await h.CS.push(JSON.stringify(board),2,1)).ok,true,'the coalesced batch still receives manifest acknowledgement');
+ for(let i=0;i<20;i++)await flush();
+ assert.equal(h.docs.has(stranded),false,'cleanup must resume an existing deleting header without the rules-forbidden timestamp rewrite');
+ const root=h.docs.get('users/owner');
+ assert.ok(h.docs.has('users/owner/generations/'+root.activeGeneration));
+ assert.ok(h.docs.has('users/owner/generations/'+root.previousGeneration));
+ assert.equal(JSON.parse((await h.CS.pull()).payload).tasks.filter(t=>t.due==='2026-11-01').length,94);
+});
+
+test('RISK CLOUD CLEANUP GUIDANCE: sync FAQ distinguishes failed attempts from acknowledgement and explains resumable cleanup',()=>{
+ const faq=html.slice(html.indexOf("<dt>What can I do if a save or sync fails?"),html.indexOf("<dt>How do I switch accounts?"));
+ assert.match(faq,/Recorded errors describe failed attempts and can remain after a later successful sync/);
+ assert.match(faq,/Interrupted cloud cleanup resumes without changing your current or previous synced board/);
+ assert.match(faq,/Synced requires server acknowledgement of the latest save/);
+});
+
+test('Firestore rules: production cleanup resumes deleting tombstones and protects active previous pending and young staging generations', {skip:!process.env.FIRESTORE_EMULATOR_HOST},async()=>{
+ const {initializeTestEnvironment}=await import('@firebase/rules-unit-testing');
+ const F=await import('firebase/firestore');
+ const env=await initializeTestEnvironment({projectId:'demo-chain-cleanup-resume',firestore:{rules:fs.readFileSync(path.join(__dirname,'firestore.rules'),'utf8')}});
+ try{
+  const uid='synthetic-owner',db=env.authenticatedContext(uid).firestore();
+  const adapterHtml=process.env.CHAIN_CLEANUP_BASE_HTML?fs.readFileSync(process.env.CHAIN_CLEANUP_BASE_HTML,'utf8'):html;
+  const adapterSource=adapterHtml.slice(adapterHtml.indexOf('    const rootRef=uid=>'),adapterHtml.indexOf('    const generationStore='));
+  assert.ok(adapterSource.includes('const cloudAdapter='),'exercise the actual production adapter');
+  const adapter=vm.runInNewContext('(function(){'+adapterSource+';return cloudAdapter;})()', {F,db,validRevision:rev=>Number.isSafeInteger(rev)&&rev>=0});
+  const header=(state)=>({schemaVersion:2,state,encoding:'utf8',chunkCount:1,byteLength:2,hash:'a'.repeat(64),baseRev:0,createdAt:Date.now(),deletingAt:123});
+  await env.withSecurityRulesDisabled(async context=>{
+   const admin=context.firestore();
+   await F.setDoc(F.doc(admin,'users',uid),{schemaVersion:2,rev:2,activeGeneration:'active',previousGeneration:'previous',updatedAt:1});
+   for(const id of ['active','previous','pending','stranded','young']){
+    await F.setDoc(F.doc(admin,'users',uid,'generations',id),header(id==='young'?'staging':'deleting'));
+    await F.setDoc(F.doc(admin,'users',uid,'generations',id,'chunks','00000000'),{index:0,text:'{}',byteLength:2,hash:'b'.repeat(64)});
+   }
+  });
+  assert.equal(await adapter.markDeleting(uid,'active'),false);
+  assert.equal(await adapter.markDeleting(uid,'previous'),false);
+  assert.equal(await adapter.markDeleting(uid,'pending',['pending']),false);
+  const parallel=await Promise.all([adapter.markDeleting(uid,'stranded'),adapter.markDeleting(uid,'stranded')]);
+  assert.deepEqual(parallel,[true,true],'overlapping resumed collectors must not rewrite the immutable deletion timestamp');
+  assert.equal((await adapter.readGeneration(uid,'stranded')).deletingAt,123);
+  const store=loadCloudV2().createCloudStore({adapter,crypto:webcrypto});
+  const cleanup=await store.collectGarbage(uid,{pendingGenerationIds:['pending']});
+  assert.deepEqual(Array.from(cleanup.removed),['stranded']);
+  for(const id of ['active','previous','pending','young'])assert.ok(await adapter.readGeneration(uid,id),id+' is retained');
+ }finally{await env.cleanup();}
 });

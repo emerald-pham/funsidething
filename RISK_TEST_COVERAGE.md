@@ -956,3 +956,8 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK terrain walking planner budget: flat canonical routes retain bounded analytic clock work
 
 - RISK Settings changelog reflow: actual archived notes retain readable tokens in narrow enlarged release lists
+
+## Cloud cleanup interruption regression
+
+- `RISK CLOUD CLEANUP RESUME: interrupted deleting generation resumes without forbidden transition and preserves acknowledged board`
+- `RISK CLOUD CLEANUP GUIDANCE: sync FAQ distinguishes failed attempts from acknowledgement and explains resumable cleanup`

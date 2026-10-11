@@ -1,5 +1,22 @@
 [
   {
+    "testChangesSha256": "79b479d886962af06cdf78a61178ba01f2a4dae59d115dabee99ed5108d837b3",
+    "reason": "Add cleanup interruption coverage enforcing the deployed deleting-state rule in the adapter fake, without altering existing regression assertions. Add real-rules production-adapter interruption, concurrent collector and current/previous/pending/young-staging preservation coverage. The real-rules negative control is retrospective; the first VM regression supplied contemporaneous preimplementation RED.",
+    "previousBehavior": "The production adapter rewrote an existing deleting tombstone and cleanup failed closed on the forbidden transition, leaving repeated full backlog queries.",
+    "intendedBehavior": "Resume existing deletion without changing its timestamp after the existing root and explicit-protection checks; current and previous complete boards remain protected.",
+    "replacementTests": [
+      "RISK CLOUD CLEANUP RESUME: interrupted deleting generation resumes without forbidden transition and preserves acknowledged board",
+      "RISK CLOUD CLEANUP GUIDANCE: sync FAQ distinguishes failed attempts from acknowledgement and explains resumable cleanup"
+    ],
+    "preservedCoverage": [
+      "All existing chunk verification, manifest revision arbitration, account cancellation, bounded retry, local recovery, bulk Save and Undo assertions remain intact."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK CLOUD CLEANUP RESUME:' tests.js; node --test --test-name-pattern='RISK CLOUD CLEANUP GUIDANCE:' tests.js",
+      "failure": "Contemporaneous preimplementation RED: stranded deleting header remained true instead of false after an acknowledged 94-task synthetic coalesced edit; /tmp/chain-sync-cleanup-red.log. Separate pre-FAQ RED: missing failed-attempt and cleanup-resume guidance; /tmp/chain-sync-guidance-red.log. Existing changelog fingerprint RED observed before fingerprint refresh: /tmp/chain-sync-shell-red.log."
+    }
+  },
+  {
     "testChangesSha256": "9142362051b35b9b4787c4057750bf803a776eea51fa4de59719f7ae4acc627c",
     "reason": "Add discriminating terrain pacing coverage while preserving all released regression tests and the human pose rig. Additively reconcile Halving mainb561960 without changing its defaults or data tests. Observed effective200% Settings modal overflow; add narrowly scoped release-note word wrapping without rewriting historical notes. Actual offender attribution remains a rendered supplement requirement. Preserve the established Settings section class by using a dedicated data attribute for release-only reflow.",
     "previousBehavior": "Phone walkers retained rapid short terrain-limited strides despite halved travel; the first experiment also replanned carrying arrivals.",
