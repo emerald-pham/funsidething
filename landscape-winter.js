@@ -25,7 +25,7 @@
   function eventValues(event, geometry, W) {
     const duration = Math.max(.001, finite(event && (event.activityDuration || event.duration), 1));
     const natural=!!event?.activityDuration&&event.type!=='skier',clock=natural?geometry.walkingClock(event):geometry.motionAge(event,'x');
-    const arrivalSeconds=event?.type==='snowangel'?Math.abs((event.reverse?W+32:-32)-W*(.18+finite(event.lane,.5)*.64))/geometry.walkingSpeed(event):0;
+    const arrivalSeconds=event?.type==='snowangel'?(natural?geometry.walkingPlan(event).arrivalSeconds:Math.abs((event.reverse?W+32:-32)-W*(.18+finite(event.lane,.5)*.64))/geometry.walkingSpeed(event)):0;
     const progress = natural?clamp((clock-(event.type==='snowangel'?arrivalSeconds-duration*.12:0))/duration,0,1):geometry.motionProgress(event, 'x');
     const verticalProgress = geometry.motionProgress(event, 'y');
     const lane = clamp(finite(event && event.lane, .5));
@@ -100,13 +100,13 @@
       const finalFadeAlpha = smooth(.94, 1, progress);
       const structureAlpha = 1 - finalFadeAlpha;
       const builderWalk = smooth(.68, .98, progress);
-      const walkDistance=natural?Math.max(0,clock-duration*.68)*geometry.walkingSpeed(event):W*.24*builderWalk;
+      const walkDistance=natural?geometry.walkingPlan(event).journey.distanceAt(Math.max(0,clock-duration*.68)):W*.24*builderWalk;
       const builderX = anchor - direction * 13 * scale + direction * walkDistance;
       const builderGroundY = geometry.middle(builderX) + snowOffset;
       const builderAlpha = smooth(.05, .14, progress) * (natural?1:1 - smooth(.90, .99, progress));
       return {
         type, x: anchor, y: groundY, groundY, snowOffset,
-        builderX, builderGroundY, builderScale: scale, travel:natural?{kind:'constant',startDistance:0,speed:geometry.walkingSpeed(event)}:{startDistance:0,length:W*.24,duration:duration*.30}, walkDistance, structureAlpha, patchAlpha: structureAlpha,
+        builderX, builderGroundY, builderScale: scale, travel:natural?geometry.walkingPlan(event).travel:{startDistance:0,length:W*.24,duration:duration*.30}, walkDistance, structureAlpha, patchAlpha: structureAlpha,
         finalFadeAlpha, angle: geometry.tangent(geometry.middle, anchor), scale, alpha,
         progress, verticalProgress, clock, lane, seed, direction, build,
         building: progress >= .08 && progress < .78,
@@ -119,7 +119,8 @@
       // The imprint keeps its original presentation clock; its person walks
       // independently until the entire silhouette has crossed the viewport.
       const start=direction>0?-32:W+32,speed=geometry.walkingSpeed(event);
-      activity.x=clock<arrivalSeconds?start+direction*clock*speed:anchor+direction*Math.max(0,clock-geometry.walkingPlan(event).begin)*speed;
+      const plan=geometry.walkingPlan(event);
+      activity.x=clock<arrivalSeconds?start+direction*plan.arrival.distanceAt(clock):anchor+direction*plan.journey.distanceAt(Math.max(0,clock-plan.begin));
     }
     const arriving=natural&&clock<arrivalSeconds;
     const imprintGroundY = geometry.near(anchor) + 9 + lane * 2;
@@ -132,8 +133,8 @@
     const walking = arriving || progress >= .84;
     return {
       type, x: activity.x, y: bodyGroundY, groundY: bodyGroundY,
-      walkDistance: natural?(arriving?clock*geometry.walkingSpeed(event):Math.abs(anchor-(direction>0?-32:W+32))+Math.abs(activity.x-anchor)):Math.abs(activity.x - anchor),
-      travel:natural?{kind:'constant',startDistance:0,speed:geometry.walkingSpeed(event)}:{startDistance:0,length:Math.abs((direction>0?W*1.22:-W*.22)-anchor),duration:duration*.16},
+      walkDistance: natural?(arriving?geometry.walkingPlan(event).arrival.distanceAt(clock):Math.abs(anchor-(direction>0?-32:W+32))+Math.abs(activity.x-anchor)):Math.abs(activity.x - anchor),
+      travel:natural?geometry.walkingPlan(event).travel:{startDistance:0,length:Math.abs((direction>0?W*1.22:-W*.22)-anchor),duration:duration*.16},
       imprintX: anchor, imprintGroundY, imprintAlpha, patchAlpha: imprintAlpha,
       snowOffset: 9 + lane * 2, angle: geometry.tangent(geometry.near, activity.x),
       scale: scale * .96, alpha, progress, verticalProgress, clock, lane, seed, direction,

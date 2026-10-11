@@ -227,6 +227,34 @@
     // stays monotone after the old endpoint; no frame history or deadline sprint.
     const walkingClock=e=>motionProgress({...e,duration:activityDuration(e)},'x',0,true)*activityDuration(e);
     const walkingSpeed=e=>e.type==='snowman'?Math.min(3.5,W*.4/activityDuration(e)):3.5;
+    // Calibrate hill cadence against the prior seven-unit running floor
+    // (5.6 local units per cycle), retaining flat half-speed travel. This is
+    // a reference for this rig, not a universal human walking proportion.
+    function humanWalkStride(ground,x,scale=1){
+      const grade=Math.max(...[-6,0,6].map(offset=>Math.abs(ground(x+(offset+.5)*scale)-ground(x+(offset-.5)*scale))/scale));
+      const clearance=5.7,reachFloor=6.32;
+      const extent=(-clearance*grade+Math.sqrt(reachFloor**2*(1+grade**2)-clearance**2))/(1+grade**2);
+      return Math.min(10,extent/.3);
+    }
+    const terrainTables=new Map();
+    function terrainJourney(start,direction,speed,ground,scale=1,offsets=[0]){
+      const pace=d=>Math.min(speed,...offsets.map(offset=>humanWalkStride(ground,start+direction*d+offset,scale)*scale*.625));
+      // Plans retain only their recipe. Long-lived reservations must not
+      // retain thousands of cumulative route tables after cache eviction.
+      const key=[start,direction,speed,scale,...offsets,ground===humanGround('near')?'near':ground===humanGround('middle')?'middle':'trail'].join('|');
+      const lookup=(value,axis,result)=>{
+        let nodes=terrainTables.get(key);
+        if(!nodes)nodes=[{distance:0,time:0}];
+        terrainTables.delete(key);terrainTables.set(key,nodes);
+        if(terrainTables.size>32)terrainTables.delete(terrainTables.keys().next().value);
+        const extend=d=>{while(nodes.at(-1).distance<d){const a=nodes.at(-1),b=a.distance+1;nodes.push({distance:b,time:a.time+(1/pace(a.distance)+1/pace(b))*.5});}};
+        value=Math.max(0,value);
+        if(axis==='distance')extend(value);else while(nodes.at(-1).time<value)extend(nodes.at(-1).distance+1);
+        let lo=0,hi=nodes.length-1;while(hi-lo>1){const mid=(lo+hi)>>1;if(nodes[mid][axis]>value)hi=mid;else lo=mid;}
+        const a=nodes[lo],b=nodes[hi];return b===a?0:a[result]+(b[result]-a[result])*(value-a[axis])/(b[axis]-a[axis]);
+      };
+      return {distanceAt:t=>lookup(t,'time','distance'),timeAt:d=>lookup(d,'distance','time')};
+    }
     const walkingPlans=new Map();
     function walkingPlan(e){
       const key=JSON.stringify([e.type,activityDuration(e),e.reverse,e.seed,e.lane,e.speed]);
@@ -235,21 +263,26 @@
       let anchor=W*(.1+(Number(e.lane)||0)*.8),start=direction>0?-32:W+32,begin=0;
       if(['reader','couple','picnic','kite'].includes(e.type)){start=anchor;begin=duration*(.94+Math.min(.999999,seed)*.12);}
       if(e.type==='snowman'){anchor=W*(.18+(Number(e.lane)||0)*.64);start=anchor-direction*13*Math.min(1,Math.max(.85,W/720));begin=duration*.68;}
-      if(e.type==='snowangel'){anchor=W*(.18+(Number(e.lane)||0)*.64);begin=Math.abs(anchor-start)/speed+duration*.72;start=anchor;}
+      const scale=['snowman','snowangel'].includes(e.type)?Math.min(1,Math.max(.85,W/720))*(e.type==='snowangel'?.96:1):1;
+      const ground=humanGround(e.type==='snowangel'?'near':e.type==='snowman'?'middle':'trail');
+      const offsets=['couple','picnic'].includes(e.type)?[-11,11]:[0];
+      let arrival=null,arrivalSeconds=0;
+      if(e.type==='snowangel'){anchor=W*(.18+(Number(e.lane)||0)*.64);arrival=terrainJourney(start,direction,speed,ground,scale);arrivalSeconds=arrival.timeAt(Math.abs(anchor-start));begin=arrivalSeconds+duration*.72;start=anchor;}
+      const journey=terrainJourney(start,direction,speed,ground,scale,offsets);
       const exit=direction>0?W+80:-80,length=Math.abs(exit-start);
-      const at=age=>Math.max(0,walkingClock({...e,age})-begin)*speed;
-      let low=0,high=begin+length/(speed*.75)+duration;
+      const at=age=>journey.distanceAt(Math.max(0,walkingClock({...e,age})-begin));
+      let low=0,high=(begin+journey.timeAt(length))/.75+duration;
       for(let i=0;i<48;i++){const mid=(low+high)/2;if(at(mid)<length)low=mid;else high=mid;}
-      const plan=Object.freeze({direction,speed,anchor,start,begin,length,duration:Math.ceil(high*1000)/1000});
+      const plan=Object.freeze({direction,speed,anchor,start,begin,length,journey,arrival,arrivalSeconds,travel:{kind:'terrain',startDistance:['reader','couple','picnic','kite'].includes(e.type)?40:0,speed},duration:Math.ceil(high*1000)/1000});
       walkingPlans.set(key,plan);if(walkingPlans.size>4096)walkingPlans.delete(walkingPlans.keys().next().value);
       return plan;
     }
     function stillWalkingAge(e){
       const duration=activityDuration(e),plan=walkingPlan(e);
       let target=duration*.5;
-      if(['walker','dogwalker'].includes(e.type))target=(W/2+32)/plan.speed;
+      if(['walker','dogwalker'].includes(e.type))target=plan.journey.timeAt(W/2+32);
       else if(['reader','couple','picnic','kite'].includes(e.type))target=duration*.62;
-      else if(e.type==='snowangel')target=Math.abs(plan.anchor-(e.reverse?W+32:-32))/plan.speed+duration*.38;
+      else if(e.type==='snowangel')target=plan.arrivalSeconds+duration*.38;
       let low=0,high=target+duration;
       for(let i=0;i<48;i++){const mid=(low+high)/2;if(walkingClock({...e,age:mid})<target)low=mid;else high=mid;}
       return (low+high)/2;
@@ -258,7 +291,7 @@
     function groundPose(kind,e){
       const direction=e.reverse?-1:1,speed=kind==='walker'?3.5:kind==='deer'?3:6,age=motionAge(e,'x');
       let x=groundTravelX(age,e.reverse,e.lane,e.duration,speed),hop=0;
-      if(kind==='walker'&&e.activityDuration){const plan=walkingPlan(e),distance=walkingClock(e)*plan.speed;return {x:plan.start+direction*distance,y:groundAnchor(kind,plan.start+direction*distance),direction,hop,distance,travel:{kind:'constant',startDistance:0,speed:plan.speed}};}
+      if(kind==='walker'&&e.activityDuration){const plan=walkingPlan(e),distance=plan.journey.distanceAt(walkingClock(e));return {x:plan.start+direction*distance,y:groundAnchor(kind,plan.start+direction*distance),direction,hop,distance,travel:plan.travel};}
       if(kind==='rabbit'){
         const cycle=age/1.2,phase=cycle%1,flight=Math.max(0,(phase-.3)/.7),travel=Math.floor(cycle)*10+flight*10;
         x=W*(.18+e.lane*.64)+direction*(travel-e.duration/1.2*5);
@@ -284,9 +317,9 @@
         const smooth=(a,b,v)=>{const q=clamp((v-a)/(b-a));return q*q*(3-2*q);};
         const arrival=smooth(0,duration*.24,clock),activity=(clock-duration*.12)/duration;
         const departureStart=.82+Math.min(.999999,clamp(e.seed??.5))*.12;
-        const leaving=Math.max(0,clock-plan.begin)*plan.speed;
+        const leaving=plan.journey.distanceAt(Math.max(0,clock-plan.begin));
         const x=anchor-direction*40*(1-arrival)+direction*leaving;
-        return {x,y:trail(x)+19,anchor,direction,distance:40*arrival+leaving,travel:{kind:'constant',startDistance:40,speed:plan.speed},pack:smooth(departureStart-.1,departureStart,activity),stand:Math.max(1-arrival,smooth(departureStart-.06,departureStart,activity)),walkAmount:clock<duration*.24?1-arrival:leaving>0?1:0,walking:clock<duration*.24||leaving>0};
+        return {x,y:trail(x)+19,anchor,direction,distance:40*arrival+leaving,travel:plan.travel,pack:smooth(departureStart-.1,departureStart,activity),stand:Math.max(1-arrival,smooth(departureStart-.06,departureStart,activity)),walkAmount:clock<duration*.24?1-arrival:leaving>0?1:0,walking:clock<duration*.24||leaving>0};
       }
       const smooth=(a,b,v)=>{const q=Math.max(0,Math.min(1,(v-a)/(b-a)));return q*q*(3-2*q);};
       const direction=e.reverse?-1:1,anchor=W*(.1+e.lane*.8);
@@ -320,17 +353,17 @@
       if(!routes){routes=new Map();humanRoutes.set(ground,routes);}
       let route=routes.get(key);
       if(!route){
-        const walkStrideAt=d=>{
-          const at=origin+direction*d*scale;
-          const grade=Math.max(...[-6,0,6].map(offset=>Math.abs(ground(at+(offset+.5)*scale)-ground(at+(offset-.5)*scale))/scale));
-          // Plan contacts for a comfortable upright clearance, rather than
-          // the emergency reach floor used only during steep transfers.
-          const clearance=5.7,reachFloor=6.32;
-          const extent=(-clearance*grade+Math.sqrt(reachFloor**2*(1+grade**2)-clearance**2))/(1+grade**2);
-          return Math.min(10,extent/.3);
-        };
+        const walkStrideAt=d=>humanWalkStride(ground,origin+direction*d*scale,scale);
         const speedAt=d=>{
           if(!travel)return 0;
+          if(travel.kind==='terrain'){
+            const limited=Math.min(travel.speed/scale,walkStrideAt(d)*.625);
+            if(!travel.startDistance)return limited;
+            // Arrival retains its released contact plan. Ease the new plan
+            // beyond the resting contacts so gathering never replans a toe.
+            const t=Math.max(0,Math.min(1,(d-travel.startDistance/scale-12)/12));
+            return travel.speed/scale+(limited-travel.speed/scale)*t*t*(3-2*t);
+          }
           if(travel.kind==='constant')return travel.speed/scale;
           const progress=Math.max(0,Math.min(1,(d*scale-travel.startDistance)/travel.length));
           let low=0,high=1;

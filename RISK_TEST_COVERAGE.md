@@ -948,3 +948,7 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK bulk task guidance: enlarged Settings note uses short sync and Undo wording
 
 - Scenery depth and lake capture: `RISK scenery depth: fountain participates in actual ground actor paint order`; `RISK scenery depth: nest bird sky and meadow passes paint each silhouette once`.
+
+- RISK terrain walking cadence: steep production routes slow travel with reachable contacts across human variants
+- RISK terrain walking approach: actual carrying painters preserve released arrival contacts before terrain-paced departures
+- RISK terrain walking guidance: extended FAQ explains terrain pacing without changing arrival chances or saved tasks
