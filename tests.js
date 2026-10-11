@@ -25065,5 +25065,5 @@ test('RISK binary context guidance: FAQ explains conditional two-state controls 
  const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
  assert.match(help,/While any context is active,.*included.*excluded/i);assert.match(help,/With no active contexts, only tasks without a known context can scan/);assert.match(help,/No context excludes unassigned/);
  assert.match(help,/No active contexts.*neutral/i);assert.match(help,/Every assigned known context must be active/);
- assert.match(help,/red display does not change saved neutral choices/i);assert.match(help,/unknown or deleted contexts/i);assert.match(help,/Context changes save, sync and support Undo/i);assert.match(help,/selector stays visible without contexts/i);assert.match(help,/New contexts start active/i);
+ assert.match(help,/red display does not change saved neutral choices/i);assert.match(help,/unknown or deleted contexts/i);assert.match(help,/Context changes save, sync and support Undo/i);assert.match(help,/selector stays visible without contexts/i);assert.match(help,/New contexts start active/i);assert.match(help,/<dt>How do I create contexts and filter All Tasks\?<\/dt>/);
 });

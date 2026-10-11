@@ -1,6 +1,6 @@
 [
   {
-    "testChangesSha256": "6509743f256ba543f08c998c035ea1f421c005eacc1d5300c7908da7501ff8af",
+    "testChangesSha256": "2a7776eaae3379c2d8addd37eab26da22e52d1f938952abe9da1e11b6ded2df0",
     "reason": "Implement the user-authorized conditional binary real-context controls while preserving stored neutral choices and every existing eligibility rule. Adapt prior zero-active-cycle fixtures and the browser keyboard expectation to the changed active-mode interaction, retaining their remaining assertions.",
     "previousBehavior": "With another real context included, neutral requirements displayed neutral and explicit red exclusions needed a neutral click before inclusion.",
     "intendedBehavior": "While any real context is included, blocked real contexts display excluded and include on one click; zero-included controls retain their stored-state cycle without making contextual tasks eligible.",
@@ -14,8 +14,8 @@
       "All-context AND matching, explicit-exclusion precedence, No context scope, empty selector, unknown assignments, ratings, full-pool shares, Undo, saved fields, released settings preservation and concurrent sync recovery remain protected."
     ],
     "redEvidence": {
-      "command": "node --test --test-name-pattern='RISK binary context' tests.js; node --test --test-name-pattern='RISK binary context guidance' tests.js",
-      "failure": "Contemporaneous preimplementation RED 4/4: neutral instead of excluded presentation, real explicit-red handler reaches neutral instead of included, reload derives neutral instead of excluded, and FAQ lacks conditional binary explanation; /tmp/chain-context-binary-red.log. Initial guidance fixture typo corrected before the accepted RED. Existing changed interaction assertions then failed under the intended change; /tmp/chain-context-existing.log. PWA changelog fingerprint failed before shell refresh; /tmp/chain-context-shell-red.log. Independent FAQ source review requested preservation, unknown/deleted context, save/sync/Undo and empty-creation guidance. Observed focused guidance RED before copy update: /tmp/chain-context-faq-red.log."
+      "command": "node --test --test-name-pattern='RISK binary context' tests.js; node --test --test-name-pattern='RISK binary context guidance' tests.js; npm test; node --test --test-name-pattern='RISK Quick start content:|RISK binary context guidance:' tests.js",
+      "failure": "Contemporaneous preimplementation RED 4/4: neutral instead of excluded presentation, real explicit-red handler reaches neutral instead of included, reload derives neutral instead of excluded, and FAQ lacks conditional binary explanation; /tmp/chain-context-binary-red.log. Initial guidance fixture typo corrected before the accepted RED. Existing changed interaction assertions then failed under the intended change; /tmp/chain-context-existing.log. PWA changelog fingerprint failed before shell refresh; /tmp/chain-context-shell-red.log. Independent FAQ source review requested preservation, unknown/deleted context, save/sync/Undo and empty-creation guidance. Observed focused guidance RED before copy update: /tmp/chain-context-faq-red.log. Dependency-qualified native run on44fbe330 completed1534pass1fail33environment skips434606ms; genuine Quick start content failure identified167word context answer exceeding130word limit. Observed focused2/2RED /tmp/chain-context-faq-length-red.log before splitting creation/list details into a second94/73word answer; all content retained, native contract not weakened."
     }
   },
   {
