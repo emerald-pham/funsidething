@@ -238,6 +238,13 @@
     }
     const terrainTables=new Map();
     function terrainJourney(start,direction,speed,ground,scale=1,offsets=[0]){
+      // The shared timeline plans at its wide canonical viewport. If even
+      // this profile's maximum derivative cannot limit pace, retain the
+      // original analytic route instead of integrating an unchanged speed.
+      const grade=(ground===humanGround('near')?.6:.4225)*H/W;
+      const bound=(-5.7*grade+Math.sqrt(6.32**2*(1+grade**2)-5.7**2))/(1+grade**2)/.3*scale*.625;
+      if(speed<=bound)return {distanceAt:t=>Math.max(0,t)*speed,timeAt:d=>Math.max(0,d)/speed};
+
       const pace=d=>Math.min(speed,...offsets.map(offset=>humanWalkStride(ground,start+direction*d+offset,scale)*scale*.625));
       // Plans retain only their recipe. Long-lived reservations must not
       // retain thousands of cumulative route tables after cache eviction.

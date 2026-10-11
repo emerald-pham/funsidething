@@ -24987,3 +24987,14 @@ test('RISK terrain walking guidance: extended FAQ explains terrain pacing withou
  assert.match(entry,/Arrival chances and the shared visit schedule stay the same/);
  assert.match(entry,/never change saved tasks/);
 });
+
+
+test('RISK terrain walking planner budget: flat canonical routes retain bounded analytic clock work',()=>{
+ let calls=0;const countingMath=Object.create(Math);countingMath.sin=value=>{calls++;return Math.sin(value);};
+ const ctx=vm.createContext({Math:countingMath});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
+ const g=ctx.LandscapeGeometry.create(8192,900);
+ for(const type of ['walker','dogwalker','reader','couple','picnic','kite','snowman','snowangel']){
+  calls=0;g.walkingPlan({type,duration:180,seed:.4,lane:.5,reverse:false});
+  assert.ok(calls<=256,`${type}: ${calls} sine evaluations for a wholly pace-unlimited canonical route should remain analytic rather than integrating thousands of units`);
+ }
+});

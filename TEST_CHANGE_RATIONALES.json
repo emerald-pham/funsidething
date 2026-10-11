@@ -1,20 +1,21 @@
 [
   {
-    "testChangesSha256": "7411b7dfa48e3445f49882b2e8cefdb11bfe5d7389f053bf8a169d9adba47b86",
+    "testChangesSha256": "5866835884004b17006a7c38e67dcb9d1a520e9d391b7c5aa5a216394e3fdb4e",
     "reason": "Add discriminating terrain pacing coverage while preserving all released regression tests and the human pose rig.",
     "previousBehavior": "Phone walkers retained rapid short terrain-limited strides despite halved travel; the first experiment also replanned carrying arrivals.",
     "intendedBehavior": "Slow steep-route translation deterministically, preserve released arrivals and flat half-speed travel, and extend opaque exits.",
     "replacementTests": [
       "RISK terrain walking cadence: steep production routes slow travel with reachable contacts across human variants",
       "RISK terrain walking approach: actual carrying painters preserve released arrival contacts before terrain-paced departures",
-      "RISK terrain walking guidance: extended FAQ explains terrain pacing without changing arrival chances or saved tasks"
+      "RISK terrain walking guidance: extended FAQ explains terrain pacing without changing arrival chances or saved tasks",
+      "RISK terrain walking planner budget: flat canonical routes retain bounded analytic clock work"
     ],
     "preservedCoverage": [
       "All prior gait, planted contact, IK, natural exit, reduced motion, half-speed, scheduling and saved-data tests remain unchanged."
     ],
     "redEvidence": {
-      "command": "node --test --test-name-pattern='RISK terrain walking cadence:|RISK terrain walking approach:|RISK terrain walking guidance:' tests.js (each run independently before its corresponding edit)",
-      "failure": "Observed cadence RED1.250 vs .625 before terrain code; actual painter approach RED stride2.8 to2.16475 before repair; guidance RED missing terrain explanation before FAQ edit. Logs /tmp/chain-terrain-walk-red.log, /tmp/chain-terrain-walk-approach-red.log, /tmp/chain-terrain-walk-guidance-red.log."
+      "command": "node --test --test-name-pattern='RISK terrain walking cadence:|RISK terrain walking approach:|RISK terrain walking guidance:' tests.js (each run independently before its corresponding edit); node --test --test-name-pattern='RISK terrain walking planner budget:' tests.js (before analytic shortcut)",
+      "failure": "Observed cadence RED1.250 vs .625 before terrain code; actual painter approach RED stride2.8 to2.16475 before repair; guidance RED missing terrain explanation before FAQ edit. Logs /tmp/chain-terrain-walk-red.log, /tmp/chain-terrain-walk-approach-red.log, /tmp/chain-terrain-walk-guidance-red.log. Additional contemporary planner-work RED:105480 sine evaluations for a pace-unlimited canonical walker, before the analytic maximum-slope shortcut. /tmp/chain-terrain-walk-budget-red.log."
     }
   },
   {

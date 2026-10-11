@@ -952,3 +952,5 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK terrain walking cadence: steep production routes slow travel with reachable contacts across human variants
 - RISK terrain walking approach: actual carrying painters preserve released arrival contacts before terrain-paced departures
 - RISK terrain walking guidance: extended FAQ explains terrain pacing without changing arrival chances or saved tasks
+
+- RISK terrain walking planner budget: flat canonical routes retain bounded analytic clock work
