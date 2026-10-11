@@ -379,7 +379,7 @@
         const deckWidth=Math.max(3,bw*.72),deckX=x+(bw-deckWidth)/2,deckY=y-1.8;
         b.fillStyle=S.mixHex(p.hill,p.front,.42);b.fillRect(deckX,deckY,deckWidth,1.8);
         line(b,deckX,deckY,deckX+deckWidth,deckY,S.mixHex(p.front,p.sky[2],.36),.55);
-        for(let pot=0;pot<2;pot++){
+        if(sky.sun.altitude<0)for(let pot=0;pot<2;pot++){
           const px=deckX+deckWidth*(.23+pot*.52);
           b.fillStyle=S.mixHex(p.far,p.hill,.38+rand(i+pot+1100)*.2);b.fillRect(px,deckY-1,Math.max(1,deckWidth*.18),1.1);
           ellipse(b,px+deckWidth*.08,deckY-1.2,.8,.65,S.mixHex(p.far,p.front,.28));

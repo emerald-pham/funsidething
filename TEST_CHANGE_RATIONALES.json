@@ -1,5 +1,93 @@
 [
   {
+    "testChangesSha256": "6d2f239c2455048e4874030ed0856074563696cbde6c6c4e2ba577ca663aa852",
+    "reason": "Bind exact reconciled test range after approved priority always-binary context main. Preserve user-authorized zero-included context correction and all rooftop paint assertions; inherited feature RED receipts remain intact.",
+    "previousBehavior": "Previous branch or shifted main comparison did not contain this exact combination of approved context coverage and unchanged rooftop additions.",
+    "intendedBehavior": "Retain every approved main assertion and the original direct rooftop consumer test after reconciliation without weakening tests.",
+    "replacementTests": [
+      "RISK context exclusions: real selectors switch included excluded with durable Undo and explicit red precedence",
+      "RISK No context filter: binary synthetic control never becomes an assignment and tracks rename deletion and unknown IDs",
+      "RISK binary context guidance: FAQ explains always two-state controls and unchanged zero-active matching",
+      "RISK always binary contexts: legacy neutral and all-excluded controls render green or red on both surfaces without saved writes",
+      "RISK always binary context interactions: last-green and all-red clicks stay binary and Undo preserves assignments and AND eligibility",
+      "RISK always binary No Context: visible green and red dispatch immediately on both surfaces with Undo and zero-context guard",
+      "RISK always binary saved contexts: reload and cloud adoption derive red real and green No Context without migration",
+      "RISK always binary context guidance: FAQ explains context-presence rule and separate green No Context eligibility"
+    ],
+    "preservedCoverage": [
+      "Saved neutral real contexts remain blocked/red; neutral No Context remains admitting/green; no rendering migration; all prior sync, toolbar, Undo, geometry and nighttime garden assertions retained."
+    ],
+    "redEvidence": {
+      "command": "validateRegressionChanges(git diff --unified=0 72c5ae28376a72c5c1b5136041eb7973906e7cde -- tests.js, TEST_CHANGE_RATIONALES.json)",
+      "failure": "Observed exact-range metadata RED /tmp/chain-rooftop-priority-previous-branch-rationale-red.log beforeaddingreceipt. Feature RED remains original rooftop /tmp/chain-rooftop-foliage-red.log and inherited priority context records; this does not claim new behavior RED."
+    }
+  },
+  {
+    "testChangesSha256": "5038317e3be3a63ff80c7e25c515bdef0eeeeb11ae05978f7958a15c29104ce1",
+    "reason": "Document inherited independently reviewed toolbar/context regression additions in the branch-push comparison after merging approved main; no test expectations are weakened. Existing per-feature RED records remain preserved in this file.",
+    "previousBehavior": "The preceding rooftop branch did not contain the approved toolbar/context main regression additions.",
+    "intendedBehavior": "Reconciled branch preserves all approved main tests and behavior alongside unchanged rooftop paint coverage.",
+    "replacementTests": [
+      "UI: the undo button carries its z keyhint glyph",
+      "RISK bulk toolbar: mounted controls stay outside scrolling rows and retain filtered selection through filter changes",
+      "RISK bulk row selection: selected label replaces the existing rank slot and deselection restores its format",
+      "RISK bulk toolbar keyboard: rerender restores the focused toolbar action and row toggle",
+      "RISK bulk toolbar guidance: extended FAQ describes frozen controls and rank-slot selection",
+      "RISK repository process boundary: actual visual tests compare every changed control with neighboring controls and scrolled states",
+      "RISK binary context presentation: active filters derive excluded controls on both surfaces without changing saved choices",
+      "RISK binary context interaction: real handlers include displayed exclusions immediately and preserve zero-active AND and No context rules",
+      "RISK binary context saved data: reload and cloud adoption retain neutral choices and derive excluded presentation",
+      "RISK binary context guidance: FAQ explains conditional two-state controls and unchanged zero-active matching",
+      "RISK Undo Z shortcut: real keyboard dispatch reverses only the latest action and retains durable Undo semantics",
+      "RISK Undo Z guards: U is retired and modified editable modal and scene keypresses leave board and native defaults alone",
+      "RISK Undo Z guidance: header hint tooltip and Quick start name Z while preserving editable native undo guidance",
+      "RISK Edit E shortcut: real keyboard dispatch edits only the offered scanner task without changing the board",
+      "RISK Edit E guards and hints: modifiers editable fields modal and scene focus do not dispatch and only the offered Edit advertises E",
+      "RISK Edit E guidance: Quick start explains the offered task editor and plain shortcut scope",
+      "RISK context reconciliation FAQ: actual Help keeps each existing bulk and context question once",
+      "RISK context Settings reflow: actual manager name fields can shrink beside protected context and delete controls"
+    ],
+    "preservedCoverage": [
+      "All old assertions, context manager wrapping and field usability, binary context filtering, keyboard guards, toolbar rank-slot selection, immutable data and legacy recovery protections remain intact."
+    ],
+    "redEvidence": {
+      "command": "node scripts/test-first-gate.mjs da82d1375538e810ba53b07993ade4d1b0a9d8bd",
+      "failure": "Observed combined-range rationale RED locally /tmp/chain-rooftop-push-reconcile-gate-red.log and pushCI38179189263. This is a metadata-gate failure, not new feature RED. Inherited feature records retain their independently observed RED logs; rooftop original preimplementation RED remains /tmp/chain-rooftop-foliage-red.log."
+    }
+  },
+  {
+    "testChangesSha256": "c3b3418f4a668f1f0663e4f63dfd2332d08f7e0ea11c1473b49b1e6adf8c71c4",
+    "reason": "Add actual rooftop garden paint coverage before gating the two potted plants in daylight; preserve all existing assertions. Reconcile exact test hunk fingerprint against approved context main; test content and original observed RED are unchanged.",
+    "previousBehavior": "Both potted plants painted at every sun altitude.",
+    "intendedBehavior": "Hide both pots and canopies at nonnegative sun altitude, retaining deck and all nighttime plant and light behavior.",
+    "replacementTests": [
+      "RISK rooftop gardens: daylight hides paired plants while preserving decks and nighttime lights"
+    ],
+    "preservedCoverage": [
+      "Existing garden/patio light sampling, weather, actor depth, sailboat schedules, data and walking contracts remain intact."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK rooftop gardens:' tests.js",
+      "failure": "Observed preimplementation RED: daylight painted 2 canopy ellipses when 0 expected, /tmp/chain-rooftop-foliage-red.log; three focused tests subsequently GREEN with zero skips."
+    }
+  },
+  {
+    "testChangesSha256": "e404a960a4ba10b01c2469b3091d2cf147d3ea6a45e9e697da5cfda77c2ebfc1",
+    "reason": "Add actual rooftop garden paint coverage before gating the two potted plants in daylight; preserve all existing assertions.",
+    "previousBehavior": "Both potted plants painted at every sun altitude.",
+    "intendedBehavior": "Hide both pots and canopies at nonnegative sun altitude, retaining deck and all nighttime plant and light behavior.",
+    "replacementTests": [
+      "RISK rooftop gardens: daylight hides paired plants while preserving decks and nighttime lights"
+    ],
+    "preservedCoverage": [
+      "Existing garden/patio light sampling, weather, actor depth, sailboat schedules, data and walking contracts remain intact."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK rooftop gardens:' tests.js",
+      "failure": "Observed preimplementation RED: daylight painted 2 canopy ellipses when 0 expected, /tmp/chain-rooftop-foliage-red.log; three focused tests subsequently GREEN with zero skips."
+    }
+  },
+  {
     "testChangesSha256": "c0c9dd2225ff487dc7decf479ae2cd5f06c3b489635b1089f463679ad0dc82e0",
     "reason": "Repair independently demonstrated enlarged-phone Settings context name-field overflow using only bounded shrink sizing. Released main518 and prior contextc064 share the same flex-only manager input rule and markup; baseline geometry will independently qualify attribution. Independent rendered795review rejected phone name editor compressed to23–25CSSpx. Allowmanagerrowswrapand160pxflexbasis rather than leaving a padding-only editor. Independent rendered795review rejected phone name editor compressed to23–25CSSpx. Allowmanagerrowswrapand160pxflexbasis rather than leaving a padding-only editor.",
     "previousBehavior": "Initial min-width0 bound fixed overflow but compressed name text into padding on phone200%.",
