@@ -25050,7 +25050,13 @@ test('Firestore rules: production cleanup resumes deleting tombstones and protec
   const adapterHtml=process.env.CHAIN_CLEANUP_BASE_HTML?fs.readFileSync(process.env.CHAIN_CLEANUP_BASE_HTML,'utf8'):html;
   const adapterSource=adapterHtml.slice(adapterHtml.indexOf('    const rootRef=uid=>'),adapterHtml.indexOf('    const generationStore='));
   assert.ok(adapterSource.includes('const cloudAdapter='),'exercise the actual production adapter');
-  const adapter=vm.runInNewContext('(function(){'+adapterSource+';return cloudAdapter;})()', {F,db,validRevision:rev=>Number.isSafeInteger(rev)&&rev>=0});
+  // The extracted browser adapter runs in a VM realm. Normalize only the
+  // outer write object for the SDK's plain-object check; retain FieldValues.
+  const adapterSDK={...F,runTransaction:(database,callback)=>F.runTransaction(database,tx=>callback({
+   get:reference=>tx.get(reference),update:(reference,value)=>tx.update(reference,{...value}),
+   set:(reference,value)=>tx.set(reference,{...value}),delete:reference=>tx.delete(reference)
+  }))};
+  const adapter=vm.runInNewContext('(function(){'+adapterSource+';return cloudAdapter;})()', {F:adapterSDK,db,validRevision:rev=>Number.isSafeInteger(rev)&&rev>=0});
   const header=(state)=>({schemaVersion:2,state,encoding:'utf8',chunkCount:1,byteLength:2,hash:'a'.repeat(64),baseRev:0,createdAt:Date.now(),deletingAt:123});
   await env.withSecurityRulesDisabled(async context=>{
    const admin=context.firestore();

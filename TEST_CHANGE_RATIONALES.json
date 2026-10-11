@@ -1,6 +1,6 @@
 [
   {
-    "testChangesSha256": "79b479d886962af06cdf78a61178ba01f2a4dae59d115dabee99ed5108d837b3",
+    "testChangesSha256": "00ca23157e02b8d2d60c7cc8fc7c4654acbafb6c2d6f0ca071219dd8ecb53f0a",
     "reason": "Add cleanup interruption coverage enforcing the deployed deleting-state rule in the adapter fake, without altering existing regression assertions. Add real-rules production-adapter interruption, concurrent collector and current/previous/pending/young-staging preservation coverage. The real-rules negative control is retrospective; the first VM regression supplied contemporaneous preimplementation RED.",
     "previousBehavior": "The production adapter rewrote an existing deleting tombstone and cleanup failed closed on the forbidden transition, leaving repeated full backlog queries.",
     "intendedBehavior": "Resume existing deletion without changing its timestamp after the existing root and explicit-protection checks; current and previous complete boards remain protected.",
@@ -13,7 +13,7 @@
     ],
     "redEvidence": {
       "command": "node --test --test-name-pattern='RISK CLOUD CLEANUP RESUME:' tests.js; node --test --test-name-pattern='RISK CLOUD CLEANUP GUIDANCE:' tests.js",
-      "failure": "Contemporaneous preimplementation RED: stranded deleting header remained true instead of false after an acknowledged 94-task synthetic coalesced edit; /tmp/chain-sync-cleanup-red.log. Separate pre-FAQ RED: missing failed-attempt and cleanup-resume guidance; /tmp/chain-sync-guidance-red.log. Existing changelog fingerprint RED observed before fingerprint refresh: /tmp/chain-sync-shell-red.log."
+      "failure": "Contemporaneous preimplementation RED: stranded deleting header remained true instead of false after an acknowledged 94-task synthetic coalesced edit; /tmp/chain-sync-cleanup-red.log. Separate pre-FAQ RED: missing failed-attempt and cleanup-resume guidance; /tmp/chain-sync-guidance-red.log. Existing changelog fingerprint RED observed before fingerprint refresh: /tmp/chain-sync-shell-red.log. Real-rules retrospective base negative initially failed for VM realm SDK plain-object setup (not accepted as behavior evidence); normalized outer write objects preserving FieldValues. Corrected base negative then observed permission-denied for deleting->deleting, /tmp/chain-sync-rules-negative.log; candidate rules3/3 and compatibility15/15 zero skips, /tmp/chain-sync-rules-green.log and /tmp/chain-sync-compatibility.log. The adapter module is extracted from actual candidate HTML. This retrospective control supplements, rather than replaces, the original contemporaneous94task RED."
     }
   },
   {
