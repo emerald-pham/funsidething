@@ -617,7 +617,7 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 
 - `RISK Squared Weighting: exact percentage math full precision and frozen quadratic ordering` — quadratic math, saved mode and preserved eligibility/data contracts.
 - `RISK Squared Weighting saved mode: settings hydration reload eligibility and first dot retain existing protections` — quadratic math, saved mode and preserved eligibility/data contracts.
-- `RISK Squared Weighting default: fresh missing invalid settings use squared and explicit saved preferences survive` — quadratic math, saved mode and preserved eligibility/data contracts.
+- `RISK fresh Halving default: new clients use Halving while legacy normalization and saved choices survive` — quadratic math, saved mode and preserved eligibility/data contracts.
 - `RISK Squared Weighting migration: old default moves once nondefault and later explicit Chance survive reload import and sync payload` — quadratic math, saved mode and preserved eligibility/data contracts.
 - `RISK Squared Weighting numerical pools: tiny weights normalize without all-zero underflow and ineligible tasks stay zero` — quadratic math, saved mode and preserved eligibility/data contracts.
 - `RISK Squared Weighting migration durability: old default is marked for device/cloud repair and later Chance is not` — quadratic math, saved mode and preserved eligibility/data contracts.
@@ -920,6 +920,13 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 
 - RISK task history: compact Likelihood labels retain recorded values across metric boundaries
 
+## Fresh-client scan defaults
+
+- `RISK fresh Halving startup: successful empty stores choose Halving and actual Start persists it across reload` — verified-empty startup, legacy recovery, saved preference and cloud adoption boundaries.
+- `RISK fresh Halving preservation: saved empty boards missing preferences supported modes and unknown settings are not fresh clients` — verified-empty startup, legacy recovery, saved preference and cloud adoption boundaries.
+- `RISK fresh Halving cloud adoption: saved modes at zero newer and legacy revisions win over browser defaults without a settings write` — verified-empty startup, legacy recovery, saved preference and cloud adoption boundaries.
+- `RISK fresh Halving copy: Settings and extended FAQ distinguish new-client defaults from saved board modes` — verified-empty startup, legacy recovery, saved preference and cloud adoption boundaries.
+- `RISK fresh Halving recovery boundary: retained backup bytes protected heads and unavailable durable stores keep the legacy fallback` — verified-empty startup, legacy recovery, saved preference and cloud adoption boundaries.
 - RISK walking rollback: terrain-driven loading preserves the prior upright silhouette and planted contacts
 
 - RISK bulk task editing: displayed selection and opted fields preserve identity and reject stale conflicts

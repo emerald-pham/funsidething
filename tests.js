@@ -15757,8 +15757,8 @@ test('Skywriters: scheduler requires a human word, respects its rate, and allows
 });
 
 // Chance order is part of the pass, not a side effect of rendering or voting.
-test('Chance scan: settings select squared default or three explicit buttons', async()=>{
- const {ctx}=await loadApp();
+test('Chance scan: saved Squared setting or explicit legacy buttons select their modes', async()=>{
+ const {ctx}=await loadApp();ctx.setScanPreference('squared'); // Preserve this established prior-mode button fixture.
  assert.equal(ctx.state.settings.scanMode,'squared');
  assert.match(ctx.scanStartButtons(),/>Start scanning</);
  ctx.state.settings.scanMode='both';
@@ -16363,11 +16363,11 @@ test('Evergreen controls: task editor hides interval and reset until evergreen i
  assert.match(appSrc,/el.id === "etEver"[\s\S]{0,100}toggleEvergreenOptions\(el.checked\)/);
 });
 
-test('Scan default: squared is used for new or missing preferences, while saved choices survive',async()=>{
+test('Scan default: fresh clients use Halving while missing saved preferences retain Squared',async()=>{
  const {ctx}=await loadApp();assert.equal(ctx.normalizeSettings({}).scanMode,'squared');
  assert.equal(ctx.normalizeSettings({scanMode:'invalid'}).scanMode,'squared');
  for(const mode of ['descending','chance','both'])assert.equal(ctx.normalizeSettings({scanMode:mode}).scanMode,mode);
- ctx.addTask('A');ctx.addTask('B');ctx.startScan();assert.equal(ctx.state.scanMode,'squared');
+ ctx.addTask('A');ctx.addTask('B');ctx.startScan();assert.equal(ctx.state.scanMode,'halving');
 });
 
 test('Dislodge signal: one loss to a fresh default reference, other tasks and chance draw untouched, undo restores rating',async()=>{
@@ -22366,8 +22366,8 @@ test('RISK Squared Weighting saved mode: settings hydration reload eligibility a
 });
 
 
-test('RISK Squared Weighting default: fresh missing invalid settings use squared and explicit saved preferences survive',async()=>{
- const {ctx}=await loadApp();assert.equal(ctx.state.settings.scanMode,'squared');
+test('RISK fresh Halving default: new clients use Halving while legacy normalization and saved choices survive',async()=>{
+ const {ctx}=await loadApp();assert.equal(ctx.state.settings.scanMode,'halving');
  for(const value of [undefined,null,'invalid'])assert.equal(ctx.normalizeSettings({scanMode:value}).scanMode,'squared');
  for(const mode of ['chance','descending','both','squared'])assert.equal(ctx.normalizeSettings({scanMode:mode}).scanMode,mode);
 });
@@ -23455,7 +23455,7 @@ test('RISK Halving weighting distribution: exact finite tails boundaries ties an
 });
 
 test('RISK Halving weighting consumer state: selector legacy preference filtering no replacement Undo and reload',async()=>{
- const {ctx,shim}=await loadApp({seed:973});
+ const {ctx,shim}=await loadApp({seed:973});ctx.setScanPreference('squared'); // Preserve the established Squared-to-Halving transition fixture.
  ctx.openSettings();assert.match(shim.document.getElementById('modalRoot').innerHTML,/<option value="halving"/);
  assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/<option value="both"/);
  assert.equal(ctx.state.settings.scanMode,'squared');
@@ -23504,7 +23504,7 @@ test('RISK Halving weighting displayed likelihood: actual list and editor distin
 });
 
 test('RISK Halving weighting concurrent joins: same-pass frozen likelihood ranks survive peer adoption and reload without mixing generations',async()=>{
- const {ctx}=await loadApp();ctx.addTask('Base');ctx.setScanPreference('halving');const base=JSON.parse(JSON.stringify(ctx.state));
+ const {ctx}=await loadApp();ctx.setScanPreference('squared');ctx.addTask('Base');ctx.setScanPreference('halving');const base=JSON.parse(JSON.stringify(ctx.state));
  const local=JSON.parse(JSON.stringify(base)),peer=JSON.parse(JSON.stringify(base));const joined=syncTask('local-join','Local');joined.mu=100;local.tasks.push(joined);local.chance.weights[joined.id]=.1;
  peer.tasks.push(syncTask('peer-join','Peer'));peer.chance.weights['peer-join']=.8;
  ctx.rebasePendingBoardFields(peer,local,base);ctx.mergeUndeletedTasks(peer,local);
@@ -23547,7 +23547,7 @@ test('RISK Halving weighting open Settings: mode transitions refresh the likelih
 });
 
 test('RISK Halving weighting enlarged metric: real Settings transition keeps a compact label and wrapping underlying likelihood explanation',async()=>{
- const {ctx,shim}=await loadApp();ctx.openSettings();
+ const {ctx,shim}=await loadApp();ctx.setScanPreference('squared');ctx.openSettings();
  const field=shim.document.getElementById('stScanMode'),metric=shim.document.getElementById('stListMetric'),option={textContent:'Overall percent chance'},help=shim.document.getElementById('stListMetricHelp');
  field.id='stScanMode';field.matches=()=>true;metric.querySelector=()=>option;shim.document.getElementById('stEverHours').value='37';
  field.value='halving';shim.document.dispatchEvent({type:'change',target:field});
@@ -24794,6 +24794,66 @@ test('RISK motion safety resume: foreground and restored pages reread expiry bef
  choice='reduced';context.dialog.open=false;handlers.pageshow();
  assert.deepEqual(calls,['read','paint:reduced'],'restored page consumes valid remembered reduction without prompting');
  assert.equal(JSON.stringify(world),before,'foreground checks retain visitor progress');
+});
+
+
+test('RISK fresh Halving startup: successful empty stores choose Halving and actual Start persists it across reload',async()=>{
+ for(const backend of ['browser','host','indexedDB']){
+  const options=backend==='host'?{hostStorage:{}}:backend==='indexedDB'?{indexedDBProvider:new (await import('fake-indexeddb')).IDBFactory(),deviceDbName:'fresh-halving-'+backend}:{};
+  const {ctx,shim}=await loadApp(options);assert.equal(ctx.state.settings.scanMode,'halving',backend+' fresh startup');
+  ctx.closeModal();ctx.addTask('Synthetic oldest');ctx.addTask('Synthetic next');
+  const control=makeFakeElement();control.dataset={act:'start-scan'};control.closest=()=>control;
+  shim.document.dispatchEvent({type:'click',detail:1,target:control});assert.equal(ctx.state.scanMode,'halving',backend+' actual Start chooses the fresh preference');
+  assert.equal(await ctx.persist(),true);const raw=JSON.stringify(ctx.state);
+  const reloaded=await loadApp({seedStorage:{[SYNC_STORE_KEY]:raw}});assert.equal(reloaded.ctx.state.settings.scanMode,'halving');assert.equal(reloaded.ctx.state.scanMode,'halving');
+ }
+});
+
+test('RISK fresh Halving preservation: saved empty boards missing preferences supported modes and unknown settings are not fresh clients',async()=>{
+ const baseline=await loadApp();assert.equal(baseline.ctx.defaultState().settings.scanMode,'squared','Reset and recovery retain their established factory');
+ for(const mode of [undefined,'descending','chance','squared','halving','both']){
+  const board=baseline.ctx.defaultState();board.seenQuickStart=true;board.settings.futureSetting={version:99,choice:'retain'};
+  if(mode===undefined)delete board.settings.scanMode;else board.settings.scanMode=mode;
+  for(const backend of ['browser','host']){
+   const raw=JSON.stringify(board),app=await loadApp(backend==='host'?{hostStorage:{[SYNC_STORE_KEY]:raw}}:{seedStorage:{[SYNC_STORE_KEY]:raw}});
+   assert.equal(app.ctx.state.settings.scanMode,mode??'squared',backend+' existing '+mode);assert.deepEqual(JSON.parse(JSON.stringify(app.ctx.state.settings.futureSetting)),board.settings.futureSetting);
+  }
+ }
+ const corrupt=await loadApp({seedStorage:{[SYNC_STORE_KEY]:'{unreadable saved board'}});
+ assert.equal(corrupt.ctx.state.settings.scanMode,'squared','unreadable existing bytes are recovery, not a new client');
+ assert.equal(corrupt.shim.localStorage.getItem(SYNC_STORE_KEY),'{unreadable saved board');
+});
+
+test('RISK fresh Halving cloud adoption: saved modes at zero newer and legacy revisions win over browser defaults without a settings write',async()=>{
+ const baseline=await loadApp();
+ for(const rev of [0,3,null])for(const mode of ['descending','chance','squared','halving','both',undefined]){
+  const board=baseline.ctx.defaultState();board.seenQuickStart=true;board.settings.futureSetting={v:7};if(mode===undefined)delete board.settings.scanMode;else board.settings.scanMode=mode;
+  const h=makeSyncHarness({remote:board,rev}),app=await loadApp({cloudSyncFactory:h.factory});
+  await app.ctx.cloudPull();await syncSettle(70);
+  assert.equal(app.ctx.state.settings.scanMode,mode??'squared','remote '+mode+' revision '+rev);assert.deepEqual(JSON.parse(JSON.stringify(app.ctx.state.settings.futureSetting)),{v:7});
+  assert.equal(h.remoteState().settings.scanMode,rev===null?(mode??'squared'):mode,'fresh default never replaces the remote preference; legacy publication retains its existing normalizer');
+  if(rev!==null)assert.equal(h.calls.filter(x=>x==='push').length,0,'clean adoption does not publish local defaults');
+ }
+});
+
+test('RISK fresh Halving copy: Settings and extended FAQ distinguish new-client defaults from saved board modes',async()=>{
+ const {ctx,shim}=await loadApp();ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(settings,/<option value="halving" selected>Halving weighting<\/option>/);
+ assert.match(settings,/<option value="squared">Squared Weighting always<\/option>/);
+ ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(help,/Halving weighting is the default for new clients/);assert.match(help,/Existing saved boards keep their mode/);assert.match(help,/saved cloud board/);
+ assert.doesNotMatch(help,/Squared Weighting is the default\./);assert.match(help,/Reset selects Squared Weighting/,'Reset retains its established factory and needs an explicit explanation');
+});
+
+
+test('RISK fresh Halving recovery boundary: retained backup bytes protected heads and unavailable durable stores keep the legacy fallback',async()=>{
+ const base=await loadApp(),board=base.ctx.defaultState();delete board.settings.scanMode;
+ const protectedOnly=await loadApp({seedStorage:{'fvp:chain-scanner:protected:v1':JSON.stringify(board)}});assert.equal(protectedOnly.ctx.state.settings.scanMode,'squared');
+ for(const raw of ['[]','unreadable retained backup index']){
+  const existing=await loadApp({seedStorage:{'fvp:chain-scanner:daily-backups:v1':raw}});assert.equal(existing.ctx.state.settings.scanMode,'squared','retained backup evidence must not be mistaken for a genuinely new client');
+ }
+ const blocked=await loadApp({indexedDBProvider:{open(){throw Error('blocked fixture');}},seedStorage:{'fvp:chain-scanner:device-store-v2':'1'}});
+ assert.equal(blocked.ctx.state.settings.scanMode,'squared','unavailable durable data is not a fresh client');
 });
 
 test('RISK bulk task guidance: bounded answers retain distinct selection property conflict Undo and result instructions',async()=>{
