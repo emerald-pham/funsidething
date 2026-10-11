@@ -1,5 +1,23 @@
 [
   {
+    "testChangesSha256": "f4a4c574d3b15d7f4d9838e691db7b7d8bc05e85254e0a915adfc2e39c1eb098",
+    "reason": "Repair demonstrated enlarged-phone overflow in changed bulk FAQ and Settings copy using equivalent breakable task-status, sync and Undo wording. Reconcile released walk PR101 additively while preserving its exact geometry, FAQ and regression contract. Bind exact bulk branch reconciliation with independently approved rollback PR103; preserve all bulk consumer/data tests and copy the upstream replacement unchanged. Reconciliation does not claim a new functional RED.",
+    "previousBehavior": "At Chrome 390px and 200% the missing/completed FAQ token painted 39px beyond its answer; Settings confirmation and uninterrupted exceeded the bullet content width.",
+    "intendedBehavior": "Actual Help and Settings consumers show equivalent short breakable wording while retaining pre-Save conflict, fresh peer, sync acknowledgement and recovery Undo limitations.",
+    "replacementTests": [
+      "RISK bulk task guidance: enlarged conflict answer uses breakable task status wording",
+      "RISK bulk task guidance: enlarged Settings note uses short sync and Undo wording"
+    ],
+    "preservedCoverage": [
+      "All existing bulk selection, field opt-in, validation, persistence, cloud conflict, deleted task, recovery and Undo tests remain intact.",
+      "Titles, ratings, task history, dependency handling, backup retention and synchronization algorithms are unchanged; only three displayed prose phrases and generated shell fingerprints change."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK bulk task guidance: enlarged' tests.js",
+      "failure": "Two observed failures before copy changes: Help output contained missing/completed; Settings output contained server confirmation and uninterrupted. Real Chrome diagnostics retained all34 images and failed133>113 in FAQ and85>73 in Settings; logs /tmp/chain-bulk-faq-overflow-red.log and /tmp/chain-bulk-faq-render-error.log."
+    }
+  },
+  {
     "testChangesSha256": "0cb50289153bfc5bc0b7a1056440ec2eac0c1023f3728449f53011d6ea80da12",
     "reason": "Repair demonstrated enlarged-phone overflow in changed bulk FAQ and Settings copy using equivalent breakable task-status, sync and Undo wording. Reconcile released walk PR101 additively while preserving its exact geometry, FAQ and regression contract.",
     "previousBehavior": "At Chrome 390px and 200% the missing/completed FAQ token painted 39px beyond its answer; Settings confirmation and uninterrupted exceeded the bullet content width.",
@@ -4748,6 +4766,24 @@
     "redEvidence": {
       "command": "node --test --test-name-pattern='RISK walking weight transfer' tests.js",
       "failure": "Observed preimplementation AssertionError: weight settles below contact after landing, rather than rising immediately. /tmp/chain-walk-weight-red.log. Original pulse then failed two unchanged regression contracts; repaired bounded pulse passes all three in /tmp/chain-walk-weight-repair.log."
+    }
+  },
+  {
+    "testChangesSha256": "742a2ef6743df83f24b33f5961c9ac420e688bda8de8e65f2bb26bd58fe3be1b",
+    "reason": "Restore the prior released terrain-driven walking silhouette after reopened rendered review found that the unshipped loading dip prolongs knee compression. Replace the extra-down requirement, which encoded the rejected aesthetic choice, with exact released-pose and preserved planting coverage.",
+    "previousBehavior": "PR101 added a .55 post-contact pelvis target dip. It passed physical contact tests but prolonged bent-knee support in reviewed flat walker, dogwalker and reader frames; its Pages deployment was cancelled before publication.",
+    "intendedBehavior": "The human rig matches immutable released c1d3b18 poses and constrained carrying grips again, retaining slower PR92 travel, deterministic seeds, terrain reach limits, reduced motion and complete offscreen exits.",
+    "replacementTests": [
+      "RISK walking rollback: terrain-driven loading preserves the prior upright silhouette and planted contacts"
+    ],
+    "preservedCoverage": [
+      "Both directions, three actor scales, free/half/full carrying grips, both leg contacts and sequential loading/recovery phases compare to the actual immutable released rig.",
+      "Existing fixed limb lengths, upright knee duty, terrain/contact transfer gradients, cadence, dog lead, source seed/lifetime, exit, reduced-motion and data/sync tests remain unchanged.",
+      "Original loading RED/review records remain retained as historical evidence; the invalid requirement to descend below touchdown is explicitly replaced rather than hidden."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK walking rollback:' tests.js",
+      "failure": "Observed contemporaneous pre-restoration failure: AssertionError do not prolong knee compression with an added pelvis dip, tests.js:354. /tmp/chain-walk-rollback-red.log retains output. Reopened actual frame review and prior public identity are separately retained; no new runtime or baseline live diagnosis is claimed."
     }
   }
 ]

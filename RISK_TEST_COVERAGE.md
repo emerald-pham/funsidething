@@ -911,6 +911,17 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 
 - FAQ menu naming: `RISK FAQs menu label: help navigation and named dialog use FAQs while retaining Quick start chapter`.
 
+- `RISK motion safety: explicit local choices expire after seven elapsed days and corrupt records fail closed`
+- `RISK motion safety: actual choice handler remembers selection while dismissal never writes consent`
+
+- `RISK motion safety accessibility: enlarged prompt fits the containing viewport and stacks intrinsic choice cards`
+
+- `RISK motion safety resume: foreground and restored pages reread expiry before painting without replacing visitors`
+
+- RISK task history: compact Likelihood labels retain recorded values across metric boundaries
+
+- RISK walking rollback: terrain-driven loading preserves the prior upright silhouette and planted contacts
+
 - RISK bulk task editing: displayed selection and opted fields preserve identity and reject stale conflicts
 - RISK bulk task editing: blank fields do not delete and explicit clearing survives reload
 - RISK bulk task editing: clearing is reversible in the draft and interval changes use the Evergreen reset rule
@@ -925,16 +936,6 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK bulk task editing: current batch result distinguishes partial reconciliation from sync success and offers no batch Undo
 - RISK bulk task editing: enlarged modal fieldsets shrink and native controls retain available width
 - RISK bulk task editing: enlarged selection rows give task controls full width
-- `RISK motion safety: explicit local choices expire after seven elapsed days and corrupt records fail closed`
-- `RISK motion safety: actual choice handler remembers selection while dismissal never writes consent`
-
-- `RISK motion safety accessibility: enlarged prompt fits the containing viewport and stacks intrinsic choice cards`
-
-- `RISK motion safety resume: foreground and restored pages reread expiry before painting without replacing visitors`
-
 - RISK bulk task guidance: bounded answers retain distinct selection property conflict Undo and result instructions
-- RISK task history: compact Likelihood labels retain recorded values across metric boundaries
-
 - RISK bulk task guidance: enlarged conflict answer uses breakable task status wording
 - RISK bulk task guidance: enlarged Settings note uses short sync and Undo wording
-- RISK walking weight transfer: post-contact down precedes recovery without moving planted feet
