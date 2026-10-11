@@ -859,7 +859,7 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK Postpone: actual backup Restore completion Undo and pass resets retain deferral intent
 
 - RISK Postpone: scan surfaces match neighboring decision button sizing without changing Edit
-- RISK Postpone: white treatment stays scoped to neutral controls on both scanner surfaces
+- RISK Postpone: day paint stays white and night paint matches Edit on both scanner surfaces
 
 - RISK Postpone layout: mounted duration field uses the bounded numeric Settings width
 
