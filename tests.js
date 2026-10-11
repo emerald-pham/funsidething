@@ -15759,7 +15759,7 @@ test('Evergreen and chance settings: malformed persisted values normalize withou
  assert.ok(Number.isFinite(st.tasks[0].evergreenHours));assert.equal(typeof st.tasks[0].evergreenResetAtDay,'boolean');
 });
 test('Chance scan: live TrueSkill ratings still change on Yes and No',async()=>{
- const {ctx}=await loadApp();for(let i=0;i<5;i++)ctx.addTask('task '+i);ctx.startScan('chance');ctx.state.snooze=100;
+ const {ctx}=await loadApp();for(let i=0;i<5;i++)ctx.addTask('task '+i);ctx.dotTask(ctx.state.tasks[0].id);ctx.startScan('chance');ctx.state.snooze=100;
  const t=ctx.state.tasks.find(t=>t.id===ctx.state.candidateId);const mu=t.mu;ctx.decide('no');assert.ok(t.mu<mu);
  ctx.undo();const restored=ctx.state.tasks.find(t=>t.id===ctx.state.candidateId);ctx.decide('yes');assert.ok(restored.mu>mu);
 });
