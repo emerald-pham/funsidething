@@ -11,6 +11,8 @@ The named-contract test in tests.js checks that every top-level test whose title
 
 ## Task state, eligibility, and scanner controls
 
+- RISK neutral bootstrap: Settings backup Restore restores causal exclusion and choice in both directions
+
 - RISK neutral bootstrap: automatic oldest stays outside Yes No and Dot comparisons until explicitly chosen
 - RISK neutral bootstrap: device cloud codecs Undo and stale concurrent copies preserve exclusion and explicit choice
 - RISK neutral bootstrap: unknown evidence concurrent automatic placement completion and restart remain safe

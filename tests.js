@@ -24515,3 +24515,11 @@ test('RISK neutral bootstrap: FAQ explains exclusion explicit choice legacy limi
  const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
  assert.match(help,/automatically dotted task stays outside ranking comparisons/i);assert.match(help,/Yes or Dot explicitly chooses/i);assert.match(help,/neither task.*rating/i);assert.match(help,/before this update.*provenance/i);assert.match(help,/Dislodge still gives.*negative/i);
 });
+
+test('RISK neutral bootstrap: Settings backup Restore restores causal exclusion and choice in both directions',async()=>{
+ const {ctx}=await loadApp();const a=ctx.addTask('Bootstrap'),b=ctx.addTask('Other');a.createdAt=1;b.createdAt=2;ctx.startScan();await ctx.persist();const neutral=await ctx.saveDurableBackup('manual',JSON.stringify(ctx.state));assert.ok(neutral?.id);
+ ctx.dislodge();ctx.state.chain=[b.id];ctx.dotTask(a.id);await ctx.persist();const chosen=await ctx.saveDurableBackup('manual',JSON.stringify(ctx.state));assert.ok(chosen?.id);assert.equal(ctx.taskComparisonEligible(ctx.state.tasks.find(t=>t.id===a.id)),true);
+ ctx.openSettings();assert.equal(await ctx.restoreDurableBackupById(neutral.id),true);assert.equal(ctx.taskComparisonEligible(ctx.state.tasks.find(t=>t.id===a.id)),false,'actual Settings Restore cannot silently promote automatic placement');
+ ctx.openSettings();assert.equal(await ctx.restoreDurableBackupById(chosen.id),true);assert.equal(ctx.taskComparisonEligible(ctx.state.tasks.find(t=>t.id===a.id)),true,'restoring recorded explicit choice supersedes the newer neutral evidence');
+ ctx.undo();assert.equal(ctx.taskComparisonEligible(ctx.state.tasks.find(t=>t.id===a.id)),false,'Undo restored explicit choice restores exclusion');await ctx.persist();ctx.deleteTask(a.id);await ctx.persist();ctx.openSettings();assert.equal(await ctx.restoreDurableBackupById(neutral.id),true);assert.equal(ctx.taskComparisonEligible(ctx.state.tasks.find(t=>t.id===a.id)),false,'restoring deleted task preserves its saved exclusion');
+});

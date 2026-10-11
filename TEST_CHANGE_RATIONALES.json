@@ -1,6 +1,6 @@
 [
   {
-    "testChangesSha256": "3cb8dce1d4f793c5da030a4e6d1265f84adee859aeea925056740480eec7499b",
+    "testChangesSha256": "1943e3d95dcea4bf2c73016ae990ff358d41ea5e72e185ad323a6378a731b068",
     "reason": "User explicitly requires auto-selected oldest bootstrap tasks to remain outside pairwise ranking until explicitly chosen; preserve independent Dislodge and all recorded historical ratings.",
     "previousBehavior": "Automatic placement was initially neutral but subsequent Yes and No comparisons credited or penalized the automatic benchmark, including after reload.",
     "intendedBehavior": "Persist causal task provenance, exclude both sides of comparisons involving an unchosen automatic task, promote only explicit Yes or Dot, and restore exclusion through Undo and stale or concurrent merges without retroactive rating rewrites. Existing Yes/No direction tests now explicitly Dot the benchmark before scanning, retaining every directional assertion; new tests protect automatic exclusion.",
@@ -9,14 +9,15 @@
       "RISK neutral bootstrap: device cloud codecs Undo and stale concurrent copies preserve exclusion and explicit choice",
       "RISK neutral bootstrap: unknown evidence concurrent automatic placement completion and restart remain safe",
       "RISK neutral bootstrap: offline reconnect real cloud glue retains neutral provenance through old copies and Undo",
-      "RISK neutral bootstrap: FAQ explains exclusion explicit choice legacy limits and standalone Dislodge"
+      "RISK neutral bootstrap: FAQ explains exclusion explicit choice legacy limits and standalone Dislodge",
+      "RISK neutral bootstrap: Settings backup Restore restores causal exclusion and choice in both directions"
     ],
     "preservedCoverage": [
       "All existing rating-direction assertions retained. Oldest eligibility, explicit Yes No Dot, standalone Dislodge, history, deletion, export, completion and Undo remain protected. Focused real cloud glue covers offline/reconnect and missing-field copies; browser and emulator compatibility remain separate pending allocated gates."
     ],
     "redEvidence": {
       "command": "node --test --test-name-pattern='RISK neutral bootstrap:' tests.js",
-      "failure": "Before implementation, 2/2 failed: automatic incumbent fell25→20.794415817248392 on Yes and reload raised25→29.205584182751608 on No (/tmp/neutral-bootstrap-red.log). Subsequent focused observed RED caught Undo startup falsely promoting eligibility; fixed with prior-choice proof. FAQ RED preceded copy changes. Real cloud Undo fixture initially reached a cloud-adoption Undo frame; fixture now reverses bounded adoption frames before the explicit Dot. Focused regression observed the prior Yes/No fixtures fail because they used an automatic bootstrap; authorized new behavior is covered separately, and their ordinary-direction assertions now use explicit Dot. No full suite/browser/emulator run is claimed."
+      "failure": "Before implementation, 2/2 failed: automatic incumbent fell25→20.794415817248392 on Yes and reload raised25→29.205584182751608 on No (/tmp/neutral-bootstrap-red.log). Subsequent focused observed RED caught Undo startup falsely promoting eligibility; fixed with prior-choice proof. FAQ RED preceded copy changes. Real cloud Undo fixture initially reached a cloud-adoption Undo frame; fixture now reverses bounded adoption frames before the explicit Dot. Focused regression observed the prior Yes/No fixtures fail because they used an automatic bootstrap; authorized new behavior is covered separately, and their ordinary-direction assertions now use explicit Dot. No full suite/browser/emulator run is claimed. Specialist review found missing Settings backup Restore provenance replacement; observed actual-handler RED (true eligible after neutral Restore) before repair, /tmp/neutral-bootstrap-restore-red.log. New test retains both directions, Undo and deleted-task restoration; sequential Undo/delete transitions await their durable saves before Restore so prior queued browser saves cannot stand in for the tested snapshot. Source FAQ review requested precise post-choice eligibility and concurrent/unknown-provenance limits, now corrected."
     }
   },
   {
