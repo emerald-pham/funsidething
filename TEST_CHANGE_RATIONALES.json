@@ -1,5 +1,24 @@
 [
   {
+    "testChangesSha256": "4dd9cdd1e47c5ada68f47cd573243e7888cb6caa07045ad1f21a9eb5b58a9d47",
+    "reason": "Implement the user-authorized conditional binary real-context controls while preserving stored neutral choices and every existing eligibility rule. Adapt prior zero-active-cycle fixtures and the browser keyboard expectation to the changed active-mode interaction, retaining their remaining assertions.",
+    "previousBehavior": "With another real context included, neutral requirements displayed neutral and explicit red exclusions needed a neutral click before inclusion.",
+    "intendedBehavior": "While any real context is included, blocked real contexts display excluded and include on one click; zero-included controls retain their stored-state cycle without making contextual tasks eligible.",
+    "replacementTests": [
+      "RISK binary context presentation: active filters derive excluded controls on both surfaces without changing saved choices",
+      "RISK binary context interaction: real handlers include displayed exclusions immediately and preserve zero-active AND and No context rules",
+      "RISK binary context saved data: reload and cloud adoption retain neutral choices and derive excluded presentation",
+      "RISK binary context guidance: FAQ explains conditional two-state controls and unchanged zero-active matching"
+    ],
+    "preservedCoverage": [
+      "All-context AND matching, explicit-exclusion precedence, No context scope, empty selector, unknown assignments, ratings, full-pool shares, Undo, saved fields, released settings preservation and concurrent sync recovery remain protected."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK binary context' tests.js",
+      "failure": "Contemporaneous preimplementation RED 4/4: neutral instead of excluded presentation, real explicit-red handler reaches neutral instead of included, reload derives neutral instead of excluded, and FAQ lacks conditional binary explanation; /tmp/chain-context-binary-red.log. Initial guidance fixture typo corrected before the accepted RED. Existing changed interaction assertions then failed under the intended change; /tmp/chain-context-existing.log. PWA changelog fingerprint failed before shell refresh; /tmp/chain-context-shell-red.log."
+    }
+  },
+  {
     "testChangesSha256": "9142362051b35b9b4787c4057750bf803a776eea51fa4de59719f7ae4acc627c",
     "reason": "Add discriminating terrain pacing coverage while preserving all released regression tests and the human pose rig. Additively reconcile Halving mainb561960 without changing its defaults or data tests. Observed effective200% Settings modal overflow; add narrowly scoped release-note word wrapping without rewriting historical notes. Actual offender attribution remains a rendered supplement requirement. Preserve the established Settings section class by using a dedicated data attribute for release-only reflow.",
     "previousBehavior": "Phone walkers retained rapid short terrain-limited strides despite halved travel; the first experiment also replanned carrying arrivals.",

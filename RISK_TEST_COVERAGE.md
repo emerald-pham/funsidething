@@ -956,3 +956,10 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK terrain walking planner budget: flat canonical routes retain bounded analytic clock work
 
 - RISK Settings changelog reflow: actual archived notes retain readable tokens in narrow enlarged release lists
+
+## Conditional binary context controls
+
+- RISK binary context presentation: active filters derive excluded controls on both surfaces without changing saved choices
+- RISK binary context interaction: real handlers include displayed exclusions immediately and preserve zero-active AND and No context rules
+- RISK binary context saved data: reload and cloud adoption retain neutral choices and derive excluded presentation
+- RISK binary context guidance: FAQ explains conditional two-state controls and unchanged zero-active matching

@@ -477,6 +477,7 @@ test('RISK upright gait consumer: every human painter consumes upright full cycl
 
 test('RISK context exclusions: real selectors cycle included excluded neutral with durable Undo and explicit red precedence',async()=>{
  const {ctx,shim}=await loadApp({seed:911});const c=ctx.state.contexts[0],task=ctx.addTask('Private required task',false,[c.id]);
+ ctx.state.contexts[1].active=false; // Preserve the zero-active legacy cycle contract.
  const protectedTasks=JSON.stringify(ctx.state.tasks);
  ctx.toggleContext(c.id);assert.equal(c.excluded,true,'the second click changes an existing green check to a red exclusion');assert.equal(c.active,false,'released clients still see the excluded requirement disabled');
  ctx.renderCtx();let markup=shim.document.getElementById('ctxPanel').innerHTML;
@@ -506,8 +507,8 @@ test('RISK context exclusions: scan and All Tasks preserve all required contexts
  ctx.state.listOpen=true;ctx.state.candidateId=one.id;ctx.toggleContext(a.id);
  assert.deepEqual(Array.from(ctx.eligibleTasks(),t=>t.id),[zero.id,unknown.id]);assert.ok(![one.id,many.id].includes(ctx.state.candidateId),'excluded candidates leave the scanner');
  vm.runInContext("listEligibilityFilter='ineligible'",ctx);ctx.renderList();assert.deepEqual(Array.from(ctx.filteredListTasks(),t=>t.id),[one.id,many.id]);assert.equal(shim.document.getElementById('listCount').textContent,'(2 of 4)');
- ctx.toggleContext(a.id);assert.deepEqual(Array.from(ctx.eligibleTasks(),t=>t.id),[zero.id,unknown.id],'neutral remains an inactive requirement, preserving existing empty-selection behavior');
- ctx.toggleContext(a.id);ctx.state.chain=[one.id];vm.runInContext("listEligibilityFilter='eligible'",ctx);
+ ctx.toggleContext(b.id);ctx.toggleContext(a.id);assert.deepEqual(Array.from(ctx.eligibleTasks(),t=>t.id),[zero.id,unknown.id],'neutral remains an inactive requirement, preserving existing empty-selection behavior');
+ ctx.toggleContext(a.id);ctx.toggleContext(b.id);ctx.state.chain=[one.id];vm.runInContext("listEligibilityFilter='eligible'",ctx);
  assert.deepEqual(Array.from(ctx.filteredListTasks(),t=>t.id),[zero.id,many.id,unknown.id]);assert.equal(ctx.isEligible(one),true,'dotting is only a list eligibility distinction');
  const poolShares=()=>JSON.stringify([...ctx.chanceDisplayStats()].map(([id,{weight,probability,available,fallback}])=>[id,{weight,probability,available,fallback}]));const shares=poolShares();ctx.state.chain=[];assert.equal(poolShares(),shares,'undotting alone preserves full-pool weights');
  ctx.toggleContext(b.id);ctx.toggleContext(a.id);ctx.toggleContext(a.id);ctx.toggleContext(b.id);
@@ -610,10 +611,10 @@ test('RISK context and Settings browser: touch keyboard filter counts disclosure
     const page=await context.newPage();await page.goto(process.env.LANDSCAPE_BROWSER_URL);await page.waitForFunction(()=>typeof state!=='undefined'&&state?.tasks);
     await page.evaluate(()=>{document.getElementById('motionDialog')?.close();closeModal();state.seenQuickStart=true;state.listOpen=true;addTask('Private no context');addTask('Private required',false,['c_errand']);addTask('Private multiple',false,['c_errand','c_home']);render();});
     const selector=page.locator('#ctxPanel [data-ctx="c_errand"]');assert.equal(await selector.getAttribute('data-filter-state'),'included');
-    if(width<1000)await selector.tap();else await selector.click();assert.equal(await selector.getAttribute('data-filter-state'),'excluded');assert.match(await selector.getAttribute('aria-label'),/excluded\. Next: neutral/);
+    if(width<1000)await selector.tap();else await selector.click();assert.equal(await selector.getAttribute('data-filter-state'),'excluded');assert.match(await selector.getAttribute('aria-label'),/excluded\. Next: included/);
     await page.locator('[data-act="list-eligibility"][data-id="ineligible"]').click();assert.equal(await page.locator('[data-row]').count(),2);assert.equal(await page.locator('#listCount').innerText(),'(2 of 3)');
-    await selector.focus();await page.keyboard.press('Space');assert.equal(await selector.getAttribute('data-filter-state'),'neutral');assert.equal(await selector.evaluate(e=>document.activeElement===e),true,'rerender retains keyboard focus');
-    await page.keyboard.press('Enter');assert.equal(await selector.getAttribute('data-filter-state'),'included');
+    await selector.focus();await page.keyboard.press('Space');assert.equal(await selector.getAttribute('data-filter-state'),'included');assert.equal(await selector.evaluate(e=>document.activeElement===e),true,'rerender retains keyboard focus');
+    await page.keyboard.press('Enter');assert.equal(await selector.getAttribute('data-filter-state'),'excluded');
     const none=page.locator('#ctxPanel [data-act="toggle-no-context"]');await none.click();assert.equal(await none.getAttribute('data-filter-state'),'excluded');await none.click();assert.equal(await none.getAttribute('data-filter-state'),'neutral');
     await page.locator('[data-act="settings"]').click();const modal=page.locator('#modalRoot .modal'),sections=modal.locator('details.settings-section'),log=sections.filter({has:page.locator('summary').filter({hasText:/^Changelog$/})});
     assert.equal(await log.count(),1);await log.locator('summary').click();assert.ok(await log.locator('li').count()>50,'long history remains intact');
@@ -25013,4 +25014,55 @@ test('RISK Settings changelog reflow: actual archived notes retain readable toke
  const rule=html.match(/\.settings-section\[data-settings-changelog\]\s+\.kv\s*\{([^}]*)\}/)?.[1]||'';
  assert.match(rule,/overflow-wrap\s*:\s*anywhere/,'73 CSS-pixel enlarged list items must permit long archived tokens to break without clipping or altering their text');
  ctx.openHelp();assert.match(shim.document.getElementById('modalRoot').innerHTML,/Release notes wrap long words in enlarged views/,'extended FAQ explains enlarged release-note reflow');
+});
+
+test('RISK binary context presentation: active filters derive excluded controls on both surfaces without changing saved choices',async()=>{
+ const {ctx,shim}=await loadApp();const [a,b]=ctx.state.contexts;b.active=false;delete b.excluded;ctx.state.ctxOpen=true;
+ const saved=JSON.stringify(ctx.state.contexts),settings=JSON.stringify(ctx.state.settings);
+ const button=makeFakeElement();button.dataset={ctx:b.id,ctxScope:'settings',act:'cycle-context'};button.setAttribute('data-ctx',b.id);
+ shim.document.getElementById('modalRoot').querySelectorAll=()=>[button];ctx.renderCtx();
+ assert.equal(ctx.contextControlInfo(b).mode,'excluded','a neutral requirement is visibly excluded while another context is included');
+ assert.equal(ctx.contextControlInfo(b).label,b.name+': excluded. Next: included.');
+ assert.equal(button.dataset.filterState,'excluded','Settings matches the main selector');assert.match(button.innerHTML,/✕/);
+ assert.match(ctx.contextControlHTML(b),/data-filter-state="excluded"/);assert.match(shim.document.getElementById('ctxPanel').innerHTML,/1 active, 1 excluded, 1 inactive/);
+ assert.equal(JSON.stringify(ctx.state.contexts),saved,'presentation never migrates saved neutral choices');assert.equal(JSON.stringify(ctx.state.settings),settings);
+ ctx.openSettings();assert.equal(JSON.stringify(ctx.state.contexts),saved,'opening Settings does not migrate');
+ assert.match(shim.document.getElementById('modalRoot').innerHTML,new RegExp('data-ctx="'+b.id+'"[^>]*data-filter-state="excluded"'));
+});
+
+test('RISK binary context interaction: real handlers include displayed exclusions immediately and preserve zero-active AND and No context rules',async()=>{
+ for(const scope of ['main','settings']){
+  const {ctx,shim}=await loadApp();const [a,b]=ctx.state.contexts;b.active=false;delete b.excluded;
+  const one=ctx.addTask('Private A',false,[a.id]),both=ctx.addTask('Private AB',false,[a.id,b.id]),none=ctx.addTask('Private none'),unknown=ctx.addTask('Private unknown',false,['retired']);
+  const tasks=JSON.stringify(ctx.state.tasks);assert.equal(ctx.isEligible(one),true);assert.equal(ctx.isEligible(both),false);
+  const button=makeFakeElement();button.dataset={id:b.id,ctx:b.id,ctxScope:scope,act:'cycle-context'};shim.document.activeElement=button;
+  ctx.onAction('cycle-context',button);assert.equal(ctx.contextFilterState(b),'included');assert.equal(ctx.isEligible(both),true);
+  ctx.undo();assert.equal(ctx.state.contexts[1].active,false);assert.equal(ctx.state.contexts[1].excluded===true,false,'Undo restores original neutral representation');assert.equal(ctx.contextControlInfo(ctx.state.contexts[1]).mode,'excluded');
+  ctx.onAction('cycle-context',button);ctx.onAction('cycle-context',button);assert.equal(ctx.state.contexts[1].excluded,true);
+  ctx.onAction('cycle-context',button);assert.equal(ctx.contextFilterState(ctx.state.contexts[1]),'included','explicit red also reaches green in one click while filtering active');
+  ctx.onAction('cycle-context',button);ctx.onAction('cycle-context',{dataset:{id:a.id}});
+  assert.equal(ctx.activeCtxSet().size,0);assert.equal(ctx.isEligible(one),false);assert.equal(ctx.isEligible(both),false);assert.equal(ctx.isEligible(none),true);assert.equal(ctx.isEligible(unknown),true);
+  assert.equal(ctx.contextControlInfo(ctx.state.contexts[0]).label,a.name+': excluded. Next: neutral.','last included exclusion returns to the established zero-active presentation');
+  ctx.onAction('cycle-context',{dataset:{id:a.id}});assert.equal(ctx.contextFilterState(ctx.state.contexts[0]),'neutral');assert.equal(ctx.isEligible(one),false);
+  ctx.onAction('cycle-context',{dataset:{id:a.id}});assert.equal(ctx.contextFilterState(ctx.state.contexts[0]),'included');
+  assert.equal(ctx.contextControlInfo(null).mode,'neutral');ctx.onAction('toggle-no-context',{});assert.equal(ctx.isEligible(none),false);assert.equal(ctx.isEligible(unknown),false);assert.equal(ctx.isEligible(one),true);
+  assert.equal(JSON.stringify(ctx.state.tasks),tasks,'controls and Undo preserve assignments and ratings');
+ }
+});
+
+test('RISK binary context saved data: reload and cloud adoption retain neutral choices and derive excluded presentation',async()=>{
+ const source=await loadApp();const [a,b]=source.ctx.state.contexts;b.active=false;delete b.excluded;const task=source.ctx.addTask('Private shared requirement',false,[a.id,b.id]);
+ await source.ctx.persist();const payload=source.ctx.cloudPayload();
+ const reloaded=await loadApp({seedStorage:{[SYNC_STORE_KEY]:payload}});assert.equal(reloaded.ctx.state.contexts[1].active,false);assert.equal(reloaded.ctx.state.contexts[1].excluded===true,false);
+ assert.equal(reloaded.ctx.contextControlInfo(reloaded.ctx.state.contexts[1]).mode,'excluded','reload derives red without a saved-data migration');assert.equal(reloaded.ctx.isEligible(reloaded.ctx.state.tasks.find(t=>t.id===task.id)),false);
+ const h=makeSyncHarness({remote:JSON.parse(payload),rev:3}),client=await loadApp({cloudSyncFactory:h.factory});await syncSettle(40);await client.ctx.cloudPull();
+ const adopted=client.ctx.state.contexts.find(c=>c.id===b.id);assert.equal(adopted.active,false);assert.equal(adopted.excluded===true,false);assert.equal(client.ctx.contextControlInfo(adopted).mode,'excluded');
+ assert.equal(h.remoteState().contexts.find(c=>c.id===b.id).excluded===true,false,'cloud adoption does not publish inferred exclusions');
+ client.ctx.state.contexts=[];client.ctx.state.settings.excludeNoContext=true;client.ctx.renderCtx();assert.match(client.shim.document.getElementById('ctxPanel').innerHTML,/toggle-ctx/);assert.equal(client.ctx.isEligible(client.ctx.state.tasks[0]),true,'zero contexts bypass the synthetic filter');
+});
+
+test('RISK binary context guidance: FAQ explains conditional two-state controls and unchanged zero-active matching',async()=>{
+ const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(help,/While any context is active,.*included.*excluded/i);assert.match(help,/With no active contexts, only tasks without a known context can scan/);assert.match(help,/No context excludes unassigned/);
+ assert.match(help,/No active contexts.*neutral/i);assert.match(help,/Every assigned known context must be active/);
 });
