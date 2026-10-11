@@ -3923,10 +3923,11 @@ test('RISK quick Add: retired add-dot actions cannot create a task or discard an
   }
 });
 
-test('RISK quick Add: help removes the retired shortcut and retains task-editor Dot as a rank decision', async () => {
+test('RISK quick Add: help removes the retired shortcut and retains participating editor Dot as a rank decision', async () => {
   const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
   assert.doesNotMatch(help,/Add &amp; dot|Add & dot/,'current help cannot advertise the removed shortcut');
-  assert.match(help,/<b>Rank signals:<\/b> Yes, No, Dot from the All Tasks editor, and Dislodge/);
+  assert.match(help,/<b>Rank signals:<\/b> Yes, No and Dot from the All Tasks editor compare participating tasks only when neither is excluded by automatic first-dot placement/);
+  assert.match(help,/Dislodge gives a standalone negative signal/);
   const bench=ctx.addTask('Benchmark'),selected=ctx.addTask('Select in editor');ctx.state.chain=[bench.id];
   const before=[selected.mu,bench.mu];ctx.dotTask(selected.id);
   assert.ok(selected.mu>before[0]&&bench.mu<before[1],'editor Dot still records a win over the current benchmark');
@@ -21783,10 +21784,11 @@ test('RISK scan lifecycle: resting evergreen Dot is absent and stale controls ca
  }
 });
 
-test('RISK scan lifecycle: Return before Dot and expired rests retain pair learning manual overrides and one-gesture Undo',async()=>{
+test('RISK scan lifecycle: Return before Dot and expired rests retain chosen pair learning manual overrides and one-gesture Undo',async()=>{
  for(const mode of ['chance','descending']){
   const app=await modeLifecycleApp(),{ctx,shim}=app,anchor=ctx.addTask('Anchor'),task=ctx.addTask('Recurring task');
   Object.assign(task,{evergreen:true,evergreenHours:18,evergreenResetAtDay:false});
+  ctx.dotTask(anchor.id); // Ordinary pair-learning fixture needs an explicitly chosen benchmark.
   ctx.startScan(mode);ctx.doneTask(task.id);
   const resting=JSON.stringify(ctx.state),ratings=JSON.stringify(ctx.state.tasks.map(t=>[t.id,t.mu,t.sigma]));
   ctx.dotTask(task.id);assert.equal(JSON.stringify(ctx.state),resting,'rest cannot produce a comparison that reconciliation discards');
