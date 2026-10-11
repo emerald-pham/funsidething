@@ -338,6 +338,25 @@ test('RISK human terrain cadence: local contact spacing preserves world planting
  }
 });
 
+test('RISK walking weight transfer: post-contact down precedes recovery without moving planted feet',()=>{
+ const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
+ for(const direction of [-1,1])for(const scale of [.65,1,1.2])for(const carrying of [0,.5,1]){
+  const geo=ctx.LandscapeGeometry.create(390,844),ground=()=>0,travel={kind:'constant',startDistance:0,speed:3.5};
+  const at=distance=>geo.humanWalkPose(195+direction*distance,0,distance,direction,ground,carrying,scale,travel);
+  const contact=at(0),stride=contact.stride*scale;
+  for(const half of [0,.5]){
+   const start=at(half*stride),down=at((half+.1)*stride),up=at((half+.375)*stride);
+   assert.ok(down.hipY>start.hipY+.04,'weight settles below contact after landing, rather than rising immediately');
+   assert.ok(up.hipY<down.hipY-.3,'body recovers above the loading pose');
+   const leg=half===0?0:1,world=p=>direction*scale*p.legs[leg].footX;
+   assert.equal(start.legs[leg].lift,0);assert.equal(down.legs[leg].lift,0);
+   assert.ok(Math.abs(world(start)-direction*.1*stride-world(down))<1e-8,'the down pose must retain the same planted contact');
+   assert.deepEqual(down,at((half+.1)*stride),'pose remains seekable without frame history');
+   assert.ok(down.legs.every(l=>Math.abs(Math.hypot(l.kneeX-down.hipX,l.kneeY-down.hipY)-3.2)<1e-8),'weight transfer cannot stretch thigh segments');
+  }
+ }
+});
+
 test('RISK upright human gait: full cycles extend stance knees with modest swing flexion and preserved terrain contact',()=>{
  const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
  for(const [w,h] of [[390,844],[844,390],[820,1180],[1440,900]])for(const direction of [-1,1])for(const scale of [.65,1,1.2])for(const carrying of [0,.5,1]){
