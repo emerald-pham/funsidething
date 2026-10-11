@@ -1054,6 +1054,8 @@ test('RISK pedestrian capacity guidance: FAQ explains skipped crowded opportunit
  const limits=html.split('<dt>Why can the scene have fewer visitors?</dt>')[1]?.split('</dd>')[0]||'';
  assert.match(limits,/complete visits fill the scene budget/);
  assert.match(limits,/midnight UTC/);
+ assert.match(limits,/A new visit in this visitor budget must finish before midnight UTC/);
+ assert.match(limits,/Trains, metro, and woodland animals keep their existing schedules/);
  assert.match(limits,/Underway visits finish normally/);
 });
 
