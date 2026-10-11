@@ -975,3 +975,5 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK overdue WOOP: neutral automatic benchmark stays neutral and Cancel can Undo only the dot
 - RISK overdue WOOP: unsupported plans remain read-only and interrupted scan hides the action
 
+
+- RISK overdue scanner layout: enlarged candidate title chips and decision footer wrap without clipping choices

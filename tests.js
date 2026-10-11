@@ -25197,3 +25197,14 @@ test('RISK overdue WOOP: unsupported plans remain read-only and interrupted scan
  ctx.state.interventionActive=false;task.woopPlan={v:9,future:'preserve'};ctx.renderScan();ctx.onAction('run-woop',overdueWoopControl(app));
  assert.equal(ctx.state.chain.at(-1),task.id);assert.match(shim.document.getElementById('modalRoot').innerHTML,/unrecognized/);assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/data-act="woop-delete"|data-act="woop-next"/);assert.equal(task.woopPlan.future,'preserve');ctx.closeModal();
 });
+test('RISK overdue scanner layout: enlarged candidate title chips and decision footer wrap without clipping choices',async()=>{
+ const {ctx,shim}=await loadApp({seed:971});const b=ctx.addTask('Benchmark'),t=ctx.addTask('A readable overdue task title',false,[],{due:ctx.todayISO(-1)});ctx.dotTask(b.id);ctx.state.mode='scan';ctx.state.candidateId=t.id;ctx.renderScan();
+ const markup=shim.document.getElementById('scan').innerHTML;assert.match(markup,/class="card cand"/);assert.match(markup,/class="chiprow"/);assert.match(markup,/class="decide-finish"/);assert.match(markup,/data-act="run-woop"/);
+ const source=fs.readFileSync(new URL('./index.html',import.meta.url),'utf8');
+ assert.match(source,/\.decide-finish\{[^}]*flex-wrap:wrap/,'the actual scanner finish group must wrap its button and rank controls instead of forcing horizontal overflow');
+ assert.match(source,/\.card\{[^}]*flex-wrap:wrap/,'task chips may move below the title when the card is constrained');
+ assert.match(source,/\.card \.title\{[^}]*flex:1 1 160px/,'reserve a readable title line rather than squeezing it to single characters');
+ assert.match(source,/\.card \.chiprow\{[^}]*flex-wrap:wrap[^}]*max-width:100%/,'multiple due/recurrence chips must also fit a constrained task card');
+ assert.match(source,/\.decide-finish \.sparkbox\{[^}]*flex-wrap:wrap[^}]*max-width:100%/,'rank controls can wrap while all choices remain visible');
+ assert.doesNotMatch(source,/\.decide-finish\{[^}]*(?:overflow:hidden|display:none)/,'containment must not hide scanner actions');
+});

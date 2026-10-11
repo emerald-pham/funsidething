@@ -5064,26 +5064,28 @@
     }
   },
   {
-    "testChangesSha256": "fe04b340de4bb5ec259541aae786f43eb9fc7efbac6fc32a6dda70da19992830",
-    "reason": "Add a separately invoked overdue scanner WOOP action while preserving established final-task controls and task-owned plans.",
+    "testChangesSha256": "289de2e598aca6cde2ba5c0cb1d6962e852313ba182f2cf2995903fd96580fcf",
+    "reason": "Add a separately invoked overdue scanner WOOP action while preserving established final-task controls and task-owned plans. Also repair scanner title/chip and finish-group wrapping after observed enlarged phone overflow before the new action appeared.",
     "previousBehavior": "Overdue offered tasks have no Run WOOP action.",
-    "intendedBehavior": "Only the currently eligible overdue candidate exposes Run WOOP; it uses explicit Dot once, pauses, and opens a new walkthrough or existing plan with explicit deletion.",
+    "intendedBehavior": "Only the currently eligible overdue candidate exposes Run WOOP; it uses explicit Dot once, pauses, and opens a new walkthrough or existing plan with explicit deletion. Constrained scanner title/chip and finish/rank groups wrap instead of squeezing titles or hiding choices; outside the420px breakpoint CSS remains unchanged.",
     "replacementTests": [
       "RISK overdue WOOP: offered action dots through existing comparison and saves with Last task WOOP off",
       "RISK overdue WOOP: local due-day boundary stale eligibility and cancel retain the explicit dot",
       "RISK overdue WOOP: existing and legacy plans show explicit delete without silent replacement",
       "RISK overdue WOOP: peer plan account and same-ID board replacement invalidate drafts and controls",
       "RISK overdue WOOP: neutral automatic benchmark stays neutral and Cancel can Undo only the dot",
-      "RISK overdue WOOP: unsupported plans remain read-only and interrupted scan hides the action"
+      "RISK overdue WOOP: unsupported plans remain read-only and interrupted scan hides the action",
+      "RISK overdue scanner layout: enlarged candidate title chips and decision footer wrap without clipping choices"
     ],
     "preservedCoverage": [
       "All existing final-task WOOP, causal persistence, old plans, Undo, stale-tab and cloud-sync protections remain unchanged.",
       "Dot ranking comparisons and neutral automatic first-dot rules are reused. Completion, date/context/dependency holds remain scanner eligibility gates.",
-      "First four tests observed the missing actual Run WOOP control before app implementation. Two additional preservation cases were added after implementation; they are not claimed as contemporaneous RED. Fixture corrections after initial GREEN attempt established a participating benchmark and used actual exposed helpers; no existing assertions were weakened."
+      "First four tests observed the missing actual Run WOOP control before app implementation. Two additional preservation cases were added after implementation; they are not claimed as contemporaneous RED. Fixture corrections after initial GREEN attempt established a participating benchmark and used actual exposed helpers; no existing assertions were weakened.",
+      "Reconciled released toolbar518c01f without changing its executable controls/tests. Pending context input/shortcut work remains in its owner worktree; its scanner/card/footer CSS is unchanged and cannot repair this constraint. Six ordinary browser configurations and original failure evidence remain retained, not called final-candidate enlarged passes."
     ],
     "redEvidence": {
       "command": "node --test --test-name-pattern='RISK overdue WOOP:' tests.js",
-      "failure": "Four observed failures before app edits: overdue offered task must expose Run WOOP. Log /tmp/overdue-woop-red.log. Initial postimplementation run exposed missing history on neutral benchmark and an unavailable test helper; fixture repaired and preserved assertions verified in /tmp/overdue-woop-focused.log (42 pass, zero skips)."
+      "failure": "Four observed failures before app edits: overdue offered task must expose Run WOOP. Log /tmp/overdue-woop-red.log. Initial postimplementation run exposed missing history on neutral benchmark and an unavailable test helper; fixture repaired and preserved assertions verified in /tmp/overdue-woop-focused.log (42 pass, zero skips). Enlarged runtime60f19f8 failed chrome390zoom2 today/no-Run-WOOP page overflow before showing the new action; all runtime closed21:48:26, /tmp/overdue-woop-runtime/failure.png and browser.log. Pre-repair mounted CSS contract observed RED: actual scanner finish group must wrap its button and rank controls (/tmp/overdue-woop-overflow-red.log), then46sourcechecks passed (/tmp/overdue-woop-overflow-green.log). No rendered baseline captured yet; source wrap rules identical across18e3eeb, released518c01f and pendingcontextad686. Compatibility is outstanding, not failed. Gate before merge commit compared old HEAD and failed old-base rationale; postmerge gate passed; no publication occurred."
     }
   }
 ]
