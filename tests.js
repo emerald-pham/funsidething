@@ -24684,7 +24684,7 @@ test('RISK bulk task editing: enlarged modal fieldsets shrink and native control
 });
 
 test('RISK bulk task editing: enlarged selection rows give task controls full width',()=>{
- assert.match(html,/\.trow\.bulk-selecting\s*\{grid-template-columns:minmax\(0,1fr\)\}/,'observed enlarged phone selection must not share the narrow rating column');
+ assert.match(html,/\.listwrap \.trow\.bulk-selecting\s*\{grid-template-columns:minmax\(0,1fr\)\}/,'observed enlarged phone selection must not share the narrow rating column');
  assert.match(html,/\.trow\.bulk-selecting \.tmain \[data-act=bulk-toggle\]\s*\{[^}]*max-width:100%[^}]*white-space:normal/,'selection button stays bounded and wraps');
  assert.ok(html.includes("(bulkSelecting?' bulk-selecting':'')"),'full-width layout applies only during selection');
 });
