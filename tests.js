@@ -24682,3 +24682,9 @@ test('RISK bulk task editing: current batch result distinguishes partial reconci
 test('RISK bulk task editing: enlarged modal fieldsets shrink and native controls retain available width',()=>{
  assert.match(html,/\.bulk-fields\s*\{[^}]*min-width:0[^}]*max-width:100%/,'observed chrome 390px 200% overflow needs fieldsets to shrink');assert.match(html,/\.bulk-fields input\[type=number\]\s*\{[^}]*min-width:0[^}]*max-width:100%/,'native numeric control must fit enlarged modal');assert.match(html,/<fieldset class="bulk-fields">/);
 });
+
+test('RISK bulk task editing: enlarged selection rows give task controls full width',()=>{
+ assert.match(html,/\.trow\.bulk-selecting\s*\{grid-template-columns:minmax\(0,1fr\)\}/,'observed enlarged phone selection must not share the narrow rating column');
+ assert.match(html,/\.trow\.bulk-selecting \.tmain \[data-act=bulk-toggle\]\s*\{[^}]*max-width:100%[^}]*white-space:normal/,'selection button stays bounded and wraps');
+ assert.ok(html.includes("(bulkSelecting?' bulk-selecting':'')"),'full-width layout applies only during selection');
+});
