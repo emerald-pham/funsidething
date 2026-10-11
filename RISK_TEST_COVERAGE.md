@@ -942,7 +942,6 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK bulk task editing: concurrent recovery keeps backups and existing board Undo boundary explicit
 - RISK bulk task editing: current batch result distinguishes partial reconciliation from sync success and offers no batch Undo
 - RISK bulk task editing: enlarged modal fieldsets shrink and native controls retain available width
-- RISK bulk task editing: enlarged selection rows give task controls full width
 - RISK bulk task guidance: bounded answers retain distinct selection property conflict Undo and result instructions
 - RISK bulk task guidance: enlarged conflict answer uses breakable task status wording
 - RISK bulk task guidance: enlarged Settings note uses short sync and Undo wording
@@ -981,3 +980,8 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 
 - `RISK pedestrian capacity liveness: a busy day admits visitors while retaining the complete-life bound`
 - `RISK pedestrian capacity day boundary: admitted visits finish within their shared day while short late visitors remain possible`
+- RISK bulk toolbar: mounted controls stay outside scrolling rows and retain filtered selection through filter changes
+- RISK bulk row selection: selected label replaces the existing rank slot and deselection restores its format
+- RISK bulk toolbar keyboard: rerender restores the focused toolbar action and row toggle
+- RISK bulk toolbar guidance: extended FAQ describes frozen controls and rank-slot selection
+- RISK repository process boundary: actual visual tests compare every changed control with neighboring controls and scrolled states
