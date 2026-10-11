@@ -5336,7 +5336,29 @@
     }
   },
   {
-    "testChangesSha256": "b0124fcd6310495c7f5ea3ec0ed699e9decf7a02df21982737b6047445278ae9",
+    "testChangesSha256": "5c7b190bec1012d26bc085bfb152e819948485792aea07cac2d51bb6c672d625",
+    "reason": "User explicitly clarified every real context and No Context must remain binary whenever contexts exist, including zero included. Replace only superseded neutral-cycle expectations, retaining matching, Undo, cloud and task/ranking protections.",
+    "previousBehavior": "The released conditional controls retained neutral when zero real contexts were included, and No Context remained neutral while admitting unassigned tasks.",
+    "intendedBehavior": "Derive red for saved-neutral real contexts and green for saved-neutral No Context whenever contexts exist, with immediate binary toggles and no rendering migration. Zero-context selector remains visible.",
+    "replacementTests": [
+      "RISK always binary contexts: legacy neutral and all-excluded controls render green or red on both surfaces without saved writes",
+      "RISK always binary context interactions: last-green and all-red clicks stay binary and Undo preserves assignments and AND eligibility",
+      "RISK always binary No Context: visible green and red dispatch immediately on both surfaces with Undo and zero-context guard",
+      "RISK always binary saved contexts: reload and cloud adoption derive red real and green No Context without migration",
+      "RISK always binary context guidance: FAQ explains context-presence rule and separate green No Context eligibility"
+    ],
+    "preservedCoverage": [
+      "All known-context AND, explicit-exclusion precedence, unassigned/unknown-only matching, task assignments, rankings, completion and Undo assertions remain. Old three-step test transition sequences now exercise the user-authorized two-state transitions with unchanged eligibility outcomes.",
+      "Existing reload, revisioned cloud adoption, concurrent clients/offline/reconnect and completion Undo contracts are retained; rendering asserts unchanged payload and saved legacy neutral choices.",
+      "The earlier browser No Context neutral expectation is explicitly superseded by user Yes; retain all browser focus/disclosure/settings saving and real green-to-red assertions. A new Undo fixture ignores only commit updatedAt while asserting every other state field."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK always binary' tests.js; node --test --test-name-pattern='PWA cache contract|Settings changelog: every app' tests.js",
+      "failure": "Contemporaneous preimplementation five-case RED: legacy/all-excluded real mode neutral instead of excluded, last-green next neutral instead of included, No Context neutral instead of included, reload neutral instead of excluded and old FAQ missing presence rule; /tmp/chain-context-always-binary-red.log. After implementation four/five passed; final new No Context fixture then failed only expected fresh Undo commit timestamp, corrected to compare all state fields except updatedAt without product change. Earlier eight old regressions failed explicitly superseded neutral-cycle/wording expectations; preserved matching assertions with binary transition sequences. Required shell2/2 RED observed before fingerprint regeneration, /tmp/chain-context-always-binary-shell-red.log. Prior released live diagnosis /tmp/chain-context-live-diagnosis-ad686/results.json reproduced both neutral cases; separate broader palette-probe failure retained."
+    }
+  },
+  {
+    "testChangesSha256": "fe338cb3996d585953489131c886eb6eb42e9da59926277651cc3966cdbdcf44",
     "reason": "Add a separately invoked overdue scanner WOOP action while preserving established final-task controls and task-owned plans. Also repair scanner title/chip and finish-group wrapping after observed enlarged phone overflow before the new action appeared.",
     "previousBehavior": "Overdue offered tasks have no Run WOOP action.",
     "intendedBehavior": "Only the currently eligible overdue candidate exposes Run WOOP; it uses explicit Dot once, pauses, and opens a new walkthrough or existing plan with explicit deletion. Constrained scanner title/chip and finish/rank groups wrap instead of squeezing titles or hiding choices; outside the420px breakpoint CSS remains unchanged.",
@@ -5354,7 +5376,8 @@
       "All existing final-task WOOP, causal persistence, old plans, Undo, stale-tab and cloud-sync protections remain unchanged.",
       "Dot ranking comparisons and neutral automatic first-dot rules are reused. Completion, date/context/dependency holds remain scanner eligibility gates.",
       "First four tests observed the missing actual Run WOOP control before app implementation. Two additional preservation cases were added after implementation; they are not claimed as contemporaneous RED. Fixture corrections after initial GREEN attempt established a participating benchmark and used actual exposed helpers; no existing assertions were weakened.",
-      "Reconciled released toolbar518c01f without changing its executable controls/tests. Pending context input/shortcut work remains in its owner worktree; its scanner/card/footer CSS is unchanged and cannot repair this constraint. Six ordinary browser configurations and original failure evidence remain retained, not called final-candidate enlarged passes."
+      "Reconciled released toolbar518c01f without changing its executable controls/tests. Pending context input/shortcut work remains in its owner worktree; its scanner/card/footer CSS is unchanged and cannot repair this constraint. Six ordinary browser configurations and original failure evidence remain retained, not called final-candidate enlarged passes.",
+      "Reconciled always-binary context PR111 main3efcedf additively; all released executable tests and source/FAQ retained. Actual later b582 enlarged fourcases completed despite preserved aggregate ownerdeadline nonpass; supplement footer/nativeTab and compatibility15/15 passed, all independentreviews approved. Sourcebase changes require refreshed exact review, not broad capturedmatrix rerun."
     ],
     "redEvidence": {
       "command": "node --test --test-name-pattern='RISK overdue WOOP:' tests.js; node --test --test-name-pattern='RISK overdue scanner layout:' tests.js; node --test --test-name-pattern='RISK overdue scanner layout: chosen-task breadcrumb' tests.js",
