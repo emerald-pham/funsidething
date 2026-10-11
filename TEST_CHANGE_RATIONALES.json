@@ -1,6 +1,6 @@
 [
   {
-    "testChangesSha256": "881aeb543f925de5130678d743ec94d80852f215948a152e2dd66847946aaf6c",
+    "testChangesSha256": "3fab4b2520d9a1aeac62d908126f6282a66760427dd3c1fd6144c3d81abafb2f",
     "reason": "User-requested filtered bulk task editing needs field-scoped preservation and atomic stale-form checks. New tests only; existing contracts retained.",
     "previousBehavior": "All Tasks had only individual Edit and lacked bottom selection controls or explicit batch date clearing.",
     "intendedBehavior": "Select visible filtered tasks, apply only opted properties, reject batch conflicts, explicitly clear and preserve identities/history/ratings and unrelated peer edits.",
@@ -25,6 +25,22 @@
     "redEvidence": {
       "command": "node --test --test-name-pattern='RISK bulk task editing:' tests.js",
       "failure": "Before implementation, selection count assertion failed and explicit clearing retained old date (/tmp/chain-bulk-red.log). Before input handler changes, reset checkbox was undefined instead of false (/tmp/chain-bulk-red2.log). Two-tab/deletion checks added afterward truthfully provide preservation coverage, not preimplementation RED. Explicit reset opt-in then failed true !== false before removing automatic Apply (/tmp/chain-bulk-red3.log). Removed context option test failed 1 !== 0 before the save-time context validity guard (/tmp/chain-bulk-red4.log). FAQ observed RED before copy repair: lacked detected-before-Save qualification (/tmp/chain-bulk-copy-red.log). Additional cloud failure/reconnect/partial adoption/recovery Undo cases passed on existing sync paths; these are postimplementation preservation checks, not claimed as initial RED. Bulk result assertion failed before result UI existed (/tmp/chain-bulk-result-red.log); current-value result then passed without server-ACK claim or added Undo shortcut (/tmp/chain-bulk-result-green.log). Actual reconnect partial adoption now checks the rendered result."
+    }
+  },
+  {
+    "testChangesSha256": "0e1b1eb85260367171b57addc931b9034f6577eb4330f6475785b933969ccbc5",
+    "reason": "Actual Start/Dislodge/Rescan cycles reach exhausted scan with two recorded actions but no WOOP and no pause control; add this previously inaccessible final-dot path.",
+    "previousBehavior": "WOOP requires work mode; exhausted scan stays scan mode and provides no pause control for its sole dot.",
+    "intendedBehavior": "Enabled WOOP admits sole-dot exhausted scans while active candidates and multi-dot chains remain excluded; preserve saved plans and default-off setting.",
+    "replacementTests": [
+      "RISK Last task WOOP: exhausted scan reaches walkthrough through real Start and Dislodge handlers"
+    ],
+    "preservedCoverage": [
+      "Existing boundary, two unique recorded actions, causal plans, Undo, sync, unknown data and stale-control preservation assertions remain intact."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK Last task WOOP: exhausted scan' tests.js",
+      "failure": "Observed before implementation: real handler sequence reaches End of the list, count 2, mode scan; walkthrough assertion fails. /tmp/woop-trigger-red.log. Initial fixture handler mistakes repaired before this discriminating RED."
     }
   },
   {
