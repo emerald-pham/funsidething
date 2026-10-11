@@ -1,5 +1,21 @@
 [
   {
+    "testChangesSha256": "c3b3418f4a668f1f0663e4f63dfd2332d08f7e0ea11c1473b49b1e6adf8c71c4",
+    "reason": "Add actual rooftop garden paint coverage before gating the two potted plants in daylight; preserve all existing assertions. Reconcile exact test hunk fingerprint against approved context main; test content and original observed RED are unchanged.",
+    "previousBehavior": "Both potted plants painted at every sun altitude.",
+    "intendedBehavior": "Hide both pots and canopies at nonnegative sun altitude, retaining deck and all nighttime plant and light behavior.",
+    "replacementTests": [
+      "RISK rooftop gardens: daylight hides paired plants while preserving decks and nighttime lights"
+    ],
+    "preservedCoverage": [
+      "Existing garden/patio light sampling, weather, actor depth, sailboat schedules, data and walking contracts remain intact."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK rooftop gardens:' tests.js",
+      "failure": "Observed preimplementation RED: daylight painted 2 canopy ellipses when 0 expected, /tmp/chain-rooftop-foliage-red.log; three focused tests subsequently GREEN with zero skips."
+    }
+  },
+  {
     "testChangesSha256": "e404a960a4ba10b01c2469b3091d2cf147d3ea6a45e9e697da5cfda77c2ebfc1",
     "reason": "Add actual rooftop garden paint coverage before gating the two potted plants in daylight; preserve all existing assertions.",
     "previousBehavior": "Both potted plants painted at every sun altitude.",
