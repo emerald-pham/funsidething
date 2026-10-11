@@ -1,5 +1,54 @@
 [
   {
+    "testChangesSha256": "e1ed5fd0f855854bccc8af773668ca23ea813da37bdfd7b2ac5771dd15be96d7",
+    "reason": "Repair the actual allocated browser RED by restoring included starting state before existing Settings included-to-excluded assertion. Preserve all previous checks and assertion strength. Normalize the reloaded private browser fixture by closing the setup-only motion dialog, matching its initial-load setup. Reconcile exact toolbar main518c01f and sync PR107 additively, retain their unchanged tests and source; imported upstream RED is not newly claimed. Reconcile exact toolbar main518c01f and sync PR107 additively, retain their unchanged tests and source; imported upstream RED is not newly claimed. Independent review caught duplicated bulk FAQ during reconciliation; remove one byte-identical block while preserving toolbar answer. Independent review caught duplicated bulk FAQ during reconciliation; remove one byte-identical block while preserving toolbar answer.",
+    "previousBehavior": "Prior Enter explicitly excluded Errands, so the next Settings click correctly included it while the legacy fixture expected excluded.",
+    "intendedBehavior": "Explicit keyboard Space restores included state before testing the unchanged Settings included-to-excluded transition.",
+    "replacementTests": [
+      "RISK Undo Z shortcut: real keyboard dispatch reverses only the latest action and retains durable Undo semantics",
+      "RISK Undo Z guards: U is retired and modified editable modal and scene keypresses leave board and native defaults alone",
+      "RISK Undo Z guidance: header hint tooltip and Quick start name Z while preserving editable native undo guidance",
+      "RISK Edit E shortcut: real keyboard dispatch edits only the offered scanner task without changing the board",
+      "RISK Edit E guards and hints: modifiers editable fields modal and scene focus do not dispatch and only the offered Edit advertises E",
+      "RISK Edit E guidance: Quick start explains the offered task editor and plain shortcut scope",
+      "RISK context reconciliation FAQ: actual Help keeps each existing bulk and context question once",
+      "RISK context reconciliation FAQ: actual Help keeps each existing bulk and context question once"
+    ],
+    "preservedCoverage": [
+      "All touch keyboard focus counts disclosure Settings draft Save reload and overflow assertions remain unchanged; context and shortcut implementation is unchanged.",
+      "Released compact toolbar rank selection focus and sync-cleanup generation rules and regressions are retained unchanged.",
+      "Released compact toolbar rank selection focus and sync-cleanup generation rules and regressions are retained unchanged."
+    ],
+    "redEvidence": {
+      "command": "LANDSCAPE_BROWSER_URL=http://127.0.0.1:8769/index.html node --test --test-name-pattern=\"RISK context and Settings browser:\" tests.js",
+      "failure": "Allocated browser observed included !== excluded at tests.js624 on candidate7866; original log /tmp/chain-context-browser-red.log. Restore intended fixture starting state only; no weakened assertion. Corrected transition then reached reload and observed motionDialog intercepting close-modal click at tests.js628; retained /tmp/chain-context-browser-green.log. Close setup dialog after reload without altering product or weakening assertions. New actual Help consumer RED observed2!==1 on duplicated bulk question before copy correction /tmp/chain-context-reconcile-duplicate-red.log. New actual Help consumer RED observed2!==1 on duplicated bulk question before copy correction /tmp/chain-context-reconcile-duplicate-red.log."
+    }
+  },
+  {
+    "testChangesSha256": "fcd8f68674d1f64e78c6c20268c44740054a854b36892a157a4e8a9fd251def2",
+    "reason": "Repair the actual allocated browser RED by restoring included starting state before existing Settings included-to-excluded assertion. Preserve all previous checks and assertion strength. Normalize the reloaded private browser fixture by closing the setup-only motion dialog, matching its initial-load setup. Reconcile exact toolbar main518c01f and sync PR107 additively, retain their unchanged tests and source; imported upstream RED is not newly claimed. Reconcile exact toolbar main518c01f and sync PR107 additively, retain their unchanged tests and source; imported upstream RED is not newly claimed. Independent review caught duplicated bulk FAQ during reconciliation; remove one byte-identical block while preserving toolbar answer.",
+    "previousBehavior": "Prior Enter explicitly excluded Errands, so the next Settings click correctly included it while the legacy fixture expected excluded.",
+    "intendedBehavior": "Explicit keyboard Space restores included state before testing the unchanged Settings included-to-excluded transition.",
+    "replacementTests": [
+      "RISK Undo Z shortcut: real keyboard dispatch reverses only the latest action and retains durable Undo semantics",
+      "RISK Undo Z guards: U is retired and modified editable modal and scene keypresses leave board and native defaults alone",
+      "RISK Undo Z guidance: header hint tooltip and Quick start name Z while preserving editable native undo guidance",
+      "RISK Edit E shortcut: real keyboard dispatch edits only the offered scanner task without changing the board",
+      "RISK Edit E guards and hints: modifiers editable fields modal and scene focus do not dispatch and only the offered Edit advertises E",
+      "RISK Edit E guidance: Quick start explains the offered task editor and plain shortcut scope",
+      "RISK context reconciliation FAQ: actual Help keeps each existing bulk and context question once"
+    ],
+    "preservedCoverage": [
+      "All touch keyboard focus counts disclosure Settings draft Save reload and overflow assertions remain unchanged; context and shortcut implementation is unchanged.",
+      "Released compact toolbar rank selection focus and sync-cleanup generation rules and regressions are retained unchanged.",
+      "Released compact toolbar rank selection focus and sync-cleanup generation rules and regressions are retained unchanged."
+    ],
+    "redEvidence": {
+      "command": "LANDSCAPE_BROWSER_URL=http://127.0.0.1:8769/index.html node --test --test-name-pattern=\"RISK context and Settings browser:\" tests.js",
+      "failure": "Allocated browser observed included !== excluded at tests.js624 on candidate7866; original log /tmp/chain-context-browser-red.log. Restore intended fixture starting state only; no weakened assertion. Corrected transition then reached reload and observed motionDialog intercepting close-modal click at tests.js628; retained /tmp/chain-context-browser-green.log. Close setup dialog after reload without altering product or weakening assertions. New actual Help consumer RED observed2!==1 on duplicated bulk question before copy correction /tmp/chain-context-reconcile-duplicate-red.log."
+    }
+  },
+  {
     "testChangesSha256": "781a682dcae684e73d153a456e3d9e71b27ce3213be3fe6f4278e2d92e4063fb",
     "reason": "Repair the actual allocated browser RED by restoring included starting state before existing Settings included-to-excluded assertion. Preserve all previous checks and assertion strength. Normalize the reloaded private browser fixture by closing the setup-only motion dialog, matching its initial-load setup. Reconcile exact toolbar main518c01f and sync PR107 additively, retain their unchanged tests and source; imported upstream RED is not newly claimed. Reconcile exact toolbar main518c01f and sync PR107 additively, retain their unchanged tests and source; imported upstream RED is not newly claimed.",
     "previousBehavior": "Prior Enter explicitly excluded Errands, so the next Settings click correctly included it while the legacy fixture expected excluded.",

@@ -25243,3 +25243,8 @@ test('Firestore rules: production cleanup resumes deleting tombstones and protec
   for(const id of ['active','previous','pending','young'])assert.ok(await adapter.readGeneration(uid,id),id+' is retained');
  }finally{await env.cleanup();}
 });
+
+test('RISK context reconciliation FAQ: actual Help keeps each existing bulk and context question once',async()=>{
+ const {ctx,shim}=await loadApp();ctx.closeModal();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ for(const question of ['How do I edit several tasks together?','Which properties can I change in Bulk Edit?','What happens if selected tasks change before or during Save?','How does Undo work after Bulk Edit?','What does the bulk result count mean?','How do contexts and list filters work?','How do I create contexts and filter All Tasks?'])assert.equal(help.split('<dt>'+question+'</dt>').length-1,1,question+' appears once in rendered Help');
+});
