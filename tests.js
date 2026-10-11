@@ -24513,7 +24513,7 @@ test('RISK neutral bootstrap: offline reconnect real cloud glue retains neutral 
 
 test('RISK neutral bootstrap: FAQ explains exclusion explicit choice legacy limits and standalone Dislodge',async()=>{
  const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
- assert.match(help,/automatically dotted task stays outside ranking comparisons/i);assert.match(help,/Yes or Dot explicitly chooses/i);assert.match(help,/neither task.*rating/i);assert.match(help,/before this update.*provenance/i);assert.match(help,/Dislodge still gives.*negative/i);
+ assert.match(help,/automatically dotted task stays outside ranking comparisons/i);assert.match(help,/Yes or Dot explicitly chooses/i);assert.match(help,/neither task.*rating/i);assert.match(help,/before this update.*provenance/i);assert.match(help,/Existing dotted tasks without this evidence still take part in comparisons/i);assert.match(help,/Dislodge still gives.*negative/i);
 });
 
 test('RISK neutral bootstrap: Settings backup Restore restores causal exclusion and choice in both directions',async()=>{
