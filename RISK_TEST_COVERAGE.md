@@ -920,3 +920,4 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK bulk task editing: failed browser pair save retains in-memory batch and retry saves without partial task loss
 - RISK bulk task editing: FAQ and editor qualify mixed Apply and later sync recovery limits
 - RISK bulk task editing: concurrent recovery keeps backups and existing board Undo boundary explicit
+- RISK bulk task editing: current batch result distinguishes partial reconciliation from sync success and offers no batch Undo
