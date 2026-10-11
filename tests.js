@@ -25283,3 +25283,20 @@ test('RISK pedestrian ski preparation attachments: hat follows the painted head 
   assert.equal(arms.length,4);assert.equal(poles.length,2);for(let i=0;i<2;i++)assert.ok(Math.hypot(poles[i].x-arms[2*i+1].x,poles[i].y-arms[2*i+1].y)<1e-8,'each preparation pole starts in the actual currently painted grip');
  }
 });
+
+test('RISK pedestrian planner cold work: full capacity skips unnecessary lifetime solving without changing admitted scenes or reseeks',()=>{
+ const prior=spawnSync('git',['show','c21ee6f2a1147636f89cc96dae80aa9ba8ba9ea5:landscape-timeline.js'],{cwd:__dirname,encoding:'utf8'});assert.equal(prior.status,0,prior.stderr);
+ const epoch=Date.parse('2026-10-06T00:00Z'),day=86400000,snapshot=value=>JSON.parse(JSON.stringify(value));
+ for(const season of ['winter','summer'])for(const night of [false,true]){
+  const current=sceneTimeline(),reference=sceneTimeline({'landscape-timeline.js':()=>prior.stdout}),create=current.LandscapeGeometry.create;let calls=0;
+  current.LandscapeGeometry.create=(w,h)=>{const geometry=create(w,h);if(w===8192){const lifetime=geometry.walkingLifetime;geometry.walkingLifetime=e=>{calls++;return lifetime(e);};}return geometry;};
+  const options={seed:'private-schedule',season,sunAt:()=>({altitude:night?-20:30,azimuth:night?0:90})},actual=current.LandscapeTimeline.create(options),baseline=reference.LandscapeTimeline.create(options),first=epoch+12*3600000;
+  assert.deepEqual(snapshot(actual.at(first)),snapshot(baseline.at(first)),'the actual cold consumer preserves every admitted event, duration and independent scenery stream');
+  assert.ok(calls<=(night?1300:season==='winter'?1300:1800),`${season} ${night?'night':'day'} cold planning solved ${calls} lifetimes despite full capacity`);
+  const coldCalls=calls;actual.at(first+8000);actual.at(first-8000);actual.at(first);assert.equal(calls,coldCalls,'same-day buckets reuse the existing bounded daily plan');
+  for(const offset of [1,23*3600000+40*60000,day-1,day,day+1,-1,2*day+1,-2*day+1,12*3600000]){
+   const at=epoch+offset,scene=actual.at(at);assert.deepEqual(snapshot(scene),snapshot(baseline.at(at)),'midnight, eviction and backwards reseek preserve exact scheduling');assert.ok(scene.events.length<=14);
+   for(const e of scene.events)if(!['train','metro'].includes(e.type)){const born=at-e.age*1000;assert.ok(born+Math.max(e.duration,e.scheduleDuration||e.activityDuration||e.duration)*1000<=(Math.floor(born/day)+1)*day+.001,'full reservations still fit their admitted UTC day');}
+  }
+ }
+});

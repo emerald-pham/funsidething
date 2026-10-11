@@ -987,3 +987,5 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK repository process boundary: actual visual tests compare every changed control with neighboring controls and scrolled states
 
 - RISK pedestrian ski preparation attachments: hat follows the painted head and poles stay in the painted grips throughout blending
+
+- `RISK pedestrian planner cold work: full capacity skips unnecessary lifetime solving without changing admitted scenes or reseeks`

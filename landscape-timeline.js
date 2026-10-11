@@ -122,10 +122,13 @@
           (!C.waterEvents.includes(e.type)||prior.filter(other=>C.waterEvents.includes(other.type)).length<2);
         prior.push(e);
         if(!eligible||e.start<from||e.start>=to)continue;
-        const duration=visibleDuration(e),end=e.start+Math.max(duration,reservationDuration(e));
-        if(end>to)continue;
+        // A full reservation budget rejects this proposal regardless of its
+        // lifetime. Avoid solving its terrain route; original eligibility and
+        // random draws above still see every raw proposal in the same order.
         active=active.filter(other=>other.end>e.start);
         if(active.length>=S.MAX_EVENTS-2)continue;
+        const duration=visibleDuration(e),end=e.start+Math.max(duration,reservationDuration(e));
+        if(end>to)continue;
         active.push({end});events.push(extendWalk(e,duration));
       }
       dayPlans.set(key,events);if(dayPlans.size>2)dayPlans.delete(dayPlans.keys().next().value);
