@@ -920,4 +920,4 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 
 - RISK task history: compact Likelihood labels retain recorded values across metric boundaries
 
-- RISK walking weight transfer: post-contact down precedes recovery without moving planted feet
+- RISK walking rollback: terrain-driven loading preserves the prior upright silhouette and planted contacts
