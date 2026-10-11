@@ -1,5 +1,21 @@
 [
   {
+    "testChangesSha256": "3a4081e7ba73d2967dc41c615dcfcbe6eeb2cf0d910317e48ffdafcaeb62fc11",
+    "reason": "Explicit user request renames only the FAQ menu and associated accessible names to FAQs; preserve Quick start onboarding chapter and all FAQ contents/behavior. Current menu references match the new name.",
+    "previousBehavior": "Header help tooltip and modal heading said Quick start; button accessible name was question mark and dialog lacked its heading association.",
+    "intendedBehavior": "Menu tooltip, button accessible name and dialog title/name say FAQs; first Quick start chapter and contents stay unchanged. Current Task history and dependency menu references use FAQs; no new changelog entry.",
+    "replacementTests": [
+      "RISK FAQs menu label: help navigation and named dialog use FAQs while retaining Quick start chapter"
+    ],
+    "preservedCoverage": [
+      "Existing four onboarding steps, collapsed detailed chapters, Task history facts and control behavior stay protected; opening help preserves board state. Existing historical changelog wording is unchanged."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK FAQs menu label:' tests.js",
+      "failure": "Observed before app edit: header button did not have FAQs title and accessible label; actual RED /tmp/faqs-label-red.log. Five relevant checks then passed /tmp/faqs-label-green.log."
+    }
+  },
+  {
     "testChangesSha256": "4e4bdacb661c3edd9432b75d3874080721143bcd83d559d0d70fa93971104cc2",
     "reason": "Repair stale ordinary comparison fixtures found by required CI without weakening lifecycle or retired-shortcut contracts.",
     "previousBehavior": "The tests assumed automatic benchmarks can learn and the old Rank signals sentence remains exact, conflicting with the approved automatic exclusion behavior.",
