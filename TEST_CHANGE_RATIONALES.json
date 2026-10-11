@@ -1,5 +1,21 @@
 [
   {
+    "testChangesSha256": "702946daeb64178fb62494ed03151a798585a50d7ea6e9f402bc845573ef0238",
+    "reason": "Latest user correction explicitly replaces white night paint with the unchanged Edit palette; preserve day paint, neighbor sizing and shared state treatments.",
+    "previousBehavior": "Both mounted Postpone surfaces used white fill and dark ink at night while Edit used the dark surface/light ink tokens.",
+    "intendedBehavior": "Only scoped Postpone dark fill and ink reuse existing Edit surface/ink tokens. Existing Edit declarations, light white paint, ordinary/final sizes, disabled treatment and actions stay unchanged.",
+    "replacementTests": [
+      "RISK Postpone: day paint stays white and night paint matches Edit on both scanner surfaces"
+    ],
+    "preservedCoverage": [
+      "Neighbor sizing without changing Edit remains protected. All existing Postpone lifecycle, Undo, causal saved state and cloud contracts are unchanged and retained."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='day paint stays white|scan surfaces match neighboring' tests.js; NIGHT_START=2026-10-11T09:50:00Z NIGHT_END=2026-10-11T09:51:00Z NIGHT_PHASE=red node /tmp/postpone-night-probe.mjs",
+      "failure": "Observed source RED before app edit: missing night Edit tokens (/tmp/postpone-night-source-red.log). Actual preimplementation Chrome4cases completed2026-10-11T09:50:06.592Z: all4night fill/ink mismatches, all4neighbor heights equal. Postpone fill rgb255,255,255/ink32,36,43; Edit fill35,39,51/ink227,230,240. /tmp/postpone-night-red/results.json. Physical handback09:50:13.131869Z."
+    }
+  },
+  {
     "testChangesSha256": "d60f169e0d0153e3251a0efc6ada551999340df213547ce500d3077bdeaf4d3f",
     "reason": "Latest user instruction supersedes matching Edit’s small size: Postpone must match neighboring decision heights, preserving established neutral design and white paint without changing any action/data contract.",
     "previousBehavior": "Ordinary Postpone reused btn sm subtle and measured32.84375px against neighboring Yes38.296875px; final row already matched32.84375px. Dark Postpone followed dark surface instead of the requested white treatment.",

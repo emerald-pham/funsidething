@@ -24270,14 +24270,14 @@ test('RISK Postpone: scan surfaces match neighboring decision button sizing with
  assert.match(source,/\.btn\.subtle:disabled\{/,'shared disabled treatment remains available');
 });
 
-test('RISK Postpone: white treatment stays scoped to neutral controls on both scanner surfaces',async()=>{
+test('RISK Postpone: day paint stays white and night paint matches Edit on both scanner surfaces',async()=>{
  const scan=await loadApp({seed:999});addTaskAged(scan.ctx,'Oldest',900000);addTaskAged(scan.ctx,'Candidate',1000);scan.ctx.startScan('descending');scan.ctx.render();
  const only=await loadApp();only.ctx.addTask('Final task',true);only.ctx.state.mode='work';only.ctx.render();
  for(const [app,action]of [[scan,'postpone'],[only,'bench-postpone']]){
   const markup=app.shim.elements.get('scan').innerHTML,classes=markup.match(new RegExp('<button class="([^"]+)" data-act="'+action+'"'))?.[1].split(/\s+/);
-  assert.ok(classes?.includes('subtle')&&classes.includes('postpone'),'both mounted Postpone surfaces use the scoped white neutral treatment');
+  assert.ok(classes?.includes('subtle')&&classes.includes('postpone'),'both mounted Postpone surfaces use their scoped theme treatment');
  }
- assert.match(html,/\.btn\.subtle\.postpone\{background:light-dark\(#fff,#fff\);color:light-dark\(#20242b,#20242b\)\}/,'white paint and readable dark ink remain white in both themes, without overriding component geometry');
+ assert.match(html,/\.btn\.subtle\.postpone\{background:light-dark\(#fff,var\(--surface\)\);color:light-dark\(#20242b,var\(--ink\)\)\}/,'day paint remains white while night fill and ink reuse Edit theme tokens without overriding component geometry');
  assert.ok(html.indexOf('.btn.subtle.postpone{')<html.indexOf('.btn.subtle:disabled{'),'shared disabled palette still takes precedence');
 });
 
