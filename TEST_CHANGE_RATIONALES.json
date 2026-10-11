@@ -1,5 +1,37 @@
 [
   {
+    "testChangesSha256": "c0c9dd2225ff487dc7decf479ae2cd5f06c3b489635b1089f463679ad0dc82e0",
+    "reason": "Repair independently demonstrated enlarged-phone Settings context name-field overflow using only bounded shrink sizing. Released main518 and prior contextc064 share the same flex-only manager input rule and markup; baseline geometry will independently qualify attribution. Independent rendered795review rejected phone name editor compressed to23–25CSSpx. Allowmanagerrowswrapand160pxflexbasis rather than leaving a padding-only editor. Independent rendered795review rejected phone name editor compressed to23–25CSSpx. Allowmanagerrowswrapand160pxflexbasis rather than leaving a padding-only editor.",
+    "previousBehavior": "Initial min-width0 bound fixed overflow but compressed name text into padding on phone200%.",
+    "intendedBehavior": "Name input requests160px and wraps onto its own usable line on constrained manager rows, retaining DOM keyboard order and protected actions.",
+    "replacementTests": [
+      "RISK context Settings reflow: actual manager name fields can shrink beside protected context and delete controls"
+    ],
+    "preservedCoverage": [
+      "Existing context toggles Undo AND/exclusion NoContext saved-neutral/cloud handling and Z/E guards are unchanged. Prior controls/rules/compat native1548pass and alloriginalfail evidence remain separately bound to c064."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern=\"RISK context Settings reflow:\" tests.js",
+      "failure": "BeforeCSSfix sourceconsumerRED observed actualflex:1 withoutmin-width0 /tmp/chain-context-settings-reflow-red.log, following independent actualphone2x rendered overflow report /tmp/chain-context-typography-review-c064.md. Minimalmin-width0/max-width100% fixes it; focused48/48 /tmp/chain-context-settings-reflow-green.log. Targeted actualbaseline/candidate geometry and expandedFAQ/EditE captures prepared; no newruntime started. StrongerconsumerRED observedflex1 withoutusefulflexbasis /tmp/chain-context-settings-usability-red.log beforewrappingrepair.48/48green /tmp/chain-context-settings-usability-green.log. Prior795renderrejection retained /tmp/chain-context-typography-review-795.md; nextcaptures awaitfreshparentallocation and wait for Appupdated toast opacity to clear. StrongerconsumerRED observedflex1 withoutusefulflexbasis /tmp/chain-context-settings-usability-red.log beforewrappingrepair.48/48green /tmp/chain-context-settings-usability-green.log. Prior795renderrejection retained /tmp/chain-context-typography-review-795.md; nextcaptures awaitfreshparentallocation and wait for Appupdated toast opacity to clear."
+    }
+  },
+  {
+    "testChangesSha256": "7841b384b0ab812ded3eb6fe28b3c90971f51095fc99e9ae0cfbb96d2a160506",
+    "reason": "Repair independently demonstrated enlarged-phone Settings context name-field overflow using only bounded shrink sizing. Released main518 and prior contextc064 share the same flex-only manager input rule and markup; baseline geometry will independently qualify attribution. Independent rendered795review rejected phone name editor compressed to23–25CSSpx. Allowmanagerrowswrapand160pxflexbasis rather than leaving a padding-only editor.",
+    "previousBehavior": "Initial min-width0 bound fixed overflow but compressed name text into padding on phone200%.",
+    "intendedBehavior": "Name input requests160px and wraps onto its own usable line on constrained manager rows, retaining DOM keyboard order and protected actions.",
+    "replacementTests": [
+      "RISK context Settings reflow: actual manager name fields can shrink beside protected context and delete controls"
+    ],
+    "preservedCoverage": [
+      "Existing context toggles Undo AND/exclusion NoContext saved-neutral/cloud handling and Z/E guards are unchanged. Prior controls/rules/compat native1548pass and alloriginalfail evidence remain separately bound to c064."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern=\"RISK context Settings reflow:\" tests.js",
+      "failure": "BeforeCSSfix sourceconsumerRED observed actualflex:1 withoutmin-width0 /tmp/chain-context-settings-reflow-red.log, following independent actualphone2x rendered overflow report /tmp/chain-context-typography-review-c064.md. Minimalmin-width0/max-width100% fixes it; focused48/48 /tmp/chain-context-settings-reflow-green.log. Targeted actualbaseline/candidate geometry and expandedFAQ/EditE captures prepared; no newruntime started. StrongerconsumerRED observedflex1 withoutusefulflexbasis /tmp/chain-context-settings-usability-red.log beforewrappingrepair.48/48green /tmp/chain-context-settings-usability-green.log. Prior795renderrejection retained /tmp/chain-context-typography-review-795.md; nextcaptures awaitfreshparentallocation and wait for Appupdated toast opacity to clear."
+    }
+  },
+  {
     "testChangesSha256": "b095f939ea7f9210396e86d67725cc4e35afcf0fd66a882049852215d58b3cac",
     "reason": "Repair independently demonstrated enlarged-phone Settings context name-field overflow using only bounded shrink sizing. Released main518 and prior contextc064 share the same flex-only manager input rule and markup; baseline geometry will independently qualify attribution.",
     "previousBehavior": "The manager name input retained native intrinsic minimum width; at phone200% it painted beyond the modal edge and hid the delete control.",

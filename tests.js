@@ -25255,5 +25255,7 @@ test('RISK context Settings reflow: actual manager name fields can shrink beside
  const rule=html.match(/\.mgr input\[type=text\]\s*\{([^}]*)\}/)?.[1]||'';
  assert.match(rule,/min-width\s*:\s*0(?:;|$)/,'manager name must shrink below native intrinsic width at enlarged phone size');
  assert.match(rule,/max-width\s*:\s*100%(?:;|$)/,'name field remains bounded to its available row');
+ assert.match(rule,/flex\s*:\s*1\s+1\s+160px(?:;|$)/,'name field reserves a useful editing width and moves to its own line when needed');
+ const rowRule=html.match(/\.mgr\s*\{([^}]*)\}/)?.[1]||'';assert.match(rowRule,/flex-wrap\s*:\s*wrap/,'an enlarged manager row wraps rather than compressing text into padding');
  assert.equal(JSON.stringify(ctx.state),saved,'opening the layout consumer never changes saved board choices');
 });
