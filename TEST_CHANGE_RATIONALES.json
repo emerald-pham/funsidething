@@ -5064,7 +5064,7 @@
     }
   },
   {
-    "testChangesSha256": "289de2e598aca6cde2ba5c0cb1d6962e852313ba182f2cf2995903fd96580fcf",
+    "testChangesSha256": "db4f2f860a92cde456c7b181c3656e11cba81f4600edf92dde2e315830b48a1b",
     "reason": "Add a separately invoked overdue scanner WOOP action while preserving established final-task controls and task-owned plans. Also repair scanner title/chip and finish-group wrapping after observed enlarged phone overflow before the new action appeared.",
     "previousBehavior": "Overdue offered tasks have no Run WOOP action.",
     "intendedBehavior": "Only the currently eligible overdue candidate exposes Run WOOP; it uses explicit Dot once, pauses, and opens a new walkthrough or existing plan with explicit deletion. Constrained scanner title/chip and finish/rank groups wrap instead of squeezing titles or hiding choices; outside the420px breakpoint CSS remains unchanged.",
@@ -5075,7 +5075,8 @@
       "RISK overdue WOOP: peer plan account and same-ID board replacement invalidate drafts and controls",
       "RISK overdue WOOP: neutral automatic benchmark stays neutral and Cancel can Undo only the dot",
       "RISK overdue WOOP: unsupported plans remain read-only and interrupted scan hides the action",
-      "RISK overdue scanner layout: enlarged candidate title chips and decision footer wrap without clipping choices"
+      "RISK overdue scanner layout: enlarged candidate title chips and decision footer wrap without clipping choices",
+      "RISK overdue scanner layout: chosen-task breadcrumb stays within the enlarged scanner width"
     ],
     "preservedCoverage": [
       "All existing final-task WOOP, causal persistence, old plans, Undo, stale-tab and cloud-sync protections remain unchanged.",
@@ -5085,7 +5086,7 @@
     ],
     "redEvidence": {
       "command": "node --test --test-name-pattern='RISK overdue WOOP:' tests.js",
-      "failure": "Four observed failures before app edits: overdue offered task must expose Run WOOP. Log /tmp/overdue-woop-red.log. Initial postimplementation run exposed missing history on neutral benchmark and an unavailable test helper; fixture repaired and preserved assertions verified in /tmp/overdue-woop-focused.log (42 pass, zero skips). Enlarged runtime60f19f8 failed chrome390zoom2 today/no-Run-WOOP page overflow before showing the new action; all runtime closed21:48:26, /tmp/overdue-woop-runtime/failure.png and browser.log. Pre-repair mounted CSS contract observed RED: actual scanner finish group must wrap its button and rank controls (/tmp/overdue-woop-overflow-red.log), then46sourcechecks passed (/tmp/overdue-woop-overflow-green.log). No rendered baseline captured yet; source wrap rules identical across18e3eeb, released518c01f and pendingcontextad686. Compatibility is outstanding, not failed. Gate before merge commit compared old HEAD and failed old-base rationale; postmerge gate passed; no publication occurred."
+      "failure": "Four observed failures before app edits: overdue offered task must expose Run WOOP. Log /tmp/overdue-woop-red.log. Initial postimplementation run exposed missing history on neutral benchmark and an unavailable test helper; fixture repaired and preserved assertions verified in /tmp/overdue-woop-focused.log (42 pass, zero skips). Enlarged runtime60f19f8 failed chrome390zoom2 today/no-Run-WOOP page overflow before showing the new action; all runtime closed21:48:26, /tmp/overdue-woop-runtime/failure.png and browser.log. Pre-repair mounted CSS contract observed RED: actual scanner finish group must wrap its button and rank controls (/tmp/overdue-woop-overflow-red.log), then46sourcechecks passed (/tmp/overdue-woop-overflow-green.log). No rendered baseline captured yet; source wrap rules identical across18e3eeb, released518c01f and pendingcontextad686. Compatibility is outstanding, not failed. Gate before merge commit compared old HEAD and failed old-base rationale; postmerge gate passed; no publication occurred. The explicit new dot also creates a former-benchmark breadcrumb with a190px cap larger than a constrained scanner. Additional mounted control/CSS contract observed RED before clamp (/tmp/overdue-woop-crumb-red.log); preserve original cap while bounding to100% at<=420px. Finalsource47pass0skip inoverflow-green.log; nativegeometry stillpending."
     }
   }
 ]

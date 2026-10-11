@@ -25208,3 +25208,8 @@ test('RISK overdue scanner layout: enlarged candidate title chips and decision f
  assert.match(source,/\.decide-finish \.sparkbox\{[^}]*flex-wrap:wrap[^}]*max-width:100%/,'rank controls can wrap while all choices remain visible');
  assert.doesNotMatch(source,/\.decide-finish\{[^}]*(?:overflow:hidden|display:none)/,'containment must not hide scanner actions');
 });
+test('RISK overdue scanner layout: chosen-task breadcrumb stays within the enlarged scanner width',async()=>{
+ const {ctx,shim}=await loadApp({seed:971}),b=ctx.addTask('A long previously chosen benchmark title'),t=ctx.addTask('Overdue task',false,[],{due:ctx.todayISO(-1)});ctx.dotTask(b.id);ctx.state.mode='scan';ctx.state.candidateId=t.id;ctx.renderScan();ctx.onAction('run-woop',overdueWoopControl({ctx,shim}));
+ assert.match(shim.document.getElementById('scan').innerHTML,/class="crumb"/,'the explicit dot makes its former benchmark a breadcrumb');
+ const source=fs.readFileSync(new URL('./index.html',import.meta.url),'utf8');assert.match(source,/\.crumb\{max-width:min\(190px,100%\)\}/,'its existing190px cap must also respect a narrower scanner instead of overflowing after the new dot');
+});

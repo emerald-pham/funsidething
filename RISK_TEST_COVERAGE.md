@@ -977,3 +977,4 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 
 
 - RISK overdue scanner layout: enlarged candidate title chips and decision footer wrap without clipping choices
+- RISK overdue scanner layout: chosen-task breadcrumb stays within the enlarged scanner width
