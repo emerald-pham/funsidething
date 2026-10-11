@@ -24523,3 +24523,10 @@ test('RISK neutral bootstrap: Settings backup Restore restores causal exclusion 
  ctx.openSettings();assert.equal(await ctx.restoreDurableBackupById(chosen.id),true);assert.equal(ctx.taskComparisonEligible(ctx.state.tasks.find(t=>t.id===a.id)),true,'restoring recorded explicit choice supersedes the newer neutral evidence');
  ctx.undo();assert.equal(ctx.taskComparisonEligible(ctx.state.tasks.find(t=>t.id===a.id)),false,'Undo restored explicit choice restores exclusion');await ctx.persist();ctx.deleteTask(a.id);await ctx.persist();ctx.openSettings();assert.equal(await ctx.restoreDurableBackupById(neutral.id),true);assert.equal(ctx.taskComparisonEligible(ctx.state.tasks.find(t=>t.id===a.id)),false,'restoring deleted task preserves its saved exclusion');
 });
+
+test('RISK neutral bootstrap: restoring a deleted automatic task during pending saves keeps backup exclusion',async()=>{
+ const {ctx}=await loadApp();const a=ctx.addTask('Bootstrap'),b=ctx.addTask('Other');a.createdAt=1;b.createdAt=2;ctx.startScan();await ctx.persist();const neutral=await ctx.saveDurableBackup('manual',JSON.stringify(ctx.state));
+ ctx.dislodge();ctx.state.chain=[b.id];ctx.dotTask(a.id);await ctx.persist();ctx.deleteTask(a.id);ctx.openSettings();assert.equal(await ctx.restoreDurableBackupById(neutral.id),true);
+ assert.equal(ctx.taskComparisonEligible(ctx.state.tasks.find(t=>t.id===a.id)),false,'restored automatic provenance must override prior saved explicit choice even while deletion save is pending');await ctx.persist();
+ assert.equal(ctx.taskComparisonEligible(ctx.state.tasks.find(t=>t.id===a.id)),false,'the durable save must retain restored exclusion');
+});
