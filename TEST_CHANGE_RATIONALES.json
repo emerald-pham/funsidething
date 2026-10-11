@@ -1,5 +1,47 @@
 [
   {
+    "testChangesSha256": "de265ba4402c1426dd7499b01edf00ff5dd5b62f99d3ae87ddff781221afbb85",
+    "reason": "User explicitly replaces plain U Undo with Z and adds E for only the offered scanner Edit action. Preserve modifier/native editable and modal guards; update prior U hint assertions as authorized and add real consumer preservation tests. This record protects the separate shortcut commit delta.",
+    "previousBehavior": "Plain U called existing Undo, Z and E had no app assignment, and scanner Edit controls did not advertise a keyboard key.",
+    "intendedBehavior": "Plain Z calls unchanged Undo, U is retired, and plain E opens existing individual Edit only for the rendered offered task; edited text, modifier shortcuts, dialogs and state remain protected.",
+    "replacementTests": [
+      "RISK Undo Z shortcut: real keyboard dispatch reverses only the latest action and retains durable Undo semantics",
+      "RISK Undo Z guards: U is retired and modified editable modal and scene keypresses leave board and native defaults alone",
+      "RISK Undo Z guidance: header hint tooltip and Quick start name Z while preserving editable native undo guidance",
+      "RISK Edit E shortcut: real keyboard dispatch edits only the offered scanner task without changing the board",
+      "RISK Edit E guards and hints: modifiers editable fields modal and scene focus do not dispatch and only the offered Edit advertises E",
+      "RISK Edit E guidance: Quick start explains the offered task editor and plain shortcut scope"
+    ],
+    "preservedCoverage": [
+      "Existing Undo button/worked-on/log/reload state semantics, decision-repeat guards, task data and context controls remain protected. Existing U glyph tests are explicitly updated to Z; no native modified shortcut is captured."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK Undo Z' tests.js; node --test --test-name-pattern='RISK Edit E' tests.js",
+      "failure": "Contemporaneous observed RED before shortcut implementation: Z3/3 (/tmp/chain-undo-z-red.log) for missing Undo dispatch, U still changing board, and absent Z hint/guidance; E3/3 (/tmp/chain-edit-e-red.log) for absent editor dispatch, absent offered hint and absent FAQ. After implementation, initial Help markup in no-offer/guard fixture was explicitly closed to normalize scanner focus; this fixture correction is not additional preimplementation RED. Shortcut/context27/27zero skips /tmp/chain-shortcuts-final-cohort.log. Prior context contemporaneous RED and native FAQ-length RED remain in their original exact rationale entries and logs; native1535/0/33 qualification applies to parent2ef only, not this new shortcut candidate."
+    }
+  },
+  {
+    "testChangesSha256": "acc21ac72a3ccc9a748bfbadd120d1793bf035bfbb42987e65f27caf262f7354",
+    "reason": "User explicitly replaces plain U Undo with Z and adds E for only the offered scanner Edit action. Preserve modifier/native editable and modal guards; update prior U hint assertions as authorized and add real consumer preservation tests. This cumulative record retains all prior context RED and preservation evidence without claiming those reviews cover the shortcut addition.",
+    "previousBehavior": "Plain U called existing Undo, Z and E had no app assignment, and scanner Edit controls did not advertise a keyboard key.",
+    "intendedBehavior": "Plain Z calls unchanged Undo, U is retired, and plain E opens existing individual Edit only for the rendered offered task; edited text, modifier shortcuts, dialogs and state remain protected.",
+    "replacementTests": [
+      "RISK Undo Z shortcut: real keyboard dispatch reverses only the latest action and retains durable Undo semantics",
+      "RISK Undo Z guards: U is retired and modified editable modal and scene keypresses leave board and native defaults alone",
+      "RISK Undo Z guidance: header hint tooltip and Quick start name Z while preserving editable native undo guidance",
+      "RISK Edit E shortcut: real keyboard dispatch edits only the offered scanner task without changing the board",
+      "RISK Edit E guards and hints: modifiers editable fields modal and scene focus do not dispatch and only the offered Edit advertises E",
+      "RISK Edit E guidance: Quick start explains the offered task editor and plain shortcut scope"
+    ],
+    "preservedCoverage": [
+      "Existing Undo button/worked-on/log/reload state semantics, decision-repeat guards, task data and context controls remain protected. Existing U glyph tests are explicitly updated to Z; no native modified shortcut is captured."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK Undo Z' tests.js; node --test --test-name-pattern='RISK Edit E' tests.js",
+      "failure": "Contemporaneous observed RED before shortcut implementation: Z3/3 (/tmp/chain-undo-z-red.log) for missing Undo dispatch, U still changing board, and absent Z hint/guidance; E3/3 (/tmp/chain-edit-e-red.log) for absent editor dispatch, absent offered hint and absent FAQ. After implementation, initial Help markup in no-offer/guard fixture was explicitly closed to normalize scanner focus; this fixture correction is not additional preimplementation RED. Shortcut/context27/27zero skips /tmp/chain-shortcuts-final-cohort.log. Prior context contemporaneous RED and native FAQ-length RED remain in their original exact rationale entries and logs; native1535/0/33 qualification applies to parent2ef only, not this new shortcut candidate."
+    }
+  },
+  {
     "testChangesSha256": "2a7776eaae3379c2d8addd37eab26da22e52d1f938952abe9da1e11b6ded2df0",
     "reason": "Implement the user-authorized conditional binary real-context controls while preserving stored neutral choices and every existing eligibility rule. Adapt prior zero-active-cycle fixtures and the browser keyboard expectation to the changed active-mode interaction, retaining their remaining assertions.",
     "previousBehavior": "With another real context included, neutral requirements displayed neutral and explicit red exclusions needed a neutral click before inclusion.",

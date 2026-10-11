@@ -6099,26 +6099,26 @@ test("UI: the arrow disappears once scanning starts and a task is dotted", async
 });
 
 /* ---------- undo advertises its key like every other keyboard control ----------
-   Undo has always had a `u` hotkey, but the only place that said so was the
+   Undo's shortcut is now `z`; keep its hint beside the label rather than only in the
    tooltip — so the one control you reach for in a hurry was the one you had to
    hover to learn. It carries the same keyhint glyph as Yes/No/Done/Delete. */
 
-test("UI: the undo button carries its u keyhint glyph", () => {
+test("UI: the undo button carries its z keyhint glyph", () => {
   const m = html.match(/<button class="ghost" data-act="undo"[^>]*>([\s\S]*?)<\/button>/);
   assert.ok(m, "the undo button should still be a ghost button in the header");
-  assert.match(m[1], /<span class="keyhint">u<\/span>/,
-    `expected a u keyhint glyph inside the undo button, got: ${m[1]}`);
+  assert.match(m[1], /<span class="keyhint">z<\/span>/,
+    `expected a z keyhint glyph inside the undo button, got: ${m[1]}`);
 });
 
 test("UI: undo's keyhint glyph sits after its label, as it does on every other keyboard button", () => {
   const m = html.match(/<button class="ghost" data-act="undo"[^>]*>([\s\S]*?)<\/button>/);
-  assert.match(m[1], /^[^<]*\S[^<]*<span class="keyhint">u<\/span>$/,
+  assert.match(m[1], /^[^<]*\S[^<]*<span class="keyhint">z<\/span>$/,
     `the glyph should trail the label with nothing after it, got: ${m[1]}`);
 });
 
 test("UI: undo's tooltip still names the key, so glyph and tooltip agree", () => {
   const m = html.match(/<button class="ghost" data-act="undo"([^>]*)>/);
-  assert.match(m[1], /title="[^"]*\(u\)"/, `expected the key named in the tooltip, got: ${m[1]}`);
+  assert.match(m[1], /title="[^"]*\(z\)"/, `expected the key named in the tooltip, got: ${m[1]}`);
 });
 
 test("undo: the header button reverses the last action through the normal onAction path", async () => {
@@ -25066,4 +25066,68 @@ test('RISK binary context guidance: FAQ explains conditional two-state controls 
  assert.match(help,/While any context is active,.*included.*excluded/i);assert.match(help,/With no active contexts, only tasks without a known context can scan/);assert.match(help,/No context excludes unassigned/);
  assert.match(help,/No active contexts.*neutral/i);assert.match(help,/Every assigned known context must be active/);
  assert.match(help,/red display does not change saved neutral choices/i);assert.match(help,/unknown or deleted contexts/i);assert.match(help,/Context changes save, sync and support Undo/i);assert.match(help,/selector stays visible without contexts/i);assert.match(help,/New contexts start active/i);assert.match(help,/<dt>How do I create contexts and filter All Tasks\?<\/dt>/);
+});
+
+test('RISK Undo Z shortcut: real keyboard dispatch reverses only the latest action and retains durable Undo semantics',async()=>{
+ for(const key of ['z','Z']){
+  const {ctx,shim}=await loadApp();ctx.closeModal();const keep=ctx.addTask('Private retained task');const before=JSON.stringify(ctx.state.tasks);ctx.addTask('Private undone task');await ctx.persist();
+  shim.document.dispatchEvent({type:'keydown',key,shiftKey:key==='Z',repeat:false});assert.equal(JSON.stringify(ctx.state.tasks),before,'plain Z uses the existing Undo consumer');
+  await ctx.persist();const reloaded=await loadApp({seedStorage:{[SYNC_STORE_KEY]:shim.localStorage.getItem(SYNC_STORE_KEY)}});assert.deepEqual(Array.from(reloaded.ctx.state.tasks,t=>t.id),[keep.id]);
+  ctx.addTask('Private second action');ctx.onAction('undo',{});assert.equal(JSON.stringify(ctx.state.tasks),before,'button Undo retains the same rule');
+ }
+});
+
+test('RISK Undo Z guards: U is retired and modified editable modal and scene keypresses leave board and native defaults alone',async()=>{
+ const {ctx,shim}=await loadApp();ctx.closeModal();ctx.addTask('Private retained');ctx.addTask('Private pending Undo');const saved=JSON.stringify(ctx.state),depth=vm.runInContext('undoStack.length',ctx);
+ let prevented=0;const dispatch=event=>shim.document.dispatchEvent({type:'keydown',key:'z',repeat:false,preventDefault(){prevented++;},...event});
+ for(const key of ['u','U'])dispatch({key});
+ for(const modifiers of [{ctrlKey:true},{metaKey:true},{altKey:true},{ctrlKey:true,shiftKey:true},{metaKey:true,shiftKey:true}])dispatch(modifiers);
+ for(const tag of ['input','textarea','select'])dispatch({target:{id:'private-'+tag,matches:selector=>selector==='input,textarea,select',isContentEditable:false}});
+ dispatch({target:{matches:()=>false,isContentEditable:true}});
+ const query=shim.document.querySelector.bind(shim.document);for(const selector of ['.mback','#motionDialog[open], #sceneTimeDialog[open], html.viewing-scene']){
+  shim.document.querySelector=s=>s===selector?{}:query(s);dispatch({});
+ }
+ shim.document.querySelector=query;
+ assert.equal(JSON.stringify(ctx.state),saved);assert.equal(vm.runInContext('undoStack.length',ctx),depth);assert.equal(prevented,0,'native text undo and modifier shortcuts are not cancelled');
+ dispatch({});assert.equal(ctx.state.tasks.length,1,'ordinary Z still works after guarded events');
+});
+
+test('RISK Undo Z guidance: header hint tooltip and Quick start name Z while preserving editable native undo guidance',async()=>{
+ const {ctx,shim}=await loadApp();ctx.closeModal();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(html,/<button class="ghost" data-act="undo" title="Undo last action \(z\)">↺ undo<span class="keyhint">z<\/span>/);
+ assert.match(help,/<b>z<\/b> to undo/);assert.doesNotMatch(help,/<b>u<\/b> to undo/);
+ assert.match(help,/Ctrl.*Z.*Command.*Z.*text fields/i);
+});
+
+test('RISK Edit E shortcut: real keyboard dispatch edits only the offered scanner task without changing the board',async()=>{
+ for(const scenario of ['candidate','paused','intervention','end','missing-candidate','no-offer']){
+  const {ctx,shim}=await loadApp();ctx.closeModal();const bench=ctx.addTask('Private benchmark'),candidate=ctx.addTask('Private candidate');
+  Object.assign(ctx.state,{chain:scenario==='no-offer'?[]:[bench.id],candidateId:candidate.id,mode:scenario==='paused'?'work':'scan',interventionActive:scenario==='intervention'});
+  if(scenario==='end')ctx.state.considered[candidate.id]='no';if(scenario==='missing-candidate')ctx.state.candidateId='retired-private';ctx.render();
+  const offered=scenario==='candidate'?candidate:bench;const scan=shim.document.getElementById('scan').innerHTML;
+  assert.equal((scan.match(/class="keyhint">e<\/span>/g)||[]).length,scenario==='no-offer'?0:1);
+  if(scenario!=='no-offer')assert.match(scan,new RegExp('data-act="edit" data-id="'+offered.id+'"[^>]*aria-label="Edit this task \\(e\\)"'));
+  const before=JSON.stringify(ctx.state),depth=vm.runInContext('undoStack.length',ctx);shim.document.dispatchEvent({type:'keydown',key:'e',repeat:false});
+  const modal=shim.document.getElementById('modalRoot').innerHTML;
+  if(scenario==='no-offer')assert.equal(modal,'','E cannot choose a task from an unstarted list');else{
+   const target=scenario==='candidate'?candidate:bench;assert.match(modal,new RegExp('data-act="save-edit" data-id="'+target.id+'"'),'opens the same existing individual editor as the offered Edit button');
+  }
+  assert.equal(JSON.stringify(ctx.state),before,'opening Edit does not save or change task state');assert.equal(vm.runInContext('undoStack.length',ctx),depth);
+ }
+});
+
+test('RISK Edit E guards and hints: modifiers editable fields modal and scene focus do not dispatch and only the offered Edit advertises E',async()=>{
+ const {ctx,shim}=await loadApp();ctx.closeModal();const bench=ctx.addTask('Private benchmark'),candidate=ctx.addTask('Private candidate');Object.assign(ctx.state,{chain:[bench.id],candidateId:candidate.id,mode:'scan'});ctx.render();
+ const scan=shim.document.getElementById('scan').innerHTML;assert.equal((scan.match(/class="keyhint">e<\/span>/g)||[]).length,1,'one offered Edit hint');assert.match(scan,new RegExp('data-act="edit" data-id="'+candidate.id+'"[^>]*aria-label="Edit this task \\(e\\)"'));
+ const before=JSON.stringify(ctx.state);let prevented=0;const dispatch=event=>shim.document.dispatchEvent({type:'keydown',key:'e',repeat:false,preventDefault(){prevented++;},...event});
+ for(const modifiers of [{ctrlKey:true},{metaKey:true},{altKey:true},{metaKey:true,shiftKey:true}])dispatch(modifiers);
+ for(const tag of ['input','textarea','select'])dispatch({target:{id:'private-'+tag,matches:s=>s==='input,textarea,select'}});dispatch({target:{matches:()=>false,isContentEditable:true}});
+ const query=shim.document.querySelector.bind(shim.document);for(const selector of ['.mback','#motionDialog[open], #sceneTimeDialog[open], html.viewing-scene']){shim.document.querySelector=s=>s===selector?{}:query(s);dispatch({});}shim.document.querySelector=query;
+ assert.equal(shim.document.getElementById('modalRoot').innerHTML,'');assert.equal(JSON.stringify(ctx.state),before);assert.equal(prevented,0);
+ dispatch({key:'E',shiftKey:true});assert.match(shim.document.getElementById('modalRoot').innerHTML,new RegExp('data-act="save-edit" data-id="'+candidate.id+'"'));
+});
+
+test('RISK Edit E guidance: Quick start explains the offered task editor and plain shortcut scope',async()=>{
+ const {ctx,shim}=await loadApp();ctx.closeModal();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(help,/<b>e<\/b> to edit/);assert.match(help,/E opens.*candidate.*benchmark/i);assert.match(help,/shortcuts.*text fields.*editable.*dialogs/i);
 });
