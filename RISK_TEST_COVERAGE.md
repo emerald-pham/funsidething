@@ -946,3 +946,5 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK bulk task guidance: bounded answers retain distinct selection property conflict Undo and result instructions
 - RISK bulk task guidance: enlarged conflict answer uses breakable task status wording
 - RISK bulk task guidance: enlarged Settings note uses short sync and Undo wording
+
+- Scenery depth and lake capture: `RISK scenery depth: fountain participates in actual ground actor paint order`; `RISK scenery depth: nest bird sky and meadow passes paint each silhouette once`.
