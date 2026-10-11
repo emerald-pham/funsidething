@@ -1,5 +1,106 @@
 [
   {
+    "testChangesSha256": "1bee3094ccef72543d5bc330f80644c66b2443acc5159c211510bcc4476b8d12",
+    "reason": "Bind exact main and incremental push test diffs to focused foreground expiry regression coverage and preserved resume fixture assertions.",
+    "previousBehavior": "The original foreground/pageshow consumer could paint an expired Normal choice without rereading storage; required push CI also lacked an incremental exact-diff rationale.",
+    "intendedBehavior": "Foreground and restored pages reread current local consent before paint, prompt once when absent and preserve visitor progress; no new runtime changes in this supplemental test commit.",
+    "replacementTests": [
+      "RISK motion safety resume: foreground and restored pages reread expiry before painting without replacing visitors"
+    ],
+    "preservedCoverage": [
+      "Original visitor world immutability and stop/start counts remain; all existing FAQ assertions, motion interval, storage safety, OS enforcement and cloud boundaries remain unchanged."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern=\"RISK motion safety resume:\" tests.js with actual baseline30afbf4 landscape restored only for comparison",
+      "failure": "Supplemental regression baseline RED observed paint:normal rather than read/paint:null/prompt; /tmp/motion-seven-days-resume-supplement-baseline-red.log. Current consumer GREEN /tmp/motion-seven-days-resume-supplement-green.log. This supplemental baseline RED is not claimed as initial preimplementation evidence; original contemporaneous motion/CSS and CI failure evidence retained."
+    }
+  },
+  {
+    "testChangesSha256": "7e67f25557bd9c6b6f3e701407a0e323121f520805eed3a1db17da322fd7f150",
+    "reason": "Bind exact main and incremental push test diffs to focused foreground expiry regression coverage and preserved resume fixture assertions.",
+    "previousBehavior": "The original foreground/pageshow consumer could paint an expired Normal choice without rereading storage; required push CI also lacked an incremental exact-diff rationale.",
+    "intendedBehavior": "Foreground and restored pages reread current local consent before paint, prompt once when absent and preserve visitor progress; no new runtime changes in this supplemental test commit.",
+    "replacementTests": [
+      "RISK motion safety resume: foreground and restored pages reread expiry before painting without replacing visitors"
+    ],
+    "preservedCoverage": [
+      "Original visitor world immutability and stop/start counts remain; all existing FAQ assertions, motion interval, storage safety, OS enforcement and cloud boundaries remain unchanged."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern=\"RISK motion safety resume:\" tests.js with actual baseline30afbf4 landscape restored only for comparison",
+      "failure": "Supplemental regression baseline RED observed paint:normal rather than read/paint:null/prompt; /tmp/motion-seven-days-resume-supplement-baseline-red.log. Current consumer GREEN /tmp/motion-seven-days-resume-supplement-green.log. This supplemental baseline RED is not claimed as initial preimplementation evidence; original contemporaneous motion/CSS and CI failure evidence retained."
+    }
+  },
+  {
+    "testChangesSha256": "1410d7569c7b0d774a467dfa5e6fbe66ef0c4a9ee04d9286b1109cf990cc97de",
+    "reason": "Bind exact main and incremental push test diffs to focused foreground expiry regression coverage and preserved resume fixture assertions.",
+    "previousBehavior": "The original foreground/pageshow consumer could paint an expired Normal choice without rereading storage; required push CI also lacked an incremental exact-diff rationale.",
+    "intendedBehavior": "Foreground and restored pages reread current local consent before paint, prompt once when absent and preserve visitor progress; no new runtime changes in this supplemental test commit.",
+    "replacementTests": [
+      "RISK motion safety resume: foreground and restored pages reread expiry before painting without replacing visitors"
+    ],
+    "preservedCoverage": [
+      "Original visitor world immutability and stop/start counts remain; all existing FAQ assertions, motion interval, storage safety, OS enforcement and cloud boundaries remain unchanged."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern=\"RISK motion safety resume:\" tests.js with actual baseline30afbf4 landscape restored only for comparison",
+      "failure": "Supplemental regression baseline RED observed paint:normal rather than read/paint:null/prompt; /tmp/motion-seven-days-resume-supplement-baseline-red.log. Current consumer GREEN /tmp/motion-seven-days-resume-supplement-green.log. This supplemental baseline RED is not claimed as initial preimplementation evidence; original contemporaneous motion/CSS and CI failure evidence retained."
+    }
+  },
+  {
+    "testChangesSha256": "70782fef1a22d4d9b7bedd55c2f9b95b19354a855b8b187d36e1110d612a4040",
+    "reason": "Complete initial seven-day motion and accessibility coverage, and repair the existing tab-resume isolated fixture after required CI exposed its missing new preference-consumer dependencies. All original visitor immutability and stop/start assertions remain.",
+    "previousBehavior": "Motion consent never expired, dismissal persisted reduced, and enlarged cards clipped. Old tab-resume fixture stubbed only start/stop and could not execute the new preference reread.",
+    "intendedBehavior": "Explicit local choice expires168h, safe dismissal/OS rules remain; prompt fits/stacks. Tab-resume fixture supplies storage/readMotion/updateMotion/dialog while still requiring exact world preservation and one restart; adds the selected-preference assertion.",
+    "replacementTests": [
+      "RISK motion safety: explicit local choices expire after seven elapsed days and corrupt records fail closed",
+      "RISK motion safety: actual choice handler remembers selection while dismissal never writes consent",
+      "RISK motion safety accessibility: enlarged prompt fits the containing viewport and stacks intrinsic choice cards"
+    ],
+    "preservedCoverage": [
+      "Unchanged world elapsed/event progress and stop/start counts; existing FAQsync/offline wording and130word cap assertions unchanged; cloud/board/WOOP/OS safety contracts retained."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK scene and list FAQ|Animation audit: tab resume|RISK product FAQ: backup age|RISK visitor motion guidance|RISK Quick start content:' tests.js",
+      "failure": "Five contemporaneous failures reproduced /tmp/motion-seven-days-ci-repro-red.log from requiredCI38148530292: fourFAQcopy contracts/132word scenery answer, and storage undefined in isolated actual resume handler. Repaired wording/fixture only, all11focused checksGREEN /tmp/motion-seven-days-ci-repair-green.log. Initial motion/CSS REDs retained in preceding rationale records."
+    }
+  },
+  {
+    "testChangesSha256": "cab77329a8171ae3ecf899cc225fc708173b59ae56be76374d9d132f0f7aeec7",
+    "reason": "Preserve the requested seven-day local explicit motion choice and repair observed release-blocking enlarged-prompt clipping found during mandatory independent rendered review.",
+    "previousBehavior": "Untimed choices persisted indefinitely and Escape saved reduced. Native prompt at390px200% clipped Reduced card and exceeded viewport in baseline and candidate.",
+    "intendedBehavior": "Explicit device choices expire after168h; dismissal saves nothing; safety prompt respects its containing viewport and stacks intrinsic choice cards with wrapping.",
+    "replacementTests": [
+      "RISK motion safety: explicit local choices expire after seven elapsed days and corrupt records fail closed",
+      "RISK motion safety: actual choice handler remembers selection while dismissal never writes consent",
+      "RISK motion safety accessibility: enlarged prompt fits the containing viewport and stacks intrinsic choice cards"
+    ],
+    "preservedCoverage": [
+      "OS reduced motion override, choice timestamp boundaries, device storage failures, cloud/account/WOOP preservation and unchanged other dialogs/control styling."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK motion safety accessibility' tests.js; earlier motion RED command in prior record",
+      "failure": "Observed /tmp/motion-seven-days-accessibility-red.log: no containing viewport max-height contract before CSS repair. Actual preceding browser RED /tmp/motion-seven-days-runtime-remaining.log: Reduced card clipped, scrollWidth217/clientWidth161,326x1608 at y-382. Initial seven-day RED remains /tmp/motion-seven-days-red.log."
+    }
+  },
+  {
+    "testChangesSha256": "ed20686fe224be0d2601da2bf53e40c3dae4866155a6b19d6c00e015406546d8",
+    "reason": "User requests remembering explicit device motion safety choice for seven days; dismissal is not consent.",
+    "previousBehavior": "Local raw choices never expire and Escape persists reduced choice.",
+    "intendedBehavior": "Explicit choices expire at exactly168 elapsed hours; invalid or future records safely ask again, without cloud scope changes.",
+    "replacementTests": [
+      "RISK motion safety: explicit local choices expire after seven elapsed days and corrupt records fail closed",
+      "RISK motion safety: actual choice handler remembers selection while dismissal never writes consent"
+    ],
+    "preservedCoverage": [
+      "OS reduced motion overrides Normal; safe no-choice defaults; local storage failure and accessible motion controls."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK motion safety' tests.js",
+      "failure": "Contemporaneous /tmp/motion-seven-days-red.log: exact seven-day boundary returned normal instead of null; actual cancel handler called saveMotion."
+    }
+  },
+  {
     "testChangesSha256": "0e1b1eb85260367171b57addc931b9034f6577eb4330f6475785b933969ccbc5",
     "reason": "Actual Start/Dislodge/Rescan cycles reach exhausted scan with two recorded actions but no WOOP and no pause control; add this previously inaccessible final-dot path.",
     "previousBehavior": "WOOP requires work mode; exhausted scan stays scan mode and provides no pause control for its sole dot.",
