@@ -1,5 +1,27 @@
 [
   {
+    "testChangesSha256": "d08e7cfba5b93ffe95e3936556b2a277140f617317b9277884c5ee4fdf385ec5",
+    "reason": "User authorized Halving only for genuinely new clients. Preserve legacy normalization/migrations and old Squared-to-Halving consumer transitions by making their existing prior-mode fixtures explicit, while new tests exercise actual boot, Start, storage recovery and cloud adoption.",
+    "previousBehavior": "Verified empty stores started Squared; equal-revision zero cloud documents could lose their saved mode to the empty client. Three Halving tests relied on the fresh Squared default as their transition precondition.",
+    "intendedBehavior": "Only verified empty clients start Halving. Saved empty boards, missing preferences, supported modes, unknown setting fields and recovery evidence keep prior behavior; fresh first reconcile adopts saved cloud modes at zero, higher or legacy revisions. Established transition assertions remain unchanged after an explicit prior Squared fixture.",
+    "replacementTests": [
+      "Scan default: fresh clients use Halving while missing saved preferences retain Squared",
+      "RISK fresh Halving default: new clients use Halving while legacy normalization and saved choices survive",
+      "RISK fresh Halving startup: successful empty stores choose Halving and actual Start persists it across reload",
+      "RISK fresh Halving preservation: saved empty boards missing preferences supported modes and unknown settings are not fresh clients",
+      "RISK fresh Halving cloud adoption: saved modes at zero newer and legacy revisions win over browser defaults without a settings write",
+      "RISK fresh Halving copy: Settings and extended FAQ distinguish new-client defaults from saved board modes",
+      "RISK fresh Halving recovery boundary: retained backup bytes protected heads and unavailable durable stores keep the legacy fallback"
+    ],
+    "preservedCoverage": [
+      "All existing math, task/rating, filtering, first-dot, Undo, reload, shared-pass joins, immediate Settings control and Chance migration assertions remain. The three transition fixtures explicitly select Squared before their unchanged transitions; no coverage is removed."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='fresh Halving|Scan default:' tests.js",
+      "failure": "Observed before app edits: 7 selected tests, 5 FAIL/2 PASS at /tmp/fresh-halving-red-final.log; fresh startup and Start produced squared instead of halving; cloud saved descending revision0 produced squared; Settings had Squared default selected. Postimplementation cohort observed three fixture-precondition failures; explicitly restored prior Squared setup rather than weakening transition assertions. Legacy missing-mode publication still normalizes Squared, as before."
+    }
+  },
+  {
     "testChangesSha256": "7057e8c23a99423b38c7b92a14b982e8d0748ec5615f3a0698eeea29d377b2b1",
     "reason": "Reconcile the reviewed Likelihood presentation candidate with released motionPR99 main247f842. This incremental push imports its exact already-reviewed tests without weakening them; original Likelihood test and rationale remain intact for main comparison.",
     "previousBehavior": "Previous pushed5da5217 was based on30afbf4 and therefore lacked the independently reviewed seven-day motion, enlarged prompt and foreground/pageshow tests now released in main.",
