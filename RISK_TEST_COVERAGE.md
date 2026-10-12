@@ -1041,3 +1041,7 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - `RISK FAQs changelog navigation: help dispatch exposes exact combined menu and all release notes without a Settings duplicate` — Combined help navigation, chapter and archive preservation, modal actions, and no saved-board writes.
 
 - `RISK FAQ redundant changelog question: actual help consumer shows release history directly without a self-referential question` — Direct changelog chapter without redundant navigation prose; preserves release entries.
+
+- `RISK Postpone return: mounted editor cancels active deferral with one Undo and preserves other eligibility rules` — Early cancellation, eligibility preservation and causal saved hold boundaries.
+- `RISK Postpone return: cancellation survives stale sync and reload while unobserved peer holds survive` — Early cancellation, eligibility preservation and causal saved hold boundaries.
+- `RISK Postpone return: exact expiry and unknown recovery evidence do not enable postponed-only return` — Early cancellation, eligibility preservation and causal saved hold boundaries.
