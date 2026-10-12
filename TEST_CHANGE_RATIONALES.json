@@ -1,5 +1,24 @@
 [
   {
+    "testChangesSha256": "be77c5154a14fcef91ba636acf017a9e963f132a06b450ae53fa8c87e8278159",
+    "reason": "User explicitly moves the release notes into the existing FAQ menu; adapt only assertions tied to the superseded Settings location or old menu name, retaining entry, date, category, link, Settings validation and saved-data protections.",
+    "previousBehavior": "Help was named FAQs and described release notes under Settings; Settings rendered all release entries.",
+    "intendedBehavior": "Help is named exactly FAQs / Changelog; its existing Changelog chapter renders the same grouped history; Settings loses only the redundant release notes disclosure.",
+    "replacementTests": [
+      "RISK FAQs changelog navigation: help dispatch exposes exact combined menu and all release notes without a Settings duplicate",
+      "RISK changelog dates: FAQ combines repeated dates in descending order without losing history categories or links",
+      "RISK Settings hierarchy: moved Changelog leaves Save settings after every section without changing validation"
+    ],
+    "preservedCoverage": [
+      "Every retained dated bullet and category/link remains byte-for-byte in the shared grouping consumer; Quick start chapters and modal controls stay intact.",
+      "Settings save validation, durable reload, context draft preservation and native keyboard remain protected; enlarged release-note reflow follows the relocated consumer."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK FAQs changelog navigation' tests.js; then focused six-test cohort before app implementation",
+      "failure": "Observed 2026-10-12 contemporaneous RED at /tmp/chain-faq-changelog-red.log: actual header title/aria-label remained FAQs, expected FAQs / Changelog. Six-test cohort /tmp/chain-faq-changelog-cohort-red.log failed all six for old consumer/menu/reflow expectations before index.html/sw.js edits."
+    }
+  },
+  {
     "testChangesSha256": "6bdd97ddf42b358d7c4f42b4daedf17630c0dae20a30784d6b694471c71ba0d2",
     "reason": "User requires continuous offscreen pedestrian entrances. Parent explicitly directed resolving the reproduced fourteen-logical-visitor regression, allowing the smallest required admission scheduling tradeoff. Preserve the protected capacity, complete retirement, water/show/rail and data regressions. Supersede released unchanged-admission guidance and equality with retained seeded-opportunity facts/subset checks under that explicit instruction. Reject the conservative full-lifetime opportunity filter because independent source measurements and meaningful liveness RED proved daytime starvation. Actual rendered sequential review found detached preparation hats/poles; the minimal correction attaches them to the actual blended head/grips without changing gait, travel or admissions. Parent requested source optimization after measured cold-start regression; capacity pruning now precedes lifetime solving for already-full proposals while preserving exact original scheduling and existing bounded daily memoization. Further allocated browser checks showed capacity precheck alone did not close coldstartup regression. Source profiling found duplicate daily proposal generation and unused show astronomy; parent-authorized bounded optimizer now reuses immutable raw abductions plus the earlier rare guard, deduplicates the inclusive join byID, and performs unchanged local showchance gates before unused sun lookups. Focused remaining cold repair reuses at most eight validated zone strings and immutable per-opportunity FNV prefixes; actual astronomy, mutable/invalid observer validation, RNG sequences, admission and speeds remain exact. Reconciled with merged WOOP1d87539 without deleting inherited coverage. Preserve the protected rare guard-join fixture by forcing the actual random consumer in both reference and optimized implementation, rather than a sampler the optimized primitive path no longer calls; retain forced presence and unique-ID assertions and add a broken-dedup negative control.",
     "previousBehavior": "Activity visitors started near visible anchors; builders and skiers faded in at interior positions; wide skating entries were translucent.",

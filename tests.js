@@ -565,10 +565,28 @@ test('RISK context sync: concurrent clients offline reload reconnect and remote 
  b.ctx.undo();await b.ctx.persist();await b.ctx.cloudPushNow();await syncSettle(40);await a.ctx.cloudPull();assert.equal(a.ctx.state.tasks.find(t=>t.id===task.id).lastDoneAt,null);assert.equal(a.ctx.state.contexts[0].excluded,true);assert.equal(a.ctx.state.settings.excludeNoContext,true);
 });
 
-test('RISK changelog dates: Settings combines repeated dates in descending order without losing history categories or links',async()=>{
+test('RISK FAQs changelog navigation: help dispatch exposes exact combined menu and all release notes without a Settings duplicate',async()=>{
+ const {ctx,shim}=await loadApp();
+ for(const id of ['appChangelogCurrent','appChangelog'])shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
+ const before=JSON.stringify(ctx.state);
+ ctx.onAction('help',{});const markup=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(html,/<button class="ghost" data-act="help" title="FAQs \/ Changelog" aria-label="FAQs \/ Changelog">/);
+ assert.match(markup,/<h2 id="faqsTitle">FAQs \/ Changelog<\/h2>/);
+ assert.match(markup,/<details class="help-faq" data-help-changelog><summary><h3>Changelog<\/h3><\/summary>/);
+ for(const chapter of ['Quick start','Scene and appearance','Scanning and recurrence','Task history','Contexts','Data and backups','Changelog'])assert.ok(markup.includes('>'+chapter+'<'),'preserves '+chapter);
+ for(const id of ['appChangelogCurrent','appChangelog'])for(const item of shim.document.getElementById(id).innerHTML.matchAll(/<li>([\s\S]*?)<\/li>/g))assert.ok(markup.includes(item[0]),'retains every release entry');
+ assert.match(markup,/data-act="close-modal" aria-label="Close"/);assert.match(markup,/data-act="ok-quickstart"/);
+ assert.equal(JSON.stringify(ctx.state),before,'opening release notes does not mutate the saved board');
+ ctx.onAction('close-modal',{});ctx.onAction('settings',{});
+ assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/data-settings-changelog|<summary>Changelog<\/summary>/);
+ assert.equal(JSON.stringify(ctx.state),before,'Settings entry preserves the board');
+ assert.match(html,/App updated — check FAQs \/ Changelog → Changelog for what’s new/);
+});
+
+test('RISK changelog dates: FAQ combines repeated dates in descending order without losing history categories or links',async()=>{
  const {ctx,shim}=await loadApp();
  const sources=['appChangelogCurrent','appChangelog'].map(id=>html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1]);
- function rendered(current,archive){shim.document.getElementById('appChangelogCurrent').innerHTML=current;shim.document.getElementById('appChangelog').innerHTML=archive;ctx.openSettings();return shim.document.getElementById('modalRoot').innerHTML.split('<summary>Changelog</summary>')[1].split('</details>')[0];}
+ function rendered(current,archive){shim.document.getElementById('appChangelogCurrent').innerHTML=current;shim.document.getElementById('appChangelog').innerHTML=archive;ctx.openHelp();return shim.document.getElementById('modalRoot').innerHTML.split('<div class="kv" data-changelog-notes>')[1].split('</details>')[0];}
  const log=rendered(...sources),dates=Array.from(log.matchAll(/<h3>(.*?)<\/h3>/g),m=>m[1]);
  assert.equal(new Set(dates).size,dates.length,'one date heading per day across current and archived entries');
  assert.deepEqual(dates,[...dates].sort((a,b)=>Date.parse(b)-Date.parse(a)),'archived September 29 rejoins its chronological group');
@@ -580,13 +598,13 @@ test('RISK changelog dates: Settings combines repeated dates in descending order
  ctx.openHelp();assert.match(shim.document.getElementById('modalRoot').innerHTML,/one heading per date, newest first/i);
 });
 
-test('RISK Settings hierarchy: Changelog uses existing sections and Save settings follows every section without changing validation',async()=>{
+test('RISK Settings hierarchy: moved Changelog leaves Save settings after every section without changing validation',async()=>{
  const {ctx,shim}=await loadApp();
  for(const id of ['appChangelogCurrent','appChangelog'])shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
  ctx.openSettings();const markup=shim.document.getElementById('modalRoot').innerHTML;
- assert.match(markup,/<details class="settings-section"[^>]*><summary>Changelog<\/summary><div class="kv">/,'Changelog shares Settings disclosure surface and body typography');
+ assert.doesNotMatch(markup,/<summary>Changelog<\/summary>/,'release notes have moved to FAQs / Changelog');
  const save=markup.indexOf('data-act="save-settings"');assert.ok(save>markup.lastIndexOf('</details>'),'Save settings is after every disclosure, including backups');assert.equal((markup.match(/data-act="save-settings"/g)||[]).length,1);
- for(const entry of html.match(/<template id="appChangelog">([\s\S]*?)<\/template>/)[1].matchAll(/<li>([\s\S]*?)<\/li>/g))assert.ok(markup.includes(entry[0]),'all historical entries remain present');
+ for(const entry of html.match(/<template id="appChangelog">([\s\S]*?)<\/template>/)[1].matchAll(/<li>([\s\S]*?)<\/li>/g)){ctx.openHelp();assert.ok(shim.document.getElementById('modalRoot').innerHTML.includes(entry[0]),'all historical entries remain in help');}ctx.openSettings();
  for(const [id,value] of Object.entries({stHorizon:'999',stCantMin:'',stWorkedHrs:'17',stThresh:'0',stSamples:'50',stEverHours:'21',stEverUnit:'hours',stScanMode:'both',stListMetric:'chance',stDateFormat:'ymd'}))shim.document.getElementById(id).value=value;
  ctx.onAction('save-settings',{});await ctx.persist();assert.equal(ctx.state.settings.horizonMin,480);assert.equal(ctx.state.settings.cantMin,30);assert.equal(ctx.state.settings.workedHours,17);assert.equal(ctx.state.settings.thresholdPct,25);assert.equal(ctx.state.settings.evergreenHours,21);
  const reloaded=await loadApp({seedStorage:{[SYNC_STORE_KEY]:shim.localStorage.getItem(SYNC_STORE_KEY)}});assert.equal(reloaded.ctx.state.settings.workedHours,17);assert.equal(reloaded.ctx.state.settings.scanMode,'both');assert.equal(reloaded.ctx.state.settings.listMetric,'chance');assert.equal(reloaded.ctx.state.settings.dateFormat,'ymd');
@@ -617,11 +635,11 @@ test('RISK context and Settings browser: touch keyboard filter counts disclosure
     await page.keyboard.press('Enter');assert.equal(await selector.getAttribute('data-filter-state'),'excluded');
     const none=page.locator('#ctxPanel [data-act="toggle-no-context"]');await none.click();assert.equal(await none.getAttribute('data-filter-state'),'excluded');await none.click();assert.equal(await none.getAttribute('data-filter-state'),'included');
     await selector.focus();await page.keyboard.press('Space');assert.equal(await selector.getAttribute('data-filter-state'),'included','restore green before testing Settings green-to-red transition');
-    await page.locator('[data-act="settings"]').click();const modal=page.locator('#modalRoot .modal'),sections=modal.locator('details.settings-section'),log=sections.filter({has:page.locator('summary').filter({hasText:/^Changelog$/})});
+    await page.locator('[data-act="help"]').click();let modal=page.locator('#modalRoot .modal');const log=modal.locator('[data-help-changelog]');
     assert.equal(await log.count(),1);await log.locator('summary').click();assert.ok(await log.locator('li').count()>50,'long history remains intact');
-    const styles=await modal.evaluate(e=>{const section=[...e.querySelectorAll('.settings-section')],first=section[0],next=section[1],save=e.querySelector('[data-act="save-settings"]');return {font:getComputedStyle(first.querySelector('.kv')).fontSize,otherFont:getComputedStyle(next.querySelector('.kv')).fontSize,surface:getComputedStyle(first).backgroundColor,otherSurface:getComputedStyle(next).backgroundColor,summary:getComputedStyle(first.querySelector('summary')).padding,otherSummary:getComputedStyle(next.querySelector('summary')).padding,last:e.lastElementChild.contains(save),overflow:e.scrollWidth<=e.clientWidth+1};});
+    const styles=await modal.evaluate(e=>{const section=[...e.querySelectorAll('.help-faq')],first=section.at(-1),next=section[1],save=e.querySelector('[data-act="ok-quickstart"]');return {font:getComputedStyle(first.querySelector('summary')).fontSize,otherFont:getComputedStyle(next.querySelector('summary')).fontSize,surface:getComputedStyle(first).backgroundColor,otherSurface:getComputedStyle(next).backgroundColor,summary:getComputedStyle(first.querySelector('summary')).padding,otherSummary:getComputedStyle(next.querySelector('summary')).padding,last:e.lastElementChild.contains(save),overflow:e.scrollWidth<=e.clientWidth+1};});
     assert.equal(styles.font,styles.otherFont);assert.equal(styles.surface,styles.otherSurface);assert.equal(styles.summary,styles.otherSummary);assert.equal(styles.last,true);assert.equal(styles.overflow,true);
-    await modal.locator('summary').filter({hasText:/^Scanning and recurrence$/}).click();await page.locator('#stWorkedHrs').fill('19');await page.locator('#stHorizon').fill('999');
+    await modal.locator('[data-act="close-modal"]').click();await page.locator('[data-act="settings"]').click();modal=page.locator('#modalRoot .modal');await modal.locator('summary').filter({hasText:/^Scanning and recurrence$/}).click();await page.locator('#stWorkedHrs').fill('19');await page.locator('#stHorizon').fill('999');
     await modal.locator('summary').filter({hasText:/^Contexts$/}).click();const manager=modal.locator('[data-ctx="c_errand"]');await manager.click();assert.equal(await manager.getAttribute('data-filter-state'),'excluded');assert.equal(await page.locator('#stWorkedHrs').inputValue(),'19','cycling a context does not discard other Settings drafts');
     const save=modal.locator('[data-act="save-settings"]');await save.scrollIntoViewIfNeeded();if(width<1000)await save.tap();else await save.click();assert.equal(await page.locator('#modalRoot .modal').count(),0);
     await page.evaluate(()=>persist());await page.reload();await page.waitForFunction(()=>state?.tasks?.length===3);await page.evaluate(()=>document.getElementById('motionDialog')?.close());assert.equal(await page.evaluate(()=>state.settings.workedHours),19);assert.equal(await page.evaluate(()=>state.settings.horizonMin),480);assert.equal(await page.evaluate(()=>state.contexts[0].excluded),true);
@@ -778,7 +796,7 @@ test('RISK task rating history: compact record disclosures retain dates and metr
  assert.match(view,/<time datetime="2026-10-06T12:34:56\.789Z"/);
  assert.match(view,/Task history/);assert.match(view,/10\/06\/2026/);assert.match(view,/class="rating-change"/);assert.match(view,/Score/);assert.match(view,/Uncertainty/);assert.match(view,/46\.49%/);assert.match(view,/MMR/);assert.match(view,/Overall likelihood/);assert.match(view,/Estimated Top x/);
  assert.doesNotMatch(view,/Recorded observations, not a complete timeline|MMR is strength|All recorded observations stay/,'explanations no longer occupy the editor');
- assert.match(view,/FAQs → Task history/);
+ assert.match(view,/FAQs \/ Changelog → Task history/);
  ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
  assert.match(help,/<details class="help-faq" id="ratingHistoryFaq">/);assert.match(help,/<h3>Task history<\/h3>/);
  assert.match(help,/not a complete timeline/);assert.match(help,/recording device’s clock/);assert.match(help,/Clear history/);
@@ -5896,7 +5914,7 @@ test("UI: Quick start displays four essential steps in order", async () => {
   const { ctx, shim } = await loadApp();
   ctx.openHelp();
   const markup = shim.elements.get("modalRoot").innerHTML;
-  assert.match(markup, /<h2 id="faqsTitle">FAQs<\/h2>/);
+  assert.match(markup, /<h2 id="faqsTitle">FAQs \/ Changelog<\/h2>/);
   const list = markup.match(/<ol>([\s\S]*?)<\/ol>/)[1];
   const steps = [...list.matchAll(/<li>([\s\S]*?)<\/li>/g)]
     .map(match => match[1].replace(/<[^>]+>/g, "").replace(/&amp;/g, "&"));
@@ -16426,7 +16444,7 @@ test('Update toast: fresh install is quiet, changed release notifies once and re
  assert.equal(fresh.shim.localStorage.getItem(updateNoticeKey),releaseFingerprint);
  assert.ok(!fresh.shim.elements.get('toast')?.textContent?.includes('App updated'));
  const updated=await loadApp({seedStorage:{[updateNoticeKey]:'old-release'},beforeStateReady:prepareReleaseNotice});
- assert.match(updated.shim.elements.get('toast').textContent,/App updated.*Settings.*Changelog/);
+ assert.match(updated.shim.elements.get('toast').textContent,/App updated.*FAQs \/ Changelog.*Changelog/);
  assert.equal(updated.shim.localStorage.getItem(updateNoticeKey),releaseFingerprint);
  const reload=await loadApp({seedStorage:{[updateNoticeKey]:releaseFingerprint},beforeStateReady:prepareReleaseNotice});
  assert.ok(!reload.shim.elements.get('toast')?.textContent?.includes('App updated'));
@@ -24751,14 +24769,14 @@ test('RISK neutral bootstrap: JSON replacement and Undo deletion cannot be promo
 });
 
 test('RISK FAQs menu label: help navigation and named dialog use FAQs while retaining Quick start chapter',async()=>{
- assert.match(html,/<button class="ghost" data-act="help" title="FAQs" aria-label="FAQs">\?<\/button>/);
+ assert.match(html,/<button class="ghost" data-act="help" title="FAQs \/ Changelog" aria-label="FAQs \/ Changelog">\?<\/button>/);
  const {ctx,shim}=await loadApp();const before=JSON.stringify(ctx.state);ctx.onAction('help',{});
- const markup=shim.elements.get('modalRoot').innerHTML;assert.match(markup,/<h2 id="faqsTitle">FAQs<\/h2>/);
+ const markup=shim.elements.get('modalRoot').innerHTML;assert.match(markup,/<h2 id="faqsTitle">FAQs \/ Changelog<\/h2>/);
  assert.match(markup,/<details class="help-faq" open><summary>Quick start<\/summary>/);
  assert.equal(JSON.stringify(ctx.state),before,'opening FAQs preserves board state');
  assert.match(html,/querySelector\('#modalRoot \.modal'\)\?\.setAttribute\('aria-labelledby','faqsTitle'\)/);
- assert.match(ctx.taskRatingHistoryHTML({ratingHistory:[]}),/Help: FAQs → Task history/);
- assert.match(ctx.dependencyFieldsHTML('edit',[]),/See dependency FAQ in FAQs\./);
+ assert.match(ctx.taskRatingHistoryHTML({ratingHistory:[]}),/Help: FAQs \/ Changelog → Task history/);
+ assert.match(ctx.dependencyFieldsHTML('edit',[]),/See dependency FAQ in FAQs \/ Changelog\./);
 });
 
 test('RISK Last task WOOP: exhausted scan reaches walkthrough through real Start and Dislodge handlers',async()=>{
@@ -25152,11 +25170,11 @@ test('RISK Settings changelog reflow: actual archived notes retain readable toke
   const content=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))?.[1];assert.ok(content);
   shim.document.getElementById(id).innerHTML=content;
  }
- ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
+ ctx.openHelp();const settings=shim.document.getElementById('modalRoot').innerHTML;
  assert.match(settings,/acknowledgement|reconciliation/,'the actual archived release consumer preserves long historical tokens rather than deleting notes');
- const notes=settings.match(/<details([^>]*)><summary>Changelog<\/summary><div class="kv">/)?.[1];
- assert.match(notes||'',/data-settings-changelog/,'the actual Settings consumer must scope enlarged release reflow without changing its section class');
- const rule=html.match(/\.settings-section\[data-settings-changelog\]\s+\.kv\s*\{([^}]*)\}/)?.[1]||'';
+ const notes=settings.match(/<details([^>]*)><summary><h3>Changelog<\/h3><\/summary>/)?.[1];
+ assert.match(notes||'',/data-help-changelog/,'the actual FAQ consumer must scope enlarged release reflow without changing its chapter class');
+ const rule=html.match(/\.help-faq\[data-help-changelog\]\s+\.kv\s*\{([^}]*)\}/)?.[1]||'';
  assert.match(rule,/overflow-wrap\s*:\s*anywhere/,'73 CSS-pixel enlarged list items must permit long archived tokens to break without clipping or altering their text');
  ctx.openHelp();assert.match(shim.document.getElementById('modalRoot').innerHTML,/Release notes wrap long words in enlarged views/,'extended FAQ explains enlarged release-note reflow');
 });

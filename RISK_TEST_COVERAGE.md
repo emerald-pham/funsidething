@@ -538,7 +538,7 @@ The editor hook blocks app or enforcement edits while tests.js has no staged or 
 - RISK No context filter: binary synthetic control never becomes an assignment and tracks rename deletion and unknown IDs
 - RISK context saved data: absent invalid and released settings preserve assignments exclusions unknown fields and completion Undo
 - RISK context sync: concurrent clients offline reload reconnect and remote completion preserve revisioned filters and recovery
-- RISK Settings hierarchy: Changelog uses existing sections and Save settings follows every section without changing validation
+- RISK Settings hierarchy: moved Changelog leaves Save settings after every section without changing validation
 - RISK context and Settings FAQ: extended guidance explains cycle empty selections synthetic scope sync limitations and bottom save
 - RISK context and Settings browser: touch keyboard filter counts disclosure scrolling and saved controls work on Chrome and WebKit
 - RISK context offline browser: installed shell reload retains exclusions settings tasks and completion Undo through reconnect
@@ -686,7 +686,7 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK date clear persistence: pasted Add dates and offline concurrent sync retain the other date and task data
 - RISK date clear tablet geometry: Edit wrapper overrides generic date minimum to reserve the Clear target
 - RISK date clear rendered geometry: native date segments remain readable beside Clear and long Starts hints at larger text
-- RISK changelog dates: Settings combines repeated dates in descending order without losing history categories or links
+- RISK changelog dates: FAQ combines repeated dates in descending order without losing history categories or links
 - RISK date clear availability: empty Add and Edit controls disable independently through typing clearing resets and reopening
 - RISK date clear programmatic values: direct assignments stay synchronized without events and preserve unrelated drafts
 - RISK date clear guidance: Quick start explains disabled empty date controls and retained save semantics
@@ -1038,3 +1038,4 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - `RISK sky observer validation reuse: bounded zone cache never bypasses mutable coordinates invalid zones or changed solar outputs`
 - `RISK pedestrian planner hash work: complete cold proposals reuse immutable RNG prefixes while retaining every admitted scene`
 - `RISK scenery random prefix reuse: draw sequence matches full public sampling for Unicode signed slots counters and mutable input fallback`
+- `RISK FAQs changelog navigation: help dispatch exposes exact combined menu and all release notes without a Settings duplicate` — Combined help navigation, chapter and archive preservation, modal actions, and no saved-board writes.
