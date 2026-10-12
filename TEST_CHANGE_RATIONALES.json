@@ -1,5 +1,23 @@
 [
   {
+    "testChangesSha256": "3aca8d430484170c0393770739813ce760a796c2b3c3d7454f33ceb88557c17f",
+    "reason": "Cover the user-reported Return as candidate failure for postponed tasks through the mounted editor and existing causal register.",
+    "previousBehavior": "Active postponement alone disables Return as candidate, and its handler never cancels a saved hold.",
+    "intendedBehavior": "Early Return cancels observed supported postponements with one Undo while other eligibility rules and unobserved holds remain applicable.",
+    "replacementTests": [
+      "RISK Postpone return: mounted editor cancels active deferral with one Undo and preserves other eligibility rules",
+      "RISK Postpone return: cancellation survives stale sync and reload while unobserved peer holds survive",
+      "RISK Postpone return: exact expiry and unknown recovery evidence do not enable postponed-only return"
+    ],
+    "preservedCoverage": [
+      "Existing skip, evergreen rest, completion History, ranking, expiry, dependency, cloud merge and recovery protections remain unchanged."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK Postpone return:' tests.js",
+      "failure": "Before implementation the mounted editor test failed: active postponement must enable the existing Return button; actual return-candidate button carried disabled. Evidence return-red.log is retained outside the committed tree. Extra causal/boundary tests were added after implementation; they are supplemental GREEN coverage, not claimed contemporaneous RED."
+    }
+  },
+  {
     "testChangesSha256": "d1562021517406dbe6f96171d815eae0ea8dd4614f5271e43efecdbbff8eb235",
     "reason": "Bind exact protected test range for ab540c9d41348120190bd985ff013ad046273173 to final candidate, including push-before comparisons. Name the existing bulk release-note protection for its actual relocated FAQ consumer; all wording assertions preserved.",
     "previousBehavior": "The historical test name and consumer referenced Settings; the correction lacked a rationale for the push-before070 range, so required pushCI rejected it.",

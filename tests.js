@@ -25696,3 +25696,25 @@ test('RISK FAQ redundant changelog question: actual help consumer shows release 
  assert.match(chapter,/<summary><h3>Changelog<\/h3><\/summary><div class="kv" data-changelog-notes>/);
  for(const id of ['appChangelogCurrent','appChangelog'])for(const item of shim.document.getElementById(id).innerHTML.matchAll(/<li>([\s\S]*?)<\/li>/g))assert.ok(chapter.includes(item[0]),'preserves actual release history');
 });
+
+test('RISK Postpone return: mounted editor cancels active deferral with one Undo and preserves other eligibility rules',async()=>{
+ const {ctx,shim}=await loadApp({seed:1003});const at=Date.parse('2026-10-12T12:00:00Z');setFakeTime(ctx,at);
+ const t=ctx.addTask('Postponed return'),head=ctx.addTask('Existing dot');ctx.state.chain=[head.id];ctx.state.mode='scan';ctx.state.candidateId=t.id;ctx.onAction('postpone',{dataset:{candidate:t.id}});const until=ctx.taskPostponeUntil(t),rating=JSON.stringify([t.mu,t.sigma]);
+ ctx.openEdit(t.id);const button=shim.document.getElementById('modalRoot').innerHTML.match(/<button[^>]*data-act="return-candidate"[^>]*>/)[0];assert.doesNotMatch(button,/\bdisabled\b/,'active postponement must enable the existing Return button');
+ fillEditPane(ctx,shim,{title:'Returned title'});ctx.onAction('return-candidate',{dataset:{id:t.id}});
+ assert.equal(ctx.taskPostponeUntil(t),0);assert.equal(t.title,'Returned title');assert.equal(ctx.isEligible(t),true);assert.equal(ctx.state.candidateId,t.id);assert.equal(JSON.stringify([t.mu,t.sigma]),rating);
+ ctx.undo();const restored=ctx.state.tasks.find(x=>x.id===t.id);assert.equal(ctx.taskPostponeUntil(restored),until);assert.equal(restored.title,'Postponed return');assert.equal(ctx.isEligible(restored),false);
+ ctx.openEdit(t.id);fillEditPane(ctx,shim,{start:'2026-10-13'});ctx.onAction('return-candidate',{dataset:{id:t.id}});const blocked=ctx.state.tasks.find(x=>x.id===t.id);assert.equal(ctx.taskPostponeUntil(blocked),0);assert.equal(ctx.isEligible(blocked),false,'future start must still block after return');
+});
+
+test('RISK Postpone return: cancellation survives stale sync and reload while unobserved peer holds survive',async()=>{
+ const {ctx}=await loadApp({seed:1004}),at=Date.parse('2026-10-12T12:00:00Z');setFakeTime(ctx,at);const t=ctx.addTask('Causal return');ctx.writeTaskPostpone(t,at+3600000);const stale=JSON.parse(ctx.cloudPayload());
+ ctx.returnAsCandidate(t.id);assert.equal(ctx.taskPostponeUntil(t),0);ctx.mergeUndeletedTasks(ctx.state,stale);assert.equal(ctx.taskPostponeUntil(t),0,'stale hold cannot resurrect after observed return');
+ const reload=await loadApp({seedStorage:{[SYNC_STORE_KEY]:ctx.cloudPayload()},beforeStateReady:c=>setFakeTime(c,at)});assert.equal(reload.ctx.taskPostponeUntil(reload.ctx.state.tasks.find(x=>x.id===t.id)),0);
+ const peer=JSON.parse(JSON.stringify(stale));peer.tasks[0].postponeOps.push({v:1,id:'unseen-peer-return-test',observed:peer.tasks[0].postponeOps.map(o=>o.id),until:at+7200000});ctx.mergeUndeletedTasks(ctx.state,peer);assert.equal(ctx.taskPostponeUntil(t),at+7200000);assert.equal(ctx.isEligible(t),false);
+});
+test('RISK Postpone return: exact expiry and unknown recovery evidence do not enable postponed-only return',async()=>{
+ const {ctx}=await loadApp({seed:1005}),at=Date.parse('2026-10-12T12:00:00Z'),t=ctx.addTask('Boundary return');ctx.writeTaskPostpone(t,at+3600000);
+ setFakeTime(ctx,at+3599999);assert.equal(ctx.canReturnAsCandidate(t),true);setFakeTime(ctx,at+3600000);assert.equal(ctx.canReturnAsCandidate(t),false);setFakeTime(ctx,at+3600001);assert.equal(ctx.canReturnAsCandidate(t),false);
+ setFakeTime(ctx,at);t.postponeRecovery=[{postponeOps:{v:99}}];const before=JSON.stringify(t.postponeOps);assert.equal(ctx.canReturnAsCandidate(t),false);ctx.returnAsCandidate(t.id);assert.equal(JSON.stringify(t.postponeOps),before,'unknown evidence remains read-only');
+});
