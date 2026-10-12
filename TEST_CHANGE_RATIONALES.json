@@ -1,5 +1,23 @@
 [
   {
+    "testChangesSha256": "dd108b51978e6bf09c85f9afc58986a0faa4407d9f9f6dc60d7c418d2d1ab591",
+    "reason": "Add the requested All Tasks Postponed filter using the existing active hold predicate and list filtering controls.",
+    "previousBehavior": "No postponed status tag exists, so active holds cannot be selected as a list filter.",
+    "intendedBehavior": "Active open holds match the postponed tag; search and eligibility combine, filtered selection follows matches, Return and expiry update matches, and an unavailable tag clears according to existing list semantics.",
+    "replacementTests": [
+      "RISK Postponed filter: mounted tag combines search eligibility and filtered Select all without changing board data",
+      "RISK Postponed filter: scan-clock expiry removes matches at the deadline and clears an unavailable last filter",
+      "RISK Postponed filter: saved hold semantics preserve legacy opaque evidence and context namespace isolation"
+    ],
+    "preservedCoverage": [
+      "Existing eligibility selection clears narrowings; no ranking, rest, date, context, dependency, persistence, or causal register behavior changes."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK Postponed filter:' tests.js",
+      "failure": "All three cases failed before implementation: two missing s:postponed control assertions and expiry filtering included an unheld task. Contemporaneous red.log retained outside the tree. Subsequent fixture corrections normalized cross-realm arrays and respected existing eligibility clicks clearing narrowings; last-Return assertions were supplemental."
+    }
+  },
+  {
     "testChangesSha256": "3aca8d430484170c0393770739813ce760a796c2b3c3d7454f33ceb88557c17f",
     "reason": "Cover the user-reported Return as candidate failure for postponed tasks through the mounted editor and existing causal register.",
     "previousBehavior": "Active postponement alone disables Return as candidate, and its handler never cancels a saved hold.",

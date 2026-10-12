@@ -1045,3 +1045,7 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - `RISK Postpone return: mounted editor cancels active deferral with one Undo and preserves other eligibility rules` — Early cancellation, eligibility preservation and causal saved hold boundaries.
 - `RISK Postpone return: cancellation survives stale sync and reload while unobserved peer holds survive` — Early cancellation, eligibility preservation and causal saved hold boundaries.
 - `RISK Postpone return: exact expiry and unknown recovery evidence do not enable postponed-only return` — Early cancellation, eligibility preservation and causal saved hold boundaries.
+
+- `RISK Postponed filter: mounted tag combines search eligibility and filtered Select all without changing board data` — Active hold filtering, combined controls, exact expiry and read-only saved evidence.
+- `RISK Postponed filter: scan-clock expiry removes matches at the deadline and clears an unavailable last filter` — Active hold filtering, combined controls, exact expiry and read-only saved evidence.
+- `RISK Postponed filter: saved hold semantics preserve legacy opaque evidence and context namespace isolation` — Active hold filtering, combined controls, exact expiry and read-only saved evidence.
