@@ -25033,7 +25033,7 @@ test('RISK bulk task guidance: enlarged conflict answer uses breakable task stat
  assert.ok(answer);assert.match(answer,/missing or completed task stops Save/,'observed phone 200% missing/completed paints 39px beyond answer content');
  assert.doesNotMatch(answer,/missing\/completed/);assert.match(answer,/conflicts detected before Save stop the whole batch/);assert.match(answer,/Unrelated fresh fields are preserved/);
 });
-test('RISK bulk task guidance: enlarged Settings note uses short sync and Undo wording',async()=>{
+test('RISK bulk task guidance: enlarged FAQs changelog note uses short sync and Undo wording',async()=>{
  const {ctx,shim}=await loadApp();const current=html.match(/id="appChangelogCurrent"[^>]*>([\s\S]*?)<\/div>/)?.[1];assert.ok(current);
  shim.document.getElementById('appChangelogCurrent').innerHTML=current;ctx.openHelp();const settings=shim.document.getElementById('modalRoot').innerHTML;
  const note=settings.match(/<li>(All Tasks now offers filtered selection.*?)<\/li>/)?.[1];assert.ok(note);

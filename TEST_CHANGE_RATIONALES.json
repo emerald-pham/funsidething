@@ -1,5 +1,56 @@
 [
   {
+    "testChangesSha256": "d1562021517406dbe6f96171d815eae0ea8dd4614f5271e43efecdbbff8eb235",
+    "reason": "Bind exact protected test range for ab540c9d41348120190bd985ff013ad046273173 to final candidate, including push-before comparisons. Name the existing bulk release-note protection for its actual relocated FAQ consumer; all wording assertions preserved.",
+    "previousBehavior": "The historical test name and consumer referenced Settings; the correction lacked a rationale for the push-before070 range, so required pushCI rejected it.",
+    "intendedBehavior": "Same sync and Undo wording protection reads Help and carries an accurate FAQ changelog test name; exact main and branch-push ranges remain independently valid.",
+    "replacementTests": [
+      "RISK bulk task guidance: enlarged FAQs changelog note uses short sync and Undo wording"
+    ],
+    "preservedCoverage": [
+      "All server-save, newer-peer-field and uninterrupted/recovered Undo wording assertions remain byte-for-byte; only consumer/location-specific test name changed.",
+      "Every previously reviewed FAQ/changelog behavior and all34application assets remain unchanged; risk inventory maps the renamed existing contract."
+    ],
+    "redEvidence": {
+      "command": "node scripts/test-first-gate.mjs 07015fa8c96d390ffff5f1533ac2057dc887a4b9; previous node --test --test-name-pattern=\"RISK bulk task guidance: enlarged Settings note\" tests.js",
+      "failure": "Required pushCI38191709987 observed missing exact-diff rationale on070..ab; preserved durable push-ci-failure-38191709987.log. Actual bulk-note consumer RED reproduced before correction in durable bulk-note-consumer-red-recovered.log. Initial functional app RED remains historical committed rationale and immutable070reviewreceipt; no newapp implementation added."
+    }
+  },
+  {
+    "testChangesSha256": "45db57976f972586197d538f9e77fff0c8040ea0d572dc9e2d974a98998e88cb",
+    "reason": "Bind exact protected test range for 07015fa8c96d390ffff5f1533ac2057dc887a4b9 to final candidate, including push-before comparisons. Name the existing bulk release-note protection for its actual relocated FAQ consumer; all wording assertions preserved.",
+    "previousBehavior": "The historical test name and consumer referenced Settings; the correction lacked a rationale for the push-before070 range, so required pushCI rejected it.",
+    "intendedBehavior": "Same sync and Undo wording protection reads Help and carries an accurate FAQ changelog test name; exact main and branch-push ranges remain independently valid.",
+    "replacementTests": [
+      "RISK bulk task guidance: enlarged FAQs changelog note uses short sync and Undo wording"
+    ],
+    "preservedCoverage": [
+      "All server-save, newer-peer-field and uninterrupted/recovered Undo wording assertions remain byte-for-byte; only consumer/location-specific test name changed.",
+      "Every previously reviewed FAQ/changelog behavior and all34application assets remain unchanged; risk inventory maps the renamed existing contract."
+    ],
+    "redEvidence": {
+      "command": "node scripts/test-first-gate.mjs 07015fa8c96d390ffff5f1533ac2057dc887a4b9; previous node --test --test-name-pattern=\"RISK bulk task guidance: enlarged Settings note\" tests.js",
+      "failure": "Required pushCI38191709987 observed missing exact-diff rationale on070..ab; preserved durable push-ci-failure-38191709987.log. Actual bulk-note consumer RED reproduced before correction in durable bulk-note-consumer-red-recovered.log. Initial functional app RED remains historical committed rationale and immutable070reviewreceipt; no newapp implementation added."
+    }
+  },
+  {
+    "testChangesSha256": "4e25042c33c332d5e99b419960c60bdb98f041704f10226c2898d3640021d2ad",
+    "reason": "Bind exact protected test range for b1c3dc5d75913872105bd870f07b0d11f1220bfc to final candidate, including push-before comparisons. Name the existing bulk release-note protection for its actual relocated FAQ consumer; all wording assertions preserved.",
+    "previousBehavior": "The historical test name and consumer referenced Settings; the correction lacked a rationale for the push-before070 range, so required pushCI rejected it.",
+    "intendedBehavior": "Same sync and Undo wording protection reads Help and carries an accurate FAQ changelog test name; exact main and branch-push ranges remain independently valid.",
+    "replacementTests": [
+      "RISK bulk task guidance: enlarged FAQs changelog note uses short sync and Undo wording"
+    ],
+    "preservedCoverage": [
+      "All server-save, newer-peer-field and uninterrupted/recovered Undo wording assertions remain byte-for-byte; only consumer/location-specific test name changed.",
+      "Every previously reviewed FAQ/changelog behavior and all34application assets remain unchanged; risk inventory maps the renamed existing contract."
+    ],
+    "redEvidence": {
+      "command": "node scripts/test-first-gate.mjs 07015fa8c96d390ffff5f1533ac2057dc887a4b9; previous node --test --test-name-pattern=\"RISK bulk task guidance: enlarged Settings note\" tests.js",
+      "failure": "Required pushCI38191709987 observed missing exact-diff rationale on070..ab; preserved durable push-ci-failure-38191709987.log. Actual bulk-note consumer RED reproduced before correction in durable bulk-note-consumer-red-recovered.log. Initial functional app RED remains historical committed rationale and immutable070reviewreceipt; no newapp implementation added."
+    }
+  },
+  {
     "testChangesSha256": "979ad81ef6a032f7a22dc8b26d93d53a3e4ccc245404ed96b58c7461fc02a556",
     "reason": "User explicitly moves the release notes into the existing FAQ menu; adapt only assertions tied to the superseded Settings location or old menu name, retaining entry, date, category, link, Settings validation and saved-data protections. Required CI found one additional bulk-release-note reader still opening Settings; update only its consumer to Help, keeping every sync and Undo wording assertion.",
     "previousBehavior": "Help was named FAQs and described release notes under Settings; Settings rendered all release entries.",
