@@ -1,5 +1,95 @@
 [
   {
+    "testChangesSha256": "d1562021517406dbe6f96171d815eae0ea8dd4614f5271e43efecdbbff8eb235",
+    "reason": "Bind exact protected test range for ab540c9d41348120190bd985ff013ad046273173 to final candidate, including push-before comparisons. Name the existing bulk release-note protection for its actual relocated FAQ consumer; all wording assertions preserved.",
+    "previousBehavior": "The historical test name and consumer referenced Settings; the correction lacked a rationale for the push-before070 range, so required pushCI rejected it.",
+    "intendedBehavior": "Same sync and Undo wording protection reads Help and carries an accurate FAQ changelog test name; exact main and branch-push ranges remain independently valid.",
+    "replacementTests": [
+      "RISK bulk task guidance: enlarged FAQs changelog note uses short sync and Undo wording"
+    ],
+    "preservedCoverage": [
+      "All server-save, newer-peer-field and uninterrupted/recovered Undo wording assertions remain byte-for-byte; only consumer/location-specific test name changed.",
+      "Every previously reviewed FAQ/changelog behavior and all34application assets remain unchanged; risk inventory maps the renamed existing contract."
+    ],
+    "redEvidence": {
+      "command": "node scripts/test-first-gate.mjs 07015fa8c96d390ffff5f1533ac2057dc887a4b9; previous node --test --test-name-pattern=\"RISK bulk task guidance: enlarged Settings note\" tests.js",
+      "failure": "Required pushCI38191709987 observed missing exact-diff rationale on070..ab; preserved durable push-ci-failure-38191709987.log. Actual bulk-note consumer RED reproduced before correction in durable bulk-note-consumer-red-recovered.log. Initial functional app RED remains historical committed rationale and immutable070reviewreceipt; no newapp implementation added."
+    }
+  },
+  {
+    "testChangesSha256": "45db57976f972586197d538f9e77fff0c8040ea0d572dc9e2d974a98998e88cb",
+    "reason": "Bind exact protected test range for 07015fa8c96d390ffff5f1533ac2057dc887a4b9 to final candidate, including push-before comparisons. Name the existing bulk release-note protection for its actual relocated FAQ consumer; all wording assertions preserved.",
+    "previousBehavior": "The historical test name and consumer referenced Settings; the correction lacked a rationale for the push-before070 range, so required pushCI rejected it.",
+    "intendedBehavior": "Same sync and Undo wording protection reads Help and carries an accurate FAQ changelog test name; exact main and branch-push ranges remain independently valid.",
+    "replacementTests": [
+      "RISK bulk task guidance: enlarged FAQs changelog note uses short sync and Undo wording"
+    ],
+    "preservedCoverage": [
+      "All server-save, newer-peer-field and uninterrupted/recovered Undo wording assertions remain byte-for-byte; only consumer/location-specific test name changed.",
+      "Every previously reviewed FAQ/changelog behavior and all34application assets remain unchanged; risk inventory maps the renamed existing contract."
+    ],
+    "redEvidence": {
+      "command": "node scripts/test-first-gate.mjs 07015fa8c96d390ffff5f1533ac2057dc887a4b9; previous node --test --test-name-pattern=\"RISK bulk task guidance: enlarged Settings note\" tests.js",
+      "failure": "Required pushCI38191709987 observed missing exact-diff rationale on070..ab; preserved durable push-ci-failure-38191709987.log. Actual bulk-note consumer RED reproduced before correction in durable bulk-note-consumer-red-recovered.log. Initial functional app RED remains historical committed rationale and immutable070reviewreceipt; no newapp implementation added."
+    }
+  },
+  {
+    "testChangesSha256": "4e25042c33c332d5e99b419960c60bdb98f041704f10226c2898d3640021d2ad",
+    "reason": "Bind exact protected test range for b1c3dc5d75913872105bd870f07b0d11f1220bfc to final candidate, including push-before comparisons. Name the existing bulk release-note protection for its actual relocated FAQ consumer; all wording assertions preserved.",
+    "previousBehavior": "The historical test name and consumer referenced Settings; the correction lacked a rationale for the push-before070 range, so required pushCI rejected it.",
+    "intendedBehavior": "Same sync and Undo wording protection reads Help and carries an accurate FAQ changelog test name; exact main and branch-push ranges remain independently valid.",
+    "replacementTests": [
+      "RISK bulk task guidance: enlarged FAQs changelog note uses short sync and Undo wording"
+    ],
+    "preservedCoverage": [
+      "All server-save, newer-peer-field and uninterrupted/recovered Undo wording assertions remain byte-for-byte; only consumer/location-specific test name changed.",
+      "Every previously reviewed FAQ/changelog behavior and all34application assets remain unchanged; risk inventory maps the renamed existing contract."
+    ],
+    "redEvidence": {
+      "command": "node scripts/test-first-gate.mjs 07015fa8c96d390ffff5f1533ac2057dc887a4b9; previous node --test --test-name-pattern=\"RISK bulk task guidance: enlarged Settings note\" tests.js",
+      "failure": "Required pushCI38191709987 observed missing exact-diff rationale on070..ab; preserved durable push-ci-failure-38191709987.log. Actual bulk-note consumer RED reproduced before correction in durable bulk-note-consumer-red-recovered.log. Initial functional app RED remains historical committed rationale and immutable070reviewreceipt; no newapp implementation added."
+    }
+  },
+  {
+    "testChangesSha256": "979ad81ef6a032f7a22dc8b26d93d53a3e4ccc245404ed96b58c7461fc02a556",
+    "reason": "User explicitly moves the release notes into the existing FAQ menu; adapt only assertions tied to the superseded Settings location or old menu name, retaining entry, date, category, link, Settings validation and saved-data protections. Required CI found one additional bulk-release-note reader still opening Settings; update only its consumer to Help, keeping every sync and Undo wording assertion.",
+    "previousBehavior": "Help was named FAQs and described release notes under Settings; Settings rendered all release entries.",
+    "intendedBehavior": "Help is named exactly FAQs / Changelog; its existing Changelog chapter renders the same grouped history; Settings loses only the redundant release notes disclosure.",
+    "replacementTests": [
+      "RISK FAQs changelog navigation: help dispatch exposes exact combined menu and all release notes without a Settings duplicate",
+      "RISK changelog dates: FAQ combines repeated dates in descending order without losing history categories or links",
+      "RISK Settings hierarchy: moved Changelog leaves Save settings after every section without changing validation"
+    ],
+    "preservedCoverage": [
+      "Every retained dated bullet and category/link remains byte-for-byte in the shared grouping consumer; Quick start chapters and modal controls stay intact.",
+      "Settings save validation, durable reload, context draft preservation and native keyboard remain protected; enlarged release-note reflow follows the relocated consumer.",
+      "Bulk release-note protections still require truthful server-save limitations, peer-field preservation, no-recovery Undo and recovered-board limitations; only the test consumer changes to the relocated Help notes."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK FAQs changelog navigation' tests.js; then focused six-test cohort before app implementation; node --test --test-name-pattern=\"RISK bulk task guidance: enlarged Settings note\" tests.js",
+      "failure": "Observed 2026-10-12 contemporaneous RED at /tmp/chain-faq-changelog-red.log: actual header title/aria-label remained FAQs, expected FAQs / Changelog. Six-test cohort /tmp/chain-faq-changelog-cohort-red.log failed all six for old consumer/menu/reflow expectations before index.html/sw.js edits. RequiredCI38190399921 failed assert.ok(note) for undefined from the removed Settings notes; locally reproduced before test correction. After reboot, same RED recovered at durable .git/funsidething-task-evidence/faqs-changelog-20261012/bulk-note-consumer-red-recovered.log. No app implementation changed for this correction."
+    }
+  },
+  {
+    "testChangesSha256": "be77c5154a14fcef91ba636acf017a9e963f132a06b450ae53fa8c87e8278159",
+    "reason": "User explicitly moves the release notes into the existing FAQ menu; adapt only assertions tied to the superseded Settings location or old menu name, retaining entry, date, category, link, Settings validation and saved-data protections.",
+    "previousBehavior": "Help was named FAQs and described release notes under Settings; Settings rendered all release entries.",
+    "intendedBehavior": "Help is named exactly FAQs / Changelog; its existing Changelog chapter renders the same grouped history; Settings loses only the redundant release notes disclosure.",
+    "replacementTests": [
+      "RISK FAQs changelog navigation: help dispatch exposes exact combined menu and all release notes without a Settings duplicate",
+      "RISK changelog dates: FAQ combines repeated dates in descending order without losing history categories or links",
+      "RISK Settings hierarchy: moved Changelog leaves Save settings after every section without changing validation"
+    ],
+    "preservedCoverage": [
+      "Every retained dated bullet and category/link remains byte-for-byte in the shared grouping consumer; Quick start chapters and modal controls stay intact.",
+      "Settings save validation, durable reload, context draft preservation and native keyboard remain protected; enlarged release-note reflow follows the relocated consumer."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK FAQs changelog navigation' tests.js; then focused six-test cohort before app implementation",
+      "failure": "Observed 2026-10-12 contemporaneous RED at /tmp/chain-faq-changelog-red.log: actual header title/aria-label remained FAQs, expected FAQs / Changelog. Six-test cohort /tmp/chain-faq-changelog-cohort-red.log failed all six for old consumer/menu/reflow expectations before index.html/sw.js edits."
+    }
+  },
+  {
     "testChangesSha256": "6bdd97ddf42b358d7c4f42b4daedf17630c0dae20a30784d6b694471c71ba0d2",
     "reason": "User requires continuous offscreen pedestrian entrances. Parent explicitly directed resolving the reproduced fourteen-logical-visitor regression, allowing the smallest required admission scheduling tradeoff. Preserve the protected capacity, complete retirement, water/show/rail and data regressions. Supersede released unchanged-admission guidance and equality with retained seeded-opportunity facts/subset checks under that explicit instruction. Reject the conservative full-lifetime opportunity filter because independent source measurements and meaningful liveness RED proved daytime starvation. Actual rendered sequential review found detached preparation hats/poles; the minimal correction attaches them to the actual blended head/grips without changing gait, travel or admissions. Parent requested source optimization after measured cold-start regression; capacity pruning now precedes lifetime solving for already-full proposals while preserving exact original scheduling and existing bounded daily memoization. Further allocated browser checks showed capacity precheck alone did not close coldstartup regression. Source profiling found duplicate daily proposal generation and unused show astronomy; parent-authorized bounded optimizer now reuses immutable raw abductions plus the earlier rare guard, deduplicates the inclusive join byID, and performs unchanged local showchance gates before unused sun lookups. Focused remaining cold repair reuses at most eight validated zone strings and immutable per-opportunity FNV prefixes; actual astronomy, mutable/invalid observer validation, RNG sequences, admission and speeds remain exact. Reconciled with merged WOOP1d87539 without deleting inherited coverage. Preserve the protected rare guard-join fixture by forcing the actual random consumer in both reference and optimized implementation, rather than a sampler the optimized primitive path no longer calls; retain forced presence and unique-ID assertions and add a broken-dedup negative control.",
     "previousBehavior": "Activity visitors started near visible anchors; builders and skiers faded in at interior positions; wide skating entries were translucent.",
