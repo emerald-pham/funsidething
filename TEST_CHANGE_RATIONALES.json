@@ -5444,5 +5444,33 @@
       "command": "node --test --test-name-pattern='RISK always binary' tests.js; node --test --test-name-pattern='PWA cache contract|Settings changelog: every app' tests.js",
       "failure": "Contemporaneous preimplementation five-case RED: legacy/all-excluded real mode neutral instead of excluded, last-green next neutral instead of included, No Context neutral instead of included, reload neutral instead of excluded and old FAQ missing presence rule; /tmp/chain-context-always-binary-red.log. After implementation four/five passed; final new No Context fixture then failed only expected fresh Undo commit timestamp, corrected to compare all state fields except updatedAt without product change. Earlier eight old regressions failed explicitly superseded neutral-cycle/wording expectations; preserved matching assertions with binary transition sequences. Required shell2/2 RED observed before fingerprint regeneration, /tmp/chain-context-always-binary-shell-red.log. Prior released live diagnosis /tmp/chain-context-live-diagnosis-ad686/results.json reproduced both neutral cases; separate broader palette-probe failure retained."
     }
+  },
+  {
+    "testChangesSha256": "9b6e485456f31469c3681c1e1f1791ba119442329d0c590cd5bd3bdb040f530e",
+    "reason": "Add a separately invoked overdue scanner WOOP action while preserving established final-task controls and task-owned plans. Also repair scanner title/chip and finish-group wrapping after observed enlarged phone overflow before the new action appeared.",
+    "previousBehavior": "Overdue offered tasks have no Run WOOP action.",
+    "intendedBehavior": "Only the currently eligible overdue candidate exposes Run WOOP; it uses explicit Dot once, pauses, and opens a new walkthrough or existing plan with explicit deletion. Constrained scanner title/chip and finish/rank groups wrap instead of squeezing titles or hiding choices; outside the420px breakpoint CSS remains unchanged.",
+    "replacementTests": [
+      "RISK overdue WOOP: offered action dots through existing comparison and saves with Last task WOOP off",
+      "RISK overdue WOOP: local due-day boundary stale eligibility and cancel retain the explicit dot",
+      "RISK overdue WOOP: existing and legacy plans show explicit delete without silent replacement",
+      "RISK overdue WOOP: peer plan account and same-ID board replacement invalidate drafts and controls",
+      "RISK overdue WOOP: neutral automatic benchmark stays neutral and Cancel can Undo only the dot",
+      "RISK overdue WOOP: unsupported plans remain read-only and interrupted scan hides the action",
+      "RISK overdue scanner layout: enlarged candidate title chips and decision footer wrap without clipping choices",
+      "RISK overdue scanner layout: chosen-task breadcrumb stays within the enlarged scanner width"
+    ],
+    "preservedCoverage": [
+      "All existing final-task WOOP, causal persistence, old plans, Undo, stale-tab and cloud-sync protections remain unchanged.",
+      "Dot ranking comparisons and neutral automatic first-dot rules are reused. Completion, date/context/dependency holds remain scanner eligibility gates.",
+      "First four tests observed the missing actual Run WOOP control before app implementation. Two additional preservation cases were added after implementation; they are not claimed as contemporaneous RED. Fixture corrections after initial GREEN attempt established a participating benchmark and used actual exposed helpers; no existing assertions were weakened.",
+      "Reconciled released toolbar518c01f without changing its executable controls/tests. Pending context input/shortcut work remains in its owner worktree; its scanner/card/footer CSS is unchanged and cannot repair this constraint. Six ordinary browser configurations and original failure evidence remain retained, not called final-candidate enlarged passes.",
+      "Reconciled always-binary context PR111 main3efcedf additively; all released executable tests and source/FAQ retained. Actual later b582 enlarged fourcases completed despite preserved aggregate ownerdeadline nonpass; supplement footer/nativeTab and compatibility15/15 passed, all independentreviews approved. Sourcebase changes require refreshed exact review, not broad capturedmatrix rerun.",
+      "Reconciled merged rooftopPR109 b76f6b2 additively; rooftoplandscape andallreleasedtests/FAQ preserved. Exact WOOP/styles remain unchanged; refreshaffectedreviews andrequirefinal-baseCI beforepublication."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK overdue WOOP:' tests.js; node --test --test-name-pattern='RISK overdue scanner layout:' tests.js; node --test --test-name-pattern='RISK overdue scanner layout: chosen-task breadcrumb' tests.js",
+      "failure": "Four observed failures before app edits: overdue offered task must expose Run WOOP. Log /tmp/overdue-woop-red.log. Initial postimplementation run exposed missing history on neutral benchmark and an unavailable test helper; fixture repaired and preserved assertions verified in /tmp/overdue-woop-focused.log (42 pass, zero skips). Enlarged runtime60f19f8 failed chrome390zoom2 today/no-Run-WOOP page overflow before showing the new action; all runtime closed21:48:26, /tmp/overdue-woop-runtime/failure.png and browser.log. Pre-repair mounted CSS contract observed RED: actual scanner finish group must wrap its button and rank controls (/tmp/overdue-woop-overflow-red.log), then46sourcechecks passed (/tmp/overdue-woop-overflow-green.log). No rendered baseline captured yet; source wrap rules identical across18e3eeb, released518c01f and pendingcontextad686. Compatibility is outstanding, not failed. Gate before merge commit compared old HEAD and failed old-base rationale; postmerge gate passed; no publication occurred. The explicit new dot also creates a former-benchmark breadcrumb with a190px cap larger than a constrained scanner. Additional mounted control/CSS contract observed RED before clamp (/tmp/overdue-woop-crumb-red.log); preserve original cap while bounding to100% at<=420px. Finalsource47pass0skip inoverflow-green.log; nativegeometry stillpending."
+    }
   }
 ]

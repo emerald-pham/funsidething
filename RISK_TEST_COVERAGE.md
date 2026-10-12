@@ -992,3 +992,16 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 
 - RISK always binary contexts: legacy neutral and all-excluded controls render green or red on both surfaces without saved writes
 - RISK always binary context interactions: last-green and all-red clicks stay binary and Undo preserves assignments and AND eligibility
+
+## Explicit overdue scanner WOOP
+
+- RISK overdue WOOP: offered action dots through existing comparison and saves with Last task WOOP off
+- RISK overdue WOOP: local due-day boundary stale eligibility and cancel retain the explicit dot
+- RISK overdue WOOP: existing and legacy plans show explicit delete without silent replacement
+- RISK overdue WOOP: peer plan account and same-ID board replacement invalidate drafts and controls
+- RISK overdue WOOP: neutral automatic benchmark stays neutral and Cancel can Undo only the dot
+- RISK overdue WOOP: unsupported plans remain read-only and interrupted scan hides the action
+
+
+- RISK overdue scanner layout: enlarged candidate title chips and decision footer wrap without clipping choices
+- RISK overdue scanner layout: chosen-task breadcrumb stays within the enlarged scanner width
