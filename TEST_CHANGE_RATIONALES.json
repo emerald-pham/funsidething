@@ -5607,5 +5607,23 @@
       "command": "node --test --test-name-pattern='RISK overdue WOOP:' tests.js; node --test --test-name-pattern='RISK overdue scanner layout:' tests.js; node --test --test-name-pattern='RISK overdue scanner layout: chosen-task breadcrumb' tests.js",
       "failure": "Four observed failures before app edits: overdue offered task must expose Run WOOP. Log /tmp/overdue-woop-red.log. Initial postimplementation run exposed missing history on neutral benchmark and an unavailable test helper; fixture repaired and preserved assertions verified in /tmp/overdue-woop-focused.log (42 pass, zero skips). Enlarged runtime60f19f8 failed chrome390zoom2 today/no-Run-WOOP page overflow before showing the new action; all runtime closed21:48:26, /tmp/overdue-woop-runtime/failure.png and browser.log. Pre-repair mounted CSS contract observed RED: actual scanner finish group must wrap its button and rank controls (/tmp/overdue-woop-overflow-red.log), then46sourcechecks passed (/tmp/overdue-woop-overflow-green.log). No rendered baseline captured yet; source wrap rules identical across18e3eeb, released518c01f and pendingcontextad686. Compatibility is outstanding, not failed. Gate before merge commit compared old HEAD and failed old-base rationale; postmerge gate passed; no publication occurred. The explicit new dot also creates a former-benchmark breadcrumb with a190px cap larger than a constrained scanner. Additional mounted control/CSS contract observed RED before clamp (/tmp/overdue-woop-crumb-red.log); preserve original cap while bounding to100% at<=420px. Finalsource47pass0skip inoverflow-green.log; nativegeometry stillpending."
     }
+  },
+  {
+    "testChangesSha256": "9cecc3168fb74db66f1e411721919bcfc0f2d40af2edacb2ea3cc5de6c218d53",
+    "reason": "User requested removal of the redundant changelog navigation question and answer. Existing reflow prose assertion now reads the retained historical note because the user explicitly removed its repeated answer; CSS and long-token protections are unchanged. Date-order test also asserted deleted answer text; its full actual date/order/category/link/history assertions remain unchanged.",
+    "previousBehavior": "Changelog repeats where to find itself before its actual release history.",
+    "intendedBehavior": "The Changelog chapter begins directly with its preserved release notes.",
+    "replacementTests": [
+      "RISK FAQ redundant changelog question: actual help consumer shows release history directly without a self-referential question",
+      "RISK FAQs changelog reflow: actual archived notes retain readable tokens in narrow enlarged release lists",
+      "RISK changelog dates: direct FAQ notes combine repeated dates in descending order without losing history categories or links"
+    ],
+    "preservedCoverage": [
+      "Existing FAQ navigation, chapters, complete historical notes, board preservation and Settings duplicate protections remain intact."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK FAQ redundant changelog question' tests.js",
+      "failure": "Observed AssertionError from actual help consumer: redundant question and definition list still rendered before release history. Durable red.log captured before implementation. Focused cohort additionally failed the reflow explanation assertion because it referenced the deliberately removed answer; green checks retain the original historical wording case-insensitively. green-final.log observed date-order prose assertion failure; changed only removed prose expectation, preserving all date/order/history assertions."
+    }
   }
 ]

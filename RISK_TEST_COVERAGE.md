@@ -686,7 +686,7 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK date clear persistence: pasted Add dates and offline concurrent sync retain the other date and task data
 - RISK date clear tablet geometry: Edit wrapper overrides generic date minimum to reserve the Clear target
 - RISK date clear rendered geometry: native date segments remain readable beside Clear and long Starts hints at larger text
-- RISK changelog dates: FAQ combines repeated dates in descending order without losing history categories or links
+- RISK changelog dates: direct FAQ notes combine repeated dates in descending order without losing history categories or links
 - RISK date clear availability: empty Add and Edit controls disable independently through typing clearing resets and reopening
 - RISK date clear programmatic values: direct assignments stay synchronized without events and preserve unrelated drafts
 - RISK date clear guidance: Quick start explains disabled empty date controls and retained save semantics
@@ -955,7 +955,7 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 
 - RISK terrain walking planner budget: flat canonical routes retain bounded analytic clock work
 
-- RISK Settings changelog reflow: actual archived notes retain readable tokens in narrow enlarged release lists
+- RISK FAQs changelog reflow: actual archived notes retain readable tokens in narrow enlarged release lists
 
 ## Conditional binary context controls
 
@@ -1039,3 +1039,5 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - `RISK pedestrian planner hash work: complete cold proposals reuse immutable RNG prefixes while retaining every admitted scene`
 - `RISK scenery random prefix reuse: draw sequence matches full public sampling for Unicode signed slots counters and mutable input fallback`
 - `RISK FAQs changelog navigation: help dispatch exposes exact combined menu and all release notes without a Settings duplicate` — Combined help navigation, chapter and archive preservation, modal actions, and no saved-board writes.
+
+- `RISK FAQ redundant changelog question: actual help consumer shows release history directly without a self-referential question` — Direct changelog chapter without redundant navigation prose; preserves release entries.

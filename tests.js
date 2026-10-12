@@ -583,7 +583,7 @@ test('RISK FAQs changelog navigation: help dispatch exposes exact combined menu 
  assert.match(html,/App updated — check FAQs \/ Changelog → Changelog for what’s new/);
 });
 
-test('RISK changelog dates: FAQ combines repeated dates in descending order without losing history categories or links',async()=>{
+test('RISK changelog dates: direct FAQ notes combine repeated dates in descending order without losing history categories or links',async()=>{
  const {ctx,shim}=await loadApp();
  const sources=['appChangelogCurrent','appChangelog'].map(id=>html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1]);
  function rendered(current,archive){shim.document.getElementById('appChangelogCurrent').innerHTML=current;shim.document.getElementById('appChangelog').innerHTML=archive;ctx.openHelp();return shim.document.getElementById('modalRoot').innerHTML.split('<div class="kv" data-changelog-notes>')[1].split('</details>')[0];}
@@ -595,7 +595,7 @@ test('RISK changelog dates: FAQ combines repeated dates in descending order with
  const next=rendered('<div><h3>January 2, 2027</h3><ul><li><a href="https://example.com/release">Future release</a></li></ul><h3>January 2, 2027</h3><ul><li>Another release</li></ul></div>','<details><summary>Changelog</summary><h3>December 31, 2026</h3><ul><li>Year end</li></ul><h3>January 2, 2027 — Seasonal details</h3><ul><li>Future category</li></ul></details>');
  assert.deepEqual(Array.from(next.matchAll(/<h3>(.*?)<\/h3>/g),m=>m[1]),['January 2, 2027','December 31, 2026'],'future duplicates and year boundaries use the same renderer');
  assert.match(next,/<a href="https:\/\/example.com\/release">Future release<\/a>/);assert.match(next,/<h4>Seasonal details<\/h4>/);assert.equal(bullets(next).length,4);
- ctx.openHelp();assert.match(shim.document.getElementById('modalRoot').innerHTML,/one heading per date, newest first/i);
+ ctx.openHelp();assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/Where can I see what changed\?/,'chronological notes no longer repeat the removed navigation question');
 });
 
 test('RISK Settings hierarchy: moved Changelog leaves Save settings after every section without changing validation',async()=>{
@@ -25164,7 +25164,7 @@ test('RISK terrain walking planner budget: flat canonical routes retain bounded 
 });
 
 
-test('RISK Settings changelog reflow: actual archived notes retain readable tokens in narrow enlarged release lists',async()=>{
+test('RISK FAQs changelog reflow: actual archived notes retain readable tokens in narrow enlarged release lists',async()=>{
  const {ctx,shim}=await loadApp();
  for(const id of ['appChangelogCurrent','appChangelog']){
   const content=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))?.[1];assert.ok(content);
@@ -25176,7 +25176,7 @@ test('RISK Settings changelog reflow: actual archived notes retain readable toke
  assert.match(notes||'',/data-help-changelog/,'the actual FAQ consumer must scope enlarged release reflow without changing its chapter class');
  const rule=html.match(/\.help-faq\[data-help-changelog\]\s+\.kv\s*\{([^}]*)\}/)?.[1]||'';
  assert.match(rule,/overflow-wrap\s*:\s*anywhere/,'73 CSS-pixel enlarged list items must permit long archived tokens to break without clipping or altering their text');
- ctx.openHelp();assert.match(shim.document.getElementById('modalRoot').innerHTML,/Release notes wrap long words in enlarged views/,'extended FAQ explains enlarged release-note reflow');
+ ctx.openHelp();assert.match(shim.document.getElementById('modalRoot').innerHTML,/release notes wrap long words in enlarged views/i,'release history preserves the enlarged release-note reflow explanation');
 });
 
 test('RISK binary context presentation: active filters derive excluded controls on both surfaces without changing saved choices',async()=>{
@@ -25684,4 +25684,15 @@ test('RISK scenery random prefix reuse: draw sequence matches full public sampli
  const c=sceneTimeline(),T=c.LandscapeTimeline;
  for(const seed of ['chain-scanner-scene-v1','private-🧑🏽‍🚀','x\ud800'])for(const stream of ['arrival','woodland','festival','fireworks'])for(const slot of [-12345,-0,0,1791288000/8,'mixed|slot']){const r=T.random(seed,stream,slot);for(let salt=0;salt<120;salt++)assert.equal(r(),T.sample(seed,stream,slot,salt),'prefix reuse must preserve exact public seed hashing and counter ordering');}
  let value='first';const mutable={toString(){return value;}},r=T.random(mutable,'arrival',7);assert.equal(r(),T.sample(mutable,'arrival',7,0));value='second';assert.equal(r(),T.sample(mutable,'arrival',7,1),'nonprimitive seed conversion remains per draw');
+});
+
+
+test('RISK FAQ redundant changelog question: actual help consumer shows release history directly without a self-referential question',async()=>{
+ const {ctx,shim}=await loadApp();
+ for(const id of ['appChangelogCurrent','appChangelog'])shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
+ ctx.onAction('help',{});const markup=shim.document.getElementById('modalRoot').innerHTML;
+ const chapter=markup.split('<details class="help-faq" data-help-changelog>')[1].split('</details>')[0];
+ assert.doesNotMatch(chapter,/Where can I see what changed\?|Open FAQs \/ Changelog → Changelog|<dl>|<dt>|<dd>/,'Changelog should begin with release notes, without its redundant question and answer');
+ assert.match(chapter,/<summary><h3>Changelog<\/h3><\/summary><div class="kv" data-changelog-notes>/);
+ for(const id of ['appChangelogCurrent','appChangelog'])for(const item of shim.document.getElementById(id).innerHTML.matchAll(/<li>([\s\S]*?)<\/li>/g))assert.ok(chapter.includes(item[0]),'preserves actual release history');
 });
