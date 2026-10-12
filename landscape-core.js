@@ -12,6 +12,9 @@
   const START_SPEED_MIN=.82,START_SPEED_MAX=1.18;
   const startingSpeed=sample=>lerp(START_SPEED_MIN,START_SPEED_MAX,clamp(Number(sample)||0));
   function validDate(date){if(!(date instanceof Date)||!Number.isFinite(+date))throw new TypeError('Valid date required');}
+  // Zone validity is independent of observer coordinates. Retain only eight
+  // validated strings; mutable locations still pass every coordinate check.
+  const validatedZones=new Set();
   function locationObserver(location){
     if(location===undefined||location===null)return {observer,timeZone:DEFAULT_LOCATION.timezone};
     if(typeof location!=='object')throw new TypeError('Location object required');
@@ -20,7 +23,11 @@
     if(typeof longitude!=='number'||!Number.isFinite(longitude)||longitude<-180||longitude>180)throw new RangeError('Invalid longitude');
     const timeZone=location.timezone===undefined?DEFAULT_LOCATION.timezone:location.timezone;
     if(typeof timeZone!=='string'||!timeZone.trim())throw new RangeError('Invalid timezone');
-    try{new Intl.DateTimeFormat('en-US',{timeZone}).format();}catch{throw new RangeError('Invalid timezone');}
+    if(!validatedZones.has(timeZone)){
+      try{new Intl.DateTimeFormat('en-US',{timeZone}).format();}catch{throw new RangeError('Invalid timezone');}
+      validatedZones.add(timeZone);
+      if(validatedZones.size>8)validatedZones.delete(validatedZones.values().next().value);
+    }
     return {observer:new A.Observer(latitude,longitude,Number.isFinite(location.elevation)?location.elevation:20),timeZone};
   }
   function partsInZone(date,timeZone){

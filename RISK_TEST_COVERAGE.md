@@ -893,7 +893,7 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK pedestrian departure pace: carrying and winter people leave at a walking pace without a lifetime sprint
 - RISK pedestrian scheduled lifetime: accepted walkers retain admission duration and survive until a full viewport exit
 - RISK pedestrian companion pace: walking deer and woodland paws halve translation and distance together while hopping stays unchanged
-- RISK pedestrian visual tail preservation: longer paint lifetimes never reroll released admission or nonwalking effects
+- RISK pedestrian visual tail preservation: capacity skips only seeded opportunities while retaining their facts and independent scenery
 - RISK pedestrian complete parties: scheduled walking routes clear both edges at bounded pace and paint without terminal fade
 - RISK pedestrian reduced motion: static production poses keep walkers on screen and winter activities settled
 
@@ -950,8 +950,8 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - Scenery depth and lake capture: `RISK scenery depth: fountain participates in actual ground actor paint order`; `RISK scenery depth: nest bird sky and meadow passes paint each silhouette once`.
 
 - RISK terrain walking cadence: steep production routes slow travel with reachable contacts across human variants
-- RISK terrain walking approach: actual carrying painters preserve released arrival contacts before terrain-paced departures
-- RISK terrain walking guidance: extended FAQ explains terrain pacing without changing arrival chances or saved tasks
+- RISK terrain walking approach: actual carrying arrivals preserve planted contacts on their full offscreen route
+- RISK terrain walking guidance: extended FAQ explains terrain pacing capacity and saved-task preservation
 
 - RISK terrain walking planner budget: flat canonical routes retain bounded analytic clock work
 
@@ -976,12 +976,40 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 
 - `RISK CLOUD CLEANUP RESUME: interrupted deleting generation resumes without forbidden transition and preserves acknowledged board`
 - `RISK CLOUD CLEANUP GUIDANCE: sync FAQ distinguishes failed attempts from acknowledgement and explains resumable cleanup`
+
+## Pedestrian in-scene entry continuity
+
+- `RISK pedestrian entry: natural carrying and builder visits start opaque outside the frame and walk continuously to activity`
+- `RISK pedestrian skier entry: scheduled skier walks in opaque before retaining the downhill run and existing exit`
+- `RISK pedestrian skate entry: wide-frame riders do not fade while already visible`
+- `RISK pedestrian entry contacts: actual carrying pose stays continuous across offscreen approach and settling boundaries`
+- `RISK pedestrian entry guidance: FAQ distinguishes offscreen ongoing entries from current-scene reconstruction`
+- `RISK pedestrian entry reconstruction: reload resize and seek retain selected visits without an invented startup delay`
+- `RISK pedestrian ski transition: actual painted head moves continuously from carrying approach into the downhill pose`
+- `RISK pedestrian builder transition: painted working hands settle continuously after walking arrival`
+- `RISK pedestrian ski carry: approach skis intersect the actual carrying hand`
+- `RISK pedestrian ski tracks: approach transition introduces track ink continuously without a full-length pop`
+
+- `RISK pedestrian entry capacity: complete visitors retain the fourteen actor bound without eviction or seek-dependent admission`
+- `RISK pedestrian capacity planner budget: cached daily scheduling evaluates each immutable proposal lifetime once`
+- `RISK pedestrian capacity guidance: FAQ explains skipped crowded opportunities without changing underway visitors or saved tasks`
+
+- `RISK pedestrian capacity liveness: a busy day admits visitors while retaining the complete-life bound`
+- `RISK pedestrian capacity day boundary: admitted visits finish within their shared day while short late visitors remain possible`
 - RISK bulk toolbar: mounted controls stay outside scrolling rows and retain filtered selection through filter changes
 - RISK bulk row selection: selected label replaces the existing rank slot and deselection restores its format
 - RISK bulk toolbar keyboard: rerender restores the focused toolbar action and row toggle
 - RISK bulk toolbar guidance: extended FAQ describes frozen controls and rank-slot selection
 - RISK repository process boundary: actual visual tests compare every changed control with neighboring controls and scrolled states
 
+- RISK pedestrian ski preparation attachments: hat follows the painted head and poles stay in the painted grips throughout blending
+
+- `RISK pedestrian planner cold work: full capacity skips unnecessary lifetime solving without changing admitted scenes or reseeks`
+
+- `RISK pedestrian planner proposal work: rare admission reuses immutable day draws instead of generating the full day twice`
+- `RISK pedestrian planner rare reuse: guard join is unique and complete admitted scenes match prior across rare rates midnight and eviction`
+
+- `RISK pedestrian planner solar work: failed show chance draws do not request unused astronomy and exact scenes remain unchanged`
 - `RISK context reconciliation FAQ: actual Help keeps each existing bulk and context question once`
 
 - RISK context Settings reflow: actual manager name fields can shrink beside protected context and delete controls
@@ -1005,3 +1033,8 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 
 - RISK overdue scanner layout: enlarged candidate title chips and decision footer wrap without clipping choices
 - RISK overdue scanner layout: chosen-task breadcrumb stays within the enlarged scanner width
+
+- `RISK pedestrian planner timezone work: actual astronomical cold consumer validates a repeated observer zone once without changing its scene`
+- `RISK sky observer validation reuse: bounded zone cache never bypasses mutable coordinates invalid zones or changed solar outputs`
+- `RISK pedestrian planner hash work: complete cold proposals reuse immutable RNG prefixes while retaining every admitted scene`
+- `RISK scenery random prefix reuse: draw sequence matches full public sampling for Unicode signed slots counters and mutable input fallback`

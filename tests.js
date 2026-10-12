@@ -1003,6 +1003,64 @@ test('RISK shared scenery: deterministic opportunities preserve rail rare-show r
  for(let i=1;i<shows.length;i++)assert.ok(shows[i].start-shows[i-1].start>=4*(shows[i-1].duration+60)*1000-1,'the released sampled start interval is doubled again');
 });
 
+test('RISK pedestrian entry capacity: complete visitors retain the fourteen actor bound without eviction or seek-dependent admission',()=>{
+ const context=sceneTimeline(),options={seed:'private-schedule',season:'summer',sunAt:()=>({altitude:-20,azimuth:0})};
+ const timeline=context.LandscapeTimeline.create(options),clock=Date.parse('2026-10-06T01:24:56.116Z');
+ const snapshot=scene=>JSON.parse(JSON.stringify(scene.events));
+ for(const offset of [-1000,-1,0,1,7884,15884,60000,300000,-300000,0]){
+  const at=clock+offset,scene=timeline.at(at);
+  assert.ok(scene.events.length<=14,`complete logical visitors remain bounded at ${new Date(at).toISOString()}`);
+  assert.deepEqual(snapshot(scene),snapshot(context.LandscapeTimeline.create({...options,width:390,height:844,reduced:true}).at(at)),'cold reload, viewport and motion choice reconstruct the same admitted visitors');
+ }
+ const before=timeline.at(clock-1),after=timeline.at(clock+15884);
+ for(const event of before.events)if(event.age+15.885<event.duration){
+  const retained=after.events.find(other=>other.id===event.id);
+  assert.ok(retained,`capacity cannot evict underway ${event.id}`);
+  assert.ok(Math.abs(retained.age-event.age-15.885)<1e-7);
+  assert.equal(retained.duration,event.duration,'a crowded opportunity cannot shorten an admitted lifetime');
+ }
+});
+
+test('RISK pedestrian capacity planner budget: cached daily scheduling evaluates each immutable proposal lifetime once',()=>{
+ const context=sceneTimeline(),create=context.LandscapeGeometry.create,counts=new Map();
+ context.LandscapeGeometry.create=(width,height)=>{const geometry=create(width,height);if(width===8192){const lifetime=geometry.walkingLifetime;geometry.walkingLifetime=event=>{counts.set(event.id,(counts.get(event.id)||0)+1);return lifetime(event);};}return geometry;};
+ const timeline=context.LandscapeTimeline.create({seed:'private-schedule',season:'summer',sunAt:()=>({altitude:-20,azimuth:0})});
+ timeline.at(Date.parse('2026-10-06T01:24:56.116Z'));
+ timeline.at(Date.parse('2026-10-06T01:24:48Z'));timeline.at(Date.parse('2026-10-06T01:25:04Z'));
+ assert.ok(counts.size>10,'the actual capacity history contains immutable proposals');
+ assert.ok([...counts.values()].every(count=>count===1),'complete-life planning must not repeat inside quadratic overlap comparisons');
+});
+
+test('RISK pedestrian capacity liveness: a busy day admits visitors while retaining the complete-life bound',()=>{
+ const context=sceneTimeline(),timeline=context.LandscapeTimeline.create({seed:'private-schedule',season:'summer',sunAt:()=>({altitude:30,azimuth:90})}),start=Date.parse('2026-10-06T01:00Z'),seen=new Set();
+ for(let second=0;second<=1200;second+=30){const scene=timeline.at(start+second*1000);assert.ok(scene.events.length<=14);for(const event of scene.events)if(!['train','metro'].includes(event.type))seen.add(event.id);}
+ assert.ok(seen.size>0,'dense opportunities must not reserve rejected visitors forever and starve all nonrail scenery');
+});
+
+test('RISK pedestrian capacity day boundary: admitted visits finish within their shared day while short late visitors remain possible',()=>{
+ const context=sceneTimeline(),timeline=context.LandscapeTimeline.create({seed:'private-schedule',season:'summer',sunAt:()=>({altitude:30,azimuth:90})}),start=Date.parse('2026-10-06T23:40Z'),end=Date.parse('2026-10-07T00:00Z'),late=new Set();
+ for(let at=start;at<=end;at+=30000){const scene=timeline.at(at);assert.ok(scene.events.length<=14);for(const event of scene.events){
+  if(['train','metro'].includes(event.type))continue;
+  const born=at-event.age*1000,dayEnd=(Math.floor(born/86400000)+1)*86400000;
+  assert.ok(born+Math.max(event.duration,event.scheduleDuration||event.activityDuration||event.duration)*1000<=dayEnd+.001,'an admitted full reservation never needs truncation or midnight eviction');
+  if(at<end&&event.age<=30)late.add(event.id);
+ }}
+ assert.ok(late.size>0,'the boundary guard is not a blanket pause before midnight');
+});
+
+test('RISK pedestrian capacity guidance: FAQ explains skipped crowded opportunities without changing underway visitors or saved tasks',()=>{
+ const entry=html.split('<dt>How do people enter the scene?</dt>')[1].split('</dd>')[0];
+ assert.match(entry,/Crowded scenes can skip new visitors/);
+ assert.match(entry,/visitors already underway keep their complete visits/);
+ assert.match(entry,/never change saved tasks/);
+ const limits=html.split('<dt>Why can the scene have fewer visitors?</dt>')[1]?.split('</dd>')[0]||'';
+ assert.match(limits,/complete visits fill the scene budget/);
+ assert.match(limits,/midnight UTC/);
+ assert.match(limits,/A new visit in this visitor budget must finish before midnight UTC/);
+ assert.match(limits,/Trains, metro, and woodland animals keep their existing schedules/);
+ assert.match(limits,/Underway visits finish normally/);
+});
+
 test('RISK rain cloud consistency: every drifting cloud uses the shaded rain contour while clear daytime clouds retain their paint',()=>{
  const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),start=source.indexOf('  function cloud('),end=source.indexOf('\n  function ',start+4),paint=source.slice(start,end);
  const draws=[];
@@ -24528,7 +24586,7 @@ test('RISK pedestrian companion pace: walking deer and woodland paws halve trans
  const rabbit=g.groundPose('rabbit',{...e,duration:22,age:.7});assert.ok(rabbit.hop>0,'explicit hopping remains a separate locomotion');
 });
 
-test('RISK pedestrian visual tail preservation: longer paint lifetimes never reroll released admission or nonwalking effects',()=>{
+test('RISK pedestrian visual tail preservation: capacity skips only seeded opportunities while retaining their facts and independent scenery',()=>{
  const baseline=spawnSync('git',['show','9d433f1e241130bb4510d17d7125a66bffb21244:landscape-timeline.js'],{cwd:__dirname,encoding:'utf8'});assert.equal(baseline.status,0);
  const old=sceneTimeline({'landscape-timeline.js':()=>baseline.stdout}),candidate=sceneTimeline();
  const facts=e=>({id:e.id,type:e.type,age:e.age,duration:e.activityDuration||e.duration,seed:e.seed,lane:e.lane,reverse:e.reverse,speed:e.speed});
@@ -24536,7 +24594,7 @@ test('RISK pedestrian visual tail preservation: longer paint lifetimes never rer
   const options={seed,season,sunAt:()=>({altitude:25,azimuth:100})},a=old.LandscapeTimeline.create(options),b=candidate.LandscapeTimeline.create(options);
   for(const seconds of [0,70,301,900,1801,3600]){
    const at=Date.parse('2026-10-10T10:00Z')+seconds*1000,prior=a.at(at),next=b.at(at);
-   assert.deepEqual(JSON.parse(JSON.stringify(next.events.filter(e=>e.age<(e.activityDuration||e.duration)).map(facts))),JSON.parse(JSON.stringify(prior.events.map(facts))),'original admission identities and RNG metadata remain identical');
+   for(const event of next.events.filter(e=>e.age<(e.activityDuration||e.duration))){const original=prior.events.find(e=>e.id===event.id);assert.ok(original,'capacity cannot invent an opportunity outside the released seeded proposal schedule');assert.deepEqual(JSON.parse(JSON.stringify(facts(event))),JSON.parse(JSON.stringify(facts(original))),'retained admission facts and RNG metadata remain identical');}
    for(const key of ['clouds','woodland','party','clocktower','gardens','windowsSlot'])assert.deepEqual(JSON.parse(JSON.stringify(next[key])),JSON.parse(JSON.stringify(prior[key])),key+' remains unchanged');
   }
  }
@@ -24612,7 +24670,8 @@ test('RISK pedestrian reduced painter consumer: production-shaped static events 
 
 test('RISK pedestrian concise help: natural exit guidance has a short adjacent FAQ without lengthening the existing scenery answer',()=>{
  const entry=html.split('<dt>How do walking visitors leave the scene?</dt>')[1];assert.ok(entry,'walking guidance has its own user-facing FAQ');
- assert.match(entry.split('</dd>')[0],/Arrival chances and the shared visit schedule stay the same/);
+ assert.match(entry.split('</dd>')[0],/Seeded opportunities stay shared across devices/);
+ assert.match(entry.split('</dd>')[0],/longer walks count toward the scene budget/);
 });
 
 test('RISK neutral bootstrap: automatic oldest stays outside Yes No and Dot comparisons until explicitly chosen',async()=>{
@@ -25056,22 +25115,22 @@ test('RISK terrain walking cadence: steep production routes slow travel with rea
 });
 
 
-test('RISK terrain walking approach: actual carrying painters preserve released arrival contacts before terrain-paced departures',async()=>{
- const {readMotionBuild,createMotionProbe}=await import('./scripts/motion-review-harness.mjs');
- const current=readMotionBuild(__dirname,'WORKTREE'),prior=readMotionBuild(__dirname,'43824ceb6280b57ec33c530dfbfe60c40db8ba05');
- for(const actor of ['reader','couple','picnic','kite'])for(const reverse of [false,true])for(const fraction of [.03,.06,.1,.18]){
-  const duration={reader:220,couple:200,picnic:240,kite:90}[actor],event={type:actor,age:duration*fraction,duration:3000,activityDuration:duration,seed:.4,lane:.5,reverse},before=[],after=[];
-  createMotionProbe(prior,{width:390,height:844,onHumanPose:(pose)=>before.push(JSON.parse(JSON.stringify(pose)))}).sample({actor,event,zoom:1});
-  createMotionProbe(current,{width:390,height:844,onHumanPose:(pose)=>after.push(JSON.parse(JSON.stringify(pose)))}).sample({actor,event,zoom:1});
-  assert.deepEqual(after,before,`${actor} reverse=${reverse} arrival ${fraction}: terrain departure pacing must not accelerate existing approach contacts`);
+test('RISK terrain walking approach: actual carrying arrivals preserve planted contacts on their full offscreen route',async()=>{
+ const {readMotionBuild,createMotionProbe}=await import('./scripts/motion-review-harness.mjs'),build=readMotionBuild(__dirname,'WORKTREE');
+ for(const actor of ['reader','couple','picnic','kite'])for(const reverse of [false,true])for(const age of [1,3,7,12]){
+  const duration={reader:220,couple:200,picnic:240,kite:90}[actor],event={type:actor,age,duration:9000,activityDuration:duration,seed:.4,lane:.5,reverse},samples=[];
+  for(const offset of [0,.00001]){const poses=[],frame=createMotionProbe(build,{width:390,height:844,onHumanPose:pose=>poses.push(JSON.parse(JSON.stringify(pose)))}).sample({actor,event:{...event,age:age+offset},zoom:1});samples.push({poses,x:frame.metadata.x});}
+  assert.equal(samples[0].poses.length,actor==='couple'||actor==='picnic'?2:1,'actual constrained carrying painter executes every arriving person');
+  samples[0].poses.forEach((pose,i)=>{const next=samples[1].poses[i];for(let leg=0;leg<2;leg++)if(pose.legs[leg].lift===0&&next.legs[leg].lift===0)assert.ok(Math.abs(samples[0].x+(reverse?-1:1)*pose.legs[leg].footX-samples[1].x-(reverse?-1:1)*next.legs[leg].footX)<1e-7,'arrival stance toes stay fixed in world coordinates');});
  }
 });
 
 
-test('RISK terrain walking guidance: extended FAQ explains terrain pacing without changing arrival chances or saved tasks',()=>{
+test('RISK terrain walking guidance: extended FAQ explains terrain pacing capacity and saved-task preservation',()=>{
  const entry=html.split('<dt>How do walking visitors leave the scene?</dt>')[1].split('</dd>')[0];
  assert.match(entry,/Walkers and departing visitors slow their travel on steep ground/);
- assert.match(entry,/Arrival chances and the shared visit schedule stay the same/);
+ assert.match(entry,/Seeded opportunities stay shared across devices/);
+ assert.match(entry,/longer walks count toward the scene budget/);
  assert.match(entry,/never change saved tasks/);
 });
 
@@ -25280,6 +25339,156 @@ test('Firestore rules: production cleanup resumes deleting tombstones and protec
  }finally{await env.cleanup();}
 });
 
+// In-scene admission must start people beyond the frame, not at their activity anchor.
+test('RISK pedestrian entry: natural carrying and builder visits start opaque outside the frame and walk continuously to activity',()=>{
+ const ctx=vm.createContext({Math});for(const file of ['landscape-geometry.js','landscape-winter.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,file),'utf8'),ctx);
+ for(const [width,height] of [[390,844],[844,390],[820,1180],[1440,900]])for(const reverse of [false,true])for(const type of ['walker','dogwalker','reader','couple','picnic','kite','snowman','snowangel']){
+  const g=ctx.LandscapeGeometry.create(width,height),duration={walker:60,dogwalker:70,reader:220,couple:200,picnic:240,kite:90,snowman:180,snowangel:100}[type],e={type,duration:9000,activityDuration:duration,age:0,lane:.5,seed:.4,reverse};
+  const at=age=>{const event={...e,age};if(type==='snowman'||type==='snowangel'){const p=ctx.LandscapeWinter.pose(type,event,g,width,height);return {x:type==='snowman'?p.builderX:p.x,alpha:type==='snowman'?p.builderAlpha:p.alpha};}return {...(['walker','dogwalker'].includes(type)?g.groundPose('walker',event):g.visitPose(event,g.motionProgress(event,'x'))),alpha:1};};
+  const start=at(0),margin=type==='couple'||type==='picnic'?23:type==='dogwalker'?27:12;
+  assert.ok(reverse?start.x-margin>width:start.x+margin<0,`${type} ${width} reverse=${reverse}: initial human party x=${start.x} is inside the visible frame`);
+  assert.equal(start.alpha,1,'entry is movement, never a person alpha fade');
+  let prior=start;
+  for(let age=.25;age<=Math.min(g.walkingLifetime(e),1000);age+=.25){const current=at(age);assert.ok((current.x-prior.x)*(reverse?-1:1)>=-1e-7,'arrival/settling/departure never teleports backward');assert.ok(Math.abs(current.x-prior.x)<=4.4*.25+1e-6,'no speed-up or entry snap');if(current.x>0&&current.x<width)assert.equal(current.alpha,1,'visible person stays opaque');prior=current;}
+ }
+});
+
+test('RISK pedestrian skier entry: scheduled skier walks in opaque before retaining the downhill run and existing exit',()=>{
+ const ctx=vm.createContext({Math});for(const file of ['landscape-geometry.js','landscape-winter.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,file),'utf8'),ctx);
+ for(const [width,height] of [[390,844],[844,390],[820,1180],[1440,900]])for(const reverse of [false,true])for(const lane of [0,.5,1]){
+  const g=ctx.LandscapeGeometry.create(width,height),e={type:'skier',duration:9000,activityDuration:75,age:0,seed:.4,lane,reverse},initial=ctx.LandscapeWinter.pose('skier',e,g,width,height);
+  assert.ok(reverse?initial.x-12>width:initial.x+12<0,'scheduled skier must start outside the entire visible figure');assert.equal(initial.alpha,1);assert.equal(initial.walking,true);assert.equal(initial.skiing,false);
+  const plan=g.walkingPlan(e);assert.ok(plan.arrivalSeconds>0);let low=0,high=g.walkingLifetime(e);for(let i=0;i<48;i++){const age=(low+high)/2;if(g.walkingClock({...e,age})<plan.arrivalSeconds)low=age;else high=age;}
+  const boundary=(low+high)/2,a=ctx.LandscapeWinter.pose('skier',{...e,age:boundary-1e-5},g,width,height),b=ctx.LandscapeWinter.pose('skier',{...e,age:boundary+1e-5},g,width,height);assert.ok(Math.hypot(a.x-b.x,a.y-b.y)<.001,'walking/skiing transition position is continuous');assert.equal(b.alpha,1);
+ }
+});
+
+test('RISK pedestrian skate entry: wide-frame riders do not fade while already visible',async()=>{
+ const {readMotionBuild,createMotionProbe}=await import('./scripts/motion-review-harness.mjs'),build=readMotionBuild(__dirname,'WORKTREE');
+ for(const actor of ['skateboarder','rollerskater'])for(const reverse of [false,true]){
+  const frame=createMotionProbe(build,{width:3840,height:900}).sample({actor,reverse,progress:160/(3840+320),seed:.4,lane:.5,zoom:1});
+  const alpha=frame.commands.filter(c=>c[0]==='set'&&c[1]==='globalAlpha').at(-1)?.[2];assert.equal(alpha,1,'visible entry must not fade the person');
+ }
+});
+
+test('RISK pedestrian entry contacts: actual carrying pose stays continuous across offscreen approach and settling boundaries',async()=>{
+ const {readMotionBuild,createMotionProbe}=await import('./scripts/motion-review-harness.mjs'),build=readMotionBuild(__dirname,'WORKTREE'),ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);
+ for(const actor of ['reader','couple','picnic','kite'])for(const reverse of [false,true]){
+  const g=ctx.LandscapeGeometry.create(390,844),duration={reader:220,couple:200,picnic:240,kite:90}[actor],e={type:actor,duration:9000,activityDuration:duration,seed:.4,lane:.5,reverse},plan=g.walkingPlan(e);
+  for(const clock of [plan.arrivalSeconds,plan.arrivalSeconds+duration*.24,plan.begin]){
+   let lo=0,hi=g.walkingLifetime(e);for(let i=0;i<48;i++){const mid=(lo+hi)/2;if(g.walkingClock({...e,age:mid})<clock)lo=mid;else hi=mid;}const age=(lo+hi)/2,poses=[];
+   for(const ageOffset of [-1e-7,1e-7]){const observed=[];createMotionProbe(build,{width:390,height:844,onHumanPose:p=>observed.push(JSON.parse(JSON.stringify(p)))}).sample({actor,event:{...e,age:age+ageOffset},zoom:1});poses.push(observed);}
+   assert.equal(poses[0].length,poses[1].length);poses[0].forEach((a,i)=>{const b=poses[1][i];for(const key of ['hipX','hipY','bob'])assert.ok(Math.abs(a[key]-b[key])<.001,`${actor} ${key} must not snap at entry clock ${clock}`);for(let leg=0;leg<2;leg++)for(const key of ['footX','footY','kneeX','kneeY'])assert.ok(Math.abs(a.legs[leg][key]-b.legs[leg][key])<.001,`${actor} ${key} must not replan at entry clock ${clock}`);});
+  }
+ }
+});
+
+test('RISK pedestrian entry guidance: FAQ distinguishes offscreen ongoing entries from current-scene reconstruction',()=>{
+ const entry=html.split('<dt>How do people enter the scene?</dt>')[1].split('</dd>')[0];
+ assert.match(entry,/Walking visitors enter from outside the visible frame/);assert.match(entry,/Skiers walk in before their downhill run/);assert.match(entry,/Skating visitors enter without fading/);assert.match(entry,/Opening, reloading, or resizing reconstructs the current shared moment/);assert.match(entry,/visitor already underway can be visible immediately/);assert.match(entry,/Reduced motion keeps scenery still/);
+});
+
+test('RISK pedestrian entry reconstruction: reload resize and seek retain selected visits without an invented startup delay',()=>{
+ const base=spawnSync('git',['show','18e3eebaeac3e05d64177c97486d48d1ab1f84eb:landscape-geometry.js'],{cwd:__dirname,encoding:'utf8'});assert.equal(base.status,0);const oldTimeline=spawnSync('git',['show','18e3eebaeac3e05d64177c97486d48d1ab1f84eb:landscape-timeline.js'],{cwd:__dirname,encoding:'utf8'});assert.equal(oldTimeline.status,0);const prior=sceneTimeline({'landscape-geometry.js':()=>base.stdout,'landscape-timeline.js':()=>oldTimeline.stdout}),ctx=sceneTimeline();vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-winter.js'),'utf8'),ctx);
+ const facts=e=>({id:e.id,type:e.type,age:e.age,duration:e.activityDuration||e.duration,seed:e.seed,lane:e.lane,reverse:e.reverse,speed:e.speed}),options={seed:'private-entry-reconstruction',season:'winter',sunAt:()=>({altitude:25,azimuth:100})},old=prior.LandscapeTimeline.create(options),current=ctx.LandscapeTimeline.create(options);
+ for(const seconds of [0,70,301,900,1801]){const at=Date.parse('2026-10-11T10:00Z')+seconds*1000,a=old.at(at),b=current.at(at),fresh=ctx.LandscapeTimeline.create(options).at(at);assert.deepEqual(JSON.parse(JSON.stringify(b)),JSON.parse(JSON.stringify(fresh)),'fresh reload reconstructs current scene immediately, including ongoing ages');for(const event of b.events.filter(e=>e.age<(e.activityDuration||e.duration))){const original=a.events.find(e=>e.id===event.id);assert.ok(original,'capacity admits a subset of seeded opportunities rather than inventing arrivals');assert.deepEqual(JSON.parse(JSON.stringify(facts(event))),JSON.parse(JSON.stringify(facts(original))),'an admitted opportunity retains its original seeded type, start, speed and geometry inputs');}
+  for(const [width,height] of [[390,844],[844,390],[820,1180],[1440,900]])for(const e of b.events.filter(e=>['reader','couple','picnic','kite','snowman','skier'].includes(e.type))){const g=ctx.LandscapeGeometry.create(width,height),h=ctx.LandscapeGeometry.create(width,height),pose=(geo,event)=>['snowman','skier'].includes(e.type)?ctx.LandscapeWinter.pose(e.type,event,geo,width,height):geo.visitPose(event,geo.motionProgress(event,'x'));const expected=JSON.parse(JSON.stringify(pose(g,e)));pose(g,{...e,age:0});pose(g,{...e,age:e.age+100});assert.deepEqual(JSON.parse(JSON.stringify(pose(g,e))),expected,'backward seek is independent of previous frames');assert.deepEqual(JSON.parse(JSON.stringify(pose(h,e))),expected,'resize/fresh geometry at same dimensions reconstructs same current pose');}
+ }
+});
+
+test('RISK pedestrian ski transition: actual painted head moves continuously from carrying approach into the downhill pose',()=>{
+ const ctx=vm.createContext({Math});for(const file of ['landscape-geometry.js','landscape-winter.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,file),'utf8'),ctx);
+ for(const reverse of [false,true]){
+  const width=390,height=844,g=ctx.LandscapeGeometry.create(width,height),e={type:'skier',duration:9000,activityDuration:75,seed:.4,lane:.5,reverse},plan=g.walkingPlan(e);let lo=0,hi=g.walkingLifetime(e);for(let i=0;i<48;i++){const mid=(lo+hi)/2;if(g.walkingClock({...e,age:mid})<plan.arrivalSeconds)lo=mid;else hi=mid;}const age=(lo+hi)/2;
+  const headAt=age=>{let matrix=[1,0,0,1,0,0];const stack=[],heads=[],multiply=n=>{const[a,b,c,d,x,y]=matrix,[e,f,g,h,u,v]=n;matrix=[a*e+c*f,b*e+d*f,a*g+c*h,b*g+d*h,a*u+c*v+x,b*u+d*v+y];},canvas={save(){stack.push([...matrix]);},restore(){matrix=stack.pop();},translate(x,y){multiply([1,0,0,1,x,y]);},scale(x,y){multiply([x,0,0,y,0,0]);},rotate(angle){multiply([Math.cos(angle),Math.sin(angle),-Math.sin(angle),Math.cos(angle),0,0]);}};ctx.LandscapeWinter.paint(canvas,g,width,height,{...e,age},0,{city:'#334455',front:'#556655',sky:['#aabbcc','#bbccdd','#ccddee']},{line(){},ellipse(){},color:()=> '#112233',skinColor:()=> '#abcdef',personHead(canvas,x,y){heads.push({x:matrix[0]*x+matrix[2]*y+matrix[4],y:matrix[1]*x+matrix[3]*y+matrix[5]});}});assert.equal(heads.length,1,'one opaque person head is painted');return heads[0];};
+  const before=headAt(age-1e-7),after=headAt(age+1e-7);assert.ok(Math.hypot(before.x-after.x,before.y-after.y)<.001,'walking-to-ski head must not jump between unrelated rigs');
+ }
+});
+
+test('RISK pedestrian builder transition: painted working hands settle continuously after walking arrival',()=>{
+ const ctx=vm.createContext({Math});for(const file of ['landscape-geometry.js','landscape-winter.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,file),'utf8'),ctx);
+ for(const reverse of [false,true]){const g=ctx.LandscapeGeometry.create(390,844),e={type:'snowman',duration:9000,activityDuration:180,seed:.4,lane:.5,reverse},plan=g.walkingPlan(e);let lo=0,hi=g.walkingLifetime(e);for(let i=0;i<48;i++){const mid=(lo+hi)/2;if(g.walkingClock({...e,age:mid})<plan.arrivalSeconds)lo=mid;else hi=mid;}const age=(lo+hi)/2;
+  const armsAt=age=>{const lines=[],canvas={save(){},restore(){},translate(){},scale(){},rotate(){}};ctx.LandscapeWinter.paint(canvas,g,390,844,{...e,age},0,{city:'#334455',front:'#556655',sky:['#aabbcc','#bbccdd','#ccddee']},{ellipse(){},line(canvas,...args){if(args[4]==='#abcdef')lines.push(args.slice(0,4));},skinColor:()=> '#abcdef',color:()=> '#112233'});return lines;};const a=armsAt(age-1e-7),b=armsAt(age+1e-7);assert.equal(a.length,b.length);a.forEach((line,i)=>line.forEach((point,j)=>assert.ok(Math.abs(point-b[i][j])<.001,'builder arm must ease into working rather than jump')));
+ }
+});
+
+test('RISK pedestrian ski carry: approach skis intersect the actual carrying hand',()=>{
+ const ctx=vm.createContext({Math});for(const file of ['landscape-geometry.js','landscape-winter.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,file),'utf8'),ctx);
+ for(const reverse of [false,true]){const g=ctx.LandscapeGeometry.create(390,844),e={type:'skier',duration:9000,activityDuration:75,age:1,seed:.4,lane:.5,reverse},p=ctx.LandscapeWinter.pose('skier',e,g,390,844),motion=g.humanWalkPose(p.x,p.y,p.walkDistance,p.direction,g.humanGround('middle',p.snowOffset),0,p.scale,p.travel),hand={x:p.x+p.direction*p.scale*motion.hand.x,y:p.y+p.scale*motion.hand.y};let matrix=[1,0,0,1,0,0];const stack=[],lines=[],multiply=n=>{const[a,b,c,d,x,y]=matrix,[e,f,g,h,u,v]=n;matrix=[a*e+c*f,b*e+d*f,a*g+c*h,b*g+d*h,a*u+c*v+x,b*u+d*v+y];},point=(x,y)=>({x:matrix[0]*x+matrix[2]*y+matrix[4],y:matrix[1]*x+matrix[3]*y+matrix[5]}),canvas={save(){stack.push([...matrix]);},restore(){matrix=stack.pop();},translate(x,y){multiply([1,0,0,1,x,y]);},scale(x,y){multiply([x,0,0,y,0,0]);},rotate(angle){multiply([Math.cos(angle),Math.sin(angle),-Math.sin(angle),Math.cos(angle),0,0]);}};
+  ctx.LandscapeWinter.paint(canvas,g,390,844,e,0,{city:'#334455',front:'#556655',sky:['#aabbcc','#bbccdd','#ccddee']},{ellipse(){},skinColor:()=> '#abcdef',color:()=> '#112233',line(canvas,x,y,u,v,color,width){if(color==='#112233'&&width<2)lines.push([point(x,y),point(u,v)]);}});
+  assert.ok(lines.some(([a,b])=>{const dx=b.x-a.x,dy=b.y-a.y,t=Math.max(0,Math.min(1,((hand.x-a.x)*dx+(hand.y-a.y)*dy)/(dx*dx+dy*dy)));return Math.hypot(hand.x-a.x-t*dx,hand.y-a.y-t*dy)<.001;}),'carried ski is attached to the actual hand');
+ }
+});
+
+test('RISK pedestrian ski tracks: approach transition introduces track ink continuously without a full-length pop',()=>{
+ const ctx=vm.createContext({Math});for(const file of ['landscape-geometry.js','landscape-winter.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,file),'utf8'),ctx);const g=ctx.LandscapeGeometry.create(390,844),e={type:'skier',duration:9000,activityDuration:75,seed:.4,lane:.5,reverse:false},plan=g.walkingPlan(e);let lo=0,hi=g.walkingLifetime(e);for(let i=0;i<48;i++){const mid=(lo+hi)/2;if(g.walkingClock({...e,age:mid})<plan.arrivalSeconds)lo=mid;else hi=mid;}const age=(lo+hi)/2,stack=[],ink=[],canvas={globalAlpha:1,save(){stack.push(this.globalAlpha);},restore(){this.globalAlpha=stack.pop();},translate(){},scale(){},rotate(){}};
+ ctx.LandscapeWinter.paint(canvas,g,390,844,{...e,age:age+1e-7},0,{city:'#334455',front:'#556655',sky:['#aabbcc','#bbccdd','#ccddee']},{ellipse(){},line(canvas,x,y,u,v,color,width){if(Math.abs(width-.65*.85)<1e-9)ink.push(Math.hypot(u-x,v-y)*canvas.globalAlpha);},skinColor:()=> '#abcdef',color:()=> '#112233'});assert.ok(ink.reduce((sum,n)=>sum+n,0)<.001,'ski tracks cannot become fully visible in the first transition instant');
+});
+
+
+test('RISK pedestrian ski preparation attachments: hat follows the painted head and poles stay in the painted grips throughout blending',()=>{
+ const ctx=vm.createContext({Math});for(const file of ['landscape-geometry.js','landscape-winter.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,file),'utf8'),ctx);
+ for(const [width,height]of[[390,844],[1440,900]])for(const reverse of[false,true])for(const progress of[.02,.06,.10,.12]){
+  const g=ctx.LandscapeGeometry.create(width,height),e={type:'skier',duration:9000,activityDuration:75,seed:.4,lane:.5,reverse},plan=g.walkingPlan(e),target=plan.arrivalSeconds+75*progress;let lo=0,hi=g.walkingLifetime(e);for(let i=0;i<48;i++){const mid=(lo+hi)/2;if(g.walkingClock({...e,age:mid})<target)lo=mid;else hi=mid;}
+  const heads=[],hats=[],arms=[],poles=[],stack=[],canvas={globalAlpha:1,save(){stack.push(this.globalAlpha);},restore(){this.globalAlpha=stack.pop();},translate(){},scale(){},rotate(){}};
+  ctx.LandscapeWinter.paint(canvas,g,width,height,{...e,age:(lo+hi)/2},0,{city:'#334455',front:'#556655',sky:['#aabbcc','#bbccdd','#ccddee']},{skinColor:()=> '#abcdef',color:()=> '#112233',personHead(canvas,x,y){heads.push({x,y});},ellipse(canvas,x,y,rx,ry){if(rx===2.2&&ry===1.2)hats.push({x,y});},line(canvas,x,y,u,v,color,width){if(color==='#abcdef')arms.push({x:u,y:v});if(width===.7)poles.push({x,y});}});
+  assert.equal(heads.length,1);assert.equal(hats.length,1);assert.ok(Math.hypot(hats[0].x-heads[0].x,hats[0].y-heads[0].y)<=1.15,'preparation hat must stay on current painted head rather than its future skiing location');
+  assert.equal(arms.length,4);assert.equal(poles.length,2);for(let i=0;i<2;i++)assert.ok(Math.hypot(poles[i].x-arms[2*i+1].x,poles[i].y-arms[2*i+1].y)<1e-8,'each preparation pole starts in the actual currently painted grip');
+ }
+});
+
+test('RISK pedestrian planner cold work: full capacity skips unnecessary lifetime solving without changing admitted scenes or reseeks',()=>{
+ const prior=spawnSync('git',['show','c21ee6f2a1147636f89cc96dae80aa9ba8ba9ea5:landscape-timeline.js'],{cwd:__dirname,encoding:'utf8'});assert.equal(prior.status,0,prior.stderr);
+ const epoch=Date.parse('2026-10-06T00:00Z'),day=86400000,snapshot=value=>JSON.parse(JSON.stringify(value));
+ for(const season of ['winter','summer'])for(const night of [false,true]){
+  const current=sceneTimeline(),reference=sceneTimeline({'landscape-timeline.js':()=>prior.stdout}),create=current.LandscapeGeometry.create;let calls=0;
+  current.LandscapeGeometry.create=(w,h)=>{const geometry=create(w,h);if(w===8192){const lifetime=geometry.walkingLifetime;geometry.walkingLifetime=e=>{calls++;return lifetime(e);};}return geometry;};
+  const options={seed:'private-schedule',season,sunAt:()=>({altitude:night?-20:30,azimuth:night?0:90})},actual=current.LandscapeTimeline.create(options),baseline=reference.LandscapeTimeline.create(options),first=epoch+12*3600000;
+  assert.deepEqual(snapshot(actual.at(first)),snapshot(baseline.at(first)),'the actual cold consumer preserves every admitted event, duration and independent scenery stream');
+  assert.ok(calls<=(night?1300:season==='winter'?1300:1800),`${season} ${night?'night':'day'} cold planning solved ${calls} lifetimes despite full capacity`);
+  const coldCalls=calls;actual.at(first+8000);actual.at(first-8000);actual.at(first);assert.equal(calls,coldCalls,'same-day buckets reuse the existing bounded daily plan');
+  for(const offset of [1,23*3600000+40*60000,day-1,day,day+1,-1,2*day+1,-2*day+1,12*3600000]){
+   const at=epoch+offset,scene=actual.at(at);assert.deepEqual(snapshot(scene),snapshot(baseline.at(at)),'midnight, eviction and backwards reseek preserve exact scheduling');assert.ok(scene.events.length<=14);
+   for(const e of scene.events)if(!['train','metro'].includes(e.type)){const born=at-e.age*1000;assert.ok(born+Math.max(e.duration,e.scheduleDuration||e.activityDuration||e.duration)*1000<=(Math.floor(born/day)+1)*day+.001,'full reservations still fit their admitted UTC day');}
+  }
+ }
+});
+
+test('RISK pedestrian planner proposal work: rare admission reuses immutable day draws instead of generating the full day twice',()=>{
+ const count=source=>`{const c=LandscapeConfig;globalThis.proposalDraws=0;globalThis.LandscapeConfig={...c,pickEvent(...args){proposalDraws++;return c.pickEvent(...args);}};}\n`+source;
+ const context=sceneTimeline({'landscape-timeline.js':count}),timeline=context.LandscapeTimeline.create({seed:'private-schedule',season:'summer',sunAt:()=>({altitude:30,azimuth:90})});
+ const at=Date.parse('2026-10-06T12:00Z');timeline.at(at);assert.ok(context.proposalDraws>1000,'the actual consumer exercises a complete busy-day proposal stream');
+ assert.ok(context.proposalDraws<=11500,`cold planning performed ${context.proposalDraws} event-table draws, duplicating the same immutable day proposals`);
+ const before=context.proposalDraws;timeline.at(at+8000);timeline.at(at-8000);assert.equal(context.proposalDraws,before,'the bounded same-day memo remains effective');
+});
+
+test('RISK pedestrian planner rare reuse: guard join is unique and complete admitted scenes match prior across rare rates midnight and eviction',()=>{
+ const released=spawnSync('git',['show','f8fa176ddfaeedb9b2b7aeaf586b8e71a2e5ce3f:landscape-timeline.js'],{cwd:__dirname,encoding:'utf8'});assert.equal(released.status,0,released.stderr);
+ const epoch=Date.parse('2026-10-06T00:00Z'),day=86400000,snapshot=value=>JSON.parse(JSON.stringify(value));
+ for(const season of ['summer','winter'])for(const night of [false,true])for(const rareRate of [0,2]){
+  const actual=sceneTimeline(),prior=sceneTimeline({'landscape-timeline.js':()=>released.stdout});for(const c of[actual,prior])assert.equal(c.LandscapeConfig.setSpawnRates(`| abduction | ${rareRate} |\n| festival | ${rareRate} |`),true);
+  const options={seed:rareRate?'private-schedule':'chain-scanner-scene-v1',season,sunAt:()=>({altitude:night?-20:30,azimuth:night?0:90})},a=actual.LandscapeTimeline.create(options),b=prior.LandscapeTimeline.create(options);
+  for(const offset of[12*3600000,-1,0,1,day-1,day,day+1,2*day+1,12*3600000]){const value=a.at(epoch+offset);assert.deepEqual(snapshot(value),snapshot(b.at(epoch+offset)),'raw reuse retains accepted IDs, lifetimes, independent streams and cache/UTC reconstruction');assert.ok(value.events.length<=14);}
+ }
+ const boundarySlot=epoch/1000/8-75,inject=source=>source.replace('function random(seed,stream,slot=0){',`function random(seed,stream,slot=0){if(seed==='private-rare-boundary'&&stream==='arrival'&&slot===${boundarySlot})return ()=>0;`).replace('const rare=rareRaw.filter','globalThis.rareIds=rareRaw.map(e=>e.id);const rare=rareRaw.filter');
+ const a=sceneTimeline({'landscape-timeline.js':inject}),b=sceneTimeline({'landscape-timeline.js':()=>inject(released.stdout)}),options={seed:'private-rare-boundary',season:'summer',sunAt:()=>({altitude:30,azimuth:90})};
+ assert.deepEqual(snapshot(a.LandscapeTimeline.create(options).at(epoch+3600000)),snapshot(b.LandscapeTimeline.create(options).at(epoch+3600000)));
+ assert.ok(a.rareIds.includes(`arrival:${boundarySlot}`),'fixture puts an actual abduction exactly at the raw/rare guard join');assert.equal(new Set(a.rareIds).size,a.rareIds.length,'inclusive ordinary range endpoints cannot duplicate the join proposal');
+ const broken=sceneTimeline({'landscape-timeline.js':source=>inject(source).replace("filter(e=>e.type==='abduction'&&!rareIds.has(e.id))","filter(e=>e.type==='abduction')")});broken.LandscapeTimeline.create(options).at(epoch+3600000);assert.ok(new Set(broken.rareIds).size<broken.rareIds.length,'negative control removing guard-join deduplication must still expose the forced duplicate');
+});
+
+test('RISK pedestrian planner solar work: failed show chance draws do not request unused astronomy and exact scenes remain unchanged',()=>{
+ const old=spawnSync('git',['show','f8fa176ddfaeedb9b2b7aeaf586b8e71a2e5ce3f:landscape-timeline.js'],{cwd:__dirname,encoding:'utf8'});assert.equal(old.status,0,old.stderr);
+ for(const rate of[0,1]){
+  const current=sceneTimeline(),prior=sceneTimeline({'landscape-timeline.js':()=>old.stdout}),location={latitude:28.5383,longitude:-81.3792,timezone:'America/New_York',elevation:20},storage={getItem(){return null;}};let calls=0;
+  for(const c of[current,prior])assert.equal(c.LandscapeConfig.setSpawnRates(`| fireworks | ${rate} |\n| festival | ${rate} |`),true);
+  const options=c=>({seed:c.LandscapeTimeline.DEFAULT_SEED,season:'autumn',location,sunAt:at=>{if(c===current)calls++;return c.LivingSky.sunAt(c.LivingSky.sceneDate(new Date(at),storage,location),location);}}),a=current.LandscapeTimeline.create(options(current)),b=prior.LandscapeTimeline.create(options(prior)),at=Date.parse('2026-10-06T12:00Z'),value=a.at(at);
+  assert.deepEqual(JSON.parse(JSON.stringify(value)),JSON.parse(JSON.stringify(b.at(at))),'pure chance prechecks preserve the actual astronomy-derived admitted scene');
+  assert.ok(calls<=(rate?2100:1600),`show rate ${rate} unnecessarily queried ${calls} astronomical instants after already failed chance draws`);
+  const count=calls;a.at(at+8000);assert.ok(calls<=count+1,'same-day scheduling retains its bounded sun memo');
+ }
+});
+
 test('RISK context reconciliation FAQ: actual Help keeps each existing bulk and context question once',async()=>{
  const {ctx,shim}=await loadApp();ctx.closeModal();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
  for(const question of ['How do I edit several tasks together?','Which properties can I change in Bulk Edit?','What happens if selected tasks change before or during Save?','How does Undo work after Bulk Edit?','What does the bulk result count mean?','How do contexts and list filters work?','How do I create contexts and filter All Tasks?'])assert.equal(help.split('<dt>'+question+'</dt>').length-1,1,question+' appears once in rendered Help');
@@ -25421,4 +25630,40 @@ test('RISK overdue scanner layout: chosen-task breadcrumb stays within the enlar
  const {ctx,shim}=await loadApp({seed:971}),b=ctx.addTask('A long previously chosen benchmark title'),t=ctx.addTask('Overdue task',false,[],{due:ctx.todayISO(-1)});ctx.dotTask(b.id);ctx.state.mode='scan';ctx.state.candidateId=t.id;ctx.renderScan();ctx.onAction('run-woop',overdueWoopControl({ctx,shim}));
  assert.match(shim.document.getElementById('scan').innerHTML,/class="crumb"/,'the explicit dot makes its former benchmark a breadcrumb');
  const source=fs.readFileSync(new URL('./index.html',import.meta.url),'utf8');assert.match(source,/\.crumb\{max-width:min\(190px,100%\)\}/,'its existing190px cap must also respect a narrower scanner instead of overflowing after the new dot');
+});
+
+test('RISK pedestrian planner timezone work: actual astronomical cold consumer validates a repeated observer zone once without changing its scene',()=>{
+ const prior=spawnSync('git',['show','1d875397d87e4eca2b08ca7f171f7c17084061e0:landscape-core.js'],{cwd:__dirname,encoding:'utf8'});assert.equal(prior.status,0,prior.stderr);
+ const instrument=source=>`{const Native=Intl.DateTimeFormat;globalThis.zoneValidations=0;globalThis.Intl=Object.create(Intl);Intl.DateTimeFormat=new Proxy(Native,{construct(target,args){if(Object.keys(args[1]||{}).length===1&&Object.hasOwn(args[1],'timeZone'))zoneValidations++;return Reflect.construct(target,args);}});}\n`+source;
+ const current=sceneTimeline({'landscape-core.js':instrument}),reference=sceneTimeline({'landscape-core.js':()=>prior.stdout}),location={latitude:28.5383,longitude:-81.3792,timezone:'America/New_York',elevation:20},storage={getItem(){return null;}},options=c=>({seed:c.LandscapeTimeline.DEFAULT_SEED,season:'autumn',location,sunAt:at=>c.LivingSky.sunAt(c.LivingSky.sceneDate(new Date(at),storage,location),location)}),at=Date.parse('2026-10-06T12:00Z');
+ const actual=current.LandscapeTimeline.create(options(current)),expected=reference.LandscapeTimeline.create(options(reference));assert.deepEqual(JSON.parse(JSON.stringify(actual.at(at))),JSON.parse(JSON.stringify(expected.at(at))),'the complete actual seeded scene is unchanged');
+ assert.ok(current.zoneValidations<=1,`actual cold planning repeated observer timezone validation ${current.zoneValidations} times`);
+ const count=current.zoneValidations;actual.at(at+8000);actual.at(at-8000);assert.equal(current.zoneValidations,count,'same observer remains validated across planning and reseek');
+});
+
+test('RISK sky observer validation reuse: bounded zone cache never bypasses mutable coordinates invalid zones or changed solar outputs',()=>{
+ const old=spawnSync('git',['show','1d875397d87e4eca2b08ca7f171f7c17084061e0:landscape-core.js'],{cwd:__dirname,encoding:'utf8'});assert.equal(old.status,0,old.stderr);
+ const instrument=source=>`{const Native=Intl.DateTimeFormat;globalThis.zoneValidations=0;globalThis.Intl=Object.create(Intl);Intl.DateTimeFormat=new Proxy(Native,{construct(target,args){if(Object.keys(args[1]||{}).length===1&&Object.hasOwn(args[1],'timeZone'))zoneValidations++;return Reflect.construct(target,args);}});}\n`+source;
+ const a=sceneTimeline({'landscape-core.js':instrument}),b=sceneTimeline({'landscape-core.js':()=>old.stdout}),date=new Date('2026-06-21T12:00Z'),location={latitude:28.5383,longitude:-81.3792,timezone:'America/New_York',elevation:20},snapshot=v=>JSON.parse(JSON.stringify(v));
+ const compare=()=>{for(const method of ['sunAt','skyAt','sunTimes','solarSchedule'])assert.deepEqual(snapshot(a.LivingSky[method](date,location)),snapshot(b.LivingSky[method](date,location)),method+' retains actual mutable observer astronomy');};compare();
+ location.latitude=69.6492;location.longitude=18.9553;location.timezone='Europe/Oslo';location.elevation=100;compare();
+ location.latitude=-33.8688;location.longitude=151.2093;location.timezone='Australia/Sydney';compare();
+ for(const change of [{latitude:91},{longitude:181},{latitude:'28'},{timezone:'Invalid/Zone'},{timezone:''},{timezone:17}]){const invalid={...location,...change};assert.throws(()=>a.LivingSky.sunAt(date,invalid),/Invalid/,'cached zones cannot excuse invalid input');}
+ const zones=['UTC','Europe/London','Asia/Tokyo','Pacific/Honolulu','Pacific/Auckland','Asia/Kolkata','America/Los_Angeles','America/Chicago'];
+ for(const timezone of zones)a.LivingSky.sunAt(date,{latitude:0,longitude:0,timezone});const before=a.zoneValidations;a.LivingSky.sunAt(date,{latitude:0,longitude:0,timezone:'America/New_York'});assert.equal(a.zoneValidations,before+1,'after eight distinct newer zones the old validation is evicted and rechecked');
+ const after=a.zoneValidations;a.LivingSky.sunAt(date,{latitude:0,longitude:0,timezone:'America/New_York'});assert.equal(a.zoneValidations,after,'an immediately repeated valid zone reuses validation');
+});
+
+test('RISK pedestrian planner hash work: complete cold proposals reuse immutable RNG prefixes while retaining every admitted scene',()=>{
+ const prior=spawnSync('git',['show','523d691:landscape-timeline.js'],{cwd:__dirname,encoding:'utf8'});assert.equal(prior.status,0,prior.stderr);
+ const instrument=source=>`{const Native=Math;globalThis.hashMultiplies=0;globalThis.Math=Object.create(Math);Math.imul=(...args)=>{hashMultiplies++;return Native.imul(...args);};}\n`+source;
+ const a=sceneTimeline({'landscape-timeline.js':instrument}),b=sceneTimeline({'landscape-timeline.js':()=>prior.stdout}),options={seed:'chain-scanner-scene-v1',season:'autumn',sunAt:()=>({altitude:30,azimuth:90})},at=Date.parse('2026-10-06T12:00Z');
+ assert.deepEqual(JSON.parse(JSON.stringify(a.LandscapeTimeline.create(options).at(at))),JSON.parse(JSON.stringify(b.LandscapeTimeline.create(options).at(at))),'all seeded proposals and admitted scene remain exact');
+ assert.ok(a.hashMultiplies<=1800000,`full cold proposal consumer repeats immutable hash prefixes: ${a.hashMultiplies} multiplies`);
+});
+
+test('RISK scenery random prefix reuse: draw sequence matches full public sampling for Unicode signed slots counters and mutable input fallback',()=>{
+ const c=sceneTimeline(),T=c.LandscapeTimeline;
+ for(const seed of ['chain-scanner-scene-v1','private-🧑🏽‍🚀','x\ud800'])for(const stream of ['arrival','woodland','festival','fireworks'])for(const slot of [-12345,-0,0,1791288000/8,'mixed|slot']){const r=T.random(seed,stream,slot);for(let salt=0;salt<120;salt++)assert.equal(r(),T.sample(seed,stream,slot,salt),'prefix reuse must preserve exact public seed hashing and counter ordering');}
+ let value='first';const mutable={toString(){return value;}},r=T.random(mutable,'arrival',7);assert.equal(r(),T.sample(mutable,'arrival',7,0));value='second';assert.equal(r(),T.sample(mutable,'arrival',7,1),'nonprimitive seed conversion remains per draw');
 });

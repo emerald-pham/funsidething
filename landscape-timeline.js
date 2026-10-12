@@ -14,7 +14,20 @@
     return ((hash^(hash>>>16))>>>0)/4294967296;
   }
   const normalizeSeed=seed=>typeof seed==='string'&&seed.length&&seed.length<=128?seed:DEFAULT_SEED;
-  function random(seed,stream,slot=0){let counter=0;return ()=>sample(seed,stream,slot,counter++);}
+  function random(seed,stream,slot=0){
+    let counter=0;
+    // Each immutable opportunity draws several salts from the same prefix.
+    // Preserve per-draw conversion for callers with mutable object inputs.
+    if(typeof seed!=='string'||typeof stream!=='string'||!['number','string'].includes(typeof slot))return ()=>sample(seed,stream,slot,counter++);
+    let prefix=2166136261;
+    for(const character of `${seed}|${stream}|${slot}|`)prefix=Math.imul(prefix^character.charCodeAt(0),16777619);
+    return ()=>{
+      let hash=prefix;
+      for(const character of `${counter++}`)hash=Math.imul(hash^character.charCodeAt(0),16777619);
+      hash=Math.imul(hash^(hash>>>16),0x7feb352d);hash=Math.imul(hash^(hash>>>15),0x846ca68b);
+      return ((hash^(hash>>>16))>>>0)/4294967296;
+    };
+  }
   function terrainSample(n,seed=DEFAULT_SEED){
     // Keep the accepted skyline/trees for the existing initial seed.
     const offset=seed===DEFAULT_SEED?0:sample(seed,'terrain')*1000;
@@ -47,9 +60,9 @@
     // finite travel budget covers canvases through 8192 CSS pixels; smaller
     // canvases simply finish painting a visit earlier, without changing admission.
     const walkingGeometry=root.LandscapeGeometry.create(8192,900);
-    const walkingLookback=MAX_LIFE*3+(8192+200)/1.4;
     const visibleDuration=e=>walkingGeometry.walkingLifetime(e);
-    const extendWalk=e=>{const duration=visibleDuration(e);return duration===e.duration?e:{...e,activityDuration:e.duration,duration};};
+    const extendWalk=(e,duration)=>duration===e.duration?e:{...e,activityDuration:e.duration,duration};
+    const dayPlans=new Map();
     const roofs=city.partyRoofs,gardens=[...city.gardens,...city.patios].map(roof=>roof.index).sort((a,b)=>a-b);
     const wind=.6+sample(seed,'wind')*1.2,visitSeed=sample(seed,'visitors');
     function ordinary(from,to){
@@ -66,9 +79,10 @@
     }
     function festivals(from,to){
       const out=[],show=C.nightShows.festival;
+      // Rejected local draws cannot create a show; skip their unused sun query.
       for(let slot=Math.floor(from/show.interval);slot<=Math.ceil(to/show.interval);slot++){
         const start=slot*show.interval,r=random(seed,'festival',slot);
-        if(start<from||start>to||!S.fireworksAllowed(sunAt(start))||r()>=Math.min(1,show.chance*C.spawnRate('festival')))continue;
+        if(start<from||start>to||r()>=Math.min(1,show.chance*C.spawnRate('festival'))||!S.fireworksAllowed(sunAt(start)))continue;
         out.push(event('festival',start,r,`festival:${slot}`));
       }
       return out;
@@ -81,7 +95,7 @@
       let start=day*DAY+20*scale;
       while(start<(day+1)*DAY){
         const roll=r();
-        if(S.fireworksAllowed(sunAt(start))&&roll<Math.min(1,show.chance*C.spawnRate('fireworks'))){
+        if(roll<Math.min(1,show.chance*C.spawnRate('fireworks'))&&S.fireworksAllowed(sunAt(start))){
           const candidate=event('fireworks',start,r,`fireworks:${day}:${out.length}`);out.push(candidate);
           start+=(candidate.scheduleDuration+show.rest)*scale;
         }else start+=show.interval*scale;
@@ -93,31 +107,52 @@
     // not increase occurrence frequency or admit a different shared scene.
     const reservationDuration=e=>e.scheduleDuration||e.duration;
     const overlaps=(a,b)=>a.start<b.start+reservationDuration(b)&&b.start<a.start+reservationDuration(a);
-    function build(bucket){
-      const from=bucket*8,to=from+8;
-      // Visual walks need a viewport-bounded history; admission still uses only
-      // the original finite reservations. Extra history is immutable proposals,
-      // never a queue accumulated while the tab was asleep.
-      const raw=ordinary(from-walkingLookback-MAX_LIFE*2,to+MAX_LIFE);
-      const rareRaw=[...ordinary(from-walkingLookback-MAX_LIFE-1800,to+MAX_LIFE).filter(e=>e.type==='abduction'),
-        ...festivals(from-walkingLookback-MAX_LIFE-1800,to+MAX_LIFE)].sort((a,b)=>a.start-b.start);
+    function dayPlan(day){
+      const key=JSON.stringify([day,...C.spawnRateNames.map(C.spawnRate)]);
+      if(dayPlans.has(key)){const plan=dayPlans.get(key);dayPlans.delete(key);dayPlans.set(key,plan);return plan;}
+      const from=day*DAY,to=from+DAY;
+      // A visit must finish its full reservation before the next UTC day. This
+      // upfront admission guard gives cold clients a bounded, identical replay;
+      // it never ends an underway visitor at midnight or stores tab history.
+      const raw=ordinary(from-MAX_LIFE*2,to),rawRare=raw.filter(e=>e.type==='abduction'),rareIds=new Set(rawRare.map(e=>e.id));
+      // The rare guard needs earlier draws, not a second copy of the same day.
+      // Deduplicate the inclusive join by immutable ID, including rounded starts.
+      const rareRaw=[...rawRare,...ordinary(from-MAX_LIFE*3-1800,from-MAX_LIFE*2).filter(e=>e.type==='abduction'&&!rareIds.has(e.id)),
+        ...festivals(from-MAX_LIFE*3-1800,to)].sort((a,b)=>a.start-b.start);
       const rare=rareRaw.filter(e=>!rareRaw.some(prior=>prior.start<e.start&&
         e.start-prior.start<(e.type==='festival'&&prior.type==='festival'?C.nightShows.festival.cooldown:S.RARE_COOLDOWN)));
-      const barges=rare.filter(e=>e.type==='festival');
-      const day=Math.floor(from/DAY),proposals=[];
-      for(let d=Math.floor((from-walkingLookback)/DAY)-1;d<=day;d++)proposals.push(...fireworks(d));
+      const barges=rare.filter(e=>e.type==='festival'),proposals=[];
+      for(let d=day-2;d<=day;d++)proposals.push(...fireworks(d));
       proposals.sort((a,b)=>a.start-b.start);
-      const shows=proposals.filter((e,index)=>e.start<to&&e.start+reservationDuration(e)>from&&
+      const shows=proposals.filter((e,index)=>e.start<to&&e.start+reservationDuration(e)>from-MAX_LIFE*2&&
         (!index||e.start>=proposals[index-1].start+(C.nightShows.fireworks.occurrenceScale||1)*(proposals[index-1].scheduleDuration+C.nightShows.fireworks.rest))&&
         !barges.some(barge=>overlaps(e,barge)));
       const pool=[...raw.filter(e=>e.type!=='abduction'),...rare,...shows].sort((a,b)=>a.start-b.start||a.id.localeCompare(b.id));
-      const events=pool.filter(e=>{
-        if(e.start>=to||e.start+visibleDuration(e)<=from)return false;
-        const prior=pool.filter(other=>(other.start<e.start||other.start===e.start&&other.id<e.id)&&other.start+reservationDuration(other)>e.start);
-        if(prior.length>=S.MAX_EVENTS-2)return false;
-        if(['banner','skywriter','meteor','bird','dolphin'].includes(e.type)&&prior.some(other=>other.type===e.type))return false;
-        return !C.waterEvents.includes(e.type)||prior.filter(other=>C.waterEvents.includes(other.type)).length<2;
-      });
+      const events=[];let prior=[],active=[];
+      for(const e of pool){
+        // The original type/chance rules still see every raw predecessor, even
+        // one that was rejected. Keep a sliding original-reservation list.
+        prior=prior.filter(other=>other.start+reservationDuration(other)>e.start);
+        const eligible=prior.length<S.MAX_EVENTS-2&&
+          (!['banner','skywriter','meteor','bird','dolphin'].includes(e.type)||!prior.some(other=>other.type===e.type))&&
+          (!C.waterEvents.includes(e.type)||prior.filter(other=>C.waterEvents.includes(other.type)).length<2);
+        prior.push(e);
+        if(!eligible||e.start<from||e.start>=to)continue;
+        // A full reservation budget rejects this proposal regardless of its
+        // lifetime. Avoid solving its terrain route; original eligibility and
+        // random draws above still see every raw proposal in the same order.
+        active=active.filter(other=>other.end>e.start);
+        if(active.length>=S.MAX_EVENTS-2)continue;
+        const duration=visibleDuration(e),end=e.start+Math.max(duration,reservationDuration(e));
+        if(end>to)continue;
+        active.push({end});events.push(extendWalk(e,duration));
+      }
+      dayPlans.set(key,events);if(dayPlans.size>2)dayPlans.delete(dayPlans.keys().next().value);
+      return events;
+    }
+    function build(bucket){
+      const from=bucket*8,to=from+8;
+      const events=dayPlan(Math.floor(from/DAY)).filter(e=>e.start<to&&e.start+e.duration>from);
       for(const type of ['train','metro']){
         const rate=C.spawnRate(type);if(!rate)continue;
         // Bernoulli opportunities are one maximum crossing apart, so no
@@ -143,9 +178,7 @@
         const speed=S.startingSpeed(r());woods.push({id:`woodland:${slot}`,type:C.woodland.types[index],start,duration:C.woodland.duration/speed,speed,seed:r(),lane:r(),reverse:r()>.5});
       }
       const woodland=woods.filter(e=>e.start<to&&e.start+reservationDuration(e)>from&&woods.filter(prior=>prior.start<e.start&&prior.start+prior.duration>e.start).length<C.woodland.maxActive);
-      // Admission always saw the original durations above. Only accepted visits
-      // receive a longer visual lifetime, so slowing a walk cannot reroll traffic.
-      return {events:events.map(extendWalk),woodland};
+      return {events,woodland};
     }
     function rareVisit(seconds,stream,interval,duration,chance,rate=1){
       const slot=Math.floor(seconds/interval),start=slot*interval,r=random(seed,stream,slot);

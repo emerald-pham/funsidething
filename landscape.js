@@ -1202,7 +1202,7 @@
     }
     if(e.type==='skateboarder'||e.type==='rollerskater'){
       const pose=geometry.skater(x,e.reverse),skin=skinColor(e.seed),phase=t*(1.8+e.seed*.6),push=Math.max(0,Math.sin(phase));
-      g.save();g.globalAlpha=S.smooth(0,.06,f)*(1-S.smooth(.94,1,f));
+      g.save();g.globalAlpha=1-S.smooth(.94,1,f);
       g.translate(pose.x,pose.y);g.rotate(pose.angle);g.scale(pose.direction,1);
       const wheel=(wx)=>ellipse(g,wx,-.9,.9,.9,p.city);
       if(e.type==='skateboarder'){
