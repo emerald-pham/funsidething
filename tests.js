@@ -25470,10 +25470,11 @@ test('RISK pedestrian planner rare reuse: guard join is unique and complete admi
   const options={seed:rareRate?'private-schedule':'chain-scanner-scene-v1',season,sunAt:()=>({altitude:night?-20:30,azimuth:night?0:90})},a=actual.LandscapeTimeline.create(options),b=prior.LandscapeTimeline.create(options);
   for(const offset of[12*3600000,-1,0,1,day-1,day,day+1,2*day+1,12*3600000]){const value=a.at(epoch+offset);assert.deepEqual(snapshot(value),snapshot(b.at(epoch+offset)),'raw reuse retains accepted IDs, lifetimes, independent streams and cache/UTC reconstruction');assert.ok(value.events.length<=14);}
  }
- const boundarySlot=epoch/1000/8-75,inject=source=>source.replace('function sample(seed,stream,slot=0,salt=0){',`function sample(seed,stream,slot=0,salt=0){if(seed==='private-rare-boundary'&&stream==='arrival'&&slot===${boundarySlot})return 0;`).replace('const rare=rareRaw.filter','globalThis.rareIds=rareRaw.map(e=>e.id);const rare=rareRaw.filter');
+ const boundarySlot=epoch/1000/8-75,inject=source=>source.replace('function random(seed,stream,slot=0){',`function random(seed,stream,slot=0){if(seed==='private-rare-boundary'&&stream==='arrival'&&slot===${boundarySlot})return ()=>0;`).replace('const rare=rareRaw.filter','globalThis.rareIds=rareRaw.map(e=>e.id);const rare=rareRaw.filter');
  const a=sceneTimeline({'landscape-timeline.js':inject}),b=sceneTimeline({'landscape-timeline.js':()=>inject(released.stdout)}),options={seed:'private-rare-boundary',season:'summer',sunAt:()=>({altitude:30,azimuth:90})};
  assert.deepEqual(snapshot(a.LandscapeTimeline.create(options).at(epoch+3600000)),snapshot(b.LandscapeTimeline.create(options).at(epoch+3600000)));
  assert.ok(a.rareIds.includes(`arrival:${boundarySlot}`),'fixture puts an actual abduction exactly at the raw/rare guard join');assert.equal(new Set(a.rareIds).size,a.rareIds.length,'inclusive ordinary range endpoints cannot duplicate the join proposal');
+ const broken=sceneTimeline({'landscape-timeline.js':source=>inject(source).replace("filter(e=>e.type==='abduction'&&!rareIds.has(e.id))","filter(e=>e.type==='abduction')")});broken.LandscapeTimeline.create(options).at(epoch+3600000);assert.ok(new Set(broken.rareIds).size<broken.rareIds.length,'negative control removing guard-join deduplication must still expose the forced duplicate');
 });
 
 test('RISK pedestrian planner solar work: failed show chance draws do not request unused astronomy and exact scenes remain unchanged',()=>{
