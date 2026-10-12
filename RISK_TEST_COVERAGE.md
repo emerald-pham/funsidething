@@ -1033,3 +1033,8 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 
 - RISK overdue scanner layout: enlarged candidate title chips and decision footer wrap without clipping choices
 - RISK overdue scanner layout: chosen-task breadcrumb stays within the enlarged scanner width
+
+- `RISK pedestrian planner timezone work: actual astronomical cold consumer validates a repeated observer zone once without changing its scene`
+- `RISK sky observer validation reuse: bounded zone cache never bypasses mutable coordinates invalid zones or changed solar outputs`
+- `RISK pedestrian planner hash work: complete cold proposals reuse immutable RNG prefixes while retaining every admitted scene`
+- `RISK scenery random prefix reuse: draw sequence matches full public sampling for Unicode signed slots counters and mutable input fallback`

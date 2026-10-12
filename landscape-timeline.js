@@ -14,7 +14,20 @@
     return ((hash^(hash>>>16))>>>0)/4294967296;
   }
   const normalizeSeed=seed=>typeof seed==='string'&&seed.length&&seed.length<=128?seed:DEFAULT_SEED;
-  function random(seed,stream,slot=0){let counter=0;return ()=>sample(seed,stream,slot,counter++);}
+  function random(seed,stream,slot=0){
+    let counter=0;
+    // Each immutable opportunity draws several salts from the same prefix.
+    // Preserve per-draw conversion for callers with mutable object inputs.
+    if(typeof seed!=='string'||typeof stream!=='string'||!['number','string'].includes(typeof slot))return ()=>sample(seed,stream,slot,counter++);
+    let prefix=2166136261;
+    for(const character of `${seed}|${stream}|${slot}|`)prefix=Math.imul(prefix^character.charCodeAt(0),16777619);
+    return ()=>{
+      let hash=prefix;
+      for(const character of `${counter++}`)hash=Math.imul(hash^character.charCodeAt(0),16777619);
+      hash=Math.imul(hash^(hash>>>16),0x7feb352d);hash=Math.imul(hash^(hash>>>15),0x846ca68b);
+      return ((hash^(hash>>>16))>>>0)/4294967296;
+    };
+  }
   function terrainSample(n,seed=DEFAULT_SEED){
     // Keep the accepted skyline/trees for the existing initial seed.
     const offset=seed===DEFAULT_SEED?0:sample(seed,'terrain')*1000;

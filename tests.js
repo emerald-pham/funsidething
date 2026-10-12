@@ -25630,3 +25630,39 @@ test('RISK overdue scanner layout: chosen-task breadcrumb stays within the enlar
  assert.match(shim.document.getElementById('scan').innerHTML,/class="crumb"/,'the explicit dot makes its former benchmark a breadcrumb');
  const source=fs.readFileSync(new URL('./index.html',import.meta.url),'utf8');assert.match(source,/\.crumb\{max-width:min\(190px,100%\)\}/,'its existing190px cap must also respect a narrower scanner instead of overflowing after the new dot');
 });
+
+test('RISK pedestrian planner timezone work: actual astronomical cold consumer validates a repeated observer zone once without changing its scene',()=>{
+ const prior=spawnSync('git',['show','1d875397d87e4eca2b08ca7f171f7c17084061e0:landscape-core.js'],{cwd:__dirname,encoding:'utf8'});assert.equal(prior.status,0,prior.stderr);
+ const instrument=source=>`{const Native=Intl.DateTimeFormat;globalThis.zoneValidations=0;globalThis.Intl=Object.create(Intl);Intl.DateTimeFormat=new Proxy(Native,{construct(target,args){if(Object.keys(args[1]||{}).length===1&&Object.hasOwn(args[1],'timeZone'))zoneValidations++;return Reflect.construct(target,args);}});}\n`+source;
+ const current=sceneTimeline({'landscape-core.js':instrument}),reference=sceneTimeline({'landscape-core.js':()=>prior.stdout}),location={latitude:28.5383,longitude:-81.3792,timezone:'America/New_York',elevation:20},storage={getItem(){return null;}},options=c=>({seed:c.LandscapeTimeline.DEFAULT_SEED,season:'autumn',location,sunAt:at=>c.LivingSky.sunAt(c.LivingSky.sceneDate(new Date(at),storage,location),location)}),at=Date.parse('2026-10-06T12:00Z');
+ const actual=current.LandscapeTimeline.create(options(current)),expected=reference.LandscapeTimeline.create(options(reference));assert.deepEqual(JSON.parse(JSON.stringify(actual.at(at))),JSON.parse(JSON.stringify(expected.at(at))),'the complete actual seeded scene is unchanged');
+ assert.ok(current.zoneValidations<=1,`actual cold planning repeated observer timezone validation ${current.zoneValidations} times`);
+ const count=current.zoneValidations;actual.at(at+8000);actual.at(at-8000);assert.equal(current.zoneValidations,count,'same observer remains validated across planning and reseek');
+});
+
+test('RISK sky observer validation reuse: bounded zone cache never bypasses mutable coordinates invalid zones or changed solar outputs',()=>{
+ const old=spawnSync('git',['show','1d875397d87e4eca2b08ca7f171f7c17084061e0:landscape-core.js'],{cwd:__dirname,encoding:'utf8'});assert.equal(old.status,0,old.stderr);
+ const instrument=source=>`{const Native=Intl.DateTimeFormat;globalThis.zoneValidations=0;globalThis.Intl=Object.create(Intl);Intl.DateTimeFormat=new Proxy(Native,{construct(target,args){if(Object.keys(args[1]||{}).length===1&&Object.hasOwn(args[1],'timeZone'))zoneValidations++;return Reflect.construct(target,args);}});}\n`+source;
+ const a=sceneTimeline({'landscape-core.js':instrument}),b=sceneTimeline({'landscape-core.js':()=>old.stdout}),date=new Date('2026-06-21T12:00Z'),location={latitude:28.5383,longitude:-81.3792,timezone:'America/New_York',elevation:20},snapshot=v=>JSON.parse(JSON.stringify(v));
+ const compare=()=>{for(const method of ['sunAt','skyAt','sunTimes','solarSchedule'])assert.deepEqual(snapshot(a.LivingSky[method](date,location)),snapshot(b.LivingSky[method](date,location)),method+' retains actual mutable observer astronomy');};compare();
+ location.latitude=69.6492;location.longitude=18.9553;location.timezone='Europe/Oslo';location.elevation=100;compare();
+ location.latitude=-33.8688;location.longitude=151.2093;location.timezone='Australia/Sydney';compare();
+ for(const change of [{latitude:91},{longitude:181},{latitude:'28'},{timezone:'Invalid/Zone'},{timezone:''},{timezone:17}]){const invalid={...location,...change};assert.throws(()=>a.LivingSky.sunAt(date,invalid),/Invalid/,'cached zones cannot excuse invalid input');}
+ const zones=['UTC','Europe/London','Asia/Tokyo','Pacific/Honolulu','Pacific/Auckland','Asia/Kolkata','America/Los_Angeles','America/Chicago'];
+ for(const timezone of zones)a.LivingSky.sunAt(date,{latitude:0,longitude:0,timezone});const before=a.zoneValidations;a.LivingSky.sunAt(date,{latitude:0,longitude:0,timezone:'America/New_York'});assert.equal(a.zoneValidations,before+1,'after eight distinct newer zones the old validation is evicted and rechecked');
+ const after=a.zoneValidations;a.LivingSky.sunAt(date,{latitude:0,longitude:0,timezone:'America/New_York'});assert.equal(a.zoneValidations,after,'an immediately repeated valid zone reuses validation');
+});
+
+test('RISK pedestrian planner hash work: complete cold proposals reuse immutable RNG prefixes while retaining every admitted scene',()=>{
+ const prior=spawnSync('git',['show','523d691:landscape-timeline.js'],{cwd:__dirname,encoding:'utf8'});assert.equal(prior.status,0,prior.stderr);
+ const instrument=source=>`{const Native=Math;globalThis.hashMultiplies=0;globalThis.Math=Object.create(Math);Math.imul=(...args)=>{hashMultiplies++;return Native.imul(...args);};}\n`+source;
+ const a=sceneTimeline({'landscape-timeline.js':instrument}),b=sceneTimeline({'landscape-timeline.js':()=>prior.stdout}),options={seed:'chain-scanner-scene-v1',season:'autumn',sunAt:()=>({altitude:30,azimuth:90})},at=Date.parse('2026-10-06T12:00Z');
+ assert.deepEqual(JSON.parse(JSON.stringify(a.LandscapeTimeline.create(options).at(at))),JSON.parse(JSON.stringify(b.LandscapeTimeline.create(options).at(at))),'all seeded proposals and admitted scene remain exact');
+ assert.ok(a.hashMultiplies<=1800000,`full cold proposal consumer repeats immutable hash prefixes: ${a.hashMultiplies} multiplies`);
+});
+
+test('RISK scenery random prefix reuse: draw sequence matches full public sampling for Unicode signed slots counters and mutable input fallback',()=>{
+ const c=sceneTimeline(),T=c.LandscapeTimeline;
+ for(const seed of ['chain-scanner-scene-v1','private-🧑🏽‍🚀','x\ud800'])for(const stream of ['arrival','woodland','festival','fireworks'])for(const slot of [-12345,-0,0,1791288000/8,'mixed|slot']){const r=T.random(seed,stream,slot);for(let salt=0;salt<120;salt++)assert.equal(r(),T.sample(seed,stream,slot,salt),'prefix reuse must preserve exact public seed hashing and counter ordering');}
+ let value='first';const mutable={toString(){return value;}},r=T.random(mutable,'arrival',7);assert.equal(r(),T.sample(mutable,'arrival',7,0));value='second';assert.equal(r(),T.sample(mutable,'arrival',7,1),'nonprimitive seed conversion remains per draw');
+});
