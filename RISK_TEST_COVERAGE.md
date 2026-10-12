@@ -2,6 +2,7 @@
 
 This map records the current named RISK contracts in tests.js. It lets reviewers see which costly feature boundaries already have explicit protection before changing nearby behavior. Related non-RISK regression tests remain part of the contract too; the focused companions below call those out where they matter.
 
+- RISK rooftop gardens: daylight hides paired plants while preserving decks and nighttime lights
 - RISK skyline light cadence: twice as many opportunities keep single-roof samples and visible-window toggles
 - RISK clocktower visit geometry: four staggered visitors stand on both actual roof slopes at every viewport
 - RISK clocktower visit scheduler: rare night-only rolls pause expire cancel and never replay a backlog
@@ -532,9 +533,9 @@ The editor hook blocks app or enforcement edits while tests.js has no staged or 
 
 ## Context exclusions and Settings layout
 
-- RISK context exclusions: real selectors cycle included excluded neutral with durable Undo and explicit red precedence
+- RISK context exclusions: real selectors switch included excluded with durable Undo and explicit red precedence
 - RISK context exclusions: scan and All Tasks preserve all required contexts dotted classification and full-pool shares
-- RISK No context filter: exclude-only synthetic control never becomes an assignment and tracks rename deletion and unknown IDs
+- RISK No context filter: binary synthetic control never becomes an assignment and tracks rename deletion and unknown IDs
 - RISK context saved data: absent invalid and released settings preserve assignments exclusions unknown fields and completion Undo
 - RISK context sync: concurrent clients offline reload reconnect and remote completion preserve revisioned filters and recovery
 - RISK Settings hierarchy: Changelog uses existing sections and Save settings follows every section without changing validation
@@ -956,6 +957,21 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 
 - RISK Settings changelog reflow: actual archived notes retain readable tokens in narrow enlarged release lists
 
+## Conditional binary context controls
+
+- RISK binary context presentation: active filters derive excluded controls on both surfaces without changing saved choices
+- RISK binary context interaction: real handlers include displayed exclusions immediately and preserve zero-active AND and No context rules
+- RISK binary context saved data: reload and cloud adoption retain neutral choices and derive excluded presentation
+- RISK binary context guidance: FAQ explains always two-state controls and unchanged zero-active matching
+
+## Requested keyboard Undo and Edit shortcuts
+
+- RISK Undo Z shortcut: real keyboard dispatch reverses only the latest action and retains durable Undo semantics
+- RISK Undo Z guards: U is retired and modified editable modal and scene keypresses leave board and native defaults alone
+- RISK Undo Z guidance: header hint tooltip and Quick start name Z while preserving editable native undo guidance
+- RISK Edit E shortcut: real keyboard dispatch edits only the offered scanner task without changing the board
+- RISK Edit E guards and hints: modifiers editable fields modal and scene focus do not dispatch and only the offered Edit advertises E
+- RISK Edit E guidance: Quick start explains the offered task editor and plain shortcut scope
 ## Cloud cleanup interruption regression
 
 - `RISK CLOUD CLEANUP RESUME: interrupted deleting generation resumes without forbidden transition and preserves acknowledged board`
@@ -994,3 +1010,26 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - `RISK pedestrian planner rare reuse: guard join is unique and complete admitted scenes match prior across rare rates midnight and eviction`
 
 - `RISK pedestrian planner solar work: failed show chance draws do not request unused astronomy and exact scenes remain unchanged`
+- `RISK context reconciliation FAQ: actual Help keeps each existing bulk and context question once`
+
+- RISK context Settings reflow: actual manager name fields can shrink beside protected context and delete controls
+
+- RISK always binary No Context: visible green and red dispatch immediately on both surfaces with Undo and zero-context guard
+- RISK always binary saved contexts: reload and cloud adoption derive red real and green No Context without migration
+- RISK always binary context guidance: FAQ explains context-presence rule and separate green No Context eligibility
+
+- RISK always binary contexts: legacy neutral and all-excluded controls render green or red on both surfaces without saved writes
+- RISK always binary context interactions: last-green and all-red clicks stay binary and Undo preserves assignments and AND eligibility
+
+## Explicit overdue scanner WOOP
+
+- RISK overdue WOOP: offered action dots through existing comparison and saves with Last task WOOP off
+- RISK overdue WOOP: local due-day boundary stale eligibility and cancel retain the explicit dot
+- RISK overdue WOOP: existing and legacy plans show explicit delete without silent replacement
+- RISK overdue WOOP: peer plan account and same-ID board replacement invalidate drafts and controls
+- RISK overdue WOOP: neutral automatic benchmark stays neutral and Cancel can Undo only the dot
+- RISK overdue WOOP: unsupported plans remain read-only and interrupted scan hides the action
+
+
+- RISK overdue scanner layout: enlarged candidate title chips and decision footer wrap without clipping choices
+- RISK overdue scanner layout: chosen-task breadcrumb stays within the enlarged scanner width

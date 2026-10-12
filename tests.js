@@ -475,15 +475,16 @@ test('RISK upright gait consumer: every human painter consumes upright full cycl
  }
 });
 
-test('RISK context exclusions: real selectors cycle included excluded neutral with durable Undo and explicit red precedence',async()=>{
+test('RISK context exclusions: real selectors switch included excluded with durable Undo and explicit red precedence',async()=>{
  const {ctx,shim}=await loadApp({seed:911});const c=ctx.state.contexts[0],task=ctx.addTask('Private required task',false,[c.id]);
+ ctx.state.contexts[1].active=false; // Exercise the last included real context.
  const protectedTasks=JSON.stringify(ctx.state.tasks);
  ctx.toggleContext(c.id);assert.equal(c.excluded,true,'the second click changes an existing green check to a red exclusion');assert.equal(c.active,false,'released clients still see the excluded requirement disabled');
  ctx.renderCtx();let markup=shim.document.getElementById('ctxPanel').innerHTML;
- assert.match(markup,/data-filter-state="excluded"/);assert.match(markup,/aria-label="Errands: excluded\. Next: neutral\."/);assert.match(markup,/aria-hidden="true">✕/);
+ assert.match(markup,/data-filter-state="excluded"/);assert.match(markup,/aria-label="Errands: excluded\. Next: included\."/);assert.match(markup,/aria-hidden="true">✕/);
  ctx.undo();assert.equal(ctx.state.contexts[0].active,true);assert.equal(ctx.state.contexts[0].excluded===true,false);
- ctx.toggleContext(c.id);ctx.toggleContext(c.id);assert.equal(ctx.state.contexts[0].active,false);assert.equal(ctx.state.contexts[0].excluded===true,false,'red returns to neutral');
- ctx.toggleContext(c.id);assert.equal(ctx.state.contexts[0].active,true);assert.equal(ctx.state.contexts[0].excluded===true,false,'neutral returns to included');
+ ctx.toggleContext(c.id);ctx.toggleContext(c.id);assert.equal(ctx.state.contexts[0].active,true);assert.equal(ctx.state.contexts[0].excluded===true,false,'red returns directly to included');
+ ctx.toggleContext(c.id);assert.equal(ctx.state.contexts[0].active,false);assert.equal(ctx.state.contexts[0].excluded,true,'green returns directly to excluded');
  ctx.state.contexts[0].excluded=true;ctx.state.contexts[0].active=true;
  assert.equal(ctx.isEligible(task,new Set([c.id])),false,'an explicit exclusion wins over green or a supplied active set');
  const undoCount=vm.runInContext('undoStack.length',ctx);ctx.toggleContext('missing');assert.equal(vm.runInContext('undoStack.length',ctx),undoCount,'a stale control creates no Undo entry');
@@ -496,7 +497,7 @@ test('RISK context rendering: an imported empty context ID retains its real sele
  const {ctx,shim}=await loadApp(),c={id:'',name:'Private imported context',active:true,privateUnknown:'retained'};ctx.state.contexts=[c];
  const button=makeFakeElement();button.dataset={ctx:'',ctxScope:'settings',act:'cycle-context'};button.setAttribute('data-ctx','');
  shim.document.getElementById('modalRoot').querySelectorAll=()=>[button];ctx.toggleContext('');
- assert.equal(c.excluded,true);assert.equal(button.getAttribute('aria-label'),'Private imported context: excluded. Next: neutral.','an empty imported ID is a real context, not the synthetic filter');
+ assert.equal(c.excluded,true);assert.equal(button.getAttribute('aria-label'),'Private imported context: excluded. Next: included.','an empty imported ID is a real context, not the synthetic filter');
  assert.equal(button.dataset.filterState,'excluded');assert.equal(c.privateUnknown,'retained');assert.equal(ctx.state.settings.excludeNoContext,false);
 });
 
@@ -506,22 +507,22 @@ test('RISK context exclusions: scan and All Tasks preserve all required contexts
  ctx.state.listOpen=true;ctx.state.candidateId=one.id;ctx.toggleContext(a.id);
  assert.deepEqual(Array.from(ctx.eligibleTasks(),t=>t.id),[zero.id,unknown.id]);assert.ok(![one.id,many.id].includes(ctx.state.candidateId),'excluded candidates leave the scanner');
  vm.runInContext("listEligibilityFilter='ineligible'",ctx);ctx.renderList();assert.deepEqual(Array.from(ctx.filteredListTasks(),t=>t.id),[one.id,many.id]);assert.equal(shim.document.getElementById('listCount').textContent,'(2 of 4)');
- ctx.toggleContext(a.id);assert.deepEqual(Array.from(ctx.eligibleTasks(),t=>t.id),[zero.id,unknown.id],'neutral remains an inactive requirement, preserving existing empty-selection behavior');
- ctx.toggleContext(a.id);ctx.state.chain=[one.id];vm.runInContext("listEligibilityFilter='eligible'",ctx);
+ ctx.toggleContext(b.id);assert.deepEqual(Array.from(ctx.eligibleTasks(),t=>t.id),[zero.id,unknown.id],'all excluded requirements preserve existing empty-selection eligibility');
+ ctx.toggleContext(a.id);ctx.toggleContext(b.id);ctx.state.chain=[one.id];vm.runInContext("listEligibilityFilter='eligible'",ctx);
  assert.deepEqual(Array.from(ctx.filteredListTasks(),t=>t.id),[zero.id,many.id,unknown.id]);assert.equal(ctx.isEligible(one),true,'dotting is only a list eligibility distinction');
  const poolShares=()=>JSON.stringify([...ctx.chanceDisplayStats()].map(([id,{weight,probability,available,fallback}])=>[id,{weight,probability,available,fallback}]));const shares=poolShares();ctx.state.chain=[];assert.equal(poolShares(),shares,'undotting alone preserves full-pool weights');
- ctx.toggleContext(b.id);ctx.toggleContext(a.id);ctx.toggleContext(a.id);ctx.toggleContext(b.id);
- assert.deepEqual(Array.from(ctx.eligibleTasks(),t=>t.id),[zero.id,unknown.id],'all neutral still admits tasks without any known assigned context');
+ ctx.toggleContext(b.id);ctx.toggleContext(a.id);
+ assert.deepEqual(Array.from(ctx.eligibleTasks(),t=>t.id),[zero.id,unknown.id],'all excluded still admits tasks without any known assigned context');
 });
 
-test('RISK No context filter: exclude-only synthetic control never becomes an assignment and tracks rename deletion and unknown IDs',async()=>{
+test('RISK No context filter: binary synthetic control never becomes an assignment and tracks rename deletion and unknown IDs',async()=>{
  const {ctx,shim}=await loadApp({seed:913}),[a,b]=ctx.state.contexts;
  const zero=ctx.addTask('Private zero'),unknown=ctx.addTask('Private unknown',false,['retired-id']),known=ctx.addTask('Private assigned',false,[a.id]),both=ctx.addTask('Private both',false,[a.id,b.id]);
  ctx.renderCtx();assert.match(shim.document.getElementById('ctxPanel').innerHTML,/data-act="toggle-no-context"/);
  const ids=JSON.stringify(ctx.state.contexts.map(c=>c.id)),tasks=JSON.stringify(ctx.state.tasks);
  ctx.onAction('toggle-no-context',{});assert.equal(ctx.state.settings.excludeNoContext,true);
  assert.equal(ctx.isEligible(zero),false);assert.equal(ctx.isEligible(unknown),false);assert.equal(ctx.isEligible(known),true);assert.equal(ctx.isEligible(both),true);
- ctx.renderCtx();assert.match(shim.document.getElementById('ctxPanel').innerHTML,/No context: excluded\. Next: neutral\./);assert.match(shim.document.getElementById('ctxPanel').innerHTML,/2 active, 1 excluded, 0 inactive/);
+ ctx.renderCtx();assert.match(shim.document.getElementById('ctxPanel').innerHTML,/No context: excluded\. Next: included\./);assert.match(shim.document.getElementById('ctxPanel').innerHTML,/2 active, 1 excluded, 0 inactive/);
  ctx.renderQuickCtx();assert.doesNotMatch(shim.document.getElementById('quickCtxRow').innerHTML,/No context/);
  ctx.openEdit(zero.id);assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/data-editctx="[^\"]*no.context/i);
  assert.equal(JSON.stringify(ctx.state.contexts.map(c=>c.id)),ids);assert.equal(JSON.stringify(ctx.state.tasks),tasks);
@@ -593,7 +594,7 @@ test('RISK Settings hierarchy: Changelog uses existing sections and Save setting
 
 test('RISK context and Settings FAQ: extended guidance explains cycle empty selections synthetic scope sync limitations and bottom save',async()=>{
  const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
- for(const pattern of [/neutral.*green check.*red X.*neutral/i,/Every assigned.*context.*active/i,/No context excludes unassigned/i,/cannot be assigned/i,/Refresh all devices/i,/Save settings.*bottom/i])assert.match(help,pattern);
+ for(const pattern of [/Whenever contexts exist,.*green check.*red X/i,/Every assigned.*context.*active/i,/No context.*green.*unassigned/i,/cannot be assigned/i,/Refresh all devices/i,/Save settings.*bottom/i])assert.match(help,pattern);
  const current=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];for(const pattern of [/red X/i,/No context/i,/Changelog.*Settings/i,/Save settings.*bottom/i])assert.match(current,pattern);
 });
 
@@ -610,11 +611,12 @@ test('RISK context and Settings browser: touch keyboard filter counts disclosure
     const page=await context.newPage();await page.goto(process.env.LANDSCAPE_BROWSER_URL);await page.waitForFunction(()=>typeof state!=='undefined'&&state?.tasks);
     await page.evaluate(()=>{document.getElementById('motionDialog')?.close();closeModal();state.seenQuickStart=true;state.listOpen=true;addTask('Private no context');addTask('Private required',false,['c_errand']);addTask('Private multiple',false,['c_errand','c_home']);render();});
     const selector=page.locator('#ctxPanel [data-ctx="c_errand"]');assert.equal(await selector.getAttribute('data-filter-state'),'included');
-    if(width<1000)await selector.tap();else await selector.click();assert.equal(await selector.getAttribute('data-filter-state'),'excluded');assert.match(await selector.getAttribute('aria-label'),/excluded\. Next: neutral/);
+    if(width<1000)await selector.tap();else await selector.click();assert.equal(await selector.getAttribute('data-filter-state'),'excluded');assert.match(await selector.getAttribute('aria-label'),/excluded\. Next: included/);
     await page.locator('[data-act="list-eligibility"][data-id="ineligible"]').click();assert.equal(await page.locator('[data-row]').count(),2);assert.equal(await page.locator('#listCount').innerText(),'(2 of 3)');
-    await selector.focus();await page.keyboard.press('Space');assert.equal(await selector.getAttribute('data-filter-state'),'neutral');assert.equal(await selector.evaluate(e=>document.activeElement===e),true,'rerender retains keyboard focus');
-    await page.keyboard.press('Enter');assert.equal(await selector.getAttribute('data-filter-state'),'included');
-    const none=page.locator('#ctxPanel [data-act="toggle-no-context"]');await none.click();assert.equal(await none.getAttribute('data-filter-state'),'excluded');await none.click();assert.equal(await none.getAttribute('data-filter-state'),'neutral');
+    await selector.focus();await page.keyboard.press('Space');assert.equal(await selector.getAttribute('data-filter-state'),'included');assert.equal(await selector.evaluate(e=>document.activeElement===e),true,'rerender retains keyboard focus');
+    await page.keyboard.press('Enter');assert.equal(await selector.getAttribute('data-filter-state'),'excluded');
+    const none=page.locator('#ctxPanel [data-act="toggle-no-context"]');await none.click();assert.equal(await none.getAttribute('data-filter-state'),'excluded');await none.click();assert.equal(await none.getAttribute('data-filter-state'),'included');
+    await selector.focus();await page.keyboard.press('Space');assert.equal(await selector.getAttribute('data-filter-state'),'included','restore green before testing Settings green-to-red transition');
     await page.locator('[data-act="settings"]').click();const modal=page.locator('#modalRoot .modal'),sections=modal.locator('details.settings-section'),log=sections.filter({has:page.locator('summary').filter({hasText:/^Changelog$/})});
     assert.equal(await log.count(),1);await log.locator('summary').click();assert.ok(await log.locator('li').count()>50,'long history remains intact');
     const styles=await modal.evaluate(e=>{const section=[...e.querySelectorAll('.settings-section')],first=section[0],next=section[1],save=e.querySelector('[data-act="save-settings"]');return {font:getComputedStyle(first.querySelector('.kv')).fontSize,otherFont:getComputedStyle(next.querySelector('.kv')).fontSize,surface:getComputedStyle(first).backgroundColor,otherSurface:getComputedStyle(next).backgroundColor,summary:getComputedStyle(first.querySelector('summary')).padding,otherSummary:getComputedStyle(next.querySelector('summary')).padding,last:e.lastElementChild.contains(save),overflow:e.scrollWidth<=e.clientWidth+1};});
@@ -622,7 +624,7 @@ test('RISK context and Settings browser: touch keyboard filter counts disclosure
     await modal.locator('summary').filter({hasText:/^Scanning and recurrence$/}).click();await page.locator('#stWorkedHrs').fill('19');await page.locator('#stHorizon').fill('999');
     await modal.locator('summary').filter({hasText:/^Contexts$/}).click();const manager=modal.locator('[data-ctx="c_errand"]');await manager.click();assert.equal(await manager.getAttribute('data-filter-state'),'excluded');assert.equal(await page.locator('#stWorkedHrs').inputValue(),'19','cycling a context does not discard other Settings drafts');
     const save=modal.locator('[data-act="save-settings"]');await save.scrollIntoViewIfNeeded();if(width<1000)await save.tap();else await save.click();assert.equal(await page.locator('#modalRoot .modal').count(),0);
-    await page.evaluate(()=>persist());await page.reload();await page.waitForFunction(()=>state?.tasks?.length===3);assert.equal(await page.evaluate(()=>state.settings.workedHours),19);assert.equal(await page.evaluate(()=>state.settings.horizonMin),480);assert.equal(await page.evaluate(()=>state.contexts[0].excluded),true);
+    await page.evaluate(()=>persist());await page.reload();await page.waitForFunction(()=>state?.tasks?.length===3);await page.evaluate(()=>document.getElementById('motionDialog')?.close());assert.equal(await page.evaluate(()=>state.settings.workedHours),19);assert.equal(await page.evaluate(()=>state.settings.horizonMin),480);assert.equal(await page.evaluate(()=>state.contexts[0].excluded),true);
     await page.evaluate(()=>openSettings());await page.locator('#modalRoot [data-act="close-modal"]').click();assert.equal(await page.evaluate(()=>state.settings.workedHours),19,'closing Settings retains the saved value');
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
     if(process.env.CONTEXT_EVIDENCE_DIR)await page.screenshot({path:path.join(process.env.CONTEXT_EVIDENCE_DIR,`${name}-${width}x${height}-contexts.png`)});
@@ -1393,6 +1395,43 @@ test('RISK rain density: phone tablet and short screens retain a dense bounded c
   assert.ok(rain.every(([x,y,x2,y2])=>x>=0&&x<W&&y>=0&&y<H&&y2>y),'rain falls down across the entire scene');
   if(reduced)assert.deepEqual(draw(false,0),rain,'the reduced-motion pose remains deterministic');
   else assert.notDeepEqual(draw(false,.5),rain,'normal-motion rain advances smoothly');
+ }
+});
+
+test('RISK rooftop gardens: daylight hides paired plants while preserving decks and nighttime lights',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ const start=source.indexOf('      if(gardens.has(i)){'),end=source.indexOf('      if(patios.has(i))',start),paint=source.slice(start,end);
+ assert.ok(start>=0&&end>start,'extract the actual city garden paint consumer');
+ const context=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),context);
+ const rand=n=>{const x=Math.sin(n*127.1+311.7)*43758.5453;return x-Math.floor(x);};
+ for(const [W,H] of [[320,568],[390,844],[568,320],[768,1024],[1440,900]]){
+  const plan=context.LandscapeGeometry.create(W,H).cityscape(rand);
+  assert.ok(plan.gardens.length>0,`${W}x${H}: real seeded garden fixtures exist`);
+  for(const garden of plan.gardens){
+   const roof=plan.towers[garden.index],i=garden.index;
+   const draw=(altitude,lit,night=.8)=>{
+    const rectangles=[],ellipses=[],lines=[],gardenLights={lit:{[i]:lit}},before=JSON.stringify(gardenLights);
+    const b={fillRect(...args){rectangles.push([...args,this.fillStyle]);}};
+    vm.runInNewContext(paint,{b,i,gardens:new Map([[i,garden]]),x:roof.x,y:roof.y,bw:roof.bw,rand,sky:{sun:{altitude}},night,gardenLights,p:{hill:'#345',front:'#123',far:'#567',sky:['#123','#234','#456']},S:{mixHex:(...args)=>args.join(':')},line(_b,...args){lines.push(args)},ellipse(_b,...args){ellipses.push(args)}});
+    assert.equal(JSON.stringify(gardenLights),before,'painting never changes retained lighting state');
+    return {rectangles,ellipses,lines};
+   };
+   const unlit=draw(-20,false),lit=draw(-20,true);
+   assert.equal(unlit.rectangles.length,3,'night retains deck and both pots');
+   assert.equal(unlit.ellipses.length,2,'night retains both plant canopies');
+   assert.deepEqual(lit.rectangles,unlit.rectangles,'lighting does not change pot geometry or colors');
+   assert.deepEqual(lit.ellipses.slice(0,2),unlit.ellipses,'lit roofs retain identical plants');
+   assert.equal(lit.ellipses.length,2+garden.lights,'night retains every sampled garden bulb');
+   assert.deepEqual(draw(-.0001,false,.1),draw(-20,false,.1),'plants remain at negative sun altitude without bright bulbs');
+   for(const altitude of [0,.0001,40]){
+    for(const retainedLit of [false,true]){
+     const day=draw(altitude,retainedLit);
+     assert.equal(day.ellipses.length,0,'daylight hides the paired foliage and retained bulbs');
+     assert.deepEqual(day.rectangles,[unlit.rectangles[0]],'daylight retains only the unchanged garden deck');
+     assert.deepEqual(day.lines,unlit.lines,'daylight preserves the deck edge');
+    }
+   }
+  }
  }
 });
 
@@ -6156,26 +6195,26 @@ test("UI: the arrow disappears once scanning starts and a task is dotted", async
 });
 
 /* ---------- undo advertises its key like every other keyboard control ----------
-   Undo has always had a `u` hotkey, but the only place that said so was the
+   Undo's shortcut is now `z`; keep its hint beside the label rather than only in the
    tooltip — so the one control you reach for in a hurry was the one you had to
    hover to learn. It carries the same keyhint glyph as Yes/No/Done/Delete. */
 
-test("UI: the undo button carries its u keyhint glyph", () => {
+test("UI: the undo button carries its z keyhint glyph", () => {
   const m = html.match(/<button class="ghost" data-act="undo"[^>]*>([\s\S]*?)<\/button>/);
   assert.ok(m, "the undo button should still be a ghost button in the header");
-  assert.match(m[1], /<span class="keyhint">u<\/span>/,
-    `expected a u keyhint glyph inside the undo button, got: ${m[1]}`);
+  assert.match(m[1], /<span class="keyhint">z<\/span>/,
+    `expected a z keyhint glyph inside the undo button, got: ${m[1]}`);
 });
 
 test("UI: undo's keyhint glyph sits after its label, as it does on every other keyboard button", () => {
   const m = html.match(/<button class="ghost" data-act="undo"[^>]*>([\s\S]*?)<\/button>/);
-  assert.match(m[1], /^[^<]*\S[^<]*<span class="keyhint">u<\/span>$/,
+  assert.match(m[1], /^[^<]*\S[^<]*<span class="keyhint">z<\/span>$/,
     `the glyph should trail the label with nothing after it, got: ${m[1]}`);
 });
 
 test("UI: undo's tooltip still names the key, so glyph and tooltip agree", () => {
   const m = html.match(/<button class="ghost" data-act="undo"([^>]*)>/);
-  assert.match(m[1], /title="[^"]*\(u\)"/, `expected the key named in the tooltip, got: ${m[1]}`);
+  assert.match(m[1], /title="[^"]*\(z\)"/, `expected the key named in the tooltip, got: ${m[1]}`);
 });
 
 test("undo: the header button reverses the last action through the normal onAction path", async () => {
@@ -25122,6 +25161,120 @@ test('RISK Settings changelog reflow: actual archived notes retain readable toke
  ctx.openHelp();assert.match(shim.document.getElementById('modalRoot').innerHTML,/Release notes wrap long words in enlarged views/,'extended FAQ explains enlarged release-note reflow');
 });
 
+test('RISK binary context presentation: active filters derive excluded controls on both surfaces without changing saved choices',async()=>{
+ const {ctx,shim}=await loadApp();const [a,b]=ctx.state.contexts;b.active=false;delete b.excluded;ctx.state.ctxOpen=true;
+ const saved=JSON.stringify(ctx.state.contexts),settings=JSON.stringify(ctx.state.settings);
+ const button=makeFakeElement();button.dataset={ctx:b.id,ctxScope:'settings',act:'cycle-context'};button.setAttribute('data-ctx',b.id);
+ shim.document.getElementById('modalRoot').querySelectorAll=()=>[button];ctx.renderCtx();
+ assert.equal(ctx.contextControlInfo(b).mode,'excluded','a neutral requirement is visibly excluded while another context is included');
+ assert.equal(ctx.contextControlInfo(b).label,b.name+': excluded. Next: included.');
+ assert.equal(button.dataset.filterState,'excluded','Settings matches the main selector');assert.match(button.innerHTML,/✕/);
+ assert.match(ctx.contextControlHTML(b),/data-filter-state="excluded"/);assert.match(shim.document.getElementById('ctxPanel').innerHTML,/1 active, 1 excluded, 0 inactive/);
+ assert.equal(JSON.stringify(ctx.state.contexts),saved,'presentation never migrates saved neutral choices');assert.equal(JSON.stringify(ctx.state.settings),settings);
+ ctx.openSettings();assert.equal(JSON.stringify(ctx.state.contexts),saved,'opening Settings does not migrate');
+ assert.match(shim.document.getElementById('modalRoot').innerHTML,new RegExp('data-ctx="'+b.id+'"[^>]*data-filter-state="excluded"'));
+});
+
+test('RISK binary context interaction: real handlers include displayed exclusions immediately and preserve zero-active AND and No context rules',async()=>{
+ for(const scope of ['main','settings']){
+  const {ctx,shim}=await loadApp();const [a,b]=ctx.state.contexts;b.active=false;delete b.excluded;
+  const one=ctx.addTask('Private A',false,[a.id]),both=ctx.addTask('Private AB',false,[a.id,b.id]),none=ctx.addTask('Private none'),unknown=ctx.addTask('Private unknown',false,['retired']);
+  const tasks=JSON.stringify(ctx.state.tasks);assert.equal(ctx.isEligible(one),true);assert.equal(ctx.isEligible(both),false);
+  const button=makeFakeElement();button.dataset={id:b.id,ctx:b.id,ctxScope:scope,act:'cycle-context'};shim.document.activeElement=button;
+  ctx.onAction('cycle-context',button);assert.equal(ctx.contextFilterState(b),'included');assert.equal(ctx.isEligible(both),true);
+  ctx.undo();assert.equal(ctx.state.contexts[1].active,false);assert.equal(ctx.state.contexts[1].excluded===true,false,'Undo restores original neutral representation');assert.equal(ctx.contextControlInfo(ctx.state.contexts[1]).mode,'excluded');
+  ctx.onAction('cycle-context',button);ctx.onAction('cycle-context',button);assert.equal(ctx.state.contexts[1].excluded,true);
+  ctx.onAction('cycle-context',button);assert.equal(ctx.contextFilterState(ctx.state.contexts[1]),'included','explicit red also reaches green in one click while filtering active');
+  ctx.onAction('cycle-context',button);ctx.onAction('cycle-context',{dataset:{id:a.id}});
+  assert.equal(ctx.activeCtxSet().size,0);assert.equal(ctx.isEligible(one),false);assert.equal(ctx.isEligible(both),false);assert.equal(ctx.isEligible(none),true);assert.equal(ctx.isEligible(unknown),true);
+  assert.equal(ctx.contextControlInfo(ctx.state.contexts[0]).label,a.name+': excluded. Next: included.','last included exclusion retains binary presentation');
+  ctx.onAction('cycle-context',{dataset:{id:a.id}});assert.equal(ctx.contextFilterState(ctx.state.contexts[0]),'included');assert.equal(ctx.isEligible(one),true);
+  assert.equal(ctx.contextControlInfo(null).mode,'included');ctx.onAction('toggle-no-context',{});assert.equal(ctx.isEligible(none),false);assert.equal(ctx.isEligible(unknown),false);assert.equal(ctx.isEligible(one),true);
+  assert.equal(JSON.stringify(ctx.state.tasks),tasks,'controls and Undo preserve assignments and ratings');
+ }
+});
+
+test('RISK binary context saved data: reload and cloud adoption retain neutral choices and derive excluded presentation',async()=>{
+ const source=await loadApp();const [a,b]=source.ctx.state.contexts;b.active=false;delete b.excluded;const task=source.ctx.addTask('Private shared requirement',false,[a.id,b.id]);
+ await source.ctx.persist();const payload=source.ctx.cloudPayload();
+ const reloaded=await loadApp({seedStorage:{[SYNC_STORE_KEY]:payload}});assert.equal(reloaded.ctx.state.contexts[1].active,false);assert.equal(reloaded.ctx.state.contexts[1].excluded===true,false);
+ assert.equal(reloaded.ctx.contextControlInfo(reloaded.ctx.state.contexts[1]).mode,'excluded','reload derives red without a saved-data migration');assert.equal(reloaded.ctx.isEligible(reloaded.ctx.state.tasks.find(t=>t.id===task.id)),false);
+ const h=makeSyncHarness({remote:JSON.parse(payload),rev:3}),client=await loadApp({cloudSyncFactory:h.factory});await syncSettle(40);await client.ctx.cloudPull();
+ const adopted=client.ctx.state.contexts.find(c=>c.id===b.id);assert.equal(adopted.active,false);assert.equal(adopted.excluded===true,false);assert.equal(client.ctx.contextControlInfo(adopted).mode,'excluded');
+ assert.equal(h.remoteState().contexts.find(c=>c.id===b.id).excluded===true,false,'cloud adoption does not publish inferred exclusions');
+ client.ctx.state.contexts=[];client.ctx.state.settings.excludeNoContext=true;client.ctx.renderCtx();assert.match(client.shim.document.getElementById('ctxPanel').innerHTML,/toggle-ctx/);assert.equal(client.ctx.isEligible(client.ctx.state.tasks[0]),true,'zero contexts bypass the synthetic filter');
+});
+
+test('RISK binary context guidance: FAQ explains always two-state controls and unchanged zero-active matching',async()=>{
+ const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(help,/Whenever contexts exist,.*included.*excluded/i);assert.match(help,/With no active contexts, only tasks without a known context can scan/);assert.match(help,/No context.*green.*unassigned/);
+ assert.doesNotMatch(help,/No active contexts.*neutral/i);assert.match(help,/Every assigned known context must be active/);
+ assert.match(help,/red display does not change saved neutral choices/i);assert.match(help,/unknown or deleted contexts/i);assert.match(help,/Context changes save, sync and support Undo/i);assert.match(help,/selector stays visible without contexts/i);assert.match(help,/New contexts start active/i);assert.match(help,/<dt>How do I create contexts and filter All Tasks\?<\/dt>/);
+});
+
+test('RISK Undo Z shortcut: real keyboard dispatch reverses only the latest action and retains durable Undo semantics',async()=>{
+ for(const key of ['z','Z']){
+  const {ctx,shim}=await loadApp();ctx.closeModal();const keep=ctx.addTask('Private retained task');const before=JSON.stringify(ctx.state.tasks);ctx.addTask('Private undone task');await ctx.persist();
+  shim.document.dispatchEvent({type:'keydown',key,shiftKey:key==='Z',repeat:false});assert.equal(JSON.stringify(ctx.state.tasks),before,'plain Z uses the existing Undo consumer');
+  await ctx.persist();const reloaded=await loadApp({seedStorage:{[SYNC_STORE_KEY]:shim.localStorage.getItem(SYNC_STORE_KEY)}});assert.deepEqual(Array.from(reloaded.ctx.state.tasks,t=>t.id),[keep.id]);
+  ctx.addTask('Private second action');ctx.onAction('undo',{});assert.equal(JSON.stringify(ctx.state.tasks),before,'button Undo retains the same rule');
+ }
+});
+
+test('RISK Undo Z guards: U is retired and modified editable modal and scene keypresses leave board and native defaults alone',async()=>{
+ const {ctx,shim}=await loadApp();ctx.closeModal();ctx.addTask('Private retained');ctx.addTask('Private pending Undo');const saved=JSON.stringify(ctx.state),depth=vm.runInContext('undoStack.length',ctx);
+ let prevented=0;const dispatch=event=>shim.document.dispatchEvent({type:'keydown',key:'z',repeat:false,preventDefault(){prevented++;},...event});
+ for(const key of ['u','U'])dispatch({key});
+ for(const modifiers of [{ctrlKey:true},{metaKey:true},{altKey:true},{ctrlKey:true,shiftKey:true},{metaKey:true,shiftKey:true}])dispatch(modifiers);
+ for(const tag of ['input','textarea','select'])dispatch({target:{id:'private-'+tag,matches:selector=>selector==='input,textarea,select',isContentEditable:false}});
+ dispatch({target:{matches:()=>false,isContentEditable:true}});
+ const query=shim.document.querySelector.bind(shim.document);for(const selector of ['.mback','#motionDialog[open], #sceneTimeDialog[open], html.viewing-scene']){
+  shim.document.querySelector=s=>s===selector?{}:query(s);dispatch({});
+ }
+ shim.document.querySelector=query;
+ assert.equal(JSON.stringify(ctx.state),saved);assert.equal(vm.runInContext('undoStack.length',ctx),depth);assert.equal(prevented,0,'native text undo and modifier shortcuts are not cancelled');
+ dispatch({});assert.equal(ctx.state.tasks.length,1,'ordinary Z still works after guarded events');
+});
+
+test('RISK Undo Z guidance: header hint tooltip and Quick start name Z while preserving editable native undo guidance',async()=>{
+ const {ctx,shim}=await loadApp();ctx.closeModal();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(html,/<button class="ghost" data-act="undo" title="Undo last action \(z\)">↺ undo<span class="keyhint">z<\/span>/);
+ assert.match(help,/<b>z<\/b> to undo/);assert.doesNotMatch(help,/<b>u<\/b> to undo/);
+ assert.match(help,/Ctrl.*Z.*Command.*Z.*text fields/i);
+});
+
+test('RISK Edit E shortcut: real keyboard dispatch edits only the offered scanner task without changing the board',async()=>{
+ for(const scenario of ['candidate','paused','intervention','end','missing-candidate','no-offer']){
+  const {ctx,shim}=await loadApp();ctx.closeModal();const bench=ctx.addTask('Private benchmark'),candidate=ctx.addTask('Private candidate');
+  Object.assign(ctx.state,{chain:scenario==='no-offer'?[]:[bench.id],candidateId:candidate.id,mode:scenario==='paused'?'work':'scan',interventionActive:scenario==='intervention'});
+  if(scenario==='end')ctx.state.considered[candidate.id]='no';if(scenario==='missing-candidate')ctx.state.candidateId='retired-private';ctx.render();
+  const offered=scenario==='candidate'?candidate:bench;const scan=shim.document.getElementById('scan').innerHTML;
+  assert.equal((scan.match(/class="keyhint">e<\/span>/g)||[]).length,scenario==='no-offer'?0:1);
+  if(scenario!=='no-offer')assert.match(scan,new RegExp('data-act="edit" data-id="'+offered.id+'"[^>]*aria-label="Edit this task \\(e\\)"'));
+  const before=JSON.stringify(ctx.state),depth=vm.runInContext('undoStack.length',ctx);shim.document.dispatchEvent({type:'keydown',key:'e',repeat:false});
+  const modal=shim.document.getElementById('modalRoot').innerHTML;
+  if(scenario==='no-offer')assert.equal(modal,'','E cannot choose a task from an unstarted list');else{
+   const target=scenario==='candidate'?candidate:bench;assert.match(modal,new RegExp('data-act="save-edit" data-id="'+target.id+'"'),'opens the same existing individual editor as the offered Edit button');
+  }
+  assert.equal(JSON.stringify(ctx.state),before,'opening Edit does not save or change task state');assert.equal(vm.runInContext('undoStack.length',ctx),depth);
+ }
+});
+
+test('RISK Edit E guards and hints: modifiers editable fields modal and scene focus do not dispatch and only the offered Edit advertises E',async()=>{
+ const {ctx,shim}=await loadApp();ctx.closeModal();const bench=ctx.addTask('Private benchmark'),candidate=ctx.addTask('Private candidate');Object.assign(ctx.state,{chain:[bench.id],candidateId:candidate.id,mode:'scan'});ctx.render();
+ const scan=shim.document.getElementById('scan').innerHTML;assert.equal((scan.match(/class="keyhint">e<\/span>/g)||[]).length,1,'one offered Edit hint');assert.match(scan,new RegExp('data-act="edit" data-id="'+candidate.id+'"[^>]*aria-label="Edit this task \\(e\\)"'));
+ const before=JSON.stringify(ctx.state);let prevented=0;const dispatch=event=>shim.document.dispatchEvent({type:'keydown',key:'e',repeat:false,preventDefault(){prevented++;},...event});
+ for(const modifiers of [{ctrlKey:true},{metaKey:true},{altKey:true},{metaKey:true,shiftKey:true}])dispatch(modifiers);
+ for(const tag of ['input','textarea','select'])dispatch({target:{id:'private-'+tag,matches:s=>s==='input,textarea,select'}});dispatch({target:{matches:()=>false,isContentEditable:true}});
+ const query=shim.document.querySelector.bind(shim.document);for(const selector of ['.mback','#motionDialog[open], #sceneTimeDialog[open], html.viewing-scene']){shim.document.querySelector=s=>s===selector?{}:query(s);dispatch({});}shim.document.querySelector=query;
+ assert.equal(shim.document.getElementById('modalRoot').innerHTML,'');assert.equal(JSON.stringify(ctx.state),before);assert.equal(prevented,0);
+ dispatch({key:'E',shiftKey:true});assert.match(shim.document.getElementById('modalRoot').innerHTML,new RegExp('data-act="save-edit" data-id="'+candidate.id+'"'));
+});
+
+test('RISK Edit E guidance: Quick start explains the offered task editor and plain shortcut scope',async()=>{
+ const {ctx,shim}=await loadApp();ctx.closeModal();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(help,/<b>e<\/b> to edit/);assert.match(help,/E opens.*candidate.*benchmark/i);assert.match(help,/shortcuts.*text fields.*editable.*dialogs/i);
+});
 
 test('RISK CLOUD CLEANUP RESUME: interrupted deleting generation resumes without forbidden transition and preserves acknowledged board',async()=>{
  const h=await loadCloudBackendV2({rootData:null,timeoutMs:5000,failures:{enforceDeletingTransition:true}});
@@ -25333,4 +25486,147 @@ test('RISK pedestrian planner solar work: failed show chance draws do not reques
   assert.ok(calls<=(rate?2100:1600),`show rate ${rate} unnecessarily queried ${calls} astronomical instants after already failed chance draws`);
   const count=calls;a.at(at+8000);assert.ok(calls<=count+1,'same-day scheduling retains its bounded sun memo');
  }
+});
+
+test('RISK context reconciliation FAQ: actual Help keeps each existing bulk and context question once',async()=>{
+ const {ctx,shim}=await loadApp();ctx.closeModal();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ for(const question of ['How do I edit several tasks together?','Which properties can I change in Bulk Edit?','What happens if selected tasks change before or during Save?','How does Undo work after Bulk Edit?','What does the bulk result count mean?','How do contexts and list filters work?','How do I create contexts and filter All Tasks?'])assert.equal(help.split('<dt>'+question+'</dt>').length-1,1,question+' appears once in rendered Help');
+});
+
+test('RISK context Settings reflow: actual manager name fields can shrink beside protected context and delete controls',async()=>{
+ const {ctx,shim}=await loadApp();ctx.closeModal();const saved=JSON.stringify(ctx.state);ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(settings,/<div class="mgr"><button[^>]*data-act="cycle-context"[\s\S]*?<input type="text" data-mgrname="[^"]+"[^>]*aria-label="Context name"\/[\s\S]*?data-act="del-ctx"/,'real Settings manager retains its state control, editable name and delete action');
+ const rule=html.match(/\.mgr input\[type=text\]\s*\{([^}]*)\}/)?.[1]||'';
+ assert.match(rule,/min-width\s*:\s*0(?:;|$)/,'manager name must shrink below native intrinsic width at enlarged phone size');
+ assert.match(rule,/max-width\s*:\s*100%(?:;|$)/,'name field remains bounded to its available row');
+ assert.match(rule,/flex\s*:\s*1\s+1\s+160px(?:;|$)/,'name field reserves a useful editing width and moves to its own line when needed');
+ const rowRule=html.match(/\.mgr\s*\{([^}]*)\}/)?.[1]||'';assert.match(rowRule,/flex-wrap\s*:\s*wrap/,'an enlarged manager row wraps rather than compressing text into padding');
+ assert.equal(JSON.stringify(ctx.state),saved,'opening the layout consumer never changes saved board choices');
+});
+
+test('RISK always binary contexts: legacy neutral and all-excluded controls render green or red on both surfaces without saved writes',async()=>{
+ for(const excluded of [false,true]){
+  const {ctx,shim}=await loadApp();for(const c of ctx.state.contexts){c.active=false;if(excluded)c.excluded=true;else delete c.excluded;}ctx.state.ctxOpen=true;ctx.state.settings.excludeNoContext=false;
+  const before=JSON.stringify(ctx.state),payload=ctx.cloudPayload();ctx.renderCtx();
+  for(const c of ctx.state.contexts){assert.equal(ctx.contextControlInfo(c).mode,'excluded');assert.equal(ctx.contextControlInfo(c).label,c.name+': excluded. Next: included.');assert.match(ctx.contextControlHTML(c),/>✕<\/span>/);}
+  assert.equal(ctx.contextControlInfo(null).mode,'included');assert.match(ctx.contextControlHTML(null),/>✓<\/span>/);assert.match(shim.document.getElementById('ctxPanel').innerHTML,/0 active, 2 excluded, 0 inactive/);
+  ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;assert.match(settings,/data-act="toggle-no-context"[^>]*data-filter-state="included"/);for(const c of ctx.state.contexts)assert.match(settings,new RegExp('data-ctx="'+c.id+'"[^>]*data-filter-state="excluded"'));
+  assert.equal(JSON.stringify(ctx.state),before);assert.equal(ctx.cloudPayload(),payload,'rendering both surfaces does not migrate saved choices');
+ }
+});
+
+test('RISK always binary context interactions: last-green and all-red clicks stay binary and Undo preserves assignments and AND eligibility',async()=>{
+ for(const scope of ['main','settings']){
+  const {ctx,shim}=await loadApp();const [a,b]=ctx.state.contexts;b.active=false;delete b.excluded;const one=ctx.addTask('Private one',false,[a.id]),both=ctx.addTask('Private both',false,[a.id,b.id]),none=ctx.addTask('Private unassigned'),unknown=ctx.addTask('Private unknown',false,['deleted']);const tasks=JSON.stringify(ctx.state.tasks);
+  const button=makeFakeElement();button.dataset={id:a.id,ctx:a.id,ctxScope:scope,act:'cycle-context'};shim.document.activeElement=button;ctx.onAction('cycle-context',button);
+  assert.equal(ctx.activeCtxSet().size,0);assert.equal(ctx.contextControlInfo(a).label,a.name+': excluded. Next: included.');assert.equal(ctx.contextControlInfo(b).mode,'excluded');assert.equal(ctx.isEligible(one),false);assert.equal(ctx.isEligible(both),false);assert.equal(ctx.isEligible(none),true);assert.equal(ctx.isEligible(unknown),true);
+  ctx.onAction('cycle-context',button);assert.equal(ctx.contextFilterState(a),'included','all-red to green takes one click');assert.equal(ctx.isEligible(one),true);assert.equal(ctx.isEligible(both),false);ctx.undo();assert.equal(ctx.contextFilterState(ctx.state.contexts[0]),'excluded');ctx.undo();assert.equal(ctx.contextFilterState(ctx.state.contexts[0]),'included');
+  const other=makeFakeElement();other.dataset={id:b.id,ctx:b.id,ctxScope:scope,act:'cycle-context'};ctx.onAction('cycle-context',other);assert.equal(ctx.isEligible(both),true);ctx.undo();assert.equal(ctx.state.contexts[1].active,false);assert.equal(ctx.state.contexts[1].excluded===true,false);assert.equal(ctx.contextControlInfo(ctx.state.contexts[1]).mode,'excluded');assert.equal(JSON.stringify(ctx.state.tasks),tasks);
+ }
+});
+
+test('RISK always binary No Context: visible green and red dispatch immediately on both surfaces with Undo and zero-context guard',async()=>{
+ for(const scope of ['main','settings']){
+  const {ctx,shim}=await loadApp();for(const c of ctx.state.contexts)c.active=false;ctx.state.settings.excludeNoContext=false;const none=ctx.addTask('Private unassigned'),unknown=ctx.addTask('Private unknown',false,['deleted']),known=ctx.addTask('Private known',false,[ctx.state.contexts[0].id]);const saved=JSON.stringify({...ctx.state,updatedAt:0});
+  assert.equal(ctx.contextControlInfo(null).mode,'included');assert.equal(ctx.isEligible(none),true);assert.equal(ctx.isEligible(unknown),true);assert.equal(ctx.isEligible(known),false);
+  const button=makeFakeElement();button.dataset={ctxScope:scope,act:'toggle-no-context'};shim.document.activeElement=button;ctx.onAction('toggle-no-context',button);assert.equal(ctx.contextControlInfo(null).mode,'excluded');assert.equal(ctx.isEligible(none),false);assert.equal(ctx.isEligible(unknown),false);ctx.onAction('toggle-no-context',button);assert.equal(ctx.contextControlInfo(null).mode,'included');assert.equal(ctx.isEligible(none),true);ctx.undo();assert.equal(ctx.contextControlInfo(null).mode,'excluded');ctx.undo();assert.equal(JSON.stringify({...ctx.state,updatedAt:0}),saved);
+  ctx.state.contexts=[];ctx.state.settings.excludeNoContext=true;ctx.renderCtx();const before=JSON.stringify(ctx.state);ctx.onAction('toggle-no-context',button);assert.equal(JSON.stringify(ctx.state),before);assert.equal(ctx.isEligible(known),true);assert.match(shim.document.getElementById('ctxPanel').innerHTML,/toggle-ctx/);assert.match(shim.document.getElementById('ctxPanel').innerHTML,/add-ctx/);
+ }
+});
+
+test('RISK always binary saved contexts: reload and cloud adoption derive red real and green No Context without migration',async()=>{
+ const source=await loadApp();for(const c of source.ctx.state.contexts){c.active=false;delete c.excluded;}source.ctx.state.settings.excludeNoContext=false;const task=source.ctx.addTask('Private old assignment',false,[source.ctx.state.contexts[0].id]);const none=source.ctx.addTask('Private old unassigned');await source.ctx.persist();const payload=source.ctx.cloudPayload();
+ const reload=await loadApp({seedStorage:{[SYNC_STORE_KEY]:payload}});for(const c of reload.ctx.state.contexts){assert.equal(c.active,false);assert.equal(c.excluded===true,false);assert.equal(reload.ctx.contextControlInfo(c).mode,'excluded');}assert.equal(reload.ctx.contextControlInfo(null).mode,'included');assert.equal(reload.ctx.isEligible(reload.ctx.state.tasks.find(t=>t.id===task.id)),false);assert.equal(reload.ctx.isEligible(reload.ctx.state.tasks.find(t=>t.id===none.id)),true);
+ const h=makeSyncHarness({remote:JSON.parse(payload),rev:3}),client=await loadApp({cloudSyncFactory:h.factory});await syncSettle(40);await client.ctx.cloudPull();client.ctx.renderCtx();client.ctx.openSettings();assert.equal(client.ctx.contextControlInfo(client.ctx.state.contexts[0]).mode,'excluded');assert.equal(client.ctx.contextControlInfo(null).mode,'included');for(const c of h.remoteState().contexts){assert.equal(c.active,false);assert.equal(c.excluded===true,false);}assert.equal(h.remoteState().settings.excludeNoContext,false);
+});
+
+test('RISK always binary context guidance: FAQ explains context-presence rule and separate green No Context eligibility',async()=>{
+ const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;assert.match(help,/Whenever contexts exist,.*green.*red/i);assert.match(help,/No context.*green.*unassigned/i);assert.match(help,/With no active contexts, only tasks without a known context can scan/);assert.doesNotMatch(help,/No active contexts.*neutral/i);assert.match(help,/does not change saved neutral choices/i);
+});
+
+async function overdueWoopFixture(){
+ const app=await loadApp({seed:971}),{ctx}=app;
+ const base=ctx.addTask('Private benchmark'),task=ctx.addTask('Private overdue',false,[],{due:ctx.todayISO(-1)});
+ ctx.dotTask(base.id);ctx.onAction('start-scan',{dataset:{}});ctx.state.candidateId=task.id;ctx.renderScan();
+ return {...app,base,task};
+}
+function overdueWoopControl(app){
+ const html=app.shim.document.getElementById('scan').innerHTML;
+ const tag=html.match(/<button[^>]*data-act="run-woop"[^>]*>/)?.[0];assert.ok(tag,'overdue offered task must expose Run WOOP');
+ return {dataset:Object.fromEntries([...tag.matchAll(/data-([a-z]+)="([^"]*)"/g)].map(m=>[m[1],m[2]]))};
+}
+test('RISK overdue WOOP: offered action dots through existing comparison and saves with Last task WOOP off',async()=>{
+ const app=await overdueWoopFixture(),{ctx,shim,task,base}=app;
+ assert.equal(ctx.state.settings.lastTaskWoop,false);const control=overdueWoopControl(app);
+ const equivalent=await overdueWoopFixture();equivalent.ctx.dotTask(equivalent.task.id);
+ ctx.onAction('run-woop',control);
+ assert.equal(ctx.state.chain.at(-1),task.id);assert.equal(ctx.state.mode,'work');
+ assert.match(shim.document.getElementById('modalRoot').innerHTML,/best outcome/i);
+ assert.equal(task.mu,equivalent.task.mu);assert.equal(task.sigma,equivalent.task.sigma);assert.equal(base.mu,equivalent.base.mu);
+ assert.equal(task.ratingHistory.at(-1).kind,'dot','one existing explicit Dot signal, no WOOP reward');
+ woopStep(app,'Outcome');woopStep(app,'Obstacle');woopStep(app,'If blocked, then act');
+ assert.equal(task.woopPlan.plan,'If blocked, then act');assert.equal(ctx.state.settings.lastTaskWoop,false);
+ await ctx.persist();const reload=await loadApp({seedStorage:{[STORE_KEY]:JSON.stringify(ctx.state)}});
+ assert.equal(reload.ctx.state.tasks.find(t=>t.id===task.id).woopPlan.plan,'If blocked, then act');
+});
+test('RISK overdue WOOP: local due-day boundary stale eligibility and cancel retain the explicit dot',async()=>{
+ const app=await overdueWoopFixture(),{ctx,shim,task}=app;
+ for(const due of [null,ctx.todayISO(0),ctx.todayISO(1)]){task.due=due;ctx.renderScan();assert.doesNotMatch(shim.document.getElementById('scan').innerHTML,/data-act="run-woop"/);}
+ task.due=ctx.todayISO(-1);ctx.renderScan();const stale=overdueWoopControl(app),before=JSON.stringify(ctx.state);
+ ctx.state.mode='work';ctx.onAction('run-woop',stale);assert.equal(task.woopPlan,undefined);assert.equal(ctx.state.chain.includes(task.id),false);
+ ctx.state.mode='scan';task.done=true;ctx.onAction('run-woop',stale);assert.equal(ctx.state.chain.includes(task.id),false);task.done=false;
+ task.startsAt=ctx.todayISO(1);ctx.onAction('run-woop',stale);assert.equal(ctx.state.chain.includes(task.id),false);task.startsAt=null;
+ const prerequisite=ctx.addTask('Unfinished prerequisite');ctx.setTaskPrerequisites(task.id,[prerequisite.id]);ctx.onAction('run-woop',stale);assert.equal(ctx.state.chain.includes(task.id),false);
+ ctx.setTaskPrerequisites(task.id,[]);ctx.state.candidateId=task.id;ctx.renderScan();ctx.onAction('run-woop',overdueWoopControl(app));ctx.onAction('close-modal',{dataset:{}});
+ assert.equal(task.woopPlan,undefined);assert.equal(ctx.state.chain.at(-1),task.id,'Cancel discards answers, not the explicitly chosen dot');
+ const history=JSON.stringify(task.ratingHistory);ctx.onAction('run-woop',stale);assert.equal(JSON.stringify(task.ratingHistory),history,'repeated old click cannot dot twice');
+ assert.ok(before);
+});
+test('RISK overdue WOOP: existing and legacy plans show explicit delete without silent replacement',async()=>{
+ const app=await overdueWoopFixture(),{ctx,shim,task}=app;
+ task.woopPlan={v:1,id:'legacy-plan',outcome:'Saved outcome',obstacle:'Saved obstacle',plan:'If saved, then act'};
+ ctx.renderScan();ctx.onAction('run-woop',overdueWoopControl(app));
+ assert.match(shim.document.getElementById('modalRoot').innerHTML,/Saved outcome/);assert.match(shim.document.getElementById('modalRoot').innerHTML,/Delete WOOP plan/);
+ assert.equal(task.woopPlan.id,'legacy-plan');assert.equal(vm.runInContext('woopDraft',ctx),null);
+ const tag=shim.document.getElementById('modalRoot').innerHTML.match(/<button[^>]*data-act="woop-delete"[^>]*>/)[0];
+ const del={dataset:Object.fromEntries([...tag.matchAll(/data-([a-z]+)="([^"]*)"/g)].map(m=>[m[1],m[2]]))};ctx.onAction('woop-delete',del);
+ assert.equal(task.woopPlan,null);assert.match(shim.document.getElementById('modalRoot').innerHTML,/best outcome/i);ctx.closeModal();
+ assert.equal(task.woopPlan,null);assert.equal(ctx.state.chain.at(-1),task.id);
+});
+test('RISK overdue WOOP: peer plan account and same-ID board replacement invalidate drafts and controls',async()=>{
+ const app=await overdueWoopFixture(),{ctx,task}=app;const stale=overdueWoopControl(app);
+ const replacement=JSON.parse(JSON.stringify(ctx.state));vm.runInContext('state=JSON.parse('+JSON.stringify(JSON.stringify(replacement))+')',ctx);
+ ctx.onAction('run-woop',stale);assert.equal(ctx.state.chain.includes(task.id),false,'a same-ID replacement does not inherit the old rendered authority');
+ ctx.renderScan();ctx.onAction('run-woop',overdueWoopControl(app));woopStep(app,'Outcome');woopStep(app,'Obstacle');
+ const current=ctx.state.tasks.find(t=>t.id===task.id),peer={v:1,id:'peer',outcome:'Peer',obstacle:'Obstacle',plan:'If peer, then act'};current.woopPlan=peer;
+ woopStep(app,'If local, then act');assert.equal(current.woopPlan.id,'peer');
+ current.woopPlan=null;ctx.state.chain=ctx.state.chain.filter(id=>id!==task.id);ctx.state.mode='scan';ctx.state.candidateId=task.id;ctx.renderScan();
+ ctx.onAction('run-woop',overdueWoopControl(app));woopStep(app,'Outcome');woopStep(app,'Obstacle');ctx.window.CloudSync={user:'different-account'};
+ woopStep(app,'If changed account, then act');assert.equal(current.woopPlan,null);
+});
+test('RISK overdue WOOP: neutral automatic benchmark stays neutral and Cancel can Undo only the dot',async()=>{
+ const app=await overdueWoopFixture(),{ctx,task,base}=app;ctx.writeTaskComparison(base,true);const before=[task.mu,task.sigma,base.mu,base.sigma];
+ ctx.renderScan();ctx.onAction('run-woop',overdueWoopControl(app));assert.deepEqual([task.mu,task.sigma,base.mu,base.sigma],before);assert.equal(ctx.taskComparisonEligible(task),true);
+ ctx.closeModal();ctx.undo();assert.equal(ctx.state.chain.includes(task.id),false);assert.equal(ctx.state.tasks.find(t=>t.id===task.id).woopPlan,undefined);
+});
+test('RISK overdue WOOP: unsupported plans remain read-only and interrupted scan hides the action',async()=>{
+ const app=await overdueWoopFixture(),{ctx,shim,task}=app;ctx.state.interventionActive=true;ctx.renderScan();assert.doesNotMatch(shim.document.getElementById('scan').innerHTML,/data-act="run-woop"/);
+ ctx.state.interventionActive=false;task.woopPlan={v:9,future:'preserve'};ctx.renderScan();ctx.onAction('run-woop',overdueWoopControl(app));
+ assert.equal(ctx.state.chain.at(-1),task.id);assert.match(shim.document.getElementById('modalRoot').innerHTML,/unrecognized/);assert.doesNotMatch(shim.document.getElementById('modalRoot').innerHTML,/data-act="woop-delete"|data-act="woop-next"/);assert.equal(task.woopPlan.future,'preserve');ctx.closeModal();
+});
+test('RISK overdue scanner layout: enlarged candidate title chips and decision footer wrap without clipping choices',async()=>{
+ const {ctx,shim}=await loadApp({seed:971});const b=ctx.addTask('Benchmark'),t=ctx.addTask('A readable overdue task title',false,[],{due:ctx.todayISO(-1)});ctx.dotTask(b.id);ctx.state.mode='scan';ctx.state.candidateId=t.id;ctx.renderScan();
+ const markup=shim.document.getElementById('scan').innerHTML;assert.match(markup,/class="card cand"/);assert.match(markup,/class="chiprow"/);assert.match(markup,/class="decide-finish"/);assert.match(markup,/data-act="run-woop"/);
+ const source=fs.readFileSync(new URL('./index.html',import.meta.url),'utf8');
+ assert.match(source,/\.decide-finish\{[^}]*flex-wrap:wrap/,'the actual scanner finish group must wrap its button and rank controls instead of forcing horizontal overflow');
+ assert.match(source,/\.card\{[^}]*flex-wrap:wrap/,'task chips may move below the title when the card is constrained');
+ assert.match(source,/\.card \.title\{[^}]*flex:1 1 160px/,'reserve a readable title line rather than squeezing it to single characters');
+ assert.match(source,/\.card \.chiprow\{[^}]*flex-wrap:wrap[^}]*max-width:100%/,'multiple due/recurrence chips must also fit a constrained task card');
+ assert.match(source,/\.decide-finish \.sparkbox\{[^}]*flex-wrap:wrap[^}]*max-width:100%/,'rank controls can wrap while all choices remain visible');
+ assert.doesNotMatch(source,/\.decide-finish\{[^}]*(?:overflow:hidden|display:none)/,'containment must not hide scanner actions');
+});
+test('RISK overdue scanner layout: chosen-task breadcrumb stays within the enlarged scanner width',async()=>{
+ const {ctx,shim}=await loadApp({seed:971}),b=ctx.addTask('A long previously chosen benchmark title'),t=ctx.addTask('Overdue task',false,[],{due:ctx.todayISO(-1)});ctx.dotTask(b.id);ctx.state.mode='scan';ctx.state.candidateId=t.id;ctx.renderScan();ctx.onAction('run-woop',overdueWoopControl({ctx,shim}));
+ assert.match(shim.document.getElementById('scan').innerHTML,/class="crumb"/,'the explicit dot makes its former benchmark a breadcrumb');
+ const source=fs.readFileSync(new URL('./index.html',import.meta.url),'utf8');assert.match(source,/\.crumb\{max-width:min\(190px,100%\)\}/,'its existing190px cap must also respect a narrower scanner instead of overflowing after the new dot');
 });
