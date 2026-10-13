@@ -1,5 +1,47 @@
 [
   {
+    "testChangesSha256": "e69d5d25d7c8d3acb9036a3f4583292c71f5bbba9bade069a5aa9abe6d29d32c",
+    "reason": "Repair observed rounded-background glyph failure across all chip surfaces by capping shared multiline corner depth at the existing one-line pill radius.",
+    "previousBehavior": "99px radius made very tall wrapped chips elliptical and let first/last glyphs cross their fill in narrow enlarged views despite centered text and horizontal bounds.",
+    "intendedBehavior": "Sharedcalc(.725em+4px) equals half the established1.45lineheight plus3pxpadding/1pxborder for ordinary one-line controls, but prevents tall multiline corners from curving into full captions; focused4pxoverride and palette unchanged.",
+    "replacementTests": [
+      "RISK task context multiline corners: shared radius preserves the one-line pill and leaves wrapped glyphs inside the fill"
+    ],
+    "preservedCoverage": [
+      "Full text/wrapping/centered alignment, short-chip silhouette, actual reference palette/ink/contrast, focus/emptyID, native checkboxes, bulk mixedApply/Clear and exact persistence/sync/Undo consumer protections remain intact."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK task context multiline corners' tests.js",
+      "failure": "Observed sourceREDbeforeimplementation: multiline chips must cap corner depth at half established one-lineheight; actualradius99px. Preceding exact35a0a665 actual10-config strongerglyphRED98failures, confirmed independentpixels across320enlarged Add/list/single/bulk; evidencevisual-red-corners preserved."
+    }
+  },
+  {
+    "testChangesSha256": "ebbb3c7f76974a1f2973a07318eb0060d195434037a38af0280cd3f207c9496d",
+    "reason": "Repair observed rounded-background glyph failure across all chip surfaces by capping shared multiline corner depth at the existing one-line pill radius.",
+    "previousBehavior": "99px radius made very tall wrapped chips elliptical and let first/last glyphs cross their fill in narrow enlarged views despite centered text and horizontal bounds.",
+    "intendedBehavior": "Sharedcalc(.725em+4px) equals half the established1.45lineheight plus3pxpadding/1pxborder for ordinary one-line controls, but prevents tall multiline corners from curving into full captions; focused4pxoverride and palette unchanged.",
+    "replacementTests": [
+      "RISK task context assignment paint: Add single Edit and Bulk Edit reuse All Tasks chips with native selection feedback",
+      "RISK task context assignment preservation: mixed bulk choices remain unchanged without Apply and editor opening never writes",
+      "RISK task context theme paint: both themes retain resolved landscape reference across assignment and context filters",
+      "RISK task context contrast: selected small chip labels meet readable contrast in both themes",
+      "RISK task context wrapping: shared chips constrain long names across Add list and both editors",
+      "RISK task context keyboard paint: editor labels match the native focused reference chip shape",
+      "RISK task context rerender focus: Add and All Tasks retain only their logical active chip during repeated toggles",
+      "RISK task context landscape cascade: editor labels share resolved All Tasks fill and ink without overriding its palette",
+      "RISK task context imported empty ID: Add restores the existing logical chip without changing saved assignments",
+      "RISK task context wrapped alignment: shared editor and button chips center full captions inside their rounded fill",
+      "RISK task context multiline corners: shared radius preserves the one-line pill and leaves wrapped glyphs inside the fill"
+    ],
+    "preservedCoverage": [
+      "Full text/wrapping/centered alignment, short-chip silhouette, actual reference palette/ink/contrast, focus/emptyID, native checkboxes, bulk mixedApply/Clear and exact persistence/sync/Undo consumer protections remain intact."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK task context multiline corners' tests.js",
+      "failure": "Observed sourceREDbeforeimplementation: multiline chips must cap corner depth at half established one-lineheight; actualradius99px. Preceding exact35a0a665 actual10-config strongerglyphRED98failures, confirmed independentpixels across320enlarged Add/list/single/bulk; evidencevisual-red-corners preserved."
+    }
+  },
+  {
     "testChangesSha256": "91861ccb9680f4a2fe6395ea15cc0ed95c461d8c39c331982650243f9c9851d2",
     "reason": "Repair independent actual rendered typography finding missed by horizontal element bounds: wrapped native editor labels left-aligned across rounded background, unlike centered button reference.",
     "previousBehavior": "Single/bulk editor label inherited left alignment while Add/All Tasks native buttons center captions; long first/last lines visibly crossed pill curve.",

@@ -25827,3 +25827,9 @@ test('RISK task context imported empty ID: Add restores the existing logical chi
 test('RISK task context wrapped alignment: shared editor and button chips center full captions inside their rounded fill',()=>{
  const source=fs.readFileSync(path.join(__dirname,'index.html'),'utf8'),rule=source.match(/\.ltag\{([^}]+)\}/)?.[1];assert.ok(rule);assert.match(rule,/text-align:center/,'native editor label text must share the centered button reference, including wrapped first and last lines');assert.match(rule,/overflow-wrap:anywhere/,'alignment repair retains full unbroken captions');
 });
+test('RISK task context multiline corners: shared radius preserves the one-line pill and leaves wrapped glyphs inside the fill',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'index.html'),'utf8'),rule=source.match(/\.ltag\{([^}]+)\}/)?.[1];assert.ok(rule);
+ assert.match(rule,/border-radius:calc\(\.725em \+ 4px\)/,'multiline chips must cap corner depth at half the established one-line height');
+ for(const font of [12,19.2,24]){const oneLineHeight=font*1.45+2*3+2*1,radius=font*.725+4;assert.equal(radius,oneLineHeight/2,'ordinary one-line silhouette remains the same clamped pill');assert.ok(radius<(font*1.45*4+8)/2,'multiline fill no longer rounds into a tall ellipse');}
+ assert.match(rule,/text-align:center/);assert.match(rule,/overflow-wrap:anywhere/,'full long captions still wrap');
+});
