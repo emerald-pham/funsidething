@@ -1,5 +1,22 @@
 [
   {
+    "testChangesSha256": "23b364c590977dd13d9a3eb8eff944a2a3a4d5bf7f2ab42292c9151860b3491a",
+    "reason": "Unify task context assignment chip paint with the existing All Tasks reference while preserving native checkbox draft behavior.",
+    "previousBehavior": "Add duplicated reference styling and omitted pressed feedback; single and bulk editors used bare checkboxes.",
+    "intendedBehavior": "Assignment surfaces share All Tasks styling and expose native selected/focus feedback without modifying saved task or bulk Apply semantics.",
+    "replacementTests": [
+      "RISK task context assignment paint: Add single Edit and Bulk Edit reuse All Tasks chips with native selection feedback",
+      "RISK task context assignment preservation: mixed bulk choices remain unchanged without Apply and editor opening never writes"
+    ],
+    "preservedCoverage": [
+      "Existing quick-add tagging, sticky choices, context availability, editor Save and bulk conflicts, Apply/Clear, Undo and recovery contracts remain unchanged."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK task context assignment' tests.js",
+      "failure": "Observed preimplementation failure: Add must share the All Tasks control; actual class qctxchip lacked shared ltag. Preservation control already passed and was not represented as RED."
+    }
+  },
+  {
     "testChangesSha256": "4d574ecad12a54ca6069a9d23cd5491494d0ada1d8011c8d7b351a86fdbd6679",
     "reason": "Correct exact rationale name visibility after CI rejected an unchanged test declaration; use a descriptive calendar-relative test name and retain all assertions.",
     "previousBehavior": "The body-only future-day fixture correction named an unchanged declaration absent from added diff lines, so the existing structural rationale gate rejected it.",

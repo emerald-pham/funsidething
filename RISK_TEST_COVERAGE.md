@@ -1051,3 +1051,5 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - `RISK Postponed filter: saved hold semantics preserve legacy opaque evidence and context namespace isolation` — Active hold filtering, combined controls, exact expiry and read-only saved evidence.
 
 - `RISK selected rank geometry browser: enlarged labels stay inside their rank slot without changing selection row height with optional loaded fonts` — Actual full-size selection label containment, native keyboard/pointer actions, stable row geometry and read-only board state across text sizes and rank layouts.
+- `RISK task context assignment paint: Add single Edit and Bulk Edit reuse All Tasks chips with native selection feedback` — Shared reference chip paint, native checkbox feedback and keyboard focus across task assignment entry points.
+- `RISK task context assignment preservation: mixed bulk choices remain unchanged without Apply and editor opening never writes` — Native draft controls retain mixed/unchanged semantics and never write merely by opening an editor.

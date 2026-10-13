@@ -25760,3 +25760,21 @@ test('RISK selected rank geometry browser: enlarged labels stay inside their ran
   assert.deepEqual(report.errors,[]);
  }catch(error){report.failure=error.stack;throw error}finally{if(browser.isConnected())report.ownedPids=[...new Set([...report.ownedPids,...(await session.send('SystemInfo.getProcessInfo')).processInfo.map(p=>p.id)])];await context.close();await browser.close();report.closedAt=new Date().toISOString();if(out)fs.writeFileSync(path.join(out,'results.json'),JSON.stringify(report,null,2)+'\n')}
 });
+
+test('RISK task context assignment paint: Add single Edit and Bulk Edit reuse All Tasks chips with native selection feedback',async()=>{
+ const {ctx,shim}=await loadApp();ctx.state.contexts=[{id:'home',name:'Home',active:true},{id:'work',name:'Work',active:false}];
+ const task=ctx.addTask('Private context paint',false,['home']);ctx.renderQuickCtx();
+ assert.match(shim.document.getElementById('quickCtxRow').innerHTML,/class="ltag qctxchip/,'Add must share the All Tasks control');
+ ctx.onAction('qctx',{dataset:{id:'home'}});assert.match(shim.document.getElementById('quickCtxRow').innerHTML,/aria-pressed="true"/);
+ ctx.openEdit(task.id);assert.match(shim.document.getElementById('modalRoot').innerHTML,/<label class="ltag"><input type="checkbox" data-editctx="home" checked/,'single editor retains native checked input within the shared chip');
+ ctx.state.listOpen=true;ctx.onAction('bulk-select-all');ctx.onAction('bulk-edit');assert.match(shim.document.getElementById('modalRoot').innerHTML,/<label class="ltag"><input type="checkbox" data-bulkctx="home" checked/);
+ const css=fs.readFileSync(path.join(__dirname,'index.html'),'utf8');assert.match(css,/\.ltag\.on,\.ctxpick \.ltag:has\(input:checked\)/,'checked native inputs must share the exact selected reference paint');assert.match(css,/\.ctxpick \.ltag:has\(input:focus-visible\)/,'native checkbox keyboard focus remains visible');
+});
+test('RISK task context assignment preservation: mixed bulk choices remain unchanged without Apply and editor opening never writes',async()=>{
+ const {ctx,shim}=await loadApp();ctx.state.contexts=[{id:'home',name:'Home',active:true},{id:'work',name:'Work',active:false}];
+ const a=ctx.addTask('Private mixed A',false,['home']),b=ctx.addTask('Private mixed B',false,['work']);const before=JSON.stringify(ctx.state.tasks);
+ ctx.openEdit(a.id);ctx.closeModal();ctx.state.listOpen=true;ctx.onAction('bulk-select-all');ctx.onAction('bulk-edit');
+ const html=shim.document.getElementById('modalRoot').innerHTML;assert.match(html,/Mixed values\. Unchanged unless Apply is checked/);assert.doesNotMatch(html,/data-bulkctx="[^"]+" checked/);
+ const old=shim.document.querySelectorAll;shim.document.querySelectorAll=s=>s==='[data-bulkctx]'?[{checked:true,dataset:{bulkctx:'home'}}]:old(s);
+ ctx.onAction('bulk-save');assert.equal(JSON.stringify(ctx.state.tasks),before,'unchecked Apply must not flatten mixed requirements or modify another task field');
+});
