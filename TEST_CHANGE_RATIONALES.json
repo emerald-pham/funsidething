@@ -6216,5 +6216,34 @@
       "command": "SELECTION_LAYOUT_BROWSER_URL=http://127.0.0.1:18551/ PLAYWRIGHT_MODULE=<bundled Playwright> SELECTION_LAYOUT_EVIDENCE_DIR=<durable evidence>/red SELECTION_LAYOUT_CANDIDATE=be895df1bb8e46880ffbcd9369dbbac79b5bb274 node --test --test-name-pattern=\"RISK selected rank geometry browser:\" tests.js",
       "failure": "Contemporaneous unchanged-app RED before index.html or sw.js edits: 320-light-2x-sparksummary-rank every Selected glyph fits the rank slot failed. Saved red.log/results.json and actual selected screenshot show text beyond the button toward title. Initial GREEN attempt exposed the later mobile .tk max-width cascade; specificity correction then passed all twelve cases. Evidence in .git/funsidething-task-evidence/selected-row-readability-20261013."
     }
+  },
+  {
+    "testChangesSha256": "c22047620f715081a1d2745dc2e588f81025bd255d5814dcbd7018f2c5fff7f2",
+    "reason": "User requests every existing context in All Tasks filters independently of scanner inclusion and matches. Confirmed older editor Save drops unavailable IDs; preserve those while keeping explicit visible choices and bulk Clear. Isolate newer CSS selectors so native fallback remains usable.",
+    "previousBehavior": "Inactive/unused contexts disappear from All Tasks filters; single-task Save silently strips unknown IDs; unsupported relational selectors can hide selection feedback.",
+    "intendedBehavior": "All existing context filters remain available, single edits retain unknown references, explicit bulk replacement/Clear retains its behavior, and native checkbox indicators remain usable without :has.",
+    "replacementTests": [
+      "list filter row: a plain unmarked list without contexts offers no filter buttons",
+      "list filter row: contexts nobody uses remain available",
+      "list filter row: inactive contexts remain offered independently of scanning",
+      "list filter: deactivating the filtered context retains the filter",
+      "RISK legacy context editor preservation: Save keeps unknown references while applying explicit known choices and Undo",
+      "RISK legacy context editor preservation: no available contexts retain saved requirements on unrelated Save",
+      "RISK legacy context bulk Clear: explicit Clear removes unknown references and Undo restores them",
+      "RISK context checkbox fallback: native selection remains visible without relational selector support",
+      "RISK context filter restoration: every existing context remains offered independently of scanner choices and open matches",
+      "RISK context selector fallback isolation: ordinary selected controls do not share a rule with unsupported relational selectors",
+      "RISK legacy context completion preservation: editor completion consumers retain unknown references through payload reload and Undo",
+      "RISK legacy context peer deletion: preserved references do not override concurrent known-context deletion during editor rebase"
+    ],
+    "preservedCoverage": [
+      "Status-tag availability still depends on matches; no-context empty row tests now explicitly use no contexts. Context-deactivation tests intentionally adopt the user requested filter policy, deletion still removes its filter. No status/eligibility/search or assignment assertions removed.",
+      "Shared chip paint tests retain tokens/focus checks while replacing comma-selector syntax with isolated supported selectors. Existing bulk mixed Apply, Clear, native controls and Undo stay protected.",
+      "Completion, cloud payload/reload and peer deletion protections added by specialist; those additional cases have retrospective baseline RED, separately labeled, after original preimplementation Save RED."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK legacy context|RISK context checkbox fallback' tests.js; node --test --test-name-pattern='RISK context filter restoration|RISK context selector fallback isolation' tests.js",
+      "failure": "Contemporaneous RED retained in evidence/incident-red.log and filter-fallback-red.log: missing future-id after Save, missing inactive context filter, unguarded hidden indicators and invalidating comma selectors. Initial test harness errors retained and corrected before app edit. specialist-added-tests-retrospective-red.txt records later coverage discrimination, not implementation chronology."
+    }
   }
 ]
