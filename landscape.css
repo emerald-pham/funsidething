@@ -139,11 +139,15 @@ html.viewing-scene{overflow:hidden;overscroll-behavior:none}
   background-image:var(--indicator-excluded);
   background-size:16px 16px;background-repeat:repeat;
 }
-:root[data-patterned-indicators="true"] :is(.ctxitem.included .ctxmark,.ctxitem.excluded .ctxmark,.cand,.chip.due-tomorrow){
-  background-image:var(--indicator-selected);
-  background-size:16px 4px;background-position:left bottom;background-repeat:repeat-x;
+/* Clip full-size diagonal tiles at the edge; scaling would flatten the dash.
+   Small light glyphs keep their existing paint and remain above the clear center. */
+:root[data-patterned-indicators="true"] :is(.ctxitem.included .ctxmark,.ctxitem.excluded .ctxmark,.cand,.chip.due-tomorrow){position:relative}
+:root[data-patterned-indicators="true"] :is(.ctxitem.included .ctxmark,.ctxitem.excluded .ctxmark,.cand,.chip.due-tomorrow)::after{
+  content:"";position:absolute;left:0;right:0;bottom:0;height:4px;pointer-events:none;
+  background-image:var(--indicator-selected);background-size:16px 16px;background-repeat:repeat;
+  border-bottom-left-radius:inherit;border-bottom-right-radius:inherit;
 }
-:root[data-patterned-indicators="true"] .ctxitem.excluded .ctxmark{background-image:var(--indicator-excluded)}
+:root[data-patterned-indicators="true"] .ctxitem.excluded .ctxmark::after{background-image:var(--indicator-excluded)}
 :root[data-patterned-indicators="true"] :is(.syncbtn.ok,.syncbtn.busy,.syncbtn.err){
   background-image:repeating-linear-gradient(135deg,transparent 0 4px,currentColor 4px 6px,transparent 6px 10px);
   background-size:100% 4px;background-position:left bottom;background-repeat:no-repeat;
@@ -160,3 +164,10 @@ html.viewing-scene{overflow:hidden;overscroll-behavior:none}
   background-size:16px 16px;background-repeat:repeat;
 }
 }
+
+/* A transparent Selected slot cannot carry white stripes in day mode. Match
+   selected context fill; keep its existing label ink on an opaque panel backing. */
+:root[data-patterned-indicators="true"] .bulk-rank-selected{background-color:var(--chain-deep)}
+:root[data-patterned-indicators="true"] .bulk-rank-selected .tkl{background:var(--panel)}
+/* Secondary descriptions need the same contrast as the selected main label. */
+:root[data-patterned-indicators="true"] .motion-choices button[aria-pressed="true"] span{color:var(--action-ink)}

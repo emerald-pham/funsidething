@@ -25903,7 +25903,7 @@ test('RISK patterned indicators preference: actual checkbox saves immediately su
 test('RISK patterned indicators paint: opt-in static dashed diagonal textures retain semantic fills and separate excluded state',()=>{
  const css=fs.readFileSync(path.join(__dirname,'landscape.css'),'utf8');assert.match(css,/data-patterned-indicators/);assert.match(css,/repeating-linear-gradient\(135deg/);assert.match(css,/--indicator-excluded/,'excluded must differ from included');
  for(const selector of ['.ltag.on','.ctxpick .ltag:has(input:checked)','.ctxitem.included .ctxmark','.ctxitem.excluded .ctxmark','#addButton.yes','.setting-set','.setting-unset','.bulk-rank-selected','.motion-choices button[aria-pressed="true"]','.chip.due-overdue'])assert.ok(css.slice(css.indexOf('/* Optional patterned')).includes(selector),selector+' audited state has a texture');
- const patterned=css.slice(css.indexOf('/* Optional patterned'));assert.match(patterned,/background-size:/);assert.match(patterned,/background-repeat:no-repeat/);assert.doesNotMatch(patterned,/animation:|transition:|background-color:|(?<!-)color:/,'texture does not replace semantic paint or animate');
+ const patterned=css.slice(css.indexOf('/* Optional patterned'));assert.match(patterned,/background-size:/);assert.match(patterned,/background-repeat:no-repeat/);const unchanged=patterned.replace(/:root\[data-patterned-indicators="true"\] \.bulk-rank-selected\{background-color:var\(--chain-deep\)\}/,'').replace(/:root\[data-patterned-indicators="true"\] \.motion-choices button\[aria-pressed="true"\] span\{color:var\(--action-ink\)\}/,'');assert.doesNotMatch(unchanged,/animation:|transition:|background-color:|(?<!-)color:/,'only the two explicitly protected contrast repairs alter paint; other semantic fills and motion remain unchanged');
 });
 test('RISK patterned indicators FAQ: appearance chapter explains default persistence and separate meanings',async()=>{
  const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;assert.match(help,/Patterned active indicators/);assert.match(help,/Off by default/);assert.match(help,/stripes/);
@@ -25915,14 +25915,14 @@ test('RISK patterned indicators benchmark fill: striped overlay retains original
 
 test('RISK patterned indicators full-field cue: selected controls use genuinely dashed stripes across the fill while small glyphs stay clear',()=>{
  const css=fs.readFileSync(path.join(__dirname,'landscape.css'),'utf8').split('/* Optional patterned')[1];assert.match(css,/stroke-dasharray/,'a diagonal line must be dashed rather than a continuous stripe');assert.match(css,/background-size:16px 16px/,'large active fills repeat a full-field dashed tile');
- assert.match(css,/\.ctxitem\.included \.ctxmark[^}]*background-size:16px 4px/,'small check and X marks keep their center clear');
+ assert.match(css,/\.ctxitem\.included \.ctxmark[^}]*position:relative/,'small check and X marks keep their center clear');
 });
 test('RISK patterned indicators sync contrast: status texture uses semantic ink rather than white on the white day surface',()=>{
  const css=fs.readFileSync(path.join(__dirname,'landscape.css'),'utf8').split('/* Optional patterned')[1];assert.match(css,/\.syncbtn\.ok,\.syncbtn\.busy,\.syncbtn\.err[^}]*currentColor/,'status stripes must remain visible on day white and night dark surfaces');
 });
 
 test('RISK patterned indicators light-label protection: candidate and tomorrow badges retain unobstructed night-theme ink',()=>{
- const css=fs.readFileSync(path.join(__dirname,'landscape.css'),'utf8');assert.match(css,/\.cand,\.chip\.due-tomorrow[^}]*background-size:16px 4px/,'existing night light glyphs must not sit over white full-field stripes');
+ const css=fs.readFileSync(path.join(__dirname,'landscape.css'),'utf8');assert.match(css,/\.cand,\.chip\.due-tomorrow\)::after\{[^}]*height:4px/,'existing night light glyphs must not sit over white full-field stripes');
 });
 
 test('RISK patterned indicators immediate-save FAQ: established settings lifecycle answer lists the new toggle',async()=>{
@@ -25931,4 +25931,16 @@ test('RISK patterned indicators immediate-save FAQ: established settings lifecyc
 
 test('RISK patterned indicators selector fallback: native editor texture is isolated from ordinary active chips',()=>{
  const css=fs.readFileSync(path.join(__dirname,'landscape.css'),'utf8').split('/* Optional patterned')[1];assert.match(css,/@supports selector\(:has\(input:checked\)\)\{[\s\S]*?data-patterned-indicators[\s\S]*?\.ctxpick \.ltag:has\(input:checked\)\{[^}]*background-image:var\(--indicator-selected\)/,'relational texture is separately supported');assert.doesNotMatch(css,/[^{}]*\.ltag\.on[^{}]*:has\([^{}]*\)\s*\{/,'unsupported editor selectors cannot invalidate ordinary active chip textures');
+});
+
+test('RISK patterned indicators selected rank contrast: texture has shared green fill and an opaque unchanged-ink label backing',()=>{
+ const css=fs.readFileSync(path.join(__dirname,'landscape.css'),'utf8');assert.match(css,/data-patterned-indicators="true"\] \.bulk-rank-selected\{[^}]*background-color:var\(--chain-deep\)/,'a white pattern cannot mark a transparent white selected slot');assert.match(css,/data-patterned-indicators="true"\] \.bulk-rank-selected \.tkl\{[^}]*background:var\(--panel\)/,'opaque backing protects existing night label ink from white texture');
+});
+test('RISK patterned indicators selected caption contrast: motion descriptions share readable selected action ink in both themes',()=>{
+ const css=fs.readFileSync(path.join(__dirname,'landscape.css'),'utf8');assert.match(css,/data-patterned-indicators="true"\] \.motion-choices button\[aria-pressed="true"\] span\{color:var\(--action-ink\)\}/,'light secondary ink must not cross white stripes');
+ const tokens=css.match(/--action-ink:light-dark\((#[a-f0-9]{6}),(#[a-f0-9]{6})\)/),fill=css.match(/--yes:light-dark\((#[a-f0-9]{6}),(#[a-f0-9]{6})\)/);const lum=hex=>hex.slice(1).match(/../g).map(x=>parseInt(x,16)/255).map(x=>x<=.04045?x/12.92:((x+.055)/1.055)**2.4).reduce((s,x,i)=>s+x*[.2126,.7152,.0722][i],0);
+ for(let i=1;i<=2;i++)for(const surface of [fill[i],'#ffffff'])assert.ok((lum(surface)+.05)/(lum(tokens[i])+.05)>=4.5,'selected description retains contrast on semantic fill and light stripe');
+});
+test('RISK patterned indicators edge geometry: light-label edge cues clip a square dashed tile without vertical compression',()=>{
+ const css=fs.readFileSync(path.join(__dirname,'landscape.css'),'utf8');assert.match(css,/\.cand,\.chip\.due-tomorrow\)::after\{[^}]*height:4px[^}]*background-size:16px 16px/,'four-pixel band clips rather than scales square diagonal tile');assert.doesNotMatch(css,/background-size:16px 4px/,'compressed diagonal paint must not return');assert.match(css,/::after\{[^}]*pointer-events:none/,'decorative stripe never intercepts native actions');
 });

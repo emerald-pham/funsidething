@@ -1090,3 +1090,6 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - `RISK patterned indicators light-label protection: candidate and tomorrow badges retain unobstructed night-theme ink`
 - `RISK patterned indicators immediate-save FAQ: established settings lifecycle answer lists the new toggle`
 - `RISK patterned indicators selector fallback: native editor texture is isolated from ordinary active chips`
+- `RISK patterned indicators selected rank contrast: texture has shared green fill and an opaque unchanged-ink label backing`
+- `RISK patterned indicators selected caption contrast: motion descriptions share readable selected action ink in both themes`
+- `RISK patterned indicators edge geometry: light-label edge cues clip a square dashed tile without vertical compression`
