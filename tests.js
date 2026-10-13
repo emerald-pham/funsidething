@@ -25768,7 +25768,7 @@ test('RISK task context assignment paint: Add single Edit and Bulk Edit reuse Al
  ctx.onAction('qctx',{dataset:{id:'home'}});assert.match(shim.document.getElementById('quickCtxRow').innerHTML,/aria-pressed="true"/);
  ctx.openEdit(task.id);assert.match(shim.document.getElementById('modalRoot').innerHTML,/<label class="ltag"><input type="checkbox" data-editctx="home" checked/,'single editor retains native checked input within the shared chip');
  ctx.state.listOpen=true;ctx.onAction('bulk-select-all');ctx.onAction('bulk-edit');assert.match(shim.document.getElementById('modalRoot').innerHTML,/<label class="ltag"><input type="checkbox" data-bulkctx="home" checked/);
- const css=fs.readFileSync(path.join(__dirname,'index.html'),'utf8');assert.match(css,/\.ltag\.on,\.ctxpick \.ltag:has\(input:checked\)/,'checked native inputs must share the exact selected reference paint');assert.match(css,/\.ctxpick \.ltag:has\(input:focus-visible\)/,'native checkbox keyboard focus remains visible');
+ const css=fs.readFileSync(path.join(__dirname,'index.html'),'utf8');assert.match(css,/\.task-context\.on,\.qctxchip\.on,\.ctxpick \.ltag:has\(input:checked\)/,'checked native inputs must share the exact selected reference paint');assert.match(css,/\.ctxpick \.ltag:has\(input:focus-visible\)/,'native checkbox keyboard focus remains visible');
 });
 test('RISK task context assignment preservation: mixed bulk choices remain unchanged without Apply and editor opening never writes',async()=>{
  const {ctx,shim}=await loadApp();ctx.state.contexts=[{id:'home',name:'Home',active:true},{id:'work',name:'Work',active:false}];
@@ -25777,4 +25777,13 @@ test('RISK task context assignment preservation: mixed bulk choices remain uncha
  const html=shim.document.getElementById('modalRoot').innerHTML;assert.match(html,/Mixed values\. Unchanged unless Apply is checked/);assert.doesNotMatch(html,/data-bulkctx="[^"]+" checked/);
  const old=shim.document.querySelectorAll;shim.document.querySelectorAll=s=>s==='[data-bulkctx]'?[{checked:true,dataset:{bulkctx:'home'}}]:old(s);
  ctx.onAction('bulk-save');assert.equal(JSON.stringify(ctx.state.tasks),before,'unchecked Apply must not flatten mixed requirements or modify another task field');
+});
+test('RISK task context theme paint: day selection is green and night retains released purple across assignment and context filters',async()=>{
+ const source=fs.readFileSync(path.join(__dirname,'index.html'),'utf8');
+ assert.match(source,/--task-context-selected:light-dark\(#2f9e48,#6a55e0\)/,'explicit theme pair must change day only and retain released night purple');
+ assert.match(source,/\.task-context\.on,\.qctxchip\.on,\.ctxpick \.ltag:has\(input:checked\)\{background:var\(--task-context-selected\);color:#fff;border-color:var\(--task-context-selected\)\}/);
+ assert.match(source,/\.ltag\{[^}]*background:var\(--surface\)/,'white day and existing dark unselected surface remain shared');
+ const {ctx,shim}=await loadApp();ctx.state.contexts=[{id:'home',name:'Home',active:true}];ctx.addTask('Private theme',false,['home']);ctx.state.listOpen=true;ctx.toggleListTag('c:home');
+ assert.match(shim.document.getElementById('listTagRow').innerHTML,/class="ltag task-context on"[^>]*data-id="c:home"/,'actual context filter uses dedicated semantic paint');
+ assert.doesNotMatch(shim.document.getElementById('listEligibilityRow').innerHTML,/task-context/,'unrelated eligibility paint stays unchanged');
 });

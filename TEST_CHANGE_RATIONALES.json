@@ -1,5 +1,40 @@
 [
   {
+    "testChangesSha256": "c814d5af6eeb3aff78c9aba25cc82b724757c7bbd9d3cd1f6a14280647ecf344",
+    "reason": "Apply explicit user correction to green day task-context selection while preserving the exact released purple night paint and native assignment semantics.",
+    "previousBehavior": "The reference and assignment chips selected purple in both themes.",
+    "intendedBehavior": "Only context choices select green in light mode; dark mode keeps released purple. Native draft checked controls and unrelated list eligibility/status paint remain intact.",
+    "replacementTests": [
+      "RISK task context assignment paint: Add single Edit and Bulk Edit reuse All Tasks chips with native selection feedback",
+      "RISK task context theme paint: day selection is green and night retains released purple across assignment and context filters"
+    ],
+    "preservedCoverage": [
+      "Existing native editor selection, quick-add tagging, bulk mixed/Apply/Clear, persistence/recovery, no-context availability and main include/exclude semantics remain protected."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK task context theme paint' tests.js",
+      "failure": "Observed preimplementation failure: explicit theme pair must change day only and retain released night purple. Dedicated --task-context-selected token was absent."
+    }
+  },
+  {
+    "testChangesSha256": "43817ee3a7aeec1f6271e5ee55913427d3f91398e5a0f81f2d2437ebd61d4933",
+    "reason": "Apply explicit user correction to green day task-context selection while preserving the exact released purple night paint and native assignment semantics.",
+    "previousBehavior": "The reference and assignment chips selected purple in both themes.",
+    "intendedBehavior": "Only context choices select green in light mode; dark mode keeps released purple. Native draft checked controls and unrelated list eligibility/status paint remain intact.",
+    "replacementTests": [
+      "RISK task context assignment paint: Add single Edit and Bulk Edit reuse All Tasks chips with native selection feedback",
+      "RISK task context assignment preservation: mixed bulk choices remain unchanged without Apply and editor opening never writes",
+      "RISK task context theme paint: day selection is green and night retains released purple across assignment and context filters"
+    ],
+    "preservedCoverage": [
+      "Existing native editor selection, quick-add tagging, bulk mixed/Apply/Clear, persistence/recovery, no-context availability and main include/exclude semantics remain protected."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK task context theme paint' tests.js",
+      "failure": "Observed preimplementation failure: explicit theme pair must change day only and retain released night purple. Dedicated --task-context-selected token was absent."
+    }
+  },
+  {
     "testChangesSha256": "23b364c590977dd13d9a3eb8eff944a2a3a4d5bf7f2ab42292c9151860b3491a",
     "reason": "Unify task context assignment chip paint with the existing All Tasks reference while preserving native checkbox draft behavior.",
     "previousBehavior": "Add duplicated reference styling and omitted pressed feedback; single and bulk editors used bare checkboxes.",
