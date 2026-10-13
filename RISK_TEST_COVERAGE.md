@@ -1061,3 +1061,4 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 
 - `RISK task context landscape cascade: editor labels share resolved All Tasks fill and ink without overriding its palette` — Selected labels and buttons share exact reference tokens and later landscape ink override; no private palette can replace released theme paint.
 - `RISK task context imported empty ID: Add restores the existing logical chip without changing saved assignments` — Supported imported empty context IDs retain native Add focus across repeated selection, without modifying saved task requirements.
+- `RISK task context wrapped alignment: shared editor and button chips center full captions inside their rounded fill` — Shared centered text prevents native editor wrapped captions from drifting outside the pill reference treatment while retaining full names and width wrapping.

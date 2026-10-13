@@ -1,5 +1,46 @@
 [
   {
+    "testChangesSha256": "91861ccb9680f4a2fe6395ea15cc0ed95c461d8c39c331982650243f9c9851d2",
+    "reason": "Repair independent actual rendered typography finding missed by horizontal element bounds: wrapped native editor labels left-aligned across rounded background, unlike centered button reference.",
+    "previousBehavior": "Single/bulk editor label inherited left alignment while Add/All Tasks native buttons center captions; long first/last lines visibly crossed pill curve.",
+    "intendedBehavior": "Shared ltag explicitly centers text for both label/button controls without altering palette, wrapping, focus or saved consumers.",
+    "replacementTests": [
+      "RISK task context wrapped alignment: shared editor and button chips center full captions inside their rounded fill"
+    ],
+    "preservedCoverage": [
+      "Full captions and unbroken-name wrapping, actual reference palette/contrast, native keyboard/focus, importedempty-ID, bulk Apply/mixed, persisteddata/cloud/sync/Undo protections all retained."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK task context wrapped alignment' tests.js",
+      "failure": "Observed source RED before repair: native editor label text must share centered button reference; shared rule lacked text-align:center. Independent final rendered4337 review found long label first/last lines crossing roundedfill at320darkenlarged and390lightbulk; evidence visual-red-alignment retained."
+    }
+  },
+  {
+    "testChangesSha256": "088b30b5fedc1e6e18b25eff6c6ed5157a7449214b27c40d04b8e3cb7eb75a42",
+    "reason": "Repair independent actual rendered typography finding missed by horizontal element bounds: wrapped native editor labels left-aligned across rounded background, unlike centered button reference.",
+    "previousBehavior": "Single/bulk editor label inherited left alignment while Add/All Tasks native buttons center captions; long first/last lines visibly crossed pill curve.",
+    "intendedBehavior": "Shared ltag explicitly centers text for both label/button controls without altering palette, wrapping, focus or saved consumers.",
+    "replacementTests": [
+      "RISK task context assignment paint: Add single Edit and Bulk Edit reuse All Tasks chips with native selection feedback",
+      "RISK task context assignment preservation: mixed bulk choices remain unchanged without Apply and editor opening never writes",
+      "RISK task context theme paint: both themes retain resolved landscape reference across assignment and context filters",
+      "RISK task context contrast: selected small chip labels meet readable contrast in both themes",
+      "RISK task context wrapping: shared chips constrain long names across Add list and both editors",
+      "RISK task context keyboard paint: editor labels match the native focused reference chip shape",
+      "RISK task context rerender focus: Add and All Tasks retain only their logical active chip during repeated toggles",
+      "RISK task context landscape cascade: editor labels share resolved All Tasks fill and ink without overriding its palette",
+      "RISK task context imported empty ID: Add restores the existing logical chip without changing saved assignments",
+      "RISK task context wrapped alignment: shared editor and button chips center full captions inside their rounded fill"
+    ],
+    "preservedCoverage": [
+      "Full captions and unbroken-name wrapping, actual reference palette/contrast, native keyboard/focus, importedempty-ID, bulk Apply/mixed, persisteddata/cloud/sync/Undo protections all retained."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK task context wrapped alignment' tests.js",
+      "failure": "Observed source RED before repair: native editor label text must share centered button reference; shared rule lacked text-align:center. Independent final rendered4337 review found long label first/last lines crossing roundedfill at320darkenlarged and390lightbulk; evidence visual-red-alignment retained."
+    }
+  },
+  {
     "testChangesSha256": "ac8b8e221600e1c8e9b386dfd1a80334ecd376a59175a4c6ef1d0c69a10d0d8c",
     "reason": "Fix specialist-observed focus guard edge case for already supported imported empty context IDs.",
     "previousBehavior": "A truthiness check skipped refocus for id empty string even though it is an existing rendered real context.",

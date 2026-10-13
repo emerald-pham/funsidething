@@ -25824,3 +25824,6 @@ test('RISK task context imported empty ID: Add restores the existing logical chi
  row.querySelectorAll=()=>[{dataset:{act:'qctx',id:''},focus:options=>{assert.equal(options.preventScroll,true);focus++;shim.document.activeElement={dataset:{act:'qctx',id:''}}}}];shim.document.activeElement={dataset:{act:'qctx',id:''}};
  ctx.onAction('qctx',{dataset:{id:''}});assert.equal(focus,1,'an existing empty ID is still a real active chip');assert.match(row.innerHTML,/aria-pressed="true"/);ctx.onAction('qctx',{dataset:{id:''}});assert.equal(focus,2);assert.match(row.innerHTML,/aria-pressed="false"/);assert.equal(JSON.stringify(ctx.state.tasks),tasks);
 });
+test('RISK task context wrapped alignment: shared editor and button chips center full captions inside their rounded fill',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'index.html'),'utf8'),rule=source.match(/\.ltag\{([^}]+)\}/)?.[1];assert.ok(rule);assert.match(rule,/text-align:center/,'native editor label text must share the centered button reference, including wrapped first and last lines');assert.match(rule,/overflow-wrap:anywhere/,'alignment repair retains full unbroken captions');
+});
