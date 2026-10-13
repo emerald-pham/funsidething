@@ -1,5 +1,41 @@
 [
   {
+    "testChangesSha256": "a4d90c87508a96962af650e00dd02f1e8f2054b96f8555b2b31cd8b25b6ed5a4",
+    "reason": "Repair independent reviewer finding that initial day green made small white context labels unreadable.",
+    "previousBehavior": "Selected day chip white text on #2f9e48 had only 3.44:1 contrast.",
+    "intendedBehavior": "Use established included-context #2c7346 day green for sufficient white small-label contrast, preserving exact night purple and all assignment semantics.",
+    "replacementTests": [
+      "RISK task context theme paint: day selection is green and night retains released purple across assignment and context filters",
+      "RISK task context contrast: selected small chip labels meet readable contrast in both themes"
+    ],
+    "preservedCoverage": [
+      "Shared assignment classes, native checkbox focus and draft/bulk Apply semantics, exact night paint, unchanged unrelated filters and existing sync/Undo protections remain."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK task context contrast' tests.js",
+      "failure": "Observed RED before repair: white small context labels require 4.5:1 contrast against #2f9e48."
+    }
+  },
+  {
+    "testChangesSha256": "2edb5cd10d69f0f6b45245d33d7ca63c3923b918369370ac8bd324fdb3eef945",
+    "reason": "Repair independent reviewer finding that initial day green made small white context labels unreadable.",
+    "previousBehavior": "Selected day chip white text on #2f9e48 had only 3.44:1 contrast.",
+    "intendedBehavior": "Use established included-context #2c7346 day green for sufficient white small-label contrast, preserving exact night purple and all assignment semantics.",
+    "replacementTests": [
+      "RISK task context assignment paint: Add single Edit and Bulk Edit reuse All Tasks chips with native selection feedback",
+      "RISK task context assignment preservation: mixed bulk choices remain unchanged without Apply and editor opening never writes",
+      "RISK task context theme paint: day selection is green and night retains released purple across assignment and context filters",
+      "RISK task context contrast: selected small chip labels meet readable contrast in both themes"
+    ],
+    "preservedCoverage": [
+      "Shared assignment classes, native checkbox focus and draft/bulk Apply semantics, exact night paint, unchanged unrelated filters and existing sync/Undo protections remain."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK task context contrast' tests.js",
+      "failure": "Observed RED before repair: white small context labels require 4.5:1 contrast against #2f9e48."
+    }
+  },
+  {
     "testChangesSha256": "c814d5af6eeb3aff78c9aba25cc82b724757c7bbd9d3cd1f6a14280647ecf344",
     "reason": "Apply explicit user correction to green day task-context selection while preserving the exact released purple night paint and native assignment semantics.",
     "previousBehavior": "The reference and assignment chips selected purple in both themes.",

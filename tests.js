@@ -25780,10 +25780,15 @@ test('RISK task context assignment preservation: mixed bulk choices remain uncha
 });
 test('RISK task context theme paint: day selection is green and night retains released purple across assignment and context filters',async()=>{
  const source=fs.readFileSync(path.join(__dirname,'index.html'),'utf8');
- assert.match(source,/--task-context-selected:light-dark\(#2f9e48,#6a55e0\)/,'explicit theme pair must change day only and retain released night purple');
+ assert.match(source,/--task-context-selected:light-dark\(#2c7346,#6a55e0\)/,'explicit theme pair must change day only and retain released night purple');
  assert.match(source,/\.task-context\.on,\.qctxchip\.on,\.ctxpick \.ltag:has\(input:checked\)\{background:var\(--task-context-selected\);color:#fff;border-color:var\(--task-context-selected\)\}/);
  assert.match(source,/\.ltag\{[^}]*background:var\(--surface\)/,'white day and existing dark unselected surface remain shared');
  const {ctx,shim}=await loadApp();ctx.state.contexts=[{id:'home',name:'Home',active:true}];ctx.addTask('Private theme',false,['home']);ctx.state.listOpen=true;ctx.toggleListTag('c:home');
  assert.match(shim.document.getElementById('listTagRow').innerHTML,/class="ltag task-context on"[^>]*data-id="c:home"/,'actual context filter uses dedicated semantic paint');
  assert.doesNotMatch(shim.document.getElementById('listEligibilityRow').innerHTML,/task-context/,'unrelated eligibility paint stays unchanged');
+});
+test('RISK task context contrast: selected small chip labels meet readable contrast in both themes',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'index.html'),'utf8'),pair=source.match(/--task-context-selected:light-dark\((#[a-f0-9]{6}),(#[a-f0-9]{6})\)/);assert.ok(pair);
+ const luminance=hex=>{const c=hex.slice(1).match(/../g).map(x=>parseInt(x,16)/255).map(x=>x<=.04045?x/12.92:((x+.055)/1.055)**2.4);return .2126*c[0]+.7152*c[1]+.0722*c[2]};
+ for(const color of pair.slice(1))assert.ok(1.05/(luminance(color)+.05)>=4.5,'white small context labels require 4.5:1 contrast against '+color);
 });
