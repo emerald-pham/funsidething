@@ -1094,3 +1094,4 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - `RISK patterned indicators selected caption contrast: motion descriptions share readable selected action ink in both themes`
 - `RISK patterned indicators edge geometry: light-label edge cues clip a square dashed tile without vertical compression`
 - `RISK patterned context direction cue: contrasting full-control rails leave original check and X glyphs untouched`
+- `RISK patterned indicator slope legend: FAQ distinguishes locked selections and unset location from ordinary selected controls` — Covers semantic exceptions in the appearance legend.

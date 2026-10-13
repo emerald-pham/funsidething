@@ -25948,3 +25948,7 @@ test('RISK patterned indicators edge geometry: light-label edge cues clip a squa
 test('RISK patterned context direction cue: contrasting full-control rails leave original check and X glyphs untouched',()=>{
  const css=fs.readFileSync(path.join(__dirname,'landscape.css'),'utf8').split('/* Optional patterned')[1];assert.match(css,/\.ctxitem\.included,\.ctxitem\.excluded\)::after\{[^}]*height:4px[^}]*background-size:16px 16px/,'wide click-control rail clips real diagonals below glyphs');assert.match(css,/\.ctxitem\.included::after\{background-color:light-dark\(#2c7346,#28643e\)/,'included rail retains actual green mark palette');assert.match(css,/\.ctxitem\.excluded::after\{background-color:light-dark\(#b7353c,#a82f36\);background-image:var\(--indicator-excluded\)/,'excluded rail retains actual red and an opposite slope');assert.doesNotMatch(css,/\.ctxmark(?:::after|[^}]*background-image)/,'no added stripes share the small glyph box');
 });
+
+test('RISK patterned indicator slope legend: FAQ distinguishes locked selections and unset location from ordinary selected controls',async()=>{
+ const {ctx,shim}=await loadApp();ctx.openHelp();const answer=shim.document.getElementById('modalRoot').innerHTML.split('<dt>What are Patterned active indicators?</dt><dd>')[1].split('</dd>')[0];for(const cue of [/excluded contexts/,/locked Scene Time selections/,/unset location/])assert.match(answer,cue,'legend must explain its red-status slope exceptions');
+});
