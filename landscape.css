@@ -125,7 +125,7 @@ html.viewing-scene{overflow:hidden;overscroll-behavior:none}
 
 /* Optional patterned indicators keep the resolved semantic fill and dark label
    ink. Dashed white diagonals cover active fills; opposite slopes mark exclusions.
-   Light-label fields, small check/X symbols and ink-only sync status use an edge cue to leave their
+   Light-label fields and ink-only sync status use an edge cue to leave their
    glyphs clear. No animation, new layout box, or interaction is introduced. */
 :root[data-patterned-indicators="true"]{
   --indicator-selected:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16'%3E%3Cpath d='M-8 8L8-8M0 16L16 0M8 24L24 8' fill='none' stroke='%23fff' stroke-width='2' stroke-dasharray='5 3'/%3E%3C/svg%3E");
@@ -139,15 +139,13 @@ html.viewing-scene{overflow:hidden;overscroll-behavior:none}
   background-image:var(--indicator-excluded);
   background-size:16px 16px;background-repeat:repeat;
 }
-/* Clip full-size diagonal tiles at the edge; scaling would flatten the dash.
-   Small light glyphs keep their existing paint and remain above the clear center. */
-:root[data-patterned-indicators="true"] :is(.ctxitem.included .ctxmark,.ctxitem.excluded .ctxmark,.cand,.chip.due-tomorrow){position:relative}
-:root[data-patterned-indicators="true"] :is(.ctxitem.included .ctxmark,.ctxitem.excluded .ctxmark,.cand,.chip.due-tomorrow)::after{
+/* Clip full-size diagonal tiles at light-label field edges; scaling flattens them. */
+:root[data-patterned-indicators="true"] :is(.cand,.chip.due-tomorrow){position:relative}
+:root[data-patterned-indicators="true"] :is(.cand,.chip.due-tomorrow)::after{
   content:"";position:absolute;left:0;right:0;bottom:0;height:4px;pointer-events:none;
   background-image:var(--indicator-selected);background-size:16px 16px;background-repeat:repeat;
   border-bottom-left-radius:inherit;border-bottom-right-radius:inherit;
 }
-:root[data-patterned-indicators="true"] .ctxitem.excluded .ctxmark::after{background-image:var(--indicator-excluded)}
 :root[data-patterned-indicators="true"] :is(.syncbtn.ok,.syncbtn.busy,.syncbtn.err){
   background-image:repeating-linear-gradient(135deg,transparent 0 4px,currentColor 4px 6px,transparent 6px 10px);
   background-size:100% 4px;background-position:left bottom;background-repeat:no-repeat;
@@ -171,3 +169,14 @@ html.viewing-scene{overflow:hidden;overscroll-behavior:none}
 :root[data-patterned-indicators="true"] .bulk-rank-selected .tkl{background:var(--panel)}
 /* Secondary descriptions need the same contrast as the selected main label. */
 :root[data-patterned-indicators="true"] .motion-choices button[aria-pressed="true"] span{color:var(--action-ink)}
+
+/* The twenty-pixel marks cannot carry distinguishable stripes without merging
+   into their check/X feet. Use the whole control's bottom padding as a rail,
+   matching each mark's actual color and leaving its glyph completely untouched. */
+:root[data-patterned-indicators="true"] :is(.ctxitem.included,.ctxitem.excluded){position:relative}
+:root[data-patterned-indicators="true"] :is(.ctxitem.included,.ctxitem.excluded)::after{
+  content:"";position:absolute;left:0;right:0;bottom:0;height:4px;pointer-events:none;
+  background-image:var(--indicator-selected);background-size:16px 16px;background-repeat:repeat;
+}
+:root[data-patterned-indicators="true"] .ctxitem.included::after{background-color:light-dark(#2c7346,#28643e)}
+:root[data-patterned-indicators="true"] .ctxitem.excluded::after{background-color:light-dark(#b7353c,#a82f36);background-image:var(--indicator-excluded)}
