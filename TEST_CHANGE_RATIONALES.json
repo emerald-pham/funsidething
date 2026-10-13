@@ -5751,15 +5751,17 @@
     }
   },
   {
-    "testChangesSha256": "bf9dfaa4fa6690a5eabfb98b10d41ac35d1336c4ad5061bb6544113be159f790",
+    "testChangesSha256": "10f25737bbb65909e875bfb45e448a99a97137b9d8efb36366158e4f19822d6f",
     "reason": "Reserve the full Selected label in enlarged All Tasks rank slots after actual rendered overlap, preserving selection transitions and task-title editing.",
     "previousBehavior": "Fixed mobile rank slots allow doubled Selected text to extend into the title gap.",
     "intendedBehavior": "Rank slots reserve eight mono glyphs plus padding before selection; full labels stay inside the rank control without selection changing row height.",
     "replacementTests": [
-      "RISK selected rank geometry browser: enlarged labels stay inside their rank slot without changing selection row height"
+      "RISK selected rank geometry browser: enlarged labels stay inside their rank slot without changing selection row height",
+      "rank presentation list columns stay responsive for every flag combination"
     ],
     "preservedCoverage": [
-      "Existing selection, filtered Select all, task-title Edit, native Tab/Space/Enter, rank/chance modes, normal rank widths and saved board values remain asserted. All existing tests are unchanged. Twelve isolated phone, landscape, tablet and desktop cases cover both themes and ordinary/doubled fonts; normal and selected row heights are compared."
+      "Existing selection, filtered Select all, task-title Edit, native Tab/Space/Enter, rank/chance modes, normal rank widths and saved board values remain asserted. All existing tests are unchanged. Twelve isolated phone, landscape, tablet and desktop cases cover both themes and ordinary/doubled fonts; normal and selected row heights are compared.",
+      "Existing CSS structural regression changed only expected track syntax to minmax and escaped parentheses; all feature-flag/class checks and original88/118/70/92 pixel floors remain. Existing full-suite RED352 and independent targeted failure exposed the superseded literal fixed-track expectation; focused-source.log passes six cases after correction. Browser opt-in font mode permits only Google font origins and asserts actual Spline/Spline Mono paint; all other external traffic stays blocked. Initial rendered evidence proves fallback-font behavior only; custom-font qualification is held for a new runtime allocation."
     ],
     "redEvidence": {
       "command": "SELECTION_LAYOUT_BROWSER_URL=http://127.0.0.1:18551/ PLAYWRIGHT_MODULE=<bundled Playwright> SELECTION_LAYOUT_EVIDENCE_DIR=<durable evidence>/red SELECTION_LAYOUT_CANDIDATE=be895df1bb8e46880ffbcd9369dbbac79b5bb274 node --test --test-name-pattern=\"RISK selected rank geometry browser:\" tests.js",
