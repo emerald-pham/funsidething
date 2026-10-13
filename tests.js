@@ -25697,7 +25697,7 @@ test('RISK FAQ redundant changelog question: actual help consumer shows release 
  for(const id of ['appChangelogCurrent','appChangelog'])for(const item of shim.document.getElementById(id).innerHTML.matchAll(/<li>([\s\S]*?)<\/li>/g))assert.ok(chapter.includes(item[0]),'preserves actual release history');
 });
 
-test('RISK Postpone return: mounted editor cancels active deferral with one Undo and preserves other eligibility rules',async()=>{
+test('RISK Postpone return: mounted editor cancels active deferral with one Undo and preserves other eligibility rules across calendar days',async()=>{
  const {ctx,shim}=await loadApp({seed:1003});const at=Date.parse('2026-10-12T12:00:00Z');setFakeTime(ctx,at);
  const t=ctx.addTask('Postponed return'),head=ctx.addTask('Existing dot');ctx.state.chain=[head.id];ctx.state.mode='scan';ctx.state.candidateId=t.id;ctx.onAction('postpone',{dataset:{candidate:t.id}});const until=ctx.taskPostponeUntil(t),rating=JSON.stringify([t.mu,t.sigma]);
  ctx.openEdit(t.id);const button=shim.document.getElementById('modalRoot').innerHTML.match(/<button[^>]*data-act="return-candidate"[^>]*>/)[0];assert.doesNotMatch(button,/\bdisabled\b/,'active postponement must enable the existing Return button');
