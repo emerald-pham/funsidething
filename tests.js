@@ -5641,7 +5641,7 @@ test("rank presentation flags independently restore their existing UI only for l
   assert.doesNotMatch(shim.elements.get("scan").innerHTML, /class="topkchip/);
 });
 
-test("rank presentation list columns stay responsive for every flag combination", async () => {
+test("rank presentation list columns stay responsive for every flag combination with label reservation", async () => {
   const { ctx, shim } = await loadApp({ seed: 792 });
   addTaskAged(ctx, "Oldest", 900000);
   addTaskAged(ctx, "Newer", 1000);
@@ -25735,7 +25735,7 @@ test('RISK Postponed filter: saved hold semantics preserve legacy opaque evidenc
  assert.ok(tagKeys(shim).includes('s:postponed'));assert.ok(tagKeys(shim).includes('c:postponed-context'));clickTag(ctx,'s:postponed');assert.deepEqual(rowTitles(shim),['Known readonly hold']);clickTag(ctx,'c:postponed-context');assert.deepEqual(rowTitles(shim),['Legacy context task']);assert.equal(JSON.stringify(ctx.state),before,'reading filter matches preserves old and future evidence verbatim');
 });
 
-test('RISK selected rank geometry browser: enlarged labels stay inside their rank slot without changing selection row height',
+test('RISK selected rank geometry browser: enlarged labels stay inside their rank slot without changing selection row height with optional loaded fonts',
  {skip:!process.env.SELECTION_LAYOUT_BROWSER_URL},async()=>{
  const {chromium}=await import(process.env.PLAYWRIGHT_MODULE||'playwright');const url=process.env.SELECTION_LAYOUT_BROWSER_URL,origin=new URL(url).origin,allowFonts=process.env.SELECTION_LAYOUT_ALLOW_FONTS==='1';
  assert.ok(['127.0.0.1','localhost'].includes(new URL(url).hostname),'selection geometry uses an isolated local fixture');const out=process.env.SELECTION_LAYOUT_EVIDENCE_DIR;const report={sourceSha:process.env.SELECTION_LAYOUT_CANDIDATE||'uncommitted test-first fixture',loadedFontQualification:allowFonts,cases:[],startedAt:new Date().toISOString(),errors:[]};if(out)fs.mkdirSync(out,{recursive:true});
