@@ -1073,3 +1073,4 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - `RISK patterned indicators full-field cue: selected controls use genuinely dashed stripes across the fill while small glyphs stay clear`
 - `RISK patterned indicators sync contrast: status texture uses semantic ink rather than white on the white day surface`
 - `RISK patterned indicators light-label protection: candidate and tomorrow badges retain unobstructed night-theme ink`
+- `RISK patterned indicators immediate-save FAQ: established settings lifecycle answer lists the new toggle`

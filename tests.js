@@ -25877,3 +25877,7 @@ test('RISK patterned indicators sync contrast: status texture uses semantic ink 
 test('RISK patterned indicators light-label protection: candidate and tomorrow badges retain unobstructed night-theme ink',()=>{
  const css=fs.readFileSync(path.join(__dirname,'landscape.css'),'utf8');assert.match(css,/\.cand,\.chip\.due-tomorrow[^}]*background-size:16px 4px/,'existing night light glyphs must not sit over white full-field stripes');
 });
+
+test('RISK patterned indicators immediate-save FAQ: established settings lifecycle answer lists the new toggle',async()=>{
+ const {ctx,shim}=await loadApp();ctx.openHelp();const answer=shim.document.getElementById('modalRoot').innerHTML.split('<dt>Which settings save immediately?</dt><dd>')[1].split('</dd>')[0];assert.match(answer,/Patterned active indicators/,'existing Settings lifecycle guidance must include this immediate toggle');
+});
