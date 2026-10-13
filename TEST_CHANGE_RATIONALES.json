@@ -1,5 +1,45 @@
 [
   {
+    "testChangesSha256": "ac8b8e221600e1c8e9b386dfd1a80334ecd376a59175a4c6ef1d0c69a10d0d8c",
+    "reason": "Fix specialist-observed focus guard edge case for already supported imported empty context IDs.",
+    "previousBehavior": "A truthiness check skipped refocus for id empty string even though it is an existing rendered real context.",
+    "intendedBehavior": "Use explicit null sentinel for absent focus, preserving the same logical empty-ID chip on rerender without changing task assignments or context availability.",
+    "replacementTests": [
+      "RISK task context imported empty ID: Add restores the existing logical chip without changing saved assignments"
+    ],
+    "preservedCoverage": [
+      "Actual landscape reference palette and contrast, native checked/keyboard feedback, unrelated focus protection, bulk mixed Apply/Clear, saved task context semantics and cloud/sync/Undo remain intact."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK task context imported empty ID' tests.js",
+      "failure": "Observed RED before repair: existing empty ID is still a real active chip;0focus calls rather than1."
+    }
+  },
+  {
+    "testChangesSha256": "6d518de712d66e0d2b4a1edcf8f97db22fb17ac4b7ec7b6a9deaf343e1266326",
+    "reason": "Fix specialist-observed focus guard edge case for already supported imported empty context IDs.",
+    "previousBehavior": "A truthiness check skipped refocus for id empty string even though it is an existing rendered real context.",
+    "intendedBehavior": "Use explicit null sentinel for absent focus, preserving the same logical empty-ID chip on rerender without changing task assignments or context availability.",
+    "replacementTests": [
+      "RISK task context assignment paint: Add single Edit and Bulk Edit reuse All Tasks chips with native selection feedback",
+      "RISK task context assignment preservation: mixed bulk choices remain unchanged without Apply and editor opening never writes",
+      "RISK task context theme paint: both themes retain resolved landscape reference across assignment and context filters",
+      "RISK task context contrast: selected small chip labels meet readable contrast in both themes",
+      "RISK task context wrapping: shared chips constrain long names across Add list and both editors",
+      "RISK task context keyboard paint: editor labels match the native focused reference chip shape",
+      "RISK task context rerender focus: Add and All Tasks retain only their logical active chip during repeated toggles",
+      "RISK task context landscape cascade: editor labels share resolved All Tasks fill and ink without overriding its palette",
+      "RISK task context imported empty ID: Add restores the existing logical chip without changing saved assignments"
+    ],
+    "preservedCoverage": [
+      "Actual landscape reference palette and contrast, native checked/keyboard feedback, unrelated focus protection, bulk mixed Apply/Clear, saved task context semantics and cloud/sync/Undo remain intact."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK task context imported empty ID' tests.js",
+      "failure": "Observed RED before repair: existing empty ID is still a real active chip;0focus calls rather than1."
+    }
+  },
+  {
     "testChangesSha256": "bcf02326def4796e830a951407515e3cf9923a75d68aebdb52a9161786954946",
     "reason": "Repair actual final rendered cascade mismatch and replace invalid source-only purple-night/white-label expectations with the observed landscape reference contract.",
     "previousBehavior": "Private token wrongly replaced resolved palegreen reference with darkgreen/purple; editor labels kept white ink because later landscape override covered buttons only. Earlier tests incorrectly described inactive fallback tokens as actual paint.",

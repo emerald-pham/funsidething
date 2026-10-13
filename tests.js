@@ -25819,3 +25819,8 @@ test('RISK task context landscape cascade: editor labels share resolved All Task
  assert.match(palette,/\.ltag\.on,\.qctxchip\.on,\.ctxpick \.ltag:has\(input:checked\)\{color:var\(--action-ink\)\}/,'landscape override must apply the same actual ink to labels and buttons');
  assert.match(palette,/--chain-deep:light-dark\(#96d6b2,#8dcbb0\)/,'released reference palette remains exact in both themes');assert.match(palette,/--surface:light-dark\(#ffffff,#3d566b\)/,'actual unselected palette remains exact');
 });
+test('RISK task context imported empty ID: Add restores the existing logical chip without changing saved assignments',async()=>{
+ const {ctx,shim}=await loadApp();ctx.state.contexts=[{id:'',name:'Imported context',active:true}];ctx.addTask('Private imported context',false,['']);const tasks=JSON.stringify(ctx.state.tasks),row=shim.document.getElementById('quickCtxRow');let focus=0;
+ row.querySelectorAll=()=>[{dataset:{act:'qctx',id:''},focus:options=>{assert.equal(options.preventScroll,true);focus++;shim.document.activeElement={dataset:{act:'qctx',id:''}}}}];shim.document.activeElement={dataset:{act:'qctx',id:''}};
+ ctx.onAction('qctx',{dataset:{id:''}});assert.equal(focus,1,'an existing empty ID is still a real active chip');assert.match(row.innerHTML,/aria-pressed="true"/);ctx.onAction('qctx',{dataset:{id:''}});assert.equal(focus,2);assert.match(row.innerHTML,/aria-pressed="false"/);assert.equal(JSON.stringify(ctx.state.tasks),tasks);
+});

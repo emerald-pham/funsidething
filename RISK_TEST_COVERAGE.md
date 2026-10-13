@@ -1060,3 +1060,4 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - `RISK task context rerender focus: Add and All Tasks retain only their logical active chip during repeated toggles` — Replaced context/adjacent eligibility rows restore the previously active action/ID with scroll preservation, leaving unrelated inputs, bulk controls and deleted options alone.
 
 - `RISK task context landscape cascade: editor labels share resolved All Tasks fill and ink without overriding its palette` — Selected labels and buttons share exact reference tokens and later landscape ink override; no private palette can replace released theme paint.
+- `RISK task context imported empty ID: Add restores the existing logical chip without changing saved assignments` — Supported imported empty context IDs retain native Add focus across repeated selection, without modifying saved task requirements.
