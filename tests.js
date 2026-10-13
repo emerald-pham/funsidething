@@ -8542,8 +8542,9 @@ function rowTitles(shim) {
 
 /* ---------- "where present": nothing offers an empty filter ---------- */
 
-test("list filter row: a plain unmarked list offers no filter buttons at all", async () => {
+test("list filter row: a plain unmarked list without contexts offers no filter buttons", async () => {
   const { ctx, shim } = await loadApp({ seed: 940 });
+  ctx.state.contexts=[];
   ctx.addTask("Write the scene", false);
   ctx.addTask("Fix the sink", false);
   openList(ctx);
@@ -8633,21 +8634,21 @@ test("list filter row: a context carried by an open task is offered alongside th
 
   const labels = tagLabels(shim);
   assert.ok(labels.includes("Errands"), `a context in use should be filterable: ${labels}`);
-  assert.deepEqual(labels, ["Errands"],
-    `and only the one in use — the other active context has no tasks: ${labels}`);
+  assert.deepEqual(labels, ["Errands", "Home Only"],
+    `all existing contexts remain available: ${labels}`);
 });
 
-test("list filter row: contexts nobody uses stay off the row entirely", async () => {
+test("list filter row: contexts nobody uses remain available", async () => {
   const { ctx, shim } = await loadApp({ seed: 948 });
   ctx.addTask("Write the scene", false);   // no contexts on it — the common case
   ctx.addTask("Fix the sink", false);
   openList(ctx);
 
-  assert.deepEqual(tagLabels(shim), [],
-    `unused contexts shouldn't clutter the row: ${tagRowHTML(shim)}`);
+  assert.deepEqual(tagLabels(shim), ["Errands", "Home Only"],
+    `unused existing contexts remain filterable: ${tagRowHTML(shim)}`);
 });
 
-test("list filter row: an inactive context isn't offered even when a task carries it", async () => {
+test("list filter row: inactive contexts remain offered independently of scanning", async () => {
   const { ctx, shim } = await loadApp({ seed: 949 });
   ctx.addTask("Drive to the shop", false, ["c_errand"]);
   ctx.addTask("Write the scene", false, ["c_home"]);
@@ -8655,8 +8656,8 @@ test("list filter row: an inactive context isn't offered even when a task carrie
   assert.deepEqual(tagLabels(shim).sort(), ["Errands", "Home Only"], "precondition: both are offered");
 
   ctx.toggleContext("c_errand");
-  assert.deepEqual(tagLabels(shim), ["Home Only"],
-    `only active contexts are searchable: ${tagRowHTML(shim)}`);
+  assert.deepEqual(tagLabels(shim).sort(), ["Errands", "Home Only"],
+    `scanner inclusion does not remove filters: ${tagRowHTML(shim)}`);
 });
 
 test("list filter row: a context named after a badge doesn't collide with it", async () => {
@@ -8800,7 +8801,7 @@ test("list filter: clearing the skip marks drops a badge filter that pointed at 
   assert.deepEqual(litTags(shim), []);
 });
 
-test("list filter: deactivating the filtered context drops the filter", async () => {
+test("list filter: deactivating the filtered context retains the filter", async () => {
   const { ctx, shim } = await loadApp({ seed: 960 });
   ctx.addTask("Drive to the shop", false, ["c_errand"]);
   ctx.addTask("Write the scene", false, ["c_home"]);
@@ -8809,8 +8810,8 @@ test("list filter: deactivating the filtered context drops the filter", async ()
   assert.equal(rowTitles(shim).length, 1, "precondition: the filter is narrowing");
 
   ctx.toggleContext("c_errand");
-  assert.equal(rowTitles(shim).length, 2);
-  assert.ok(!tagKeys(shim).includes("c:c_errand"), "and the button should be gone");
+  assert.equal(rowTitles(shim).length, 1);
+  assert.ok(tagKeys(shim).includes("c:c_errand"), "scanner state does not remove the button");
 });
 
 test("list filter: deleting the filtered context drops the filter", async () => {
@@ -8963,6 +8964,7 @@ test("list filter row: the chip row is labelled when it has anything to offer", 
 
 test("list filter row: no label either when there's nothing to filter by", async () => {
   const { ctx, shim } = await loadApp({ seed: 970 });
+  ctx.state.contexts=[];
   ctx.addTask("Write the scene", false);
   openList(ctx);
 
@@ -25768,7 +25770,7 @@ test('RISK task context assignment paint: Add single Edit and Bulk Edit reuse Al
  ctx.onAction('qctx',{dataset:{id:'home'}});assert.match(shim.document.getElementById('quickCtxRow').innerHTML,/aria-pressed="true"/);
  ctx.openEdit(task.id);assert.match(shim.document.getElementById('modalRoot').innerHTML,/<label class="ltag"><input type="checkbox" data-editctx="home" checked/,'single editor retains native checked input within the shared chip');
  ctx.state.listOpen=true;ctx.onAction('bulk-select-all');ctx.onAction('bulk-edit');assert.match(shim.document.getElementById('modalRoot').innerHTML,/<label class="ltag"><input type="checkbox" data-bulkctx="home" checked/);
- const css=fs.readFileSync(path.join(__dirname,'index.html'),'utf8');assert.match(css,/\.ltag\.on,\.ctxpick \.ltag:has\(input:checked\)/,'checked native inputs must share the exact selected reference paint');assert.match(css,/\.ctxpick \.ltag:has\(input:focus-visible\)/,'native checkbox keyboard focus remains visible');
+ const css=fs.readFileSync(path.join(__dirname,'index.html'),'utf8');assert.match(css,/\.ctxpick \.ltag:has\(input:checked\)/,'checked native inputs must share the exact selected reference paint');assert.match(css,/\.ctxpick \.ltag:has\(input:focus-visible\)/,'native checkbox keyboard focus remains visible');
 });
 test('RISK task context assignment preservation: mixed bulk choices remain unchanged without Apply and editor opening never writes',async()=>{
  const {ctx,shim}=await loadApp();ctx.state.contexts=[{id:'home',name:'Home',active:true},{id:'work',name:'Work',active:false}];
@@ -25781,7 +25783,7 @@ test('RISK task context assignment preservation: mixed bulk choices remain uncha
 test('RISK task context theme paint: both themes retain resolved landscape reference across assignment and context filters',async()=>{
  const source=fs.readFileSync(path.join(__dirname,'index.html'),'utf8');
  const palette=fs.readFileSync(path.join(__dirname,'landscape.css'),'utf8');assert.match(palette,/--chain-deep:light-dark\(#96d6b2,#8dcbb0\)/,'actual landscape reference retains its released theme pair');
- assert.match(source,/\.ltag\.on,\.ctxpick \.ltag:has\(input:checked\)\{background:var\(--chain-deep\);color:#fff;border-color:var\(--chain-deep\)\}/);
+ assert.match(source,/\.ctxpick \.ltag:has\(input:checked\)\{background:var\(--chain-deep\);color:var\(--action-ink,#fff\);border-color:var\(--chain-deep\)\}/);
  assert.match(source,/\.ltag\{[^}]*background:var\(--surface\)/,'white day and existing dark unselected surface remain shared');
  const {ctx,shim}=await loadApp();ctx.state.contexts=[{id:'home',name:'Home',active:true}];ctx.addTask('Private theme',false,['home']);ctx.state.listOpen=true;ctx.toggleListTag('c:home');
  assert.match(shim.document.getElementById('listTagRow').innerHTML,/class="ltag task-context on"[^>]*data-id="c:home"/,'actual context filter retains the shared reference class');
@@ -25814,9 +25816,9 @@ test('RISK task context rerender focus: Add and All Tasks retain only their logi
 });
 test('RISK task context landscape cascade: editor labels share resolved All Tasks fill and ink without overriding its palette',()=>{
  const source=fs.readFileSync(path.join(__dirname,'index.html'),'utf8'),palette=fs.readFileSync(path.join(__dirname,'landscape.css'),'utf8');
- assert.match(source,/\.ltag\.on,\.ctxpick \.ltag:has\(input:checked\)\{background:var\(--chain-deep\);color:#fff;border-color:var\(--chain-deep\)\}/,'editor selected fill must follow the same cascaded token as actual All Tasks');
+ assert.match(source,/\.ctxpick \.ltag:has\(input:checked\)\{background:var\(--chain-deep\);color:var\(--action-ink,#fff\);border-color:var\(--chain-deep\)\}/,'editor selected fill must follow the same cascaded token as actual All Tasks');
  assert.doesNotMatch(source,/--task-context-selected:/,'a private palette must not replace the actual reference');
- assert.match(palette,/\.ltag\.on,\.qctxchip\.on,\.ctxpick \.ltag:has\(input:checked\)\{color:var\(--action-ink\)\}/,'landscape override must apply the same actual ink to labels and buttons');
+ assert.match(palette,/\.ltag\.on,\.qctxchip\.on\{color:var\(--action-ink\)\}/,'landscape override must apply the same actual ink to labels and buttons');
  assert.match(palette,/--chain-deep:light-dark\(#96d6b2,#8dcbb0\)/,'released reference palette remains exact in both themes');assert.match(palette,/--surface:light-dark\(#ffffff,#3d566b\)/,'actual unselected palette remains exact');
 });
 test('RISK task context imported empty ID: Add restores the existing logical chip without changing saved assignments',async()=>{
@@ -25838,4 +25840,49 @@ test('RISK task context FAQ placement: bounded context-choice answer lives in Co
  const contexts=help.split('<h3>Contexts</h3>')[1].split('</details>')[0];assert.ok(contexts.includes('<dt>'+question+'</dt>'),'assignment appearance belongs in the existing Contexts chapter');
  const answer=contexts.split('<dt>'+question+'</dt><dd>')[1].split('</dd>')[0];assert.ok(answer.split(/\s+/).filter(Boolean).length<=130);for(const pattern of [/white unselected and green selected/,/dark surface and softer green/,/Tab and Space/,/closing without saving/,/green check and red X/])assert.match(answer,pattern);
  const bulk=help.split('<dt>Which properties can I change in Bulk Edit?</dt><dd>')[1].split('</dd>')[0];assert.ok(bulk.split(/\s+/).filter(Boolean).length<=130);assert.match(bulk,/Mixed values stay unchanged until you check Apply; unchecked values stay unchanged/);assert.doesNotMatch(bulk,/chip styling/,'bulk field instruction stays independently readable');
+});
+
+
+test('RISK legacy context editor preservation: Save keeps unknown references while applying explicit known choices and Undo',async()=>{
+ const {ctx,shim}=await loadApp();ctx.state.contexts=[{id:'home',name:'Home',active:true},{id:'',name:'Empty ID',active:false}];const t=ctx.addTask('Legacy edit',false,['home','','future-id']);const before=JSON.stringify(t.ctx);
+ ctx.openEdit(t.id);fillEditPane(ctx,shim,{title:'Renamed legacy',ctxIds:['']});ctx.onAction('save-edit',{dataset:{id:t.id}});
+ assert.equal(t.title,'Renamed legacy');assert.deepEqual(Array.from(t.ctx),['','future-id'],'removing a known context must not silently discard an unavailable saved reference');ctx.undo();assert.equal(JSON.stringify(ctx.state.tasks.find(x=>x.id===t.id).ctx),before);
+});
+test('RISK legacy context editor preservation: no available contexts retain saved requirements on unrelated Save',async()=>{
+ const {ctx,shim}=await loadApp();ctx.state.contexts=[];const t=ctx.addTask('Unknown-only legacy',false,['future-id']);ctx.openEdit(t.id);fillEditPane(ctx,shim,{title:'Unrelated title',ctxIds:[]});ctx.onAction('save-edit',{dataset:{id:t.id}});assert.deepEqual(Array.from(t.ctx),['future-id']);
+});
+test('RISK legacy context bulk Clear: explicit Clear removes unknown references and Undo restores them',async()=>{
+ const {ctx,shim}=await loadApp();ctx.state.contexts=[{id:'home',name:'Home',active:true}];const t=ctx.addTask('Legacy clear',false,['home','future-id']);ctx.state.listOpen=true;ctx.onAction('bulk-select-all');ctx.openBulkEdit();ctx.onAction('bulk-clear',{dataset:{field:'ctx'}});ctx.onAction('bulk-save');assert.deepEqual(Array.from(t.ctx),[]);ctx.undo();assert.deepEqual(Array.from(ctx.state.tasks.find(x=>x.id===t.id).ctx),['home','future-id']);
+});
+
+test('RISK context checkbox fallback: native selection remains visible without relational selector support',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'index.html'),'utf8');assert.match(source,/@supports selector\(:has\(input:checked\)\)\{[\s\S]*?\.ctxpick \.ltag input\{[^}]*opacity:0/,'hide native indicators only when selected chip feedback can be rendered');
+});
+
+test('RISK context filter restoration: every existing context remains offered independently of scanner choices and open matches',async()=>{
+ const {ctx,shim}=await loadApp();ctx.state.contexts=[{id:'active',name:'Active',active:true},{id:'off',name:'Off',active:false},{id:'excluded',name:'Excluded',active:false,excluded:true},{id:'done',name:'Done only',active:true},{id:'unused',name:'Unused',active:true}];const a=ctx.addTask('Active match',false,['active']),b=ctx.addTask('Excluded match',false,['excluded']),c=ctx.addTask('Completed match',false,['done']);c.done=true;const before=JSON.stringify(ctx.state.tasks),choices=JSON.stringify(ctx.state.contexts);openList(ctx);
+ for(const id of ['active','off','excluded','done','unused'])assert.ok(ctx.listTagOptions().some(x=>x.key==='c:'+id),'existing '+id+' context needs a filter');ctx.toggleListTag('c:excluded');assert.deepEqual(Array.from(ctx.filteredListTasks(),t=>t.id),[b.id]);ctx.onAction('bulk-select-all');assert.deepEqual(JSON.parse(vm.runInContext('JSON.stringify([...bulkSelection])',ctx)),[b.id]);ctx.toggleListTag('c:done');assert.equal(ctx.filteredListTasks().length,0);assert.match(tagRowHTML(shim),/data-id="c:done"[^>]*aria-pressed="true"/);assert.equal(JSON.stringify(ctx.state.tasks),before);assert.equal(JSON.stringify(ctx.state.contexts),choices);assert.equal(ctx.isEligible(b),false);ctx.state.contexts=ctx.state.contexts.filter(x=>x.id!=='done');ctx.renderList();assert.equal(vm.runInContext('listTagFilter',ctx),null);
+});
+test('RISK context selector fallback isolation: ordinary selected controls do not share a rule with unsupported relational selectors',()=>{
+ for(const file of ['index.html','landscape.css']){const source=fs.readFileSync(path.join(__dirname,file),'utf8');assert.doesNotMatch(source,/[^{}]*\.ltag\.on[^{}]*:has\([^{}]*\)\s*\{/,'unsupported editor selector must not invalidate ordinary selected chip paint in '+file);}
+});
+
+
+test('RISK legacy context completion preservation: editor completion consumers retain unknown references through payload reload and Undo',async()=>{
+ for(const action of ['done-task','worked-task','dot-task']){
+  const {ctx,shim}=await loadApp();ctx.state.contexts=[{id:'home',name:'Home',active:true}];const t=ctx.addTask('Legacy '+action,false,['home','future-id']);
+  ctx.openEdit(t.id);fillEditPane(ctx,shim,{title:t.title,ctxIds:['home']});ctx.onAction(action,{dataset:{id:t.id}});
+  assert.deepEqual(Array.from(t.ctx),['home','future-id'],action+' must retain unavailable saved references');
+  if(action==='done-task')assert.equal(t.done,true,'completion must actually execute');
+  if(action==='worked-task')assert.ok(ctx.state.workedAt[t.id],'Worked must actually execute');
+  if(action==='dot-task')assert.ok(ctx.state.chain.includes(t.id),'Dot must actually execute');
+  const payload=ctx.cloudPayload(),reload=await loadApp({seedStorage:{[SYNC_STORE_KEY]:payload}});assert.deepEqual(Array.from(reload.ctx.state.tasks.find(x=>x.id===t.id).ctx),['home','future-id'],action+' payload must survive fresh startup');
+  ctx.undo();const undone=ctx.state.tasks.find(x=>x.id===t.id);assert.deepEqual(Array.from(undone.ctx),['home','future-id']);assert.equal(undone.done,false);
+ }
+});
+test('RISK legacy context peer deletion: preserved references do not override concurrent known-context deletion during editor rebase',async()=>{
+ const {ctx,shim}=await loadApp();ctx.state.contexts=[{id:'home',name:'Home',active:true}];const t=ctx.addTask('Legacy peer deletion',false,['home','future-id']);const base=JSON.parse(ctx.cloudPayload());
+ ctx.openEdit(t.id);fillEditPane(ctx,shim,{title:'Independent title edit',ctxIds:['home']});ctx.onAction('save-edit',{dataset:{id:t.id}});const local=JSON.parse(ctx.cloudPayload());assert.deepEqual(local.tasks[0].ctx,['home','future-id'],'unrelated editor save must preserve unseen reference before reconciliation');
+ const peer=JSON.parse(JSON.stringify(base));peer.contexts=[];peer.tasks[0].ctx=['future-id'];ctx.rebaseTaskEditorFields(peer,local,base);assert.deepEqual(peer.tasks[0].ctx,['future-id'],'peer known-context deletion must prevail');assert.equal(peer.tasks[0].title,'Independent title edit','independent observed title edit must survive');
+ ctx.onAction('del-ctx',{dataset:{id:'home'}});assert.deepEqual(Array.from(t.ctx),['future-id'],'explicit local deletion still removes its known reference');
 });

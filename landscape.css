@@ -100,7 +100,7 @@ html.viewing-scene{overflow:hidden;overscroll-behavior:none}
    overrode the earlier scanning rules; keyboard focus should reveal actions
    just as hover does, without taking those actions out of the tab order. */
 .actionrow.disabled:focus-within,.siderail.disabled:focus-within,.btnwrap.disabled:focus-within{opacity:1}
-.chip.due-today,.chip.due-overdue,.ltag.on,.qctxchip.on,.ctxpick .ltag:has(input:checked){color:var(--action-ink)}
+.chip.due-today,.chip.due-overdue,.ltag.on,.qctxchip.on{color:var(--action-ink)}
 .syncbtn.err,#importMsg.warn{color:var(--ink)}
 
 /* Let scenery through supporting surfaces without fading text or controls. */
