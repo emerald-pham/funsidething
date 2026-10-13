@@ -25704,7 +25704,7 @@ test('RISK Postpone return: mounted editor cancels active deferral with one Undo
  fillEditPane(ctx,shim,{title:'Returned title'});ctx.onAction('return-candidate',{dataset:{id:t.id}});
  assert.equal(ctx.taskPostponeUntil(t),0);assert.equal(t.title,'Returned title');assert.equal(ctx.isEligible(t),true);assert.equal(ctx.state.candidateId,t.id);assert.equal(JSON.stringify([t.mu,t.sigma]),rating);
  ctx.undo();const restored=ctx.state.tasks.find(x=>x.id===t.id);assert.equal(ctx.taskPostponeUntil(restored),until);assert.equal(restored.title,'Postponed return');assert.equal(ctx.isEligible(restored),false);
- ctx.openEdit(t.id);fillEditPane(ctx,shim,{start:'2026-10-13'});ctx.onAction('return-candidate',{dataset:{id:t.id}});const blocked=ctx.state.tasks.find(x=>x.id===t.id);assert.equal(ctx.taskPostponeUntil(blocked),0);assert.equal(ctx.isEligible(blocked),false,'future start must still block after return');
+ const futureStart=ctx.todayISO(1);ctx.openEdit(t.id);fillEditPane(ctx,shim,{start:futureStart});ctx.onAction('return-candidate',{dataset:{id:t.id}});const blocked=ctx.state.tasks.find(x=>x.id===t.id);assert.equal(ctx.taskPostponeUntil(blocked),0);assert.equal(blocked.startsAt,futureStart,'editor must preserve the selected future day');assert.equal(ctx.isEligible(blocked),false,'future start must still block after return');
 });
 
 test('RISK Postpone return: cancellation survives stale sync and reload while unobserved peer holds survive',async()=>{
