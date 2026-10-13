@@ -1,5 +1,48 @@
 [
   {
+    "testChangesSha256": "fef88e177be5478dc87564a4eac8d0fea9d52590fae803b30f4591ecbd9c480c",
+    "reason": "Repair two requiredCI FAQ readability failures without weakening existing130-word guide limits by moving newlyaddedcontext prose into its own existing-chapter question.",
+    "previousBehavior": "New context explanation expanded Which properties can I change in BulkEdit beyond130words, failing existing Quickstart and bulk-guidance contracts.",
+    "intendedBehavior": "The unchanged context explanation occupies one bounded Contextsquestion; originalBulkEdit propertyanswer restored and all other content/structure retained. No CSS/control/persistence behavior changes.",
+    "replacementTests": [
+      "RISK task context FAQ placement: bounded context-choice answer lives in Contexts without expanding the bulk property answer"
+    ],
+    "preservedCoverage": [
+      "Both existing130-word readability assertions and all five distinctbulk answers retained unchanged; full palette/draft/keyboard/context availability/mainselector exception guidance preserved. All previouslyapproved controlgeometry/type/palette/focus/functional/compatibility consumers unchanged."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK Quick start content: essential steps|RISK bulk task guidance: bounded answers' tests.js; node --test --test-name-pattern='RISK task context FAQ placement' tests.js",
+      "failure": "Observed exact33da928 pushCI38440080004 and matchinglocalRED: WhichpropertiescanIchangeinBulkEdit exceeds user-facing readability bounds. New placementREDbeforeedit: focusedcontextchoicequestioncount0instead1. Limits preserved; no bypass or weakened assertion."
+    }
+  },
+  {
+    "testChangesSha256": "cc313433cbce457d724dc63900235d6c190579f31dcf69702f0586826dde81b3",
+    "reason": "Repair two requiredCI FAQ readability failures without weakening existing130-word guide limits by moving newlyaddedcontext prose into its own existing-chapter question.",
+    "previousBehavior": "New context explanation expanded Which properties can I change in BulkEdit beyond130words, failing existing Quickstart and bulk-guidance contracts.",
+    "intendedBehavior": "The unchanged context explanation occupies one bounded Contextsquestion; originalBulkEdit propertyanswer restored and all other content/structure retained. No CSS/control/persistence behavior changes.",
+    "replacementTests": [
+      "RISK task context assignment paint: Add single Edit and Bulk Edit reuse All Tasks chips with native selection feedback",
+      "RISK task context assignment preservation: mixed bulk choices remain unchanged without Apply and editor opening never writes",
+      "RISK task context theme paint: both themes retain resolved landscape reference across assignment and context filters",
+      "RISK task context contrast: selected small chip labels meet readable contrast in both themes",
+      "RISK task context wrapping: shared chips constrain long names across Add list and both editors",
+      "RISK task context keyboard paint: editor labels match the native focused reference chip shape",
+      "RISK task context rerender focus: Add and All Tasks retain only their logical active chip during repeated toggles",
+      "RISK task context landscape cascade: editor labels share resolved All Tasks fill and ink without overriding its palette",
+      "RISK task context imported empty ID: Add restores the existing logical chip without changing saved assignments",
+      "RISK task context wrapped alignment: shared editor and button chips center full captions inside their rounded fill",
+      "RISK task context multiline corners: shared radius preserves the one-line pill and leaves wrapped glyphs inside the fill",
+      "RISK task context FAQ placement: bounded context-choice answer lives in Contexts without expanding the bulk property answer"
+    ],
+    "preservedCoverage": [
+      "Both existing130-word readability assertions and all five distinctbulk answers retained unchanged; full palette/draft/keyboard/context availability/mainselector exception guidance preserved. All previouslyapproved controlgeometry/type/palette/focus/functional/compatibility consumers unchanged."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK Quick start content: essential steps|RISK bulk task guidance: bounded answers' tests.js; node --test --test-name-pattern='RISK task context FAQ placement' tests.js",
+      "failure": "Observed exact33da928 pushCI38440080004 and matchinglocalRED: WhichpropertiescanIchangeinBulkEdit exceeds user-facing readability bounds. New placementREDbeforeedit: focusedcontextchoicequestioncount0instead1. Limits preserved; no bypass or weakened assertion."
+    }
+  },
+  {
     "testChangesSha256": "e69d5d25d7c8d3acb9036a3f4583292c71f5bbba9bade069a5aa9abe6d29d32c",
     "reason": "Repair observed rounded-background glyph failure across all chip surfaces by capping shared multiline corner depth at the existing one-line pill radius.",
     "previousBehavior": "99px radius made very tall wrapped chips elliptical and let first/last glyphs cross their fill in narrow enlarged views despite centered text and horizontal bounds.",

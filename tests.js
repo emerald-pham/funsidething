@@ -25833,3 +25833,9 @@ test('RISK task context multiline corners: shared radius preserves the one-line 
  for(const font of [12,19.2,24]){const oneLineHeight=font*1.45+2*3+2*1,radius=font*.725+4;assert.equal(radius,oneLineHeight/2,'ordinary one-line silhouette remains the same clamped pill');assert.ok(radius<(font*1.45*4+8)/2,'multiline fill no longer rounds into a tall ellipse');}
  assert.match(rule,/text-align:center/);assert.match(rule,/overflow-wrap:anywhere/,'full long captions still wrap');
 });
+test('RISK task context FAQ placement: bounded context-choice answer lives in Contexts without expanding the bulk property answer',async()=>{
+ const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML,question='How do task context choices look and save?';assert.equal(help.split('<dt>'+question+'</dt>').length-1,1,'context choice guidance needs one focused question');
+ const contexts=help.split('<h3>Contexts</h3>')[1].split('</details>')[0];assert.ok(contexts.includes('<dt>'+question+'</dt>'),'assignment appearance belongs in the existing Contexts chapter');
+ const answer=contexts.split('<dt>'+question+'</dt><dd>')[1].split('</dd>')[0];assert.ok(answer.split(/\s+/).filter(Boolean).length<=130);for(const pattern of [/white unselected and green selected/,/dark surface and softer green/,/Tab and Space/,/closing without saving/,/green check and red X/])assert.match(answer,pattern);
+ const bulk=help.split('<dt>Which properties can I change in Bulk Edit?</dt><dd>')[1].split('</dd>')[0];assert.ok(bulk.split(/\s+/).filter(Boolean).length<=130);assert.match(bulk,/Mixed values stay unchanged until you check Apply; unchecked values stay unchanged/);assert.doesNotMatch(bulk,/chip styling/,'bulk field instruction stays independently readable');
+});
