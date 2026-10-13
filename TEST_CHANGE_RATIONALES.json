@@ -5749,5 +5749,65 @@
       "command": "node --test --test-name-pattern='RISK FAQ redundant changelog question' tests.js",
       "failure": "Observed AssertionError from actual help consumer: redundant question and definition list still rendered before release history. Durable red.log captured before implementation. Focused cohort additionally failed the reflow explanation assertion because it referenced the deliberately removed answer; green checks retain the original historical wording case-insensitively. green-final.log observed date-order prose assertion failure; changed only removed prose expectation, preserving all date/order/history assertions."
     }
+  },
+  {
+    "testChangesSha256": "32b35ea4f39d00c0a2926367b48fc0c31513b8adc2efc6f1319cac33832ccef2",
+    "reason": "Reserve the full Selected label in enlarged All Tasks rank slots after actual rendered overlap, preserving selection transitions and task-title editing.",
+    "previousBehavior": "Fixed mobile rank slots allow doubled Selected text to extend into the title gap.",
+    "intendedBehavior": "Rank slots reserve eight mono glyphs plus padding before selection; full labels stay inside the rank control without selection changing row height.",
+    "replacementTests": [
+      "RISK selected rank geometry browser: enlarged labels stay inside their rank slot without changing selection row height with optional loaded fonts",
+      "rank presentation list columns stay responsive for every flag combination with label reservation"
+    ],
+    "preservedCoverage": [
+      "Existing selection, filtered Select all, task-title Edit, native Tab/Space/Enter, rank/chance modes, normal rank widths and saved board values remain asserted. Existing assertions remain; only superseded fixed-track CSS syntax is updated as explained below. Twelve isolated phone, landscape, tablet and desktop cases cover both themes and ordinary/doubled fonts; normal and selected row heights are compared.",
+      "Existing CSS structural regression changed only expected track syntax to minmax and escaped parentheses; all feature-flag/class checks and original88/118/70/92 pixel floors remain. Existing full-suite RED352 and independent targeted failure exposed the superseded literal fixed-track expectation; focused-source.log passes six cases after correction. Browser opt-in font mode permits only Google font origins and asserts actual Spline/Spline Mono paint; all other external traffic stays blocked. Initial rendered evidence proves fallback-font behavior only; custom-font qualification is held for a new runtime allocation.",
+      "App assets remain byte-identical to reviewed/rendered dff864c. Test-name suffixes expose updated declarations to the structural rationale gate; no assertions removed. The failed intermediate46eaee gates are retained and no publication occurred.",
+      "Independent review caught an overly broad test route replacement in unpublished2066461. Six unrelated browser fixtures are restored exactly; only the new selection regression permits optional Google font origins. No production app changes or assertion removals followed this review."
+    ],
+    "redEvidence": {
+      "command": "SELECTION_LAYOUT_BROWSER_URL=http://127.0.0.1:18551/ PLAYWRIGHT_MODULE=<bundled Playwright> SELECTION_LAYOUT_EVIDENCE_DIR=<durable evidence>/red SELECTION_LAYOUT_CANDIDATE=be895df1bb8e46880ffbcd9369dbbac79b5bb274 node --test --test-name-pattern=\"RISK selected rank geometry browser:\" tests.js",
+      "failure": "Contemporaneous unchanged-app RED before index.html or sw.js edits: 320-light-2x-sparksummary-rank every Selected glyph fits the rank slot failed. Saved red.log/results.json and actual selected screenshot show text beyond the button toward title. Initial GREEN attempt exposed the later mobile .tk max-width cascade; specificity correction then passed all twelve cases. Evidence in .git/funsidething-task-evidence/selected-row-readability-20261013."
+    }
+  },
+  {
+    "testChangesSha256": "f20a0421906ba13ff67bfe83a7f4a8c38297dbdcbe801a3bfdca98a85644343b",
+    "reason": "Reserve the full Selected label in enlarged All Tasks rank slots after actual rendered overlap, preserving selection transitions and task-title editing.",
+    "previousBehavior": "Fixed mobile rank slots allow doubled Selected text to extend into the title gap.",
+    "intendedBehavior": "Rank slots reserve eight mono glyphs plus padding before selection; full labels stay inside the rank control without selection changing row height.",
+    "replacementTests": [
+      "RISK selected rank geometry browser: enlarged labels stay inside their rank slot without changing selection row height with optional loaded fonts",
+      "rank presentation list columns stay responsive for every flag combination with label reservation"
+    ],
+    "preservedCoverage": [
+      "Existing selection, filtered Select all, task-title Edit, native Tab/Space/Enter, rank/chance modes, normal rank widths and saved board values remain asserted. Existing assertions remain; only superseded fixed-track CSS syntax is updated as explained below. Twelve isolated phone, landscape, tablet and desktop cases cover both themes and ordinary/doubled fonts; normal and selected row heights are compared.",
+      "Existing CSS structural regression changed only expected track syntax to minmax and escaped parentheses; all feature-flag/class checks and original88/118/70/92 pixel floors remain. Existing full-suite RED352 and independent targeted failure exposed the superseded literal fixed-track expectation; focused-source.log passes six cases after correction. Browser opt-in font mode permits only Google font origins and asserts actual Spline/Spline Mono paint; all other external traffic stays blocked. Initial rendered evidence proves fallback-font behavior only; custom-font qualification is held for a new runtime allocation.",
+      "App assets remain byte-identical to reviewed/rendered dff864c. Test-name suffixes expose updated declarations to the structural rationale gate; no assertions removed. The failed intermediate46eaee gates are retained and no publication occurred.",
+      "Independent review caught an overly broad test route replacement in unpublished2066461. Six unrelated browser fixtures are restored exactly; only the new selection regression permits optional Google font origins. No production app changes or assertion removals followed this review."
+    ],
+    "redEvidence": {
+      "command": "SELECTION_LAYOUT_BROWSER_URL=http://127.0.0.1:18551/ PLAYWRIGHT_MODULE=<bundled Playwright> SELECTION_LAYOUT_EVIDENCE_DIR=<durable evidence>/red SELECTION_LAYOUT_CANDIDATE=be895df1bb8e46880ffbcd9369dbbac79b5bb274 node --test --test-name-pattern=\"RISK selected rank geometry browser:\" tests.js",
+      "failure": "Contemporaneous unchanged-app RED before index.html or sw.js edits: 320-light-2x-sparksummary-rank every Selected glyph fits the rank slot failed. Saved red.log/results.json and actual selected screenshot show text beyond the button toward title. Initial GREEN attempt exposed the later mobile .tk max-width cascade; specificity correction then passed all twelve cases. Evidence in .git/funsidething-task-evidence/selected-row-readability-20261013."
+    }
+  },
+  {
+    "testChangesSha256": "5dfcbfb8442ee7a7dd2c9e55f5f6e515e22ab3cdfeaa766aa7e930955779f9dd",
+    "reason": "Reserve the full Selected label in enlarged All Tasks rank slots after actual rendered overlap, preserving selection transitions and task-title editing.",
+    "previousBehavior": "Fixed mobile rank slots allow doubled Selected text to extend into the title gap.",
+    "intendedBehavior": "Rank slots reserve eight mono glyphs plus padding before selection; full labels stay inside the rank control without selection changing row height.",
+    "replacementTests": [
+      "RISK selected rank geometry browser: enlarged labels stay inside their rank slot without changing selection row height with optional loaded fonts",
+      "rank presentation list columns stay responsive for every flag combination with label reservation"
+    ],
+    "preservedCoverage": [
+      "Existing selection, filtered Select all, task-title Edit, native Tab/Space/Enter, rank/chance modes, normal rank widths and saved board values remain asserted. Existing assertions remain; only superseded fixed-track CSS syntax is updated as explained below. Twelve isolated phone, landscape, tablet and desktop cases cover both themes and ordinary/doubled fonts; normal and selected row heights are compared.",
+      "Existing CSS structural regression changed only expected track syntax to minmax and escaped parentheses; all feature-flag/class checks and original88/118/70/92 pixel floors remain. Existing full-suite RED352 and independent targeted failure exposed the superseded literal fixed-track expectation; focused-source.log passes six cases after correction. Browser opt-in font mode permits only Google font origins and asserts actual Spline/Spline Mono paint; all other external traffic stays blocked. Initial rendered evidence proves fallback-font behavior only; custom-font qualification is held for a new runtime allocation.",
+      "App assets remain byte-identical to reviewed/rendered dff864c. Test-name suffixes expose updated declarations to the structural rationale gate; no assertions removed. The failed intermediate46eaee gates are retained and no publication occurred.",
+      "Independent review caught an overly broad test route replacement in unpublished2066461. Six unrelated browser fixtures are restored exactly; only the new selection regression permits optional Google font origins. No production app changes or assertion removals followed this review."
+    ],
+    "redEvidence": {
+      "command": "SELECTION_LAYOUT_BROWSER_URL=http://127.0.0.1:18551/ PLAYWRIGHT_MODULE=<bundled Playwright> SELECTION_LAYOUT_EVIDENCE_DIR=<durable evidence>/red SELECTION_LAYOUT_CANDIDATE=be895df1bb8e46880ffbcd9369dbbac79b5bb274 node --test --test-name-pattern=\"RISK selected rank geometry browser:\" tests.js",
+      "failure": "Contemporaneous unchanged-app RED before index.html or sw.js edits: 320-light-2x-sparksummary-rank every Selected glyph fits the rank slot failed. Saved red.log/results.json and actual selected screenshot show text beyond the button toward title. Initial GREEN attempt exposed the later mobile .tk max-width cascade; specificity correction then passed all twelve cases. Evidence in .git/funsidething-task-evidence/selected-row-readability-20261013."
+    }
   }
 ]
