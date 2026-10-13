@@ -1,5 +1,43 @@
 [
   {
+    "testChangesSha256": "cf172177e73433e54e1563becde93f7849c3c7a8c9a336ed887cd63bc3f246f6",
+    "reason": "Repair actual native keyboard failure caused by replacing focused Add chip and matching All Tasks filter rows.",
+    "previousBehavior": "Space toggled Add selection but its rerender stranded focus, so subsequent Enter failed to deselect; All Tasks replaced focused filter rows similarly.",
+    "intendedBehavior": "Rerenders restore only their prior active action/ID with preventScroll, permitting repeated keyboard selection without stealing focus from another control or redirecting deleted contexts.",
+    "replacementTests": [
+      "RISK task context rerender focus: Add and All Tasks retain only their logical active chip during repeated toggles"
+    ],
+    "preservedCoverage": [
+      "Native editor checkbox focus remains unchanged; no new task writes, bulk Apply/mixed/Clear, context availability, theme paint, wrapping, cloud/sync/recovery and Undo boundaries retained."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK task context rerender focus' tests.js",
+      "failure": "Observed source RED before implementation: qctx rerender must restore logical active chip after both toggles; actual focus calls []. Preceding native browser RED d43cc7a: Space selected Add Work then Enter left aria-pressed true; visual-red-keyboard/results.json and screenshots retained."
+    }
+  },
+  {
+    "testChangesSha256": "ec198aa2aa0b0a57f13bf0c5fd44847d2ded5d3d83bfebced61e63a1dee08979",
+    "reason": "Repair actual native keyboard failure caused by replacing focused Add chip and matching All Tasks filter rows.",
+    "previousBehavior": "Space toggled Add selection but its rerender stranded focus, so subsequent Enter failed to deselect; All Tasks replaced focused filter rows similarly.",
+    "intendedBehavior": "Rerenders restore only their prior active action/ID with preventScroll, permitting repeated keyboard selection without stealing focus from another control or redirecting deleted contexts.",
+    "replacementTests": [
+      "RISK task context assignment paint: Add single Edit and Bulk Edit reuse All Tasks chips with native selection feedback",
+      "RISK task context assignment preservation: mixed bulk choices remain unchanged without Apply and editor opening never writes",
+      "RISK task context theme paint: day selection is green and night retains released purple across assignment and context filters",
+      "RISK task context contrast: selected small chip labels meet readable contrast in both themes",
+      "RISK task context wrapping: shared chips constrain long names across Add list and both editors",
+      "RISK task context keyboard paint: editor labels match the native focused reference chip shape",
+      "RISK task context rerender focus: Add and All Tasks retain only their logical active chip during repeated toggles"
+    ],
+    "preservedCoverage": [
+      "Native editor checkbox focus remains unchanged; no new task writes, bulk Apply/mixed/Clear, context availability, theme paint, wrapping, cloud/sync/recovery and Undo boundaries retained."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK task context rerender focus' tests.js",
+      "failure": "Observed source RED before implementation: qctx rerender must restore logical active chip after both toggles; actual focus calls []. Preceding native browser RED d43cc7a: Space selected Add Work then Enter left aria-pressed true; visual-red-keyboard/results.json and screenshots retained."
+    }
+  },
+  {
     "testChangesSha256": "6bde70238d7e1330d4668762508ecfbed5a531ac7785cc16e5c78acc018a9af4",
     "reason": "Repair independent reference-consistency finding for native editor checkbox label focus shape.",
     "previousBehavior": "Focused editor labels retained resting99px radius while focused All Tasks/Add buttons use4px radius.",

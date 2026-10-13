@@ -25803,3 +25803,12 @@ test('RISK task context wrapping: shared chips constrain long names across Add l
 test('RISK task context keyboard paint: editor labels match the native focused reference chip shape',()=>{
  const source=fs.readFileSync(path.join(__dirname,'index.html'),'utf8'),rule=source.match(/\.ctxpick \.ltag:has\(input:focus-visible\)\{([^}]+)\}/)?.[1];assert.ok(rule);assert.match(rule,/outline:2px solid var\(--accent\)/);assert.match(rule,/outline-offset:2px/);assert.match(rule,/border-radius:4px/,'native focused editor labels must match the All Tasks and Add focus shape');
 });
+test('RISK task context rerender focus: Add and All Tasks retain only their logical active chip during repeated toggles',async()=>{
+ const {ctx,shim}=await loadApp();ctx.state.contexts=[{id:'home',name:'Home',active:true},{id:'work',name:'Work',active:true}];ctx.addTask('Private focused context',false,['home']);ctx.state.listOpen=true;ctx.render();let focused=[];
+ for(const id of ['quickCtxRow','listTagRow','listEligibilityRow']){const row=shim.document.getElementById(id);row.querySelectorAll=()=>[...row.innerHTML.matchAll(/<button[^>]*data-act="([^"]+)"[^>]*data-id="([^"]+)"[^>]*>/g)].map(([,act,key])=>({dataset:{act,id:key},focus:options=>{focused.push([act,key,options?.preventScroll]);shim.document.activeElement={dataset:{act,id:key}}}}))}
+ const tasks=JSON.stringify(ctx.state.tasks);
+ for(const act of ['qctx','list-tag','list-eligibility']){const id=act==='list-tag'?'c:home':act==='list-eligibility'?'eligible':'home';shim.document.activeElement={dataset:{act,id}};focused=[];ctx.onAction(act,{dataset:{id}});ctx.onAction(act,{dataset:{id}});assert.deepEqual(focused.map(x=>x.slice(0,2)),[[act,id],[act,id]],act+' rerender must restore the logical active chip after both toggles');assert.ok(focused.every(x=>x[2]===true),'restoring replacement focus must preserve scroll');}
+ assert.equal(JSON.stringify(ctx.state.tasks),tasks,'chip toggles are view/draft only');
+ for(const active of [{id:'addInput',dataset:{}},{dataset:{act:'bulk-save'}}]){shim.document.activeElement=active;focused=[];ctx.renderQuickCtx();ctx.renderListFilters();assert.equal(focused.length,0,'unrelated active control must keep focus during render');}
+ shim.document.activeElement={dataset:{act:'qctx',id:'deleted'}};focused=[];ctx.renderQuickCtx();assert.equal(focused.length,0,'removed chip cannot redirect focus to another context');
+});
