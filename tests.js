@@ -25800,3 +25800,6 @@ test('RISK task context wrapping: shared chips constrain long names across Add l
  ctx.openEdit(task.id);assert.match(shim.document.getElementById('modalRoot').innerHTML,/<label class="ltag"><input type="checkbox" data-editctx="long" checked/);ctx.onAction('bulk-select-all');ctx.onAction('bulk-edit');assert.match(shim.document.getElementById('modalRoot').innerHTML,/<label class="ltag"><input type="checkbox" data-bulkctx="long" checked/);
  for(const id of ['quickCtxRow','listTagRow','modalRoot'])assert.ok(shim.document.getElementById(id).innerHTML.includes(name),'full long name remains visible source without truncation');
 });
+test('RISK task context keyboard paint: editor labels match the native focused reference chip shape',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'index.html'),'utf8'),rule=source.match(/\.ctxpick \.ltag:has\(input:focus-visible\)\{([^}]+)\}/)?.[1];assert.ok(rule);assert.match(rule,/outline:2px solid var\(--accent\)/);assert.match(rule,/outline-offset:2px/);assert.match(rule,/border-radius:4px/,'native focused editor labels must match the All Tasks and Add focus shape');
+});

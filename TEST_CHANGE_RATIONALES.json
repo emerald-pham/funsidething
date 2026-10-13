@@ -1,5 +1,42 @@
 [
   {
+    "testChangesSha256": "6bde70238d7e1330d4668762508ecfbed5a531ac7785cc16e5c78acc018a9af4",
+    "reason": "Repair independent reference-consistency finding for native editor checkbox label focus shape.",
+    "previousBehavior": "Focused editor labels retained resting99px radius while focused All Tasks/Add buttons use4px radius.",
+    "intendedBehavior": "Focused labels share established4px radius,2px outline and2px outline offset without changing checkbox/draft consumers.",
+    "replacementTests": [
+      "RISK task context keyboard paint: editor labels match the native focused reference chip shape"
+    ],
+    "preservedCoverage": [
+      "Existing day/night paint, long-name wrapping, native accessibility and all task Save/Cancel, bulk Apply/Clear/mixed, persistence/sync/Undo protections remain."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK task context keyboard paint' tests.js",
+      "failure": "Observed RED before repair: native focused editor labels must match All Tasks and Add focus shape; label focus rule omitted border-radius4px."
+    }
+  },
+  {
+    "testChangesSha256": "ed13ae2802c4a8e68258eb6b4bd4ce43992ce628661874bcaf2c01d127f51b50",
+    "reason": "Repair independent reference-consistency finding for native editor checkbox label focus shape.",
+    "previousBehavior": "Focused editor labels retained resting99px radius while focused All Tasks/Add buttons use4px radius.",
+    "intendedBehavior": "Focused labels share established4px radius,2px outline and2px outline offset without changing checkbox/draft consumers.",
+    "replacementTests": [
+      "RISK task context assignment paint: Add single Edit and Bulk Edit reuse All Tasks chips with native selection feedback",
+      "RISK task context assignment preservation: mixed bulk choices remain unchanged without Apply and editor opening never writes",
+      "RISK task context theme paint: day selection is green and night retains released purple across assignment and context filters",
+      "RISK task context contrast: selected small chip labels meet readable contrast in both themes",
+      "RISK task context wrapping: shared chips constrain long names across Add list and both editors",
+      "RISK task context keyboard paint: editor labels match the native focused reference chip shape"
+    ],
+    "preservedCoverage": [
+      "Existing day/night paint, long-name wrapping, native accessibility and all task Save/Cancel, bulk Apply/Clear/mixed, persistence/sync/Undo protections remain."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK task context keyboard paint' tests.js",
+      "failure": "Observed RED before repair: native focused editor labels must match All Tasks and Add focus shape; label focus rule omitted border-radius4px."
+    }
+  },
+  {
     "testChangesSha256": "c0fbcaeb5360386f4f422242eb963f83bf12e40b29029ae5b7a3c576011b63ac",
     "reason": "Repair actual phone visual failure for long Add context names by sharing shrink/width/wrap constraints across all task-context chip surfaces.",
     "previousBehavior": "Editor labels alone had sizing constraints; Add and list chips could overflow their actual flex rows for unbroken names.",
