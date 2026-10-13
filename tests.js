@@ -625,7 +625,7 @@ test('RISK context and Settings browser: touch keyboard filter counts disclosure
    const context=await browser.newContext({viewport:{width,height},hasTouch:width<1000,serviceWorkers:'block'});
    try{
     await context.addInitScript(()=>{Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});localStorage.setItem('fvp:chain-scanner:landscape-motion','reduced');});
-    await context.route('**/*',route=>{const request=new URL(route.request().url());return request.origin===origin||(allowFonts&&['fonts.googleapis.com','fonts.gstatic.com'].includes(request.hostname))?route.continue():route.abort()});
+    await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
     const page=await context.newPage();await page.goto(process.env.LANDSCAPE_BROWSER_URL);await page.waitForFunction(()=>typeof state!=='undefined'&&state?.tasks);
     await page.evaluate(()=>{document.getElementById('motionDialog')?.close();closeModal();state.seenQuickStart=true;state.listOpen=true;addTask('Private no context');addTask('Private required',false,['c_errand']);addTask('Private multiple',false,['c_errand','c_home']);render();});
     const selector=page.locator('#ctxPanel [data-ctx="c_errand"]');assert.equal(await selector.getAttribute('data-filter-state'),'included');
@@ -663,7 +663,7 @@ test('RISK context marker browser: green checks and red exclusions retain readab
    const context=await browser.newContext({viewport:{width:390,height:844},colorScheme,serviceWorkers:'block'});
    try{
     await context.addInitScript(()=>{Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});localStorage.setItem('fvp:chain-scanner:landscape-motion','reduced');});
-    await context.route('**/*',route=>{const request=new URL(route.request().url());return request.origin===origin||(allowFonts&&['fonts.googleapis.com','fonts.gstatic.com'].includes(request.hostname))?route.continue():route.abort()});
+    await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
     const page=await context.newPage();await page.goto(process.env.LANDSCAPE_BROWSER_URL);await page.waitForFunction(()=>typeof state!=='undefined'&&state?.contexts);
     await page.evaluate(()=>{closeModal();document.getElementById('motionDialog')?.close();state.seenQuickStart=true;render();});
     for(const [mode,symbol] of [['included','✓'],['excluded','✕']]){
@@ -689,7 +689,7 @@ test('RISK context offline browser: installed shell reload retains exclusions se
   const context=await browser.newContext({viewport:{width:390,height:844}});
   try{
    await context.addInitScript(()=>{Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});localStorage.setItem('fvp:chain-scanner:landscape-motion','reduced');});
-   await context.route('**/*',route=>{const request=new URL(route.request().url());return request.origin===origin||(allowFonts&&['fonts.googleapis.com','fonts.gstatic.com'].includes(request.hostname))?route.continue():route.abort()});
+   await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
    const page=await context.newPage();await page.goto(process.env.LANDSCAPE_BROWSER_URL);await page.waitForFunction(()=>typeof state!=='undefined'&&state?.tasks);
    const id=await page.evaluate(async()=>{closeModal();document.getElementById('motionDialog')?.close();state.seenQuickStart=true;const t=addTask('Private offline evergreen');t.evergreen=true;t.evergreenResetAtDay=false;toggleContext('c_errand');onAction('toggle-no-context',{});await persist();return t.id;});
    await page.evaluate(()=>navigator.serviceWorker.ready);await page.waitForFunction(()=>!!navigator.serviceWorker.controller);await context.setOffline(true);await page.reload();await page.waitForFunction(()=>state?.tasks?.length===1);
@@ -21280,7 +21280,7 @@ test('RISK tablet date fields browser: empty filled and focused dates remain tou
     Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});
     localStorage.setItem('fvp:chain-scanner:landscape-motion','reduced');
    });
-   await context.route('**/*',route=>{const request=new URL(route.request().url());return request.origin===origin||(allowFonts&&['fonts.googleapis.com','fonts.gstatic.com'].includes(request.hostname))?route.continue():route.abort()});
+   await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
    const page=await context.newPage();await page.goto(process.env.LANDSCAPE_BROWSER_URL);await page.waitForFunction(()=>typeof state!=='undefined'&&state?.tasks);
    const id=await page.evaluate(()=>{closeModal();document.getElementById('motionDialog')?.close();return addTask('Synthetic tablet date fixture').id;});
    for(const [width,height] of [[1024,706],[1024,768],[768,1024],[621,800],[620,800],[619,800],[390,844],[568,320],[1280,800]]){
@@ -21757,7 +21757,7 @@ test('RISK All Tasks mobile layout browser: WebKit and Chrome keep names badges 
     Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});
     localStorage.setItem('fvp:chain-scanner:landscape-motion','reduced');
    });
-   await context.route('**/*',route=>{const request=new URL(route.request().url());return request.origin===origin||(allowFonts&&['fonts.googleapis.com','fonts.gstatic.com'].includes(request.hostname))?route.continue():route.abort()});
+   await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
    const page=await context.newPage();await page.goto(process.env.LANDSCAPE_BROWSER_URL);
    await page.waitForFunction(()=>typeof state!=='undefined'&&state?.tasks);
    const id=await page.evaluate(()=>{
@@ -23803,7 +23803,7 @@ test('RISK Last task WOOP browser: mounted controls responsive saved revisit del
    for(const [width,height]of sizes){
     const context=await browser.newContext({viewport:{width,height},reducedMotion:'reduce'}),errors=[];
     await context.addInitScript(()=>{Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});localStorage.setItem('fvp:chain-scanner:landscape-motion','reduced');});
-    await context.route('**/*',route=>{const request=new URL(route.request().url());return request.origin===origin||(allowFonts&&['fonts.googleapis.com','fonts.gstatic.com'].includes(request.hostname))?route.continue():route.abort()});
+    await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
     const page=await context.newPage();page.on('pageerror',error=>errors.push(error.message));await page.goto(process.env.WOOP_BROWSER_URL);await page.waitForFunction(()=>typeof state!=='undefined'&&state?.tasks);
     const id=await page.evaluate(()=>{closeModal();document.querySelectorAll('dialog[open]').forEach(d=>d.close());state.addOpen=true;const task=addTask('Synthetic final task with a long title for responsive wrapping');state.chain=[task.id];state.mode='work';render();return task.id;});
     assert.equal(await page.locator('[data-act=woop-start]').count(),0,'off by default');
