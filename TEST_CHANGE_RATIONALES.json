@@ -1,5 +1,47 @@
 [
   {
+    "testChangesSha256": "bcf02326def4796e830a951407515e3cf9923a75d68aebdb52a9161786954946",
+    "reason": "Repair actual final rendered cascade mismatch and replace invalid source-only purple-night/white-label expectations with the observed landscape reference contract.",
+    "previousBehavior": "Private token wrongly replaced resolved palegreen reference with darkgreen/purple; editor labels kept white ink because later landscape override covered buttons only. Earlier tests incorrectly described inactive fallback tokens as actual paint.",
+    "intendedBehavior": "Reuse actual cascaded chain-deep reference fill and extend existing landscape action-ink rule to native editor labels. Preserve exact day/night reference palette and4.5:1 actual label contrast. Rename erroneous theme wording without removing protected availability, keyboard, mixed Apply or native selection assertions.",
+    "replacementTests": [
+      "RISK task context assignment paint: Add single Edit and Bulk Edit reuse All Tasks chips with native selection feedback",
+      "RISK task context theme paint: both themes retain resolved landscape reference across assignment and context filters",
+      "RISK task context contrast: selected small chip labels meet readable contrast in both themes",
+      "RISK task context landscape cascade: editor labels share resolved All Tasks fill and ink without overriding its palette"
+    ],
+    "preservedCoverage": [
+      "All context assignment/check/focus consumers and existing test assertions for saved task rules, bulk mixed Apply/Clear, explicit Save/Cancel, cloud/sync/recovery, Undo, long-name sizing and main include/exclude remain. Actual f88bb38 ten-config native keyboard/wrapping/consumer evidence and15/15 compatibility retained; next paint-only candidate must document executable artifact equivalence."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK task context landscape cascade' tests.js",
+      "failure": "Observed source RED before repair: editor selected fill must follow same cascaded token as actual All Tasks. Preceding f88bb38 actual ten-config RED: selected editor ink white differed from reference RGB36,59,64. Baseline confirmed resolved chain-deep RGB150,214,178 day/RGB141,203,176 night, dark surfaceRGB61,86,107; earlier fallback expectations were wrong. Full captures retained in visual-red-cascade."
+    }
+  },
+  {
+    "testChangesSha256": "b23d761c90da61212a586f5275e3bd3144abdc434f150ec22402d4148a001ce8",
+    "reason": "Repair actual final rendered cascade mismatch and replace invalid source-only purple-night/white-label expectations with the observed landscape reference contract.",
+    "previousBehavior": "Private token wrongly replaced resolved palegreen reference with darkgreen/purple; editor labels kept white ink because later landscape override covered buttons only. Earlier tests incorrectly described inactive fallback tokens as actual paint.",
+    "intendedBehavior": "Reuse actual cascaded chain-deep reference fill and extend existing landscape action-ink rule to native editor labels. Preserve exact day/night reference palette and4.5:1 actual label contrast. Rename erroneous theme wording without removing protected availability, keyboard, mixed Apply or native selection assertions.",
+    "replacementTests": [
+      "RISK task context assignment paint: Add single Edit and Bulk Edit reuse All Tasks chips with native selection feedback",
+      "RISK task context assignment preservation: mixed bulk choices remain unchanged without Apply and editor opening never writes",
+      "RISK task context theme paint: both themes retain resolved landscape reference across assignment and context filters",
+      "RISK task context contrast: selected small chip labels meet readable contrast in both themes",
+      "RISK task context wrapping: shared chips constrain long names across Add list and both editors",
+      "RISK task context keyboard paint: editor labels match the native focused reference chip shape",
+      "RISK task context rerender focus: Add and All Tasks retain only their logical active chip during repeated toggles",
+      "RISK task context landscape cascade: editor labels share resolved All Tasks fill and ink without overriding its palette"
+    ],
+    "preservedCoverage": [
+      "All context assignment/check/focus consumers and existing test assertions for saved task rules, bulk mixed Apply/Clear, explicit Save/Cancel, cloud/sync/recovery, Undo, long-name sizing and main include/exclude remain. Actual f88bb38 ten-config native keyboard/wrapping/consumer evidence and15/15 compatibility retained; next paint-only candidate must document executable artifact equivalence."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK task context landscape cascade' tests.js",
+      "failure": "Observed source RED before repair: editor selected fill must follow same cascaded token as actual All Tasks. Preceding f88bb38 actual ten-config RED: selected editor ink white differed from reference RGB36,59,64. Baseline confirmed resolved chain-deep RGB150,214,178 day/RGB141,203,176 night, dark surfaceRGB61,86,107; earlier fallback expectations were wrong. Full captures retained in visual-red-cascade."
+    }
+  },
+  {
     "testChangesSha256": "cf172177e73433e54e1563becde93f7849c3c7a8c9a336ed887cd63bc3f246f6",
     "reason": "Repair actual native keyboard failure caused by replacing focused Add chip and matching All Tasks filter rows.",
     "previousBehavior": "Space toggled Add selection but its rerender stranded focus, so subsequent Enter failed to deselect; All Tasks replaced focused filter rows similarly.",
