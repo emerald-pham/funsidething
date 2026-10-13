@@ -1,5 +1,111 @@
 [
   {
+    "testChangesSha256": "4d574ecad12a54ca6069a9d23cd5491494d0ada1d8011c8d7b351a86fdbd6679",
+    "reason": "Correct exact rationale name visibility after CI rejected an unchanged test declaration; use a descriptive calendar-relative test name and retain all assertions.",
+    "previousBehavior": "The body-only future-day fixture correction named an unchanged declaration absent from added diff lines, so the existing structural rationale gate rejected it.",
+    "intendedBehavior": "Name the existing strengthened Return test across calendar days and map that current name. Exact base/main and branch push ranges now name an actually updated declaration; test and gate behavior remain unchanged.",
+    "replacementTests": [
+      "RISK Postpone return: mounted editor cancels active deferral with one Undo and preserves other eligibility rules across calendar days"
+    ],
+    "preservedCoverage": [
+      "All Return cancellation, title, rating, candidate, Undo, saved future-date and eligibility assertions remain unchanged from the strengthened38c test body.",
+      "All three new active-hold filter contracts and existing regression-gate machinery remain unchanged; only test title, inventory and exact rationale records change."
+    ],
+    "redEvidence": {
+      "command": "node scripts/test-first-gate.mjs 4dcc062915460f61d2fd1ec6c2069b954befe136",
+      "failure": "Observed local and CI38325702029 gate failure: Regression rationale must name replacement tests added or updated in this diff. This structural RED precedes title/inventory/rationale correction; original filter RED and UTC calendar RED remain separately retained."
+    }
+  },
+  {
+    "testChangesSha256": "b4b8038df58fcbf21868ec2bab861bbea8c909f0387ce0691bf04e26293b9f73",
+    "reason": "Correct exact rationale name visibility after CI rejected an unchanged test declaration; use a descriptive calendar-relative test name and retain all assertions.",
+    "previousBehavior": "The body-only future-day fixture correction named an unchanged declaration absent from added diff lines, so the existing structural rationale gate rejected it.",
+    "intendedBehavior": "Name the existing strengthened Return test across calendar days and map that current name. Exact base/main and branch push ranges now name an actually updated declaration; test and gate behavior remain unchanged.",
+    "replacementTests": [
+      "RISK Postpone return: mounted editor cancels active deferral with one Undo and preserves other eligibility rules across calendar days"
+    ],
+    "preservedCoverage": [
+      "All Return cancellation, title, rating, candidate, Undo, saved future-date and eligibility assertions remain unchanged from the strengthened38c test body.",
+      "All three new active-hold filter contracts and existing regression-gate machinery remain unchanged; only test title, inventory and exact rationale records change."
+    ],
+    "redEvidence": {
+      "command": "node scripts/test-first-gate.mjs 4dcc062915460f61d2fd1ec6c2069b954befe136",
+      "failure": "Observed local and CI38325702029 gate failure: Regression rationale must name replacement tests added or updated in this diff. This structural RED precedes title/inventory/rationale correction; original filter RED and UTC calendar RED remain separately retained."
+    }
+  },
+  {
+    "testChangesSha256": "357f0f5f1eb01537e9ee3d08d4ceee5011856347b759e1b0a503adb983b41d5b",
+    "reason": "Correct exact rationale name visibility after CI rejected an unchanged test declaration; use a descriptive calendar-relative test name and retain all assertions.",
+    "previousBehavior": "The body-only future-day fixture correction named an unchanged declaration absent from added diff lines, so the existing structural rationale gate rejected it.",
+    "intendedBehavior": "Name the existing strengthened Return test across calendar days and map that current name. Exact base/main and branch push ranges now name an actually updated declaration; test and gate behavior remain unchanged.",
+    "replacementTests": [
+      "RISK Postpone return: mounted editor cancels active deferral with one Undo and preserves other eligibility rules across calendar days"
+    ],
+    "preservedCoverage": [
+      "All Return cancellation, title, rating, candidate, Undo, saved future-date and eligibility assertions remain unchanged from the strengthened38c test body.",
+      "All three new active-hold filter contracts and existing regression-gate machinery remain unchanged; only test title, inventory and exact rationale records change."
+    ],
+    "redEvidence": {
+      "command": "node scripts/test-first-gate.mjs 4dcc062915460f61d2fd1ec6c2069b954befe136",
+      "failure": "Observed local and CI38325702029 gate failure: Regression rationale must name replacement tests added or updated in this diff. This structural RED precedes title/inventory/rationale correction; original filter RED and UTC calendar RED remain separately retained."
+    }
+  },
+  {
+    "testChangesSha256": "6f57b377ac442ec2a9d25639119132cedf8f803998f8eb98b3f0e4682fa8540e",
+    "reason": "Correct the existing Return test future-day fixture after exact CI crossed UTC midnight; retain and strengthen the date guard. This is directly required to qualify the filter candidate.",
+    "previousBehavior": "A hard-coded October13 future date becomes today on the UTC CI calendar; Date.now-only hold fixture does not freeze new Date calendar calculation.",
+    "intendedBehavior": "Use todayISO(1) from the actual app calendar, assert the editor preserves that future day, and retain the intrinsic eligibility blocking assertion. All postponed-filter contracts remain unchanged.",
+    "replacementTests": [
+      "RISK Postpone return: mounted editor cancels active deferral with one Undo and preserves other eligibility rules"
+    ],
+    "preservedCoverage": [
+      "Every existing cancellation, title, rating, candidate, Undo and future-start eligibility assertion is retained; selected date preservation is additionally asserted.",
+      "Original three filter RED failures and their GREEN contracts remain unchanged; no executable app or saved-data behavior changes."
+    ],
+    "redEvidence": {
+      "command": "TZ=UTC node --test --test-name-pattern='RISK Postpone return: mounted' tests.js",
+      "failure": "Observed one failure after UTC midnight: future start must still block after return, actualtrue expectedfalse. CI38324661663 has the same failure. Host-timezone command passed separately. Original filter RED retained in red.log. This UTC RED precedes this fixture correction; it does not recharacterize original filter chronology."
+    }
+  },
+  {
+    "testChangesSha256": "d1acb553c6555794ea665c9966792259d987522f48ef1fc17074beddfd5b2203",
+    "reason": "Correct the existing Return test future-day fixture after exact CI crossed UTC midnight; retain and strengthen the date guard. This is directly required to qualify the filter candidate.",
+    "previousBehavior": "A hard-coded October13 future date becomes today on the UTC CI calendar; Date.now-only hold fixture does not freeze new Date calendar calculation.",
+    "intendedBehavior": "Use todayISO(1) from the actual app calendar, assert the editor preserves that future day, and retain the intrinsic eligibility blocking assertion. All postponed-filter contracts remain unchanged.",
+    "replacementTests": [
+      "RISK Postpone return: mounted editor cancels active deferral with one Undo and preserves other eligibility rules",
+      "RISK Postponed filter: mounted tag combines search eligibility and filtered Select all without changing board data",
+      "RISK Postponed filter: scan-clock expiry removes matches at the deadline and clears an unavailable last filter",
+      "RISK Postponed filter: saved hold semantics preserve legacy opaque evidence and context namespace isolation"
+    ],
+    "preservedCoverage": [
+      "Every existing cancellation, title, rating, candidate, Undo and future-start eligibility assertion is retained; selected date preservation is additionally asserted.",
+      "Original three filter RED failures and their GREEN contracts remain unchanged; no executable app or saved-data behavior changes."
+    ],
+    "redEvidence": {
+      "command": "TZ=UTC node --test --test-name-pattern='RISK Postpone return: mounted' tests.js",
+      "failure": "Observed one failure after UTC midnight: future start must still block after return, actualtrue expectedfalse. CI38324661663 has the same failure. Host-timezone command passed separately. Original filter RED retained in red.log. This UTC RED precedes this fixture correction; it does not recharacterize original filter chronology."
+    }
+  },
+  {
+    "testChangesSha256": "dd108b51978e6bf09c85f9afc58986a0faa4407d9f9f6dc60d7c418d2d1ab591",
+    "reason": "Add the requested All Tasks Postponed filter using the existing active hold predicate and list filtering controls.",
+    "previousBehavior": "No postponed status tag exists, so active holds cannot be selected as a list filter.",
+    "intendedBehavior": "Active open holds match the postponed tag; search and eligibility combine, filtered selection follows matches, Return and expiry update matches, and an unavailable tag clears according to existing list semantics.",
+    "replacementTests": [
+      "RISK Postponed filter: mounted tag combines search eligibility and filtered Select all without changing board data",
+      "RISK Postponed filter: scan-clock expiry removes matches at the deadline and clears an unavailable last filter",
+      "RISK Postponed filter: saved hold semantics preserve legacy opaque evidence and context namespace isolation"
+    ],
+    "preservedCoverage": [
+      "Existing eligibility selection clears narrowings; no ranking, rest, date, context, dependency, persistence, or causal register behavior changes."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK Postponed filter:' tests.js",
+      "failure": "All three cases failed before implementation: two missing s:postponed control assertions and expiry filtering included an unheld task. Contemporaneous red.log retained outside the tree. Subsequent fixture corrections normalized cross-realm arrays and respected existing eligibility clicks clearing narrowings; last-Return assertions were supplemental."
+    }
+  },
+  {
     "testChangesSha256": "3aca8d430484170c0393770739813ce760a796c2b3c3d7454f33ceb88557c17f",
     "reason": "Cover the user-reported Return as candidate failure for postponed tasks through the mounted editor and existing causal register.",
     "previousBehavior": "Active postponement alone disables Return as candidate, and its handler never cancels a saved hold.",
