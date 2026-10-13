@@ -25792,3 +25792,11 @@ test('RISK task context contrast: selected small chip labels meet readable contr
  const luminance=hex=>{const c=hex.slice(1).match(/../g).map(x=>parseInt(x,16)/255).map(x=>x<=.04045?x/12.92:((x+.055)/1.055)**2.4);return .2126*c[0]+.7152*c[1]+.0722*c[2]};
  for(const color of pair.slice(1))assert.ok(1.05/(luminance(color)+.05)>=4.5,'white small context labels require 4.5:1 contrast against '+color);
 });
+test('RISK task context wrapping: shared chips constrain long names across Add list and both editors',async()=>{
+ const source=fs.readFileSync(path.join(__dirname,'index.html'),'utf8'),rule=source.match(/\.ltag\{([^}]+)\}/)?.[1];assert.ok(rule);
+ assert.match(rule,/min-width:0/,'the shared chip must shrink in its actual flex row');assert.match(rule,/max-width:100%/,'a single long chip must fit its parent');assert.match(rule,/overflow-wrap:anywhere/,'unbroken context names must wrap rather than overflow');
+ const {ctx,shim}=await loadApp();const name='Long context '+ 'W'.repeat(80);ctx.state.contexts=[{id:'long',name,active:true}];const task=ctx.addTask('Private long context',false,['long']);ctx.state.listOpen=true;ctx.renderList();ctx.renderQuickCtx();
+ assert.match(shim.document.getElementById('listTagRow').innerHTML,/class="ltag task-context/);assert.match(shim.document.getElementById('quickCtxRow').innerHTML,/class="ltag qctxchip/);
+ ctx.openEdit(task.id);assert.match(shim.document.getElementById('modalRoot').innerHTML,/<label class="ltag"><input type="checkbox" data-editctx="long" checked/);ctx.onAction('bulk-select-all');ctx.onAction('bulk-edit');assert.match(shim.document.getElementById('modalRoot').innerHTML,/<label class="ltag"><input type="checkbox" data-bulkctx="long" checked/);
+ for(const id of ['quickCtxRow','listTagRow','modalRoot'])assert.ok(shim.document.getElementById(id).innerHTML.includes(name),'full long name remains visible source without truncation');
+});

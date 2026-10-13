@@ -1,5 +1,41 @@
 [
   {
+    "testChangesSha256": "c0fbcaeb5360386f4f422242eb963f83bf12e40b29029ae5b7a3c576011b63ac",
+    "reason": "Repair actual phone visual failure for long Add context names by sharing shrink/width/wrap constraints across all task-context chip surfaces.",
+    "previousBehavior": "Editor labels alone had sizing constraints; Add and list chips could overflow their actual flex rows for unbroken names.",
+    "intendedBehavior": "The shared ltag class bounds and wraps full names in Add, All Tasks and both editors, preserving all checked and Apply behavior.",
+    "replacementTests": [
+      "RISK task context wrapping: shared chips constrain long names across Add list and both editors"
+    ],
+    "preservedCoverage": [
+      "All existing reference paint, native checked/focus feedback, explicit Apply/Clear, mixed unchanged, Save/Cancel, context availability, persistence/sync/recovery and unrelated list filters remain protected."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK task context wrapping' tests.js",
+      "failure": "Before repair source RED: shared chip must shrink in its actual flex row (missing min-width:0). Preceding actual browser candidate b71f01d RED at 390x844 light: context within parent failed for long Add context name; retained visual-red-long-context/results.json, browser closed16:10:09.529Z."
+    }
+  },
+  {
+    "testChangesSha256": "27462b0efa6e69c40310bd74cc62617cb231be8ce512ae85ae499a3cd04349ca",
+    "reason": "Repair actual phone visual failure for long Add context names by sharing shrink/width/wrap constraints across all task-context chip surfaces.",
+    "previousBehavior": "Editor labels alone had sizing constraints; Add and list chips could overflow their actual flex rows for unbroken names.",
+    "intendedBehavior": "The shared ltag class bounds and wraps full names in Add, All Tasks and both editors, preserving all checked and Apply behavior.",
+    "replacementTests": [
+      "RISK task context assignment paint: Add single Edit and Bulk Edit reuse All Tasks chips with native selection feedback",
+      "RISK task context assignment preservation: mixed bulk choices remain unchanged without Apply and editor opening never writes",
+      "RISK task context theme paint: day selection is green and night retains released purple across assignment and context filters",
+      "RISK task context contrast: selected small chip labels meet readable contrast in both themes",
+      "RISK task context wrapping: shared chips constrain long names across Add list and both editors"
+    ],
+    "preservedCoverage": [
+      "All existing reference paint, native checked/focus feedback, explicit Apply/Clear, mixed unchanged, Save/Cancel, context availability, persistence/sync/recovery and unrelated list filters remain protected."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK task context wrapping' tests.js",
+      "failure": "Before repair source RED: shared chip must shrink in its actual flex row (missing min-width:0). Preceding actual browser candidate b71f01d RED at 390x844 light: context within parent failed for long Add context name; retained visual-red-long-context/results.json, browser closed16:10:09.529Z."
+    }
+  },
+  {
     "testChangesSha256": "a4d90c87508a96962af650e00dd02f1e8f2054b96f8555b2b31cd8b25b6ed5a4",
     "reason": "Repair independent reviewer finding that initial day green made small white context labels unreadable.",
     "previousBehavior": "Selected day chip white text on #2f9e48 had only 3.44:1 contrast.",
