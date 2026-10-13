@@ -25952,3 +25952,9 @@ test('RISK patterned context direction cue: contrasting full-control rails leave
 test('RISK patterned indicator slope legend: FAQ distinguishes locked selections and unset location from ordinary selected controls',async()=>{
  const {ctx,shim}=await loadApp();ctx.openHelp();const answer=shim.document.getElementById('modalRoot').innerHTML.split('<dt>What are Patterned active indicators?</dt><dd>')[1].split('</dd>')[0];for(const cue of [/excluded contexts/,/locked Scene Time selections/,/unset location/])assert.match(answer,cue,'legend must explain its red-status slope exceptions');
 });
+
+test('RISK patterned indicators absent root: both preference states safely defer paint until a document root exists',async()=>{
+ const {ctx,shim}=await loadApp();const root=shim.document.documentElement;
+ for(const missing of [undefined,null]){shim.document.documentElement=missing;for(const enabled of [false,true]){ctx.state.settings.patternedIndicators=enabled;assert.doesNotThrow(()=>ctx.renderPatternedIndicators(),'non-DOM host must retain established startup no-op behavior');assert.equal(ctx.state.settings.patternedIndicators,enabled);}}
+ shim.document.documentElement=root;ctx.renderPatternedIndicators();assert.equal(root.getAttribute('data-patterned-indicators'),'true');ctx.state.settings.patternedIndicators=false;ctx.renderPatternedIndicators();assert.equal(root.getAttribute('data-patterned-indicators'),null);
+});
