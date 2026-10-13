@@ -1049,3 +1049,5 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - `RISK Postponed filter: mounted tag combines search eligibility and filtered Select all without changing board data` — Active hold filtering, combined controls, exact expiry and read-only saved evidence.
 - `RISK Postponed filter: scan-clock expiry removes matches at the deadline and clears an unavailable last filter` — Active hold filtering, combined controls, exact expiry and read-only saved evidence.
 - `RISK Postponed filter: saved hold semantics preserve legacy opaque evidence and context namespace isolation` — Active hold filtering, combined controls, exact expiry and read-only saved evidence.
+
+- `RISK selected rank geometry browser: enlarged labels stay inside their rank slot without changing selection row height` — Actual full-size selection label containment, native keyboard/pointer actions, stable row geometry and read-only board state across text sizes and rank layouts.

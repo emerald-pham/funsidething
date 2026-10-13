@@ -5749,5 +5749,21 @@
       "command": "node --test --test-name-pattern='RISK FAQ redundant changelog question' tests.js",
       "failure": "Observed AssertionError from actual help consumer: redundant question and definition list still rendered before release history. Durable red.log captured before implementation. Focused cohort additionally failed the reflow explanation assertion because it referenced the deliberately removed answer; green checks retain the original historical wording case-insensitively. green-final.log observed date-order prose assertion failure; changed only removed prose expectation, preserving all date/order/history assertions."
     }
+  },
+  {
+    "testChangesSha256": "bf9dfaa4fa6690a5eabfb98b10d41ac35d1336c4ad5061bb6544113be159f790",
+    "reason": "Reserve the full Selected label in enlarged All Tasks rank slots after actual rendered overlap, preserving selection transitions and task-title editing.",
+    "previousBehavior": "Fixed mobile rank slots allow doubled Selected text to extend into the title gap.",
+    "intendedBehavior": "Rank slots reserve eight mono glyphs plus padding before selection; full labels stay inside the rank control without selection changing row height.",
+    "replacementTests": [
+      "RISK selected rank geometry browser: enlarged labels stay inside their rank slot without changing selection row height"
+    ],
+    "preservedCoverage": [
+      "Existing selection, filtered Select all, task-title Edit, native Tab/Space/Enter, rank/chance modes, normal rank widths and saved board values remain asserted. All existing tests are unchanged. Twelve isolated phone, landscape, tablet and desktop cases cover both themes and ordinary/doubled fonts; normal and selected row heights are compared."
+    ],
+    "redEvidence": {
+      "command": "SELECTION_LAYOUT_BROWSER_URL=http://127.0.0.1:18551/ PLAYWRIGHT_MODULE=<bundled Playwright> SELECTION_LAYOUT_EVIDENCE_DIR=<durable evidence>/red SELECTION_LAYOUT_CANDIDATE=be895df1bb8e46880ffbcd9369dbbac79b5bb274 node --test --test-name-pattern=\"RISK selected rank geometry browser:\" tests.js",
+      "failure": "Contemporaneous unchanged-app RED before index.html or sw.js edits: 320-light-2x-sparksummary-rank every Selected glyph fits the rank slot failed. Saved red.log/results.json and actual selected screenshot show text beyond the button toward title. Initial GREEN attempt exposed the later mobile .tk max-width cascade; specificity correction then passed all twelve cases. Evidence in .git/funsidething-task-evidence/selected-row-readability-20261013."
+    }
   }
 ]
