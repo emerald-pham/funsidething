@@ -123,19 +123,32 @@ html.viewing-scene{overflow:hidden;overscroll-behavior:none}
 #sceneSolarTimes strong{font-size:13px}
 #sceneSolarDate{overflow-wrap:anywhere}
 
-/* Optional patterned indicators use a dashed diagonal edge rather than painting
-   over glyphs. Keep the resolved fill, label ink, geometry and native focus.
-   Opposite slopes distinguish exclusions from included/selected states. */
-:root[data-patterned-indicators="true"] :is(.ltag.on,.ctxpick .ltag:has(input:checked),.ctxitem.included .ctxmark,#addButton.yes,.setting-set,.bulk-rank-selected,.motion-choices button[aria-pressed="true"],.chip.due-today,.chip.due-overdue,.chip.due-tomorrow,.cand,.syncbtn.ok,.syncbtn.busy,.syncbtn.err){
-  background-image:repeating-linear-gradient(135deg,transparent 0 4px,#fff 4px 6px,transparent 6px 10px);
+/* Optional patterned indicators keep the resolved semantic fill and dark label
+   ink. Dashed white diagonals cover active fills; opposite slopes mark exclusions.
+   Light-label fields, small check/X symbols and ink-only sync status use an edge cue to leave their
+   glyphs clear. No animation, new layout box, or interaction is introduced. */
+:root[data-patterned-indicators="true"]{
+  --indicator-selected:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16'%3E%3Cpath d='M-8 8L8-8M0 16L16 0M8 24L24 8' fill='none' stroke='%23fff' stroke-width='2' stroke-dasharray='5 3'/%3E%3C/svg%3E");
+  --indicator-excluded:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16'%3E%3Cpath d='M-8 8L8 24M0 0L16 16M8-8L24 8' fill='none' stroke='%23fff' stroke-width='2' stroke-dasharray='5 3'/%3E%3C/svg%3E");
+}
+:root[data-patterned-indicators="true"] :is(.ltag.on,.ctxpick .ltag:has(input:checked),#addButton.yes,.setting-set,.bulk-rank-selected,.motion-choices button[aria-pressed="true"],.chip.due-today,.chip.due-overdue){
+  background-image:var(--indicator-selected);
+  background-size:16px 16px;background-repeat:repeat;
+}
+:root[data-patterned-indicators="true"] :is(.setting-unset,#sceneTimeDialog .motion-choices button[aria-pressed="true"]:not([data-scene-time="live"])){
+  background-image:var(--indicator-excluded);
+  background-size:16px 16px;background-repeat:repeat;
+}
+:root[data-patterned-indicators="true"] :is(.ctxitem.included .ctxmark,.ctxitem.excluded .ctxmark,.cand,.chip.due-tomorrow){
+  background-image:var(--indicator-selected);
+  background-size:16px 4px;background-position:left bottom;background-repeat:repeat-x;
+}
+:root[data-patterned-indicators="true"] .ctxitem.excluded .ctxmark{background-image:var(--indicator-excluded)}
+:root[data-patterned-indicators="true"] :is(.syncbtn.ok,.syncbtn.busy,.syncbtn.err){
+  background-image:repeating-linear-gradient(135deg,transparent 0 4px,currentColor 4px 6px,transparent 6px 10px);
   background-size:100% 4px;background-position:left bottom;background-repeat:no-repeat;
 }
-:root[data-patterned-indicators="true"] :is(.ctxitem.excluded .ctxmark,.setting-unset,#sceneTimeDialog .motion-choices button[aria-pressed="true"]:not([data-scene-time="live"] )){
-  background-image:repeating-linear-gradient(45deg,transparent 0 4px,#fff 4px 6px,transparent 6px 10px);
-  background-size:100% 4px;background-position:left bottom;background-repeat:no-repeat;
-}
-
 :root[data-patterned-indicators="true"] .bench{
-  background-image:repeating-linear-gradient(135deg,transparent 0 4px,#fff 4px 6px,transparent 6px 10px),linear-gradient(180deg,var(--chain) 0%,var(--chain-deep) 140%);
-  background-size:100% 4px,100% 100%;background-position:left bottom,left top;background-repeat:no-repeat;
+  background-image:var(--indicator-selected),linear-gradient(180deg,var(--chain) 0%,var(--chain-deep) 140%);
+  background-size:16px 16px,100% 100%;background-position:left top,left top;background-repeat:repeat,no-repeat;
 }

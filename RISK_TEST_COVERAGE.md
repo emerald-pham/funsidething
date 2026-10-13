@@ -1070,3 +1070,6 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - `RISK patterned indicators paint: opt-in static dashed diagonal textures retain semantic fills and separate excluded state`
 - `RISK patterned indicators FAQ: appearance chapter explains default persistence and separate meanings`
 - `RISK patterned indicators benchmark fill: striped overlay retains original chain gradient beneath the texture`
+- `RISK patterned indicators full-field cue: selected controls use genuinely dashed stripes across the fill while small glyphs stay clear`
+- `RISK patterned indicators sync contrast: status texture uses semantic ink rather than white on the white day surface`
+- `RISK patterned indicators light-label protection: candidate and tomorrow badges retain unobstructed night-theme ink`

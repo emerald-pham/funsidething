@@ -1,5 +1,28 @@
 [
   {
+    "testChangesSha256": "eb68a13ef50ad39ed5317b365bc266aa8e9737a5a28551d2b1445b9514dff973",
+    "reason": "Add opt-in presentation preference coverage, then strengthen texture contracts after independent source review found invisible sync stripes and an insufficient edge-only treatment.",
+    "previousBehavior": "No preference originally existed. Initial candidate used white stripes on white sync controls and a universal narrow edge band rather than requested across-field dashed stripes.",
+    "intendedBehavior": "Default-off persisted preference retains data and native semantics; genuinely dashed tiles cover active fills, opposite slopes distinguish excluded states, sync uses semantic-ink texture and light-label fields keep clear centers.",
+    "replacementTests": [
+      "RISK patterned indicators preference: actual checkbox saves immediately survives reload and leaves task state intact",
+      "RISK patterned indicators paint: opt-in static dashed diagonal textures retain semantic fills and separate excluded state",
+      "RISK patterned indicators FAQ: appearance chapter explains default persistence and separate meanings",
+      "RISK patterned indicators benchmark fill: striped overlay retains original chain gradient beneath the texture",
+      "RISK patterned indicators full-field cue: selected controls use genuinely dashed stripes across the fill while small glyphs stay clear",
+      "RISK patterned indicators sync contrast: status texture uses semantic ink rather than white on the white day surface",
+      "RISK patterned indicators light-label protection: candidate and tomorrow badges retain unobstructed night-theme ink"
+    ],
+    "preservedCoverage": [
+      "No preexisting assertion removed. Gradient-layer assertion retained with SVG selected texture replacing the continuous gradient layer. Static-paint assertion still forbids changing fill/ink declarations or adding motion; custom image variables are permitted.",
+      "Eligibility, context assignments, mixed bulk Apply, rank, cloud reconciliation, old preferences and native semantics remain covered by unchanged focused regression tests."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK patterned indicators' tests.js; node --test --test-name-pattern='RISK patterned indicators benchmark fill|RISK patterned indicators full-field|RISK patterned indicators sync contrast' tests.js; node --test --test-name-pattern='RISK patterned indicators light-label protection' tests.js",
+      "failure": "Observed initial missing default/paint/FAQ RED in red.txt; benchmark replacement RED in red-benchmark.txt. Before repair implementation, three RED failures in red-review-repairs.txt: missing dashed SVG, full-field tile, semantic sync ink and layered selected texture. Light-label RED in red-light-labels.txt before moving candidate/tomorrow to protected edge cues. 39 focused checks GREEN after scoped repairs."
+    }
+  },
+  {
     "testChangesSha256": "cd0168890e946663d6e77ccb754c9255d5c078db3c58bc117132198c870f6182",
     "reason": "Add discriminating presentation preference and static texture contracts for optional colorblind state cues without weakening existing behavior tests.",
     "previousBehavior": "No patterned state option existed; legacy boards and actual Settings checkbox lacked the new preference.",

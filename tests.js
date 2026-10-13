@@ -25854,14 +25854,26 @@ test('RISK patterned indicators preference: actual checkbox saves immediately su
  field.checked=false;shim.document.dispatchEvent({type:'change',target:field});assert.equal(ctx.state.settings.patternedIndicators,false);assert.equal(shim.document.documentElement.getAttribute('data-patterned-indicators'),null);
 });
 test('RISK patterned indicators paint: opt-in static dashed diagonal textures retain semantic fills and separate excluded state',()=>{
- const css=fs.readFileSync(path.join(__dirname,'landscape.css'),'utf8');assert.match(css,/data-patterned-indicators/);assert.match(css,/repeating-linear-gradient\(135deg/);assert.match(css,/repeating-linear-gradient\(45deg/,'excluded must differ from included');
+ const css=fs.readFileSync(path.join(__dirname,'landscape.css'),'utf8');assert.match(css,/data-patterned-indicators/);assert.match(css,/repeating-linear-gradient\(135deg/);assert.match(css,/--indicator-excluded/,'excluded must differ from included');
  for(const selector of ['.ltag.on','.ctxpick .ltag:has(input:checked)','.ctxitem.included .ctxmark','.ctxitem.excluded .ctxmark','#addButton.yes','.setting-set','.setting-unset','.bulk-rank-selected','.motion-choices button[aria-pressed="true"]','.chip.due-overdue'])assert.ok(css.slice(css.indexOf('/* Optional patterned')).includes(selector),selector+' audited state has a texture');
- const patterned=css.slice(css.indexOf('/* Optional patterned'));assert.match(patterned,/background-size:/);assert.match(patterned,/background-repeat:no-repeat/);assert.doesNotMatch(patterned,/animation:|transition:|background-color:|color:/,'texture does not replace semantic paint or animate');
+ const patterned=css.slice(css.indexOf('/* Optional patterned'));assert.match(patterned,/background-size:/);assert.match(patterned,/background-repeat:no-repeat/);assert.doesNotMatch(patterned,/animation:|transition:|background-color:|(?<!-)color:/,'texture does not replace semantic paint or animate');
 });
 test('RISK patterned indicators FAQ: appearance chapter explains default persistence and separate meanings',async()=>{
  const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;assert.match(help,/Patterned active indicators/);assert.match(help,/Off by default/);assert.match(help,/stripes/);
 });
 
 test('RISK patterned indicators benchmark fill: striped overlay retains original chain gradient beneath the texture',()=>{
- const css=fs.readFileSync(path.join(__dirname,'landscape.css'),'utf8');assert.match(css,/\.bench\{[^}]*background-image:repeating-linear-gradient\(135deg[^;]*,linear-gradient\(180deg,var\(--chain\) 0%,var\(--chain-deep\) 140%\)/,'opt-in must layer rather than replace the benchmark fill');
+ const css=fs.readFileSync(path.join(__dirname,'landscape.css'),'utf8');assert.match(css,/\.bench\{[^}]*background-image:var\(--indicator-selected\),linear-gradient\(180deg,var\(--chain\) 0%,var\(--chain-deep\) 140%\)/,'opt-in must layer rather than replace the benchmark fill');
+});
+
+test('RISK patterned indicators full-field cue: selected controls use genuinely dashed stripes across the fill while small glyphs stay clear',()=>{
+ const css=fs.readFileSync(path.join(__dirname,'landscape.css'),'utf8').split('/* Optional patterned')[1];assert.match(css,/stroke-dasharray/,'a diagonal line must be dashed rather than a continuous stripe');assert.match(css,/background-size:16px 16px/,'large active fills repeat a full-field dashed tile');
+ assert.match(css,/\.ctxitem\.included \.ctxmark[^}]*background-size:16px 4px/,'small check and X marks keep their center clear');
+});
+test('RISK patterned indicators sync contrast: status texture uses semantic ink rather than white on the white day surface',()=>{
+ const css=fs.readFileSync(path.join(__dirname,'landscape.css'),'utf8').split('/* Optional patterned')[1];assert.match(css,/\.syncbtn\.ok,\.syncbtn\.busy,\.syncbtn\.err[^}]*currentColor/,'status stripes must remain visible on day white and night dark surfaces');
+});
+
+test('RISK patterned indicators light-label protection: candidate and tomorrow badges retain unobstructed night-theme ink',()=>{
+ const css=fs.readFileSync(path.join(__dirname,'landscape.css'),'utf8');assert.match(css,/\.cand,\.chip\.due-tomorrow[^}]*background-size:16px 4px/,'existing night light glyphs must not sit over white full-field stripes');
 });
