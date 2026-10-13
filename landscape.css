@@ -100,7 +100,7 @@ html.viewing-scene{overflow:hidden;overscroll-behavior:none}
    overrode the earlier scanning rules; keyboard focus should reveal actions
    just as hover does, without taking those actions out of the tab order. */
 .actionrow.disabled:focus-within,.siderail.disabled:focus-within,.btnwrap.disabled:focus-within{opacity:1}
-.chip.due-today,.chip.due-overdue,.ltag.on,.qctxchip.on,.ctxpick .ltag:has(input:checked){color:var(--action-ink)}
+.chip.due-today,.chip.due-overdue,.ltag.on,.qctxchip.on{color:var(--action-ink)}
 .syncbtn.err,#importMsg.warn{color:var(--ink)}
 
 /* Let scenery through supporting surfaces without fading text or controls. */
@@ -131,7 +131,7 @@ html.viewing-scene{overflow:hidden;overscroll-behavior:none}
   --indicator-selected:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16'%3E%3Cpath d='M-8 8L8-8M0 16L16 0M8 24L24 8' fill='none' stroke='%23fff' stroke-width='2' stroke-dasharray='5 3'/%3E%3C/svg%3E");
   --indicator-excluded:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16'%3E%3Cpath d='M-8 8L8 24M0 0L16 16M8-8L24 8' fill='none' stroke='%23fff' stroke-width='2' stroke-dasharray='5 3'/%3E%3C/svg%3E");
 }
-:root[data-patterned-indicators="true"] :is(.ltag.on,.ctxpick .ltag:has(input:checked),#addButton.yes,.setting-set,.bulk-rank-selected,.motion-choices button[aria-pressed="true"],.chip.due-today,.chip.due-overdue){
+:root[data-patterned-indicators="true"] :is(.ltag.on,#addButton.yes,.setting-set,.bulk-rank-selected,.motion-choices button[aria-pressed="true"],.chip.due-today,.chip.due-overdue){
   background-image:var(--indicator-selected);
   background-size:16px 16px;background-repeat:repeat;
 }
@@ -151,4 +151,12 @@ html.viewing-scene{overflow:hidden;overscroll-behavior:none}
 :root[data-patterned-indicators="true"] .bench{
   background-image:var(--indicator-selected),linear-gradient(180deg,var(--chain) 0%,var(--chain-deep) 140%);
   background-size:16px 16px,100% 100%;background-position:left top,left top;background-repeat:repeat,no-repeat;
+}
+
+/* Keep the native checkbox fallback independent of ordinary active chip paint. */
+@supports selector(:has(input:checked)){
+:root[data-patterned-indicators="true"] .ctxpick .ltag:has(input:checked){
+  background-image:var(--indicator-selected);
+  background-size:16px 16px;background-repeat:repeat;
+}
 }

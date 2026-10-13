@@ -1065,6 +1065,21 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - `RISK task context multiline corners: shared radius preserves the one-line pill and leaves wrapped glyphs inside the fill` — Half-lineheight plus established padding/border caps multiline corners while retaining the ordinary one-line pill silhouette and full captions across all chip surfaces.
 - `RISK task context FAQ placement: bounded context-choice answer lives in Contexts without expanding the bulk property answer` — Context appearance/draft/keyboard guidance lives once in the existing chapter while all bulk answers retain independently readable130-word limits and Apply semantics.
 
+- `RISK legacy context completion preservation: editor completion consumers retain unknown references through payload reload and Undo` — Mounted Done, Worked and Dot retain unknown context requirements through cloud payload, fresh offline startup and Undo.
+- `RISK legacy context peer deletion: preserved references do not override concurrent known-context deletion during editor rebase` — Peer known-context deletion wins while unknown requirements and independent title edits survive; explicit local context deletion stays effective.
+
+- `RISK legacy context editor preservation: Save keeps unknown references while applying explicit known choices and Undo` — Preserves legacy assignments, explicit edits, scanner-independent filters and usable native feedback.
+
+- `RISK legacy context editor preservation: no available contexts retain saved requirements on unrelated Save` — Preserves legacy assignments, explicit edits, scanner-independent filters and usable native feedback.
+
+- `RISK legacy context bulk Clear: explicit Clear removes unknown references and Undo restores them` — Preserves legacy assignments, explicit edits, scanner-independent filters and usable native feedback.
+
+- `RISK context checkbox fallback: native selection remains visible without relational selector support` — Preserves legacy assignments, explicit edits, scanner-independent filters and usable native feedback.
+
+- `RISK context filter restoration: every existing context remains offered independently of scanner choices and open matches` — Preserves legacy assignments, explicit edits, scanner-independent filters and usable native feedback.
+
+- `RISK context selector fallback isolation: ordinary selected controls do not share a rule with unsupported relational selectors` — Preserves legacy assignments, explicit edits, scanner-independent filters and usable native feedback.
+
 ## Patterned active indicators
 - `RISK patterned indicators preference: actual checkbox saves immediately survives reload and leaves task state intact`
 - `RISK patterned indicators paint: opt-in static dashed diagonal textures retain semantic fills and separate excluded state`
@@ -1074,3 +1089,4 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - `RISK patterned indicators sync contrast: status texture uses semantic ink rather than white on the white day surface`
 - `RISK patterned indicators light-label protection: candidate and tomorrow badges retain unobstructed night-theme ink`
 - `RISK patterned indicators immediate-save FAQ: established settings lifecycle answer lists the new toggle`
+- `RISK patterned indicators selector fallback: native editor texture is isolated from ordinary active chips`

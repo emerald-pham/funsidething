@@ -1,5 +1,31 @@
 [
   {
+    "testChangesSha256": "b404ac6699ecd67564594b969fa3cdee475b5f56e3e32df48c6e6b688c53f4d5",
+    "reason": "Add opt-in presentation preference coverage, then strengthen texture contracts after independent source review found invisible sync stripes and an insufficient edge-only treatment. Add a focused assertion for the established immediate-save FAQ list after specialist review found the new toggle omitted. Reconcile separately released cb64ed3 without changing its tests or preservation rules; isolate checked-editor texture inside supports to retain its native-selector fallback.",
+    "previousBehavior": "No preference originally existed. Initial candidate used white stripes on white sync controls and a universal narrow edge band rather than requested across-field dashed stripes.",
+    "intendedBehavior": "Default-off persisted preference retains data and native semantics; genuinely dashed tiles cover active fills, opposite slopes distinguish excluded states, sync uses semantic-ink texture and light-label fields keep clear centers.",
+    "replacementTests": [
+      "RISK patterned indicators preference: actual checkbox saves immediately survives reload and leaves task state intact",
+      "RISK patterned indicators paint: opt-in static dashed diagonal textures retain semantic fills and separate excluded state",
+      "RISK patterned indicators FAQ: appearance chapter explains default persistence and separate meanings",
+      "RISK patterned indicators benchmark fill: striped overlay retains original chain gradient beneath the texture",
+      "RISK patterned indicators full-field cue: selected controls use genuinely dashed stripes across the fill while small glyphs stay clear",
+      "RISK patterned indicators sync contrast: status texture uses semantic ink rather than white on the white day surface",
+      "RISK patterned indicators light-label protection: candidate and tomorrow badges retain unobstructed night-theme ink",
+      "RISK patterned indicators immediate-save FAQ: established settings lifecycle answer lists the new toggle",
+      "RISK patterned indicators selector fallback: native editor texture is isolated from ordinary active chips"
+    ],
+    "preservedCoverage": [
+      "No preexisting assertion removed. Gradient-layer assertion retained with SVG selected texture replacing the continuous gradient layer. Static-paint assertion still forbids changing fill/ink declarations or adding motion; custom image variables are permitted.",
+      "Eligibility, context assignments, mixed bulk Apply, rank, cloud reconciliation, old preferences and native semantics remain covered by unchanged focused regression tests.",
+      "Every test byte from cb64ed3 is retained; only the feature tests are appended. Unknown/empty saved references, single-task Save/completion/Undo, explicit bulk Clear and all-context filters remain protected."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK patterned indicators' tests.js; node --test --test-name-pattern='RISK patterned indicators benchmark fill|RISK patterned indicators full-field|RISK patterned indicators sync contrast' tests.js; node --test --test-name-pattern='RISK patterned indicators light-label protection' tests.js; node --test --test-name-pattern='RISK patterned indicators immediate-save FAQ' tests.js; node --test --test-name-pattern='RISK patterned indicators selector fallback' tests.js",
+      "failure": "Observed initial missing default/paint/FAQ RED in red.txt; benchmark replacement RED in red-benchmark.txt. Before repair implementation, three RED failures in red-review-repairs.txt: missing dashed SVG, full-field tile, semantic sync ink and layered selected texture. Light-label RED in red-light-labels.txt before moving candidate/tomorrow to protected edge cues. 39 focused checks GREEN after scoped repairs. Additional contemporaneous RED in red-immediate-save-faq.txt: existing lifecycle answer omitted the new preference; repaired without changing save semantics. Final focused source cohort: 42 pass, zero skipped. Reconciliation existing selector-isolation contract RED and new source-fallback RED observed before supports-rule repair in red-reconciliation-selector.txt; after repair 51 checks pass, 0 skip. Conflict-resolution syntax failure is separately recorded and is not functional test-first evidence."
+    }
+  },
+  {
     "testChangesSha256": "1e3fc7603e86661230ab9cd7b0f337587209971bfb138d65a51db114499c7f40",
     "reason": "Add opt-in presentation preference coverage, then strengthen texture contracts after independent source review found invisible sync stripes and an insufficient edge-only treatment. Add a focused assertion for the established immediate-save FAQ list after specialist review found the new toggle omitted.",
     "previousBehavior": "No preference originally existed. Initial candidate used white stripes on white sync controls and a universal narrow edge band rather than requested across-field dashed stripes.",
@@ -6281,6 +6307,35 @@
     "redEvidence": {
       "command": "SELECTION_LAYOUT_BROWSER_URL=http://127.0.0.1:18551/ PLAYWRIGHT_MODULE=<bundled Playwright> SELECTION_LAYOUT_EVIDENCE_DIR=<durable evidence>/red SELECTION_LAYOUT_CANDIDATE=be895df1bb8e46880ffbcd9369dbbac79b5bb274 node --test --test-name-pattern=\"RISK selected rank geometry browser:\" tests.js",
       "failure": "Contemporaneous unchanged-app RED before index.html or sw.js edits: 320-light-2x-sparksummary-rank every Selected glyph fits the rank slot failed. Saved red.log/results.json and actual selected screenshot show text beyond the button toward title. Initial GREEN attempt exposed the later mobile .tk max-width cascade; specificity correction then passed all twelve cases. Evidence in .git/funsidething-task-evidence/selected-row-readability-20261013."
+    }
+  },
+  {
+    "testChangesSha256": "c22047620f715081a1d2745dc2e588f81025bd255d5814dcbd7018f2c5fff7f2",
+    "reason": "User requests every existing context in All Tasks filters independently of scanner inclusion and matches. Confirmed older editor Save drops unavailable IDs; preserve those while keeping explicit visible choices and bulk Clear. Isolate newer CSS selectors so native fallback remains usable.",
+    "previousBehavior": "Inactive/unused contexts disappear from All Tasks filters; single-task Save silently strips unknown IDs; unsupported relational selectors can hide selection feedback.",
+    "intendedBehavior": "All existing context filters remain available, single edits retain unknown references, explicit bulk replacement/Clear retains its behavior, and native checkbox indicators remain usable without :has.",
+    "replacementTests": [
+      "list filter row: a plain unmarked list without contexts offers no filter buttons",
+      "list filter row: contexts nobody uses remain available",
+      "list filter row: inactive contexts remain offered independently of scanning",
+      "list filter: deactivating the filtered context retains the filter",
+      "RISK legacy context editor preservation: Save keeps unknown references while applying explicit known choices and Undo",
+      "RISK legacy context editor preservation: no available contexts retain saved requirements on unrelated Save",
+      "RISK legacy context bulk Clear: explicit Clear removes unknown references and Undo restores them",
+      "RISK context checkbox fallback: native selection remains visible without relational selector support",
+      "RISK context filter restoration: every existing context remains offered independently of scanner choices and open matches",
+      "RISK context selector fallback isolation: ordinary selected controls do not share a rule with unsupported relational selectors",
+      "RISK legacy context completion preservation: editor completion consumers retain unknown references through payload reload and Undo",
+      "RISK legacy context peer deletion: preserved references do not override concurrent known-context deletion during editor rebase"
+    ],
+    "preservedCoverage": [
+      "Status-tag availability still depends on matches; no-context empty row tests now explicitly use no contexts. Context-deactivation tests intentionally adopt the user requested filter policy, deletion still removes its filter. No status/eligibility/search or assignment assertions removed.",
+      "Shared chip paint tests retain tokens/focus checks while replacing comma-selector syntax with isolated supported selectors. Existing bulk mixed Apply, Clear, native controls and Undo stay protected.",
+      "Completion, cloud payload/reload and peer deletion protections added by specialist; those additional cases have retrospective baseline RED, separately labeled, after original preimplementation Save RED."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK legacy context|RISK context checkbox fallback' tests.js; node --test --test-name-pattern='RISK context filter restoration|RISK context selector fallback isolation' tests.js",
+      "failure": "Contemporaneous RED retained in evidence/incident-red.log and filter-fallback-red.log: missing future-id after Save, missing inactive context filter, unguarded hidden indicators and invalidating comma selectors. Initial test harness errors retained and corrected before app edit. specialist-added-tests-retrospective-red.txt records later coverage discrimination, not implementation chronology."
     }
   }
 ]
