@@ -25839,3 +25839,29 @@ test('RISK task context FAQ placement: bounded context-choice answer lives in Co
  const answer=contexts.split('<dt>'+question+'</dt><dd>')[1].split('</dd>')[0];assert.ok(answer.split(/\s+/).filter(Boolean).length<=130);for(const pattern of [/white unselected and green selected/,/dark surface and softer green/,/Tab and Space/,/closing without saving/,/green check and red X/])assert.match(answer,pattern);
  const bulk=help.split('<dt>Which properties can I change in Bulk Edit?</dt><dd>')[1].split('</dd>')[0];assert.ok(bulk.split(/\s+/).filter(Boolean).length<=130);assert.match(bulk,/Mixed values stay unchanged until you check Apply; unchecked values stay unchanged/);assert.doesNotMatch(bulk,/chip styling/,'bulk field instruction stays independently readable');
 });
+
+// Optional stripes protect existing appearance and remain presentation-only.
+test('RISK patterned indicators preference: actual checkbox saves immediately survives reload and leaves task state intact',async()=>{
+ const {ctx,shim}=await loadApp();assert.equal(ctx.state.settings.patternedIndicators,false,'old and new boards default off');
+ for(const value of [undefined,null,'true',1])assert.equal(ctx.normalizeSettings({patternedIndicators:value}).patternedIndicators,false);
+ ctx.state.contexts=[{id:'home',name:'Home',active:true}];ctx.addTask('Private pattern fixture',false,['home']);const tasks=JSON.stringify(ctx.state.tasks),contexts=JSON.stringify(ctx.state.contexts);
+ ctx.openSettings();assert.match(shim.document.getElementById('modalRoot').innerHTML,/id="stPatternedIndicators" type="checkbox"/);
+ const field=shim.document.getElementById('stPatternedIndicators');field.id='stPatternedIndicators';field.matches=()=>false;field.checked=true;
+ shim.document.dispatchEvent({type:'change',target:field});assert.equal(ctx.state.settings.patternedIndicators,true);assert.equal(shim.document.documentElement.getAttribute('data-patterned-indicators'),'true');
+ ctx.closeModal();ctx.openSettings();assert.match(shim.document.getElementById('modalRoot').innerHTML,/id="stPatternedIndicators" type="checkbox" checked/);
+ await ctx.persist();const saved=shim.localStorage.getItem(SYNC_STORE_KEY);const reloaded=await loadApp({seedStorage:{[SYNC_STORE_KEY]:saved}});assert.equal(reloaded.ctx.state.settings.patternedIndicators,true);assert.equal(reloaded.shim.document.documentElement.getAttribute('data-patterned-indicators'),'true');
+ assert.equal(JSON.stringify(ctx.state.tasks),tasks);assert.equal(JSON.stringify(ctx.state.contexts),contexts);
+ field.checked=false;shim.document.dispatchEvent({type:'change',target:field});assert.equal(ctx.state.settings.patternedIndicators,false);assert.equal(shim.document.documentElement.getAttribute('data-patterned-indicators'),null);
+});
+test('RISK patterned indicators paint: opt-in static dashed diagonal textures retain semantic fills and separate excluded state',()=>{
+ const css=fs.readFileSync(path.join(__dirname,'landscape.css'),'utf8');assert.match(css,/data-patterned-indicators/);assert.match(css,/repeating-linear-gradient\(135deg/);assert.match(css,/repeating-linear-gradient\(45deg/,'excluded must differ from included');
+ for(const selector of ['.ltag.on','.ctxpick .ltag:has(input:checked)','.ctxitem.included .ctxmark','.ctxitem.excluded .ctxmark','#addButton.yes','.setting-set','.setting-unset','.bulk-rank-selected','.motion-choices button[aria-pressed="true"]','.chip.due-overdue'])assert.ok(css.slice(css.indexOf('/* Optional patterned')).includes(selector),selector+' audited state has a texture');
+ const patterned=css.slice(css.indexOf('/* Optional patterned'));assert.match(patterned,/background-size:/);assert.match(patterned,/background-repeat:no-repeat/);assert.doesNotMatch(patterned,/animation:|transition:|background-color:|color:/,'texture does not replace semantic paint or animate');
+});
+test('RISK patterned indicators FAQ: appearance chapter explains default persistence and separate meanings',async()=>{
+ const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;assert.match(help,/Patterned active indicators/);assert.match(help,/Off by default/);assert.match(help,/stripes/);
+});
+
+test('RISK patterned indicators benchmark fill: striped overlay retains original chain gradient beneath the texture',()=>{
+ const css=fs.readFileSync(path.join(__dirname,'landscape.css'),'utf8');assert.match(css,/\.bench\{[^}]*background-image:repeating-linear-gradient\(135deg[^;]*,linear-gradient\(180deg,var\(--chain\) 0%,var\(--chain-deep\) 140%\)/,'opt-in must layer rather than replace the benchmark fill');
+});

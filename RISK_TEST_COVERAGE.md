@@ -1064,3 +1064,9 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - `RISK task context wrapped alignment: shared editor and button chips center full captions inside their rounded fill` — Shared centered text prevents native editor wrapped captions from drifting outside the pill reference treatment while retaining full names and width wrapping.
 - `RISK task context multiline corners: shared radius preserves the one-line pill and leaves wrapped glyphs inside the fill` — Half-lineheight plus established padding/border caps multiline corners while retaining the ordinary one-line pill silhouette and full captions across all chip surfaces.
 - `RISK task context FAQ placement: bounded context-choice answer lives in Contexts without expanding the bulk property answer` — Context appearance/draft/keyboard guidance lives once in the existing chapter while all bulk answers retain independently readable130-word limits and Apply semantics.
+
+## Patterned active indicators
+- `RISK patterned indicators preference: actual checkbox saves immediately survives reload and leaves task state intact`
+- `RISK patterned indicators paint: opt-in static dashed diagonal textures retain semantic fills and separate excluded state`
+- `RISK patterned indicators FAQ: appearance chapter explains default persistence and separate meanings`
+- `RISK patterned indicators benchmark fill: striped overlay retains original chain gradient beneath the texture`

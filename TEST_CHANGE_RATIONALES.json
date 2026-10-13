@@ -1,5 +1,24 @@
 [
   {
+    "testChangesSha256": "cd0168890e946663d6e77ccb754c9255d5c078db3c58bc117132198c870f6182",
+    "reason": "Add discriminating presentation preference and static texture contracts for optional colorblind state cues without weakening existing behavior tests.",
+    "previousBehavior": "No patterned state option existed; legacy boards and actual Settings checkbox lacked the new preference.",
+    "intendedBehavior": "Strict opt-in checkbox saves with established board settings, reapplies after reload, preserves task/context data, and paints different static stripe slopes while preserving benchmark fill.",
+    "replacementTests": [
+      "RISK patterned indicators preference: actual checkbox saves immediately survives reload and leaves task state intact",
+      "RISK patterned indicators paint: opt-in static dashed diagonal textures retain semantic fills and separate excluded state",
+      "RISK patterned indicators FAQ: appearance chapter explains default persistence and separate meanings",
+      "RISK patterned indicators benchmark fill: striped overlay retains original chain gradient beneath the texture"
+    ],
+    "preservedCoverage": [
+      "Existing eligibility, context assignments, mixed bulk Apply, rank, cloud reconciliation, undo and native control semantics remain unchanged. No existing assertion removed."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK patterned indicators' tests.js; node --test --test-name-pattern='RISK patterned indicators benchmark fill' tests.js",
+      "failure": "Contemporaneous preimplementation RED recorded in ../evidence/red.txt: default was undefined, texture selector absent, FAQ absent. Subsequent benchmark RED in red-benchmark.txt caught overwritten gradient before the layered fill repair. All four tests GREEN afterward."
+    }
+  },
+  {
     "testChangesSha256": "fef88e177be5478dc87564a4eac8d0fea9d52590fae803b30f4591ecbd9c480c",
     "reason": "Repair two requiredCI FAQ readability failures without weakening existing130-word guide limits by moving newlyaddedcontext prose into its own existing-chapter question.",
     "previousBehavior": "New context explanation expanded Which properties can I change in BulkEdit beyond130words, failing existing Quickstart and bulk-guidance contracts.",

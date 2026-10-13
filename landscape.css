@@ -122,3 +122,20 @@ html.viewing-scene{overflow:hidden;overscroll-behavior:none}
 #sceneTimeDialog .motion-choices span{margin-top:2px}
 #sceneSolarTimes strong{font-size:13px}
 #sceneSolarDate{overflow-wrap:anywhere}
+
+/* Optional patterned indicators use a dashed diagonal edge rather than painting
+   over glyphs. Keep the resolved fill, label ink, geometry and native focus.
+   Opposite slopes distinguish exclusions from included/selected states. */
+:root[data-patterned-indicators="true"] :is(.ltag.on,.ctxpick .ltag:has(input:checked),.ctxitem.included .ctxmark,#addButton.yes,.setting-set,.bulk-rank-selected,.motion-choices button[aria-pressed="true"],.chip.due-today,.chip.due-overdue,.chip.due-tomorrow,.cand,.syncbtn.ok,.syncbtn.busy,.syncbtn.err){
+  background-image:repeating-linear-gradient(135deg,transparent 0 4px,#fff 4px 6px,transparent 6px 10px);
+  background-size:100% 4px;background-position:left bottom;background-repeat:no-repeat;
+}
+:root[data-patterned-indicators="true"] :is(.ctxitem.excluded .ctxmark,.setting-unset,#sceneTimeDialog .motion-choices button[aria-pressed="true"]:not([data-scene-time="live"] )){
+  background-image:repeating-linear-gradient(45deg,transparent 0 4px,#fff 4px 6px,transparent 6px 10px);
+  background-size:100% 4px;background-position:left bottom;background-repeat:no-repeat;
+}
+
+:root[data-patterned-indicators="true"] .bench{
+  background-image:repeating-linear-gradient(135deg,transparent 0 4px,#fff 4px 6px,transparent 6px 10px),linear-gradient(180deg,var(--chain) 0%,var(--chain-deep) 140%);
+  background-size:100% 4px,100% 100%;background-position:left bottom,left top;background-repeat:no-repeat;
+}
