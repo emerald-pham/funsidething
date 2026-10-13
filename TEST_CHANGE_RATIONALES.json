@@ -1,5 +1,412 @@
 [
   {
+    "testChangesSha256": "fef88e177be5478dc87564a4eac8d0fea9d52590fae803b30f4591ecbd9c480c",
+    "reason": "Repair two requiredCI FAQ readability failures without weakening existing130-word guide limits by moving newlyaddedcontext prose into its own existing-chapter question.",
+    "previousBehavior": "New context explanation expanded Which properties can I change in BulkEdit beyond130words, failing existing Quickstart and bulk-guidance contracts.",
+    "intendedBehavior": "The unchanged context explanation occupies one bounded Contextsquestion; originalBulkEdit propertyanswer restored and all other content/structure retained. No CSS/control/persistence behavior changes.",
+    "replacementTests": [
+      "RISK task context FAQ placement: bounded context-choice answer lives in Contexts without expanding the bulk property answer"
+    ],
+    "preservedCoverage": [
+      "Both existing130-word readability assertions and all five distinctbulk answers retained unchanged; full palette/draft/keyboard/context availability/mainselector exception guidance preserved. All previouslyapproved controlgeometry/type/palette/focus/functional/compatibility consumers unchanged."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK Quick start content: essential steps|RISK bulk task guidance: bounded answers' tests.js; node --test --test-name-pattern='RISK task context FAQ placement' tests.js",
+      "failure": "Observed exact33da928 pushCI38440080004 and matchinglocalRED: WhichpropertiescanIchangeinBulkEdit exceeds user-facing readability bounds. New placementREDbeforeedit: focusedcontextchoicequestioncount0instead1. Limits preserved; no bypass or weakened assertion."
+    }
+  },
+  {
+    "testChangesSha256": "cc313433cbce457d724dc63900235d6c190579f31dcf69702f0586826dde81b3",
+    "reason": "Repair two requiredCI FAQ readability failures without weakening existing130-word guide limits by moving newlyaddedcontext prose into its own existing-chapter question.",
+    "previousBehavior": "New context explanation expanded Which properties can I change in BulkEdit beyond130words, failing existing Quickstart and bulk-guidance contracts.",
+    "intendedBehavior": "The unchanged context explanation occupies one bounded Contextsquestion; originalBulkEdit propertyanswer restored and all other content/structure retained. No CSS/control/persistence behavior changes.",
+    "replacementTests": [
+      "RISK task context assignment paint: Add single Edit and Bulk Edit reuse All Tasks chips with native selection feedback",
+      "RISK task context assignment preservation: mixed bulk choices remain unchanged without Apply and editor opening never writes",
+      "RISK task context theme paint: both themes retain resolved landscape reference across assignment and context filters",
+      "RISK task context contrast: selected small chip labels meet readable contrast in both themes",
+      "RISK task context wrapping: shared chips constrain long names across Add list and both editors",
+      "RISK task context keyboard paint: editor labels match the native focused reference chip shape",
+      "RISK task context rerender focus: Add and All Tasks retain only their logical active chip during repeated toggles",
+      "RISK task context landscape cascade: editor labels share resolved All Tasks fill and ink without overriding its palette",
+      "RISK task context imported empty ID: Add restores the existing logical chip without changing saved assignments",
+      "RISK task context wrapped alignment: shared editor and button chips center full captions inside their rounded fill",
+      "RISK task context multiline corners: shared radius preserves the one-line pill and leaves wrapped glyphs inside the fill",
+      "RISK task context FAQ placement: bounded context-choice answer lives in Contexts without expanding the bulk property answer"
+    ],
+    "preservedCoverage": [
+      "Both existing130-word readability assertions and all five distinctbulk answers retained unchanged; full palette/draft/keyboard/context availability/mainselector exception guidance preserved. All previouslyapproved controlgeometry/type/palette/focus/functional/compatibility consumers unchanged."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK Quick start content: essential steps|RISK bulk task guidance: bounded answers' tests.js; node --test --test-name-pattern='RISK task context FAQ placement' tests.js",
+      "failure": "Observed exact33da928 pushCI38440080004 and matchinglocalRED: WhichpropertiescanIchangeinBulkEdit exceeds user-facing readability bounds. New placementREDbeforeedit: focusedcontextchoicequestioncount0instead1. Limits preserved; no bypass or weakened assertion."
+    }
+  },
+  {
+    "testChangesSha256": "e69d5d25d7c8d3acb9036a3f4583292c71f5bbba9bade069a5aa9abe6d29d32c",
+    "reason": "Repair observed rounded-background glyph failure across all chip surfaces by capping shared multiline corner depth at the existing one-line pill radius.",
+    "previousBehavior": "99px radius made very tall wrapped chips elliptical and let first/last glyphs cross their fill in narrow enlarged views despite centered text and horizontal bounds.",
+    "intendedBehavior": "Sharedcalc(.725em+4px) equals half the established1.45lineheight plus3pxpadding/1pxborder for ordinary one-line controls, but prevents tall multiline corners from curving into full captions; focused4pxoverride and palette unchanged.",
+    "replacementTests": [
+      "RISK task context multiline corners: shared radius preserves the one-line pill and leaves wrapped glyphs inside the fill"
+    ],
+    "preservedCoverage": [
+      "Full text/wrapping/centered alignment, short-chip silhouette, actual reference palette/ink/contrast, focus/emptyID, native checkboxes, bulk mixedApply/Clear and exact persistence/sync/Undo consumer protections remain intact."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK task context multiline corners' tests.js",
+      "failure": "Observed sourceREDbeforeimplementation: multiline chips must cap corner depth at half established one-lineheight; actualradius99px. Preceding exact35a0a665 actual10-config strongerglyphRED98failures, confirmed independentpixels across320enlarged Add/list/single/bulk; evidencevisual-red-corners preserved."
+    }
+  },
+  {
+    "testChangesSha256": "ebbb3c7f76974a1f2973a07318eb0060d195434037a38af0280cd3f207c9496d",
+    "reason": "Repair observed rounded-background glyph failure across all chip surfaces by capping shared multiline corner depth at the existing one-line pill radius.",
+    "previousBehavior": "99px radius made very tall wrapped chips elliptical and let first/last glyphs cross their fill in narrow enlarged views despite centered text and horizontal bounds.",
+    "intendedBehavior": "Sharedcalc(.725em+4px) equals half the established1.45lineheight plus3pxpadding/1pxborder for ordinary one-line controls, but prevents tall multiline corners from curving into full captions; focused4pxoverride and palette unchanged.",
+    "replacementTests": [
+      "RISK task context assignment paint: Add single Edit and Bulk Edit reuse All Tasks chips with native selection feedback",
+      "RISK task context assignment preservation: mixed bulk choices remain unchanged without Apply and editor opening never writes",
+      "RISK task context theme paint: both themes retain resolved landscape reference across assignment and context filters",
+      "RISK task context contrast: selected small chip labels meet readable contrast in both themes",
+      "RISK task context wrapping: shared chips constrain long names across Add list and both editors",
+      "RISK task context keyboard paint: editor labels match the native focused reference chip shape",
+      "RISK task context rerender focus: Add and All Tasks retain only their logical active chip during repeated toggles",
+      "RISK task context landscape cascade: editor labels share resolved All Tasks fill and ink without overriding its palette",
+      "RISK task context imported empty ID: Add restores the existing logical chip without changing saved assignments",
+      "RISK task context wrapped alignment: shared editor and button chips center full captions inside their rounded fill",
+      "RISK task context multiline corners: shared radius preserves the one-line pill and leaves wrapped glyphs inside the fill"
+    ],
+    "preservedCoverage": [
+      "Full text/wrapping/centered alignment, short-chip silhouette, actual reference palette/ink/contrast, focus/emptyID, native checkboxes, bulk mixedApply/Clear and exact persistence/sync/Undo consumer protections remain intact."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK task context multiline corners' tests.js",
+      "failure": "Observed sourceREDbeforeimplementation: multiline chips must cap corner depth at half established one-lineheight; actualradius99px. Preceding exact35a0a665 actual10-config strongerglyphRED98failures, confirmed independentpixels across320enlarged Add/list/single/bulk; evidencevisual-red-corners preserved."
+    }
+  },
+  {
+    "testChangesSha256": "91861ccb9680f4a2fe6395ea15cc0ed95c461d8c39c331982650243f9c9851d2",
+    "reason": "Repair independent actual rendered typography finding missed by horizontal element bounds: wrapped native editor labels left-aligned across rounded background, unlike centered button reference.",
+    "previousBehavior": "Single/bulk editor label inherited left alignment while Add/All Tasks native buttons center captions; long first/last lines visibly crossed pill curve.",
+    "intendedBehavior": "Shared ltag explicitly centers text for both label/button controls without altering palette, wrapping, focus or saved consumers.",
+    "replacementTests": [
+      "RISK task context wrapped alignment: shared editor and button chips center full captions inside their rounded fill"
+    ],
+    "preservedCoverage": [
+      "Full captions and unbroken-name wrapping, actual reference palette/contrast, native keyboard/focus, importedempty-ID, bulk Apply/mixed, persisteddata/cloud/sync/Undo protections all retained."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK task context wrapped alignment' tests.js",
+      "failure": "Observed source RED before repair: native editor label text must share centered button reference; shared rule lacked text-align:center. Independent final rendered4337 review found long label first/last lines crossing roundedfill at320darkenlarged and390lightbulk; evidence visual-red-alignment retained."
+    }
+  },
+  {
+    "testChangesSha256": "088b30b5fedc1e6e18b25eff6c6ed5157a7449214b27c40d04b8e3cb7eb75a42",
+    "reason": "Repair independent actual rendered typography finding missed by horizontal element bounds: wrapped native editor labels left-aligned across rounded background, unlike centered button reference.",
+    "previousBehavior": "Single/bulk editor label inherited left alignment while Add/All Tasks native buttons center captions; long first/last lines visibly crossed pill curve.",
+    "intendedBehavior": "Shared ltag explicitly centers text for both label/button controls without altering palette, wrapping, focus or saved consumers.",
+    "replacementTests": [
+      "RISK task context assignment paint: Add single Edit and Bulk Edit reuse All Tasks chips with native selection feedback",
+      "RISK task context assignment preservation: mixed bulk choices remain unchanged without Apply and editor opening never writes",
+      "RISK task context theme paint: both themes retain resolved landscape reference across assignment and context filters",
+      "RISK task context contrast: selected small chip labels meet readable contrast in both themes",
+      "RISK task context wrapping: shared chips constrain long names across Add list and both editors",
+      "RISK task context keyboard paint: editor labels match the native focused reference chip shape",
+      "RISK task context rerender focus: Add and All Tasks retain only their logical active chip during repeated toggles",
+      "RISK task context landscape cascade: editor labels share resolved All Tasks fill and ink without overriding its palette",
+      "RISK task context imported empty ID: Add restores the existing logical chip without changing saved assignments",
+      "RISK task context wrapped alignment: shared editor and button chips center full captions inside their rounded fill"
+    ],
+    "preservedCoverage": [
+      "Full captions and unbroken-name wrapping, actual reference palette/contrast, native keyboard/focus, importedempty-ID, bulk Apply/mixed, persisteddata/cloud/sync/Undo protections all retained."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK task context wrapped alignment' tests.js",
+      "failure": "Observed source RED before repair: native editor label text must share centered button reference; shared rule lacked text-align:center. Independent final rendered4337 review found long label first/last lines crossing roundedfill at320darkenlarged and390lightbulk; evidence visual-red-alignment retained."
+    }
+  },
+  {
+    "testChangesSha256": "ac8b8e221600e1c8e9b386dfd1a80334ecd376a59175a4c6ef1d0c69a10d0d8c",
+    "reason": "Fix specialist-observed focus guard edge case for already supported imported empty context IDs.",
+    "previousBehavior": "A truthiness check skipped refocus for id empty string even though it is an existing rendered real context.",
+    "intendedBehavior": "Use explicit null sentinel for absent focus, preserving the same logical empty-ID chip on rerender without changing task assignments or context availability.",
+    "replacementTests": [
+      "RISK task context imported empty ID: Add restores the existing logical chip without changing saved assignments"
+    ],
+    "preservedCoverage": [
+      "Actual landscape reference palette and contrast, native checked/keyboard feedback, unrelated focus protection, bulk mixed Apply/Clear, saved task context semantics and cloud/sync/Undo remain intact."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK task context imported empty ID' tests.js",
+      "failure": "Observed RED before repair: existing empty ID is still a real active chip;0focus calls rather than1."
+    }
+  },
+  {
+    "testChangesSha256": "6d518de712d66e0d2b4a1edcf8f97db22fb17ac4b7ec7b6a9deaf343e1266326",
+    "reason": "Fix specialist-observed focus guard edge case for already supported imported empty context IDs.",
+    "previousBehavior": "A truthiness check skipped refocus for id empty string even though it is an existing rendered real context.",
+    "intendedBehavior": "Use explicit null sentinel for absent focus, preserving the same logical empty-ID chip on rerender without changing task assignments or context availability.",
+    "replacementTests": [
+      "RISK task context assignment paint: Add single Edit and Bulk Edit reuse All Tasks chips with native selection feedback",
+      "RISK task context assignment preservation: mixed bulk choices remain unchanged without Apply and editor opening never writes",
+      "RISK task context theme paint: both themes retain resolved landscape reference across assignment and context filters",
+      "RISK task context contrast: selected small chip labels meet readable contrast in both themes",
+      "RISK task context wrapping: shared chips constrain long names across Add list and both editors",
+      "RISK task context keyboard paint: editor labels match the native focused reference chip shape",
+      "RISK task context rerender focus: Add and All Tasks retain only their logical active chip during repeated toggles",
+      "RISK task context landscape cascade: editor labels share resolved All Tasks fill and ink without overriding its palette",
+      "RISK task context imported empty ID: Add restores the existing logical chip without changing saved assignments"
+    ],
+    "preservedCoverage": [
+      "Actual landscape reference palette and contrast, native checked/keyboard feedback, unrelated focus protection, bulk mixed Apply/Clear, saved task context semantics and cloud/sync/Undo remain intact."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK task context imported empty ID' tests.js",
+      "failure": "Observed RED before repair: existing empty ID is still a real active chip;0focus calls rather than1."
+    }
+  },
+  {
+    "testChangesSha256": "bcf02326def4796e830a951407515e3cf9923a75d68aebdb52a9161786954946",
+    "reason": "Repair actual final rendered cascade mismatch and replace invalid source-only purple-night/white-label expectations with the observed landscape reference contract.",
+    "previousBehavior": "Private token wrongly replaced resolved palegreen reference with darkgreen/purple; editor labels kept white ink because later landscape override covered buttons only. Earlier tests incorrectly described inactive fallback tokens as actual paint.",
+    "intendedBehavior": "Reuse actual cascaded chain-deep reference fill and extend existing landscape action-ink rule to native editor labels. Preserve exact day/night reference palette and4.5:1 actual label contrast. Rename erroneous theme wording without removing protected availability, keyboard, mixed Apply or native selection assertions.",
+    "replacementTests": [
+      "RISK task context assignment paint: Add single Edit and Bulk Edit reuse All Tasks chips with native selection feedback",
+      "RISK task context theme paint: both themes retain resolved landscape reference across assignment and context filters",
+      "RISK task context contrast: selected small chip labels meet readable contrast in both themes",
+      "RISK task context landscape cascade: editor labels share resolved All Tasks fill and ink without overriding its palette"
+    ],
+    "preservedCoverage": [
+      "All context assignment/check/focus consumers and existing test assertions for saved task rules, bulk mixed Apply/Clear, explicit Save/Cancel, cloud/sync/recovery, Undo, long-name sizing and main include/exclude remain. Actual f88bb38 ten-config native keyboard/wrapping/consumer evidence and15/15 compatibility retained; next paint-only candidate must document executable artifact equivalence."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK task context landscape cascade' tests.js",
+      "failure": "Observed source RED before repair: editor selected fill must follow same cascaded token as actual All Tasks. Preceding f88bb38 actual ten-config RED: selected editor ink white differed from reference RGB36,59,64. Baseline confirmed resolved chain-deep RGB150,214,178 day/RGB141,203,176 night, dark surfaceRGB61,86,107; earlier fallback expectations were wrong. Full captures retained in visual-red-cascade."
+    }
+  },
+  {
+    "testChangesSha256": "b23d761c90da61212a586f5275e3bd3144abdc434f150ec22402d4148a001ce8",
+    "reason": "Repair actual final rendered cascade mismatch and replace invalid source-only purple-night/white-label expectations with the observed landscape reference contract.",
+    "previousBehavior": "Private token wrongly replaced resolved palegreen reference with darkgreen/purple; editor labels kept white ink because later landscape override covered buttons only. Earlier tests incorrectly described inactive fallback tokens as actual paint.",
+    "intendedBehavior": "Reuse actual cascaded chain-deep reference fill and extend existing landscape action-ink rule to native editor labels. Preserve exact day/night reference palette and4.5:1 actual label contrast. Rename erroneous theme wording without removing protected availability, keyboard, mixed Apply or native selection assertions.",
+    "replacementTests": [
+      "RISK task context assignment paint: Add single Edit and Bulk Edit reuse All Tasks chips with native selection feedback",
+      "RISK task context assignment preservation: mixed bulk choices remain unchanged without Apply and editor opening never writes",
+      "RISK task context theme paint: both themes retain resolved landscape reference across assignment and context filters",
+      "RISK task context contrast: selected small chip labels meet readable contrast in both themes",
+      "RISK task context wrapping: shared chips constrain long names across Add list and both editors",
+      "RISK task context keyboard paint: editor labels match the native focused reference chip shape",
+      "RISK task context rerender focus: Add and All Tasks retain only their logical active chip during repeated toggles",
+      "RISK task context landscape cascade: editor labels share resolved All Tasks fill and ink without overriding its palette"
+    ],
+    "preservedCoverage": [
+      "All context assignment/check/focus consumers and existing test assertions for saved task rules, bulk mixed Apply/Clear, explicit Save/Cancel, cloud/sync/recovery, Undo, long-name sizing and main include/exclude remain. Actual f88bb38 ten-config native keyboard/wrapping/consumer evidence and15/15 compatibility retained; next paint-only candidate must document executable artifact equivalence."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK task context landscape cascade' tests.js",
+      "failure": "Observed source RED before repair: editor selected fill must follow same cascaded token as actual All Tasks. Preceding f88bb38 actual ten-config RED: selected editor ink white differed from reference RGB36,59,64. Baseline confirmed resolved chain-deep RGB150,214,178 day/RGB141,203,176 night, dark surfaceRGB61,86,107; earlier fallback expectations were wrong. Full captures retained in visual-red-cascade."
+    }
+  },
+  {
+    "testChangesSha256": "cf172177e73433e54e1563becde93f7849c3c7a8c9a336ed887cd63bc3f246f6",
+    "reason": "Repair actual native keyboard failure caused by replacing focused Add chip and matching All Tasks filter rows.",
+    "previousBehavior": "Space toggled Add selection but its rerender stranded focus, so subsequent Enter failed to deselect; All Tasks replaced focused filter rows similarly.",
+    "intendedBehavior": "Rerenders restore only their prior active action/ID with preventScroll, permitting repeated keyboard selection without stealing focus from another control or redirecting deleted contexts.",
+    "replacementTests": [
+      "RISK task context rerender focus: Add and All Tasks retain only their logical active chip during repeated toggles"
+    ],
+    "preservedCoverage": [
+      "Native editor checkbox focus remains unchanged; no new task writes, bulk Apply/mixed/Clear, context availability, theme paint, wrapping, cloud/sync/recovery and Undo boundaries retained."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK task context rerender focus' tests.js",
+      "failure": "Observed source RED before implementation: qctx rerender must restore logical active chip after both toggles; actual focus calls []. Preceding native browser RED d43cc7a: Space selected Add Work then Enter left aria-pressed true; visual-red-keyboard/results.json and screenshots retained."
+    }
+  },
+  {
+    "testChangesSha256": "ec198aa2aa0b0a57f13bf0c5fd44847d2ded5d3d83bfebced61e63a1dee08979",
+    "reason": "Repair actual native keyboard failure caused by replacing focused Add chip and matching All Tasks filter rows.",
+    "previousBehavior": "Space toggled Add selection but its rerender stranded focus, so subsequent Enter failed to deselect; All Tasks replaced focused filter rows similarly.",
+    "intendedBehavior": "Rerenders restore only their prior active action/ID with preventScroll, permitting repeated keyboard selection without stealing focus from another control or redirecting deleted contexts.",
+    "replacementTests": [
+      "RISK task context assignment paint: Add single Edit and Bulk Edit reuse All Tasks chips with native selection feedback",
+      "RISK task context assignment preservation: mixed bulk choices remain unchanged without Apply and editor opening never writes",
+      "RISK task context theme paint: day selection is green and night retains released purple across assignment and context filters",
+      "RISK task context contrast: selected small chip labels meet readable contrast in both themes",
+      "RISK task context wrapping: shared chips constrain long names across Add list and both editors",
+      "RISK task context keyboard paint: editor labels match the native focused reference chip shape",
+      "RISK task context rerender focus: Add and All Tasks retain only their logical active chip during repeated toggles"
+    ],
+    "preservedCoverage": [
+      "Native editor checkbox focus remains unchanged; no new task writes, bulk Apply/mixed/Clear, context availability, theme paint, wrapping, cloud/sync/recovery and Undo boundaries retained."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK task context rerender focus' tests.js",
+      "failure": "Observed source RED before implementation: qctx rerender must restore logical active chip after both toggles; actual focus calls []. Preceding native browser RED d43cc7a: Space selected Add Work then Enter left aria-pressed true; visual-red-keyboard/results.json and screenshots retained."
+    }
+  },
+  {
+    "testChangesSha256": "6bde70238d7e1330d4668762508ecfbed5a531ac7785cc16e5c78acc018a9af4",
+    "reason": "Repair independent reference-consistency finding for native editor checkbox label focus shape.",
+    "previousBehavior": "Focused editor labels retained resting99px radius while focused All Tasks/Add buttons use4px radius.",
+    "intendedBehavior": "Focused labels share established4px radius,2px outline and2px outline offset without changing checkbox/draft consumers.",
+    "replacementTests": [
+      "RISK task context keyboard paint: editor labels match the native focused reference chip shape"
+    ],
+    "preservedCoverage": [
+      "Existing day/night paint, long-name wrapping, native accessibility and all task Save/Cancel, bulk Apply/Clear/mixed, persistence/sync/Undo protections remain."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK task context keyboard paint' tests.js",
+      "failure": "Observed RED before repair: native focused editor labels must match All Tasks and Add focus shape; label focus rule omitted border-radius4px."
+    }
+  },
+  {
+    "testChangesSha256": "ed13ae2802c4a8e68258eb6b4bd4ce43992ce628661874bcaf2c01d127f51b50",
+    "reason": "Repair independent reference-consistency finding for native editor checkbox label focus shape.",
+    "previousBehavior": "Focused editor labels retained resting99px radius while focused All Tasks/Add buttons use4px radius.",
+    "intendedBehavior": "Focused labels share established4px radius,2px outline and2px outline offset without changing checkbox/draft consumers.",
+    "replacementTests": [
+      "RISK task context assignment paint: Add single Edit and Bulk Edit reuse All Tasks chips with native selection feedback",
+      "RISK task context assignment preservation: mixed bulk choices remain unchanged without Apply and editor opening never writes",
+      "RISK task context theme paint: day selection is green and night retains released purple across assignment and context filters",
+      "RISK task context contrast: selected small chip labels meet readable contrast in both themes",
+      "RISK task context wrapping: shared chips constrain long names across Add list and both editors",
+      "RISK task context keyboard paint: editor labels match the native focused reference chip shape"
+    ],
+    "preservedCoverage": [
+      "Existing day/night paint, long-name wrapping, native accessibility and all task Save/Cancel, bulk Apply/Clear/mixed, persistence/sync/Undo protections remain."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK task context keyboard paint' tests.js",
+      "failure": "Observed RED before repair: native focused editor labels must match All Tasks and Add focus shape; label focus rule omitted border-radius4px."
+    }
+  },
+  {
+    "testChangesSha256": "c0fbcaeb5360386f4f422242eb963f83bf12e40b29029ae5b7a3c576011b63ac",
+    "reason": "Repair actual phone visual failure for long Add context names by sharing shrink/width/wrap constraints across all task-context chip surfaces.",
+    "previousBehavior": "Editor labels alone had sizing constraints; Add and list chips could overflow their actual flex rows for unbroken names.",
+    "intendedBehavior": "The shared ltag class bounds and wraps full names in Add, All Tasks and both editors, preserving all checked and Apply behavior.",
+    "replacementTests": [
+      "RISK task context wrapping: shared chips constrain long names across Add list and both editors"
+    ],
+    "preservedCoverage": [
+      "All existing reference paint, native checked/focus feedback, explicit Apply/Clear, mixed unchanged, Save/Cancel, context availability, persistence/sync/recovery and unrelated list filters remain protected."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK task context wrapping' tests.js",
+      "failure": "Before repair source RED: shared chip must shrink in its actual flex row (missing min-width:0). Preceding actual browser candidate b71f01d RED at 390x844 light: context within parent failed for long Add context name; retained visual-red-long-context/results.json, browser closed16:10:09.529Z."
+    }
+  },
+  {
+    "testChangesSha256": "27462b0efa6e69c40310bd74cc62617cb231be8ce512ae85ae499a3cd04349ca",
+    "reason": "Repair actual phone visual failure for long Add context names by sharing shrink/width/wrap constraints across all task-context chip surfaces.",
+    "previousBehavior": "Editor labels alone had sizing constraints; Add and list chips could overflow their actual flex rows for unbroken names.",
+    "intendedBehavior": "The shared ltag class bounds and wraps full names in Add, All Tasks and both editors, preserving all checked and Apply behavior.",
+    "replacementTests": [
+      "RISK task context assignment paint: Add single Edit and Bulk Edit reuse All Tasks chips with native selection feedback",
+      "RISK task context assignment preservation: mixed bulk choices remain unchanged without Apply and editor opening never writes",
+      "RISK task context theme paint: day selection is green and night retains released purple across assignment and context filters",
+      "RISK task context contrast: selected small chip labels meet readable contrast in both themes",
+      "RISK task context wrapping: shared chips constrain long names across Add list and both editors"
+    ],
+    "preservedCoverage": [
+      "All existing reference paint, native checked/focus feedback, explicit Apply/Clear, mixed unchanged, Save/Cancel, context availability, persistence/sync/recovery and unrelated list filters remain protected."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK task context wrapping' tests.js",
+      "failure": "Before repair source RED: shared chip must shrink in its actual flex row (missing min-width:0). Preceding actual browser candidate b71f01d RED at 390x844 light: context within parent failed for long Add context name; retained visual-red-long-context/results.json, browser closed16:10:09.529Z."
+    }
+  },
+  {
+    "testChangesSha256": "a4d90c87508a96962af650e00dd02f1e8f2054b96f8555b2b31cd8b25b6ed5a4",
+    "reason": "Repair independent reviewer finding that initial day green made small white context labels unreadable.",
+    "previousBehavior": "Selected day chip white text on #2f9e48 had only 3.44:1 contrast.",
+    "intendedBehavior": "Use established included-context #2c7346 day green for sufficient white small-label contrast, preserving exact night purple and all assignment semantics.",
+    "replacementTests": [
+      "RISK task context theme paint: day selection is green and night retains released purple across assignment and context filters",
+      "RISK task context contrast: selected small chip labels meet readable contrast in both themes"
+    ],
+    "preservedCoverage": [
+      "Shared assignment classes, native checkbox focus and draft/bulk Apply semantics, exact night paint, unchanged unrelated filters and existing sync/Undo protections remain."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK task context contrast' tests.js",
+      "failure": "Observed RED before repair: white small context labels require 4.5:1 contrast against #2f9e48."
+    }
+  },
+  {
+    "testChangesSha256": "2edb5cd10d69f0f6b45245d33d7ca63c3923b918369370ac8bd324fdb3eef945",
+    "reason": "Repair independent reviewer finding that initial day green made small white context labels unreadable.",
+    "previousBehavior": "Selected day chip white text on #2f9e48 had only 3.44:1 contrast.",
+    "intendedBehavior": "Use established included-context #2c7346 day green for sufficient white small-label contrast, preserving exact night purple and all assignment semantics.",
+    "replacementTests": [
+      "RISK task context assignment paint: Add single Edit and Bulk Edit reuse All Tasks chips with native selection feedback",
+      "RISK task context assignment preservation: mixed bulk choices remain unchanged without Apply and editor opening never writes",
+      "RISK task context theme paint: day selection is green and night retains released purple across assignment and context filters",
+      "RISK task context contrast: selected small chip labels meet readable contrast in both themes"
+    ],
+    "preservedCoverage": [
+      "Shared assignment classes, native checkbox focus and draft/bulk Apply semantics, exact night paint, unchanged unrelated filters and existing sync/Undo protections remain."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK task context contrast' tests.js",
+      "failure": "Observed RED before repair: white small context labels require 4.5:1 contrast against #2f9e48."
+    }
+  },
+  {
+    "testChangesSha256": "c814d5af6eeb3aff78c9aba25cc82b724757c7bbd9d3cd1f6a14280647ecf344",
+    "reason": "Apply explicit user correction to green day task-context selection while preserving the exact released purple night paint and native assignment semantics.",
+    "previousBehavior": "The reference and assignment chips selected purple in both themes.",
+    "intendedBehavior": "Only context choices select green in light mode; dark mode keeps released purple. Native draft checked controls and unrelated list eligibility/status paint remain intact.",
+    "replacementTests": [
+      "RISK task context assignment paint: Add single Edit and Bulk Edit reuse All Tasks chips with native selection feedback",
+      "RISK task context theme paint: day selection is green and night retains released purple across assignment and context filters"
+    ],
+    "preservedCoverage": [
+      "Existing native editor selection, quick-add tagging, bulk mixed/Apply/Clear, persistence/recovery, no-context availability and main include/exclude semantics remain protected."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK task context theme paint' tests.js",
+      "failure": "Observed preimplementation failure: explicit theme pair must change day only and retain released night purple. Dedicated --task-context-selected token was absent."
+    }
+  },
+  {
+    "testChangesSha256": "43817ee3a7aeec1f6271e5ee55913427d3f91398e5a0f81f2d2437ebd61d4933",
+    "reason": "Apply explicit user correction to green day task-context selection while preserving the exact released purple night paint and native assignment semantics.",
+    "previousBehavior": "The reference and assignment chips selected purple in both themes.",
+    "intendedBehavior": "Only context choices select green in light mode; dark mode keeps released purple. Native draft checked controls and unrelated list eligibility/status paint remain intact.",
+    "replacementTests": [
+      "RISK task context assignment paint: Add single Edit and Bulk Edit reuse All Tasks chips with native selection feedback",
+      "RISK task context assignment preservation: mixed bulk choices remain unchanged without Apply and editor opening never writes",
+      "RISK task context theme paint: day selection is green and night retains released purple across assignment and context filters"
+    ],
+    "preservedCoverage": [
+      "Existing native editor selection, quick-add tagging, bulk mixed/Apply/Clear, persistence/recovery, no-context availability and main include/exclude semantics remain protected."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK task context theme paint' tests.js",
+      "failure": "Observed preimplementation failure: explicit theme pair must change day only and retain released night purple. Dedicated --task-context-selected token was absent."
+    }
+  },
+  {
+    "testChangesSha256": "23b364c590977dd13d9a3eb8eff944a2a3a4d5bf7f2ab42292c9151860b3491a",
+    "reason": "Unify task context assignment chip paint with the existing All Tasks reference while preserving native checkbox draft behavior.",
+    "previousBehavior": "Add duplicated reference styling and omitted pressed feedback; single and bulk editors used bare checkboxes.",
+    "intendedBehavior": "Assignment surfaces share All Tasks styling and expose native selected/focus feedback without modifying saved task or bulk Apply semantics.",
+    "replacementTests": [
+      "RISK task context assignment paint: Add single Edit and Bulk Edit reuse All Tasks chips with native selection feedback",
+      "RISK task context assignment preservation: mixed bulk choices remain unchanged without Apply and editor opening never writes"
+    ],
+    "preservedCoverage": [
+      "Existing quick-add tagging, sticky choices, context availability, editor Save and bulk conflicts, Apply/Clear, Undo and recovery contracts remain unchanged."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK task context assignment' tests.js",
+      "failure": "Observed preimplementation failure: Add must share the All Tasks control; actual class qctxchip lacked shared ltag. Preservation control already passed and was not represented as RED."
+    }
+  },
+  {
     "testChangesSha256": "4d574ecad12a54ca6069a9d23cd5491494d0ada1d8011c8d7b351a86fdbd6679",
     "reason": "Correct exact rationale name visibility after CI rejected an unchanged test declaration; use a descriptive calendar-relative test name and retain all assertions.",
     "previousBehavior": "The body-only future-day fixture correction named an unchanged declaration absent from added diff lines, so the existing structural rationale gate rejected it.",

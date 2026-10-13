@@ -25760,3 +25760,82 @@ test('RISK selected rank geometry browser: enlarged labels stay inside their ran
   assert.deepEqual(report.errors,[]);
  }catch(error){report.failure=error.stack;throw error}finally{if(browser.isConnected())report.ownedPids=[...new Set([...report.ownedPids,...(await session.send('SystemInfo.getProcessInfo')).processInfo.map(p=>p.id)])];await context.close();await browser.close();report.closedAt=new Date().toISOString();if(out)fs.writeFileSync(path.join(out,'results.json'),JSON.stringify(report,null,2)+'\n')}
 });
+
+test('RISK task context assignment paint: Add single Edit and Bulk Edit reuse All Tasks chips with native selection feedback',async()=>{
+ const {ctx,shim}=await loadApp();ctx.state.contexts=[{id:'home',name:'Home',active:true},{id:'work',name:'Work',active:false}];
+ const task=ctx.addTask('Private context paint',false,['home']);ctx.renderQuickCtx();
+ assert.match(shim.document.getElementById('quickCtxRow').innerHTML,/class="ltag qctxchip/,'Add must share the All Tasks control');
+ ctx.onAction('qctx',{dataset:{id:'home'}});assert.match(shim.document.getElementById('quickCtxRow').innerHTML,/aria-pressed="true"/);
+ ctx.openEdit(task.id);assert.match(shim.document.getElementById('modalRoot').innerHTML,/<label class="ltag"><input type="checkbox" data-editctx="home" checked/,'single editor retains native checked input within the shared chip');
+ ctx.state.listOpen=true;ctx.onAction('bulk-select-all');ctx.onAction('bulk-edit');assert.match(shim.document.getElementById('modalRoot').innerHTML,/<label class="ltag"><input type="checkbox" data-bulkctx="home" checked/);
+ const css=fs.readFileSync(path.join(__dirname,'index.html'),'utf8');assert.match(css,/\.ltag\.on,\.ctxpick \.ltag:has\(input:checked\)/,'checked native inputs must share the exact selected reference paint');assert.match(css,/\.ctxpick \.ltag:has\(input:focus-visible\)/,'native checkbox keyboard focus remains visible');
+});
+test('RISK task context assignment preservation: mixed bulk choices remain unchanged without Apply and editor opening never writes',async()=>{
+ const {ctx,shim}=await loadApp();ctx.state.contexts=[{id:'home',name:'Home',active:true},{id:'work',name:'Work',active:false}];
+ const a=ctx.addTask('Private mixed A',false,['home']),b=ctx.addTask('Private mixed B',false,['work']);const before=JSON.stringify(ctx.state.tasks);
+ ctx.openEdit(a.id);ctx.closeModal();ctx.state.listOpen=true;ctx.onAction('bulk-select-all');ctx.onAction('bulk-edit');
+ const html=shim.document.getElementById('modalRoot').innerHTML;assert.match(html,/Mixed values\. Unchanged unless Apply is checked/);assert.doesNotMatch(html,/data-bulkctx="[^"]+" checked/);
+ const old=shim.document.querySelectorAll;shim.document.querySelectorAll=s=>s==='[data-bulkctx]'?[{checked:true,dataset:{bulkctx:'home'}}]:old(s);
+ ctx.onAction('bulk-save');assert.equal(JSON.stringify(ctx.state.tasks),before,'unchecked Apply must not flatten mixed requirements or modify another task field');
+});
+test('RISK task context theme paint: both themes retain resolved landscape reference across assignment and context filters',async()=>{
+ const source=fs.readFileSync(path.join(__dirname,'index.html'),'utf8');
+ const palette=fs.readFileSync(path.join(__dirname,'landscape.css'),'utf8');assert.match(palette,/--chain-deep:light-dark\(#96d6b2,#8dcbb0\)/,'actual landscape reference retains its released theme pair');
+ assert.match(source,/\.ltag\.on,\.ctxpick \.ltag:has\(input:checked\)\{background:var\(--chain-deep\);color:#fff;border-color:var\(--chain-deep\)\}/);
+ assert.match(source,/\.ltag\{[^}]*background:var\(--surface\)/,'white day and existing dark unselected surface remain shared');
+ const {ctx,shim}=await loadApp();ctx.state.contexts=[{id:'home',name:'Home',active:true}];ctx.addTask('Private theme',false,['home']);ctx.state.listOpen=true;ctx.toggleListTag('c:home');
+ assert.match(shim.document.getElementById('listTagRow').innerHTML,/class="ltag task-context on"[^>]*data-id="c:home"/,'actual context filter retains the shared reference class');
+ assert.doesNotMatch(shim.document.getElementById('listEligibilityRow').innerHTML,/task-context/,'unrelated eligibility paint stays unchanged');
+});
+test('RISK task context contrast: selected small chip labels meet readable contrast in both themes',()=>{
+ const palette=fs.readFileSync(path.join(__dirname,'landscape.css'),'utf8'),pair=palette.match(/--chain-deep:light-dark\((#[a-f0-9]{6}),(#[a-f0-9]{6})\)/),ink=palette.match(/--action-ink:light-dark\((#[a-f0-9]{6}),(#[a-f0-9]{6})\)/);assert.ok(pair);assert.ok(ink);
+ const luminance=hex=>{const c=hex.slice(1).match(/../g).map(x=>parseInt(x,16)/255).map(x=>x<=.04045?x/12.92:((x+.055)/1.055)**2.4);return .2126*c[0]+.7152*c[1]+.0722*c[2]};
+ for(let i=1;i<=2;i++){const fill=luminance(pair[i]),label=luminance(ink[i]);assert.ok((Math.max(fill,label)+.05)/(Math.min(fill,label)+.05)>=4.5,'actual small context labels require 4.5:1 contrast against '+pair[i]);}
+});
+test('RISK task context wrapping: shared chips constrain long names across Add list and both editors',async()=>{
+ const source=fs.readFileSync(path.join(__dirname,'index.html'),'utf8'),rule=source.match(/\.ltag\{([^}]+)\}/)?.[1];assert.ok(rule);
+ assert.match(rule,/min-width:0/,'the shared chip must shrink in its actual flex row');assert.match(rule,/max-width:100%/,'a single long chip must fit its parent');assert.match(rule,/overflow-wrap:anywhere/,'unbroken context names must wrap rather than overflow');
+ const {ctx,shim}=await loadApp();const name='Long context '+ 'W'.repeat(80);ctx.state.contexts=[{id:'long',name,active:true}];const task=ctx.addTask('Private long context',false,['long']);ctx.state.listOpen=true;ctx.renderList();ctx.renderQuickCtx();
+ assert.match(shim.document.getElementById('listTagRow').innerHTML,/class="ltag task-context/);assert.match(shim.document.getElementById('quickCtxRow').innerHTML,/class="ltag qctxchip/);
+ ctx.openEdit(task.id);assert.match(shim.document.getElementById('modalRoot').innerHTML,/<label class="ltag"><input type="checkbox" data-editctx="long" checked/);ctx.onAction('bulk-select-all');ctx.onAction('bulk-edit');assert.match(shim.document.getElementById('modalRoot').innerHTML,/<label class="ltag"><input type="checkbox" data-bulkctx="long" checked/);
+ for(const id of ['quickCtxRow','listTagRow','modalRoot'])assert.ok(shim.document.getElementById(id).innerHTML.includes(name),'full long name remains visible source without truncation');
+});
+test('RISK task context keyboard paint: editor labels match the native focused reference chip shape',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'index.html'),'utf8'),rule=source.match(/\.ctxpick \.ltag:has\(input:focus-visible\)\{([^}]+)\}/)?.[1];assert.ok(rule);assert.match(rule,/outline:2px solid var\(--accent\)/);assert.match(rule,/outline-offset:2px/);assert.match(rule,/border-radius:4px/,'native focused editor labels must match the All Tasks and Add focus shape');
+});
+test('RISK task context rerender focus: Add and All Tasks retain only their logical active chip during repeated toggles',async()=>{
+ const {ctx,shim}=await loadApp();ctx.state.contexts=[{id:'home',name:'Home',active:true},{id:'work',name:'Work',active:true}];ctx.addTask('Private focused context',false,['home']);ctx.state.listOpen=true;ctx.render();let focused=[];
+ for(const id of ['quickCtxRow','listTagRow','listEligibilityRow']){const row=shim.document.getElementById(id);row.querySelectorAll=()=>[...row.innerHTML.matchAll(/<button[^>]*data-act="([^"]+)"[^>]*data-id="([^"]+)"[^>]*>/g)].map(([,act,key])=>({dataset:{act,id:key},focus:options=>{focused.push([act,key,options?.preventScroll]);shim.document.activeElement={dataset:{act,id:key}}}}))}
+ const tasks=JSON.stringify(ctx.state.tasks);
+ for(const act of ['qctx','list-tag','list-eligibility']){const id=act==='list-tag'?'c:home':act==='list-eligibility'?'eligible':'home';shim.document.activeElement={dataset:{act,id}};focused=[];ctx.onAction(act,{dataset:{id}});ctx.onAction(act,{dataset:{id}});assert.deepEqual(focused.map(x=>x.slice(0,2)),[[act,id],[act,id]],act+' rerender must restore the logical active chip after both toggles');assert.ok(focused.every(x=>x[2]===true),'restoring replacement focus must preserve scroll');}
+ assert.equal(JSON.stringify(ctx.state.tasks),tasks,'chip toggles are view/draft only');
+ for(const active of [{id:'addInput',dataset:{}},{dataset:{act:'bulk-save'}}]){shim.document.activeElement=active;focused=[];ctx.renderQuickCtx();ctx.renderListFilters();assert.equal(focused.length,0,'unrelated active control must keep focus during render');}
+ shim.document.activeElement={dataset:{act:'qctx',id:'deleted'}};focused=[];ctx.renderQuickCtx();assert.equal(focused.length,0,'removed chip cannot redirect focus to another context');
+});
+test('RISK task context landscape cascade: editor labels share resolved All Tasks fill and ink without overriding its palette',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'index.html'),'utf8'),palette=fs.readFileSync(path.join(__dirname,'landscape.css'),'utf8');
+ assert.match(source,/\.ltag\.on,\.ctxpick \.ltag:has\(input:checked\)\{background:var\(--chain-deep\);color:#fff;border-color:var\(--chain-deep\)\}/,'editor selected fill must follow the same cascaded token as actual All Tasks');
+ assert.doesNotMatch(source,/--task-context-selected:/,'a private palette must not replace the actual reference');
+ assert.match(palette,/\.ltag\.on,\.qctxchip\.on,\.ctxpick \.ltag:has\(input:checked\)\{color:var\(--action-ink\)\}/,'landscape override must apply the same actual ink to labels and buttons');
+ assert.match(palette,/--chain-deep:light-dark\(#96d6b2,#8dcbb0\)/,'released reference palette remains exact in both themes');assert.match(palette,/--surface:light-dark\(#ffffff,#3d566b\)/,'actual unselected palette remains exact');
+});
+test('RISK task context imported empty ID: Add restores the existing logical chip without changing saved assignments',async()=>{
+ const {ctx,shim}=await loadApp();ctx.state.contexts=[{id:'',name:'Imported context',active:true}];ctx.addTask('Private imported context',false,['']);const tasks=JSON.stringify(ctx.state.tasks),row=shim.document.getElementById('quickCtxRow');let focus=0;
+ row.querySelectorAll=()=>[{dataset:{act:'qctx',id:''},focus:options=>{assert.equal(options.preventScroll,true);focus++;shim.document.activeElement={dataset:{act:'qctx',id:''}}}}];shim.document.activeElement={dataset:{act:'qctx',id:''}};
+ ctx.onAction('qctx',{dataset:{id:''}});assert.equal(focus,1,'an existing empty ID is still a real active chip');assert.match(row.innerHTML,/aria-pressed="true"/);ctx.onAction('qctx',{dataset:{id:''}});assert.equal(focus,2);assert.match(row.innerHTML,/aria-pressed="false"/);assert.equal(JSON.stringify(ctx.state.tasks),tasks);
+});
+test('RISK task context wrapped alignment: shared editor and button chips center full captions inside their rounded fill',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'index.html'),'utf8'),rule=source.match(/\.ltag\{([^}]+)\}/)?.[1];assert.ok(rule);assert.match(rule,/text-align:center/,'native editor label text must share the centered button reference, including wrapped first and last lines');assert.match(rule,/overflow-wrap:anywhere/,'alignment repair retains full unbroken captions');
+});
+test('RISK task context multiline corners: shared radius preserves the one-line pill and leaves wrapped glyphs inside the fill',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'index.html'),'utf8'),rule=source.match(/\.ltag\{([^}]+)\}/)?.[1];assert.ok(rule);
+ assert.match(rule,/border-radius:calc\(\.725em \+ 4px\)/,'multiline chips must cap corner depth at half the established one-line height');
+ for(const font of [12,19.2,24]){const oneLineHeight=font*1.45+2*3+2*1,radius=font*.725+4;assert.equal(radius,oneLineHeight/2,'ordinary one-line silhouette remains the same clamped pill');assert.ok(radius<(font*1.45*4+8)/2,'multiline fill no longer rounds into a tall ellipse');}
+ assert.match(rule,/text-align:center/);assert.match(rule,/overflow-wrap:anywhere/,'full long captions still wrap');
+});
+test('RISK task context FAQ placement: bounded context-choice answer lives in Contexts without expanding the bulk property answer',async()=>{
+ const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML,question='How do task context choices look and save?';assert.equal(help.split('<dt>'+question+'</dt>').length-1,1,'context choice guidance needs one focused question');
+ const contexts=help.split('<h3>Contexts</h3>')[1].split('</details>')[0];assert.ok(contexts.includes('<dt>'+question+'</dt>'),'assignment appearance belongs in the existing Contexts chapter');
+ const answer=contexts.split('<dt>'+question+'</dt><dd>')[1].split('</dd>')[0];assert.ok(answer.split(/\s+/).filter(Boolean).length<=130);for(const pattern of [/white unselected and green selected/,/dark surface and softer green/,/Tab and Space/,/closing without saving/,/green check and red X/])assert.match(answer,pattern);
+ const bulk=help.split('<dt>Which properties can I change in Bulk Edit?</dt><dd>')[1].split('</dd>')[0];assert.ok(bulk.split(/\s+/).filter(Boolean).length<=130);assert.match(bulk,/Mixed values stay unchanged until you check Apply; unchecked values stay unchanged/);assert.doesNotMatch(bulk,/chip styling/,'bulk field instruction stays independently readable');
+});
