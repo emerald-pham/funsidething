@@ -72,7 +72,7 @@
   const colors=['#db947e','#a4c9bd','#e6c680','#ada9ce','#88b9cf','#e8b6c4'];
   const color=(seed,offset=0)=>S.mixHex(colors[Math.floor((seed*97+offset)%colors.length)],p.front,p.night*.35);
   const skinColor=seed=>S.skinTone(seed,p.night,p.city);
-  function personHead(ctx,x,y,rx,ry,seed,skin,hat=false,direction=1){
+  function personHead(ctx,x,y,rx,ry,seed,skin,hat=false,direction=null){
     const dir=direction===-1?-1:1;
     const appearance=LandscapeAppearance.person(seed),hair=S.mixHex(appearance.color,p.city,p.night*.4),style=appearance.style;
     // Hair belongs to an individual; protective headwear always takes precedence.
@@ -83,10 +83,10 @@
     }
     ellipse(ctx,x,y,rx,ry,skin);
     // A small forward profile makes the exposed face legible beneath every hairstyle.
-    if(!hat)ellipse(ctx,x+dir*rx*.9,y+ry*.1,rx*.25,ry*.28,skin);
+    if(!hat&&direction!==null)ellipse(ctx,x+dir*rx*.9,y+ry*.1,rx*.25,ry*.28,skin);
     if(!hat&&style!=='bald'){
       ellipse(ctx,x-dir*rx*.1,y-ry*.67,rx*1.07,ry*.55,hair);
-      if(style==='curly')for(let i=0;i<4;i++)ellipse(ctx,x+dir*(-rx+i*rx*.6),y-ry*.7-Math.sin(i)*ry*.4,rx*.48,ry*.48,hair);
+      if(style==='curly')for(let i=0;i<4;i++)ellipse(ctx,direction===null?x-rx+i*rx*.6:x+dir*(-rx+i*rx*.6),y-ry*.7-Math.sin(i)*ry*.4,rx*.48,ry*.48,hair);
     }
   }
   function layer(name,top){

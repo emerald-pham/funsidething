@@ -26017,3 +26017,10 @@ test('RISK clocktower human paint: children use shared skin and heads through fl
   assert.ok(strokes.some(args=>args[5]==='#647779'),'legs share ordinary human trousers');assert.equal(g.globalAlpha,1);
  }
 });
+
+test('RISK human inherited head paint: existing local-transform carriers retain paint while explicit profiles face travel',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),head=source.slice(source.indexOf('  function personHead('),source.indexOf('  function layer('));
+ const paint=(direction,explicit)=>{const ink=[];vm.runInNewContext(head+';personHead({},0,0,2,2,.4,"skin",false'+(explicit?',direction':'')+');',{direction,LandscapeAppearance:{person:()=>({style:'short',color:'hair'})},p:{night:0,city:'city'},S:{mixHex:x=>x},ellipse:(...args)=>ink.push(args)});return ink;};
+ assert.equal(paint(undefined,false).filter(args=>args[5]==='skin').length,1,'default inherited heads preserve accepted carrying paint');
+ for(const direction of [-1,1])assert.equal(paint(direction,true).filter(args=>args[5]==='skin').length,2,'explicit walking and clocktower profiles retain forward face detail');
+});
