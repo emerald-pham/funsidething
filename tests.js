@@ -25967,7 +25967,7 @@ test('RISK human profile paint: every hairstyle mirrors face and rear hair for e
   const paint=direction=>{const shapes=[];vm.runInNewContext(head+';personHead({},10,20,2,2,.4,"skin",hat,direction);',{LandscapeAppearance:{person:()=>({style,color:'hair'})},S:{mixHex:x=>x},p:{city:'city',night:0},ellipse:(_ctx,x,y,rx,ry,ink)=>shapes.push({x,y,rx,ry,ink}),hat,direction});return shapes;};
   const forward=paint(1),reverse=paint(-1);assert.equal(forward.length,reverse.length);
   forward.forEach((shape,i)=>{assert.equal(reverse[i].x,20-shape.x,style+' rear hair and face mirror');assert.deepEqual({...reverse[i],x:shape.x},shape);});
-  assert.ok(forward.some(s=>s.ink==='skin'&&s.x>11.5&&s.rx<1),'visible skin profile faces travel');
+  if(!hat)assert.ok(forward.some(s=>s.ink==='skin'&&s.x>11.5&&s.rx<1),'visible skin profile faces travel');
   if(hat)assert.ok(forward.every(s=>s.ink==='skin'),'headwear suppresses all hair');
  }
  const walk=source.slice(source.indexOf("if(e.type==='walker'||e.type==='dogwalker')"),source.indexOf("if(e.type==='walker'||e.type==='dogwalker')")+1600);

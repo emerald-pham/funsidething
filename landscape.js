@@ -83,7 +83,7 @@
     }
     ellipse(ctx,x,y,rx,ry,skin);
     // A small forward profile makes the exposed face legible beneath every hairstyle.
-    ellipse(ctx,x+dir*rx*.9,y+ry*.1,rx*.25,ry*.28,skin);
+    if(!hat)ellipse(ctx,x+dir*rx*.9,y+ry*.1,rx*.25,ry*.28,skin);
     if(!hat&&style!=='bald'){
       ellipse(ctx,x-dir*rx*.1,y-ry*.67,rx*1.07,ry*.55,hair);
       if(style==='curly')for(let i=0;i<4;i++)ellipse(ctx,x+dir*(-rx+i*rx*.6),y-ry*.7-Math.sin(i)*ry*.4,rx*.48,ry*.48,hair);
