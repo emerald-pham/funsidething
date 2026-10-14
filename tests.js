@@ -6268,6 +6268,7 @@ const benchAction = (scanHtml) => (scanHtml.match(/<div class="actionrow[^"]*">[
 
 test("UI: the benchmark's seven actions sit in one row beneath the purple card", async () => {
   const { ctx, shim } = await loadApp({ seed: 270 });
+  ctx.state.settings.showPostpone = true;
   ctx.addTask("Dotted task", true);
   ctx.render();
   const scanHtml = shim.elements.get("scan").innerHTML;
@@ -6305,6 +6306,7 @@ test("UI: no siderail hangs off the benchmark card any more", async () => {
 
 test("UI: every action in the benchmark's row shares the same .sm sizing", async () => {
   const { ctx, shim } = await loadApp({ seed: 273 });
+  ctx.state.settings.showPostpone = true;
   ctx.addTask("Dotted task", true);
   ctx.render();
   const row = benchAction(shim.elements.get("scan").innerHTML);

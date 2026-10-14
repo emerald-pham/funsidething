@@ -1,5 +1,28 @@
 [
   {
+    "testChangesSha256": "8411b2fdfe6b33f4df24749b24d4ad9d455a4c9366b39a81d20a9f92f5ca0010",
+    "reason": "User revised the unreleased visibility setting to positive Show Postpone: off only for verified fresh clients, on for pre-setting saved boards, preserve explicit choices. Retain prior Postpone feature assertions with explicit visible fixtures rather than weakening them. Reconciled once on verified released colors936ec4d, retaining all upstream palette/FAQ tests. Only test line positions changed; original feature RED chronology retained, integration syntax failure preserved and corrected by composing complete upstream tests with unchanged feature tail. Required full CI surfaced two additional existing seven-action benchmark fixtures. Explicitly enable the now-optional Postpone in those paint/order fixtures; retain every original action/order/count/sizing assertion, with fresh-off separately protected.",
+    "previousBehavior": "Prior source candidate used Hide Postpone default off for all boards. Fresh clients displayed Postpone, and no positive preference distinguished older saved boards.",
+    "intendedBehavior": "Show Postpone is off only at verified fresh initialization; existing local/cloud/import/recovery boards default on when absent, explicit booleans survive and native Settings consumer saves visibility without changing holds.",
+    "replacementTests": [
+      "RISK Show Postpone preference: actual Settings checkbox hides both scanner controls and restores them without changing tasks",
+      "RISK Show Postpone initialization: fresh browser and host clients default off while recovery evidence keeps visibility",
+      "RISK Show Postpone local adoption: saved empty legacy boards and explicit choices survive reload with future settings intact",
+      "RISK Show Postpone cloud adoption: missing legacy setting and explicit choices override fresh defaults at all supported revisions",
+      "RISK Show Postpone import: actual JSON consumer treats old settings as existing and preserves explicit choices and holds",
+      "RISK Show Postpone explicit visibility: saved booleans drive positive checkbox and both scanner surfaces",
+      "RISK Show Postpone normalization: explicit positive choices win and draft inverse choices migrate only when absent"
+    ],
+    "preservedCoverage": [
+      "All pre-existing Postpone behavior, sizing, theme, expiry, hold merge, Return, completion/Undo and cloud preservation assertions retained. Three rendered/consumer fixtures explicitly enable Postpone because requested fresh default now hides it.",
+      "Unrelated settings, unknown future keys, existing Halving initialization, corrupt/recovery storage and clean cloud adoption protection remain covered without changes."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK Show Postpone' tests.js",
+      "failure": "Observed six failing cases before delta implementation: fresh showPostpone undefined vs false; legacy local/cloud/import undefined vs true; explicit false still renders button (true vs false); inverse-draft normalization undefined vs false. Full output retained evidence/red-show-defaults.txt. Earlier original checkbox RED also retained red.txt. Postimplementation cohort initially exposed three existing visibility fixtures; their expected Postpone assertions were retained and fixtures explicitly enabled to honor the changed user default. Required CI38569469425/38569427273 observed exactly two failures: seven actions/order omitted bench-postpone and sizing expected7 received6. Independently reproduced both with node --test --test-name-pattern=\"UI: the benchmark's seven actions|UI: every action in the benchmark\" tests.js before fixture repair; red-seven-action-fixtures.txt and full CI logs retained. No app code, CSS, markup, saved-setting or acceptance change in this repair."
+    }
+  },
+  {
     "testChangesSha256": "671b34c525cb4c145e4efc2cdd2c1c641244f6d6bfc02baec81bdd968d8b4197",
     "reason": "User revised the unreleased visibility setting to positive Show Postpone: off only for verified fresh clients, on for pre-setting saved boards, preserve explicit choices. Retain prior Postpone feature assertions with explicit visible fixtures rather than weakening them. Reconciled once on verified released colors936ec4d, retaining all upstream palette/FAQ tests. Only test line positions changed; original feature RED chronology retained, integration syntax failure preserved and corrected by composing complete upstream tests with unchanged feature tail.",
     "previousBehavior": "Prior source candidate used Hide Postpone default off for all boards. Fresh clients displayed Postpone, and no positive preference distinguished older saved boards.",
