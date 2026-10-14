@@ -26187,3 +26187,49 @@ test('RISK blimp admission: full-budget and later overlapping visits reject comp
  const sunny=probe.LandscapeTimeline.create({seed,season:'summer',sunAt:()=>({altitude:30,azimuth:90})}).at(at);
  assert.equal(sunny.events.filter(e=>e.type==='blimp').length,0,'retain the real full-budget sunny fixture found during initial validation');
 });
+
+// Shadow audit: execute the actual visitor shadow pass, including its inherited alpha.
+test('RISK visitor shadows: seated height and activity opacity match the visible people',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ const code=source.slice(source.indexOf('  function paintGroundEventShadow('),source.indexOf('  function paintFestivalBarge('));
+ for(const type of ['picnic','couple','reader','kite'])for(const stand of [0,.5,1])for(const activityDuration of [undefined,180]){
+  const calls=[],stack=[],g={globalAlpha:1,save(){stack.push(this.globalAlpha);},restore(){this.globalAlpha=stack.pop();}};
+  const e={type,activityDuration},f=.97,visit={x:100,stand};
+  vm.runInNewContext(code+';paintGroundEventShadow(e);',{e,g,W:390,p:{hill:'#456'},trail:x=>30+x*.01,geometry:{routeProgress:()=>f,motionProgress:()=>f,visitPose:()=>visit},S:{smooth:(a,b,x)=>{const t=Math.max(0,Math.min(1,(x-a)/(b-a)));return t*t*(3-2*t);}},paintGroundShadow:(ctx,x,y,height,width)=>calls.push({x,y,height,width,alpha:ctx.globalAlpha})});
+  assert.equal(calls.length,type==='picnic'||type==='couple'?2:1);
+  for(const c of calls){assert.equal(c.height,type==='kite'?14:10+4*stand,`${type} shade follows seated/standing crossfade`);assert.equal(c.y,30+c.x*.01+20);assert.equal(c.alpha,1,`${type} visible end-of-visit people retain full shadows`);}
+ }
+});
+
+test('RISK crossing shadows: opaque actors and skater departure use the actual paint alpha',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),code=source.slice(source.indexOf('  function paintGroundEventShadow('),source.indexOf('  function paintFestivalBarge('));
+ for(const type of ['walker','dogwalker','cyclist','hoverboard','scooter','skateboarder','rollerskater'])for(const f of [.03,.97]){
+  const calls=[],stack=[],g={globalAlpha:1,save(){stack.push(this.globalAlpha);},restore(){this.globalAlpha=stack.pop();}};
+  const smooth=(a,b,x)=>{const t=Math.max(0,Math.min(1,(x-a)/(b-a)));return t*t*(3-2*t);};
+  vm.runInNewContext(code+';paintGroundEventShadow(e);',{e:{type,count:1},g,W:390,p:{hill:'#456'},trail:()=>50,geometry:{routeProgress:()=>f,pack:x=>[{x}],groundPose:()=>({x:80,y:55}),dogPose:()=>({x:96,y:55})},S:{smooth},paintGroundShadow:ctx=>calls.push(ctx.globalAlpha)});
+  assert.ok(calls.length>0);const expected=['skateboarder','rollerskater'].includes(type)?1-smooth(.94,1,f):1;
+  calls.forEach(alpha=>assert.equal(alpha,expected,`${type}, progress ${f}: shadow matches actor opacity`));
+ }
+});
+test('RISK rider shadows: phone scale matches cyclists scooters and hoverboards',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),code=source.slice(source.indexOf('  function paintGroundEventShadow('),source.indexOf('  function paintFestivalBarge('));
+ for(const W of [390,844,1440])for(const type of ['cyclist','hoverboard','scooter']){
+  const calls=[],g={globalAlpha:1,save(){},restore(){}},scale=W<600?.85:1;
+  vm.runInNewContext(code+';paintGroundEventShadow(e);',{e:{type,count:1},g,W,p:{hill:'#456'},trail:()=>50,geometry:{routeProgress:()=>.5,pack:x=>[{x}]},S:{smooth:()=>1},paintGroundShadow:(ctx,x,y,h,w)=>calls.push({h,w})});
+  assert.equal(calls.length,1);assert.equal(calls[0].h,(type==='cyclist'?15:18)*scale);assert.equal(calls[0].w,12*scale);
+ }
+});
+test('RISK woodland shadows: projected height shrinks with the painted depth scale',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),code=source.slice(source.indexOf('  function paintWoodland('),source.indexOf('  function reflectWaterObject('));
+ for(const type of ['deer','rabbit','fox','raccoon'])for(const scale of [.65,1,1.2]){
+  let shade;const stop={},g={save(){},globalAlpha:1};
+  try{vm.runInNewContext(code+';paintWoodland(e);',{e:{type},g,p:{front:'#456',night:0},geometry:{woodlandPose:()=>({x:40,y:70,scale}),motionProgress:()=>.5},S:{mixHex:()=> '#456',smooth:()=>.5},paintGroundShadow:(ctx,x,y,h,w)=>{shade={h,w};throw stop;}});}catch(error){if(error!==stop)throw error;}
+  assert.equal(shade.h,(type==='deer'?19:type==='rabbit'?8:11)*scale);assert.ok(shade.w>0);
+ }
+});
+test('RISK shadow FAQ: mounted guidance explains pose light and scenery-only changes',async()=>{
+ const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ const answer=[...help.matchAll(/<dt>(.*?)<\/dt><dd>(.*?)<\/dd>/g)].find(x=>x[1]==='Why do scenery shadows change?')?.[2];
+ assert.ok(answer,'shadow guidance belongs beside the existing scenery answers');assert.match(answer,/Sun or Moon/);assert.match(answer,/Seated visitors/);assert.match(answer,/phone and depth scale/);assert.match(answer,/saved tasks/);
+ assert.match(html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1],/Visitor shadows now follow seated and standing poses, visible opacity, and phone or depth scale/);
+});

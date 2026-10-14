@@ -560,22 +560,30 @@
     const x=-160+progress*(W+320),fade=S.smooth(0,.06,f)*(1-S.smooth(.94,1,f));
     g.save();g.globalAlpha*=fade;
     if(e.type==='cyclist'){
+      g.globalAlpha=1;const scale=W<600?.85:1;
       geometry.pack(x,e.count||S.groupSize('cyclist',e.seed),e.reverse).forEach(pose=>
-        paintGroundShadow(g,pose.x,trail(pose.x),15,12,p.hill));
+        paintGroundShadow(g,pose.x,trail(pose.x),15*scale,12*scale,p.hill));
     }else if(['reader','picnic','couple','kite'].includes(e.type)){
-      const visit=geometry.visitPose(e,geometry.motionProgress(e,'x'));
+      const motion=geometry.motionProgress(e,'x'),visit=geometry.visitPose(e,motion);
+      // Visitors use their own arrival/standing crossfade, not the crossing
+      // fade: a seated picnicker is shorter, and a departing walker stays opaque.
+      g.globalAlpha=e.activityDuration?1:S.smooth(0,.04,motion);
+      const height=e.type==='kite'?14:10+4*visit.stand;
       for(const offset of e.type==='picnic'||e.type==='couple'?[-11,11]:[0]){
-        const xx=visit.x+offset;paintGroundShadow(g,xx,trail(xx)+20,14,7,p.hill);
+        const xx=visit.x+offset;paintGroundShadow(g,xx,trail(xx)+20,height,7,p.hill);
       }
     }else if(['walker','dogwalker','rabbit','deer'].includes(e.type)){
       const pose=geometry.groundPose(e.type==='dogwalker'?'walker':e.type,e);
+      if(e.type==='walker'||e.type==='dogwalker')g.globalAlpha=1;
       paintGroundShadow(g,pose.x,pose.y,e.type==='deer'?18:e.type==='rabbit'?6:14,e.type==='deer'?15:7,p.hill);
       if(e.type==='dogwalker'){
         const dog=geometry.dogPose(pose.x,pose.distance,pose.direction);
         paintGroundShadow(g,dog.x,dog.y,7,9,p.hill);
       }
     }else if(['skateboarder','rollerskater','hoverboard','scooter'].includes(e.type)){
-      paintGroundShadow(g,x,trail(x),18,12,p.hill);
+      const skater=e.type==='skateboarder'||e.type==='rollerskater',scale=skater?1:W<600?.85:1;
+      g.globalAlpha=skater?1-S.smooth(.94,1,f):1;
+      paintGroundShadow(g,x,trail(x),18*scale,12*scale,p.hill);
     }else if(e.type==='abduction'){
       const lift=Math.sin(S.clamp((geometry.motionProgress(e,'y')-.25)/.5)*Math.PI);
       if(lift<.1){
@@ -944,7 +952,7 @@
     const fur=S.mixHex(deer?'#bda181':rabbit?'#a99d88':fox?'#b7764f':'#92958c',p.front,p.night*.45);
     const bodyY=deer?-11:rabbit?-4:-6,hipY=deer?-9:-4,half=deer?7:rabbit?3:5;
     g.save();g.globalAlpha=S.smooth(0,.1,f)*(1-S.smooth(.85,1,f));
-    paintGroundShadow(g,pose.x,pose.y,deer?19:rabbit?8:11,(half+2)*pose.scale*2,p.front);
+    paintGroundShadow(g,pose.x,pose.y,(deer?19:rabbit?8:11)*pose.scale,(half+2)*pose.scale*2,p.front);
     g.translate(pose.x,pose.y);g.scale(pose.direction*pose.scale,pose.scale);
     for(const [hip,offset] of [[-half*.65,0],[half*.65,.5]]){
       const step=geometry.strideFoot(pose.distance/pose.scale,5,offset),kneeX=hip+step.x*.45;
