@@ -1096,3 +1096,6 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - `RISK patterned context direction cue: contrasting full-control rails leave original check and X glyphs untouched`
 - `RISK patterned indicator slope legend: FAQ distinguishes locked selections and unset location from ordinary selected controls` — Covers semantic exceptions in the appearance legend.
 - `RISK patterned indicators absent root: both preference states safely defer paint until a document root exists` — Preserves established non-DOM startup and resumed paint behavior.
+
+- RISK transit line livery: actual painter keeps line colors across cars directions reloads and day-night shading
+- RISK transit line guidance: extended scenery FAQ explains stable line colors without new settings

@@ -544,7 +544,8 @@
       // their own shade. Only the lower train needs a ground-contact shadow.
       if(isTrain)paintRailVehicleShadow(g,xx,track(xx),11,cw*scale,cars[i].angle,p.front);
       g.save();g.translate(xx,cars[i].y-2);g.rotate(cars[i].angle);g.scale(dir*scale,scale);
-      g.fillStyle=S.mixHex(isTrain?'#e4cfa5':'#dceade',p.city,p.night*.3);g.beginPath();g.roundRect(-cw/2,-10,cw,8,2);g.fill();
+      // Livery belongs to the physical line, never to a departure or random draw.
+      g.fillStyle=S.mixHex(isTrain?'#c78d76':'#78aaa5',p.city,p.night*.3);g.beginPath();g.roundRect(-cw/2,-10,cw,8,2);g.fill();
       g.fillStyle=isTrain?'#bb8275':'#77a8a2';g.fillRect(-cw/2,-5,cw,2);
       g.fillStyle=p.night>.4?'#edce89':'#71969c';for(let j=3;j<cw-3;j+=5)g.fillRect(-cw/2+j,-8,3,2);
       ellipse(g,-cw/2+4,-1,1.5,1.5,p.city);ellipse(g,cw/2-4,-1,1.5,1.5,p.city);g.restore();
