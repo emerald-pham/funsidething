@@ -1,5 +1,49 @@
 [
   {
+    "testChangesSha256": "2fbdd859fecc6f5f9b68436e2fb9177a8956cd894fbe0abd81e272750ba3de5b",
+    "reason": "Integrate already released Show Postpone and Top X changes into the preserved blimp branch while retaining their exact code and tests. Bind the inherited executable test delta to the actual previous remote tip comparison.",
+    "previousBehavior": "Previous remote blimp tip6ffa421 predates released Show Postpone and Top X; those inherited test changes appear in incremental push CI.",
+    "intendedBehavior": "Approved seeded blimps coexist with byte-preserved incoming features and tests; independent opportunities and complete-crossing capacity remain unchanged, with concise accurate FAQ and current shell fingerprints.",
+    "replacementTests": [
+      "RISK Show Postpone preference: actual Settings checkbox hides both scanner controls and restores them without changing tasks",
+      "RISK Show Postpone initialization: fresh browser and host clients default off while recovery evidence keeps visibility",
+      "RISK Show Postpone local adoption: saved empty legacy boards and explicit choices survive reload with future settings intact",
+      "RISK Show Postpone cloud adoption: missing legacy setting and explicit choices override fresh defaults at all supported revisions",
+      "RISK Show Postpone import: actual JSON consumer treats old settings as existing and preserves explicit choices and holds",
+      "RISK Show Postpone explicit visibility: saved booleans drive positive checkbox and both scanner surfaces",
+      "RISK Show Postpone normalization: explicit positive choices win and draft inverse choices migrate only when absent",
+      "RISK task history: compact Top X uses recorded snapshots and preserves legacy facts",
+      "RISK history browser driver: first-run motion uses the supported choice before history fixtures"
+    ],
+    "preservedCoverage": [
+      "All98a5540 tests remain an exact prefix of final tests.js; three original approved blimp tests append unchanged, preserving saved defaults, cloud/import/Undo, Top X snapshots, colors and gait contracts.",
+      "Integration adds no new behavior beyond previously tested blimp design and separately released features; original discriminating RED chronology and existing fullCI evidence remain retained and are not relabeled as a new preimplementation run."
+    ],
+    "redEvidence": {
+      "command": "Original blimp preimplementation and6ffa baseRED: node --test --test-name-pattern='^RISK blimp' tests.js; inherited feature RED commands retained verbatim in released main rationale records",
+      "failure": "Original blimp RED observed missing admitted event, painter and visitor FAQ before implementation; original162word FAQ failure was fixed without weakening130word guard. No new functional behavior is implemented during this merge; incoming Show Postpone and Top X RED records remain preserved. Changed-base focused/regression checks are new GREEN qualification, not new contemporaneous RED."
+    }
+  },
+  {
+    "testChangesSha256": "861a3c253e8f419fb46281542be3cc3baf004f8c74eece357f6b919a235200e6",
+    "reason": "Reconcile the user-approved blimp onto the newly released Show Postpone and Top X main base without changing its design, scheduling streams, or incoming feature contracts.",
+    "previousBehavior": "Released98a5540 includes Show Postpone and Top X but no blimp opportunity, painter, or dedicated blimp FAQ.",
+    "intendedBehavior": "Approved seeded blimps coexist with byte-preserved incoming features and tests; independent opportunities and complete-crossing capacity remain unchanged, with concise accurate FAQ and current shell fingerprints.",
+    "replacementTests": [
+      "RISK blimp schedule: independent seeded opportunities preserve existing scenes and reconstruct across clients",
+      "RISK blimp paint: seeded envelopes retain offscreen margins day-night shading and reduced-motion consumer",
+      "RISK blimp admission: full-budget and later overlapping visits reject complete crossings without eviction"
+    ],
+    "preservedCoverage": [
+      "All98a5540 tests remain an exact prefix of final tests.js; three original approved blimp tests append unchanged, preserving saved defaults, cloud/import/Undo, Top X snapshots, colors and gait contracts.",
+      "Integration adds no new behavior beyond previously tested blimp design and separately released features; original discriminating RED chronology and existing fullCI evidence remain retained and are not relabeled as a new preimplementation run."
+    ],
+    "redEvidence": {
+      "command": "Original blimp preimplementation and6ffa baseRED: node --test --test-name-pattern='^RISK blimp' tests.js; inherited feature RED commands retained verbatim in released main rationale records",
+      "failure": "Original blimp RED observed missing admitted event, painter and visitor FAQ before implementation; original162word FAQ failure was fixed without weakening130word guard. No new functional behavior is implemented during this merge; incoming Show Postpone and Top X RED records remain preserved. Changed-base focused/regression checks are new GREEN qualification, not new contemporaneous RED."
+    }
+  },
+  {
     "testChangesSha256": "52d43ad91b25a6218f50fcd9e55fded49ec27933e7af2e76a95deadc882f65ba",
     "reason": "Integrate the user-approved independent blimp visitor onto released colors without changing any existing scene schedule, seed sequence, data or protected color/gait assertions.",
     "previousBehavior": "The released colors base has no blimp opportunity or painter and its FAQ does not explain blimp visits.",
@@ -16,6 +60,113 @@
     "redEvidence": {
       "command": "node --test --test-name-pattern='^RISK blimp' tests.js on released936ec4d source before approved blimp implementation",
       "failure": "Observed two behavioral failures: independent opportunity produced zero blimps, and extended FAQ lacked the new visitor. Prior original painter-absence RED and162word FAQ-budget RED are retained; nine integrated focused checks now pass."
+    }
+  },
+  {
+    "testChangesSha256": "418cb1ddae1a960e5a8f4ae9c71c43160d5e7989c97f01ad3622c299898f53c3",
+    "reason": "User-requested fresh OFF default makes Postpone optional. Preserve complete seven-action order/count/sm contracts with explicit Show ON fixtures and accurate scoped titles. Record exact protected fingerprints for PR main base and previous pushed heads because CI compares each event independently. No assertion removal or gate implementation change.",
+    "previousBehavior": "Prior source candidate used Hide Postpone default off for all boards. Fresh clients displayed Postpone, and no positive preference distinguished older saved boards.",
+    "intendedBehavior": "Show Postpone is off only at verified fresh initialization; existing local/cloud/import/recovery boards default on when absent, explicit booleans survive and native Settings consumer saves visibility without changing holds.",
+    "replacementTests": [
+      "UI: with Postpone shown, the benchmark's seven actions sit in one row beneath the purple card",
+      "UI: with Postpone shown, every action in the benchmark's row shares the same .sm sizing"
+    ],
+    "preservedCoverage": [
+      "All pre-existing Postpone behavior, sizing, theme, expiry, hold merge, Return, completion/Undo and cloud preservation assertions retained. Three rendered/consumer fixtures explicitly enable Postpone because requested fresh default now hides it.",
+      "Unrelated settings, unknown future keys, existing Halving initialization, corrupt/recovery storage and clean cloud adoption protection remain covered without changes."
+    ],
+    "redEvidence": {
+      "command": "node scripts/test-first-gate.mjs 26051ecc617d6482c3d4094ebecd9b0382b53815",
+      "failure": "Observed local and CI38571538721 RED: incremental push compare had no matching exact fingerprint though PR-base record existed. Preserved red-incremental-diff-gate.txt and ci-failed-38571538721.txt. Earlier both benchmark fixtures observed RED before opt-in repair in red-seven-action-fixtures.txt (missing bench-postpone/count6 instead7). Add exact records and title their existing visible-state scope; every original action/order/count/sm assertion unchanged."
+    }
+  },
+  {
+    "testChangesSha256": "c9c59431eee239899b74c237df70679cfe82141252a27878d6cd3bf1b72402c8",
+    "reason": "User-requested fresh OFF default makes Postpone optional. Preserve complete seven-action order/count/sm contracts with explicit Show ON fixtures and accurate scoped titles. Record exact protected fingerprints for PR main base and previous pushed heads because CI compares each event independently. No assertion removal or gate implementation change.",
+    "previousBehavior": "Prior source candidate used Hide Postpone default off for all boards. Fresh clients displayed Postpone, and no positive preference distinguished older saved boards.",
+    "intendedBehavior": "Show Postpone is off only at verified fresh initialization; existing local/cloud/import/recovery boards default on when absent, explicit booleans survive and native Settings consumer saves visibility without changing holds.",
+    "replacementTests": [
+      "UI: with Postpone shown, the benchmark's seven actions sit in one row beneath the purple card",
+      "UI: with Postpone shown, every action in the benchmark's row shares the same .sm sizing"
+    ],
+    "preservedCoverage": [
+      "All pre-existing Postpone behavior, sizing, theme, expiry, hold merge, Return, completion/Undo and cloud preservation assertions retained. Three rendered/consumer fixtures explicitly enable Postpone because requested fresh default now hides it.",
+      "Unrelated settings, unknown future keys, existing Halving initialization, corrupt/recovery storage and clean cloud adoption protection remain covered without changes."
+    ],
+    "redEvidence": {
+      "command": "node scripts/test-first-gate.mjs 26051ecc617d6482c3d4094ebecd9b0382b53815",
+      "failure": "Observed local and CI38571538721 RED: incremental push compare had no matching exact fingerprint though PR-base record existed. Preserved red-incremental-diff-gate.txt and ci-failed-38571538721.txt. Earlier both benchmark fixtures observed RED before opt-in repair in red-seven-action-fixtures.txt (missing bench-postpone/count6 instead7). Add exact records and title their existing visible-state scope; every original action/order/count/sm assertion unchanged."
+    }
+  },
+  {
+    "testChangesSha256": "a5f92d6c7ccefa8b574675a0775e6cba2cb6ddef1128434a2022349c749853b4",
+    "reason": "User-requested fresh OFF default makes Postpone optional. Preserve complete seven-action order/count/sm contracts with explicit Show ON fixtures and accurate scoped titles. Record exact protected fingerprints for PR main base and previous pushed heads because CI compares each event independently. No assertion removal or gate implementation change.",
+    "previousBehavior": "Prior source candidate used Hide Postpone default off for all boards. Fresh clients displayed Postpone, and no positive preference distinguished older saved boards.",
+    "intendedBehavior": "Show Postpone is off only at verified fresh initialization; existing local/cloud/import/recovery boards default on when absent, explicit booleans survive and native Settings consumer saves visibility without changing holds.",
+    "replacementTests": [
+      "RISK Show Postpone preference: actual Settings checkbox hides both scanner controls and restores them without changing tasks",
+      "RISK Show Postpone initialization: fresh browser and host clients default off while recovery evidence keeps visibility",
+      "RISK Show Postpone local adoption: saved empty legacy boards and explicit choices survive reload with future settings intact",
+      "RISK Show Postpone cloud adoption: missing legacy setting and explicit choices override fresh defaults at all supported revisions",
+      "RISK Show Postpone import: actual JSON consumer treats old settings as existing and preserves explicit choices and holds",
+      "RISK Show Postpone explicit visibility: saved booleans drive positive checkbox and both scanner surfaces",
+      "RISK Show Postpone normalization: explicit positive choices win and draft inverse choices migrate only when absent",
+      "UI: with Postpone shown, the benchmark's seven actions sit in one row beneath the purple card",
+      "UI: with Postpone shown, every action in the benchmark's row shares the same .sm sizing"
+    ],
+    "preservedCoverage": [
+      "All pre-existing Postpone behavior, sizing, theme, expiry, hold merge, Return, completion/Undo and cloud preservation assertions retained. Three rendered/consumer fixtures explicitly enable Postpone because requested fresh default now hides it.",
+      "Unrelated settings, unknown future keys, existing Halving initialization, corrupt/recovery storage and clean cloud adoption protection remain covered without changes."
+    ],
+    "redEvidence": {
+      "command": "node scripts/test-first-gate.mjs 26051ecc617d6482c3d4094ebecd9b0382b53815",
+      "failure": "Observed local and CI38571538721 RED: incremental push compare had no matching exact fingerprint though PR-base record existed. Preserved red-incremental-diff-gate.txt and ci-failed-38571538721.txt. Earlier both benchmark fixtures observed RED before opt-in repair in red-seven-action-fixtures.txt (missing bench-postpone/count6 instead7). Add exact records and title their existing visible-state scope; every original action/order/count/sm assertion unchanged."
+    }
+  },
+  {
+    "testChangesSha256": "8411b2fdfe6b33f4df24749b24d4ad9d455a4c9366b39a81d20a9f92f5ca0010",
+    "reason": "User revised the unreleased visibility setting to positive Show Postpone: off only for verified fresh clients, on for pre-setting saved boards, preserve explicit choices. Retain prior Postpone feature assertions with explicit visible fixtures rather than weakening them. Reconciled once on verified released colors936ec4d, retaining all upstream palette/FAQ tests. Only test line positions changed; original feature RED chronology retained, integration syntax failure preserved and corrected by composing complete upstream tests with unchanged feature tail. Required full CI surfaced two additional existing seven-action benchmark fixtures. Explicitly enable the now-optional Postpone in those paint/order fixtures; retain every original action/order/count/sizing assertion, with fresh-off separately protected.",
+    "previousBehavior": "Prior source candidate used Hide Postpone default off for all boards. Fresh clients displayed Postpone, and no positive preference distinguished older saved boards.",
+    "intendedBehavior": "Show Postpone is off only at verified fresh initialization; existing local/cloud/import/recovery boards default on when absent, explicit booleans survive and native Settings consumer saves visibility without changing holds.",
+    "replacementTests": [
+      "RISK Show Postpone preference: actual Settings checkbox hides both scanner controls and restores them without changing tasks",
+      "RISK Show Postpone initialization: fresh browser and host clients default off while recovery evidence keeps visibility",
+      "RISK Show Postpone local adoption: saved empty legacy boards and explicit choices survive reload with future settings intact",
+      "RISK Show Postpone cloud adoption: missing legacy setting and explicit choices override fresh defaults at all supported revisions",
+      "RISK Show Postpone import: actual JSON consumer treats old settings as existing and preserves explicit choices and holds",
+      "RISK Show Postpone explicit visibility: saved booleans drive positive checkbox and both scanner surfaces",
+      "RISK Show Postpone normalization: explicit positive choices win and draft inverse choices migrate only when absent"
+    ],
+    "preservedCoverage": [
+      "All pre-existing Postpone behavior, sizing, theme, expiry, hold merge, Return, completion/Undo and cloud preservation assertions retained. Three rendered/consumer fixtures explicitly enable Postpone because requested fresh default now hides it.",
+      "Unrelated settings, unknown future keys, existing Halving initialization, corrupt/recovery storage and clean cloud adoption protection remain covered without changes."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK Show Postpone' tests.js",
+      "failure": "Observed six failing cases before delta implementation: fresh showPostpone undefined vs false; legacy local/cloud/import undefined vs true; explicit false still renders button (true vs false); inverse-draft normalization undefined vs false. Full output retained evidence/red-show-defaults.txt. Earlier original checkbox RED also retained red.txt. Postimplementation cohort initially exposed three existing visibility fixtures; their expected Postpone assertions were retained and fixtures explicitly enabled to honor the changed user default. Required CI38569469425/38569427273 observed exactly two failures: seven actions/order omitted bench-postpone and sizing expected7 received6. Independently reproduced both with node --test --test-name-pattern=\"UI: the benchmark's seven actions|UI: every action in the benchmark\" tests.js before fixture repair; red-seven-action-fixtures.txt and full CI logs retained. No app code, CSS, markup, saved-setting or acceptance change in this repair."
+    }
+  },
+  {
+    "testChangesSha256": "671b34c525cb4c145e4efc2cdd2c1c641244f6d6bfc02baec81bdd968d8b4197",
+    "reason": "User revised the unreleased visibility setting to positive Show Postpone: off only for verified fresh clients, on for pre-setting saved boards, preserve explicit choices. Retain prior Postpone feature assertions with explicit visible fixtures rather than weakening them. Reconciled once on verified released colors936ec4d, retaining all upstream palette/FAQ tests. Only test line positions changed; original feature RED chronology retained, integration syntax failure preserved and corrected by composing complete upstream tests with unchanged feature tail.",
+    "previousBehavior": "Prior source candidate used Hide Postpone default off for all boards. Fresh clients displayed Postpone, and no positive preference distinguished older saved boards.",
+    "intendedBehavior": "Show Postpone is off only at verified fresh initialization; existing local/cloud/import/recovery boards default on when absent, explicit booleans survive and native Settings consumer saves visibility without changing holds.",
+    "replacementTests": [
+      "RISK Show Postpone preference: actual Settings checkbox hides both scanner controls and restores them without changing tasks",
+      "RISK Show Postpone initialization: fresh browser and host clients default off while recovery evidence keeps visibility",
+      "RISK Show Postpone local adoption: saved empty legacy boards and explicit choices survive reload with future settings intact",
+      "RISK Show Postpone cloud adoption: missing legacy setting and explicit choices override fresh defaults at all supported revisions",
+      "RISK Show Postpone import: actual JSON consumer treats old settings as existing and preserves explicit choices and holds",
+      "RISK Show Postpone explicit visibility: saved booleans drive positive checkbox and both scanner surfaces",
+      "RISK Show Postpone normalization: explicit positive choices win and draft inverse choices migrate only when absent"
+    ],
+    "preservedCoverage": [
+      "All pre-existing Postpone behavior, sizing, theme, expiry, hold merge, Return, completion/Undo and cloud preservation assertions retained. Three rendered/consumer fixtures explicitly enable Postpone because requested fresh default now hides it.",
+      "Unrelated settings, unknown future keys, existing Halving initialization, corrupt/recovery storage and clean cloud adoption protection remain covered without changes."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK Show Postpone' tests.js",
+      "failure": "Observed six failing cases before delta implementation: fresh showPostpone undefined vs false; legacy local/cloud/import undefined vs true; explicit false still renders button (true vs false); inverse-draft normalization undefined vs false. Full output retained evidence/red-show-defaults.txt. Earlier original checkbox RED also retained red.txt. Postimplementation cohort initially exposed three existing visibility fixtures; their expected Postpone assertions were retained and fixtures explicitly enabled to honor the changed user default."
     }
   },
   {
@@ -6687,6 +6838,161 @@
     "redEvidence": {
       "command": "node --test --test-name-pattern='RISK legacy context|RISK context checkbox fallback' tests.js; node --test --test-name-pattern='RISK context filter restoration|RISK context selector fallback isolation' tests.js",
       "failure": "Contemporaneous RED retained in evidence/incident-red.log and filter-fallback-red.log: missing future-id after Save, missing inactive context filter, unguarded hidden indicators and invalidating comma selectors. Initial test harness errors retained and corrected before app edit. specialist-added-tests-retrospective-red.txt records later coverage discrimination, not implementation chronology."
+    }
+  },
+  {
+    "testChangesSha256": "0a12222ebf6abb738cc74c628e0bd8eaa2f31a1d6ad127ec1b4cced9b102c8e0",
+    "reason": "User revised the unreleased visibility setting to positive Show Postpone: off only for verified fresh clients, on for pre-setting saved boards, preserve explicit choices. Retain prior Postpone feature assertions with explicit visible fixtures rather than weakening them.",
+    "previousBehavior": "Prior source candidate used Hide Postpone default off for all boards. Fresh clients displayed Postpone, and no positive preference distinguished older saved boards.",
+    "intendedBehavior": "Show Postpone is off only at verified fresh initialization; existing local/cloud/import/recovery boards default on when absent, explicit booleans survive and native Settings consumer saves visibility without changing holds.",
+    "replacementTests": [
+      "RISK Show Postpone preference: actual Settings checkbox hides both scanner controls and restores them without changing tasks",
+      "RISK Show Postpone initialization: fresh browser and host clients default off while recovery evidence keeps visibility",
+      "RISK Show Postpone local adoption: saved empty legacy boards and explicit choices survive reload with future settings intact",
+      "RISK Show Postpone cloud adoption: missing legacy setting and explicit choices override fresh defaults at all supported revisions",
+      "RISK Show Postpone import: actual JSON consumer treats old settings as existing and preserves explicit choices and holds",
+      "RISK Show Postpone explicit visibility: saved booleans drive positive checkbox and both scanner surfaces",
+      "RISK Show Postpone normalization: explicit positive choices win and draft inverse choices migrate only when absent"
+    ],
+    "preservedCoverage": [
+      "All pre-existing Postpone behavior, sizing, theme, expiry, hold merge, Return, completion/Undo and cloud preservation assertions retained. Three rendered/consumer fixtures explicitly enable Postpone because requested fresh default now hides it.",
+      "Unrelated settings, unknown future keys, existing Halving initialization, corrupt/recovery storage and clean cloud adoption protection remain covered without changes."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK Show Postpone' tests.js",
+      "failure": "Observed six failing cases before delta implementation: fresh showPostpone undefined vs false; legacy local/cloud/import undefined vs true; explicit false still renders button (true vs false); inverse-draft normalization undefined vs false. Full output retained evidence/red-show-defaults.txt. Earlier original checkbox RED also retained red.txt. Postimplementation cohort initially exposed three existing visibility fixtures; their expected Postpone assertions were retained and fixtures explicitly enabled to honor the changed user default."
+    }
+  },
+  {
+    "testChangesSha256": "abdd4e975e7967f0df97d3d22248c8f17f67d73624298e4f72e53a895eee1731",
+    "reason": "Protect the requested saved visibility toggle through the real Settings change consumer and both scanner surfaces.",
+    "previousBehavior": "The scanner always displays Postpone and no saved preference exists to hide it.",
+    "intendedBehavior": "Hide Postpone defaults off, saves immediately and hides both controls while preserving existing task holds and scanner state.",
+    "replacementTests": [
+      "RISK Hide Postpone preference: actual Settings checkbox hides both scanner controls and restores them without changing tasks"
+    ],
+    "preservedCoverage": [
+      "Existing postpone duration, eligibility, completion/Undo, concurrent holds and cloud reconciliation assertions remain unchanged."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK Hide Postpone' tests.js",
+      "failure": "Observed before implementation: absent saved preference defaults off failed with actual undefined versus expected false. Full output retained in task-2/evidence/red.txt."
+    }
+  },
+  {
+    "testChangesSha256": "faa4ff8bf4d381c47b29c0831746d6b3a25eae3cb94c06e32d60366c0a192dc6",
+    "reason": "Add direct compact history snapshot coverage without altering existing metric contracts.",
+    "previousBehavior": "Compact events omit saved Top X cutoff transitions.",
+    "intendedBehavior": "Compact events render saved cutoff transitions and explicitly unavailable historical cutoffs.",
+    "replacementTests": [
+      "RISK task history: compact Top X uses recorded snapshots and preserves legacy facts"
+    ],
+    "preservedCoverage": [
+      "Existing likelihood, plain Done, ranking, storage and synchronization contracts are unchanged."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK task history: compact Top X' tests.js",
+      "failure": "Observed before implementation: expected Top X 2 of 7 → 4 of 9; actual Likelihood 46.49% / Score 29.21 / Uncertainty 7.19. Evidence /tmp/topx-red.txt. Delta RED /tmp/topx-slash-red.txt observed separate metric line assertion fail on > / Top X before removing slash."
+    }
+  },
+  {
+    "testChangesSha256": "a958a7cd87f0c00000834048313de79fc2d892d85c6db8feb1751aa5a823b9ca",
+    "reason": "Add direct compact history snapshot coverage without altering existing metric contracts. Rendered phone review found an orphaned slash on the separate Top X line; add a direct punctuation assertion.",
+    "previousBehavior": "Compact events omit saved Top X cutoff transitions.",
+    "intendedBehavior": "Compact events render saved cutoff transitions and explicitly unavailable historical cutoffs.",
+    "replacementTests": [
+      "RISK task history: compact Top X uses recorded snapshots and preserves legacy facts"
+    ],
+    "preservedCoverage": [
+      "Existing likelihood, plain Done, ranking, storage and synchronization contracts are unchanged."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK task history: compact Top X' tests.js",
+      "failure": "Observed before implementation: expected Top X 2 of 7 → 4 of 9; actual Likelihood 46.49% / Score 29.21 / Uncertainty 7.19. Evidence /tmp/topx-red.txt. Delta RED /tmp/topx-slash-red.txt observed separate metric line assertion fail on > / Top X before removing slash."
+    }
+  },
+  {
+    "testChangesSha256": "de6cb44b03e768faf56ff40515b95d05be20bd1e9d1d31baadd23e2fc01dd23c",
+    "reason": "Correct only the existing isolated browser history driver to complete supported first-run motion choice; preserve the observed prior browser failure.",
+    "previousBehavior": "Driver seeds obsolete untimed reduced string and directly dismisses dialog; cold reload asks again and intercepts Undo.",
+    "intendedBehavior": "Driver clicks real Reduced motion button and verifies supported timed browser-local choice before history setup, allowing reload to honor actual consent.",
+    "replacementTests": [
+      "RISK history browser driver: first-run motion uses the supported choice before history fixtures",
+      "RISK task history: compact Top X uses recorded snapshots and preserves legacy facts"
+    ],
+    "preservedCoverage": [
+      "All prior pagination, drafts, layout, offline reload, saved history and completion/Undo assertions remain intact. No product or consent code changes."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK history browser driver:' tests.js",
+      "failure": "Observed RED before driver edit: expected supported #motionDialog Reduced motion button click, absent from existing history driver. /tmp/topx-driver-red.txt. Earlier real browser failure preserved at /tmp/topx-browser-history.txt. Original Top X RED /tmp/topx-red.txt and punctuation delta RED /tmp/topx-slash-red.txt retained."
+    }
+  },
+  {
+    "testChangesSha256": "37049a9fe8c76cd74034252bbd4c80e9a83a3f5bf18ad0b7ad72237f6b9ece15",
+    "reason": "Correct only the existing isolated browser history driver to complete supported first-run motion choice; preserve the observed prior browser failure. Also retains the contemporaneous snapshot display and punctuation RED evidence from prior candidate records.",
+    "previousBehavior": "Driver seeds obsolete untimed reduced string and directly dismisses dialog; cold reload asks again and intercepts Undo.",
+    "intendedBehavior": "Driver clicks real Reduced motion button and verifies supported timed browser-local choice before history setup, allowing reload to honor actual consent.",
+    "replacementTests": [
+      "RISK history browser driver: first-run motion uses the supported choice before history fixtures",
+      "RISK task history: compact Top X uses recorded snapshots and preserves legacy facts"
+    ],
+    "preservedCoverage": [
+      "All prior pagination, drafts, layout, offline reload, saved history and completion/Undo assertions remain intact. No product or consent code changes."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK history browser driver:' tests.js",
+      "failure": "Observed RED before driver edit: expected supported #motionDialog Reduced motion button click, absent from existing history driver. /tmp/topx-driver-red.txt. Earlier real browser failure preserved at /tmp/topx-browser-history.txt. Original Top X RED /tmp/topx-red.txt and punctuation delta RED /tmp/topx-slash-red.txt retained."
+    }
+  },
+  {
+    "testChangesSha256": "2a24ca761847063d0f1fbcb509494125747e372cc79ad7f83b6ba78c691941d8",
+    "reason": "Source reconciliation onto merged colors/blimp/Show Postpone base preserves their tests and the reviewed Top X tests. Rationale binds exact c616df29fd5145e7dc3bcf593e23140f9697d63f comparison; no historical failures rewritten.",
+    "previousBehavior": "Driver seeds obsolete untimed reduced string and directly dismisses dialog; cold reload asks again and intercepts Undo.",
+    "intendedBehavior": "Driver clicks real Reduced motion button and verifies supported timed browser-local choice before history setup, allowing reload to honor actual consent.",
+    "replacementTests": [
+      "RISK task history: compact Top X uses recorded snapshots and preserves legacy facts",
+      "RISK history browser driver: first-run motion uses the supported choice before history fixtures"
+    ],
+    "preservedCoverage": [
+      "All prior pagination, drafts, layout, offline reload, saved history and completion/Undo assertions remain intact. No product or consent code changes."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK history browser driver:' tests.js",
+      "failure": "Observed RED before driver edit: expected supported #motionDialog Reduced motion button click, absent from existing history driver. /tmp/topx-driver-red.txt. Earlier real browser failure preserved at /tmp/topx-browser-history.txt. Original Top X RED /tmp/topx-red.txt and punctuation delta RED /tmp/topx-slash-red.txt retained."
+    }
+  },
+  {
+    "testChangesSha256": "e8f2c345d7466d808f2dab5dd9336834cab5a3a886d7d37088d5318c80fad944",
+    "reason": "Source reconciliation onto merged colors/blimp/Show Postpone base preserves their tests and the reviewed Top X tests. Rationale binds exact e93dbae47638a7c80243eff0e8419c1884eb27c3 comparison; no historical failures rewritten.",
+    "previousBehavior": "Previous reviewed Top X head lacks the subsequently reviewed and merged colors/blimp/Show Postpone tests; this comparison includes inherited upstream executable test additions.",
+    "intendedBehavior": "Retain upstream reviewed Show Postpone control and saved-setting tests alongside unchanged reviewed Top X history coverage; no upstream behavior or old assertions are removed.",
+    "replacementTests": [
+      "RISK Show Postpone preference: actual Settings checkbox hides both scanner controls and restores them without changing tasks"
+    ],
+    "preservedCoverage": [
+      "All prior pagination, drafts, layout, offline reload, saved history and completion/Undo assertions remain intact. No product or consent code changes."
+    ],
+    "redEvidence": {
+      "command": "Upstream retained Show Postpone RED commands in c616df29fd5145e7dc3bcf593e23140f9697d63f: node --test --test-name-pattern='RISK Hide Postpone' tests.js",
+      "failure": "Reuse inherited RED evidence explicitly recorded by the Show Postpone owner in released-base TEST_CHANGE_RATIONALES.json: missing saved preference expected false but actual undefined; task-2/evidence/red.txt. Other inherited upstream tests retain their own original RED rationale records. This is evidence reuse, not a new contemporaneous RED for upstream features. Own Top X original/punctuation/driver RED retained separately."
+    }
+  },
+  {
+    "testChangesSha256": "9022535b6854329eb139476dbfc869fa041aaaff8e90fda6d9aebf4463bdbd0b",
+    "reason": "The previous-reviewed-head symmetric comparison uses shared ancestor 382de0b and therefore includes upstream reviewed colors/blimp/Show Postpone changes as well as Top X. Preserve their original owner rationale/RED evidence without representing it as newly observed here.",
+    "previousBehavior": "Shared historical comparison ancestor predates merged colors/blimp/Show Postpone and reviewed Top X; all were individually observed and reviewed in their original branches.",
+    "intendedBehavior": "Combine unchanged upstream contracts with recorded-only compact Top X display and its supported consent browser fixture, preserving existing assertions.",
+    "replacementTests": [
+      "RISK Show Postpone preference: actual Settings checkbox hides both scanner controls and restores them without changing tasks",
+      "RISK task history: compact Top X uses recorded snapshots and preserves legacy facts"
+    ],
+    "preservedCoverage": [
+      "All prior pagination, drafts, layout, offline reload, saved history and completion/Undo assertions remain intact. No product or consent code changes."
+    ],
+    "redEvidence": {
+      "command": "Original Top X node --test --test-name-pattern=\"RISK task history: compact Top X\" tests.js; inherited upstream commands retained in released-base TEST_CHANGE_RATIONALES.json",
+      "failure": "Original observed Top X RED expected Top X 2 of 7 → 4 of 9, actual prior compact metrics /tmp/topx-red.txt; punctuation /tmp/topx-slash-red.txt; consent driver /tmp/topx-driver-red.txt. Upstream RED is reused from its exact released-base records, not claimed newly executed."
     }
   }
 ]
