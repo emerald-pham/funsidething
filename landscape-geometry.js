@@ -353,7 +353,25 @@
     // A route's contact anchors are geometry, not animation history. Cache the
     // deterministic phase table so painting a crowd does not reintegrate its
     // traveled route on every frame; seeks construct the same table entries.
-    const humanRoutes=new WeakMap(),humanGrounds=new Map(),humanRouteOrder=new Map();
+    const humanRoutes=new WeakMap(),humanGrounds=new Map(),humanRouteOrder=new Map(),humanClearanceOrder=new Map();
+    // At most345 retained visits, two people and two current contact windows
+    // each. Bound the aggregate working set rather than evicting a crowded
+    // shared route's sixteen windows on every frame.
+    const MAX_HUMAN_CLEARANCES=345*2*2;
+    // The widest measured winter crowd needs48 distinct routes.
+    // Keep room for their moving successors, with a separate aggregate node
+    // budget so a larger route count cannot retain unbounded hill prefixes.
+    // Keep a single requested route even for an oversized caller; the node
+    // ceiling is proven for the supported8192px production routes below.
+    const MAX_HUMAN_ROUTES=64,MAX_HUMAN_ROUTE_NODES=524288;
+    let humanRouteNodes=0;
+    const trimHumanRoutes=()=>{
+      while(humanRouteOrder.size>1&&(humanRouteOrder.size>MAX_HUMAN_ROUTES||humanRouteNodes>MAX_HUMAN_ROUTE_NODES)){
+        const [old,owner]=humanRouteOrder.entries().next().value;
+        owner.routes.delete(owner.key);humanRouteOrder.delete(old);humanRouteNodes-=old.nodes.length;
+        for(const samples of old.clearances.values())humanClearanceOrder.delete(samples);
+      }
+    };
     function humanGround(name,offset=0){
       const profiles={middle,near,trail},profile=profiles[name];
       if(!profile)throw new Error('Unknown human ground profile');
@@ -403,20 +421,17 @@
         const nodes=[{distance:0,phase:0}];
         let phase=0;
         for(let d=-1;d>=-32;d--){phase-=rate(d,d+1);nodes.unshift({distance:d,phase});}
-        route={nodes,rate,strideAt,walkStrideAt,carrierAt,approach,factor,clearances:new Map()};routes.set(key,route);
+        route={nodes,rate,strideAt,walkStrideAt,carrierAt,approach,factor,clearances:new Map()};routes.set(key,route);humanRouteNodes+=nodes.length;
       }
       humanRouteOrder.delete(route);humanRouteOrder.set(route,{routes,key});
-      if(humanRouteOrder.size>32){
-        const [old,owner]=humanRouteOrder.entries().next().value;
-        owner.routes.delete(owner.key);humanRouteOrder.delete(old);
-      }
       const {nodes,rate}=route,target=distance/scale+36;
       while(nodes.at(-1).distance<target){
         const previous=nodes.at(-1),d=previous.distance;
         // Include the exact stop boundary in the integration table.
         const end=d<route.approach&&d+1>route.approach?route.approach:d+1;
-        nodes.push({distance:end,phase:previous.phase+rate(d,end)});
+        nodes.push({distance:end,phase:previous.phase+rate(d,end)});humanRouteNodes++;
       }
+      trimHumanRoutes();
       const interpolate=(value,field,result)=>{
         // Running contacts can lie much farther ahead than a walking stride.
         // Extend on the requested axis instead of extrapolating an endpoint;
@@ -425,12 +440,13 @@
         while(nodes.at(-1)[field]<value){
           const previous=nodes.at(-1),d=previous.distance;
           const end=d<route.approach&&d+1>route.approach?route.approach:d+1;
-          nodes.push({distance:end,phase:previous.phase+rate(d,end)});
+          nodes.push({distance:end,phase:previous.phase+rate(d,end)});humanRouteNodes++;
         }
         while(nodes[0][field]>value){
           const next=nodes[0],d=next.distance-1;
-          nodes.unshift({distance:d,phase:next.phase-rate(d,next.distance)});
+          nodes.unshift({distance:d,phase:next.phase-rate(d,next.distance)});humanRouteNodes++;
         }
+        trimHumanRoutes();
         let low=0,high=nodes.length-1;
         while(high-low>1){const middle=(low+high)>>1;if(nodes[middle][field]>value)high=middle;else low=middle;}
         const a=nodes[low],b=nodes[high],t=(value-a[field])/(b[field]-a[field]);
@@ -509,7 +525,11 @@
       // Propagate their feasible clearance intervals in both directions;
       // this anticipates landing instead of snapping after a toe plants.
       const clearanceWindow=center=>{
-        if(route.clearances.has(center))return route.clearances.get(center);
+        if(route.clearances.has(center)){
+          const samples=route.clearances.get(center),owner=humanClearanceOrder.get(samples);
+          humanClearanceOrder.delete(samples);humanClearanceOrder.set(samples,owner);
+          return samples;
+        }
         const start=center-12,end=center+12,distances=[];
         for(let d=start;d<=end+1e-9;d+=.125)distances.push(d);
         const firstPhase=route.phaseAt(start),lastPhase=route.phaseAt(end);
@@ -563,7 +583,11 @@
           sample.clearance=Math.max(sample.lo,Math.min(sample.hi,sample.target));
         }
         route.clearances.set(center,samples);
-        if(route.clearances.size>16)route.clearances.delete(route.clearances.keys().next().value);
+        humanClearanceOrder.set(samples,{windows:route.clearances,center});
+        if(humanClearanceOrder.size>MAX_HUMAN_CLEARANCES){
+          const [old,owner]=humanClearanceOrder.entries().next().value;
+          owner.windows.delete(owner.center);humanClearanceOrder.delete(old);
+        }
         return samples;
       };
       const center=Math.floor(localDistance/4)*4;

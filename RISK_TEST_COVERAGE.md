@@ -1161,3 +1161,10 @@ Protect original shared admission slots separately from finite crossing recipes,
 - `RISK pedestrian deferred reconstruction: eager recipe reference matches lazy output at lookback midnight and cache eviction`
 - `RISK pedestrian motion toggle consumer: real motion-choice handler restores full underway tails without changing shared recipes`
 - `RISK pedestrian cull painted bounds: real companions held props and winter residue clear the frame before local retirement`
+
+- `RISK pedestrian gait working set: retained walkers reuse warm clearance windows without changing poses`
+- `RISK pedestrian winter route working set: distinct retained profiles reuse bounded contact prefixes`
+- `RISK pedestrian gait cache bounds: route prefixes and contact windows have aggregate eviction budgets`
+- `RISK native animation fixture: only the identified first-run Quick start panel is resolved`
+
+Protect warm crowd reuse, exact reordered and evicted gait reconstruction, aggregate prefix/window memory bounds, and native fixture handling that rejects unexpected dialogs.

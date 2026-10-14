@@ -26412,3 +26412,31 @@ test('RISK pedestrian cull painted bounds: real companions held props and winter
   for(const age of ages){const xs=paintedMotionWorldXs(probe.sample({actor:type,event:{...event,age},zoom:1}));assert.ok(xs.every(x=>reverse?(age===0?x>width:x<0):(age===0?x<0:x>width)),`${type} ${width} ${reverse} at ${age}: actual painted party touches frame [${Math.min(...xs)},${Math.max(...xs)}]`);}
  }
 });
+
+test('RISK pedestrian gait working set: retained walkers reuse warm clearance windows without changing poses',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8').replace('const start=center-12,end=center+12,distances=[];','globalThis.windowMiss++;const start=center-12,end=center+12,distances=[];');
+ const c=vm.createContext({windowMiss:0});vm.runInContext(source,c);const g=c.LandscapeGeometry.create(390,844),events=Array.from({length:35},(_,i)=>({type:'walker',id:String(i),seed:i/35,lane:.5,reverse:!!(i%2),duration:2400,activityDuration:60,age:10+i*3}));
+ const frame=()=>events.map(e=>{const p=g.groundPose('walker',e);return g.humanWalkPose(p.x,p.y,p.distance,e.reverse?-1:1,g.humanGround('trail',5),false,1,p.travel);});
+ const cold=frame(),first=c.windowMiss,warm=frame();assert.ok(first>32,'fixture exceeds the old shared-route window capacity');assert.equal(c.windowMiss,first,'an unchanged crowd must not rebuild every contact corridor');assert.deepEqual(warm,cold,'memoization preserves exact production poses');
+ events.reverse();assert.deepEqual(frame(),cold.toReversed(),'actor order preserves cached contact poses');
+});
+
+test('RISK native animation fixture: only the identified first-run Quick start panel is resolved',async()=>{
+ const {resolveExpectedFirstRunHelp}=await import('./scripts/browser-fixture-setup.mjs');
+ const fixture=(heading,summary)=>{let clicks=0;return{get clicks(){return clicks;},page:{locator(selector){return {count:async()=>heading===null?0:1,innerText:async()=>selector.includes('faqsTitle')?heading:summary,click:async()=>{clicks++;},first(){return this;}};}}};};
+ const help=fixture('FAQs / Changelog','Quick start');assert.equal(await resolveExpectedFirstRunHelp(help.page),true);assert.equal(help.clicks,1);
+ const empty=fixture(null,null);assert.equal(await resolveExpectedFirstRunHelp(empty.page),false);assert.equal(empty.clicks,0);
+ const other=fixture('Delete board','Quick start');await assert.rejects(resolveExpectedFirstRunHelp(other.page),/Unexpected first-run panel/);assert.equal(other.clicks,0);
+});
+
+test('RISK pedestrian winter route working set: distinct retained profiles reuse bounded contact prefixes',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8').replace('if(!route){','if(!route){globalThis.routeMiss++;');const c=vm.createContext({routeMiss:0});vm.runInContext(source,c);const g=c.LandscapeGeometry.create(8192,900);
+ const actors=Array.from({length:48},(_,i)=>({x:100+i*10,d:120+i*10,offset:i/10}));const frame=()=>actors.map(a=>g.humanWalkPose(a.x,g.middle(a.x)+a.offset,a.d,1,g.humanGround('middle',a.offset),false,1,{kind:'constant',speed:3.5,startDistance:0}));const cold=frame(),miss=c.routeMiss;assert.equal(miss,48);assert.deepEqual(frame(),cold);assert.equal(c.routeMiss,miss,'a stable48profile winter crowd must reuse its finite contact prefixes');
+});
+
+test('RISK pedestrian gait cache bounds: route prefixes and contact windows have aggregate eviction budgets',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8').replace('return {stillWalkingAge,','return {cacheStats:()=>({routes:humanRouteOrder.size,nodes:humanRouteNodes,windows:humanClearanceOrder.size,actualWindows:[...humanRouteOrder.keys()].reduce((n,r)=>n+r.clearances.size,0),actualNodes:[...humanRouteOrder.keys()].reduce((n,r)=>n+r.nodes.length,0)}),stillWalkingAge,');const c=vm.createContext({});vm.runInContext(source,c);const g=c.LandscapeGeometry.create(8192,900);
+ for(let i=0;i<70;i++){const d=8192+i,x=d-32;g.humanWalkPose(x,g.middle(x)+i/10,d,1,g.humanGround('middle',i/10),false,1,{kind:'constant',speed:3.5,startDistance:0});const stats=g.cacheStats();assert.ok(stats.routes<=64);assert.ok(stats.nodes<=524288);assert.equal(stats.nodes,stats.actualNodes,'node accounting includes eviction and contact extension');assert.ok(stats.windows<=1380);assert.equal(stats.windows,stats.actualWindows,'window ownership matches the aggregate eviction index');}
+ const tiny=vm.createContext({});vm.runInContext(source.replace('MAX_HUMAN_CLEARANCES=345*2*2','MAX_HUMAN_CLEARANCES=8'),tiny);const small=tiny.LandscapeGeometry.create(8192,900);for(let i=0;i<12;i++){const x=100+i*20;small.humanWalkPose(x,small.trail(x)+5,x+32,1,small.humanGround('trail',5),false,1,{kind:'constant',speed:3.5,startDistance:0});const stats=small.cacheStats();assert.ok(stats.windows<=8);assert.equal(stats.windows,stats.actualWindows);}assert.equal(small.cacheStats().windows,8,'fixture actually reaches window eviction');
+ const event={type:'walker',seed:.3,lane:.5,duration:2400,activityDuration:60,age:100},p=g.groundPose('walker',event),walk=geo=>geo.humanWalkPose(p.x,p.y,p.distance,1,geo.humanGround('trail',5),false,1,p.travel),cold=walk(c.LandscapeGeometry.create(8192,900));assert.deepEqual(walk(g),cold,'an evicted route reconstructs the exact cold pose');assert.deepEqual(JSON.parse(JSON.stringify(walk(small))),JSON.parse(JSON.stringify(cold)),'window eviction reconstructs the exact cold pose across isolated realms');
+});
