@@ -1,5 +1,21 @@
 [
   {
+    "testChangesSha256": "ac66c890d141c947556faafd61b197997eb93a5154deb6efbf5514121936e996",
+    "reason": "Bind the additive absent-root regression to the incremental push comparison as well as the retained cumulative main comparison; no tests or executable behavior change in this evidence-only correction.",
+    "previousBehavior": "New pattern paint attempted root methods when a non-DOM host had no documentElement.",
+    "intendedBehavior": "Safely defer either preference state until a document root exists, then apply or remove ordinary paint without changing settings.",
+    "replacementTests": [
+      "RISK patterned indicators absent root: both preference states safely defer paint until a document root exists"
+    ],
+    "preservedCoverage": [
+      "Every released test byte remains unchanged; retained applyTheme absent-root startup test passes. This record is additional; cumulative cb64ed3 rationale remains intact. Full PR CI oncf7106d passed, while its push comparison to1b7 lacked this exact fingerprint."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='applyTheme: a host with no documentElement|RISK patterned indicators absent root' tests.js; node scripts/test-first-gate.mjs 1b7bfe3d33cd917d1db7585e8e54c12900e0ac95",
+      "failure": "Existing startup RED and new both-state RED observed before guard in red-null-root-ci-regression.txt/red-patterned-absent-root.txt;61focusedGREEN after guard. Push workflow38487586186 failed exact test-first binding; reproduced in red-incremental-test-first-binding.txt before adding this record. No test weakened or new behavior introduced."
+    }
+  },
+  {
     "testChangesSha256": "c453cb59a4d13090c8929c9e03e53e5dfe06ce540fdd87e455423b6967451fe7",
     "reason": "Add opt-in presentation preference coverage, then strengthen texture contracts after independent source review found invisible sync stripes and an insufficient edge-only treatment. Add a focused assertion for the established immediate-save FAQ list after specialist review found the new toggle omitted. Reconcile separately released cb64ed3 without changing its tests or preservation rules; isolate checked-editor texture inside supports to retain its native-selector fallback. Actual independent rendered review found invisible Selected stripes, weak selected motion descriptions and flattened edge cues. Replace broken paint assumptions with explicit contrast and clipped-tile contracts. Independent affected rendered review rejected the20px context glyph texture; move its cue to the full click-control padding rail with actual mark colors. Independent FAQ review found the slope legend omitted locked selections and unset location; clarify those exceptions without changing controls. Mandatory exact CI caught the retained absent-documentElement startup contract; add a focused both-state regression and guard paint before DOM access.",
     "previousBehavior": "No preference originally existed. Initial candidate used white stripes on white sync controls and a universal narrow edge band rather than requested across-field dashed stripes.",
