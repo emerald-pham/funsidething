@@ -1096,3 +1096,6 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - `RISK patterned context direction cue: contrasting full-control rails leave original check and X glyphs untouched`
 - `RISK patterned indicator slope legend: FAQ distinguishes locked selections and unset location from ordinary selected controls` — Covers semantic exceptions in the appearance legend.
 - `RISK patterned indicators absent root: both preference states safely defer paint until a document root exists` — Preserves established non-DOM startup and resumed paint behavior.
+
+- `RISK human profile paint: every hairstyle mirrors face and rear hair for either walking direction` — Actual head paint and world-coordinate walker direction.
+- `RISK clocktower human paint: children use shared skin and heads through flight landing and departure` — Shared head geometry, character hats, skin arms, trousers and opacity.

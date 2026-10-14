@@ -25958,3 +25958,31 @@ test('RISK patterned indicators absent root: both preference states safely defer
  for(const missing of [undefined,null]){shim.document.documentElement=missing;for(const enabled of [false,true]){ctx.state.settings.patternedIndicators=enabled;assert.doesNotThrow(()=>ctx.renderPatternedIndicators(),'non-DOM host must retain established startup no-op behavior');assert.equal(ctx.state.settings.patternedIndicators,enabled);}}
  shim.document.documentElement=root;ctx.renderPatternedIndicators();assert.equal(root.getAttribute('data-patterned-indicators'),'true');ctx.state.settings.patternedIndicators=false;ctx.renderPatternedIndicators();assert.equal(root.getAttribute('data-patterned-indicators'),null);
 });
+
+// Human profiles must mirror at the painter boundary, independent of travel timing.
+test('RISK human profile paint: every hairstyle mirrors face and rear hair for either walking direction',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ const head=source.slice(source.indexOf('  function personHead('),source.indexOf('  function layer('));
+ for(const style of ['short','long','bob','bun','ponytail','curly','bald'])for(const hat of [false,true]){
+  const paint=direction=>{const shapes=[];vm.runInNewContext(head+';personHead({},10,20,2,2,.4,"skin",hat,direction);',{LandscapeAppearance:{person:()=>({style,color:'hair'})},S:{mixHex:x=>x},p:{city:'city',night:0},ellipse:(_ctx,x,y,rx,ry,ink)=>shapes.push({x,y,rx,ry,ink}),hat,direction});return shapes;};
+  const forward=paint(1),reverse=paint(-1);assert.equal(forward.length,reverse.length);
+  forward.forEach((shape,i)=>{assert.equal(reverse[i].x,20-shape.x,style+' rear hair and face mirror');assert.deepEqual({...reverse[i],x:shape.x},shape);});
+  assert.ok(forward.some(s=>s.ink==='skin'&&s.x>11.5&&s.rx<1),'visible skin profile faces travel');
+  if(hat)assert.ok(forward.every(s=>s.ink==='skin'),'headwear suppresses all hair');
+ }
+ const walk=source.slice(source.indexOf("if(e.type==='walker'||e.type==='dogwalker')"),source.indexOf("if(e.type==='walker'||e.type==='dogwalker')")+1600);
+ assert.match(walk,/personHead\([^;]*skin,false,dir\)/,'world-coordinate walkers pass travel direction');
+});
+
+test('RISK clocktower human paint: children use shared skin and heads through flight landing and departure',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),paint=source.slice(source.indexOf('  function paintClocktowerVisit('),source.indexOf('  function paintLife('));
+ for(const stand of [0,.5,1])for(const direction of [-1,1]){
+  const heads=[],strokes=[],poses=['peter','wendy','john','michael'].map((character,i)=>({character,x:100+i*8,y:80,height:7-i*.3,stand,direction,visible:true,alpha:.7,feet:[{x:100+i*8-.55,y:80},{x:100+i*8+.55,y:80}]}));
+  const g={globalAlpha:1,save(){this.prior=this.globalAlpha;},restore(){this.globalAlpha=this.prior;},beginPath(){},moveTo(){},lineTo(){},fill(){},fillRect(){}};
+  vm.runInNewContext(paint+';paintClocktowerVisit();',{clocktowerVisit:{active:{seed:.4}},sky:{sun:{altitude:-10}},geometry:{clocktowerVisitPoses:()=>poses},reduced:false,g,p:{sky:['sky'],city:'city',night:1},S:{mixHex:x=>x},skinColor:seed=>'skin:'+seed,personHead:(...args)=>heads.push(args),ellipse(){},line:(...args)=>strokes.push(args)});
+  assert.equal(heads.length,4,'all children share actual personHead painter');
+  heads.forEach((args,i)=>{assert.match(args[6],/^skin:/);assert.equal(args[7],i===0||i===2,'character hats retained');assert.equal(args[8],direction);assert.equal(args[3],poses[i].height/7,'head radius matches half-size ordinary human');});
+  assert.ok(strokes.some(args=>String(args[5]).startsWith('skin:')),'arms use skin rather than clothing');
+  assert.ok(strokes.some(args=>args[5]==='#647779'),'legs share ordinary human trousers');assert.equal(g.globalAlpha,1);
+ }
+});
