@@ -1138,3 +1138,5 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK rider shadows: phone scale matches cyclists scooters and hoverboards
 - RISK woodland shadows: projected height shrinks with the painted depth scale
 - RISK shadow FAQ: mounted guidance explains pose light and scenery-only changes
+
+- RISK human profile selector: historical walker consumer still selects the actual guest painter

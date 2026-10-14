@@ -1,5 +1,58 @@
 [
   {
+    "testChangesSha256": "15f301a282e98ed4420f65782f13a5adaadfc86ca8874baaea27cbd80e57dcad",
+    "reason": "Protect the inherited walker-profile source consumer after new shadow opacity branches exposed an ambiguous first-match selector; retain every existing assertion and risk contract.",
+    "previousBehavior": "Candidate1018009 introduced a matching shadow branch before paintGuest, so the historical consumer inspected opacity setup rather than travel-facing head paint and CI failed.",
+    "intendedBehavior": "Equivalent OR operand order leaves shadow behavior unchanged and the historical consumer selects the actual guest painter; the new discriminating selector regression protects that boundary.",
+    "preservedCoverage": [
+      "All existing tests remain byte-identical; original shadow geometry/opacity, walking direction, seeded schedules and task/storage behavior remain protected."
+    ],
+    "replacementTests": [
+      "RISK human profile selector: historical walker consumer still selects the actual guest painter"
+    ],
+    "redEvidence": {
+      "command": "node /tmp/shadow-audit-evidence/integration/selector-contract-red.mjs (actual new contract against immutable1018009 landscape bytes)",
+      "failure": "Observed AssertionError: historical walker consumer must select the actual guest painter rather than a shadow branch. CI original profile failure and local focused RED retained. Original five shadow RED chronology retained in previous records. New selector GREEN33pass0fail0skip; no new product behavior."
+    }
+  },
+  {
+    "testChangesSha256": "15f301a282e98ed4420f65782f13a5adaadfc86ca8874baaea27cbd80e57dcad",
+    "reason": "Protect the inherited walker-profile source consumer after new shadow opacity branches exposed an ambiguous first-match selector; retain every existing assertion and risk contract.",
+    "previousBehavior": "Candidate1018009 introduced a matching shadow branch before paintGuest, so the historical consumer inspected opacity setup rather than travel-facing head paint and CI failed.",
+    "intendedBehavior": "Equivalent OR operand order leaves shadow behavior unchanged and the historical consumer selects the actual guest painter; the new discriminating selector regression protects that boundary.",
+    "preservedCoverage": [
+      "All existing tests remain byte-identical; original shadow geometry/opacity, walking direction, seeded schedules and task/storage behavior remain protected."
+    ],
+    "replacementTests": [
+      "RISK human profile selector: historical walker consumer still selects the actual guest painter"
+    ],
+    "redEvidence": {
+      "command": "node /tmp/shadow-audit-evidence/integration/selector-contract-red.mjs (actual new contract against immutable1018009 landscape bytes)",
+      "failure": "Observed AssertionError: historical walker consumer must select the actual guest painter rather than a shadow branch. CI original profile failure and local focused RED retained. Original five shadow RED chronology retained in previous records. New selector GREEN33pass0fail0skip; no new product behavior."
+    }
+  },
+  {
+    "testChangesSha256": "7decc169714aadef7ecf19e1d39d248d79f3f0bf9495314d1105fec122dd5536",
+    "reason": "Protect the inherited walker-profile source consumer after new shadow opacity branches exposed an ambiguous first-match selector; retain every existing assertion and risk contract.",
+    "previousBehavior": "Candidate1018009 introduced a matching shadow branch before paintGuest, so the historical consumer inspected opacity setup rather than travel-facing head paint and CI failed.",
+    "intendedBehavior": "Equivalent OR operand order leaves shadow behavior unchanged and the historical consumer selects the actual guest painter; the new discriminating selector regression protects that boundary.",
+    "preservedCoverage": [
+      "All existing tests remain byte-identical; original shadow geometry/opacity, walking direction, seeded schedules and task/storage behavior remain protected."
+    ],
+    "replacementTests": [
+      "RISK human profile selector: historical walker consumer still selects the actual guest painter",
+      "RISK visitor shadows: seated height and activity opacity match the visible people",
+      "RISK crossing shadows: opaque actors and skater departure use the actual paint alpha",
+      "RISK rider shadows: phone scale matches cyclists scooters and hoverboards",
+      "RISK woodland shadows: projected height shrinks with the painted depth scale",
+      "RISK shadow FAQ: mounted guidance explains pose light and scenery-only changes"
+    ],
+    "redEvidence": {
+      "command": "node /tmp/shadow-audit-evidence/integration/selector-contract-red.mjs (actual new contract against immutable1018009 landscape bytes)",
+      "failure": "Observed AssertionError: historical walker consumer must select the actual guest painter rather than a shadow branch. CI original profile failure and local focused RED retained. Original five shadow RED chronology retained in previous records. New selector GREEN33pass0fail0skip; no new product behavior."
+    }
+  },
+  {
     "testChangesSha256": "ea73b4e816f274905f878004bb95def240f4ade32f56b75cc1ff5d9544df8b7d",
     "reason": "Bind the previous reviewed shadow candidate three-dot comparison to the merged release base plus unchanged shadow contracts. This comparison includes already released Show Postpone, Top X and blimp tests; their original RED/rationale records are retained. New shadow integration RED was observed on3989e9 before product changes.",
     "previousBehavior": "Previous shadow candidate d66acec was based on936ec4d and did not include released Show Postpone, Top X and approved blimp tests or fixture repair.",

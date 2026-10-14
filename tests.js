@@ -26233,3 +26233,13 @@ test('RISK shadow FAQ: mounted guidance explains pose light and scenery-only cha
  assert.ok(answer,'shadow guidance belongs beside the existing scenery answers');assert.match(answer,/Sun or Moon/);assert.match(answer,/Seated visitors/);assert.match(answer,/phone and depth scale/);assert.match(answer,/saved tasks/);
  assert.match(html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1],/Visitor shadows now follow seated and standing poses, visible opacity, and phone or depth scale/);
 });
+
+// The inherited profile contract selects the first walker branch; shadow branches
+// must not make that consumer silently inspect a different painter.
+test('RISK human profile selector: historical walker consumer still selects the actual guest painter',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ const selected=source.indexOf("if(e.type==='walker'||e.type==='dogwalker')");
+ const guestStart=source.indexOf('  function paintGuest('),guestEnd=source.indexOf('  function updateChrome(',guestStart);
+ assert.ok(selected>=guestStart&&selected<guestEnd,'historical walker consumer must select the actual guest painter rather than a shadow branch');
+ assert.match(source.slice(selected,selected+1600),/personHead\([^;]*skin,false,dir\)/,'selected painter preserves travel-facing head paint');
+});
