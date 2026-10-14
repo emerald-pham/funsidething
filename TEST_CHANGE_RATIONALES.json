@@ -1,5 +1,56 @@
 [
   {
+    "testChangesSha256": "99383ed066fc0bc23f1265ab2cd86a0ee0a6607e1828cfa2d0693cfd7143fe52",
+    "reason": "Add discriminating actual-painter coverage for backward-facing hairstyle offsets and separately painted monochrome clocktower children. Required CI found protected immutable carrying output drift. Limit new face detail to explicit world-coordinate walkers/clocktower heads and retain original default-head floating-point paint ordering; old carrying assertions remain unchanged.",
+    "previousBehavior": "Head hair offsets remained right-facing during left travel; clocktower children bypassed shared skin and head painting.",
+    "intendedBehavior": "Both travel directions mirror the same profile and all clocktower poses share head proportions, skin arms and trousers while keeping character hats.",
+    "replacementTests": [
+      "RISK human inherited head paint: existing local-transform carriers retain paint while explicit profiles face travel"
+    ],
+    "preservedCoverage": [
+      "Existing tests and their assertions remain unchanged; geometry, pacing, seeded event timing, roof contacts, reduced motion, depth and task data are preserved."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK carrying isolation:|RISK human inherited head paint:' tests.js",
+      "failure": "Both observed RED before repair: immutable accepted carrying command equality fails with extra skin ellipses; new default inherited-head regression expects one skin ellipse and receives two. Retained red-ci-carrying-isolation.txt, plus original contemporaneous feature RED in red.txt; no historical fixture or old assertions altered."
+    }
+  },
+  {
+    "testChangesSha256": "2c2f2984ddae90301ca41590e0820e85d750ab8f84b511db1a7a755f59700d00",
+    "reason": "Add discriminating actual-painter coverage for backward-facing hairstyle offsets and separately painted monochrome clocktower children. Required CI found protected immutable carrying output drift. Limit new face detail to explicit world-coordinate walkers/clocktower heads and retain original default-head floating-point paint ordering; old carrying assertions remain unchanged.",
+    "previousBehavior": "Head hair offsets remained right-facing during left travel; clocktower children bypassed shared skin and head painting.",
+    "intendedBehavior": "Both travel directions mirror the same profile and all clocktower poses share head proportions, skin arms and trousers while keeping character hats.",
+    "replacementTests": [
+      "RISK human profile paint: every hairstyle mirrors face and rear hair for either walking direction",
+      "RISK clocktower human paint: children use shared skin and heads through flight landing and departure",
+      "RISK human inherited head paint: existing local-transform carriers retain paint while explicit profiles face travel"
+    ],
+    "preservedCoverage": [
+      "Existing tests and their assertions remain unchanged; geometry, pacing, seeded event timing, roof contacts, reduced motion, depth and task data are preserved."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK carrying isolation:|RISK human inherited head paint:' tests.js",
+      "failure": "Both observed RED before repair: immutable accepted carrying command equality fails with extra skin ellipses; new default inherited-head regression expects one skin ellipse and receives two. Retained red-ci-carrying-isolation.txt, plus original contemporaneous feature RED in red.txt; no historical fixture or old assertions altered."
+    }
+  },
+  {
+    "testChangesSha256": "3bc847bc075cd903f59e774f7edbab9954769179fcd6222a4f6d213dfcf9cce8",
+    "reason": "Add discriminating actual-painter coverage for backward-facing hairstyle offsets and separately painted monochrome clocktower children. Preserve original one-skin-ellipse headwear after the separately reproduced protected appearance failure. This binding reconciles the already-tested human patch onto transit release2ed0d18; transit code and its tests remain unchanged.",
+    "previousBehavior": "Head hair offsets remained right-facing during left travel; clocktower children bypassed shared skin and head painting.",
+    "intendedBehavior": "Both travel directions mirror the same profile and all clocktower poses share head proportions, skin arms and trousers while keeping character hats.",
+    "replacementTests": [
+      "RISK human profile paint: every hairstyle mirrors face and rear hair for either walking direction",
+      "RISK clocktower human paint: children use shared skin and heads through flight landing and departure"
+    ],
+    "preservedCoverage": [
+      "Existing tests and their assertions remain unchanged; geometry, pacing, seeded event timing, roof contacts, reduced motion, depth and task data are preserved."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK human profile paint:|RISK clocktower human paint:' tests.js",
+      "failure": "Observed before implementation: short hair x9.8 versus mirrored10.2; clocktower shared-head call count0 versus4. Exact output retained in .evidence/red.txt. Existing hat contract RED reproduced before headwear guard in .evidence/red-hat-preservation.txt;13focusedGREEN after repair. No new implementation was introduced during transit reconciliation."
+    }
+  },
+  {
     "testChangesSha256": "30b16197757bf9096ff262a28e59491e025d740273f2325b535ae245aa937662",
     "reason": "Add direct actual transit painter line-livery coverage and matching extended FAQ guidance before functional changes.",
     "previousBehavior": "Lower railway bodies were neutral beige and metro bodies pale green.",

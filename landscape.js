@@ -72,18 +72,21 @@
   const colors=['#db947e','#a4c9bd','#e6c680','#ada9ce','#88b9cf','#e8b6c4'];
   const color=(seed,offset=0)=>S.mixHex(colors[Math.floor((seed*97+offset)%colors.length)],p.front,p.night*.35);
   const skinColor=seed=>S.skinTone(seed,p.night,p.city);
-  function personHead(ctx,x,y,rx,ry,seed,skin,hat=false){
+  function personHead(ctx,x,y,rx,ry,seed,skin,hat=false,direction=null){
+    const dir=direction===-1?-1:1;
     const appearance=LandscapeAppearance.person(seed),hair=S.mixHex(appearance.color,p.city,p.night*.4),style=appearance.style;
     // Hair belongs to an individual; protective headwear always takes precedence.
     if(!hat&&style!=='bald'){
-      if(style==='long'||style==='bob')ellipse(ctx,x-rx*.3,y+ry*.35,rx*1.15,ry*(style==='long'?1.65:1.1),hair);
-      if(style==='bun')ellipse(ctx,x-rx*.8,y-ry*.8,rx*.65,ry*.65,hair);
-      if(style==='ponytail')ellipse(ctx,x-rx*1.1,y+ry*.6,rx*.55,ry*1.15,hair);
+      if(style==='long'||style==='bob')ellipse(ctx,x-dir*rx*.3,y+ry*.35,rx*1.15,ry*(style==='long'?1.65:1.1),hair);
+      if(style==='bun')ellipse(ctx,x-dir*rx*.8,y-ry*.8,rx*.65,ry*.65,hair);
+      if(style==='ponytail')ellipse(ctx,x-dir*rx*1.1,y+ry*.6,rx*.55,ry*1.15,hair);
     }
     ellipse(ctx,x,y,rx,ry,skin);
+    // A small forward profile makes the exposed face legible beneath every hairstyle.
+    if(!hat&&direction!==null)ellipse(ctx,x+dir*rx*.9,y+ry*.1,rx*.25,ry*.28,skin);
     if(!hat&&style!=='bald'){
-      ellipse(ctx,x-rx*.1,y-ry*.67,rx*1.07,ry*.55,hair);
-      if(style==='curly')for(let i=0;i<4;i++)ellipse(ctx,x-rx+i*rx*.6,y-ry*.7-Math.sin(i)*ry*.4,rx*.48,ry*.48,hair);
+      ellipse(ctx,x-dir*rx*.1,y-ry*.67,rx*1.07,ry*.55,hair);
+      if(style==='curly')for(let i=0;i<4;i++)ellipse(ctx,direction===null?x-rx+i*rx*.6:x+dir*(-rx+i*rx*.6),y-ry*.7-Math.sin(i)*ry*.4,rx*.48,ry*.48,hair);
     }
   }
   function layer(name,top){
@@ -690,6 +693,7 @@
     for(const pose of geometry.clocktowerVisitPoses(clocktowerVisit.active,reduced)){
       if(!pose.visible||pose.alpha<=0)continue;
       const scale=pose.height/7,flight=1-pose.stand,dir=pose.direction;
+      const seed=clocktowerVisit.active.seed+['peter','wendy','john','michael'].indexOf(pose.character)*.173,skin=skinColor(seed);
       const ink=S.mixHex({peter:'#72967b',wendy:'#b1c5ce',john:'#9cabb9',michael:'#bea992'}[pose.character],p.sky[0],.18);
       const headX=pose.x+dir*3.5*flight,headY=pose.y-scale*(3+3*pose.stand);
       const hipX=pose.x-dir*1.6*flight,hipY=pose.y-scale*(1.8+.7*pose.stand),neckY=headY+1.2*scale;
@@ -698,11 +702,12 @@
       if(pose.character==='wendy'){
         g.fillStyle=ink;g.beginPath();g.moveTo(headX,neckY);g.lineTo(hipX-1.3*scale,hipY+.2);g.lineTo(hipX+1.3*scale,hipY+.2);g.fill();
       }
-      for(const foot of pose.feet)line(g,hipX,hipY,foot.x,foot.y,ink,.7*scale);
+      for(const foot of pose.feet)line(g,hipX,hipY,foot.x,foot.y,'#647779',.7*scale);
       const armX=headX+dir*scale*(.8+3*flight),armY=neckY+scale*(1.6-2.1*flight);
-      line(g,headX,neckY,armX,armY,ink,.65*scale);
-      line(g,headX,neckY,headX-dir*1.5*scale,neckY+scale*(1.5-.8*flight),ink,.65*scale);
-      ellipse(g,headX,headY,.8*scale,.9*scale,ink);
+      line(g,headX,neckY,armX,armY,skin,.65*scale);
+      line(g,headX,neckY,headX-dir*1.5*scale,neckY+scale*(1.5-.8*flight),skin,.65*scale);
+      // Half-size ordinary human proportions, with the same individual head painter.
+      personHead(g,headX,headY,scale,scale,seed,skin,pose.character==='peter'||pose.character==='john',dir);
       if(pose.character==='peter'){
         g.fillStyle=ink;g.beginPath();g.moveTo(headX-1*scale,headY-.4);g.lineTo(headX+dir*2*scale,headY-1.7*scale);g.lineTo(headX+1*scale,headY-.4);g.fill();
       }else if(pose.character==='john'){
@@ -1223,7 +1228,7 @@
       // The far arm passes behind the torso; both arms share the leg stride.
       const armAt=index=>{const arm=motion.arms[index],elbowX=pose.x+dir*(motion.hipX+arm.x)*.5,elbowY=pose.y-5.5+motion.bob;line(g,pose.x+dir*motion.hipX,pose.y-8+motion.bob,elbowX,elbowY,skin,1.3);line(g,elbowX,elbowY,pose.x+dir*arm.x,pose.y+arm.y,skin,1.3);};
       armAt(1);
-      personHead(g,pose.x+dir*motion.hipX,pose.y-12+motion.bob,2,2,e.seed,skin);line(g,pose.x+dir*motion.hipX,pose.y-9+motion.bob,pose.x+dir*motion.hipX,pose.y+motion.hipY,c,3);
+      personHead(g,pose.x+dir*motion.hipX,pose.y-12+motion.bob,2,2,e.seed,skin,false,dir);line(g,pose.x+dir*motion.hipX,pose.y-9+motion.bob,pose.x+dir*motion.hipX,pose.y+motion.hipY,c,3);
       for(const leg of motion.legs){line(g,pose.x+dir*motion.hipX,pose.y+motion.hipY,pose.x+dir*leg.kneeX,pose.y+leg.kneeY,'#647779',1.4);line(g,pose.x+dir*leg.kneeX,pose.y+leg.kneeY,pose.x+dir*leg.footX,pose.y+leg.footY,'#647779',1.4);}
       armAt(0);
       if(e.type==='dogwalker'){
