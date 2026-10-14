@@ -1,5 +1,40 @@
 [
   {
+    "reason": "Retain the established130wordper-answer Quickstart limit after CI caught the overlong general scenery answer. Restore its original controls guidance and put useful seeded-color/reload/night-shading guidance in a compact dedicated answer adjacent to transit. Add an actual mounted FAQ placement regression, preserving existing word-budget and paint assertions. Exactcomparisonbase 382de0b438fd60a8c14df2f4e632f4c6fc1c31de.",
+    "previousBehavior": "The added palette guidance made the general scenery FAQ exceed its existing130word limit; there was no dedicated answer for stable visitor colors.",
+    "intendedBehavior": "General scenery controls retain their exact prior copy; a concise adjacent color answer explains seeded kite/plane variations, same-visit reload consistency and night shading without changing controls or task data.",
+    "preservedCoverage": [
+      "All existing Quickstart length/topic/structure protections and all paint/gait/transit/human/data assertions remain intact. App behavior changes only in static FAQ prose and derived release fingerprints."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='^RISK Quick start content:|^RISK scene color FAQ:' tests.js",
+      "failure": "Observed both RED before FAQ edit: existing general-answer130word assertion fails; new actual-mounted dedicated-answer assertion fails because entry is absent. CI38556041134 fullsuite has one Quickstart length failure; all other1635tests pass with35environment skips. Logsfaq-budget-red.txt and ci-failed-38556041134.txt retained. Five focused relevant checks GREEN after minimum copy move and shell fingerprints."
+    },
+    "testChangesSha256": "71f5b661a42d7b7d8684e51f1857149da16d3ac1180d047bf15cf0f1e5bdd7b8",
+    "replacementTests": [
+      "RISK carrying isolation: immutable accepted renderer commands stay exact outside requested walker pace and kite fabric changes",
+      "RISK landscape aircraft: scheduled planes retain the compact silhouette with seeded liveries in both directions",
+      "RISK scene color variation: kite panels and passing plane livery use existing seeded accents without new random draws",
+      "RISK scene color FAQ: seeded palettes stay in a compact dedicated answer"
+    ]
+  },
+  {
+    "reason": "Retain the established130wordper-answer Quickstart limit after CI caught the overlong general scenery answer. Restore its original controls guidance and put useful seeded-color/reload/night-shading guidance in a compact dedicated answer adjacent to transit. Add an actual mounted FAQ placement regression, preserving existing word-budget and paint assertions. Exactcomparisonbase bad4d477e267b9d719024665064c2b0d0417745f.",
+    "previousBehavior": "The added palette guidance made the general scenery FAQ exceed its existing130word limit; there was no dedicated answer for stable visitor colors.",
+    "intendedBehavior": "General scenery controls retain their exact prior copy; a concise adjacent color answer explains seeded kite/plane variations, same-visit reload consistency and night shading without changing controls or task data.",
+    "preservedCoverage": [
+      "All existing Quickstart length/topic/structure protections and all paint/gait/transit/human/data assertions remain intact. App behavior changes only in static FAQ prose and derived release fingerprints."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='^RISK Quick start content:|^RISK scene color FAQ:' tests.js",
+      "failure": "Observed both RED before FAQ edit: existing general-answer130word assertion fails; new actual-mounted dedicated-answer assertion fails because entry is absent. CI38556041134 fullsuite has one Quickstart length failure; all other1635tests pass with35environment skips. Logsfaq-budget-red.txt and ci-failed-38556041134.txt retained. Five focused relevant checks GREEN after minimum copy move and shell fingerprints."
+    },
+    "testChangesSha256": "804290caf6167a5513cef4138dd8b28dc0a00d611500a901146dbfd1778cffad",
+    "replacementTests": [
+      "RISK scene color FAQ: seeded palettes stay in a compact dedicated answer"
+    ]
+  },
+  {
     "testChangesSha256": "ed703a3367a6d8b99118f0ff1d249ba90534f8028638204ad49022ad0895dd5b",
     "reason": "The explicitly requested scenery palette change intersects two frozen paint contracts: immutable gait output and scheduled-plane fixed ivory. Preserve frozen fixture bytes and exact unrelated commands; project only seven kite panel commands and update only the plane paint expectation to its already supplied seeded accent, retaining silhouette, transforms, route, contrail, night lights and opacity assertions. Add exact main-base and incremental-push rationale bindings. Exact comparison base 382de0b438fd60a8c14df2f4e632f4c6fc1c31de.",
     "previousBehavior": "Protected tests required the old single-fabric kite command stream and fixed ivory passing-plane fill despite the user-authorized palette changes.",

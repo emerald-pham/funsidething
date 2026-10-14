@@ -26053,3 +26053,10 @@ test('RISK scene color variation: kite panels and passing plane livery use exist
  assert.match(plane,/S\.mixHex\(color\(e\.seed\),p\.sky\[1\],p\.night\*\.7\)/,'passing planes vary their livery using the existing visitor seed');
  assert.doesNotMatch(plane+kite,/Math\.random|\br\(\)/,'paint variation cannot consume schedule randomness');
 });
+
+test('RISK scene color FAQ: seeded palettes stay in a compact dedicated answer',async()=>{
+ const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML,answers=new Map([...help.matchAll(/<dt>(.*?)<\/dt><dd>(.*?)<\/dd>/g)].map(x=>[x[1],x[2]]));
+ const colors=answers.get('Why do visitor colors stay consistent?');assert.ok(colors,'palette guidance has its own concise answer beside the transit explanation');
+ assert.match(colors,/Kites have two-tone fabric and passing planes use varied pastel liveries/);assert.match(colors,/shared visitor seed/);assert.match(colors,/same visit keeps its palette after reload/);assert.match(colors,/night shading still follows the scene/);
+ assert.doesNotMatch(answers.get('How do I change the scenery?'),/Kites have two-tone|pastel liveries/,'general controls guidance retains its established scope and word budget');
+});
