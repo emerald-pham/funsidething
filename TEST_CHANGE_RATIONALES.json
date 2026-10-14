@@ -1,5 +1,28 @@
 [
   {
+    "testChangesSha256": "671b34c525cb4c145e4efc2cdd2c1c641244f6d6bfc02baec81bdd968d8b4197",
+    "reason": "User revised the unreleased visibility setting to positive Show Postpone: off only for verified fresh clients, on for pre-setting saved boards, preserve explicit choices. Retain prior Postpone feature assertions with explicit visible fixtures rather than weakening them. Reconciled once on verified released colors936ec4d, retaining all upstream palette/FAQ tests. Only test line positions changed; original feature RED chronology retained, integration syntax failure preserved and corrected by composing complete upstream tests with unchanged feature tail.",
+    "previousBehavior": "Prior source candidate used Hide Postpone default off for all boards. Fresh clients displayed Postpone, and no positive preference distinguished older saved boards.",
+    "intendedBehavior": "Show Postpone is off only at verified fresh initialization; existing local/cloud/import/recovery boards default on when absent, explicit booleans survive and native Settings consumer saves visibility without changing holds.",
+    "replacementTests": [
+      "RISK Show Postpone preference: actual Settings checkbox hides both scanner controls and restores them without changing tasks",
+      "RISK Show Postpone initialization: fresh browser and host clients default off while recovery evidence keeps visibility",
+      "RISK Show Postpone local adoption: saved empty legacy boards and explicit choices survive reload with future settings intact",
+      "RISK Show Postpone cloud adoption: missing legacy setting and explicit choices override fresh defaults at all supported revisions",
+      "RISK Show Postpone import: actual JSON consumer treats old settings as existing and preserves explicit choices and holds",
+      "RISK Show Postpone explicit visibility: saved booleans drive positive checkbox and both scanner surfaces",
+      "RISK Show Postpone normalization: explicit positive choices win and draft inverse choices migrate only when absent"
+    ],
+    "preservedCoverage": [
+      "All pre-existing Postpone behavior, sizing, theme, expiry, hold merge, Return, completion/Undo and cloud preservation assertions retained. Three rendered/consumer fixtures explicitly enable Postpone because requested fresh default now hides it.",
+      "Unrelated settings, unknown future keys, existing Halving initialization, corrupt/recovery storage and clean cloud adoption protection remain covered without changes."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK Show Postpone' tests.js",
+      "failure": "Observed six failing cases before delta implementation: fresh showPostpone undefined vs false; legacy local/cloud/import undefined vs true; explicit false still renders button (true vs false); inverse-draft normalization undefined vs false. Full output retained evidence/red-show-defaults.txt. Earlier original checkbox RED also retained red.txt. Postimplementation cohort initially exposed three existing visibility fixtures; their expected Postpone assertions were retained and fixtures explicitly enabled to honor the changed user default."
+    }
+  },
+  {
     "reason": "Retain the established130wordper-answer Quickstart limit after CI caught the overlong general scenery answer. Restore its original controls guidance and put useful seeded-color/reload/night-shading guidance in a compact dedicated answer adjacent to transit. Add an actual mounted FAQ placement regression, preserving existing word-budget and paint assertions. Exactcomparisonbase 382de0b438fd60a8c14df2f4e632f4c6fc1c31de.",
     "previousBehavior": "The added palette guidance made the general scenery FAQ exceed its existing130word limit; there was no dedicated answer for stable visitor colors.",
     "intendedBehavior": "General scenery controls retain their exact prior copy; a concise adjacent color answer explains seeded kite/plane variations, same-visit reload consistency and night shading without changing controls or task data.",
@@ -6668,6 +6691,45 @@
     "redEvidence": {
       "command": "node --test --test-name-pattern='RISK legacy context|RISK context checkbox fallback' tests.js; node --test --test-name-pattern='RISK context filter restoration|RISK context selector fallback isolation' tests.js",
       "failure": "Contemporaneous RED retained in evidence/incident-red.log and filter-fallback-red.log: missing future-id after Save, missing inactive context filter, unguarded hidden indicators and invalidating comma selectors. Initial test harness errors retained and corrected before app edit. specialist-added-tests-retrospective-red.txt records later coverage discrimination, not implementation chronology."
+    }
+  },
+  {
+    "testChangesSha256": "0a12222ebf6abb738cc74c628e0bd8eaa2f31a1d6ad127ec1b4cced9b102c8e0",
+    "reason": "User revised the unreleased visibility setting to positive Show Postpone: off only for verified fresh clients, on for pre-setting saved boards, preserve explicit choices. Retain prior Postpone feature assertions with explicit visible fixtures rather than weakening them.",
+    "previousBehavior": "Prior source candidate used Hide Postpone default off for all boards. Fresh clients displayed Postpone, and no positive preference distinguished older saved boards.",
+    "intendedBehavior": "Show Postpone is off only at verified fresh initialization; existing local/cloud/import/recovery boards default on when absent, explicit booleans survive and native Settings consumer saves visibility without changing holds.",
+    "replacementTests": [
+      "RISK Show Postpone preference: actual Settings checkbox hides both scanner controls and restores them without changing tasks",
+      "RISK Show Postpone initialization: fresh browser and host clients default off while recovery evidence keeps visibility",
+      "RISK Show Postpone local adoption: saved empty legacy boards and explicit choices survive reload with future settings intact",
+      "RISK Show Postpone cloud adoption: missing legacy setting and explicit choices override fresh defaults at all supported revisions",
+      "RISK Show Postpone import: actual JSON consumer treats old settings as existing and preserves explicit choices and holds",
+      "RISK Show Postpone explicit visibility: saved booleans drive positive checkbox and both scanner surfaces",
+      "RISK Show Postpone normalization: explicit positive choices win and draft inverse choices migrate only when absent"
+    ],
+    "preservedCoverage": [
+      "All pre-existing Postpone behavior, sizing, theme, expiry, hold merge, Return, completion/Undo and cloud preservation assertions retained. Three rendered/consumer fixtures explicitly enable Postpone because requested fresh default now hides it.",
+      "Unrelated settings, unknown future keys, existing Halving initialization, corrupt/recovery storage and clean cloud adoption protection remain covered without changes."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK Show Postpone' tests.js",
+      "failure": "Observed six failing cases before delta implementation: fresh showPostpone undefined vs false; legacy local/cloud/import undefined vs true; explicit false still renders button (true vs false); inverse-draft normalization undefined vs false. Full output retained evidence/red-show-defaults.txt. Earlier original checkbox RED also retained red.txt. Postimplementation cohort initially exposed three existing visibility fixtures; their expected Postpone assertions were retained and fixtures explicitly enabled to honor the changed user default."
+    }
+  },
+  {
+    "testChangesSha256": "abdd4e975e7967f0df97d3d22248c8f17f67d73624298e4f72e53a895eee1731",
+    "reason": "Protect the requested saved visibility toggle through the real Settings change consumer and both scanner surfaces.",
+    "previousBehavior": "The scanner always displays Postpone and no saved preference exists to hide it.",
+    "intendedBehavior": "Hide Postpone defaults off, saves immediately and hides both controls while preserving existing task holds and scanner state.",
+    "replacementTests": [
+      "RISK Hide Postpone preference: actual Settings checkbox hides both scanner controls and restores them without changing tasks"
+    ],
+    "preservedCoverage": [
+      "Existing postpone duration, eligibility, completion/Undo, concurrent holds and cloud reconciliation assertions remain unchanged."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK Hide Postpone' tests.js",
+      "failure": "Observed before implementation: absent saved preference defaults off failed with actual undefined versus expected false. Full output retained in task-2/evidence/red.txt."
     }
   }
 ]

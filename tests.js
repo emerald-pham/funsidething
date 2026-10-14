@@ -24449,7 +24449,7 @@ test('RISK changelog editorial: public history omits internal housekeeping and r
 });
 
 test('RISK Postpone: mounted scanner action defers without rating or task edits and expiry restores soft eligibility',async()=>{
- const {ctx,shim}=await loadApp({seed:981});setFakeTime(ctx,Date.parse('2026-10-10T12:00:00Z'));
+ const {ctx,shim}=await loadApp({seed:981});ctx.state.settings.showPostpone=true;setFakeTime(ctx,Date.parse('2026-10-10T12:00:00Z'));
  const a=ctx.addTask('Current'),b=ctx.addTask('Next'),soft=ctx.addTask('Soft'),hard=ctx.addTask('Hard');ctx.setTaskPrerequisites(soft.id,[a.id]);ctx.setTaskPrerequisites(hard.id,[a.id]);ctx.writeTaskDependencyModes(hard,{[a.id]:'hard'});
  a.due='2026-10-12';a.startsAt='2026-10-01';const before=JSON.stringify([a.mu,a.sigma,a.due,a.startsAt,a.done,a.ratingHistory]);ctx.state.chain=[b.id];ctx.state.candidateId=a.id;ctx.state.mode='scan';
  ctx.renderScan();assert.match(shim.document.getElementById('scan').innerHTML,/data-act="postpone"/);
@@ -24504,17 +24504,17 @@ test('RISK Postpone: scan surfaces match neighboring decision button sizing with
   assert.ok(classes(postpone).includes('subtle'),'retain the established neutral border weight shadow and state vocabulary');
   assert.deepEqual(classes(edit).sort(),['btn','sm','subtle'],'Edit sizing remains unchanged');
  };
- const scan=await loadApp({seed:997});addTaskAged(scan.ctx,'Oldest',900000);addTaskAged(scan.ctx,'Candidate',1000);scan.ctx.startScan('descending');scan.ctx.render();
+ const scan=await loadApp({seed:997});scan.ctx.state.settings.showPostpone=true;addTaskAged(scan.ctx,'Oldest',900000);addTaskAged(scan.ctx,'Candidate',1000);scan.ctx.startScan('descending');scan.ctx.render();
  assertNeighbors(scan.shim.elements.get('scan').innerHTML,'postpone','yes',scan.ctx.state.candidateId);
- for(const woop of [false,true]){const {ctx,shim}=await loadApp({seed:998});const t=ctx.addTask('Only remaining task',true);ctx.state.settings.lastTaskWoop=woop;ctx.state.mode='work';ctx.render();assertNeighbors(shim.elements.get('scan').innerHTML,'bench-postpone','bench-done',t.id);}
+ for(const woop of [false,true]){const {ctx,shim}=await loadApp({seed:998});ctx.state.settings.showPostpone=true;const t=ctx.addTask('Only remaining task',true);ctx.state.settings.lastTaskWoop=woop;ctx.state.mode='work';ctx.render();assertNeighbors(shim.elements.get('scan').innerHTML,'bench-postpone','bench-done',t.id);}
  const source=fs.readFileSync(new URL('./index.html',import.meta.url),'utf8');
  assert.match(source,/\.btn\.subtle\{background:var\(--surface\);color:var\(--ink\);border:1px solid var\(--line\);box-shadow:none;font-weight:600\}/,'unrelated Edit palette stays intact');
  assert.match(source,/\.btn\.subtle:disabled\{/,'shared disabled treatment remains available');
 });
 
 test('RISK Postpone: day paint stays white and night paint matches Edit on both scanner surfaces',async()=>{
- const scan=await loadApp({seed:999});addTaskAged(scan.ctx,'Oldest',900000);addTaskAged(scan.ctx,'Candidate',1000);scan.ctx.startScan('descending');scan.ctx.render();
- const only=await loadApp();only.ctx.addTask('Final task',true);only.ctx.state.mode='work';only.ctx.render();
+ const scan=await loadApp({seed:999});scan.ctx.state.settings.showPostpone=true;addTaskAged(scan.ctx,'Oldest',900000);addTaskAged(scan.ctx,'Candidate',1000);scan.ctx.startScan('descending');scan.ctx.render();
+ const only=await loadApp();only.ctx.state.settings.showPostpone=true;only.ctx.addTask('Final task',true);only.ctx.state.mode='work';only.ctx.render();
  for(const [app,action]of [[scan,'postpone'],[only,'bench-postpone']]){
   const markup=app.shim.elements.get('scan').innerHTML,classes=markup.match(new RegExp('<button class="([^"]+)" data-act="'+action+'"'))?.[1].split(/\s+/);
   assert.ok(classes?.includes('subtle')&&classes.includes('postpone'),'both mounted Postpone surfaces use their scoped theme treatment');
@@ -26059,4 +26059,58 @@ test('RISK scene color FAQ: seeded palettes stay in a compact dedicated answer',
  const colors=answers.get('Why do visitor colors stay consistent?');assert.ok(colors,'palette guidance has its own concise answer beside the transit explanation');
  assert.match(colors,/Kites have two-tone fabric and passing planes use varied pastel liveries/);assert.match(colors,/shared visitor seed/);assert.match(colors,/same visit keeps its palette after reload/);assert.match(colors,/night shading still follows the scene/);
  assert.doesNotMatch(answers.get('How do I change the scenery?'),/Kites have two-tone|pastel liveries/,'general controls guidance retains its established scope and word budget');
+});
+
+// Visibility is a saved presentation choice; existing holds and scanner state survive.
+test('RISK Show Postpone preference: actual Settings checkbox hides both scanner controls and restores them without changing tasks',async()=>{
+ const {ctx,shim}=await loadApp({seed:982});
+ assert.equal(ctx.state.settings.showPostpone,false,'verified fresh client defaults off');
+ for(const value of [undefined,null,'true',1])assert.equal(ctx.normalizeSettings({showPostpone:value}).showPostpone,true);
+ ctx.state.settings.showPostpone=true;
+ const a=ctx.addTask('Dotted'),b=ctx.addTask('Candidate'),held=ctx.addTask('Held');ctx.writeTaskPostpone(held,Date.now()+3600000);
+ ctx.state.chain=[a.id];ctx.state.candidateId=b.id;ctx.state.mode='scan';ctx.render();
+ const scanner=()=>shim.document.getElementById('scan').innerHTML;
+ assert.match(scanner(),/data-act="postpone"/);assert.match(scanner(),/data-act="bench-postpone"/);
+ const tasks=JSON.stringify(ctx.state.tasks),chain=JSON.stringify(ctx.state.chain),until=ctx.taskPostponeUntil(held);
+ ctx.openSettings();assert.match(shim.document.getElementById('modalRoot').innerHTML,/id="stShowPostpone" type="checkbox"/);
+ const field=shim.document.getElementById('stShowPostpone');field.id='stShowPostpone';field.matches=()=>false;field.checked=false;
+ shim.document.dispatchEvent({type:'change',target:field});assert.equal(ctx.state.settings.showPostpone,false);
+ assert.doesNotMatch(scanner(),/data-act="(?:bench-)?postpone"/);assert.equal(JSON.stringify(ctx.state.tasks),tasks);assert.equal(JSON.stringify(ctx.state.chain),chain);assert.equal(ctx.state.candidateId,b.id);
+ ctx.closeModal();ctx.openSettings();assert.match(shim.document.getElementById('modalRoot').innerHTML,/id="stShowPostpone" type="checkbox"\//);
+ ctx.onAction('save-settings',{dataset:{}});assert.equal(ctx.state.settings.showPostpone,false);
+ await ctx.persist();const reload=await loadApp({seedStorage:{[SYNC_STORE_KEY]:shim.localStorage.getItem(SYNC_STORE_KEY)}});assert.equal(reload.ctx.state.settings.showPostpone,false);assert.equal(reload.ctx.taskPostponeUntil(reload.ctx.state.tasks.find(t=>t.id===held.id)),until);
+ field.checked=true;shim.document.dispatchEvent({type:'change',target:field});assert.equal(ctx.state.settings.showPostpone,true);assert.match(scanner(),/data-act="postpone"/);
+ ctx.state.mode='work';ctx.state.candidateId=null;ctx.render();assert.match(scanner(),/data-act="bench-postpone"/);
+ field.checked=false;shim.document.dispatchEvent({type:'change',target:field});assert.doesNotMatch(scanner(),/data-act="bench-postpone"/);
+ ctx.undo();assert.equal(ctx.state.settings.showPostpone,true);assert.match(scanner(),/data-act="bench-postpone"/);assert.equal(ctx.taskPostponeUntil(ctx.state.tasks.find(t=>t.id===held.id)),until);
+ ctx.openHelp();const faq=shim.document.getElementById('modalRoot').innerHTML;assert.match(faq,/Show Postpone button/);assert.match(faq.split('<dt>Which settings save immediately?</dt><dd>')[1].split('</dd>')[0],/Show Postpone button/);
+});
+
+// Freshness comes from verified absence of saved data, never a missing setting.
+test('RISK Show Postpone initialization: fresh browser and host clients default off while recovery evidence keeps visibility',async()=>{
+ for(const options of [{},{hostStorage:{}}]){const {ctx}=await loadApp(options);assert.equal(ctx.state.settings.showPostpone,false);}
+ const base=await loadApp();assert.equal(base.ctx.defaultState().settings.showPostpone,true,'factory recovery is legacy-compatible');
+ for(const seedStorage of [{[SYNC_STORE_KEY]:'{damaged existing'}, {'fvp:chain-scanner:daily-backups:v1':'[]'}]){const {ctx}=await loadApp({seedStorage});assert.equal(ctx.state.settings.showPostpone,true,'existing unreadable/backup evidence is not fresh');}
+});
+test('RISK Show Postpone local adoption: saved empty legacy boards and explicit choices survive reload with future settings intact',async()=>{
+ const base=await loadApp();for(const value of [undefined,true,false])for(const backend of ['browser','host']){
+ const board=base.ctx.defaultState();delete board.settings.showPostpone;delete board.settings.hidePostpone;if(value!==undefined)board.settings.showPostpone=value;board.settings.futurePreference={v:99,choice:'retain'};
+ const raw=JSON.stringify(board),app=await loadApp(backend==='host'?{hostStorage:{[SYNC_STORE_KEY]:raw}}:{seedStorage:{[SYNC_STORE_KEY]:raw}});assert.equal(app.ctx.state.settings.showPostpone,value??true);assert.deepEqual(JSON.parse(JSON.stringify(app.ctx.state.settings.futurePreference)),board.settings.futurePreference);await app.ctx.persist();const reload=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(app.ctx.state)}});assert.equal(reload.ctx.state.settings.showPostpone,value??true);
+ }
+});
+test('RISK Show Postpone cloud adoption: missing legacy setting and explicit choices override fresh defaults at all supported revisions',async()=>{
+ const base=await loadApp();for(const rev of [0,3,null])for(const value of [undefined,true,false]){
+ const board=base.ctx.defaultState();delete board.settings.showPostpone;delete board.settings.hidePostpone;if(value!==undefined)board.settings.showPostpone=value;board.settings.futurePreference={v:7};const h=makeSyncHarness({remote:board,rev}),app=await loadApp({cloudSyncFactory:h.factory});await app.ctx.cloudPull();await syncSettle(70);assert.equal(app.ctx.state.settings.showPostpone,value??true);assert.deepEqual(JSON.parse(JSON.stringify(app.ctx.state.settings.futurePreference)),{v:7});if(rev!==null)assert.equal(h.calls.filter(x=>x==='push').length,0,'adoption must not write fresh defaults over remote');
+ }
+});
+test('RISK Show Postpone import: actual JSON consumer treats old settings as existing and preserves explicit choices and holds',async()=>{
+ const {ctx,shim}=await loadApp();const t=ctx.addTask('Import hold fixture');ctx.writeTaskPostpone(t,Date.now()+3600000);const until=ctx.taskPostponeUntil(t),board=JSON.parse(JSON.stringify(ctx.state));delete board.settings.showPostpone;delete board.settings.hidePostpone;board.settings.futurePreference={v:3};
+ for(const value of [undefined,true,false]){if(value===undefined)delete board.settings.showPostpone;else board.settings.showPostpone=value;shim.document.getElementById('jsonBox').value=JSON.stringify(board);ctx.onAction('import-json',{});assert.equal(ctx.state.settings.showPostpone,value??true);assert.equal(ctx.taskPostponeUntil(ctx.state.tasks.find(x=>x.id===t.id)),until);assert.deepEqual(JSON.parse(JSON.stringify(ctx.state.settings.futurePreference)),{v:3});}
+});
+test('RISK Show Postpone explicit visibility: saved booleans drive positive checkbox and both scanner surfaces',async()=>{
+ const base=await loadApp();for(const value of [false,true]){const board=base.ctx.defaultState();board.settings.showPostpone=value;delete board.settings.hidePostpone;const {ctx,shim}=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(board)}});const a=ctx.addTask('Explicit dot'),b=ctx.addTask('Explicit candidate');ctx.state.chain=[a.id];ctx.state.candidateId=b.id;ctx.state.mode='scan';ctx.render();const markup=shim.document.getElementById('scan').innerHTML;assert.equal(/data-act="postpone"/.test(markup),value);assert.equal(/data-act="bench-postpone"/.test(markup),value);ctx.openSettings();assert.match(shim.document.getElementById('modalRoot').innerHTML,new RegExp('id="stShowPostpone" type="checkbox"'+(value?' checked':'')+'/> Show Postpone button'));}
+});
+test('RISK Show Postpone normalization: explicit positive choices win and draft inverse choices migrate only when absent',async()=>{
+ const {ctx}=await loadApp();for(const value of [true,false]){assert.equal(ctx.normalizeSettings({showPostpone:value,hidePostpone:value}).showPostpone,value);assert.equal(ctx.normalizeSettings({hidePostpone:value}).showPostpone,!value);}
+ for(const value of [null,'true',1,{v:99}])assert.equal(ctx.normalizeSettings({showPostpone:value,hidePostpone:true}).showPostpone,true,'invalid positive choice is not an absent legacy field');
 });
