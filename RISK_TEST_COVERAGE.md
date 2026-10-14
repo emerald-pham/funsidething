@@ -1122,3 +1122,8 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK Show Postpone explicit visibility: saved booleans drive positive checkbox and both scanner surfaces
 
 - RISK Show Postpone normalization: explicit positive choices win and draft inverse choices migrate only when absent
+
+
+- `RISK task history: compact Top X uses recorded snapshots and preserves legacy facts` — Saved cutoff transitions and missing legacy cutoffs, independent of today’s pool.
+
+- `RISK history browser driver: first-run motion uses the supported choice before history fixtures` — Prevent obsolete untimed preference seeding or direct dismissal from returning in the offline history driver.

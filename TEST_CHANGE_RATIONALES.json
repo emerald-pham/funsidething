@@ -6815,5 +6815,121 @@
       "command": "node --test --test-name-pattern='RISK Hide Postpone' tests.js",
       "failure": "Observed before implementation: absent saved preference defaults off failed with actual undefined versus expected false. Full output retained in task-2/evidence/red.txt."
     }
+  },
+  {
+    "testChangesSha256": "faa4ff8bf4d381c47b29c0831746d6b3a25eae3cb94c06e32d60366c0a192dc6",
+    "reason": "Add direct compact history snapshot coverage without altering existing metric contracts.",
+    "previousBehavior": "Compact events omit saved Top X cutoff transitions.",
+    "intendedBehavior": "Compact events render saved cutoff transitions and explicitly unavailable historical cutoffs.",
+    "replacementTests": [
+      "RISK task history: compact Top X uses recorded snapshots and preserves legacy facts"
+    ],
+    "preservedCoverage": [
+      "Existing likelihood, plain Done, ranking, storage and synchronization contracts are unchanged."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK task history: compact Top X' tests.js",
+      "failure": "Observed before implementation: expected Top X 2 of 7 → 4 of 9; actual Likelihood 46.49% / Score 29.21 / Uncertainty 7.19. Evidence /tmp/topx-red.txt. Delta RED /tmp/topx-slash-red.txt observed separate metric line assertion fail on > / Top X before removing slash."
+    }
+  },
+  {
+    "testChangesSha256": "a958a7cd87f0c00000834048313de79fc2d892d85c6db8feb1751aa5a823b9ca",
+    "reason": "Add direct compact history snapshot coverage without altering existing metric contracts. Rendered phone review found an orphaned slash on the separate Top X line; add a direct punctuation assertion.",
+    "previousBehavior": "Compact events omit saved Top X cutoff transitions.",
+    "intendedBehavior": "Compact events render saved cutoff transitions and explicitly unavailable historical cutoffs.",
+    "replacementTests": [
+      "RISK task history: compact Top X uses recorded snapshots and preserves legacy facts"
+    ],
+    "preservedCoverage": [
+      "Existing likelihood, plain Done, ranking, storage and synchronization contracts are unchanged."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK task history: compact Top X' tests.js",
+      "failure": "Observed before implementation: expected Top X 2 of 7 → 4 of 9; actual Likelihood 46.49% / Score 29.21 / Uncertainty 7.19. Evidence /tmp/topx-red.txt. Delta RED /tmp/topx-slash-red.txt observed separate metric line assertion fail on > / Top X before removing slash."
+    }
+  },
+  {
+    "testChangesSha256": "de6cb44b03e768faf56ff40515b95d05be20bd1e9d1d31baadd23e2fc01dd23c",
+    "reason": "Correct only the existing isolated browser history driver to complete supported first-run motion choice; preserve the observed prior browser failure.",
+    "previousBehavior": "Driver seeds obsolete untimed reduced string and directly dismisses dialog; cold reload asks again and intercepts Undo.",
+    "intendedBehavior": "Driver clicks real Reduced motion button and verifies supported timed browser-local choice before history setup, allowing reload to honor actual consent.",
+    "replacementTests": [
+      "RISK history browser driver: first-run motion uses the supported choice before history fixtures",
+      "RISK task history: compact Top X uses recorded snapshots and preserves legacy facts"
+    ],
+    "preservedCoverage": [
+      "All prior pagination, drafts, layout, offline reload, saved history and completion/Undo assertions remain intact. No product or consent code changes."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK history browser driver:' tests.js",
+      "failure": "Observed RED before driver edit: expected supported #motionDialog Reduced motion button click, absent from existing history driver. /tmp/topx-driver-red.txt. Earlier real browser failure preserved at /tmp/topx-browser-history.txt. Original Top X RED /tmp/topx-red.txt and punctuation delta RED /tmp/topx-slash-red.txt retained."
+    }
+  },
+  {
+    "testChangesSha256": "37049a9fe8c76cd74034252bbd4c80e9a83a3f5bf18ad0b7ad72237f6b9ece15",
+    "reason": "Correct only the existing isolated browser history driver to complete supported first-run motion choice; preserve the observed prior browser failure. Also retains the contemporaneous snapshot display and punctuation RED evidence from prior candidate records.",
+    "previousBehavior": "Driver seeds obsolete untimed reduced string and directly dismisses dialog; cold reload asks again and intercepts Undo.",
+    "intendedBehavior": "Driver clicks real Reduced motion button and verifies supported timed browser-local choice before history setup, allowing reload to honor actual consent.",
+    "replacementTests": [
+      "RISK history browser driver: first-run motion uses the supported choice before history fixtures",
+      "RISK task history: compact Top X uses recorded snapshots and preserves legacy facts"
+    ],
+    "preservedCoverage": [
+      "All prior pagination, drafts, layout, offline reload, saved history and completion/Undo assertions remain intact. No product or consent code changes."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK history browser driver:' tests.js",
+      "failure": "Observed RED before driver edit: expected supported #motionDialog Reduced motion button click, absent from existing history driver. /tmp/topx-driver-red.txt. Earlier real browser failure preserved at /tmp/topx-browser-history.txt. Original Top X RED /tmp/topx-red.txt and punctuation delta RED /tmp/topx-slash-red.txt retained."
+    }
+  },
+  {
+    "testChangesSha256": "2a24ca761847063d0f1fbcb509494125747e372cc79ad7f83b6ba78c691941d8",
+    "reason": "Source reconciliation onto merged colors/blimp/Show Postpone base preserves their tests and the reviewed Top X tests. Rationale binds exact c616df29fd5145e7dc3bcf593e23140f9697d63f comparison; no historical failures rewritten.",
+    "previousBehavior": "Driver seeds obsolete untimed reduced string and directly dismisses dialog; cold reload asks again and intercepts Undo.",
+    "intendedBehavior": "Driver clicks real Reduced motion button and verifies supported timed browser-local choice before history setup, allowing reload to honor actual consent.",
+    "replacementTests": [
+      "RISK task history: compact Top X uses recorded snapshots and preserves legacy facts",
+      "RISK history browser driver: first-run motion uses the supported choice before history fixtures"
+    ],
+    "preservedCoverage": [
+      "All prior pagination, drafts, layout, offline reload, saved history and completion/Undo assertions remain intact. No product or consent code changes."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK history browser driver:' tests.js",
+      "failure": "Observed RED before driver edit: expected supported #motionDialog Reduced motion button click, absent from existing history driver. /tmp/topx-driver-red.txt. Earlier real browser failure preserved at /tmp/topx-browser-history.txt. Original Top X RED /tmp/topx-red.txt and punctuation delta RED /tmp/topx-slash-red.txt retained."
+    }
+  },
+  {
+    "testChangesSha256": "e8f2c345d7466d808f2dab5dd9336834cab5a3a886d7d37088d5318c80fad944",
+    "reason": "Source reconciliation onto merged colors/blimp/Show Postpone base preserves their tests and the reviewed Top X tests. Rationale binds exact e93dbae47638a7c80243eff0e8419c1884eb27c3 comparison; no historical failures rewritten.",
+    "previousBehavior": "Previous reviewed Top X head lacks the subsequently reviewed and merged colors/blimp/Show Postpone tests; this comparison includes inherited upstream executable test additions.",
+    "intendedBehavior": "Retain upstream reviewed Show Postpone control and saved-setting tests alongside unchanged reviewed Top X history coverage; no upstream behavior or old assertions are removed.",
+    "replacementTests": [
+      "RISK Show Postpone preference: actual Settings checkbox hides both scanner controls and restores them without changing tasks"
+    ],
+    "preservedCoverage": [
+      "All prior pagination, drafts, layout, offline reload, saved history and completion/Undo assertions remain intact. No product or consent code changes."
+    ],
+    "redEvidence": {
+      "command": "Upstream retained Show Postpone RED commands in c616df29fd5145e7dc3bcf593e23140f9697d63f: node --test --test-name-pattern='RISK Hide Postpone' tests.js",
+      "failure": "Reuse inherited RED evidence explicitly recorded by the Show Postpone owner in released-base TEST_CHANGE_RATIONALES.json: missing saved preference expected false but actual undefined; task-2/evidence/red.txt. Other inherited upstream tests retain their own original RED rationale records. This is evidence reuse, not a new contemporaneous RED for upstream features. Own Top X original/punctuation/driver RED retained separately."
+    }
+  },
+  {
+    "testChangesSha256": "9022535b6854329eb139476dbfc869fa041aaaff8e90fda6d9aebf4463bdbd0b",
+    "reason": "The previous-reviewed-head symmetric comparison uses shared ancestor 382de0b and therefore includes upstream reviewed colors/blimp/Show Postpone changes as well as Top X. Preserve their original owner rationale/RED evidence without representing it as newly observed here.",
+    "previousBehavior": "Shared historical comparison ancestor predates merged colors/blimp/Show Postpone and reviewed Top X; all were individually observed and reviewed in their original branches.",
+    "intendedBehavior": "Combine unchanged upstream contracts with recorded-only compact Top X display and its supported consent browser fixture, preserving existing assertions.",
+    "replacementTests": [
+      "RISK Show Postpone preference: actual Settings checkbox hides both scanner controls and restores them without changing tasks",
+      "RISK task history: compact Top X uses recorded snapshots and preserves legacy facts"
+    ],
+    "preservedCoverage": [
+      "All prior pagination, drafts, layout, offline reload, saved history and completion/Undo assertions remain intact. No product or consent code changes."
+    ],
+    "redEvidence": {
+      "command": "Original Top X node --test --test-name-pattern=\"RISK task history: compact Top X\" tests.js; inherited upstream commands retained in released-base TEST_CHANGE_RATIONALES.json",
+      "failure": "Original observed Top X RED expected Top X 2 of 7 → 4 of 9, actual prior compact metrics /tmp/topx-red.txt; punctuation /tmp/topx-slash-red.txt; consent driver /tmp/topx-driver-red.txt. Upstream RED is reused from its exact released-base records, not claimed newly executed."
+    }
   }
 ]
