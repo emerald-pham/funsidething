@@ -1127,3 +1127,7 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - `RISK task history: compact Top X uses recorded snapshots and preserves legacy facts` — Saved cutoff transitions and missing legacy cutoffs, independent of today’s pool.
 
 - `RISK history browser driver: first-run motion uses the supported choice before history fixtures` — Prevent obsolete untimed preference seeding or direct dismissal from returning in the offline history driver.
+
+- RISK blimp schedule: independent seeded opportunities preserve existing scenes and reconstruct across clients
+- RISK blimp paint: seeded envelopes retain offscreen margins day-night shading and reduced-motion consumer
+- RISK blimp admission: full-budget and later overlapping visits reject complete crossings without eviction

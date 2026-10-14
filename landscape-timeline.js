@@ -170,6 +170,21 @@
           if(candidate.start<to&&candidate.start+candidate.duration>from)events.push(candidate);
         }
       }
+      // A separate immutable stream leaves every established visitor and its
+      // admission budget unchanged. Slots exceed the longest possible crossing.
+      for(let slot=Math.floor((from-240)/240);slot<=Math.ceil(to/240);slot++){
+        if(sample(seed,'blimp-admission',slot)>=.08*C.spawnRate('blimp'))continue;
+        const r=random(seed,'blimp',slot),speed=S.startingSpeed(r()),start=slot*240;
+        const candidate={id:`blimp:${slot}`,type:'blimp',start,duration:180/speed,speed,lane:r(),seed:r(),reverse:r()>.5};
+        if(start>=to||start+candidate.duration<=from)continue;
+        const end=start+candidate.duration,neighbors=[];
+        for(let day=Math.floor(start/DAY);day<=Math.floor(end/DAY);day++)neighbors.push(...dayPlan(day));
+        const overlaps=neighbors.filter(e=>e.start<end&&e.start+e.duration>start);
+        // Never evict or delay existing visits. Prove room throughout this
+        // crossing, conservatively retaining two slots for the two rail lines.
+        if([start,...overlaps.map(e=>Math.max(start,e.start))].some(at=>overlaps.filter(e=>e.start<=at&&e.start+e.duration>at).length>=S.MAX_EVENTS-2))continue;
+        events.push(candidate);
+      }
       const woods=[],weights=C.woodland.types.map(type=>C.spawnRate('woodland-'+type)),total=weights.reduce((a,b)=>a+b,0);
       for(let slot=Math.floor((from-MAX_LIFE*2)/C.woodland.interval);slot<=Math.ceil(to/C.woodland.interval);slot++){
         const start=slot*C.woodland.interval,r=random(seed,'woodland',slot);

@@ -1,5 +1,68 @@
 [
   {
+    "testChangesSha256": "2fbdd859fecc6f5f9b68436e2fb9177a8956cd894fbe0abd81e272750ba3de5b",
+    "reason": "Integrate already released Show Postpone and Top X changes into the preserved blimp branch while retaining their exact code and tests. Bind the inherited executable test delta to the actual previous remote tip comparison.",
+    "previousBehavior": "Previous remote blimp tip6ffa421 predates released Show Postpone and Top X; those inherited test changes appear in incremental push CI.",
+    "intendedBehavior": "Approved seeded blimps coexist with byte-preserved incoming features and tests; independent opportunities and complete-crossing capacity remain unchanged, with concise accurate FAQ and current shell fingerprints.",
+    "replacementTests": [
+      "RISK Show Postpone preference: actual Settings checkbox hides both scanner controls and restores them without changing tasks",
+      "RISK Show Postpone initialization: fresh browser and host clients default off while recovery evidence keeps visibility",
+      "RISK Show Postpone local adoption: saved empty legacy boards and explicit choices survive reload with future settings intact",
+      "RISK Show Postpone cloud adoption: missing legacy setting and explicit choices override fresh defaults at all supported revisions",
+      "RISK Show Postpone import: actual JSON consumer treats old settings as existing and preserves explicit choices and holds",
+      "RISK Show Postpone explicit visibility: saved booleans drive positive checkbox and both scanner surfaces",
+      "RISK Show Postpone normalization: explicit positive choices win and draft inverse choices migrate only when absent",
+      "RISK task history: compact Top X uses recorded snapshots and preserves legacy facts",
+      "RISK history browser driver: first-run motion uses the supported choice before history fixtures"
+    ],
+    "preservedCoverage": [
+      "All98a5540 tests remain an exact prefix of final tests.js; three original approved blimp tests append unchanged, preserving saved defaults, cloud/import/Undo, Top X snapshots, colors and gait contracts.",
+      "Integration adds no new behavior beyond previously tested blimp design and separately released features; original discriminating RED chronology and existing fullCI evidence remain retained and are not relabeled as a new preimplementation run."
+    ],
+    "redEvidence": {
+      "command": "Original blimp preimplementation and6ffa baseRED: node --test --test-name-pattern='^RISK blimp' tests.js; inherited feature RED commands retained verbatim in released main rationale records",
+      "failure": "Original blimp RED observed missing admitted event, painter and visitor FAQ before implementation; original162word FAQ failure was fixed without weakening130word guard. No new functional behavior is implemented during this merge; incoming Show Postpone and Top X RED records remain preserved. Changed-base focused/regression checks are new GREEN qualification, not new contemporaneous RED."
+    }
+  },
+  {
+    "testChangesSha256": "861a3c253e8f419fb46281542be3cc3baf004f8c74eece357f6b919a235200e6",
+    "reason": "Reconcile the user-approved blimp onto the newly released Show Postpone and Top X main base without changing its design, scheduling streams, or incoming feature contracts.",
+    "previousBehavior": "Released98a5540 includes Show Postpone and Top X but no blimp opportunity, painter, or dedicated blimp FAQ.",
+    "intendedBehavior": "Approved seeded blimps coexist with byte-preserved incoming features and tests; independent opportunities and complete-crossing capacity remain unchanged, with concise accurate FAQ and current shell fingerprints.",
+    "replacementTests": [
+      "RISK blimp schedule: independent seeded opportunities preserve existing scenes and reconstruct across clients",
+      "RISK blimp paint: seeded envelopes retain offscreen margins day-night shading and reduced-motion consumer",
+      "RISK blimp admission: full-budget and later overlapping visits reject complete crossings without eviction"
+    ],
+    "preservedCoverage": [
+      "All98a5540 tests remain an exact prefix of final tests.js; three original approved blimp tests append unchanged, preserving saved defaults, cloud/import/Undo, Top X snapshots, colors and gait contracts.",
+      "Integration adds no new behavior beyond previously tested blimp design and separately released features; original discriminating RED chronology and existing fullCI evidence remain retained and are not relabeled as a new preimplementation run."
+    ],
+    "redEvidence": {
+      "command": "Original blimp preimplementation and6ffa baseRED: node --test --test-name-pattern='^RISK blimp' tests.js; inherited feature RED commands retained verbatim in released main rationale records",
+      "failure": "Original blimp RED observed missing admitted event, painter and visitor FAQ before implementation; original162word FAQ failure was fixed without weakening130word guard. No new functional behavior is implemented during this merge; incoming Show Postpone and Top X RED records remain preserved. Changed-base focused/regression checks are new GREEN qualification, not new contemporaneous RED."
+    }
+  },
+  {
+    "testChangesSha256": "52d43ad91b25a6218f50fcd9e55fded49ec27933e7af2e76a95deadc882f65ba",
+    "reason": "Integrate the user-approved independent blimp visitor onto released colors without changing any existing scene schedule, seed sequence, data or protected color/gait assertions.",
+    "previousBehavior": "The released colors base has no blimp opportunity or painter and its FAQ does not explain blimp visits.",
+    "intendedBehavior": "Seeded pastel blimps cross outside-to-outside through independent opportunities only when the complete crossing fits the scene budget, with shared reconstruction and existing motion handling.",
+    "replacementTests": [
+      "RISK blimp schedule: independent seeded opportunities preserve existing scenes and reconstruct across clients",
+      "RISK blimp paint: seeded envelopes retain offscreen margins day-night shading and reduced-motion consumer",
+      "RISK blimp admission: full-budget and later overlapping visits reject complete crossings without eviction"
+    ],
+    "preservedCoverage": [
+      "All incoming colors tests and frozen gait/plane contracts remain unchanged, with whole-frame comparisons and every prior FAQ answer preserved.",
+      "Present and future overlapping crowd rejection, both rail reservations and immutable unrelated timeline comparison retain whole-lifetime capacity safety."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='^RISK blimp' tests.js on released936ec4d source before approved blimp implementation",
+      "failure": "Observed two behavioral failures: independent opportunity produced zero blimps, and extended FAQ lacked the new visitor. Prior original painter-absence RED and162word FAQ-budget RED are retained; nine integrated focused checks now pass."
+    }
+  },
+  {
     "testChangesSha256": "418cb1ddae1a960e5a8f4ae9c71c43160d5e7989c97f01ad3622c299898f53c3",
     "reason": "User-requested fresh OFF default makes Postpone optional. Preserve complete seven-action order/count/sm contracts with explicit Show ON fixtures and accurate scoped titles. Record exact protected fingerprints for PR main base and previous pushed heads because CI compares each event independently. No assertion removal or gate implementation change.",
     "previousBehavior": "Prior source candidate used Hide Postpone default off for all boards. Fresh clients displayed Postpone, and no positive preference distinguished older saved boards.",

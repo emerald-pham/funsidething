@@ -26141,3 +26141,49 @@ test('RISK history browser driver: first-run motion uses the supported choice be
  assert.doesNotMatch(driver,/addInitScript\(\(\)=>localStorage\.setItem\('fvp:chain-scanner:landscape-motion'/,'do not seed obsolete untimed consent');
  assert.doesNotMatch(driver,/getElementById\('motionDialog'\)\?\.close\(\)/,'do not bypass the actual welcome choice');
 });
+
+test('RISK blimp schedule: independent seeded opportunities preserve existing scenes and reconstruct across clients',()=>{
+ const ctx=sceneTimeline(),timelineSource=fs.readFileSync(path.join(__dirname,'landscape-timeline.js'),'utf8');
+ const reference=sceneTimeline({'landscape-timeline.js':()=>spawnSync('git',['show','382de0b:landscape-timeline.js'],{encoding:'utf8'}).stdout});
+ const options={seed:'blimp-preview',season:'winter',sunAt:()=>({altitude:-20,azimuth:90})},a=ctx.LandscapeTimeline.create(options),b=ctx.LandscapeTimeline.create(options),old=reference.LandscapeTimeline.create(options),epoch=Date.parse('2026-10-14T12:00Z');
+ let found=null;
+ for(let slot=0;slot<80;slot++)if(ctx.LandscapeTimeline.sample(options.seed,'blimp-admission',Math.floor(epoch/240000)+slot)<.08){found=epoch+slot*240000+1000;break;}
+ assert.ok(found,'bounded deterministic fixture finds a successful opportunity');
+ const snap=a.at(found),blimps=snap.events.filter(e=>e.type==='blimp');assert.equal(blimps.length,1,'the independent opportunity admits a blimp');
+ const normalize=x=>JSON.parse(JSON.stringify(x));assert.deepEqual(normalize(snap),normalize(b.at(found)),'cold clients match exactly');
+ assert.deepEqual(normalize({...snap,events:snap.events.filter(e=>e.type!=='blimp')}),normalize(old.at(found)),'all unrelated scene output remains byte equivalent');
+ a.at(found+600000);assert.deepEqual(normalize(a.at(found)),normalize(snap),'backward seek reconstructs the same visit');
+ assert.ok(blimps[0].duration<=240&&blimps[0].age>=0);assert.doesNotMatch(timelineSource,/localStorage|sessionStorage|firestore/i);
+ const geom=ctx.LandscapeGeometry.create(390,844),e=blimps[0];assert.equal(geom.routeProgress({...e,age:e.duration*.25},'x'),.25,'constant horizontal travel');
+});
+test('RISK blimp paint: seeded envelopes retain offscreen margins day-night shading and reduced-motion consumer',()=>{
+ assert.match(html,/Blimps cross the sky in several pastel colors/,'extended FAQ describes the new sky visitor');
+ assert.match(html,/visits are skipped unless there is room for a complete crossing/,'crowded opportunities are skipped, never queued');
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),start=source.indexOf("      if(e.type==='blimp'){");assert.ok(start>=0,'blimp has an actual scene painter');
+ const code=source.slice(start,source.indexOf("      if(e.type==='balloon'){",start)),inks=[];
+ const g={save(){},restore(){},translate(){},scale(){},beginPath(){},moveTo(){},lineTo(){},closePath(){},fill(){inks.push(this.fillStyle)},fillRect(){inks.push(this.fillStyle)}};
+ for(const seed of [.01,.11,.21])for(const night of [0,1]){
+  inks.length=0;vm.runInNewContext('(function(){'+code+'})()',{g,e:{type:'blimp',seed,lane:.5,reverse:false},x:-160,hy:200,p:{night,sky:['#aaccdd','#bbccdd'],city:'#405060'},geometry:{verticalOffset:()=>0},color:()=>['#db947e','#a4c9bd','#e6c680'][Math.floor(seed*10)],S:livingSky(),ellipse:(g,x,y,rx,ry,ink)=>{assert.ok(Math.abs(x)+rx<=40,'full envelope fits route entry margin');inks.push(ink)},line(){}});
+  assert.ok(inks.length>=5,'envelope fins ribs and gondola are painted');
+ }
+ assert.match(source,/const airborne=new Set\(\[[^\n]*'blimp'/,'blimp uses existing sky layer and reflection capture');
+ assert.match(source,/function scenePose\(e,firework=false\).*reduced\?/,'existing reduced-motion pose freezes new sky visitors');
+});
+
+test('RISK blimp admission: full-budget and later overlapping visits reject complete crossings without eviction',()=>{
+ const seed='blimp-preview',epoch=Date.parse('2026-10-14T12:00Z'),probe=sceneTimeline();
+ let slot=Math.floor(epoch/240000);while(probe.LandscapeTimeline.sample(seed,'blimp-admission',slot)>=.08)slot++;
+ const start=slot*240,at=start*1000+1000;
+ for(const delay of process.env.BLIMP_CAPACITY_NEGATIVE_CONTROL==='future'?[30]:[0,30]){
+  const ctx=sceneTimeline({'landscape-timeline.js':source=>{
+   const synthetic="function dayPlan(day){if(true)return Array.from({length:S.MAX_EVENTS-2},(_,i)=>({id:'fixture:'+i,type:'walker',start:"+(start+delay)+",duration:60,seed:.4,lane:.5,reverse:false}));";
+   let result=source.replace('function dayPlan(day){',synthetic);
+   if(process.env.BLIMP_CAPACITY_NEGATIVE_CONTROL)result=result.replace(/if\(\[start,\.\.\.overlaps\.map[\s\S]*?\)continue;/,'');
+   return result;
+  }}),scene=ctx.LandscapeTimeline.create({seed,season:'winter',sunAt:()=>({altitude:-20,azimuth:90})}).at(at);
+  assert.equal(scene.events.filter(e=>e.type==='blimp').length,0,delay?'a future crowd must reject the crossing before it begins':'an already full budget must reject the crossing');
+  assert.equal(scene.events.filter(e=>e.type==='walker').length,delay?0:ctx.LivingSky.MAX_EVENTS-2,'existing visits remain unchanged');
+ }
+ const sunny=probe.LandscapeTimeline.create({seed,season:'summer',sunAt:()=>({altitude:30,azimuth:90})}).at(at);
+ assert.equal(sunny.events.filter(e=>e.type==='blimp').length,0,'retain the real full-budget sunny fixture found during initial validation');
+});

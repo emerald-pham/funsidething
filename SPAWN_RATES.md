@@ -5,6 +5,12 @@ Use 0 to disable, 1 for the default, 0.5 for less, or 2 for more. Values from
 0 to 10 are accepted. Keep event IDs and the two-column table intact.
 An invalid table is rejected as a whole; missing rows use 1.
 
+Blimps use independent 240-second UTC opportunities with an 8% chance at rate 1.
+They keep existing visits unchanged and skip a crossing if its complete lifetime
+would exceed the scene budget, reserving room for both rail lines. There is no
+guaranteed next arrival. Their 180-second baseline crossing uses the existing
+seeded travel-speed range and works in all seasons, by day and night.
+
 Ordinary visitors use relative selection weights, so increasing one reduces
 others' share of the same limited visitor budget. Seasonal eligibility still applies.
 Train and metro have dedicated seeded-chance service: 65 and 50 seconds baseline
@@ -84,6 +90,7 @@ and deploy this file with the app so installed offline copies receive it.
 | cyclist | 1 |
 | bird | 1 |
 | balloon | 1 |
+| blimp | 1 |
 | train | 1 |
 | metro | 1 |
 | plane | 1 |
