@@ -1,5 +1,22 @@
 [
   {
+    "testChangesSha256": "30b16197757bf9096ff262a28e59491e025d740273f2325b535ae245aa937662",
+    "reason": "Add direct actual transit painter line-livery coverage and matching extended FAQ guidance before functional changes.",
+    "previousBehavior": "Lower railway bodies were neutral beige and metro bodies pale green.",
+    "intendedBehavior": "Muted terracotta railway and teal metro bodies remain consistent for every carriage and departure, direction and fresh context with unchanged night shading and windows.",
+    "replacementTests": [
+      "RISK transit line livery: actual painter keeps line colors across cars directions reloads and day-night shading",
+      "RISK transit line guidance: extended scenery FAQ explains stable line colors without new settings"
+    ],
+    "preservedCoverage": [
+      "All existing tests and assertions retained byte-for-byte; seeded admission, paint geometry, shadows, motion and saved-data paths unchanged."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK transit line' tests.js",
+      "failure": "Observed before implementation: actual body #e4cfa5 did not equal #c78d76 and extended FAQ lacked line guidance. Durable red.txt and red-final.txt retained in .task-storage/transit-line-colors/evidence."
+    }
+  },
+  {
     "testChangesSha256": "ac66c890d141c947556faafd61b197997eb93a5154deb6efbf5514121936e996",
     "reason": "Bind the additive absent-root regression to the incremental push comparison as well as the retained cumulative main comparison; no tests or executable behavior change in this evidence-only correction.",
     "previousBehavior": "New pattern paint attempted root methods when a non-DOM host had no documentElement.",
