@@ -1079,3 +1079,20 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - `RISK context filter restoration: every existing context remains offered independently of scanner choices and open matches` — Preserves legacy assignments, explicit edits, scanner-independent filters and usable native feedback.
 
 - `RISK context selector fallback isolation: ordinary selected controls do not share a rule with unsupported relational selectors` — Preserves legacy assignments, explicit edits, scanner-independent filters and usable native feedback.
+
+## Patterned active indicators
+- `RISK patterned indicators preference: actual checkbox saves immediately survives reload and leaves task state intact`
+- `RISK patterned indicators paint: opt-in static dashed diagonal textures retain semantic fills and separate excluded state`
+- `RISK patterned indicators FAQ: appearance chapter explains default persistence and separate meanings`
+- `RISK patterned indicators benchmark fill: striped overlay retains original chain gradient beneath the texture`
+- `RISK patterned indicators full-field cue: selected controls use genuinely dashed stripes across the fill while small glyphs stay clear`
+- `RISK patterned indicators sync contrast: status texture uses semantic ink rather than white on the white day surface`
+- `RISK patterned indicators light-label protection: candidate and tomorrow badges retain unobstructed night-theme ink`
+- `RISK patterned indicators immediate-save FAQ: established settings lifecycle answer lists the new toggle`
+- `RISK patterned indicators selector fallback: native editor texture is isolated from ordinary active chips`
+- `RISK patterned indicators selected rank contrast: texture has shared green fill and an opaque unchanged-ink label backing`
+- `RISK patterned indicators selected caption contrast: motion descriptions share readable selected action ink in both themes`
+- `RISK patterned indicators edge geometry: light-label edge cues clip a square dashed tile without vertical compression`
+- `RISK patterned context direction cue: contrasting full-control rails leave original check and X glyphs untouched`
+- `RISK patterned indicator slope legend: FAQ distinguishes locked selections and unset location from ordinary selected controls` — Covers semantic exceptions in the appearance legend.
+- `RISK patterned indicators absent root: both preference states safely defer paint until a document root exists` — Preserves established non-DOM startup and resumed paint behavior.

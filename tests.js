@@ -25886,3 +25886,75 @@ test('RISK legacy context peer deletion: preserved references do not override co
  const peer=JSON.parse(JSON.stringify(base));peer.contexts=[];peer.tasks[0].ctx=['future-id'];ctx.rebaseTaskEditorFields(peer,local,base);assert.deepEqual(peer.tasks[0].ctx,['future-id'],'peer known-context deletion must prevail');assert.equal(peer.tasks[0].title,'Independent title edit','independent observed title edit must survive');
  ctx.onAction('del-ctx',{dataset:{id:'home'}});assert.deepEqual(Array.from(t.ctx),['future-id'],'explicit local deletion still removes its known reference');
 });
+
+// Optional stripes protect existing appearance and remain presentation-only.
+test('RISK patterned indicators preference: actual checkbox saves immediately survives reload and leaves task state intact',async()=>{
+ const {ctx,shim}=await loadApp();assert.equal(ctx.state.settings.patternedIndicators,false,'old and new boards default off');
+ for(const value of [undefined,null,'true',1])assert.equal(ctx.normalizeSettings({patternedIndicators:value}).patternedIndicators,false);
+ ctx.state.contexts=[{id:'home',name:'Home',active:true}];ctx.addTask('Private pattern fixture',false,['home']);const tasks=JSON.stringify(ctx.state.tasks),contexts=JSON.stringify(ctx.state.contexts);
+ ctx.openSettings();assert.match(shim.document.getElementById('modalRoot').innerHTML,/id="stPatternedIndicators" type="checkbox"/);
+ const field=shim.document.getElementById('stPatternedIndicators');field.id='stPatternedIndicators';field.matches=()=>false;field.checked=true;
+ shim.document.dispatchEvent({type:'change',target:field});assert.equal(ctx.state.settings.patternedIndicators,true);assert.equal(shim.document.documentElement.getAttribute('data-patterned-indicators'),'true');
+ ctx.closeModal();ctx.openSettings();assert.match(shim.document.getElementById('modalRoot').innerHTML,/id="stPatternedIndicators" type="checkbox" checked/);
+ await ctx.persist();const saved=shim.localStorage.getItem(SYNC_STORE_KEY);const reloaded=await loadApp({seedStorage:{[SYNC_STORE_KEY]:saved}});assert.equal(reloaded.ctx.state.settings.patternedIndicators,true);assert.equal(reloaded.shim.document.documentElement.getAttribute('data-patterned-indicators'),'true');
+ assert.equal(JSON.stringify(ctx.state.tasks),tasks);assert.equal(JSON.stringify(ctx.state.contexts),contexts);
+ field.checked=false;shim.document.dispatchEvent({type:'change',target:field});assert.equal(ctx.state.settings.patternedIndicators,false);assert.equal(shim.document.documentElement.getAttribute('data-patterned-indicators'),null);
+});
+test('RISK patterned indicators paint: opt-in static dashed diagonal textures retain semantic fills and separate excluded state',()=>{
+ const css=fs.readFileSync(path.join(__dirname,'landscape.css'),'utf8');assert.match(css,/data-patterned-indicators/);assert.match(css,/repeating-linear-gradient\(135deg/);assert.match(css,/--indicator-excluded/,'excluded must differ from included');
+ for(const selector of ['.ltag.on','.ctxpick .ltag:has(input:checked)','.ctxitem.included','.ctxitem.excluded','#addButton.yes','.setting-set','.setting-unset','.bulk-rank-selected','.motion-choices button[aria-pressed="true"]','.chip.due-overdue'])assert.ok(css.slice(css.indexOf('/* Optional patterned')).includes(selector),selector+' audited state has a texture');
+ const patterned=css.slice(css.indexOf('/* Optional patterned'));assert.match(patterned,/background-size:/);assert.match(patterned,/background-repeat:no-repeat/);const unchanged=patterned.replace(/:root\[data-patterned-indicators="true"\] \.bulk-rank-selected\{background-color:var\(--chain-deep\)\}/,'').replace(/:root\[data-patterned-indicators="true"\] \.motion-choices button\[aria-pressed="true"\] span\{color:var\(--action-ink\)\}/,'').replace(/:root\[data-patterned-indicators="true"\] \.ctxitem\.(?:included|excluded)::after\{background-color:light-dark\(#[a-f0-9]+,#[a-f0-9]+\);?[^}]*\}/g,'');assert.doesNotMatch(unchanged,/animation:|transition:|background-color:|(?<!-)color:/,'only explicitly protected contrast repairs and original-color context rails alter paint; other semantic fills and motion remain unchanged');
+});
+test('RISK patterned indicators FAQ: appearance chapter explains default persistence and separate meanings',async()=>{
+ const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;assert.match(help,/Patterned active indicators/);assert.match(help,/Off by default/);assert.match(help,/stripes/);
+});
+
+test('RISK patterned indicators benchmark fill: striped overlay retains original chain gradient beneath the texture',()=>{
+ const css=fs.readFileSync(path.join(__dirname,'landscape.css'),'utf8');assert.match(css,/\.bench\{[^}]*background-image:var\(--indicator-selected\),linear-gradient\(180deg,var\(--chain\) 0%,var\(--chain-deep\) 140%\)/,'opt-in must layer rather than replace the benchmark fill');
+});
+
+test('RISK patterned indicators full-field cue: selected controls use genuinely dashed stripes across the fill while small glyphs stay clear',()=>{
+ const css=fs.readFileSync(path.join(__dirname,'landscape.css'),'utf8').split('/* Optional patterned')[1];assert.match(css,/stroke-dasharray/,'a diagonal line must be dashed rather than a continuous stripe');assert.match(css,/background-size:16px 16px/,'large active fills repeat a full-field dashed tile');
+ assert.match(css,/\.ctxitem\.included,\.ctxitem\.excluded[^}]*position:relative/,'small check and X marks keep their center clear');
+});
+test('RISK patterned indicators sync contrast: status texture uses semantic ink rather than white on the white day surface',()=>{
+ const css=fs.readFileSync(path.join(__dirname,'landscape.css'),'utf8').split('/* Optional patterned')[1];assert.match(css,/\.syncbtn\.ok,\.syncbtn\.busy,\.syncbtn\.err[^}]*currentColor/,'status stripes must remain visible on day white and night dark surfaces');
+});
+
+test('RISK patterned indicators light-label protection: candidate and tomorrow badges retain unobstructed night-theme ink',()=>{
+ const css=fs.readFileSync(path.join(__dirname,'landscape.css'),'utf8');assert.match(css,/\.cand,\.chip\.due-tomorrow\)::after\{[^}]*height:4px/,'existing night light glyphs must not sit over white full-field stripes');
+});
+
+test('RISK patterned indicators immediate-save FAQ: established settings lifecycle answer lists the new toggle',async()=>{
+ const {ctx,shim}=await loadApp();ctx.openHelp();const answer=shim.document.getElementById('modalRoot').innerHTML.split('<dt>Which settings save immediately?</dt><dd>')[1].split('</dd>')[0];assert.match(answer,/Patterned active indicators/,'existing Settings lifecycle guidance must include this immediate toggle');
+});
+
+test('RISK patterned indicators selector fallback: native editor texture is isolated from ordinary active chips',()=>{
+ const css=fs.readFileSync(path.join(__dirname,'landscape.css'),'utf8').split('/* Optional patterned')[1];assert.match(css,/@supports selector\(:has\(input:checked\)\)\{[\s\S]*?data-patterned-indicators[\s\S]*?\.ctxpick \.ltag:has\(input:checked\)\{[^}]*background-image:var\(--indicator-selected\)/,'relational texture is separately supported');assert.doesNotMatch(css,/[^{}]*\.ltag\.on[^{}]*:has\([^{}]*\)\s*\{/,'unsupported editor selectors cannot invalidate ordinary active chip textures');
+});
+
+test('RISK patterned indicators selected rank contrast: texture has shared green fill and an opaque unchanged-ink label backing',()=>{
+ const css=fs.readFileSync(path.join(__dirname,'landscape.css'),'utf8');assert.match(css,/data-patterned-indicators="true"\] \.bulk-rank-selected\{[^}]*background-color:var\(--chain-deep\)/,'a white pattern cannot mark a transparent white selected slot');assert.match(css,/data-patterned-indicators="true"\] \.bulk-rank-selected \.tkl\{[^}]*background:var\(--panel\)/,'opaque backing protects existing night label ink from white texture');
+});
+test('RISK patterned indicators selected caption contrast: motion descriptions share readable selected action ink in both themes',()=>{
+ const css=fs.readFileSync(path.join(__dirname,'landscape.css'),'utf8');assert.match(css,/data-patterned-indicators="true"\] \.motion-choices button\[aria-pressed="true"\] span\{color:var\(--action-ink\)\}/,'light secondary ink must not cross white stripes');
+ const tokens=css.match(/--action-ink:light-dark\((#[a-f0-9]{6}),(#[a-f0-9]{6})\)/),fill=css.match(/--yes:light-dark\((#[a-f0-9]{6}),(#[a-f0-9]{6})\)/);const lum=hex=>hex.slice(1).match(/../g).map(x=>parseInt(x,16)/255).map(x=>x<=.04045?x/12.92:((x+.055)/1.055)**2.4).reduce((s,x,i)=>s+x*[.2126,.7152,.0722][i],0);
+ for(let i=1;i<=2;i++)for(const surface of [fill[i],'#ffffff'])assert.ok((lum(surface)+.05)/(lum(tokens[i])+.05)>=4.5,'selected description retains contrast on semantic fill and light stripe');
+});
+test('RISK patterned indicators edge geometry: light-label edge cues clip a square dashed tile without vertical compression',()=>{
+ const css=fs.readFileSync(path.join(__dirname,'landscape.css'),'utf8');assert.match(css,/\.cand,\.chip\.due-tomorrow\)::after\{[^}]*height:4px[^}]*background-size:16px 16px/,'four-pixel band clips rather than scales square diagonal tile');assert.doesNotMatch(css,/background-size:16px 4px/,'compressed diagonal paint must not return');assert.match(css,/::after\{[^}]*pointer-events:none/,'decorative stripe never intercepts native actions');
+});
+
+test('RISK patterned context direction cue: contrasting full-control rails leave original check and X glyphs untouched',()=>{
+ const css=fs.readFileSync(path.join(__dirname,'landscape.css'),'utf8').split('/* Optional patterned')[1];assert.match(css,/\.ctxitem\.included,\.ctxitem\.excluded\)::after\{[^}]*height:4px[^}]*background-size:16px 16px/,'wide click-control rail clips real diagonals below glyphs');assert.match(css,/\.ctxitem\.included::after\{background-color:light-dark\(#2c7346,#28643e\)/,'included rail retains actual green mark palette');assert.match(css,/\.ctxitem\.excluded::after\{background-color:light-dark\(#b7353c,#a82f36\);background-image:var\(--indicator-excluded\)/,'excluded rail retains actual red and an opposite slope');assert.doesNotMatch(css,/\.ctxmark(?:::after|[^}]*background-image)/,'no added stripes share the small glyph box');
+});
+
+test('RISK patterned indicator slope legend: FAQ distinguishes locked selections and unset location from ordinary selected controls',async()=>{
+ const {ctx,shim}=await loadApp();ctx.openHelp();const answer=shim.document.getElementById('modalRoot').innerHTML.split('<dt>What are Patterned active indicators?</dt><dd>')[1].split('</dd>')[0];for(const cue of [/excluded contexts/,/locked Scene Time selections/,/unset location/])assert.match(answer,cue,'legend must explain its red-status slope exceptions');
+});
+
+test('RISK patterned indicators absent root: both preference states safely defer paint until a document root exists',async()=>{
+ const {ctx,shim}=await loadApp();const root=shim.document.documentElement;
+ for(const missing of [undefined,null]){shim.document.documentElement=missing;for(const enabled of [false,true]){ctx.state.settings.patternedIndicators=enabled;assert.doesNotThrow(()=>ctx.renderPatternedIndicators(),'non-DOM host must retain established startup no-op behavior');assert.equal(ctx.state.settings.patternedIndicators,enabled);}}
+ shim.document.documentElement=root;ctx.renderPatternedIndicators();assert.equal(root.getAttribute('data-patterned-indicators'),'true');ctx.state.settings.patternedIndicators=false;ctx.renderPatternedIndicators();assert.equal(root.getAttribute('data-patterned-indicators'),null);
+});

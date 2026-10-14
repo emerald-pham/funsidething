@@ -1,5 +1,242 @@
 [
   {
+    "testChangesSha256": "ac66c890d141c947556faafd61b197997eb93a5154deb6efbf5514121936e996",
+    "reason": "Bind the additive absent-root regression to the incremental push comparison as well as the retained cumulative main comparison; no tests or executable behavior change in this evidence-only correction.",
+    "previousBehavior": "New pattern paint attempted root methods when a non-DOM host had no documentElement.",
+    "intendedBehavior": "Safely defer either preference state until a document root exists, then apply or remove ordinary paint without changing settings.",
+    "replacementTests": [
+      "RISK patterned indicators absent root: both preference states safely defer paint until a document root exists"
+    ],
+    "preservedCoverage": [
+      "Every released test byte remains unchanged; retained applyTheme absent-root startup test passes. This record is additional; cumulative cb64ed3 rationale remains intact. Full PR CI oncf7106d passed, while its push comparison to1b7 lacked this exact fingerprint."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='applyTheme: a host with no documentElement|RISK patterned indicators absent root' tests.js; node scripts/test-first-gate.mjs 1b7bfe3d33cd917d1db7585e8e54c12900e0ac95",
+      "failure": "Existing startup RED and new both-state RED observed before guard in red-null-root-ci-regression.txt/red-patterned-absent-root.txt;61focusedGREEN after guard. Push workflow38487586186 failed exact test-first binding; reproduced in red-incremental-test-first-binding.txt before adding this record. No test weakened or new behavior introduced."
+    }
+  },
+  {
+    "testChangesSha256": "c453cb59a4d13090c8929c9e03e53e5dfe06ce540fdd87e455423b6967451fe7",
+    "reason": "Add opt-in presentation preference coverage, then strengthen texture contracts after independent source review found invisible sync stripes and an insufficient edge-only treatment. Add a focused assertion for the established immediate-save FAQ list after specialist review found the new toggle omitted. Reconcile separately released cb64ed3 without changing its tests or preservation rules; isolate checked-editor texture inside supports to retain its native-selector fallback. Actual independent rendered review found invisible Selected stripes, weak selected motion descriptions and flattened edge cues. Replace broken paint assumptions with explicit contrast and clipped-tile contracts. Independent affected rendered review rejected the20px context glyph texture; move its cue to the full click-control padding rail with actual mark colors. Independent FAQ review found the slope legend omitted locked selections and unset location; clarify those exceptions without changing controls. Mandatory exact CI caught the retained absent-documentElement startup contract; add a focused both-state regression and guard paint before DOM access.",
+    "previousBehavior": "No preference originally existed. Initial candidate used white stripes on white sync controls and a universal narrow edge band rather than requested across-field dashed stripes.",
+    "intendedBehavior": "Default-off persisted preference retains data and native semantics; genuinely dashed tiles cover active fills, opposite slopes distinguish excluded states, sync uses semantic-ink texture and light-label fields keep clear centers.",
+    "replacementTests": [
+      "RISK patterned indicators preference: actual checkbox saves immediately survives reload and leaves task state intact",
+      "RISK patterned indicators paint: opt-in static dashed diagonal textures retain semantic fills and separate excluded state",
+      "RISK patterned indicators FAQ: appearance chapter explains default persistence and separate meanings",
+      "RISK patterned indicators benchmark fill: striped overlay retains original chain gradient beneath the texture",
+      "RISK patterned indicators full-field cue: selected controls use genuinely dashed stripes across the fill while small glyphs stay clear",
+      "RISK patterned indicators sync contrast: status texture uses semantic ink rather than white on the white day surface",
+      "RISK patterned indicators light-label protection: candidate and tomorrow badges retain unobstructed night-theme ink",
+      "RISK patterned indicators immediate-save FAQ: established settings lifecycle answer lists the new toggle",
+      "RISK patterned indicators selector fallback: native editor texture is isolated from ordinary active chips",
+      "RISK patterned indicators selected rank contrast: texture has shared green fill and an opaque unchanged-ink label backing",
+      "RISK patterned indicators selected caption contrast: motion descriptions share readable selected action ink in both themes",
+      "RISK patterned indicators edge geometry: light-label edge cues clip a square dashed tile without vertical compression",
+      "RISK patterned context direction cue: contrasting full-control rails leave original check and X glyphs untouched",
+      "RISK patterned indicator slope legend: FAQ distinguishes locked selections and unset location from ordinary selected controls",
+      "RISK patterned indicators absent root: both preference states safely defer paint until a document root exists"
+    ],
+    "preservedCoverage": [
+      "No preexisting assertion removed. Gradient-layer assertion retained with SVG selected texture replacing the continuous gradient layer. Static-paint assertion still forbids changing fill/ink declarations or adding motion; custom image variables are permitted.",
+      "Eligibility, context assignments, mixed bulk Apply, rank, cloud reconciliation, old preferences and native semantics remain covered by unchanged focused regression tests.",
+      "Every test byte from cb64ed3 is retained; only the feature tests are appended. Unknown/empty saved references, single-task Save/completion/Undo, explicit bulk Clear and all-context filters remain protected.",
+      "Observed pixel defects justify two exact opt-in paint exceptions: green background on previously transparent Selected slot plus opaque unchanged-ink label backing, and selected motion secondary captions sharing dark action ink. Blanket semantic/motion check retains every other field. Edge geometry tests now assert full16px tile clipped4px instead of the demonstrably squashed16x4 texture. All base tests remain byte-exact.",
+      "Only the texture target changes from small glyph box to wider context control. Original check/X paint is explicitly protected from patterns; true diagonal geometry, exact original green/red palettes and opposite slopes receive a new direct contract. All base tests remain byte-exact; prior accepted selection/motion/light-label repairs unchanged."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK patterned indicators' tests.js; node --test --test-name-pattern='RISK patterned indicators benchmark fill|RISK patterned indicators full-field|RISK patterned indicators sync contrast' tests.js; node --test --test-name-pattern='RISK patterned indicators light-label protection' tests.js; node --test --test-name-pattern='RISK patterned indicators immediate-save FAQ' tests.js; node --test --test-name-pattern='RISK patterned indicators selector fallback' tests.js; node --test --test-name-pattern='RISK patterned indicators selected rank contrast|RISK patterned indicators selected caption contrast|RISK patterned indicators edge geometry' tests.js; node --test --test-name-pattern='RISK patterned context direction cue' tests.js; node --test --test-name-pattern='RISK patterned indicator slope legend' tests.js; node --test --test-name-pattern='applyTheme: a host with no documentElement|RISK patterned indicators absent root' tests.js",
+      "failure": "Observed initial missing default/paint/FAQ RED in red.txt; benchmark replacement RED in red-benchmark.txt. Before repair implementation, three RED failures in red-review-repairs.txt: missing dashed SVG, full-field tile, semantic sync ink and layered selected texture. Light-label RED in red-light-labels.txt before moving candidate/tomorrow to protected edge cues. 39 focused checks GREEN after scoped repairs. Additional contemporaneous RED in red-immediate-save-faq.txt: existing lifecycle answer omitted the new preference; repaired without changing save semantics. Final focused source cohort: 42 pass, zero skipped. Reconciliation existing selector-isolation contract RED and new source-fallback RED observed before supports-rule repair in red-reconciliation-selector.txt; after repair 51 checks pass, 0 skip. Conflict-resolution syntax failure is separately recorded and is not functional test-first evidence. All3 new contracts observed RED before rendered repair in red-rendered-repairs.txt; 54 final focused source/fingerprint checks GREEN after source repairs. Actual rendered approval and compatibility deferred to new allocation; no test pass substitutes for those. New contextrail contract observed RED before source repair in red-context-rail.txt.55source/fingerprint tests GREEN; actual new rail approval pending. Compatibility15/15 passed on78ffd97; its unchanged persistence/data paths will be assessed for evidence reuse, not falsely called a run on this later SHA. Missing exception wording observed RED in red-faq-slope-legend.txt before copy correction;19 targeted checks GREEN in green-faq-slope-legend.txt. CI push38486340900 failed exactly1 existing absent-root regression (1628pass35skip); locally reproduced existing RED and new both-state RED before guard. Logs red-null-root-ci-regression.txt/red-patterned-absent-root.txt preserved. Focused repair GREEN in green-null-root-repair.txt. No base assertion weakened; candidate requires affected reviews/new receipt and exact CI."
+    }
+  },
+  {
+    "testChangesSha256": "020db16dd4d32250451faa20575b7ce7fc92e89705c843c07dc78739a6325762",
+    "reason": "Add opt-in presentation preference coverage, then strengthen texture contracts after independent source review found invisible sync stripes and an insufficient edge-only treatment. Add a focused assertion for the established immediate-save FAQ list after specialist review found the new toggle omitted. Reconcile separately released cb64ed3 without changing its tests or preservation rules; isolate checked-editor texture inside supports to retain its native-selector fallback. Actual independent rendered review found invisible Selected stripes, weak selected motion descriptions and flattened edge cues. Replace broken paint assumptions with explicit contrast and clipped-tile contracts. Independent affected rendered review rejected the20px context glyph texture; move its cue to the full click-control padding rail with actual mark colors. Independent FAQ review found the slope legend omitted locked selections and unset location; clarify those exceptions without changing controls.",
+    "previousBehavior": "No preference originally existed. Initial candidate used white stripes on white sync controls and a universal narrow edge band rather than requested across-field dashed stripes.",
+    "intendedBehavior": "Default-off persisted preference retains data and native semantics; genuinely dashed tiles cover active fills, opposite slopes distinguish excluded states, sync uses semantic-ink texture and light-label fields keep clear centers.",
+    "replacementTests": [
+      "RISK patterned indicators preference: actual checkbox saves immediately survives reload and leaves task state intact",
+      "RISK patterned indicators paint: opt-in static dashed diagonal textures retain semantic fills and separate excluded state",
+      "RISK patterned indicators FAQ: appearance chapter explains default persistence and separate meanings",
+      "RISK patterned indicators benchmark fill: striped overlay retains original chain gradient beneath the texture",
+      "RISK patterned indicators full-field cue: selected controls use genuinely dashed stripes across the fill while small glyphs stay clear",
+      "RISK patterned indicators sync contrast: status texture uses semantic ink rather than white on the white day surface",
+      "RISK patterned indicators light-label protection: candidate and tomorrow badges retain unobstructed night-theme ink",
+      "RISK patterned indicators immediate-save FAQ: established settings lifecycle answer lists the new toggle",
+      "RISK patterned indicators selector fallback: native editor texture is isolated from ordinary active chips",
+      "RISK patterned indicators selected rank contrast: texture has shared green fill and an opaque unchanged-ink label backing",
+      "RISK patterned indicators selected caption contrast: motion descriptions share readable selected action ink in both themes",
+      "RISK patterned indicators edge geometry: light-label edge cues clip a square dashed tile without vertical compression",
+      "RISK patterned context direction cue: contrasting full-control rails leave original check and X glyphs untouched",
+      "RISK patterned indicator slope legend: FAQ distinguishes locked selections and unset location from ordinary selected controls"
+    ],
+    "preservedCoverage": [
+      "No preexisting assertion removed. Gradient-layer assertion retained with SVG selected texture replacing the continuous gradient layer. Static-paint assertion still forbids changing fill/ink declarations or adding motion; custom image variables are permitted.",
+      "Eligibility, context assignments, mixed bulk Apply, rank, cloud reconciliation, old preferences and native semantics remain covered by unchanged focused regression tests.",
+      "Every test byte from cb64ed3 is retained; only the feature tests are appended. Unknown/empty saved references, single-task Save/completion/Undo, explicit bulk Clear and all-context filters remain protected.",
+      "Observed pixel defects justify two exact opt-in paint exceptions: green background on previously transparent Selected slot plus opaque unchanged-ink label backing, and selected motion secondary captions sharing dark action ink. Blanket semantic/motion check retains every other field. Edge geometry tests now assert full16px tile clipped4px instead of the demonstrably squashed16x4 texture. All base tests remain byte-exact.",
+      "Only the texture target changes from small glyph box to wider context control. Original check/X paint is explicitly protected from patterns; true diagonal geometry, exact original green/red palettes and opposite slopes receive a new direct contract. All base tests remain byte-exact; prior accepted selection/motion/light-label repairs unchanged."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK patterned indicators' tests.js; node --test --test-name-pattern='RISK patterned indicators benchmark fill|RISK patterned indicators full-field|RISK patterned indicators sync contrast' tests.js; node --test --test-name-pattern='RISK patterned indicators light-label protection' tests.js; node --test --test-name-pattern='RISK patterned indicators immediate-save FAQ' tests.js; node --test --test-name-pattern='RISK patterned indicators selector fallback' tests.js; node --test --test-name-pattern='RISK patterned indicators selected rank contrast|RISK patterned indicators selected caption contrast|RISK patterned indicators edge geometry' tests.js; node --test --test-name-pattern='RISK patterned context direction cue' tests.js; node --test --test-name-pattern='RISK patterned indicator slope legend' tests.js",
+      "failure": "Observed initial missing default/paint/FAQ RED in red.txt; benchmark replacement RED in red-benchmark.txt. Before repair implementation, three RED failures in red-review-repairs.txt: missing dashed SVG, full-field tile, semantic sync ink and layered selected texture. Light-label RED in red-light-labels.txt before moving candidate/tomorrow to protected edge cues. 39 focused checks GREEN after scoped repairs. Additional contemporaneous RED in red-immediate-save-faq.txt: existing lifecycle answer omitted the new preference; repaired without changing save semantics. Final focused source cohort: 42 pass, zero skipped. Reconciliation existing selector-isolation contract RED and new source-fallback RED observed before supports-rule repair in red-reconciliation-selector.txt; after repair 51 checks pass, 0 skip. Conflict-resolution syntax failure is separately recorded and is not functional test-first evidence. All3 new contracts observed RED before rendered repair in red-rendered-repairs.txt; 54 final focused source/fingerprint checks GREEN after source repairs. Actual rendered approval and compatibility deferred to new allocation; no test pass substitutes for those. New contextrail contract observed RED before source repair in red-context-rail.txt.55source/fingerprint tests GREEN; actual new rail approval pending. Compatibility15/15 passed on78ffd97; its unchanged persistence/data paths will be assessed for evidence reuse, not falsely called a run on this later SHA. Missing exception wording observed RED in red-faq-slope-legend.txt before copy correction;19 targeted checks GREEN in green-faq-slope-legend.txt."
+    }
+  },
+  {
+    "testChangesSha256": "e5a149f4ee461f3f8b99786424d43454068cf0042e84ce31e0aa1862ce1ec16e",
+    "reason": "Add opt-in presentation preference coverage, then strengthen texture contracts after independent source review found invisible sync stripes and an insufficient edge-only treatment. Add a focused assertion for the established immediate-save FAQ list after specialist review found the new toggle omitted. Reconcile separately released cb64ed3 without changing its tests or preservation rules; isolate checked-editor texture inside supports to retain its native-selector fallback. Actual independent rendered review found invisible Selected stripes, weak selected motion descriptions and flattened edge cues. Replace broken paint assumptions with explicit contrast and clipped-tile contracts. Independent affected rendered review rejected the20px context glyph texture; move its cue to the full click-control padding rail with actual mark colors.",
+    "previousBehavior": "No preference originally existed. Initial candidate used white stripes on white sync controls and a universal narrow edge band rather than requested across-field dashed stripes.",
+    "intendedBehavior": "Default-off persisted preference retains data and native semantics; genuinely dashed tiles cover active fills, opposite slopes distinguish excluded states, sync uses semantic-ink texture and light-label fields keep clear centers.",
+    "replacementTests": [
+      "RISK patterned indicators preference: actual checkbox saves immediately survives reload and leaves task state intact",
+      "RISK patterned indicators paint: opt-in static dashed diagonal textures retain semantic fills and separate excluded state",
+      "RISK patterned indicators FAQ: appearance chapter explains default persistence and separate meanings",
+      "RISK patterned indicators benchmark fill: striped overlay retains original chain gradient beneath the texture",
+      "RISK patterned indicators full-field cue: selected controls use genuinely dashed stripes across the fill while small glyphs stay clear",
+      "RISK patterned indicators sync contrast: status texture uses semantic ink rather than white on the white day surface",
+      "RISK patterned indicators light-label protection: candidate and tomorrow badges retain unobstructed night-theme ink",
+      "RISK patterned indicators immediate-save FAQ: established settings lifecycle answer lists the new toggle",
+      "RISK patterned indicators selector fallback: native editor texture is isolated from ordinary active chips",
+      "RISK patterned indicators selected rank contrast: texture has shared green fill and an opaque unchanged-ink label backing",
+      "RISK patterned indicators selected caption contrast: motion descriptions share readable selected action ink in both themes",
+      "RISK patterned indicators edge geometry: light-label edge cues clip a square dashed tile without vertical compression",
+      "RISK patterned context direction cue: contrasting full-control rails leave original check and X glyphs untouched"
+    ],
+    "preservedCoverage": [
+      "No preexisting assertion removed. Gradient-layer assertion retained with SVG selected texture replacing the continuous gradient layer. Static-paint assertion still forbids changing fill/ink declarations or adding motion; custom image variables are permitted.",
+      "Eligibility, context assignments, mixed bulk Apply, rank, cloud reconciliation, old preferences and native semantics remain covered by unchanged focused regression tests.",
+      "Every test byte from cb64ed3 is retained; only the feature tests are appended. Unknown/empty saved references, single-task Save/completion/Undo, explicit bulk Clear and all-context filters remain protected.",
+      "Observed pixel defects justify two exact opt-in paint exceptions: green background on previously transparent Selected slot plus opaque unchanged-ink label backing, and selected motion secondary captions sharing dark action ink. Blanket semantic/motion check retains every other field. Edge geometry tests now assert full16px tile clipped4px instead of the demonstrably squashed16x4 texture. All base tests remain byte-exact.",
+      "Only the texture target changes from small glyph box to wider context control. Original check/X paint is explicitly protected from patterns; true diagonal geometry, exact original green/red palettes and opposite slopes receive a new direct contract. All base tests remain byte-exact; prior accepted selection/motion/light-label repairs unchanged."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK patterned indicators' tests.js; node --test --test-name-pattern='RISK patterned indicators benchmark fill|RISK patterned indicators full-field|RISK patterned indicators sync contrast' tests.js; node --test --test-name-pattern='RISK patterned indicators light-label protection' tests.js; node --test --test-name-pattern='RISK patterned indicators immediate-save FAQ' tests.js; node --test --test-name-pattern='RISK patterned indicators selector fallback' tests.js; node --test --test-name-pattern='RISK patterned indicators selected rank contrast|RISK patterned indicators selected caption contrast|RISK patterned indicators edge geometry' tests.js; node --test --test-name-pattern='RISK patterned context direction cue' tests.js",
+      "failure": "Observed initial missing default/paint/FAQ RED in red.txt; benchmark replacement RED in red-benchmark.txt. Before repair implementation, three RED failures in red-review-repairs.txt: missing dashed SVG, full-field tile, semantic sync ink and layered selected texture. Light-label RED in red-light-labels.txt before moving candidate/tomorrow to protected edge cues. 39 focused checks GREEN after scoped repairs. Additional contemporaneous RED in red-immediate-save-faq.txt: existing lifecycle answer omitted the new preference; repaired without changing save semantics. Final focused source cohort: 42 pass, zero skipped. Reconciliation existing selector-isolation contract RED and new source-fallback RED observed before supports-rule repair in red-reconciliation-selector.txt; after repair 51 checks pass, 0 skip. Conflict-resolution syntax failure is separately recorded and is not functional test-first evidence. All3 new contracts observed RED before rendered repair in red-rendered-repairs.txt; 54 final focused source/fingerprint checks GREEN after source repairs. Actual rendered approval and compatibility deferred to new allocation; no test pass substitutes for those. New contextrail contract observed RED before source repair in red-context-rail.txt.55source/fingerprint tests GREEN; actual new rail approval pending. Compatibility15/15 passed on78ffd97; its unchanged persistence/data paths will be assessed for evidence reuse, not falsely called a run on this later SHA."
+    }
+  },
+  {
+    "testChangesSha256": "8cb6177c60724725ea78ced23615817bb4179f38ac9152e5fbd6c24d790b761b",
+    "reason": "Add opt-in presentation preference coverage, then strengthen texture contracts after independent source review found invisible sync stripes and an insufficient edge-only treatment. Add a focused assertion for the established immediate-save FAQ list after specialist review found the new toggle omitted. Reconcile separately released cb64ed3 without changing its tests or preservation rules; isolate checked-editor texture inside supports to retain its native-selector fallback. Actual independent rendered review found invisible Selected stripes, weak selected motion descriptions and flattened edge cues. Replace broken paint assumptions with explicit contrast and clipped-tile contracts.",
+    "previousBehavior": "No preference originally existed. Initial candidate used white stripes on white sync controls and a universal narrow edge band rather than requested across-field dashed stripes.",
+    "intendedBehavior": "Default-off persisted preference retains data and native semantics; genuinely dashed tiles cover active fills, opposite slopes distinguish excluded states, sync uses semantic-ink texture and light-label fields keep clear centers.",
+    "replacementTests": [
+      "RISK patterned indicators preference: actual checkbox saves immediately survives reload and leaves task state intact",
+      "RISK patterned indicators paint: opt-in static dashed diagonal textures retain semantic fills and separate excluded state",
+      "RISK patterned indicators FAQ: appearance chapter explains default persistence and separate meanings",
+      "RISK patterned indicators benchmark fill: striped overlay retains original chain gradient beneath the texture",
+      "RISK patterned indicators full-field cue: selected controls use genuinely dashed stripes across the fill while small glyphs stay clear",
+      "RISK patterned indicators sync contrast: status texture uses semantic ink rather than white on the white day surface",
+      "RISK patterned indicators light-label protection: candidate and tomorrow badges retain unobstructed night-theme ink",
+      "RISK patterned indicators immediate-save FAQ: established settings lifecycle answer lists the new toggle",
+      "RISK patterned indicators selector fallback: native editor texture is isolated from ordinary active chips",
+      "RISK patterned indicators selected rank contrast: texture has shared green fill and an opaque unchanged-ink label backing",
+      "RISK patterned indicators selected caption contrast: motion descriptions share readable selected action ink in both themes",
+      "RISK patterned indicators edge geometry: light-label edge cues clip a square dashed tile without vertical compression"
+    ],
+    "preservedCoverage": [
+      "No preexisting assertion removed. Gradient-layer assertion retained with SVG selected texture replacing the continuous gradient layer. Static-paint assertion still forbids changing fill/ink declarations or adding motion; custom image variables are permitted.",
+      "Eligibility, context assignments, mixed bulk Apply, rank, cloud reconciliation, old preferences and native semantics remain covered by unchanged focused regression tests.",
+      "Every test byte from cb64ed3 is retained; only the feature tests are appended. Unknown/empty saved references, single-task Save/completion/Undo, explicit bulk Clear and all-context filters remain protected.",
+      "Observed pixel defects justify two exact opt-in paint exceptions: green background on previously transparent Selected slot plus opaque unchanged-ink label backing, and selected motion secondary captions sharing dark action ink. Blanket semantic/motion check retains every other field. Edge geometry tests now assert full16px tile clipped4px instead of the demonstrably squashed16x4 texture. All base tests remain byte-exact."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK patterned indicators' tests.js; node --test --test-name-pattern='RISK patterned indicators benchmark fill|RISK patterned indicators full-field|RISK patterned indicators sync contrast' tests.js; node --test --test-name-pattern='RISK patterned indicators light-label protection' tests.js; node --test --test-name-pattern='RISK patterned indicators immediate-save FAQ' tests.js; node --test --test-name-pattern='RISK patterned indicators selector fallback' tests.js; node --test --test-name-pattern='RISK patterned indicators selected rank contrast|RISK patterned indicators selected caption contrast|RISK patterned indicators edge geometry' tests.js",
+      "failure": "Observed initial missing default/paint/FAQ RED in red.txt; benchmark replacement RED in red-benchmark.txt. Before repair implementation, three RED failures in red-review-repairs.txt: missing dashed SVG, full-field tile, semantic sync ink and layered selected texture. Light-label RED in red-light-labels.txt before moving candidate/tomorrow to protected edge cues. 39 focused checks GREEN after scoped repairs. Additional contemporaneous RED in red-immediate-save-faq.txt: existing lifecycle answer omitted the new preference; repaired without changing save semantics. Final focused source cohort: 42 pass, zero skipped. Reconciliation existing selector-isolation contract RED and new source-fallback RED observed before supports-rule repair in red-reconciliation-selector.txt; after repair 51 checks pass, 0 skip. Conflict-resolution syntax failure is separately recorded and is not functional test-first evidence. All3 new contracts observed RED before rendered repair in red-rendered-repairs.txt; 54 final focused source/fingerprint checks GREEN after source repairs. Actual rendered approval and compatibility deferred to new allocation; no test pass substitutes for those."
+    }
+  },
+  {
+    "testChangesSha256": "b404ac6699ecd67564594b969fa3cdee475b5f56e3e32df48c6e6b688c53f4d5",
+    "reason": "Add opt-in presentation preference coverage, then strengthen texture contracts after independent source review found invisible sync stripes and an insufficient edge-only treatment. Add a focused assertion for the established immediate-save FAQ list after specialist review found the new toggle omitted. Reconcile separately released cb64ed3 without changing its tests or preservation rules; isolate checked-editor texture inside supports to retain its native-selector fallback.",
+    "previousBehavior": "No preference originally existed. Initial candidate used white stripes on white sync controls and a universal narrow edge band rather than requested across-field dashed stripes.",
+    "intendedBehavior": "Default-off persisted preference retains data and native semantics; genuinely dashed tiles cover active fills, opposite slopes distinguish excluded states, sync uses semantic-ink texture and light-label fields keep clear centers.",
+    "replacementTests": [
+      "RISK patterned indicators preference: actual checkbox saves immediately survives reload and leaves task state intact",
+      "RISK patterned indicators paint: opt-in static dashed diagonal textures retain semantic fills and separate excluded state",
+      "RISK patterned indicators FAQ: appearance chapter explains default persistence and separate meanings",
+      "RISK patterned indicators benchmark fill: striped overlay retains original chain gradient beneath the texture",
+      "RISK patterned indicators full-field cue: selected controls use genuinely dashed stripes across the fill while small glyphs stay clear",
+      "RISK patterned indicators sync contrast: status texture uses semantic ink rather than white on the white day surface",
+      "RISK patterned indicators light-label protection: candidate and tomorrow badges retain unobstructed night-theme ink",
+      "RISK patterned indicators immediate-save FAQ: established settings lifecycle answer lists the new toggle",
+      "RISK patterned indicators selector fallback: native editor texture is isolated from ordinary active chips"
+    ],
+    "preservedCoverage": [
+      "No preexisting assertion removed. Gradient-layer assertion retained with SVG selected texture replacing the continuous gradient layer. Static-paint assertion still forbids changing fill/ink declarations or adding motion; custom image variables are permitted.",
+      "Eligibility, context assignments, mixed bulk Apply, rank, cloud reconciliation, old preferences and native semantics remain covered by unchanged focused regression tests.",
+      "Every test byte from cb64ed3 is retained; only the feature tests are appended. Unknown/empty saved references, single-task Save/completion/Undo, explicit bulk Clear and all-context filters remain protected."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK patterned indicators' tests.js; node --test --test-name-pattern='RISK patterned indicators benchmark fill|RISK patterned indicators full-field|RISK patterned indicators sync contrast' tests.js; node --test --test-name-pattern='RISK patterned indicators light-label protection' tests.js; node --test --test-name-pattern='RISK patterned indicators immediate-save FAQ' tests.js; node --test --test-name-pattern='RISK patterned indicators selector fallback' tests.js",
+      "failure": "Observed initial missing default/paint/FAQ RED in red.txt; benchmark replacement RED in red-benchmark.txt. Before repair implementation, three RED failures in red-review-repairs.txt: missing dashed SVG, full-field tile, semantic sync ink and layered selected texture. Light-label RED in red-light-labels.txt before moving candidate/tomorrow to protected edge cues. 39 focused checks GREEN after scoped repairs. Additional contemporaneous RED in red-immediate-save-faq.txt: existing lifecycle answer omitted the new preference; repaired without changing save semantics. Final focused source cohort: 42 pass, zero skipped. Reconciliation existing selector-isolation contract RED and new source-fallback RED observed before supports-rule repair in red-reconciliation-selector.txt; after repair 51 checks pass, 0 skip. Conflict-resolution syntax failure is separately recorded and is not functional test-first evidence."
+    }
+  },
+  {
+    "testChangesSha256": "1e3fc7603e86661230ab9cd7b0f337587209971bfb138d65a51db114499c7f40",
+    "reason": "Add opt-in presentation preference coverage, then strengthen texture contracts after independent source review found invisible sync stripes and an insufficient edge-only treatment. Add a focused assertion for the established immediate-save FAQ list after specialist review found the new toggle omitted.",
+    "previousBehavior": "No preference originally existed. Initial candidate used white stripes on white sync controls and a universal narrow edge band rather than requested across-field dashed stripes.",
+    "intendedBehavior": "Default-off persisted preference retains data and native semantics; genuinely dashed tiles cover active fills, opposite slopes distinguish excluded states, sync uses semantic-ink texture and light-label fields keep clear centers.",
+    "replacementTests": [
+      "RISK patterned indicators preference: actual checkbox saves immediately survives reload and leaves task state intact",
+      "RISK patterned indicators paint: opt-in static dashed diagonal textures retain semantic fills and separate excluded state",
+      "RISK patterned indicators FAQ: appearance chapter explains default persistence and separate meanings",
+      "RISK patterned indicators benchmark fill: striped overlay retains original chain gradient beneath the texture",
+      "RISK patterned indicators full-field cue: selected controls use genuinely dashed stripes across the fill while small glyphs stay clear",
+      "RISK patterned indicators sync contrast: status texture uses semantic ink rather than white on the white day surface",
+      "RISK patterned indicators light-label protection: candidate and tomorrow badges retain unobstructed night-theme ink",
+      "RISK patterned indicators immediate-save FAQ: established settings lifecycle answer lists the new toggle"
+    ],
+    "preservedCoverage": [
+      "No preexisting assertion removed. Gradient-layer assertion retained with SVG selected texture replacing the continuous gradient layer. Static-paint assertion still forbids changing fill/ink declarations or adding motion; custom image variables are permitted.",
+      "Eligibility, context assignments, mixed bulk Apply, rank, cloud reconciliation, old preferences and native semantics remain covered by unchanged focused regression tests."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK patterned indicators' tests.js; node --test --test-name-pattern='RISK patterned indicators benchmark fill|RISK patterned indicators full-field|RISK patterned indicators sync contrast' tests.js; node --test --test-name-pattern='RISK patterned indicators light-label protection' tests.js; node --test --test-name-pattern='RISK patterned indicators immediate-save FAQ' tests.js",
+      "failure": "Observed initial missing default/paint/FAQ RED in red.txt; benchmark replacement RED in red-benchmark.txt. Before repair implementation, three RED failures in red-review-repairs.txt: missing dashed SVG, full-field tile, semantic sync ink and layered selected texture. Light-label RED in red-light-labels.txt before moving candidate/tomorrow to protected edge cues. 39 focused checks GREEN after scoped repairs. Additional contemporaneous RED in red-immediate-save-faq.txt: existing lifecycle answer omitted the new preference; repaired without changing save semantics. Final focused source cohort: 42 pass, zero skipped."
+    }
+  },
+  {
+    "testChangesSha256": "eb68a13ef50ad39ed5317b365bc266aa8e9737a5a28551d2b1445b9514dff973",
+    "reason": "Add opt-in presentation preference coverage, then strengthen texture contracts after independent source review found invisible sync stripes and an insufficient edge-only treatment.",
+    "previousBehavior": "No preference originally existed. Initial candidate used white stripes on white sync controls and a universal narrow edge band rather than requested across-field dashed stripes.",
+    "intendedBehavior": "Default-off persisted preference retains data and native semantics; genuinely dashed tiles cover active fills, opposite slopes distinguish excluded states, sync uses semantic-ink texture and light-label fields keep clear centers.",
+    "replacementTests": [
+      "RISK patterned indicators preference: actual checkbox saves immediately survives reload and leaves task state intact",
+      "RISK patterned indicators paint: opt-in static dashed diagonal textures retain semantic fills and separate excluded state",
+      "RISK patterned indicators FAQ: appearance chapter explains default persistence and separate meanings",
+      "RISK patterned indicators benchmark fill: striped overlay retains original chain gradient beneath the texture",
+      "RISK patterned indicators full-field cue: selected controls use genuinely dashed stripes across the fill while small glyphs stay clear",
+      "RISK patterned indicators sync contrast: status texture uses semantic ink rather than white on the white day surface",
+      "RISK patterned indicators light-label protection: candidate and tomorrow badges retain unobstructed night-theme ink"
+    ],
+    "preservedCoverage": [
+      "No preexisting assertion removed. Gradient-layer assertion retained with SVG selected texture replacing the continuous gradient layer. Static-paint assertion still forbids changing fill/ink declarations or adding motion; custom image variables are permitted.",
+      "Eligibility, context assignments, mixed bulk Apply, rank, cloud reconciliation, old preferences and native semantics remain covered by unchanged focused regression tests."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK patterned indicators' tests.js; node --test --test-name-pattern='RISK patterned indicators benchmark fill|RISK patterned indicators full-field|RISK patterned indicators sync contrast' tests.js; node --test --test-name-pattern='RISK patterned indicators light-label protection' tests.js",
+      "failure": "Observed initial missing default/paint/FAQ RED in red.txt; benchmark replacement RED in red-benchmark.txt. Before repair implementation, three RED failures in red-review-repairs.txt: missing dashed SVG, full-field tile, semantic sync ink and layered selected texture. Light-label RED in red-light-labels.txt before moving candidate/tomorrow to protected edge cues. 39 focused checks GREEN after scoped repairs."
+    }
+  },
+  {
+    "testChangesSha256": "cd0168890e946663d6e77ccb754c9255d5c078db3c58bc117132198c870f6182",
+    "reason": "Add discriminating presentation preference and static texture contracts for optional colorblind state cues without weakening existing behavior tests.",
+    "previousBehavior": "No patterned state option existed; legacy boards and actual Settings checkbox lacked the new preference.",
+    "intendedBehavior": "Strict opt-in checkbox saves with established board settings, reapplies after reload, preserves task/context data, and paints different static stripe slopes while preserving benchmark fill.",
+    "replacementTests": [
+      "RISK patterned indicators preference: actual checkbox saves immediately survives reload and leaves task state intact",
+      "RISK patterned indicators paint: opt-in static dashed diagonal textures retain semantic fills and separate excluded state",
+      "RISK patterned indicators FAQ: appearance chapter explains default persistence and separate meanings",
+      "RISK patterned indicators benchmark fill: striped overlay retains original chain gradient beneath the texture"
+    ],
+    "preservedCoverage": [
+      "Existing eligibility, context assignments, mixed bulk Apply, rank, cloud reconciliation, undo and native control semantics remain unchanged. No existing assertion removed."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK patterned indicators' tests.js; node --test --test-name-pattern='RISK patterned indicators benchmark fill' tests.js",
+      "failure": "Contemporaneous preimplementation RED recorded in ../evidence/red.txt: default was undefined, texture selector absent, FAQ absent. Subsequent benchmark RED in red-benchmark.txt caught overwritten gradient before the layered fill repair. All four tests GREEN afterward."
+    }
+  },
+  {
     "testChangesSha256": "fef88e177be5478dc87564a4eac8d0fea9d52590fae803b30f4591ecbd9c480c",
     "reason": "Repair two requiredCI FAQ readability failures without weakening existing130-word guide limits by moving newlyaddedcontext prose into its own existing-chapter question.",
     "previousBehavior": "New context explanation expanded Which properties can I change in BulkEdit beyond130words, failing existing Quickstart and bulk-guidance contracts.",
