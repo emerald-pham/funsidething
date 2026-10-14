@@ -574,7 +574,7 @@
       }
     }else if(['walker','dogwalker','rabbit','deer'].includes(e.type)){
       const pose=geometry.groundPose(e.type==='dogwalker'?'walker':e.type,e);
-      if(e.type==='walker'||e.type==='dogwalker')g.globalAlpha=1;
+      if(e.type==='dogwalker'||e.type==='walker')g.globalAlpha=1;
       paintGroundShadow(g,pose.x,pose.y,e.type==='deer'?18:e.type==='rabbit'?6:14,e.type==='deer'?15:7,p.hill);
       if(e.type==='dogwalker'){
         const dog=geometry.dogPose(pose.x,pose.distance,pose.direction);
