@@ -25959,6 +25959,37 @@ test('RISK patterned indicators absent root: both preference states safely defer
  shim.document.documentElement=root;ctx.renderPatternedIndicators();assert.equal(root.getAttribute('data-patterned-indicators'),'true');ctx.state.settings.patternedIndicators=false;ctx.renderPatternedIndicators();assert.equal(root.getAttribute('data-patterned-indicators'),null);
 });
 
+
+test('RISK transit line livery: actual painter keeps line colors across cars directions reloads and day-night shading',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ const code=source.slice(source.indexOf('  function transport('),source.indexOf('  function paintGroundEventShadow('));
+ function paint(isTrain,night,reverse=false,x=500){
+  const bodies=[],stripes=[],windows=[],mixes=[],p={city:'#243b4a',front:'#263c37',night};
+  const g={save(){},restore(){},translate(){},rotate(){},scale(){},beginPath(){},roundRect(){},fill(){bodies.push(this.fillStyle);},fillRect(x,y,w,h){(y===-5?stripes:windows).push(this.fillStyle);}};
+  const geometry={lowerRail:()=>500,tangent:()=>0,railCars:(x,n,spacing,reverse)=>Array.from({length:n},(_,i)=>({x:x-i*spacing*(reverse?-1:1),y:500,angle:0}))};
+  const S={mixHex(a,b,t){mixes.push([a,b,t]);return `${a}:${b}:${t}`;}};
+  vm.runInNewContext(code+';transport(x,0,.5,isTrain,reverse)',{x,isTrain,reverse,g,geometry,rail:()=>300,p,S,ellipse(){},paintRailVehicleShadow(){},line(){}});
+  return {bodies,stripes,windows,mixes};
+ }
+ for(const night of [0,1])for(const train of [true,false]){
+  const expected=train?'#c78d76':'#78aaa5',a=paint(train,night),b=paint(train,night,true,800),reload=paint(train,night);
+  assert.equal(a.mixes[0][0],expected,'body color belongs to the physical line rather than an individual departure');
+  assert.equal(new Set(a.bodies).size,1,'every carriage has the same body');
+  assert.deepEqual(a.bodies,b.bodies,'direction and scene position do not change line color');assert.deepEqual(a,reload,'fresh painter context restores identical livery');
+  assert.equal(a.bodies.length,train?5:3);assert.ok(a.mixes.every(m=>m[1]==='#243b4a'&&m[2]===night*.3),'existing night shading stays unchanged');
+  assert.ok(a.windows.every(c=>c===(night?'#edce89':'#71969c')),'existing readable window paint is retained');
+  assert.equal(new Set(a.stripes).size,1);assert.notEqual(a.stripes[0],paint(!train,night).stripes[0]);
+ }
+ assert.notEqual(paint(true,0).bodies[0],paint(false,0).bodies[0],'the two physical lines have distinct liveries');
+ assert.doesNotMatch(code,/Math\.random|\brand\(|\brandom\(/,'livery consumes no random draws or changes the seeded timeline');
+});
+
+test('RISK transit line guidance: extended scenery FAQ explains stable line colors without new settings',()=>{
+ const help=html.slice(html.indexOf('function openHelp'),html.indexOf('function openInstallHelp'));
+ assert.match(help,/lower railway.*terracotta.*elevated metro.*teal/);
+ assert.match(help,/same line keep the same color across departures and reloads/);
+});
+
 // Human profiles must mirror at the painter boundary, independent of travel timing.
 test('RISK human profile paint: every hairstyle mirrors face and rear hair for either walking direction',()=>{
  const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');

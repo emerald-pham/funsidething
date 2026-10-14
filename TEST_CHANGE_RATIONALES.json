@@ -1,7 +1,7 @@
 [
   {
-    "testChangesSha256": "aa026f38fd3423baa6a9dc8b5b463df1c0814d92ef7badbf8715214e3b803c99",
-    "reason": "Add discriminating actual-painter coverage for backward-facing hairstyle offsets and separately painted monochrome clocktower children. Independent review caught protected headwear paint drift; preserve original one-skin-ellipse headwear and limit the new forward profile to uncovered heads.",
+    "testChangesSha256": "3bc847bc075cd903f59e774f7edbab9954769179fcd6222a4f6d213dfcf9cce8",
+    "reason": "Add discriminating actual-painter coverage for backward-facing hairstyle offsets and separately painted monochrome clocktower children. Preserve original one-skin-ellipse headwear after the separately reproduced protected appearance failure. This binding reconciles the already-tested human patch onto transit release2ed0d18; transit code and its tests remain unchanged.",
     "previousBehavior": "Head hair offsets remained right-facing during left travel; clocktower children bypassed shared skin and head painting.",
     "intendedBehavior": "Both travel directions mirror the same profile and all clocktower poses share head proportions, skin arms and trousers while keeping character hats.",
     "replacementTests": [
@@ -13,7 +13,24 @@
     ],
     "redEvidence": {
       "command": "node --test --test-name-pattern='RISK human profile paint:|RISK clocktower human paint:' tests.js",
-      "failure": "Observed before implementation: short hair x9.8 versus mirrored10.2; clocktower shared-head call count0 versus4. Exact output retained in .evidence/red.txt. Reviewer-found existing hat contract RED reproduced in .evidence/red-hat-preservation.txt before headwear guard; 13 focused tests GREEN after repair. New test hat profile assertion was corrected to retain the established headwear boundary; no old assertion changed."
+      "failure": "Observed before implementation: short hair x9.8 versus mirrored10.2; clocktower shared-head call count0 versus4. Exact output retained in .evidence/red.txt. Existing hat contract RED reproduced before headwear guard in .evidence/red-hat-preservation.txt;13focusedGREEN after repair. No new implementation was introduced during transit reconciliation."
+    }
+  },
+  {
+    "testChangesSha256": "30b16197757bf9096ff262a28e59491e025d740273f2325b535ae245aa937662",
+    "reason": "Add direct actual transit painter line-livery coverage and matching extended FAQ guidance before functional changes.",
+    "previousBehavior": "Lower railway bodies were neutral beige and metro bodies pale green.",
+    "intendedBehavior": "Muted terracotta railway and teal metro bodies remain consistent for every carriage and departure, direction and fresh context with unchanged night shading and windows.",
+    "replacementTests": [
+      "RISK transit line livery: actual painter keeps line colors across cars directions reloads and day-night shading",
+      "RISK transit line guidance: extended scenery FAQ explains stable line colors without new settings"
+    ],
+    "preservedCoverage": [
+      "All existing tests and assertions retained byte-for-byte; seeded admission, paint geometry, shadows, motion and saved-data paths unchanged."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK transit line' tests.js",
+      "failure": "Observed before implementation: actual body #e4cfa5 did not equal #c78d76 and extended FAQ lacked line guidance. Durable red.txt and red-final.txt retained in .task-storage/transit-line-colors/evidence."
     }
   },
   {
