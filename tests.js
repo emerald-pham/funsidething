@@ -144,7 +144,7 @@ test('RISK carrying recovery: rejected actual phone sequence requires strikes op
  assert.ok(separation>4,`recovery must oppose fore/aft legs rather than the rejected ${separation}-unit tiny shuffle`);
  assert.ok(arcs.length>=3&&arcs.every(arc=>arc>.12),`each full flight must rise above its landing chord: ${arcs}`);
 });
-test('RISK carrying isolation: immutable accepted renderer commands stay exact outside requested walker pace changes',async()=>{
+test('RISK carrying isolation: immutable accepted renderer commands stay exact outside requested walker pace and kite fabric changes',async()=>{
  const {readMotionBuild,createMotionProbe}=await import('./scripts/motion-review-harness.mjs'),build=readMotionBuild(__dirname,'WORKTREE');
  const bytes=fs.readFileSync(path.join(__dirname,'scripts/fixtures/gait-carrying-sentinel.json')),fixture=JSON.parse(bytes);
  assert.equal(createHash('sha256').update(bytes).digest('hex'),'740faa80ea8862bf7d1d65f4d9c3090bff6169d241b00acd3f7f2c142a06223d','preserve every original accepted input, reference hash and control');
@@ -163,6 +163,17 @@ test('RISK carrying isolation: immutable accepted renderer commands stay exact o
    assert.ok(Math.abs(frame.metadata.x-(anchor+(expected.metadata.x-anchor)*.5))<1e-7,'requested half pace retains the same deterministic local route');
    assert.equal(frame.metadata.duration,expected.metadata.duration);assert.equal(frame.metadata.direction,expected.metadata.direction);
    assert.equal(frame.commands.find(c=>c[0]==='set'&&c[1]==='globalAlpha')[2],1,'requested walker no longer fades while visible');
+  }else if(options.actor==='kite'){
+   // The user requested two-tone kite fabric. Project only that explicit
+   // seven-command panel onto the immutable old paint; every other command,
+   // including the person, string, tail, spar and movement, remains exact.
+   const commands=expected.commands,start=commands.findIndex((command,i)=>command[0]==='beginPath'&&JSON.stringify(commands[i+1])===JSON.stringify(['moveTo',0,-12])&&JSON.stringify(commands[i+2])===JSON.stringify(['lineTo',8,0]));
+   assert.ok(start>=0,'immutable reference retains the original kite diamond');
+   const fabric=commands[start+6][2],accent=commands[start+11][2];
+   assert.deepEqual(commands.slice(start,start+14),[['beginPath'],['moveTo',0,-12],['lineTo',8,0],['lineTo',0,10],['lineTo',-8,0],['closePath'],['set','fillStyle',fabric],['fill'],['beginPath'],['moveTo',0,-12],['lineTo',0,10],['set','strokeStyle',accent],['set','lineWidth',1],['stroke']]);
+   const panel=[['beginPath'],['moveTo',0,-12],['lineTo',8,0],['lineTo',0,10],['closePath'],['set','fillStyle',accent],['fill']];
+   const projected={...expected,commands:[...commands.slice(0,start+8),...panel,...commands.slice(start+8)]};
+   assert.deepEqual(frame,projected,'only the explicitly requested seeded fabric panel changes immutable kite paint');
   }else assert.deepEqual(frame,expected,'unaffected carrying/activity consumer retains exact196 painter output');
  };
  for(const c of fixture.controls){const expected=createMotionProbe(baseline,c).sample(c.options),frame=createMotionProbe(build,c).sample(c.options);compare(expected,frame,c.options,c.width);assert.deepEqual(frame,createMotionProbe(build,c).sample(c.options),'cold reconstruction matches actual candidate painter');}

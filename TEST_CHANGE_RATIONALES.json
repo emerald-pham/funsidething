@@ -1,5 +1,22 @@
 [
   {
+    "testChangesSha256": "553bccaa52f3991272dd740f4dc965b0b0f7a9f8c0599971836f128c71ee1926",
+    "reason": "User explicitly requested two-tone kite fabric. The immutable196 gait reference also freezes kite paint and correctly detects the seven added panel commands. Preserve original frozen bytes/hash and every unrelated exact command; project only the explicit seven-command right-half panel from the reference spar accent before exact comparison. No application asset changes in this repair.",
+    "previousBehavior": "The gait isolation contract required the old single-fabric kite command stream even after the user explicitly requested two-tone fabric.",
+    "intendedBehavior": "Retain exact immutable geometry, person, string, spar, tail and activity paint, with exactly one approved seven-command seeded fabric panel projected onto the frozen kite reference.",
+    "replacementTests": [
+      "RISK carrying isolation: immutable accepted renderer commands stay exact outside requested walker pace and kite fabric changes",
+      "RISK scene color variation: kite panels and passing plane livery use existing seeded accents without new random draws"
+    ],
+    "preservedCoverage": [
+      "Frozen fixture source/hash and every unrelated exact renderer command remain required; projected panel must match immutable reference accent. All other existing behavior assertions remain unchanged."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='^RISK carrying isolation:' tests.js",
+      "failure": "Observed existing immutable-reference RED before test repair: actual kite commands include the explicitly requested fabric panel and exact old renderer assertion fails. Original fixture/hash and existing assertions for other actors retained; no application code changed during repair. .task-storage/colors-blimp/carrying-isolation-current.txt; focused repaired result in carrying-isolation-repaired.txt. Original plane/kite/FAQ feature RED logs also retained."
+    }
+  },
+  {
     "testChangesSha256": "0c59f1170c969dcd7bbde8d84225b0e3d6d77e873bc10a12429f508a15e2d1ec",
     "reason": "Protect seeded presentation-only color variation with real kite painter commands and existing plane consumer binding.",
     "previousBehavior": "Kites had one fabric panel and passing planes always used a fixed cream body.",
