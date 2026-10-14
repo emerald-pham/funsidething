@@ -928,9 +928,11 @@ test('RISK task rating history browser: phone tablet and desktop disclosures pag
   try{for(const [width,height] of [[320,568],[568,320],[768,1024],[1440,900]])for(const colorScheme of ['light','dark']){
    const context=await browser.newContext({viewport:{width,height},hasTouch:width<1000,isMobile:width<1000,colorScheme,reducedMotion:'reduce'}),page=await context.newPage();
    try{
-    await context.addInitScript(()=>localStorage.setItem('fvp:chain-scanner:landscape-motion','reduced'));
     await page.route('https://**/*',route=>route.abort());await page.goto(process.env.LANDSCAPE_BROWSER_URL);await page.waitForFunction(()=>typeof state!=='undefined'&&state!==null);
-    const fixture=await page.evaluate(()=>{closeModal();document.getElementById('motionDialog')?.close();state.seenQuickStart=true;const a=addTask('Private browser benchmark'),b=addTask('Private browser rating history');state.chain=[a.id];state.candidateId=b.id;recomputeRanks();decide('yes');const row=JSON.parse(JSON.stringify(b.ratingHistory[0]));b.ratingHistory=Array.from({length:45},(_,i)=>({...row,id:'private-browser-event-'+i,seq:45-i,at:row.at-i*1000}));b.ratingHistoryHead=b.ratingHistory[0].id;state.listOpen=true;render();return {id:b.id,raw:JSON.stringify(b.ratingHistory)};});
+    // Complete the real browser-local welcome choice so cold reload retains it.
+    await page.locator('#motionDialog button[data-landscape-motion="reduced"]').click();
+    await page.waitForFunction(()=>LivingSky.readMotion(localStorage)==='reduced'&&!document.getElementById('motionDialog').open);
+    const fixture=await page.evaluate(()=>{closeModal();state.seenQuickStart=true;const a=addTask('Private browser benchmark'),b=addTask('Private browser rating history');state.chain=[a.id];state.candidateId=b.id;recomputeRanks();decide('yes');const row=JSON.parse(JSON.stringify(b.ratingHistory[0]));b.ratingHistory=Array.from({length:45},(_,i)=>({...row,id:'private-browser-event-'+i,seq:45-i,at:row.at-i*1000}));b.ratingHistoryHead=b.ratingHistory[0].id;state.listOpen=true;render();return {id:b.id,raw:JSON.stringify(b.ratingHistory)};});
     const row=page.locator('[data-row]').filter({has:page.locator('[data-act="edit"][data-id="'+fixture.id+'"]')});await row.locator('[data-act="edit"]').click();
     const summary=page.locator('.task-rating-history > summary');await summary.focus();await summary.press('Enter');await page.locator('.rating-event').first().waitFor();assert.equal(await page.locator('.rating-event').count(),20);
     await page.locator('#etTitle').fill('Unsaved private history draft');await page.getByRole('button',{name:/Show 20 more/}).click();assert.equal(await page.locator('.rating-event').count(),40);assert.equal(await page.locator('#etTitle').inputValue(),'Unsaved private history draft');
@@ -26115,4 +26117,27 @@ test('RISK Show Postpone explicit visibility: saved booleans drive positive chec
 test('RISK Show Postpone normalization: explicit positive choices win and draft inverse choices migrate only when absent',async()=>{
  const {ctx}=await loadApp();for(const value of [true,false]){assert.equal(ctx.normalizeSettings({showPostpone:value,hidePostpone:value}).showPostpone,value);assert.equal(ctx.normalizeSettings({hidePostpone:value}).showPostpone,!value);}
  for(const value of [null,'true',1,{v:99}])assert.equal(ctx.normalizeSettings({showPostpone:value,hidePostpone:true}).showPostpone,true,'invalid positive choice is not an absent legacy field');
+});
+
+ test('RISK task history: compact Top X uses recorded snapshots and preserves legacy facts',async()=>{
+ const {ctx,b}=await ratingHistoryFixture(631);ctx.decide('yes');
+ const row=b.ratingHistory[0];row.before.topK=2;row.before.n=7;row.after.topK=4;row.after.n=9;
+ const raw=JSON.stringify(b.ratingHistory);
+ const compact=()=>ctx.taskRatingHistoryHTML(b).match(/<span class="rating-change">Top X (.*?)<\/span>/)[0];
+ assert.match(compact(),/Top X 2 of 7 → 4 of 9/);assert.doesNotMatch(compact(),/> \/ Top X/,'separate metric line starts with its label');
+ ctx.addTask('Unrelated current pool change');ctx.recomputeRanks();assert.match(compact(),/Top X 2 of 7 → 4 of 9/);
+ assert.equal(JSON.stringify(b.ratingHistory),raw);
+ row.before.topK=null;assert.match(compact(),/Top X Unavailable → 4 of 9/);
+ delete row.before;row.after.topK=null;assert.match(compact(),/Top X Unavailable/);
+ row.after.topK=4;assert.match(compact(),/Top X 4 of 9/);
+ assert.equal(ctx.validRatingHistoryRow(row),true);
+ });
+
+test('RISK history browser driver: first-run motion uses the supported choice before history fixtures',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'tests.js'),'utf8');
+ const start=source.indexOf("test('RISK task rating history browser:"),end=source.indexOf("\ntest(",start+1),driver=source.slice(start,end);
+ assert.match(driver,/await page\.locator\('#motionDialog button\[data-landscape-motion="reduced"\]'\)\.click\(\)/,'complete the actual first-run choice through its button');
+ assert.match(driver,/LivingSky\.readMotion\(localStorage\)===\s*'reduced'/,'verify the supported timed preference before reload');
+ assert.doesNotMatch(driver,/addInitScript\(\(\)=>localStorage\.setItem\('fvp:chain-scanner:landscape-motion'/,'do not seed obsolete untimed consent');
+ assert.doesNotMatch(driver,/getElementById\('motionDialog'\)\?\.close\(\)/,'do not bypass the actual welcome choice');
 });
