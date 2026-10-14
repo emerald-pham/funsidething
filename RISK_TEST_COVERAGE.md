@@ -990,11 +990,11 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - `RISK pedestrian ski carry: approach skis intersect the actual carrying hand`
 - `RISK pedestrian ski tracks: approach transition introduces track ink continuously without a full-length pop`
 
-- `RISK pedestrian entry capacity: complete visitors retain the fourteen actor bound without eviction or seek-dependent admission`
+- `RISK pedestrian entry capacity: complete visitors retain fourteen admission reservations without eviction or seek-dependent admission`
 - `RISK pedestrian capacity planner budget: cached daily scheduling evaluates each immutable proposal lifetime once`
 - `RISK pedestrian capacity guidance: FAQ explains skipped crowded opportunities without changing underway visitors or saved tasks`
 
-- `RISK pedestrian capacity liveness: a busy day admits visitors while retaining the complete-life bound`
+- `RISK pedestrian capacity liveness: a busy day admits visitors while retaining bounded reservations and complete recipes`
 - `RISK pedestrian capacity day boundary: admitted visits finish within their shared day while short late visitors remain possible`
 - RISK bulk toolbar: mounted controls stay outside scrolling rows and retain filtered selection through filter changes
 - RISK bulk row selection: selected label replaces the existing rank slot and deselection restores its format
@@ -1140,3 +1140,24 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK shadow FAQ: mounted guidance explains pose light and scenery-only changes
 
 - RISK human profile selector: historical walker consumer still selects the actual guest painter
+
+## Pedestrian admission/display separation
+
+- `RISK pedestrian slot recovery: departed display recipes cannot suppress an otherwise eligible shared arrival`
+- `RISK pedestrian reservation workload: stress admission stays fourteen while complete recipes have a derived finite bound`
+- `RISK pedestrian local paint culling: completed parties stop before pose shadow reflection and actor consumers without altering shared records`
+- `RISK pedestrian reduced workload: original shared reservations alone select deterministic still representatives`
+- `RISK pedestrian paint memo: UTC frame age advances without rebuilding each local completion recipe`
+- `RISK pedestrian fireworks isolation: retained walking recipes never enter unrelated show pose work`
+- `RISK pedestrian slot guidance: extended FAQ separates arrival budget from complete walks and bounded still scenery`
+
+Protect original shared admission slots separately from finite crossing recipes, pre-pose local retirement, reduced still-scene selection, immutable completion memoization and unrelated show work.
+
+- `RISK pedestrian reduced retirement consumer: shared slot expiry repaints a still scene even when retained IDs do not change`
+
+- `RISK pedestrian deferred recipes: cold admission plans solve only near-midnight and current display lifetimes once`
+
+- `RISK pedestrian maximum lifetime: all canonical walking cohorts fit the proven finite recipe lookback`
+- `RISK pedestrian deferred reconstruction: eager recipe reference matches lazy output at lookback midnight and cache eviction`
+- `RISK pedestrian motion toggle consumer: real motion-choice handler restores full underway tails without changing shared recipes`
+- `RISK pedestrian cull painted bounds: real companions held props and winter residue clear the frame before local retirement`

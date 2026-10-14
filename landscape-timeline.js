@@ -5,7 +5,7 @@
 (function(root){
   'use strict';
   const S=root.LivingSky,C=root.LandscapeConfig;
-  const DEFAULT_SEED='chain-scanner-scene-v1',DAY=86400,MAX_LIFE=300;
+  const DEFAULT_SEED='chain-scanner-scene-v1',DAY=86400,MAX_LIFE=300,MAX_WALK_LIFE=2700;
   const unit=value=>((value%1)+1)%1;
   function sample(seed,stream,slot=0,salt=0){
     let hash=2166136261;
@@ -60,8 +60,21 @@
     // finite travel budget covers canvases through 8192 CSS pixels; smaller
     // canvases simply finish painting a visit earlier, without changing admission.
     const walkingGeometry=root.LandscapeGeometry.create(8192,900);
-    const visibleDuration=e=>walkingGeometry.walkingLifetime(e);
-    const extendWalk=(e,duration)=>duration===e.duration?e:{...e,activityDuration:e.duration,duration};
+    const walkingTypes=new Set(['walker','dogwalker','reader','couple','picnic','kite','snowman','snowangel','skier']);
+    const walkingDurations=new WeakMap();
+    const visibleDuration=e=>{
+      if(!walkingTypes.has(e.type))return e.duration;
+      if(!walkingDurations.has(e))walkingDurations.set(e,walkingGeometry.walkingLifetime(e));
+      return walkingDurations.get(e);
+    };
+    const extendWalk=e=>{
+      if(!walkingTypes.has(e.type))return e;
+      const visit={...e,activityDuration:e.duration};
+      // Lifetime reads are pure and memoized. Planning a whole day's original
+      // reservations must not solve every walk when only this moment is painted.
+      Object.defineProperty(visit,'duration',{enumerable:true,get:()=>visibleDuration(e)});
+      return visit;
+    };
     const dayPlans=new Map();
     const roofs=city.partyRoofs,gardens=[...city.gardens,...city.patios].map(roof=>roof.index).sort((a,b)=>a-b);
     const wind=.6+sample(seed,'wind')*1.2,visitSeed=sample(seed,'visitors');
@@ -105,7 +118,7 @@
     }
     // Admission reservations keep the old show horizon; a shorter display must
     // not increase occurrence frequency or admit a different shared scene.
-    const reservationDuration=e=>e.scheduleDuration||e.duration;
+    const reservationDuration=e=>e.scheduleDuration||e.activityDuration||e.duration;
     const overlaps=(a,b)=>a.start<b.start+reservationDuration(b)&&b.start<a.start+reservationDuration(a);
     function dayPlan(day){
       const key=JSON.stringify([day,...C.spawnRateNames.map(C.spawnRate)]);
@@ -138,21 +151,25 @@
           (!C.waterEvents.includes(e.type)||prior.filter(other=>C.waterEvents.includes(other.type)).length<2);
         prior.push(e);
         if(!eligible||e.start<from||e.start>=to)continue;
-        // A full reservation budget rejects this proposal regardless of its
-        // lifetime. Avoid solving its terrain route; original eligibility and
-        // random draws above still see every raw proposal in the same order.
+        // Admission counts the original reservation, never the retained walking
+        // recipe. A person who has left a phone can still be crossing a wide
+        // scene; keeping that recipe must not block the next shared arrival.
+        // Full exits stay finite and unchanged across widths, reload and seek.
         active=active.filter(other=>other.end>e.start);
         if(active.length>=S.MAX_EVENTS-2)continue;
-        const duration=visibleDuration(e),end=e.start+Math.max(duration,reservationDuration(e));
+        // The canonical route is below2700seconds: (8192+112)/3.5 plus
+        // the longest240/.82activity and its bounded clock offset. Only a
+        // proposal this close to midnight needs its exact full-life fit solved.
+        const end=e.start+(e.start+MAX_WALK_LIFE>to?Math.max(visibleDuration(e),reservationDuration(e)):reservationDuration(e));
         if(end>to)continue;
-        active.push({end});events.push(extendWalk(e,duration));
+        active.push({end:e.start+reservationDuration(e)});events.push(extendWalk(e));
       }
       dayPlans.set(key,events);if(dayPlans.size>2)dayPlans.delete(dayPlans.keys().next().value);
       return events;
     }
     function build(bucket){
       const from=bucket*8,to=from+8;
-      const events=dayPlan(Math.floor(from/DAY)).filter(e=>e.start<to&&e.start+e.duration>from);
+      const events=dayPlan(Math.floor(from/DAY)).filter(e=>e.start>=from-MAX_WALK_LIFE&&e.start<to&&e.start+e.duration>from);
       for(const type of ['train','metro']){
         const rate=C.spawnRate(type);if(!rate)continue;
         // Bernoulli opportunities are one maximum crossing apart, so no
@@ -179,10 +196,11 @@
         if(start>=to||start+candidate.duration<=from)continue;
         const end=start+candidate.duration,neighbors=[];
         for(let day=Math.floor(start/DAY);day<=Math.floor(end/DAY);day++)neighbors.push(...dayPlan(day));
-        const overlaps=neighbors.filter(e=>e.start<end&&e.start+e.duration>start);
+        const overlaps=neighbors.filter(e=>e.start<end&&e.start+reservationDuration(e)>start);
         // Never evict or delay existing visits. Prove room throughout this
-        // crossing, conservatively retaining two slots for the two rail lines.
-        if([start,...overlaps.map(e=>Math.max(start,e.start))].some(at=>overlaps.filter(e=>e.start<=at&&e.start+e.duration>at).length>=S.MAX_EVENTS-2))continue;
+        // crossing against admission reservations, with two slots for rail.
+        // Retained walking recipes are display work, not extra reservations.
+        if([start,...overlaps.map(e=>Math.max(start,e.start))].some(at=>overlaps.filter(e=>e.start<=at&&e.start+reservationDuration(e)>at).length>=S.MAX_EVENTS-2))continue;
         events.push(candidate);
       }
       const woods=[],weights=C.woodland.types.map(type=>C.spawnRate('woodland-'+type)),total=weights.reduce((a,b)=>a+b,0);

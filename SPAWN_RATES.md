@@ -6,8 +6,9 @@ Use 0 to disable, 1 for the default, 0.5 for less, or 2 for more. Values from
 An invalid table is rejected as a whole; missing rows use 1.
 
 Blimps use independent 240-second UTC opportunities with an 8% chance at rate 1.
-They keep existing visits unchanged and skip a crossing if its complete lifetime
-would exceed the scene budget, reserving room for both rail lines. There is no
+They keep existing visits unchanged and require room in the shared arrival
+reservation budget throughout their complete crossing, reserving both rail lines.
+Retained walking display recipes do not occupy extra arrival reservations. There is no
 guaranteed next arrival. Their 180-second baseline crossing uses the existing
 seeded travel-speed range and works in all seasons, by day and night.
 

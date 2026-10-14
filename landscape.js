@@ -14,6 +14,7 @@
   const back=host.querySelector('[data-scenery]'),front=host.querySelector('[data-life]');
   let b=back.getContext('2d',{alpha:false});const base=b,g=front.getContext('2d');
   const layers={};let geometry;
+  const localWalkEnds=new Map();
   const cityLayer=document.createElement('canvas'),partyLayer=document.createElement('canvas'),skyCity=document.createElement('canvas'),skyReflection=document.createElement('canvas'),blurredReflection=document.createElement('canvas'),softenedReflection=document.createElement('canvas'),reflectionCanvas=document.createElement('canvas');
   if(!b||!g){host.hidden=true;return;}
   const mq=window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -669,7 +670,7 @@
     // The sky labels both solar directions as dawn/dusk below the +8-degree day boundary.
     if(!S.fireworksAllowed(sky))return;
     g.save();
-    for(const e of world.events.map(e=>scenePose(e,true)))if(e.type===type&&e.fireworkActive!==false){
+    for(const e of world.events.filter(e=>e.type===type).map(e=>scenePose(e,true)))if(e.type===type&&e.fireworkActive!==false){
       g.save();
       for(const dot of geometry.fireworks(e.age,e.seed,e.type==='festival',e)){
         const night=1-S.smooth(-12,8,sky.sun.altitude);
@@ -724,9 +725,24 @@
       g.restore();
     }
   }
+  function eventPaintable(e){
+    if(!e.activityDuration)return true;
+    // Still scenery represents only the shared admission set. Otherwise the
+    // midpoint substitution would bring hundreds of expired tails back on screen.
+    if(reduced)return e.age<e.activityDuration;
+    // Retire only local paint after the complete party clears this geometry.
+    // The shared recipe and admission clock remain intact for every other client.
+    const key=JSON.stringify([e.id,e.type,e.activityDuration,e.seed,e.lane,e.reverse]);
+    if(!localWalkEnds.has(key)){
+      localWalkEnds.set(key,geometry.walkingLifetime(e));
+      // At most345recipes can be current; retain a bounded memo across frame ages.
+      if(localWalkEnds.size>1024)localWalkEnds.delete(localWalkEnds.keys().next().value);
+    }
+    return e.age<localWalkEnds.get(key);
+  }
   function paintLife(t){
     visibleBanners=[];if(reduced)t=0;
-    const paintEvents=world.events.map(scenePose);
+    const paintEvents=world.events.filter(eventPaintable).map(scenePose);
     const weather=S.weatherAt(new Date(),sceneSeason),weatherPhase=reduced?0:Date.now()/1000;
     g.clearRect(0,0,W,H);
     paintFireworks('fireworks');
@@ -1417,7 +1433,7 @@
   }
   function resize(){
     cityLights.windows=[];
-    W=host.clientWidth;H=host.clientHeight;geometry=LandscapeGeometry.create(W,H);hy=geometry.horizon;
+    W=host.clientWidth;H=host.clientHeight;geometry=LandscapeGeometry.create(W,H);hy=geometry.horizon;localWalkEnds.clear();
     if(!rooftopParty)rooftopParty={active:null};
     if(!clocktowerVisit)clocktowerVisit={active:null};
     // Pixel budget prevents high-DPR phones from allocating desktop-size canvases.
@@ -1480,10 +1496,10 @@
     if(document.hidden||!geometry||!p)return;
     // Static scenery repaints on membership changes, including the complete
     // barge crossing, without turning reduced motion into continuous animation.
-    const before=JSON.stringify([world.events.map(e=>[e.id,e.type==='festival'&&e.age<e.duration]),woodland.events.map(e=>e.id),rooftopParty.active?.roofIndex,clocktowerVisit.active,lastCitySlot]);
+    const before=JSON.stringify([(reduced?world.events.filter(eventPaintable):world.events).map(e=>[e.id,e.type==='festival'&&e.age<e.duration]),woodland.events.map(e=>e.id),rooftopParty.active?.roofIndex,clocktowerVisit.active,lastCitySlot]);
     syncScene(Date.now());
     if(lastCitySlot!==sceneSnapshot.windowsSlot){lastCitySlot=sceneSnapshot.windowsSlot;paintBackground();}
-    const after=JSON.stringify([world.events.map(e=>[e.id,e.type==='festival'&&e.age<e.duration]),woodland.events.map(e=>e.id),rooftopParty.active?.roofIndex,clocktowerVisit.active,lastCitySlot]);
+    const after=JSON.stringify([(reduced?world.events.filter(eventPaintable):world.events).map(e=>[e.id,e.type==='festival'&&e.age<e.duration]),woodland.events.map(e=>e.id),rooftopParty.active?.roofIndex,clocktowerVisit.active,lastCitySlot]);
     if(reduced&&before!==after)paintLife(world.elapsed);
   }
   function stop(){if(frame)cancelAnimationFrame(frame);frame=0;last=0;nextPaint=0;clearTimeout(skyTimer);clearTimeout(resizeTimer);clearInterval(partyTimer);skyTimer=0;resizeTimer=0;partyTimer=0;}
