@@ -26024,3 +26024,20 @@ test('RISK human inherited head paint: existing local-transform carriers retain 
  assert.equal(paint(undefined,false).filter(args=>args[5]==='skin').length,1,'default inherited heads preserve accepted carrying paint');
  for(const direction of [-1,1])assert.equal(paint(direction,true).filter(args=>args[5]==='skin').length,2,'explicit walking and clocktower profiles retain forward face detail');
 });
+
+test('RISK scene color variation: kite panels and passing plane livery use existing seeded accents without new random draws',async()=>{
+ assert.match(html,/Kites have two-tone fabric and passing planes use varied pastel liveries/,'extended scenery FAQ explains the visible variation');
+ const source=fs.readFileSync(new URL('./landscape.js',import.meta.url),'utf8');
+ const plane=source.slice(source.indexOf("if(e.type==='plane'){"),source.indexOf("if(e.type==='balloon'){"));
+
+ const kite=source.slice(source.indexOf("      if(e.type==='kite'){"),source.indexOf("    if(e.type==='skateboarder'"));
+ const panels=[],g={save(){},restore(){},translate(){},scale(){},beginPath(){},moveTo(){},lineTo(){},closePath(){},fill(){panels.push(this.fillStyle)},quadraticCurveTo(){},stroke(){}};
+ for(const seed of [.01,.11,.21,.31,.41,.51]){
+  panels.length=0;
+  vm.runInNewContext(kite.split('}g.restore();return true;')[0]+'}',{g,e:{type:'kite',seed},visit:{x:40,direction:1,pack:0},groundAt:()=>100,kiteHand:{x:40,y:90},t:0,verticalClock:0,c:'base',color:(s,o)=>'accent-'+s+'-'+o,line(){},Math});
+  assert.ok(panels.includes('base'),'retain the original body color');
+  assert.ok(panels.includes('accent-'+seed+'-2'),'paint a complementary seeded fabric panel, not just a thin spar');
+ }
+ assert.match(plane,/S\.mixHex\(color\(e\.seed\),p\.sky\[1\],p\.night\*\.7\)/,'passing planes vary their livery using the existing visitor seed');
+ assert.doesNotMatch(plane+kite,/Math\.random|\br\(\)/,'paint variation cannot consume schedule randomness');
+});

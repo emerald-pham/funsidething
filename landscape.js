@@ -1081,7 +1081,7 @@
         const y=hy*.18+e.lane*hy*.18+geometry.verticalOffset(e,14);
         g.save();g.translate(x,y);g.scale(e.reverse?-1:1,1);
         g.globalAlpha=.45;const tail=g.createLinearGradient(-90,0,-6,0);tail.addColorStop(0,'rgba(248,246,225,0)');tail.addColorStop(1,'rgba(248,246,225,.65)');g.fillStyle=tail;g.fillRect(-90,1,83,.7);g.globalAlpha=1;
-        g.fillStyle=S.mixHex('#f6f1db',p.sky[1],p.night*.7);g.beginPath();g.moveTo(9,0);g.lineTo(0,-2);g.lineTo(-7,-8);g.lineTo(-10,-8);g.lineTo(-5,-1);g.lineTo(-13,-1);g.lineTo(-17,-4);g.lineTo(-18,-3);g.lineTo(-16,2);g.lineTo(-5,2);g.lineTo(-10,8);g.lineTo(-7,8);g.lineTo(0,2);g.closePath();g.fill();
+        g.fillStyle=S.mixHex(color(e.seed),p.sky[1],p.night*.7);g.beginPath();g.moveTo(9,0);g.lineTo(0,-2);g.lineTo(-7,-8);g.lineTo(-10,-8);g.lineTo(-5,-1);g.lineTo(-13,-1);g.lineTo(-17,-4);g.lineTo(-18,-3);g.lineTo(-16,2);g.lineTo(-5,2);g.lineTo(-10,8);g.lineTo(-7,8);g.lineTo(0,2);g.closePath();g.fill();
         if(p.night>.4){ellipse(g,0,-2,1,1,'#ed8976');ellipse(g,0,2,1,1,'#abcdaa');}g.restore();return;
       }
       if(e.type==='balloon'){
@@ -1202,7 +1202,9 @@
         const kx=ax+visit.direction*5+visit.direction*(23+Math.sin(t*.3)*12)*reach,ky=ay-8+(-67+Math.sin(verticalClock*.5)*6)*reach;
         g.beginPath();g.moveTo(kiteHand.x,kiteHand.y);g.quadraticCurveTo(kiteHand.x+visit.direction*30*reach,kiteHand.y-19*reach,kx,ky);g.strokeStyle='#8c9585';g.lineWidth=.65;g.stroke();
         const size=1-.7*visit.pack;g.save();g.translate(kx,ky);g.scale(size,size);
-        g.beginPath();g.moveTo(0,-12);g.lineTo(8,0);g.lineTo(0,10);g.lineTo(-8,0);g.closePath();g.fillStyle=c;g.fill();line(g,0,-12,0,10,color(e.seed,2));
+        g.beginPath();g.moveTo(0,-12);g.lineTo(8,0);g.lineTo(0,10);g.lineTo(-8,0);g.closePath();g.fillStyle=c;g.fill();
+        // Reuse the visitor identity so fabric never consumes event-schedule randomness.
+        g.beginPath();g.moveTo(0,-12);g.lineTo(8,0);g.lineTo(0,10);g.closePath();g.fillStyle=color(e.seed,2);g.fill();line(g,0,-12,0,10,color(e.seed,2));
         for(let i=0;i<4;i++)line(g,Math.sin(verticalClock+i)*3,10+i*4,Math.sin(verticalClock+i+1)*3,14+i*4,c,.7);g.restore();
       }g.restore();return true;
     }

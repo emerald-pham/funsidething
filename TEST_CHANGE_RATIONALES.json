@@ -1,5 +1,21 @@
 [
   {
+    "testChangesSha256": "0c59f1170c969dcd7bbde8d84225b0e3d6d77e873bc10a12429f508a15e2d1ec",
+    "reason": "Protect seeded presentation-only color variation with real kite painter commands and existing plane consumer binding.",
+    "previousBehavior": "Kites had one fabric panel and passing planes always used a fixed cream body.",
+    "intendedBehavior": "Kites paint complementary fabric panels and planes reuse existing seeded visitor accents without changing schedule randomness.",
+    "replacementTests": [
+      "RISK scene color variation: kite panels and passing plane livery use existing seeded accents without new random draws"
+    ],
+    "preservedCoverage": [
+      "All existing tests unchanged; transit line colors, human styling, task data, event selection and timing are retained."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK scene color variation:' tests.js",
+      "failure": "Observed plane livery assertion failure; after test reordering observed missing complementary kite fabric panel; FAQ assertion also failed before its edit. Earlier harness readFile ReferenceError corrected before behavior RED. Logs in .task-storage/colors-blimp."
+    }
+  },
+  {
     "testChangesSha256": "99383ed066fc0bc23f1265ab2cd86a0ee0a6607e1828cfa2d0693cfd7143fe52",
     "reason": "Add discriminating actual-painter coverage for backward-facing hairstyle offsets and separately painted monochrome clocktower children. Required CI found protected immutable carrying output drift. Limit new face detail to explicit world-coordinate walkers/clocktower heads and retain original default-head floating-point paint ordering; old carrying assertions remain unchanged.",
     "previousBehavior": "Head hair offsets remained right-facing during left travel; clocktower children bypassed shared skin and head painting.",

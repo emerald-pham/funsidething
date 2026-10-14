@@ -1104,3 +1104,5 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - `RISK clocktower human paint: children use shared skin and heads through flight landing and departure` — Shared head geometry, character hats, skin arms, trousers and opacity.
 
 - `RISK human inherited head paint: existing local-transform carriers retain paint while explicit profiles face travel` — Preserve immutable carrying/activity head paint outside explicit world-coordinate walker/clocktower profiles.
+
+- RISK scene color variation: kite panels and passing plane livery use existing seeded accents without new random draws
