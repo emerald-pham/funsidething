@@ -17592,18 +17592,19 @@ test('RISK landscape aircraft: ordinary planes restore their previous compact pr
  }
 });
 
-test('RISK landscape aircraft: scheduled planes restore the compact ivory silhouette in both directions',()=>{
+test('RISK landscape aircraft: scheduled planes retain the compact silhouette with seeded liveries in both directions',()=>{
  const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),start=source.indexOf("      if(e.type==='plane'){"),end=source.indexOf("      if(e.type==='balloon')",start),branch=source.slice(start,end);
  assert.ok(start>=0&&end>start,'the exercised code is the ordinary scheduled-plane visitor');
  const silhouette=[[9,0],[0,-2],[-7,-8],[-10,-8],[-5,-1],[-13,-1],[-17,-4],[-18,-3],[-16,2],[-5,2],[-10,8],[-7,8],[0,2]];
  for(const [W,H] of [[390,844],[768,1024],[568,320],[1280,720]])for(const reduced of [false,true])for(const reverse of [false,true])for(const night of [0,.4,.8]){
-  const hy=Math.min(H*(W<600?.37:.47),W<600?310:480),fills=[],lines=[],ellipses=[],rectangles=[],transforms=[],offsets=[];let current=null;
+  const hy=Math.min(H*(W<600?.37:.47),W<600?310:480),fills=[],lines=[],ellipses=[],rectangles=[],transforms=[],offsets=[],colorSeeds=[];let current=null;
   const g={globalAlpha:1,save(){},restore(){},translate(...args){transforms.push(['translate',...args]);},scale(...args){transforms.push(['scale',...args]);},beginPath(){current=[];},moveTo(x,y){current.push([x,y]);},lineTo(x,y){current.push([x,y]);},closePath(){},fill(){fills.push({paint:this.fillStyle,path:current});},fillRect(...rect){rectangles.push({rect,paint:this.fillStyle,alpha:this.globalAlpha});},createLinearGradient(...from){return {from,stops:[],addColorStop(at,paint){this.stops.push([at,paint]);}};}};
-  const context={g,W,H,hy,reduced,p:{night,sky:['#123','#456','#789'],city:'#abc'},geometry:{verticalOffset(e,amplitude){offsets.push([e.type,amplitude]);return reduced?0:3;}},color:()=> '#cb8d80',S:{mixHex:(a,b,amount)=>[a,b,amount].join(':')},ellipse(_g,x,y,rx,ry,paint){ellipses.push({x,y,rx,ry,paint});},line(_g,...args){lines.push(args);}};
+  const context={g,W,H,hy,reduced,p:{night,sky:['#123','#456','#789'],city:'#abc'},geometry:{verticalOffset(e,amplitude){offsets.push([e.type,amplitude]);return reduced?0:3;}},color:seed=>{colorSeeds.push(seed);return '#cb8d80';},S:{mixHex:(a,b,amount)=>[a,b,amount].join(':')},ellipse(_g,x,y,rx,ry,paint){ellipses.push({x,y,rx,ry,paint});},line(_g,...args){lines.push(args);}};
   const paint=vm.runInNewContext(`(function(e,x){${branch}\n})`,context);
   paint({type:'plane',lane:.5,seed:.4,reverse},W/2);
   assert.equal(fills.length,1,`${W}x${H}: the previous compact silhouette has one filled surface`);
-  assert.deepEqual(fills[0],{paint:['#f6f1db','#456',night*.7].join(':'),path:silhouette},'the previous ivory finish blends into the night sky');
+  assert.deepEqual(fills[0],{paint:['#cb8d80','#456',night*.7].join(':'),path:silhouette},'the requested seeded livery retains the compact silhouette and night-sky blend');
+  assert.deepEqual(colorSeeds,[.4],'the passing plane obtains its livery from exactly its existing visitor seed');
   assert.deepEqual(lines,[],'oversized wings and added panel strokes are absent');
   assert.deepEqual(transforms,[['translate',W/2,hy*.18+.5*hy*.18+(reduced?0:3)],['scale',reverse?-1:1,1]]);
   assert.deepEqual(offsets,[['plane',14]],'the existing vertical flight route is preserved');

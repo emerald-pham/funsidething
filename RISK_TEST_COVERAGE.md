@@ -367,7 +367,7 @@ The editor hook blocks app or enforcement edits while tests.js has no staged or 
 - RISK landscape city and aircraft: current changelog names the skyline and plane details
 - RISK landscape aircraft: the biplane has one centered landing gear set
 - RISK landscape aircraft: ordinary planes restore their previous compact profile
-- RISK landscape aircraft: scheduled planes restore the compact ivory silhouette in both directions
+- RISK landscape aircraft: scheduled planes retain the compact silhouette with seeded liveries in both directions
 - RISK night shows: standalone fireworks recur independently of the rare cooldown and stay bounded
 - RISK night shows: festival odds are lower than standalone fireworks with finite visits and rate controls
 - RISK night shows: festivals keep a thirty-minute cooldown while fireworks stay independent
