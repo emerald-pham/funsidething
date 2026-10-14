@@ -6266,7 +6266,7 @@ test("undo: the header button reverses the last action through the normal onActi
 
 const benchAction = (scanHtml) => (scanHtml.match(/<div class="actionrow[^"]*">[\s\S]*?<\/div>/) || [])[0];
 
-test("UI: the benchmark's seven actions sit in one row beneath the purple card", async () => {
+test("UI: with Postpone shown, the benchmark's seven actions sit in one row beneath the purple card", async () => {
   const { ctx, shim } = await loadApp({ seed: 270 });
   ctx.state.settings.showPostpone = true;
   ctx.addTask("Dotted task", true);
@@ -6304,7 +6304,7 @@ test("UI: no siderail hangs off the benchmark card any more", async () => {
     `nothing but a benchmark is showing, so no siderail should remain in: ${scanHtml}`);
 });
 
-test("UI: every action in the benchmark's row shares the same .sm sizing", async () => {
+test("UI: with Postpone shown, every action in the benchmark's row shares the same .sm sizing", async () => {
   const { ctx, shim } = await loadApp({ seed: 273 });
   ctx.state.settings.showPostpone = true;
   ctx.addTask("Dotted task", true);
