@@ -723,7 +723,7 @@
     g.clearRect(0,0,W,H);
     paintFireworks('fireworks');
     const waterEvents=new Set(['festival','jetski','sailboat','cruise','yacht','windsurfer','duck','fish','dolphin']);
-    const airborne=new Set(['festival','duck','fish','plane','balloon','airshow','banner','skywriter','hangglider','jetski','sailboat','cruise','yacht','windsurfer','dolphin','flock']);
+    const airborne=new Set(['festival','duck','fish','plane','balloon','blimp','airshow','banner','skywriter','hangglider','jetski','sailboat','cruise','yacht','windsurfer','dolphin','flock']);
     for(const e of paintEvents)if(e.type==='meteor'&&p.night>.3){
       const fx=geometry.motionProgress(e,'x'),fy=geometry.motionProgress(e,'y'),dx=(e.reverse?-1:1)*(85+e.seed*70),dy=24+e.lane*20;
       const sx=W*(.2+e.seed*.6),sy=hy*(.08+e.lane*.3),x=sx+dx*fx,y=sy+dy*fy;
@@ -1083,6 +1083,18 @@
         g.globalAlpha=.45;const tail=g.createLinearGradient(-90,0,-6,0);tail.addColorStop(0,'rgba(248,246,225,0)');tail.addColorStop(1,'rgba(248,246,225,.65)');g.fillStyle=tail;g.fillRect(-90,1,83,.7);g.globalAlpha=1;
         g.fillStyle=S.mixHex(color(e.seed),p.sky[1],p.night*.7);g.beginPath();g.moveTo(9,0);g.lineTo(0,-2);g.lineTo(-7,-8);g.lineTo(-10,-8);g.lineTo(-5,-1);g.lineTo(-13,-1);g.lineTo(-17,-4);g.lineTo(-18,-3);g.lineTo(-16,2);g.lineTo(-5,2);g.lineTo(-10,8);g.lineTo(-7,8);g.lineTo(0,2);g.closePath();g.fill();
         if(p.night>.4){ellipse(g,0,-2,1,1,'#ed8976');ellipse(g,0,2,1,1,'#abcdaa');}g.restore();return;
+      }
+      if(e.type==='blimp'){
+        const y=hy*(.26+e.lane*.18)+geometry.verticalOffset(e,7);
+        const fabric=S.mixHex(color(e.seed),p.sky[1],.15+p.night*.45),rib=S.mixHex(fabric,'#fff2d8',.28),shade=S.mixHex(fabric,p.city,.4);
+        g.save();g.translate(x,y);g.scale(e.reverse?-1:1,1);
+        // Tail fins sit behind the envelope; the small cabin hangs below it.
+        g.fillStyle=shade;g.beginPath();g.moveTo(-19,-2);g.lineTo(-29,-13);g.lineTo(-29,0);g.lineTo(-32,8);g.lineTo(-18,4);g.closePath();g.fill();
+        ellipse(g,0,0,27,9,fabric);ellipse(g,1,-1.4,24,5.6,rib);ellipse(g,1,2.3,24,3.4,fabric);
+        line(g,-19,4,18,4,shade,.6);line(g,-5,8,-4,12,shade,.6);line(g,7,8,6,12,shade,.6);
+        g.fillStyle=shade;g.fillRect(-6,11,15,4);g.fillStyle=S.mixHex('#a5c8cd',p.city,p.night*.65);g.fillRect(-3,11.7,8,1.5);
+        line(g,-10,13,-13,13,shade,.7);line(g,-13,11.5,-13,14.5,rib,.7);
+        g.restore();return;
       }
       if(e.type==='balloon'){
         const drift=geometry.balloonDrift(e.seed,clock,wind,verticalClock),y=hy*.48+e.lane*hy*.18+drift.y+geometry.verticalOffset(e,10),r=10+e.lane*7;

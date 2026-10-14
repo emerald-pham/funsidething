@@ -2,7 +2,7 @@
 (function(root){
   'use strict';
   function create(W,H){
-    const FIXED_X_TYPES=new Set(['festival','cyclist','train','metro','plane','balloon','airshow','banner','hangglider','jetski','sailboat','cruise','yacht','skateboarder','rollerskater','hoverboard','scooter','windsurfer']);
+    const FIXED_X_TYPES=new Set(['festival','cyclist','train','metro','plane','balloon','blimp','airshow','banner','hangglider','jetski','sailboat','cruise','yacht','skateboarder','rollerskater','hoverboard','scooter','windsurfer']);
     const clamp=value=>Math.max(0,Math.min(1,Number.isFinite(Number(value))?Number(value):0));
     const unit=value=>((value%1)+1)%1;
     const rawProgress=event=>{

@@ -1,5 +1,24 @@
 [
   {
+    "testChangesSha256": "52d43ad91b25a6218f50fcd9e55fded49ec27933e7af2e76a95deadc882f65ba",
+    "reason": "Integrate the user-approved independent blimp visitor onto released colors without changing any existing scene schedule, seed sequence, data or protected color/gait assertions.",
+    "previousBehavior": "The released colors base has no blimp opportunity or painter and its FAQ does not explain blimp visits.",
+    "intendedBehavior": "Seeded pastel blimps cross outside-to-outside through independent opportunities only when the complete crossing fits the scene budget, with shared reconstruction and existing motion handling.",
+    "replacementTests": [
+      "RISK blimp schedule: independent seeded opportunities preserve existing scenes and reconstruct across clients",
+      "RISK blimp paint: seeded envelopes retain offscreen margins day-night shading and reduced-motion consumer",
+      "RISK blimp admission: full-budget and later overlapping visits reject complete crossings without eviction"
+    ],
+    "preservedCoverage": [
+      "All incoming colors tests and frozen gait/plane contracts remain unchanged, with whole-frame comparisons and every prior FAQ answer preserved.",
+      "Present and future overlapping crowd rejection, both rail reservations and immutable unrelated timeline comparison retain whole-lifetime capacity safety."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='^RISK blimp' tests.js on released936ec4d source before approved blimp implementation",
+      "failure": "Observed two behavioral failures: independent opportunity produced zero blimps, and extended FAQ lacked the new visitor. Prior original painter-absence RED and162word FAQ-budget RED are retained; nine integrated focused checks now pass."
+    }
+  },
+  {
     "reason": "Retain the established130wordper-answer Quickstart limit after CI caught the overlong general scenery answer. Restore its original controls guidance and put useful seeded-color/reload/night-shading guidance in a compact dedicated answer adjacent to transit. Add an actual mounted FAQ placement regression, preserving existing word-budget and paint assertions. Exactcomparisonbase 382de0b438fd60a8c14df2f4e632f4c6fc1c31de.",
     "previousBehavior": "The added palette guidance made the general scenery FAQ exceed its existing130word limit; there was no dedicated answer for stable visitor colors.",
     "intendedBehavior": "General scenery controls retain their exact prior copy; a concise adjacent color answer explains seeded kite/plane variations, same-visit reload consistency and night shading without changing controls or task data.",

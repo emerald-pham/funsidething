@@ -1108,3 +1108,7 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK scene color variation: kite panels and passing plane livery use existing seeded accents without new random draws
 
 - RISK scene color FAQ: seeded palettes stay in a compact dedicated answer
+
+- RISK blimp schedule: independent seeded opportunities preserve existing scenes and reconstruct across clients
+- RISK blimp paint: seeded envelopes retain offscreen margins day-night shading and reduced-motion consumer
+- RISK blimp admission: full-budget and later overlapping visits reject complete crossings without eviction
