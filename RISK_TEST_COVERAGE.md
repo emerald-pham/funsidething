@@ -1108,3 +1108,17 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK scene color variation: kite panels and passing plane livery use existing seeded accents without new random draws
 
 - RISK scene color FAQ: seeded palettes stay in a compact dedicated answer
+
+- RISK Show Postpone preference: actual Settings checkbox hides both scanner controls and restores them without changing tasks
+
+- RISK Show Postpone initialization: fresh browser and host clients default off while recovery evidence keeps visibility
+
+- RISK Show Postpone local adoption: saved empty legacy boards and explicit choices survive reload with future settings intact
+
+- RISK Show Postpone cloud adoption: missing legacy setting and explicit choices override fresh defaults at all supported revisions
+
+- RISK Show Postpone import: actual JSON consumer treats old settings as existing and preserves explicit choices and holds
+
+- RISK Show Postpone explicit visibility: saved booleans drive positive checkbox and both scanner surfaces
+
+- RISK Show Postpone normalization: explicit positive choices win and draft inverse choices migrate only when absent
