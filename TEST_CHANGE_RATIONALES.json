@@ -1,5 +1,124 @@
 [
   {
+    "reason": "Retain the established130wordper-answer Quickstart limit after CI caught the overlong general scenery answer. Restore its original controls guidance and put useful seeded-color/reload/night-shading guidance in a compact dedicated answer adjacent to transit. Add an actual mounted FAQ placement regression, preserving existing word-budget and paint assertions. Exactcomparisonbase 382de0b438fd60a8c14df2f4e632f4c6fc1c31de.",
+    "previousBehavior": "The added palette guidance made the general scenery FAQ exceed its existing130word limit; there was no dedicated answer for stable visitor colors.",
+    "intendedBehavior": "General scenery controls retain their exact prior copy; a concise adjacent color answer explains seeded kite/plane variations, same-visit reload consistency and night shading without changing controls or task data.",
+    "preservedCoverage": [
+      "All existing Quickstart length/topic/structure protections and all paint/gait/transit/human/data assertions remain intact. App behavior changes only in static FAQ prose and derived release fingerprints."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='^RISK Quick start content:|^RISK scene color FAQ:' tests.js",
+      "failure": "Observed both RED before FAQ edit: existing general-answer130word assertion fails; new actual-mounted dedicated-answer assertion fails because entry is absent. CI38556041134 fullsuite has one Quickstart length failure; all other1635tests pass with35environment skips. Logsfaq-budget-red.txt and ci-failed-38556041134.txt retained. Five focused relevant checks GREEN after minimum copy move and shell fingerprints."
+    },
+    "testChangesSha256": "71f5b661a42d7b7d8684e51f1857149da16d3ac1180d047bf15cf0f1e5bdd7b8",
+    "replacementTests": [
+      "RISK carrying isolation: immutable accepted renderer commands stay exact outside requested walker pace and kite fabric changes",
+      "RISK landscape aircraft: scheduled planes retain the compact silhouette with seeded liveries in both directions",
+      "RISK scene color variation: kite panels and passing plane livery use existing seeded accents without new random draws",
+      "RISK scene color FAQ: seeded palettes stay in a compact dedicated answer"
+    ]
+  },
+  {
+    "reason": "Retain the established130wordper-answer Quickstart limit after CI caught the overlong general scenery answer. Restore its original controls guidance and put useful seeded-color/reload/night-shading guidance in a compact dedicated answer adjacent to transit. Add an actual mounted FAQ placement regression, preserving existing word-budget and paint assertions. Exactcomparisonbase bad4d477e267b9d719024665064c2b0d0417745f.",
+    "previousBehavior": "The added palette guidance made the general scenery FAQ exceed its existing130word limit; there was no dedicated answer for stable visitor colors.",
+    "intendedBehavior": "General scenery controls retain their exact prior copy; a concise adjacent color answer explains seeded kite/plane variations, same-visit reload consistency and night shading without changing controls or task data.",
+    "preservedCoverage": [
+      "All existing Quickstart length/topic/structure protections and all paint/gait/transit/human/data assertions remain intact. App behavior changes only in static FAQ prose and derived release fingerprints."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='^RISK Quick start content:|^RISK scene color FAQ:' tests.js",
+      "failure": "Observed both RED before FAQ edit: existing general-answer130word assertion fails; new actual-mounted dedicated-answer assertion fails because entry is absent. CI38556041134 fullsuite has one Quickstart length failure; all other1635tests pass with35environment skips. Logsfaq-budget-red.txt and ci-failed-38556041134.txt retained. Five focused relevant checks GREEN after minimum copy move and shell fingerprints."
+    },
+    "testChangesSha256": "804290caf6167a5513cef4138dd8b28dc0a00d611500a901146dbfd1778cffad",
+    "replacementTests": [
+      "RISK scene color FAQ: seeded palettes stay in a compact dedicated answer"
+    ]
+  },
+  {
+    "testChangesSha256": "ed703a3367a6d8b99118f0ff1d249ba90534f8028638204ad49022ad0895dd5b",
+    "reason": "The explicitly requested scenery palette change intersects two frozen paint contracts: immutable gait output and scheduled-plane fixed ivory. Preserve frozen fixture bytes and exact unrelated commands; project only seven kite panel commands and update only the plane paint expectation to its already supplied seeded accent, retaining silhouette, transforms, route, contrail, night lights and opacity assertions. Add exact main-base and incremental-push rationale bindings. Exact comparison base 382de0b438fd60a8c14df2f4e632f4c6fc1c31de.",
+    "previousBehavior": "Protected tests required the old single-fabric kite command stream and fixed ivory passing-plane fill despite the user-authorized palette changes.",
+    "intendedBehavior": "Exact frozen gait geometry and human/string/tail/spar output remain protected around the seven approved kite panel commands; passing planes must request exactly their visitor seed and keep all geometry/lighting/contrail contracts while varying livery.",
+    "replacementTests": [
+      "RISK carrying isolation: immutable accepted renderer commands stay exact outside requested walker pace and kite fabric changes",
+      "RISK landscape aircraft: scheduled planes retain the compact silhouette with seeded liveries in both directions",
+      "RISK scene color variation: kite panels and passing plane livery use existing seeded accents without new random draws"
+    ],
+    "preservedCoverage": [
+      "Original immutable fixture bytes/source/hash and unrelated exact renderer commands remain required. Plane silhouette, route, transforms, contrail, lights, opacity, reduced-motion and all existing viewport cases are retained; exact seed-consumer assertion is added."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='^RISK carrying isolation:|^RISK landscape aircraft: scheduled planes' tests.js",
+      "failure": "Observed each old paint-contract RED separately before its test repair: immutable kite full-frame equality rejects the requested extra panel; scheduled-plane assertion expects ivory but actual requested livery is the supplied seeded accent. Retained carrying-isolation-current.txt and aircraft-ivory-contract-red.txt. Original feature RED logs also retained. PushCI38555038860 separately rejects missing incremental rationale binding, reproduced locally before metadata correction. No application bytes change during these protected-test/rationale repairs."
+    }
+  },
+  {
+    "testChangesSha256": "b27c99230bacaaba524be3ca787d3b9aa976418d2142ad48d3b43fba1656a4ff",
+    "reason": "The explicitly requested scenery palette change intersects two frozen paint contracts: immutable gait output and scheduled-plane fixed ivory. Preserve frozen fixture bytes and exact unrelated commands; project only seven kite panel commands and update only the plane paint expectation to its already supplied seeded accent, retaining silhouette, transforms, route, contrail, night lights and opacity assertions. Add exact main-base and incremental-push rationale bindings. Exact comparison base c9308e63cc7c66eb598b346c8fe03cbcb5d07f89.",
+    "previousBehavior": "Protected tests required the old single-fabric kite command stream and fixed ivory passing-plane fill despite the user-authorized palette changes.",
+    "intendedBehavior": "Exact frozen gait geometry and human/string/tail/spar output remain protected around the seven approved kite panel commands; passing planes must request exactly their visitor seed and keep all geometry/lighting/contrail contracts while varying livery.",
+    "replacementTests": [
+      "RISK landscape aircraft: scheduled planes retain the compact silhouette with seeded liveries in both directions"
+    ],
+    "preservedCoverage": [
+      "Original immutable fixture bytes/source/hash and unrelated exact renderer commands remain required. Plane silhouette, route, transforms, contrail, lights, opacity, reduced-motion and all existing viewport cases are retained; exact seed-consumer assertion is added."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='^RISK carrying isolation:|^RISK landscape aircraft: scheduled planes' tests.js",
+      "failure": "Observed each old paint-contract RED separately before its test repair: immutable kite full-frame equality rejects the requested extra panel; scheduled-plane assertion expects ivory but actual requested livery is the supplied seeded accent. Retained carrying-isolation-current.txt and aircraft-ivory-contract-red.txt. Original feature RED logs also retained. PushCI38555038860 separately rejects missing incremental rationale binding, reproduced locally before metadata correction. No application bytes change during these protected-test/rationale repairs."
+    }
+  },
+  {
+    "testChangesSha256": "6c85e8bf3780974b96f59fb04d19d1aa601edb3e5a8b8e645918a32059113cd1",
+    "reason": "User explicitly requested two-tone kite fabric. The immutable196 gait reference also freezes kite paint and correctly detects the seven added panel commands. Preserve original frozen bytes/hash and every unrelated exact command; project only the explicit seven-command right-half panel from the reference spar accent before exact comparison. No application asset changes in this repair. This additional binding covers the exact incremental push diff440e608-to-c9308e6; the base382-to-final binding remains retained.",
+    "previousBehavior": "The gait isolation contract required the old single-fabric kite command stream even after the user explicitly requested two-tone fabric.",
+    "intendedBehavior": "Retain exact immutable geometry, person, string, spar, tail and activity paint, with exactly one approved seven-command seeded fabric panel projected onto the frozen kite reference.",
+    "replacementTests": [
+      "RISK carrying isolation: immutable accepted renderer commands stay exact outside requested walker pace and kite fabric changes",
+      "RISK scene color variation: kite panels and passing plane livery use existing seeded accents without new random draws"
+    ],
+    "preservedCoverage": [
+      "Frozen fixture source/hash and every unrelated exact renderer command remain required; projected panel must match immutable reference accent. All other existing behavior assertions remain unchanged."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='^RISK carrying isolation:' tests.js",
+      "failure": "Observed existing immutable-reference RED before test repair: actual kite commands include the explicitly requested fabric panel and exact old renderer assertion fails. Original fixture/hash and existing assertions for other actors retained; no application code changed during repair. .task-storage/colors-blimp/carrying-isolation-current.txt; focused repaired result in carrying-isolation-repaired.txt. Original plane/kite/FAQ feature RED logs also retained. Incremental push CI38555038860 also correctly rejected the missing440e608-to-c9308e6 rationale binding; exact local gate reproduction failed before this metadata-only repair. No test or app bytes changed in this binding repair."
+    }
+  },
+  {
+    "testChangesSha256": "553bccaa52f3991272dd740f4dc965b0b0f7a9f8c0599971836f128c71ee1926",
+    "reason": "User explicitly requested two-tone kite fabric. The immutable196 gait reference also freezes kite paint and correctly detects the seven added panel commands. Preserve original frozen bytes/hash and every unrelated exact command; project only the explicit seven-command right-half panel from the reference spar accent before exact comparison. No application asset changes in this repair.",
+    "previousBehavior": "The gait isolation contract required the old single-fabric kite command stream even after the user explicitly requested two-tone fabric.",
+    "intendedBehavior": "Retain exact immutable geometry, person, string, spar, tail and activity paint, with exactly one approved seven-command seeded fabric panel projected onto the frozen kite reference.",
+    "replacementTests": [
+      "RISK carrying isolation: immutable accepted renderer commands stay exact outside requested walker pace and kite fabric changes",
+      "RISK scene color variation: kite panels and passing plane livery use existing seeded accents without new random draws"
+    ],
+    "preservedCoverage": [
+      "Frozen fixture source/hash and every unrelated exact renderer command remain required; projected panel must match immutable reference accent. All other existing behavior assertions remain unchanged."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='^RISK carrying isolation:' tests.js",
+      "failure": "Observed existing immutable-reference RED before test repair: actual kite commands include the explicitly requested fabric panel and exact old renderer assertion fails. Original fixture/hash and existing assertions for other actors retained; no application code changed during repair. .task-storage/colors-blimp/carrying-isolation-current.txt; focused repaired result in carrying-isolation-repaired.txt. Original plane/kite/FAQ feature RED logs also retained."
+    }
+  },
+  {
+    "testChangesSha256": "0c59f1170c969dcd7bbde8d84225b0e3d6d77e873bc10a12429f508a15e2d1ec",
+    "reason": "Protect seeded presentation-only color variation with real kite painter commands and existing plane consumer binding.",
+    "previousBehavior": "Kites had one fabric panel and passing planes always used a fixed cream body.",
+    "intendedBehavior": "Kites paint complementary fabric panels and planes reuse existing seeded visitor accents without changing schedule randomness.",
+    "replacementTests": [
+      "RISK scene color variation: kite panels and passing plane livery use existing seeded accents without new random draws"
+    ],
+    "preservedCoverage": [
+      "All existing tests unchanged; transit line colors, human styling, task data, event selection and timing are retained."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK scene color variation:' tests.js",
+      "failure": "Observed plane livery assertion failure; after test reordering observed missing complementary kite fabric panel; FAQ assertion also failed before its edit. Earlier harness readFile ReferenceError corrected before behavior RED. Logs in .task-storage/colors-blimp."
+    }
+  },
+  {
     "testChangesSha256": "99383ed066fc0bc23f1265ab2cd86a0ee0a6607e1828cfa2d0693cfd7143fe52",
     "reason": "Add discriminating actual-painter coverage for backward-facing hairstyle offsets and separately painted monochrome clocktower children. Required CI found protected immutable carrying output drift. Limit new face detail to explicit world-coordinate walkers/clocktower heads and retain original default-head floating-point paint ordering; old carrying assertions remain unchanged.",
     "previousBehavior": "Head hair offsets remained right-facing during left travel; clocktower children bypassed shared skin and head painting.",

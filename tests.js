@@ -144,7 +144,7 @@ test('RISK carrying recovery: rejected actual phone sequence requires strikes op
  assert.ok(separation>4,`recovery must oppose fore/aft legs rather than the rejected ${separation}-unit tiny shuffle`);
  assert.ok(arcs.length>=3&&arcs.every(arc=>arc>.12),`each full flight must rise above its landing chord: ${arcs}`);
 });
-test('RISK carrying isolation: immutable accepted renderer commands stay exact outside requested walker pace changes',async()=>{
+test('RISK carrying isolation: immutable accepted renderer commands stay exact outside requested walker pace and kite fabric changes',async()=>{
  const {readMotionBuild,createMotionProbe}=await import('./scripts/motion-review-harness.mjs'),build=readMotionBuild(__dirname,'WORKTREE');
  const bytes=fs.readFileSync(path.join(__dirname,'scripts/fixtures/gait-carrying-sentinel.json')),fixture=JSON.parse(bytes);
  assert.equal(createHash('sha256').update(bytes).digest('hex'),'740faa80ea8862bf7d1d65f4d9c3090bff6169d241b00acd3f7f2c142a06223d','preserve every original accepted input, reference hash and control');
@@ -163,6 +163,17 @@ test('RISK carrying isolation: immutable accepted renderer commands stay exact o
    assert.ok(Math.abs(frame.metadata.x-(anchor+(expected.metadata.x-anchor)*.5))<1e-7,'requested half pace retains the same deterministic local route');
    assert.equal(frame.metadata.duration,expected.metadata.duration);assert.equal(frame.metadata.direction,expected.metadata.direction);
    assert.equal(frame.commands.find(c=>c[0]==='set'&&c[1]==='globalAlpha')[2],1,'requested walker no longer fades while visible');
+  }else if(options.actor==='kite'){
+   // The user requested two-tone kite fabric. Project only that explicit
+   // seven-command panel onto the immutable old paint; every other command,
+   // including the person, string, tail, spar and movement, remains exact.
+   const commands=expected.commands,start=commands.findIndex((command,i)=>command[0]==='beginPath'&&JSON.stringify(commands[i+1])===JSON.stringify(['moveTo',0,-12])&&JSON.stringify(commands[i+2])===JSON.stringify(['lineTo',8,0]));
+   assert.ok(start>=0,'immutable reference retains the original kite diamond');
+   const fabric=commands[start+6][2],accent=commands[start+11][2];
+   assert.deepEqual(commands.slice(start,start+14),[['beginPath'],['moveTo',0,-12],['lineTo',8,0],['lineTo',0,10],['lineTo',-8,0],['closePath'],['set','fillStyle',fabric],['fill'],['beginPath'],['moveTo',0,-12],['lineTo',0,10],['set','strokeStyle',accent],['set','lineWidth',1],['stroke']]);
+   const panel=[['beginPath'],['moveTo',0,-12],['lineTo',8,0],['lineTo',0,10],['closePath'],['set','fillStyle',accent],['fill']];
+   const projected={...expected,commands:[...commands.slice(0,start+8),...panel,...commands.slice(start+8)]};
+   assert.deepEqual(frame,projected,'only the explicitly requested seeded fabric panel changes immutable kite paint');
   }else assert.deepEqual(frame,expected,'unaffected carrying/activity consumer retains exact196 painter output');
  };
  for(const c of fixture.controls){const expected=createMotionProbe(baseline,c).sample(c.options),frame=createMotionProbe(build,c).sample(c.options);compare(expected,frame,c.options,c.width);assert.deepEqual(frame,createMotionProbe(build,c).sample(c.options),'cold reconstruction matches actual candidate painter');}
@@ -17581,18 +17592,19 @@ test('RISK landscape aircraft: ordinary planes restore their previous compact pr
  }
 });
 
-test('RISK landscape aircraft: scheduled planes restore the compact ivory silhouette in both directions',()=>{
+test('RISK landscape aircraft: scheduled planes retain the compact silhouette with seeded liveries in both directions',()=>{
  const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),start=source.indexOf("      if(e.type==='plane'){"),end=source.indexOf("      if(e.type==='balloon')",start),branch=source.slice(start,end);
  assert.ok(start>=0&&end>start,'the exercised code is the ordinary scheduled-plane visitor');
  const silhouette=[[9,0],[0,-2],[-7,-8],[-10,-8],[-5,-1],[-13,-1],[-17,-4],[-18,-3],[-16,2],[-5,2],[-10,8],[-7,8],[0,2]];
  for(const [W,H] of [[390,844],[768,1024],[568,320],[1280,720]])for(const reduced of [false,true])for(const reverse of [false,true])for(const night of [0,.4,.8]){
-  const hy=Math.min(H*(W<600?.37:.47),W<600?310:480),fills=[],lines=[],ellipses=[],rectangles=[],transforms=[],offsets=[];let current=null;
+  const hy=Math.min(H*(W<600?.37:.47),W<600?310:480),fills=[],lines=[],ellipses=[],rectangles=[],transforms=[],offsets=[],colorSeeds=[];let current=null;
   const g={globalAlpha:1,save(){},restore(){},translate(...args){transforms.push(['translate',...args]);},scale(...args){transforms.push(['scale',...args]);},beginPath(){current=[];},moveTo(x,y){current.push([x,y]);},lineTo(x,y){current.push([x,y]);},closePath(){},fill(){fills.push({paint:this.fillStyle,path:current});},fillRect(...rect){rectangles.push({rect,paint:this.fillStyle,alpha:this.globalAlpha});},createLinearGradient(...from){return {from,stops:[],addColorStop(at,paint){this.stops.push([at,paint]);}};}};
-  const context={g,W,H,hy,reduced,p:{night,sky:['#123','#456','#789'],city:'#abc'},geometry:{verticalOffset(e,amplitude){offsets.push([e.type,amplitude]);return reduced?0:3;}},color:()=> '#cb8d80',S:{mixHex:(a,b,amount)=>[a,b,amount].join(':')},ellipse(_g,x,y,rx,ry,paint){ellipses.push({x,y,rx,ry,paint});},line(_g,...args){lines.push(args);}};
+  const context={g,W,H,hy,reduced,p:{night,sky:['#123','#456','#789'],city:'#abc'},geometry:{verticalOffset(e,amplitude){offsets.push([e.type,amplitude]);return reduced?0:3;}},color:seed=>{colorSeeds.push(seed);return '#cb8d80';},S:{mixHex:(a,b,amount)=>[a,b,amount].join(':')},ellipse(_g,x,y,rx,ry,paint){ellipses.push({x,y,rx,ry,paint});},line(_g,...args){lines.push(args);}};
   const paint=vm.runInNewContext(`(function(e,x){${branch}\n})`,context);
   paint({type:'plane',lane:.5,seed:.4,reverse},W/2);
   assert.equal(fills.length,1,`${W}x${H}: the previous compact silhouette has one filled surface`);
-  assert.deepEqual(fills[0],{paint:['#f6f1db','#456',night*.7].join(':'),path:silhouette},'the previous ivory finish blends into the night sky');
+  assert.deepEqual(fills[0],{paint:['#cb8d80','#456',night*.7].join(':'),path:silhouette},'the requested seeded livery retains the compact silhouette and night-sky blend');
+  assert.deepEqual(colorSeeds,[.4],'the passing plane obtains its livery from exactly its existing visitor seed');
   assert.deepEqual(lines,[],'oversized wings and added panel strokes are absent');
   assert.deepEqual(transforms,[['translate',W/2,hy*.18+.5*hy*.18+(reduced?0:3)],['scale',reverse?-1:1,1]]);
   assert.deepEqual(offsets,[['plane',14]],'the existing vertical flight route is preserved');
@@ -26023,4 +26035,28 @@ test('RISK human inherited head paint: existing local-transform carriers retain 
  const paint=(direction,explicit)=>{const ink=[];vm.runInNewContext(head+';personHead({},0,0,2,2,.4,"skin",false'+(explicit?',direction':'')+');',{direction,LandscapeAppearance:{person:()=>({style:'short',color:'hair'})},p:{night:0,city:'city'},S:{mixHex:x=>x},ellipse:(...args)=>ink.push(args)});return ink;};
  assert.equal(paint(undefined,false).filter(args=>args[5]==='skin').length,1,'default inherited heads preserve accepted carrying paint');
  for(const direction of [-1,1])assert.equal(paint(direction,true).filter(args=>args[5]==='skin').length,2,'explicit walking and clocktower profiles retain forward face detail');
+});
+
+test('RISK scene color variation: kite panels and passing plane livery use existing seeded accents without new random draws',async()=>{
+ assert.match(html,/Kites have two-tone fabric and passing planes use varied pastel liveries/,'extended scenery FAQ explains the visible variation');
+ const source=fs.readFileSync(new URL('./landscape.js',import.meta.url),'utf8');
+ const plane=source.slice(source.indexOf("if(e.type==='plane'){"),source.indexOf("if(e.type==='balloon'){"));
+
+ const kite=source.slice(source.indexOf("      if(e.type==='kite'){"),source.indexOf("    if(e.type==='skateboarder'"));
+ const panels=[],g={save(){},restore(){},translate(){},scale(){},beginPath(){},moveTo(){},lineTo(){},closePath(){},fill(){panels.push(this.fillStyle)},quadraticCurveTo(){},stroke(){}};
+ for(const seed of [.01,.11,.21,.31,.41,.51]){
+  panels.length=0;
+  vm.runInNewContext(kite.split('}g.restore();return true;')[0]+'}',{g,e:{type:'kite',seed},visit:{x:40,direction:1,pack:0},groundAt:()=>100,kiteHand:{x:40,y:90},t:0,verticalClock:0,c:'base',color:(s,o)=>'accent-'+s+'-'+o,line(){},Math});
+  assert.ok(panels.includes('base'),'retain the original body color');
+  assert.ok(panels.includes('accent-'+seed+'-2'),'paint a complementary seeded fabric panel, not just a thin spar');
+ }
+ assert.match(plane,/S\.mixHex\(color\(e\.seed\),p\.sky\[1\],p\.night\*\.7\)/,'passing planes vary their livery using the existing visitor seed');
+ assert.doesNotMatch(plane+kite,/Math\.random|\br\(\)/,'paint variation cannot consume schedule randomness');
+});
+
+test('RISK scene color FAQ: seeded palettes stay in a compact dedicated answer',async()=>{
+ const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML,answers=new Map([...help.matchAll(/<dt>(.*?)<\/dt><dd>(.*?)<\/dd>/g)].map(x=>[x[1],x[2]]));
+ const colors=answers.get('Why do visitor colors stay consistent?');assert.ok(colors,'palette guidance has its own concise answer beside the transit explanation');
+ assert.match(colors,/Kites have two-tone fabric and passing planes use varied pastel liveries/);assert.match(colors,/shared visitor seed/);assert.match(colors,/same visit keeps its palette after reload/);assert.match(colors,/night shading still follows the scene/);
+ assert.doesNotMatch(answers.get('How do I change the scenery?'),/Kites have two-tone|pastel liveries/,'general controls guidance retains its established scope and word budget');
 });

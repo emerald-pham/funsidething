@@ -367,7 +367,7 @@ The editor hook blocks app or enforcement edits while tests.js has no staged or 
 - RISK landscape city and aircraft: current changelog names the skyline and plane details
 - RISK landscape aircraft: the biplane has one centered landing gear set
 - RISK landscape aircraft: ordinary planes restore their previous compact profile
-- RISK landscape aircraft: scheduled planes restore the compact ivory silhouette in both directions
+- RISK landscape aircraft: scheduled planes retain the compact silhouette with seeded liveries in both directions
 - RISK night shows: standalone fireworks recur independently of the rare cooldown and stay bounded
 - RISK night shows: festival odds are lower than standalone fireworks with finite visits and rate controls
 - RISK night shows: festivals keep a thirty-minute cooldown while fireworks stay independent
@@ -785,7 +785,7 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK human grip endpoints: complete carrying retains its exact hip offset across every cadence
 
 - RISK carrying recovery: rejected actual phone sequence requires strikes opposed swing and a coherent flight arc
-- RISK carrying isolation: immutable accepted renderer commands stay exact outside requested walker pace changes
+- RISK carrying isolation: immutable accepted renderer commands stay exact outside requested walker pace and kite fabric changes
 
 - RISK carrying continuity: stable actor capability preserves resting grip transitions and deterministic departure seeks
 
@@ -1104,3 +1104,7 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - `RISK clocktower human paint: children use shared skin and heads through flight landing and departure` — Shared head geometry, character hats, skin arms, trousers and opacity.
 
 - `RISK human inherited head paint: existing local-transform carriers retain paint while explicit profiles face travel` — Preserve immutable carrying/activity head paint outside explicit world-coordinate walker/clocktower profiles.
+
+- RISK scene color variation: kite panels and passing plane livery use existing seeded accents without new random draws
+
+- RISK scene color FAQ: seeded palettes stay in a compact dedicated answer
