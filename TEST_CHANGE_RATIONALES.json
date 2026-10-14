@@ -1,5 +1,110 @@
 [
   {
+    "testChangesSha256": "15f301a282e98ed4420f65782f13a5adaadfc86ca8874baaea27cbd80e57dcad",
+    "reason": "Protect the inherited walker-profile source consumer after new shadow opacity branches exposed an ambiguous first-match selector; retain every existing assertion and risk contract.",
+    "previousBehavior": "Candidate1018009 introduced a matching shadow branch before paintGuest, so the historical consumer inspected opacity setup rather than travel-facing head paint and CI failed.",
+    "intendedBehavior": "Equivalent OR operand order leaves shadow behavior unchanged and the historical consumer selects the actual guest painter; the new discriminating selector regression protects that boundary.",
+    "preservedCoverage": [
+      "All existing tests remain byte-identical; original shadow geometry/opacity, walking direction, seeded schedules and task/storage behavior remain protected."
+    ],
+    "replacementTests": [
+      "RISK human profile selector: historical walker consumer still selects the actual guest painter"
+    ],
+    "redEvidence": {
+      "command": "node /tmp/shadow-audit-evidence/integration/selector-contract-red.mjs (actual new contract against immutable1018009 landscape bytes)",
+      "failure": "Observed AssertionError: historical walker consumer must select the actual guest painter rather than a shadow branch. CI original profile failure and local focused RED retained. Original five shadow RED chronology retained in previous records. New selector GREEN33pass0fail0skip; no new product behavior."
+    }
+  },
+  {
+    "testChangesSha256": "15f301a282e98ed4420f65782f13a5adaadfc86ca8874baaea27cbd80e57dcad",
+    "reason": "Protect the inherited walker-profile source consumer after new shadow opacity branches exposed an ambiguous first-match selector; retain every existing assertion and risk contract.",
+    "previousBehavior": "Candidate1018009 introduced a matching shadow branch before paintGuest, so the historical consumer inspected opacity setup rather than travel-facing head paint and CI failed.",
+    "intendedBehavior": "Equivalent OR operand order leaves shadow behavior unchanged and the historical consumer selects the actual guest painter; the new discriminating selector regression protects that boundary.",
+    "preservedCoverage": [
+      "All existing tests remain byte-identical; original shadow geometry/opacity, walking direction, seeded schedules and task/storage behavior remain protected."
+    ],
+    "replacementTests": [
+      "RISK human profile selector: historical walker consumer still selects the actual guest painter"
+    ],
+    "redEvidence": {
+      "command": "node /tmp/shadow-audit-evidence/integration/selector-contract-red.mjs (actual new contract against immutable1018009 landscape bytes)",
+      "failure": "Observed AssertionError: historical walker consumer must select the actual guest painter rather than a shadow branch. CI original profile failure and local focused RED retained. Original five shadow RED chronology retained in previous records. New selector GREEN33pass0fail0skip; no new product behavior."
+    }
+  },
+  {
+    "testChangesSha256": "7decc169714aadef7ecf19e1d39d248d79f3f0bf9495314d1105fec122dd5536",
+    "reason": "Protect the inherited walker-profile source consumer after new shadow opacity branches exposed an ambiguous first-match selector; retain every existing assertion and risk contract.",
+    "previousBehavior": "Candidate1018009 introduced a matching shadow branch before paintGuest, so the historical consumer inspected opacity setup rather than travel-facing head paint and CI failed.",
+    "intendedBehavior": "Equivalent OR operand order leaves shadow behavior unchanged and the historical consumer selects the actual guest painter; the new discriminating selector regression protects that boundary.",
+    "preservedCoverage": [
+      "All existing tests remain byte-identical; original shadow geometry/opacity, walking direction, seeded schedules and task/storage behavior remain protected."
+    ],
+    "replacementTests": [
+      "RISK human profile selector: historical walker consumer still selects the actual guest painter",
+      "RISK visitor shadows: seated height and activity opacity match the visible people",
+      "RISK crossing shadows: opaque actors and skater departure use the actual paint alpha",
+      "RISK rider shadows: phone scale matches cyclists scooters and hoverboards",
+      "RISK woodland shadows: projected height shrinks with the painted depth scale",
+      "RISK shadow FAQ: mounted guidance explains pose light and scenery-only changes"
+    ],
+    "redEvidence": {
+      "command": "node /tmp/shadow-audit-evidence/integration/selector-contract-red.mjs (actual new contract against immutable1018009 landscape bytes)",
+      "failure": "Observed AssertionError: historical walker consumer must select the actual guest painter rather than a shadow branch. CI original profile failure and local focused RED retained. Original five shadow RED chronology retained in previous records. New selector GREEN33pass0fail0skip; no new product behavior."
+    }
+  },
+  {
+    "testChangesSha256": "ea73b4e816f274905f878004bb95def240f4ade32f56b75cc1ff5d9544df8b7d",
+    "reason": "Bind the previous reviewed shadow candidate three-dot comparison to the merged release base plus unchanged shadow contracts. This comparison includes already released Show Postpone, Top X and blimp tests; their original RED/rationale records are retained. New shadow integration RED was observed on3989e9 before product changes.",
+    "previousBehavior": "Previous shadow candidate d66acec was based on936ec4d and did not include released Show Postpone, Top X and approved blimp tests or fixture repair.",
+    "intendedBehavior": "All test bytes from released3989e9 remain an exact prefix; five preserved shadow/FAQ tests append afterward. Released feature protections are not weakened or replaced.",
+    "preservedCoverage": [
+      "Every assertion and executable test from3989e9 is retained byte-for-byte; shadow actor opacity/geometry, data lifecycle, positive Postpone preference, recorded Top X facts and seeded complete blimp admission remain protected."
+    ],
+    "replacementTests": [
+      "RISK Show Postpone preference: actual Settings checkbox hides both scanner controls and restores them without changing tasks",
+      "RISK Show Postpone initialization: fresh browser and host clients default off while recovery evidence keeps visibility",
+      "RISK Show Postpone local adoption: saved empty legacy boards and explicit choices survive reload with future settings intact",
+      "RISK Show Postpone cloud adoption: missing legacy setting and explicit choices override fresh defaults at all supported revisions",
+      "RISK Show Postpone import: actual JSON consumer treats old settings as existing and preserves explicit choices and holds",
+      "RISK Show Postpone explicit visibility: saved booleans drive positive checkbox and both scanner surfaces",
+      "RISK Show Postpone normalization: explicit positive choices win and draft inverse choices migrate only when absent",
+      "RISK task history: compact Top X uses recorded snapshots and preserves legacy facts",
+      "RISK history browser driver: first-run motion uses the supported choice before history fixtures",
+      "RISK blimp schedule: independent seeded opportunities preserve existing scenes and reconstruct across clients",
+      "RISK blimp paint: seeded envelopes retain offscreen margins day-night shading and reduced-motion consumer",
+      "RISK blimp admission: full-budget and later overlapping visits reject complete crossings without eviction",
+      "RISK visitor shadows: seated height and activity opacity match the visible people",
+      "RISK crossing shadows: opaque actors and skater departure use the actual paint alpha",
+      "RISK rider shadows: phone scale matches cyclists scooters and hoverboards",
+      "RISK woodland shadows: projected height shrinks with the painted depth scale",
+      "RISK shadow FAQ: mounted guidance explains pose light and scenery-only changes"
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='^RISK (visitor|crossing|rider|woodland) shadows:|^RISK shadow FAQ:' tests.js",
+      "failure": "Integration contemporaneous RED on3989e9: all five shadow/FAQ cases fail for original height, opacity, scale and absent-copy defects; log integration/3989e9-red.txt. Inherited released changes retain their original chronology records from3989e9; this record does not claim a new RED for those previously shipped changes. Focused integration cohort105pass/0fail/1separate-browser-skip."
+    }
+  },
+  {
+    "testChangesSha256": "7fe2857fdab3a1476893a2f8ed02f92de65aeabec0663b3f4d09a405e57ec00e",
+    "reason": "Execute actual shadow painters to protect visitor pose, actor opacity and mobile/depth scaling; verify concise mounted shadow guidance. Reconcile unchanged shadow contracts onto the exact released Show Postpone/Top X/blimp base3989e9604c4c923b57854158b0650e0fed97a731; all released tests and assertions retained.",
+    "previousBehavior": "Seated visitors used standing height; opaque crossings inherited edge fades; small riders and woodland shadow heights missed paint scaling.",
+    "intendedBehavior": "Shadow geometry and opacity match the unchanged actor paint and terrain; FAQ describes light and pose without changing task data.",
+    "preservedCoverage": [
+      "All existing travel, seed, schedule, winter imprint, celestial direction and task/storage protections remain intact; no animation timing changes."
+    ],
+    "replacementTests": [
+      "RISK visitor shadows: seated height and activity opacity match the visible people",
+      "RISK crossing shadows: opaque actors and skater departure use the actual paint alpha",
+      "RISK rider shadows: phone scale matches cyclists scooters and hoverboards",
+      "RISK woodland shadows: projected height shrinks with the painted depth scale",
+      "RISK shadow FAQ: mounted guidance explains pose light and scenery-only changes"
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='^RISK (visitor|crossing|rider|woodland) shadows:|^RISK shadow FAQ:' tests.js",
+      "failure": "Observed all five contemporaneous RED on3989e9 before applying painter/docs: seated14 versus10; crossing.5 versus1; cyclist15 versus12.75; woodland19 versus12.35; mounted shadow FAQ absent. /tmp/shadow-audit-evidence/integration/3989e9-red.txt preserves output. Original source RED logs retained separately."
+    }
+  },
+  {
     "testChangesSha256": "2fbdd859fecc6f5f9b68436e2fb9177a8956cd894fbe0abd81e272750ba3de5b",
     "reason": "Integrate already released Show Postpone and Top X changes into the preserved blimp branch while retaining their exact code and tests. Bind the inherited executable test delta to the actual previous remote tip comparison.",
     "previousBehavior": "Previous remote blimp tip6ffa421 predates released Show Postpone and Top X; those inherited test changes appear in incremental push CI.",

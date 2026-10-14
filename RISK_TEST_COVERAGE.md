@@ -1131,3 +1131,12 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK blimp schedule: independent seeded opportunities preserve existing scenes and reconstruct across clients
 - RISK blimp paint: seeded envelopes retain offscreen margins day-night shading and reduced-motion consumer
 - RISK blimp admission: full-budget and later overlapping visits reject complete crossings without eviction
+
+- `RISK visitor shadows: seated height and activity opacity match the visible people` — actual visitor shadow painter follows seated/standing height and visitor alpha without changing travel or schedules.
+
+- RISK crossing shadows: opaque actors and skater departure use the actual paint alpha
+- RISK rider shadows: phone scale matches cyclists scooters and hoverboards
+- RISK woodland shadows: projected height shrinks with the painted depth scale
+- RISK shadow FAQ: mounted guidance explains pose light and scenery-only changes
+
+- RISK human profile selector: historical walker consumer still selects the actual guest painter
