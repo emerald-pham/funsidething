@@ -14,6 +14,7 @@
   const back=host.querySelector('[data-scenery]'),front=host.querySelector('[data-life]');
   let b=back.getContext('2d',{alpha:false});const base=b,g=front.getContext('2d');
   const layers={};let geometry;
+  const wheeledShadowCanvas=document.createElement('canvas');
   const localWalkEnds=new Map();
   const cityLayer=document.createElement('canvas'),partyLayer=document.createElement('canvas'),skyCity=document.createElement('canvas'),skyReflection=document.createElement('canvas'),blurredReflection=document.createElement('canvas'),softenedReflection=document.createElement('canvas'),reflectionCanvas=document.createElement('canvas');
   if(!b||!g){host.hidden=true;return;}
@@ -242,6 +243,31 @@
     ctx.beginPath();ctx.ellipse(x+shade.dx*.5,y+shade.dy*.5,shade.rx,shade.ry,
       Math.atan2(shade.dy,shade.dx),0,TAU);
     ctx.fillStyle=S.mixHex(ground,'#203d37',.68);ctx.fill();ctx.restore();
+  }
+  function paintWheeledShadow(x,y,height,width,draw){
+    const shade=geometry.castShadow(sky,height,width,x,y);
+    const slope=Math.tan(geometry.tangent(trail,x));
+    // Project the actual frame, wheels and rider onto the local ground plane.
+    // A rotated upright oval turns the wheelbase into a narrow vertical strip.
+    // Ground contacts stay fixed; only height travels along the celestial ray.
+    const size=96,half=size/2,resolution=Math.max(1,dpr);
+    if(wheeledShadowCanvas.width!==size*resolution){
+      wheeledShadowCanvas.width=size*resolution;wheeledShadowCanvas.height=size*resolution;
+    }
+    const ctx=wheeledShadowCanvas.getContext('2d');
+    ctx.setTransform(resolution,0,0,resolution,0,0);ctx.clearRect(0,0,size,size);
+    ctx.save();ctx.translate(half,half);
+    const dx=shade.dx/height,dy=shade.dy/height;
+    ctx.transform(1+slope*dx,slope*(1+dy),-dx,-dy,0,0);
+    ctx.translate(-x,-y);draw(ctx);ctx.restore();
+    // A union mask applies opacity once where spokes, limbs and frame overlap.
+    ctx.globalCompositeOperation='source-in';ctx.fillStyle=S.mixHex(p.hill,'#203d37',.68);
+    ctx.fillRect(0,0,size,size);ctx.globalCompositeOperation='source-over';
+    if(shade.source==='stars'){
+      // Diffuse starlight has no ray: retain a shallow terrain-aligned contact pool.
+      ctx.beginPath();ctx.ellipse(half,half,width*.8,.8,Math.atan(slope),0,TAU);ctx.fill();
+    }
+    g.save();g.globalAlpha*=shade.alpha;g.drawImage(wheeledShadowCanvas,x-half,y-half,size,size);g.restore();
   }
   function paintRailVehicleShadow(ctx,x,y,height,width,angle,ground){
     const shade=geometry.castShadow(sky,height,width,x,y);
@@ -518,7 +544,8 @@
     g.beginPath();g.moveTo(x-size,y-Math.abs(Math.sin(t*5))*size*.6);g.quadraticCurveTo(x-size*.4,y-size*.4,x,y);g.quadraticCurveTo(x+size*.5,y-size*.6,x+size,y-(perched?0:Math.abs(Math.sin(t*5+.3))*size*.6));g.stroke();
     if(twig&&!perched){line(g,x,y+.4,x+size*.7,y+size*.35,'#8b745a',.55);line(g,x+size*.35,y+size*.2,x+size*.5,y-.1,'#8b745a',.45);}    g.restore();
   }
-  function cyclist(x,y,t,color,scale=1,reverse=false,skin=skinColor(0)){
+  function cyclist(x,y,t,color,scale=1,reverse=false,skin=skinColor(0),ctx=g){
+    const g=ctx;
     g.save();g.translate(x,y-3.6*scale);g.rotate(geometry.tangent(trail,x));g.scale((reverse?-1:1)*scale,scale);
     g.strokeStyle=S.mixHex('#253f3b',p.front,p.night*.35);g.lineWidth=1;
     for(const xx of [-5,6]){g.beginPath();g.arc(xx,0,3.6,0,TAU);g.stroke();line(g,xx,0,xx+Math.cos(t*6)*3,Math.sin(t*6)*3,g.strokeStyle,.5);}
@@ -562,8 +589,10 @@
     g.save();g.globalAlpha*=fade;
     if(e.type==='cyclist'){
       g.globalAlpha=1;const scale=W<600?.85:1;
-      geometry.pack(x,e.count||S.groupSize('cyclist',e.seed),e.reverse).forEach(pose=>
-        paintGroundShadow(g,pose.x,trail(pose.x),15*scale,12*scale,p.hill));
+      const clock=geometry.motionAge(e,'x');
+      geometry.pack(x,e.count||S.groupSize('cyclist',e.seed),e.reverse).forEach((pose,i)=>
+        paintWheeledShadow(pose.x,trail(pose.x),15*scale,12*scale,ctx=>
+          cyclist(pose.x,trail(pose.x),clock+i*.8,color(e.seed,i),scale,e.reverse,skinColor((e.seed+i*.173)%1),ctx)));
     }else if(['reader','picnic','couple','kite'].includes(e.type)){
       const motion=geometry.motionProgress(e,'x'),visit=geometry.visitPose(e,motion);
       // Visitors use their own arrival/standing crossfade, not the crossing
@@ -584,7 +613,9 @@
     }else if(['skateboarder','rollerskater','hoverboard','scooter'].includes(e.type)){
       const skater=e.type==='skateboarder'||e.type==='rollerskater',scale=skater?1:W<600?.85:1;
       g.globalAlpha=skater?1-S.smooth(.94,1,f):1;
-      paintGroundShadow(g,x,trail(x),18*scale,12*scale,p.hill);
+      if(skater)paintGroundShadow(g,x,trail(x),18*scale,12*scale,p.hill);
+      else paintWheeledShadow(x,trail(x),18*scale,12*scale,ctx=>
+        LandscapeRiders.paint(ctx,geometry,W,e,geometry.motionAge(e,'x'),p,{ellipse,line,color,skinColor,personHead}));
     }else if(e.type==='abduction'){
       const lift=Math.sin(S.clamp((geometry.motionProgress(e,'y')-.25)/.5)*Math.PI);
       if(lift<.1){
@@ -855,7 +886,7 @@
     // Ground contact determines occlusion, including props previously baked into the hill.
     const groundPass=paintEvents.filter(e=>!airborne.has(e.type)&&e.type!=='metro'&&e.type!=='train'&&e.type!=='snowangel').map(e=>{
       const depth=globalThis.LandscapeWinter?.types.includes(e.type)?LandscapeWinter.pose(e.type,e,geometry,W,H).y:geometry.eventDepth(e);
-      return {depth,draw:()=>{paintGroundEventShadow(e,depth);paintEvent(e,t,'ground');}};
+      return {depth,draw:()=>paintEvent(e,t,'ground'),shadow:()=>paintGroundEventShadow(e,depth)};
     });
     if(sceneSeason!=='winter'&&W>650&&visitSeed>.25)groundPass.push({depth:trail(W*.43)+15,draw:paintIceCreamStand});
     // The basin must cover farther visitors while nearer bodies cover it.
@@ -864,7 +895,11 @@
       ellipse(g,fx,fy,11,3,S.mixHex(p.city,'#e8e4d1',.6));ellipse(g,fx,fy-1,8,2,p.sky[1]);
       if(sceneSeason!=='winter')for(let i=-1;i<=1;i++){g.beginPath();g.moveTo(fx,fy);g.quadraticCurveTo(fx+i*7,fy-20+Math.sin(t*wind)*2,fx+i*7,fy-1);g.strokeStyle=S.mixHex(p.sky[1],'#ffffff',.6);g.lineWidth=1;g.stroke();}
     }});
-    for(const item of groundPass.sort((a,b)=>a.depth-b.depth))item.draw();
+    groundPass.sort((a,b)=>a.depth-b.depth);
+    // People and vehicles receive no ground shade. Paint their shadows first so
+    // a nearer caster cannot stripe a previously painted farther silhouette.
+    for(const item of groundPass)if(item.shadow)item.shadow();
+    for(const item of groundPass)item.draw();
     composite('front');
     composite('trees-ground');
     for(const e of paintEvents)if(e.type==='snowangel')paintEvent(e,t);
