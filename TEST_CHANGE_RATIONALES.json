@@ -1,5 +1,26 @@
 [
   {
+    "testChangesSha256": "af80322471a442b66f511f6bdde937a0a7bce268b5e5728c582a7477ced815a3",
+    "reason": "Repair reproduced narrow wheeled footprint and mobile shadow overpainting while preserving all visitor pose, scale, fade and complementary bird mask assertions. Existing mocks now intercept the silhouette projector and supply its unchanged animation clock.",
+    "previousBehavior": "Cyclists and scooters shared a rotated upright oval and near shadows painted over farther bodies. No silhouette projection or fixed wheelbase contract existed.",
+    "intendedBehavior": "Actual wheels, frame and rider project along the existing celestial ray onto terrain, with contacts fixed, one opacity mask and mobile bodies rendered above mobile ground shadows.",
+    "replacementTests": [
+      "RISK wheeled shadows: project the complete cyclist and scooter silhouette with grounded contacts",
+      "RISK ground shadow receivers: mobile shadows paint before every mobile body without screen-y clipping",
+      "RISK wheeled projection: wheel contacts retain terrain width while height follows the celestial ray once",
+      "RISK wheeled shadow FAQ: guidance describes complete vehicle shade and body occlusion"
+    ],
+    "preservedCoverage": [
+      "Existing seated height, opacity and phone scale assertions remain unchanged.",
+      "Nest bird complementary sky and ground mask assertions remain; only ground consumer shape changes to separate shadow and body callbacks.",
+      "No spawn rates, persisted data, deterministic timeline seed or animation frequencies change."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK wheeled shadows:|RISK ground shadow receivers:|RISK wheeled projection:|RISK wheeled shadow FAQ:' tests.js (run in sequential focused stages before each implementation)",
+      "failure": "Observed 2 failures: silhouette projector absent and near shadow after farther body; separate projector test failed absent projector; FAQ test failed missing Bicycles and scooters. Logs /tmp/wheeled-shadow-evidence/red.txt, projection-red.txt and faq-red.txt. FAQ limitation RED observed in faq-limit-red.txt before naming hoverboards and diffuse starlight. Full initial regression observed original stand depth callback shape assertion fail; retained its original draw-first shape while adding separate shadow callback, keeping depth/body ordering unchanged. Initial full-run changelog fingerprint was stale while metadata was being finalized; current focused fingerprint passed."
+    }
+  },
+  {
     "testChangesSha256": "cc755a76a7537d114e9147f082d4bf360689502699dd53a336538f32d8c22bb0",
     "reason": "User explicitly authorized repairing reproduced arrival starvation while retaining half walking pace, shared deterministic seed/time scheduling and full crossings. Separate original admission reservations from retained display recipes instead of treating invisible tails as admission occupancy. Preserve the fourteen-reservation safety assertion and replace only the disproven fourteen-total-retained-record assumption with a tighter calculated finite345recipe bound. Historical planner fixtures receive only this intentional accounting policy before exact algorithm comparisons; older pre-blimp optimization fixtures isolate blimps at rate0 while distinct blimp tests retain complete-crossing reservation checks. Runtime qualification exposed repeated clearance-window and winter route-prefix rebuilding in the newly admitted crowds; use aggregate bounded cache reuse without altering production pose math. Parent requested guarded shared native first-run Help setup.",
     "previousBehavior": "Ten departed phone visitors filled12full-life slots and rejected otherwise eligible arrival223992509. Retained tails entered every pose/show pass and reduced midpoint substitution could revive300old walkers. Expired still representatives did not repaint when shared IDs stayed unchanged. Eager daily lifetime planning performed10800solves in walker-only stress.35 stable walkers rebuilt68windows per warmframe;48distinct winter profiles rebuilt all48routes. Blind fixture interactions were blocked by expected Quick start.",

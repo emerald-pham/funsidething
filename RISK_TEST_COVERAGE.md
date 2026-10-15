@@ -1168,3 +1168,12 @@ Protect original shared admission slots separately from finite crossing recipes,
 - `RISK native animation fixture: only the identified first-run Quick start panel is resolved`
 
 Protect warm crowd reuse, exact reordered and evicted gait reconstruction, aggregate prefix/window memory bounds, and native fixture handling that rejects unexpected dialogs.
+
+## Wheeled shadow projection and receivers
+
+- `RISK wheeled shadows: project the complete cyclist and scooter silhouette with grounded contacts`
+- `RISK ground shadow receivers: mobile shadows paint before every mobile body without screen-y clipping`
+- `RISK wheeled projection: wheel contacts retain terrain width while height follows the celestial ray once`
+- `RISK wheeled shadow FAQ: guidance describes complete vehicle shade and body occlusion`
+
+Protect full bicycle and scooter silhouettes, fixed tire contacts, shared solar rays, one opacity mask, and mobile bodies above ground shadows.

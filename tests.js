@@ -25116,7 +25116,7 @@ test('RISK scenery depth: nest bird sky and meadow passes paint each silhouette 
  }
  const life=source.slice(source.indexOf('  function paintLife('),source.indexOf('  function paintWeatherOn('));
  assert.ok(life.indexOf("paintEvent(e,t,'sky')")>=0&&life.indexOf("paintEvent(e,t,'sky')")<life.indexOf('reflectionContext.drawImage(front'),'actual sky consumer captures flying nest bird ink in the lake mirror');
- assert.match(life,/paintGroundEventShadow\(e,depth\);paintEvent\(e,t,'ground'\)/,'actual ground consumer uses the complementary pixel mask');
+ assert.match(life,/draw:\(\)=>paintEvent\(e,t,'ground'\),shadow:\(\)=>paintGroundEventShadow\(e,depth\)/,'actual ground consumer uses the complementary pixel mask after its shadow pass');
 });
 
 
@@ -26210,7 +26210,7 @@ test('RISK crossing shadows: opaque actors and skater departure use the actual p
  for(const type of ['walker','dogwalker','cyclist','hoverboard','scooter','skateboarder','rollerskater'])for(const f of [.03,.97]){
   const calls=[],stack=[],g={globalAlpha:1,save(){stack.push(this.globalAlpha);},restore(){this.globalAlpha=stack.pop();}};
   const smooth=(a,b,x)=>{const t=Math.max(0,Math.min(1,(x-a)/(b-a)));return t*t*(3-2*t);};
-  vm.runInNewContext(code+';paintGroundEventShadow(e);',{e:{type,count:1},g,W:390,p:{hill:'#456'},trail:()=>50,geometry:{routeProgress:()=>f,pack:x=>[{x}],groundPose:()=>({x:80,y:55}),dogPose:()=>({x:96,y:55})},S:{smooth},paintGroundShadow:ctx=>calls.push(ctx.globalAlpha)});
+  vm.runInNewContext(code+';paintGroundEventShadow(e);',{e:{type,count:1},g,W:390,p:{hill:'#456'},trail:()=>50,geometry:{routeProgress:()=>f,motionAge:()=>10,pack:x=>[{x}],groundPose:()=>({x:80,y:55}),dogPose:()=>({x:96,y:55})},S:{smooth},paintGroundShadow:ctx=>calls.push(ctx.globalAlpha),paintWheeledShadow:()=>calls.push(g.globalAlpha)});
   assert.ok(calls.length>0);const expected=['skateboarder','rollerskater'].includes(type)?1-smooth(.94,1,f):1;
   calls.forEach(alpha=>assert.equal(alpha,expected,`${type}, progress ${f}: shadow matches actor opacity`));
  }
@@ -26219,7 +26219,7 @@ test('RISK rider shadows: phone scale matches cyclists scooters and hoverboards'
  const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),code=source.slice(source.indexOf('  function paintGroundEventShadow('),source.indexOf('  function paintFestivalBarge('));
  for(const W of [390,844,1440])for(const type of ['cyclist','hoverboard','scooter']){
   const calls=[],g={globalAlpha:1,save(){},restore(){}},scale=W<600?.85:1;
-  vm.runInNewContext(code+';paintGroundEventShadow(e);',{e:{type,count:1},g,W,p:{hill:'#456'},trail:()=>50,geometry:{routeProgress:()=>.5,pack:x=>[{x}]},S:{smooth:()=>1},paintGroundShadow:(ctx,x,y,h,w)=>calls.push({h,w})});
+  vm.runInNewContext(code+';paintGroundEventShadow(e);',{e:{type,count:1},g,W,p:{hill:'#456'},trail:()=>50,geometry:{routeProgress:()=>.5,motionAge:()=>10,pack:x=>[{x}]},S:{smooth:()=>1},paintGroundShadow:(ctx,x,y,h,w)=>calls.push({h,w}),paintWheeledShadow:(x,y,h,w)=>calls.push({h,w})});
   assert.equal(calls.length,1);assert.equal(calls[0].h,(type==='cyclist'?15:18)*scale);assert.equal(calls[0].w,12*scale);
  }
 });
@@ -26439,4 +26439,47 @@ test('RISK pedestrian gait cache bounds: route prefixes and contact windows have
  for(let i=0;i<70;i++){const d=8192+i,x=d-32;g.humanWalkPose(x,g.middle(x)+i/10,d,1,g.humanGround('middle',i/10),false,1,{kind:'constant',speed:3.5,startDistance:0});const stats=g.cacheStats();assert.ok(stats.routes<=64);assert.ok(stats.nodes<=524288);assert.equal(stats.nodes,stats.actualNodes,'node accounting includes eviction and contact extension');assert.ok(stats.windows<=1380);assert.equal(stats.windows,stats.actualWindows,'window ownership matches the aggregate eviction index');}
  const tiny=vm.createContext({});vm.runInContext(source.replace('MAX_HUMAN_CLEARANCES=345*2*2','MAX_HUMAN_CLEARANCES=8'),tiny);const small=tiny.LandscapeGeometry.create(8192,900);for(let i=0;i<12;i++){const x=100+i*20;small.humanWalkPose(x,small.trail(x)+5,x+32,1,small.humanGround('trail',5),false,1,{kind:'constant',speed:3.5,startDistance:0});const stats=small.cacheStats();assert.ok(stats.windows<=8);assert.equal(stats.windows,stats.actualWindows);}assert.equal(small.cacheStats().windows,8,'fixture actually reaches window eviction');
  const event={type:'walker',seed:.3,lane:.5,duration:2400,activityDuration:60,age:100},p=g.groundPose('walker',event),walk=geo=>geo.humanWalkPose(p.x,p.y,p.distance,1,geo.humanGround('trail',5),false,1,p.travel),cold=walk(c.LandscapeGeometry.create(8192,900));assert.deepEqual(walk(g),cold,'an evicted route reconstructs the exact cold pose');assert.deepEqual(JSON.parse(JSON.stringify(walk(small))),JSON.parse(JSON.stringify(cold)),'window eviction reconstructs the exact cold pose across isolated realms');
+});
+
+// A vehicle's horizontal contacts must survive projection toward the light.
+test('RISK wheeled shadows: project the complete cyclist and scooter silhouette with grounded contacts',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ assert.match(source,/function paintWheeledShadow\(/,'wide wheeled visitors need a silhouette projection instead of the upright oval');
+ const code=source.slice(source.indexOf('  function paintGroundEventShadow('),source.indexOf('  function paintFestivalBarge('));
+ for(const type of ['cyclist','scooter','hoverboard'])for(const W of [390,820,1440])for(const reverse of [false,true]){
+  const calls=[],g={globalAlpha:1,save(){},restore(){}},scale=W<600?.85:1;
+  vm.runInNewContext(code+';paintGroundEventShadow(e);',{e:{type,count:1,reverse,seed:.4},g,W,p:{hill:'#456'},trail:()=>50,geometry:{routeProgress:()=>.5,motionAge:()=>10,pack:x=>[{x}]},S:{smooth:()=>1},paintGroundShadow(){assert.fail('generic upright oval cannot represent a wheeled footprint');},paintWheeledShadow:(x,y,h,w,draw)=>calls.push({x,y,h,w,draw})});
+  assert.equal(calls.length,1);assert.equal(calls[0].h,(type==='cyclist'?15:18)*scale);assert.equal(calls[0].w,12*scale);assert.equal(typeof calls[0].draw,'function');
+ }
+});
+test('RISK ground shadow receivers: mobile shadows paint before every mobile body without screen-y clipping',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ const block=source.slice(source.indexOf("    composite('middle');"),source.indexOf("    composite('front');"));
+ const painted=[],events=[{type:'scooter',id:'near',depth:128},{type:'cyclist',id:'far',depth:120}];
+ const g=new Proxy({},{get:()=>()=>{},set:()=>true});
+ vm.runInNewContext(block,{g,W:390,H:844,t:0,visitSeed:0,sceneSeason:'summer',paintEvents:events,airborne:new Set(),geometry:{eventDepth:e=>e.depth},p:{night:0},S:{mixHex:x=>x},trail:()=>100,composite(){},paintGroundEventShadow:e=>painted.push('shadow:'+e.id),paintEvent:e=>painted.push('body:'+e.id),paintIceCreamStand(){},ellipse(){},wind:1});
+ assert.ok(painted.lastIndexOf('shadow:near')<painted.indexOf('body:far'),'near shadows must not paint across previously drawn farther riders');
+ assert.deepEqual(painted.filter(x=>x.startsWith('body:')),['body:far','body:near']);
+});
+test('RISK wheeled projection: wheel contacts retain terrain width while height follows the celestial ray once',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
+ const start=source.indexOf('  function paintWheeledShadow(');assert.ok(start>=0,'silhouette projector is required');
+ const code=source.slice(start,source.indexOf('  function paintRailVehicleShadow(',start));
+ for(const slope of [-.2,0,.2])for(const dx of [-12,0,12])for(const dy of [1.5,9]){
+  let matrix,drawn=0,composited=0;const operations=[];
+  const ctx=new Proxy({transform(...m){matrix=m;},get globalCompositeOperation(){return 'source-over';},set globalCompositeOperation(v){operations.push(v);}},{get:(o,k)=>k in o?o[k]:()=>{}});
+  const canvas={width:0,height:0,getContext:()=>ctx};const g={save(){},restore(){},globalAlpha:1,drawImage(){composited++;}};
+  vm.runInNewContext(code+';paintWheeledShadow(100,80,18,12,draw);',{g,dpr:2,wheeledShadowCanvas:canvas,geometry:{castShadow:()=>({dx,dy,alpha:.15,source:'sun'}),tangent:()=>Math.atan(slope)},sky:{},trail:()=>80,p:{hill:'#456'},S:{mixHex:()=> '#234'},draw:ctx=>{drawn++;assert.ok(ctx);}});
+  assert.equal(drawn,1,'project the actual actor painter exactly once');
+  assert.equal(composited,1);assert.ok(operations.includes('source-in'),'overlapping frame, wheels and rider use one opacity mask');
+  const [a,b,c,d]=matrix;
+  for(const x of [-9,10]){assert.ok(Math.abs(a*x+c*slope*x-x)<1e-8);assert.ok(Math.abs(b*x+d*slope*x-slope*x)<1e-8);}
+  assert.ok(Math.abs(c*-18-dx)<1e-8);assert.ok(Math.abs(d*-18-dy)<1e-8);
+ }
+});
+test('RISK wheeled shadow FAQ: guidance describes complete vehicle shade and body occlusion',async()=>{
+ const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ const answer=help.match(/<dt>Why do scenery shadows change\?<\/dt><dd>(.*?)<\/dd>/)?.[1];
+ assert.match(answer,/Bicycles, scooters and hoverboards/);assert.match(answer,/silhouettes/);assert.match(answer,/starlight.*faint and diffuse/);assert.match(answer,/behind visitors/);
+ assert.match(html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1],/Bicycle and scooter shadows/);
 });
