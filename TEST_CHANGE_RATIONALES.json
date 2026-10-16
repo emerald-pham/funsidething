@@ -1,5 +1,35 @@
 [
   {
+    "testChangesSha256": "39c7e999620a61fcf45c1ec3d2c267653ca3c9366e9eed3dc81237fd6f2a5561",
+    "reason": "Correct the reproduced continuous-daylight cutoff through existing solar, timeline and painter consumers, document the exclusion through real help rendering, and verify the installed shell receives and runs the corrected solar bytes. Existing assertions are retained; the offline module-delivery test is strengthened.",
+    "previousBehavior": "At 65.8 N / 18.96 E on 2026-06-21 the Sun remains above the local-day horizon but the fixed 66 degree guard returns polarDay:false, dawn and show eligibility. The default-seed observer local day admits 18 fireworks and 2 festivals. Help omits the exclusion, and unchanged sw.js bytes would not cause browsers to install the new solar source.",
+    "intendedBehavior": "Visible Sun plus no sunrise or sunset in the actual observer local day yields polarDay:true and period:day in both hemispheres around the former cutoff. Real scheduling and barge/stage/shell consumers exclude all shows. Rendered FAQ/release notes explain the corrected condition. Changed worker bytes enable updates and the actual offline-cached solar consumer also returns day and forbids shows.",
+    "replacementTests": [
+      "RISK continuous daylight: the actual observer local day classifies 65.8 N midnight as day",
+      "RISK continuous daylight: both hemispheres use solar events around the former 66 degree cutoff",
+      "RISK continuous daylight consumers: the real timeline and show painters suppress the 65.8 N boundary",
+      "RISK continuous daylight FAQ: rendered help and release notes explain show exclusion"
+    ],
+    "preservedCoverage": [
+      "Every previous assertion in the offline module-delivery consumer remains; no previous test or risk contract is deleted, skipped or weakened.",
+      "Existing ordinary sunrise/sunset, both dawn/dusk show directions, continuous night, seeded opportunity timing, reload reconstruction, reduced-motion expiry and preset behavior remain covered.",
+      "All artwork, scheduling random streams, task controls, saved boards, authorization, storage formats and synchronization logic remain unchanged; existing full regression and compatibility gates remain required.",
+      "FAQ navigation, all unrelated release history, widening finales, reduced-motion guidance and reading without saved-board mutation remain protected."
+    ],
+    "redEvidence": {
+      "command": "In /private/tmp/chain-arctic-134-20261016: node --test --test-name-pattern='RISK continuous daylight' tests.js; subsequent real-consumer and hemisphere matrix vertical tests. In integration: node --test --test-name-pattern='RISK continuous daylight FAQ:' tests.js; node --test --test-name-pattern='RISK PWA module delivery:' tests.js.",
+      "failure": "Initial contemporaneous preimplementation RED at pinned 48b9c58: the solar-state test observed polarDay false !== true at 21:08:00Z, before the one-line runtime fix. Its first GREEN log was created at 21:08:25Z (filesystem creation time, no embedded command/timestamp). The timeline/painter and hemisphere tests were written AFTER that fix already existed: their restored-baseline failures at 21:11:27Z (18 standalone + 2 festivals and drawing calls) and 21:13:32Z (matrix polar flag) are later baseline-sensitivity checks, NOT preimplementation REDs. They strengthen preserved coverage without claiming new chronology. Root separately observed FAQ rendering RED at a0c44e7 at 21:11:30.946617Z before copy edits, and packaging RED at 8cf4a2a before metadata update because current/released worker bytes were identical. Full logs and the owner chronology clarification are under /Users/emeraldpham/Documents/GitHub/funsidething/.git/funsidething-task-evidence/arctic-observer-20261016. The first packaging GREEN attempt had a cross-VM Date fixture TypeError; corrected only fixture construction, then all 6 focused consumers passed. The first full regression at c08d08a found existing no-Orlando UI and 130-word FAQ contracts broken by new prose; repaired only prose, retained every assertion, then all 59 affected FAQ/copy consumers passed. Observed the resulting stale shell hash RED before regenerating metadata. These concrete failed gates explain final full/rendered/offline reruns."
+    },
+    "updatedTests": [
+      "RISK PWA module delivery: a fresh installed shell serves every production script while offline"
+    ],
+    "coverageChronology": {
+      "preimplementation": "Initial actual solar consumer RED precedes the sole one-line runtime correction.",
+      "postimplementation": "Timeline/painter and hemisphere coverage was added after the fix existed. Restoring the immutable old source established sensitivity only; no missing chronology is claimed.",
+      "independentRootSlices": "Rendered FAQ and worker-update-delivery assertions failed before their respective copy/generated metadata changes."
+    }
+  },
+  {
     "testChangesSha256": "af80322471a442b66f511f6bdde937a0a7bce268b5e5728c582a7477ced815a3",
     "reason": "Repair reproduced narrow wheeled footprint and mobile shadow overpainting while preserving all visitor pose, scale, fade and complementary bird mask assertions. Existing mocks now intercept the silhouette projector and supply its unchanged animation clock.",
     "previousBehavior": "Cyclists and scooters shared a rotated upright oval and near shadows painted over farther bodies. No silhouette projection or fixed wheelbase contract existed.",
@@ -7237,7 +7267,7 @@
     ],
     "redEvidence": {
       "command": "node --test --test-reporter=spec --test-name-pattern='RISK bulk result ownership:|RISK bulk account selection guidance:' tests.js",
-      "failure": "At 2026-10-16 17:09:26 UTC on baseline 84d9e11b840ee21e184c7a6fc1607d977ccdc96f, the result ownership characterization passed and the actual Help answer failed because it lacked 'Switching accounts clears the previous board\u2019s selection.' After adding that FAQ sentence, the first changelog run exposed an unseeded fake template rather than product behavior; the fixture was corrected to use the real current/archive templates. At 17:10:27 UTC, the mounted Help Changelog consumer then failed because it had no October 16 entry with the selection-reset bullet. The account-owner draft characterization passed both board-account and CloudSync-user change cases against the original 84d9 source at 17:14:37 UTC, so this is GREEN preservation coverage, not a bug RED. A deliberate sensitivity mutant at 17:11:12 UTC tied the result to the exact state object; the same-account Undo result assertion failed as expected, then the mutant was restored. Outputs: /private/tmp/chain-architecture-evidence-20261016/06/preimplementation-red.log, changelog-copy-red.log (fixture issue), changelog-copy-red-with-consumer-fixture.log, result-owner-sensitivity-negative-control.log, bulk-owner-characterization-baseline-green.log. The actual feature RED is the missing public copy; the controlled result failure is sensitivity evidence, not a reported product defect. The behavior-preserving bulk ownership refactor uses approved GREEN/refactor/GREEN rather than a manufactured failure."
+      "failure": "At 2026-10-16 17:09:26 UTC on baseline 84d9e11b840ee21e184c7a6fc1607d977ccdc96f, the result ownership characterization passed and the actual Help answer failed because it lacked 'Switching accounts clears the previous board’s selection.' After adding that FAQ sentence, the first changelog run exposed an unseeded fake template rather than product behavior; the fixture was corrected to use the real current/archive templates. At 17:10:27 UTC, the mounted Help Changelog consumer then failed because it had no October 16 entry with the selection-reset bullet. The account-owner draft characterization passed both board-account and CloudSync-user change cases against the original 84d9 source at 17:14:37 UTC, so this is GREEN preservation coverage, not a bug RED. A deliberate sensitivity mutant at 17:11:12 UTC tied the result to the exact state object; the same-account Undo result assertion failed as expected, then the mutant was restored. Outputs: /private/tmp/chain-architecture-evidence-20261016/06/preimplementation-red.log, changelog-copy-red.log (fixture issue), changelog-copy-red-with-consumer-fixture.log, result-owner-sensitivity-negative-control.log, bulk-owner-characterization-baseline-green.log. The actual feature RED is the missing public copy; the controlled result failure is sensitivity evidence, not a reported product defect. The behavior-preserving bulk ownership refactor uses approved GREEN/refactor/GREEN rather than a manufactured failure."
     }
   },
   {
