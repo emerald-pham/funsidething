@@ -25018,6 +25018,24 @@ test('RISK bulk task editing: current batch result distinguishes partial reconci
  ctx.state.tasks.find(t=>t.id===a.id).due='2028-03-01';ctx.renderList();assert.match(shim.document.getElementById('listBulkToolbar').innerHTML,/1 currently match in this tab; 1 have different values or are no longer open/);assert.match(shim.document.getElementById('listBulkToolbar').innerHTML,/Check Settings recovery backups/);assert.doesNotMatch(shim.document.getElementById('listBulkToolbar').innerHTML,/data-act="bulk-undo"/);
  ctx.state.syncAccount='another-private-account';ctx.renderList();assert.doesNotMatch(shim.document.getElementById('listBulkToolbar').innerHTML,/Bulk edit requested/,'result does not leak across accounts');
 });
+test('RISK bulk task editing: logical and cloud owner changes reject the whole draft before mutation',async()=>{
+ for(const ownerChange of ['board','cloud']){
+  const {ctx,shim}=await loadApp(),a=ctx.addTask('Private owner A'),b=ctx.addTask('Private owner B');ctx.state.listOpen=true;ctx.onAction('bulk-select-all');ctx.onAction('bulk-edit');shim.document.getElementById('bulkApplyDue').checked=true;shim.document.getElementById('bulkDue').value='2028-04-12';
+  if(ownerChange==='board')ctx.state.syncAccount='other-private-board';else ctx.window.CloudSync={user:'other-private-owner'};
+  ctx.onAction('bulk-save');assert.equal(ctx.state.tasks.find(task=>task.id===a.id).due,null,ownerChange+' owner change rejects before the first task mutates');assert.equal(ctx.state.tasks.find(task=>task.id===b.id).due,null,ownerChange+' owner change rejects the whole batch');assert.match(shim.document.getElementById('bulkError').textContent,/board changed/i);
+ }
+});
+test('RISK bulk result ownership: same-account Undo keeps the current-value summary across board replacement',async()=>{
+ const {ctx,shim}=await loadApp(),a=ctx.addTask('Private Undo A'),b=ctx.addTask('Private Undo B');ctx.state.listOpen=true;ctx.onAction('bulk-select-all');ctx.onAction('bulk-edit');shim.document.getElementById('bulkApplyDue').checked=true;shim.document.getElementById('bulkDue').value='2028-03-12';ctx.onAction('bulk-save');
+ assert.match(shim.document.getElementById('listBulkToolbar').innerHTML,/2 currently match in this tab; 0 have different values or are no longer open/);
+ const editedBoard=ctx.state;ctx.undo();assert.notEqual(ctx.state,editedBoard,'ordinary board Undo restores a replacement object');assert.equal(ctx.state.tasks.find(task=>task.id===a.id).due,null);assert.equal(ctx.state.tasks.find(task=>task.id===b.id).due,null);
+ assert.match(shim.document.getElementById('listBulkToolbar').innerHTML,/Bulk edit requested for 2 tasks: 0 currently match in this tab; 2 have different values or are no longer open/,'same logical owner keeps the result and measures its current values after Undo');assert.doesNotMatch(shim.document.getElementById('listBulkToolbar').innerHTML,/data-act="bulk-undo"/);
+});
+test('RISK bulk account selection guidance: Help and Changelog explain account-switch clearing',async()=>{
+ const {ctx,shim}=await loadApp();for(const id of ['appChangelogCurrent','appChangelog'])shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ const answer=help.split('<dt>How do I edit several tasks together?</dt><dd>')[1]?.split('</dd>')[0]||'';assert.match(answer,/Switching accounts clears the previous board’s selection\./);
+ const chapter=help.split('<details class="help-faq" data-help-changelog>')[1]?.split('</details>')[0]||'';assert.match(chapter,/<h3>October 16, 2026<\/h3>[\s\S]*?<li>Switching accounts clears the previous board’s selection\.<\/li>/);
+});
 test('RISK bulk task editing: enlarged modal fieldsets shrink and native controls retain available width',()=>{
  assert.match(html,/\.bulk-fields\s*\{[^}]*min-width:0[^}]*max-width:100%/,'observed chrome 390px 200% overflow needs fieldsets to shrink');assert.match(html,/\.bulk-fields input\[type=number\]\s*\{[^}]*min-width:0[^}]*max-width:100%/,'native numeric control must fit enlarged modal');assert.match(html,/<fieldset class="bulk-fields">/);
 });
