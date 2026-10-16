@@ -7172,5 +7172,21 @@
       "command": "Baseline consumer: node --test --test-name-pattern='RISK pedestrian visit recipe consumer:' tests.js; intentional sensitivity mutant: the same command with the timeline recipe getter changed to return its reservation duration; post-refactor regression: node --test --test-name-pattern='RISK pedestrian (capacity planner budget|deferred recipes):' tests.js.",
       "failure": "The new production consumer passed 1/1 before editing; the deliberate reservation-duration mutant failed its activity-versus-complete-lifetime assertion and was reverted, so that is sensitivity evidence, not feature RED. The first implementation run then exposed duplicate canonical lifetime calculations in two existing RISK tests; consuming the visit recipe getter in inWindow fixed the observed regression. Logs: /private/tmp/chain-architecture-evidence-20261016/01/recipe-consumer-green.log, recipe-consumer-negative-control.log, lifetime-cache-diagnostic.log, lifetime-cache-green.log. The behavior-preserving GREEN/refactor/GREEN approach was approved in /private/tmp/chain-architecture-evidence-20261016/approval.json."
     }
+  },
+  {
+    "testChangesSha256": "2e98474e4a2abdbc819f8f1b0437fbdb01d31eae2f93f3906b3e009e5c04c976",
+    "reason": "Add a production paint-consumer characterization before the approved behavior-preserving Visits presentation refactor. It checks current normal and reduced choices against a deterministic timeline visit, and the deliberate cutoff mutation verifies that the local-exit assertion detects a party left in frame.",
+    "previousBehavior": "The existing renderer already retires normal visitors after the whole local party leaves, keeps only current activity reservations under reduced motion, selects its settled representative, and resumes the original UTC age when motion changes back.",
+    "intendedBehavior": "LandscapeVisits owns local completion, reduced activity filtering and settled walking pose selection; the renderer consumes one paint-ready set while shared visit records and nonwalking representatives retain their existing behavior.",
+    "replacementTests": [
+      "RISK pedestrian paint presentation consumer: current motion and viewport choices preserve complete local exits"
+    ],
+    "preservedCoverage": [
+      "Existing complete-party bounds, local culling before pose and downstream paint passes, fireworks isolation, reduced admission workload, motion toggles, gait caches and immutable shared reservations remain protected."
+    ],
+    "redEvidence": {
+      "command": "Baseline: node --test --test-name-pattern='RISK pedestrian paint presentation consumer:' tests.js; deliberate negative control: the same command after temporarily changing landscape.js local completion to return true.",
+    "failure": "The initial source-sliced characterization version of this RISK consumer passed 1/1 at baseline SHA 26bd74a49eb8ed59e6d65fdb9582da88a89becc2 before runtime edits. The temporary local-cutoff mutant failed its expected normal paint set by adding departed; the exact assertion output is /private/tmp/chain-architecture-evidence-20261016/02/paint-presentation-negative-control.log. This is sensitivity evidence, not preimplementation feature RED; the clean source was restored byte-for-byte. After refactoring, the same named consumer was migrated to the production LandscapeVisits seam and extended with narrow/wide/narrow resize history. Scoped GREEN/refactor/GREEN approval is /private/tmp/chain-architecture-evidence-20261016/approval.json."
+    }
   }
 ]
