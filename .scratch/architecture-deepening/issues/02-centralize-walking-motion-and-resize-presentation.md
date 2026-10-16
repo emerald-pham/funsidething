@@ -4,7 +4,7 @@
 
 **Blocked by:** 01: Centralize walking recipes and complete visit lifetimes.
 
-**Status:** implemented — local presentation ownership and consumer checks. Ticket 07 owns the final integrated rendered, packaging, and live verification evidence.
+**Status:** complete — integrated, reviewed, deployed and accepted on the ordinary production path.
 
 - [x] Settle the presentation interface against the established walking recipe owner before implementation. Production callers and behavioral tests use the same coherent walking seam, without callers coordinating lifetime selection and pose ordering. Reuse the agreed scene/motion controls and composed painter consumers; resolve any materially new test seam before tests at it.
 - [x] Select locally relevant visits before substituting reduced-motion poses and before downstream body, shadow or reflection work. Expired walking tails cannot reappear through representative-pose substitution.
@@ -16,3 +16,7 @@
 - [x] Verify production reconstruction and motion through the established consumer seams, narrow/wide/enlarged geometry history, cache behavior, and local painted bounds. Recording-canvas and deterministic checks are not claimed as composed rendering or physical-device proof. Ticket 07 owns final integrated rendering and packaging evidence.
 
 Focused evidence and complete logs: `/private/tmp/chain-architecture-evidence-20261016/02/implementation.md`.
+
+## Integrated release acceptance — 2026-10-16
+
+Complete in [product PR132](https://github.com/emerald-pham/funsidething/pull/132), reviewed candidate `5ae84fdefb209127e90537e25ab3b166b8e9320b`, deployed main `7fcc49f2565694f44ccf1ab2376aed22f489aa06`. The integrated tree is `1a79407ea6cf263f7ac435d8f3d871b89b70e827`. Ticket 07 records the common validation, independent reviews, live acceptance and playable checks; its acceptance supersedes earlier local-only handback notes. The original baseline, real RED/GREEN and approved refactor chronology remain retained.

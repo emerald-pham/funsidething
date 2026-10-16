@@ -4,7 +4,7 @@
 
 **Blocked by:** 03: Centralize rating history for direct task actions.
 
-**Status:** implemented in branch; awaiting ticket 07 integrated acceptance
+**Status:** complete — integrated, reviewed, deployed and accepted on the ordinary production path.
 
 - [x] Settle editor integration with the established task action owner before implementation. Editor callers no longer independently coordinate observation capture, Undo and finalization. Reuse the agreed task-editor actions, Task history, Undo and isolated reload/sync fixtures; resolve only materially new testing seams before tests at them.
 - [x] Save, edit-and-Done, edit-and-Worked and edit-and-Dot retain their supported behavior. One Undo reverses each complete gesture's fields and action effects without erasing immutable history facts or adding a second Undo step.
@@ -17,3 +17,7 @@
 - [x] Verify editor gestures, visible history and saved/reloaded isolated boards through the production action owner. Retain focused state/sync preservation evidence and hand back the locally verified commit for the integrated checkpoint, without a separate product release.
 
 Local evidence is recorded in `/private/tmp/chain-architecture-evidence-20261016/04/`. The checks use the production `onAction` and `TaskActionOwner` in isolated VM/fake-indexeddb fixtures. Rendered PWA, authenticated live sync, deployment and physical-device acceptance remain with ticket 07.
+
+## Integrated release acceptance — 2026-10-16
+
+Complete in [product PR132](https://github.com/emerald-pham/funsidething/pull/132), reviewed candidate `5ae84fdefb209127e90537e25ab3b166b8e9320b`, deployed main `7fcc49f2565694f44ccf1ab2376aed22f489aa06`. The integrated tree is `1a79407ea6cf263f7ac435d8f3d871b89b70e827`. Ticket 07 records the common validation, independent reviews, live acceptance and playable checks; its acceptance supersedes earlier local-only handback notes. The original baseline, real RED/GREEN and approved refactor chronology remain retained.
