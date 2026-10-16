@@ -854,6 +854,7 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 
 - RISK fireworks crescendo: finale emits distinct overlapping volleys and a wider closing crown
 - RISK fireworks crescendo FAQ: scenery help explains widening finale and existing motion limits
+- RISK continuous daylight FAQ: rendered help and release notes explain show exclusion
 
 - RISK seeded trigger admissions: actual UTC rail consumer admits chance gaps with preserved mean and track capacity
 - RISK seeded trigger windows: actual light consumer uses independent state draws and can retain state across opportunities

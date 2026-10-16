@@ -24436,6 +24436,20 @@ test('RISK fireworks crescendo: finale emits distinct overlapping volleys and a 
  }
 });
 
+test('RISK continuous daylight FAQ: rendered help and release notes explain show exclusion',async()=>{
+ const {ctx,shim}=await loadApp();
+ for(const id of ['appChangelogCurrent','appChangelog'])shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
+ const before=JSON.stringify(ctx.state);ctx.onAction('help',{});
+ const markup=shim.document.getElementById('modalRoot').innerHTML,answer=markup.split('<dt>How do I change the scenery?</dt>')[1].split('</dd>')[0];
+ assert.match(answer,/Fireworks and festivals stay off during continuous daylight/i);
+ assert.match(answer,/even below the Arctic Circle/i);
+ assert.match(answer,/Sunrise, sunset and nighttime can show fireworks/i);
+ assert.match(answer,/Reduced motion keeps scenery still/i);
+ const notes=markup.split('<div class="kv" data-changelog-notes>')[1].split('</details>')[0];
+ assert.match(notes,/Fireworks and festivals now stay off during the midnight sun/i);
+ assert.equal(JSON.stringify(ctx.state),before,'reading the daylight guidance preserves the saved board');
+});
+
  test('RISK fireworks crescendo FAQ: scenery help explains widening finale and existing motion limits',()=>{
  const help=html.slice(html.indexOf('function openHelp'),html.indexOf('function openInstallHelp'));
  assert.match(help,/overlapping volleys[\s\S]*wider closing crown/);
