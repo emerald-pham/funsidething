@@ -7204,5 +7204,24 @@
       "command": "node --test --test-reporter=spec --test-name-pattern='RISK task action history: scanner comparison stays visible through Undo and saved reload' tests.js > /private/tmp/chain-architecture-evidence-20261016/03/sensitivity-negative-control.log 2>&1",
       "failure": "The controlled mutant failed at tests.js:734 with actual undefined versus expected yes; full output is retained in /private/tmp/chain-architecture-evidence-20261016/03/sensitivity-negative-control.log. The unmutated production baseline passed at 2026-10-16 16:52:02 UTC; this is sensitivity evidence, not feature RED."
     }
+  },
+  {
+    "testChangesSha256": "d07731f3c4c45253418426a291b4b505bcd79791eb5110b4c568ca938c75daa5",
+    "reason": "Add an actual Help consumer regression for the ticket 05 account-selection correction and preserve Bulk Edit owner/result behavior. The same-account result characterization passed on the original pre-refactor source; a later logical/cloud draft-owner characterization also passed against the original integration source. These are preservation cases, not behavior-change REDs.",
+    "previousBehavior": "The All Tasks Help answer omits that switching accounts clears prior selection. Existing result coverage does not assert that a same-account Undo replacement keeps the result scoped to the logical owner while counts follow current values.",
+    "intendedBehavior": "Help and the October 16 Changelog state that account switches clear the prior board selection. A bulk result remains visible after same-account Undo replaces the board object and recounts matches from the restored current values.",
+    "replacementTests": [
+      "RISK bulk task editing: logical and cloud owner changes reject the whole draft before mutation",
+      "RISK bulk result ownership: same-account Undo keeps the current-value summary across board replacement",
+      "RISK bulk account selection guidance: Help and Changelog explain account-switch clearing"
+    ],
+    "preservedCoverage": [
+      "All existing selection, clear-versus-blank, typed-over-clear, stale-batch, context, Undo, reconciliation, recovery, retry and result assertions remain unchanged.",
+      "The new result assertion uses the existing user-facing All Tasks and Undo consumer; this is local presentation state and makes no cloud acknowledgement claim."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='RISK bulk result ownership:|RISK bulk account selection guidance:' tests.js",
+      "failure": "At 2026-10-16 17:09:26 UTC on baseline 84d9e11b840ee21e184c7a6fc1607d977ccdc96f, the result ownership characterization passed and the actual Help answer failed because it lacked 'Switching accounts clears the previous board’s selection.' After adding that FAQ sentence, the first changelog run exposed an unseeded fake template rather than product behavior; the fixture was corrected to use the real current/archive templates. At 17:10:27 UTC, the mounted Help Changelog consumer then failed because it had no October 16 entry with the selection-reset bullet. The account-owner draft characterization passed both board-account and CloudSync-user change cases against the original 84d9 source at 17:14:37 UTC, so this is GREEN preservation coverage, not a bug RED. A deliberate sensitivity mutant at 17:11:12 UTC tied the result to the exact state object; the same-account Undo result assertion failed as expected, then the mutant was restored. Outputs: /private/tmp/chain-architecture-evidence-20261016/06/preimplementation-red.log, changelog-copy-red.log (fixture issue), changelog-copy-red-with-consumer-fixture.log, result-owner-sensitivity-negative-control.log, bulk-owner-characterization-baseline-green.log. The actual feature RED is the missing public copy; the controlled result failure is sensitivity evidence, not a reported product defect. The behavior-preserving bulk ownership refactor uses approved GREEN/refactor/GREEN rather than a manufactured failure."
+    }
   }
 ]
