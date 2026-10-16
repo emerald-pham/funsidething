@@ -564,6 +564,7 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK scan lifecycle FAQ: Dot rest boundary current Start eligibility and durable remote refresh are explained
 
 - RISK task rating history: actual comparisons retain timestamped before and after values without backfilling or changing signals
+- RISK task action history: scanner comparison stays visible through Undo and saved reload
 - RISK task rating history: editor observations distinguish relative movement and never write on open render or resampling
 - RISK task rating history: No Dot Dislodge completion and Undo retain honest rating versus pool changes
 - RISK task rating history: concurrent offline and older missing-field copies union immutable facts idempotently without retimestamping
@@ -942,6 +943,9 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK bulk task editing: FAQ and editor qualify mixed Apply and later sync recovery limits
 - RISK bulk task editing: concurrent recovery keeps backups and existing board Undo boundary explicit
 - RISK bulk task editing: current batch result distinguishes partial reconciliation from sync success and offers no batch Undo
+- RISK bulk task editing: logical and cloud owner changes reject the whole draft before mutation — Draft Save rejects changed board and signed-in owner before any batch field is written.
+- RISK bulk result ownership: same-account Undo keeps the current-value summary across board replacement — Same-owner board replacement retains result scope while counts follow current values.
+- RISK bulk account selection guidance: Help and Changelog explain account-switch clearing — Actual Help consumer covers the selection reset introduced by ticket 05.
 - RISK bulk task editing: enlarged modal fieldsets shrink and native controls retain available width
 - RISK bulk task guidance: bounded answers retain distinct selection property conflict Undo and result instructions
 - RISK bulk task guidance: enlarged conflict answer uses breakable task status wording
@@ -999,6 +1003,7 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK bulk toolbar: mounted controls stay outside scrolling rows and retain filtered selection through filter changes
 - RISK bulk row selection: selected label replaces the existing rank slot and deselection restores its format
 - RISK bulk toolbar keyboard: rerender restores the focused toolbar action and row toggle
+- RISK All Tasks view ownership: account adoption clears prior selection while same-account Undo retains it
 - RISK bulk toolbar guidance: extended FAQ describes frozen controls and rank-slot selection
 - RISK repository process boundary: actual visual tests compare every changed control with neighboring controls and scrolled states
 
