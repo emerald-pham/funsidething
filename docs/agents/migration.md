@@ -1,12 +1,12 @@
 # Guidance migration — 2026-10-16
 
-Base: `0adb54670c863c36be4faf11833d71c951c4147e`. Installed source: Matt Pocock skills v1.3.1, read directly from
+Base: `0adb54670c863c36be4faf11833d71c951c4147e`. Installed source: `mattpocock-skills` v1.3.1, read directly from
 its installed setup, TDD (including tests/mocking), writing-for-agents, implement,
 implement-spec, diagnosing-bugs, code-review, to-spec and PR guidance.
 
 This is a repository-guidance migration, not application implementation or a
 claim of historical TDD compliance. Existing evidence/release records remain.
-The user requested relevant Matt workflows while retaining strict TDD. Explicit
+The user requested relevant installed skills while retaining strict TDD. Explicit
 user/repository safety and acceptance gates take precedence over generic defaults.
 
 ## Setup decisions still needed

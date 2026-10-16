@@ -1,6 +1,6 @@
-# Relevant Matt Pocock workflow
+# Development workflow
 
-Use the installed `mattpocock-skills` v1.3.1 plugin. Discover the installed path
+Locate the installed `mattpocock-skills` v1.3.1 plugin to invoke skills. Discover its path
 at session start; older sessions may need explicit file reads. The current host
 installation is `/Users/emeraldpham/.codex/plugins/cache/mattpocock/mattpocock-skills/1.3.1/skills`.
 If unavailable, report that limitation and follow the repository gates; never

@@ -4,7 +4,7 @@ A ranked FVP task scanner with a PWA/offline shell and cloud-synced saved boards
 
 ## Agent skills
 
-Use only relevant installed Matt Pocock skills, routed by
+Use only relevant installed skills, routed by
 [workflow](docs/agents/workflow.md). Read it before functional work, bug diagnosis,
 code review, PR writing or guidance edits. It defines strict behavioral RED→GREEN,
 seam agreement, honest evidence and user feedback boundaries.
