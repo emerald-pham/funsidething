@@ -960,7 +960,7 @@ const lzStringSrc = fs.readFileSync(path.join(__dirname, "vendor/lz-string-1.5.0
 
 function sceneTimeline(transforms={}) {
  const context=vm.createContext({Date,Math,Intl,console});
- for(const file of ['landscape-config.js','vendor/astronomy.min.js','stars.js','landscape-core.js','landscape-geometry.js','landscape-timeline.js']){
+ for(const file of ['landscape-config.js','vendor/astronomy.min.js','stars.js','landscape-core.js','landscape-geometry.js','landscape-visits.js','landscape-timeline.js']){
   assert.ok(fs.existsSync(path.join(__dirname,file)),`deterministic scenery module missing: ${file}`);
   const source=fs.readFileSync(path.join(__dirname,file),'utf8');
   vm.runInContext(transforms[file]?transforms[file](source):source,context);
@@ -1059,7 +1059,7 @@ test('RISK pedestrian capacity planner budget: cached daily scheduling evaluates
  timeline.at(Date.parse('2026-10-06T01:24:56.116Z'));
  timeline.at(Date.parse('2026-10-06T01:24:48Z'));timeline.at(Date.parse('2026-10-06T01:25:04Z'));
  assert.ok(counts.size>10,'the actual capacity history contains immutable proposals');
- assert.ok([...counts.values()].every(count=>count===1),'complete-life planning must not repeat inside quadratic overlap comparisons');
+ assert.ok([...counts.values()].every(count=>count===1),`complete-life planning must not repeat inside quadratic overlap comparisons: ${JSON.stringify([...counts].filter(([,count])=>count!==1))}`);
 });
 
 test('RISK pedestrian capacity liveness: a busy day admits visitors while retaining bounded reservations and complete recipes',()=>{
@@ -1942,7 +1942,7 @@ test("Landscape location: reports denied, unavailable, timeout, and storage fail
 });
 
 test("Landscape location: the browser wiring is explicit and exposes the standalone dialog", () => {
-  assert.match(html, /<script defer src="location\.js"><\/script>\s*<script defer src="landscape-geometry\.js"><\/script>\s*<script defer src="landscape-timeline\.js"><\/script>\s*<script defer src="landscape-mood\.js"><\/script>\s*(?:<script defer src="landscape-(?:appearance|riders|winter|seasonal|skywriter)\.js"><\/script>\s*)+<script defer src="landscape\.js">/);
+  assert.match(html, /<script defer src="location\.js"><\/script>\s*<script defer src="landscape-geometry\.js"><\/script>\s*<script defer src="landscape-visits\.js"><\/script>\s*<script defer src="landscape-timeline\.js"><\/script>\s*<script defer src="landscape-mood\.js"><\/script>\s*(?:<script defer src="landscape-(?:appearance|riders|winter|seasonal|skywriter)\.js"><\/script>\s*)+<script defer src="landscape\.js">/);
   assert.match(html, /<script defer src="landscape-geometry\.js"><\/script>/);
   assert.match(html, /data-act="location-settings"/);
   assert.match(html, /<dialog id="locationDialog"/);
@@ -24616,6 +24616,25 @@ test('RISK pedestrian scheduled lifetime: accepted walkers retain admission dura
  assert.ok(!timeline.at(born+event.duration*1000+.01).events.some(e=>e.id===event.id),'finite retirement follows complete route');
 });
 
+test('RISK pedestrian visit recipe consumer: complete lifetime stays separate from admission and reconstructs at current UTC age',()=>{
+ const context=sceneTimeline(),options={seed:'private-walking-exits',season:'summer',sunAt:()=>({altitude:25,azimuth:100})};
+ const timeline=context.LandscapeTimeline.create(options),start=Date.parse('2026-10-10T10:00Z');let selectedAt,recipe;
+ for(let second=0;second<3600&&!recipe;second+=8){
+  const at=start+second*1000,event=timeline.at(at).events.find(e=>e.type==='walker'||e.type==='dogwalker');
+  if(event){selectedAt=at;recipe=event;}
+ }
+ assert.ok(recipe,'the deterministic production consumer admits a complete walking recipe');
+ assert.ok(recipe.activityDuration>0&&recipe.duration>recipe.activityDuration,'admission activity remains distinct from its full canonical visit');
+ const born=selectedAt-recipe.age*1000,afterActivity=born+(recipe.activityDuration+1)*1000;
+ const resumed=timeline.at(afterActivity).events.find(event=>event.id===recipe.id);
+ assert.ok(resumed,'a visit remains present after its original admission reservation expires');
+ assert.ok(Math.abs(resumed.age-(recipe.activityDuration+1))<1e-7,'the current recipe advances by UTC age rather than frame history');
+ assert.deepEqual(JSON.parse(JSON.stringify(timeline.at(afterActivity))),JSON.parse(JSON.stringify(context.LandscapeTimeline.create(options).at(afterActivity))),'a cold deterministic reconstruction selects the same underway recipe');
+ const lastFrame=timeline.at(born+(recipe.duration-.001)*1000).events.find(event=>event.id===recipe.id);
+ assert.ok(lastFrame,'the complete visit remains selected up to its canonical exit');
+ assert.ok(!timeline.at(born+(recipe.duration+.001)*1000).events.some(event=>event.id===recipe.id),'the finite complete recipe retires immediately after its exit');
+});
+
 test('RISK pedestrian companion pace: walking deer and woodland paws halve translation and distance together while hopping stays unchanged',()=>{
  const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);const g=ctx.LandscapeGeometry.create(820,1180),e={type:'deer',age:30,duration:180,seed:.4,lane:.5,reverse:false};
  assert.equal(g.groundPose('deer',e).distance,g.motionAge(e,'x')*3,'walking deer use half prior six-pixel local pace');
@@ -26352,7 +26371,7 @@ test('RISK pedestrian deferred recipes: cold admission plans solve only near-mid
  const t=c.LandscapeTimeline.create({seed:'private-walking-exits',season:'summer',sunAt:()=>({altitude:25,azimuth:100})}),at=Date.parse('2026-10-14T01:00Z');const before=JSON.parse(JSON.stringify(t.at(at)));
  assert.ok(counts.size<=700,`a cold instant should not solve ${counts.size} full-day walking recipes`);
  t.at(at+8000);t.at(at-8000);assert.deepEqual(JSON.parse(JSON.stringify(t.at(at))),before,'deferred lifetime reads cannot select different admission');
- assert.ok([...counts.values()].every(n=>n===1),'deferred recipes solve once per immutable opportunity');
+ assert.ok([...counts.values()].every(n=>n===1),`deferred recipes solve once per immutable opportunity: ${JSON.stringify([...counts].filter(([,count])=>count!==1))}`);
 });
 
 test('RISK pedestrian maximum lifetime: all canonical walking cohorts fit the proven finite recipe lookback',()=>{
@@ -26364,7 +26383,7 @@ test('RISK pedestrian maximum lifetime: all canonical walking cohorts fit the pr
 });
 
 test('RISK pedestrian deferred reconstruction: eager recipe reference matches lazy output at lookback midnight and cache eviction',()=>{
- const lazy=sceneTimeline(),eager=sceneTimeline({'landscape-timeline.js':source=>source.replace('events.push(extendWalk(e));','const visit=extendWalk(e);void visit.duration;events.push(visit);').replace('e.start>=from-MAX_WALK_LIFE&&','')});
+ const lazy=sceneTimeline(),eager=sceneTimeline({'landscape-visits.js':source=>source.replace('return visit;','void visit.duration;return visit;').replace('event.start>=from-MAX_VISIT_LIFETIME&&','true&&')});
  const options={seed:'private-walking-exits',season:'winter',sunAt:()=>({altitude:25,azimuth:100})},a=lazy.LandscapeTimeline.create(options),b=eager.LandscapeTimeline.create(options),epoch=Date.parse('2026-10-14T00:00Z'),day=86400000;
  for(const offset of [0,2700000-1,2700000,2700000+1,day-2700000,day-1,day,day+1,2*day+1,-day+1,2700000]){
   const at=epoch+offset,actual=a.at(at);assert.deepEqual(JSON.parse(JSON.stringify(actual)),JSON.parse(JSON.stringify(b.at(at))),'getter read order, boundary and cache history cannot change shared output');
