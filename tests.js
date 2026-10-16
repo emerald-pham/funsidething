@@ -1688,6 +1688,53 @@ test('RISK fireworks twilight: actual reduced-motion painter holds its pose acro
  }
 });
 
+test('RISK continuous daylight: the actual observer local day classifies 65.8 N midnight as day',()=>{
+ const sampler=livingSky(),date=new Date('2026-06-21T00:28:09.928Z'),location={latitude:65.8,longitude:18.96,timezone:'Europe/Oslo'},sky=sampler.skyAt(date,location),times=sampler.sunTimes(date,location);
+ assert.ok(sky.sun.altitude>0&&sky.sun.altitude<8,'the saved boundary instant has an above-horizon Sun in the ordinary twilight range');
+ assert.equal(times.rise,null,'the observer local date has no sunrise');assert.equal(times.set,null,'the observer local date has no sunset');
+ assert.equal(sky.polarDay,true,'continuous daylight follows actual local-day solar events below the former latitude cutoff');
+ assert.equal(sky.period,'day','the continuous-day scene is never classified as dawn');
+});
+
+test('RISK continuous daylight: both hemispheres use solar events around the former 66 degree cutoff',()=>{
+ const sampler=livingSky(),cases=[
+  {name:'north below cutoff continuous day',latitude:65.8,date:'2026-06-21T00:28:09.928Z',timezone:'Europe/Oslo',longitude:18.96,kind:'day',polarDay:true,events:false},
+  {name:'north above cutoff continuous day',latitude:66.2,date:'2026-06-21T00:28:09.928Z',timezone:'Europe/Oslo',longitude:18.96,kind:'day',polarDay:true,events:false},
+  {name:'south below cutoff continuous day',latitude:-65.8,date:'2026-12-21T12:00:00Z',timezone:'UTC',longitude:0,kind:'day',polarDay:true,events:false},
+  {name:'south above cutoff continuous day',latitude:-66.2,date:'2026-12-21T12:00:00Z',timezone:'UTC',longitude:0,kind:'day',polarDay:true,events:false},
+  {name:'north continuous night',latitude:70,date:'2026-12-21T12:00:00Z',timezone:'UTC',longitude:0,kind:'night',polarDay:false,events:false},
+  {name:'south continuous night',latitude:-70,date:'2026-06-21T12:00:00Z',timezone:'UTC',longitude:0,kind:'night',polarDay:false,events:false},
+  {name:'north ordinary winter sunrise and sunset',latitude:65.8,date:'2026-12-21T12:00:00Z',timezone:'UTC',longitude:0,kind:'ordinary',polarDay:false,events:true},
+  {name:'south ordinary winter sunrise and sunset',latitude:-65.8,date:'2026-06-21T12:00:00Z',timezone:'UTC',longitude:0,kind:'ordinary',polarDay:false,events:true},
+ ];
+ for(const fixture of cases){
+  const location={latitude:fixture.latitude,longitude:fixture.longitude,timezone:fixture.timezone},date=new Date(fixture.date),sky=sampler.skyAt(date,location),times=sampler.sunTimes(date,location),hasEvents=!!times.rise&&!!times.set;
+  assert.equal(hasEvents,fixture.events,`${fixture.name}: rise=${times.rise}, set=${times.set}`);
+  assert.equal(sky.polarDay,fixture.polarDay,`${fixture.name}: polarDay=${sky.polarDay}`);
+  if(fixture.kind==='day')assert.equal(sky.period,'day',`${fixture.name}: period=${sky.period}`);
+  else if(fixture.kind==='night'){assert.ok(sky.sun.altitude<0,`${fixture.name}: Sun altitude=${sky.sun.altitude}`);assert.notEqual(sky.period,'day',`${fixture.name}: period=${sky.period}`);}
+  else assert.ok(['dawn','dusk'].includes(sky.period),`${fixture.name}: period=${sky.period}`);
+ }
+});
+
+test('RISK continuous daylight consumers: the real timeline and show painters suppress the 65.8 N boundary',()=>{
+ const scenery=sceneTimeline(),sampler=scenery.LivingSky,location={latitude:65.8,longitude:18.96,timezone:'Europe/Oslo'},date=new Date('2026-06-21T00:28:09.928Z'),sky=sampler.skyAt(date,location),start=Date.parse('2026-06-20T22:00:00Z');
+ const timeline=scenery.LandscapeTimeline.create({seed:scenery.LandscapeTimeline.DEFAULT_SEED,season:'summer',location}),scheduled=new Map();
+ for(let minute=0;minute<1440;minute++){const at=start+minute*60000;for(const event of timeline.at(at).events)if(['fireworks','festival'].includes(event.type))scheduled.set(event.id,{type:event.type,start:at/1000-event.age});}
+ const shows=[...scheduled.values()].sort((a,b)=>a.start-b.start).map(event=>`${event.type}@${new Date(event.start*1000).toISOString()}`);
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),from=source.indexOf('  function paintFestivalBarge(e){'),to=source.indexOf('\n  function paintClocktowerVisit()',from),paint=source.slice(from,to),paintCalls=[],paintCounts={},recorder={group:''};
+ assert.ok(from>=0&&to>from,'the real barge, stage, and firework painters are available');
+ const target={globalAlpha:1,globalCompositeOperation:'source-over',createLinearGradient(){return {addColorStop(){}};}},g=new Proxy(target,{get(object,key){return key in object?object[key]:(...args)=>{paintCalls.push(recorder.group);};},set(object,key,value){object[key]=value;return true;}});
+ const festival={type:'festival',age:75,duration:150,lane:.55,seed:.4},fireworks={type:'fireworks',age:1.6,duration:60,lane:.55,seed:.4},painterContext={Date,Math,S:sampler,sky,festival,fireworks,recorder,world:{events:[]},g,geometry:scenery.LandscapeGeometry.create(390,844),W:390,H:844,far:[],cityLayer:{width:390,height:844},dpr:1,p:{sky:['#111111','#222222','#333333']},path(){},line(){paintCalls.push(recorder.group);},ellipse(){paintCalls.push(recorder.group);},reflectWaterObject(_y,draw){draw();},scenePose:event=>event};
+ vm.createContext(painterContext);vm.runInContext(`${paint};recorder.group='festival barge';paintFestivalBarge(festival);recorder.group='festival stage';paintFestival(festival);recorder.group='standalone shells';world.events=[fireworks];paintFireworks('fireworks');recorder.group='festival shells';world.events=[festival];paintFireworks('festival')`,painterContext);
+ for(const group of paintCalls)paintCounts[group]=(paintCounts[group]||0)+1;
+ const failures=[];
+ if(!sky.polarDay||sky.period!=='day')failures.push(`solar=${JSON.stringify({polarDay:sky.polarDay,period:sky.period,altitude:sky.sun.altitude})}`);
+ if(shows.length)failures.push(`timeline=${JSON.stringify(shows)}`);
+ if(paintCalls.length)failures.push(`painters=${JSON.stringify(paintCounts)}`);
+ assert.deepEqual(failures,[],`continuous daylight must block solar classification, default-seed timeline admissions, and retained show paint: ${failures.join('; ')}`);
+});
+
 test('RISK fireworks polar day: real Arctic midnight remains excluded in solar sampling legacy admission and actual painting',()=>{
  const sampler=livingSky(),date=new Date('2026-06-21T00:00:00Z'),location={latitude:70,longitude:0,timezone:'UTC'},sky=sampler.skyAt(date,location);
  assert.equal(sky.polarDay,true);assert.equal(sky.period,'day');assert.ok(sky.sun.altitude>0&&sky.sun.altitude<8,'actual midnight Sun lies within the ordinary twilight altitude range');

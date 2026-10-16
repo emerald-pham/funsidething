@@ -94,7 +94,7 @@
   const polarDayCache=new Map();
   function polarDayAt(date,location,sun){
     const config=locationObserver(location);let polarDay=false;
-    if(Math.abs(config.observer.latitude)>66&&sun.visible){
+    if(sun.visible){
       const parts=partsInZone(date,config.timeZone),key=[config.observer.latitude,config.observer.longitude,config.timeZone,parts.year,parts.month,parts.day].join(':');
       if(!polarDayCache.has(key)){const times=sunTimes(date,location);polarDayCache.set(key,!times.rise&&!times.set);if(polarDayCache.size>8)polarDayCache.delete(polarDayCache.keys().next().value);}
       polarDay=polarDayCache.get(key);

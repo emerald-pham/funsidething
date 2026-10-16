@@ -833,6 +833,10 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK fireworks twilight: actual festival painter keeps sunrise and sunset particles visible below daytime
 - RISK fireworks twilight: actual reduced-motion painter holds its pose across dawn and dusk and expires at the source lifetime
 
+- RISK continuous daylight: the actual observer local day classifies 65.8 N midnight as day
+- RISK continuous daylight: both hemispheres use solar events around the former 66 degree cutoff
+- RISK continuous daylight consumers: the real timeline and show painters suppress the 65.8 N boundary
+
 - RISK fireworks polar day: real Arctic midnight remains excluded in solar sampling legacy admission and actual painting
 - RISK fireworks polar UTC: real Arctic daylight never schedules either source across a complete day
 
