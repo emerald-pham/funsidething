@@ -10,7 +10,9 @@ code review, PR writing or guidance edits. It defines strict behavioral RED→GR
 seam agreement, honest evidence and user feedback boundaries.
 
 Domain docs: single-context; see [domain rules](docs/agents/domain.md) before exploration.
-Tracker/triage setup remains unconfirmed; see [migration](docs/agents/migration.md).
+Before publishing or triaging issues/specs, read the
+[GitHub tracker](docs/agents/issue-tracker.md) and
+[triage labels](docs/agents/triage-labels.md).
 
 ## Test-first and regression
 

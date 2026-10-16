@@ -9,15 +9,17 @@ claim of historical TDD compliance. Existing evidence/release records remain.
 The user requested relevant installed skills while retaining strict TDD. Explicit
 user/repository safety and acceptance gates take precedence over generic defaults.
 
-## Setup decisions still needed
+## Setup completed — 2026-10-16
 
-Tracker selection and triage-label vocabulary are unconfirmed. No tracker was
-chosen, no issues/labels created, no external integration configured. Full
-`setup-matt-pocock-skills` has NOT been completed. Before using tracker-dependent
-workflows, send the parent/user the setup skill's recommended tracker question,
-then its triage-label question if applicable, and concrete proposed files for
-review. Do not silently default to GitHub or local markdown. Direct authorized
-work can continue from its task brief without manufacturing tickets.
+The user approved GitHub Issues and the five default triage labels after
+reviewing the concrete setup and ticket breakdown. Issues are enabled for
+`emerald-pham/funsidething`; missing labels were created and the existing
+`wontfix` label retained. Tracker operations are defined in
+[issue-tracker.md](issue-tracker.md), and label mappings in
+[triage-labels.md](triage-labels.md). The tracker/triage setup is complete.
+
+Existing local planning documents remain in place. Direct authorized work can
+still proceed from its task brief without manufacturing tickets.
 
 Domain consumer rules are in `domain.md`; there is no monorepo configuration.
 See `workflow.md` for relevant-skill routing and strict TDD integration.
