@@ -7156,5 +7156,148 @@
       "command": "Original Top X node --test --test-name-pattern=\"RISK task history: compact Top X\" tests.js; inherited upstream commands retained in released-base TEST_CHANGE_RATIONALES.json",
       "failure": "Original observed Top X RED expected Top X 2 of 7 → 4 of 9, actual prior compact metrics /tmp/topx-red.txt; punctuation /tmp/topx-slash-red.txt; consent driver /tmp/topx-driver-red.txt. Upstream RED is reused from its exact released-base records, not claimed newly executed."
     }
+  },
+  {
+    "testChangesSha256": "55a9061b4da05452ac91e6f0124db2c694a6a636eae11c82fd09e8eb3a500dac",
+    "reason": "Add a production reconstruction characterization before the approved behavior-preserving ownership refactor and move eager/lazy reconstruction coverage to LandscapeVisits. Keep existing contracts intact; diagnostic messages on two once-per-proposal checks now expose repeated calculations if they regress.",
+    "previousBehavior": "The released timeline already retains admitted walkers through full canonical exits, reconstructs their current UTC age, and solves each immutable proposal lifetime once.",
+    "intendedBehavior": "The production scene consumer preserves activity duration, complete lifetime, cold reconstruction, finite retirement and one lazy lifetime solve per admitted event after recipe ownership moves to LandscapeVisits.",
+    "replacementTests": [
+      "RISK pedestrian visit recipe consumer: complete lifetime stays separate from admission and reconstructs at current UTC age"
+    ],
+    "preservedCoverage": [
+      "Existing capacity, midnight, local culling, reduced motion, painted bounds, deferred recipe, gait and cache assertions remain in place; the eager/lazy reference targets LandscapeVisits and the browser module-order assertion includes the new script."
+    ],
+    "redEvidence": {
+      "command": "Baseline consumer: node --test --test-name-pattern='RISK pedestrian visit recipe consumer:' tests.js; intentional sensitivity mutant: the same command with the timeline recipe getter changed to return its reservation duration; post-refactor regression: node --test --test-name-pattern='RISK pedestrian (capacity planner budget|deferred recipes):' tests.js.",
+      "failure": "The new production consumer passed 1/1 before editing; the deliberate reservation-duration mutant failed its activity-versus-complete-lifetime assertion and was reverted, so that is sensitivity evidence, not feature RED. The first implementation run then exposed duplicate canonical lifetime calculations in two existing RISK tests; consuming the visit recipe getter in inWindow fixed the observed regression. Logs: /private/tmp/chain-architecture-evidence-20261016/01/recipe-consumer-green.log, recipe-consumer-negative-control.log, lifetime-cache-diagnostic.log, lifetime-cache-green.log. The behavior-preserving GREEN/refactor/GREEN approach was approved in /private/tmp/chain-architecture-evidence-20261016/approval.json."
+    }
+  },
+  {
+    "testChangesSha256": "6160158e27d667168d7a79a60f3013498e025eec4730b6ea728629a67de8318e",
+    "reason": "Fix the observed All Tasks selection leak when a cloud adoption switches signed-in owners, retain selection across ordinary same-account Undo replacement, and keep existing filter checks on actual controls.",
+    "previousBehavior": "All Tasks prunes selected IDs only against visible membership, so a second account with a matching task ID inherits the prior account's selected state.",
+    "intendedBehavior": "The view owner clears selected IDs when either the board account or signed-in account changes, while same-account state replacement retains selection for still-visible tasks.",
+    "replacementTests": [
+      "RISK All Tasks view ownership: account adoption clears prior selection while same-account Undo retains it"
+    ],
+    "preservedCoverage": [
+      "Existing search, context/status/eligibility filtering, Postponed expiry, selected-row paint, keyboard focus, visible-only Select all, and Bulk Edit consumer assertions remain unchanged."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='RISK All Tasks view ownership:' tests.js",
+      "failure": "Observed before runtime edits at 2026-10-16 16:49:15 UTC on baseline bf36ec674780879e4bfb5224733176cbbda2230d: after a real CloudSync account-B board adoption with the same task ID, expected toolbar /0 selected/ but actual markup contained 1 selected. Exact contemporaneous output: /private/tmp/chain-architecture-evidence-20261016/05/ownership-red.log. Same-account Undo assertions passed before the account transition. The final expanded test was also run later against a temporary baseline-index fixture as sensitivity confirmation only; that retrospective result is in ownership-final-tests-on-baseline.log and is not the chronological RED."
+    }
+  },
+  {
+    "testChangesSha256": "6991579bc9c9f5643df40df55475eba0f66031ee84c017978128e6fe66a614b9",
+    "reason": "Add a consumer characterization before the approved behavior-preserving TaskActionOwner refactor. The production baseline passed; the deliberate sensitivity mutant below verifies that missing comparison finalization is detected. This is not a claim of feature RED.",
+    "previousBehavior": "The scanner Yes gesture already records one actual comparison visible in Task history, and its facts survive Undo and a saved reload.",
+    "intendedBehavior": "Keep the existing scanner-to-history-to-Undo/reload behavior while the TaskActionOwner takes responsibility for the action transaction.",
+    "replacementTests": [
+      "RISK task action history: scanner comparison stays visible through Undo and saved reload"
+    ],
+    "preservedCoverage": [
+      "Existing rating-history comparisons, provenance, immutable facts, single-gesture Undo, latest-head retention, storage reload, unknown-format recovery, and editor observation boundaries remain covered."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='RISK task action history: scanner comparison stays visible through Undo and saved reload' tests.js > /private/tmp/chain-architecture-evidence-20261016/03/sensitivity-negative-control.log 2>&1",
+      "failure": "The controlled mutant failed at tests.js:734 with actual undefined versus expected yes; full output is retained in /private/tmp/chain-architecture-evidence-20261016/03/sensitivity-negative-control.log. The unmutated production baseline passed at 2026-10-16 16:52:02 UTC; this is sensitivity evidence, not feature RED."
+    }
+  },
+  {
+    "testChangesSha256": "34bb28d3b022f866e04dd320a8e4b2d10683530fb58f1da778f18a3bee58aa3d",
+    "reason": "Add an editor-action consumer characterization before the approved behavior-preserving TaskActionOwner refactor and migrate direct editor-field checks onto the actual Save action. The baseline is GREEN; the controlled sensitivity mutant confirms that dropped drafts are detected. This is not feature RED.",
+    "previousBehavior": "Editor Save, Done, Worked, Dot and Return already preserve their current field, ranking, history and Undo behavior through their existing consumers.",
+    "intendedBehavior": "The same gestures retain a normalized editor draft and post-edit intent under TaskActionOwner, with one Undo, honest retained history and no extra random draw for an unchanged Save.",
+    "replacementTests": [
+      "RISK task action history: editor gestures keep edits and outcomes within one Undo"
+    ],
+    "preservedCoverage": [
+      "Existing action, eligibility, ranking, history provenance, invalid-Dot, immutable-history, Undo, reload, concurrent-client, future-format and synchronization assertions remain intact; direct editor-field assertions now dispatch Save through the consumer."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='RISK task action history: editor gestures keep edits and outcomes within one Undo' tests.js; controlled mutant suppresses the compatibility edit application and reruns that exact command.",
+      "failure": "Observed GREEN on baseline 84d9e11b840ee21e184c7a6fc1607d977ccdc96f at 2026-10-16 17:13:35 UTC: 6/6 tests passed. The deliberate mutant failed 5/6, with Done, Worked, Dot and Return observing unchanged fields; full mutant output is /private/tmp/chain-architecture-evidence-20261016/04/editor-owner-negative-control.log. This is sensitivity evidence, not feature RED. Final baseline cohort passed 40/40 at 2026-10-16 17:14:42 UTC; full output is /private/tmp/chain-architecture-evidence-20261016/04/baseline-editor-history-final.log. The GREEN/refactor/GREEN exception is approved in /private/tmp/chain-architecture-evidence-20261016/approval.json."
+    }
+  },
+  {
+    "testChangesSha256": "d07731f3c4c45253418426a291b4b505bcd79791eb5110b4c568ca938c75daa5",
+    "reason": "Add an actual Help consumer regression for the ticket 05 account-selection correction and preserve Bulk Edit owner/result behavior. The same-account result characterization passed on the original pre-refactor source; a later logical/cloud draft-owner characterization also passed against the original integration source. These are preservation cases, not behavior-change REDs.",
+    "previousBehavior": "The All Tasks Help answer omits that switching accounts clears prior selection. Existing result coverage does not assert that a same-account Undo replacement keeps the result scoped to the logical owner while counts follow current values.",
+    "intendedBehavior": "Help and the October 16 Changelog state that account switches clear the prior board selection. A bulk result remains visible after same-account Undo replaces the board object and recounts matches from the restored current values.",
+    "replacementTests": [
+      "RISK bulk task editing: logical and cloud owner changes reject the whole draft before mutation",
+      "RISK bulk result ownership: same-account Undo keeps the current-value summary across board replacement",
+      "RISK bulk account selection guidance: Help and Changelog explain account-switch clearing"
+    ],
+    "preservedCoverage": [
+      "All existing selection, clear-versus-blank, typed-over-clear, stale-batch, context, Undo, reconciliation, recovery, retry and result assertions remain unchanged.",
+      "The new result assertion uses the existing user-facing All Tasks and Undo consumer; this is local presentation state and makes no cloud acknowledgement claim."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='RISK bulk result ownership:|RISK bulk account selection guidance:' tests.js",
+      "failure": "At 2026-10-16 17:09:26 UTC on baseline 84d9e11b840ee21e184c7a6fc1607d977ccdc96f, the result ownership characterization passed and the actual Help answer failed because it lacked 'Switching accounts clears the previous board\u2019s selection.' After adding that FAQ sentence, the first changelog run exposed an unseeded fake template rather than product behavior; the fixture was corrected to use the real current/archive templates. At 17:10:27 UTC, the mounted Help Changelog consumer then failed because it had no October 16 entry with the selection-reset bullet. The account-owner draft characterization passed both board-account and CloudSync-user change cases against the original 84d9 source at 17:14:37 UTC, so this is GREEN preservation coverage, not a bug RED. A deliberate sensitivity mutant at 17:11:12 UTC tied the result to the exact state object; the same-account Undo result assertion failed as expected, then the mutant was restored. Outputs: /private/tmp/chain-architecture-evidence-20261016/06/preimplementation-red.log, changelog-copy-red.log (fixture issue), changelog-copy-red-with-consumer-fixture.log, result-owner-sensitivity-negative-control.log, bulk-owner-characterization-baseline-green.log. The actual feature RED is the missing public copy; the controlled result failure is sensitivity evidence, not a reported product defect. The behavior-preserving bulk ownership refactor uses approved GREEN/refactor/GREEN rather than a manufactured failure."
+    }
+  },
+  {
+    "testChangesSha256": "8bd0135fa205c0cd06e21244d90dd369dc15a5177881ea3b8bedd301e615cc9c",
+    "reason": "Exercise the actual service-worker install and fetch consumers so every local production script is delivered by a fresh installed shell without a prior online load.",
+    "previousBehavior": "The new LandscapeVisits production script is loaded by the page but was absent from the deferred service-worker packaging list, so a fresh installed shell cannot deliver it offline.",
+    "intendedBehavior": "Installation caches the new module with the existing shell and offline GETs return the exact production bytes for every local script declared by the page.",
+    "replacementTests": [
+      "RISK PWA module delivery: a fresh installed shell serves every production script while offline"
+    ],
+    "preservedCoverage": [
+      "The existing install/activation, shell fingerprint, update deferral, saved-board persistence, protected recovery and offline lifecycle assertions are unchanged. Final fingerprints and actual browser update/offline proof remain required after the remaining integration."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='^RISK PWA module delivery:' tests.js",
+      "failure": "Observed before editing sw.js on integration44d695470f0e1e67c0c520729e1da58850664207: fresh installation must deliver /landscape-visits.js offline failed because actual service-worker fetch attempted the disabled network for that module. Full contemporaneous output and source hashes: /private/tmp/chain-architecture-evidence-20261016/07/module-delivery-red.log and module-delivery-red.command.json. After adding the module to install addAll, the same consumer and existing lifecycle test passed2/2 in module-delivery-green.log."
+    }
+  },
+  {
+    "testChangesSha256": "2e98474e4a2abdbc819f8f1b0437fbdb01d31eae2f93f3906b3e009e5c04c976",
+    "reason": "Add a production paint-consumer characterization before the approved behavior-preserving Visits presentation refactor. It checks current normal and reduced choices against a deterministic timeline visit, and the deliberate cutoff mutation verifies that the local-exit assertion detects a party left in frame.",
+    "previousBehavior": "The existing renderer already retires normal visitors after the whole local party leaves, keeps only current activity reservations under reduced motion, selects its settled representative, and resumes the original UTC age when motion changes back.",
+    "intendedBehavior": "LandscapeVisits owns local completion, reduced activity filtering and settled walking pose selection; the renderer consumes one paint-ready set while shared visit records and nonwalking representatives retain their existing behavior.",
+    "replacementTests": [
+      "RISK pedestrian paint presentation consumer: current motion and viewport choices preserve complete local exits"
+    ],
+    "preservedCoverage": [
+      "Existing complete-party bounds, local culling before pose and downstream paint passes, fireworks isolation, reduced admission workload, motion toggles, gait caches and immutable shared reservations remain protected."
+    ],
+    "redEvidence": {
+      "command": "Baseline: node --test --test-name-pattern='RISK pedestrian paint presentation consumer:' tests.js; deliberate negative control: the same command after temporarily changing landscape.js local completion to return true.",
+      "failure": "The initial source-sliced characterization version of this RISK consumer passed 1/1 at baseline SHA 26bd74a49eb8ed59e6d65fdb9582da88a89becc2 before runtime edits. The temporary local-cutoff mutant failed its expected normal paint set by adding departed; the exact assertion output is /private/tmp/chain-architecture-evidence-20261016/02/paint-presentation-negative-control.log. This is sensitivity evidence, not preimplementation feature RED; the clean source was restored byte-for-byte. After refactoring, the same named consumer was migrated to the production LandscapeVisits seam and extended with narrow/wide/narrow resize history. Scoped GREEN/refactor/GREEN approval is /private/tmp/chain-architecture-evidence-20261016/approval.json."
+    }
+  },
+  {
+    "testChangesSha256": "3e6703d83321c36cf8147db14eab69856592ecc87bb03a8def79e6bbb43118a9",
+    "reason": "Reconcile the exact main-to-integrated architecture checkpoint test diff while retaining every ticket-specific rationale and its original chronology. The user explicitly approved GREEN/refactor/GREEN for behavior-preserving refactors; real behavior corrections retain actual preimplementation RED.",
+    "previousBehavior": "Released walking recipes/presentation, action/history ordering and list/bulk behavior were spread across callers. Existing preservation behavior passed. Actual CloudSync account adoption could retain another account selection, corresponding Help/Changelog copy was missing, and deferred new-module packaging could not deliver LandscapeVisits on a fresh offline install.",
+    "intendedBehavior": "Deep owners preserve shared scenery, immutable observations, single-gesture Undo and saved data while owning their ordering rules. Account changes clear selection, public guidance describes that correction, and a fresh installed shell serves every production script offline. A new combined editor/selection/bulk/Undo/reload consumer preserves cross-owner boundaries.",
+    "replacementTests": [
+      "RISK task action history: scanner comparison stays visible through Undo and saved reload",
+      "RISK task action history: editor gestures keep edits and outcomes within one Undo",
+      "RISK PWA module delivery: a fresh installed shell serves every production script while offline",
+      "RISK pedestrian visit recipe consumer: complete lifetime stays separate from admission and reconstructs at current UTC age",
+      "RISK All Tasks view ownership: account adoption clears prior selection while same-account Undo retains it",
+      "RISK bulk task editing: logical and cloud owner changes reject the whole draft before mutation",
+      "RISK bulk result ownership: same-account Undo keeps the current-value summary across board replacement",
+      "RISK architecture checkpoint: editor Undo and bulk Undo preserve selection boundaries and immutable history through reload",
+      "RISK bulk account selection guidance: Help and Changelog explain account-switch clearing",
+      "RISK pedestrian paint presentation consumer: current motion and viewport choices preserve complete local exits"
+    ],
+    "preservedCoverage": [
+      "All prior deterministic admission, current-age/midnight reconstruction, full-party/prop/residue exits, gait/contact/paint ordering, lazy work and bounded caches are retained; coupled fixture setup now calls the production Visits seam.",
+      "All ranking, RNG, own-versus-relative observation provenance, original immutable history/head, unknown formats, editor action/Undo, cloud reconciliation/retry and protected recovery assertions remain. Editor field fixtures now dispatch real Save consumers rather than the removed private apply helper.",
+      "All existing filter/tag validity, visible-only selection, focus/row paint, mixed/Apply/Clear, stale whole-batch rejection, unknown contexts, peer-field reconciliation and current-value result assertions remain. The combined consumer additionally checks that Undo does not silently reselect a formerly hidden task.",
+      "Source ticket exact-diff entries remain byte-preserved. Final app and cache fingerprints use the unchanged mechanical algorithm with LandscapeVisits in the asset list. Full regression, emulator compatibility, actual rendered/PWA evidence and independent exact-candidate reviews remain mandatory release gates."
+    ],
+    "redEvidence": {
+      "command": "Original exact commands and output: 01/implementation.md;02/implementation.md;03/action-owner-implementation.md;04 retained per-cohort logs;05/implementation.md;06/report.md;07/module-delivery-red.command.json and final-fingerprint-red.command.json under /private/tmp/chain-architecture-evidence-20261016. Final source gate: node scripts/test-first-gate.mjs 3d87c226519f878ddf4db7fbbdec9bf90376810d.",
+      "failure": "Preservation cases were GREEN before implementation under approval.json. Deliberate duration/culling/finalization/draft/result mutants failed discriminating behavioral assertions and were reverted; they are sensitivity evidence, not feature RED. Actual prior-account selection leak RED at16:49:15UTC is in05/ownership-red.log; missing mounted FAQ and Changelog REDs at17:09:26 and17:10:27UTC are in06. Root fresh-installed actual worker fetch RED names /landscape-visits.js before its cache entry in07/module-delivery-red.log; GREEN2/2 follows. Final mechanical cache and changelog fingerprints failed2/2 before refresh in07/final-fingerprint-red.log. Cross-owner integration characterization passed1/1 before the final fingerprint edits in07/cross-owner-baseline-green.log. Failed fake-template/text-enlargement/unseeded-row-order fixtures and controlled mutants are retained separately and never represented as product RED. All integration replays identify when the original filter was unavailable rather than inventing it."
+    }
   }
 ]

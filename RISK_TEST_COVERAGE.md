@@ -259,6 +259,8 @@ The named-contract test in tests.js checks that every top-level test whose title
 
 - RISK PWA updates: an already durable board applies a downloaded worker without a redundant quota write
 - RISK PWA updates: an unsaved draft visibly defers reload while update checks continue
+- RISK PWA module delivery: a fresh installed shell serves every production script while offline
+- RISK architecture checkpoint: editor Undo and bulk Undo preserve selection boundaries and immutable history through reload
 - RISK PWA updates: a host write in flight must finish before a reverted board reloads
 
 ## Test-first enforcement and regression protection
@@ -564,6 +566,8 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK scan lifecycle FAQ: Dot rest boundary current Start eligibility and durable remote refresh are explained
 
 - RISK task rating history: actual comparisons retain timestamped before and after values without backfilling or changing signals
+- RISK task action history: scanner comparison stays visible through Undo and saved reload
+- RISK task action history: editor gestures keep edits and outcomes within one Undo
 - RISK task rating history: editor observations distinguish relative movement and never write on open render or resampling
 - RISK task rating history: No Dot Dislodge completion and Undo retain honest rating versus pool changes
 - RISK task rating history: concurrent offline and older missing-field copies union immutable facts idempotently without retimestamping
@@ -942,6 +946,9 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK bulk task editing: FAQ and editor qualify mixed Apply and later sync recovery limits
 - RISK bulk task editing: concurrent recovery keeps backups and existing board Undo boundary explicit
 - RISK bulk task editing: current batch result distinguishes partial reconciliation from sync success and offers no batch Undo
+- RISK bulk task editing: logical and cloud owner changes reject the whole draft before mutation — Draft Save rejects changed board and signed-in owner before any batch field is written.
+- RISK bulk result ownership: same-account Undo keeps the current-value summary across board replacement — Same-owner board replacement retains result scope while counts follow current values.
+- RISK bulk account selection guidance: Help and Changelog explain account-switch clearing — Actual Help consumer covers the selection reset introduced by ticket 05.
 - RISK bulk task editing: enlarged modal fieldsets shrink and native controls retain available width
 - RISK bulk task guidance: bounded answers retain distinct selection property conflict Undo and result instructions
 - RISK bulk task guidance: enlarged conflict answer uses breakable task status wording
@@ -999,6 +1006,7 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK bulk toolbar: mounted controls stay outside scrolling rows and retain filtered selection through filter changes
 - RISK bulk row selection: selected label replaces the existing rank slot and deselection restores its format
 - RISK bulk toolbar keyboard: rerender restores the focused toolbar action and row toggle
+- RISK All Tasks view ownership: account adoption clears prior selection while same-account Undo retains it
 - RISK bulk toolbar guidance: extended FAQ describes frozen controls and rank-slot selection
 - RISK repository process boundary: actual visual tests compare every changed control with neighboring controls and scrolled states
 
@@ -1145,7 +1153,9 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 
 - `RISK pedestrian slot recovery: departed display recipes cannot suppress an otherwise eligible shared arrival`
 - `RISK pedestrian reservation workload: stress admission stays fourteen while complete recipes have a derived finite bound`
+- `RISK pedestrian visit recipe consumer: complete lifetime stays separate from admission and reconstructs at current UTC age`
 - `RISK pedestrian local paint culling: completed parties stop before pose shadow reflection and actor consumers without altering shared records`
+- `RISK pedestrian paint presentation consumer: current motion and viewport choices preserve complete local exits`
 - `RISK pedestrian reduced workload: original shared reservations alone select deterministic still representatives`
 - `RISK pedestrian paint memo: UTC frame age advances without rebuilding each local completion recipe`
 - `RISK pedestrian fireworks isolation: retained walking recipes never enter unrelated show pose work`

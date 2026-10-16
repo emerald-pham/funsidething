@@ -517,9 +517,9 @@ test('RISK context exclusions: scan and All Tasks preserve all required contexts
  const zero=ctx.addTask('Private no context'),one=ctx.addTask('Private one',false,[a.id]),many=ctx.addTask('Private multiple',false,[a.id,b.id]),unknown=ctx.addTask('Private unknown',false,['deleted-private-id']);
  ctx.state.listOpen=true;ctx.state.candidateId=one.id;ctx.toggleContext(a.id);
  assert.deepEqual(Array.from(ctx.eligibleTasks(),t=>t.id),[zero.id,unknown.id]);assert.ok(![one.id,many.id].includes(ctx.state.candidateId),'excluded candidates leave the scanner');
- vm.runInContext("listEligibilityFilter='ineligible'",ctx);ctx.renderList();assert.deepEqual(Array.from(ctx.filteredListTasks(),t=>t.id),[one.id,many.id]);assert.equal(shim.document.getElementById('listCount').textContent,'(2 of 4)');
+ ctx.onAction('list-eligibility',{dataset:{id:'ineligible'}});assert.deepEqual(Array.from(ctx.filteredListTasks(),t=>t.id),[one.id,many.id]);assert.equal(shim.document.getElementById('listCount').textContent,'(2 of 4)');
  ctx.toggleContext(b.id);assert.deepEqual(Array.from(ctx.eligibleTasks(),t=>t.id),[zero.id,unknown.id],'all excluded requirements preserve existing empty-selection eligibility');
- ctx.toggleContext(a.id);ctx.toggleContext(b.id);ctx.state.chain=[one.id];vm.runInContext("listEligibilityFilter='eligible'",ctx);
+ ctx.toggleContext(a.id);ctx.toggleContext(b.id);ctx.state.chain=[one.id];ctx.onAction('list-eligibility',{dataset:{id:'eligible'}});
  assert.deepEqual(Array.from(ctx.filteredListTasks(),t=>t.id),[zero.id,many.id,unknown.id]);assert.equal(ctx.isEligible(one),true,'dotting is only a list eligibility distinction');
  const poolShares=()=>JSON.stringify([...ctx.chanceDisplayStats()].map(([id,{weight,probability,available,fallback}])=>[id,{weight,probability,available,fallback}]));const shares=poolShares();ctx.state.chain=[];assert.equal(poolShares(),shares,'undotting alone preserves full-pool weights');
  ctx.toggleContext(b.id);ctx.toggleContext(a.id);
@@ -720,6 +720,99 @@ async function ratingHistoryFixture(seed=613){
  h.ctx.state.chain=[a.id];h.ctx.state.candidateId=b.id;h.ctx.recomputeRanks();
  return {...h,a,b,c};
 }
+test('RISK task action history: scanner comparison stays visible through Undo and saved reload',async()=>{
+ const {indexedDB}=await import('fake-indexeddb'),name='private-task-action-owner-'+Date.now();
+ const {ctx,shim}=await loadApp({seed:639,cryptoProvider:webcrypto,indexedDBProvider:indexedDB,deviceDbName:name});
+ setFakeTime(ctx,Date.parse('2026-10-16T12:34:56.789Z'));
+ const benchmark=ctx.addTask('Private action benchmark'),candidate=ctx.addTask('Private action candidate');
+ ctx.state.chain=[benchmark.id];ctx.state.candidateId=candidate.id;ctx.recomputeRanks();ctx.renderScan();
+ const scan=shim.document.getElementById('scan').innerHTML;
+ assert.ok(scan.includes(`data-act="yes" data-candidate="${candidate.id}" data-benchmark="${benchmark.id}"`),'the rendered scanner binds Yes to the displayed pair');
+ ctx.onAction('yes',{dataset:{candidate:candidate.id,benchmark:benchmark.id}});
+ const selected=ratingHistoryTask(ctx,candidate.id),compared=ratingHistoryTask(ctx,benchmark.id);
+ assert.equal(ctx.state.chain.at(-1),candidate.id);assert.equal(ctx.state.candidateId,null);
+ assert.equal(selected.ratingHistory?.[0]?.kind,'yes');assert.equal(compared.ratingHistory?.[0]?.kind,'yes');
+ assert.equal(selected.ratingHistory[0].id,compared.ratingHistory[0].id,'one decision records one shared observation identity for both participants');
+ const facts={candidate:ratingHistoryCopy(selected.ratingHistory),benchmark:ratingHistoryCopy(compared.ratingHistory)};
+ ctx.openEdit(candidate.id);let visible=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(visible,/Task history \(1 observations\)/,'the action fact is visible from the existing task history consumer');
+ assert.match(visible,/Yes comparison/);
+ assert.equal(await ctx.persist(),true);
+ ctx.onAction('undo',{});
+ const restored=ratingHistoryTask(ctx,candidate.id),restoredBenchmark=ratingHistoryTask(ctx,benchmark.id);
+ assert.deepEqual(ratingHistoryCopy(restored.ratingHistory).filter(row=>row.kind==='yes'),facts.candidate);
+ assert.deepEqual(ratingHistoryCopy(restoredBenchmark.ratingHistory).filter(row=>row.kind==='yes'),facts.benchmark);
+ assert.equal(ctx.state.chain.length,1);assert.equal(ctx.state.chain[0],benchmark.id);
+ ctx.openEdit(candidate.id);visible=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(visible,/Yes comparison/,'Undo keeps the original immutable event visible');
+ assert.equal(await ctx.persist(),true);
+ const reloaded=await loadApp({seed:640,cryptoProvider:webcrypto,indexedDBProvider:indexedDB,deviceDbName:name});
+ const saved=ratingHistoryTask(reloaded.ctx,candidate.id),savedBenchmark=ratingHistoryTask(reloaded.ctx,benchmark.id);
+ assert.deepEqual(ratingHistoryCopy(saved.ratingHistory),ratingHistoryCopy(restored.ratingHistory));
+ assert.deepEqual(ratingHistoryCopy(savedBenchmark.ratingHistory),ratingHistoryCopy(restoredBenchmark.ratingHistory));
+ assert.equal(reloaded.ctx.state.chain.length,1);assert.equal(reloaded.ctx.state.chain[0],benchmark.id);
+ reloaded.ctx.openEdit(candidate.id);
+ assert.match(reloaded.shim.document.getElementById('modalRoot').innerHTML,/Yes comparison/,'saved reload retains visible history after Undo');
+});
+test('RISK task action history: editor gestures keep edits and outcomes within one Undo',async(t)=>{
+ await t.test('unchanged Save keeps its observation without consuming random draws',async()=>{
+  const {ctx,shim,c}=await ratingHistoryFixture(641);
+  ctx.openEdit(c.id);ctx.onAction('save-edit',{dataset:{id:c.id}});
+  const first=ratingHistoryCopy(c.ratingHistory),chance=JSON.stringify(ctx.state.chance);
+  vm.runInContext('globalThis.editorRandomDraws=0;globalThis.editorOriginalRandom=Math.random;Math.random=function(){editorRandomDraws++;return editorOriginalRandom();}',ctx);
+  ctx.openEdit(c.id);ctx.render();ctx.onAction('save-edit',{dataset:{id:c.id}});
+  assert.deepEqual(ratingHistoryCopy(c.ratingHistory),first,'opening, rendering, and unchanged Save cannot append or rewrite an observation');
+  assert.equal(JSON.stringify(ctx.state.chance),chance,'unchanged Save cannot replace the active sampling state');
+  assert.equal(vm.runInContext('editorRandomDraws',ctx),0,'deduplicated Save cannot consume a random draw');
+  assert.equal(shim.document.getElementById('modalRoot').innerHTML,'','successful Save closes the same editor');
+ });
+ await t.test('Done saves the complete draft and one Undo reverses both',async()=>{
+  const {ctx,shim,b}=await ratingHistoryFixture(642),id=b.id,undoBefore=vm.runInContext('undoStack.length',ctx),title=b.title;
+  ctx.openEdit(id);fillEditPane(ctx,shim,{title:'Private edited Done',due:'2026-10-18'});ctx.onAction('done-task',{dataset:{id}});
+  const completed=ratingHistoryTask(ctx,id),event=ratingHistoryCopy(completed.ratingHistory.at(-1));
+  assert.equal(completed.title,'Private edited Done');assert.equal(completed.due,'2026-10-18');assert.equal(completed.done,true);
+  assert.equal(event.kind,'done');assert.equal(vm.runInContext('undoStack.length',ctx),undoBefore+1,'one editor gesture contributes one Undo frame');
+  assert.equal(ctx.undo(),true);const restored=ratingHistoryTask(ctx,id);
+  assert.equal(restored.title,title);assert.equal(restored.due,null);assert.equal(restored.done,false,'one Undo reverses both the draft and action');
+  assert.ok(restored.ratingHistory.some(row=>JSON.stringify(row)===JSON.stringify(event)),'Undo preserves the original immutable Done observation');
+  assert.equal(vm.runInContext('undoStack.length',ctx),undoBefore);
+  assert.equal(await ctx.persist(),true);
+  const reloaded=await loadApp({seedStorage:{[STORE_KEY]:JSON.stringify(ctx.state)}});await reloaded.ctx.__dataReady;
+  assert.deepEqual(ratingHistoryCopy(ratingHistoryTask(reloaded.ctx,id).ratingHistory),ratingHistoryCopy(restored.ratingHistory));
+  reloaded.ctx.openEdit(id);assert.match(reloaded.shim.document.getElementById('modalRoot').innerHTML,/Private edited Done|Done/,'saved history remains available after reload');
+ });
+ await t.test('Worked saves an eligibility edit and one Undo restores the prior task state',async()=>{
+  const {ctx,shim,c}=await ratingHistoryFixture(643),id=c.id,undoBefore=vm.runInContext('undoStack.length',ctx),title=c.title;
+  ctx.openEdit(id);fillEditPane(ctx,shim,{title:'Private worked edit',start:'2099-01-02'});ctx.onAction('worked-task',{dataset:{id}});
+  const worked=ratingHistoryTask(ctx,id),event=worked.ratingHistory.at(-1);
+  assert.equal(worked.title,'Private worked edit');assert.equal(worked.startsAt,'2099-01-02');assert.equal(ctx.state.considered[id],'worked');
+  assert.equal(event.kind,'worked');assert.equal(event.change,'relative');assert.equal(vm.runInContext('undoStack.length',ctx),undoBefore+1);
+  assert.equal(ctx.undo(),true);const restored=ratingHistoryTask(ctx,id);
+  assert.equal(restored.title,title);assert.equal(restored.startsAt,null);assert.equal(ctx.state.considered[id],undefined);
+  assert.ok(restored.ratingHistory.some(row=>row.id===event.id&&row.at===event.at));assert.equal(vm.runInContext('undoStack.length',ctx),undoBefore);
+ });
+ await t.test('Dot saves the draft, compares the intended pair, and one Undo restores both',async()=>{
+  const {ctx,shim,a,b}=await ratingHistoryFixture(644),id=b.id,undoBefore=vm.runInContext('undoStack.length',ctx),title=b.title,mu=b.mu;
+  ctx.openEdit(id);fillEditPane(ctx,shim,{title:'Private dotted edit'});ctx.onAction('dot-task',{dataset:{id}});
+  const dotted=ratingHistoryTask(ctx,id),benchmark=ratingHistoryTask(ctx,a.id),event=ratingHistoryCopy(dotted.ratingHistory.at(-1));
+  assert.equal(dotted.title,'Private dotted edit');assert.equal(ctx.state.chain.at(-1),id);assert.notEqual(ctx.state.candidateId,id,'the newly dotted task cannot remain the offered candidate');
+  assert.equal(event.kind,'dot');assert.equal(benchmark.ratingHistory.at(-1).id,event.id);assert.equal(vm.runInContext('undoStack.length',ctx),undoBefore+1);
+  assert.equal(ctx.undo(),true);const restored=ratingHistoryTask(ctx,id);
+  assert.equal(restored.title,title);assert.deepEqual(Array.from(ctx.state.chain),[a.id]);assert.equal(restored.mu,mu);
+  assert.ok(restored.ratingHistory.some(row=>row.id===event.id&&row.at===event.at));assert.equal(vm.runInContext('undoStack.length',ctx),undoBefore);
+ });
+ await t.test('Return saves the draft and one Undo restores its saved rest',async()=>{
+  const {ctx,shim,c}=await ratingHistoryFixture(645),id=c.id,now=vm.runInContext('Date.now()',ctx),undoBefore=vm.runInContext('undoStack.length',ctx),title=c.title;
+  Object.assign(c,{evergreen:true,evergreenHours:18,evergreenResetAtDay:false,lastDoneAt:now-3600000});
+  ctx.openEdit(id);fillEditPane(ctx,shim,{title:'Private returned edit',evergreen:true});ctx.onAction('return-candidate',{dataset:{id}});
+  const returned=ratingHistoryTask(ctx,id),event=ratingHistoryCopy(returned.ratingHistory.at(-1));
+  assert.equal(returned.title,'Private returned edit');assert.equal(returned.lastDoneAt,null);assert.equal(event.kind,'return');assert.equal(event.change,'relative');
+  assert.equal(vm.runInContext('undoStack.length',ctx),undoBefore+1);
+  assert.equal(ctx.undo(),true);const restored=ratingHistoryTask(ctx,id);
+  assert.equal(restored.title,title);assert.equal(restored.lastDoneAt,now-3600000);assert.equal(restored.evergreenHours,18);
+  assert.ok(restored.ratingHistory.some(row=>JSON.stringify(row)===JSON.stringify(event)));assert.equal(vm.runInContext('undoStack.length',ctx),undoBefore);
+ });
+});
 test('RISK task rating history: actual comparisons retain timestamped before and after values without backfilling or changing signals',async()=>{
  const {ctx,a,b,c}=await ratingHistoryFixture();
  const at=vm.runInContext('Date.now()',ctx),before=ratingHistoryCopy({mu:b.mu,sigma:b.sigma}),chance=ctx.chanceDisplayStats().get(b.id).probability;
@@ -960,7 +1053,7 @@ const lzStringSrc = fs.readFileSync(path.join(__dirname, "vendor/lz-string-1.5.0
 
 function sceneTimeline(transforms={}) {
  const context=vm.createContext({Date,Math,Intl,console});
- for(const file of ['landscape-config.js','vendor/astronomy.min.js','stars.js','landscape-core.js','landscape-geometry.js','landscape-timeline.js']){
+ for(const file of ['landscape-config.js','vendor/astronomy.min.js','stars.js','landscape-core.js','landscape-geometry.js','landscape-visits.js','landscape-timeline.js']){
   assert.ok(fs.existsSync(path.join(__dirname,file)),`deterministic scenery module missing: ${file}`);
   const source=fs.readFileSync(path.join(__dirname,file),'utf8');
   vm.runInContext(transforms[file]?transforms[file](source):source,context);
@@ -1059,7 +1152,7 @@ test('RISK pedestrian capacity planner budget: cached daily scheduling evaluates
  timeline.at(Date.parse('2026-10-06T01:24:56.116Z'));
  timeline.at(Date.parse('2026-10-06T01:24:48Z'));timeline.at(Date.parse('2026-10-06T01:25:04Z'));
  assert.ok(counts.size>10,'the actual capacity history contains immutable proposals');
- assert.ok([...counts.values()].every(count=>count===1),'complete-life planning must not repeat inside quadratic overlap comparisons');
+ assert.ok([...counts.values()].every(count=>count===1),`complete-life planning must not repeat inside quadratic overlap comparisons: ${JSON.stringify([...counts].filter(([,count])=>count!==1))}`);
 });
 
 test('RISK pedestrian capacity liveness: a busy day admits visitors while retaining bounded reservations and complete recipes',()=>{
@@ -1123,7 +1216,7 @@ test('RISK shared scenery runtime: every scene owner consumes the UTC snapshot w
  assert.match(source,/timeline\.at\(now\)/);
  assert.match(source,/syncScene\(Date\.now\(\)\)/,'normal rendering reads the same wall-clock snapshot as reload');
  assert.match(source,/sceneSnapshot\.clouds/,'cloud positions come from normalized world space');
- assert.match(source,/scenePose\(e\)/,'motion reduction changes painting rather than event selection');
+ assert.match(source,/visits\.forPaint\(world\.events,geometry,reduced,\{poseOther:scenePose\}\)/,'walking motion choices and local completion are selected before composed painting');
  const module=fs.readFileSync(path.join(__dirname,'landscape-timeline.js'),'utf8');
  assert.doesNotMatch(module,/localStorage|indexedDB|\.setItem\(|Firestore|\bfetch\(/,'scene ticks cannot write seeds or task/cloud data');
  assert.match(html,/src="landscape-timeline\.js"/);
@@ -1131,12 +1224,11 @@ test('RISK shared scenery runtime: every scene owner consumes the UTC snapshot w
 });
 
 test('RISK shared scenery reduced motion: the ambient timer repaints isolated woodland arrival and expiry at the current UTC instant',()=>{
- const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');
- const functionSource=source.slice(source.indexOf('  function eventPaintable('),source.indexOf('  function paintLife('))+source.slice(source.indexOf('  function advanceRooftopParty('),source.indexOf('  function stop()',source.indexOf('  function advanceRooftopParty(')));
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),functionSource=source.slice(source.indexOf('  function advanceRooftopParty('),source.indexOf('  function stop()',source.indexOf('  function advanceRooftopParty('))),c=sceneTimeline(),visits=c.LandscapeVisits.create();
  for(const [previous,next] of [[[],[{id:'private-woodland-arrival'}]],[[{id:'private-woodland-expiry'}],[]]]){
   for(const reduced of [true,false]){
    let paints=0,backgrounds=0,syncs=0;
-   const woodland={events:previous},context={document:{hidden:false},geometry:{},p:{},world:{events:[{id:'unchanged-train'}],elapsed:1},woodland,
+   const woodland={events:previous},context={visits,document:{hidden:false},geometry:c.LandscapeGeometry.create(390,844),p:{},world:{events:[{id:'unchanged-train',type:'train',age:1,duration:100}],elapsed:1},woodland,
     rooftopParty:{active:null},clocktowerVisit:{active:null},lastCitySlot:42,sceneSnapshot:{windowsSlot:42},reduced,
     syncScene(){syncs++;woodland.events=next;},paintBackground(){backgrounds++;},paintLife(){paints++;},Date};
    vm.runInNewContext(functionSource+';advanceRooftopParty(1)',context);
@@ -1152,15 +1244,15 @@ test('RISK dotted list filter: dot undot Done evergreen and dependencies classif
  dependent.prerequisiteId=a.id;Object.assign(resting,{evergreen:true,evergreenHours:18,evergreenResetAtDay:false,lastDoneAt:Date.now()});
  ctx.state.listOpen=true;ctx.state.chain=[a.id];ctx.state.scanMode='chance';ctx.resetChance();
  const board=JSON.stringify(ctx.state),shares=JSON.stringify([...ctx.chanceDisplayStats()]);
- vm.runInContext("listEligibilityFilter='eligible'",ctx);ctx.renderList();
+ ctx.onAction('list-eligibility',{dataset:{id:'eligible'}});
  assert.deepEqual(Array.from(ctx.filteredListTasks(),t=>t.id),[b.id],'dotted, resting and blocked rows are outside All Tasks Eligible');
  assert.equal(shim.document.getElementById('listCount').textContent,'(1 of 4)');
  assert.doesNotMatch(shim.document.getElementById('listBody').innerHTML,new RegExp('data-row="'+a.id+'"'));
- vm.runInContext("listEligibilityFilter='ineligible'",ctx);ctx.renderList();assert.ok(ctx.filteredListTasks().some(t=>t.id===a.id));assert.match(shim.document.getElementById('listBody').innerHTML,/In the chain/);
+ ctx.onAction('list-eligibility',{dataset:{id:'ineligible'}});assert.ok(ctx.filteredListTasks().some(t=>t.id===a.id));assert.match(shim.document.getElementById('listBody').innerHTML,/In the chain/);
  assert.equal(ctx.isEligible(a),true,'a filter is not scanner eligibility');
  assert.equal(JSON.stringify([...ctx.chanceDisplayStats()]),shares,'the full eligible-pool denominator still includes the dotted task');assert.equal(JSON.stringify(ctx.state),board);
- ctx.state.chain=[];vm.runInContext("listEligibilityFilter='eligible'",ctx);assert.ok(ctx.filteredListTasks().some(t=>t.id===a.id),'undot restores the row to Eligible');
- ctx.state.chain=[a.id];ctx.pushUndo();ctx.completeTask(a);vm.runInContext("listEligibilityFilter='ineligible'",ctx);assert.ok(!ctx.filteredListTasks().some(t=>t.id===a.id),'a completed non-evergreen task stays in History');
+ ctx.state.chain=[];ctx.onAction('list-eligibility',{dataset:{id:'eligible'}});assert.ok(ctx.filteredListTasks().some(t=>t.id===a.id),'undot restores the row to Eligible');
+ ctx.state.chain=[a.id];ctx.pushUndo();ctx.completeTask(a);ctx.onAction('list-eligibility',{dataset:{id:'ineligible'}});assert.ok(!ctx.filteredListTasks().some(t=>t.id===a.id),'a completed non-evergreen task stays in History');
  ctx.undo();assert.ok(ctx.filteredListTasks().some(t=>t.id===a.id),'Undo restores the dotted row classification');
 });
 
@@ -1169,9 +1261,9 @@ test('RISK dotted list filter: a remote chain update changes visible classificat
  const remote=JSON.parse(JSON.stringify(base));remote.chain=[a.id];remote.candidateId=b.id;remote.mode='scan';
  const h=makeSyncHarness({remote,rev:4}),{ctx,shim}=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(base)},cloudSyncFactory:h.factory});
  await ctx.__dataReady;await ctx.cloudPull();
- ctx.state.listOpen=true;vm.runInContext("listEligibilityFilter='ineligible'",ctx);ctx.renderList();
+ ctx.state.listOpen=true;ctx.onAction('list-eligibility',{dataset:{id:'ineligible'}});
  assert.ok(ctx.state.chain.includes(a.id));assert.deepEqual(Array.from(ctx.filteredListTasks(),t=>t.id),[a.id]);assert.equal(shim.document.getElementById('listCount').textContent,'(1 of 2)');
- vm.runInContext("listEligibilityFilter='eligible'",ctx);ctx.renderList();assert.deepEqual(Array.from(ctx.filteredListTasks(),t=>t.id),[b.id]);
+ ctx.onAction('list-eligibility',{dataset:{id:'eligible'}});assert.deepEqual(Array.from(ctx.filteredListTasks(),t=>t.id),[b.id]);
 });
 
 test('RISK list metric preference: Top x is the stable default and Settings switches display and ordering without changing scan algorithms',async()=>{
@@ -1942,7 +2034,7 @@ test("Landscape location: reports denied, unavailable, timeout, and storage fail
 });
 
 test("Landscape location: the browser wiring is explicit and exposes the standalone dialog", () => {
-  assert.match(html, /<script defer src="location\.js"><\/script>\s*<script defer src="landscape-geometry\.js"><\/script>\s*<script defer src="landscape-timeline\.js"><\/script>\s*<script defer src="landscape-mood\.js"><\/script>\s*(?:<script defer src="landscape-(?:appearance|riders|winter|seasonal|skywriter)\.js"><\/script>\s*)+<script defer src="landscape\.js">/);
+  assert.match(html, /<script defer src="location\.js"><\/script>\s*<script defer src="landscape-geometry\.js"><\/script>\s*<script defer src="landscape-visits\.js"><\/script>\s*<script defer src="landscape-timeline\.js"><\/script>\s*<script defer src="landscape-mood\.js"><\/script>\s*(?:<script defer src="landscape-(?:appearance|riders|winter|seasonal|skywriter)\.js"><\/script>\s*)+<script defer src="landscape\.js">/);
   assert.match(html, /<script defer src="landscape-geometry\.js"><\/script>/);
   assert.match(html, /data-act="location-settings"/);
   assert.match(html, /<dialog id="locationDialog"/);
@@ -2595,6 +2687,70 @@ test("PWA lifecycle: current shell installs and activation retires prior shell c
   assert.equal(harness.cacheRecords.has("unrelated-cache"), true,
     "activation must leave unrelated caches alone");
   assert.equal(harness.claimCalls(), 1, "activation must claim already-open app clients");
+});
+
+test("RISK PWA module delivery: a fresh installed shell serves every production script while offline", async () => {
+  const origin = "https://scanner.example";
+  const handlers = {}, records = new Map(), networkRequests = [];
+  const key = request => new URL(typeof request === "string" ? request : request.url, origin).href;
+  const caches = {
+    async open(name) {
+      if (!records.has(name)) records.set(name, new Map());
+      const entries = records.get(name);
+      return {
+        async addAll(requests) {
+          for (const request of requests) {
+            const url = new URL(key(request));
+            const file = path.resolve(__dirname, url.pathname === "/" ? "index.html" : "." + url.pathname);
+            assert.ok(file.startsWith(`${__dirname}${path.sep}`), "installation must stay inside the isolated shell");
+            entries.set(url.href, new Response(fs.readFileSync(file)));
+          }
+        },
+        async put(request, response) { entries.set(key(request), response.clone()); },
+      };
+    },
+    async match(request) {
+      for (const entries of records.values()) {
+        const response = entries.get(key(request));
+        if (response) return response.clone();
+      }
+    },
+  };
+  class ShellRequest extends Request {
+    constructor(input, options) { super(key(input), options); }
+  }
+  vm.runInNewContext(serviceWorkerSource(), {
+    caches, URL, Request: ShellRequest,
+    fetch(request) {
+      networkRequests.push(key(request));
+      return Promise.reject(new Error(`Offline network request: ${key(request)}`));
+    },
+    self: {
+      location: { origin },
+      addEventListener(type, handler) { handlers[type] = handler; },
+      skipWaiting() { return Promise.resolve(); },
+      clients: { claim() { return Promise.resolve(); } },
+    },
+  }, { filename: "sw.js" });
+  const installation = [];
+  handlers.install({ waitUntil(promise) { installation.push(promise); } });
+  await Promise.all(installation);
+
+  const scripts = [...html.matchAll(/<script\b[^>]*\bsrc=["']([^"']+)["']/gi)]
+    .map(match => new URL(match[1], origin + "/"))
+    .filter(url => url.origin === origin);
+  assert.ok(scripts.length > 0, "the fixture must use the production page's local scripts");
+  for (const url of scripts) {
+    let pending;
+    handlers.fetch({ request: new Request(url), respondWith(promise) { pending = promise; } });
+    assert.ok(pending, `the installed worker must handle ${url.pathname}`);
+    await assert.doesNotReject(pending, `fresh installation must deliver ${url.pathname} offline`);
+    const response = await pending;
+    assert.ok(response?.ok, `offline delivery must succeed for ${url.pathname}`);
+    assert.deepEqual(Buffer.from(await response.arrayBuffer()), fs.readFileSync(path.join(__dirname, url.pathname)),
+      `offline delivery must retain the exact production bytes for ${url.pathname}`);
+  }
+  assert.deepEqual(networkRequests, [], "fresh installation must not depend on a prior online script fetch");
 });
 
 function slice(src, startMarker, endMarker) {
@@ -8400,6 +8556,9 @@ function listHTML(shim) {
 }
 function listCount(shim) {
   return shim.elements.get("listCount").textContent;
+}
+function selectedListIds(shim) {
+  return [...listHTML(shim).matchAll(/data-act="bulk-toggle" data-id="([^"]+)" aria-pressed="true"/g)].map(match=>match[1]);
 }
 function tagRowHTML(shim) {
   return shim.elements.get("listTagRow").innerHTML;
@@ -16017,9 +16176,10 @@ test('Evergreen edit: hours threshold suggests checkbox but allows either manual
  const {ctx,shim}=await loadApp();const t=ctx.addTask('repeat');ctx.openEdit(t.id);
  const hours=shim.document.getElementById('etEverHours'), reset=shim.document.getElementById('etEverReset');hours.id='etEverHours';
  hours.value='19';ctx.suggestEvergreenReset(hours);assert.equal(reset.checked,false);
- reset.checked=true;fillEditPane(ctx,shim,{evergreen:true});ctx.applyEditFields(t);assert.equal(t.evergreenHours,19);assert.equal(t.evergreenResetAtDay,true);
- hours.value='18';ctx.suggestEvergreenReset(hours);assert.equal(reset.checked,true);
- reset.checked=false;ctx.applyEditFields(t);assert.equal(t.evergreenResetAtDay,false);
+ reset.checked=true;fillEditPane(ctx,shim,{evergreen:true});ctx.onAction('save-edit',{dataset:{id:t.id}});assert.equal(t.evergreenHours,19);assert.equal(t.evergreenResetAtDay,true);
+ ctx.openEdit(t.id);const nextHours=shim.document.getElementById('etEverHours'),nextReset=shim.document.getElementById('etEverReset');nextHours.id='etEverHours';
+ nextHours.value='18';ctx.suggestEvergreenReset(nextHours);assert.equal(nextReset.checked,true);
+ nextReset.checked=false;ctx.onAction('save-edit',{dataset:{id:t.id}});assert.equal(t.evergreenResetAtDay,false);
 });
 test('Scan settings: long mode selector stays within a narrow edit pane',()=>{
  assert.match(html,/\.frow select\s*\{[^}]*min-width:0[^}]*max-width:100%/);
@@ -17010,8 +17170,8 @@ test('RISK prerequisites: Add and each task editor expose stable selectors and r
  shim.document.getElementById('addPrerequisite').value=bob.id;ctx.onAction('add',{});
  const gene=ctx.state.tasks.find(t=>t.title==='gene');assert.equal(gene.prerequisiteId,bob.id);
  ctx.openEdit(gene.id);assert.match(shim.document.getElementById('modalRoot').innerHTML,/id="etPrerequisite"[\s\S]*bob/);
- shim.document.getElementById('etPrerequisite').value='';ctx.applyEditFields(gene);assert.equal(gene.prerequisiteId,null);
- shim.document.getElementById('etPrerequisite').value=bob.id;ctx.applyEditFields(gene);assert.equal(gene.prerequisiteId,bob.id);
+ shim.document.getElementById('etPrerequisite').value='';ctx.onAction('save-edit',{dataset:{id:gene.id}});assert.equal(gene.prerequisiteId,null);
+ ctx.openEdit(gene.id);shim.document.getElementById('etPrerequisite').value=bob.id;ctx.onAction('save-edit',{dataset:{id:gene.id}});assert.equal(gene.prerequisiteId,bob.id);
  ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
  assert.doesNotMatch(settings,/Task prerequisites|stPrerequisiteTask|stPrerequisiteNeeds|data-act="remove-prerequisite"/);
 });
@@ -17235,7 +17395,7 @@ test('RISK evergreen hours or days: stored hours survive conversion, UI save, an
  const weekly=ctx.state.tasks[0];assert.equal(weekly.evergreenHours,168);
  ctx.openEdit(weekly.id);assert.match(shim.document.getElementById('modalRoot').innerHTML,/id="etEverHours"[^>]*value="7"[\s\S]*id="etEverUnit"[\s\S]*value="days" selected/);
  shim.document.getElementById('etEverHours').value='2';shim.document.getElementById('etEverUnit').value='days';
- ctx.applyEditFields(weekly);assert.equal(weekly.evergreenHours,48);
+ ctx.onAction('save-edit',{dataset:{id:weekly.id}});assert.equal(weekly.evergreenHours,48);
  ctx.openSettings();assert.match(shim.document.getElementById('modalRoot').innerHTML,/id="stEverUnit"/);
  shim.document.getElementById('stEverHours').value='3';shim.document.getElementById('stEverUnit').value='days';
  ctx.onAction('save-settings',{});assert.equal(ctx.state.settings.evergreenHours,72);
@@ -22868,9 +23028,8 @@ test('RISK fireworks reduced motion: static blooms stay on the stationary barge 
 });
 
 test('RISK fireworks reduced deadline: static scheduler preserves a persistent barge bloom across sixty seconds without animated repaints',()=>{
- const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),helper=source.slice(source.indexOf('  function eventPaintable('),source.indexOf('  function paintLife('));
- const code=helper+source.slice(source.indexOf('  function advanceRooftopParty('),source.indexOf('  function stop()',source.indexOf('  function advanceRooftopParty('))),paints=[];
- const context={reduced:true,document:{hidden:false},geometry:{},p:{},world:{elapsed:59,events:[{id:'festival:unchanged',type:'festival',age:59,duration:150}]},woodland:{events:[]},rooftopParty:{active:null},clocktowerVisit:{active:null},lastCitySlot:0,sceneSnapshot:{windowsSlot:0},Date:{now:()=>60000},syncScene(){context.world.events[0].age=60;context.world.elapsed=60;},paintBackground(){throw Error('unrelated background must stay unchanged');},paintLife(age){paints.push(age);}};
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),c=sceneTimeline(),visits=c.LandscapeVisits.create(),code=source.slice(source.indexOf('  function advanceRooftopParty('),source.indexOf('  function stop()',source.indexOf('  function advanceRooftopParty('))),paints=[];
+ const context={visits,reduced:true,document:{hidden:false},geometry:c.LandscapeGeometry.create(390,844),p:{},world:{elapsed:59,events:[{id:'festival:unchanged',type:'festival',age:59,duration:150}]},woodland:{events:[]},rooftopParty:{active:null},clocktowerVisit:{active:null},lastCitySlot:0,sceneSnapshot:{windowsSlot:0},Date:{now:()=>60000},syncScene(){context.world.events[0].age=60;context.world.elapsed=60;},paintBackground(){throw Error('unrelated background must stay unchanged');},paintLife(age){paints.push(age);}};
  vm.runInNewContext(code+';advanceRooftopParty(1)',context);
  assert.deepEqual(paints,[],'sixty seconds no longer expires barge fireworks');
  context.advanceRooftopParty(1);assert.deepEqual(paints,[],'unchanged static membership cannot start continuous animation');
@@ -24616,6 +24775,25 @@ test('RISK pedestrian scheduled lifetime: accepted walkers retain admission dura
  assert.ok(!timeline.at(born+event.duration*1000+.01).events.some(e=>e.id===event.id),'finite retirement follows complete route');
 });
 
+test('RISK pedestrian visit recipe consumer: complete lifetime stays separate from admission and reconstructs at current UTC age',()=>{
+ const context=sceneTimeline(),options={seed:'private-walking-exits',season:'summer',sunAt:()=>({altitude:25,azimuth:100})};
+ const timeline=context.LandscapeTimeline.create(options),start=Date.parse('2026-10-10T10:00Z');let selectedAt,recipe;
+ for(let second=0;second<3600&&!recipe;second+=8){
+  const at=start+second*1000,event=timeline.at(at).events.find(e=>e.type==='walker'||e.type==='dogwalker');
+  if(event){selectedAt=at;recipe=event;}
+ }
+ assert.ok(recipe,'the deterministic production consumer admits a complete walking recipe');
+ assert.ok(recipe.activityDuration>0&&recipe.duration>recipe.activityDuration,'admission activity remains distinct from its full canonical visit');
+ const born=selectedAt-recipe.age*1000,afterActivity=born+(recipe.activityDuration+1)*1000;
+ const resumed=timeline.at(afterActivity).events.find(event=>event.id===recipe.id);
+ assert.ok(resumed,'a visit remains present after its original admission reservation expires');
+ assert.ok(Math.abs(resumed.age-(recipe.activityDuration+1))<1e-7,'the current recipe advances by UTC age rather than frame history');
+ assert.deepEqual(JSON.parse(JSON.stringify(timeline.at(afterActivity))),JSON.parse(JSON.stringify(context.LandscapeTimeline.create(options).at(afterActivity))),'a cold deterministic reconstruction selects the same underway recipe');
+ const lastFrame=timeline.at(born+(recipe.duration-.001)*1000).events.find(event=>event.id===recipe.id);
+ assert.ok(lastFrame,'the complete visit remains selected up to its canonical exit');
+ assert.ok(!timeline.at(born+(recipe.duration+.001)*1000).events.some(event=>event.id===recipe.id),'the finite complete recipe retires immediately after its exit');
+});
+
 test('RISK pedestrian companion pace: walking deer and woodland paws halve translation and distance together while hopping stays unchanged',()=>{
  const ctx=vm.createContext({Math});vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-geometry.js'),'utf8'),ctx);const g=ctx.LandscapeGeometry.create(820,1180),e={type:'deer',age:30,duration:180,seed:.4,lane:.5,reverse:false};
  assert.equal(g.groundPose('deer',e).distance,g.motionAge(e,'x')*3,'walking deer use half prior six-pixel local pace');
@@ -24655,15 +24833,15 @@ test('RISK pedestrian complete parties: scheduled walking routes clear both edge
 });
 
 test('RISK pedestrian reduced motion: static production poses keep walkers on screen and winter activities settled',()=>{
- const ctx=sceneTimeline();vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-winter.js'),'utf8'),ctx);
+ const ctx=sceneTimeline(),visits=ctx.LandscapeVisits.create();vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-winter.js'),'utf8'),ctx);
  for(const [width,height] of [[390,844],[820,1180],[1440,900]])for(const reverse of [false,true])for(const type of ['walker','dogwalker','reader','couple','picnic','kite','snowman','snowangel']){
-  const g=ctx.LandscapeGeometry.create(width,height),duration=ctx.LandscapeConfig.eventDurations[type],e={type,activityDuration:duration,duration:2000,seed:.4,lane:.5,reverse,speed:1};
-  const still={...e,age:g.stillWalkingAge(e)};
+  const g=ctx.LandscapeGeometry.create(width,height),duration=ctx.LandscapeConfig.eventDurations[type],e={type,activityDuration:duration,duration:2000,age:duration*.5,seed:.4,lane:.5,reverse,speed:1},prepared=visits.forPaint([e],g,true);
+  assert.equal(prepared.length,1,'a current shared walking activity receives one reduced representative');const still=prepared[0];
+  assert.equal(still.age,g.stillWalkingAge(e),'the visit owner selects the established settled age');
   const pose=['snowman','snowangel'].includes(type)?ctx.LandscapeWinter.pose(type,still,g,width,height):['walker','dogwalker'].includes(type)?g.groundPose('walker',still):g.visitPose(still,g.motionProgress(still,'x'));
   const x=type==='snowman'?pose.builderX:pose.x;assert.ok(x>=0&&x<=width,'static representative remains within the viewport');
   if(type==='snowangel')assert.equal(pose.bodyMode,0,'reduced motion retains its settled snow activity');
  }
- const runtime=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');assert.match(runtime,/e\.activityDuration\?geometry\.stillWalkingAge\(e\)/,'actual reduced-motion consumer selects the representative instead of a visual tail midpoint');
 });
 
 test('Pedestrian extended FAQ: accurate natural exits retain shared chance schedule and reduced motion explanation',()=>{
@@ -24695,12 +24873,13 @@ test('RISK pedestrian production half pace: scheduled ordinary and dog walkers h
 });
 
 test('RISK pedestrian reduced painter consumer: production-shaped static events use the same settled representative as the app',async()=>{
- const {readMotionBuild,createMotionProbe}=await import('./scripts/motion-review-harness.mjs'),build=readMotionBuild(__dirname,'WORKTREE'),ctx=sceneTimeline();
+ const {readMotionBuild,createMotionProbe}=await import('./scripts/motion-review-harness.mjs'),build=readMotionBuild(__dirname,'WORKTREE'),ctx=sceneTimeline(),visits=ctx.LandscapeVisits.create();
  vm.runInContext(fs.readFileSync(path.join(__dirname,'landscape-winter.js'),'utf8'),ctx);
  for(const actor of ['walker','dogwalker','reader','snowman','snowangel']){
   const g=ctx.LandscapeGeometry.create(390,844),duration=ctx.LandscapeConfig.eventDurations[actor],base={type:actor,duration,seed:.4,lane:.5,reverse:false,speed:.82};
-  const event={...base,activityDuration:duration,duration:ctx.LandscapeGeometry.create(8192,900).walkingLifetime(base)},probe=createMotionProbe(build,{width:390,height:844});
-  const staticFrame=probe.sample({actor,event,progress:.5,reduced:true,zoom:1}),age=g.stillWalkingAge(event),direct=probe.sample({actor,event:{...event,age},zoom:1});
+  const event={...base,activityDuration:duration,duration:ctx.LandscapeGeometry.create(8192,900).walkingLifetime(base),age:duration*.5},probe=createMotionProbe(build,{width:390,height:844}),prepared=visits.forPaint([event],g,true)[0];
+  assert.equal(prepared.age,g.stillWalkingAge(event),'the visit owner returns the scene-specific settled representative');
+  const staticFrame=probe.sample({actor,event:prepared,progress:.5,zoom:1}),direct=probe.sample({actor,event:{...event,age:prepared.age},zoom:1});
   assert.deepEqual(staticFrame,direct,'actual static painter must choose the exact production representative');
  }
 });
@@ -24824,7 +25003,7 @@ test('RISK bulk toolbar: mounted controls stay outside scrolling rows and retain
  assert.doesNotMatch(body.innerHTML,/data-act="bulk-select(?:-all)?"/,'selection toolbar must remain outside the task scroller rather than scrolling away with rows');
  assert.match(toolbar.innerHTML,/class="ltag"[^>]*data-act="bulk-select"/,'toolbar reuses neighboring compact All Tasks control classes');assert.equal(toolbar.hidden,false);
  body.scrollTop=420;ctx.onAction('bulk-select-all');assert.equal(body.scrollTop,420,'selection rerender preserves the task scroller position');assert.match(toolbar.innerHTML,/36 selected/,'Select all includes matching tasks below the fold');
- assert.equal(vm.runInContext('bulkSelection.has('+JSON.stringify(outside.id)+')',ctx),false,'filtered-out board task stays unselected');
+ assert.equal(selectedListIds(shim).length,36,'the selection feedback names only the visible matching rows');assert.ok(!body.innerHTML.includes(outside.id),'the filtered-out task has no row selection control');
  ctx.setListQuery('Private match 1');assert.match(toolbar.innerHTML,/11 selected/,'changing filters prunes only the newly hidden selection');
  ctx.onAction('bulk-edit');assert.match(shim.document.getElementById('modalRoot').innerHTML,/Edit 11 selected tasks/);ctx.closeModal();
  ctx.setListQuery('Private match');assert.match(toolbar.innerHTML,/11 selected/,'revealing hidden rows does not silently add them');ctx.onAction('bulk-select-all');assert.match(toolbar.innerHTML,/36 selected/);
@@ -24855,6 +25034,25 @@ test('RISK bulk toolbar keyboard: rerender restores the focused toolbar action a
  shim.document.activeElement={dataset:{act:'bulk-select-all'}};ctx.onAction('bulk-select-all');assert.equal(focused,'bulk-select-all');
  shim.document.activeElement={dataset:{act:'bulk-toggle',id:task.id}};ctx.onAction('bulk-toggle',{dataset:{id:task.id}});assert.equal(focused,task.id);
  shim.document.activeElement={dataset:{act:'bulk-cancel'}};ctx.onAction('bulk-cancel');assert.equal(focused,'bulk-select','Cancel returns focus to the remaining Select control');
+});
+
+test('RISK All Tasks view ownership: account adoption clears prior selection while same-account Undo retains it',async()=>{
+ const accountA=syncState({tasks:[syncTask('shared','Account A task')],syncAccount:'e@example.com',syncRev:4,listOpen:true});
+ const accountB=syncState({tasks:[syncTask('shared','Account B task')],syncAccount:'other@example.test',syncRev:1,listOpen:true});
+ const h=makeSyncHarness({remote:accountA,rev:4});
+ const {ctx,shim}=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(accountA)},cloudSyncFactory:h.factory});
+ await ctx.cloudPull();ctx.state.listOpen=true;ctx.onAction('bulk-select-all');
+ const toolbar=shim.document.getElementById('listBulkToolbar'),body=shim.document.getElementById('listBody');
+ assert.match(toolbar.innerHTML,/1 selected/,'the All Tasks control selects the visible account-A task');assert.deepEqual(selectedListIds(shim),['shared']);
+ assert.match(body.innerHTML,/aria-pressed="true" aria-label="Deselect Account A task"/);
+ ctx.pushUndo();ctx.state.tasks[0].title='Same account replacement';ctx.commit();ctx.undo();
+ assert.match(toolbar.innerHTML,/1 selected/,'ordinary same-account Undo replacement keeps the logical selection owner');assert.deepEqual(selectedListIds(shim),['shared']);
+ assert.match(body.innerHTML,/aria-pressed="true" aria-label="Deselect Account A task"/);
+ h.writeBehindBack(accountB);shim.window.CloudSync.user='other@example.test';await ctx.cloudPull();
+ assert.equal(ctx.state.syncAccount,'other@example.test');assert.deepEqual(Array.from(ctx.state.tasks,task=>task.title),['Account B task']);
+ assert.match(toolbar.innerHTML,/0 selected/,'a different signed-in owner cannot inherit matching task IDs');assert.deepEqual(selectedListIds(shim),[]);
+ assert.match(body.innerHTML,/aria-pressed="false" aria-label="Select Account B task"/);
+ assert.equal(JSON.stringify(ctx.state.tasks.map(task=>task.title)),JSON.stringify(['Account B task']),'selection transitions remain view-only');
 });
 
 test('RISK bulk toolbar guidance: extended FAQ describes frozen controls and rank-slot selection',async()=>{
@@ -24942,6 +25140,47 @@ test('RISK bulk task editing: current batch result distinguishes partial reconci
  assert.match(shim.document.getElementById('listBulkToolbar').innerHTML,/Bulk edit requested for 2 tasks: 2 currently match in this tab; 0 have different values or are no longer open/);assert.match(shim.document.getElementById('listBulkToolbar').innerHTML,/This is not a server save confirmation/);
  ctx.state.tasks.find(t=>t.id===a.id).due='2028-03-01';ctx.renderList();assert.match(shim.document.getElementById('listBulkToolbar').innerHTML,/1 currently match in this tab; 1 have different values or are no longer open/);assert.match(shim.document.getElementById('listBulkToolbar').innerHTML,/Check Settings recovery backups/);assert.doesNotMatch(shim.document.getElementById('listBulkToolbar').innerHTML,/data-act="bulk-undo"/);
  ctx.state.syncAccount='another-private-account';ctx.renderList();assert.doesNotMatch(shim.document.getElementById('listBulkToolbar').innerHTML,/Bulk edit requested/,'result does not leak across accounts');
+});
+test('RISK bulk task editing: logical and cloud owner changes reject the whole draft before mutation',async()=>{
+ for(const ownerChange of ['board','cloud']){
+  const {ctx,shim}=await loadApp(),a=ctx.addTask('Private owner A'),b=ctx.addTask('Private owner B');ctx.state.listOpen=true;ctx.onAction('bulk-select-all');ctx.onAction('bulk-edit');shim.document.getElementById('bulkApplyDue').checked=true;shim.document.getElementById('bulkDue').value='2028-04-12';
+  if(ownerChange==='board')ctx.state.syncAccount='other-private-board';else ctx.window.CloudSync={user:'other-private-owner'};
+  ctx.onAction('bulk-save');assert.equal(ctx.state.tasks.find(task=>task.id===a.id).due,null,ownerChange+' owner change rejects before the first task mutates');assert.equal(ctx.state.tasks.find(task=>task.id===b.id).due,null,ownerChange+' owner change rejects the whole batch');assert.match(shim.document.getElementById('bulkError').textContent,/board changed/i);
+ }
+});
+test('RISK bulk result ownership: same-account Undo keeps the current-value summary across board replacement',async()=>{
+ const {ctx,shim}=await loadApp(),a=ctx.addTask('Private Undo A'),b=ctx.addTask('Private Undo B');ctx.state.listOpen=true;ctx.onAction('bulk-select-all');ctx.onAction('bulk-edit');shim.document.getElementById('bulkApplyDue').checked=true;shim.document.getElementById('bulkDue').value='2028-03-12';ctx.onAction('bulk-save');
+ assert.match(shim.document.getElementById('listBulkToolbar').innerHTML,/2 currently match in this tab; 0 have different values or are no longer open/);
+ const editedBoard=ctx.state;ctx.undo();assert.notEqual(ctx.state,editedBoard,'ordinary board Undo restores a replacement object');assert.equal(ctx.state.tasks.find(task=>task.id===a.id).due,null);assert.equal(ctx.state.tasks.find(task=>task.id===b.id).due,null);
+ assert.match(shim.document.getElementById('listBulkToolbar').innerHTML,/Bulk edit requested for 2 tasks: 0 currently match in this tab; 2 have different values or are no longer open/,'same logical owner keeps the result and measures its current values after Undo');assert.doesNotMatch(shim.document.getElementById('listBulkToolbar').innerHTML,/data-act="bulk-undo"/);
+});
+test('RISK architecture checkpoint: editor Undo and bulk Undo preserve selection boundaries and immutable history through reload',async()=>{
+ const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),deviceDbName='private-architecture-checkpoint';
+ const {ctx,shim}=await loadApp({seed:613,cryptoProvider:webcrypto,indexedDBProvider:indexedDB,deviceDbName});
+ setFakeTime(ctx,Date.parse('2026-10-16T12:34:56.789Z'));
+ const a=ctx.addTask('Private checkpoint A'),b=ctx.addTask('Private checkpoint B');ctx.state.listOpen=true;ctx.render();
+ ctx.onAction('bulk-select-all');assert.match(shim.document.getElementById('listBulkToolbar').innerHTML,/2 selected/);
+ ctx.openEdit(a.id);fillEditPane(ctx,shim,{title:'Private checkpoint edited Done',due:'2028-04-12'});ctx.onAction('done-task',{dataset:{id:a.id}});
+ const completion=ratingHistoryCopy(ratingHistoryTask(ctx,a.id).ratingHistory.find(row=>row.kind==='done'));
+ assert.ok(completion.id,'the actual editor gesture creates an immutable completion fact');
+ assert.match(shim.document.getElementById('listBulkToolbar').innerHTML,/1 selected/,'completing a task prunes its hidden selection');
+ ctx.onAction('undo');assert.equal(ratingHistoryTask(ctx,a.id).title,'Private checkpoint A');assert.equal(ratingHistoryTask(ctx,a.id).done,false);
+ assert.match(shim.document.getElementById('listBulkToolbar').innerHTML,/1 selected/,'Undo restores the task without silently reselecting the formerly hidden row');
+ ctx.onAction('bulk-select-all');ctx.onAction('bulk-edit');shim.document.getElementById('bulkApplyDue').checked=true;shim.document.getElementById('bulkDue').value='2028-06-12';ctx.onAction('bulk-save');
+ assert.equal(ratingHistoryTask(ctx,a.id).due,'2028-06-12');assert.equal(ratingHistoryTask(ctx,b.id).due,'2028-06-12');
+ assert.match(shim.document.getElementById('listBulkToolbar').innerHTML,/2 currently match in this tab/);
+ ctx.onAction('undo');assert.equal(ratingHistoryTask(ctx,a.id).due,null);assert.equal(ratingHistoryTask(ctx,b.id).due,null);
+ assert.match(shim.document.getElementById('listBulkToolbar').innerHTML,/0 currently match in this tab; 2 have different values or are no longer open/);
+ assert.deepEqual(ratingHistoryCopy(ratingHistoryTask(ctx,a.id).ratingHistory.find(row=>row.id===completion.id)),completion,'later bulk Undo cannot erase or rewrite the editor completion fact');
+ assert.equal(await ctx.persist(),true);const saved=ratingHistoryCopy(ctx.state.tasks);
+ const reloaded=await loadApp({seed:614,cryptoProvider:webcrypto,indexedDBProvider:indexedDB,deviceDbName});
+ assert.deepEqual(ratingHistoryCopy(reloaded.ctx.state.tasks),saved,'isolated cold reload retains task fields and exact immutable facts after both owner transactions');
+ reloaded.ctx.openEdit(a.id);assert.match(reloaded.shim.document.getElementById('modalRoot').innerHTML,/Done/,'the retained completion remains visible in Task history');
+});
+test('RISK bulk account selection guidance: Help and Changelog explain account-switch clearing',async()=>{
+ const {ctx,shim}=await loadApp();for(const id of ['appChangelogCurrent','appChangelog'])shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ const answer=help.split('<dt>How do I edit several tasks together?</dt><dd>')[1]?.split('</dd>')[0]||'';assert.match(answer,/Switching accounts clears the previous board’s selection\./);
+ const chapter=help.split('<details class="help-faq" data-help-changelog>')[1]?.split('</details>')[0]||'';assert.match(chapter,/<h3>October 16, 2026<\/h3>[\s\S]*?<li>Switching accounts clears the previous board’s selection\.<\/li>/);
 });
 test('RISK bulk task editing: enlarged modal fieldsets shrink and native controls retain available width',()=>{
  assert.match(html,/\.bulk-fields\s*\{[^}]*min-width:0[^}]*max-width:100%/,'observed chrome 390px 200% overflow needs fieldsets to shrink');assert.match(html,/\.bulk-fields input\[type=number\]\s*\{[^}]*min-width:0[^}]*max-width:100%/,'native numeric control must fit enlarged modal');assert.match(html,/<fieldset class="bulk-fields">/);
@@ -25745,12 +25984,12 @@ test('RISK Postponed filter: mounted tag combines search eligibility and filtere
  const {ctx,shim}=await loadApp({seed:1010});const at=Date.parse('2026-10-12T12:00:00Z');setFakeTime(ctx,at);
  const a=ctx.addTask('Alpha held'),b=ctx.addTask('Beta held'),plain=ctx.addTask('Alpha ready'),expired=ctx.addTask('Expired hold'),done=ctx.addTask('Completed hold');ctx.state.chain=[plain.id];ctx.state.mode='scan';ctx.state.candidateId=a.id;ctx.onAction('postpone',{dataset:{candidate:a.id}});ctx.writeTaskPostpone(b,at+7200000);ctx.writeTaskPostpone(expired,at-1);ctx.writeTaskPostpone(done,at+7200000);done.done=true;openList(ctx);const before=JSON.stringify(ctx.state);
  assert.ok(tagKeys(shim).includes('s:postponed'),'active holds must offer the existing-style postponed tag filter');clickTag(ctx,'s:postponed');assert.deepEqual(rowTitles(shim).sort(),['Alpha held','Beta held']);assert.match(tagRowHTML(shim),/data-id="s:postponed" aria-pressed="true">postponed/);
- ctx.setListQuery('alpha');assert.deepEqual(rowTitles(shim),['Alpha held']);clickTag(ctx,'s:postponed');assert.deepEqual(rowTitles(shim).sort(),['Alpha held','Alpha ready']);clickTag(ctx,'s:postponed');ctx.onAction('list-eligibility',{dataset:{id:'eligible'}});clickTag(ctx,'s:postponed');ctx.setListQuery('alpha');assert.deepEqual(rowTitles(shim),[]);ctx.onAction('list-eligibility',{dataset:{id:'ineligible'}});clickTag(ctx,'s:postponed');ctx.setListQuery('alpha');assert.deepEqual(rowTitles(shim),['Alpha held']);ctx.setListQuery('');ctx.onAction('bulk-select-all',{dataset:{}});assert.deepEqual(JSON.parse(vm.runInContext('JSON.stringify([...bulkSelection].sort())',ctx)),[a.id,b.id].sort());assert.equal(JSON.stringify(ctx.state),before,'tag search eligibility and selection are view-only');
- ctx.returnAsCandidate(a.id);assert.deepEqual(Array.from(ctx.filteredListTasks(),t=>t.id),[b.id]);assert.deepEqual(JSON.parse(vm.runInContext('JSON.stringify([...bulkSelection])',ctx)),[b.id],'a returned task leaves the held filter and hidden selection');ctx.undo();assert.deepEqual(Array.from(ctx.filteredListTasks(),t=>t.id).sort(),[a.id,b.id].sort(),'Undo restores the held task to the still-active filter');ctx.setListQuery('alpha');ctx.returnAsCandidate(a.id);ctx.returnAsCandidate(b.id);assert.ok(!tagKeys(shim).includes('s:postponed'));assert.equal(vm.runInContext('listTagFilter',ctx),null);assert.equal(vm.runInContext('listQuery',ctx),'alpha');assert.equal(vm.runInContext('listEligibilityFilter',ctx),'ineligible');assert.deepEqual(Array.from(ctx.filteredListTasks(),t=>t.id),[plain.id],'clearing the last hold retains search and Ineligible, leaving the dotted Alpha row');
+ ctx.setListQuery('alpha');assert.deepEqual(rowTitles(shim),['Alpha held']);clickTag(ctx,'s:postponed');assert.deepEqual(rowTitles(shim).sort(),['Alpha held','Alpha ready']);clickTag(ctx,'s:postponed');ctx.onAction('list-eligibility',{dataset:{id:'eligible'}});clickTag(ctx,'s:postponed');ctx.setListQuery('alpha');assert.deepEqual(rowTitles(shim),[]);ctx.onAction('list-eligibility',{dataset:{id:'ineligible'}});clickTag(ctx,'s:postponed');ctx.setListQuery('alpha');assert.deepEqual(rowTitles(shim),['Alpha held']);ctx.setListQuery('');ctx.onAction('bulk-select-all',{dataset:{}});assert.deepEqual(selectedListIds(shim).sort(),[a.id,b.id].sort());assert.equal(JSON.stringify(ctx.state),before,'tag search eligibility and selection are view-only');
+ ctx.returnAsCandidate(a.id);assert.deepEqual(Array.from(ctx.filteredListTasks(),t=>t.id),[b.id]);assert.deepEqual(selectedListIds(shim),[b.id],'a returned task leaves the held filter and hidden selection');ctx.undo();assert.deepEqual(Array.from(ctx.filteredListTasks(),t=>t.id).sort(),[a.id,b.id].sort(),'Undo restores the held task to the still-active filter');ctx.setListQuery('alpha');ctx.returnAsCandidate(a.id);ctx.returnAsCandidate(b.id);assert.ok(!tagKeys(shim).includes('s:postponed'));assert.ok(!litTags(shim).includes('s:postponed'));assert.deepEqual(Array.from(ctx.filteredListTasks(),t=>t.id),[plain.id],'clearing the last hold retains search and Ineligible, leaving the dotted Alpha row');assert.equal(listCount(shim),'(1 of 4)');
 });
 test('RISK Postponed filter: scan-clock expiry removes matches at the deadline and clears an unavailable last filter',async()=>{
  const {ctx,shim}=await loadApp({seed:1011});const at=Date.parse('2026-10-12T12:00:00Z');setFakeTime(ctx,at);const a=ctx.addTask('First expiry'),b=ctx.addTask('Last expiry'),plain=ctx.addTask('Unheld');ctx.writeTaskPostpone(a,at+1000);ctx.writeTaskPostpone(b,at+2000);ctx.state.mode='work';openList(ctx);clickTag(ctx,'s:postponed');ctx.onAction('bulk-select-all',{dataset:{}});const before=JSON.stringify(ctx.state);
- setFakeTime(ctx,at+999);ctx.refreshScanClock();assert.deepEqual(Array.from(ctx.filteredListTasks(),t=>t.id).sort(),[a.id,b.id].sort());setFakeTime(ctx,at+1000);ctx.refreshScanClock();assert.deepEqual(Array.from(ctx.filteredListTasks(),t=>t.id),[b.id]);assert.deepEqual(JSON.parse(vm.runInContext('JSON.stringify([...bulkSelection])',ctx)),[b.id]);setFakeTime(ctx,at+1999);ctx.refreshScanClock();assert.deepEqual(Array.from(ctx.filteredListTasks(),t=>t.id),[b.id]);setFakeTime(ctx,at+2000);ctx.refreshScanClock();assert.ok(!tagKeys(shim).includes('s:postponed'));assert.equal(vm.runInContext('listTagFilter',ctx),null);assert.deepEqual(Array.from(ctx.filteredListTasks(),t=>t.id).sort(),[a.id,b.id,plain.id].sort(),'existing semantics clear a tag filter when no open task can match it');setFakeTime(ctx,at+2001);ctx.refreshScanClock();assert.equal(JSON.stringify(ctx.state),before,'expiry filtering must not rewrite deadlines or other saved task data');
+ setFakeTime(ctx,at+999);ctx.refreshScanClock();assert.deepEqual(Array.from(ctx.filteredListTasks(),t=>t.id).sort(),[a.id,b.id].sort());setFakeTime(ctx,at+1000);ctx.refreshScanClock();assert.deepEqual(Array.from(ctx.filteredListTasks(),t=>t.id),[b.id]);assert.deepEqual(selectedListIds(shim),[b.id]);setFakeTime(ctx,at+1999);ctx.refreshScanClock();assert.deepEqual(Array.from(ctx.filteredListTasks(),t=>t.id),[b.id]);setFakeTime(ctx,at+2000);ctx.refreshScanClock();assert.ok(!tagKeys(shim).includes('s:postponed'));assert.ok(!litTags(shim).includes('s:postponed'));assert.deepEqual(Array.from(ctx.filteredListTasks(),t=>t.id).sort(),[a.id,b.id,plain.id].sort(),'existing semantics clear a tag filter when no open task can match it');setFakeTime(ctx,at+2001);ctx.refreshScanClock();assert.equal(JSON.stringify(ctx.state),before,'expiry filtering must not rewrite deadlines or other saved task data');ctx.writeTaskPostpone(plain,at+3000);ctx.refreshScanClock();assert.ok(tagKeys(shim).includes('s:postponed'));assert.ok(!litTags(shim).includes('s:postponed'),'a later active hold does not resurrect the expired view filter');
 });
 test('RISK Postponed filter: saved hold semantics preserve legacy opaque evidence and context namespace isolation',async()=>{
  const {ctx,shim}=await loadApp({seed:1012});const at=Date.parse('2026-10-12T12:00:00Z');setFakeTime(ctx,at);const held=ctx.addTask('Known readonly hold'),legacy=ctx.addTask('Legacy context task'),opaque=ctx.addTask('Opaque future data');ctx.writeTaskPostpone(held,at+3600000);held.postponeRecovery=[{postponeOps:{v:99}}];opaque.postponeOps={v:99,private:{deadline:'unknown'}};ctx.state.contexts.push({id:'postponed-context',name:'postponed',active:true});legacy.ctx=['postponed-context'];openList(ctx);const before=JSON.stringify(ctx.state);
@@ -25772,7 +26011,7 @@ test('RISK selected rank geometry browser: enlarged labels stay inside their ran
   const measure=()=>page.evaluate(()=>{const rect=e=>{const r=e.getBoundingClientRect();return{left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height}};const paint=e=>{const s=getComputedStyle(e);return{family:s.fontFamily,size:s.fontSize,weight:s.fontWeight,lineHeight:s.lineHeight,padding:s.padding,radius:s.borderRadius,border:s.border,fill:s.backgroundColor,ink:s.color,shadow:s.boxShadow,outline:s.outline,focusVisible:e.matches(':focus-visible'),visibility:s.visibility,opacity:s.opacity}};return{theme:document.documentElement.dataset.theme,colorScheme:getComputedStyle(document.documentElement).colorScheme,cloudDisabled:FIREBASE_CONFIG===null,pageWidth:document.documentElement.scrollWidth,viewport:innerWidth,listWidth:document.getElementById('listBody').scrollWidth,listClient:document.getElementById('listBody').clientWidth,rows:[...document.querySelectorAll('#listBody .trow')].map(row=>{const rank=row.querySelector('.rank-summary'),title=row.querySelector('.tmain'),label=row.querySelector('.bulk-rank-selected .tkl'),original=row.querySelector('.bulk-rank-original .tkl')||row.querySelector('.rank-summary .tk:not(.bulk-rank-selected) .tkl');const range=label?document.createRange():null;if(range)range.selectNodeContents(label);return{id:row.dataset.row,labelTextBox:range?rect(range):null,labelScroll:label?.scrollWidth,labelClient:label?.clientWidth,row:rect(row),title:rect(title),rank:rank?rect(rank):null,label:label?rect(label):null,labelText:label?.textContent,selected:label?paint(label):null,reference:original?paint(original):null,rankControl:rank?paint(rank):null}})}});
   const configs=[];for(const[width,height,theme]of[[320,568,'light'],[390,844,'dark'],[768,1024,'light'],[1440,900,'dark']])for(const large of[false,true])configs.push({width,height,theme,large,spark:true,summary:true,metric:width>=768?'chance':'rank'});configs.push({width:568,height:320,theme:'light',large:true,spark:true,summary:false,metric:'rank'},{width:320,height:568,theme:'dark',large:true,spark:true,summary:false,metric:'rank'},{width:390,height:844,theme:'light',large:true,spark:false,summary:true,metric:'chance'},{width:320,height:568,theme:'light',large:true,spark:false,summary:false,metric:'rank'});
   for(const config of configs){
-   await page.setViewportSize({width:config.width,height:config.height});await page.emulateMedia({colorScheme:config.theme});await page.evaluate(c=>{bulkSelection.clear();bulkSelecting=false;state.settings.theme=c.theme;state.settings.listMetric=c.metric;FEATURE_FLAGS.rankSparklines=c.spark;FEATURE_FLAGS.topKLanguage=c.summary;applyTheme();renderList()},config);await page.evaluate(()=>document.fonts.ready);await enlarge(config.large);const before=await measure(),referenceFonts=await fonts('.rank-summary .tkl'),stateBefore=await page.evaluate(()=>JSON.stringify(state));await page.locator('[data-act="bulk-select"]').click();await enlarge(config.large);const selecting=await measure();const row=page.locator('[data-row="'+ids.short+'"]');const toggle=row.locator('[data-act="bulk-toggle"]');await page.locator('#listSearch').focus();for(let tabs=0;tabs<60&&!await toggle.evaluate(e=>e===document.activeElement);tabs++)await page.keyboard.press('Tab');assert.equal(await toggle.evaluate(e=>e===document.activeElement),true,'native Tab reaches the row selection control');await page.keyboard.press('Space');await enlarge(config.large);const selected=await measure();const stem=config.width+'-'+config.theme+'-'+(config.large?'2x':'normal')+'-'+(config.spark?'spark':'')+(config.summary?'summary':'none')+'-'+config.metric;const entry={config,before,selecting,selected,referenceFonts,selectedFonts:await fonts('.bulk-rank-selected .tkl'),titleFonts:await fonts('.tmain .tt')};report.cases.push(entry);if(allowFonts){assert.ok(entry.titleFonts.some(f=>/Spline/.test(f.familyName||f.postScriptName)),stem+': custom Spline title font actually paints');if(config.spark||config.summary)assert.ok(entry.selectedFonts.some(f=>/Spline.*Mono/.test(f.familyName||f.postScriptName)),stem+': custom Spline mono Selected font actually paints')}
+   await page.setViewportSize({width:config.width,height:config.height});await page.emulateMedia({colorScheme:config.theme});await page.evaluate(c=>{state.settings.theme=c.theme;state.settings.listMetric=c.metric;FEATURE_FLAGS.rankSparklines=c.spark;FEATURE_FLAGS.topKLanguage=c.summary;applyTheme();renderList()},config);await page.evaluate(()=>document.fonts.ready);await enlarge(config.large);const before=await measure(),referenceFonts=await fonts('.rank-summary .tkl'),stateBefore=await page.evaluate(()=>JSON.stringify(state));await page.locator('[data-act="bulk-select"]').click();await enlarge(config.large);const selecting=await measure();const row=page.locator('[data-row="'+ids.short+'"]');const toggle=row.locator('[data-act="bulk-toggle"]');await page.locator('#listSearch').focus();for(let tabs=0;tabs<60&&!await toggle.evaluate(e=>e===document.activeElement);tabs++)await page.keyboard.press('Tab');assert.equal(await toggle.evaluate(e=>e===document.activeElement),true,'native Tab reaches the row selection control');await page.keyboard.press('Space');await enlarge(config.large);const selected=await measure();const stem=config.width+'-'+config.theme+'-'+(config.large?'2x':'normal')+'-'+(config.spark?'spark':'')+(config.summary?'summary':'none')+'-'+config.metric;const entry={config,before,selecting,selected,referenceFonts,selectedFonts:await fonts('.bulk-rank-selected .tkl'),titleFonts:await fonts('.tmain .tt')};report.cases.push(entry);if(allowFonts){assert.ok(entry.titleFonts.some(f=>/Spline/.test(f.familyName||f.postScriptName)),stem+': custom Spline title font actually paints');if(config.spark||config.summary)assert.ok(entry.selectedFonts.some(f=>/Spline.*Mono/.test(f.familyName||f.postScriptName)),stem+': custom Spline mono Selected font actually paints')}
    await row.scrollIntoViewIfNeeded();if(out)await page.screenshot({path:path.join(out,stem+'-selected.png')});assert.equal(selected.theme,config.theme);assert.equal(selected.colorScheme,config.theme);assert.ok(selected.cloudDisabled);assert.ok(selected.pageWidth<=selected.viewport+1&&selected.listWidth<=selected.listClient+1,stem+': no horizontal overflow');
    for(const r of selected.rows){const prior=before.rows.find(x=>x.id===r.id),ready=selecting.rows.find(x=>x.id===r.id);assert.ok(Math.abs(r.row.height-prior.row.height)<.75&&Math.abs(r.row.height-ready.row.height)<.75,stem+': selection must not change row height '+r.id);if(!config.large&&r.rank){const floor=config.width<=560?(config.summary?92:70):(config.summary?118:88);assert.ok(Math.abs(r.rank.width-floor)<.75,stem+': ordinary rank width stays unchanged')}if(r.label){assert.equal(r.labelText,'Selected');assert.ok(r.labelTextBox.width>0&&r.labelTextBox.height>0,stem+': full label remains rendered');assert.equal(parseFloat(r.selected.size),config.large?21:10.5,stem+': full Selected label retains the established text size');assert.equal(r.selected.visibility,'visible');assert.equal(r.selected.opacity,'1');assert.ok(r.labelScroll<=r.labelClient+1,stem+': label text is not clipped');assert.ok(r.labelTextBox.left>=r.rank.left-.5&&r.labelTextBox.right<=r.rank.right+.5,stem+': every Selected glyph fits the rank slot');assert.ok(r.label.left>=r.rank.left-.5&&r.label.right<=r.rank.right+.5,stem+': full Selected label fits rank slot');assert.ok(r.label.right<=r.title.left-1,stem+': Selected cannot overlap task title');assert.ok(r.label.top>=r.row.top-.5&&r.label.bottom<=r.row.bottom+.5,stem+': Selected fits row vertically');for(const key of['family','size','weight','lineHeight','ink'])if(r.reference)assert.equal(r.selected[key],r.reference[key],stem+': Selected matches original rank '+key)}}
    assert.equal(await page.evaluate(()=>JSON.stringify(state)),stateBefore,stem+': selection is view-only');assert.equal(await toggle.getAttribute('aria-pressed'),'true');await page.keyboard.press('Enter');await enlarge(config.large);assert.equal(await toggle.getAttribute('aria-pressed'),'false');const restored=await measure();assert.ok(Math.abs(restored.rows.find(x=>x.id===ids.short).row.height-before.rows.find(x=>x.id===ids.short).row.height)<.75,stem+': deselection restores geometry');
@@ -25881,7 +26120,7 @@ test('RISK context checkbox fallback: native selection remains visible without r
 
 test('RISK context filter restoration: every existing context remains offered independently of scanner choices and open matches',async()=>{
  const {ctx,shim}=await loadApp();ctx.state.contexts=[{id:'active',name:'Active',active:true},{id:'off',name:'Off',active:false},{id:'excluded',name:'Excluded',active:false,excluded:true},{id:'done',name:'Done only',active:true},{id:'unused',name:'Unused',active:true}];const a=ctx.addTask('Active match',false,['active']),b=ctx.addTask('Excluded match',false,['excluded']),c=ctx.addTask('Completed match',false,['done']);c.done=true;const before=JSON.stringify(ctx.state.tasks),choices=JSON.stringify(ctx.state.contexts);openList(ctx);
- for(const id of ['active','off','excluded','done','unused'])assert.ok(ctx.listTagOptions().some(x=>x.key==='c:'+id),'existing '+id+' context needs a filter');ctx.toggleListTag('c:excluded');assert.deepEqual(Array.from(ctx.filteredListTasks(),t=>t.id),[b.id]);ctx.onAction('bulk-select-all');assert.deepEqual(JSON.parse(vm.runInContext('JSON.stringify([...bulkSelection])',ctx)),[b.id]);ctx.toggleListTag('c:done');assert.equal(ctx.filteredListTasks().length,0);assert.match(tagRowHTML(shim),/data-id="c:done"[^>]*aria-pressed="true"/);assert.equal(JSON.stringify(ctx.state.tasks),before);assert.equal(JSON.stringify(ctx.state.contexts),choices);assert.equal(ctx.isEligible(b),false);ctx.state.contexts=ctx.state.contexts.filter(x=>x.id!=='done');ctx.renderList();assert.equal(vm.runInContext('listTagFilter',ctx),null);
+ for(const id of ['active','off','excluded','done','unused'])assert.ok(ctx.listTagOptions().some(x=>x.key==='c:'+id),'existing '+id+' context needs a filter');ctx.toggleListTag('c:excluded');assert.deepEqual(Array.from(ctx.filteredListTasks(),t=>t.id),[b.id]);ctx.onAction('bulk-select-all');assert.deepEqual(selectedListIds(shim),[b.id]);ctx.toggleListTag('c:done');assert.equal(ctx.filteredListTasks().length,0);assert.match(tagRowHTML(shim),/data-id="c:done"[^>]*aria-pressed="true"/);assert.deepEqual(selectedListIds(shim),[],'a hidden row loses its selection');assert.equal(JSON.stringify(ctx.state.tasks),before);assert.equal(JSON.stringify(ctx.state.contexts),choices);assert.equal(ctx.isEligible(b),false);ctx.state.contexts=ctx.state.contexts.filter(x=>x.id!=='done');ctx.renderList();assert.ok(!litTags(shim).includes('c:done'));
 });
 test('RISK context selector fallback isolation: ordinary selected controls do not share a rule with unsupported relational selectors',()=>{
  for(const file of ['index.html','landscape.css']){const source=fs.readFileSync(path.join(__dirname,file),'utf8');assert.doesNotMatch(source,/[^{}]*\.ltag\.on[^{}]*:has\([^{}]*\)\s*\{/,'unsupported editor selector must not invalidate ordinary selected chip paint in '+file);}
@@ -26284,39 +26523,74 @@ test('RISK pedestrian reservation workload: stress admission stays fourteen whil
  assert.ok(largest>14,'test must exercise retained recipes separately from the fourteen admission slots');
 });
 
-function pedestrianFrameSelection(source,world,geometry,reduced=false){
- const helperStart=source.indexOf('  function eventPaintable('),helper=helperStart<0?'':source.slice(helperStart,source.indexOf('  function paintLife(',helperStart));
- const selection=source.slice(source.indexOf('    const paintEvents=',source.indexOf('  function paintLife(')),source.indexOf('    const weather=',source.indexOf('  function paintLife(')));
- const calls=[],context={world,geometry,reduced,localWalkEnds:new Map(),scenePose:e=>{calls.push(e.id);return {...e,age:reduced?1:e.age};}};
- vm.runInNewContext(helper+selection+';globalThis.selected=paintEvents;',context);
- return {selected:context.selected,calls,context,helper,selection};
+function pedestrianFrameSelection(visits,world,geometry,reduced=false,poseOther=event=>event){
+ const calls=[],selected=visits.forPaint(world.events,geometry,reduced,{poseOther:event=>{calls.push(event.id);return poseOther(event);}});
+ return {selected,calls};
 }
 
+function pedestrianPresentationConsumer(source,geometry,reduced=false,visits){
+ const paintStart=source.indexOf('  function paintLife('),selection=source.slice(source.indexOf('    const paintEvents=',paintStart),source.indexOf('    const weather=',paintStart));
+ const poseStart=source.indexOf('  function scenePose('),pose=source.slice(poseStart,source.indexOf('  function syncScene(',poseStart));
+ const context=vm.createContext({world:{events:[]},geometry,reduced,visits});
+ vm.runInContext(pose+`globalThis.selectPaintEvents=function(){${selection};return paintEvents;};`,context);
+ return {context,select(events,nextGeometry=geometry,nextReduced=reduced){context.world={events};context.geometry=nextGeometry;context.reduced=nextReduced;return vm.runInContext('selectPaintEvents()',context);}};
+}
+
+test('RISK pedestrian paint presentation consumer: current motion and viewport choices preserve complete local exits',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),c=sceneTimeline();
+ assert.equal(c.LandscapeConfig.setSpawnRates(c.LandscapeConfig.spawnRateNames.map(n=>`| ${n} | ${n==='walker'?10:0} |`).join('\n')),true);
+ const timeline=c.LandscapeTimeline.create({seed:'private-walking-exits',season:'summer',sunAt:()=>({altitude:25,azimuth:100})}),epoch=Date.parse('2026-10-14T01:00Z');let event=null;
+ for(let second=0;second<=7200&&!event;second+=30)event=timeline.at(epoch+second*1000).events.find(candidate=>candidate.type==='walker');
+ assert.ok(event,'deterministic production reconstruction supplies a walking visit');
+ const geometry=c.LandscapeGeometry.create(390,844),visits=c.LandscapeVisits.create(),end=geometry.walkingLifetime(event),active={...event,id:'active',age:event.activityDuration*.5},tail={...event,id:'tail',age:event.activityDuration+1},departed={...event,id:'departed',age:end+.001},plane={id:'plane',type:'plane',age:10,duration:90},before=JSON.stringify([active,tail,departed,plane]);
+ const consumer=pedestrianPresentationConsumer(source,geometry,false,visits),normal=consumer.select([active,tail,departed,plane],geometry,false),still=consumer.select([active,tail,departed,plane],geometry,true),resumed=consumer.select([active,tail,departed,plane],geometry,false);
+ assert.deepEqual(Array.from(normal,e=>e.id),['active','tail','plane'],'normal motion keeps the full local journey until its party has cleared the geometry');
+ assert.deepEqual(Array.from(still,e=>e.id),['active','plane'],'reduced motion keeps current admission visits and cannot revive either expired tail');
+ assert.equal(still[0].age,geometry.stillWalkingAge(active),'the reduced representative uses the established settled walking pose');
+ assert.equal(still[1].age,plane.duration*.5,'unrelated reduced scenery keeps its existing representative');
+ assert.deepEqual(Array.from(resumed,e=>e.id),['active','tail','plane'],'normal motion resumes the same still-underway recipe at its current age');
+ assert.equal(resumed[1].age,tail.age);assert.equal(JSON.stringify([active,tail,departed,plane]),before,'presentation leaves shared event records unchanged');
+ const wide=c.LandscapeGeometry.create(1440,900),between={...event,id:'resize-history',age:end+1},wideEnd=wide.walkingLifetime(between);
+ assert.ok(wideEnd>end+1,'the wide viewport retains a longer complete local crossing');
+ assert.deepEqual(Array.from(visits.forPaint([between],geometry,false)),[],'the current narrow geometry retires its departed party');
+ assert.deepEqual(Array.from(visits.forPaint([between],wide,false),e=>e.id),['resize-history'],'the same logical recipe remains paintable on the wide geometry');
+ assert.deepEqual(Array.from(visits.forPaint([between],geometry,false)),[],'returning to the narrow geometry discards the wide local completion');
+});
+
 test('RISK pedestrian local paint culling: completed parties stop before pose shadow reflection and actor consumers without altering shared records',()=>{
- const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),ctx=sceneTimeline();
+ const ctx=sceneTimeline(),visits=ctx.LandscapeVisits.create();
  for(const [width,height]of [[390,844],[820,1180],[1440,900],[2560,1080],[8192,900]])for(const reverse of [false,true])for(const type of ['walker','dogwalker','reader','couple','picnic','kite','snowman','snowangel','skier']){
   const geometry=ctx.LandscapeGeometry.create(width,height),base={type,id:'party',seed:.4,lane:.5,reverse,duration:ctx.LandscapeConfig.eventDurations[type]},end=geometry.walkingLifetime(base);
   const event={...base,activityDuration:base.duration,duration:ctx.LandscapeGeometry.create(8192,900).walkingLifetime(base)},world={events:[{...event,id:'underway',age:end-.001},{...event,id:'departed',age:end+.001},{id:'plane',type:'plane',age:10,duration:90}]},before=JSON.stringify(world);
-  const result=pedestrianFrameSelection(source,world,geometry);
-  assert.deepEqual(result.calls,['underway','plane'],`${type} ${width}: local retirement must precede scenePose and all downstream paint passes`);
+  const result=pedestrianFrameSelection(visits,world,geometry);
+  assert.deepEqual(Array.from(result.selected,e=>e.id),['underway','plane'],`${type} ${width}: local retirement must precede every downstream paint pass`);
+  assert.deepEqual(result.calls,['plane'],`${type} ${width}: nonwalking representatives remain in the separate caller-owned pose path`);
   assert.equal(JSON.stringify(world),before,'local painting never removes a shared recipe or changes its clocks');
  }
 });
 
 test('RISK pedestrian reduced workload: original shared reservations alone select deterministic still representatives',()=>{
- const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),world={events:Array.from({length:300},(_,i)=>({id:'tail:'+i,type:'walker',age:100+i,duration:2373,activityDuration:60,seed:.4,lane:.5,reverse:false}))};
+ const c=sceneTimeline(),visits=c.LandscapeVisits.create(),world={events:Array.from({length:300},(_,i)=>({id:'tail:'+i,type:'walker',age:100+i,duration:2373,activityDuration:60,seed:.4,lane:.5,reverse:false}))};
  world.events.push({id:'reserved',type:'walker',age:30,duration:2373,activityDuration:60,seed:.4,lane:.5,reverse:false},{id:'plane',type:'plane',age:20,duration:90});
- const geometry={walkingLifetime(){throw Error('reduced scenery must not solve three hundred local tail routes');}},result=pedestrianFrameSelection(source,world,geometry,true);
- assert.deepEqual(result.calls,['reserved','plane'],'expired reservations cannot be moved back into the viewport by reduced midpoint poses');
- assert.deepEqual(result.selected.map(e=>e.id),['reserved','plane']);
+ let stillPoses=0;const geometry={walkingLifetime(){throw Error('reduced scenery must not solve three hundred local tail routes');},stillWalkingAge:event=>{stillPoses++;return event.activityDuration*.5;}},result=pedestrianFrameSelection(visits,world,geometry,true,event=>({...event,age:event.duration*.5}));
+ assert.deepEqual(result.calls,['plane'],'expired walking tails bypass both local route solving and nonwalking pose selection');
+ assert.deepEqual(Array.from(result.selected,e=>e.id),['reserved','plane']);
+ assert.equal(result.selected[0].age,30,'the owner selects the established representative without changing the shared current age');
+ assert.equal(result.selected[1].age,45,'nonwalking still-scene composition stays with the renderer');
+ assert.equal(stillPoses,1,'only the current shared walking reservation receives a still pose');
+ assert.deepEqual(Array.from(visits.forPaint(world.events,geometry,true,{membershipOnly:true}),e=>e.id),['reserved','plane'],'the ambient timer can track expiry without preparing painter poses');
+ assert.equal(stillPoses,1,'membership-only repaint checks do not repeat terrain pose work');
 });
 
 test('RISK pedestrian paint memo: UTC frame age advances without rebuilding each local completion recipe',()=>{
- const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8');let solves=0;const geometry={walkingLifetime(){solves++;return 400;}},world={events:[{id:'walker',type:'walker',age:10,duration:2373,activityDuration:60,seed:.4,lane:.5,reverse:false}]};
- const result=pedestrianFrameSelection(source,world,geometry);world.events=[{...world.events[0],age:20}];
- vm.runInNewContext('{'+result.helper+result.selection+'}',result.context);
- assert.equal(solves,1,'immutable local completion is solved once, not on each frame');
- assert.match(source,/localWalkEnds\.clear\(\)/,'resize discards completion bounds for the previous geometry');
+ const c=sceneTimeline(),visits=c.LandscapeVisits.create(),world={events:[{id:'walker',type:'walker',age:10,duration:2373,activityDuration:60,seed:.4,lane:.5,reverse:false}]};let narrowSolves=0,wideSolves=0;
+ const narrow={walkingLifetime(){narrowSolves++;return 400;}},wide={walkingLifetime(){wideSolves++;return 800;}};
+ assert.deepEqual(Array.from(visits.forPaint(world.events,narrow,false),e=>e.id),['walker']);world.events=[{...world.events[0],age:20}];
+ visits.forPaint(world.events,narrow,false);assert.equal(narrowSolves,1,'immutable local completion is solved once, not on each frame');
+ world.events=[{...world.events[0],age:500}];assert.deepEqual(Array.from(visits.forPaint(world.events,narrow,false)),[],'the narrow geometry retires its complete visit');
+ assert.deepEqual(Array.from(visits.forPaint(world.events,wide,false),e=>e.id),['walker'],'the wider geometry receives its own later completion');
+ assert.deepEqual(Array.from(visits.forPaint(world.events,narrow,false)),[],'returning to the narrow geometry cannot retain a wider cached cutoff');
+ assert.equal(narrowSolves,2,'geometry changes discard stale local completion decisions');assert.equal(wideSolves,1);
 });
 
 test('RISK pedestrian fireworks isolation: retained walking recipes never enter unrelated show pose work',()=>{
@@ -26338,9 +26612,9 @@ test('RISK pedestrian slot guidance: extended FAQ separates arrival budget from 
 });
 
 test('RISK pedestrian reduced retirement consumer: shared slot expiry repaints a still scene even when retained IDs do not change',()=>{
- const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),helper=source.slice(source.indexOf('  function eventPaintable('),source.indexOf('  function paintLife(')),advance=source.slice(source.indexOf('  function advanceRooftopParty('),source.indexOf('  function stop(',source.indexOf('  function advanceRooftopParty(')));
- let painted=0;const event={id:'retained',type:'walker',age:59,duration:2373,activityDuration:60},context={reduced:true,document:{hidden:false},geometry:{},p:{},world:{elapsed:59,events:[event]},woodland:{events:[]},rooftopParty:{active:null},clocktowerVisit:{active:null},lastCitySlot:0,sceneSnapshot:{windowsSlot:0},syncScene(){event.age=61;context.world.elapsed=61;},paintBackground(){throw Error('unrelated background should remain cached');},paintLife(){painted++;}};
- vm.runInNewContext(helper+advance+';advanceRooftopParty(1);',context);
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),advance=source.slice(source.indexOf('  function advanceRooftopParty('),source.indexOf('  function stop(',source.indexOf('  function advanceRooftopParty('))),c=sceneTimeline(),visits=c.LandscapeVisits.create();
+ let painted=0;const event={id:'retained',type:'walker',age:59,duration:2373,activityDuration:60},context={visits,reduced:true,document:{hidden:false},geometry:c.LandscapeGeometry.create(390,844),p:{},world:{elapsed:59,events:[event]},woodland:{events:[]},rooftopParty:{active:null},clocktowerVisit:{active:null},lastCitySlot:0,sceneSnapshot:{windowsSlot:0},syncScene(){event.age=61;context.world.elapsed=61;},paintBackground(){throw Error('unrelated background should remain cached');},paintLife(){painted++;}};
+ vm.runInNewContext(advance+';advanceRooftopParty(1);',context);
  assert.equal(painted,1,'expiry of a shared admission slot must remove its old reduced representative');
  assert.equal(context.world.events[0].age,61,'retained shared walking recipe remains available to normal motion');
 });
@@ -26352,7 +26626,7 @@ test('RISK pedestrian deferred recipes: cold admission plans solve only near-mid
  const t=c.LandscapeTimeline.create({seed:'private-walking-exits',season:'summer',sunAt:()=>({altitude:25,azimuth:100})}),at=Date.parse('2026-10-14T01:00Z');const before=JSON.parse(JSON.stringify(t.at(at)));
  assert.ok(counts.size<=700,`a cold instant should not solve ${counts.size} full-day walking recipes`);
  t.at(at+8000);t.at(at-8000);assert.deepEqual(JSON.parse(JSON.stringify(t.at(at))),before,'deferred lifetime reads cannot select different admission');
- assert.ok([...counts.values()].every(n=>n===1),'deferred recipes solve once per immutable opportunity');
+ assert.ok([...counts.values()].every(n=>n===1),`deferred recipes solve once per immutable opportunity: ${JSON.stringify([...counts].filter(([,count])=>count!==1))}`);
 });
 
 test('RISK pedestrian maximum lifetime: all canonical walking cohorts fit the proven finite recipe lookback',()=>{
@@ -26364,7 +26638,7 @@ test('RISK pedestrian maximum lifetime: all canonical walking cohorts fit the pr
 });
 
 test('RISK pedestrian deferred reconstruction: eager recipe reference matches lazy output at lookback midnight and cache eviction',()=>{
- const lazy=sceneTimeline(),eager=sceneTimeline({'landscape-timeline.js':source=>source.replace('events.push(extendWalk(e));','const visit=extendWalk(e);void visit.duration;events.push(visit);').replace('e.start>=from-MAX_WALK_LIFE&&','')});
+ const lazy=sceneTimeline(),eager=sceneTimeline({'landscape-visits.js':source=>source.replace('return visit;','void visit.duration;return visit;').replace('event.start>=from-MAX_VISIT_LIFETIME&&','true&&')});
  const options={seed:'private-walking-exits',season:'winter',sunAt:()=>({altitude:25,azimuth:100})},a=lazy.LandscapeTimeline.create(options),b=eager.LandscapeTimeline.create(options),epoch=Date.parse('2026-10-14T00:00Z'),day=86400000;
  for(const offset of [0,2700000-1,2700000,2700000+1,day-2700000,day-1,day,day+1,2*day+1,-day+1,2700000]){
   const at=epoch+offset,actual=a.at(at);assert.deepEqual(JSON.parse(JSON.stringify(actual)),JSON.parse(JSON.stringify(b.at(at))),'getter read order, boundary and cache history cannot change shared output');
@@ -26373,10 +26647,10 @@ test('RISK pedestrian deferred reconstruction: eager recipe reference matches la
 });
 
 test('RISK pedestrian motion toggle consumer: real motion-choice handler restores full underway tails without changing shared recipes',()=>{
- const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),helper=source.slice(source.indexOf('  function eventPaintable('),source.indexOf('  function paintLife(')),update=source.slice(source.indexOf('  function updateMotion('),source.indexOf('  function openMotion(')),listener=source.slice(source.indexOf("  document.addEventListener('click',event=>{\n    const button=event.target.closest('[data-landscape-motion]"),source.indexOf("  dialog.addEventListener('close'",source.indexOf("const button=event.target.closest('[data-landscape-motion]")));
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),update=source.slice(source.indexOf('  function updateMotion('),source.indexOf('  function openMotion(')),listener=source.slice(source.indexOf("  document.addEventListener('click',event=>{\n    const button=event.target.closest('[data-landscape-motion]"),source.indexOf("  dialog.addEventListener('close'",source.indexOf("const button=event.target.closest('[data-landscape-motion]"))),c=sceneTimeline(),visits=c.LandscapeVisits.create();
  const world={events:[{id:'tail',type:'walker',activityDuration:60,duration:2373,age:200,seed:.4,lane:.5,reverse:false},{id:'current',type:'walker',activityDuration:60,duration:2373,age:30,seed:.4,lane:.5,reverse:false}]},before=JSON.stringify(world),saved=[],results=[];let handler,context;
- const state={world,geometry:{walkingLifetime:()=>400},localWalkEnds:new Map(),preference:'reduced',reduced:true,mq:{matches:false},storage:{},S:{motionReduced:value=>value!=='normal',saveMotion:(storage,value)=>saved.push(value)},motionButton:{},dialog:{querySelectorAll:()=>[],close(){}},document:{documentElement:{dataset:{}},getElementById:()=>({}),addEventListener:(name,fn)=>{handler=fn;}},start(){results.push(vm.runInContext('world.events.filter(eventPaintable).map(e=>e.id)',context));},scenePose:e=>e};
- context=vm.createContext(state);vm.runInContext(helper+update+listener,context);
+ const state={world,visits,geometry:{walkingLifetime:()=>400,stillWalkingAge:()=>42},preference:'reduced',reduced:true,mq:{matches:false},storage:{},S:{motionReduced:value=>value!=='normal',saveMotion:(storage,value)=>saved.push(value)},motionButton:{},dialog:{querySelectorAll:()=>[],close(){}},document:{documentElement:{dataset:{}},getElementById:()=>({}),addEventListener:(name,fn)=>{handler=fn;}},start(){results.push(Array.from(visits.forPaint(world.events,state.geometry,state.reduced),e=>e.id));}};
+ context=vm.createContext(state);vm.runInContext(update+listener,context);
  for(const mode of ['normal','reduced','normal'])handler({target:{closest:()=>({dataset:{landscapeMotion:mode},hasAttribute:()=>false})}});
  assert.deepEqual(saved,['normal','reduced','normal']);assert.deepEqual(JSON.parse(JSON.stringify(results)),[['tail','current'],['current'],['tail','current']]);assert.equal(JSON.stringify(world),before);
 });
