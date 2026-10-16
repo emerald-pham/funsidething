@@ -25154,6 +25154,29 @@ test('RISK bulk result ownership: same-account Undo keeps the current-value summ
  const editedBoard=ctx.state;ctx.undo();assert.notEqual(ctx.state,editedBoard,'ordinary board Undo restores a replacement object');assert.equal(ctx.state.tasks.find(task=>task.id===a.id).due,null);assert.equal(ctx.state.tasks.find(task=>task.id===b.id).due,null);
  assert.match(shim.document.getElementById('listBulkToolbar').innerHTML,/Bulk edit requested for 2 tasks: 0 currently match in this tab; 2 have different values or are no longer open/,'same logical owner keeps the result and measures its current values after Undo');assert.doesNotMatch(shim.document.getElementById('listBulkToolbar').innerHTML,/data-act="bulk-undo"/);
 });
+test('RISK architecture checkpoint: editor Undo and bulk Undo preserve selection boundaries and immutable history through reload',async()=>{
+ const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),deviceDbName='private-architecture-checkpoint';
+ const {ctx,shim}=await loadApp({seed:613,cryptoProvider:webcrypto,indexedDBProvider:indexedDB,deviceDbName});
+ setFakeTime(ctx,Date.parse('2026-10-16T12:34:56.789Z'));
+ const a=ctx.addTask('Private checkpoint A'),b=ctx.addTask('Private checkpoint B');ctx.state.listOpen=true;ctx.render();
+ ctx.onAction('bulk-select-all');assert.match(shim.document.getElementById('listBulkToolbar').innerHTML,/2 selected/);
+ ctx.openEdit(a.id);fillEditPane(ctx,shim,{title:'Private checkpoint edited Done',due:'2028-04-12'});ctx.onAction('done-task',{dataset:{id:a.id}});
+ const completion=ratingHistoryCopy(ratingHistoryTask(ctx,a.id).ratingHistory.find(row=>row.kind==='done'));
+ assert.ok(completion.id,'the actual editor gesture creates an immutable completion fact');
+ assert.match(shim.document.getElementById('listBulkToolbar').innerHTML,/1 selected/,'completing a task prunes its hidden selection');
+ ctx.onAction('undo');assert.equal(ratingHistoryTask(ctx,a.id).title,'Private checkpoint A');assert.equal(ratingHistoryTask(ctx,a.id).done,false);
+ assert.match(shim.document.getElementById('listBulkToolbar').innerHTML,/1 selected/,'Undo restores the task without silently reselecting the formerly hidden row');
+ ctx.onAction('bulk-select-all');ctx.onAction('bulk-edit');shim.document.getElementById('bulkApplyDue').checked=true;shim.document.getElementById('bulkDue').value='2028-06-12';ctx.onAction('bulk-save');
+ assert.equal(ratingHistoryTask(ctx,a.id).due,'2028-06-12');assert.equal(ratingHistoryTask(ctx,b.id).due,'2028-06-12');
+ assert.match(shim.document.getElementById('listBulkToolbar').innerHTML,/2 currently match in this tab/);
+ ctx.onAction('undo');assert.equal(ratingHistoryTask(ctx,a.id).due,null);assert.equal(ratingHistoryTask(ctx,b.id).due,null);
+ assert.match(shim.document.getElementById('listBulkToolbar').innerHTML,/0 currently match in this tab; 2 have different values or are no longer open/);
+ assert.deepEqual(ratingHistoryCopy(ratingHistoryTask(ctx,a.id).ratingHistory.find(row=>row.id===completion.id)),completion,'later bulk Undo cannot erase or rewrite the editor completion fact');
+ assert.equal(await ctx.persist(),true);const saved=ratingHistoryCopy(ctx.state.tasks);
+ const reloaded=await loadApp({seed:614,cryptoProvider:webcrypto,indexedDBProvider:indexedDB,deviceDbName});
+ assert.deepEqual(ratingHistoryCopy(reloaded.ctx.state.tasks),saved,'isolated cold reload retains task fields and exact immutable facts after both owner transactions');
+ reloaded.ctx.openEdit(a.id);assert.match(reloaded.shim.document.getElementById('modalRoot').innerHTML,/Done/,'the retained completion remains visible in Task history');
+});
 test('RISK bulk account selection guidance: Help and Changelog explain account-switch clearing',async()=>{
  const {ctx,shim}=await loadApp();for(const id of ['appChangelogCurrent','appChangelog'])shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
  const answer=help.split('<dt>How do I edit several tasks together?</dt><dd>')[1]?.split('</dd>')[0]||'';assert.match(answer,/Switching accounts clears the previous board’s selection\./);
