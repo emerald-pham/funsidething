@@ -1,221 +1,38 @@
 # Chain Scanner
 
-A ranked FVP task scanner. The app is centered in `index.html`, with its installable
-PWA shell in `manifest.webmanifest`, `sw.js`, and the local icon assets. All tests
-live in `tests.js`, run with `node --test tests.js`.
+A ranked FVP task scanner with a PWA/offline shell and cloud-synced saved boards.
 
-## Test-first, without exception
+## Agent skills
 
-Every functional change requires a meaningful, contemporaneously observed RED
-before implementation, then GREEN afterward. Risk determines test selection,
-execution breadth and regression depth; it never permits implementation-first
-for a low-risk control, layout, default, parser, provider path or other behavior.
-Pure prose and nonfunctional housekeeping use consistency review.
+Use only relevant installed Matt Pocock skills, routed by
+[workflow](docs/agents/workflow.md). Read it before functional work, bug diagnosis,
+code review, PR writing or guidance edits. It defines strict behavioral RED→GREEN,
+seam agreement, honest evidence and user feedback boundaries.
 
-No implementation code goes into `index.html`, `sw.js`, `manifest.webmanifest`, or
-the PWA icon assets until a test for that behavior exists in `tests.js`, has been run,
-and has been **seen to fail for the right reason**. A test written after the code is
-a test that has never been observed to catch anything.
+Domain docs: single-context; see [domain rules](docs/agents/domain.md) before exploration.
+Tracker/triage setup remains unconfirmed; see [migration](docs/agents/migration.md).
 
-The loop, every time: pin down the behavior → enumerate the cases (happy path,
-boundaries, invalid input, failure modes, ordering effects) → write the tests →
-run them and show the red output → minimum implementation →
-run and show the green output.
+## Test-first and regression
 
-Watch for a new test that passes *before* the implementation exists. That test is
-broken, not finished — strengthen it until it discriminates, then continue.
+Every functional change requires meaningful observed RED before implementation,
+then GREEN. Preserve red output and actual chronology. Use risk-based focused
+cohorts and the full suite when required. Read [TDD and regression gates](docs/agents/tdd-and-regression.md)
+before any runtime, visual, test or enforcement-file edit: its hook, RISK cases,
+coverage map and fingerprinted rationales remain mandatory. Existing passing
+feature assertions remain protected.
 
-## Forced risk-based TDD and regression gates
+Use one agreed seam/test/minimal implementation per vertical cycle; inventory
+cases up front without writing every future test before implementation. A test
+that unexpectedly passes needs investigation, not a fabricated RED. Configuration
+or dependency changes follow the same behavioral loop when functional.
 
-Before editing any scanner, landscape, location, or offline-shell behavior,
-write a discriminating test in `tests.js`, run it, and keep the red output for
-the release record. The edit guard covers every app module. The CI diff gate
-also rejects app changes without changed tests. Browser/runtime JavaScript,
-HTML, the web manifest, Firestore rules, and the test-first gate, hook, or
-workflow require a new `RISK` test in the same diff. Runtime paths are matched
-by file type, so a newly added module cannot avoid the gate by using a new
-filename. CSS and static image edits still need a direct test in the same diff;
-they use a `RISK` case when the failure cost warrants one.
+## Review and release
 
-For behavior-changing controls, begin with the prior state and exercise the
-transition through the actual consumer: the change/click handler, command, or
-import path. A helper test or fixture already set to the final value cannot
-prove that the control reaches the rule. Check equivalent entry points where
-they should share that rule (for example, Add and Edit Hours → Days, or a scan
-preference change and Save settings). Cover only the relevant transitions and
-saved-data consequences for the change; do not expand this into a blanket
-matrix or introduce another test framework. For Add and Edit Hours → Days,
-assert the displayed draft before saving and the persisted result afterward;
-retain custom-duration and return-to-default cases when prior edits matter.
-Use an isolated board. When closing a gap in established
-behavior, verify that an isolated broken-handler negative control fails and
-record its actual chronology rather than calling it preimplementation red. The
-seven-day suggestion originally tested only Add; Edit's conversion/Save test
-never dispatched its Hours → Days change. Keep interaction and serialization
-contracts separate and retain both.
-
-Choose cases by failure cost. For persisted task rules, include old saved data,
-undo, import or restore, deletion, and cross-device reconciliation when those
-paths touch the change. For a visual or motion change, cover the numerical
-geometry or paint contract, reduced motion, and relevant phone, tablet, and
-short-landscape viewports. For offline changes, check the asset fingerprint and
-offline reload. A text or styling fix needs a direct UI assertion that would
-have failed before the edit. Run the focused tests and affected regression
-cohort; broaden to the full suite when risk or a required release gate warrants
-it. Inspect the rendered result when pixels or controls changed. Record test, browser,
-offline, CI, and live results separately.
-
-A `PreToolUse` hook (`.claude/hooks/test-first-guard.sh`) enforces the ordering: an edit
-to an app, PWA shell, or enforcement file is refused while `tests.js` has no uncommitted changes.
-Treat the block as correct and go write the test — do not work around it.
-
-`RISK_TEST_COVERAGE.md` maps the current high-cost feature contracts to their
-named tests. Add or rename its entry whenever a `RISK` test is added, removed,
-or renamed; a test in `tests.js` checks that the map stays complete. Changes to
-the diff gate, edit hook, or CI workflow also need a new process-focused
-`RISK` test, named under the test-first gate, regression gate, test inventory,
-or repository process boundary. An unrelated feature risk test cannot satisfy
-that process requirement.
-
-The hook and CI gate enforce structural requirements: tests appear in the app
-diff, a new risk case is named, and test changes carry a rationale with red
-command/failure evidence. They cannot independently prove that the command ran
-before implementation or that the recorded failure was observed. Keep the real
-red output with task or release evidence, then run focused tests and the
-risk-selected regression cohort after the fix. Distinguish contemporaneous RED
-from retrospective base-versus-fixed validation; the latter does not establish
-test-first chronology. Treat the rationale as a review aid, not proof of chronology.
-
-Only pure prose, comments and nonfunctional housekeeping are exempt from a
-functional RED/GREEN loop. Configuration, dependencies and code deletion need
-the same test-first evidence whenever they change functionality. Keep focused
-cohorts; do not expand into blanket account matrices without a changed risk.
-
-## Conventions
-
-- Comments in this codebase explain *why*, especially where a past bug drove the design
-  (see the cloud-sync block). Match that density and voice; a fix without its reasoning
-  invites the same bug back.
-- Cloud sync orders writes by a revision counter, never by wall-clock timestamps.
-- Select local regression breadth by the affected risk; run the full suite when
-  warranted, and complete mandatory CI, compatibility and release gates.
-
-## Backward compatibility before release
-
-Run `npm run test:compatibility` before release. The required `scanner-tests`
-CI job runs it for every PR, push, and Pages deployment. It requires the
-Firestore emulator, available Git history, and zero skipped compatibility cases.
-It executes real released client backends and codecs against candidate rules,
-and candidate clients against released rules, then runs the bounded sync-error
-and safe reload contracts. Read success alone is never evidence of sync success.
-
-The matrix retains the immutable supported baseline in
-`scripts/backward-compatibility.mjs` and also tests the exact comparison base
-(`COMPATIBILITY_BASE_SHA` in CI, `origin/main` locally). Do not advance or remove
-the pinned baseline to make an incompatible change pass. A new protocol needs
-a staged compatible rollout or an explicitly reviewed support/migration change.
-See [BACKWARD_COMPATIBILITY.md](BACKWARD_COMPATIBILITY.md) for the supported
-boundary and the historical negative control. The Firestore `predeploy` hook
-also runs this same gate before `firebase deploy --only firestore:rules`, so a
-manual CLI rules deployment cannot accidentally omit the compatibility check.
-
-## Protect existing features when changing tests
-
-Existing passing behavior tests are feature contracts. Preserve their assertions
-unless a user explicitly changes the behavior or concrete bug evidence shows the
-old expectation is wrong. Never weaken, delete, skip, or replace a regression
-test merely to make an implementation pass. Fix the implementation first.
-
-Every executable change in `tests.js`, including new coverage, needs an entry
-in `TEST_CHANGE_RATIONALES.json` with the exact protected-test-change fingerprint,
-the specific reason, previous and intended behavior, named replacement or new
-tests, remaining feature boundaries, and the command plus observed failure from
-the red run. Write and observe that failure before implementing the change. Keep
-unrelated protections intact. Update the entry if the test diff changes.
-
-`scripts/test-first-gate.mjs` runs in required CI and rejects test changes without
-this record, including test-only changes and deletion of `tests.js`. It protects
-all executable additions as well as removals: early returns, comment delimiters,
-and appended termination code cannot silently bypass the suite. Blank lines and
-single-line `//` comments are ignored; block-comment changes are protected
-because they can hide assertions. The record is evidence for review, not an
-automatic permission to regress: the independent reviewer must judge the reason,
-replacement coverage, and actual user-visible result on the final commit. CI
-checks the record and diff; it cannot itself prove that a command ran earlier.
-
-## Risk-based exact-commit release gates
-
-Every candidate needs an owner review of its exact diff. The release validator
-derives the review plan from the exact base-to-candidate diff and records it in
-the receipt. Pure documentation, comments, copy, and housekeeping with no
-executable, configuration, test, release-gate, data, or product-behavior change
-need only the owner's exact-diff review. Ordinary code or behavior needs one
-independent code/behavior review. Shared session state, callable or auth
-behavior, Firestore rules, deployment/authentication infrastructure, data
-migration, memory, cloud persistence, and synchronization need the relevant
-specialist review. A code reviewer and a specialist reviewer are both required
-only when the exact diff affects both domains.
-
-Risk is derived from changed paths and their exact diff content; callers cannot
-lower the required review plan. An optional `additionalSpecialistDomains`
-input may add domains from the validator's known-domain list, but cannot replace
-or remove any derived domain; that escalation is recorded in the receipt.
-Ambiguous auth, state-persistence, and session-persistence changes fail closed
-to their relevant specialists. Memory/cloud/sync specialist receipts record
-source fingerprints and per-domain impact and rationale. Every affected domain
-lists focused tests; an all-unaffected assessment still includes at least one
-focused preservation test across the assessed domains. Install the shared pre-push gate with
-`npm run release:install-hook`, record evidence with `npm run release:record`,
-verify it with `npm run release:verify`, and publish statuses with
-`npm run release:publish` before merging. Re-review affected domains whenever
-the candidate SHA changes. The main ruleset must retain
-`funsidething/memory-audit` and `funsidething/independent-review`, add
-`funsidething/specialist-review`, and keep its other required checks. Schema
-version 1 receipts retain their original two-review policy and publish a
-receipt-bound specialist-compatibility status so all current required contexts
-are present; this compatibility status does not claim a third human review. New
-schema version 2 receipts follow the derived plan. Pages CI independently
-verifies the merged PR head, exact tree, base, receipt digest, and latest status
-contexts before deployment. Follow [RELEASE_GATES.md](RELEASE_GATES.md) for the
-evidence format and release steps. Receipts and statuses record human work but
-cannot prove that a person actually performed the review; repository writers
-with status permission and protection-bypassing administrators remain inside
-the trust boundary.
-
-## Independent typography review for final releases
-
-Owner instruction, 2026-10-08: every final product checkpoint release and
-equivalent release requires a typography reviewer independent of the
-implementer. Review the actual final built candidate, identify its commit and
-build artifact, and compare it with the intended typography contract and
-previous released build. Automated typography checks do not substitute for this
-review. Recheck affected evidence if the reviewed candidate materially changes.
-
-Inspect the actual resolved/rendered font (including platform fallback or font
-load failure), computed family, size, weight and line height, readability,
-wrapping and overflow. Use representative relevant viewports and states,
-including changed controls, dialogs/portals and recovery screens when affected.
-Choose the smallest useful configuration set; do not expand into a full actor
-or account matrix. For a global font report, sample shared chrome plus distinct
-font/inheritance paths across the app, and compare base/candidate CSS and assets.
-Record the baseline, exact artifact, platform, states, viewport/window sizes,
-findings, evidence and what was not checked. An inaccessible runtime is an
-unresolved review gap, not a pass inferred from unit, inference or source tests.
-Fix actionable typography findings and obtain the affected independent review
-before publication.
-
-For each added or restyled control, identify the established equivalent or
-adjacent reference control and the intended match or deliberate difference.
-Reuse its component classes and theme tokens. Compare the actual final controls
-side by side: font family, size, weight and line height; padding and height;
-radius, border, fill, ink and shadow; and hover, focus and disabled treatment
-where applicable. Inspect every affected surface, including the active
-candidate and paused or sole/final task, in both themes and relevant narrow,
-wide and enlarged views. Distinguish naturally disabled states from isolated
-paint probes. Record exact-candidate screenshots, computed styles, the reference
-and coverage limits. White paint, readable text and passing bounds alone do not
-establish a visual match. Unexplained drift is an actionable finding; fix it and
-repeat the affected final rendered comparison before approval.
+Read [AGENTS.md](AGENTS.md) for maintenance authorization, FAQ duties and holds.
+Before release, read [release and review](docs/agents/release-and-review.md) and
+[RELEASE_GATES.md](RELEASE_GATES.md). Preserve independent changed-code/specialist,
+FAQ and final rendered typography reviews, exact-candidate evidence, compatibility,
+CI, Pages and live-asset/behavior checks. Local GREEN alone is not shipment.
 
 Verify the applied theme attribute, computed color scheme and paint before
 accepting each theme capture; theme labels alone do not establish coverage.
@@ -232,15 +49,10 @@ Screenshots in isolation are not a pass: record executed assertions, exact
 artifact and visible changed surfaces together with the named reference and
 coverage limits. Missing relevant runtime evidence remains a review gap.
 
-## Context data and rendering regression boundaries
+## Context and persistence
 
-Context UI reviews must distinguish assigned task IDs, main scanner inclusion,
-and All Tasks filters. Compare representative legacy string-array assignments
-(including unknown and empty IDs) through actual Save, Cancel, completion and
-Undo consumers, serialization and reload. Preserve unavailable references on
-unrelated single-task edits; test explicit bulk replacement and Clear separately.
-Inspect the visible editor context row after scrolling, including native checked
-state and rendered feedback. When hiding native indicators behind newer CSS
-selectors, retain a usable native fallback and isolate unsupported selectors
-from ordinary chip rules. Synthetic fixtures cannot establish the state of a
-user’s board; restore only verified scoped differences from identified backups.
+For context assignments, filters, editing or context rendering, read
+[context regressions](docs/agents/context-regressions.md). For persistence/sync,
+exercise old saved data, concurrent clients, offline/reload/reconnect and
+completion/Undo as affected. Order cloud writes by revision, never wall clock.
+Comments explain why, especially historical cloud-sync safeguards.
