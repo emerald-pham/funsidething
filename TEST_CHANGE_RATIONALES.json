@@ -7156,5 +7156,21 @@
       "command": "Original Top X node --test --test-name-pattern=\"RISK task history: compact Top X\" tests.js; inherited upstream commands retained in released-base TEST_CHANGE_RATIONALES.json",
       "failure": "Original observed Top X RED expected Top X 2 of 7 → 4 of 9, actual prior compact metrics /tmp/topx-red.txt; punctuation /tmp/topx-slash-red.txt; consent driver /tmp/topx-driver-red.txt. Upstream RED is reused from its exact released-base records, not claimed newly executed."
     }
+  },
+  {
+    "testChangesSha256": "6991579bc9c9f5643df40df55475eba0f66031ee84c017978128e6fe66a614b9",
+    "reason": "Add a consumer characterization before the approved behavior-preserving TaskActionOwner refactor. The production baseline passed; the deliberate sensitivity mutant below verifies that missing comparison finalization is detected. This is not a claim of feature RED.",
+    "previousBehavior": "The scanner Yes gesture already records one actual comparison visible in Task history, and its facts survive Undo and a saved reload.",
+    "intendedBehavior": "Keep the existing scanner-to-history-to-Undo/reload behavior while the TaskActionOwner takes responsibility for the action transaction.",
+    "replacementTests": [
+      "RISK task action history: scanner comparison stays visible through Undo and saved reload"
+    ],
+    "preservedCoverage": [
+      "Existing rating-history comparisons, provenance, immutable facts, single-gesture Undo, latest-head retention, storage reload, unknown-format recovery, and editor observation boundaries remain covered."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='RISK task action history: scanner comparison stays visible through Undo and saved reload' tests.js > /private/tmp/chain-architecture-evidence-20261016/03/sensitivity-negative-control.log 2>&1",
+      "failure": "The controlled mutant failed at tests.js:734 with actual undefined versus expected yes; full output is retained in /private/tmp/chain-architecture-evidence-20261016/03/sensitivity-negative-control.log. The unmutated production baseline passed at 2026-10-16 16:52:02 UTC; this is sensitivity evidence, not feature RED."
+    }
   }
 ]

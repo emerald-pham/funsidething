@@ -3850,40 +3850,7 @@ function pushUndo(){
   undoStack.push({snapshot:JSON.stringify(state), generation:chanceGeneration});
   if(undoStack.length > 30) undoStack.shift();
 }
-function undo(){
-  if(!undoStack.length) return;
-  const currentChance = state.chance;
-  const frame = undoStack.at(-1);
-  const next=JSON.parse(frame.snapshot);
-  if(!sameListOwner(next,state)){ undoStack=[]; return; }
-  const inputs=t=>t&&[t.mu,t.sigma,t.done,t.ctx,t.startsAt,t.evergreen,t.evergreenHours,t.evergreenResetAtDay,t.lastDoneAt,taskPrerequisiteIds(t),t.dependencyModes];
-  const ids=next.tasks.filter(t=>JSON.stringify(inputs(t))!==JSON.stringify(inputs(taskById(t.id)))).map(t=>t.id);
-  const observation=captureRatingObservation("undo",ids);
-  undoStack.pop();
-  // Undo is a deliberate replacement. Carry the deletion evidence forward
-  // and record which removed tasks/history were explicitly brought back.
-  markReplacementDeletes(next);
-  // Observations survive Undo, so their supported latest pointer must survive
-  // too. Rewinding it could hide a later relative change back to an old value.
-  for(const task of next.tasks){
-    const head=taskById(task.id)?.ratingHistoryHead;
-    if(typeof head==="string" && Array.isArray(task.ratingHistory) && task.ratingHistory.some(row=>row?.id===head&&validRatingHistoryRow(row)))task.ratingHistoryHead=head;
-  }
-  replaceState(next);
-  // Undo restores ratings and decisions, but a fresh-pass/day boundary keeps
-  // its already-generated draw. Decision undos within a pass share the seed.
-  if(currentChance && Date.now() < passResetCutoff(currentChance.at) &&
-     (frame.generation !== chanceGeneration || (state.chance && Date.now() >= passResetCutoff(state.chance.at)))){
-    ensureCandidate();
-    state.chance = currentChance;
-    state.candidateId = null;
-  }
-  // A full commit, not commit(false): taking something back is itself a write.
-  // It has to reach storage or a reload resurrects what you just undid, and it
-  // has to re-stamp updatedAt for the local edit record. Its revision base is
-  // preserved by replaceState(), so the next cloud write can carry the Undo.
-  recomputeRanks(); finishRatingObservation(observation); commit();
-}
+function undo(){return TaskActionOwner.undo();}
 
 /* ---------- derived helpers ---------- */
 const taskById = id => state.tasks.find(t=>t.id===id) || null;
@@ -4523,42 +4490,171 @@ function recordDecisionTime(){
   const dt = Date.now() - state.presentedAt;
   if(dt > 300 && dt < 120000){ state.decisionsMs.push(dt); if(state.decisionsMs.length>20) state.decisionsMs.shift(); }
 }
-function decide(kind){ // 'yes' | 'no' | 'cant' | 'cand-done'
-  // An unrecognised kind — the retired 'can' among them — falls straight out
-  // rather than dropping through to the tail below, which would clear the
-  // candidate and deal a new one for a decision nobody made.
-  if(kind!=="yes" && kind!=="no" && kind!=="cant" && kind!=="cand-done") return;
-  const cand = taskById(state.candidateId); if(!cand) return;
-  const b = benchmark();
-  // Yes/No are comparisons against the benchmark, so they need one. A chain
-  // now dots its own head before any candidate is dealt, so this shouldn't be
-  // reachable — but a rank signal with nothing to rank against is a fabricated
-  // one, and the guard is cheaper than trusting it stays unreachable.
-  if(!b && (kind==="yes" || kind==="no")) return;
-  const observation=captureRatingObservation(kind,[cand.id,...(b && (kind==="yes" || kind==="no")?[b.id]:[])]);
-  pushUndo(); recordDecisionTime();
-  if(kind==="yes"){
-    writeTaskComparison(cand,false); // An explicit Yes establishes this task as a chosen participant.
-    if(b) updateTaskComparison(cand, b);
-    state.chain.push(cand.id);
-    delete state.considered[cand.id];
-    delete state.cantAt[cand.id];
-    delete state.workedAt[cand.id];
-  }else if(kind==="no"){
-    if(b) updateTaskComparison(b, cand); // Automatic participants provide no preference evidence.
-    state.considered[cand.id] = "no";
-  }else if(kind==="cant"){
-    state.considered[cand.id] = "cant";   // rejected without a rank signal
-    state.cantAt[cand.id] = Date.now();   // bulletproof until cantMin elapses — see expireCants()
-  }else if(kind==="cand-done"){
-    completeTask(cand);
+/* Own each semantic task action from its before-state capture through Undo,
+   outcome, finalization and action-specific commit. UI adapters submit intent. */
+const taskActionOwnerBundle=(()=>{
+  function executeTaskAction(action,id,compatibility){
+    const task=taskById(id);if(!task)return false;
+    if(!["done","worked","dot","return"].includes(action))return false;
+    if(action==="dot"&&!canDotTask(task)||action==="return"&&!canReturnAsCandidate(task))return false;
+    const beforeEditBenchmark=action==="dot"?benchmark():null;
+    const kind=action==="return"?"return":action;
+    const observation=action==="dot"
+      ?captureRatingObservation(kind,[task.id,...(beforeEditBenchmark?[beforeEditBenchmark.id]:[])])
+      :captureRatingObservation(kind,[task.id]);
+    if(!compatibility?.undoAlreadyPushed)pushUndo();
+    const resting=action==="return"&&task.evergreen&&task.lastDoneAt&&Date.now()<evergreenUntil(task);
+    if(compatibility?.editDraft)applyEditFields(task);
+    if(action==="dot"&&!canDotTask(task)){
+      finishRatingObservation({...observation,kind:"edit",ids:[task.id]});
+      commit();
+      return "saved-dot-unavailable";
+    }
+    if(action==="done"){
+      completeTask(task);
+      state.chain=state.chain.filter(c=>c!==id);
+      delete state.cantAt[id];delete state.workedAt[id];
+      if(state.candidateId===id)state.candidateId=null;
+      recomputeRanks();finishRatingObservation(observation);commit(true,true);
+      return true;
+    }
+    if(action==="worked"){
+      state.chain=state.chain.filter(c=>c!==id);
+      state.considered[id]="worked";
+      state.workedAt[id]=Date.now();
+      state.workLog.push({id:uid(),taskId:id,title:task.title,kind:"worked",at:Date.now()});
+      delete state.cantAt[id];
+      if(state.candidateId===id)state.candidateId=null;
+      state.interventionActive=false;
+      finishRatingObservation(observation);commit();
+      return true;
+    }
+    if(action==="dot"){
+      const b=beforeEditBenchmark;
+      writeTaskComparison(task,false);
+      // A deliberate Dot can choose an off-context or future-start task; only
+      // the automatic first placement remains neutral in startScan().
+      if(chainStart())state.passStartedAt=Date.now();
+      state.chain.push(id);
+      delete state.considered[id];delete state.cantAt[id];delete state.workedAt[id];
+      if(state.candidateId===id)state.candidateId=null;
+      state.interventionActive=false;
+      if(b)updateTaskComparison(task,b);
+      recomputeRanks();finishRatingObservation(observation);commit(true,true);
+      return true;
+    }
+    if(action==="return"){
+      if(resting)reopenTask(task);
+      if(supportedPostponeEvidence(task)&&Date.now()<taskPostponeUntil(task))writeTaskPostpone(task,0);
+      delete state.considered[id];delete state.cantAt[id];delete state.workedAt[id];
+      finishRatingObservation(observation);commit();
+      return true;
+    }
+    return false;
   }
-  state.candidateId = null;
-  recomputeRanks();
-  finishRatingObservation(observation);
-  maybeIntervene();
-  commit(true, kind==="yes" || kind==="cand-done");   // Dots and completions publish after their durable device save.
-}
+  function perform(command,compatibility){
+    if(!command||typeof command!=="object")return false;
+    if(command.type==="decision"){
+      const kind=command.decision;
+      // Reject unknown historical/UI tokens before they can clear a candidate
+      // or create a fresh pass with no decision attached.
+      if(kind!=="yes"&&kind!=="no"&&kind!=="cant"&&kind!=="cand-done")return false;
+      const candidate=taskById(state.candidateId);if(!candidate)return false;
+      const b=benchmark();
+      if(!b&&(kind==="yes"||kind==="no"))return false;
+      const observation=captureRatingObservation(kind,[candidate.id,...(b&&(kind==="yes"||kind==="no")?[b.id]:[])]);
+      pushUndo();recordDecisionTime();
+      if(kind==="yes"){
+        writeTaskComparison(candidate,false);
+        if(b)updateTaskComparison(candidate,b);
+        state.chain.push(candidate.id);
+        delete state.considered[candidate.id];delete state.cantAt[candidate.id];delete state.workedAt[candidate.id];
+      }else if(kind==="no"){
+        if(b)updateTaskComparison(b,candidate);
+        state.considered[candidate.id]="no";
+      }else if(kind==="cant"){
+        state.considered[candidate.id]="cant";state.cantAt[candidate.id]=Date.now();
+      }else completeTask(candidate);
+      state.candidateId=null;
+      recomputeRanks();finishRatingObservation(observation);maybeIntervene();
+      commit(true,kind==="yes"||kind==="cand-done");
+      return true;
+    }
+    if(command.type==="benchmark"){
+      const b=benchmark();if(!b)return false;
+      if(command.action==="done"){
+        const observation=captureRatingObservation("done",[b.id]);
+        // Completing a queued benchmark ends scanning; candidate Done does not.
+        pushUndo();completeTask(b);state.chain.pop();state.mode="work";
+        if(state.chain.length===0)newPass(false);
+        recomputeRanks();finishRatingObservation(observation);state.interventionActive=false;commit(true,true);
+        return true;
+      }
+      if(command.action==="worked")return executeTaskAction("worked",b.id,null);
+      if(command.action==="dislodge"){
+        const observation=captureRatingObservation("dislodge",[b.id]);
+        pushUndo();
+        // Dislodge is a standalone negative signal; it never moves a reference task.
+        updatePair({mu:PRIOR_MU,sigma:PRIOR_SIGMA},b);
+        recomputeRanks();state.chain.pop();state.considered[b.id]="dislodged";state.interventionActive=false;
+        finishRatingObservation(observation);commit();
+        return true;
+      }
+      if(command.action==="cant"){
+        pushUndo();state.chain.pop();state.considered[b.id]="cant";state.cantAt[b.id]=Date.now();state.interventionActive=false;commit();
+        return true;
+      }
+      return false;
+    }
+    if(command.type==="candidate-worked"){
+      const id=command.taskId;
+      if(state.mode!=="scan"||state.interventionActive||state.candidateId!==id||!pool().some(t=>t.id===id))return false;
+      return executeTaskAction("worked",id,null);
+    }
+    if(command.type==="task")return executeTaskAction(command.action,command.taskId,compatibility);
+    if(command.type==="overdue-woop-dot"){
+      const task=taskById(command.taskId);if(!overdueWoopCandidate(task))return false;
+      pushUndo();state.mode="work";
+      return executeTaskAction("dot",task.id,{undoAlreadyPushed:true});
+    }
+    return false;
+  }
+  function undo(){
+    if(!undoStack.length)return false;
+    const currentChance=state.chance,frame=undoStack.at(-1),next=JSON.parse(frame.snapshot);
+    if(!sameListOwner(next,state)){undoStack=[];return false;}
+    const inputs=t=>t&&[t.mu,t.sigma,t.done,t.ctx,t.startsAt,t.evergreen,t.evergreenHours,t.evergreenResetAtDay,t.lastDoneAt,taskPrerequisiteIds(t),t.dependencyModes];
+    const ids=next.tasks.filter(t=>JSON.stringify(inputs(t))!==JSON.stringify(inputs(taskById(t.id)))).map(t=>t.id);
+    const observation=captureRatingObservation("undo",ids);
+    undoStack.pop();
+    // Replacement preserves deletion evidence and immutable observations.
+    markReplacementDeletes(next);
+    // Keep the latest supported head so a later return to old values is still
+    // observed as a new relative change rather than hidden by Undo.
+    for(const task of next.tasks){
+      const head=taskById(task.id)?.ratingHistoryHead;
+      if(typeof head==="string"&&Array.isArray(task.ratingHistory)&&task.ratingHistory.some(row=>row?.id===head&&validRatingHistoryRow(row)))task.ratingHistoryHead=head;
+    }
+    replaceState(next);
+    // Restore ratings without replaying a fresh-pass/day random draw.
+    if(currentChance&&Date.now()<passResetCutoff(currentChance.at)&&
+      (frame.generation!==chanceGeneration||(state.chance&&Date.now()>=passResetCutoff(state.chance.at)))){
+      ensureCandidate();state.chance=currentChance;state.candidateId=null;
+    }
+    // Undo itself is persisted, so reload cannot resurrect the action.
+    recomputeRanks();finishRatingObservation(observation);commit();
+    return true;
+  }
+  return {
+    owner:Object.freeze({perform:command=>perform(command,null),undo}),
+    // Ticket 03 keeps the editor's old edit-plus-action gestures on a named
+    // bridge; ticket 04 will move their draft and action into the owner command.
+    editorCompatibility:Object.freeze({perform:(action,taskId)=>perform({type:"task",action,taskId},{editDraft:true})}),
+  };
+})();
+const TaskActionOwner=taskActionOwnerBundle.owner;
+const LegacyEditorTaskActionCompatibility=taskActionOwnerBundle.editorCompatibility;
+function decide(kind){return TaskActionOwner.perform({type:"decision",decision:kind});}
 function completeTask(t){
   // Completion records what happened, not a preference comparison. Ordinary
   // and evergreen Done actions therefore leave TrueSkill untouched; only an
@@ -4573,71 +4669,11 @@ function completeTask(t){
   }
   else { t.done = true; t.completedAt = Date.now(); delete state.considered[t.id]; }
 }
-function benchDone(){
-  const b = benchmark(); if(!b) return;
-  const observation=captureRatingObservation("done",[b.id]);
-  pushUndo();
-  completeTask(b);
-  state.chain.pop();
-  state.mode = "work";   // checking off a task that's already in the queue means: stop suggesting new
-                          // candidates, I'm executing now. (Finishing a *suggested* candidate via cand-done
-                          // does NOT do this — that's still part of scanning, not working the queue.)
-  if(state.chain.length===0) newPass(false);
-  recomputeRanks();
-  finishRatingObservation(observation);
-  state.interventionActive = false;
-  commit(true,true);
-}
-function workedOn(){ // Forster rule 7: worked on it, cross off, re-add at the bottom
-  const b = benchmark(); if(!b) return;
-  workedOnTask(b.id);
-}
-/* Rule 7 for any task, dotted or not, wherever it sits — the edit pane's button
-   as well as the benchmark card's. No mode change and no
-   updatePair: no "would I rather?" was answered, so there's no rank signal. */
-function workedOnTask(id, push, observation){
-  const t = taskById(id); if(!t) return;
-  observation ||= captureRatingObservation("worked",[id]);
-  if(push!==false) pushUndo();   // false when the caller already snapshotted — see the worked-task action
-  state.chain = state.chain.filter(c=>c!==id);
-  state.considered[id] = "worked";
-  state.workedAt[id] = Date.now();   // stamps the window — expireWorked() returns it to the scan once workedHours elapses
-  // Logged separately from the mark above so History remembers this happened
-  // even after the mark itself clears (Return as candidate, Rescan, New pass, the window expiring).
-  state.workLog.push({id:uid(), taskId:id, title:t.title, kind:"worked", at:Date.now()});
-  delete state.cantAt[id];
-  if(state.candidateId===id) state.candidateId=null;
-  state.interventionActive = false;
-  finishRatingObservation(observation);
-  commit();
-}
-function dislodge(){
-  const b = benchmark(); if(!b) return;
-  const observation=captureRatingObservation("dislodge",[b.id]);
-  pushUndo();
-  // Dislodge is an explicit negative preference signal, even without another
-  // chained task. Discard the reference update so unrelated tasks never move.
-  updatePair({mu:PRIOR_MU, sigma:PRIOR_SIGMA}, b);
-  recomputeRanks();
-  state.chain.pop();
-  state.considered[b.id] = "dislodged";
-  state.interventionActive = false;
-  finishRatingObservation(observation);
-  commit();
-}
-/* Dislodge's time-boxed sibling. Off the chain, but without a rank signal,
-   since refusing on circumstance answers no "would I rather?" — but the mark
-   is stamped, so expireCants() returns it to the scan once cantMin passes.
-   Dislodge says "not this pass"; this says "not right now, ask me later". */
-function benchCant(){
-  const b = benchmark(); if(!b) return;
-  pushUndo();
-  state.chain.pop();
-  state.considered[b.id] = "cant";
-  state.cantAt[b.id] = Date.now();
-  state.interventionActive = false;
-  commit();
-}
+function benchDone(){return TaskActionOwner.perform({type:"benchmark",action:"done"});}
+function workedOn(){return TaskActionOwner.perform({type:"benchmark",action:"worked"});}
+function workedOnTask(id){return TaskActionOwner.perform({type:"task",taskId:id,action:"worked"});}
+function dislodge(){return TaskActionOwner.perform({type:"benchmark",action:"dislodge"});}
+function benchCant(){return TaskActionOwner.perform({type:"benchmark",action:"cant"});}
 /* Reads whatever is currently in the edit pane's inputs onto the task. Shared by
    Save, Done, Worked on it, and Return as candidate — the latter two save before
    they act, so a title you retyped on your way out isn't lost, and a box you
@@ -4667,24 +4703,7 @@ function applyEditFields(t){
 /* Returns one skipped, postponed or resting task from the edit pane. Unlike
    bulk Rescan, this explicit action can cancel its saved postponement. With
    nothing supported to return, both the button and direct call are guarded. */
-function returnAsCandidate(id, push, edit=false){
-  const t = taskById(id); if(!t || !canReturnAsCandidate(t)) return;
-  const observation=captureRatingObservation("return",[id]);
-  if(push!==false) pushUndo();
-  // Capture the original hold before saving fields: a shorter interval or
-  // unchecking Evergreen in this pane must not cancel the return action.
-  const resting=t.evergreen && t.lastDoneAt && Date.now()<evergreenUntil(t);
-  if(edit) applyEditFields(t);
-  if(resting) reopenTask(t);
-  // Observe the saved holds instead of deleting them: stale copies must not
-  // resurrect a cancelled postponement, while unseen concurrent holds survive.
-  if(supportedPostponeEvidence(t) && Date.now()<taskPostponeUntil(t))writeTaskPostpone(t,0);
-  delete state.considered[id];
-  delete state.cantAt[id];
-  delete state.workedAt[id];
-  finishRatingObservation(observation);
-  commit();
-}
+function returnAsCandidate(id){return TaskActionOwner.perform({type:"task",taskId:id,action:"return"});}
 /* Puts a task on the chain straight from the All Tasks editor, skipping the
    scan. Choosing it while a benchmark exists is the same preference statement
    as Yes: the directly dotted task wins against a participating benchmark.
@@ -4692,42 +4711,8 @@ function returnAsCandidate(id, push, edit=false){
    remains neutral because there is nothing to compare it with. It pushes onto
    the END of the chain, so the task you just
    dotted becomes the benchmark: the one you do next. */
-function dotTask(id, push, observation){
-  const t = taskById(id); if(!canDotTask(t)) return;
-  const b = benchmark();
-  observation ||= captureRatingObservation("dot",[id,...(b?[b.id]:[])]);
-  if(push!==false) pushUndo();   // false when the caller already snapshotted — see the dot-task action
-  writeTaskComparison(t,false);
-  // Eligibility is deliberately NOT checked. An off-context or not-yet-started
-  // task that you opened and dotted by hand is a decision, not an accident, and
-  // the chain already carries members that go ineligible when a context is
-  // toggled off under them.
-  if(chainStart()) state.passStartedAt = Date.now();   // a fresh chain root is a fresh pass — same as startScan()
-  state.chain.push(id);
-  delete state.considered[id];   // dotted and skipped is a contradiction
-  delete state.cantAt[id];
-  delete state.workedAt[id];
-  if(state.candidateId===id) state.candidateId = null;   // else a later "yes" would dot it a second time
-  state.interventionActive = false;
-  if(b) updateTaskComparison(t, b);
-  recomputeRanks();
-  finishRatingObservation(observation);
-  commit(true, true);            // a dot syncs to the cloud right away
-}
-function doneTask(id, push, observation){ // cross any task off from the edit pane, dotted or not, wherever it sits
-  const t = taskById(id); if(!t) return;
-  observation ||= captureRatingObservation("done",[id]);
-  if(push!==false) pushUndo();   // false when the caller already snapshotted — see the done-task action
-  completeTask(t);
-  state.chain = state.chain.filter(c=>c!==id);   // a completed task must never stay dotted
-  delete state.cantAt[id];
-  delete state.workedAt[id];
-  if(state.candidateId===id) state.candidateId=null;
-  // Completing from the editor preserves the current scanning mode.
-  recomputeRanks();
-  finishRatingObservation(observation);
-  commit(true,true);
-}
+function dotTask(id){return TaskActionOwner.perform({type:"task",taskId:id,action:"dot"});}
+function doneTask(id){return TaskActionOwner.perform({type:"task",taskId:id,action:"done"});}
 function deleteTask(id){ // removes a task entirely — from the list, the chain, everywhere
   if(!id) return;
   if(!state.tasks.some(t=>t.id===id)) return;
@@ -5748,7 +5733,7 @@ function runOverdueWoop(data){
   if(woopDraft || !binding || binding.id!==data.binding || binding.board!==state || binding.task!==task || binding.benchmark!==benchmark()?.id || binding.account!==(window.CloudSync?.user||null) || !sameListOwner(binding.owner,state) || !overdueWoopCandidate(task))return;
   // This user action chooses the existing Dot signal once. Cancel only drops
   // unfinished answers; Undo can reverse the explicit choice separately.
-  pushUndo();state.mode="work";dotTask(task.id,false);
+  if(!TaskActionOwner.perform({type:"overdue-woop-dot",taskId:task.id}))return;
   overdueWoopSession={board:state,task,due:task.due,owner:{syncAccount:state.syncAccount},account:window.CloudSync?.user||null};
   if(supportedWoopEvidence(task) && task.woopPlan==null)overdueWoopWalkthrough(task);
   else modalShell('<div class="mtop"><h2>WOOP plan</h2><button class="x" data-act="close-modal" aria-label="Close">✕</button></div><p>'+esc(task.title)+'</p>'+woopHTML(task)+'<div class="mbtns"><button class="btn subtle" data-act="close-modal">Close</button></div>');
@@ -6701,22 +6686,21 @@ function onAction(act, el){
       renderQuickCtx();syncQuickAddAppearance();   // ephemeral, UI-only selection — no state mutation, no commit()/save() needed
       break;
     }
-    case "yes": case "no": case "cant": decide(act); break;
-    case "cand-done": decide("cand-done"); break;
+    case "yes": case "no": case "cant": TaskActionOwner.perform({type:"decision",decision:act}); break;
+    case "cand-done": TaskActionOwner.perform({type:"decision",decision:"cand-done"}); break;
     case "cand-worked":
-      // Bind the click to the displayed candidate: a stale click must never log its replacement.
-      if(state.mode==="scan" && !state.interventionActive && el.dataset.id===state.candidateId && pool().some(t=>t.id===el.dataset.id)) workedOnTask(el.dataset.id);
+      TaskActionOwner.perform({type:"candidate-worked",taskId:el.dataset.id});
       break;
-    case "bench-done": benchDone(); break;
-    case "bench-cant": benchCant(); break;
+    case "bench-done": TaskActionOwner.perform({type:"benchmark",action:"done"}); break;
+    case "bench-cant": TaskActionOwner.perform({type:"benchmark",action:"cant"}); break;
     case "postpone": if(state.mode==="scan" && !state.interventionActive && pool().some(t=>t.id===state.candidateId))postponeTask(state.candidateId);break;
     case "bench-postpone": if(benchmark())postponeTask(benchmark().id);break;
-    case "dislodge": dislodge(); break;
+    case "dislodge": TaskActionOwner.perform({type:"benchmark",action:"dislodge"}); break;
     case "run-woop": runOverdueWoop(el.dataset); break;
     case "woop-start": startWoop(el.dataset.benchmark); break;
     case "woop-next": advanceWoop(el.dataset); break;
     case "woop-delete": deleteWoop(el.dataset); break;
-    case "worked": workedOn(); break;
+    case "worked": TaskActionOwner.perform({type:"benchmark",action:"worked"}); break;
     case "reveal": revealTask(el.dataset.id); break;
     case "continue-scan": pushUndo(); state.interventionActive=false; state.snooze=12; commit(); break;
     case "start-working": pushUndo(); state.interventionActive=false; state.mode="work"; commit(true,true); break;
@@ -6805,39 +6789,23 @@ function onAction(act, el){
       closeModal(); commit(); break;
     }
     case "done-task": {
-      const t=taskById(el.dataset.id); if(!t) break;
-      const observation=captureRatingObservation("done",[t.id]);
-      pushUndo();                 // one snapshot covers the save AND the completion,
-      applyEditFields(t);         // so a single undo reverses the whole gesture
-      doneTask(t.id, false,observation);
+      if(!LegacyEditorTaskActionCompatibility.perform("done",el.dataset.id))break;
       closeModal(); break;
     }
     case "worked-task": {
-      const t=taskById(el.dataset.id); if(!t) break;
-      const observation=captureRatingObservation("worked",[t.id]);
-      pushUndo();                 // same one-snapshot deal as done-task above
-      applyEditFields(t);
-      workedOnTask(t.id, false,observation);
+      if(!LegacyEditorTaskActionCompatibility.perform("worked",el.dataset.id))break;
       closeModal(); break;
     }
     case "dot-task": {
-      const t=taskById(el.dataset.id); if(!canDotTask(t)) break;
-      const observation=captureRatingObservation("dot",[t.id,...(benchmark()?[benchmark().id]:[])]);
-      pushUndo();                 // same one-snapshot deal as done-task/worked-task above
-      applyEditFields(t);
-      if(canDotTask(t)) dotTask(t.id, false,observation);
-      else{
-        // Lengthening an expired interval can put the task back at rest. Save
-        // those deliberate edits, without inventing a discarded preference.
-        finishRatingObservation({...observation,kind:"edit",ids:[t.id]});
-        commit();
+      const outcome=LegacyEditorTaskActionCompatibility.perform("dot",el.dataset.id);
+      if(outcome==="saved-dot-unavailable"){
         toast("Changes saved. This evergreen task is resting; use Return as candidate before Dot.");
       }
+      if(!outcome)break;
       closeModal(); break;
     }
     case "return-candidate": {
-      const t=taskById(el.dataset.id); if(!t || !canReturnAsCandidate(t)) break;
-      returnAsCandidate(el.dataset.id,undefined,true); // fields and early return share one Undo
+      if(!LegacyEditorTaskActionCompatibility.perform("return",el.dataset.id))break;
       closeModal(); break;
     }
     case "more-rating-history": {
@@ -7046,7 +7014,7 @@ function onAction(act, el){
       window.checkForAppUpdate?.(); return cloudPull();
     case "sync-reload": return reloadForCloudRecovery();
     case "sync-signout": closeModal(); window.CloudSync?.signOut(); break;
-    case "undo": undo(); break;
+    case "undo": TaskActionOwner.undo(); break;
     case "mback": break; // handled in click listener
   }
 }
@@ -7183,13 +7151,13 @@ document.addEventListener("keydown", e=>{
   const k=e.key.toLowerCase();
   const plainEditUndo=!e.ctrlKey&&!e.metaKey&&!e.altKey&&!t?.isContentEditable;
   // One held decision key must not answer for the next card dealt by commit().
-  if(k==="y"&&!e.repeat&&!state.interventionActive&&state.candidateId) decide("yes");   // dot it
-  else if(k==="n"&&!e.repeat&&!state.interventionActive&&state.candidateId) decide("no");
-  else if(k==="c"&&!e.repeat&&!state.interventionActive&&state.candidateId) decide("cant");
+  if(k==="y"&&!e.repeat&&!state.interventionActive&&state.candidateId) TaskActionOwner.perform({type:"decision",decision:"yes"});   // dot it
+  else if(k==="n"&&!e.repeat&&!state.interventionActive&&state.candidateId) TaskActionOwner.perform({type:"decision",decision:"no"});
+  else if(k==="c"&&!e.repeat&&!state.interventionActive&&state.candidateId) TaskActionOwner.perform({type:"decision",decision:"cant"});
   else if(k==="d"&&!e.repeat) hotkeyDone();                                                   // one held key is one completion
-  else if(k==="w") workedOn();                                                               // worked on it — cross off, back to the bottom
+  else if(k==="w") TaskActionOwner.perform({type:"benchmark",action:"worked"});           // worked on it — cross off, back to the bottom
   else if(e.key==="Delete"||e.key==="Backspace"){ e.preventDefault(); hotkeyDelete(); }       // remove it entirely
-  else if(k==="z"&&plainEditUndo) undo();
+  else if(k==="z"&&plainEditUndo) TaskActionOwner.undo();
   else if(k==="e"&&plainEditUndo){const task=scannerEditTask();if(task)onAction("edit",{dataset:{id:task.id}});}
 });
 
@@ -7204,8 +7172,8 @@ function scannerEditTask(){
 /* "Done" and "Delete" act on the candidate you're deciding on, if one's showing;
    otherwise they fall back to the benchmark at the head of the chain. */
 function hotkeyDone(){
-  if(!state.interventionActive && state.mode==="scan" && state.candidateId){ decide("cand-done"); return; }
-  benchDone();
+  if(!state.interventionActive && state.mode==="scan" && state.candidateId){ TaskActionOwner.perform({type:"decision",decision:"cand-done"}); return; }
+  TaskActionOwner.perform({type:"benchmark",action:"done"});
 }
 function hotkeyDelete(){
   if(!state.interventionActive && state.mode==="scan" && state.candidateId){ deleteTask(state.candidateId); return; }

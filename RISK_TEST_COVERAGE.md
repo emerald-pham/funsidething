@@ -564,6 +564,7 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK scan lifecycle FAQ: Dot rest boundary current Start eligibility and durable remote refresh are explained
 
 - RISK task rating history: actual comparisons retain timestamped before and after values without backfilling or changing signals
+- RISK task action history: scanner comparison stays visible through Undo and saved reload
 - RISK task rating history: editor observations distinguish relative movement and never write on open render or resampling
 - RISK task rating history: No Dot Dislodge completion and Undo retain honest rating versus pool changes
 - RISK task rating history: concurrent offline and older missing-field copies union immutable facts idempotently without retimestamping
