@@ -874,10 +874,7 @@ window.formatScannerCalendarDate = (date,timeZone) => {
   const field=type=>parts.find(part=>part.type===type).value;
   return formatCalendarDate(field("year")+"-"+field("month")+"-"+field("day"),{year:true});
 };
-let bulkSelection = new Set(), bulkSelecting = false, bulkDraft = null, bulkResult = null;
-let listQuery = "";            // all-tasks search box, already trimmed + lowercased — UI-only, like quickAddCtx: never saved, never synced, never undoable
-let listEligibilityFilter = "all"; // independent view-only eligibility narrowing
-let listTagFilter = null;      // ...and the one filter key the list is narrowed to ("s:no", "c:c_home"), or null. One at a time, by design.
+let bulkDraft = null, bulkResult = null;
 let saveTimer = null;
 let persistedChanceSeed = null;
 let persistQueue = Promise.resolve();
@@ -5933,57 +5930,73 @@ const LIST_STATUS_TAGS = [
   { id:"postponed",  label:"postponed",   match:t=>taskPostponeUntil(t)>Date.now() }
 ];
 
-/* Status badges appear when an open task matches. Existing contexts remain
-   available independently of scanner inclusion and current matches; selecting
-   one with no open matches shows an empty list. Namespaced keys keep context
-   names separate from status badges. */
-function listTagOptions(){
-  const open = openTasks();
-  const out = [];
-  for(const s of LIST_STATUS_TAGS){
-    if(open.some(s.match)) out.push({ key:"s:"+s.id, label:s.label, match:s.match });
+/* All Tasks owns filter validity, visible membership and transient selection.
+   Context requirements and scanner inclusion remain separate board semantics. */
+const allTasksView = (()=>{
+  let ownerStamp=null, query="", eligibility="all", tagFilter=null;
+  let selectedIds=new Set(), selecting=false;
+  function currentOwner(){
+    return {syncAccount:state?.syncAccount||null,account:window.CloudSync?.user||null};
   }
-  for(const c of state.contexts){
-    const match = t => t.ctx.includes(c.id);
-    out.push({ key:"c:"+c.id, label:c.name, match });
+  function tagOptions(open){
+    const out=[];
+    for(const status of LIST_STATUS_TAGS){
+      if(open.some(status.match)) out.push({key:"s:"+status.id,label:status.label,match:status.match});
+    }
+    for(const context of state.contexts){
+      const match=task=>task.ctx.includes(context.id);
+      out.push({key:"c:"+context.id,label:context.name,match});
+    }
+    return out;
   }
-  return out;
-}
-/* A filter can outlive what it points at: a status clears or expires, or a
-   context is deleted. When the thing
-   stops being offered, the filter goes with it rather than leaving the list
-   stuck behind a control that's no longer on screen. */
-function normalizeListFilters(){
-  if(listTagFilter && !listTagOptions().some(o=>o.key===listTagFilter)) listTagFilter = null;
-}
-function listFiltersActive(){ normalizeListFilters(); return !!(listQuery || listTagFilter || listEligibilityFilter !== "all"); }
-function filteredListTasks(){
-  normalizeListFilters();
-  const byId=new Map(state.tasks.map(t=>[t.id,t]));
-  const tag = listTagFilter ? listTagOptions().find(o=>o.key===listTagFilter) : null;
-  return openTasks().filter(t=>{
-    // A task declined for this pass belongs in Ineligible until its mark clears.
-    const eligible = isEligible(t,null,byId) && !state.chain.includes(t.id) && !["no","cant","dislodged","worked"].includes(state.considered[t.id]);
-    if(listEligibilityFilter !== "all" && eligible !== (listEligibilityFilter === "eligible")) return false;
-    if(tag && !tag.match(t)) return false;
-    if(listQuery && !t.title.toLowerCase().includes(listQuery)) return false;
-    return true;
-  });
-}
-function setListQuery(v){
-  listQuery = String(v==null?"":v).trim().toLowerCase();
-  renderList();          // body + header count; the tag chips don't depend on the query
-}
-function toggleListTag(id){
-  listTagFilter = (listTagFilter===id) ? null : id;   // clicking the lit one clears it
-  renderList();
-}
+  function read(){
+    const owner=currentOwner();
+    if(!ownerStamp||ownerStamp.syncAccount!==owner.syncAccount||ownerStamp.account!==owner.account) selectedIds=new Set();
+    ownerStamp=owner;
+    const open=openTasks(),options=tagOptions(open);
+    if(tagFilter&&!options.some(option=>option.key===tagFilter))tagFilter=null;
+    const tag=tagFilter?options.find(option=>option.key===tagFilter):null;
+    const byId=new Map(state.tasks.map(task=>[task.id,task]));
+    const visible=open.filter(task=>{
+      // A task declined for this pass belongs in Ineligible until its mark clears.
+      const isListEligible=isEligible(task,null,byId)&&!state.chain.includes(task.id)&&!["no","cant","dislodged","worked"].includes(state.considered[task.id]);
+      if(eligibility!=="all"&&isListEligible!==(eligibility==="eligible"))return false;
+      if(tag&&!tag.match(task))return false;
+      if(query&&!task.title.toLowerCase().includes(query))return false;
+      return true;
+    });
+    const visibleIds=new Set(visible.map(task=>task.id));
+    selectedIds=new Set([...selectedIds].filter(id=>visibleIds.has(id)));
+    return Object.freeze({
+      owner:Object.freeze({...owner}),query,eligibility,tagFilter,
+      filtersActive:!!(query||tagFilter||eligibility!=="all"),
+      openTasks:Object.freeze([...open]),visibleTasks:Object.freeze([...visible]),
+      tagOptions:Object.freeze(options.map(option=>Object.freeze(option))),
+      selecting,selectedIds:Object.freeze([...selectedIds])
+    });
+  }
+  return {
+    read,
+    setQuery(value){query=String(value==null?"":value).trim().toLowerCase();return read();},
+    toggleTag(id){tagFilter=tagFilter===id?null:id;return read();},
+    setEligibility(value){query="";tagFilter=null;eligibility=["eligible","ineligible"].includes(value)?value:"all";return read();},
+    clearFilters(){query="";tagFilter=null;eligibility="all";},
+    startSelecting(){selecting=true;return read();},
+    selectAll(){const view=read();selecting=true;selectedIds=new Set(view.visibleTasks.map(task=>task.id));return read();},
+    toggleSelection(id){const view=read();if(!view.visibleTasks.some(task=>task.id===id))return false;selecting=true;if(selectedIds.has(id))selectedIds.delete(id);else selectedIds.add(id);return true;},
+    cancelSelection(){selectedIds.clear();selecting=false;return read();}
+  };
+})();
+function listTagOptions(){return allTasksView.read().tagOptions;}
+function filteredListTasks(){return allTasksView.read().visibleTasks;}
+function setListQuery(value){allTasksView.setQuery(value);renderList();}
+function toggleListTag(id){allTasksView.toggleTag(id);renderList();}
 function clearListFilters(){
-  listQuery = ""; listTagFilter = null; listEligibilityFilter = "all";
-  const box = document.getElementById("listSearch");
-  if(box) box.value = "";   // the only place we write back into the input, so typing is never fought
+  allTasksView.clearFilters();
+  const box=document.getElementById("listSearch");
+  if(box)box.value="";   // the only place we write back into the input, so typing is never fought
 }
-function renderListFilters(){
+function renderListFilters(view=allTasksView.read()){
   const focused=document.activeElement?.dataset,focusAction=focused?.act,focusId=focused?.id;
   const refocus=row=>{
     if(!["list-tag","list-eligibility"].includes(focusAction))return;
@@ -5993,18 +6006,17 @@ function renderListFilters(){
   if(wrap) wrap.hidden = !state.listOpen;
   const eligibilityRow = document.getElementById("listEligibilityRow");
   if(eligibilityRow) eligibilityRow.innerHTML = state.listOpen ? '<span class="ltaglabel">Eligibility</span>' + [["all","All"],["eligible","Eligible"],["ineligible","Ineligible"]].map(([id,label])=>
-    '<button type="button" class="ltag'+(listEligibilityFilter===id?' on':'')+'" data-act="list-eligibility" data-id="'+id+'" aria-pressed="'+(listEligibilityFilter===id)+'">'+label+'</button>').join('') : '';
+    '<button type="button" class="ltag'+(view.eligibility===id?' on':'')+'" data-act="list-eligibility" data-id="'+id+'" aria-pressed="'+(view.eligibility===id)+'">'+label+'</button>').join('') : '';
   refocus(eligibilityRow);
   const row = document.getElementById("listTagRow");
   if(!row) return;
   if(!state.listOpen){ row.innerHTML=""; return; }
-  normalizeListFilters();
-  const opts = listTagOptions();
+  const opts = view.tagOptions;
   if(!opts.length){ row.innerHTML=""; return; }   // no caption either — nothing to caption
   // Labelled because the quick-add bar carries a similar-looking chip row a few
   // pixels below, and it does something entirely different.
   row.innerHTML = '<span class="ltaglabel">Filter</span>' + opts.map(o => {
-    const on = listTagFilter===o.key;
+    const on = view.tagFilter===o.key;
     return '<button type="button" class="ltag'+(o.key.startsWith('c:')?' task-context':'')+(on?" on":"")+'" data-act="list-tag" data-id="'+esc(o.key)+'"'
          + ' aria-pressed="'+(on?"true":"false")+'">'+esc(o.label)+'</button>';
   }).join("");
@@ -6021,14 +6033,12 @@ function bulkResultHTML(){
   return '<p class="kv" role="status">Bulk edit requested for '+result.ids.length+' tasks: '+matched+' currently match in this tab; '+changed+' have different values or are no longer open. This is not a server save confirmation; check the sync status. '+(changed?'Check Settings recovery backups for displaced values. ':'')+'After recovery, Undo restores an earlier whole board.</p>';
 }
 function renderList(){
-  const open = openTasks();
+  const view=allTasksView.read();
+  const open=view.openTasks,shown=view.visibleTasks,selectedIds=new Set(view.selectedIds),selecting=view.selecting;
   const act = activeCtxSet();
-  renderListFilters();
-  const shown = filteredListTasks();
-  const visibleIds = new Set(shown.map(t=>t.id));
-  bulkSelection = new Set([...bulkSelection].filter(id=>visibleIds.has(id)));
+  renderListFilters(view);
   document.getElementById("listCount").textContent =
-    listFiltersActive() ? "("+shown.length+" of "+open.length+")" : "("+open.length+")";
+    view.filtersActive ? "("+shown.length+" of "+open.length+")" : "("+open.length+")";
   document.getElementById("listCaret").textContent = state.listOpen ? "▾" : "▸";
   const body = document.getElementById("listBody");
   const toolbar = document.getElementById("listBulkToolbar");
@@ -6081,12 +6091,12 @@ function renderList(){
     const consid = state.considered[t.id];
     const dim = !isEligible(t, act, byId);
     const blockers=unresolvedPrerequisites(t,byId);
-    const selected=bulkSelection.has(t.id),rankTag=bulkSelecting?'span':'div';
+    const selected=selectedIds.has(t.id),rankTag=selecting?'span':'div';
     const selectionAttrs=' data-act="bulk-toggle" data-id="'+esc(t.id)+'" aria-pressed="'+selected+'" aria-label="'+(selected?'Deselect ':'Select ')+esc(t.title)+'"';
     const rankContent=(showSparklines ? sparkSVG(t.id, 88, 22) : '')
       +(showTopK ? '<'+rankTag+' class="tk" title="'+esc(summary.title)+'"><span class="tkl">'+esc(summary.label)+'</span><'+rankTag+' class="tkbar"><i style="width:'+summary.fill+'%"></i></'+rankTag+'></'+rankTag+'>' : '');
     const rankSummary=(showSparklines||showTopK)
-      ? bulkSelecting
+      ? selecting
         ? '<button type="button" class="rank-summary bulk-rank-toggle"'+selectionAttrs+'><span class="bulk-rank-original" aria-hidden="'+selected+'">'+rankContent+'</span>'+(selected?'<span class="tk bulk-rank-selected"><span class="tkl">Selected</span></span>':'')+'</button>'
         : '<div class="rank-summary">'+rankContent+'</div>'
       : '';
@@ -6094,7 +6104,7 @@ function renderList(){
          + rankSummary
          + '<div class="tmain">'
          + (inChain.has(t.id) ? '<span class="inchain" title="In the chain">●</span>' : '') + (nextDotted && nextDotted.id===t.id ? '<span class="chainind" title="Will be added to the chain when you start scanning">→ </span>' : '')
-         + '<button class="tt"'+(bulkSelecting&&!rankSummary?selectionAttrs:' data-act="edit" data-id="'+esc(t.id)+'"')+'>'+esc(t.title)+'</button>'
+         + '<button class="tt"'+(selecting&&!rankSummary?selectionAttrs:' data-act="edit" data-id="'+esc(t.id)+'"')+'>'+esc(t.title)+'</button>'
          + (safeUrl(t.url) ? '<a class="ext" href="'+esc(safeUrl(t.url))+'" target="_blank" rel="noopener noreferrer" title="Open link">↗</a>' : '')
          + chipHTML(t)
          + (blockers.length?'<span class="dependency-blockers">Blocked by: '+blockers.map(t=>esc(t.title)).join(', ')+'</span>':'')
@@ -6109,10 +6119,10 @@ function renderList(){
     ? '<div class="emptystate">No tasks match.<div style="margin-top:12px"><button class="btn subtle" data-act="clear-list-filters">Clear filters</button></div></div>'
     : '<div class="emptystate">No open tasks.</div>');
   // Separate from the task scroller so actions remain at the pane bottom at any row.
-  toolbar.innerHTML = '<div class="ltags"><button type="button" class="ltag" data-act="bulk-select" aria-pressed="'+bulkSelecting+'">Select</button><button type="button" class="ltag" data-act="bulk-select-all"'+(shown.length?'':' disabled')+'>Select all</button><button type="button" class="ltag" data-act="bulk-edit"'+(bulkSelection.size?'':' disabled')+'>Edit</button>'+(bulkSelecting?'<span class="kv" role="status">'+bulkSelection.size+' selected</span><button type="button" class="ltag" data-act="bulk-cancel">Cancel selection</button>':'')+'</div><p class="kv">Select all includes only the current filtered list. Changing filters removes hidden selections.</p>'+bulkResultHTML();
+  toolbar.innerHTML = '<div class="ltags"><button type="button" class="ltag" data-act="bulk-select" aria-pressed="'+selecting+'">Select</button><button type="button" class="ltag" data-act="bulk-select-all"'+(shown.length?'':' disabled')+'>Select all</button><button type="button" class="ltag" data-act="bulk-edit"'+(selectedIds.size?'':' disabled')+'>Edit</button>'+(selecting?'<span class="kv" role="status">'+selectedIds.size+' selected</span><button type="button" class="ltag" data-act="bulk-cancel">Cancel selection</button>':'')+'</div><p class="kv">Select all includes only the current filtered list. Changing filters removes hidden selections.</p>'+bulkResultHTML();
   body.scrollTop = savedScroll;
   if(toolbarFocus){
-    const action=toolbarFocus==="bulk-cancel"&&!bulkSelecting?"bulk-select":toolbarFocus;
+    const action=toolbarFocus==="bulk-cancel"&&!selecting?"bulk-select":toolbarFocus;
     [...toolbar.querySelectorAll("[data-act]")].find(el=>el.dataset.act===action&&!el.disabled)?.focus({preventScroll:true});
   }
   if(selectedFocus)[...body.querySelectorAll('[data-act=bulk-toggle]')].find(el=>el.dataset.id===selectedFocus)?.focus({preventScroll:true});
@@ -6294,7 +6304,7 @@ const bulkFields = [
 ];
 function openBulkEdit(){
   renderList();
-  const tasks=[...bulkSelection].map(taskById).filter(Boolean);if(!tasks.length)return;
+  const tasks=allTasksView.read().selectedIds.map(taskById).filter(Boolean);if(!tasks.length)return;
   bulkDraft={board:state,owner:{syncAccount:state.syncAccount},account:window.CloudSync?.user||null,
     originals:new Map(tasks.map(t=>[t.id,JSON.parse(JSON.stringify(t))])),clear:new Set()};
   let html='<div class="mtop"><h2>Edit '+tasks.length+' selected tasks</h2><button class="x" data-act="close-modal" aria-label="Close">✕</button></div><p class="kv">Check Apply for each property to change. Later sync conflicts keep newer peer fields; other edits may apply. Undo after recovery restores an earlier board. Mixed values stay unchanged until you check Apply; unchecked properties stay unchanged. Clear explicitly removes a link, date or context requirements.</p>';
@@ -6313,6 +6323,7 @@ function saveBulkEdit(){
   const draft=bulkDraft;if(!draft)return;
   const fail=message=>{document.getElementById('bulkError').textContent=message;return false;};
   if(draft.board!==state||!sameListOwner(draft.owner,state)||draft.account!==(window.CloudSync?.user||null))return fail('The board changed. Cancel and reopen bulk Edit.');
+  const selectedIds=new Set(allTasksView.read().selectedIds);
   const patch={};
   for(const [key,label,id,type] of bulkFields){
     if(!document.getElementById('bulkApply'+id).checked)continue;
@@ -6334,14 +6345,14 @@ function saveBulkEdit(){
   const tasks=[];
   for(const [id,before] of draft.originals){
     const task=taskById(id);
-    if(!task||task.done||!bulkSelection.has(id))return fail('A selected task was removed, completed or hidden. Cancel and reopen bulk Edit.');
+    if(!task||task.done||!selectedIds.has(id))return fail('A selected task was removed, completed or hidden. Cancel and reopen bulk Edit.');
     for(const key of Object.keys(patch))if(JSON.stringify(task[key])!==JSON.stringify(before[key]))return fail('A selected property changed while editing. No tasks were changed. Cancel and reopen bulk Edit.');
     tasks.push(task);
   }
   pushUndo();
   for(const task of tasks)for(const [key,value] of Object.entries(patch))task[key]=JSON.parse(JSON.stringify(value));
   bulkResult={owner:draft.owner,account:draft.account,ids:tasks.map(t=>t.id),patch:JSON.parse(JSON.stringify(patch))};
-  closeModal();bulkSelection.clear();bulkSelecting=false;commit();return true;
+  closeModal();allTasksView.cancelSelection();commit();return true;
 }
 
 function openEdit(id){
@@ -6726,7 +6737,7 @@ function onAction(act, el){
     case "clear-done": clearCompleted(); openSettings(); break;
     case "new-pass": newPass(); closeModal(); break;
     case "list-tag": toggleListTag(el.dataset.id); break;          // view-only, so no pushUndo/commit — nothing in state changed
-    case "list-eligibility": clearListFilters(); listEligibilityFilter = ["eligible","ineligible"].includes(el.dataset.id) ? el.dataset.id : "all"; renderList(); break;
+    case "list-eligibility": allTasksView.setEligibility(el.dataset.id); { const box=document.getElementById("listSearch"); if(box)box.value=""; } renderList(); break;
     case "clear-list-filters": clearListFilters(); renderList(); break;
     case "toggle-list": state.listOpen=!state.listOpen; render(); save(); break;
     case "toggle-ctx": state.ctxOpen=!state.ctxOpen; render(); save(); break;
@@ -6783,10 +6794,10 @@ function onAction(act, el){
       const ids=readDependencyDraft(scope);if(index<0||index>=ids.length)break;
       ids.splice(index,1);renderDependencyFields(scope,ids);break;
     }
-    case "bulk-select": bulkSelecting=true;renderList();break;
-    case "bulk-select-all": bulkSelecting=true;bulkSelection=new Set(filteredListTasks().map(t=>t.id));renderList();break;
-    case "bulk-toggle": if(filteredListTasks().some(t=>t.id===el.dataset.id)){bulkSelecting=true;if(bulkSelection.has(el.dataset.id))bulkSelection.delete(el.dataset.id);else bulkSelection.add(el.dataset.id);renderList();}break;
-    case "bulk-cancel": bulkSelection.clear();bulkSelecting=false;renderList();break;
+    case "bulk-select": allTasksView.startSelecting();renderList();break;
+    case "bulk-select-all": allTasksView.selectAll();renderList();break;
+    case "bulk-toggle": if(allTasksView.toggleSelection(el.dataset.id))renderList();break;
+    case "bulk-cancel": allTasksView.cancelSelection();renderList();break;
     case "bulk-edit": openBulkEdit();break;
     case "bulk-save": saveBulkEdit();break;
     case "bulk-clear": {

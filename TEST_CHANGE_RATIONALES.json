@@ -7156,5 +7156,21 @@
       "command": "Original Top X node --test --test-name-pattern=\"RISK task history: compact Top X\" tests.js; inherited upstream commands retained in released-base TEST_CHANGE_RATIONALES.json",
       "failure": "Original observed Top X RED expected Top X 2 of 7 → 4 of 9, actual prior compact metrics /tmp/topx-red.txt; punctuation /tmp/topx-slash-red.txt; consent driver /tmp/topx-driver-red.txt. Upstream RED is reused from its exact released-base records, not claimed newly executed."
     }
+  },
+  {
+    "testChangesSha256": "6160158e27d667168d7a79a60f3013498e025eec4730b6ea728629a67de8318e",
+    "reason": "Fix the observed All Tasks selection leak when a cloud adoption switches signed-in owners, retain selection across ordinary same-account Undo replacement, and keep existing filter checks on actual controls.",
+    "previousBehavior": "All Tasks prunes selected IDs only against visible membership, so a second account with a matching task ID inherits the prior account's selected state.",
+    "intendedBehavior": "The view owner clears selected IDs when either the board account or signed-in account changes, while same-account state replacement retains selection for still-visible tasks.",
+    "replacementTests": [
+      "RISK All Tasks view ownership: account adoption clears prior selection while same-account Undo retains it"
+    ],
+    "preservedCoverage": [
+      "Existing search, context/status/eligibility filtering, Postponed expiry, selected-row paint, keyboard focus, visible-only Select all, and Bulk Edit consumer assertions remain unchanged."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='RISK All Tasks view ownership:' tests.js",
+      "failure": "Observed before runtime edits at 2026-10-16 16:49:15 UTC on baseline bf36ec674780879e4bfb5224733176cbbda2230d: after a real CloudSync account-B board adoption with the same task ID, expected toolbar /0 selected/ but actual markup contained 1 selected. Exact contemporaneous output: /private/tmp/chain-architecture-evidence-20261016/05/ownership-red.log. Same-account Undo assertions passed before the account transition. The final expanded test was also run later against a temporary baseline-index fixture as sensitivity confirmation only; that retrospective result is in ownership-final-tests-on-baseline.log and is not the chronological RED."
+    }
   }
 ]
