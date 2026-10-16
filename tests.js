@@ -720,6 +720,40 @@ async function ratingHistoryFixture(seed=613){
  h.ctx.state.chain=[a.id];h.ctx.state.candidateId=b.id;h.ctx.recomputeRanks();
  return {...h,a,b,c};
 }
+test('RISK task action history: scanner comparison stays visible through Undo and saved reload',async()=>{
+ const {indexedDB}=await import('fake-indexeddb'),name='private-task-action-owner-'+Date.now();
+ const {ctx,shim}=await loadApp({seed:639,cryptoProvider:webcrypto,indexedDBProvider:indexedDB,deviceDbName:name});
+ setFakeTime(ctx,Date.parse('2026-10-16T12:34:56.789Z'));
+ const benchmark=ctx.addTask('Private action benchmark'),candidate=ctx.addTask('Private action candidate');
+ ctx.state.chain=[benchmark.id];ctx.state.candidateId=candidate.id;ctx.recomputeRanks();ctx.renderScan();
+ const scan=shim.document.getElementById('scan').innerHTML;
+ assert.ok(scan.includes(`data-act="yes" data-candidate="${candidate.id}" data-benchmark="${benchmark.id}"`),'the rendered scanner binds Yes to the displayed pair');
+ ctx.onAction('yes',{dataset:{candidate:candidate.id,benchmark:benchmark.id}});
+ const selected=ratingHistoryTask(ctx,candidate.id),compared=ratingHistoryTask(ctx,benchmark.id);
+ assert.equal(ctx.state.chain.at(-1),candidate.id);assert.equal(ctx.state.candidateId,null);
+ assert.equal(selected.ratingHistory?.[0]?.kind,'yes');assert.equal(compared.ratingHistory?.[0]?.kind,'yes');
+ assert.equal(selected.ratingHistory[0].id,compared.ratingHistory[0].id,'one decision records one shared observation identity for both participants');
+ const facts={candidate:ratingHistoryCopy(selected.ratingHistory),benchmark:ratingHistoryCopy(compared.ratingHistory)};
+ ctx.openEdit(candidate.id);let visible=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(visible,/Task history \(1 observations\)/,'the action fact is visible from the existing task history consumer');
+ assert.match(visible,/Yes comparison/);
+ assert.equal(await ctx.persist(),true);
+ ctx.onAction('undo',{});
+ const restored=ratingHistoryTask(ctx,candidate.id),restoredBenchmark=ratingHistoryTask(ctx,benchmark.id);
+ assert.deepEqual(ratingHistoryCopy(restored.ratingHistory).filter(row=>row.kind==='yes'),facts.candidate);
+ assert.deepEqual(ratingHistoryCopy(restoredBenchmark.ratingHistory).filter(row=>row.kind==='yes'),facts.benchmark);
+ assert.equal(ctx.state.chain.length,1);assert.equal(ctx.state.chain[0],benchmark.id);
+ ctx.openEdit(candidate.id);visible=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(visible,/Yes comparison/,'Undo keeps the original immutable event visible');
+ assert.equal(await ctx.persist(),true);
+ const reloaded=await loadApp({seed:640,cryptoProvider:webcrypto,indexedDBProvider:indexedDB,deviceDbName:name});
+ const saved=ratingHistoryTask(reloaded.ctx,candidate.id),savedBenchmark=ratingHistoryTask(reloaded.ctx,benchmark.id);
+ assert.deepEqual(ratingHistoryCopy(saved.ratingHistory),ratingHistoryCopy(restored.ratingHistory));
+ assert.deepEqual(ratingHistoryCopy(savedBenchmark.ratingHistory),ratingHistoryCopy(restoredBenchmark.ratingHistory));
+ assert.equal(reloaded.ctx.state.chain.length,1);assert.equal(reloaded.ctx.state.chain[0],benchmark.id);
+ reloaded.ctx.openEdit(candidate.id);
+ assert.match(reloaded.shim.document.getElementById('modalRoot').innerHTML,/Yes comparison/,'saved reload retains visible history after Undo');
+});
 test('RISK task rating history: actual comparisons retain timestamped before and after values without backfilling or changing signals',async()=>{
  const {ctx,a,b,c}=await ratingHistoryFixture();
  const at=vm.runInContext('Date.now()',ctx),before=ratingHistoryCopy({mu:b.mu,sigma:b.sigma}),chance=ctx.chanceDisplayStats().get(b.id).probability;
