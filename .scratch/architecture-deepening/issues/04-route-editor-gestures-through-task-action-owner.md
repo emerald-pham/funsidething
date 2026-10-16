@@ -4,7 +4,7 @@
 
 **Blocked by:** 03: Centralize rating history for direct task actions.
 
-**Status:** implemented-local; awaiting integration checkpoint and ticket 07 acceptance
+**Status:** implemented in branch; awaiting ticket 07 integrated acceptance
 
 - [x] Settle editor integration with the established task action owner before implementation. Editor callers no longer independently coordinate observation capture, Undo and finalization. Reuse the agreed task-editor actions, Task history, Undo and isolated reload/sync fixtures; resolve only materially new testing seams before tests at them.
 - [x] Save, edit-and-Done, edit-and-Worked and edit-and-Dot retain their supported behavior. One Undo reverses each complete gesture's fields and action effects without erasing immutable history facts or adding a second Undo step.
