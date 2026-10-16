@@ -4,7 +4,7 @@
 
 **Blocked by:** None (can start immediately).
 
-**Status:** implemented-local; awaiting integration
+**Status:** complete — integrated, reviewed, deployed and accepted on the ordinary production path.
 
 - [x] Settle the action owner's concrete interface before implementation, keeping existing useful modules and in-process responsibilities. Reuse scanner actions, visible Task history, Undo and saved/reloaded boards as the agreed consumer seams. Resolve any materially new testing seam before tests at it; demonstrate reduced caller knowledge rather than a forwarding extraction.
 - [x] Yes and No retain the actual before/after rating, uncertainty, likelihood and available Top X values for the affected tasks. Missing historical facts remain unavailable rather than being reconstructed as invented observations.
@@ -15,3 +15,7 @@
 - [x] Ordinary save/reload and reconciliation preserve supported history, original timestamps, opaque future formats and recovery evidence. Keep the saved format and observation retention unchanged; no history rewrite, migration or destructive reset is introduced.
 - [x] Retain runnable baseline evidence and protected comparison/action/Undo/merge/reload assertions. Resolve already-passing behavior against the repository's test-first requirement before editing, and observe behavioral RED before every functional change, then GREEN. Use isolated boards and retain exact commands, identities and output.
 - [x] Verify the complete direct-action-to-visible-history-to-Undo/reload path through the production owner. Keep focused preservation evidence for state and sync review, and hand back a locally verified commit for integration with the editor and other behavior groups; do not publish a separate product release.
+
+## Integrated release acceptance — 2026-10-16
+
+Complete in [product PR132](https://github.com/emerald-pham/funsidething/pull/132), reviewed candidate `5ae84fdefb209127e90537e25ab3b166b8e9320b`, deployed main `7fcc49f2565694f44ccf1ab2376aed22f489aa06`. The integrated tree is `1a79407ea6cf263f7ac435d8f3d871b89b70e827`. Ticket 07 records the common validation, independent reviews, live acceptance and playable checks; its acceptance supersedes earlier local-only handback notes. The original baseline, real RED/GREEN and approved refactor chronology remain retained.

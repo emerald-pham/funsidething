@@ -4,7 +4,7 @@
 
 **Blocked by:** None (can start immediately).
 
-**Status:** complete — local recipe and lifetime ownership. Ticket 02 owns local motion/resize presentation; ticket 07 owns final rendered integration and PWA packaging evidence.
+**Status:** complete — integrated, reviewed, deployed and accepted on the ordinary production path.
 
 - [x] Settle the concrete responsibility and interface before implementation. Reuse the agreed deterministic scene reconstruction and composed painter consumers; resolve any materially new testing seam with the user before tests at it. Demonstrate that production callers know fewer walking rules; a file move or forwarding module alone is insufficient.
 - [x] Keep shared seeded opportunity selection and admission in the timeline, independent of viewport and local motion preference. Admission reservation duration, complete canonical display lifetime and local paint completion remain distinct, with immutable shared recipes.
@@ -18,3 +18,7 @@
 Local implementation commit: `142ae0c876c64629ccebf3e37310919984f9734d`.
 
 Focused evidence and complete logs: `/private/tmp/chain-architecture-evidence-20261016/01/implementation.md`. This ticket adds the recipe/lifetime owner only; `landscape.js` local motion and resize decisions remain for ticket 02, and the final shell cache fingerprint remains for ticket 07.
+
+## Integrated release acceptance — 2026-10-16
+
+Complete in [product PR132](https://github.com/emerald-pham/funsidething/pull/132), reviewed candidate `5ae84fdefb209127e90537e25ab3b166b8e9320b`, deployed main `7fcc49f2565694f44ccf1ab2376aed22f489aa06`. The integrated tree is `1a79407ea6cf263f7ac435d8f3d871b89b70e827`. Ticket 07 records the common validation, independent reviews, live acceptance and playable checks; its acceptance supersedes earlier local-only handback notes. The original baseline, real RED/GREEN and approved refactor chronology remain retained.
