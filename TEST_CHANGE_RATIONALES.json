@@ -7223,5 +7223,21 @@
       "command": "node --test --test-reporter=spec --test-name-pattern='RISK bulk result ownership:|RISK bulk account selection guidance:' tests.js",
       "failure": "At 2026-10-16 17:09:26 UTC on baseline 84d9e11b840ee21e184c7a6fc1607d977ccdc96f, the result ownership characterization passed and the actual Help answer failed because it lacked 'Switching accounts clears the previous board’s selection.' After adding that FAQ sentence, the first changelog run exposed an unseeded fake template rather than product behavior; the fixture was corrected to use the real current/archive templates. At 17:10:27 UTC, the mounted Help Changelog consumer then failed because it had no October 16 entry with the selection-reset bullet. The account-owner draft characterization passed both board-account and CloudSync-user change cases against the original 84d9 source at 17:14:37 UTC, so this is GREEN preservation coverage, not a bug RED. A deliberate sensitivity mutant at 17:11:12 UTC tied the result to the exact state object; the same-account Undo result assertion failed as expected, then the mutant was restored. Outputs: /private/tmp/chain-architecture-evidence-20261016/06/preimplementation-red.log, changelog-copy-red.log (fixture issue), changelog-copy-red-with-consumer-fixture.log, result-owner-sensitivity-negative-control.log, bulk-owner-characterization-baseline-green.log. The actual feature RED is the missing public copy; the controlled result failure is sensitivity evidence, not a reported product defect. The behavior-preserving bulk ownership refactor uses approved GREEN/refactor/GREEN rather than a manufactured failure."
     }
+  },
+  {
+    "testChangesSha256": "8bd0135fa205c0cd06e21244d90dd369dc15a5177881ea3b8bedd301e615cc9c",
+    "reason": "Exercise the actual service-worker install and fetch consumers so every local production script is delivered by a fresh installed shell without a prior online load.",
+    "previousBehavior": "The new LandscapeVisits production script is loaded by the page but was absent from the deferred service-worker packaging list, so a fresh installed shell cannot deliver it offline.",
+    "intendedBehavior": "Installation caches the new module with the existing shell and offline GETs return the exact production bytes for every local script declared by the page.",
+    "replacementTests": [
+      "RISK PWA module delivery: a fresh installed shell serves every production script while offline"
+    ],
+    "preservedCoverage": [
+      "The existing install/activation, shell fingerprint, update deferral, saved-board persistence, protected recovery and offline lifecycle assertions are unchanged. Final fingerprints and actual browser update/offline proof remain required after the remaining integration."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='^RISK PWA module delivery:' tests.js",
+      "failure": "Observed before editing sw.js on integration44d695470f0e1e67c0c520729e1da58850664207: fresh installation must deliver /landscape-visits.js offline failed because actual service-worker fetch attempted the disabled network for that module. Full contemporaneous output and source hashes: /private/tmp/chain-architecture-evidence-20261016/07/module-delivery-red.log and module-delivery-red.command.json. After adding the module to install addAll, the same consumer and existing lifecycle test passed2/2 in module-delivery-green.log."
+    }
   }
 ]
