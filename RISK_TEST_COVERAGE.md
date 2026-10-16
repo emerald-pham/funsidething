@@ -1154,6 +1154,7 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - `RISK pedestrian reservation workload: stress admission stays fourteen while complete recipes have a derived finite bound`
 - `RISK pedestrian visit recipe consumer: complete lifetime stays separate from admission and reconstructs at current UTC age`
 - `RISK pedestrian local paint culling: completed parties stop before pose shadow reflection and actor consumers without altering shared records`
+- `RISK pedestrian paint presentation consumer: current motion and viewport choices preserve complete local exits`
 - `RISK pedestrian reduced workload: original shared reservations alone select deterministic still representatives`
 - `RISK pedestrian paint memo: UTC frame age advances without rebuilding each local completion recipe`
 - `RISK pedestrian fireworks isolation: retained walking recipes never enter unrelated show pose work`
