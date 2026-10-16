@@ -5,7 +5,7 @@
 (function(root){
   'use strict';
   const S=root.LivingSky,C=root.LandscapeConfig;
-  const DEFAULT_SEED='chain-scanner-scene-v1',DAY=86400,MAX_LIFE=300,MAX_WALK_LIFE=2700;
+  const DEFAULT_SEED='chain-scanner-scene-v1',DAY=86400,MAX_LIFE=300;
   const unit=value=>((value%1)+1)%1;
   function sample(seed,stream,slot=0,salt=0){
     let hash=2166136261;
@@ -56,25 +56,7 @@
       return sunCache.get(minute);
     };
     const terrain=n=>terrainSample(n,seed),city=root.LandscapeGeometry.create(1440,900).cityscape(terrain);
-    // Keep logical lifetimes identical across browsers and resize. The shared
-    // finite travel budget covers canvases through 8192 CSS pixels; smaller
-    // canvases simply finish painting a visit earlier, without changing admission.
-    const walkingGeometry=root.LandscapeGeometry.create(8192,900);
-    const walkingTypes=new Set(['walker','dogwalker','reader','couple','picnic','kite','snowman','snowangel','skier']);
-    const walkingDurations=new WeakMap();
-    const visibleDuration=e=>{
-      if(!walkingTypes.has(e.type))return e.duration;
-      if(!walkingDurations.has(e))walkingDurations.set(e,walkingGeometry.walkingLifetime(e));
-      return walkingDurations.get(e);
-    };
-    const extendWalk=e=>{
-      if(!walkingTypes.has(e.type))return e;
-      const visit={...e,activityDuration:e.duration};
-      // Lifetime reads are pure and memoized. Planning a whole day's original
-      // reservations must not solve every walk when only this moment is painted.
-      Object.defineProperty(visit,'duration',{enumerable:true,get:()=>visibleDuration(e)});
-      return visit;
-    };
+    const visits=root.LandscapeVisits.create();
     const dayPlans=new Map();
     const roofs=city.partyRoofs,gardens=[...city.gardens,...city.patios].map(roof=>roof.index).sort((a,b)=>a-b);
     const wind=.6+sample(seed,'wind')*1.2,visitSeed=sample(seed,'visitors');
@@ -157,19 +139,17 @@
         // Full exits stay finite and unchanged across widths, reload and seek.
         active=active.filter(other=>other.end>e.start);
         if(active.length>=S.MAX_EVENTS-2)continue;
-        // The canonical route is below2700seconds: (8192+112)/3.5 plus
-        // the longest240/.82activity and its bounded clock offset. Only a
-        // proposal this close to midnight needs its exact full-life fit solved.
-        const end=e.start+(e.start+MAX_WALK_LIFE>to?Math.max(visibleDuration(e),reservationDuration(e)):reservationDuration(e));
-        if(end>to)continue;
-        active.push({end:e.start+reservationDuration(e)});events.push(extendWalk(e));
+        // Shared admission remains based on original reservations. Visits owns
+        // the rare exact full-life check for proposals close to UTC midnight.
+        if(!visits.fitsUtcDay(e,reservationDuration(e),to))continue;
+        active.push({end:e.start+reservationDuration(e)});events.push(visits.recipe(e));
       }
       dayPlans.set(key,events);if(dayPlans.size>2)dayPlans.delete(dayPlans.keys().next().value);
       return events;
     }
     function build(bucket){
       const from=bucket*8,to=from+8;
-      const events=dayPlan(Math.floor(from/DAY)).filter(e=>e.start>=from-MAX_WALK_LIFE&&e.start<to&&e.start+e.duration>from);
+      const events=visits.inWindow(dayPlan(Math.floor(from/DAY)),from,to);
       for(const type of ['train','metro']){
         const rate=C.spawnRate(type);if(!rate)continue;
         // Bernoulli opportunities are one maximum crossing apart, so no
