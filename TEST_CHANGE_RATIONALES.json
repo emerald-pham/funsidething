@@ -7172,5 +7172,21 @@
       "command": "Baseline consumer: node --test --test-name-pattern='RISK pedestrian visit recipe consumer:' tests.js; intentional sensitivity mutant: the same command with the timeline recipe getter changed to return its reservation duration; post-refactor regression: node --test --test-name-pattern='RISK pedestrian (capacity planner budget|deferred recipes):' tests.js.",
       "failure": "The new production consumer passed 1/1 before editing; the deliberate reservation-duration mutant failed its activity-versus-complete-lifetime assertion and was reverted, so that is sensitivity evidence, not feature RED. The first implementation run then exposed duplicate canonical lifetime calculations in two existing RISK tests; consuming the visit recipe getter in inWindow fixed the observed regression. Logs: /private/tmp/chain-architecture-evidence-20261016/01/recipe-consumer-green.log, recipe-consumer-negative-control.log, lifetime-cache-diagnostic.log, lifetime-cache-green.log. The behavior-preserving GREEN/refactor/GREEN approach was approved in /private/tmp/chain-architecture-evidence-20261016/approval.json."
     }
+  },
+  {
+    "testChangesSha256": "6160158e27d667168d7a79a60f3013498e025eec4730b6ea728629a67de8318e",
+    "reason": "Fix the observed All Tasks selection leak when a cloud adoption switches signed-in owners, retain selection across ordinary same-account Undo replacement, and keep existing filter checks on actual controls.",
+    "previousBehavior": "All Tasks prunes selected IDs only against visible membership, so a second account with a matching task ID inherits the prior account's selected state.",
+    "intendedBehavior": "The view owner clears selected IDs when either the board account or signed-in account changes, while same-account state replacement retains selection for still-visible tasks.",
+    "replacementTests": [
+      "RISK All Tasks view ownership: account adoption clears prior selection while same-account Undo retains it"
+    ],
+    "preservedCoverage": [
+      "Existing search, context/status/eligibility filtering, Postponed expiry, selected-row paint, keyboard focus, visible-only Select all, and Bulk Edit consumer assertions remain unchanged."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='RISK All Tasks view ownership:' tests.js",
+      "failure": "Observed before runtime edits at 2026-10-16 16:49:15 UTC on baseline bf36ec674780879e4bfb5224733176cbbda2230d: after a real CloudSync account-B board adoption with the same task ID, expected toolbar /0 selected/ but actual markup contained 1 selected. Exact contemporaneous output: /private/tmp/chain-architecture-evidence-20261016/05/ownership-red.log. Same-account Undo assertions passed before the account transition. The final expanded test was also run later against a temporary baseline-index fixture as sensitivity confirmation only; that retrospective result is in ownership-final-tests-on-baseline.log and is not the chronological RED."
+    }
   }
 ]

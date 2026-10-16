@@ -999,6 +999,7 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK bulk toolbar: mounted controls stay outside scrolling rows and retain filtered selection through filter changes
 - RISK bulk row selection: selected label replaces the existing rank slot and deselection restores its format
 - RISK bulk toolbar keyboard: rerender restores the focused toolbar action and row toggle
+- RISK All Tasks view ownership: account adoption clears prior selection while same-account Undo retains it
 - RISK bulk toolbar guidance: extended FAQ describes frozen controls and rank-slot selection
 - RISK repository process boundary: actual visual tests compare every changed control with neighboring controls and scrolled states
 
