@@ -2737,6 +2737,10 @@ test("PWA lifecycle: current shell installs and activation retires prior shell c
 });
 
 test("RISK PWA module delivery: a fresh installed shell serves every production script while offline", async () => {
+  const releasedWorker = spawnSync('git', ['show', '48b9c58aa03b4d2c7006358f70466f590e685543:sw.js'], { cwd: __dirname, encoding: 'utf8' });
+  assert.equal(releasedWorker.status, 0, 'the pinned pre-daylight-fix worker remains available');
+  assert.notEqual(serviceWorkerSource(), releasedWorker.stdout,
+    'installed browsers must see changed worker bytes before they can deliver the continuous-daylight correction');
   const origin = "https://scanner.example";
   const handlers = {}, records = new Map(), networkRequests = [];
   const key = request => new URL(typeof request === "string" ? request : request.url, origin).href;
@@ -2798,6 +2802,15 @@ test("RISK PWA module delivery: a fresh installed shell serves every production 
       `offline delivery must retain the exact production bytes for ${url.pathname}`);
   }
   assert.deepEqual(networkRequests, [], "fresh installation must not depend on a prior online script fetch");
+  const cachedSolar = vm.createContext({ Math });
+  for (const file of ['landscape-config.js', 'vendor/astronomy.min.js', 'stars.js', 'landscape-core.js']) {
+    let pending;
+    handlers.fetch({ request: new Request(new URL(file, origin)), respondWith(promise) { pending = promise; } });
+    vm.runInContext(await (await pending).text(), cachedSolar, { filename: 'offline/' + file });
+  }
+  const sky = vm.runInContext("LivingSky.skyAt(new Date('2026-06-21T00:28:09.928Z'), { latitude: 65.8, longitude: 18.96, timezone: 'Europe/Oslo' })", cachedSolar);
+  assert.equal(sky.period, 'day', 'the actual offline-delivered solar consumer retains the continuous-daylight fix');
+  assert.equal(cachedSolar.LivingSky.fireworksAllowed(sky), false, 'offline daylight excludes shows too');
 });
 
 function slice(src, startMarker, endMarker) {
