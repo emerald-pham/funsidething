@@ -48,4 +48,3 @@ successful merge. The change owner completes this work before handing off.
    alignment with `origin/main`, every intentionally retained branch or
    checkout and its reason, and any recovery directory. A completed product
    change does not justify leaving its safely removable checkout behind.
-

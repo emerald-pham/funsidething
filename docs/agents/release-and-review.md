@@ -93,41 +93,16 @@ and coverage limits. White paint, readable text and passing bounds alone do not
 establish a visual match. Unexplained drift is an actionable finding; fix it and
 repeat the affected final rendered comparison before approval.
 
-Verify the applied theme attribute, computed color scheme and paint before
-accepting each theme capture; theme labels alone do not establish coverage.
+For executed visual assertions, theme verification and neighboring-control/scroll
+coverage, follow the mandatory visual policy in [CLAUDE.md](../../CLAUDE.md#review-and-release).
 
-Actual visual tests are mandatory for changed controls or layout. Code and
-typography reviewers inspect the final rendered visual-test evidence for every
-changed control and its established neighboring control. Compare the controls
-in the same pane, not a modal reference substituted for a list toolbar. Test
-day and night themes, ordinary and enlarged relevant mobile/desktop views,
-natural disabled and selected states, native keyboard focus, and top, middle and end
-task scrolling. Check row height before/after selection, group spacing, pane
-insets, safe-area spacing and unobscured content as well as individual styles.
-Screenshots in isolation are not a pass: record executed assertions, exact
-artifact and visible changed surfaces together with the named reference and
-coverage limits. Missing relevant runtime evidence remains a review gap.
+## Final-candidate timing
 
-## Risk-based final-candidate review
-
-Before pushing, merging, or deploying a change, classify its risk from the
-exact final commit and record the rationale with the release evidence.
-
-- Pure documentation, comments, copy, or repository housekeeping with no
-  executable, configuration, test, release-gate, data, or user-visible behavior
-  change needs an exact-diff owner self-review, but no independent reviewer.
-- Ordinary code or behavior changes need one independent reviewer of the exact
-  final commit, including the full diff, relevant tests, and user-visible or
-  data-safety effects.
-- Changes to shared session state, callable behavior or authorization,
-  Firestore rules, deployment or authentication infrastructure, data migration,
-  memory, cloud persistence, or synchronization need the relevant independent
-  specialist review. Use separate code/behavior and memory/cloud/sync reviewers
-  only when both risk domains are materially affected.
-
-Fix actionable findings and recheck changed areas before release. If the
-candidate changes after review, repeat the affected review on the new exact
-commit. A review of an earlier draft is not a review of the final commit.
+Before pushing, merging or deploying, classify the exact final commit under the
+risk-based plan above and record the rationale with release evidence. Fix all
+actionable findings and recheck changed areas before release. If the candidate
+changes after review, repeat the affected review on the new exact commit; an
+earlier draft review does not approve the final commit.
 
 ## Independent FAQ coverage release check
 

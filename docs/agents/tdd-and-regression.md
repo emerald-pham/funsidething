@@ -89,4 +89,3 @@ because they can hide assertions. The record is evidence for review, not an
 automatic permission to regress: the independent reviewer must judge the reason,
 replacement coverage, and actual user-visible result on the final commit. CI
 checks the record and diff; it cannot itself prove that a command ran earlier.
-
