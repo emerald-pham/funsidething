@@ -754,6 +754,65 @@ test('RISK task action history: scanner comparison stays visible through Undo an
  reloaded.ctx.openEdit(candidate.id);
  assert.match(reloaded.shim.document.getElementById('modalRoot').innerHTML,/Yes comparison/,'saved reload retains visible history after Undo');
 });
+test('RISK task action history: editor gestures keep edits and outcomes within one Undo',async(t)=>{
+ await t.test('unchanged Save keeps its observation without consuming random draws',async()=>{
+  const {ctx,shim,c}=await ratingHistoryFixture(641);
+  ctx.openEdit(c.id);ctx.onAction('save-edit',{dataset:{id:c.id}});
+  const first=ratingHistoryCopy(c.ratingHistory),chance=JSON.stringify(ctx.state.chance);
+  vm.runInContext('globalThis.editorRandomDraws=0;globalThis.editorOriginalRandom=Math.random;Math.random=function(){editorRandomDraws++;return editorOriginalRandom();}',ctx);
+  ctx.openEdit(c.id);ctx.render();ctx.onAction('save-edit',{dataset:{id:c.id}});
+  assert.deepEqual(ratingHistoryCopy(c.ratingHistory),first,'opening, rendering, and unchanged Save cannot append or rewrite an observation');
+  assert.equal(JSON.stringify(ctx.state.chance),chance,'unchanged Save cannot replace the active sampling state');
+  assert.equal(vm.runInContext('editorRandomDraws',ctx),0,'deduplicated Save cannot consume a random draw');
+  assert.equal(shim.document.getElementById('modalRoot').innerHTML,'','successful Save closes the same editor');
+ });
+ await t.test('Done saves the complete draft and one Undo reverses both',async()=>{
+  const {ctx,shim,b}=await ratingHistoryFixture(642),id=b.id,undoBefore=vm.runInContext('undoStack.length',ctx),title=b.title;
+  ctx.openEdit(id);fillEditPane(ctx,shim,{title:'Private edited Done',due:'2026-10-18'});ctx.onAction('done-task',{dataset:{id}});
+  const completed=ratingHistoryTask(ctx,id),event=ratingHistoryCopy(completed.ratingHistory.at(-1));
+  assert.equal(completed.title,'Private edited Done');assert.equal(completed.due,'2026-10-18');assert.equal(completed.done,true);
+  assert.equal(event.kind,'done');assert.equal(vm.runInContext('undoStack.length',ctx),undoBefore+1,'one editor gesture contributes one Undo frame');
+  assert.equal(ctx.undo(),true);const restored=ratingHistoryTask(ctx,id);
+  assert.equal(restored.title,title);assert.equal(restored.due,null);assert.equal(restored.done,false,'one Undo reverses both the draft and action');
+  assert.ok(restored.ratingHistory.some(row=>JSON.stringify(row)===JSON.stringify(event)),'Undo preserves the original immutable Done observation');
+  assert.equal(vm.runInContext('undoStack.length',ctx),undoBefore);
+  assert.equal(await ctx.persist(),true);
+  const reloaded=await loadApp({seedStorage:{[STORE_KEY]:JSON.stringify(ctx.state)}});await reloaded.ctx.__dataReady;
+  assert.deepEqual(ratingHistoryCopy(ratingHistoryTask(reloaded.ctx,id).ratingHistory),ratingHistoryCopy(restored.ratingHistory));
+  reloaded.ctx.openEdit(id);assert.match(reloaded.shim.document.getElementById('modalRoot').innerHTML,/Private edited Done|Done/,'saved history remains available after reload');
+ });
+ await t.test('Worked saves an eligibility edit and one Undo restores the prior task state',async()=>{
+  const {ctx,shim,c}=await ratingHistoryFixture(643),id=c.id,undoBefore=vm.runInContext('undoStack.length',ctx),title=c.title;
+  ctx.openEdit(id);fillEditPane(ctx,shim,{title:'Private worked edit',start:'2099-01-02'});ctx.onAction('worked-task',{dataset:{id}});
+  const worked=ratingHistoryTask(ctx,id),event=worked.ratingHistory.at(-1);
+  assert.equal(worked.title,'Private worked edit');assert.equal(worked.startsAt,'2099-01-02');assert.equal(ctx.state.considered[id],'worked');
+  assert.equal(event.kind,'worked');assert.equal(event.change,'relative');assert.equal(vm.runInContext('undoStack.length',ctx),undoBefore+1);
+  assert.equal(ctx.undo(),true);const restored=ratingHistoryTask(ctx,id);
+  assert.equal(restored.title,title);assert.equal(restored.startsAt,null);assert.equal(ctx.state.considered[id],undefined);
+  assert.ok(restored.ratingHistory.some(row=>row.id===event.id&&row.at===event.at));assert.equal(vm.runInContext('undoStack.length',ctx),undoBefore);
+ });
+ await t.test('Dot saves the draft, compares the intended pair, and one Undo restores both',async()=>{
+  const {ctx,shim,a,b}=await ratingHistoryFixture(644),id=b.id,undoBefore=vm.runInContext('undoStack.length',ctx),title=b.title,mu=b.mu;
+  ctx.openEdit(id);fillEditPane(ctx,shim,{title:'Private dotted edit'});ctx.onAction('dot-task',{dataset:{id}});
+  const dotted=ratingHistoryTask(ctx,id),benchmark=ratingHistoryTask(ctx,a.id),event=ratingHistoryCopy(dotted.ratingHistory.at(-1));
+  assert.equal(dotted.title,'Private dotted edit');assert.equal(ctx.state.chain.at(-1),id);assert.notEqual(ctx.state.candidateId,id,'the newly dotted task cannot remain the offered candidate');
+  assert.equal(event.kind,'dot');assert.equal(benchmark.ratingHistory.at(-1).id,event.id);assert.equal(vm.runInContext('undoStack.length',ctx),undoBefore+1);
+  assert.equal(ctx.undo(),true);const restored=ratingHistoryTask(ctx,id);
+  assert.equal(restored.title,title);assert.deepEqual(Array.from(ctx.state.chain),[a.id]);assert.equal(restored.mu,mu);
+  assert.ok(restored.ratingHistory.some(row=>row.id===event.id&&row.at===event.at));assert.equal(vm.runInContext('undoStack.length',ctx),undoBefore);
+ });
+ await t.test('Return saves the draft and one Undo restores its saved rest',async()=>{
+  const {ctx,shim,c}=await ratingHistoryFixture(645),id=c.id,now=vm.runInContext('Date.now()',ctx),undoBefore=vm.runInContext('undoStack.length',ctx),title=c.title;
+  Object.assign(c,{evergreen:true,evergreenHours:18,evergreenResetAtDay:false,lastDoneAt:now-3600000});
+  ctx.openEdit(id);fillEditPane(ctx,shim,{title:'Private returned edit',evergreen:true});ctx.onAction('return-candidate',{dataset:{id}});
+  const returned=ratingHistoryTask(ctx,id),event=ratingHistoryCopy(returned.ratingHistory.at(-1));
+  assert.equal(returned.title,'Private returned edit');assert.equal(returned.lastDoneAt,null);assert.equal(event.kind,'return');assert.equal(event.change,'relative');
+  assert.equal(vm.runInContext('undoStack.length',ctx),undoBefore+1);
+  assert.equal(ctx.undo(),true);const restored=ratingHistoryTask(ctx,id);
+  assert.equal(restored.title,title);assert.equal(restored.lastDoneAt,now-3600000);assert.equal(restored.evergreenHours,18);
+  assert.ok(restored.ratingHistory.some(row=>JSON.stringify(row)===JSON.stringify(event)));assert.equal(vm.runInContext('undoStack.length',ctx),undoBefore);
+ });
+});
 test('RISK task rating history: actual comparisons retain timestamped before and after values without backfilling or changing signals',async()=>{
  const {ctx,a,b,c}=await ratingHistoryFixture();
  const at=vm.runInContext('Date.now()',ctx),before=ratingHistoryCopy({mu:b.mu,sigma:b.sigma}),chance=ctx.chanceDisplayStats().get(b.id).probability;
@@ -16118,9 +16177,10 @@ test('Evergreen edit: hours threshold suggests checkbox but allows either manual
  const {ctx,shim}=await loadApp();const t=ctx.addTask('repeat');ctx.openEdit(t.id);
  const hours=shim.document.getElementById('etEverHours'), reset=shim.document.getElementById('etEverReset');hours.id='etEverHours';
  hours.value='19';ctx.suggestEvergreenReset(hours);assert.equal(reset.checked,false);
- reset.checked=true;fillEditPane(ctx,shim,{evergreen:true});ctx.applyEditFields(t);assert.equal(t.evergreenHours,19);assert.equal(t.evergreenResetAtDay,true);
- hours.value='18';ctx.suggestEvergreenReset(hours);assert.equal(reset.checked,true);
- reset.checked=false;ctx.applyEditFields(t);assert.equal(t.evergreenResetAtDay,false);
+ reset.checked=true;fillEditPane(ctx,shim,{evergreen:true});ctx.onAction('save-edit',{dataset:{id:t.id}});assert.equal(t.evergreenHours,19);assert.equal(t.evergreenResetAtDay,true);
+ ctx.openEdit(t.id);const nextHours=shim.document.getElementById('etEverHours'),nextReset=shim.document.getElementById('etEverReset');nextHours.id='etEverHours';
+ nextHours.value='18';ctx.suggestEvergreenReset(nextHours);assert.equal(nextReset.checked,true);
+ nextReset.checked=false;ctx.onAction('save-edit',{dataset:{id:t.id}});assert.equal(t.evergreenResetAtDay,false);
 });
 test('Scan settings: long mode selector stays within a narrow edit pane',()=>{
  assert.match(html,/\.frow select\s*\{[^}]*min-width:0[^}]*max-width:100%/);
@@ -17111,8 +17171,8 @@ test('RISK prerequisites: Add and each task editor expose stable selectors and r
  shim.document.getElementById('addPrerequisite').value=bob.id;ctx.onAction('add',{});
  const gene=ctx.state.tasks.find(t=>t.title==='gene');assert.equal(gene.prerequisiteId,bob.id);
  ctx.openEdit(gene.id);assert.match(shim.document.getElementById('modalRoot').innerHTML,/id="etPrerequisite"[\s\S]*bob/);
- shim.document.getElementById('etPrerequisite').value='';ctx.applyEditFields(gene);assert.equal(gene.prerequisiteId,null);
- shim.document.getElementById('etPrerequisite').value=bob.id;ctx.applyEditFields(gene);assert.equal(gene.prerequisiteId,bob.id);
+ shim.document.getElementById('etPrerequisite').value='';ctx.onAction('save-edit',{dataset:{id:gene.id}});assert.equal(gene.prerequisiteId,null);
+ ctx.openEdit(gene.id);shim.document.getElementById('etPrerequisite').value=bob.id;ctx.onAction('save-edit',{dataset:{id:gene.id}});assert.equal(gene.prerequisiteId,bob.id);
  ctx.openSettings();const settings=shim.document.getElementById('modalRoot').innerHTML;
  assert.doesNotMatch(settings,/Task prerequisites|stPrerequisiteTask|stPrerequisiteNeeds|data-act="remove-prerequisite"/);
 });
@@ -17336,7 +17396,7 @@ test('RISK evergreen hours or days: stored hours survive conversion, UI save, an
  const weekly=ctx.state.tasks[0];assert.equal(weekly.evergreenHours,168);
  ctx.openEdit(weekly.id);assert.match(shim.document.getElementById('modalRoot').innerHTML,/id="etEverHours"[^>]*value="7"[\s\S]*id="etEverUnit"[\s\S]*value="days" selected/);
  shim.document.getElementById('etEverHours').value='2';shim.document.getElementById('etEverUnit').value='days';
- ctx.applyEditFields(weekly);assert.equal(weekly.evergreenHours,48);
+ ctx.onAction('save-edit',{dataset:{id:weekly.id}});assert.equal(weekly.evergreenHours,48);
  ctx.openSettings();assert.match(shim.document.getElementById('modalRoot').innerHTML,/id="stEverUnit"/);
  shim.document.getElementById('stEverHours').value='3';shim.document.getElementById('stEverUnit').value='days';
  ctx.onAction('save-settings',{});assert.equal(ctx.state.settings.evergreenHours,72);
