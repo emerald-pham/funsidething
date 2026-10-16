@@ -259,6 +259,7 @@ The named-contract test in tests.js checks that every top-level test whose title
 
 - RISK PWA updates: an already durable board applies a downloaded worker without a redundant quota write
 - RISK PWA updates: an unsaved draft visibly defers reload while update checks continue
+- RISK PWA module delivery: a fresh installed shell serves every production script while offline
 - RISK PWA updates: a host write in flight must finish before a reverted board reloads
 
 ## Test-first enforcement and regression protection
@@ -944,6 +945,9 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK bulk task editing: FAQ and editor qualify mixed Apply and later sync recovery limits
 - RISK bulk task editing: concurrent recovery keeps backups and existing board Undo boundary explicit
 - RISK bulk task editing: current batch result distinguishes partial reconciliation from sync success and offers no batch Undo
+- RISK bulk task editing: logical and cloud owner changes reject the whole draft before mutation — Draft Save rejects changed board and signed-in owner before any batch field is written.
+- RISK bulk result ownership: same-account Undo keeps the current-value summary across board replacement — Same-owner board replacement retains result scope while counts follow current values.
+- RISK bulk account selection guidance: Help and Changelog explain account-switch clearing — Actual Help consumer covers the selection reset introduced by ticket 05.
 - RISK bulk task editing: enlarged modal fieldsets shrink and native controls retain available width
 - RISK bulk task guidance: bounded answers retain distinct selection property conflict Undo and result instructions
 - RISK bulk task guidance: enlarged conflict answer uses breakable task status wording

@@ -7220,5 +7220,40 @@
       "command": "node --test --test-reporter=spec --test-name-pattern='RISK task action history: editor gestures keep edits and outcomes within one Undo' tests.js; controlled mutant suppresses the compatibility edit application and reruns that exact command.",
       "failure": "Observed GREEN on baseline 84d9e11b840ee21e184c7a6fc1607d977ccdc96f at 2026-10-16 17:13:35 UTC: 6/6 tests passed. The deliberate mutant failed 5/6, with Done, Worked, Dot and Return observing unchanged fields; full mutant output is /private/tmp/chain-architecture-evidence-20261016/04/editor-owner-negative-control.log. This is sensitivity evidence, not feature RED. Final baseline cohort passed 40/40 at 2026-10-16 17:14:42 UTC; full output is /private/tmp/chain-architecture-evidence-20261016/04/baseline-editor-history-final.log. The GREEN/refactor/GREEN exception is approved in /private/tmp/chain-architecture-evidence-20261016/approval.json."
     }
+  },
+  {
+    "testChangesSha256": "d07731f3c4c45253418426a291b4b505bcd79791eb5110b4c568ca938c75daa5",
+    "reason": "Add an actual Help consumer regression for the ticket 05 account-selection correction and preserve Bulk Edit owner/result behavior. The same-account result characterization passed on the original pre-refactor source; a later logical/cloud draft-owner characterization also passed against the original integration source. These are preservation cases, not behavior-change REDs.",
+    "previousBehavior": "The All Tasks Help answer omits that switching accounts clears prior selection. Existing result coverage does not assert that a same-account Undo replacement keeps the result scoped to the logical owner while counts follow current values.",
+    "intendedBehavior": "Help and the October 16 Changelog state that account switches clear the prior board selection. A bulk result remains visible after same-account Undo replaces the board object and recounts matches from the restored current values.",
+    "replacementTests": [
+      "RISK bulk task editing: logical and cloud owner changes reject the whole draft before mutation",
+      "RISK bulk result ownership: same-account Undo keeps the current-value summary across board replacement",
+      "RISK bulk account selection guidance: Help and Changelog explain account-switch clearing"
+    ],
+    "preservedCoverage": [
+      "All existing selection, clear-versus-blank, typed-over-clear, stale-batch, context, Undo, reconciliation, recovery, retry and result assertions remain unchanged.",
+      "The new result assertion uses the existing user-facing All Tasks and Undo consumer; this is local presentation state and makes no cloud acknowledgement claim."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='RISK bulk result ownership:|RISK bulk account selection guidance:' tests.js",
+      "failure": "At 2026-10-16 17:09:26 UTC on baseline 84d9e11b840ee21e184c7a6fc1607d977ccdc96f, the result ownership characterization passed and the actual Help answer failed because it lacked 'Switching accounts clears the previous board\u2019s selection.' After adding that FAQ sentence, the first changelog run exposed an unseeded fake template rather than product behavior; the fixture was corrected to use the real current/archive templates. At 17:10:27 UTC, the mounted Help Changelog consumer then failed because it had no October 16 entry with the selection-reset bullet. The account-owner draft characterization passed both board-account and CloudSync-user change cases against the original 84d9 source at 17:14:37 UTC, so this is GREEN preservation coverage, not a bug RED. A deliberate sensitivity mutant at 17:11:12 UTC tied the result to the exact state object; the same-account Undo result assertion failed as expected, then the mutant was restored. Outputs: /private/tmp/chain-architecture-evidence-20261016/06/preimplementation-red.log, changelog-copy-red.log (fixture issue), changelog-copy-red-with-consumer-fixture.log, result-owner-sensitivity-negative-control.log, bulk-owner-characterization-baseline-green.log. The actual feature RED is the missing public copy; the controlled result failure is sensitivity evidence, not a reported product defect. The behavior-preserving bulk ownership refactor uses approved GREEN/refactor/GREEN rather than a manufactured failure."
+    }
+  },
+  {
+    "testChangesSha256": "8bd0135fa205c0cd06e21244d90dd369dc15a5177881ea3b8bedd301e615cc9c",
+    "reason": "Exercise the actual service-worker install and fetch consumers so every local production script is delivered by a fresh installed shell without a prior online load.",
+    "previousBehavior": "The new LandscapeVisits production script is loaded by the page but was absent from the deferred service-worker packaging list, so a fresh installed shell cannot deliver it offline.",
+    "intendedBehavior": "Installation caches the new module with the existing shell and offline GETs return the exact production bytes for every local script declared by the page.",
+    "replacementTests": [
+      "RISK PWA module delivery: a fresh installed shell serves every production script while offline"
+    ],
+    "preservedCoverage": [
+      "The existing install/activation, shell fingerprint, update deferral, saved-board persistence, protected recovery and offline lifecycle assertions are unchanged. Final fingerprints and actual browser update/offline proof remain required after the remaining integration."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='^RISK PWA module delivery:' tests.js",
+      "failure": "Observed before editing sw.js on integration44d695470f0e1e67c0c520729e1da58850664207: fresh installation must deliver /landscape-visits.js offline failed because actual service-worker fetch attempted the disabled network for that module. Full contemporaneous output and source hashes: /private/tmp/chain-architecture-evidence-20261016/07/module-delivery-red.log and module-delivery-red.command.json. After adding the module to install addAll, the same consumer and existing lifecycle test passed2/2 in module-delivery-green.log."
+    }
   }
 ]

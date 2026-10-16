@@ -2690,6 +2690,70 @@ test("PWA lifecycle: current shell installs and activation retires prior shell c
   assert.equal(harness.claimCalls(), 1, "activation must claim already-open app clients");
 });
 
+test("RISK PWA module delivery: a fresh installed shell serves every production script while offline", async () => {
+  const origin = "https://scanner.example";
+  const handlers = {}, records = new Map(), networkRequests = [];
+  const key = request => new URL(typeof request === "string" ? request : request.url, origin).href;
+  const caches = {
+    async open(name) {
+      if (!records.has(name)) records.set(name, new Map());
+      const entries = records.get(name);
+      return {
+        async addAll(requests) {
+          for (const request of requests) {
+            const url = new URL(key(request));
+            const file = path.resolve(__dirname, url.pathname === "/" ? "index.html" : "." + url.pathname);
+            assert.ok(file.startsWith(`${__dirname}${path.sep}`), "installation must stay inside the isolated shell");
+            entries.set(url.href, new Response(fs.readFileSync(file)));
+          }
+        },
+        async put(request, response) { entries.set(key(request), response.clone()); },
+      };
+    },
+    async match(request) {
+      for (const entries of records.values()) {
+        const response = entries.get(key(request));
+        if (response) return response.clone();
+      }
+    },
+  };
+  class ShellRequest extends Request {
+    constructor(input, options) { super(key(input), options); }
+  }
+  vm.runInNewContext(serviceWorkerSource(), {
+    caches, URL, Request: ShellRequest,
+    fetch(request) {
+      networkRequests.push(key(request));
+      return Promise.reject(new Error(`Offline network request: ${key(request)}`));
+    },
+    self: {
+      location: { origin },
+      addEventListener(type, handler) { handlers[type] = handler; },
+      skipWaiting() { return Promise.resolve(); },
+      clients: { claim() { return Promise.resolve(); } },
+    },
+  }, { filename: "sw.js" });
+  const installation = [];
+  handlers.install({ waitUntil(promise) { installation.push(promise); } });
+  await Promise.all(installation);
+
+  const scripts = [...html.matchAll(/<script\b[^>]*\bsrc=["']([^"']+)["']/gi)]
+    .map(match => new URL(match[1], origin + "/"))
+    .filter(url => url.origin === origin);
+  assert.ok(scripts.length > 0, "the fixture must use the production page's local scripts");
+  for (const url of scripts) {
+    let pending;
+    handlers.fetch({ request: new Request(url), respondWith(promise) { pending = promise; } });
+    assert.ok(pending, `the installed worker must handle ${url.pathname}`);
+    await assert.doesNotReject(pending, `fresh installation must deliver ${url.pathname} offline`);
+    const response = await pending;
+    assert.ok(response?.ok, `offline delivery must succeed for ${url.pathname}`);
+    assert.deepEqual(Buffer.from(await response.arrayBuffer()), fs.readFileSync(path.join(__dirname, url.pathname)),
+      `offline delivery must retain the exact production bytes for ${url.pathname}`);
+  }
+  assert.deepEqual(networkRequests, [], "fresh installation must not depend on a prior online script fetch");
+});
+
 function slice(src, startMarker, endMarker) {
   const s = src.indexOf(startMarker);
   const e = src.indexOf(endMarker);
@@ -25077,6 +25141,24 @@ test('RISK bulk task editing: current batch result distinguishes partial reconci
  assert.match(shim.document.getElementById('listBulkToolbar').innerHTML,/Bulk edit requested for 2 tasks: 2 currently match in this tab; 0 have different values or are no longer open/);assert.match(shim.document.getElementById('listBulkToolbar').innerHTML,/This is not a server save confirmation/);
  ctx.state.tasks.find(t=>t.id===a.id).due='2028-03-01';ctx.renderList();assert.match(shim.document.getElementById('listBulkToolbar').innerHTML,/1 currently match in this tab; 1 have different values or are no longer open/);assert.match(shim.document.getElementById('listBulkToolbar').innerHTML,/Check Settings recovery backups/);assert.doesNotMatch(shim.document.getElementById('listBulkToolbar').innerHTML,/data-act="bulk-undo"/);
  ctx.state.syncAccount='another-private-account';ctx.renderList();assert.doesNotMatch(shim.document.getElementById('listBulkToolbar').innerHTML,/Bulk edit requested/,'result does not leak across accounts');
+});
+test('RISK bulk task editing: logical and cloud owner changes reject the whole draft before mutation',async()=>{
+ for(const ownerChange of ['board','cloud']){
+  const {ctx,shim}=await loadApp(),a=ctx.addTask('Private owner A'),b=ctx.addTask('Private owner B');ctx.state.listOpen=true;ctx.onAction('bulk-select-all');ctx.onAction('bulk-edit');shim.document.getElementById('bulkApplyDue').checked=true;shim.document.getElementById('bulkDue').value='2028-04-12';
+  if(ownerChange==='board')ctx.state.syncAccount='other-private-board';else ctx.window.CloudSync={user:'other-private-owner'};
+  ctx.onAction('bulk-save');assert.equal(ctx.state.tasks.find(task=>task.id===a.id).due,null,ownerChange+' owner change rejects before the first task mutates');assert.equal(ctx.state.tasks.find(task=>task.id===b.id).due,null,ownerChange+' owner change rejects the whole batch');assert.match(shim.document.getElementById('bulkError').textContent,/board changed/i);
+ }
+});
+test('RISK bulk result ownership: same-account Undo keeps the current-value summary across board replacement',async()=>{
+ const {ctx,shim}=await loadApp(),a=ctx.addTask('Private Undo A'),b=ctx.addTask('Private Undo B');ctx.state.listOpen=true;ctx.onAction('bulk-select-all');ctx.onAction('bulk-edit');shim.document.getElementById('bulkApplyDue').checked=true;shim.document.getElementById('bulkDue').value='2028-03-12';ctx.onAction('bulk-save');
+ assert.match(shim.document.getElementById('listBulkToolbar').innerHTML,/2 currently match in this tab; 0 have different values or are no longer open/);
+ const editedBoard=ctx.state;ctx.undo();assert.notEqual(ctx.state,editedBoard,'ordinary board Undo restores a replacement object');assert.equal(ctx.state.tasks.find(task=>task.id===a.id).due,null);assert.equal(ctx.state.tasks.find(task=>task.id===b.id).due,null);
+ assert.match(shim.document.getElementById('listBulkToolbar').innerHTML,/Bulk edit requested for 2 tasks: 0 currently match in this tab; 2 have different values or are no longer open/,'same logical owner keeps the result and measures its current values after Undo');assert.doesNotMatch(shim.document.getElementById('listBulkToolbar').innerHTML,/data-act="bulk-undo"/);
+});
+test('RISK bulk account selection guidance: Help and Changelog explain account-switch clearing',async()=>{
+ const {ctx,shim}=await loadApp();for(const id of ['appChangelogCurrent','appChangelog'])shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ const answer=help.split('<dt>How do I edit several tasks together?</dt><dd>')[1]?.split('</dd>')[0]||'';assert.match(answer,/Switching accounts clears the previous board’s selection\./);
+ const chapter=help.split('<details class="help-faq" data-help-changelog>')[1]?.split('</details>')[0]||'';assert.match(chapter,/<h3>October 16, 2026<\/h3>[\s\S]*?<li>Switching accounts clears the previous board’s selection\.<\/li>/);
 });
 test('RISK bulk task editing: enlarged modal fieldsets shrink and native controls retain available width',()=>{
  assert.match(html,/\.bulk-fields\s*\{[^}]*min-width:0[^}]*max-width:100%/,'observed chrome 390px 200% overflow needs fieldsets to shrink');assert.match(html,/\.bulk-fields input\[type=number\]\s*\{[^}]*min-width:0[^}]*max-width:100%/,'native numeric control must fit enlarged modal');assert.match(html,/<fieldset class="bulk-fields">/);
