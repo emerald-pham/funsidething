@@ -7204,5 +7204,21 @@
       "command": "node --test --test-reporter=spec --test-name-pattern='RISK task action history: scanner comparison stays visible through Undo and saved reload' tests.js > /private/tmp/chain-architecture-evidence-20261016/03/sensitivity-negative-control.log 2>&1",
       "failure": "The controlled mutant failed at tests.js:734 with actual undefined versus expected yes; full output is retained in /private/tmp/chain-architecture-evidence-20261016/03/sensitivity-negative-control.log. The unmutated production baseline passed at 2026-10-16 16:52:02 UTC; this is sensitivity evidence, not feature RED."
     }
+  },
+  {
+    "testChangesSha256": "34bb28d3b022f866e04dd320a8e4b2d10683530fb58f1da778f18a3bee58aa3d",
+    "reason": "Add an editor-action consumer characterization before the approved behavior-preserving TaskActionOwner refactor and migrate direct editor-field checks onto the actual Save action. The baseline is GREEN; the controlled sensitivity mutant confirms that dropped drafts are detected. This is not feature RED.",
+    "previousBehavior": "Editor Save, Done, Worked, Dot and Return already preserve their current field, ranking, history and Undo behavior through their existing consumers.",
+    "intendedBehavior": "The same gestures retain a normalized editor draft and post-edit intent under TaskActionOwner, with one Undo, honest retained history and no extra random draw for an unchanged Save.",
+    "replacementTests": [
+      "RISK task action history: editor gestures keep edits and outcomes within one Undo"
+    ],
+    "preservedCoverage": [
+      "Existing action, eligibility, ranking, history provenance, invalid-Dot, immutable-history, Undo, reload, concurrent-client, future-format and synchronization assertions remain intact; direct editor-field assertions now dispatch Save through the consumer."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='RISK task action history: editor gestures keep edits and outcomes within one Undo' tests.js; controlled mutant suppresses the compatibility edit application and reruns that exact command.",
+      "failure": "Observed GREEN on baseline 84d9e11b840ee21e184c7a6fc1607d977ccdc96f at 2026-10-16 17:13:35 UTC: 6/6 tests passed. The deliberate mutant failed 5/6, with Done, Worked, Dot and Return observing unchanged fields; full mutant output is /private/tmp/chain-architecture-evidence-20261016/04/editor-owner-negative-control.log. This is sensitivity evidence, not feature RED. Final baseline cohort passed 40/40 at 2026-10-16 17:14:42 UTC; full output is /private/tmp/chain-architecture-evidence-20261016/04/baseline-editor-history-final.log. The GREEN/refactor/GREEN exception is approved in /private/tmp/chain-architecture-evidence-20261016/approval.json."
+    }
   }
 ]

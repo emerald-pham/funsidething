@@ -4488,10 +4488,35 @@ function recordDecisionTime(){
   const dt = Date.now() - state.presentedAt;
   if(dt > 300 && dt < 120000){ state.decisionsMs.push(dt); if(state.decisionsMs.length>20) state.decisionsMs.shift(); }
 }
-/* Own each semantic task action from its before-state capture through Undo,
-   outcome, finalization and action-specific commit. UI adapters submit intent. */
+/*
+ * `perform({type:"editor",taskId,action,draft})` is the editor interface. Its
+ * detached draft uses null for blank dates and booleans/arrays for controls;
+ * the form adapter reads it, but this owner decides whether the task/action is
+ * still valid, captures before metrics, pushes one Undo, applies fields before
+ * the requested outcome, finalizes observations and commits in action order.
+ * A Dot invalidated by its own edit keeps only the saved edit observation.
+ * Direct scanner and list actions use the same owner without an editor draft.
+ */
 const taskActionOwnerBundle=(()=>{
-  function executeTaskAction(action,id,compatibility){
+  function applyEditorDraft(task,draft){
+    if(!task||!draft||typeof draft!=="object")return false;
+    task.title=String(draft.title??"").trim()||task.title;
+    task.url=safeUrl(draft.url);
+    task.due=draft.due||null;
+    task.startsAt=draft.startsAt||null;
+    task.evergreen=!!draft.evergreen;
+    if(draft.evergreenHoursInput!==null&&draft.evergreenHoursInput!==undefined)
+      task.evergreenHours=evergreenDurationHours(draft.evergreenHoursInput,draft.evergreenUnit,task.evergreenHours);
+    if(typeof draft.evergreenResetAtDay==="boolean")task.evergreenResetAtDay=draft.evergreenResetAtDay;
+    writeTaskPrerequisites(task,draft.prerequisiteIds);
+    writeTaskDependencyModes(task,draft.dependencyModes);
+    // An older/imported task may reference contexts this client cannot display.
+    // Editing visible choices must not silently delete those saved requirements.
+    const unavailableCtx=task.ctx.filter(id=>!state.contexts.some(c=>c.id===id));
+    task.ctx=[...new Set([...(Array.isArray(draft.contextIds)?draft.contextIds:[]),...unavailableCtx])];
+    return true;
+  }
+  function executeTaskAction(action,id,draft=null,modeOnStart=null){
     const task=taskById(id);if(!task)return false;
     if(!["done","worked","dot","return"].includes(action))return false;
     if(action==="dot"&&!canDotTask(task)||action==="return"&&!canReturnAsCandidate(task))return false;
@@ -4500,9 +4525,10 @@ const taskActionOwnerBundle=(()=>{
     const observation=action==="dot"
       ?captureRatingObservation(kind,[task.id,...(beforeEditBenchmark?[beforeEditBenchmark.id]:[])])
       :captureRatingObservation(kind,[task.id]);
-    if(!compatibility?.undoAlreadyPushed)pushUndo();
+    pushUndo();
+    if(modeOnStart)state.mode=modeOnStart;
     const resting=action==="return"&&task.evergreen&&task.lastDoneAt&&Date.now()<evergreenUntil(task);
-    if(compatibility?.editDraft)applyEditFields(task);
+    if(draft)applyEditorDraft(task,draft);
     if(action==="dot"&&!canDotTask(task)){
       finishRatingObservation({...observation,kind:"edit",ids:[task.id]});
       commit();
@@ -4550,7 +4576,21 @@ const taskActionOwnerBundle=(()=>{
     }
     return false;
   }
-  function perform(command,compatibility){
+  function executeEditorGesture(command){
+    const task=taskById(command.taskId),action=command.action,draft=command.draft;
+    if(!task||!draft||typeof draft!=="object")return false;
+    if(action==="save"){
+      const observation=captureRatingObservation("edit",[task.id]);
+      pushUndo();applyEditorDraft(task,draft);finishRatingObservation(observation,true);
+      closeModal();commit();return true;
+    }
+    if(!["done","worked","dot","return"].includes(action))return false;
+    const result=executeTaskAction(action,task.id,draft);
+    if(result==="saved-dot-unavailable")toast("Changes saved. This evergreen task is resting; use Return as candidate before Dot.");
+    if(result)closeModal();
+    return result;
+  }
+  function perform(command){
     if(!command||typeof command!=="object")return false;
     if(command.type==="decision"){
       const kind=command.decision;
@@ -4588,7 +4628,7 @@ const taskActionOwnerBundle=(()=>{
         recomputeRanks();finishRatingObservation(observation);state.interventionActive=false;commit(true,true);
         return true;
       }
-      if(command.action==="worked")return executeTaskAction("worked",b.id,null);
+      if(command.action==="worked")return executeTaskAction("worked",b.id);
       if(command.action==="dislodge"){
         const observation=captureRatingObservation("dislodge",[b.id]);
         pushUndo();
@@ -4607,13 +4647,13 @@ const taskActionOwnerBundle=(()=>{
     if(command.type==="candidate-worked"){
       const id=command.taskId;
       if(state.mode!=="scan"||state.interventionActive||state.candidateId!==id||!pool().some(t=>t.id===id))return false;
-      return executeTaskAction("worked",id,null);
+      return executeTaskAction("worked",id);
     }
-    if(command.type==="task")return executeTaskAction(command.action,command.taskId,compatibility);
+    if(command.type==="task")return executeTaskAction(command.action,command.taskId);
+    if(command.type==="editor")return executeEditorGesture(command);
     if(command.type==="overdue-woop-dot"){
       const task=taskById(command.taskId);if(!overdueWoopCandidate(task))return false;
-      pushUndo();state.mode="work";
-      return executeTaskAction("dot",task.id,{undoAlreadyPushed:true});
+      return executeTaskAction("dot",task.id,null,"work");
     }
     return false;
   }
@@ -4644,14 +4684,10 @@ const taskActionOwnerBundle=(()=>{
     return true;
   }
   return {
-    owner:Object.freeze({perform:command=>perform(command,null),undo}),
-    // Ticket 03 keeps the editor's old edit-plus-action gestures on a named
-    // bridge; ticket 04 will move their draft and action into the owner command.
-    editorCompatibility:Object.freeze({perform:(action,taskId)=>perform({type:"task",action,taskId},{editDraft:true})}),
+    owner:Object.freeze({perform,undo}),
   };
 })();
 const TaskActionOwner=taskActionOwnerBundle.owner;
-const LegacyEditorTaskActionCompatibility=taskActionOwnerBundle.editorCompatibility;
 function decide(kind){return TaskActionOwner.perform({type:"decision",decision:kind});}
 function completeTask(t){
   // Completion records what happened, not a preference comparison. Ordinary
@@ -4672,31 +4708,27 @@ function workedOn(){return TaskActionOwner.perform({type:"benchmark",action:"wor
 function workedOnTask(id){return TaskActionOwner.perform({type:"task",taskId:id,action:"worked"});}
 function dislodge(){return TaskActionOwner.perform({type:"benchmark",action:"dislodge"});}
 function benchCant(){return TaskActionOwner.perform({type:"benchmark",action:"cant"});}
-/* Reads whatever is currently in the edit pane's inputs onto the task. Shared by
-   Save, Done, Worked on it, and Return as candidate — the latter two save before
-   they act, so a title you retyped on your way out isn't lost, and a box you
-   just ticked (evergreen) decides HOW it completes. Returns false if the pane
-   isn't open. */
-function applyEditFields(t){
+/* The adapter reads the live editor into one normalized value object. The
+   TaskActionOwner applies it with the requested post-edit action in one Undo. */
+function readEditDraft(){
   const title = document.getElementById("etTitle");
-  if(!t || !title) return false;
-  t.title = title.value.trim() || t.title;
-  t.url = safeUrl(document.getElementById("etUrl").value);
-  const d = document.getElementById("etDue").value; t.due = d || null;
-  const sd = document.getElementById("etStart").value; t.startsAt = sd || null;
-  t.evergreen = !!document.getElementById("etEver").checked;
+  if(!title)return null;
   const hours = document.getElementById("etEverHours");
   const unit = document.getElementById("etEverUnit");
   const reset = document.getElementById("etEverReset");
-  if(hours) t.evergreenHours = evergreenDurationHours(hours.value, unit?.value, t.evergreenHours);
-  if(reset) t.evergreenResetAtDay = !!reset.checked;
-  writeTaskPrerequisites(t,readDependencyDraft("edit"));
-  writeTaskDependencyModes(t,dependencyDraftModes.edit);
-  // An older/imported task may reference contexts this client cannot display.
-  // Editing visible choices must not silently delete those saved requirements.
-  const unavailableCtx=t.ctx.filter(id=>!state.contexts.some(c=>c.id===id));
-  t.ctx = [...new Set([...document.querySelectorAll("[data-editctx]")].filter(x=>x.checked).map(x=>x.dataset.editctx).concat(unavailableCtx))];
-  return true;
+  return {
+    title:title.value,
+    url:document.getElementById("etUrl")?.value||"",
+    due:document.getElementById("etDue")?.value||null,
+    startsAt:document.getElementById("etStart")?.value||null,
+    evergreen:!!document.getElementById("etEver")?.checked,
+    evergreenHoursInput:hours?.value??null,
+    evergreenUnit:unit?.value,
+    evergreenResetAtDay:reset?!!reset.checked:undefined,
+    prerequisiteIds:readDependencyDraft("edit"),
+    dependencyModes:{...dependencyDraftModes.edit},
+    contextIds:[...new Set([...document.querySelectorAll("[data-editctx]")].filter(x=>x.checked).map(x=>x.dataset.editctx))],
+  };
 }
 /* Returns one skipped, postponed or resting task from the edit pane. Unlike
    bulk Rescan, this explicit action can cancel its saved postponement. With
@@ -6792,34 +6824,16 @@ function onAction(act, el){
       document.getElementById('bulkStatus'+field[2]).textContent='Will clear this property for every selected task.';break;
     }
     case "edit": openEdit(el.dataset.id); break;
-    case "save-edit": {
-      const t=taskById(el.dataset.id); if(!t) break;
-      const observation=captureRatingObservation("edit",[t.id]);
-      pushUndo();
-      applyEditFields(t);
-      finishRatingObservation(observation,true);
-      closeModal(); commit(); break;
-    }
-    case "done-task": {
-      if(!LegacyEditorTaskActionCompatibility.perform("done",el.dataset.id))break;
-      closeModal(); break;
-    }
-    case "worked-task": {
-      if(!LegacyEditorTaskActionCompatibility.perform("worked",el.dataset.id))break;
-      closeModal(); break;
-    }
-    case "dot-task": {
-      const outcome=LegacyEditorTaskActionCompatibility.perform("dot",el.dataset.id);
-      if(outcome==="saved-dot-unavailable"){
-        toast("Changes saved. This evergreen task is resting; use Return as candidate before Dot.");
-      }
-      if(!outcome)break;
-      closeModal(); break;
-    }
-    case "return-candidate": {
-      if(!LegacyEditorTaskActionCompatibility.perform("return",el.dataset.id))break;
-      closeModal(); break;
-    }
+    case "save-edit":
+      TaskActionOwner.perform({type:"editor",taskId:el.dataset.id,action:"save",draft:readEditDraft()});break;
+    case "done-task":
+      TaskActionOwner.perform({type:"editor",taskId:el.dataset.id,action:"done",draft:readEditDraft()});break;
+    case "worked-task":
+      TaskActionOwner.perform({type:"editor",taskId:el.dataset.id,action:"worked",draft:readEditDraft()});break;
+    case "dot-task":
+      TaskActionOwner.perform({type:"editor",taskId:el.dataset.id,action:"dot",draft:readEditDraft()});break;
+    case "return-candidate":
+      TaskActionOwner.perform({type:"editor",taskId:el.dataset.id,action:"return",draft:readEditDraft()});break;
     case "more-rating-history": {
       const t=taskById(el.dataset.id),limit=Number(el.dataset.limit);if(!t||!Number.isSafeInteger(limit)||limit<20)break;
       document.getElementById("taskRatingHistory").innerHTML=taskRatingHistoryHTML(t,limit);
