@@ -23,6 +23,7 @@ self.addEventListener("install", event => {
         "./landscape-core.js",
         "./location.js",
         "./landscape-geometry.js",
+        "./landscape-visits.js",
         "./landscape-timeline.js",
         "./landscape-mood.js",
         "./landscape-appearance.js",

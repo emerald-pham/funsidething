@@ -7225,6 +7225,22 @@
     }
   },
   {
+    "testChangesSha256": "8bd0135fa205c0cd06e21244d90dd369dc15a5177881ea3b8bedd301e615cc9c",
+    "reason": "Exercise the actual service-worker install and fetch consumers so every local production script is delivered by a fresh installed shell without a prior online load.",
+    "previousBehavior": "The new LandscapeVisits production script is loaded by the page but was absent from the deferred service-worker packaging list, so a fresh installed shell cannot deliver it offline.",
+    "intendedBehavior": "Installation caches the new module with the existing shell and offline GETs return the exact production bytes for every local script declared by the page.",
+    "replacementTests": [
+      "RISK PWA module delivery: a fresh installed shell serves every production script while offline"
+    ],
+    "preservedCoverage": [
+      "The existing install/activation, shell fingerprint, update deferral, saved-board persistence, protected recovery and offline lifecycle assertions are unchanged. Final fingerprints and actual browser update/offline proof remain required after the remaining integration."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='^RISK PWA module delivery:' tests.js",
+      "failure": "Observed before editing sw.js on integration44d695470f0e1e67c0c520729e1da58850664207: fresh installation must deliver /landscape-visits.js offline failed because actual service-worker fetch attempted the disabled network for that module. Full contemporaneous output and source hashes: /private/tmp/chain-architecture-evidence-20261016/07/module-delivery-red.log and module-delivery-red.command.json. After adding the module to install addAll, the same consumer and existing lifecycle test passed2/2 in module-delivery-green.log."
+    }
+  },
+  {
     "testChangesSha256": "2e98474e4a2abdbc819f8f1b0437fbdb01d31eae2f93f3906b3e009e5c04c976",
     "reason": "Add a production paint-consumer characterization before the approved behavior-preserving Visits presentation refactor. It checks current normal and reduced choices against a deterministic timeline visit, and the deliberate cutoff mutation verifies that the local-exit assertion detects a party left in frame.",
     "previousBehavior": "The existing renderer already retires normal visitors after the whole local party leaves, keeps only current activity reservations under reduced motion, selects its settled representative, and resumes the original UTC age when motion changes back.",
