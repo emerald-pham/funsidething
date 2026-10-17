@@ -12844,6 +12844,34 @@ test('RISK decision recovery unknown destination: sole recovery authority blocks
  });
 });
 
+test('RISK decision recovery replacement overlap: selected shared facts survive a displaced cloud branch returning after Import',async t=>{
+ const source=await decisionRecoveryApp146();t.after(()=>{source.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',source.ctx);});
+ const raw=JSON.stringify(source.ctx.state),initial=JSON.parse(raw),h=makeSyncHarness({remote:initial,rev:4,delayMs:1});
+ const app=await loadApp({seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw},cloudSyncFactory:h.factory}),{ctx,shim}=app,CS=ctx.window.CloudSync;
+ t.after(()=>{CS.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',ctx);});
+ await ctx.cloudPull();await syncSettle(15);CS.ready=false;hydrateUnchangedEditorDraft(app,'bench');shim.document.getElementById('etTitle').value='Later destination title';ctx.onAction('save-edit',{dataset:{id:'bench'}});await ctx.persist();CS.ready=true;ctx.cloudPushNow();await syncSettle(50);assert.equal(ctx.state.syncDirty,false);
+ const displaced=JSON.stringify(ctx.state);shim.document.getElementById('jsonBox').value=raw;assert.equal(await ctx.onAction('import-json',{}),true);await ctx.persist();ctx.cloudPushNow();await syncSettle(50);assert.equal(ctx.state.syncDirty,false);
+ assert.equal(JSON.stringify(ctx.state.decisionEvents),JSON.stringify(source.ctx.state.decisionEvents),'the selected original No stays active after explicit Import');
+ h.writeBehindBack(JSON.parse(displaced));await ctx.cloudPull();ctx.cloudPushNow();await syncSettle(65);
+ assert.equal(JSON.stringify(ctx.state.decisionEvents),JSON.stringify(source.ctx.state.decisionEvents),'the selected shared No cannot be retired with the displaced editor fact in reversed cloud merge');
+ assert.equal(JSON.stringify(h.remoteState().decisionEvents),JSON.stringify(source.ctx.state.decisionEvents));assert.equal(ctx.state.syncDirty,false);assert.equal(ctx.state.tasks.find(task=>task.id==='bench').title,'Recovery benchmark');
+});
+
+test('RISK decision recovery retired identity: changed same-ID retired editor facts cannot become fresh authority',async t=>{
+ const source=await decisionRecoveryApp146();t.after(()=>{source.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',source.ctx);});
+ const raw=JSON.stringify(source.ctx.state),initial=JSON.parse(raw),h=makeSyncHarness({remote:initial,rev:4,delayMs:1});
+ const app=await loadApp({seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw},cloudSyncFactory:h.factory}),{ctx,shim}=app,CS=ctx.window.CloudSync;
+ t.after(()=>{CS.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',ctx);});
+ await ctx.cloudPull();await syncSettle(15);CS.ready=false;hydrateUnchangedEditorDraft(app,'bench');shim.document.getElementById('etTitle').value='Destination chosen title';ctx.onAction('save-edit',{dataset:{id:'bench'}});await ctx.persist();CS.ready=true;ctx.cloudPushNow();await syncSettle(50);
+ const displaced=JSON.parse(JSON.stringify(ctx.state));shim.document.getElementById('jsonBox').value=raw;assert.equal(await ctx.onAction('import-json',{}),true);await ctx.persist();ctx.cloudPushNow();await syncSettle(50);assert.equal(ctx.state.syncDirty,false);
+ const row=displaced.decisionEvents.find(event=>event.kind==='current-choice'&&event.target.property==='title');assert.ok(row);row.value='Changed retired fact';displaced.tasks.find(task=>task.id==='bench').title=row.value;
+ assert.equal(ctx.decisionEvidenceIssue(displaced,'e@example.com'),null,'the peer branch is internally coherent; the conflict is its changed retired identity');
+ h.writeBehindBack(displaced);const cloud=h.doc.payload,saved=app.shim.localStorage.getItem(SYNC_STORE_KEY),events=JSON.stringify(ctx.state.decisionEvents);
+ await ctx.cloudPull();ctx.cloudPushNow();await syncSettle(60);
+ assert.equal(CS.errorCode,'conflicting-decision-evidence','retirement records immutable identity as well as exact bytes');
+ assert.equal(JSON.stringify(ctx.state.decisionEvents),events);assert.equal(ctx.state.tasks.find(task=>task.id==='bench').title,'Recovery benchmark');assert.equal(h.doc.payload,cloud);assert.equal(app.shim.localStorage.getItem(SYNC_STORE_KEY),saved);
+});
+
 test('RISK decision recovery inheritance authority: changed attested facts stay held and ordinary account switches gain no consent',async t=>{
  const source=await decisionRecoveryApp146();t.after(()=>{source.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',source.ctx);});
  const raw=JSON.stringify(source.ctx.state),original=source.event,baseline=JSON.stringify(source.ctx.state.decisionBaseline);
