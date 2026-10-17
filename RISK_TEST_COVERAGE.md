@@ -1324,7 +1324,7 @@ Shared selected facts remain active through reversed cloud adoption; retired typ
 
 ## Mixed-client rollout across every decision family (#146/#147)
 
-- `RISK decision mixed rollout fixture: actual comparisons current choices Start and scoped Undo survive durable publication and reopen`
+- `RISK decision mixed rollout fixture: actual comparisons current choices Pause Start and scoped Undo survive durable publication and reopen`
 
 The existing `Firestore rules: real pinned writer reads decision authority then holds its ordinary app edit without erasing it` and `Firestore rules: first decision against released rules stays exact and pending until rules-first rollout then retry` consumers now publish coherent actual-app No, Yes, editor Dot, Dislodge, current-choice, Start and scoped Undo evidence through the production Firebase adapter. The same producer fixture includes theme, date format, time/season scene fields and a created context definition, and checks their effective values after publication, cold reopen, the immutable historical read and rules-first Retry. Both rollout guards and immutable supported baseline remain protected. Exact emulator execution belongs to the final root candidate; the in-process fixture is not emulator proof.
 
@@ -1357,3 +1357,5 @@ A real explicit Import may select a plain supported legacy board with a differen
 - `RISK final decision review: repeated manual Restore and Undo retain bounded exact lineage and peer progress`
 
 Compatibility context projection honors exact cancellation facts, including all-cancelled prior membership. Pause/Resume use strict pass-scoped work/scan choices with original time and observed ancestry, independent of weighting changes; Start maintenance stays subordinate to those choices. Contrary Yes/No current membership resolves without removing either learning observation or fabricating another comparison. Title-only retired branches receive the same exact selected-pass protection as comparison branches. Repeated real backup Restore/Undo deduplicates only selected-root receipts already archived exactly in the new displaced baseline, preserving exact lineage, stale recognition, peer fields and cold reopen with linear metadata growth. Unsupported authority remains held. The two native scene-time/layout fixture seeds use the supported timestamped motion preference; every existing native assertion stays unchanged and native execution remains parent-owned.
+
+Postimplementation mixed integration acceptance also carries a normal visible enabled Pause and its exact ordinary Undo, retaining the original immutable pass.mode fact and cancellation. Existing raw stream, effective cold state, old-reader and rules-first Retry assertions stay unchanged; final exact emulator execution remains root-owned.

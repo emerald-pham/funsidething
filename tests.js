@@ -12728,6 +12728,12 @@ async function recordMixedDecisionActions146(app){
  const compound=ctx.state.decisionEvents.filter(event=>event.actionId===dot.actionId);assert.ok(compound.some(event=>event.kind==='current-choice'),'the actual editor Dot also retains its changed title');
  await ctx.onAction('undo',{});assert.equal(ctx.state.tasks.find(task=>task.id===dotTask.id).title,'Mixed editor Dot candidate');
  assert.deepEqual(Array.from(ctx.state.decisionEvents.find(event=>event.kind==='undo').targetEventIds).sort(),Array.from(compound,event=>event.id).sort(),'Undo targets the complete real editor/Dot gesture');
+ ctx.renderScan();assert.equal(ctx.state.candidateId,dotTask.id,'the undone Dot is again the eligible offered candidate');
+ const pauseControl=shim.document.getElementById('scan').innerHTML.match(/<button\b[^>]*data-act="start-working"[^>]*>/)?.[0];assert.ok(pauseControl,'the normal scanner shows its Pause control');assert.doesNotMatch(pauseControl,/disabled/,'Pause is enabled with the offered candidate');
+ const beforePause=new Set(ctx.state.decisionEvents.map(event=>event.id));ctx.onAction('start-working',{});assert.equal(ctx.state.mode,'work');
+ const pause=ctx.state.decisionEvents.find(event=>!beforePause.has(event.id)&&event.kind==='current-choice'&&event.target?.type==='pass'&&event.target.property==='mode');assert.ok(pause);assert.equal(pause.target.id,pause.passId);assert.equal(pause.value,'work');assert.deepEqual(JSON.parse(JSON.stringify(pause.before)),{present:true,value:'scan'});assert.equal(ctx.supportedDecisionEvent(pause),true);const originalPause=JSON.stringify(pause);
+ assert.equal(await ctx.onAction('undo',{}),true);assert.equal(ctx.state.mode,'scan','ordinary Undo restores scanning without forcing a disabled Resume');
+ const pauseUndo=ctx.state.decisionEvents.at(-1);assert.equal(pauseUndo.kind,'undo');assert.deepEqual(Array.from(pauseUndo.targetEventIds),[pause.id]);assert.equal(pauseUndo.targetActionId,pause.actionId);assert.equal(JSON.stringify(ctx.state.decisionEvents.find(event=>event.id===pause.id)),originalPause,'Pause keeps its exact original fact after cancellation');
  for(const id of [yesTask.id,benchmark]){assert.equal(ctx.state.chain.at(-1),id);ctx.onAction('dislodge',{dataset:{benchmark:id}});}
  assert.equal(ctx.state.chain.length,0,'real Dislodge actions make the Start control available');
  ctx.onAction('start-scan',{dataset:{mode:'halving'}});
@@ -12735,18 +12741,19 @@ async function recordMixedDecisionActions146(app){
  await ctx.onAction('undo',{});assert.equal(ctx.state.chain.length,0);assert.ok(ctx.state.decisionEvents.some(event=>event.kind==='undo'&&event.passBefore),'actual Start Undo retains exact prior-pass authority');
  hydrateUnchangedEditorDraft(app,benchmark);shim.document.getElementById('etTitle').value='Mixed retained benchmark title';ctx.onAction('save-edit',{dataset:{id:benchmark}});
  assert.equal(await ctx.persist(),true);assert.equal(ctx.decisionEvidenceIssue(ctx.state,'e@example.com'),null,'all new kinds coexist as coherent real-app authority');
- return {yesTaskId:yesTask.id,dotTaskId:dotTask.id,benchmark,shared};
+ return {yesTaskId:yesTask.id,dotTaskId:dotTask.id,benchmark,shared,pauseEventId:pause.id,pauseUndoId:pauseUndo.id};
 }
 async function decisionMixedActionsApp146(){
  const app=await decisionRecoveryApp146();return {...app,mixed:await recordMixedDecisionActions146(app)};
 }
 
-test('RISK decision mixed rollout fixture: actual comparisons current choices Start and scoped Undo survive durable publication and reopen',async t=>{
+test('RISK decision mixed rollout fixture: actual comparisons current choices Pause Start and scoped Undo survive durable publication and reopen',async t=>{
  const f=await decisionMixedActionsApp146(),{ctx}=f,events=JSON.stringify(ctx.state.decisionEvents),ratings=JSON.stringify(ctx.state.tasks.map(task=>[task.id,task.mu,task.sigma]));
  t.after(()=>{ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',ctx);});
  assert.deepEqual([...new Set(ctx.state.decisionEvents.map(event=>event.kind))].sort(),['comparison','current-choice','no','undo']);
  assert.deepEqual([...new Set(ctx.state.decisionEvents.filter(event=>event.kind==='comparison').map(event=>event.action))].sort(),['dislodge','dot','yes']);
  assert.equal(JSON.stringify(ctx.state.decisionEvents.find(event=>event.kind==='no')),JSON.stringify(f.event),'the original No stays immutable beside later action families');
+ assert.equal(ctx.state.mode,'scan');assert.deepEqual(Array.from(ctx.state.decisionEvents.find(event=>event.id===f.mixed.pauseUndoId).targetEventIds),[f.mixed.pauseEventId]);
  assert.equal(ctx.state.tasks.find(task=>task.id===f.mixed.benchmark).title,'Mixed retained benchmark title');
  assert.deepEqual(mixedSharedOutcome146(ctx.state),f.mixed.shared);
  ctx.window.CloudSync.ready=true;ctx.cloudPushNow();await syncSettle(80);assert.equal(ctx.state.syncDirty,false);assert.equal(JSON.stringify(f.h.remoteState().decisionEvents),events);
@@ -12755,6 +12762,7 @@ test('RISK decision mixed rollout fixture: actual comparisons current choices St
  await reopened.ctx.cloudPull();reopened.ctx.cloudPushNow();await syncSettle(60);
  assert.equal(JSON.stringify(reopened.ctx.state.decisionEvents),events);assert.equal(JSON.stringify(reopened.ctx.state.tasks.map(task=>[task.id,task.mu,task.sigma])),ratings,'cold reopening never reapplies cancelled learning');
  assert.deepEqual(mixedSharedOutcome146(reopened.ctx.state),f.mixed.shared,'typed shared settings, scene fields and context definitions survive publication and cold reopen');
+ assert.equal(reopened.ctx.state.mode,'scan','the mixed Pause cancellation retains its effective mode after cold reopen');assert.equal(f.h.remoteState().mode,'scan');
  assert.equal(reopened.ctx.state.tasks.find(task=>task.id===f.mixed.benchmark).title,'Mixed retained benchmark title');assert.equal(reopened.shim.document.getElementById('syncBtn').textContent,'☁ synced');
 });
 
