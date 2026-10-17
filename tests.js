@@ -28695,6 +28695,19 @@ test('RISK cloud current choices: context membership additions compose across ob
   phone.ctx.projectCurrentChoiceEvents(unattestedBoard);
   assert.deepEqual(JSON.parse(JSON.stringify(unattestedBoard.tasks.find(task=>task.id==='context-delta-target').ctx)),['ctx-peer'],
    'a missing exact cloud base remains conservative even when the before memberships match');
+
+  const staleChosen=h.remoteState();await phone.ctx.cloudPull();
+  phone.ctx.onAction('undo',{});
+  assert.deepEqual(Array.from(phone.ctx.state.tasks.find(task=>task.id==='context-delta-target').ctx),['ctx-peer'],
+   'ordinary local Undo reverses only the phone membership across different observed bases');
+  assert.equal(phone.ctx.state.tasks.find(task=>task.id==='revision-marker').title,'Advanced cloud revision','Undo retains the earlier unrelated local action');
+  const cancellation=phone.ctx.state.decisionEvents.find(event=>event.kind==='undo');assert.deepEqual(Array.from(cancellation.targetEventIds),[phoneChoice.id]);
+  await phone.ctx.persist();await phone.ctx.cloudPushNow();await syncSettle(40);
+  h.writeBehindBack(staleChosen);await phone.ctx.cloudPull();await phone.ctx.cloudPushNow();await syncSettle(40);
+  assert.deepEqual(h.remoteState().tasks.find(task=>task.id==='context-delta-target').ctx,['ctx-peer'],'stale original delivery cannot restore the cancelled phone delta');
+  const undoneRaw=JSON.stringify({...h.remoteState(),syncAccount:'e@example.com',syncRev:h.doc.rev,syncDirty:false});
+  const undoneReopen=await loadAppAtTime(at,{seedStorage:{[SYNC_STORE_KEY]:undoneRaw},cloudSyncFactory:h.factory});
+  await undoneReopen.ctx.cloudPull();assert.deepEqual(Array.from(undoneReopen.ctx.state.tasks.find(task=>task.id==='context-delta-target').ctx),['ctx-peer'],'cold reopen preserves the peer membership and phone cancellation');
  }finally{
   for(const app of [phone,peer])try{await app.shim.window.ScannerDeviceStore?.close?.();}catch{}
  }
