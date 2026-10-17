@@ -363,8 +363,9 @@ test('RISK scoped Undo recovery: compound Done Undo survives older device and cl
 
 test('RISK scoped Undo FAQ: whole Done Dot and Return actions survive stale-source recovery',async()=>{
  const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
- assert.match(help,/Undo applies to the whole action, including editor changes made with Done, Dot, or Return as candidate/i);
- assert.match(help,/A stale saved or cloud copy cannot reapply the cancelled action after sync and reopening/i);
+ assert.match(help,/Undo in the header reverses the whole action, including editor changes with Done, Dot, or Return as candidate/i);
+ assert.match(help,/older saved or cloud copies cannot reapply it/i);
+ assert.match(help,/comparison-learning effect/i);
  assert.match(help,/unrelated decisions from either device/i);
 });
 test('RISK scoped Undo recovery: a true Undo cancels only its compound Dot while peer completion and learning remain',async t=>{
@@ -529,8 +530,8 @@ test('RISK scoped Undo recovery: Undo of an informed evergreen return survives o
  assert.ok(preUndoPaints.length>0&&preUndoWrites.length>0,'the older pre-Undo source exercises both rendered and durable recovery');
  assert.ok(preUndoPaints.every(row=>row.chain.includes(targetId)&&row.visible.includes(targetId)),`every pre-Undo recovery paint retains the valid informed return: ${JSON.stringify(preUndoPaints)}`);
  assert.ok(preUndoWrites.every(row=>row.chain.includes(targetId)),`every pre-Undo device-head write retains the valid informed return: ${JSON.stringify(preUndoWrites)}`);
- assert.ok(undoPaints.every(row=>!row.chain.includes(targetId)&&!row.visible.includes(targetId)),'actual Undo removes the target from every scanner paint');
- assert.ok(undoWrites.every(row=>!row.chain.includes(targetId)),'actual Undo persists the cancellation to the device head');
+ assert.ok(undoPaints.length>0&&undoPaints.every(row=>!row.chain.includes(targetId)&&!row.visible.includes(targetId)),'actual Undo removes the target from every scanner paint');
+ assert.ok(undoWrites.length>0&&undoWrites.every(row=>!row.chain.includes(targetId)),'actual Undo persists the cancellation to the device head');
  assert.ok(postUndoPaints.length>0&&postUndoWrites.length>0,'the stale return source is retried after Undo upload');
  assert.ok(postUndoPaints.every(row=>!row.chain.includes(targetId)&&!row.visible.includes(targetId)),'every post-Undo recovery paint keeps the returned target cancelled');
  assert.ok(postUndoWrites.every(row=>!row.chain.includes(targetId)),'every post-Undo device-head write keeps the returned target cancelled');

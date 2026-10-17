@@ -9818,5 +9818,39 @@
       "fixtureCorrections": "Earlier exploratory fixture expectation failures remain as immutable records with explicit correction links. They concerned baseline latest-backup rotation, a missing explicit debounce flush, the actual independent Dot in the chain, account B's own acknowledged revision, and fake DOM modal detection; none is represented as a runtime RED."
     },
     "releaseStatus": "Issue 174 focused local consumer and FAQ work only; no runtime repair, full suite, browser, emulator, CI, push, release receipt or deployment verification. Parent /root owns integration and release."
-  }
-]
+  },
+  {
+    "testChangesSha256": "31b02c53c363004a91633b4bcbc3b348c4771efebeb82a36da574583e43156b9",
+    "comparison": "issue172Incremental",
+    "comparisonBase": "3cfe539a3da7f5a49561dfd5833c449bf930acdb",
+    "reason": "Add complete-application coverage for the remaining #172 Undo boundary without changing app authority: prove real Done, unaware Dot and informed expired-rest return actions reverse as scoped groups after peer progress, stale recovery and cold reopen.",
+    "previousBehavior": "Existing tests covered lifecycle facts, ordinary Undo, scoped editor Dot, and a standalone permitted return, but did not join those actions to peer progress, source replay, exact device/cloud state, and cold reopen after Undo. The extended FAQ also omitted whole-action and stale-copy recovery guidance.",
+    "intendedBehavior": "Undo cancels only the selected original action group. Unrelated peer fields and comparison learning remain; a losing unaware Dot keeps its valid learning until its own real Undo; an informed return stays valid before Undo and cannot reappear from older sources afterward. Original facts, event times and causal ancestry, restore-run lineage, History, and a later permitted return followed by Done remain intact. The existing runtime already satisfies these consumers, so no runtime repair is claimed.",
+    "replacementTests": [
+      "RISK scoped Undo recovery: compound Done Undo survives older device and cloud replay after peer progress",
+      "RISK scoped Undo recovery: a true Undo cancels only its compound Dot while peer completion and learning remain",
+      "RISK scoped Undo recovery: Undo of an informed evergreen return survives older source and permits a later return",
+      "RISK scoped Undo FAQ: whole Done Dot and Return actions survive stale-source recovery"
+    ],
+    "preservedCoverage": [
+      "The populated-editor ordinary Done test retains its exact completion and full Done/editor action group, unrelated peer Yes and field edit, prior restore-run lineage, History behavior, old saved-source recovery, post-Undo stale cloud replay, production IndexedDB head, and cold reopen.",
+      "The Dot test makes a real editor Dot that the completing peer has not seen. Its learning remains alongside an unrelated peer No while completion owns membership; only an actual Undo cancels the Dot group and its learning, retaining the peer comparison, completion, field and evergreen History through stale replay and reopen.",
+      "The return test enforces rest expiry without automatic return, then performs an informed editor Dot after expiry. It preserves the immutable original completion, peer Yes and title, legitimate chain members, complete editor-action cancellation, restore-run lineage and History through older source replay before Undo, stale Dot replay after upload, IDB reopen, and a later informed return followed by a distinct completion.",
+      "Each source/Undo phase checks its independently expected scanner paint and production device head; synthetic cloud assertions use acknowledged exact state. The FAQ remains within the existing 130-word answer limit and explains whole-action Undo, unrelated decisions and stale-copy behavior."
+    ],
+    "redEvidence": {
+      "command": "scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/scoped-undo-172/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/completion-precedence-168/172 --purpose preimplementation-red -- node --test --test-reporter=spec --test-name-pattern='RISK scoped Undo (recovery|FAQ)' tests.js",
+      "failure": "The three actual Done, unaware-Dot and informed-return recovery consumers passed on unchanged runtime. Only the rendered FAQ assertion failed because its answer did not explain whole-action editor Undo for Done/Dot/Return or that an older saved/cloud copy cannot reapply a cancelled action."
+    },
+    "greenEvidence": "/Users/emeraldpham/.codex/task-artifacts/completion-precedence-168/172/2026-10-17T21-31-27-539Z-1b1f2aba-8988-4232-af29-4f2542491c27.json (four #172 behavior/FAQ tests plus all six #174 completion-boundary consumers passed).",
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/completion-precedence-168/172",
+    "withdrawnEvidence": {
+      "record": "/Users/emeraldpham/.codex/task-artifacts/completion-precedence-168/172/2026-10-17T21-26-32-191Z-29294c06-0682-466f-b902-f142e62de616.json",
+      "correction": "Withdraw the initial apparent product RED. Its paint hook left the phase labeled pre-Undo while the real Undo ran, so the two expected Undo renders that removed membership were misclassified as stale-source recovery. After separating pre-source, Undo-action and post-source phases, the older completion source retains the valid return, actual Undo removes it, and post-Undo stale replay preserves its cancellation. No runtime edit was made."
+    },
+    "coverageChronology": {
+      "runtime": "All three behavior consumers passed before FAQ editing. The first apparent return RED is explicitly withdrawn above; phase-separated recovery, Undo, device-write, cloud and reopen assertions now pass.",
+      "faq": "A valid FAQ-only RED was recorded at 2026-10-17T21-29-30-898Z before index.html changed. The final focused green record includes this FAQ assertion and the #174 consumer cohort."
+    },
+    "releaseStatus": "Focused local #172 tests and FAQ only. No runtime repair, full suite, browser, emulator, CI, push, release receipt or deployment verification. Parent /root owns final integration and release."
+  }]
