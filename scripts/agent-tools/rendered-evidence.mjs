@@ -401,6 +401,11 @@ async function prepareApp(page, options) {
   for (const label of taskLabels) {
     await titleInput.fill(label);
     await addButton.click();
+    const acknowledgementDeadline = Date.now() + options.timeoutMs;
+    // The native Add form clears only after its durable save acknowledges.
+    while ((await titleInput.inputValue()) !== '' && Date.now() < acknowledgementDeadline) {
+      await page.waitForTimeout(25);
+    }
     if ((await titleInput.inputValue()) !== '') throw new Error('The app did not clear the synthetic task title after its native Add control was used.');
   }
 
