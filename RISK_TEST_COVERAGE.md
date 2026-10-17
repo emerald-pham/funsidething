@@ -1252,3 +1252,10 @@ Protect source validation before authority union; missing/cyclic ancestry, basel
 - `RISK decision recovery Start authority: incomplete or ambiguous real Start groups hold exact branches`
 
 Preserve both sources when a supported Start group is incomplete/ambiguous or a chosen field no longer matches its retained decision.
+
+## Deliberate exact decision replacement (#146)
+
+- `RISK decision recovery modern replacement: explicit transfer into an existing decision board keeps exact displaced authority recoverable`
+- `RISK decision recovery replacement scope: exact retired branches stay retired while new changed and unknown peer facts stay held`
+
+Durable exact displaced-baseline/fact receipts retire only explicitly replaced authority; new/changed/unknown peer facts stay protected. Reverse replacement Undo is the dependent #145 gate.

@@ -12493,6 +12493,44 @@ test('RISK decision recovery explicit transfer: consented cross-account Import a
  });
 });
 
+test('RISK decision recovery modern replacement: explicit transfer into an existing decision board keeps exact displaced authority recoverable',async t=>{
+ for(const action of ['import','restore'])await t.test(action,async t=>{
+  const source=await decisionRecoveryApp146(),target=await decisionRecoveryApp146('destination@example.com');
+  for(const app of [source,target])t.after(()=>{app.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',app.ctx);});
+  const CS=target.ctx.window.CloudSync;CS.ready=true;target.ctx.cloudPushNow();await syncSettle(60);assert.equal(target.ctx.state.syncDirty,false);
+  const prior=JSON.stringify(target.ctx.state),raw=JSON.stringify(source.ctx.state),original=JSON.stringify(source.ctx.state.decisionEvents);
+  target.ctx.confirm=()=>true;
+  if(action==='import'){target.shim.document.getElementById('jsonBox').value=raw;assert.equal(await target.ctx.onAction('import-json',{}),true);}
+  else{const row=await target.ctx.saveDurableBackup('manual',raw);target.ctx.openSettings();assert.equal(await target.ctx.restoreDurableBackupById(row.id),true);}
+  await target.ctx.persist();target.ctx.cloudPushNow();await syncSettle(70);
+  assert.equal(target.ctx.state.syncDirty,false,'authorized replacement into a modern destination must complete without combining incompatible frozen learning');
+  assert.equal(JSON.stringify(target.ctx.state.decisionEvents),original,'the explicitly selected source journal stays exact');
+  assert.ok(target.ctx.readLocalBackups().some(row=>row.payload===prior),'the complete displaced modern target authority remains durably recoverable');
+  assert.equal(target.ctx.window.CloudSync.errorCode??null,null);assert.equal(target.ctx.decisionEvidenceIssue(target.h.remoteState(),'destination@example.com'),null);
+ });
+});
+
+test('RISK decision recovery replacement scope: exact retired branches stay retired while new changed and unknown peer facts stay held',async t=>{
+ for(const fault of ['unchanged retired copy','changed retired fact','new peer fact','unknown peer fact'])await t.test(fault,async t=>{
+  const source=await decisionRecoveryApp146(),target=await decisionRecoveryApp146('destination@example.com');
+  for(const app of [source,target])t.after(()=>{app.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',app.ctx);});
+  const CS=target.ctx.window.CloudSync;CS.ready=true;target.ctx.cloudPushNow();await syncSettle(50);
+  const prior=JSON.stringify(target.ctx.state),raw=JSON.stringify(source.ctx.state),selected=JSON.stringify(source.ctx.state.decisionEvents);
+  target.shim.document.getElementById('jsonBox').value=raw;assert.equal(await target.ctx.onAction('import-json',{}),true);await target.ctx.persist();target.ctx.cloudPushNow();await syncSettle(50);assert.equal(target.ctx.state.syncDirty,false);
+  const receipt=target.ctx.state.decisionBaseline.replacement[0];assert.equal(JSON.stringify(receipt.baseline),JSON.stringify(JSON.parse(prior).decisionBaseline));
+  assert.deepEqual(JSON.parse(target.ctx.LZString.decompressFromUTF16(receipt.facts[0].witness)),JSON.parse(prior).decisionEvents[0]);
+  const stale=JSON.parse(prior);
+  if(fault==='changed retired fact')stale.decisionEvents[0].at++;
+  if(fault==='new peer fact')stale.decisionEvents.push({...stale.decisionEvents[0],id:'unattested-peer-decision-146'});
+  if(fault==='unknown peer fact')stale.decisionEvents.push({v:99,id:'future-peer-146',opaque:'sole future authority'});
+  target.h.writeBehindBack(stale);const cloud=target.h.doc.payload,saved=target.storage.getItem(SYNC_STORE_KEY);
+  await target.ctx.cloudPull();target.ctx.cloudPushNow();await syncSettle(60);
+  assert.equal(JSON.stringify(target.ctx.state.decisionEvents),selected,'retirement cannot reapply a displaced choice or authorize a new peer fact');
+  if(fault==='unchanged retired copy'){assert.equal(target.ctx.state.syncDirty,false);assert.equal(target.ctx.window.CloudSync.errorCode??null,null);assert.equal(JSON.stringify(target.h.remoteState().decisionEvents),selected);}
+  else{assert.ok(target.ctx.window.CloudSync.errorCode,'unattested facts cannot disappear under a baseline-only retirement bypass');assert.equal(target.h.doc.payload,cloud);assert.equal(target.storage.getItem(SYNC_STORE_KEY),saved);}
+ });
+});
+
 test('RISK decision recovery inheritance authority: changed attested facts stay held and ordinary account switches gain no consent',async t=>{
  const source=await decisionRecoveryApp146();t.after(()=>{source.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',source.ctx);});
  const raw=JSON.stringify(source.ctx.state),original=source.event,baseline=JSON.stringify(source.ctx.state.decisionBaseline);

@@ -3440,6 +3440,53 @@ function decisionStartIssue(board){
   }
   return null;
 }
+function supportedDecisionReplacement(receipt,account){
+  if(!receipt || typeof receipt!=="object" || Array.isArray(receipt) || receipt.v!==1
+    || Object.keys(receipt).some(key=>!["v","reason","account","actionId","at","baseline","facts"].includes(key))
+    || !["explicit-import","explicit-restore","explicit-undo"].includes(receipt.reason) || receipt.account!==account
+    || !decisionId(receipt.actionId) || !Number.isFinite(receipt.at) || receipt.at<0
+    || !supportedDecisionBaseline(receipt.baseline) || receipt.baseline.account!==account
+    || !Array.isArray(receipt.facts) || new Set(receipt.facts.map(fact=>fact?.id)).size!==receipt.facts.length)return false;
+  return receipt.facts.every(fact=>{
+    if(!fact || typeof fact!=="object" || Array.isArray(fact) || Object.keys(fact).some(key=>!["id","witness"].includes(key))
+      || !decisionId(fact.id) || typeof fact.witness!=="string")return false;
+    try{
+      const canonical=LZString.decompressFromUTF16(fact.witness),event=JSON.parse(canonical);
+      return event.id===fact.id && supportedDecisionEvent(event) && canonicalDecisionFact(event)===canonical
+        && (event.account===account || attestedDecisionEvent(receipt.baseline,event));
+    }catch{return false;}
+  });
+}
+function replacementDecisionReceipts(baseline){
+  return (Array.isArray(baseline?.replacement)?baseline.replacement:[]).filter(receipt=>supportedDecisionReplacement(receipt,baseline.account));
+}
+function retiredDecisionBaseline(baseline,other){
+  return other!==undefined && replacementDecisionReceipts(baseline).some(receipt=>canonicalDecisionFact(receipt.baseline)===canonicalDecisionFact(other));
+}
+function retiredDecisionEvent(baseline,event){
+  const canonical=canonicalDecisionFact(event);
+  return replacementDecisionReceipts(baseline).some(receipt=>receipt.facts.some(fact=>fact.id===event?.id && LZString.decompressFromUTF16(fact.witness)===canonical));
+}
+async function prepareDecisionReplacement(next,current,reason,gestureId=null){
+  if(current?.decisionBaseline===undefined && (current?.decisionEvents===undefined
+    || Array.isArray(current.decisionEvents) && !current.decisionEvents.length))return true;
+  const account=current.syncAccount??current.decisionBaseline?.account??null;
+  const issue=decisionEvidenceIssue(current,account) || decisionEvidenceIssue(next,account);
+  if(issue){reportCloudReconcileError(issue);return false;}
+  const before=JSON.stringify(current),source=JSON.stringify(next),backend=window.CloudSync,user=backend?.user||null,at=Date.now();
+  const prior=await saveDurableBackup("before-decision-replacement",before);
+  if(!prior?.id)return false;
+  const selected=await saveDurableBackup("decision-replacement-source",source);
+  if(!selected?.id || JSON.stringify(current)!==before || JSON.stringify(next)!==source
+    || window.CloudSync!==backend || (window.CloudSync?.user||null)!==user)return false;
+  if(!next.decisionBaseline){const plain=JSON.parse(source);delete plain.decisionBase;next.decisionBaseline=baselineFromSource(plain,{account,baseId:null});}
+  const baseline=next.decisionBaseline;
+  const receipt={v:1,reason,account,actionId:decisionId(gestureId)?gestureId:uid(),at,
+    baseline:JSON.parse(JSON.stringify(current.decisionBaseline)),facts:(current.decisionEvents||[]).map(event=>({id:event.id,witness:LZString.compressToUTF16(canonicalDecisionFact(event))}))};
+  if(!supportedDecisionReplacement(receipt,account))return false;
+  baseline.replacement=[...(baseline.replacement||[]),receipt];
+  return true;
+}
 function decisionProjectionIssue(board,checkCoherence=true){
   if(decisionBaselineRecoveryRows(board).length)return "unprojectable-decision-evidence";
   const rows=Array.isArray(board?.decisionEvents)?board.decisionEvents:[],baseline=board?.decisionBaseline;
@@ -3448,7 +3495,9 @@ function decisionProjectionIssue(board,checkCoherence=true){
   if(decisionStartIssue(board))return "unprojectable-decision-evidence";
   const ratings=decisionBaselineRatings(baseline);
   if(ratings.conflicts.size || decisionEventOrder(board,baseline).blockedIds.size)return "unprojectable-decision-evidence";
-  const representedHistory=new Set([...(baseline.observedRatingHistoryIds||[]),...baseline.includedActionIds,...rows.map(event=>event?.id)]);
+  const retiredHistory=replacementDecisionReceipts(baseline).flatMap(receipt=>[
+    ...(receipt.baseline.observedRatingHistoryIds||[]),...receipt.baseline.includedActionIds,...receipt.facts.map(fact=>fact.id)]);
+  const representedHistory=new Set([...(baseline.observedRatingHistoryIds||[]),...baseline.includedActionIds,...rows.map(event=>event?.id),...retiredHistory]);
   for(const task of board.tasks||[])for(const row of Array.isArray(task.ratingHistory)?task.ratingHistory:[]){
     // This is a compatibility hold, never an attempt to reconstruct missing
     // decisions from observational history or its possibly skewed timestamps.
@@ -5605,6 +5654,8 @@ function supportedDecisionBaseline(baseline,account=null){
     &&(alias.passId===null||decisionId(alias.passId))&&Number.isFinite(alias.passAt)&&alias.passAt>=0
     &&(alias.id===learningId||alias.id===legacyDecisionBaselineIdentity(baseline.account,baseline.ratings,baseline.includedActionIds,alias.chainIds,alias.passId,alias.passAt)))
     ||new Set(aliases.map(alias=>alias.id)).size!==aliases.length)return false;
+  if(baseline.replacement!==undefined && (!Array.isArray(baseline.replacement)
+    || !baseline.replacement.every(receipt=>supportedDecisionReplacement(receipt,baseline.account))))return false;
   if(baseline.inheritance!==undefined && (!Array.isArray(baseline.inheritance)
     || !baseline.inheritance.every(receipt=>supportedDecisionInheritance(receipt,baseline.account))))return false;
   return true;
@@ -5647,10 +5698,10 @@ function mergeDecisionEvents(target,source){
   if(!target||!source)return false;
   const before=JSON.stringify([target.decisionEvents,target.decisionEventsRecovery]);
   if(source.decisionEvents!==undefined){
-    if(target.decisionEvents===undefined)target.decisionEvents=JSON.parse(JSON.stringify(source.decisionEvents));
+    if(target.decisionEvents===undefined)target.decisionEvents=Array.isArray(source.decisionEvents)?source.decisionEvents.filter(row=>!retiredDecisionEvent(target.decisionBaseline,row)).map(row=>JSON.parse(JSON.stringify(row))):JSON.parse(JSON.stringify(source.decisionEvents));
     else if(Array.isArray(target.decisionEvents)&&Array.isArray(source.decisionEvents)){
       const seen=new Set(target.decisionEvents.map(row=>JSON.stringify(row)));
-      for(const row of source.decisionEvents){const key=JSON.stringify(row);if(!seen.has(key)){target.decisionEvents.push(JSON.parse(key));seen.add(key);}}
+      for(const row of source.decisionEvents){if(retiredDecisionEvent(target.decisionBaseline,row))continue;const key=JSON.stringify(row);if(!seen.has(key)){target.decisionEvents.push(JSON.parse(key));seen.add(key);}}
     }else if(JSON.stringify(target.decisionEvents)!==JSON.stringify(source.decisionEvents))
       keepDecisionRecovery(target,"decisionEventsRecovery",{unrecognizedDecisionEvents:source.decisionEvents});
   }
@@ -5675,6 +5726,12 @@ function decisionBaselineAcceptsEvent(baseline,event){
 function mergeDecisionBaseline(target,source){
   if(!target||!source||source.decisionBaseline===undefined)return false;
   const before=JSON.stringify([target.decisionBaseline,target.decisionBaselineRecovery]);
+  if(retiredDecisionBaseline(target.decisionBaseline,source.decisionBaseline))return false;
+  if(retiredDecisionBaseline(source.decisionBaseline,target.decisionBaseline)){
+    if(Array.isArray(target.decisionEvents))target.decisionEvents=target.decisionEvents.filter(event=>!retiredDecisionEvent(source.decisionBaseline,event));
+    target.decisionBaseline=JSON.parse(JSON.stringify(source.decisionBaseline));
+  }
+
   if(target.decisionBaseline===undefined){target.decisionBaseline=JSON.parse(JSON.stringify(source.decisionBaseline));}
   else if(JSON.stringify(target.decisionBaseline)!==JSON.stringify(source.decisionBaseline)){
     if(decisionBaselineCoreEqual(target.decisionBaseline,source.decisionBaseline)){
@@ -5702,6 +5759,11 @@ function mergeDecisionBaseline(target,source){
       for(const receipt of source.decisionBaseline.inheritance||[])
         if(!inheritance.some(prior=>canonicalDecisionFact(prior)===canonicalDecisionFact(receipt)))inheritance.push(JSON.parse(JSON.stringify(receipt)));
       if(inheritance.length)winner.inheritance=inheritance;
+      const replacement=Array.isArray(winner.replacement)?winner.replacement.slice():[];
+      for(const receipt of source.decisionBaseline.replacement||[])
+        if(!replacement.some(prior=>canonicalDecisionFact(prior)===canonicalDecisionFact(receipt)))replacement.push(JSON.parse(JSON.stringify(receipt)));
+      if(replacement.length)winner.replacement=replacement;
+
       if(conflicts.length)keepDecisionRecovery(target,"decisionBaselineRecovery",{incompatibleRatingExtensions:conflicts});
     }else keepDecisionRecovery(target,"decisionBaselineRecovery",source.decisionBaseline);
   }
@@ -7799,6 +7861,7 @@ async function importDecisionBoard(next,sourcePayload,box){
   const current=()=>JSON.stringify(state)===prior && window.CloudSync===backend && (window.CloudSync?.user||null)===user && box.value===sourcePayload;
   if(!safety?.id || !current())return false;
   if(!await inheritDecisionAuthority(next,account,"explicit-import",sourcePayload) || !current())return false;
+  if(!await prepareDecisionReplacement(next,state,"explicit-import") || !current())return false;
   markReplacementDeletes(next);pushUndo();replaceState(next);applyTheme();baseUpdatedAt=Date.now();
   initializeReplacedScan();recomputeRanks();closeModal();commit();return true;
 }
@@ -7828,6 +7891,8 @@ async function restoreDurableBackupById(id){
       if(!await inheritDecisionAuthority(next,destination,"explicit-restore",entry.payload))return false;
       if(JSON.stringify(state)!==currentBoard || window.CloudSync!==restoreBackend || (window.CloudSync?.user||null)!==restoreAccount)return false;
     }
+    if(!await prepareDecisionReplacement(next,state,"explicit-restore") || JSON.stringify(state)!==currentBoard
+      || window.CloudSync!==restoreBackend || (window.CloudSync?.user||null)!==restoreAccount)return false;
     if(!deviceStorageAuthority)pendingRestoreSafetyIds.set(safetyCopy.id,currentBoard);
     next.restoredTaskIds||={};next.restoredTaskOps||={};
     for(const task of next.tasks)if(state.deletedTaskIds?.[task.id])noteRestoreIntent(next,task.id,"deletedTaskIds","restoredTaskIds","restoredTaskOps","deletedAfterRestoreOps");
@@ -8119,7 +8184,7 @@ function onAction(act, el){
         // catch below can report the bad backup without damaging anything.
         dropRemovedFields(st); hydrateState(st);
         const destination=state.syncAccount||(cloudReady()?window.CloudSync.user:null);
-        if(needsDecisionInheritance(st,destination))return importDecisionBoard(st,box.value,box);
+        if(needsDecisionInheritance(st,destination) || state.decisionBaseline || state.decisionEvents)return importDecisionBoard(st,box.value,box);
         markReplacementDeletes(st); pushUndo(); replaceState(st); applyTheme();
         // Pasted in by hand, so it is authoritative as of now — not stale content
         // that cloudPull() should hold this device's writes back over.
