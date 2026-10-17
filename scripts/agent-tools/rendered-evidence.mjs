@@ -401,6 +401,11 @@ async function prepareApp(page, options) {
   for (const label of taskLabels) {
     await titleInput.fill(label);
     await addButton.click();
+    const acknowledgementDeadline = Date.now() + options.timeoutMs;
+    // The native Add form clears only after its durable save acknowledges.
+    while ((await titleInput.inputValue()) !== '' && Date.now() < acknowledgementDeadline) {
+      await page.waitForTimeout(25);
+    }
     if ((await titleInput.inputValue()) !== '') throw new Error('The app did not clear the synthetic task title after its native Add control was used.');
   }
 
@@ -416,13 +421,14 @@ async function prepareApp(page, options) {
     await page.waitForTimeout(50);
   }
   const requestedThemeSnapshot = await inspectTheme();
+  const alternateTheme = options.theme === 'light' ? 'dark' : 'light';
   let alternateThemeSnapshot = null;
   for (let attempt = 0; attempt < 3; attempt += 1) {
     await themeButton.click();
     themeControlActions += 1;
     await page.waitForTimeout(80);
     const candidate = await inspectTheme();
-    if (candidate.theme.colorScheme !== options.theme) {
+    if (themeSchemeMatches(candidate, alternateTheme)) {
       alternateThemeSnapshot = candidate;
       break;
     }
@@ -467,7 +473,7 @@ async function prepareApp(page, options) {
       && themeSchemeMatches(requestedThemeSnapshot, options.theme)
       && themeSchemeMatches(restoredThemeSnapshot, options.theme)
       && alternateThemeSnapshot !== null
-      && alternateThemeSnapshot.theme.colorScheme !== options.theme
+      && themeSchemeMatches(alternateThemeSnapshot, alternateTheme)
       && themePaintAudit.paintChanged
       && themePaintAudit.requestedPaintRestored,
   };
