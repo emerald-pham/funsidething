@@ -7798,5 +7798,34 @@
       "command": "node --test --test-reporter=spec --test-name-pattern='RISK scoped Undo: explicit modern' tests.js; node --test --test-reporter=spec --test-name-pattern='Undo|undo|Restore|restore|Import|import|Reset|reset|RISK cloud current choices|RISK comparison replay|RISK decision recovery' tests.js; node --test --test-reporter=spec --test-name-pattern='RISK scoped Undo: local comparison' tests.js",
       "failure": "Actual145/red-explicit-replacement-undo-behavior.log05:06:42UTC observed imported source journal instead of the prior destination journal after normal Undo. Earlier red-explicit-replacement-undo.log asserted a historically void return value and is setup-only, not behavioral RED. Exact145/affected-undo-replacement.log272pass/7fail/10skip preserved reset-frame-byte mutation and neutral-order failure before runtime repairs plus old async/ownership/legacy-fixture expectation mismatches. All26 focused scoped+affected repair cases subsequently passed in green-explicit-and-regressions.log; original vertical REDs remain retained. Additional actual05:11:28UTC red-comparison-history.log: shared benchmark had no undo observation after correct recomputation; capture all potentially replay-affected task metrics and attach cancellation.id. green-comparison-history.log passes42/42 scoped and rating-history cases. All other changed fixture contracts remain documented above."
     }
+  },
+  {
+    "testChangesSha256": "766acc1cc21af1709fafdfc2de855912f152d3b2d9fd775259d62fa61673eb89",
+    "reason": "Complete action-scoped Undo and preserve deliberate modern Import/Restore/Reset with exact reverse replacement recovery; repair regressions exposed by the broad affected cohort without weakening domain assertions. Preserve actual benchmark reversal history after comparison replay. Final exact dependency-base fingerprint after preserving root guidance and #146 retirement fixes.",
+    "previousBehavior": "Snapshot Undo of a modern explicit replacement could be replaced again by its selected source journal. Reset mutated the previously retained Undo frame while rollback expected its exact bytes. Sync ordering of equivalent comparisonOps prevented inverse exclusion. Existing old-backup fixtures changed frozen draw fields while retaining contradictory modern fact metadata.",
+    "intendedBehavior": "Explicit replacement Undo first saves current/source recovery and installs a reverse exact receipt; failures/races preserve board and frame. Reset has its own authorized replacement receipt. Ordinary inverse recognizes an equivalent unordered comparison operation set while retaining peer operations. Legacy fixtures remain legacy and all expected original chance outcomes remain asserted.",
+    "replacementTests": [
+      "RISK scoped Undo: local comparison cancellation keeps peer learning and survives stale cloud and reopen",
+      "RISK scoped Undo: compound editor Dot restores only local fields and context deltas after peer progress",
+      "RISK scoped Undo: bulk edit is one durable cancellation group and later peer choices stay effective",
+      "RISK scoped Undo: cancelled No cannot return from stale marks and context membership keeps the peer delta",
+      "RISK scoped Undo: first guest sign-in keeps local cancellation authority and replays later signed learning",
+      "RISK scoped Undo: unsupported cancellation payloads hold exact local and cloud branches",
+      "RISK scoped Undo: completion evergreen work delete and postpone retain unrelated peer fields",
+      "RISK scoped Undo: cancelling Start restores the prior pass root and exact draw through stale delivery",
+      "RISK scoped Undo: Return cancellation restores the original hold time while peer task fields survive",
+      "RISK scoped Undo: explicit modern Import Restore and Reset reverse exact journal replacement after recovery",
+      "RISK scoped Undo: replacement recovery failure and an account race retain the current board and Undo frame"
+    ],
+    "preservedCoverage": [
+      "Every task, rating, chance seed, candidate, cooldown, history and recovery assertion is retained. Explicit replacement tests now await mandatory recovery completion before checking results. The two old-backup fixtures intentionally omit decisionEvents/decisionBaseline before editing their historical scalar snapshot; incoherent modern imports remain held by #146.",
+      "WOOP and neutral bootstrap fixtures now establish actual guest-to-empty-account or authenticated adoption before cloud publication, rather than placing unapproved guest facts directly in signed cloud. All prior visible plan, exclusion, completion, Undo and reload assertions remain.",
+      "No Context restores every ordinary field exactly and now separately asserts two immutable cancellation facts; only decisionEvents/decisionBaseline are excluded from the old byte-equality check because retaining reversal evidence is the approved behavior. Original assertions for eligibility and zero-context guard remain.",
+      "No production, browser timing, physical-device or deployment proof is claimed. Parent owns final guidance, shell fingerprints, independent review and full release validation."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='RISK scoped Undo: explicit modern' tests.js; node --test --test-reporter=spec --test-name-pattern='Undo|undo|Restore|restore|Import|import|Reset|reset|RISK cloud current choices|RISK comparison replay|RISK decision recovery' tests.js; node --test --test-reporter=spec --test-name-pattern='RISK scoped Undo: local comparison' tests.js",
+      "failure": "Actual145/red-explicit-replacement-undo-behavior.log05:06:42UTC observed imported source journal instead of the prior destination journal after normal Undo. Earlier red-explicit-replacement-undo.log asserted a historically void return value and is setup-only, not behavioral RED. Exact145/affected-undo-replacement.log272pass/7fail/10skip preserved reset-frame-byte mutation and neutral-order failure before runtime repairs plus old async/ownership/legacy-fixture expectation mismatches. All26 focused scoped+affected repair cases subsequently passed in green-explicit-and-regressions.log; original vertical REDs remain retained. Additional actual05:11:28UTC red-comparison-history.log: shared benchmark had no undo observation after correct recomputation; capture all potentially replay-affected task metrics and attach cancellation.id. green-comparison-history.log passes42/42 scoped and rating-history cases. All other changed fixture contracts remain documented above."
+    }
   }
 ]
