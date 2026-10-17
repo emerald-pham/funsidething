@@ -29,8 +29,3 @@ the integrated repair rather than creating a separate release.
 - [ ] Existing completion and evergreen Undo contracts remain intact; an undone completion must not duplicate work history or later reappear merely because an older snapshot arrives.
 - [ ] Existing explicit Import, Restore, and Reset behavior keeps its deliberate replacement, account, deletion-intent, and mandatory-backup safeguards.
 - [ ] Verify actual Undo entry points and the final visible, durable, learned, and cloud results through the approved complete-app seam, with observed RED followed by GREEN.
-
-## Blocked by
-
-- Ticket 2 — Combine independent dotted choices and comparison evidence. Undo must reverse that implemented comparison/chain projection correctly.
-- Ticket 3 — Merge current choices by original decision time. Undo must preserve that implemented current-choice reconciliation.

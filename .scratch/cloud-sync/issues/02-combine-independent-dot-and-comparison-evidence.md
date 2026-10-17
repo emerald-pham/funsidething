@@ -29,7 +29,3 @@ to the shared repair; it does not create a separate release or candidate CI run.
 - [ ] Preserve the valid learned baseline and historical observations without replaying incomplete old history as new training. Unknown comparison formats remain protected evidence.
 - [ ] Automatic first placement and ordinary navigation remain neutral where the current product requires it; eligibility, completion, and existing scan-day rules remain intact.
 - [ ] Verify visible chain, effective ratings, history, durable saved result, and exact cloud content through the approved complete-app boundary with observed RED followed by GREEN.
-
-## Blocked by
-
-- Ticket 1 — Preserve No decisions after offline reopening. Its durable decision identity, baseline, and reconciliation contract are required by this extension.

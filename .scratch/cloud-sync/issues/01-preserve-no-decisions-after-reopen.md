@@ -30,7 +30,3 @@ candidate and release. Do not publish a separate partial feature release.
 - [ ] Decision evidence remains account-bound and durable before cloud publication. Failed local saves or unknown cloud outcomes retain pending evidence and do not present a completed sync.
 - [ ] Existing immutable publication, revision compare-and-swap, read-before-write, recovery, and same-tab write serialization protections remain intact.
 - [ ] Use the approved complete-app two-device test boundary, observe meaningful behavioral RED before the repair, then demonstrate GREEN. Record what this first slice does and does not yet cover.
-
-## Blocked by
-
-None — can start immediately.

@@ -31,7 +31,3 @@ green commits to the integrated repair rather than releasing separately.
 - [ ] Preserve existing completion and evergreen work semantics, deliberate return/reopening, deletion and deferral intent, and prerequisite rules. Stale data must not manufacture an explicit reversal of these actions.
 - [ ] Preserve the original task and scan-pass context, established expiry rules, active editor drafts, and pressed-control task binding. Current choices must remain coherent with the visible task after reconciliation.
 - [ ] Cover normal action/edit entry points, delayed upload, both publication orders, and offline reopening through the approved consumer seam, with observed RED followed by GREEN.
-
-## Blocked by
-
-- Ticket 1 — Preserve No decisions after offline reopening. Its durable decision and observed-context contract is the shared foundation.

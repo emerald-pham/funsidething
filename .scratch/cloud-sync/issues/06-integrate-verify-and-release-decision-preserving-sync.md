@@ -34,8 +34,3 @@ finding and other explicitly excluded audit concerns remain outside this repair.
 - [ ] Complete applicable historical-client compatibility, rules, CI, Pages deployment, and exact deployed-asset checks. Verify representative deployed behavior with isolated authorized identities and boards, preserving all personal production data.
 - [ ] Report local automated checks, actual browser and emulator behavior, ordinary production verification, and physical-device evidence separately. Any unavailable proof remains explicit; do not call a merely local repair deployed or physically verified.
 - [ ] Hand over a short numbered set of playable in-app checks and finish preservation-first cleanup, retaining unique or live work and recovery evidence. Do not close or rewrite the parent spec merely to finish this ticket.
-
-## Blocked by
-
-- Ticket 4 — Undo one action without rolling back peer progress. Its prerequisites include the independent-choice and current-conflict behavior.
-- Ticket 5 — Preserve decision authority through legacy and failure recovery. The complete checkpoint cannot ship before these safety behaviors are qualified.

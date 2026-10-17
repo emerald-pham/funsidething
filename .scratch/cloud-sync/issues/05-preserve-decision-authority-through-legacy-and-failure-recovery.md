@@ -33,7 +33,3 @@ release to the final integration ticket.
 - [ ] Synced requires the exact coherent retained-decision board to be durable and acknowledged. Unsaved local work, missing decision effects, held adoption, and failed writes remain visibly pending or failed through existing status behavior.
 - [ ] Open drafts and active gestures remain protected, and safe PWA updates do not force-refresh unsaved work.
 - [ ] Complete the relevant historical-client and rules checks if protocol or authority changes require them. Preserve existing owner isolation and immutable-generation safety; observe new behavioral RED before repairs and focused GREEN afterward.
-
-## Blocked by
-
-- Ticket 1 — Preserve No decisions after offline reopening. The durable representation and first complete action flow must exist before its mixed-client and failure recovery can be qualified.

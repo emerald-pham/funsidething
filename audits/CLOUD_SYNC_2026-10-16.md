@@ -62,8 +62,10 @@ it does not request runtime implementation. The user approved the proposed
 consumer test boundary and proceeded to ticket planning. The spec is published
 as [#141 — Preserve nonconflicting board decisions across cloud sync](https://github.com/emerald-pham/funsidething/issues/141),
 with the configured `ready-for-agent` label. Its saved body was verified against
-the local approved source. The six proposed child-ticket bodies and dependency
-graph await the breakdown review required by the to-tickets skill.
+the local approved source. The user approved the six-ticket breakdown, which
+is published as sub-issues #142–#147. All six issue bodies, labels, parent links,
+and seven native blocking relationships were read back and verified. The first
+ready implementation ticket is #142; runtime implementation has not started.
 
 ## How the current system works
 
@@ -256,5 +258,5 @@ saved-view task is adding its own glossary terms; later integration must keep
 both sets of vocabulary rather than replace that work.
 
 This document and the glossary are local audit/design work. The approved spec
-has been published to the configured tracker. No runtime fix, CI candidate,
-merge, or deployment is claimed.
+and six approved implementation tickets have been published to the configured
+tracker. No runtime fix, CI candidate, merge, or deployment is claimed.
