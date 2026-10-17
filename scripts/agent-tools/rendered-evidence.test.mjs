@@ -65,6 +65,7 @@ const state = {
   dpr: 1,
   visualScale: 1,
   theme: 'light',
+  preferredTheme: 'light',
   input: '',
   tasks: [],
   helpOpen: false,
@@ -75,7 +76,8 @@ const state = {
 };
 
 function paint() {
-  return state.theme === 'dark'
+  const effectiveTheme = state.theme === 'system' ? state.preferredTheme : state.theme;
+  return effectiveTheme === 'dark'
     ? { background: 'rgb(20, 22, 28)', color: 'rgb(234, 235, 240)', modalBackground: 'rgb(35, 39, 51)' }
     : { background: 'rgb(250, 251, 254)', color: 'rgb(31, 35, 43)', modalBackground: 'rgb(255, 255, 255)' };
 }
@@ -95,7 +97,7 @@ function observe(surfaces) {
     viewportCss: { innerWidth: state.innerWidth, innerHeight: state.innerHeight, outerWidth: state.width, outerHeight: state.height },
     devicePixelRatio: state.dpr,
     visualViewport: { width: state.innerWidth / state.visualScale, height: state.innerHeight / state.visualScale, scale: state.visualScale, offsetLeft: 0, offsetTop: 0 },
-    theme: { attribute: state.theme, colorScheme: state.theme, documentBackground: colors.background, documentColor: colors.color, bodyBackground: colors.background, bodyColor: colors.color, modalBackground: colors.modalBackground, modalColor: colors.color },
+    theme: { attribute: state.theme === 'system' ? null : state.theme, colorScheme: state.theme === 'system' ? 'light dark' : state.theme, documentBackground: colors.background, documentColor: colors.color, bodyBackground: colors.background, bodyColor: colors.color, modalBackground: colors.modalBackground, modalColor: colors.color },
     documentFontsStatus: 'loaded',
     viewportMeta: 'width=device-width, initial-scale=1',
     surfaces: surfaces.map(({ name, selector }) => ({
@@ -125,6 +127,7 @@ const page = {
     state.height = context.options.viewport.height;
     state.innerWidth = state.width;
     state.innerHeight = state.height;
+    state.preferredTheme = context.options.colorScheme;
     state.theme = context.options.colorScheme === 'light' ? 'dark' : 'light';
     if (state.routeHandler) {
       let localContinued = false;
@@ -161,7 +164,10 @@ const page = {
           if (mode === 'delayed-add') setTimeout(() => { state.input = ''; }, 25);
           else state.input = '';
         } else if (selector === '#themeBtn') {
-          if (mode !== 'theme-mismatch') state.theme = state.theme === 'light' ? 'dark' : 'light';
+          if (mode === 'three-state-theme') {
+            const choices = ['system', 'light', 'dark'];
+            state.theme = choices[(choices.indexOf(state.theme) + 1) % choices.length];
+          } else if (mode !== 'theme-mismatch') state.theme = state.theme === 'light' ? 'dark' : 'light';
         } else if (selector === 'button[aria-label="FAQs / Changelog"]') state.helpOpen = true;
         else if (selector === '#modalRoot details.help-faq:not([open]) > summary') state.expanded += 1;
       },
@@ -287,6 +293,19 @@ test('capture waits for durable native Add acknowledgement before reusing the dr
   assert.equal(report.isolation.syntheticBoard.taskCount, 2);
   assert.equal(report.metricsStatus, 'pass');
   assert.equal(report.captureIntegrity, 'pass');
+});
+
+test('theme audit cycles past automatic to verify the explicit opposite paint', async (t) => {
+  const fixture = await makeFixture(t);
+  for (const theme of ['dark', 'light']) {
+    const { result, output } = run({ ...fixture, name: `three-state-${theme}`, mode: 'three-state-theme', theme });
+    assert.equal(result.status, 0, `automatic can follow the requested ${theme} paint without being its opposite`);
+    const report = await readCase(output);
+    assert.equal(report.themePaintAudit.alternate.attribute, theme === 'dark' ? 'light' : 'dark');
+    assert.equal(report.themePaintAudit.paintChanged, true);
+    assert.equal(report.themePaintAudit.requestedPaintRestored, true);
+    assert.equal(report.observed.capture.theme.attribute, theme);
+  }
 });
 
 test('no-op CSS enlargement is a real behavioral failure with observed measurements', async (t) => {

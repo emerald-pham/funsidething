@@ -421,13 +421,14 @@ async function prepareApp(page, options) {
     await page.waitForTimeout(50);
   }
   const requestedThemeSnapshot = await inspectTheme();
+  const alternateTheme = options.theme === 'light' ? 'dark' : 'light';
   let alternateThemeSnapshot = null;
   for (let attempt = 0; attempt < 3; attempt += 1) {
     await themeButton.click();
     themeControlActions += 1;
     await page.waitForTimeout(80);
     const candidate = await inspectTheme();
-    if (candidate.theme.colorScheme !== options.theme) {
+    if (themeSchemeMatches(candidate, alternateTheme)) {
       alternateThemeSnapshot = candidate;
       break;
     }
@@ -472,7 +473,7 @@ async function prepareApp(page, options) {
       && themeSchemeMatches(requestedThemeSnapshot, options.theme)
       && themeSchemeMatches(restoredThemeSnapshot, options.theme)
       && alternateThemeSnapshot !== null
-      && alternateThemeSnapshot.theme.colorScheme !== options.theme
+      && themeSchemeMatches(alternateThemeSnapshot, alternateTheme)
       && themePaintAudit.paintChanged
       && themePaintAudit.requestedPaintRestored,
   };
