@@ -8798,5 +8798,23 @@
       "command": "node --test --test-name-pattern='RISK PWA updates: a scanner gesture commits' tests.js; node --test --test-name-pattern='RISK PWA updates: the extended FAQ and changelog explain gesture-safe reloads' tests.js",
       "failure": "Before runtime changes on base 659aac18, the full-app scanner regression failed because controllerchange caused one reload during the active pointer gesture (expected zero). After the runtime fix, the independent copy test failed because the Quick start answer lacked scanner-touch guidance. The async-save and cancellation logs are explicitly postimplementation broken-handler sensitivity controls, not additional preimplementation RED slices."
     }
+  },
+  {
+    "testChangesSha256": "7123c004e0c11ed889bd9f963e60060bb77fea0fe1676c500323e562f9ff4c7e",
+    "reason": "Approved spec #152 requires isolated agent-tool process suites to participate in the normal repository test command.",
+    "previousBehavior": "The npm test script ran only tests.js, so a failing scripts/agent-tools test cohort did not affect its exit status.",
+    "intendedBehavior": "npm test executes each agent-tool test cohort and returns nonzero with its assertion output when any cohort fails.",
+    "replacementTests": [
+      "RISK repository process: npm test fails when an agent-tool cohort assertion fails"
+    ],
+    "preservedCoverage": [
+      "All existing tests.js assertions and unrelated rationale records remain intact.",
+      "Each isolated agent-tool cohort keeps its own Node test assertions and remains runnable through the focused test script.",
+      "The repository full suite and release gates remain required after focused agent-tool checks."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='^RISK repository process: npm test fails when an agent-tool cohort assertion fails$' tests.js",
+      "failure": "At baseline 25c5da1866231f6ca1f564deb36847e47088ef17, the disposable fixture's npm test returned zero while ignoring its deliberate synthetic-failure.test.mjs cohort; the process assertion expecting a nonzero result failed. See evidence/wiring/npm-test-agent-cohort-red.json."
+    }
   }
 ]
