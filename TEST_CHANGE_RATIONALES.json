@@ -10906,7 +10906,15 @@
     "idbBoundaryGreenEvidence": "/Users/emeraldpham/.codex/task-artifacts/completion-precedence-168/idb-boundary-repair/2026-10-17T23-39-19-052Z-bdf4330d-9558-4cf8-b062-013c00f4dd89.json (92 top-level/138 total cases,138 pass,0 fail/skip; includes all affected legacy/modern completion, scoped Undo, source safety, P0 and mounted copy/history consumers). Runtime/index/SW bytes stay identical to6ba; parent owns renewed clean exact-commit full regression.",
     "updatedTests": [
       "RISK legacy completion recovery: immutable released Done stays offchain through expired device recovery and every save"
-    ]
+    ],
+    "closedOriginalP0Audit": {
+      "reviewedSha": "dd4300a5d0d29529a1302920e86741201ad4d183",
+      "evidence": "/tmp/chain-reload-p0-evidence/typography-dd4300a-final.md",
+      "sha256": "d87c233ea67b2834554877a63834638959dea8096bc264acfcc2274504c55344",
+      "completedAt": "2026-10-17T23:22:53.839Z",
+      "runtimeReturnedAt": "2026-10-17T23:22:09.988Z",
+      "status": "Original dd-only changed install/update FAQ/current October17 bullet audit approved after authorized retry; prior denial closed. This does not approve later combined14add/168/173 candidate or all historical release text. Combined typography remains pending; no audit rerun or replacement occurred."
+    }
   },
   {
     "testChangesSha256": "2e9716a4149eda0fa57b1151fade7a107f0ed851f4fb15eb3322e4247c86d29d",
@@ -10920,7 +10928,7 @@
     "preservedCoverage": [
       "All prior source, device-write, cloud payload, lifecycle fact, rating, learning, History, Undo, account, and chain-member assertions remain. The stale-source paint assertion is now non-vacuous because an actual independent title edit requires adoption.",
       "The exact device and cloud publication checks remain; #175 replaces only fixed-delay readiness assumptions with the existing durable saved-view acknowledgement helper.",
-      "The selected inherited cohort remains 118 top-level tests and 199 tests including subtests, with 199 passed and zero failed or skipped; the copy expected-RED tests were deliberately excluded from that run and are verified separately.",
+      "Historical selected inherited slice: The selected inherited cohort was 118 top-level tests and 199 tests including subtests, with 199 passed and zero failed or skipped; the copy expected-RED tests were deliberately excluded from that run and are verified separately.",
       "The actual mounted FAQ and Changelog consumers, existing Quick start length check, Retry/Undo copy checks and unrelated help structure remain covered.",
       "All existing passing source, device, fact, rating, Undo, account, title, cloud and FAQ assertions remain unchanged. The immutable bd84 producer performs actual Dot, editor Done, title Save and expired stale replay; no modern action rows are removed to simulate legacy data.",
       "New consumer captures every scanner replacement and primary write, requires both literal backups before every overwrite, retains original facts/ratings/title and newer Add, then verifies exact acknowledged journal and cold reopen after closing the finished original.",
@@ -11022,7 +11030,7 @@
     "integrationEvidence": {
       "commit": "dd4300a5d0d29529a1302920e86741201ad4d183",
       "merge": "4649297",
-      "preserved": "Exact P0 predecessor-safe worker implementation, sessionUsed guards, original reproduction and replacement assertions/FAQ remain. Both original rationale records are retained. Conflicts resolved by retaining both risk inventories and player outcomes; fingerprints regenerated after preflight. Denied same-worker Chrome FAQ audit remains an independent release hold; this worker did not satisfy or bypass it."
+      "preserved": "Historical integration slice at4649297: exact P0 predecessor-safe worker implementation, sessionUsed guards, original reproduction and replacement assertions/FAQ were retained, along with both original rationale records and both risk inventories/player outcomes. Fingerprints were regenerated after preflight. The native audit was denied at that earlier boundary; that denial was subsequently resolved by explicit user authorization and the original dd-only audit was approved at23:22:53.839Z. Later combined typography approval remains pending."
     },
     "combinedReleasedStartGreenEvidence": "Released-Start narrowing and exact P0 integration at14add: released-start-repair/2026-10-17T23-07-47-195Z-06743fbb-1bb4-434c-ba74-ef0a06d0431f.json,82 top-level/121 cases,121 pass,0 skip. Actual source/runtime and app/SW fingerprints changed for the Start hold and P0; no unchanged-runtime claim applies to that combined aggregate. This is predecessor evidence for the subsequent startup repairs.",
     "changelogHistoryEvidence": {
@@ -11040,6 +11048,30 @@
       "chronology": "First new control run88d2496e failed a newly added overstrict whole-journal equality because it legitimately retained the incoming independent title fact. That never-passing new expectation was corrected to require the exact union of every original and incoming source fact, with count and byte equality. No prior passing assertion was changed.",
       "scope": "Test-only fix in the single failing fixture plus new controlled companion. Existing startup/unknown/Start-hold/P0/runtime code and bytes remain exact6ba. Earlier production/fixture REDs, attribution corrections and predecessor evidence are retained as historical records."
     },
-    "idbBoundaryGreenEvidence": "/Users/emeraldpham/.codex/task-artifacts/completion-precedence-168/idb-boundary-repair/2026-10-17T23-39-19-052Z-bdf4330d-9558-4cf8-b062-013c00f4dd89.json (92 top-level/138 total cases,138 pass,0 fail/skip; includes all affected legacy/modern completion, scoped Undo, source safety, P0 and mounted copy/history consumers). Runtime/index/SW bytes stay identical to6ba; parent owns renewed clean exact-commit full regression."
+    "idbBoundaryGreenEvidence": "/Users/emeraldpham/.codex/task-artifacts/completion-precedence-168/idb-boundary-repair/2026-10-17T23-39-19-052Z-bdf4330d-9558-4cf8-b062-013c00f4dd89.json (92 top-level/138 total cases,138 pass,0 fail/skip; includes all affected legacy/modern completion, scoped Undo, source safety, P0 and mounted copy/history consumers). Runtime/index/SW bytes stay identical to6ba; parent owns renewed clean exact-commit full regression.",
+    "closedOriginalP0Audit": {
+      "reviewedSha": "dd4300a5d0d29529a1302920e86741201ad4d183",
+      "evidence": "/tmp/chain-reload-p0-evidence/typography-dd4300a-final.md",
+      "sha256": "d87c233ea67b2834554877a63834638959dea8096bc264acfcc2274504c55344",
+      "completedAt": "2026-10-17T23:22:53.839Z",
+      "runtimeReturnedAt": "2026-10-17T23:22:09.988Z",
+      "status": "Original dd-only changed install/update FAQ/current October17 bullet audit approved after authorized retry; prior denial closed. This does not approve later combined14add/168/173 candidate or all historical release text. Combined typography remains pending; no audit rerun or replacement occurred."
+    }
+  },
+  {
+    "comparison": "completion168AuditStatusEvidenceIncremental",
+    "baseCommit": "c28fb55bdc1c3eb2133e0be344755b13da8ff396",
+    "testChangesSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "reason": "Correct copied historical audit/cohort attribution in only the two newest IDB repair rationale records and report the verified closed original dd audit separately from pending combined typography.",
+    "previousBehavior": "The newest copied aggregate repeated an earlier native audit denial as current and described an older selected199-case cohort as remaining current.",
+    "intendedBehavior": "Those copied statements are explicitly historical; the verified exact-dd final audit approval is cited with its immutable evidence hash, while later combined typography remains pending.",
+    "preservedCoverage": [
+      "All app, test, service-worker bytes and all pre-IDB historical rationale object bytes remain identical to c28. Existing exact original-bd84 test-diff rationale fingerprint remains valid."
+    ],
+    "redEvidence": {
+      "command": "sha256sum/read /tmp/chain-reload-p0-evidence/typography-dd4300a-final.md and compare the newest aggregate audit/cohort claims",
+      "failure": "Evidence attribution discrepancy only: verified final original-dd approval at23:22:53.839Z contradicts the copied current-denial statement. This is documentation correction, not a new product/test RED."
+    },
+    "validationScope": "No test source or executable behavior changes; c28 incremental and original-bd84 gates plus focused preflight validate the evidence-only diff."
   }
 ]
