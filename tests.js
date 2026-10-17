@@ -12649,8 +12649,19 @@ async function decisionRecoveryApp146(account='e@example.com'){
  return {...app,h,storage,event:JSON.parse(JSON.stringify(app.ctx.state.decisionEvents[0]))};
 }
 
+function mixedSharedOutcome146(board){
+ return JSON.parse(JSON.stringify({theme:board.settings.theme,dateFormat:board.settings.dateFormat,
+  scene:board.settings.scene,contexts:board.contexts}));
+}
 async function recordMixedDecisionActions146(app){
- const {ctx,shim}=app,yesTask=ctx.addTask('Mixed Yes candidate');
+ const {ctx,shim}=app;
+ ctx.onAction('cycle-theme',{});ctx.openSettings();
+ const format=shim.document.getElementById('stDateFormat');format.id='stDateFormat';format.matches=()=>false;format.value='ymd';
+ shim.document.dispatchEvent({type:'change',target:format});
+ shim.document.getElementById('newCtxName').value='Mixed shared context';ctx.onAction('add-ctx-named',{});ctx.closeModal();
+ shim.document.dispatchEvent({type:'landscape-scene-time-change',detail:{time:'sunset',season:'autumn'}});
+ assert.deepEqual([...new Set(Array.from(ctx.state.decisionEvents).filter(event=>event.kind==='current-choice').map(event=>event.target.type))].sort(),['context','scene','setting'],'real preference/context producers coexist with comparison authority');
+ const shared=mixedSharedOutcome146(ctx.state),yesTask=ctx.addTask('Mixed Yes candidate');
  ctx.renderScan();assert.equal(ctx.state.candidateId,yesTask.id,'the actual scanner offers the new Yes candidate');
  const benchmark=ctx.state.chain.at(-1);assert.match(shim.document.getElementById('scan').innerHTML,/data-act="yes"/);
  ctx.onAction('yes',{dataset:{candidate:yesTask.id,benchmark}});
@@ -12667,7 +12678,7 @@ async function recordMixedDecisionActions146(app){
  await ctx.onAction('undo',{});assert.equal(ctx.state.chain.length,0);assert.ok(ctx.state.decisionEvents.some(event=>event.kind==='undo'&&event.passBefore),'actual Start Undo retains exact prior-pass authority');
  hydrateUnchangedEditorDraft(app,benchmark);shim.document.getElementById('etTitle').value='Mixed retained benchmark title';ctx.onAction('save-edit',{dataset:{id:benchmark}});
  assert.equal(await ctx.persist(),true);assert.equal(ctx.decisionEvidenceIssue(ctx.state,'e@example.com'),null,'all new kinds coexist as coherent real-app authority');
- return {yesTaskId:yesTask.id,dotTaskId:dotTask.id,benchmark};
+ return {yesTaskId:yesTask.id,dotTaskId:dotTask.id,benchmark,shared};
 }
 async function decisionMixedActionsApp146(){
  const app=await decisionRecoveryApp146();return {...app,mixed:await recordMixedDecisionActions146(app)};
@@ -12680,11 +12691,13 @@ test('RISK decision mixed rollout fixture: actual comparisons current choices St
  assert.deepEqual([...new Set(ctx.state.decisionEvents.filter(event=>event.kind==='comparison').map(event=>event.action))].sort(),['dislodge','dot','yes']);
  assert.equal(JSON.stringify(ctx.state.decisionEvents.find(event=>event.kind==='no')),JSON.stringify(f.event),'the original No stays immutable beside later action families');
  assert.equal(ctx.state.tasks.find(task=>task.id===f.mixed.benchmark).title,'Mixed retained benchmark title');
+ assert.deepEqual(mixedSharedOutcome146(ctx.state),f.mixed.shared);
  ctx.window.CloudSync.ready=true;ctx.cloudPushNow();await syncSettle(80);assert.equal(ctx.state.syncDirty,false);assert.equal(JSON.stringify(f.h.remoteState().decisionEvents),events);
  const reopened=await loadApp({seedStorage:{[SYNC_STORE_KEY]:f.storage.getItem(SYNC_STORE_KEY),[LOCAL_HEAD_KEY]:f.storage.getItem(LOCAL_HEAD_KEY)},cloudSyncFactory:f.h.factory});
  t.after(()=>{reopened.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',reopened.ctx);});
  await reopened.ctx.cloudPull();reopened.ctx.cloudPushNow();await syncSettle(60);
  assert.equal(JSON.stringify(reopened.ctx.state.decisionEvents),events);assert.equal(JSON.stringify(reopened.ctx.state.tasks.map(task=>[task.id,task.mu,task.sigma])),ratings,'cold reopening never reapplies cancelled learning');
+ assert.deepEqual(mixedSharedOutcome146(reopened.ctx.state),f.mixed.shared,'typed shared settings, scene fields and context definitions survive publication and cold reopen');
  assert.equal(reopened.ctx.state.tasks.find(task=>task.id===f.mixed.benchmark).title,'Mixed retained benchmark title');assert.equal(reopened.shim.document.getElementById('syncBtn').textContent,'☁ synced');
 });
 
@@ -21159,6 +21172,7 @@ test('Firestore rules: real pinned writer reads decision authority then holds it
   await oldApp.ctx.cloudPull();
   assert.equal(JSON.stringify(oldApp.ctx.state.decisionEvents),JSON.stringify(JSON.parse(decided).decisionEvents),'the immutable historical app carries every comparison, choice and Undo fact exactly');
   assert.equal(oldApp.ctx.state.tasks.find(task=>task.id==='bench').title,'Mixed retained benchmark title','the old reader opens the effective retained current choice');
+  assert.deepEqual(mixedSharedOutcome146(oldApp.ctx.state),f.mixed.shared,'the immutable historical reader carries the new typed shared outcomes without overwriting them');
   oldApp.ctx.addTask('Legacy independent edit held for safe update');await oldApp.ctx.persist();oldApp.ctx.cloudPushNow();await syncSettle(180);
   assert.equal(old.CS.errorCode,'permission-denied','the real fixed historical manifest is denied');
   assert.equal(oldApp.ctx.state.syncDirty,true);assert.equal(oldApp.shim.document.getElementById('syncBtn').textContent,'☁ error');assert.ok(updates>=1,'historical app enters its established compatible-shell recovery');
@@ -21182,6 +21196,7 @@ test('Firestore rules: first decision against released rules stays exact and pen
   t.after(()=>{handle.CS.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',app.ctx);});
   app.shim.window.CLOUD_PUSH_DELAY_MS=2;await app.ctx.cloudPull();handle.CS.ready=false;app.ctx.renderScan();app.ctx.onAction('no',{dataset:{candidate:'candidate',benchmark:'bench'}});await recordMixedDecisionActions146(app);await app.ctx.persist();handle.CS.ready=true;
   const evidence=JSON.stringify(app.ctx.state.decisionEvents),ratings=JSON.stringify(app.ctx.state.tasks.map(task=>[task.id,task.mu,task.sigma]));
+  const shared=mixedSharedOutcome146(app.ctx.state);
   const outcomes=JSON.stringify({chain:app.ctx.state.chain,title:app.ctx.state.tasks.find(task=>task.id==='bench').title,passId:app.ctx.state.passId,scanMode:app.ctx.state.scanMode,chance:app.ctx.state.chance});
   assert.deepEqual([...new Set(app.ctx.state.decisionEvents.map(event=>event.kind))].sort(),['comparison','current-choice','no','undo']);
   assert.deepEqual([...new Set(app.ctx.state.decisionEvents.filter(event=>event.kind==='comparison').map(event=>event.action))].sort(),['dislodge','dot','yes']);
@@ -21195,6 +21210,7 @@ test('Firestore rules: first decision against released rules stays exact and pen
   assert.equal(JSON.stringify(app.ctx.state.tasks.map(task=>[task.id,task.mu,task.sigma])),ratings,'retry does not retrain the comparison');
   assert.equal(app.ctx.state.syncDirty,false);assert.equal(app.shim.document.getElementById('syncBtn').textContent,'☁ synced');
   const cloud=JSON.parse(published.payload);
+  assert.deepEqual(mixedSharedOutcome146(cloud),shared,'rules-first retry preserves every typed shared preference, scene field and context definition');
   assert.equal(JSON.stringify({chain:cloud.chain,title:cloud.tasks.find(task=>task.id==='bench').title,passId:cloud.passId,scanMode:cloud.scanMode,chance:cloud.chance}),outcomes,'rules-first Retry preserves actual chosen fields and scoped Undo/pass outcomes as well as learning and raw facts');
  }finally{await handle.drain();await upgraded?.cleanup();await env.cleanup();}
 });
@@ -29231,6 +29247,9 @@ test('RISK independent decision guidance: rendered FAQ and Settings distinguish 
  const help=shim.document.getElementById('modalRoot').innerHTML;
  const answers=new Map([...help.matchAll(/<dt>(.*?)<\/dt><dd>(.*?)<\/dd>/g)].map(row=>[row[1],row[2]]));
  const answer=q=>{assert.ok(answers.has(q),'mounted FAQ includes '+q);return answers.get(q);};
+ assert.match(answer('How do shared appearance choices sync?'),/Theme, date format, scene time, season and sky location combine with independent task changes/i);
+ assert.match(answer('How do shared appearance choices sync?'),/do not add an Undo step/i);
+ assert.match(answer('How do contexts and list filters work?'),/Context changes support Undo while keeping unrelated progress/i);
  assert.match(answer('Can I use the app offline or on another device?'),/offline decisions.*closing and reopening/i);
  assert.match(answer('How are conflicting choices resolved?'),/original decision times/i);
  assert.match(answer('How are conflicting choices resolved?'),/missing.*held|untrusted.*held/i);

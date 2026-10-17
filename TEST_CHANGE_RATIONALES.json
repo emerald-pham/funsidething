@@ -8096,5 +8096,25 @@
       "command": "node --test --test-reporter=spec --test-name-pattern='RISK cloud shared preferences|RISK cloud contexts:|a changed scene source is held|typed preference authority' tests.js",
       "failure": "Before this extension, the real theme/date/hourly-quote/scene controls lost their independent choices in the retained 879 RED logs (shared-preferences-theme-red-879-final.log, shared-preferences-date-format-red-879-fixture-fixed.log, shared-preferences-hourly-quote-red-879.log, shared-preferences-scene-red-879.log); context deletion and create/mode failed in context-lifecycle-undo-red-879.log and context-create-name-mode-red-879.log. Against pre-extension app source 1c29374, the changed-scene consumer observed 0 instead of 2 typed producer rows (scene-source-hold-red-1c29374.txt), and modern replacement likewise observed 0 instead of 2 theme facts (modern-preference-replacement-red-1c29374.txt). The first scene-hold attempt was a fixture TypeError before the assertion and is retained as scene-source-hold-harness-misfire.txt, not counted as RED. The final candidate passes all 18 focused preference/context/source-hold/replacement cases in shared-choices-context-replacement-green.txt."
     }
+  },
+  {
+    "testChangesSha256": "d2f479bc471ebdd439058c6c7ab36f6cbdea04fb3137b077417dd2cd8ba027c4",
+    "reason": "Extend final #147 integration acceptance and matching FAQ to the completed #144 typed shared preferences and context definitions.",
+    "previousBehavior": "The mixed rollout fixture carried task/pass current-choice facts but did not carry setting/scene/context targets together; guidance did not explain their independent sync or theme/scene Undo boundary.",
+    "intendedBehavior": "Retain every No/Yes/Dot/Dislodge/Start/scoped Undo assertion while also creating real theme/date-format/context choices and delivering the real scene-control event. Check exact shared outcomes through cold reopen, historical reader and rules-first Retry. Explain independent shared choices and non-Undoable theme/scene saves in the mounted FAQ.",
+    "replacementTests": [
+      "RISK decision mixed rollout fixture: actual comparisons current choices Start and scoped Undo survive durable publication and reopen",
+      "Firestore rules: real pinned writer reads decision authority then holds its ordinary app edit without erasing it",
+      "Firestore rules: first decision against released rules stays exact and pending until rules-first rollout then retry",
+      "RISK independent decision guidance: rendered FAQ and Settings distinguish retained decisions targeted Undo and held evidence"
+    ],
+    "preservedCoverage": [
+      "All original mixed learning/raw identity/pass/Undo/exactACK/legacy hold/rollout assertions remain. No immutable support pin or production rules altered.",
+      "Actual scene event consumer is separate from native browser control and deployed/offline evidence. Emulator execution remains pending final candidate."
+    ],
+    "redEvidence": {
+      "command": "env TZ=UTC node --test --test-name-pattern=\"RISK independent decision guidance: rendered FAQ\" tests.js",
+      "failure": "shared-choices-faq-red-aad.log observes missing mounted appearance FAQ before copy repair. shared-choices-faq-green-aad.log7/7GREEN includes existing130-word readability bound. The mixed typed fixture extension is explicitly post-implementation acceptance (mixed-shared-typed-acceptance-aad.log1/1), not original runtime RED; final real emulator execution remains pending."
+    }
   }
 ]
