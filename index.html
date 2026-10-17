@@ -3484,7 +3484,20 @@ function supportedDecisionReplacement(receipt,account){
   });
 }
 function replacementDecisionReceipts(baseline){
-  return (Array.isArray(baseline?.replacement)?baseline.replacement:[]).filter(receipt=>supportedDecisionReplacement(receipt,baseline.account));
+  if(!supportedDecisionBaseline(baseline))return [];
+  const receipts=[],seenBaselines=new Set(),seenReceipts=new Set();
+  const visit=source=>{
+    const key=canonicalDecisionFact(source);if(seenBaselines.has(key))return;seenBaselines.add(key);
+    // Root validation recursively checks every archived edge with its own
+    // account/proof. Walk only that known lineage; keep its wire bytes intact.
+    for(const receipt of source.replacement||[]){
+      const fact=canonicalDecisionFact(receipt);
+      if(!seenReceipts.has(fact)){receipts.push(receipt);seenReceipts.add(fact);}
+      visit(receipt.baseline);
+    }
+    for(const receipt of source.inheritance||[])if(receipt.sourceBaseline)visit(receipt.sourceBaseline);
+  };
+  visit(baseline);return receipts;
 }
 function retiredDecisionBaseline(baseline,other){
   return other!==undefined && replacementDecisionReceipts(baseline).some(receipt=>canonicalDecisionFact(receipt.baseline)===canonicalDecisionFact(other));
@@ -3497,7 +3510,21 @@ function restoreRetiredDecisionFields(target,source){
   const receipts=replacementDecisionReceipts(source.decisionBaseline).filter(receipt=>canonicalDecisionFact(receipt.baseline)===canonicalDecisionFact(target.decisionBaseline));
   const copy=(to,from,key)=>{if(Object.hasOwn(from||{},key))to[key]=JSON.parse(JSON.stringify(from[key]));else delete to[key];};
   for(const receipt of receipts)for(const fact of receipt.facts){
-    const event=JSON.parse(LZString.decompressFromUTF16(fact.witness));if(event.kind!=="current-choice")continue;
+    const event=JSON.parse(LZString.decompressFromUTF16(fact.witness));
+    if(event.kind==="no"||event.kind==="comparison"){
+      const id=event.kind==="no"?event.candidateId:event.taskId;
+      for(const key of ["considered","cantAt","workedAt"]){target[key]||={};copy(target[key],source[key],id);}
+      if(event.kind==="comparison"){
+        const desired=source.chain||[],chain=(target.chain||[]).filter(value=>value!==id),at=desired.indexOf(id);
+        if(at>=0){
+          const before=desired.slice(0,at).reverse().find(value=>chain.includes(value)),after=desired.slice(at+1).find(value=>chain.includes(value));
+          chain.splice(before!==undefined?chain.indexOf(before)+1:after!==undefined?chain.indexOf(after):Math.min(at,chain.length),0,id);
+        }
+        target.chain=chain;
+      }
+      continue;
+    }
+    if(event.kind!=="current-choice")continue;
     const {type,id,property}=event.target;
     if(type==="task" && property==="disposition"){
       for(const key of ["considered","cantAt","workedAt"]){target[key]||={};copy(target[key],source[key],id);}
@@ -3526,6 +3553,11 @@ async function prepareDecisionReplacement(next,current,reason,gestureId=null){
   const selected=await saveDurableBackup("decision-replacement-source",source);
   if(!selected?.id || JSON.stringify(current)!==before || JSON.stringify(next)!==source
     || window.CloudSync!==backend || (window.CloudSync?.user||null)!==user)return false;
+  const facts=board=>[...new Set((board.decisionEvents||[]).map(canonicalDecisionFact))].sort();
+  // Exact current Export/Import already carries its full authority. Recovery
+  // still completed above; a redundant receipt would duplicate its whole tree.
+  if(canonicalDecisionFact(next.decisionBaseline)===canonicalDecisionFact(current.decisionBaseline)
+    &&canonicalDecisionFact(facts(next))===canonicalDecisionFact(facts(current)))return true;
   if(!next.decisionBaseline){const plain=JSON.parse(source);delete plain.decisionBase;next.decisionBaseline=baselineFromSource(plain,{account,baseId:null});}
   const baseline=next.decisionBaseline;
   const receipt={v:1,reason,account,actionId:decisionId(gestureId)?gestureId:uid(),at,
@@ -3642,8 +3674,11 @@ function initializeReplacedScan(){
   try{ ensureCandidate(); }finally{ chanceGeneration = generation; }
   return JSON.stringify(state) !== before;
 }
-function replaceState(next){
-  sealUndoFrame();
+function replaceState(next,{replacement=false}={}){
+  // Ordinary adoption seals the preceding local gesture before peer effects.
+  // Explicit replacement has just pushed its own frame; its caller seals the
+  // installed board before any asynchronous persistence can admit peer work.
+  if(!replacement)sealUndoFrame();
   const keep = {};
   for(const k of DEVICE_LOCAL_KEYS) keep[k] = state ? state[k] : undefined;
   state = next;
@@ -3770,7 +3805,8 @@ async function cloudPull(){
       return;
     }
     const switchedAccount = state.syncAccount != null && state.syncAccount !== acct;
-    if(!haveRemote && !switchedAccount && state.syncAccount==null && Array.isArray(state.decisionEvents) && state.decisionEvents.length){
+    if(!haveRemote && !switchedAccount && state.syncAccount==null
+      && (Object.hasOwn(state,"decisionBaseline") || Array.isArray(state.decisionEvents) && state.decisionEvents.length)){
       if(!await inheritDecisionAuthority(state,acct,"guest-first-empty-account"))return;
       if(!cloudReady() || window.CloudSync.user!==acct)return;
     }
@@ -3914,7 +3950,7 @@ async function cloudPull(){
         toast("Signed in as " + acct + " — nothing synced under that account yet. The previous board is in Settings backups.");
         return;
       }
-      if(state.tasks.length || sceneHasChoice(state.settings.scene)){
+      if(state.tasks.length || sceneHasChoice(state.settings.scene) || Object.hasOwn(state,"decisionBaseline")){
         // A returning user's saved board may predate syncDirty or still be
         // marked clean. Reading an empty account does not acknowledge that
         // board: otherwise each failed first upload resets its retry budget.
@@ -5059,12 +5095,24 @@ const taskActionOwnerBundle=(()=>{
     }
     return false;
   }
-  async function undoReplacement(frame){
+  async function undoReplacement(frame,adoptedGuest=null){
     if(frame.pending)return false;
     frame.pending=true;
     const prior=JSON.stringify(state),backend=window.CloudSync,account=backend?.user??null,next=JSON.parse(frame.snapshot);
     try{
-      if(!sameListOwner(next,state))return false;
+      const current=()=>JSON.stringify(state)===prior&&window.CloudSync===backend
+        &&(window.CloudSync?.user??null)===account&&undoStack.at(-1)===frame;
+      if(!sameListOwner(next,state)){
+        if(!adoptedGuest||(next.syncAccount??null)!==null||typeof state.syncAccount!=="string"
+          ||account!==state.syncAccount||adoptedGuest.targetAccount!==state.syncAccount
+          ||!retiredDecisionBaseline(adoptedGuest.sourceBaseline,next.decisionBaseline)
+          ||(next.decisionEvents||[]).some(event=>!retiredDecisionEvent(adoptedGuest.sourceBaseline,event)))return false;
+        // The first empty-account adoption already attests this exact guest
+        // Reset frame. Recover its source before restoring its available Undo;
+        // archived event identities, times and original owners stay unchanged.
+        if(!await inheritDecisionAuthority(next,state.syncAccount,"guest-first-empty-account",frame.snapshot)||!current())return false;
+        next.syncAccount=state.syncAccount;
+      }
       if(!await prepareDecisionReplacement(next,state,"explicit-undo"))return false;
       if(JSON.stringify(state)!==prior||window.CloudSync!==backend||(window.CloudSync?.user??null)!==account||undoStack.at(-1)!==frame){
         toast("Undo stopped: the board or signed-in account changed. The recovery copy is in Settings backups.",7000);return false;
@@ -5077,12 +5125,14 @@ const taskActionOwnerBundle=(()=>{
     sealUndoFrame();
     const currentChance=state.chance,frame=undoStack.at(-1),before=JSON.parse(frame.snapshot),after=JSON.parse(frame.after);
     if(expectedFrame&&frame!==expectedFrame)return false;
-    const inheritedGuest=(before.syncAccount??null)===null&&(state.decisionBaseline?.inheritance||[]).some(receipt=>
-      receipt.reason==="guest-first-empty-account"&&receipt.sourceAccount===null
-      &&canonicalDecisionFact(receipt.sourceBaseline)===canonicalDecisionFact(after.decisionBaseline));
+    const inheritedGuest=(before.syncAccount??null)===null&&(after.syncAccount??null)===null
+      &&state.decisionBaseline?.account===state.syncAccount&&(state.decisionBaseline?.inheritance||[]).find(receipt=>
+        receipt.reason==="guest-first-empty-account"&&receipt.sourceAccount===null&&receipt.targetAccount===state.syncAccount
+        &&supportedDecisionInheritance(receipt,state.syncAccount)
+        &&canonicalDecisionFact(receipt.sourceBaseline)===canonicalDecisionFact(after.decisionBaseline));
     const adoptedLegacy=(before.syncAccount??null)===null&&frame.adoptedOwner===state.syncAccount;
     if(!sameListOwner(before,state)&&!inheritedGuest&&!adoptedLegacy){undoStack=[];return false;}
-    if(!preparedNext&&frame.kind==="replacement"&&(state.decisionBaseline||state.decisionEvents||before.decisionBaseline||before.decisionEvents))return undoReplacement(frame);
+    if(!preparedNext&&frame.kind==="replacement"&&(state.decisionBaseline||state.decisionEvents||before.decisionBaseline||before.decisionEvents))return undoReplacement(frame,inheritedGuest);
     const next=preparedNext||(frame.kind==="replacement"?before:scopedUndoState(frame));
     if(!sameListOwner(next,state)){undoStack=[];return false;}
     const priorIds=new Set((Array.isArray(before.decisionEvents)?before.decisionEvents:[]).map(row=>row?.id));
@@ -5786,11 +5836,12 @@ function supportedDecisionInheritance(receipt,account){
     || !(receipt.sourceAccount===null || typeof receipt.sourceAccount==="string" && receipt.sourceAccount)
     || receipt.sourceAccount===receipt.targetAccount
     || receipt.reason==="guest-first-empty-account" && receipt.sourceAccount!==null
-    || !Array.isArray(receipt.facts) || !receipt.facts.length
+    || !Array.isArray(receipt.facts)
     || new Set(receipt.facts.map(fact=>fact?.id)).size!==receipt.facts.length)return false;
   if(receipt.sourceBaseline!==null && (!supportedDecisionBaseline(receipt.sourceBaseline)
     || receipt.sourceBaseline.account!==receipt.sourceAccount))return false;
   if(receipt.sourceBaseline===null && receipt.reason!=="guest-first-empty-account")return false;
+  if(!receipt.facts.length && receipt.sourceBaseline===null)return false;
   return receipt.facts.every(fact=>{
     if(!fact || typeof fact!=="object" || Array.isArray(fact) || Object.keys(fact).some(key=>!["id","witness"].includes(key))
       || !decisionId(fact.id) || typeof fact.witness!=="string")return false;
@@ -5961,6 +6012,12 @@ function mergeDecisionBaseline(target,source){
   if(retiredDecisionBaseline(source.decisionBaseline,target.decisionBaseline)){
     restoreRetiredDecisionFields(target,source);
     if(Array.isArray(target.decisionEvents))target.decisionEvents=target.decisionEvents.filter(event=>!retiredDecisionEvent(source.decisionBaseline,event));
+    // A later explicit replacement can deliberately select a previously
+    // retired original again. Its current exact active facts stay authoritative.
+    if(Array.isArray(source.decisionEvents)){
+      target.decisionEvents||=[];
+      for(const event of source.decisionEvents)if(!target.decisionEvents.some(row=>canonicalDecisionFact(row)===canonicalDecisionFact(event)))target.decisionEvents.push(JSON.parse(JSON.stringify(event)));
+    }
     target.decisionBaseline=JSON.parse(JSON.stringify(source.decisionBaseline));
   }
 
@@ -6039,8 +6096,8 @@ function baselineFromSource(board,event){
 }
 async function inheritDecisionAuthority(board,targetAccount,reason,sourcePayload=null){
   const rows=Array.isArray(board?.decisionEvents)?board.decisionEvents:[];
-  if(!rows.length)return true;
-  const sourceAccount=board.decisionBaseline?.account??board.syncAccount??null;
+  if(!rows.length && !Object.hasOwn(board,"decisionBaseline"))return true;
+  const sourceAccount=Object.hasOwn(board,"decisionBaseline")?board.decisionBaseline?.account??null:board.syncAccount??null;
   if(sourceAccount===targetAccount)return true;
   const issue=decisionEvidenceIssue(board,sourceAccount);
   if(issue){reportCloudReconcileError(issue);return false;}
@@ -8370,8 +8427,9 @@ function openResetConfirmation(){
     +'<div class="mbtns"><button class="btn subtle" data-act="close-modal">Cancel</button><button class="btn danger" data-act="confirm-wipe">Confirm reset</button></div>');
 }
 function needsDecisionInheritance(board,account){
-  return typeof account==="string" && !!account && Array.isArray(board?.decisionEvents) && board.decisionEvents.length>0
-    && (board.decisionBaseline?.account??board.syncAccount??null)!==account;
+  const hasBaseline=Object.hasOwn(board,"decisionBaseline");
+  return typeof account==="string" && !!account && (hasBaseline || Array.isArray(board?.decisionEvents) && board.decisionEvents.length>0)
+    && (hasBaseline?board.decisionBaseline?.account??null:board.syncAccount??null)!==account;
 }
 async function importDecisionBoard(next,sourcePayload,box){
   const prior=JSON.stringify(state),backend=window.CloudSync,account=state.syncAccount||(cloudReady()?backend.user:null);
@@ -8380,7 +8438,7 @@ async function importDecisionBoard(next,sourcePayload,box){
   if(!safety?.id || !current())return false;
   if(!await inheritDecisionAuthority(next,account,"explicit-import",sourcePayload) || !current())return false;
   if(!await prepareDecisionReplacement(next,state,"explicit-import") || !current())return false;
-  markReplacementDeletes(next);pushUndo("replacement");replaceState(next);applyTheme();baseUpdatedAt=Date.now();
+  markReplacementDeletes(next);pushUndo("replacement");replaceState(next,{replacement:true});applyTheme();baseUpdatedAt=Date.now();
   initializeReplacedScan();recomputeRanks();closeModal();commit();return true;
 }
 async function restoreDurableBackupById(id){
@@ -8417,8 +8475,8 @@ async function restoreDurableBackupById(id){
     next.restoredHistoryIds||={};next.restoredHistoryOps||={};
     for(const row of next.workLog)if(state.clearedHistoryIds?.[historyEntryKey(row)])noteRestoreIntent(next,historyEntryKey(row),"clearedHistoryIds","restoredHistoryIds","restoredHistoryOps","clearedAfterRestoreOps");
     for(const task of next.tasks){const current=state.tasks.find(t=>t.id===task.id);replaceTaskWoop(task,current);replaceTaskPostpone(task,current);replaceTaskComparison(task,current);replaceTaskPrerequisites(task,current);if(current?.done&&!task.done)reopenTask(task,current);}
-    mergeUndeletedTasks(next,state);pushUndo("replacement");replaceState(next);applyTheme();baseUpdatedAt=Date.now();initializeReplacedScan();recomputeRanks();render();
-    state.updatedAt=Date.now();state.syncDirty=true;
+    mergeUndeletedTasks(next,state);pushUndo("replacement");replaceState(next,{replacement:true});applyTheme();baseUpdatedAt=Date.now();initializeReplacedScan();recomputeRanks();render();
+    state.updatedAt=Date.now();state.syncDirty=true;sealUndoFrame();
     if(!await persist(deviceStorageAuthority,safetyCopy.id)){
       // Preserve the restored board in this open tab and keep its exact
       // pre-Restore proof pinned. A later automatic or user edit can retry;
@@ -8450,9 +8508,9 @@ async function confirmResetEverything(){
     const empty=defaultState();markReplacementDeletes(empty);
     if(!await prepareDecisionReplacement(empty,state,"explicit-reset")||JSON.stringify(state)!==currentBoard
       ||window.CloudSync!==resetBackend||(window.CloudSync?.user||null)!==resetAccount)return;
-    pushUndo("replacement");replaceState(empty);
+    pushUndo("replacement");replaceState(empty,{replacement:true});
     state.updatedAt=Date.now();state.syncDirty=true;
-    recomputeRanks();render();
+    recomputeRanks();render();sealUndoFrame();
     const resetBoard=JSON.stringify(state);
     // `before-reset` is a retained, nonautomatic row. Skip another optional
     // daily copy, while still allowing lossless archive compaction if the two
@@ -8712,7 +8770,7 @@ function onAction(act, el){
         dropRemovedFields(st); hydrateState(st);
         const destination=state.syncAccount||(cloudReady()?window.CloudSync.user:null);
         if(needsDecisionInheritance(st,destination) || state.decisionBaseline || state.decisionEvents)return importDecisionBoard(st,box.value,box);
-        markReplacementDeletes(st); pushUndo("replacement"); replaceState(st); applyTheme();
+        markReplacementDeletes(st); pushUndo("replacement"); replaceState(st,{replacement:true}); applyTheme();
         // Pasted in by hand, so it is authoritative as of now — not stale content
         // that cloudPull() should hold this device's writes back over.
         baseUpdatedAt = Date.now();

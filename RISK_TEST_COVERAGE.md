@@ -1329,3 +1329,12 @@ The existing `Firestore rules: real pinned writer reads decision authority then 
 - `RISK decision recovery baseline metadata: unknown v1 authority stays exact instead of disappearing through compatible baseline adoption`
 
 A real newer-peer adoption must preserve and hold unknown version1 metadata at the baseline, frozen rating, existing extension and compatible alias boundaries. It cannot drop those fields and report Synced; known optional provenance/legacy/inheritance/replacement forms remain supported.
+
+## Exact replacement lineage and guest Reset inheritance (#146)
+
+- `RISK decision recovery retired comparison effects: exact stale returns cannot revive No Yes Dot or Dislodge after two replacements and peer progress`
+- `RISK decision recovery transitive replacement: a second plain Import recognizes exact retired learning and still holds malformed nested ownership`
+- `RISK decision recovery replacement idempotence: repeated current Export Import retains one exact authority tree after durable recovery`
+- `RISK decision recovery guest Reset inheritance: replacement-only authority supports first signed No and the existing local Reset Undo`
+
+Exact comparison retirement clears only named effects, preserving later peer choices and learning. Validated nested replacement/inheritance receipts retain lossless wire witnesses; changed foreign witnesses hold. Reimporting the exact current authority completes recovery without duplicating its tree. Empty guest Reset authority adopts only through first-empty-account provenance, retains available Reset and earlier No Undo, and stops on failed recovery or an account race. Explicit replacement frames seal the installed result before asynchronous persistence, while ordinary adoption still seals the preceding gesture.

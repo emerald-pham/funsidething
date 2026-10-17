@@ -8096,5 +8096,29 @@
       "command": "node --test --test-reporter=spec --test-name-pattern='RISK cloud shared preferences|RISK cloud contexts:|a changed scene source is held|typed preference authority' tests.js",
       "failure": "Before this extension, the real theme/date/hourly-quote/scene controls lost their independent choices in the retained 879 RED logs (shared-preferences-theme-red-879-final.log, shared-preferences-date-format-red-879-fixture-fixed.log, shared-preferences-hourly-quote-red-879.log, shared-preferences-scene-red-879.log); context deletion and create/mode failed in context-lifecycle-undo-red-879.log and context-create-name-mode-red-879.log. Against pre-extension app source 1c29374, the changed-scene consumer observed 0 instead of 2 typed producer rows (scene-source-hold-red-1c29374.txt), and modern replacement likewise observed 0 instead of 2 theme facts (modern-preference-replacement-red-1c29374.txt). The first scene-hold attempt was a fixture TypeError before the assertion and is retained as scene-source-hold-harness-misfire.txt, not counted as RED. The final candidate passes all 18 focused preference/context/source-hold/replacement cases in shared-choices-context-replacement-green.txt."
     }
+  },
+  {
+    "testChangesSha256": "a2481733d08bd75aa734095147f0c44a40c6636221900a09570685136cb8d80a",
+    "reason": "Repair the four observed specialist recovery findings through exact replacement lineage, bounded effect restoration, idempotent authority selection and guest Reset adoption/Undo consumers.",
+    "previousBehavior": "Exact displaced comparisons could restore stale scalar marks or chain entries with clean acknowledgement; a second plain Import failed to recognize nested retired learning; repeated current Export/Import duplicated the entire receipt tree; guest Reset authority with no active facts skipped ownership inheritance and blocked the next signed No and available Reset Undo.",
+    "intendedBehavior": "Retire only exact named comparison effects while retaining active peer progress, recognize every validated known archived lineage without altering wire witnesses, avoid a redundant identical-authority receipt after mandatory recovery, and preserve exact baseline-only guest provenance plus local Reset/earlier No Undo through first-empty-account adoption.",
+    "replacementTests": [
+      "RISK decision recovery retired comparison effects: exact stale returns cannot revive No Yes Dot or Dislodge after two replacements and peer progress",
+      "RISK decision recovery transitive replacement: a second plain Import recognizes exact retired learning and still holds malformed nested ownership",
+      "RISK decision recovery replacement idempotence: repeated current Export Import retains one exact authority tree after durable recovery",
+      "RISK decision recovery guest Reset inheritance: replacement-only authority supports first signed No and the existing local Reset Undo"
+    ],
+    "preservedCoverage": [
+      "All existing tests and assertions remain. No supported release pin, compatibility matrix, rules, transport format, shell metadata, public guidance or deployment gate changes.",
+      "Actual No, Yes, editor Dot and Dislodge are returned as stale higher revisions both before and after a second explicit replacement. Exact selected ratings and active facts survive; later independent peer title and Dot are retained.",
+      "Two actual plain Imports acknowledge cleanly while the original nested event remains exact. A changed foreign nested witness retains exact local durable bytes and cloud payload under an unsupported-evidence hold.",
+      "Eleven repeated current-authority Imports retain exact baseline/event/rating bytes and prove exact source recovery still occurs. This is bounded consumer evidence, not a production performance claim.",
+      "Guest No then Reset then first empty-account sign-in supports a new signed No with a valid target baseline, and separately preserves available Reset Undo then earlier No Undo. Failed mandatory guest-source recovery and an account change during recovery keep board, cloud and frame exact; archived original fact ID/time/owner are not rewritten.",
+      "The replacement-frame assertion was added after diagnosis to preserve the approved lifecycle repair: explicit replacement seals its actual installed baseline before persistence yields; ordinary cloud adoption retains its early sealing boundary. Existing scoped Undo replacement recovery/account-race tests remain."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='RISK decision recovery retired comparison|RISK decision recovery transitive replacement|RISK decision recovery replacement idempotence|RISK decision recovery guest Reset inheritance' tests.js",
+      "failure": "External146 specialist-repair-02-integrated-red.log records all four actual failures on committed aad before runtime edits: stale marks/chain, dirty second Import, duplicate baseline tree, and guest target ownership failure.01 also contains an initial guest test setup error (dispatcher returns undefined), not F4 behavioral RED.03 passes retirement/transitive/idempotence7/7;04 passes signed No but retains guest Reset Undo RED;05 and06 retain the dependent Undo/frame failures, not claimed GREEN.07 diagnoses pre-install frame sealing.08 passes guest/same-account replacement7/7;09 passes all four10/10 plus recovery/account-race preservation.10 passes135/135 before simplifying the temporary Reset-specific proof.11 passes8/8 with the approved explicit replacement lifecycle seam and existing exact adoption proof; final135-cohort evidence is specialist-repair-12-final-preservation.log. New post-diagnosis lifecycle/race assertions are honestly preservation coverage; no independent preimplementation failure is claimed for each. No emulator/browser/full-suite/production claim."
+    }
   }
 ]
