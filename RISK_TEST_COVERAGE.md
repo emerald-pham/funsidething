@@ -1394,4 +1394,8 @@ The actual intervention Yes records deliberate current-pass Scan intent even whe
 
 - `RISK repository process: npm test fails when an agent-tool cohort assertion fails`
 
+Preflight comparison coverage:
+- `RISK repository process: preflight catches outgoing upstream rationale gaps after the selected base passes`
+  exercises the public command with a real published local Git branch, a passing selected comparison and a missing outgoing rationale. It preserves the existing gate, focused copy checks, refs, HEAD, tracked files and configuration.
+
 The required npm test entry point surfaces a failing isolated agent-tool cohort with a nonzero result and its assertion output.
