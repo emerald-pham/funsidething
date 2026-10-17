@@ -716,6 +716,10 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK cloud shared preferences: scene time season and structured location survive an independent No
 - RISK cloud contexts: deleting a legacy context and targeted Undo restore its exact definition for a cold peer
 - RISK cloud contexts: create rename mode and task assignment survive an independent No in either order
+- RISK cloud contexts: independent new definitions materialize in either publication order
+- RISK cloud contexts: long names create rename delete and Undo retain the exact definition on a cold peer
+- RISK cloud contexts: unsupported prior rows hold rename mode and delete before Undo or cloud mutation
+- RISK current-choice projection: a complete creation group reconstructs its definition on a pristine board
 - RISK cloud current choices: a changed scene source is held before adoption or acknowledgement
 - RISK cloud current choices: typed preference authority survives a modern replacement Undo and stale delivery
 - RISK cloud current choices: causal action order beats skew and equal concurrent times use event identity
