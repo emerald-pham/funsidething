@@ -1254,3 +1254,9 @@ Protect local gesture targeting through reconciliation, immutable grouped cancel
 - `RISK decision recovery validation order: rejected local evidence stays exact before known-cloud union`
 
 Protect source validation before authority union; missing/cyclic ancestry, baseline recovery and extension conflicts; lossless explicit ownership inheritance and exact-fact attestation; mandatory source/replacement recovery in both stores; and safe update of sole pending legacy learning without invented comparisons.
+
+- `RISK scoped Undo: first guest sign-in keeps local cancellation authority and replays later signed learning`
+- `RISK scoped Undo: unsupported cancellation payloads hold exact local and cloud branches`
+- `RISK scoped Undo: completion evergreen work delete and postpone retain unrelated peer fields`
+- `RISK scoped Undo: cancelling Start restores the prior pass root and exact draw through stale delivery`
+- `RISK scoped Undo: Return cancellation restores the original hold time while peer task fields survive`
