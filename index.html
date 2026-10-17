@@ -3444,7 +3444,7 @@ function decisionStartIssue(board){
 function supportedDecisionReplacement(receipt,account){
   if(!receipt || typeof receipt!=="object" || Array.isArray(receipt) || receipt.v!==1
     || Object.keys(receipt).some(key=>!["v","reason","account","actionId","at","baseline","facts"].includes(key))
-    || !["explicit-import","explicit-restore","explicit-undo"].includes(receipt.reason) || receipt.account!==account
+    || !["explicit-import","explicit-restore","explicit-undo","explicit-reset"].includes(receipt.reason) || receipt.account!==account
     || !decisionId(receipt.actionId) || !Number.isFinite(receipt.at) || receipt.at<0
     || !supportedDecisionBaseline(receipt.baseline) || receipt.baseline.account!==account
     || !Array.isArray(receipt.facts) || new Set(receipt.facts.map(fact=>fact?.id)).size!==receipt.facts.length)return false;
@@ -4100,7 +4100,8 @@ function scopedUndoState(frame){
       const a=prior?.[key],b=applied?.[key];
       if(a&&b&&typeof a==="object"&&typeof b==="object"&&!Array.isArray(a)&&!Array.isArray(b)
           &&target[key]&&typeof target[key]==="object"&&!Array.isArray(target[key]))inverse(target[key],a,b);
-      else if(equal(target[key],b)){
+      else if(equal(target[key],b)||(key==="comparisonOps"&&Array.isArray(target[key])&&Array.isArray(b)
+        &&JSON.stringify(target[key].map(row=>JSON.stringify(row)).sort())===JSON.stringify(b.map(row=>JSON.stringify(row)).sort()))){
         if(Object.hasOwn(prior,key))target[key]=JSON.parse(JSON.stringify(a));else delete target[key];
       }
     }
@@ -4999,11 +5000,30 @@ const taskActionOwnerBundle=(()=>{
     }
     return false;
   }
-  function undo(){
+  async function undoReplacement(frame){
+    if(frame.pending)return false;
+    frame.pending=true;
+    const prior=JSON.stringify(state),backend=window.CloudSync,account=backend?.user??null,next=JSON.parse(frame.snapshot);
+    try{
+      if(!sameListOwner(next,state))return false;
+      if(!await prepareDecisionReplacement(next,state,"explicit-undo"))return false;
+      if(JSON.stringify(state)!==prior||window.CloudSync!==backend||(window.CloudSync?.user??null)!==account||undoStack.at(-1)!==frame){
+        toast("Undo stopped: the board or signed-in account changed. The recovery copy is in Settings backups.",7000);return false;
+      }
+      return undo(next,frame);
+    }finally{delete frame.pending;}
+  }
+  function undo(preparedNext=null,expectedFrame=null){
     if(!undoStack.length)return false;
     sealUndoFrame();
     const currentChance=state.chance,frame=undoStack.at(-1),before=JSON.parse(frame.snapshot),after=JSON.parse(frame.after);
-    const next=frame.kind==="replacement"?before:scopedUndoState(frame);
+    if(expectedFrame&&frame!==expectedFrame)return false;
+    const inheritedGuest=(before.syncAccount??null)===null&&(state.decisionBaseline?.inheritance||[]).some(receipt=>
+      receipt.reason==="guest-first-empty-account"&&receipt.sourceAccount===null
+      &&canonicalDecisionFact(receipt.sourceBaseline)===canonicalDecisionFact(after.decisionBaseline));
+    if(!sameListOwner(before,state)&&!inheritedGuest){undoStack=[];return false;}
+    if(!preparedNext&&frame.kind==="replacement"&&(state.decisionBaseline||state.decisionEvents||before.decisionBaseline||before.decisionEvents))return undoReplacement(frame);
+    const next=preparedNext||(frame.kind==="replacement"?before:scopedUndoState(frame));
     if(!sameListOwner(next,state)){undoStack=[];return false;}
     const priorIds=new Set((Array.isArray(before.decisionEvents)?before.decisionEvents:[]).map(row=>row?.id));
     const targets=(Array.isArray(after.decisionEvents)?after.decisionEvents:[]).filter(row=>!priorIds.has(row?.id)&&supportedDecisionEvent(row)&&row.kind!=="undo");
@@ -8089,8 +8109,10 @@ async function confirmResetEverything(){
     if(JSON.stringify(state)!==currentBoard || window.CloudSync!==resetBackend || (window.CloudSync?.user||null)!==resetAccount){
       toast("Reset stopped: the board or signed-in account changed. Check the current board and try again.",7000);return;
     }
-    const priorUndo=undoStack.slice();
+    const priorUndo=undoStack.map(frame=>({...frame}));
     const empty=defaultState();markReplacementDeletes(empty);
+    if(!await prepareDecisionReplacement(empty,state,"explicit-reset")||JSON.stringify(state)!==currentBoard
+      ||window.CloudSync!==resetBackend||(window.CloudSync?.user||null)!==resetAccount)return;
     pushUndo("replacement");replaceState(empty);
     state.updatedAt=Date.now();state.syncDirty=true;
     recomputeRanks();render();
@@ -8465,7 +8487,7 @@ function onAction(act, el){
       window.checkForAppUpdate?.(); return cloudPull();
     case "sync-reload": return reloadForCloudRecovery();
     case "sync-signout": closeModal(); window.CloudSync?.signOut(); break;
-    case "undo": TaskActionOwner.undo(); break;
+    case "undo": return TaskActionOwner.undo();
     case "mback": break; // handled in click listener
   }
 }

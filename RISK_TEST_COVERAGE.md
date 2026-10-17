@@ -1274,3 +1274,6 @@ Preserve both sources when a supported Start group is incomplete/ambiguous or a 
 - `RISK decision recovery replacement scope: exact retired branches stay retired while new changed and unknown peer facts stay held`
 
 Durable exact displaced-baseline/fact receipts retire only explicitly replaced authority; new/changed/unknown peer facts stay protected. Reverse replacement Undo is the dependent #145 gate.
+
+- `RISK scoped Undo: explicit modern Import Restore and Reset reverse exact journal replacement after recovery`
+- `RISK scoped Undo: replacement recovery failure and an account race retain the current board and Undo frame`
