@@ -859,7 +859,7 @@ test('RISK Settings hierarchy: moved Changelog leaves Save settings after every 
 
 test('RISK context and Settings FAQ: extended guidance explains cycle empty selections synthetic scope sync limitations and bottom save',async()=>{
  const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
- for(const pattern of [/Whenever contexts exist,.*green check.*red X/i,/Every assigned.*context.*active/i,/No context.*green.*unassigned/i,/cannot be assigned/i,/Refresh all devices/i,/Save settings.*bottom/i])assert.match(help,pattern);
+ for(const pattern of [/Whenever contexts exist,.*green check.*red X/i,/Every assigned.*context.*active/i,/No context.*green.*unassigned/i,/cannot be assigned/i,/safe-update path protects unsaved work and unfinished drafts/i,/Save settings.*bottom/i])assert.match(help,pattern);
  const current=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];for(const pattern of [/red X/i,/No context/i,/Changelog.*Settings/i,/Save settings.*bottom/i])assert.match(current,pattern);
 });
 
@@ -23020,7 +23020,7 @@ test('RISK live scan sync: the second physical click of one double-click cannot 
 test('RISK live scan sync: Settings describes live revision refresh while retaining draft protection',async()=>{
  const {a}=await liveScanSyncClients();a.ctx.openSettings();
  assert.match(a.shim.document.getElementById('modalRoot').innerHTML,/when another device saves/,'Settings must describe the new open-device refresh');
- assert.match(a.shim.document.getElementById('modalRoot').innerHTML,/Drafts wait until you finish/,'the draft boundary remains visible to the user');
+ assert.match(a.shim.document.getElementById('modalRoot').innerHTML,/Drafts and pressed controls wait until you finish/,'the draft and pressed-control boundary remains visible to the user');
 });
 
 /* Dependencies are saved by task ID; fixtures never use an account or a real board. */
@@ -23222,7 +23222,7 @@ test('RISK multiple dependencies FAQ: extended help explains progressive links s
  const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
  for(const text of [/up to ten dependencies/i,/\+ dependency/,/All Tasks names blockers/i,/cycle.*warning/i,/full eligible/i,/scanned after/i,/another device/i,/draft/i,/offline/i,/top-K/])assert.match(help,text);
  assert.doesNotMatch(help,/first dot in either mode is labeled/i,'the age label belongs to Chance presentation; descending retains its top-K summary');
- assert.match(help,/Refresh all devices/i,'older single-link controls must disclose their complex-dependency boundary');
+ assert.match(help,/saved control is protected or disabled because its data is newer.*use a compatible app before editing/i,'older single-link controls must disclose their complex-dependency boundary');
  const instructions=fs.readFileSync(path.join(__dirname,'AGENTS.md'),'utf8');
  assert.match(instructions,/live product/i);assert.match(instructions,/extended FAQ/i);assert.match(instructions,/regression/i);
 });
@@ -25059,8 +25059,8 @@ test('RISK STALE TAB: legacy coexistence retains independent live fields before 
 
 test('RISK STALE TAB: recovery guidance explains independent edits conflicts and unobserved cloud bases',async()=>{
  const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
- assert.match(help,/offline edits save locally and sync when you reconnect/i);
- assert.match(help,/edits conflict.*Settings backups.*recovery/i);
+ assert.match(help,/offline decisions stay saved through closing and reopening, then combine when you reconnect/i);
+ assert.match(help,/Settings backups for recovery copies of displaced edits/i);
  const log=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];assert.match(log,/stale.tab.*independent.*edits/i);
 });
 
@@ -25931,7 +25931,7 @@ test('RISK Quick start content: essential steps stay brief and detailed help rem
  const intro=help.split('<ol>')[1].split('</ol>')[0];assert.ok(intro.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=100,'getting-started steps should be brief');assert.doesNotMatch(intro,/TrueSkill|weighted random|25%|squared|Halving/i,'algorithm details belong in detailed help');
  const answers=[...help.matchAll(/<dt>(.*?)<\/dt><dd>(.*?)<\/dd>/g)];assert.ok(answers.length>=35,'retain existing help topics');for(const [,question,answer]of answers)assert.ok(answer.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,question+' should focus on user actions and consequences');
  const dependency=answers.find(x=>x[1]==='What is a prerequisite task?')[2];assert.match(dependency,/Hard dependency clears only after deletion or Done with Evergreen off/);assert.match(dependency,/recurring.*blocks again/i);assert.doesNotMatch(dependency,/saved edge evidence|operation identity|compatible app|future formats|old snapshots/);
- const data=help.split('<h3>Data and backups</h3>')[1];assert.match(data,/refresh all devices/i);assert.match(data,/protected.*compatible app/i);
+ const data=help.split('<h3>Data and backups</h3>')[1];assert.match(data,/safe-update path protects unsaved work and unfinished drafts/i);assert.match(data,/protected.*compatible app/i);
 });
 
 test('RISK Quick start chapters: mounted help includes Task history with native disclosures and detailed chapters closed',async()=>{
@@ -26656,12 +26656,25 @@ test('RISK bulk task editing: removed context options reject the whole batch rat
  const old=shim.document.querySelectorAll;shim.document.querySelectorAll=selector=>selector==='[data-bulkctx]'?[{checked:true,dataset:{bulkctx:'private-context'}}]:old(selector);ctx.state.contexts=[];ctx.onAction('bulk-save');assert.equal(a.ctx.length,0);assert.match(shim.document.getElementById('bulkError').textContent,/context.*changed/i);
 });
 test('RISK bulk task editing: offline two-task cloud conflict preserves fresh peer fields and reconnects without resurrection',async()=>{
- const initial=await loadApp(),first=initial.ctx.addTask('Private A'),second=initial.ctx.addTask('Private B'),base=JSON.parse(initial.ctx.cloudPayload()),h=makeSyncHarness({remote:base,rev:4});
- const app=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(base)},cloudSyncFactory:h.factory}),{ctx,shim}=app;await ctx.cloudPull();await syncSettle(30);h.failPull=true;
- ctx.state.listOpen=true;ctx.onAction('bulk-select-all');ctx.onAction('bulk-edit');shim.document.getElementById('bulkApplyDue').checked=true;shim.document.getElementById('bulkDue').value='2027-08-01';ctx.onAction('bulk-save');assert.equal(await ctx.persist(),true);const offline=await loadApp({seedStorage:{[SYNC_STORE_KEY]:shim.localStorage.getItem(SYNC_STORE_KEY)}});assert.equal(offline.ctx.state.tasks.find(t=>t.id===second.id).due,'2027-08-01');
- const peer=JSON.parse(JSON.stringify(base));peer.tasks.find(t=>t.id===first.id).due='2027-09-01';peer.tasks.find(t=>t.id===second.id).title='Fresh peer title';h.writeBehindBack(peer);h.failPull=false;await ctx.cloudPull();await ctx.cloudPushNow();await syncSettle(80);const saved=h.remoteState();assert.equal(saved.tasks.find(t=>t.id===first.id).due,'2027-09-01');assert.equal(saved.tasks.find(t=>t.id===second.id).due,'2027-08-01');assert.equal(saved.tasks.find(t=>t.id===second.id).title,'Fresh peer title');assert.match(shim.document.getElementById('listBulkToolbar').innerHTML,/1 currently match in this tab; 1 have different values or are no longer open/,'actual two-task reconnect reports partial adoption');
- const deleting=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(saved)},cloudSyncFactory:h.factory});await deleting.ctx.cloudPull();h.failPull=true;deleting.ctx.state.listOpen=true;deleting.ctx.onAction('bulk-select-all');deleting.ctx.onAction('bulk-edit');deleting.shim.document.getElementById('bulkApplyDue').checked=true;deleting.shim.document.getElementById('bulkDue').value='2027-10-01';deleting.ctx.onAction('bulk-save');await deleting.ctx.persist();
- const peerDelete=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(saved)}});peerDelete.ctx.onAction('delete-task',{dataset:{id:first.id}});h.writeBehindBack(JSON.parse(peerDelete.ctx.cloudPayload()));h.failPull=false;await deleting.ctx.cloudPull();await deleting.ctx.cloudPushNow();await syncSettle(80);assert.equal(h.remoteState().tasks.some(t=>t.id===first.id),false,'stale batch does not resurrect deleted selected task');assert.equal(h.remoteState().tasks.find(t=>t.id===second.id).due,'2027-10-01');
+ const at=Date.parse('2026-10-17T15:00:00Z'),initial=await loadAppAtTime(at),first=initial.ctx.addTask('Private A'),second=initial.ctx.addTask('Private B'),base=JSON.parse(initial.ctx.cloudPayload()),h=makeSyncHarness({remote:base,rev:4});
+ const seedStorage={[SYNC_STORE_KEY]:JSON.stringify(base)},app=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:h.factory}),peer=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:h.factory}),{ctx,shim}=app;
+ await ctx.cloudPull();await peer.ctx.cloudPull();await syncSettle(30);h.failPull=true;peer.ctx.window.CloudSync.ready=false;
+ setFakeTime(ctx,at+1000);ctx.state.listOpen=true;ctx.onAction('bulk-select-all');ctx.onAction('bulk-edit');shim.document.getElementById('bulkApplyDue').checked=true;shim.document.getElementById('bulkDue').value='2027-08-01';ctx.onAction('bulk-save');assert.equal(await ctx.persist(),true);
+ const offline=await loadAppAtTime(at+1000,{seedStorage:{[SYNC_STORE_KEY]:shim.localStorage.getItem(SYNC_STORE_KEY)}});assert.equal(offline.ctx.state.tasks.find(t=>t.id===second.id).due,'2027-08-01');
+ // A current peer uses the actual editor so its conflicting and independent fields
+ // carry original decision evidence rather than silently overwriting legacy scalars.
+ await saveEditorChoice(peer,first.id,at+2000,{due:'2027-09-01'});await saveEditorChoice(peer,second.id,at+3000,{title:'Fresh peer title'});
+ assert.deepEqual(Array.from(peer.ctx.state.decisionEvents,event=>event.target.property).sort(),['due','title']);
+ h.failPull=false;peer.ctx.window.CloudSync.ready=true;await peer.ctx.cloudPushNow();await syncSettle(50);
+ await ctx.cloudPull();await ctx.cloudPushNow();await syncSettle(80);const saved=h.remoteState();
+ assert.equal(saved.tasks.find(t=>t.id===first.id).due,'2027-09-01');assert.equal(saved.tasks.find(t=>t.id===second.id).due,'2027-08-01');assert.equal(saved.tasks.find(t=>t.id===second.id).title,'Fresh peer title');assert.match(shim.document.getElementById('listBulkToolbar').innerHTML,/1 currently match in this tab; 1 have different values or are no longer open/,'actual two-task reconnect reports partial adoption');
+ assert.equal(ctx.state.syncDirty,false);assert.equal(ctx.window.CloudSync.errorCode??null,null);
+ const finalSeed={[SYNC_STORE_KEY]:JSON.stringify(saved)},deleting=await loadAppAtTime(at+4000,{seedStorage:finalSeed,cloudSyncFactory:h.factory}),peerDelete=await loadAppAtTime(at+4000,{seedStorage:finalSeed,cloudSyncFactory:h.factory});
+ await deleting.ctx.cloudPull();await peerDelete.ctx.cloudPull();h.failPull=true;peerDelete.ctx.window.CloudSync.ready=false;
+ setFakeTime(deleting.ctx,at+5000);deleting.ctx.state.listOpen=true;deleting.ctx.onAction('bulk-select-all');deleting.ctx.onAction('bulk-edit');deleting.shim.document.getElementById('bulkApplyDue').checked=true;deleting.shim.document.getElementById('bulkDue').value='2027-10-01';deleting.ctx.onAction('bulk-save');await deleting.ctx.persist();
+ setFakeTime(peerDelete.ctx,at+6000);peerDelete.ctx.onAction('delete-task',{dataset:{id:first.id}});await peerDelete.ctx.persist();h.failPull=false;peerDelete.ctx.window.CloudSync.ready=true;await peerDelete.ctx.cloudPushNow();await syncSettle(50);
+ await deleting.ctx.cloudPull();await deleting.ctx.cloudPushNow();await syncSettle(80);assert.equal(h.remoteState().tasks.some(t=>t.id===first.id),false,'stale batch does not resurrect deleted selected task');assert.equal(h.remoteState().tasks.find(t=>t.id===second.id).due,'2027-10-01');
+ assert.equal(deleting.ctx.state.syncDirty,false);
 });
 test('RISK bulk task editing: failed cloud publication retains local batch and retry acknowledges exact payload',async()=>{
  const original=await loadApp();original.ctx.addTask('Private A');original.ctx.addTask('Private B');const base=JSON.parse(original.ctx.cloudPayload()),h=makeSyncHarness({remote:base,rev:2}),{ctx,shim}=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(base)},cloudSyncFactory:h.factory});await ctx.cloudPull();await syncSettle(30);
