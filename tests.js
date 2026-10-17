@@ -9204,10 +9204,20 @@ test('RISK saved view guidance: Quick start and Changelog describe this-device r
  assert.match(answer,/last All Tasks search or filter, whether its list was open, and your place in the list on this device/i);
  assert.match(answer,/saved board first/i);assert.match(answer,/dates and eligibility use today/i);
  assert.match(answer,/if this browser cannot retain the view, your saved board still opens with its usual list view/i);
- assert.match(answer,/last settled appearance stays visible quietly while the saved board opens/i);
+ assert.match(answer,/When a saved appearance is available, it stays visible quietly while the saved board opens/i);
  assert.doesNotMatch(answer,/loading message|small panel|spinner/i);
  const chapter=help.split('<details class="help-faq" data-help-changelog>')[1]?.split('</details>')[0]||'';
- assert.match(chapter,/<h3>October 17, 2026<\/h3>[\s\S]*?<li>Opening or refreshing quietly restores this device’s All Tasks list, filters and position, with its last settled appearance visible while the saved board opens; newer cloud changes still sync in the background\. If this browser cannot retain the view, the saved board still opens with its usual list view\.<\/li>/);
+ assert.match(chapter,/<h3>October 17, 2026<\/h3>[\s\S]*?<li>Opening or refreshing quietly restores this device’s All Tasks list, filters and position; newer cloud changes still sync in the background\. When a saved appearance is available, it stays visible quietly while the saved board opens\. If this browser cannot retain the view, the saved board still opens with its usual list view\.<\/li>/);
+});
+
+
+test('RISK saved view guidance qualification: FAQ and current release note promise an appearance only when available',async t=>{
+ const {ctx,shim}=await loadApp();for(const id of ['appChangelogCurrent','appChangelog'])shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ const answer=help.split('<dt>What does All Tasks remember when I reopen?</dt><dd>')[1]?.split('</dd>')[0]||'';
+ const release=help.split('<h3>October 17, 2026</h3>')[1]?.split('</ul>')[0]||'';
+ for(const [surface,copy] of [['All Tasks FAQ',answer],['October17 changelog',release]])await t.test(surface,()=>{
+  assert.match(copy,/When a saved appearance is available, it stays visible quietly while the saved board opens\./i,'optional appearance availability must qualify the visible-while-opening promise');
+ });
 });
 
 async function delayedLocalBoardBrowser(viewport={width:390,height:844},dispatchResizeDuringLoad=false,theme='system'){

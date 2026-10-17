@@ -9515,5 +9515,140 @@
     },
     "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/resumed-20261017/owner",
     "releaseStatus": "Local merged candidate only. No browser/emulator/server/port, push, PR update, CI, main merge or deployment by this worker. Parent /root retains integration, affected reviews and all final release validation."
+  },
+  {
+    "testChangesSha256": "2ed477c7028ea1ab8eea11f6d70db7472b3b4be4b30863d255e63e5144710eeb",
+    "comparison": "repairDelta",
+    "comparisonBase": "0cc73cd9137c3377290cf087e805c78a2b1b1302",
+    "reason": "Independent FAQ review F-1 on0cc correctly found that two saved-view copy claims promised a visible previous appearance unconditionally, although existing show() safely falls back for absent, invalid or viewport-mismatched optional appearance records. Parent explicitly authorized qualifying both FAQ and October17 release note while preserving all executable product behavior.",
+    "previousBehavior": "The FAQ said its last settled appearance stays visible quietly while the saved board opens, and the release note promised the same appearance without an availability condition. The existing guidance test required those exact unqualified strings. Optional appearance absence/validation/viewport fallback was already correct in runtime code.",
+    "intendedBehavior": "Both user-facing surfaces say: When a saved appearance is available, it stays visible quietly while the saved board opens. All other FAQ/release-note content and the usual-list-view fallback remain unchanged. Update only the two superseded textual expectations, add direct openHelp/current-release subcases for the qualification, and refresh required app/SW fingerprints.",
+    "replacementTests": [
+      "RISK saved view guidance qualification: FAQ and current release note promise an appearance only when available"
+    ],
+    "updatedTests": [
+      "RISK saved view guidance: Quick start and Changelog describe this-device restoration and current dates"
+    ],
+    "preservedCoverage": [
+      "Every existing behavior, task, authority, account, fallback, search/list/position, eligibility/date, cloud, Undo, draft and PWA safeguard assertion remains. Only two old exact copy expectations are replaced by qualified equivalents as explicitly requested by independent FAQ finding F-1; no runtime requirement is relaxed.",
+      "The new direct UI-copy regression calls actual openHelp and reads the All Tasks answer and current October17 note from real template output. Both subcases require the availability qualifier and the retained quiet-visible-while-opening promise. It fails both original unqualified surfaces before copy edits.",
+      "source-parity.json proves index.html is exactly0cc plus two intended copy replacements and embedded fingerprints; SW changes only its cache key. All34 other checked product runtime assets, styles, SavedAppearance validation/fallback logic, board authority, view metadata, adapters and rules remain byte-exact0cc.",
+      "All prior rationale/RED histories and immutable evidence remain untouched. The root-interrupted superseded0cc full suite finalized143 is not a failure or RED; rules/compatibility results on0cc remain separate historical checks. Root owns renewed exact final full/native/browser/compatibility/reviews/CI/release.",
+      "The initial test patch was made before a clean-checkpoint resume, which the ledger correctly rejected. The exact patch was saved externally, only that owned test edit was restored to0cc, the owner resumed cleanly and reapplied the same patch, then recorded the intended RED again before any app-copy edit. Both original records remain; this corrected coordination order does not fabricate implementation chronology."
+    ],
+    "redEvidence": {
+      "command": "/opt/local/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/saved-view-implementation/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/resumed-20261017/faq-qualification-repair/runs --purpose preimplementation-red -- /opt/local/bin/node --test --test-reporter=spec --test-name-pattern=\"^RISK saved view guidance qualification:\" tests.js",
+      "failure": "Actual resumed-checkpoint pre-copy RED in red.txt:0pass/3fail/0skip (parent plus All Tasks FAQ and October17 changelog subcases), each AssertionError ERR_ASSERTION reports optional appearance availability must qualify the visible-while-opening promise. Both old strings lacked When a saved appearance is available. Recorder identifies actual assertion-failure/exit1. Only after observing that failure were the two app strings and superseded copy expectations changed. copy-green.txt then passes the guidance consumers; focused and exact metadata gates follow. Earlier test-before-resume attempt is preserved honestly in red-before-resume-correction.txt, not substituted for the clean-resume run."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/resumed-20261017/faq-qualification-repair",
+    "releaseStatus": "Local copy/fingerprint repair only. No broad suite, browser/emulator/server, push, CI, main merge or release by this owner. Parent /root owns affected exact-candidate review and final release validation."
+  },
+  {
+    "testChangesSha256": "95efef6c44e2b80d7b84c7603bccf13cadef70bdf1e716b53206e1ca0b3c9d8b",
+    "comparison": "currentMainDelta",
+    "comparisonBase": "49f67e44130da9360998c7a2b272d6483babdd9b",
+    "reason": "Independent FAQ review F-1 on0cc correctly found that two saved-view copy claims promised a visible previous appearance unconditionally, although existing show() safely falls back for absent, invalid or viewport-mismatched optional appearance records. Parent explicitly authorized qualifying both FAQ and October17 release note while preserving all executable product behavior.",
+    "previousBehavior": "The FAQ said its last settled appearance stays visible quietly while the saved board opens, and the release note promised the same appearance without an availability condition. The existing guidance test required those exact unqualified strings. Optional appearance absence/validation/viewport fallback was already correct in runtime code.",
+    "intendedBehavior": "Both user-facing surfaces say: When a saved appearance is available, it stays visible quietly while the saved board opens. All other FAQ/release-note content and the usual-list-view fallback remain unchanged. Update only the two superseded textual expectations, add direct openHelp/current-release subcases for the qualification, and refresh required app/SW fingerprints.",
+    "replacementTests": [
+      "RISK saved view guidance qualification: FAQ and current release note promise an appearance only when available"
+    ],
+    "updatedTests": [
+      "RISK saved view guidance: Quick start and Changelog describe this-device restoration and current dates"
+    ],
+    "preservedCoverage": [
+      "Every existing behavior, task, authority, account, fallback, search/list/position, eligibility/date, cloud, Undo, draft and PWA safeguard assertion remains. Only two old exact copy expectations are replaced by qualified equivalents as explicitly requested by independent FAQ finding F-1; no runtime requirement is relaxed.",
+      "The new direct UI-copy regression calls actual openHelp and reads the All Tasks answer and current October17 note from real template output. Both subcases require the availability qualifier and the retained quiet-visible-while-opening promise. It fails both original unqualified surfaces before copy edits.",
+      "source-parity.json proves index.html is exactly0cc plus two intended copy replacements and embedded fingerprints; SW changes only its cache key. All34 other checked product runtime assets, styles, SavedAppearance validation/fallback logic, board authority, view metadata, adapters and rules remain byte-exact0cc.",
+      "All prior rationale/RED histories and immutable evidence remain untouched. The root-interrupted superseded0cc full suite finalized143 is not a failure or RED; rules/compatibility results on0cc remain separate historical checks. Root owns renewed exact final full/native/browser/compatibility/reviews/CI/release.",
+      "The initial test patch was made before a clean-checkpoint resume, which the ledger correctly rejected. The exact patch was saved externally, only that owned test edit was restored to0cc, the owner resumed cleanly and reapplied the same patch, then recorded the intended RED again before any app-copy edit. Both original records remain; this corrected coordination order does not fabricate implementation chronology."
+    ],
+    "redEvidence": {
+      "command": "/opt/local/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/saved-view-implementation/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/resumed-20261017/faq-qualification-repair/runs --purpose preimplementation-red -- /opt/local/bin/node --test --test-reporter=spec --test-name-pattern=\"^RISK saved view guidance qualification:\" tests.js",
+      "failure": "Actual resumed-checkpoint pre-copy RED in red.txt:0pass/3fail/0skip (parent plus All Tasks FAQ and October17 changelog subcases), each AssertionError ERR_ASSERTION reports optional appearance availability must qualify the visible-while-opening promise. Both old strings lacked When a saved appearance is available. Recorder identifies actual assertion-failure/exit1. Only after observing that failure were the two app strings and superseded copy expectations changed. copy-green.txt then passes the guidance consumers; focused and exact metadata gates follow. Earlier test-before-resume attempt is preserved honestly in red-before-resume-correction.txt, not substituted for the clean-resume run."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/resumed-20261017/faq-qualification-repair",
+    "releaseStatus": "Local copy/fingerprint repair only. No broad suite, browser/emulator/server, push, CI, main merge or release by this owner. Parent /root owns affected exact-candidate review and final release validation."
+  },
+  {
+    "testChangesSha256": "00bf2769c206cebaeb32b2aeca0773cd6ddab2c528c4a12a356a58b05302a774",
+    "comparison": "priorMainDelta",
+    "comparisonBase": "4a3f332ba543147691147120e83048e162dabae1",
+    "reason": "Independent FAQ review F-1 on0cc correctly found that two saved-view copy claims promised a visible previous appearance unconditionally, although existing show() safely falls back for absent, invalid or viewport-mismatched optional appearance records. Parent explicitly authorized qualifying both FAQ and October17 release note while preserving all executable product behavior.",
+    "previousBehavior": "The FAQ said its last settled appearance stays visible quietly while the saved board opens, and the release note promised the same appearance without an availability condition. The existing guidance test required those exact unqualified strings. Optional appearance absence/validation/viewport fallback was already correct in runtime code.",
+    "intendedBehavior": "Both user-facing surfaces say: When a saved appearance is available, it stays visible quietly while the saved board opens. All other FAQ/release-note content and the usual-list-view fallback remain unchanged. Update only the two superseded textual expectations, add direct openHelp/current-release subcases for the qualification, and refresh required app/SW fingerprints.",
+    "replacementTests": [
+      "RISK saved view guidance qualification: FAQ and current release note promise an appearance only when available"
+    ],
+    "updatedTests": [
+      "RISK saved view guidance: Quick start and Changelog describe this-device restoration and current dates"
+    ],
+    "preservedCoverage": [
+      "Every existing behavior, task, authority, account, fallback, search/list/position, eligibility/date, cloud, Undo, draft and PWA safeguard assertion remains. Only two old exact copy expectations are replaced by qualified equivalents as explicitly requested by independent FAQ finding F-1; no runtime requirement is relaxed.",
+      "The new direct UI-copy regression calls actual openHelp and reads the All Tasks answer and current October17 note from real template output. Both subcases require the availability qualifier and the retained quiet-visible-while-opening promise. It fails both original unqualified surfaces before copy edits.",
+      "source-parity.json proves index.html is exactly0cc plus two intended copy replacements and embedded fingerprints; SW changes only its cache key. All34 other checked product runtime assets, styles, SavedAppearance validation/fallback logic, board authority, view metadata, adapters and rules remain byte-exact0cc.",
+      "All prior rationale/RED histories and immutable evidence remain untouched. The root-interrupted superseded0cc full suite finalized143 is not a failure or RED; rules/compatibility results on0cc remain separate historical checks. Root owns renewed exact final full/native/browser/compatibility/reviews/CI/release.",
+      "The initial test patch was made before a clean-checkpoint resume, which the ledger correctly rejected. The exact patch was saved externally, only that owned test edit was restored to0cc, the owner resumed cleanly and reapplied the same patch, then recorded the intended RED again before any app-copy edit. Both original records remain; this corrected coordination order does not fabricate implementation chronology."
+    ],
+    "redEvidence": {
+      "command": "/opt/local/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/saved-view-implementation/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/resumed-20261017/faq-qualification-repair/runs --purpose preimplementation-red -- /opt/local/bin/node --test --test-reporter=spec --test-name-pattern=\"^RISK saved view guidance qualification:\" tests.js",
+      "failure": "Actual resumed-checkpoint pre-copy RED in red.txt:0pass/3fail/0skip (parent plus All Tasks FAQ and October17 changelog subcases), each AssertionError ERR_ASSERTION reports optional appearance availability must qualify the visible-while-opening promise. Both old strings lacked When a saved appearance is available. Recorder identifies actual assertion-failure/exit1. Only after observing that failure were the two app strings and superseded copy expectations changed. copy-green.txt then passes the guidance consumers; focused and exact metadata gates follow. Earlier test-before-resume attempt is preserved honestly in red-before-resume-correction.txt, not substituted for the clean-resume run."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/resumed-20261017/faq-qualification-repair",
+    "releaseStatus": "Local copy/fingerprint repair only. No broad suite, browser/emulator/server, push, CI, main merge or release by this owner. Parent /root owns affected exact-candidate review and final release validation."
+  },
+  {
+    "testChangesSha256": "5f5ad042f3eae7690e636c4d0f5d334662e3e945dc9a332789de3615b82dda95",
+    "comparison": "approvedDelta",
+    "comparisonBase": "7d5b069603b758b73e5704a4a3eb91625ffd6413",
+    "reason": "Independent FAQ review F-1 on0cc correctly found that two saved-view copy claims promised a visible previous appearance unconditionally, although existing show() safely falls back for absent, invalid or viewport-mismatched optional appearance records. Parent explicitly authorized qualifying both FAQ and October17 release note while preserving all executable product behavior.",
+    "previousBehavior": "The FAQ said its last settled appearance stays visible quietly while the saved board opens, and the release note promised the same appearance without an availability condition. The existing guidance test required those exact unqualified strings. Optional appearance absence/validation/viewport fallback was already correct in runtime code.",
+    "intendedBehavior": "Both user-facing surfaces say: When a saved appearance is available, it stays visible quietly while the saved board opens. All other FAQ/release-note content and the usual-list-view fallback remain unchanged. Update only the two superseded textual expectations, add direct openHelp/current-release subcases for the qualification, and refresh required app/SW fingerprints.",
+    "replacementTests": [
+      "RISK saved view guidance qualification: FAQ and current release note promise an appearance only when available"
+    ],
+    "updatedTests": [
+      "RISK saved view guidance: Quick start and Changelog describe this-device restoration and current dates"
+    ],
+    "preservedCoverage": [
+      "Every existing behavior, task, authority, account, fallback, search/list/position, eligibility/date, cloud, Undo, draft and PWA safeguard assertion remains. Only two old exact copy expectations are replaced by qualified equivalents as explicitly requested by independent FAQ finding F-1; no runtime requirement is relaxed.",
+      "The new direct UI-copy regression calls actual openHelp and reads the All Tasks answer and current October17 note from real template output. Both subcases require the availability qualifier and the retained quiet-visible-while-opening promise. It fails both original unqualified surfaces before copy edits.",
+      "source-parity.json proves index.html is exactly0cc plus two intended copy replacements and embedded fingerprints; SW changes only its cache key. All34 other checked product runtime assets, styles, SavedAppearance validation/fallback logic, board authority, view metadata, adapters and rules remain byte-exact0cc.",
+      "All prior rationale/RED histories and immutable evidence remain untouched. The root-interrupted superseded0cc full suite finalized143 is not a failure or RED; rules/compatibility results on0cc remain separate historical checks. Root owns renewed exact final full/native/browser/compatibility/reviews/CI/release.",
+      "The initial test patch was made before a clean-checkpoint resume, which the ledger correctly rejected. The exact patch was saved externally, only that owned test edit was restored to0cc, the owner resumed cleanly and reapplied the same patch, then recorded the intended RED again before any app-copy edit. Both original records remain; this corrected coordination order does not fabricate implementation chronology."
+    ],
+    "redEvidence": {
+      "command": "/opt/local/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/saved-view-implementation/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/resumed-20261017/faq-qualification-repair/runs --purpose preimplementation-red -- /opt/local/bin/node --test --test-reporter=spec --test-name-pattern=\"^RISK saved view guidance qualification:\" tests.js",
+      "failure": "Actual resumed-checkpoint pre-copy RED in red.txt:0pass/3fail/0skip (parent plus All Tasks FAQ and October17 changelog subcases), each AssertionError ERR_ASSERTION reports optional appearance availability must qualify the visible-while-opening promise. Both old strings lacked When a saved appearance is available. Recorder identifies actual assertion-failure/exit1. Only after observing that failure were the two app strings and superseded copy expectations changed. copy-green.txt then passes the guidance consumers; focused and exact metadata gates follow. Earlier test-before-resume attempt is preserved honestly in red-before-resume-correction.txt, not substituted for the clean-resume run."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/resumed-20261017/faq-qualification-repair",
+    "releaseStatus": "Local copy/fingerprint repair only. No broad suite, browser/emulator/server, push, CI, main merge or release by this owner. Parent /root owns affected exact-candidate review and final release validation."
+  },
+  {
+    "testChangesSha256": "f3047822945f7320afcd59c7fa2520e9cb012248ac7b850d81bad838bf330fd5",
+    "comparison": "originalLiveCumulative",
+    "comparisonBase": "69a9feddf5d6bb8c4973475f7232e363b8646097",
+    "reason": "Independent FAQ review F-1 on0cc correctly found that two saved-view copy claims promised a visible previous appearance unconditionally, although existing show() safely falls back for absent, invalid or viewport-mismatched optional appearance records. Parent explicitly authorized qualifying both FAQ and October17 release note while preserving all executable product behavior.",
+    "previousBehavior": "The FAQ said its last settled appearance stays visible quietly while the saved board opens, and the release note promised the same appearance without an availability condition. The existing guidance test required those exact unqualified strings. Optional appearance absence/validation/viewport fallback was already correct in runtime code.",
+    "intendedBehavior": "Both user-facing surfaces say: When a saved appearance is available, it stays visible quietly while the saved board opens. All other FAQ/release-note content and the usual-list-view fallback remain unchanged. Update only the two superseded textual expectations, add direct openHelp/current-release subcases for the qualification, and refresh required app/SW fingerprints.",
+    "replacementTests": [
+      "RISK saved view guidance qualification: FAQ and current release note promise an appearance only when available"
+    ],
+    "updatedTests": [
+      "RISK saved view guidance: Quick start and Changelog describe this-device restoration and current dates"
+    ],
+    "preservedCoverage": [
+      "Every existing behavior, task, authority, account, fallback, search/list/position, eligibility/date, cloud, Undo, draft and PWA safeguard assertion remains. Only two old exact copy expectations are replaced by qualified equivalents as explicitly requested by independent FAQ finding F-1; no runtime requirement is relaxed.",
+      "The new direct UI-copy regression calls actual openHelp and reads the All Tasks answer and current October17 note from real template output. Both subcases require the availability qualifier and the retained quiet-visible-while-opening promise. It fails both original unqualified surfaces before copy edits.",
+      "source-parity.json proves index.html is exactly0cc plus two intended copy replacements and embedded fingerprints; SW changes only its cache key. All34 other checked product runtime assets, styles, SavedAppearance validation/fallback logic, board authority, view metadata, adapters and rules remain byte-exact0cc.",
+      "All prior rationale/RED histories and immutable evidence remain untouched. The root-interrupted superseded0cc full suite finalized143 is not a failure or RED; rules/compatibility results on0cc remain separate historical checks. Root owns renewed exact final full/native/browser/compatibility/reviews/CI/release.",
+      "The initial test patch was made before a clean-checkpoint resume, which the ledger correctly rejected. The exact patch was saved externally, only that owned test edit was restored to0cc, the owner resumed cleanly and reapplied the same patch, then recorded the intended RED again before any app-copy edit. Both original records remain; this corrected coordination order does not fabricate implementation chronology."
+    ],
+    "redEvidence": {
+      "command": "/opt/local/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/saved-view-implementation/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/resumed-20261017/faq-qualification-repair/runs --purpose preimplementation-red -- /opt/local/bin/node --test --test-reporter=spec --test-name-pattern=\"^RISK saved view guidance qualification:\" tests.js",
+      "failure": "Actual resumed-checkpoint pre-copy RED in red.txt:0pass/3fail/0skip (parent plus All Tasks FAQ and October17 changelog subcases), each AssertionError ERR_ASSERTION reports optional appearance availability must qualify the visible-while-opening promise. Both old strings lacked When a saved appearance is available. Recorder identifies actual assertion-failure/exit1. Only after observing that failure were the two app strings and superseded copy expectations changed. copy-green.txt then passes the guidance consumers; focused and exact metadata gates follow. Earlier test-before-resume attempt is preserved honestly in red-before-resume-correction.txt, not substituted for the clean-resume run."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/resumed-20261017/faq-qualification-repair",
+    "releaseStatus": "Local copy/fingerprint repair only. No broad suite, browser/emulator/server, push, CI, main merge or release by this owner. Parent /root owns affected exact-candidate review and final release validation."
   }
 ]
