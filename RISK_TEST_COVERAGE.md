@@ -1315,3 +1315,9 @@ Shared selected facts remain active through reversed cloud adoption; retired typ
 - `RISK decision mixed rollout fixture: actual comparisons current choices Start and scoped Undo survive durable publication and reopen`
 
 The existing `Firestore rules: real pinned writer reads decision authority then holds its ordinary app edit without erasing it` and `Firestore rules: first decision against released rules stays exact and pending until rules-first rollout then retry` consumers now publish coherent actual-app No, Yes, editor Dot, Dislodge, current-choice, Start and scoped Undo evidence through the production Firebase adapter. Both rollout guards and immutable supported baseline remain protected. Exact emulator execution belongs to the final root candidate; the in-process fixture is not emulator proof.
+
+## Unknown compatible-baseline authority (#146)
+
+- `RISK decision recovery baseline metadata: unknown v1 authority stays exact instead of disappearing through compatible baseline adoption`
+
+A real newer-peer adoption must preserve and hold unknown version1 metadata at the baseline, frozen rating, existing extension and compatible alias boundaries. It cannot drop those fields and report Synced; known optional provenance/legacy/inheritance/replacement forms remain supported.

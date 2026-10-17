@@ -12704,6 +12704,26 @@ test('RISK decision recovery: unknown cloud evidence holds adoption and publicat
  assert.equal(f.shim.document.getElementById('syncBtn').textContent,'☁ error');
 });
 
+test('RISK decision recovery baseline metadata: unknown v1 authority stays exact instead of disappearing through compatible baseline adoption',async t=>{
+ for(const kind of ['baseline','rating','extension','alias'])await t.test(kind,async t=>{
+  const f=await decisionRecoveryApp146(),{ctx}=f,CS=ctx.window.CloudSync;
+  t.after(()=>{CS.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',ctx);});
+  const added=ctx.addTask('Baseline extension metadata owner');ctx.renderScan();assert.equal(ctx.state.candidateId,added.id);ctx.onAction('no',{dataset:{candidate:added.id,benchmark:'bench'}});await ctx.persist();
+  const baseline=ctx.state.decisionBaseline;assert.ok(baseline.ratingExtensions?.some(row=>row.taskId===added.id),'a real comparison creates the supported new-task extension');
+  if(kind==='rating'){baseline.ratings[0].sourceBaseId=baseline.sourceBaseId;baseline.ratings[0].sourceRevision=baseline.sourceRevision;}
+  if(kind==='alias')baseline.compatibleBaselineIds=[{id:ctx.legacyDecisionBaselineIdentity(baseline.account,baseline.ratings,baseline.includedActionIds,baseline.chainIds,baseline.passId,baseline.passAt),chainIds:Array.from(baseline.chainIds),passId:baseline.passId,passAt:baseline.passAt}];
+  assert.equal(ctx.supportedDecisionBaseline(baseline),true,'the source is a known supported baseline before future metadata appears');
+  const clean=JSON.parse(ctx.cloudPayload()),target=kind==='baseline'?baseline:kind==='rating'?baseline.ratings[0]:kind==='extension'?baseline.ratingExtensions[0]:baseline.compatibleBaselineIds[0];
+  target.futureAuthority={v:99,opaque:'sole unknown '+kind+' authority'};await ctx.persist();
+  const authority=JSON.stringify(ctx.state.decisionBaseline),saved=f.storage.getItem(SYNC_STORE_KEY),events=JSON.stringify(ctx.state.decisionEvents);
+  f.h.writeBehindBack(clean);const cloud=f.h.doc.payload;CS.ready=true;await ctx.cloudPull();ctx.cloudPushNow();await syncSettle(50);
+  t.diagnostic(JSON.stringify({kind,errorCode:CS.errorCode??null,syncDirty:ctx.state.syncDirty,localHasFuture:JSON.stringify(ctx.state.decisionBaseline).includes('futureAuthority'),cloudHasFuture:f.h.doc.payload.includes('futureAuthority')}));
+  assert.equal(JSON.stringify(ctx.state.decisionBaseline),authority,'a compatible clean peer cannot discard unknown authoritative source metadata');
+  assert.equal(f.storage.getItem(SYNC_STORE_KEY),saved,'the exact local future authority remains the active durable source');assert.equal(f.h.doc.payload,cloud,'the peer cloud remains exact while unsupported authority is held');
+  assert.equal(JSON.stringify(ctx.state.decisionEvents),events);assert.equal(CS.errorCode,'unsupported-decision-evidence');assert.equal(f.shim.document.getElementById('syncBtn').textContent,'☁ error');
+ });
+});
+
 test('RISK decision recovery baseline: unsupported sole learning baseline cannot replace a durable local action',async t=>{
  for(const baseline of [{v:99,opaque:'sole unsupported learned state'},{v:1,id:'invalid-baseline',account:'e@example.com',ratings:['unreadable rating'],includedActionIds:[],chainIds:[]}])await t.test('version '+baseline.v,async t=>{
  const f=await decisionRecoveryApp146();

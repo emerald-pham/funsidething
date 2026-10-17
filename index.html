@@ -5684,6 +5684,9 @@ function decisionId(value){return typeof value==="string"&&value.length>0&&value
 function decisionIdList(value){return Array.isArray(value)&&value.every(decisionId)&&new Set(value).size===value.length;}
 function decisionRating(value){
   return value&&typeof value==="object"&&!Array.isArray(value)&&decisionId(value.taskId)
+    &&!Object.keys(value).some(key=>!["taskId","mu","sigma","sourceBaseId","sourceRevision"].includes(key))
+    &&(value.sourceBaseId===undefined||value.sourceBaseId===null||decisionId(value.sourceBaseId))
+    &&(value.sourceRevision===undefined||value.sourceRevision===null||Number.isSafeInteger(value.sourceRevision)&&value.sourceRevision>=0)
     &&Number.isFinite(value.mu)&&Math.abs(value.mu)<=RATING_MU_LIMIT
     &&Number.isFinite(value.sigma)&&value.sigma>0&&value.sigma<=RATING_SIGMA_LIMIT;
 }
@@ -5724,6 +5727,9 @@ function supportedDecisionInheritance(receipt,account){
 }
 function supportedDecisionBaseline(baseline,account=null){
   if(!baseline||typeof baseline!=="object"||Array.isArray(baseline)||baseline.v!==1
+    ||Object.keys(baseline).some(key=>!["v","id","account","sourceBaseId","sourceRevision","includedActionIds","ratings",
+      "observedRatingHistoryIds","chainIds","passId","passAt","considered","cantAt","workedAt","ratingExtensions",
+      "compatibleBaselineIds","replacement","inheritance"].includes(key))
     ||!decisionId(baseline.id)||!(baseline.account===null||typeof baseline.account==="string"&&baseline.account)
     ||account!==null&&baseline.account!==account
     ||!(baseline.sourceBaseId===null||decisionId(baseline.sourceBaseId))
@@ -5745,6 +5751,7 @@ function supportedDecisionBaseline(baseline,account=null){
   if(baseline.id!==learningId&&baseline.id!==legacyId)return false;
   const aliases=baseline.compatibleBaselineIds===undefined?[]:baseline.compatibleBaselineIds;
   if(!Array.isArray(aliases)||!aliases.every(alias=>alias&&typeof alias==="object"&&!Array.isArray(alias)
+    &&!Object.keys(alias).some(key=>!["id","chainIds","passId","passAt"].includes(key))
     &&decisionId(alias.id)&&Array.isArray(alias.chainIds)&&alias.chainIds.every(decisionId)
     &&(alias.passId===null||decisionId(alias.passId))&&Number.isFinite(alias.passAt)&&alias.passAt>=0
     &&(alias.id===learningId||alias.id===legacyDecisionBaselineIdentity(baseline.account,baseline.ratings,baseline.includedActionIds,alias.chainIds,alias.passId,alias.passAt)))
