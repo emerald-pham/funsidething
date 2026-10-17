@@ -3279,7 +3279,7 @@ function makeDomShim({ prefersDark = false, sharedStorage = null } = {}) {
 
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
-async function loadApp({ appSource=appSrc, seed, cloudSyncFactory, prefersDark = false, noMatchMedia = false, seedStorage, sharedStorage, hostStorage, hostStorageDelayMs = 0, beforeStateReady, cryptoProvider = webcrypto, indexedDBProvider, deviceDbName, deviceOpenTimeoutMs, withSceneModules = false, sceneModulesAfterDomReady = false } = {}) {
+async function loadApp({ appSource=appSrc, seed, cloudSyncFactory, prefersDark = false, noMatchMedia = false, seedStorage, sharedStorage, hostStorage, hostStorageDelayMs = 0, beforeStateReady, navigatorProvider, cryptoProvider = webcrypto, indexedDBProvider, deviceDbName, deviceOpenTimeoutMs, withSceneModules = false, sceneModulesAfterDomReady = false } = {}) {
   const shim = makeDomShim({ prefersDark, sharedStorage });
   if (noMatchMedia) delete shim.window.matchMedia;   // old browser / bare JS host
   if (seedStorage) for (const [k, v] of Object.entries(seedStorage)) shim.localStorage.setItem(k, v);
@@ -3303,6 +3303,7 @@ async function loadApp({ appSource=appSrc, seed, cloudSyncFactory, prefersDark =
   if (deviceOpenTimeoutMs) shim.window.CHAIN_STORAGE_OPEN_TIMEOUT_MS = deviceOpenTimeoutMs;
   if (indexedDBProvider) shim.window.indexedDB = indexedDBProvider;
   const sandbox = {
+    navigator:navigatorProvider,
     window: shim.window,
     document: shim.document,
     localStorage: shim.localStorage,
@@ -18239,7 +18240,7 @@ test('RISK PWA session updates: a blurred unfinished Add draft prevents automati
  assert.equal(cold.ctx.state.tasks.filter(task=>task.title==='Private unfinished draft').length,1,'the retained draft can be submitted and reopened exactly once');
 });
 test('RISK PWA session updates: keyboard scrolling and accessible clicks keep updates available without replacing used documents',async()=>{
- for(const type of ['keydown','wheel','touchstart','click']){
+ for(const type of ['scroll','keydown','wheel','touchstart','click']){
   const {ctx,shim}=await loadApp({seed:4711});ctx.addTask('Private session '+type);assert.equal(await ctx.persist(),true);
   const handlers={},reloads=[];let checks=0;
   ctx.navigator={serviceWorker:{controller:{},addEventListener:(event,fn)=>handlers[event]=fn,register:async()=>({update:async()=>{checks++;}})}};
@@ -18252,6 +18253,38 @@ test('RISK PWA session updates: keyboard scrolling and accessible clicks keep up
   const raw=shim.localStorage.getItem(SYNC_STORE_KEY),cold=await loadApp({seedStorage:{[SYNC_STORE_KEY]:raw}});
   assert.equal(cold.ctx.state.tasks[0].title,'Private session '+type,'normal reopening retains the saved board');
  }
+});
+test('RISK PWA session updates: scrolling during an awaited host save prevents document replacement',async()=>{
+ const {ctx,shim}=await loadApp({hostStorage:{[SYNC_STORE_KEY]:JSON.stringify(syncState())}});
+ assert.equal(await ctx.persist(),true);
+ let releaseSave,held=false;const originalSet=shim.window.storage.set;
+ shim.window.storage.set=async(...args)=>{if(!held){held=true;await new Promise(resolve=>{releaseSave=resolve;});}return originalSet(...args);};
+ const handlers={},reloads=[];
+ ctx.navigator={serviceWorker:{controller:{},addEventListener:(type,fn)=>handlers[type]=fn,register:async()=>({update:async()=>{}})}};
+ shim.document.readyState='complete';shim.document.hidden=false;shim.window.location={reload:()=>reloads.push('page replaced')};
+ ctx.registerServiceWorker();await flush();
+ const applying=handlers.controllerchange();
+ for(let attempt=0;attempt<100&&typeof releaseSave!=='function';attempt++)await flush();
+ assert.equal(typeof releaseSave,'function','the actual host persistence boundary is awaiting its write');
+ shim.document.dispatchEvent({type:'scroll',target:shim.document.getElementById('listBody')});
+ releaseSave();await applying;
+ assert.equal(reloads.length,0,'scrolling which begins during saving preserves the active document');
+});
+test('RISK PWA session updates: real boot protects input while asynchronous board restoration is pending',async()=>{
+ const handlers={},reloads=[],navigatorProvider={serviceWorker:{controller:{},addEventListener:(type,fn)=>handlers[type]=fn,register:async()=>({update:async()=>{}})}};
+ const {ctx,shim}=await loadApp({navigatorProvider,hostStorage:{[SYNC_STORE_KEY]:JSON.stringify(syncState({tasks:[syncTask('boot-saved','Saved before boot')]}))},hostStorageDelayMs:25,beforeStateReady:(context,dom)=>{
+  dom.window.location={reload:()=>reloads.push('page replaced')};dom.document.hidden=false;
+  assert.equal(typeof handlers.controllerchange,'function','the real boot call has installed update protection before it yields usable UI');
+  const input=dom.document.getElementById('addInput');input.id='addInput';input.value='Private startup draft';input.matches=()=>true;dom.document.activeElement=input;
+  dom.document.dispatchEvent({type:'input',target:input});
+  dom.document.activeElement=null;dom.document.dispatchEvent({type:'focusout',target:input});
+  handlers.controllerchange();dom.window.dispatchEvent({type:'load'});
+ }});
+ for(let attempt=0;attempt<100&&!ctx.state;attempt++)await new Promise(resolve=>setTimeout(resolve,5));
+ assert.ok(ctx.state?.tasks.some(task=>task.id==='boot-saved'),'the real asynchronous restore completes');
+ await ctx.window.applyPendingAppUpdate();
+ assert.equal(reloads.length,0,'a pending update at startup cannot discard already entered text after restoration');
+ assert.equal(shim.document.getElementById('addInput').value,'Private startup draft');
 });
 test('PWA updates: check on launch, foreground and reconnect with HTTP cache bypass',async()=>{
  const h=pwaUpdateHarness();await h.ready();assert.equal(h.counts().options.updateViaCache,'none');

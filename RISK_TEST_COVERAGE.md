@@ -1406,3 +1406,6 @@ The required npm test entry point surfaces a failing isolated agent-tool cohort 
 - RISK PWA session updates: keyboard scrolling and accessible clicks keep updates available without replacing used documents
 
 Issue #176/#177 supersedes the prior after-gesture automatic reload expectation. Quiet startup, first installation, failed saves, editor deferral, normal task saving, update downloads and cold board reopen remain protected. The synthetic controller-change reproduction does not establish the original reported browser crash cause.
+
+- RISK PWA session updates: scrolling during an awaited host save prevents document replacement
+- RISK PWA session updates: real boot protects input while asynchronous board restoration is pending
