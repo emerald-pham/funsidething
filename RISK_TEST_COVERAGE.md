@@ -490,12 +490,20 @@ The editor hook blocks app or enforcement edits while tests.js has no staged or 
 - RISK completion lifecycle return: an observed Dot returns after expiry and a later Done removes it again
 - RISK completion lifecycle FAQ: expired rest and saved-chain return match the shipped controls
 - RISK completion lifecycle recovery: expired rest cannot restore 2→1 or 13→4 saved chains
+- RISK completion lifecycle Start: an explicit new pass bootstraps an eligible task after rest without a synthetic Dot
+- RISK completion lifecycle Start: an observed new-pass root survives peer merge and IndexedDB reopen
+- RISK completion lifecycle Start: an unaware pass root cannot bypass completion in either publication order
+- RISK completion lifecycle Dot: unseen Dot and opposite No keep learning while completion owns membership
+- RISK completion lifecycle maintenance: the local day marker and Resume or Rescan do not renew a removed member
+- RISK completion lifecycle return: observed Dot and next Done survive stale delivery and IndexedDB reopen
 - RISK evergreen scan reconciliation: merged completion removes resting crumbs tails and candidates without losing evidence
 - RISK evergreen scan reconciliation: a newer stale cloud chain cannot revive another browsers completed task
 - RISK evergreen scan reconciliation: held editor and pointer delay resting chain adoption then stale benchmark controls stay inert
 - RISK evergreen scan reconciliation: cooldown expiry day reset and explicit return preserve eligible and unrelated chain membership
 - RISK evergreen scan reconciliation: offline cold reload clears legacy resting dots and Undo retains completion history
 - RISK evergreen scan reconciliation: a delayed stale read and later revision converge without restoring completed membership
+
+Completion authority ends only after a deliberate return event observes every outstanding completion. A validated real new-pass root can provide that causal return after eligibility resumes; unaware roots, Dot/No comparison clocks, cloud revision order and local day maintenance cannot. The consumer matrices retain both opposite learning observations, exact original Done/return facts, independent title/theme choices, every reconciled scan paint and the production IndexedDB head through stale retry and reopen. This extends issue #169's recovery foundation without creating an ordinary Done, day reset, Resume or Rescan shortcut.
 
 ## Backup age, night shows, and legacy dependency compatibility
 

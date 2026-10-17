@@ -9750,5 +9750,39 @@
     "greenEvidence": "/Users/emeraldpham/.codex/task-artifacts/completion-precedence-168/171/runs/2026-10-17T20-51-05-814Z-46d32d0c-1835-4ed0-ba41-2f24252fce7f.json (focused 18-test Delete/Undo/Clear/History cohort on commit 5dd2d46, all passed)",
     "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/completion-precedence-168/171",
     "releaseStatus": "Focused local issue 171 implementation and consumer validation only. No shared browser/emulator, production, CI, push or release. Parent /root owns integration, final shell/changelog/fingerprints, broader review and release validation."
+  },
+  {
+    "testChangesSha256": "0f56d9b28f77214c686fd67cf2771837dcb06a29c0a9c28f731c4124de9ec17d",
+    "comparison": "issue170Incremental",
+    "comparisonBase": "1c2765689b6c347c125ef50243da588cf9f83423",
+    "reason": "Allow a real Start action to return an eligible task only when its new-pass root causally observed every outstanding Done fact. Keep lifecycle evidence separate from preference learning, and preserve actual Dot/Yes returns, unaware-source fences, pass maintenance rules, history and saved members. The inherited expired-rest fixture now proves its earlier source bytes and cloud acknowledgement before closing only the preparer; it retains the active recovery app's ordinary autosave path.",
+    "previousBehavior": "Completion precedence recognized comparison Dot or Yes as return evidence, but not the actual Start action after expiry. An informed new-pass root was saved locally, then a real peer cloud edit caused reconciliation to reject the graph as unprojectable and leave that nonconflicting title unadopted. Clock order alone cannot distinguish this permitted return from an unaware stale root.",
+    "intendedBehavior": "A validated pass-root chain choice may clear only the completions for its chosen task that appear in its causal ancestors. A new root without that knowledge cannot restore a completed member, and Resume, Rescan or the local day marker cannot create a return. Original Done, return, comparison and No facts stay immutable; Dot and No learning is retained exactly once; current members, unrelated edits, History, ratings and production device state survive stale retry and reopen.",
+    "replacementTests": [
+      "RISK completion lifecycle facts: editor candidate and benchmark Done preserve ordinary ratings and Undo",
+      "RISK completion lifecycle Start: an explicit new pass bootstraps an eligible task after rest without a synthetic Dot",
+      "RISK completion lifecycle Start: an observed new-pass root survives peer merge and IndexedDB reopen",
+      "RISK completion lifecycle Start: an unaware pass root cannot bypass completion in either publication order",
+      "RISK completion lifecycle Dot: unseen Dot and opposite No keep learning while completion owns membership",
+      "RISK completion lifecycle maintenance: the local day marker and Resume or Rescan do not renew a removed member",
+      "RISK completion lifecycle return: observed Dot and next Done survive stale delivery and IndexedDB reopen"
+    ],
+    "updatedTests": [
+      "RISK completion lifecycle recovery: saved device source cannot restore a 2→1 chain before scan refresh",
+      "RISK completion lifecycle recovery: expired rest cannot restore 2→1 or 13→4 saved chains"
+    ],
+    "preservedCoverage": [
+      "The actual Done consumers still cover editor, candidate and benchmark actions, ordinary completion, Evergreen History, unchanged ratings and Undo. A real post-expiry Start may begin a new pass without inventing a comparison; only a root that observed all outstanding completion facts can return its selected task.",
+      "Unaware Start and Dot are exercised in both publication orders with earlier, equal and later event clocks. The opposite No and independent preference remain distinct observations; exact comparison ratings/history, immutable facts, current legitimate members, every scanner paint, IndexedDB head, retry and cold reopen remain checked.",
+      "The inherited expired-rest recovery fixture checks each persist() result, the exact older browser bytes and title fact in both guarded copies, and cloud acknowledgement before source capture. It closes only the completed source preparer. Public cloud/device acknowledgement waits observe the recovery result while the active app's normal 350 ms save remains enabled.",
+      "A combined #169/#171 cohort first exposed missing title and comparison evidence. Its original records remain unchanged. A later exact-source, settled-boundary run passes 8/8; this was test fixture and acknowledgement sensitivity, not a new product RED or a reason to cancel active autosaves."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK completion lifecycle Start: an observed new-pass root survives peer merge and IndexedDB reopen' tests.js; recorded with scripts/agent-tools/record-run.mjs at /Users/emeraldpham/.codex/task-artifacts/completion-precedence-168/170/runs/2026-10-17T20-40-19-907Z-69da082e-0974-452c-8747-4f85be42452e.json.",
+      "failure": "Before the runtime change, an actual eligible task was started after its one-hour rest; the saved pass root included the prior immutable completion in observedActionIds and the local IndexedDB head contained the task. A peer's real title edit reached cloud revision 6, but the next local reconciliation held with unprojectable-decision-evidence at revision 5 and left the independent title as 'Independent task'. This is an assertion-based production consumer failure, not a missing proposed record."
+    },
+    "greenEvidence": "/Users/emeraldpham/.codex/task-artifacts/completion-precedence-168/170/runs/2026-10-17T21-04-33-937Z-dc50df9e-1bd9-4f67-9653-d93c334ab2d5.json (final focused lifecycle cohort after the single-first-member guard: 25 passed, 0 failed).",
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/completion-precedence-168/170",
+    "releaseStatus": "Focused local issue 170 implementation and consumer validation only. No full suite, emulator, CI, push or release. Parent /root owns integration, final version/changelog/service-worker packaging and release validation."
   }
 ]
