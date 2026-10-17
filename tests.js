@@ -20,6 +20,63 @@ async function scopedUndoClients(configure=()=>{}){
  local.ctx.window.CloudSync.ready=false;peer.ctx.window.CloudSync.ready=false;
  return {local,peer,h,at,initial};
 }
+test('RISK final decision review: offline context Undo restores retained membership across null and attested bases',async t=>{
+ for(const first of ['attested','offline'])await t.test(first+' publishes first',async t=>{
+  const at=Date.parse('2026-10-17T15:00:00Z'),initial=syncState({tasks:[syncTask('context-target','Target')],contexts:[{id:'phone-ctx',name:'Phone',active:true},{id:'peer-ctx',name:'Peer',active:true}],chain:[],candidateId:null,mode:'scan',scanMode:'descending',passId:'context-pass',passStartedAt:at-60000,syncRev:4,syncAccount:'e@example.com',syncDirty:false}),h=makeSyncHarness({remote:initial,rev:4,delayMs:1}),seedStorage={[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)};
+  const attested=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:h.factory});await attested.ctx.cloudPull();attested.ctx.window.CloudSync.ready=false;
+  const offline=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:()=>{const CS=h.factory();CS.ready=false;return CS;}});
+  for(const app of [attested,offline])t.after(()=>{app.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',app.ctx);});
+  await saveEditorChoice(attested,'context-target',at+100,{ctxIds:['phone-ctx']});await saveEditorChoice(offline,'context-target',at+200,{ctxIds:['peer-ctx']});assert.equal(offline.ctx.state.decisionEvents[0].baseId,null);assert.match(attested.ctx.state.decisionEvents[0].baseId,/^db1:/);
+  const a=first==='attested'?attested:offline,b=first==='attested'?offline:attested;a.ctx.window.CloudSync.ready=true;await a.ctx.cloudPushNow();await syncSettle(35);b.ctx.window.CloudSync.ready=true;await b.ctx.cloudPull();await b.ctx.cloudPushNow();await syncSettle(40);await offline.ctx.cloudPull();await syncSettle(25);
+  assert.deepEqual(Array.from(offline.ctx.state.tasks[0].ctx),['peer-ctx']);const stale=JSON.parse(offline.ctx.cloudPayload());assert.equal(await offline.ctx.onAction('undo',{}),true);await offline.ctx.persist();await offline.ctx.cloudPushNow();await syncSettle(35);
+  assert.deepEqual(Array.from(offline.ctx.state.tasks[0].ctx),['phone-ctx'],'Undo of a fallback whole-list choice exposes the other retained choice');assert.deepEqual(h.remoteState().tasks[0].ctx,['phone-ctx']);assert.equal(offline.ctx.state.decisionEvents.filter(row=>row.kind==='undo').length,1);assert.equal(offline.ctx.state.syncDirty,false);
+  h.writeBehindBack(stale);await offline.ctx.cloudPull();await offline.ctx.cloudPushNow();await syncSettle(35);assert.deepEqual(Array.from(offline.ctx.state.tasks[0].ctx),['phone-ctx']);
+  const raw=offline.shim.localStorage.getItem(SYNC_STORE_KEY),cold=await loadAppAtTime(at+400,{seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw},cloudSyncFactory:h.factory});t.after(()=>{cold.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',cold.ctx);});await cold.ctx.cloudPull();assert.deepEqual(Array.from(cold.ctx.state.tasks[0].ctx),['phone-ctx']);assert.equal(cold.ctx.state.syncDirty,false);
+  attested.ctx.window.CloudSync.ready=true;await attested.ctx.cloudPull();assert.equal(await attested.ctx.onAction('undo',{}),true);await attested.ctx.persist();await attested.ctx.cloudPushNow();await syncSettle(35);assert.deepEqual(Array.from(attested.ctx.state.tasks[0].ctx),[],'cancelling every fallback choice restores the original empty membership');await cold.ctx.cloudPull();assert.deepEqual(Array.from(cold.ctx.state.tasks[0].ctx),[]);
+ });
+});
+
+test('RISK final decision review: later Resume beats older Pause in both publication orders and targeted Undo survives stale reopen',async t=>{
+ for(const first of ['pause','resume'])await t.test(first+' publishes first',async t=>{
+  const {local,peer,h,at}=await scopedUndoClients(initial=>{initial.candidateId=null;initial.considered={'undo-local':'no','undo-peer':'no'};initial.interventionActive=true;});
+  for(const app of [local,peer])t.after(()=>{app.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',app.ctx);});
+  assert.match(local.shim.document.getElementById('scan').innerHTML,/data-act="start-working"/);setFakeTime(local.ctx,at+100);local.ctx.onAction('start-working',{});setFakeTime(peer.ctx,at+50);peer.ctx.onAction('start-working',{});assert.match(peer.shim.document.getElementById('scan').innerHTML,/data-act="resume-scan"/);setFakeTime(peer.ctx,at+200);peer.ctx.onAction('resume-scan',{dataset:{mode:'descending'}});
+  const a=first==='pause'?local:peer,b=first==='pause'?peer:local;a.ctx.window.CloudSync.ready=true;await a.ctx.cloudPushNow();await syncSettle(35);b.ctx.window.CloudSync.ready=true;await b.ctx.cloudPull();await b.ctx.cloudPushNow();await syncSettle(35);await peer.ctx.cloudPull();await syncSettle(20);
+  assert.equal(peer.ctx.state.mode,'scan','later deliberate Resume wins independent of upload order');assert.equal(h.remoteState().mode,'scan');assert.equal(peer.ctx.state.syncDirty,false);assert.equal(peer.ctx.state.decisionEvents.filter(row=>row.kind==='current-choice'&&row.target?.property==='mode').length,3);
+  const stale=JSON.parse(peer.ctx.cloudPayload());assert.equal(await peer.ctx.onAction('undo',{}),true);await peer.ctx.persist();await peer.ctx.cloudPushNow();await syncSettle(35);assert.equal(peer.ctx.state.mode,'work','Undo the latest Resume reveals the other device’s retained Pause');h.writeBehindBack(stale);await peer.ctx.cloudPull();await peer.ctx.cloudPushNow();await syncSettle(35);assert.equal(peer.ctx.state.mode,'work');
+  const raw=peer.shim.localStorage.getItem(SYNC_STORE_KEY),cold=await loadAppAtTime(at+400,{seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw},cloudSyncFactory:h.factory});t.after(()=>{cold.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',cold.ctx);});await cold.ctx.cloudPull();assert.equal(cold.ctx.state.mode,'work');assert.equal(cold.ctx.state.syncDirty,false);
+ });
+});
+
+test('RISK final decision review: fresh Start then Pause remains paused through independent title and scoped Undo',async t=>{
+ for(const first of ['start-pause','title'])await t.test(first+' publishes first',async t=>{
+  const {local,peer,h,at}=await scopedUndoClients(initial=>{initial.chain=[];initial.candidateId=null;});for(const app of [local,peer])t.after(()=>{app.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',app.ctx);});
+  setFakeTime(local.ctx,at+100);local.ctx.onAction('start-scan',{dataset:{mode:'descending'}});assert.equal(local.ctx.state.mode,'scan');setFakeTime(local.ctx,at+200);local.ctx.onAction('start-working',{});await saveEditorChoice(peer,'undo-peer',at+300,{title:'Independent title while paused'});
+  const a=first==='start-pause'?local:peer,b=first==='start-pause'?peer:local;a.ctx.window.CloudSync.ready=true;await a.ctx.cloudPushNow();await syncSettle(35);b.ctx.window.CloudSync.ready=true;await b.ctx.cloudPull();await b.ctx.cloudPushNow();await syncSettle(35);await local.ctx.cloudPull();await syncSettle(20);
+  assert.equal(local.ctx.state.mode,'work','Start projection is subordinate to the later deliberate Pause');assert.equal(h.remoteState().mode,'work');assert.equal(local.ctx.state.tasks.find(row=>row.id==='undo-peer').title,'Independent title while paused');assert.equal(local.ctx.state.syncDirty,false);const paused=JSON.parse(local.ctx.cloudPayload());
+  assert.equal(await local.ctx.onAction('undo',{}),true);await local.ctx.persist();await local.ctx.cloudPushNow();await syncSettle(35);assert.equal(local.ctx.state.mode,'scan');assert.equal(local.ctx.state.tasks.find(row=>row.id==='undo-peer').title,'Independent title while paused');h.writeBehindBack(paused);await local.ctx.cloudPull();await local.ctx.cloudPushNow();await syncSettle(35);assert.equal(local.ctx.state.mode,'scan');
+  const raw=local.shim.localStorage.getItem(SYNC_STORE_KEY),cold=await loadAppAtTime(at+400,{seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw},cloudSyncFactory:h.factory});t.after(()=>{cold.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',cold.ctx);});await cold.ctx.cloudPull();await cold.ctx.cloudPushNow();await syncSettle(35);assert.equal(cold.ctx.state.mode,'scan');assert.equal(cold.ctx.state.tasks.find(row=>row.id==='undo-peer').title,'Independent title while paused');assert.equal(cold.ctx.state.syncDirty,false);
+ });
+});
+
+test('RISK final decision review: contrary comparison current membership follows intent while both learning observations survive',async t=>{
+ for(const later of ['no','yes'])for(const first of ['local','peer'])await t.test(later+' later; '+first+' publishes first',async t=>{
+  const {local,peer,h,at,initial}=await scopedUndoClients();for(const app of [local,peer])t.after(()=>{app.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',app.ctx);});
+  const earlier=later==='no'?'yes':'no';setFakeTime(local.ctx,at+100);local.ctx.onAction(earlier,{dataset:{candidate:'undo-local',benchmark:'undo-base'}});setFakeTime(peer.ctx,at+200);peer.ctx.onAction(later,{dataset:{candidate:'undo-local',benchmark:'undo-base'}});const original=[...local.ctx.state.decisionEvents,...peer.ctx.state.decisionEvents].map(row=>JSON.parse(JSON.stringify(row)));const expected=Object.fromEntries(initial.tasks.map(task=>[task.id,{mu:task.mu,sigma:task.sigma}])),engine=loadEngine(145);for(const action of [earlier,later])engine.updatePair(expected[action==='yes'?'undo-local':'undo-base'],expected[action==='yes'?'undo-base':'undo-local']);
+  const a=first==='local'?local:peer,b=first==='local'?peer:local;a.ctx.window.CloudSync.ready=true;await a.ctx.cloudPushNow();await syncSettle(35);b.ctx.window.CloudSync.ready=true;await b.ctx.cloudPull();await b.ctx.cloudPushNow();await syncSettle(35);await peer.ctx.cloudPull();await syncSettle(20);
+  assert.equal(peer.ctx.state.chain.includes('undo-local'),later==='yes','only current dotted membership resolves the contrary choice');assert.equal(peer.ctx.state.considered['undo-local'],later==='no'?'no':undefined);for(const row of original)assert.equal(JSON.stringify(peer.ctx.state.decisionEvents.find(event=>event.id===row.id)),JSON.stringify(row),'both original learning facts remain exact');assert.equal(peer.ctx.state.syncDirty,false);for(const task of peer.ctx.state.tasks){assert.equal(task.mu,expected[task.id].mu);assert.equal(task.sigma,expected[task.id].sigma);}
+  const rating=()=>JSON.stringify(peer.ctx.state.tasks.map(task=>[task.id,task.mu,task.sigma])),learned=rating(),stale=JSON.parse(peer.ctx.cloudPayload());h.writeBehindBack(stale);await peer.ctx.cloudPull();await peer.ctx.cloudPushNow();await syncSettle(30);assert.equal(rating(),learned,'redelivery cannot train either observation twice');
+  assert.equal(await peer.ctx.onAction('undo',{}),true);await peer.ctx.persist();await peer.ctx.cloudPushNow();await syncSettle(35);assert.equal(peer.ctx.state.chain.includes('undo-local'),earlier==='yes');assert.equal(peer.ctx.state.considered['undo-local'],earlier==='no'?'no':undefined);assert.ok(peer.ctx.state.decisionEvents.some(row=>row.kind==='undo'));h.writeBehindBack(stale);await peer.ctx.cloudPull();await peer.ctx.cloudPushNow();await syncSettle(30);assert.equal(peer.ctx.state.chain.includes('undo-local'),earlier==='yes');
+  const raw=peer.shim.localStorage.getItem(SYNC_STORE_KEY),cold=await loadAppAtTime(at+400,{seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw},cloudSyncFactory:h.factory});t.after(()=>{cold.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',cold.ctx);});await cold.ctx.cloudPull();assert.equal(cold.ctx.state.chain.includes('undo-local'),earlier==='yes');assert.equal(cold.ctx.state.syncDirty,false);
+ });
+});
+
+test('RISK final decision review: mode authority respects observed causality and unsupported mode facts stay held',async t=>{
+ const {local,peer,h,at}=await scopedUndoClients(initial=>{initial.candidateId=null;initial.considered={'undo-local':'no','undo-peer':'no'};initial.interventionActive=true;});for(const app of [local,peer])t.after(()=>{app.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',app.ctx);});
+ setFakeTime(local.ctx,at+200);local.ctx.onAction('start-working',{});local.ctx.window.CloudSync.ready=true;await local.ctx.cloudPushNow();await syncSettle(30);peer.ctx.window.CloudSync.ready=true;await peer.ctx.cloudPull();setFakeTime(peer.ctx,at+100);peer.ctx.onAction('resume-scan',{dataset:{mode:'descending'}});await peer.ctx.persist();await peer.ctx.cloudPushNow();await syncSettle(30);assert.equal(h.remoteState().mode,'scan','an observed Resume follows Pause even when its original device clock is earlier');const resume=peer.ctx.state.decisionEvents.find(row=>row.target?.property==='mode'&&row.value==='scan');assert.equal(resume.at,at+100);assert.ok(resume.observedActionIds.length>0);
+ const cloud=h.doc.payload;peer.ctx.window.CloudSync.ready=false;resume.value='future-mode';await peer.ctx.persist();const pending=peer.shim.localStorage.getItem(SYNC_STORE_KEY);peer.ctx.window.CloudSync.ready=true;await peer.ctx.onAction('sync-retry',{});await syncSettle(35);assert.equal(peer.ctx.window.CloudSync.errorCode,'unsupported-decision-evidence');assert.equal(h.doc.payload,cloud);assert.equal(peer.shim.localStorage.getItem(SYNC_STORE_KEY),pending,'unsupported mode authority is preserved exactly while held');
+});
+
 test('RISK scoped Undo: local comparison cancellation keeps peer learning and survives stale cloud and reopen',async()=>{
  const {local,peer,h,at,initial}=await scopedUndoClients();
  setFakeTime(local.ctx,at+100);local.ctx.onAction('yes',{dataset:{candidate:'undo-local',benchmark:'undo-base'}});
@@ -13051,10 +13108,11 @@ test('RISK decision recovery retired comparison effects: exact stale returns can
 });
 
 test('RISK decision recovery selected legacy pass: exact retired comparisons cannot replace the imported pass draw root or No marks',async t=>{
- for(const action of ['no','yes','dot','dislodge'])await t.test(action,async t=>{
+ for(const action of ['no','yes','dot','dislodge','title-only'])await t.test(action,async t=>{
   const {local,peer,h,initial,at}=await scopedUndoClients(),ctx=local.ctx;
   for(const app of [local,peer])t.after(()=>{app.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',app.ctx);});
-  if(action==='no'||action==='yes')ctx.onAction(action,{dataset:{candidate:'undo-local',benchmark:'undo-base'}});
+  if(action==='title-only')await saveEditorChoice(local,'undo-local',at+100,{title:'Displaced title-only choice'});
+  else if(action==='no'||action==='yes')ctx.onAction(action,{dataset:{candidate:'undo-local',benchmark:'undo-base'}});
   else if(action==='dot'){hydrateUnchangedEditorDraft(local,'undo-local');ctx.onAction('dot-task',{dataset:{id:'undo-local'}});}
   else ctx.onAction('dislodge',{dataset:{benchmark:'undo-base'}});
   await ctx.persist();ctx.window.CloudSync.ready=true;await ctx.cloudPushNow();await syncSettle(35);const displaced=JSON.parse(JSON.stringify(ctx.state));
@@ -13089,6 +13147,14 @@ test('RISK decision recovery replacement idempotence: repeated actual Export Imp
  ctx.onAction('no',{dataset:{candidate:'undo-local',benchmark:'undo-base'}});await ctx.persist();
  const baseline=JSON.stringify(ctx.state.decisionBaseline),events=JSON.stringify(ctx.state.decisionEvents),ratings=JSON.stringify(ctx.state.tasks.map(task=>[task.id,task.mu,task.sigma]));
  for(let i=0;i<11;i++){const raw=JSON.stringify(ctx.state);ctx.onAction('export-json',{});assert.equal(JSON.stringify(JSON.parse(local.shim.document.getElementById('jsonBox').value).decisionBaseline),baseline,'the actual Export control carries the selected authority');assert.equal(await ctx.onAction('import-json',{}),true);await ctx.persist();assert.equal(JSON.stringify(ctx.state.decisionBaseline),baseline,'same authority must not duplicate its complete prior tree');assert.equal(JSON.stringify(ctx.state.decisionEvents),events);assert.equal(JSON.stringify(ctx.state.tasks.map(task=>[task.id,task.mu,task.sigma])),ratings);assert.ok(ctx.readLocalBackups().some(row=>row.payload===raw),'required exact recovery still precedes the no-op authority guard');}
+});
+
+test('RISK final decision review: repeated manual Restore and Undo retain bounded exact lineage and peer progress',async t=>{
+ const {local,peer,h,at,initial}=await scopedUndoClients(),ctx=local.ctx;for(const app of [local,peer])t.after(()=>{app.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',app.ctx);});
+ ctx.onAction('no',{dataset:{candidate:'undo-local',benchmark:'undo-base'}});await ctx.persist();const original=JSON.stringify(ctx.state.decisionEvents),ratings=JSON.stringify(ctx.state.tasks.map(task=>[task.id,task.mu,task.sigma])),start=JSON.stringify(ctx.state.decisionBaseline).length,backup=await ctx.saveDurableBackup('manual',JSON.stringify(initial));let firstGrowth,retired;
+ for(let cycle=1;cycle<=10;cycle++){const sourceBaseline=ctx.canonicalDecisionFact(ctx.state.decisionBaseline);ctx.openSettings();assert.equal(await ctx.restoreDurableBackupById(backup.id),true);await ctx.persist();if(cycle===1)retired=JSON.parse(ctx.cloudPayload());assert.equal(await ctx.onAction('undo',{}),true);await ctx.persist();const bytes=JSON.stringify(ctx.state.decisionBaseline).length;if(cycle===1)firstGrowth=bytes-start;assert.ok(bytes<=start+cycle*firstGrowth*2,'overlapping exact authority must grow at most linearly across supported Restore/Undo cycles: '+JSON.stringify({cycle,bytes,start,firstGrowth}));assert.equal(JSON.stringify(ctx.state.decisionEvents),original);assert.equal(JSON.stringify(ctx.state.tasks.map(task=>[task.id,task.mu,task.sigma])),ratings);assert.equal(ctx.decisionEvidenceIssue(ctx.state,'e@example.com'),null);assert.ok(ctx.replacementDecisionReceipts(ctx.state.decisionBaseline).some(row=>ctx.canonicalDecisionFact(row.baseline)===sourceBaseline),'each original source baseline stays lossless inside the exact archived lineage');assert.ok(ctx.readLocalBackups().some(row=>row.id===backup.id&&row.payload===JSON.stringify(initial)));}
+ ctx.window.CloudSync.ready=true;await ctx.cloudPushNow();await syncSettle(35);peer.ctx.window.CloudSync.ready=true;await peer.ctx.cloudPull();await saveEditorChoice(peer,'undo-peer',at+500,{title:'Peer progress after Restore cycles'});await peer.ctx.cloudPushNow();await syncSettle(35);await ctx.cloudPull();h.writeBehindBack(retired);await ctx.cloudPull();await ctx.cloudPushNow();await syncSettle(35);assert.equal(JSON.stringify(ctx.state.decisionEvents.filter(row=>row.kind==='no')),original);assert.equal(ctx.state.tasks.find(row=>row.id==='undo-peer').title,'Peer progress after Restore cycles');assert.equal(ctx.state.syncDirty,false);assert.ok(ctx.retiredDecisionBaseline(ctx.state.decisionBaseline,retired.decisionBaseline),'the exact old replacement branch remains recognized after deduplication');
+ const raw=local.shim.localStorage.getItem(SYNC_STORE_KEY),cold=await loadAppAtTime(at+600,{seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw},cloudSyncFactory:h.factory});t.after(()=>{cold.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',cold.ctx);});await cold.ctx.cloudPull();assert.equal(cold.ctx.state.tasks.find(row=>row.id==='undo-peer').title,'Peer progress after Restore cycles');assert.equal(JSON.stringify(cold.ctx.state.decisionEvents.filter(row=>row.kind==='no')),original);assert.equal(cold.ctx.state.syncDirty,false);
 });
 
 test('RISK decision recovery guest Reset inheritance: replacement-only authority supports first signed No and the existing local Reset Undo',async t=>{
@@ -15646,7 +15712,7 @@ test('Landscape browser: scene time presets persist and return to live without c
  const {chromium}=await import(process.env.LANDSCAPE_PLAYWRIGHT),browser=await chromium.launch({channel:'chrome'});
  try{
   const page=await browser.newPage({viewport:{width:390,height:844},timezoneId:'America/New_York'});
-  await page.addInitScript(()=>localStorage.setItem('fvp:chain-scanner:landscape-motion','reduced'));
+  await page.addInitScript(()=>localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:'reduced',savedAt:Date.now()})));
   await page.goto(process.env.LANDSCAPE_BROWSER_URL);await page.locator('#modalRoot [data-act="close-modal"]').click();
   const tasks=await page.evaluate(()=>JSON.stringify(state.tasks));
   await page.evaluate(()=>openSettings());await page.locator('[data-act="scene-time-settings"]').click();
@@ -15659,7 +15725,7 @@ test('Landscape browser: scene time presets persist and return to live without c
   await page.reload();assert.equal(await page.evaluate(()=>LivingSky.readSceneSeason(localStorage)),'winter');assert.equal(await page.evaluate(()=>LivingSky.readSceneTime(localStorage)),'23:15');assert.equal(await page.evaluate(()=>document.documentElement.dataset.scenePeriod),'night');
   await page.evaluate(()=>openSettings());await page.locator('[data-act="scene-time-settings"]').click();await page.locator('[data-scene-time="live"]').click();
   assert.equal(await page.evaluate(()=>LivingSky.readSceneSeason(localStorage)),null);assert.equal(await page.evaluate(()=>LivingSky.readSceneTime(localStorage)),null);assert.equal(await page.evaluate(()=>JSON.stringify(state.tasks)),tasks);
-  await page.locator('[data-scene-time="close"]').click();assert.equal(await page.locator('[data-act="scene-time-settings"]').evaluate(e=>e===document.activeElement),true);await page.getByText('Changelog',{exact:true}).click();assert.ok(await page.getByText('Cyclists pedal with connected hips and naturally bending knees.').isVisible());
+  await page.locator('[data-scene-time="close"]').click();assert.equal(await page.locator('[data-act="scene-time-settings"]').evaluate(e=>e===document.activeElement),true);await page.locator('#modalRoot [data-act="close-modal"]').click();await page.locator('[data-act="help"]').click();await page.locator('[data-help-changelog] > summary').click();assert.ok(await page.getByText('Cyclists pedal with connected hips and naturally bending knees.').isVisible());
  }finally{await browser.close();}
 });
 
@@ -18319,7 +18385,7 @@ test('RISK narrow decision row: Add actions may wrap but done adding and rank ev
 test('RISK browser layout matrix: native dates respect pane insets, rank evidence stays aligned, and enabled Undo remains pinned', {skip:!process.env.LANDSCAPE_BROWSER_URL}, async()=>{
  const {chromium}=await import(process.env.LANDSCAPE_PLAYWRIGHT);const browser=await chromium.launch({headless:true,channel:'chrome'});
  try{
-  const page=await browser.newPage();await page.addInitScript(()=>localStorage.setItem('fvp:chain-scanner:landscape-motion','reduced'));
+  const page=await browser.newPage();await page.addInitScript(()=>localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:'reduced',savedAt:Date.now()})));
   await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'networkidle'});
   const close=page.locator('#modalRoot [data-act="close-modal"]');if(await close.count())await close.click();
   await page.evaluate(()=>{for(let i=0;i<24;i++)addTask('Task '+i);state.addOpen=true;state.listOpen=true;startScan('descending');render();});
@@ -29504,7 +29570,8 @@ test('RISK independent decision guidance: rendered FAQ and Settings distinguish 
  const answer=q=>{assert.ok(answers.has(q),'mounted FAQ includes '+q);return answers.get(q);};
  assert.match(answer('How do shared appearance choices sync?'),/Theme, date format, scene time, season and sky location combine with independent task changes/i);
  assert.match(answer('How do shared appearance choices sync?'),/do not add an Undo step/i);
- assert.match(answer('How do contexts and list filters work?'),/Context changes support Undo while keeping unrelated progress/i);
+ assert.match(answer('How do contexts and list filters work?'),/Context changes save, sync and support Undo while keeping unrelated progress/i);
+ assert.match(answer('How do Resume and Rescan differ?'),/Pause and Resume sync as choices and support Undo while keeping unrelated task edits/i);
  assert.match(answer('Can I use the app offline or on another device?'),/offline decisions.*closing and reopening/i);
  assert.match(answer('How are conflicting choices resolved?'),/original decision times/i);
  assert.match(answer('How are conflicting choices resolved?'),/missing.*held|untrusted.*held/i);

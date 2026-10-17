@@ -3510,13 +3510,10 @@ function restoreRetiredDecisionFields(target,source){
   const receipts=replacementDecisionReceipts(source.decisionBaseline).filter(receipt=>canonicalDecisionFact(receipt.baseline)===canonicalDecisionFact(target.decisionBaseline));
   const copy=(to,from,key)=>{if(Object.hasOwn(from||{},key))to[key]=JSON.parse(JSON.stringify(from[key]));else delete to[key];};
   // A plain imported board can deliberately select a different current pass
-  // without modern Start facts. An exact retired comparison from the returning
-  // pass cannot make its old root/draw current again. Keep this pass coherent;
+  // without modern Start facts. An exact retired baseline, including a branch
+  // with only field choices, cannot make its old root/draw current again;
   // retained active peer facts still project normally after the evidence merge.
-  if(currentChoicePassId(target)!==currentChoicePassId(source)&&receipts.some(receipt=>receipt.facts.some(fact=>{
-    const event=JSON.parse(LZString.decompressFromUTF16(fact.witness));
-    return (event.kind==="no"||event.kind==="comparison")&&event.passId===currentChoicePassId(target);
-  }))){
+  if(receipts.length&&currentChoicePassId(target)!==currentChoicePassId(source)){
     for(const key of ["passId","passStartedAt","mode","scanMode","chance","chain","candidateId","interventionActive","considered","cantAt","workedAt"])copy(target,source,key);
     target.settings||={};copy(target.settings,source.settings,"scanMode");
   }
@@ -3576,7 +3573,11 @@ async function prepareDecisionReplacement(next,current,reason,gestureId=null){
       .filter(event=>!(next.decisionEvents||[]).some(selected=>canonicalDecisionFact(selected)===canonicalDecisionFact(event)))
       .map(event=>({id:event.id,witness:LZString.compressToUTF16(canonicalDecisionFact(event))}))};
   if(!supportedDecisionReplacement(receipt,account))return false;
-  baseline.replacement=[...(baseline.replacement||[]),receipt];
+  // The complete current baseline is about to be archived in this receipt.
+  // Keep overlapping selected-root receipts there once, rather than copying
+  // their entire exact lineage twice on every Restore/Undo round trip.
+  const archived=new Set(replacementDecisionReceipts(current.decisionBaseline).map(canonicalDecisionFact));
+  baseline.replacement=[...(baseline.replacement||[]).filter(row=>!archived.has(canonicalDecisionFact(row))),receipt];
   return true;
 }
 function decisionProjectionIssue(board,checkCoherence=true){
@@ -3630,7 +3631,7 @@ function decisionProjectionIssue(board,checkCoherence=true){
       }else if(type==="pass"){
         if(id!==currentChoicePassId(board))continue;
         const field=(source,key)=>[Object.hasOwn(source,key),source[key]??null];
-        values=(property==="chain"?["chain","passId","passStartedAt"]:["scanMode","chance"]).map(key=>[field(board,key),field(projected,key)]);
+        values=(property==="chain"?["chain","passId","passStartedAt"]:property==="mode"?["mode"]:["scanMode","chance"]).map(key=>[field(board,key),field(projected,key)]);
       }else{
         const actual=currentChoiceTargetRead(board,event.target),expected=currentChoiceTargetRead(projected,event.target);
         if(type==="task"&&!actual&&!expected)continue;
@@ -6221,7 +6222,7 @@ function decisionNoHistoryProvesRating(board,event,ratings){
 function projectDecisionEvents(board=state,inheritedCancellations=null){
   const baseline=board?.decisionBaseline,account=Object.hasOwn(board,"syncAccount")?board.syncAccount:baseline?.account??window.CloudSync?.user??null;
   if(!supportedDecisionBaseline(baseline,account)||decisionProjectionIssue(board,false))return false;
-  const before=JSON.stringify([(board.tasks||[]).map(task=>[task.id,task.mu,task.sigma]),board.chain,board.considered,board.cantAt,board.workedAt,board.scanMode,board.settings?.scanMode]);
+  const before=JSON.stringify([(board.tasks||[]).map(task=>[task.id,task.mu,task.sigma]),board.chain,board.considered,board.cantAt,board.workedAt,board.mode,board.scanMode,board.settings?.scanMode]);
   if(typeof projectDecisionPassBase==="function")projectDecisionPassBase(board);
   const {values:ratings,conflicts}=decisionBaselineRatings(baseline);
   const {events,blockedIds}=decisionEventOrder(board,baseline);
@@ -6282,6 +6283,12 @@ function projectDecisionEvents(board=state,inheritedCancellations=null){
     for(const event of passEvents){
       if(cancelled.has(event.id))continue;
       const id=event.kind==="no"?null:event.kind==="comparison"&&event.action!=="dislodge"?event.taskId:null;
+      if(event.kind==="no"){
+        // No is also a current candidate exclusion. Its observation still
+        // trains above; only its pass membership competes with Yes/Dot here.
+        const index=chain.indexOf(event.candidateId);if(index>=0)chain.splice(index,1);
+        continue;
+      }
       if(event.kind==="comparison"&&event.action==="dislodge"){
         const index=chain.indexOf(event.taskId);if(index>=0)chain.splice(index,1);
         continue;
@@ -6309,7 +6316,7 @@ function projectDecisionEvents(board=state,inheritedCancellations=null){
   }
   if(typeof projectCurrentChoiceEvents==="function")projectCurrentChoiceEvents(board,cancelled);
   recomputeProjectedDecisionRanks(board);
-  return before!==JSON.stringify([(board.tasks||[]).map(task=>[task.id,task.mu,task.sigma]),board.chain,board.considered,board.cantAt,board.workedAt,board.scanMode,board.settings?.scanMode]);
+  return before!==JSON.stringify([(board.tasks||[]).map(task=>[task.id,task.mu,task.sigma]),board.chain,board.considered,board.cantAt,board.workedAt,board.mode,board.scanMode,board.settings?.scanMode]);
 }
 function recomputeProjectedDecisionRanks(board){
   if(board===state)recomputeRanks();
@@ -6383,6 +6390,12 @@ function currentChoiceDispositionSnapshot(id){
   if(kind==="worked"&&Number.isFinite(state.workedAt?.[id])&&state.workedAt[id]>0)value.at=state.workedAt[id];
   return {present:true,value};
 }
+function recordCurrentScannerMode(gesture,before){
+  if(before===state.mode)return;
+  appendCurrentChoiceEvents(prepareCurrentChoiceEvents([{
+    target:{type:"pass",id:gesture.passId,property:"mode"},value:state.mode,
+    after:{present:true},before:{present:true,value:before}}],gesture));
+}
 function currentChoicePassModeValue(mode,chance){
   return {mode,chance:chance==null?null:JSON.parse(JSON.stringify(chance))};
 }
@@ -6432,14 +6445,7 @@ function currentChoiceDispositionChange(id,before,force=false){
   return {target:{type:"task",id,property:"disposition"},value,after:{present:after.present},before};
 }
 function captureCurrentChoiceGesture(actionId=null,at=null){
-  if(typeof captureDecisionGesture==="function")return captureDecisionGesture(actionId,at);
-  const account=typeof state.syncAccount==="string"&&state.syncAccount
-    ? state.syncAccount : typeof window.CloudSync?.user==="string"&&window.CloudSync.user ? window.CloudSync.user : null;
-  const base=account&&validDecisionBase(state.decisionBase,account,state.syncRev)?state.decisionBase:null;
-  return {actionId:actionId||uid(),at:Number.isFinite(at)?at:Date.now(),account,baseId:base?.id??null,passId:currentDecisionPassId(),
-    passAt:Number.isFinite(state.passStartedAt)&&state.passStartedAt>=0?state.passStartedAt:0,
-    scanMode:state.scanMode,chainIds:Array.isArray(state.chain)?state.chain.slice():[],
-    observedActionIds:decisionActionFrontier(state.decisionEvents)};
+  return captureDecisionGesture(actionId,at);
 }
 function prepareCurrentChoiceEvents(choices,gesture,taskContextIds={}){
   if(!Array.isArray(choices)||!choices.length||!gesture)return [];
@@ -6484,6 +6490,7 @@ function currentChoiceValueSupported(type,property,value,present=true,evidence=f
     if(property==="ctx")return Array.isArray(value)&&value.every(id=>typeof id==="string"&&id.length>0&&!Object.hasOwn(Object.prototype,id))&&new Set(value).size===value.length;
   }
   if(type==="setting"&&property==="scanMode")return ["descending","chance","squared","halving","both"].includes(value);
+  if(type==="pass"&&property==="mode")return ["work","scan"].includes(value);
   if(type==="pass"&&property==="scanMode")return currentChoicePassModeValueSupported(value,!evidence);
   if(type==="pass"&&property==="chain")return currentChoicePassChainValueSupported(value,evidence);
   if(type==="setting"){
@@ -6561,7 +6568,7 @@ function supportedCurrentChoiceEvent(event){
     target.type==="setting"&&target.id==="board"&&(CURRENT_CHOICE_SETTINGS_PROPERTIES.includes(target.property)||/^hourlyQuote:(?:[01]\d|2[0-3])$/.test(target.property))||
     target.type==="scene"&&target.id==="board"&&["location","time","season"].includes(target.property)||
     target.type==="context"&&["exists","name","mode"].includes(target.property)&&!Object.hasOwn(Object.prototype,target.id)||
-    target.type==="pass"&&["scanMode","chain"].includes(target.property);
+    target.type==="pass"&&["scanMode","chain","mode"].includes(target.property);
   const beforeSupported=event.before&&typeof event.before==="object"&&!Array.isArray(event.before)&&
     typeof event.before.present==="boolean"&&Object.keys(event.before).every(key=>key==="present"||key==="value")&&
     (!event.before.present?!Object.hasOwn(event.before,"value"):
@@ -6570,6 +6577,8 @@ function supportedCurrentChoiceEvent(event){
   if(!supportedTarget||!event.after||typeof event.after!=="object"||Array.isArray(event.after)||Object.keys(event.after).some(key=>key!=="present")||
       typeof event.after.present!=="boolean"||!currentChoiceValueSupported(target.type,target.property,event.value,event.after.present)||
       !beforeSupported)return false;
+  if(target.type==="pass"&&target.property==="mode"&&
+      (target.id!==event.passId||event.after.present!==true||event.before.present!==true))return false;
   if(target.type==="pass"&&target.property==="chain"&&
       (event.actionId===undefined||target.id===event.passId||event.after.present!==true||event.before.present!==true||
        event.before.value.length!==0||event.value.length!==1))return false;
@@ -6914,9 +6923,10 @@ function projectCurrentChoiceContextProperty(task,events,byId,cancelled=new Set(
   const sameBase=minima.every(event=>event.baseId===base.baseId)&&sameBefore;
   const sameAttestedBefore=minima.every(event=>typeof event.baseId==="string"&&!!event.baseId)&&sameBefore;
   if(!sameBase&&!sameAttestedBefore){
-    const winner=latestCurrentChoiceEvent(events,byId);if(!winner)return false;
+    const winner=latestCurrentChoiceEvent(events.filter(event=>!cancelled.has(event.id)),byId);
+    const selected=winner?{present:winner.after.present,value:winner.value}:base.before;
     const prior=Object.hasOwn(task,"ctx")?JSON.stringify(task.ctx):null;
-    if(winner.after.present)task.ctx=JSON.parse(JSON.stringify(winner.value));else delete task.ctx;
+    if(selected.present)task.ctx=JSON.parse(JSON.stringify(selected.value));else delete task.ctx;
     return prior!==(Object.hasOwn(task,"ctx")?JSON.stringify(task.ctx):null);
   }
   const initial=base.before.present?base.before.value.slice():[],members=new Set(initial),perContext=new Map();
@@ -6973,6 +6983,12 @@ function projectCurrentChoiceEvents(board=state,cancellationOverride=null){
     if(type==="task"&&property==="ctx"){
       changed=projectCurrentChoiceContextProperty(target,rows,byId,cancelled)||changed;continue;
     }
+    if(type==="pass"&&property==="mode"){
+      if(winner.after.present&&board.mode!==winner.value){
+        board.mode=winner.value;board.candidateId=null;board.interventionActive=false;changed=true;
+      }
+      continue;
+    }
     if(type==="pass"&&property==="scanMode"){
       if(!winner.after.present)continue;
       const next=winner.value,modeChanged=board.scanMode!==next.mode;
@@ -7005,24 +7021,8 @@ function projectCurrentChoiceEvents(board=state,cancellationOverride=null){
 }
 function appendCurrentChoiceEvents(events){
   if(!Array.isArray(events)||!events.length)return;
-  if(typeof appendDecisionEvent==="function"){
-    if(typeof ensureDecisionBaseline==="function")ensureDecisionBaseline(events[0]);
-    for(const event of events)appendDecisionEvent(event);
-    return;
-  }
-  if(typeof ensureDecisionBaseline==="function")ensureDecisionBaseline();
-  if(Array.isArray(state.decisionEvents)){
-    const seen=new Set(state.decisionEvents.map(existing=>existing?.id).filter(id=>typeof id==="string"));
-    const fresh=events.filter(event=>event&&typeof event.id==="string"&&!seen.has(event.id));
-    if(fresh.length)state.decisionEvents=[...state.decisionEvents,...fresh];
-    return;
-  }
-  if(state.decisionEvents!==undefined){
-    const recovery=Array.isArray(state.decisionEventsRecovery)?state.decisionEventsRecovery
-      : state.decisionEventsRecovery===undefined?[]:[{unrecognizedDecisionEventsRecovery:JSON.parse(JSON.stringify(state.decisionEvents))}];
-    state.decisionEventsRecovery=[...recovery,{unrecognizedDecisionEvents:JSON.parse(JSON.stringify(state.decisionEvents))}];
-  }
-  state.decisionEvents=events;
+  ensureDecisionBaseline(events[0]);
+  for(const event of events)appendDecisionEvent(event);
 }
 function ratingMetricsChanged(a,b,oldBasis,basis){
   return ["mu","sigma","likelihood","eligible","fallback","n","samples"].some(key=>a[key]!==b[key])
@@ -8107,7 +8107,7 @@ function openHelp(){
     + '<dt>How do I keep Undo within reach?</dt><dd>Enable Keep the header visible while scrolling in Settings → Scanning and recurrence. It is off by default and saves immediately. Freezing and unfreezing keep the same reserved top space. The header keeps its normal responsive size and updates the clearance when the window, text size or wrapping changes.</dd>'
     + '<dt>How do I install or update the app?</dt><dd>Install this app on your phone opens instructions for Safari on iPhone and Chrome on Android, or the browser’s install prompt when available. The installed app checks for updates when it opens or returns to the foreground. An update waits for unfinished edits and the latest board save before reloading. If a save fails, keep the tab open and use Diagnostics download to preserve the current board.</dd>'
     + '<dt>What do Horizon, Interrupt below, and MC samples change?</dt><dd>Horizon sets the comparison time span, 60 minutes by default. Interrupt below controls the nudge to stop when the estimated chance of finding a better task within one minute is below your percentage, 25% by default. Continue scanning or choose No — work the chain. MC samples controls rank estimates, 250 by default; more gives steadier estimates. Save settings applies these numeric fields.</dd>'
-    + '<dt>How do Resume and Rescan differ?</dt><dd>Resume continues the same pass without offering tasks already scanned. Rescan skipped tasks clears No, Can’t, Worked on it, and Dislodged marks, including unexpired holds. A fresh pass refreshes the draw and clears No and Dislodged while retaining unexpired holds on the same day. The local 2 AM marker clears old scan marks for the new day. Evergreen Done follows its own interval and optional day reset. Completed sessions stay in History.</dd>'
+    + '<dt>How do Resume and Rescan differ?</dt><dd>Resume continues the same pass without offering tasks already scanned. Pause and Resume sync as choices and support Undo while keeping unrelated task edits. Rescan skipped tasks clears No, Can’t, Worked on it, and Dislodged marks, including unexpired holds. A fresh pass refreshes the draw and clears No and Dislodged while retaining unexpired holds on the same day. The local 2 AM marker clears old scan marks for the new day. Evergreen Done follows its own interval and optional day reset. Completed sessions stay in History.</dd>'
     + '</dl>'
     + '<h3>What the machinery does</h3>'
     + '<p class="kv">Comparisons help the app learn your preferences. The selected scan mode determines candidate order; ratings change immediately, while weighted modes keep their saved ordering until a fresh pass or the local 2 AM marker.</p>'
@@ -8123,7 +8123,7 @@ function openHelp(){
     + '<details class="help-faq"><summary><h3>Contexts</h3></summary><dl>'
     + '<dt>How do I edit several tasks together?</dt><dd>The controls stay at the bottom of All Tasks while task rows scroll. Choose Select, then click a rank slot to select that task without changing row height. The rank slot keeps the full Selected label separate from the task title, including with enlarged text. Selected replaces the rank label; click Selected to deselect and restore the rank. These buttons also support Tab and Enter or Space. Select all selects every task in the current filtered list, including rows below the fold; there is no pagination. Edit enables after a selection and the toolbar shows the count. Changing filters removes hidden selections; Cancel selection clears them. Switching accounts clears the previous board’s selection.</dd><dt>Which properties can I change in Bulk Edit?</dt><dd>Bulk Edit supports links, Starts, Due, context requirements, Evergreen, its interval in hours and its 2 AM reset. Check Apply separately for each property. Changing the interval suggests the same 18-hour reset rule as individual Edit but the reset still needs its own Apply checkbox; you can change the suggestion afterward. Mixed values stay unchanged until you check Apply; unchecked values stay unchanged. Blanks are rejected, and Clear explicitly removes links, dates or all context requirements. Turning Evergreen off does not delete previous completion dates. Titles, ratings, history, dependencies and task actions remain in individual Edit. Dependency limits, self-links, cycles and Hard/soft choices are unchanged.</dd><dt>What happens if selected tasks change before or during Save?</dt><dd>A changed board or a missing or completed task stops Save; conflicts detected before Save stop the whole batch. Reopen Edit to review fresh values. A later sync conflict combines compatible changes to different fields. Incompatible current choices use the original decision time, so a delayed earlier upload does not gain fresh authority. Recovery copies keep displaced data. Unrelated fresh fields are preserved. Save uses the existing local and cloud paths.</dd><dt>How does Undo work after Bulk Edit?</dt><dd>One Undo reverses the batch against the current board while keeping unrelated progress from either device. Later independent fields and comparison evidence remain. Check the current values and sync status after Undo.</dd><dt>What does the bulk result count mean?</dt><dd>After Save, the bottom result counts tasks whose current open-tab values match the request and tasks whose values differ or are no longer open. This is not server confirmation; check sync status. Counts update with later board changes and disappear on reload. Failed writes keep the edited board in this tab for the usual recovery and retry.</dd>'
     + '<dt>What happens to unavailable saved task contexts?</dt><dd>Single-task Save and editor actions preserve previously assigned context IDs that this device cannot show. Changing visible choices changes only known contexts. To remove every requirement, select the task in All Tasks and use Bulk Edit’s explicit Clear context requirements, then Save. Bulk Apply replaces context requirements with the selected visible choices; unchecked Apply preserves them. Undo restores the previous assignments.</dd><dt>Why do All Tasks context filters stay visible?</dt><dd>Every existing context stays available as an All Tasks filter, including inactive, excluded and currently unused contexts. These filters only narrow the open task list; they do not change scanner inclusion or saved assignments. A filter without open matches shows an empty list. Search and eligibility filters still combine with it, and Select all selects only matching open tasks. Deleting a context removes its filter. No context in the main selector keeps its existing unassigned-task eligibility meaning.</dd>'
-    + '<dt>How do task context choices look and save?</dt><dd>Context choices in Add, Edit and Bulk Edit share the All Tasks context filter chip styling: white unselected and green selected in day mode, with the existing All Tasks dark surface and softer green selection at night. Use Tab and Space to choose editor contexts; Add and list filter buttons also support Enter. Long context names wrap within the available row. Add and All Tasks context chips keep keyboard focus after toggling, so repeated Space or Enter presses continue to select or deselect that chip. Choices in an editor change the draft until Save; closing without saving keeps the task unchanged. The main included/excluded context selector keeps its green check and red X.</dd><dt>How do contexts and list filters work?</dt><dd>Whenever contexts exist, every context shows green check (included) or red X (excluded); click to switch, even when all real contexts are excluded. The red display does not change saved neutral choices. Every assigned known context must be active; any exclusion wins. With no active contexts, only tasks without a known context can scan. No context is green to admit unassigned tasks and tasks with only unknown or deleted contexts, or red to exclude them; it cannot be assigned to a task. Rendering never changes saved choices. Their names, inclusion and task assignments save and sync. Context changes support Undo while keeping unrelated progress.</dd><dt>How do I create contexts and filter All Tasks?</dt><dd>The main selector stays visible without contexts; create the first with + context or Settings. New contexts start active. Edit hides Needs these contexts until a context exists. All Tasks searches and filters the list without changing the scan. Dotted tasks appear under Ineligible until undotted, while remaining in the scanner’s eligible pool. Top x is the default display and sort; Settings can switch to overall percent chance. Names, tags and countdowns wrap to fit. Context name fields in Settings fit narrow and enlarged views.</dd>'
+    + '<dt>How do task context choices look and save?</dt><dd>Context choices in Add, Edit and Bulk Edit share the All Tasks context filter chip styling: white unselected and green selected in day mode, with the existing All Tasks dark surface and softer green selection at night. Use Tab and Space to choose editor contexts; Add and list filter buttons also support Enter. Long context names wrap within the available row. Add and All Tasks context chips keep keyboard focus after toggling, so repeated Space or Enter presses continue to select or deselect that chip. Choices in an editor change the draft until Save; closing without saving keeps the task unchanged. The main included/excluded context selector keeps its green check and red X.</dd><dt>How do contexts and list filters work?</dt><dd>Whenever contexts exist, every context shows green check (included) or red X (excluded); click to switch, even when all real contexts are excluded. The red display does not change saved neutral choices. Every assigned known context must be active; any exclusion wins. With no active contexts, only tasks without a known context can scan. No context is green to admit unassigned tasks and tasks with only unknown or deleted contexts, or red to exclude them; it cannot be assigned to a task. Rendering never changes saved choices. Context changes save, sync and support Undo while keeping unrelated progress. This includes names, inclusion and task assignments.</dd><dt>How do I create contexts and filter All Tasks?</dt><dd>The main selector stays visible without contexts; create the first with + context or Settings. New contexts start active. Edit hides Needs these contexts until a context exists. All Tasks searches and filters the list without changing the scan. Dotted tasks appear under Ineligible until undotted, while remaining in the scanner’s eligible pool. Top x is the default display and sort; Settings can switch to overall percent chance. Names, tags and countdowns wrap to fit. Context name fields in Settings fit narrow and enlarged views.</dd>'
     + '<dt>How do I filter postponed tasks?</dt><dd>The postponed tag filter shows active holds. Choose Eligible or Ineligible first, then apply the tag and title search: clicking an eligibility control clears both narrowings. Select all selects only matching rows. Return or expiry removes holds from the matches. With no active hold on an open task, the tag disappears and clears; other filters remain.</dd>'
     + '</dl>'
     + '</details>'
@@ -8586,15 +8586,18 @@ function onAction(act, el){
     case "worked": TaskActionOwner.perform({type:"benchmark",action:"worked"}); break;
     case "reveal": revealTask(el.dataset.id); break;
     case "continue-scan": pushUndo(); state.interventionActive=false; state.snooze=12; commit(); break;
-    case "start-working": pushUndo(); state.interventionActive=false; state.mode="work"; commit(true,true); break;
+    case "start-working": {
+      const gesture=captureCurrentChoiceGesture(),before=state.mode;
+      pushUndo();state.interventionActive=false;state.mode="work";recordCurrentScannerMode(gesture,before);commit(true,true);break;
+    }
     case "resume-scan": {
-      const choiceGesture=captureCurrentChoiceGesture(),beforePassMode=currentChoicePassModeValue(state.scanMode,state.chance);
+      const choiceGesture=captureCurrentChoiceGesture(),beforeMode=state.mode,beforePassMode=currentChoicePassModeValue(state.scanMode,state.chance);
       pushUndo();applyScanPreference(el?.dataset?.mode);
       const afterPassMode=currentChoicePassModeValue(state.scanMode,state.chance);
       if(JSON.stringify(beforePassMode)!==JSON.stringify(afterPassMode))appendCurrentChoiceEvents(prepareCurrentChoiceEvents([{
         target:{type:"pass",id:choiceGesture.passId,property:"scanMode"},value:afterPassMode,after:{present:true},
         before:{present:true,value:beforePassMode}}],choiceGesture));
-      state.mode="scan";state.candidateId=null;state.interventionActive=false;state.snooze=6;commit();break;
+      state.mode="scan";recordCurrentScannerMode(choiceGesture,beforeMode);state.candidateId=null;state.interventionActive=false;state.snooze=6;commit();break;
     }
     case "start-scan": startScan(el.dataset?.mode); break;
     case "rescan": rescanSkipped(); break;

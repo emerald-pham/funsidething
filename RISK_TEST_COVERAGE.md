@@ -1346,3 +1346,14 @@ Exact comparison retirement clears only named effects, preserving later peer cho
 - `RISK decision recovery selected legacy pass: exact retired comparisons cannot replace the imported pass draw root or No marks`
 
 A real explicit Import may select a plain supported legacy board with a different pass and no modern Start facts. Exact retired No/Yes/Dot/Dislodge returning as a higher revision preserves that selected pass ID, start, mode, frozen draw, root, candidate and marks, both before and after new peer editor/Dot learning. The correction copies only the coherent pass tuple when exact retired comparison evidence identifies the returning pass; other fields/learning still merge and supported active actions project normally.
+
+## Final decision review preservation (#141)
+
+- `RISK final decision review: offline context Undo restores retained membership across null and attested bases`
+- `RISK final decision review: later Resume beats older Pause in both publication orders and targeted Undo survives stale reopen`
+- `RISK final decision review: fresh Start then Pause remains paused through independent title and scoped Undo`
+- `RISK final decision review: contrary comparison current membership follows intent while both learning observations survive`
+- `RISK final decision review: mode authority respects observed causality and unsupported mode facts stay held`
+- `RISK final decision review: repeated manual Restore and Undo retain bounded exact lineage and peer progress`
+
+Compatibility context projection honors exact cancellation facts, including all-cancelled prior membership. Pause/Resume use strict pass-scoped work/scan choices with original time and observed ancestry, independent of weighting changes; Start maintenance stays subordinate to those choices. Contrary Yes/No current membership resolves without removing either learning observation or fabricating another comparison. Title-only retired branches receive the same exact selected-pass protection as comparison branches. Repeated real backup Restore/Undo deduplicates only selected-root receipts already archived exactly in the new displaced baseline, preserving exact lineage, stale recognition, peer fields and cold reopen with linear metadata growth. Unsupported authority remains held. The two native scene-time/layout fixture seeds use the supported timestamped motion preference; every existing native assertion stays unchanged and native execution remains parent-owned.
