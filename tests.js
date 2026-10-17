@@ -8909,7 +8909,7 @@ async function delayedLocalBoardBrowser(viewport={width:390,height:844},dispatch
  return {browser,context,page,early,ready,errors};
 }
 
-async function invisibleSavedViewBrowser(theme='light',delayAppearanceAsset=false,keepHeader=false,viewport={width:390,height:844}){
+async function invisibleSavedViewBrowser(theme='light',delayAppearanceAsset=false,keepHeader=false,viewport={width:390,height:844},activeScanner=false){
  const {chromium}=await import(process.env.PLAYWRIGHT_MODULE||process.env.LANDSCAPE_PLAYWRIGHT||'playwright');
  const browser=await chromium.launch({headless:true,channel:process.env.LANDSCAPE_BROWSER_CHANNEL||'chrome'});
  const context=await browser.newContext({viewport,serviceWorkers:'block',reducedMotion:'reduce'});
@@ -8933,6 +8933,7 @@ async function invisibleSavedViewBrowser(theme='light',delayAppearanceAsset=fals
  await page.evaluate(async()=>{document.getElementById('motionDialog')?.close();closeModal();state.seenQuickStart=true;state.addOpen=false;state.histOpen=false;state.settings.theme=localStorage.getItem('fvp:chain-scanner:theme');
   for(let i=0;i<65;i++)addTask('Saved appearance task '+String(i).padStart(2,'0'));
   addTask('Unmatched control task');save();await persist();render();});
+ if(activeScanner)await page.locator('[data-act="start-scan"]').first().click();
  if(keepHeader){await page.locator('[data-act="settings"]').first().click();await page.getByText('Scanning and recurrence',{exact:true}).click();await page.locator('#stFloatingHeader').check();await page.locator('#modalRoot [data-act="close-modal"]').click();}
  if(await page.locator('#listBody').isHidden())await page.locator('[data-act="toggle-list"]').first().click();
  await page.locator('#listSearch').fill('Saved appearance');
@@ -8941,10 +8942,10 @@ async function invisibleSavedViewBrowser(theme='light',delayAppearanceAsset=fals
  await page.locator('#listBody').evaluate(e=>{e.scrollTop=420;e.dispatchEvent(new Event('scroll'));});
  await page.evaluate(()=>{window.scrollTo(0,220);window.dispatchEvent(new Event('pagehide'));localStorage.setItem('__delayLocalRead','true');});
  if(process.env.SAVED_VIEW_ARTIFACT_DIR)await page.screenshot({path:path.join(process.env.SAVED_VIEW_ARTIFACT_DIR,`invisible-before-${theme}.png`)});
- const before=await page.evaluate(()=>({query:document.getElementById('listSearch').value,scroll:document.getElementById('listBody').scrollTop,pageY:scrollY,visibleTitles:(()=>{const body=document.getElementById('listBody'),r=body.getBoundingClientRect();return[...body.querySelectorAll('.trow')].filter(e=>{const b=e.getBoundingClientRect();return b.bottom>r.top&&b.top<Math.min(r.bottom,innerHeight);}).map(e=>e.querySelector('.tt')?.textContent);})(),header:(()=>{const r=document.getElementById('appHeader').getBoundingClientRect();return{x:r.x,y:r.y,width:r.width,height:r.height};})(),tasks:JSON.stringify(state.tasks),cache:localStorage.getItem('fvp:chain-scanner:appearance:v1')}));
+ const before=await page.evaluate(()=>({query:document.getElementById('listSearch').value,scroll:document.getElementById('listBody').scrollTop,pageY:scrollY,geometry:(()=>{const rect=id=>{const r=document.getElementById(id).getBoundingClientRect();return{x:r.x,y:r.y,width:r.width,height:r.height};};return{scan:rect('scan'),list:rect('listWrap'),body:rect('listBody'),separators:document.querySelectorAll('#scan hr.sep').length};})(),visibleTitles:(()=>{const body=document.getElementById('listBody'),r=body.getBoundingClientRect();return[...body.querySelectorAll('.trow')].filter(e=>{const b=e.getBoundingClientRect();return b.bottom>r.top&&b.top<Math.min(r.bottom,innerHeight);}).map(e=>e.querySelector('.tt')?.textContent);})(),header:(()=>{const r=document.getElementById('appHeader').getBoundingClientRect();return{x:r.x,y:r.y,width:r.width,height:r.height};})(),tasks:JSON.stringify(state.tasks),cache:localStorage.getItem('fvp:chain-scanner:appearance:v1')}));
  await page.reload({waitUntil:'domcontentloaded'});
  await page.waitForFunction(()=>window.__actualLocalRead?.started);
- const early=await page.evaluate(()=>{const preview=document.querySelector('[data-saved-preview]'),list=preview?.querySelector('[data-preview-id="listBody"]'),search=preview?.querySelector('[data-preview-id="listSearch"]');return{settled:window.__actualLocalRead.settled,ready:document.documentElement.dataset.appReady,previewVisible:!!preview&&getComputedStyle(preview).visibility==='visible',rows:[...(list?.querySelectorAll('.trow')||[])].map(e=>e.textContent),query:search?.value,listScroll:list?.scrollTop,pageY:scrollY,visibleTitles:(()=>{if(!list)return[];const r=list.getBoundingClientRect();return[...list.querySelectorAll('.trow')].filter(e=>{const b=e.getBoundingClientRect();return b.bottom>r.top&&b.top<Math.min(r.bottom,innerHeight);}).map(e=>e.querySelector('.tt')?.textContent);})(),header:(()=>{const r=preview?.querySelector('[data-preview-id="appHeader"]')?.getBoundingClientRect();return r?{x:r.x,y:r.y,width:r.width,height:r.height}:null;})(),status:document.getElementById('startupStatus')?.textContent||null,theme:document.documentElement.dataset.theme,colorScheme:getComputedStyle(document.documentElement).colorScheme,duplicateIds:[...document.querySelectorAll('[id]')].map(e=>e.id).filter((id,i,all)=>all.indexOf(id)!==i),activeActions:preview?.querySelectorAll('[data-act],[href],[onclick],[onerror]').length||0};});
+ const early=await page.evaluate(()=>{const preview=document.querySelector('[data-saved-preview]'),list=preview?.querySelector('[data-preview-id="listBody"]'),search=preview?.querySelector('[data-preview-id="listSearch"]');return{settled:window.__actualLocalRead.settled,ready:document.documentElement.dataset.appReady,previewVisible:!!preview&&getComputedStyle(preview).visibility==='visible',rows:[...(list?.querySelectorAll('.trow')||[])].map(e=>e.textContent),query:search?.value,listScroll:list?.scrollTop,pageY:scrollY,geometry:(()=>{const rect=id=>{const r=preview?.querySelector('[data-preview-id="'+id+'"]')?.getBoundingClientRect();return r?{x:r.x,y:r.y,width:r.width,height:r.height}:null;};return{scan:rect('scan'),list:rect('listWrap'),body:rect('listBody'),separators:preview?.querySelectorAll('hr.sep').length||0};})(),visibleTitles:(()=>{if(!list)return[];const r=list.getBoundingClientRect();return[...list.querySelectorAll('.trow')].filter(e=>{const b=e.getBoundingClientRect();return b.bottom>r.top&&b.top<Math.min(r.bottom,innerHeight);}).map(e=>e.querySelector('.tt')?.textContent);})(),header:(()=>{const r=preview?.querySelector('[data-preview-id="appHeader"]')?.getBoundingClientRect();return r?{x:r.x,y:r.y,width:r.width,height:r.height}:null;})(),status:document.getElementById('startupStatus')?.textContent||null,theme:document.documentElement.dataset.theme,colorScheme:getComputedStyle(document.documentElement).colorScheme,duplicateIds:[...document.querySelectorAll('[id]')].map(e=>e.id).filter((id,i,all)=>all.indexOf(id)!==i),activeActions:preview?.querySelectorAll('[data-act],[href],[onclick],[onerror]').length||0};});
  if(process.env.SAVED_VIEW_ARTIFACT_DIR)await page.screenshot({path:path.join(process.env.SAVED_VIEW_ARTIFACT_DIR,`invisible-early-${theme}.png`)});
  if(process.env.SAVED_VIEW_ARTIFACT_DIR)fs.writeFileSync(path.join(process.env.SAVED_VIEW_ARTIFACT_DIR,`probe-${theme}.json`),JSON.stringify({before:{...before,cache:JSON.parse(before.cache||'null')},early},null,2));
  return {browser,context,page,errors,before,early};
@@ -8973,6 +8974,25 @@ test('RISK saved view invisible startup: real IndexedDB reload paints the prior 
    const ready=await view.page.evaluate(()=>({query:document.getElementById('listSearch').value,scroll:document.getElementById('listBody').scrollTop,pageY:scrollY,rows:document.querySelectorAll('#listBody .trow').length,tasks:JSON.stringify(state.tasks),preview:!!document.querySelector('[data-saved-preview]')}));
    assert.equal(ready.query,'Saved appearance');assert.equal(ready.rows,65);assert.equal(ready.tasks,view.before.tasks,'early clicks and shortcuts cannot mutate the pending board');assert.equal(ready.preview,false);
    assert.ok(Math.abs(ready.scroll-view.before.scroll)<2);assert.ok(Math.abs(ready.pageY-view.before.pageY)<2);
+   assert.deepEqual(view.errors,[]);
+  }finally{await view.browser.close();}
+ }
+});
+
+test('RISK saved view invisible active scanner: a running scan retains scanner and task-list geometry before hydration',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ for(const viewport of [{width:1100,height:1000},{width:390,height:844}]){
+  const view=await invisibleSavedViewBrowser('light',false,false,viewport,true);
+  try{
+   if(process.env.SAVED_VIEW_ARTIFACT_DIR){
+    const dir=process.env.SAVED_VIEW_ARTIFACT_DIR;
+    fs.copyFileSync(path.join(dir,'invisible-before-light.png'),path.join(dir,`active-${viewport.width}-before.png`));
+    await view.page.screenshot({path:path.join(dir,`active-${viewport.width}-pending.png`)});
+    fs.writeFileSync(path.join(dir,`active-${viewport.width}-geometry.json`),JSON.stringify({before:view.before.geometry,pending:view.early.geometry,storagePending:!view.early.settled,listScroll:view.early.listScroll,pageScroll:view.early.pageY},null,2)+'\n');
+   }
+   assert.ok(view.before.geometry.separators>0,'Start scanning reaches the populated benchmark and candidate surface');
+   assert.equal(view.early.settled,false,'the actual native local read is still pending');
+   assert.equal(view.early.listScroll,view.before.scroll);assert.equal(view.early.pageY,view.before.pageY);
+   assert.deepEqual(view.early.geometry,view.before.geometry,'active scanner and All Tasks must keep the prior accepted bounds during reopen');
    assert.deepEqual(view.errors,[]);
   }finally{await view.browser.close();}
  }

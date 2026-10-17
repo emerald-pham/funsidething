@@ -7537,5 +7537,71 @@
     "comparison": "fullReleaseBase",
     "comparisonBase": "69a9feddf5d6bb8c4973475f7232e363b8646097",
     "testChangesSha256": "8e4859224236e577cdb1f786cdc82252a7b53406ffeef7239fe9159664f67a9b"
+  },
+  {
+    "testChangesSha256": "765fc02454c9121ba86bfeff39afefd84e47d1fd7e32b91ffcc83f9ba34bc026",
+    "comparisonBase": "670ccf9565b87dc019ef904d424b1a368b1926ec",
+    "comparison": "activeScannerDelta",
+    "reason": "Root actual screenshot inspection found the active scanner preview17px shorter than the accepted populated scanner. Extend the actual Start scanning consumer through delayed native storage and preserve its harmless separator in the inert visual projection.",
+    "previousBehavior": "The preview tag allowlist omitted hr. After Start scanning displayed both a dotted benchmark and candidate, capture dropped hr.sep, shortening the scanner by17px and shifting All Tasks upward even though page and list scroll matched.",
+    "intendedBehavior": "Preserve hr through the same safe DOM projection. Scanner, All Tasks panel and list-body bounds, including the separator, exactly match before close and while actual IndexedDB is pending on desktop and phone. The projection remains inert and separate from all board authority.",
+    "replacementTests": [
+      "RISK saved view invisible active scanner: a running scan retains scanner and task-list geometry before hydration"
+    ],
+    "preservedCoverage": [
+      "Every prior populated-first-paint, theme, search, filter, list position, early-input safety, account boundary, malformed/oversized/blocked cache, tall-window and floating-header assertion remains unchanged. The existing FAQ and changelog continue accurately describing silent restored appearance.",
+      "No action or event attributes, raw HTML, IDs, board state, saves, migration, recovery or cloud acknowledgement are introduced. A harmless hr is the only new runtime allowlist token.",
+      "Historical original RED/GREEN evidence and exact rationale records remain preserved. The full release-base comparison retains all earlier saved-view/filter/toggle/reveal chronology and the user-authorized rejection of loading UI. No status-panel approval is revived."
+    ],
+    "redEvidence": {
+      "command": "On670ccf9565b87dc019ef904d424b1a368b1926ec, tests.js alone edited: LANDSCAPE_BROWSER_URL=http://127.0.0.1:8794 PLAYWRIGHT_MODULE=/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs SAVED_VIEW_ARTIFACT_DIR=/Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/invisible/active-scanner node --test --test-name-pattern='RISK saved view invisible active scanner:' tests.js.",
+      "failure": "Contemporaneous preimplementation assertion RED: scanner height327.53125 instead of344.53125, list panel y680.890625 instead of697.890625, list body y841.078125 instead of858.078125, separator count0 instead of1. Page/list scroll and scanner width/top matched. Exact log active-scanner/red.txt. Only then added hr to the allowlist; active-scanner/green.txt passed desktop and phone. Final screenshots and equal geometry reports are under active-scanner/final, with the final focused cohort in final-green.txt. Original earlier feature and repair RED chronology remains in existing rationale records and invisible/report.md."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/invisible/active-scanner",
+    "releaseStatus": "Local candidate only; no release actions. User screenshot approval and live hold remain."
+  },
+  {
+    "testChangesSha256": "1dd92423b14ca1b70bdbe042282a6cf6fa459d5a266ad05d5ff121fa94e3eb62",
+    "comparisonBase": "bf64e0381e267f2fda17e9383010513284b21dd1",
+    "comparison": "revisedDelta",
+    "reason": "Root actual screenshot inspection found the active scanner preview17px shorter than the accepted populated scanner. Extend the actual Start scanning consumer through delayed native storage and preserve its harmless separator in the inert visual projection.",
+    "previousBehavior": "The preview tag allowlist omitted hr. After Start scanning displayed both a dotted benchmark and candidate, capture dropped hr.sep, shortening the scanner by17px and shifting All Tasks upward even though page and list scroll matched.",
+    "intendedBehavior": "Preserve hr through the same safe DOM projection. Scanner, All Tasks panel and list-body bounds, including the separator, exactly match before close and while actual IndexedDB is pending on desktop and phone. The projection remains inert and separate from all board authority.",
+    "replacementTests": [
+      "RISK saved view invisible active scanner: a running scan retains scanner and task-list geometry before hydration"
+    ],
+    "preservedCoverage": [
+      "Every prior populated-first-paint, theme, search, filter, list position, early-input safety, account boundary, malformed/oversized/blocked cache, tall-window and floating-header assertion remains unchanged. The existing FAQ and changelog continue accurately describing silent restored appearance.",
+      "No action or event attributes, raw HTML, IDs, board state, saves, migration, recovery or cloud acknowledgement are introduced. A harmless hr is the only new runtime allowlist token.",
+      "Historical original RED/GREEN evidence and exact rationale records remain preserved. The full release-base comparison retains all earlier saved-view/filter/toggle/reveal chronology and the user-authorized rejection of loading UI. No status-panel approval is revived."
+    ],
+    "redEvidence": {
+      "command": "On670ccf9565b87dc019ef904d424b1a368b1926ec, tests.js alone edited: LANDSCAPE_BROWSER_URL=http://127.0.0.1:8794 PLAYWRIGHT_MODULE=/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs SAVED_VIEW_ARTIFACT_DIR=/Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/invisible/active-scanner node --test --test-name-pattern='RISK saved view invisible active scanner:' tests.js.",
+      "failure": "Contemporaneous preimplementation assertion RED: scanner height327.53125 instead of344.53125, list panel y680.890625 instead of697.890625, list body y841.078125 instead of858.078125, separator count0 instead of1. Page/list scroll and scanner width/top matched. Exact log active-scanner/red.txt. Only then added hr to the allowlist; active-scanner/green.txt passed desktop and phone. Final screenshots and equal geometry reports are under active-scanner/final, with the final focused cohort in final-green.txt. Original earlier feature and repair RED chronology remains in existing rationale records and invisible/report.md."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/invisible/active-scanner",
+    "releaseStatus": "Local candidate only; no release actions. User screenshot approval and live hold remain."
+  },
+  {
+    "testChangesSha256": "b90550989fbe140f7fd117a96ff2e70d9eb7fdd3911b1e3e2f0a3845ac9d63a7",
+    "comparisonBase": "69a9feddf5d6bb8c4973475f7232e363b8646097",
+    "comparison": "fullReleaseBase",
+    "reason": "Root actual screenshot inspection found the active scanner preview17px shorter than the accepted populated scanner. Extend the actual Start scanning consumer through delayed native storage and preserve its harmless separator in the inert visual projection.",
+    "previousBehavior": "The preview tag allowlist omitted hr. After Start scanning displayed both a dotted benchmark and candidate, capture dropped hr.sep, shortening the scanner by17px and shifting All Tasks upward even though page and list scroll matched.",
+    "intendedBehavior": "Preserve hr through the same safe DOM projection. Scanner, All Tasks panel and list-body bounds, including the separator, exactly match before close and while actual IndexedDB is pending on desktop and phone. The projection remains inert and separate from all board authority.",
+    "replacementTests": [
+      "RISK saved view invisible active scanner: a running scan retains scanner and task-list geometry before hydration"
+    ],
+    "preservedCoverage": [
+      "Every prior populated-first-paint, theme, search, filter, list position, early-input safety, account boundary, malformed/oversized/blocked cache, tall-window and floating-header assertion remains unchanged. The existing FAQ and changelog continue accurately describing silent restored appearance.",
+      "No action or event attributes, raw HTML, IDs, board state, saves, migration, recovery or cloud acknowledgement are introduced. A harmless hr is the only new runtime allowlist token.",
+      "Historical original RED/GREEN evidence and exact rationale records remain preserved. The full release-base comparison retains all earlier saved-view/filter/toggle/reveal chronology and the user-authorized rejection of loading UI. No status-panel approval is revived."
+    ],
+    "redEvidence": {
+      "command": "On670ccf9565b87dc019ef904d424b1a368b1926ec, tests.js alone edited: LANDSCAPE_BROWSER_URL=http://127.0.0.1:8794 PLAYWRIGHT_MODULE=/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs SAVED_VIEW_ARTIFACT_DIR=/Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/invisible/active-scanner node --test --test-name-pattern='RISK saved view invisible active scanner:' tests.js.",
+      "failure": "Contemporaneous preimplementation assertion RED: scanner height327.53125 instead of344.53125, list panel y680.890625 instead of697.890625, list body y841.078125 instead of858.078125, separator count0 instead of1. Page/list scroll and scanner width/top matched. Exact log active-scanner/red.txt. Only then added hr to the allowlist; active-scanner/green.txt passed desktop and phone. Final screenshots and equal geometry reports are under active-scanner/final, with the final focused cohort in final-green.txt. Original earlier feature and repair RED chronology remains in existing rationale records and invisible/report.md."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/invisible/active-scanner",
+    "releaseStatus": "Local candidate only; no release actions. User screenshot approval and live hold remain."
   }
 ]
