@@ -1450,6 +1450,7 @@ Actual populated-editor ordinary Done, an offline Dot that an independent peer c
 - RISK legacy completion recovery safety: failed exact-source backup holds startup and guarded recovery without losing a newer edit
 - RISK legacy completion support floor: real eventless learned ratings upgrade without reconstructing comparison history
 - RISK legacy completion released shell: actual stale write conflicts then holds unknown authority and its pending edit for safe update
+- RISK legacy completion startup acknowledgement: pending IndexedDB upgrade holds recovery until its actual save completes
 - RISK legacy completion startup copies: both literal divergent sources precede every upgrade write
 - RISK legacy completion startup safety: refused unverified and raced copies retain both sources and newer drafts
 - RISK legacy completion unknown inheritance: unsupported witnesses preserve a usable startup hold
