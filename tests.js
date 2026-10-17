@@ -8370,7 +8370,7 @@ test("boot: a synced dark preference is applied to the root element on load", as
   assert.equal(shim.documentElement.getAttribute("data-theme"), "dark");
 });
 
-test("applyTheme: a host with no documentElement is a safe no-op", async () => {
+test('applyTheme: a host with no documentElement is a safe no-op', async () => {
   const shim = makeDomShim();
   delete shim.document.documentElement;
   const sandbox = {
@@ -8382,7 +8382,7 @@ test("applyTheme: a host with no documentElement is a safe no-op", async () => {
     confirm: () => true, alert: () => {}, prompt: () => null,
   };
   vm.createContext(sandbox);
-  vm.runInContext(appSource, sandbox, { filename: "index.html#app" });
+  vm.runInContext(appSrc, sandbox, { filename: "index.html#app" });
   await flush();
   assert.doesNotThrow(() => sandbox.setTheme("dark"));
 });

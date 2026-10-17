@@ -7977,6 +7977,23 @@
     }
   },
   {
+    "testChangesSha256": "65a83402e418821c7a36b724f365759c98741cd2ba900f65d55df72f9c8ad447",
+    "reason": "Restore the standalone theme fixture source variable accidentally changed while adding the loadApp historical-source parameter.",
+    "previousBehavior": "The standalone no-documentElement test called vm.runInContext(appSource,...) even though appSource exists only as a loadApp parameter, causing ReferenceError before its preserved safety assertion.",
+    "intendedBehavior": "The standalone fixture evaluates the shared appSrc again. loadApp retains its appSource parameter for exact historical-client consumers. Original test name, setup and no-throw assertion remain unchanged; heading quotes are normalized only so the existing named test is an exact added/updated rationale anchor.",
+    "replacementTests": [
+      "applyTheme: a host with no documentElement is a safe no-op"
+    ],
+    "preservedCoverage": [
+      "No app runtime changes. The existing no-documentElement safety assertion remains intact and the coverage map is unchanged because no contract is added or renamed.",
+      "Focused applyTheme family plus actual pinned-source safe-update consumer passes5/5 zero skips. Root owns final full suite; it was not repeated."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='applyTheme: a host with no documentElement' tests.js",
+      "failure": "146/theme-fixture-01-red.log reproduces ReferenceError: appSource is not defined at standalone tests.js:8385 on8a. Restore appSrc only in that fixture; theme-fixture-02-green.log passes the applyTheme family and exact immutable historical-source recovery consumer5/5."
+    }
+  },
+  {
     "testChangesSha256": "5b4e6f3bd895d904bda454b3f4ca283e09aad9a5ba2eb78b7fc4228b86ccafb8",
     "reason": "Align the existing extended-FAQ limitation assertion with approved automatic safe-update and draft-preservation behavior for #141.",
     "previousBehavior": "The coverage asserted the exact instruction Refresh all devices even though automatic safe-update guidance now protects unfinished work.",
