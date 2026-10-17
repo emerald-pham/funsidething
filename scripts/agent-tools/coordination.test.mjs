@@ -202,6 +202,499 @@ test('status preserves legacy entries, resources, and unknown v1 fields', () => 
   }
 });
 
+test('begin registers an attached task against an explicitly selected local master base', () => {
+  const fixture = mkdtempSync(join(tmpdir(), 'chain-coordination-master-base-'));
+  try {
+    const ledgerPath = join(fixture, 'host-ledger.json');
+    const project = createProject(join(fixture, 'project'), 'work/master');
+    const mainSha = git(project, 'rev-parse', 'main');
+    git(project, 'branch', 'master', 'main');
+    git(project, 'checkout', '--quiet', 'master');
+    mkdirSync(join(project, 'docs'), { recursive: true });
+    writeFileSync(join(project, 'docs/master-base.md'), 'Selected master base.\n');
+    git(project, 'add', 'docs/master-base.md');
+    git(project, 'commit', '--quiet', '-m', 'advance master base');
+    const masterSha = git(project, 'rev-parse', 'HEAD');
+    git(project, 'checkout', '--quiet', 'work/master');
+    git(project, 'merge', '--quiet', '--ff-only', 'master');
+    writeFileSync(join(project, 'task.md'), 'Task starts from master.\n');
+    git(project, 'add', 'task.md');
+    git(project, 'commit', '--quiet', '-m', 'add task change');
+    const taskSha = git(project, 'rev-parse', 'HEAD');
+
+    const result = command([
+      'begin', '--file', ledgerPath, '--work-type', 'tooling', '--intent', 'Register from local master',
+      '--base-ref', 'master',
+    ], project);
+    assert.equal(result.status, 0, result.stderr);
+    const entry = JSON.parse(result.stdout);
+    assert.equal(entry.branchName, 'work/master');
+    assert.equal(entry.startBranchSha, taskSha);
+    assert.deepEqual(entry.selectedBase, { ref: 'refs/heads/master', sha: masterSha });
+    assert.equal(entry.startMainSha, mainSha, 'the legacy field keeps its main-based meaning');
+    assert.equal(entry.repositoryRoot, realpathSync(project));
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
+test('begin registers against an explicitly selected origin/master tracking ref', () => {
+  const fixture = mkdtempSync(join(tmpdir(), 'chain-coordination-origin-master-'));
+  try {
+    const ledgerPath = join(fixture, 'host-ledger.json');
+    const project = createProject(join(fixture, 'project'), 'work/origin-master');
+    const origin = addOrigin(project, fixture);
+    const mainSha = git(project, 'rev-parse', 'main');
+    git(project, 'branch', 'master', 'main');
+    git(project, 'checkout', '--quiet', 'master');
+    mkdirSync(join(project, 'docs'), { recursive: true });
+    writeFileSync(join(project, 'docs/master-base.md'), 'Published master base.\n');
+    git(project, 'add', 'docs/master-base.md');
+    git(project, 'commit', '--quiet', '-m', 'advance master base');
+    const masterSha = git(project, 'rev-parse', 'HEAD');
+    git(project, 'push', '--quiet', origin, 'master');
+    git(project, 'fetch', '--quiet', 'origin');
+    git(project, 'checkout', '--quiet', 'work/origin-master');
+    git(project, 'merge', '--quiet', '--ff-only', 'master');
+    writeFileSync(join(project, 'task.md'), 'Task starts from origin/master.\n');
+    git(project, 'add', 'task.md');
+    git(project, 'commit', '--quiet', '-m', 'add task change');
+
+    const result = command([
+      'begin', '--file', ledgerPath, '--work-type', 'tooling', '--intent', 'Register from origin/master',
+      '--base-ref', 'origin/master',
+    ], project);
+    assert.equal(result.status, 0, result.stderr);
+    const entry = JSON.parse(result.stdout);
+    assert.equal(entry.branchName, 'work/origin-master');
+    assert.deepEqual(entry.selectedBase, { ref: 'refs/remotes/origin/master', sha: masterSha });
+    assert.equal(entry.startMainSha, mainSha, 'the legacy field keeps its actual main-based meaning');
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
+test('begin keeps the origin/main default when the local main branch is absent', () => {
+  const fixture = mkdtempSync(join(tmpdir(), 'chain-coordination-origin-main-default-'));
+  try {
+    const ledgerPath = join(fixture, 'host-ledger.json');
+    const project = createProject(join(fixture, 'project'), 'work/origin-main-default');
+    addOrigin(project, fixture);
+    git(project, 'branch', '--delete', 'main');
+
+    const result = command([
+      'begin', '--file', ledgerPath, '--work-type', 'tooling', '--intent', 'Keep origin/main default',
+    ], project);
+    assert.equal(result.status, 0, result.stderr);
+    const entry = JSON.parse(result.stdout);
+    const originMainSha = git(project, 'rev-parse', 'origin/main');
+    assert.equal(entry.branchName, 'work/origin-main-default');
+    assert.deepEqual(entry.selectedBase, { ref: 'refs/remotes/origin/main', sha: originMainSha });
+    assert.equal(entry.startMainSha, originMainSha);
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
+test('begin rejects invalid and ambiguous refs without mutation and accepts fully qualified bases', () => {
+  const fixture = mkdtempSync(join(tmpdir(), 'chain-coordination-invalid-base-'));
+  try {
+    const ledgerPath = join(fixture, 'host-ledger.json');
+    const project = createProject(join(fixture, 'project'), 'work/selector-validation');
+    const origin = addOrigin(project, fixture);
+    git(project, 'branch', 'master', 'main');
+    git(project, 'checkout', '--quiet', 'master');
+    mkdirSync(join(project, 'docs'), { recursive: true });
+    writeFileSync(join(project, 'docs/master-base.md'), 'Selector validation base.\n');
+    git(project, 'add', 'docs/master-base.md');
+    git(project, 'commit', '--quiet', '-m', 'advance master base');
+    git(project, 'push', '--quiet', origin, 'master');
+    git(project, 'fetch', '--quiet', 'origin');
+    git(project, 'branch', 'origin/master', 'master');
+    git(project, 'tag', 'release-marker', 'master');
+    git(project, 'checkout', '--quiet', 'work/selector-validation');
+    git(project, 'merge', '--quiet', '--ff-only', 'master');
+    writeFileSync(join(project, 'task.md'), 'Selector validation task.\n');
+    git(project, 'add', 'task.md');
+    git(project, 'commit', '--quiet', '-m', 'add task change');
+
+    const foreignWorktree = join(fixture, 'foreign-owner');
+    const seededState = {
+      version: 1,
+      scope: 'codex-wide',
+      unknownLedgerData: { preserve: true },
+      entries: [{
+        id: 'foreign-owner', status: 'active', worktree: foreignWorktree,
+        branchName: 'feature/foreign', claims: ['release-foreign'], resources: ['foreign-resource'],
+        unknownEntryData: { preserve: ['all', 'bytes'] },
+      }],
+      reservations: [{ id: 'foreign-reservation', worktree: foreignWorktree, pid: process.pid, ports: [8080] }],
+      configurations: [{ id: 'foreign-configuration', worktree: foreignWorktree, slot: 7 }],
+    };
+    const originalContents = `${JSON.stringify(seededState, null, 2)}\n`;
+    writeFileSync(ledgerPath, originalContents);
+    const cases = [
+      { label: 'missing branch', options: ['--base-ref', 'missing/branch'] },
+      { label: 'tag ref', options: ['--base-ref', 'refs/tags/release-marker'] },
+      { label: 'revision expression', options: ['--base-ref', 'master~1'] },
+      { label: 'option-like value', options: ['--base-ref', '-master'] },
+      { label: 'ambiguous short ref', options: ['--base-ref', 'origin/master'] },
+      { label: 'missing value', options: ['--base-ref'] },
+      { label: 'duplicate value', options: ['--base-ref', 'master', '--base-ref', 'main'] },
+    ];
+    for (const { label, options } of cases) {
+      const result = command([
+        'begin', '--file', ledgerPath, '--work-type', 'tooling', '--intent', `Reject ${label}`,
+        ...options,
+      ], project);
+      assert.notEqual(result.status, 0, `${label} must be rejected`);
+      assert.match(result.stderr, /base-ref|missing value|only once/i, `${label} should explain the rejected selector`);
+      assert.equal(readFileSync(ledgerPath, 'utf8'), originalContents, `${label} must not mutate unknown or foreign v1 data`);
+    }
+
+    const fullLocalLedger = join(fixture, 'full-local-ledger.json');
+    const fullLocal = command([
+      'begin', '--file', fullLocalLedger, '--work-type', 'tooling', '--intent', 'Select the fully qualified local ref',
+      '--base-ref', 'refs/heads/origin/master',
+    ], project);
+    assert.equal(fullLocal.status, 0, fullLocal.stderr);
+    assert.deepEqual(JSON.parse(fullLocal.stdout).selectedBase, {
+      ref: 'refs/heads/origin/master', sha: git(project, 'rev-parse', 'master'),
+    });
+
+    const fullRemote = command([
+      'begin', '--file', ledgerPath, '--work-type', 'tooling', '--intent', 'Select the fully qualified remote ref',
+      '--base-ref', 'refs/remotes/origin/master',
+    ], project);
+    assert.equal(fullRemote.status, 0, fullRemote.stderr);
+    assert.deepEqual(JSON.parse(fullRemote.stdout).selectedBase, {
+      ref: 'refs/remotes/origin/master', sha: git(project, 'rev-parse', 'origin/master'),
+    });
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
+test('begin protects a selected tracking base when its configured remote name contains a slash', () => {
+  const fixture = mkdtempSync(join(tmpdir(), 'chain-coordination-slashed-remote-base-'));
+  try {
+    const ledgerPath = join(fixture, 'host-ledger.json');
+    const project = createProject(join(fixture, 'project'), 'work/team-upstream-base');
+    const remote = join(fixture, 'team-upstream.git');
+    git(fixture, 'init', '--bare', '--quiet', remote);
+    git(project, 'remote', 'add', 'team/upstream', remote);
+    git(project, 'branch', 'master', 'main');
+    git(project, 'push', '--quiet', 'team/upstream', 'master');
+    git(project, 'fetch', '--quiet', 'team/upstream');
+    const selectedSha = git(project, 'rev-parse', 'refs/remotes/team/upstream/master');
+
+    const foreignWorktree = join(fixture, 'foreign-owner');
+    const seededState = {
+      version: 1,
+      scope: 'codex-wide',
+      foreignLedgerMetadata: { keep: true },
+      entries: [{
+        id: 'foreign-owner', status: 'active', worktree: foreignWorktree,
+        branchName: 'feature/foreign', claims: ['foreign-claim'], resources: ['foreign-resource'],
+        unknownEntryMetadata: { keep: ['all', 'fields'] },
+      }],
+      reservations: [{ id: 'foreign-reservation', worktree: foreignWorktree, pid: process.pid, ports: [8080] }],
+      configurations: [{ id: 'foreign-configuration', worktree: foreignWorktree, slot: 4 }],
+    };
+    const originalContents = `${JSON.stringify(seededState, null, 2)}\n`;
+    writeFileSync(ledgerPath, originalContents);
+
+    git(project, 'checkout', '--quiet', 'master');
+    const protectedBase = command([
+      'begin', '--file', ledgerPath, '--work-type', 'tooling', '--intent', 'Reject direct tracking-base registration',
+      '--base-ref', 'team/upstream/master',
+    ], project);
+    assert.notEqual(protectedBase.status, 0, 'local master must stay protected when selected through a slash-named remote');
+    assert.match(protectedBase.stderr, /protected base branch master/i);
+    assert.equal(readFileSync(ledgerPath, 'utf8'), originalContents, 'rejection must preserve foreign and unknown ledger bytes');
+
+    git(project, 'checkout', '--quiet', 'work/team-upstream-base');
+    writeFileSync(join(project, 'task.md'), 'Task based on the slash-named remote tracking ref.\n');
+    git(project, 'add', 'task.md');
+    git(project, 'commit', '--quiet', '-m', 'add task change');
+    const branchSha = git(project, 'rev-parse', 'HEAD');
+    const registered = command([
+      'begin', '--file', ledgerPath, '--work-type', 'tooling', '--intent', 'Register attached task branch from tracking base',
+      '--base-ref', 'team/upstream/master',
+    ], project);
+    assert.equal(registered.status, 0, registered.stderr);
+    const entry = JSON.parse(registered.stdout);
+    assert.equal(entry.branchName, 'work/team-upstream-base');
+    assert.equal(entry.startBranchSha, branchSha);
+    assert.deepEqual(entry.selectedBase, { ref: 'refs/remotes/team/upstream/master', sha: selectedSha });
+    const state = JSON.parse(readFileSync(ledgerPath, 'utf8'));
+    assert.deepEqual(state.entries[0], seededState.entries[0], 'registering the task must retain the foreign entry');
+    assert.deepEqual(state.reservations, seededState.reservations);
+    assert.deepEqual(state.configurations, seededState.configurations);
+    assert.deepEqual(state.foreignLedgerMetadata, seededState.foreignLedgerMetadata);
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
+test('begin protects a slash-named local base through a custom slashed-remote fetch mapping', () => {
+  const fixture = mkdtempSync(join(tmpdir(), 'chain-coordination-slashed-custom-base-'));
+  try {
+    const ledgerPath = join(fixture, 'host-ledger.json');
+    const project = createProject(join(fixture, 'project'), 'work/team-upstream-custom');
+    const remote = join(fixture, 'team-upstream.git');
+    git(fixture, 'init', '--bare', '--quiet', remote);
+    git(project, 'remote', 'add', 'team/upstream', remote);
+    git(project, 'checkout', '--quiet', '-b', 'release/v1', 'main');
+    writeFileSync(join(project, 'base.md'), 'Slash-named custom base.\n');
+    git(project, 'add', 'base.md');
+    git(project, 'commit', '--quiet', '-m', 'advance release base');
+    git(project, 'push', '--quiet', 'team/upstream', 'release/v1');
+    git(project, 'config', '--replace-all', 'remote.team/upstream.fetch', '+refs/heads/release/v1:refs/remotes/team/upstream/custom-base');
+    git(project, 'fetch', '--quiet', 'team/upstream');
+    const selectedSha = git(project, 'rev-parse', 'refs/remotes/team/upstream/custom-base');
+
+    const foreignWorktree = join(fixture, 'foreign-owner');
+    const seededState = {
+      version: 1,
+      scope: 'codex-wide',
+      foreignMetadata: { untouched: true },
+      entries: [{ id: 'foreign-owner', status: 'active', worktree: foreignWorktree, retained: { owner: true } }],
+      reservations: [{ id: 'foreign-reservation', worktree: foreignWorktree, pid: process.pid, ports: [8123] }],
+      configurations: [{ id: 'foreign-configuration', worktree: foreignWorktree, slot: 5 }],
+    };
+    const originalContents = `${JSON.stringify(seededState, null, 2)}\n`;
+    writeFileSync(ledgerPath, originalContents);
+
+    const protectedBase = command([
+      'begin', '--file', ledgerPath, '--work-type', 'tooling', '--intent', 'Reject direct slash-named base registration',
+      '--base-ref', 'team/upstream/custom-base',
+    ], project);
+    assert.notEqual(protectedBase.status, 0, 'release/v1 must be protected through its configured custom tracking mapping');
+    assert.match(protectedBase.stderr, /protected base branch release\/v1/i);
+    assert.equal(readFileSync(ledgerPath, 'utf8'), originalContents, 'rejection must preserve unknown and foreign ledger bytes');
+
+    git(project, 'checkout', '--quiet', 'work/team-upstream-custom');
+    git(project, 'merge', '--quiet', '--ff-only', 'release/v1');
+    writeFileSync(join(project, 'task.md'), 'Task based on the slash-named custom tracking ref.\n');
+    git(project, 'add', 'task.md');
+    git(project, 'commit', '--quiet', '-m', 'add task change');
+    const branchSha = git(project, 'rev-parse', 'HEAD');
+    const registered = command([
+      'begin', '--file', ledgerPath, '--work-type', 'tooling', '--intent', 'Register attached slash-base task branch',
+      '--base-ref', 'team/upstream/custom-base',
+    ], project);
+    assert.equal(registered.status, 0, registered.stderr);
+    const entry = JSON.parse(registered.stdout);
+    assert.equal(entry.branchName, 'work/team-upstream-custom');
+    assert.equal(entry.startBranchSha, branchSha);
+    assert.deepEqual(entry.selectedBase, { ref: 'refs/remotes/team/upstream/custom-base', sha: selectedSha });
+    const state = JSON.parse(readFileSync(ledgerPath, 'utf8'));
+    assert.deepEqual(state.entries[0], seededState.entries[0]);
+    assert.deepEqual(state.reservations, seededState.reservations);
+    assert.deepEqual(state.configurations, seededState.configurations);
+    assert.deepEqual(state.foreignMetadata, seededState.foreignMetadata);
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
+test('begin rejects ambiguous configured mappings for a tracking base without ledger mutation', () => {
+  const fixture = mkdtempSync(join(tmpdir(), 'chain-coordination-ambiguous-base-mapping-'));
+  try {
+    const ledgerPath = join(fixture, 'host-ledger.json');
+    const project = createProject(join(fixture, 'project'), 'work/ambiguous-base-mapping');
+    const origin = addOrigin(project, fixture);
+    git(project, 'checkout', '--quiet', '-b', 'release/base', 'main');
+    git(project, 'push', '--quiet', origin, 'release/base');
+    git(project, 'checkout', '--quiet', '-b', 'alternate/base', 'main');
+    git(project, 'push', '--quiet', origin, 'alternate/base');
+    git(project, 'fetch', '--quiet', 'origin');
+    git(project, 'config', '--add', 'remote.origin.fetch', '+refs/heads/alternate/base:refs/remotes/origin/release/base');
+
+    const foreignWorktree = join(fixture, 'foreign-owner');
+    const seededState = {
+      version: 1,
+      scope: 'codex-wide',
+      unknownHeader: { preserve: true },
+      entries: [{ id: 'foreign-owner', status: 'active', worktree: foreignWorktree, extra: ['retain'] }],
+      reservations: [{ id: 'foreign-reservation', worktree: foreignWorktree, pid: process.pid }],
+      configurations: [{ id: 'foreign-configuration', worktree: foreignWorktree, slot: 6 }],
+    };
+    const originalContents = `${JSON.stringify(seededState, null, 2)}\n`;
+    writeFileSync(ledgerPath, originalContents);
+
+    const result = command([
+      'begin', '--file', ledgerPath, '--work-type', 'tooling', '--intent', 'Reject an ambiguous remote base mapping',
+      '--base-ref', 'origin/release/base',
+    ], project);
+    assert.notEqual(result.status, 0, 'an ambiguous tracking ref must not be guessed into a local protected branch');
+    assert.match(result.stderr, /ambiguous|mapping|cannot safely determine/i);
+    assert.equal(readFileSync(ledgerPath, 'utf8'), originalContents, 'ambiguous mapping rejection must not mutate foreign v1 bytes');
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
+test('begin protects main and the selected local base branch, including for origin/master', () => {
+  const fixture = mkdtempSync(join(tmpdir(), 'chain-coordination-protected-base-'));
+  try {
+    const ledgerPath = join(fixture, 'host-ledger.json');
+    const project = createProject(join(fixture, 'project'), 'work/protected-base');
+    const origin = addOrigin(project, fixture);
+    git(project, 'branch', 'master', 'main');
+    git(project, 'checkout', '--quiet', 'master');
+    mkdirSync(join(project, 'docs'), { recursive: true });
+    writeFileSync(join(project, 'docs/master-base.md'), 'Protected master base.\n');
+    git(project, 'add', 'docs/master-base.md');
+    git(project, 'commit', '--quiet', '-m', 'advance master base');
+    git(project, 'push', '--quiet', origin, 'master');
+    git(project, 'fetch', '--quiet', 'origin');
+    git(project, 'checkout', '--quiet', 'work/protected-base');
+    git(project, 'merge', '--quiet', '--ff-only', 'master');
+    writeFileSync(join(project, 'task.md'), 'Protected base task.\n');
+    git(project, 'add', 'task.md');
+    git(project, 'commit', '--quiet', '-m', 'add task change');
+
+    const foreignWorktree = join(fixture, 'foreign-owner');
+    const seededState = {
+      version: 1,
+      scope: 'codex-wide',
+      legacyHeader: { keep: true },
+      entries: [{ id: 'foreign-owner', status: 'active', worktree: foreignWorktree, unknown: 'keep' }],
+      reservations: [{ id: 'foreign-reservation', worktree: foreignWorktree, pid: process.pid }],
+      configurations: [{ id: 'foreign-config', worktree: foreignWorktree, slot: 4 }],
+    };
+    const originalContents = `${JSON.stringify(seededState, null, 2)}\n`;
+    writeFileSync(ledgerPath, originalContents);
+    const cases = [
+      { branch: 'main', base: 'master', reason: /protected base branch main/i },
+      { branch: 'master', base: 'origin/master', reason: /protected base branch master/i },
+      { branch: 'master', base: 'master', reason: /protected base branch master/i },
+    ];
+    for (const { branch, base, reason } of cases) {
+      git(project, 'checkout', '--quiet', branch);
+      const result = command([
+        'begin', '--file', ledgerPath, '--work-type', 'tooling', '--intent', 'Reject protected branch registration',
+        '--base-ref', base,
+      ], project);
+      assert.notEqual(result.status, 0, `${branch} must not be registered directly`);
+      assert.match(result.stderr, reason);
+      assert.equal(readFileSync(ledgerPath, 'utf8'), originalContents, `${branch} rejection must not mutate the ledger`);
+    }
+    git(project, 'checkout', '--detach', '--quiet', 'HEAD');
+    const detached = command([
+      'begin', '--file', ledgerPath, '--work-type', 'tooling', '--intent', 'Reject detached registration',
+      '--base-ref', 'master',
+    ], project);
+    assert.notEqual(detached.status, 0);
+    assert.match(detached.stderr, /attached branch/i);
+    assert.equal(readFileSync(ledgerPath, 'utf8'), originalContents, 'detached rejection must not mutate the ledger');
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
+test('begin registers a master-only repository without inventing a main SHA', () => {
+  const fixture = mkdtempSync(join(tmpdir(), 'chain-coordination-master-only-'));
+  try {
+    const ledgerPath = join(fixture, 'host-ledger.json');
+    const project = createProject(join(fixture, 'project'), 'work/master-only');
+    git(project, 'branch', 'master', 'main');
+    git(project, 'checkout', '--quiet', 'master');
+    mkdirSync(join(project, 'docs'), { recursive: true });
+    writeFileSync(join(project, 'docs/master-base.md'), 'Master-only base.\n');
+    git(project, 'add', 'docs/master-base.md');
+    git(project, 'commit', '--quiet', '-m', 'advance master base');
+    const masterSha = git(project, 'rev-parse', 'HEAD');
+    git(project, 'checkout', '--quiet', 'work/master-only');
+    git(project, 'merge', '--quiet', '--ff-only', 'master');
+    git(project, 'branch', '--delete', 'main');
+    writeFileSync(join(project, 'task.md'), 'Master-only task.\n');
+    git(project, 'add', 'task.md');
+    git(project, 'commit', '--quiet', '-m', 'add task change');
+
+    const result = command([
+      'begin', '--file', ledgerPath, '--work-type', 'tooling', '--intent', 'Register a master-only checkout',
+      '--base-ref', 'master',
+    ], project);
+    assert.equal(result.status, 0, result.stderr);
+    const entry = JSON.parse(result.stdout);
+    assert.equal(entry.branchName, 'work/master-only');
+    assert.equal(entry.repositoryRoot, realpathSync(project));
+    assert.deepEqual(entry.selectedBase, { ref: 'refs/heads/master', sha: masterSha });
+    assert.equal(Object.hasOwn(entry, 'startMainSha'), false, 'a repository without main has no main SHA to record');
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
+test('master-only owner can park and resume with its persisted selected base', () => {
+  const fixture = mkdtempSync(join(tmpdir(), 'chain-coordination-master-lifecycle-'));
+  try {
+    const ledgerPath = join(fixture, 'host-ledger.json');
+    const project = createProject(join(fixture, 'project'), 'work/master-lifecycle');
+    git(project, 'branch', 'master', 'main');
+    git(project, 'checkout', '--quiet', 'master');
+    mkdirSync(join(project, 'docs'), { recursive: true });
+    writeFileSync(join(project, 'docs/master-base.md'), 'Master-only lifecycle base.\n');
+    git(project, 'add', 'docs/master-base.md');
+    git(project, 'commit', '--quiet', '-m', 'advance master base');
+    const masterSha = git(project, 'rev-parse', 'HEAD');
+    git(project, 'checkout', '--quiet', 'work/master-lifecycle');
+    git(project, 'merge', '--quiet', '--ff-only', 'master');
+    git(project, 'branch', '--delete', 'main');
+    writeFileSync(join(project, 'task.md'), 'Master-only lifecycle task.\n');
+    git(project, 'add', 'task.md');
+    git(project, 'commit', '--quiet', '-m', 'add task change');
+
+    const began = command([
+      'begin', '--file', ledgerPath, '--work-type', 'tooling', '--intent', 'Park a master-only owner',
+      '--base-ref', 'master', '--resources', 'master-lifecycle-resource',
+    ], project);
+    assert.equal(began.status, 0, began.stderr);
+    const entry = JSON.parse(began.stdout);
+    const checkpoint = git(project, 'rev-parse', 'HEAD');
+    const claimedResult = command([
+      'claim', '--file', ledgerPath, '--id', entry.id, '--scope', 'docs/master-lifecycle.md',
+      '--claims', 'master-lifecycle-claim',
+    ], project);
+    assert.equal(claimedResult.status, 0, claimedResult.stderr);
+    const claimed = JSON.parse(claimedResult.stdout);
+    assert.deepEqual(claimed.selectedBase, entry.selectedBase);
+    const heartbeatResult = command(['heartbeat', '--file', ledgerPath, '--id', entry.id], project);
+    assert.equal(heartbeatResult.status, 0, heartbeatResult.stderr);
+    const heartbeat = JSON.parse(heartbeatResult.stdout);
+    assert.deepEqual(heartbeat.selectedBase, entry.selectedBase);
+    const releasedResult = command([
+      'release-claim', '--file', ledgerPath, '--id', entry.id, '--scope', 'docs/master-lifecycle.md',
+      '--claims', 'master-lifecycle-claim',
+    ], project);
+    assert.equal(releasedResult.status, 0, releasedResult.stderr);
+    const released = JSON.parse(releasedResult.stdout);
+    assert.deepEqual(released.selectedBase, entry.selectedBase);
+    assert.deepEqual(released.resources, ['master-lifecycle-resource']);
+    const parkedResult = command([
+      'park', '--file', ledgerPath, '--id', entry.id, '--checkpoint-sha', checkpoint,
+      '--next-action', 'Resume the same master-based task.',
+    ], project);
+    assert.equal(parkedResult.status, 0, parkedResult.stderr);
+    const parked = JSON.parse(parkedResult.stdout);
+    assert.equal(parked.status, 'parked');
+    assert.deepEqual(parked.selectedBase, { ref: 'refs/heads/master', sha: masterSha });
+    assert.deepEqual(parked.resources, ['master-lifecycle-resource']);
+
+    const resumedResult = command(['resume', '--file', ledgerPath, '--id', entry.id], project);
+    assert.equal(resumedResult.status, 0, resumedResult.stderr);
+    const resumed = JSON.parse(resumedResult.stdout);
+    assert.equal(resumed.status, 'active');
+    assert.deepEqual(resumed.selectedBase, parked.selectedBase);
+    assert.deepEqual(resumed.resources, parked.resources);
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
 test('begin blocks a second project resource owner and retains both projects in v1 state', () => {
   const fixture = mkdtempSync(join(tmpdir(), 'chain-coordination-begin-'));
   try {
@@ -251,6 +744,9 @@ test('begin blocks a second project resource owner and retains both projects in 
     assert.equal(projectAEntry.branchName, 'work/project-a');
     assert.equal(projectAEntry.startBranchSha, git(projectA, 'rev-parse', 'HEAD'));
     assert.equal(projectAEntry.startMainSha, git(projectA, 'rev-parse', 'main'));
+    assert.deepEqual(projectAEntry.selectedBase, {
+      ref: 'refs/heads/main', sha: git(projectA, 'rev-parse', 'main'),
+    });
     assert.deepEqual(projectAEntry.resources, ['project-a-only']);
 
     const afterFirstBegin = JSON.parse(readFileSync(ledgerPath, 'utf8'));
@@ -501,6 +997,81 @@ test('Chain Scanner finish rejects a landed entry without exact-SHA release evid
     assert.equal(finalState.reservations[0].id, 'other-project-reservation');
     assert.deepEqual(finalState.reservations[0].ports, [8787]);
     assert.equal(git(project, '--git-dir', origin, 'rev-parse', 'refs/heads/main'), candidateSha);
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
+test('Chain Scanner finish keeps actual main and exact receipt authority after master-base registration', () => {
+  const fixture = mkdtempSync(join(tmpdir(), 'chain-coordination-master-release-'));
+  try {
+    const ledgerPath = join(fixture, 'host-ledger.json');
+    const project = createProject(join(fixture, 'chain-scanner'), 'work/master-release');
+    git(project, 'checkout', '--quiet', 'main');
+    mkdirSync(join(project, 'scripts'), { recursive: true });
+    copyFileSync(releaseEvidenceEntrypoint, join(project, 'scripts/release-evidence.mjs'));
+    git(project, 'add', 'scripts/release-evidence.mjs');
+    git(project, 'commit', '--quiet', '-m', 'install fixture release adapter');
+    git(project, 'checkout', '--quiet', 'work/master-release');
+    git(project, 'merge', '--quiet', '--ff-only', 'main');
+    git(project, 'branch', 'master', 'main');
+    git(project, 'checkout', '--quiet', 'master');
+    mkdirSync(join(project, 'docs'), { recursive: true });
+    writeFileSync(join(project, 'docs/master-base.md'), 'Master release base.\n');
+    git(project, 'add', 'docs/master-base.md');
+    git(project, 'commit', '--quiet', '-m', 'advance master release base');
+    const masterSha = git(project, 'rev-parse', 'HEAD');
+    const origin = addOrigin(project, fixture);
+    git(project, 'push', '--quiet', origin, 'master');
+    git(project, 'fetch', '--quiet', 'origin');
+    git(project, 'checkout', '--quiet', 'work/master-release');
+    git(project, 'merge', '--quiet', '--ff-only', 'master');
+    const began = command([
+      'begin', '--file', ledgerPath, '--work-type', 'tooling', '--intent', 'Strict release after master registration',
+      '--base-ref', 'master',
+    ], project);
+    assert.equal(began.status, 0, began.stderr);
+    const entry = JSON.parse(began.stdout);
+    assert.deepEqual(entry.selectedBase, { ref: 'refs/heads/master', sha: masterSha });
+    writeFileSync(join(project, 'docs/task-note.md'), 'Candidate based on master.\n');
+    git(project, 'add', 'docs/task-note.md');
+    git(project, 'commit', '--quiet', '-m', 'add master-based task change');
+    const candidateSha = git(project, 'rev-parse', 'HEAD');
+
+    // Even when local master contains the candidate, Chain Scanner must require actual main.
+    git(project, 'checkout', '--quiet', 'master');
+    git(project, 'merge', '--quiet', '--ff-only', entry.branchName);
+    git(project, 'checkout', '--quiet', entry.branchName);
+    const missingFromMain = command([
+      'finish', '--file', ledgerPath, '--id', entry.id, '--outcome', 'landed', '--adapter', 'chain-scanner',
+    ], project);
+    assert.notEqual(missingFromMain.status, 0);
+    assert.match(missingFromMain.stderr, /local main does not contain exact task commit/i);
+    assert.deepEqual(JSON.parse(readFileSync(ledgerPath, 'utf8')).entries[0].selectedBase, entry.selectedBase);
+
+    git(project, 'checkout', '--quiet', 'main');
+    git(project, 'merge', '--quiet', '--ff-only', entry.branchName);
+    git(project, 'checkout', '--quiet', entry.branchName);
+    const staleRemote = command([
+      'finish', '--file', ledgerPath, '--id', entry.id, '--outcome', 'landed', '--adapter', 'chain-scanner',
+    ], project);
+    assert.notEqual(staleRemote.status, 0);
+    assert.match(staleRemote.stderr, /origin\/main .* does not match local main/i);
+
+    git(project, 'checkout', '--quiet', 'main');
+    git(project, 'push', '--quiet', 'origin', 'main');
+    git(project, 'fetch', '--quiet', 'origin');
+    git(project, 'checkout', '--quiet', entry.branchName);
+    assert.equal(git(project, 'rev-parse', 'origin/main'), candidateSha);
+    const missingReceipt = command([
+      'finish', '--file', ledgerPath, '--id', entry.id, '--outcome', 'landed', '--adapter', 'chain-scanner',
+    ], project);
+    assert.notEqual(missingReceipt.status, 0);
+    assert.match(missingReceipt.stderr, /release receipt|release evidence/i);
+    const finalEntry = JSON.parse(readFileSync(ledgerPath, 'utf8')).entries[0];
+    assert.equal(finalEntry.status, 'active');
+    assert.deepEqual(finalEntry.selectedBase, entry.selectedBase);
+    assert.equal(finalEntry.finalBranchSha, undefined);
   } finally {
     rmSync(fixture, { recursive: true, force: true });
   }
