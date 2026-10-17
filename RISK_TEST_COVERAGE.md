@@ -259,10 +259,10 @@ The named-contract test in tests.js checks that every top-level test whose title
 
 - RISK PWA updates: an already durable board applies a downloaded worker without a redundant quota write
 - RISK PWA updates: an unsaved draft visibly defers reload while update checks continue
-- RISK PWA updates: a scanner gesture commits its action before a downloaded worker reloads
-- RISK PWA updates: a gesture beginning during an update save holds and resumes reload
-- RISK PWA updates: cancelled and released gestures resume a pending replacement
-- RISK PWA updates: the extended FAQ and changelog explain gesture-safe reloads
+- RISK PWA updates: a scanner gesture commits durably without an automatic session reload
+- RISK PWA updates: a gesture beginning during an update save preserves the ongoing session
+- RISK PWA updates: cancelled and released gestures preserve the used session
+- RISK PWA updates: the extended FAQ and changelog explain uninterrupted used sessions
 - RISK PWA module delivery: a fresh installed shell serves every production script while offline
 - RISK architecture checkpoint: editor Undo and bulk Undo preserve selection boundaries and immutable history through reload
 - RISK PWA updates: a host write in flight must finish before a reverted board reloads
@@ -1464,3 +1464,16 @@ Actual populated-editor ordinary Done, an offline Dot that an independent peer c
 - `RISK legacy completion divergent sources: both literal guarded copies are safe before reconciliation writes`
 - `RISK legacy completion divergent safety: refused copies and either guarded-key race hold exact sources and newer edits`
 - `RISK completion awareness FAQ: unseen completion defeats later clock or upload while comparison ratings remain`
+## P0 active app sessions
+
+- RISK PWA session updates: a blurred unfinished Add draft prevents automatic document replacement
+- RISK PWA session updates: keyboard scrolling and accessible clicks keep updates available without replacing used documents
+
+Issue #176/#177 supersedes the prior after-gesture automatic reload expectation. Quiet startup, first installation, failed saves, editor deferral, normal task saving, update downloads and cold board reopen remain protected. The synthetic controller-change reproduction does not establish the original reported browser crash cause.
+
+- RISK PWA session updates: scrolling during an awaited host save prevents document replacement
+- RISK PWA session updates: real boot protects input while asynchronous board restoration is pending
+
+- RISK PWA upgrade safety: candidate installation keeps a predecessor document and unfinished draft intact
+
+The candidate worker precaches while predecessor clients remain on their existing worker. Natural activation after all app clients close retains first-install claim and cache retirement. Actual predecessor upgrade browser evidence is separate from Node lifecycle coverage.

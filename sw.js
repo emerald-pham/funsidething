@@ -45,7 +45,9 @@ self.addEventListener("install", event => {
         "./vendor/HYG-LICENSE",
         "./vendor/CC-BY-SA-4.0.txt"
       ].map(path => new Request(path, {cache:"reload"}))))
-      .then(() => self.skipWaiting())
+    // Keep predecessor pages on their worker until all of its clients close.
+    // Their older controllerchange handler can otherwise discard an unfocused
+    // draft before the new page's session protection has a chance to run.
   );
 });
 
