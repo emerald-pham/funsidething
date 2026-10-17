@@ -13060,12 +13060,12 @@ test('RISK decision recovery transitive replacement: a second plain Import recog
  ctx.window.CloudSync.ready=true;await ctx.onAction('sync-retry',{});await syncSettle(40);assert.equal(ctx.window.CloudSync.errorCode,'unsupported-decision-evidence');assert.equal(h.doc.payload,cloud);assert.equal(local.shim.localStorage.getItem(SYNC_STORE_KEY),saved,'transitive recognition cannot authorize a mutated foreign witness');
 });
 
-test('RISK decision recovery replacement idempotence: repeated current Export Import retains one exact authority tree after durable recovery',async t=>{
+test('RISK decision recovery replacement idempotence: repeated actual Export Import retains one exact authority tree after durable recovery',async t=>{
  const {local,peer}=await scopedUndoClients(),ctx=local.ctx;
  for(const app of [local,peer])t.after(()=>{app.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',app.ctx);});
  ctx.onAction('no',{dataset:{candidate:'undo-local',benchmark:'undo-base'}});await ctx.persist();
  const baseline=JSON.stringify(ctx.state.decisionBaseline),events=JSON.stringify(ctx.state.decisionEvents),ratings=JSON.stringify(ctx.state.tasks.map(task=>[task.id,task.mu,task.sigma]));
- for(let i=0;i<11;i++){const raw=JSON.stringify(ctx.state);local.shim.document.getElementById('jsonBox').value=raw;assert.equal(await ctx.onAction('import-json',{}),true);await ctx.persist();assert.equal(JSON.stringify(ctx.state.decisionBaseline),baseline,'same authority must not duplicate its complete prior tree');assert.equal(JSON.stringify(ctx.state.decisionEvents),events);assert.equal(JSON.stringify(ctx.state.tasks.map(task=>[task.id,task.mu,task.sigma])),ratings);assert.ok(ctx.readLocalBackups().some(row=>row.payload===raw),'required exact recovery still precedes the no-op authority guard');}
+ for(let i=0;i<11;i++){const raw=JSON.stringify(ctx.state);ctx.onAction('export-json',{});assert.equal(JSON.stringify(JSON.parse(local.shim.document.getElementById('jsonBox').value).decisionBaseline),baseline,'the actual Export control carries the selected authority');assert.equal(await ctx.onAction('import-json',{}),true);await ctx.persist();assert.equal(JSON.stringify(ctx.state.decisionBaseline),baseline,'same authority must not duplicate its complete prior tree');assert.equal(JSON.stringify(ctx.state.decisionEvents),events);assert.equal(JSON.stringify(ctx.state.tasks.map(task=>[task.id,task.mu,task.sigma])),ratings);assert.ok(ctx.readLocalBackups().some(row=>row.payload===raw),'required exact recovery still precedes the no-op authority guard');}
 });
 
 test('RISK decision recovery guest Reset inheritance: replacement-only authority supports first signed No and the existing local Reset Undo',async t=>{

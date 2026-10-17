@@ -1334,7 +1334,7 @@ A real newer-peer adoption must preserve and hold unknown version1 metadata at t
 
 - `RISK decision recovery retired comparison effects: exact stale returns cannot revive No Yes Dot or Dislodge after two replacements and peer progress`
 - `RISK decision recovery transitive replacement: a second plain Import recognizes exact retired learning and still holds malformed nested ownership`
-- `RISK decision recovery replacement idempotence: repeated current Export Import retains one exact authority tree after durable recovery`
+- `RISK decision recovery replacement idempotence: repeated actual Export Import retains one exact authority tree after durable recovery`
 - `RISK decision recovery guest Reset inheritance: replacement-only authority supports first signed No and the existing local Reset Undo`
 
 Exact comparison retirement clears only named effects, preserving later peer choices and learning. Validated nested replacement/inheritance receipts retain lossless wire witnesses; changed foreign witnesses hold. Reimporting the exact current authority completes recovery without duplicating its tree. Empty guest Reset authority adopts only through first-empty-account provenance, retains available Reset and earlier No Undo, and stops on failed recovery or an account race. Explicit replacement frames seal the installed result before asynchronous persistence, while ordinary adoption still seals the preceding gesture.
