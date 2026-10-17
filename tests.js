@@ -8785,6 +8785,23 @@ test('RISK saved view restoration: the eligibility filter remains selected after
  assert.match(reopened.shim.document.getElementById('listEligibilityRow').innerHTML,/data-id="ineligible" aria-pressed="true"/);
 });
 
+test('RISK saved view cloud adoption: this device keeps its open All Tasks view through a newer remote board and reload',async()=>{
+ const local=syncState({tasks:[syncTask('local-view','Local board task')],syncAccount:'e@example.com',syncRev:4,listOpen:false,seenQuickStart:true});
+ const remote=syncState({tasks:[syncTask('remote-view','Remote board task')],syncAccount:'e@example.com',syncRev:4,listOpen:false,seenQuickStart:true});
+ const storage=sharedScannerStorage({[SYNC_STORE_KEY]:JSON.stringify(local)}),h=makeSyncHarness({remote,rev:5});
+ const opened=await loadApp({sharedStorage:storage,cloudSyncFactory:h.factory});
+ opened.ctx.onAction('toggle-list');
+ const afterToggle={listOpen:opened.ctx.state.listOpen,cachedListOpen:JSON.parse(storage.getItem('fvp:chain-scanner:saved-view:v1')||'null')?.listOpen??null};
+ vm.runInContext('if(cloudTimer){clearTimeout(cloudTimer);cloudTimer=null;}',opened.ctx);
+ opened.ctx.setListQuery('Remote');
+ await opened.ctx.cloudPull();
+ const adopted={title:opened.ctx.state.tasks[0].title,listOpen:opened.ctx.state.listOpen,hidden:opened.shim.document.getElementById('listBody').hidden};
+ const reopened=await loadApp({sharedStorage:storage});
+ assert.deepEqual({afterToggle,adopted,reloaded:{listOpen:reopened.ctx.state.listOpen,hidden:reopened.shim.document.getElementById('listBody').hidden,query:reopened.shim.document.getElementById('listSearch').value}},
+  {afterToggle:{listOpen:true,cachedListOpen:true},adopted:{title:'Remote board task',listOpen:true,hidden:false},reloaded:{listOpen:true,hidden:false,query:'Remote'}},
+  'new cloud task data is accepted while this browser retains its own open list and filters through adoption and reload');
+});
+
 test('RISK saved view fallback: corrupt or blocked local presentation storage leaves the saved board usable',async()=>{
  const board=syncState({tasks:[syncTask('view-fallback','Keep task')],listOpen:true,seenQuickStart:true}),payload=JSON.stringify(board);
  const corrupt=await loadApp({sharedStorage:sharedScannerStorage({[SYNC_STORE_KEY]:payload,'fvp:chain-scanner:saved-view:v1':'{'})});
@@ -8804,10 +8821,11 @@ test('RISK saved view fallback: corrupt or blocked local presentation storage le
 test('RISK saved view guidance: Quick start and Changelog describe this-device restoration and current dates',async()=>{
  const {ctx,shim}=await loadApp();for(const id of ['appChangelogCurrent','appChangelog'])shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
  const answer=help.split('<dt>What does All Tasks remember when I reopen?</dt><dd>')[1]?.split('</dd>')[0]||'';
- assert.match(answer,/last All Tasks search or filter and your place in the list on this device/i);
+ assert.match(answer,/last All Tasks search or filter, whether its list was open, and your place in the list on this device/i);
  assert.match(answer,/saved board first/i);assert.match(answer,/dates and eligibility use today/i);
+ assert.match(answer,/if this browser cannot retain the view, your saved board still opens with its usual list view/i);
  const chapter=help.split('<details class="help-faq" data-help-changelog>')[1]?.split('</details>')[0]||'';
- assert.match(chapter,/<h3>October 16, 2026<\/h3>[\s\S]*?<li>Opening or refreshing restores this device’s All Tasks filters and list position before the screen appears; newer cloud changes still sync in the background\.<\/li>/);
+ assert.match(chapter,/<h3>October 16, 2026<\/h3>[\s\S]*?<li>Opening or refreshing restores this device’s All Tasks list, filters and position before the screen appears; newer cloud changes still sync in the background. If this browser cannot retain the view, the saved board still opens with its usual list view\.<\/li>/);
 });
 
 async function delayedLocalBoardBrowser(viewport={width:390,height:844},dispatchResizeDuringLoad=false){

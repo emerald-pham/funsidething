@@ -1015,6 +1015,7 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK saved view restoration: a reopened All Tasks list retains its local search tag filter and scroll position
 - RISK saved view restoration: the eligibility filter remains selected after reopening All Tasks
 - RISK saved view account boundary: an All Tasks filter is cleared when the signed-in account changes
+- RISK saved view cloud adoption: this device keeps its open All Tasks view through a newer remote board and reload
 - RISK saved view fallback: corrupt or blocked local presentation storage leaves the saved board usable
 - RISK saved view startup: delayed local board reads do not expose an empty default shell
 - RISK saved view startup: delayed local reads do not call state renderers before board hydration
