@@ -8774,5 +8774,29 @@
       "command": "FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 node --test --test-name-pattern='Firestore rules: real pinned writer reads decision authority' tests.js; exact4b24 natural diagnostic146/ci-rules-02-trace-05.log, staged-before-predicate03, post-predicate04 and diagnostic05. Parent preserved actualmainCI39014424519 in ci-main-148-failed.log/json.",
       "failure": "Natural trace05: activated error=true/codepermission-denied, competing ok=true/rev3, oldstatusok, nextstatuspush/errorpermission-denied; original asymmetric predicate fails after CAS one-winner passes. Staged03 reproduces same original assertion for historical-first. Post-predicate04 then fails original historical-fact assertion with undefined versus exactevents; diagnostic05 has pullingfalse/rev4/statusok and remains unchanged after50ms, disproving the suspected in-flight cause. Source initial fixture syncRev4 matched real retryrev4 without a read. Corrected witnessed-read seed and immutable predicate pass06/08/10. Post-correction fence-removal sensitivity07 fails original fixed-manifest denial assertion in all3 schedules; this is sensitivity, not a product RED."
     }
+  },
+  {
+    "testChangesSha256": "f3a23b1198f2171eaeeaf4c5b710246c2ca65e9edeb3c9dcc1e065bc02cbf49f",
+    "reason": "The downloaded service worker could reload the full app between a scanner pointerdown and its delegated task response. This ticket adds focused full-app coverage for the existing gesture lifecycle and documents the update wait in the extended FAQ and current release notes.",
+    "previousBehavior": "An update could reach applyPendingAppUpdate during an active scanner gesture and reload immediately, interrupting the pending response. If persistence yielded while a new gesture began, the continuation could still reload. Gesture completion did not retry a pending update.",
+    "intendedBehavior": "A ready update waits while the existing scanner gesture is active, rechecks that boundary after asynchronous persistence, and resumes at the existing gesture finish after the delegated click has committed. Pointer cancellation and the existing pointerup fallback release pending updates. Existing edit, visibility, first-install, storage, and cloud safeguards remain in place; no new gesture or storage state is introduced.",
+    "replacementTests": [
+      "RISK PWA updates: a scanner gesture commits its action before a downloaded worker reloads",
+      "RISK PWA updates: a gesture beginning during an update save holds and resumes reload",
+      "RISK PWA updates: cancelled and released gestures resume a pending replacement",
+      "RISK PWA updates: the extended FAQ and changelog explain gesture-safe reloads"
+    ],
+    "preservedCoverage": [
+      "The preimplementation full-app regression on base 659aac18 observed reloads.length equal to 1 immediately after pointerdown and controllerchange, where the test expected 0. The saved log is .git/funsidething-task-evidence/active-reload-progress-20261016/worker-151-entry-red.log.",
+      "The FAQ regression first failed because the rendered Quick start install/update answer omitted scanner-touch guidance, then passed after the FAQ and October 17 current changelog were updated; its original failure is preserved in worker-151-copy-red.log.",
+      "The full-app committed-click case checks the actual delegated No handler, a later update reload, and a cold reopen from isolated fake IndexedDB with the decision and board intact. The asynchronous case begins a gesture while update persistence is held. Cancellation and pointerup fallback cases each resume without another worker event.",
+      "The async-save and cancellation failure logs were produced by temporarily disabling already-implemented guards/callbacks after the first consumer regression was green; they are broken-handler sensitivity controls, not preimplementation RED evidence. They are preserved as worker-151-async-red.log and worker-151-fallback-red.log.",
+      "All nine pre-existing PWA update protections remain mapped and passing, including launch/focus/online checks, first install, failed save, edit deferral and async edit race. The update snippet fixture now supplies the real runtime global scannerGestureActive.",
+      "The offline shell delivery contract, exact app changelog fingerprint and service-worker cache fingerprint are refreshed and pass their focused tests."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK PWA updates: a scanner gesture commits' tests.js; node --test --test-name-pattern='RISK PWA updates: the extended FAQ and changelog explain gesture-safe reloads' tests.js",
+      "failure": "Before runtime changes on base 659aac18, the full-app scanner regression failed because controllerchange caused one reload during the active pointer gesture (expected zero). After the runtime fix, the independent copy test failed because the Quick start answer lacked scanner-touch guidance. The async-save and cancellation logs are explicitly postimplementation broken-handler sensitivity controls, not additional preimplementation RED slices."
+    }
   }
 ]

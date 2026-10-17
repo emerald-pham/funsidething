@@ -17824,7 +17824,7 @@ function pwaUpdateHarness({controller=true,editing=false,saveOK=true,durable=fal
  const sw={controller:controller?{}:null,addEventListener:(e,f)=>sh[e]=f,register:async(url,opts)=>{options=opts;return registration;}};
  const doc={hidden:false,readyState:'complete',activeElement:{matches:()=>false},querySelector:()=>editing?{}:null,addEventListener:(e,f)=>dh[e]=f};
  const raw='{}',storage={getItem:key=>durable&&(key==='head'||key==='store')?raw:null};
- const box={navigator:{serviceWorker:sw},window:{addEventListener:(e,f)=>wh[e]=f,location:{reload:()=>reloads++}},document:doc,setTimeout,clearTimeout,state:{},persist:async()=>{saves++;return saveOK;},toast:message=>toasts.push(message),console,
+ const box={navigator:{serviceWorker:sw},window:{addEventListener:(e,f)=>wh[e]=f,location:{reload:()=>reloads++}},document:doc,setTimeout,clearTimeout,state:{},scannerGestureActive:false,persist:async()=>{saves++;return saveOK;},toast:message=>toasts.push(message),console,
   storageOK:true,useLocal:durable&&!host,lastPersistedRaw:durable?raw:null,localStorage:storage,LOCAL_HEAD_KEY:'head',STORE_KEY:'store'};
  const source=html.slice(html.indexOf('function hasActiveEditor(){'),html.indexOf('function resumeDeferredCloudPull(){'))+html.slice(html.indexOf('function registerServiceWorker(){'),html.indexOf('registerServiceWorker();',html.indexOf('function registerServiceWorker(){')));
  vm.runInNewContext(source+';registerServiceWorker();',box);
@@ -17889,6 +17889,77 @@ test('PWA updates: opening an edit during an asynchronous save defers reload aga
  h.box.persist=()=>new Promise(r=>release=r);
  const applying=h.sh.controllerchange();await flush();h.edit(true);release(true);await applying;
  assert.equal(h.counts().reloads,0,'new editing must be checked after the async save');
+});
+test('RISK PWA updates: a scanner gesture commits its action before a downloaded worker reloads',async()=>{
+ const {IDBFactory}=await import('fake-indexeddb'),indexedDBProvider=new IDBFactory(),deviceDbName='private-pwa-update-gesture-'+Date.now()+'-'+Math.random();
+ const {ctx,shim}=await loadApp({seed:4701,indexedDBProvider,deviceDbName});
+ for(let i=0;i<8;i++)ctx.addTask('Private update gesture '+i);
+ ctx.startScan('descending');const candidateId=ctx.state.candidateId;
+ assert.ok(candidateId,'the scanner must offer a real task decision');assert.match(shim.document.getElementById('scan').innerHTML,/data-act="no"/);
+ assert.equal(await ctx.persist(),true,'the fixture starts from a durable board');
+ const handlers={},reloads=[];
+ ctx.navigator={serviceWorker:{controller:{},addEventListener:(type,fn)=>handlers[type]=fn,register:async()=>({update:async()=>{}})}};
+ shim.document.readyState='complete';shim.document.hidden=false;shim.window.location={reload:()=>reloads.push('page replaced')};
+ ctx.registerServiceWorker();await flush();
+ shim.document.dispatchEvent({type:'pointerdown'});await handlers.controllerchange();
+ assert.equal(reloads.length,0,'a ready worker cannot replace the page between pointerdown and the scanner click');
+ const noButton={dataset:{act:'no'},disabled:false};
+ shim.document.dispatchEvent({type:'click',detail:1,target:{closest:()=>noButton}});
+ for(let attempt=0;attempt<100&&reloads.length===0;attempt++)await new Promise(resolve=>setTimeout(resolve,10));
+ assert.equal(reloads.length,1,'the pending update resumes after the committed click');
+ assert.equal(ctx.state.considered[candidateId],'no','the delegated scanner click commits the selected task decision');
+ const committed=JSON.parse(JSON.stringify({marks:ctx.state.considered,tasks:ctx.state.tasks,chain:ctx.state.chain}));
+ assert.equal(Object.values(committed.marks).filter(mark=>mark==='no').length,1);
+ const reopened=await loadApp({indexedDBProvider,deviceDbName});
+ assert.deepEqual(JSON.parse(JSON.stringify({marks:reopened.ctx.state.considered,tasks:reopened.ctx.state.tasks,chain:reopened.ctx.state.chain})),committed,
+  'a cold full-app reopen retains the committed decision in the isolated durable store');
+});
+test('RISK PWA updates: a gesture beginning during an update save holds and resumes reload',async()=>{
+ const {IDBFactory}=await import('fake-indexeddb'),indexedDBProvider=new IDBFactory(),deviceDbName='private-pwa-update-async-gesture-'+Date.now()+'-'+Math.random();
+ const {ctx,shim}=await loadApp({seed:4702,indexedDBProvider,deviceDbName});
+ for(let i=0;i<8;i++)ctx.addTask('Private async update '+i);
+ ctx.startScan('descending');const candidateId=ctx.state.candidateId;assert.ok(candidateId);
+ assert.equal(await ctx.persist(),true,'the update starts from a durable board');
+ let releaseSave,saveCalls=0;const originalPersist=ctx.persist.bind(ctx);
+ ctx.persist=()=>{saveCalls++;return saveCalls===1?new Promise(resolve=>{releaseSave=resolve;}):originalPersist();};
+ const handlers={},reloads=[];
+ ctx.navigator={serviceWorker:{controller:{},addEventListener:(type,fn)=>handlers[type]=fn,register:async()=>({update:async()=>{}})}};
+ shim.document.readyState='complete';shim.document.hidden=false;shim.window.location={reload:()=>reloads.push('page replaced')};
+ ctx.registerServiceWorker();await flush();
+ const applying=handlers.controllerchange();await flush();
+ assert.equal(typeof releaseSave,'function','the worker update must be waiting on its asynchronous board save');
+ shim.document.dispatchEvent({type:'pointerdown'});releaseSave(true);await applying;
+ assert.equal(reloads.length,0,'a gesture that begins before save resolution still blocks page replacement');
+ const noButton={dataset:{act:'no'},disabled:false};
+ shim.document.dispatchEvent({type:'pointerup'});
+ shim.document.dispatchEvent({type:'click',detail:1,target:{closest:()=>noButton}});
+ for(let attempt=0;attempt<100&&reloads.length===0;attempt++)await new Promise(resolve=>setTimeout(resolve,10));
+ assert.equal(reloads.length,1,'the update resumes after the real scanner click without another worker event');
+ assert.equal(ctx.state.considered[candidateId],'no','the click commits while the update is deferred');
+ const reopened=await loadApp({indexedDBProvider,deviceDbName});
+ assert.equal(reopened.ctx.state.considered[candidateId],'no','the resumed update reloads only after the action reaches durable storage');
+});
+test('RISK PWA updates: cancelled and released gestures resume a pending replacement',async()=>{
+ for(const ending of ['pointercancel','pointerup']){
+  const {ctx,shim}=await loadApp({seed:4703});ctx.addTask('Private cancelled gesture');ctx.startScan('descending');
+  assert.equal(await ctx.persist(),true,'the cancellation fixture starts from a durable board');
+  const handlers={},reloads=[];
+  ctx.navigator={serviceWorker:{controller:{},addEventListener:(type,fn)=>handlers[type]=fn,register:async()=>({update:async()=>{}})}};
+  shim.document.readyState='complete';shim.document.hidden=false;shim.window.location={reload:()=>reloads.push('page replaced')};
+  ctx.registerServiceWorker();await flush();shim.document.dispatchEvent({type:'pointerdown'});await handlers.controllerchange();
+  assert.equal(reloads.length,0,ending+' must remain protected until its completion boundary');
+  shim.document.dispatchEvent({type:ending});
+  for(let attempt=0;attempt<100&&reloads.length===0;attempt++)await new Promise(resolve=>setTimeout(resolve,10));
+  assert.equal(reloads.length,1,ending+' must release the deferred update without another worker event');
+ }
+});
+test('RISK PWA updates: the extended FAQ and changelog explain gesture-safe reloads',async()=>{
+ const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ const answer=help.split('<dt>How do I install or update the app?</dt><dd>')[1]?.split('</dd>')[0];assert.ok(answer,'the install/update FAQ remains in Quick start');
+ assert.match(answer,/scanner touch/i,'the FAQ explains why an update can wait during a scanner gesture');
+ assert.match(answer,/choose.*response.*save.*before.*reload/i,'the FAQ explains that the task response is saved before reload');
+ assert.match(answer,/cancel.*touch.*gesture ends/i,'the FAQ explains how a cancelled gesture releases the update');
+ assert.match(help,/scanner touch.*finish.*(?:saved|save).*update/i,'the changelog describes the shipped update behavior');
 });
 test('Scan preference: saving always chance changes the current scan, without changing ratings or marks',async()=>{
  const {ctx,shim}=await loadApp();for(let i=0;i<5;i++)ctx.addTask('task '+i);ctx.startScan();ctx.state.snooze=100;ctx.decide('no');
