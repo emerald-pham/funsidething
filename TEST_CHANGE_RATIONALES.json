@@ -7491,5 +7491,29 @@
       "preimplementation": "Not applicable: this change corrects a timezone-dependent test fixture after behavior implementation; the actual UTC failure was observed before the fixture edit.",
       "postimplementation": "Pinning the existing timestamp before initial boot and cold reopen makes the preserved expiry/reconciliation scenario green in UTC and America/New_York without changing runtime code."
     }
+  },
+  {
+    "testChangesSha256": "218e8e8f7f740ffe5243d7c370feaaa4f5dd5775d0054a9017b6f819dfafed0d",
+    "reason": "Extend the integrated complete-app No recovery scenario to cover both cloud publication orders for both localStorage fallback and production IndexedDB. Keep this as a test-only acceptance expansion; no runtime code or behavior was changed.",
+    "previousBehavior": "The existing #142 consumer exercised only Mac-first publication: the phone made five No actions offline and closed, the Mac editor published its title, then the phone reopened and reconciled. It did not prove the reverse order where the reopened phone publishes the five No facts before the offline Mac edit reconnects.",
+    "intendedBehavior": "For both storage backends, exercise Mac-first and phone-first publication after the phone acts offline, durably saves, closes, and reopens. In phone-first, keep the Mac offline through the phone publication, then reconnect and reconcile Mac before the reopened phone pulls again. Preserve all No marks, full task/rating-history data, event IDs/times/account/base/pass, unchanged task/context fields, durable event bytes, the final five No plus one title-choice cloud union, and explicit pass expiry.",
+    "replacementTests": [
+      "RISK cloud No recovery: five scanner decisions survive offline durable reopen beside an independent peer edit"
+    ],
+    "preservedCoverage": [
+      "The original five real scanner No actions, exact effective ratings and observation histories, owner/base/pass/context evidence, cold device-store reopen, independent editor action, and explicit temporary-mark expiry assertions remain active.",
+      "Both publication orders end with one immutable row for each of five No actions and one separately identified Mac title choice, with unchanged unrelated task and context data."
+    ],
+    "redEvidence": {
+      "command": "Historical #142 behavioral RED: node --test --test-name-pattern='RISK cloud No recovery' tests.js; current acceptance expansion: node --test --test-name-pattern='RISK cloud No recovery|RISK cloud current choices|RISK comparison replay:' tests.js (also with TZ=UTC).",
+      "failure": "No new feature RED is claimed: this is a positive acceptance extension after implementation. The original #142 actual full-app RED remains documented in /Users/emeraldpham/.codex/task-artifacts/decision-sync-141/142/behavioral-red.md and behavioral-red.txt: both fallback and IndexedDB failed because a newer peer revision cleared the five deliberate No marks after offline save, close, and cold reopen. Against integrated tip 944e443, the extended No scenario passed 7/7 and the complete No/current-choice/comparison cohort passed 30/30 in default America/New_York and 30/30 in UTC. Exact outputs: /Users/emeraldpham/.codex/task-artifacts/decision-sync-141/147/two-publication-orders-green-default.log and two-publication-orders-green-utc.log."
+    },
+    "updatedTests": [
+      "RISK cloud No recovery: five scanner decisions survive offline durable reopen beside an independent peer edit"
+    ],
+    "coverageChronology": {
+      "preimplementation": "This additional publication order is not represented as a new preimplementation failure. The original No-loss behavioral RED remains preserved in the #142 artifacts and predates all runtime fixes.",
+      "postimplementation": "Both Mac-first and phone-first flows pass through real app actions, storage reopen, cloud publication, reconciliation and the explicit pass-expiry boundary in both backends; the complete focused integrated cohort is green in both UTC and America/New_York."
+    }
   }
 ]
