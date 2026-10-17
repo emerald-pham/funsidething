@@ -7419,5 +7419,32 @@
     "updatedTests": [
       "CLOUD ACCOUNT: a transaction binds its document before auth can switch"
     ]
+  },
+  {
+    "testChangesSha256": "7ce91841a9b114dc15e0542412f42cbf91950b35f9eb913280864938a998478d",
+    "reason": "Complete the approved recovery follow-through against integrated #143 by preserving proper source-validation holds, rejecting unprojectable authority, and adding the explicitly approved guest/Import/Restore ownership transition without rewriting original decisions.",
+    "previousBehavior": "The #143 journal union turned malformed/foreign source rows into same-ID conflicts before the intended hold. Supported rows with missing ancestry, cycles or unusable baseline evidence could be acknowledged. Guest decisions blocked first sign-in; authorized foreign modern journals blocked Import/Restore. The immutable historical app could safe-reload a pending No and the upgraded app acknowledged scalar learning its decision projection could not reconstruct.",
+    "intendedBehavior": "Each source is validated before union with shape/account diagnostics preserved. Exact branches are held for missing/cyclic ancestry, baseline ambiguity or unmatched effective learning. Strict lossless fact witnesses attest only explicitly inherited guest/foreign facts after durable recovery, with a frozen target baseline and original owner/id/time unchanged. Subsequent authenticated learning applies once; ordinary account switch gains no consent. Legacy pending learned work remains exact and visibly held rather than receiving false Synced or guessed actions.",
+    "replacementTests": [
+      "RISK decision capability recovery: sole baseline recovery activates the fence without rewriting evidence",
+      "RISK decision recovery compatible update: unsupported authority checks the safe app update path and Retry keeps exact work",
+      "RISK decision recovery guest sign-in: a saved guest No and later authenticated No retain original facts and learning",
+      "RISK decision recovery explicit transfer: consented cross-account Import and Restore preserve original facts and later learning",
+      "RISK decision recovery inheritance authority: changed attested facts stay held and ordinary account switches gain no consent",
+      "RISK decision recovery inheritance durability: failed replacement recovery keeps both boards and an explicit retry succeeds",
+      "RISK decision recovery legacy update: safe reload and Retry hold a sole unrepresented legacy comparison instead of acknowledging lost learning",
+      "RISK decision recovery projection: supported but unprojectable authority holds exact cloud and local branches",
+      "RISK decision recovery validation order: rejected local evidence stays exact before known-cloud union"
+    ],
+    "preservedCoverage": [
+      "Every previous assertion remains. The existing #146 fixture now explicitly starts at zero threshold so follow-up scanner comparisons are actually offered; no expected learned values are weakened or manufactured.",
+      "Existing #143 comparison replay consumers, #142 cold No fallback/IndexedDB flow, account isolation, exact acknowledgement, revision/CAS and protected recovery behavior remain green.",
+      "Normal legacy Import and same-account modern Import retain their original path; the new awaited source/replacement recovery path applies only to explicit cross-account modern transfer. No support pin, Firestore rules, authentication configuration, public FAQ, shell fingerprint or release metadata is changed by this follow-through.",
+      "The historical-app pending-No consumer runs exact immutable source and actual No, safe Reload and upgraded Retry; it preserves incomplete evidence rather than synthesizing comparisons from observational history."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK decision recovery validation order:|RISK decision recovery projection:|RISK decision recovery guest sign-in:|RISK decision recovery explicit transfer:|RISK decision recovery compatible update:|RISK decision recovery legacy update:' tests.js; separate RISK decision capability recovery adapter run. Exact sequence in /Users/emeraldpham/.codex/task-artifacts/decision-sync-141/146/CHRONOLOGY.md logs27-50.",
+      "failure": "Actual RED27/28 reproduced integrated shape/owner diagnostic corruption and source mutation. Moving sendPush validation alone left existing failures29 because persist had already unioned variants; predicate precedence + source gate GREEN30. RED31 observed unsafe adoption for five unprojectable formats; preserved collision diagnostic initially failed32 then GREEN33. RED34 sole baselineRecovery lacked capability, GREEN35. Guest first-sign-in RED36 and actual explicit Import/Restore RED39 stayed pending; parent-approved exact-fact inheritance repaired them (42/43). Secondary failures40/41 were fixture threshold/offered-candidate/debounce assumptions, corrected without weakening action assertions. Unsupported semantic safe-update check RED37 observed zero calls, GREEN38. Real pinned legacy safe Reload/Retry RED45/46 confirmed false acknowledged rev6; history provenance alone failed47 because floor did not append a history row, scalar coherence hold GREEN48. Mandatory recovery failures and exact-fact mutation/account switch were added preservation coverage, green43/49. Final affected cohort50 passes93/93 without skips."
+    }
   }
 ]

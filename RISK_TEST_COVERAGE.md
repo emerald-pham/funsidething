@@ -1216,3 +1216,17 @@ Protect full bicycle and scooter silhouettes, fixed tire contacts, shared solar 
 - `RISK decision recovery account transition: pending No acknowledgement cannot enter another account and the exact prior board stays recoverable`
 
 Protect conditional decision-capability activation, ordinary pinned-client compatibility, exact unknown/foreign/colliding evidence holds, mandatory local saves, original action identity through uncertain acknowledgement and cold reopen, and account-bound late replies. Firestore rules consumers additionally execute the immutable historical backend and full application, activation CAS, historical safe-update holds, and rules-first rollout.
+
+## Decision inheritance and complete replay safety (#146)
+
+- `RISK decision capability recovery: sole baseline recovery activates the fence without rewriting evidence`
+- `RISK decision recovery compatible update: unsupported authority checks the safe app update path and Retry keeps exact work`
+- `RISK decision recovery guest sign-in: a saved guest No and later authenticated No retain original facts and learning`
+- `RISK decision recovery explicit transfer: consented cross-account Import and Restore preserve original facts and later learning`
+- `RISK decision recovery inheritance authority: changed attested facts stay held and ordinary account switches gain no consent`
+- `RISK decision recovery inheritance durability: failed replacement recovery keeps both boards and an explicit retry succeeds`
+- `RISK decision recovery legacy update: safe reload and Retry hold a sole unrepresented legacy comparison instead of acknowledging lost learning`
+- `RISK decision recovery projection: supported but unprojectable authority holds exact cloud and local branches`
+- `RISK decision recovery validation order: rejected local evidence stays exact before known-cloud union`
+
+Protect source validation before authority union; missing/cyclic ancestry, baseline recovery and extension conflicts; lossless explicit ownership inheritance and exact-fact attestation; mandatory source/replacement recovery in both stores; and safe update of sole pending legacy learning without invented comparisons.

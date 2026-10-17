@@ -28,7 +28,7 @@
     const needsDecisionCapability=payload=>{
       try{
         const board=JSON.parse(payload);
-        return board&&typeof board==="object"&&["decisionEvents","decisionEventsRecovery","decisionBaseline"].some(key=>Object.hasOwn(board,key));
+        return board&&typeof board==="object"&&["decisionEvents","decisionEventsRecovery","decisionBaseline","decisionBaselineRecovery"].some(key=>Object.hasOwn(board,key));
       }catch{return false;}
     };
 
