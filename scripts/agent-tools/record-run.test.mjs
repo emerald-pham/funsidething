@@ -28,10 +28,13 @@ async function createCommittedRepository(root) {
 }
 
 function invokeRecorder({ repo, evidence, purpose, command, args = [], extraOptions = [] }) {
+  const env = { ...process.env };
+  delete env.NODE_TEST_CONTEXT;
   return spawnSync(node, [recorder, '--repo', repo, '--evidence-dir', evidence, '--purpose', purpose, ...extraOptions, '--', command, ...args], {
     cwd: repo,
     encoding: 'utf8',
     timeout: 15000,
+    env,
   });
 }
 
@@ -427,4 +430,117 @@ test('leaves only the last durable partial record after an uncatchable recorder 
   assert.equal(record.execution.outcome, 'running');
   assert.equal(record.execution.output.stdout, '');
   assert.equal(record.interruption, undefined);
+});
+
+
+test('redacts quoted and escaped JSON credentials in source diff output and code arguments', async (t) => {
+  const temp = await mkdtemp(path.join(os.tmpdir(), 'record-json-secrets-'));
+  t.after(() => rm(temp, { recursive: true, force: true }));
+  const repo = await createCommittedRepository(temp);
+  const credentials = ['synthetic quoted phrase 17af', 'synthetic escaped phrase 29cd'];
+  const json = JSON.stringify({ api_key: credentials[0], client_secret: credentials[1] });
+  await writeFile(path.join(repo, 'src', 'app.js'), `export const config = ${json};\n`);
+  await writeFile(path.join(repo, 'config.json'), json);
+  const child = `process.stdout.write(${JSON.stringify(json)}); process.stderr.write(${JSON.stringify(JSON.stringify(json))});`;
+  const result = invokeRecorder({ repo, evidence: path.join(temp, 'evidence'), purpose: 'green', command: node, args: ['-e', child] });
+  assert.equal(result.status, 0, result.stderr);
+  const serialized = await readFile(evidencePathFrom(result), 'utf8');
+  for (const credential of credentials) assert.equal(serialized.includes(credential), false, 'quoted credential must not reach a durable field');
+  const record = JSON.parse(serialized);
+  assert.match(record.execution.output.stdout, /REDACTED/);
+  assert.match(record.execution.output.stderr, /REDACTED/);
+  assert.match(record.workingTree.sourceTestFiles.find(file => file.path === 'src/app.js').diff, /REDACTED/);
+});
+
+test('distinguishes actual redacted binary dependency and staged state without persisting payloads', async (t) => {
+  const temp = await mkdtemp(path.join(os.tmpdir(), 'record-opaque-identity-'));
+  t.after(() => rm(temp, { recursive: true, force: true }));
+  const repo = await createCommittedRepository(temp);
+  const evidence = path.join(temp, 'evidence');
+  const capture = async () => {
+    const result = invokeRecorder({ repo, evidence, purpose: 'green', command: node, args: ['-e', ''] });
+    assert.equal(result.status, 0, result.stderr);
+    return JSON.parse(await readFile(evidencePathFrom(result), 'utf8'));
+  };
+  const clean = await capture();
+  for (const [file, first, second] of [
+    ['src/opaque.js', 'export const token = "synthetic-one";', 'export const token = "synthetic-two";'],
+    ['picture.png', Buffer.from([0, 1, 2]), Buffer.from([0, 3, 4])],
+    ['credentials.json', '{"secret":"synthetic-one"}', '{"secret":"synthetic-two"}'],
+    ['firestore.rules', 'allow read: if false;', 'allow read: if true;'],
+    ['manifest.webmanifest', '{"name":"one"}', '{"name":"two"}'],
+    ['package-lock.json', '{"lockfileVersion":1}', '{"lockfileVersion":2}'],
+  ]) {
+    await writeFile(path.join(repo, file), first);
+    const a = await capture();
+    await writeFile(path.join(repo, file), second);
+    const b = await capture();
+    assert.notEqual(a.workingTree.sourceTestDiffSha256, b.workingTree.sourceTestDiffSha256, `${file}: actual changed bytes need distinct identities`);
+    assert.notEqual(clean.workingTree.sourceTestDiffSha256, a.workingTree.sourceTestDiffSha256);
+    assert.equal(b.workingTree.identity.status, 'complete');
+    const entry = b.workingTree.sourceTestFiles.find(item => item.path === file);
+    assert.match(entry.actualBytesSha256, /^[a-f0-9]{64}$/);
+    if (['picture.png', 'credentials.json', 'package-lock.json'].includes(file)) assert.equal(entry.content, null);
+    assert.equal(JSON.stringify(b).includes('synthetic-two'), false);
+  }
+  const app = path.join(repo, 'src/app.js');
+  await writeFile(app, 'export const value = 2;\n');
+  spawnSync('git', ['-C', repo, 'add', 'src/app.js']);
+  await writeFile(app, 'export const value = 3;\n');
+  const stagedFirst = await capture();
+  spawnSync('git', ['-C', repo, 'add', 'src/app.js']);
+  const stagedSecond = await capture();
+  assert.notEqual(stagedFirst.workingTree.sourceTestDiffSha256, stagedSecond.workingTree.sourceTestDiffSha256, 'index state remains part of tested identity');
+  await writeFile(app, 'export const value = 1;\n');
+  spawnSync('git', ['-C', repo, 'add', 'src/app.js']);
+  spawnSync('git', ['-C', repo, 'mv', 'src/app.js', 'src/renamed.js']);
+  const renamed = await capture();
+  const renamedFile = renamed.workingTree.sourceTestFiles.find(item => item.path === 'src/renamed.js');
+  assert.equal(renamedFile.previousPath, 'src/app.js');
+  assert.match(renamedFile.actualDiffSha256, /^[a-f0-9]{64}$/);
+});
+
+test('classifies real TAP syntax and import failures separately from assertions and generic not-ok output', async (t) => {
+  const temp = await mkdtemp(path.join(os.tmpdir(), 'record-real-tap-'));
+  t.after(() => rm(temp, { recursive: true, force: true }));
+  const repo = await createCommittedRepository(temp);
+  const evidence = path.join(temp, 'evidence');
+  for (const [name, code, expected] of [
+    ['syntax', 'const = 1;', 'infrastructure-failure'],
+    ['import', 'import "./missing-fixture-module.mjs";', 'infrastructure-failure'],
+    ['assertion', 'import {test} from "node:test"; import assert from "node:assert/strict"; test("real assertion",()=>assert.equal(1,2));', 'assertion-failure'],
+  ]) {
+    const file = `${name}.test.mjs`;
+    await writeFile(path.join(repo, file), code);
+    const result = invokeRecorder({ repo, evidence, purpose: 'preimplementation-red', command: node, args: ['--test', '--test-reporter=tap', file] });
+    assert.equal(result.status, 1, result.stderr);
+    const record = JSON.parse(await readFile(evidencePathFrom(result), 'utf8'));
+    assert.equal(record.execution.outcome, expected, `${name}: runner failure markers are not assertion evidence`);
+    assert.equal(record.declaredPurpose, 'preimplementation-red');
+  }
+  const result = invokeRecorder({ repo, evidence, purpose: 'green', command: node, args: ['-e', 'console.log("not ok 1 - failed runner\\n# fail 1"); process.exitCode=1;'] });
+  assert.equal(JSON.parse(await readFile(evidencePathFrom(result), 'utf8')).execution.outcome, 'nonzero-exit');
+});
+
+test('opaque identity never exposes deleted binary or renamed sensitive diff payloads', async (t) => {
+  const temp = await mkdtemp(path.join(os.tmpdir(), 'record-opaque-diffs-'));
+  t.after(() => rm(temp, { recursive: true, force: true }));
+  const repo = await createCommittedRepository(temp);
+  const sensitive = 'synthetic-sensitive-raw-payload-6f91';
+  await writeFile(path.join(repo, 'credentials.json'), sensitive);
+  await writeFile(path.join(repo, 'src', 'binary.js'), Buffer.from([0, 20, 31, 99]));
+  spawnSync('git', ['-C', repo, 'add', '.']);
+  spawnSync('git', ['-C', repo, 'commit', '--quiet', '-m', 'opaque fixtures']);
+  spawnSync('git', ['-C', repo, 'mv', 'credentials.json', 'config.json']);
+  await rm(path.join(repo, 'src', 'binary.js'));
+  const result = invokeRecorder({ repo, evidence: path.join(temp, 'evidence'), purpose: 'green', command: node, args: ['-e', ''] });
+  assert.equal(result.status, 0, result.stderr);
+  const serialized = await readFile(evidencePathFrom(result), 'utf8');
+  const record = JSON.parse(serialized);
+  assert.equal(serialized.includes(sensitive), false, 'renaming cannot expose a sensitive payload');
+  const binary = record.workingTree.sourceTestFiles.find(file => file.path === 'src/binary.js');
+  assert.equal(binary.content, null);
+  assert.equal(binary.diff, undefined, 'deleted binary patch payload stays opaque');
+  assert.match(binary.actualDiffSha256, /^[a-f0-9]{64}$/);
+  assert.equal(record.workingTree.sourceTestFiles.find(file => file.path === 'config.json').previousPath, 'credentials.json');
 });

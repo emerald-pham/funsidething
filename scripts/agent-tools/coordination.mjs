@@ -2,7 +2,7 @@
 
 import { tmpdir } from 'node:os';
 import { dirname, isAbsolute, resolve } from 'node:path';
-import { lstat, mkdir, open, readFile, rename, stat, unlink, writeFile } from 'node:fs/promises';
+import { lstat, mkdir, open, readFile, realpath, rename, stat, unlink, writeFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -328,6 +328,10 @@ function pruneOrphanedConfigurations(state) {
 
 async function begin(filePath, options) {
   const start = await readGitStartState();
+  const worktreeRoot = await realpath(start.repositoryRoot);
+  if (await realpath(process.cwd()) !== worktreeRoot) {
+    throw new Error(`coordination begin requires the actual Git worktree root: ${worktreeRoot}.`);
+  }
   const { scopes, claims, resources } = normalizeOwnership(options);
   const workType = text(options['work-type'], 'tooling');
   if (!['product', 'tooling', 'documentation', 'investigation'].includes(workType)) {
@@ -335,8 +339,19 @@ async function begin(filePath, options) {
   }
   return withCoordinationLock(filePath, async () => {
     const state = pruneDeadReservations(await readState(filePath));
-    if (state.entries.some((entry) => ownsCoordination(entry) && entry.worktree === process.cwd())) {
-      throw new Error('An active coordination entry already exists for this worktree.');
+    for (const entry of state.entries.filter(ownsCoordination)) {
+      let sameWorktree = entry.worktree === process.cwd();
+      if (!sameWorktree && typeof entry.worktree === 'string' && isAbsolute(entry.worktree)) {
+        try {
+          const recordedPath = await realpath(entry.worktree);
+          // Resolve only paths within this checkout; a nested independent Git repo
+          // remains a distinct owner. Legacy strings are never rewritten.
+          if (recordedPath === worktreeRoot || recordedPath.startsWith(`${worktreeRoot}/`)) {
+            sameWorktree = await realpath(await runGit(['rev-parse', '--show-toplevel'], recordedPath)) === worktreeRoot;
+          }
+        } catch { /* Missing/offline owners retain their existing ownership and metadata. */ }
+      }
+      if (sameWorktree) throw new Error('An active or parked coordination entry already exists for the same Git worktree.');
     }
     const conflict = ownershipConflict(state.entries, undefined, process.cwd(), claims, resources);
     if (conflict) throw new Error(formatOwnershipConflict(conflict));
@@ -344,7 +359,7 @@ async function begin(filePath, options) {
     const implementationPrompt = text(options['implementation-prompt']).toLowerCase();
     const entry = {
       id: `${Date.now()}-${process.pid}-${randomUUID().slice(0, 8)}`,
-      worktree: process.cwd(),
+      worktree: worktreeRoot,
       pid: process.pid,
       startedAt: now,
       heartbeatAt: now,

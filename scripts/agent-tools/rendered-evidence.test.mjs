@@ -127,6 +127,7 @@ const page = {
     state.height = context.options.viewport.height;
     state.innerWidth = state.width;
     state.innerHeight = state.height;
+    if (mode === 'layout-reference-mismatch') state.innerWidth += 100;
     state.preferredTheme = context.options.colorScheme;
     state.theme = context.options.colorScheme === 'light' ? 'dark' : 'light';
     if (state.routeHandler) {
@@ -183,12 +184,20 @@ const page = {
     return observe(surfaces);
   },
   async addStyleTag({ content }) {
+    if (mode === 'layout-capture-mismatch') state.innerHeight += 100;
     if (mode === 'noop-css') return;
-    const rules = content.matchAll(/\/\* rendered-evidence surface=([a-z-]+) index=(\d+) baseline=([\d.]+) target=([\d.]+) \*\//g);
-    for (const [, name, index, baseline, target] of rules) {
+    if (mode === 'broken-selector') content = content.replace(/#fixture-/g, '.absent #fixture-');
+    if (mode === 'broken-declaration') content = content.replace(/font-size:/g, 'unknown-font-size:');
+    // This bounded CSS consumer applies declarations only to fixture elements that selectors match.
+    // It deliberately ignores the renderer's diagnostic comments and target annotations.
+    const rules = content.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/([^{}]+)\{([^{}]*)\}/g);
+    for (const [, selector, declaration] of rules) {
+      const element = selector.trim().match(/^#fixture-(faq-title|faq-section|faq-question|faq-answer|faq-list-item|faq-paragraph|faq-subheading)-(0|1)$/);
+      const fontSize = declaration.match(/(?:^|;)\s*font-size\s*:\s*([\d.]+)px\s*!important\s*(?:;|$)/);
+      if (!element || !fontSize || (element[1] === 'faq-title' && element[2] !== '0')) continue;
+      const [, name, index] = element;
       if (mode === 'partial-css' && name === 'faq-answer' && index === '0') continue;
-      if (Number(target) <= Number(baseline)) continue;
-      state.metricTargets.set(name + ':' + index, Number(target));
+      state.metricTargets.set(name + ':' + index, Number(fontSize[1]));
     }
   },
   async waitForTimeout(ms) {
@@ -528,4 +537,32 @@ test('loopback guard and output collision protect evidence scope and prior captu
   assert.equal(second.status, 1);
   assert.match(second.stderr, /Refusing to overwrite existing case evidence/);
   assert.deepEqual(await readFile(path.join(output, 'diagnostic-css-light-390x844-capture.png')), existing);
+});
+
+
+test('standalone capture rejects reference layout mismatch for every mechanism and diagnostic after mismatch', async (t) => {
+  const fixture = await makeFixture(t);
+  for (const mechanism of ['diagnostic-css', 'native-page-zoom', 'pinch-zoom']) {
+    const { result, output } = run({ ...fixture, name: `reference-layout-${mechanism}`, mechanism, mode: 'layout-reference-mismatch' });
+    assert.equal(result.status, 1, 'requested and measured reference viewport must agree');
+    const report = await readCase(output);
+    assert.equal(report.observed.reference.viewportCss.innerWidth, 490);
+    assert.equal(report.metricsStatus, 'fail');
+    assert.equal(report.overallStatus, 'fail');
+  }
+  const { result, output } = run({ ...fixture, name: 'capture-layout', mode: 'layout-capture-mismatch' });
+  assert.equal(result.status, 1, 'diagnostic CSS must retain the requested layout viewport');
+  assert.equal((await readCase(output)).metricsStatus, 'fail');
+});
+
+
+test('CSS consumer rejects broken selectors and declarations even when diagnostic comments retain targets', async (t) => {
+  const fixture = await makeFixture(t);
+  for (const mode of ['broken-selector', 'broken-declaration']) {
+    const { result, output } = run({ ...fixture, name: mode, mode });
+    assert.equal(result.status, 1, `${mode}: comments cannot establish CSS effects`);
+    const report = await readCase(output);
+    assert.equal(report.metricsStatus, 'fail');
+    assert.ok(report.surfaces.every(surface => surface.elements.every(({ before, after }) => before.fontSizePx === after.fontSizePx)));
+  }
 });

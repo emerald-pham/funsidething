@@ -549,7 +549,7 @@ const report = {`,
   await delay(50);
 
   const resume = spawnSync(process.execPath, [...args, '--resume'], { encoding: 'utf8', timeout: 120000, maxBuffer: 1024 * 1024 });
-  assert.equal(resume.status, 0, `${resume.stdout}\n${resume.stderr}`);
+  assert.equal(resume.status, 2, `historical cleanup remains unverified: ${resume.stdout}\n${resume.stderr}`);
   manifest = JSON.parse(await readFile(path.join(output, 'manifest.json'), 'utf8'));
   assert.equal(manifest.runStatus, 'complete');
   assert.equal(manifest.cases[0].attempts.length, 1, 'a durably completed case must not be rerun');
@@ -560,9 +560,109 @@ const report = {`,
   assert.equal(recoveredCase.attempts[0].status, 'failed');
   assert.equal(recoveredCase.attempts[0].failureType, 'unclean-termination-recovered');
   assert.equal(recoveredCase.attempts[0].cleanup.status, 'unverified');
+  assert.equal(manifest.cleanup.status, 'unverified');
+  assert.equal(manifest.cleanup.scope, 'all-recorded-attempts');
+  assert.deepEqual(manifest.cleanup.unresolvedAttempts.map(({ caseId, attemptNumber, status }) => ({ caseId, attemptNumber, status })), [{ caseId: recoveredCase.id, attemptNumber: 1, status: 'unverified' }]);
   assert.ok(recoveredCase.coverageLimits.some((limit) => /Recovered an attempt without a terminal rendered-evidence report/.test(limit)));
   assert.equal(recoveredCase.attempts[1].status, 'completed');
   assert.deepEqual(recoveredCase.resultStatuses, { metricsStatus: 'pass', captureIntegrity: 'pass', visualStatus: 'unverified', overallStatus: 'unverified' });
   assert.deepEqual(recoveredCase.attempts[1].caseReport.surfaces.map(({ name }) => name), expectedSurfaces);
   assert.deepEqual(manifest.recoveries[0].recoveredAttempts, [{ caseId: recoveredCase.id, attemptNumber: 1 }]);
+});
+
+test('handled actual-renderer failure retains earlier completion and marks continued matrix incomplete', async (t) => {
+  const fixture = await makePortableRealRendererFixture(t);
+  const fixtureSource = await readFile(new URL('./rendered-evidence.test.mjs', import.meta.url), 'utf8');
+  const browserSource = fixtureSource.split('const browserFixture = String.raw`')[1].split('\n`;')[0]
+    .replace("if (mode === 'missing-capture' && state.screenshotCount === 2)", "if (state.theme === 'dark' && state.screenshotCount === 2)");
+  const runtime = path.join(fixture.root, 'playwright.mjs');
+  await writeFile(runtime, browserSource);
+  const output = path.join(fixture.root, 'partial-failure');
+  const result = spawnSync(process.execPath, [fixture.command, '--mode', 'desktop-browser', '--url', 'http://127.0.0.1:8999/', '--resource', 'app-server=synthetic', '--resource', 'browser-runtime=synthetic', '--source-id', 'fixture-mixed', '--output', output, '--playwright-module', runtime, '--mechanism', 'diagnostic-css', '--theme', 'light', '--theme', 'dark', '--viewport', '390x844', '--viewport', '1280x800'], { encoding: 'utf8', timeout: 20000 });
+  assert.equal(result.status, 1, result.stderr);
+  const manifest = JSON.parse(await readFile(path.join(output, 'manifest.json')));
+  assert.equal(manifest.cases[0].status, 'completed');
+  assert.ok(manifest.cases.some(item => item.status === 'failed'));
+  assert.ok(manifest.cases.every(item => item.attempts.length === 1), 'handled failures continue the remaining independent matrix cases');
+  assert.equal(manifest.runStatus, 'incomplete', 'handled failure must not imply fulfilled coverage');
+  assert.ok(manifest.cases.find(item => item.status === 'failed').attempts[0].caseReport.runtimeErrors.some(item => item.type === 'capture'));
+});
+
+test('stalled real renderer cannot claim detached browser cleanup and preserves a separate fixture owner', { skip: process.platform === 'win32' }, async (t) => {
+  const fixture = await makePortableRealRendererFixture(t);
+  const runtime = path.join(fixture.root, 'detached-playwright.mjs');
+  const browserPidPath = path.join(fixture.root, 'browser.pid');
+  const readyPath = path.join(fixture.root, 'browser.ready');
+  const output = path.join(fixture.root, 'stalled-audit');
+  const owner = spawn(process.execPath, ['-e', 'setInterval(()=>{},1000)'], { detached: true, stdio: 'ignore' });
+  owner.unref();
+  let auditProcess;
+  let browserPid;
+  let rendererPid;
+  t.after(async () => {
+    for (const pid of [browserPid, rendererPid, owner.pid]) if (pid) { try { process.kill(-pid, 'SIGKILL'); } catch {} }
+    if (auditProcess && auditProcess.exitCode === null && auditProcess.signalCode === null) auditProcess.kill('SIGKILL');
+    await delay(50);
+  });
+  const browserCode = `process.on('SIGINT',()=>{}); process.on('SIGTERM',()=>{}); require('node:fs').writeFileSync(${JSON.stringify(readyPath)}, 'ready'); setInterval(()=>{},1000);`;
+  await writeFile(runtime, `import {spawn} from 'node:child_process'; import {writeFileSync,existsSync} from 'node:fs';
+export const chromium = { async launch() {
+  process.on('SIGINT',()=>{}); process.on('SIGTERM',()=>{});
+  const browser=spawn(process.execPath,['-e',${JSON.stringify(browserCode)}],{detached:true,stdio:'ignore'}); browser.unref();
+  writeFileSync(${JSON.stringify(browserPidPath)},String(browser.pid));
+  while (!existsSync(${JSON.stringify(readyPath)})) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,10);
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,120000);
+} };`);
+  const args = [fixture.command, '--mode', 'desktop-browser', '--url', 'http://127.0.0.1:8999/', '--source-id', 'synthetic-stalled', '--output', output, '--playwright-module', runtime, '--resource', 'app-server=separate-owner', '--resource', 'browser-runtime=synthetic', '--mechanism', 'diagnostic-css', '--theme', 'light', '--viewport', '390x844'];
+  auditProcess = spawn(process.execPath, args, { detached: true, stdio: 'ignore' });
+  const closed = new Promise(resolve => auditProcess.once('close', (code, signal) => resolve({ code, signal })));
+  const deadline = Date.now() + 8000;
+  while (Date.now() < deadline) {
+    try {
+      browserPid = Number(await readFile(browserPidPath));
+      await readFile(readyPath);
+      const manifest = JSON.parse(await readFile(path.join(output, 'manifest.json')));
+      rendererPid = manifest.cases[0].attempts[0].rendererProcess.pid;
+      break;
+    } catch { await delay(20); }
+  }
+  assert.ok(browserPid && rendererPid, 'both synthetic renderer and detached browser must start');
+  auditProcess.kill('SIGINT');
+  const exit = await waitBounded(closed, 6000);
+  assert.ok(exit, 'own group shutdown remains bounded');
+  assert.equal(exit.code, 130);
+  assert.equal(await processIsAlive(owner.pid), true, 'foreign fixture owner remains alive');
+  assert.equal(await processIsAlive(browserPid), true, 'detached browser is outside the group; cleanup must admit uncertainty');
+  const manifest = JSON.parse(await readFile(path.join(output, 'manifest.json')));
+  assert.equal(manifest.runStatus, 'incomplete');
+  assert.equal(manifest.cleanup.status, 'unverified', 'empty renderer group is not full browser-tree proof');
+  const attempt = manifest.cases[0].attempts[0];
+  assert.equal(attempt.cleanup.status, 'unverified');
+  assert.ok(attempt.cleanup.signalsSent.includes('SIGKILL'));
+  assert.equal(attempt.cleanup.processGroupStatus, 'completed');
+  assert.match(attempt.coverageLimits.join(' '), /detached browser/i);
+});
+
+test('resume retains legacy group-only completion as uncertain without mutating history or signaling its PID', async (t) => {
+  const fixture = await makePortableFixture(t);
+  const output = path.join(fixture.root, 'legacy-cleanup');
+  const args = [fixture.command, '--mode', 'desktop-browser', '--url', 'http://127.0.0.1:8999/', '--source-id', 'legacy-cleanup', '--output', output, '--playwright-module', path.join(fixture.root, 'playwright.mjs'), '--resource', 'app-server=synthetic', '--resource', 'browser-runtime=synthetic', '--mechanism', 'diagnostic-css', '--theme', 'light', '--viewport', '390x844'];
+  const initial = spawnSync(process.execPath, args, { encoding: 'utf8' });
+  assert.equal(initial.status, 0, initial.stderr);
+  const manifestPath = path.join(output, 'manifest.json');
+  const before = JSON.parse(await readFile(manifestPath));
+  const owner = spawn(process.execPath, ['-e', 'setInterval(()=>{},1000)'], { detached: true, stdio: 'ignore' }); owner.unref();
+  t.after(() => { try { process.kill(-owner.pid, 'SIGKILL'); } catch {} });
+  const completed = structuredClone(before.cases[0].attempts[0]);
+  const legacy = { attemptNumber: 1, status: 'failed', failureType: 'interrupted', signal: 'SIGKILL', rendererProcess: { pid: owner.pid, processGroupId: owner.pid }, cleanup: { status: 'completed', method: 'bounded-owned-process-group-shutdown', signalsSent: ['SIGINT', 'SIGTERM', 'SIGKILL'] } };
+  before.cases[0].attempts = [legacy, { ...completed, attemptNumber: 2 }];
+  await writeFile(manifestPath, JSON.stringify(before));
+  const resume = spawnSync(process.execPath, [...args, '--resume'], { encoding: 'utf8' });
+  assert.equal(resume.status, 2, 'legacy empty-group cleanup cannot establish detached-browser termination');
+  const after = JSON.parse(await readFile(manifestPath));
+  assert.equal(after.cleanup.status, 'unverified');
+  assert.deepEqual(after.cases[0].attempts, before.cases[0].attempts, 'history and completed evidence stay exact; no new renderer launches');
+  assert.equal(after.cleanup.unresolvedAttempts[0].status, 'unverified');
+  assert.match(after.cleanup.unresolvedAttempts[0].reason, /legacy|terminal/i);
+  assert.equal(await processIsAlive(owner.pid), true, 'a historical PID does not establish current cleanup ownership');
 });

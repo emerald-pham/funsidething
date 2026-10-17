@@ -129,10 +129,7 @@ function parsePullResponse(response, target) {
 
 function assertGhSucceeded(response, action) {
   if (response.status === 0) return;
-  if (response.timeout) throw new Error(`gh api ${action} timed out after ${requestTimeoutMs}ms.`);
-  if (response.oversized) throw new Error(`gh api ${action} returned more than ${maxOutputBytes} bytes.`);
-  const detail = response.stderr.trim() || `exit status ${response.status}${response.signal ? ` (${response.signal})` : ''}`;
-  throw new Error(`gh api ${action} failed: ${detail}`);
+  throw new Error(summarizeFailure(response, action));
 }
 
 function isDefiniteRejection(response) {

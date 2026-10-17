@@ -573,6 +573,8 @@ function themeMatches(snapshot, expectedTheme) {
 }
 
 function metricStatus(options, before, after, surfaces, themeMatched, operations, runtimeErrors) {
+  const requestedLayout = snapshot => snapshot?.viewportCss?.innerWidth === options.width && snapshot?.viewportCss?.innerHeight === options.height;
+  if (!requestedLayout(before) || (options.mechanism === 'diagnostic-css' && !requestedLayout(after))) return 'fail';
   if (surfaces.some((surface) => surface.metricsStatus === 'fail')) return 'fail';
   if (!themeMatched || !themeMatches(before, options.theme) || !themeMatches(after, options.theme)) return 'fail';
   if (runtimeErrors.some((error) => ['pageerror', 'requestfailed', 'theme-mismatch'].includes(error.type))) return 'fail';

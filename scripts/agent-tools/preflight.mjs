@@ -131,30 +131,3 @@ async function main() {
 }
 
 process.exitCode = await main();
-
-const result = spawnSync(process.execPath, [
-  '--test',
-  `--test-name-pattern=${testNamePattern}`,
-  '--test-reporter=spec',
-  'tests.js',
-], {
-  cwd: process.cwd(),
-  encoding: 'utf8',
-  maxBuffer: 16 * 1024 * 1024,
-});
-if (result.stdout) process.stdout.write(result.stdout);
-if (result.stderr) process.stderr.write(result.stderr);
-
-if (result.error) {
-  process.stderr.write(`Could not run the focused test checks: ${result.error.message}\n`);
-  process.exitCode = 2;
-} else if (result.signal) {
-  process.stderr.write(`Focused test checks were interrupted by ${result.signal}.\n`);
-  process.exitCode = 2;
-} else if (result.status !== 0) {
-  process.stderr.write(`Preflight failed: focused help/copy tests exited ${result.status ?? 1}.\n`);
-  process.exitCode = result.status ?? 1;
-} else {
-  process.stdout.write(`Preflight passed: ${focusedChecks.length} focused help/copy tests only.\n`);
-  process.stdout.write('This does not report full-suite, rules, compatibility, CI, release, or live results.\n');
-}

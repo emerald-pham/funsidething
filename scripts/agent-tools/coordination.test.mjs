@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
-import { chmodSync, copyFileSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { chmodSync, copyFileSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -844,4 +844,64 @@ test('bounded legacy v1 client fixture and current CLI interoperate on one locke
   } finally {
     rmSync(fixture, { recursive: true, force: true });
   }
+});
+
+test('same-owner explicit resume checkpoint preserves inherited override without claiming the saved checkpoint was checked', () => {
+  const fixture = mkdtempSync(join(tmpdir(), 'chain-coordination-checkpoint-override-'));
+  try {
+    const project = createProject(join(fixture, 'project'), 'work/checkpoint');
+    const ledger = join(fixture, 'ledger.json');
+    const begin = command(['begin', '--file', ledger, '--work-type', 'tooling'], project);
+    assert.equal(begin.status, 0, begin.stderr);
+    const entry = JSON.parse(begin.stdout);
+    const saved = git(project, 'rev-parse', 'HEAD');
+    const park = command(['park', '--file', ledger, '--id', entry.id, '--checkpoint-sha', saved, '--next-action', 'Retain original next action.'], project);
+    assert.equal(park.status, 0, park.stderr);
+    const parked = JSON.parse(park.stdout);
+    writeFileSync(join(project, 'README.md'), 'advanced owner checkpoint\n');
+    git(project, 'add', 'README.md'); git(project, 'commit', '--quiet', '-m', 'owner advanced checkpoint');
+    const current = git(project, 'rev-parse', 'HEAD');
+    const before = readFileSync(ledger, 'utf8');
+    const defaultResume = command(['resume', '--file', ledger, '--id', entry.id], project);
+    assert.notEqual(defaultResume.status, 0, 'default resume validates the saved SHA');
+    assert.equal(readFileSync(ledger, 'utf8'), before);
+    const override = command(['resume', '--file', ledger, '--id', entry.id, '--checkpoint-sha', current], project);
+    assert.equal(override.status, 0, override.stderr);
+    const resumed = JSON.parse(override.stdout);
+    assert.equal(resumed.id, parked.id);
+    assert.equal(resumed.worktree, parked.worktree);
+    assert.equal(resumed.branchName, parked.branchName);
+    assert.equal(resumed.parked.checkpointSha, saved, 'override does not rewrite old checkpoint evidence');
+    assert.equal(resumed.parked.nextAction, parked.parked.nextAction);
+    assert.equal(resumed.status, 'active');
+  } finally { rmSync(fixture, { recursive: true, force: true }); }
+});
+
+test('begin uses actual Git worktree identity and preserves legacy active or parked alias owners', () => {
+  const fixture = mkdtempSync(join(tmpdir(), 'chain-coordination-worktree-alias-'));
+  try {
+    const project = createProject(join(fixture, 'project'), 'work/aliases');
+    const subdirectory = join(project, 'nested'); mkdirSync(subdirectory);
+    const ledger = join(fixture, 'ledger.json');
+    const fromSubdirectory = command(['begin', '--file', ledger, '--work-type', 'tooling'], subdirectory);
+    assert.notEqual(fromSubdirectory.status, 0, 'new entries must begin at the actual Git worktree root');
+    assert.match(fromSubdirectory.stderr, /worktree root/i);
+    const began = command(['begin', '--file', ledger, '--work-type', 'tooling'], project);
+    assert.equal(began.status, 0, began.stderr);
+    const state = JSON.parse(readFileSync(ledger, 'utf8'));
+    const alias = join(fixture, 'project-alias'); symlinkSync(project, alias, 'dir');
+    for (const ownerPath of [subdirectory, alias]) for (const status of ['active', 'parked']) {
+      const seeded = structuredClone(state);
+      seeded.entries[0].worktree = ownerPath;
+      seeded.entries[0].status = status;
+      seeded.entries[0].parked = { checkpointSha: git(project, 'rev-parse', 'HEAD'), nextAction: 'Legacy owner keeps this path.' };
+      seeded.entries[0].customLegacyMetadata = { retained: true };
+      writeFileSync(ledger, JSON.stringify(seeded));
+      const before = readFileSync(ledger, 'utf8');
+      const duplicate = command(['begin', '--file', ledger, '--work-type', 'tooling'], project);
+      assert.notEqual(duplicate.status, 0, `${status} ${ownerPath}: alias cannot create a duplicate owner`);
+      assert.match(duplicate.stderr, /already exists|same.*worktree/i);
+      assert.equal(readFileSync(ledger, 'utf8'), before, 'legacy recorded paths and ownership stay byte-for-byte intact');
+    }
+  } finally { rmSync(fixture, { recursive: true, force: true }); }
 });
