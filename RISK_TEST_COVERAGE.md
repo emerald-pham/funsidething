@@ -259,6 +259,10 @@ The named-contract test in tests.js checks that every top-level test whose title
 
 - RISK PWA updates: an already durable board applies a downloaded worker without a redundant quota write
 - RISK PWA updates: an unsaved draft visibly defers reload while update checks continue
+- RISK PWA updates: a scanner gesture commits its action before a downloaded worker reloads
+- RISK PWA updates: a gesture beginning during an update save holds and resumes reload
+- RISK PWA updates: cancelled and released gestures resume a pending replacement
+- RISK PWA updates: the extended FAQ and changelog explain gesture-safe reloads
 - RISK PWA module delivery: a fresh installed shell serves every production script while offline
 - RISK architecture checkpoint: editor Undo and bulk Undo preserve selection boundaries and immutable history through reload
 - RISK PWA updates: a host write in flight must finish before a reverted board reloads

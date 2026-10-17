@@ -9218,5 +9218,159 @@
     },
     "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/approved-release/settlement-repair",
     "releaseStatus": "Local test-only repair candidate. Root owns full regression, native runtime, reviews, CI and release. Original8ab full-suite failure is retained; runtime source equality lets parent relate its native evidence by exact asset hash."
+  },
+  {
+    "testChangesSha256": "f3a23b1198f2171eaeeaf4c5b710246c2ca65e9edeb3c9dcc1e065bc02cbf49f",
+    "reason": "The downloaded service worker could reload the full app between a scanner pointerdown and its delegated task response. This ticket adds focused full-app coverage for the existing gesture lifecycle and documents the update wait in the extended FAQ and current release notes.",
+    "previousBehavior": "An update could reach applyPendingAppUpdate during an active scanner gesture and reload immediately, interrupting the pending response. If persistence yielded while a new gesture began, the continuation could still reload. Gesture completion did not retry a pending update.",
+    "intendedBehavior": "A ready update waits while the existing scanner gesture is active, rechecks that boundary after asynchronous persistence, and resumes at the existing gesture finish after the delegated click has committed. Pointer cancellation and the existing pointerup fallback release pending updates. Existing edit, visibility, first-install, storage, and cloud safeguards remain in place; no new gesture or storage state is introduced.",
+    "replacementTests": [
+      "RISK PWA updates: a scanner gesture commits its action before a downloaded worker reloads",
+      "RISK PWA updates: a gesture beginning during an update save holds and resumes reload",
+      "RISK PWA updates: cancelled and released gestures resume a pending replacement",
+      "RISK PWA updates: the extended FAQ and changelog explain gesture-safe reloads"
+    ],
+    "preservedCoverage": [
+      "The preimplementation full-app regression on base 659aac18 observed reloads.length equal to 1 immediately after pointerdown and controllerchange, where the test expected 0. The saved log is .git/funsidething-task-evidence/active-reload-progress-20261016/worker-151-entry-red.log.",
+      "The FAQ regression first failed because the rendered Quick start install/update answer omitted scanner-touch guidance, then passed after the FAQ and October 17 current changelog were updated; its original failure is preserved in worker-151-copy-red.log.",
+      "The full-app committed-click case checks the actual delegated No handler, a later update reload, and a cold reopen from isolated fake IndexedDB with the decision and board intact. The asynchronous case begins a gesture while update persistence is held. Cancellation and pointerup fallback cases each resume without another worker event.",
+      "The async-save and cancellation failure logs were produced by temporarily disabling already-implemented guards/callbacks after the first consumer regression was green; they are broken-handler sensitivity controls, not preimplementation RED evidence. They are preserved as worker-151-async-red.log and worker-151-fallback-red.log.",
+      "All nine pre-existing PWA update protections remain mapped and passing, including launch/focus/online checks, first install, failed save, edit deferral and async edit race. The update snippet fixture now supplies the real runtime global scannerGestureActive.",
+      "The offline shell delivery contract, exact app changelog fingerprint and service-worker cache fingerprint are refreshed and pass their focused tests."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK PWA updates: a scanner gesture commits' tests.js; node --test --test-name-pattern='RISK PWA updates: the extended FAQ and changelog explain gesture-safe reloads' tests.js",
+      "failure": "Before runtime changes on base 659aac18, the full-app scanner regression failed because controllerchange caused one reload during the active pointer gesture (expected zero). After the runtime fix, the independent copy test failed because the Quick start answer lacked scanner-touch guidance. The async-save and cancellation logs are explicitly postimplementation broken-handler sensitivity controls, not additional preimplementation RED slices."
+    }
+  },
+  {
+    "testChangesSha256": "6a638a1b5889092855eb8272e0111a7c06570960f4ed14e337d7154687ae377f",
+    "comparison": "mergeDelta",
+    "comparisonBase": "465c9566a3cb4b03abd67abbc5ec6119f31e7464",
+    "reason": "Reconcile accepted saved-view candidate465c956 with newly released main4a3f332 (PWA scanner-gesture update guard), after another authorized task advanced main. Preserve both complete proven implementations, all existing assertions and historical rationale/RED records. No new functional repair or behavior redesign is introduced by this merge.",
+    "previousBehavior": "Candidate465c956 already preserved approved silent SavedAppearance and released decision authority, and passed parent full/native/rules/compatibility reviews. Released main4a3f332 independently adds entry and post-save scannerGestureActive reload guards plus finishScannerGesture update resumption, consumer tests and FAQ/current changelog copy. Their branches carried separate changelog and metadata fingerprints.",
+    "intendedBehavior": "The combined source keeps the exact approved SavedAppearance/CSS/device-view/list/render seams from465c956 and exact released finishScannerGesture/registerServiceWorker guards from4a3f332. Both October17 player notes and unrelated history remain, with refreshed combined app/SW metadata. Existing isolated tests from both parents remain unchanged and run against the combined source.",
+    "replacementTests": [
+      "RISK PWA updates: a scanner gesture commits its action before a downloaded worker reloads",
+      "RISK PWA updates: a gesture beginning during an update save holds and resumes reload",
+      "RISK PWA updates: cancelled and released gestures resume a pending replacement",
+      "RISK PWA updates: the extended FAQ and changelog explain gesture-safe reloads"
+    ],
+    "preservedCoverage": [
+      "All accepted saved-view task/view/account/Undo/content and durable acknowledgement assertions remain exactly465c956. The suite auto-merges without any executable test edits beyond the exact released4a3f332 additions and its required scannerGestureActive fixture global.",
+      "Released PWA full-app pointerdown/controllerchange/No-handler/cold-reopen, held asynchronous save, pointercancel/pointerup fallback and FAQ guidance tests remain exact4a3f332. Existing edit/visibility/failed-write/no-redundant-quota-save and sync safeguards remain intact.",
+      "Every rationale record from both parents is retained as an exact record; prior immutable465 reviews, receipts and CI evidence are preserved externally. This merge changes candidate SHA and requires affected exact-candidate reviews again; it does not reuse old approvals as current approval.",
+      "The copied source seams and unchanged cloud-store-v2.js/device-store-v2.js/firestore.rules are independently compared by exact SHA256 in source-parity.json. Native browser/full regression/emulator/compatibility/review/release gates remain parent-owned; the inherited WebKit offline internal-error limit is not claimed as a pass."
+    ],
+    "redEvidence": {
+      "command": "Original approved saved-view/geometry and settlement chronology remains in inherited rationale records and invisible/ plus approved-release/settlement-repair artifacts. Released PWA command: node --test --test-name-pattern=\"RISK PWA updates: a scanner gesture commits\" tests.js; original entry and FAQ RED logs are in .git/funsidething-task-evidence/active-reload-progress-20261016/. Current focused preservation command is recorded in this owner report.",
+      "failure": "This is a preservation merge of two previously implemented and approved/released source changes, not a new functional fix; no fabricated new preimplementation RED is claimed. Original worker-151-entry-red.log observed one reload during pointerdown/controllerchange where zero was expected before its three-line guard fix; worker-151-copy-red.log preceded FAQ edits. Its async/fallback sensitivity controls remain labelled postimplementation. Saved-view actual source/geometry and untouched Node22 settlement47pass/2fail chronology remain in their original records. The first merged cohort, run before final metadata refresh, passed all behavior tests and failed only stale app/SW fingerprints (pre-fingerprint-cohort.txt); that mechanical mismatch is not a new product RED."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/approved-release/reconcile-main-4a3/owner",
+    "releaseStatus": "Local merged candidate only. Root owns exact final regression/reviews/native/browser/emulator/CI/release. No shared allocation, push, PR, main merge or deployment by this owner."
+  },
+  {
+    "testChangesSha256": "d5fbafe14ad5fbb7d103428929b1ce501e9bf848c03306f88b5f84dc7d2682aa",
+    "comparison": "approvedDelta",
+    "comparisonBase": "7d5b069603b758b73e5704a4a3eb91625ffd6413",
+    "reason": "Reconcile accepted saved-view candidate465c956 with newly released main4a3f332 (PWA scanner-gesture update guard), after another authorized task advanced main. Preserve both complete proven implementations, all existing assertions and historical rationale/RED records. No new functional repair or behavior redesign is introduced by this merge.",
+    "previousBehavior": "Candidate465c956 already preserved approved silent SavedAppearance and released decision authority, and passed parent full/native/rules/compatibility reviews. Released main4a3f332 independently adds entry and post-save scannerGestureActive reload guards plus finishScannerGesture update resumption, consumer tests and FAQ/current changelog copy. Their branches carried separate changelog and metadata fingerprints.",
+    "intendedBehavior": "The combined source keeps the exact approved SavedAppearance/CSS/device-view/list/render seams from465c956 and exact released finishScannerGesture/registerServiceWorker guards from4a3f332. Both October17 player notes and unrelated history remain, with refreshed combined app/SW metadata. Existing isolated tests from both parents remain unchanged and run against the combined source.",
+    "replacementTests": [
+      "RISK saved view decision integration: inherited guest authority and peer edits retain this device view through scoped Undo and durably acknowledged reopen",
+      "RISK PWA updates: a scanner gesture commits its action before a downloaded worker reloads",
+      "RISK PWA updates: a gesture beginning during an update save holds and resumes reload",
+      "RISK PWA updates: cancelled and released gestures resume a pending replacement",
+      "RISK PWA updates: the extended FAQ and changelog explain gesture-safe reloads"
+    ],
+    "preservedCoverage": [
+      "All accepted saved-view task/view/account/Undo/content and durable acknowledgement assertions remain exactly465c956. The suite auto-merges without any executable test edits beyond the exact released4a3f332 additions and its required scannerGestureActive fixture global.",
+      "Released PWA full-app pointerdown/controllerchange/No-handler/cold-reopen, held asynchronous save, pointercancel/pointerup fallback and FAQ guidance tests remain exact4a3f332. Existing edit/visibility/failed-write/no-redundant-quota-save and sync safeguards remain intact.",
+      "Every rationale record from both parents is retained as an exact record; prior immutable465 reviews, receipts and CI evidence are preserved externally. This merge changes candidate SHA and requires affected exact-candidate reviews again; it does not reuse old approvals as current approval.",
+      "The copied source seams and unchanged cloud-store-v2.js/device-store-v2.js/firestore.rules are independently compared by exact SHA256 in source-parity.json. Native browser/full regression/emulator/compatibility/review/release gates remain parent-owned; the inherited WebKit offline internal-error limit is not claimed as a pass."
+    ],
+    "redEvidence": {
+      "command": "Original approved saved-view/geometry and settlement chronology remains in inherited rationale records and invisible/ plus approved-release/settlement-repair artifacts. Released PWA command: node --test --test-name-pattern=\"RISK PWA updates: a scanner gesture commits\" tests.js; original entry and FAQ RED logs are in .git/funsidething-task-evidence/active-reload-progress-20261016/. Current focused preservation command is recorded in this owner report.",
+      "failure": "This is a preservation merge of two previously implemented and approved/released source changes, not a new functional fix; no fabricated new preimplementation RED is claimed. Original worker-151-entry-red.log observed one reload during pointerdown/controllerchange where zero was expected before its three-line guard fix; worker-151-copy-red.log preceded FAQ edits. Its async/fallback sensitivity controls remain labelled postimplementation. Saved-view actual source/geometry and untouched Node22 settlement47pass/2fail chronology remain in their original records. The first merged cohort, run before final metadata refresh, passed all behavior tests and failed only stale app/SW fingerprints (pre-fingerprint-cohort.txt); that mechanical mismatch is not a new product RED."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/approved-release/reconcile-main-4a3/owner",
+    "releaseStatus": "Local merged candidate only. Root owns exact final regression/reviews/native/browser/emulator/CI/release. No shared allocation, push, PR, main merge or deployment by this owner."
+  },
+  {
+    "testChangesSha256": "99f07a468e334a7f2df4412bf130e1d3decad7a59d3e45a7a325cc22668710b0",
+    "comparison": "priorReleasedDelta",
+    "comparisonBase": "659aac18ad6bae310f8d6f50be2201abf1791eb8",
+    "reason": "Reconcile accepted saved-view candidate465c956 with newly released main4a3f332 (PWA scanner-gesture update guard), after another authorized task advanced main. Preserve both complete proven implementations, all existing assertions and historical rationale/RED records. No new functional repair or behavior redesign is introduced by this merge.",
+    "previousBehavior": "Candidate465c956 already preserved approved silent SavedAppearance and released decision authority, and passed parent full/native/rules/compatibility reviews. Released main4a3f332 independently adds entry and post-save scannerGestureActive reload guards plus finishScannerGesture update resumption, consumer tests and FAQ/current changelog copy. Their branches carried separate changelog and metadata fingerprints.",
+    "intendedBehavior": "The combined source keeps the exact approved SavedAppearance/CSS/device-view/list/render seams from465c956 and exact released finishScannerGesture/registerServiceWorker guards from4a3f332. Both October17 player notes and unrelated history remain, with refreshed combined app/SW metadata. Existing isolated tests from both parents remain unchanged and run against the combined source.",
+    "replacementTests": [
+      "RISK saved view decision integration: inherited guest authority and peer edits retain this device view through scoped Undo and durably acknowledged reopen",
+      "RISK PWA updates: a scanner gesture commits its action before a downloaded worker reloads",
+      "RISK PWA updates: a gesture beginning during an update save holds and resumes reload",
+      "RISK PWA updates: cancelled and released gestures resume a pending replacement",
+      "RISK PWA updates: the extended FAQ and changelog explain gesture-safe reloads"
+    ],
+    "preservedCoverage": [
+      "All accepted saved-view task/view/account/Undo/content and durable acknowledgement assertions remain exactly465c956. The suite auto-merges without any executable test edits beyond the exact released4a3f332 additions and its required scannerGestureActive fixture global.",
+      "Released PWA full-app pointerdown/controllerchange/No-handler/cold-reopen, held asynchronous save, pointercancel/pointerup fallback and FAQ guidance tests remain exact4a3f332. Existing edit/visibility/failed-write/no-redundant-quota-save and sync safeguards remain intact.",
+      "Every rationale record from both parents is retained as an exact record; prior immutable465 reviews, receipts and CI evidence are preserved externally. This merge changes candidate SHA and requires affected exact-candidate reviews again; it does not reuse old approvals as current approval.",
+      "The copied source seams and unchanged cloud-store-v2.js/device-store-v2.js/firestore.rules are independently compared by exact SHA256 in source-parity.json. Native browser/full regression/emulator/compatibility/review/release gates remain parent-owned; the inherited WebKit offline internal-error limit is not claimed as a pass."
+    ],
+    "redEvidence": {
+      "command": "Original approved saved-view/geometry and settlement chronology remains in inherited rationale records and invisible/ plus approved-release/settlement-repair artifacts. Released PWA command: node --test --test-name-pattern=\"RISK PWA updates: a scanner gesture commits\" tests.js; original entry and FAQ RED logs are in .git/funsidething-task-evidence/active-reload-progress-20261016/. Current focused preservation command is recorded in this owner report.",
+      "failure": "This is a preservation merge of two previously implemented and approved/released source changes, not a new functional fix; no fabricated new preimplementation RED is claimed. Original worker-151-entry-red.log observed one reload during pointerdown/controllerchange where zero was expected before its three-line guard fix; worker-151-copy-red.log preceded FAQ edits. Its async/fallback sensitivity controls remain labelled postimplementation. Saved-view actual source/geometry and untouched Node22 settlement47pass/2fail chronology remain in their original records. The first merged cohort, run before final metadata refresh, passed all behavior tests and failed only stale app/SW fingerprints (pre-fingerprint-cohort.txt); that mechanical mismatch is not a new product RED."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/approved-release/reconcile-main-4a3/owner",
+    "releaseStatus": "Local merged candidate only. Root owns exact final regression/reviews/native/browser/emulator/CI/release. No shared allocation, push, PR, main merge or deployment by this owner."
+  },
+  {
+    "testChangesSha256": "3f43aa7f1e1af0321cf04ced1be7c3c66a923b985d3a9c1ba02521cf3ce01074",
+    "comparison": "originalLiveCumulative",
+    "comparisonBase": "69a9feddf5d6bb8c4973475f7232e363b8646097",
+    "reason": "Reconcile accepted saved-view candidate465c956 with newly released main4a3f332 (PWA scanner-gesture update guard), after another authorized task advanced main. Preserve both complete proven implementations, all existing assertions and historical rationale/RED records. No new functional repair or behavior redesign is introduced by this merge.",
+    "previousBehavior": "Candidate465c956 already preserved approved silent SavedAppearance and released decision authority, and passed parent full/native/rules/compatibility reviews. Released main4a3f332 independently adds entry and post-save scannerGestureActive reload guards plus finishScannerGesture update resumption, consumer tests and FAQ/current changelog copy. Their branches carried separate changelog and metadata fingerprints.",
+    "intendedBehavior": "The combined source keeps the exact approved SavedAppearance/CSS/device-view/list/render seams from465c956 and exact released finishScannerGesture/registerServiceWorker guards from4a3f332. Both October17 player notes and unrelated history remain, with refreshed combined app/SW metadata. Existing isolated tests from both parents remain unchanged and run against the combined source.",
+    "replacementTests": [
+      "RISK saved view decision integration: inherited guest authority and peer edits retain this device view through scoped Undo and durably acknowledged reopen",
+      "RISK PWA updates: a scanner gesture commits its action before a downloaded worker reloads",
+      "RISK PWA updates: a gesture beginning during an update save holds and resumes reload",
+      "RISK PWA updates: cancelled and released gestures resume a pending replacement",
+      "RISK PWA updates: the extended FAQ and changelog explain gesture-safe reloads"
+    ],
+    "preservedCoverage": [
+      "All accepted saved-view task/view/account/Undo/content and durable acknowledgement assertions remain exactly465c956. The suite auto-merges without any executable test edits beyond the exact released4a3f332 additions and its required scannerGestureActive fixture global.",
+      "Released PWA full-app pointerdown/controllerchange/No-handler/cold-reopen, held asynchronous save, pointercancel/pointerup fallback and FAQ guidance tests remain exact4a3f332. Existing edit/visibility/failed-write/no-redundant-quota-save and sync safeguards remain intact.",
+      "Every rationale record from both parents is retained as an exact record; prior immutable465 reviews, receipts and CI evidence are preserved externally. This merge changes candidate SHA and requires affected exact-candidate reviews again; it does not reuse old approvals as current approval.",
+      "The copied source seams and unchanged cloud-store-v2.js/device-store-v2.js/firestore.rules are independently compared by exact SHA256 in source-parity.json. Native browser/full regression/emulator/compatibility/review/release gates remain parent-owned; the inherited WebKit offline internal-error limit is not claimed as a pass."
+    ],
+    "redEvidence": {
+      "command": "Original approved saved-view/geometry and settlement chronology remains in inherited rationale records and invisible/ plus approved-release/settlement-repair artifacts. Released PWA command: node --test --test-name-pattern=\"RISK PWA updates: a scanner gesture commits\" tests.js; original entry and FAQ RED logs are in .git/funsidething-task-evidence/active-reload-progress-20261016/. Current focused preservation command is recorded in this owner report.",
+      "failure": "This is a preservation merge of two previously implemented and approved/released source changes, not a new functional fix; no fabricated new preimplementation RED is claimed. Original worker-151-entry-red.log observed one reload during pointerdown/controllerchange where zero was expected before its three-line guard fix; worker-151-copy-red.log preceded FAQ edits. Its async/fallback sensitivity controls remain labelled postimplementation. Saved-view actual source/geometry and untouched Node22 settlement47pass/2fail chronology remain in their original records. The first merged cohort, run before final metadata refresh, passed all behavior tests and failed only stale app/SW fingerprints (pre-fingerprint-cohort.txt); that mechanical mismatch is not a new product RED."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/approved-release/reconcile-main-4a3/owner",
+    "releaseStatus": "Local merged candidate only. Root owns exact final regression/reviews/native/browser/emulator/CI/release. No shared allocation, push, PR, main merge or deployment by this owner."
+  },
+  {
+    "testChangesSha256": "94c2d9c2360dcdb32074243818331893caaf6f21ac4e43c19cd6c0e4aa60bff5",
+    "comparison": "currentMainDelta",
+    "comparisonBase": "4a3f332ba543147691147120e83048e162dabae1",
+    "reason": "Reconcile accepted saved-view candidate465c956 with newly released main4a3f332 (PWA scanner-gesture update guard), after another authorized task advanced main. Preserve both complete proven implementations, all existing assertions and historical rationale/RED records. No new functional repair or behavior redesign is introduced by this merge.",
+    "previousBehavior": "Candidate465c956 already preserved approved silent SavedAppearance and released decision authority, and passed parent full/native/rules/compatibility reviews. Released main4a3f332 independently adds entry and post-save scannerGestureActive reload guards plus finishScannerGesture update resumption, consumer tests and FAQ/current changelog copy. Their branches carried separate changelog and metadata fingerprints.",
+    "intendedBehavior": "The combined source keeps the exact approved SavedAppearance/CSS/device-view/list/render seams from465c956 and exact released finishScannerGesture/registerServiceWorker guards from4a3f332. Both October17 player notes and unrelated history remain, with refreshed combined app/SW metadata. Existing isolated tests from both parents remain unchanged and run against the combined source.",
+    "replacementTests": [
+      "RISK saved view decision integration: inherited guest authority and peer edits retain this device view through scoped Undo and durably acknowledged reopen"
+    ],
+    "preservedCoverage": [
+      "All accepted saved-view task/view/account/Undo/content and durable acknowledgement assertions remain exactly465c956. The suite auto-merges without any executable test edits beyond the exact released4a3f332 additions and its required scannerGestureActive fixture global.",
+      "Released PWA full-app pointerdown/controllerchange/No-handler/cold-reopen, held asynchronous save, pointercancel/pointerup fallback and FAQ guidance tests remain exact4a3f332. Existing edit/visibility/failed-write/no-redundant-quota-save and sync safeguards remain intact.",
+      "Every rationale record from both parents is retained as an exact record; prior immutable465 reviews, receipts and CI evidence are preserved externally. This merge changes candidate SHA and requires affected exact-candidate reviews again; it does not reuse old approvals as current approval.",
+      "The copied source seams and unchanged cloud-store-v2.js/device-store-v2.js/firestore.rules are independently compared by exact SHA256 in source-parity.json. Native browser/full regression/emulator/compatibility/review/release gates remain parent-owned; the inherited WebKit offline internal-error limit is not claimed as a pass."
+    ],
+    "redEvidence": {
+      "command": "Original approved saved-view/geometry and settlement chronology remains in inherited rationale records and invisible/ plus approved-release/settlement-repair artifacts. Released PWA command: node --test --test-name-pattern=\"RISK PWA updates: a scanner gesture commits\" tests.js; original entry and FAQ RED logs are in .git/funsidething-task-evidence/active-reload-progress-20261016/. Current focused preservation command is recorded in this owner report.",
+      "failure": "This is a preservation merge of two previously implemented and approved/released source changes, not a new functional fix; no fabricated new preimplementation RED is claimed. Original worker-151-entry-red.log observed one reload during pointerdown/controllerchange where zero was expected before its three-line guard fix; worker-151-copy-red.log preceded FAQ edits. Its async/fallback sensitivity controls remain labelled postimplementation. Saved-view actual source/geometry and untouched Node22 settlement47pass/2fail chronology remain in their original records. The first merged cohort, run before final metadata refresh, passed all behavior tests and failed only stale app/SW fingerprints (pre-fingerprint-cohort.txt); that mechanical mismatch is not a new product RED."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/approved-release/reconcile-main-4a3/owner",
+    "releaseStatus": "Local merged candidate only. Root owns exact final regression/reviews/native/browser/emulator/CI/release. No shared allocation, push, PR, main merge or deployment by this owner."
   }
 ]
