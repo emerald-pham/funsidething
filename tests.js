@@ -11795,7 +11795,7 @@ function makeSyncHarness({ delayMs = 4, remote = null, failPull = false, rev = n
   return h;
 }
 
-test('RISK cloud No recovery: five scanner decisions survive offline durable reopen beside an independent peer edit',async t=>{
+test('RISK cloud No recovery: five scanner decisions survive offline durable reopen beside an independent peer edit',async t=>{ // Pin simulated time before boot and cold reopen.
  const {IDBFactory}=await import('fake-indexeddb');
  const at=Date.parse('2026-10-16T15:10:00.000Z'),passAt=at-60000;
  for(const backend of ['browser fallback','IndexedDB'])await t.test(backend,async()=>{
@@ -11811,9 +11811,10 @@ test('RISK cloud No recovery: five scanner decisions survive offline durable reo
   const indexedDB=backend==='IndexedDB'?new IDBFactory():null;
   const names={phone:'cloud-no-142-phone-'+Date.now()+'-'+Math.random(),mac:'cloud-no-142-mac-'+Date.now()+'-'+Math.random()};
   const seedStorage={[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)};
+  const beforeStateReady=ctx=>setFakeTime(ctx,at);
   const appOptions=device=>backend==='IndexedDB'
-   ?{seedStorage,indexedDBProvider:indexedDB,deviceDbName:names[device]}
-   :{seedStorage};
+   ?{seedStorage,indexedDBProvider:indexedDB,deviceDbName:names[device],beforeStateReady}
+   :{seedStorage,beforeStateReady};
   const {ctx:phone,shim:phoneShim}=await loadApp({...appOptions('phone'),cloudSyncFactory:h.factory});
   const {ctx:mac,shim:macShim}=await loadApp({...appOptions('mac'),cloudSyncFactory:h.factory});
   const closeStore=async app=>{try{await app.window.ScannerDeviceStore?.close?.();}catch{}};
@@ -11821,7 +11822,6 @@ test('RISK cloud No recovery: five scanner decisions survive offline durable reo
    await phone.cloudPull();await mac.cloudPull();await syncSettle(20);
    assert.equal(phone.state.syncRev,4);assert.equal(mac.state.syncRev,4);
    phone.window.CloudSync.ready=false; // retain the five real actions locally while the phone is offline
-   setFakeTime(phone,at);
    const acted=[];
    for(let i=0;i<5;i++){
     phone.renderScan();
@@ -11874,8 +11874,8 @@ test('RISK cloud No recovery: five scanner decisions survive offline durable reo
 
    const offlineCloudFactory=()=>{const cloud=h.factory();cloud.ready=false;return cloud;};
    const reloadOptions=backend==='IndexedDB'
-    ?{indexedDBProvider:indexedDB,deviceDbName:names.phone}
-    :{seedStorage:{[SYNC_STORE_KEY]:offlineRaw,[LOCAL_HEAD_KEY]:offlineRaw}};
+    ?{indexedDBProvider:indexedDB,deviceDbName:names.phone,beforeStateReady}
+    :{seedStorage:{[SYNC_STORE_KEY]:offlineRaw,[LOCAL_HEAD_KEY]:offlineRaw},beforeStateReady};
    const {ctx:reopened,shim:reopenedShim}=await loadApp({...reloadOptions,cloudSyncFactory:offlineCloudFactory});
    assert.deepEqual(acted.filter(id=>reopened.state.considered[id]==='no').sort(),acted.slice().sort(),
     'the cold device-store reopen itself retains every No mark');

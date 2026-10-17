@@ -697,7 +697,7 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 
 ## Stale-tab reconciliation
 
-- RISK cloud No recovery: five scanner decisions survive offline durable reopen beside an independent peer edit
+- RISK cloud No recovery: five scanner decisions survive offline durable reopen beside an independent peer edit (action time is fixed before boot and cold reopen across timezone boundaries)
 - RISK STALE TAB: CAS repair preserves newer fields and independent edits through an awaiting third action
 - RISK STALE TAB: browser rebase keeps disjoint fields but newer conflicts and deletions win
 - RISK STALE TAB: cloud adoption does not replace edits made while its safety backup awaits

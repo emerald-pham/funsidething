@@ -7419,5 +7419,29 @@
     "updatedTests": [
       "CLOUD ACCOUNT: a transaction binds its document before auth can switch"
     ]
+  },
+  {
+    "testChangesSha256": "9f2e3e91b98e7ee3d447a91af2206751f59f29b4bc3498f669bfb227a9e6d576",
+    "reason": "Make the protected No-recovery fixture deterministic across local timezones by installing its existing action timestamp before app readiness for both clients and the offline cold reopen. The test still exercises the established day-expiry boundary.",
+    "previousBehavior": "The fixture installed its fake clock only after initial boot and cloud pull, then cold-reopened without a fake clock. Under UTC after the established 2 AM cutoff, boot created a fresh pass before the fixture actions; both storage backends emitted events with host-time passAt and baseId=null. The account stayed e@example.com, but the exact-base part of the combined assertion failed. The default America/New_York run remained before its local cutoff.",
+    "intendedBehavior": "Initial phone and Mac clients and the cold reopened phone start under the same existing October 16 action time. Event account, exact base, original pass/time, learned ratings, peer edit, durable stores, and the explicit new-pass expiry assertions remain active and pass consistently in UTC and the default timezone.",
+    "replacementTests": [
+      "RISK cloud No recovery: five scanner decisions survive offline durable reopen beside an independent peer edit"
+    ],
+    "preservedCoverage": [
+      "Both browser fallback and production IndexedDB exercise five real offline No controls, durable close/reopen, and reconciliation beside an independent peer title edit.",
+      "Original action identity, account, exact observed base, pass/time/context, effective ratings, cloud event retention, and pass-day expiry assertions are retained."
+    ],
+    "redEvidence": {
+      "command": "TZ=UTC node --test --test-name-pattern='RISK cloud No recovery' tests.js",
+      "failure": "Before the fixture clock change, both storage subtests failed at the exact-base event assertion. Diagnostic run showed fixed event at=1792163400000 paired with a newly generated boot-time passId, passAt=1792212247783/1792212247862, and baseId=null. Raw failure: /Users/emeraldpham/.codex/task-artifacts/decision-sync-141/147/no-recovery-fixture-red-utc.log; diagnostic facts: no-recovery-fixture-red-diagnostic-utc.log. After pinning the existing timestamp before boot and cold reopen, the combined No-recovery and comparison cohort passed 9/9 in UTC and 9/9 in default America/New_York; logs: no-recovery-fixture-green-utc.log and no-recovery-fixture-green-default.log in the same evidence directory."
+    },
+    "updatedTests": [
+      "RISK cloud No recovery: five scanner decisions survive offline durable reopen beside an independent peer edit"
+    ],
+    "coverageChronology": {
+      "preimplementation": "Not applicable: this change corrects a timezone-dependent test fixture after behavior implementation; the actual UTC failure was observed before the fixture edit.",
+      "postimplementation": "Pinning the existing timestamp before initial boot and cold reopen makes the preserved expiry/reconciliation scenario green in UTC and America/New_York without changing runtime code."
+    }
   }
 ]
