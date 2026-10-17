@@ -18,18 +18,23 @@ the data. Its deployable source is `firestore.rules`, referenced by `firebase.js
 
 ## The security rule
 
-A signed-in account can read and write exactly one document — its own,
-at `users/{their uid}`. Nobody else's, and nothing at all while signed out.
-Writes need the next revision and a Firestore server timestamp. Old shells may
-still read, but their blind writes are denied until they reload. Document
-deletion is denied. The rule checks the write envelope; it cannot parse the
-JSON payload, so client-side history gates and backups remain necessary.
+A signed-in account can read and write its own board at `users/{their uid}`
+and the board's generation and chunk subcollections. Nobody else's, and nothing
+at all while signed out. The root is a small manifest identifying the current
+and previous immutable board generations. Publication needs the next revision,
+a sealed generation, and a Firestore server timestamp. Old shells may still
+read, but blind writes are denied until they reload. Root deletion is denied.
+The rules check ownership, envelopes, and generation transitions; they cannot
+parse the JSON hidden in chunks, so client validation and recovery copies
+remain necessary.
 
 ## How syncing behaves
 
-Deliberately **not** realtime. A live listener would let a write from your phone
-swap the benchmark card out from under you mid-scan. Instead it reconciles at
-two moments: when the page loads, and when the tab regains focus.
+A server-confirmed listener on the root manifest reports newer revisions. A
+notification requests a fresh, validated board read; notification data never
+replaces the board or acknowledges a write. Startup, focus, visibility, and
+reconnect also trigger reconciliation. An open editor or active scanner gesture
+defers adoption, and scanner controls remain bound to the tasks they displayed.
 
 - Writes are debounced 2 seconds, so a fast scanning run costs one write, not thirty
 - A pull that finds nothing new produces zero writes
@@ -124,17 +129,28 @@ later tasks that have no recorded deletion; the chosen backup restores its scan
 and settings state. Restoring a backup from another account asks explicitly
 before its tasks can be synced into the current account.
 
-The entire synced board currently lives in one Firestore document. Firestore's
-[1 MiB document limit](https://firebase.google.com/docs/firestore/quotas)
-therefore limits this design; task, History, and deletion evidence all count.
-The app does not yet split large boards across documents. Browser storage has
-a quota; automatic history rotates before and at the quota boundary. If even
-the newest safety copy cannot fit beside user-kept recovery data, replacement
-and cloud writes stay paused, and an unsaved primary board is reported plainly.
+The board is encoded into hash-verified UTF-8 chunks beneath an immutable
+generation. Uploads stage and verify all chunks, seal the generation, then
+conditionally publish its root manifest. Readers verify the complete generation
+and recheck the root before adopting it. A legacy single-document board can be
+read and migrated without treating a failed read as an empty cloud. Chunking
+removes the single-document board limit; browser, request, and project quotas
+still apply. With durable pending storage, interrupted uploads retain a stable
+generation identity for retry.
+The current and previous published generations are protected during collection;
+unpublished uploads have at least seven days to resume before becoming eligible
+for cleanup. This is not a promise of scheduled deletion after seven days.
+
+On the device, IndexedDB stores the durable board with immutable snapshots and
+recovery references. Supported fallback storage and retained legacy browser
+bytes keep their recovery roles. Automatic history rotates before and at the
+quota boundary. If mandatory recovery or the primary device save cannot finish,
+replacement and cloud publication remain held, and unsaved work is reported.
 
 GitHub Pages uses GitHub Actions as its publishing source. The deployment job
-depends on the release gate: `npm test` and `npm run test:rules` against the
-Firestore emulator. `firestore.rules` is deployed separately with
+depends on the test-first gate, full tests, Firestore rules tests, historical
+client compatibility, and exact-candidate review evidence. Rules and compatibility
+tests use the Firestore emulator. `firestore.rules` is deployed separately with
 `firebase deploy --only firestore:rules --project chain-scanner`; a passing
 emulator run does not update the live rule by itself.
 
