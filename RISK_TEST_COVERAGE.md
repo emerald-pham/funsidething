@@ -1272,3 +1272,10 @@ Same-account replacement retains the selected learning baseline; a failed mandat
 - `RISK decision recovery unknown destination: sole recovery authority blocks explicit journal replacement without changing either board`
 
 Validate sole recovery authority before the no-active-journal replacement shortcut; preserve exact destination, source input and cloud while held.
+
+## Precise shared-fact retirement (#146)
+
+- `RISK decision recovery replacement overlap: selected shared facts survive a displaced cloud branch returning after Import`
+- `RISK decision recovery retired identity: changed same-ID retired editor facts cannot become fresh authority`
+
+Shared selected facts remain active through reversed cloud adoption; retired typed field values cannot resurrect; changed retired identities hold against exact witness bytes.

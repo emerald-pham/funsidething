@@ -7641,5 +7641,23 @@
       "command": "node --test --test-name-pattern='RISK decision recovery unknown destination:' tests.js",
       "failure": "Actual app Import returned true for both sole decisionBaselineRecovery and decisionEventsRecovery formats in146/67-unknown-destination-red.log. Moving validation before shortcut gives GREEN68 (21/21 replacement-focused checks)."
     }
+  },
+  {
+    "testChangesSha256": "0a6f8c934a2c57478679539e41a2291ba9fc422d1c540fb382cafbbc71400c2d",
+    "reason": "Repair actual reversed replacement merge defects while enforcing immutable retired identity.",
+    "previousBehavior": "A receipt retired every destination row including facts shared with the chosen source, so reversed stale cloud adoption dropped the selected No. Retaining shared facts still let the retired scalar title resurrect. A changed retired editor row with the same ID was accepted as fresh coherent authority.",
+    "intendedBehavior": "Retire only exact destination facts absent from chosen source. On exact reversed receipt adoption restore only the retired typed fields/pass values from selected source before normal replay. Compare active identities against strict retired witnesses across sources; changed immutable facts hold before union.",
+    "replacementTests": [
+      "RISK decision recovery replacement overlap: selected shared facts survive a displaced cloud branch returning after Import",
+      "RISK decision recovery retired identity: changed same-ID retired editor facts cannot become fresh authority"
+    ],
+    "preservedCoverage": [
+      "All previous assertions remain unchanged; exact displaced baseline plus full destination recovery remain preserved.",
+      "New/unrecognized/unattested peer evidence still merges safely or holds; there is no retired-baseline-ID bypass. Same-account selected learning baseline remains intact. No Undo/frame semantics changed."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK decision recovery replacement overlap:|RISK decision recovery retired identity:' tests.js",
+      "failure": "146/69 observed selected No dropped to[]. Initial precision fix70 retained No but left retired title resurrection (11/12);71 observed changed retired editor identity accepted without hold.72 complete replacement precision GREEN16/16. Earlier complete affected cohort66 passes146/146, with final all-action145 integration still required."
+    }
   }
 ]

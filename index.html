@@ -3416,11 +3416,14 @@ function attestedDecisionEvent(baseline,event){
 }
 function conflictingDecisionEvidence(...boards){
   const identities=new Map();
-  for(const board of boards)for(const event of Array.isArray(board?.decisionEvents)?board.decisionEvents:[]){
-    if(typeof event?.id!=="string")continue;
-    const bytes=canonicalDecisionFact(event);
-    if(identities.has(event.id) && identities.get(event.id)!==bytes)return true;
-    identities.set(event.id,bytes);
+  for(const board of boards){
+    const facts=[...(Array.isArray(board?.decisionEvents)?board.decisionEvents:[]).map(event=>({id:event?.id,bytes:canonicalDecisionFact(event)})),
+      ...replacementDecisionReceipts(board?.decisionBaseline).flatMap(receipt=>receipt.facts.map(fact=>({id:fact.id,bytes:LZString.decompressFromUTF16(fact.witness)})))];
+    for(const {id,bytes} of facts){
+      if(typeof id!=="string")continue;
+      if(identities.has(id) && identities.get(id)!==bytes)return true;
+      identities.set(id,bytes);
+    }
   }
   return false;
 }
@@ -3467,10 +3470,29 @@ function retiredDecisionEvent(baseline,event){
   const canonical=canonicalDecisionFact(event);
   return replacementDecisionReceipts(baseline).some(receipt=>receipt.facts.some(fact=>fact.id===event?.id && LZString.decompressFromUTF16(fact.witness)===canonical));
 }
+function restoreRetiredDecisionFields(target,source){
+  const receipts=replacementDecisionReceipts(source.decisionBaseline).filter(receipt=>canonicalDecisionFact(receipt.baseline)===canonicalDecisionFact(target.decisionBaseline));
+  const copy=(to,from,key)=>{if(Object.hasOwn(from||{},key))to[key]=JSON.parse(JSON.stringify(from[key]));else delete to[key];};
+  for(const receipt of receipts)for(const fact of receipt.facts){
+    const event=JSON.parse(LZString.decompressFromUTF16(fact.witness));if(event.kind!=="current-choice")continue;
+    const {type,id,property}=event.target;
+    if(type==="task" && property==="disposition"){
+      for(const key of ["considered","cantAt","workedAt"]){target[key]||={};copy(target[key],source[key],id);}
+    }else if(type==="task"){
+      const to=(target.tasks||[]).find(task=>task.id===id),from=(source.tasks||[]).find(task=>task.id===id);
+      if(to&&from)copy(to,from,property);
+    }else if(type==="setting"){
+      target.settings||={};copy(target.settings,source.settings,property);
+    }else if(type==="pass"){
+      for(const key of ["passId","passStartedAt","mode","scanMode","chance","chain","candidateId","interventionActive","considered","cantAt","workedAt"])copy(target,source,key);
+    }
+  }
+}
 async function prepareDecisionReplacement(next,current,reason,gestureId=null){
   const account=current.syncAccount??current.decisionBaseline?.account??null;
   const issue=decisionEvidenceIssue(current,account) || decisionEvidenceIssue(next,account);
   if(issue){reportCloudReconcileError(issue);return false;}
+  if(conflictingDecisionEvidence(next,current)){reportCloudReconcileError("conflicting-decision-evidence");return false;}
   if(current?.decisionBaseline===undefined && (current?.decisionEvents===undefined
     || Array.isArray(current.decisionEvents) && !current.decisionEvents.length))return true;
   const before=JSON.stringify(current),source=JSON.stringify(next),backend=window.CloudSync,user=backend?.user||null,at=Date.now();
@@ -3482,7 +3504,9 @@ async function prepareDecisionReplacement(next,current,reason,gestureId=null){
   if(!next.decisionBaseline){const plain=JSON.parse(source);delete plain.decisionBase;next.decisionBaseline=baselineFromSource(plain,{account,baseId:null});}
   const baseline=next.decisionBaseline;
   const receipt={v:1,reason,account,actionId:decisionId(gestureId)?gestureId:uid(),at,
-    baseline:JSON.parse(JSON.stringify(current.decisionBaseline)),facts:(current.decisionEvents||[]).map(event=>({id:event.id,witness:LZString.compressToUTF16(canonicalDecisionFact(event))}))};
+    baseline:JSON.parse(JSON.stringify(current.decisionBaseline)),facts:(current.decisionEvents||[])
+      .filter(event=>!(next.decisionEvents||[]).some(selected=>canonicalDecisionFact(selected)===canonicalDecisionFact(event)))
+      .map(event=>({id:event.id,witness:LZString.compressToUTF16(canonicalDecisionFact(event))}))};
   if(!supportedDecisionReplacement(receipt,account))return false;
   baseline.replacement=[...(baseline.replacement||[]),receipt];
   return true;
@@ -5728,6 +5752,7 @@ function mergeDecisionBaseline(target,source){
   const before=JSON.stringify([target.decisionBaseline,target.decisionBaselineRecovery]);
   if(retiredDecisionBaseline(target.decisionBaseline,source.decisionBaseline))return false;
   if(retiredDecisionBaseline(source.decisionBaseline,target.decisionBaseline)){
+    restoreRetiredDecisionFields(target,source);
     if(Array.isArray(target.decisionEvents))target.decisionEvents=target.decisionEvents.filter(event=>!retiredDecisionEvent(source.decisionBaseline,event));
     target.decisionBaseline=JSON.parse(JSON.stringify(source.decisionBaseline));
   }
