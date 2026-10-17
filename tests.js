@@ -28343,6 +28343,73 @@ test('RISK cloud current choices: causal projector retains compatible task field
   'event delivery order does not change the projected compatible result');
 });
 
+test('RISK cloud current choices: context membership additions compose across observed revisions',async()=>{
+ const at=Date.parse('2026-10-16T18:20:00.000Z');
+ const initial=syncState({tasks:[syncTask('revision-marker','Before marker'),syncTask('context-delta-target','Shared task')],
+  contexts:[{id:'ctx-phone',name:'Phone',active:true},{id:'ctx-peer',name:'Peer',active:true}],chain:[],candidateId:null,
+  passStartedAt:at-60000,passId:'shared-pass-context-delta',scanMode:'descending',syncRev:4,syncAccount:'e@example.com',syncDirty:false});
+ const remote=JSON.parse(JSON.stringify(initial));
+ for(const key of ['syncRev','syncAccount','syncDirty','lastCloudServerAt','protectedBackupIds'])delete remote[key];
+ const h=makeSyncHarness({remote,rev:4,delayMs:1}),seedStorage={[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)};
+ const phone=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:h.factory});
+ const peer=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:h.factory});
+ try{
+  await phone.ctx.cloudPull();await peer.ctx.cloudPull();await syncSettle(20);
+  const sharedBase=phone.ctx.state.decisionBase?.id;
+  assert.ok(sharedBase,'both devices begin from an adopted exact cloud revision');
+  assert.equal(peer.ctx.state.decisionBase?.id,sharedBase,'the peer begins from the same decision base');
+
+  assert.equal(await saveEditorChoice(phone,'revision-marker',at+100,{title:'Advanced cloud revision'}),true);
+  await phone.ctx.cloudPushNow();await syncSettle(30);
+  assert.ok(h.doc.rev>4,'the unrelated editor action is acknowledged as a new cloud revision');
+  assert.ok(phone.ctx.state.decisionBase?.id&&phone.ctx.state.decisionBase.id!==sharedBase,
+   'publishing an unrelated edit advances the phone’s observed decision base');
+  assert.equal(peer.ctx.state.decisionBase?.id,sharedBase,'the peer remains stale on the original decision base');
+
+  phone.shim.window.CloudSync.ready=false;peer.shim.window.CloudSync.ready=false;
+  assert.equal(await saveEditorChoice(phone,'context-delta-target',at+200,{ctxIds:['ctx-phone']}),true);
+  assert.equal(await saveEditorChoice(peer,'context-delta-target',at+300,{ctxIds:['ctx-peer']}),true);
+  const phoneChoice=phone.ctx.state.decisionEvents.find(event=>event?.kind==='current-choice'&&event.target?.property==='ctx');
+  const peerChoice=peer.ctx.state.decisionEvents.find(event=>event?.kind==='current-choice'&&event.target?.property==='ctx');
+  assert.deepEqual(JSON.parse(JSON.stringify(phoneChoice.before)),{present:true,value:[]},'the phone records the shared empty membership before its edit');
+  assert.deepEqual(JSON.parse(JSON.stringify(peerChoice.before)),{present:true,value:[]},'the stale peer records the same shared empty membership');
+  assert.notEqual(phoneChoice.baseId,peerChoice.baseId,'the concurrent editor actions attest different observed cloud revisions');
+
+  phone.shim.window.CloudSync.ready=true;
+  await phone.ctx.cloudPushNow();await syncSettle(30);
+  peer.shim.window.CloudSync.ready=true;
+  await peer.ctx.cloudPull();await syncSettle(40);
+  const adopted=peer.ctx.state.tasks.find(task=>task.id==='context-delta-target');
+  assert.deepEqual(JSON.parse(JSON.stringify(adopted.ctx)),['ctx-phone','ctx-peer'],
+   'the stale peer visibly composes both independent additions from the same attested before membership: '+JSON.stringify({actual:adopted.ctx,
+    phone:{id:phoneChoice.id,baseId:phoneChoice.baseId,at:phoneChoice.at,before:phoneChoice.before,value:phoneChoice.value},
+    peer:{id:peerChoice.id,baseId:peerChoice.baseId,at:peerChoice.at,before:peerChoice.before,value:peerChoice.value}}));
+  await peer.ctx.cloudPushNow();await syncSettle(40);
+  assert.deepEqual(JSON.parse(JSON.stringify(h.remoteState().tasks.find(task=>task.id==='context-delta-target').ctx)),['ctx-phone','ctx-peer'],
+   'the merged memberships are durable in the acknowledged cloud payload');
+  const reopened=await loadAppAtTime(at,{seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(h.remoteState()),[LOCAL_HEAD_KEY]:JSON.stringify(h.remoteState())},cloudSyncFactory:h.factory});
+  try{
+   await reopened.ctx.cloudPull();await syncSettle(20);
+   assert.deepEqual(JSON.parse(JSON.stringify(reopened.ctx.state.tasks.find(task=>task.id==='context-delta-target').ctx)),['ctx-phone','ctx-peer'],
+    'a cold client reopening the cloud payload projects both memberships');
+  }finally{try{await reopened.shim.window.ScannerDeviceStore?.close?.();}catch{}}
+
+  const conflictingBefore=JSON.parse(JSON.stringify(peerChoice));
+  conflictingBefore.before={present:true,value:['ctx-stale']};
+  const conflictingBoard=JSON.parse(JSON.stringify(initial));conflictingBoard.decisionEvents=[phoneChoice,conflictingBefore];
+  phone.ctx.projectCurrentChoiceEvents(conflictingBoard);
+  assert.deepEqual(JSON.parse(JSON.stringify(conflictingBoard.tasks.find(task=>task.id==='context-delta-target').ctx)),['ctx-peer'],
+   'different exact before memberships remain a whole-list conflict and are not composed');
+  const unattestedPeer=JSON.parse(JSON.stringify(peerChoice));unattestedPeer.id=peerChoice.id+'-unbased';unattestedPeer.baseId=null;
+  const unattestedBoard=JSON.parse(JSON.stringify(initial));unattestedBoard.decisionEvents=[phoneChoice,unattestedPeer];
+  phone.ctx.projectCurrentChoiceEvents(unattestedBoard);
+  assert.deepEqual(JSON.parse(JSON.stringify(unattestedBoard.tasks.find(task=>task.id==='context-delta-target').ctx)),['ctx-peer'],
+   'a missing exact cloud base remains conservative even when the before memberships match');
+ }finally{
+  for(const app of [phone,peer])try{await app.shim.window.ScannerDeviceStore?.close?.();}catch{}
+ }
+});
+
 test('RISK cloud current choices: causal action order beats skew and equal concurrent times use event identity',async()=>{
  const at=Date.parse('2026-10-16T17:50:00.000Z');
  const initial=syncState({tasks:[syncTask('order-projection','Before')],chain:[],candidateId:null,
