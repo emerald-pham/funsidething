@@ -1,7 +1,11 @@
 # Saved view on reopen and refresh
 
-Status: approved for implementation, October 16, 2026. The user confirmed the
-shared understanding with “sure” and explicitly invoked implement-spec.
+Status: implementation in progress; live release is on hold. On October 16,
+2026, the user rejected the added loading popup and required invisible, seamless
+restoration and sync. They requested real functionality screenshots for approval
+and explicitly said to hold going live until they wake up. Do not push, merge or
+deploy this candidate before their approval. The original shared understanding
+was confirmed with “sure” and an explicit implement-spec invocation.
 Implementation and release track [GitHub #140](https://github.com/emerald-pham/funsidething/issues/140).
 
 ## Problem
@@ -24,8 +28,17 @@ want the opening view to resemble the one they left.
    answers routine design details; do not turn source-discoverable facts into
    more preference questions (subsequent direct user correction).
 
+7. Startup and background sync must stay visually seamless. Do not introduce a
+   loading popup, status card or similar new interruption. With a cached filled
+   appearance available, show it while local hydration is pending and replace it
+   quietly with the authoritative current board.
+8. Show actual local screenshots of before-close, first-reopen and background
+   update behavior for approval before proceeding toward live release.
+
 The canonical term is **saved view**; see [GLOSSARY.md](../../GLOSSARY.md).
-No screenshot, storage mechanism or new source of board truth has been selected.
+No new source of board truth is authorized. A bounded presentation cache may
+paint the last settled view while authoritative storage loads; it must remain
+inert and must never seed, mutate, save or sync tasks.
 
 ## Proposed fix and observable acceptance
 
@@ -51,7 +64,7 @@ reproducing the reported visual transition rather than assuming its cause.
 No additional preference questionnaire is needed for established behavior.
 The shared-understanding confirmation is complete.
 
-## Current implementation evidence
+## Initial source investigation
 
 Read-only source inspection used `origin/main` at
 `69a9feddf5d6bb8c4973475f7232e363b8646097`. No browser reproduction was performed;
@@ -122,3 +135,20 @@ storage failures. Preserve existing data, sync and draft safety contracts.
 The eventual product change requires the repository's FAQ/changelog, review,
 rendered startup evidence, compatibility and release gates. This document and
 source inspection claim no implementation, tests or deployed behavior.
+
+## Current local checkpoint and user correction
+
+The local implementation checkpoint `7d90e9f9f313f1357d369b20af136f85634b86da`
+restores view metadata and hides the empty shell during local hydration, but its
+added loading status panel was explicitly rejected. It is superseded and has no
+release approval. No feature code was pushed or deployed. Preserve its regression
+evidence; replace the rejected loading design with the last accepted app design
+and invisible filled-appearance restoration.
+
+Acceptance now includes a delayed authoritative local read with a previously
+cached filled view: actual first paint must retain that view without any new
+loading surface, then yield quietly to the live board. Exercise the real reopen
+and render consumers, account changes, corrupt/blocked/oversized cache fallback,
+current dates, safe interactivity and untrusted cached content. Keep the visual
+cache bounded for large boards and separate from recovery or persistence truth.
+Screenshot approval is the next user-facing checkpoint; publishing remains held.

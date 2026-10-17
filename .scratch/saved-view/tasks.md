@@ -32,3 +32,14 @@ test seams, reusing the app's real consumers:
 These seams implement the accepted reopen/refresh, local-first, date correctness,
 per-device continuity and account-safety checks. They do not add a new product
 surface or widen the task into new editing/selection features.
+
+## Revised frontier after user feedback
+
+The initial implementation owner is parked at `7d90e9f9f313f1357d369b20af136f85634b86da`.
+The user rejected the loading popup and requested invisible restoration plus real
+functionality screenshots for approval. One new implementation owner will carry
+the revised invisible-appearance behavior locally; `/root` retains integration
+and the explicit live-release hold. No push, merge or deployment until approval.
+The next deliverable is a reviewable local candidate and before-close, immediate
+reopen and background-update screenshots. Prior technical passes do not approve
+the rejected visual design.
