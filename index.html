@@ -3737,6 +3737,7 @@ function decisionProjectionIssue(board,checkCoherence=true){
   const embodied=new Set(baseline.includedActionIds);
   for(const event of rows){
     if(!supportedDecisionEvent(event)||embodied.has(event.id)||attestedDecisionEvent(baseline,event))continue;
+    if(event.kind==="completion"&&!decisionBaselineAcceptsEvent(baseline,event))return "unprojectable-decision-evidence";
     if(["no","comparison"].includes(event.kind)){
       if(!decisionBaselineAcceptsEvent(baseline,event))return "unprojectable-decision-evidence";
       if(event.ratingApplied===true){
@@ -5087,11 +5088,11 @@ const taskActionOwnerBundle=(()=>{
       return "saved-dot-unavailable";
     }
     if(action==="done"){
-      completeTask(task);
+      completeTask(task,actionGesture);
       state.chain=state.chain.filter(c=>c!==id);
       delete state.cantAt[id];delete state.workedAt[id];
       if(state.candidateId===id)state.candidateId=null;
-      recomputeRanks();finishRatingObservation(observation);commit(true,true);
+      projectDecisionEvents(state);recomputeRanks();finishRatingObservation(observation);commit(true,true);
       return true;
     }
     if(action==="worked"){
@@ -5188,9 +5189,9 @@ const taskActionOwnerBundle=(()=>{
         state.considered[candidate.id]="cant";state.cantAt[candidate.id]=choiceGesture.at;
         const change=currentChoiceDispositionChange(candidate.id,beforeDisposition,true);
         appendCurrentChoiceEvents(prepareCurrentChoiceEvents(change?[change]:[],choiceGesture,{[candidate.id]:Array.isArray(candidate.ctx)?candidate.ctx.slice():[]}));
-      }else completeTask(candidate);
+      }else completeTask(candidate,gesture);
       state.candidateId=null;
-      if(decisionEvent)projectDecisionEvents(state);
+      if(decisionEvent||kind==="cand-done")projectDecisionEvents(state);
       recomputeRanks();finishRatingObservation(observation);maybeIntervene();
       commit(true,kind==="yes"||kind==="cand-done");
       return true;
@@ -5199,10 +5200,11 @@ const taskActionOwnerBundle=(()=>{
       const b=benchmark();if(!b)return false;
       if(command.action==="done"){
         const observation=captureRatingObservation("done",[b.id]);
+        const gesture=captureDecisionGesture(null,observation.at);
         // Completing a queued benchmark ends scanning; candidate Done does not.
-        pushUndo();completeTask(b);state.chain.pop();state.mode="work";
+        pushUndo();completeTask(b,gesture);state.chain.pop();state.mode="work";
         if(state.chain.length===0)newPass(false);
-        recomputeRanks();finishRatingObservation(observation);state.interventionActive=false;commit(true,true);
+        projectDecisionEvents(state);recomputeRanks();finishRatingObservation(observation);state.interventionActive=false;commit(true,true);
         return true;
       }
       if(command.action==="worked")return executeTaskAction("worked",b.id);
@@ -5325,11 +5327,14 @@ const taskActionOwnerBundle=(()=>{
 })();
 const TaskActionOwner=taskActionOwnerBundle.owner;
 function decide(kind){return TaskActionOwner.perform({type:"decision",decision:kind});}
-function completeTask(t){
+function completeTask(t,gesture=null){
+  const at=gesture&&Number.isFinite(gesture.at)&&gesture.at>=0?gesture.at:Date.now();
+  const event={...decisionGestureFields(gesture,at),v:1,id:uid(),kind:"completion",meaning:"task-completed",taskId:t.id};
+  recordDecisionEvent(event);
   // Completion records what happened, not a preference comparison. Ordinary
   // and evergreen Done actions therefore leave TrueSkill untouched; only an
   // explicit comparison or Dislodge should teach the ranker.
-  t.lastDoneAt = Date.now();
+  t.lastDoneAt = at;
   if(t.restoredRunOp) t.completedAfterRestoreOp=t.restoredRunOp;
   if(t.evergreen){
     state.considered[t.id]="done";
@@ -5337,7 +5342,7 @@ function completeTask(t){
     // in History once the rest period passes — see historyRows().
     state.workLog.push({id:uid(), taskId:t.id, title:t.title, kind:"evergreen-done", at:t.lastDoneAt});
   }
-  else { t.done = true; t.completedAt = Date.now(); delete state.considered[t.id]; }
+  else { t.done = true; t.completedAt = at; delete state.considered[t.id]; }
 }
 function benchDone(){return TaskActionOwner.perform({type:"benchmark",action:"done"});}
 function workedOn(){return TaskActionOwner.perform({type:"benchmark",action:"worked"});}
@@ -6049,6 +6054,7 @@ function supportedDecisionEvent(event){
     ||!decisionIdList(event.observedActionIds)||event.observedActionIds.includes(event.id))return false;
   if(event.kind==="current-choice")return typeof supportedCurrentChoiceEvent==="function"&&supportedCurrentChoiceEvent(event);
   if(event.kind==="undo")return supportedDecisionUndoEvent(event);
+  if(event.kind==="completion")return event.meaning==="task-completed"&&decisionId(event.taskId)&&decisionId(event.actionId);
   if(event.kind==="no")return event.meaning==="benchmark-preferred"&&decisionId(event.candidateId)&&decisionId(event.benchmarkId)
     &&event.candidateId!==event.benchmarkId&&Array.isArray(event.candidateContextIds)&&event.candidateContextIds.every(decisionId)
     &&Array.isArray(event.benchmarkContextIds)&&event.benchmarkContextIds.every(decisionId)
@@ -6340,7 +6346,32 @@ function decisionEventOrder(board,baseline){
     }
     if(!changed)break; // a cycle or a missing causal ancestor stays conserved, not guessed
   }
-  return {events:ordered,blockedIds:new Set([...blocked,...pending.keys()])};
+  return {events:ordered,blockedIds:new Set([...blocked,...pending.keys()]),byId};
+}
+function decisionEventAncestors(event,byId,memo=new Map(),visiting=new Set()){
+  if(memo.has(event.id))return memo.get(event.id);
+  if(visiting.has(event.id))return new Set();
+  const active=new Set(visiting);active.add(event.id);const ancestors=new Set();
+  for(const id of Array.isArray(event.observedActionIds)?event.observedActionIds:[]){
+    ancestors.add(id);const prior=byId.get(id);
+    if(prior)for(const ancestor of decisionEventAncestors(prior,byId,memo,active))ancestors.add(ancestor);
+  }
+  memo.set(event.id,ancestors);return ancestors;
+}
+function outstandingDecisionCompletions(events,byId,cancelled){
+  const outstanding=new Map(),memo=new Map();
+  for(const event of events){
+    if(cancelled.has(event.id))continue;
+    if(event.kind==="completion"){
+      const ids=outstanding.get(event.taskId)||new Set();ids.add(event.id);outstanding.set(event.taskId,ids);
+      continue;
+    }
+    if(event.kind!=="comparison"||!(event.action==="yes"||event.action==="dot"))continue;
+    const ids=outstanding.get(event.taskId);if(!ids?.size)continue;
+    const ancestors=decisionEventAncestors(event,byId,memo);
+    if([...ids].every(id=>ancestors.has(id)))outstanding.delete(event.taskId);
+  }
+  return outstanding;
 }
 function decisionNoHistoryProvesRating(board,event,ratings){
   if(event.kind!=="no"||event.ratingApplied!==undefined||!event.baseId)return false;
@@ -6360,7 +6391,7 @@ function projectDecisionEvents(board=state,inheritedCancellations=null){
   const before=JSON.stringify([(board.tasks||[]).map(task=>[task.id,task.mu,task.sigma]),board.chain,board.considered,board.cantAt,board.workedAt,board.mode,board.scanMode,board.settings?.scanMode]);
   if(typeof projectDecisionPassBase==="function")projectDecisionPassBase(board);
   const {values:ratings,conflicts}=decisionBaselineRatings(baseline);
-  const {events,blockedIds}=decisionEventOrder(board,baseline);
+  const {events,blockedIds,byId}=decisionEventOrder(board,baseline);
   const cancelled=new Set([...decisionUndoTargets(board),...(inheritedCancellations||[])]);
   for(const row of baseline.ratings)ratings.set(row.taskId,{mu:row.mu,sigma:row.sigma});
   // Explicit ownership adoption embodies source learning without changing the
@@ -6435,6 +6466,11 @@ function projectDecisionEvents(board=state,inheritedCancellations=null){
     }
     board.chain=chain;
   }
+  // A remembered completion removes saved membership until a later explicit
+  // Dot/Yes observes every completion run. Device/source order and wall-clock
+  // order alone cannot turn a stale choice into a return.
+  const outstanding=outstandingDecisionCompletions(events,byId,cancelled);
+  if(outstanding.size)board.chain=(board.chain||[]).filter(id=>!outstanding.has(id));
   const disposition=new Map();
   for(const event of passEvents){
     if(cancelled.has(event.id))continue;
@@ -8282,7 +8318,7 @@ function openHelp(){
     + '<dt>Why does Add turn green?</dt><dd>Green means the task draft differs from its defaults; grey means fresh or reset. Dependency search alone does not change it. Successful Add resets the saved draft while keeping sticky context defaults. A failed save keeps the draft for retry. The color does not show whether the title is valid or the save has finished.</dd>'
     + '<dt>How do keyboard decisions work?</dt><dd>Use a fresh keypress for each Yes (Y), No (N), or Can’t (C) decision: release before pressing again. Holding a key does not decide on the next task. Z replaces U for Undo and reverses each accepted decision and its rating changes. E opens the visible candidate’s editor, or the displayed benchmark’s editor when no candidate is offered; it does nothing without a scanner Edit action. These plain shortcuts leave text fields, editable content and dialogs alone. Ctrl+Z and Command+Z keep native Undo in text fields.</dd>'
     + '<dt>What happens when I choose Done?</dt><dd>Done on an ordinary task removes it from the active task list. It appears crossed out in History as completed.</dd>'
-    + '<dt>What does Done mean for an evergreen task?</dt><dd>Evergreen Done records a completed session in History and rests the task until its per-task interval ends. New evergreen tasks default to 18 hours; change the default in Settings or edit the task. The optional day reset can return it at the next local 2 AM marker if sooner. Dot is unavailable while an evergreen task rests; choose Return as candidate before Dot to end the rest early. Completed sessions stay in History.</dd>'
+    + '<dt>What does Done mean for an evergreen task?</dt><dd>Evergreen Done records a completed session in History and rests the task until its per-task interval ends. New evergreen tasks default to 18 hours; change the default in Settings or edit the task. The optional day reset can return it at the next local 2 AM marker if sooner. Dot is unavailable while an evergreen task rests; choose Return as candidate before Dot to end the rest early. After the rest ends, an old saved chain does not put the task back automatically; Dot or Yes adds it again after you see it. Done itself does not change preference ratings. Completed sessions stay in History.</dd>'
     + '<dt>What does Postpone do?</dt><dd>Postpone matches the height of its neighboring decision buttons, stays white in the light theme and uses Edit’s colors in the dark theme. It defers the displayed candidate, or the current dotted task when paused. Scanning continues with another eligible task; with none available, start scanning again when one becomes eligible. The default is one hour. Change Postpone for (hrs) in Settings and Save settings; positive fractional hours are supported. Changes apply to future postponements. Ratings, History, due/start dates and evergreen rest stay unchanged. A Postponed tag identifies held tasks; its tooltip gives the saved deadline. Soft dependencies release during postponement and block again on expiry; hard dependencies remain blocked.</dd>'
     + '<dt>Do I need Postpone?</dt><dd>With dependencies set up correctly, you generally should not need Postpone; it remains available for real-life interruptions. Show Postpone button in Settings is off for new clients and on for older saved boards without this preference. Explicit saved choices stay selected. It saves immediately with your board and shows or hides Postpone for candidates and dotted tasks. Existing holds, expiry, Undo and Return as candidate stay unchanged.</dd>'
     + '<dt>How is Postpone saved and reversed?</dt><dd>The saved hold survives reload, sync, Rescan and the 2 AM pass reset, and expires at its deadline. Return as candidate in the task editor cancels it early; Undo reverses postponement or its cancellation. An unobserved concurrent postponement still survives. Older clients preserve the saved deferral but do not enforce it until updated. Unrecognized deferral formats are retained for recovery and cannot be changed by Postpone or Return as candidate on this client.</dd>'

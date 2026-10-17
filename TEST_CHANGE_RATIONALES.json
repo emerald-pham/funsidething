@@ -9700,5 +9700,29 @@
       "command": "node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/saved-view-integration/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/resumed-20261017/retro164/runs --purpose preimplementation-red -- node --test '--test-name-pattern=^RISK repository process: preflight catches outgoing upstream rationale gaps after the selected base passes$' tests.js",
       "failure": "Observed before preflight edits at2026-10-17T17:31:58Z: ERR_ASSERTION actual0 expected1. Real selected gate passed and real outgoing gate rejected absent exact rationale, but preflight incorrectly reported pass. Record5d4de123 and tracer-red.log retained. Later separate preimplementation Git-error RED f533343b at17:33:19Z found masked bad-config diagnostics; fixed without changing existing assertions."
     }
+  },
+  {
+    "testChangesSha256": "b24fa2e912f6733074256657e483c24efc6eb7459e6d4b5f9b55e6289222d529",
+    "reason": "Record real Done actions as durable lifecycle facts and make saved membership respect those facts until a later deliberate return observes them. Exercise the actual stale-device recovery route before scanner refresh, then extend coverage through expired evergreen rests, cloud and local storage recovery, rendered intermediate states, durable writes and cold reopen.",
+    "previousBehavior": "Done updated task completion fields and History but had no lifecycle fact in the decision graph. A stale device source with an older Dot could put the just-completed task back into the active chain during persist before focus or candidate refresh, and an expired rest could make the stale membership eligible again.",
+    "intendedBehavior": "Editor, candidate and benchmark Done append one immutable supported completion fact in the existing decision graph without teaching preference ratings. Saved membership stays removed until a later Yes or Dot causally observes every outstanding completion; Undo cancels the completion action. Recovery preserves current members, comparisons, ratings, History and independent edits while keeping every scanner paint and durable device head free of completed members.",
+    "replacementTests": [
+      "RISK completion lifecycle facts: editor candidate and benchmark Done preserve ordinary ratings and Undo",
+      "RISK completion lifecycle recovery: saved device source cannot restore a 2→1 chain before scan refresh",
+      "RISK completion lifecycle return: an observed Dot returns after expiry and a later Done removes it again",
+      "RISK completion lifecycle FAQ: expired rest and saved-chain return match the shipped controls",
+      "RISK completion lifecycle recovery: expired rest cannot restore 2→1 or 13→4 saved chains"
+    ],
+    "preservedCoverage": [
+      "Ordinary and evergreen Done semantics remain intact, including immutable comparisons, preference ratings, completion timestamps, one History session, and Undo of only the latest completion action.",
+      "The 2→1 production IndexedDB device-copy recovery preserves an unseen title edit and repairs the saved head before focus or ensureCandidate can run; every captured intermediate scanner paint and durable write omits the completed task.",
+      "Expired-rest recovery covers a two-task fallback-store cohort and a thirteen-task IndexedDB cohort with nine actual Done actions, older synthetic cloud and browser sources, current legitimate members, original comparison facts and ratings, History, offline cold reopen, and all intermediate DOM and save boundaries."
+    ],
+    "redEvidence": {
+      "command": "Preimplementation RED recorded by scripts/agent-tools/record-run.mjs at /Users/emeraldpham/.codex/task-artifacts/completion-precedence-168/169/runs/2026-10-17T20-18-25-672Z-a581b266-7393-4a74-9d9f-8395b6ad76d8.json: node --test --test-reporter=spec --test-name-pattern='^RISK completion lifecycle recovery: saved device source' tests.js. FAQ copy RED recorded at /Users/emeraldpham/.codex/task-artifacts/completion-precedence-168/169/runs/2026-10-17T20-23-31-196Z-568022c8-2887-4d62-9cc3-742643523e3a.json.",
+      "failure": "The actual preimplementation consumer failed at tests.js:23223: expected chain ['device-recovery-next'], received ['device-recovery-done','device-recovery-next'] after the older saved device source passed through production persist before any focus or candidate refresh; exit 1. The separate FAQ consumer also failed because the saved-chain recovery guidance was absent. These are assertion failures, not dependency or setup errors."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/completion-precedence-168/169",
+    "releaseStatus": "Focused local issue 169 implementation and consumer validation only. Parent /root owns integration, exact-candidate broader review, final changelog/version/service-worker packaging, CI and release validation."
   }
 ]
