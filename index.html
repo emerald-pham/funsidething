@@ -4523,9 +4523,16 @@ function syncScanPreferenceControls(){
 function setScanPreference(value){
   const mode = normalizeSettings({scanMode:value}).scanMode;
   if(state.settings.scanMode === mode) return;
+  const choiceGesture=captureCurrentChoiceGesture(),beforeSetting={present:Object.hasOwn(state.settings,"scanMode"),value:state.settings.scanMode};
+  const beforePassMode=currentChoicePassModeValue(state.scanMode,state.chance),passTargetId=choiceGesture.passId;
   pushUndo();
   state.settings.scanMode = mode;
   applyScanPreference();
+  const choices=[{target:{type:"setting",id:"board",property:"scanMode"},value:mode,
+    after:{present:true},before:beforeSetting}];
+  if(state.scanMode!==beforePassMode.mode)choices.push({target:{type:"pass",id:passTargetId,property:"scanMode"},value:currentChoicePassModeValue(state.scanMode,state.chance),
+    after:{present:true},before:{present:true,value:beforePassMode}});
+  appendCurrentChoiceEvents(prepareCurrentChoiceEvents(choices,choiceGesture));
   commit();
   syncScanPreferenceControls();
   persist(); // this selection saves on change, including an immediate close/reload
@@ -4539,18 +4546,22 @@ function renderPatternedIndicators(){
 function setShowPostponePreference(enabled){
   const value=enabled===true;
   if(state.settings.showPostpone===value)return;
-  pushUndo();state.settings.showPostpone=value;commit();persist();
+  const gesture=captureCurrentChoiceGesture(),before=currentChoiceSettingSnapshot();
+  pushUndo();state.settings.showPostpone=value;recordCurrentChoiceSettings(gesture,before);commit();persist();
 }
 function setPatternedIndicatorsPreference(enabled){
   const value=enabled===true;
   if(state.settings.patternedIndicators===value)return;
-  pushUndo();state.settings.patternedIndicators=value;commit();persist();
+  const gesture=captureCurrentChoiceGesture(),before=currentChoiceSettingSnapshot();
+  pushUndo();state.settings.patternedIndicators=value;recordCurrentChoiceSettings(gesture,before);commit();persist();
 }
 function setFloatingHeaderPreference(enabled){
   const value = enabled === true;
   if(state.settings.floatingHeader === value) return;
+  const gesture=captureCurrentChoiceGesture(),before=currentChoiceSettingSnapshot();
   pushUndo();
   state.settings.floatingHeader = value;
+  recordCurrentChoiceSettings(gesture,before);
   commit();
   persist(); // The checkbox is itself the choice; closing Settings must not discard it.
 }
@@ -4573,6 +4584,7 @@ function applyScanPreference(mode){
   state.interventionActive = false;
 }
 function startScan(mode){
+  const choiceGesture=captureCurrentChoiceGesture(),beforePassMode=currentChoicePassModeValue(state.scanMode,state.chance);
   pushUndo();
   // Timer/focus sweeps may not have run yet. Choose the oldest first dot from
   // today's pool, after expired holds and the local day marker are reconciled.
@@ -4583,12 +4595,20 @@ function startScan(mode){
   state.candidateId = null;
   state.interventionActive = false;
   const t = chainStart() ? oldestFirst(pool()) : null;
+  const choices=[];
   if(t){
     writeTaskComparison(t,true);
     state.chain.push(t.id);
-    state.passStartedAt = Date.now();   // a fresh chain root is a fresh pass — start its stale-pass clock (a plain resume leaves t null and keeps the old time)
+    state.passStartedAt = choiceGesture.at;   // the pass clock keeps the original Start action time
     state.passId = uid();
+    choices.push({target:{type:"pass",id:state.passId,property:"chain"},value:[t.id],after:{present:true},
+      before:{present:true,value:[]}});
   }
+  const afterPassMode=currentChoicePassModeValue(state.scanMode,state.chance);
+  if(t||JSON.stringify(beforePassMode)!==JSON.stringify(afterPassMode))choices.unshift({
+    target:{type:"pass",id:state.passId||choiceGesture.passId,property:"scanMode"},value:afterPassMode,after:{present:true},
+    before:{present:true,value:beforePassMode}});
+  appendCurrentChoiceEvents(prepareCurrentChoiceEvents(choices,choiceGesture));
   commit(true, !!t);   // a dot syncs to the cloud right away
 }
 /* The first PASS_RESET_HOUR:00 local instant strictly after `startedAt` — the
@@ -4678,12 +4698,15 @@ const taskActionOwnerBundle=(()=>{
     const task=taskById(id);if(!task)return false;
     if(!["done","worked","dot","return"].includes(action))return false;
     if(action==="dot"&&!canDotTask(task)||action==="return"&&!canReturnAsCandidate(task))return false;
-    const beforeEditBenchmark=action==="dot"?benchmark():null;
-    const kind=action==="return"?"return":action;
     const actionAt=gesture&&Number.isFinite(gesture.at)&&gesture.at>=0?gesture.at:Date.now();
     const newPassId=action==="dot"&&chainStart()&&!gesture?uid():null;
     const actionGesture=gesture&&typeof gesture==="object"?gesture:captureDecisionGesture(null,actionAt,
       newPassId?{passId:newPassId,passAt:actionAt,chainIds:state.chain}:{});
+    const choiceGesture=actionGesture;
+    const beforeChoice=draft?currentChoiceTaskSnapshot(task):null;
+    const beforeDisposition=["worked","return"].includes(action)?currentChoiceDispositionSnapshot(id):null;
+    const beforeEditBenchmark=action==="dot"?benchmark():null;
+    const kind=action==="return"?"return":action;
     const observation=action==="dot"
       ?captureRatingObservation(kind,[task.id,...(beforeEditBenchmark?[beforeEditBenchmark.id]:[])])
       :captureRatingObservation(kind,[task.id]);
@@ -4691,7 +4714,11 @@ const taskActionOwnerBundle=(()=>{
     pushUndo();
     if(modeOnStart)state.mode=modeOnStart;
     const resting=action==="return"&&task.evergreen&&task.lastDoneAt&&Date.now()<evergreenUntil(task);
-    if(draft)applyEditorDraft(task,draft);
+    if(draft){
+      applyEditorDraft(task,draft);
+      appendCurrentChoiceEvents(prepareCurrentChoiceEvents(
+        currentChoiceChanges(task,beforeChoice),choiceGesture,{[task.id]:beforeChoice.ctx?.value??[]}));
+    }
     if(action==="dot"&&!canDotTask(task)){
       finishRatingObservation({...observation,kind:"edit",ids:[task.id]});
       commit();
@@ -4708,11 +4735,14 @@ const taskActionOwnerBundle=(()=>{
     if(action==="worked"){
       state.chain=state.chain.filter(c=>c!==id);
       state.considered[id]="worked";
-      state.workedAt[id]=Date.now();
-      state.workLog.push({id:uid(),taskId:id,title:task.title,kind:"worked",at:Date.now()});
+      state.workedAt[id]=actionAt;
+      state.workLog.push({id:uid(),taskId:id,title:task.title,kind:"worked",at:actionAt});
       delete state.cantAt[id];
       if(state.candidateId===id)state.candidateId=null;
       state.interventionActive=false;
+      const change=currentChoiceDispositionChange(id,beforeDisposition,true);
+      const observedCtx=beforeChoice?.ctx?.value??task.ctx;
+      appendCurrentChoiceEvents(prepareCurrentChoiceEvents(change?[change]:[],choiceGesture,{[id]:Array.isArray(observedCtx)?observedCtx.slice():[]}));
       finishRatingObservation(observation);commit();
       return true;
     }
@@ -4737,6 +4767,9 @@ const taskActionOwnerBundle=(()=>{
       if(resting)reopenTask(task);
       if(supportedPostponeEvidence(task)&&Date.now()<taskPostponeUntil(task))writeTaskPostpone(task,0);
       delete state.considered[id];delete state.cantAt[id];delete state.workedAt[id];
+      const change=currentChoiceDispositionChange(id,beforeDisposition);
+      const observedCtx=beforeChoice?.ctx?.value??task.ctx;
+      appendCurrentChoiceEvents(prepareCurrentChoiceEvents(change?[change]:[],choiceGesture,{[id]:Array.isArray(observedCtx)?observedCtx.slice():[]}));
       finishRatingObservation(observation);commit();
       return true;
     }
@@ -4746,8 +4779,12 @@ const taskActionOwnerBundle=(()=>{
     const task=taskById(command.taskId),action=command.action,draft=command.draft;
     if(!task||!draft||typeof draft!=="object")return false;
     if(action==="save"){
+      const choiceGesture=captureCurrentChoiceGesture(),beforeChoice=currentChoiceTaskSnapshot(task);
       const observation=captureRatingObservation("edit",[task.id]);
-      pushUndo();applyEditorDraft(task,draft);finishRatingObservation(observation,true);
+      pushUndo();applyEditorDraft(task,draft);
+      appendCurrentChoiceEvents(prepareCurrentChoiceEvents(
+        currentChoiceChanges(task,beforeChoice),choiceGesture,{[task.id]:beforeChoice.ctx?.value??[]}));
+      finishRatingObservation(observation,true);
       closeModal();commit();return true;
     }
     if(!["done","worked","dot","return"].includes(action))return false;
@@ -4771,6 +4808,8 @@ const taskActionOwnerBundle=(()=>{
       const decisionEvent=kind==="no"?prepareNoDecisionEvent(candidate,b,observation,gesture,
         taskComparisonEligible(candidate)&&taskComparisonEligible(b))
         :kind==="yes"?prepareComparisonDecisionEvent("yes",candidate,b,observation,gesture,false):null;
+      const choiceGesture=kind==="cant"?gesture:null;
+      const beforeDisposition=kind==="cant"?currentChoiceDispositionSnapshot(candidate.id):null;
       pushUndo();recordDecisionTime();
       if(kind==="yes"){
         writeTaskComparison(candidate,false);
@@ -4784,7 +4823,9 @@ const taskActionOwnerBundle=(()=>{
         if(b)updateTaskComparison(b,candidate);
         state.considered[candidate.id]="no";
       }else if(kind==="cant"){
-        state.considered[candidate.id]="cant";state.cantAt[candidate.id]=Date.now();
+        state.considered[candidate.id]="cant";state.cantAt[candidate.id]=choiceGesture.at;
+        const change=currentChoiceDispositionChange(candidate.id,beforeDisposition,true);
+        appendCurrentChoiceEvents(prepareCurrentChoiceEvents(change?[change]:[],choiceGesture,{[candidate.id]:Array.isArray(candidate.ctx)?candidate.ctx.slice():[]}));
       }else completeTask(candidate);
       state.candidateId=null;
       if(decisionEvent)projectDecisionEvents(state);
@@ -4816,7 +4857,11 @@ const taskActionOwnerBundle=(()=>{
         return true;
       }
       if(command.action==="cant"){
-        pushUndo();state.chain.pop();state.considered[b.id]="cant";state.cantAt[b.id]=Date.now();state.interventionActive=false;commit();
+        const choiceGesture=captureCurrentChoiceGesture(),beforeDisposition=currentChoiceDispositionSnapshot(b.id);
+        pushUndo();state.chain.pop();state.considered[b.id]="cant";state.cantAt[b.id]=choiceGesture.at;state.interventionActive=false;
+        const change=currentChoiceDispositionChange(b.id,beforeDisposition,true);
+        appendCurrentChoiceEvents(prepareCurrentChoiceEvents(change?[change]:[],choiceGesture,{[b.id]:Array.isArray(b.ctx)?b.ctx.slice():[]}));
+        commit();
         return true;
       }
       return false;
@@ -4995,11 +5040,20 @@ function clearCompleted(){ // completed tasks and logged worked-on/evergreen-don
   commit();
 }
 function rescanSkipped(){ // clear only the no/can't marks, keep 'done' — an explicit override, ignores the can't timer on purpose
+  const choiceGesture=captureCurrentChoiceGesture(),before=new Map();
+  for(const [id,value] of Object.entries(state.considered))if(["no","cant","dislodged","worked"].includes(value))before.set(id,currentChoiceDispositionSnapshot(id));
   pushUndo();
   for(const [id,v] of Object.entries(state.considered)){
     if(v==="no"||v==="cant"||v==="dislodged"||v==="worked"){ delete state.considered[id]; delete state.cantAt[id]; delete state.workedAt[id]; }
   }
   state.mode="scan"; state.interventionActive=false; state.snooze = 6;
+  const choices=[];
+  for(const [id,snapshot] of before){
+    const change=currentChoiceDispositionChange(id,snapshot);
+    if(change)choices.push(change);
+  }
+  const contexts=Object.fromEntries([...before.keys()].map(id=>[id,Array.isArray(taskById(id)?.ctx)?taskById(id).ctx.slice():[]]));
+  appendCurrentChoiceEvents(prepareCurrentChoiceEvents(choices,choiceGesture,contexts));
   commit();
 }
 /* ---------- bulk list parsing ----------
@@ -5261,7 +5315,8 @@ function toggleContext(id){
 function toggleNoContext(){
   if(!state.contexts.length)return;
   const focus=document.activeElement,scope=focus?.dataset?.ctxScope,refocus=focus?.dataset?.act==="toggle-no-context";
-  pushUndo();state.settings.excludeNoContext=!state.settings.excludeNoContext;commit();
+  const gesture=captureCurrentChoiceGesture(),before=currentChoiceSettingSnapshot();
+  pushUndo();state.settings.excludeNoContext=!state.settings.excludeNoContext;recordCurrentChoiceSettings(gesture,before);commit();
   if(refocus)for(const button of document.querySelectorAll('[data-act="toggle-no-context"]'))if(button.dataset.ctxScope===scope){button.focus();break;}
 }
 function revealTask(id){
@@ -5873,6 +5928,423 @@ function appendNoDecisionEvent(event){
   if(!event||!event.id)return false;
   state.passId ||= event.passId;
   return recordDecisionEvent(event);
+}
+const CURRENT_CHOICE_TASK_PROPERTIES=["title","url","due","startsAt","evergreen","evergreenHours","evergreenResetAtDay","ctx"];
+function currentChoiceTaskSnapshot(task){
+  const snapshot={};
+  for(const property of CURRENT_CHOICE_TASK_PROPERTIES){
+    const present=Object.hasOwn(task,property),value=task[property];
+    snapshot[property]=present?{present:true,value:value===undefined?null:JSON.parse(JSON.stringify(value))}:{present:false};
+  }
+  return snapshot;
+}
+function currentChoiceChanges(task,before){
+  if(!task||!before)return [];
+  const after=currentChoiceTaskSnapshot(task);
+  return CURRENT_CHOICE_TASK_PROPERTIES.filter(property=>JSON.stringify(before[property])!==JSON.stringify(after[property]))
+    .map(property=>({target:{type:"task",id:task.id,property},value:after[property].present?after[property].value:null,
+      after:{present:after[property].present},
+      before:before[property]}));
+}
+function currentChoiceDispositionSnapshot(id){
+  const kind=state.considered?.[id];
+  if(!["no","cant","dislodged","worked"].includes(kind))return {present:false};
+  const value={kind};
+  if(kind==="cant"&&Number.isFinite(state.cantAt?.[id])&&state.cantAt[id]>0)value.at=state.cantAt[id];
+  if(kind==="worked"&&Number.isFinite(state.workedAt?.[id])&&state.workedAt[id]>0)value.at=state.workedAt[id];
+  return {present:true,value};
+}
+function currentChoicePassModeValue(mode,chance){
+  return {mode,chance:chance==null?null:JSON.parse(JSON.stringify(chance))};
+}
+function currentChoiceChanceSnapshotSupported(chance){
+  if(!chance||typeof chance!=="object"||Array.isArray(chance)||
+      Object.keys(chance).sort().join(",")!=="at,opponents,seed,weights"||
+      typeof chance.seed!=="string"||!chance.seed||!Number.isFinite(chance.at)||chance.at<0||
+      !chance.weights||typeof chance.weights!=="object"||Array.isArray(chance.weights)||
+      !Array.isArray(chance.opponents))return false;
+  const weightIds=Object.keys(chance.weights);
+  if(weightIds.some(id=>!id||Object.hasOwn(Object.prototype,id)||!Number.isFinite(chance.weights[id])||chance.weights[id]<0))return false;
+  const opponentIds=new Set();
+  for(const opponent of chance.opponents){
+    if(!opponent||typeof opponent!=="object"||Array.isArray(opponent)||
+        Object.keys(opponent).sort().join(",")!=="id,mu,sigma"||typeof opponent.id!=="string"||!opponent.id||
+        Object.hasOwn(Object.prototype,opponent.id)||opponentIds.has(opponent.id)||!Number.isFinite(opponent.mu)||
+        !Number.isFinite(opponent.sigma)||opponent.sigma<=0)return false;
+    opponentIds.add(opponent.id);
+  }
+  return true;
+}
+function currentChoicePassModeValueSupported(value,requireDraw=true){
+  if(!value||typeof value!=="object"||Array.isArray(value)||Object.keys(value).sort().join(",")!=="chance,mode"||
+      !["descending","chance","squared","halving"].includes(value.mode))return false;
+  if(value.mode==="descending")return value.chance===null;
+  return value.chance===null?!requireDraw:currentChoiceChanceSnapshotSupported(value.chance);
+}
+function currentChoicePassChainValueSupported(value,evidence=false){
+  return Array.isArray(value)&&value.every(id=>typeof id==="string"&&id.length>0&&!Object.hasOwn(Object.prototype,id))&&
+    new Set(value).size===value.length&&value.length===(evidence?0:1);
+}
+function currentChoiceDispositionValueSupported(value){
+  return !!value&&typeof value==="object"&&!Array.isArray(value)&&
+    Object.keys(value).length===2&&Object.hasOwn(value,"kind")&&Object.hasOwn(value,"at")&&
+    ["cant","worked"].includes(value.kind)&&Number.isFinite(value.at)&&value.at>0;
+}
+function currentChoiceDispositionEvidenceSupported(value){
+  if(!value||typeof value!=="object"||Array.isArray(value))return false;
+  if(["cant","worked"].includes(value.kind))return currentChoiceDispositionValueSupported(value);
+  return ["no","dislodged"].includes(value.kind)&&Object.keys(value).length===1;
+}
+function currentChoiceDispositionChange(id,before,force=false){
+  if(!before||before.present&&!currentChoiceDispositionEvidenceSupported(before.value))return null;
+  const after=currentChoiceDispositionSnapshot(id);
+  if(!force&&JSON.stringify(before)===JSON.stringify(after))return null;
+  const value=after.present?after.value:null;
+  return {target:{type:"task",id,property:"disposition"},value,after:{present:after.present},before};
+}
+function captureCurrentChoiceGesture(actionId=null,at=null){
+  if(typeof captureDecisionGesture==="function")return captureDecisionGesture(actionId,at);
+  const account=typeof state.syncAccount==="string"&&state.syncAccount
+    ? state.syncAccount : typeof window.CloudSync?.user==="string"&&window.CloudSync.user ? window.CloudSync.user : null;
+  const base=account&&validDecisionBase(state.decisionBase,account,state.syncRev)?state.decisionBase:null;
+  return {actionId:actionId||uid(),at:Number.isFinite(at)?at:Date.now(),account,baseId:base?.id??null,passId:currentDecisionPassId(),
+    passAt:Number.isFinite(state.passStartedAt)&&state.passStartedAt>=0?state.passStartedAt:0,
+    scanMode:state.scanMode,chainIds:Array.isArray(state.chain)?state.chain.slice():[],
+    observedActionIds:decisionActionFrontier(state.decisionEvents)};
+}
+function prepareCurrentChoiceEvents(choices,gesture,taskContextIds={}){
+  if(!Array.isArray(choices)||!choices.length||!gesture)return [];
+  return choices.map(choice=>({v:1,id:uid(),at:gesture.at,account:gesture.account,baseId:gesture.baseId,kind:"current-choice",
+      actionId:gesture.actionId,target:{...choice.target},value:JSON.parse(JSON.stringify(choice.value)),after:{present:choice.after.present},
+      before:{present:choice.before.present,...(choice.before.present?{value:JSON.parse(JSON.stringify(choice.before.value))}:{})},
+      ...(choice.target.type==="task"?{taskContextIds:{[choice.target.id]:Array.isArray(taskContextIds[choice.target.id])?taskContextIds[choice.target.id].slice():[]}}:{}),
+      passId:gesture.passId,passAt:gesture.passAt,scanMode:gesture.scanMode,chainIds:gesture.chainIds.slice(),
+      observedActionIds:gesture.observedActionIds.slice()})).filter(supportedCurrentChoiceEvent);
+}
+const CURRENT_CHOICE_SETTINGS_PROPERTIES=["scanMode","listMetric","excludeNoContext","lastTaskWoop","floatingHeader",
+  "patternedIndicators","showPostpone","horizonMin","thresholdPct","samples","cantMin","workedHours",
+  "postponeHours","evergreenHours","evergreenResetAtDay"];
+function currentChoiceSettingSnapshot(settings=state.settings){
+  const snapshot={};
+  for(const property of CURRENT_CHOICE_SETTINGS_PROPERTIES){
+    const present=Object.hasOwn(settings,property);
+    snapshot[property]=present?{present:true,value:JSON.parse(JSON.stringify(settings[property]))}:{present:false};
+  }
+  return snapshot;
+}
+function currentChoiceSettingChanges(before){
+  if(!before)return [];
+  const after=currentChoiceSettingSnapshot();
+  return CURRENT_CHOICE_SETTINGS_PROPERTIES.filter(property=>JSON.stringify(before[property])!==JSON.stringify(after[property]))
+    .map(property=>({target:{type:"setting",id:"board",property},value:after[property].present?after[property].value:null,
+      after:{present:after[property].present},before:before[property]}));
+}
+function recordCurrentChoiceSettings(gesture,before){
+  appendCurrentChoiceEvents(prepareCurrentChoiceEvents(currentChoiceSettingChanges(before),gesture));
+}
+function currentChoiceValueSupported(type,property,value,present=true,evidence=false){
+  if(typeof present!=="boolean")return false;
+  if(!present)return value===null;
+  if(type==="task"){
+    if(property==="disposition")return evidence?currentChoiceDispositionEvidenceSupported(value):currentChoiceDispositionValueSupported(value);
+    if(property==="title")return typeof value==="string"&&value.trim().length>0;
+    if(property==="url")return value===null||typeof value==="string";
+    if(property==="due"||property==="startsAt")return value===null||typeof value==="string"&&normalizedISODate(value)===value;
+    if(property==="evergreen"||property==="evergreenResetAtDay")return typeof value==="boolean";
+    if(property==="evergreenHours")return Number.isFinite(value)&&value>=0.01&&value<=87600;
+    if(property==="ctx")return Array.isArray(value)&&value.every(id=>typeof id==="string"&&id.length>0&&!Object.hasOwn(Object.prototype,id))&&new Set(value).size===value.length;
+  }
+  if(type==="setting"&&property==="scanMode")return ["descending","chance","squared","halving","both"].includes(value);
+  if(type==="pass"&&property==="scanMode")return currentChoicePassModeValueSupported(value,!evidence);
+  if(type==="pass"&&property==="chain")return currentChoicePassChainValueSupported(value,evidence);
+  if(type==="setting"){
+    if(property==="listMetric")return ["rank","chance"].includes(value);
+    if(["excludeNoContext","lastTaskWoop","floatingHeader","patternedIndicators","showPostpone","evergreenResetAtDay"].includes(property))return typeof value==="boolean";
+    if(property==="thresholdPct")return Number.isFinite(value)&&value>=1&&value<=90;
+    if(property==="samples")return Number.isInteger(value)&&value>=50&&value<=2000;
+    if(property==="horizonMin"||property==="cantMin")return Number.isInteger(value)&&value>=5&&value<=480;
+    if(property==="workedHours")return Number.isInteger(value)&&value>=1&&value<=720;
+    if(property==="postponeHours"||property==="evergreenHours")return Number.isFinite(value)&&value>=0.01&&value<=87600;
+  }
+  return false;
+}
+function currentChoiceEvidenceSupported(type,property,evidence){
+  return !!evidence&&typeof evidence==="object"&&!Array.isArray(evidence)&&typeof evidence.present==="boolean"&&
+    (evidence.present?currentChoiceValueSupported(type,property,evidence.value,true,true):!Object.hasOwn(evidence,"value"));
+}
+function supportedCurrentChoiceEvent(event){
+  if(!event||typeof event!=="object"||Array.isArray(event)||event.v!==1||event.kind!=="current-choice"||
+      typeof event.id!=="string"||!event.id||!Number.isFinite(event.at)||event.at<0)return false;
+  if(!(event.account===null||typeof event.account==="string"&&event.account) ||
+      !(event.baseId===null||typeof event.baseId==="string"&&event.baseId) ||
+      typeof event.passId!=="string"||!event.passId||!Number.isFinite(event.passAt)||event.passAt<0||
+      !["descending","chance","squared","halving"].includes(event.scanMode))return false;
+  if(event.actionId!==undefined&&(typeof event.actionId!=="string"||!event.actionId))return false;
+  const target=event.target;
+  if(!target||typeof target!=="object"||Array.isArray(target)||Object.keys(target).some(key=>!(["type","id","property"].includes(key)))||
+      typeof target.type!=="string"||!target.type||
+      typeof target.id!=="string"||!target.id||Object.hasOwn(Object.prototype,target.id)||
+      typeof target.property!=="string"||!target.property)return false;
+  const supportedTarget=target.type==="task"&&(CURRENT_CHOICE_TASK_PROPERTIES.includes(target.property)||target.property==="disposition")||
+    target.type==="setting"&&target.id==="board"&&CURRENT_CHOICE_SETTINGS_PROPERTIES.includes(target.property)||
+    target.type==="pass"&&["scanMode","chain"].includes(target.property);
+  if(!supportedTarget||!event.after||typeof event.after!=="object"||Array.isArray(event.after)||Object.keys(event.after).some(key=>key!=="present")||
+      typeof event.after.present!=="boolean"||!currentChoiceValueSupported(target.type,target.property,event.value,event.after.present)||
+      !currentChoiceEvidenceSupported(target.type,target.property,event.before))return false;
+  if(target.type==="pass"&&target.property==="chain"&&
+      (event.actionId===undefined||target.id===event.passId||event.after.present!==true||event.before.present!==true||
+       event.before.value.length!==0||event.value.length!==1))return false;
+  if(Object.keys(event.before).some(key=>key!=="present"&&key!=="value"))return false;
+  if(event.taskContextIds!==undefined){
+    if(!event.taskContextIds||typeof event.taskContextIds!=="object"||Array.isArray(event.taskContextIds)||
+        Object.keys(event.taskContextIds).some(id=>Object.hasOwn(Object.prototype,id)||!Array.isArray(event.taskContextIds[id])||
+          event.taskContextIds[id].some(contextId=>typeof contextId!=="string"||!contextId)))return false;
+    if(target.type!=="task"||Object.keys(event.taskContextIds).some(id=>id!==target.id))return false;
+  }
+  if(target.type==="task"&&(!event.taskContextIds||!Array.isArray(event.taskContextIds[target.id])))return false;
+  if(target.type==="setting"||target.type==="pass")if(event.taskContextIds!==undefined)return false;
+  if(!Array.isArray(event.chainIds)||event.chainIds.some(id=>typeof id!=="string"||!id)||new Set(event.chainIds).size!==event.chainIds.length)return false;
+  if(!Array.isArray(event.observedActionIds)||event.observedActionIds.some(id=>typeof id!=="string"||!id)||new Set(event.observedActionIds).size!==event.observedActionIds.length)return false;
+  if(event.passAt!==undefined&&(!Number.isFinite(event.passAt)||event.passAt<0))return false;
+  return true;
+}
+function currentChoicePassId(board){
+  if(typeof board?.passId==="string"&&board.passId)return board.passId;
+  const started=Number.isFinite(board?.passStartedAt)&&board.passStartedAt>=0?board.passStartedAt:0;
+  return "legacy-pass-v1:"+started+":"+(typeof board?.chain?.[0]==="string"?board.chain[0]:"none");
+}
+function supportedCurrentChoiceProjectionRecord(event){
+  if(event?.kind==="current-choice")return supportedCurrentChoiceEvent(event);
+  if(typeof supportedDecisionEvent==="function")return supportedDecisionEvent(event);
+  if(!event||typeof event!=="object"||Array.isArray(event)||event.v!==1||typeof event.id!=="string"||!event.id||
+      !Number.isFinite(event.at)||event.at<0||typeof event.passId!=="string"||!event.passId||
+      !Number.isFinite(event.passAt)||event.passAt<0||!Array.isArray(event.observedActionIds)||
+      event.observedActionIds.some(id=>typeof id!=="string"||!id))return false;
+  if(event.kind==="no")return event.meaning==="benchmark-preferred"&&typeof event.candidateId==="string"&&!!event.candidateId&&
+    typeof event.benchmarkId==="string"&&!!event.benchmarkId;
+  if(event.kind==="comparison")return ["yes","dot","dislodge"].includes(event.action)&&typeof event.taskId==="string"&&!!event.taskId;
+  return false;
+}
+function currentChoiceProjectionIndex(events){
+  const byId=new Map(),conflicts=new Set();
+  for(const event of events){
+    if(!supportedCurrentChoiceProjectionRecord(event))continue;
+    const prior=byId.get(event.id);
+    if(prior&&JSON.stringify(prior)!==JSON.stringify(event)){conflicts.add(event.id);byId.delete(event.id);}
+    else if(!conflicts.has(event.id))byId.set(event.id,event);
+  }
+  for(const id of conflicts)byId.delete(id);
+  return byId;
+}
+function currentChoiceStartEnvelopeMatches(modeEvent,chainEvent){
+  return modeEvent?.actionId===chainEvent?.actionId&&modeEvent?.actionId!==undefined&&
+    ["at","account","baseId","passId","passAt","scanMode","chainIds","observedActionIds"].every(key=>
+      JSON.stringify(modeEvent[key])===JSON.stringify(chainEvent[key]));
+}
+function projectDecisionPassBase(board=state){
+  if(!board||typeof board!=="object"||Array.isArray(board)||!Array.isArray(board.tasks))return false;
+  const source=Array.isArray(board.decisionEvents)?board.decisionEvents:[],byId=currentChoiceProjectionIndex(source);
+  const account=typeof board.syncAccount==="string"&&board.syncAccount?board.syncAccount:null;
+  const baselineIds=new Set(Array.isArray(board.decisionBaseline?.includedActionIds)?board.decisionBaseline.includedActionIds:[]);
+  const roots=[...byId.values()].filter(event=>event.kind==="current-choice"&&event.target?.type==="pass"&&
+    event.target.property==="chain"&&event.account===account);
+  const groups=[];
+  for(const root of roots){
+    const modeRows=[...byId.values()].filter(event=>event.kind==="current-choice"&&event.target?.type==="pass"&&
+      event.target.property==="scanMode"&&event.target.id===root.target.id&&currentChoiceStartEnvelopeMatches(event,root));
+    if(modeRows.length!==1)continue;
+    const allGroupRows=[...byId.values()].filter(event=>event.kind==="current-choice"&&event.actionId===root.actionId&&
+      event.target?.type==="pass"&&event.target.id===root.target.id&&event.account===account&&event.at===root.at);
+    if(allGroupRows.length!==2||!modeRows[0].after.present||!root.after.present||root.target.id===root.passId||
+        root.chainIds.length!==0||root.before.value.length!==0)continue;
+    if(root.observedActionIds.some(id=>!byId.has(id)&&!baselineIds.has(id)))continue;
+    const task=board.tasks.find(row=>row?.id===root.value[0]);
+    if(!task||task.done===true||board.deletedTaskIds?.[task.id]===true&&!board.restoredTaskIds?.[task.id])continue;
+    if(Date.now()>=passResetCutoff(root.at))continue;
+    groups.push({root,mode:modeRows[0]});
+  }
+  if(!groups.length)return false;
+  const winnerMode=latestCurrentChoiceEvent(groups.map(group=>group.mode),byId);
+  const winner=groups.find(group=>group.mode.id===winnerMode?.id);if(!winner)return false;
+  const activeId=currentChoicePassId(board),samePass=groups.find(group=>group.root.target.id===activeId);
+  if(!samePass&&activeId!==winner.root.target.id){
+    const activeAt=Number.isFinite(board.passStartedAt)&&board.passStartedAt>=0?board.passStartedAt:0;
+    if(activeAt>winner.root.at||activeAt===winner.root.at&&activeId>winner.root.target.id)return false;
+  }
+  const rootTask=winner.root.value[0];
+  const before=JSON.stringify([board.passId,board.passStartedAt,board.chain,board.mode,board.scanMode,board.chance,board.candidateId,board.interventionActive]);
+  board.passId=winner.root.target.id;board.passStartedAt=winner.root.at;board.chain=[rootTask];board.mode="scan";
+  board.scanMode=winner.mode.value.mode;board.chance=winner.mode.value.chance===null?null:JSON.parse(JSON.stringify(winner.mode.value.chance));
+  board.candidateId=null;board.interventionActive=false;
+  if(board===state)chanceGeneration++;
+  return before!==JSON.stringify([board.passId,board.passStartedAt,board.chain,board.mode,board.scanMode,board.chance,board.candidateId,board.interventionActive]);
+}
+function currentChoiceAncestors(event,byId,memo=new Map(),visiting=new Set()){
+  if(memo.has(event.id))return memo.get(event.id);
+  if(visiting.has(event.id))return new Set();
+  const active=new Set(visiting);active.add(event.id);const ancestors=new Set();
+  for(const id of Array.isArray(event.observedActionIds)?event.observedActionIds:[]){
+    ancestors.add(id);const prior=byId.get(id);
+    if(prior)for(const ancestor of currentChoiceAncestors(prior,byId,memo,active))ancestors.add(ancestor);
+  }
+  memo.set(event.id,ancestors);return ancestors;
+}
+function latestCurrentChoiceEvent(events,byId){
+  const unique=[...new Map(events.map(event=>[event.id,event])).values()];if(!unique.length)return null;
+  const memo=new Map();
+  const maxima=unique.filter(event=>!unique.some(other=>other.id!==event.id&&currentChoiceAncestors(other,byId,memo).has(event.id)));
+  if(!maxima.length)return null; // a cyclic or otherwise contradictory frontier is not a safe ordering
+  maxima.sort((a,b)=>a.at-b.at||(a.id<b.id?-1:a.id>b.id?1:0));
+  return maxima.at(-1);
+}
+function currentChoiceDispositionActions(board,events){
+  const byTask=new Map(),passId=currentChoicePassId(board),tasks=new Set(board.tasks.map(task=>task?.id).filter(id=>typeof id==="string"&&id));
+  const add=(id,event,present,value,passScoped)=>{
+    if(!tasks.has(id)||event.passId!==passId&&passScoped)return;
+    if(board.tasks.find(task=>task?.id===id)?.done===true)return;
+    const rows=byTask.get(id)||[];rows.push({event,present,value});byTask.set(id,rows);
+  };
+  for(const event of events){
+    if(!supportedCurrentChoiceProjectionRecord(event))continue;
+    if(event.account!==(typeof board.syncAccount==="string"&&board.syncAccount?board.syncAccount:null))continue;
+    if(event.kind==="current-choice"&&event.target?.type==="task"&&event.target.property==="disposition"){
+      const beforeKind=event.before?.present?event.before.value?.kind:null,afterKind=event.after?.present?event.value?.kind:null;
+      if(event.after?.present===true&&afterKind!=="cant"&&afterKind!=="worked")continue;
+      if(event.after?.present===false&&!event.before?.present)continue;
+      const passScoped=["no","dislodged"].includes(afterKind)||!afterKind&&["no","dislodged"].includes(beforeKind);
+      add(event.target.id,event,event.after.present,event.after.present?event.value:null,passScoped);
+      continue;
+    }
+    if(event.kind==="no"){
+      add(event.candidateId,event,true,{kind:"no"},true);continue;
+    }
+    if(event.kind==="comparison"){
+      const action=event.action,id=event.taskId;
+      if(action==="dislodge")add(id,event,true,{kind:"dislodged"},true);
+      else if(action==="yes"||action==="dot"){
+        if(event.passId===passId||board.chain?.includes(id))add(id,event,false,null,false);
+      }
+    }
+  }
+  return byTask;
+}
+function applyCurrentChoiceDisposition(board,id,choice){
+  const considered=board.considered&&typeof board.considered==="object"&&!Array.isArray(board.considered)?board.considered:(board.considered={});
+  const cantAt=board.cantAt&&typeof board.cantAt==="object"&&!Array.isArray(board.cantAt)?board.cantAt:(board.cantAt={});
+  const workedAt=board.workedAt&&typeof board.workedAt==="object"&&!Array.isArray(board.workedAt)?board.workedAt:(board.workedAt={});
+  const before=JSON.stringify([Object.hasOwn(considered,id)?considered[id]:null,Object.hasOwn(cantAt,id)?cantAt[id]:null,Object.hasOwn(workedAt,id)?workedAt[id]:null]);
+  if(!choice.present){delete considered[id];delete cantAt[id];delete workedAt[id];}
+  else if(choice.value.kind==="cant"){
+    considered[id]="cant";cantAt[id]=choice.value.at;delete workedAt[id];
+  }else if(choice.value.kind==="worked"){
+    considered[id]="worked";workedAt[id]=choice.value.at;delete cantAt[id];
+  }else{
+    considered[id]=choice.value.kind;delete cantAt[id];delete workedAt[id];
+  }
+  return before!==JSON.stringify([Object.hasOwn(considered,id)?considered[id]:null,Object.hasOwn(cantAt,id)?cantAt[id]:null,Object.hasOwn(workedAt,id)?workedAt[id]:null]);
+}
+function projectCurrentChoiceContextProperty(task,events,byId){
+  if(!task||!Array.isArray(events)||!events.length)return false;
+  const ordered=events.slice().sort((a,b)=>a.at-b.at||(a.id<b.id?-1:a.id>b.id?1:0)),memo=new Map();
+  const minima=ordered.filter(event=>!ordered.some(other=>other.id!==event.id&&currentChoiceAncestors(event,byId,memo).has(other.id)));
+  const base=minima[0];if(!base)return false;
+  const sameBase=minima.every(event=>event.baseId===base.baseId&&JSON.stringify(event.before)===JSON.stringify(base.before));
+  if(!sameBase){
+    const winner=latestCurrentChoiceEvent(events,byId);if(!winner)return false;
+    const prior=Object.hasOwn(task,"ctx")?JSON.stringify(task.ctx):null;
+    if(winner.after.present)task.ctx=JSON.parse(JSON.stringify(winner.value));else delete task.ctx;
+    return prior!==(Object.hasOwn(task,"ctx")?JSON.stringify(task.ctx):null);
+  }
+  const initial=base.before.present?base.before.value.slice():[],members=new Set(initial),perContext=new Map();
+  for(const event of ordered){
+    const before=new Set(event.before.present?event.before.value:[]),after=new Set(event.after.present?event.value:[]);
+    for(const id of new Set([...before,...after]))if(before.has(id)!==after.has(id)){
+      const rows=perContext.get(id)||[];rows.push({event,present:after.has(id)});perContext.set(id,rows);
+    }
+  }
+  for(const [id,rows] of perContext){
+    const winner=latestCurrentChoiceEvent(rows.map(row=>row.event),byId);if(!winner)continue;
+    const action=rows.find(row=>row.event.id===winner.id);if(action?.present)members.add(id);else members.delete(id);
+  }
+  const added=[...perContext].flatMap(([id,rows])=>{
+    const winner=latestCurrentChoiceEvent(rows.map(row=>row.event),byId),action=rows.find(row=>row.event.id===winner?.id);
+    return action?.present&&!initial.includes(id)?[{id,event:winner}]:[];
+  }).sort((a,b)=>a.event.at-b.event.at||(a.event.id<b.event.id?-1:a.event.id>b.event.id?1:0)||(a.id<b.id?-1:a.id>b.id?1:0));
+  const next=initial.filter(id=>members.has(id));
+  for(const row of added)if(members.has(row.id)&&!next.includes(row.id))next.push(row.id);
+  const prior=Object.hasOwn(task,"ctx")?JSON.stringify(task.ctx):null;
+  const present=base.before.present||next.length>0||ordered.some(event=>event.after.present);
+  if(present)task.ctx=next;else delete task.ctx;
+  return prior!==(Object.hasOwn(task,"ctx")?JSON.stringify(task.ctx):null);
+}
+function projectCurrentChoiceEvents(board=state){
+  if(!board||typeof board!=="object"||Array.isArray(board)||!Array.isArray(board.tasks))return false;
+  const events=Array.isArray(board.decisionEvents)?board.decisionEvents:[],byId=currentChoiceProjectionIndex(events);let changed=false;
+  const taskById=new Map(board.tasks.filter(task=>task&&typeof task.id==="string"&&task.id&&!Object.hasOwn(Object.prototype,task.id)).map(task=>[task.id,task]));
+  const properties=new Map();
+  for(const event of byId.values()){
+    if(event.kind!=="current-choice"||!supportedCurrentChoiceEvent(event)||
+        event.account!==(typeof board.syncAccount==="string"&&board.syncAccount?board.syncAccount:null))continue;
+    const {type,id,property}=event.target;
+    if(type==="task"&&!taskById.has(id))continue;
+    if(type==="task"&&property==="disposition")continue;
+    // Pass roots are installed before comparison replay. Reapplying the
+    // original Start root in this final outcome pass would erase later Dots.
+    if(type==="pass"&&property==="chain")continue;
+    if(type==="setting"&&(id!=="board"||!board.settings||typeof board.settings!=="object"||Array.isArray(board.settings)))continue;
+    if(type==="pass"&&id!==currentChoicePassId(board))continue;
+    const key=JSON.stringify([type,id,property]),rows=properties.get(key)||[];rows.push(event);properties.set(key,rows);
+  }
+  for(const [key,rows] of properties){
+    const winner=latestCurrentChoiceEvent(rows,byId);if(!winner)continue;
+    const [type,id,property]=JSON.parse(key),target=type==="task"?taskById.get(id):type==="setting"?board.settings:board;
+    if(!target)continue;
+    if(type==="task"&&property==="ctx"){
+      changed=projectCurrentChoiceContextProperty(target,rows,byId)||changed;continue;
+    }
+    if(type==="pass"&&property==="scanMode"){
+      if(!winner.after.present)continue;
+      const next=winner.value,modeChanged=board.scanMode!==next.mode;
+      const drawChanged=JSON.stringify(board.chance??null)!==JSON.stringify(next.chance);
+      if(modeChanged||drawChanged){
+        board.scanMode=next.mode;board.chance=next.chance===null?null:JSON.parse(JSON.stringify(next.chance));
+        board.candidateId=null;board.interventionActive=false;
+        if(board===state)chanceGeneration++;
+        changed=true;
+      }
+      continue;
+    }
+    const had=Object.hasOwn(target,property),prior=had?JSON.stringify(target[property]):null;
+    if(winner.after.present)target[property]=JSON.parse(JSON.stringify(winner.value));else delete target[property];
+    if(had!==Object.hasOwn(target,property)||(winner.after.present&&prior!==JSON.stringify(target[property])))changed=true;
+  }
+  const dispositions=currentChoiceDispositionActions(board,events);
+  for(const [id,rows] of dispositions){
+    const winner=latestCurrentChoiceEvent(rows.map(row=>row.event),byId);if(!winner)continue;
+    const selected=rows.find(row=>row.event.id===winner.id);if(selected)changed=applyCurrentChoiceDisposition(board,id,selected)||changed;
+  }
+  return changed;
+}
+function appendCurrentChoiceEvents(events){
+  if(!Array.isArray(events)||!events.length)return;
+  if(typeof appendDecisionEvent==="function"){
+    if(typeof ensureDecisionBaseline==="function")ensureDecisionBaseline(events[0]);
+    for(const event of events)appendDecisionEvent(event);
+    return;
+  }
+  if(typeof ensureDecisionBaseline==="function")ensureDecisionBaseline();
+  if(Array.isArray(state.decisionEvents)){
+    const seen=new Set(state.decisionEvents.map(existing=>existing?.id).filter(id=>typeof id==="string"));
+    const fresh=events.filter(event=>event&&typeof event.id==="string"&&!seen.has(event.id));
+    if(fresh.length)state.decisionEvents=[...state.decisionEvents,...fresh];
+    return;
+  }
+  if(state.decisionEvents!==undefined){
+    const recovery=Array.isArray(state.decisionEventsRecovery)?state.decisionEventsRecovery
+      : state.decisionEventsRecovery===undefined?[]:[{unrecognizedDecisionEventsRecovery:JSON.parse(JSON.stringify(state.decisionEvents))}];
+    state.decisionEventsRecovery=[...recovery,{unrecognizedDecisionEvents:JSON.parse(JSON.stringify(state.decisionEvents))}];
+  }
+  state.decisionEvents=events;
 }
 function ratingMetricsChanged(a,b,oldBasis,basis){
   return ["mu","sigma","likelihood","eligible","fallback","n","samples"].some(key=>a[key]!==b[key])
@@ -7425,7 +7897,15 @@ function onAction(act, el){
     case "reveal": revealTask(el.dataset.id); break;
     case "continue-scan": pushUndo(); state.interventionActive=false; state.snooze=12; commit(); break;
     case "start-working": pushUndo(); state.interventionActive=false; state.mode="work"; commit(true,true); break;
-    case "resume-scan": pushUndo(); applyScanPreference(el?.dataset?.mode); state.mode="scan"; state.candidateId=null; state.interventionActive=false; state.snooze=6; commit(); break;
+    case "resume-scan": {
+      const choiceGesture=captureCurrentChoiceGesture(),beforePassMode=currentChoicePassModeValue(state.scanMode,state.chance);
+      pushUndo();applyScanPreference(el?.dataset?.mode);
+      const afterPassMode=currentChoicePassModeValue(state.scanMode,state.chance);
+      if(JSON.stringify(beforePassMode)!==JSON.stringify(afterPassMode))appendCurrentChoiceEvents(prepareCurrentChoiceEvents([{
+        target:{type:"pass",id:choiceGesture.passId,property:"scanMode"},value:afterPassMode,after:{present:true},
+        before:{present:true,value:beforePassMode}}],choiceGesture));
+      state.mode="scan";state.candidateId=null;state.interventionActive=false;state.snooze=6;commit();break;
+    }
     case "start-scan": startScan(el.dataset?.mode); break;
     case "rescan": rescanSkipped(); break;
     case "clear-done": clearCompleted(); openSettings(); break;
@@ -7538,6 +8018,8 @@ function onAction(act, el){
     case "install-app": openInstallHelp(); break;
     case "native-install": installNative(); break;
     case "save-settings": {
+      const choiceGesture=captureCurrentChoiceGesture(),beforeSettings=currentChoiceSettingSnapshot();
+      const beforePassMode=currentChoicePassModeValue(state.scanMode,state.chance);
       pushUndo();
       const s=state.settings;
       /* Bounds from SETTINGS_RANGE and the empty-field fallback from
@@ -7565,6 +8047,11 @@ function onAction(act, el){
       s.listMetric = normalizeSettings({listMetric:document.getElementById("stListMetric")?.value || s.listMetric}).listMetric;
       s.dateFormat = normalizeDateFormat(document.getElementById("stDateFormat")?.value || s.dateFormat);
       applyScanPreference();
+      const choices=currentChoiceSettingChanges(beforeSettings),afterPassMode=currentChoicePassModeValue(state.scanMode,state.chance);
+      if(JSON.stringify(beforePassMode)!==JSON.stringify(afterPassMode))choices.push({
+        target:{type:"pass",id:choiceGesture.passId,property:"scanMode"},value:afterPassMode,after:{present:true},
+        before:{present:true,value:beforePassMode}});
+      appendCurrentChoiceEvents(prepareCurrentChoiceEvents(choices,choiceGesture));
       recomputeRanks(); closeModal(); commit(); break;
     }
     case "help": openHelp(); break;
@@ -7754,11 +8241,17 @@ document.addEventListener("change", e=>{
   if(el.id === "addEver"){ toggleQuickEvergreenOptions(el.checked); return; }
   if(el.id === "stScanMode"){ setScanPreference(el.value); return; }
   if(el.id === "stLastTaskWoop"){
-    const value=!!el.checked;if(state.settings.lastTaskWoop!==value){pushUndo();state.settings.lastTaskWoop=value;commit();}return;
+    const value=!!el.checked;if(state.settings.lastTaskWoop!==value){
+      const gesture=captureCurrentChoiceGesture(),before=currentChoiceSettingSnapshot();
+      pushUndo();state.settings.lastTaskWoop=value;recordCurrentChoiceSettings(gesture,before);commit();
+    }return;
   }
   if(el.id === "stListMetric"){
     const metric=el.value==='chance'?'chance':'rank';
-    if(metric!==state.settings.listMetric){pushUndo();state.settings.listMetric=metric;save();persist();renderList();renderSync();}
+    if(metric!==state.settings.listMetric){
+      const gesture=captureCurrentChoiceGesture(),before=currentChoiceSettingSnapshot();
+      pushUndo();state.settings.listMetric=metric;recordCurrentChoiceSettings(gesture,before);save();persist();renderList();renderSync();
+    }
     return;
   }
   if(el.id === "stShowPostpone"){ setShowPostponePreference(el.checked); return; }
