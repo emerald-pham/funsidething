@@ -1650,6 +1650,7 @@ const automaticBackupKinds=new Set(["daily","latest","before-restore","before-cl
 // A Restore may remain unsaved while a cloud timer, app update, or later edit
 // invokes persist without its original arguments. Keep its safety copy in
 // memory until some guarded primary write actually succeeds.
+let pendingLegacyCompletionSource=null; // exact pre-upgrade bytes must be safe before any overwrite
 const pendingRestoreSafetyIds=new Map(); // backup ID -> exact board bytes it displaced
 function protectedBackupIdSet(){
   const ids=new Set(Array.isArray(state?.protectedBackupIds) ? state.protectedBackupIds : []);
@@ -2105,6 +2106,10 @@ function reopenTask(task,current=task){
    delete action left an explicit tombstone. The winning copy owns shared
    scan/layout state; this only repairs the task membership that was missing. */
 function mergeUndeletedTasks(winner, other){
+  // Attest each original source before union: a peer's equal completion date
+  // cannot prove this source already contained that peer's modern Done.
+  other=JSON.parse(JSON.stringify(other));
+  const importedCompletion=checkpointLegacyCompletions(winner,other)|checkpointLegacyCompletions(other,winner);
   const evidenceKeys=["deletedTaskIds","restoredTaskIds","restoredTaskOps","deletedAfterRestoreOps","clearedHistoryIds","restoredHistoryIds","restoredHistoryOps","clearedAfterRestoreOps"];
   const beforeEvidence=JSON.stringify(evidenceKeys.map(key=>winner[key] || {}));
   if(!Array.isArray(winner.workLog)) winner.workLog=[];
@@ -2115,7 +2120,7 @@ function mergeUndeletedTasks(winner, other){
   const beforeTasks=winner.tasks.length;
   winner.tasks=winner.tasks.filter(task=>!deleted[task.id]);
   for(const id of [...present.keys()]) if(deleted[id]) present.delete(id);
-  let changed = winner.tasks.length!==beforeTasks;
+  let changed = winner.tasks.length!==beforeTasks||!!importedCompletion;
   // A stale board can bring back scan references without bringing back a task.
   // Keep explicit deletion authoritative over those same-ID references too;
   // missing membership without a tombstone is still not a deletion.
@@ -2239,7 +2244,7 @@ function mergeUndeletedTasks(winner, other){
   if(beforeDeletionLog!==JSON.stringify(winner.deletionLog)) changed=true;
   pruneDeletionLog(winner);
   const mergedDecisionEvidence=mergeDecisionBaseline(winner,other)|mergeDecisionEvents(winner,other);
-  if(mergedDecisionEvidence){
+  if(mergedDecisionEvidence||importedCompletion){
     changed=true;
     if(projectDecisionEvents(winner))changed=true;
   }
@@ -2672,6 +2677,10 @@ function refreshBrowserCopy(){
     try{
       if(localStorage.getItem(LOCAL_HEAD_KEY)!==head || localStorage.getItem(STORE_KEY)!==disk){ warnUnsavedBrowserChange(); return false; }
     }catch(e){ warnUnsavedBrowserChange(); return false; }
+    // Reconciliation can upgrade lifecycle evidence before replacing the pair.
+    // Preserve the exact incoming bytes as well as this tab's draft; two equal
+    // guarded keys are still a source, not a redundant copy of the merged board.
+    if(!saveLocalBackup("other-browser-copy",recoveredHead))return false;
     const next=JSON.parse(recoveredHead);
     try{ dropRemovedFields(next); hydrateState(next); }
     catch(e){ return false; }
@@ -2830,6 +2839,12 @@ function deviceQuotaFailure(error){
    a 2-second write loop with no edit behind it. */
 async function persist(backupAlreadySafe=false,preserveBackupId=null,deviceRetry=0){
   if(!storageOK) return reportDeviceSaveFailure("storage","unavailable","Keep this tab open; use Diagnostics download in Settings before closing it.");
+  if(pendingLegacyCompletionSource!==null){
+    const source=pendingLegacyCompletionSource,safe=await saveDurableBackup("before-completion-upgrade",source);
+    if(!safe?.id)return reportDeviceSaveFailure("completion-upgrade","recovery-unavailable","The older saved board is retained; its completion upgrade will retry when a recovery copy can be saved.");
+    if(pendingLegacyCompletionSource===source)pendingLegacyCompletionSource=null;
+    state.protectedBackupIds=[...new Set([...(state.protectedBackupIds||[]),safe.id])];
+  }
   const ancestorRaw=lastPersistedRaw; // capture before any storage await can advance the marker
   projectLegacyPrerequisites(state);
   if(deviceStore&&!deviceStorageAuthority){
@@ -3752,7 +3767,7 @@ function decisionProjectionIssue(board,checkCoherence=true){
   const embodied=new Set(baseline.includedActionIds);
   for(const event of rows){
     if(!supportedDecisionEvent(event)||embodied.has(event.id)||attestedDecisionEvent(baseline,event))continue;
-    if(event.kind==="completion"&&!decisionBaselineAcceptsEvent(baseline,event))return "unprojectable-decision-evidence";
+    if((event.kind==="completion"||event.kind==="completion-boundary")&&!decisionBaselineAcceptsEvent(baseline,event))return "unprojectable-decision-evidence";
     if(["no","comparison"].includes(event.kind)){
       if(!decisionBaselineAcceptsEvent(baseline,event))return "unprojectable-decision-evidence";
       if(event.ratingApplied===true){
@@ -6069,6 +6084,7 @@ function supportedDecisionEvent(event){
     ||!decisionIdList(event.observedActionIds)||event.observedActionIds.includes(event.id))return false;
   if(event.kind==="current-choice")return typeof supportedCurrentChoiceEvent==="function"&&supportedCurrentChoiceEvent(event);
   if(event.kind==="undo")return supportedDecisionUndoEvent(event);
+  if(event.kind==="completion-boundary")return supportedCompletionBoundary(event);
   if(event.kind==="completion")return event.meaning==="task-completed"&&decisionId(event.taskId)&&decisionId(event.actionId);
   if(event.kind==="no")return event.meaning==="benchmark-preferred"&&decisionId(event.candidateId)&&decisionId(event.benchmarkId)
     &&event.candidateId!==event.benchmarkId&&Array.isArray(event.candidateContextIds)&&event.candidateContextIds.every(decisionId)
@@ -6080,6 +6096,17 @@ function supportedDecisionEvent(event){
   return decisionId(event.taskId)&&decisionId(event.winnerId)&&event.winnerId===event.taskId
     &&(event.action==="dot"&&event.ratingApplied===false&&event.loserId===null
       ||decisionId(event.loserId)&&event.loserId!==event.winnerId);
+}
+function supportedCompletionBoundary(event){
+  const fields=["v","id","at","account","baseId","baselineId","passId","passAt","scanMode","chainIds","observedActionIds","kind","meaning","taskId","sourceEvidence"];
+  if(event.meaning!=="imported-completion-evidence"||!decisionId(event.taskId)||!decisionId(event.baselineId)
+    ||event.baseId!==null||Object.keys(event).some(key=>!fields.includes(key))||typeof event.sourceEvidence!=="string")return false;
+  try{
+    const source=JSON.parse(event.sourceEvidence);
+    return Array.isArray(source)&&source.length===3&&source[0]===event.taskId
+      &&source.slice(1).every(at=>at===null||Number.isFinite(at)&&at>0)
+      &&source.slice(1).some(at=>at!==null)&&canonicalDecisionFact(source)===event.sourceEvidence;
+  }catch{return false;}
 }
 function supportedDecisionUndoEvent(event){
   const fields=["v","id","at","account","baseId","baselineId","actionId","passId","passAt","scanMode","chainIds","observedActionIds","kind","targetActionId","targetEventIds","passBefore"];
@@ -6108,12 +6135,12 @@ function decisionUndoIssue(board){return decisionUndoResolution(board).issue;}
 function decisionUndoResolution(board){
   const baseline=board?.decisionBaseline,cancelled=new Set();
   if(!supportedDecisionBaseline(baseline))return {cancelled,issue:null};
-  const {events}=decisionEventOrder(board,baseline),byId=new Map();
+  const {events}=decisionEventOrder(board,baseline,true),byId=new Map();
   for(const row of Array.isArray(board.decisionEvents)?board.decisionEvents:[])
     if(supportedDecisionEvent(row)&&(row.account===baseline.account||attestedDecisionEvent(baseline,row)))byId.set(row.id,row);
   for(const event of events){
     if(event.kind!=="undo")continue;
-    if(!decisionBaselineAcceptsEvent(baseline,event))return {cancelled,issue:"unprojectable-decision-undo"};
+    if(!decisionBaselineAcceptsEvent(baseline,event)&&!attestedDecisionEvent(baseline,event))return {cancelled,issue:"unprojectable-decision-undo"};
     const targets=event.targetEventIds.map(id=>byId.get(id));
     if(targets.some(row=>!row||row.kind==="undo"||(row.account!==event.account&&!attestedDecisionEvent(baseline,row))
       ||(row.actionId||row.id)!==event.targetActionId))return {cancelled,issue:"unprojectable-decision-undo"};
@@ -6335,11 +6362,15 @@ function appendDecisionEvent(event,board=state){
   if(rows.some(row=>JSON.stringify(row)===key))return false;
   board.decisionEvents=[...rows,JSON.parse(key)];return true;
 }
-function decisionEventOrder(board,baseline){
+function decisionEventOrder(board,baseline,lifecycle=false){
   const rows=Array.isArray(board?.decisionEvents)?board.decisionEvents:[],included=new Set([...baseline.includedActionIds,...inheritedDecisionFacts(baseline).map(fact=>fact.id)]);
   const allIds=new Set(rows.map(row=>row?.id).filter(decisionId)),byId=new Map(),ambiguous=new Set();
+  // Inherited learning is already embodied; inherited lifecycle is still live.
+  // Missing embodied ancestors remain witnessed, while retained facts enter
+  // this separate ordering without retraining their comparisons.
+  if(lifecycle)for(const id of included)if(allIds.has(id))included.delete(id);
   for(const row of rows){
-    if(!supportedDecisionEvent(row)||row.account!==baseline.account)continue;
+    if(!supportedDecisionEvent(row)||row.account!==baseline.account&&!(lifecycle&&attestedDecisionEvent(baseline,row)))continue;
     const prior=byId.get(row.id);
     if(prior&&JSON.stringify(prior)!==JSON.stringify(row)){ambiguous.add(row.id);byId.delete(row.id);}
     else if(!ambiguous.has(row.id))byId.set(row.id,row);
@@ -6373,11 +6404,43 @@ function decisionEventAncestors(event,byId,memo=new Map(),visiting=new Set()){
   }
   memo.set(event.id,ancestors);return ancestors;
 }
+/* Imported evidence is a checkpoint observed now, never a reconstructed Done.
+   Keep its source signature after cancellation/retirement so replaying the same
+   legacy bytes cannot manufacture another lifecycle boundary. */
+function retainedDecisionFacts(board){
+  return [...(Array.isArray(board.decisionEvents)?board.decisionEvents:[]),
+    ...inheritedDecisionFacts(board.decisionBaseline).map(fact=>JSON.parse(LZString.decompressFromUTF16(fact.witness))),
+    ...replacementDecisionReceipts(board.decisionBaseline).flatMap(receipt=>receipt.facts.map(fact=>JSON.parse(LZString.decompressFromUTF16(fact.witness))))];
+}
+function checkpointLegacyCompletions(board,peer=null){
+  if(!(board.tasks||[]).some(task=>!task.done&&(task.lastDoneAt||task.completedAt)))return false;
+  const account=board.syncAccount??board.decisionBaseline?.account??null;
+  if(decisionEvidenceIssue(board,account,false))return false;
+  const facts=retainedDecisionFacts(board),known=peer&&!decisionEvidenceIssue(peer,peer.syncAccount??peer.decisionBaseline?.account??null,false)?retainedDecisionFacts(peer):[];let changed=false;
+  for(const task of board.tasks||[]){
+    if(task.done||!task.lastDoneAt&&!task.completedAt)continue;
+    const run=taskRestoreRun(task),peerRun=taskRestoreRun(peer?.tasks?.find(row=>row.id===task.id));
+    // Existing restore-run evidence already cancels a completion that never
+    // observed that deliberate return. Importing a checkpoint must not undo it.
+    if(run&&!runObserved(task.completedAfterRestoreOp,run)||peerRun&&!runObserved(task.completedAfterRestoreOp,peerRun))continue;
+    const sourceEvidence=canonicalDecisionFact([task.id,task.lastDoneAt??null,task.completedAt??null]);
+    if([...facts,...known.filter(row=>row.kind==="completion-boundary")].some(row=>row.taskId===task.id&&(row.kind==="completion-boundary"&&row.sourceEvidence===sourceEvidence
+      ||row.kind==="completion"&&row.at===(task.lastDoneAt||task.completedAt))))continue;
+    const event={v:1,id:uid(),at:Date.now(),account,baseId:null,passId:decisionId(board.passId)?board.passId:null,
+      passAt:Number.isFinite(board.passStartedAt)?board.passStartedAt:0,scanMode:board.scanMode,
+      chainIds:(board.chain||[]).slice(),observedActionIds:decisionActionFrontier(board.decisionEvents),
+      kind:"completion-boundary",meaning:"imported-completion-evidence",taskId:task.id,sourceEvidence};
+    const baseline=ensureDecisionBaseline(event,board);if(!baseline)continue;
+    event.baselineId=baseline.id;
+    if(appendDecisionEvent(event,board)){facts.push(event);changed=true;}
+  }
+  return changed;
+}
 function outstandingDecisionCompletions(events,byId,cancelled){
   const outstanding=new Map(),memo=new Map();
   for(const event of events){
     if(cancelled.has(event.id))continue;
-    if(event.kind==="completion"){
+    if(event.kind==="completion"||event.kind==="completion-boundary"){
       const ids=outstanding.get(event.taskId)||new Set();ids.add(event.id);outstanding.set(event.taskId,ids);
       continue;
     }
@@ -6497,7 +6560,8 @@ function projectDecisionEvents(board=state,inheritedCancellations=null){
   // A remembered completion removes saved membership until a later explicit
   // Dot/Yes observes every completion run. Device/source order and wall-clock
   // order alone cannot turn a stale choice into a return.
-  const outstanding=outstandingDecisionCompletions(events,byId,cancelled);
+  const lifecycle=decisionEventOrder(board,baseline,true);
+  const outstanding=outstandingDecisionCompletions(lifecycle.events,lifecycle.byId,cancelled);
   if(outstanding.size)board.chain=(board.chain||[]).filter(id=>!outstanding.has(id));
   const disposition=new Map();
   for(const event of passEvents){
@@ -8399,6 +8463,7 @@ function openHelp(){
     + '<dt>How are conflicting choices resolved?</dt><dd>Independent decisions combine, including B over A on one device and C over A on another. Only incompatible current choices need a winner. Their original decision times survive saving, retrying and reopening. Separate comparisons remain learning evidence whichever current choice wins. Check Settings backups for recovery copies of displaced edits. Equal original times use a consistent rule. Missing or untrusted evidence stays protected and sync is held; an inaccurate device clock cannot reveal the true order.</dd>'
     + '<dt>What does Synced confirm?</dt><dd>The coherent board containing the retained decisions must be saved on this device and acknowledged by the server. A successful read or a History row alone does not confirm a saved action. Unsaved work, held adoption and failed or uncertain uploads remain pending or show an error until reconciliation and acknowledgement finish.</dd>'
     + '<dt>What happens to older boards and tabs?</dt><dd>Existing learned ratings and recorded history remain the starting baseline; missing old comparisons are not invented or trained again. Unknown evidence and recovery copies remain protected. Older tabs can be held from uploading when they cannot preserve saved decisions. The safe-update path protects unsaved work and unfinished drafts. A compatible update cannot reconstruct an older decision that was never recorded: that local copy stays protected and sync remains held. If a saved control is protected or disabled because its data is newer, use a compatible app before editing it.</dd>'
+    + '<dt>How are older completions recovered?</dt><dd>An imported completion boundary keeps older completed work out of the dotted chain, including after evergreen rest expires. It records the recovery observation and does not invent an earlier Done action or comparison learning. A new permitted Dot, Yes or Start can return the task after observing that boundary. Proven returns and Undo remain valid. Exact source copies stay in local backups. If the recovery copy cannot be saved, adoption and uploading wait while newer edits remain open. Unknown or conflicting evidence stays protected until a compatible app can preserve it.</dd>'
     + '<dt>Which settings save immediately?</dt><dd>Scan buttons, All Tasks display and sort, Date format, Last task WOOP, Show Postpone button, Patterned active indicators, and Keep the header visible while scrolling save as you change them. Context controls and scene dialogs save through their own actions. Horizon, Can’t sticks for, Worked on it sticks for, Postpone for, Interrupt below, MC samples, and Evergreen defaults apply through Save settings. Closing Settings discards unsaved numeric fields. Save settings is at the bottom; scroll the dialog to reach it. Fields wrap on narrow screens.</dd>'
     + '<dt>What does Clear history remove?</dt><dd>After confirmation, Clear history removes ordinary completed tasks and logged Worked on it and Evergreen Done sessions. Open evergreen and unfinished tasks remain. An older saved copy cannot restore a deleted task, even after its dated log entry expires; adding the same title creates a new task identity. Rating observations are separate from completion and work History. Clearing Evergreen Done history does not delete the task or reset its rest; after the rest expires, it can return for Dot or Yes when eligible. Undo can reverse the clear.</dd>'
     + '<dt>How do backups and Restore work?</dt><dd>Daily local and manual backups stay on this device. Automatic backups cover today and the previous six local dates; older automatic entries are removed after a successful save, without Undo. Manual and protected recovery copies remain until you delete them. Restore first keeps a recovery copy of the current board, then restores the selected board while retaining later tasks without recorded deletion. Crossing signed-in accounts warns first. If saving fails or the board or account changes, Restore stops and keeps newer work open. Matching duplicate backups appear once; conflicting copies stay available for recovery.</dd>'
@@ -8715,6 +8780,9 @@ async function importDecisionBoard(next,sourcePayload,box){
   const user=backend?.user||null,safety=await saveDurableBackup("before-import",prior);
   const current=()=>JSON.stringify(state)===prior && window.CloudSync===backend && (window.CloudSync?.user||null)===user && box.value===sourcePayload;
   if(!safety?.id || !current())return false;
+  const selected=await saveDurableBackup("decision-import-source",sourcePayload);
+  if(!selected?.id||!current())return false;
+  if(checkpointLegacyCompletions(next))projectDecisionEvents(next);
   if(!await inheritDecisionAuthority(next,account,"explicit-import",sourcePayload) || !current())return false;
   if(!await prepareDecisionReplacement(next,state,"explicit-import") || !current())return false;
   markReplacementDeletes(next);pushUndo("replacement");replaceState(next,{replacement:true});applyTheme();baseUpdatedAt=Date.now();
@@ -8743,6 +8811,7 @@ async function restoreDurableBackupById(id){
       toast("Restore stopped: the board or signed-in account changed. Check the current board and try again.",7000);return false;
     }
     if(needsDecisionInheritance(next,destination)){
+      if(checkpointLegacyCompletions(next))projectDecisionEvents(next);
       if(!await inheritDecisionAuthority(next,destination,"explicit-restore",entry.payload))return false;
       if(JSON.stringify(state)!==currentBoard || window.CloudSync!==restoreBackend || (window.CloudSync?.user||null)!==restoreAccount)return false;
     }
@@ -9055,7 +9124,7 @@ function onAction(act, el){
         // catch below can report the bad backup without damaging anything.
         dropRemovedFields(st); hydrateState(st);
         const destination=state.syncAccount||(cloudReady()?window.CloudSync.user:null);
-        if(needsDecisionInheritance(st,destination) || state.decisionBaseline || state.decisionEvents)return importDecisionBoard(st,box.value,box);
+        if(needsDecisionInheritance(st,destination) || state.decisionBaseline || state.decisionEvents || st.tasks.some(task=>task.lastDoneAt||task.completedAt||task.done))return importDecisionBoard(st,box.value,box);
         markReplacementDeletes(st); pushUndo("replacement"); replaceState(st,{replacement:true}); applyTheme();
         // Pasted in by hand, so it is authoritative as of now — not stale content
         // that cloudPull() should hold this device's writes back over.
@@ -9376,7 +9445,7 @@ function hotkeyDelete(){
   if(!loaded && freshClient){ state.settings.scanMode="halving";state.settings.showPostpone=false; }
   const hadScene=!!(loaded?.settings && Object.hasOwn(loaded.settings,"scene"));
   const deviceScene=readDeviceScene();
-  let rejectedSavedState = false, repairedDeletionLog = false;
+  let rejectedSavedState = false, repairedDeletionLog = false, repairedCompletionAuthority=false;
   try{
     dropRemovedFields(state);
     repairedDeletionLog=hydrateState(state);
@@ -9387,6 +9456,15 @@ function hotkeyDelete(){
     // fallback is not persisted until the user makes a real edit.
     state = defaultState();
     rejectedSavedState = true;
+  }
+  if(!rejectedSavedState&&loaded){
+    const upgraded=JSON.parse(JSON.stringify(state));
+    if(checkpointLegacyCompletions(upgraded)){
+      // Retain the literal loaded source before a later persist may replace it.
+      // Until that recovery succeeds, persist fails closed and cloud stays pending.
+      pendingLegacyCompletionSource=lastPersistedRaw??JSON.stringify(loaded);
+      state=upgraded;projectDecisionEvents(state);repairedCompletionAuthority=true;
+    }
   }
   const migratedScene=!rejectedSavedState && (!loaded || !hadScene) && sceneHasChoice(deviceScene);
   if(migratedScene) state.settings.scene=deviceScene;
@@ -9415,7 +9493,7 @@ function hotkeyDelete(){
   // rows on every Undo, Restore, import, and Reset. Repair that losslessly on
   // cold open, make the smaller board durable, then let the normal read-before-
   // write gate publish it. Distinct same-ID records stay separate above.
-  if(repairedDeletionLog){
+  if(repairedDeletionLog||repairedCompletionAuthority){
     state.updatedAt=Date.now();state.syncDirty=true;
     if(await persist(true)) cloudPush();
   }

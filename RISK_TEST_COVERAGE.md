@@ -1436,3 +1436,22 @@ Actual editor Delete, Add, Done, Clear history, and Undo actions run through iso
 - `RISK scoped Undo FAQ: whole Done Dot and Return actions survive stale-source recovery`
 
 Actual populated-editor ordinary Done, an offline Dot that an independent peer completion has not observed, and a post-rest informed evergreen return each receive one true action-scoped Undo after peer progress. The tests preserve whole editor/scanner action groups, immutable original event bytes and times, prior restore-run lineage, ordinary and evergreen History, independent comparison learning, peer fields and current pass members. Older device/cloud sources are delivered before and after Undo publication; every recovery, Undo and replay paint is checked against its expected membership, along with production IndexedDB heads, exact synthetic cloud state and cold reopen. After reopening, a new eligible return and its next Done remain meaningful. The separately recorded first phase-label failure is withdrawn as product evidence: its later paints were caused by the actual Undo action, and phase-separated source/Undo/replay assertions pass without runtime edits. The only valid preimplementation RED was the missing Quick start FAQ explanation; its behavior consumers were GREEN.
+
+## Legacy completion recovery checkpoints (#173)
+
+- RISK legacy completion recovery: immutable released Done stays offchain through expired device recovery and every save
+- RISK legacy completion return: imported boundary survives replay while actual Dot Done Undo and exact cloud acknowledgement remain meaningful
+- RISK legacy completion startup: an actually revived released board is coherent before first paint and permits an observed return
+- RISK legacy completion equal clocks: an independent eventless Done is not attested by another modern completion at the same time
+- RISK legacy completion inheritance: consented Import retains lifecycle authority independently of embodied learning
+- RISK legacy completion imported boundary: actual cross-account Import of a released revived board cannot paint old membership
+- RISK legacy completion recovery safety: failed exact-source backup holds startup and guarded recovery without losing a newer edit
+- RISK legacy completion support floor: real eventless learned ratings upgrade without reconstructing comparison history
+- RISK legacy completion released shell: actual stale write conflicts then holds unknown authority and its pending edit for safe update
+- RISK legacy completion unknown evidence: malformed imported provenance holds exact local and cloud branches
+- RISK legacy completion proven restore: an actual released early Return and Dot cannot be fenced again by its stale completion
+- RISK legacy completion replacement: actual Import Restore Reset and their Undo retain retired checkpoint provenance
+- RISK legacy completion replacement safety: refused source recovery and account races leave Import Restore Reset and input exact
+- RISK legacy completion guest adoption: actual modern guest Done remains observable and Undoable after first empty-account sign-in
+- RISK legacy completion FAQ: imported completion boundaries explain exact recovery and permitted return without invented history
+- RISK legacy completion inherited cancellation: an actual guest Done Undo stays reversed after authorized first sign-in

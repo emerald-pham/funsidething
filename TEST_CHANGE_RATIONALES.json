@@ -9853,4 +9853,46 @@
       "faq": "A valid FAQ-only RED was recorded at 2026-10-17T21-29-30-898Z before index.html changed. The final focused green record includes this FAQ assertion and the #174 consumer cohort."
     },
     "releaseStatus": "Focused local #172 tests and FAQ only. No runtime repair, full suite, browser, emulator, CI, push, release receipt or deployment verification. Parent /root owns final integration and release."
-  }]
+  },
+  {
+    "testChangesSha256": "0ccc94a3dc57035c019b33948c1ffb970d0fec3088dca476801bc586a35515db",
+    "comparison": "issue173Incremental",
+    "comparisonBase": "697da4eebc48c2e99e0d2d25d4d9011d421beaf4",
+    "reason": "Repair the reproduced eventless-legacy completion recovery gap through the approved full-application consumer seam. Preserve source bytes, existing learned ratings, original Done identities, source-scoped observation, targeted Undo, replacement retirement, and older full-shell safe hold.",
+    "previousBehavior": "New actual Done had lifecycle facts, but older released Done retained only completion dates and History. After rest expiry, recovery and initial opening could paint and durably save stale dotted membership. Equal modern dates did not prove that an independent legacy source observed that modern completion. Imported inherited lifecycle and pre-adoption cancellations also needed their own projection rather than being discarded as embodied learning.",
+    "intendedBehavior": "A validated source can record an explicitly labelled imported-completion checkpoint at actual observation time, without inventing historical Done or comparison actions. Source provenance survives repeat delivery, permitted returns, Undo and exact retirement. New explicit permitted choices can observe the boundary; legacy restore-run cancellation remains authoritative. Unknown evidence and failed mandatory source recovery keep exact data protected and publication held.",
+    "replacementTests": [
+      "RISK legacy completion recovery: immutable released Done stays offchain through expired device recovery and every save",
+      "RISK legacy completion return: imported boundary survives replay while actual Dot Done Undo and exact cloud acknowledgement remain meaningful",
+      "RISK legacy completion startup: an actually revived released board is coherent before first paint and permits an observed return",
+      "RISK legacy completion equal clocks: an independent eventless Done is not attested by another modern completion at the same time",
+      "RISK legacy completion inheritance: consented Import retains lifecycle authority independently of embodied learning",
+      "RISK legacy completion imported boundary: actual cross-account Import of a released revived board cannot paint old membership",
+      "RISK legacy completion recovery safety: failed exact-source backup holds startup and guarded recovery without losing a newer edit",
+      "RISK legacy completion support floor: real eventless learned ratings upgrade without reconstructing comparison history",
+      "RISK legacy completion released shell: actual stale write conflicts then holds unknown authority and its pending edit for safe update",
+      "RISK legacy completion unknown evidence: malformed imported provenance holds exact local and cloud branches",
+      "RISK legacy completion proven restore: an actual released early Return and Dot cannot be fenced again by its stale completion",
+      "RISK legacy completion replacement: actual Import Restore Reset and their Undo retain retired checkpoint provenance",
+      "RISK legacy completion replacement safety: refused source recovery and account races leave Import Restore Reset and input exact",
+      "RISK legacy completion guest adoption: actual modern guest Done remains observable and Undoable after first empty-account sign-in",
+      "RISK legacy completion FAQ: imported completion boundaries explain exact recovery and permitted return without invented history",
+      "Firestore rules: immutable decision-aware full shell conflicts then safely holds completion-upgrade authority and its local edit",
+      "RISK legacy completion inherited cancellation: an actual guest Done Undo stays reversed after authorized first sign-in"
+    ],
+    "preservedCoverage": [
+      "All existing passing feature assertions remain unchanged. Ordinary Done keeps its existing done and restore-run authority without unnecessary migration facts; comparison learning remains separate and starts from the retained frozen baseline.",
+      "Actual immutable bd84 full-app Dot, editor Done, early Return, editor title Save and stale-source revival produce the legacy fixtures. The immutable support floor also produces a genuinely eventless board with learned ratings. No modern action row is deleted to simulate old storage.",
+      "Isolated production IndexedDB and fallback recovery assert every captured DOM membership and successful durable write, exact head, source backups, expired eligibility and cold reopen. Finished fixture stores, cloud and owned timers are disposed only after final durability assertions.",
+      "Actual Import, backup Restore and Reset retain their chosen-board behavior, exact safety copies, source refusal/account-race guards, retired checkpoints and replacement Undo. Guest adoption retains original facts/accounts and observes inherited completion separately from embodied learning.",
+      "The synthetic immutable released full shell actually attempts a stale conditional write, pulls unknown authority, retains its pending local edit, requests safe update and leaves acknowledged cloud exact. A separate immutable full-shell real-backend Firestore test is added for the parent emulator gate; it was not run by this worker. Existing rules/capability and generic compatibility matrix remain unchanged."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo $PWD --evidence-dir /Users/emeraldpham/.codex/task-artifacts/completion-precedence-168/173/runs --purpose preimplementation-red -- node --test --test-name-pattern='^RISK legacy completion recovery:' tests.js",
+      "failure": "At baseline697da4e, the immutable released app actually Dotted and completed its evergreen task. The candidate reopened after rest expiry and recovered a real older editor choice. Both fallback and production isolated IndexedDB had 2 chain members instead of 1; diagnostics captured the incorrect recovery DOM replacement and exact durable head, plus two successful incorrect IDB writes before any runtime edit. Further distinct consumer REDs and subsequent GREENs are listed in 173/173implementation.md; fixture-only failures are explicitly distinguished."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/completion-precedence-168/173/runs",
+    "releaseStatus": "Focused issue173 worker only. No push, CI, full suite, emulator/browser allocation, independent approval, fingerprints or release. Parent /root owns final175 packaging, aggregate rationale, mixed-client/rules execution and release. Broader focused inherited timing failures remain disclosed in 173/173implementation.md.",
+    "greenEvidence": "/Users/emeraldpham/.codex/task-artifacts/completion-precedence-168/173/runs/2026-10-17T21-49-20-566Z-061257db-ae26-4142-8320-025f92a58e35.json (final focused issue173 and scoped Undo/comparison/inheritance/lifecycle cohort: 51 top-level consumers, 88 passed, 0 failed, 0 skipped)."
+  }
+]
