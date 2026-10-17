@@ -8030,5 +8030,24 @@
       "command": "env TZ=UTC node --test --test-name-pattern=\"RISK live scan sync: Settings|RISK multiple dependencies FAQ:|RISK STALE TAB: recovery guidance\" tests.js",
       "failure": "secondary-guidance-assertions-red-1c.log captures the three obsolete assertions. recovery-location-guidance-red-1c.log then captures the missing Settings backups destination with current wording assertions; adding that concrete FAQ sentence passes8/8 in secondary-guidance-green-1c.log. Copy-only repair; no new runtime bug claim."
     }
+  },
+  {
+    "testChangesSha256": "da852ee4b399573d505dbad8308487b83baa49fec861a2920e0e863375830898",
+    "reason": "Retain the old two-task partial-conflict acceptance using two real current clients and align Quick start safe-update wording with #141.",
+    "previousBehavior": "The bulk fixture manually changed cloud due/title scalars without recording the peer choices, so missing original authority is now conservatively held. Quick start separately still asserted Refresh all devices.",
+    "intendedBehavior": "Use real editor choices at distinct original times and real peer publication, keeping all original conflicting due, independent due/title, partial-result, offline-reopen and deletion assertions. Check clean exact acknowledgement too. Unknown/unrepresented legacy authority stays covered by held-source consumers.",
+    "replacementTests": [
+      "RISK bulk task editing: offline two-task cloud conflict preserves fresh peer fields and reconnects without resurrection",
+      "RISK Quick start content: essential steps stay brief and detailed help remains user-facing in existing sections",
+      "RISK decision recovery legacy update: safe reload and Retry hold a sole unrepresented legacy comparison instead of acknowledging lost learning"
+    ],
+    "preservedCoverage": [
+      "All original two-task due/title/deletion/result assertions and Quick start130-word limit/chapters/dependency constraints remain.",
+      "Added actual editor choice targets and successful clean-sync assertions. No runtime or support pin changes."
+    ],
+    "redEvidence": {
+      "command": "env TZ=UTC node --test --test-name-pattern=\"RISK Quick start content:|RISK bulk task editing: offline two-task\" tests.js",
+      "failure": "bulk-quickstart-preliminary-red-0c.log records obsolete refresh wording and held manual unrepresented peer conflict.02-cross-realm-failure preserves a fixture-only host/VM array comparison error; Array.from fixes the assertion realm.03-0c.log passes2/2 with real current peer actions. This is fixture/copy coverage correction, not original runtime bug RED."
+    }
   }
 ]
