@@ -710,6 +710,14 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK cloud current choices: original decision time wins conflicts in either publication order
 - RISK cloud current choices: causal projector retains compatible task fields and context membership
 - RISK cloud current choices: context membership additions compose across observed revisions
+- RISK cloud shared preferences: later theme choice survives either publication order and cold reopen
+- RISK cloud shared preferences: date format survives an independent No in either publication order and cold reopen
+- RISK cloud shared preferences: one hourly quote edit survives an independent No without replacing other hours
+- RISK cloud shared preferences: scene time season and structured location survive an independent No
+- RISK cloud contexts: deleting a legacy context and targeted Undo restore its exact definition for a cold peer
+- RISK cloud contexts: create rename mode and task assignment survive an independent No in either order
+- RISK cloud current choices: a changed scene source is held before adoption or acknowledgement
+- RISK cloud current choices: typed preference authority survives a modern replacement Undo and stale delivery
 - RISK cloud current choices: causal action order beats skew and equal concurrent times use event identity
 - RISK cloud current choices: fresh pass projection installs the exact frozen mode draw
 - RISK cloud current choices: final outcome projection does not erase later pass comparisons

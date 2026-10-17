@@ -1424,10 +1424,24 @@ function applyScenePreferences(){
 }
 function recordScenePreferences(patch){
   if(!state?.settings || applyingSceneFromState) return;
-  const before=state.settings.scene;
-  const after=normalizeSceneSettings({...before,...patch});
-  if(JSON.stringify(before)===JSON.stringify(after)) return;
+  const before=state.settings.scene||defaultSceneSettings();
+  if(!currentChoiceSceneShapeSupported(before)){reportCloudReconcileError("unprojectable-decision-evidence");return;}
+  const proposed=normalizeSceneSettings({...before,...patch}),after={...before};
+  const choices=[];
+  for(const property of ["location","time","season"]){
+    if(!Object.hasOwn(patch,property))continue;
+    const prior=currentChoiceDescriptor(before,property),next={present:true,value:proposed[property]};
+    if(JSON.stringify(prior)===JSON.stringify(next))continue;
+    after[property]=proposed[property];
+    choices.push({target:{type:"scene",id:"board",property},value:next.value,after:{present:true},before:prior});
+  }
+  if(!choices.length)return;
+  const gesture=captureCurrentChoiceGesture();
+  // Scene controls do not have their own Undo item. Seal an older local frame
+  // so Undo cannot absorb this separate, immediate preference action.
+  sealUndoFrame();
   state.settings.scene=after;
+  appendCurrentChoiceEvents(prepareCurrentChoiceEvents(choices,gesture));
   save();
 }
 
@@ -1475,7 +1489,15 @@ function writeThemeHint(pref){
 }
 
 function setTheme(v){
-  state.settings.theme = normalizeTheme(v);
+  const value=normalizeTheme(v);
+  if(state.settings.theme!==value){
+    const gesture=captureCurrentChoiceGesture(),before=currentChoiceSettingSnapshot();
+    // Theme has no standalone Undo action. Close the prior local gesture before
+    // this separate preference write so that Undo cannot absorb the theme.
+    sealUndoFrame();
+    state.settings.theme=value;
+    recordCurrentChoiceSettings(gesture,before);
+  }
   applyTheme();
   save();      // bumps updatedAt, so the choice pushes to your other devices
   render();
@@ -3479,13 +3501,15 @@ function restoreRetiredDecisionFields(target,source){
     const {type,id,property}=event.target;
     if(type==="task" && property==="disposition"){
       for(const key of ["considered","cantAt","workedAt"]){target[key]||={};copy(target[key],source[key],id);}
-    }else if(type==="task"){
-      const to=(target.tasks||[]).find(task=>task.id===id),from=(source.tasks||[]).find(task=>task.id===id);
-      if(to&&from)copy(to,from,property);
-    }else if(type==="setting"){
-      target.settings||={};copy(target.settings,source.settings,property);
+    }else if(type==="context"&&property==="exists"){
+      const from=(source.contexts||[]).find(context=>context?.id===id);
+      target.contexts=Array.isArray(target.contexts)?target.contexts.filter(context=>context?.id!==id):[];
+      if(from)target.contexts.push(JSON.parse(JSON.stringify(from)));
     }else if(type==="pass"){
       for(const key of ["passId","passStartedAt","mode","scanMode","chance","chain","candidateId","interventionActive","considered","cantAt","workedAt"])copy(target,source,key);
+    }else if(type==="task"||type==="setting"||type==="scene"||type==="context"){
+      const evidence=currentChoiceTargetRead(source,event.target);
+      if(evidence)currentChoiceTargetApply(target,event.target,evidence);
     }
   }
 }
@@ -3517,6 +3541,7 @@ function decisionProjectionIssue(board,checkCoherence=true){
   const rows=Array.isArray(board?.decisionEvents)?board.decisionEvents:[],baseline=board?.decisionBaseline;
   if(!rows.length && baseline===undefined)return null;
   if(!supportedDecisionBaseline(baseline))return rows.length?"unprojectable-decision-evidence":null;
+  const contextGroupIssue=currentChoiceContextActionIssue(rows);if(contextGroupIssue)return contextGroupIssue;
   if(decisionStartIssue(board))return "unprojectable-decision-evidence";
   const ratings=decisionBaselineRatings(baseline);
   if(ratings.conflicts.size || decisionEventOrder(board,baseline).blockedIds.size)return "unprojectable-decision-evidence";
@@ -3552,19 +3577,23 @@ function decisionProjectionIssue(board,checkCoherence=true){
       const expected=byId.get(task.id);
       return expected && (task.mu!==expected.mu || task.sigma!==expected.sigma);
     }))return "unrepresented-legacy-learning";
-    const field=(target,key)=>[Object.hasOwn(target||{},key),target?.[key]??null];
     for(const event of rows){
       if(event.kind!=="current-choice" || event.account!==baseline.account || attestedDecisionEvent(baseline,event))continue;
       const {type,id,property}=event.target;
-      const actual=type==="task"?(board.tasks||[]).find(task=>task.id===id):type==="setting"?board.settings:board;
-      const expected=type==="task"?byId.get(id):type==="setting"?projected.settings:projected;
-      if(!actual || !expected)continue;
       let values;
-      if(type==="task" && property==="disposition")values=["considered","cantAt","workedAt"].map(key=>[field(board[key],id),field(projected[key],id)]);
-      else if(type==="pass"){
+      if(type==="task" && property==="disposition"){
+        const field=(source,key)=>[Object.hasOwn(source[key]||{},id),source[key]?.[id]??null];
+        values=["considered","cantAt","workedAt"].map(key=>[field(board,key),field(projected,key)]);
+      }else if(type==="pass"){
         if(id!==currentChoicePassId(board))continue;
+        const field=(source,key)=>[Object.hasOwn(source,key),source[key]??null];
         values=(property==="chain"?["chain","passId","passStartedAt"]:["scanMode","chance"]).map(key=>[field(board,key),field(projected,key)]);
-      }else values=[[field(actual,property),field(expected,property)]];
+      }else{
+        const actual=currentChoiceTargetRead(board,event.target),expected=currentChoiceTargetRead(projected,event.target);
+        if(type==="task"&&!actual&&!expected)continue;
+        if(!actual||!expected)return "unprojectable-decision-evidence";
+        values=[[actual,expected]];
+      }
       if(values.some(([left,right])=>canonicalDecisionFact(left)!==canonicalDecisionFact(right)))return "unprojectable-decision-evidence";
     }
   }
@@ -3584,6 +3613,15 @@ function decisionEvidenceIssue(board,account,checkProjection=true){
     return "decision-account-mismatch";
   if(conflictingDecisionEvidence(board))return "conflicting-decision-evidence";
   return checkProjection?decisionProjectionIssue(board):null;
+}
+function currentChoiceSourceIssue(board){
+  const events=Array.isArray(board?.decisionEvents)?board.decisionEvents:[];
+  for(const event of events){
+    if(!supportedCurrentChoiceEvent(event))continue;
+    if(!["setting","scene","context"].includes(event.target.type))continue;
+    if(!currentChoiceTargetRead(board,event.target))return "unprojectable-decision-evidence";
+  }
+  return null;
 }
 function persistedDecisionAncestor(account,revision){
   const base=state?.decisionBase;
@@ -3711,6 +3749,8 @@ async function cloudPull(){
       try{
         remoteState = JSON.parse(remote.payload);
         if(!remoteState || !Array.isArray(remoteState.tasks)){ reportCloudReconcileError("invalid-payload");return; }
+        const rawChoiceIssue=currentChoiceSourceIssue(remoteState);
+        if(rawChoiceIssue){reportCloudReconcileError(rawChoiceIssue);return;}
         remoteHadScene=!!(remoteState.settings && Object.hasOwn(remoteState.settings,"scene"));
         // A successful network read is not a successful reconciliation until
         // its content is usable. Validate before binding this session to the
@@ -4707,7 +4747,8 @@ function setFloatingHeaderPreference(enabled){
 function setDateFormatPreference(preference){
   const value=normalizeDateFormat(preference);
   if(state.settings.dateFormat===value)return;
-  pushUndo();state.settings.dateFormat=value;commit();
+  const gesture=captureCurrentChoiceGesture(),before=currentChoiceSettingSnapshot();
+  pushUndo();state.settings.dateFormat=value;recordCurrentChoiceSettings(gesture,before);commit();
   persist(); // Keep the chosen display format even when Settings closes immediately.
   const preview=document.getElementById("stDatePreview");
   if(preview)preview.textContent=formatCalendarDate(new Date(Date.now()),{year:true});
@@ -5476,16 +5517,50 @@ function addTask(title, dot, ctx, dates = {}, taskOptions = {}){
   commit(true, !!dot);          // "Add & dot" syncs to the cloud right away
   return t;
 }
+function createContextChoice(name){
+  const clean=typeof name==="string"?name.trim():"";if(!clean)return null;
+  const id=uid(),context={id,name:clean,active:true},gesture=captureCurrentChoiceGesture();
+  pushUndo();state.contexts.push(context);
+  const mode=currentChoiceContextModeSnapshot(context);
+  const choices=[
+    {target:{type:"context",id,property:"exists"},value:true,after:{present:true},before:{present:false}},
+    {target:{type:"context",id,property:"name"},value:clean,after:{present:true},before:{present:false}},
+    {target:{type:"context",id,property:"mode"},value:mode,after:{present:true},before:{present:false}}
+  ];
+  appendCurrentChoiceEvents(prepareCurrentChoiceEvents(choices,gesture));
+  commit();return context;
+}
+function deleteContextChoice(id){
+  const context=state.contexts.find(row=>row?.id===id);if(!context)return false;
+  const gesture=captureCurrentChoiceGesture(),choices=[{
+    target:{type:"context",id,property:"exists"},value:false,after:{present:true},
+    before:{present:true,value:JSON.parse(JSON.stringify(context))}
+  }],taskContextIds={};
+  pushUndo();state.contexts=state.contexts.filter(row=>row?.id!==id);
+  for(const task of state.tasks){
+    const before=Array.isArray(task.ctx)?task.ctx.slice():[];
+    if(!before.includes(id))continue;
+    const after=before.filter(contextId=>contextId!==id);task.ctx=after;taskContextIds[task.id]=after.slice();
+    choices.push({target:{type:"task",id:task.id,property:"ctx"},value:after,after:{present:true},before:{present:true,value:before}});
+  }
+  appendCurrentChoiceEvents(prepareCurrentChoiceEvents(choices,gesture,taskContextIds));
+  commit();return true;
+}
 function toggleContext(id){
   const c = state.contexts.find(c=>c.id===id); if(!c) return;
   const focus=document.activeElement,scope=focus?.dataset?.ctxScope;
   const refocus=focus?.dataset?.ctx===id;
+  const gesture=captureCurrentChoiceGesture(),before=currentChoiceContextModeSnapshot(c);
   pushUndo();
   const current=contextControlInfo(c).mode;
   // Saved neutral requirements remain blocked; their red control must include
   // them in one click even when every real context is currently excluded.
   c.active=current!=="included";
   if(current==="included") c.excluded=true; else delete c.excluded;
+  const after=currentChoiceContextModeSnapshot(c);
+  if(JSON.stringify(before)!==JSON.stringify(after))appendCurrentChoiceEvents(prepareCurrentChoiceEvents([{
+    target:{type:"context",id,property:"mode"},value:after,after:{present:true},before:{present:true,value:before}
+  }],gesture));
   commit();
   if(refocus) for(const button of document.querySelectorAll('[data-ctx]')) if(button.dataset.ctx===id && button.dataset.ctxScope===scope){button.focus();break;}
 }
@@ -6300,7 +6375,7 @@ function prepareCurrentChoiceEvents(choices,gesture,taskContextIds={}){
 }
 const CURRENT_CHOICE_SETTINGS_PROPERTIES=["scanMode","listMetric","excludeNoContext","lastTaskWoop","floatingHeader",
   "patternedIndicators","showPostpone","horizonMin","thresholdPct","samples","cantMin","workedHours",
-  "postponeHours","evergreenHours","evergreenResetAtDay"];
+  "postponeHours","evergreenHours","evergreenResetAtDay","theme","dateFormat"];
 function currentChoiceSettingSnapshot(settings=state.settings){
   const snapshot={};
   for(const property of CURRENT_CHOICE_SETTINGS_PROPERTIES){
@@ -6335,6 +6410,10 @@ function currentChoiceValueSupported(type,property,value,present=true,evidence=f
   if(type==="pass"&&property==="scanMode")return currentChoicePassModeValueSupported(value,!evidence);
   if(type==="pass"&&property==="chain")return currentChoicePassChainValueSupported(value,evidence);
   if(type==="setting"){
+    if(/^hourlyQuote:(?:[01]\d|2[0-3])$/.test(property))return Array.isArray(value)&&value.length>0&&value.length<=12&&
+      value.every(line=>typeof line==="string"&&line.trim()===line&&line.length>0&&line.length<=180)&&new Set(value).size===value.length;
+    if(property==="theme")return ["system","light","dark"].includes(value);
+    if(property==="dateFormat")return ["system","mdy","dmy","ymd"].includes(value);
     if(property==="listMetric")return ["rank","chance"].includes(value);
     if(["excludeNoContext","lastTaskWoop","floatingHeader","patternedIndicators","showPostpone","evergreenResetAtDay"].includes(property))return typeof value==="boolean";
     if(property==="thresholdPct")return Number.isFinite(value)&&value>=1&&value<=90;
@@ -6343,11 +6422,50 @@ function currentChoiceValueSupported(type,property,value,present=true,evidence=f
     if(property==="workedHours")return Number.isInteger(value)&&value>=1&&value<=720;
     if(property==="postponeHours"||property==="evergreenHours")return Number.isFinite(value)&&value>=0.01&&value<=87600;
   }
+  if(type==="scene"&&property==="location")return currentChoiceSceneLocationSupported(value);
+  if(type==="scene"&&property==="time")return value===null||typeof value==="string"&&
+    (SCENE_SOLAR_PRESETS.has(value)||/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(value));
+  if(type==="scene"&&property==="season")return value===null||SCENE_SEASONS.has(value);
+  if(type==="context"&&property==="exists")return !evidence&&typeof value==="boolean";
+  if(type==="context"&&property==="name")return typeof value==="string"&&value.trim()===value&&!!value&&value.length<=120;
+  if(type==="context"&&property==="mode")return currentChoiceContextModeSupported(value);
   return false;
 }
-function currentChoiceEvidenceSupported(type,property,evidence){
-  return !!evidence&&typeof evidence==="object"&&!Array.isArray(evidence)&&typeof evidence.present==="boolean"&&
-    (evidence.present?currentChoiceValueSupported(type,property,evidence.value,true,true):!Object.hasOwn(evidence,"value"));
+function currentChoiceSceneLocationSupported(value){
+  if(value===null)return true;
+  if(!value||typeof value!=="object"||Array.isArray(value)||
+      Object.keys(value).sort().join(",")!=="enabled,label,latitude,longitude,timezone"||value.enabled!==true||
+      typeof value.latitude!=="number"||!Number.isFinite(value.latitude)||value.latitude< -90||value.latitude>90||
+      typeof value.longitude!=="number"||!Number.isFinite(value.longitude)||value.longitude< -180||value.longitude>180||
+      typeof value.timezone!=="string"||!value.timezone.trim()||typeof value.label!=="string"||value.label.length>80||
+      value.label!==value.label.trim()||/[\u0000-\u001f\u007f]/.test(value.label))return false;
+  try{new Intl.DateTimeFormat("en-US",{timeZone:value.timezone}).format();}catch{return false;}
+  return true;
+}
+function currentChoiceContextModeSupported(value){
+  if(!value||typeof value!=="object"||Array.isArray(value)||Object.keys(value).sort().join(",")!=="active,excluded")return false;
+  return ["active","excluded"].every(key=>{
+    const field=value[key];
+    return !!field&&typeof field==="object"&&!Array.isArray(field)&&
+      (Object.keys(field).length===1&&field.present===false||Object.keys(field).length===2&&field.present===true&&typeof field.value==="boolean");
+  });
+}
+function currentChoiceJsonSafe(value,depth=0,budget={left:1500}){
+  if(depth>8||--budget.left<0)return false;
+  if(value===null||typeof value==="string"||typeof value==="boolean")return true;
+  if(typeof value==="number")return Number.isFinite(value);
+  if(!value||typeof value!=="object")return false;
+  if(Array.isArray(value))return value.length<=500&&value.every(item=>currentChoiceJsonSafe(item,depth+1,budget));
+  const prototype=Object.getPrototypeOf(value);
+  if(prototype!==null&&Object.getPrototypeOf(prototype)!==null)return false;
+  const keys=Object.keys(value);
+  return keys.length<=200&&keys.every(key=>!Object.hasOwn(Object.prototype,key)&&currentChoiceJsonSafe(value[key],depth+1,budget));
+}
+function currentChoiceContextRowSupported(value,id){
+  if(!value||typeof value!=="object"||Array.isArray(value)||value.id!==id||typeof value.name!=="string"||
+      !value.name.trim()||value.name.trim()!==value.name||value.name.length>120||!currentChoiceJsonSafe(value))return false;
+  return (!Object.hasOwn(value,"active")||typeof value.active==="boolean")&&
+    (!Object.hasOwn(value,"excluded")||typeof value.excluded==="boolean");
 }
 function supportedCurrentChoiceEvent(event){
   if(!event||typeof event!=="object"||Array.isArray(event)||event.v!==1||event.kind!=="current-choice"||
@@ -6363,11 +6481,18 @@ function supportedCurrentChoiceEvent(event){
       typeof target.id!=="string"||!target.id||Object.hasOwn(Object.prototype,target.id)||
       typeof target.property!=="string"||!target.property)return false;
   const supportedTarget=target.type==="task"&&(CURRENT_CHOICE_TASK_PROPERTIES.includes(target.property)||target.property==="disposition")||
-    target.type==="setting"&&target.id==="board"&&CURRENT_CHOICE_SETTINGS_PROPERTIES.includes(target.property)||
+    target.type==="setting"&&target.id==="board"&&(CURRENT_CHOICE_SETTINGS_PROPERTIES.includes(target.property)||/^hourlyQuote:(?:[01]\d|2[0-3])$/.test(target.property))||
+    target.type==="scene"&&target.id==="board"&&["location","time","season"].includes(target.property)||
+    target.type==="context"&&["exists","name","mode"].includes(target.property)&&!Object.hasOwn(Object.prototype,target.id)||
     target.type==="pass"&&["scanMode","chain"].includes(target.property);
+  const beforeSupported=event.before&&typeof event.before==="object"&&!Array.isArray(event.before)&&
+    typeof event.before.present==="boolean"&&Object.keys(event.before).every(key=>key==="present"||key==="value")&&
+    (!event.before.present?!Object.hasOwn(event.before,"value"):
+      target.type==="context"&&target.property==="exists"?currentChoiceContextRowSupported(event.before.value,target.id):
+      currentChoiceValueSupported(target.type,target.property,event.before.value,true,true));
   if(!supportedTarget||!event.after||typeof event.after!=="object"||Array.isArray(event.after)||Object.keys(event.after).some(key=>key!=="present")||
       typeof event.after.present!=="boolean"||!currentChoiceValueSupported(target.type,target.property,event.value,event.after.present)||
-      !currentChoiceEvidenceSupported(target.type,target.property,event.before))return false;
+      !beforeSupported)return false;
   if(target.type==="pass"&&target.property==="chain"&&
       (event.actionId===undefined||target.id===event.passId||event.after.present!==true||event.before.present!==true||
        event.before.value.length!==0||event.value.length!==1))return false;
@@ -6379,11 +6504,171 @@ function supportedCurrentChoiceEvent(event){
     if(target.type!=="task"||Object.keys(event.taskContextIds).some(id=>id!==target.id))return false;
   }
   if(target.type==="task"&&(!event.taskContextIds||!Array.isArray(event.taskContextIds[target.id])))return false;
-  if(target.type==="setting"||target.type==="pass")if(event.taskContextIds!==undefined)return false;
+  if(target.type==="setting"||target.type==="scene"||target.type==="context"||target.type==="pass")if(event.taskContextIds!==undefined)return false;
   if(!Array.isArray(event.chainIds)||event.chainIds.some(id=>typeof id!=="string"||!id)||new Set(event.chainIds).size!==event.chainIds.length)return false;
   if(!Array.isArray(event.observedActionIds)||event.observedActionIds.some(id=>typeof id!=="string"||!id)||new Set(event.observedActionIds).size!==event.observedActionIds.length)return false;
   if(event.passAt!==undefined&&(!Number.isFinite(event.passAt)||event.passAt<0))return false;
   return true;
+}
+function currentChoiceSceneShapeSupported(scene){
+  if(!scene||typeof scene!=="object"||Array.isArray(scene)||Object.keys(scene).some(key=>!(["time","season","location"].includes(key))))return false;
+  return (!Object.hasOwn(scene,"time")||currentChoiceValueSupported("scene","time",scene.time))&&
+    (!Object.hasOwn(scene,"season")||currentChoiceValueSupported("scene","season",scene.season))&&
+    (!Object.hasOwn(scene,"location")||currentChoiceValueSupported("scene","location",scene.location));
+}
+function currentChoiceHourlyQuotesSupported(quotes){
+  if(!quotes||typeof quotes!=="object"||Array.isArray(quotes)||Object.keys(quotes).some(key=>Object.hasOwn(Object.prototype,key)))return false;
+  for(const [hour,lines] of Object.entries(quotes))if(!/^(?:[01]\d|2[0-3])$/.test(hour)||!Array.isArray(lines)||
+      !currentChoiceValueSupported("setting","hourlyQuote:"+hour,lines))return false;
+  return true;
+}
+function currentChoiceDescriptor(target,property){
+  return Object.hasOwn(target||{},property)?{present:true,value:JSON.parse(JSON.stringify(target[property]))}:{present:false};
+}
+function currentChoiceTargetRead(board,target){
+  if(!board||!target)return null;
+  if(target.type==="task"){
+    const task=Array.isArray(board.tasks)?board.tasks.find(row=>row?.id===target.id):null;
+    if(!task)return null;
+    const descriptor=currentChoiceDescriptor(task,target.property);
+    return target.property==="disposition"||!descriptor.present||currentChoiceValueSupported("task",target.property,descriptor.value)?descriptor:null;
+  }
+  if(target.type==="setting"){
+    if(target.id!=="board"||!board.settings||typeof board.settings!=="object"||Array.isArray(board.settings))return null;
+    if(/^hourlyQuote:(?:[01]\d|2[0-3])$/.test(target.property)){
+      const quotes=board.settings.hourlyQuotes??{};
+      if(!currentChoiceHourlyQuotesSupported(quotes))return null;
+      const hour=target.property.slice(-2),present=Object.hasOwn(quotes,hour);
+      return present?{present:true,value:JSON.parse(JSON.stringify(quotes[hour]))}:{present:false};
+    }
+    if(!CURRENT_CHOICE_SETTINGS_PROPERTIES.includes(target.property))return null;
+    const descriptor=currentChoiceDescriptor(board.settings,target.property);
+    return !descriptor.present||currentChoiceValueSupported("setting",target.property,descriptor.value)?descriptor:null;
+  }
+  if(target.type==="scene"){
+    if(target.id!=="board"||!board.settings||typeof board.settings!=="object"||Array.isArray(board.settings))return null;
+    const scene=board.settings.scene;
+    if(scene===undefined)return {present:true,value:null};
+    if(!currentChoiceSceneShapeSupported(scene))return null;
+    const descriptor=currentChoiceDescriptor(scene,target.property);
+    return !descriptor.present||currentChoiceValueSupported("scene",target.property,descriptor.value)?descriptor:null;
+  }
+  if(target.type==="context"){
+    if(!Array.isArray(board.contexts))return null;
+    const context=board.contexts.find(row=>row?.id===target.id);
+    if(target.property==="exists")return context
+      ?currentChoiceContextRowSupported(context,target.id)?{present:true,value:true}:null:{present:false};
+    if(!context)return {present:false};
+    if(!currentChoiceContextRowSupported(context,target.id))return null;
+    const descriptor=target.property==="mode"?{present:true,value:currentChoiceContextModeSnapshot(context)}:currentChoiceDescriptor(context,target.property);
+    return !descriptor.present||currentChoiceValueSupported("context",target.property,descriptor.value)?descriptor:null;
+  }
+  return null;
+}
+function currentChoiceTargetApply(board,target,evidence){
+  if(!board||!target||!evidence||typeof evidence!="object"||typeof evidence.present!=="boolean")return false;
+  if(target.type==="task"){
+    const task=Array.isArray(board.tasks)?board.tasks.find(row=>row?.id===target.id):null;if(!task)return false;
+    if(evidence.present)task[target.property]=JSON.parse(JSON.stringify(evidence.value));else delete task[target.property];
+    return true;
+  }
+  if(target.type==="setting"){
+    if(target.id!=="board"||!board.settings||typeof board.settings!=="object"||Array.isArray(board.settings))return false;
+    if(/^hourlyQuote:(?:[01]\d|2[0-3])$/.test(target.property)){
+      const quotes=board.settings.hourlyQuotes??{};if(!currentChoiceHourlyQuotesSupported(quotes))return false;
+      const next={...quotes},hour=target.property.slice(-2);
+      if(evidence.present)next[hour]=JSON.parse(JSON.stringify(evidence.value));else delete next[hour];
+      board.settings.hourlyQuotes=next;return true;
+    }
+    if(!CURRENT_CHOICE_SETTINGS_PROPERTIES.includes(target.property))return false;
+    if(evidence.present)board.settings[target.property]=JSON.parse(JSON.stringify(evidence.value));else delete board.settings[target.property];
+    return true;
+  }
+  if(target.type==="scene"){
+    if(target.id!=="board"||!board.settings||typeof board.settings!=="object"||Array.isArray(board.settings))return false;
+    const scene=board.settings.scene===undefined?{time:null,season:null,location:null}:board.settings.scene;
+    if(!currentChoiceSceneShapeSupported(scene))return false;
+    if(evidence.present)scene[target.property]=JSON.parse(JSON.stringify(evidence.value));else delete scene[target.property];
+    board.settings.scene=scene;return true;
+  }
+  if(target.type==="context"){
+    if(!Array.isArray(board.contexts)||target.property==="exists")return false;
+    const context=board.contexts.find(row=>row?.id===target.id);if(!context)return false;
+    if(target.property==="mode"){
+      const mode=evidence.present?evidence.value:{active:{present:false},excluded:{present:false}};
+      for(const key of ["active","excluded"]){if(mode[key].present)context[key]=mode[key].value;else delete context[key];}
+      return true;
+    }
+    if(target.property==="name"){
+      if(!evidence.present)return false;
+      context.name=evidence.value;return true;
+    }
+  }
+  return false;
+}
+function currentChoiceContextModeSnapshot(context){
+  return {active:currentChoiceDescriptor(context,"active"),excluded:currentChoiceDescriptor(context,"excluded")};
+}
+function currentChoiceContextActionIssue(events){
+  const contexts=events.filter(event=>event?.kind==="current-choice"&&event.target?.type==="context");
+  const byAction=new Map();
+  for(const event of contexts){const rows=byAction.get(event.actionId)||[];rows.push(event);byAction.set(event.actionId,rows);}
+  for(const [actionId,rows] of byAction){
+    if(typeof actionId!=="string"||!actionId)return "unprojectable-decision-evidence";
+    const creates=rows.filter(row=>row.target.property==="exists"&&row.value===true);
+    if(creates.length){
+      const id=creates[0].target.id,at=creates[0].at;
+      const peers=rows.filter(row=>row.target.id===id);
+      if(creates.length!==1||peers.length!==3||peers.some(row=>row.at!==at)||
+          !peers.some(row=>row.target.property==="name")||!peers.some(row=>row.target.property==="mode")||
+          peers.some(row=>!currentChoiceStartEnvelopeMatches(creates[0],row)))return "unprojectable-decision-evidence";
+      if(creates[0].before.present)return "unprojectable-decision-evidence";
+    }
+    for(const row of rows)if(row.target.property==="exists"&&row.value===false&&
+        (!row.before.present||!currentChoiceContextRowSupported(row.before.value,row.target.id)))return "unprojectable-decision-evidence";
+  }
+  return null;
+}
+function projectCurrentChoiceContextExistence(board,events,byId,cancelled){
+  if(!Array.isArray(board.contexts))return false;
+  const groups=new Map();
+  for(const event of events)if(event?.kind==="current-choice"&&event.target?.type==="context"&&event.target.property==="exists"
+      &&currentChoiceDecisionOwner(event,board,cancelled)){
+    const rows=groups.get(event.target.id)||[];rows.push(event);groups.set(event.target.id,rows);
+  }
+  let changed=false;
+  for(const [id,rows] of groups){
+    const active=rows.filter(row=>!cancelled.has(row.id));
+    let selected=latestCurrentChoiceEvent(active,byId),evidence=null;
+    if(selected)evidence={present:true,value:selected.value};
+    else{
+      const minima=rows.filter(row=>!rows.some(other=>other.id!==row.id&&currentChoiceAncestors(row,byId).has(other.id)))
+        .sort((a,b)=>a.at-b.at||(a.id<b.id?-1:a.id>b.id?1:0));
+      selected=minima[0];if(!selected)continue;
+      evidence=selected.before;
+    }
+    const priorIndex=board.contexts.findIndex(context=>context?.id===id),prior=priorIndex<0?null:board.contexts[priorIndex];
+    if(!active.length&&evidence.present&&currentChoiceContextRowSupported(evidence.value,id)){
+      if(priorIndex<0||JSON.stringify(prior)!==JSON.stringify(evidence.value)){
+        board.contexts=board.contexts.filter(context=>context?.id!==id);board.contexts.push(JSON.parse(JSON.stringify(evidence.value)));changed=true;
+      }
+      continue;
+    }
+    if(!evidence.present||evidence.value!==true){
+      if(priorIndex>=0){board.contexts=board.contexts.filter(context=>context?.id!==id);changed=true;}
+      continue;
+    }
+    if(priorIndex<0){
+      if(selected===null||selected===undefined||selected.before.present)continue;
+      const actionRows=rows.filter(row=>row.actionId===selected.actionId&&row.at===selected.at&&row.account===selected.account);
+      const name=actionRows.find(row=>row.target.property==="name"),mode=actionRows.find(row=>row.target.property==="mode");
+      if(!name||!mode||!name.after.present||!mode.after.present)continue;
+      const context={id,name:name.value};
+      for(const key of ["active","excluded"]){const field=mode.value[key];if(field.present)context[key]=field.value;}
+      board.contexts.push(context);changed=true;
+    }
+  }
+  return changed;
 }
 function currentChoicePassId(board){
   if(typeof board?.passId==="string"&&board.passId)return board.passId;
@@ -6583,6 +6868,7 @@ function projectCurrentChoiceEvents(board=state,cancellationOverride=null){
   if(!board||typeof board!=="object"||Array.isArray(board)||!Array.isArray(board.tasks))return false;
   const events=Array.isArray(board.decisionEvents)?board.decisionEvents:[],byId=currentChoiceProjectionIndex(events),cancelled=cancellationOverride||decisionUndoTargets(board);let changed=false;
   const taskById=new Map(board.tasks.filter(task=>task&&typeof task.id==="string"&&task.id&&!Object.hasOwn(Object.prototype,task.id)).map(task=>[task.id,task]));
+  changed=projectCurrentChoiceContextExistence(board,events,byId,cancelled)||changed;
   const properties=new Map();
   for(const event of byId.values()){
     if(event.kind!=="current-choice"||!supportedCurrentChoiceEvent(event)||
@@ -6592,8 +6878,7 @@ function projectCurrentChoiceEvents(board=state,cancellationOverride=null){
     if(type==="task"&&property==="disposition")continue;
     // Pass roots are installed before comparison replay. Reapplying the
     // original Start root in this final outcome pass would erase later Dots.
-    if(type==="pass"&&property==="chain")continue;
-    if(type==="setting"&&(id!=="board"||!board.settings||typeof board.settings!=="object"||Array.isArray(board.settings)))continue;
+    if(type==="pass"&&property==="chain"||type==="context"&&property==="exists")continue;
     if(type==="pass"&&id!==currentChoicePassId(board))continue;
     const key=JSON.stringify([type,id,property]),rows=properties.get(key)||[];rows.push(event);properties.set(key,rows);
   }
@@ -6606,8 +6891,7 @@ function projectCurrentChoiceEvents(board=state,cancellationOverride=null){
       if(!earliest)continue;
       winner={...earliest,value:earliest.before.present?earliest.before.value:null,after:{present:earliest.before.present}};
     }
-    const [type,id,property]=JSON.parse(key),target=type==="task"?taskById.get(id):type==="setting"?board.settings:board;
-    if(!target)continue;
+    const [type,id,property]=JSON.parse(key),target=type==="task"?taskById.get(id):null;
     if(type==="task"&&property==="ctx"){
       changed=projectCurrentChoiceContextProperty(target,rows,byId,cancelled)||changed;continue;
     }
@@ -6623,9 +6907,16 @@ function projectCurrentChoiceEvents(board=state,cancellationOverride=null){
       }
       continue;
     }
-    const had=Object.hasOwn(target,property),prior=had?JSON.stringify(target[property]):null;
-    if(winner.after.present)target[property]=JSON.parse(JSON.stringify(winner.value));else delete target[property];
-    if(had!==Object.hasOwn(target,property)||(winner.after.present&&prior!==JSON.stringify(target[property])))changed=true;
+    const typedTarget={type,id,property};
+    // Retired contexts remain tombstoned. A stale rename or mode choice never
+    // recreates a definition that no active existence choice selected.
+    if(type==="context"&&!Array.isArray(board.contexts))continue;
+    const before=currentChoiceTargetRead(board,typedTarget);
+    if(!before)continue;
+    const next={present:winner.after.present,...(winner.after.present?{value:winner.value}:{})};
+    if(!currentChoiceTargetApply(board,typedTarget,next))continue;
+    const after=currentChoiceTargetRead(board,typedTarget);
+    if(!after||canonicalDecisionFact(before)!==canonicalDecisionFact(after))changed=true;
   }
   const dispositions=currentChoiceDispositionActions(board,events,cancelled);
   for(const [id,rows] of dispositions){
@@ -8252,20 +8543,18 @@ function onAction(act, el){
     }
     case "add-ctx": {
       const name = prompt("New context name:");
-      if(name && name.trim()){ pushUndo(); state.contexts.push({id:uid(),name:name.trim(),active:true}); commit(); }
+      if(name && name.trim())createContextChoice(name);
       break;
     }
     case "add-ctx-named": {
       const box=document.getElementById("newCtxName");
-      if(box && box.value.trim()){ pushUndo(); state.contexts.push({id:uid(),name:box.value.trim(),active:true}); commit(); openSettings(); }
+      if(box && box.value.trim()){ createContextChoice(box.value);openSettings(); }
       break;
     }
     case "del-ctx": {
-      pushUndo();
       const id=el.dataset.id;
-      state.contexts = state.contexts.filter(c=>c.id!==id);
-      for(const t of state.tasks) t.ctx = t.ctx.filter(c=>c!==id);
-      commit(); openSettings(); break;
+      if(deleteContextChoice(id))openSettings();
+      break;
     }
     case "set-prerequisite": {
       const taskId=document.getElementById("stPrerequisiteTask")?.value;
@@ -8332,8 +8621,17 @@ function onAction(act, el){
       const hour=document.getElementById("stQuoteHour")?.value;
       const lines=document.getElementById("stQuoteLines")?.value||"";
       if(!/^(?:[01]\d|2[0-3])$/.test(hour)) break;
-      const next=normalizeHourlyQuotes({...state.settings.hourlyQuotes,[hour]:lines.split(/\r?\n/)});
-      pushUndo();state.settings.hourlyQuotes=next;settingsQuoteHour=hour;commit();openSettings();break;
+      const current=state.settings.hourlyQuotes??{};
+      if(!currentChoiceHourlyQuotesSupported(current)){reportCloudReconcileError("unprojectable-decision-evidence");break;}
+      const before=Object.hasOwn(current,hour)?{present:true,value:JSON.parse(JSON.stringify(current[hour]))}:{present:false};
+      const next=normalizeHourlyQuotes({...current,[hour]:lines.split(/\r?\n/)}),after=Object.hasOwn(next,hour)
+        ?{present:true,value:JSON.parse(JSON.stringify(next[hour]))}:{present:false};
+      const gesture=captureCurrentChoiceGesture();pushUndo();state.settings.hourlyQuotes=next;settingsQuoteHour=hour;
+      if(JSON.stringify(before)!==JSON.stringify(after))appendCurrentChoiceEvents(prepareCurrentChoiceEvents([{
+        target:{type:"setting",id:"board",property:"hourlyQuote:"+hour},value:after.present?after.value:null,
+        after:{present:after.present},before
+      }],gesture));
+      commit();openSettings();break;
     }
     case "install-app": openInstallHelp(); break;
     case "native-install": installNative(); break;
@@ -8592,7 +8890,17 @@ document.addEventListener("change", e=>{
     suggestEvergreenReset(field);syncQuickAddAppearance();return;
   }
   if(el.matches("[data-ctx]")){ toggleContext(el.dataset.ctx); return; }
-  if(el.matches("[data-mgrname]")){ const c=state.contexts.find(c=>c.id===el.dataset.mgrname); if(c && el.value.trim()){ pushUndo(); c.name=el.value.trim(); commit(); } return; }
+  if(el.matches("[data-mgrname]")){
+    const c=state.contexts.find(c=>c.id===el.dataset.mgrname),name=el.value.trim();
+    if(c&&name&&c.name!==name){
+      const gesture=captureCurrentChoiceGesture(),before=currentChoiceDescriptor(c,"name");
+      pushUndo();c.name=name;
+      appendCurrentChoiceEvents(prepareCurrentChoiceEvents([{
+        target:{type:"context",id:c.id,property:"name"},value:name,after:{present:true},before
+      }],gesture));commit();
+    }
+    return;
+  }
 });
 document.addEventListener('landscape-location-change',()=>{
   recordScenePreferences({location:globalThis.LivingLocation?.current?.()});

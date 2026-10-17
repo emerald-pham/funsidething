@@ -28713,6 +28713,376 @@ test('RISK cloud current choices: context membership additions compose across ob
  }
 });
 
+test('RISK cloud shared preferences: later theme choice survives either publication order and cold reopen',async t=>{
+ for(const first of ['earlier','later'])await t.test(`${first} theme action publishes first`,async()=>{
+  const at=Date.parse('2026-10-17T15:00:00.000Z');
+  const initial=syncState({tasks:[syncTask('theme-marker','Unchanged task')],chain:[],candidateId:null,
+   passStartedAt:at-60000,passId:'shared-pass-theme',scanMode:'descending',syncRev:4,syncAccount:'e@example.com',syncDirty:false,
+   settings:{horizonMin:60,thresholdPct:25,samples:250,cantMin:30,workedHours:16,theme:'system'}});
+  const remote=JSON.parse(JSON.stringify(initial));
+  for(const key of ['syncRev','syncAccount','syncDirty','lastCloudServerAt','protectedBackupIds'])delete remote[key];
+  const h=makeSyncHarness({remote,rev:4,delayMs:1}),seedStorage={[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)};
+  const earlier=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:h.factory});
+  const later=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:h.factory});
+  let reopened;
+  try{
+   await earlier.ctx.cloudPull();await later.ctx.cloudPull();
+   setFakeTime(earlier.ctx,at+100);earlier.ctx.onAction('cycle-theme',{});await earlier.ctx.persist();
+   setFakeTime(later.ctx,at+200);later.ctx.onAction('cycle-theme',{});
+   setFakeTime(later.ctx,at+300);later.ctx.onAction('cycle-theme',{});await later.ctx.persist();
+   assert.equal(earlier.ctx.state.settings.theme,'light');
+   assert.equal(later.ctx.state.settings.theme,'dark');
+   const laterChoices=later.ctx.state.decisionEvents?.filter(event=>event?.kind==='current-choice'&&event.target?.property==='theme')||[];
+   assert.equal(laterChoices.length,2,'the real theme-cycle actions must record supported current-choice rows');
+   assert.equal(laterChoices[1].at,at+300,'the later theme decision keeps its original user-action time');
+   const firstClient=first==='earlier'?earlier:later,secondClient=first==='earlier'?later:earlier;
+   await firstClient.ctx.cloudPushNow();await syncSettle(30);
+   await secondClient.ctx.cloudPull();await syncSettle(40);await secondClient.ctx.cloudPushNow();await syncSettle(40);
+   assert.equal(secondClient.ctx.state.settings.theme,'dark','the later selected theme remains visible after either publication order');
+   assert.equal(h.remoteState().settings.theme,'dark','the later action wins independently of which action publishes first');
+   const cloudChoices=h.remoteState().decisionEvents.filter(event=>event?.kind==='current-choice'&&event.target?.property==='theme');
+   assert.equal(cloudChoices.length,3,'the two later action facts and earlier action fact remain separate evidence');
+   reopened=await loadAppAtTime(at,{seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(h.remoteState()),[LOCAL_HEAD_KEY]:JSON.stringify(h.remoteState())},cloudSyncFactory:h.factory});
+   await reopened.ctx.cloudPull();await syncSettle(20);
+   assert.equal(reopened.ctx.state.settings.theme,'dark','a cold client projects the later original choice');
+   assert.equal(reopened.shim.document.documentElement.getAttribute('data-theme'),'dark','the rendered theme follows the projected board choice');
+  }finally{
+   for(const app of [earlier,later,reopened])if(app)try{await app.shim.window.ScannerDeviceStore?.close?.();}catch{}
+  }
+ });
+});
+
+test('RISK cloud shared preferences: date format survives an independent No in either publication order and cold reopen',async t=>{
+ for(const first of ['date format','No'])await t.test(`${first} publishes first`,async()=>{
+  const at=Date.parse('2026-10-17T16:00:00.000Z'),passAt=at-60000;
+  const initial=syncState({tasks:[
+   Object.assign(syncTask('format-benchmark','Benchmark'),{mu:36,sigma:8}),
+   syncTask('format-candidate','Candidate'),
+  ],chain:['format-benchmark'],candidateId:'format-candidate',passStartedAt:passAt,passId:'shared-pass-format',scanMode:'descending',
+   syncRev:4,syncAccount:'e@example.com',syncDirty:false,
+   settings:{horizonMin:60,thresholdPct:25,samples:250,cantMin:30,workedHours:16,theme:'system',dateFormat:'system'}});
+  const remote=JSON.parse(JSON.stringify(initial));
+  for(const key of ['syncRev','syncAccount','syncDirty','lastCloudServerAt','protectedBackupIds'])delete remote[key];
+  const h=makeSyncHarness({remote,rev:4,delayMs:1}),seedStorage={[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)};
+  const dateClient=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:h.factory});
+  const noClient=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:h.factory});
+  let reopened;
+  try{
+   await dateClient.ctx.cloudPull();await noClient.ctx.cloudPull();
+   setFakeTime(dateClient.ctx,at+200);dateClient.ctx.openSettings();
+   const field=dateClient.shim.document.getElementById('stDateFormat');
+   assert.ok(field,'the date preference is changed through the visible Settings control');
+   field.id='stDateFormat';field.value='dmy';field.matches=()=>false;
+   dateClient.shim.document.dispatchEvent({type:'change',target:field});
+   assert.equal(dateClient.ctx.state.settings.dateFormat,'dmy');
+   setFakeTime(noClient.ctx,at+100);noClient.ctx.onAction('no',{dataset:{candidate:'format-candidate',benchmark:'format-benchmark'}});
+   await dateClient.ctx.persist();await noClient.ctx.persist();
+   const dateEvents=dateClient.ctx.state.decisionEvents?.filter(event=>event?.kind==='current-choice'&&event.target?.property==='dateFormat')||[];
+   assert.equal(dateEvents.length,1,'the actual date-format Settings choice creates one supported current-choice fact');
+   assert.equal(dateEvents[0].value,'dmy');assert.equal(dateEvents[0].at,at+200,'the fact retains original action time');
+   const noEvents=noClient.ctx.state.decisionEvents?.filter(event=>event?.kind==='no')||[];
+   assert.equal(noEvents.length,1,'the independent No remains its own cloud-visible action');
+   const firstClient=first==='date format'?dateClient:noClient,secondClient=first==='date format'?noClient:dateClient;
+   await firstClient.ctx.cloudPushNow();await syncSettle(30);
+   await secondClient.ctx.cloudPull();await syncSettle(40);await secondClient.ctx.cloudPushNow();await syncSettle(40);
+   assert.equal(secondClient.ctx.state.settings.dateFormat,'dmy','the preference remains visible after either publication order');
+   assert.equal(h.remoteState().settings.dateFormat,'dmy','the date-format intent survives the independent No in cloud');
+   assert.equal(h.remoteState().decisionEvents.filter(event=>event?.kind==='no').length,1,'the peer No is retained');
+   assert.equal(h.remoteState().decisionEvents.filter(event=>event?.kind==='current-choice'&&event.target?.property==='dateFormat').length,1,
+    'the deliberate preference remains separate cloud evidence');
+   reopened=await loadAppAtTime(at,{seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(h.remoteState()),[LOCAL_HEAD_KEY]:JSON.stringify(h.remoteState())},cloudSyncFactory:h.factory});
+   await reopened.ctx.cloudPull();await syncSettle(20);
+   assert.equal(reopened.ctx.state.settings.dateFormat,'dmy','a cold client restores the selected display preference');
+  }finally{
+   for(const app of [dateClient,noClient,reopened])if(app)try{await app.shim.window.ScannerDeviceStore?.close?.();}catch{}
+  }
+ });
+});
+
+test('RISK cloud shared preferences: one hourly quote edit survives an independent No without replacing other hours',async t=>{
+ for(const first of ['quotes','No'])await t.test(`${first} publishes first`,async()=>{
+  const at=Date.parse('2026-10-17T17:00:00.000Z'),passAt=at-60000;
+  const initial=syncState({tasks:[
+   Object.assign(syncTask('quote-benchmark','Benchmark'),{mu:36,sigma:8}),syncTask('quote-candidate','Candidate'),
+  ],chain:['quote-benchmark'],candidateId:'quote-candidate',passStartedAt:passAt,passId:'shared-pass-quotes',scanMode:'descending',
+   syncRev:4,syncAccount:'e@example.com',syncDirty:false,
+   settings:{horizonMin:60,thresholdPct:25,samples:250,cantMin:30,workedHours:16,theme:'system',dateFormat:'system',
+    hourlyQuotes:{'09':['Other hour'],'14':['Original quote']}}});
+  const remote=JSON.parse(JSON.stringify(initial));
+  for(const key of ['syncRev','syncAccount','syncDirty','lastCloudServerAt','protectedBackupIds'])delete remote[key];
+  const h=makeSyncHarness({remote,rev:4,delayMs:1}),seedStorage={[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)};
+  const quoteClient=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:h.factory});
+  const noClient=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:h.factory});
+  let reopened;
+  try{
+   await quoteClient.ctx.cloudPull();await noClient.ctx.cloudPull();
+   setFakeTime(quoteClient.ctx,at+200);
+   quoteClient.shim.document.getElementById('stQuoteHour').value='14';
+   quoteClient.shim.document.getElementById('stQuoteLines').value='First new line\nSecond new line';
+   quoteClient.ctx.onAction('save-hourly-quotes',{});
+   setFakeTime(noClient.ctx,at+100);noClient.ctx.onAction('no',{dataset:{candidate:'quote-candidate',benchmark:'quote-benchmark'}});
+   await quoteClient.ctx.persist();await noClient.ctx.persist();
+   const quoteEvents=quoteClient.ctx.state.decisionEvents?.filter(event=>event?.kind==='current-choice'&&event.target?.property==='hourlyQuote:14')||[];
+   assert.equal(quoteEvents.length,1,'the established per-hour save action creates one typed quote fact');
+   assert.deepEqual(JSON.parse(JSON.stringify(quoteEvents[0].value)),['First new line','Second new line']);
+   assert.deepEqual(JSON.parse(JSON.stringify(quoteEvents[0].before)),{present:true,value:['Original quote']});
+   assert.equal(quoteEvents[0].at,at+200,'the fact retains the original save-action time');
+   const firstClient=first==='quotes'?quoteClient:noClient,secondClient=first==='quotes'?noClient:quoteClient;
+   await firstClient.ctx.cloudPushNow();await syncSettle(30);
+   await secondClient.ctx.cloudPull();await syncSettle(40);await secondClient.ctx.cloudPushNow();await syncSettle(40);
+   assert.deepEqual(JSON.parse(JSON.stringify(secondClient.ctx.state.settings.hourlyQuotes['14'])),['First new line','Second new line'],
+    'the chosen hour remains visible after either publication order');
+   assert.deepEqual(JSON.parse(JSON.stringify(secondClient.ctx.state.settings.hourlyQuotes['09'])),['Other hour'],
+    'an independent hour is preserved');
+   assert.deepEqual(JSON.parse(JSON.stringify(h.remoteState().settings.hourlyQuotes)),{'09':['Other hour'],'14':['First new line','Second new line']},
+    'the exact normalized per-hour buckets survive the peer No in cloud');
+   assert.equal(h.remoteState().decisionEvents.filter(event=>event?.kind==='no').length,1,'the independent No is retained');
+   reopened=await loadAppAtTime(at,{seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(h.remoteState()),[LOCAL_HEAD_KEY]:JSON.stringify(h.remoteState())},cloudSyncFactory:h.factory});
+   await reopened.ctx.cloudPull();await syncSettle(20);
+   assert.deepEqual(JSON.parse(JSON.stringify(reopened.ctx.state.settings.hourlyQuotes)),{'09':['Other hour'],'14':['First new line','Second new line']},
+    'a cold client restores both current quote buckets');
+  }finally{
+   for(const app of [quoteClient,noClient,reopened])if(app)try{await app.shim.window.ScannerDeviceStore?.close?.();}catch{}
+  }
+ });
+});
+
+test('RISK cloud shared preferences: scene time season and structured location survive an independent No',async t=>{
+ for(const first of ['scene','No'])await t.test(`${first} publishes first`,async()=>{
+  const at=Date.parse('2026-10-17T17:30:00.000Z'),passAt=at-60000;
+  const initial=syncState({tasks:[Object.assign(syncTask('scene-benchmark','Benchmark'),{mu:36,sigma:8}),syncTask('scene-candidate','Candidate')],
+   chain:['scene-benchmark'],candidateId:'scene-candidate',passStartedAt:passAt,passId:'shared-pass-scene',scanMode:'descending',
+   syncRev:4,syncAccount:'e@example.com',syncDirty:false,
+   settings:{horizonMin:60,thresholdPct:25,samples:250,cantMin:30,workedHours:16,theme:'system',dateFormat:'system',hourlyQuotes:{},
+    scene:{time:null,season:null,location:null}}});
+  const remote=JSON.parse(JSON.stringify(initial));
+  for(const key of ['syncRev','syncAccount','syncDirty','lastCloudServerAt','protectedBackupIds'])delete remote[key];
+  const h=makeSyncHarness({remote,rev:4,delayMs:1}),seedStorage={[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)};
+  const sceneClient=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:h.factory,withSceneModules:true});
+  const noClient=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:h.factory});
+  let reopened;
+  const london={latitude:51.5074,longitude:-0.1278,timezone:'Europe/London',label:'Home',enabled:true};
+  try{
+   await sceneClient.ctx.cloudPull();await noClient.ctx.cloudPull();
+   setFakeTime(sceneClient.ctx,at+200);
+   sceneClient.ctx.LivingLocation.saveCoordinates({latitude:london.latitude,longitude:london.longitude},
+    {timezone:london.timezone,label:london.label});
+   setFakeTime(sceneClient.ctx,at+300);
+   sceneClient.shim.document.dispatchEvent({type:'landscape-scene-time-change',detail:{time:'sunset',season:'autumn'}});
+   setFakeTime(noClient.ctx,at+100);noClient.ctx.onAction('no',{dataset:{candidate:'scene-candidate',benchmark:'scene-benchmark'}});
+   await sceneClient.ctx.persist();await noClient.ctx.persist();
+   const sceneEvents=sceneClient.ctx.state.decisionEvents?.filter(event=>event?.kind==='current-choice'&&event.target?.type==='scene')||[];
+   assert.equal(sceneEvents.length,3,'the actual location and scene controls create narrow typed facts');
+   assert.deepEqual(JSON.parse(JSON.stringify(sceneEvents.map(event=>event.target.property).sort())),['location','season','time']);
+   const time=sceneEvents.find(event=>event.target.property==='time'),season=sceneEvents.find(event=>event.target.property==='season');
+   assert.equal(time.actionId,season.actionId,'one time-and-season control gesture has one shared action identity');
+   assert.equal(time.at,at+300);assert.equal(season.at,at+300);
+   assert.equal(sceneEvents.find(event=>event.target.property==='location').at,at+200,'location keeps its separate original action time');
+   const firstClient=first==='scene'?sceneClient:noClient,secondClient=first==='scene'?noClient:sceneClient;
+   await firstClient.ctx.cloudPushNow();await syncSettle(30);
+   await secondClient.ctx.cloudPull();await syncSettle(40);await secondClient.ctx.cloudPushNow();await syncSettle(40);
+   const expected={time:'sunset',season:'autumn',location:london};
+   assert.deepEqual(JSON.parse(JSON.stringify(secondClient.ctx.state.settings.scene)),expected,'all scene properties remain visible after either publication order');
+   assert.deepEqual(JSON.parse(JSON.stringify(h.remoteState().settings.scene)),expected,'the peer No cannot erase structured scene preferences in cloud');
+   assert.equal(h.remoteState().decisionEvents.filter(event=>event?.kind==='no').length,1,'the independent No is retained');
+   reopened=await loadAppAtTime(at,{seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(h.remoteState()),[LOCAL_HEAD_KEY]:JSON.stringify(h.remoteState())},cloudSyncFactory:h.factory,withSceneModules:true});
+   await reopened.ctx.cloudPull();await syncSettle(20);
+   assert.deepEqual(JSON.parse(JSON.stringify(reopened.ctx.state.settings.scene)),expected,'a cold client restores the typed scene choices');
+  }finally{
+   for(const app of [sceneClient,noClient,reopened])if(app)try{await app.shim.window.ScannerDeviceStore?.close?.();}catch{}
+  }
+ });
+});
+
+test('RISK cloud contexts: deleting a legacy context and targeted Undo restore its exact definition for a cold peer',async()=>{
+ const at=Date.parse('2026-10-17T18:00:00.000Z'),passAt=at-60000;
+ const legacy={id:'legacy-context-undo',name:'Legacy focus',active:true,legacyProjectionMarker:{keep:true,version:2}};
+ const initial=syncState({tasks:[syncTask('legacy-context-task','Assigned task')],contexts:[JSON.parse(JSON.stringify(legacy))],chain:[],candidateId:null,
+  passStartedAt:passAt,passId:'shared-pass-context-undo',scanMode:'descending',syncRev:4,syncAccount:'e@example.com',syncDirty:false});
+ initial.tasks[0].ctx=[legacy.id];
+ const remote=JSON.parse(JSON.stringify(initial));
+ for(const key of ['syncRev','syncAccount','syncDirty','lastCloudServerAt','protectedBackupIds'])delete remote[key];
+ const h=makeSyncHarness({remote,rev:4,delayMs:1}),seedStorage={[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)};
+ const phone=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:h.factory}),peer=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:h.factory});
+ let reopened;
+ try{
+  await phone.ctx.cloudPull();await peer.ctx.cloudPull();
+  assert.equal(phone.ctx.currentChoiceContextRowSupported(phone.ctx.state.contexts[0],legacy.id),true,
+   'the bounded prior context definition accepts the actual hydrated legacy row');
+  setFakeTime(phone.ctx,at+100);phone.ctx.onAction('del-ctx',{dataset:{id:legacy.id}});await phone.ctx.persist();
+  const deletion=phone.ctx.state.decisionEvents?.filter(event=>event?.kind==='current-choice'
+   &&(event.target?.type==='context'||event.target?.property==='ctx'))||[];
+  assert.equal(deletion.length,2,'one delete gesture records its tombstone and the affected task membership removal: '+JSON.stringify(deletion.map(event=>event.target)));
+  const tombstone=deletion.find(event=>event.target?.type==='context'&&event.target.property==='exists');
+  const membership=deletion.find(event=>event.target?.type==='task'&&event.target.property==='ctx');
+  assert.ok(tombstone&&membership,'the group carries both definition and task assignment intent');
+  assert.equal(tombstone.value,false);assert.equal(tombstone.actionId,membership.actionId,'context delete and assignments share one Undo identity');
+  assert.deepEqual(JSON.parse(JSON.stringify(tombstone.before)),{present:true,value:legacy},
+   'the bounded deletion witness preserves the exact legacy definition, field presence, and unknown data');
+  await phone.ctx.cloudPushNow();await syncSettle(30);await peer.ctx.cloudPull();await syncSettle(40);
+  assert.equal(peer.ctx.state.contexts.some(context=>context.id===legacy.id),false,'the peer applies the deliberate context deletion');
+  assert.deepEqual(JSON.parse(JSON.stringify(peer.ctx.state.tasks[0].ctx)),[],'the peer applies the matching task assignment removal');
+  phone.ctx.onAction('undo',{});await phone.ctx.persist();await phone.ctx.cloudPushNow();await syncSettle(40);
+  await peer.ctx.cloudPull();await syncSettle(20);
+  const undone=peer.ctx.state.contexts.find(context=>context.id===legacy.id);
+  assert.ok(undone,'targeted Undo restores the definition on the other device');
+  assert.equal(undone.name,'Legacy focus');assert.equal(undone.active,true);
+  assert.equal(Object.hasOwn(undone,'excluded'),false,'Undo keeps the original absence of the excluded mode field');
+  assert.deepEqual(JSON.parse(JSON.stringify(undone.legacyProjectionMarker)),{keep:true,version:2},'Undo keeps unknown legacy fields exactly');
+  assert.deepEqual(JSON.parse(JSON.stringify(peer.ctx.state.tasks[0].ctx)),[legacy.id],'Undo restores its task membership');
+  reopened=await loadAppAtTime(at,{seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(h.remoteState()),[LOCAL_HEAD_KEY]:JSON.stringify(h.remoteState())},cloudSyncFactory:h.factory});
+  await reopened.ctx.cloudPull();await syncSettle(20);
+  const cold=reopened.ctx.state.contexts.find(context=>context.id===legacy.id);
+  assert.deepEqual(JSON.parse(JSON.stringify(cold)),legacy,'a cold peer reconstructs the original definition from cloud-visible bounded evidence');
+  assert.deepEqual(JSON.parse(JSON.stringify(reopened.ctx.state.tasks[0].ctx)),[legacy.id]);
+ }finally{
+  for(const app of [phone,peer,reopened])if(app)try{await app.shim.window.ScannerDeviceStore?.close?.();}catch{}
+ }
+});
+
+test('RISK cloud contexts: create rename mode and task assignment survive an independent No in either order',async t=>{
+ for(const first of ['context edits','No'])await t.test(`${first} publishes first`,async()=>{
+  const at=Date.parse('2026-10-17T18:30:00.000Z'),passAt=at-60000;
+  const initial=syncState({tasks:[Object.assign(syncTask('new-context-task','Task without a context'),{ctx:[]}),
+    Object.assign(syncTask('context-benchmark','Benchmark'),{mu:36,sigma:8}),syncTask('context-candidate','Candidate')],
+   contexts:[],chain:['context-benchmark'],candidateId:'context-candidate',passStartedAt:passAt,passId:'shared-pass-context-definition',scanMode:'descending',
+   syncRev:4,syncAccount:'e@example.com',syncDirty:false});
+  const remote=JSON.parse(JSON.stringify(initial));
+  for(const key of ['syncRev','syncAccount','syncDirty','lastCloudServerAt','protectedBackupIds'])delete remote[key];
+  const h=makeSyncHarness({remote,rev:4,delayMs:1}),seedStorage={[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)};
+  const editClient=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:h.factory});
+  const noClient=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:h.factory});
+  let reopened;
+  try{
+   await editClient.ctx.cloudPull();await noClient.ctx.cloudPull();
+   setFakeTime(editClient.ctx,at+100);editClient.ctx.openSettings();
+   editClient.shim.document.getElementById('newCtxName').value='New work area';
+   editClient.ctx.onAction('add-ctx-named',{});
+   const id=editClient.ctx.state.contexts.find(context=>context.name==='New work area')?.id;
+   assert.ok(id,'the real Settings Add action creates a domain context identity');
+   setFakeTime(editClient.ctx,at+150);
+   const nameField=makeFakeElement();nameField.dataset={mgrname:id};nameField.value='Renamed work area';
+   nameField.matches=selector=>selector==='[data-mgrname]';
+   editClient.shim.document.dispatchEvent({type:'change',target:nameField});
+   setFakeTime(editClient.ctx,at+200);editClient.ctx.onAction('cycle-context',{dataset:{id}});
+   assert.equal(await saveEditorChoice(editClient,'new-context-task',at+300,{ctxIds:[id]}),true,'task membership uses the actual editor Save action');
+   setFakeTime(noClient.ctx,at+50);noClient.ctx.onAction('no',{dataset:{candidate:'context-candidate',benchmark:'context-benchmark'}});
+   await editClient.ctx.persist();await noClient.ctx.persist();
+   const definitionEvents=editClient.ctx.state.decisionEvents?.filter(event=>event?.kind==='current-choice'&&event.target?.type==='context')||[];
+   assert.deepEqual(JSON.parse(JSON.stringify(definitionEvents.map(event=>event.target.property).sort())),['exists','mode','mode','name','name'],
+    'create is grouped from one exists/name/mode fact and later rename/mode remain distinct choices');
+   const create=definitionEvents.find(event=>event.target.property==='exists'&&event.value===true);
+   const createdName=definitionEvents.find(event=>event.target.property==='name'&&event.actionId===create.actionId);
+   const createdMode=definitionEvents.find(event=>event.target.property==='mode'&&event.actionId===create.actionId);
+   assert.ok(create&&createdName&&createdMode,'a new context carries a complete coherent creation group');
+   assert.equal(create.at,at+100);assert.equal(createdName.at,create.at);assert.equal(createdMode.at,create.at);
+   const mode=definitionEvents.filter(event=>event.target.property==='mode').at(-1);
+   assert.deepEqual(JSON.parse(JSON.stringify(mode.value)),{active:{present:true,value:false},excluded:{present:true,value:true}},
+    'the one mode fact preserves the actual included-to-excluded state as a pair');
+   const firstClient=first==='context edits'?editClient:noClient,secondClient=first==='context edits'?noClient:editClient;
+   await firstClient.ctx.cloudPushNow();await syncSettle(30);
+   await secondClient.ctx.cloudPull();await syncSettle(40);await secondClient.ctx.cloudPushNow();await syncSettle(40);
+   const context=secondClient.ctx.state.contexts.find(row=>row.id===id);
+   assert.ok(context,'a cloud peer materializes the new supported context');
+   assert.equal(context.name,'Renamed work area');assert.equal(context.active,false);assert.equal(context.excluded,true);
+   assert.deepEqual(JSON.parse(JSON.stringify(secondClient.ctx.state.tasks.find(task=>task.id==='new-context-task').ctx)),[id]);
+   assert.equal(h.remoteState().decisionEvents.filter(event=>event?.kind==='no').length,1,'the independent No remains separate evidence');
+   reopened=await loadAppAtTime(at,{seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(h.remoteState()),[LOCAL_HEAD_KEY]:JSON.stringify(h.remoteState())},cloudSyncFactory:h.factory});
+   await reopened.ctx.cloudPull();await syncSettle(20);
+   const cold=reopened.ctx.state.contexts.find(row=>row.id===id);
+   assert.equal(cold.name,'Renamed work area');assert.equal(cold.active,false);assert.equal(cold.excluded,true);
+   assert.deepEqual(JSON.parse(JSON.stringify(reopened.ctx.state.tasks.find(task=>task.id==='new-context-task').ctx)),[id]);
+  }finally{
+   for(const app of [editClient,noClient,reopened])if(app)try{await app.shim.window.ScannerDeviceStore?.close?.();}catch{}
+  }
+ });
+});
+
+test('RISK cloud current choices: a changed scene source is held before adoption or acknowledgement',async t=>{
+ const at=Date.parse('2026-10-17T19:00:00.000Z'),passAt=at-60000;
+ const initial=syncState({tasks:[syncTask('scene-hold-task','Scene hold')],chain:[],candidateId:null,passStartedAt:passAt,
+  passId:'scene-source-hold-pass',scanMode:'descending',syncRev:4,syncAccount:'e@example.com',syncDirty:false,
+  settings:{horizonMin:60,thresholdPct:25,samples:250,cantMin:30,workedHours:16,theme:'system',dateFormat:'system',hourlyQuotes:{},
+   scene:{time:null,season:null,location:null}}});
+ const remote=JSON.parse(JSON.stringify(initial));
+ for(const key of ['syncRev','syncAccount','syncDirty','lastCloudServerAt','protectedBackupIds'])delete remote[key];
+ const h=makeSyncHarness({remote,rev:4,delayMs:1}),seedStorage={[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)};
+ const chooser=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:h.factory});
+ const receiver=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:h.factory});
+ try{
+  await chooser.ctx.cloudPull();await receiver.ctx.cloudPull();
+  setFakeTime(chooser.ctx,at+100);
+  chooser.shim.document.dispatchEvent({type:'landscape-scene-time-change',detail:{time:'sunset',season:'autumn'}});
+  assert.equal(await chooser.ctx.persist(),true);
+  await chooser.ctx.cloudPushNow();await syncSettle(40);
+  const chosen=h.remoteState();
+  const sceneFacts=(Array.isArray(chosen.decisionEvents)?chosen.decisionEvents:[]).filter(event=>event?.kind==='current-choice'&&event.target?.type==='scene');
+  assert.equal(sceneFacts.length,2,'the real time-and-season control publishes typed source evidence');
+  assert.equal(sceneFacts[0].actionId,sceneFacts[1].actionId,'the paired controls share one original gesture');
+  const unsafe=JSON.parse(JSON.stringify(chosen));
+  unsafe.settings.scene.futureSolarFormat={version:9,raw:'preserve this unsupported source'};
+  h.writeBehindBack(unsafe);
+  const unsafePayload=h.doc.payload,receiverState=JSON.stringify(receiver.ctx.state);
+  const receiverBytes=receiver.shim.localStorage.getItem(SYNC_STORE_KEY);
+  assert.notEqual(unsafePayload,JSON.stringify(chosen),'the peer source now differs from its known projection');
+  await receiver.ctx.cloudPull();
+  assert.equal(receiver.ctx.window.CloudSync.errorCode,'unprojectable-decision-evidence',
+   'an unknown scene format beside a supported deliberate choice must hold reconciliation');
+  assert.equal(JSON.stringify(receiver.ctx.state),receiverState,'a held changed source cannot alter the visible local board');
+  assert.equal(receiver.shim.localStorage.getItem(SYNC_STORE_KEY),receiverBytes,'a held source cannot acknowledge or rewrite local storage');
+  assert.equal(h.doc.payload,unsafePayload,'a hold must preserve the exact changed cloud bytes for recovery');
+  assert.equal(h.remoteState().decisionEvents.filter(event=>event?.kind==='current-choice'&&event.target?.type==='scene').length,2,
+   'the held raw source retains both original scene facts');
+ }finally{
+  for(const app of [chooser,receiver])if(app)try{await app.shim.window.ScannerDeviceStore?.close?.();}catch{}
+ }
+});
+
+test('RISK cloud current choices: typed preference authority survives a modern replacement Undo and stale delivery',async t=>{
+ const source=await decisionRecoveryApp146('e@example.com');
+ const target=await decisionRecoveryApp146('destination@example.com');
+ for(const app of [source,target])t.after(()=>{app.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',app.ctx);});
+ const at=Date.now();
+ setFakeTime(target.ctx,at+100);target.ctx.onAction('cycle-theme',{});
+ setFakeTime(target.ctx,at+200);target.ctx.onAction('cycle-theme',{});
+ assert.equal(target.ctx.state.settings.theme,'dark','the destination makes its deliberate current theme choice');
+ const retired=target.ctx.state.decisionEvents.filter(event=>event?.kind==='current-choice'&&event.target?.type==='setting'&&event.target.property==='theme');
+ assert.equal(retired.length,2,'the normal theme controls create immutable typed authority before replacement');
+ await target.ctx.persist();target.ctx.window.CloudSync.ready=true;await target.ctx.cloudPushNow();await syncSettle(50);
+ const displaced=JSON.parse(JSON.stringify(target.h.remoteState()));
+
+ setFakeTime(source.ctx,at+300);source.ctx.onAction('cycle-theme',{});
+ assert.equal(source.ctx.state.settings.theme,'light','the selected source has an independent supported preference');
+ const selectedRaw=JSON.stringify(source.ctx.state),selectedThemeEvent=source.ctx.state.decisionEvents.find(event=>
+  event?.kind==='current-choice'&&event.target?.type==='setting'&&event.target.property==='theme');
+ assert.ok(selectedThemeEvent,'the replacement source carries its original typed preference action');
+ target.ctx.confirm=()=>true;target.shim.document.getElementById('jsonBox').value=selectedRaw;
+ assert.equal(await target.ctx.onAction('import-json',{}),true,'the established Import consumer deliberately replaces a modern board');
+ assert.equal(target.ctx.state.settings.theme,'light');
+ await target.ctx.persist();target.ctx.cloudPushNow();await syncSettle(60);
+ const selectedState=JSON.parse(JSON.stringify(target.h.remoteState()));
+ assert.equal(target.ctx.state.syncDirty,false,'the selected modern replacement is durably acknowledged');
+
+ target.h.writeBehindBack(displaced);await target.ctx.cloudPull();await syncSettle(35);
+ assert.equal(target.ctx.window.CloudSync.errorCode??null,null,'an unchanged displaced branch remains recognizable as retired');
+ assert.equal(target.ctx.state.settings.theme,'light','stale destination delivery cannot replace the selected source preference');
+ assert.equal(target.h.remoteState().settings.theme,'light','the acknowledged modern source remains effective in cloud');
+
+ await target.ctx.onAction('undo',{});await target.ctx.persist();target.ctx.cloudPushNow();await syncSettle(60);
+ assert.equal(target.ctx.state.settings.theme,'dark','ordinary Undo restores the displaced typed preference exactly');
+ assert.deepEqual(Array.from(target.ctx.state.decisionEvents.filter(event=>event?.kind==='current-choice'&&event.target?.type==='setting'&&event.target.property==='theme'),
+  event=>event.id).sort(),Array.from(retired,event=>event.id).sort(),'replacement Undo restores only the exact displaced preference facts');
+ assert.ok(target.ctx.state.decisionBaseline.replacement.some(receipt=>receipt.reason==='explicit-undo'),
+  'modern replacement Undo records the existing reverse-replacement receipt');
+ target.h.writeBehindBack(selectedState);await target.ctx.cloudPull();await syncSettle(35);
+ assert.equal(target.ctx.window.CloudSync.errorCode??null,null,'the stale selected branch stays retired after targeted Undo');
+ assert.equal(target.ctx.state.settings.theme,'dark','later stale source delivery cannot resurrect the cancelled replacement');
+ const reopened=await loadAppAtTime(at+500,{seedStorage:{[SYNC_STORE_KEY]:target.shim.localStorage.getItem(SYNC_STORE_KEY),
+  [LOCAL_HEAD_KEY]:target.shim.localStorage.getItem(LOCAL_HEAD_KEY)},cloudSyncFactory:target.h.factory});
+ t.after(()=>{reopened.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',reopened.ctx);});
+ await reopened.ctx.cloudPull();assert.equal(reopened.ctx.state.settings.theme,'dark','cold reopen preserves the exact final selected preference');
+});
+
 test('RISK cloud current choices: causal action order beats skew and equal concurrent times use event identity',async()=>{
  const at=Date.parse('2026-10-16T17:50:00.000Z');
  const initial=syncState({tasks:[syncTask('order-projection','Before')],chain:[],candidateId:null,
