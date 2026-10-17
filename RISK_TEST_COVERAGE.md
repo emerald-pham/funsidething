@@ -709,6 +709,7 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK cloud current choices: compatible edits on the same task retain each changed property
 - RISK cloud current choices: original decision time wins conflicts in either publication order
 - RISK cloud current choices: causal projector retains compatible task fields and context membership
+- RISK cloud current choices: context membership additions compose across observed revisions
 - RISK cloud current choices: causal action order beats skew and equal concurrent times use event identity
 - RISK cloud current choices: fresh pass projection installs the exact frozen mode draw
 - RISK cloud current choices: final outcome projection does not erase later pass comparisons

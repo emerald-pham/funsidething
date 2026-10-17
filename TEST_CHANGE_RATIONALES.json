@@ -7728,6 +7728,23 @@
     }
   },
   {
+    "testChangesSha256": "aee891341cda55cddba6ee39ce9db63e5dac89fdf0b6d2448165728863c5547d",
+    "reason": "Concurrent task-context membership additions were discarded when otherwise compatible editor choices observed different acknowledged cloud revisions.",
+    "previousBehavior": "A phone and stale peer both captured the exact same empty ctx before value but different nonempty base IDs. The projector treated that as an incompatible whole-list conflict and kept only the last action's membership.",
+    "intendedBehavior": "Compose per-context membership deltas across distinct attested cloud bases only when all concurrent root facts capture the exact same before presence and value. Keep the conservative whole-list winner for different before snapshots and for missing exact bases.",
+    "replacementTests": [
+      "RISK cloud current choices: context membership additions compose across observed revisions"
+    ],
+    "preservedCoverage": [
+      "The full-app editor/save/two-device consumer advances one device's base through an unrelated published title edit, then proves distinct context additions remain visible, durable in cloud and consistent after cold reopen.",
+      "Existing shared-base task-field/context projection remains covered. The new consumer also checks differing before snapshots and a null base remain conservative; targeted Undo preservation is separately owned by #145 and remains an integration acceptance."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='RISK cloud current choices: context membership additions compose across observed revisions' tests.js",
+      "failure": "On 947c3bec1076a729257185142bf17da066bb441a, the full-app peer pull retained only ctx-peer after phone's ctx-phone choice. Raw /Users/emeraldpham/.codex/task-artifacts/decision-sync-141/144/context-delta-red-before-fix.txt includes distinct action IDs/base IDs and both exact before:{present:true,value:[]} records. The fixed consumer passes on integrated root checkpoint e480c2c."
+    }
+  },
+  {
     "testChangesSha256": "7f863bc4850d0401e51968b8a999a93ad70430615d11b02c91bb5ca52a255812",
     "reason": "Implement approved #141/#145 ordinary action-scoped Undo using real two-device app consumers; preserve unrelated peer choices and immutable observations.",
     "previousBehavior": "Cloud adoption added a snapshot Undo frame which reversed peer Dot while retaining local Yes, and bulk Save lacked durable per-task choice facts.",

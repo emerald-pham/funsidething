@@ -6547,8 +6547,10 @@ function projectCurrentChoiceContextProperty(task,events,byId,cancelled=new Set(
   const ordered=events.slice().sort((a,b)=>a.at-b.at||(a.id<b.id?-1:a.id>b.id?1:0)),memo=new Map();
   const minima=ordered.filter(event=>!ordered.some(other=>other.id!==event.id&&currentChoiceAncestors(event,byId,memo).has(other.id)));
   const base=minima[0];if(!base)return false;
-  const sameBase=minima.every(event=>event.baseId===base.baseId&&JSON.stringify(event.before)===JSON.stringify(base.before));
-  if(!sameBase){
+  const sameBefore=minima.every(event=>JSON.stringify(event.before)===JSON.stringify(base.before));
+  const sameBase=minima.every(event=>event.baseId===base.baseId)&&sameBefore;
+  const sameAttestedBefore=minima.every(event=>typeof event.baseId==="string"&&!!event.baseId)&&sameBefore;
+  if(!sameBase&&!sameAttestedBefore){
     const winner=latestCurrentChoiceEvent(events,byId);if(!winner)return false;
     const prior=Object.hasOwn(task,"ctx")?JSON.stringify(task.ctx):null;
     if(winner.after.present)task.ctx=JSON.parse(JSON.stringify(winner.value));else delete task.ctx;
