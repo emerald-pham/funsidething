@@ -10887,7 +10887,6 @@
     "previousBehavior": "loadApp waits only until state is non-null, while startup upgrade persist can still await an actual committed IDB head acknowledgement. Two immediate recovery saves can correctly return false while the application head marker is older than the real durable head; the fixture incorrectly assumed startup had already completed.",
     "intendedBehavior": "This fixture captures and awaits the real startup persist promise, then verifies durable head/hash/lastPersistedRaw/state convergence before injecting the actual immutable legacy source. A separate held-startup control requires both early saves to remain false, releases the actual acknowledgement, requires real startup/save success and exact publication, and retains completion exclusion and exact originals. No production code, app/SW bytes or general harness semantics change.",
     "replacementTests": [
-      "RISK legacy completion recovery: immutable released Done stays offchain through expired device recovery and every save",
       "RISK legacy completion startup acknowledgement: pending IndexedDB upgrade holds recovery until its actual save completes"
     ],
     "preservedCoverage": [
@@ -10904,7 +10903,10 @@
       "chronology": "First new control run88d2496e failed a newly added overstrict whole-journal equality because it legitimately retained the incoming independent title fact. That never-passing new expectation was corrected to require the exact union of every original and incoming source fact, with count and byte equality. No prior passing assertion was changed.",
       "scope": "Test-only fix in the single failing fixture plus new controlled companion. Existing startup/unknown/Start-hold/P0/runtime code and bytes remain exact6ba. Earlier production/fixture REDs, attribution corrections and predecessor evidence are retained as historical records."
     },
-    "idbBoundaryGreenEvidence": "/Users/emeraldpham/.codex/task-artifacts/completion-precedence-168/idb-boundary-repair/2026-10-17T23-39-19-052Z-bdf4330d-9558-4cf8-b062-013c00f4dd89.json (92 top-level/138 total cases,138 pass,0 fail/skip; includes all affected legacy/modern completion, scoped Undo, source safety, P0 and mounted copy/history consumers). Runtime/index/SW bytes stay identical to6ba; parent owns renewed clean exact-commit full regression."
+    "idbBoundaryGreenEvidence": "/Users/emeraldpham/.codex/task-artifacts/completion-precedence-168/idb-boundary-repair/2026-10-17T23-39-19-052Z-bdf4330d-9558-4cf8-b062-013c00f4dd89.json (92 top-level/138 total cases,138 pass,0 fail/skip; includes all affected legacy/modern completion, scoped Undo, source safety, P0 and mounted copy/history consumers). Runtime/index/SW bytes stay identical to6ba; parent owns renewed clean exact-commit full regression.",
+    "updatedTests": [
+      "RISK legacy completion recovery: immutable released Done stays offchain through expired device recovery and every save"
+    ]
   },
   {
     "testChangesSha256": "2e9716a4149eda0fa57b1151fade7a107f0ed851f4fb15eb3322e4247c86d29d",
