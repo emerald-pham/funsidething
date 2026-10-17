@@ -178,6 +178,56 @@ test('RISK legacy completion released shell: actual stale write conflicts then h
  await old.ctx.onAction('sync-retry',{});await syncSettle(25);assert.equal(h.doc.payload,exact);assert.equal(old.ctx.state.syncDirty,true);
 });
 
+test('RISK legacy completion released Start: normally acknowledged expired return is preserved or explicitly held before rewrite',async t=>{
+ const released=spawnSync('git',['show',LEGACY_COMPLETION_RELEASE+':index.html'],{cwd:__dirname,encoding:'utf8'});assert.equal(released.status,0,released.stderr);
+ const publish=async(app,h,label)=>{assert.equal(await app.ctx.persist(),true);await app.ctx.cloudPushNow();await settleSavedViewPublication(app,h,label);};
+ const at=Date.parse('2026-10-17T15:00:00Z'),initial=syncState({tasks:[
+  {...syncTask('expiry-recurring','Recurring first task'),createdAt:at-2000,evergreen:true,evergreenHours:1,evergreenResetAtDay:false},
+  {...syncTask('expiry-peer','Independent peer title'),createdAt:at-1000,startsAt:'2026-10-18'}],chain:[],candidateId:null,mode:'work',scanMode:'descending',
+  passId:'expiry-initial-pass',passStartedAt:at-60000,syncAccount:'e@example.com',syncRev:4,syncDirty:false,seenQuickStart:true,
+  settings:{horizonMin:60,thresholdPct:0,samples:40}}),remote=structuredClone(initial);for(const key of ['syncRev','syncAccount','syncDirty'])delete remote[key];
+ const h=makeSyncHarness({remote,rev:4,delayMs:1}),raw=JSON.stringify(initial),old=await loadAppAtTime(at,{appSource:extractAppScript(released.stdout),
+  seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw},cloudSyncFactory:h.factory});t.after(()=>closeLegacyApp173(old));await old.ctx.cloudPull();
+ old.ctx.window.CloudSync.ready=false;old.ctx.onAction('start-scan',{dataset:{mode:'descending'}});old.ctx.window.CloudSync.ready=true;await publish(old,h,'expiry-released-initial-start');
+ old.ctx.window.CloudSync.ready=false;hydrateUnchangedEditorDraft(old,'expiry-recurring');old.ctx.onAction('dot-task',{dataset:{id:'expiry-recurring'}});old.ctx.window.CloudSync.ready=true;await publish(old,h,'expiry-released-original-dot');
+ const beforeDoneRaw=old.shim.localStorage.getItem(SYNC_STORE_KEY);old.ctx.window.CloudSync.ready=false;setFakeTime(old.ctx,at+100);hydrateUnchangedEditorDraft(old,'expiry-recurring');old.ctx.onAction('done-task',{dataset:{id:'expiry-recurring'}});assert.equal(await old.ctx.persist(),true);
+ const afterDoneRaw=old.shim.localStorage.getItem(SYNC_STORE_KEY);setFakeTime(old.ctx,at+2*3600000);old.ctx.ensureCandidate();old.ctx.renderScan();
+ assert.match(old.shim.document.getElementById('scan').innerHTML,/data-act="start-scan"/,'the actual old scanner offers permitted Start after its rest expires');
+ old.ctx.onAction('start-scan',{dataset:{mode:'descending'}});assert.deepEqual(Array.from(old.ctx.state.chain),['expiry-recurring']);
+ hydrateUnchangedEditorDraft(old,'expiry-peer');old.shim.document.getElementById('etTitle').value='Actual later released peer title';old.ctx.onAction('save-edit',{dataset:{id:'expiry-peer'}});
+ old.ctx.window.CloudSync.ready=true;await publish(old,h,'expiry-released-informed-start-title');
+ const exactOldCloud=h.doc.payload,exactOldRev=h.doc.rev,exactOldDevice=old.shim.localStorage.getItem(SYNC_STORE_KEY);assert.deepEqual(JSON.parse(exactOldCloud).chain,['expiry-recurring']);assert.equal(exactOldRev,6);assert.equal(old.ctx.decisionProjectionIssue(old.ctx.state),null);await closeLegacyApp173(old);
+ const candidate=await loadAppAtTime(at+2*3600000+1,{seedStorage:{[SYNC_STORE_KEY]:beforeDoneRaw,[LOCAL_HEAD_KEY]:beforeDoneRaw},cloudSyncFactory:()=>{const CS=h.factory();CS.ready=false;return CS;}});t.after(()=>closeLegacyApp173(candidate));
+ const before=candidate.shim.localStorage.getItem(SYNC_STORE_KEY),facts=JSON.stringify(candidate.ctx.state.decisionEvents),ratings=JSON.stringify(candidate.ctx.state.tasks.map(row=>[row.id,row.mu,row.sigma]));
+ candidate.ctx.window.CloudSync.ready=true;await candidate.ctx.cloudPull();await candidate.ctx.cloudPushNow();
+ if(candidate.ctx.window.CloudSync.errorCode){
+  assert.equal(candidate.ctx.window.CloudSync.errorCode,'ambiguous-legacy-completion');assert.equal(h.doc.payload,exactOldCloud);assert.equal(h.doc.rev,exactOldRev);assert.equal(candidate.shim.localStorage.getItem(SYNC_STORE_KEY),before);assert.equal(JSON.stringify(candidate.ctx.state.decisionEvents),facts);assert.equal(JSON.stringify(candidate.ctx.state.tasks.map(row=>[row.id,row.mu,row.sigma])),ratings);
+ }else{
+  await settleSavedViewPublication(candidate,h,'normally published released expiry Start');
+  assert.equal(candidate.ctx.state.tasks.find(row=>row.id==='expiry-peer').title,'Actual later released peer title');
+  assert.deepEqual(Array.from(candidate.ctx.state.chain),['expiry-recurring'],'a normally published supported old Start after expiry must not be silently removed and acknowledged');
+  assert.deepEqual(h.remoteState().chain,['expiry-recurring']);
+ }
+ candidate.ctx.openHelp();assert.match(candidate.shim.document.getElementById('modalRoot').innerHTML,/If an older Start and completion cannot be ordered safely, recovery waits/);
+ t.diagnostic(JSON.stringify({exactOldRev,sourceChain:JSON.parse(exactOldCloud).chain,candidateChain:Array.from(candidate.ctx.state.chain),remoteRev:h.doc.rev,error:candidate.ctx.window.CloudSync.errorCode}));
+ await t.test('deliberate Import and Restore hold without replacing the current board',async t=>{
+  const app=await loadAppAtTime(at+2*3600000+1,{seedStorage:{[SYNC_STORE_KEY]:beforeDoneRaw,[LOCAL_HEAD_KEY]:beforeDoneRaw}});t.after(()=>closeLegacyApp173(app));
+  const prior=JSON.stringify(app.ctx.state);app.shim.document.getElementById('jsonBox').value=exactOldDevice;assert.equal(await app.ctx.onAction('import-json',{}),false);assert.equal(JSON.stringify(app.ctx.state),prior);assert.ok(app.ctx.readLocalBackups().some(row=>row.payload===exactOldDevice));
+  const backup=await app.ctx.saveDurableBackup('manual',exactOldDevice);app.ctx.openSettings();assert.equal(await app.ctx.restoreDurableBackupById(backup.id),false);assert.equal(JSON.stringify(app.ctx.state),prior);assert.equal(app.shim.localStorage.getItem(SYNC_STORE_KEY),beforeDoneRaw);
+ });
+
+ for(const backend of ['fallback','indexedDB'])await t.test('startup and local '+backend,async t=>{
+  const opts=backend==='indexedDB'?{indexedDBProvider:new (await import('fake-indexeddb')).IDBFactory(),deviceDbName:'held-released-start-'+Math.random()}:{};
+  const local=await loadAppAtTime(at+2*3600000+1,{seedStorage:{[SYNC_STORE_KEY]:exactOldDevice,[LOCAL_HEAD_KEY]:exactOldDevice},...opts});t.after(()=>closeLegacyApp173(local));
+  assert.deepEqual(Array.from(local.ctx.state.chain),['expiry-recurring'],'startup retains the real released return instead of minting contradictory authority');
+  assert.equal(local.ctx.state.decisionEvents.some(row=>row.kind==='completion-boundary'),false);const oldFacts=JSON.stringify(local.ctx.state.decisionEvents),oldRatings=JSON.stringify(local.ctx.state.tasks.map(row=>[row.id,row.mu,row.sigma]));
+  const added=local.ctx.addTask('Newer draft while chronology is held');assert.equal(await local.ctx.persist(),false);assert.ok(local.ctx.state.tasks.some(row=>row.id===added.id));assert.equal(local.shim.localStorage.getItem(SYNC_STORE_KEY),exactOldDevice);assert.equal(local.shim.localStorage.getItem(LOCAL_HEAD_KEY),exactOldDevice);if(local.ctx.window.ScannerDeviceStore)assert.equal((await local.ctx.window.ScannerDeviceStore.readHead()).payload,exactOldDevice);assert.ok(local.ctx.readLocalBackups().some(row=>row.payload===exactOldDevice));assert.equal(JSON.stringify(local.ctx.state.decisionEvents),oldFacts);assert.equal(JSON.stringify(local.ctx.state.tasks.filter(row=>row.id!==added.id).map(row=>[row.id,row.mu,row.sigma])),oldRatings);
+  const recovery=await loadAppAtTime(at+2*3600000+1,{seedStorage:{[SYNC_STORE_KEY]:beforeDoneRaw,[LOCAL_HEAD_KEY]:beforeDoneRaw},...opts, ...(backend==='indexedDB'?{deviceDbName:'held-incoming-start-'+Math.random()}: {})});t.after(()=>closeLegacyApp173(recovery));
+  const draft=recovery.ctx.addTask('Retained current draft beside incoming old Start'),prior=JSON.stringify(recovery.ctx.state);recovery.shim.localStorage.setItem(SYNC_STORE_KEY,exactOldDevice);recovery.shim.localStorage.setItem(LOCAL_HEAD_KEY,exactOldDevice);assert.equal(await recovery.ctx.persist(),false);assert.equal(JSON.stringify(recovery.ctx.state),prior);assert.ok(recovery.ctx.state.tasks.some(row=>row.id===draft.id));assert.equal(recovery.shim.localStorage.getItem(SYNC_STORE_KEY),exactOldDevice);assert.equal(recovery.shim.localStorage.getItem(LOCAL_HEAD_KEY),exactOldDevice);
+ });
+
+});
+
 test('RISK legacy completion unknown evidence: malformed imported provenance holds exact local and cloud branches',async t=>{
  const app=await upgradedLegacyApp173(t),{ctx,h}=app;const future=ctx.state.decisionEvents.find(e=>e.kind==='completion-boundary');future.id='future-provenance-checkpoint';future.sourceEvidence='future opaque provenance';await ctx.persist();const saved=app.shim.localStorage.getItem(SYNC_STORE_KEY),cloud=h.doc.payload;
  ctx.window.CloudSync.ready=true;await ctx.cloudPull();await ctx.cloudPushNow();await syncSettle(25);assert.equal(h.doc.payload,cloud,'an unknown imported authority must not be published');assert.equal(ctx.window.CloudSync.errorCode,'unsupported-decision-evidence','unknown imported chronology cannot become a supported membership checkpoint');assert.equal(app.shim.localStorage.getItem(SYNC_STORE_KEY),saved);assert.equal(h.doc.payload,cloud);

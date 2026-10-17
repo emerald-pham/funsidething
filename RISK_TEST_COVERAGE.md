@@ -1450,6 +1450,7 @@ Actual populated-editor ordinary Done, an offline Dot that an independent peer c
 - RISK legacy completion recovery safety: failed exact-source backup holds startup and guarded recovery without losing a newer edit
 - RISK legacy completion support floor: real eventless learned ratings upgrade without reconstructing comparison history
 - RISK legacy completion released shell: actual stale write conflicts then holds unknown authority and its pending edit for safe update
+- RISK legacy completion released Start: normally acknowledged expired return is preserved or explicitly held before rewrite
 - RISK legacy completion unknown evidence: malformed imported provenance holds exact local and cloud branches
 - RISK legacy completion proven restore: an actual released early Return and Dot cannot be fenced again by its stale completion
 - RISK legacy completion replacement: actual Import Restore Reset and their Undo retain retired checkpoint provenance
