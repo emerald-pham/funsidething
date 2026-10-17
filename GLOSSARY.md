@@ -1,8 +1,13 @@
 # Chain Scanner
 
-Language for choices made on a board and shared across devices.
+Language for saved boards, device views and choices shared across devices.
 
 ## Language
+
+**Saved view**:
+A person's last-used board, task-list view, filters and position in the list,
+remembered separately by each device or browser.
+_Avoid_: Cached screenshot
 
 **Board decision**:
 A person's choice about a task or a scan, such as preferring one task over

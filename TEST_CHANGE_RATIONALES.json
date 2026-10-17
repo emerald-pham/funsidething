@@ -8776,6 +8776,450 @@
     }
   },
   {
+    "testChangesSha256": "d6526edba8a2f0e16852c4e458e7292b553419bdcac7e59df4f1bdded3bce54d",
+    "reason": "Add consumer regressions for the approved saved All Tasks view and safe first paint after reproducing that reload lost the query/tag/eligibility/scroll, retained another account filter, exposed the default shell before local board hydration, and allowed a resize renderer to read null state.",
+    "previousBehavior": "All Tasks query and filters existed only in the active view, scroll restoration only covered re-renders in memory, and boot could display its empty shell while the local saved board was still loading.",
+    "intendedBehavior": "Reopen the last per-device All Tasks search, filters and list position against the durable local board; clear presentation state on account change; avoid painting the empty shell before local hydration; tolerate corrupt or blocked view storage without changing board authority.",
+    "replacementTests": [
+      "RISK saved view restoration: a reopened All Tasks list retains its local search tag filter and scroll position",
+      "RISK saved view account boundary: an All Tasks filter is cleared when the signed-in account changes",
+      "RISK saved view restoration: the eligibility filter remains selected after reopening All Tasks",
+      "RISK saved view fallback: corrupt or blocked local presentation storage leaves the saved board usable",
+      "RISK saved view guidance: Quick start and Changelog describe this-device restoration and current dates",
+      "RISK saved view startup: delayed local board reads do not expose an empty default shell",
+      "RISK saved view startup: delayed local reads do not call state renderers before board hydration"
+    ],
+    "preservedCoverage": [
+      "Authoritative saved-board bytes, ranking, cloud write paths and existing task/list behavior remain unchanged; only bounded presentation metadata is stored separately on this device.",
+      "Current-day eligibility and account boundaries are covered, with corrupt or unavailable presentation storage falling back to the existing saved board.",
+      "Existing theme boot, search, All Tasks owner and ordinary startup tests remain in the focused 24-test passing cohort."
+    ],
+    "redEvidence": {
+      "command": "LANDSCAPE_BROWSER_URL=http://127.0.0.1:8794/index.html LANDSCAPE_PLAYWRIGHT=/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs LANDSCAPE_BROWSER_CHANNEL=chrome /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-name-pattern='RISK saved view' tests.js; additionally /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-name-pattern='RISK saved view restoration: the eligibility filter' tests.js",
+      "failure": "On the unchanged base a6cbbbaad70a4cb3a76dd53d25fa23fbc9c665f1 at 2026-10-17T02:47:58.917436Z, the actual browser consumer run failed 4/4: no local presentation record was saved, the prior account filter remained, the empty shell was visible before delayed local storage settled, and a resize raised Cannot read properties of null (reading settings). At 2026-10-17T02:48:42.412238Z the eligibility filter also reopened as (1) instead of (0 of 1). Full stdout is retained in /Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/worker/baseline-red.log and eligibility-red.log; the independent missing-FAQ RED is in guidance-red.log."
+    }
+  },
+  {
+    "testChangesSha256": "d7b0d3cea7fc4adcd64cb9a6d11182ca33fcbdca7544880335e9011ef1dc6031",
+    "reason": "Add the actual toggle-to-cloud-adoption regression and accurately document the saved-view fallback after reproducing that a newer remote closed-list board erased this device's just-opened All Tasks view.",
+    "previousBehavior": "The All Tasks toggle opened the local list but did not retain its open state in the device view record; adopting a newer remote board with listOpen false closed the list and reload lost the open view. The FAQ also omitted the fallback when this browser cannot retain presentation metadata.",
+    "intendedBehavior": "The real toggle records this device's open-list choice; newer remote task data is still adopted while this device keeps its open list and filters through adoption and reload. Guidance explains that a saved board remains usable with its usual list view when this browser cannot retain the view.",
+    "replacementTests": [
+      "RISK saved view cloud adoption: this device keeps its open All Tasks view through a newer remote board and reload"
+    ],
+    "preservedCoverage": [
+      "The test uses the real toggle-list action and verifies its local saved-view record before cloud adoption; it preserves newer remote task data while asserting local open state and query through reload.",
+      "Existing same-account reconciliation, account boundaries, durable board authority, current-date recomputation and blocked/corrupt view-storage fallback coverage remain intact."
+    ],
+    "redEvidence": {
+      "command": "2026-10-17T02:59:33.360923000Z at base 86af551a464a78d2c873d04b6fd33b02f9231e83: /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=spec --test-name-pattern='RISK saved view cloud adoption:' tests.js; copy check 2026-10-17T03:00:43.206445000Z: /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=spec --test-name-pattern='RISK saved view guidance:' tests.js",
+      "failure": "The actual toggle set state.listOpen true but saved-view metadata had no listOpen; after cloudPull adopted the newer Remote board with listOpen false, the rendered and reloaded list were both closed. Exact output: /Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/worker/cloud-list-open-toggle-red.log. The FAQ RED confirmed the open-state and browser-storage fallback language was absent: /Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/worker/saved-view-open-copy-red.log."
+    }
+  },
+  {
+    "testChangesSha256": "ef0145c35be132143c1b0ec1e0f6163494e88653023b5050c4bc0b01d0a8141b",
+    "reason": "Bind the exact cumulative origin/main-to-candidate test diff after adding the cloud-adoption open-list regression, while retaining the feature-specific and repair-specific rationale records and their original RED chronology.",
+    "previousBehavior": "All Tasks filters and scroll were transient, the initial board shell could appear empty before local hydration, account changes could retain the prior presentation, and a newer remote closed-list board could close this device's newly opened list through reload.",
+    "intendedBehavior": "Restore this device's open-list choice, filters and position with its saved board; adopt newer remote task data without replacing the local view; clear view state at account boundaries; keep the saved board usable when presentation storage is unavailable; and recompute time-sensitive eligibility on reopen.",
+    "replacementTests": [
+      "RISK saved view restoration: a reopened All Tasks list retains its local search tag filter and scroll position",
+      "RISK saved view account boundary: an All Tasks filter is cleared when the signed-in account changes",
+      "RISK saved view restoration: the eligibility filter remains selected after reopening All Tasks",
+      "RISK saved view cloud adoption: this device keeps its open All Tasks view through a newer remote board and reload",
+      "RISK saved view fallback: corrupt or blocked local presentation storage leaves the saved board usable",
+      "RISK saved view guidance: Quick start and Changelog describe this-device restoration and current dates",
+      "RISK saved view startup: delayed local board reads do not expose an empty default shell",
+      "RISK saved view startup: delayed local reads do not call state renderers before board hydration"
+    ],
+    "preservedCoverage": [
+      "The durable board remains authoritative for tasks and sync; saved presentation remains bounded, device-local and account-scoped, while existing merge and recovery behavior is retained.",
+      "Original startup, filter, account-boundary, blocked-storage and copy RED chronology remains in the feature rationale; the actual toggle/cloud-adoption RED and its later repair remain in the follow-up rationale."
+    ],
+    "redEvidence": {
+      "command": "Original saved-view RED: 2026-10-17T02:47:58.917436Z at base a6cbbbaad70a4cb3a76dd53d25fa23fbc9c665f1, LANDSCAPE_BROWSER_URL=http://127.0.0.1:8794/index.html LANDSCAPE_PLAYWRIGHT=/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs LANDSCAPE_BROWSER_CHANNEL=chrome /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-name-pattern='RISK saved view' tests.js; toggle/cloud RED: 2026-10-17T02:59:33.360923000Z at base 86af551a464a78d2c873d04b6fd33b02f9231e83, /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=spec --test-name-pattern='RISK saved view cloud adoption:' tests.js.",
+      "failure": "The original browser consumer RED failed restoration, account isolation and delayed first paint; its detailed commands and output remain in the existing feature rationale and baseline-red.log/eligibility-red.log. The follow-up real-toggle RED showed state.listOpen true but no saved view open-state, then a newer remote listOpen false closed the rendered and reloaded list; exact output remains in cloud-list-open-toggle-red.log. The intervening copy RED remains in saved-view-open-copy-red.log."
+    }
+  },
+  {
+    "testChangesSha256": "f91a0f459dfc1cb0014ee91942b953001b9db04473e935794f68e2eb8b95a801",
+    "reason": "Add a real reveal-action regression after independent review found that revealTask opened All Tasks without updating the saved device view.",
+    "previousBehavior": "Starting with the list closed, revealTask cleared filters and set state.listOpen true directly while the saved view still recorded false; a newer same-task peer board with listOpen false closed the list again after repeated pull and reload.",
+    "intendedBehavior": "The reveal action records its open-list choice through the same per-device saved-view owner as the toggle; repeated cloud reads and reload retain the local open list while the peer board stays closed and unchanged.",
+    "replacementTests": [
+      "RISK saved view reveal: the real reveal action keeps its opened list through cloud adoption and reload"
+    ],
+    "preservedCoverage": [
+      "The regression starts closed and calls the actual reveal action; the peer reuses the same task and differs in list presentation, so no task addition drives the adoption path.",
+      "The repeated pull and reload retain the local view while the remote listOpen remains false; task authority and the existing cloud payload shape are unchanged."
+    ],
+    "redEvidence": {
+      "command": "Refined actual-control RED at 2026-10-17T03:08:48Z on base f639e3b8534535dd1d909177d4ca09e7354c22e3: /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=spec --test-name-pattern='RISK saved view reveal:' tests.js.",
+      "failure": "With no runtime files edited, the real reveal action opened the list but left cachedListOpen false. A higher-revision same-task peer board with listOpen false closed the rendered list; another pull and reload stayed closed. Exact output is /Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/worker/saved-view-reveal-refined-red.log; the initial reveal RED is retained in saved-view-reveal-red.log."
+    }
+  },
+  {
+    "testChangesSha256": "1e8d1a12db983ed88182e78927f3d9acfe598073f9a929eef76bae4fcc9887cf",
+    "reason": "Bind the exact cumulative origin/main-to-candidate test diff after the reviewed reveal entry-point regression, preserving all earlier feature and repair-specific records and actual RED chronology.",
+    "previousBehavior": "All Tasks filters and scroll were transient, startup could paint the empty shell before local hydration, account changes could retain prior presentation, and toggle or reveal entry points could lose a locally open list after cloud adoption.",
+    "intendedBehavior": "Restore this device's list-open choice, filters and position with its saved board; keep the local view through newer and repeated peer reads; clear state across accounts; retain the board fallback when view storage is unavailable; and recompute current dates and eligibility.",
+    "replacementTests": [
+      "RISK saved view restoration: a reopened All Tasks list retains its local search tag filter and scroll position",
+      "RISK saved view account boundary: an All Tasks filter is cleared when the signed-in account changes",
+      "RISK saved view restoration: the eligibility filter remains selected after reopening All Tasks",
+      "RISK saved view cloud adoption: this device keeps its open All Tasks view through a newer remote board and reload",
+      "RISK saved view reveal: the real reveal action keeps its opened list through cloud adoption and reload",
+      "RISK saved view fallback: corrupt or blocked local presentation storage leaves the saved board usable",
+      "RISK saved view guidance: Quick start and Changelog describe this-device restoration and current dates",
+      "RISK saved view startup: delayed local board reads do not expose an empty default shell",
+      "RISK saved view startup: delayed local reads do not call state renderers before board hydration"
+    ],
+    "preservedCoverage": [
+      "Durable task board authority, merge/recovery, per-account privacy and current-day recomputation remain covered; presentation metadata remains device-local.",
+      "The original local-first consumer RED, actual toggle cloud-adoption RED, and refined actual reveal RED retain their own chronology and evidence in the prior rationale records and worker logs."
+    ],
+    "redEvidence": {
+      "command": "Original startup/view RED at 2026-10-17T02:47:58.917436Z on base a6cbbbaad70a4cb3a76dd53d25fa23fbc9c665f1; toggle cloud-adoption RED at 2026-10-17T02:59:33.360923Z on base 86af551a464a78d2c873d04b6fd33b02f9231e83; refined reveal RED at 2026-10-17T03:08:48Z on base f639e3b8534535dd1d909177d4ca09e7354c22e3. Exact commands remain in the original feature and repair-specific entries.",
+      "failure": "The initial browser consumer showed missing filters, account isolation and populated first paint. The real toggle consumer showed the open view lost to a newer closed-list board. The actual reveal consumer then reproduced the equivalent gap with the same task on both devices and an extra pull, leaving the local list closed through reload. All chronology and outputs remain in the respective feature, toggle and reveal logs."
+    }
+  },
+  {
+    "testChangesSha256": "103f916bb4956ec2bbebf66a943f07cb1b456bf601fc1250aba2dba5254f0376",
+    "reason": "Add a delayed local-hydration RISK consumer for startup-status readability, preserve the revealTask test collaborator introduced by the saved-view owner seam, and record the full-suite no-root regression before repairing the marker guard.",
+    "previousBehavior": "At candidate 5360ea1, the startup status used muted text directly over the moving landscape with no readable surface. The full suite also showed init dereferencing document.documentElement in an established no-root host, while the extracted revealTask fixture lacked its newly required saved-view collaborator.",
+    "intendedBehavior": "During delayed local board hydration, the status uses the established panel surface and readable app ink in both saved light and dark themes while scenery remains visible. Hosts without a document root remain a safe no-op, and the reduced-motion reveal test supplies and verifies the actual view owner collaborator.",
+    "replacementTests": [
+      "RISK saved view startup: delayed loading status stays readable over scenery in light and dark themes"
+    ],
+    "preservedCoverage": [
+      "The browser regression delays the real local board read, confirms no empty board rows are exposed, captures both themes before hydration completes, compares computed surface and border to an existing panel and text ink to the app ink, and bounds the card within the viewport.",
+      "The existing no-documentElement safe-no-op assertion remains unchanged; the runtime marker now guards the absent root.",
+      "All four existing reduced-motion combinations, centered reveal scrolling and list-open state remain asserted; the isolated fixture now supplies the actual saved-view owner and verifies its invocation.",
+      "After source inspection, the final style comparator was tightened to the separate All Tasks #listWrap pane. A 2026-10-17T03:28:27Z harness diagnostic using the first .wrap .panel selected #ctxPanel, whose intentional translucent secondary surface differs; no app source changed in that run. The final #listWrap light/dark consumer GREEN at 2026-10-17T03:29:07Z confirms matching surface, border and radius with a distinct node; details are in worker/startup-status-typography-green-final.log, worker/startup-status-typography-green-final2.log, and startup-status-green-final2/startup-status-paint.json."
+    ],
+    "redEvidence": {
+      "command": "Actual RISK RED at 2026-10-17T03:22:54Z on base 5360ea1dc9f1ecbe0a2d3aa58d8229029774d77e: LANDSCAPE_BROWSER_URL=http://127.0.0.1:8794/index.html LANDSCAPE_PLAYWRIGHT=/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs LANDSCAPE_BROWSER_CHANNEL=chrome SAVED_VIEW_ARTIFACT_DIR=/Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/startup-status-red /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=spec --test-name-pattern='RISK saved view startup: delayed loading status' tests.js.",
+      "failure": "With no app runtime or FAQ edits, the delayed local-read consumer found statusCard=null in light and dark mode; the status text had no surface. Exact refined failure and computed snapshots are in startup-status-typography-refined-red.log and startup-status-red/startup-status-paint.json, with the original standards screenshot at rendered-final/startup-loading.png. The parent full-suite run on 5360ea1 independently captured the no-root TypeError and missing allTasksView fixture collaborator in full-suite.log/.json; focused unchanged no-root RED is in typography-repair-existing-regressions-red.log."
+    }
+  },
+  {
+    "testChangesSha256": "1411cd00d779dd00fda1ba11d70119d3a4f6dfcf065d1adea736a82172581667",
+    "reason": "Bind the exact cumulative origin/main-to-candidate test diff after the startup-status readability and boot-host compatibility repair, preserving earlier saved-view and repair-specific chronology.",
+    "previousBehavior": "The original saved-view regressions lost per-device filters, position and local list-open choice during startup or cloud adoption, briefly exposed an empty shell, and had no protected delayed-startup surface/ink contract. Candidate 5360ea1 also regressed the no-root host marker and the isolated reveal motion fixture.",
+    "intendedBehavior": "During delayed local board hydration, the status uses the established panel surface and readable app ink in both saved light and dark themes while scenery remains visible. Hosts without a document root remain a safe no-op, and the reduced-motion reveal test supplies and verifies the actual view owner collaborator. Existing local-first board restoration, account boundaries, fallback behavior, cloud reconciliation and current-date reevaluation remain intact.",
+    "replacementTests": [
+      "RISK saved view startup: delayed loading status stays readable over scenery in light and dark themes"
+    ],
+    "preservedCoverage": [
+      "All original saved-view contracts remain present: restoration, account boundary, same-account adoption, reveal action, storage fallback, populated first paint, null-renderer prevention, guidance and current-date behavior.",
+      "The browser regression delays the real local board read, confirms no empty board rows are exposed, captures both themes before hydration completes, compares computed surface and border to an existing panel and text ink to the app ink, and bounds the card within the viewport.",
+      "The existing no-documentElement safe-no-op assertion remains unchanged; the runtime marker now guards the absent root.",
+      "All four existing reduced-motion combinations, centered reveal scrolling and list-open state remain asserted; the isolated fixture now supplies the actual saved-view owner and verifies its invocation.",
+      "After source inspection, the final style comparator was tightened to the separate All Tasks #listWrap pane. A 2026-10-17T03:28:27Z harness diagnostic using the first .wrap .panel selected #ctxPanel, whose intentional translucent secondary surface differs; no app source changed in that run. The final #listWrap light/dark consumer GREEN at 2026-10-17T03:29:07Z confirms matching surface, border and radius with a distinct node; details are in worker/startup-status-typography-green-final.log, worker/startup-status-typography-green-final2.log, and startup-status-green-final2/startup-status-paint.json."
+    ],
+    "redEvidence": {
+      "command": "Typography RED at 2026-10-17T03:22:54Z on base 5360ea1dc9f1ecbe0a2d3aa58d8229029774d77e: LANDSCAPE_BROWSER_URL=http://127.0.0.1:8794/index.html LANDSCAPE_PLAYWRIGHT=/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs LANDSCAPE_BROWSER_CHANNEL=chrome SAVED_VIEW_ARTIFACT_DIR=/Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/startup-status-red /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=spec --test-name-pattern='RISK saved view startup: delayed loading status' tests.js. Candidate 5360ea1 full-suite started at 2026-10-17T03:12:20.586Z and ended at03:18:54.789Z via node --test --test-reporter=spec tests.js.",
+      "failure": "Prior actual RED outputs remain in earlier rationale records and worker logs. The new delayed-read RISK failed because statusCard was absent in both themes. The actual full suite at 5360ea1 also failed the existing no-root safe no-op with TypeError at init and failed the extracted reduced-motion consumer with ReferenceError allTasksView; exact output is preserved in full-suite.log/.json."
+    }
+  },
+  {
+    "reason": "The user explicitly rejected the loading panel and required silent populated first paint. Replace the rejected assertions with actual storage-boundary and first-compositor consumers while preserving board hydration, filter, account and cloud contracts.",
+    "previousBehavior": "The superseded local candidate hid the static empty shell and displayed Opening your saved board in a panel. Filters and local list position restored after authoritative hydration; no populated prior appearance could paint while storage was pending.",
+    "intendedBehavior": "A bounded inert JSON visual-node projection paints the prior populated app with its accepted classes, search and scroll while the real IndexedDB read is pending, then quietly yields to authoritative current data. No popup, spinner, skeleton, duplicate IDs, executable attributes or stale task actions. Account changes mask the prior appearance and invalid, oversized or blocked records cannot affect boards.",
+    "replacementTests": [
+      "RISK saved view invisible startup: real IndexedDB reload paints the prior populated search and position without loading chrome",
+      "RISK saved view invisible large window: a tall viewport retains all visible rows with bounded projection work",
+      "RISK saved view invisible header: the prior floating header keeps its normal size and place while storage opens",
+      "RISK saved view invisible account boundary: a new identity immediately masks the pending prior appearance",
+      "RISK saved view invisible fallback: corrupt oversized untrusted and blocked projections never become board authority"
+    ],
+    "updatedTests": [
+      "RISK saved view guidance: Quick start and Changelog describe this-device restoration and current dates",
+      "RISK saved view startup: delayed local board reads do not expose an empty default shell"
+    ],
+    "preservedCoverage": [
+      "The user explicitly superseded the loading-status readability contract; no passing saved-board, populated-hydration, current-date, search, eligibility, tag, list-open, scroll, reveal, cloud adoption, account isolation or fallback assertion is removed or weakened.",
+      "The delayed-read no-default-shell and no-prehydration-state-render tests remain. Only the rejected status expectation changes to absent. If no valid projection exists, the static empty shell stays hidden until authoritative hydration.",
+      "Real-handler search, eligibility, list toggle and reveal, cloud adoption and reload coverage remains. Presentation bytes never feed task authority, recovery, serialization, migration, persistence or cloud acknowledgement.",
+      "No production account, saved user board or other owner worktree is used. Independent release reviews, full regression, compatibility, CI, deployment and ordinary production proof remain pending under the user release hold."
+    ],
+    "redEvidence": {
+      "command": "On clean bf64e0381e267f2fda17e9383010513284b21dd1 with tests.js alone edited: LANDSCAPE_BROWSER_URL=http://127.0.0.1:8794 PLAYWRIGHT_MODULE=/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs node --test --test-name-pattern='RISK saved view invisible startup:' tests.js. Subsequent vertical REDs use the same environment and 'RISK saved view invisible header:'. FAQ RED: node --test --test-name-pattern='RISK saved view guidance:' tests.js.",
+      "failure": "Actual contemporaneous initial RED before runtime edits: first visible app must already resemble the prior populated view, false !== true while actual IndexedDB was pending (invisible/red.txt). Subsequent stricter first-compositor RED caught blank frames while an extra projection asset was delayed (first-paint-red.txt), before inlining that code. Floating-header RED observed cached width261.609375 versus accepted366 (floating-header-red.txt), before copying four bounded CSS geometry hints. FAQ RED observed the rejected small-panel promise before prose edits (faq-red.txt). Intermediate position probes caught browser history restoring206px instead of220px; temporary manual restoration repaired that failure. Account/corrupt/oversized/untrusted/blocked consumers were added as postimplementation preservation coverage and passed; no earlier RED is claimed for them. Initial external runtime QA expected the same filter across a synthetic initial account change; it correctly reset the filter. The fixture now establishes this account filter through the real search handler before the same-account update; runtime code was unchanged for that fixture correction. Exact original and final logs remain external. A final actual tall-window RED at1280x2160 found29 visible prior rows versus16 cached visible rows (tall-window-red.txt). Before the repair, this exposed incomplete visible coverage under the eighteen-row cap. Capture now binary-searches both visible edges and two-row buffers with a hard48-row maximum; tall-window-green.txt proves that consumer and ordinary phone startup. No full-board clone is introduced."
+    },
+    "userAuthorization": "Direct correction: WOAH that giant popup is unacceptable. the sync is supposed to be invisible and seamless. User held going live until awake and asked for actual functionality screenshots for approval; this candidate stays local.",
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/invisible",
+    "comparison": "revisedDelta",
+    "comparisonBase": "bf64e0381e267f2fda17e9383010513284b21dd1",
+    "testChangesSha256": "f153a9c689393f839032b06991a8c72cc14fc68f82a0084ea7a46ba26ba63a31"
+  },
+  {
+    "reason": "The user explicitly rejected the loading panel and required silent populated first paint. Replace the rejected assertions with actual storage-boundary and first-compositor consumers while preserving board hydration, filter, account and cloud contracts.",
+    "previousBehavior": "The superseded local candidate hid the static empty shell and displayed Opening your saved board in a panel. Filters and local list position restored after authoritative hydration; no populated prior appearance could paint while storage was pending.",
+    "intendedBehavior": "A bounded inert JSON visual-node projection paints the prior populated app with its accepted classes, search and scroll while the real IndexedDB read is pending, then quietly yields to authoritative current data. No popup, spinner, skeleton, duplicate IDs, executable attributes or stale task actions. Account changes mask the prior appearance and invalid, oversized or blocked records cannot affect boards.",
+    "replacementTests": [
+      "RISK saved view invisible startup: real IndexedDB reload paints the prior populated search and position without loading chrome",
+      "RISK saved view invisible large window: a tall viewport retains all visible rows with bounded projection work",
+      "RISK saved view invisible header: the prior floating header keeps its normal size and place while storage opens",
+      "RISK saved view invisible account boundary: a new identity immediately masks the pending prior appearance",
+      "RISK saved view invisible fallback: corrupt oversized untrusted and blocked projections never become board authority"
+    ],
+    "updatedTests": [
+      "RISK saved view guidance: Quick start and Changelog describe this-device restoration and current dates",
+      "RISK saved view startup: delayed local board reads do not expose an empty default shell"
+    ],
+    "preservedCoverage": [
+      "The user explicitly superseded the loading-status readability contract; no passing saved-board, populated-hydration, current-date, search, eligibility, tag, list-open, scroll, reveal, cloud adoption, account isolation or fallback assertion is removed or weakened.",
+      "The delayed-read no-default-shell and no-prehydration-state-render tests remain. Only the rejected status expectation changes to absent. If no valid projection exists, the static empty shell stays hidden until authoritative hydration.",
+      "Real-handler search, eligibility, list toggle and reveal, cloud adoption and reload coverage remains. Presentation bytes never feed task authority, recovery, serialization, migration, persistence or cloud acknowledgement.",
+      "No production account, saved user board or other owner worktree is used. Independent release reviews, full regression, compatibility, CI, deployment and ordinary production proof remain pending under the user release hold."
+    ],
+    "redEvidence": {
+      "command": "On clean bf64e0381e267f2fda17e9383010513284b21dd1 with tests.js alone edited: LANDSCAPE_BROWSER_URL=http://127.0.0.1:8794 PLAYWRIGHT_MODULE=/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs node --test --test-name-pattern='RISK saved view invisible startup:' tests.js. Subsequent vertical REDs use the same environment and 'RISK saved view invisible header:'. FAQ RED: node --test --test-name-pattern='RISK saved view guidance:' tests.js.",
+      "failure": "Actual contemporaneous initial RED before runtime edits: first visible app must already resemble the prior populated view, false !== true while actual IndexedDB was pending (invisible/red.txt). Subsequent stricter first-compositor RED caught blank frames while an extra projection asset was delayed (first-paint-red.txt), before inlining that code. Floating-header RED observed cached width261.609375 versus accepted366 (floating-header-red.txt), before copying four bounded CSS geometry hints. FAQ RED observed the rejected small-panel promise before prose edits (faq-red.txt). Intermediate position probes caught browser history restoring206px instead of220px; temporary manual restoration repaired that failure. Account/corrupt/oversized/untrusted/blocked consumers were added as postimplementation preservation coverage and passed; no earlier RED is claimed for them. Initial external runtime QA expected the same filter across a synthetic initial account change; it correctly reset the filter. The fixture now establishes this account filter through the real search handler before the same-account update; runtime code was unchanged for that fixture correction. Exact original and final logs remain external. Original saved-view, toggle/reveal and harness-specific REDs remain in earlier rationale records and historical worker evidence. Their status-panel UX is superseded; original data/filter safety and actual chronology remain. This cumulative record binds all retained coverage and the authorized silent-startup correction. A final actual tall-window RED at1280x2160 found29 visible prior rows versus16 cached visible rows (tall-window-red.txt). Before the repair, this exposed incomplete visible coverage under the eighteen-row cap. Capture now binary-searches both visible edges and two-row buffers with a hard48-row maximum; tall-window-green.txt proves that consumer and ordinary phone startup. No full-board clone is introduced."
+    },
+    "userAuthorization": "Direct correction: WOAH that giant popup is unacceptable. the sync is supposed to be invisible and seamless. User held going live until awake and asked for actual functionality screenshots for approval; this candidate stays local.",
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/invisible",
+    "comparison": "fullReleaseBase",
+    "comparisonBase": "69a9feddf5d6bb8c4973475f7232e363b8646097",
+    "testChangesSha256": "8e4859224236e577cdb1f786cdc82252a7b53406ffeef7239fe9159664f67a9b"
+  },
+  {
+    "testChangesSha256": "765fc02454c9121ba86bfeff39afefd84e47d1fd7e32b91ffcc83f9ba34bc026",
+    "comparisonBase": "670ccf9565b87dc019ef904d424b1a368b1926ec",
+    "comparison": "activeScannerDelta",
+    "reason": "Root actual screenshot inspection found the active scanner preview17px shorter than the accepted populated scanner. Extend the actual Start scanning consumer through delayed native storage and preserve its harmless separator in the inert visual projection.",
+    "previousBehavior": "The preview tag allowlist omitted hr. After Start scanning displayed both a dotted benchmark and candidate, capture dropped hr.sep, shortening the scanner by17px and shifting All Tasks upward even though page and list scroll matched.",
+    "intendedBehavior": "Preserve hr through the same safe DOM projection. Scanner, All Tasks panel and list-body bounds, including the separator, exactly match before close and while actual IndexedDB is pending on desktop and phone. The projection remains inert and separate from all board authority.",
+    "replacementTests": [
+      "RISK saved view invisible active scanner: a running scan retains scanner and task-list geometry before hydration"
+    ],
+    "preservedCoverage": [
+      "Every prior populated-first-paint, theme, search, filter, list position, early-input safety, account boundary, malformed/oversized/blocked cache, tall-window and floating-header assertion remains unchanged. The existing FAQ and changelog continue accurately describing silent restored appearance.",
+      "No action or event attributes, raw HTML, IDs, board state, saves, migration, recovery or cloud acknowledgement are introduced. A harmless hr is the only new runtime allowlist token.",
+      "Historical original RED/GREEN evidence and exact rationale records remain preserved. The full release-base comparison retains all earlier saved-view/filter/toggle/reveal chronology and the user-authorized rejection of loading UI. No status-panel approval is revived."
+    ],
+    "redEvidence": {
+      "command": "On670ccf9565b87dc019ef904d424b1a368b1926ec, tests.js alone edited: LANDSCAPE_BROWSER_URL=http://127.0.0.1:8794 PLAYWRIGHT_MODULE=/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs SAVED_VIEW_ARTIFACT_DIR=/Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/invisible/active-scanner node --test --test-name-pattern='RISK saved view invisible active scanner:' tests.js.",
+      "failure": "Contemporaneous preimplementation assertion RED: scanner height327.53125 instead of344.53125, list panel y680.890625 instead of697.890625, list body y841.078125 instead of858.078125, separator count0 instead of1. Page/list scroll and scanner width/top matched. Exact log active-scanner/red.txt. Only then added hr to the allowlist; active-scanner/green.txt passed desktop and phone. Final screenshots and equal geometry reports are under active-scanner/final, with the final focused cohort in final-green.txt. Original earlier feature and repair RED chronology remains in existing rationale records and invisible/report.md."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/invisible/active-scanner",
+    "releaseStatus": "Local candidate only; no release actions. User screenshot approval and live hold remain."
+  },
+  {
+    "testChangesSha256": "1dd92423b14ca1b70bdbe042282a6cf6fa459d5a266ad05d5ff121fa94e3eb62",
+    "comparisonBase": "bf64e0381e267f2fda17e9383010513284b21dd1",
+    "comparison": "revisedDelta",
+    "reason": "Root actual screenshot inspection found the active scanner preview17px shorter than the accepted populated scanner. Extend the actual Start scanning consumer through delayed native storage and preserve its harmless separator in the inert visual projection.",
+    "previousBehavior": "The preview tag allowlist omitted hr. After Start scanning displayed both a dotted benchmark and candidate, capture dropped hr.sep, shortening the scanner by17px and shifting All Tasks upward even though page and list scroll matched.",
+    "intendedBehavior": "Preserve hr through the same safe DOM projection. Scanner, All Tasks panel and list-body bounds, including the separator, exactly match before close and while actual IndexedDB is pending on desktop and phone. The projection remains inert and separate from all board authority.",
+    "replacementTests": [
+      "RISK saved view invisible active scanner: a running scan retains scanner and task-list geometry before hydration"
+    ],
+    "preservedCoverage": [
+      "Every prior populated-first-paint, theme, search, filter, list position, early-input safety, account boundary, malformed/oversized/blocked cache, tall-window and floating-header assertion remains unchanged. The existing FAQ and changelog continue accurately describing silent restored appearance.",
+      "No action or event attributes, raw HTML, IDs, board state, saves, migration, recovery or cloud acknowledgement are introduced. A harmless hr is the only new runtime allowlist token.",
+      "Historical original RED/GREEN evidence and exact rationale records remain preserved. The full release-base comparison retains all earlier saved-view/filter/toggle/reveal chronology and the user-authorized rejection of loading UI. No status-panel approval is revived."
+    ],
+    "redEvidence": {
+      "command": "On670ccf9565b87dc019ef904d424b1a368b1926ec, tests.js alone edited: LANDSCAPE_BROWSER_URL=http://127.0.0.1:8794 PLAYWRIGHT_MODULE=/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs SAVED_VIEW_ARTIFACT_DIR=/Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/invisible/active-scanner node --test --test-name-pattern='RISK saved view invisible active scanner:' tests.js.",
+      "failure": "Contemporaneous preimplementation assertion RED: scanner height327.53125 instead of344.53125, list panel y680.890625 instead of697.890625, list body y841.078125 instead of858.078125, separator count0 instead of1. Page/list scroll and scanner width/top matched. Exact log active-scanner/red.txt. Only then added hr to the allowlist; active-scanner/green.txt passed desktop and phone. Final screenshots and equal geometry reports are under active-scanner/final, with the final focused cohort in final-green.txt. Original earlier feature and repair RED chronology remains in existing rationale records and invisible/report.md."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/invisible/active-scanner",
+    "releaseStatus": "Local candidate only; no release actions. User screenshot approval and live hold remain."
+  },
+  {
+    "testChangesSha256": "b90550989fbe140f7fd117a96ff2e70d9eb7fdd3911b1e3e2f0a3845ac9d63a7",
+    "comparisonBase": "69a9feddf5d6bb8c4973475f7232e363b8646097",
+    "comparison": "fullReleaseBase",
+    "reason": "Root actual screenshot inspection found the active scanner preview17px shorter than the accepted populated scanner. Extend the actual Start scanning consumer through delayed native storage and preserve its harmless separator in the inert visual projection.",
+    "previousBehavior": "The preview tag allowlist omitted hr. After Start scanning displayed both a dotted benchmark and candidate, capture dropped hr.sep, shortening the scanner by17px and shifting All Tasks upward even though page and list scroll matched.",
+    "intendedBehavior": "Preserve hr through the same safe DOM projection. Scanner, All Tasks panel and list-body bounds, including the separator, exactly match before close and while actual IndexedDB is pending on desktop and phone. The projection remains inert and separate from all board authority.",
+    "replacementTests": [
+      "RISK saved view invisible active scanner: a running scan retains scanner and task-list geometry before hydration"
+    ],
+    "preservedCoverage": [
+      "Every prior populated-first-paint, theme, search, filter, list position, early-input safety, account boundary, malformed/oversized/blocked cache, tall-window and floating-header assertion remains unchanged. The existing FAQ and changelog continue accurately describing silent restored appearance.",
+      "No action or event attributes, raw HTML, IDs, board state, saves, migration, recovery or cloud acknowledgement are introduced. A harmless hr is the only new runtime allowlist token.",
+      "Historical original RED/GREEN evidence and exact rationale records remain preserved. The full release-base comparison retains all earlier saved-view/filter/toggle/reveal chronology and the user-authorized rejection of loading UI. No status-panel approval is revived."
+    ],
+    "redEvidence": {
+      "command": "On670ccf9565b87dc019ef904d424b1a368b1926ec, tests.js alone edited: LANDSCAPE_BROWSER_URL=http://127.0.0.1:8794 PLAYWRIGHT_MODULE=/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs SAVED_VIEW_ARTIFACT_DIR=/Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/invisible/active-scanner node --test --test-name-pattern='RISK saved view invisible active scanner:' tests.js.",
+      "failure": "Contemporaneous preimplementation assertion RED: scanner height327.53125 instead of344.53125, list panel y680.890625 instead of697.890625, list body y841.078125 instead of858.078125, separator count0 instead of1. Page/list scroll and scanner width/top matched. Exact log active-scanner/red.txt. Only then added hr to the allowlist; active-scanner/green.txt passed desktop and phone. Final screenshots and equal geometry reports are under active-scanner/final, with the final focused cohort in final-green.txt. Original earlier feature and repair RED chronology remains in existing rationale records and invisible/report.md."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/invisible/active-scanner",
+    "releaseStatus": "Local candidate only; no release actions. User screenshot approval and live hold remain."
+  },
+  {
+    "testChangesSha256": "faf05d76a86973f0bcb59bd8fcf14a46e0291d2cd651e03aa5a9f301f94dbde9",
+    "comparison": "approvedDelta",
+    "comparisonBase": "7d5b069603b758b73e5704a4a3eb91625ffd6413",
+    "reason": "Reconcile the user-approved silent saved-view release with already released decision-preserving sync659aac. Preserve both complete implementations and their test/RED histories; add combined real-consumer coverage and update only the saved-view release-note date to the explicitly requested current October17 chapter.",
+    "previousBehavior": "The approved saved-view branch predated released decision authority and scoped Undo. Its guidance assertion located the saved-view note under October16, and its external QA helper reassigned account IDs on boards that can now contain retained guest decisions.",
+    "intendedBehavior": "Keep approved SavedAppearance bytes and released cloud adapter/rules/decision authority intact. Normal guest inheritance precedes same-account publication; a real peer editor change and local concurrent Add retain this-device search/list-open/scroll through scoped Undo and cold reopen on fallback and IndexedDB. The identical approved saved-view note appears in current October17 with released sync notes and all unrelated history retained.",
+    "replacementTests": [
+      "RISK saved view decision integration: inherited guest authority and peer edits retain this device view through scoped Undo and reopen"
+    ],
+    "updatedTests": [
+      "RISK saved view guidance: Quick start and Changelog describe this-device restoration and current dates"
+    ],
+    "preservedCoverage": [
+      "All original approved saved-view and released decision/current-choice/Undo/account/recovery assertions remain protected. No runtime behavior assertion is deleted or weakened; the sole old expectation changed is the user-authorized changelog chapter date from October16 to October17.",
+      "The exact approved SavedAppearance block is unchanged, including inert preview, first-paint bounds, hr separator, account masking, size limits and no task authority. Released cloud-store-v2.js and firestore.rules remain byte-exact659aac.",
+      "Both rationale histories are unioned without loss or same-fingerprint conflicts. Original contemporaneous source RED/GREEN evidence remains in its prior records; this source merge reuses those proven implementations and does not claim a new functional fix.",
+      "The new combined consumer exercises real Start, first-empty-account reconciliation/attestation, peer editor Save, local Add, scoped Undo and persisted reopen through fallback and IndexedDB. Its assertions retain exact peer title, removed local addition, query, list-open,420px scroll and confirmed final sync. Browser, emulator, compatibility, full suite and release reviews remain separate parent-owned gates."
+    ],
+    "redEvidence": {
+      "command": "Original source REDs remain in imported approved7d5 and released659aac rationale histories. First merged non-browser cohort: node --test --test-name-pattern='RISK saved view restoration:|RISK saved view cloud adoption:|RISK saved view reveal:|RISK saved view account boundary:|RISK saved view fallback:|RISK saved view guidance:' tests.js. Combined preservation: node --test --test-name-pattern='RISK saved view decision integration:|RISK saved view guidance:' tests.js.",
+      "failure": "The first source-merged cohort passed six saved-view consumers and failed only the old October16 guidance-date assertion after the explicitly authorized exact saved-view note was moved to October17; saved-view-first-cohort.txt preserves that observed mismatch before the date assertion was updated. No runtime repair followed. The new combined preservation test initially passed fallback but saw IndexedDB syncDirty true when the fixture closed before Undo acknowledgement and had never accepted Quick start. It now uses the real OK consumer and asserts acknowledgement before close; no app runtime code changed for this fixture lifecycle correction. integration-first.txt, integration-green.txt and integration-probe.txt retain those failed observations; integration-settled.txt passes both storage paths and guidance. This added combined coverage is postimplementation preservation, not fabricated preimplementation RED. Earlier actual feature and geometry RED chronology is retained unchanged."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/approved-release/integration-owner",
+    "releaseStatus": "Screenshot hold lifted by user; this assignment remains local with no browser/emulator allocation, push, PR, CI or deployment. Root owns exact reviews, full regression and release."
+  },
+  {
+    "testChangesSha256": "acca16564c71d30293ff674c6e5e117e817f06e3f2d895717f4dbea834b1bc54",
+    "comparison": "releasedDelta",
+    "comparisonBase": "659aac18ad6bae310f8d6f50be2201abf1791eb8",
+    "reason": "Reconcile the user-approved silent saved-view release with already released decision-preserving sync659aac. Preserve both complete implementations and their test/RED histories; add combined real-consumer coverage and update only the saved-view release-note date to the explicitly requested current October17 chapter.",
+    "previousBehavior": "The approved saved-view branch predated released decision authority and scoped Undo. Its guidance assertion located the saved-view note under October16, and its external QA helper reassigned account IDs on boards that can now contain retained guest decisions.",
+    "intendedBehavior": "Keep approved SavedAppearance bytes and released cloud adapter/rules/decision authority intact. Normal guest inheritance precedes same-account publication; a real peer editor change and local concurrent Add retain this-device search/list-open/scroll through scoped Undo and cold reopen on fallback and IndexedDB. The identical approved saved-view note appears in current October17 with released sync notes and all unrelated history retained.",
+    "replacementTests": [
+      "RISK saved view decision integration: inherited guest authority and peer edits retain this device view through scoped Undo and reopen"
+    ],
+    "updatedTests": [
+      "RISK saved view guidance: Quick start and Changelog describe this-device restoration and current dates"
+    ],
+    "preservedCoverage": [
+      "All original approved saved-view and released decision/current-choice/Undo/account/recovery assertions remain protected. No runtime behavior assertion is deleted or weakened; the sole old expectation changed is the user-authorized changelog chapter date from October16 to October17.",
+      "The exact approved SavedAppearance block is unchanged, including inert preview, first-paint bounds, hr separator, account masking, size limits and no task authority. Released cloud-store-v2.js and firestore.rules remain byte-exact659aac.",
+      "Both rationale histories are unioned without loss or same-fingerprint conflicts. Original contemporaneous source RED/GREEN evidence remains in its prior records; this source merge reuses those proven implementations and does not claim a new functional fix.",
+      "The new combined consumer exercises real Start, first-empty-account reconciliation/attestation, peer editor Save, local Add, scoped Undo and persisted reopen through fallback and IndexedDB. Its assertions retain exact peer title, removed local addition, query, list-open,420px scroll and confirmed final sync. Browser, emulator, compatibility, full suite and release reviews remain separate parent-owned gates."
+    ],
+    "redEvidence": {
+      "command": "Original source REDs remain in imported approved7d5 and released659aac rationale histories. First merged non-browser cohort: node --test --test-name-pattern='RISK saved view restoration:|RISK saved view cloud adoption:|RISK saved view reveal:|RISK saved view account boundary:|RISK saved view fallback:|RISK saved view guidance:' tests.js. Combined preservation: node --test --test-name-pattern='RISK saved view decision integration:|RISK saved view guidance:' tests.js.",
+      "failure": "The first source-merged cohort passed six saved-view consumers and failed only the old October16 guidance-date assertion after the explicitly authorized exact saved-view note was moved to October17; saved-view-first-cohort.txt preserves that observed mismatch before the date assertion was updated. No runtime repair followed. The new combined preservation test initially passed fallback but saw IndexedDB syncDirty true when the fixture closed before Undo acknowledgement and had never accepted Quick start. It now uses the real OK consumer and asserts acknowledgement before close; no app runtime code changed for this fixture lifecycle correction. integration-first.txt, integration-green.txt and integration-probe.txt retain those failed observations; integration-settled.txt passes both storage paths and guidance. This added combined coverage is postimplementation preservation, not fabricated preimplementation RED. Earlier actual feature and geometry RED chronology is retained unchanged."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/approved-release/integration-owner",
+    "releaseStatus": "Screenshot hold lifted by user; this assignment remains local with no browser/emulator allocation, push, PR, CI or deployment. Root owns exact reviews, full regression and release."
+  },
+  {
+    "testChangesSha256": "133c9009bade1b7d6f425eab14f12f3a002111a92b84290019885bdc625cb22c",
+    "comparison": "originalLiveCumulative",
+    "comparisonBase": "69a9feddf5d6bb8c4973475f7232e363b8646097",
+    "reason": "Reconcile the user-approved silent saved-view release with already released decision-preserving sync659aac. Preserve both complete implementations and their test/RED histories; add combined real-consumer coverage and update only the saved-view release-note date to the explicitly requested current October17 chapter.",
+    "previousBehavior": "The approved saved-view branch predated released decision authority and scoped Undo. Its guidance assertion located the saved-view note under October16, and its external QA helper reassigned account IDs on boards that can now contain retained guest decisions.",
+    "intendedBehavior": "Keep approved SavedAppearance bytes and released cloud adapter/rules/decision authority intact. Normal guest inheritance precedes same-account publication; a real peer editor change and local concurrent Add retain this-device search/list-open/scroll through scoped Undo and cold reopen on fallback and IndexedDB. The identical approved saved-view note appears in current October17 with released sync notes and all unrelated history retained.",
+    "replacementTests": [
+      "RISK saved view decision integration: inherited guest authority and peer edits retain this device view through scoped Undo and reopen"
+    ],
+    "updatedTests": [
+      "RISK saved view guidance: Quick start and Changelog describe this-device restoration and current dates"
+    ],
+    "preservedCoverage": [
+      "All original approved saved-view and released decision/current-choice/Undo/account/recovery assertions remain protected. No runtime behavior assertion is deleted or weakened; the sole old expectation changed is the user-authorized changelog chapter date from October16 to October17.",
+      "The exact approved SavedAppearance block is unchanged, including inert preview, first-paint bounds, hr separator, account masking, size limits and no task authority. Released cloud-store-v2.js and firestore.rules remain byte-exact659aac.",
+      "Both rationale histories are unioned without loss or same-fingerprint conflicts. Original contemporaneous source RED/GREEN evidence remains in its prior records; this source merge reuses those proven implementations and does not claim a new functional fix.",
+      "The new combined consumer exercises real Start, first-empty-account reconciliation/attestation, peer editor Save, local Add, scoped Undo and persisted reopen through fallback and IndexedDB. Its assertions retain exact peer title, removed local addition, query, list-open,420px scroll and confirmed final sync. Browser, emulator, compatibility, full suite and release reviews remain separate parent-owned gates."
+    ],
+    "redEvidence": {
+      "command": "Original source REDs remain in imported approved7d5 and released659aac rationale histories. First merged non-browser cohort: node --test --test-name-pattern='RISK saved view restoration:|RISK saved view cloud adoption:|RISK saved view reveal:|RISK saved view account boundary:|RISK saved view fallback:|RISK saved view guidance:' tests.js. Combined preservation: node --test --test-name-pattern='RISK saved view decision integration:|RISK saved view guidance:' tests.js.",
+      "failure": "The first source-merged cohort passed six saved-view consumers and failed only the old October16 guidance-date assertion after the explicitly authorized exact saved-view note was moved to October17; saved-view-first-cohort.txt preserves that observed mismatch before the date assertion was updated. No runtime repair followed. The new combined preservation test initially passed fallback but saw IndexedDB syncDirty true when the fixture closed before Undo acknowledgement and had never accepted Quick start. It now uses the real OK consumer and asserts acknowledgement before close; no app runtime code changed for this fixture lifecycle correction. integration-first.txt, integration-green.txt and integration-probe.txt retain those failed observations; integration-settled.txt passes both storage paths and guidance. This added combined coverage is postimplementation preservation, not fabricated preimplementation RED. Earlier actual feature and geometry RED chronology is retained unchanged."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/approved-release/integration-owner",
+    "releaseStatus": "Screenshot hold lifted by user; this assignment remains local with no browser/emulator allocation, push, PR, CI or deployment. Root owns exact reviews, full regression and release."
+  },
+  {
+    "testChangesSha256": "be858f6d6e2479650ffb92eafac5e50a8f15b26d4d24e623d8a94201bea11553",
+    "comparison": "repairDelta",
+    "comparisonBase": "8abed97fd09a3430fa5ffaf8c94d455abb6f1546",
+    "reason": "Correct the combined reopen fixture after supported Node22 reproduced a false acknowledgement assumption. Replace fixed 80/100ms sleeps and syncDirty-only close settlement with a bounded condition requiring an idle publication, exact acknowledged cloud payload/revision, and exact current bytes in the real storage backend. Preserve all runtime sources and existing assertions.",
+    "previousBehavior": "On untouched8abed97, the fixture observed syncDirty=false while the preceding Add acknowledgement still owned cloudPushInFlight/pendingPush; durable local rev3 already contained Undo but remote rev3 still contained the46-task Add without deletion evidence. It closed then asserted cold reopen after100ms. The8ab rationale had claimed the syncDirty-only wait established Undo acknowledgement; this trace corrects that unsupported claim without rewriting its historical evidence.",
+    "intendedBehavior": "Finish each intended publication phase before treating it as acknowledged. Exercise guest inheritance, real peer editor Save, concurrent local Add during a held pull, scoped Undo and cold reopen through fallback and IndexedDB, with exact current cloud and durable bytes before closing and at final reopen. This is a test settlement correction; no application behavior or runtime asset changes.",
+    "replacementTests": [
+      "RISK saved view decision integration: inherited guest authority and peer edits retain this device view through scoped Undo and durably acknowledged reopen"
+    ],
+    "preservedCoverage": [
+      "Every prior task/content, guest inheritance and account/authority, decision-base, peer title, concurrent Add, scoped Undo and final syncDirty assertion remains. Query Shared, open list and420px list position are still checked before and after cold reopen on fallback and IndexedDB.",
+      "New settlement checks strengthen the fixture: within8seconds the publication slot, pull, pending push and resume must be idle; syncDirty false; cloudPayload and syncRev exactly match the harness acknowledgement; lastPersistedRaw and actual IndexedDB head/browser store exactly match current state bytes. No retries, payload rewriting, assertion skipping, or protocol spoofing are introduced.",
+      "All user-approved invisible SavedAppearance, view metadata, FAQ/changelog, dates, cloud/account, released decision authority, activation, Undo and persistence source bytes remain exactly8abed97. This does not claim that closing an actively publishing page immediately uploads its latest edit, or that the dirty flag alone proves full quiescence.",
+      "Earlier actual feature/geometry RED and imported release-main histories are retained unchanged. Broader full-suite, native browser, emulator, independent review and release validation remain parent-owned; this task uses focused non-browser Node22 checks only."
+    ],
+    "redEvidence": {
+      "command": "Untouched8abed97: /opt/local/bin/node --test --test-reporter=spec --test-name-pattern='RISK saved view (restoration|account boundary|cloud adoption|reveal|fallback|decision integration)|RISK decision.*(authority|Undo)|RISK CLOUD ACCOUNT:|LOGIC AUDIT: a malformed newer cloud payload|RISK STALE TAB: (cloud adoption|failed cloud adoption)' tests.js. External synchronous snapshot probe is reproducible with create-baseline-trace.py in the evidence directory.",
+      "failure": "Actual Node22 baseline47pass/2fail/0skip; IndexedDB cold reopen syncDirty true, localRev3/remoteRev3, remote/current tasks/deletion evidence differed. node22-baseline.txt preserves the untouched observation. trace-exact.json and trace-exact-run.txt capture current/persisted/cloud payloads and active-slot flags without changing application source: the premature Undo clean flag was not exact cloud acknowledgement; the retained Undo later reached rev4 intact. An external bounded actual-settlement probe passed49/49 before the fixture edit; final focused Node22 runs preserve GREEN. No runtime defect or preimplementation app fix is claimed."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/approved-release/settlement-repair",
+    "releaseStatus": "Local test-only repair candidate. Root owns full regression, native runtime, reviews, CI and release. Original8ab full-suite failure is retained; runtime source equality lets parent relate its native evidence by exact asset hash."
+  },
+  {
+    "testChangesSha256": "bdf632206c76985dac7fb1af502fe9be4a2109e24a12704c5128dccfd336d74b",
+    "comparison": "approvedDelta",
+    "comparisonBase": "7d5b069603b758b73e5704a4a3eb91625ffd6413",
+    "reason": "Correct the combined reopen fixture after supported Node22 reproduced a false acknowledgement assumption. Replace fixed 80/100ms sleeps and syncDirty-only close settlement with a bounded condition requiring an idle publication, exact acknowledged cloud payload/revision, and exact current bytes in the real storage backend. Preserve all runtime sources and existing assertions.",
+    "previousBehavior": "On untouched8abed97, the fixture observed syncDirty=false while the preceding Add acknowledgement still owned cloudPushInFlight/pendingPush; durable local rev3 already contained Undo but remote rev3 still contained the46-task Add without deletion evidence. It closed then asserted cold reopen after100ms. The8ab rationale had claimed the syncDirty-only wait established Undo acknowledgement; this trace corrects that unsupported claim without rewriting its historical evidence.",
+    "intendedBehavior": "Finish each intended publication phase before treating it as acknowledged. Exercise guest inheritance, real peer editor Save, concurrent local Add during a held pull, scoped Undo and cold reopen through fallback and IndexedDB, with exact current cloud and durable bytes before closing and at final reopen. This is a test settlement correction; no application behavior or runtime asset changes.",
+    "replacementTests": [
+      "RISK saved view decision integration: inherited guest authority and peer edits retain this device view through scoped Undo and durably acknowledged reopen"
+    ],
+    "preservedCoverage": [
+      "Every prior task/content, guest inheritance and account/authority, decision-base, peer title, concurrent Add, scoped Undo and final syncDirty assertion remains. Query Shared, open list and420px list position are still checked before and after cold reopen on fallback and IndexedDB.",
+      "New settlement checks strengthen the fixture: within8seconds the publication slot, pull, pending push and resume must be idle; syncDirty false; cloudPayload and syncRev exactly match the harness acknowledgement; lastPersistedRaw and actual IndexedDB head/browser store exactly match current state bytes. No retries, payload rewriting, assertion skipping, or protocol spoofing are introduced.",
+      "All user-approved invisible SavedAppearance, view metadata, FAQ/changelog, dates, cloud/account, released decision authority, activation, Undo and persistence source bytes remain exactly8abed97. This does not claim that closing an actively publishing page immediately uploads its latest edit, or that the dirty flag alone proves full quiescence.",
+      "Earlier actual feature/geometry RED and imported release-main histories are retained unchanged. Broader full-suite, native browser, emulator, independent review and release validation remain parent-owned; this task uses focused non-browser Node22 checks only."
+    ],
+    "redEvidence": {
+      "command": "Untouched8abed97: /opt/local/bin/node --test --test-reporter=spec --test-name-pattern='RISK saved view (restoration|account boundary|cloud adoption|reveal|fallback|decision integration)|RISK decision.*(authority|Undo)|RISK CLOUD ACCOUNT:|LOGIC AUDIT: a malformed newer cloud payload|RISK STALE TAB: (cloud adoption|failed cloud adoption)' tests.js. External synchronous snapshot probe is reproducible with create-baseline-trace.py in the evidence directory.",
+      "failure": "Actual Node22 baseline47pass/2fail/0skip; IndexedDB cold reopen syncDirty true, localRev3/remoteRev3, remote/current tasks/deletion evidence differed. node22-baseline.txt preserves the untouched observation. trace-exact.json and trace-exact-run.txt capture current/persisted/cloud payloads and active-slot flags without changing application source: the premature Undo clean flag was not exact cloud acknowledgement; the retained Undo later reached rev4 intact. An external bounded actual-settlement probe passed49/49 before the fixture edit; final focused Node22 runs preserve GREEN. No runtime defect or preimplementation app fix is claimed."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/approved-release/settlement-repair",
+    "releaseStatus": "Local test-only repair candidate. Root owns full regression, native runtime, reviews, CI and release. Original8ab full-suite failure is retained; runtime source equality lets parent relate its native evidence by exact asset hash."
+  },
+  {
+    "testChangesSha256": "94c2d9c2360dcdb32074243818331893caaf6f21ac4e43c19cd6c0e4aa60bff5",
+    "comparison": "releasedDelta",
+    "comparisonBase": "659aac18ad6bae310f8d6f50be2201abf1791eb8",
+    "reason": "Correct the combined reopen fixture after supported Node22 reproduced a false acknowledgement assumption. Replace fixed 80/100ms sleeps and syncDirty-only close settlement with a bounded condition requiring an idle publication, exact acknowledged cloud payload/revision, and exact current bytes in the real storage backend. Preserve all runtime sources and existing assertions.",
+    "previousBehavior": "On untouched8abed97, the fixture observed syncDirty=false while the preceding Add acknowledgement still owned cloudPushInFlight/pendingPush; durable local rev3 already contained Undo but remote rev3 still contained the46-task Add without deletion evidence. It closed then asserted cold reopen after100ms. The8ab rationale had claimed the syncDirty-only wait established Undo acknowledgement; this trace corrects that unsupported claim without rewriting its historical evidence.",
+    "intendedBehavior": "Finish each intended publication phase before treating it as acknowledged. Exercise guest inheritance, real peer editor Save, concurrent local Add during a held pull, scoped Undo and cold reopen through fallback and IndexedDB, with exact current cloud and durable bytes before closing and at final reopen. This is a test settlement correction; no application behavior or runtime asset changes.",
+    "replacementTests": [
+      "RISK saved view decision integration: inherited guest authority and peer edits retain this device view through scoped Undo and durably acknowledged reopen"
+    ],
+    "preservedCoverage": [
+      "Every prior task/content, guest inheritance and account/authority, decision-base, peer title, concurrent Add, scoped Undo and final syncDirty assertion remains. Query Shared, open list and420px list position are still checked before and after cold reopen on fallback and IndexedDB.",
+      "New settlement checks strengthen the fixture: within8seconds the publication slot, pull, pending push and resume must be idle; syncDirty false; cloudPayload and syncRev exactly match the harness acknowledgement; lastPersistedRaw and actual IndexedDB head/browser store exactly match current state bytes. No retries, payload rewriting, assertion skipping, or protocol spoofing are introduced.",
+      "All user-approved invisible SavedAppearance, view metadata, FAQ/changelog, dates, cloud/account, released decision authority, activation, Undo and persistence source bytes remain exactly8abed97. This does not claim that closing an actively publishing page immediately uploads its latest edit, or that the dirty flag alone proves full quiescence.",
+      "Earlier actual feature/geometry RED and imported release-main histories are retained unchanged. Broader full-suite, native browser, emulator, independent review and release validation remain parent-owned; this task uses focused non-browser Node22 checks only."
+    ],
+    "redEvidence": {
+      "command": "Untouched8abed97: /opt/local/bin/node --test --test-reporter=spec --test-name-pattern='RISK saved view (restoration|account boundary|cloud adoption|reveal|fallback|decision integration)|RISK decision.*(authority|Undo)|RISK CLOUD ACCOUNT:|LOGIC AUDIT: a malformed newer cloud payload|RISK STALE TAB: (cloud adoption|failed cloud adoption)' tests.js. External synchronous snapshot probe is reproducible with create-baseline-trace.py in the evidence directory.",
+      "failure": "Actual Node22 baseline47pass/2fail/0skip; IndexedDB cold reopen syncDirty true, localRev3/remoteRev3, remote/current tasks/deletion evidence differed. node22-baseline.txt preserves the untouched observation. trace-exact.json and trace-exact-run.txt capture current/persisted/cloud payloads and active-slot flags without changing application source: the premature Undo clean flag was not exact cloud acknowledgement; the retained Undo later reached rev4 intact. An external bounded actual-settlement probe passed49/49 before the fixture edit; final focused Node22 runs preserve GREEN. No runtime defect or preimplementation app fix is claimed."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/approved-release/settlement-repair",
+    "releaseStatus": "Local test-only repair candidate. Root owns full regression, native runtime, reviews, CI and release. Original8ab full-suite failure is retained; runtime source equality lets parent relate its native evidence by exact asset hash."
+  },
+  {
+    "testChangesSha256": "bac3d9d873752f3e4e2fb47b833c5b0a4c3502f159f881060a2f9ff493fdcb0f",
+    "comparison": "originalLiveCumulative",
+    "comparisonBase": "69a9feddf5d6bb8c4973475f7232e363b8646097",
+    "reason": "Correct the combined reopen fixture after supported Node22 reproduced a false acknowledgement assumption. Replace fixed 80/100ms sleeps and syncDirty-only close settlement with a bounded condition requiring an idle publication, exact acknowledged cloud payload/revision, and exact current bytes in the real storage backend. Preserve all runtime sources and existing assertions.",
+    "previousBehavior": "On untouched8abed97, the fixture observed syncDirty=false while the preceding Add acknowledgement still owned cloudPushInFlight/pendingPush; durable local rev3 already contained Undo but remote rev3 still contained the46-task Add without deletion evidence. It closed then asserted cold reopen after100ms. The8ab rationale had claimed the syncDirty-only wait established Undo acknowledgement; this trace corrects that unsupported claim without rewriting its historical evidence.",
+    "intendedBehavior": "Finish each intended publication phase before treating it as acknowledged. Exercise guest inheritance, real peer editor Save, concurrent local Add during a held pull, scoped Undo and cold reopen through fallback and IndexedDB, with exact current cloud and durable bytes before closing and at final reopen. This is a test settlement correction; no application behavior or runtime asset changes.",
+    "replacementTests": [
+      "RISK saved view decision integration: inherited guest authority and peer edits retain this device view through scoped Undo and durably acknowledged reopen"
+    ],
+    "preservedCoverage": [
+      "Every prior task/content, guest inheritance and account/authority, decision-base, peer title, concurrent Add, scoped Undo and final syncDirty assertion remains. Query Shared, open list and420px list position are still checked before and after cold reopen on fallback and IndexedDB.",
+      "New settlement checks strengthen the fixture: within8seconds the publication slot, pull, pending push and resume must be idle; syncDirty false; cloudPayload and syncRev exactly match the harness acknowledgement; lastPersistedRaw and actual IndexedDB head/browser store exactly match current state bytes. No retries, payload rewriting, assertion skipping, or protocol spoofing are introduced.",
+      "All user-approved invisible SavedAppearance, view metadata, FAQ/changelog, dates, cloud/account, released decision authority, activation, Undo and persistence source bytes remain exactly8abed97. This does not claim that closing an actively publishing page immediately uploads its latest edit, or that the dirty flag alone proves full quiescence.",
+      "Earlier actual feature/geometry RED and imported release-main histories are retained unchanged. Broader full-suite, native browser, emulator, independent review and release validation remain parent-owned; this task uses focused non-browser Node22 checks only."
+    ],
+    "redEvidence": {
+      "command": "Untouched8abed97: /opt/local/bin/node --test --test-reporter=spec --test-name-pattern='RISK saved view (restoration|account boundary|cloud adoption|reveal|fallback|decision integration)|RISK decision.*(authority|Undo)|RISK CLOUD ACCOUNT:|LOGIC AUDIT: a malformed newer cloud payload|RISK STALE TAB: (cloud adoption|failed cloud adoption)' tests.js. External synchronous snapshot probe is reproducible with create-baseline-trace.py in the evidence directory.",
+      "failure": "Actual Node22 baseline47pass/2fail/0skip; IndexedDB cold reopen syncDirty true, localRev3/remoteRev3, remote/current tasks/deletion evidence differed. node22-baseline.txt preserves the untouched observation. trace-exact.json and trace-exact-run.txt capture current/persisted/cloud payloads and active-slot flags without changing application source: the premature Undo clean flag was not exact cloud acknowledgement; the retained Undo later reached rev4 intact. An external bounded actual-settlement probe passed49/49 before the fixture edit; final focused Node22 runs preserve GREEN. No runtime defect or preimplementation app fix is claimed."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/approved-release/settlement-repair",
+    "releaseStatus": "Local test-only repair candidate. Root owns full regression, native runtime, reviews, CI and release. Original8ab full-suite failure is retained; runtime source equality lets parent relate its native evidence by exact asset hash."
+  },
+  {
     "testChangesSha256": "f3a23b1198f2171eaeeaf4c5b710246c2ca65e9edeb3c9dcc1e065bc02cbf49f",
     "reason": "The downloaded service worker could reload the full app between a scanner pointerdown and its delegated task response. This ticket adds focused full-app coverage for the existing gesture lifecycle and documents the update wait in the extended FAQ and current release notes.",
     "previousBehavior": "An update could reach applyPendingAppUpdate during an active scanner gesture and reload immediately, interrupting the pending response. If persistence yielded while a new gesture began, the continuation could still reload. Gesture completion did not retry a pending update.",
@@ -8800,6 +9244,136 @@
     }
   },
   {
+    "testChangesSha256": "6a638a1b5889092855eb8272e0111a7c06570960f4ed14e337d7154687ae377f",
+    "comparison": "mergeDelta",
+    "comparisonBase": "465c9566a3cb4b03abd67abbc5ec6119f31e7464",
+    "reason": "Reconcile accepted saved-view candidate465c956 with newly released main4a3f332 (PWA scanner-gesture update guard), after another authorized task advanced main. Preserve both complete proven implementations, all existing assertions and historical rationale/RED records. No new functional repair or behavior redesign is introduced by this merge.",
+    "previousBehavior": "Candidate465c956 already preserved approved silent SavedAppearance and released decision authority, and passed parent full/native/rules/compatibility reviews. Released main4a3f332 independently adds entry and post-save scannerGestureActive reload guards plus finishScannerGesture update resumption, consumer tests and FAQ/current changelog copy. Their branches carried separate changelog and metadata fingerprints.",
+    "intendedBehavior": "The combined source keeps the exact approved SavedAppearance/CSS/device-view/list/render seams from465c956 and exact released finishScannerGesture/registerServiceWorker guards from4a3f332. Both October17 player notes and unrelated history remain, with refreshed combined app/SW metadata. Existing isolated tests from both parents remain unchanged and run against the combined source.",
+    "replacementTests": [
+      "RISK PWA updates: a scanner gesture commits its action before a downloaded worker reloads",
+      "RISK PWA updates: a gesture beginning during an update save holds and resumes reload",
+      "RISK PWA updates: cancelled and released gestures resume a pending replacement",
+      "RISK PWA updates: the extended FAQ and changelog explain gesture-safe reloads"
+    ],
+    "preservedCoverage": [
+      "All accepted saved-view task/view/account/Undo/content and durable acknowledgement assertions remain exactly465c956. The suite auto-merges without any executable test edits beyond the exact released4a3f332 additions and its required scannerGestureActive fixture global.",
+      "Released PWA full-app pointerdown/controllerchange/No-handler/cold-reopen, held asynchronous save, pointercancel/pointerup fallback and FAQ guidance tests remain exact4a3f332. Existing edit/visibility/failed-write/no-redundant-quota-save and sync safeguards remain intact.",
+      "Every rationale record from both parents is retained as an exact record; prior immutable465 reviews, receipts and CI evidence are preserved externally. This merge changes candidate SHA and requires affected exact-candidate reviews again; it does not reuse old approvals as current approval.",
+      "The copied source seams and unchanged cloud-store-v2.js/device-store-v2.js/firestore.rules are independently compared by exact SHA256 in source-parity.json. Native browser/full regression/emulator/compatibility/review/release gates remain parent-owned; the inherited WebKit offline internal-error limit is not claimed as a pass."
+    ],
+    "redEvidence": {
+      "command": "Original approved saved-view/geometry and settlement chronology remains in inherited rationale records and invisible/ plus approved-release/settlement-repair artifacts. Released PWA command: node --test --test-name-pattern=\"RISK PWA updates: a scanner gesture commits\" tests.js; original entry and FAQ RED logs are in .git/funsidething-task-evidence/active-reload-progress-20261016/. Current focused preservation command is recorded in this owner report.",
+      "failure": "This is a preservation merge of two previously implemented and approved/released source changes, not a new functional fix; no fabricated new preimplementation RED is claimed. Original worker-151-entry-red.log observed one reload during pointerdown/controllerchange where zero was expected before its three-line guard fix; worker-151-copy-red.log preceded FAQ edits. Its async/fallback sensitivity controls remain labelled postimplementation. Saved-view actual source/geometry and untouched Node22 settlement47pass/2fail chronology remain in their original records. The first merged cohort, run before final metadata refresh, passed all behavior tests and failed only stale app/SW fingerprints (pre-fingerprint-cohort.txt); that mechanical mismatch is not a new product RED."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/approved-release/reconcile-main-4a3/owner",
+    "releaseStatus": "Local merged candidate only. Root owns exact final regression/reviews/native/browser/emulator/CI/release. No shared allocation, push, PR, main merge or deployment by this owner."
+  },
+  {
+    "testChangesSha256": "d5fbafe14ad5fbb7d103428929b1ce501e9bf848c03306f88b5f84dc7d2682aa",
+    "comparison": "approvedDelta",
+    "comparisonBase": "7d5b069603b758b73e5704a4a3eb91625ffd6413",
+    "reason": "Reconcile accepted saved-view candidate465c956 with newly released main4a3f332 (PWA scanner-gesture update guard), after another authorized task advanced main. Preserve both complete proven implementations, all existing assertions and historical rationale/RED records. No new functional repair or behavior redesign is introduced by this merge.",
+    "previousBehavior": "Candidate465c956 already preserved approved silent SavedAppearance and released decision authority, and passed parent full/native/rules/compatibility reviews. Released main4a3f332 independently adds entry and post-save scannerGestureActive reload guards plus finishScannerGesture update resumption, consumer tests and FAQ/current changelog copy. Their branches carried separate changelog and metadata fingerprints.",
+    "intendedBehavior": "The combined source keeps the exact approved SavedAppearance/CSS/device-view/list/render seams from465c956 and exact released finishScannerGesture/registerServiceWorker guards from4a3f332. Both October17 player notes and unrelated history remain, with refreshed combined app/SW metadata. Existing isolated tests from both parents remain unchanged and run against the combined source.",
+    "replacementTests": [
+      "RISK saved view decision integration: inherited guest authority and peer edits retain this device view through scoped Undo and durably acknowledged reopen",
+      "RISK PWA updates: a scanner gesture commits its action before a downloaded worker reloads",
+      "RISK PWA updates: a gesture beginning during an update save holds and resumes reload",
+      "RISK PWA updates: cancelled and released gestures resume a pending replacement",
+      "RISK PWA updates: the extended FAQ and changelog explain gesture-safe reloads"
+    ],
+    "preservedCoverage": [
+      "All accepted saved-view task/view/account/Undo/content and durable acknowledgement assertions remain exactly465c956. The suite auto-merges without any executable test edits beyond the exact released4a3f332 additions and its required scannerGestureActive fixture global.",
+      "Released PWA full-app pointerdown/controllerchange/No-handler/cold-reopen, held asynchronous save, pointercancel/pointerup fallback and FAQ guidance tests remain exact4a3f332. Existing edit/visibility/failed-write/no-redundant-quota-save and sync safeguards remain intact.",
+      "Every rationale record from both parents is retained as an exact record; prior immutable465 reviews, receipts and CI evidence are preserved externally. This merge changes candidate SHA and requires affected exact-candidate reviews again; it does not reuse old approvals as current approval.",
+      "The copied source seams and unchanged cloud-store-v2.js/device-store-v2.js/firestore.rules are independently compared by exact SHA256 in source-parity.json. Native browser/full regression/emulator/compatibility/review/release gates remain parent-owned; the inherited WebKit offline internal-error limit is not claimed as a pass."
+    ],
+    "redEvidence": {
+      "command": "Original approved saved-view/geometry and settlement chronology remains in inherited rationale records and invisible/ plus approved-release/settlement-repair artifacts. Released PWA command: node --test --test-name-pattern=\"RISK PWA updates: a scanner gesture commits\" tests.js; original entry and FAQ RED logs are in .git/funsidething-task-evidence/active-reload-progress-20261016/. Current focused preservation command is recorded in this owner report.",
+      "failure": "This is a preservation merge of two previously implemented and approved/released source changes, not a new functional fix; no fabricated new preimplementation RED is claimed. Original worker-151-entry-red.log observed one reload during pointerdown/controllerchange where zero was expected before its three-line guard fix; worker-151-copy-red.log preceded FAQ edits. Its async/fallback sensitivity controls remain labelled postimplementation. Saved-view actual source/geometry and untouched Node22 settlement47pass/2fail chronology remain in their original records. The first merged cohort, run before final metadata refresh, passed all behavior tests and failed only stale app/SW fingerprints (pre-fingerprint-cohort.txt); that mechanical mismatch is not a new product RED."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/approved-release/reconcile-main-4a3/owner",
+    "releaseStatus": "Local merged candidate only. Root owns exact final regression/reviews/native/browser/emulator/CI/release. No shared allocation, push, PR, main merge or deployment by this owner."
+  },
+  {
+    "testChangesSha256": "99f07a468e334a7f2df4412bf130e1d3decad7a59d3e45a7a325cc22668710b0",
+    "comparison": "priorReleasedDelta",
+    "comparisonBase": "659aac18ad6bae310f8d6f50be2201abf1791eb8",
+    "reason": "Reconcile accepted saved-view candidate465c956 with newly released main4a3f332 (PWA scanner-gesture update guard), after another authorized task advanced main. Preserve both complete proven implementations, all existing assertions and historical rationale/RED records. No new functional repair or behavior redesign is introduced by this merge.",
+    "previousBehavior": "Candidate465c956 already preserved approved silent SavedAppearance and released decision authority, and passed parent full/native/rules/compatibility reviews. Released main4a3f332 independently adds entry and post-save scannerGestureActive reload guards plus finishScannerGesture update resumption, consumer tests and FAQ/current changelog copy. Their branches carried separate changelog and metadata fingerprints.",
+    "intendedBehavior": "The combined source keeps the exact approved SavedAppearance/CSS/device-view/list/render seams from465c956 and exact released finishScannerGesture/registerServiceWorker guards from4a3f332. Both October17 player notes and unrelated history remain, with refreshed combined app/SW metadata. Existing isolated tests from both parents remain unchanged and run against the combined source.",
+    "replacementTests": [
+      "RISK saved view decision integration: inherited guest authority and peer edits retain this device view through scoped Undo and durably acknowledged reopen",
+      "RISK PWA updates: a scanner gesture commits its action before a downloaded worker reloads",
+      "RISK PWA updates: a gesture beginning during an update save holds and resumes reload",
+      "RISK PWA updates: cancelled and released gestures resume a pending replacement",
+      "RISK PWA updates: the extended FAQ and changelog explain gesture-safe reloads"
+    ],
+    "preservedCoverage": [
+      "All accepted saved-view task/view/account/Undo/content and durable acknowledgement assertions remain exactly465c956. The suite auto-merges without any executable test edits beyond the exact released4a3f332 additions and its required scannerGestureActive fixture global.",
+      "Released PWA full-app pointerdown/controllerchange/No-handler/cold-reopen, held asynchronous save, pointercancel/pointerup fallback and FAQ guidance tests remain exact4a3f332. Existing edit/visibility/failed-write/no-redundant-quota-save and sync safeguards remain intact.",
+      "Every rationale record from both parents is retained as an exact record; prior immutable465 reviews, receipts and CI evidence are preserved externally. This merge changes candidate SHA and requires affected exact-candidate reviews again; it does not reuse old approvals as current approval.",
+      "The copied source seams and unchanged cloud-store-v2.js/device-store-v2.js/firestore.rules are independently compared by exact SHA256 in source-parity.json. Native browser/full regression/emulator/compatibility/review/release gates remain parent-owned; the inherited WebKit offline internal-error limit is not claimed as a pass."
+    ],
+    "redEvidence": {
+      "command": "Original approved saved-view/geometry and settlement chronology remains in inherited rationale records and invisible/ plus approved-release/settlement-repair artifacts. Released PWA command: node --test --test-name-pattern=\"RISK PWA updates: a scanner gesture commits\" tests.js; original entry and FAQ RED logs are in .git/funsidething-task-evidence/active-reload-progress-20261016/. Current focused preservation command is recorded in this owner report.",
+      "failure": "This is a preservation merge of two previously implemented and approved/released source changes, not a new functional fix; no fabricated new preimplementation RED is claimed. Original worker-151-entry-red.log observed one reload during pointerdown/controllerchange where zero was expected before its three-line guard fix; worker-151-copy-red.log preceded FAQ edits. Its async/fallback sensitivity controls remain labelled postimplementation. Saved-view actual source/geometry and untouched Node22 settlement47pass/2fail chronology remain in their original records. The first merged cohort, run before final metadata refresh, passed all behavior tests and failed only stale app/SW fingerprints (pre-fingerprint-cohort.txt); that mechanical mismatch is not a new product RED."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/approved-release/reconcile-main-4a3/owner",
+    "releaseStatus": "Local merged candidate only. Root owns exact final regression/reviews/native/browser/emulator/CI/release. No shared allocation, push, PR, main merge or deployment by this owner."
+  },
+  {
+    "testChangesSha256": "3f43aa7f1e1af0321cf04ced1be7c3c66a923b985d3a9c1ba02521cf3ce01074",
+    "comparison": "originalLiveCumulative",
+    "comparisonBase": "69a9feddf5d6bb8c4973475f7232e363b8646097",
+    "reason": "Reconcile accepted saved-view candidate465c956 with newly released main4a3f332 (PWA scanner-gesture update guard), after another authorized task advanced main. Preserve both complete proven implementations, all existing assertions and historical rationale/RED records. No new functional repair or behavior redesign is introduced by this merge.",
+    "previousBehavior": "Candidate465c956 already preserved approved silent SavedAppearance and released decision authority, and passed parent full/native/rules/compatibility reviews. Released main4a3f332 independently adds entry and post-save scannerGestureActive reload guards plus finishScannerGesture update resumption, consumer tests and FAQ/current changelog copy. Their branches carried separate changelog and metadata fingerprints.",
+    "intendedBehavior": "The combined source keeps the exact approved SavedAppearance/CSS/device-view/list/render seams from465c956 and exact released finishScannerGesture/registerServiceWorker guards from4a3f332. Both October17 player notes and unrelated history remain, with refreshed combined app/SW metadata. Existing isolated tests from both parents remain unchanged and run against the combined source.",
+    "replacementTests": [
+      "RISK saved view decision integration: inherited guest authority and peer edits retain this device view through scoped Undo and durably acknowledged reopen",
+      "RISK PWA updates: a scanner gesture commits its action before a downloaded worker reloads",
+      "RISK PWA updates: a gesture beginning during an update save holds and resumes reload",
+      "RISK PWA updates: cancelled and released gestures resume a pending replacement",
+      "RISK PWA updates: the extended FAQ and changelog explain gesture-safe reloads"
+    ],
+    "preservedCoverage": [
+      "All accepted saved-view task/view/account/Undo/content and durable acknowledgement assertions remain exactly465c956. The suite auto-merges without any executable test edits beyond the exact released4a3f332 additions and its required scannerGestureActive fixture global.",
+      "Released PWA full-app pointerdown/controllerchange/No-handler/cold-reopen, held asynchronous save, pointercancel/pointerup fallback and FAQ guidance tests remain exact4a3f332. Existing edit/visibility/failed-write/no-redundant-quota-save and sync safeguards remain intact.",
+      "Every rationale record from both parents is retained as an exact record; prior immutable465 reviews, receipts and CI evidence are preserved externally. This merge changes candidate SHA and requires affected exact-candidate reviews again; it does not reuse old approvals as current approval.",
+      "The copied source seams and unchanged cloud-store-v2.js/device-store-v2.js/firestore.rules are independently compared by exact SHA256 in source-parity.json. Native browser/full regression/emulator/compatibility/review/release gates remain parent-owned; the inherited WebKit offline internal-error limit is not claimed as a pass."
+    ],
+    "redEvidence": {
+      "command": "Original approved saved-view/geometry and settlement chronology remains in inherited rationale records and invisible/ plus approved-release/settlement-repair artifacts. Released PWA command: node --test --test-name-pattern=\"RISK PWA updates: a scanner gesture commits\" tests.js; original entry and FAQ RED logs are in .git/funsidething-task-evidence/active-reload-progress-20261016/. Current focused preservation command is recorded in this owner report.",
+      "failure": "This is a preservation merge of two previously implemented and approved/released source changes, not a new functional fix; no fabricated new preimplementation RED is claimed. Original worker-151-entry-red.log observed one reload during pointerdown/controllerchange where zero was expected before its three-line guard fix; worker-151-copy-red.log preceded FAQ edits. Its async/fallback sensitivity controls remain labelled postimplementation. Saved-view actual source/geometry and untouched Node22 settlement47pass/2fail chronology remain in their original records. The first merged cohort, run before final metadata refresh, passed all behavior tests and failed only stale app/SW fingerprints (pre-fingerprint-cohort.txt); that mechanical mismatch is not a new product RED."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/approved-release/reconcile-main-4a3/owner",
+    "releaseStatus": "Local merged candidate only. Root owns exact final regression/reviews/native/browser/emulator/CI/release. No shared allocation, push, PR, main merge or deployment by this owner."
+  },
+  {
+    "testChangesSha256": "94c2d9c2360dcdb32074243818331893caaf6f21ac4e43c19cd6c0e4aa60bff5",
+    "comparison": "currentMainDelta",
+    "comparisonBase": "4a3f332ba543147691147120e83048e162dabae1",
+    "reason": "Reconcile accepted saved-view candidate465c956 with newly released main4a3f332 (PWA scanner-gesture update guard), after another authorized task advanced main. Preserve both complete proven implementations, all existing assertions and historical rationale/RED records. No new functional repair or behavior redesign is introduced by this merge.",
+    "previousBehavior": "Candidate465c956 already preserved approved silent SavedAppearance and released decision authority, and passed parent full/native/rules/compatibility reviews. Released main4a3f332 independently adds entry and post-save scannerGestureActive reload guards plus finishScannerGesture update resumption, consumer tests and FAQ/current changelog copy. Their branches carried separate changelog and metadata fingerprints.",
+    "intendedBehavior": "The combined source keeps the exact approved SavedAppearance/CSS/device-view/list/render seams from465c956 and exact released finishScannerGesture/registerServiceWorker guards from4a3f332. Both October17 player notes and unrelated history remain, with refreshed combined app/SW metadata. Existing isolated tests from both parents remain unchanged and run against the combined source.",
+    "replacementTests": [
+      "RISK saved view decision integration: inherited guest authority and peer edits retain this device view through scoped Undo and durably acknowledged reopen"
+    ],
+    "preservedCoverage": [
+      "All accepted saved-view task/view/account/Undo/content and durable acknowledgement assertions remain exactly465c956. The suite auto-merges without any executable test edits beyond the exact released4a3f332 additions and its required scannerGestureActive fixture global.",
+      "Released PWA full-app pointerdown/controllerchange/No-handler/cold-reopen, held asynchronous save, pointercancel/pointerup fallback and FAQ guidance tests remain exact4a3f332. Existing edit/visibility/failed-write/no-redundant-quota-save and sync safeguards remain intact.",
+      "Every rationale record from both parents is retained as an exact record; prior immutable465 reviews, receipts and CI evidence are preserved externally. This merge changes candidate SHA and requires affected exact-candidate reviews again; it does not reuse old approvals as current approval.",
+      "The copied source seams and unchanged cloud-store-v2.js/device-store-v2.js/firestore.rules are independently compared by exact SHA256 in source-parity.json. Native browser/full regression/emulator/compatibility/review/release gates remain parent-owned; the inherited WebKit offline internal-error limit is not claimed as a pass."
+    ],
+    "redEvidence": {
+      "command": "Original approved saved-view/geometry and settlement chronology remains in inherited rationale records and invisible/ plus approved-release/settlement-repair artifacts. Released PWA command: node --test --test-name-pattern=\"RISK PWA updates: a scanner gesture commits\" tests.js; original entry and FAQ RED logs are in .git/funsidething-task-evidence/active-reload-progress-20261016/. Current focused preservation command is recorded in this owner report.",
+      "failure": "This is a preservation merge of two previously implemented and approved/released source changes, not a new functional fix; no fabricated new preimplementation RED is claimed. Original worker-151-entry-red.log observed one reload during pointerdown/controllerchange where zero was expected before its three-line guard fix; worker-151-copy-red.log preceded FAQ edits. Its async/fallback sensitivity controls remain labelled postimplementation. Saved-view actual source/geometry and untouched Node22 settlement47pass/2fail chronology remain in their original records. The first merged cohort, run before final metadata refresh, passed all behavior tests and failed only stale app/SW fingerprints (pre-fingerprint-cohort.txt); that mechanical mismatch is not a new product RED."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/approved-release/reconcile-main-4a3/owner",
+    "releaseStatus": "Local merged candidate only. Root owns exact final regression/reviews/native/browser/emulator/CI/release. No shared allocation, push, PR, main merge or deployment by this owner."
+  },
+  {
     "testChangesSha256": "7123c004e0c11ed889bd9f963e60060bb77fea0fe1676c500323e562f9ff4c7e",
     "reason": "Approved spec #152 requires isolated agent-tool process suites to participate in the normal repository test command.",
     "previousBehavior": "The npm test script ran only tests.js, so a failing scripts/agent-tools test cohort did not affect its exit status.",
@@ -8816,5 +9390,298 @@
       "command": "node --test --test-name-pattern='^RISK repository process: npm test fails when an agent-tool cohort assertion fails$' tests.js",
       "failure": "At baseline 25c5da1866231f6ca1f564deb36847e47088ef17, the disposable fixture's npm test returned zero while ignoring its deliberate synthetic-failure.test.mjs cohort; the process assertion expecting a nonzero result failed. See evidence/wiring/npm-test-agent-cohort-red.json."
     }
+  },
+  {
+    "testChangesSha256": "3eb27217b7fc3a29632ca6ed24de0c6a0fb28d6d105237ed2d42a4204d45eb26",
+    "comparison": "mergeDelta",
+    "comparisonBase": "d89d5f1e2d2b8bbbc5c445caeb6bba28ac06e401",
+    "reason": "Resume the same user-authorized #140 owner and reconcile released main49f67e4 (PR163 tooling, PR162 browser guidance) into accepted candidate d89d5f1. Preserve both parent test/rationale/coverage histories and product metadata; no product runtime bytes or test assertions are repaired or weakened.",
+    "previousBehavior": "Candidate d89d5f1 held the accepted invisible saved appearance and released scanner-gesture PWA safeguards. New released main49f67e4 added agent evidence commands, aggregate npm test wiring, browser-choice guidance and one process integration test. Their appended risk-map and rationale sections required an exact union.",
+    "intendedBehavior": "Keep every product runtime asset and app/SW fingerprint exactly d89d5f1, import tooling/package/guidance exactly49f67e4, and retain the exact automatic union of both tests.js suites plus all parent rationale records and risk-map content. Use current provenance/preflight commands for focused local evidence; parent renews exact-candidate release checks.",
+    "replacementTests": [
+      "RISK repository process: npm test fails when an agent-tool cohort assertion fails"
+    ],
+    "preservedCoverage": [
+      "All existing saved-view populated restoration, inert appearance, account boundary, current-date, filter/list/scroll, guest inheritance, peer editor, concurrent Add, scoped Undo and acknowledged cold-reopen assertions remain intact. All36 checked product assets including index.html, CSS, SW, cloud/device adapters and rules match d89d5f1 exactly.",
+      "Released PWA entry/post-save scannerGestureActive guards and finishScannerGesture resumption remain unchanged inside the byte-identical product source. Their accepted test and original RED histories are retained; no new product design or behavior is introduced.",
+      "tests.js equals an exact automatic three-way union of both parents, with no manual executable test edits. All405 d89-parent and382 main-parent rationale records remain exact JSON records; the coverage map retains all prior content and the released npm cohort wiring contract.",
+      "All26 imported tooling/guidance/package files match49f67e4 exactly. The focused82 agent-tool tests use isolated process/fake browser/fixture-ledger boundaries, not real browser allocation or production accounts. Product67 runtime/process consumers and all existing release gates remain; no skips or broad suite substitutions are added.",
+      "Prior evidence, original contemporaneous RED chronology and immutable465/d89 approvals/receipts remain historical. No new functional RED is fabricated for this source/documentation preservation merge; full/native/emulator/compatibility/independent-review/CI/release remain parent-owned."
+    ],
+    "redEvidence": {
+      "command": "Original saved-view, geometry, settlement and released PWA RED commands remain in exact inherited records and saved-view task artifacts. Imported #152 command: node --test --test-name-pattern=\"^RISK repository process: npm test fails when an agent-tool cohort assertion fails$\" tests.js; its original evidence/wiring/npm-test-agent-cohort-red.json reference remains unchanged. Current recorder commands are captured under resumed-20261017/owner/runs.",
+      "failure": "No new product implementation or test behavior repair occurs in this merge, so no new preimplementation RED is claimed. The imported wiring rationale records its actual baseline25c5da1866231f6ca1f564deb36847e47088ef17 failure: npm test returned zero while ignoring the disposable synthetic-failure.test.mjs cohort. Existing saved-view/geometry and47pass/2fail Node22 settlement observations remain preserved with their original chronology; current preservation runs pass67/67 runtime/process and82/82 agent-tool cases with zero skips."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/resumed-20261017/owner",
+    "releaseStatus": "Local merged candidate only. No browser/emulator/server/port, push, PR update, CI, main merge or deployment by this worker. Parent /root retains integration, affected reviews and all final release validation."
+  },
+  {
+    "testChangesSha256": "94c2d9c2360dcdb32074243818331893caaf6f21ac4e43c19cd6c0e4aa60bff5",
+    "comparison": "currentMainDelta",
+    "comparisonBase": "49f67e44130da9360998c7a2b272d6483babdd9b",
+    "reason": "Resume the same user-authorized #140 owner and reconcile released main49f67e4 (PR163 tooling, PR162 browser guidance) into accepted candidate d89d5f1. Preserve both parent test/rationale/coverage histories and product metadata; no product runtime bytes or test assertions are repaired or weakened.",
+    "previousBehavior": "Candidate d89d5f1 held the accepted invisible saved appearance and released scanner-gesture PWA safeguards. New released main49f67e4 added agent evidence commands, aggregate npm test wiring, browser-choice guidance and one process integration test. Their appended risk-map and rationale sections required an exact union.",
+    "intendedBehavior": "Keep every product runtime asset and app/SW fingerprint exactly d89d5f1, import tooling/package/guidance exactly49f67e4, and retain the exact automatic union of both tests.js suites plus all parent rationale records and risk-map content. Use current provenance/preflight commands for focused local evidence; parent renews exact-candidate release checks.",
+    "replacementTests": [
+      "RISK saved view decision integration: inherited guest authority and peer edits retain this device view through scoped Undo and durably acknowledged reopen"
+    ],
+    "preservedCoverage": [
+      "All existing saved-view populated restoration, inert appearance, account boundary, current-date, filter/list/scroll, guest inheritance, peer editor, concurrent Add, scoped Undo and acknowledged cold-reopen assertions remain intact. All36 checked product assets including index.html, CSS, SW, cloud/device adapters and rules match d89d5f1 exactly.",
+      "Released PWA entry/post-save scannerGestureActive guards and finishScannerGesture resumption remain unchanged inside the byte-identical product source. Their accepted test and original RED histories are retained; no new product design or behavior is introduced.",
+      "tests.js equals an exact automatic three-way union of both parents, with no manual executable test edits. All405 d89-parent and382 main-parent rationale records remain exact JSON records; the coverage map retains all prior content and the released npm cohort wiring contract.",
+      "All26 imported tooling/guidance/package files match49f67e4 exactly. The focused82 agent-tool tests use isolated process/fake browser/fixture-ledger boundaries, not real browser allocation or production accounts. Product67 runtime/process consumers and all existing release gates remain; no skips or broad suite substitutions are added.",
+      "Prior evidence, original contemporaneous RED chronology and immutable465/d89 approvals/receipts remain historical. No new functional RED is fabricated for this source/documentation preservation merge; full/native/emulator/compatibility/independent-review/CI/release remain parent-owned."
+    ],
+    "redEvidence": {
+      "command": "Original saved-view, geometry, settlement and released PWA RED commands remain in exact inherited records and saved-view task artifacts. Imported #152 command: node --test --test-name-pattern=\"^RISK repository process: npm test fails when an agent-tool cohort assertion fails$\" tests.js; its original evidence/wiring/npm-test-agent-cohort-red.json reference remains unchanged. Current recorder commands are captured under resumed-20261017/owner/runs.",
+      "failure": "No new product implementation or test behavior repair occurs in this merge, so no new preimplementation RED is claimed. The imported wiring rationale records its actual baseline25c5da1866231f6ca1f564deb36847e47088ef17 failure: npm test returned zero while ignoring the disposable synthetic-failure.test.mjs cohort. Existing saved-view/geometry and47pass/2fail Node22 settlement observations remain preserved with their original chronology; current preservation runs pass67/67 runtime/process and82/82 agent-tool cases with zero skips."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/resumed-20261017/owner",
+    "releaseStatus": "Local merged candidate only. No browser/emulator/server/port, push, PR update, CI, main merge or deployment by this worker. Parent /root retains integration, affected reviews and all final release validation."
+  },
+  {
+    "testChangesSha256": "314f338f72c7c66ce5521b7eb875292a675cba129923bd324eaf127d911ebba5",
+    "comparison": "priorMainDelta",
+    "comparisonBase": "4a3f332ba543147691147120e83048e162dabae1",
+    "reason": "Resume the same user-authorized #140 owner and reconcile released main49f67e4 (PR163 tooling, PR162 browser guidance) into accepted candidate d89d5f1. Preserve both parent test/rationale/coverage histories and product metadata; no product runtime bytes or test assertions are repaired or weakened.",
+    "previousBehavior": "Candidate d89d5f1 held the accepted invisible saved appearance and released scanner-gesture PWA safeguards. New released main49f67e4 added agent evidence commands, aggregate npm test wiring, browser-choice guidance and one process integration test. Their appended risk-map and rationale sections required an exact union.",
+    "intendedBehavior": "Keep every product runtime asset and app/SW fingerprint exactly d89d5f1, import tooling/package/guidance exactly49f67e4, and retain the exact automatic union of both tests.js suites plus all parent rationale records and risk-map content. Use current provenance/preflight commands for focused local evidence; parent renews exact-candidate release checks.",
+    "replacementTests": [
+      "RISK repository process: npm test fails when an agent-tool cohort assertion fails",
+      "RISK saved view decision integration: inherited guest authority and peer edits retain this device view through scoped Undo and durably acknowledged reopen"
+    ],
+    "preservedCoverage": [
+      "All existing saved-view populated restoration, inert appearance, account boundary, current-date, filter/list/scroll, guest inheritance, peer editor, concurrent Add, scoped Undo and acknowledged cold-reopen assertions remain intact. All36 checked product assets including index.html, CSS, SW, cloud/device adapters and rules match d89d5f1 exactly.",
+      "Released PWA entry/post-save scannerGestureActive guards and finishScannerGesture resumption remain unchanged inside the byte-identical product source. Their accepted test and original RED histories are retained; no new product design or behavior is introduced.",
+      "tests.js equals an exact automatic three-way union of both parents, with no manual executable test edits. All405 d89-parent and382 main-parent rationale records remain exact JSON records; the coverage map retains all prior content and the released npm cohort wiring contract.",
+      "All26 imported tooling/guidance/package files match49f67e4 exactly. The focused82 agent-tool tests use isolated process/fake browser/fixture-ledger boundaries, not real browser allocation or production accounts. Product67 runtime/process consumers and all existing release gates remain; no skips or broad suite substitutions are added.",
+      "Prior evidence, original contemporaneous RED chronology and immutable465/d89 approvals/receipts remain historical. No new functional RED is fabricated for this source/documentation preservation merge; full/native/emulator/compatibility/independent-review/CI/release remain parent-owned."
+    ],
+    "redEvidence": {
+      "command": "Original saved-view, geometry, settlement and released PWA RED commands remain in exact inherited records and saved-view task artifacts. Imported #152 command: node --test --test-name-pattern=\"^RISK repository process: npm test fails when an agent-tool cohort assertion fails$\" tests.js; its original evidence/wiring/npm-test-agent-cohort-red.json reference remains unchanged. Current recorder commands are captured under resumed-20261017/owner/runs.",
+      "failure": "No new product implementation or test behavior repair occurs in this merge, so no new preimplementation RED is claimed. The imported wiring rationale records its actual baseline25c5da1866231f6ca1f564deb36847e47088ef17 failure: npm test returned zero while ignoring the disposable synthetic-failure.test.mjs cohort. Existing saved-view/geometry and47pass/2fail Node22 settlement observations remain preserved with their original chronology; current preservation runs pass67/67 runtime/process and82/82 agent-tool cases with zero skips."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/resumed-20261017/owner",
+    "releaseStatus": "Local merged candidate only. No browser/emulator/server/port, push, PR update, CI, main merge or deployment by this worker. Parent /root retains integration, affected reviews and all final release validation."
+  },
+  {
+    "testChangesSha256": "d59a0e75abec4b3b347303a4f2c72fe158451f564dbe12e5c6a5d6f5201c6a62",
+    "comparison": "approvedDelta",
+    "comparisonBase": "7d5b069603b758b73e5704a4a3eb91625ffd6413",
+    "reason": "Resume the same user-authorized #140 owner and reconcile released main49f67e4 (PR163 tooling, PR162 browser guidance) into accepted candidate d89d5f1. Preserve both parent test/rationale/coverage histories and product metadata; no product runtime bytes or test assertions are repaired or weakened.",
+    "previousBehavior": "Candidate d89d5f1 held the accepted invisible saved appearance and released scanner-gesture PWA safeguards. New released main49f67e4 added agent evidence commands, aggregate npm test wiring, browser-choice guidance and one process integration test. Their appended risk-map and rationale sections required an exact union.",
+    "intendedBehavior": "Keep every product runtime asset and app/SW fingerprint exactly d89d5f1, import tooling/package/guidance exactly49f67e4, and retain the exact automatic union of both tests.js suites plus all parent rationale records and risk-map content. Use current provenance/preflight commands for focused local evidence; parent renews exact-candidate release checks.",
+    "replacementTests": [
+      "RISK repository process: npm test fails when an agent-tool cohort assertion fails",
+      "RISK saved view decision integration: inherited guest authority and peer edits retain this device view through scoped Undo and durably acknowledged reopen",
+      "RISK PWA updates: a scanner gesture commits its action before a downloaded worker reloads"
+    ],
+    "preservedCoverage": [
+      "All existing saved-view populated restoration, inert appearance, account boundary, current-date, filter/list/scroll, guest inheritance, peer editor, concurrent Add, scoped Undo and acknowledged cold-reopen assertions remain intact. All36 checked product assets including index.html, CSS, SW, cloud/device adapters and rules match d89d5f1 exactly.",
+      "Released PWA entry/post-save scannerGestureActive guards and finishScannerGesture resumption remain unchanged inside the byte-identical product source. Their accepted test and original RED histories are retained; no new product design or behavior is introduced.",
+      "tests.js equals an exact automatic three-way union of both parents, with no manual executable test edits. All405 d89-parent and382 main-parent rationale records remain exact JSON records; the coverage map retains all prior content and the released npm cohort wiring contract.",
+      "All26 imported tooling/guidance/package files match49f67e4 exactly. The focused82 agent-tool tests use isolated process/fake browser/fixture-ledger boundaries, not real browser allocation or production accounts. Product67 runtime/process consumers and all existing release gates remain; no skips or broad suite substitutions are added.",
+      "Prior evidence, original contemporaneous RED chronology and immutable465/d89 approvals/receipts remain historical. No new functional RED is fabricated for this source/documentation preservation merge; full/native/emulator/compatibility/independent-review/CI/release remain parent-owned."
+    ],
+    "redEvidence": {
+      "command": "Original saved-view, geometry, settlement and released PWA RED commands remain in exact inherited records and saved-view task artifacts. Imported #152 command: node --test --test-name-pattern=\"^RISK repository process: npm test fails when an agent-tool cohort assertion fails$\" tests.js; its original evidence/wiring/npm-test-agent-cohort-red.json reference remains unchanged. Current recorder commands are captured under resumed-20261017/owner/runs.",
+      "failure": "No new product implementation or test behavior repair occurs in this merge, so no new preimplementation RED is claimed. The imported wiring rationale records its actual baseline25c5da1866231f6ca1f564deb36847e47088ef17 failure: npm test returned zero while ignoring the disposable synthetic-failure.test.mjs cohort. Existing saved-view/geometry and47pass/2fail Node22 settlement observations remain preserved with their original chronology; current preservation runs pass67/67 runtime/process and82/82 agent-tool cases with zero skips."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/resumed-20261017/owner",
+    "releaseStatus": "Local merged candidate only. No browser/emulator/server/port, push, PR update, CI, main merge or deployment by this worker. Parent /root retains integration, affected reviews and all final release validation."
+  },
+  {
+    "testChangesSha256": "6c772285482a8db54cea3565db0309c0dd863acdcb76805dc2d62ea594ab9b95",
+    "comparison": "originalLiveCumulative",
+    "comparisonBase": "69a9feddf5d6bb8c4973475f7232e363b8646097",
+    "reason": "Resume the same user-authorized #140 owner and reconcile released main49f67e4 (PR163 tooling, PR162 browser guidance) into accepted candidate d89d5f1. Preserve both parent test/rationale/coverage histories and product metadata; no product runtime bytes or test assertions are repaired or weakened.",
+    "previousBehavior": "Candidate d89d5f1 held the accepted invisible saved appearance and released scanner-gesture PWA safeguards. New released main49f67e4 added agent evidence commands, aggregate npm test wiring, browser-choice guidance and one process integration test. Their appended risk-map and rationale sections required an exact union.",
+    "intendedBehavior": "Keep every product runtime asset and app/SW fingerprint exactly d89d5f1, import tooling/package/guidance exactly49f67e4, and retain the exact automatic union of both tests.js suites plus all parent rationale records and risk-map content. Use current provenance/preflight commands for focused local evidence; parent renews exact-candidate release checks.",
+    "replacementTests": [
+      "RISK repository process: npm test fails when an agent-tool cohort assertion fails",
+      "RISK saved view decision integration: inherited guest authority and peer edits retain this device view through scoped Undo and durably acknowledged reopen",
+      "RISK PWA updates: a scanner gesture commits its action before a downloaded worker reloads"
+    ],
+    "preservedCoverage": [
+      "All existing saved-view populated restoration, inert appearance, account boundary, current-date, filter/list/scroll, guest inheritance, peer editor, concurrent Add, scoped Undo and acknowledged cold-reopen assertions remain intact. All36 checked product assets including index.html, CSS, SW, cloud/device adapters and rules match d89d5f1 exactly.",
+      "Released PWA entry/post-save scannerGestureActive guards and finishScannerGesture resumption remain unchanged inside the byte-identical product source. Their accepted test and original RED histories are retained; no new product design or behavior is introduced.",
+      "tests.js equals an exact automatic three-way union of both parents, with no manual executable test edits. All405 d89-parent and382 main-parent rationale records remain exact JSON records; the coverage map retains all prior content and the released npm cohort wiring contract.",
+      "All26 imported tooling/guidance/package files match49f67e4 exactly. The focused82 agent-tool tests use isolated process/fake browser/fixture-ledger boundaries, not real browser allocation or production accounts. Product67 runtime/process consumers and all existing release gates remain; no skips or broad suite substitutions are added.",
+      "Prior evidence, original contemporaneous RED chronology and immutable465/d89 approvals/receipts remain historical. No new functional RED is fabricated for this source/documentation preservation merge; full/native/emulator/compatibility/independent-review/CI/release remain parent-owned."
+    ],
+    "redEvidence": {
+      "command": "Original saved-view, geometry, settlement and released PWA RED commands remain in exact inherited records and saved-view task artifacts. Imported #152 command: node --test --test-name-pattern=\"^RISK repository process: npm test fails when an agent-tool cohort assertion fails$\" tests.js; its original evidence/wiring/npm-test-agent-cohort-red.json reference remains unchanged. Current recorder commands are captured under resumed-20261017/owner/runs.",
+      "failure": "No new product implementation or test behavior repair occurs in this merge, so no new preimplementation RED is claimed. The imported wiring rationale records its actual baseline25c5da1866231f6ca1f564deb36847e47088ef17 failure: npm test returned zero while ignoring the disposable synthetic-failure.test.mjs cohort. Existing saved-view/geometry and47pass/2fail Node22 settlement observations remain preserved with their original chronology; current preservation runs pass67/67 runtime/process and82/82 agent-tool cases with zero skips."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/resumed-20261017/owner",
+    "releaseStatus": "Local merged candidate only. No browser/emulator/server/port, push, PR update, CI, main merge or deployment by this worker. Parent /root retains integration, affected reviews and all final release validation."
+  },
+  {
+    "testChangesSha256": "2ed477c7028ea1ab8eea11f6d70db7472b3b4be4b30863d255e63e5144710eeb",
+    "comparison": "repairDelta",
+    "comparisonBase": "0cc73cd9137c3377290cf087e805c78a2b1b1302",
+    "reason": "Independent FAQ review F-1 on0cc correctly found that two saved-view copy claims promised a visible previous appearance unconditionally, although existing show() safely falls back for absent, invalid or viewport-mismatched optional appearance records. Parent explicitly authorized qualifying both FAQ and October17 release note while preserving all executable product behavior.",
+    "previousBehavior": "The FAQ said its last settled appearance stays visible quietly while the saved board opens, and the release note promised the same appearance without an availability condition. The existing guidance test required those exact unqualified strings. Optional appearance absence/validation/viewport fallback was already correct in runtime code.",
+    "intendedBehavior": "Both user-facing surfaces say: When a saved appearance is available, it stays visible quietly while the saved board opens. All other FAQ/release-note content and the usual-list-view fallback remain unchanged. Update only the two superseded textual expectations, add direct openHelp/current-release subcases for the qualification, and refresh required app/SW fingerprints.",
+    "replacementTests": [
+      "RISK saved view guidance qualification: FAQ and current release note promise an appearance only when available"
+    ],
+    "updatedTests": [
+      "RISK saved view guidance: Quick start and Changelog describe this-device restoration and current dates"
+    ],
+    "preservedCoverage": [
+      "Every existing behavior, task, authority, account, fallback, search/list/position, eligibility/date, cloud, Undo, draft and PWA safeguard assertion remains. Only two old exact copy expectations are replaced by qualified equivalents as explicitly requested by independent FAQ finding F-1; no runtime requirement is relaxed.",
+      "The new direct UI-copy regression calls actual openHelp and reads the All Tasks answer and current October17 note from real template output. Both subcases require the availability qualifier and the retained quiet-visible-while-opening promise. It fails both original unqualified surfaces before copy edits.",
+      "source-parity.json proves index.html is exactly0cc plus two intended copy replacements and embedded fingerprints; SW changes only its cache key. All34 other checked product runtime assets, styles, SavedAppearance validation/fallback logic, board authority, view metadata, adapters and rules remain byte-exact0cc.",
+      "All prior rationale/RED histories and immutable evidence remain untouched. The root-interrupted superseded0cc full suite finalized143 is not a failure or RED; rules/compatibility results on0cc remain separate historical checks. Root owns renewed exact final full/native/browser/compatibility/reviews/CI/release.",
+      "The initial test patch was made before a clean-checkpoint resume, which the ledger correctly rejected. The exact patch was saved externally, only that owned test edit was restored to0cc, the owner resumed cleanly and reapplied the same patch, then recorded the intended RED again before any app-copy edit. Both original records remain; this corrected coordination order does not fabricate implementation chronology."
+    ],
+    "redEvidence": {
+      "command": "/opt/local/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/saved-view-implementation/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/resumed-20261017/faq-qualification-repair/runs --purpose preimplementation-red -- /opt/local/bin/node --test --test-reporter=spec --test-name-pattern=\"^RISK saved view guidance qualification:\" tests.js",
+      "failure": "Actual resumed-checkpoint pre-copy RED in red.txt:0pass/3fail/0skip (parent plus All Tasks FAQ and October17 changelog subcases), each AssertionError ERR_ASSERTION reports optional appearance availability must qualify the visible-while-opening promise. Both old strings lacked When a saved appearance is available. Recorder identifies actual assertion-failure/exit1. Only after observing that failure were the two app strings and superseded copy expectations changed. copy-green.txt then passes the guidance consumers; focused and exact metadata gates follow. Earlier test-before-resume attempt is preserved honestly in red-before-resume-correction.txt, not substituted for the clean-resume run."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/resumed-20261017/faq-qualification-repair",
+    "releaseStatus": "Local copy/fingerprint repair only. No broad suite, browser/emulator/server, push, CI, main merge or release by this owner. Parent /root owns affected exact-candidate review and final release validation."
+  },
+  {
+    "testChangesSha256": "95efef6c44e2b80d7b84c7603bccf13cadef70bdf1e716b53206e1ca0b3c9d8b",
+    "comparison": "currentMainDelta",
+    "comparisonBase": "49f67e44130da9360998c7a2b272d6483babdd9b",
+    "reason": "Independent FAQ review F-1 on0cc correctly found that two saved-view copy claims promised a visible previous appearance unconditionally, although existing show() safely falls back for absent, invalid or viewport-mismatched optional appearance records. Parent explicitly authorized qualifying both FAQ and October17 release note while preserving all executable product behavior.",
+    "previousBehavior": "The FAQ said its last settled appearance stays visible quietly while the saved board opens, and the release note promised the same appearance without an availability condition. The existing guidance test required those exact unqualified strings. Optional appearance absence/validation/viewport fallback was already correct in runtime code.",
+    "intendedBehavior": "Both user-facing surfaces say: When a saved appearance is available, it stays visible quietly while the saved board opens. All other FAQ/release-note content and the usual-list-view fallback remain unchanged. Update only the two superseded textual expectations, add direct openHelp/current-release subcases for the qualification, and refresh required app/SW fingerprints.",
+    "replacementTests": [
+      "RISK saved view guidance qualification: FAQ and current release note promise an appearance only when available"
+    ],
+    "updatedTests": [
+      "RISK saved view guidance: Quick start and Changelog describe this-device restoration and current dates"
+    ],
+    "preservedCoverage": [
+      "Every existing behavior, task, authority, account, fallback, search/list/position, eligibility/date, cloud, Undo, draft and PWA safeguard assertion remains. Only two old exact copy expectations are replaced by qualified equivalents as explicitly requested by independent FAQ finding F-1; no runtime requirement is relaxed.",
+      "The new direct UI-copy regression calls actual openHelp and reads the All Tasks answer and current October17 note from real template output. Both subcases require the availability qualifier and the retained quiet-visible-while-opening promise. It fails both original unqualified surfaces before copy edits.",
+      "source-parity.json proves index.html is exactly0cc plus two intended copy replacements and embedded fingerprints; SW changes only its cache key. All34 other checked product runtime assets, styles, SavedAppearance validation/fallback logic, board authority, view metadata, adapters and rules remain byte-exact0cc.",
+      "All prior rationale/RED histories and immutable evidence remain untouched. The root-interrupted superseded0cc full suite finalized143 is not a failure or RED; rules/compatibility results on0cc remain separate historical checks. Root owns renewed exact final full/native/browser/compatibility/reviews/CI/release.",
+      "The initial test patch was made before a clean-checkpoint resume, which the ledger correctly rejected. The exact patch was saved externally, only that owned test edit was restored to0cc, the owner resumed cleanly and reapplied the same patch, then recorded the intended RED again before any app-copy edit. Both original records remain; this corrected coordination order does not fabricate implementation chronology."
+    ],
+    "redEvidence": {
+      "command": "/opt/local/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/saved-view-implementation/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/resumed-20261017/faq-qualification-repair/runs --purpose preimplementation-red -- /opt/local/bin/node --test --test-reporter=spec --test-name-pattern=\"^RISK saved view guidance qualification:\" tests.js",
+      "failure": "Actual resumed-checkpoint pre-copy RED in red.txt:0pass/3fail/0skip (parent plus All Tasks FAQ and October17 changelog subcases), each AssertionError ERR_ASSERTION reports optional appearance availability must qualify the visible-while-opening promise. Both old strings lacked When a saved appearance is available. Recorder identifies actual assertion-failure/exit1. Only after observing that failure were the two app strings and superseded copy expectations changed. copy-green.txt then passes the guidance consumers; focused and exact metadata gates follow. Earlier test-before-resume attempt is preserved honestly in red-before-resume-correction.txt, not substituted for the clean-resume run."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/resumed-20261017/faq-qualification-repair",
+    "releaseStatus": "Local copy/fingerprint repair only. No broad suite, browser/emulator/server, push, CI, main merge or release by this owner. Parent /root owns affected exact-candidate review and final release validation."
+  },
+  {
+    "testChangesSha256": "00bf2769c206cebaeb32b2aeca0773cd6ddab2c528c4a12a356a58b05302a774",
+    "comparison": "priorMainDelta",
+    "comparisonBase": "4a3f332ba543147691147120e83048e162dabae1",
+    "reason": "Independent FAQ review F-1 on0cc correctly found that two saved-view copy claims promised a visible previous appearance unconditionally, although existing show() safely falls back for absent, invalid or viewport-mismatched optional appearance records. Parent explicitly authorized qualifying both FAQ and October17 release note while preserving all executable product behavior.",
+    "previousBehavior": "The FAQ said its last settled appearance stays visible quietly while the saved board opens, and the release note promised the same appearance without an availability condition. The existing guidance test required those exact unqualified strings. Optional appearance absence/validation/viewport fallback was already correct in runtime code.",
+    "intendedBehavior": "Both user-facing surfaces say: When a saved appearance is available, it stays visible quietly while the saved board opens. All other FAQ/release-note content and the usual-list-view fallback remain unchanged. Update only the two superseded textual expectations, add direct openHelp/current-release subcases for the qualification, and refresh required app/SW fingerprints.",
+    "replacementTests": [
+      "RISK saved view guidance qualification: FAQ and current release note promise an appearance only when available"
+    ],
+    "updatedTests": [
+      "RISK saved view guidance: Quick start and Changelog describe this-device restoration and current dates"
+    ],
+    "preservedCoverage": [
+      "Every existing behavior, task, authority, account, fallback, search/list/position, eligibility/date, cloud, Undo, draft and PWA safeguard assertion remains. Only two old exact copy expectations are replaced by qualified equivalents as explicitly requested by independent FAQ finding F-1; no runtime requirement is relaxed.",
+      "The new direct UI-copy regression calls actual openHelp and reads the All Tasks answer and current October17 note from real template output. Both subcases require the availability qualifier and the retained quiet-visible-while-opening promise. It fails both original unqualified surfaces before copy edits.",
+      "source-parity.json proves index.html is exactly0cc plus two intended copy replacements and embedded fingerprints; SW changes only its cache key. All34 other checked product runtime assets, styles, SavedAppearance validation/fallback logic, board authority, view metadata, adapters and rules remain byte-exact0cc.",
+      "All prior rationale/RED histories and immutable evidence remain untouched. The root-interrupted superseded0cc full suite finalized143 is not a failure or RED; rules/compatibility results on0cc remain separate historical checks. Root owns renewed exact final full/native/browser/compatibility/reviews/CI/release.",
+      "The initial test patch was made before a clean-checkpoint resume, which the ledger correctly rejected. The exact patch was saved externally, only that owned test edit was restored to0cc, the owner resumed cleanly and reapplied the same patch, then recorded the intended RED again before any app-copy edit. Both original records remain; this corrected coordination order does not fabricate implementation chronology."
+    ],
+    "redEvidence": {
+      "command": "/opt/local/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/saved-view-implementation/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/resumed-20261017/faq-qualification-repair/runs --purpose preimplementation-red -- /opt/local/bin/node --test --test-reporter=spec --test-name-pattern=\"^RISK saved view guidance qualification:\" tests.js",
+      "failure": "Actual resumed-checkpoint pre-copy RED in red.txt:0pass/3fail/0skip (parent plus All Tasks FAQ and October17 changelog subcases), each AssertionError ERR_ASSERTION reports optional appearance availability must qualify the visible-while-opening promise. Both old strings lacked When a saved appearance is available. Recorder identifies actual assertion-failure/exit1. Only after observing that failure were the two app strings and superseded copy expectations changed. copy-green.txt then passes the guidance consumers; focused and exact metadata gates follow. Earlier test-before-resume attempt is preserved honestly in red-before-resume-correction.txt, not substituted for the clean-resume run."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/resumed-20261017/faq-qualification-repair",
+    "releaseStatus": "Local copy/fingerprint repair only. No broad suite, browser/emulator/server, push, CI, main merge or release by this owner. Parent /root owns affected exact-candidate review and final release validation."
+  },
+  {
+    "testChangesSha256": "5f5ad042f3eae7690e636c4d0f5d334662e3e945dc9a332789de3615b82dda95",
+    "comparison": "approvedDelta",
+    "comparisonBase": "7d5b069603b758b73e5704a4a3eb91625ffd6413",
+    "reason": "Independent FAQ review F-1 on0cc correctly found that two saved-view copy claims promised a visible previous appearance unconditionally, although existing show() safely falls back for absent, invalid or viewport-mismatched optional appearance records. Parent explicitly authorized qualifying both FAQ and October17 release note while preserving all executable product behavior.",
+    "previousBehavior": "The FAQ said its last settled appearance stays visible quietly while the saved board opens, and the release note promised the same appearance without an availability condition. The existing guidance test required those exact unqualified strings. Optional appearance absence/validation/viewport fallback was already correct in runtime code.",
+    "intendedBehavior": "Both user-facing surfaces say: When a saved appearance is available, it stays visible quietly while the saved board opens. All other FAQ/release-note content and the usual-list-view fallback remain unchanged. Update only the two superseded textual expectations, add direct openHelp/current-release subcases for the qualification, and refresh required app/SW fingerprints.",
+    "replacementTests": [
+      "RISK saved view guidance qualification: FAQ and current release note promise an appearance only when available"
+    ],
+    "updatedTests": [
+      "RISK saved view guidance: Quick start and Changelog describe this-device restoration and current dates"
+    ],
+    "preservedCoverage": [
+      "Every existing behavior, task, authority, account, fallback, search/list/position, eligibility/date, cloud, Undo, draft and PWA safeguard assertion remains. Only two old exact copy expectations are replaced by qualified equivalents as explicitly requested by independent FAQ finding F-1; no runtime requirement is relaxed.",
+      "The new direct UI-copy regression calls actual openHelp and reads the All Tasks answer and current October17 note from real template output. Both subcases require the availability qualifier and the retained quiet-visible-while-opening promise. It fails both original unqualified surfaces before copy edits.",
+      "source-parity.json proves index.html is exactly0cc plus two intended copy replacements and embedded fingerprints; SW changes only its cache key. All34 other checked product runtime assets, styles, SavedAppearance validation/fallback logic, board authority, view metadata, adapters and rules remain byte-exact0cc.",
+      "All prior rationale/RED histories and immutable evidence remain untouched. The root-interrupted superseded0cc full suite finalized143 is not a failure or RED; rules/compatibility results on0cc remain separate historical checks. Root owns renewed exact final full/native/browser/compatibility/reviews/CI/release.",
+      "The initial test patch was made before a clean-checkpoint resume, which the ledger correctly rejected. The exact patch was saved externally, only that owned test edit was restored to0cc, the owner resumed cleanly and reapplied the same patch, then recorded the intended RED again before any app-copy edit. Both original records remain; this corrected coordination order does not fabricate implementation chronology."
+    ],
+    "redEvidence": {
+      "command": "/opt/local/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/saved-view-implementation/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/resumed-20261017/faq-qualification-repair/runs --purpose preimplementation-red -- /opt/local/bin/node --test --test-reporter=spec --test-name-pattern=\"^RISK saved view guidance qualification:\" tests.js",
+      "failure": "Actual resumed-checkpoint pre-copy RED in red.txt:0pass/3fail/0skip (parent plus All Tasks FAQ and October17 changelog subcases), each AssertionError ERR_ASSERTION reports optional appearance availability must qualify the visible-while-opening promise. Both old strings lacked When a saved appearance is available. Recorder identifies actual assertion-failure/exit1. Only after observing that failure were the two app strings and superseded copy expectations changed. copy-green.txt then passes the guidance consumers; focused and exact metadata gates follow. Earlier test-before-resume attempt is preserved honestly in red-before-resume-correction.txt, not substituted for the clean-resume run."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/resumed-20261017/faq-qualification-repair",
+    "releaseStatus": "Local copy/fingerprint repair only. No broad suite, browser/emulator/server, push, CI, main merge or release by this owner. Parent /root owns affected exact-candidate review and final release validation."
+  },
+  {
+    "testChangesSha256": "f3047822945f7320afcd59c7fa2520e9cb012248ac7b850d81bad838bf330fd5",
+    "comparison": "originalLiveCumulative",
+    "comparisonBase": "69a9feddf5d6bb8c4973475f7232e363b8646097",
+    "reason": "Independent FAQ review F-1 on0cc correctly found that two saved-view copy claims promised a visible previous appearance unconditionally, although existing show() safely falls back for absent, invalid or viewport-mismatched optional appearance records. Parent explicitly authorized qualifying both FAQ and October17 release note while preserving all executable product behavior.",
+    "previousBehavior": "The FAQ said its last settled appearance stays visible quietly while the saved board opens, and the release note promised the same appearance without an availability condition. The existing guidance test required those exact unqualified strings. Optional appearance absence/validation/viewport fallback was already correct in runtime code.",
+    "intendedBehavior": "Both user-facing surfaces say: When a saved appearance is available, it stays visible quietly while the saved board opens. All other FAQ/release-note content and the usual-list-view fallback remain unchanged. Update only the two superseded textual expectations, add direct openHelp/current-release subcases for the qualification, and refresh required app/SW fingerprints.",
+    "replacementTests": [
+      "RISK saved view guidance qualification: FAQ and current release note promise an appearance only when available"
+    ],
+    "updatedTests": [
+      "RISK saved view guidance: Quick start and Changelog describe this-device restoration and current dates"
+    ],
+    "preservedCoverage": [
+      "Every existing behavior, task, authority, account, fallback, search/list/position, eligibility/date, cloud, Undo, draft and PWA safeguard assertion remains. Only two old exact copy expectations are replaced by qualified equivalents as explicitly requested by independent FAQ finding F-1; no runtime requirement is relaxed.",
+      "The new direct UI-copy regression calls actual openHelp and reads the All Tasks answer and current October17 note from real template output. Both subcases require the availability qualifier and the retained quiet-visible-while-opening promise. It fails both original unqualified surfaces before copy edits.",
+      "source-parity.json proves index.html is exactly0cc plus two intended copy replacements and embedded fingerprints; SW changes only its cache key. All34 other checked product runtime assets, styles, SavedAppearance validation/fallback logic, board authority, view metadata, adapters and rules remain byte-exact0cc.",
+      "All prior rationale/RED histories and immutable evidence remain untouched. The root-interrupted superseded0cc full suite finalized143 is not a failure or RED; rules/compatibility results on0cc remain separate historical checks. Root owns renewed exact final full/native/browser/compatibility/reviews/CI/release.",
+      "The initial test patch was made before a clean-checkpoint resume, which the ledger correctly rejected. The exact patch was saved externally, only that owned test edit was restored to0cc, the owner resumed cleanly and reapplied the same patch, then recorded the intended RED again before any app-copy edit. Both original records remain; this corrected coordination order does not fabricate implementation chronology."
+    ],
+    "redEvidence": {
+      "command": "/opt/local/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/saved-view-implementation/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/resumed-20261017/faq-qualification-repair/runs --purpose preimplementation-red -- /opt/local/bin/node --test --test-reporter=spec --test-name-pattern=\"^RISK saved view guidance qualification:\" tests.js",
+      "failure": "Actual resumed-checkpoint pre-copy RED in red.txt:0pass/3fail/0skip (parent plus All Tasks FAQ and October17 changelog subcases), each AssertionError ERR_ASSERTION reports optional appearance availability must qualify the visible-while-opening promise. Both old strings lacked When a saved appearance is available. Recorder identifies actual assertion-failure/exit1. Only after observing that failure were the two app strings and superseded copy expectations changed. copy-green.txt then passes the guidance consumers; focused and exact metadata gates follow. Earlier test-before-resume attempt is preserved honestly in red-before-resume-correction.txt, not substituted for the clean-resume run."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/resumed-20261017/faq-qualification-repair",
+    "releaseStatus": "Local copy/fingerprint repair only. No broad suite, browser/emulator/server, push, CI, main merge or release by this owner. Parent /root owns affected exact-candidate review and final release validation."
+  },
+  {
+    "testChangesSha256": "c098e4fe13e1f86a928a8681cd9a6c00fce1d7509f8e71e303d3193ed59a40d6",
+    "comparison": "outgoingPushBeforeDelta",
+    "comparisonBase": "465c9566a3cb4b03abd67abbc5ec6119f31e7464",
+    "comparisonTip": "8b0ffda1e705b4d58c48efba4fa0cf559ad0b28c",
+    "reason": "Bind the exact cumulative protected-test delta from the existing published PR161 push-before465c956 tip to final8b0ffda. The current-main49f binding passed, but the actual outgoing branch gate had no matching fingerprint. This append-only release metadata repair adds the missing comparison without changing tests, product source, copy or hashes.",
+    "previousBehavior": "Final8b0ffda contained the accepted saved-view suite, released main PWA/tooling test unions and authorized F-1 availability qualification, with exact records for current main and selected prior bases. The published branch still pointed at465c956; its distinct cumulative protected-test fingerprint was absent, so that real outgoing gate failed before any push.",
+    "intendedBehavior": "Preserve all existing records and original source RED chronology while binding the exact outgoing465-to8b test changes. The gate can validate cumulative preservation of approved saved-view/device appearance, released scanner-gesture PWA safety, agent-tool cohort wiring and the reviewed conditional FAQ/release-note qualification. No functional implementation or new behavioral RED is introduced.",
+    "replacementTests": [
+      "RISK PWA updates: a scanner gesture commits its action before a downloaded worker reloads",
+      "RISK PWA updates: a gesture beginning during an update save holds and resumes reload",
+      "RISK PWA updates: cancelled and released gestures resume a pending replacement",
+      "RISK PWA updates: the extended FAQ and changelog explain gesture-safe reloads",
+      "RISK repository process: npm test fails when an agent-tool cohort assertion fails",
+      "RISK saved view guidance qualification: FAQ and current release note promise an appearance only when available"
+    ],
+    "updatedTests": [
+      "RISK saved view guidance: Quick start and Changelog describe this-device restoration and current dates"
+    ],
+    "preservedCoverage": [
+      "Accepted saved-view populated first appearance, inert bounded cache, local metadata/filter/list/position, account/privacy/data authority, current-date, concurrent peer/local edits and scoped Undo/durable reopen tests remain. The product implementation and tests are byte-identical8b0ffda in this metadata-only repair.",
+      "The cumulative diff retains released PWA actual pointerdown/No-handler/durable cold-reopen, post-save gesture, cancellation/release and guidance cases; its snippet fixture includes the required real scannerGestureActive global. Their original preimplementation and later sensitivity evidence remains correctly labelled in inherited records.",
+      "Released npm aggregate wiring and its deliberate failing-cohort process test remain exact; isolated tooling tests and all current guidance are unchanged. F-1 changes only two explicitly superseded unqualified copy expectations and adds direct FAQ/October17 availability subcases; every other existing assertion is preserved.",
+      "All prior rationale records remain exact and in order. New-main49f, direct8b, outgoing465 and relevant approved/original preserved-base validators plus focused preflight/process checks are run on this final metadata candidate. App/SW fingerprints remain exact8b; no refresh or source change is needed.",
+      "The actual failed outgoing metadata gate is not a product failure or behavioral RED. Original saved-view/geometry/settlement/PWA/tooling/F-1 RED chronology remains in its original records and artifact folders. Root-interrupted superseded0cc/8b full runs finalized143 are neither failures nor REDs; root owns renewed exact final full/native/reviews/CI/release."
+    ],
+    "redEvidence": {
+      "command": "Root actual check on8b: node scripts/test-first-gate.mjs 465c9566a3cb4b03abd67abbc5ec6119f31e7464, recorded with purpose later-baseline-sensitivity; resumed-20261017/outgoing-push-base-check.log and outgoing-push-base-check/2026-10-17T14-47-14-263Z-384b7aef-8886-4609-b988-7d807e6d32e4.json.",
+      "failure": "Observed metadata-only validator failure: Existing tests were changed or removed without an exact-diff rationale in TEST_CHANGE_RATIONALES.json. Recorder finalized nonzero-exit1, not an assertion-based functional RED. This missing outgoing comparison is the sole repair. All original functional REDs, including F-1 missing-qualification assertions before copy edits, remain preserved and are not replaced by this gate observation."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/resumed-20261017/outgoing-base-metadata-repair",
+    "releaseStatus": "Local append-only rationale repair. No test/source/app/copy/hash changes, broad full suite, shared runtime, push, CI or release by this owner. Parent /root owns final release validation."
   }
 ]

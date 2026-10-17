@@ -9044,6 +9044,393 @@ test("list search: the query survives an unrelated re-render", async () => {
   assert.ok(!/Write the scene/.test(listHTML(shim)), "a repaint shouldn't silently drop the filter");
 });
 
+test('RISK saved view restoration: a reopened All Tasks list retains its local search tag filter and scroll position',async()=>{
+ const board=syncState({
+  contexts:[{id:'home',name:'Home',active:true},{id:'other',name:'Other',active:true}],
+  tasks:Array.from({length:45},(_,i)=>({...syncTask('saved-view-'+i,'Matching task '+i),ctx:[i<40?'home':'other']})),
+  listOpen:true,seenQuickStart:true
+ });
+ const storage=sharedScannerStorage({[SYNC_STORE_KEY]:JSON.stringify(board)});
+ const first=await loadApp({sharedStorage:storage}),{ctx,shim}=first;
+ const initialBoard=JSON.stringify(ctx.state);
+ const search=shim.document.getElementById('listSearch');search.id='listSearch';search.value='matching';
+ shim.document.dispatchEvent({type:'input',target:search});
+ ctx.onAction('list-tag',{dataset:{id:'c:home'}});
+ const body=shim.document.getElementById('listBody');body.id='listBody';body.scrollTop=420;
+ shim.document.dispatchEvent({type:'scroll',target:body});
+ shim.window.dispatchEvent({type:'pagehide'});
+ const savedView=JSON.parse(storage.getItem('fvp:chain-scanner:saved-view:v1')||'null');
+ assert.equal(savedView?.query,'matching','only compact presentation data is saved locally');
+ assert.equal(savedView?.scrollTop,420,'pagehide flushes the pending list position');
+ assert.equal(JSON.stringify(ctx.state),initialBoard,'filter and scroll changes must remain presentation-only');
+ const reopened=await loadApp({sharedStorage:storage}),restoredSearch=reopened.shim.document.getElementById('listSearch');
+ assert.equal(restoredSearch.value,'matching','reopening restores the All Tasks search input');
+ assert.equal(reopened.shim.document.getElementById('listCount').textContent,'(40 of 45)','reopening reapplies the context tag filter');
+ assert.match(reopened.shim.document.getElementById('listTagRow').innerHTML,/data-id="c:home"[^>]*aria-pressed="true"/,'the restored filter remains visibly selected');
+ assert.equal(reopened.shim.document.getElementById('listBody').scrollTop,420,'reopening restores the list position');
+ assert.equal(JSON.stringify(reopened.ctx.state),initialBoard,'saved-view restoration cannot alter the authoritative board');
+});
+
+test('RISK saved view account boundary: an All Tasks filter is cleared when the signed-in account changes',async()=>{
+ const board=syncState({syncAccount:'account-a',tasks:[syncTask('account-a-task','Matching private account A task')],listOpen:true,seenQuickStart:true});
+ const {ctx,shim}=await loadApp({sharedStorage:sharedScannerStorage({[SYNC_STORE_KEY]:JSON.stringify(board)})});
+ const search=shim.document.getElementById('listSearch');search.id='listSearch';search.value='private';shim.document.dispatchEvent({type:'input',target:search});
+ shim.window.CloudSync={user:'account-b'};ctx.render();
+ assert.equal(search.value,'','a private filter from the prior account must not remain in the new account view');
+ assert.equal(shim.document.getElementById('listCount').textContent,'(1)','the new account must not inherit the prior account filter');
+});
+
+test('RISK saved view restoration: the eligibility filter remains selected after reopening All Tasks',async()=>{
+ const board=syncState({tasks:[syncTask('eligibility-view','Eligibility view task')],listOpen:true,seenQuickStart:true});
+ const storage=sharedScannerStorage({[SYNC_STORE_KEY]:JSON.stringify(board)}),first=await loadApp({sharedStorage:storage});
+ first.ctx.onAction('list-eligibility',{dataset:{id:'ineligible'}});
+ assert.equal(first.shim.document.getElementById('listCount').textContent,'(0 of 1)');
+ first.shim.window.dispatchEvent({type:'pagehide'});
+ const reopened=await loadApp({sharedStorage:storage});
+ assert.equal(reopened.shim.document.getElementById('listCount').textContent,'(0 of 1)','the saved eligibility filter applies before the reopened list paints');
+ assert.match(reopened.shim.document.getElementById('listEligibilityRow').innerHTML,/data-id="ineligible" aria-pressed="true"/);
+});
+
+test('RISK saved view cloud adoption: this device keeps its open All Tasks view through a newer remote board and reload',async()=>{
+ const local=syncState({tasks:[syncTask('local-view','Local board task')],syncAccount:'e@example.com',syncRev:4,listOpen:false,seenQuickStart:true});
+ const remote=syncState({tasks:[syncTask('remote-view','Remote board task')],syncAccount:'e@example.com',syncRev:4,listOpen:false,seenQuickStart:true});
+ const storage=sharedScannerStorage({[SYNC_STORE_KEY]:JSON.stringify(local)}),h=makeSyncHarness({remote,rev:5});
+ const opened=await loadApp({sharedStorage:storage,cloudSyncFactory:h.factory});
+ opened.ctx.onAction('toggle-list');
+ const afterToggle={listOpen:opened.ctx.state.listOpen,cachedListOpen:JSON.parse(storage.getItem('fvp:chain-scanner:saved-view:v1')||'null')?.listOpen??null};
+ vm.runInContext('if(cloudTimer){clearTimeout(cloudTimer);cloudTimer=null;}',opened.ctx);
+ opened.ctx.setListQuery('Remote');
+ await opened.ctx.cloudPull();
+ const adopted={title:opened.ctx.state.tasks[0].title,listOpen:opened.ctx.state.listOpen,hidden:opened.shim.document.getElementById('listBody').hidden};
+ const reopened=await loadApp({sharedStorage:storage});
+ assert.deepEqual({afterToggle,adopted,reloaded:{listOpen:reopened.ctx.state.listOpen,hidden:reopened.shim.document.getElementById('listBody').hidden,query:reopened.shim.document.getElementById('listSearch').value}},
+  {afterToggle:{listOpen:true,cachedListOpen:true},adopted:{title:'Remote board task',listOpen:true,hidden:false},reloaded:{listOpen:true,hidden:false,query:'Remote'}},
+  'new cloud task data is accepted while this browser retains its own open list and filters through adoption and reload');
+});
+
+test('RISK saved view reveal: the real reveal action keeps its opened list through cloud adoption and reload',async()=>{
+ const task=syncTask('shared-reveal','Shared task');
+ const local=syncState({tasks:[task],syncAccount:'e@example.com',syncRev:4,listOpen:false,seenQuickStart:true});
+ const remote=syncState({tasks:[{...task}],syncAccount:'e@example.com',syncRev:4,listOpen:false,seenQuickStart:true});
+ const storage=sharedScannerStorage({[SYNC_STORE_KEY]:JSON.stringify(local)}),h=makeSyncHarness({remote,rev:5});
+ const opened=await loadApp({sharedStorage:storage,cloudSyncFactory:h.factory});
+ opened.ctx.onAction('reveal',{dataset:{id:'shared-reveal'}});
+ const afterReveal={listOpen:opened.ctx.state.listOpen,cachedListOpen:JSON.parse(storage.getItem('fvp:chain-scanner:saved-view:v1')||'null')?.listOpen??null,hidden:opened.shim.document.getElementById('listBody').hidden};
+ vm.runInContext('if(cloudTimer){clearTimeout(cloudTimer);cloudTimer=null;}',opened.ctx);
+ await opened.ctx.cloudPull();
+ const adopted={title:opened.ctx.state.tasks[0].title,listOpen:opened.ctx.state.listOpen,hidden:opened.shim.document.getElementById('listBody').hidden};
+ await opened.ctx.cloudPull();
+ const repeatedPull={listOpen:opened.ctx.state.listOpen,hidden:opened.shim.document.getElementById('listBody').hidden,remoteListOpen:h.remoteState().listOpen};
+ vm.runInContext('if(cloudTimer){clearTimeout(cloudTimer);cloudTimer=null;}',opened.ctx);
+ const reopened=await loadApp({sharedStorage:storage});
+ assert.deepEqual({afterReveal,adopted,repeatedPull,reloaded:{listOpen:reopened.ctx.state.listOpen,hidden:reopened.shim.document.getElementById('listBody').hidden}},
+  {afterReveal:{listOpen:true,cachedListOpen:true,hidden:false},adopted:{title:'Shared task',listOpen:true,hidden:false},repeatedPull:{listOpen:true,hidden:false,remoteListOpen:false},reloaded:{listOpen:true,hidden:false}},
+  'the actual reveal action records this device’s list-open choice and keeps it around newer cloud task data');
+});
+
+test('RISK saved view fallback: corrupt or blocked local presentation storage leaves the saved board usable',async()=>{
+ const board=syncState({tasks:[syncTask('view-fallback','Keep task')],listOpen:true,seenQuickStart:true}),payload=JSON.stringify(board);
+ const corrupt=await loadApp({sharedStorage:sharedScannerStorage({[SYNC_STORE_KEY]:payload,'fvp:chain-scanner:saved-view:v1':'{'})});
+ assert.equal(corrupt.ctx.state.tasks.length,1);assert.equal(corrupt.shim.document.getElementById('listSearch').value,'');
+ const values=new Map([[SYNC_STORE_KEY,payload]]),blocked={
+  getItem(key){if(key==='fvp:chain-scanner:saved-view:v1')throw new Error('local view reads are blocked');return values.has(key)?values.get(key):null;},
+  setItem(key,value){if(key==='fvp:chain-scanner:saved-view:v1')throw new Error('local view writes are blocked');values.set(key,String(value));},
+  removeItem(key){if(key==='fvp:chain-scanner:saved-view:v1')throw new Error('local view removal is blocked');values.delete(key);}
+ };
+ const unavailable=await loadApp({sharedStorage:blocked}),before=JSON.stringify(unavailable.ctx.state),search=unavailable.shim.document.getElementById('listSearch');
+ search.id='listSearch';search.value='keep';unavailable.shim.document.dispatchEvent({type:'input',target:search});
+ unavailable.shim.window.dispatchEvent({type:'pagehide'});
+ assert.equal(unavailable.shim.document.getElementById('listCount').textContent,'(1 of 1)');
+ assert.equal(JSON.stringify(unavailable.ctx.state),before,'presentation storage failures never block or edit the authoritative board');
+});
+
+async function settleSavedViewPublication(app,h,stage){
+ const deadline=performance.now()+8000;let observed,stored;
+ do{
+  observed=JSON.parse(vm.runInContext('JSON.stringify({idle:!cloudPushInFlight&&!pulling&&!pendingPush&&!cloudResumePending,payload:cloudPayload(),raw:lastPersistedRaw,stateRaw:JSON.stringify(state),revision:state.syncRev,dirty:state.syncDirty})',app.ctx));
+  if(observed.idle && !observed.dirty && observed.payload===h.doc?.payload && observed.revision===h.doc?.rev && observed.raw===observed.stateRaw){
+   stored=await vm.runInContext('deviceStorageAuthority?deviceStore.readHead().then(head=>head?.payload):Promise.resolve(localStorage.getItem(STORE_KEY))',app.ctx);
+   if(stored===observed.stateRaw)return;
+  }
+  await syncSettle(25);
+ }while(performance.now()<deadline);
+ assert.fail(stage+' did not durably acknowledge publication: '+JSON.stringify({idle:observed.idle,dirty:observed.dirty,localRev:observed.revision,remoteRev:h.doc?.rev,cloudMatches:observed.payload===h.doc?.payload,persistedMatches:observed.raw===observed.stateRaw,durableMatches:stored===observed.stateRaw,code:app.shim.window.CloudSync.errorCode}));
+}
+
+test('RISK saved view decision integration: inherited guest authority and peer edits retain this device view through scoped Undo and durably acknowledged reopen',async t=>{
+ const {IDBFactory}=await import('fake-indexeddb');
+ for(const backend of ['fallback','IndexedDB'])await t.test(backend,async t=>{
+  const at=Date.parse('2026-10-17T15:00:00Z'),storage=sharedScannerStorage(),indexedDB=backend==='IndexedDB'?new IDBFactory():undefined;
+  const options={sharedStorage:storage,...(indexedDB?{indexedDBProvider:indexedDB,deviceDbName:'saved-view-integration-'+Date.now()}: {})};
+  const local=await loadAppAtTime(at,options),apps=[local];
+  t.after(()=>{for(const app of apps){app.shim.window.CloudSync&&(app.shim.window.CloudSync.user=null);vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',app.ctx);}});
+  local.ctx.onAction('ok-quickstart',{});for(let i=0;i<45;i++)local.ctx.addTask('Shared integration task '+i,false);
+  local.ctx.onAction('start-scan',{dataset:{mode:'descending'}});
+  assert.ok(local.ctx.state.decisionEvents.some(row=>row.account===null),'the real guest scanner creates retained guest authority');
+  const h=makeSyncHarness({remote:null,rev:0,delayMs:1}),CS=local.shim.window.CloudSync=h.factory();
+  local.shim.window.dispatchEvent({type:'cloudsync'});await local.ctx.cloudPull();local.ctx.cloudPushNow();await settleSavedViewPublication(local,h,'Guest inheritance');
+  assert.equal(local.ctx.state.syncAccount,'e@example.com');assert.equal(CS.errorCode||null,null);
+  assert.equal(local.ctx.state.decisionBaseline.account,'e@example.com');
+  assert.ok(local.ctx.state.decisionBaseline.inheritance.some(row=>row.reason==='guest-first-empty-account'&&row.sourceAccount===null),'normal reconciliation attests guest actions before account publication');
+  assert.equal(local.ctx.state.syncDirty,false);assert.match(local.ctx.state.decisionBase.id,/^db1:/);
+  if(!local.ctx.state.listOpen)local.ctx.onAction('toggle-list');
+  const search=local.shim.document.getElementById('listSearch');search.id='listSearch';search.value='Shared';local.shim.document.dispatchEvent({type:'input',target:search});
+  const body=local.shim.document.getElementById('listBody');body.id='listBody';body.scrollTop=420;local.shim.document.dispatchEvent({type:'scroll',target:body});local.shim.window.dispatchEvent({type:'pagehide'});
+  // pagehide deliberately suspends publication; reopen through the real lifecycle consumer.
+  local.shim.window.dispatchEvent({type:'pageshow'});CS.ready=false;
+  await local.ctx.persist();const raw=JSON.stringify(local.ctx.state),peer=await loadAppAtTime(at,{seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw},cloudSyncFactory:h.factory});apps.push(peer);await peer.ctx.cloudPull();
+  const edited=peer.ctx.state.tasks.at(-1).id;await saveEditorChoice(peer,edited,at+100,{title:'Shared peer title after inheritance'});
+  if(peer.ctx.state.listOpen)peer.ctx.onAction('toggle-list');peer.ctx.cloudPushNow();await settleSavedViewPublication(peer,h,'Peer editor Save');
+  assert.equal(peer.ctx.state.syncDirty,false);assert.ok(h.remoteState().decisionEvents.some(row=>row.kind==='current-choice'&&row.target?.property==='title'));
+  let release;const gate=new Promise(resolve=>{release=resolve;}),pull=CS.pull.bind(CS);CS.pull=async()=>{const response=await pull();await gate;return response;};CS.ready=true;
+  const pending=local.ctx.cloudPull();await syncSettle(5);setFakeTime(local.ctx,at+200);const added=local.ctx.addTask('Shared local add during pull',false);release();await pending;CS.pull=pull;local.ctx.cloudPushNow();await settleSavedViewPublication(local,h,'Concurrent local Add');
+  assert.equal(local.ctx.state.tasks.find(row=>row.id===edited).title,'Shared peer title after inheritance');assert.ok(local.ctx.state.tasks.some(row=>row.id===added.id));
+  assert.equal(local.ctx.state.listOpen,true);assert.equal(search.value,'Shared');assert.equal(body.scrollTop,420);assert.equal(local.ctx.state.syncDirty,false);
+  assert.equal(await local.ctx.onAction('undo',{}),true);await local.ctx.persist();local.ctx.cloudPushNow();
+  // A clean flag can precede completion of the preceding write's CAS/ack tail.
+  // Close only after the intended Undo bytes are acknowledged and durable.
+  await settleSavedViewPublication(local,h,'Undo before close');assert.equal(local.ctx.state.syncDirty,false,'Undo publication is acknowledged before closing this fixture');
+  assert.equal(local.ctx.state.tasks.some(row=>row.id===added.id),false,'scoped Undo removes only the local addition');assert.equal(local.ctx.state.tasks.find(row=>row.id===edited).title,'Shared peer title after inheritance','scoped Undo retains independent peer authority');
+  local.shim.window.dispatchEvent({type:'pagehide'});await local.ctx.persist();
+  const reopened=await loadAppAtTime(at+300,{...options,cloudSyncFactory:h.factory});apps.push(reopened);await reopened.ctx.cloudPull();reopened.ctx.cloudPushNow();await settleSavedViewPublication(reopened,h,'Reopened board');
+  assert.equal(reopened.ctx.state.listOpen,true);assert.equal(reopened.shim.document.getElementById('listSearch').value,'Shared');assert.equal(reopened.shim.document.getElementById('listBody').scrollTop,420);
+  assert.equal(reopened.ctx.state.tasks.find(row=>row.id===edited).title,'Shared peer title after inheritance');assert.equal(reopened.ctx.state.tasks.some(row=>row.id===added.id),false);assert.equal(reopened.ctx.state.syncDirty,false,JSON.stringify({code:reopened.shim.window.CloudSync.errorCode,localRev:reopened.ctx.state.syncRev,remoteRev:h.doc.rev,same:reopened.ctx.cloudPayload()===h.doc.payload,calls:h.calls.slice(-10),differentFields:Object.keys(JSON.parse(h.doc.payload)).filter(key=>JSON.stringify(reopened.ctx.state[key])!==JSON.stringify(JSON.parse(h.doc.payload)[key]))}));
+ });
+});
+
+test('RISK saved view guidance: Quick start and Changelog describe this-device restoration and current dates',async()=>{
+ const {ctx,shim}=await loadApp();for(const id of ['appChangelogCurrent','appChangelog'])shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ const answer=help.split('<dt>What does All Tasks remember when I reopen?</dt><dd>')[1]?.split('</dd>')[0]||'';
+ assert.match(answer,/last All Tasks search or filter, whether its list was open, and your place in the list on this device/i);
+ assert.match(answer,/saved board first/i);assert.match(answer,/dates and eligibility use today/i);
+ assert.match(answer,/if this browser cannot retain the view, your saved board still opens with its usual list view/i);
+ assert.match(answer,/When a saved appearance is available, it stays visible quietly while the saved board opens/i);
+ assert.doesNotMatch(answer,/loading message|small panel|spinner/i);
+ const chapter=help.split('<details class="help-faq" data-help-changelog>')[1]?.split('</details>')[0]||'';
+ assert.match(chapter,/<h3>October 17, 2026<\/h3>[\s\S]*?<li>Opening or refreshing quietly restores this device’s All Tasks list, filters and position; newer cloud changes still sync in the background\. When a saved appearance is available, it stays visible quietly while the saved board opens\. If this browser cannot retain the view, the saved board still opens with its usual list view\.<\/li>/);
+});
+
+
+test('RISK saved view guidance qualification: FAQ and current release note promise an appearance only when available',async t=>{
+ const {ctx,shim}=await loadApp();for(const id of ['appChangelogCurrent','appChangelog'])shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ const answer=help.split('<dt>What does All Tasks remember when I reopen?</dt><dd>')[1]?.split('</dd>')[0]||'';
+ const release=help.split('<h3>October 17, 2026</h3>')[1]?.split('</ul>')[0]||'';
+ for(const [surface,copy] of [['All Tasks FAQ',answer],['October17 changelog',release]])await t.test(surface,()=>{
+  assert.match(copy,/When a saved appearance is available, it stays visible quietly while the saved board opens\./i,'optional appearance availability must qualify the visible-while-opening promise');
+ });
+});
+
+async function delayedLocalBoardBrowser(viewport={width:390,height:844},dispatchResizeDuringLoad=false,theme='system'){
+ const {chromium}=await import(process.env.PLAYWRIGHT_MODULE||process.env.LANDSCAPE_PLAYWRIGHT||'playwright');
+ const browser=await chromium.launch({headless:true,channel:process.env.LANDSCAPE_BROWSER_CHANNEL||'chrome'});
+ const context=await browser.newContext({viewport,serviceWorkers:'block'});
+ const board=syncState({
+  contexts:[{id:'home',name:'Home',active:true}],
+  tasks:Array.from({length:45},(_,i)=>({...syncTask('boot-'+i,'Saved boot task '+i),ctx:['home']})),
+  listOpen:true,seenQuickStart:true,settings:{...syncState().settings,theme}
+ });
+ const payload=JSON.stringify(board),delayMs=1000;
+ await context.addInitScript(({payload,delayMs,theme})=>{
+  Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});
+  if(theme==='light'||theme==='dark')localStorage.setItem('fvp:chain-scanner:theme',theme);
+  localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:'reduced',savedAt:Date.now()}));
+  window.__savedViewRead={started:false,settled:false};
+  window.storage={
+   async get(){window.__savedViewRead.started=true;await new Promise(resolve=>setTimeout(resolve,delayMs));window.__savedViewRead.settled=true;return {value:payload};},
+   async set(){}
+  };
+ },{payload,delayMs,theme});
+ const origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+ await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
+ const page=await context.newPage(),errors=[];
+ page.on('pageerror',error=>errors.push(error.message));
+ await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});
+ await page.waitForFunction(()=>window.__savedViewRead?.started===true);
+ if(dispatchResizeDuringLoad)await page.evaluate(()=>window.dispatchEvent(new Event('resize')));
+ const early=await page.evaluate(()=>({
+  storageSettled:window.__savedViewRead.settled,
+  shellVisibility:getComputedStyle(document.querySelector('.wrap')).visibility,
+  status:document.querySelector('#startupStatus')?.textContent.trim()||null,
+  colorScheme:getComputedStyle(document.documentElement).colorScheme,
+  inkReference:getComputedStyle(document.body).color,
+  statusCard:(()=>{
+   const node=document.querySelector('#startupStatus .startup-status-card');if(!node)return null;
+   const style=getComputedStyle(node),rect=node.getBoundingClientRect();
+   return {background:style.backgroundColor,color:style.color,borderColor:style.borderColor,borderRadius:style.borderRadius,
+    bounds:{x:rect.x,y:rect.y,right:rect.right,bottom:rect.bottom,width:rect.width,height:rect.height}};
+  })(),
+  panelReference:(()=>{const node=document.querySelector('.wrap #listWrap');if(!node)return null;const style=getComputedStyle(node);return {id:node.id,className:node.className,sameNode:node===document.querySelector('#startupStatus .startup-status-card'),background:style.backgroundColor,color:style.color,borderColor:style.borderColor,borderRadius:style.borderRadius};})(),
+  viewport:{width:innerWidth,height:innerHeight},
+  rows:document.querySelectorAll('#listBody [data-row]').length,
+  listCount:document.querySelector('#listCount')?.textContent||''
+ }));
+ if(process.env.SAVED_VIEW_ARTIFACT_DIR&&(theme==='light'||theme==='dark')){
+  fs.mkdirSync(process.env.SAVED_VIEW_ARTIFACT_DIR,{recursive:true});
+  await page.screenshot({path:path.join(process.env.SAVED_VIEW_ARTIFACT_DIR,`startup-loading-${theme}.png`)});
+ }
+ await page.waitForFunction(()=>document.querySelectorAll('#listBody [data-row]').length===45,{timeout:5000});
+ const ready=await page.evaluate(()=>({
+  shellVisibility:getComputedStyle(document.querySelector('.wrap')).visibility,
+  status:document.querySelector('#startupStatus')?.textContent.trim()||null,
+  rows:document.querySelectorAll('#listBody [data-row]').length,
+  listCount:document.querySelector('#listCount')?.textContent||'',
+  listOpen:!document.querySelector('#listBody').hidden
+ }));
+ return {browser,context,page,early,ready,errors};
+}
+
+async function invisibleSavedViewBrowser(theme='light',delayAppearanceAsset=false,keepHeader=false,viewport={width:390,height:844},activeScanner=false){
+ const {chromium}=await import(process.env.PLAYWRIGHT_MODULE||process.env.LANDSCAPE_PLAYWRIGHT||'playwright');
+ const browser=await chromium.launch({headless:true,channel:process.env.LANDSCAPE_BROWSER_CHANNEL||'chrome'});
+ const context=await browser.newContext({viewport,serviceWorkers:'block',reducedMotion:'reduce'});
+ const origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+ await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
+ if(delayAppearanceAsset)await context.route('**/saved-appearance.js',async route=>{await new Promise(resolve=>setTimeout(resolve,600));await route.continue();});
+ await context.addInitScript(theme=>{
+  Object.defineProperty(window,'FIREBASE_CONFIG',{value:null,writable:false});
+  localStorage.setItem('fvp:chain-scanner:theme',theme);
+  localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:'reduced',savedAt:Date.now()}));
+  window.__actualLocalRead={started:false,settled:false};
+  window.__firstAppearanceFrames=[];let frames=0;function observe(){if(localStorage.getItem('__delayLocalRead')==='true'&&document.querySelector('.wrap')){const preview=document.querySelector('[data-saved-preview]');window.__firstAppearanceFrames.push({ready:document.documentElement.dataset.appReady==='true',populated:!!preview&&getComputedStyle(preview).visibility==='visible'&&!!preview.querySelector('.trow')});}if(++frames<180)requestAnimationFrame(observe);}requestAnimationFrame(observe);
+  const open=indexedDB.open.bind(indexedDB),success=Object.getOwnPropertyDescriptor(IDBRequest.prototype,'onsuccess');
+  indexedDB.open=(...args)=>{const request=open(...args);if(localStorage.getItem('__delayLocalRead')!=='true')return request;
+   window.__actualLocalRead.started=true;let listener=null;
+   Object.defineProperty(request,'onsuccess',{configurable:true,get:()=>listener,set:fn=>{listener=fn;success.set.call(request,event=>setTimeout(()=>{window.__actualLocalRead.settled=true;fn?.call(request,event);},1800));}});return request;};
+ },theme);
+ const page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
+ await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});
+ await page.waitForFunction(()=>document.documentElement.dataset.appReady==='true');
+ await page.evaluate(async()=>{document.getElementById('motionDialog')?.close();closeModal();state.seenQuickStart=true;state.addOpen=false;state.histOpen=false;state.settings.theme=localStorage.getItem('fvp:chain-scanner:theme');
+  for(let i=0;i<65;i++)addTask('Saved appearance task '+String(i).padStart(2,'0'));
+  addTask('Unmatched control task');save();await persist();render();});
+ if(activeScanner)await page.locator('[data-act="start-scan"]').first().click();
+ if(keepHeader){await page.locator('[data-act="settings"]').first().click();await page.getByText('Scanning and recurrence',{exact:true}).click();await page.locator('#stFloatingHeader').check();await page.locator('#modalRoot [data-act="close-modal"]').click();}
+ if(await page.locator('#listBody').isHidden())await page.locator('[data-act="toggle-list"]').first().click();
+ await page.locator('#listSearch').fill('Saved appearance');
+ await page.locator('[data-act="list-eligibility"][data-id="all"]').click();
+ await page.locator('#listSearch').fill('Saved appearance');
+ await page.locator('#listBody').evaluate(e=>{e.scrollTop=420;e.dispatchEvent(new Event('scroll'));});
+ await page.evaluate(()=>{window.scrollTo(0,220);window.dispatchEvent(new Event('pagehide'));localStorage.setItem('__delayLocalRead','true');});
+ if(process.env.SAVED_VIEW_ARTIFACT_DIR)await page.screenshot({path:path.join(process.env.SAVED_VIEW_ARTIFACT_DIR,`invisible-before-${theme}.png`)});
+ const before=await page.evaluate(()=>({query:document.getElementById('listSearch').value,scroll:document.getElementById('listBody').scrollTop,pageY:scrollY,geometry:(()=>{const rect=id=>{const r=document.getElementById(id).getBoundingClientRect();return{x:r.x,y:r.y,width:r.width,height:r.height};};return{scan:rect('scan'),list:rect('listWrap'),body:rect('listBody'),separators:document.querySelectorAll('#scan hr.sep').length};})(),visibleTitles:(()=>{const body=document.getElementById('listBody'),r=body.getBoundingClientRect();return[...body.querySelectorAll('.trow')].filter(e=>{const b=e.getBoundingClientRect();return b.bottom>r.top&&b.top<Math.min(r.bottom,innerHeight);}).map(e=>e.querySelector('.tt')?.textContent);})(),header:(()=>{const r=document.getElementById('appHeader').getBoundingClientRect();return{x:r.x,y:r.y,width:r.width,height:r.height};})(),tasks:JSON.stringify(state.tasks),cache:localStorage.getItem('fvp:chain-scanner:appearance:v1')}));
+ await page.reload({waitUntil:'domcontentloaded'});
+ await page.waitForFunction(()=>window.__actualLocalRead?.started);
+ const early=await page.evaluate(()=>{const preview=document.querySelector('[data-saved-preview]'),list=preview?.querySelector('[data-preview-id="listBody"]'),search=preview?.querySelector('[data-preview-id="listSearch"]');return{settled:window.__actualLocalRead.settled,ready:document.documentElement.dataset.appReady,previewVisible:!!preview&&getComputedStyle(preview).visibility==='visible',rows:[...(list?.querySelectorAll('.trow')||[])].map(e=>e.textContent),query:search?.value,listScroll:list?.scrollTop,pageY:scrollY,geometry:(()=>{const rect=id=>{const r=preview?.querySelector('[data-preview-id="'+id+'"]')?.getBoundingClientRect();return r?{x:r.x,y:r.y,width:r.width,height:r.height}:null;};return{scan:rect('scan'),list:rect('listWrap'),body:rect('listBody'),separators:preview?.querySelectorAll('hr.sep').length||0};})(),visibleTitles:(()=>{if(!list)return[];const r=list.getBoundingClientRect();return[...list.querySelectorAll('.trow')].filter(e=>{const b=e.getBoundingClientRect();return b.bottom>r.top&&b.top<Math.min(r.bottom,innerHeight);}).map(e=>e.querySelector('.tt')?.textContent);})(),header:(()=>{const r=preview?.querySelector('[data-preview-id="appHeader"]')?.getBoundingClientRect();return r?{x:r.x,y:r.y,width:r.width,height:r.height}:null;})(),status:document.getElementById('startupStatus')?.textContent||null,theme:document.documentElement.dataset.theme,colorScheme:getComputedStyle(document.documentElement).colorScheme,duplicateIds:[...document.querySelectorAll('[id]')].map(e=>e.id).filter((id,i,all)=>all.indexOf(id)!==i),activeActions:preview?.querySelectorAll('[data-act],[href],[onclick],[onerror]').length||0};});
+ if(process.env.SAVED_VIEW_ARTIFACT_DIR)await page.screenshot({path:path.join(process.env.SAVED_VIEW_ARTIFACT_DIR,`invisible-early-${theme}.png`)});
+ if(process.env.SAVED_VIEW_ARTIFACT_DIR)fs.writeFileSync(path.join(process.env.SAVED_VIEW_ARTIFACT_DIR,`probe-${theme}.json`),JSON.stringify({before:{...before,cache:JSON.parse(before.cache||'null')},early},null,2));
+ return {browser,context,page,errors,before,early};
+}
+
+test('RISK saved view invisible startup: real IndexedDB reload paints the prior populated search and position without loading chrome',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ for(const theme of ['light','dark']){
+  const view=await invisibleSavedViewBrowser(theme,true);
+  try{
+   const frames=await view.page.evaluate(()=>window.__firstAppearanceFrames);assert.ok(frames.length>0,'observe real animation frames before storage resolves');assert.ok(frames.filter(frame=>!frame.ready).every(frame=>frame.populated),'every first compositor opportunity already has the prior populated view');
+   assert.equal(view.early.settled,false,'actual durable local read is pending at the first visible capture');
+   assert.equal(view.early.previewVisible,true,'the first visible app must already resemble the prior populated view');
+   assert.equal(view.early.status,null,'the rejected loading surface must be absent');
+   assert.equal(view.early.query,'Saved appearance');
+   assert.ok(view.early.rows.length>0&&view.early.rows.length<=18,'cache only a bounded visible list window');
+   assert.ok(view.early.rows.every(text=>text.includes('Saved appearance task')),'the initial list has matching saved rows');
+   assert.deepEqual(view.early.visibleTitles,view.before.visibleTitles,'the visible cached rows match the saved list window');
+   assert.ok(Math.abs(view.early.listScroll-view.before.scroll)<2,'the initial populated window keeps the list place');
+   assert.ok(Math.abs(view.early.pageY-view.before.pageY)<2,'the initial appearance keeps the page place: '+JSON.stringify({early:view.early.pageY,before:view.before.pageY}));
+   assert.equal(view.early.theme,theme);assert.equal(view.early.colorScheme,theme);
+   assert.deepEqual(view.early.duplicateIds,[]);assert.equal(view.early.activeActions,0);
+   await view.page.keyboard.press('Delete');await view.page.keyboard.press('y');
+   await view.page.locator('[data-saved-preview]').dispatchEvent('click');
+   if(process.env.SAVED_VIEW_ARTIFACT_DIR){fs.mkdirSync(process.env.SAVED_VIEW_ARTIFACT_DIR,{recursive:true});await view.page.screenshot({path:path.join(process.env.SAVED_VIEW_ARTIFACT_DIR,`invisible-pending-${theme}.png`)});}
+   await view.page.waitForFunction(()=>document.documentElement.dataset.appReady==='true');
+   const ready=await view.page.evaluate(()=>({query:document.getElementById('listSearch').value,scroll:document.getElementById('listBody').scrollTop,pageY:scrollY,rows:document.querySelectorAll('#listBody .trow').length,tasks:JSON.stringify(state.tasks),preview:!!document.querySelector('[data-saved-preview]')}));
+   assert.equal(ready.query,'Saved appearance');assert.equal(ready.rows,65);assert.equal(ready.tasks,view.before.tasks,'early clicks and shortcuts cannot mutate the pending board');assert.equal(ready.preview,false);
+   assert.ok(Math.abs(ready.scroll-view.before.scroll)<2);assert.ok(Math.abs(ready.pageY-view.before.pageY)<2);
+   assert.deepEqual(view.errors,[]);
+  }finally{await view.browser.close();}
+ }
+});
+
+test('RISK saved view invisible active scanner: a running scan retains scanner and task-list geometry before hydration',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ for(const viewport of [{width:1100,height:1000},{width:390,height:844}]){
+  const view=await invisibleSavedViewBrowser('light',false,false,viewport,true);
+  try{
+   if(process.env.SAVED_VIEW_ARTIFACT_DIR){
+    const dir=process.env.SAVED_VIEW_ARTIFACT_DIR;
+    fs.copyFileSync(path.join(dir,'invisible-before-light.png'),path.join(dir,`active-${viewport.width}-before.png`));
+    await view.page.screenshot({path:path.join(dir,`active-${viewport.width}-pending.png`)});
+    fs.writeFileSync(path.join(dir,`active-${viewport.width}-geometry.json`),JSON.stringify({before:view.before.geometry,pending:view.early.geometry,storagePending:!view.early.settled,listScroll:view.early.listScroll,pageScroll:view.early.pageY},null,2)+'\n');
+   }
+   assert.ok(view.before.geometry.separators>0,'Start scanning reaches the populated benchmark and candidate surface');
+   assert.equal(view.early.settled,false,'the actual native local read is still pending');
+   assert.equal(view.early.listScroll,view.before.scroll);assert.equal(view.early.pageY,view.before.pageY);
+   assert.deepEqual(view.early.geometry,view.before.geometry,'active scanner and All Tasks must keep the prior accepted bounds during reopen');
+   assert.deepEqual(view.errors,[]);
+  }finally{await view.browser.close();}
+ }
+});
+
+test('RISK saved view invisible large window: a tall viewport retains all visible rows with bounded projection work',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const view=await invisibleSavedViewBrowser('light',false,false,{width:1280,height:2160});
+ try{
+  assert.ok(view.before.visibleTitles.length>18,'the tall consumer exceeds the old eighteen-row limit');
+  assert.deepEqual(view.early.visibleTitles,view.before.visibleTitles,'all visible rows must remain populated, including a tall display');
+  assert.ok(view.early.rows.length<=48,'even a tall display has a fixed bounded projection');
+ }finally{await view.browser.close();}
+});
+
+test('RISK saved view invisible header: the prior floating header keeps its normal size and place while storage opens',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const view=await invisibleSavedViewBrowser('light',false,true);
+ try{assert.deepEqual(view.early.header,view.before.header,'the saved floating header must retain the accepted app geometry');}
+ finally{await view.browser.close();}
+});
+
+test('RISK saved view invisible account boundary: a new identity immediately masks the pending prior appearance',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const view=await invisibleSavedViewBrowser();
+ try{
+  assert.equal(view.early.previewVisible,true);
+  const masked=await view.page.evaluate(()=>{window.CloudSync={configured:false,ready:true,user:'other@example.com',status:'off'};window.dispatchEvent(new Event('cloudsync'));return{preview:!!document.querySelector('[data-saved-preview]'),cache:localStorage.getItem('fvp:chain-scanner:appearance:v1'),settled:window.__actualLocalRead.settled};});
+  assert.equal(masked.settled,false);assert.equal(masked.preview,false);assert.equal(masked.cache,null);
+  await view.page.waitForFunction(()=>document.documentElement.dataset.appReady==='true');
+  assert.equal(await view.page.evaluate(()=>state.tasks.length),66,'masking a prior appearance cannot erase local tasks');
+  assert.deepEqual(view.errors,[]);
+ }finally{await view.browser.close();}
+});
+
+test('RISK saved view invisible fallback: corrupt oversized untrusted and blocked projections never become board authority',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const view=await invisibleSavedViewBrowser();
+ try{
+  await view.page.waitForFunction(()=>document.documentElement.dataset.appReady==='true');
+  await view.page.addInitScript(()=>{const kind=localStorage.getItem('__projectionFault'),key='fvp:chain-scanner:appearance:v1',valid=localStorage.getItem('__validProjection');if(!kind)return;let raw=valid;if(kind==='corrupt')raw='{';if(kind==='oversized')raw=' '.repeat(192001);if(kind==='untrusted'){const value=JSON.parse(valid);value.tree.n.push({t:'img',src:'x',onerror:'window.__unsafeProjection=true',n:[]});raw=JSON.stringify(value);}localStorage.setItem(key,raw);if(kind==='blocked'){const get=Storage.prototype.getItem;Storage.prototype.getItem=function(key){if(key==='fvp:chain-scanner:appearance:v1')throw new DOMException('isolated blocked preview','SecurityError');return get.call(this,key);};}});
+  for(const kind of ['corrupt','oversized','untrusted','blocked']){
+   await view.page.evaluate(({kind,valid})=>{localStorage.setItem('__projectionFault',kind);localStorage.setItem('__validProjection',valid);},{kind,valid:view.before.cache});
+   await view.page.reload({waitUntil:'domcontentloaded'});await view.page.waitForFunction(()=>window.__actualLocalRead.started);
+   const early=await view.page.evaluate(()=>({preview:!!document.querySelector('[data-saved-preview]'),attack:!!window.__unsafeProjection,settled:window.__actualLocalRead.settled,status:!!document.getElementById('startupStatus')}));
+   assert.equal(early.settled,false);assert.equal(early.preview,false,kind+' projection is not displayed');assert.equal(early.attack,false);assert.equal(early.status,false);
+   await view.page.waitForFunction(()=>document.documentElement.dataset.appReady==='true');
+   assert.equal(await view.page.evaluate(()=>JSON.stringify(state.tasks)),view.before.tasks,kind+' projection cannot save, migrate or replace tasks');
+   assert.equal(await view.page.locator('#listBody .trow').count(),65);
+  }
+  assert.deepEqual(view.errors,[]);
+ }finally{await view.browser.close();}
+});
+
+test('RISK saved view startup: delayed local board reads do not expose an empty default shell',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const startup=await delayedLocalBoardBrowser();
+ try{
+  assert.equal(startup.early.storageSettled,false,'the local copy must still be loading when its first frame is inspected');
+  assert.equal(startup.early.shellVisibility,'hidden','the empty default shell is not visible while the saved board is loading');
+  assert.equal(startup.early.status,null,'no loading surface is added when a saved appearance is unavailable');
+  assert.equal(startup.ready.shellVisibility,'visible');
+  assert.equal(startup.ready.rows,45,'the first revealed board/list is the restored local copy');
+  assert.equal(startup.ready.listOpen,true);
+ }finally{await startup.browser.close();}
+});
+
+test('RISK saved view startup: delayed local reads do not call state renderers before board hydration',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const startup=await delayedLocalBoardBrowser({width:1366,height:900},true);
+ try{assert.deepEqual(startup.errors,[],'the application must not run board renderers against null state while the local copy loads');}
+ finally{await startup.browser.close();}
+});
+
 test("list search: the search box lives outside #listBody, so a repaint can't steal focus", () => {
   const wrap = html.match(/<section class="panel listwrap"[\s\S]*?<\/section>/);
   assert.ok(wrap, "the list panel should still be a .listwrap section");
@@ -16274,11 +16661,11 @@ test('Animation controls: revealing a task respects app and device reduced motio
  assert.ok(end>start,'the revealTask snippet ends before the commit helper');
  const code=html.slice(start,end);
  for(const [preference,osReduced,expected] of [['normal',false,'smooth'],['reduced',false,'instant'],['normal',true,'instant'],[undefined,false,'instant']]){
-  const calls=[],row={classList:{remove(){},add(){}},offsetWidth:100,scrollIntoView(options){calls.push(options);}};
-  const ctx=vm.createContext({state:{listOpen:false},clearListFilters(){},render(){},requestAnimationFrame(fn){fn();},document:{documentElement:{dataset:{landscapeMotion:preference}},querySelectorAll(){return [Object.assign(row,{dataset:{row:'task'}})];}},window:{matchMedia(){return {matches:osReduced};}}});
+  const calls=[],viewCalls=[],row={classList:{remove(){},add(){}},offsetWidth:100,scrollIntoView(options){calls.push(options);}};
+  const ctx=vm.createContext({state:{listOpen:false},allTasksView:{setListOpen(value){viewCalls.push(value);}},clearListFilters(){},render(){},requestAnimationFrame(fn){fn();},document:{documentElement:{dataset:{landscapeMotion:preference}},querySelectorAll(){return [Object.assign(row,{dataset:{row:'task'}})];}},window:{matchMedia(){return {matches:osReduced};}}});
   vm.runInContext(code+';revealTask("task");',ctx);
   assert.equal(calls[0].behavior,expected,`${preference}/${osReduced} must choose ${expected}`);
-  assert.equal(calls[0].block,'center');assert.equal(ctx.state.listOpen,true);
+  assert.equal(calls[0].block,'center');assert.equal(ctx.state.listOpen,true);assert.deepEqual(viewCalls,[true]);
  }
 });
 

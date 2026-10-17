@@ -1053,6 +1053,22 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK bulk row selection: selected label replaces the existing rank slot and deselection restores its format
 - RISK bulk toolbar keyboard: rerender restores the focused toolbar action and row toggle
 - RISK All Tasks view ownership: account adoption clears prior selection while same-account Undo retains it
+- RISK saved view restoration: a reopened All Tasks list retains its local search tag filter and scroll position
+- RISK saved view restoration: the eligibility filter remains selected after reopening All Tasks
+- RISK saved view account boundary: an All Tasks filter is cleared when the signed-in account changes
+- RISK saved view cloud adoption: this device keeps its open All Tasks view through a newer remote board and reload
+- RISK saved view reveal: the real reveal action keeps its opened list through cloud adoption and reload
+- RISK saved view fallback: corrupt or blocked local presentation storage leaves the saved board usable
+- RISK saved view startup: delayed local board reads do not expose an empty default shell
+- RISK saved view startup: delayed local reads do not call state renderers before board hydration
+- RISK saved view invisible startup: real IndexedDB reload paints the prior populated search and position without loading chrome
+- RISK saved view invisible active scanner: a running scan retains scanner and task-list geometry before hydration
+- RISK saved view invisible large window: a tall viewport retains all visible rows with bounded projection work
+- RISK saved view invisible header: the prior floating header keeps its normal size and place while storage opens
+- RISK saved view invisible account boundary: a new identity immediately masks the pending prior appearance
+- RISK saved view invisible fallback: corrupt oversized untrusted and blocked projections never become board authority
+- RISK saved view guidance: Quick start and Changelog describe this-device restoration and current dates
+- RISK saved view guidance qualification: FAQ and current release note promise an appearance only when available
 - RISK bulk toolbar guidance: extended FAQ describes frozen controls and rank-slot selection
 - RISK repository process boundary: actual visual tests compare every changed control with neighboring controls and scrolled states
 
@@ -1369,6 +1385,10 @@ Postimplementation mixed integration acceptance also carries a normal visible en
 - `RISK intervention Continue authority: a visible scan reaffirmation competes with Pause and scoped Undo in either publication order`
 
 The actual intervention Yes records deliberate current-pass Scan intent even when already scanning. Both upload orders and both original-time directions preserve the correct opposing answer, original fact owner/time, existing snooze/intervention behavior, exact scoped Undo, unrelated peer title, stale delivery and cold reopen. The existing mode causal-skew and unsupported-fact hold consumers remain included; no fake weighting or Start event is created.
+
+## Saved view and released decision authority integration
+
+- RISK saved view decision integration: inherited guest authority and peer edits retain this device view through scoped Undo and durably acknowledged reopen
 
 ## Agent evidence command wiring (#152)
 

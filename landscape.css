@@ -43,8 +43,8 @@ body{background:transparent;isolation:isolate}
 .scene-dot{width:5px;height:5px;border-radius:50%;background:var(--accent);display:inline-block;margin-right:5px;vertical-align:2px}
 .scene-look{font-size:11px;color:var(--ink);border:1px solid color-mix(in srgb,var(--mut) 40%,transparent);background:color-mix(in srgb,var(--panel) 88%,transparent);padding:5px 10px;border-radius:99px;min-height:30px}
 .panel{border-radius:16px;background:color-mix(in srgb,var(--panel) 97%,var(--scene-tint));box-shadow:0 5px 22px #123c2a0a}
-#scan{border-radius:16px;background:color-mix(in srgb,var(--panel) 97%,var(--scene-tint));padding:18px;border:1px solid var(--line);box-shadow:0 8px 28px #123c2a0b}
-#scan:empty{display:none}
+#scan,[data-preview-id="scan"]{border-radius:16px;background:color-mix(in srgb,var(--panel) 97%,var(--scene-tint));padding:18px;border:1px solid var(--line);box-shadow:0 8px 28px #123c2a0b}
+#scan:empty,[data-preview-id="scan"]:empty{display:none}
 .bench{box-shadow:0 4px 12px #254c3d25}
 .foot{background:color-mix(in srgb,var(--panel) 97%,var(--scene-tint));padding:16px;border:1px solid var(--line);border-radius:16px;font-size:13px}
 .foot .themebtn,.foot .inspiration-note{font-size:inherit}
@@ -75,7 +75,7 @@ html.viewing-scene{overflow:hidden;overscroll-behavior:none}
   .top{padding:11px 12px}.titles h1{font-size:17px}.topbtns{gap:0}.topbtns .ghost{padding:7px}
   .scene-intro{height:clamp(155px,24vh,210px);padding-left:10px}
   .scene-intro h2{font-size:33px}.scene-details{font-size:10px;gap:6px}
-  #scan{padding:14px}
+  #scan,[data-preview-id="scan"]{padding:14px}
 }
 @media(max-width:360px){.titles h1{font-size:15px}.scene-intro h2{font-size:30px}.topbtns .ghost{padding:6px}.syncbtn{width:70px}}
 @media(max-height:500px) and (min-width:601px){.scene-intro{height:110px}.scene-intro h2{font-size:30px}.scene-eyebrow{margin-bottom:5px}.top{padding:9px 14px}.passbar{margin-top:5px}.wrap{padding-top:10px}}
@@ -104,7 +104,7 @@ html.viewing-scene{overflow:hidden;overscroll-behavior:none}
 .syncbtn.err,#importMsg.warn{color:var(--ink)}
 
 /* Let scenery through supporting surfaces without fading text or controls. */
-.foot,#ctxPanel,#histPanel{background:var(--secondary-surface)}
+.foot,#ctxPanel,#histPanel,[data-preview-id="ctxPanel"],[data-preview-id="histPanel"]{background:var(--secondary-surface)}
 @media(max-width:600px){
   .scene-reading{width:300px;max-width:calc(100% - 20px)}
   .scene-intro h2{font-size:clamp(25px,7.5vw,30px)}
