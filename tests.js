@@ -8802,6 +8802,26 @@ test('RISK saved view cloud adoption: this device keeps its open All Tasks view 
   'new cloud task data is accepted while this browser retains its own open list and filters through adoption and reload');
 });
 
+test('RISK saved view reveal: the real reveal action keeps its opened list through cloud adoption and reload',async()=>{
+ const task=syncTask('shared-reveal','Shared task');
+ const local=syncState({tasks:[task],syncAccount:'e@example.com',syncRev:4,listOpen:false,seenQuickStart:true});
+ const remote=syncState({tasks:[{...task}],syncAccount:'e@example.com',syncRev:4,listOpen:false,seenQuickStart:true});
+ const storage=sharedScannerStorage({[SYNC_STORE_KEY]:JSON.stringify(local)}),h=makeSyncHarness({remote,rev:5});
+ const opened=await loadApp({sharedStorage:storage,cloudSyncFactory:h.factory});
+ opened.ctx.onAction('reveal',{dataset:{id:'shared-reveal'}});
+ const afterReveal={listOpen:opened.ctx.state.listOpen,cachedListOpen:JSON.parse(storage.getItem('fvp:chain-scanner:saved-view:v1')||'null')?.listOpen??null,hidden:opened.shim.document.getElementById('listBody').hidden};
+ vm.runInContext('if(cloudTimer){clearTimeout(cloudTimer);cloudTimer=null;}',opened.ctx);
+ await opened.ctx.cloudPull();
+ const adopted={title:opened.ctx.state.tasks[0].title,listOpen:opened.ctx.state.listOpen,hidden:opened.shim.document.getElementById('listBody').hidden};
+ await opened.ctx.cloudPull();
+ const repeatedPull={listOpen:opened.ctx.state.listOpen,hidden:opened.shim.document.getElementById('listBody').hidden,remoteListOpen:h.remoteState().listOpen};
+ vm.runInContext('if(cloudTimer){clearTimeout(cloudTimer);cloudTimer=null;}',opened.ctx);
+ const reopened=await loadApp({sharedStorage:storage});
+ assert.deepEqual({afterReveal,adopted,repeatedPull,reloaded:{listOpen:reopened.ctx.state.listOpen,hidden:reopened.shim.document.getElementById('listBody').hidden}},
+  {afterReveal:{listOpen:true,cachedListOpen:true,hidden:false},adopted:{title:'Shared task',listOpen:true,hidden:false},repeatedPull:{listOpen:true,hidden:false,remoteListOpen:false},reloaded:{listOpen:true,hidden:false}},
+  'the actual reveal action records this device’s list-open choice and keeps it around newer cloud task data');
+});
+
 test('RISK saved view fallback: corrupt or blocked local presentation storage leaves the saved board usable',async()=>{
  const board=syncState({tasks:[syncTask('view-fallback','Keep task')],listOpen:true,seenQuickStart:true}),payload=JSON.stringify(board);
  const corrupt=await loadApp({sharedStorage:sharedScannerStorage({[SYNC_STORE_KEY]:payload,'fvp:chain-scanner:saved-view:v1':'{'})});

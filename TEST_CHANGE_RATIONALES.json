@@ -7394,5 +7394,47 @@
       "command": "Original saved-view RED: 2026-10-17T02:47:58.917436Z at base a6cbbbaad70a4cb3a76dd53d25fa23fbc9c665f1, LANDSCAPE_BROWSER_URL=http://127.0.0.1:8794/index.html LANDSCAPE_PLAYWRIGHT=/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs LANDSCAPE_BROWSER_CHANNEL=chrome /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-name-pattern='RISK saved view' tests.js; toggle/cloud RED: 2026-10-17T02:59:33.360923000Z at base 86af551a464a78d2c873d04b6fd33b02f9231e83, /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=spec --test-name-pattern='RISK saved view cloud adoption:' tests.js.",
       "failure": "The original browser consumer RED failed restoration, account isolation and delayed first paint; its detailed commands and output remain in the existing feature rationale and baseline-red.log/eligibility-red.log. The follow-up real-toggle RED showed state.listOpen true but no saved view open-state, then a newer remote listOpen false closed the rendered and reloaded list; exact output remains in cloud-list-open-toggle-red.log. The intervening copy RED remains in saved-view-open-copy-red.log."
     }
+  },
+  {
+    "testChangesSha256": "f91a0f459dfc1cb0014ee91942b953001b9db04473e935794f68e2eb8b95a801",
+    "reason": "Add a real reveal-action regression after independent review found that revealTask opened All Tasks without updating the saved device view.",
+    "previousBehavior": "Starting with the list closed, revealTask cleared filters and set state.listOpen true directly while the saved view still recorded false; a newer same-task peer board with listOpen false closed the list again after repeated pull and reload.",
+    "intendedBehavior": "The reveal action records its open-list choice through the same per-device saved-view owner as the toggle; repeated cloud reads and reload retain the local open list while the peer board stays closed and unchanged.",
+    "replacementTests": [
+      "RISK saved view reveal: the real reveal action keeps its opened list through cloud adoption and reload"
+    ],
+    "preservedCoverage": [
+      "The regression starts closed and calls the actual reveal action; the peer reuses the same task and differs in list presentation, so no task addition drives the adoption path.",
+      "The repeated pull and reload retain the local view while the remote listOpen remains false; task authority and the existing cloud payload shape are unchanged."
+    ],
+    "redEvidence": {
+      "command": "Refined actual-control RED at 2026-10-17T03:08:48Z on base f639e3b8534535dd1d909177d4ca09e7354c22e3: /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=spec --test-name-pattern='RISK saved view reveal:' tests.js.",
+      "failure": "With no runtime files edited, the real reveal action opened the list but left cachedListOpen false. A higher-revision same-task peer board with listOpen false closed the rendered list; another pull and reload stayed closed. Exact output is /Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/worker/saved-view-reveal-refined-red.log; the initial reveal RED is retained in saved-view-reveal-red.log."
+    }
+  },
+  {
+    "testChangesSha256": "1e8d1a12db983ed88182e78927f3d9acfe598073f9a929eef76bae4fcc9887cf",
+    "reason": "Bind the exact cumulative origin/main-to-candidate test diff after the reviewed reveal entry-point regression, preserving all earlier feature and repair-specific records and actual RED chronology.",
+    "previousBehavior": "All Tasks filters and scroll were transient, startup could paint the empty shell before local hydration, account changes could retain prior presentation, and toggle or reveal entry points could lose a locally open list after cloud adoption.",
+    "intendedBehavior": "Restore this device's list-open choice, filters and position with its saved board; keep the local view through newer and repeated peer reads; clear state across accounts; retain the board fallback when view storage is unavailable; and recompute current dates and eligibility.",
+    "replacementTests": [
+      "RISK saved view restoration: a reopened All Tasks list retains its local search tag filter and scroll position",
+      "RISK saved view account boundary: an All Tasks filter is cleared when the signed-in account changes",
+      "RISK saved view restoration: the eligibility filter remains selected after reopening All Tasks",
+      "RISK saved view cloud adoption: this device keeps its open All Tasks view through a newer remote board and reload",
+      "RISK saved view reveal: the real reveal action keeps its opened list through cloud adoption and reload",
+      "RISK saved view fallback: corrupt or blocked local presentation storage leaves the saved board usable",
+      "RISK saved view guidance: Quick start and Changelog describe this-device restoration and current dates",
+      "RISK saved view startup: delayed local board reads do not expose an empty default shell",
+      "RISK saved view startup: delayed local reads do not call state renderers before board hydration"
+    ],
+    "preservedCoverage": [
+      "Durable task board authority, merge/recovery, per-account privacy and current-day recomputation remain covered; presentation metadata remains device-local.",
+      "The original local-first consumer RED, actual toggle cloud-adoption RED, and refined actual reveal RED retain their own chronology and evidence in the prior rationale records and worker logs."
+    ],
+    "redEvidence": {
+      "command": "Original startup/view RED at 2026-10-17T02:47:58.917436Z on base a6cbbbaad70a4cb3a76dd53d25fa23fbc9c665f1; toggle cloud-adoption RED at 2026-10-17T02:59:33.360923Z on base 86af551a464a78d2c873d04b6fd33b02f9231e83; refined reveal RED at 2026-10-17T03:08:48Z on base f639e3b8534535dd1d909177d4ca09e7354c22e3. Exact commands remain in the original feature and repair-specific entries.",
+      "failure": "The initial browser consumer showed missing filters, account isolation and populated first paint. The real toggle consumer showed the open view lost to a newer closed-list board. The actual reveal consumer then reproduced the equivalent gap with the same task on both devices and an extra pull, leaving the local list closed through reload. All chronology and outputs remain in the respective feature, toggle and reveal logs."
+    }
   }
 ]
