@@ -23020,7 +23020,7 @@ test('RISK live scan sync: the second physical click of one double-click cannot 
 test('RISK live scan sync: Settings describes live revision refresh while retaining draft protection',async()=>{
  const {a}=await liveScanSyncClients();a.ctx.openSettings();
  assert.match(a.shim.document.getElementById('modalRoot').innerHTML,/when another device saves/,'Settings must describe the new open-device refresh');
- assert.match(a.shim.document.getElementById('modalRoot').innerHTML,/Drafts wait until you finish/,'the draft boundary remains visible to the user');
+ assert.match(a.shim.document.getElementById('modalRoot').innerHTML,/Drafts and pressed controls wait until you finish/,'the draft and pressed-control boundary remains visible to the user');
 });
 
 /* Dependencies are saved by task ID; fixtures never use an account or a real board. */
@@ -23222,7 +23222,7 @@ test('RISK multiple dependencies FAQ: extended help explains progressive links s
  const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
  for(const text of [/up to ten dependencies/i,/\+ dependency/,/All Tasks names blockers/i,/cycle.*warning/i,/full eligible/i,/scanned after/i,/another device/i,/draft/i,/offline/i,/top-K/])assert.match(help,text);
  assert.doesNotMatch(help,/first dot in either mode is labeled/i,'the age label belongs to Chance presentation; descending retains its top-K summary');
- assert.match(help,/Refresh all devices/i,'older single-link controls must disclose their complex-dependency boundary');
+ assert.match(help,/saved control is protected or disabled because its data is newer.*use a compatible app before editing/i,'older single-link controls must disclose their complex-dependency boundary');
  const instructions=fs.readFileSync(path.join(__dirname,'AGENTS.md'),'utf8');
  assert.match(instructions,/live product/i);assert.match(instructions,/extended FAQ/i);assert.match(instructions,/regression/i);
 });
@@ -25050,8 +25050,8 @@ test('RISK STALE TAB: legacy coexistence retains independent live fields before 
 
 test('RISK STALE TAB: recovery guidance explains independent edits conflicts and unobserved cloud bases',async()=>{
  const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
- assert.match(help,/offline edits save locally and sync when you reconnect/i);
- assert.match(help,/edits conflict.*Settings backups.*recovery/i);
+ assert.match(help,/offline decisions stay saved through closing and reopening, then combine when you reconnect/i);
+ assert.match(help,/Settings backups for recovery copies of displaced edits/i);
  const log=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];assert.match(log,/stale.tab.*independent.*edits/i);
 });
 
