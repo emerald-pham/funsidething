@@ -60,6 +60,47 @@ async function upgradedLegacyApp173(t,options={}){
  t.after(()=>closeLegacyApp173(app));app.shim.localStorage.setItem(SYNC_STORE_KEY,f.stale);app.shim.localStorage.setItem(LOCAL_HEAD_KEY,f.stale);if(!await app.ctx.persist())assert.equal(await app.ctx.persist(),true);
  return {...app,f,h};
 }
+test('RISK legacy completion divergent sources: both literal guarded copies are safe before reconciliation writes',async t=>{
+ const f=await legacyCompletionSource173(t),h=makeSyncHarness({remote:f.board,rev:4,delayMs:1}),app=await loadAppAtTime(f.at+3*3600000,{seedStorage:{[SYNC_STORE_KEY]:f.completed,[LOCAL_HEAD_KEY]:f.completed},cloudSyncFactory:()=>{const CS=h.factory();CS.ready=false;return CS;}});t.after(()=>closeLegacyApp173(app));
+ const {ctx,shim}=app,added=ctx.addTask('Newer open edit during divergent recovery'),facts=JSON.stringify(ctx.state.decisionEvents),ratings=JSON.stringify(ctx.state.tasks.filter(row=>row.id!==added.id).map(row=>[row.id,row.mu,row.sigma]));
+ assert.equal(ctx.readLocalBackups().some(row=>row.payload===f.revived),false,'the incoming literal head has not already been saved');
+ shim.localStorage.setItem(SYNC_STORE_KEY,f.stale);shim.localStorage.setItem(LOCAL_HEAD_KEY,f.revived);
+ const writes=[],paints=[],write=shim.localStorage.setItem,scan=shim.document.getElementById('scan');let markup=scan.innerHTML;
+ shim.localStorage.setItem=(key,value)=>{if(key===SYNC_STORE_KEY||key===LOCAL_HEAD_KEY){const backups=ctx.readLocalBackups();writes.push({chain:JSON.parse(value).chain,bothSafe:[f.stale,f.revived].every(raw=>backups.some(row=>row.payload===raw))});}return write(key,value);};
+ Object.defineProperty(scan,'innerHTML',{configurable:true,get:()=>markup,set(value){markup=value;paints.push(Array.from(ctx.state.chain));}});
+ if(!await ctx.persist())assert.equal(await ctx.persist(),true);
+ assert.deepEqual(Array.from(ctx.state.chain),[f.ids[1]],'membership is coherent independently of exact-copy safety');
+ const backups=ctx.readLocalBackups();t.diagnostic(JSON.stringify({exactDisk:backups.some(row=>row.payload===f.stale),exactHead:backups.some(row=>row.payload===f.revived),writes}));
+ for(const raw of [f.stale,f.revived])assert.ok(backups.some(row=>row.payload===raw),'each literal guarded source survives upgrade and overwrite');
+ assert.ok(writes.length>0);assert.ok(writes.every(row=>row.bothSafe),'both exact sources precede every primary write');assert.ok(writes.every(row=>!row.chain.includes(f.ids[0])));assert.ok(paints.length>0);assert.ok(paints.every(chain=>!chain.includes(f.ids[0])));
+ for(const fact of JSON.parse(facts))assert.equal(JSON.stringify(ctx.state.decisionEvents.find(row=>row.id===fact.id)),JSON.stringify(fact));assert.equal(JSON.stringify(ctx.state.tasks.filter(row=>row.id!==added.id).map(row=>[row.id,row.mu,row.sigma])),ratings);assert.ok(ctx.state.tasks.some(row=>row.id===added.id));assert.equal(ctx.state.tasks.find(row=>row.id===f.ids[1]).title,'Retained legacy title');
+ assert.equal(shim.localStorage.getItem(SYNC_STORE_KEY),shim.localStorage.getItem(LOCAL_HEAD_KEY));const raw=shim.localStorage.getItem(SYNC_STORE_KEY);assert.deepEqual(JSON.parse(raw).chain,[f.ids[1]]);
+ ctx.window.CloudSync.ready=true;await ctx.cloudPull();await ctx.cloudPushNow();await settleSavedViewPublication(app,h,'divergent exact-source recovery');assert.deepEqual(h.remoteState().chain,[f.ids[1]]);assert.equal(JSON.stringify(h.remoteState().decisionEvents),JSON.stringify(ctx.state.decisionEvents));assert.ok(h.remoteState().tasks.some(row=>row.id===added.id));
+ await closeLegacyApp173(app);const cold=await loadAppAtTime(f.at+3*3600000+1,{sharedStorage:shim.localStorage});t.after(()=>closeLegacyApp173(cold));assert.deepEqual(Array.from(cold.ctx.state.chain),[f.ids[1]]);for(const source of [f.stale,f.revived])assert.ok(cold.ctx.readLocalBackups().some(row=>row.payload===source));
+});
+
+test('RISK legacy completion divergent safety: refused copies and either guarded-key race hold exact sources and newer edits',async t=>{
+ const f=await legacyCompletionSource173(t);
+ for(const fault of ['disk-copy-refused','head-copy-unverified','head-race','disk-race'])await t.test(fault,async t=>{
+  const h=makeSyncHarness({remote:f.board,rev:4,delayMs:1}),app=await loadAppAtTime(f.at+3*3600000,{seedStorage:{[SYNC_STORE_KEY]:f.completed,[LOCAL_HEAD_KEY]:f.completed},cloudSyncFactory:()=>{const CS=h.factory();CS.ready=false;return CS;}});t.after(()=>closeLegacyApp173(app));
+  const {ctx,shim}=app,added=ctx.addTask('Retain newer draft through '+fault),prior=JSON.stringify(ctx.state),cloud=h.doc.payload,write=shim.localStorage.setItem,paints=[],primary=[];
+  shim.localStorage.setItem(SYNC_STORE_KEY,f.stale);shim.localStorage.setItem(LOCAL_HEAD_KEY,f.revived);
+  const raced=fault==='head-race'?f.revived+'\n':f.stale+'\n';let copies=0;const scan=shim.document.getElementById('scan');let markup=scan.innerHTML;
+  Object.defineProperty(scan,'innerHTML',{configurable:true,get:()=>markup,set(value){markup=value;paints.push(Array.from(ctx.state.chain));}});
+  shim.localStorage.setItem=(key,value)=>{
+   if(key===LOCAL_BACKUPS_KEY){copies++;if(fault==='disk-copy-refused')throw Error('refused exact disk backup');if(fault==='head-copy-unverified'&&copies>=2)return;
+    const result=write(key,value);if(copies>=2&&fault.endsWith('-race')){write(fault==='head-race'?LOCAL_HEAD_KEY:SYNC_STORE_KEY,(fault==='head-race'?f.revived:f.stale)+'\n'.repeat(copies-1));}return result;
+   }
+   if(key===SYNC_STORE_KEY||key===LOCAL_HEAD_KEY)primary.push(key);return write(key,value);
+  };
+  assert.equal(await ctx.persist(),false,'unsafe divergent adoption must stop');assert.equal(JSON.stringify(ctx.state),prior,'the actual newer draft stays exact');assert.deepEqual(primary,[],'no primary overwrite precedes safe exact copies and a current pair');assert.deepEqual(paints,[],'failed adoption never replaces the scanner');
+  const expectedHead=fault==='head-race'?raced:f.revived,expectedDisk=fault==='disk-race'?raced:f.stale;assert.equal(shim.localStorage.getItem(LOCAL_HEAD_KEY),expectedHead);assert.equal(shim.localStorage.getItem(SYNC_STORE_KEY),expectedDisk);
+  ctx.window.CloudSync.ready=true;await ctx.cloudPushNow();await syncSettle(25);assert.equal(h.doc.payload,cloud,'source safety failure cannot outrun device recovery');assert.ok(ctx.state.tasks.some(row=>row.id===added.id));for(const fact of JSON.parse(prior).decisionEvents)assert.equal(JSON.stringify(ctx.state.decisionEvents.find(row=>row.id===fact.id)),JSON.stringify(fact));assert.deepEqual(primary,[],'held retry still cannot overwrite either source');
+  const retrySources=[shim.localStorage.getItem(SYNC_STORE_KEY),shim.localStorage.getItem(LOCAL_HEAD_KEY)];shim.localStorage.setItem=write;if(!await ctx.persist())assert.equal(await ctx.persist(),true);for(const raw of retrySources)assert.ok(ctx.readLocalBackups().some(row=>row.payload===raw),'retry retains the current literal source');assert.deepEqual(Array.from(ctx.state.chain),[f.ids[1]]);assert.ok(ctx.state.tasks.some(row=>row.id===added.id));
+  await ctx.cloudPull();await ctx.cloudPushNow();await settleSavedViewPublication(app,h,'divergent source safety retry '+fault);assert.deepEqual(h.remoteState().chain,[f.ids[1]]);assert.ok(h.remoteState().tasks.some(row=>row.id===added.id));
+ });
+});
+
 test('RISK legacy completion return: imported boundary survives replay while actual Dot Done Undo and exact cloud acknowledgement remain meaningful',async t=>{
  const app=await upgradedLegacyApp173(t),{ctx,f,h}=app,checkpoint=ctx.state.decisionEvents.find(e=>e.kind==='completion-boundary'),original=JSON.stringify(ctx.state.decisionEvents),ratings=JSON.stringify(ctx.state.tasks.map(row=>[row.id,row.mu,row.sigma]));
  assert.ok(checkpoint);assert.equal(checkpoint.meaning,'imported-completion-evidence');assert.equal(checkpoint.at,f.at+2*3600000,'the boundary records import observation time, not a guessed original Done time');assert.equal(checkpoint.actionId,undefined,'the import boundary does not invent a user Done gesture');
@@ -188,6 +229,14 @@ test('RISK legacy completion FAQ: older saved boards keep completed tasks out an
   /Changes this version cannot safely read stay protected/i])assert.match(answer,pattern);
  assert.doesNotMatch(answer,/imported completion boundary|recovery observation|observes that boundary|sourceEvidence/i,'players see outcomes rather than internal recovery terms');
  assert.ok(answer.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,'the answer stays within the existing word limit');await closeLegacyApp173(app);
+});
+test('RISK completion awareness FAQ: unseen completion defeats later clock or upload while comparison ratings remain',async()=>{
+ const app=await loadApp(),{ctx,shim}=app;ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ const answer=help.match(/<dt>How are conflicting choices resolved\?<\/dt><dd>(.*?)<\/dd>/)?.[1];assert.ok(answer);
+ assert.match(answer,/Dot.*device that has not seen the completion.*cannot put the task back in the chain/i);
+ assert.match(answer,/even with a later clock or upload/i);assert.match(answer,/comparison still counts toward ratings/i);
+ assert.match(help,/After seeing a completion, you can return an eligible task with Dot, Yes, or Start/i);
+ assert.ok(answer.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130);await closeLegacyApp173(app);
 });
 test('RISK completion lifecycle Changelog: the mounted release notes describe older-board recovery in player language',async()=>{
  const {ctx,shim}=await loadApp();
@@ -11176,7 +11225,7 @@ test('RESTORE INTENT: importing an open backup deliberately reopens a completed 
   ctx.doneTask(task.id);
   const completed=JSON.parse(JSON.stringify(ctx.state));
   shim.document.getElementById('jsonBox').value=openBackup;
-  ctx.onAction('import-json',{});
+  await ctx.onAction('import-json',{});
   ctx.mergeUndeletedTasks(ctx.state,completed);
   assert.equal(ctx.state.tasks.find(t=>t.id===task.id).done,false,
     'an older completed copy cannot silently undo the deliberate import');
@@ -28781,8 +28830,8 @@ test('RISK Postpone: unknown future deferral evidence is adopted archived and re
 test('RISK Postpone: actual backup Restore completion Undo and pass resets retain deferral intent',async()=>{
  const {ctx}=await loadApp({seed:990}),task=ctx.addTask('Restore task');ctx.state.chain=[task.id];ctx.onAction('bench-postpone',{dataset:{benchmark:task.id}});await ctx.persist();const until=ctx.taskPostponeUntil(task),snapshot=ctx.cloudPayload();assert.equal(ctx.saveLocalBackup('manual',snapshot),true);const backup=ctx.readLocalBackups().find(row=>row.kind==='manual'&&row.payload===snapshot);
  ctx.rescanSkipped();ctx.newPass();assert.equal(ctx.taskPostponeUntil(ctx.state.tasks.find(t=>t.id===task.id)),until);assert.equal(ctx.isEligible(ctx.state.tasks.find(t=>t.id===task.id)),false);
- ctx.pushUndo();ctx.completeTask(ctx.state.tasks.find(t=>t.id===task.id));await ctx.persist();assert.equal(ctx.state.tasks.find(t=>t.id===task.id).done,true);ctx.undo();assert.equal(ctx.taskPostponeUntil(ctx.state.tasks.find(t=>t.id===task.id)),until);assert.equal(ctx.isEligible(ctx.state.tasks.find(t=>t.id===task.id)),false);
- ctx.pushUndo();ctx.writeTaskPostpone(ctx.state.tasks.find(t=>t.id===task.id),0);ctx.commit();const later=ctx.addTask('Later task');await ctx.persist();ctx.openSettings();assert.equal(await ctx.restoreDurableBackupById(backup.id),true);assert.equal(ctx.taskPostponeUntil(ctx.state.tasks.find(t=>t.id===task.id)),until);assert.ok(ctx.state.tasks.some(t=>t.id===later.id));const stable=JSON.stringify(ctx.state.tasks.find(t=>t.id===task.id).postponeOps);ctx.mergeUndeletedTasks(ctx.state,JSON.parse(snapshot));assert.equal(JSON.stringify(ctx.state.tasks.find(t=>t.id===task.id).postponeOps),stable);ctx.undo();assert.equal(ctx.taskPostponeUntil(ctx.state.tasks.find(t=>t.id===task.id)),0);assert.ok(ctx.state.tasks.some(t=>t.id===later.id));
+ ctx.pushUndo();ctx.completeTask(ctx.state.tasks.find(t=>t.id===task.id));await ctx.persist();assert.equal(ctx.state.tasks.find(t=>t.id===task.id).done,true);await ctx.undo();assert.equal(ctx.taskPostponeUntil(ctx.state.tasks.find(t=>t.id===task.id)),until);assert.equal(ctx.isEligible(ctx.state.tasks.find(t=>t.id===task.id)),false);
+ ctx.pushUndo();ctx.writeTaskPostpone(ctx.state.tasks.find(t=>t.id===task.id),0);ctx.commit();const later=ctx.addTask('Later task');await ctx.persist();ctx.openSettings();assert.equal(await ctx.restoreDurableBackupById(backup.id),true);assert.equal(ctx.taskPostponeUntil(ctx.state.tasks.find(t=>t.id===task.id)),until);assert.ok(ctx.state.tasks.some(t=>t.id===later.id));const stable=JSON.stringify(ctx.state.tasks.find(t=>t.id===task.id).postponeOps);ctx.mergeUndeletedTasks(ctx.state,JSON.parse(snapshot));assert.equal(JSON.stringify(ctx.state.tasks.find(t=>t.id===task.id).postponeOps),stable);await ctx.undo();assert.equal(ctx.taskPostponeUntil(ctx.state.tasks.find(t=>t.id===task.id)),0);assert.ok(ctx.state.tasks.some(t=>t.id===later.id));
 });
 
 test('RISK Postpone: scan surfaces match neighboring decision button sizing without changing Edit',async()=>{

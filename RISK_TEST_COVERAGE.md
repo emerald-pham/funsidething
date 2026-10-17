@@ -1457,3 +1457,9 @@ Actual populated-editor ordinary Done, an offline Dot that an independent peer c
 - RISK legacy completion guest adoption: actual modern guest Done remains observable and Undoable after first empty-account sign-in
 - RISK legacy completion FAQ: older saved boards keep completed tasks out and explain safe return
 - RISK legacy completion inherited cancellation: an actual guest Done Undo stays reversed after authorized first sign-in
+
+## Divergent fallback source preservation (final review repair)
+
+- `RISK legacy completion divergent sources: both literal guarded copies are safe before reconciliation writes`
+- `RISK legacy completion divergent safety: refused copies and either guarded-key race hold exact sources and newer edits`
+- `RISK completion awareness FAQ: unseen completion defeats later clock or upload while comparison ratings remain`

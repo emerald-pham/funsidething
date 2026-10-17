@@ -9956,5 +9956,110 @@
       "renderedCopy": "The mounted FAQ and Changelog RED was recorded before index.html edits. The concise changelog outcome and FAQ wording preserve unrelated content and stay within the existing 130-word answer cap.",
       "inheritedCohort": "The 199 passing cases are a selected inherited cohort, not a full-suite result. All original failed evidence remains unchanged; fixture corrections do not get relabeled as product REDs."
     }
+  },
+  {
+    "testChangesSha256": "16462c154901b83f0674aec825d8e7d3e22ac9e69aa570b356abcbcad6a38ad8",
+    "comparison": "reviewRepairIncremental",
+    "comparisonBase": "69f5daaf70db6037a3081930d9ab8f361071e008",
+    "reason": "Resolve the independent Spec P1 exact-source preservation finding at the actual fallback consumer boundary, with failure and concurrent-key guards. Include the five parent full-suite failures: unchanged original assertions, awaited guarded operation completion, and restored protected concise FAQ phrases.",
+    "previousBehavior": "When guarded fallback keys differed, reconciliation upgraded and wrote the combined pair before preserving the literal incoming head. A backup write also lacked source readback verification before this adoption.",
+    "intendedBehavior": "Preserve and verify both literal guarded sources before parsing/upgrading or overwriting either primary key. Refused/unverified backup or either changed key holds recovery without losing source bytes or the newer draft; normal retry retains coherent membership and exact acknowledgement. Existing async replacement safety remains intact; Help retains all protected wording and its 130-word cap.",
+    "replacementTests": [
+      "RISK legacy completion divergent sources: both literal guarded copies are safe before reconciliation writes",
+      "RISK legacy completion divergent safety: refused copies and either guarded-key race hold exact sources and newer edits",
+      "RISK completion awareness FAQ: unseen completion defeats later clock or upload while comparison ratings remain"
+    ],
+    "preservedCoverage": [
+      "All existing passing source, device, fact, rating, Undo, account, title, cloud and FAQ assertions remain unchanged. The immutable bd84 producer performs actual Dot, editor Done, title Save and expired stale replay; no modern action rows are removed to simulate legacy data.",
+      "New consumer captures every scanner replacement and primary write, requires both literal backups before every overwrite, retains original facts/ratings/title and newer Add, then verifies exact acknowledged journal and cold reopen after closing the finished original.",
+      "Storage-boundary refusal, silent unverified head-copy write and races on either guarded key must stop immediate adoption/overwrite. Persistent faults hold publication and retain original facts/newer edit; removing the fault permits exact-source-safe retry and coherent ACK.",
+      "The existing #173 upgrade/replacement/retirement/inheritance and immutable released-shell consumers, #169/#170 completion lifecycle, #171 deletion, #172 Undo, corrected #175 replay/ACK fixtures and fallback backup/recovery contracts remain in the focused cohort. IndexedDB storage protocol and UI copy are unchanged.",
+      "Two existing consumers now await the actual asynchronous guarded Import/replacement Undo completion before making their unchanged assertions. This preserves deliberate reopening and zero deferral after replacement Undo; no Restore runtime behavior or assertions are weakened. Focused full-path diagnostics passed before any Restore runtime edit (none was needed)."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo $PWD --evidence-dir /Users/emeraldpham/.codex/task-artifacts/completion-precedence-168/review-repair/runs --purpose preimplementation-red -- node --test --test-name-pattern='^RISK legacy completion divergent sources:' tests.js",
+      "failure": "On clean69f5 before runtime repair, the actual immutable legacy producer supplied distinct guarded disk/head payloads. Production persist correctly retained one chain member and a newer open Add, but the exact incoming revived raw was absent from backups. All six captured primary writes lacked both exact source backups. Record2026-10-17T22-20-34-181Z-b9a18714-dbed-4bd3-af52-10555e7a0415.json retains the assertion failure. Follow-up safety coverage then exposed unverified backup-index retention before the narrow readback guard, record2026-10-17T22-21-35-003Z-db360f94-ce89-4223-b912-cb4ebe8cb686.json; that GREEN-stage record also contains overly strict post-cloud-retry expectations subsequently corrected without weakening original passing assertions."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/completion-precedence-168/review-repair/",
+    "releaseStatus": "Scoped review repair only; no full suite, browser/emulator, CI, push, independent approval or release. Parent owns exact-final gates and affected re-review.",
+    "regressionRepairEvidence": {
+      "fullSuite": "/Users/emeraldpham/.codex/task-artifacts/completion-precedence-168/final-gates/2026-10-17T22-12-14-608Z-bd4ba324-1379-42a5-b7d7-b1df870b4894.json",
+      "focusedBeforeRepair": "/Users/emeraldpham/.codex/task-artifacts/completion-precedence-168/review-repair/runs/2026-10-17T22-24-05-038Z-6c579093-2e49-42e4-a6e6-524975a3d1ab.json",
+      "classification": "The five failures are two completion-boundary fixture mismatches (Import and replacement Undo assertions preceded their guarded async return) and three real protected-copy regressions after the #175 trim. All five existing assertions are preserved. Only awaited real operations and exact short FAQ phrases change; no synchronous safety bypass or Restore runtime repair.",
+      "awaitedOperationDiagnostic": "/Users/emeraldpham/.codex/task-artifacts/completion-precedence-168/review-repair/runs/2026-10-17T22-24-31-304Z-4db5c5ff-3e07-420e-8f79-745d8a08f996.json",
+      "copy": "Restored keeping unrelated decisions and opening Settings does not delete it while retaining the more-than-seven-days cue and <=130-word answer contract."
+    },
+    "awarenessFaqEvidence": {
+      "redLog": "/Users/emeraldpham/.codex/task-artifacts/completion-precedence-168/review-repair/awareness-faq-red.log",
+      "command": "node scripts/agent-tools/record-run.mjs --repo $PWD --evidence-dir /Users/emeraldpham/.codex/task-artifacts/completion-precedence-168/review-repair/runs --purpose preimplementation-red -- node --test --test-name-pattern='^RISK completion awareness FAQ:' tests.js",
+      "failure": "The mounted conflicting-choices answer lacked the explicit rule that an unaware device Dot cannot return completed work even with a later clock/upload, while its comparison still counts toward ratings. Recorded before modifying this answer; other review repairs were already in the draft.",
+      "greenLog": "/Users/emeraldpham/.codex/task-artifacts/completion-precedence-168/review-repair/awareness-faq-green.log",
+      "copy": "The conflict answer now states the lifecycle exception in plain task/chain language. The separate older-completion answer already says After seeing a completion and retains permitted eligible Dot/Yes/Start. Every answer stays <=130 words."
+    },
+    "greenEvidence": "/Users/emeraldpham/.codex/task-artifacts/completion-precedence-168/review-repair/runs/2026-10-17T22-26-16-587Z-6b82519e-6f97-4723-b9c4-8dd69fae7881.json (frozen source/test affected cohort:135 top-level/181 cases,181 passed,zero failed/skipped). After a one-word singular-backup grammar clarification and final fingerprint refresh, final source safety/FAQ/hash/#174 cohort review-repair/runs/2026-10-17T22-28-18-451Z-df0e7459-bd59-4058-a6ce-feeabab11321.json passes23/23. Final Undo answer130 words; conflict answer109; older-completion answer97.",
+    "validationLimits": "No final full suite, emulator/rules/compatibility, browser, CI, independent approval or release by this worker; parent owns those gates. Preserved changing-draft attempt22:25:14 had a live-file/module-loaded risk inventory mismatch and is not accepted final evidence. FAQ, test and runtime content froze before the181-case final cohort; only generated app/cache fingerprints changed afterward, then their final checks passed. The final one-word singular-backup grammar adjustment was followed by renewed preflight, final hash generation and the23-case packaged cohort; no runtime/test logic changed after the181-case run."
+  },
+  {
+    "testChangesSha256": "71ba63c2ec4749b8795c0835028e1ce3b72fc6cbe943987ad780c1cb61b66575",
+    "reason": "Carry the integrated completion and recovery contracts through #175’s closed-session fixture cleanup, real stale-client recovery paint, exact cloud acknowledgement, and player-facing older-board FAQ/Changelog. The selected inherited behavior cohort and #174 runtime probes pass without a speculative runtime change. Final independent Spec review identified a real divergent fallback source loss; the scoped consumer RED precedes its source-backup/readback repair.",
+    "previousBehavior": "The actual mounted older-completion FAQ used recovery terminology and missed required player outcomes; the current Help Changelog did not describe the older-board recovery result, and Quick start exceeded its existing per-answer limit. Two broad #173 test failures also had invalid preconditions: one expected a render from a semantic no-op, and one treated a 40 ms delay as acknowledgement. Divergent fallback keys could lose the literal guarded head while preserving only the reconciled result.",
+    "intendedBehavior": "The mounted FAQ explains that older boards keep completed tasks out of the dotted chain after rest, preserve saved Ratings and History, allow only an observed eligible return, keep exact local backups, wait on an unsaved safety copy, and protect unreadable changes. Changelog states the player-visible result in one short bullet. Closed-session recovery tests start only after their producer is fully saved and disposed; stale-client paint uses a real independent title edit, and cloud completion waits for exact acknowledgement. Both guarded literal sources must be verified recoverable before authority upgrade or primary replacement.",
+    "replacementTests": [
+      "RISK completion lifecycle recovery: saved device source cannot restore a 2→1 chain before scan refresh",
+      "RISK completion lifecycle Start: an observed new-pass root survives peer merge and IndexedDB reopen",
+      "RISK deletion authority: real Delete defeats a stale saved and cloud Dot after log pruning while same-title Add stays usable",
+      "RISK scoped Undo recovery: compound Done Undo survives older device and cloud replay after peer progress",
+      "RISK completion boundaries: delayed stale cloud adoption retains Done and concurrent task edit before exact retry acknowledgement",
+      "RISK legacy completion recovery: immutable released Done stays offchain through expired device recovery and every save",
+      "RISK legacy completion FAQ: older saved boards keep completed tasks out and explain safe return",
+      "RISK completion lifecycle Changelog: the mounted release notes describe older-board recovery in player language",
+      "RISK legacy completion divergent sources: both literal guarded copies are safe before reconciliation writes",
+      "RISK legacy completion divergent safety: refused copies and either guarded-key race hold exact sources and newer edits",
+      "RISK completion awareness FAQ: unseen completion defeats later clock or upload while comparison ratings remain"
+    ],
+    "preservedCoverage": [
+      "All prior source, device-write, cloud payload, lifecycle fact, rating, learning, History, Undo, account, and chain-member assertions remain. The stale-source paint assertion is now non-vacuous because an actual independent title edit requires adoption.",
+      "The exact device and cloud publication checks remain; #175 replaces only fixed-delay readiness assumptions with the existing durable saved-view acknowledgement helper.",
+      "The selected inherited cohort remains 118 top-level tests and 199 tests including subtests, with 199 passed and zero failed or skipped; the copy expected-RED tests were deliberately excluded from that run and are verified separately.",
+      "The actual mounted FAQ and Changelog consumers, existing Quick start length check, Retry/Undo copy checks and unrelated help structure remain covered.",
+      "All existing passing source, device, fact, rating, Undo, account, title, cloud and FAQ assertions remain unchanged. The immutable bd84 producer performs actual Dot, editor Done, title Save and expired stale replay; no modern action rows are removed to simulate legacy data.",
+      "New consumer captures every scanner replacement and primary write, requires both literal backups before every overwrite, retains original facts/ratings/title and newer Add, then verifies exact acknowledged journal and cold reopen after closing the finished original.",
+      "Storage-boundary refusal, silent unverified head-copy write and races on either guarded key must stop immediate adoption/overwrite. Persistent faults hold publication and retain original facts/newer edit; removing the fault permits exact-source-safe retry and coherent ACK.",
+      "The existing #173 upgrade/replacement/retirement/inheritance and immutable released-shell consumers, #169/#170 completion lifecycle, #171 deletion, #172 Undo, corrected #175 replay/ACK fixtures and fallback backup/recovery contracts remain in the focused cohort. IndexedDB storage protocol and UI copy are unchanged.",
+      "Two existing consumers now await the actual asynchronous guarded Import/replacement Undo completion before making their unchanged assertions. This preserves deliberate reopening and zero deferral after replacement Undo; no Restore runtime behavior or assertions are weakened. Focused full-path diagnostics passed before any Restore runtime edit (none was needed)."
+    ],
+    "redEvidence": {
+      "command": "Original evidence: #175 Quick start RED 175/runs/2026-10-17T21-38-28-536Z-57bbb9a9-017a-4c6c-b91f-5b56e5786b35.json; mounted FAQ/Changelog RED 175/runs/2026-10-17T21-58-41-707Z-f0bbd902-83e7-407e-8ac9-a01f458d9895.json. Final #175 GREENs: 175/runs/2026-10-17T22-03-51-413Z-372a1956-0d34-47b0-a8fb-38d94e1fb273.json, 175/runs/2026-10-17T22-04-04-438Z-ce01b178-c1cf-4aac-9af9-90311b15b3cf.json and 175/runs/2026-10-17T22-06-48-467Z-2f1dde18-7e14-429b-b627-752e4d74f617.json.",
+      "failure": "The existing Quick start consumer failed on the 131-word Undo answer. New actual rendered Help assertions then failed on the old recovery FAQ and missing current Changelog item before index.html changed. The early post-copy focused attempt at 22:06:31 failed two new exact-phrase expectations because the first prose edit did not match the approved required wording; that was a GREEN-stage copy/test alignment failure, not a preimplementation RED, and the copy was corrected before the six-test final copy GREEN. The inherited 199-test run excludes copy expected-RED tests and is not claimed as a full suite.",
+      "scope": "No #175 runtime RED or runtime repair is claimed. The inherited scoped-Undo no-op and fixed-wait failures remain immutable, are classified as invalid render/ack preconditions, and pass with actual stale-device title adoption and exact coherent publication acknowledgement."
+    },
+    "coverageChronology": {
+      "fixtureLifecycle": "The producer must prove exact guarded device bytes and complete acknowledgement before close; only a finished producer’s own app/cloud timers and device store are disposed before cold reopen. Active recovery autosave remains enabled.",
+      "renderedCopy": "The mounted FAQ and Changelog RED was recorded before index.html edits. The concise changelog outcome and FAQ wording preserve unrelated content and stay within the existing 130-word answer cap.",
+      "inheritedCohort": "The 199 passing cases are a selected inherited cohort, not a full-suite result. All original failed evidence remains unchanged; fixture corrections do not get relabeled as product REDs.",
+      "finalReviewRepair": "Original #169–#175 chronology above remains intact. Independent Spec reproduced the source loss at69f5; the new repository consumer RED was recorded before runtime repair. Subsequent safety coverage and its GREEN-stage failure are explicitly separate. Final worker receipt is review-repair/implementation.md."
+    },
+    "comparison": "completion168FinalReviewAggregate",
+    "comparisonBase": "bd84e5c0ccc7c6ebe065f42f18df34d89eeab14e",
+    "reviewRepairEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo $PWD --evidence-dir /Users/emeraldpham/.codex/task-artifacts/completion-precedence-168/review-repair/runs --purpose preimplementation-red -- node --test --test-name-pattern='^RISK legacy completion divergent sources:' tests.js",
+      "failure": "On clean69f5 before runtime repair, the actual immutable legacy producer supplied distinct guarded disk/head payloads. Production persist correctly retained one chain member and a newer open Add, but the exact incoming revived raw was absent from backups. All six captured primary writes lacked both exact source backups. Record2026-10-17T22-20-34-181Z-b9a18714-dbed-4bd3-af52-10555e7a0415.json retains the assertion failure. Follow-up safety coverage then exposed unverified backup-index retention before the narrow readback guard, record2026-10-17T22-21-35-003Z-db360f94-ce89-4223-b912-cb4ebe8cb686.json; that GREEN-stage record also contains overly strict post-cloud-retry expectations subsequently corrected without weakening original passing assertions."
+    },
+    "regressionRepairEvidence": {
+      "fullSuite": "/Users/emeraldpham/.codex/task-artifacts/completion-precedence-168/final-gates/2026-10-17T22-12-14-608Z-bd4ba324-1379-42a5-b7d7-b1df870b4894.json",
+      "focusedBeforeRepair": "/Users/emeraldpham/.codex/task-artifacts/completion-precedence-168/review-repair/runs/2026-10-17T22-24-05-038Z-6c579093-2e49-42e4-a6e6-524975a3d1ab.json",
+      "classification": "The five failures are two completion-boundary fixture mismatches (Import and replacement Undo assertions preceded their guarded async return) and three real protected-copy regressions after the #175 trim. All five existing assertions are preserved. Only awaited real operations and exact short FAQ phrases change; no synchronous safety bypass or Restore runtime repair.",
+      "awaitedOperationDiagnostic": "/Users/emeraldpham/.codex/task-artifacts/completion-precedence-168/review-repair/runs/2026-10-17T22-24-31-304Z-4db5c5ff-3e07-420e-8f79-745d8a08f996.json",
+      "copy": "Restored keeping unrelated decisions and opening Settings does not delete it while retaining the more-than-seven-days cue and <=130-word answer contract."
+    },
+    "awarenessFaqEvidence": {
+      "redLog": "/Users/emeraldpham/.codex/task-artifacts/completion-precedence-168/review-repair/awareness-faq-red.log",
+      "command": "node scripts/agent-tools/record-run.mjs --repo $PWD --evidence-dir /Users/emeraldpham/.codex/task-artifacts/completion-precedence-168/review-repair/runs --purpose preimplementation-red -- node --test --test-name-pattern='^RISK completion awareness FAQ:' tests.js",
+      "failure": "The mounted conflicting-choices answer lacked the explicit rule that an unaware device Dot cannot return completed work even with a later clock/upload, while its comparison still counts toward ratings. Recorded before modifying this answer; other review repairs were already in the draft.",
+      "greenLog": "/Users/emeraldpham/.codex/task-artifacts/completion-precedence-168/review-repair/awareness-faq-green.log",
+      "copy": "The conflict answer now states the lifecycle exception in plain task/chain language. The separate older-completion answer already says After seeing a completion and retains permitted eligible Dot/Yes/Start. Every answer stays <=130 words."
+    },
+    "greenEvidence": "/Users/emeraldpham/.codex/task-artifacts/completion-precedence-168/review-repair/runs/2026-10-17T22-26-16-587Z-6b82519e-6f97-4723-b9c4-8dd69fae7881.json (frozen source/test affected cohort:135 top-level/181 cases,181 passed,zero failed/skipped). After a one-word singular-backup grammar clarification and final fingerprint refresh, final source safety/FAQ/hash/#174 cohort review-repair/runs/2026-10-17T22-28-18-451Z-df0e7459-bd59-4058-a6ce-feeabab11321.json passes23/23. Final Undo answer130 words; conflict answer109; older-completion answer97.",
+    "validationLimits": "No final full suite, emulator/rules/compatibility, browser, CI, independent approval or release by this worker; parent owns those gates. Preserved changing-draft attempt22:25:14 had a live-file/module-loaded risk inventory mismatch and is not accepted final evidence. FAQ, test and runtime content froze before the181-case final cohort; only generated app/cache fingerprints changed afterward, then their final checks passed. The final one-word singular-backup grammar adjustment was followed by renewed preflight, final hash generation and the23-case packaged cohort; no runtime/test logic changed after the181-case run."
   }
 ]
