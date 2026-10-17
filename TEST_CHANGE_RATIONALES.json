@@ -9683,5 +9683,22 @@
     },
     "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/resumed-20261017/outgoing-base-metadata-repair",
     "releaseStatus": "Local append-only rationale repair. No test/source/app/copy/hash changes, broad full suite, shared runtime, push, CI or release by this owner. Parent /root owns final release validation."
+  },
+  {
+    "testChangesSha256": "a1d2bf4911b180bd9283e2617946a5a0de18276963a1c011c5d8b1dd509ad45e",
+    "reason": "Approved tooling ticket164 brings the existing outgoing branch rationale check into focused preflight before expensive regression begins.",
+    "previousBehavior": "Focused preflight validated only the selected main comparison; a different published branch tip could still lack an exact outgoing test-change rationale.",
+    "intendedBehavior": "The actual preflight CLI rejects an outgoing rationale gap after the selected base passes, identifies upstream, preserves copy checks once and leaves Git state unchanged.",
+    "replacementTests": [
+      "RISK repository process: preflight catches outgoing upstream rationale gaps after the selected base passes"
+    ],
+    "preservedCoverage": [
+      "All existing app, persistence, sync, release gate and copy/FAQ assertions remain byte-for-byte intact; this adds one public-command process regression.",
+      "Existing preflight failure, missing-contract, help/argument, valid unpublished branch and exact execution-count tests remain intact; additional real-Git cases cover deduplication and errors."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/saved-view-integration/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/resumed-20261017/retro164/runs --purpose preimplementation-red -- node --test '--test-name-pattern=^RISK repository process: preflight catches outgoing upstream rationale gaps after the selected base passes$' tests.js",
+      "failure": "Observed before preflight edits at2026-10-17T17:31:58Z: ERR_ASSERTION actual0 expected1. Real selected gate passed and real outgoing gate rejected absent exact rationale, but preflight incorrectly reported pass. Record5d4de123 and tracer-red.log retained. Later separate preimplementation Git-error RED f533343b at17:33:19Z found masked bad-config diagnostics; fixed without changing existing assertions."
+    }
   }
 ]

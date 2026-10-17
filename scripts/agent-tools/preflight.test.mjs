@@ -229,3 +229,65 @@ test('preflight launches each selected child once and launches none for help or 
     if (!expectedChecks) assert.doesNotMatch(output, /Preflight passed/);
   }
 });
+
+test('preflight reports real Git errors without treating them as an unpublished branch', async t => {
+  const fixture = await createAppFixture(t, 'git-error');
+  await writeFile(path.join(fixture.fixtureRoot, '.git/config'), '[broken\n');
+  const result = spawnSync(process.execPath, [preflight, '--base', fixture.base], {
+    cwd: fixture.fixtureRoot, encoding: 'utf8', env: childEnvironment(),
+  });
+  assert.equal(result.status, 2, result.stdout + result.stderr);
+  assert.match(result.stderr, /bad config line/i, 'the original Git diagnostic remains actionable');
+  assert.doesNotMatch(result.stdout, /Preflight passed/);
+});
+
+test('preflight checks each distinct local comparison once without fetching its remote', async t => {
+  for (const distinct of [false, true]) await t.test(distinct ? 'distinct upstream' : 'duplicate upstream', async t => {
+    const fixture = await createAppFixture(t, distinct ? 'distinct' : 'duplicate');
+    runGit(fixture.fixtureRoot, ['switch', '-c', 'task']);
+    if (distinct) {
+      await writeFile(path.join(fixture.fixtureRoot, 'notes.md'), 'published prose\n');
+      runGit(fixture.fixtureRoot, ['add', 'notes.md']);
+      runGit(fixture.fixtureRoot, ['commit', '-m', 'published prose']);
+    }
+    const remote = path.join(fixture.fixtureRoot, 'remote.git');
+    runGit(fixture.fixtureRoot, ['init', '--bare', remote]);
+    runGit(fixture.fixtureRoot, ['remote', 'add', 'origin', remote]);
+    runGit(fixture.fixtureRoot, ['push', '-u', 'origin', 'task']);
+    await rm(remote, { recursive: true });
+    await writeFile(path.join(fixture.fixtureRoot, 'notes.md'), 'candidate prose\n');
+    runGit(fixture.fixtureRoot, ['add', 'notes.md']);
+    runGit(fixture.fixtureRoot, ['commit', '-m', 'candidate prose']);
+    const before = runGit(fixture.fixtureRoot, ['show-ref']);
+    const { result, output } = await runPreflight(fixture, distinct ? 'distinct-upstream' : 'duplicate-upstream');
+    assert.equal(result.status, 0, output);
+    assert.equal((output.match(/Test-first diff gate passed\./g) ?? []).length, distinct ? 2 : 1);
+    assert.equal((output.match(/^✔ Landscape location:/gm) ?? []).length, 1);
+    assert.equal((output.match(/^✔ RISK Quick start content:/gm) ?? []).length, 1);
+    if (distinct) assert.match(output, /published upstream refs\/remotes\/origin\/task/);
+    assert.equal(runGit(fixture.fixtureRoot, ['show-ref']), before, 'local refs remain unchanged');
+  });
+});
+
+test('preflight rejects an invalid explicit comparison with its ref name', async t => {
+  const fixture = await createAppFixture(t, 'invalid-ref');
+  const result = spawnSync(process.execPath, [preflight, '--base', 'missing-explicit-ref'], {
+    cwd: fixture.fixtureRoot, encoding: 'utf8', env: childEnvironment(),
+  });
+  assert.equal(result.status, 2, result.stdout + result.stderr);
+  assert.match(result.stderr, /selected comparison missing-explicit-ref/);
+  assert.doesNotMatch(result.stdout, /Test-first diff gate passed|Preflight passed/);
+});
+
+test('preflight does not reinterpret an unavailable configured upstream as an unpublished branch', async t => {
+  const fixture = await createAppFixture(t, 'missing-upstream');
+  const remote = path.join(fixture.fixtureRoot, 'remote.git');
+  runGit(fixture.fixtureRoot, ['init', '--bare', remote]);
+  runGit(fixture.fixtureRoot, ['remote', 'add', 'origin', remote]);
+  runGit(fixture.fixtureRoot, ['push', '-u', 'origin', 'main']);
+  runGit(fixture.fixtureRoot, ['update-ref', '-d', 'refs/remotes/origin/main']);
+  const { result, output } = await runPreflight(fixture, 'missing-upstream');
+  assert.equal(result.status, 2, output);
+  assert.match(output, /published upstream comparison refs\/remotes\/origin\/main/);
+  assert.doesNotMatch(output, /Preflight passed/);
+});

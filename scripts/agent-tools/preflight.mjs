@@ -32,15 +32,48 @@ function parseArguments(args) {
 function resolveBase(requestedBase) {
   const candidates = requestedBase ? [requestedBase] : ['origin/main', 'main', 'master'];
   for (const candidate of candidates) {
-    const result = spawnSync('git', ['merge-base', 'HEAD', candidate], {
+    const ref = spawnSync('git', ['rev-parse', '--verify', '--quiet', candidate + '^{commit}'], {
       cwd: repositoryRoot,
       encoding: 'utf8',
       maxBuffer: 1024 * 1024,
     });
+    if (!ref.error && !ref.signal && ref.status === 1 && !requestedBase) continue;
+    if (ref.error || ref.signal || ref.status !== 0) {
+      throw new Error(`Could not resolve the selected comparison ${candidate}: ${ref.error?.message || ref.stderr?.trim() || ref.signal || `Git exited ${ref.status}`}`);
+    }
+    const result = spawnSync('git', ['merge-base', 'HEAD', ref.stdout.trim()], {
+      cwd: repositoryRoot, encoding: 'utf8', maxBuffer: 1024 * 1024,
+    });
     if (result.status === 0 && /^[0-9a-f]{40}$/i.test(result.stdout.trim())) return result.stdout.trim();
+    throw new Error(`Could not compare HEAD with selected base ${candidate}: ${result.error?.message || result.stderr?.trim() || result.signal || `Git exited ${result.status}`}`);
   }
   const hint = requestedBase ? `from ${requestedBase}` : 'from origin/main, main, or master';
   throw new Error(`Could not resolve the test-first comparison base ${hint}; pass --base <ref>.`);
+}
+
+function resolveUpstream() {
+  const git = (args, label) => {
+    const result = spawnSync('git', args, { cwd: repositoryRoot, encoding: 'utf8', maxBuffer: 1024 * 1024 });
+    if (result.error || result.signal || result.status !== 0) {
+      throw new Error(`Could not read ${label}: ${result.error?.message || result.stderr?.trim() || result.signal || `Git exited ${result.status}`}`);
+    }
+    return result.stdout.trim();
+  };
+  // Detached checkouts have no branch upstream. Other Git failures must remain failures.
+  const branch = spawnSync('git', ['symbolic-ref', '--quiet', 'HEAD'], { cwd: repositoryRoot, encoding: 'utf8' });
+  if (!branch.error && !branch.signal && branch.status === 1) return null;
+  if (branch.error || branch.signal || branch.status !== 0) {
+    throw new Error(`Could not read the current branch: ${branch.error?.message || branch.stderr?.trim() || branch.signal || `Git exited ${branch.status}`}`);
+  }
+  const ref = branch.stdout.trim();
+  const row = git(['for-each-ref', '--format=%(refname) %(upstream)', ref], 'branch upstream')
+    .split('\n').find(line => line === ref || line.startsWith(ref + ' '));
+  if (row === undefined) throw new Error(`Could not find the current branch ${ref}.`);
+  const upstream = row.slice(ref.length + 1).trim();
+  if (!upstream) return null;
+  const sha = git(['rev-parse', '--verify', upstream + '^{commit}'], `published upstream comparison ${upstream}`);
+  if (!/^[0-9a-f]{40}$/i.test(sha)) throw new Error(`Invalid published upstream comparison ${upstream}.`);
+  return { sha, label: `published upstream ${upstream}` };
 }
 
 function printOutput(result) {
@@ -113,17 +146,23 @@ async function main() {
   }
   if (testExit !== 0) return testExit;
 
-  let base;
+  let comparisons;
   try {
-    base = resolveBase(options.base);
+    const base = resolveBase(options.base);
+    const upstream = resolveUpstream();
+    comparisons = [{ sha: base, label: 'selected base' }];
+    if (upstream && upstream.sha !== base) comparisons.push(upstream);
   } catch (error) {
     process.stderr.write(`${error.message}\n`);
     return 2;
   }
-  process.stdout.write(`\nPreflight: existing test-first/rationale validator (base ${base})\n`);
-  const rationale = runNode(['scripts/test-first-gate.mjs', base]);
-  const rationaleExit = failForResult('test-first/rationale validator', rationale);
-  if (rationaleExit !== 0) return rationaleExit;
+  for (const comparison of comparisons) {
+    const label = `test-first/rationale validator (${comparison.label}, base ${comparison.sha})`;
+    process.stdout.write(`\nPreflight: existing ${label}\n`);
+    const rationale = runNode(['scripts/test-first-gate.mjs', comparison.sha]);
+    const rationaleExit = failForResult(label, rationale);
+    if (rationaleExit !== 0) return rationaleExit;
+  }
 
   process.stdout.write('Preflight passed: focused help/copy checks and test-first/rationale validation.\n');
   process.stdout.write('This does not report full-suite, rules, compatibility, CI, release, or live results.\n');
