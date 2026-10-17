@@ -12649,6 +12649,45 @@ async function decisionRecoveryApp146(account='e@example.com'){
  return {...app,h,storage,event:JSON.parse(JSON.stringify(app.ctx.state.decisionEvents[0]))};
 }
 
+async function recordMixedDecisionActions146(app){
+ const {ctx,shim}=app,yesTask=ctx.addTask('Mixed Yes candidate');
+ ctx.renderScan();assert.equal(ctx.state.candidateId,yesTask.id,'the actual scanner offers the new Yes candidate');
+ const benchmark=ctx.state.chain.at(-1);assert.match(shim.document.getElementById('scan').innerHTML,/data-act="yes"/);
+ ctx.onAction('yes',{dataset:{candidate:yesTask.id,benchmark}});
+ const dotTask=ctx.addTask('Mixed editor Dot candidate');hydrateUnchangedEditorDraft(app,dotTask.id);
+ shim.document.getElementById('etTitle').value='Mixed compound title';ctx.onAction('dot-task',{dataset:{id:dotTask.id}});
+ const dot=ctx.state.decisionEvents.find(event=>event.kind==='comparison'&&event.action==='dot');assert.ok(dot);
+ const compound=ctx.state.decisionEvents.filter(event=>event.actionId===dot.actionId);assert.ok(compound.some(event=>event.kind==='current-choice'),'the actual editor Dot also retains its changed title');
+ await ctx.onAction('undo',{});assert.equal(ctx.state.tasks.find(task=>task.id===dotTask.id).title,'Mixed editor Dot candidate');
+ assert.deepEqual(Array.from(ctx.state.decisionEvents.find(event=>event.kind==='undo').targetEventIds).sort(),Array.from(compound,event=>event.id).sort(),'Undo targets the complete real editor/Dot gesture');
+ for(const id of [yesTask.id,benchmark]){assert.equal(ctx.state.chain.at(-1),id);ctx.onAction('dislodge',{dataset:{benchmark:id}});}
+ assert.equal(ctx.state.chain.length,0,'real Dislodge actions make the Start control available');
+ ctx.onAction('start-scan',{dataset:{mode:'halving'}});
+ assert.ok(ctx.state.decisionEvents.some(event=>event.kind==='current-choice'&&event.target?.type==='pass'&&event.target.property==='chain'),'actual Start records its paired pass root');
+ await ctx.onAction('undo',{});assert.equal(ctx.state.chain.length,0);assert.ok(ctx.state.decisionEvents.some(event=>event.kind==='undo'&&event.passBefore),'actual Start Undo retains exact prior-pass authority');
+ hydrateUnchangedEditorDraft(app,benchmark);shim.document.getElementById('etTitle').value='Mixed retained benchmark title';ctx.onAction('save-edit',{dataset:{id:benchmark}});
+ assert.equal(await ctx.persist(),true);assert.equal(ctx.decisionEvidenceIssue(ctx.state,'e@example.com'),null,'all new kinds coexist as coherent real-app authority');
+ return {yesTaskId:yesTask.id,dotTaskId:dotTask.id,benchmark};
+}
+async function decisionMixedActionsApp146(){
+ const app=await decisionRecoveryApp146();return {...app,mixed:await recordMixedDecisionActions146(app)};
+}
+
+test('RISK decision mixed rollout fixture: actual comparisons current choices Start and scoped Undo survive durable publication and reopen',async t=>{
+ const f=await decisionMixedActionsApp146(),{ctx}=f,events=JSON.stringify(ctx.state.decisionEvents),ratings=JSON.stringify(ctx.state.tasks.map(task=>[task.id,task.mu,task.sigma]));
+ t.after(()=>{ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',ctx);});
+ assert.deepEqual([...new Set(ctx.state.decisionEvents.map(event=>event.kind))].sort(),['comparison','current-choice','no','undo']);
+ assert.deepEqual([...new Set(ctx.state.decisionEvents.filter(event=>event.kind==='comparison').map(event=>event.action))].sort(),['dislodge','dot','yes']);
+ assert.equal(JSON.stringify(ctx.state.decisionEvents.find(event=>event.kind==='no')),JSON.stringify(f.event),'the original No stays immutable beside later action families');
+ assert.equal(ctx.state.tasks.find(task=>task.id===f.mixed.benchmark).title,'Mixed retained benchmark title');
+ ctx.window.CloudSync.ready=true;ctx.cloudPushNow();await syncSettle(80);assert.equal(ctx.state.syncDirty,false);assert.equal(JSON.stringify(f.h.remoteState().decisionEvents),events);
+ const reopened=await loadApp({seedStorage:{[SYNC_STORE_KEY]:f.storage.getItem(SYNC_STORE_KEY),[LOCAL_HEAD_KEY]:f.storage.getItem(LOCAL_HEAD_KEY)},cloudSyncFactory:f.h.factory});
+ t.after(()=>{reopened.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',reopened.ctx);});
+ await reopened.ctx.cloudPull();reopened.ctx.cloudPushNow();await syncSettle(60);
+ assert.equal(JSON.stringify(reopened.ctx.state.decisionEvents),events);assert.equal(JSON.stringify(reopened.ctx.state.tasks.map(task=>[task.id,task.mu,task.sigma])),ratings,'cold reopening never reapplies cancelled learning');
+ assert.equal(reopened.ctx.state.tasks.find(task=>task.id===f.mixed.benchmark).title,'Mixed retained benchmark title');assert.equal(reopened.shim.document.getElementById('syncBtn').textContent,'☁ synced');
+});
+
 test('RISK decision recovery: unknown cloud evidence holds adoption and publication without replacing the durable local decision',async t=>{
  const f=await decisionRecoveryApp146();
  t.after(()=>{f.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',f.ctx);});
@@ -21082,7 +21121,7 @@ test('Firestore rules: real pinned writer reads decision authority then holds it
  const floor=readReleasedClient(__dirname,SUPPORTED_RELEASE),candidate=decisionCandidate146();
  try{
   const old=await decisionBackend146(floor,env.authenticatedContext('owner').firestore(),F),next=await decisionBackend146(candidate,env.authenticatedContext('owner').firestore(),F);handles.push(old,next);
-  const f=await decisionRecoveryApp146();t.after(()=>{f.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',f.ctx);});
+  const f=await decisionMixedActionsApp146();t.after(()=>{f.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',f.ctx);});
   const plain=JSON.stringify(f.h.remoteState()),decided=f.ctx.cloudPayload();
   assert.equal((await old.CS.push(plain,1,0)).ok,true,'pinned writer seeds an ordinary board');
   assert.equal((await next.CS.pull()).payload,plain);
@@ -21097,7 +21136,10 @@ test('Firestore rules: real pinned writer reads decision authority then holds it
   const oldApp=await loadApp({appSource:extractAppScript(floor.html),seedStorage:{[SYNC_STORE_KEY]:plain,[LOCAL_HEAD_KEY]:plain},cloudSyncFactory:()=>old.CS});
   let updates=0;oldApp.ctx.window.checkForAppUpdate=async()=>{updates++;};
   t.after(()=>{old.CS.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',oldApp.ctx);});
-  await oldApp.ctx.cloudPull();oldApp.ctx.addTask('Legacy independent edit held for safe update');await oldApp.ctx.persist();oldApp.ctx.cloudPushNow();await syncSettle(180);
+  await oldApp.ctx.cloudPull();
+  assert.equal(JSON.stringify(oldApp.ctx.state.decisionEvents),JSON.stringify(JSON.parse(decided).decisionEvents),'the immutable historical app carries every comparison, choice and Undo fact exactly');
+  assert.equal(oldApp.ctx.state.tasks.find(task=>task.id==='bench').title,'Mixed retained benchmark title','the old reader opens the effective retained current choice');
+  oldApp.ctx.addTask('Legacy independent edit held for safe update');await oldApp.ctx.persist();oldApp.ctx.cloudPushNow();await syncSettle(180);
   assert.equal(old.CS.errorCode,'permission-denied','the real fixed historical manifest is denied');
   assert.equal(oldApp.ctx.state.syncDirty,true);assert.equal(oldApp.shim.document.getElementById('syncBtn').textContent,'☁ error');assert.ok(updates>=1,'historical app enters its established compatible-shell recovery');
   const before=await next.CS.pull();assert.equal(before.payload,exact.payload);assert.equal(before.rev,exact.rev);
@@ -21118,8 +21160,11 @@ test('Firestore rules: first decision against released rules stays exact and pen
   const plain=JSON.stringify(f.h.remoteState());assert.equal((await handle.CS.push(plain,1,0)).ok,true);
   const app=await loadApp({seedStorage:{[SYNC_STORE_KEY]:plain,[LOCAL_HEAD_KEY]:plain},cloudSyncFactory:()=>handle.CS});
   t.after(()=>{handle.CS.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',app.ctx);});
-  app.shim.window.CLOUD_PUSH_DELAY_MS=2;await app.ctx.cloudPull();app.ctx.renderScan();app.ctx.onAction('no',{dataset:{candidate:'candidate',benchmark:'bench'}});await app.ctx.persist();
+  app.shim.window.CLOUD_PUSH_DELAY_MS=2;await app.ctx.cloudPull();handle.CS.ready=false;app.ctx.renderScan();app.ctx.onAction('no',{dataset:{candidate:'candidate',benchmark:'bench'}});await recordMixedDecisionActions146(app);await app.ctx.persist();handle.CS.ready=true;
   const evidence=JSON.stringify(app.ctx.state.decisionEvents),ratings=JSON.stringify(app.ctx.state.tasks.map(task=>[task.id,task.mu,task.sigma]));
+  const outcomes=JSON.stringify({chain:app.ctx.state.chain,title:app.ctx.state.tasks.find(task=>task.id==='bench').title,passId:app.ctx.state.passId,scanMode:app.ctx.state.scanMode,chance:app.ctx.state.chance});
+  assert.deepEqual([...new Set(app.ctx.state.decisionEvents.map(event=>event.kind))].sort(),['comparison','current-choice','no','undo']);
+  assert.deepEqual([...new Set(app.ctx.state.decisionEvents.filter(event=>event.kind==='comparison').map(event=>event.action))].sort(),['dislodge','dot','yes']);
   app.ctx.cloudPushNow();await syncSettle(160);
   assert.equal(handle.CS.errorCode,'permission-denied');assert.equal(app.ctx.state.syncDirty,true);assert.equal(JSON.stringify(app.ctx.state.decisionEvents),evidence);
   assert.equal(JSON.stringify(JSON.parse(app.shim.localStorage.getItem(SYNC_STORE_KEY)).decisionEvents),evidence,'rejected first decision stays durable');
@@ -21129,6 +21174,8 @@ test('Firestore rules: first decision against released rules stays exact and pen
   const published=await handle.CS.pull();assert.equal(JSON.stringify(JSON.parse(published.payload).decisionEvents),evidence);
   assert.equal(JSON.stringify(app.ctx.state.tasks.map(task=>[task.id,task.mu,task.sigma])),ratings,'retry does not retrain the comparison');
   assert.equal(app.ctx.state.syncDirty,false);assert.equal(app.shim.document.getElementById('syncBtn').textContent,'☁ synced');
+  const cloud=JSON.parse(published.payload);
+  assert.equal(JSON.stringify({chain:cloud.chain,title:cloud.tasks.find(task=>task.id==='bench').title,passId:cloud.passId,scanMode:cloud.scanMode,chance:cloud.chance}),outcomes,'rules-first Retry preserves actual chosen fields and scoped Undo/pass outcomes as well as learning and raw facts');
  }finally{await handle.drain();await upgraded?.cleanup();await env.cleanup();}
 });
 

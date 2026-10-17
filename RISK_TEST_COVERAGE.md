@@ -1309,3 +1309,9 @@ Shared selected facts remain active through reversed cloud adoption; retired typ
 
 - `RISK scoped Undo: inherited guest edit restores its before value through stale signed snapshots`
 - `RISK scoped Undo: inherited legacy-pass No cancellation survives stale marks without inventing a pass`
+
+## Mixed-client rollout across every decision family (#146/#147)
+
+- `RISK decision mixed rollout fixture: actual comparisons current choices Start and scoped Undo survive durable publication and reopen`
+
+The existing `Firestore rules: real pinned writer reads decision authority then holds its ordinary app edit without erasing it` and `Firestore rules: first decision against released rules stays exact and pending until rules-first rollout then retry` consumers now publish coherent actual-app No, Yes, editor Dot, Dislodge, current-choice, Start and scoped Undo evidence through the production Firebase adapter. Both rollout guards and immutable supported baseline remain protected. Exact emulator execution belongs to the final root candidate; the in-process fixture is not emulator proof.
