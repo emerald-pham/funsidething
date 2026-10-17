@@ -7567,7 +7567,7 @@ const bulkFields = [
 function openBulkEdit(){
   renderList();
   const form=allTasksView.beginBulkEdit();if(!form)return;
-  let html='<div class="mtop"><h2>Edit '+form.count+' selected tasks</h2><button class="x" data-act="close-modal" aria-label="Close">✕</button></div><p class="kv">Check Apply for each property to change. Later sync conflicts keep newer peer fields; other edits may apply. Undo after recovery restores an earlier board. Mixed values stay unchanged until you check Apply; unchecked properties stay unchanged. Clear explicitly removes a link, date or context requirements.</p>';
+  let html='<div class="mtop"><h2>Edit '+form.count+' selected tasks</h2><button class="x" data-act="close-modal" aria-label="Close">✕</button></div><p class="kv">Check Apply for each property to change. Later sync combines independent fields; conflicting choices use when they were made. Undo reverses this batch and keeps unrelated progress. Mixed values stay unchanged until you check Apply; unchecked properties stay unchanged. Clear explicitly removes a link, date or context requirements.</p>';
   for(const [key,label,id,type] of bulkFields){
     const field=form.fields[key];
     html+='<fieldset class="bulk-fields"><legend><label class="cbox"><input type="checkbox" id="bulkApply'+id+'"/> Apply '+label+'</label></legend>';

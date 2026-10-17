@@ -7643,5 +7643,21 @@
       "command": "node --test --test-name-pattern='RISK decision recovery same-account replacement:|RISK decision recovery replacement durability:' tests.js",
       "failure": "Preservation-only tests65 GREEN4/4 on the existing helper; no newly discovered runtime defect or preimplementation RED claimed. Exact selected-source recovery is fault-injected at the storage boundary, with assertions that primary state/cloud/input stay exact and explicit retry succeeds."
     }
+  },
+  {
+    "testChangesSha256": "ef23d755cd11a39b4903c7c1f14db844de069cd893d78abc46f7c4b31eb0d880",
+    "reason": "The actual Bulk Edit intro retained the obsolete whole-board recovery Undo warning after the FAQ was corrected; the same approved spec applies to this control surface.",
+    "previousBehavior": "Opening Bulk Edit promised newer peer fields and said Undo after recovery restores an earlier board, contradicting scoped ordinary Undo and original-time conflicts.",
+    "intendedBehavior": "The actual modal describes compatible field combination, original decision times and batch-only Undo while retaining mixed Apply and explicit Clear instructions.",
+    "replacementTests": [
+      "RISK independent decision guidance: the actual bulk editor explains scoped reversal and original choice times"
+    ],
+    "preservedCoverage": [
+      "Keep every existing bulk task behavior and form control assertion, all mixed/unchecked Apply and explicit Clear rules, and narrow/enlarged FAQ copy constraints."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK independent decision guidance: the actual bulk editor' tests.js",
+      "failure": "Actual modal rendered the old newer-peer and whole-board Undo intro and failed the original-choice-time assertion before the intro edit; raw147/bulk-guidance-red.log. Both new guidance consumers and existing copy cohort then passed6/6 in147/bulk-guidance-green.log."
+    }
   }
 ]

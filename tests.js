@@ -28424,3 +28424,13 @@ test('RISK independent decision guidance: rendered FAQ and Settings distinguish 
  assert.match(settings,/conflicting current choices use when each choice was made/);
  assert.doesNotMatch(settings,/newest revision wins/);
 });
+
+test('RISK independent decision guidance: the actual bulk editor explains scoped reversal and original choice times',async()=>{
+ const {ctx,shim}=await loadApp();ctx.closeModal();ctx.addTask('Isolated guidance task');ctx.state.listOpen=true;
+ ctx.onAction('bulk-select-all');ctx.onAction('bulk-edit');
+ const editor=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(editor,/conflicting choices use when they were made/i);
+ assert.match(editor,/Undo reverses this batch and keeps unrelated progress/i);
+ assert.doesNotMatch(editor,/Undo after recovery restores an earlier board|keep newer peer fields/i);
+ assert.match(editor,/Mixed values stay unchanged until you check Apply/);
+});
