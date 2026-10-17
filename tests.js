@@ -110,18 +110,41 @@ test('RISK scoped Undo: first guest sign-in keeps local cancellation authority a
  const app=await loadAppAtTime(at,{seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(initial)},cloudSyncFactory:factory});
  app.ctx.onAction('no',{dataset:{candidate:'guest-no',benchmark:'guest-bench'}});await app.ctx.persist();
  const original=JSON.stringify(app.ctx.state.decisionEvents[0]);app.ctx.window.CloudSync.user='e@example.com';await app.ctx.cloudPull();await app.ctx.cloudPushNow();await syncSettle(50);
- assert.equal(app.ctx.state.syncDirty,false);assert.ok(app.ctx.state.decisionBaseline.inheritance[0].sourceBaseline);
+ assert.equal(app.ctx.state.syncDirty,false);assert.ok(app.ctx.state.decisionBaseline.inheritance[0].sourceBaseline);const guestPublished=h.remoteState();
  app.ctx.onAction('undo',{});
  assert.equal(app.ctx.state.tasks.find(t=>t.id==='guest-bench').mu,25,'guest comparison remains undoable after its explicit first ownership adoption');
  assert.equal(app.ctx.state.considered['guest-no'],undefined);assert.equal(JSON.stringify(app.ctx.state.decisionEvents[0]),original);
- app.ctx.state.candidateId='signed-no';app.ctx.renderScan();app.ctx.onAction('no',{dataset:{candidate:'signed-no',benchmark:'guest-bench'}});
+ const signedTask=app.ctx.addTask('New signed-in candidate');app.ctx.state.candidateId=signedTask.id;app.ctx.renderScan();app.ctx.onAction('no',{dataset:{candidate:signedTask.id,benchmark:'guest-bench'}});
  const expected={bench:{mu:25,sigma:25/3},signed:{mu:25,sigma:25/3}};loadEngine(145).updatePair(expected.bench,expected.signed);
  assert.equal(app.ctx.state.tasks.find(t=>t.id==='guest-bench').mu,expected.bench.mu);
+ assert.equal(app.ctx.state.tasks.find(t=>t.id===signedTask.id).mu,expected.signed.mu,'a task added after ownership adoption trains only once');
  await app.ctx.persist();await app.ctx.cloudPushNow();await syncSettle(40);assert.equal(app.ctx.state.syncDirty,false,JSON.stringify({issue:app.ctx.decisionEvidenceIssue(app.ctx.state,'e@example.com'),code:app.ctx.window.CloudSync.errorCode,rows:app.ctx.state.decisionEvents}));
+ h.writeBehindBack(guestPublished);await app.ctx.cloudPull();await app.ctx.cloudPushNow();await syncSettle(40);
+ assert.equal(app.ctx.state.considered['guest-no'],undefined,'stale embodied guest No cannot restore a cancelled pass mark');
  const fresh={...h.remoteState(),syncAccount:'e@example.com',syncRev:h.doc.rev,syncDirty:false},raw=JSON.stringify(fresh);
  const reopened=await loadAppAtTime(at+100,{seedStorage:{[SYNC_STORE_KEY]:raw},cloudSyncFactory:h.factory});await reopened.ctx.cloudPull();
  assert.equal(reopened.ctx.state.tasks.find(t=>t.id==='guest-bench').mu,expected.bench.mu);assert.equal(reopened.ctx.state.tasks.find(t=>t.id==='guest-no').mu,25);
  assert.equal(JSON.stringify(h.remoteState().decisionEvents.find(e=>e.id===JSON.parse(original).id)),original);
+});
+test('RISK scoped Undo: inherited guest edit restores its before value through stale signed snapshots',async()=>{
+ const at=Date.parse('2026-10-17T15:00:00Z'),initial=syncState({tasks:[syncTask('guest-edit','Original guest title')],syncAccount:null,settings:{thresholdPct:0,horizonMin:60,samples:250}});
+ const h=makeSyncHarness({remote:null,rev:0,delayMs:1}),factory=()=>{const cloud=h.factory();cloud.user=null;return cloud;};
+ const app=await loadAppAtTime(at,{seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(initial)},cloudSyncFactory:factory});
+ await saveEditorChoice(app,'guest-edit',at+100,{title:'Guest edited title'});const original=JSON.stringify(app.ctx.state.decisionEvents);
+ app.ctx.window.CloudSync.user='e@example.com';await app.ctx.cloudPull();await app.ctx.cloudPushNow();await syncSettle(40);const stale=h.remoteState();
+ app.ctx.onAction('undo',{});assert.equal(app.ctx.state.tasks[0].title,'Original guest title');await app.ctx.persist();await app.ctx.cloudPushNow();await syncSettle(40);
+ h.writeBehindBack(stale);await app.ctx.cloudPull();await app.ctx.cloudPushNow();await syncSettle(40);
+ assert.equal(app.ctx.state.tasks[0].title,'Original guest title','a cancelled inherited edit cannot be replayed by a stale signed snapshot');
+ assert.equal(JSON.stringify(app.ctx.state.decisionEvents.filter(e=>e.kind==='current-choice')),original);assert.equal(h.remoteState().tasks[0].title,'Original guest title');
+});
+test('RISK scoped Undo: inherited legacy-pass No cancellation survives stale marks without inventing a pass',async()=>{
+ const at=Date.parse('2026-10-17T15:00:00Z'),initial=syncState({tasks:[syncTask('legacy-bench','Legacy benchmark'),syncTask('legacy-no','Legacy candidate')],chain:['legacy-bench'],candidateId:'legacy-no',passStartedAt:at-60000,syncAccount:null,settings:{thresholdPct:0,horizonMin:60,samples:250}});
+ const h=makeSyncHarness({remote:null,rev:0,delayMs:1}),factory=()=>{const cloud=h.factory();cloud.user=null;return cloud;};
+ const app=await loadAppAtTime(at,{seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(initial)},cloudSyncFactory:factory});
+ app.ctx.onAction('no',{dataset:{candidate:'legacy-no',benchmark:'legacy-bench'}});await app.ctx.persist();const passId=app.ctx.state.passId;assert.match(passId,/^legacy-pass-v1:/);
+ app.ctx.window.CloudSync.user='e@example.com';await app.ctx.cloudPull();await app.ctx.cloudPushNow();await syncSettle(40);const stale=h.remoteState();
+ app.ctx.onAction('undo',{});await app.ctx.persist();await app.ctx.cloudPushNow();await syncSettle(40);h.writeBehindBack(stale);await app.ctx.cloudPull();await app.ctx.cloudPushNow();await syncSettle(40);
+ assert.equal(app.ctx.state.considered['legacy-no'],undefined,'the legacy pass mark remains cancelled after stale delivery');assert.equal(app.ctx.state.passId,passId,'Undo does not fabricate a fresh pass');
 });
 test('RISK scoped Undo: unsupported cancellation payloads hold exact local and cloud branches',async()=>{
  const {local,h,at}=await scopedUndoClients();local.ctx.onAction('yes',{dataset:{candidate:'undo-local',benchmark:'undo-base'}});local.ctx.onAction('undo',{});
@@ -13232,7 +13255,7 @@ test("adopting a newer remote over unsaved local edits says so, so the edits don
     cloudSyncFactory: h.factory,
   });
 
-  ctx.addTask("Typed into the stale tab", false);
+  const added=ctx.addTask("Typed into the stale tab", false);
   await ctx.cloudPull();
 
   const el = shim.elements.get("toast");
@@ -13241,7 +13264,10 @@ test("adopting a newer remote over unsaved local edits says so, so the edits don
   assert.match(el.textContent, /↺/, "and it should point at undo as the way back");
 
   ctx.undo();
-  assert.deepEqual(ctx.state.chain, STALE_CHAIN, "undo really does take the adoption back");
+  assert.deepEqual(ctx.state.chain, CLOUD_CHAIN, "ordinary local Add Undo preserves the adopted peer chain");
+  assert.equal(ctx.state.tasks.some(task=>task.id===added.id),false,'Undo removes only the normal local Add');
+  for(const task of cloudState(now).tasks)assert.ok(ctx.state.tasks.some(row=>row.id===task.id),'all unrelated peer tasks remain');
+  assert.ok(ctx.readLocalBackups().some(row=>{try{return JSON.parse(row.payload).tasks.some(task=>task.id===added.id);}catch{return false;}}),'the displaced local board remains explicitly recoverable');
 });
 
 test("a silent adopt stays silent when there was nothing local to lose", async () => {

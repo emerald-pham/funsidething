@@ -4041,6 +4041,17 @@ async function cloudPull(){
         }
         if(!useLocal) persist();
       }catch(e){ holdAdoption(); return; }
+      if(!switchedAccount&&(JSON.parse(priorBoard).syncAccount??null)===null){
+        // Legacy local gestures that this successful adoption retained still
+        // belong to this tab. Bind only metadata-free guest frames; modern
+        // guest decisions require the explicit inherited-fact proof instead.
+        for(const frame of undoStack){
+          const before=JSON.parse(frame.snapshot),after=JSON.parse(frame.after||frame.snapshot);
+          if((before.syncAccount??null)===null&&(after.syncAccount??null)===null
+            &&after.decisionBaseline===undefined&&(after.decisionEvents===undefined
+              ||Array.isArray(after.decisionEvents)&&after.decisionEvents.length===0))frame.adoptedOwner=acct;
+        }
+      }
       lastPushed = rr===null || repairedScan || remoteDeletionLogRepaired ? "" : remotePayload;
       applyTheme();
       recomputeRanks(); render();
@@ -5041,7 +5052,8 @@ const taskActionOwnerBundle=(()=>{
     const inheritedGuest=(before.syncAccount??null)===null&&(state.decisionBaseline?.inheritance||[]).some(receipt=>
       receipt.reason==="guest-first-empty-account"&&receipt.sourceAccount===null
       &&canonicalDecisionFact(receipt.sourceBaseline)===canonicalDecisionFact(after.decisionBaseline));
-    if(!sameListOwner(before,state)&&!inheritedGuest){undoStack=[];return false;}
+    const adoptedLegacy=(before.syncAccount??null)===null&&frame.adoptedOwner===state.syncAccount;
+    if(!sameListOwner(before,state)&&!inheritedGuest&&!adoptedLegacy){undoStack=[];return false;}
     if(!preparedNext&&frame.kind==="replacement"&&(state.decisionBaseline||state.decisionEvents||before.decisionBaseline||before.decisionEvents))return undoReplacement(frame);
     const next=preparedNext||(frame.kind==="replacement"?before:scopedUndoState(frame));
     if(!sameListOwner(next,state)){undoStack=[];return false;}
@@ -6088,7 +6100,15 @@ function projectDecisionEvents(board=state,inheritedCancellations=null){
     for(const task of source.tasks)if(Array.isArray(task.ratingHistory))task.ratingHistory=task.ratingHistory.filter(row=>sourceHistory.has(row.id));
     delete source.decisionBaselineRecovery;delete source.decisionEventsRecovery;
     projectDecisionEvents(source,cancelled);
-    for(const task of source.tasks)if(ratings.has(task.id))ratings.set(task.id,{mu:task.mu,sigma:task.sigma});
+    const sourceRatings=decisionBaselineRatings(receipt.sourceBaseline).values;
+    for(const task of source.tasks)if(sourceRatings.has(task.id)&&ratings.has(task.id))ratings.set(task.id,{mu:task.mu,sigma:task.sigma});
+    for(const event of source.decisionEvents)if(cancelled.has(event.id)&&event.passId===board.passId
+      &&(event.kind==="no"||event.kind==="comparison")){
+      const id=event.kind==="no"?event.candidateId:event.taskId,kind=source.considered?.[id];
+      if(board.tasks.find(task=>task.id===id)?.done)continue;
+      const value=kind==="cant"?{kind,at:source.cantAt?.[id]}:kind==="worked"?{kind,at:source.workedAt?.[id]}:{kind};
+      applyCurrentChoiceDisposition(board,id,{present:["no","cant","worked","dislodged"].includes(kind),value});
+    }
   }
   // Every rating starts at the one frozen inherited value. Legacy ratingHistory
   // remains visible evidence but is never reverse-engineered into comparisons.
@@ -6148,7 +6168,7 @@ function projectDecisionEvents(board=state,inheritedCancellations=null){
     if(value==="clear"){delete board.considered[id];if(board.cantAt)delete board.cantAt[id];if(board.workedAt)delete board.workedAt[id];}
     else board.considered[id]=value;
   }
-  if(typeof projectCurrentChoiceEvents==="function")projectCurrentChoiceEvents(board);
+  if(typeof projectCurrentChoiceEvents==="function")projectCurrentChoiceEvents(board,cancelled);
   recomputeProjectedDecisionRanks(board);
   return before!==JSON.stringify([(board.tasks||[]).map(task=>[task.id,task.mu,task.sigma]),board.chain,board.considered,board.cantAt,board.workedAt,board.scanMode,board.settings?.scanMode]);
 }
@@ -6474,10 +6494,14 @@ function latestCurrentChoiceEvent(events,byId){
   maxima.sort((a,b)=>a.at-b.at||(a.id<b.id?-1:a.id>b.id?1:0));
   return maxima.at(-1);
 }
-function currentChoiceDispositionActions(board,events){
+function currentChoiceDecisionOwner(event,board,cancelled){
+  return attestedDecisionEvent(board.decisionBaseline,event)?cancelled.has(event.id)
+    :event.account===(typeof board.syncAccount==="string"&&board.syncAccount?board.syncAccount:null);
+}
+function currentChoiceDispositionActions(board,events,cancellationOverride=null){
   const byTask=new Map(),passId=currentChoicePassId(board),tasks=new Set(board.tasks.map(task=>task?.id).filter(id=>typeof id==="string"&&id));
-  const cancelled=decisionUndoTargets(board),byId=currentChoiceProjectionIndex(events);
-  const dispositionEvents=events.filter(event=>event.kind==="current-choice"&&event.target?.property==="disposition");
+  const cancelled=cancellationOverride||decisionUndoTargets(board),byId=currentChoiceProjectionIndex(events);
+  const dispositionEvents=events.filter(event=>event.kind==="current-choice"&&event.target?.property==="disposition"&&currentChoiceDecisionOwner(event,board,cancelled));
   const add=(id,event,present,value,passScoped)=>{
     if(!tasks.has(id)||event.passId!==passId&&passScoped)return;
     if(board.tasks.find(task=>task?.id===id)?.done===true)return;
@@ -6485,7 +6509,7 @@ function currentChoiceDispositionActions(board,events){
   };
   for(const event of events){
     if(!supportedCurrentChoiceProjectionRecord(event))continue;
-    if(event.account!==(typeof board.syncAccount==="string"&&board.syncAccount?board.syncAccount:null))continue;
+    if(!currentChoiceDecisionOwner(event,board,cancelled))continue;
     if(cancelled.has(event.id)){
       if(event.kind==="current-choice"&&event.target?.property==="disposition"){
         const others=dispositionEvents.filter(row=>row.target.id===event.target.id&&!cancelled.has(row.id));
@@ -6566,14 +6590,14 @@ function projectCurrentChoiceContextProperty(task,events,byId,cancelled=new Set(
   if(present)task.ctx=next;else delete task.ctx;
   return prior!==(Object.hasOwn(task,"ctx")?JSON.stringify(task.ctx):null);
 }
-function projectCurrentChoiceEvents(board=state){
+function projectCurrentChoiceEvents(board=state,cancellationOverride=null){
   if(!board||typeof board!=="object"||Array.isArray(board)||!Array.isArray(board.tasks))return false;
-  const events=Array.isArray(board.decisionEvents)?board.decisionEvents:[],byId=currentChoiceProjectionIndex(events),cancelled=decisionUndoTargets(board);let changed=false;
+  const events=Array.isArray(board.decisionEvents)?board.decisionEvents:[],byId=currentChoiceProjectionIndex(events),cancelled=cancellationOverride||decisionUndoTargets(board);let changed=false;
   const taskById=new Map(board.tasks.filter(task=>task&&typeof task.id==="string"&&task.id&&!Object.hasOwn(Object.prototype,task.id)).map(task=>[task.id,task]));
   const properties=new Map();
   for(const event of byId.values()){
     if(event.kind!=="current-choice"||!supportedCurrentChoiceEvent(event)||
-        event.account!==(typeof board.syncAccount==="string"&&board.syncAccount?board.syncAccount:null))continue;
+        !currentChoiceDecisionOwner(event,board,cancelled))continue;
     const {type,id,property}=event.target;
     if(type==="task"&&!taskById.has(id))continue;
     if(type==="task"&&property==="disposition")continue;
@@ -6614,7 +6638,7 @@ function projectCurrentChoiceEvents(board=state){
     if(winner.after.present)target[property]=JSON.parse(JSON.stringify(winner.value));else delete target[property];
     if(had!==Object.hasOwn(target,property)||(winner.after.present&&prior!==JSON.stringify(target[property])))changed=true;
   }
-  const dispositions=currentChoiceDispositionActions(board,events);
+  const dispositions=currentChoiceDispositionActions(board,events,cancelled);
   for(const [id,rows] of dispositions){
     const winner=latestCurrentChoiceEvent(rows.map(row=>row.event),byId);if(!winner)continue;
     const selected=rows.find(row=>row.event.id===winner.id);if(selected)changed=applyCurrentChoiceDisposition(board,id,selected)||changed;

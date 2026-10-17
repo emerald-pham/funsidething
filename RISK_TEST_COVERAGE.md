@@ -1303,3 +1303,6 @@ Validate sole recovery authority before the no-active-journal replacement shortc
 - `RISK decision recovery retired identity: changed same-ID retired editor facts cannot become fresh authority`
 
 Shared selected facts remain active through reversed cloud adoption; retired typed field values cannot resurrect; changed retired identities hold against exact witness bytes.
+
+- `RISK scoped Undo: inherited guest edit restores its before value through stale signed snapshots`
+- `RISK scoped Undo: inherited legacy-pass No cancellation survives stale marks without inventing a pass`
