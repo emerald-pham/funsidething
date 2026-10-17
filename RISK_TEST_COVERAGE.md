@@ -1245,3 +1245,10 @@ Protect conditional decision-capability activation, ordinary pinned-client compa
 - `RISK decision recovery validation order: rejected local evidence stays exact before known-cloud union`
 
 Protect source validation before authority union; missing/cyclic ancestry, baseline recovery and extension conflicts; lossless explicit ownership inheritance and exact-fact attestation; mandatory source/replacement recovery in both stores; and safe update of sole pending legacy learning without invented comparisons.
+
+## Complete Start and chosen-field authority (#146)
+
+- `RISK decision recovery current-choice authority: strict editor semantics and effective chosen fields guard cloud adoption`
+- `RISK decision recovery Start authority: incomplete or ambiguous real Start groups hold exact branches`
+
+Preserve both sources when a supported Start group is incomplete/ambiguous or a chosen field no longer matches its retained decision.

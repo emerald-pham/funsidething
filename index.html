@@ -3424,11 +3424,28 @@ function conflictingDecisionEvidence(...boards){
   }
   return false;
 }
+function decisionStartIssue(board){
+  const rows=Array.isArray(board?.decisionEvents)?board.decisionEvents:[];
+  const fresh=rows.filter(event=>event?.kind==="current-choice" && event.target?.type==="pass"
+    && (event.target.property==="chain" || event.target.property==="scanMode" && event.target.id!==event.passId)
+    && !attestedDecisionEvent(board.decisionBaseline,event));
+  for(const event of fresh){
+    const group=rows.filter(row=>row?.kind==="current-choice" && row.actionId===event.actionId
+      && row.target?.type==="pass" && row.target.id===event.target.id);
+    const roots=group.filter(row=>row.target.property==="chain"),modes=group.filter(row=>row.target.property==="scanMode");
+    if(group.length!==2 || roots.length!==1 || modes.length!==1
+      || !currentChoiceStartEnvelopeMatches(modes[0],roots[0]) || roots[0].target.id===roots[0].passId
+      || roots[0].chainIds.length!==0 || roots[0].before.value.length!==0)
+      return "unprojectable-decision-evidence";
+  }
+  return null;
+}
 function decisionProjectionIssue(board,checkCoherence=true){
   if(decisionBaselineRecoveryRows(board).length)return "unprojectable-decision-evidence";
   const rows=Array.isArray(board?.decisionEvents)?board.decisionEvents:[],baseline=board?.decisionBaseline;
   if(!rows.length && baseline===undefined)return null;
   if(!supportedDecisionBaseline(baseline))return rows.length?"unprojectable-decision-evidence":null;
+  if(decisionStartIssue(board))return "unprojectable-decision-evidence";
   const ratings=decisionBaselineRatings(baseline);
   if(ratings.conflicts.size || decisionEventOrder(board,baseline).blockedIds.size)return "unprojectable-decision-evidence";
   const representedHistory=new Set([...(baseline.observedRatingHistoryIds||[]),...baseline.includedActionIds,...rows.map(event=>event?.id)]);
@@ -3453,12 +3470,28 @@ function decisionProjectionIssue(board,checkCoherence=true){
   }
   if(checkCoherence){
     const projected=JSON.parse(JSON.stringify(board));
+    if(!Object.hasOwn(projected,"syncAccount"))projected.syncAccount=baseline.account;
     projectDecisionEvents(projected);
     const byId=new Map(projected.tasks.map(task=>[task.id,task]));
     if((board.tasks||[]).some(task=>{
       const expected=byId.get(task.id);
       return expected && (task.mu!==expected.mu || task.sigma!==expected.sigma);
     }))return "unrepresented-legacy-learning";
+    const field=(target,key)=>[Object.hasOwn(target||{},key),target?.[key]??null];
+    for(const event of rows){
+      if(event.kind!=="current-choice" || event.account!==baseline.account || attestedDecisionEvent(baseline,event))continue;
+      const {type,id,property}=event.target;
+      const actual=type==="task"?(board.tasks||[]).find(task=>task.id===id):type==="setting"?board.settings:board;
+      const expected=type==="task"?byId.get(id):type==="setting"?projected.settings:projected;
+      if(!actual || !expected)continue;
+      let values;
+      if(type==="task" && property==="disposition")values=["considered","cantAt","workedAt"].map(key=>[field(board[key],id),field(projected[key],id)]);
+      else if(type==="pass"){
+        if(id!==currentChoicePassId(board))continue;
+        values=(property==="chain"?["chain","passId","passStartedAt"]:["scanMode","chance"]).map(key=>[field(board,key),field(projected,key)]);
+      }else values=[[field(actual,property),field(expected,property)]];
+      if(values.some(([left,right])=>canonicalDecisionFact(left)!==canonicalDecisionFact(right)))return "unprojectable-decision-evidence";
+    }
   }
   return null;
 }

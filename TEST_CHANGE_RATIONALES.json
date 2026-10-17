@@ -7570,5 +7570,23 @@
       "preimplementation": "This aggregate fingerprint combines previously implemented #143/#144/#146 behaviors with a positive #142 publication-order coverage extension. It is not presented as a new behavioral RED; the original No-loss and #146 failure sequences remain in ticket-specific logs.",
       "postimplementation": "Against merged checkpoint 919c139, the No/current-choice/comparison cohort passed 30/30 in UTC and 30/30 in the default America/New_York timezone. The No consumer covers both publication orders, both local storage backends, offline save/close/reopen, exact final cloud union, preserved unrelated task/context state, and explicit pass expiry."
     }
+  },
+  {
+    "testChangesSha256": "935eaa40067e55b4660e532bf73fd2d75b2d4996fbcd95cfd13628afd19f74bd",
+    "reason": "Protect semantically complete Start groups and effective current-choice outcomes through actual cloud consumers.",
+    "previousBehavior": "A cloud copy missing either half of a real Start group, or containing a duplicate mode row, was silently repaired by local union and acknowledged; an unrepresented legacy title overwrite was also acknowledged.",
+    "intendedBehavior": "Both exact branches stay held until supported complete authority can explain the effective fields. Unsupported editor targets and values retain existing strict source diagnostics.",
+    "replacementTests": [
+      "RISK decision recovery current-choice authority: strict editor semantics and effective chosen fields guard cloud adoption",
+      "RISK decision recovery Start authority: incomplete or ambiguous real Start groups hold exact branches"
+    ],
+    "preservedCoverage": [
+      "All previous assertions remain; the existing recovery fixture gains only an optional account parameter for distinct account consumers.",
+      "Actual #144 current-choice family and #143 comparison family remain green."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK decision recovery Start authority:|RISK decision recovery current-choice authority:' tests.js",
+      "failure": "146/54-start-authority-red.log observed missing-root, missing-mode and duplicate-mode acceptance;146/57-choice-authority-red.log observed effective title overwrite acceptance. Runtime repair GREEN146/55 and58 (36/36 combined family)."
+    }
   }
 ]

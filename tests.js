@@ -12399,11 +12399,11 @@ test('RISK comparison replay: compatible frozen learning survives different lega
  }finally{await close(phone);await close(mac);}
 });
 
-async function decisionRecoveryApp146(){
- const initial=syncState({tasks:[Object.assign(syncTask('bench','Recovery benchmark'),{mu:35,sigma:7}),syncTask('candidate','Recovery candidate'),Object.assign(syncTask('peer','Peer task'),{done:true,completedAt:100})],chain:['bench'],candidateId:'candidate',considered:{},mode:'scan',scanMode:'descending',passStartedAt:Date.now(),passId:'recovery-pass-146',settings:{thresholdPct:0,horizonMin:60,samples:250},syncRev:4,syncAccount:'e@example.com',syncDirty:false});
+async function decisionRecoveryApp146(account='e@example.com'){
+ const initial=syncState({tasks:[Object.assign(syncTask('bench','Recovery benchmark'),{mu:35,sigma:7}),syncTask('candidate','Recovery candidate'),Object.assign(syncTask('peer','Peer task'),{done:true,completedAt:100})],chain:['bench'],candidateId:'candidate',considered:{},mode:'scan',scanMode:'descending',passStartedAt:Date.now(),passId:'recovery-pass-146',settings:{thresholdPct:0,horizonMin:60,samples:250},syncRev:4,syncAccount:account,syncDirty:false});
  const h=makeSyncHarness({remote:initial,rev:4,delayMs:1});
  const storage=sharedScannerStorage({[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)});
- const app=await loadApp({sharedStorage:storage,cloudSyncFactory:h.factory});
+ const app=await loadApp({sharedStorage:storage,cloudSyncFactory:()=>{const CS=h.factory();CS.user=account;return CS;}});
  await app.ctx.cloudPull();await syncSettle(15);
  app.ctx.window.CloudSync.ready=false;
  app.ctx.renderScan();assert.match(app.shim.document.getElementById('scan').innerHTML,/data-act="no"/);
@@ -12466,6 +12466,45 @@ test('RISK decision recovery compatible update: unsupported authority checks the
  assert.equal(JSON.stringify(f.ctx.state),local);assert.equal(f.storage.getItem(SYNC_STORE_KEY),saved);assert.equal(f.h.doc.payload,cloud);assert.equal(reloads,0);
  f.h.writeBehindBack(JSON.parse(f.ctx.cloudPayload()));await f.ctx.onAction('sync-retry',{});await syncSettle(40);
  assert.equal(JSON.stringify(f.ctx.state.decisionEvents),JSON.stringify([f.event]));assert.equal(CS.errorCode,null);assert.equal(f.ctx.state.syncDirty,false);
+});
+
+test('RISK decision recovery current-choice authority: strict editor semantics and effective chosen fields guard cloud adoption',async t=>{
+ for(const fault of ['unsupported property','invalid value','unrepresented field'])await t.test(fault,async t=>{
+  const f=await decisionRecoveryApp146(),{ctx,shim}=f,CS=ctx.window.CloudSync;
+  t.after(()=>{CS.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',ctx);});
+  hydrateUnchangedEditorDraft(f,'bench');shim.document.getElementById('etTitle').value='Explicitly chosen title';ctx.onAction('save-edit',{dataset:{id:'bench'}});await ctx.persist();
+  const events=JSON.stringify(ctx.state.decisionEvents),saved=f.storage.getItem(SYNC_STORE_KEY),remote=JSON.parse(ctx.cloudPayload());
+  const choice=remote.decisionEvents.find(event=>event.kind==='current-choice'&&event.target.property==='title');assert.ok(choice,'the actual Save supplies the typed title fact');
+  if(fault==='unsupported property')choice.target.property='mu';
+  if(fault==='invalid value')choice.value={unsupported:'title object'};
+  if(fault==='unrepresented field')remote.tasks.find(task=>task.id==='bench').title='Unrepresented legacy overwrite';
+  f.h.writeBehindBack(remote);const cloud=f.h.doc.payload;CS.ready=true;await ctx.cloudPull();ctx.cloudPushNow();await syncSettle(45);
+  assert.equal(CS.errorCode,fault==='unrepresented field'?'unprojectable-decision-evidence':'unsupported-decision-evidence');
+  assert.equal(f.h.doc.payload,cloud);assert.equal(JSON.stringify(ctx.state.decisionEvents),events);assert.equal(f.storage.getItem(SYNC_STORE_KEY),saved);
+  assert.equal(ctx.state.tasks.find(task=>task.id==='bench').title,'Explicitly chosen title');
+ });
+});
+
+test('RISK decision recovery Start authority: incomplete or ambiguous real Start groups hold exact branches',async t=>{
+ for(const fault of ['missing root','missing mode','mismatched envelope','duplicate mode'])await t.test(fault,async t=>{
+  const at=Date.now(),initial=syncState({tasks:[syncTask('start-root-146','Start root')],chain:[],candidateId:null,mode:'work',passStartedAt:at-60000,passId:'before-start-146',scanMode:'descending',syncRev:4,syncAccount:'e@example.com',syncDirty:false});
+  const h=makeSyncHarness({remote:initial,rev:4,delayMs:1}),storage=sharedScannerStorage({[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)});
+  const app=await loadApp({sharedStorage:storage,cloudSyncFactory:h.factory}),{ctx}=app,CS=ctx.window.CloudSync;
+  t.after(()=>{CS.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',ctx);});
+  await ctx.cloudPull();await syncSettle(15);CS.ready=false;ctx.onAction('start-scan',{dataset:{mode:'halving'}});await ctx.persist();
+  const events=JSON.stringify(ctx.state.decisionEvents),saved=storage.getItem(SYNC_STORE_KEY),remote=JSON.parse(ctx.cloudPayload());
+  const root=remote.decisionEvents.find(event=>event.target?.property==='chain'),mode=remote.decisionEvents.find(event=>event.target?.type==='pass'&&event.target.property==='scanMode');
+  assert.ok(root&&mode,'the actual Start action supplies the paired typed facts');
+  if(fault==='missing root')remote.decisionEvents=remote.decisionEvents.filter(event=>event.id!==root.id);
+  if(fault==='missing mode')remote.decisionEvents=remote.decisionEvents.filter(event=>event.id!==mode.id);
+  if(fault==='mismatched envelope')mode.at++;
+  if(fault==='duplicate mode')remote.decisionEvents.push({...mode,id:mode.id+'-duplicate'});
+  assert.ok(remote.decisionEvents.every(event=>ctx.supportedDecisionEvent(event)),'each individual fact remains supported; group authority is the missing proof');
+  h.writeBehindBack(remote);const cloud=h.doc.payload;CS.ready=true;await ctx.cloudPull();ctx.cloudPushNow();await syncSettle(45);
+  assert.equal(CS.errorCode,fault==='mismatched envelope'?'conflicting-decision-evidence':'unprojectable-decision-evidence');
+  assert.equal(h.doc.payload,cloud,'an incomplete Start group must not be acknowledged or repaired by silently unioning local facts');
+  assert.equal(JSON.stringify(ctx.state.decisionEvents),events);assert.equal(storage.getItem(SYNC_STORE_KEY),saved);
+ });
 });
 
 test('RISK decision recovery guest sign-in: a saved guest No and later authenticated No retain original facts and learning',async t=>{
