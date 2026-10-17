@@ -21322,13 +21322,18 @@ test('RISK CLOUD V2: corrupt active data fails closed, manifest races retry, and
   'the previous generation stays available for explicit recovery but is never silently made current');
 });
 
-async function decisionBackend146(artifacts,db,F,uid='owner'){
+async function decisionBackend146(artifacts,db,F,uid='owner',{beforePublication=null}={}){
  const pending=new Set(),auth={currentUser:{uid,email:'e@example.com'}},events=[];
  const host=value=>Array.isArray(value)?Array.from(value,host):value?.constructor?.name==='Object'?Object.fromEntries(Object.entries(value).map(([k,v])=>[k,host(v)])):value;
- const writer=target=>new Proxy(target,{get(object,key){const value=object[key];return typeof value!=='function'?value:(...args)=>Reflect.apply(value,object,['set','update'].includes(key)?args.map(host):args);}});
+ const writer=(target,onWrite=null)=>new Proxy(target,{get(object,key){const value=object[key];return typeof value!=='function'?value:(...args)=>{if(['set','update'].includes(key))onWrite?.(args[0]);return Reflect.apply(value,object,['set','update'].includes(key)?args.map(host):args);};}});
  const sdk={...F,getFirestore:()=>db,writeBatch:(...args)=>writer(F.writeBatch(...args))};
  for(const key of ['getDoc','getDocs','runTransaction'])sdk[key]=(...args)=>{
-  if(key==='runTransaction'){const fn=args[1];args[1]=tx=>fn(writer(tx));}
+  if(key==='runTransaction'){const fn=args[1];args[1]=async tx=>{
+   let publishes=false;
+   const result=await fn(writer(tx,ref=>{if(ref.path===`users/${uid}`)publishes=true;}));
+   if(publishes)await beforePublication?.();
+   return result;
+  };}
   const result=F[key](...args);pending.add(result);result.then(()=>pending.delete(result),()=>pending.delete(result));return result;
  };
  const window={FIREBASE_CONFIG:{apiKey:'emulator-only'},CLOUD_SYNC_TIMEOUT_MS:5000,dispatchEvent:event=>events.push(event)};
@@ -21343,26 +21348,66 @@ async function decisionBackend146(artifacts,db,F,uid='owner'){
 }
 function decisionCandidate146(){return {html,cloud:fs.readFileSync(path.join(__dirname,'cloud-store-v2.js'),'utf8'),storage:fs.readFileSync(path.join(__dirname,'device-store-v2.js'),'utf8')};}
 
-test('Firestore rules: real pinned writer reads decision authority then holds its ordinary app edit without erasing it', {skip:!process.env.FIRESTORE_EMULATOR_HOST},async t=>{
+test('Firestore rules: real pinned writer reads decision authority then holds its ordinary app edit without erasing it', {skip:!process.env.FIRESTORE_EMULATOR_HOST}, async t=>{
  const {SUPPORTED_RELEASE,readReleasedClient}=await import('./scripts/backward-compatibility.mjs');
  const {initializeTestEnvironment}=await import('@firebase/rules-unit-testing'),F=await import('firebase/firestore');
- const env=await initializeTestEnvironment({projectId:'demo-decision-mixed-146',firestore:{rules:fs.readFileSync(path.join(__dirname,'firestore.rules'),'utf8')}}),handles=[];
  const floor=readReleasedClient(__dirname,SUPPORTED_RELEASE),candidate=decisionCandidate146();
+ for(const schedule of ['natural','candidate','historical'])await t.test(schedule,async t=>{
+ const env=await initializeTestEnvironment({projectId:`demo-decision-mixed-146-${schedule}`,firestore:{rules:fs.readFileSync(path.join(__dirname,'firestore.rules'),'utf8')}}),handles=[];
+ let publicationReady=null;
  try{
-  const old=await decisionBackend146(floor,env.authenticatedContext('owner').firestore(),F),next=await decisionBackend146(candidate,env.authenticatedContext('owner').firestore(),F);handles.push(old,next);
+  const old=await decisionBackend146(floor,env.authenticatedContext('owner').firestore(),F,'owner',{beforePublication:()=>publicationReady?.('historical')}),
+   next=await decisionBackend146(candidate,env.authenticatedContext('owner').firestore(),F,'owner',{beforePublication:()=>publicationReady?.('candidate')});handles.push(old,next);
   const f=await decisionMixedActionsApp146();t.after(()=>{f.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',f.ctx);});
   const plain=JSON.stringify(f.h.remoteState()),decided=f.ctx.cloudPayload();
   assert.equal((await old.CS.push(plain,1,0)).ok,true,'pinned writer seeds an ordinary board');
   assert.equal((await next.CS.pull()).payload,plain);
   assert.equal((await next.CS.push(plain,2,1)).ok,true,'upgraded ordinary publication remains readable by floor');
-  assert.equal((await old.CS.pull()).payload,plain);
-  const [activated,competing]=await Promise.all([next.CS.push(decided,3,2),old.CS.push(plain,3,2)]);
+  const oldRead=await old.CS.pull(),oldReadAccount=old.CS.user;assert.equal(oldRead.payload,plain);
+  // Both real transactions stage their publication against revision2 before
+  // the selected winner commits. The loser may then conflict or be denied by
+  // the rules; neither outcome may alter the exact winning root.
+  let releaseLoser,releasePrepared;
+  if(schedule!=='natural'){
+   let prepared=0;
+   const bothPrepared=new Promise(resolve=>{releasePrepared=resolve;}),winnerAcknowledged=new Promise(resolve=>{releaseLoser=resolve;});
+   publicationReady=async side=>{if(++prepared===2)releasePrepared();await bothPrepared;if(side!==schedule)await winnerAcknowledged;};
+  }
+  const activating=next.CS.push(decided,3,2),legacy=old.CS.push(plain,3,2);
+  // An operation failing before staging must release the peer for a concrete
+  // failed assertion rather than leave the test waiting on its barrier.
+  if(releasePrepared)for(const operation of [activating,legacy])operation.then(releasePrepared,releasePrepared);
+  if(releaseLoser)(schedule==='candidate'?activating:legacy).then(releaseLoser,releaseLoser);
+  const [activated,competing]=await Promise.all([activating,legacy]);publicationReady=null;
   assert.equal(Number(activated.ok===true)+Number(competing.ok===true),1,'CAS admits one activation-racing writer');
-  assert.ok(activated.conflict===true||competing.conflict===true||old.CS.errorCode==='permission-denied','activation races either conflict or safely fence the losing writer');
+  const winner=activated.ok?activated:competing,loser=activated.ok?competing:activated,losingClient=activated.ok?old.CS:next.CS;
+  const raceFacts=JSON.stringify({schedule,activated,competing,status:losingClient.status,code:losingClient.errorCode});
+  assert.ok(loser.conflict===true||(loser.error===true&&loser.code==='permission-denied'),
+   'activation races either conflict or safely fence the losing writer: '+raceFacts);
+  if(schedule!=='natural')assert.equal((schedule==='candidate'?activated:competing).ok,true,'the real SDK commits the scheduled winner');
+  if(loser.error){assert.equal(losingClient.status,'error');assert.equal(losingClient.errorStage,'push');assert.equal(losingClient.errorCode,'permission-denied');}
+  else assert.equal(loser.rev,3,'a conflict identifies the actual winning revision');
+  const root=(await F.getDocFromServer(F.doc(env.authenticatedContext('owner').firestore(),'users/owner'))).data();
+  assert.equal(root.rev,3);assert.equal(winner.rev,3);assert.equal(root.activeGeneration,winner.generationId);
+  assert.equal(root.decisionCapability,activated.ok?1:undefined,'only an actual winning activation installs the fence');
+  const winning=await next.CS.pull();assert.equal(winning.rev,3);assert.equal(winning.payload,activated.ok?decided:plain,'the losing transaction cannot replace any winning bytes');
+  assert.equal(f.ctx.cloudPayload(),decided);assert.equal(f.ctx.state.syncDirty,true,'the actual-app decision source stays pending');
+  assert.equal(JSON.stringify(JSON.parse(f.storage.getItem(SYNC_STORE_KEY)).decisionEvents),JSON.stringify(JSON.parse(decided).decisionEvents),
+   'all candidate facts stay exact and durable even when activation loses');
+  // Once the winning revision is visible, either stale writer must return a
+  // revision conflict without publishing even a partial generation.
+  for(const [client,payload] of [[next.CS,decided],[old.CS,plain]]){
+   const stale=await client.push(payload,3,2);assert.equal(stale.conflict,true);assert.equal(stale.rev,3);
+  }
+  const unchanged=await next.CS.pull();assert.equal(unchanged.rev,winning.rev);assert.equal(unchanged.payload,winning.payload);
   if(!activated.ok){const current=await next.CS.pull();assert.equal((await next.CS.push(decided,4,current.rev)).ok,true);}
-  const exact=await next.CS.pull();assert.equal(exact.payload,decided);
+  const exact=await next.CS.pull();assert.equal(exact.payload,decided);assert.equal(exact.rev,activated.ok?3:4);
   assert.equal((await old.CS.pull()).payload,decided,'pinned reader accepts additional root capability');
-  const oldApp=await loadApp({appSource:extractAppScript(floor.html),seedStorage:{[SYNC_STORE_KEY]:plain,[LOCAL_HEAD_KEY]:plain},cloudSyncFactory:()=>old.CS});
+  // Reopen the pinned reader's last durable plain-board read, witnessed above.
+  // The action producer's separate synthetic revision4 must not attest that
+  // this old device already read the later real activation at revision4.
+  const oldLocal=JSON.stringify({...JSON.parse(oldRead.payload),syncRev:oldRead.rev,syncAccount:oldReadAccount,syncDirty:false});
+  const oldApp=await loadApp({appSource:extractAppScript(floor.html),seedStorage:{[SYNC_STORE_KEY]:oldLocal,[LOCAL_HEAD_KEY]:oldLocal},cloudSyncFactory:()=>old.CS});
   let updates=0;oldApp.ctx.window.checkForAppUpdate=async()=>{updates++;};
   t.after(()=>{old.CS.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',oldApp.ctx);});
   await oldApp.ctx.cloudPull();
@@ -21377,6 +21422,7 @@ test('Firestore rules: real pinned writer reads decision authority then holds it
   const after=await next.CS.pull();assert.equal(after.payload,exact.payload);assert.equal(after.rev,exact.rev,'focus does not spin rejected writes');
   assert.ok(oldApp.ctx.state.tasks.some(task=>task.title==='Legacy independent edit held for safe update'),'unpublished legacy edit stays recoverable');
  }finally{await Promise.all(handles.map(handle=>handle.drain()));await env.cleanup();}
+ });
 });
 
 test('Firestore rules: first decision against released rules stays exact and pending until rules-first rollout then retry', {skip:!process.env.FIRESTORE_EMULATOR_HOST},async t=>{
