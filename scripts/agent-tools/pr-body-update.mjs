@@ -216,9 +216,13 @@ export async function run(argv = process.argv.slice(2)) {
   const target = parsePullRequest(parsed.options['--pr']);
   const body = await readBodyFile(parsed.options['--body-file']);
   const outcome = await updatePullBody(target, body);
-  process.stdout.write(outcome.verifiedAfterUncertainWrite
-    ? `Verified ${target.identifier} body after an uncertain update; no duplicate write was sent.\n`
-    : `Updated ${target.identifier} body.\n`);
+  if (outcome.verifiedAfterUncertainWrite && outcome.retried) {
+    process.stdout.write(`Verified ${target.identifier} body after retrying an uncertain update.\n`);
+  } else if (outcome.verifiedAfterUncertainWrite) {
+    process.stdout.write(`Verified ${target.identifier} body after an uncertain update; readback showed no retry was needed.\n`);
+  } else {
+    process.stdout.write(`Updated ${target.identifier} body.\n`);
+  }
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {

@@ -28,8 +28,14 @@ if (args[0] !== 'api') {
 const endpoint = args[1];
 const state = JSON.parse(readFileSync(statePath, 'utf8'));
 const method = args.includes('--method') ? args[args.indexOf('--method') + 1] : 'GET';
-if (method === 'PATCH' && scenario === 'transient-before-write' && patchAttempt === 1) {
+if (method === 'PATCH' && ['transient-before-write', 'transient-then-lost-response-on-retry'].includes(scenario) && patchAttempt === 1) {
   process.stderr.write('HTTP 503: Service Unavailable\\n');
+  process.exit(1);
+}
+if (method === 'PATCH' && scenario === 'transient-then-lost-response-on-retry' && patchAttempt === 2) {
+  state.pull.body = JSON.parse(input).body;
+  writeFileSync(statePath, JSON.stringify(state) + '\\n', 'utf8');
+  process.stderr.write('request failed: connection reset by peer\\n');
   process.exit(1);
 }
 if (method === 'PATCH' && scenario === 'always-transient-before-write') {
@@ -270,9 +276,28 @@ test('verifies an uncertain write before retrying and avoids a duplicate body mu
 
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /verified/i);
+  assert.match(result.stdout, /no retry was needed/i);
   const calls = fixture.readCalls();
   const methods = calls.map((call) => call.args.includes('--method') ? call.args[call.args.indexOf('--method') + 1] : 'GET');
   assert.deepEqual(methods, ['PATCH', 'GET'], 'readback follows the uncertain write and precedes any retry');
+  assert.equal(fixture.readState().pull.body, replacement);
+  assert.deepEqual(fixture.readState().issueComments, []);
+  assert.deepEqual(fixture.readState().createdPullRequests, []);
+});
+
+test('reports exact readback after the single retry of an uncertain update', (t) => {
+  const fixture = makeFixture({ scenario: 'transient-then-lost-response-on-retry' });
+  t.after(() => fixture.cleanup());
+  const replacement = 'Body applied during the one retry';
+  fixture.writeBody(replacement);
+
+  const result = fixture.run();
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /Verified acme\/widgets#42 body after retrying an uncertain update/);
+  const calls = fixture.readCalls();
+  assert.deepEqual(calls.map((call) => call.args.includes('--method') ? call.args[call.args.indexOf('--method') + 1] : 'GET'), ['PATCH', 'GET', 'PATCH', 'GET']);
+  assert.equal(calls.filter((call) => call.args.includes('--method')).length, 2);
   assert.equal(fixture.readState().pull.body, replacement);
   assert.deepEqual(fixture.readState().issueComments, []);
   assert.deepEqual(fixture.readState().createdPullRequests, []);
