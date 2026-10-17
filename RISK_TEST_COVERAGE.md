@@ -1383,4 +1383,4 @@ The actual intervention Yes records deliberate current-pass Scan intent even whe
 
 ## Saved view and released decision authority integration
 
-- RISK saved view decision integration: inherited guest authority and peer edits retain this device view through scoped Undo and reopen
+- RISK saved view decision integration: inherited guest authority and peer edits retain this device view through scoped Undo and durably acknowledged reopen

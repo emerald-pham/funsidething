@@ -9144,7 +9144,20 @@ test('RISK saved view fallback: corrupt or blocked local presentation storage le
  assert.equal(JSON.stringify(unavailable.ctx.state),before,'presentation storage failures never block or edit the authoritative board');
 });
 
-test('RISK saved view decision integration: inherited guest authority and peer edits retain this device view through scoped Undo and reopen',async t=>{
+async function settleSavedViewPublication(app,h,stage){
+ const deadline=performance.now()+8000;let observed,stored;
+ do{
+  observed=JSON.parse(vm.runInContext('JSON.stringify({idle:!cloudPushInFlight&&!pulling&&!pendingPush&&!cloudResumePending,payload:cloudPayload(),raw:lastPersistedRaw,stateRaw:JSON.stringify(state),revision:state.syncRev,dirty:state.syncDirty})',app.ctx));
+  if(observed.idle && !observed.dirty && observed.payload===h.doc?.payload && observed.revision===h.doc?.rev && observed.raw===observed.stateRaw){
+   stored=await vm.runInContext('deviceStorageAuthority?deviceStore.readHead().then(head=>head?.payload):Promise.resolve(localStorage.getItem(STORE_KEY))',app.ctx);
+   if(stored===observed.stateRaw)return;
+  }
+  await syncSettle(25);
+ }while(performance.now()<deadline);
+ assert.fail(stage+' did not durably acknowledge publication: '+JSON.stringify({idle:observed.idle,dirty:observed.dirty,localRev:observed.revision,remoteRev:h.doc?.rev,cloudMatches:observed.payload===h.doc?.payload,persistedMatches:observed.raw===observed.stateRaw,durableMatches:stored===observed.stateRaw,code:app.shim.window.CloudSync.errorCode}));
+}
+
+test('RISK saved view decision integration: inherited guest authority and peer edits retain this device view through scoped Undo and durably acknowledged reopen',async t=>{
  const {IDBFactory}=await import('fake-indexeddb');
  for(const backend of ['fallback','IndexedDB'])await t.test(backend,async t=>{
   const at=Date.parse('2026-10-17T15:00:00Z'),storage=sharedScannerStorage(),indexedDB=backend==='IndexedDB'?new IDBFactory():undefined;
@@ -9155,7 +9168,7 @@ test('RISK saved view decision integration: inherited guest authority and peer e
   local.ctx.onAction('start-scan',{dataset:{mode:'descending'}});
   assert.ok(local.ctx.state.decisionEvents.some(row=>row.account===null),'the real guest scanner creates retained guest authority');
   const h=makeSyncHarness({remote:null,rev:0,delayMs:1}),CS=local.shim.window.CloudSync=h.factory();
-  local.shim.window.dispatchEvent({type:'cloudsync'});await local.ctx.cloudPull();local.ctx.cloudPushNow();await syncSettle(100);
+  local.shim.window.dispatchEvent({type:'cloudsync'});await local.ctx.cloudPull();local.ctx.cloudPushNow();await settleSavedViewPublication(local,h,'Guest inheritance');
   assert.equal(local.ctx.state.syncAccount,'e@example.com');assert.equal(CS.errorCode||null,null);
   assert.equal(local.ctx.state.decisionBaseline.account,'e@example.com');
   assert.ok(local.ctx.state.decisionBaseline.inheritance.some(row=>row.reason==='guest-first-empty-account'&&row.sourceAccount===null),'normal reconciliation attests guest actions before account publication');
@@ -9167,17 +9180,19 @@ test('RISK saved view decision integration: inherited guest authority and peer e
   local.shim.window.dispatchEvent({type:'pageshow'});CS.ready=false;
   await local.ctx.persist();const raw=JSON.stringify(local.ctx.state),peer=await loadAppAtTime(at,{seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw},cloudSyncFactory:h.factory});apps.push(peer);await peer.ctx.cloudPull();
   const edited=peer.ctx.state.tasks.at(-1).id;await saveEditorChoice(peer,edited,at+100,{title:'Shared peer title after inheritance'});
-  if(peer.ctx.state.listOpen)peer.ctx.onAction('toggle-list');peer.ctx.cloudPushNow();await syncSettle(80);
+  if(peer.ctx.state.listOpen)peer.ctx.onAction('toggle-list');peer.ctx.cloudPushNow();await settleSavedViewPublication(peer,h,'Peer editor Save');
   assert.equal(peer.ctx.state.syncDirty,false);assert.ok(h.remoteState().decisionEvents.some(row=>row.kind==='current-choice'&&row.target?.property==='title'));
   let release;const gate=new Promise(resolve=>{release=resolve;}),pull=CS.pull.bind(CS);CS.pull=async()=>{const response=await pull();await gate;return response;};CS.ready=true;
-  const pending=local.ctx.cloudPull();await syncSettle(5);setFakeTime(local.ctx,at+200);const added=local.ctx.addTask('Shared local add during pull',false);release();await pending;CS.pull=pull;local.ctx.cloudPushNow();await syncSettle(100);
+  const pending=local.ctx.cloudPull();await syncSettle(5);setFakeTime(local.ctx,at+200);const added=local.ctx.addTask('Shared local add during pull',false);release();await pending;CS.pull=pull;local.ctx.cloudPushNow();await settleSavedViewPublication(local,h,'Concurrent local Add');
   assert.equal(local.ctx.state.tasks.find(row=>row.id===edited).title,'Shared peer title after inheritance');assert.ok(local.ctx.state.tasks.some(row=>row.id===added.id));
   assert.equal(local.ctx.state.listOpen,true);assert.equal(search.value,'Shared');assert.equal(body.scrollTop,420);assert.equal(local.ctx.state.syncDirty,false);
   assert.equal(await local.ctx.onAction('undo',{}),true);await local.ctx.persist();local.ctx.cloudPushNow();
-  for(let attempt=0;attempt<80&&local.ctx.state.syncDirty;attempt++)await syncSettle(25);assert.equal(local.ctx.state.syncDirty,false,'Undo publication is acknowledged before closing this fixture');
+  // A clean flag can precede completion of the preceding write's CAS/ack tail.
+  // Close only after the intended Undo bytes are acknowledged and durable.
+  await settleSavedViewPublication(local,h,'Undo before close');assert.equal(local.ctx.state.syncDirty,false,'Undo publication is acknowledged before closing this fixture');
   assert.equal(local.ctx.state.tasks.some(row=>row.id===added.id),false,'scoped Undo removes only the local addition');assert.equal(local.ctx.state.tasks.find(row=>row.id===edited).title,'Shared peer title after inheritance','scoped Undo retains independent peer authority');
   local.shim.window.dispatchEvent({type:'pagehide'});await local.ctx.persist();
-  const reopened=await loadAppAtTime(at+300,{...options,cloudSyncFactory:h.factory});apps.push(reopened);await reopened.ctx.cloudPull();reopened.ctx.cloudPushNow();await syncSettle(100);
+  const reopened=await loadAppAtTime(at+300,{...options,cloudSyncFactory:h.factory});apps.push(reopened);await reopened.ctx.cloudPull();reopened.ctx.cloudPushNow();await settleSavedViewPublication(reopened,h,'Reopened board');
   assert.equal(reopened.ctx.state.listOpen,true);assert.equal(reopened.shim.document.getElementById('listSearch').value,'Shared');assert.equal(reopened.shim.document.getElementById('listBody').scrollTop,420);
   assert.equal(reopened.ctx.state.tasks.find(row=>row.id===edited).title,'Shared peer title after inheritance');assert.equal(reopened.ctx.state.tasks.some(row=>row.id===added.id),false);assert.equal(reopened.ctx.state.syncDirty,false,JSON.stringify({code:reopened.shim.window.CloudSync.errorCode,localRev:reopened.ctx.state.syncRev,remoteRev:h.doc.rev,same:reopened.ctx.cloudPayload()===h.doc.payload,calls:h.calls.slice(-10),differentFields:Object.keys(JSON.parse(h.doc.payload)).filter(key=>JSON.stringify(reopened.ctx.state[key])!==JSON.stringify(JSON.parse(h.doc.payload)[key]))}));
  });

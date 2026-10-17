@@ -9126,5 +9126,97 @@
     },
     "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/approved-release/integration-owner",
     "releaseStatus": "Screenshot hold lifted by user; this assignment remains local with no browser/emulator allocation, push, PR, CI or deployment. Root owns exact reviews, full regression and release."
+  },
+  {
+    "testChangesSha256": "be858f6d6e2479650ffb92eafac5e50a8f15b26d4d24e623d8a94201bea11553",
+    "comparison": "repairDelta",
+    "comparisonBase": "8abed97fd09a3430fa5ffaf8c94d455abb6f1546",
+    "reason": "Correct the combined reopen fixture after supported Node22 reproduced a false acknowledgement assumption. Replace fixed 80/100ms sleeps and syncDirty-only close settlement with a bounded condition requiring an idle publication, exact acknowledged cloud payload/revision, and exact current bytes in the real storage backend. Preserve all runtime sources and existing assertions.",
+    "previousBehavior": "On untouched8abed97, the fixture observed syncDirty=false while the preceding Add acknowledgement still owned cloudPushInFlight/pendingPush; durable local rev3 already contained Undo but remote rev3 still contained the46-task Add without deletion evidence. It closed then asserted cold reopen after100ms. The8ab rationale had claimed the syncDirty-only wait established Undo acknowledgement; this trace corrects that unsupported claim without rewriting its historical evidence.",
+    "intendedBehavior": "Finish each intended publication phase before treating it as acknowledged. Exercise guest inheritance, real peer editor Save, concurrent local Add during a held pull, scoped Undo and cold reopen through fallback and IndexedDB, with exact current cloud and durable bytes before closing and at final reopen. This is a test settlement correction; no application behavior or runtime asset changes.",
+    "replacementTests": [
+      "RISK saved view decision integration: inherited guest authority and peer edits retain this device view through scoped Undo and durably acknowledged reopen"
+    ],
+    "preservedCoverage": [
+      "Every prior task/content, guest inheritance and account/authority, decision-base, peer title, concurrent Add, scoped Undo and final syncDirty assertion remains. Query Shared, open list and420px list position are still checked before and after cold reopen on fallback and IndexedDB.",
+      "New settlement checks strengthen the fixture: within8seconds the publication slot, pull, pending push and resume must be idle; syncDirty false; cloudPayload and syncRev exactly match the harness acknowledgement; lastPersistedRaw and actual IndexedDB head/browser store exactly match current state bytes. No retries, payload rewriting, assertion skipping, or protocol spoofing are introduced.",
+      "All user-approved invisible SavedAppearance, view metadata, FAQ/changelog, dates, cloud/account, released decision authority, activation, Undo and persistence source bytes remain exactly8abed97. This does not claim that closing an actively publishing page immediately uploads its latest edit, or that the dirty flag alone proves full quiescence.",
+      "Earlier actual feature/geometry RED and imported release-main histories are retained unchanged. Broader full-suite, native browser, emulator, independent review and release validation remain parent-owned; this task uses focused non-browser Node22 checks only."
+    ],
+    "redEvidence": {
+      "command": "Untouched8abed97: /opt/local/bin/node --test --test-reporter=spec --test-name-pattern='RISK saved view (restoration|account boundary|cloud adoption|reveal|fallback|decision integration)|RISK decision.*(authority|Undo)|RISK CLOUD ACCOUNT:|LOGIC AUDIT: a malformed newer cloud payload|RISK STALE TAB: (cloud adoption|failed cloud adoption)' tests.js. External synchronous snapshot probe is reproducible with create-baseline-trace.py in the evidence directory.",
+      "failure": "Actual Node22 baseline47pass/2fail/0skip; IndexedDB cold reopen syncDirty true, localRev3/remoteRev3, remote/current tasks/deletion evidence differed. node22-baseline.txt preserves the untouched observation. trace-exact.json and trace-exact-run.txt capture current/persisted/cloud payloads and active-slot flags without changing application source: the premature Undo clean flag was not exact cloud acknowledgement; the retained Undo later reached rev4 intact. An external bounded actual-settlement probe passed49/49 before the fixture edit; final focused Node22 runs preserve GREEN. No runtime defect or preimplementation app fix is claimed."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/approved-release/settlement-repair",
+    "releaseStatus": "Local test-only repair candidate. Root owns full regression, native runtime, reviews, CI and release. Original8ab full-suite failure is retained; runtime source equality lets parent relate its native evidence by exact asset hash."
+  },
+  {
+    "testChangesSha256": "bdf632206c76985dac7fb1af502fe9be4a2109e24a12704c5128dccfd336d74b",
+    "comparison": "approvedDelta",
+    "comparisonBase": "7d5b069603b758b73e5704a4a3eb91625ffd6413",
+    "reason": "Correct the combined reopen fixture after supported Node22 reproduced a false acknowledgement assumption. Replace fixed 80/100ms sleeps and syncDirty-only close settlement with a bounded condition requiring an idle publication, exact acknowledged cloud payload/revision, and exact current bytes in the real storage backend. Preserve all runtime sources and existing assertions.",
+    "previousBehavior": "On untouched8abed97, the fixture observed syncDirty=false while the preceding Add acknowledgement still owned cloudPushInFlight/pendingPush; durable local rev3 already contained Undo but remote rev3 still contained the46-task Add without deletion evidence. It closed then asserted cold reopen after100ms. The8ab rationale had claimed the syncDirty-only wait established Undo acknowledgement; this trace corrects that unsupported claim without rewriting its historical evidence.",
+    "intendedBehavior": "Finish each intended publication phase before treating it as acknowledged. Exercise guest inheritance, real peer editor Save, concurrent local Add during a held pull, scoped Undo and cold reopen through fallback and IndexedDB, with exact current cloud and durable bytes before closing and at final reopen. This is a test settlement correction; no application behavior or runtime asset changes.",
+    "replacementTests": [
+      "RISK saved view decision integration: inherited guest authority and peer edits retain this device view through scoped Undo and durably acknowledged reopen"
+    ],
+    "preservedCoverage": [
+      "Every prior task/content, guest inheritance and account/authority, decision-base, peer title, concurrent Add, scoped Undo and final syncDirty assertion remains. Query Shared, open list and420px list position are still checked before and after cold reopen on fallback and IndexedDB.",
+      "New settlement checks strengthen the fixture: within8seconds the publication slot, pull, pending push and resume must be idle; syncDirty false; cloudPayload and syncRev exactly match the harness acknowledgement; lastPersistedRaw and actual IndexedDB head/browser store exactly match current state bytes. No retries, payload rewriting, assertion skipping, or protocol spoofing are introduced.",
+      "All user-approved invisible SavedAppearance, view metadata, FAQ/changelog, dates, cloud/account, released decision authority, activation, Undo and persistence source bytes remain exactly8abed97. This does not claim that closing an actively publishing page immediately uploads its latest edit, or that the dirty flag alone proves full quiescence.",
+      "Earlier actual feature/geometry RED and imported release-main histories are retained unchanged. Broader full-suite, native browser, emulator, independent review and release validation remain parent-owned; this task uses focused non-browser Node22 checks only."
+    ],
+    "redEvidence": {
+      "command": "Untouched8abed97: /opt/local/bin/node --test --test-reporter=spec --test-name-pattern='RISK saved view (restoration|account boundary|cloud adoption|reveal|fallback|decision integration)|RISK decision.*(authority|Undo)|RISK CLOUD ACCOUNT:|LOGIC AUDIT: a malformed newer cloud payload|RISK STALE TAB: (cloud adoption|failed cloud adoption)' tests.js. External synchronous snapshot probe is reproducible with create-baseline-trace.py in the evidence directory.",
+      "failure": "Actual Node22 baseline47pass/2fail/0skip; IndexedDB cold reopen syncDirty true, localRev3/remoteRev3, remote/current tasks/deletion evidence differed. node22-baseline.txt preserves the untouched observation. trace-exact.json and trace-exact-run.txt capture current/persisted/cloud payloads and active-slot flags without changing application source: the premature Undo clean flag was not exact cloud acknowledgement; the retained Undo later reached rev4 intact. An external bounded actual-settlement probe passed49/49 before the fixture edit; final focused Node22 runs preserve GREEN. No runtime defect or preimplementation app fix is claimed."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/approved-release/settlement-repair",
+    "releaseStatus": "Local test-only repair candidate. Root owns full regression, native runtime, reviews, CI and release. Original8ab full-suite failure is retained; runtime source equality lets parent relate its native evidence by exact asset hash."
+  },
+  {
+    "testChangesSha256": "94c2d9c2360dcdb32074243818331893caaf6f21ac4e43c19cd6c0e4aa60bff5",
+    "comparison": "releasedDelta",
+    "comparisonBase": "659aac18ad6bae310f8d6f50be2201abf1791eb8",
+    "reason": "Correct the combined reopen fixture after supported Node22 reproduced a false acknowledgement assumption. Replace fixed 80/100ms sleeps and syncDirty-only close settlement with a bounded condition requiring an idle publication, exact acknowledged cloud payload/revision, and exact current bytes in the real storage backend. Preserve all runtime sources and existing assertions.",
+    "previousBehavior": "On untouched8abed97, the fixture observed syncDirty=false while the preceding Add acknowledgement still owned cloudPushInFlight/pendingPush; durable local rev3 already contained Undo but remote rev3 still contained the46-task Add without deletion evidence. It closed then asserted cold reopen after100ms. The8ab rationale had claimed the syncDirty-only wait established Undo acknowledgement; this trace corrects that unsupported claim without rewriting its historical evidence.",
+    "intendedBehavior": "Finish each intended publication phase before treating it as acknowledged. Exercise guest inheritance, real peer editor Save, concurrent local Add during a held pull, scoped Undo and cold reopen through fallback and IndexedDB, with exact current cloud and durable bytes before closing and at final reopen. This is a test settlement correction; no application behavior or runtime asset changes.",
+    "replacementTests": [
+      "RISK saved view decision integration: inherited guest authority and peer edits retain this device view through scoped Undo and durably acknowledged reopen"
+    ],
+    "preservedCoverage": [
+      "Every prior task/content, guest inheritance and account/authority, decision-base, peer title, concurrent Add, scoped Undo and final syncDirty assertion remains. Query Shared, open list and420px list position are still checked before and after cold reopen on fallback and IndexedDB.",
+      "New settlement checks strengthen the fixture: within8seconds the publication slot, pull, pending push and resume must be idle; syncDirty false; cloudPayload and syncRev exactly match the harness acknowledgement; lastPersistedRaw and actual IndexedDB head/browser store exactly match current state bytes. No retries, payload rewriting, assertion skipping, or protocol spoofing are introduced.",
+      "All user-approved invisible SavedAppearance, view metadata, FAQ/changelog, dates, cloud/account, released decision authority, activation, Undo and persistence source bytes remain exactly8abed97. This does not claim that closing an actively publishing page immediately uploads its latest edit, or that the dirty flag alone proves full quiescence.",
+      "Earlier actual feature/geometry RED and imported release-main histories are retained unchanged. Broader full-suite, native browser, emulator, independent review and release validation remain parent-owned; this task uses focused non-browser Node22 checks only."
+    ],
+    "redEvidence": {
+      "command": "Untouched8abed97: /opt/local/bin/node --test --test-reporter=spec --test-name-pattern='RISK saved view (restoration|account boundary|cloud adoption|reveal|fallback|decision integration)|RISK decision.*(authority|Undo)|RISK CLOUD ACCOUNT:|LOGIC AUDIT: a malformed newer cloud payload|RISK STALE TAB: (cloud adoption|failed cloud adoption)' tests.js. External synchronous snapshot probe is reproducible with create-baseline-trace.py in the evidence directory.",
+      "failure": "Actual Node22 baseline47pass/2fail/0skip; IndexedDB cold reopen syncDirty true, localRev3/remoteRev3, remote/current tasks/deletion evidence differed. node22-baseline.txt preserves the untouched observation. trace-exact.json and trace-exact-run.txt capture current/persisted/cloud payloads and active-slot flags without changing application source: the premature Undo clean flag was not exact cloud acknowledgement; the retained Undo later reached rev4 intact. An external bounded actual-settlement probe passed49/49 before the fixture edit; final focused Node22 runs preserve GREEN. No runtime defect or preimplementation app fix is claimed."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/approved-release/settlement-repair",
+    "releaseStatus": "Local test-only repair candidate. Root owns full regression, native runtime, reviews, CI and release. Original8ab full-suite failure is retained; runtime source equality lets parent relate its native evidence by exact asset hash."
+  },
+  {
+    "testChangesSha256": "bac3d9d873752f3e4e2fb47b833c5b0a4c3502f159f881060a2f9ff493fdcb0f",
+    "comparison": "originalLiveCumulative",
+    "comparisonBase": "69a9feddf5d6bb8c4973475f7232e363b8646097",
+    "reason": "Correct the combined reopen fixture after supported Node22 reproduced a false acknowledgement assumption. Replace fixed 80/100ms sleeps and syncDirty-only close settlement with a bounded condition requiring an idle publication, exact acknowledged cloud payload/revision, and exact current bytes in the real storage backend. Preserve all runtime sources and existing assertions.",
+    "previousBehavior": "On untouched8abed97, the fixture observed syncDirty=false while the preceding Add acknowledgement still owned cloudPushInFlight/pendingPush; durable local rev3 already contained Undo but remote rev3 still contained the46-task Add without deletion evidence. It closed then asserted cold reopen after100ms. The8ab rationale had claimed the syncDirty-only wait established Undo acknowledgement; this trace corrects that unsupported claim without rewriting its historical evidence.",
+    "intendedBehavior": "Finish each intended publication phase before treating it as acknowledged. Exercise guest inheritance, real peer editor Save, concurrent local Add during a held pull, scoped Undo and cold reopen through fallback and IndexedDB, with exact current cloud and durable bytes before closing and at final reopen. This is a test settlement correction; no application behavior or runtime asset changes.",
+    "replacementTests": [
+      "RISK saved view decision integration: inherited guest authority and peer edits retain this device view through scoped Undo and durably acknowledged reopen"
+    ],
+    "preservedCoverage": [
+      "Every prior task/content, guest inheritance and account/authority, decision-base, peer title, concurrent Add, scoped Undo and final syncDirty assertion remains. Query Shared, open list and420px list position are still checked before and after cold reopen on fallback and IndexedDB.",
+      "New settlement checks strengthen the fixture: within8seconds the publication slot, pull, pending push and resume must be idle; syncDirty false; cloudPayload and syncRev exactly match the harness acknowledgement; lastPersistedRaw and actual IndexedDB head/browser store exactly match current state bytes. No retries, payload rewriting, assertion skipping, or protocol spoofing are introduced.",
+      "All user-approved invisible SavedAppearance, view metadata, FAQ/changelog, dates, cloud/account, released decision authority, activation, Undo and persistence source bytes remain exactly8abed97. This does not claim that closing an actively publishing page immediately uploads its latest edit, or that the dirty flag alone proves full quiescence.",
+      "Earlier actual feature/geometry RED and imported release-main histories are retained unchanged. Broader full-suite, native browser, emulator, independent review and release validation remain parent-owned; this task uses focused non-browser Node22 checks only."
+    ],
+    "redEvidence": {
+      "command": "Untouched8abed97: /opt/local/bin/node --test --test-reporter=spec --test-name-pattern='RISK saved view (restoration|account boundary|cloud adoption|reveal|fallback|decision integration)|RISK decision.*(authority|Undo)|RISK CLOUD ACCOUNT:|LOGIC AUDIT: a malformed newer cloud payload|RISK STALE TAB: (cloud adoption|failed cloud adoption)' tests.js. External synchronous snapshot probe is reproducible with create-baseline-trace.py in the evidence directory.",
+      "failure": "Actual Node22 baseline47pass/2fail/0skip; IndexedDB cold reopen syncDirty true, localRev3/remoteRev3, remote/current tasks/deletion evidence differed. node22-baseline.txt preserves the untouched observation. trace-exact.json and trace-exact-run.txt capture current/persisted/cloud payloads and active-slot flags without changing application source: the premature Undo clean flag was not exact cloud acknowledgement; the retained Undo later reached rev4 intact. An external bounded actual-settlement probe passed49/49 before the fixture edit; final focused Node22 runs preserve GREEN. No runtime defect or preimplementation app fix is claimed."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/approved-release/settlement-repair",
+    "releaseStatus": "Local test-only repair candidate. Root owns full regression, native runtime, reviews, CI and release. Original8ab full-suite failure is retained; runtime source equality lets parent relate its native evidence by exact asset hash."
   }
 ]
