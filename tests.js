@@ -23646,10 +23646,19 @@ function modeLifecycleEdit(app,task,{hours=18,title=task.title}={}){
  app.shim.document.getElementById('etEverReset').checked=false;
 }
 async function modeLifecycleRemoteFixture(){
- const app=await modeLifecycleApp();
+ const {SUPPORTED_RELEASE,readReleasedClient}=await import('./scripts/backward-compatibility.mjs');
+ const historical=readReleasedClient(__dirname,SUPPORTED_RELEASE);
+ const app=await modeLifecycleApp({appSource:extractAppScript(historical.html)});
  for(let i=0;i<8;i++)app.ctx.addTask('Private selection fixture '+i);
  app.ctx.startScan('chance');app.ctx.state.snooze=100;
- const base=modeLifecycleCopy(app.ctx.state);
+ assert.equal(Object.hasOwn(app.ctx.state,'decisionEvents'),false,'the actual supported historical producer has no modern action journal');
+ assert.equal(Object.hasOwn(app.ctx.state,'decisionBaseline'),false,'the old scalar pass is not a contradictory modern frozen Start');
+ // Complete ordinary current-client maintenance before the tested remote pass
+ // ages; migration bookkeeping must not be counted as its conditional repair.
+ const opened=await modeLifecycleApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(app.ctx.state)}});
+ assert.equal(await opened.ctx.persist(),true,'ordinary legacy migration is durable before the remote pass is aged');
+ assert.equal(Object.hasOwn(opened.ctx.state,'decisionEvents'),false,'opening a legacy board does not invent deliberate decisions');
+ const base=modeLifecycleCopy(opened.ctx.state);
  Object.assign(base,{syncRev:20,syncDirty:false,syncAccount:'e@example.com'});
  const remote=modeLifecycleCopy(base);
  remote.passStartedAt=MODE_LIFECYCLE_NOW-48*HOUR;
@@ -23758,7 +23767,7 @@ test('RISK scan lifecycle: first Start sweeps stale day marks and evergreen rest
  }
 });
 
-test('RISK scan lifecycle sync: repaired old remote Chance draw is durable across all stores and offline reload',async()=>{
+test("RISK scan lifecycle sync: repaired old remote Chance draw is durable across all stores and offline reload",async()=>{
  const {indexedDB}=await import('fake-indexeddb');
  for(const backend of ['legacy','transactional','host']){
   const {base,remote}=await modeLifecycleRemoteFixture(),h=makeSyncHarness({remote,rev:21,delayMs:1});
@@ -23788,7 +23797,7 @@ test('RISK scan lifecycle sync: repaired old remote Chance draw is durable acros
  }
 });
 
-test('RISK scan lifecycle sync: concurrent old-pass repairs converge by revision without replaying ratings or Done',async()=>{
+test("RISK scan lifecycle sync: concurrent old-pass repairs converge by revision without replaying ratings or Done",async()=>{
  const {base,remote}=await modeLifecycleRemoteFixture(),rest=remote.tasks[2];
  Object.assign(rest,{evergreen:true,evergreenHours:18,evergreenResetAtDay:false,lastDoneAt:MODE_LIFECYCLE_NOW});
  remote.workLog.push({id:'private-completion',taskId:rest.id,title:rest.title,kind:'evergreen-done',at:MODE_LIFECYCLE_NOW});
@@ -23818,7 +23827,7 @@ test('RISK scan lifecycle sync: concurrent old-pass repairs converge by revision
  assert.ok(h.conflicts>0,'the fixture must exercise competing conditional writes');
 });
 
-test('RISK scan lifecycle sync: failed local repair persistence holds adoption and a newer cloud revision cannot be overwritten',async()=>{
+test("RISK scan lifecycle sync: failed local repair persistence holds adoption and a newer cloud revision cannot be overwritten",async()=>{
  const {base,remote}=await modeLifecycleRemoteFixture(),h=makeSyncHarness({remote:base,rev:20,delayMs:1});
  const app=await modeLifecycleApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(base)},cloudSyncFactory:h.factory}),{ctx,shim}=app;
  await ctx.cloudPull();await syncSettle(15);

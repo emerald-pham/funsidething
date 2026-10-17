@@ -7992,5 +7992,25 @@
       "command": "node --test --test-name-pattern='applyTheme: a host with no documentElement' tests.js",
       "failure": "146/theme-fixture-01-red.log reproduces ReferenceError: appSource is not defined at standalone tests.js:8385 on8a. Restore appSrc only in that fixture; theme-fixture-02-green.log passes the applyTheme family and exact immutable historical-source recovery consumer5/5."
     }
+  },
+  {
+    "testChangesSha256": "ba022a806c1a98583c4f3194a397e3420fde33f28e086b4efba6aef6bd80279f",
+    "reason": "Restore legitimate old scalar-pass inputs to the existing lifecycle repair acceptance without weakening modern authority holds.",
+    "previousBehavior": "The shared old-remote fixture invoked current guest Start, stamped root account ownership without inheritance, then contradicted retained frozen Start facts by rewriting only pass time/draw. Modern guards correctly held it. Using the real immutable historical producer alone exposed unrelated first-open migration writes and transactional legacy-copy repair in the tested save/CAS window.",
+    "intendedBehavior": "Produce the old scalar board with the unchanged supported historical app, then complete ordinary current-app opening and durable migration before aging the tested pass. This preserves the exact original three acceptance contracts while ensuring no modern deliberate action journal is invented or stripped. Test headings change quote style only to anchor their existing names in the exact rationale.",
+    "replacementTests": [
+      "RISK scan lifecycle sync: repaired old remote Chance draw is durable across all stores and offline reload",
+      "RISK scan lifecycle sync: concurrent old-pass repairs converge by revision without replaying ratings or Done",
+      "RISK scan lifecycle sync: failed local repair persistence holds adoption and a newer cloud revision cannot be overwritten"
+    ],
+    "preservedCoverage": [
+      "Every original test-body assertion remains unchanged: higher revision adoption, exact 2AM refresh, all legacy/IndexedDB/host stores, offline seed/order, no preference teaching, unchanged ratings/Done/history, canonical revision conflict convergence, durable heads, no write after failed save, retry, and later revision/title/draw ownership.",
+      "Additional fixture assertions prove actual historical producer has no decisionEvents/baseline, current opening does not invent decisions, and migration saves before the remote pass ages. Supported pin and all runtime guards remain unchanged.",
+      "Complete lifecycle plus modern malformed current-choice/Start and sole legacy learned-work holds pass19/19 zero skips. No runtime/shared resources/full suite/CI/push. Coverage map unchanged because all existing names/contracts remain."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK scan lifecycle sync: repaired old|RISK scan lifecycle sync: concurrent old|RISK scan lifecycle sync: failed local' tests.js",
+      "failure": "146/pass-repair-01-red.log reproduces all3 failures on8d.02 source diagnostic proves account mismatch for root-stamped guest Start and unprojectable contradictory frozen pass after restoring guest ownership.03 immutable historical producer alone passes concurrent but leaves unrelated startup migration failures;04 observes initial pull+push/rev21 before fault and delayed transactional adoption. Complete current opening/persist before tested aging gives05all3GREEN;06preservation19/19 zero skips. These are fixture-precondition repairs, no runtime RED/fix claim."
+    }
   }
 ]
