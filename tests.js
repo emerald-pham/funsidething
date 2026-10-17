@@ -8844,29 +8844,31 @@ test('RISK saved view guidance: Quick start and Changelog describe this-device r
  assert.match(answer,/last All Tasks search or filter, whether its list was open, and your place in the list on this device/i);
  assert.match(answer,/saved board first/i);assert.match(answer,/dates and eligibility use today/i);
  assert.match(answer,/if this browser cannot retain the view, your saved board still opens with its usual list view/i);
+ assert.match(answer,/while it loads, a small panel keeps the message readable over the scenery in light and dark themes/i);
  const chapter=help.split('<details class="help-faq" data-help-changelog>')[1]?.split('</details>')[0]||'';
- assert.match(chapter,/<h3>October 16, 2026<\/h3>[\s\S]*?<li>Opening or refreshing restores this device’s All Tasks list, filters and position before the screen appears; newer cloud changes still sync in the background. If this browser cannot retain the view, the saved board still opens with its usual list view\.<\/li>/);
+ assert.match(chapter,/<h3>October 16, 2026<\/h3>[\s\S]*?<li>Opening or refreshing restores this device’s All Tasks list, filters and position before the screen appears; newer cloud changes still sync in the background. If this browser cannot retain the view, the saved board still opens with its usual list view\. The loading message stays readable over the scenery in both themes\.<\/li>/);
 });
 
-async function delayedLocalBoardBrowser(viewport={width:390,height:844},dispatchResizeDuringLoad=false){
+async function delayedLocalBoardBrowser(viewport={width:390,height:844},dispatchResizeDuringLoad=false,theme='system'){
  const {chromium}=await import(process.env.PLAYWRIGHT_MODULE||process.env.LANDSCAPE_PLAYWRIGHT||'playwright');
  const browser=await chromium.launch({headless:true,channel:process.env.LANDSCAPE_BROWSER_CHANNEL||'chrome'});
  const context=await browser.newContext({viewport,serviceWorkers:'block'});
  const board=syncState({
   contexts:[{id:'home',name:'Home',active:true}],
   tasks:Array.from({length:45},(_,i)=>({...syncTask('boot-'+i,'Saved boot task '+i),ctx:['home']})),
-  listOpen:true,seenQuickStart:true
+  listOpen:true,seenQuickStart:true,settings:{...syncState().settings,theme}
  });
  const payload=JSON.stringify(board),delayMs=1000;
- await context.addInitScript(({payload,delayMs})=>{
+ await context.addInitScript(({payload,delayMs,theme})=>{
   Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});
+  if(theme==='light'||theme==='dark')localStorage.setItem('fvp:chain-scanner:theme',theme);
   localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:'reduced',savedAt:Date.now()}));
   window.__savedViewRead={started:false,settled:false};
   window.storage={
    async get(){window.__savedViewRead.started=true;await new Promise(resolve=>setTimeout(resolve,delayMs));window.__savedViewRead.settled=true;return {value:payload};},
    async set(){}
   };
- },{payload,delayMs});
+ },{payload,delayMs,theme});
  const origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
  await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
  const page=await context.newPage(),errors=[];
@@ -8878,9 +8880,23 @@ async function delayedLocalBoardBrowser(viewport={width:390,height:844},dispatch
   storageSettled:window.__savedViewRead.settled,
   shellVisibility:getComputedStyle(document.querySelector('.wrap')).visibility,
   status:document.querySelector('#startupStatus')?.textContent.trim()||null,
+  colorScheme:getComputedStyle(document.documentElement).colorScheme,
+  inkReference:getComputedStyle(document.body).color,
+  statusCard:(()=>{
+   const node=document.querySelector('#startupStatus .startup-status-card');if(!node)return null;
+   const style=getComputedStyle(node),rect=node.getBoundingClientRect();
+   return {background:style.backgroundColor,color:style.color,borderColor:style.borderColor,borderRadius:style.borderRadius,
+    bounds:{x:rect.x,y:rect.y,right:rect.right,bottom:rect.bottom,width:rect.width,height:rect.height}};
+  })(),
+  panelReference:(()=>{const node=document.querySelector('.wrap #listWrap');if(!node)return null;const style=getComputedStyle(node);return {id:node.id,className:node.className,sameNode:node===document.querySelector('#startupStatus .startup-status-card'),background:style.backgroundColor,color:style.color,borderColor:style.borderColor,borderRadius:style.borderRadius};})(),
+  viewport:{width:innerWidth,height:innerHeight},
   rows:document.querySelectorAll('#listBody [data-row]').length,
   listCount:document.querySelector('#listCount')?.textContent||''
  }));
+ if(process.env.SAVED_VIEW_ARTIFACT_DIR&&(theme==='light'||theme==='dark')){
+  fs.mkdirSync(process.env.SAVED_VIEW_ARTIFACT_DIR,{recursive:true});
+  await page.screenshot({path:path.join(process.env.SAVED_VIEW_ARTIFACT_DIR,`startup-loading-${theme}.png`)});
+ }
  await page.waitForFunction(()=>document.querySelectorAll('#listBody [data-row]').length===45,{timeout:5000});
  const ready=await page.evaluate(()=>({
   shellVisibility:getComputedStyle(document.querySelector('.wrap')).visibility,
@@ -8891,6 +8907,39 @@ async function delayedLocalBoardBrowser(viewport={width:390,height:844},dispatch
  }));
  return {browser,context,page,early,ready,errors};
 }
+
+test('RISK saved view startup: delayed loading status stays readable over scenery in light and dark themes',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const samples=[];
+ for(const theme of ['light','dark']){
+  const startup=await delayedLocalBoardBrowser({width:390,height:844},false,theme);
+  try{
+   assert.equal(startup.early.storageSettled,false,'the saved board is still loading during the status capture');
+   assert.equal(startup.early.shellVisibility,'hidden','the default board stays hidden while local state loads');
+   assert.match(startup.early.status,/Opening your saved board/i);
+   assert.deepEqual(startup.errors,[]);
+   samples.push({theme,...startup.early});
+  }finally{await startup.browser.close();}
+ }
+ if(process.env.SAVED_VIEW_ARTIFACT_DIR){
+  fs.mkdirSync(process.env.SAVED_VIEW_ARTIFACT_DIR,{recursive:true});
+  fs.writeFileSync(path.join(process.env.SAVED_VIEW_ARTIFACT_DIR,'startup-status-paint.json'),JSON.stringify({capturedAt:new Date().toISOString(),samples},null,2)+'\n');
+ }
+ for(const sample of samples){
+  assert.equal(sample.colorScheme,sample.theme,`${sample.theme} saved view should paint with its theme before hydration`);
+  assert.ok(sample.statusCard,`${sample.theme}: loading status should have its own readable panel`);
+  assert.ok(sample.panelReference,`${sample.theme}: an established app panel is available as an independent style reference`);
+  assert.equal(sample.panelReference?.sameNode,false,`${sample.theme}: the reference is a separate app panel, not the startup status card itself`);
+  assert.deepEqual(sample.statusCard&&{
+   background:sample.statusCard.background,borderColor:sample.statusCard.borderColor,borderRadius:sample.statusCard.borderRadius
+  },sample.panelReference&&{
+   background:sample.panelReference.background,borderColor:sample.panelReference.borderColor,borderRadius:sample.panelReference.borderRadius
+  },`${sample.theme}: status panel reuses the established panel surface and border`);
+  assert.equal(sample.statusCard?.color,sample.inkReference,`${sample.theme}: status text uses the normal readable app ink`);
+  const b=sample.statusCard?.bounds,v=sample.viewport;
+  assert.ok(b&&b.x>=12&&b.y>=12&&b.right<=v.width-12&&b.bottom<=v.height-12,`${sample.theme}: status panel remains inside the viewport: ${JSON.stringify(b)}`);
+  assert.ok(b.width>0&&b.height>0,`${sample.theme}: status panel has visible bounds`);
+ }
+});
 
 test('RISK saved view startup: delayed local board reads do not expose an empty default shell',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
  const startup=await delayedLocalBoardBrowser();
@@ -14901,11 +14950,11 @@ test('Animation controls: revealing a task respects app and device reduced motio
  assert.ok(end>start,'the revealTask snippet ends before the commit helper');
  const code=html.slice(start,end);
  for(const [preference,osReduced,expected] of [['normal',false,'smooth'],['reduced',false,'instant'],['normal',true,'instant'],[undefined,false,'instant']]){
-  const calls=[],row={classList:{remove(){},add(){}},offsetWidth:100,scrollIntoView(options){calls.push(options);}};
-  const ctx=vm.createContext({state:{listOpen:false},clearListFilters(){},render(){},requestAnimationFrame(fn){fn();},document:{documentElement:{dataset:{landscapeMotion:preference}},querySelectorAll(){return [Object.assign(row,{dataset:{row:'task'}})];}},window:{matchMedia(){return {matches:osReduced};}}});
+  const calls=[],viewCalls=[],row={classList:{remove(){},add(){}},offsetWidth:100,scrollIntoView(options){calls.push(options);}};
+  const ctx=vm.createContext({state:{listOpen:false},allTasksView:{setListOpen(value){viewCalls.push(value);}},clearListFilters(){},render(){},requestAnimationFrame(fn){fn();},document:{documentElement:{dataset:{landscapeMotion:preference}},querySelectorAll(){return [Object.assign(row,{dataset:{row:'task'}})];}},window:{matchMedia(){return {matches:osReduced};}}});
   vm.runInContext(code+';revealTask("task");',ctx);
   assert.equal(calls[0].behavior,expected,`${preference}/${osReduced} must choose ${expected}`);
-  assert.equal(calls[0].block,'center');assert.equal(ctx.state.listOpen,true);
+  assert.equal(calls[0].block,'center');assert.equal(ctx.state.listOpen,true);assert.deepEqual(viewCalls,[true]);
  }
 });
 

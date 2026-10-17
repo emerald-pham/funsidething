@@ -7436,5 +7436,44 @@
       "command": "Original startup/view RED at 2026-10-17T02:47:58.917436Z on base a6cbbbaad70a4cb3a76dd53d25fa23fbc9c665f1; toggle cloud-adoption RED at 2026-10-17T02:59:33.360923Z on base 86af551a464a78d2c873d04b6fd33b02f9231e83; refined reveal RED at 2026-10-17T03:08:48Z on base f639e3b8534535dd1d909177d4ca09e7354c22e3. Exact commands remain in the original feature and repair-specific entries.",
       "failure": "The initial browser consumer showed missing filters, account isolation and populated first paint. The real toggle consumer showed the open view lost to a newer closed-list board. The actual reveal consumer then reproduced the equivalent gap with the same task on both devices and an extra pull, leaving the local list closed through reload. All chronology and outputs remain in the respective feature, toggle and reveal logs."
     }
+  },
+  {
+    "testChangesSha256": "103f916bb4956ec2bbebf66a943f07cb1b456bf601fc1250aba2dba5254f0376",
+    "reason": "Add a delayed local-hydration RISK consumer for startup-status readability, preserve the revealTask test collaborator introduced by the saved-view owner seam, and record the full-suite no-root regression before repairing the marker guard.",
+    "previousBehavior": "At candidate 5360ea1, the startup status used muted text directly over the moving landscape with no readable surface. The full suite also showed init dereferencing document.documentElement in an established no-root host, while the extracted revealTask fixture lacked its newly required saved-view collaborator.",
+    "intendedBehavior": "During delayed local board hydration, the status uses the established panel surface and readable app ink in both saved light and dark themes while scenery remains visible. Hosts without a document root remain a safe no-op, and the reduced-motion reveal test supplies and verifies the actual view owner collaborator.",
+    "replacementTests": [
+      "RISK saved view startup: delayed loading status stays readable over scenery in light and dark themes"
+    ],
+    "preservedCoverage": [
+      "The browser regression delays the real local board read, confirms no empty board rows are exposed, captures both themes before hydration completes, compares computed surface and border to an existing panel and text ink to the app ink, and bounds the card within the viewport.",
+      "The existing no-documentElement safe-no-op assertion remains unchanged; the runtime marker now guards the absent root.",
+      "All four existing reduced-motion combinations, centered reveal scrolling and list-open state remain asserted; the isolated fixture now supplies the actual saved-view owner and verifies its invocation.",
+      "After source inspection, the final style comparator was tightened to the separate All Tasks #listWrap pane. A 2026-10-17T03:28:27Z harness diagnostic using the first .wrap .panel selected #ctxPanel, whose intentional translucent secondary surface differs; no app source changed in that run. The final #listWrap light/dark consumer GREEN at 2026-10-17T03:29:07Z confirms matching surface, border and radius with a distinct node; details are in worker/startup-status-typography-green-final.log, worker/startup-status-typography-green-final2.log, and startup-status-green-final2/startup-status-paint.json."
+    ],
+    "redEvidence": {
+      "command": "Actual RISK RED at 2026-10-17T03:22:54Z on base 5360ea1dc9f1ecbe0a2d3aa58d8229029774d77e: LANDSCAPE_BROWSER_URL=http://127.0.0.1:8794/index.html LANDSCAPE_PLAYWRIGHT=/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs LANDSCAPE_BROWSER_CHANNEL=chrome SAVED_VIEW_ARTIFACT_DIR=/Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/startup-status-red /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=spec --test-name-pattern='RISK saved view startup: delayed loading status' tests.js.",
+      "failure": "With no app runtime or FAQ edits, the delayed local-read consumer found statusCard=null in light and dark mode; the status text had no surface. Exact refined failure and computed snapshots are in startup-status-typography-refined-red.log and startup-status-red/startup-status-paint.json, with the original standards screenshot at rendered-final/startup-loading.png. The parent full-suite run on 5360ea1 independently captured the no-root TypeError and missing allTasksView fixture collaborator in full-suite.log/.json; focused unchanged no-root RED is in typography-repair-existing-regressions-red.log."
+    }
+  },
+  {
+    "testChangesSha256": "1411cd00d779dd00fda1ba11d70119d3a4f6dfcf065d1adea736a82172581667",
+    "reason": "Bind the exact cumulative origin/main-to-candidate test diff after the startup-status readability and boot-host compatibility repair, preserving earlier saved-view and repair-specific chronology.",
+    "previousBehavior": "The original saved-view regressions lost per-device filters, position and local list-open choice during startup or cloud adoption, briefly exposed an empty shell, and had no protected delayed-startup surface/ink contract. Candidate 5360ea1 also regressed the no-root host marker and the isolated reveal motion fixture.",
+    "intendedBehavior": "During delayed local board hydration, the status uses the established panel surface and readable app ink in both saved light and dark themes while scenery remains visible. Hosts without a document root remain a safe no-op, and the reduced-motion reveal test supplies and verifies the actual view owner collaborator. Existing local-first board restoration, account boundaries, fallback behavior, cloud reconciliation and current-date reevaluation remain intact.",
+    "replacementTests": [
+      "RISK saved view startup: delayed loading status stays readable over scenery in light and dark themes"
+    ],
+    "preservedCoverage": [
+      "All original saved-view contracts remain present: restoration, account boundary, same-account adoption, reveal action, storage fallback, populated first paint, null-renderer prevention, guidance and current-date behavior.",
+      "The browser regression delays the real local board read, confirms no empty board rows are exposed, captures both themes before hydration completes, compares computed surface and border to an existing panel and text ink to the app ink, and bounds the card within the viewport.",
+      "The existing no-documentElement safe-no-op assertion remains unchanged; the runtime marker now guards the absent root.",
+      "All four existing reduced-motion combinations, centered reveal scrolling and list-open state remain asserted; the isolated fixture now supplies the actual saved-view owner and verifies its invocation.",
+      "After source inspection, the final style comparator was tightened to the separate All Tasks #listWrap pane. A 2026-10-17T03:28:27Z harness diagnostic using the first .wrap .panel selected #ctxPanel, whose intentional translucent secondary surface differs; no app source changed in that run. The final #listWrap light/dark consumer GREEN at 2026-10-17T03:29:07Z confirms matching surface, border and radius with a distinct node; details are in worker/startup-status-typography-green-final.log, worker/startup-status-typography-green-final2.log, and startup-status-green-final2/startup-status-paint.json."
+    ],
+    "redEvidence": {
+      "command": "Typography RED at 2026-10-17T03:22:54Z on base 5360ea1dc9f1ecbe0a2d3aa58d8229029774d77e: LANDSCAPE_BROWSER_URL=http://127.0.0.1:8794/index.html LANDSCAPE_PLAYWRIGHT=/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs LANDSCAPE_BROWSER_CHANNEL=chrome SAVED_VIEW_ARTIFACT_DIR=/Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/startup-status-red /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=spec --test-name-pattern='RISK saved view startup: delayed loading status' tests.js. Candidate 5360ea1 full-suite started at 2026-10-17T03:12:20.586Z and ended at03:18:54.789Z via node --test --test-reporter=spec tests.js.",
+      "failure": "Prior actual RED outputs remain in earlier rationale records and worker logs. The new delayed-read RISK failed because statusCard was absent in both themes. The actual full suite at 5360ea1 also failed the existing no-root safe no-op with TypeError at init and failed the extracted reduced-motion consumer with ReferenceError allTasksView; exact output is preserved in full-suite.log/.json."
+    }
   }
 ]
