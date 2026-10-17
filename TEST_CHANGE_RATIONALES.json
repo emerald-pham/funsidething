@@ -10182,122 +10182,30 @@
       "command": "Original broad records: final-gates/2026-10-17T22-31-14-185Z-4ebd429b-d7a4-49fc-9f52-0517d824016c.json and final-gates-worker/2026-10-17T22-36-55-833Z-4d6b88d2-ff47-4060-854d-06d822184162.json. Fast controlled loop: node scripts/agent-tools/record-run.mjs --repo $PWD --evidence-dir /Users/emeraldpham/.codex/task-artifacts/completion-precedence-168/fixture-boundaries --purpose later-baseline-sensitivity -- node --test --test-name-pattern='^RISK completion lifecycle Dot: unseen Dot|^RISK scoped Undo recovery: Undo of an informed evergreen' tests.js",
       "failure": "Root3da completion-first/+100 failed the original every-reconciliation-paint assertion; worker3b failed final nextReturn/laterCompletion remote-journal presence. Controlled record2026-10-17T22-49-38-836Z-6b03c973-5a8e-4cde-9025-480a3fb50899.json reproduces both original assertions: Dot rows2/3 have no current/delivered/known-cloud completion and precede delivery4, with zero bad known rows; held Undo publication remains local dirty/inFlight at rev13 with both pending IDs absent remotely, then release ACK14 contains both. These are observed fixture-boundary failures, not product runtime RED."
     },
-    "fixtureAudit": [
-      {
-        "name": "RISK legacy completion return: imported boundary survives replay while actual Dot Done Undo and exact cloud acknowledgement remain meaningful",
-        "previousName": "RISK legacy completion return: imported boundary survives replay while actual Dot Done Undo and exact cloud acknowledgement remain meaningful",
-        "coherentPublicationWaitsAdded": 1,
-        "knowledgeBoundary": false,
-        "controlledPublication": false,
-        "missingOriginalAssertionText": []
-      },
-      {
-        "name": "RISK legacy completion inheritance: consented Import retains lifecycle authority independently of embodied learning",
-        "previousName": "RISK legacy completion inheritance: consented Import retains lifecycle authority independently of embodied learning",
-        "coherentPublicationWaitsAdded": 2,
-        "knowledgeBoundary": false,
-        "controlledPublication": false,
-        "missingOriginalAssertionText": []
-      },
-      {
-        "name": "RISK legacy completion recovery safety: failed exact-source backup holds startup and guarded recovery without losing a newer edit",
-        "previousName": "RISK legacy completion recovery safety: failed exact-source backup holds startup and guarded recovery without losing a newer edit",
-        "coherentPublicationWaitsAdded": 1,
-        "knowledgeBoundary": false,
-        "controlledPublication": false,
-        "missingOriginalAssertionText": []
-      },
-      {
-        "name": "RISK legacy completion released shell: actual stale write conflicts then holds unknown authority and its pending edit for safe update",
-        "previousName": "RISK legacy completion released shell: actual stale write conflicts then holds unknown authority and its pending edit for safe update",
-        "coherentPublicationWaitsAdded": 1,
-        "knowledgeBoundary": false,
-        "controlledPublication": false,
-        "missingOriginalAssertionText": []
-      },
-      {
-        "name": "RISK legacy completion guest adoption: actual modern guest Done remains observable and Undoable after first empty-account sign-in",
-        "previousName": "RISK legacy completion guest adoption: actual modern guest Done remains observable and Undoable after first empty-account sign-in",
-        "coherentPublicationWaitsAdded": 1,
-        "knowledgeBoundary": false,
-        "controlledPublication": false,
-        "missingOriginalAssertionText": []
-      },
-      {
-        "name": "RISK scoped Undo recovery: a true Undo cancels only its compound Dot while peer completion and learning remain",
-        "previousName": "RISK scoped Undo recovery: a true Undo cancels only its compound Dot while peer completion and learning remain",
-        "coherentPublicationWaitsAdded": 5,
-        "knowledgeBoundary": false,
-        "controlledPublication": false,
-        "missingOriginalAssertionText": []
-      },
-      {
-        "name": "RISK scoped Undo recovery: Undo of an informed evergreen return survives older source and permits an acknowledged later return",
-        "previousName": "RISK scoped Undo recovery: Undo of an informed evergreen return survives older source and permits a later return",
-        "coherentPublicationWaitsAdded": 8,
-        "knowledgeBoundary": false,
-        "controlledPublication": true,
-        "missingOriginalAssertionText": []
-      },
-      {
-        "name": "RISK deletion authority: real Delete defeats a stale saved and cloud Dot after log pruning while same-title Add stays usable",
-        "previousName": "RISK deletion authority: real Delete defeats a stale saved and cloud Dot after log pruning while same-title Add stays usable",
-        "coherentPublicationWaitsAdded": 2,
-        "knowledgeBoundary": false,
-        "controlledPublication": false,
-        "missingOriginalAssertionText": []
-      },
-      {
-        "name": "RISK deletion authority: Clear history retries and pruned stale delivery retain ordinary deletion and evergreen completion separately",
-        "previousName": "RISK deletion authority: Clear history retries and pruned stale delivery retain ordinary deletion and evergreen completion separately",
-        "coherentPublicationWaitsAdded": 2,
-        "knowledgeBoundary": false,
-        "controlledPublication": false,
-        "missingOriginalAssertionText": []
-      },
-      {
-        "name": "RISK completion lifecycle Start: an observed new-pass root survives peer merge and IndexedDB reopen",
-        "previousName": "RISK completion lifecycle Start: an observed new-pass root survives peer merge and IndexedDB reopen",
-        "coherentPublicationWaitsAdded": 4,
-        "knowledgeBoundary": false,
-        "controlledPublication": false,
-        "missingOriginalAssertionText": []
-      },
-      {
-        "name": "RISK completion lifecycle Start: an unaware pass root cannot bypass completion in either publication order",
-        "previousName": "RISK completion lifecycle Start: an unaware pass root cannot bypass completion in either publication order",
-        "coherentPublicationWaitsAdded": 8,
-        "knowledgeBoundary": true,
-        "controlledPublication": false,
-        "missingOriginalAssertionText": []
-      },
-      {
-        "name": "RISK completion lifecycle Dot: unseen Dot and opposite No keep learning while observed completion owns membership",
-        "previousName": "RISK completion lifecycle Dot: unseen Dot and opposite No keep learning while completion owns membership",
-        "coherentPublicationWaitsAdded": 0,
-        "knowledgeBoundary": true,
-        "controlledPublication": false,
-        "missingOriginalAssertionText": []
-      },
-      {
-        "name": "RISK completion lifecycle return: observed Dot and next Done survive stale delivery and IndexedDB reopen",
-        "previousName": "RISK completion lifecycle return: observed Dot and next Done survive stale delivery and IndexedDB reopen",
-        "coherentPublicationWaitsAdded": 6,
-        "knowledgeBoundary": true,
-        "controlledPublication": false,
-        "missingOriginalAssertionText": []
-      },
-      {
-        "name": "RISK completion boundaries: failed read stays pending and wake exactly acknowledges an uncertain completion publication",
-        "previousName": "RISK completion boundaries: failed read stays pending and wake exactly acknowledges an uncertain completion publication",
-        "coherentPublicationWaitsAdded": 1,
-        "knowledgeBoundary": false,
-        "controlledPublication": false,
-        "missingOriginalAssertionText": []
-      }
-    ],
+    "fixtureAudit": {
+      "scope": "Only newly added168 consumers; older unrelated baseline tests are unchanged.",
+      "changedTests": [
+        "RISK legacy completion return: imported boundary survives replay while actual Dot Done Undo and exact cloud acknowledgement remain meaningful",
+        "RISK legacy completion inheritance: consented Import retains lifecycle authority independently of embodied learning",
+        "RISK legacy completion recovery safety: failed exact-source backup holds startup and guarded recovery without losing a newer edit",
+        "RISK legacy completion released shell: actual stale write conflicts then holds unknown authority and its pending edit for safe update",
+        "RISK legacy completion guest adoption: actual modern guest Done remains observable and Undoable after first empty-account sign-in",
+        "RISK scoped Undo recovery: a true Undo cancels only its compound Dot while peer completion and learning remain",
+        "RISK scoped Undo recovery: Undo of an informed evergreen return survives older source and permits an acknowledged later return",
+        "RISK deletion authority: real Delete defeats a stale saved and cloud Dot after log pruning while same-title Add stays usable",
+        "RISK deletion authority: Clear history retries and pruned stale delivery retain ordinary deletion and evergreen completion separately",
+        "RISK completion lifecycle Start: an observed new-pass root survives peer merge and IndexedDB reopen",
+        "RISK completion lifecycle Start: an unaware pass root cannot bypass completion in either publication order",
+        "RISK completion lifecycle Dot: unseen Dot and opposite No keep learning while observed completion owns membership",
+        "RISK completion lifecycle return: observed Dot and next Done survive stale delivery and IndexedDB reopen",
+        "RISK completion boundaries: failed read stays pending and wake exactly acknowledges an uncertain completion publication"
+      ],
+      "detailedEvidence": "/Users/emeraldpham/.codex/task-artifacts/completion-precedence-168/fixture-boundaries/changed-fixtures-final.json",
+      "knowledgeCapture": "The unaware Start, unseen Dot and observed-return/next-Done fixtures latch actual completion-bearing response delivery before application continuation and retain both before/after observations. Other changed sites replace fixed successful source/ACK waits with existing bounded coherent publication."
+    },
     "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/completion-precedence-168/fixture-boundaries",
-    "releaseStatus": "Fixture-only worker repair; no runtime/app hash change, new full suite, shared browser, CI/push/release or independent approval. Parent separately holds public release for P0 safe-upgrade work."
+    "releaseStatus": "Fixture-only worker repair; no runtime/app hash change, new full suite, shared browser, CI/push/release or independent approval. Parent separately holds public release for P0 safe-upgrade work.",
+    "fixtureBoundaryGreenEvidence": "/Users/emeraldpham/.codex/task-artifacts/completion-precedence-168/fixture-boundaries/2026-10-17T22-56-49-344Z-5dbcdf99-a421-44d8-a64f-30821ed60628.json (verified final scoped source cohort45 top-level/80 cases,80 pass,zero fail/skip). Earlier affected cohortscc4911cb and7d61f9f3 also80/80; the controlled two-consumer loop passes10/10 after correction."
   },
   {
     "testChangesSha256": "d284aad6463a4e0081e4e131cd62911b031f2c82eec4dc2386196c76cf8c6bd3",
@@ -10384,119 +10292,27 @@
       "command": "Original broad records: final-gates/2026-10-17T22-31-14-185Z-4ebd429b-d7a4-49fc-9f52-0517d824016c.json and final-gates-worker/2026-10-17T22-36-55-833Z-4d6b88d2-ff47-4060-854d-06d822184162.json. Fast controlled loop: node scripts/agent-tools/record-run.mjs --repo $PWD --evidence-dir /Users/emeraldpham/.codex/task-artifacts/completion-precedence-168/fixture-boundaries --purpose later-baseline-sensitivity -- node --test --test-name-pattern='^RISK completion lifecycle Dot: unseen Dot|^RISK scoped Undo recovery: Undo of an informed evergreen' tests.js",
       "failure": "Root3da completion-first/+100 failed the original every-reconciliation-paint assertion; worker3b failed final nextReturn/laterCompletion remote-journal presence. Controlled record2026-10-17T22-49-38-836Z-6b03c973-5a8e-4cde-9025-480a3fb50899.json reproduces both original assertions: Dot rows2/3 have no current/delivered/known-cloud completion and precede delivery4, with zero bad known rows; held Undo publication remains local dirty/inFlight at rev13 with both pending IDs absent remotely, then release ACK14 contains both. These are observed fixture-boundary failures, not product runtime RED."
     },
-    "fixtureAudit": [
-      {
-        "name": "RISK legacy completion return: imported boundary survives replay while actual Dot Done Undo and exact cloud acknowledgement remain meaningful",
-        "previousName": "RISK legacy completion return: imported boundary survives replay while actual Dot Done Undo and exact cloud acknowledgement remain meaningful",
-        "coherentPublicationWaitsAdded": 1,
-        "knowledgeBoundary": false,
-        "controlledPublication": false,
-        "missingOriginalAssertionText": []
-      },
-      {
-        "name": "RISK legacy completion inheritance: consented Import retains lifecycle authority independently of embodied learning",
-        "previousName": "RISK legacy completion inheritance: consented Import retains lifecycle authority independently of embodied learning",
-        "coherentPublicationWaitsAdded": 2,
-        "knowledgeBoundary": false,
-        "controlledPublication": false,
-        "missingOriginalAssertionText": []
-      },
-      {
-        "name": "RISK legacy completion recovery safety: failed exact-source backup holds startup and guarded recovery without losing a newer edit",
-        "previousName": "RISK legacy completion recovery safety: failed exact-source backup holds startup and guarded recovery without losing a newer edit",
-        "coherentPublicationWaitsAdded": 1,
-        "knowledgeBoundary": false,
-        "controlledPublication": false,
-        "missingOriginalAssertionText": []
-      },
-      {
-        "name": "RISK legacy completion released shell: actual stale write conflicts then holds unknown authority and its pending edit for safe update",
-        "previousName": "RISK legacy completion released shell: actual stale write conflicts then holds unknown authority and its pending edit for safe update",
-        "coherentPublicationWaitsAdded": 1,
-        "knowledgeBoundary": false,
-        "controlledPublication": false,
-        "missingOriginalAssertionText": []
-      },
-      {
-        "name": "RISK legacy completion guest adoption: actual modern guest Done remains observable and Undoable after first empty-account sign-in",
-        "previousName": "RISK legacy completion guest adoption: actual modern guest Done remains observable and Undoable after first empty-account sign-in",
-        "coherentPublicationWaitsAdded": 1,
-        "knowledgeBoundary": false,
-        "controlledPublication": false,
-        "missingOriginalAssertionText": []
-      },
-      {
-        "name": "RISK scoped Undo recovery: a true Undo cancels only its compound Dot while peer completion and learning remain",
-        "previousName": "RISK scoped Undo recovery: a true Undo cancels only its compound Dot while peer completion and learning remain",
-        "coherentPublicationWaitsAdded": 5,
-        "knowledgeBoundary": false,
-        "controlledPublication": false,
-        "missingOriginalAssertionText": []
-      },
-      {
-        "name": "RISK scoped Undo recovery: Undo of an informed evergreen return survives older source and permits an acknowledged later return",
-        "previousName": "RISK scoped Undo recovery: Undo of an informed evergreen return survives older source and permits a later return",
-        "coherentPublicationWaitsAdded": 8,
-        "knowledgeBoundary": false,
-        "controlledPublication": true,
-        "missingOriginalAssertionText": []
-      },
-      {
-        "name": "RISK deletion authority: real Delete defeats a stale saved and cloud Dot after log pruning while same-title Add stays usable",
-        "previousName": "RISK deletion authority: real Delete defeats a stale saved and cloud Dot after log pruning while same-title Add stays usable",
-        "coherentPublicationWaitsAdded": 2,
-        "knowledgeBoundary": false,
-        "controlledPublication": false,
-        "missingOriginalAssertionText": []
-      },
-      {
-        "name": "RISK deletion authority: Clear history retries and pruned stale delivery retain ordinary deletion and evergreen completion separately",
-        "previousName": "RISK deletion authority: Clear history retries and pruned stale delivery retain ordinary deletion and evergreen completion separately",
-        "coherentPublicationWaitsAdded": 2,
-        "knowledgeBoundary": false,
-        "controlledPublication": false,
-        "missingOriginalAssertionText": []
-      },
-      {
-        "name": "RISK completion lifecycle Start: an observed new-pass root survives peer merge and IndexedDB reopen",
-        "previousName": "RISK completion lifecycle Start: an observed new-pass root survives peer merge and IndexedDB reopen",
-        "coherentPublicationWaitsAdded": 4,
-        "knowledgeBoundary": false,
-        "controlledPublication": false,
-        "missingOriginalAssertionText": []
-      },
-      {
-        "name": "RISK completion lifecycle Start: an unaware pass root cannot bypass completion in either publication order",
-        "previousName": "RISK completion lifecycle Start: an unaware pass root cannot bypass completion in either publication order",
-        "coherentPublicationWaitsAdded": 8,
-        "knowledgeBoundary": true,
-        "controlledPublication": false,
-        "missingOriginalAssertionText": []
-      },
-      {
-        "name": "RISK completion lifecycle Dot: unseen Dot and opposite No keep learning while observed completion owns membership",
-        "previousName": "RISK completion lifecycle Dot: unseen Dot and opposite No keep learning while completion owns membership",
-        "coherentPublicationWaitsAdded": 0,
-        "knowledgeBoundary": true,
-        "controlledPublication": false,
-        "missingOriginalAssertionText": []
-      },
-      {
-        "name": "RISK completion lifecycle return: observed Dot and next Done survive stale delivery and IndexedDB reopen",
-        "previousName": "RISK completion lifecycle return: observed Dot and next Done survive stale delivery and IndexedDB reopen",
-        "coherentPublicationWaitsAdded": 6,
-        "knowledgeBoundary": true,
-        "controlledPublication": false,
-        "missingOriginalAssertionText": []
-      },
-      {
-        "name": "RISK completion boundaries: failed read stays pending and wake exactly acknowledges an uncertain completion publication",
-        "previousName": "RISK completion boundaries: failed read stays pending and wake exactly acknowledges an uncertain completion publication",
-        "coherentPublicationWaitsAdded": 1,
-        "knowledgeBoundary": false,
-        "controlledPublication": false,
-        "missingOriginalAssertionText": []
-      }
-    ]
+    "fixtureAudit": {
+      "scope": "Only newly added168 consumers; older unrelated baseline tests are unchanged.",
+      "changedTests": [
+        "RISK legacy completion return: imported boundary survives replay while actual Dot Done Undo and exact cloud acknowledgement remain meaningful",
+        "RISK legacy completion inheritance: consented Import retains lifecycle authority independently of embodied learning",
+        "RISK legacy completion recovery safety: failed exact-source backup holds startup and guarded recovery without losing a newer edit",
+        "RISK legacy completion released shell: actual stale write conflicts then holds unknown authority and its pending edit for safe update",
+        "RISK legacy completion guest adoption: actual modern guest Done remains observable and Undoable after first empty-account sign-in",
+        "RISK scoped Undo recovery: a true Undo cancels only its compound Dot while peer completion and learning remain",
+        "RISK scoped Undo recovery: Undo of an informed evergreen return survives older source and permits an acknowledged later return",
+        "RISK deletion authority: real Delete defeats a stale saved and cloud Dot after log pruning while same-title Add stays usable",
+        "RISK deletion authority: Clear history retries and pruned stale delivery retain ordinary deletion and evergreen completion separately",
+        "RISK completion lifecycle Start: an observed new-pass root survives peer merge and IndexedDB reopen",
+        "RISK completion lifecycle Start: an unaware pass root cannot bypass completion in either publication order",
+        "RISK completion lifecycle Dot: unseen Dot and opposite No keep learning while observed completion owns membership",
+        "RISK completion lifecycle return: observed Dot and next Done survive stale delivery and IndexedDB reopen",
+        "RISK completion boundaries: failed read stays pending and wake exactly acknowledges an uncertain completion publication"
+      ],
+      "detailedEvidence": "/Users/emeraldpham/.codex/task-artifacts/completion-precedence-168/fixture-boundaries/changed-fixtures-final.json",
+      "knowledgeCapture": "The unaware Start, unseen Dot and observed-return/next-Done fixtures latch actual completion-bearing response delivery before application continuation and retain both before/after observations. Other changed sites replace fixed successful source/ACK waits with existing bounded coherent publication."
+    },
+    "fixtureBoundaryGreenEvidence": "/Users/emeraldpham/.codex/task-artifacts/completion-precedence-168/fixture-boundaries/2026-10-17T22-56-49-344Z-5dbcdf99-a421-44d8-a64f-30821ed60628.json (verified final scoped source cohort45 top-level/80 cases,80 pass,zero fail/skip). Earlier affected cohortscc4911cb and7d61f9f3 also80/80; the controlled two-consumer loop passes10/10 after correction."
   }
 ]

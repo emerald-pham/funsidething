@@ -7267,7 +7267,7 @@ test("UI: benchmark's action row is full opacity in work mode (not greyed)", asy
   // In work mode, the action row should NOT have the disabled class (full opacity)
   const benchmarkSiderail = benchAction(scanHtml);
   assert.ok(benchmarkSiderail, "the benchmark should have its action row in work mode");
-  assert.ok(!/class="actionrow[^"]*disabled/.test(benchmarkSiderail),
+  assert.ok(!/class="actionrow[^"]*disabled/.test(benchmarkSiderail), 
     "the action row should NOT be greyed out in work mode — actions are relevant here");
 
   // benchmark's Done SHOULD have the d keyhint when no candidate is showing
@@ -9446,20 +9446,20 @@ test("UX: rescan button doesn't show when resume-scan is available", async () =>
   ctx.addTask("Task C", false);
   ctx.startScan('descending');  // dots Task A
   ctx.render();
-
+  
   // Skip a task (decide "no")
   ctx.onAction("no");  // Task B gets skipped
   ctx.render();
-
+  
   // Move to work mode
   ctx.onAction("start-working");
   ctx.render();
-
+  
   const scanHtml = shim.elements.get("scan").innerHTML;
-
+  
   // Resume scanning button should be present
   assert.match(scanHtml, /data-act="resume-scan"/, "resume-scan button should be present in work mode");
-
+  
   // Rescan button should NOT be present when resume-scan is available
   assert.ok(!scanHtml.includes('data-act="rescan"'), "rescan button should NOT appear when resume-scan is available");
 });
@@ -9472,13 +9472,13 @@ test("UX: resume-scan button is greyed during work mode if pool has eligible tas
   ctx.startScan('descending');  // dots Task A, mode stays "scan"
   ctx.onAction("start-working");  // switch to work mode
   ctx.render();
-
+  
   const scanHtml = shim.elements.get("scan").innerHTML;
-
+  
   // Find the resume-scan button's parent container
   const resumeMatch = scanHtml.match(/<button[^>]*data-act="resume-scan"[^>]*>Resume scanning<\/button>/);
   assert.ok(resumeMatch, "resume-scan button should exist when in work mode");
-
+  
   // Check if the button or its container has disabled/greyed styling
   // For now, verify button exists (we'll check CSS/opacity in next assertion)
   const noticeMatch = scanHtml.match(/<div class="notice"[^>]*>[\s\S]*?resume-scan[\s\S]*?<\/div>/);
@@ -9493,14 +9493,14 @@ test("UX: resume-scan button is full opacity once all eligible tasks are gone", 
   ctx.decide("yes");  // select Task B, dot it
   ctx.decide("yes");  // no more tasks
   ctx.render();
-
+  
   // Now we're in scan mode with no eligible tasks remaining
   const scanHtml = shim.elements.get("scan").innerHTML;
-
+  
   // Move to work mode
   ctx.onAction("start-working");
   ctx.render();
-
+  
   const scanHtml2 = shim.elements.get("scan").innerHTML;
   assert.ok(scanHtml2.includes('data-act="resume-scan"'), "resume-scan button should be present");
   // Button should be full opacity when no tasks remain
