@@ -7741,7 +7741,7 @@
     ],
     "redEvidence": {
       "command": "node --test --test-reporter=spec --test-name-pattern='RISK cloud current choices: context membership additions compose across observed revisions' tests.js",
-      "failure": "On 947c3bec1076a729257185142bf17da066bb441a, the full-app peer pull retained only ctx-peer after phone's ctx-phone choice. Raw /Users/emeraldpham/.codex/task-artifacts/decision-sync-141/144/context-delta-red-before-fix.txt includes distinct action IDs/base IDs and both exact before:{present:true,value:[]} records. The fixed consumer passes on integrated root checkpoint e480c2c."
+      "failure": "On 947c3bec1076a729257185142bf17da066bb441a, the full-app peer pull retained only ctx-peer after phone's ctx-phone choice. Raw /Users/emeraldpham/.codex/task-artifacts/decision-sync-141/144/context-delta-red-before-fix.txt includes distinct action IDs/base IDs and both exact before:{present:true,value:[]} records. The fixed consumer passes on integrated root checkpoint 98528c0."
     }
   }
 ]
