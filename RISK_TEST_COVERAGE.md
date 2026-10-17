@@ -697,7 +697,7 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 
 ## Stale-tab reconciliation
 
-- RISK cloud No recovery: five scanner decisions survive offline durable reopen beside an independent peer edit (action time is fixed before boot and cold reopen across timezone boundaries)
+- RISK cloud No recovery: five scanner decisions survive offline durable reopen beside an independent peer edit in Mac-first and phone-first cloud publication orders (action time is fixed before boot and cold reopen across timezone boundaries)
 - RISK cloud current choices: editor Save records original per-property action time
 - RISK cloud current choices: scan mode preference records an explicit timed choice
 - RISK cloud current choices: Resume scanning records an explicit active-pass mode change
@@ -1260,3 +1260,17 @@ Protect source validation before authority union; missing/cyclic ancestry, basel
 - `RISK scoped Undo: completion evergreen work delete and postpone retain unrelated peer fields`
 - `RISK scoped Undo: cancelling Start restores the prior pass root and exact draw through stale delivery`
 - `RISK scoped Undo: Return cancellation restores the original hold time while peer task fields survive`
+
+## Complete Start and chosen-field authority (#146)
+
+- `RISK decision recovery current-choice authority: strict editor semantics and effective chosen fields guard cloud adoption`
+- `RISK decision recovery Start authority: incomplete or ambiguous real Start groups hold exact branches`
+
+Preserve both sources when a supported Start group is incomplete/ambiguous or a chosen field no longer matches its retained decision.
+
+## Deliberate exact decision replacement (#146)
+
+- `RISK decision recovery modern replacement: explicit transfer into an existing decision board keeps exact displaced authority recoverable`
+- `RISK decision recovery replacement scope: exact retired branches stay retired while new changed and unknown peer facts stay held`
+
+Durable exact displaced-baseline/fact receipts retire only explicitly replaced authority; new/changed/unknown peer facts stay protected. Reverse replacement Undo is the dependent #145 gate.
