@@ -3468,11 +3468,11 @@ function retiredDecisionEvent(baseline,event){
   return replacementDecisionReceipts(baseline).some(receipt=>receipt.facts.some(fact=>fact.id===event?.id && LZString.decompressFromUTF16(fact.witness)===canonical));
 }
 async function prepareDecisionReplacement(next,current,reason,gestureId=null){
-  if(current?.decisionBaseline===undefined && (current?.decisionEvents===undefined
-    || Array.isArray(current.decisionEvents) && !current.decisionEvents.length))return true;
   const account=current.syncAccount??current.decisionBaseline?.account??null;
   const issue=decisionEvidenceIssue(current,account) || decisionEvidenceIssue(next,account);
   if(issue){reportCloudReconcileError(issue);return false;}
+  if(current?.decisionBaseline===undefined && (current?.decisionEvents===undefined
+    || Array.isArray(current.decisionEvents) && !current.decisionEvents.length))return true;
   const before=JSON.stringify(current),source=JSON.stringify(next),backend=window.CloudSync,user=backend?.user||null,at=Date.now();
   const prior=await saveDurableBackup("before-decision-replacement",before);
   if(!prior?.id)return false;

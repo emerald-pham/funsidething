@@ -12619,6 +12619,18 @@ test('RISK decision recovery replacement durability: failed selected-source reco
  assert.ok(target.ctx.readLocalBackups().some(row=>row.payload===prior));assert.ok(target.ctx.readLocalBackups().some(row=>row.payload===raw));
 });
 
+test('RISK decision recovery unknown destination: sole recovery authority blocks explicit journal replacement without changing either board',async t=>{
+ for(const key of ['decisionBaselineRecovery','decisionEventsRecovery'])await t.test(key,async t=>{
+  const source=await decisionRecoveryApp146();t.after(()=>{source.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',source.ctx);});
+  const initial=syncState({tasks:[syncTask('protected-recovery','Unknown recovery owner')],syncAccount:'destination@example.com',syncRev:2,syncDirty:false,[key]:[{v:99,opaque:'sole unreplayable destination authority'}]});
+  const h=makeSyncHarness({remote:initial,rev:2,delayMs:1}),app=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)},cloudSyncFactory:()=>{const CS=h.factory();CS.user='destination@example.com';CS.ready=false;return CS;}});
+  t.after(()=>{app.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',app.ctx);});
+  const before=JSON.stringify(app.ctx.state),saved=app.shim.localStorage.getItem(SYNC_STORE_KEY),cloud=h.doc.payload,raw=JSON.stringify(source.ctx.state);
+  app.shim.document.getElementById('jsonBox').value=raw;assert.equal(await app.ctx.onAction('import-json',{}),false,'explicit replacement cannot retire unknown authority without understanding its exact facts');
+  assert.equal(JSON.stringify(app.ctx.state),before);assert.equal(app.shim.localStorage.getItem(SYNC_STORE_KEY),saved);assert.equal(h.doc.payload,cloud);assert.equal(app.shim.document.getElementById('jsonBox').value,raw);
+ });
+});
+
 test('RISK decision recovery inheritance authority: changed attested facts stay held and ordinary account switches gain no consent',async t=>{
  const source=await decisionRecoveryApp146();t.after(()=>{source.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',source.ctx);});
  const raw=JSON.stringify(source.ctx.state),original=source.event,baseline=JSON.stringify(source.ctx.state.decisionBaseline);

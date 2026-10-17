@@ -1266,3 +1266,9 @@ Durable exact displaced-baseline/fact receipts retire only explicitly replaced a
 - `RISK decision recovery replacement durability: failed selected-source recovery leaves a modern destination and input exact for retry`
 
 Same-account replacement retains the selected learning baseline; a failed mandatory selected-source recovery leaves the exact modern destination and input ready for retry.
+
+## Sole recovery replacement authority (#146)
+
+- `RISK decision recovery unknown destination: sole recovery authority blocks explicit journal replacement without changing either board`
+
+Validate sole recovery authority before the no-active-journal replacement shortcut; preserve exact destination, source input and cloud while held.
