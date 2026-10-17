@@ -37,10 +37,27 @@ progress. The user explicitly settled these requirements:
    the ranking and dotted chain.
 4. The timestamp is when the choice was made. Reconnection, retry, upload,
    and saving must retain that original decision time.
+5. Separate deliberate comparisons are valid, useful evidence, including two
+   devices comparing the same pair from the same starting state. Keep both
+   comparison observations rather than collapsing them into one choice or
+   treating their disagreement as a reason to discard either observation.
+   Resolving a genuinely incompatible current board choice must not erase the
+   comparison evidence. Repeated delivery of the same recorded action remains
+   one observation; a separate user comparison remains separate evidence.
+6. Undo reverses the action being undone while preserving unrelated decisions
+   from the other device. It must not replace the whole earlier board.
 
-Two follow-up boundaries remain under discussion: how two devices answering
-the same comparison count, and whether Undo reverses only its action rather
-than replacing the whole earlier board. These are not silently assumed.
+The user explicitly corrected the proposed same-comparison deduplication rule:
+"both comparisons are technically valid and useful data" and "keep the
+comparison but not the conflict." Deduplication must therefore distinguish
+delivery of one recorded action from two deliberate comparison actions. The
+comparison evidence and any incompatible current board choice have different
+roles. This supersedes the earlier proposal that matching answers count once
+or that opposite comparison answers make one observation replace the other.
+
+These product boundaries are recorded. The final shared-understanding check
+required by the invoked grilling skill remains pending; this is not runtime
+implementation authorization.
 
 ## How the current system works
 
@@ -196,19 +213,25 @@ Change the merge authority to durable decisions and their observed context.
 Snapshots can remain the transport/checkpoint format.
 
 The repair needs to retain a common base or explicit pending decision evidence
-across reopening, identify repeated delivery of a decision, preserve independent
-choices despite overlapping derived fields, and resolve only genuine conflicts
-using original decision time. Rankings and the dotted chain must be derived
-from the retained decisions rather than accepted solely because one snapshot
-was published later. A durable base by itself fixes the first finding but not
+across reopening, identify repeated delivery of one recorded action without
+collapsing separate comparisons, preserve independent choices despite overlapping
+derived fields, and resolve only genuine conflicts using original decision time.
+All deliberate comparison observations remain available as evidence, including
+separate comparisons of the same pair. A resolved current board choice must not
+erase the observations that contributed to it. Rankings and the dotted chain
+must be derived from the retained decisions rather than accepted solely because
+one snapshot was published later. Undo reverses its action rather than loading
+an entire prior board. A durable base by itself fixes the first finding but not
 the second; array union by itself would invent ordering and Undo semantics.
 
-Before implementation, finish the conflict/Undo discussion and agree the
-consumer seams. The first regression should cover the user's five-plus-one
+Before implementation, confirm the recorded shared understanding and agree
+the consumer seams. The first regression should cover the user's five-plus-one
 branch example through actual actions, both publication orders, offline
 reopening, and an acknowledged final cloud board. Add the warm independent-Dot
-case, genuine conflicts with delayed upload, duplicate delivery, and scoped Undo
-as their behavior is settled. Keep existing historical safety tests intact.
+case, genuine current-state conflicts with delayed upload, two deliberate
+comparisons of the same pair, redelivery of one comparison, preservation of
+comparison evidence through conflict resolution, and action-scoped Undo.
+Keep existing historical safety tests intact.
 
 No ADR chooses an event journal, CRDT, or cloud schema yet. The product rule
 is settled; the storage and replay design is still a trade-off to resolve.
