@@ -71,7 +71,18 @@ function resolveUpstream() {
     .split('\n').find(line => line === ref || line.startsWith(ref + ' '));
   if (row === undefined) throw new Error(`Could not find the current branch ${ref}.`);
   const upstream = row.slice(ref.length + 1).trim();
-  if (!upstream) return null;
+  if (!upstream) {
+    // Git also prints an empty upstream when configured remote/merge keys cannot
+    // map to a tracking ref. Only absent configuration means unpublished.
+    const configured = spawnSync('git', ['config', '--get-regexp', `^branch\\.${escapeRegExp(ref.slice('refs/heads/'.length))}\\.(remote|merge)$`], {
+      cwd: repositoryRoot, encoding: 'utf8', maxBuffer: 1024 * 1024,
+    });
+    if (!configured.error && !configured.signal && configured.status === 1) return null;
+    if (configured.error || configured.signal || configured.status !== 0) {
+      throw new Error(`Could not read configured upstream for ${ref}: ${configured.error?.message || configured.stderr?.trim() || configured.signal || `Git exited ${configured.status}`}`);
+    }
+    throw new Error(`Could not resolve configured upstream for ${ref}; check its remote, merge ref and fetch mapping.`);
+  }
   const sha = git(['rev-parse', '--verify', upstream + '^{commit}'], `published upstream comparison ${upstream}`);
   if (!/^[0-9a-f]{40}$/i.test(sha)) throw new Error(`Invalid published upstream comparison ${upstream}.`);
   return { sha, label: `published upstream ${upstream}` };

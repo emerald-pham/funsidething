@@ -306,3 +306,19 @@ test('preflight keeps the first available default merge base when origin main ha
   assert.equal(result.status, 0, result.stdout + result.stderr);
   assert.match(result.stdout, /Preflight passed/);
 });
+
+test('preflight rejects configured upstreams that Git cannot map to a tracking ref', async t => {
+  for (const missing of ['remote', 'fetch mapping']) await t.test(missing, async t => {
+    const fixture = await createAppFixture(t, 'unmapped-upstream');
+    if (missing === 'fetch mapping') {
+      runGit(fixture.fixtureRoot, ['remote', 'add', 'origin', path.join(fixture.fixtureRoot, 'absent-remote.git')]);
+      runGit(fixture.fixtureRoot, ['config', '--unset-all', 'remote.origin.fetch']);
+    }
+    runGit(fixture.fixtureRoot, ['config', 'branch.main.remote', 'origin']);
+    runGit(fixture.fixtureRoot, ['config', 'branch.main.merge', 'refs/heads/main']);
+    const { result, output } = await runPreflight(fixture, 'unmapped-upstream-' + missing.replace(' ', '-'));
+    assert.equal(result.status, 2, output);
+    assert.match(output, /configured upstream/i, 'distinguish broken branch configuration from no upstream');
+    assert.doesNotMatch(output, /Preflight passed/);
+  });
+});
