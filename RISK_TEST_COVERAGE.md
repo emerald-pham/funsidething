@@ -1294,7 +1294,7 @@ Durable exact displaced-baseline/fact receipts retire only explicitly replaced a
 - `RISK independent decision guidance: actual adoption toast directs recovery without promising remote-board Undo`
 - `RISK independent decision guidance: the actual bulk result keeps confirmation and Undo meanings separate`
 
-The mounted FAQ and Settings explain durable offline decisions, narrow original-time conflicts, exact acknowledgement, preserved inherited ratings, safely held unrecorded legacy work, and ordinary targeted Undo. Existing bulk form, conflict, readability and historical changelog protections remain.
+The mounted FAQ and Settings explain durable offline decisions, narrow original-time conflicts, exact acknowledgement, preserved inherited ratings, safely held unrecorded legacy work, and ordinary targeted Undo. Shared appearance and context guidance covers independent changes and the separate non-Undo theme/scene boundary. Existing bulk form, conflict, readability and historical changelog protections remain.
 ## Replacement source preservation (#146)
 
 - `RISK decision recovery same-account replacement: Import and Restore keep the selected modern learning baseline intact`
@@ -1322,7 +1322,7 @@ Shared selected facts remain active through reversed cloud adoption; retired typ
 
 - `RISK decision mixed rollout fixture: actual comparisons current choices Start and scoped Undo survive durable publication and reopen`
 
-The existing `Firestore rules: real pinned writer reads decision authority then holds its ordinary app edit without erasing it` and `Firestore rules: first decision against released rules stays exact and pending until rules-first rollout then retry` consumers now publish coherent actual-app No, Yes, editor Dot, Dislodge, current-choice, Start and scoped Undo evidence through the production Firebase adapter. Both rollout guards and immutable supported baseline remain protected. Exact emulator execution belongs to the final root candidate; the in-process fixture is not emulator proof.
+The existing `Firestore rules: real pinned writer reads decision authority then holds its ordinary app edit without erasing it` and `Firestore rules: first decision against released rules stays exact and pending until rules-first rollout then retry` consumers now publish coherent actual-app No, Yes, editor Dot, Dislodge, current-choice, Start and scoped Undo evidence through the production Firebase adapter. The same producer fixture includes theme, date format, time/season scene fields and a created context definition, and checks their effective values after publication, cold reopen, the immutable historical read and rules-first Retry. Both rollout guards and immutable supported baseline remain protected. Exact emulator execution belongs to the final root candidate; the in-process fixture is not emulator proof.
 
 ## Unknown compatible-baseline authority (#146)
 
