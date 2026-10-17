@@ -43,3 +43,12 @@ and the explicit live-release hold. No push, merge or deployment until approval.
 The next deliverable is a reviewable local candidate and before-close, immediate
 reopen and background-update screenshots. Prior technical passes do not approve
 the rejected visual design.
+
+## Approved release frontier
+
+The user approved the invisible local screenshots on October 17, 2026. The hold
+is lifted. Reconcile current released main with the approved implementation,
+complete independent code/spec/state-safety, FAQ and typography review, and run
+the exact-candidate checks before push, PR, merge and verified deployment. Keep
+one implementation owner for any integration repairs; #140 closes through the
+final release PR.

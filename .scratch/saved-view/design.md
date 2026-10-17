@@ -1,10 +1,12 @@
 # Saved view on reopen and refresh
 
-Status: implementation in progress; live release is on hold. On October 16,
+Status: screenshot behavior approved on October 17, 2026; final integration,
+independent review and release checks are in progress. The user's “approved”
+reply lifts the screenshot/live-release hold. On October 16,
 2026, the user rejected the added loading popup and required invisible, seamless
 restoration and sync. They requested real functionality screenshots for approval
-and explicitly said to hold going live until they wake up. Do not push, merge or
-deploy this candidate before their approval. The original shared understanding
+and explicitly said to hold going live until they wake up. That hold was honored:
+the local candidate remained unpushed and undeployed until approval. The original shared understanding
 was confirmed with “sure” and an explicit implement-spec invocation.
 Implementation and release track [GitHub #140](https://github.com/emerald-pham/funsidething/issues/140).
 
@@ -152,3 +154,12 @@ and render consumers, account changes, corrupt/blocked/oversized cache fallback,
 current dates, safe interactivity and untrusted cached content. Keep the visual
 cache bounded for large boards and separate from recovery or persistence truth.
 Screenshot approval is the next user-facing checkpoint; publishing remains held.
+
+## Screenshot approval and release frontier
+
+On October 17, 2026, the user replied “approved” to the actual before-close,
+pending-reopen and quiet background-update screenshots of local candidate
+`eb20732817fd78df067478deb090fd47e54ef0e1`. Complete the existing authorized
+maintenance release after reconciling current main, preserving the approved
+invisible appearance, independent reviews and all applicable release gates.
+Historical rejected/loading-panel evidence remains superseded.
