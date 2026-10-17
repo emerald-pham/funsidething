@@ -45,6 +45,7 @@ function resolveBase(requestedBase) {
       cwd: repositoryRoot, encoding: 'utf8', maxBuffer: 1024 * 1024,
     });
     if (result.status === 0 && /^[0-9a-f]{40}$/i.test(result.stdout.trim())) return result.stdout.trim();
+    if (!result.error && !result.signal && result.status === 1 && !requestedBase) continue;
     throw new Error(`Could not compare HEAD with selected base ${candidate}: ${result.error?.message || result.stderr?.trim() || result.signal || `Git exited ${result.status}`}`);
   }
   const hint = requestedBase ? `from ${requestedBase}` : 'from origin/main, main, or master';

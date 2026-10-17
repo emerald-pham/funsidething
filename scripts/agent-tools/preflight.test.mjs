@@ -291,3 +291,18 @@ test('preflight does not reinterpret an unavailable configured upstream as an un
   assert.match(output, /published upstream comparison refs\/remotes\/origin\/main/);
   assert.doesNotMatch(output, /Preflight passed/);
 });
+
+test('preflight keeps the first available default merge base when origin main has unrelated history', async t => {
+  const fixture = await createAppFixture(t, 'default-fallback');
+  runGit(fixture.fixtureRoot, ['switch', '--orphan', 'unrelated']);
+  await writeFile(path.join(fixture.fixtureRoot, 'notes.md'), 'unrelated history\n');
+  runGit(fixture.fixtureRoot, ['add', 'notes.md']);
+  runGit(fixture.fixtureRoot, ['commit', '-m', 'unrelated root']);
+  runGit(fixture.fixtureRoot, ['update-ref', 'refs/remotes/origin/main', 'HEAD']);
+  runGit(fixture.fixtureRoot, ['switch', 'main']);
+  const result = spawnSync(process.execPath, [preflight], {
+    cwd: fixture.fixtureRoot, encoding: 'utf8', env: childEnvironment(),
+  });
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.match(result.stdout, /Preflight passed/);
+});
