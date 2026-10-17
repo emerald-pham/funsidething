@@ -32,6 +32,9 @@ or dependency changes follow the same behavioral loop when functional.
 
 ## Review and release
 
+Before browser interaction or rendered web review, follow
+[browser choice](docs/agents/workflow.md#browser-choice).
+
 Read [AGENTS.md](AGENTS.md) for maintenance authorization, FAQ duties and holds.
 Before release, read [release and review](docs/agents/release-and-review.md) and
 [RELEASE_GATES.md](RELEASE_GATES.md). Preserve independent changed-code/specialist,

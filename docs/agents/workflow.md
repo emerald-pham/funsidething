@@ -64,6 +64,27 @@ Risk determines regression breadth and the minimum useful actor/configuration
 set; it never waives RED. No blanket 21-actor/account matrix. Complete repository
 required full-suite/CI checks even when focused local tests suffice during a slice.
 
+## Browser choice
+
+Prefer the supported ChatGPT/Codex built-in browser (`@Browser`, the in-app
+browser) for ordinary localhost/public web-app interaction, screenshots, and
+rendered visual, typography and overflow review when available and sufficient.
+See the [official Browser documentation](https://learn.chatgpt.com/docs/browser).
+
+Check current tool availability and capabilities before selecting a route; do
+not assume the built-in browser supports isolated authenticated contexts or
+every required engine. Use another browser or automation route only for a
+concrete unmet capability, such as separate authenticated actors, engine-specific
+compatibility, unsupported automation, or verified unavailability. Record the
+capability gap and reason with the task evidence.
+
+Apply shared resource allocation/ownership, security prompts and denials,
+privacy constraints and required acceptance to every route; a browser switch
+never waives them. Keep functional, actual rendered and independent review
+requirements, including native/device and named-engine checks. Missing coverage
+remains a gap. Keep full CDP access and security permissions unchanged; changes
+require separate explicit authorization.
+
 ## Finish and hand off
 
 Review the exact final diff against requirements and standards. Keep independent
