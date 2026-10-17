@@ -1259,3 +1259,10 @@ Preserve both sources when a supported Start group is incomplete/ambiguous or a 
 - `RISK decision recovery replacement scope: exact retired branches stay retired while new changed and unknown peer facts stay held`
 
 Durable exact displaced-baseline/fact receipts retire only explicitly replaced authority; new/changed/unknown peer facts stay protected. Reverse replacement Undo is the dependent #145 gate.
+
+## Replacement source preservation (#146)
+
+- `RISK decision recovery same-account replacement: Import and Restore keep the selected modern learning baseline intact`
+- `RISK decision recovery replacement durability: failed selected-source recovery leaves a modern destination and input exact for retry`
+
+Same-account replacement retains the selected learning baseline; a failed mandatory selected-source recovery leaves the exact modern destination and input ready for retry.
