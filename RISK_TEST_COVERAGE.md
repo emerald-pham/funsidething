@@ -1388,3 +1388,9 @@ The actual intervention Yes records deliberate current-pass Scan intent even whe
 ## Saved view and released decision authority integration
 
 - RISK saved view decision integration: inherited guest authority and peer edits retain this device view through scoped Undo and durably acknowledged reopen
+
+## Agent evidence command wiring (#152)
+
+- `RISK repository process: npm test fails when an agent-tool cohort assertion fails`
+
+The required npm test entry point surfaces a failing isolated agent-tool cohort with a nonzero result and its assertion output.

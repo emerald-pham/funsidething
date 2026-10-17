@@ -9372,5 +9372,148 @@
     },
     "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/approved-release/reconcile-main-4a3/owner",
     "releaseStatus": "Local merged candidate only. Root owns exact final regression/reviews/native/browser/emulator/CI/release. No shared allocation, push, PR, main merge or deployment by this owner."
+  },
+  {
+    "testChangesSha256": "7123c004e0c11ed889bd9f963e60060bb77fea0fe1676c500323e562f9ff4c7e",
+    "reason": "Approved spec #152 requires isolated agent-tool process suites to participate in the normal repository test command.",
+    "previousBehavior": "The npm test script ran only tests.js, so a failing scripts/agent-tools test cohort did not affect its exit status.",
+    "intendedBehavior": "npm test executes each agent-tool test cohort and returns nonzero with its assertion output when any cohort fails.",
+    "replacementTests": [
+      "RISK repository process: npm test fails when an agent-tool cohort assertion fails"
+    ],
+    "preservedCoverage": [
+      "All existing tests.js assertions and unrelated rationale records remain intact.",
+      "Each isolated agent-tool cohort keeps its own Node test assertions and remains runnable through the focused test script.",
+      "The repository full suite and release gates remain required after focused agent-tool checks."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='^RISK repository process: npm test fails when an agent-tool cohort assertion fails$' tests.js",
+      "failure": "At baseline 25c5da1866231f6ca1f564deb36847e47088ef17, the disposable fixture's npm test returned zero while ignoring its deliberate synthetic-failure.test.mjs cohort; the process assertion expecting a nonzero result failed. See evidence/wiring/npm-test-agent-cohort-red.json."
+    }
+  },
+  {
+    "testChangesSha256": "3eb27217b7fc3a29632ca6ed24de0c6a0fb28d6d105237ed2d42a4204d45eb26",
+    "comparison": "mergeDelta",
+    "comparisonBase": "d89d5f1e2d2b8bbbc5c445caeb6bba28ac06e401",
+    "reason": "Resume the same user-authorized #140 owner and reconcile released main49f67e4 (PR163 tooling, PR162 browser guidance) into accepted candidate d89d5f1. Preserve both parent test/rationale/coverage histories and product metadata; no product runtime bytes or test assertions are repaired or weakened.",
+    "previousBehavior": "Candidate d89d5f1 held the accepted invisible saved appearance and released scanner-gesture PWA safeguards. New released main49f67e4 added agent evidence commands, aggregate npm test wiring, browser-choice guidance and one process integration test. Their appended risk-map and rationale sections required an exact union.",
+    "intendedBehavior": "Keep every product runtime asset and app/SW fingerprint exactly d89d5f1, import tooling/package/guidance exactly49f67e4, and retain the exact automatic union of both tests.js suites plus all parent rationale records and risk-map content. Use current provenance/preflight commands for focused local evidence; parent renews exact-candidate release checks.",
+    "replacementTests": [
+      "RISK repository process: npm test fails when an agent-tool cohort assertion fails"
+    ],
+    "preservedCoverage": [
+      "All existing saved-view populated restoration, inert appearance, account boundary, current-date, filter/list/scroll, guest inheritance, peer editor, concurrent Add, scoped Undo and acknowledged cold-reopen assertions remain intact. All36 checked product assets including index.html, CSS, SW, cloud/device adapters and rules match d89d5f1 exactly.",
+      "Released PWA entry/post-save scannerGestureActive guards and finishScannerGesture resumption remain unchanged inside the byte-identical product source. Their accepted test and original RED histories are retained; no new product design or behavior is introduced.",
+      "tests.js equals an exact automatic three-way union of both parents, with no manual executable test edits. All405 d89-parent and382 main-parent rationale records remain exact JSON records; the coverage map retains all prior content and the released npm cohort wiring contract.",
+      "All26 imported tooling/guidance/package files match49f67e4 exactly. The focused82 agent-tool tests use isolated process/fake browser/fixture-ledger boundaries, not real browser allocation or production accounts. Product67 runtime/process consumers and all existing release gates remain; no skips or broad suite substitutions are added.",
+      "Prior evidence, original contemporaneous RED chronology and immutable465/d89 approvals/receipts remain historical. No new functional RED is fabricated for this source/documentation preservation merge; full/native/emulator/compatibility/independent-review/CI/release remain parent-owned."
+    ],
+    "redEvidence": {
+      "command": "Original saved-view, geometry, settlement and released PWA RED commands remain in exact inherited records and saved-view task artifacts. Imported #152 command: node --test --test-name-pattern=\"^RISK repository process: npm test fails when an agent-tool cohort assertion fails$\" tests.js; its original evidence/wiring/npm-test-agent-cohort-red.json reference remains unchanged. Current recorder commands are captured under resumed-20261017/owner/runs.",
+      "failure": "No new product implementation or test behavior repair occurs in this merge, so no new preimplementation RED is claimed. The imported wiring rationale records its actual baseline25c5da1866231f6ca1f564deb36847e47088ef17 failure: npm test returned zero while ignoring the disposable synthetic-failure.test.mjs cohort. Existing saved-view/geometry and47pass/2fail Node22 settlement observations remain preserved with their original chronology; current preservation runs pass67/67 runtime/process and82/82 agent-tool cases with zero skips."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/resumed-20261017/owner",
+    "releaseStatus": "Local merged candidate only. No browser/emulator/server/port, push, PR update, CI, main merge or deployment by this worker. Parent /root retains integration, affected reviews and all final release validation."
+  },
+  {
+    "testChangesSha256": "94c2d9c2360dcdb32074243818331893caaf6f21ac4e43c19cd6c0e4aa60bff5",
+    "comparison": "currentMainDelta",
+    "comparisonBase": "49f67e44130da9360998c7a2b272d6483babdd9b",
+    "reason": "Resume the same user-authorized #140 owner and reconcile released main49f67e4 (PR163 tooling, PR162 browser guidance) into accepted candidate d89d5f1. Preserve both parent test/rationale/coverage histories and product metadata; no product runtime bytes or test assertions are repaired or weakened.",
+    "previousBehavior": "Candidate d89d5f1 held the accepted invisible saved appearance and released scanner-gesture PWA safeguards. New released main49f67e4 added agent evidence commands, aggregate npm test wiring, browser-choice guidance and one process integration test. Their appended risk-map and rationale sections required an exact union.",
+    "intendedBehavior": "Keep every product runtime asset and app/SW fingerprint exactly d89d5f1, import tooling/package/guidance exactly49f67e4, and retain the exact automatic union of both tests.js suites plus all parent rationale records and risk-map content. Use current provenance/preflight commands for focused local evidence; parent renews exact-candidate release checks.",
+    "replacementTests": [
+      "RISK saved view decision integration: inherited guest authority and peer edits retain this device view through scoped Undo and durably acknowledged reopen"
+    ],
+    "preservedCoverage": [
+      "All existing saved-view populated restoration, inert appearance, account boundary, current-date, filter/list/scroll, guest inheritance, peer editor, concurrent Add, scoped Undo and acknowledged cold-reopen assertions remain intact. All36 checked product assets including index.html, CSS, SW, cloud/device adapters and rules match d89d5f1 exactly.",
+      "Released PWA entry/post-save scannerGestureActive guards and finishScannerGesture resumption remain unchanged inside the byte-identical product source. Their accepted test and original RED histories are retained; no new product design or behavior is introduced.",
+      "tests.js equals an exact automatic three-way union of both parents, with no manual executable test edits. All405 d89-parent and382 main-parent rationale records remain exact JSON records; the coverage map retains all prior content and the released npm cohort wiring contract.",
+      "All26 imported tooling/guidance/package files match49f67e4 exactly. The focused82 agent-tool tests use isolated process/fake browser/fixture-ledger boundaries, not real browser allocation or production accounts. Product67 runtime/process consumers and all existing release gates remain; no skips or broad suite substitutions are added.",
+      "Prior evidence, original contemporaneous RED chronology and immutable465/d89 approvals/receipts remain historical. No new functional RED is fabricated for this source/documentation preservation merge; full/native/emulator/compatibility/independent-review/CI/release remain parent-owned."
+    ],
+    "redEvidence": {
+      "command": "Original saved-view, geometry, settlement and released PWA RED commands remain in exact inherited records and saved-view task artifacts. Imported #152 command: node --test --test-name-pattern=\"^RISK repository process: npm test fails when an agent-tool cohort assertion fails$\" tests.js; its original evidence/wiring/npm-test-agent-cohort-red.json reference remains unchanged. Current recorder commands are captured under resumed-20261017/owner/runs.",
+      "failure": "No new product implementation or test behavior repair occurs in this merge, so no new preimplementation RED is claimed. The imported wiring rationale records its actual baseline25c5da1866231f6ca1f564deb36847e47088ef17 failure: npm test returned zero while ignoring the disposable synthetic-failure.test.mjs cohort. Existing saved-view/geometry and47pass/2fail Node22 settlement observations remain preserved with their original chronology; current preservation runs pass67/67 runtime/process and82/82 agent-tool cases with zero skips."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/resumed-20261017/owner",
+    "releaseStatus": "Local merged candidate only. No browser/emulator/server/port, push, PR update, CI, main merge or deployment by this worker. Parent /root retains integration, affected reviews and all final release validation."
+  },
+  {
+    "testChangesSha256": "314f338f72c7c66ce5521b7eb875292a675cba129923bd324eaf127d911ebba5",
+    "comparison": "priorMainDelta",
+    "comparisonBase": "4a3f332ba543147691147120e83048e162dabae1",
+    "reason": "Resume the same user-authorized #140 owner and reconcile released main49f67e4 (PR163 tooling, PR162 browser guidance) into accepted candidate d89d5f1. Preserve both parent test/rationale/coverage histories and product metadata; no product runtime bytes or test assertions are repaired or weakened.",
+    "previousBehavior": "Candidate d89d5f1 held the accepted invisible saved appearance and released scanner-gesture PWA safeguards. New released main49f67e4 added agent evidence commands, aggregate npm test wiring, browser-choice guidance and one process integration test. Their appended risk-map and rationale sections required an exact union.",
+    "intendedBehavior": "Keep every product runtime asset and app/SW fingerprint exactly d89d5f1, import tooling/package/guidance exactly49f67e4, and retain the exact automatic union of both tests.js suites plus all parent rationale records and risk-map content. Use current provenance/preflight commands for focused local evidence; parent renews exact-candidate release checks.",
+    "replacementTests": [
+      "RISK repository process: npm test fails when an agent-tool cohort assertion fails",
+      "RISK saved view decision integration: inherited guest authority and peer edits retain this device view through scoped Undo and durably acknowledged reopen"
+    ],
+    "preservedCoverage": [
+      "All existing saved-view populated restoration, inert appearance, account boundary, current-date, filter/list/scroll, guest inheritance, peer editor, concurrent Add, scoped Undo and acknowledged cold-reopen assertions remain intact. All36 checked product assets including index.html, CSS, SW, cloud/device adapters and rules match d89d5f1 exactly.",
+      "Released PWA entry/post-save scannerGestureActive guards and finishScannerGesture resumption remain unchanged inside the byte-identical product source. Their accepted test and original RED histories are retained; no new product design or behavior is introduced.",
+      "tests.js equals an exact automatic three-way union of both parents, with no manual executable test edits. All405 d89-parent and382 main-parent rationale records remain exact JSON records; the coverage map retains all prior content and the released npm cohort wiring contract.",
+      "All26 imported tooling/guidance/package files match49f67e4 exactly. The focused82 agent-tool tests use isolated process/fake browser/fixture-ledger boundaries, not real browser allocation or production accounts. Product67 runtime/process consumers and all existing release gates remain; no skips or broad suite substitutions are added.",
+      "Prior evidence, original contemporaneous RED chronology and immutable465/d89 approvals/receipts remain historical. No new functional RED is fabricated for this source/documentation preservation merge; full/native/emulator/compatibility/independent-review/CI/release remain parent-owned."
+    ],
+    "redEvidence": {
+      "command": "Original saved-view, geometry, settlement and released PWA RED commands remain in exact inherited records and saved-view task artifacts. Imported #152 command: node --test --test-name-pattern=\"^RISK repository process: npm test fails when an agent-tool cohort assertion fails$\" tests.js; its original evidence/wiring/npm-test-agent-cohort-red.json reference remains unchanged. Current recorder commands are captured under resumed-20261017/owner/runs.",
+      "failure": "No new product implementation or test behavior repair occurs in this merge, so no new preimplementation RED is claimed. The imported wiring rationale records its actual baseline25c5da1866231f6ca1f564deb36847e47088ef17 failure: npm test returned zero while ignoring the disposable synthetic-failure.test.mjs cohort. Existing saved-view/geometry and47pass/2fail Node22 settlement observations remain preserved with their original chronology; current preservation runs pass67/67 runtime/process and82/82 agent-tool cases with zero skips."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/resumed-20261017/owner",
+    "releaseStatus": "Local merged candidate only. No browser/emulator/server/port, push, PR update, CI, main merge or deployment by this worker. Parent /root retains integration, affected reviews and all final release validation."
+  },
+  {
+    "testChangesSha256": "d59a0e75abec4b3b347303a4f2c72fe158451f564dbe12e5c6a5d6f5201c6a62",
+    "comparison": "approvedDelta",
+    "comparisonBase": "7d5b069603b758b73e5704a4a3eb91625ffd6413",
+    "reason": "Resume the same user-authorized #140 owner and reconcile released main49f67e4 (PR163 tooling, PR162 browser guidance) into accepted candidate d89d5f1. Preserve both parent test/rationale/coverage histories and product metadata; no product runtime bytes or test assertions are repaired or weakened.",
+    "previousBehavior": "Candidate d89d5f1 held the accepted invisible saved appearance and released scanner-gesture PWA safeguards. New released main49f67e4 added agent evidence commands, aggregate npm test wiring, browser-choice guidance and one process integration test. Their appended risk-map and rationale sections required an exact union.",
+    "intendedBehavior": "Keep every product runtime asset and app/SW fingerprint exactly d89d5f1, import tooling/package/guidance exactly49f67e4, and retain the exact automatic union of both tests.js suites plus all parent rationale records and risk-map content. Use current provenance/preflight commands for focused local evidence; parent renews exact-candidate release checks.",
+    "replacementTests": [
+      "RISK repository process: npm test fails when an agent-tool cohort assertion fails",
+      "RISK saved view decision integration: inherited guest authority and peer edits retain this device view through scoped Undo and durably acknowledged reopen",
+      "RISK PWA updates: a scanner gesture commits its action before a downloaded worker reloads"
+    ],
+    "preservedCoverage": [
+      "All existing saved-view populated restoration, inert appearance, account boundary, current-date, filter/list/scroll, guest inheritance, peer editor, concurrent Add, scoped Undo and acknowledged cold-reopen assertions remain intact. All36 checked product assets including index.html, CSS, SW, cloud/device adapters and rules match d89d5f1 exactly.",
+      "Released PWA entry/post-save scannerGestureActive guards and finishScannerGesture resumption remain unchanged inside the byte-identical product source. Their accepted test and original RED histories are retained; no new product design or behavior is introduced.",
+      "tests.js equals an exact automatic three-way union of both parents, with no manual executable test edits. All405 d89-parent and382 main-parent rationale records remain exact JSON records; the coverage map retains all prior content and the released npm cohort wiring contract.",
+      "All26 imported tooling/guidance/package files match49f67e4 exactly. The focused82 agent-tool tests use isolated process/fake browser/fixture-ledger boundaries, not real browser allocation or production accounts. Product67 runtime/process consumers and all existing release gates remain; no skips or broad suite substitutions are added.",
+      "Prior evidence, original contemporaneous RED chronology and immutable465/d89 approvals/receipts remain historical. No new functional RED is fabricated for this source/documentation preservation merge; full/native/emulator/compatibility/independent-review/CI/release remain parent-owned."
+    ],
+    "redEvidence": {
+      "command": "Original saved-view, geometry, settlement and released PWA RED commands remain in exact inherited records and saved-view task artifacts. Imported #152 command: node --test --test-name-pattern=\"^RISK repository process: npm test fails when an agent-tool cohort assertion fails$\" tests.js; its original evidence/wiring/npm-test-agent-cohort-red.json reference remains unchanged. Current recorder commands are captured under resumed-20261017/owner/runs.",
+      "failure": "No new product implementation or test behavior repair occurs in this merge, so no new preimplementation RED is claimed. The imported wiring rationale records its actual baseline25c5da1866231f6ca1f564deb36847e47088ef17 failure: npm test returned zero while ignoring the disposable synthetic-failure.test.mjs cohort. Existing saved-view/geometry and47pass/2fail Node22 settlement observations remain preserved with their original chronology; current preservation runs pass67/67 runtime/process and82/82 agent-tool cases with zero skips."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/resumed-20261017/owner",
+    "releaseStatus": "Local merged candidate only. No browser/emulator/server/port, push, PR update, CI, main merge or deployment by this worker. Parent /root retains integration, affected reviews and all final release validation."
+  },
+  {
+    "testChangesSha256": "6c772285482a8db54cea3565db0309c0dd863acdcb76805dc2d62ea594ab9b95",
+    "comparison": "originalLiveCumulative",
+    "comparisonBase": "69a9feddf5d6bb8c4973475f7232e363b8646097",
+    "reason": "Resume the same user-authorized #140 owner and reconcile released main49f67e4 (PR163 tooling, PR162 browser guidance) into accepted candidate d89d5f1. Preserve both parent test/rationale/coverage histories and product metadata; no product runtime bytes or test assertions are repaired or weakened.",
+    "previousBehavior": "Candidate d89d5f1 held the accepted invisible saved appearance and released scanner-gesture PWA safeguards. New released main49f67e4 added agent evidence commands, aggregate npm test wiring, browser-choice guidance and one process integration test. Their appended risk-map and rationale sections required an exact union.",
+    "intendedBehavior": "Keep every product runtime asset and app/SW fingerprint exactly d89d5f1, import tooling/package/guidance exactly49f67e4, and retain the exact automatic union of both tests.js suites plus all parent rationale records and risk-map content. Use current provenance/preflight commands for focused local evidence; parent renews exact-candidate release checks.",
+    "replacementTests": [
+      "RISK repository process: npm test fails when an agent-tool cohort assertion fails",
+      "RISK saved view decision integration: inherited guest authority and peer edits retain this device view through scoped Undo and durably acknowledged reopen",
+      "RISK PWA updates: a scanner gesture commits its action before a downloaded worker reloads"
+    ],
+    "preservedCoverage": [
+      "All existing saved-view populated restoration, inert appearance, account boundary, current-date, filter/list/scroll, guest inheritance, peer editor, concurrent Add, scoped Undo and acknowledged cold-reopen assertions remain intact. All36 checked product assets including index.html, CSS, SW, cloud/device adapters and rules match d89d5f1 exactly.",
+      "Released PWA entry/post-save scannerGestureActive guards and finishScannerGesture resumption remain unchanged inside the byte-identical product source. Their accepted test and original RED histories are retained; no new product design or behavior is introduced.",
+      "tests.js equals an exact automatic three-way union of both parents, with no manual executable test edits. All405 d89-parent and382 main-parent rationale records remain exact JSON records; the coverage map retains all prior content and the released npm cohort wiring contract.",
+      "All26 imported tooling/guidance/package files match49f67e4 exactly. The focused82 agent-tool tests use isolated process/fake browser/fixture-ledger boundaries, not real browser allocation or production accounts. Product67 runtime/process consumers and all existing release gates remain; no skips or broad suite substitutions are added.",
+      "Prior evidence, original contemporaneous RED chronology and immutable465/d89 approvals/receipts remain historical. No new functional RED is fabricated for this source/documentation preservation merge; full/native/emulator/compatibility/independent-review/CI/release remain parent-owned."
+    ],
+    "redEvidence": {
+      "command": "Original saved-view, geometry, settlement and released PWA RED commands remain in exact inherited records and saved-view task artifacts. Imported #152 command: node --test --test-name-pattern=\"^RISK repository process: npm test fails when an agent-tool cohort assertion fails$\" tests.js; its original evidence/wiring/npm-test-agent-cohort-red.json reference remains unchanged. Current recorder commands are captured under resumed-20261017/owner/runs.",
+      "failure": "No new product implementation or test behavior repair occurs in this merge, so no new preimplementation RED is claimed. The imported wiring rationale records its actual baseline25c5da1866231f6ca1f564deb36847e47088ef17 failure: npm test returned zero while ignoring the disposable synthetic-failure.test.mjs cohort. Existing saved-view/geometry and47pass/2fail Node22 settlement observations remain preserved with their original chronology; current preservation runs pass67/67 runtime/process and82/82 agent-tool cases with zero skips."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/resumed-20261017/owner",
+    "releaseStatus": "Local merged candidate only. No browser/emulator/server/port, push, PR update, CI, main merge or deployment by this worker. Parent /root retains integration, affected reviews and all final release validation."
   }
 ]

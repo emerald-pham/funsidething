@@ -13,6 +13,8 @@ Domain docs: single-context; see [domain rules](docs/agents/domain.md) before ex
 Before publishing or triaging issues/specs, read the
 [GitHub tracker](docs/agents/issue-tracker.md) and
 [triage labels](docs/agents/triage-labels.md).
+For command-line evidence collection, coordination, audits, or CI/PR automation,
+use [agent evidence tools](docs/agents/agent-evidence.md).
 
 ## Test-first and regression
 
@@ -29,6 +31,9 @@ that unexpectedly passes needs investigation, not a fabricated RED. Configuratio
 or dependency changes follow the same behavioral loop when functional.
 
 ## Review and release
+
+Before browser interaction or rendered web review, follow
+[browser choice](docs/agents/workflow.md#browser-choice).
 
 Read [AGENTS.md](AGENTS.md) for maintenance authorization, FAQ duties and holds.
 Before release, read [release and review](docs/agents/release-and-review.md) and
