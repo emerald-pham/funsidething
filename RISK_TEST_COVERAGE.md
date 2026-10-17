@@ -1369,3 +1369,9 @@ Postimplementation mixed integration acceptance also carries a normal visible en
 - `RISK intervention Continue authority: a visible scan reaffirmation competes with Pause and scoped Undo in either publication order`
 
 The actual intervention Yes records deliberate current-pass Scan intent even when already scanning. Both upload orders and both original-time directions preserve the correct opposing answer, original fact owner/time, existing snooze/intervention behavior, exact scoped Undo, unrelated peer title, stale delivery and cold reopen. The existing mode causal-skew and unsupported-fact hold consumers remain included; no fake weighting or Start event is created.
+
+## Agent evidence command wiring (#152)
+
+- `RISK repository process: npm test fails when an agent-tool cohort assertion fails`
+
+The required npm test entry point surfaces a failing isolated agent-tool cohort with a nonzero result and its assertion output.

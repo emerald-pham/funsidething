@@ -19633,6 +19633,23 @@ test('RISK landscape water browser: GPU distortion preserves contact and sharp p
  }finally{await browser.close();}
 });
 
+test('RISK repository process: npm test fails when an agent-tool cohort assertion fails',async t=>{
+ const root=path.dirname(fileURLToPath(import.meta.url)),os=await import('node:os');
+ const fixture=fs.mkdtempSync(path.join(os.tmpdir(),'funsidething-agent-tool-cohort-'));
+ t.after(()=>fs.rmSync(fixture,{recursive:true,force:true}));
+ const packageData=JSON.parse(fs.readFileSync(path.join(root,'package.json'),'utf8'));
+ fs.writeFileSync(path.join(fixture,'package.json'),JSON.stringify(packageData));
+ fs.writeFileSync(path.join(fixture,'tests.js'),"import { test } from 'node:test'; test('fixture baseline passes',()=>{});\n");
+ const cohort=path.join(fixture,'scripts','agent-tools');fs.mkdirSync(cohort,{recursive:true});
+ fs.writeFileSync(path.join(cohort,'synthetic-failure.test.mjs'),"import { test } from 'node:test'; import assert from 'node:assert/strict'; test('synthetic agent-tool assertion fails',()=>assert.equal('wrong','right','synthetic agent-tool cohort assertion failed'));\n");
+ const env={...process.env,CI:'1',npm_config_audit:'false',npm_config_fund:'false',npm_config_update_notifier:'false'};delete env.NODE_TEST_CONTEXT;
+ const result=spawnSync('npm',['test'],{cwd:fixture,encoding:'utf8',timeout:30000,env});
+ assert.equal(result.error,undefined,result.error?.message);
+ const output=[result.stdout,result.stderr].filter(Boolean).join('\n');
+ assert.notEqual(result.status,0,`npm test passed despite a failing agent-tool cohort:\n${output}`);
+ assert.match(output,/synthetic agent-tool cohort assertion failed/);
+});
+
 test('RISK regression gate: changing existing tests requires a specific reason and replacement coverage',async()=>{
  const {validateRegressionChanges,protectedTestFingerprint}=await import('./scripts/test-first-gate.mjs');
  assert.equal(typeof validateRegressionChanges,'function','CI must protect existing feature tests');
