@@ -8491,5 +8491,22 @@
       "command": "Ticket-specific actual RED commands and raw142-147 logs are retained under /Users/emeraldpham/.codex/task-artifacts/decision-sync-141; final focused/full/rules/compatibility commands are recorded with exact candidate.",
       "failure": "142 original cold-reopen No loss;143 independent comparison replay;144 current-property chronology and context delta failures;145 scoped/replacement/inherited Undo failures;146 source validation, guest inheritance, legacy hold and precise replacement failures;147 actual mounted FAQ/Settings and bulk intro failures. Individual records preserve exact observed errors and corrections. Both publication orders and other positive follow-through are explicitly post-implementation coverage."
     }
+  },
+  {
+    "testChangesSha256": "4c9e5b8c795f9dd2997c11c5111a61ee2d871979a6bde67b79cbf43632a5d0fe",
+    "reason": "Narrow the approved native scene fixture Help click to the unique actual header control without changing a product behavior or assertion.",
+    "previousBehavior": "The exact3ff native run reached the final Help navigation but Playwright rejected the unscoped data-act help selector because both header Help and another How this works control matched.",
+    "intendedBehavior": "Click only #appHeader [data-act=\"help\"], then retain the existing Changelog expansion and every scene preset, task preservation, reload, live, focus and Cyclists visibility assertion. Keep the existing test heading unchanged as instructed.",
+    "replacementTests": [
+      "Landscape browser: scene time presets persist and return to live without changing tasks"
+    ],
+    "preservedCoverage": [
+      "Only the one approved selector changes in executable tests. No runtime, FAQ, CSS, motion initializer, assertion, heading, timeout or skip changes. Existing scene focus, task bytes, all presets/reload/live/season and Cyclists visibility assertions remain byte-for-byte.",
+      "Parent owns the actual native rerun and final exact aggregate test-diff rationale. This one-line local diff does not add or rename a test declaration, so the current scoped gate cannot anchor replacementTests to an added declaration; do not alter the heading just to satisfy that mechanical anchor."
+    ],
+    "redEvidence": {
+      "command": "Parent exact native selected6 at3ff487718da10ebfebebfa96ed4f170e44989671; local node --test --test-reporter=spec --test-name-pattern=RISK test inventory:|RISK test-first gate:|RISK regression gate: tests.js",
+      "failure": "Parent147/final-native-browser-3ff4877.log records5pass and the scene fixture strict-mode locator error: data-act help resolved to2elements. This is a fixture-only failure, not runtime RED. Local scene-help-01-metadata.log passes all selected metadata/inventory checks; no native/browser run is claimed. Parent will run the actual native1 on this exact fixture before metadata freeze."
+    }
   }
 ]

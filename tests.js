@@ -15746,7 +15746,7 @@ test('Landscape browser: scene time presets persist and return to live without c
   await page.reload();assert.equal(await page.evaluate(()=>LivingSky.readSceneSeason(localStorage)),'winter');assert.equal(await page.evaluate(()=>LivingSky.readSceneTime(localStorage)),'23:15');assert.equal(await page.evaluate(()=>document.documentElement.dataset.scenePeriod),'night');
   await page.evaluate(()=>openSettings());await page.locator('[data-act="scene-time-settings"]').click();await page.locator('[data-scene-time="live"]').click();
   assert.equal(await page.evaluate(()=>LivingSky.readSceneSeason(localStorage)),null);assert.equal(await page.evaluate(()=>LivingSky.readSceneTime(localStorage)),null);assert.equal(await page.evaluate(()=>JSON.stringify(state.tasks)),tasks);
-  await page.locator('[data-scene-time="close"]').click();assert.equal(await page.locator('[data-act="scene-time-settings"]').evaluate(e=>e===document.activeElement),true);await page.locator('#modalRoot [data-act="close-modal"]').click();await page.locator('[data-act="help"]').click();await page.locator('[data-help-changelog] > summary').click();assert.ok(await page.getByText('Cyclists pedal with connected hips and naturally bending knees.').isVisible());
+  await page.locator('[data-scene-time="close"]').click();assert.equal(await page.locator('[data-act="scene-time-settings"]').evaluate(e=>e===document.activeElement),true);await page.locator('#modalRoot [data-act="close-modal"]').click();await page.locator('#appHeader [data-act="help"]').click();await page.locator('[data-help-changelog] > summary').click();assert.ok(await page.getByText('Cyclists pedal with connected hips and naturally bending knees.').isVisible());
  }finally{await browser.close();}
 });
 
