@@ -7696,6 +7696,38 @@
     }
   },
   {
+    "testChangesSha256": "4a1c079b044f033ebe54de1a2707198a003a156b276870c9e142a28e6bd5b68a",
+    "reason": "Remove an obsolete live cloud-adoption toast promise that header Undo restores the previous remote board; approved scoped Undo preserves independent peer progress.",
+    "previousBehavior": "The actual stale-tab adoption toast said the previous board is in Settings backups and ↺ undoes it; its old regression explicitly required that misleading promise.",
+    "intendedBehavior": "Keep the out-of-date notification and explicit recovery direction while making no whole-board Undo promise. Preserve ordinary local action reversal; #145 owns its separate behavioral assertion.",
+    "replacementTests": [
+      "RISK independent decision guidance: actual adoption toast directs recovery without promising remote-board Undo"
+    ],
+    "preservedCoverage": [
+      "Keep the actual cloud-pull notification trigger, exact prior-board recovery, silent clean adoption, separate account-switch notices and all unrelated FAQ/bulk guidance assertions. The original adoption test behavioral portion remains for #145 scoped Undo integration."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK independent decision guidance: actual adoption toast' tests.js",
+      "failure": "Actual app cloudPull notification failed by rendering the literal ↺ undoes it promise before the toast edit; raw147/toast-guidance-red.log. Direct consumer and existing guidance/adoption cohort then passed8/8 in147/toast-guidance-green.log against the pre-145 root; later #145 preserves the changed ordinary Undo behavior."
+    }
+  },
+  {
+    "testChangesSha256": "026bc3439f78676863d434969871d8a15fc64b3a93c0044f0076686b46c324a1",
+    "reason": "The persistent bulk result retained another obsolete earlier-whole-board Undo warning; align this actual post-Save surface with approved ordinary scoped Undo.",
+    "previousBehavior": "Actual bulk Save displayed accurate local result counts but claimed recovery Undo restores an earlier whole board.",
+    "intendedBehavior": "Keep result counts separate from server confirmation and state that header Undo reverses the last local action while retaining unrelated progress.",
+    "replacementTests": [
+      "RISK independent decision guidance: the actual bulk result keeps confirmation and Undo meanings separate"
+    ],
+    "preservedCoverage": [
+      "Retain all current local match/change counts, late-result updates, recovery backup direction, account-switch result isolation, no separate batch Undo button, form rules and full unrelated guidance."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK independent decision guidance: the actual bulk result' tests.js",
+      "failure": "Actual post-Save listBulkToolbar output failed last-action Undo wording and contained the prior whole-board warning before source edit; raw147/bulk-result-guidance-red.log. Focused existing/new guidance and result consumers then pass147/bulk-result-guidance-green.log."
+    }
+  },
+  {
     "testChangesSha256": "7f863bc4850d0401e51968b8a999a93ad70430615d11b02c91bb5ca52a255812",
     "reason": "Implement approved #141/#145 ordinary action-scoped Undo using real two-device app consumers; preserve unrelated peer choices and immutable observations.",
     "previousBehavior": "Cloud adoption added a snapshot Undo frame which reversed peer Dot while retaining local Yes, and bulk Save lacked durable per-task choice facts.",
