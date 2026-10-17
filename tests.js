@@ -7,6 +7,311 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 
+async function scopedUndoClients(configure=()=>{}){
+ const at=Date.parse('2026-10-17T15:00:00Z');
+ const initial=syncState({tasks:[syncTask('undo-base','Benchmark'),syncTask('undo-local','Local choice'),syncTask('undo-peer','Peer choice')],
+  chain:['undo-base'],candidateId:'undo-local',mode:'scan',scanMode:'descending',passId:'undo-pass',passStartedAt:at-60000,
+  syncRev:4,syncAccount:'e@example.com',syncDirty:false,settings:{horizonMin:60,thresholdPct:0,samples:250,cantMin:30,workedHours:8}});
+ configure(initial);
+ const remote=JSON.parse(JSON.stringify(initial));for(const key of ['syncRev','syncAccount','syncDirty'])delete remote[key];
+ const h=makeSyncHarness({remote,rev:4,delayMs:1}),seedStorage={[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)};
+ const local=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:h.factory}),peer=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:h.factory});
+ await local.ctx.cloudPull();await peer.ctx.cloudPull();
+ local.ctx.window.CloudSync.ready=false;peer.ctx.window.CloudSync.ready=false;
+ return {local,peer,h,at,initial};
+}
+test('RISK final decision review: offline context Undo restores retained membership across null and attested bases',async t=>{
+ for(const first of ['attested','offline'])await t.test(first+' publishes first',async t=>{
+  const at=Date.parse('2026-10-17T15:00:00Z'),initial=syncState({tasks:[syncTask('context-target','Target')],contexts:[{id:'phone-ctx',name:'Phone',active:true},{id:'peer-ctx',name:'Peer',active:true}],chain:[],candidateId:null,mode:'scan',scanMode:'descending',passId:'context-pass',passStartedAt:at-60000,syncRev:4,syncAccount:'e@example.com',syncDirty:false}),h=makeSyncHarness({remote:initial,rev:4,delayMs:1}),seedStorage={[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)};
+  const attested=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:h.factory});await attested.ctx.cloudPull();attested.ctx.window.CloudSync.ready=false;
+  const offline=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:()=>{const CS=h.factory();CS.ready=false;return CS;}});
+  for(const app of [attested,offline])t.after(()=>{app.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',app.ctx);});
+  await saveEditorChoice(attested,'context-target',at+100,{ctxIds:['phone-ctx']});await saveEditorChoice(offline,'context-target',at+200,{ctxIds:['peer-ctx']});assert.equal(offline.ctx.state.decisionEvents[0].baseId,null);assert.match(attested.ctx.state.decisionEvents[0].baseId,/^db1:/);
+  const a=first==='attested'?attested:offline,b=first==='attested'?offline:attested;a.ctx.window.CloudSync.ready=true;await a.ctx.cloudPushNow();await syncSettle(35);b.ctx.window.CloudSync.ready=true;await b.ctx.cloudPull();await b.ctx.cloudPushNow();await syncSettle(40);await offline.ctx.cloudPull();await syncSettle(25);
+  assert.deepEqual(Array.from(offline.ctx.state.tasks[0].ctx),['peer-ctx']);const stale=JSON.parse(offline.ctx.cloudPayload());assert.equal(await offline.ctx.onAction('undo',{}),true);await offline.ctx.persist();await offline.ctx.cloudPushNow();await syncSettle(35);
+  assert.deepEqual(Array.from(offline.ctx.state.tasks[0].ctx),['phone-ctx'],'Undo of a fallback whole-list choice exposes the other retained choice');assert.deepEqual(h.remoteState().tasks[0].ctx,['phone-ctx']);assert.equal(offline.ctx.state.decisionEvents.filter(row=>row.kind==='undo').length,1);assert.equal(offline.ctx.state.syncDirty,false);
+  h.writeBehindBack(stale);await offline.ctx.cloudPull();await offline.ctx.cloudPushNow();await syncSettle(35);assert.deepEqual(Array.from(offline.ctx.state.tasks[0].ctx),['phone-ctx']);
+  const raw=offline.shim.localStorage.getItem(SYNC_STORE_KEY),cold=await loadAppAtTime(at+400,{seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw},cloudSyncFactory:h.factory});t.after(()=>{cold.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',cold.ctx);});await cold.ctx.cloudPull();assert.deepEqual(Array.from(cold.ctx.state.tasks[0].ctx),['phone-ctx']);assert.equal(cold.ctx.state.syncDirty,false);
+  attested.ctx.window.CloudSync.ready=true;await attested.ctx.cloudPull();assert.equal(await attested.ctx.onAction('undo',{}),true);await attested.ctx.persist();await attested.ctx.cloudPushNow();await syncSettle(35);assert.deepEqual(Array.from(attested.ctx.state.tasks[0].ctx),[],'cancelling every fallback choice restores the original empty membership');await cold.ctx.cloudPull();assert.deepEqual(Array.from(cold.ctx.state.tasks[0].ctx),[]);
+ });
+});
+
+test('RISK final decision review: later Resume beats older Pause in both publication orders and targeted Undo survives stale reopen',async t=>{
+ for(const first of ['pause','resume'])await t.test(first+' publishes first',async t=>{
+  const {local,peer,h,at}=await scopedUndoClients(initial=>{initial.candidateId=null;initial.considered={'undo-local':'no','undo-peer':'no'};initial.interventionActive=true;});
+  for(const app of [local,peer])t.after(()=>{app.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',app.ctx);});
+  assert.match(local.shim.document.getElementById('scan').innerHTML,/data-act="start-working"/);setFakeTime(local.ctx,at+100);local.ctx.onAction('start-working',{});setFakeTime(peer.ctx,at+50);peer.ctx.onAction('start-working',{});assert.match(peer.shim.document.getElementById('scan').innerHTML,/data-act="resume-scan"/);setFakeTime(peer.ctx,at+200);peer.ctx.onAction('resume-scan',{dataset:{mode:'descending'}});
+  const a=first==='pause'?local:peer,b=first==='pause'?peer:local;a.ctx.window.CloudSync.ready=true;await a.ctx.cloudPushNow();await syncSettle(35);b.ctx.window.CloudSync.ready=true;await b.ctx.cloudPull();await b.ctx.cloudPushNow();await syncSettle(35);await peer.ctx.cloudPull();await syncSettle(20);
+  assert.equal(peer.ctx.state.mode,'scan','later deliberate Resume wins independent of upload order');assert.equal(h.remoteState().mode,'scan');assert.equal(peer.ctx.state.syncDirty,false);assert.equal(peer.ctx.state.decisionEvents.filter(row=>row.kind==='current-choice'&&row.target?.property==='mode').length,3);
+  const stale=JSON.parse(peer.ctx.cloudPayload());assert.equal(await peer.ctx.onAction('undo',{}),true);await peer.ctx.persist();await peer.ctx.cloudPushNow();await syncSettle(35);assert.equal(peer.ctx.state.mode,'work','Undo the latest Resume reveals the other device’s retained Pause');h.writeBehindBack(stale);await peer.ctx.cloudPull();await peer.ctx.cloudPushNow();await syncSettle(35);assert.equal(peer.ctx.state.mode,'work');
+  const raw=peer.shim.localStorage.getItem(SYNC_STORE_KEY),cold=await loadAppAtTime(at+400,{seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw},cloudSyncFactory:h.factory});t.after(()=>{cold.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',cold.ctx);});await cold.ctx.cloudPull();assert.equal(cold.ctx.state.mode,'work');assert.equal(cold.ctx.state.syncDirty,false);
+ });
+});
+
+test('RISK final decision review: fresh Start then Pause remains paused through independent title and scoped Undo',async t=>{
+ for(const first of ['start-pause','title'])await t.test(first+' publishes first',async t=>{
+  const {local,peer,h,at}=await scopedUndoClients(initial=>{initial.chain=[];initial.candidateId=null;});for(const app of [local,peer])t.after(()=>{app.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',app.ctx);});
+  setFakeTime(local.ctx,at+100);local.ctx.onAction('start-scan',{dataset:{mode:'descending'}});assert.equal(local.ctx.state.mode,'scan');setFakeTime(local.ctx,at+200);local.ctx.onAction('start-working',{});await saveEditorChoice(peer,'undo-peer',at+300,{title:'Independent title while paused'});
+  const a=first==='start-pause'?local:peer,b=first==='start-pause'?peer:local;a.ctx.window.CloudSync.ready=true;await a.ctx.cloudPushNow();await syncSettle(35);b.ctx.window.CloudSync.ready=true;await b.ctx.cloudPull();await b.ctx.cloudPushNow();await syncSettle(35);await local.ctx.cloudPull();await syncSettle(20);
+  assert.equal(local.ctx.state.mode,'work','Start projection is subordinate to the later deliberate Pause');assert.equal(h.remoteState().mode,'work');assert.equal(local.ctx.state.tasks.find(row=>row.id==='undo-peer').title,'Independent title while paused');assert.equal(local.ctx.state.syncDirty,false);const paused=JSON.parse(local.ctx.cloudPayload());
+  assert.equal(await local.ctx.onAction('undo',{}),true);await local.ctx.persist();await local.ctx.cloudPushNow();await syncSettle(35);assert.equal(local.ctx.state.mode,'scan');assert.equal(local.ctx.state.tasks.find(row=>row.id==='undo-peer').title,'Independent title while paused');h.writeBehindBack(paused);await local.ctx.cloudPull();await local.ctx.cloudPushNow();await syncSettle(35);assert.equal(local.ctx.state.mode,'scan');
+  const raw=local.shim.localStorage.getItem(SYNC_STORE_KEY),cold=await loadAppAtTime(at+400,{seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw},cloudSyncFactory:h.factory});t.after(()=>{cold.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',cold.ctx);});await cold.ctx.cloudPull();await cold.ctx.cloudPushNow();await syncSettle(35);assert.equal(cold.ctx.state.mode,'scan');assert.equal(cold.ctx.state.tasks.find(row=>row.id==='undo-peer').title,'Independent title while paused');assert.equal(cold.ctx.state.syncDirty,false);
+ });
+});
+
+test('RISK final decision review: contrary comparison current membership follows intent while both learning observations survive',async t=>{
+ for(const later of ['no','yes'])for(const first of ['local','peer'])await t.test(later+' later; '+first+' publishes first',async t=>{
+  const {local,peer,h,at,initial}=await scopedUndoClients();for(const app of [local,peer])t.after(()=>{app.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',app.ctx);});
+  const earlier=later==='no'?'yes':'no';setFakeTime(local.ctx,at+100);local.ctx.onAction(earlier,{dataset:{candidate:'undo-local',benchmark:'undo-base'}});setFakeTime(peer.ctx,at+200);peer.ctx.onAction(later,{dataset:{candidate:'undo-local',benchmark:'undo-base'}});const original=[...local.ctx.state.decisionEvents,...peer.ctx.state.decisionEvents].map(row=>JSON.parse(JSON.stringify(row)));const expected=Object.fromEntries(initial.tasks.map(task=>[task.id,{mu:task.mu,sigma:task.sigma}])),engine=loadEngine(145);for(const action of [earlier,later])engine.updatePair(expected[action==='yes'?'undo-local':'undo-base'],expected[action==='yes'?'undo-base':'undo-local']);
+  const a=first==='local'?local:peer,b=first==='local'?peer:local;a.ctx.window.CloudSync.ready=true;await a.ctx.cloudPushNow();await syncSettle(35);b.ctx.window.CloudSync.ready=true;await b.ctx.cloudPull();await b.ctx.cloudPushNow();await syncSettle(35);await peer.ctx.cloudPull();await syncSettle(20);
+  assert.equal(peer.ctx.state.chain.includes('undo-local'),later==='yes','only current dotted membership resolves the contrary choice');assert.equal(peer.ctx.state.considered['undo-local'],later==='no'?'no':undefined);for(const row of original)assert.equal(JSON.stringify(peer.ctx.state.decisionEvents.find(event=>event.id===row.id)),JSON.stringify(row),'both original learning facts remain exact');assert.equal(peer.ctx.state.syncDirty,false);for(const task of peer.ctx.state.tasks){assert.equal(task.mu,expected[task.id].mu);assert.equal(task.sigma,expected[task.id].sigma);}
+  const rating=()=>JSON.stringify(peer.ctx.state.tasks.map(task=>[task.id,task.mu,task.sigma])),learned=rating(),stale=JSON.parse(peer.ctx.cloudPayload());h.writeBehindBack(stale);await peer.ctx.cloudPull();await peer.ctx.cloudPushNow();await syncSettle(30);assert.equal(rating(),learned,'redelivery cannot train either observation twice');
+  assert.equal(await peer.ctx.onAction('undo',{}),true);await peer.ctx.persist();await peer.ctx.cloudPushNow();await syncSettle(35);assert.equal(peer.ctx.state.chain.includes('undo-local'),earlier==='yes');assert.equal(peer.ctx.state.considered['undo-local'],earlier==='no'?'no':undefined);assert.ok(peer.ctx.state.decisionEvents.some(row=>row.kind==='undo'));h.writeBehindBack(stale);await peer.ctx.cloudPull();await peer.ctx.cloudPushNow();await syncSettle(30);assert.equal(peer.ctx.state.chain.includes('undo-local'),earlier==='yes');
+  const raw=peer.shim.localStorage.getItem(SYNC_STORE_KEY),cold=await loadAppAtTime(at+400,{seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw},cloudSyncFactory:h.factory});t.after(()=>{cold.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',cold.ctx);});await cold.ctx.cloudPull();assert.equal(cold.ctx.state.chain.includes('undo-local'),earlier==='yes');assert.equal(cold.ctx.state.syncDirty,false);
+ });
+});
+
+test('RISK intervention Continue authority: a visible scan reaffirmation competes with Pause and scoped Undo in either publication order',async t=>{
+ for(const continueOffset of [200,50])for(const first of ['continue','pause'])await t.test('Continue at '+continueOffset+'; '+first+' publishes first',async t=>{
+  const {local,peer,h,at}=await scopedUndoClients(initial=>{initial.candidateId=null;initial.considered={'undo-local':'no','undo-peer':'no'};initial.interventionActive=true;});for(const app of [local,peer])t.after(()=>{app.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',app.ctx);});
+  for(const action of ['continue-scan','start-working']){const control=peer.shim.document.getElementById('scan').innerHTML.match(new RegExp('<button\\b[^>]*data-act="'+action+'"[^>]*>'))?.[0];assert.ok(control,'the actual intervention shows '+action);assert.doesNotMatch(control,/disabled/);}
+  setFakeTime(local.ctx,at+100);local.ctx.onAction('start-working',{});await saveEditorChoice(local,'undo-peer',at+150,{title:'Peer edit retained through Continue Undo'});setFakeTime(peer.ctx,at+continueOffset);peer.ctx.onAction('continue-scan',{});
+  assert.equal(peer.ctx.state.mode,'scan');assert.equal(peer.ctx.state.interventionActive,false);assert.equal(peer.ctx.state.snooze,12,'Continue keeps its existing local delay');const immediateEventCount=peer.ctx.state.decisionEvents?.length??0;assert.equal(peer.ctx.state.scanMode,'descending');const continued=peer.ctx.state.decisionEvents?.find(event=>event.kind==='current-choice'&&event.target?.property==='mode');const original=JSON.stringify(continued);
+  const a=first==='continue'?peer:local,b=first==='continue'?local:peer;a.ctx.window.CloudSync.ready=true;await a.ctx.cloudPushNow();await syncSettle(35);b.ctx.window.CloudSync.ready=true;await b.ctx.cloudPull();await b.ctx.cloudPushNow();await syncSettle(35);await peer.ctx.cloudPull();await syncSettle(20);
+  const expected=continueOffset>100?'scan':'work';assert.equal(peer.ctx.state.mode,expected,'opposite intervention answers use their original intent time rather than upload order');assert.equal(h.remoteState().mode,expected);assert.equal(peer.ctx.state.syncDirty,false);assert.equal(immediateEventCount,1,'Continue records only its mode choice, without a weighting, Start or comparison fact');assert.ok(continued,'a deliberate Scan reaffirmation retains its own fact');assert.deepEqual(JSON.parse(JSON.stringify(continued.before)),{present:true,value:'scan'});assert.equal(continued.value,'scan');assert.equal(continued.at,at+continueOffset);assert.equal(continued.account,'e@example.com');assert.equal(continued.target.id,continued.passId);assert.equal(peer.ctx.supportedDecisionEvent(continued),true);assert.equal(JSON.stringify(peer.ctx.state.decisionEvents.find(event=>event.id===continued.id)),original);assert.equal(peer.ctx.state.tasks.find(task=>task.id==='undo-peer').title,'Peer edit retained through Continue Undo');
+  const stale=JSON.parse(peer.ctx.cloudPayload());assert.equal(await peer.ctx.onAction('undo',{}),true);await peer.ctx.persist();await peer.ctx.cloudPushNow();await syncSettle(35);assert.equal(peer.ctx.state.mode,'work','Undo Continue preserves the peer Pause');const cancelled=peer.ctx.state.decisionEvents.at(-1);assert.equal(cancelled.kind,'undo');assert.deepEqual(Array.from(cancelled.targetEventIds),[continued.id]);assert.equal(cancelled.targetActionId,continued.actionId);assert.equal(peer.ctx.state.tasks.find(task=>task.id==='undo-peer').title,'Peer edit retained through Continue Undo');h.writeBehindBack(stale);await peer.ctx.cloudPull();await peer.ctx.cloudPushNow();await syncSettle(35);assert.equal(peer.ctx.state.mode,'work');assert.equal(h.remoteState().mode,'work');assert.equal(JSON.stringify(peer.ctx.state.decisionEvents.find(event=>event.id===continued.id)),original);
+  const raw=peer.shim.localStorage.getItem(SYNC_STORE_KEY),cold=await loadAppAtTime(at+400,{seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw},cloudSyncFactory:h.factory});t.after(()=>{cold.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',cold.ctx);});await cold.ctx.cloudPull();await cold.ctx.cloudPushNow();await syncSettle(25);assert.equal(cold.ctx.state.mode,'work');assert.equal(cold.ctx.state.tasks.find(task=>task.id==='undo-peer').title,'Peer edit retained through Continue Undo');assert.equal(cold.ctx.state.syncDirty,false);
+ });
+});
+
+test('RISK final decision review: mode authority respects observed causality and unsupported mode facts stay held',async t=>{
+ const {local,peer,h,at}=await scopedUndoClients(initial=>{initial.candidateId=null;initial.considered={'undo-local':'no','undo-peer':'no'};initial.interventionActive=true;});for(const app of [local,peer])t.after(()=>{app.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',app.ctx);});
+ setFakeTime(local.ctx,at+200);local.ctx.onAction('start-working',{});local.ctx.window.CloudSync.ready=true;await local.ctx.cloudPushNow();await syncSettle(30);peer.ctx.window.CloudSync.ready=true;await peer.ctx.cloudPull();setFakeTime(peer.ctx,at+100);peer.ctx.onAction('resume-scan',{dataset:{mode:'descending'}});await peer.ctx.persist();await peer.ctx.cloudPushNow();await syncSettle(30);assert.equal(h.remoteState().mode,'scan','an observed Resume follows Pause even when its original device clock is earlier');const resume=peer.ctx.state.decisionEvents.find(row=>row.target?.property==='mode'&&row.value==='scan');assert.equal(resume.at,at+100);assert.ok(resume.observedActionIds.length>0);
+ const cloud=h.doc.payload;peer.ctx.window.CloudSync.ready=false;resume.value='future-mode';await peer.ctx.persist();const pending=peer.shim.localStorage.getItem(SYNC_STORE_KEY);peer.ctx.window.CloudSync.ready=true;await peer.ctx.onAction('sync-retry',{});await syncSettle(35);assert.equal(peer.ctx.window.CloudSync.errorCode,'unsupported-decision-evidence');assert.equal(h.doc.payload,cloud);assert.equal(peer.shim.localStorage.getItem(SYNC_STORE_KEY),pending,'unsupported mode authority is preserved exactly while held');
+});
+
+test('RISK scoped Undo: local comparison cancellation keeps peer learning and survives stale cloud and reopen',async()=>{
+ const {local,peer,h,at,initial}=await scopedUndoClients();
+ setFakeTime(local.ctx,at+100);local.ctx.onAction('yes',{dataset:{candidate:'undo-local',benchmark:'undo-base'}});
+ const original=JSON.parse(JSON.stringify(local.ctx.state.decisionEvents.find(e=>e.kind==='comparison')));
+ setFakeTime(peer.ctx,at+200);hydrateUnchangedEditorDraft(peer,'undo-peer');peer.ctx.onAction('dot-task',{dataset:{id:'undo-peer'}});
+ peer.ctx.window.CloudSync.ready=true;await peer.ctx.cloudPushNow();await syncSettle(40);
+ local.ctx.window.CloudSync.ready=true;await local.ctx.cloudPull();await syncSettle(50);
+ assert.deepEqual(Array.from(local.ctx.state.chain),['undo-base','undo-local','undo-peer']);
+ const stale=JSON.parse(local.ctx.cloudPayload());
+ setFakeTime(local.ctx,at+300);local.ctx.onAction('undo',{});
+ assert.deepEqual(Array.from(local.ctx.state.chain),['undo-base','undo-peer'],'normal Undo targets the local comparison, preserving the peer Dot');
+ const expected=Object.fromEntries(initial.tasks.map(t=>[t.id,{mu:t.mu,sigma:t.sigma}]));loadEngine(145).updatePair(expected['undo-peer'],expected['undo-base']);
+ for(const task of local.ctx.state.tasks){assert.equal(task.mu,expected[task.id].mu);assert.equal(task.sigma,expected[task.id].sigma);}
+ assert.ok(local.ctx.state.tasks.find(t=>t.id==='undo-base').ratingHistory.some(row=>row.kind==='undo'),'the shared benchmark records its actual recomputed learning reversal');
+ const cancellation=local.ctx.state.decisionEvents.find(e=>e.kind==='undo');assert.ok(cancellation,'Undo retains explicit target cancellation evidence');
+ assert.deepEqual(Array.from(cancellation.targetEventIds),[original.id]);assert.equal(JSON.stringify(local.ctx.state.decisionEvents.find(e=>e.id===original.id)),JSON.stringify(original));
+ assert.ok(local.ctx.state.tasks.find(t=>t.id==='undo-local').ratingHistory.some(row=>row.kind==='yes'));
+ assert.equal(await local.ctx.persist(),true);await local.ctx.cloudPushNow();await syncSettle(50);
+ const final=h.remoteState();assert.deepEqual(final.chain,['undo-base','undo-peer']);assert.equal(final.decisionEvents.filter(e=>e.kind==='undo').length,1);
+ h.writeBehindBack(stale);await local.ctx.cloudPull();await local.ctx.cloudPushNow();await syncSettle(50);
+ assert.deepEqual(Array.from(local.ctx.state.chain),['undo-base','undo-peer'],'stale original delivery cannot reapply a cancelled comparison');
+ const raw=local.shim.localStorage.getItem(SYNC_STORE_KEY),reopened=await loadAppAtTime(at+400,{seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw},cloudSyncFactory:h.factory});
+ await reopened.ctx.cloudPull();assert.deepEqual(Array.from(reopened.ctx.state.chain),['undo-base','undo-peer']);
+ for(const task of reopened.ctx.state.tasks)assert.equal(task.mu,expected[task.id].mu);
+ assert.deepEqual(h.remoteState().chain,['undo-base','undo-peer']);
+});
+test('RISK scoped Undo: compound editor Dot restores only local fields and context deltas after peer progress',async()=>{
+ const {local,peer,h,at}=await scopedUndoClients();
+ // This older board deliberately has no due property; Undo must preserve absence.
+ delete local.ctx.state.tasks.find(t=>t.id==='undo-local').due;
+ setFakeTime(local.ctx,at+100);hydrateUnchangedEditorDraft(local,'undo-local');
+ local.shim.document.getElementById('etTitle').value='Local edited title';local.shim.document.getElementById('etDue').value='2026-10-30';
+ local.ctx.onAction('dot-task',{dataset:{id:'undo-local'}});
+ const targetRows=local.ctx.state.decisionEvents.filter(e=>e.kind==='comparison'||e.kind==='current-choice');
+ assert.equal(targetRows.filter(e=>e.kind==='comparison').length,1);assert.equal(new Set(targetRows.map(e=>e.actionId)).size,1,'editor save plus Dot remains one gesture');
+ await saveEditorChoice(peer,'undo-local',at+200,{url:'https://peer.test/'});
+ await saveEditorChoice(peer,'undo-peer',at+250,{title:'Peer independent title'});
+ peer.ctx.window.CloudSync.ready=true;await peer.ctx.cloudPushNow();await syncSettle(30);
+ local.ctx.window.CloudSync.ready=true;await local.ctx.cloudPull();await syncSettle(50);
+ setFakeTime(local.ctx,at+300);local.shim.document.dispatchEvent({type:'keydown',key:'z',repeat:false});
+ const task=local.ctx.state.tasks.find(t=>t.id==='undo-local');
+ assert.equal(task.title,'Local choice','one normal Undo reverses local editor fields');assert.equal(Object.hasOwn(task,'due'),false,'absent prior field remains absent');
+ assert.equal(task.url,'https://peer.test/','a peer edit to another property survives');assert.equal(local.ctx.state.tasks.find(t=>t.id==='undo-peer').title,'Peer independent title');
+ assert.deepEqual(Array.from(local.ctx.state.chain),['undo-base']);
+ await local.ctx.persist();await local.ctx.cloudPushNow();await syncSettle(40);
+ const cloud=h.remoteState();assert.equal(cloud.tasks.find(t=>t.id==='undo-local').title,'Local choice');assert.equal(Object.hasOwn(cloud.tasks.find(t=>t.id==='undo-local'),'due'),false);
+ assert.deepEqual(cloud.decisionEvents.find(e=>e.kind==='undo').targetEventIds.slice().sort(),Array.from(targetRows,e=>e.id).sort());
+ const final={...cloud,syncAccount:'e@example.com',syncRev:h.doc.rev,syncDirty:false};
+ const fresh=await loadAppAtTime(at+400,{seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(final)},cloudSyncFactory:h.factory});await fresh.ctx.cloudPull();
+ assert.equal(fresh.ctx.state.tasks.find(t=>t.id==='undo-local').title,'Local choice');assert.equal(fresh.ctx.state.tasks.find(t=>t.id==='undo-local').url,'https://peer.test/');
+});
+test('RISK scoped Undo: bulk edit is one durable cancellation group and later peer choices stay effective',async()=>{
+ const {local,peer,h,at}=await scopedUndoClients();
+ setFakeTime(local.ctx,at+100);local.ctx.state.listOpen=true;local.ctx.onAction('bulk-select-all');local.ctx.onAction('bulk-edit');
+ local.shim.document.getElementById('bulkApplyDue').checked=true;local.shim.document.getElementById('bulkDue').value='2026-11-01';local.ctx.onAction('bulk-save');
+ const rows=Array.from(local.ctx.state.decisionEvents||[]).filter(e=>e.kind==='current-choice'&&e.target.property==='due');
+ assert.equal(rows.length,3,'bulk save records one choice per changed task in one gesture');assert.equal(new Set(rows.map(e=>e.actionId)).size,1);
+ await saveEditorChoice(peer,'undo-local',at+200,{due:'2026-12-01',title:'Peer later title'});
+ peer.ctx.window.CloudSync.ready=true;await peer.ctx.cloudPushNow();await syncSettle(40);local.ctx.window.CloudSync.ready=true;await local.ctx.cloudPull();await syncSettle(40);
+ local.ctx.onAction('undo',{});await local.ctx.persist();await local.ctx.cloudPushNow();await syncSettle(40);
+ for(const task of h.remoteState().tasks){assert.equal(task.due,task.id==='undo-local'?'2026-12-01':null);}
+ assert.equal(h.remoteState().tasks.find(t=>t.id==='undo-local').title,'Peer later title');
+ assert.equal(h.remoteState().decisionEvents.filter(e=>e.kind==='undo').length,1);assert.equal(h.remoteState().decisionEvents.find(e=>e.kind==='undo').targetEventIds.length,3);
+});
+test('RISK scoped Undo: cancelled No cannot return from stale marks and context membership keeps the peer delta',async()=>{
+ const {local,peer,h,at}=await scopedUndoClients();
+ setFakeTime(local.ctx,at+100);local.ctx.onAction('no',{dataset:{candidate:'undo-local',benchmark:'undo-base'}});
+ const stale=JSON.parse(local.ctx.cloudPayload());local.ctx.onAction('undo',{});await local.ctx.persist();
+ local.ctx.window.CloudSync.ready=true;await local.ctx.cloudPushNow();await syncSettle(30);
+ assert.equal(local.ctx.state.considered['undo-local'],undefined);
+ h.writeBehindBack(stale);await local.ctx.cloudPull();await local.ctx.cloudPushNow();await syncSettle(40);
+ assert.equal(local.ctx.state.considered['undo-local'],undefined,'a stale No mark cannot outlive its durable cancellation');
+ const fresh={...h.remoteState(),syncAccount:'e@example.com',syncRev:h.doc.rev,syncDirty:false};fresh.considered['undo-local']='no';
+ const reopened=await loadAppAtTime(at+200,{seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(fresh)},cloudSyncFactory:h.factory});await reopened.ctx.cloudPull();
+ assert.equal(reopened.ctx.state.considered['undo-local'],undefined,'fresh projection removes cancelled temporary No effect');
+ const context=await scopedUndoClients(),a=context.local,b=context.peer;
+ for(const app of [a,b])app.ctx.state.contexts=[{id:'local-ctx',name:'Local',active:true},{id:'peer-ctx',name:'Peer',active:true}];
+ await saveEditorChoice(a,'undo-peer',at+300,{ctxIds:['local-ctx']});await saveEditorChoice(b,'undo-peer',at+400,{ctxIds:['peer-ctx']});
+ b.ctx.window.CloudSync.ready=true;await b.ctx.cloudPushNow();await syncSettle(30);a.ctx.window.CloudSync.ready=true;await a.ctx.cloudPull();await syncSettle(40);
+ assert.deepEqual(Array.from(a.ctx.state.tasks.find(t=>t.id==='undo-peer').ctx).sort(),['local-ctx','peer-ctx']);
+ a.ctx.onAction('undo',{});await a.ctx.persist();await a.ctx.cloudPushNow();await syncSettle(40);
+ assert.deepEqual(context.h.remoteState().tasks.find(t=>t.id==='undo-peer').ctx,['peer-ctx'],'Undo removes only the local context membership delta');
+});
+test('RISK scoped Undo: first guest sign-in keeps local cancellation authority and replays later signed learning',async()=>{
+ const at=Date.parse('2026-10-17T15:00:00Z'),initial=syncState({tasks:[syncTask('guest-bench','Benchmark'),syncTask('guest-no','Guest choice'),syncTask('signed-no','Signed choice')],
+  chain:['guest-bench'],candidateId:'guest-no',passId:'guest-undo-pass',passStartedAt:at-60000,scanMode:'descending',syncAccount:null,settings:{thresholdPct:0,horizonMin:60,samples:250}});
+ const h=makeSyncHarness({remote:null,rev:0,delayMs:1}),factory=()=>{const cloud=h.factory();cloud.user=null;return cloud;};
+ const app=await loadAppAtTime(at,{seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(initial)},cloudSyncFactory:factory});
+ app.ctx.onAction('no',{dataset:{candidate:'guest-no',benchmark:'guest-bench'}});await app.ctx.persist();
+ const original=JSON.stringify(app.ctx.state.decisionEvents[0]);app.ctx.window.CloudSync.user='e@example.com';await app.ctx.cloudPull();await app.ctx.cloudPushNow();await syncSettle(50);
+ assert.equal(app.ctx.state.syncDirty,false);assert.ok(app.ctx.state.decisionBaseline.inheritance[0].sourceBaseline);const guestPublished=h.remoteState();
+ app.ctx.onAction('undo',{});
+ assert.equal(app.ctx.state.tasks.find(t=>t.id==='guest-bench').mu,25,'guest comparison remains undoable after its explicit first ownership adoption');
+ assert.equal(app.ctx.state.considered['guest-no'],undefined);assert.equal(JSON.stringify(app.ctx.state.decisionEvents[0]),original);
+ const signedTask=app.ctx.addTask('New signed-in candidate');app.ctx.state.candidateId=signedTask.id;app.ctx.renderScan();app.ctx.onAction('no',{dataset:{candidate:signedTask.id,benchmark:'guest-bench'}});
+ const expected={bench:{mu:25,sigma:25/3},signed:{mu:25,sigma:25/3}};loadEngine(145).updatePair(expected.bench,expected.signed);
+ assert.equal(app.ctx.state.tasks.find(t=>t.id==='guest-bench').mu,expected.bench.mu);
+ assert.equal(app.ctx.state.tasks.find(t=>t.id===signedTask.id).mu,expected.signed.mu,'a task added after ownership adoption trains only once');
+ await app.ctx.persist();await app.ctx.cloudPushNow();await syncSettle(40);assert.equal(app.ctx.state.syncDirty,false,JSON.stringify({issue:app.ctx.decisionEvidenceIssue(app.ctx.state,'e@example.com'),code:app.ctx.window.CloudSync.errorCode,rows:app.ctx.state.decisionEvents}));
+ h.writeBehindBack(guestPublished);await app.ctx.cloudPull();await app.ctx.cloudPushNow();await syncSettle(40);
+ assert.equal(app.ctx.state.considered['guest-no'],undefined,'stale embodied guest No cannot restore a cancelled pass mark');
+ const fresh={...h.remoteState(),syncAccount:'e@example.com',syncRev:h.doc.rev,syncDirty:false},raw=JSON.stringify(fresh);
+ const reopened=await loadAppAtTime(at+100,{seedStorage:{[SYNC_STORE_KEY]:raw},cloudSyncFactory:h.factory});await reopened.ctx.cloudPull();
+ assert.equal(reopened.ctx.state.tasks.find(t=>t.id==='guest-bench').mu,expected.bench.mu);assert.equal(reopened.ctx.state.tasks.find(t=>t.id==='guest-no').mu,25);
+ assert.equal(JSON.stringify(h.remoteState().decisionEvents.find(e=>e.id===JSON.parse(original).id)),original);
+});
+test('RISK scoped Undo: inherited guest edit restores its before value through stale signed snapshots',async()=>{
+ const at=Date.parse('2026-10-17T15:00:00Z'),initial=syncState({tasks:[syncTask('guest-edit','Original guest title')],syncAccount:null,settings:{thresholdPct:0,horizonMin:60,samples:250}});
+ const h=makeSyncHarness({remote:null,rev:0,delayMs:1}),factory=()=>{const cloud=h.factory();cloud.user=null;return cloud;};
+ const app=await loadAppAtTime(at,{seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(initial)},cloudSyncFactory:factory});
+ await saveEditorChoice(app,'guest-edit',at+100,{title:'Guest edited title'});const original=JSON.stringify(app.ctx.state.decisionEvents);
+ app.ctx.window.CloudSync.user='e@example.com';await app.ctx.cloudPull();await app.ctx.cloudPushNow();await syncSettle(40);const stale=h.remoteState();
+ app.ctx.onAction('undo',{});assert.equal(app.ctx.state.tasks[0].title,'Original guest title');await app.ctx.persist();await app.ctx.cloudPushNow();await syncSettle(40);
+ h.writeBehindBack(stale);await app.ctx.cloudPull();await app.ctx.cloudPushNow();await syncSettle(40);
+ assert.equal(app.ctx.state.tasks[0].title,'Original guest title','a cancelled inherited edit cannot be replayed by a stale signed snapshot');
+ assert.equal(JSON.stringify(app.ctx.state.decisionEvents.filter(e=>e.kind==='current-choice')),original);assert.equal(h.remoteState().tasks[0].title,'Original guest title');
+});
+test('RISK scoped Undo: inherited legacy-pass No cancellation survives stale marks without inventing a pass',async()=>{
+ const at=Date.parse('2026-10-17T15:00:00Z'),initial=syncState({tasks:[syncTask('legacy-bench','Legacy benchmark'),syncTask('legacy-no','Legacy candidate')],chain:['legacy-bench'],candidateId:'legacy-no',passStartedAt:at-60000,syncAccount:null,settings:{thresholdPct:0,horizonMin:60,samples:250}});
+ const h=makeSyncHarness({remote:null,rev:0,delayMs:1}),factory=()=>{const cloud=h.factory();cloud.user=null;return cloud;};
+ const app=await loadAppAtTime(at,{seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(initial)},cloudSyncFactory:factory});
+ app.ctx.onAction('no',{dataset:{candidate:'legacy-no',benchmark:'legacy-bench'}});await app.ctx.persist();const passId=app.ctx.state.passId;assert.match(passId,/^legacy-pass-v1:/);
+ app.ctx.window.CloudSync.user='e@example.com';await app.ctx.cloudPull();await app.ctx.cloudPushNow();await syncSettle(40);const stale=h.remoteState();
+ app.ctx.onAction('undo',{});await app.ctx.persist();await app.ctx.cloudPushNow();await syncSettle(40);h.writeBehindBack(stale);await app.ctx.cloudPull();await app.ctx.cloudPushNow();await syncSettle(40);
+ assert.equal(app.ctx.state.considered['legacy-no'],undefined,'the legacy pass mark remains cancelled after stale delivery');assert.equal(app.ctx.state.passId,passId,'Undo does not fabricate a fresh pass');
+});
+test('RISK scoped Undo: unsupported cancellation payloads hold exact local and cloud branches',async()=>{
+ const {local,h,at}=await scopedUndoClients();local.ctx.onAction('yes',{dataset:{candidate:'undo-local',benchmark:'undo-base'}});local.ctx.onAction('undo',{});
+ await local.ctx.persist();local.ctx.window.CloudSync.ready=true;await local.ctx.cloudPushNow();await syncSettle(40);
+ const raw=JSON.stringify(local.ctx.state),saved=local.shim.localStorage.getItem(SYNC_STORE_KEY),remote=h.remoteState();
+ const malformed=JSON.parse(JSON.stringify(remote));malformed.decisionEvents.find(e=>e.kind==='undo').patch={tasks:[]};h.writeBehindBack(malformed);
+ const exact=h.doc.payload;await local.ctx.cloudPull();await syncSettle(30);
+ assert.equal(local.ctx.window.CloudSync.errorCode,'unsupported-decision-evidence','an arbitrary patch is not supported cancellation authority');
+ assert.equal(JSON.stringify(local.ctx.state),raw);assert.equal(local.shim.localStorage.getItem(SYNC_STORE_KEY),saved);assert.equal(h.doc.payload,exact);
+ const missing=JSON.parse(JSON.stringify(remote)),invalid=missing.decisionEvents.find(e=>e.kind==='undo');invalid.id='malformed-new-undo';invalid.targetEventIds=['unknown-action'];h.writeBehindBack(missing);
+ await local.ctx.onAction('sync-retry',{});await syncSettle(20);assert.equal(local.ctx.window.CloudSync.errorCode,'unprojectable-decision-undo');
+ assert.equal(JSON.stringify(local.ctx.state),raw);assert.equal(h.doc.payload,JSON.stringify(missing));
+});
+test('RISK scoped Undo: completion evergreen work delete and postpone retain unrelated peer fields',async t=>{
+ for(const action of ['done','evergreen-done','worked','delete','postpone'])await t.test(action,async()=>{
+  const {local,peer,h,at}=await scopedUndoClients(),task=local.ctx.state.tasks.find(t=>t.id==='undo-local');
+  if(action==='evergreen-done'){for(const app of [local,peer]){const row=app.ctx.state.tasks.find(t=>t.id===task.id);row.evergreen=true;row.evergreenResetAtDay=false;}}
+  setFakeTime(local.ctx,at+100);
+  if(action==='done'||action==='evergreen-done')local.ctx.onAction('done-task',{dataset:{id:task.id}});
+  else if(action==='worked')local.ctx.onAction('worked-task',{dataset:{id:task.id}});
+  else if(action==='delete')local.ctx.onAction('delete-task',{dataset:{id:task.id}});
+  else local.ctx.postponeTask(task.id);
+  assert.ok(action==='delete'?!local.ctx.state.tasks.some(t=>t.id===task.id):action==='postpone'?local.ctx.taskPostponeUntil(task)>at:action==='worked'?local.ctx.state.workLog.length>0:!!task.lastDoneAt,'the normal action has an effect before Undo');
+  const stale=JSON.parse(local.ctx.cloudPayload());await saveEditorChoice(peer,'undo-peer',at+200,{title:'Peer '+action});
+  peer.ctx.window.CloudSync.ready=true;await peer.ctx.cloudPushNow();await syncSettle(30);local.ctx.window.CloudSync.ready=true;await local.ctx.cloudPull();await syncSettle(40);
+  local.ctx.onAction('undo',{});await local.ctx.persist();await local.ctx.cloudPushNow();await syncSettle(40);
+  const restored=local.ctx.state.tasks.find(t=>t.id===task.id);assert.ok(restored,'Undo restores its own task');assert.equal(restored.done,false);assert.equal(restored.lastDoneAt,null);assert.equal(local.ctx.taskPostponeUntil(restored),0);
+  assert.equal(local.ctx.state.workLog.length,0,'Undo removes only the local work/completion entry');assert.equal(local.ctx.state.tasks.find(t=>t.id==='undo-peer').title,'Peer '+action);
+  h.writeBehindBack(stale);await local.ctx.cloudPull();await local.ctx.cloudPushNow();await syncSettle(40);
+  assert.equal(h.remoteState().tasks.find(t=>t.id===task.id).done,false);assert.equal(h.remoteState().tasks.find(t=>t.id==='undo-peer').title,'Peer '+action);assert.equal(h.remoteState().workLog.length,0);
+ });
+});
+test('RISK scoped Undo: cancelling Start restores the prior pass root and exact draw through stale delivery',async()=>{
+ const {local,peer,h,at}=await scopedUndoClients(initial=>{initial.chain=[];initial.candidateId=null;initial.mode='work';initial.chance=null;});
+ const prior=JSON.parse(JSON.stringify({passId:local.ctx.state.passId,passStartedAt:local.ctx.state.passStartedAt,chain:local.ctx.state.chain,scanMode:local.ctx.state.scanMode,chance:local.ctx.state.chance}));
+ setFakeTime(local.ctx,at+100);local.ctx.onAction('start-scan',{dataset:{mode:'halving'}});
+ assert.equal(local.ctx.state.scanMode,'halving');assert.ok(local.ctx.state.chance);const stale=JSON.parse(local.ctx.cloudPayload());
+ await saveEditorChoice(peer,'undo-peer',at+200,{title:'Peer after Start'});peer.ctx.window.CloudSync.ready=true;await peer.ctx.cloudPushNow();await syncSettle(30);
+ local.ctx.window.CloudSync.ready=true;await local.ctx.cloudPull();await syncSettle(40);local.ctx.onAction('undo',{});await local.ctx.persist();await local.ctx.cloudPushNow();await syncSettle(40);
+ const select=board=>({passId:board.passId,passStartedAt:board.passStartedAt,chain:Array.from(board.chain),scanMode:board.scanMode,chance:board.chance});
+ assert.deepEqual(JSON.parse(JSON.stringify(select(local.ctx.state))),prior);h.writeBehindBack(stale);await local.ctx.cloudPull();await local.ctx.cloudPushNow();await syncSettle(40);
+ assert.deepEqual(JSON.parse(JSON.stringify(select(local.ctx.state))),prior,'stale Start cannot reactivate its cancelled pass or random draw');
+ assert.deepEqual(select(h.remoteState()),prior);assert.equal(h.remoteState().tasks.find(t=>t.id==='undo-peer').title,'Peer after Start');
+ const raw=JSON.stringify({...h.remoteState(),syncAccount:'e@example.com',syncRev:h.doc.rev,syncDirty:false});
+ const fresh=await loadAppAtTime(at+300,{seedStorage:{[SYNC_STORE_KEY]:raw},cloudSyncFactory:h.factory});await fresh.ctx.cloudPull();
+ assert.deepEqual(JSON.parse(JSON.stringify(select(fresh.ctx.state))),prior,'cold reopen keeps the cancelled pass and draw inactive');
+ await peer.ctx.cloudPull();setFakeTime(peer.ctx,at+500);peer.ctx.onAction('done-task',{dataset:{id:'undo-base'}});
+ peer.ctx.onAction('start-scan',{dataset:{mode:'descending'}});await peer.ctx.persist();await peer.ctx.cloudPushNow();await syncSettle(40);
+ const later=select(peer.ctx.state);assert.notEqual(later.passId,prior.passId);assert.equal(peer.ctx.state.tasks.find(t=>t.id==='undo-base').done,true);
+ await local.ctx.cloudPull();await syncSettle(40);
+ assert.deepEqual(JSON.parse(JSON.stringify(select(local.ctx.state))),JSON.parse(JSON.stringify(later)),'a later independent peer Start keeps its own pass and draw');
+ assert.equal(local.ctx.state.tasks.find(t=>t.id==='undo-base').done,true,'cancelled Start cannot reopen a peer-completed task');
+});
+test('RISK scoped Undo: Return cancellation restores the original hold time while peer task fields survive',async()=>{
+ const {local,peer,h,at}=await scopedUndoClients();
+ setFakeTime(local.ctx,at+100);local.ctx.onAction('cant',{dataset:{candidate:'undo-local',benchmark:'undo-base'}});
+ const hold=local.ctx.state.cantAt['undo-local'];assert.equal(hold,at+100);local.ctx.returnAsCandidate('undo-local');
+ assert.equal(local.ctx.state.considered['undo-local'],undefined);
+ await saveEditorChoice(peer,'undo-local',at+300,{url:'https://peer.test/hold'});peer.ctx.window.CloudSync.ready=true;await peer.ctx.cloudPushNow();await syncSettle(30);
+ local.ctx.window.CloudSync.ready=true;await local.ctx.cloudPull();await syncSettle(40);local.ctx.onAction('undo',{});
+ assert.equal(local.ctx.state.considered['undo-local'],'cant');assert.equal(local.ctx.state.cantAt['undo-local'],hold,'Undo never renews the hold duration');assert.equal(local.ctx.state.tasks.find(t=>t.id==='undo-local').url,'https://peer.test/hold');
+ await local.ctx.persist();await local.ctx.cloudPushNow();await syncSettle(40);assert.equal(h.remoteState().cantAt['undo-local'],hold);
+ setFakeTime(local.ctx,hold+local.ctx.state.settings.cantMin*60000);local.ctx.ensureCandidate();assert.equal(local.ctx.state.considered['undo-local'],undefined,'the restored original hold expires on its existing deadline');
+});
+test('RISK scoped Undo: explicit modern Import Restore and Reset reverse exact journal replacement after recovery',async t=>{
+ for(const action of ['import','restore','reset'])await t.test(action,async()=>{
+  const source=await decisionRecoveryApp146(),target=await decisionRecoveryApp146('destination@example.com');
+  target.ctx.window.CloudSync.ready=true;await target.ctx.cloudPushNow();await syncSettle(50);
+  const prior=JSON.parse(JSON.stringify(target.ctx.state)),raw=JSON.stringify(source.ctx.state);target.ctx.confirm=()=>true;
+  if(action==='import'){target.shim.document.getElementById('jsonBox').value=raw;await target.ctx.onAction('import-json',{});}
+  else if(action==='restore'){const backup=await target.ctx.saveDurableBackup('manual',raw);target.ctx.openSettings();assert.equal(await target.ctx.restoreDurableBackupById(backup.id),true);}
+  else await target.ctx.onAction('confirm-wipe',{});
+  await target.ctx.persist();await target.ctx.cloudPushNow();await syncSettle(50);const selected=JSON.parse(JSON.stringify(target.ctx.state));
+  assert.equal(target.ctx.state.syncDirty,false);await target.ctx.onAction('undo',{});
+  await target.ctx.persist();await target.ctx.cloudPushNow();await syncSettle(60);
+  assert.equal(target.ctx.state.syncDirty,false,'the reverse replacement must be acknowledged');
+  assert.deepEqual(JSON.parse(JSON.stringify(target.ctx.state.decisionEvents)),prior.decisionEvents,'the original selected prior journal returns exactly');
+  assert.ok(target.ctx.state.decisionBaseline.replacement.some(receipt=>receipt.reason==='explicit-undo'));
+  assert.ok(target.ctx.readLocalBackups().some(backup=>backup.payload===JSON.stringify(selected)),'the displaced replacement has mandatory exact recovery');
+  target.h.writeBehindBack(selected);await target.ctx.cloudPull();await target.ctx.cloudPushNow();await syncSettle(50);
+  assert.deepEqual(target.h.remoteState().decisionEvents,prior.decisionEvents,'stale selected journal cannot reapply after explicit replacement Undo');
+  assert.equal(target.ctx.window.CloudSync.errorCode??null,null);
+ });
+});
+test('RISK scoped Undo: replacement recovery failure and an account race retain the current board and Undo frame',async()=>{
+ const source=await decisionRecoveryApp146(),target=await decisionRecoveryApp146('destination@example.com');target.ctx.window.CloudSync.ready=true;await target.ctx.cloudPushNow();await syncSettle(40);
+ target.ctx.confirm=()=>true;target.shim.document.getElementById('jsonBox').value=JSON.stringify(source.ctx.state);await target.ctx.onAction('import-json',{});
+ await target.ctx.persist();await target.ctx.cloudPushNow();await syncSettle(40);
+ const prior=JSON.stringify(target.ctx.state),depth=vm.runInContext('undoStack.length',target.ctx),cloud=target.h.doc.payload;
+ const write=target.storage.setItem;target.storage.setItem=(key,value)=>{if(key===LOCAL_BACKUPS_KEY)throw new Error('isolated mandatory recovery refusal');write(key,value);};
+ assert.equal(await target.ctx.onAction('undo',{}),false);assert.equal(JSON.stringify(target.ctx.state),prior);assert.equal(vm.runInContext('undoStack.length',target.ctx),depth);assert.equal(target.h.doc.payload,cloud);
+ target.storage.setItem=write;
+ const pending=target.ctx.onAction('undo',{});target.ctx.window.CloudSync.user='other@example.com';assert.equal(await pending,false);
+ assert.equal(JSON.stringify(target.ctx.state),prior,'an account change during recovery cannot authorize the captured replacement');assert.equal(vm.runInContext('undoStack.length',target.ctx),depth);
+ target.ctx.window.CloudSync.user='destination@example.com';assert.equal(await target.ctx.onAction('undo',{}),true,'retry retains the original local replacement frame');
+});
+
 // Last task WOOP exercises mounted handlers and real task history, not guessed pass marks.
 async function woopFixture(){
  const app=await loadApp({seed:971});const {ctx}=app;
@@ -93,7 +398,8 @@ test('RISK Last task WOOP: real stale-tab saves preserve newer title plan and de
  const reload=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(latest)}});assert.equal(reload.ctx.state.tasks.find(t=>t.id===id).woopPlan,null);assert.equal(reload.ctx.state.tasks.find(t=>t.id===id).title,'Newer peer title');
 });
 test('RISK Last task WOOP: cloud offline failed pull reconnect completion and Undo retain task-owned causal plan',async()=>{
- const app=await woopFixture();woopDislodgeTwice(app);const base=JSON.parse(app.ctx.cloudPayload()),h=makeSyncHarness({remote:base,rev:4}),id=app.task.id;
+ const app=await woopFixture();woopDislodgeTwice(app);const h=makeSyncHarness({remote:null,rev:0}),id=app.task.id;
+ app.ctx.window.CloudSync=h.factory();await app.ctx.cloudPull();await app.ctx.cloudPushNow();await syncSettle(60);const base=JSON.parse(JSON.stringify(app.ctx.state));
  const a=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(base)},cloudSyncFactory:h.factory}),b=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(base)},cloudSyncFactory:h.factory});
  await syncSettle(40);await a.ctx.cloudPull();await b.ctx.cloudPull();
  h.failPull=true;a.ctx.state.mode='work';a.ctx.state.chain=[id];a.ctx.onAction('woop-start',{dataset:{benchmark:id}});woopStep(a,'Offline outcome');woopStep(a,'Offline obstacle');woopStep(a,'If offline, then take a small step');await a.ctx.persist();
@@ -623,7 +929,7 @@ test('RISK Settings hierarchy: moved Changelog leaves Save settings after every 
 
 test('RISK context and Settings FAQ: extended guidance explains cycle empty selections synthetic scope sync limitations and bottom save',async()=>{
  const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
- for(const pattern of [/Whenever contexts exist,.*green check.*red X/i,/Every assigned.*context.*active/i,/No context.*green.*unassigned/i,/cannot be assigned/i,/Refresh all devices/i,/Save settings.*bottom/i])assert.match(help,pattern);
+ for(const pattern of [/Whenever contexts exist,.*green check.*red X/i,/Every assigned.*context.*active/i,/No context.*green.*unassigned/i,/cannot be assigned/i,/safe-update path protects unsaved work and unfinished drafts/i,/Save settings.*bottom/i])assert.match(help,pattern);
  const current=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];for(const pattern of [/red X/i,/No context/i,/Changelog.*Settings/i,/Save settings.*bottom/i])assert.match(current,pattern);
 });
 
@@ -2973,7 +3279,7 @@ function makeDomShim({ prefersDark = false, sharedStorage = null } = {}) {
 
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
-async function loadApp({ seed, cloudSyncFactory, prefersDark = false, noMatchMedia = false, seedStorage, sharedStorage, hostStorage, hostStorageDelayMs = 0, beforeStateReady, cryptoProvider = webcrypto, indexedDBProvider, deviceDbName, deviceOpenTimeoutMs, withSceneModules = false, sceneModulesAfterDomReady = false } = {}) {
+async function loadApp({ appSource=appSrc, seed, cloudSyncFactory, prefersDark = false, noMatchMedia = false, seedStorage, sharedStorage, hostStorage, hostStorageDelayMs = 0, beforeStateReady, cryptoProvider = webcrypto, indexedDBProvider, deviceDbName, deviceOpenTimeoutMs, withSceneModules = false, sceneModulesAfterDomReady = false } = {}) {
   const shim = makeDomShim({ prefersDark, sharedStorage });
   if (noMatchMedia) delete shim.window.matchMedia;   // old browser / bare JS host
   if (seedStorage) for (const [k, v] of Object.entries(seedStorage)) shim.localStorage.setItem(k, v);
@@ -3045,7 +3351,7 @@ async function loadApp({ seed, cloudSyncFactory, prefersDark = false, noMatchMed
   };
   if (withSceneModules && !sceneModulesAfterDomReady) installSceneModules()();
   if (sceneModulesAfterDomReady) shim.document.readyState = "loading";
-  vm.runInContext(appSrc, sandbox, { filename: "index.html#app" });
+  vm.runInContext(appSource, sandbox, { filename: "index.html#app" });
   beforeStateReady?.(sandbox, shim);
   if (sceneModulesAfterDomReady) {
     await flush(); // the inline boot script can resume before deferred modules execute
@@ -8134,7 +8440,7 @@ test("boot: a synced dark preference is applied to the root element on load", as
   assert.equal(shim.documentElement.getAttribute("data-theme"), "dark");
 });
 
-test("applyTheme: a host with no documentElement is a safe no-op", async () => {
+test('applyTheme: a host with no documentElement is a safe no-op', async () => {
   const shim = makeDomShim();
   delete shim.document.documentElement;
   const sandbox = {
@@ -8838,6 +9144,45 @@ test('RISK saved view fallback: corrupt or blocked local presentation storage le
  assert.equal(JSON.stringify(unavailable.ctx.state),before,'presentation storage failures never block or edit the authoritative board');
 });
 
+test('RISK saved view decision integration: inherited guest authority and peer edits retain this device view through scoped Undo and reopen',async t=>{
+ const {IDBFactory}=await import('fake-indexeddb');
+ for(const backend of ['fallback','IndexedDB'])await t.test(backend,async t=>{
+  const at=Date.parse('2026-10-17T15:00:00Z'),storage=sharedScannerStorage(),indexedDB=backend==='IndexedDB'?new IDBFactory():undefined;
+  const options={sharedStorage:storage,...(indexedDB?{indexedDBProvider:indexedDB,deviceDbName:'saved-view-integration-'+Date.now()}: {})};
+  const local=await loadAppAtTime(at,options),apps=[local];
+  t.after(()=>{for(const app of apps){app.shim.window.CloudSync&&(app.shim.window.CloudSync.user=null);vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',app.ctx);}});
+  local.ctx.onAction('ok-quickstart',{});for(let i=0;i<45;i++)local.ctx.addTask('Shared integration task '+i,false);
+  local.ctx.onAction('start-scan',{dataset:{mode:'descending'}});
+  assert.ok(local.ctx.state.decisionEvents.some(row=>row.account===null),'the real guest scanner creates retained guest authority');
+  const h=makeSyncHarness({remote:null,rev:0,delayMs:1}),CS=local.shim.window.CloudSync=h.factory();
+  local.shim.window.dispatchEvent({type:'cloudsync'});await local.ctx.cloudPull();local.ctx.cloudPushNow();await syncSettle(100);
+  assert.equal(local.ctx.state.syncAccount,'e@example.com');assert.equal(CS.errorCode||null,null);
+  assert.equal(local.ctx.state.decisionBaseline.account,'e@example.com');
+  assert.ok(local.ctx.state.decisionBaseline.inheritance.some(row=>row.reason==='guest-first-empty-account'&&row.sourceAccount===null),'normal reconciliation attests guest actions before account publication');
+  assert.equal(local.ctx.state.syncDirty,false);assert.match(local.ctx.state.decisionBase.id,/^db1:/);
+  if(!local.ctx.state.listOpen)local.ctx.onAction('toggle-list');
+  const search=local.shim.document.getElementById('listSearch');search.id='listSearch';search.value='Shared';local.shim.document.dispatchEvent({type:'input',target:search});
+  const body=local.shim.document.getElementById('listBody');body.id='listBody';body.scrollTop=420;local.shim.document.dispatchEvent({type:'scroll',target:body});local.shim.window.dispatchEvent({type:'pagehide'});
+  // pagehide deliberately suspends publication; reopen through the real lifecycle consumer.
+  local.shim.window.dispatchEvent({type:'pageshow'});CS.ready=false;
+  await local.ctx.persist();const raw=JSON.stringify(local.ctx.state),peer=await loadAppAtTime(at,{seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw},cloudSyncFactory:h.factory});apps.push(peer);await peer.ctx.cloudPull();
+  const edited=peer.ctx.state.tasks.at(-1).id;await saveEditorChoice(peer,edited,at+100,{title:'Shared peer title after inheritance'});
+  if(peer.ctx.state.listOpen)peer.ctx.onAction('toggle-list');peer.ctx.cloudPushNow();await syncSettle(80);
+  assert.equal(peer.ctx.state.syncDirty,false);assert.ok(h.remoteState().decisionEvents.some(row=>row.kind==='current-choice'&&row.target?.property==='title'));
+  let release;const gate=new Promise(resolve=>{release=resolve;}),pull=CS.pull.bind(CS);CS.pull=async()=>{const response=await pull();await gate;return response;};CS.ready=true;
+  const pending=local.ctx.cloudPull();await syncSettle(5);setFakeTime(local.ctx,at+200);const added=local.ctx.addTask('Shared local add during pull',false);release();await pending;CS.pull=pull;local.ctx.cloudPushNow();await syncSettle(100);
+  assert.equal(local.ctx.state.tasks.find(row=>row.id===edited).title,'Shared peer title after inheritance');assert.ok(local.ctx.state.tasks.some(row=>row.id===added.id));
+  assert.equal(local.ctx.state.listOpen,true);assert.equal(search.value,'Shared');assert.equal(body.scrollTop,420);assert.equal(local.ctx.state.syncDirty,false);
+  assert.equal(await local.ctx.onAction('undo',{}),true);await local.ctx.persist();local.ctx.cloudPushNow();
+  for(let attempt=0;attempt<80&&local.ctx.state.syncDirty;attempt++)await syncSettle(25);assert.equal(local.ctx.state.syncDirty,false,'Undo publication is acknowledged before closing this fixture');
+  assert.equal(local.ctx.state.tasks.some(row=>row.id===added.id),false,'scoped Undo removes only the local addition');assert.equal(local.ctx.state.tasks.find(row=>row.id===edited).title,'Shared peer title after inheritance','scoped Undo retains independent peer authority');
+  local.shim.window.dispatchEvent({type:'pagehide'});await local.ctx.persist();
+  const reopened=await loadAppAtTime(at+300,{...options,cloudSyncFactory:h.factory});apps.push(reopened);await reopened.ctx.cloudPull();reopened.ctx.cloudPushNow();await syncSettle(100);
+  assert.equal(reopened.ctx.state.listOpen,true);assert.equal(reopened.shim.document.getElementById('listSearch').value,'Shared');assert.equal(reopened.shim.document.getElementById('listBody').scrollTop,420);
+  assert.equal(reopened.ctx.state.tasks.find(row=>row.id===edited).title,'Shared peer title after inheritance');assert.equal(reopened.ctx.state.tasks.some(row=>row.id===added.id),false);assert.equal(reopened.ctx.state.syncDirty,false,JSON.stringify({code:reopened.shim.window.CloudSync.errorCode,localRev:reopened.ctx.state.syncRev,remoteRev:h.doc.rev,same:reopened.ctx.cloudPayload()===h.doc.payload,calls:h.calls.slice(-10),differentFields:Object.keys(JSON.parse(h.doc.payload)).filter(key=>JSON.stringify(reopened.ctx.state[key])!==JSON.stringify(JSON.parse(h.doc.payload)[key]))}));
+ });
+});
+
 test('RISK saved view guidance: Quick start and Changelog describe this-device restoration and current dates',async()=>{
  const {ctx,shim}=await loadApp();for(const id of ['appChangelogCurrent','appChangelog'])shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
  const answer=help.split('<dt>What does All Tasks remember when I reopen?</dt><dd>')[1]?.split('</dd>')[0]||'';
@@ -8847,7 +9192,7 @@ test('RISK saved view guidance: Quick start and Changelog describe this-device r
  assert.match(answer,/last settled appearance stays visible quietly while the saved board opens/i);
  assert.doesNotMatch(answer,/loading message|small panel|spinner/i);
  const chapter=help.split('<details class="help-faq" data-help-changelog>')[1]?.split('</details>')[0]||'';
- assert.match(chapter,/<h3>October 16, 2026<\/h3>[\s\S]*?<li>Opening or refreshing quietly restores this device’s All Tasks list, filters and position, with its last settled appearance visible while the saved board opens; newer cloud changes still sync in the background\. If this browser cannot retain the view, the saved board still opens with its usual list view\.<\/li>/);
+ assert.match(chapter,/<h3>October 17, 2026<\/h3>[\s\S]*?<li>Opening or refreshing quietly restores this device’s All Tasks list, filters and position, with its last settled appearance visible while the saved board opens; newer cloud changes still sync in the background\. If this browser cannot retain the view, the saved board still opens with its usual list view\.<\/li>/);
 });
 
 async function delayedLocalBoardBrowser(viewport={width:390,height:844},dispatchResizeDuringLoad=false,theme='system'){
@@ -9658,7 +10003,7 @@ test('CLOUD ACCOUNT: a transaction binds its document before auth can switch', (
   assert.match(push,/const pushUser\s*=\s*auth\.currentUser/);
   assert.match(push,/const pushUid\s*=\s*pushUser\.uid/);
   assert.match(html,/const rootRef=uid=>F\.doc\(db,"users",uid\)/);
-  assert.match(html,/publishGeneration\(uid,id,\{baseRev,updatedAt,stillCurrent\}\)/);
+  assert.match(html,/publishGeneration\(uid,id,\{baseRev,updatedAt,stillCurrent,decisionCapability\}\)/);
   assert.match(html,/if\(stillCurrent&&!stillCurrent\(\)\)return \{cancelled:true\}/,'the manifest transaction rechecks identity after its reads');
   assert.match(push,/stillCurrent:\(\)=>auth\.currentUser\?\.uid===pushUid&&operation===pushOperation/);
   assert.match(push,/auth\.currentUser\?\.uid\s*!==\s*pushUid/,'a late result from an earlier account cannot change current cloud status');
@@ -9726,6 +10071,38 @@ async function loadCloudBackendV2({rootData=null,batchFailureAt=Infinity,failure
   emitSnapshot(entry,data,{fromCache=false,hasPendingWrites=false}={}){entry.next({exists:()=>data!==null,data:()=>clone(data),metadata:{fromCache,hasPendingWrites}});},
   emitAuth(user){auth.currentUser=user;authListener?.(user);}};
 }
+
+test('RISK decision capability adapter: first decision activates a sticky fence while plain legacy boards remain compatible',async()=>{
+ const h=await loadCloudBackendV2({timeoutMs:5000});
+ const plain=JSON.stringify({tasks:[{id:'legacy',mu:31,sigma:5}],futureEvidence:{opaque:'keep'}});
+ assert.equal((await h.CS.push(plain,1,0)).ok,true);
+ assert.equal(Object.hasOwn(h.docs.get('users/owner'),'decisionCapability'),false,'ordinary boards retain the historical manifest');
+ const decision=JSON.stringify({...JSON.parse(plain),decisionEvents:[{v:1,id:'real-action',at:123,account:'owner@example.test',kind:'no'}]});
+ assert.equal((await h.CS.push(decision,2,1)).ok,true);
+ assert.equal(h.docs.get('users/owner').decisionCapability,1,'the first decision must atomically fence metadata-unaware writers');
+ assert.equal((await h.CS.pull()).payload,decision,'the fenced generation remains byte-exactly readable');
+ assert.equal((await h.CS.push(plain,3,2)).ok,true);
+ assert.equal(h.docs.get('users/owner').decisionCapability,1,'deliberate replacement cannot silently remove the writer capability');
+ const unknown=await loadCloudBackendV2({timeoutMs:5000});
+ assert.equal((await unknown.CS.push(JSON.stringify({tasks:[],decisionEvents:{v:99,opaque:'future'}}),1,0)).ok,true);
+ assert.equal(unknown.docs.get('users/owner').decisionCapability,1,'unknown decision evidence also needs the fence');
+});
+
+test('RISK decision capability baseline: sole unknown learned authority activates the fence without rewriting bytes',async()=>{
+ const h=await loadCloudBackendV2({timeoutMs:5000});
+ const payload=JSON.stringify({tasks:[{id:'legacy',mu:40,sigma:4}],decisionBaseline:{v:99,opaque:'sole inherited learning authority'}});
+ assert.equal((await h.CS.push(payload,1,0)).ok,true);
+ assert.equal(h.docs.get('users/owner').decisionCapability,1,'baseline authority requires protection even when the action stream is absent');
+ assert.equal((await h.CS.pull()).payload,payload,'unknown baseline bytes remain exact');
+});
+
+test('RISK decision capability recovery: sole baseline recovery activates the fence without rewriting evidence',async()=>{
+ const h=await loadCloudBackendV2({timeoutMs:5000});
+ const payload=JSON.stringify({tasks:[],decisionBaselineRecovery:{v:99,opaque:'sole inherited recovery bytes'}});
+ assert.equal((await h.CS.push(payload,1,0)).ok,true);
+ assert.equal(h.docs.get('users/owner').decisionCapability,1,'baseline recovery is authority even without an active baseline or stream');
+ assert.equal((await h.CS.pull()).payload,payload);
+});
 
 test('RISK CLOUD V2 ADAPTER: production migrates a legacy root to verified chunks and pulls the exact multi-megabyte board',async()=>{
  const legacy=JSON.stringify({tasks:[{id:'legacy'}]}),payload=cloudV2Payload('production');assert.ok(Buffer.byteLength(payload,'utf8')>1048576);
@@ -12035,6 +12412,33 @@ const syncState = (over = {}) => Object.assign({
   settings: { horizonMin: 60, thresholdPct: 25, samples: 250, cantMin: 30, workedHours: 8, theme: "system" },
 }, over);
 
+async function saveEditorChoice(app,id,at,changes={}){
+ const task=app.ctx.state.tasks.find(row=>row.id===id);
+ assert.ok(task,`normal editor action has task ${id}`);
+ setFakeTime(app.ctx,at);app.ctx.openEdit(id);
+ app.shim.document.getElementById('etEverReset').checked=task.evergreenResetAtDay!==false;
+ const value=(key,fallback)=>Object.hasOwn(changes,key)?changes[key]:fallback;
+ fillEditPane(app.ctx,app.shim,{title:value('title',task.title),url:value('url',task.url||''),due:value('due',task.due||''),
+  start:value('startsAt',task.startsAt||''),evergreen:task.evergreen,ctxIds:value('ctxIds',task.ctx)});
+ app.ctx.onAction('save-edit',{dataset:{id}});
+ return app.ctx.persist();
+}
+
+async function loadAppAtTime(at,options={}){
+ const original=options.beforeStateReady;
+ return loadApp({...options,beforeStateReady(ctx,shim){setFakeTime(ctx,at);original?.(ctx,shim);}});
+}
+
+function hydrateUnchangedEditorDraft(app,id){
+ const task=app.ctx.state.tasks.find(row=>row.id===id);
+ assert.ok(task,`normal editor action has task ${id}`);
+ app.ctx.openEdit(id);
+ fillEditPane(app.ctx,app.shim,{title:task.title,url:task.url||'',due:task.due||'',start:task.startsAt||'',
+  evergreen:task.evergreen,ctxIds:task.ctx});
+ app.shim.document.getElementById('etEverReset').checked=task.evergreenResetAtDay!==false;
+ return task;
+}
+
 /* The weeks-old copy sitting in the stale browser. */
 const STALE_CHAIN = ["t_old"];
 const staleState = (updatedAt) => syncState({
@@ -12093,6 +12497,1181 @@ function makeSyncHarness({ delayMs = 4, remote = null, failPull = false, rev = n
   };
   return h;
 }
+
+test('RISK cloud No recovery: five scanner decisions survive offline durable reopen beside an independent peer edit',async t=>{ // Pin simulated time and cover both publication orders.
+ const {IDBFactory}=await import('fake-indexeddb');
+ const at=Date.parse('2026-10-16T15:10:00.000Z'),passAt=at-60000;
+ for(const publicationOrder of ['Mac first','Phone first'])await t.test(publicationOrder,async publicationTest=>{
+ for(const backend of ['browser fallback','IndexedDB'])await publicationTest.test(backend,async()=>{
+  const initial=syncState({tasks:[
+   Object.assign(syncTask('bench','Phone benchmark'),{mu:36,sigma:8,ctx:['c_shared']}),
+   ...Array.from({length:5},(_,i)=>Object.assign(syncTask('phone-no-'+(i+1),'Phone No '+(i+1)),{ctx:['c_shared']})),
+   Object.assign(syncTask('mac-edit','Mac independent task'),{done:true,completedAt:100,startsAt:null,evergreenHours:18,evergreenResetAtDay:true,ctx:['c_shared']}),
+  ],contexts:[{id:'c_shared',name:'Shared context',active:true}],chain:['bench'],considered:{},candidateId:'phone-no-1',mode:'scan',scanMode:'descending',passStartedAt:passAt,passId:'shared-pass-142',syncRev:4,syncAccount:'e@example.com',syncDirty:false,
+   settings:{horizonMin:60,thresholdPct:0,samples:250,cantMin:30,workedHours:8,theme:'system'}});
+  const remote=JSON.parse(JSON.stringify(initial));
+  for(const key of ['syncRev','syncAccount','syncDirty','lastCloudServerAt','protectedBackupIds'])delete remote[key];
+  const h=makeSyncHarness({remote,rev:4,delayMs:1});
+  const indexedDB=backend==='IndexedDB'?new IDBFactory():null;
+  const names={phone:'cloud-no-142-phone-'+Date.now()+'-'+Math.random(),mac:'cloud-no-142-mac-'+Date.now()+'-'+Math.random()};
+  const seedStorage={[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)};
+  const beforeStateReady=ctx=>setFakeTime(ctx,at);
+  const appOptions=device=>backend==='IndexedDB'
+   ?{seedStorage,indexedDBProvider:indexedDB,deviceDbName:names[device],beforeStateReady}
+   :{seedStorage,beforeStateReady};
+  const {ctx:phone,shim:phoneShim}=await loadApp({...appOptions('phone'),cloudSyncFactory:h.factory});
+  const {ctx:mac,shim:macShim}=await loadApp({...appOptions('mac'),cloudSyncFactory:h.factory});
+  const closeStore=async app=>{try{await app.window.ScannerDeviceStore?.close?.();}catch{}};
+  try{
+   await phone.cloudPull();await mac.cloudPull();await syncSettle(20);
+   assert.equal(phone.state.syncRev,4);assert.equal(mac.state.syncRev,4);
+   phone.window.CloudSync.ready=false; // retain the five real actions locally while the phone is offline
+   const acted=[];
+   for(let i=0;i<5;i++){
+    phone.renderScan();
+    const markup=phoneShim.document.getElementById('scan').innerHTML;
+    assert.match(markup,/data-act="no"/,'the scanner must render the real No control');
+    const candidate=phone.state.candidateId,benchmark=phone.state.chain.at(-1);
+    assert.ok(candidate&&candidate!=='bench'&&benchmark==='bench');
+    phone.onAction('no',{dataset:{candidate,benchmark}});
+    acted.push(candidate);
+   }
+   assert.equal(new Set(acted).size,5,'each deliberate No compares a distinct candidate');
+   const localRatings=Object.fromEntries(phone.state.tasks.map(task=>[task.id,[task.mu,task.sigma]]));
+   assert.notDeepEqual(localRatings.bench,[initial.tasks[0].mu,initial.tasks[0].sigma],
+    'the five actual No actions changed the learned benchmark rating');
+   const localEvents=phone.state.decisionEvents;
+   assert.ok(Array.isArray(localEvents),'No actions create a durable cloud-visible event collection');
+   const noEvents=localEvents.filter(event=>event?.kind==='no');
+   assert.equal(noEvents.length,5,'each No action has one durable cloud-visible decision event');
+   assert.equal(localEvents.length,5,'the offline phone contains only its five No decisions');
+   assert.equal(new Set(noEvents.map(event=>event.id)).size,5,'each No action event has a stable unique identity');
+   assert.ok(noEvents.every(event=>event.v===1&&event.meaning==='benchmark-preferred'),
+    'the event records the supported No meaning');
+   assert.ok(noEvents.every(event=>event.account==='e@example.com'&&event.baseId===phone.state.decisionBase?.id),
+    'No events bind to their owning account and exact observed cloud base');
+   assert.ok(noEvents.every(event=>event.at===at&&event.passAt===passAt&&event.passId==='shared-pass-142'),
+    'No events retain original action time and pass identity');
+   assert.ok(noEvents.every(event=>event.scanMode==='descending'&&event.chainIds[0]==='bench'
+    &&event.benchmarkId==='bench'&&event.candidateContextIds.includes('c_shared')
+    &&event.benchmarkContextIds.includes('c_shared')),'No events retain scan and comparison context');
+   assert.ok(noEvents.every(event=>phone.state.tasks.some(task=>task.ratingHistory?.some(row=>row.id===event.id&&row.kind==='no'))),
+    'each No identity is shared by its observation record');
+   assert.deepEqual([...noEvents[0].observedActionIds],[],'the first No has no observed predecessor');
+   for(let i=1;i<noEvents.length;i++)assert.deepEqual([...noEvents[i].observedActionIds],[noEvents[i-1].id],
+    'each later No stores the bounded causal frontier, not a quadratic full history');
+   const noEventsSnapshot=JSON.stringify(JSON.parse(JSON.stringify(noEvents)));
+   const phoneTaskSnapshots=Object.fromEntries(phone.state.tasks.map(task=>[task.id,JSON.stringify(JSON.parse(JSON.stringify(task)))]));
+   const phoneContextsSnapshot=JSON.stringify(JSON.parse(JSON.stringify(phone.state.contexts)));
+   assert.equal(await phone.persist(),true,'the offline device store accepts the complete local board');
+   const offlineRaw=backend==='IndexedDB'
+    ?(await phone.window.ScannerDeviceStore.readHead()).payload
+    :phoneShim.localStorage.getItem(SYNC_STORE_KEY);
+   assert.ok(offlineRaw,'the phone has a readable durable board before it closes');
+   const offlineBoard=JSON.parse(offlineRaw);
+   assert.equal(offlineBoard.decisionBase?.account,'e@example.com','the exact-base owner survives durable save');
+   assert.equal(offlineBoard.decisionBase?.revision,4,'the common cloud revision survives durable save');
+   assert.ok(typeof offlineBoard.decisionBase?.payload==='string','the exact common payload survives durable save');
+   assert.equal(JSON.stringify(offlineBoard.decisionEvents),noEventsSnapshot,'the durable bytes preserve the exact five original No event rows');
+   await closeStore({window:phone.window});
+
+   if(publicationOrder==='Phone first')mac.window.CloudSync.ready=false;
+   assert.equal(await saveEditorChoice({ctx:mac,shim:macShim},'mac-edit',at+2000,{title:'Mac independent edit'}),true,
+    'the independent peer edit uses the actual editor action with unchanged rendered context/reset controls');
+   phoneTaskSnapshots['mac-edit']=JSON.stringify(JSON.parse(JSON.stringify(mac.state.tasks.find(task=>task.id==='mac-edit'))));
+   const macChoice=mac.state.decisionEvents.filter(event=>event?.kind==='current-choice');
+   assert.equal(macChoice.length,1,'the hydrated Mac editor records only its deliberate title change');
+   assert.deepEqual(JSON.parse(JSON.stringify(macChoice[0].target)),{type:'task',id:'mac-edit',property:'title'});
+   assert.deepEqual(JSON.parse(JSON.stringify(macChoice[0].before)),{present:true,value:'Mac independent task'});
+   assert.equal(macChoice[0].value,'Mac independent edit');
+   assert.equal(macChoice[0].at,at+2000,'the Mac title fact keeps its original action time');
+   assert.equal(macChoice[0].account,'e@example.com','the Mac title fact keeps its owning account');
+   assert.equal(macChoice[0].baseId,mac.state.decisionBase?.id,'the Mac title fact keeps its exact observed base');
+   assert.equal(macChoice[0].passId,'shared-pass-142','the Mac title fact keeps its observed pass identity');
+   assert.equal(macChoice[0].passAt,passAt,'the Mac title fact keeps the original pass time');
+   assert.deepEqual(Array.from(mac.state.tasks.find(task=>task.id==='mac-edit').ctx),['c_shared'],'editor hydration preserves its unrelated context');
+   assert.equal(mac.state.tasks.find(task=>task.id==='mac-edit').evergreenResetAtDay,true,'editor hydration preserves its checked reset control');
+   if(publicationOrder==='Mac first'){
+    await mac.cloudPushNow();await syncSettle(30);
+    assert.equal(h.remoteState().tasks.find(task=>task.id==='mac-edit').title,'Mac independent edit');
+    assert.deepEqual(Array.from(h.remoteState().tasks.find(task=>task.id==='mac-edit').ctx),['c_shared']);
+    assert.equal(h.remoteState().tasks.find(task=>task.id==='mac-edit').evergreenResetAtDay,true);
+    const publishedEvents=h.remoteState().decisionEvents;
+    assert.equal(publishedEvents.filter(event=>event?.kind==='no').length,0,'offline No actions are not visible before the phone reconnects');
+    const publishedChoice=publishedEvents.filter(event=>event?.kind==='current-choice');
+    assert.equal(publishedChoice.length,1,'the independent editor action remains a separate current-choice record');
+    assert.equal(publishedChoice[0].id,macChoice[0].id,'the Mac title fact keeps its original event identity');
+    assert.deepEqual(JSON.parse(JSON.stringify(publishedChoice[0].target)),{type:'task',id:'mac-edit',property:'title'});
+    assert.equal(publishedEvents.length,1,'the first peer publication contains only its deliberate Mac title record');
+    assert.equal(h.doc.rev,5,'the independent Mac edit is a newer cloud publication');
+   }else{
+    assert.equal(h.remoteState().tasks.find(task=>task.id==='mac-edit').title,'Mac independent task','an offline Mac edit stays local before phone publication');
+    assert.equal(h.remoteState().decisionEvents?.length??0,0,'the offline Mac edit stays unpublished before phone publication');
+    assert.equal(h.doc.rev,4,'the offline Mac edit does not advance the shared cloud revision');
+   }
+
+   const offlineCloudFactory=()=>{const cloud=h.factory();cloud.ready=false;return cloud;};
+   const reloadOptions=backend==='IndexedDB'
+    ?{indexedDBProvider:indexedDB,deviceDbName:names.phone,beforeStateReady}
+    :{seedStorage:{[SYNC_STORE_KEY]:offlineRaw,[LOCAL_HEAD_KEY]:offlineRaw},beforeStateReady};
+   const {ctx:reopened,shim:reopenedShim}=await loadApp({...reloadOptions,cloudSyncFactory:offlineCloudFactory});
+   assert.deepEqual(acted.filter(id=>reopened.state.considered[id]==='no').sort(),acted.slice().sort(),
+    'the cold device-store reopen itself retains every No mark');
+   assert.equal(reopened.state.tasks.find(task=>task.id==='bench').mu,localRatings.bench[0],
+    'the cold reopen retains the actual learned benchmark value');
+   reopened.window.CloudSync.ready=true;
+   await reopened.cloudPull();await syncSettle(60);
+   for(const id of acted)assert.equal(reopened.state.considered[id],'no','a newer peer revision cannot clear a deliberate No mark');
+   for(const [id,[mu,sigma]] of Object.entries(localRatings)){
+    assert.equal(reopened.state.tasks.find(task=>task.id===id).mu,mu,'the effective learned mean survives reconciliation');
+    assert.equal(reopened.state.tasks.find(task=>task.id===id).sigma,sigma,'the effective learned uncertainty survives reconciliation');
+   }
+   assert.equal(reopened.state.tasks.find(task=>task.id==='mac-edit').title,publicationOrder==='Mac first'?'Mac independent edit':'Mac independent task','phone observes exactly the choice events published before its reopen reconciliation');
+   assert.deepEqual(Array.from(reopened.state.tasks.find(task=>task.id==='mac-edit').ctx),['c_shared'],'No replay preserves the peer task contexts');
+   assert.equal(reopened.state.tasks.find(task=>task.id==='mac-edit').evergreenResetAtDay,true,'No replay preserves the rendered reset preference');
+   if(publicationOrder==='Phone first'){
+    assert.equal((await reopened.persist()),true,'the reopened phone durably saves its reconciled No records before publishing');
+    await reopened.cloudPushNow();await syncSettle(60);
+    const phoneFirstEvents=h.remoteState().decisionEvents||[];
+    assert.equal(phoneFirstEvents.filter(event=>event?.kind==='no').length,5,'phone-first cloud publication contains all five offline No facts');
+    assert.equal(phoneFirstEvents.filter(event=>event?.kind==='current-choice').length,0,'phone-first cloud publication precedes the offline Mac title fact');
+    assert.equal(h.remoteState().tasks.find(task=>task.id==='mac-edit').title,'Mac independent task');
+    assert.equal(h.doc.rev,5,'the reopened phone publishes the No decisions first');
+    mac.window.CloudSync.ready=true;
+    await mac.cloudPull();await syncSettle(60);
+    for(const id of acted)assert.equal(mac.state.considered[id],'no','the reconnected Mac adopts every phone No mark');
+    for(const [id,[mu,sigma]] of Object.entries(localRatings)){
+     assert.equal(mac.state.tasks.find(task=>task.id===id).mu,mu,'the reconnected Mac adopts the effective learned mean');
+     assert.equal(mac.state.tasks.find(task=>task.id===id).sigma,sigma,'the reconnected Mac adopts the effective learned uncertainty');
+    }
+    assert.equal(mac.state.tasks.find(task=>task.id==='mac-edit').title,'Mac independent edit','Mac retains its offline title choice while reconciling phone facts');
+    await mac.cloudPushNow();await syncSettle(60);
+    assert.equal(h.remoteState().tasks.find(task=>task.id==='mac-edit').title,'Mac independent edit');
+    assert.equal(h.doc.rev,6,'the reconnected Mac publishes the union at the next revision');
+    await reopened.cloudPull();await syncSettle(60);
+   }else{
+    assert.equal((await reopened.persist()),true);
+    await reopened.cloudPushNow();await syncSettle(60);
+   }
+   for(const id of acted)assert.equal(reopened.state.considered[id],'no','the final phone pull retains every No mark in either publication order');
+   for(const [id,[mu,sigma]] of Object.entries(localRatings)){
+    assert.equal(reopened.state.tasks.find(task=>task.id===id).mu,mu,'the final phone pull retains the effective learned mean');
+    assert.equal(reopened.state.tasks.find(task=>task.id===id).sigma,sigma,'the final phone pull retains the effective learned uncertainty');
+   }
+   assert.equal(reopened.state.tasks.find(task=>task.id==='mac-edit').title,'Mac independent edit','the final phone pull retains the Mac title fact');
+   for(const task of reopened.state.tasks){
+    const expected=JSON.parse(phoneTaskSnapshots[task.id]);
+    if(task.id==='mac-edit')expected.title='Mac independent edit';
+    assert.deepEqual(JSON.parse(JSON.stringify(task)),expected,`all other task data is retained for ${task.id}`);
+   }
+   assert.equal(JSON.stringify(JSON.parse(JSON.stringify(reopened.state.contexts))),phoneContextsSnapshot,'unrelated shared context data remains unchanged');
+   assert.equal(JSON.stringify(JSON.parse(JSON.stringify(h.remoteState().tasks.find(task=>task.id==='mac-edit').ctx))),JSON.stringify(['c_shared']));
+   assert.equal(h.remoteState().tasks.find(task=>task.id==='mac-edit').title,'Mac independent edit');
+   assert.ok(h.remoteState().considered && acted.every(id=>h.remoteState().considered[id]==='no'),
+    'the final cloud board contains all five No marks');
+   const finalEvents=h.remoteState().decisionEvents;
+   assert.equal(finalEvents.filter(event=>event?.kind==='no').length,5,'after phone reconnect and republish, the cloud retains exactly the five immutable No records');
+   assert.equal(finalEvents.filter(event=>event?.kind==='current-choice').length,1,'the cloud retains the separate deliberate Mac title record');
+   assert.equal(finalEvents.length,6,'no action or task edit was duplicated during reopen or retry');
+   assert.equal(JSON.stringify(JSON.parse(JSON.stringify(finalEvents.filter(event=>event?.kind==='no')))),noEventsSnapshot,'the final cloud keeps each original No event byte-for-byte');
+   const finalMacChoice=finalEvents.find(event=>event?.kind==='current-choice');
+   assert.equal(finalMacChoice?.id,macChoice[0].id,'the final cloud keeps the original Mac title event identity');
+   assert.deepEqual(JSON.parse(JSON.stringify(finalMacChoice)),JSON.parse(JSON.stringify(macChoice[0])),'the final cloud keeps the Mac title event time, base, pass, and prior-field evidence');
+   const sortedEvents=rows=>rows.map(row=>JSON.parse(JSON.stringify(row))).sort((a,b)=>a.id<b.id?-1:a.id>b.id?1:0);
+   assert.deepEqual(sortedEvents(reopened.state.decisionEvents),sortedEvents(finalEvents),'the fully reopened phone acknowledges the exact final cloud event union');
+   assert.equal(Object.hasOwn(h.remoteState(),'decisionBase'),false,'the device-local decision base is excluded from cloud payloads');
+   const learnedBeforePassReset=Object.fromEntries(acted.map(id=>[id,[reopened.state.tasks.find(task=>task.id===id).mu,reopened.state.tasks.find(task=>task.id===id).sigma]]));
+   const retainedEvents=JSON.stringify(reopened.state.decisionEvents),oldPassId=reopened.state.passId;
+   reopened.newPass(false,true);
+   assert.notEqual(reopened.state.passId,oldPassId,'the established day boundary starts a new pass identity');
+   assert.ok(acted.every(id=>reopened.state.considered[id]===undefined),'the established day boundary expires temporary No marks');
+   assert.equal(JSON.stringify(reopened.state.decisionEvents),retainedEvents,'pass reset keeps retained comparison evidence');
+   for(const [id,[mu,sigma]] of Object.entries(learnedBeforePassReset)){
+    assert.equal(reopened.state.tasks.find(task=>task.id===id).mu,mu,'pass expiry does not erase learned ratings');
+    assert.equal(reopened.state.tasks.find(task=>task.id===id).sigma,sigma,'pass expiry does not reset learned uncertainty');
+   }
+  }finally{
+   await closeStore({window:phone.window});await closeStore({window:mac.window});
+  }
+  });
+ });
+});
+
+test('RISK comparison replay: independent Yes and Dot evidence survives either cloud publication order and a fresh client',async()=>{
+ const {IDBFactory}=await import('fake-indexeddb');
+ const at=Date.parse('2026-10-17T15:10:00.000Z'),passAt=at-60000;
+ for(const backend of ['browser fallback','IndexedDB'])for(const first of ['yes','dot']){
+   const initial=syncState({tasks:[
+    Object.assign(syncTask('base','Common benchmark'),{mu:34,sigma:7,ctx:['c_shared']}),
+    Object.assign(syncTask('phone-choice','Phone choice'),{mu:25,sigma:8,ctx:['c_shared']}),
+    Object.assign(syncTask('mac-choice','Mac choice'),{mu:27,sigma:9,ctx:['c_shared']}),
+   ],contexts:[{id:'c_shared',name:'Shared context',active:true}],chain:['base'],considered:{},candidateId:'phone-choice',mode:'scan',scanMode:'descending',passStartedAt:passAt,passId:'shared-pass-143',syncRev:4,syncAccount:'e@example.com',syncDirty:false,
+    settings:{horizonMin:60,thresholdPct:0,samples:250,cantMin:30,workedHours:8,theme:'system'}});
+   const remote=JSON.parse(JSON.stringify(initial));
+   for(const key of ['syncRev','syncAccount','syncDirty','lastCloudServerAt','protectedBackupIds','decisionBase'])delete remote[key];
+   const h=makeSyncHarness({remote,rev:4,delayMs:1}),indexedDB=backend==='IndexedDB'?new IDBFactory():null;
+   const names={phone:'decision-comparison-143-phone-'+Date.now()+'-'+Math.random(),mac:'decision-comparison-143-mac-'+Date.now()+'-'+Math.random(),fresh:'decision-comparison-143-fresh-'+Date.now()+'-'+Math.random()};
+   const seedStorage={[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)};
+   const appOptions=device=>indexedDB?{seedStorage,indexedDBProvider:indexedDB,deviceDbName:names[device]}:{seedStorage};
+   const factory=()=>h.factory();
+   const phone=await loadAppAtTime(at,{...appOptions('phone'),cloudSyncFactory:factory});
+   let mac=await loadAppAtTime(at,{...appOptions('mac'),cloudSyncFactory:factory});
+   const freshClose=async app=>{try{await app?.ctx?.window.ScannerDeviceStore?.close?.();}catch{}};
+   try{
+    await phone.ctx.cloudPull();await mac.ctx.cloudPull();await syncSettle(20);
+    assert.equal(phone.ctx.state.syncRev,4);assert.equal(mac.ctx.state.syncRev,4);
+    setFakeTime(phone.ctx,at+1000);phone.ctx.state.candidateId='phone-choice';phone.ctx.renderScan();
+    assert.match(phone.shim.document.getElementById('scan').innerHTML,/data-act="yes" data-candidate="phone-choice" data-benchmark="base"/,
+     'the phone offers its real Yes choice against the common benchmark');
+    setFakeTime(mac.ctx,at+2000);hydrateUnchangedEditorDraft(mac,'mac-choice');
+    assert.match(mac.shim.document.getElementById('modalRoot').innerHTML,/data-act="dot-task" data-id="mac-choice"/,
+     'the Mac offers its real editor Dot control');
+    phone.ctx.window.CloudSync.ready=false;mac.ctx.window.CloudSync.ready=false;
+    phone.ctx.onAction('yes',{dataset:{candidate:'phone-choice',benchmark:'base'}});
+    mac.ctx.onAction('dot-task',{dataset:{id:'mac-choice'}});
+    assert.deepEqual(Array.from(phone.ctx.state.chain),['base','phone-choice'],'Yes actually appends the phone task');
+    assert.deepEqual(Array.from(mac.ctx.state.chain),['base','mac-choice'],'Dot actually appends the Mac task');
+    assert.equal(await mac.ctx.persist(),true,'the offline Dot is committed to the device store before close');
+    const offlineMacRaw=indexedDB?(await mac.ctx.window.ScannerDeviceStore.readHead()).payload:mac.shim.localStorage.getItem(SYNC_STORE_KEY);
+    assert.ok(offlineMacRaw,'the offline Dot has a readable durable payload');
+    const offlineMac=JSON.parse(offlineMacRaw),offlineDotId=mac.ctx.state.decisionEvents.find(event=>event.kind==='comparison'&&event.action==='dot').id;
+    await freshClose(mac);
+    const offlineFactory=()=>{const cloud=factory();cloud.ready=false;return cloud;};
+    const reopenOptions=indexedDB?{indexedDBProvider:indexedDB,deviceDbName:names.mac}
+      :{seedStorage:{[SYNC_STORE_KEY]:offlineMacRaw,[LOCAL_HEAD_KEY]:offlineMacRaw}};
+    mac=await loadAppAtTime(at+2000,{...reopenOptions,cloudSyncFactory:offlineFactory});
+    await mac.ctx.__dataReady;
+    assert.deepEqual(Array.from(mac.ctx.state.chain),['base','mac-choice'],'an offline editor Dot survives a full app restart before reconnect');
+    assert.equal(mac.ctx.state.decisionEvents.find(event=>event.kind==='comparison'&&event.action==='dot').id,offlineDotId,'the offline restart preserves the original immutable action identity');
+    assert.equal(mac.ctx.state.tasks.find(task=>task.id==='base').mu,offlineMac.tasks.find(task=>task.id==='base').mu,
+     'the offline restart preserves the effective learned benchmark rating');
+    assert.equal(h.remoteState().decisionEvents,undefined,'the offline Dot was not published before the reopened client reconnects');
+    const start=Object.fromEntries(initial.tasks.map(task=>[task.id,{mu:task.mu,sigma:task.sigma}]));
+    const expected=Object.fromEntries(Object.entries(start).map(([id,rating])=>[id,{...rating}]));
+    const engine=loadEngine(1430);
+    engine.updatePair(expected['phone-choice'],expected.base);
+    engine.updatePair(expected['mac-choice'],expected.base);
+    const firstApp=first==='yes'?phone:mac,secondApp=first==='yes'?mac:phone;
+    firstApp.ctx.window.CloudSync.ready=true;await firstApp.ctx.cloudPushNow();await syncSettle(60);
+    secondApp.ctx.window.CloudSync.ready=true;await secondApp.ctx.cloudPull();await syncSettle(80);
+    await secondApp.ctx.cloudPushNow();await syncSettle(60);
+    const cloud=h.remoteState();
+    assert.deepEqual([...cloud.chain],['base','phone-choice','mac-choice'],
+     'the merged dotted chain retains both real choices in original action order without comparing the two choices');
+    const pairs=(cloud.decisionEvents||[]).filter(event=>event.kind==='comparison').map(event=>[event.action,event.winnerId,event.loserId]).sort();
+    assert.deepEqual(pairs,[['dot','mac-choice','base'],['yes','phone-choice','base']],
+     'the cloud retains two distinct immutable comparisons against the common benchmark');
+    const comparisons=cloud.decisionEvents.filter(event=>event.kind==='comparison');
+    assert.equal(comparisons.length,2,'the two deliberate scanner/editor comparisons remain explicit observations');
+    assert.equal(new Set(comparisons.map(event=>event.id)).size,2,'each deliberate comparison has one stable event identity');
+    assert.equal(comparisons.every(event=>event.ratingApplied===true),true,'both actions retain their action-time rating participation');
+    assert.deepEqual(comparisons.map(event=>event.baselineId),[cloud.decisionBaseline.id,cloud.decisionBaseline.id],
+     'both comparisons name the one inherited frozen baseline');
+    assert.equal(cloud.decisionEvents.length,2,'an unchanged editor draft adds no task-field choice facts');
+    for(const [id,rating] of Object.entries(expected)){
+     const task=cloud.tasks.find(row=>row.id===id);
+     assert.equal(task.mu,rating.mu,`${id}: both concurrent comparisons contribute to the cloud rating`);
+     assert.equal(task.sigma,rating.sigma,`${id}: replay retains the deterministic learned uncertainty`);
+    }
+    assert.deepEqual(cloud.decisionBaseline.ratings.map(row=>[row.taskId,row.mu,row.sigma]).sort(([a],[b])=>a<b?-1:a>b?1:0),
+     initial.tasks.map(task=>[task.id,task.mu,task.sigma]).sort(([a],[b])=>a<b?-1:a>b?1:0),'the cloud carries the original inherited ratings as a frozen baseline');
+    assert.deepEqual(cloud.tasks.find(task=>task.id==='base').ratingHistory.map(row=>row.kind).sort(),['dot','yes'],
+     'the shared benchmark keeps both original visible history rows');
+    assert.equal(cloud.tasks.find(task=>task.id==='phone-choice').ratingHistory.at(-1).kind,'yes');
+    assert.equal(cloud.tasks.find(task=>task.id==='mac-choice').ratingHistory.at(-1).kind,'dot');
+    const freshState={...cloud,syncRev:h.doc.rev,syncAccount:'e@example.com',syncDirty:false};
+    const fresh=await loadAppAtTime(at+3000,{...appOptions('fresh'),seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(freshState),[LOCAL_HEAD_KEY]:JSON.stringify(freshState)},cloudSyncFactory:factory});
+    try{
+     await fresh.ctx.cloudPull();await syncSettle(30);
+     assert.deepEqual(Array.from(fresh.ctx.state.chain),['base','phone-choice','mac-choice'],'a fresh client receives both dotted tasks');
+     assert.deepEqual(Array.from(fresh.ctx.state.tasks,task=>[task.id,task.mu,task.sigma]),
+      Array.from(cloud.tasks,task=>[task.id,task.mu,task.sigma]),'the fresh client agrees on the cloud-visible learned ratings');
+     const stable=JSON.stringify(fresh.ctx.state.tasks.map(task=>[task.id,task.mu,task.sigma]));
+     await fresh.ctx.cloudPull();await syncSettle(30);
+     assert.equal(JSON.stringify(fresh.ctx.state.tasks.map(task=>[task.id,task.mu,task.sigma])),stable,
+      'a duplicate read/revision hint cannot train either retained observation twice');
+     assert.equal(h.remoteState().decisionEvents.filter(event=>event.kind==='comparison').length,2,'reopen and duplicate delivery preserve one comparison row per action');
+     const eventFacts=JSON.stringify(fresh.ctx.state.decisionEvents),oldPass=fresh.ctx.state.passId;
+     const learned=JSON.stringify(fresh.ctx.state.tasks.map(task=>[task.id,task.mu,task.sigma]));
+     fresh.ctx.newPass(false,true);
+     assert.notEqual(fresh.ctx.state.passId,oldPass,'the established pass boundary starts a fresh temporary projection');
+     assert.equal(JSON.stringify(fresh.ctx.state.decisionEvents),eventFacts,'pass reset retains permanent comparison evidence');
+     assert.equal(JSON.stringify(fresh.ctx.state.tasks.map(task=>[task.id,task.mu,task.sigma])),learned,
+      'pass expiry does not reset comparison learning');
+    }finally{await freshClose(fresh);}
+   }finally{await freshClose(phone);await freshClose(mac);}
+ }
+});
+
+test('RISK comparison replay: repeated same-pair Yes and No actions remain distinct and replay once by original action order',async()=>{
+ const {IDBFactory}=await import('fake-indexeddb');
+ const scenarios=[
+  {answers:['yes','yes'],uploadFirst:0},
+  {answers:['yes','no'],uploadFirst:0},
+  {answers:['yes','no'],uploadFirst:1},
+  {answers:['no','yes'],uploadFirst:0},
+  {answers:['no','yes'],uploadFirst:1},
+ ];
+ for(const backend of ['browser fallback','IndexedDB'])for(const scenario of scenarios){
+   const at=Date.parse('2026-10-17T15:30:00.000Z'),passAt=at-60000;
+   const initial=syncState({tasks:[
+    Object.assign(syncTask('base','Common benchmark'),{mu:34,sigma:7,ctx:['c_shared']}),
+    Object.assign(syncTask('choice','Repeated choice'),{mu:25,sigma:8,ctx:['c_shared']}),
+   ],contexts:[{id:'c_shared',name:'Shared context',active:true}],chain:['base'],considered:{},candidateId:'choice',mode:'scan',scanMode:'descending',passStartedAt:passAt,passId:'shared-pass-143-pair',syncRev:9,syncAccount:'e@example.com',syncDirty:false,
+    settings:{horizonMin:60,thresholdPct:0,samples:250,cantMin:30,workedHours:8,theme:'system'}});
+   const remote=JSON.parse(JSON.stringify(initial));
+   for(const key of ['syncRev','syncAccount','syncDirty','lastCloudServerAt','protectedBackupIds','decisionBase'])delete remote[key];
+   const h=makeSyncHarness({remote,rev:9,delayMs:1}),indexedDB=backend==='IndexedDB'?new IDBFactory():null;
+   const nonce=Date.now()+'-'+Math.random(),names={phone:'decision-same-pair-phone-'+nonce,mac:'decision-same-pair-mac-'+nonce};
+   const seedStorage={[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)};
+   const appOptions=device=>indexedDB?{seedStorage,indexedDBProvider:indexedDB,deviceDbName:names[device]}:{seedStorage};
+   const factory=()=>h.factory();
+   const phone=await loadAppAtTime(at,{...appOptions('phone'),cloudSyncFactory:factory});
+   const mac=await loadAppAtTime(at,{...appOptions('mac'),cloudSyncFactory:factory});
+   const clients=[phone,mac],close=async app=>{try{await app?.ctx?.window.ScannerDeviceStore?.close?.();}catch{}};
+   try{
+    await Promise.all(clients.map(app=>app.ctx.cloudPull()));await syncSettle(30);
+    for(let index=0;index<clients.length;index++){
+     const app=clients[index],answer=scenario.answers[index];
+     setFakeTime(app.ctx,at+(index+1)*1000);app.ctx.state.candidateId='choice';app.ctx.renderScan();
+     assert.match(app.shim.document.getElementById('scan').innerHTML,/data-act="yes" data-candidate="choice" data-benchmark="base"/,
+      `client ${index} has the real Yes action`);
+     assert.match(app.shim.document.getElementById('scan').innerHTML,/data-act="no" data-candidate="choice" data-benchmark="base"/,
+      `client ${index} has the real No action`);
+     app.ctx.window.CloudSync.ready=false;
+     app.ctx.onAction(answer,{dataset:{candidate:'choice',benchmark:'base'}});
+     assert.equal(app.ctx.state.decisionEvents.length,1,`client ${index} records one deliberate action`);
+     assert.equal(app.ctx.state.decisionEvents[0].kind,answer==='no'?'no':'comparison');
+     assert.equal(app.ctx.state.decisionEvents[0].at,at+(index+1)*1000,'the action keeps its original timestamp');
+    }
+    const first=scenario.uploadFirst,second=1-first,firstApp=clients[first],secondApp=clients[second];
+    firstApp.ctx.window.CloudSync.ready=true;await firstApp.ctx.cloudPushNow();await syncSettle(60);
+    await secondApp.ctx.cloudPull();await syncSettle(80);
+    secondApp.ctx.window.CloudSync.ready=true;await secondApp.ctx.cloudPushNow();await syncSettle(60);
+    await secondApp.ctx.cloudPull();await syncSettle(40);
+    await secondApp.ctx.cloudPushNow();await syncSettle(40);
+    const cloud=h.remoteState(),events=cloud.decisionEvents||[];
+    assert.equal(events.length,2,'separate same-pair actions survive both publication orders');
+    assert.equal(new Set(events.map(event=>event.id)).size,2,'each deliberate comparison has its own immutable ID');
+    assert.deepEqual(events.map(event=>event.at).sort((a,b)=>a-b),[at+1000,at+2000],'upload and retry do not restamp action time');
+    assert.equal(events.every(event=>event.baselineId===cloud.decisionBaseline.id),true,'both observations share the inherited frozen baseline');
+    const expected={base:{mu:34,sigma:7},choice:{mu:25,sigma:8}},engine=loadEngine(1431);
+    for(const answer of scenario.answers){
+     if(answer==='yes')engine.updatePair(expected.choice,expected.base);
+     else engine.updatePair(expected.base,expected.choice);
+    }
+    for(const id of ['base','choice']){
+     const row=cloud.tasks.find(task=>task.id===id);
+     assert.equal(row.mu,expected[id].mu,`${id}: all distinct answers train in original action order`);
+     assert.equal(row.sigma,expected[id].sigma,`${id}: replay is deterministic and not double-applied`);
+    }
+    const visibleRows=cloud.tasks.flatMap(task=>(task.ratingHistory||[]).filter(row=>row.id===events[0].id||row.id===events[1].id));
+    assert.equal(visibleRows.length,4,'the two separate comparisons retain their visible per-task history');
+    assert.deepEqual(new Set(visibleRows.map(row=>row.id)),new Set(events.map(event=>event.id)));
+   }finally{await Promise.all(clients.map(close));}
+ }
+});
+
+test('RISK comparison replay: first supported action freezes learned legacy ratings without replaying observational history',async()=>{
+ const legacy=await ratingHistoryFixture(1432),{ctx:legacyCtx,a,b,c}=legacy;
+ legacyCtx.decide('yes');
+ const oldHistory=Object.fromEntries([a,b,c].map(task=>[task.id,JSON.parse(JSON.stringify(task.ratingHistory||[]))]));
+ const initial=JSON.parse(JSON.stringify(legacyCtx.state));
+ delete initial.decisionEvents;delete initial.decisionBaseline;delete initial.decisionEventsRecovery;delete initial.decisionBaselineRecovery;
+ initial.syncRev=6;initial.syncAccount='e@example.com';initial.syncDirty=false;
+ const inherited=Object.fromEntries(initial.tasks.map(task=>[task.id,{mu:task.mu,sigma:task.sigma}]));
+ const remote=JSON.parse(JSON.stringify(initial));
+ for(const key of ['syncRev','syncAccount','syncDirty','lastCloudServerAt','protectedBackupIds','decisionBase'])delete remote[key];
+ const h=makeSyncHarness({remote,rev:6,delayMs:1}),factory=()=>h.factory(),actionAt=Date.parse('2026-10-17T16:00:00.000Z');
+ const app=await loadAppAtTime(actionAt,{seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)},cloudSyncFactory:factory});
+ try{
+  await app.ctx.cloudPull();await syncSettle(30);
+  assert.equal(app.ctx.state.decisionEvents,undefined,'legacy observation history has no manufactured action stream');
+  const beforeAction=Object.fromEntries(app.ctx.state.tasks.map(task=>[task.id,{mu:task.mu,sigma:task.sigma}]));
+  setFakeTime(app.ctx,actionAt);
+  hydrateUnchangedEditorDraft(app,c.id);
+  assert.match(app.shim.document.getElementById('modalRoot').innerHTML,/data-act="dot-task" data-id="/,'the legacy task can be explicitly selected with the normal editor control');
+  app.ctx.window.CloudSync.ready=false;
+  app.ctx.onAction('dot-task',{dataset:{id:c.id}});
+  const event=app.ctx.state.decisionEvents?.find(row=>row.kind==='comparison'&&row.action==='dot'),baseline=app.ctx.state.decisionBaseline;
+  assert.ok(event&&baseline,'the first deliberate post-upgrade Dot creates a frozen baseline and one event');
+  assert.deepEqual(baseline.ratings.map(row=>[row.taskId,row.mu,row.sigma]).sort(([x],[y])=>x<y?-1:x>y?1:0),
+   Object.entries(beforeAction).map(([id,rating])=>[id,rating.mu,rating.sigma]).sort(([x],[y])=>x<y?-1:x>y?1:0),
+   'the baseline starts from already-learned legacy values');
+  assert.deepEqual(Array.from(baseline.includedActionIds),[],'legacy observational rows are not assigned guessed action identities');
+  assert.equal(event.at,actionAt,'the new supported action keeps its actual decision time');
+  assert.equal(event.ratingApplied,true,'the explicit editor Dot records its action-time comparison participation');
+  const expected=Object.fromEntries(Object.entries(inherited).map(([id,rating])=>[id,{...rating}]));
+  const engine=loadEngine(1433);engine.updatePair(expected[c.id],expected[b.id]);
+  for(const id of Object.keys(expected)){
+   const task=app.ctx.state.tasks.find(row=>row.id===id);
+   assert.equal(task.mu,expected[id].mu,`${id}: only the new action affects learned ratings`);
+   assert.equal(task.sigma,expected[id].sigma,`${id}: legacy history is not applied again`);
+   for(const row of oldHistory[id])assert.ok(task.ratingHistory.some(saved=>JSON.stringify(saved)===JSON.stringify(row)),`${id}: old observation is retained exactly`);
+  }
+  assert.equal(h.remoteState().decisionEvents,undefined,'the supported action remains local while offline');
+  app.ctx.window.CloudSync.ready=true;await app.ctx.cloudPushNow();await syncSettle(50);
+  const cloud=h.remoteState();assert.equal(cloud.decisionEvents.filter(row=>row.kind==='comparison').length,1,'cloud carries the newly supported explicit comparison once');
+  assert.equal(cloud.decisionEvents.length,1,'unchanged editor fields do not create current-choice edit facts');
+  assert.deepEqual(Object.fromEntries(cloud.tasks.map(task=>[task.id,{mu:task.mu,sigma:task.sigma}])),expected,
+   'the durable cloud projection preserves baseline learning plus the new comparison once');
+ }finally{try{await app.ctx.window.ScannerDeviceStore?.close?.();}catch{}}
+});
+
+test('RISK comparison replay: deleting an opponent keeps its frozen rating available without resurrecting the task',async()=>{
+ const {IDBFactory}=await import('fake-indexeddb'),at=Date.parse('2026-10-17T16:00:00.000Z');
+ for(const backend of ['browser fallback','IndexedDB'])for(const uploadFirst of ['yes','delete']){
+  const initial=syncState({tasks:[
+   Object.assign(syncTask('base','Common benchmark'),{mu:35,sigma:7,ctx:['c_shared']}),
+   Object.assign(syncTask('choice','Surviving choice'),{mu:26,sigma:8,ctx:['c_shared']}),
+  ],contexts:[{id:'c_shared',name:'Shared context',active:true}],chain:['base'],considered:{},candidateId:'choice',mode:'scan',scanMode:'descending',passStartedAt:Date.parse('2026-10-17T16:00:00Z')-60000,passId:'shared-pass-143-ghost',syncRev:12,syncAccount:'e@example.com',syncDirty:false,
+   settings:{horizonMin:60,thresholdPct:0,samples:250,cantMin:30,workedHours:8,theme:'system'}});
+  const remote=JSON.parse(JSON.stringify(initial));for(const key of ['syncRev','syncAccount','syncDirty','lastCloudServerAt','protectedBackupIds','decisionBase'])delete remote[key];
+  const h=makeSyncHarness({remote,rev:12,delayMs:1}),indexedDB=backend==='IndexedDB'?new IDBFactory():null;
+  const names={phone:'decision-ghost-phone-'+Date.now()+'-'+Math.random(),mac:'decision-ghost-mac-'+Date.now()+'-'+Math.random()};
+  const seedStorage={[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)};
+  const options=device=>indexedDB?{seedStorage,indexedDBProvider:indexedDB,deviceDbName:names[device]}:{seedStorage};
+  const factory=()=>h.factory(),phone=await loadAppAtTime(at,{...options('phone'),cloudSyncFactory:factory}),mac=await loadAppAtTime(at,{...options('mac'),cloudSyncFactory:factory});
+  const close=async app=>{try{await app.ctx.window.ScannerDeviceStore?.close?.();}catch{}};
+  try{
+   await phone.ctx.cloudPull();await mac.ctx.cloudPull();await syncSettle(20);
+   setFakeTime(phone.ctx,Date.parse('2026-10-17T16:01:00Z'));phone.ctx.state.candidateId='choice';phone.ctx.renderScan();
+   assert.match(phone.shim.document.getElementById('scan').innerHTML,/data-act="yes" data-candidate="choice" data-benchmark="base"/);
+   phone.ctx.window.CloudSync.ready=false;phone.ctx.onAction('yes',{dataset:{candidate:'choice',benchmark:'base'}});
+   setFakeTime(mac.ctx,Date.parse('2026-10-17T16:02:00Z'));mac.ctx.openEdit('base');
+   assert.match(mac.shim.document.getElementById('modalRoot').innerHTML,/data-act="delete-task" data-id="base"/);
+   mac.ctx.window.CloudSync.ready=false;mac.ctx.onAction('delete-task',{dataset:{id:'base'}});
+   const uploadFirstApp=uploadFirst==='yes'?phone:mac,uploadSecondApp=uploadFirst==='yes'?mac:phone;
+   uploadFirstApp.ctx.window.CloudSync.ready=true;await uploadFirstApp.ctx.cloudPushNow();await syncSettle(50);
+   await uploadSecondApp.ctx.cloudPull();await syncSettle(70);
+   uploadSecondApp.ctx.window.CloudSync.ready=true;await uploadSecondApp.ctx.cloudPushNow();await syncSettle(50);
+   const cloud=h.remoteState(),baseline=cloud.decisionBaseline,event=cloud.decisionEvents?.[0];
+   assert.equal(cloud.tasks.some(task=>task.id==='base'),false,'the explicit peer deletion wins in either publication order');
+   assert.ok(event&&event.kind==='comparison'&&event.winnerId==='choice'&&event.loserId==='base');
+   assert.ok(baseline.ratings.some(row=>row.taskId==='base'),'the deleted opponent remains an input in the frozen learning baseline');
+   const expected=baseline.ratings.find(row=>row.taskId==='choice'),ghost={...baseline.ratings.find(row=>row.taskId==='base')};
+   loadEngine(1434).updatePair(expected,ghost);
+   const survivor=cloud.tasks.find(task=>task.id==='choice');
+   assert.equal(survivor.mu,expected.mu,'the surviving task learns against the deleted opponent exactly once');
+   assert.equal(survivor.sigma,expected.sigma,'the ghost input retains deterministic uncertainty');
+   assert.ok(survivor.ratingHistory.some(row=>row.id===event.id&&row.kind==='yes'),'visible surviving-task history retains the comparison');
+   const freshState={...cloud,syncRev:h.doc.rev,syncAccount:'e@example.com',syncDirty:false};
+   const fresh=await loadAppAtTime(at+2*60000,{seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(freshState),[LOCAL_HEAD_KEY]:JSON.stringify(freshState)},cloudSyncFactory:factory});
+   try{
+    await fresh.ctx.cloudPull();await syncSettle(25);
+    assert.equal(fresh.ctx.state.tasks.some(task=>task.id==='base'),false,'a fresh client never recreates the deleted opponent');
+    assert.equal(fresh.ctx.state.tasks.find(task=>task.id==='choice').mu,expected.mu,'a fresh client retains the learned effect');
+    assert.equal(fresh.ctx.state.tasks.find(task=>task.id==='choice').sigma,expected.sigma);
+   }finally{await close(fresh);}
+  }finally{await close(phone);await close(mac);}
+ }
+});
+
+test('RISK comparison replay: compatible new-task baseline extensions union without freezing branch-local posteriors',async()=>{
+ const at=Date.parse('2026-10-17T16:30:00.000Z');
+ for(const uploadFirst of ['yes','dot']){
+  const initial=syncState({tasks:[Object.assign(syncTask('base','Common benchmark'),{mu:32,sigma:6})],chain:['base'],considered:{},mode:'scan',scanMode:'descending',passStartedAt:at-60000,passId:'shared-pass-143-extensions',syncRev:14,syncAccount:'e@example.com',syncDirty:false,
+   settings:{horizonMin:60,thresholdPct:0,samples:250,cantMin:30,workedHours:8,theme:'system'}});
+  const remote=JSON.parse(JSON.stringify(initial));for(const key of ['syncRev','syncAccount','syncDirty','lastCloudServerAt','protectedBackupIds','decisionBase'])delete remote[key];
+  const h=makeSyncHarness({remote,rev:15,delayMs:1}),factory=()=>h.factory(),seedStorage={[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)};
+  const phone=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:factory}),mac=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:factory});
+  const close=async app=>{try{await app.ctx.window.ScannerDeviceStore?.close?.();}catch{}};
+  try{
+   await phone.ctx.cloudPull();await mac.ctx.cloudPull();await syncSettle(20);
+   assert.ok(phone.ctx.state.decisionBase&&mac.ctx.state.decisionBase,'both clients pin the exact common revision before local task joins');
+   phone.ctx.window.CloudSync.ready=false;mac.ctx.window.CloudSync.ready=false;
+   const phoneChoice=phone.ctx.addTask('Phone branch choice'),macChoice=mac.ctx.addTask('Mac branch choice');
+   setFakeTime(phone.ctx,at+60000);phone.ctx.state.candidateId=phoneChoice.id;phone.ctx.renderScan();
+   assert.match(phone.shim.document.getElementById('scan').innerHTML,new RegExp('data-act="yes" data-candidate="'+phoneChoice.id+'" data-benchmark="base"'));
+   phone.ctx.window.CloudSync.ready=false;phone.ctx.onAction('yes',{dataset:{candidate:phoneChoice.id,benchmark:'base'}});
+   setFakeTime(mac.ctx,at+2*60000);hydrateUnchangedEditorDraft(mac,macChoice.id);
+   assert.ok(mac.shim.document.getElementById('modalRoot').innerHTML.includes('data-act="dot-task" data-id="'+macChoice.id+'"'));
+   mac.ctx.window.CloudSync.ready=false;mac.ctx.onAction('dot-task',{dataset:{id:macChoice.id}});
+   const first=uploadFirst==='yes'?phone:mac,second=uploadFirst==='yes'?mac:phone;
+   first.ctx.window.CloudSync.ready=true;await first.ctx.cloudPushNow();await syncSettle(50);
+   await second.ctx.cloudPull();await syncSettle(70);second.ctx.window.CloudSync.ready=true;await second.ctx.cloudPushNow();await syncSettle(50);
+   const cloud=h.remoteState(),baseline=cloud.decisionBaseline,events=cloud.decisionEvents;
+   assert.equal((baseline.ratingExtensions||[]).length,2,'each compatible branch-local new task adds one frozen starting rating: '+JSON.stringify({baseline,events}));
+   assert.equal(new Set(baseline.ratingExtensions.map(row=>row.taskId)).size,2,'independent extension identities are not collapsed');
+   assert.deepEqual(cloud.chain,['base',phoneChoice.id,macChoice.id],'both choices survive without inventing a comparison between them');
+   const expected=new Map([...baseline.ratings,...baseline.ratingExtensions].map(row=>[row.taskId,{mu:row.mu,sigma:row.sigma}]));
+   const engine=loadEngine(1435);engine.updatePair(expected.get(phoneChoice.id),expected.get('base'));engine.updatePair(expected.get(macChoice.id),expected.get('base'));
+   const comparisons=events.filter(event=>event.kind==='comparison');
+   assert.equal(comparisons.length,2,'each branch records one explicit comparison observation');
+   assert.ok(comparisons.every(event=>event.baselineId===baseline.id));
+   assert.equal(events.length,2,'unchanged editor state does not add current-choice rows');
+   for(const [id,rating] of expected){const task=cloud.tasks.find(row=>row.id===id);assert.equal(task.mu,rating.mu,`${id}: merged extensions replay from frozen starts`);assert.equal(task.sigma,rating.sigma,`${id}: merged extension uncertainty is deterministic`);}
+   const fresh=await loadAppAtTime(at+2*60000,{seedStorage:{[SYNC_STORE_KEY]:JSON.stringify({...cloud,syncRev:h.doc.rev,syncAccount:'e@example.com',syncDirty:false}),[LOCAL_HEAD_KEY]:JSON.stringify(cloud)},cloudSyncFactory:factory});
+   try{await fresh.ctx.cloudPull();await syncSettle(25);assert.deepEqual(Array.from(fresh.ctx.state.tasks,task=>[task.id,task.mu,task.sigma]),Array.from(cloud.tasks,task=>[task.id,task.mu,task.sigma]));}
+   finally{await close(fresh);}
+  }finally{await close(phone);await close(mac);}
+ }
+});
+
+test('RISK comparison replay: compatible frozen learning survives different legacy pass-context baseline IDs',async()=>{
+ const at=Date.parse('2026-10-17T17:00:00.000Z');
+ const initial=syncState({tasks:[
+  Object.assign(syncTask('base','Common benchmark'),{mu:34,sigma:7,ctx:['c_shared']}),
+  Object.assign(syncTask('choice','Repeated choice'),{mu:25,sigma:8,ctx:['c_shared']}),
+ ],contexts:[{id:'c_shared',name:'Shared context',active:true}],chain:['base'],considered:{},candidateId:'choice',mode:'scan',scanMode:'descending',passStartedAt:at-60000,passId:'shared-pass-143-compatible',syncRev:16,syncAccount:'e@example.com',syncDirty:false,
+  settings:{horizonMin:60,thresholdPct:0,samples:250,cantMin:30,workedHours:8,theme:'system'}});
+ const remote=JSON.parse(JSON.stringify(initial));
+ for(const key of ['syncRev','syncAccount','syncDirty','lastCloudServerAt','protectedBackupIds','decisionBase'])delete remote[key];
+ const h=makeSyncHarness({remote,rev:16,delayMs:1}),seedStorage={[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)},factory=()=>h.factory();
+ const phone=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:factory}),mac=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:factory});
+ const close=async app=>{try{await app.ctx.window.ScannerDeviceStore?.close?.();}catch{}};
+ const makeLegacyBaseline=(app,passId)=>{
+  const ratings=app.ctx.state.tasks.map(task=>({taskId:task.id,mu:task.mu,sigma:task.sigma})).sort((a,b)=>a.taskId<b.taskId?-1:a.taskId>b.taskId?1:0);
+  const baseline={v:1,account:'e@example.com',sourceBaseId:null,sourceRevision:null,includedActionIds:[],ratings,
+   chainIds:['base'],passId,passAt:app.ctx.state.passStartedAt,considered:{},cantAt:{},workedAt:{}};
+  const frozen=[baseline.account,ratings.map(({taskId,mu,sigma})=>[taskId,mu,sigma]).sort(([a],[b])=>a<b?-1:a>b?1:0),[],baseline.chainIds,baseline.passId,baseline.passAt];
+  const fact=JSON.stringify(frozen);
+  baseline.id='dlb1:'+[0,1,2,3].map(index=>app.ctx.chanceHash('decision-learning-v1:'+index+':'+fact).toString(16).padStart(8,'0')).join('');
+  return baseline;
+ };
+ try{
+  await phone.ctx.cloudPull();await mac.ctx.cloudPull();await syncSettle(25);
+  phone.ctx.state.decisionBaseline=makeLegacyBaseline(phone,'legacy-temp-pass-a');
+  mac.ctx.state.decisionBaseline=makeLegacyBaseline(mac,'legacy-temp-pass-b');
+  assert.notEqual(phone.ctx.state.decisionBaseline.id,mac.ctx.state.decisionBaseline.id,
+   'the two supported historical baseline IDs differ only because their frozen pass contexts differ');
+  setFakeTime(phone.ctx,at+60000);phone.ctx.state.candidateId='choice';phone.ctx.renderScan();
+  assert.match(phone.shim.document.getElementById('scan').innerHTML,/data-act="yes" data-candidate="choice" data-benchmark="base"/);
+  phone.ctx.window.CloudSync.ready=false;phone.ctx.onAction('yes',{dataset:{candidate:'choice',benchmark:'base'}});
+  setFakeTime(mac.ctx,at+2*60000);mac.ctx.state.candidateId='choice';mac.ctx.renderScan();
+  assert.match(mac.shim.document.getElementById('scan').innerHTML,/data-act="no" data-candidate="choice" data-benchmark="base"/);
+  mac.ctx.window.CloudSync.ready=false;mac.ctx.onAction('no',{dataset:{candidate:'choice',benchmark:'base'}});
+  const yesId=phone.ctx.state.decisionEvents[0].id,noId=mac.ctx.state.decisionEvents[0].id;
+  assert.notEqual(phone.ctx.state.decisionEvents[0].baselineId,mac.ctx.state.decisionEvents[0].baselineId,
+   'each actual action retains the baseline identity it observed');
+  phone.ctx.window.CloudSync.ready=true;await phone.ctx.cloudPushNow();await syncSettle(60);
+  await mac.ctx.cloudPull();await syncSettle(70);mac.ctx.window.CloudSync.ready=true;await mac.ctx.cloudPushNow();await syncSettle(60);
+  const cloud=h.remoteState(),events=cloud.decisionEvents||[];
+  assert.equal(cloud.decisionBaselineRecovery,undefined,'compatible inherited learning is not sent to recovery solely because legacy pass metadata differs');
+  assert.equal(events.length,2,'both immutable actions remain in the common cloud log');
+  assert.deepEqual(new Set(events.map(event=>event.id)),new Set([yesId,noId]));
+  assert.equal(new Set(events.map(event=>event.baselineId)).size,2,'neither immutable action is rewritten to a different baseline identity');
+  assert.ok(cloud.decisionBaseline.compatibleBaselineIds.some(alias=>events.some(event=>event.baselineId===alias.id)),
+   'the merged baseline keeps a validated alias for the other compatible legacy identity');
+  const expected={base:{mu:34,sigma:7},choice:{mu:25,sigma:8}},engine=loadEngine(1436);
+  engine.updatePair(expected.choice,expected.base);engine.updatePair(expected.base,expected.choice);
+  for(const [id,rating] of Object.entries(expected)){
+   const task=cloud.tasks.find(row=>row.id===id);
+   assert.equal(task.mu,rating.mu,`${id}: different legacy baseline IDs do not suppress either comparison`);
+   assert.equal(task.sigma,rating.sigma,`${id}: comparisons replay once from compatible inherited ratings`);
+  }
+  const freshState={...cloud,syncRev:h.doc.rev,syncAccount:'e@example.com',syncDirty:false};
+  const fresh=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(freshState),[LOCAL_HEAD_KEY]:JSON.stringify(freshState)},cloudSyncFactory:factory});
+  try{await fresh.ctx.cloudPull();await syncSettle(30);assert.deepEqual(Array.from(fresh.ctx.state.tasks,task=>[task.id,task.mu,task.sigma]),Array.from(cloud.tasks,task=>[task.id,task.mu,task.sigma]),'a fresh client replays every compatible-baseline action once');}
+  finally{await close(fresh);}
+ }finally{await close(phone);await close(mac);}
+});
+
+async function decisionRecoveryApp146(account='e@example.com'){
+ const initial=syncState({tasks:[Object.assign(syncTask('bench','Recovery benchmark'),{mu:35,sigma:7}),syncTask('candidate','Recovery candidate'),Object.assign(syncTask('peer','Peer task'),{done:true,completedAt:100})],chain:['bench'],candidateId:'candidate',considered:{},mode:'scan',scanMode:'descending',passStartedAt:Date.now(),passId:'recovery-pass-146',settings:{thresholdPct:0,horizonMin:60,samples:250},syncRev:4,syncAccount:account,syncDirty:false});
+ const h=makeSyncHarness({remote:initial,rev:4,delayMs:1});
+ const storage=sharedScannerStorage({[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)});
+ const app=await loadApp({sharedStorage:storage,cloudSyncFactory:()=>{const CS=h.factory();CS.user=account;return CS;}});
+ await app.ctx.cloudPull();await syncSettle(15);
+ app.ctx.window.CloudSync.ready=false;
+ app.ctx.renderScan();assert.match(app.shim.document.getElementById('scan').innerHTML,/data-act="no"/);
+ app.ctx.onAction('no',{dataset:{candidate:'candidate',benchmark:'bench'}});
+ assert.equal(await app.ctx.persist(),true);
+ assert.equal(app.ctx.state.decisionEvents.length,1);
+ return {...app,h,storage,event:JSON.parse(JSON.stringify(app.ctx.state.decisionEvents[0]))};
+}
+
+function mixedSharedOutcome146(board){
+ return JSON.parse(JSON.stringify({theme:board.settings.theme,dateFormat:board.settings.dateFormat,
+  scene:board.settings.scene,contexts:board.contexts}));
+}
+async function recordMixedDecisionActions146(app){
+ const {ctx,shim}=app;
+ ctx.onAction('cycle-theme',{});ctx.openSettings();
+ const format=shim.document.getElementById('stDateFormat');format.id='stDateFormat';format.matches=()=>false;format.value='ymd';
+ shim.document.dispatchEvent({type:'change',target:format});
+ shim.document.getElementById('newCtxName').value='Mixed shared context';ctx.onAction('add-ctx-named',{});ctx.closeModal();
+ shim.document.dispatchEvent({type:'landscape-scene-time-change',detail:{time:'sunset',season:'autumn'}});
+ assert.deepEqual([...new Set(Array.from(ctx.state.decisionEvents).filter(event=>event.kind==='current-choice').map(event=>event.target.type))].sort(),['context','scene','setting'],'real preference/context producers coexist with comparison authority');
+ const shared=mixedSharedOutcome146(ctx.state),yesTask=ctx.addTask('Mixed Yes candidate');
+ ctx.renderScan();assert.equal(ctx.state.candidateId,yesTask.id,'the actual scanner offers the new Yes candidate');
+ const benchmark=ctx.state.chain.at(-1);assert.match(shim.document.getElementById('scan').innerHTML,/data-act="yes"/);
+ ctx.onAction('yes',{dataset:{candidate:yesTask.id,benchmark}});
+ const dotTask=ctx.addTask('Mixed editor Dot candidate');hydrateUnchangedEditorDraft(app,dotTask.id);
+ shim.document.getElementById('etTitle').value='Mixed compound title';ctx.onAction('dot-task',{dataset:{id:dotTask.id}});
+ const dot=ctx.state.decisionEvents.find(event=>event.kind==='comparison'&&event.action==='dot');assert.ok(dot);
+ const compound=ctx.state.decisionEvents.filter(event=>event.actionId===dot.actionId);assert.ok(compound.some(event=>event.kind==='current-choice'),'the actual editor Dot also retains its changed title');
+ await ctx.onAction('undo',{});assert.equal(ctx.state.tasks.find(task=>task.id===dotTask.id).title,'Mixed editor Dot candidate');
+ assert.deepEqual(Array.from(ctx.state.decisionEvents.find(event=>event.kind==='undo').targetEventIds).sort(),Array.from(compound,event=>event.id).sort(),'Undo targets the complete real editor/Dot gesture');
+ ctx.renderScan();assert.equal(ctx.state.candidateId,dotTask.id,'the undone Dot is again the eligible offered candidate');
+ const pauseControl=shim.document.getElementById('scan').innerHTML.match(/<button\b[^>]*data-act="start-working"[^>]*>/)?.[0];assert.ok(pauseControl,'the normal scanner shows its Pause control');assert.doesNotMatch(pauseControl,/disabled/,'Pause is enabled with the offered candidate');
+ const beforePause=new Set(ctx.state.decisionEvents.map(event=>event.id));ctx.onAction('start-working',{});assert.equal(ctx.state.mode,'work');
+ const pause=ctx.state.decisionEvents.find(event=>!beforePause.has(event.id)&&event.kind==='current-choice'&&event.target?.type==='pass'&&event.target.property==='mode');assert.ok(pause);assert.equal(pause.target.id,pause.passId);assert.equal(pause.value,'work');assert.deepEqual(JSON.parse(JSON.stringify(pause.before)),{present:true,value:'scan'});assert.equal(ctx.supportedDecisionEvent(pause),true);const originalPause=JSON.stringify(pause);
+ assert.equal(await ctx.onAction('undo',{}),true);assert.equal(ctx.state.mode,'scan','ordinary Undo restores scanning without forcing a disabled Resume');
+ const pauseUndo=ctx.state.decisionEvents.at(-1);assert.equal(pauseUndo.kind,'undo');assert.deepEqual(Array.from(pauseUndo.targetEventIds),[pause.id]);assert.equal(pauseUndo.targetActionId,pause.actionId);assert.equal(JSON.stringify(ctx.state.decisionEvents.find(event=>event.id===pause.id)),originalPause,'Pause keeps its exact original fact after cancellation');
+ for(const id of [yesTask.id,benchmark]){assert.equal(ctx.state.chain.at(-1),id);ctx.onAction('dislodge',{dataset:{benchmark:id}});}
+ assert.equal(ctx.state.chain.length,0,'real Dislodge actions make the Start control available');
+ ctx.onAction('start-scan',{dataset:{mode:'halving'}});
+ assert.ok(ctx.state.decisionEvents.some(event=>event.kind==='current-choice'&&event.target?.type==='pass'&&event.target.property==='chain'),'actual Start records its paired pass root');
+ await ctx.onAction('undo',{});assert.equal(ctx.state.chain.length,0);assert.ok(ctx.state.decisionEvents.some(event=>event.kind==='undo'&&event.passBefore),'actual Start Undo retains exact prior-pass authority');
+ hydrateUnchangedEditorDraft(app,benchmark);shim.document.getElementById('etTitle').value='Mixed retained benchmark title';ctx.onAction('save-edit',{dataset:{id:benchmark}});
+ assert.equal(await ctx.persist(),true);assert.equal(ctx.decisionEvidenceIssue(ctx.state,'e@example.com'),null,'all new kinds coexist as coherent real-app authority');
+ return {yesTaskId:yesTask.id,dotTaskId:dotTask.id,benchmark,shared,pauseEventId:pause.id,pauseUndoId:pauseUndo.id};
+}
+async function decisionMixedActionsApp146(){
+ const app=await decisionRecoveryApp146();return {...app,mixed:await recordMixedDecisionActions146(app)};
+}
+
+test('RISK decision mixed rollout fixture: actual comparisons current choices Pause Start and scoped Undo survive durable publication and reopen',async t=>{
+ const f=await decisionMixedActionsApp146(),{ctx}=f,events=JSON.stringify(ctx.state.decisionEvents),ratings=JSON.stringify(ctx.state.tasks.map(task=>[task.id,task.mu,task.sigma]));
+ t.after(()=>{ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',ctx);});
+ assert.deepEqual([...new Set(ctx.state.decisionEvents.map(event=>event.kind))].sort(),['comparison','current-choice','no','undo']);
+ assert.deepEqual([...new Set(ctx.state.decisionEvents.filter(event=>event.kind==='comparison').map(event=>event.action))].sort(),['dislodge','dot','yes']);
+ assert.equal(JSON.stringify(ctx.state.decisionEvents.find(event=>event.kind==='no')),JSON.stringify(f.event),'the original No stays immutable beside later action families');
+ assert.equal(ctx.state.mode,'scan');assert.deepEqual(Array.from(ctx.state.decisionEvents.find(event=>event.id===f.mixed.pauseUndoId).targetEventIds),[f.mixed.pauseEventId]);
+ assert.equal(ctx.state.tasks.find(task=>task.id===f.mixed.benchmark).title,'Mixed retained benchmark title');
+ assert.deepEqual(mixedSharedOutcome146(ctx.state),f.mixed.shared);
+ ctx.window.CloudSync.ready=true;ctx.cloudPushNow();await syncSettle(80);assert.equal(ctx.state.syncDirty,false);assert.equal(JSON.stringify(f.h.remoteState().decisionEvents),events);
+ const reopened=await loadApp({seedStorage:{[SYNC_STORE_KEY]:f.storage.getItem(SYNC_STORE_KEY),[LOCAL_HEAD_KEY]:f.storage.getItem(LOCAL_HEAD_KEY)},cloudSyncFactory:f.h.factory});
+ t.after(()=>{reopened.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',reopened.ctx);});
+ await reopened.ctx.cloudPull();reopened.ctx.cloudPushNow();await syncSettle(60);
+ assert.equal(JSON.stringify(reopened.ctx.state.decisionEvents),events);assert.equal(JSON.stringify(reopened.ctx.state.tasks.map(task=>[task.id,task.mu,task.sigma])),ratings,'cold reopening never reapplies cancelled learning');
+ assert.deepEqual(mixedSharedOutcome146(reopened.ctx.state),f.mixed.shared,'typed shared settings, scene fields and context definitions survive publication and cold reopen');
+ assert.equal(reopened.ctx.state.mode,'scan','the mixed Pause cancellation retains its effective mode after cold reopen');assert.equal(f.h.remoteState().mode,'scan');
+ assert.equal(reopened.ctx.state.tasks.find(task=>task.id===f.mixed.benchmark).title,'Mixed retained benchmark title');assert.equal(reopened.shim.document.getElementById('syncBtn').textContent,'☁ synced');
+});
+
+test('RISK decision recovery: unknown cloud evidence holds adoption and publication without replacing the durable local decision',async t=>{
+ const f=await decisionRecoveryApp146();
+ t.after(()=>{f.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',f.ctx);});
+ const saved=f.storage.getItem(SYNC_STORE_KEY),ratings=f.ctx.state.tasks.map(task=>[task.id,task.mu,task.sigma]);
+ const remote={...f.h.remoteState(),decisionEvents:{v:99,opaque:'sole future decision bytes'}};
+ f.h.writeBehindBack(remote);const cloud=f.h.doc.payload;
+ f.ctx.window.CloudSync.ready=true;await f.ctx.cloudPull();await syncSettle(30);
+ assert.equal(JSON.stringify(f.ctx.state.decisionEvents),JSON.stringify([f.event]),'unsupported evidence cannot replace the local action stream');
+ assert.equal(f.storage.getItem(SYNC_STORE_KEY),saved,'held adoption leaves the exact durable decision board intact');
+ assert.deepEqual(f.ctx.state.tasks.map(task=>[task.id,task.mu,task.sigma]),ratings,'unreplayable evidence cannot change effective learning');
+ f.ctx.cloudPushNow();await syncSettle(20);
+ assert.equal(f.h.doc.payload,cloud,'a held unsupported cloud board is never overwritten');
+ assert.equal(f.ctx.window.CloudSync.errorCode,'unsupported-decision-evidence');
+ assert.equal(f.shim.document.getElementById('syncBtn').textContent,'☁ error');
+});
+
+test('RISK decision recovery baseline metadata: unknown v1 authority stays exact instead of disappearing through compatible baseline adoption',async t=>{
+ for(const kind of ['baseline','rating','extension','alias'])await t.test(kind,async t=>{
+  const f=await decisionRecoveryApp146(),{ctx}=f,CS=ctx.window.CloudSync;
+  t.after(()=>{CS.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',ctx);});
+  const added=ctx.addTask('Baseline extension metadata owner');ctx.renderScan();assert.equal(ctx.state.candidateId,added.id);ctx.onAction('no',{dataset:{candidate:added.id,benchmark:'bench'}});await ctx.persist();
+  const baseline=ctx.state.decisionBaseline;assert.ok(baseline.ratingExtensions?.some(row=>row.taskId===added.id),'a real comparison creates the supported new-task extension');
+  if(kind==='rating'){baseline.ratings[0].sourceBaseId=baseline.sourceBaseId;baseline.ratings[0].sourceRevision=baseline.sourceRevision;}
+  if(kind==='alias')baseline.compatibleBaselineIds=[{id:ctx.legacyDecisionBaselineIdentity(baseline.account,baseline.ratings,baseline.includedActionIds,baseline.chainIds,baseline.passId,baseline.passAt),chainIds:Array.from(baseline.chainIds),passId:baseline.passId,passAt:baseline.passAt}];
+  assert.equal(ctx.supportedDecisionBaseline(baseline),true,'the source is a known supported baseline before future metadata appears');
+  const clean=JSON.parse(ctx.cloudPayload()),target=kind==='baseline'?baseline:kind==='rating'?baseline.ratings[0]:kind==='extension'?baseline.ratingExtensions[0]:baseline.compatibleBaselineIds[0];
+  target.futureAuthority={v:99,opaque:'sole unknown '+kind+' authority'};await ctx.persist();
+  const authority=JSON.stringify(ctx.state.decisionBaseline),saved=f.storage.getItem(SYNC_STORE_KEY),events=JSON.stringify(ctx.state.decisionEvents);
+  f.h.writeBehindBack(clean);const cloud=f.h.doc.payload;CS.ready=true;await ctx.cloudPull();ctx.cloudPushNow();await syncSettle(50);
+  t.diagnostic(JSON.stringify({kind,errorCode:CS.errorCode??null,syncDirty:ctx.state.syncDirty,localHasFuture:JSON.stringify(ctx.state.decisionBaseline).includes('futureAuthority'),cloudHasFuture:f.h.doc.payload.includes('futureAuthority')}));
+  assert.equal(JSON.stringify(ctx.state.decisionBaseline),authority,'a compatible clean peer cannot discard unknown authoritative source metadata');
+  assert.equal(f.storage.getItem(SYNC_STORE_KEY),saved,'the exact local future authority remains the active durable source');assert.equal(f.h.doc.payload,cloud,'the peer cloud remains exact while unsupported authority is held');
+  assert.equal(JSON.stringify(ctx.state.decisionEvents),events);assert.equal(CS.errorCode,'unsupported-decision-evidence');assert.equal(f.shim.document.getElementById('syncBtn').textContent,'☁ error');
+ });
+});
+
+test('RISK decision recovery baseline: unsupported sole learning baseline cannot replace a durable local action',async t=>{
+ for(const baseline of [{v:99,opaque:'sole unsupported learned state'},{v:1,id:'invalid-baseline',account:'e@example.com',ratings:['unreadable rating'],includedActionIds:[],chainIds:[]}])await t.test('version '+baseline.v,async t=>{
+ const f=await decisionRecoveryApp146();
+ t.after(()=>{f.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',f.ctx);});
+ const saved=f.storage.getItem(SYNC_STORE_KEY);
+ f.h.writeBehindBack({...f.h.remoteState(),decisionBaseline:baseline});const cloud=f.h.doc.payload;
+ f.ctx.window.CloudSync.ready=true;await f.ctx.cloudPull();f.ctx.cloudPushNow();await syncSettle(40);
+ assert.equal(JSON.stringify(f.ctx.state.decisionEvents),JSON.stringify([f.event]),'unknown baseline cannot erase supported local decisions');
+ assert.equal(f.storage.getItem(SYNC_STORE_KEY),saved);assert.equal(f.h.doc.payload,cloud);
+ assert.equal(f.ctx.window.CloudSync.errorCode,'unsupported-decision-evidence');
+ });
+});
+
+test('RISK decision recovery identity: conflicting bytes for one acknowledged action hold both exact branches',async t=>{
+ const f=await decisionRecoveryApp146();
+ t.after(()=>{f.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',f.ctx);});
+ const saved=f.storage.getItem(SYNC_STORE_KEY),remote={...f.h.remoteState(),decisionEvents:[{...f.event,at:f.event.at+1}]};
+ f.h.writeBehindBack(remote);const cloud=f.h.doc.payload;
+ f.ctx.window.CloudSync.ready=true;await f.ctx.cloudPull();f.ctx.cloudPushNow();await syncSettle(40);
+ assert.equal(JSON.stringify(f.ctx.state.decisionEvents),JSON.stringify([f.event]),'one identity cannot be silently replaced with a different decision time');
+ assert.equal(f.storage.getItem(SYNC_STORE_KEY),saved);assert.equal(f.h.doc.payload,cloud);
+ assert.equal(f.ctx.window.CloudSync.errorCode,'conflicting-decision-evidence');
+});
+
+test('RISK decision recovery compatible update: unsupported authority checks the safe app update path and Retry keeps exact work',async t=>{
+ const f=await decisionRecoveryApp146(),CS=f.ctx.window.CloudSync;let updates=0,reloads=0;
+ const pull=CS.pull;CS.pull=async()=>{const res=await pull();CS.status='ok';CS.errorCode=null;CS.errorStage=null;return res;};
+ t.after(()=>{CS.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',f.ctx);});
+ f.ctx.window.checkForAppUpdate=async()=>{updates++;};f.ctx.window.location={reload(){reloads++;}};
+ const local=JSON.stringify(f.ctx.state),saved=f.storage.getItem(SYNC_STORE_KEY);
+ f.h.writeBehindBack({...f.h.remoteState(),decisionEvents:{v:99,opaque:'future authority'}});const cloud=f.h.doc.payload;
+ CS.ready=true;await f.ctx.cloudPull();await syncSettle(20);
+ assert.equal(updates,1,'unsupported semantics must request the established compatible app update path');assert.equal(reloads,0,'a semantic hold does not force-refresh the app');
+ await f.ctx.onAction('sync-retry',{});await syncSettle(30);
+ assert.equal(JSON.stringify(f.ctx.state),local);assert.equal(f.storage.getItem(SYNC_STORE_KEY),saved);assert.equal(f.h.doc.payload,cloud);assert.equal(reloads,0);
+ f.h.writeBehindBack(JSON.parse(f.ctx.cloudPayload()));await f.ctx.onAction('sync-retry',{});await syncSettle(40);
+ assert.equal(JSON.stringify(f.ctx.state.decisionEvents),JSON.stringify([f.event]));assert.equal(CS.errorCode,null);assert.equal(f.ctx.state.syncDirty,false);
+});
+
+test('RISK decision recovery current-choice authority: strict editor semantics and effective chosen fields guard cloud adoption',async t=>{
+ for(const fault of ['unsupported property','invalid value','unrepresented field'])await t.test(fault,async t=>{
+  const f=await decisionRecoveryApp146(),{ctx,shim}=f,CS=ctx.window.CloudSync;
+  t.after(()=>{CS.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',ctx);});
+  hydrateUnchangedEditorDraft(f,'bench');shim.document.getElementById('etTitle').value='Explicitly chosen title';ctx.onAction('save-edit',{dataset:{id:'bench'}});await ctx.persist();
+  const events=JSON.stringify(ctx.state.decisionEvents),saved=f.storage.getItem(SYNC_STORE_KEY),remote=JSON.parse(ctx.cloudPayload());
+  const choice=remote.decisionEvents.find(event=>event.kind==='current-choice'&&event.target.property==='title');assert.ok(choice,'the actual Save supplies the typed title fact');
+  if(fault==='unsupported property')choice.target.property='mu';
+  if(fault==='invalid value')choice.value={unsupported:'title object'};
+  if(fault==='unrepresented field')remote.tasks.find(task=>task.id==='bench').title='Unrepresented legacy overwrite';
+  f.h.writeBehindBack(remote);const cloud=f.h.doc.payload;CS.ready=true;await ctx.cloudPull();ctx.cloudPushNow();await syncSettle(45);
+  assert.equal(CS.errorCode,fault==='unrepresented field'?'unprojectable-decision-evidence':'unsupported-decision-evidence');
+  assert.equal(f.h.doc.payload,cloud);assert.equal(JSON.stringify(ctx.state.decisionEvents),events);assert.equal(f.storage.getItem(SYNC_STORE_KEY),saved);
+  assert.equal(ctx.state.tasks.find(task=>task.id==='bench').title,'Explicitly chosen title');
+ });
+});
+
+test('RISK decision recovery Start authority: incomplete or ambiguous real Start groups hold exact branches',async t=>{
+ for(const fault of ['missing root','missing mode','mismatched envelope','duplicate mode'])await t.test(fault,async t=>{
+  const at=Date.now(),initial=syncState({tasks:[syncTask('start-root-146','Start root')],chain:[],candidateId:null,mode:'work',passStartedAt:at-60000,passId:'before-start-146',scanMode:'descending',syncRev:4,syncAccount:'e@example.com',syncDirty:false});
+  const h=makeSyncHarness({remote:initial,rev:4,delayMs:1}),storage=sharedScannerStorage({[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)});
+  const app=await loadApp({sharedStorage:storage,cloudSyncFactory:h.factory}),{ctx}=app,CS=ctx.window.CloudSync;
+  t.after(()=>{CS.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',ctx);});
+  await ctx.cloudPull();await syncSettle(15);CS.ready=false;ctx.onAction('start-scan',{dataset:{mode:'halving'}});await ctx.persist();
+  const events=JSON.stringify(ctx.state.decisionEvents),saved=storage.getItem(SYNC_STORE_KEY),remote=JSON.parse(ctx.cloudPayload());
+  const root=remote.decisionEvents.find(event=>event.target?.property==='chain'),mode=remote.decisionEvents.find(event=>event.target?.type==='pass'&&event.target.property==='scanMode');
+  assert.ok(root&&mode,'the actual Start action supplies the paired typed facts');
+  if(fault==='missing root')remote.decisionEvents=remote.decisionEvents.filter(event=>event.id!==root.id);
+  if(fault==='missing mode')remote.decisionEvents=remote.decisionEvents.filter(event=>event.id!==mode.id);
+  if(fault==='mismatched envelope')mode.at++;
+  if(fault==='duplicate mode')remote.decisionEvents.push({...mode,id:mode.id+'-duplicate'});
+  assert.ok(remote.decisionEvents.every(event=>ctx.supportedDecisionEvent(event)),'each individual fact remains supported; group authority is the missing proof');
+  h.writeBehindBack(remote);const cloud=h.doc.payload;CS.ready=true;await ctx.cloudPull();ctx.cloudPushNow();await syncSettle(45);
+  assert.equal(CS.errorCode,fault==='mismatched envelope'?'conflicting-decision-evidence':'unprojectable-decision-evidence');
+  assert.equal(h.doc.payload,cloud,'an incomplete Start group must not be acknowledged or repaired by silently unioning local facts');
+  assert.equal(JSON.stringify(ctx.state.decisionEvents),events);assert.equal(storage.getItem(SYNC_STORE_KEY),saved);
+ });
+});
+
+test('RISK decision recovery guest sign-in: a saved guest No and later authenticated No retain original facts and learning',async t=>{
+ const initial=syncState({tasks:[Object.assign(syncTask('bench','Guest benchmark'),{mu:35,sigma:7}),syncTask('guest','Guest candidate'),syncTask('signed','Signed-in candidate')],chain:['bench'],candidateId:'guest',considered:{},mode:'scan',scanMode:'descending',passStartedAt:Date.now(),passId:'guest-pass-146',settings:{thresholdPct:0,horizonMin:60,samples:250},syncRev:0,syncAccount:null,syncDirty:true});
+ const h=makeSyncHarness({remote:null,rev:0,delayMs:1}),storage=sharedScannerStorage({[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)});
+ const factory=()=>{const CS=h.factory();CS.user=null;return CS;};
+ const {ctx,shim}=await loadApp({sharedStorage:storage,cloudSyncFactory:factory}),CS=ctx.window.CloudSync;
+ t.after(()=>{CS.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',ctx);});
+ ctx.renderScan();assert.match(shim.document.getElementById('scan').innerHTML,/data-act="no"/);ctx.onAction('no',{dataset:{candidate:'guest',benchmark:'bench'}});assert.equal(await ctx.persist(),true);
+ const guest=JSON.stringify(ctx.state.decisionEvents[0]),guestRatings=JSON.stringify(ctx.state.tasks.map(task=>[task.id,task.mu,task.sigma]));
+ assert.equal(JSON.parse(guest).account,null,'a guest action retains its actual original owner');
+ CS.user='e@example.com';await ctx.cloudPull();ctx.cloudPushNow();await syncSettle(80);
+ assert.equal(ctx.state.syncDirty,false,'first sign-in can save the already-learned guest board without rewriting its action');
+ assert.equal(JSON.stringify(ctx.state.decisionEvents[0]),guest);assert.equal(JSON.stringify(ctx.state.tasks.map(task=>[task.id,task.mu,task.sigma])),guestRatings);
+ ctx.renderScan();const candidate=ctx.state.candidateId;assert.equal(candidate,'signed');ctx.onAction('no',{dataset:{candidate,benchmark:'bench'}});assert.equal(await ctx.persist(),true);
+ const signed=ctx.state.decisionEvents.find(event=>event.id!==JSON.parse(guest).id);assert.equal(signed.account,'e@example.com');
+ const finalRatings=JSON.stringify(ctx.state.tasks.map(task=>[task.id,task.mu,task.sigma]));assert.notEqual(finalRatings,guestRatings);
+ ctx.cloudPushNow();await syncSettle(80);assert.equal(ctx.state.syncDirty,false);assert.equal(JSON.stringify(h.remoteState().decisionEvents[0]),guest);
+ const reopened=await loadApp({seedStorage:{[SYNC_STORE_KEY]:storage.getItem(SYNC_STORE_KEY),[LOCAL_HEAD_KEY]:storage.getItem(LOCAL_HEAD_KEY)},cloudSyncFactory:h.factory});
+ t.after(()=>{reopened.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',reopened.ctx);});
+ await reopened.ctx.cloudPull();reopened.ctx.cloudPushNow();await syncSettle(60);assert.equal(JSON.stringify(reopened.ctx.state.tasks.map(task=>[task.id,task.mu,task.sigma])),finalRatings,'cold replay includes guest learning once plus the new authenticated observation');
+ assert.equal(reopened.ctx.state.decisionEvents.length,2);assert.equal(JSON.stringify(reopened.ctx.state.decisionEvents[0]),guest);assert.equal(reopened.shim.document.getElementById('syncBtn').textContent,'☁ synced');
+});
+
+test('RISK decision recovery explicit transfer: consented cross-account Import and Restore preserve original facts and later learning',async t=>{
+ for(const action of ['import','restore'])await t.test(action,async t=>{
+  const source=await decisionRecoveryApp146();
+  t.after(()=>{source.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',source.ctx);});
+  const sourceRaw=JSON.stringify(source.ctx.state),sourceEvents=JSON.stringify(source.ctx.state.decisionEvents),sourceRatings=JSON.stringify(source.ctx.state.tasks.map(task=>[task.id,task.mu,task.sigma]));
+  const initial=syncState({tasks:[syncTask('destination','Destination protected task')],syncRev:1,syncAccount:'destination@example.com',syncDirty:false});
+  const h=makeSyncHarness({remote:initial,rev:1,delayMs:1}),factory=()=>{const CS=h.factory();CS.user='destination@example.com';return CS;};
+  const app=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)},cloudSyncFactory:factory});
+  t.after(()=>{app.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',app.ctx);});
+  await app.ctx.cloudPull();const before=JSON.stringify(app.ctx.state);let consent=0;
+  app.ctx.confirm=message=>{assert.match(message,/belongs to .*e@example.com/);consent++;return true;};
+  if(action==='import'){app.shim.document.getElementById('jsonBox').value=sourceRaw;await app.ctx.onAction('import-json',{});}
+  else{const row=await app.ctx.saveDurableBackup('manual',sourceRaw);app.ctx.openSettings();assert.equal(await app.ctx.restoreDurableBackupById(row.id),true);assert.equal(consent,1);}
+  await app.ctx.persist();app.ctx.cloudPushNow();await syncSettle(80);
+  assert.equal(app.ctx.state.syncDirty,false,'explicitly authorized ownership transfer must not get stuck as a foreign journal');
+  assert.equal(JSON.stringify(app.ctx.state.decisionEvents),sourceEvents,'source event identities, times and owners remain exact');
+  assert.equal(JSON.stringify(app.ctx.state.tasks.filter(task=>task.id!=='destination').map(task=>[task.id,task.mu,task.sigma])),sourceRatings);
+  assert.ok(app.ctx.readLocalBackups().some(row=>row.payload===before),'the displaced destination board has exact durable recovery');
+  assert.equal(app.ctx.state.decisionBaseline.account,'destination@example.com');
+  app.ctx.addTask('New target-account comparison');app.ctx.renderScan();const offered=app.ctx.state.candidateId;assert.ok(offered,'normal scanner offers the authenticated comparison');app.ctx.onAction('no',{dataset:{candidate:offered,benchmark:'bench'}});await app.ctx.persist();
+  app.ctx.cloudPushNow();await syncSettle(60);assert.equal(app.ctx.state.syncDirty,false);assert.ok(h.remoteState().decisionEvents.some(event=>event.account==='destination@example.com'));
+ });
+});
+
+test('RISK decision recovery modern replacement: explicit transfer into an existing decision board keeps exact displaced authority recoverable',async t=>{
+ for(const action of ['import','restore'])await t.test(action,async t=>{
+  const source=await decisionRecoveryApp146(),target=await decisionRecoveryApp146('destination@example.com');
+  for(const app of [source,target])t.after(()=>{app.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',app.ctx);});
+  const CS=target.ctx.window.CloudSync;CS.ready=true;target.ctx.cloudPushNow();await syncSettle(60);assert.equal(target.ctx.state.syncDirty,false);
+  const prior=JSON.stringify(target.ctx.state),raw=JSON.stringify(source.ctx.state),original=JSON.stringify(source.ctx.state.decisionEvents);
+  target.ctx.confirm=()=>true;
+  if(action==='import'){target.shim.document.getElementById('jsonBox').value=raw;assert.equal(await target.ctx.onAction('import-json',{}),true);}
+  else{const row=await target.ctx.saveDurableBackup('manual',raw);target.ctx.openSettings();assert.equal(await target.ctx.restoreDurableBackupById(row.id),true);}
+  await target.ctx.persist();target.ctx.cloudPushNow();await syncSettle(70);
+  assert.equal(target.ctx.state.syncDirty,false,'authorized replacement into a modern destination must complete without combining incompatible frozen learning');
+  assert.equal(JSON.stringify(target.ctx.state.decisionEvents),original,'the explicitly selected source journal stays exact');
+  assert.ok(target.ctx.readLocalBackups().some(row=>row.payload===prior),'the complete displaced modern target authority remains durably recoverable');
+  assert.equal(target.ctx.window.CloudSync.errorCode??null,null);assert.equal(target.ctx.decisionEvidenceIssue(target.h.remoteState(),'destination@example.com'),null);
+ });
+});
+
+test('RISK decision recovery replacement scope: exact retired branches stay retired while new changed and unknown peer facts stay held',async t=>{
+ for(const fault of ['unchanged retired copy','changed retired fact','new peer fact','unknown peer fact'])await t.test(fault,async t=>{
+  const source=await decisionRecoveryApp146(),target=await decisionRecoveryApp146('destination@example.com');
+  for(const app of [source,target])t.after(()=>{app.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',app.ctx);});
+  const CS=target.ctx.window.CloudSync;CS.ready=true;target.ctx.cloudPushNow();await syncSettle(50);
+  const prior=JSON.stringify(target.ctx.state),raw=JSON.stringify(source.ctx.state),selected=JSON.stringify(source.ctx.state.decisionEvents);
+  target.shim.document.getElementById('jsonBox').value=raw;assert.equal(await target.ctx.onAction('import-json',{}),true);await target.ctx.persist();target.ctx.cloudPushNow();await syncSettle(50);assert.equal(target.ctx.state.syncDirty,false);
+  const receipt=target.ctx.state.decisionBaseline.replacement[0];assert.equal(JSON.stringify(receipt.baseline),JSON.stringify(JSON.parse(prior).decisionBaseline));
+  assert.deepEqual(JSON.parse(target.ctx.LZString.decompressFromUTF16(receipt.facts[0].witness)),JSON.parse(prior).decisionEvents[0]);
+  const stale=JSON.parse(prior);
+  if(fault==='changed retired fact')stale.decisionEvents[0].at++;
+  if(fault==='new peer fact')stale.decisionEvents.push({...stale.decisionEvents[0],id:'unattested-peer-decision-146'});
+  if(fault==='unknown peer fact')stale.decisionEvents.push({v:99,id:'future-peer-146',opaque:'sole future authority'});
+  target.h.writeBehindBack(stale);const cloud=target.h.doc.payload,saved=target.storage.getItem(SYNC_STORE_KEY);
+  await target.ctx.cloudPull();target.ctx.cloudPushNow();await syncSettle(60);
+  assert.equal(JSON.stringify(target.ctx.state.decisionEvents),selected,'retirement cannot reapply a displaced choice or authorize a new peer fact');
+  if(fault==='unchanged retired copy'){assert.equal(target.ctx.state.syncDirty,false);assert.equal(target.ctx.window.CloudSync.errorCode??null,null);assert.equal(JSON.stringify(target.h.remoteState().decisionEvents),selected);}
+  else{assert.ok(target.ctx.window.CloudSync.errorCode,'unattested facts cannot disappear under a baseline-only retirement bypass');assert.equal(target.h.doc.payload,cloud);assert.equal(target.storage.getItem(SYNC_STORE_KEY),saved);}
+ });
+});
+
+test('RISK decision recovery same-account replacement: Import and Restore keep the selected modern learning baseline intact',async t=>{
+ for(const action of ['import','restore'])await t.test(action,async t=>{
+  const source=await decisionRecoveryApp146(),target=await decisionRecoveryApp146();
+  for(const app of [source,target])t.after(()=>{app.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',app.ctx);});
+  const CS=target.ctx.window.CloudSync;CS.ready=true;target.ctx.cloudPushNow();await syncSettle(45);
+  const raw=JSON.stringify(source.ctx.state),selected=JSON.stringify(source.ctx.state.decisionBaseline),events=JSON.stringify(source.ctx.state.decisionEvents);
+  if(action==='import'){target.shim.document.getElementById('jsonBox').value=raw;assert.equal(await target.ctx.onAction('import-json',{}),true);}
+  else{const row=await target.ctx.saveDurableBackup('manual',raw);target.ctx.confirm=()=>true;target.ctx.openSettings();assert.equal(await target.ctx.restoreDurableBackupById(row.id),true);}
+  await target.ctx.persist();target.ctx.cloudPushNow();await syncSettle(60);assert.equal(target.ctx.state.syncDirty,false);
+  const actual=JSON.parse(JSON.stringify(target.ctx.state.decisionBaseline));delete actual.replacement;
+  assert.equal(JSON.stringify(actual),selected,'same-account replacement must not freeze a new learning baseline or broaden inherited provenance');
+  assert.equal(JSON.stringify(target.ctx.state.decisionEvents),events);assert.equal(target.ctx.state.decisionBaseline.inheritance,undefined);
+ });
+});
+
+test('RISK decision recovery replacement durability: failed selected-source recovery leaves a modern destination and input exact for retry',async t=>{
+ const source=await decisionRecoveryApp146(),target=await decisionRecoveryApp146();
+ for(const app of [source,target])t.after(()=>{app.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',app.ctx);});
+ const CS=target.ctx.window.CloudSync;CS.ready=true;target.ctx.cloudPushNow();await syncSettle(50);
+ const prior=JSON.stringify(target.ctx.state),saved=target.storage.getItem(SYNC_STORE_KEY),cloud=target.h.doc.payload,raw=JSON.stringify(source.ctx.state);
+ const backup=target.ctx.saveDurableBackup;target.ctx.saveDurableBackup=async(kind,...args)=>kind==='decision-replacement-source'?null:backup(kind,...args);
+ target.shim.document.getElementById('jsonBox').value=raw;assert.equal(await target.ctx.onAction('import-json',{}),false);
+ assert.equal(JSON.stringify(target.ctx.state),prior);assert.equal(target.storage.getItem(SYNC_STORE_KEY),saved);assert.equal(target.h.doc.payload,cloud);assert.equal(target.shim.document.getElementById('jsonBox').value,raw);
+ target.ctx.saveDurableBackup=backup;assert.equal(await target.ctx.onAction('import-json',{}),true);await target.ctx.persist();target.ctx.cloudPushNow();await syncSettle(70);
+ assert.equal(target.ctx.state.syncDirty,false);assert.equal(JSON.stringify(target.ctx.state.decisionEvents),JSON.stringify(source.ctx.state.decisionEvents));
+ assert.ok(target.ctx.readLocalBackups().some(row=>row.payload===prior));assert.ok(target.ctx.readLocalBackups().some(row=>row.payload===raw));
+});
+
+test('RISK decision recovery unknown destination: sole recovery authority blocks explicit journal replacement without changing either board',async t=>{
+ for(const key of ['decisionBaselineRecovery','decisionEventsRecovery'])await t.test(key,async t=>{
+  const source=await decisionRecoveryApp146();t.after(()=>{source.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',source.ctx);});
+  const initial=syncState({tasks:[syncTask('protected-recovery','Unknown recovery owner')],syncAccount:'destination@example.com',syncRev:2,syncDirty:false,[key]:[{v:99,opaque:'sole unreplayable destination authority'}]});
+  const h=makeSyncHarness({remote:initial,rev:2,delayMs:1}),app=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)},cloudSyncFactory:()=>{const CS=h.factory();CS.user='destination@example.com';CS.ready=false;return CS;}});
+  t.after(()=>{app.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',app.ctx);});
+  const before=JSON.stringify(app.ctx.state),saved=app.shim.localStorage.getItem(SYNC_STORE_KEY),cloud=h.doc.payload,raw=JSON.stringify(source.ctx.state);
+  app.shim.document.getElementById('jsonBox').value=raw;assert.equal(await app.ctx.onAction('import-json',{}),false,'explicit replacement cannot retire unknown authority without understanding its exact facts');
+  assert.equal(JSON.stringify(app.ctx.state),before);assert.equal(app.shim.localStorage.getItem(SYNC_STORE_KEY),saved);assert.equal(h.doc.payload,cloud);assert.equal(app.shim.document.getElementById('jsonBox').value,raw);
+ });
+});
+
+test('RISK decision recovery replacement overlap: selected shared facts survive a displaced cloud branch returning after Import',async t=>{
+ const source=await decisionRecoveryApp146();t.after(()=>{source.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',source.ctx);});
+ const raw=JSON.stringify(source.ctx.state),initial=JSON.parse(raw),h=makeSyncHarness({remote:initial,rev:4,delayMs:1});
+ const app=await loadApp({seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw},cloudSyncFactory:h.factory}),{ctx,shim}=app,CS=ctx.window.CloudSync;
+ t.after(()=>{CS.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',ctx);});
+ await ctx.cloudPull();await syncSettle(15);CS.ready=false;hydrateUnchangedEditorDraft(app,'bench');shim.document.getElementById('etTitle').value='Later destination title';ctx.onAction('save-edit',{dataset:{id:'bench'}});await ctx.persist();CS.ready=true;ctx.cloudPushNow();await syncSettle(50);assert.equal(ctx.state.syncDirty,false);
+ const displaced=JSON.stringify(ctx.state);shim.document.getElementById('jsonBox').value=raw;assert.equal(await ctx.onAction('import-json',{}),true);await ctx.persist();ctx.cloudPushNow();await syncSettle(50);assert.equal(ctx.state.syncDirty,false);
+ assert.equal(JSON.stringify(ctx.state.decisionEvents),JSON.stringify(source.ctx.state.decisionEvents),'the selected original No stays active after explicit Import');
+ h.writeBehindBack(JSON.parse(displaced));await ctx.cloudPull();ctx.cloudPushNow();await syncSettle(65);
+ assert.equal(JSON.stringify(ctx.state.decisionEvents),JSON.stringify(source.ctx.state.decisionEvents),'the selected shared No cannot be retired with the displaced editor fact in reversed cloud merge');
+ assert.equal(JSON.stringify(h.remoteState().decisionEvents),JSON.stringify(source.ctx.state.decisionEvents));assert.equal(ctx.state.syncDirty,false);assert.equal(ctx.state.tasks.find(task=>task.id==='bench').title,'Recovery benchmark');
+});
+
+test('RISK decision recovery retired identity: changed same-ID retired editor facts cannot become fresh authority',async t=>{
+ const source=await decisionRecoveryApp146();t.after(()=>{source.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',source.ctx);});
+ const raw=JSON.stringify(source.ctx.state),initial=JSON.parse(raw),h=makeSyncHarness({remote:initial,rev:4,delayMs:1});
+ const app=await loadApp({seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw},cloudSyncFactory:h.factory}),{ctx,shim}=app,CS=ctx.window.CloudSync;
+ t.after(()=>{CS.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',ctx);});
+ await ctx.cloudPull();await syncSettle(15);CS.ready=false;hydrateUnchangedEditorDraft(app,'bench');shim.document.getElementById('etTitle').value='Destination chosen title';ctx.onAction('save-edit',{dataset:{id:'bench'}});await ctx.persist();CS.ready=true;ctx.cloudPushNow();await syncSettle(50);
+ const displaced=JSON.parse(JSON.stringify(ctx.state));shim.document.getElementById('jsonBox').value=raw;assert.equal(await ctx.onAction('import-json',{}),true);await ctx.persist();ctx.cloudPushNow();await syncSettle(50);assert.equal(ctx.state.syncDirty,false);
+ const row=displaced.decisionEvents.find(event=>event.kind==='current-choice'&&event.target.property==='title');assert.ok(row);row.value='Changed retired fact';displaced.tasks.find(task=>task.id==='bench').title=row.value;
+ assert.equal(ctx.decisionEvidenceIssue(displaced,'e@example.com'),null,'the peer branch is internally coherent; the conflict is its changed retired identity');
+ h.writeBehindBack(displaced);const cloud=h.doc.payload,saved=app.shim.localStorage.getItem(SYNC_STORE_KEY),events=JSON.stringify(ctx.state.decisionEvents);
+ await ctx.cloudPull();ctx.cloudPushNow();await syncSettle(60);
+ assert.equal(CS.errorCode,'conflicting-decision-evidence','retirement records immutable identity as well as exact bytes');
+ assert.equal(JSON.stringify(ctx.state.decisionEvents),events);assert.equal(ctx.state.tasks.find(task=>task.id==='bench').title,'Recovery benchmark');assert.equal(h.doc.payload,cloud);assert.equal(app.shim.localStorage.getItem(SYNC_STORE_KEY),saved);
+});
+
+test('RISK decision recovery inheritance authority: changed attested facts stay held and ordinary account switches gain no consent',async t=>{
+ const source=await decisionRecoveryApp146();t.after(()=>{source.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',source.ctx);});
+ const raw=JSON.stringify(source.ctx.state),original=source.event,baseline=JSON.stringify(source.ctx.state.decisionBaseline);
+ const initial=syncState({tasks:[],syncRev:0,syncAccount:'target@example.com',syncDirty:false}),h=makeSyncHarness({remote:null,rev:0,delayMs:1});
+ const app=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)},cloudSyncFactory:()=>{const CS=h.factory();CS.user='target@example.com';return CS;}}),CS=app.ctx.window.CloudSync;
+ t.after(()=>{CS.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',app.ctx);});
+ await app.ctx.cloudPull();app.shim.document.getElementById('jsonBox').value=raw;await app.ctx.onAction('import-json',{});await app.ctx.persist();app.ctx.cloudPushNow();await syncSettle(70);
+ assert.equal(app.ctx.state.syncDirty,false);
+ const receipt=app.ctx.state.decisionBaseline.inheritance[0];assert.equal(receipt.reason,'explicit-import');assert.equal(JSON.stringify(receipt.sourceBaseline),baseline,'the original source baseline stays exact');
+ const witness=receipt.facts.find(fact=>fact.id===original.id);assert.deepEqual(JSON.parse(app.ctx.LZString.decompressFromUTF16(witness.witness)),original,'the lossless receipt attests the exact original semantic fact');
+ const cloud=h.doc.payload;CS.ready=false;app.ctx.state.decisionEvents[0].at+=1;await app.ctx.persist();const saved=app.shim.localStorage.getItem(SYNC_STORE_KEY);
+ CS.ready=true;await app.ctx.onAction('sync-retry',{});app.ctx.cloudPushNow();await syncSettle(40);
+ assert.equal(CS.errorCode,'decision-account-mismatch','consent does not permit changed foreign-owned facts');assert.equal(h.doc.payload,cloud);assert.equal(app.shim.localStorage.getItem(SYNC_STORE_KEY),saved);
+ const pull=CS.pull;CS.pull=async()=>CS.user==='another@example.com'?{empty:true}:pull();CS.user='another@example.com';app.shim.window.dispatchEvent({type:'cloudsync'});await app.ctx.cloudPull();await syncSettle(30);
+ assert.equal(app.ctx.state.syncAccount,'another@example.com');assert.equal(app.ctx.state.tasks.length,0);assert.equal(app.ctx.state.decisionEvents,undefined);assert.equal(app.ctx.state.decisionBaseline,undefined,'ordinary account transition cannot reuse explicit import consent');
+ assert.ok(app.ctx.readLocalBackups().some(row=>row.payload.includes('explicit-import')),'the previous account board remains recoverable');assert.equal(h.doc.payload,cloud);
+});
+
+test('RISK decision recovery inheritance durability: failed replacement recovery keeps both boards and an explicit retry succeeds',async t=>{
+ const {IDBFactory}=await import('fake-indexeddb');
+ for(const backend of ['browser fallback','IndexedDB'])await t.test(backend,async t=>{
+  const source=await decisionRecoveryApp146();t.after(()=>{source.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',source.ctx);});
+  const raw=JSON.stringify(source.ctx.state),initial=syncState({tasks:[syncTask('target','Target sole saved work')],syncRev:1,syncAccount:'target@example.com',syncDirty:false}),h=makeSyncHarness({remote:initial,rev:1,delayMs:1});
+  const app=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)},...(backend==='IndexedDB'?{indexedDBProvider:new IDBFactory(),deviceDbName:'inheritance-failure-146-'+Date.now()+'-'+Math.random()}:{}),cloudSyncFactory:()=>{const CS=h.factory();CS.user='target@example.com';return CS;}});
+  t.after(async()=>{app.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',app.ctx);await app.ctx.window.ScannerDeviceStore?.close?.();});
+  await app.ctx.cloudPull();await syncSettle(20);const before=JSON.stringify(app.ctx.state),cloud=h.doc.payload,store=app.ctx.window.ScannerDeviceStore;
+  const durable=store?(await store.readHead()).payload:app.shim.localStorage.getItem(SYNC_STORE_KEY);
+  let restore;
+  if(store){const put=store.putBackup;store.putBackup=async()=>({error:true,code:'forced-recovery-failure'});restore=()=>{store.putBackup=put;};}
+  else{const write=app.shim.localStorage.setItem;app.shim.localStorage.setItem=(key,value)=>{if(key===LOCAL_BACKUPS_KEY)throw Object.assign(Error('isolated recovery quota'),{name:'QuotaExceededError'});return write(key,value);};restore=()=>{app.shim.localStorage.setItem=write;};}
+  app.shim.document.getElementById('jsonBox').value=raw;assert.equal(await app.ctx.onAction('import-json',{}),false);
+  assert.equal(JSON.stringify(app.ctx.state),before,'failed mandatory recovery cannot replace destination work');assert.equal(h.doc.payload,cloud);assert.equal(app.shim.document.getElementById('jsonBox').value,raw,'the source input is retained');
+  assert.equal(store?(await store.readHead()).payload:app.shim.localStorage.getItem(SYNC_STORE_KEY),durable);
+  restore();assert.equal(await app.ctx.onAction('import-json',{}),true);await app.ctx.persist();app.ctx.cloudPushNow();await syncSettle(70);
+  assert.equal(app.ctx.state.syncDirty,false);assert.equal(JSON.stringify(h.remoteState().decisionEvents),JSON.stringify(source.ctx.state.decisionEvents));
+  const backups=store?await store.listBackups():app.ctx.readLocalBackups();assert.ok(backups.some(row=>row.payload===before));assert.ok(backups.some(row=>row.payload===raw));
+ });
+});
+
+test('RISK decision recovery legacy update: safe reload and Retry hold a sole unrepresented legacy comparison instead of acknowledging lost learning',async t=>{
+ const {SUPPORTED_RELEASE,readReleasedClient}=await import('./scripts/backward-compatibility.mjs'),floor=readReleasedClient(__dirname,SUPPORTED_RELEASE);
+ const source=await decisionRecoveryApp146();t.after(()=>{source.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',source.ctx);});
+ source.h.writeBehindBack(JSON.parse(source.ctx.cloudPayload()));const cloud=source.h.doc.payload;
+ const seeded={...JSON.parse(cloud),syncRev:source.h.doc.rev,syncAccount:'e@example.com',syncDirty:false};
+ const factory=()=>{const CS=source.h.factory();CS.push=async()=>{CS.status='error';CS.errorStage='push';CS.errorCode='permission-denied';return {error:true};};return CS;};
+ const old=await loadApp({appSource:extractAppScript(floor.html),seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(seeded),[LOCAL_HEAD_KEY]:JSON.stringify(seeded)},cloudSyncFactory:factory});
+ t.after(()=>{old.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',old.ctx);});
+ await old.ctx.cloudPull();const before=old.ctx.state.tasks.find(task=>task.id==='bench').mu;
+ old.ctx.addTask('Legacy sole pending comparison');old.ctx.renderScan();const candidate=old.ctx.state.candidateId;assert.ok(candidate);
+ old.ctx.onAction('no',{dataset:{candidate,benchmark:'bench'}});await old.ctx.persist();const learned=old.ctx.state.tasks.find(task=>task.id==='bench').mu;assert.notEqual(learned,before);
+ old.ctx.cloudPushNow();await syncSettle(40);assert.equal(old.ctx.window.CloudSync.errorCode,'permission-denied');
+ let reloads=0;old.ctx.window.location={reload(){reloads++;}};await old.ctx.onAction('sync-reload',{});assert.equal(reloads,1,'historical safe reload first saves the exact unchanged pending board');
+ const pending=old.shim.localStorage.getItem(SYNC_STORE_KEY);assert.equal(JSON.parse(pending).tasks.find(task=>task.id==='bench').mu,learned);
+ const upgraded=await loadApp({seedStorage:{[SYNC_STORE_KEY]:pending,[LOCAL_HEAD_KEY]:pending},cloudSyncFactory:()=>{const CS=source.h.factory();CS.ready=false;return CS;}});
+ t.after(()=>{upgraded.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',upgraded.ctx);});
+ upgraded.ctx.window.CloudSync.ready=true;await upgraded.ctx.onAction('sync-retry',{});upgraded.ctx.cloudPushNow();await syncSettle(50);
+ assert.equal(upgraded.ctx.state.tasks.find(task=>task.id==='bench').mu,learned,'upgrade must retain the sole pending legacy comparison effect while held');
+ assert.equal(upgraded.ctx.window.CloudSync.errorCode,'unrepresented-legacy-learning');assert.equal(upgraded.shim.document.getElementById('syncBtn').textContent,'☁ error');assert.equal(source.h.doc.payload,cloud);
+ assert.ok(upgraded.shim.localStorage.getItem(SYNC_STORE_KEY)===pending || upgraded.ctx.readLocalBackups().some(row=>row.payload===pending),'exact pending legacy bytes remain durable');
+});
+
+test('RISK decision recovery retired comparison effects: exact stale returns cannot revive No Yes Dot or Dislodge after two replacements and peer progress',async t=>{
+ for(const action of ['no','yes','dot','dislodge'])await t.test(action,async t=>{
+  const {local,peer,h,initial,at}=await scopedUndoClients(),ctx=local.ctx;
+  for(const app of [local,peer])t.after(()=>{app.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',app.ctx);});
+  if(action==='no'||action==='yes')ctx.onAction(action,{dataset:{candidate:'undo-local',benchmark:'undo-base'}});
+  else if(action==='dot'){hydrateUnchangedEditorDraft(local,'undo-local');ctx.onAction('dot-task',{dataset:{id:'undo-local'}});}
+  else ctx.onAction('dislodge',{dataset:{benchmark:'undo-base'}});
+  await ctx.persist();ctx.window.CloudSync.ready=true;await ctx.cloudPushNow();await syncSettle(35);const stale=JSON.parse(JSON.stringify(ctx.state));
+  const replace=async()=>{local.shim.document.getElementById('jsonBox').value=JSON.stringify(initial);assert.equal(await ctx.onAction('import-json',{}),true);await ctx.persist();await ctx.cloudPushNow();await syncSettle(35);assert.equal(ctx.state.syncDirty,false);};
+  await replace();const selected={chain:Array.from(ctx.state.chain),considered:JSON.parse(JSON.stringify(ctx.state.considered)),ratings:JSON.stringify(ctx.state.tasks.map(task=>[task.id,task.mu,task.sigma]))};
+  h.writeBehindBack(stale);await ctx.cloudPull();await ctx.cloudPushNow();await syncSettle(45);
+  assert.deepEqual(Array.from(ctx.state.chain),selected.chain,'an exact retired comparison cannot restore its former chain effect');
+  assert.deepEqual(JSON.parse(JSON.stringify(ctx.state.considered)),selected.considered,'an exact retired comparison cannot restore its former No or Dislodged mark');
+  assert.equal(JSON.stringify(ctx.state.tasks.map(task=>[task.id,task.mu,task.sigma])),selected.ratings);assert.equal(ctx.state.decisionEvents.length,0);assert.equal(ctx.state.syncDirty,false);
+  await replace();peer.ctx.window.CloudSync.ready=true;await peer.ctx.cloudPull();await saveEditorChoice(peer,'undo-peer',at+500,{title:'Peer choice after replacements'});hydrateUnchangedEditorDraft(peer,'undo-peer');peer.ctx.onAction('dot-task',{dataset:{id:'undo-peer'}});await peer.ctx.persist();await peer.ctx.cloudPushNow();await syncSettle(45);await ctx.cloudPull();await ctx.cloudPushNow();await syncSettle(35);
+  const peerRows=JSON.stringify(ctx.state.decisionEvents),peerRatings=JSON.stringify(ctx.state.tasks.map(task=>[task.id,task.mu,task.sigma]));assert.ok(ctx.state.decisionEvents.some(row=>row.kind==='comparison'&&row.action==='dot'));
+  h.writeBehindBack(stale);await ctx.cloudPull();await ctx.cloudPushNow();await syncSettle(45);
+  assert.deepEqual(Array.from(ctx.state.chain),['undo-base','undo-peer'],'precise retirement must retain the new independent peer Dot');assert.equal(ctx.state.tasks.find(task=>task.id==='undo-peer').title,'Peer choice after replacements');
+  assert.equal(JSON.stringify(ctx.state.decisionEvents),peerRows);assert.equal(JSON.stringify(ctx.state.tasks.map(task=>[task.id,task.mu,task.sigma])),peerRatings);assert.equal(ctx.state.considered['undo-local'],undefined);assert.equal(ctx.state.considered['undo-base'],undefined);assert.equal(ctx.state.syncDirty,false);assert.equal(JSON.stringify(h.remoteState().decisionEvents),peerRows);
+ });
+});
+
+test('RISK decision recovery selected legacy pass: exact retired comparisons cannot replace the imported pass draw root or No marks',async t=>{
+ for(const action of ['no','yes','dot','dislodge','title-only'])await t.test(action,async t=>{
+  const {local,peer,h,initial,at}=await scopedUndoClients(),ctx=local.ctx;
+  for(const app of [local,peer])t.after(()=>{app.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',app.ctx);});
+  if(action==='title-only')await saveEditorChoice(local,'undo-local',at+100,{title:'Displaced title-only choice'});
+  else if(action==='no'||action==='yes')ctx.onAction(action,{dataset:{candidate:'undo-local',benchmark:'undo-base'}});
+  else if(action==='dot'){hydrateUnchangedEditorDraft(local,'undo-local');ctx.onAction('dot-task',{dataset:{id:'undo-local'}});}
+  else ctx.onAction('dislodge',{dataset:{benchmark:'undo-base'}});
+  await ctx.persist();ctx.window.CloudSync.ready=true;await ctx.cloudPushNow();await syncSettle(35);const displaced=JSON.parse(JSON.stringify(ctx.state));
+  // A plain saved board is a supported explicit selection: it need not invent
+  // modern Start facts to retain its different current pass and frozen draw.
+  const selected=JSON.parse(JSON.stringify(initial));Object.assign(selected,{chain:['undo-peer'],candidateId:null,mode:'scan',scanMode:'squared',passId:'selected-legacy-pass-Q',passStartedAt:at-5000,considered:{'undo-local':'no'},cantAt:{},workedAt:{},chance:{seed:'selected-Q-frozen-draw',at:at-5000,weights:{},opponents:selected.tasks.map(task=>({id:task.id,mu:task.mu,sigma:task.sigma}))}});selected.settings.scanMode='squared';
+  assert.equal(selected.decisionBaseline,undefined);assert.equal(selected.decisionEvents,undefined);local.shim.document.getElementById('jsonBox').value=JSON.stringify(selected);assert.equal(await ctx.onAction('import-json',{}),true);await ctx.persist();await ctx.cloudPushNow();await syncSettle(40);assert.equal(ctx.state.syncDirty,false);assert.equal(ctx.state.decisionEvents.length,0);
+  const pass=board=>JSON.stringify(['passId','passStartedAt','mode','scanMode','chance','chain','candidateId','interventionActive','considered','cantAt','workedAt'].map(key=>[key,board[key]]));
+  const chosen=pass(ctx.state),chosenRatings=JSON.stringify(ctx.state.tasks.map(task=>[task.id,task.mu,task.sigma]));assert.equal(ctx.state.passId,selected.passId);assert.deepEqual(Array.from(ctx.state.chain),['undo-peer']);assert.equal(ctx.state.considered['undo-local'],'no');assert.equal(ctx.state.chance.seed,selected.chance.seed);
+  h.writeBehindBack(displaced);await ctx.cloudPull();await ctx.cloudPushNow();await syncSettle(45);
+  assert.equal(pass(ctx.state),chosen,'the selected legacy pass is coherent authority even with no active modern Start or comparison facts');assert.equal(pass(h.remoteState()),chosen);assert.equal(JSON.stringify(ctx.state.tasks.map(task=>[task.id,task.mu,task.sigma])),chosenRatings);assert.equal(ctx.state.settings.scanMode,'squared');assert.equal(ctx.state.syncDirty,false);assert.equal(ctx.window.CloudSync.errorCode??null,null);
+  peer.ctx.window.CloudSync.ready=true;await peer.ctx.cloudPull();await saveEditorChoice(peer,'undo-base',at+500,{title:'Peer progress in selected pass'});hydrateUnchangedEditorDraft(peer,'undo-base');peer.ctx.onAction('dot-task',{dataset:{id:'undo-base'}});await peer.ctx.persist();await peer.ctx.cloudPushNow();await syncSettle(40);await ctx.cloudPull();await ctx.cloudPushNow();await syncSettle(35);
+  const activePass=pass(ctx.state),facts=JSON.stringify(ctx.state.decisionEvents),ratings=JSON.stringify(ctx.state.tasks.map(task=>[task.id,task.mu,task.sigma]));assert.deepEqual(Array.from(ctx.state.chain),['undo-peer','undo-base']);assert.ok(ctx.state.decisionEvents.some(event=>event.kind==='comparison'&&event.action==='dot'));
+  h.writeBehindBack(displaced);await ctx.cloudPull();await ctx.cloudPushNow();await syncSettle(45);
+  assert.equal(pass(ctx.state),activePass,'precise pass retirement preserves later peer progress in the selected pass');assert.equal(pass(h.remoteState()),activePass);assert.equal(ctx.state.settings.scanMode,'squared');assert.equal(ctx.state.tasks.find(task=>task.id==='undo-base').title,'Peer progress in selected pass');assert.equal(JSON.stringify(ctx.state.decisionEvents),facts);assert.equal(JSON.stringify(ctx.state.tasks.map(task=>[task.id,task.mu,task.sigma])),ratings);assert.equal(ctx.state.syncDirty,false);assert.equal(ctx.window.CloudSync.errorCode??null,null);
+ });
+});
+
+test('RISK decision recovery transitive replacement: a second plain Import recognizes exact retired learning and still holds malformed nested ownership',async t=>{
+ const {local,peer,h,initial}=await scopedUndoClients(),ctx=local.ctx;
+ for(const app of [local,peer])t.after(()=>{app.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',app.ctx);});
+ ctx.onAction('no',{dataset:{candidate:'undo-local',benchmark:'undo-base'}});await ctx.persist();const original=JSON.parse(JSON.stringify(ctx.state.decisionEvents[0]));ctx.window.CloudSync.ready=true;await ctx.cloudPushNow();await syncSettle(35);
+ for(let i=0;i<2;i++){local.shim.document.getElementById('jsonBox').value=JSON.stringify(initial);assert.equal(await ctx.onAction('import-json',{}),true);await ctx.persist();await ctx.cloudPushNow();await syncSettle(35);assert.equal(ctx.state.syncDirty,false,'every explicit replacement must recognize the exact retained history lineage');assert.equal(ctx.window.CloudSync.errorCode??null,null);assert.equal(ctx.state.decisionEvents.length,0);}
+ const nested=ctx.state.decisionBaseline.replacement[0].baseline.replacement[0].facts[0];assert.deepEqual(JSON.parse(ctx.LZString.decompressFromUTF16(nested.witness)),original,'the original retired fact stays lossless through the nested replacement');
+ const cloud=h.doc.payload;ctx.window.CloudSync.ready=false;const changed=JSON.parse(ctx.LZString.decompressFromUTF16(nested.witness));changed.account='foreign@example.com';nested.witness=ctx.LZString.compressToUTF16(ctx.canonicalDecisionFact(changed));await ctx.persist();const saved=local.shim.localStorage.getItem(SYNC_STORE_KEY);
+ ctx.window.CloudSync.ready=true;await ctx.onAction('sync-retry',{});await syncSettle(40);assert.equal(ctx.window.CloudSync.errorCode,'unsupported-decision-evidence');assert.equal(h.doc.payload,cloud);assert.equal(local.shim.localStorage.getItem(SYNC_STORE_KEY),saved,'transitive recognition cannot authorize a mutated foreign witness');
+});
+
+test('RISK decision recovery replacement idempotence: repeated actual Export Import retains one exact authority tree after durable recovery',async t=>{
+ const {local,peer}=await scopedUndoClients(),ctx=local.ctx;
+ for(const app of [local,peer])t.after(()=>{app.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',app.ctx);});
+ ctx.onAction('no',{dataset:{candidate:'undo-local',benchmark:'undo-base'}});await ctx.persist();
+ const baseline=JSON.stringify(ctx.state.decisionBaseline),events=JSON.stringify(ctx.state.decisionEvents),ratings=JSON.stringify(ctx.state.tasks.map(task=>[task.id,task.mu,task.sigma]));
+ for(let i=0;i<11;i++){const raw=JSON.stringify(ctx.state);ctx.onAction('export-json',{});assert.equal(JSON.stringify(JSON.parse(local.shim.document.getElementById('jsonBox').value).decisionBaseline),baseline,'the actual Export control carries the selected authority');assert.equal(await ctx.onAction('import-json',{}),true);await ctx.persist();assert.equal(JSON.stringify(ctx.state.decisionBaseline),baseline,'same authority must not duplicate its complete prior tree');assert.equal(JSON.stringify(ctx.state.decisionEvents),events);assert.equal(JSON.stringify(ctx.state.tasks.map(task=>[task.id,task.mu,task.sigma])),ratings);assert.ok(ctx.readLocalBackups().some(row=>row.payload===raw),'required exact recovery still precedes the no-op authority guard');}
+});
+
+test('RISK final decision review: repeated manual Restore and Undo retain bounded exact lineage and peer progress',async t=>{
+ const {local,peer,h,at,initial}=await scopedUndoClients(),ctx=local.ctx;for(const app of [local,peer])t.after(()=>{app.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',app.ctx);});
+ ctx.onAction('no',{dataset:{candidate:'undo-local',benchmark:'undo-base'}});await ctx.persist();const original=JSON.stringify(ctx.state.decisionEvents),ratings=JSON.stringify(ctx.state.tasks.map(task=>[task.id,task.mu,task.sigma])),start=JSON.stringify(ctx.state.decisionBaseline).length,backup=await ctx.saveDurableBackup('manual',JSON.stringify(initial));let firstGrowth,retired;
+ for(let cycle=1;cycle<=10;cycle++){const sourceBaseline=ctx.canonicalDecisionFact(ctx.state.decisionBaseline);ctx.openSettings();assert.equal(await ctx.restoreDurableBackupById(backup.id),true);await ctx.persist();if(cycle===1)retired=JSON.parse(ctx.cloudPayload());assert.equal(await ctx.onAction('undo',{}),true);await ctx.persist();const bytes=JSON.stringify(ctx.state.decisionBaseline).length;if(cycle===1)firstGrowth=bytes-start;assert.ok(bytes<=start+cycle*firstGrowth*2,'overlapping exact authority must grow at most linearly across supported Restore/Undo cycles: '+JSON.stringify({cycle,bytes,start,firstGrowth}));assert.equal(JSON.stringify(ctx.state.decisionEvents),original);assert.equal(JSON.stringify(ctx.state.tasks.map(task=>[task.id,task.mu,task.sigma])),ratings);assert.equal(ctx.decisionEvidenceIssue(ctx.state,'e@example.com'),null);assert.ok(ctx.replacementDecisionReceipts(ctx.state.decisionBaseline).some(row=>ctx.canonicalDecisionFact(row.baseline)===sourceBaseline),'each original source baseline stays lossless inside the exact archived lineage');assert.ok(ctx.readLocalBackups().some(row=>row.id===backup.id&&row.payload===JSON.stringify(initial)));}
+ ctx.window.CloudSync.ready=true;await ctx.cloudPushNow();await syncSettle(35);peer.ctx.window.CloudSync.ready=true;await peer.ctx.cloudPull();await saveEditorChoice(peer,'undo-peer',at+500,{title:'Peer progress after Restore cycles'});await peer.ctx.cloudPushNow();await syncSettle(35);await ctx.cloudPull();h.writeBehindBack(retired);await ctx.cloudPull();await ctx.cloudPushNow();await syncSettle(35);assert.equal(JSON.stringify(ctx.state.decisionEvents.filter(row=>row.kind==='no')),original);assert.equal(ctx.state.tasks.find(row=>row.id==='undo-peer').title,'Peer progress after Restore cycles');assert.equal(ctx.state.syncDirty,false);assert.ok(ctx.retiredDecisionBaseline(ctx.state.decisionBaseline,retired.decisionBaseline),'the exact old replacement branch remains recognized after deduplication');
+ const raw=local.shim.localStorage.getItem(SYNC_STORE_KEY),cold=await loadAppAtTime(at+600,{seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw},cloudSyncFactory:h.factory});t.after(()=>{cold.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',cold.ctx);});await cold.ctx.cloudPull();assert.equal(cold.ctx.state.tasks.find(row=>row.id==='undo-peer').title,'Peer progress after Restore cycles');assert.equal(JSON.stringify(cold.ctx.state.decisionEvents.filter(row=>row.kind==='no')),original);assert.equal(cold.ctx.state.syncDirty,false);
+});
+
+test('RISK decision recovery guest Reset inheritance: replacement-only authority supports first signed No and the existing local Reset Undo',async t=>{
+ for(const route of ['signed comparison','Reset Undo'])await t.test(route,async t=>{
+  const at=Date.parse('2026-10-17T15:00:00Z'),initial=syncState({tasks:[syncTask('guest-reset-bench','Guest benchmark'),syncTask('guest-reset-choice','Guest candidate')],chain:['guest-reset-bench'],candidateId:'guest-reset-choice',passId:'guest-reset-pass',passStartedAt:at-60000,scanMode:'descending',syncAccount:null,settings:{thresholdPct:0,horizonMin:60,samples:250}}),h=makeSyncHarness({remote:null,rev:0,delayMs:1});
+  const app=await loadAppAtTime(at,{seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(initial)},cloudSyncFactory:()=>{const CS=h.factory();CS.user=null;return CS;}}),{ctx}=app,CS=ctx.window.CloudSync;
+  t.after(()=>{CS.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',ctx);});
+  ctx.onAction('no',{dataset:{candidate:'guest-reset-choice',benchmark:'guest-reset-bench'}});await ctx.persist();const original=JSON.stringify(ctx.state.decisionEvents[0]);ctx.onAction('confirm-wipe',{});await modeLifecycleWaitFor(()=>ctx.state.tasks.length===0,'the guest Reset must finish before first sign-in');await ctx.persist();const resetBaseline=JSON.stringify(ctx.state.decisionBaseline);assert.equal(ctx.state.decisionEvents.length,0);assert.ok(vm.runInContext('undoStack.length',ctx)>0);assert.equal(JSON.stringify(JSON.parse(vm.runInContext('undoStack.at(-1).after',ctx)).decisionBaseline),resetBaseline,'the replacement frame seals the actual installed Reset before persistence yields');
+  CS.user='e@example.com';await ctx.cloudPull();await ctx.cloudPushNow();await syncSettle(40);
+  if(route==='Reset Undo'){
+   const current=JSON.stringify(ctx.state),head=app.shim.localStorage.getItem(SYNC_STORE_KEY),cloud=h.doc.payload,frames=vm.runInContext('undoStack.length',ctx),backup=ctx.saveDurableBackup;
+   ctx.saveDurableBackup=async(kind,...args)=>kind==='before-decision-inheritance'?null:backup(kind,...args);
+   assert.equal(await ctx.onAction('undo',{}),false,'failed mandatory guest-source recovery cannot install the reverse replacement');assert.equal(JSON.stringify(ctx.state),current);assert.equal(app.shim.localStorage.getItem(SYNC_STORE_KEY),head);assert.equal(h.doc.payload,cloud);assert.equal(vm.runInContext('undoStack.length',ctx),frames);
+   let release,started;const ready=new Promise(resolve=>started=resolve);
+   ctx.saveDurableBackup=async(kind,...args)=>{const saved=await backup(kind,...args);if(kind==='before-decision-inheritance'){started();await new Promise(resolve=>release=resolve);}return saved;};
+   const pending=ctx.onAction('undo',{});await ready;CS.user='other@example.com';release();assert.equal(await pending,false,'an account change during guest-source recovery stops the pending reverse replacement');assert.equal(JSON.stringify(ctx.state),current);assert.equal(h.doc.payload,cloud);assert.equal(vm.runInContext('undoStack.length',ctx),frames);CS.user='e@example.com';ctx.saveDurableBackup=backup;
+   assert.equal(await ctx.onAction('undo',{}),true,'the available local guest Reset remains undoable immediately after first sign-in');await ctx.persist();await ctx.cloudPushNow();await syncSettle(40);
+   assert.equal(JSON.stringify(ctx.state.decisionEvents.find(event=>event.kind==='no')),original);assert.equal(ctx.state.tasks.length,2);assert.equal(ctx.state.syncDirty,false);
+   assert.equal(await ctx.onAction('undo',{}),true,'the earlier guest No remains an available local gesture after reversing Reset');await ctx.persist();await ctx.cloudPushNow();await syncSettle(35);assert.equal(ctx.state.tasks.find(task=>task.id==='guest-reset-bench').mu,25);assert.equal(ctx.state.syncDirty,false);
+  }else{
+   const a=ctx.addTask('Signed benchmark',true),b=ctx.addTask('Signed candidate');ctx.renderScan();assert.equal(ctx.state.candidateId,b.id);await ctx.persist();await ctx.cloudPushNow();await syncSettle(35);ctx.onAction('no',{dataset:{candidate:b.id,benchmark:a.id}});await ctx.persist();await ctx.cloudPushNow();await syncSettle(40);
+   assert.equal(ctx.state.decisionBaseline.account,'e@example.com','replacement-only guest authority must transfer before the next signed decision');const signed=ctx.state.decisionEvents.find(event=>event.kind==='no');assert.equal(signed.account,'e@example.com');assert.equal(typeof signed.baselineId,'string');assert.equal(ctx.state.syncDirty,false);assert.equal(JSON.stringify(h.remoteState().decisionEvents),JSON.stringify(ctx.state.decisionEvents));
+  }
+  assert.ok(JSON.stringify(ctx.state.decisionBaseline).includes(resetBaseline),'the exact guest Reset baseline remains archived without relabeling its facts');
+ });
+});
+
+test('RISK decision recovery projection: supported but unprojectable authority holds exact cloud and local branches',async t=>{
+ for(const kind of ['missing frontier','causal cycle','unrelated baseline','baseline recovery','conflicting extension'])await t.test(kind,async t=>{
+  const f=await decisionRecoveryApp146(),CS=f.ctx.window.CloudSync;
+  t.after(()=>{CS.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',f.ctx);});
+  const remote=JSON.parse(f.ctx.cloudPayload()),event={...f.event,id:'remote-146',at:f.event.at+1};
+  if(kind==='missing frontier'){event.observedActionIds=['absent-authority'];remote.decisionEvents.push(event);}
+  if(kind==='causal cycle'){event.observedActionIds=['cycle-146'];remote.decisionEvents.push(event,{...event,id:'cycle-146',observedActionIds:[event.id]});}
+  if(kind==='unrelated baseline'){event.baselineId='unrelated-learning-start';remote.decisionEvents.push(event);}
+  if(kind==='baseline recovery')remote.decisionBaselineRecovery=[{v:99,opaque:'sole future baseline recovery'}];
+  if(kind==='conflicting extension'){
+   const row=remote.decisionBaseline.ratings[0];
+   remote.decisionBaseline.ratingExtensions=[{...row,mu:row.mu+5,sourceBaseId:null,sourceRevision:4}];
+  }
+  const saved=f.storage.getItem(SYNC_STORE_KEY),local=JSON.stringify(f.ctx.state);
+  f.h.writeBehindBack(remote);const cloud=f.h.doc.payload;
+  CS.ready=true;await f.ctx.cloudPull();f.ctx.cloudPushNow();await syncSettle(40);
+  assert.equal(JSON.stringify(f.ctx.state),local,'unprojectable authority cannot replace the coherent current board');
+  assert.equal(f.storage.getItem(SYNC_STORE_KEY),saved,'the coherent durable board stays byte-exact');assert.equal(f.h.doc.payload,cloud,'the sole remote authority stays byte-exact');
+  assert.equal(CS.errorCode,'unprojectable-decision-evidence');assert.equal(f.shim.document.getElementById('syncBtn').textContent,'☁ error');
+ });
+});
+
+test('RISK decision recovery validation order: rejected local evidence stays exact before known-cloud union',async t=>{
+ for(const [field,value,code] of [['at',-1,'unsupported-decision-evidence'],['account','foreign@example.com','decision-account-mismatch']])await t.test(field,async t=>{
+  const f=await decisionRecoveryApp146(),CS=f.ctx.window.CloudSync;
+  t.after(()=>{CS.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',f.ctx);});
+  CS.ready=true;f.ctx.cloudPushNow();await syncSettle(70);
+  assert.equal(f.ctx.state.syncDirty,false,'first action is acknowledged before local evidence is damaged');
+  const cloud=f.h.doc.payload;CS.ready=false;f.ctx.state.decisionEvents[0][field]=value;await f.ctx.persist();
+  const local=JSON.stringify(f.ctx.state),saved=f.storage.getItem(SYNC_STORE_KEY);
+  CS.ready=true;f.ctx.cloudPushNow();await syncSettle(50);
+  assert.equal(JSON.stringify(f.ctx.state),local,'a rejected source must not be unioned or reprojected before validation');
+  assert.equal(f.storage.getItem(SYNC_STORE_KEY),saved);assert.equal(f.h.doc.payload,cloud);
+  assert.equal(CS.errorCode,code);assert.equal(f.shim.document.getElementById('syncBtn').textContent,'☁ error');
+ });
+});
+
+test('RISK decision recovery shape: malformed known action evidence stays durable and cannot publish',async t=>{
+ const f=await decisionRecoveryApp146();
+ t.after(()=>{f.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',f.ctx);});
+ f.ctx.state.decisionEvents[0].at=-1;await f.ctx.persist();
+ const saved=f.storage.getItem(SYNC_STORE_KEY),cloud=f.h.doc.payload;
+ f.ctx.window.CloudSync.ready=true;await f.ctx.cloudPull();f.ctx.cloudPushNow();await syncSettle(40);
+ assert.equal(f.h.doc.payload,cloud,'a known kind does not make malformed original-time authority publishable');
+ assert.equal(f.storage.getItem(SYNC_STORE_KEY),saved);assert.equal(f.ctx.window.CloudSync.errorCode,'unsupported-decision-evidence');
+});
+
+test('RISK decision recovery ownership: foreign action evidence cannot be published under the current account',async t=>{
+ const f=await decisionRecoveryApp146();
+ t.after(()=>{f.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',f.ctx);});
+ f.ctx.state.decisionEvents[0].account='another@example.com';await f.ctx.persist();
+ const saved=f.storage.getItem(SYNC_STORE_KEY),remote=f.h.doc.payload;
+ f.ctx.window.CloudSync.ready=true;await f.ctx.cloudPull();f.ctx.cloudPushNow();await syncSettle(50);
+ assert.equal(f.h.doc.payload,remote,'foreign-owned action evidence must never enter this account cloud');
+ assert.equal(f.storage.getItem(SYNC_STORE_KEY),saved,'foreign evidence remains byte-exact for recovery');
+ assert.equal(f.ctx.window.CloudSync.errorCode,'decision-account-mismatch');
+ assert.equal(f.shim.document.getElementById('syncBtn').textContent,'☁ error');
+});
+
+test('RISK decision recovery durability: failed local save holds publication and retry retains one original No',async t=>{
+ const f=await decisionRecoveryApp146();
+ t.after(()=>{f.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',f.ctx);});
+ const saved=f.storage.getItem(SYNC_STORE_KEY),remote=f.h.doc.payload,write=f.storage.setItem;
+ f.storage.setItem=(key,value)=>{if(key===SYNC_STORE_KEY||key===LOCAL_HEAD_KEY)throw Object.assign(Error('isolated quota'),{name:'QuotaExceededError'});return write(key,value);};
+ f.ctx.addTask('Unsaved later edit');f.ctx.window.CloudSync.ready=true;f.ctx.cloudPushNow();await syncSettle(60);
+ assert.equal(f.h.doc.payload,remote,'cloud cannot outrun mandatory local save');assert.equal(f.storage.getItem(SYNC_STORE_KEY),saved,'sole durable No remains intact');
+ assert.equal(JSON.stringify(f.ctx.state.decisionEvents),JSON.stringify([f.event]));assert.equal(f.ctx.state.syncDirty,true);
+ f.storage.setItem=write;assert.equal(await f.ctx.persist(),true);await f.ctx.onAction('sync-retry',{});f.ctx.cloudPushNow();await syncSettle(80);
+ assert.equal(JSON.stringify(f.h.remoteState().decisionEvents),JSON.stringify([f.event]));assert.ok(f.h.remoteState().tasks.some(task=>task.title==='Unsaved later edit'));
+ assert.equal(f.ctx.state.syncDirty,false);assert.equal(f.shim.document.getElementById('syncBtn').textContent,'☁ synced');
+});
+
+test('RISK decision recovery uncertain acknowledgement: committed No is read back after cold reopen without another comparison',async t=>{
+ const f=await decisionRecoveryApp146(),CS=f.ctx.window.CloudSync,basePush=CS.push;
+ t.after(()=>{CS.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',f.ctx);});
+ const ratings=JSON.stringify(f.ctx.state.tasks.map(task=>[task.id,task.mu,task.sigma]));
+ CS.push=async(...args)=>{await basePush(...args);CS.status='error';CS.errorStage='push';CS.errorCode='deadline-exceeded';return {error:true};};
+ CS.ready=true;f.ctx.cloudPushNow();await syncSettle(60);
+ assert.equal(f.ctx.state.syncDirty,true,'lost acknowledgement remains pending');assert.equal(f.shim.document.getElementById('syncBtn').textContent,'☁ error');
+ assert.equal(JSON.stringify(f.h.remoteState().decisionEvents),JSON.stringify([f.event]));
+ const raw=f.storage.getItem(SYNC_STORE_KEY);CS.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',f.ctx);
+ const reopened=await loadApp({seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw},beforeStateReady:context=>setFakeTime(context,JSON.parse(raw).presentedAt),cloudSyncFactory:f.h.factory});
+ t.after(()=>{reopened.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',reopened.ctx);});
+ await reopened.ctx.cloudPull();await syncSettle(50);
+ assert.equal(JSON.stringify(reopened.ctx.state.decisionEvents),JSON.stringify([f.event]),'identity and original time survive uncertain ACK and cold reopen');
+ assert.equal(JSON.stringify(reopened.ctx.state.tasks.map(task=>[task.id,task.mu,task.sigma])),ratings,'readback never retrains an already applied observation');
+ assert.equal(f.h.calls.filter(call=>call==='push').length,1,'exact readback acknowledges rather than blindly republishing');
+ assert.equal(reopened.ctx.state.syncDirty,false);assert.equal(reopened.ctx.state.syncRev,f.h.doc.rev);
+ assert.equal(reopened.shim.document.getElementById('syncBtn').textContent,'☁ synced');
+ assert.equal(JSON.stringify(JSON.parse(reopened.shim.localStorage.getItem(SYNC_STORE_KEY)).decisionEvents),JSON.stringify([f.event]));
+});
+
+test('RISK decision recovery account transition: pending No acknowledgement cannot enter another account and the exact prior board stays recoverable',async t=>{
+ const f=await decisionRecoveryApp146(),CS=f.ctx.window.CloudSync,basePull=CS.pull;let finish,pushes=0;
+ t.after(()=>{CS.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',f.ctx);});
+ CS.pull=async()=>CS.user==='e@example.com'?basePull():{empty:true};
+ CS.push=async()=>{pushes++;return new Promise(resolve=>{finish=resolve;});};
+ CS.ready=true;f.ctx.cloudPushNow();await syncSettle(30);assert.equal(pushes,1);
+ CS.user='other@example.com';f.shim.window.dispatchEvent({type:'cloudsync'});await f.ctx.cloudPull();
+ finish({ok:true,rev:99});await syncSettle(80);
+ assert.equal(f.ctx.state.syncAccount,'other@example.com');assert.equal(f.ctx.state.syncRev,0,'old acknowledgement cannot set new account revision');
+ assert.equal(f.ctx.state.tasks.length,0);assert.equal(f.ctx.state.decisionEvents,undefined);assert.equal(f.ctx.state.decisionBase,null);
+ assert.ok(f.ctx.readLocalBackups().some(row=>JSON.stringify(JSON.parse(row.payload).decisionEvents)===JSON.stringify([f.event])),'exact original account action stays in protected recovery');
+ const payload=JSON.parse(f.ctx.cloudPayload());assert.equal(Object.hasOwn(payload,'decisionBase'),false);assert.equal(Object.hasOwn(payload,'protectedBackupIds'),false);assert.equal(Object.hasOwn(payload,'decisionEvents'),false);
+ CS.user=null;f.shim.window.dispatchEvent({type:'cloudsync'});CS.user='other@example.com';f.shim.window.dispatchEvent({type:'cloudsync'});await f.ctx.cloudPull();
+ assert.equal(f.ctx.state.decisionEvents,undefined);assert.equal(pushes,1,'identity change cancels queued old-account publication');
+});
 
 test("LOGIC AUDIT: a malformed newer cloud payload cannot corrupt the local board", async () => {
   const now = Date.now();
@@ -12285,16 +13864,20 @@ test("adopting a newer remote over unsaved local edits says so, so the edits don
     cloudSyncFactory: h.factory,
   });
 
-  ctx.addTask("Typed into the stale tab", false);
+  const added=ctx.addTask("Typed into the stale tab", false);
   await ctx.cloudPull();
 
   const el = shim.elements.get("toast");
   assert.ok(el && /out of date/i.test(el.textContent),
     `expected a notice that this tab was replaced, got: ${el && el.textContent}`);
-  assert.match(el.textContent, /↺/, "and it should point at undo as the way back");
+  assert.match(el.textContent, /Settings backups/, "explicit recovery keeps the prior board available");
+  assert.doesNotMatch(el.textContent, /↺|undoes it/, "ordinary Undo must not promise a remote-board replacement");
 
   ctx.undo();
-  assert.deepEqual(ctx.state.chain, STALE_CHAIN, "undo really does take the adoption back");
+  assert.deepEqual(ctx.state.chain, CLOUD_CHAIN, "ordinary local Add Undo preserves the adopted peer chain");
+  assert.equal(ctx.state.tasks.some(task=>task.id===added.id),false,'Undo removes only the normal local Add');
+  for(const task of cloudState(now).tasks)assert.ok(ctx.state.tasks.some(row=>row.id===task.id),'all unrelated peer tasks remain');
+  assert.ok(ctx.readLocalBackups().some(row=>{try{return JSON.parse(row.payload).tasks.some(task=>task.id===added.id);}catch{return false;}}),'the displaced local board remains explicitly recoverable');
 });
 
 test("a silent adopt stays silent when there was nothing local to lose", async () => {
@@ -13143,7 +14726,7 @@ test("AUDIT H2: an imported export must not be overwritten by a revision it pred
    "This tab was out of date — loaded the newer copy. ↺ undoes it." The undo
    snapshot carries the pre-adoption syncRev, so pressing u puts the device
    behind the cloud again and the next push loses to it. */
-test("AUDIT H3: undoing a remote adoption must stick, as the toast promises", async () => {
+test("AUDIT H3: cloud adoption keeps recovery without creating ordinary remote-history Undo", async () => {
   const now = Date.now();
   const h = makeSyncHarness({ remote: cloudState(now), rev: 4 });
   const local = staleState(now); local.syncRev = 3;
@@ -13156,12 +14739,13 @@ test("AUDIT H3: undoing a remote adoption must stick, as the toast promises", as
   await ctx.cloudPull();
   assert.deepEqual(ctx.state.chain, CLOUD_CHAIN, "the newer revision is adopted, as designed");
 
-  ctx.undo();
-  assert.deepEqual(ctx.state.chain, STALE_CHAIN, "u takes it back");
+  assert.equal(ctx.undo(),false,'receiving a cloud board is not a local user action');
+  assert.deepEqual(ctx.state.chain, CLOUD_CHAIN, "ordinary Undo cannot replace peer progress with a prior adoption snapshot");
+  assert.ok(ctx.readLocalBackups().some(row=>{try{return JSON.stringify(JSON.parse(row.payload).chain)===JSON.stringify(STALE_CHAIN);}catch{return false;}}),'the displaced board remains available through explicit recovery');
 
   await syncSettle(PAST_DEBOUNCE);
-  assert.deepEqual(ctx.state.chain, STALE_CHAIN,
-    "and it must stay taken back — an undo the cloud silently reverses is not an undo");
+  assert.deepEqual(ctx.state.chain, CLOUD_CHAIN,
+    "an attempted ordinary Undo cannot republish the older board over current peer progress");
 });
 
 /* ---- H4: a cloud document BEHIND this device never converges ----
@@ -14511,7 +16095,7 @@ test('Landscape browser: scene time presets persist and return to live without c
  const {chromium}=await import(process.env.LANDSCAPE_PLAYWRIGHT),browser=await chromium.launch({channel:'chrome'});
  try{
   const page=await browser.newPage({viewport:{width:390,height:844},timezoneId:'America/New_York'});
-  await page.addInitScript(()=>localStorage.setItem('fvp:chain-scanner:landscape-motion','reduced'));
+  await page.addInitScript(()=>localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:'reduced',savedAt:Date.now()})));
   await page.goto(process.env.LANDSCAPE_BROWSER_URL);await page.locator('#modalRoot [data-act="close-modal"]').click();
   const tasks=await page.evaluate(()=>JSON.stringify(state.tasks));
   await page.evaluate(()=>openSettings());await page.locator('[data-act="scene-time-settings"]').click();
@@ -14524,7 +16108,7 @@ test('Landscape browser: scene time presets persist and return to live without c
   await page.reload();assert.equal(await page.evaluate(()=>LivingSky.readSceneSeason(localStorage)),'winter');assert.equal(await page.evaluate(()=>LivingSky.readSceneTime(localStorage)),'23:15');assert.equal(await page.evaluate(()=>document.documentElement.dataset.scenePeriod),'night');
   await page.evaluate(()=>openSettings());await page.locator('[data-act="scene-time-settings"]').click();await page.locator('[data-scene-time="live"]').click();
   assert.equal(await page.evaluate(()=>LivingSky.readSceneSeason(localStorage)),null);assert.equal(await page.evaluate(()=>LivingSky.readSceneTime(localStorage)),null);assert.equal(await page.evaluate(()=>JSON.stringify(state.tasks)),tasks);
-  await page.locator('[data-scene-time="close"]').click();assert.equal(await page.locator('[data-act="scene-time-settings"]').evaluate(e=>e===document.activeElement),true);await page.getByText('Changelog',{exact:true}).click();assert.ok(await page.getByText('Cyclists pedal with connected hips and naturally bending knees.').isVisible());
+  await page.locator('[data-scene-time="close"]').click();assert.equal(await page.locator('[data-act="scene-time-settings"]').evaluate(e=>e===document.activeElement),true);await page.locator('#modalRoot [data-act="close-modal"]').click();await page.locator('#appHeader [data-act="help"]').click();await page.locator('[data-help-changelog] > summary').click();assert.ok(await page.getByText('Cyclists pedal with connected hips and naturally bending knees.').isVisible());
  }finally{await browser.close();}
 });
 
@@ -16691,8 +18275,8 @@ test('Consistency repair: remote adoption retains account isolation before switc
 });
 test('Consistency repair: import Undo restores the original chance order, including across repeated undos',async()=>{
  const {ctx,shim}=await loadApp();for(let i=0;i<5;i++)ctx.addTask('Original '+i);ctx.startScan('chance');ctx.state.snooze=100;
- const oldSeed=ctx.state.chance.seed,oldCandidate=ctx.state.candidateId;const backup=JSON.parse(ctx.cloudPayload());backup.chance.seed='imported-seed';backup.tasks[0].title='Imported';
- shim.document.getElementById('jsonBox').value=JSON.stringify(backup);ctx.onAction('import-json',{});ctx.undo();
+ const oldSeed=ctx.state.chance.seed,oldCandidate=ctx.state.candidateId;const backup=JSON.parse(ctx.cloudPayload());delete backup.decisionEvents;delete backup.decisionBaseline;backup.chance.seed='imported-seed';backup.tasks[0].title='Imported';
+ shim.document.getElementById('jsonBox').value=JSON.stringify(backup);await ctx.onAction('import-json',{});await ctx.undo();
  assert.equal(ctx.state.tasks[0].title,'Original 0');assert.equal(ctx.state.chance.seed,oldSeed);assert.equal(ctx.state.candidateId,oldCandidate);
  ctx.decide('no');ctx.newPass();const fresh=ctx.state.chance.seed;ctx.undo();ctx.undo();assert.equal(ctx.state.chance.seed,fresh,'explicit fresh pass remains a boundary across older undos');
 });
@@ -16729,8 +18313,8 @@ test('Consistency repair: detailed help distinguishes weighted ordering from the
 });
 test('Consistency repair: undoing an old backup import restores today\'s original chance pass',async()=>{
  const {ctx,shim}=await loadApp();for(let i=0;i<4;i++)ctx.addTask('Task '+i);ctx.startScan('chance');const original=ctx.state.chance.seed;
- const old=JSON.parse(ctx.cloudPayload());old.chance.seed='old-backup';old.chance.at=Date.now()-48*HOUR;old.passStartedAt=old.chance.at;
- shim.document.getElementById('jsonBox').value=JSON.stringify(old);ctx.onAction('import-json',{});ctx.undo();assert.equal(ctx.state.chance.seed,original);
+ const old=JSON.parse(ctx.cloudPayload());delete old.decisionEvents;delete old.decisionBaseline;old.chance.seed='old-backup';old.chance.at=Date.now()-48*HOUR;old.passStartedAt=old.chance.at;
+ shim.document.getElementById('jsonBox').value=JSON.stringify(old);await ctx.onAction('import-json',{});await ctx.undo();assert.equal(ctx.state.chance.seed,original);
 });
 test('Consistency repair: an in-flight pull cannot adopt the previous account under a new identity',async()=>{
  const {ctx,shim}=await loadApp();ctx.state.syncAccount='A';ctx.state.syncRev=1;let release;
@@ -17184,7 +18768,7 @@ test('RISK narrow decision row: Add actions may wrap but done adding and rank ev
 test('RISK browser layout matrix: native dates respect pane insets, rank evidence stays aligned, and enabled Undo remains pinned', {skip:!process.env.LANDSCAPE_BROWSER_URL}, async()=>{
  const {chromium}=await import(process.env.LANDSCAPE_PLAYWRIGHT);const browser=await chromium.launch({headless:true,channel:'chrome'});
  try{
-  const page=await browser.newPage();await page.addInitScript(()=>localStorage.setItem('fvp:chain-scanner:landscape-motion','reduced'));
+  const page=await browser.newPage();await page.addInitScript(()=>localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:'reduced',savedAt:Date.now()})));
   await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'networkidle'});
   const close=page.locator('#modalRoot [data-act="close-modal"]');if(await close.count())await close.click();
   await page.evaluate(()=>{for(let i=0;i<24;i++)addTask('Task '+i);state.addOpen=true;state.listOpen=true;startScan('descending');render();});
@@ -19213,7 +20797,7 @@ test('RISK test inventory: every named risk contract maps to a feature boundary'
  assert.match(inventory,/future|new feature/i,'the inventory must explain how future work adds risk contracts');
 });
 
-function recoveringCloudStatusHarness(shim,ctx,{failedRetry=false}={}){
+function recoveringCloudStatusHarness(shim,ctx,{failedRetry=false,beforePushAck=null}={}){
  let pulls=0,pushes=0;
  let remotePayload=ctx.cloudPayload(),remoteRev=ctx.state.syncRev||0;
  const ping=()=>shim.window.dispatchEvent({type:'cloudsync'});
@@ -19229,6 +20813,7 @@ function recoveringCloudStatusHarness(shim,ctx,{failedRetry=false}={}){
   },
   async push(payload,_updatedAt,baseRev){
    pushes++;CS.status='syncing';ping();await flush();
+   if(beforePushAck)await beforePushAck(pushes);
    if(failedRetry){fail('push','permission-denied');return {error:true};}
    if(baseRev!==remoteRev){succeed();return {conflict:true,rev:remoteRev};}
    remotePayload=payload;remoteRev++;succeed();return {ok:true,rev:remoteRev};
@@ -19264,9 +20849,20 @@ test('RISK CLOUD RECOVERY: a durable ordinary save retries and clears its stale 
  assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ synced','the write acknowledgement completes recovery');
 });
 
-test('RISK CLOUD RECOVERY: Undo retries a failed write, while a failed retry and an account change stay errors',async()=>{
+test('RISK CLOUD RECOVERY: Undo retries a failed write, while a failed retry and an account change stay errors', async()=>{
  const storage=sharedScannerStorage(),{ctx,shim}=await loadApp({sharedStorage:storage});
- const cloud=recoveringCloudStatusHarness(shim,ctx);
+ // The recovery preflight can outlast 40ms on a slower host. Hold the third
+ // backend acknowledgement so that elapsed time cannot masquerade as a write.
+ let releaseRetry,acknowledgeRetry;
+ const retryGate=new Promise(resolve=>{releaseRetry=resolve;});
+ const retryAcknowledged=new Promise(resolve=>{acknowledgeRetry=resolve;});
+ const cloud=recoveringCloudStatusHarness(shim,ctx,{beforePushAck:attempt=>attempt===3?retryGate:null});
+ const push=cloud.CS.push;
+ cloud.CS.push=async(...args)=>{
+  const attempt=cloud.pushes()+1,result=await push(...args);
+  if(attempt===3)acknowledgeRetry(result);
+  return result;
+ };
  await ctx.cloudPull();
  const task=ctx.addTask('Before Undo');await ctx.persist();ctx.cloudPushNow();await syncSettle(30);
  ctx.openEdit(task.id);fillEditPane(ctx,shim,{title:'After edit'});ctx.onAction('save-edit',{dataset:{id:task.id}});
@@ -19277,9 +20873,18 @@ test('RISK CLOUD RECOVERY: Undo retries a failed write, while a failed retry and
   if(blocked&&(key===LOCAL_HEAD_KEY||key===SYNC_STORE_KEY)){const error=Error('site quota');error.name='QuotaExceededError';throw error;}
   set(key,value);
  };
- ctx.undo();assert.equal(await ctx.persist(),false);
+ ctx.undo();const undoFacts=JSON.stringify(ctx.state.decisionEvents);assert.equal(await ctx.persist(),false);
  blocked=false;assert.equal(await ctx.persist(),true);await syncSettle(40);
+ assert.equal(cloud.pushes(),3,'durable recovery starts the automatic retry without waiting for the ordinary save debounce');
+ assert.equal(ctx.state.tasks.find(row=>row.id===task.id).title,'Before Undo');
+ assert.equal(JSON.parse(storage.getItem(LOCAL_HEAD_KEY)).tasks.find(row=>row.id===task.id).title,'Before Undo',
+  'the exact Undo is durable before its cloud acknowledgement');
+ assert.equal(JSON.stringify(JSON.parse(storage.getItem(LOCAL_HEAD_KEY)).decisionEvents),undoFacts,'the pending durable copy retains the exact edit and Undo facts');
+ assert.equal(cloud.remote().tasks.find(row=>row.id===task.id).title,'After edit','an unacknowledged retry cannot already change the remote');
+ assert.equal(ctx.state.syncDirty,true);assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ syncing');
+ releaseRetry();assert.equal((await retryAcknowledged).ok,true);await flush();
  assert.equal(cloud.remote().tasks.find(row=>row.id===task.id).title,'Before Undo');
+ assert.equal(JSON.stringify(cloud.remote().decisionEvents),undoFacts,'the acknowledgement retains the exact edit and targeted Undo facts');
  assert.equal(cloud.CS.status,'ok');assert.equal(cloud.CS.errorStage,null);
 
  const failed=await loadApp({sharedStorage:sharedScannerStorage()});
@@ -20077,6 +21682,161 @@ test('RISK CLOUD V2: corrupt active data fails closed, manifest races retry, and
  const corrupt=await store.pull('owner');assert.equal(corrupt.error,true);assert.match(corrupt.code,/corrupt|hash/i);
  assert.notEqual(JSON.parse(adapter.generations.get('owner/'+newRoot.previousGeneration).chunks.get(0).text).tasks[0].id,undefined,
   'the previous generation stays available for explicit recovery but is never silently made current');
+});
+
+async function decisionBackend146(artifacts,db,F,uid='owner',{beforePublication=null}={}){
+ const pending=new Set(),auth={currentUser:{uid,email:'e@example.com'}},events=[];
+ const host=value=>Array.isArray(value)?Array.from(value,host):value?.constructor?.name==='Object'?Object.fromEntries(Object.entries(value).map(([k,v])=>[k,host(v)])):value;
+ const writer=(target,onWrite=null)=>new Proxy(target,{get(object,key){const value=object[key];return typeof value!=='function'?value:(...args)=>{if(['set','update'].includes(key))onWrite?.(args[0]);return Reflect.apply(value,object,['set','update'].includes(key)?args.map(host):args);};}});
+ const sdk={...F,getFirestore:()=>db,writeBatch:(...args)=>writer(F.writeBatch(...args))};
+ for(const key of ['getDoc','getDocs','runTransaction'])sdk[key]=(...args)=>{
+  if(key==='runTransaction'){const fn=args[1];args[1]=async tx=>{
+   let publishes=false;
+   const result=await fn(writer(tx,ref=>{if(ref.path===`users/${uid}`)publishes=true;}));
+   if(publishes)await beforePublication?.();
+   return result;
+  };}
+  const result=F[key](...args);pending.add(result);result.then(()=>pending.delete(result),()=>pending.delete(result));return result;
+ };
+ const window={FIREBASE_CONFIG:{apiKey:'emulator-only'},CLOUD_SYNC_TIMEOUT_MS:5000,dispatchEvent:event=>events.push(event)};
+ const A={getAuth:()=>auth,setPersistence:async()=>{},browserLocalPersistence:{},onAuthStateChanged:(_,fn)=>fn(auth.currentUser)};
+ const context=vm.createContext({window,crypto:webcrypto,TextEncoder,TextDecoder,structuredClone,console,setTimeout,clearTimeout,CustomEvent:class{},__modules:[{initializeApp:()=>({})},A,sdk]});
+ for(const [file,code] of [['device-store-v2.js',artifacts.storage],['cloud-store-v2.js',artifacts.cloud]])vm.runInContext(code,context,{filename:file});
+ window.ChainStorageV2=context.ChainStorageV2;window.ChainCloudV2=context.ChainCloudV2;
+ const module=artifacts.html.match(/<script type="module">([\s\S]*?)<\/script>/)[1].replace(/const \[appMod, A, F\] = await Promise\.all\(\[[\s\S]*?\]\);/,'const [appMod,A,F]=globalThis.__modules;');
+ await vm.runInContext(`(async()=>{${module}\n})()`,context);
+ assert.equal(window.CloudSync.ready,true);
+ return {CS:window.CloudSync,async drain(){for(let idle=0;idle<2;){if(pending.size){idle=0;await Promise.allSettled([...pending]);}else idle++;await flush();}}};
+}
+function decisionCandidate146(){return {html,cloud:fs.readFileSync(path.join(__dirname,'cloud-store-v2.js'),'utf8'),storage:fs.readFileSync(path.join(__dirname,'device-store-v2.js'),'utf8')};}
+
+test('Firestore rules: real pinned writer reads decision authority then holds its ordinary app edit without erasing it', {skip:!process.env.FIRESTORE_EMULATOR_HOST}, async t=>{
+ const {SUPPORTED_RELEASE,readReleasedClient}=await import('./scripts/backward-compatibility.mjs');
+ const {initializeTestEnvironment}=await import('@firebase/rules-unit-testing'),F=await import('firebase/firestore');
+ const floor=readReleasedClient(__dirname,SUPPORTED_RELEASE),candidate=decisionCandidate146();
+ for(const schedule of ['natural','candidate','historical'])await t.test(schedule,async t=>{
+ const env=await initializeTestEnvironment({projectId:`demo-decision-mixed-146-${schedule}`,firestore:{rules:fs.readFileSync(path.join(__dirname,'firestore.rules'),'utf8')}}),handles=[];
+ let publicationReady=null;
+ try{
+  const old=await decisionBackend146(floor,env.authenticatedContext('owner').firestore(),F,'owner',{beforePublication:()=>publicationReady?.('historical')}),
+   next=await decisionBackend146(candidate,env.authenticatedContext('owner').firestore(),F,'owner',{beforePublication:()=>publicationReady?.('candidate')});handles.push(old,next);
+  const f=await decisionMixedActionsApp146();t.after(()=>{f.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',f.ctx);});
+  const plain=JSON.stringify(f.h.remoteState()),decided=f.ctx.cloudPayload();
+  assert.equal((await old.CS.push(plain,1,0)).ok,true,'pinned writer seeds an ordinary board');
+  assert.equal((await next.CS.pull()).payload,plain);
+  assert.equal((await next.CS.push(plain,2,1)).ok,true,'upgraded ordinary publication remains readable by floor');
+  const oldRead=await old.CS.pull(),oldReadAccount=old.CS.user;assert.equal(oldRead.payload,plain);
+  // Both real transactions stage their publication against revision2 before
+  // the selected winner commits. The loser may then conflict or be denied by
+  // the rules; neither outcome may alter the exact winning root.
+  let releaseLoser,releasePrepared;
+  if(schedule!=='natural'){
+   let prepared=0;
+   const bothPrepared=new Promise(resolve=>{releasePrepared=resolve;}),winnerAcknowledged=new Promise(resolve=>{releaseLoser=resolve;});
+   publicationReady=async side=>{if(++prepared===2)releasePrepared();await bothPrepared;if(side!==schedule)await winnerAcknowledged;};
+  }
+  const activating=next.CS.push(decided,3,2),legacy=old.CS.push(plain,3,2);
+  // An operation failing before staging must release the peer for a concrete
+  // failed assertion rather than leave the test waiting on its barrier.
+  if(releasePrepared)for(const operation of [activating,legacy])operation.then(releasePrepared,releasePrepared);
+  if(releaseLoser)(schedule==='candidate'?activating:legacy).then(releaseLoser,releaseLoser);
+  const [activated,competing]=await Promise.all([activating,legacy]);publicationReady=null;
+  assert.equal(Number(activated.ok===true)+Number(competing.ok===true),1,'CAS admits one activation-racing writer');
+  const winner=activated.ok?activated:competing,loser=activated.ok?competing:activated,losingClient=activated.ok?old.CS:next.CS;
+  const raceFacts=JSON.stringify({schedule,activated,competing,status:losingClient.status,code:losingClient.errorCode});
+  assert.ok(loser.conflict===true||(loser.error===true&&loser.code==='permission-denied'),
+   'activation races either conflict or safely fence the losing writer: '+raceFacts);
+  if(schedule!=='natural')assert.equal((schedule==='candidate'?activated:competing).ok,true,'the real SDK commits the scheduled winner');
+  if(loser.error){assert.equal(losingClient.status,'error');assert.equal(losingClient.errorStage,'push');assert.equal(losingClient.errorCode,'permission-denied');}
+  else assert.equal(loser.rev,3,'a conflict identifies the actual winning revision');
+  const root=(await F.getDocFromServer(F.doc(env.authenticatedContext('owner').firestore(),'users/owner'))).data();
+  assert.equal(root.rev,3);assert.equal(winner.rev,3);assert.equal(root.activeGeneration,winner.generationId);
+  assert.equal(root.decisionCapability,activated.ok?1:undefined,'only an actual winning activation installs the fence');
+  const winning=await next.CS.pull();assert.equal(winning.rev,3);assert.equal(winning.payload,activated.ok?decided:plain,'the losing transaction cannot replace any winning bytes');
+  assert.equal(f.ctx.cloudPayload(),decided);assert.equal(f.ctx.state.syncDirty,true,'the actual-app decision source stays pending');
+  assert.equal(JSON.stringify(JSON.parse(f.storage.getItem(SYNC_STORE_KEY)).decisionEvents),JSON.stringify(JSON.parse(decided).decisionEvents),
+   'all candidate facts stay exact and durable even when activation loses');
+  // Once the winning revision is visible, either stale writer must return a
+  // revision conflict without publishing even a partial generation.
+  for(const [client,payload] of [[next.CS,decided],[old.CS,plain]]){
+   const stale=await client.push(payload,3,2);assert.equal(stale.conflict,true);assert.equal(stale.rev,3);
+  }
+  const unchanged=await next.CS.pull();assert.equal(unchanged.rev,winning.rev);assert.equal(unchanged.payload,winning.payload);
+  if(!activated.ok){const current=await next.CS.pull();assert.equal((await next.CS.push(decided,4,current.rev)).ok,true);}
+  const exact=await next.CS.pull();assert.equal(exact.payload,decided);assert.equal(exact.rev,activated.ok?3:4);
+  assert.equal((await old.CS.pull()).payload,decided,'pinned reader accepts additional root capability');
+  // Reopen the pinned reader's last durable plain-board read, witnessed above.
+  // The action producer's separate synthetic revision4 must not attest that
+  // this old device already read the later real activation at revision4.
+  const oldLocal=JSON.stringify({...JSON.parse(oldRead.payload),syncRev:oldRead.rev,syncAccount:oldReadAccount,syncDirty:false});
+  const oldApp=await loadApp({appSource:extractAppScript(floor.html),seedStorage:{[SYNC_STORE_KEY]:oldLocal,[LOCAL_HEAD_KEY]:oldLocal},cloudSyncFactory:()=>old.CS});
+  let updates=0;oldApp.ctx.window.checkForAppUpdate=async()=>{updates++;};
+  t.after(()=>{old.CS.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',oldApp.ctx);});
+  await oldApp.ctx.cloudPull();
+  assert.equal(JSON.stringify(oldApp.ctx.state.decisionEvents),JSON.stringify(JSON.parse(decided).decisionEvents),'the immutable historical app carries every comparison, choice and Undo fact exactly');
+  assert.equal(oldApp.ctx.state.tasks.find(task=>task.id==='bench').title,'Mixed retained benchmark title','the old reader opens the effective retained current choice');
+  assert.deepEqual(mixedSharedOutcome146(oldApp.ctx.state),f.mixed.shared,'the immutable historical reader carries the new typed shared outcomes without overwriting them');
+  oldApp.ctx.addTask('Legacy independent edit held for safe update');await oldApp.ctx.persist();oldApp.ctx.cloudPushNow();await syncSettle(180);
+  assert.equal(old.CS.errorCode,'permission-denied','the real fixed historical manifest is denied');
+  assert.equal(oldApp.ctx.state.syncDirty,true);assert.equal(oldApp.shim.document.getElementById('syncBtn').textContent,'☁ error');assert.ok(updates>=1,'historical app enters its established compatible-shell recovery');
+  const before=await next.CS.pull();assert.equal(before.payload,exact.payload);assert.equal(before.rev,exact.rev);
+  oldApp.shim.window.dispatchEvent({type:'focus'});oldApp.ctx.cloudPushNow();await syncSettle(50);
+  const after=await next.CS.pull();assert.equal(after.payload,exact.payload);assert.equal(after.rev,exact.rev,'focus does not spin rejected writes');
+  assert.ok(oldApp.ctx.state.tasks.some(task=>task.title==='Legacy independent edit held for safe update'),'unpublished legacy edit stays recoverable');
+ }finally{await Promise.all(handles.map(handle=>handle.drain()));await env.cleanup();}
+ });
+});
+
+test('Firestore rules: first decision against released rules stays exact and pending until rules-first rollout then retry', {skip:!process.env.FIRESTORE_EMULATOR_HOST},async t=>{
+ const {SUPPORTED_RELEASE,readReleasedClient}=await import('./scripts/backward-compatibility.mjs');
+ const {initializeTestEnvironment}=await import('@firebase/rules-unit-testing'),F=await import('firebase/firestore');
+ const floor=readReleasedClient(__dirname,SUPPORTED_RELEASE),projectId='demo-decision-rollout-146';
+ const env=await initializeTestEnvironment({projectId,firestore:{rules:floor.rules}});let upgraded;
+ const handle=await decisionBackend146(decisionCandidate146(),env.authenticatedContext('owner').firestore(),F);
+ try{
+  const f=await decisionRecoveryApp146();t.after(()=>{f.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',f.ctx);});
+  const plain=JSON.stringify(f.h.remoteState());assert.equal((await handle.CS.push(plain,1,0)).ok,true);
+  const app=await loadApp({seedStorage:{[SYNC_STORE_KEY]:plain,[LOCAL_HEAD_KEY]:plain},cloudSyncFactory:()=>handle.CS});
+  t.after(()=>{handle.CS.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',app.ctx);});
+  app.shim.window.CLOUD_PUSH_DELAY_MS=2;await app.ctx.cloudPull();handle.CS.ready=false;app.ctx.renderScan();app.ctx.onAction('no',{dataset:{candidate:'candidate',benchmark:'bench'}});await recordMixedDecisionActions146(app);await app.ctx.persist();handle.CS.ready=true;
+  const evidence=JSON.stringify(app.ctx.state.decisionEvents),ratings=JSON.stringify(app.ctx.state.tasks.map(task=>[task.id,task.mu,task.sigma]));
+  const shared=mixedSharedOutcome146(app.ctx.state);
+  const outcomes=JSON.stringify({chain:app.ctx.state.chain,title:app.ctx.state.tasks.find(task=>task.id==='bench').title,passId:app.ctx.state.passId,scanMode:app.ctx.state.scanMode,chance:app.ctx.state.chance});
+  assert.deepEqual([...new Set(app.ctx.state.decisionEvents.map(event=>event.kind))].sort(),['comparison','current-choice','no','undo']);
+  assert.deepEqual([...new Set(app.ctx.state.decisionEvents.filter(event=>event.kind==='comparison').map(event=>event.action))].sort(),['dislodge','dot','yes']);
+  app.ctx.cloudPushNow();await syncSettle(160);
+  assert.equal(handle.CS.errorCode,'permission-denied');assert.equal(app.ctx.state.syncDirty,true);assert.equal(JSON.stringify(app.ctx.state.decisionEvents),evidence);
+  assert.equal(JSON.stringify(JSON.parse(app.shim.localStorage.getItem(SYNC_STORE_KEY)).decisionEvents),evidence,'rejected first decision stays durable');
+  assert.equal((await handle.CS.pull()).payload,plain,'released rules never accept an unfenced fallback');
+  upgraded=await initializeTestEnvironment({projectId,firestore:{rules:fs.readFileSync(path.join(__dirname,'firestore.rules'),'utf8')}});
+  await app.ctx.onAction('sync-retry',{});await syncSettle(600);
+  const published=await handle.CS.pull();assert.equal(JSON.stringify(JSON.parse(published.payload).decisionEvents),evidence);
+  assert.equal(JSON.stringify(app.ctx.state.tasks.map(task=>[task.id,task.mu,task.sigma])),ratings,'retry does not retrain the comparison');
+  assert.equal(app.ctx.state.syncDirty,false);assert.equal(app.shim.document.getElementById('syncBtn').textContent,'☁ synced');
+  const cloud=JSON.parse(published.payload);
+  assert.deepEqual(mixedSharedOutcome146(cloud),shared,'rules-first retry preserves every typed shared preference, scene field and context definition');
+  assert.equal(JSON.stringify({chain:cloud.chain,title:cloud.tasks.find(task=>task.id==='bench').title,passId:cloud.passId,scanMode:cloud.scanMode,chance:cloud.chance}),outcomes,'rules-first Retry preserves actual chosen fields and scoped Undo/pass outcomes as well as learning and raw facts');
+ }finally{await handle.drain();await upgraded?.cleanup();await env.cleanup();}
+});
+
+test('Firestore rules: decision capability activates atomically and denies an omitting historical manifest', {skip:!process.env.FIRESTORE_EMULATOR_HOST},async()=>{
+ const {assertFails,assertSucceeds,initializeTestEnvironment}=await import('@firebase/rules-unit-testing');
+ const {doc,setDoc,getDoc,serverTimestamp}=await import('firebase/firestore');
+ const env=await initializeTestEnvironment({projectId:'demo-decision-capability-146',firestore:{rules:fs.readFileSync(path.join(__dirname,'firestore.rules'),'utf8')}});
+ try{
+  const db=env.authenticatedContext('owner').firestore(),root=doc(db,'users/owner');
+  await env.withSecurityRulesDisabled(async context=>{
+   for(const id of ['plain','decision','omission','retained'])await setDoc(doc(context.firestore(),'users/owner/generations/'+id),{schemaVersion:2,state:'sealed'});
+  });
+  const manifest=(rev,activeGeneration,previousGeneration,extra={})=>({schemaVersion:2,rev,activeGeneration,previousGeneration,updatedAt:rev,serverUpdatedAt:serverTimestamp(),...extra});
+  await assertSucceeds(setDoc(root,manifest(1,'plain',null)));
+  await assertSucceeds(setDoc(root,manifest(2,'decision','plain',{decisionCapability:1})));
+  assert.equal((await getDoc(root)).data().decisionCapability,1);
+  await assertFails(setDoc(root,manifest(3,'omission','decision')),'fixed-manifest historical publication must not remove acknowledged authority');
+  assert.equal((await getDoc(root)).data().activeGeneration,'decision','denied legacy publication leaves exact active authority');
+  await assertFails(setDoc(root,manifest(3,'omission','decision',{decisionCapability:2})));
+  await assertSucceeds(setDoc(root,manifest(3,'retained','decision',{decisionCapability:1})));
+ }finally{await env.cleanup();}
 });
 
 test('Firestore rules: v2 chunks are owner-only, immutable, sealed before publish, and old clients fail closed', {skip:!process.env.FIRESTORE_EMULATOR_HOST}, async()=>{
@@ -21880,7 +23640,7 @@ test('RISK live scan sync: the second physical click of one double-click cannot 
 test('RISK live scan sync: Settings describes live revision refresh while retaining draft protection',async()=>{
  const {a}=await liveScanSyncClients();a.ctx.openSettings();
  assert.match(a.shim.document.getElementById('modalRoot').innerHTML,/when another device saves/,'Settings must describe the new open-device refresh');
- assert.match(a.shim.document.getElementById('modalRoot').innerHTML,/Drafts wait until you finish/,'the draft boundary remains visible to the user');
+ assert.match(a.shim.document.getElementById('modalRoot').innerHTML,/Drafts and pressed controls wait until you finish/,'the draft and pressed-control boundary remains visible to the user');
 });
 
 /* Dependencies are saved by task ID; fixtures never use an account or a real board. */
@@ -22082,7 +23842,7 @@ test('RISK multiple dependencies FAQ: extended help explains progressive links s
  const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
  for(const text of [/up to ten dependencies/i,/\+ dependency/,/All Tasks names blockers/i,/cycle.*warning/i,/full eligible/i,/scanned after/i,/another device/i,/draft/i,/offline/i,/top-K/])assert.match(help,text);
  assert.doesNotMatch(help,/first dot in either mode is labeled/i,'the age label belongs to Chance presentation; descending retains its top-K summary');
- assert.match(help,/Refresh all devices/i,'older single-link controls must disclose their complex-dependency boundary');
+ assert.match(help,/saved control is protected or disabled because its data is newer.*use a compatible app before editing/i,'older single-link controls must disclose their complex-dependency boundary');
  const instructions=fs.readFileSync(path.join(__dirname,'AGENTS.md'),'utf8');
  assert.match(instructions,/live product/i);assert.match(instructions,/extended FAQ/i);assert.match(instructions,/regression/i);
 });
@@ -22506,10 +24266,19 @@ function modeLifecycleEdit(app,task,{hours=18,title=task.title}={}){
  app.shim.document.getElementById('etEverReset').checked=false;
 }
 async function modeLifecycleRemoteFixture(){
- const app=await modeLifecycleApp();
+ const {SUPPORTED_RELEASE,readReleasedClient}=await import('./scripts/backward-compatibility.mjs');
+ const historical=readReleasedClient(__dirname,SUPPORTED_RELEASE);
+ const app=await modeLifecycleApp({appSource:extractAppScript(historical.html)});
  for(let i=0;i<8;i++)app.ctx.addTask('Private selection fixture '+i);
  app.ctx.startScan('chance');app.ctx.state.snooze=100;
- const base=modeLifecycleCopy(app.ctx.state);
+ assert.equal(Object.hasOwn(app.ctx.state,'decisionEvents'),false,'the actual supported historical producer has no modern action journal');
+ assert.equal(Object.hasOwn(app.ctx.state,'decisionBaseline'),false,'the old scalar pass is not a contradictory modern frozen Start');
+ // Complete ordinary current-client maintenance before the tested remote pass
+ // ages; migration bookkeeping must not be counted as its conditional repair.
+ const opened=await modeLifecycleApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(app.ctx.state)}});
+ assert.equal(await opened.ctx.persist(),true,'ordinary legacy migration is durable before the remote pass is aged');
+ assert.equal(Object.hasOwn(opened.ctx.state,'decisionEvents'),false,'opening a legacy board does not invent deliberate decisions');
+ const base=modeLifecycleCopy(opened.ctx.state);
  Object.assign(base,{syncRev:20,syncDirty:false,syncAccount:'e@example.com'});
  const remote=modeLifecycleCopy(base);
  remote.passStartedAt=MODE_LIFECYCLE_NOW-48*HOUR;
@@ -22618,7 +24387,7 @@ test('RISK scan lifecycle: first Start sweeps stale day marks and evergreen rest
  }
 });
 
-test('RISK scan lifecycle sync: repaired old remote Chance draw is durable across all stores and offline reload',async()=>{
+test("RISK scan lifecycle sync: repaired old remote Chance draw is durable across all stores and offline reload",async()=>{
  const {indexedDB}=await import('fake-indexeddb');
  for(const backend of ['legacy','transactional','host']){
   const {base,remote}=await modeLifecycleRemoteFixture(),h=makeSyncHarness({remote,rev:21,delayMs:1});
@@ -22648,7 +24417,7 @@ test('RISK scan lifecycle sync: repaired old remote Chance draw is durable acros
  }
 });
 
-test('RISK scan lifecycle sync: concurrent old-pass repairs converge by revision without replaying ratings or Done',async()=>{
+test("RISK scan lifecycle sync: concurrent old-pass repairs converge by revision without replaying ratings or Done",async()=>{
  const {base,remote}=await modeLifecycleRemoteFixture(),rest=remote.tasks[2];
  Object.assign(rest,{evergreen:true,evergreenHours:18,evergreenResetAtDay:false,lastDoneAt:MODE_LIFECYCLE_NOW});
  remote.workLog.push({id:'private-completion',taskId:rest.id,title:rest.title,kind:'evergreen-done',at:MODE_LIFECYCLE_NOW});
@@ -22678,7 +24447,7 @@ test('RISK scan lifecycle sync: concurrent old-pass repairs converge by revision
  assert.ok(h.conflicts>0,'the fixture must exercise competing conditional writes');
 });
 
-test('RISK scan lifecycle sync: failed local repair persistence holds adoption and a newer cloud revision cannot be overwritten',async()=>{
+test("RISK scan lifecycle sync: failed local repair persistence holds adoption and a newer cloud revision cannot be overwritten",async()=>{
  const {base,remote}=await modeLifecycleRemoteFixture(),h=makeSyncHarness({remote:base,rev:20,delayMs:1});
  const app=await modeLifecycleApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(base)},cloudSyncFactory:h.factory}),{ctx,shim}=app;
  await ctx.cloudPull();await syncSettle(15);
@@ -23910,8 +25679,8 @@ test('RISK STALE TAB: legacy coexistence retains independent live fields before 
 
 test('RISK STALE TAB: recovery guidance explains independent edits conflicts and unobserved cloud bases',async()=>{
  const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
- assert.match(help,/offline edits save locally and sync when you reconnect/i);
- assert.match(help,/edits conflict.*Settings backups.*recovery/i);
+ assert.match(help,/offline decisions stay saved through closing and reopening, then combine when you reconnect/i);
+ assert.match(help,/Settings backups for recovery copies of displaced edits/i);
  const log=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];assert.match(log,/stale.tab.*independent.*edits/i);
 });
 
@@ -24782,7 +26551,7 @@ test('RISK Quick start content: essential steps stay brief and detailed help rem
  const intro=help.split('<ol>')[1].split('</ol>')[0];assert.ok(intro.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=100,'getting-started steps should be brief');assert.doesNotMatch(intro,/TrueSkill|weighted random|25%|squared|Halving/i,'algorithm details belong in detailed help');
  const answers=[...help.matchAll(/<dt>(.*?)<\/dt><dd>(.*?)<\/dd>/g)];assert.ok(answers.length>=35,'retain existing help topics');for(const [,question,answer]of answers)assert.ok(answer.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,question+' should focus on user actions and consequences');
  const dependency=answers.find(x=>x[1]==='What is a prerequisite task?')[2];assert.match(dependency,/Hard dependency clears only after deletion or Done with Evergreen off/);assert.match(dependency,/recurring.*blocks again/i);assert.doesNotMatch(dependency,/saved edge evidence|operation identity|compatible app|future formats|old snapshots/);
- const data=help.split('<h3>Data and backups</h3>')[1];assert.match(data,/refresh all devices/i);assert.match(data,/protected.*compatible app/i);
+ const data=help.split('<h3>Data and backups</h3>')[1];assert.match(data,/safe-update path protects unsaved work and unfinished drafts/i);assert.match(data,/protected.*compatible app/i);
 });
 
 test('RISK Quick start chapters: mounted help includes Task history with native disclosures and detailed chapters closed',async()=>{
@@ -25321,15 +27090,16 @@ test('RISK neutral bootstrap: unknown evidence concurrent automatic placement co
 });
 
 test('RISK neutral bootstrap: offline reconnect real cloud glue retains neutral provenance through old copies and Undo',async()=>{
- const initial=await loadApp();const a=initial.ctx.addTask('Bootstrap'),b=initial.ctx.addTask('Other');a.createdAt=1;b.createdAt=2;initial.ctx.startScan();
- const base=JSON.parse(initial.ctx.cloudPayload());base.syncAccount='e@example.com';base.updatedAt=Date.now();base.syncRev=1;base.syncDirty=false;
- const cloud=makeSyncHarness({remote:base,rev:1}),left=await loadApp({seedStorage:{[STORE_KEY]:JSON.stringify(base)},cloudSyncFactory:cloud.factory}),right=await loadApp({seedStorage:{[STORE_KEY]:JSON.stringify(base)},cloudSyncFactory:cloud.factory});
+ const cloud=makeSyncHarness({remote:null,rev:0}),initial=await loadApp({cloudSyncFactory:cloud.factory});await initial.ctx.cloudPull();
+ const a=initial.ctx.addTask('Bootstrap'),b=initial.ctx.addTask('Other');a.createdAt=1;b.createdAt=2;initial.ctx.startScan();await initial.ctx.persist();await initial.ctx.cloudPushNow();await syncSettle(80);
+ const base=JSON.parse(JSON.stringify(initial.ctx.state));
+ const left=await loadApp({seedStorage:{[STORE_KEY]:JSON.stringify(base)},cloudSyncFactory:cloud.factory}),right=await loadApp({seedStorage:{[STORE_KEY]:JSON.stringify(base)},cloudSyncFactory:cloud.factory});
  for(const h of [left,right]){h.shim.window.CLOUD_PUSH_DELAY_MS=2;h.shim.window.CLOUD_RETRY_DELAY_MS=2;await h.ctx.cloudPull();}
  cloud.failPull=true;left.ctx.suspendCloudSync();left.ctx.state.candidateId=b.id;left.ctx.decide('no');await left.ctx.persist();assert.equal(left.ctx.state.tasks.find(t=>t.id===a.id).mu,25);
  cloud.failPull=false;left.ctx.resumeCloudSync();await syncSettle(100);await right.ctx.cloudPull();assert.equal(right.ctx.taskComparisonEligible(right.ctx.state.tasks.find(t=>t.id===a.id)),false);
  const old=cloud.remoteState();delete old.tasks.find(t=>t.id===a.id).comparisonOps;old.updatedAt=Date.now()+1;cloud.writeBehindBack(old);await left.ctx.cloudPull();await syncSettle(100);assert.equal(left.ctx.taskComparisonEligible(left.ctx.state.tasks.find(t=>t.id===a.id)),false,'newer missing-field copy retains local exclusion');
  left.ctx.dislodge();left.ctx.state.chain=[b.id];left.ctx.dotTask(a.id);const choiceUndoDepth=vm.runInContext('undoStack.length',left.ctx);await left.ctx.persist();left.ctx.cloudPushNow();await syncSettle(100);await right.ctx.cloudPull();assert.equal(right.ctx.taskComparisonEligible(right.ctx.state.tasks.find(t=>t.id===a.id)),true);
- const adoptionFrames=vm.runInContext('undoStack.length',left.ctx)-choiceUndoDepth;assert.ok(adoptionFrames>=0&&adoptionFrames<=3,'only bounded cloud-adoption frames can follow the choice');for(let i=0;i<adoptionFrames;i++)left.ctx.undo();left.ctx.undo();await left.ctx.persist();left.ctx.cloudPushNow();await syncSettle(100);await right.ctx.cloudPull();assert.equal(right.ctx.taskComparisonEligible(right.ctx.state.tasks.find(t=>t.id===a.id)),false);
+ const adoptionFrames=vm.runInContext('undoStack.length',left.ctx)-choiceUndoDepth;assert.equal(adoptionFrames,0,'cloud reception never adds an ordinary Undo frame');left.ctx.undo();assert.equal(left.ctx.taskComparisonEligible(left.ctx.state.tasks.find(t=>t.id===a.id)),false,'local Undo restores the neutral boundary before publication');await left.ctx.persist();left.ctx.cloudPushNow();await syncSettle(100);await right.ctx.cloudPull();assert.equal(right.ctx.taskComparisonEligible(right.ctx.state.tasks.find(t=>t.id===a.id)),false);
  const reload=await loadApp({seedStorage:{[STORE_KEY]:JSON.stringify(right.ctx.state)},cloudSyncFactory:cloud.factory});await reload.ctx.cloudPull();assert.equal(reload.ctx.taskComparisonEligible(reload.ctx.state.tasks.find(t=>t.id===a.id)),false);
 });
 
@@ -25343,7 +27113,7 @@ test('RISK neutral bootstrap: Settings backup Restore restores causal exclusion 
  ctx.dislodge();ctx.state.chain=[b.id];ctx.dotTask(a.id);await ctx.persist();const chosen=await ctx.saveDurableBackup('manual',JSON.stringify(ctx.state));assert.ok(chosen?.id);assert.equal(ctx.taskComparisonEligible(ctx.state.tasks.find(t=>t.id===a.id)),true);
  ctx.openSettings();assert.equal(await ctx.restoreDurableBackupById(neutral.id),true);assert.equal(ctx.taskComparisonEligible(ctx.state.tasks.find(t=>t.id===a.id)),false,'actual Settings Restore cannot silently promote automatic placement');
  ctx.openSettings();assert.equal(await ctx.restoreDurableBackupById(chosen.id),true);assert.equal(ctx.taskComparisonEligible(ctx.state.tasks.find(t=>t.id===a.id)),true,'restoring recorded explicit choice supersedes the newer neutral evidence');
- ctx.undo();assert.equal(ctx.taskComparisonEligible(ctx.state.tasks.find(t=>t.id===a.id)),false,'Undo restored explicit choice restores exclusion');await ctx.persist();ctx.deleteTask(a.id);await ctx.persist();ctx.openSettings();assert.equal(await ctx.restoreDurableBackupById(neutral.id),true);assert.equal(ctx.taskComparisonEligible(ctx.state.tasks.find(t=>t.id===a.id)),false,'restoring deleted task preserves its saved exclusion');
+ await ctx.undo();assert.equal(ctx.taskComparisonEligible(ctx.state.tasks.find(t=>t.id===a.id)),false,'Undo restored explicit choice restores exclusion');await ctx.persist();ctx.deleteTask(a.id);await ctx.persist();ctx.openSettings();assert.equal(await ctx.restoreDurableBackupById(neutral.id),true);assert.equal(ctx.taskComparisonEligible(ctx.state.tasks.find(t=>t.id===a.id)),false,'restoring deleted task preserves its saved exclusion');
 });
 
 test('RISK neutral bootstrap: restoring a deleted automatic task during pending saves keeps backup exclusion',async()=>{
@@ -25506,12 +27276,25 @@ test('RISK bulk task editing: removed context options reject the whole batch rat
  const old=shim.document.querySelectorAll;shim.document.querySelectorAll=selector=>selector==='[data-bulkctx]'?[{checked:true,dataset:{bulkctx:'private-context'}}]:old(selector);ctx.state.contexts=[];ctx.onAction('bulk-save');assert.equal(a.ctx.length,0);assert.match(shim.document.getElementById('bulkError').textContent,/context.*changed/i);
 });
 test('RISK bulk task editing: offline two-task cloud conflict preserves fresh peer fields and reconnects without resurrection',async()=>{
- const initial=await loadApp(),first=initial.ctx.addTask('Private A'),second=initial.ctx.addTask('Private B'),base=JSON.parse(initial.ctx.cloudPayload()),h=makeSyncHarness({remote:base,rev:4});
- const app=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(base)},cloudSyncFactory:h.factory}),{ctx,shim}=app;await ctx.cloudPull();await syncSettle(30);h.failPull=true;
- ctx.state.listOpen=true;ctx.onAction('bulk-select-all');ctx.onAction('bulk-edit');shim.document.getElementById('bulkApplyDue').checked=true;shim.document.getElementById('bulkDue').value='2027-08-01';ctx.onAction('bulk-save');assert.equal(await ctx.persist(),true);const offline=await loadApp({seedStorage:{[SYNC_STORE_KEY]:shim.localStorage.getItem(SYNC_STORE_KEY)}});assert.equal(offline.ctx.state.tasks.find(t=>t.id===second.id).due,'2027-08-01');
- const peer=JSON.parse(JSON.stringify(base));peer.tasks.find(t=>t.id===first.id).due='2027-09-01';peer.tasks.find(t=>t.id===second.id).title='Fresh peer title';h.writeBehindBack(peer);h.failPull=false;await ctx.cloudPull();await ctx.cloudPushNow();await syncSettle(80);const saved=h.remoteState();assert.equal(saved.tasks.find(t=>t.id===first.id).due,'2027-09-01');assert.equal(saved.tasks.find(t=>t.id===second.id).due,'2027-08-01');assert.equal(saved.tasks.find(t=>t.id===second.id).title,'Fresh peer title');assert.match(shim.document.getElementById('listBulkToolbar').innerHTML,/1 currently match in this tab; 1 have different values or are no longer open/,'actual two-task reconnect reports partial adoption');
- const deleting=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(saved)},cloudSyncFactory:h.factory});await deleting.ctx.cloudPull();h.failPull=true;deleting.ctx.state.listOpen=true;deleting.ctx.onAction('bulk-select-all');deleting.ctx.onAction('bulk-edit');deleting.shim.document.getElementById('bulkApplyDue').checked=true;deleting.shim.document.getElementById('bulkDue').value='2027-10-01';deleting.ctx.onAction('bulk-save');await deleting.ctx.persist();
- const peerDelete=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(saved)}});peerDelete.ctx.onAction('delete-task',{dataset:{id:first.id}});h.writeBehindBack(JSON.parse(peerDelete.ctx.cloudPayload()));h.failPull=false;await deleting.ctx.cloudPull();await deleting.ctx.cloudPushNow();await syncSettle(80);assert.equal(h.remoteState().tasks.some(t=>t.id===first.id),false,'stale batch does not resurrect deleted selected task');assert.equal(h.remoteState().tasks.find(t=>t.id===second.id).due,'2027-10-01');
+ const at=Date.parse('2026-10-17T15:00:00Z'),initial=await loadAppAtTime(at),first=initial.ctx.addTask('Private A'),second=initial.ctx.addTask('Private B'),base=JSON.parse(initial.ctx.cloudPayload()),h=makeSyncHarness({remote:base,rev:4});
+ const seedStorage={[SYNC_STORE_KEY]:JSON.stringify(base)},app=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:h.factory}),peer=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:h.factory}),{ctx,shim}=app;
+ await ctx.cloudPull();await peer.ctx.cloudPull();await syncSettle(30);h.failPull=true;peer.ctx.window.CloudSync.ready=false;
+ setFakeTime(ctx,at+1000);ctx.state.listOpen=true;ctx.onAction('bulk-select-all');ctx.onAction('bulk-edit');shim.document.getElementById('bulkApplyDue').checked=true;shim.document.getElementById('bulkDue').value='2027-08-01';ctx.onAction('bulk-save');assert.equal(await ctx.persist(),true);
+ const offline=await loadAppAtTime(at+1000,{seedStorage:{[SYNC_STORE_KEY]:shim.localStorage.getItem(SYNC_STORE_KEY)}});assert.equal(offline.ctx.state.tasks.find(t=>t.id===second.id).due,'2027-08-01');
+ // A current peer uses the actual editor so its conflicting and independent fields
+ // carry original decision evidence rather than silently overwriting legacy scalars.
+ await saveEditorChoice(peer,first.id,at+2000,{due:'2027-09-01'});await saveEditorChoice(peer,second.id,at+3000,{title:'Fresh peer title'});
+ assert.deepEqual(Array.from(peer.ctx.state.decisionEvents,event=>event.target.property).sort(),['due','title']);
+ h.failPull=false;peer.ctx.window.CloudSync.ready=true;await peer.ctx.cloudPushNow();await syncSettle(50);
+ await ctx.cloudPull();await ctx.cloudPushNow();await syncSettle(80);const saved=h.remoteState();
+ assert.equal(saved.tasks.find(t=>t.id===first.id).due,'2027-09-01');assert.equal(saved.tasks.find(t=>t.id===second.id).due,'2027-08-01');assert.equal(saved.tasks.find(t=>t.id===second.id).title,'Fresh peer title');assert.match(shim.document.getElementById('listBulkToolbar').innerHTML,/1 currently match in this tab; 1 have different values or are no longer open/,'actual two-task reconnect reports partial adoption');
+ assert.equal(ctx.state.syncDirty,false);assert.equal(ctx.window.CloudSync.errorCode??null,null);
+ const finalSeed={[SYNC_STORE_KEY]:JSON.stringify(saved)},deleting=await loadAppAtTime(at+4000,{seedStorage:finalSeed,cloudSyncFactory:h.factory}),peerDelete=await loadAppAtTime(at+4000,{seedStorage:finalSeed,cloudSyncFactory:h.factory});
+ await deleting.ctx.cloudPull();await peerDelete.ctx.cloudPull();h.failPull=true;peerDelete.ctx.window.CloudSync.ready=false;
+ setFakeTime(deleting.ctx,at+5000);deleting.ctx.state.listOpen=true;deleting.ctx.onAction('bulk-select-all');deleting.ctx.onAction('bulk-edit');deleting.shim.document.getElementById('bulkApplyDue').checked=true;deleting.shim.document.getElementById('bulkDue').value='2027-10-01';deleting.ctx.onAction('bulk-save');await deleting.ctx.persist();
+ setFakeTime(peerDelete.ctx,at+6000);peerDelete.ctx.onAction('delete-task',{dataset:{id:first.id}});await peerDelete.ctx.persist();h.failPull=false;peerDelete.ctx.window.CloudSync.ready=true;await peerDelete.ctx.cloudPushNow();await syncSettle(50);
+ await deleting.ctx.cloudPull();await deleting.ctx.cloudPushNow();await syncSettle(80);assert.equal(h.remoteState().tasks.some(t=>t.id===first.id),false,'stale batch does not resurrect deleted selected task');assert.equal(h.remoteState().tasks.find(t=>t.id===second.id).due,'2027-10-01');
+ assert.equal(deleting.ctx.state.syncDirty,false);
 });
 test('RISK bulk task editing: failed cloud publication retains local batch and retry acknowledges exact payload',async()=>{
  const original=await loadApp();original.ctx.addTask('Private A');original.ctx.addTask('Private B');const base=JSON.parse(original.ctx.cloudPayload()),h=makeSyncHarness({remote:base,rev:2}),{ctx,shim}=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(base)},cloudSyncFactory:h.factory});await ctx.cloudPull();await syncSettle(30);
@@ -25525,7 +27308,7 @@ test('RISK bulk task editing: failed browser pair save retains in-memory batch a
  shim.localStorage.setItem=write;assert.equal(await ctx.persist(),true);const saved=JSON.parse(shim.localStorage.getItem(SYNC_STORE_KEY));assert.equal(saved.tasks.length,2);assert.equal(saved.tasks.every(t=>t.due==='2027-12-01'),true);
 });
 test('RISK bulk task editing: FAQ and editor qualify mixed Apply and later sync recovery limits',async()=>{
- const {ctx,shim}=await loadApp();ctx.addTask('Private draft');ctx.openHelp();const faq=shim.document.getElementById('modalRoot').innerHTML;assert.match(faq,/conflicts detected before Save stop the whole batch/i);assert.match(faq,/later sync conflict.*newer peer values.*other selected tasks/i);assert.match(faq,/after recovery.*Undo.*earlier board/i);ctx.closeModal();ctx.state.listOpen=true;ctx.onAction('bulk-select-all');ctx.onAction('bulk-edit');assert.match(shim.document.getElementById('modalRoot').innerHTML,/mixed values stay unchanged until you check Apply/i);
+ const {ctx,shim}=await loadApp();ctx.addTask('Private draft');ctx.openHelp();const faq=shim.document.getElementById('modalRoot').innerHTML;assert.match(faq,/conflicts detected before Save stop the whole batch/i);assert.match(faq,/later sync conflict.*compatible changes to different fields/i);assert.match(faq,/One Undo reverses the batch.*keeping unrelated progress/i);assert.doesNotMatch(faq.split('<dt>How does Undo work after Bulk Edit?</dt><dd>')[1].split('</dd>')[0],/earlier board|older peer fields/i);ctx.closeModal();ctx.state.listOpen=true;ctx.onAction('bulk-select-all');ctx.onAction('bulk-edit');assert.match(shim.document.getElementById('modalRoot').innerHTML,/mixed values stay unchanged until you check Apply/i);
 });
 test('RISK bulk task editing: concurrent recovery keeps backups and existing board Undo boundary explicit',async()=>{
  const initial=await loadApp(),a=initial.ctx.addTask('Private A'),b=initial.ctx.addTask('Private B');await initial.ctx.persist();const raw=initial.shim.localStorage.getItem(SYNC_STORE_KEY),storage=sharedScannerStorage({[LOCAL_HEAD_KEY]:raw,[SYNC_STORE_KEY]:raw}),left=await loadApp({sharedStorage:storage}),right=await loadApp({sharedStorage:storage});
@@ -25679,7 +27462,7 @@ test('RISK bulk task guidance: bounded answers retain distinct selection propert
  const {ctx,shim}=await loadApp();ctx.openHelp();const faq=shim.document.getElementById('modalRoot').innerHTML,answers=[...faq.matchAll(/<dt>(.*?)<\/dt><dd>(.*?)<\/dd>/g)].filter(([,q])=>/several tasks together|Bulk Edit|selected tasks change|bulk result count/.test(q));
  assert.equal(answers.length,5,'bulk guidance separates controls, properties, conflicts, Undo and result meanings');
  for(const [,question,answer] of answers)assert.ok(answer.split(/\s+/).filter(Boolean).length<=130,question+' remains independently readable');
- const combined=answers.map(a=>a[2]).join(' ');for(const guidance of ['current filtered list','Apply separately','Clear explicitly','later sync conflict','first Undo may leave batch values','not server confirmation','disappear on reload'])assert.ok(combined.includes(guidance),'retain '+guidance);
+ const combined=answers.map(a=>a[2]).join(' ');for(const guidance of ['current filtered list','Apply separately','Clear explicitly','later sync conflict','One Undo reverses the batch','keeping unrelated progress','not server confirmation','disappear on reload'])assert.ok(combined.includes(guidance),'retain '+guidance);
 });
 
 test('RISK bulk task guidance: enlarged conflict answer uses breakable task status wording',async()=>{
@@ -26202,10 +27985,11 @@ test('RISK always binary context interactions: last-green and all-red clicks sta
 });
 
 test('RISK always binary No Context: visible green and red dispatch immediately on both surfaces with Undo and zero-context guard',async()=>{
+ const ordinaryState=board=>{const result={...board,updatedAt:0};delete result.decisionEvents;delete result.decisionBaseline;return JSON.stringify(result);};
  for(const scope of ['main','settings']){
-  const {ctx,shim}=await loadApp();for(const c of ctx.state.contexts)c.active=false;ctx.state.settings.excludeNoContext=false;const none=ctx.addTask('Private unassigned'),unknown=ctx.addTask('Private unknown',false,['deleted']),known=ctx.addTask('Private known',false,[ctx.state.contexts[0].id]);const saved=JSON.stringify({...ctx.state,updatedAt:0});
+  const {ctx,shim}=await loadApp();for(const c of ctx.state.contexts)c.active=false;ctx.state.settings.excludeNoContext=false;const none=ctx.addTask('Private unassigned'),unknown=ctx.addTask('Private unknown',false,['deleted']),known=ctx.addTask('Private known',false,[ctx.state.contexts[0].id]);const saved=ordinaryState(ctx.state);
   assert.equal(ctx.contextControlInfo(null).mode,'included');assert.equal(ctx.isEligible(none),true);assert.equal(ctx.isEligible(unknown),true);assert.equal(ctx.isEligible(known),false);
-  const button=makeFakeElement();button.dataset={ctxScope:scope,act:'toggle-no-context'};shim.document.activeElement=button;ctx.onAction('toggle-no-context',button);assert.equal(ctx.contextControlInfo(null).mode,'excluded');assert.equal(ctx.isEligible(none),false);assert.equal(ctx.isEligible(unknown),false);ctx.onAction('toggle-no-context',button);assert.equal(ctx.contextControlInfo(null).mode,'included');assert.equal(ctx.isEligible(none),true);ctx.undo();assert.equal(ctx.contextControlInfo(null).mode,'excluded');ctx.undo();assert.equal(JSON.stringify({...ctx.state,updatedAt:0}),saved);
+  const button=makeFakeElement();button.dataset={ctxScope:scope,act:'toggle-no-context'};shim.document.activeElement=button;ctx.onAction('toggle-no-context',button);assert.equal(ctx.contextControlInfo(null).mode,'excluded');assert.equal(ctx.isEligible(none),false);assert.equal(ctx.isEligible(unknown),false);ctx.onAction('toggle-no-context',button);assert.equal(ctx.contextControlInfo(null).mode,'included');assert.equal(ctx.isEligible(none),true);ctx.undo();assert.equal(ctx.contextControlInfo(null).mode,'excluded');ctx.undo();assert.equal(ordinaryState(ctx.state),saved);assert.equal(ctx.state.decisionEvents.filter(event=>event.kind==='undo').length,2,'both reversals retain their durable target evidence');
   ctx.state.contexts=[];ctx.state.settings.excludeNoContext=true;ctx.renderCtx();const before=JSON.stringify(ctx.state);ctx.onAction('toggle-no-context',button);assert.equal(JSON.stringify(ctx.state),before);assert.equal(ctx.isEligible(known),true);assert.match(shim.document.getElementById('ctxPanel').innerHTML,/toggle-ctx/);assert.match(shim.document.getElementById('ctxPanel').innerHTML,/add-ctx/);
  }
 });
@@ -27153,4 +28937,1130 @@ test('RISK wheeled shadow FAQ: guidance describes complete vehicle shade and bod
  const answer=help.match(/<dt>Why do scenery shadows change\?<\/dt><dd>(.*?)<\/dd>/)?.[1];
  assert.match(answer,/Bicycles, scooters and hoverboards/);assert.match(answer,/silhouettes/);assert.match(answer,/starlight.*faint and diffuse/);assert.match(answer,/behind visitors/);
  assert.match(html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1],/Bicycle and scooter shadows/);
+});
+
+test('RISK cloud current choices: editor Save records original per-property action time',async()=>{
+ const at=Date.parse('2026-10-16T16:20:00.000Z'),actionAt=at+1234;
+ const initial=syncState({tasks:[syncTask('edited-task','Before')],chain:[],candidateId:null,
+  passStartedAt:at-60000,passId:'shared-pass-144',scanMode:'descending',syncRev:4,
+  syncAccount:'e@example.com',syncDirty:false});
+ const remote=JSON.parse(JSON.stringify(initial));
+ for(const key of ['syncRev','syncAccount','syncDirty','lastCloudServerAt','protectedBackupIds'])delete remote[key];
+ const h=makeSyncHarness({remote,rev:4,delayMs:1});
+ const {ctx,shim}=await loadAppAtTime(at,{seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)},cloudSyncFactory:h.factory});
+ await ctx.cloudPull();await syncSettle(10);
+ assert.ok(ctx.state.decisionBase?.id,'the client has the exact adopted cloud base before the user action');
+ setFakeTime(ctx,actionAt);
+ ctx.openEdit('edited-task');
+ shim.document.getElementById('etEverReset').checked=true;
+ fillEditPane(ctx,shim,{title:'After'});
+ ctx.onAction('save-edit',{dataset:{id:'edited-task'}});
+ const event=ctx.state.decisionEvents?.find(item=>item?.kind==='current-choice');
+ assert.ok(event,'the actual editor Save action records immutable current-choice evidence');
+ assert.equal(event.v,1,'current-choice evidence uses the shared v1 decision envelope');
+ assert.equal(typeof event.id,'string','each changed property has an immutable event identity');
+ assert.equal(typeof event.actionId,'string','one editor gesture has an Undo grouping identity');
+ assert.equal(event.actionId.length>0,true,'the action grouping identity is nonempty');
+ assert.equal(event.at,actionAt,'decision time is captured at the user action, not during a later save');
+ assert.equal(event.account,'e@example.com','the action records its cloud owner');
+ assert.equal(event.baseId,ctx.state.decisionBase.id,'the action records the exact cloud base it observed');
+ assert.equal(event.passId,'shared-pass-144','the action retains the existing scan pass identity');
+ assert.equal(event.passAt,at-60000,'the action retains the original pass start');
+ assert.deepEqual(JSON.parse(JSON.stringify(event.target)),
+  {type:'task',id:'edited-task',property:'title'},'the event has one typed task-property target');
+ assert.equal(event.value,'After','the event carries the chosen field value');
+ assert.deepEqual(JSON.parse(JSON.stringify(event.after)),{present:true},'the saved value is distinguished from removing the property');
+ assert.deepEqual(JSON.parse(JSON.stringify(event.before)),{present:true,value:'Before'},
+  'cloud-visible prior-field evidence can restore the value after a targeted Undo');
+ assert.deepEqual(JSON.parse(JSON.stringify(event.observedActionIds)),[],
+  'the original observed frontier is frozen before the gesture');
+ assert.deepEqual(JSON.parse(JSON.stringify(event.taskContextIds)),{'edited-task':[]},
+  'the action retains the task context it observed');
+ assert.equal(event.scanMode,'descending','the action retains its original scan mode');
+ assert.equal(ctx.supportedCurrentChoiceEvent(event),true,'the strict projection boundary accepts a valid task field fact');
+ const unsupported=JSON.parse(JSON.stringify(event));unsupported.target.property='mu';
+ assert.equal(ctx.supportedCurrentChoiceEvent(unsupported),false,'rating fields cannot be patched through generic current-choice replay');
+ unsupported.target.id='__proto__';unsupported.target.property='title';
+ assert.equal(ctx.supportedCurrentChoiceEvent(unsupported),false,'prototype-like values cannot become task identifiers');
+ unsupported.target.id='edited-task';unsupported.value={mu:999};
+ assert.equal(ctx.supportedCurrentChoiceEvent(unsupported),false,'a known property rejects values outside its supported type');
+ const recorded=JSON.stringify(event);
+ assert.equal(await ctx.persist(),true,'the choice is durable on the device');
+ assert.equal(await ctx.persist(),true,'a repeated save does not create another decision');
+ assert.equal(JSON.stringify(ctx.state.decisionEvents.find(item=>item?.id===event.id)),recorded,
+  'retry and projection maintenance retain the same identity and original action time');
+ const payload=JSON.parse(ctx.cloudPayload());
+ assert.equal(Object.hasOwn(payload,'decisionBase'),false,'the device-only base remains excluded from cloud payloads');
+ assert.deepEqual(JSON.parse(JSON.stringify(payload.decisionEvents)),[JSON.parse(JSON.stringify(event))],
+  'the cloud payload carries the exact user action record');
+});
+
+test('RISK cloud current choices: scan mode preference records an explicit timed choice',async()=>{
+ const at=Date.parse('2026-10-16T16:40:00.000Z');
+ const initial=syncState({tasks:[syncTask('mode-task','Mode task')],chain:[],candidateId:null,
+  passStartedAt:at-60000,passId:'shared-pass-mode',scanMode:'squared',syncRev:4,
+  settings:{horizonMin:60,thresholdPct:25,samples:250,cantMin:30,workedHours:16,scanMode:'squared'},
+  syncAccount:'e@example.com',syncDirty:false});
+ const remote=JSON.parse(JSON.stringify(initial));
+ for(const key of ['syncRev','syncAccount','syncDirty','lastCloudServerAt','protectedBackupIds'])delete remote[key];
+ const h=makeSyncHarness({remote,rev:4,delayMs:1});
+ const {ctx}=await loadAppAtTime(at,{seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)},cloudSyncFactory:h.factory});
+ await ctx.cloudPull();await syncSettle(10);setFakeTime(ctx,at+1234);
+ ctx.setScanPreference('chance');
+ const events=ctx.state.decisionEvents?.filter(item=>item?.kind==='current-choice')||[];
+ const cache=JSON.parse(JSON.stringify(ctx.state.chance));
+ assert.equal(events.length,2,'one preference action records its saved setting and its active pass mode');
+ assert.equal(new Set(events.map(event=>event.actionId)).size,1,'both facts share one stable Undo grouping identity');
+ assert.ok(events.every(event=>event.at===at+1234),'both mode facts retain the original click time');
+ assert.deepEqual(JSON.parse(JSON.stringify(events.map(event=>event.target))),[
+  {type:'setting',id:'board',property:'scanMode'},{type:'pass',id:'shared-pass-mode',property:'scanMode'}]);
+ assert.deepEqual(JSON.parse(JSON.stringify(events[0].value)),'chance','the persisted setting remains the selected scan mode');
+ assert.deepEqual(JSON.parse(JSON.stringify(events[0].before)),{present:true,value:'squared'});
+ assert.deepEqual(JSON.parse(JSON.stringify(events[1].value)),{mode:'chance',chance:cache},
+  'the active pass choice freezes its exact post-action chance draw for fresh clients');
+ assert.deepEqual(JSON.parse(JSON.stringify(events[1].before)),{present:true,value:{mode:'squared',chance:null}},
+  'Undo evidence retains the exact pre-action mode and draw, including an absent draw');
+ assert.ok(events.every(event=>ctx.supportedCurrentChoiceEvent(event)),'the strict projection boundary accepts both exact mode choices');
+ assert.deepEqual(JSON.parse(JSON.stringify(JSON.parse(ctx.cloudPayload()).decisionEvents)),JSON.parse(JSON.stringify(events)),
+  'the exact preference facts are carried to the cloud');
+});
+
+test('RISK cloud current choices: Resume scanning records an explicit active-pass mode change',async()=>{
+ const at=Date.parse('2026-10-16T16:42:00.000Z');
+ const initial=syncState({tasks:[syncTask('resume-mode','Resume task')],chain:['resume-mode'],candidateId:null,mode:'work',
+  passStartedAt:at-60000,passId:'shared-pass-resume-mode',scanMode:'squared',syncRev:4,
+  settings:{horizonMin:60,thresholdPct:25,samples:250,cantMin:30,workedHours:16,scanMode:'both'},
+  syncAccount:'e@example.com',syncDirty:false});
+ const remote=JSON.parse(JSON.stringify(initial));
+ for(const key of ['syncRev','syncAccount','syncDirty','lastCloudServerAt','protectedBackupIds'])delete remote[key];
+ const h=makeSyncHarness({remote,rev:4,delayMs:1});
+ const {ctx}=await loadAppAtTime(at,{seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)},cloudSyncFactory:h.factory});
+ await ctx.cloudPull();await syncSettle(10);setFakeTime(ctx,at+1234);
+ ctx.onAction('resume-scan',{dataset:{mode:'chance'}});
+ const event=ctx.state.decisionEvents?.find(item=>item?.kind==='current-choice'&&item.target.type==='pass'&&item.target.property==='scanMode');
+ assert.ok(event,'the actual Resume scanning choice records its active mode transition');
+ assert.equal(event.at,at+1234);assert.equal(event.passId,'shared-pass-resume-mode');
+ assert.equal(event.target.id,'shared-pass-resume-mode','resuming changes the existing pass rather than creating a new one');
+ assert.deepEqual(JSON.parse(JSON.stringify(event.before)),{present:true,value:{mode:'squared',chance:null}});
+ assert.deepEqual(JSON.parse(JSON.stringify(event.value)),{mode:'chance',chance:JSON.parse(JSON.stringify(ctx.state.chance))});
+ assert.equal(ctx.state.mode,'scan');assert.ok(ctx.supportedCurrentChoiceEvent(event));
+});
+
+test('RISK cloud current choices: explicit Start scanning mode records its new active pass',async()=>{
+ const at=Date.parse('2026-10-16T16:45:00.000Z');
+ const initial=syncState({tasks:[syncTask('explicit-start-mode','Mode task')],chain:[],candidateId:null,mode:'work',
+  passStartedAt:at-60000,passId:'previous-pass-start-mode',scanMode:'descending',syncRev:4,
+  settings:{horizonMin:60,thresholdPct:25,samples:250,cantMin:30,workedHours:16,scanMode:'both'},
+  syncAccount:'e@example.com',syncDirty:false});
+ const remote=JSON.parse(JSON.stringify(initial));
+ for(const key of ['syncRev','syncAccount','syncDirty','lastCloudServerAt','protectedBackupIds'])delete remote[key];
+ const h=makeSyncHarness({remote,rev:4,delayMs:1});
+ const {ctx}=await loadAppAtTime(at,{seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)},cloudSyncFactory:h.factory});
+ await ctx.cloudPull();await syncSettle(10);setFakeTime(ctx,at+1234);
+ ctx.onAction('start-scan',{dataset:{mode:'halving'}});
+ const event=ctx.state.decisionEvents?.find(item=>item?.kind==='current-choice'&&item.target.type==='pass'&&item.target.property==='scanMode');
+ const rootEvent=ctx.state.decisionEvents?.find(item=>item?.kind==='current-choice'&&item.target.type==='pass'&&item.target.property==='chain');
+ assert.ok(event,'the explicit Start scanning control records its selected active-pass mode');
+ assert.equal(event.at,at+1234,'the selected mode retains the original action time');
+ assert.equal(event.passId,'previous-pass-start-mode','the envelope retains the pass context the action observed');
+ assert.equal(event.target.id,ctx.state.passId,'the mode target is the new pass created by Start scanning');
+ assert.deepEqual(JSON.parse(JSON.stringify(event.value)),{mode:'halving',chance:JSON.parse(JSON.stringify(ctx.state.chance))});
+ assert.equal(event.passAt,at-60000,'the envelope preserves the pass start the action observed');
+ assert.equal(ctx.state.passStartedAt,at+1234,'the new pass start uses the frozen original Start scanning time');
+ assert.ok(rootEvent,'Start also records its neutral automatic root without inventing a comparison');
+ assert.equal(rootEvent.actionId,event.actionId,'pass identity, root chain and mode share one Undo action group');
+ assert.equal(rootEvent.at,event.at,'the root uses the same frozen Start action time');
+ assert.deepEqual(JSON.parse(JSON.stringify(rootEvent.value)),[ctx.state.chain[0]],'the root task is the one selected by this Start action');
+ assert.deepEqual(JSON.parse(JSON.stringify(rootEvent.before)),{present:true,value:[]},'the root retains its exact prior empty-chain evidence');
+ assert.ok(ctx.supportedCurrentChoiceEvent(event),'the strict projector recognizes this explicit mode choice');
+ assert.ok(ctx.supportedCurrentChoiceEvent(rootEvent),'the strict projector recognizes only the bounded fresh-pass root choice');
+});
+
+test('RISK cloud current choices: Save settings retains changed shared preferences as one action',async()=>{
+ const at=Date.parse('2026-10-16T17:05:00.000Z');
+ const initial=syncState({tasks:[syncTask('settings-choice','Settings task')],chain:[],candidateId:null,
+  passStartedAt:at-60000,passId:'shared-pass-settings',scanMode:'descending',syncRev:4,
+  settings:{horizonMin:60,thresholdPct:25,samples:250,cantMin:30,workedHours:16,postponeHours:1,evergreenHours:18,
+   evergreenResetAtDay:true,showPostpone:true,patternedIndicators:false,floatingHeader:false,lastTaskWoop:false,
+   scanMode:'descending',listMetric:'rank',excludeNoContext:false},
+  syncAccount:'e@example.com',syncDirty:false});
+ const remote=JSON.parse(JSON.stringify(initial));
+ for(const key of ['syncRev','syncAccount','syncDirty','lastCloudServerAt','protectedBackupIds'])delete remote[key];
+ const h=makeSyncHarness({remote,rev:4,delayMs:1});
+ const {ctx,shim}=await loadAppAtTime(at,{seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)},cloudSyncFactory:h.factory});
+ await ctx.cloudPull();await syncSettle(10);setFakeTime(ctx,at+1234);ctx.openSettings();
+ shim.document.getElementById('stHorizon').value='90';
+ shim.document.getElementById('stSamples').value='500';
+ shim.document.getElementById('stScanMode').value='descending';
+ ctx.onAction('save-settings',{});
+ const events=ctx.state.decisionEvents?.filter(event=>event?.kind==='current-choice'&&event.target.type==='setting')||[];
+ assert.equal(events.length,2,'Save records both changed shared preferences instead of replacing settings wholesale');
+ assert.equal(new Set(events.map(event=>event.actionId)).size,1,'one Save settings gesture has one Undo grouping identity');
+ assert.ok(events.every(event=>event.at===at+1234),'all settings retain the original Save action time');
+ assert.deepEqual(JSON.parse(JSON.stringify(events.map(event=>event.target).sort((a,b)=>a.property<b.property?-1:a.property>b.property?1:0))),[
+  {type:'setting',id:'board',property:'horizonMin'},{type:'setting',id:'board',property:'samples'}]);
+ assert.deepEqual(JSON.parse(JSON.stringify(events.find(event=>event.target.property==='horizonMin').before)),{present:true,value:60});
+ assert.equal(events.find(event=>event.target.property==='horizonMin').value,90);
+ assert.deepEqual(JSON.parse(JSON.stringify(events.find(event=>event.target.property==='samples').before)),{present:true,value:250});
+ assert.equal(events.find(event=>event.target.property==='samples').value,500);
+ assert.ok(events.every(event=>ctx.supportedCurrentChoiceEvent(event)),'strict projection accepts only supported preference values');
+ assert.equal(JSON.parse(ctx.cloudPayload()).decisionEvents.length,2,'the exact changes are present in the normal cloud payload');
+});
+
+test('RISK cloud current choices: immediate preference controls retain their action times',async()=>{
+ const at=Date.parse('2026-10-16T17:08:00.000Z');
+ const initial=syncState({tasks:[syncTask('immediate-pref','Preference task')],contexts:[{id:'pref-context',name:'Context',active:true}],
+  chain:[],candidateId:null,passStartedAt:at-60000,passId:'shared-pass-immediate-pref',scanMode:'descending',syncRev:4,
+  settings:{horizonMin:60,thresholdPct:25,samples:250,cantMin:30,workedHours:16,scanMode:'descending',listMetric:'rank',
+   excludeNoContext:false,lastTaskWoop:false,showPostpone:true,patternedIndicators:false,floatingHeader:false},
+  syncAccount:'e@example.com',syncDirty:false});
+ const remote=JSON.parse(JSON.stringify(initial));
+ for(const key of ['syncRev','syncAccount','syncDirty','lastCloudServerAt','protectedBackupIds'])delete remote[key];
+ const h=makeSyncHarness({remote,rev:4,delayMs:1});
+ const {ctx,shim}=await loadAppAtTime(at,{seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)},cloudSyncFactory:h.factory});
+ await ctx.cloudPull();await syncSettle(10);ctx.openSettings();
+ setFakeTime(ctx,at+100);
+ const metric=shim.document.getElementById('stListMetric');metric.id='stListMetric';metric.matches=()=>false;metric.value='chance';
+ shim.document.dispatchEvent({type:'change',target:metric});
+ setFakeTime(ctx,at+200);ctx.onAction('toggle-no-context',{});
+ setFakeTime(ctx,at+300);
+ const postpone=shim.document.getElementById('stShowPostpone');postpone.id='stShowPostpone';postpone.matches=()=>false;postpone.checked=false;
+ shim.document.dispatchEvent({type:'change',target:postpone});
+ const events=ctx.state.decisionEvents?.filter(event=>event?.kind==='current-choice'&&event.target.type==='setting')||[];
+ assert.equal(events.length,3,'immediate settings and context-filter controls each retain a deliberate change');
+ assert.deepEqual(JSON.parse(JSON.stringify(events.map(event=>[event.target.property,event.value,event.at]).sort((a,b)=>a[0]<b[0]?-1:a[0]>b[0]?1:0))),[
+  ['excludeNoContext',true,at+200],['listMetric','chance',at+100],['showPostpone',false,at+300]].sort((a,b)=>a[0]<b[0]?-1:a[0]>b[0]?1:0));
+ assert.equal(new Set(events.map(event=>event.actionId)).size,3,'each separate preference gesture gets its own Undo action group');
+ assert.ok(events.every(event=>ctx.supportedCurrentChoiceEvent(event)),'only exact whitelisted preference values are accepted');
+ assert.equal(JSON.parse(ctx.cloudPayload()).decisionEvents.length,3,'all three user choices reach the shared board payload');
+});
+
+test('RISK cloud current choices: Start scanning pass root and frozen draw survive a fresh client reopen',async()=>{
+ const at=Date.parse('2026-10-16T17:10:00.000Z');
+ const initial=syncState({tasks:[syncTask('start-root','First task'),syncTask('start-next','Next task'),syncTask('start-last','Last task')],
+  chain:[],candidateId:null,mode:'work',passStartedAt:at-60000,passId:'previous-start-pass',scanMode:'descending',syncRev:4,
+  settings:{horizonMin:60,thresholdPct:25,samples:250,cantMin:30,workedHours:16,scanMode:'both'},
+  syncAccount:'e@example.com',syncDirty:false});
+ const remote=JSON.parse(JSON.stringify(initial));
+ for(const key of ['syncRev','syncAccount','syncDirty','lastCloudServerAt','protectedBackupIds'])delete remote[key];
+ const h=makeSyncHarness({remote,rev:4,delayMs:1}),seedStorage={[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)};
+ const started=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:h.factory}),peer=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:h.factory});
+ await started.ctx.cloudPull();await peer.ctx.cloudPull();started.ctx.window.CloudSync.ready=false;setFakeTime(started.ctx,at+1234);
+ started.ctx.onAction('start-scan',{dataset:{mode:'halving'}});
+ const chosenPass=started.ctx.state.passId,chosenRoot=started.ctx.state.chain[0];
+ const events=started.ctx.state.decisionEvents||[];
+ const root=events.find(event=>event?.kind==='current-choice'&&event.target?.property==='chain');
+ const mode=events.find(event=>event?.kind==='current-choice'&&event.target?.property==='scanMode'&&event.target?.type==='pass');
+ assert.ok(root&&mode,'Start records both its pass root and exact active mode');
+ assert.equal(root.target.id,chosenPass);assert.equal(mode.target.id,chosenPass);
+ assert.equal(root.value[0],chosenRoot);
+ started.ctx.window.CloudSync.ready=true;
+ await saveEditorChoice(peer,'start-next',at+2000,{title:'Independent peer edit'});
+ await peer.ctx.cloudPushNow();await syncSettle(40);
+ assert.equal(h.remoteState().tasks.find(task=>task.id==='start-next').title,'Independent peer edit');
+ await started.ctx.cloudPushNow();await syncSettle(40);setFakeTime(peer.ctx,at+1234);
+ await peer.ctx.cloudPull();await syncSettle(50);
+ assert.equal(started.ctx.state.tasks.find(task=>task.id==='start-next').title,'Independent peer edit',
+  'the stale offline Start action does not replace a peer’s independent edit');
+ assert.equal(peer.ctx.state.passId,chosenPass,'a fresh client adopts the explicit new pass identity');
+ assert.equal(peer.ctx.state.passStartedAt,at+1234,'the pass keeps its original start time through publication');
+ assert.deepEqual(JSON.parse(JSON.stringify(peer.ctx.state.chain)),[chosenRoot],'the exact neutral auto-selected root is restored without a fabricated comparison');
+ assert.equal(peer.ctx.state.scanMode,'halving','the selected active mode is restored');
+ assert.deepEqual(JSON.parse(JSON.stringify(peer.ctx.state.chance)),JSON.parse(JSON.stringify(mode.value.chance)),
+  'the same frozen chance draw, not a replayed random reset, drives this pass');
+ peer.ctx.ensureCandidate();assert.equal(peer.ctx.state.candidateId,started.ctx.state.candidateId,
+  'the next candidate converges from the shared root, mode and frozen draw');
+ assert.equal(await peer.ctx.persist(),true,'the adopted pass is durable on the fresh device');
+ const saved=peer.shim.localStorage.getItem(SYNC_STORE_KEY),reopened=await loadAppAtTime(at+1234,{seedStorage:{[SYNC_STORE_KEY]:saved},cloudSyncFactory:h.factory});
+ await reopened.ctx.cloudPull();setFakeTime(reopened.ctx,at+1234);reopened.ctx.ensureCandidate();
+ assert.equal(reopened.ctx.state.passId,chosenPass,'cold reopen keeps the pass identity');
+ assert.deepEqual(JSON.parse(JSON.stringify(reopened.ctx.state.chain)),[chosenRoot],'cold reopen keeps the neutral root');
+ assert.deepEqual(JSON.parse(JSON.stringify(reopened.ctx.state.chance)),JSON.parse(JSON.stringify(mode.value.chance)),'cold reopen keeps the exact draw');
+ assert.equal(reopened.ctx.state.candidateId,started.ctx.state.candidateId,'cold reopen chooses the same next task');
+ assert.equal(h.remoteState().decisionEvents.filter(event=>event?.kind==='current-choice').length,3,
+  'the cloud retains the two typed Start facts and peer edit, without a synthetic comparison: '+JSON.stringify(h.remoteState().decisionEvents));
+});
+
+test('RISK cloud current choices: Can’t and Return are timed, causally linked disposition actions',async()=>{
+ const at=Date.parse('2026-10-16T16:50:00.000Z'),candidate=syncTask('cant-choice','Candidate'),benchmark=syncTask('cant-bench','Benchmark');
+ const initial=syncState({tasks:[candidate,benchmark],chain:[benchmark.id],candidateId:candidate.id,
+  considered:{},cantAt:{},workedAt:{},passStartedAt:at-60000,passId:'shared-pass-cant',scanMode:'descending',
+  settings:{horizonMin:60,thresholdPct:25,samples:250,cantMin:30,workedHours:16,scanMode:'squared'},
+  syncRev:4,syncAccount:'e@example.com',syncDirty:false});
+ const remote=JSON.parse(JSON.stringify(initial));
+ for(const key of ['syncRev','syncAccount','syncDirty','lastCloudServerAt','protectedBackupIds'])delete remote[key];
+ const h=makeSyncHarness({remote,rev:4,delayMs:1});
+ const {ctx}=await loadAppAtTime(at,{seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)},cloudSyncFactory:h.factory});
+ await ctx.cloudPull();await syncSettle(10);setFakeTime(ctx,at+100);
+ ctx.onAction('cant',{dataset:{}});
+ const cant=ctx.state.decisionEvents?.find(item=>item?.kind==='current-choice');
+ assert.ok(cant,'the actual scanner Can’t action records a supported current disposition');
+ assert.equal(cant.at,at+100,'Can’t uses the original user action time as the start of its hold');
+ assert.deepEqual(JSON.parse(JSON.stringify(cant.target)),{type:'task',id:candidate.id,property:'disposition'});
+ assert.deepEqual(JSON.parse(JSON.stringify(cant.value)),{kind:'cant',at:at+100},'the choice retains the exact start of its existing hold');
+ assert.deepEqual(JSON.parse(JSON.stringify(cant.before)),{present:false});
+ setFakeTime(ctx,at+200);assert.equal(ctx.returnAsCandidate(candidate.id),true,'the actual Return action still clears a Can’t hold');
+ const events=ctx.state.decisionEvents.filter(item=>item?.kind==='current-choice');
+ assert.equal(events.length,2,'the later deliberate Return is separately preserved');
+ assert.deepEqual(JSON.parse(JSON.stringify(events[1].after)),{present:false},'Return clears only this task’s current disposition');
+ assert.deepEqual(JSON.parse(JSON.stringify(events[1].before.value)),{kind:'cant',at:at+100},
+  'the clear retains the exact disposition and original hold-start it replaced');
+ assert.ok(events[1].observedActionIds.includes(cant.id),'Return causally observes the earlier Can’t action');
+ assert.ok(events.every(event=>ctx.supportedCurrentChoiceEvent(event)),'both disposition facts pass exact semantic validation');
+ assert.equal(JSON.parse(ctx.cloudPayload()).decisionEvents.length,2,'the action pair is durable in the cloud payload');
+});
+
+test('RISK cloud current choices: compatible edits on the same task retain each changed property',async()=>{
+ const at=Date.parse('2026-10-16T17:00:00.000Z');
+ const initial=syncState({tasks:[Object.assign(syncTask('shared-edit','Original title'),{ctx:['ctx-work']}),
+  syncTask('independent-edit','Independent task')],contexts:[{id:'ctx-work',name:'Work',active:true}],chain:[],candidateId:null,
+  passStartedAt:at-60000,passId:'shared-pass-compatible',scanMode:'descending',syncRev:4,syncAccount:'e@example.com',syncDirty:false});
+ const remote=JSON.parse(JSON.stringify(initial));
+ for(const key of ['syncRev','syncAccount','syncDirty','lastCloudServerAt','protectedBackupIds'])delete remote[key];
+ const h=makeSyncHarness({remote,rev:4,delayMs:1}),seedStorage={[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)};
+ const a=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:h.factory}),b=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:h.factory});
+ await a.ctx.cloudPull();await b.ctx.cloudPull();
+ assert.equal(await saveEditorChoice(a,'shared-edit',at+100,{title:'Chosen title'}),true);
+ assert.equal(await saveEditorChoice(b,'shared-edit',at+200,{url:'https://example.test/'}),true);
+ assert.equal(await saveEditorChoice(b,'independent-edit',at+300,{due:'2026-10-25'}),true);
+ await a.ctx.cloudPushNow();await syncSettle(30);await b.ctx.cloudPull();await syncSettle(40);await b.ctx.cloudPushNow();await syncSettle(40);
+ const final=h.remoteState(),shared=final.tasks.find(task=>task.id==='shared-edit');
+ assert.equal(shared.title,'Chosen title','a local choice to one property survives the peer’s compatible edit');
+ assert.equal(shared.url,'https://example.test/','a compatible peer property survives on the same task');
+ assert.equal(final.tasks.find(task=>task.id==='independent-edit').due,'2026-10-25','an independent task choice also survives');
+ const events=final.decisionEvents.filter(event=>event?.kind==='current-choice');
+ assert.equal(events.length,3,'all three deliberate per-property choices remain cloud-visible: '+JSON.stringify(events.map(event=>event.target.property)));
+ assert.equal(new Set(events.map(event=>event.id)).size,3,'per-property records have unique event identities');
+ assert.deepEqual(events.map(event=>event.target.property).sort(),['due','title','url']);
+});
+
+test('RISK cloud current choices: original decision time wins conflicts in either publication order',async t=>{
+ const at=Date.parse('2026-10-16T17:20:00.000Z');
+ for(const first of ['earlier','later'])await t.test(`${first} action publishes first`,async()=>{
+  const initial=syncState({tasks:[syncTask('conflict-title','Before')],chain:[],candidateId:null,
+   passStartedAt:at-60000,passId:'shared-pass-conflict',scanMode:'descending',syncRev:4,syncAccount:'e@example.com',syncDirty:false});
+  const remote=JSON.parse(JSON.stringify(initial));
+  for(const key of ['syncRev','syncAccount','syncDirty','lastCloudServerAt','protectedBackupIds'])delete remote[key];
+  const h=makeSyncHarness({remote,rev:4,delayMs:1}),seedStorage={[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)};
+  const earlier=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:h.factory}),later=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:h.factory});
+  await earlier.ctx.cloudPull();await later.ctx.cloudPull();
+  await saveEditorChoice(earlier,'conflict-title',at+100,{title:'Earlier choice'});
+  await saveEditorChoice(later,'conflict-title',at+200,{title:'Later choice'});
+  const expectedLater=later.ctx.state.decisionEvents.find(event=>event?.kind==='current-choice');
+  assert.equal(expectedLater.at,at+200,'the second device retains its original action time');
+  const firstClient=first==='earlier'?earlier:later,secondClient=first==='earlier'?later:earlier;
+  await firstClient.ctx.cloudPushNow();await syncSettle(40);
+  await secondClient.ctx.cloudPull();await syncSettle(50);await secondClient.ctx.cloudPushNow();await syncSettle(50);
+  assert.equal(h.remoteState().tasks.find(task=>task.id==='conflict-title').title,'Later choice',
+   'publication and upload order cannot make the older deliberate title win');
+  assert.equal(secondClient.ctx.state.tasks.find(task=>task.id==='conflict-title').title,'Later choice',
+   'the adopting device projects the same winning current choice');
+  assert.equal(h.remoteState().decisionEvents.filter(event=>event?.kind==='current-choice').length,2,
+   'both incompatible choices stay available as evidence');
+  assert.equal(JSON.stringify(h.remoteState().decisionEvents.find(event=>event.id===expectedLater.id)),JSON.stringify(expectedLater),
+   'reconciliation does not restamp the later action');
+  const reopened=await loadAppAtTime(at,{seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(h.remoteState()),[LOCAL_HEAD_KEY]:JSON.stringify(h.remoteState())},
+   cloudSyncFactory:h.factory});
+  await reopened.ctx.cloudPull();
+  assert.equal(reopened.ctx.state.tasks.find(task=>task.id==='conflict-title').title,'Later choice',
+   'a cold reopen uses retained action evidence rather than a fresh save timestamp');
+ });
+});
+
+test('RISK cloud current choices: causal projector retains compatible task fields and context membership',async()=>{
+ const at=Date.parse('2026-10-16T17:40:00.000Z');
+ const initial=syncState({tasks:[Object.assign(syncTask('compatible-projection','Original'),{ctx:['ctx-work']}),
+  syncTask('other-projection','Other')],contexts:[{id:'ctx-work',name:'Work',active:true},{id:'ctx-home',name:'Home',active:true},
+  {id:'ctx-priority',name:'Priority',active:true}],chain:[],candidateId:null,passStartedAt:at-60000,passId:'shared-pass-projection',
+  scanMode:'descending',syncRev:4,syncAccount:'e@example.com',syncDirty:false});
+ const remote=JSON.parse(JSON.stringify(initial));
+ for(const key of ['syncRev','syncAccount','syncDirty','lastCloudServerAt','protectedBackupIds'])delete remote[key];
+ const h=makeSyncHarness({remote,rev:4,delayMs:1}),seedStorage={[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)};
+ const a=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:h.factory}),b=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:h.factory});
+ await a.ctx.cloudPull();await b.ctx.cloudPull();
+ assert.equal(await saveEditorChoice(a,'compatible-projection',at+100,{title:'Title from A',ctxIds:['ctx-work','ctx-home']}),true);
+ assert.equal(await saveEditorChoice(b,'compatible-projection',at+200,{due:'2026-10-25',ctxIds:['ctx-work','ctx-priority']}),true);
+ const events=[...a.ctx.state.decisionEvents,...b.ctx.state.decisionEvents].filter(event=>event?.kind==='current-choice');
+ assert.equal(events.length,4,'two normal Save actions each retain their independent field facts');
+ const board=JSON.parse(JSON.stringify(initial));board.decisionEvents=JSON.parse(JSON.stringify(events));
+ const reversed=JSON.parse(JSON.stringify(board));reversed.decisionEvents.reverse();
+ a.ctx.projectCurrentChoiceEvents(board);a.ctx.projectCurrentChoiceEvents(reversed);
+ const task=board.tasks.find(row=>row.id==='compatible-projection'),reverseTask=reversed.tasks.find(row=>row.id==='compatible-projection');
+ assert.equal(task.title,'Title from A','the first compatible field is applied independently');
+ assert.equal(task.due,'2026-10-25','the other device’s different field survives');
+ assert.deepEqual(task.ctx,['ctx-work','ctx-home','ctx-priority'],
+  'concurrent additions to distinct context memberships compose from their exact common before value');
+ assert.deepEqual(JSON.parse(JSON.stringify([task.title,task.due,task.ctx])),
+  JSON.parse(JSON.stringify([reverseTask.title,reverseTask.due,reverseTask.ctx])),
+  'event delivery order does not change the projected compatible result');
+});
+
+test('RISK cloud current choices: context membership additions compose across observed revisions',async()=>{
+ const at=Date.parse('2026-10-16T18:20:00.000Z');
+ const initial=syncState({tasks:[syncTask('revision-marker','Before marker'),syncTask('context-delta-target','Shared task')],
+  contexts:[{id:'ctx-phone',name:'Phone',active:true},{id:'ctx-peer',name:'Peer',active:true}],chain:[],candidateId:null,
+  passStartedAt:at-60000,passId:'shared-pass-context-delta',scanMode:'descending',syncRev:4,syncAccount:'e@example.com',syncDirty:false});
+ const remote=JSON.parse(JSON.stringify(initial));
+ for(const key of ['syncRev','syncAccount','syncDirty','lastCloudServerAt','protectedBackupIds'])delete remote[key];
+ const h=makeSyncHarness({remote,rev:4,delayMs:1}),seedStorage={[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)};
+ const phone=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:h.factory});
+ const peer=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:h.factory});
+ try{
+  await phone.ctx.cloudPull();await peer.ctx.cloudPull();await syncSettle(20);
+  const sharedBase=phone.ctx.state.decisionBase?.id;
+  assert.ok(sharedBase,'both devices begin from an adopted exact cloud revision');
+  assert.equal(peer.ctx.state.decisionBase?.id,sharedBase,'the peer begins from the same decision base');
+
+  assert.equal(await saveEditorChoice(phone,'revision-marker',at+100,{title:'Advanced cloud revision'}),true);
+  await phone.ctx.cloudPushNow();await syncSettle(30);
+  assert.ok(h.doc.rev>4,'the unrelated editor action is acknowledged as a new cloud revision');
+  assert.ok(phone.ctx.state.decisionBase?.id&&phone.ctx.state.decisionBase.id!==sharedBase,
+   'publishing an unrelated edit advances the phone’s observed decision base');
+  assert.equal(peer.ctx.state.decisionBase?.id,sharedBase,'the peer remains stale on the original decision base');
+
+  phone.shim.window.CloudSync.ready=false;peer.shim.window.CloudSync.ready=false;
+  assert.equal(await saveEditorChoice(phone,'context-delta-target',at+200,{ctxIds:['ctx-phone']}),true);
+  assert.equal(await saveEditorChoice(peer,'context-delta-target',at+300,{ctxIds:['ctx-peer']}),true);
+  const phoneChoice=phone.ctx.state.decisionEvents.find(event=>event?.kind==='current-choice'&&event.target?.property==='ctx');
+  const peerChoice=peer.ctx.state.decisionEvents.find(event=>event?.kind==='current-choice'&&event.target?.property==='ctx');
+  assert.deepEqual(JSON.parse(JSON.stringify(phoneChoice.before)),{present:true,value:[]},'the phone records the shared empty membership before its edit');
+  assert.deepEqual(JSON.parse(JSON.stringify(peerChoice.before)),{present:true,value:[]},'the stale peer records the same shared empty membership');
+  assert.notEqual(phoneChoice.baseId,peerChoice.baseId,'the concurrent editor actions attest different observed cloud revisions');
+
+  phone.shim.window.CloudSync.ready=true;
+  await phone.ctx.cloudPushNow();await syncSettle(30);
+  peer.shim.window.CloudSync.ready=true;
+  await peer.ctx.cloudPull();await syncSettle(40);
+  const adopted=peer.ctx.state.tasks.find(task=>task.id==='context-delta-target');
+  assert.deepEqual(JSON.parse(JSON.stringify(adopted.ctx)),['ctx-phone','ctx-peer'],
+   'the stale peer visibly composes both independent additions from the same attested before membership: '+JSON.stringify({actual:adopted.ctx,
+    phone:{id:phoneChoice.id,baseId:phoneChoice.baseId,at:phoneChoice.at,before:phoneChoice.before,value:phoneChoice.value},
+    peer:{id:peerChoice.id,baseId:peerChoice.baseId,at:peerChoice.at,before:peerChoice.before,value:peerChoice.value}}));
+  await peer.ctx.cloudPushNow();await syncSettle(40);
+  assert.deepEqual(JSON.parse(JSON.stringify(h.remoteState().tasks.find(task=>task.id==='context-delta-target').ctx)),['ctx-phone','ctx-peer'],
+   'the merged memberships are durable in the acknowledged cloud payload');
+  const reopened=await loadAppAtTime(at,{seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(h.remoteState()),[LOCAL_HEAD_KEY]:JSON.stringify(h.remoteState())},cloudSyncFactory:h.factory});
+  try{
+   await reopened.ctx.cloudPull();await syncSettle(20);
+   assert.deepEqual(JSON.parse(JSON.stringify(reopened.ctx.state.tasks.find(task=>task.id==='context-delta-target').ctx)),['ctx-phone','ctx-peer'],
+    'a cold client reopening the cloud payload projects both memberships');
+  }finally{try{await reopened.shim.window.ScannerDeviceStore?.close?.();}catch{}}
+
+  const conflictingBefore=JSON.parse(JSON.stringify(peerChoice));
+  conflictingBefore.before={present:true,value:['ctx-stale']};
+  const conflictingBoard=JSON.parse(JSON.stringify(initial));conflictingBoard.decisionEvents=[phoneChoice,conflictingBefore];
+  phone.ctx.projectCurrentChoiceEvents(conflictingBoard);
+  assert.deepEqual(JSON.parse(JSON.stringify(conflictingBoard.tasks.find(task=>task.id==='context-delta-target').ctx)),['ctx-peer'],
+   'different exact before memberships remain a whole-list conflict and are not composed');
+  const unattestedPeer=JSON.parse(JSON.stringify(peerChoice));unattestedPeer.id=peerChoice.id+'-unbased';unattestedPeer.baseId=null;
+  const unattestedBoard=JSON.parse(JSON.stringify(initial));unattestedBoard.decisionEvents=[phoneChoice,unattestedPeer];
+  phone.ctx.projectCurrentChoiceEvents(unattestedBoard);
+  assert.deepEqual(JSON.parse(JSON.stringify(unattestedBoard.tasks.find(task=>task.id==='context-delta-target').ctx)),['ctx-peer'],
+   'a missing exact cloud base remains conservative even when the before memberships match');
+
+  const staleChosen=h.remoteState();await phone.ctx.cloudPull();
+  phone.ctx.onAction('undo',{});
+  assert.deepEqual(Array.from(phone.ctx.state.tasks.find(task=>task.id==='context-delta-target').ctx),['ctx-peer'],
+   'ordinary local Undo reverses only the phone membership across different observed bases');
+  assert.equal(phone.ctx.state.tasks.find(task=>task.id==='revision-marker').title,'Advanced cloud revision','Undo retains the earlier unrelated local action');
+  const cancellation=phone.ctx.state.decisionEvents.find(event=>event.kind==='undo');assert.deepEqual(Array.from(cancellation.targetEventIds),[phoneChoice.id]);
+  await phone.ctx.persist();await phone.ctx.cloudPushNow();await syncSettle(40);
+  h.writeBehindBack(staleChosen);await phone.ctx.cloudPull();await phone.ctx.cloudPushNow();await syncSettle(40);
+  assert.deepEqual(h.remoteState().tasks.find(task=>task.id==='context-delta-target').ctx,['ctx-peer'],'stale original delivery cannot restore the cancelled phone delta');
+  const undoneRaw=JSON.stringify({...h.remoteState(),syncAccount:'e@example.com',syncRev:h.doc.rev,syncDirty:false});
+  const undoneReopen=await loadAppAtTime(at,{seedStorage:{[SYNC_STORE_KEY]:undoneRaw},cloudSyncFactory:h.factory});
+  await undoneReopen.ctx.cloudPull();assert.deepEqual(Array.from(undoneReopen.ctx.state.tasks.find(task=>task.id==='context-delta-target').ctx),['ctx-peer'],'cold reopen preserves the peer membership and phone cancellation');
+ }finally{
+  for(const app of [phone,peer])try{await app.shim.window.ScannerDeviceStore?.close?.();}catch{}
+ }
+});
+
+test('RISK cloud shared preferences: later theme choice survives either publication order and cold reopen',async t=>{
+ for(const first of ['earlier','later'])await t.test(`${first} theme action publishes first`,async()=>{
+  const at=Date.parse('2026-10-17T15:00:00.000Z');
+  const initial=syncState({tasks:[syncTask('theme-marker','Unchanged task')],chain:[],candidateId:null,
+   passStartedAt:at-60000,passId:'shared-pass-theme',scanMode:'descending',syncRev:4,syncAccount:'e@example.com',syncDirty:false,
+   settings:{horizonMin:60,thresholdPct:25,samples:250,cantMin:30,workedHours:16,theme:'system'}});
+  const remote=JSON.parse(JSON.stringify(initial));
+  for(const key of ['syncRev','syncAccount','syncDirty','lastCloudServerAt','protectedBackupIds'])delete remote[key];
+  const h=makeSyncHarness({remote,rev:4,delayMs:1}),seedStorage={[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)};
+  const earlier=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:h.factory});
+  const later=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:h.factory});
+  let reopened;
+  try{
+   await earlier.ctx.cloudPull();await later.ctx.cloudPull();
+   setFakeTime(earlier.ctx,at+100);earlier.ctx.onAction('cycle-theme',{});await earlier.ctx.persist();
+   setFakeTime(later.ctx,at+200);later.ctx.onAction('cycle-theme',{});
+   setFakeTime(later.ctx,at+300);later.ctx.onAction('cycle-theme',{});await later.ctx.persist();
+   assert.equal(earlier.ctx.state.settings.theme,'light');
+   assert.equal(later.ctx.state.settings.theme,'dark');
+   const laterChoices=later.ctx.state.decisionEvents?.filter(event=>event?.kind==='current-choice'&&event.target?.property==='theme')||[];
+   assert.equal(laterChoices.length,2,'the real theme-cycle actions must record supported current-choice rows');
+   assert.equal(laterChoices[1].at,at+300,'the later theme decision keeps its original user-action time');
+   const firstClient=first==='earlier'?earlier:later,secondClient=first==='earlier'?later:earlier;
+   await firstClient.ctx.cloudPushNow();await syncSettle(30);
+   await secondClient.ctx.cloudPull();await syncSettle(40);await secondClient.ctx.cloudPushNow();await syncSettle(40);
+   assert.equal(secondClient.ctx.state.settings.theme,'dark','the later selected theme remains visible after either publication order');
+   assert.equal(h.remoteState().settings.theme,'dark','the later action wins independently of which action publishes first');
+   const cloudChoices=h.remoteState().decisionEvents.filter(event=>event?.kind==='current-choice'&&event.target?.property==='theme');
+   assert.equal(cloudChoices.length,3,'the two later action facts and earlier action fact remain separate evidence');
+   reopened=await loadAppAtTime(at,{seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(h.remoteState()),[LOCAL_HEAD_KEY]:JSON.stringify(h.remoteState())},cloudSyncFactory:h.factory});
+   await reopened.ctx.cloudPull();await syncSettle(20);
+   assert.equal(reopened.ctx.state.settings.theme,'dark','a cold client projects the later original choice');
+   assert.equal(reopened.shim.document.documentElement.getAttribute('data-theme'),'dark','the rendered theme follows the projected board choice');
+  }finally{
+   for(const app of [earlier,later,reopened])if(app)try{await app.shim.window.ScannerDeviceStore?.close?.();}catch{}
+  }
+ });
+});
+
+test('RISK cloud shared preferences: date format survives an independent No in either publication order and cold reopen',async t=>{
+ for(const first of ['date format','No'])await t.test(`${first} publishes first`,async()=>{
+  const at=Date.parse('2026-10-17T16:00:00.000Z'),passAt=at-60000;
+  const initial=syncState({tasks:[
+   Object.assign(syncTask('format-benchmark','Benchmark'),{mu:36,sigma:8}),
+   syncTask('format-candidate','Candidate'),
+  ],chain:['format-benchmark'],candidateId:'format-candidate',passStartedAt:passAt,passId:'shared-pass-format',scanMode:'descending',
+   syncRev:4,syncAccount:'e@example.com',syncDirty:false,
+   settings:{horizonMin:60,thresholdPct:25,samples:250,cantMin:30,workedHours:16,theme:'system',dateFormat:'system'}});
+  const remote=JSON.parse(JSON.stringify(initial));
+  for(const key of ['syncRev','syncAccount','syncDirty','lastCloudServerAt','protectedBackupIds'])delete remote[key];
+  const h=makeSyncHarness({remote,rev:4,delayMs:1}),seedStorage={[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)};
+  const dateClient=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:h.factory});
+  const noClient=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:h.factory});
+  let reopened;
+  try{
+   await dateClient.ctx.cloudPull();await noClient.ctx.cloudPull();
+   setFakeTime(dateClient.ctx,at+200);dateClient.ctx.openSettings();
+   const field=dateClient.shim.document.getElementById('stDateFormat');
+   assert.ok(field,'the date preference is changed through the visible Settings control');
+   field.id='stDateFormat';field.value='dmy';field.matches=()=>false;
+   dateClient.shim.document.dispatchEvent({type:'change',target:field});
+   assert.equal(dateClient.ctx.state.settings.dateFormat,'dmy');
+   setFakeTime(noClient.ctx,at+100);noClient.ctx.onAction('no',{dataset:{candidate:'format-candidate',benchmark:'format-benchmark'}});
+   await dateClient.ctx.persist();await noClient.ctx.persist();
+   const dateEvents=dateClient.ctx.state.decisionEvents?.filter(event=>event?.kind==='current-choice'&&event.target?.property==='dateFormat')||[];
+   assert.equal(dateEvents.length,1,'the actual date-format Settings choice creates one supported current-choice fact');
+   assert.equal(dateEvents[0].value,'dmy');assert.equal(dateEvents[0].at,at+200,'the fact retains original action time');
+   const noEvents=noClient.ctx.state.decisionEvents?.filter(event=>event?.kind==='no')||[];
+   assert.equal(noEvents.length,1,'the independent No remains its own cloud-visible action');
+   const firstClient=first==='date format'?dateClient:noClient,secondClient=first==='date format'?noClient:dateClient;
+   await firstClient.ctx.cloudPushNow();await syncSettle(30);
+   await secondClient.ctx.cloudPull();await syncSettle(40);await secondClient.ctx.cloudPushNow();await syncSettle(40);
+   assert.equal(secondClient.ctx.state.settings.dateFormat,'dmy','the preference remains visible after either publication order');
+   assert.equal(h.remoteState().settings.dateFormat,'dmy','the date-format intent survives the independent No in cloud');
+   assert.equal(h.remoteState().decisionEvents.filter(event=>event?.kind==='no').length,1,'the peer No is retained');
+   assert.equal(h.remoteState().decisionEvents.filter(event=>event?.kind==='current-choice'&&event.target?.property==='dateFormat').length,1,
+    'the deliberate preference remains separate cloud evidence');
+   reopened=await loadAppAtTime(at,{seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(h.remoteState()),[LOCAL_HEAD_KEY]:JSON.stringify(h.remoteState())},cloudSyncFactory:h.factory});
+   await reopened.ctx.cloudPull();await syncSettle(20);
+   assert.equal(reopened.ctx.state.settings.dateFormat,'dmy','a cold client restores the selected display preference');
+  }finally{
+   for(const app of [dateClient,noClient,reopened])if(app)try{await app.shim.window.ScannerDeviceStore?.close?.();}catch{}
+  }
+ });
+});
+
+test('RISK cloud shared preferences: one hourly quote edit survives an independent No without replacing other hours',async t=>{
+ for(const first of ['quotes','No'])await t.test(`${first} publishes first`,async()=>{
+  const at=Date.parse('2026-10-17T17:00:00.000Z'),passAt=at-60000;
+  const initial=syncState({tasks:[
+   Object.assign(syncTask('quote-benchmark','Benchmark'),{mu:36,sigma:8}),syncTask('quote-candidate','Candidate'),
+  ],chain:['quote-benchmark'],candidateId:'quote-candidate',passStartedAt:passAt,passId:'shared-pass-quotes',scanMode:'descending',
+   syncRev:4,syncAccount:'e@example.com',syncDirty:false,
+   settings:{horizonMin:60,thresholdPct:25,samples:250,cantMin:30,workedHours:16,theme:'system',dateFormat:'system',
+    hourlyQuotes:{'09':['Other hour'],'14':['Original quote']}}});
+  const remote=JSON.parse(JSON.stringify(initial));
+  for(const key of ['syncRev','syncAccount','syncDirty','lastCloudServerAt','protectedBackupIds'])delete remote[key];
+  const h=makeSyncHarness({remote,rev:4,delayMs:1}),seedStorage={[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)};
+  const quoteClient=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:h.factory});
+  const noClient=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:h.factory});
+  let reopened;
+  try{
+   await quoteClient.ctx.cloudPull();await noClient.ctx.cloudPull();
+   setFakeTime(quoteClient.ctx,at+200);
+   quoteClient.shim.document.getElementById('stQuoteHour').value='14';
+   quoteClient.shim.document.getElementById('stQuoteLines').value='First new line\nSecond new line';
+   quoteClient.ctx.onAction('save-hourly-quotes',{});
+   setFakeTime(noClient.ctx,at+100);noClient.ctx.onAction('no',{dataset:{candidate:'quote-candidate',benchmark:'quote-benchmark'}});
+   await quoteClient.ctx.persist();await noClient.ctx.persist();
+   const quoteEvents=quoteClient.ctx.state.decisionEvents?.filter(event=>event?.kind==='current-choice'&&event.target?.property==='hourlyQuote:14')||[];
+   assert.equal(quoteEvents.length,1,'the established per-hour save action creates one typed quote fact');
+   assert.deepEqual(JSON.parse(JSON.stringify(quoteEvents[0].value)),['First new line','Second new line']);
+   assert.deepEqual(JSON.parse(JSON.stringify(quoteEvents[0].before)),{present:true,value:['Original quote']});
+   assert.equal(quoteEvents[0].at,at+200,'the fact retains the original save-action time');
+   const firstClient=first==='quotes'?quoteClient:noClient,secondClient=first==='quotes'?noClient:quoteClient;
+   await firstClient.ctx.cloudPushNow();await syncSettle(30);
+   await secondClient.ctx.cloudPull();await syncSettle(40);await secondClient.ctx.cloudPushNow();await syncSettle(40);
+   assert.deepEqual(JSON.parse(JSON.stringify(secondClient.ctx.state.settings.hourlyQuotes['14'])),['First new line','Second new line'],
+    'the chosen hour remains visible after either publication order');
+   assert.deepEqual(JSON.parse(JSON.stringify(secondClient.ctx.state.settings.hourlyQuotes['09'])),['Other hour'],
+    'an independent hour is preserved');
+   assert.deepEqual(JSON.parse(JSON.stringify(h.remoteState().settings.hourlyQuotes)),{'09':['Other hour'],'14':['First new line','Second new line']},
+    'the exact normalized per-hour buckets survive the peer No in cloud');
+   assert.equal(h.remoteState().decisionEvents.filter(event=>event?.kind==='no').length,1,'the independent No is retained');
+   reopened=await loadAppAtTime(at,{seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(h.remoteState()),[LOCAL_HEAD_KEY]:JSON.stringify(h.remoteState())},cloudSyncFactory:h.factory});
+   await reopened.ctx.cloudPull();await syncSettle(20);
+   assert.deepEqual(JSON.parse(JSON.stringify(reopened.ctx.state.settings.hourlyQuotes)),{'09':['Other hour'],'14':['First new line','Second new line']},
+    'a cold client restores both current quote buckets');
+  }finally{
+   for(const app of [quoteClient,noClient,reopened])if(app)try{await app.shim.window.ScannerDeviceStore?.close?.();}catch{}
+  }
+ });
+});
+
+test('RISK cloud shared preferences: scene time season and structured location survive an independent No',async t=>{
+ for(const first of ['scene','No'])await t.test(`${first} publishes first`,async()=>{
+  const at=Date.parse('2026-10-17T17:30:00.000Z'),passAt=at-60000;
+  const initial=syncState({tasks:[Object.assign(syncTask('scene-benchmark','Benchmark'),{mu:36,sigma:8}),syncTask('scene-candidate','Candidate')],
+   chain:['scene-benchmark'],candidateId:'scene-candidate',passStartedAt:passAt,passId:'shared-pass-scene',scanMode:'descending',
+   syncRev:4,syncAccount:'e@example.com',syncDirty:false,
+   settings:{horizonMin:60,thresholdPct:25,samples:250,cantMin:30,workedHours:16,theme:'system',dateFormat:'system',hourlyQuotes:{},
+    scene:{time:null,season:null,location:null}}});
+  const remote=JSON.parse(JSON.stringify(initial));
+  for(const key of ['syncRev','syncAccount','syncDirty','lastCloudServerAt','protectedBackupIds'])delete remote[key];
+  const h=makeSyncHarness({remote,rev:4,delayMs:1}),seedStorage={[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)};
+  const sceneClient=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:h.factory,withSceneModules:true});
+  const noClient=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:h.factory});
+  let reopened;
+  const london={latitude:51.5074,longitude:-0.1278,timezone:'Europe/London',label:'Home',enabled:true};
+  try{
+   await sceneClient.ctx.cloudPull();await noClient.ctx.cloudPull();
+   setFakeTime(sceneClient.ctx,at+200);
+   sceneClient.ctx.LivingLocation.saveCoordinates({latitude:london.latitude,longitude:london.longitude},
+    {timezone:london.timezone,label:london.label});
+   setFakeTime(sceneClient.ctx,at+300);
+   sceneClient.shim.document.dispatchEvent({type:'landscape-scene-time-change',detail:{time:'sunset',season:'autumn'}});
+   setFakeTime(noClient.ctx,at+100);noClient.ctx.onAction('no',{dataset:{candidate:'scene-candidate',benchmark:'scene-benchmark'}});
+   await sceneClient.ctx.persist();await noClient.ctx.persist();
+   const sceneEvents=sceneClient.ctx.state.decisionEvents?.filter(event=>event?.kind==='current-choice'&&event.target?.type==='scene')||[];
+   assert.equal(sceneEvents.length,3,'the actual location and scene controls create narrow typed facts');
+   assert.deepEqual(JSON.parse(JSON.stringify(sceneEvents.map(event=>event.target.property).sort())),['location','season','time']);
+   const time=sceneEvents.find(event=>event.target.property==='time'),season=sceneEvents.find(event=>event.target.property==='season');
+   assert.equal(time.actionId,season.actionId,'one time-and-season control gesture has one shared action identity');
+   assert.equal(time.at,at+300);assert.equal(season.at,at+300);
+   assert.equal(sceneEvents.find(event=>event.target.property==='location').at,at+200,'location keeps its separate original action time');
+   const firstClient=first==='scene'?sceneClient:noClient,secondClient=first==='scene'?noClient:sceneClient;
+   await firstClient.ctx.cloudPushNow();await syncSettle(30);
+   await secondClient.ctx.cloudPull();await syncSettle(40);await secondClient.ctx.cloudPushNow();await syncSettle(40);
+   const expected={time:'sunset',season:'autumn',location:london};
+   assert.deepEqual(JSON.parse(JSON.stringify(secondClient.ctx.state.settings.scene)),expected,'all scene properties remain visible after either publication order');
+   assert.deepEqual(JSON.parse(JSON.stringify(h.remoteState().settings.scene)),expected,'the peer No cannot erase structured scene preferences in cloud');
+   assert.equal(h.remoteState().decisionEvents.filter(event=>event?.kind==='no').length,1,'the independent No is retained');
+   reopened=await loadAppAtTime(at,{seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(h.remoteState()),[LOCAL_HEAD_KEY]:JSON.stringify(h.remoteState())},cloudSyncFactory:h.factory,withSceneModules:true});
+   await reopened.ctx.cloudPull();await syncSettle(20);
+   assert.deepEqual(JSON.parse(JSON.stringify(reopened.ctx.state.settings.scene)),expected,'a cold client restores the typed scene choices');
+  }finally{
+   for(const app of [sceneClient,noClient,reopened])if(app)try{await app.shim.window.ScannerDeviceStore?.close?.();}catch{}
+  }
+ });
+});
+
+test('RISK cloud contexts: deleting a legacy context and targeted Undo restore its exact definition for a cold peer',async()=>{
+ const at=Date.parse('2026-10-17T18:00:00.000Z'),passAt=at-60000;
+ const legacy={id:'legacy-context-undo',name:'Legacy focus',active:true,legacyProjectionMarker:{keep:true,version:2}};
+ const initial=syncState({tasks:[syncTask('legacy-context-task','Assigned task')],contexts:[JSON.parse(JSON.stringify(legacy))],chain:[],candidateId:null,
+  passStartedAt:passAt,passId:'shared-pass-context-undo',scanMode:'descending',syncRev:4,syncAccount:'e@example.com',syncDirty:false});
+ initial.tasks[0].ctx=[legacy.id];
+ const remote=JSON.parse(JSON.stringify(initial));
+ for(const key of ['syncRev','syncAccount','syncDirty','lastCloudServerAt','protectedBackupIds'])delete remote[key];
+ const h=makeSyncHarness({remote,rev:4,delayMs:1}),seedStorage={[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)};
+ const phone=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:h.factory}),peer=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:h.factory});
+ let reopened;
+ try{
+  await phone.ctx.cloudPull();await peer.ctx.cloudPull();
+  assert.equal(phone.ctx.currentChoiceContextRowSupported(phone.ctx.state.contexts[0],legacy.id),true,
+   'the bounded prior context definition accepts the actual hydrated legacy row');
+  setFakeTime(phone.ctx,at+100);phone.ctx.onAction('del-ctx',{dataset:{id:legacy.id}});await phone.ctx.persist();
+  const deletion=phone.ctx.state.decisionEvents?.filter(event=>event?.kind==='current-choice'
+   &&(event.target?.type==='context'||event.target?.property==='ctx'))||[];
+  assert.equal(deletion.length,2,'one delete gesture records its tombstone and the affected task membership removal: '+JSON.stringify(deletion.map(event=>event.target)));
+  const tombstone=deletion.find(event=>event.target?.type==='context'&&event.target.property==='exists');
+  const membership=deletion.find(event=>event.target?.type==='task'&&event.target.property==='ctx');
+  assert.ok(tombstone&&membership,'the group carries both definition and task assignment intent');
+  assert.equal(tombstone.value,false);assert.equal(tombstone.actionId,membership.actionId,'context delete and assignments share one Undo identity');
+  assert.deepEqual(JSON.parse(JSON.stringify(tombstone.before)),{present:true,value:legacy},
+   'the bounded deletion witness preserves the exact legacy definition, field presence, and unknown data');
+  await phone.ctx.cloudPushNow();await syncSettle(30);await peer.ctx.cloudPull();await syncSettle(40);
+  assert.equal(peer.ctx.state.contexts.some(context=>context.id===legacy.id),false,'the peer applies the deliberate context deletion');
+  assert.deepEqual(JSON.parse(JSON.stringify(peer.ctx.state.tasks[0].ctx)),[],'the peer applies the matching task assignment removal');
+  phone.ctx.onAction('undo',{});await phone.ctx.persist();await phone.ctx.cloudPushNow();await syncSettle(40);
+  await peer.ctx.cloudPull();await syncSettle(20);
+  const undone=peer.ctx.state.contexts.find(context=>context.id===legacy.id);
+  assert.ok(undone,'targeted Undo restores the definition on the other device');
+  assert.equal(undone.name,'Legacy focus');assert.equal(undone.active,true);
+  assert.equal(Object.hasOwn(undone,'excluded'),false,'Undo keeps the original absence of the excluded mode field');
+  assert.deepEqual(JSON.parse(JSON.stringify(undone.legacyProjectionMarker)),{keep:true,version:2},'Undo keeps unknown legacy fields exactly');
+  assert.deepEqual(JSON.parse(JSON.stringify(peer.ctx.state.tasks[0].ctx)),[legacy.id],'Undo restores its task membership');
+  reopened=await loadAppAtTime(at,{seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(h.remoteState()),[LOCAL_HEAD_KEY]:JSON.stringify(h.remoteState())},cloudSyncFactory:h.factory});
+  await reopened.ctx.cloudPull();await syncSettle(20);
+  const cold=reopened.ctx.state.contexts.find(context=>context.id===legacy.id);
+  assert.deepEqual(JSON.parse(JSON.stringify(cold)),legacy,'a cold peer reconstructs the original definition from cloud-visible bounded evidence');
+  assert.deepEqual(JSON.parse(JSON.stringify(reopened.ctx.state.tasks[0].ctx)),[legacy.id]);
+ }finally{
+  for(const app of [phone,peer,reopened])if(app)try{await app.shim.window.ScannerDeviceStore?.close?.();}catch{}
+ }
+});
+
+test('RISK cloud contexts: create rename mode and task assignment survive an independent No in either order',async t=>{
+ for(const first of ['context edits','No'])await t.test(`${first} publishes first`,async()=>{
+  const at=Date.parse('2026-10-17T18:30:00.000Z'),passAt=at-60000;
+  const initial=syncState({tasks:[Object.assign(syncTask('new-context-task','Task without a context'),{ctx:[]}),
+    Object.assign(syncTask('context-benchmark','Benchmark'),{mu:36,sigma:8}),syncTask('context-candidate','Candidate')],
+   contexts:[],chain:['context-benchmark'],candidateId:'context-candidate',passStartedAt:passAt,passId:'shared-pass-context-definition',scanMode:'descending',
+   syncRev:4,syncAccount:'e@example.com',syncDirty:false});
+  const remote=JSON.parse(JSON.stringify(initial));
+  for(const key of ['syncRev','syncAccount','syncDirty','lastCloudServerAt','protectedBackupIds'])delete remote[key];
+  const h=makeSyncHarness({remote,rev:4,delayMs:1}),seedStorage={[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)};
+  const editClient=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:h.factory});
+  const noClient=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:h.factory});
+  let reopened;
+  try{
+   await editClient.ctx.cloudPull();await noClient.ctx.cloudPull();
+   setFakeTime(editClient.ctx,at+100);editClient.ctx.openSettings();
+   editClient.shim.document.getElementById('newCtxName').value='New work area';
+   editClient.ctx.onAction('add-ctx-named',{});
+   const id=editClient.ctx.state.contexts.find(context=>context.name==='New work area')?.id;
+   assert.ok(id,'the real Settings Add action creates a domain context identity');
+   setFakeTime(editClient.ctx,at+150);
+   const nameField=makeFakeElement();nameField.dataset={mgrname:id};nameField.value='Renamed work area';
+   nameField.matches=selector=>selector==='[data-mgrname]';
+   editClient.shim.document.dispatchEvent({type:'change',target:nameField});
+   setFakeTime(editClient.ctx,at+200);editClient.ctx.onAction('cycle-context',{dataset:{id}});
+   assert.equal(await saveEditorChoice(editClient,'new-context-task',at+300,{ctxIds:[id]}),true,'task membership uses the actual editor Save action');
+   setFakeTime(noClient.ctx,at+50);noClient.ctx.onAction('no',{dataset:{candidate:'context-candidate',benchmark:'context-benchmark'}});
+   await editClient.ctx.persist();await noClient.ctx.persist();
+   const definitionEvents=editClient.ctx.state.decisionEvents?.filter(event=>event?.kind==='current-choice'&&event.target?.type==='context')||[];
+   assert.deepEqual(JSON.parse(JSON.stringify(definitionEvents.map(event=>event.target.property).sort())),['exists','mode','mode','name','name'],
+    'create is grouped from one exists/name/mode fact and later rename/mode remain distinct choices');
+   const create=definitionEvents.find(event=>event.target.property==='exists'&&event.value===true);
+   const createdName=definitionEvents.find(event=>event.target.property==='name'&&event.actionId===create.actionId);
+   const createdMode=definitionEvents.find(event=>event.target.property==='mode'&&event.actionId===create.actionId);
+   assert.ok(create&&createdName&&createdMode,'a new context carries a complete coherent creation group');
+   assert.equal(create.at,at+100);assert.equal(createdName.at,create.at);assert.equal(createdMode.at,create.at);
+   const mode=definitionEvents.filter(event=>event.target.property==='mode').at(-1);
+   assert.deepEqual(JSON.parse(JSON.stringify(mode.value)),{active:{present:true,value:false},excluded:{present:true,value:true}},
+    'the one mode fact preserves the actual included-to-excluded state as a pair');
+   const firstClient=first==='context edits'?editClient:noClient,secondClient=first==='context edits'?noClient:editClient;
+   await firstClient.ctx.cloudPushNow();await syncSettle(30);
+   await secondClient.ctx.cloudPull();await syncSettle(40);await secondClient.ctx.cloudPushNow();await syncSettle(40);
+   const context=secondClient.ctx.state.contexts.find(row=>row.id===id);
+   assert.ok(context,'a cloud peer materializes the new supported context');
+   assert.equal(context.name,'Renamed work area');assert.equal(context.active,false);assert.equal(context.excluded,true);
+   assert.deepEqual(JSON.parse(JSON.stringify(secondClient.ctx.state.tasks.find(task=>task.id==='new-context-task').ctx)),[id]);
+   assert.equal(h.remoteState().decisionEvents.filter(event=>event?.kind==='no').length,1,'the independent No remains separate evidence');
+   reopened=await loadAppAtTime(at,{seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(h.remoteState()),[LOCAL_HEAD_KEY]:JSON.stringify(h.remoteState())},cloudSyncFactory:h.factory});
+   await reopened.ctx.cloudPull();await syncSettle(20);
+   const cold=reopened.ctx.state.contexts.find(row=>row.id===id);
+   assert.equal(cold.name,'Renamed work area');assert.equal(cold.active,false);assert.equal(cold.excluded,true);
+   assert.deepEqual(JSON.parse(JSON.stringify(reopened.ctx.state.tasks.find(task=>task.id==='new-context-task').ctx)),[id]);
+  }finally{
+   for(const app of [editClient,noClient,reopened])if(app)try{await app.shim.window.ScannerDeviceStore?.close?.();}catch{}
+  }
+ });
+});
+
+test('RISK cloud contexts: independent new definitions materialize in either publication order',async t=>{
+ for(const first of ['left','right'])await t.test(`${first} creation publishes first`,async()=>{
+  const at=Date.parse('2026-10-17T20:30:00.000Z'),passAt=at-60000;
+  const initial=syncState({tasks:[Object.assign(syncTask('context-left-task','Left task'),{ctx:[]}),
+    Object.assign(syncTask('context-right-task','Right task'),{ctx:[]})],contexts:[],chain:[],candidateId:null,
+   passStartedAt:passAt,passId:'concurrent-context-pass',scanMode:'descending',syncRev:4,syncAccount:'e@example.com',syncDirty:false});
+  const remote=JSON.parse(JSON.stringify(initial));
+  for(const key of ['syncRev','syncAccount','syncDirty','lastCloudServerAt','protectedBackupIds'])delete remote[key];
+  const h=makeSyncHarness({remote,rev:4,delayMs:1}),seedStorage={[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)};
+  const left=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:h.factory}),right=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:h.factory});
+  let reopened;
+  try{
+   await left.ctx.cloudPull();await right.ctx.cloudPull();await syncSettle(20);
+   assert.equal(left.ctx.state.decisionBase?.id,right.ctx.state.decisionBase?.id,'both creators start from one saved cloud revision');
+   left.ctx.window.CloudSync.ready=false;right.ctx.window.CloudSync.ready=false;
+   const create=async(app,name,offset)=>{
+    setFakeTime(app.ctx,at+offset);app.ctx.openSettings();app.shim.document.getElementById('newCtxName').value=name;
+    app.ctx.onAction('add-ctx-named',{});
+    const row=app.ctx.state.contexts.find(context=>context.name===name);assert.ok(row,'actual Settings Add creates the local context');
+    assert.equal(await saveEditorChoice(app,name==='Left context'?'context-left-task':'context-right-task',at+offset+20,{ctxIds:[row.id]}),true,
+     'actual task editor assigns the new context');
+    const group=app.ctx.state.decisionEvents.filter(event=>event?.kind==='current-choice'&&event.target?.type==='context'&&event.target.id===row.id);
+    assert.deepEqual(JSON.parse(JSON.stringify(group.map(event=>event.target.property).sort())),['exists','mode','name']);
+    assert.equal(new Set(group.map(event=>event.actionId)).size,1,'one deliberate creation gesture carries the complete group');
+    return row.id;
+   };
+   const leftId=await create(left,'Left context',100),rightId=await create(right,'Right context',150);
+   const firstClient=first==='left'?left:right,secondClient=first==='left'?right:left;
+   firstClient.ctx.window.CloudSync.ready=true;await firstClient.ctx.cloudPushNow();await syncSettle(40);
+   assert.equal(secondClient.ctx.state.contexts.some(row=>row.id===(first==='left'?leftId:rightId)),false,
+    'the second creator remains a stale independent source before reading the first publication');
+   secondClient.ctx.window.CloudSync.ready=true;await secondClient.ctx.cloudPull();await syncSettle(40);
+   const expectedIds=[leftId,rightId].sort(),visibleIds=secondClient.ctx.state.contexts.map(row=>row.id).sort();
+   assert.deepEqual(JSON.parse(JSON.stringify(visibleIds)),expectedIds,
+    'fresh projection materializes both independently created rows from their complete event groups: '+JSON.stringify({visibleIds,expectedIds,
+     events:secondClient.ctx.state.decisionEvents.filter(event=>event?.kind==='current-choice'&&event.target?.type==='context')}));
+   assert.deepEqual(JSON.parse(JSON.stringify(secondClient.ctx.state.tasks.find(task=>task.id==='context-left-task').ctx)),[leftId]);
+   assert.deepEqual(JSON.parse(JSON.stringify(secondClient.ctx.state.tasks.find(task=>task.id==='context-right-task').ctx)),[rightId]);
+   await secondClient.ctx.cloudPushNow();await syncSettle(40);
+   const durable=h.remoteState();assert.deepEqual(durable.contexts.map(row=>row.id).sort(),expectedIds,'both definitions are in the acknowledged cloud board');
+   assert.deepEqual(durable.tasks.find(task=>task.id==='context-left-task').ctx,[leftId]);
+   assert.deepEqual(durable.tasks.find(task=>task.id==='context-right-task').ctx,[rightId]);
+   reopened=await loadAppAtTime(at+500,{seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(durable),[LOCAL_HEAD_KEY]:JSON.stringify(durable)},cloudSyncFactory:h.factory});
+   await reopened.ctx.cloudPull();await syncSettle(20);
+   assert.deepEqual(reopened.ctx.state.contexts.map(row=>row.id).sort(),expectedIds,'cold reopen retains both definitions');
+   assert.deepEqual(JSON.parse(JSON.stringify(reopened.ctx.state.tasks.find(task=>task.id==='context-left-task').ctx)),[leftId]);
+   assert.deepEqual(JSON.parse(JSON.stringify(reopened.ctx.state.tasks.find(task=>task.id==='context-right-task').ctx)),[rightId]);
+  }finally{
+   for(const app of [left,right,reopened])if(app)try{await app.shim.window.ScannerDeviceStore?.close?.();}catch{}
+  }
+ });
+});
+
+test('RISK cloud contexts: long names create rename delete and Undo retain the exact definition on a cold peer',async()=>{
+ const at=Date.parse('2026-10-17T21:00:00.000Z'),initialName='Long context '.repeat(10).trim(),renamed='Renamed context '.repeat(9).trim();
+ assert.ok(initialName.length>120&&renamed.length>120,'the established context producer accepts realistic long labels without a new limit');
+ const initial=syncState({tasks:[Object.assign(syncTask('long-context-task','Assigned task'),{ctx:[]})],contexts:[],chain:[],candidateId:null,
+  passStartedAt:at-60000,passId:'long-context-pass',scanMode:'descending',syncRev:4,syncAccount:'e@example.com',syncDirty:false});
+ const remote=JSON.parse(JSON.stringify(initial));
+ for(const key of ['syncRev','syncAccount','syncDirty','lastCloudServerAt','protectedBackupIds'])delete remote[key];
+ const h=makeSyncHarness({remote,rev:4,delayMs:1}),seedStorage={[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)};
+ const phone=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:h.factory}),peer=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:h.factory});
+ let reopened;
+ try{
+  await phone.ctx.cloudPull();await peer.ctx.cloudPull();
+  setFakeTime(phone.ctx,at+100);phone.ctx.openSettings();phone.shim.document.getElementById('newCtxName').value=initialName;
+  phone.ctx.onAction('add-ctx-named',{});
+  const context=phone.ctx.state.contexts.find(row=>row.name===initialName);assert.ok(context,
+   'the real Settings Add action creates the requested long context name: '+JSON.stringify({input:phone.shim.document.getElementById('newCtxName')?.value,
+    contexts:phone.ctx.state.contexts,toast:phone.shim.document.getElementById('toast')?.textContent,error:phone.ctx.window.CloudSync?.errorCode}));
+  const create=phone.ctx.state.decisionEvents.filter(event=>event?.kind==='current-choice'&&event.target?.type==='context'&&event.target.id===context.id);
+  assert.deepEqual(JSON.parse(JSON.stringify(create.map(event=>event.target.property).sort())),['exists','mode','name'],
+   'long-name creation retains a complete cloud-visible definition group');
+  assert.equal(await saveEditorChoice(phone,'long-context-task',at+150,{ctxIds:[context.id]}),true,'the real task editor assigns the context');
+  setFakeTime(phone.ctx,at+200);
+  const nameField=makeFakeElement();nameField.dataset={mgrname:context.id};nameField.value=renamed;
+  nameField.matches=selector=>selector==='[data-mgrname]';phone.shim.document.dispatchEvent({type:'change',target:nameField});
+  setFakeTime(phone.ctx,at+250);phone.ctx.onAction('cycle-context',{dataset:{id:context.id}});
+  const live=phone.ctx.state.contexts.find(row=>row.id===context.id);live.futureProjectionExtension={version:7,opaque:['keep','exactly']};
+  const prior=JSON.parse(JSON.stringify(live));
+  setFakeTime(phone.ctx,at+300);phone.ctx.onAction('del-ctx',{dataset:{id:context.id}});
+  const tombstone=phone.ctx.state.decisionEvents.find(event=>event?.kind==='current-choice'&&event.target?.type==='context'
+   &&event.target.id===context.id&&event.target.property==='exists'&&event.value===false);
+  assert.ok(tombstone,'deleting the long definition retains its bounded removal authority');
+  assert.deepEqual(JSON.parse(JSON.stringify(tombstone.before)),{present:true,value:prior},'the delete witness preserves long names, exact mode and opaque fields');
+  await phone.ctx.persist();await phone.ctx.cloudPushNow();await syncSettle(40);await peer.ctx.cloudPull();await syncSettle(30);
+  assert.equal(peer.ctx.state.contexts.some(row=>row.id===context.id),false,'the peer applies the deliberate deletion');
+  assert.deepEqual(JSON.parse(JSON.stringify(peer.ctx.state.tasks[0].ctx)),[],'the peer applies its grouped assignment removal');
+  setFakeTime(phone.ctx,at+400);phone.ctx.onAction('undo',{});await phone.ctx.persist();await phone.ctx.cloudPushNow();await syncSettle(40);
+  await peer.ctx.cloudPull();await syncSettle(30);
+  assert.deepEqual(JSON.parse(JSON.stringify(peer.ctx.state.contexts.find(row=>row.id===context.id))),prior,
+   'targeted Undo restores the exact long definition and opaque fields for the peer');
+  assert.deepEqual(JSON.parse(JSON.stringify(peer.ctx.state.tasks[0].ctx)),[context.id],'targeted Undo restores the context assignment');
+  const durable=h.remoteState();
+  reopened=await loadAppAtTime(at+500,{seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(durable),[LOCAL_HEAD_KEY]:JSON.stringify(durable)},cloudSyncFactory:h.factory});
+  await reopened.ctx.cloudPull();await syncSettle(20);
+  assert.deepEqual(JSON.parse(JSON.stringify(reopened.ctx.state.contexts.find(row=>row.id===context.id))),prior,
+   'cold reopen retains the long context name, mode and opaque fields');
+  assert.deepEqual(JSON.parse(JSON.stringify(reopened.ctx.state.tasks[0].ctx)),[context.id]);
+ }finally{
+  for(const app of [phone,peer,reopened])if(app)try{await app.shim.window.ScannerDeviceStore?.close?.();}catch{}
+ }
+});
+
+test('RISK cloud contexts: unsupported prior rows hold rename mode and delete before Undo or cloud mutation',async t=>{
+ const at=Date.parse('2026-10-17T21:15:00.000Z'),id='future-context-mode-v8';
+ const opaque={id,name:'Future mode context',active:'future-active-v8',futureProjectionExtension:{version:8,raw:['preserve','exactly']}};
+ for(const action of ['rename','mode','delete'])await t.test(action,async()=>{
+  const initial=syncState({tasks:[Object.assign(syncTask('future-context-task','Assigned task'),{ctx:[id]})],contexts:[JSON.parse(JSON.stringify(opaque))],
+   chain:[],candidateId:null,passStartedAt:at-60000,passId:'future-context-pass',scanMode:'descending',syncRev:4,syncAccount:'e@example.com',syncDirty:false});
+  const remote=JSON.parse(JSON.stringify(initial));
+  for(const key of ['syncRev','syncAccount','syncDirty','lastCloudServerAt','protectedBackupIds'])delete remote[key];
+  const h=makeSyncHarness({remote,rev:4,delayMs:1}),seedStorage={[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)};
+  const app=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:h.factory});
+  try{
+   await app.ctx.cloudPull();await syncSettle(20);
+   assert.deepEqual(JSON.parse(JSON.stringify(app.ctx.state.contexts.find(row=>row.id===id))),opaque,
+    'the saved unknown context row survives ordinary hydration unchanged');
+   const beforeRow=JSON.parse(JSON.stringify(app.ctx.state.contexts.find(row=>row.id===id)));
+   const beforeTaskContexts=JSON.parse(JSON.stringify(app.ctx.state.tasks[0].ctx)),events=JSON.stringify(app.ctx.state.decisionEvents||[]);
+   const dirty=app.ctx.state.syncDirty,undoDepth=vm.runInContext('undoStack.length',app.ctx),cloud=h.doc.payload;
+   if(action==='rename'){
+    app.ctx.openSettings();const field=makeFakeElement();field.dataset={mgrname:id};field.value='Renamed future context';
+    field.matches=selector=>selector==='[data-mgrname]';app.shim.document.dispatchEvent({type:'change',target:field});
+   }else if(action==='mode')app.ctx.onAction('cycle-context',{dataset:{id}});
+   else app.ctx.onAction('del-ctx',{dataset:{id}});
+   await syncSettle(25);
+   const afterRow=app.ctx.state.contexts.find(row=>row.id===id);
+   assert.equal(afterRow?JSON.stringify(afterRow):null,JSON.stringify(beforeRow),
+    'an unsupported prior row is held byte-for-byte before '+action+' can mutate it');
+   assert.deepEqual(JSON.parse(JSON.stringify(app.ctx.state.tasks[0].ctx)),beforeTaskContexts,'the unsupported context membership stays untouched');
+   assert.equal(vm.runInContext('undoStack.length',app.ctx),undoDepth,'an unrepresentable action adds no local Undo frame');
+   assert.equal(JSON.stringify(app.ctx.state.decisionEvents||[]),events,'no incomplete current-choice evidence is minted');
+   assert.equal(app.ctx.state.syncDirty,dirty,'a held action does not mark the board for publication');
+   assert.equal(h.doc.payload,cloud,'no cloud write can acknowledge the unrepresentable mutation');
+   assert.equal(h.calls.filter(call=>call==='push').length,0,'the unrepresentable action causes no cloud write');
+   assert.equal(app.ctx.window.CloudSync.errorCode,'unprojectable-decision-evidence','the existing safe hold is reported');
+  }finally{try{await app.shim.window.ScannerDeviceStore?.close?.();}catch{}}
+ });
+});
+
+test('RISK current-choice projection: a complete creation group reconstructs its definition on a pristine board',async()=>{
+ const at=Date.parse('2026-10-17T20:45:00.000Z');
+ const initial=syncState({tasks:[syncTask('context-projection-task','Task')],contexts:[],chain:[],candidateId:null,
+  passStartedAt:at-60000,passId:'context-projection-pass',scanMode:'descending',syncRev:4,syncAccount:'e@example.com',syncDirty:false});
+ const remote=JSON.parse(JSON.stringify(initial));
+ for(const key of ['syncRev','syncAccount','syncDirty','lastCloudServerAt','protectedBackupIds'])delete remote[key];
+ const h=makeSyncHarness({remote,rev:4,delayMs:1}),seedStorage={[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)};
+ const app=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:h.factory});
+ try{
+  await app.ctx.cloudPull();await syncSettle(20);
+  const pristine=JSON.parse(JSON.stringify(app.ctx.state));
+  app.ctx.openSettings();app.shim.document.getElementById('newCtxName').value='Projection context';
+  app.ctx.onAction('add-ctx-named',{});
+  const created=app.ctx.state.contexts.find(row=>row.name==='Projection context');assert.ok(created,'the real Settings Add action creates the context');
+  const rows=app.ctx.state.decisionEvents.filter(event=>event?.kind==='current-choice'&&event.target?.type==='context'&&event.target.id===created.id);
+  assert.deepEqual(JSON.parse(JSON.stringify(rows.map(event=>event.target.property).sort())),['exists','mode','name'],
+   'the captured creation action has its complete supported fact group');
+  pristine.decisionBaseline=JSON.parse(JSON.stringify(app.ctx.state.decisionBaseline));
+  pristine.decisionEvents=JSON.parse(JSON.stringify(rows));
+  pristine.syncAccount='e@example.com';
+  app.ctx.projectDecisionEvents(pristine);
+  assert.deepEqual(JSON.parse(JSON.stringify(pristine.contexts)),[{id:created.id,name:'Projection context',active:true}],
+   'full decision replay materializes the definition and exact initial mode from the complete creation group');
+ }finally{try{await app.shim.window.ScannerDeviceStore?.close?.();}catch{}}
+});
+
+test('RISK cloud current choices: a changed scene source is held before adoption or acknowledgement',async t=>{
+ const at=Date.parse('2026-10-17T19:00:00.000Z'),passAt=at-60000;
+ const initial=syncState({tasks:[syncTask('scene-hold-task','Scene hold')],chain:[],candidateId:null,passStartedAt:passAt,
+  passId:'scene-source-hold-pass',scanMode:'descending',syncRev:4,syncAccount:'e@example.com',syncDirty:false,
+  settings:{horizonMin:60,thresholdPct:25,samples:250,cantMin:30,workedHours:16,theme:'system',dateFormat:'system',hourlyQuotes:{},
+   scene:{time:null,season:null,location:null}}});
+ const remote=JSON.parse(JSON.stringify(initial));
+ for(const key of ['syncRev','syncAccount','syncDirty','lastCloudServerAt','protectedBackupIds'])delete remote[key];
+ const h=makeSyncHarness({remote,rev:4,delayMs:1}),seedStorage={[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)};
+ const chooser=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:h.factory});
+ const receiver=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:h.factory});
+ try{
+  await chooser.ctx.cloudPull();await receiver.ctx.cloudPull();
+  setFakeTime(chooser.ctx,at+100);
+  chooser.shim.document.dispatchEvent({type:'landscape-scene-time-change',detail:{time:'sunset',season:'autumn'}});
+  assert.equal(await chooser.ctx.persist(),true);
+  await chooser.ctx.cloudPushNow();await syncSettle(40);
+  const chosen=h.remoteState();
+  const sceneFacts=(Array.isArray(chosen.decisionEvents)?chosen.decisionEvents:[]).filter(event=>event?.kind==='current-choice'&&event.target?.type==='scene');
+  assert.equal(sceneFacts.length,2,'the real time-and-season control publishes typed source evidence');
+  assert.equal(sceneFacts[0].actionId,sceneFacts[1].actionId,'the paired controls share one original gesture');
+  const unsafe=JSON.parse(JSON.stringify(chosen));
+  unsafe.settings.scene.futureSolarFormat={version:9,raw:'preserve this unsupported source'};
+  h.writeBehindBack(unsafe);
+  const unsafePayload=h.doc.payload,receiverState=JSON.stringify(receiver.ctx.state);
+  const receiverBytes=receiver.shim.localStorage.getItem(SYNC_STORE_KEY);
+  assert.notEqual(unsafePayload,JSON.stringify(chosen),'the peer source now differs from its known projection');
+  await receiver.ctx.cloudPull();
+  assert.equal(receiver.ctx.window.CloudSync.errorCode,'unprojectable-decision-evidence',
+   'an unknown scene format beside a supported deliberate choice must hold reconciliation');
+  assert.equal(JSON.stringify(receiver.ctx.state),receiverState,'a held changed source cannot alter the visible local board');
+  assert.equal(receiver.shim.localStorage.getItem(SYNC_STORE_KEY),receiverBytes,'a held source cannot acknowledge or rewrite local storage');
+  assert.equal(h.doc.payload,unsafePayload,'a hold must preserve the exact changed cloud bytes for recovery');
+  assert.equal(h.remoteState().decisionEvents.filter(event=>event?.kind==='current-choice'&&event.target?.type==='scene').length,2,
+   'the held raw source retains both original scene facts');
+ }finally{
+  for(const app of [chooser,receiver])if(app)try{await app.shim.window.ScannerDeviceStore?.close?.();}catch{}
+ }
+});
+
+test('RISK cloud current choices: typed preference authority survives a modern replacement Undo and stale delivery',async t=>{
+ const source=await decisionRecoveryApp146('e@example.com');
+ const target=await decisionRecoveryApp146('destination@example.com');
+ for(const app of [source,target])t.after(()=>{app.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',app.ctx);});
+ const at=Date.now();
+ setFakeTime(target.ctx,at+100);target.ctx.onAction('cycle-theme',{});
+ setFakeTime(target.ctx,at+200);target.ctx.onAction('cycle-theme',{});
+ assert.equal(target.ctx.state.settings.theme,'dark','the destination makes its deliberate current theme choice');
+ const retired=target.ctx.state.decisionEvents.filter(event=>event?.kind==='current-choice'&&event.target?.type==='setting'&&event.target.property==='theme');
+ assert.equal(retired.length,2,'the normal theme controls create immutable typed authority before replacement');
+ await target.ctx.persist();target.ctx.window.CloudSync.ready=true;await target.ctx.cloudPushNow();await syncSettle(50);
+ const displaced=JSON.parse(JSON.stringify(target.h.remoteState()));
+
+ setFakeTime(source.ctx,at+300);source.ctx.onAction('cycle-theme',{});
+ assert.equal(source.ctx.state.settings.theme,'light','the selected source has an independent supported preference');
+ const selectedRaw=JSON.stringify(source.ctx.state),selectedThemeEvent=source.ctx.state.decisionEvents.find(event=>
+  event?.kind==='current-choice'&&event.target?.type==='setting'&&event.target.property==='theme');
+ assert.ok(selectedThemeEvent,'the replacement source carries its original typed preference action');
+ target.ctx.confirm=()=>true;target.shim.document.getElementById('jsonBox').value=selectedRaw;
+ assert.equal(await target.ctx.onAction('import-json',{}),true,'the established Import consumer deliberately replaces a modern board');
+ assert.equal(target.ctx.state.settings.theme,'light');
+ await target.ctx.persist();target.ctx.cloudPushNow();await syncSettle(60);
+ const selectedState=JSON.parse(JSON.stringify(target.h.remoteState()));
+ assert.equal(target.ctx.state.syncDirty,false,'the selected modern replacement is durably acknowledged');
+
+ target.h.writeBehindBack(displaced);await target.ctx.cloudPull();await syncSettle(35);
+ assert.equal(target.ctx.window.CloudSync.errorCode??null,null,'an unchanged displaced branch remains recognizable as retired');
+ assert.equal(target.ctx.state.settings.theme,'light','stale destination delivery cannot replace the selected source preference');
+ assert.equal(target.h.remoteState().settings.theme,'light','the acknowledged modern source remains effective in cloud');
+
+ await target.ctx.onAction('undo',{});await target.ctx.persist();target.ctx.cloudPushNow();await syncSettle(60);
+ assert.equal(target.ctx.state.settings.theme,'dark','ordinary Undo restores the displaced typed preference exactly');
+ assert.deepEqual(Array.from(target.ctx.state.decisionEvents.filter(event=>event?.kind==='current-choice'&&event.target?.type==='setting'&&event.target.property==='theme'),
+  event=>event.id).sort(),Array.from(retired,event=>event.id).sort(),'replacement Undo restores only the exact displaced preference facts');
+ assert.ok(target.ctx.state.decisionBaseline.replacement.some(receipt=>receipt.reason==='explicit-undo'),
+  'modern replacement Undo records the existing reverse-replacement receipt');
+ target.h.writeBehindBack(selectedState);await target.ctx.cloudPull();await syncSettle(35);
+ assert.equal(target.ctx.window.CloudSync.errorCode??null,null,'the stale selected branch stays retired after targeted Undo');
+ assert.equal(target.ctx.state.settings.theme,'dark','later stale source delivery cannot resurrect the cancelled replacement');
+ const reopened=await loadAppAtTime(at+500,{seedStorage:{[SYNC_STORE_KEY]:target.shim.localStorage.getItem(SYNC_STORE_KEY),
+  [LOCAL_HEAD_KEY]:target.shim.localStorage.getItem(LOCAL_HEAD_KEY)},cloudSyncFactory:target.h.factory});
+ t.after(()=>{reopened.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',reopened.ctx);});
+ await reopened.ctx.cloudPull();assert.equal(reopened.ctx.state.settings.theme,'dark','cold reopen preserves the exact final selected preference');
+});
+
+test('RISK cloud current choices: causal action order beats skew and equal concurrent times use event identity',async()=>{
+ const at=Date.parse('2026-10-16T17:50:00.000Z');
+ const initial=syncState({tasks:[syncTask('order-projection','Before')],chain:[],candidateId:null,
+  passStartedAt:at-60000,passId:'shared-pass-order',scanMode:'descending',syncRev:4,syncAccount:'e@example.com',syncDirty:false});
+ const remote=JSON.parse(JSON.stringify(initial));
+ for(const key of ['syncRev','syncAccount','syncDirty','lastCloudServerAt','protectedBackupIds'])delete remote[key];
+ const h=makeSyncHarness({remote,rev:4,delayMs:1}),seedStorage={[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)};
+ const a=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:h.factory}),b=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:h.factory});
+ await a.ctx.cloudPull();await b.ctx.cloudPull();
+ assert.equal(await saveEditorChoice(a,'order-projection',at+100,{title:'Equal choice A'}),true);
+ assert.equal(await saveEditorChoice(b,'order-projection',at+100,{title:'Equal choice B'}),true);
+ const equalEvents=[a.ctx.state.decisionEvents[0],b.ctx.state.decisionEvents[0]];
+ const equalWinner=equalEvents.slice().sort((x,y)=>x.id<y.id?-1:x.id>y.id?1:0).at(-1);
+ const equalBoard=JSON.parse(JSON.stringify(initial));equalBoard.decisionEvents=JSON.parse(JSON.stringify(equalEvents.reverse()));
+ a.ctx.projectCurrentChoiceEvents(equalBoard);
+ assert.equal(equalBoard.tasks[0].title,equalWinner.value,'equal concurrent action times converge by immutable event ID');
+ const causal=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:h.factory});await causal.ctx.cloudPull();
+ assert.equal(await saveEditorChoice(causal,'order-projection',at+500,{title:'Clock-forward action'}),true);
+ const first=causal.ctx.state.decisionEvents.find(event=>event?.kind==='current-choice');
+ assert.equal(await saveEditorChoice(causal,'order-projection',at+100,{title:'Causal successor after clock skew'}),true);
+ const causalEvents=causal.ctx.state.decisionEvents.filter(event=>event?.kind==='current-choice');
+ const successor=causalEvents.find(event=>event.id!==first.id);
+ assert.ok(successor.observedActionIds.includes(first.id),'the later deliberate edit observes the earlier action even when its device clock moved backward');
+ const causalBoard=JSON.parse(JSON.stringify(initial));causalBoard.decisionEvents=JSON.parse(JSON.stringify(causalEvents.reverse()));
+ causal.ctx.projectCurrentChoiceEvents(causalBoard);
+ assert.equal(causalBoard.tasks[0].title,'Causal successor after clock skew','causal intent wins over a misleading wall-clock order');
+ const unknown=JSON.parse(JSON.stringify(successor));unknown.at=null;
+ assert.equal(causal.ctx.supportedCurrentChoiceEvent(unknown),false,'a missing chronology is not upgraded into a supported choice');
+ const unknownBoard=JSON.parse(JSON.stringify(initial));unknownBoard.decisionEvents=[unknown];
+ causal.ctx.projectCurrentChoiceEvents(unknownBoard);
+ assert.equal(unknownBoard.tasks[0].title,'Before','unknown chronology does not invent a current winner');
+ assert.deepEqual(JSON.parse(JSON.stringify(unknownBoard.decisionEvents)),[unknown],'unsupported raw evidence remains available for recovery');
+});
+
+test('RISK cloud current choices: fresh pass projection installs the exact frozen mode draw',async()=>{
+ const at=Date.parse('2026-10-16T18:00:00.000Z');
+ const initial=syncState({tasks:[syncTask('mode-projection','Mode task')],chain:[],candidateId:null,
+  passStartedAt:at-60000,passId:'shared-pass-mode-projection',scanMode:'squared',syncRev:4,
+  settings:{horizonMin:60,thresholdPct:25,samples:250,cantMin:30,workedHours:16,scanMode:'squared'},
+  syncAccount:'e@example.com',syncDirty:false});
+ const remote=JSON.parse(JSON.stringify(initial));
+ for(const key of ['syncRev','syncAccount','syncDirty','lastCloudServerAt','protectedBackupIds'])delete remote[key];
+ const h=makeSyncHarness({remote,rev:4,delayMs:1});
+ const {ctx}=await loadAppAtTime(at,{seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)},cloudSyncFactory:h.factory});
+ await ctx.cloudPull();await syncSettle(10);setFakeTime(ctx,at+1234);ctx.setScanPreference('chance');
+ const events=JSON.parse(JSON.stringify(ctx.state.decisionEvents));
+ const passChoice=events.find(event=>event?.kind==='current-choice'&&event.target.type==='pass');
+ const fresh=JSON.parse(JSON.stringify(initial));fresh.candidateId='mode-projection';fresh.interventionActive=true;
+ fresh.chance={seed:'stale-client-draw',at:at-50000,weights:{'mode-projection':0.5},opponents:[{id:'mode-projection',mu:25,sigma:8.333333333333334}]};
+ fresh.decisionEvents=events;
+ ctx.projectCurrentChoiceEvents(fresh);
+ assert.equal(fresh.settings.scanMode,'chance','the persisted settings value reaches a fresh client');
+ assert.equal(fresh.scanMode,'chance','the active pass uses the deliberate mode choice');
+ assert.deepEqual(JSON.parse(JSON.stringify(fresh.chance)),passChoice.value.chance,
+  'projection reuses the action-time frozen draw instead of minting a local random draw');
+ assert.equal(fresh.candidateId,null,'a stale candidate is cleared when the active scan mode changes');
+ assert.equal(fresh.interventionActive,false,'a stale intervention is cleared with its candidate');
+ assert.equal(fresh.passId,initial.passId,'mode replay preserves the pass identity');
+ assert.equal(fresh.passStartedAt,initial.passStartedAt,'mode replay preserves the original pass start');
+});
+
+test('RISK cloud current choices: final outcome projection does not erase later pass comparisons',async()=>{
+ const at=Date.parse('2026-10-16T18:05:00.000Z'),root=syncTask('projected-pass-root','Root task'),later=syncTask('projected-pass-later','Later choice');
+ const chance={seed:'start-action-seed',at,weights:{[root.id]:1,[later.id]:0.5},opponents:[
+  {id:root.id,mu:25,sigma:8.333333333333334},{id:later.id,mu:25,sigma:8.333333333333334}]};
+ const initial=syncState({tasks:[root,later],chain:[root.id,later.id],candidateId:null,passStartedAt:at,passId:'new-pass-after-comparison',
+  scanMode:'halving',chance,decisionEvents:[
+   {v:1,id:'start-root-choice',at,account:'e@example.com',baseId:null,kind:'current-choice',actionId:'start-gesture',
+    target:{type:'pass',id:'new-pass-after-comparison',property:'chain'},value:[root.id],after:{present:true},before:{present:true,value:[]},
+    passId:'previous-pass',passAt:at-60000,scanMode:'descending',chainIds:[],observedActionIds:[]},
+   {v:1,id:'start-mode-choice',at,account:'e@example.com',baseId:null,kind:'current-choice',actionId:'start-gesture',
+    target:{type:'pass',id:'new-pass-after-comparison',property:'scanMode'},value:{mode:'halving',chance},after:{present:true},
+    before:{present:true,value:{mode:'descending',chance:null}},passId:'previous-pass',passAt:at-60000,scanMode:'descending',chainIds:[],observedActionIds:[]}
+  ],syncAccount:'e@example.com'});
+ const {ctx}=await loadAppAtTime(at,{seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)}});
+ ctx.projectCurrentChoiceEvents(initial);
+ assert.deepEqual(JSON.parse(JSON.stringify(initial.chain)),[root.id,later.id],
+  'the final current-outcome pass must leave the comparison projector’s appended task in the active chain');
+});
+
+test('RISK cloud current choices: projected Can’t and Return preserve the original hold then clear it',async()=>{
+ const at=Date.parse('2026-10-16T18:10:00.000Z'),candidate=syncTask('disposition-projection','Candidate'),benchmark=syncTask('disposition-benchmark','Benchmark');
+ const initial=syncState({tasks:[candidate,benchmark],chain:[benchmark.id],candidateId:candidate.id,considered:{},cantAt:{},workedAt:{},
+  passStartedAt:at-60000,passId:'shared-pass-disposition-projection',scanMode:'descending',syncRev:4,syncAccount:'e@example.com',syncDirty:false});
+ const remote=JSON.parse(JSON.stringify(initial));
+ for(const key of ['syncRev','syncAccount','syncDirty','lastCloudServerAt','protectedBackupIds'])delete remote[key];
+ const h=makeSyncHarness({remote,rev:4,delayMs:1});
+ const {ctx}=await loadAppAtTime(at,{seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)},cloudSyncFactory:h.factory});
+ await ctx.cloudPull();await syncSettle(10);setFakeTime(ctx,at+100);ctx.onAction('cant',{dataset:{}});
+ const cant=JSON.parse(JSON.stringify(ctx.state.decisionEvents.find(event=>event?.kind==='current-choice')));
+ setFakeTime(ctx,at+200);assert.equal(ctx.returnAsCandidate(candidate.id),true);
+ const returned=JSON.parse(JSON.stringify(ctx.state.decisionEvents.filter(event=>event?.kind==='current-choice')[1]));
+ const held=JSON.parse(JSON.stringify(initial));held.decisionEvents=[cant];ctx.projectCurrentChoiceEvents(held);
+ assert.equal(held.considered[candidate.id],'cant','a fresh projection reconstructs the existing current hold');
+ assert.equal(held.cantAt[candidate.id],at+100,'the hold starts at its original action time, so its expiry is unchanged');
+ const cleared=JSON.parse(JSON.stringify(initial));cleared.decisionEvents=[cant,returned];ctx.projectCurrentChoiceEvents(cleared);
+ assert.equal(cleared.considered[candidate.id],undefined,'the observed Return clears the hold');
+ assert.equal(cleared.cantAt[candidate.id],undefined,'the clear removes only the active hold timestamp');
+ assert.ok(returned.observedActionIds.includes(cant.id),'Return retains its causal link to the exact hold');
+});
+
+test('RISK independent decision guidance: rendered FAQ and Settings distinguish retained decisions targeted Undo and held evidence',async()=>{
+ const {ctx,shim}=await loadApp();ctx.closeModal();ctx.openHelp();
+ const help=shim.document.getElementById('modalRoot').innerHTML;
+ const answers=new Map([...help.matchAll(/<dt>(.*?)<\/dt><dd>(.*?)<\/dd>/g)].map(row=>[row[1],row[2]]));
+ const answer=q=>{assert.ok(answers.has(q),'mounted FAQ includes '+q);return answers.get(q);};
+ assert.match(answer('How do shared appearance choices sync?'),/Theme, date format, scene time, season and sky location combine with independent task changes/i);
+ assert.match(answer('How do shared appearance choices sync?'),/do not add an Undo step/i);
+ assert.match(answer('How do contexts and list filters work?'),/Context changes save, sync and support Undo while keeping unrelated progress/i);
+ assert.match(answer('How do Resume and Rescan differ?'),/Continue, Pause and Resume sync as choices and support Undo while keeping unrelated task edits/i);
+ assert.match(answer('Can I use the app offline or on another device?'),/offline decisions.*closing and reopening/i);
+ assert.match(answer('How are conflicting choices resolved?'),/original decision times/i);
+ assert.match(answer('How are conflicting choices resolved?'),/missing.*held|untrusted.*held/i);
+ assert.match(answer('What does Synced confirm?'),/saved on this device.*acknowledged by the server/i);
+ assert.match(answer('What happens to older boards and tabs?'),/ratings.*baseline/i);
+ assert.match(answer('What happens to older boards and tabs?'),/update.*cannot reconstruct|cannot reconstruct.*update/i);
+ assert.match(answer('Can I undo, restore, or remove a task?'),/keeping unrelated decisions/i);
+ assert.match(answer('How does Undo work after Bulk Edit?'),/One Undo reverses the batch.*keeping unrelated progress/i);
+ assert.doesNotMatch(answer('How does Undo work after Bulk Edit?'),/restore an earlier board|older peer fields|leave batch values in place/i);
+ shim.window.CloudSync={configured:true,ready:true,user:'guidance-fixture@example.invalid'};ctx.closeModal();ctx.openSettings();
+ const settings=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(settings,/Independent decisions combine/);
+ assert.match(settings,/conflicting current choices use when each choice was made/);
+ assert.doesNotMatch(settings,/newest revision wins/);
+});
+
+test('RISK independent decision guidance: the actual bulk editor explains scoped reversal and original choice times',async()=>{
+ const {ctx,shim}=await loadApp();ctx.closeModal();ctx.addTask('Isolated guidance task');ctx.state.listOpen=true;
+ ctx.onAction('bulk-select-all');ctx.onAction('bulk-edit');
+ const editor=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(editor,/conflicting choices use when they were made/i);
+ assert.match(editor,/Undo reverses this batch and keeps unrelated progress/i);
+ assert.doesNotMatch(editor,/Undo after recovery restores an earlier board|keep newer peer fields/i);
+ assert.match(editor,/Mixed values stay unchanged until you check Apply/);
+});
+
+test('RISK independent decision guidance: actual adoption toast directs recovery without promising remote-board Undo',async()=>{
+ const now=Date.now(),h=makeSyncHarness({remote:cloudState(now)});
+ const {ctx,shim}=await loadApp({seed:147979,seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(staleState(now-30*24*HOUR))},cloudSyncFactory:h.factory});
+ ctx.addTask('Isolated local notification draft',false);await ctx.cloudPull();
+ const text=shim.elements.get('toast')?.textContent||'';
+ assert.match(text,/out of date/i);assert.match(text,/previous board.*Settings backups/i);
+ assert.doesNotMatch(text,/↺|undoes it|Undo restores.*board/i,'ordinary Undo targets a local action, so the adoption notice must offer explicit recovery');
+});
+
+test('RISK independent decision guidance: the actual bulk result keeps confirmation and Undo meanings separate',async()=>{
+ const {ctx,shim}=await loadApp();ctx.closeModal();ctx.addTask('Isolated bulk result task');ctx.state.listOpen=true;
+ ctx.onAction('bulk-select-all');ctx.onAction('bulk-edit');shim.document.getElementById('bulkApplyDue').checked=true;shim.document.getElementById('bulkDue').value='2027-08-12';ctx.onAction('bulk-save');
+ const result=shim.document.getElementById('listBulkToolbar').innerHTML;
+ assert.match(result,/not a server save confirmation/);assert.match(result,/Undo reverses your last action and keeps unrelated progress/);
+ assert.doesNotMatch(result,/earlier whole board|Undo restores.*board/);
 });
