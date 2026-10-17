@@ -248,6 +248,320 @@ test('RISK scoped Undo: completion evergreen work delete and postpone retain unr
   assert.equal(h.remoteState().tasks.find(t=>t.id===task.id).done,false);assert.equal(h.remoteState().tasks.find(t=>t.id==='undo-peer').title,'Peer '+action);assert.equal(h.remoteState().workLog.length,0);
  });
 });
+test('RISK scoped Undo recovery: compound Done Undo survives older device and cloud replay after peer progress',async t=>{
+ const {IDBFactory}=await import('fake-indexeddb'),at=Date.parse('2026-10-17T15:00:00Z'),indexedDB=new IDBFactory(),
+  deviceDbName=`scoped-undo-recovery-${Date.now()}-${Math.random()}`,targetId='undo-recovery-target',referenceId='undo-recovery-reference',
+  peerCandidateId='undo-recovery-peer-choice',peerFieldId='undo-recovery-peer-field';
+ const initial=syncState({tasks:[
+  {...syncTask(referenceId,'Reference'),createdAt:at-1000},
+  {...syncTask(targetId,'Original target'),createdAt:at-900,restoredAt:at-800,restoredRunOp:'restore-run-172'},
+  {...syncTask(peerCandidateId,'Peer candidate'),createdAt:at-700},
+  {...syncTask(peerFieldId,'Peer field'),createdAt:at-500},
+ ],chain:[referenceId,targetId],candidateId:peerCandidateId,passId:'undo-recovery-pass',passStartedAt:at-60000,
+  syncRev:4,syncAccount:'e@example.com',syncDirty:false,
+  settings:{horizonMin:60,thresholdPct:0,samples:80,cantMin:30,workedHours:8,theme:'system'}});
+ const remote=structuredClone(initial);for(const key of ['syncRev','syncAccount','syncDirty'])delete remote[key];
+ const h=makeSyncHarness({remote,rev:4,delayMs:1}),seedStorage={[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)},
+  local=await loadAppAtTime(at,{seedStorage,indexedDBProvider:indexedDB,deviceDbName,cloudSyncFactory:h.factory}),
+  peer=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:h.factory}),fixtures=[local,peer];
+ const closeStore=async app=>{try{await app?.ctx?.window?.ScannerDeviceStore?.close?.();}catch{}};
+ t.after(async()=>{for(const app of fixtures){try{app.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer);clearTimeout(saveTimer);',app.ctx);}catch{}await closeStore(app);}});
+ await local.ctx.cloudPull();await peer.ctx.cloudPull();local.ctx.window.CloudSync.ready=false;peer.ctx.window.CloudSync.ready=false;
+ setFakeTime(local.ctx,at+100);hydrateUnchangedEditorDraft(local,targetId);
+ local.shim.document.getElementById('etTitle').value='Local Done title';local.shim.document.getElementById('etDue').value='2026-10-30';
+ local.ctx.onAction('done-task',{dataset:{id:targetId}});assert.equal(await local.ctx.persist(),true);
+ const completion=JSON.parse(JSON.stringify(local.ctx.state.decisionEvents.find(event=>event.kind==='completion'&&event.taskId===targetId)));
+ assert.ok(completion,'the real populated-editor Done records an immutable completion');assert.equal(local.ctx.state.tasks.find(row=>row.id===targetId).done,true);
+ assert.deepEqual(Array.from(local.ctx.state.chain),[referenceId],'Done removes the target from active membership');
+ assert.ok(completion.completedAt===undefined||completion.at===at+100,'the original completion keeps the actual gesture time');
+ const originalActionId=completion.actionId,group=local.ctx.state.decisionEvents.filter(event=>event.actionId===originalActionId);
+ assert.ok(group.some(event=>event.kind==='current-choice'&&event.target?.property==='title'));
+ assert.ok(group.some(event=>event.kind==='current-choice'&&event.target?.property==='due'));
+ assert.ok(group.some(event=>event.kind==='completion'),'editor field saves and Done remain one complete action group');
+ assert.equal(new Set(group.map(event=>event.id)).size,group.length);
+ local.ctx.window.CloudSync.ready=true;await local.ctx.cloudPushNow();await syncSettle(40);
+ assert.equal(local.ctx.state.syncDirty,false,'the original target action is acknowledged before stale-source delivery');
+ const staleActionSource=JSON.parse(JSON.stringify(h.remoteState()));
+ peer.ctx.window.CloudSync.ready=true;await peer.ctx.cloudPull();await peer.ctx.onAction('yes',{dataset:{candidate:peerCandidateId,benchmark:referenceId}});
+ await saveEditorChoice(peer,peerFieldId,at+200,{title:'Peer independent title'});
+ const peerChoiceValue=peer.ctx.state.decisionEvents.find(event=>event.kind==='comparison'&&event.action==='yes'&&event.candidateId===peerCandidateId);
+ assert.ok(peerChoiceValue,JSON.stringify({candidateId:peer.ctx.state.candidateId,chain:peer.ctx.state.chain,mode:peer.ctx.state.mode,done:peer.ctx.state.tasks.find(row=>row.id===targetId)?.done,events:peer.ctx.state.decisionEvents}));
+ const peerChoice=JSON.parse(JSON.stringify(peerChoiceValue));
+ assert.ok(peerChoice,'the peer makes a real unrelated comparison');
+ peer.ctx.window.CloudSync.ready=true;await peer.ctx.cloudPushNow();await syncSettle(45);
+ local.ctx.window.CloudSync.ready=true;await local.ctx.cloudPull();await syncSettle(30);
+ assert.equal(local.ctx.state.tasks.find(row=>row.id===peerFieldId).title,'Peer independent title');
+ const scan=local.shim.document.getElementById('scan'),store=local.ctx.window.ScannerDeviceStore,commitHead=store.commitHead.bind(store),
+  paints=[],deviceWrites=[];let phase='idle',markup=scan.innerHTML;
+ Object.defineProperty(scan,'innerHTML',{configurable:true,get:()=>markup,set(value){markup=value;if(phase!=='idle'){
+  const visible=[...String(value).matchAll(/data-act="reveal" data-id="([^"]+)"/g)].map(match=>match[1]),bench=String(value).match(/data-act="bench-done" data-benchmark="([^"]+)"/);
+  if(bench)visible.push(bench[1]);paints.push({phase,chain:Array.from(local.ctx.state.chain),visible,done:!!local.ctx.state.tasks.find(row=>row.id===targetId)?.done});
+ }}});
+ store.commitHead=async options=>{const result=await commitHead(options);if(result?.ok&&phase!=='idle'){
+  const board=JSON.parse(options.payload);deviceWrites.push({phase,chain:board.chain.slice(),done:!!board.tasks.find(row=>row.id===targetId)?.done,
+   events:board.decisionEvents.map(event=>event.id)});
+ }return result;};
+ phase='original-device-source-before-undo';const markupBeforeOlderSource=scan.innerHTML,headBeforeOlderSource=JSON.parse((await store.readHead()).payload);
+ local.shim.localStorage.setItem(SYNC_STORE_KEY,JSON.stringify(staleActionSource));local.shim.localStorage.setItem(LOCAL_HEAD_KEY,JSON.stringify(staleActionSource));
+ assert.equal(await local.ctx.persist(),true,'the production saved-device recovery path accepts the original action source');
+ assert.equal(local.ctx.state.tasks.find(row=>row.id===targetId).done,true,'the original completion remains active before Undo');
+ const headAfterOlderSource=JSON.parse((await store.readHead()).payload);
+ assert.deepEqual(Array.from(headAfterOlderSource.chain),[referenceId,peerCandidateId]);
+ assert.equal(headAfterOlderSource.tasks.find(row=>row.id===targetId).done,true,'the production device head keeps the original completion');
+ assert.deepEqual(Array.from(local.ctx.state.chain),[referenceId,peerCandidateId]);
+ assert.equal(local.shim.document.getElementById('scan').innerHTML,markupBeforeOlderSource,'a duplicate original device source causes no transient repaint');
+ const stateBeforeUndo=JSON.parse(JSON.stringify(local.ctx.state));
+ assert.equal(await local.ctx.onAction('undo',{}),true,'the actual header Undo cancels the complete latest local action');
+ assert.equal(local.ctx.state.tasks.find(row=>row.id===targetId).done,false);
+ assert.equal(local.ctx.state.tasks.find(row=>row.id===targetId).title,'Original target');
+ assert.equal(local.ctx.state.tasks.find(row=>row.id===targetId).due,null);
+ const undoRestoreRun=local.ctx.state.tasks.find(row=>row.id===targetId).restoredRunOp;
+ assert.ok(undoRestoreRun.split('|').includes('restore-run-172'),'Undo retains the exact prior restore-run lineage while recording its reopen');
+ assert.equal(local.ctx.state.tasks.find(row=>row.id===targetId).completedAfterRestoreOp,undefined,'Undo clears only the Done marker for that restore run');
+ assert.equal(local.ctx.state.tasks.find(row=>row.id===peerFieldId).title,'Peer independent title');
+ const cancellation=local.ctx.state.decisionEvents.find(event=>event.kind==='undo'&&event.targetEventIds.includes(completion.id));
+ assert.ok(cancellation,'Undo retains an explicit cancellation fact for Done');
+ assert.deepEqual(Array.from(cancellation.targetEventIds).sort(),Array.from(group,event=>event.id).sort(),'the compound editor plus Done group is cancelled as a whole');
+ assert.deepEqual(Array.from(local.ctx.state.chain),[referenceId,targetId,peerCandidateId]);
+ assert.equal(JSON.stringify(local.ctx.state.decisionEvents.find(event=>event.id===completion.id)),JSON.stringify(completion),'the original completion ID, time and observed context remain immutable');
+ assert.equal(JSON.stringify(local.ctx.state.decisionEvents.filter(event=>event.actionId===originalActionId)),JSON.stringify(group),'the original compound action facts remain exact');
+ await local.ctx.persist();await local.ctx.cloudPushNow();await syncSettle(45);
+ const acknowledged=h.remoteState(),ackUndo=acknowledged.decisionEvents.find(event=>event.kind==='undo'&&event.targetEventIds.includes(completion.id));
+ assert.ok(ackUndo,'the exact cloud board acknowledges the cancellation');assert.equal(local.ctx.state.syncDirty,false);
+ assert.equal(acknowledged.tasks.find(row=>row.id===targetId).done,false);
+ assert.equal(acknowledged.tasks.find(row=>row.id===peerFieldId).title,'Peer independent title');assert.equal(acknowledged.tasks.find(row=>row.id===targetId).restoredRunOp,undoRestoreRun);
+ assert.equal(acknowledged.workLog.filter(row=>row.taskId===targetId).length,0,'ordinary Done remains outside evergreen History');
+ const expected=Object.fromEntries(initial.tasks.map(row=>[row.id,{mu:row.mu,sigma:row.sigma}]));loadEngine(1450).updatePair(expected[peerCandidateId],expected[referenceId]);
+ for(const row of acknowledged.tasks){assert.equal(row.mu,expected[row.id].mu,`${row.id}: only the unrelated peer comparison remains learned`);assert.equal(row.sigma,expected[row.id].sigma);}
+ const history=acknowledged.tasks.flatMap(row=>row.ratingHistory||[]).filter(row=>row.id===peerChoice.id);assert.ok(history.length>=1,'the peer comparison learning record remains attached');
+ assert.ok(acknowledged.decisionEvents.some(event=>event.id===peerChoice.id),'Undo keeps the peer comparison fact');
+ phase='stale-cloud-after-undo';h.writeBehindBack(staleActionSource);await local.ctx.cloudPull();await local.ctx.cloudPushNow();await syncSettle(50);
+ assert.ok(paints.some(row=>row.phase===phase),'stale cloud replay produces captured scanner paints');
+ assert.ok(paints.filter(row=>row.phase===phase).every(row=>row.chain.includes(targetId)&&row.visible.includes(targetId)&&!row.done),
+  'every post-Undo stale replay paint retains the restored target membership');
+ assert.ok(deviceWrites.filter(row=>row.phase===phase).every(row=>row.chain.includes(targetId)&&!row.done),
+  'every post-Undo durable device write retains the restored target membership');
+ const cloudAfterReplay=h.remoteState();assert.deepEqual(Array.from(cloudAfterReplay.chain),[referenceId,targetId,peerCandidateId]);
+ assert.equal(cloudAfterReplay.tasks.find(row=>row.id===targetId).done,false);
+ assert.equal(cloudAfterReplay.tasks.find(row=>row.id===peerFieldId).title,'Peer independent title');
+ assert.equal(JSON.stringify(cloudAfterReplay.decisionEvents.find(event=>event.id===completion.id)),JSON.stringify(completion));
+ assert.ok(cloudAfterReplay.decisionEvents.some(event=>event.id===peerChoice.id));assert.ok(cloudAfterReplay.decisionEvents.some(event=>event.id===cancellation.id));
+ assert.equal(cloudAfterReplay.decisionEvents.filter(event=>event.kind==='completion'&&event.taskId===targetId).length,1);
+ const deviceHead=JSON.parse((await store.readHead()).payload);assert.deepEqual(deviceHead.chain,[referenceId,targetId,peerCandidateId]);
+ assert.equal(deviceHead.tasks.find(row=>row.id===targetId).restoredRunOp,undoRestoreRun);
+ assert.ok(deviceHead.decisionEvents.some(event=>event.id===cancellation.id));
+ assert.notDeepEqual(stateBeforeUndo.tasks.map(row=>row.done),local.ctx.state.tasks.map(row=>row.done),'the actual Undo changed completion state');
+ await closeStore(local);
+ const cold=await loadAppAtTime(at+400,{indexedDBProvider:indexedDB,deviceDbName,cloudSyncFactory:()=>{const cloud=h.factory();cloud.ready=false;return cloud;}});fixtures.push(cold);
+ await cold.ctx.__dataReady;assert.deepEqual(Array.from(cold.ctx.state.chain),[referenceId,targetId,peerCandidateId]);
+ assert.equal(cold.ctx.state.tasks.find(row=>row.id===targetId).done,false);assert.equal(cold.ctx.state.tasks.find(row=>row.id===targetId).restoredRunOp,undoRestoreRun);
+ assert.equal(cold.ctx.state.tasks.find(row=>row.id===peerFieldId).title,'Peer independent title');assert.equal(cold.ctx.state.syncDirty,false);
+ assert.ok(cold.ctx.state.decisionEvents.some(event=>event.id===cancellation.id));
+ cold.ctx.window.CloudSync.ready=true;await cold.ctx.cloudPull();assert.deepEqual(Array.from(cold.ctx.state.chain),[referenceId,targetId,peerCandidateId]);
+ assert.deepEqual(Array.from(cold.ctx.state.tasks,row=>[row.id,row.mu,row.sigma]),Array.from(cloudAfterReplay.tasks,row=>[row.id,row.mu,row.sigma]));
+});
+
+test('RISK scoped Undo FAQ: whole Done Dot and Return actions survive stale-source recovery',async()=>{
+ const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(help,/Undo applies to the whole action, including editor changes made with Done, Dot, or Return as candidate/i);
+ assert.match(help,/A stale saved or cloud copy cannot reapply the cancelled action after sync and reopening/i);
+ assert.match(help,/unrelated decisions from either device/i);
+});
+test('RISK scoped Undo recovery: a true Undo cancels only its compound Dot while peer completion and learning remain',async t=>{
+ const {IDBFactory}=await import('fake-indexeddb'),at=Date.parse('2026-10-17T15:00:00Z'),indexedDB=new IDBFactory(),
+  deviceDbName=`scoped-undo-dot-${Date.now()}-${Math.random()}`,targetId='undo-dot-target',referenceId='undo-dot-reference',
+  peerCandidateId='undo-dot-peer-choice',peerFieldId='undo-dot-peer-field';
+ const initial=syncState({tasks:[
+  syncTask(referenceId,'Reference'),{...syncTask(targetId,'Recurring target'),evergreen:true,evergreenHours:1,evergreenResetAtDay:false},
+  syncTask(peerCandidateId,'Peer candidate'),syncTask(peerFieldId,'Peer field')],chain:[referenceId],candidateId:targetId,
+  passId:'undo-dot-pass',passStartedAt:at-60000,syncRev:4,syncAccount:'e@example.com',syncDirty:false,
+  settings:{horizonMin:60,thresholdPct:0,samples:80,cantMin:30,workedHours:8,theme:'system'}});
+ const remote=structuredClone(initial);for(const key of ['syncRev','syncAccount','syncDirty'])delete remote[key];
+ const h=makeSyncHarness({remote,rev:4,delayMs:1}),seedStorage={[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)},
+  local=await loadAppAtTime(at,{seedStorage,indexedDBProvider:indexedDB,deviceDbName,cloudSyncFactory:h.factory}),
+  peer=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:h.factory}),fixtures=[local,peer];
+ const closeStore=async app=>{try{await app?.ctx?.window?.ScannerDeviceStore?.close?.();}catch{}};
+ t.after(async()=>{for(const app of fixtures){try{app.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer);clearTimeout(saveTimer);',app.ctx);}catch{}await closeStore(app);}});
+ await local.ctx.cloudPull();await peer.ctx.cloudPull();local.ctx.window.CloudSync.ready=false;peer.ctx.window.CloudSync.ready=false;
+ setFakeTime(local.ctx,at+100);hydrateUnchangedEditorDraft(local,targetId);
+ local.shim.document.getElementById('etTitle').value='Local Dot title';local.shim.document.getElementById('etDue').value='2026-10-30';
+ local.ctx.onAction('dot-task',{dataset:{id:targetId}});assert.equal(await local.ctx.persist(),true);
+ const dot=JSON.parse(JSON.stringify(local.ctx.state.decisionEvents.find(event=>event.kind==='comparison'&&event.action==='dot'&&event.taskId===targetId)));
+ const dotGroup=Array.from(local.ctx.state.decisionEvents).filter(event=>event.actionId===dot.actionId);
+ assert.ok(dot,'the actual editor Dot records its real comparison observation');assert.ok(dotGroup.some(event=>event.kind==='current-choice'&&event.target.property==='title'));
+ assert.ok(dotGroup.some(event=>event.kind==='current-choice'&&event.target.property==='due'));
+ assert.deepEqual(Array.from(local.ctx.state.chain),[referenceId,targetId]);
+ const staleDotSource=JSON.parse(local.ctx.cloudPayload());
+ peer.ctx.state.candidateId=peerCandidateId;peer.ctx.renderScan();
+ setFakeTime(peer.ctx,at+200);peer.ctx.onAction('no',{dataset:{candidate:peerCandidateId,benchmark:referenceId}});
+ setFakeTime(peer.ctx,at+300);hydrateUnchangedEditorDraft(peer,targetId);peer.ctx.onAction('done-task',{dataset:{id:targetId}});await peer.ctx.persist();
+ const completion=JSON.parse(JSON.stringify(peer.ctx.state.decisionEvents.find(event=>event.kind==='completion'&&event.taskId===targetId)));
+ const no=JSON.parse(JSON.stringify(peer.ctx.state.decisionEvents.find(event=>event.kind==='no'&&event.candidateId===peerCandidateId)));
+ assert.ok(completion&&!completion.observedActionIds.includes(dot.id),'the real peer Done is unaware of the still-offline Dot');
+ assert.ok(completion?.observedActionIds.includes(no.id),'the peer Done observes its own unrelated comparison');
+ await saveEditorChoice(peer,peerFieldId,at+350,{title:'Peer kept title'});peer.ctx.window.CloudSync.ready=true;await peer.ctx.cloudPushNow();await syncSettle(45);
+ local.ctx.window.CloudSync.ready=true;await local.ctx.cloudPull();await syncSettle(30);
+ assert.equal(local.ctx.state.tasks.find(row=>row.id===targetId).lastDoneAt,at+300);
+ assert.deepEqual(Array.from(local.ctx.state.chain),[referenceId],'the unaware peer completion defeats Dot membership without cancelling its valid learning');
+ const expectedBeforeUndo=Object.fromEntries(initial.tasks.map(row=>[row.id,{mu:row.mu,sigma:row.sigma}])),beforeEngine=loadEngine(1450);
+ beforeEngine.updatePair(expectedBeforeUndo[targetId],expectedBeforeUndo[referenceId]);beforeEngine.updatePair(expectedBeforeUndo[referenceId],expectedBeforeUndo[peerCandidateId]);
+ for(const row of local.ctx.state.tasks){assert.equal(row.mu,expectedBeforeUndo[row.id].mu,`${row.id}: both observed comparisons are learned before Dot Undo`);assert.equal(row.sigma,expectedBeforeUndo[row.id].sigma);}
+ const scan=local.shim.document.getElementById('scan'),store=local.ctx.window.ScannerDeviceStore,originalCommit=store.commitHead.bind(store),paints=[],writes=[];
+ let phase='idle',markup=scan.innerHTML;
+ Object.defineProperty(scan,'innerHTML',{configurable:true,get:()=>markup,set(value){markup=value;if(phase==='stale-cloud'){
+  const visible=[...String(value).matchAll(/data-act="reveal" data-id="([^"]+)"/g)].map(match=>match[1]),bench=String(value).match(/data-act="bench-done" data-benchmark="([^"]+)"/);if(bench)visible.push(bench[1]);
+  paints.push({phase,chain:Array.from(local.ctx.state.chain),visible});
+ }}});
+ store.commitHead=async options=>{const result=await originalCommit(options);if(result?.ok&&phase==='stale-cloud'){
+  const board=JSON.parse(options.payload);writes.push({chain:board.chain.slice(),done:!!board.tasks.find(row=>row.id===targetId)?.done,events:board.decisionEvents.map(event=>event.id)});
+ }return result;};
+ phase='stale-cloud';h.writeBehindBack(staleDotSource);await local.ctx.cloudPull();await local.ctx.cloudPushNow();await syncSettle(45);
+ assert.deepEqual(Array.from(local.ctx.state.chain),[referenceId],'replaying the original unaware Dot before Undo does not restore completed membership');
+ assert.ok(local.ctx.state.decisionEvents.some(event=>event.id===dot.id),'the losing Dot remains durable until its own actual Undo');
+ for(const row of local.ctx.state.tasks){assert.equal(row.mu,expectedBeforeUndo[row.id].mu,`${row.id}: losing Dot and unrelated peer No each train once`);assert.equal(row.sigma,expectedBeforeUndo[row.id].sigma);}
+ const beforeUndoCloud=h.remoteState();assert.deepEqual(Array.from(beforeUndoCloud.chain),[referenceId]);assert.ok(beforeUndoCloud.decisionEvents.some(event=>event.id===dot.id));
+ assert.equal(await local.ctx.onAction('undo',{}),true,'the actual Undo cancels the local Dot action');
+ const cancellation=local.ctx.state.decisionEvents.find(event=>event.kind==='undo'&&event.targetEventIds.includes(dot.id));
+ assert.ok(cancellation,'Dot Undo adds an immutable cancellation fact');assert.deepEqual(Array.from(cancellation.targetEventIds).sort(),Array.from(dotGroup,event=>event.id).sort());
+ assert.equal(JSON.stringify(local.ctx.state.decisionEvents.find(event=>event.id===dot.id)),JSON.stringify(dot));
+ assert.equal(local.ctx.state.tasks.find(row=>row.id===targetId).title,'Recurring target','Undo restores only the Dot editor fields');
+ assert.equal(local.ctx.state.tasks.find(row=>row.id===targetId).due,null);assert.equal(local.ctx.state.tasks.find(row=>row.id===targetId).lastDoneAt,at+300);
+ assert.deepEqual(Array.from(local.ctx.state.chain),[referenceId],'the cancelled Dot does not undo the peer completion');
+ assert.equal(local.ctx.state.tasks.find(row=>row.id===peerFieldId).title,'Peer kept title');
+ const expectedAfterUndo=Object.fromEntries(initial.tasks.map(row=>[row.id,{mu:row.mu,sigma:row.sigma}]));loadEngine(1450).updatePair(expectedAfterUndo[referenceId],expectedAfterUndo[peerCandidateId]);
+ for(const row of local.ctx.state.tasks){assert.equal(row.mu,expectedAfterUndo[row.id].mu,`${row.id}: the valid Dot stops training only after its own Undo`);assert.equal(row.sigma,expectedAfterUndo[row.id].sigma);}
+ assert.ok(local.ctx.state.decisionEvents.some(event=>event.id===completion.id)&&local.ctx.state.decisionEvents.some(event=>event.id===no.id));
+ await local.ctx.persist();await local.ctx.cloudPushNow();await syncSettle(45);assert.equal(local.ctx.state.syncDirty,false);
+ phase='stale-cloud';h.writeBehindBack(staleDotSource);await local.ctx.cloudPull();await local.ctx.cloudPushNow();await syncSettle(50);
+ assert.ok(paints.length>0&&writes.length>0,'stale saved-cloud recovery reaches the actual scanner and production device store');
+ assert.ok(paints.every(row=>!row.chain.includes(targetId)&&!row.visible.includes(targetId)),'every stale replay paint keeps the completed target out');
+ assert.ok(writes.every(row=>!row.chain.includes(targetId)&&!row.done),'every durable stale replay write retains peer completion');
+ const cloud=h.remoteState();assert.deepEqual(Array.from(cloud.chain),[referenceId]);assert.equal(cloud.tasks.find(row=>row.id===targetId).lastDoneAt,at+300);
+ assert.ok(cloud.decisionEvents.some(event=>event.id===completion.id)&&cloud.decisionEvents.some(event=>event.id===no.id));
+ assert.ok(cloud.decisionEvents.some(event=>event.id===cancellation.id));assert.equal(JSON.stringify(cloud.decisionEvents.find(event=>event.id===dot.id)),JSON.stringify(dot));
+ assert.equal(cloud.workLog.filter(row=>row.taskId===targetId&&row.kind==='evergreen-done').length,1,'Undo preserves peer evergreen History');
+ assert.equal(cloud.tasks.find(row=>row.id===peerFieldId).title,'Peer kept title');
+ for(const row of cloud.tasks){assert.equal(row.mu,expectedAfterUndo[row.id].mu);assert.equal(row.sigma,expectedAfterUndo[row.id].sigma);}
+ const device=JSON.parse((await store.readHead()).payload);assert.deepEqual(device.chain,[referenceId]);assert.ok(device.decisionEvents.some(event=>event.id===cancellation.id));
+ await closeStore(local);
+ const cold=await loadAppAtTime(at+2*3600000,{indexedDBProvider:indexedDB,deviceDbName,cloudSyncFactory:()=>{const cloudSync=h.factory();cloudSync.ready=false;return cloudSync;}});fixtures.push(cold);
+ await cold.ctx.__dataReady;assert.deepEqual(Array.from(cold.ctx.state.chain),[referenceId]);assert.equal(cold.ctx.state.tasks.find(row=>row.id===targetId).lastDoneAt,at+300);
+ assert.ok(cold.ctx.state.decisionEvents.some(event=>event.id===completion.id)&&cold.ctx.state.decisionEvents.some(event=>event.id===cancellation.id));
+ cold.ctx.window.CloudSync.ready=true;await cold.ctx.cloudPull();assert.deepEqual(Array.from(cold.ctx.state.chain),[referenceId]);
+ assert.deepEqual(Array.from(cold.ctx.state.tasks,row=>[row.id,row.mu,row.sigma]),Array.from(cloud.tasks,row=>[row.id,row.mu,row.sigma]));
+});
+test('RISK scoped Undo recovery: Undo of an informed evergreen return survives older source and permits a later return',async t=>{
+ const {IDBFactory}=await import('fake-indexeddb'),at=Date.parse('2026-10-17T15:00:00Z'),indexedDB=new IDBFactory(),
+  deviceDbName=`scoped-undo-return-${Date.now()}-${Math.random()}`,targetId='undo-return-target',referenceId='undo-return-reference',
+  peerCandidateId='undo-return-peer-choice',peerFieldId='undo-return-peer-field';
+ const initial=syncState({tasks:[syncTask(referenceId,'Reference'),{...syncTask(targetId,'Recurring target'),evergreen:true,evergreenHours:1,
+   evergreenResetAtDay:false,restoredAt:at-900,restoredRunOp:'return-run-172'},syncTask(peerCandidateId,'Peer candidate'),syncTask(peerFieldId,'Peer field')],
+  chain:[referenceId,targetId],candidateId:targetId,passId:'undo-return-pass',passStartedAt:at-60000,syncRev:4,syncAccount:'e@example.com',syncDirty:false,
+  settings:{horizonMin:60,thresholdPct:0,samples:80,cantMin:30,workedHours:8,theme:'system'}});
+ const remote=structuredClone(initial);for(const key of ['syncRev','syncAccount','syncDirty'])delete remote[key];
+ const h=makeSyncHarness({remote,rev:4,delayMs:1}),seedStorage={[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)},
+  local=await loadAppAtTime(at,{seedStorage,indexedDBProvider:indexedDB,deviceDbName,cloudSyncFactory:h.factory}),
+  peer=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:h.factory}),fixtures=[local,peer];
+ const closeStore=async app=>{try{await app?.ctx?.window?.ScannerDeviceStore?.close?.();}catch{}};
+ t.after(async()=>{for(const app of fixtures){try{app.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer);clearTimeout(saveTimer);',app.ctx);}catch{}await closeStore(app);}});
+ await local.ctx.cloudPull();await peer.ctx.cloudPull();local.ctx.window.CloudSync.ready=false;peer.ctx.window.CloudSync.ready=false;
+ setFakeTime(local.ctx,at+100);hydrateUnchangedEditorDraft(local,targetId);local.ctx.onAction('done-task',{dataset:{id:targetId}});await local.ctx.persist();
+ const firstCompletion=JSON.parse(JSON.stringify(local.ctx.state.decisionEvents.find(event=>event.kind==='completion'&&event.taskId===targetId)));
+ assert.ok(firstCompletion,'the real first Done creates immutable rest authority');assert.deepEqual(Array.from(local.ctx.state.chain),[referenceId]);
+ const priorRun=local.ctx.state.tasks.find(row=>row.id===targetId).restoredRunOp;
+ local.ctx.window.CloudSync.ready=true;await local.ctx.cloudPushNow();await syncSettle(40);const olderCompletionSource=JSON.parse(JSON.stringify(h.remoteState()));
+ local.ctx.window.CloudSync.ready=false;setFakeTime(local.ctx,at+2*3600000);local.ctx.ensureCandidate();await local.ctx.persist();
+ assert.equal(local.ctx.isEligible(local.ctx.state.tasks.find(row=>row.id===targetId)),true,'the first evergreen rest expires');
+ assert.deepEqual(Array.from(local.ctx.state.chain),[referenceId],'expiry alone never restores chain membership');
+ setFakeTime(local.ctx,at+2*3600000+10);hydrateUnchangedEditorDraft(local,targetId);local.shim.document.getElementById('etTitle').value='First return edit';
+ local.shim.document.getElementById('etDue').value='2026-11-01';local.ctx.onAction('dot-task',{dataset:{id:targetId}});await local.ctx.persist();
+ const firstReturn=JSON.parse(JSON.stringify(local.ctx.state.decisionEvents.find(event=>event.kind==='comparison'&&event.action==='dot'&&event.taskId===targetId)));
+ const returnGroup=Array.from(local.ctx.state.decisionEvents).filter(event=>event.actionId===firstReturn.actionId);
+ assert.ok(firstReturn?.observedActionIds.includes(firstCompletion.id),'the actual post-rest return observes the original Done');
+ assert.ok(returnGroup.some(event=>event.kind==='current-choice'&&event.target.property==='title')&&returnGroup.some(event=>event.kind==='current-choice'&&event.target.property==='due'));
+ assert.deepEqual(Array.from(local.ctx.state.chain),[referenceId,targetId]);
+ local.ctx.window.CloudSync.ready=true;await local.ctx.cloudPushNow();await syncSettle(40);const staleReturnSource=JSON.parse(JSON.stringify(h.remoteState()));
+ peer.ctx.window.CloudSync.ready=true;await peer.ctx.cloudPull();peer.ctx.state.candidateId=peerCandidateId;peer.ctx.renderScan();
+ setFakeTime(peer.ctx,at+2*3600000+20);peer.ctx.onAction('yes',{dataset:{candidate:peerCandidateId,benchmark:referenceId}});
+ await saveEditorChoice(peer,peerFieldId,at+2*3600000+25,{title:'Peer kept return title'});peer.ctx.window.CloudSync.ready=true;await peer.ctx.cloudPushNow();await syncSettle(45);
+ local.ctx.window.CloudSync.ready=true;await local.ctx.cloudPull();await syncSettle(30);
+ assert.deepEqual(Array.from(local.ctx.state.chain),[referenceId,targetId,peerCandidateId],'the permitted return and peer pass progress both survive before Undo');
+ assert.equal(local.ctx.state.tasks.find(row=>row.id===peerFieldId).title,'Peer kept return title');
+ const rated=(...events)=>{const values=Object.fromEntries(initial.tasks.map(row=>[row.id,{mu:row.mu,sigma:row.sigma}])),engine=loadEngine(1450);
+  for(const event of events)engine.updatePair(values[event.winnerId],values[event.loserId]);return values;};
+ const peerChoice=peer.ctx.state.decisionEvents.find(event=>event.kind==='comparison'&&event.action==='yes'&&event.candidateId===peerCandidateId);
+ assert.ok(peerChoice,'the peer makes a real independent comparison');
+ const expectedBeforeUndo=rated(firstReturn,peerChoice);
+ for(const row of local.ctx.state.tasks){assert.equal(row.mu,expectedBeforeUndo[row.id].mu,`${row.id}: both local return and peer Yes are learned before Undo`);assert.equal(row.sigma,expectedBeforeUndo[row.id].sigma);}
+ const scan=local.shim.document.getElementById('scan'),store=local.ctx.window.ScannerDeviceStore,commit=store.commitHead.bind(store),paints=[],writes=[];
+ let phase='idle',markup=scan.innerHTML;
+ Object.defineProperty(scan,'innerHTML',{configurable:true,get:()=>markup,set(value){markup=value;if(phase!=='idle'){
+  const visible=[...String(value).matchAll(/data-act="reveal" data-id="([^"]+)"/g)].map(match=>match[1]),bench=String(value).match(/data-act="bench-done" data-benchmark="([^"]+)"/);if(bench)visible.push(bench[1]);
+  paints.push({phase,chain:Array.from(local.ctx.state.chain),visible});
+ }}});
+ store.commitHead=async options=>{const result=await commit(options);if(result?.ok&&phase!=='idle'){
+  const board=JSON.parse(options.payload);writes.push({phase,chain:board.chain.slice(),events:board.decisionEvents.map(event=>event.id)});
+ }return result;};
+ phase='pre-undo-source';h.writeBehindBack(olderCompletionSource);await local.ctx.cloudPull();await local.ctx.cloudPushNow();await syncSettle(45);
+ assert.deepEqual(Array.from(local.ctx.state.chain),[referenceId,targetId,peerCandidateId],'the older completion-only source cannot erase the informed return or peer pass progress before Undo');
+ assert.ok(local.ctx.state.decisionEvents.some(event=>event.id===firstReturn.id));
+ const completionBytes=JSON.stringify(local.ctx.state.decisionEvents.find(event=>event.id===firstCompletion.id));
+ phase='undo-action';
+ assert.equal(await local.ctx.onAction('undo',{}),true,'the real Undo targets the complete informed Dot/editor gesture');
+ const cancellation=local.ctx.state.decisionEvents.find(event=>event.kind==='undo'&&event.targetEventIds.includes(firstReturn.id));
+ assert.ok(cancellation);assert.deepEqual(Array.from(cancellation.targetEventIds).sort(),Array.from(returnGroup,event=>event.id).sort());
+ assert.equal(JSON.stringify(local.ctx.state.decisionEvents.find(event=>event.id===firstCompletion.id)),completionBytes,'Undo leaves original Done bytes and time intact');
+ assert.equal(local.ctx.state.tasks.find(row=>row.id===targetId).title,'Recurring target');assert.equal(local.ctx.state.tasks.find(row=>row.id===targetId).due,null);
+ assert.equal(local.ctx.state.tasks.find(row=>row.id===targetId).restoredRunOp,priorRun,'the cancellation preserves existing restore-run lineage');
+ assert.deepEqual(Array.from(local.ctx.state.chain),[referenceId,peerCandidateId],'cancelling only the later return restores the original completion fence and keeps peer membership');
+ assert.equal(local.ctx.state.tasks.find(row=>row.id===peerFieldId).title,'Peer kept return title');
+ const expectedAfterUndo=rated(peerChoice);
+ for(const row of local.ctx.state.tasks){assert.equal(row.mu,expectedAfterUndo[row.id].mu,`${row.id}: true Undo removes only its own Dot learning`);assert.equal(row.sigma,expectedAfterUndo[row.id].sigma);}
+ assert.equal(local.ctx.state.workLog.filter(row=>row.taskId===targetId&&row.kind==='evergreen-done').length,1,'Undo preserves the first evergreen History session');
+ assert.ok(local.ctx.state.decisionEvents.some(event=>event.id===cancellation.id));
+ await local.ctx.persist();await local.ctx.cloudPushNow();await syncSettle(45);assert.equal(local.ctx.state.syncDirty,false);
+ phase='post-undo-source';
+ h.writeBehindBack(staleReturnSource);await local.ctx.cloudPull();await local.ctx.cloudPushNow();await syncSettle(50);
+ assert.ok(paints.length>0&&writes.length>0,'older sources exercise the mounted scanner and production IndexedDB store');
+ const preUndoPaints=paints.filter(row=>row.phase==='pre-undo-source'),undoPaints=paints.filter(row=>row.phase==='undo-action'),
+  postUndoPaints=paints.filter(row=>row.phase==='post-undo-source'),preUndoWrites=writes.filter(row=>row.phase==='pre-undo-source'),
+  undoWrites=writes.filter(row=>row.phase==='undo-action'),postUndoWrites=writes.filter(row=>row.phase==='post-undo-source');
+ assert.ok(preUndoPaints.length>0&&preUndoWrites.length>0,'the older pre-Undo source exercises both rendered and durable recovery');
+ assert.ok(preUndoPaints.every(row=>row.chain.includes(targetId)&&row.visible.includes(targetId)),`every pre-Undo recovery paint retains the valid informed return: ${JSON.stringify(preUndoPaints)}`);
+ assert.ok(preUndoWrites.every(row=>row.chain.includes(targetId)),`every pre-Undo device-head write retains the valid informed return: ${JSON.stringify(preUndoWrites)}`);
+ assert.ok(undoPaints.every(row=>!row.chain.includes(targetId)&&!row.visible.includes(targetId)),'actual Undo removes the target from every scanner paint');
+ assert.ok(undoWrites.every(row=>!row.chain.includes(targetId)),'actual Undo persists the cancellation to the device head');
+ assert.ok(postUndoPaints.length>0&&postUndoWrites.length>0,'the stale return source is retried after Undo upload');
+ assert.ok(postUndoPaints.every(row=>!row.chain.includes(targetId)&&!row.visible.includes(targetId)),'every post-Undo recovery paint keeps the returned target cancelled');
+ assert.ok(postUndoWrites.every(row=>!row.chain.includes(targetId)),'every post-Undo device-head write keeps the returned target cancelled');
+ const cloud=h.remoteState();assert.deepEqual(Array.from(cloud.chain),[referenceId,peerCandidateId]);
+ assert.equal(JSON.stringify(cloud.decisionEvents.find(event=>event.id===firstCompletion.id)),completionBytes);
+ assert.equal(JSON.stringify(cloud.decisionEvents.find(event=>event.id===firstReturn.id)),JSON.stringify(firstReturn));
+ assert.ok(cloud.decisionEvents.some(event=>event.id===cancellation.id));assert.equal(cloud.tasks.find(row=>row.id===peerFieldId).title,'Peer kept return title');
+ assert.equal(cloud.workLog.filter(row=>row.taskId===targetId&&row.kind==='evergreen-done').length,1);
+ for(const row of cloud.tasks){assert.equal(row.mu,expectedAfterUndo[row.id].mu);assert.equal(row.sigma,expectedAfterUndo[row.id].sigma);}
+ const device=JSON.parse((await store.readHead()).payload);assert.deepEqual(device.chain,[referenceId,peerCandidateId]);assert.ok(device.decisionEvents.some(event=>event.id===cancellation.id));
+ await closeStore(local);
+ const cold=await loadAppAtTime(at+2*3600000+40,{indexedDBProvider:indexedDB,deviceDbName,cloudSyncFactory:()=>{const cloudSync=h.factory();cloudSync.ready=false;return cloudSync;}});fixtures.push(cold);
+ await cold.ctx.__dataReady;assert.deepEqual(Array.from(cold.ctx.state.chain),[referenceId,peerCandidateId]);assert.equal(cold.ctx.state.tasks.find(row=>row.id===targetId).restoredRunOp,priorRun);
+ assert.equal(JSON.stringify(cold.ctx.state.decisionEvents.find(event=>event.id===firstCompletion.id)),completionBytes);
+ assert.ok(cold.ctx.state.decisionEvents.some(event=>event.id===cancellation.id));
+ setFakeTime(cold.ctx,at+2*3600000+60);const coldTarget=cold.ctx.state.tasks.find(row=>row.id===targetId);
+ assert.equal(cold.ctx.isEligible(coldTarget),true,'the original rest remains expired after reopening');assert.deepEqual(Array.from(cold.ctx.state.chain),[referenceId,peerCandidateId]);
+ hydrateUnchangedEditorDraft(cold,targetId);cold.ctx.onAction('dot-task',{dataset:{id:targetId}});await cold.ctx.persist();
+ const nextReturn=JSON.parse(JSON.stringify(cold.ctx.state.decisionEvents.filter(event=>event.kind==='comparison'&&event.action==='dot'&&event.taskId===targetId).at(-1)));
+ const byId=new Map(cold.ctx.state.decisionEvents.map(event=>[event.id,event])),observes=(event,id,seen=new Set())=>event.observedActionIds.some(parent=>parent===id||
+  !seen.has(parent)&&(seen.add(parent),byId.has(parent)&&observes(byId.get(parent),id,seen)));
+ assert.ok(nextReturn.id!==firstReturn.id&&nextReturn.observedActionIds.includes(cancellation.id)&&observes(nextReturn,firstCompletion.id),
+  'a new informed return remains possible and follows the original Done through the return cancellation lineage');
+ assert.deepEqual(Array.from(cold.ctx.state.chain),[referenceId,peerCandidateId,targetId]);
+ setFakeTime(cold.ctx,at+2*3600000+70);hydrateUnchangedEditorDraft(cold,targetId);cold.ctx.onAction('done-task',{dataset:{id:targetId}});await cold.ctx.persist();
+ const laterCompletion=JSON.parse(JSON.stringify(cold.ctx.state.decisionEvents.filter(event=>event.kind==='completion'&&event.taskId===targetId).at(-1)));
+ assert.ok(laterCompletion.id!==firstCompletion.id&&laterCompletion.observedActionIds.includes(nextReturn.id));assert.deepEqual(Array.from(cold.ctx.state.chain),[referenceId,peerCandidateId]);
+ assert.equal(cold.ctx.state.workLog.filter(row=>row.taskId===targetId&&row.kind==='evergreen-done').length,2,'the next real Done creates its own later History session');
+ cold.ctx.window.CloudSync.ready=true;await cold.ctx.cloudPushNow();await syncSettle(45);
+ assert.deepEqual(Array.from(h.remoteState().chain),[referenceId,peerCandidateId]);assert.ok(h.remoteState().decisionEvents.some(event=>event.id===nextReturn.id)&&h.remoteState().decisionEvents.some(event=>event.id===laterCompletion.id));
+});
 test('RISK scoped Undo: cancelling Start restores the prior pass root and exact draw through stale delivery',async()=>{
  const {local,peer,h,at}=await scopedUndoClients(initial=>{initial.chain=[];initial.candidateId=null;initial.mode='work';initial.chance=null;});
  const prior=JSON.parse(JSON.stringify({passId:local.ctx.state.passId,passStartedAt:local.ctx.state.passStartedAt,chain:local.ctx.state.chain,scanMode:local.ctx.state.scanMode,chance:local.ctx.state.chance}));
