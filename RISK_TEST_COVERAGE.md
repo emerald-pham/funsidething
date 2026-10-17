@@ -486,6 +486,8 @@ The editor hook blocks app or enforcement edits while tests.js has no staged or 
 ## Evergreen remote completion and scanner membership
 
 - RISK completion lifecycle facts: editor candidate and benchmark Done preserve ordinary ratings and Undo
+- RISK legacy completion FAQ: older saved boards keep completed tasks out and explain safe return
+- RISK completion lifecycle Changelog: the mounted release notes describe older-board recovery in player language
 - RISK completion lifecycle recovery: saved device source cannot restore a 2→1 chain before scan refresh
 - RISK completion lifecycle return: an observed Dot returns after expiry and a later Done removes it again
 - RISK completion lifecycle FAQ: expired rest and saved-chain return match the shipped controls

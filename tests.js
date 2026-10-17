@@ -180,9 +180,25 @@ test('RISK legacy completion guest adoption: actual modern guest Done remains ob
  setFakeTime(app.ctx,at+2*3600000);hydrateUnchangedEditorDraft(app,'guest-173');app.ctx.onAction('dot-task',{dataset:{id:'guest-173'}});await app.ctx.persist();assert.ok(app.ctx.state.chain.includes('guest-173'));assert.equal(await app.ctx.onAction('undo',{}),true);await app.ctx.persist();assert.deepEqual(Array.from(app.ctx.state.chain),['guest-173-next'],'Undo of a current owner return exposes the still-live inherited completion');await app.ctx.cloudPushNow();await settleSavedViewPublication(app,h,'guest return Undo publication');t.diagnostic(JSON.stringify({stage:'guest-return-undo',error:app.ctx.window.CloudSync.errorCode,issue:app.ctx.decisionEvidenceIssue(app.ctx.state,'e@example.com'),dirty:app.ctx.state.syncDirty,events:app.ctx.state.decisionEvents.map(e=>({id:e.id,kind:e.kind,account:e.account,parents:e.observedActionIds}))}));assert.equal(app.ctx.state.syncDirty,false);
 });
 
-test('RISK legacy completion FAQ: imported completion boundaries explain exact recovery and permitted return without invented history',async()=>{
- const app=await loadApp();app.ctx.openHelp();const help=app.shim.document.getElementById('modalRoot').innerHTML;
- for(const pattern of [/imported completion boundary/i,/does not invent an earlier Done action/i,/Proven returns and Undo remain valid/i,/recovery copy cannot be saved.*uploading wait/i])assert.match(help,pattern);await closeLegacyApp173(app);
+test('RISK legacy completion FAQ: older saved boards keep completed tasks out and explain safe return',async()=>{
+ const app=await loadApp(),{ctx,shim}=app;ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ const answer=help.match(/<dt>How are older completions recovered\?<\/dt><dd>(.*?)<\/dd>/)?.[1];assert.ok(answer,'the existing older-completion FAQ stays mounted');
+ for(const pattern of [/older saved board leaves completed tasks out of the dotted chain/i,/after an Evergreen rest ends/i,/Dot, Yes, or Start/i,
+  /Ratings and History stay as saved/i,/exact older board remains in local backups/i,/If a safety copy cannot be saved, the app waits/i,
+  /Changes this version cannot safely read stay protected/i])assert.match(answer,pattern);
+ assert.doesNotMatch(answer,/imported completion boundary|recovery observation|observes that boundary|sourceEvidence/i,'players see outcomes rather than internal recovery terms');
+ assert.ok(answer.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,'the answer stays within the existing word limit');await closeLegacyApp173(app);
+});
+test('RISK completion lifecycle Changelog: the mounted release notes describe older-board recovery in player language',async()=>{
+ const {ctx,shim}=await loadApp();
+ for(const id of ['appChangelogCurrent','appChangelog']){
+  const content=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))?.[1];assert.ok(content,`the ${id} release template exists`);
+  shim.document.getElementById(id).innerHTML=content;
+ }
+ ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(help,/<summary><h3>Changelog<\/h3><\/summary>/,'the actual Help consumer mounts the Changelog chapter');
+ assert.match(help,/<li>Recovering an older saved board keeps completed tasks out of the chain and preserves your other edits, ratings and Undo\.<\/li>/,
+  'the mounted final Changelog includes the approved concise recovery outcome');
 });
 
 test('Firestore rules: immutable decision-aware full shell conflicts then safely holds completion-upgrade authority and its local edit',{skip:!process.env.FIRESTORE_EMULATOR_HOST},async t=>{
@@ -460,8 +476,8 @@ test('RISK scoped Undo recovery: compound Done Undo survives older device and cl
  const h=makeSyncHarness({remote,rev:4,delayMs:1}),seedStorage={[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)},
   local=await loadAppAtTime(at,{seedStorage,indexedDBProvider:indexedDB,deviceDbName,cloudSyncFactory:h.factory}),
   peer=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:h.factory}),fixtures=[local,peer];
- const closeStore=async app=>{try{await app?.ctx?.window?.ScannerDeviceStore?.close?.();}catch{}};
- t.after(async()=>{for(const app of fixtures){try{app.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer);clearTimeout(saveTimer);',app.ctx);}catch{}await closeStore(app);}});
+ const closed=new WeakSet(),closeFixture=async app=>{if(!app||closed.has(app))return;closed.add(app);try{app.ctx.window.CloudSync.user=null;app.ctx.suspendCloudSync?.();vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer);clearTimeout(saveTimer);',app.ctx);}catch{}try{await app.ctx.window.ScannerDeviceStore?.close?.();}catch{}};
+ t.after(async()=>{for(const app of fixtures)await closeFixture(app);});
  await local.ctx.cloudPull();await peer.ctx.cloudPull();local.ctx.window.CloudSync.ready=false;peer.ctx.window.CloudSync.ready=false;
  setFakeTime(local.ctx,at+100);hydrateUnchangedEditorDraft(local,targetId);
  local.shim.document.getElementById('etTitle').value='Local Done title';local.shim.document.getElementById('etDue').value='2026-10-30';
@@ -475,7 +491,7 @@ test('RISK scoped Undo recovery: compound Done Undo survives older device and cl
  assert.ok(group.some(event=>event.kind==='current-choice'&&event.target?.property==='due'));
  assert.ok(group.some(event=>event.kind==='completion'),'editor field saves and Done remain one complete action group');
  assert.equal(new Set(group.map(event=>event.id)).size,group.length);
- local.ctx.window.CloudSync.ready=true;await local.ctx.cloudPushNow();await syncSettle(40);
+ local.ctx.window.CloudSync.ready=true;await local.ctx.cloudPushNow();await settleSavedViewPublication(local,h,'compound Done source exact acknowledgement');
  assert.equal(local.ctx.state.syncDirty,false,'the original target action is acknowledged before stale-source delivery');
  const staleActionSource=JSON.parse(JSON.stringify(h.remoteState()));
  peer.ctx.window.CloudSync.ready=true;await peer.ctx.cloudPull();await peer.ctx.onAction('yes',{dataset:{candidate:peerCandidateId,benchmark:referenceId}});
@@ -484,14 +500,15 @@ test('RISK scoped Undo recovery: compound Done Undo survives older device and cl
  assert.ok(peerChoiceValue,JSON.stringify({candidateId:peer.ctx.state.candidateId,chain:peer.ctx.state.chain,mode:peer.ctx.state.mode,done:peer.ctx.state.tasks.find(row=>row.id===targetId)?.done,events:peer.ctx.state.decisionEvents}));
  const peerChoice=JSON.parse(JSON.stringify(peerChoiceValue));
  assert.ok(peerChoice,'the peer makes a real unrelated comparison');
- peer.ctx.window.CloudSync.ready=true;await peer.ctx.cloudPushNow();await syncSettle(45);
- local.ctx.window.CloudSync.ready=true;await local.ctx.cloudPull();await syncSettle(30);
+ peer.ctx.window.CloudSync.ready=true;await peer.ctx.cloudPushNow();await settleSavedViewPublication(peer,h,'peer comparison and field exact acknowledgement');
+ local.ctx.window.CloudSync.ready=true;await local.ctx.cloudPull();await settleSavedViewPublication(local,h,'peer progress adoption exact device state');
  assert.equal(local.ctx.state.tasks.find(row=>row.id===peerFieldId).title,'Peer independent title');
+ await closeFixture(peer);
  const scan=local.shim.document.getElementById('scan'),store=local.ctx.window.ScannerDeviceStore,commitHead=store.commitHead.bind(store),
   paints=[],deviceWrites=[];let phase='idle',markup=scan.innerHTML;
  Object.defineProperty(scan,'innerHTML',{configurable:true,get:()=>markup,set(value){markup=value;if(phase!=='idle'){
   const visible=[...String(value).matchAll(/data-act="reveal" data-id="([^"]+)"/g)].map(match=>match[1]),bench=String(value).match(/data-act="bench-done" data-benchmark="([^"]+)"/);
-  if(bench)visible.push(bench[1]);paints.push({phase,chain:Array.from(local.ctx.state.chain),visible,done:!!local.ctx.state.tasks.find(row=>row.id===targetId)?.done});
+  if(bench)visible.push(bench[1]);paints.push({phase,chain:Array.from(local.ctx.state.chain),visible,done:!!local.ctx.state.tasks.find(row=>row.id===targetId)?.done,markup:String(value)});
  }}});
  store.commitHead=async options=>{const result=await commitHead(options);if(result?.ok&&phase!=='idle'){
   const board=JSON.parse(options.payload);deviceWrites.push({phase,chain:board.chain.slice(),done:!!board.tasks.find(row=>row.id===targetId)?.done,
@@ -521,7 +538,7 @@ test('RISK scoped Undo recovery: compound Done Undo survives older device and cl
  assert.deepEqual(Array.from(local.ctx.state.chain),[referenceId,targetId,peerCandidateId]);
  assert.equal(JSON.stringify(local.ctx.state.decisionEvents.find(event=>event.id===completion.id)),JSON.stringify(completion),'the original completion ID, time and observed context remain immutable');
  assert.equal(JSON.stringify(local.ctx.state.decisionEvents.filter(event=>event.actionId===originalActionId)),JSON.stringify(group),'the original compound action facts remain exact');
- await local.ctx.persist();await local.ctx.cloudPushNow();await syncSettle(45);
+ await local.ctx.persist();await local.ctx.cloudPushNow();await settleSavedViewPublication(local,h,'compound Done Undo exact acknowledgement');
  const acknowledged=h.remoteState(),ackUndo=acknowledged.decisionEvents.find(event=>event.kind==='undo'&&event.targetEventIds.includes(completion.id));
  assert.ok(ackUndo,'the exact cloud board acknowledges the cancellation');assert.equal(local.ctx.state.syncDirty,false);
  assert.equal(acknowledged.tasks.find(row=>row.id===targetId).done,false);
@@ -531,14 +548,31 @@ test('RISK scoped Undo recovery: compound Done Undo survives older device and cl
  for(const row of acknowledged.tasks){assert.equal(row.mu,expected[row.id].mu,`${row.id}: only the unrelated peer comparison remains learned`);assert.equal(row.sigma,expected[row.id].sigma);}
  const history=acknowledged.tasks.flatMap(row=>row.ratingHistory||[]).filter(row=>row.id===peerChoice.id);assert.ok(history.length>=1,'the peer comparison learning record remains attached');
  assert.ok(acknowledged.decisionEvents.some(event=>event.id===peerChoice.id),'Undo keeps the peer comparison fact');
- phase='stale-cloud-after-undo';h.writeBehindBack(staleActionSource);await local.ctx.cloudPull();await local.ctx.cloudPushNow();await syncSettle(50);
+ const replaySeed=JSON.stringify({...staleActionSource,syncRev:local.ctx.state.syncRev,syncAccount:'e@example.com',syncDirty:false});
+ const replayClient=await loadAppAtTime(at+250,{seedStorage:{[SYNC_STORE_KEY]:replaySeed,[LOCAL_HEAD_KEY]:replaySeed},
+  cloudSyncFactory:()=>{const cloud=h.factory();cloud.ready=false;return cloud;}});fixtures.push(replayClient);await replayClient.ctx.__dataReady;
+ hydrateUnchangedEditorDraft(replayClient,referenceId);replayClient.shim.document.getElementById('etTitle').value='Independent stale-device title';
+ replayClient.ctx.onAction('save-edit',{dataset:{id:referenceId}});assert.equal(await replayClient.ctx.persist(),true,'a real older client saves a new independent field before learning about Undo');
+ const staleReplayPayload=replayClient.shim.localStorage.getItem(SYNC_STORE_KEY),staleReplayDevice=JSON.parse(staleReplayPayload),staleReplay=JSON.parse(replayClient.ctx.cloudPayload());
+ assert.ok(staleReplayPayload,'the stale client contributes its actual guarded source bytes');
+ assert.equal(replayClient.shim.localStorage.getItem(LOCAL_HEAD_KEY),staleReplayPayload,'both guarded copies retain the exact stale client source');
+ assert.ok(staleReplayDevice.decisionEvents.some(event=>event.id===completion.id),'the stale device still carries the original Done');
+ assert.equal(staleReplayDevice.tasks.find(row=>row.id===referenceId).title,'Independent stale-device title');
+ const replayTitleFact=staleReplayDevice.decisionEvents.find(event=>event.kind==='current-choice'&&event.target?.type==='task'&&event.target.id===referenceId&&event.target.property==='title');
+ assert.ok(replayTitleFact,'the stale device records the independent title action as a real fact');
+ assert.equal(staleReplay.tasks.find(row=>row.id===referenceId).title,'Independent stale-device title','the exact published stale source contains the guarded edit');
+ await closeFixture(replayClient);
+ phase='stale-cloud-after-undo';h.writeBehindBack(staleReplay);await local.ctx.cloudPull();await local.ctx.cloudPushNow();await settleSavedViewPublication(local,h,'stale completion plus independent title replay');
  assert.ok(paints.some(row=>row.phase===phase),'stale cloud replay produces captured scanner paints');
- assert.ok(paints.filter(row=>row.phase===phase).every(row=>row.chain.includes(targetId)&&row.visible.includes(targetId)&&!row.done),
+ assert.ok(paints.filter(row=>row.phase===phase).every(row=>row.chain.includes(targetId)&&row.visible.includes(targetId)&&!row.done
+  &&row.markup.includes('Independent stale-device title')),
   'every post-Undo stale replay paint retains the restored target membership');
+ assert.ok(deviceWrites.some(row=>row.phase===phase),'the stale source causes a real production device-head write');
  assert.ok(deviceWrites.filter(row=>row.phase===phase).every(row=>row.chain.includes(targetId)&&!row.done),
   'every post-Undo durable device write retains the restored target membership');
  const cloudAfterReplay=h.remoteState();assert.deepEqual(Array.from(cloudAfterReplay.chain),[referenceId,targetId,peerCandidateId]);
  assert.equal(cloudAfterReplay.tasks.find(row=>row.id===targetId).done,false);
+ assert.equal(cloudAfterReplay.tasks.find(row=>row.id===referenceId).title,'Independent stale-device title');
  assert.equal(cloudAfterReplay.tasks.find(row=>row.id===peerFieldId).title,'Peer independent title');
  assert.equal(JSON.stringify(cloudAfterReplay.decisionEvents.find(event=>event.id===completion.id)),JSON.stringify(completion));
  assert.ok(cloudAfterReplay.decisionEvents.some(event=>event.id===peerChoice.id));assert.ok(cloudAfterReplay.decisionEvents.some(event=>event.id===cancellation.id));
@@ -547,10 +581,11 @@ test('RISK scoped Undo recovery: compound Done Undo survives older device and cl
  assert.equal(deviceHead.tasks.find(row=>row.id===targetId).restoredRunOp,undoRestoreRun);
  assert.ok(deviceHead.decisionEvents.some(event=>event.id===cancellation.id));
  assert.notDeepEqual(stateBeforeUndo.tasks.map(row=>row.done),local.ctx.state.tasks.map(row=>row.done),'the actual Undo changed completion state');
- await closeStore(local);
+ await closeFixture(local);
  const cold=await loadAppAtTime(at+400,{indexedDBProvider:indexedDB,deviceDbName,cloudSyncFactory:()=>{const cloud=h.factory();cloud.ready=false;return cloud;}});fixtures.push(cold);
  await cold.ctx.__dataReady;assert.deepEqual(Array.from(cold.ctx.state.chain),[referenceId,targetId,peerCandidateId]);
  assert.equal(cold.ctx.state.tasks.find(row=>row.id===targetId).done,false);assert.equal(cold.ctx.state.tasks.find(row=>row.id===targetId).restoredRunOp,undoRestoreRun);
+ assert.equal(cold.ctx.state.tasks.find(row=>row.id===referenceId).title,'Independent stale-device title');
  assert.equal(cold.ctx.state.tasks.find(row=>row.id===peerFieldId).title,'Peer independent title');assert.equal(cold.ctx.state.syncDirty,false);
  assert.ok(cold.ctx.state.decisionEvents.some(event=>event.id===cancellation.id));
  cold.ctx.window.CloudSync.ready=true;await cold.ctx.cloudPull();assert.deepEqual(Array.from(cold.ctx.state.chain),[referenceId,targetId,peerCandidateId]);
@@ -577,8 +612,8 @@ test('RISK scoped Undo recovery: a true Undo cancels only its compound Dot while
  const h=makeSyncHarness({remote,rev:4,delayMs:1}),seedStorage={[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)},
   local=await loadAppAtTime(at,{seedStorage,indexedDBProvider:indexedDB,deviceDbName,cloudSyncFactory:h.factory}),
   peer=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:h.factory}),fixtures=[local,peer];
- const closeStore=async app=>{try{await app?.ctx?.window?.ScannerDeviceStore?.close?.();}catch{}};
- t.after(async()=>{for(const app of fixtures){try{app.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer);clearTimeout(saveTimer);',app.ctx);}catch{}await closeStore(app);}});
+ const closed=new WeakSet(),closeFixture=async app=>{if(!app||closed.has(app))return;closed.add(app);try{app.ctx.window.CloudSync.user=null;app.ctx.suspendCloudSync?.();vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer);clearTimeout(saveTimer);',app.ctx);}catch{}try{await app.ctx.window.ScannerDeviceStore?.close?.();}catch{}};
+ t.after(async()=>{for(const app of fixtures)await closeFixture(app);});
  await local.ctx.cloudPull();await peer.ctx.cloudPull();local.ctx.window.CloudSync.ready=false;peer.ctx.window.CloudSync.ready=false;
  setFakeTime(local.ctx,at+100);hydrateUnchangedEditorDraft(local,targetId);
  local.shim.document.getElementById('etTitle').value='Local Dot title';local.shim.document.getElementById('etDue').value='2026-10-30';
@@ -640,7 +675,7 @@ test('RISK scoped Undo recovery: a true Undo cancels only its compound Dot while
  assert.equal(cloud.tasks.find(row=>row.id===peerFieldId).title,'Peer kept title');
  for(const row of cloud.tasks){assert.equal(row.mu,expectedAfterUndo[row.id].mu);assert.equal(row.sigma,expectedAfterUndo[row.id].sigma);}
  const device=JSON.parse((await store.readHead()).payload);assert.deepEqual(device.chain,[referenceId]);assert.ok(device.decisionEvents.some(event=>event.id===cancellation.id));
- await closeStore(local);
+ await closeFixture(local);
  const cold=await loadAppAtTime(at+2*3600000,{indexedDBProvider:indexedDB,deviceDbName,cloudSyncFactory:()=>{const cloudSync=h.factory();cloudSync.ready=false;return cloudSync;}});fixtures.push(cold);
  await cold.ctx.__dataReady;assert.deepEqual(Array.from(cold.ctx.state.chain),[referenceId]);assert.equal(cold.ctx.state.tasks.find(row=>row.id===targetId).lastDoneAt,at+300);
  assert.ok(cold.ctx.state.decisionEvents.some(event=>event.id===completion.id)&&cold.ctx.state.decisionEvents.some(event=>event.id===cancellation.id));
@@ -659,8 +694,8 @@ test('RISK scoped Undo recovery: Undo of an informed evergreen return survives o
  const h=makeSyncHarness({remote,rev:4,delayMs:1}),seedStorage={[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)},
   local=await loadAppAtTime(at,{seedStorage,indexedDBProvider:indexedDB,deviceDbName,cloudSyncFactory:h.factory}),
   peer=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:h.factory}),fixtures=[local,peer];
- const closeStore=async app=>{try{await app?.ctx?.window?.ScannerDeviceStore?.close?.();}catch{}};
- t.after(async()=>{for(const app of fixtures){try{app.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer);clearTimeout(saveTimer);',app.ctx);}catch{}await closeStore(app);}});
+ const closed=new WeakSet(),closeFixture=async app=>{if(!app||closed.has(app))return;closed.add(app);try{app.ctx.window.CloudSync.user=null;app.ctx.suspendCloudSync?.();vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer);clearTimeout(saveTimer);',app.ctx);}catch{}try{await app.ctx.window.ScannerDeviceStore?.close?.();}catch{}};
+ t.after(async()=>{for(const app of fixtures)await closeFixture(app);});
  await local.ctx.cloudPull();await peer.ctx.cloudPull();local.ctx.window.CloudSync.ready=false;peer.ctx.window.CloudSync.ready=false;
  setFakeTime(local.ctx,at+100);hydrateUnchangedEditorDraft(local,targetId);local.ctx.onAction('done-task',{dataset:{id:targetId}});await local.ctx.persist();
  const firstCompletion=JSON.parse(JSON.stringify(local.ctx.state.decisionEvents.find(event=>event.kind==='completion'&&event.taskId===targetId)));
@@ -738,7 +773,7 @@ test('RISK scoped Undo recovery: Undo of an informed evergreen return survives o
  assert.equal(cloud.workLog.filter(row=>row.taskId===targetId&&row.kind==='evergreen-done').length,1);
  for(const row of cloud.tasks){assert.equal(row.mu,expectedAfterUndo[row.id].mu);assert.equal(row.sigma,expectedAfterUndo[row.id].sigma);}
  const device=JSON.parse((await store.readHead()).payload);assert.deepEqual(device.chain,[referenceId,peerCandidateId]);assert.ok(device.decisionEvents.some(event=>event.id===cancellation.id));
- await closeStore(local);
+ await closeFixture(local);
  const cold=await loadAppAtTime(at+2*3600000+40,{indexedDBProvider:indexedDB,deviceDbName,cloudSyncFactory:()=>{const cloudSync=h.factory();cloudSync.ready=false;return cloudSync;}});fixtures.push(cold);
  await cold.ctx.__dataReady;assert.deepEqual(Array.from(cold.ctx.state.chain),[referenceId,peerCandidateId]);assert.equal(cold.ctx.state.tasks.find(row=>row.id===targetId).restoredRunOp,priorRun);
  assert.equal(JSON.stringify(cold.ctx.state.decisionEvents.find(event=>event.id===firstCompletion.id)),completionBytes);
@@ -24004,8 +24039,8 @@ test('RISK completion lifecycle facts: editor candidate and benchmark Done prese
 });
 
 test('RISK completion lifecycle recovery: saved device source cannot restore a 2→1 chain before scan refresh',async t=>{
- const fixtures=[];
- t.after(async()=>{for(const app of fixtures){try{vm.runInContext('clearTimeout(saveTimer);saveTimer=null;clearTimeout(cloudTimer);cloudTimer=null;clearCloudRetry();',app.ctx);}catch{}try{await app.ctx.window.ScannerDeviceStore?.close?.();}catch{}}});
+ const fixtures=[],closed=new WeakSet(),closeFixture=async app=>{if(!app||closed.has(app))return;closed.add(app);try{app.ctx.window.CloudSync&&(app.ctx.window.CloudSync.user=null);app.ctx.suspendCloudSync?.();vm.runInContext('clearTimeout(saveTimer);saveTimer=null;clearTimeout(cloudTimer);cloudTimer=null;clearCloudRetry();',app.ctx);}catch{}try{await app.ctx.window.ScannerDeviceStore?.close?.();}catch{}};
+ t.after(async()=>{for(const app of fixtures)await closeFixture(app);});
  const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),at=Date.parse('2026-10-17T15:00:00Z'),ids=['device-recovery-done','device-recovery-next'];
  const initial=syncState({tasks:ids.map((id,index)=>({...syncTask(id,`Saved task ${index}`),evergreen:true,evergreenHours:18,evergreenResetAtDay:false})),
   chain:[ids[0]],candidateId:ids[1],passId:'device-recovery-pass',passStartedAt:at-60000,mode:'scan',scanMode:'descending',syncRev:4,syncAccount:'e@example.com',syncDirty:false,
@@ -24014,11 +24049,18 @@ test('RISK completion lifecycle recovery: saved device source cannot restore a 2
  const h=makeSyncHarness({remote,rev:4,delayMs:1}),seedStorage={[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)};
  const earlier=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:h.factory});fixtures.push(earlier);await earlier.ctx.cloudPull();earlier.ctx.window.CloudSync.ready=false;
  setFakeTime(earlier.ctx,at+1);hydrateUnchangedEditorDraft(earlier,ids[1]);earlier.ctx.onAction('dot-task',{dataset:{id:ids[1]}});
- await earlier.ctx.persist();earlier.ctx.window.CloudSync.ready=true;await earlier.ctx.cloudPushNow();await syncSettle(35);
+ assert.equal(await earlier.ctx.persist(),true,'the earlier Dot reaches guarded device storage before cloud publication');earlier.ctx.window.CloudSync.ready=true;await earlier.ctx.cloudPushNow();await settleSavedViewPublication(earlier,h,'earlier two-task Dot publication');
  const common=JSON.stringify({...h.remoteState(),syncRev:h.doc.rev,syncAccount:'e@example.com',syncDirty:false});
  earlier.ctx.window.CloudSync.ready=false;earlier.ctx.window.CloudSync.user=null;earlier.ctx.suspendCloudSync();
  setFakeTime(earlier.ctx,at+50);hydrateUnchangedEditorDraft(earlier,ids[1]);earlier.shim.document.getElementById('etTitle').value='Earlier independent title';
- earlier.ctx.onAction('save-edit',{dataset:{id:ids[1]}});await earlier.ctx.persist();const olderBrowserSource=JSON.stringify(earlier.ctx.state);
+ earlier.ctx.onAction('save-edit',{dataset:{id:ids[1]}});assert.equal(await earlier.ctx.persist(),true,'the independent title edit reaches the earlier device source');
+ const olderBrowserSource=earlier.shim.localStorage.getItem(SYNC_STORE_KEY);assert.ok(olderBrowserSource,'the source bytes come from the guarded browser copy');
+ assert.equal(earlier.shim.localStorage.getItem(LOCAL_HEAD_KEY),olderBrowserSource,'both guarded device copies acknowledge the same earlier source');
+ const earlierSource=JSON.parse(olderBrowserSource);
+ assert.equal(earlierSource.tasks.find(row=>row.id===ids[1]).title,'Earlier independent title','the guarded bytes contain the exact independent edit');
+ assert.ok(earlierSource.decisionEvents.some(event=>event.kind==='comparison'&&event.action==='dot'&&event.taskId===ids[1]),'the saved source contains the actual Dot fact');
+ assert.ok(earlierSource.decisionEvents.some(event=>event.kind==='current-choice'&&event.target?.type==='task'&&event.target.id===ids[1]&&event.target.property==='title'&&event.value==='Earlier independent title'),'the saved source contains its causal title fact');
+ await closeFixture(earlier);assert.equal(earlier.shim.localStorage.getItem(SYNC_STORE_KEY),olderBrowserSource,'the closed earlier session leaves its exact source unchanged');
  const app=await loadAppAtTime(at+75,{seedStorage:{[SYNC_STORE_KEY]:common,[LOCAL_HEAD_KEY]:common},indexedDBProvider:indexedDB,deviceDbName:`local-recovery-min-${Date.now()}-${Math.random()}`});fixtures.push(app);
  const {ctx,shim}=app,paints=[],durable=[],scan=shim.document.getElementById('scan'),store=ctx.window.ScannerDeviceStore,commit=store.commitHead.bind(store);
  for(const [index,id] of ids.slice(0,1).entries()){
@@ -24757,12 +24799,8 @@ test('RISK completion boundaries: a live editor and pressed scanner control defe
   scan=shim.document.getElementById('scan'),paints=[],durable=[],commit=store.commitHead.bind(store);
  let painted=scan.innerHTML,phase='completion-adoption',releaseRead,readStartedResolve;
  const readStarted=new Promise(resolve=>{readStartedResolve=resolve;}),readGate=new Promise(resolve=>{releaseRead=resolve;});
- t.after(async()=>{
-  for(const fixture of [app]){
-   try{fixture.shim.window.CloudSync&&(fixture.shim.window.CloudSync.user=null);vm.runInContext('clearTimeout(saveTimer);saveTimer=null;clearTimeout(cloudTimer);cloudTimer=null;clearCloudRetry();',fixture.ctx);}catch{}
-   try{await fixture.shim.window.ScannerDeviceStore?.close?.();}catch{}
-  }
- });
+ const closed=new WeakSet(),closeFixture=async fixture=>{if(!fixture||closed.has(fixture))return;closed.add(fixture);try{fixture.shim.window.CloudSync&&(fixture.shim.window.CloudSync.user=null);fixture.ctx.suspendCloudSync?.();vm.runInContext('clearTimeout(saveTimer);saveTimer=null;clearTimeout(cloudTimer);cloudTimer=null;clearCloudRetry();',fixture.ctx);}catch{}try{await fixture.shim.window.ScannerDeviceStore?.close?.();}catch{}};
+ t.after(()=>closeFixture(app));
  await ctx.__dataReady;await ctx.cloudPull();CS.ready=false;
  hydrateUnchangedEditorDraft(app,doneId);ctx.onAction('done-task',{dataset:{id:doneId}});
  assert.equal(await ctx.persist(),true,'the actual editor Done is durably saved before stale delivery');
@@ -24841,7 +24879,7 @@ test('RISK completion boundaries: a live editor and pressed scanner control defe
   &&row.events.filter(event=>event.kind==='completion'&&event.taskId===doneId).length===1),
   'durable writes after the held control retain one exact completion and no completed membership');
  const savedView=storage.getItem('fvp:chain-scanner:saved-view:v1');assert.ok(savedView,'the device view has its own saved record');
- await store.close();
+ await closeFixture(app);
  const reopened=await loadAppAtTime(at+100,{...options,cloudSyncFactory:h.factory});
  assert.equal(await reopened.ctx.__dataReady,undefined);
  await reopened.ctx.cloudPull();await settleSavedViewPublication(reopened,h,'cold reopen after deferred completion adoption');
@@ -24855,12 +24893,12 @@ test('RISK completion boundaries: a live editor and pressed scanner control defe
  assert.equal(reopened.shim.document.getElementById('listSearch').value,'Independent peer');
  assert.equal(reopened.shim.document.getElementById('listBody').scrollTop,420);
  assert.ok(savedView.includes('Independent peer'),'the exact device-local filter survives the durable board reopen');
- t.after(async()=>{try{reopened.shim.window.CloudSync.user=null;vm.runInContext('clearTimeout(saveTimer);saveTimer=null;clearTimeout(cloudTimer);cloudTimer=null;clearCloudRetry();',reopened.ctx);await reopened.shim.window.ScannerDeviceStore.close();}catch{}});
+ t.after(()=>closeFixture(reopened));
 });
 
 test('RISK completion lifecycle recovery: expired rest cannot restore 2→1 or 13→4 saved chains',async t=>{
  const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),at=Date.parse('2026-10-17T15:00:00Z');
- const fixtures=[],persistNow=app=>app.ctx.persist(),closeFixture=async app=>{try{app.ctx.window.CloudSync&&(app.ctx.window.CloudSync.user=null);vm.runInContext('clearTimeout(saveTimer);saveTimer=null;clearTimeout(cloudTimer);cloudTimer=null;clearCloudRetry();',app.ctx);}catch{}try{await app.ctx.window.ScannerDeviceStore?.close?.();}catch{}};
+ const fixtures=[],closed=new WeakSet(),persistNow=app=>app.ctx.persist(),closeFixture=async app=>{if(!app||closed.has(app))return;closed.add(app);try{app.ctx.window.CloudSync&&(app.ctx.window.CloudSync.user=null);app.ctx.suspendCloudSync?.();vm.runInContext('clearTimeout(saveTimer);saveTimer=null;clearTimeout(cloudTimer);cloudTimer=null;clearCloudRetry();',app.ctx);}catch{}try{await app.ctx.window.ScannerDeviceStore?.close?.();}catch{}};
  t.after(async()=>{for(const app of fixtures)await closeFixture(app);});
  for(const cohort of [{count:2,completed:1,backend:'fallback'},{count:13,completed:9,backend:'indexedDB'}]){
   const {count,completed,backend}=cohort,ids=Array.from({length:count},(_,index)=>`completion-recovery-${count}-${index}`),
@@ -24959,8 +24997,8 @@ test('RISK completion lifecycle recovery: expired rest cannot restore 2→1 or 1
   assert.deepEqual([...ctx.state.chain],expectedAfterDone,'the final chain contains every legitimate current member in its original order');
   const saved=backend==='indexedDB'?(await ctx.window.ScannerDeviceStore.readHead()).payload:app.shim.localStorage.getItem(SYNC_STORE_KEY);
   assert.deepEqual(JSON.parse(saved).chain,expectedAfterDone,'the repaired board is durable before cold reopen');
-  if(backend==='indexedDB')await ctx.window.ScannerDeviceStore.close();
-  else app.shim.localStorage.setItem(LOCAL_HEAD_KEY,saved);
+  if(backend!=='indexedDB')app.shim.localStorage.setItem(LOCAL_HEAD_KEY,saved);
+  await closeFixture(app); // The acknowledged recovery session is closed before cold reopen.
   const reopenOptions=backend==='indexedDB'?{indexedDBProvider:indexedDB,deviceDbName:name}:{seedStorage:{[SYNC_STORE_KEY]:saved,[LOCAL_HEAD_KEY]:saved}};
   const reopened=await loadAppAtTime(at+2*3600000+1,reopenOptions);fixtures.push(reopened);
   assert.deepEqual([...reopened.ctx.state.chain],expectedAfterDone,`${backend}: offline cold reopen retains the repaired chain after rest expiry`);
@@ -25134,7 +25172,7 @@ test('RISK evergreen flag changes: completion cancellation survives both merge d
   for(const gesture of ['return-disable','done-enable'])for(const backend of ['browser','indexedDB']){
     const h=makeSyncHarness({delayMs:1});
     const options=backend==='indexedDB'?{indexedDBProvider:indexedDB,deviceDbName:'evergreen-flags-'+Date.now()+'-'+Math.random()}:{};
-    const {ctx,shim}=await loadApp({...options,cloudSyncFactory:h.factory});await syncSettle(30);
+    const app=await loadApp({...options,cloudSyncFactory:h.factory}),{ctx,shim}=app;await syncSettle(30);
     const t=ctx.addTask('Duolingo');t.evergreen=gesture==='return-disable';t.evergreenResetAtDay=false;
     await ctx.persist();ctx.cloudPushNow();await syncSettle(30);
     if(gesture==='return-disable')ctx.doneTask(t.id);
@@ -25169,7 +25207,7 @@ test('RISK evergreen flag changes: completion cancellation survives both merge d
     }
     await ctx.persist();
     assert.equal(ctx.state.tasks.find(x=>x.id===t.id).lastDoneAt,null,'a stale saved winner cannot reinstate the cooldown');
-    h.writeBehindBack(completed);await ctx.cloudPull();ctx.cloudPushNow();await syncSettle(40);
+    h.writeBehindBack(completed);await ctx.cloudPull();ctx.cloudPushNow();await settleSavedViewPublication(app,h,gesture+'/'+backend+': exact acknowledged completion cancellation replay');
     assert.equal(ctx.state.tasks.find(x=>x.id===t.id).lastDoneAt,null,'cloud adoption respects cancellation across a flag change');
     assert.equal(h.remoteState().tasks.find(x=>x.id===t.id).lastDoneAt,null,'the cloud acknowledges the retained cancellation');
   }

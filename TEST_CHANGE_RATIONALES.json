@@ -9894,5 +9894,67 @@
     "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/completion-precedence-168/173/runs",
     "releaseStatus": "Focused issue173 worker only. No push, CI, full suite, emulator/browser allocation, independent approval, fingerprints or release. Parent /root owns final175 packaging, aggregate rationale, mixed-client/rules execution and release. Broader focused inherited timing failures remain disclosed in 173/173implementation.md.",
     "greenEvidence": "/Users/emeraldpham/.codex/task-artifacts/completion-precedence-168/173/runs/2026-10-17T21-49-20-566Z-061257db-ae26-4142-8320-025f92a58e35.json (final focused issue173 and scoped Undo/comparison/inheritance/lifecycle cohort: 51 top-level consumers, 88 passed, 0 failed, 0 skipped)."
+  },
+  {
+    "testChangesSha256": "ab4a71512d3898f03e324e08fad43fa2e80102532cfc3ced000b575bb65edb0a",
+    "reason": "Bind the integrated #169–#174 completion, deletion, Start, Undo and sync consumers to their original behavioral or rendered-copy evidence. Include #173 legacy-completion recovery, retain the #169/#172/#174 cold-session boundaries, and preserve independent task fields, preferences, ratings, learning, History and device/cloud publication. #175 found no runtime defect in the inherited seven-test focus or selected 199-case cohort; this record reflects the integrated consumer work, not a new failure.",
+    "previousBehavior": "On the released baseline, a real saved older device source could restore completed membership, an observed Start root could fail to merge an independent peer edit, and a stale cloud Dot could revive a same-ID deleted task after log pruning. The #173 consumers also reproduced eventless legacy completion recovery and inherited cancellation failures. The #172 and #174 runtime consumers passed on their integrated runtimes; their genuine REDs were missing rendered Undo and Retry explanations.",
+    "intendedBehavior": "Real completion facts and explicit deletion authority survive device/cloud recovery, stale sources, expired rests, scoped Undo and cold reopen. A permitted Dot, Yes or observed Start returns an eligible task without inventing prior completion or learning. Delayed adoption, local-save failure, uncertain acknowledgement, account changes, live editing and saved views retain their exact existing safety behavior. Player help explains the outcomes in existing FAQ and Changelog surfaces.",
+    "replacementTests": [
+      "RISK completion lifecycle recovery: saved device source cannot restore a 2→1 chain before scan refresh",
+      "RISK completion lifecycle Start: an observed new-pass root survives peer merge and IndexedDB reopen",
+      "RISK deletion authority: real Delete defeats a stale saved and cloud Dot after log pruning while same-title Add stays usable",
+      "RISK scoped Undo recovery: compound Done Undo survives older device and cloud replay after peer progress",
+      "RISK completion boundaries: delayed stale cloud adoption retains Done and concurrent task edit before exact retry acknowledgement",
+      "RISK legacy completion recovery: immutable released Done stays offchain through expired device recovery and every save",
+      "RISK legacy completion FAQ: imported completion boundaries explain exact recovery and permitted return without invented history"
+    ],
+    "preservedCoverage": [
+      "All existing completion, deletion, rating, comparison-learning, History, Undo, member-order and independent-field assertions remain in the integrated consumer tests.",
+      "The full #174 delayed/CAS retry, save refusal with a pending editor change, failed read/uncertain acknowledgement, account race, editor/control deferral and device-view groups remain intact.",
+      "Fixtures use isolated production device stores and deterministic synthetic cloud state; cold-reopen producers are closed only after exact saved bytes and acknowledged publications are verified.",
+      "No assertions were weakened, no active recovery autosave was disabled, and no new public test seam or runtime abstraction was introduced."
+    ],
+    "redEvidence": {
+      "command": "See immutable #169/#170/#171 behavior records 169/runs/2026-10-17T20-18-25-672Z-a581b266-7393-4a74-9d9f-8395b6ad76d8.json, 170/runs/2026-10-17T20-40-19-907Z-69da082e-0974-452c-8747-4f85be42452e.json and 171/runs/2026-10-17T20-43-22-877Z-7a5969e9-e483-435f-a553-5a4fadd1bbba.json; #172 FAQ 172/2026-10-17T21-29-30-898Z-fd45dbfe-37de-4c0d-acf8-0798e4fdb744.json; #174 FAQ 174/runs/2026-10-17T21-20-02-765Z-5fdaf443-5b90-4ff8-99ad-2bca3550070a.json; and all original #173 records listed in 173/173implementation.md.",
+      "failure": "The #169, #170 and #171 actual application consumers failed on the released baseline at the saved-chain, independent-edit and deletion-membership boundaries respectively. #173 recorded genuine legacy recovery and inherited cancellation behavior failures before its narrow fix. #172 and #174 had only rendered FAQ REDs; their five #174 behavior groups passed without runtime edits. The withdrawn #172 paint failure was a phase-label fixture error, not a product RED. The two broader #173 inherited cohort failures are retained as fixture/precondition corrections, not runtime REDs: the scoped-Undo replay was a semantic no-op with no expected replacement, and the evergreen cancellation probe needed exact durable/publication acknowledgement rather than a 40 ms wait."
+    },
+    "coverageChronology": {
+      "currentCandidate": "This record matches the committed #169–#174 aggregate at integration de83e7d05246946f056477aa59fe0f7488d4f08f against refreshed origin/main bd84e5c0ccc7c6ebe065f42f18df34d89eeab14e.",
+      "fixtureCorrections": "The integrated #169 minimal source now proves a successful persist and exact guarded bytes before its preparer closes. #169/#172/#174 cold reopen fixtures dispose only finished sessions after final device/cloud assertions; active autosaves stay enabled.",
+      "withdrawnEvidence": "Original failed records are preserved. The false #172 runtime failure and fixture/setup failures cataloged in 173/173implementation.md are not described as product defects."
+    }
+  },
+  {
+    "testChangesSha256": "92d824ae748006d7d3b6c9f2a34aeaa8aab1e3c252815d9f0597f24f05c1b5bd",
+    "reason": "Carry the integrated completion and recovery contracts through #175’s closed-session fixture cleanup, real stale-client recovery paint, exact cloud acknowledgement, and player-facing older-board FAQ/Changelog. The selected inherited behavior cohort and #174 runtime probes pass without a speculative runtime change.",
+    "previousBehavior": "The actual mounted older-completion FAQ used recovery terminology and missed required player outcomes; the current Help Changelog did not describe the older-board recovery result, and Quick start exceeded its existing per-answer limit. Two broad #173 test failures also had invalid preconditions: one expected a render from a semantic no-op, and one treated a 40 ms delay as acknowledgement.",
+    "intendedBehavior": "The mounted FAQ explains that older boards keep completed tasks out of the dotted chain after rest, preserve saved Ratings and History, allow only an observed eligible return, keep exact local backups, wait on an unsaved safety copy, and protect unreadable changes. Changelog states the player-visible result in one short bullet. Closed-session recovery tests start only after their producer is fully saved and disposed; stale-client paint uses a real independent title edit, and cloud completion waits for exact acknowledgement.",
+    "replacementTests": [
+      "RISK completion lifecycle recovery: saved device source cannot restore a 2→1 chain before scan refresh",
+      "RISK completion lifecycle Start: an observed new-pass root survives peer merge and IndexedDB reopen",
+      "RISK deletion authority: real Delete defeats a stale saved and cloud Dot after log pruning while same-title Add stays usable",
+      "RISK scoped Undo recovery: compound Done Undo survives older device and cloud replay after peer progress",
+      "RISK completion boundaries: delayed stale cloud adoption retains Done and concurrent task edit before exact retry acknowledgement",
+      "RISK legacy completion recovery: immutable released Done stays offchain through expired device recovery and every save",
+      "RISK legacy completion FAQ: older saved boards keep completed tasks out and explain safe return",
+      "RISK completion lifecycle Changelog: the mounted release notes describe older-board recovery in player language"
+    ],
+    "preservedCoverage": [
+      "All prior source, device-write, cloud payload, lifecycle fact, rating, learning, History, Undo, account, and chain-member assertions remain. The stale-source paint assertion is now non-vacuous because an actual independent title edit requires adoption.",
+      "The exact device and cloud publication checks remain; #175 replaces only fixed-delay readiness assumptions with the existing durable saved-view acknowledgement helper.",
+      "The selected inherited cohort remains 118 top-level tests and 199 tests including subtests, with 199 passed and zero failed or skipped; the copy expected-RED tests were deliberately excluded from that run and are verified separately.",
+      "The actual mounted FAQ and Changelog consumers, existing Quick start length check, Retry/Undo copy checks and unrelated help structure remain covered."
+    ],
+    "redEvidence": {
+      "command": "Original evidence: #175 Quick start RED 175/runs/2026-10-17T21-38-28-536Z-57bbb9a9-017a-4c6c-b91f-5b56e5786b35.json; mounted FAQ/Changelog RED 175/runs/2026-10-17T21-58-41-707Z-f0bbd902-83e7-407e-8ac9-a01f458d9895.json. Final #175 GREENs: 175/runs/2026-10-17T22-03-51-413Z-372a1956-0d34-47b0-a8fb-38d94e1fb273.json, 175/runs/2026-10-17T22-04-04-438Z-ce01b178-c1cf-4aac-9af9-90311b15b3cf.json and 175/runs/2026-10-17T22-06-48-467Z-2f1dde18-7e14-429b-b627-752e4d74f617.json.",
+      "failure": "The existing Quick start consumer failed on the 131-word Undo answer. New actual rendered Help assertions then failed on the old recovery FAQ and missing current Changelog item before index.html changed. The early post-copy focused attempt at 22:06:31 failed two new exact-phrase expectations because the first prose edit did not match the approved required wording; that was a GREEN-stage copy/test alignment failure, not a preimplementation RED, and the copy was corrected before the six-test final copy GREEN. The inherited 199-test run excludes copy expected-RED tests and is not claimed as a full suite.",
+      "scope": "No #175 runtime RED or runtime repair is claimed. The inherited scoped-Undo no-op and fixed-wait failures remain immutable, are classified as invalid render/ack preconditions, and pass with actual stale-device title adoption and exact coherent publication acknowledgement."
+    },
+    "coverageChronology": {
+      "fixtureLifecycle": "The producer must prove exact guarded device bytes and complete acknowledgement before close; only a finished producer’s own app/cloud timers and device store are disposed before cold reopen. Active recovery autosave remains enabled.",
+      "renderedCopy": "The mounted FAQ and Changelog RED was recorded before index.html edits. The concise changelog outcome and FAQ wording preserve unrelated content and stay within the existing 130-word answer cap.",
+      "inheritedCohort": "The 199 passing cases are a selected inherited cohort, not a full-suite result. All original failed evidence remains unchanged; fixture corrections do not get relabeled as product REDs."
+    }
   }
 ]
