@@ -7356,5 +7356,39 @@
       "preimplementation": "The actual peer-revision No-loss RED and absent action-evidence RED were captured before app runtime changes.",
       "postimplementation": "Focused test passes with both storage backends, exact action metadata, base persistence/cloud exclusion, and day-boundary projection expiry; the affected sync/storage cohort passes 11/11."
     }
+  },
+  {
+    "testChangesSha256": "6bd1d9a3137acc5841351266184eac9424b9f5c5f214d8e261a0c658cdac9be1",
+    "reason": "Implement approved GitHub #146 recovery and conditional mixed-client rollout through actual app, device-store, production backend and real rules seams. Preserve all prior assertions; extend the harness to run the immutable historical app source.",
+    "previousBehavior": "Decision-bearing generations used an ordinary schema-2 manifest so a fixed historical writer could omit acknowledged decision authority. Unknown cloud decision formats, malformed known events, foreign-owned rows and conflicting same-ID bytes could replace or publish local authority. An unknown sole baseline had no capability fence.",
+    "intendedBehavior": "First decision or baseline publication atomically activates decisionCapability:1; later writes retain it and historical omitting manifests are denied through existing error/update holds. Unknown, unsupported, foreign or conflicting evidence remains exact on each durable branch and cannot authorize adoption or publication. Failed saves and lost acknowledgements retain one original decision and learned effect.",
+    "replacementTests": [
+      "RISK decision capability adapter: first decision activates a sticky fence while plain legacy boards remain compatible",
+      "RISK decision capability baseline: sole unknown learned authority activates the fence without rewriting bytes",
+      "RISK decision recovery: unknown cloud evidence holds adoption and publication without replacing the durable local decision",
+      "RISK decision recovery baseline: unsupported sole learning baseline cannot replace a durable local action",
+      "RISK decision recovery identity: conflicting bytes for one acknowledged action hold both exact branches",
+      "RISK decision recovery shape: malformed known action evidence stays durable and cannot publish",
+      "RISK decision recovery ownership: foreign action evidence cannot be published under the current account",
+      "RISK decision recovery durability: failed local save holds publication and retry retains one original No",
+      "RISK decision recovery uncertain acknowledgement: committed No is read back after cold reopen without another comparison",
+      "RISK decision recovery account transition: pending No acknowledgement cannot enter another account and the exact prior board stays recoverable",
+      "Firestore rules: real pinned writer reads decision authority then holds its ordinary app edit without erasing it",
+      "Firestore rules: first decision against released rules stays exact and pending until rules-first rollout then retry",
+      "Firestore rules: decision capability activates atomically and denies an omitting historical manifest"
+    ],
+    "preservedCoverage": [
+      "Every existing assertion remains except the exact publication-signature matcher gains its new capability parameter while retaining all identity/cancellation guards. No previous tests are removed, skipped or weakened.",
+      "Read-before-write, positive empty proof, owner isolation, immutable chunk/seal/CAS safety, device mandatory recovery, pinned historical baseline and both ordinary compatibility directions remain protected.",
+      "Existing focused first-sign-in, failed-write hold/retry, never-settling operation, editor/gesture/wake, account switch, local fallback and IndexedDB recovery assertions passed in the 64-test preservation cohort.",
+      "A duplicate exact-write count fixture initially advanced presentation time on reopen; freezing only fixture time establishes unchanged board readback without claiming that necessary maintenance publications are forbidden."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK decision capability adapter|RISK decision capability baseline:|RISK decision recovery' tests.js; allocated Firebase emulators:exec with node --test --test-name-pattern='Firestore rules: decision capability' tests.js; exact per-slice commands and raw outputs in /Users/emeraldpham/.codex/task-artifacts/decision-sync-141/146/CHRONOLOGY.md",
+      "failure": "Actual contemporaneous RED: adapter first-decision and sole-baseline capability undefined !== 1 (01,10); real strict rules deny initial flagged manifest (04); unknown cloud stream replaces local events (03); foreign account action reaches current account cloud (12); unsupported baseline changes durable board (17,24); same identity gets a different original time (19); malformed known event with at:-1 reaches cloud (22). Focused GREEN follows each runtime repair. Mixed-client tests were added after fence implementation and initially had overly strict CAS-loser/debounce fixture assumptions; corrected fixtures pass and are preservation coverage, not preimplementation RED. Existing durability, uncertain ACK and account-transition consumers passed after a fixture-only frozen-time correction and do not claim new runtime repairs."
+    },
+    "updatedTests": [
+      "CLOUD ACCOUNT: a transaction binds its document before auth can switch"
+    ]
   }
 ]

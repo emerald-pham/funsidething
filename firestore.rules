@@ -22,7 +22,8 @@ service cloud.firestore {
         return request.resource.data.keys().hasAll(['schemaVersion', 'rev', 'activeGeneration',
             'previousGeneration', 'updatedAt', 'serverUpdatedAt'])
           && request.resource.data.keys().hasOnly(['schemaVersion', 'rev', 'activeGeneration',
-            'previousGeneration', 'updatedAt', 'serverUpdatedAt'])
+            'previousGeneration', 'updatedAt', 'serverUpdatedAt', 'decisionCapability'])
+          && request.resource.data.get('decisionCapability', 1) == 1
           && request.resource.data.schemaVersion == 2
           && request.resource.data.rev is int
           && request.resource.data.rev > 0
@@ -41,6 +42,7 @@ service cloud.firestore {
       }
       function v2Update() {
         return v2Manifest() && request.resource.data.rev == resource.data.get('rev', 0) + 1
+          && (resource.data.get('decisionCapability', 0) != 1 || request.resource.data.get('decisionCapability', 0) == 1)
           && targetIsSealed()
           && (resource.data.get('schemaVersion', 1) == 2
             ? request.resource.data.previousGeneration == resource.data.activeGeneration
