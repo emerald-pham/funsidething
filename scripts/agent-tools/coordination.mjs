@@ -317,7 +317,7 @@ function pruneDeadReservations(state) {
 }
 
 function pruneOrphanedConfigurations(state) {
-  const active = new Set((state.entries ?? []).filter((entry) => ownsCoordination(entry)).map((entry) => entry.worktree));
+  const active = new Set((state.entries ?? []).filter((entry) => entry.status === 'active').map((entry) => entry.worktree));
   const reserved = new Set((state.reservations ?? []).map((reservation) => reservation.worktree));
   return {
     ...state,
@@ -608,6 +608,7 @@ async function install(options) {
     if (!metadata.isFile() || metadata.isSymbolicLink()) throw new Error(`Refusing to replace non-regular install target ${target}.`);
     const existing = await readFile(target);
     if (!existing.equals(sourceContents)) throw new Error(`Refusing to overwrite a different installed file at ${target}.`);
+    if ((metadata.mode & 0o111) === 0) throw new Error(`Existing install target ${target} is not executable; refusing to change its permissions.`);
     console.log(JSON.stringify({ installed: true, unchanged: true, path: target }));
     return;
   } catch (error) {

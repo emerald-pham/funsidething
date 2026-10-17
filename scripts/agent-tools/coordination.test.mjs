@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { chmodSync, copyFileSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -691,6 +691,25 @@ test('explicit install survives checkout removal and exports the canonical ledge
   }
 });
 
+test('install refuses an identical nonexecutable target instead of claiming a usable command', () => {
+  const fixture = mkdtempSync(join(tmpdir(), 'chain-coordination-nonexecutable-install-'));
+  try {
+    const target = join(fixture, 'existing.mjs');
+    copyFileSync(entrypoint, target);
+    chmodSync(target, 0o644);
+    const contents = readFileSync(target);
+
+    const result = command(['install', '--to', target], fixture);
+    assert.notEqual(result.status, 0, 'install cannot claim success for a command the shell cannot execute');
+    assert.match(result.stderr, /not executable/i);
+    assert.equal(result.stdout, '');
+    assert.deepEqual(readFileSync(target), contents, 'existing file content stays intact');
+    assert.equal(statSync(target).mode & 0o777, 0o644, 'installation must not alter an existing file permission');
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
 test('concurrent project begins serialize on one ledger without losing either entry', async () => {
   const fixture = mkdtempSync(join(tmpdir(), 'chain-coordination-concurrent-'));
   try {
@@ -714,6 +733,41 @@ test('concurrent project begins serialize on one ledger without losing either en
     const state = JSON.parse(readFileSync(ledgerPath, 'utf8'));
     assert.deepEqual(new Set(state.entries.map((entry) => entry.id)), new Set(created.map((entry) => entry.id)));
     assert.deepEqual(new Set(state.entries.flatMap((entry) => entry.resources)), new Set(['runtime-a', 'runtime-b']));
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
+test('begin prunes parked-only configurations using the v1 active-owner rule and retains reservations', () => {
+  const fixture = mkdtempSync(join(tmpdir(), 'chain-coordination-configurations-'));
+  try {
+    const ledgerPath = join(fixture, 'host-ledger.json');
+    const project = createProject(join(fixture, 'new-project'), 'work/configurations');
+    const activeWorktree = join(fixture, 'active-project');
+    const parkedWorktree = join(fixture, 'parked-project');
+    const reservedWorktree = join(fixture, 'reserved-project');
+    // Legacy mutations do not infer loss of ownership from a missing/offline worktree.
+    for (const worktree of [parkedWorktree, reservedWorktree]) mkdirSync(worktree);
+    const activeEntry = { id: 'active-owner', status: 'active', worktree: activeWorktree, resources: ['foreign-runtime'], lease: { state: 'healthy' }, foreignMetadata: { keep: true } };
+    const parkedEntry = { id: 'parked-owner', status: 'parked', worktree: parkedWorktree, resources: ['parked-runtime'], parked: { checkpointSha: '1'.repeat(40) }, lease: { state: 'parked-no-heartbeat-required' } };
+    const reservation = { id: 'reserved-runtime', worktree: reservedWorktree, pid: process.pid, slot: 5, foreignMetadata: { keep: true } };
+    const activeConfiguration = { worktree: activeWorktree, slot: 1, extra: 'active' };
+    const reservedConfiguration = { worktree: reservedWorktree, slot: 5, extra: 'reserved' };
+    writeFileSync(ledgerPath, JSON.stringify({
+      version: 1, scope: 'codex-wide', unknownTopLevel: { keep: true },
+      entries: [activeEntry, parkedEntry], reservations: [reservation],
+      configurations: [activeConfiguration, { worktree: parkedWorktree, slot: 2 }, reservedConfiguration],
+    }));
+
+    const began = command(['begin', '--file', ledgerPath, '--work-type', 'tooling', '--intent', 'Configuration compatibility fixture'], project);
+    assert.equal(began.status, 0, began.stderr);
+    const observed = command(['status', '--file', ledgerPath], project);
+    assert.equal(observed.status, 0, observed.stderr);
+    const { state } = JSON.parse(observed.stdout);
+    assert.deepEqual(state.configurations, [activeConfiguration, reservedConfiguration], 'parked-only configuration is orphaned under the existing v1 rule');
+    assert.deepEqual(state.entries.slice(0, 2), [activeEntry, parkedEntry], 'configuration cleanup must preserve foreign owner entries and parked claims');
+    assert.deepEqual(state.reservations, [reservation], 'reservation-backed configuration and reservation remain owned');
+    assert.deepEqual(state.unknownTopLevel, { keep: true });
   } finally {
     rmSync(fixture, { recursive: true, force: true });
   }
