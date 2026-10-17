@@ -697,7 +697,7 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 
 ## Stale-tab reconciliation
 
-- RISK cloud No recovery: five scanner decisions survive offline durable reopen beside an independent peer edit
+- RISK cloud No recovery: five scanner decisions survive offline durable reopen beside an independent peer edit (action time is fixed before boot and cold reopen across timezone boundaries)
 - RISK cloud current choices: editor Save records original per-property action time
 - RISK cloud current choices: scan mode preference records an explicit timed choice
 - RISK cloud current choices: Resume scanning records an explicit active-pass mode change

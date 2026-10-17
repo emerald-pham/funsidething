@@ -7421,8 +7421,8 @@
     ]
   },
   {
-    "testChangesSha256": "eb5b89a3101024b6d60532c502db087d9f635b683e705b7186d1ebd51e9959d6",
-    "reason": "Implement GitHub #144 typed current-choice actions and projection through normal editor, scanner, settings, Start/Resume, disposition, sync, and fresh-client paths. Preserve the shared #142/#143 decision event and learning boundaries; correct comparison fixtures to hydrate the real unchanged editor draft and count actual comparison rows.",
+    "testChangesSha256": "c945fde63f8c037cc96c7c6de4f4faf1e008e0c038fbcf7bab7a33b091a5c42b",
+    "reason": "Implement GitHub #144 typed current-choice actions and projection through normal editor, scanner, settings, Start/Resume, disposition, sync, and fresh-client paths. Preserve the shared #142/#143 event and learning boundaries. Also correct unchanged editor hydration, staged offline event-publication assertions, and fixed-action-time fixtures.",
     "previousBehavior": "Real editor/task/settings actions changed local state without cloud-visible per-property intent, original action time, prior-field evidence, or shared gesture identity. Compatible fields and context changes could be lost, same-property outcomes depended on upload order rather than the action chronology, scanner mode draws and Start roots were not reconstructed on a fresh client, and disposition projection could lose the original hold expiry. The comparison fixture also emitted false edit rows because its DOM shim did not hydrate rendered checked controls.",
     "intendedBehavior": "Each deliberate supported current-choice edit emits immutable typed property evidence in decisionEvents with stable row IDs, shared actionId for one gesture, original at/account/base/pass/context/causal frontier, and exact before presence/value plus after presence. Compatible fields and context membership compose; causal successors override clock skew; truly concurrent choices order by original at then stable ID; unknown chronology and unsupported target/value stay preserved without a guessed winner. Mode choices retain exact frozen chance draw, explicit Start retains the new pass root and identity without a synthetic comparison, and Can’t/Worked/Return retain or clear their original hold time. No-op maintenance, retry, and unchanged editor Save create no edit decisions.",
     "replacementTests": [
@@ -7452,16 +7452,44 @@
     ],
     "redEvidence": {
       "command": "node --test --test-reporter=spec --test-name-pattern='RISK cloud current choices' tests.js (focused consumer runs retained as individual raw logs)",
-      "failure": "Pre-runtime editor Save RED at 2026-10-17 03:55:46 UTC: editor-event-red.txt reports that the actual Save action produced no current-choice event. Subsequent action-time REDs are preserved in scan-mode-choice-red.txt, settings-save-red.txt, immediate-preferences-red.txt, resume-mode-red.txt, explicit-start-mode-red.txt, start-pass-red.txt, disposition-choice-red.txt and start-pass-reconciliation-red.txt. Reconciliation REDs current-choice-reconciliation-red.txt and current-choice-projector-red.txt show property loss and upload-order dependence. pass-mode-snapshot-red.txt caught recording only a string instead of the exact mode/draw; disposition-hold-value-red.txt caught dropping the original hold timestamp; pass-final-chain-red-behavior.txt at 2026-10-17 04:31:20 UTC caught the root replay erasing a later Dot. compatible-current-choice-red.txt at 04:34:49 UTC caught rejecting a valid null URL and is paired with its GREEN. After integration, comparison-replay-a80.txt was a fixture-only failure: comparison-row-debug.txt showed unchecked shim defaults inventing reset/context edits. The helper now hydrates the rendered unchanged draft; final tests preserve actual comparison assertions and explicitly reject invented edit facts. That corrected run is retrospective fixture repair, not preimplementation RED."
+      "failure": "Pre-runtime editor Save RED at 2026-10-17 03:55:46 UTC: editor-event-red.txt reports that the actual Save action produced no current-choice event. Subsequent action-time REDs are preserved in scan-mode-choice-red.txt, settings-save-red.txt, immediate-preferences-red.txt, resume-mode-red.txt, explicit-start-mode-red.txt, start-pass-red.txt, disposition-choice-red.txt and start-pass-reconciliation-red.txt. Reconciliation REDs current-choice-reconciliation-red.txt and current-choice-projector-red.txt show property loss and upload-order dependence. pass-mode-snapshot-red.txt caught recording only a string instead of the exact mode/draw; disposition-hold-value-red.txt caught dropping the original hold timestamp; pass-final-chain-red-behavior.txt at 2026-10-17 04:31:20 UTC caught the root replay erasing a later Dot. compatible-current-choice-red.txt at 04:34:49 UTC caught rejecting a valid null URL and is paired with its GREEN. After integration, comparison-replay-a80.txt was a fixture-only failure: comparison-row-debug.txt showed unchecked shim defaults inventing reset/context edits. The helper now hydrates the rendered unchanged draft; final tests preserve actual comparison assertions and explicitly reject invented edit facts. That corrected run is retrospective fixture repair, not preimplementation RED. After exact integration at 957ec70, the combined cloud test first showed that offline phone No facts cannot appear in the Mac-only publication; the test now asserts that staged publication, then checks all five No rows plus the separate Mac title fact after phone reconnect and republish. This is a fixture/expectation correction, not a runtime RED or #146 classification failure. Cross-realm task-context arrays are normalized only for assertions. Fixed Oct 16/17 action times are installed before app boot and cold reopen so existing pass-expiry rules remain deterministic on later dates; explicit expiry assertions stay active."
     },
     "updatedTests": [
+      "RISK cloud No recovery: five scanner decisions survive offline durable reopen beside an independent peer edit",
       "RISK comparison replay: independent Yes and Dot evidence survives either cloud publication order and a fresh client",
+      "RISK comparison replay: repeated same-pair Yes and No actions remain distinct and replay once by original action order",
       "RISK comparison replay: first supported action freezes learned legacy ratings without replaying observational history",
-      "RISK comparison replay: compatible new-task baseline extensions union without freezing branch-local posteriors"
+      "RISK comparison replay: deleting an opponent keeps its frozen rating available without resurrecting the task",
+      "RISK comparison replay: compatible new-task baseline extensions union without freezing branch-local posteriors",
+      "RISK comparison replay: compatible frozen learning survives different legacy pass-context baseline IDs"
     ],
     "coverageChronology": {
       "preimplementation": "The editor action-evidence RED is captured against original base 4b930f31272fc3db61a5cdcad0b1ec0ec0ac4ad2. Additional action, projection, mode snapshot, disposition hold, and pass-chain REDs were captured before their respective runtime repairs; raw outputs and paired times are listed in /Users/emeraldpham/.codex/task-artifacts/decision-sync-141/144/CHRONOLOGY.md.",
-      "postimplementation": "Against integrated checkpoint a80e88eef66e4622d6af6027b66a176530a1d626, the current-choice cohort passed 17/17, corrected comparison replay passed 6/6, and the affected existing domain-preservation cohort passed 12/12. Full suite, compatibility, browser/visual, CI, live deployment and production proof remain with the parent."
+      "postimplementation": "Against integration tip 957ec70cd875ce39745fa8d2b1fe1964ac8b3166, the final No-recovery, comparison replay, and current-choice cohort passed 26/26 in both UTC and default America/New_York. This includes five No events plus a separate Mac title fact after the offline phone reconnects and republishes; comparison rows retain exact IDs, action time, rating participation, frozen baseline, history, and fresh-client results. Fixture clock and cross-realm assertion corrections are retrospective and do not claim new behavioral RED. Full suite, compatibility, browser/visual, CI, live deployment and production proof remain with the parent."
+    }
+  },
+  {
+    "testChangesSha256": "9f2e3e91b98e7ee3d447a91af2206751f59f29b4bc3498f669bfb227a9e6d576",
+    "reason": "Make the protected No-recovery fixture deterministic across local timezones by installing its existing action timestamp before app readiness for both clients and the offline cold reopen. The test still exercises the established day-expiry boundary.",
+    "previousBehavior": "The fixture installed its fake clock only after initial boot and cloud pull, then cold-reopened without a fake clock. Under UTC after the established 2 AM cutoff, boot created a fresh pass before the fixture actions; both storage backends emitted events with host-time passAt and baseId=null. The account stayed e@example.com, but the exact-base part of the combined assertion failed. The default America/New_York run remained before its local cutoff.",
+    "intendedBehavior": "Initial phone and Mac clients and the cold reopened phone start under the same existing October 16 action time. Event account, exact base, original pass/time, learned ratings, peer edit, durable stores, and the explicit new-pass expiry assertions remain active and pass consistently in UTC and the default timezone.",
+    "replacementTests": [
+      "RISK cloud No recovery: five scanner decisions survive offline durable reopen beside an independent peer edit"
+    ],
+    "preservedCoverage": [
+      "Both browser fallback and production IndexedDB exercise five real offline No controls, durable close/reopen, and reconciliation beside an independent peer title edit.",
+      "Original action identity, account, exact observed base, pass/time/context, effective ratings, cloud event retention, and pass-day expiry assertions are retained."
+    ],
+    "redEvidence": {
+      "command": "TZ=UTC node --test --test-name-pattern='RISK cloud No recovery' tests.js",
+      "failure": "Before the fixture clock change, both storage subtests failed at the exact-base event assertion. Diagnostic run showed fixed event at=1792163400000 paired with a newly generated boot-time passId, passAt=1792212247783/1792212247862, and baseId=null. Raw failure: /Users/emeraldpham/.codex/task-artifacts/decision-sync-141/147/no-recovery-fixture-red-utc.log; diagnostic facts: no-recovery-fixture-red-diagnostic-utc.log. After pinning the existing timestamp before boot and cold reopen, the combined No-recovery and comparison cohort passed 9/9 in UTC and 9/9 in default America/New_York; logs: no-recovery-fixture-green-utc.log and no-recovery-fixture-green-default.log in the same evidence directory."
+    },
+    "updatedTests": [
+      "RISK cloud No recovery: five scanner decisions survive offline durable reopen beside an independent peer edit"
+    ],
+    "coverageChronology": {
+      "preimplementation": "Not applicable: this change corrects a timezone-dependent test fixture after behavior implementation; the actual UTC failure was observed before the fixture edit.",
+      "postimplementation": "Pinning the existing timestamp before initial boot and cold reopen makes the preserved expiry/reconciliation scenario green in UTC and America/New_York without changing runtime code."
     }
   }
 ]
