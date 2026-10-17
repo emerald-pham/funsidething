@@ -1020,7 +1020,11 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK saved view fallback: corrupt or blocked local presentation storage leaves the saved board usable
 - RISK saved view startup: delayed local board reads do not expose an empty default shell
 - RISK saved view startup: delayed local reads do not call state renderers before board hydration
-- RISK saved view startup: delayed loading status stays readable over scenery in light and dark themes
+- RISK saved view invisible startup: real IndexedDB reload paints the prior populated search and position without loading chrome
+- RISK saved view invisible large window: a tall viewport retains all visible rows with bounded projection work
+- RISK saved view invisible header: the prior floating header keeps its normal size and place while storage opens
+- RISK saved view invisible account boundary: a new identity immediately masks the pending prior appearance
+- RISK saved view invisible fallback: corrupt oversized untrusted and blocked projections never become board authority
 - RISK saved view guidance: Quick start and Changelog describe this-device restoration and current dates
 - RISK bulk toolbar guidance: extended FAQ describes frozen controls and rank-slot selection
 - RISK repository process boundary: actual visual tests compare every changed control with neighboring controls and scrolled states

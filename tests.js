@@ -8844,9 +8844,10 @@ test('RISK saved view guidance: Quick start and Changelog describe this-device r
  assert.match(answer,/last All Tasks search or filter, whether its list was open, and your place in the list on this device/i);
  assert.match(answer,/saved board first/i);assert.match(answer,/dates and eligibility use today/i);
  assert.match(answer,/if this browser cannot retain the view, your saved board still opens with its usual list view/i);
- assert.match(answer,/while it loads, a small panel keeps the message readable over the scenery in light and dark themes/i);
+ assert.match(answer,/last settled appearance stays visible quietly while the saved board opens/i);
+ assert.doesNotMatch(answer,/loading message|small panel|spinner/i);
  const chapter=help.split('<details class="help-faq" data-help-changelog>')[1]?.split('</details>')[0]||'';
- assert.match(chapter,/<h3>October 16, 2026<\/h3>[\s\S]*?<li>Opening or refreshing restores this device’s All Tasks list, filters and position before the screen appears; newer cloud changes still sync in the background. If this browser cannot retain the view, the saved board still opens with its usual list view\. The loading message stays readable over the scenery in both themes\.<\/li>/);
+ assert.match(chapter,/<h3>October 16, 2026<\/h3>[\s\S]*?<li>Opening or refreshing quietly restores this device’s All Tasks list, filters and position, with its last settled appearance visible while the saved board opens; newer cloud changes still sync in the background\. If this browser cannot retain the view, the saved board still opens with its usual list view\.<\/li>/);
 });
 
 async function delayedLocalBoardBrowser(viewport={width:390,height:844},dispatchResizeDuringLoad=false,theme='system'){
@@ -8908,37 +8909,118 @@ async function delayedLocalBoardBrowser(viewport={width:390,height:844},dispatch
  return {browser,context,page,early,ready,errors};
 }
 
-test('RISK saved view startup: delayed loading status stays readable over scenery in light and dark themes',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
- const samples=[];
+async function invisibleSavedViewBrowser(theme='light',delayAppearanceAsset=false,keepHeader=false,viewport={width:390,height:844}){
+ const {chromium}=await import(process.env.PLAYWRIGHT_MODULE||process.env.LANDSCAPE_PLAYWRIGHT||'playwright');
+ const browser=await chromium.launch({headless:true,channel:process.env.LANDSCAPE_BROWSER_CHANNEL||'chrome'});
+ const context=await browser.newContext({viewport,serviceWorkers:'block',reducedMotion:'reduce'});
+ const origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+ await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
+ if(delayAppearanceAsset)await context.route('**/saved-appearance.js',async route=>{await new Promise(resolve=>setTimeout(resolve,600));await route.continue();});
+ await context.addInitScript(theme=>{
+  Object.defineProperty(window,'FIREBASE_CONFIG',{value:null,writable:false});
+  localStorage.setItem('fvp:chain-scanner:theme',theme);
+  localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:'reduced',savedAt:Date.now()}));
+  window.__actualLocalRead={started:false,settled:false};
+  window.__firstAppearanceFrames=[];let frames=0;function observe(){if(localStorage.getItem('__delayLocalRead')==='true'&&document.querySelector('.wrap')){const preview=document.querySelector('[data-saved-preview]');window.__firstAppearanceFrames.push({ready:document.documentElement.dataset.appReady==='true',populated:!!preview&&getComputedStyle(preview).visibility==='visible'&&!!preview.querySelector('.trow')});}if(++frames<180)requestAnimationFrame(observe);}requestAnimationFrame(observe);
+  const open=indexedDB.open.bind(indexedDB),success=Object.getOwnPropertyDescriptor(IDBRequest.prototype,'onsuccess');
+  indexedDB.open=(...args)=>{const request=open(...args);if(localStorage.getItem('__delayLocalRead')!=='true')return request;
+   window.__actualLocalRead.started=true;let listener=null;
+   Object.defineProperty(request,'onsuccess',{configurable:true,get:()=>listener,set:fn=>{listener=fn;success.set.call(request,event=>setTimeout(()=>{window.__actualLocalRead.settled=true;fn?.call(request,event);},1800));}});return request;};
+ },theme);
+ const page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
+ await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});
+ await page.waitForFunction(()=>document.documentElement.dataset.appReady==='true');
+ await page.evaluate(async()=>{document.getElementById('motionDialog')?.close();closeModal();state.seenQuickStart=true;state.addOpen=false;state.histOpen=false;state.settings.theme=localStorage.getItem('fvp:chain-scanner:theme');
+  for(let i=0;i<65;i++)addTask('Saved appearance task '+String(i).padStart(2,'0'));
+  addTask('Unmatched control task');save();await persist();render();});
+ if(keepHeader){await page.locator('[data-act="settings"]').first().click();await page.getByText('Scanning and recurrence',{exact:true}).click();await page.locator('#stFloatingHeader').check();await page.locator('#modalRoot [data-act="close-modal"]').click();}
+ if(await page.locator('#listBody').isHidden())await page.locator('[data-act="toggle-list"]').first().click();
+ await page.locator('#listSearch').fill('Saved appearance');
+ await page.locator('[data-act="list-eligibility"][data-id="all"]').click();
+ await page.locator('#listSearch').fill('Saved appearance');
+ await page.locator('#listBody').evaluate(e=>{e.scrollTop=420;e.dispatchEvent(new Event('scroll'));});
+ await page.evaluate(()=>{window.scrollTo(0,220);window.dispatchEvent(new Event('pagehide'));localStorage.setItem('__delayLocalRead','true');});
+ if(process.env.SAVED_VIEW_ARTIFACT_DIR)await page.screenshot({path:path.join(process.env.SAVED_VIEW_ARTIFACT_DIR,`invisible-before-${theme}.png`)});
+ const before=await page.evaluate(()=>({query:document.getElementById('listSearch').value,scroll:document.getElementById('listBody').scrollTop,pageY:scrollY,visibleTitles:(()=>{const body=document.getElementById('listBody'),r=body.getBoundingClientRect();return[...body.querySelectorAll('.trow')].filter(e=>{const b=e.getBoundingClientRect();return b.bottom>r.top&&b.top<Math.min(r.bottom,innerHeight);}).map(e=>e.querySelector('.tt')?.textContent);})(),header:(()=>{const r=document.getElementById('appHeader').getBoundingClientRect();return{x:r.x,y:r.y,width:r.width,height:r.height};})(),tasks:JSON.stringify(state.tasks),cache:localStorage.getItem('fvp:chain-scanner:appearance:v1')}));
+ await page.reload({waitUntil:'domcontentloaded'});
+ await page.waitForFunction(()=>window.__actualLocalRead?.started);
+ const early=await page.evaluate(()=>{const preview=document.querySelector('[data-saved-preview]'),list=preview?.querySelector('[data-preview-id="listBody"]'),search=preview?.querySelector('[data-preview-id="listSearch"]');return{settled:window.__actualLocalRead.settled,ready:document.documentElement.dataset.appReady,previewVisible:!!preview&&getComputedStyle(preview).visibility==='visible',rows:[...(list?.querySelectorAll('.trow')||[])].map(e=>e.textContent),query:search?.value,listScroll:list?.scrollTop,pageY:scrollY,visibleTitles:(()=>{if(!list)return[];const r=list.getBoundingClientRect();return[...list.querySelectorAll('.trow')].filter(e=>{const b=e.getBoundingClientRect();return b.bottom>r.top&&b.top<Math.min(r.bottom,innerHeight);}).map(e=>e.querySelector('.tt')?.textContent);})(),header:(()=>{const r=preview?.querySelector('[data-preview-id="appHeader"]')?.getBoundingClientRect();return r?{x:r.x,y:r.y,width:r.width,height:r.height}:null;})(),status:document.getElementById('startupStatus')?.textContent||null,theme:document.documentElement.dataset.theme,colorScheme:getComputedStyle(document.documentElement).colorScheme,duplicateIds:[...document.querySelectorAll('[id]')].map(e=>e.id).filter((id,i,all)=>all.indexOf(id)!==i),activeActions:preview?.querySelectorAll('[data-act],[href],[onclick],[onerror]').length||0};});
+ if(process.env.SAVED_VIEW_ARTIFACT_DIR)await page.screenshot({path:path.join(process.env.SAVED_VIEW_ARTIFACT_DIR,`invisible-early-${theme}.png`)});
+ if(process.env.SAVED_VIEW_ARTIFACT_DIR)fs.writeFileSync(path.join(process.env.SAVED_VIEW_ARTIFACT_DIR,`probe-${theme}.json`),JSON.stringify({before:{...before,cache:JSON.parse(before.cache||'null')},early},null,2));
+ return {browser,context,page,errors,before,early};
+}
+
+test('RISK saved view invisible startup: real IndexedDB reload paints the prior populated search and position without loading chrome',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
  for(const theme of ['light','dark']){
-  const startup=await delayedLocalBoardBrowser({width:390,height:844},false,theme);
+  const view=await invisibleSavedViewBrowser(theme,true);
   try{
-   assert.equal(startup.early.storageSettled,false,'the saved board is still loading during the status capture');
-   assert.equal(startup.early.shellVisibility,'hidden','the default board stays hidden while local state loads');
-   assert.match(startup.early.status,/Opening your saved board/i);
-   assert.deepEqual(startup.errors,[]);
-   samples.push({theme,...startup.early});
-  }finally{await startup.browser.close();}
+   const frames=await view.page.evaluate(()=>window.__firstAppearanceFrames);assert.ok(frames.length>0,'observe real animation frames before storage resolves');assert.ok(frames.filter(frame=>!frame.ready).every(frame=>frame.populated),'every first compositor opportunity already has the prior populated view');
+   assert.equal(view.early.settled,false,'actual durable local read is pending at the first visible capture');
+   assert.equal(view.early.previewVisible,true,'the first visible app must already resemble the prior populated view');
+   assert.equal(view.early.status,null,'the rejected loading surface must be absent');
+   assert.equal(view.early.query,'Saved appearance');
+   assert.ok(view.early.rows.length>0&&view.early.rows.length<=18,'cache only a bounded visible list window');
+   assert.ok(view.early.rows.every(text=>text.includes('Saved appearance task')),'the initial list has matching saved rows');
+   assert.deepEqual(view.early.visibleTitles,view.before.visibleTitles,'the visible cached rows match the saved list window');
+   assert.ok(Math.abs(view.early.listScroll-view.before.scroll)<2,'the initial populated window keeps the list place');
+   assert.ok(Math.abs(view.early.pageY-view.before.pageY)<2,'the initial appearance keeps the page place: '+JSON.stringify({early:view.early.pageY,before:view.before.pageY}));
+   assert.equal(view.early.theme,theme);assert.equal(view.early.colorScheme,theme);
+   assert.deepEqual(view.early.duplicateIds,[]);assert.equal(view.early.activeActions,0);
+   await view.page.keyboard.press('Delete');await view.page.keyboard.press('y');
+   await view.page.locator('[data-saved-preview]').dispatchEvent('click');
+   if(process.env.SAVED_VIEW_ARTIFACT_DIR){fs.mkdirSync(process.env.SAVED_VIEW_ARTIFACT_DIR,{recursive:true});await view.page.screenshot({path:path.join(process.env.SAVED_VIEW_ARTIFACT_DIR,`invisible-pending-${theme}.png`)});}
+   await view.page.waitForFunction(()=>document.documentElement.dataset.appReady==='true');
+   const ready=await view.page.evaluate(()=>({query:document.getElementById('listSearch').value,scroll:document.getElementById('listBody').scrollTop,pageY:scrollY,rows:document.querySelectorAll('#listBody .trow').length,tasks:JSON.stringify(state.tasks),preview:!!document.querySelector('[data-saved-preview]')}));
+   assert.equal(ready.query,'Saved appearance');assert.equal(ready.rows,65);assert.equal(ready.tasks,view.before.tasks,'early clicks and shortcuts cannot mutate the pending board');assert.equal(ready.preview,false);
+   assert.ok(Math.abs(ready.scroll-view.before.scroll)<2);assert.ok(Math.abs(ready.pageY-view.before.pageY)<2);
+   assert.deepEqual(view.errors,[]);
+  }finally{await view.browser.close();}
  }
- if(process.env.SAVED_VIEW_ARTIFACT_DIR){
-  fs.mkdirSync(process.env.SAVED_VIEW_ARTIFACT_DIR,{recursive:true});
-  fs.writeFileSync(path.join(process.env.SAVED_VIEW_ARTIFACT_DIR,'startup-status-paint.json'),JSON.stringify({capturedAt:new Date().toISOString(),samples},null,2)+'\n');
- }
- for(const sample of samples){
-  assert.equal(sample.colorScheme,sample.theme,`${sample.theme} saved view should paint with its theme before hydration`);
-  assert.ok(sample.statusCard,`${sample.theme}: loading status should have its own readable panel`);
-  assert.ok(sample.panelReference,`${sample.theme}: an established app panel is available as an independent style reference`);
-  assert.equal(sample.panelReference?.sameNode,false,`${sample.theme}: the reference is a separate app panel, not the startup status card itself`);
-  assert.deepEqual(sample.statusCard&&{
-   background:sample.statusCard.background,borderColor:sample.statusCard.borderColor,borderRadius:sample.statusCard.borderRadius
-  },sample.panelReference&&{
-   background:sample.panelReference.background,borderColor:sample.panelReference.borderColor,borderRadius:sample.panelReference.borderRadius
-  },`${sample.theme}: status panel reuses the established panel surface and border`);
-  assert.equal(sample.statusCard?.color,sample.inkReference,`${sample.theme}: status text uses the normal readable app ink`);
-  const b=sample.statusCard?.bounds,v=sample.viewport;
-  assert.ok(b&&b.x>=12&&b.y>=12&&b.right<=v.width-12&&b.bottom<=v.height-12,`${sample.theme}: status panel remains inside the viewport: ${JSON.stringify(b)}`);
-  assert.ok(b.width>0&&b.height>0,`${sample.theme}: status panel has visible bounds`);
- }
+});
+
+test('RISK saved view invisible large window: a tall viewport retains all visible rows with bounded projection work',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const view=await invisibleSavedViewBrowser('light',false,false,{width:1280,height:2160});
+ try{
+  assert.ok(view.before.visibleTitles.length>18,'the tall consumer exceeds the old eighteen-row limit');
+  assert.deepEqual(view.early.visibleTitles,view.before.visibleTitles,'all visible rows must remain populated, including a tall display');
+  assert.ok(view.early.rows.length<=48,'even a tall display has a fixed bounded projection');
+ }finally{await view.browser.close();}
+});
+
+test('RISK saved view invisible header: the prior floating header keeps its normal size and place while storage opens',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const view=await invisibleSavedViewBrowser('light',false,true);
+ try{assert.deepEqual(view.early.header,view.before.header,'the saved floating header must retain the accepted app geometry');}
+ finally{await view.browser.close();}
+});
+
+test('RISK saved view invisible account boundary: a new identity immediately masks the pending prior appearance',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const view=await invisibleSavedViewBrowser();
+ try{
+  assert.equal(view.early.previewVisible,true);
+  const masked=await view.page.evaluate(()=>{window.CloudSync={configured:false,ready:true,user:'other@example.com',status:'off'};window.dispatchEvent(new Event('cloudsync'));return{preview:!!document.querySelector('[data-saved-preview]'),cache:localStorage.getItem('fvp:chain-scanner:appearance:v1'),settled:window.__actualLocalRead.settled};});
+  assert.equal(masked.settled,false);assert.equal(masked.preview,false);assert.equal(masked.cache,null);
+  await view.page.waitForFunction(()=>document.documentElement.dataset.appReady==='true');
+  assert.equal(await view.page.evaluate(()=>state.tasks.length),66,'masking a prior appearance cannot erase local tasks');
+  assert.deepEqual(view.errors,[]);
+ }finally{await view.browser.close();}
+});
+
+test('RISK saved view invisible fallback: corrupt oversized untrusted and blocked projections never become board authority',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const view=await invisibleSavedViewBrowser();
+ try{
+  await view.page.waitForFunction(()=>document.documentElement.dataset.appReady==='true');
+  await view.page.addInitScript(()=>{const kind=localStorage.getItem('__projectionFault'),key='fvp:chain-scanner:appearance:v1',valid=localStorage.getItem('__validProjection');if(!kind)return;let raw=valid;if(kind==='corrupt')raw='{';if(kind==='oversized')raw=' '.repeat(192001);if(kind==='untrusted'){const value=JSON.parse(valid);value.tree.n.push({t:'img',src:'x',onerror:'window.__unsafeProjection=true',n:[]});raw=JSON.stringify(value);}localStorage.setItem(key,raw);if(kind==='blocked'){const get=Storage.prototype.getItem;Storage.prototype.getItem=function(key){if(key==='fvp:chain-scanner:appearance:v1')throw new DOMException('isolated blocked preview','SecurityError');return get.call(this,key);};}});
+  for(const kind of ['corrupt','oversized','untrusted','blocked']){
+   await view.page.evaluate(({kind,valid})=>{localStorage.setItem('__projectionFault',kind);localStorage.setItem('__validProjection',valid);},{kind,valid:view.before.cache});
+   await view.page.reload({waitUntil:'domcontentloaded'});await view.page.waitForFunction(()=>window.__actualLocalRead.started);
+   const early=await view.page.evaluate(()=>({preview:!!document.querySelector('[data-saved-preview]'),attack:!!window.__unsafeProjection,settled:window.__actualLocalRead.settled,status:!!document.getElementById('startupStatus')}));
+   assert.equal(early.settled,false);assert.equal(early.preview,false,kind+' projection is not displayed');assert.equal(early.attack,false);assert.equal(early.status,false);
+   await view.page.waitForFunction(()=>document.documentElement.dataset.appReady==='true');
+   assert.equal(await view.page.evaluate(()=>JSON.stringify(state.tasks)),view.before.tasks,kind+' projection cannot save, migrate or replace tasks');
+   assert.equal(await view.page.locator('#listBody .trow').count(),65);
+  }
+  assert.deepEqual(view.errors,[]);
+ }finally{await view.browser.close();}
 });
 
 test('RISK saved view startup: delayed local board reads do not expose an empty default shell',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
@@ -8946,7 +9028,7 @@ test('RISK saved view startup: delayed local board reads do not expose an empty 
  try{
   assert.equal(startup.early.storageSettled,false,'the local copy must still be loading when its first frame is inspected');
   assert.equal(startup.early.shellVisibility,'hidden','the empty default shell is not visible while the saved board is loading');
-  assert.match(startup.early.status,/saved board/i,'a clear restore status explains the brief wait');
+  assert.equal(startup.early.status,null,'no loading surface is added when a saved appearance is unavailable');
   assert.equal(startup.ready.shellVisibility,'visible');
   assert.equal(startup.ready.rows,45,'the first revealed board/list is the restored local copy');
   assert.equal(startup.ready.listOpen,true);

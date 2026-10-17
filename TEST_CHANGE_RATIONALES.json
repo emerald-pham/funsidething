@@ -7475,5 +7475,67 @@
       "command": "Typography RED at 2026-10-17T03:22:54Z on base 5360ea1dc9f1ecbe0a2d3aa58d8229029774d77e: LANDSCAPE_BROWSER_URL=http://127.0.0.1:8794/index.html LANDSCAPE_PLAYWRIGHT=/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs LANDSCAPE_BROWSER_CHANNEL=chrome SAVED_VIEW_ARTIFACT_DIR=/Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/startup-status-red /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-reporter=spec --test-name-pattern='RISK saved view startup: delayed loading status' tests.js. Candidate 5360ea1 full-suite started at 2026-10-17T03:12:20.586Z and ended at03:18:54.789Z via node --test --test-reporter=spec tests.js.",
       "failure": "Prior actual RED outputs remain in earlier rationale records and worker logs. The new delayed-read RISK failed because statusCard was absent in both themes. The actual full suite at 5360ea1 also failed the existing no-root safe no-op with TypeError at init and failed the extracted reduced-motion consumer with ReferenceError allTasksView; exact output is preserved in full-suite.log/.json."
     }
+  },
+  {
+    "reason": "The user explicitly rejected the loading panel and required silent populated first paint. Replace the rejected assertions with actual storage-boundary and first-compositor consumers while preserving board hydration, filter, account and cloud contracts.",
+    "previousBehavior": "The superseded local candidate hid the static empty shell and displayed Opening your saved board in a panel. Filters and local list position restored after authoritative hydration; no populated prior appearance could paint while storage was pending.",
+    "intendedBehavior": "A bounded inert JSON visual-node projection paints the prior populated app with its accepted classes, search and scroll while the real IndexedDB read is pending, then quietly yields to authoritative current data. No popup, spinner, skeleton, duplicate IDs, executable attributes or stale task actions. Account changes mask the prior appearance and invalid, oversized or blocked records cannot affect boards.",
+    "replacementTests": [
+      "RISK saved view invisible startup: real IndexedDB reload paints the prior populated search and position without loading chrome",
+      "RISK saved view invisible large window: a tall viewport retains all visible rows with bounded projection work",
+      "RISK saved view invisible header: the prior floating header keeps its normal size and place while storage opens",
+      "RISK saved view invisible account boundary: a new identity immediately masks the pending prior appearance",
+      "RISK saved view invisible fallback: corrupt oversized untrusted and blocked projections never become board authority"
+    ],
+    "updatedTests": [
+      "RISK saved view guidance: Quick start and Changelog describe this-device restoration and current dates",
+      "RISK saved view startup: delayed local board reads do not expose an empty default shell"
+    ],
+    "preservedCoverage": [
+      "The user explicitly superseded the loading-status readability contract; no passing saved-board, populated-hydration, current-date, search, eligibility, tag, list-open, scroll, reveal, cloud adoption, account isolation or fallback assertion is removed or weakened.",
+      "The delayed-read no-default-shell and no-prehydration-state-render tests remain. Only the rejected status expectation changes to absent. If no valid projection exists, the static empty shell stays hidden until authoritative hydration.",
+      "Real-handler search, eligibility, list toggle and reveal, cloud adoption and reload coverage remains. Presentation bytes never feed task authority, recovery, serialization, migration, persistence or cloud acknowledgement.",
+      "No production account, saved user board or other owner worktree is used. Independent release reviews, full regression, compatibility, CI, deployment and ordinary production proof remain pending under the user release hold."
+    ],
+    "redEvidence": {
+      "command": "On clean bf64e0381e267f2fda17e9383010513284b21dd1 with tests.js alone edited: LANDSCAPE_BROWSER_URL=http://127.0.0.1:8794 PLAYWRIGHT_MODULE=/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs node --test --test-name-pattern='RISK saved view invisible startup:' tests.js. Subsequent vertical REDs use the same environment and 'RISK saved view invisible header:'. FAQ RED: node --test --test-name-pattern='RISK saved view guidance:' tests.js.",
+      "failure": "Actual contemporaneous initial RED before runtime edits: first visible app must already resemble the prior populated view, false !== true while actual IndexedDB was pending (invisible/red.txt). Subsequent stricter first-compositor RED caught blank frames while an extra projection asset was delayed (first-paint-red.txt), before inlining that code. Floating-header RED observed cached width261.609375 versus accepted366 (floating-header-red.txt), before copying four bounded CSS geometry hints. FAQ RED observed the rejected small-panel promise before prose edits (faq-red.txt). Intermediate position probes caught browser history restoring206px instead of220px; temporary manual restoration repaired that failure. Account/corrupt/oversized/untrusted/blocked consumers were added as postimplementation preservation coverage and passed; no earlier RED is claimed for them. Initial external runtime QA expected the same filter across a synthetic initial account change; it correctly reset the filter. The fixture now establishes this account filter through the real search handler before the same-account update; runtime code was unchanged for that fixture correction. Exact original and final logs remain external. A final actual tall-window RED at1280x2160 found29 visible prior rows versus16 cached visible rows (tall-window-red.txt). Before the repair, this exposed incomplete visible coverage under the eighteen-row cap. Capture now binary-searches both visible edges and two-row buffers with a hard48-row maximum; tall-window-green.txt proves that consumer and ordinary phone startup. No full-board clone is introduced."
+    },
+    "userAuthorization": "Direct correction: WOAH that giant popup is unacceptable. the sync is supposed to be invisible and seamless. User held going live until awake and asked for actual functionality screenshots for approval; this candidate stays local.",
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/invisible",
+    "comparison": "revisedDelta",
+    "comparisonBase": "bf64e0381e267f2fda17e9383010513284b21dd1",
+    "testChangesSha256": "f153a9c689393f839032b06991a8c72cc14fc68f82a0084ea7a46ba26ba63a31"
+  },
+  {
+    "reason": "The user explicitly rejected the loading panel and required silent populated first paint. Replace the rejected assertions with actual storage-boundary and first-compositor consumers while preserving board hydration, filter, account and cloud contracts.",
+    "previousBehavior": "The superseded local candidate hid the static empty shell and displayed Opening your saved board in a panel. Filters and local list position restored after authoritative hydration; no populated prior appearance could paint while storage was pending.",
+    "intendedBehavior": "A bounded inert JSON visual-node projection paints the prior populated app with its accepted classes, search and scroll while the real IndexedDB read is pending, then quietly yields to authoritative current data. No popup, spinner, skeleton, duplicate IDs, executable attributes or stale task actions. Account changes mask the prior appearance and invalid, oversized or blocked records cannot affect boards.",
+    "replacementTests": [
+      "RISK saved view invisible startup: real IndexedDB reload paints the prior populated search and position without loading chrome",
+      "RISK saved view invisible large window: a tall viewport retains all visible rows with bounded projection work",
+      "RISK saved view invisible header: the prior floating header keeps its normal size and place while storage opens",
+      "RISK saved view invisible account boundary: a new identity immediately masks the pending prior appearance",
+      "RISK saved view invisible fallback: corrupt oversized untrusted and blocked projections never become board authority"
+    ],
+    "updatedTests": [
+      "RISK saved view guidance: Quick start and Changelog describe this-device restoration and current dates",
+      "RISK saved view startup: delayed local board reads do not expose an empty default shell"
+    ],
+    "preservedCoverage": [
+      "The user explicitly superseded the loading-status readability contract; no passing saved-board, populated-hydration, current-date, search, eligibility, tag, list-open, scroll, reveal, cloud adoption, account isolation or fallback assertion is removed or weakened.",
+      "The delayed-read no-default-shell and no-prehydration-state-render tests remain. Only the rejected status expectation changes to absent. If no valid projection exists, the static empty shell stays hidden until authoritative hydration.",
+      "Real-handler search, eligibility, list toggle and reveal, cloud adoption and reload coverage remains. Presentation bytes never feed task authority, recovery, serialization, migration, persistence or cloud acknowledgement.",
+      "No production account, saved user board or other owner worktree is used. Independent release reviews, full regression, compatibility, CI, deployment and ordinary production proof remain pending under the user release hold."
+    ],
+    "redEvidence": {
+      "command": "On clean bf64e0381e267f2fda17e9383010513284b21dd1 with tests.js alone edited: LANDSCAPE_BROWSER_URL=http://127.0.0.1:8794 PLAYWRIGHT_MODULE=/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs node --test --test-name-pattern='RISK saved view invisible startup:' tests.js. Subsequent vertical REDs use the same environment and 'RISK saved view invisible header:'. FAQ RED: node --test --test-name-pattern='RISK saved view guidance:' tests.js.",
+      "failure": "Actual contemporaneous initial RED before runtime edits: first visible app must already resemble the prior populated view, false !== true while actual IndexedDB was pending (invisible/red.txt). Subsequent stricter first-compositor RED caught blank frames while an extra projection asset was delayed (first-paint-red.txt), before inlining that code. Floating-header RED observed cached width261.609375 versus accepted366 (floating-header-red.txt), before copying four bounded CSS geometry hints. FAQ RED observed the rejected small-panel promise before prose edits (faq-red.txt). Intermediate position probes caught browser history restoring206px instead of220px; temporary manual restoration repaired that failure. Account/corrupt/oversized/untrusted/blocked consumers were added as postimplementation preservation coverage and passed; no earlier RED is claimed for them. Initial external runtime QA expected the same filter across a synthetic initial account change; it correctly reset the filter. The fixture now establishes this account filter through the real search handler before the same-account update; runtime code was unchanged for that fixture correction. Exact original and final logs remain external. Original saved-view, toggle/reveal and harness-specific REDs remain in earlier rationale records and historical worker evidence. Their status-panel UX is superseded; original data/filter safety and actual chronology remain. This cumulative record binds all retained coverage and the authorized silent-startup correction. A final actual tall-window RED at1280x2160 found29 visible prior rows versus16 cached visible rows (tall-window-red.txt). Before the repair, this exposed incomplete visible coverage under the eighteen-row cap. Capture now binary-searches both visible edges and two-row buffers with a hard48-row maximum; tall-window-green.txt proves that consumer and ordinary phone startup. No full-board clone is introduced."
+    },
+    "userAuthorization": "Direct correction: WOAH that giant popup is unacceptable. the sync is supposed to be invisible and seamless. User held going live until awake and asked for actual functionality screenshots for approval; this candidate stays local.",
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/invisible",
+    "comparison": "fullReleaseBase",
+    "comparisonBase": "69a9feddf5d6bb8c4973475f7232e363b8646097",
+    "testChangesSha256": "8e4859224236e577cdb1f786cdc82252a7b53406ffeef7239fe9159664f67a9b"
   }
 ]
