@@ -8622,5 +8622,23 @@
       "command": "Ticket-specific actual RED commands and raw142-147 logs are retained under /Users/emeraldpham/.codex/task-artifacts/decision-sync-141; final focused/full/rules/compatibility commands are recorded with exact candidate.",
       "failure": "142 original cold-reopen No loss;143 independent comparison replay;144 current-property chronology and context delta failures;145 scoped/replacement/inherited Undo failures;146 source validation, guest inheritance, legacy hold and precise replacement failures;147 actual mounted FAQ/Settings and bulk intro failures. Individual records preserve exact observed errors and corrections. Both publication orders and other positive follow-through are explicitly post-implementation coverage."
     }
+  },
+  {
+    "testChangesSha256": "c6a245a07daa14829a9fe069a86d5887cf7b1faaf506615db84596c4cd94cfa5",
+    "reason": "Correct a demonstrated asynchronous acknowledgement assumption in the protected cloud recovery fixture. Keep its original 30ms/40ms waits and all Undo, failed-retry and account-change assertions; synchronize the final remote assertion to the actual third backend acknowledgement and strengthen pending-write protection.",
+    "previousBehavior": "The fixture assumed its 40ms settle timer implied the recovered Undo had reached the backend. On unchanged7546, --jitless reproduces the exact CI title failure: automatic recovery is already in the third push, but 49ms actual-app preflight delays its backend flush until after the timer assertion. The local Undo is correct and durable; the remote still has After edit while status is syncing.",
+    "intendedBehavior": "The fixture holds the real third backend acknowledgement, asserts the automatic retry started with durable Before Undo and a dirty syncing badge while remote is still After edit, then releases and awaits that exact acknowledgement. The original remote Before Undo, successful status, failed retry error and account-change cancellation assertions remain, and all edit/Undo facts must survive exactly.",
+    "replacementTests": [
+      "RISK CLOUD RECOVERY: Undo retries a failed write, while a failed retry and an account change stay errors"
+    ],
+    "preservedCoverage": [
+      "Every original assertion and both existing setup30ms/final40ms waits remain. No timeout or sleep budget is increased and no product runtime, historical support baseline, rule, shell, copy or account semantics changes.",
+      "Device quota failure must still return false, durable recovery true, and only the exact successful backend acknowledgement may establish the recovered remote title. Failed automatic retries stay errors and a queued old-account recovery cannot execute under another identity.",
+      "The controlled pending acknowledgement additionally protects durable local Undo, syncDirty and syncing status before acknowledgement, plus lossless edit and targeted Undo fact publication."
+    ],
+    "redEvidence": {
+      "command": "On exact7546: node --jitless --test --test-name-pattern='RISK CLOUD RECOVERY: Undo retries a failed write' tests.js; raw146/ci-undo-04-jitless.log, diagnostic146/ci-undo-05-jitless-trace.log. Parent preserved both actual failedCI logs and unchanged ordinary-Node23 local failure/repeat logs.",
+      "failure": "Unchanged protected assertion20504 failed with actual After edit versus expected Before Undo. Diagnostic trace: recovery durable at1792221455820; third push starts at1792221455869; same-turn original after40 assertion sees CS syncing, cloudPushInFlight true, local Before Undo, remote After edit, pushes3. This is fixture timing evidence, not a product runtime RED. The ACK-controlled fixture then passes slowed execution with exact Undo facts. Post-correction sensitivity control suppressing only retryCloudAfterDeviceRecovery in the loaded app fails the retained40ms boundary with pushes2 versus3 (146/ci-undo-11-disabled-retry-negative.log); this confirms the corrected test cannot pass by waiting for the ordinary2s debounce."
+    }
   }
 ]

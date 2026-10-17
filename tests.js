@@ -20435,7 +20435,7 @@ test('RISK test inventory: every named risk contract maps to a feature boundary'
  assert.match(inventory,/future|new feature/i,'the inventory must explain how future work adds risk contracts');
 });
 
-function recoveringCloudStatusHarness(shim,ctx,{failedRetry=false}={}){
+function recoveringCloudStatusHarness(shim,ctx,{failedRetry=false,beforePushAck=null}={}){
  let pulls=0,pushes=0;
  let remotePayload=ctx.cloudPayload(),remoteRev=ctx.state.syncRev||0;
  const ping=()=>shim.window.dispatchEvent({type:'cloudsync'});
@@ -20451,6 +20451,7 @@ function recoveringCloudStatusHarness(shim,ctx,{failedRetry=false}={}){
   },
   async push(payload,_updatedAt,baseRev){
    pushes++;CS.status='syncing';ping();await flush();
+   if(beforePushAck)await beforePushAck(pushes);
    if(failedRetry){fail('push','permission-denied');return {error:true};}
    if(baseRev!==remoteRev){succeed();return {conflict:true,rev:remoteRev};}
    remotePayload=payload;remoteRev++;succeed();return {ok:true,rev:remoteRev};
@@ -20486,9 +20487,20 @@ test('RISK CLOUD RECOVERY: a durable ordinary save retries and clears its stale 
  assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ synced','the write acknowledgement completes recovery');
 });
 
-test('RISK CLOUD RECOVERY: Undo retries a failed write, while a failed retry and an account change stay errors',async()=>{
+test('RISK CLOUD RECOVERY: Undo retries a failed write, while a failed retry and an account change stay errors', async()=>{
  const storage=sharedScannerStorage(),{ctx,shim}=await loadApp({sharedStorage:storage});
- const cloud=recoveringCloudStatusHarness(shim,ctx);
+ // The recovery preflight can outlast 40ms on a slower host. Hold the third
+ // backend acknowledgement so that elapsed time cannot masquerade as a write.
+ let releaseRetry,acknowledgeRetry;
+ const retryGate=new Promise(resolve=>{releaseRetry=resolve;});
+ const retryAcknowledged=new Promise(resolve=>{acknowledgeRetry=resolve;});
+ const cloud=recoveringCloudStatusHarness(shim,ctx,{beforePushAck:attempt=>attempt===3?retryGate:null});
+ const push=cloud.CS.push;
+ cloud.CS.push=async(...args)=>{
+  const attempt=cloud.pushes()+1,result=await push(...args);
+  if(attempt===3)acknowledgeRetry(result);
+  return result;
+ };
  await ctx.cloudPull();
  const task=ctx.addTask('Before Undo');await ctx.persist();ctx.cloudPushNow();await syncSettle(30);
  ctx.openEdit(task.id);fillEditPane(ctx,shim,{title:'After edit'});ctx.onAction('save-edit',{dataset:{id:task.id}});
@@ -20499,9 +20511,18 @@ test('RISK CLOUD RECOVERY: Undo retries a failed write, while a failed retry and
   if(blocked&&(key===LOCAL_HEAD_KEY||key===SYNC_STORE_KEY)){const error=Error('site quota');error.name='QuotaExceededError';throw error;}
   set(key,value);
  };
- ctx.undo();assert.equal(await ctx.persist(),false);
+ ctx.undo();const undoFacts=JSON.stringify(ctx.state.decisionEvents);assert.equal(await ctx.persist(),false);
  blocked=false;assert.equal(await ctx.persist(),true);await syncSettle(40);
+ assert.equal(cloud.pushes(),3,'durable recovery starts the automatic retry without waiting for the ordinary save debounce');
+ assert.equal(ctx.state.tasks.find(row=>row.id===task.id).title,'Before Undo');
+ assert.equal(JSON.parse(storage.getItem(LOCAL_HEAD_KEY)).tasks.find(row=>row.id===task.id).title,'Before Undo',
+  'the exact Undo is durable before its cloud acknowledgement');
+ assert.equal(JSON.stringify(JSON.parse(storage.getItem(LOCAL_HEAD_KEY)).decisionEvents),undoFacts,'the pending durable copy retains the exact edit and Undo facts');
+ assert.equal(cloud.remote().tasks.find(row=>row.id===task.id).title,'After edit','an unacknowledged retry cannot already change the remote');
+ assert.equal(ctx.state.syncDirty,true);assert.equal(shim.document.getElementById('syncBtn').textContent,'☁ syncing');
+ releaseRetry();assert.equal((await retryAcknowledged).ok,true);await flush();
  assert.equal(cloud.remote().tasks.find(row=>row.id===task.id).title,'Before Undo');
+ assert.equal(JSON.stringify(cloud.remote().decisionEvents),undoFacts,'the acknowledgement retains the exact edit and targeted Undo facts');
  assert.equal(cloud.CS.status,'ok');assert.equal(cloud.CS.errorStage,null);
 
  const failed=await loadApp({sharedStorage:sharedScannerStorage()});
