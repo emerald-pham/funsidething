@@ -12803,6 +12803,46 @@ test('RISK decision recovery replacement scope: exact retired branches stay reti
  });
 });
 
+test('RISK decision recovery same-account replacement: Import and Restore keep the selected modern learning baseline intact',async t=>{
+ for(const action of ['import','restore'])await t.test(action,async t=>{
+  const source=await decisionRecoveryApp146(),target=await decisionRecoveryApp146();
+  for(const app of [source,target])t.after(()=>{app.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',app.ctx);});
+  const CS=target.ctx.window.CloudSync;CS.ready=true;target.ctx.cloudPushNow();await syncSettle(45);
+  const raw=JSON.stringify(source.ctx.state),selected=JSON.stringify(source.ctx.state.decisionBaseline),events=JSON.stringify(source.ctx.state.decisionEvents);
+  if(action==='import'){target.shim.document.getElementById('jsonBox').value=raw;assert.equal(await target.ctx.onAction('import-json',{}),true);}
+  else{const row=await target.ctx.saveDurableBackup('manual',raw);target.ctx.confirm=()=>true;target.ctx.openSettings();assert.equal(await target.ctx.restoreDurableBackupById(row.id),true);}
+  await target.ctx.persist();target.ctx.cloudPushNow();await syncSettle(60);assert.equal(target.ctx.state.syncDirty,false);
+  const actual=JSON.parse(JSON.stringify(target.ctx.state.decisionBaseline));delete actual.replacement;
+  assert.equal(JSON.stringify(actual),selected,'same-account replacement must not freeze a new learning baseline or broaden inherited provenance');
+  assert.equal(JSON.stringify(target.ctx.state.decisionEvents),events);assert.equal(target.ctx.state.decisionBaseline.inheritance,undefined);
+ });
+});
+
+test('RISK decision recovery replacement durability: failed selected-source recovery leaves a modern destination and input exact for retry',async t=>{
+ const source=await decisionRecoveryApp146(),target=await decisionRecoveryApp146();
+ for(const app of [source,target])t.after(()=>{app.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',app.ctx);});
+ const CS=target.ctx.window.CloudSync;CS.ready=true;target.ctx.cloudPushNow();await syncSettle(50);
+ const prior=JSON.stringify(target.ctx.state),saved=target.storage.getItem(SYNC_STORE_KEY),cloud=target.h.doc.payload,raw=JSON.stringify(source.ctx.state);
+ const backup=target.ctx.saveDurableBackup;target.ctx.saveDurableBackup=async(kind,...args)=>kind==='decision-replacement-source'?null:backup(kind,...args);
+ target.shim.document.getElementById('jsonBox').value=raw;assert.equal(await target.ctx.onAction('import-json',{}),false);
+ assert.equal(JSON.stringify(target.ctx.state),prior);assert.equal(target.storage.getItem(SYNC_STORE_KEY),saved);assert.equal(target.h.doc.payload,cloud);assert.equal(target.shim.document.getElementById('jsonBox').value,raw);
+ target.ctx.saveDurableBackup=backup;assert.equal(await target.ctx.onAction('import-json',{}),true);await target.ctx.persist();target.ctx.cloudPushNow();await syncSettle(70);
+ assert.equal(target.ctx.state.syncDirty,false);assert.equal(JSON.stringify(target.ctx.state.decisionEvents),JSON.stringify(source.ctx.state.decisionEvents));
+ assert.ok(target.ctx.readLocalBackups().some(row=>row.payload===prior));assert.ok(target.ctx.readLocalBackups().some(row=>row.payload===raw));
+});
+
+test('RISK decision recovery unknown destination: sole recovery authority blocks explicit journal replacement without changing either board',async t=>{
+ for(const key of ['decisionBaselineRecovery','decisionEventsRecovery'])await t.test(key,async t=>{
+  const source=await decisionRecoveryApp146();t.after(()=>{source.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',source.ctx);});
+  const initial=syncState({tasks:[syncTask('protected-recovery','Unknown recovery owner')],syncAccount:'destination@example.com',syncRev:2,syncDirty:false,[key]:[{v:99,opaque:'sole unreplayable destination authority'}]});
+  const h=makeSyncHarness({remote:initial,rev:2,delayMs:1}),app=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)},cloudSyncFactory:()=>{const CS=h.factory();CS.user='destination@example.com';CS.ready=false;return CS;}});
+  t.after(()=>{app.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',app.ctx);});
+  const before=JSON.stringify(app.ctx.state),saved=app.shim.localStorage.getItem(SYNC_STORE_KEY),cloud=h.doc.payload,raw=JSON.stringify(source.ctx.state);
+  app.shim.document.getElementById('jsonBox').value=raw;assert.equal(await app.ctx.onAction('import-json',{}),false,'explicit replacement cannot retire unknown authority without understanding its exact facts');
+  assert.equal(JSON.stringify(app.ctx.state),before);assert.equal(app.shim.localStorage.getItem(SYNC_STORE_KEY),saved);assert.equal(h.doc.payload,cloud);assert.equal(app.shim.document.getElementById('jsonBox').value,raw);
+ });
+});
+
 test('RISK decision recovery inheritance authority: changed attested facts stay held and ordinary account switches gain no consent',async t=>{
  const source=await decisionRecoveryApp146();t.after(()=>{source.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',source.ctx);});
  const raw=JSON.stringify(source.ctx.state),original=source.event,baseline=JSON.stringify(source.ctx.state.decisionBaseline);
@@ -26503,7 +26543,7 @@ test('RISK bulk task editing: failed browser pair save retains in-memory batch a
  shim.localStorage.setItem=write;assert.equal(await ctx.persist(),true);const saved=JSON.parse(shim.localStorage.getItem(SYNC_STORE_KEY));assert.equal(saved.tasks.length,2);assert.equal(saved.tasks.every(t=>t.due==='2027-12-01'),true);
 });
 test('RISK bulk task editing: FAQ and editor qualify mixed Apply and later sync recovery limits',async()=>{
- const {ctx,shim}=await loadApp();ctx.addTask('Private draft');ctx.openHelp();const faq=shim.document.getElementById('modalRoot').innerHTML;assert.match(faq,/conflicts detected before Save stop the whole batch/i);assert.match(faq,/later sync conflict.*newer peer values.*other selected tasks/i);assert.match(faq,/after recovery.*Undo.*earlier board/i);ctx.closeModal();ctx.state.listOpen=true;ctx.onAction('bulk-select-all');ctx.onAction('bulk-edit');assert.match(shim.document.getElementById('modalRoot').innerHTML,/mixed values stay unchanged until you check Apply/i);
+ const {ctx,shim}=await loadApp();ctx.addTask('Private draft');ctx.openHelp();const faq=shim.document.getElementById('modalRoot').innerHTML;assert.match(faq,/conflicts detected before Save stop the whole batch/i);assert.match(faq,/later sync conflict.*compatible changes to different fields/i);assert.match(faq,/One Undo reverses the batch.*keeping unrelated progress/i);assert.doesNotMatch(faq.split('<dt>How does Undo work after Bulk Edit?</dt><dd>')[1].split('</dd>')[0],/earlier board|older peer fields/i);ctx.closeModal();ctx.state.listOpen=true;ctx.onAction('bulk-select-all');ctx.onAction('bulk-edit');assert.match(shim.document.getElementById('modalRoot').innerHTML,/mixed values stay unchanged until you check Apply/i);
 });
 test('RISK bulk task editing: concurrent recovery keeps backups and existing board Undo boundary explicit',async()=>{
  const initial=await loadApp(),a=initial.ctx.addTask('Private A'),b=initial.ctx.addTask('Private B');await initial.ctx.persist();const raw=initial.shim.localStorage.getItem(SYNC_STORE_KEY),storage=sharedScannerStorage({[LOCAL_HEAD_KEY]:raw,[SYNC_STORE_KEY]:raw}),left=await loadApp({sharedStorage:storage}),right=await loadApp({sharedStorage:storage});
@@ -26657,7 +26697,7 @@ test('RISK bulk task guidance: bounded answers retain distinct selection propert
  const {ctx,shim}=await loadApp();ctx.openHelp();const faq=shim.document.getElementById('modalRoot').innerHTML,answers=[...faq.matchAll(/<dt>(.*?)<\/dt><dd>(.*?)<\/dd>/g)].filter(([,q])=>/several tasks together|Bulk Edit|selected tasks change|bulk result count/.test(q));
  assert.equal(answers.length,5,'bulk guidance separates controls, properties, conflicts, Undo and result meanings');
  for(const [,question,answer] of answers)assert.ok(answer.split(/\s+/).filter(Boolean).length<=130,question+' remains independently readable');
- const combined=answers.map(a=>a[2]).join(' ');for(const guidance of ['current filtered list','Apply separately','Clear explicitly','later sync conflict','first Undo may leave batch values','not server confirmation','disappear on reload'])assert.ok(combined.includes(guidance),'retain '+guidance);
+ const combined=answers.map(a=>a[2]).join(' ');for(const guidance of ['current filtered list','Apply separately','Clear explicitly','later sync conflict','One Undo reverses the batch','keeping unrelated progress','not server confirmation','disappear on reload'])assert.ok(combined.includes(guidance),'retain '+guidance);
 });
 
 test('RISK bulk task guidance: enlarged conflict answer uses breakable task status wording',async()=>{
@@ -28589,4 +28629,35 @@ test('RISK cloud current choices: projected Can’t and Return preserve the orig
  assert.equal(cleared.considered[candidate.id],undefined,'the observed Return clears the hold');
  assert.equal(cleared.cantAt[candidate.id],undefined,'the clear removes only the active hold timestamp');
  assert.ok(returned.observedActionIds.includes(cant.id),'Return retains its causal link to the exact hold');
+});
+
+test('RISK independent decision guidance: rendered FAQ and Settings distinguish retained decisions targeted Undo and held evidence',async()=>{
+ const {ctx,shim}=await loadApp();ctx.closeModal();ctx.openHelp();
+ const help=shim.document.getElementById('modalRoot').innerHTML;
+ const answers=new Map([...help.matchAll(/<dt>(.*?)<\/dt><dd>(.*?)<\/dd>/g)].map(row=>[row[1],row[2]]));
+ const answer=q=>{assert.ok(answers.has(q),'mounted FAQ includes '+q);return answers.get(q);};
+ assert.match(answer('Can I use the app offline or on another device?'),/offline decisions.*closing and reopening/i);
+ assert.match(answer('How are conflicting choices resolved?'),/original decision times/i);
+ assert.match(answer('How are conflicting choices resolved?'),/missing.*held|untrusted.*held/i);
+ assert.match(answer('What does Synced confirm?'),/saved on this device.*acknowledged by the server/i);
+ assert.match(answer('What happens to older boards and tabs?'),/ratings.*baseline/i);
+ assert.match(answer('What happens to older boards and tabs?'),/update.*cannot reconstruct|cannot reconstruct.*update/i);
+ assert.match(answer('Can I undo, restore, or remove a task?'),/keeping unrelated decisions/i);
+ assert.match(answer('How does Undo work after Bulk Edit?'),/One Undo reverses the batch.*keeping unrelated progress/i);
+ assert.doesNotMatch(answer('How does Undo work after Bulk Edit?'),/restore an earlier board|older peer fields|leave batch values in place/i);
+ shim.window.CloudSync={configured:true,ready:true,user:'guidance-fixture@example.invalid'};ctx.closeModal();ctx.openSettings();
+ const settings=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(settings,/Independent decisions combine/);
+ assert.match(settings,/conflicting current choices use when each choice was made/);
+ assert.doesNotMatch(settings,/newest revision wins/);
+});
+
+test('RISK independent decision guidance: the actual bulk editor explains scoped reversal and original choice times',async()=>{
+ const {ctx,shim}=await loadApp();ctx.closeModal();ctx.addTask('Isolated guidance task');ctx.state.listOpen=true;
+ ctx.onAction('bulk-select-all');ctx.onAction('bulk-edit');
+ const editor=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(editor,/conflicting choices use when they were made/i);
+ assert.match(editor,/Undo reverses this batch and keeps unrelated progress/i);
+ assert.doesNotMatch(editor,/Undo after recovery restores an earlier board|keep newer peer fields/i);
+ assert.match(editor,/Mixed values stay unchanged until you check Apply/);
 });
