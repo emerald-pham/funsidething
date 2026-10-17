@@ -13025,7 +13025,8 @@ test("adopting a newer remote over unsaved local edits says so, so the edits don
   const el = shim.elements.get("toast");
   assert.ok(el && /out of date/i.test(el.textContent),
     `expected a notice that this tab was replaced, got: ${el && el.textContent}`);
-  assert.match(el.textContent, /↺/, "and it should point at undo as the way back");
+  assert.match(el.textContent, /Settings backups/, "explicit recovery keeps the prior board available");
+  assert.doesNotMatch(el.textContent, /↺|undoes it/, "ordinary Undo must not promise a remote-board replacement");
 
   ctx.undo();
   assert.deepEqual(ctx.state.chain, STALE_CHAIN, "undo really does take the adoption back");
@@ -28540,4 +28541,21 @@ test('RISK independent decision guidance: the actual bulk editor explains scoped
  assert.match(editor,/Undo reverses this batch and keeps unrelated progress/i);
  assert.doesNotMatch(editor,/Undo after recovery restores an earlier board|keep newer peer fields/i);
  assert.match(editor,/Mixed values stay unchanged until you check Apply/);
+});
+
+test('RISK independent decision guidance: actual adoption toast directs recovery without promising remote-board Undo',async()=>{
+ const now=Date.now(),h=makeSyncHarness({remote:cloudState(now)});
+ const {ctx,shim}=await loadApp({seed:147979,seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(staleState(now-30*24*HOUR))},cloudSyncFactory:h.factory});
+ ctx.addTask('Isolated local notification draft',false);await ctx.cloudPull();
+ const text=shim.elements.get('toast')?.textContent||'';
+ assert.match(text,/out of date/i);assert.match(text,/previous board.*Settings backups/i);
+ assert.doesNotMatch(text,/↺|undoes it|Undo restores.*board/i,'ordinary Undo targets a local action, so the adoption notice must offer explicit recovery');
+});
+
+test('RISK independent decision guidance: the actual bulk result keeps confirmation and Undo meanings separate',async()=>{
+ const {ctx,shim}=await loadApp();ctx.closeModal();ctx.addTask('Isolated bulk result task');ctx.state.listOpen=true;
+ ctx.onAction('bulk-select-all');ctx.onAction('bulk-edit');shim.document.getElementById('bulkApplyDue').checked=true;shim.document.getElementById('bulkDue').value='2027-08-12';ctx.onAction('bulk-save');
+ const result=shim.document.getElementById('listBulkToolbar').innerHTML;
+ assert.match(result,/not a server save confirmation/);assert.match(result,/Undo reverses your last action and keeps unrelated progress/);
+ assert.doesNotMatch(result,/earlier whole board|Undo restores.*board/);
 });

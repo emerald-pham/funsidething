@@ -7696,7 +7696,39 @@
     }
   },
   {
-    "testChangesSha256": "2c2db6aa8a8638e60e64cc236bd7e8ef165538e1900932dd9b2a204498b83199",
+    "testChangesSha256": "4a1c079b044f033ebe54de1a2707198a003a156b276870c9e142a28e6bd5b68a",
+    "reason": "Remove an obsolete live cloud-adoption toast promise that header Undo restores the previous remote board; approved scoped Undo preserves independent peer progress.",
+    "previousBehavior": "The actual stale-tab adoption toast said the previous board is in Settings backups and ↺ undoes it; its old regression explicitly required that misleading promise.",
+    "intendedBehavior": "Keep the out-of-date notification and explicit recovery direction while making no whole-board Undo promise. Preserve ordinary local action reversal; #145 owns its separate behavioral assertion.",
+    "replacementTests": [
+      "RISK independent decision guidance: actual adoption toast directs recovery without promising remote-board Undo"
+    ],
+    "preservedCoverage": [
+      "Keep the actual cloud-pull notification trigger, exact prior-board recovery, silent clean adoption, separate account-switch notices and all unrelated FAQ/bulk guidance assertions. The original adoption test behavioral portion remains for #145 scoped Undo integration."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK independent decision guidance: actual adoption toast' tests.js",
+      "failure": "Actual app cloudPull notification failed by rendering the literal ↺ undoes it promise before the toast edit; raw147/toast-guidance-red.log. Direct consumer and existing guidance/adoption cohort then passed8/8 in147/toast-guidance-green.log against the pre-145 root; later #145 preserves the changed ordinary Undo behavior."
+    }
+  },
+  {
+    "testChangesSha256": "026bc3439f78676863d434969871d8a15fc64b3a93c0044f0076686b46c324a1",
+    "reason": "The persistent bulk result retained another obsolete earlier-whole-board Undo warning; align this actual post-Save surface with approved ordinary scoped Undo.",
+    "previousBehavior": "Actual bulk Save displayed accurate local result counts but claimed recovery Undo restores an earlier whole board.",
+    "intendedBehavior": "Keep result counts separate from server confirmation and state that header Undo reverses the last local action while retaining unrelated progress.",
+    "replacementTests": [
+      "RISK independent decision guidance: the actual bulk result keeps confirmation and Undo meanings separate"
+    ],
+    "preservedCoverage": [
+      "Retain all current local match/change counts, late-result updates, recovery backup direction, account-switch result isolation, no separate batch Undo button, form rules and full unrelated guidance."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK independent decision guidance: the actual bulk result' tests.js",
+      "failure": "Actual post-Save listBulkToolbar output failed last-action Undo wording and contained the prior whole-board warning before source edit; raw147/bulk-result-guidance-red.log. Focused existing/new guidance and result consumers then pass147/bulk-result-guidance-green.log."
+    }
+  },
+  {
+    "testChangesSha256": "aee891341cda55cddba6ee39ce9db63e5dac89fdf0b6d2448165728863c5547d",
     "reason": "Concurrent task-context membership additions were discarded when otherwise compatible editor choices observed different acknowledged cloud revisions.",
     "previousBehavior": "A phone and stale peer both captured the exact same empty ctx before value but different nonempty base IDs. The projector treated that as an incompatible whole-list conflict and kept only the last action's membership.",
     "intendedBehavior": "Compose per-context membership deltas across distinct attested cloud bases only when all concurrent root facts capture the exact same before presence and value. Keep the conservative whole-list winner for different before snapshots and for missing exact bases.",
@@ -7709,7 +7741,7 @@
     ],
     "redEvidence": {
       "command": "node --test --test-reporter=spec --test-name-pattern='RISK cloud current choices: context membership additions compose across observed revisions' tests.js",
-      "failure": "On 947c3bec1076a729257185142bf17da066bb441a, the full-app peer pull retained only ctx-peer after phone's ctx-phone choice. Raw /Users/emeraldpham/.codex/task-artifacts/decision-sync-141/144/context-delta-red-before-fix.txt includes distinct action IDs/base IDs and both exact before:{present:true,value:[]} records. The fixed consumer passes on integrated d68c7ba."
+      "failure": "On 947c3bec1076a729257185142bf17da066bb441a, the full-app peer pull retained only ctx-peer after phone's ctx-phone choice. Raw /Users/emeraldpham/.codex/task-artifacts/decision-sync-141/144/context-delta-red-before-fix.txt includes distinct action IDs/base IDs and both exact before:{present:true,value:[]} records. The fixed consumer passes on integrated root checkpoint e480c2c."
     }
   }
 ]

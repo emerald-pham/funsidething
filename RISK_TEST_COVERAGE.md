@@ -1265,6 +1265,8 @@ Durable exact displaced-baseline/fact receipts retire only explicitly replaced a
 
 - `RISK independent decision guidance: rendered FAQ and Settings distinguish retained decisions targeted Undo and held evidence`
 - `RISK independent decision guidance: the actual bulk editor explains scoped reversal and original choice times`
+- `RISK independent decision guidance: actual adoption toast directs recovery without promising remote-board Undo`
+- `RISK independent decision guidance: the actual bulk result keeps confirmation and Undo meanings separate`
 
 The mounted FAQ and Settings explain durable offline decisions, narrow original-time conflicts, exact acknowledgement, preserved inherited ratings, safely held unrecorded legacy work, and ordinary targeted Undo. Existing bulk form, conflict, readability and historical changelog protections remain.
 ## Replacement source preservation (#146)
