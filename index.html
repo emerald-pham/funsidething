@@ -2837,6 +2837,7 @@ async function persist(backupAlreadySafe=false,preserveBackupId=null,deviceRetry
   catch(e){ toast("Couldn't save just now — will retry on your next change."); return false; }
 }
 function save(preserveBackupId=null){
+  sealUndoFrame();
   state.updatedAt = Date.now();
   state.syncDirty = true;
   cloudPush();
@@ -3446,7 +3447,7 @@ function decisionStartIssue(board){
 function supportedDecisionReplacement(receipt,account){
   if(!receipt || typeof receipt!=="object" || Array.isArray(receipt) || receipt.v!==1
     || Object.keys(receipt).some(key=>!["v","reason","account","actionId","at","baseline","facts"].includes(key))
-    || !["explicit-import","explicit-restore","explicit-undo"].includes(receipt.reason) || receipt.account!==account
+    || !["explicit-import","explicit-restore","explicit-undo","explicit-reset"].includes(receipt.reason) || receipt.account!==account
     || !decisionId(receipt.actionId) || !Number.isFinite(receipt.at) || receipt.at<0
     || !supportedDecisionBaseline(receipt.baseline) || receipt.baseline.account!==account
     || !Array.isArray(receipt.facts) || new Set(receipt.facts.map(fact=>fact?.id)).size!==receipt.facts.length)return false;
@@ -3519,6 +3520,7 @@ function decisionProjectionIssue(board,checkCoherence=true){
   if(decisionStartIssue(board))return "unprojectable-decision-evidence";
   const ratings=decisionBaselineRatings(baseline);
   if(ratings.conflicts.size || decisionEventOrder(board,baseline).blockedIds.size)return "unprojectable-decision-evidence";
+  const undoIssue=decisionUndoIssue(board);if(undoIssue)return undoIssue;
   const retiredHistory=replacementDecisionReceipts(baseline).flatMap(receipt=>[
     ...(receipt.baseline.observedRatingHistoryIds||[]),...receipt.baseline.includedActionIds,...receipt.facts.map(fact=>fact.id)]);
   const representedHistory=new Set([...(baseline.observedRatingHistoryIds||[]),...baseline.includedActionIds,...rows.map(event=>event?.id),...retiredHistory]);
@@ -3603,6 +3605,7 @@ function initializeReplacedScan(){
   return JSON.stringify(state) !== before;
 }
 function replaceState(next){
+  sealUndoFrame();
   const keep = {};
   for(const k of DEVICE_LOCAL_KEYS) keep[k] = state ? state[k] : undefined;
   state = next;
@@ -4025,9 +4028,16 @@ async function cloudPull(){
         }
         if(!useLocal) persist();
       }catch(e){ holdAdoption(); return; }
-      if(!switchedAccount){
-        undoStack.push({snapshot:undoBoard,generation:priorMarkers.generation});
-        if(undoStack.length>30) undoStack.shift();
+      if(!switchedAccount&&(JSON.parse(priorBoard).syncAccount??null)===null){
+        // Legacy local gestures that this successful adoption retained still
+        // belong to this tab. Bind only metadata-free guest frames; modern
+        // guest decisions require the explicit inherited-fact proof instead.
+        for(const frame of undoStack){
+          const before=JSON.parse(frame.snapshot),after=JSON.parse(frame.after||frame.snapshot);
+          if((before.syncAccount??null)===null&&(after.syncAccount??null)===null
+            &&after.decisionBaseline===undefined&&(after.decisionEvents===undefined
+              ||Array.isArray(after.decisionEvents)&&after.decisionEvents.length===0))frame.adoptedOwner=acct;
+        }
       }
       lastPushed = rr===null || repairedScan || remoteDeletionLogRepaired ? "" : remotePayload;
       applyTheme();
@@ -4086,9 +4096,53 @@ window.addEventListener("online", ()=>{cloudRetryAttempt=0;resumeCloudSync();});
 document.addEventListener("visibilitychange", ()=>{if(document.hidden)suspendCloudSync();else resumeCloudSync();});
 document.addEventListener("focusout", ()=>setTimeout(resumeDeferredCloudPull, 0));
 document.addEventListener("close", resumeDeferredCloudPull, true);
-function pushUndo(){
-  undoStack.push({snapshot:JSON.stringify(state), generation:chanceGeneration});
+function sealUndoFrame(){
+  // Freeze the local gesture before a later save/adoption can add peer effects.
+  const frame=undoStack.at(-1);
+  if(frame&&!frame.after)frame.after=JSON.stringify(state);
+}
+function pushUndo(kind="ordinary"){
+  sealUndoFrame();
+  undoStack.push({snapshot:JSON.stringify(state), generation:chanceGeneration,kind});
   if(undoStack.length > 30) undoStack.shift();
+}
+function scopedUndoState(frame){
+  // Reverse only the sealed local delta against the current board. Existing
+  // domain replacement writers below retain causal completion/delete evidence;
+  // comparison and typed-choice facts are reversed by their immutable IDs.
+  const before=JSON.parse(frame.snapshot),after=JSON.parse(frame.after),next=JSON.parse(JSON.stringify(state));
+  const equal=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+  const inverse=(target,prior,applied,skip=new Set())=>{
+    for(const key of new Set([...Object.keys(prior||{}),...Object.keys(applied||{})])){
+      if(skip.has(key)||equal(prior?.[key],applied?.[key]))continue;
+      const a=prior?.[key],b=applied?.[key];
+      if(a&&b&&typeof a==="object"&&typeof b==="object"&&!Array.isArray(a)&&!Array.isArray(b)
+          &&target[key]&&typeof target[key]==="object"&&!Array.isArray(target[key]))inverse(target[key],a,b);
+      else if(equal(target[key],b)||(key==="comparisonOps"&&Array.isArray(target[key])&&Array.isArray(b)
+        &&JSON.stringify(target[key].map(row=>JSON.stringify(row)).sort())===JSON.stringify(b.map(row=>JSON.stringify(row)).sort()))){
+        if(Object.hasOwn(prior,key))target[key]=JSON.parse(JSON.stringify(a));else delete target[key];
+      }
+    }
+  };
+  const taskSkip=new Set(["ratingHistory","ratingHistoryHead"]);
+  for(const task of after.tasks){
+    const prior=before.tasks.find(row=>row.id===task.id),current=next.tasks.find(row=>row.id===task.id);
+    if(prior&&current)inverse(current,prior,task,taskSkip);
+    else if(!prior&&current&&equal(current,task))next.tasks=next.tasks.filter(row=>row.id!==task.id);
+  }
+  for(const task of before.tasks)if(!after.tasks.some(row=>row.id===task.id)&&!next.tasks.some(row=>row.id===task.id))next.tasks.push(JSON.parse(JSON.stringify(task)));
+  for(const key of ["chain","workLog","contexts"]){
+    const identity=row=>key==="workLog"?historyEntryKey(row):key==="contexts"?row.id:row;
+    const prior=before[key]||[],applied=after[key]||[],current=next[key]||[];
+    const added=new Set(applied.filter(row=>!prior.some(old=>identity(old)===identity(row))).map(identity));
+    next[key]=current.filter(row=>!added.has(identity(row)));
+    for(const row of prior)if(!applied.some(old=>identity(old)===identity(row))&&!next[key].some(old=>identity(old)===identity(row)))next[key].push(JSON.parse(JSON.stringify(row)));
+    if(key==="contexts")for(const row of next[key]){
+      const a=prior.find(old=>old.id===row.id),b=applied.find(old=>old.id===row.id);if(a&&b)inverse(row,a,b);
+    }
+  }
+  inverse(next,before,after,new Set(["tasks","contexts","chain","workLog","decisionEvents","decisionBaseline","decisionBase",...DEVICE_LOCAL_KEYS]));
+  return next;
 }
 function undo(){return TaskActionOwner.undo();}
 
@@ -4964,13 +5018,50 @@ const taskActionOwnerBundle=(()=>{
     }
     return false;
   }
-  function undo(){
+  async function undoReplacement(frame){
+    if(frame.pending)return false;
+    frame.pending=true;
+    const prior=JSON.stringify(state),backend=window.CloudSync,account=backend?.user??null,next=JSON.parse(frame.snapshot);
+    try{
+      if(!sameListOwner(next,state))return false;
+      if(!await prepareDecisionReplacement(next,state,"explicit-undo"))return false;
+      if(JSON.stringify(state)!==prior||window.CloudSync!==backend||(window.CloudSync?.user??null)!==account||undoStack.at(-1)!==frame){
+        toast("Undo stopped: the board or signed-in account changed. The recovery copy is in Settings backups.",7000);return false;
+      }
+      return undo(next,frame);
+    }finally{delete frame.pending;}
+  }
+  function undo(preparedNext=null,expectedFrame=null){
     if(!undoStack.length)return false;
-    const currentChance=state.chance,frame=undoStack.at(-1),next=JSON.parse(frame.snapshot);
+    sealUndoFrame();
+    const currentChance=state.chance,frame=undoStack.at(-1),before=JSON.parse(frame.snapshot),after=JSON.parse(frame.after);
+    if(expectedFrame&&frame!==expectedFrame)return false;
+    const inheritedGuest=(before.syncAccount??null)===null&&(state.decisionBaseline?.inheritance||[]).some(receipt=>
+      receipt.reason==="guest-first-empty-account"&&receipt.sourceAccount===null
+      &&canonicalDecisionFact(receipt.sourceBaseline)===canonicalDecisionFact(after.decisionBaseline));
+    const adoptedLegacy=(before.syncAccount??null)===null&&frame.adoptedOwner===state.syncAccount;
+    if(!sameListOwner(before,state)&&!inheritedGuest&&!adoptedLegacy){undoStack=[];return false;}
+    if(!preparedNext&&frame.kind==="replacement"&&(state.decisionBaseline||state.decisionEvents||before.decisionBaseline||before.decisionEvents))return undoReplacement(frame);
+    const next=preparedNext||(frame.kind==="replacement"?before:scopedUndoState(frame));
     if(!sameListOwner(next,state)){undoStack=[];return false;}
+    const priorIds=new Set((Array.isArray(before.decisionEvents)?before.decisionEvents:[]).map(row=>row?.id));
+    const targets=(Array.isArray(after.decisionEvents)?after.decisionEvents:[]).filter(row=>!priorIds.has(row?.id)&&supportedDecisionEvent(row)&&row.kind!=="undo");
+    let cancellation=null;
+    if(frame.kind!=="replacement"&&targets.length){
+      const gesture=captureDecisionGesture();
+      cancellation={...decisionGestureFields(gesture,gesture.at),v:1,id:uid(),kind:"undo",baselineId:state.decisionBaseline?.id,
+        targetActionId:targets[0].actionId||targets[0].id,targetEventIds:targets.map(row=>row.id)};
+      const root=targets.find(event=>event.kind==="current-choice"&&event.target?.type==="pass"&&event.target.property==="chain");
+      const mode=targets.find(event=>event.kind==="current-choice"&&event.target?.type==="pass"&&event.target.property==="scanMode");
+      if(root&&mode)cancellation.passBefore={passId:root.passId,passAt:root.passAt,chainIds:root.chainIds.slice(),mode:before.mode,
+        scanMode:mode.before.value.mode,chance:JSON.parse(JSON.stringify(mode.before.value.chance))};
+      appendDecisionEvent(cancellation,next);
+    }
     const inputs=t=>t&&[t.mu,t.sigma,t.done,t.ctx,t.startsAt,t.evergreen,t.evergreenHours,t.evergreenResetAtDay,t.lastDoneAt,taskPrerequisiteIds(t),t.dependencyModes];
-    const ids=next.tasks.filter(t=>JSON.stringify(inputs(t))!==JSON.stringify(inputs(taskById(t.id)))).map(t=>t.id);
+    const replayLearning=targets.some(event=>event.kind==="no"||event.kind==="comparison");
+    const ids=next.tasks.filter(t=>replayLearning||JSON.stringify(inputs(t))!==JSON.stringify(inputs(taskById(t.id)))).map(t=>t.id);
     const observation=captureRatingObservation("undo",ids);
+    if(cancellation)observation.id=cancellation.id;
     undoStack.pop();
     // Replacement preserves deletion evidence and immutable observations.
     markReplacementDeletes(next);
@@ -4981,8 +5072,9 @@ const taskActionOwnerBundle=(()=>{
       if(typeof head==="string"&&Array.isArray(task.ratingHistory)&&task.ratingHistory.some(row=>row?.id===head&&validRatingHistoryRow(row)))task.ratingHistoryHead=head;
     }
     replaceState(next);
+    if(cancellation)projectDecisionEvents(state);
     // Restore ratings without replaying a fresh-pass/day random draw.
-    if(currentChance&&Date.now()<passResetCutoff(currentChance.at)&&
+    if(!targets.some(event=>event.kind==="current-choice"&&event.target?.type==="pass"&&event.target.property==="scanMode")&&currentChance&&Date.now()<passResetCutoff(currentChance.at)&&
       (frame.generation!==chanceGeneration||(state.chance&&Date.now()>=passResetCutoff(state.chance.at)))){
       ensureCandidate();state.chance=currentChance;state.candidateId=null;
     }
@@ -5674,6 +5766,7 @@ function supportedDecisionEvent(event){
     ||!Array.isArray(event.chainIds)||!event.chainIds.every(decisionId)
     ||!decisionIdList(event.observedActionIds)||event.observedActionIds.includes(event.id))return false;
   if(event.kind==="current-choice")return typeof supportedCurrentChoiceEvent==="function"&&supportedCurrentChoiceEvent(event);
+  if(event.kind==="undo")return supportedDecisionUndoEvent(event);
   if(event.kind==="no")return event.meaning==="benchmark-preferred"&&decisionId(event.candidateId)&&decisionId(event.benchmarkId)
     &&event.candidateId!==event.benchmarkId&&Array.isArray(event.candidateContextIds)&&event.candidateContextIds.every(decisionId)
     &&Array.isArray(event.benchmarkContextIds)&&event.benchmarkContextIds.every(decisionId)
@@ -5684,6 +5777,59 @@ function supportedDecisionEvent(event){
   return decisionId(event.taskId)&&decisionId(event.winnerId)&&event.winnerId===event.taskId
     &&(event.action==="dot"&&event.ratingApplied===false&&event.loserId===null
       ||decisionId(event.loserId)&&event.loserId!==event.winnerId);
+}
+function supportedDecisionUndoEvent(event){
+  const fields=["v","id","at","account","baseId","baselineId","actionId","passId","passAt","scanMode","chainIds","observedActionIds","kind","targetActionId","targetEventIds","passBefore"];
+  return !!event&&typeof event==="object"&&!Array.isArray(event)&&event.v===1&&event.kind==="undo"
+    &&Object.keys(event).every(key=>fields.includes(key))&&decisionId(event.id)&&Number.isFinite(event.at)&&event.at>=0
+    &&(event.account===null||typeof event.account==="string"&&!!event.account)
+    &&(event.baseId===null||decisionId(event.baseId))&&(event.actionId===undefined||decisionId(event.actionId))
+    &&(event.passId===null||decisionId(event.passId))&&Number.isFinite(event.passAt)&&event.passAt>=0
+    &&["descending","chance","squared","halving"].includes(event.scanMode)&&decisionIdList(event.chainIds)
+    &&decisionIdList(event.observedActionIds)&&!event.observedActionIds.includes(event.id)
+    &&decisionId(event.baselineId)&&decisionId(event.targetActionId)
+    &&decisionIdList(event.targetEventIds)&&event.targetEventIds.length>0
+    &&!event.targetEventIds.includes(event.id)
+    &&(event.passBefore===undefined||supportedUndoPassBefore(event.passBefore));
+}
+function supportedUndoPassBefore(value){
+  return !!value&&typeof value==="object"&&!Array.isArray(value)
+    &&Object.keys(value).length===6&&Object.keys(value).every(key=>["passId","passAt","chainIds","mode","scanMode","chance"].includes(key))
+    &&decisionId(value.passId)&&Number.isFinite(value.passAt)&&value.passAt>=0&&decisionIdList(value.chainIds)
+    &&["work","scan"].includes(value.mode)&&currentChoiceValueSupported("pass","scanMode",{mode:value.scanMode,chance:value.chance});
+}
+function decisionUndoTargets(board){
+  return decisionUndoResolution(board).cancelled;
+}
+function decisionUndoIssue(board){return decisionUndoResolution(board).issue;}
+function decisionUndoResolution(board){
+  const baseline=board?.decisionBaseline,cancelled=new Set();
+  if(!supportedDecisionBaseline(baseline))return {cancelled,issue:null};
+  const {events}=decisionEventOrder(board,baseline),byId=new Map();
+  for(const row of Array.isArray(board.decisionEvents)?board.decisionEvents:[])
+    if(supportedDecisionEvent(row)&&(row.account===baseline.account||attestedDecisionEvent(baseline,row)))byId.set(row.id,row);
+  for(const event of events){
+    if(event.kind!=="undo")continue;
+    if(!decisionBaselineAcceptsEvent(baseline,event))return {cancelled,issue:"unprojectable-decision-undo"};
+    const targets=event.targetEventIds.map(id=>byId.get(id));
+    if(targets.some(row=>!row||row.kind==="undo"||(row.account!==event.account&&!attestedDecisionEvent(baseline,row))
+      ||(row.actionId||row.id)!==event.targetActionId))return {cancelled,issue:"unprojectable-decision-undo"};
+    const group=[...byId.values()].filter(row=>row.kind!=="undo"&&(row.actionId||row.id)===event.targetActionId&&row.account===targets[0].account);
+    if(group.length!==targets.length||group.some(row=>!event.targetEventIds.includes(row.id)))return {cancelled,issue:"unprojectable-decision-undo"};
+    if(event.passBefore!==undefined){
+      const root=targets.find(row=>row.kind==="current-choice"&&row.target?.type==="pass"&&row.target.property==="chain");
+      const mode=targets.find(row=>row.kind==="current-choice"&&row.target?.type==="pass"&&row.target.property==="scanMode");
+      if(targets.length!==2||!root||!mode||!currentChoiceStartEnvelopeMatches(mode,root)
+        ||event.passBefore.passId!==root.passId||event.passBefore.passAt!==root.passAt
+        ||JSON.stringify(event.passBefore.chainIds)!==JSON.stringify(root.chainIds)
+        ||JSON.stringify({mode:event.passBefore.scanMode,chance:event.passBefore.chance})!==JSON.stringify(mode.before.value))
+        return {cancelled,issue:"unprojectable-decision-undo"};
+    }
+    const ancestors=currentChoiceAncestors(event,byId);
+    if(targets.some(row=>!ancestors.has(row.id)))return {cancelled,issue:"unprojectable-decision-undo"};
+    for(const target of targets)cancelled.add(target.id);
+  }
+  return {cancelled,issue:null};
 }
 function decisionBaselineRecoveryRows(board){
   const value=board?.decisionBaselineRecovery;
@@ -5920,19 +6066,49 @@ function decisionNoHistoryProvesRating(board,event,ratings){
     &&benchmark.mu===benchmarkRow.before.mu&&benchmark.sigma===benchmarkRow.before.sigma
     &&candidateRow.after.mu!==candidateRow.before.mu&&benchmarkRow.after.mu!==benchmarkRow.before.mu;
 }
-function projectDecisionEvents(board=state){
+function projectDecisionEvents(board=state,inheritedCancellations=null){
   const baseline=board?.decisionBaseline,account=Object.hasOwn(board,"syncAccount")?board.syncAccount:baseline?.account??window.CloudSync?.user??null;
   if(!supportedDecisionBaseline(baseline,account)||decisionProjectionIssue(board,false))return false;
   const before=JSON.stringify([(board.tasks||[]).map(task=>[task.id,task.mu,task.sigma]),board.chain,board.considered,board.cantAt,board.workedAt,board.scanMode,board.settings?.scanMode]);
   if(typeof projectDecisionPassBase==="function")projectDecisionPassBase(board);
   const {values:ratings,conflicts}=decisionBaselineRatings(baseline);
   const {events,blockedIds}=decisionEventOrder(board,baseline);
+  const cancelled=new Set([...decisionUndoTargets(board),...(inheritedCancellations||[])]);
   for(const row of baseline.ratings)ratings.set(row.taskId,{mu:row.mu,sigma:row.sigma});
+  // Explicit ownership adoption embodies source learning without changing the
+  // source facts. Undo reconstructs that exact source, then later owner facts
+  // still replay once against the reconstructed values.
+  for(const receipt of baseline.inheritance||[]){
+    if(!receipt.sourceBaseline||!receipt.facts.some(fact=>cancelled.has(fact.id)))continue;
+    const source=JSON.parse(JSON.stringify(board));
+    source.syncAccount=receipt.sourceAccount;source.decisionBaseline=JSON.parse(JSON.stringify(receipt.sourceBaseline));
+    source.decisionEvents=receipt.facts.map(fact=>JSON.parse(LZString.decompressFromUTF16(fact.witness)));
+    const sourceHistory=new Set([...(source.decisionBaseline.observedRatingHistoryIds||[]),...source.decisionEvents.map(event=>event.id)]);
+    for(const task of source.tasks)if(Array.isArray(task.ratingHistory))task.ratingHistory=task.ratingHistory.filter(row=>sourceHistory.has(row.id));
+    delete source.decisionBaselineRecovery;delete source.decisionEventsRecovery;
+    projectDecisionEvents(source,cancelled);
+    const sourceRatings=decisionBaselineRatings(receipt.sourceBaseline).values;
+    for(const task of source.tasks)if(sourceRatings.has(task.id)&&ratings.has(task.id))ratings.set(task.id,{mu:task.mu,sigma:task.sigma});
+    for(const event of source.decisionEvents)if(cancelled.has(event.id)&&event.passId===board.passId
+      &&(event.kind==="no"||event.kind==="comparison")){
+      const id=event.kind==="no"?event.candidateId:event.taskId,kind=source.considered?.[id];
+      if(board.tasks.find(task=>task.id===id)?.done)continue;
+      const value=kind==="cant"?{kind,at:source.cantAt?.[id]}:kind==="worked"?{kind,at:source.workedAt?.[id]}:{kind};
+      applyCurrentChoiceDisposition(board,id,{present:["no","cant","worked","dislodged"].includes(kind),value});
+    }
+  }
   // Every rating starts at the one frozen inherited value. Legacy ratingHistory
   // remains visible evidence but is never reverse-engineered into comparisons.
   for(const task of board.tasks||[]){const rating=ratings.get(task.id);if(rating){task.mu=rating.mu;task.sigma=rating.sigma;}}
   const activePass=decisionId(board.passId)?board.passId:null,passEvents=events.filter(event=>event.passId===activePass);
+  for(const event of passEvents)if(cancelled.has(event.id)&&(event.kind==="no"||event.kind==="comparison")){
+    const id=event.kind==="no"?event.candidateId:event.taskId,kind=baseline.considered?.[id];
+    if(board.tasks?.find(task=>task.id===id)?.done)continue;
+    const value=kind==="cant"?{kind,at:baseline.cantAt?.[id]}:kind==="worked"?{kind,at:baseline.workedAt?.[id]}:{kind};
+    applyCurrentChoiceDisposition(board,id,{present:["no","cant","worked","dislodged"].includes(kind),value});
+  }
   for(const event of events){
+    if(cancelled.has(event.id))continue;
     if(!decisionBaselineAcceptsEvent(baseline,event)||event.ratingApplied!==true&&event.kind!=="no")continue;
     const canTrain=event.kind==="comparison"&&event.ratingApplied===true
       ||event.kind==="no"&&(event.ratingApplied===true||decisionNoHistoryProvesRating(board,event,ratings));
@@ -5952,6 +6128,7 @@ function projectDecisionEvents(board=state){
     const start=passEvents[0].chainIds.filter(id=>board.tasks?.some(task=>task.id===id&&!task.done));
     const chain=[...new Set(start)];
     for(const event of passEvents){
+      if(cancelled.has(event.id))continue;
       const id=event.kind==="no"?null:event.kind==="comparison"&&event.action!=="dislodge"?event.taskId:null;
       if(event.kind==="comparison"&&event.action==="dislodge"){
         const index=chain.indexOf(event.taskId);if(index>=0)chain.splice(index,1);
@@ -5966,6 +6143,7 @@ function projectDecisionEvents(board=state){
   }
   const disposition=new Map();
   for(const event of passEvents){
+    if(cancelled.has(event.id))continue;
     const id=event.kind==="no"?event.candidateId:event.kind==="comparison"?event.taskId:null;
     if(!id)continue;
     if(event.kind==="no")disposition.set(id,"no");
@@ -5977,7 +6155,7 @@ function projectDecisionEvents(board=state){
     if(value==="clear"){delete board.considered[id];if(board.cantAt)delete board.cantAt[id];if(board.workedAt)delete board.workedAt[id];}
     else board.considered[id]=value;
   }
-  if(typeof projectCurrentChoiceEvents==="function")projectCurrentChoiceEvents(board);
+  if(typeof projectCurrentChoiceEvents==="function")projectCurrentChoiceEvents(board,cancelled);
   recomputeProjectedDecisionRanks(board);
   return before!==JSON.stringify([(board.tasks||[]).map(task=>[task.id,task.mu,task.sigma]),board.chain,board.considered,board.cantAt,board.workedAt,board.scanMode,board.settings?.scanMode]);
 }
@@ -6242,11 +6420,18 @@ function currentChoiceStartEnvelopeMatches(modeEvent,chainEvent){
 }
 function projectDecisionPassBase(board=state){
   if(!board||typeof board!=="object"||Array.isArray(board)||!Array.isArray(board.tasks))return false;
-  const source=Array.isArray(board.decisionEvents)?board.decisionEvents:[],byId=currentChoiceProjectionIndex(source);
+  const source=Array.isArray(board.decisionEvents)?board.decisionEvents:[],byId=currentChoiceProjectionIndex(source),cancelled=decisionUndoTargets(board);
+  for(const event of source)if(event?.kind==="undo"&&supportedDecisionEvent(event)&&event.passBefore){
+    const root=event.targetEventIds.map(id=>byId.get(id)).find(row=>row?.kind==="current-choice"&&row.target?.property==="chain");
+    if(!root||!cancelled.has(root.id)||board.passId!==root.target.id)continue;
+    const prior=event.passBefore;
+    board.passId=prior.passId;board.passStartedAt=prior.passAt;board.chain=prior.chainIds.slice();board.mode=prior.mode;
+    board.scanMode=prior.scanMode;board.chance=JSON.parse(JSON.stringify(prior.chance));board.candidateId=null;board.interventionActive=false;
+  }
   const account=typeof board.syncAccount==="string"&&board.syncAccount?board.syncAccount:null;
   const baselineIds=new Set(Array.isArray(board.decisionBaseline?.includedActionIds)?board.decisionBaseline.includedActionIds:[]);
   const roots=[...byId.values()].filter(event=>event.kind==="current-choice"&&event.target?.type==="pass"&&
-    event.target.property==="chain"&&event.account===account);
+    event.target.property==="chain"&&event.account===account&&!cancelled.has(event.id));
   const groups=[];
   for(const root of roots){
     const modeRows=[...byId.values()].filter(event=>event.kind==="current-choice"&&event.target?.type==="pass"&&
@@ -6296,8 +6481,14 @@ function latestCurrentChoiceEvent(events,byId){
   maxima.sort((a,b)=>a.at-b.at||(a.id<b.id?-1:a.id>b.id?1:0));
   return maxima.at(-1);
 }
-function currentChoiceDispositionActions(board,events){
+function currentChoiceDecisionOwner(event,board,cancelled){
+  return attestedDecisionEvent(board.decisionBaseline,event)?cancelled.has(event.id)
+    :event.account===(typeof board.syncAccount==="string"&&board.syncAccount?board.syncAccount:null);
+}
+function currentChoiceDispositionActions(board,events,cancellationOverride=null){
   const byTask=new Map(),passId=currentChoicePassId(board),tasks=new Set(board.tasks.map(task=>task?.id).filter(id=>typeof id==="string"&&id));
+  const cancelled=cancellationOverride||decisionUndoTargets(board),byId=currentChoiceProjectionIndex(events);
+  const dispositionEvents=events.filter(event=>event.kind==="current-choice"&&event.target?.property==="disposition"&&currentChoiceDecisionOwner(event,board,cancelled));
   const add=(id,event,present,value,passScoped)=>{
     if(!tasks.has(id)||event.passId!==passId&&passScoped)return;
     if(board.tasks.find(task=>task?.id===id)?.done===true)return;
@@ -6305,7 +6496,16 @@ function currentChoiceDispositionActions(board,events){
   };
   for(const event of events){
     if(!supportedCurrentChoiceProjectionRecord(event))continue;
-    if(event.account!==(typeof board.syncAccount==="string"&&board.syncAccount?board.syncAccount:null))continue;
+    if(!currentChoiceDecisionOwner(event,board,cancelled))continue;
+    if(cancelled.has(event.id)){
+      if(event.kind==="current-choice"&&event.target?.property==="disposition"){
+        const others=dispositionEvents.filter(row=>row.target.id===event.target.id&&!cancelled.has(row.id));
+        const earlier=dispositionEvents.filter(row=>row.target.id===event.target.id&&cancelled.has(row.id)
+          &&currentChoiceAncestors(event,byId).has(row.id));
+        if(!others.length&&!earlier.length)add(event.target.id,event,event.before.present,event.before.present?event.before.value:null,false);
+      }
+      continue;
+    }
     if(event.kind==="current-choice"&&event.target?.type==="task"&&event.target.property==="disposition"){
       const beforeKind=event.before?.present?event.before.value?.kind:null,afterKind=event.after?.present?event.value?.kind:null;
       if(event.after?.present===true&&afterKind!=="cant"&&afterKind!=="worked")continue;
@@ -6342,7 +6542,7 @@ function applyCurrentChoiceDisposition(board,id,choice){
   }
   return before!==JSON.stringify([Object.hasOwn(considered,id)?considered[id]:null,Object.hasOwn(cantAt,id)?cantAt[id]:null,Object.hasOwn(workedAt,id)?workedAt[id]:null]);
 }
-function projectCurrentChoiceContextProperty(task,events,byId){
+function projectCurrentChoiceContextProperty(task,events,byId,cancelled=new Set()){
   if(!task||!Array.isArray(events)||!events.length)return false;
   const ordered=events.slice().sort((a,b)=>a.at-b.at||(a.id<b.id?-1:a.id>b.id?1:0)),memo=new Map();
   const minima=ordered.filter(event=>!ordered.some(other=>other.id!==event.id&&currentChoiceAncestors(event,byId,memo).has(other.id)));
@@ -6358,6 +6558,7 @@ function projectCurrentChoiceContextProperty(task,events,byId){
   }
   const initial=base.before.present?base.before.value.slice():[],members=new Set(initial),perContext=new Map();
   for(const event of ordered){
+    if(cancelled.has(event.id))continue;
     const before=new Set(event.before.present?event.before.value:[]),after=new Set(event.after.present?event.value:[]);
     for(const id of new Set([...before,...after]))if(before.has(id)!==after.has(id)){
       const rows=perContext.get(id)||[];rows.push({event,present:after.has(id)});perContext.set(id,rows);
@@ -6374,18 +6575,18 @@ function projectCurrentChoiceContextProperty(task,events,byId){
   const next=initial.filter(id=>members.has(id));
   for(const row of added)if(members.has(row.id)&&!next.includes(row.id))next.push(row.id);
   const prior=Object.hasOwn(task,"ctx")?JSON.stringify(task.ctx):null;
-  const present=base.before.present||next.length>0||ordered.some(event=>event.after.present);
+  const present=base.before.present||next.length>0||ordered.some(event=>!cancelled.has(event.id)&&event.after.present);
   if(present)task.ctx=next;else delete task.ctx;
   return prior!==(Object.hasOwn(task,"ctx")?JSON.stringify(task.ctx):null);
 }
-function projectCurrentChoiceEvents(board=state){
+function projectCurrentChoiceEvents(board=state,cancellationOverride=null){
   if(!board||typeof board!=="object"||Array.isArray(board)||!Array.isArray(board.tasks))return false;
-  const events=Array.isArray(board.decisionEvents)?board.decisionEvents:[],byId=currentChoiceProjectionIndex(events);let changed=false;
+  const events=Array.isArray(board.decisionEvents)?board.decisionEvents:[],byId=currentChoiceProjectionIndex(events),cancelled=cancellationOverride||decisionUndoTargets(board);let changed=false;
   const taskById=new Map(board.tasks.filter(task=>task&&typeof task.id==="string"&&task.id&&!Object.hasOwn(Object.prototype,task.id)).map(task=>[task.id,task]));
   const properties=new Map();
   for(const event of byId.values()){
     if(event.kind!=="current-choice"||!supportedCurrentChoiceEvent(event)||
-        event.account!==(typeof board.syncAccount==="string"&&board.syncAccount?board.syncAccount:null))continue;
+        !currentChoiceDecisionOwner(event,board,cancelled))continue;
     const {type,id,property}=event.target;
     if(type==="task"&&!taskById.has(id))continue;
     if(type==="task"&&property==="disposition")continue;
@@ -6397,11 +6598,18 @@ function projectCurrentChoiceEvents(board=state){
     const key=JSON.stringify([type,id,property]),rows=properties.get(key)||[];rows.push(event);properties.set(key,rows);
   }
   for(const [key,rows] of properties){
-    const winner=latestCurrentChoiceEvent(rows,byId);if(!winner)continue;
+    const active=rows.filter(row=>!cancelled.has(row.id));
+    let winner=latestCurrentChoiceEvent(active,byId);
+    if(!winner){
+      const earliest=rows.filter(row=>!rows.some(other=>other.id!==row.id&&currentChoiceAncestors(row,byId).has(other.id)))
+        .sort((a,b)=>a.at-b.at||(a.id<b.id?-1:a.id>b.id?1:0))[0];
+      if(!earliest)continue;
+      winner={...earliest,value:earliest.before.present?earliest.before.value:null,after:{present:earliest.before.present}};
+    }
     const [type,id,property]=JSON.parse(key),target=type==="task"?taskById.get(id):type==="setting"?board.settings:board;
     if(!target)continue;
     if(type==="task"&&property==="ctx"){
-      changed=projectCurrentChoiceContextProperty(target,rows,byId)||changed;continue;
+      changed=projectCurrentChoiceContextProperty(target,rows,byId,cancelled)||changed;continue;
     }
     if(type==="pass"&&property==="scanMode"){
       if(!winner.after.present)continue;
@@ -6419,7 +6627,7 @@ function projectCurrentChoiceEvents(board=state){
     if(winner.after.present)target[property]=JSON.parse(JSON.stringify(winner.value));else delete target[property];
     if(had!==Object.hasOwn(target,property)||(winner.after.present&&prior!==JSON.stringify(target[property])))changed=true;
   }
-  const dispositions=currentChoiceDispositionActions(board,events);
+  const dispositions=currentChoiceDispositionActions(board,events,cancelled);
   for(const [id,rows] of dispositions){
     const winner=latestCurrentChoiceEvent(rows.map(row=>row.event),byId);if(!winner)continue;
     const selected=rows.find(row=>row.event.id===winner.id);if(selected)changed=applyCurrentChoiceDisposition(board,id,selected)||changed;
@@ -7245,8 +7453,11 @@ const allTasksView = (()=>{
       for(const key of Object.keys(patch))if(JSON.stringify(task[key])!==JSON.stringify(before[key]))return fail('A selected property changed while editing. No tasks were changed. Cancel and reopen bulk Edit.');
       tasks.push(task);
     }
+    const gesture=captureCurrentChoiceGesture(),before=new Map(tasks.map(task=>[task.id,currentChoiceTaskSnapshot(task)]));
     pushUndo();
     for(const task of tasks)for(const [key,value] of Object.entries(patch))task[key]=JSON.parse(JSON.stringify(value));
+    appendCurrentChoiceEvents(prepareCurrentChoiceEvents(tasks.flatMap(task=>currentChoiceChanges(task,before.get(task.id))),gesture,
+      Object.fromEntries(tasks.map(task=>[task.id,before.get(task.id).ctx?.value??[]]))));
     bulkResult={owner:Object.freeze({...draft.owner}),ids:[...draft.ids],patch:JSON.parse(JSON.stringify(patch))};
     bulkDraft=null;selectedIds.clear();selecting=false;
     return Object.freeze({ok:true});
@@ -7871,7 +8082,7 @@ async function importDecisionBoard(next,sourcePayload,box){
   if(!safety?.id || !current())return false;
   if(!await inheritDecisionAuthority(next,account,"explicit-import",sourcePayload) || !current())return false;
   if(!await prepareDecisionReplacement(next,state,"explicit-import") || !current())return false;
-  markReplacementDeletes(next);pushUndo();replaceState(next);applyTheme();baseUpdatedAt=Date.now();
+  markReplacementDeletes(next);pushUndo("replacement");replaceState(next);applyTheme();baseUpdatedAt=Date.now();
   initializeReplacedScan();recomputeRanks();closeModal();commit();return true;
 }
 async function restoreDurableBackupById(id){
@@ -7908,7 +8119,7 @@ async function restoreDurableBackupById(id){
     next.restoredHistoryIds||={};next.restoredHistoryOps||={};
     for(const row of next.workLog)if(state.clearedHistoryIds?.[historyEntryKey(row)])noteRestoreIntent(next,historyEntryKey(row),"clearedHistoryIds","restoredHistoryIds","restoredHistoryOps","clearedAfterRestoreOps");
     for(const task of next.tasks){const current=state.tasks.find(t=>t.id===task.id);replaceTaskWoop(task,current);replaceTaskPostpone(task,current);replaceTaskComparison(task,current);replaceTaskPrerequisites(task,current);if(current?.done&&!task.done)reopenTask(task,current);}
-    mergeUndeletedTasks(next,state);pushUndo();replaceState(next);applyTheme();baseUpdatedAt=Date.now();initializeReplacedScan();recomputeRanks();render();
+    mergeUndeletedTasks(next,state);pushUndo("replacement");replaceState(next);applyTheme();baseUpdatedAt=Date.now();initializeReplacedScan();recomputeRanks();render();
     state.updatedAt=Date.now();state.syncDirty=true;
     if(!await persist(deviceStorageAuthority,safetyCopy.id)){
       // Preserve the restored board in this open tab and keep its exact
@@ -7937,9 +8148,11 @@ async function confirmResetEverything(){
     if(JSON.stringify(state)!==currentBoard || window.CloudSync!==resetBackend || (window.CloudSync?.user||null)!==resetAccount){
       toast("Reset stopped: the board or signed-in account changed. Check the current board and try again.",7000);return;
     }
-    const priorUndo=undoStack.slice();
+    const priorUndo=undoStack.map(frame=>({...frame}));
     const empty=defaultState();markReplacementDeletes(empty);
-    pushUndo();replaceState(empty);
+    if(!await prepareDecisionReplacement(empty,state,"explicit-reset")||JSON.stringify(state)!==currentBoard
+      ||window.CloudSync!==resetBackend||(window.CloudSync?.user||null)!==resetAccount)return;
+    pushUndo("replacement");replaceState(empty);
     state.updatedAt=Date.now();state.syncDirty=true;
     recomputeRanks();render();
     const resetBoard=JSON.stringify(state);
@@ -8194,7 +8407,7 @@ function onAction(act, el){
         dropRemovedFields(st); hydrateState(st);
         const destination=state.syncAccount||(cloudReady()?window.CloudSync.user:null);
         if(needsDecisionInheritance(st,destination) || state.decisionBaseline || state.decisionEvents)return importDecisionBoard(st,box.value,box);
-        markReplacementDeletes(st); pushUndo(); replaceState(st); applyTheme();
+        markReplacementDeletes(st); pushUndo("replacement"); replaceState(st); applyTheme();
         // Pasted in by hand, so it is authoritative as of now — not stale content
         // that cloudPull() should hold this device's writes back over.
         baseUpdatedAt = Date.now();
@@ -8313,7 +8526,7 @@ function onAction(act, el){
       window.checkForAppUpdate?.(); return cloudPull();
     case "sync-reload": return reloadForCloudRecovery();
     case "sync-signout": closeModal(); window.CloudSync?.signOut(); break;
-    case "undo": TaskActionOwner.undo(); break;
+    case "undo": return TaskActionOwner.undo();
     case "mback": break; // handled in click listener
   }
 }
@@ -8507,6 +8720,7 @@ function hotkeyDelete(){
   try{
     dropRemovedFields(state);
     repairedDeletionLog=hydrateState(state);
+    if(Array.isArray(state.decisionEvents)&&state.decisionEvents.some(event=>event?.kind==="undo"))projectDecisionEvents(state);
   }catch(e){
     // Keep the unreadable bytes in storage for recovery, but never let one
     // malformed task prevent the scanner shell from starting at all. The

@@ -7,6 +7,241 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 
+async function scopedUndoClients(configure=()=>{}){
+ const at=Date.parse('2026-10-17T15:00:00Z');
+ const initial=syncState({tasks:[syncTask('undo-base','Benchmark'),syncTask('undo-local','Local choice'),syncTask('undo-peer','Peer choice')],
+  chain:['undo-base'],candidateId:'undo-local',mode:'scan',scanMode:'descending',passId:'undo-pass',passStartedAt:at-60000,
+  syncRev:4,syncAccount:'e@example.com',syncDirty:false,settings:{horizonMin:60,thresholdPct:0,samples:250,cantMin:30,workedHours:8}});
+ configure(initial);
+ const remote=JSON.parse(JSON.stringify(initial));for(const key of ['syncRev','syncAccount','syncDirty'])delete remote[key];
+ const h=makeSyncHarness({remote,rev:4,delayMs:1}),seedStorage={[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)};
+ const local=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:h.factory}),peer=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:h.factory});
+ await local.ctx.cloudPull();await peer.ctx.cloudPull();
+ local.ctx.window.CloudSync.ready=false;peer.ctx.window.CloudSync.ready=false;
+ return {local,peer,h,at,initial};
+}
+test('RISK scoped Undo: local comparison cancellation keeps peer learning and survives stale cloud and reopen',async()=>{
+ const {local,peer,h,at,initial}=await scopedUndoClients();
+ setFakeTime(local.ctx,at+100);local.ctx.onAction('yes',{dataset:{candidate:'undo-local',benchmark:'undo-base'}});
+ const original=JSON.parse(JSON.stringify(local.ctx.state.decisionEvents.find(e=>e.kind==='comparison')));
+ setFakeTime(peer.ctx,at+200);hydrateUnchangedEditorDraft(peer,'undo-peer');peer.ctx.onAction('dot-task',{dataset:{id:'undo-peer'}});
+ peer.ctx.window.CloudSync.ready=true;await peer.ctx.cloudPushNow();await syncSettle(40);
+ local.ctx.window.CloudSync.ready=true;await local.ctx.cloudPull();await syncSettle(50);
+ assert.deepEqual(Array.from(local.ctx.state.chain),['undo-base','undo-local','undo-peer']);
+ const stale=JSON.parse(local.ctx.cloudPayload());
+ setFakeTime(local.ctx,at+300);local.ctx.onAction('undo',{});
+ assert.deepEqual(Array.from(local.ctx.state.chain),['undo-base','undo-peer'],'normal Undo targets the local comparison, preserving the peer Dot');
+ const expected=Object.fromEntries(initial.tasks.map(t=>[t.id,{mu:t.mu,sigma:t.sigma}]));loadEngine(145).updatePair(expected['undo-peer'],expected['undo-base']);
+ for(const task of local.ctx.state.tasks){assert.equal(task.mu,expected[task.id].mu);assert.equal(task.sigma,expected[task.id].sigma);}
+ assert.ok(local.ctx.state.tasks.find(t=>t.id==='undo-base').ratingHistory.some(row=>row.kind==='undo'),'the shared benchmark records its actual recomputed learning reversal');
+ const cancellation=local.ctx.state.decisionEvents.find(e=>e.kind==='undo');assert.ok(cancellation,'Undo retains explicit target cancellation evidence');
+ assert.deepEqual(Array.from(cancellation.targetEventIds),[original.id]);assert.equal(JSON.stringify(local.ctx.state.decisionEvents.find(e=>e.id===original.id)),JSON.stringify(original));
+ assert.ok(local.ctx.state.tasks.find(t=>t.id==='undo-local').ratingHistory.some(row=>row.kind==='yes'));
+ assert.equal(await local.ctx.persist(),true);await local.ctx.cloudPushNow();await syncSettle(50);
+ const final=h.remoteState();assert.deepEqual(final.chain,['undo-base','undo-peer']);assert.equal(final.decisionEvents.filter(e=>e.kind==='undo').length,1);
+ h.writeBehindBack(stale);await local.ctx.cloudPull();await local.ctx.cloudPushNow();await syncSettle(50);
+ assert.deepEqual(Array.from(local.ctx.state.chain),['undo-base','undo-peer'],'stale original delivery cannot reapply a cancelled comparison');
+ const raw=local.shim.localStorage.getItem(SYNC_STORE_KEY),reopened=await loadAppAtTime(at+400,{seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw},cloudSyncFactory:h.factory});
+ await reopened.ctx.cloudPull();assert.deepEqual(Array.from(reopened.ctx.state.chain),['undo-base','undo-peer']);
+ for(const task of reopened.ctx.state.tasks)assert.equal(task.mu,expected[task.id].mu);
+ assert.deepEqual(h.remoteState().chain,['undo-base','undo-peer']);
+});
+test('RISK scoped Undo: compound editor Dot restores only local fields and context deltas after peer progress',async()=>{
+ const {local,peer,h,at}=await scopedUndoClients();
+ // This older board deliberately has no due property; Undo must preserve absence.
+ delete local.ctx.state.tasks.find(t=>t.id==='undo-local').due;
+ setFakeTime(local.ctx,at+100);hydrateUnchangedEditorDraft(local,'undo-local');
+ local.shim.document.getElementById('etTitle').value='Local edited title';local.shim.document.getElementById('etDue').value='2026-10-30';
+ local.ctx.onAction('dot-task',{dataset:{id:'undo-local'}});
+ const targetRows=local.ctx.state.decisionEvents.filter(e=>e.kind==='comparison'||e.kind==='current-choice');
+ assert.equal(targetRows.filter(e=>e.kind==='comparison').length,1);assert.equal(new Set(targetRows.map(e=>e.actionId)).size,1,'editor save plus Dot remains one gesture');
+ await saveEditorChoice(peer,'undo-local',at+200,{url:'https://peer.test/'});
+ await saveEditorChoice(peer,'undo-peer',at+250,{title:'Peer independent title'});
+ peer.ctx.window.CloudSync.ready=true;await peer.ctx.cloudPushNow();await syncSettle(30);
+ local.ctx.window.CloudSync.ready=true;await local.ctx.cloudPull();await syncSettle(50);
+ setFakeTime(local.ctx,at+300);local.shim.document.dispatchEvent({type:'keydown',key:'z',repeat:false});
+ const task=local.ctx.state.tasks.find(t=>t.id==='undo-local');
+ assert.equal(task.title,'Local choice','one normal Undo reverses local editor fields');assert.equal(Object.hasOwn(task,'due'),false,'absent prior field remains absent');
+ assert.equal(task.url,'https://peer.test/','a peer edit to another property survives');assert.equal(local.ctx.state.tasks.find(t=>t.id==='undo-peer').title,'Peer independent title');
+ assert.deepEqual(Array.from(local.ctx.state.chain),['undo-base']);
+ await local.ctx.persist();await local.ctx.cloudPushNow();await syncSettle(40);
+ const cloud=h.remoteState();assert.equal(cloud.tasks.find(t=>t.id==='undo-local').title,'Local choice');assert.equal(Object.hasOwn(cloud.tasks.find(t=>t.id==='undo-local'),'due'),false);
+ assert.deepEqual(cloud.decisionEvents.find(e=>e.kind==='undo').targetEventIds.slice().sort(),Array.from(targetRows,e=>e.id).sort());
+ const final={...cloud,syncAccount:'e@example.com',syncRev:h.doc.rev,syncDirty:false};
+ const fresh=await loadAppAtTime(at+400,{seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(final)},cloudSyncFactory:h.factory});await fresh.ctx.cloudPull();
+ assert.equal(fresh.ctx.state.tasks.find(t=>t.id==='undo-local').title,'Local choice');assert.equal(fresh.ctx.state.tasks.find(t=>t.id==='undo-local').url,'https://peer.test/');
+});
+test('RISK scoped Undo: bulk edit is one durable cancellation group and later peer choices stay effective',async()=>{
+ const {local,peer,h,at}=await scopedUndoClients();
+ setFakeTime(local.ctx,at+100);local.ctx.state.listOpen=true;local.ctx.onAction('bulk-select-all');local.ctx.onAction('bulk-edit');
+ local.shim.document.getElementById('bulkApplyDue').checked=true;local.shim.document.getElementById('bulkDue').value='2026-11-01';local.ctx.onAction('bulk-save');
+ const rows=Array.from(local.ctx.state.decisionEvents||[]).filter(e=>e.kind==='current-choice'&&e.target.property==='due');
+ assert.equal(rows.length,3,'bulk save records one choice per changed task in one gesture');assert.equal(new Set(rows.map(e=>e.actionId)).size,1);
+ await saveEditorChoice(peer,'undo-local',at+200,{due:'2026-12-01',title:'Peer later title'});
+ peer.ctx.window.CloudSync.ready=true;await peer.ctx.cloudPushNow();await syncSettle(40);local.ctx.window.CloudSync.ready=true;await local.ctx.cloudPull();await syncSettle(40);
+ local.ctx.onAction('undo',{});await local.ctx.persist();await local.ctx.cloudPushNow();await syncSettle(40);
+ for(const task of h.remoteState().tasks){assert.equal(task.due,task.id==='undo-local'?'2026-12-01':null);}
+ assert.equal(h.remoteState().tasks.find(t=>t.id==='undo-local').title,'Peer later title');
+ assert.equal(h.remoteState().decisionEvents.filter(e=>e.kind==='undo').length,1);assert.equal(h.remoteState().decisionEvents.find(e=>e.kind==='undo').targetEventIds.length,3);
+});
+test('RISK scoped Undo: cancelled No cannot return from stale marks and context membership keeps the peer delta',async()=>{
+ const {local,peer,h,at}=await scopedUndoClients();
+ setFakeTime(local.ctx,at+100);local.ctx.onAction('no',{dataset:{candidate:'undo-local',benchmark:'undo-base'}});
+ const stale=JSON.parse(local.ctx.cloudPayload());local.ctx.onAction('undo',{});await local.ctx.persist();
+ local.ctx.window.CloudSync.ready=true;await local.ctx.cloudPushNow();await syncSettle(30);
+ assert.equal(local.ctx.state.considered['undo-local'],undefined);
+ h.writeBehindBack(stale);await local.ctx.cloudPull();await local.ctx.cloudPushNow();await syncSettle(40);
+ assert.equal(local.ctx.state.considered['undo-local'],undefined,'a stale No mark cannot outlive its durable cancellation');
+ const fresh={...h.remoteState(),syncAccount:'e@example.com',syncRev:h.doc.rev,syncDirty:false};fresh.considered['undo-local']='no';
+ const reopened=await loadAppAtTime(at+200,{seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(fresh)},cloudSyncFactory:h.factory});await reopened.ctx.cloudPull();
+ assert.equal(reopened.ctx.state.considered['undo-local'],undefined,'fresh projection removes cancelled temporary No effect');
+ const context=await scopedUndoClients(),a=context.local,b=context.peer;
+ for(const app of [a,b])app.ctx.state.contexts=[{id:'local-ctx',name:'Local',active:true},{id:'peer-ctx',name:'Peer',active:true}];
+ await saveEditorChoice(a,'undo-peer',at+300,{ctxIds:['local-ctx']});await saveEditorChoice(b,'undo-peer',at+400,{ctxIds:['peer-ctx']});
+ b.ctx.window.CloudSync.ready=true;await b.ctx.cloudPushNow();await syncSettle(30);a.ctx.window.CloudSync.ready=true;await a.ctx.cloudPull();await syncSettle(40);
+ assert.deepEqual(Array.from(a.ctx.state.tasks.find(t=>t.id==='undo-peer').ctx).sort(),['local-ctx','peer-ctx']);
+ a.ctx.onAction('undo',{});await a.ctx.persist();await a.ctx.cloudPushNow();await syncSettle(40);
+ assert.deepEqual(context.h.remoteState().tasks.find(t=>t.id==='undo-peer').ctx,['peer-ctx'],'Undo removes only the local context membership delta');
+});
+test('RISK scoped Undo: first guest sign-in keeps local cancellation authority and replays later signed learning',async()=>{
+ const at=Date.parse('2026-10-17T15:00:00Z'),initial=syncState({tasks:[syncTask('guest-bench','Benchmark'),syncTask('guest-no','Guest choice'),syncTask('signed-no','Signed choice')],
+  chain:['guest-bench'],candidateId:'guest-no',passId:'guest-undo-pass',passStartedAt:at-60000,scanMode:'descending',syncAccount:null,settings:{thresholdPct:0,horizonMin:60,samples:250}});
+ const h=makeSyncHarness({remote:null,rev:0,delayMs:1}),factory=()=>{const cloud=h.factory();cloud.user=null;return cloud;};
+ const app=await loadAppAtTime(at,{seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(initial)},cloudSyncFactory:factory});
+ app.ctx.onAction('no',{dataset:{candidate:'guest-no',benchmark:'guest-bench'}});await app.ctx.persist();
+ const original=JSON.stringify(app.ctx.state.decisionEvents[0]);app.ctx.window.CloudSync.user='e@example.com';await app.ctx.cloudPull();await app.ctx.cloudPushNow();await syncSettle(50);
+ assert.equal(app.ctx.state.syncDirty,false);assert.ok(app.ctx.state.decisionBaseline.inheritance[0].sourceBaseline);const guestPublished=h.remoteState();
+ app.ctx.onAction('undo',{});
+ assert.equal(app.ctx.state.tasks.find(t=>t.id==='guest-bench').mu,25,'guest comparison remains undoable after its explicit first ownership adoption');
+ assert.equal(app.ctx.state.considered['guest-no'],undefined);assert.equal(JSON.stringify(app.ctx.state.decisionEvents[0]),original);
+ const signedTask=app.ctx.addTask('New signed-in candidate');app.ctx.state.candidateId=signedTask.id;app.ctx.renderScan();app.ctx.onAction('no',{dataset:{candidate:signedTask.id,benchmark:'guest-bench'}});
+ const expected={bench:{mu:25,sigma:25/3},signed:{mu:25,sigma:25/3}};loadEngine(145).updatePair(expected.bench,expected.signed);
+ assert.equal(app.ctx.state.tasks.find(t=>t.id==='guest-bench').mu,expected.bench.mu);
+ assert.equal(app.ctx.state.tasks.find(t=>t.id===signedTask.id).mu,expected.signed.mu,'a task added after ownership adoption trains only once');
+ await app.ctx.persist();await app.ctx.cloudPushNow();await syncSettle(40);assert.equal(app.ctx.state.syncDirty,false,JSON.stringify({issue:app.ctx.decisionEvidenceIssue(app.ctx.state,'e@example.com'),code:app.ctx.window.CloudSync.errorCode,rows:app.ctx.state.decisionEvents}));
+ h.writeBehindBack(guestPublished);await app.ctx.cloudPull();await app.ctx.cloudPushNow();await syncSettle(40);
+ assert.equal(app.ctx.state.considered['guest-no'],undefined,'stale embodied guest No cannot restore a cancelled pass mark');
+ const fresh={...h.remoteState(),syncAccount:'e@example.com',syncRev:h.doc.rev,syncDirty:false},raw=JSON.stringify(fresh);
+ const reopened=await loadAppAtTime(at+100,{seedStorage:{[SYNC_STORE_KEY]:raw},cloudSyncFactory:h.factory});await reopened.ctx.cloudPull();
+ assert.equal(reopened.ctx.state.tasks.find(t=>t.id==='guest-bench').mu,expected.bench.mu);assert.equal(reopened.ctx.state.tasks.find(t=>t.id==='guest-no').mu,25);
+ assert.equal(JSON.stringify(h.remoteState().decisionEvents.find(e=>e.id===JSON.parse(original).id)),original);
+});
+test('RISK scoped Undo: inherited guest edit restores its before value through stale signed snapshots',async()=>{
+ const at=Date.parse('2026-10-17T15:00:00Z'),initial=syncState({tasks:[syncTask('guest-edit','Original guest title')],syncAccount:null,settings:{thresholdPct:0,horizonMin:60,samples:250}});
+ const h=makeSyncHarness({remote:null,rev:0,delayMs:1}),factory=()=>{const cloud=h.factory();cloud.user=null;return cloud;};
+ const app=await loadAppAtTime(at,{seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(initial)},cloudSyncFactory:factory});
+ await saveEditorChoice(app,'guest-edit',at+100,{title:'Guest edited title'});const original=JSON.stringify(app.ctx.state.decisionEvents);
+ app.ctx.window.CloudSync.user='e@example.com';await app.ctx.cloudPull();await app.ctx.cloudPushNow();await syncSettle(40);const stale=h.remoteState();
+ app.ctx.onAction('undo',{});assert.equal(app.ctx.state.tasks[0].title,'Original guest title');await app.ctx.persist();await app.ctx.cloudPushNow();await syncSettle(40);
+ h.writeBehindBack(stale);await app.ctx.cloudPull();await app.ctx.cloudPushNow();await syncSettle(40);
+ assert.equal(app.ctx.state.tasks[0].title,'Original guest title','a cancelled inherited edit cannot be replayed by a stale signed snapshot');
+ assert.equal(JSON.stringify(app.ctx.state.decisionEvents.filter(e=>e.kind==='current-choice')),original);assert.equal(h.remoteState().tasks[0].title,'Original guest title');
+});
+test('RISK scoped Undo: inherited legacy-pass No cancellation survives stale marks without inventing a pass',async()=>{
+ const at=Date.parse('2026-10-17T15:00:00Z'),initial=syncState({tasks:[syncTask('legacy-bench','Legacy benchmark'),syncTask('legacy-no','Legacy candidate')],chain:['legacy-bench'],candidateId:'legacy-no',passStartedAt:at-60000,syncAccount:null,settings:{thresholdPct:0,horizonMin:60,samples:250}});
+ const h=makeSyncHarness({remote:null,rev:0,delayMs:1}),factory=()=>{const cloud=h.factory();cloud.user=null;return cloud;};
+ const app=await loadAppAtTime(at,{seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(initial)},cloudSyncFactory:factory});
+ app.ctx.onAction('no',{dataset:{candidate:'legacy-no',benchmark:'legacy-bench'}});await app.ctx.persist();const passId=app.ctx.state.passId;assert.match(passId,/^legacy-pass-v1:/);
+ app.ctx.window.CloudSync.user='e@example.com';await app.ctx.cloudPull();await app.ctx.cloudPushNow();await syncSettle(40);const stale=h.remoteState();
+ app.ctx.onAction('undo',{});await app.ctx.persist();await app.ctx.cloudPushNow();await syncSettle(40);h.writeBehindBack(stale);await app.ctx.cloudPull();await app.ctx.cloudPushNow();await syncSettle(40);
+ assert.equal(app.ctx.state.considered['legacy-no'],undefined,'the legacy pass mark remains cancelled after stale delivery');assert.equal(app.ctx.state.passId,passId,'Undo does not fabricate a fresh pass');
+});
+test('RISK scoped Undo: unsupported cancellation payloads hold exact local and cloud branches',async()=>{
+ const {local,h,at}=await scopedUndoClients();local.ctx.onAction('yes',{dataset:{candidate:'undo-local',benchmark:'undo-base'}});local.ctx.onAction('undo',{});
+ await local.ctx.persist();local.ctx.window.CloudSync.ready=true;await local.ctx.cloudPushNow();await syncSettle(40);
+ const raw=JSON.stringify(local.ctx.state),saved=local.shim.localStorage.getItem(SYNC_STORE_KEY),remote=h.remoteState();
+ const malformed=JSON.parse(JSON.stringify(remote));malformed.decisionEvents.find(e=>e.kind==='undo').patch={tasks:[]};h.writeBehindBack(malformed);
+ const exact=h.doc.payload;await local.ctx.cloudPull();await syncSettle(30);
+ assert.equal(local.ctx.window.CloudSync.errorCode,'unsupported-decision-evidence','an arbitrary patch is not supported cancellation authority');
+ assert.equal(JSON.stringify(local.ctx.state),raw);assert.equal(local.shim.localStorage.getItem(SYNC_STORE_KEY),saved);assert.equal(h.doc.payload,exact);
+ const missing=JSON.parse(JSON.stringify(remote)),invalid=missing.decisionEvents.find(e=>e.kind==='undo');invalid.id='malformed-new-undo';invalid.targetEventIds=['unknown-action'];h.writeBehindBack(missing);
+ await local.ctx.onAction('sync-retry',{});await syncSettle(20);assert.equal(local.ctx.window.CloudSync.errorCode,'unprojectable-decision-undo');
+ assert.equal(JSON.stringify(local.ctx.state),raw);assert.equal(h.doc.payload,JSON.stringify(missing));
+});
+test('RISK scoped Undo: completion evergreen work delete and postpone retain unrelated peer fields',async t=>{
+ for(const action of ['done','evergreen-done','worked','delete','postpone'])await t.test(action,async()=>{
+  const {local,peer,h,at}=await scopedUndoClients(),task=local.ctx.state.tasks.find(t=>t.id==='undo-local');
+  if(action==='evergreen-done'){for(const app of [local,peer]){const row=app.ctx.state.tasks.find(t=>t.id===task.id);row.evergreen=true;row.evergreenResetAtDay=false;}}
+  setFakeTime(local.ctx,at+100);
+  if(action==='done'||action==='evergreen-done')local.ctx.onAction('done-task',{dataset:{id:task.id}});
+  else if(action==='worked')local.ctx.onAction('worked-task',{dataset:{id:task.id}});
+  else if(action==='delete')local.ctx.onAction('delete-task',{dataset:{id:task.id}});
+  else local.ctx.postponeTask(task.id);
+  assert.ok(action==='delete'?!local.ctx.state.tasks.some(t=>t.id===task.id):action==='postpone'?local.ctx.taskPostponeUntil(task)>at:action==='worked'?local.ctx.state.workLog.length>0:!!task.lastDoneAt,'the normal action has an effect before Undo');
+  const stale=JSON.parse(local.ctx.cloudPayload());await saveEditorChoice(peer,'undo-peer',at+200,{title:'Peer '+action});
+  peer.ctx.window.CloudSync.ready=true;await peer.ctx.cloudPushNow();await syncSettle(30);local.ctx.window.CloudSync.ready=true;await local.ctx.cloudPull();await syncSettle(40);
+  local.ctx.onAction('undo',{});await local.ctx.persist();await local.ctx.cloudPushNow();await syncSettle(40);
+  const restored=local.ctx.state.tasks.find(t=>t.id===task.id);assert.ok(restored,'Undo restores its own task');assert.equal(restored.done,false);assert.equal(restored.lastDoneAt,null);assert.equal(local.ctx.taskPostponeUntil(restored),0);
+  assert.equal(local.ctx.state.workLog.length,0,'Undo removes only the local work/completion entry');assert.equal(local.ctx.state.tasks.find(t=>t.id==='undo-peer').title,'Peer '+action);
+  h.writeBehindBack(stale);await local.ctx.cloudPull();await local.ctx.cloudPushNow();await syncSettle(40);
+  assert.equal(h.remoteState().tasks.find(t=>t.id===task.id).done,false);assert.equal(h.remoteState().tasks.find(t=>t.id==='undo-peer').title,'Peer '+action);assert.equal(h.remoteState().workLog.length,0);
+ });
+});
+test('RISK scoped Undo: cancelling Start restores the prior pass root and exact draw through stale delivery',async()=>{
+ const {local,peer,h,at}=await scopedUndoClients(initial=>{initial.chain=[];initial.candidateId=null;initial.mode='work';initial.chance=null;});
+ const prior=JSON.parse(JSON.stringify({passId:local.ctx.state.passId,passStartedAt:local.ctx.state.passStartedAt,chain:local.ctx.state.chain,scanMode:local.ctx.state.scanMode,chance:local.ctx.state.chance}));
+ setFakeTime(local.ctx,at+100);local.ctx.onAction('start-scan',{dataset:{mode:'halving'}});
+ assert.equal(local.ctx.state.scanMode,'halving');assert.ok(local.ctx.state.chance);const stale=JSON.parse(local.ctx.cloudPayload());
+ await saveEditorChoice(peer,'undo-peer',at+200,{title:'Peer after Start'});peer.ctx.window.CloudSync.ready=true;await peer.ctx.cloudPushNow();await syncSettle(30);
+ local.ctx.window.CloudSync.ready=true;await local.ctx.cloudPull();await syncSettle(40);local.ctx.onAction('undo',{});await local.ctx.persist();await local.ctx.cloudPushNow();await syncSettle(40);
+ const select=board=>({passId:board.passId,passStartedAt:board.passStartedAt,chain:Array.from(board.chain),scanMode:board.scanMode,chance:board.chance});
+ assert.deepEqual(JSON.parse(JSON.stringify(select(local.ctx.state))),prior);h.writeBehindBack(stale);await local.ctx.cloudPull();await local.ctx.cloudPushNow();await syncSettle(40);
+ assert.deepEqual(JSON.parse(JSON.stringify(select(local.ctx.state))),prior,'stale Start cannot reactivate its cancelled pass or random draw');
+ assert.deepEqual(select(h.remoteState()),prior);assert.equal(h.remoteState().tasks.find(t=>t.id==='undo-peer').title,'Peer after Start');
+ const raw=JSON.stringify({...h.remoteState(),syncAccount:'e@example.com',syncRev:h.doc.rev,syncDirty:false});
+ const fresh=await loadAppAtTime(at+300,{seedStorage:{[SYNC_STORE_KEY]:raw},cloudSyncFactory:h.factory});await fresh.ctx.cloudPull();
+ assert.deepEqual(JSON.parse(JSON.stringify(select(fresh.ctx.state))),prior,'cold reopen keeps the cancelled pass and draw inactive');
+ await peer.ctx.cloudPull();setFakeTime(peer.ctx,at+500);peer.ctx.onAction('done-task',{dataset:{id:'undo-base'}});
+ peer.ctx.onAction('start-scan',{dataset:{mode:'descending'}});await peer.ctx.persist();await peer.ctx.cloudPushNow();await syncSettle(40);
+ const later=select(peer.ctx.state);assert.notEqual(later.passId,prior.passId);assert.equal(peer.ctx.state.tasks.find(t=>t.id==='undo-base').done,true);
+ await local.ctx.cloudPull();await syncSettle(40);
+ assert.deepEqual(JSON.parse(JSON.stringify(select(local.ctx.state))),JSON.parse(JSON.stringify(later)),'a later independent peer Start keeps its own pass and draw');
+ assert.equal(local.ctx.state.tasks.find(t=>t.id==='undo-base').done,true,'cancelled Start cannot reopen a peer-completed task');
+});
+test('RISK scoped Undo: Return cancellation restores the original hold time while peer task fields survive',async()=>{
+ const {local,peer,h,at}=await scopedUndoClients();
+ setFakeTime(local.ctx,at+100);local.ctx.onAction('cant',{dataset:{candidate:'undo-local',benchmark:'undo-base'}});
+ const hold=local.ctx.state.cantAt['undo-local'];assert.equal(hold,at+100);local.ctx.returnAsCandidate('undo-local');
+ assert.equal(local.ctx.state.considered['undo-local'],undefined);
+ await saveEditorChoice(peer,'undo-local',at+300,{url:'https://peer.test/hold'});peer.ctx.window.CloudSync.ready=true;await peer.ctx.cloudPushNow();await syncSettle(30);
+ local.ctx.window.CloudSync.ready=true;await local.ctx.cloudPull();await syncSettle(40);local.ctx.onAction('undo',{});
+ assert.equal(local.ctx.state.considered['undo-local'],'cant');assert.equal(local.ctx.state.cantAt['undo-local'],hold,'Undo never renews the hold duration');assert.equal(local.ctx.state.tasks.find(t=>t.id==='undo-local').url,'https://peer.test/hold');
+ await local.ctx.persist();await local.ctx.cloudPushNow();await syncSettle(40);assert.equal(h.remoteState().cantAt['undo-local'],hold);
+ setFakeTime(local.ctx,hold+local.ctx.state.settings.cantMin*60000);local.ctx.ensureCandidate();assert.equal(local.ctx.state.considered['undo-local'],undefined,'the restored original hold expires on its existing deadline');
+});
+test('RISK scoped Undo: explicit modern Import Restore and Reset reverse exact journal replacement after recovery',async t=>{
+ for(const action of ['import','restore','reset'])await t.test(action,async()=>{
+  const source=await decisionRecoveryApp146(),target=await decisionRecoveryApp146('destination@example.com');
+  target.ctx.window.CloudSync.ready=true;await target.ctx.cloudPushNow();await syncSettle(50);
+  const prior=JSON.parse(JSON.stringify(target.ctx.state)),raw=JSON.stringify(source.ctx.state);target.ctx.confirm=()=>true;
+  if(action==='import'){target.shim.document.getElementById('jsonBox').value=raw;await target.ctx.onAction('import-json',{});}
+  else if(action==='restore'){const backup=await target.ctx.saveDurableBackup('manual',raw);target.ctx.openSettings();assert.equal(await target.ctx.restoreDurableBackupById(backup.id),true);}
+  else await target.ctx.onAction('confirm-wipe',{});
+  await target.ctx.persist();await target.ctx.cloudPushNow();await syncSettle(50);const selected=JSON.parse(JSON.stringify(target.ctx.state));
+  assert.equal(target.ctx.state.syncDirty,false);await target.ctx.onAction('undo',{});
+  await target.ctx.persist();await target.ctx.cloudPushNow();await syncSettle(60);
+  assert.equal(target.ctx.state.syncDirty,false,'the reverse replacement must be acknowledged');
+  assert.deepEqual(JSON.parse(JSON.stringify(target.ctx.state.decisionEvents)),prior.decisionEvents,'the original selected prior journal returns exactly');
+  assert.ok(target.ctx.state.decisionBaseline.replacement.some(receipt=>receipt.reason==='explicit-undo'));
+  assert.ok(target.ctx.readLocalBackups().some(backup=>backup.payload===JSON.stringify(selected)),'the displaced replacement has mandatory exact recovery');
+  target.h.writeBehindBack(selected);await target.ctx.cloudPull();await target.ctx.cloudPushNow();await syncSettle(50);
+  assert.deepEqual(target.h.remoteState().decisionEvents,prior.decisionEvents,'stale selected journal cannot reapply after explicit replacement Undo');
+  assert.equal(target.ctx.window.CloudSync.errorCode??null,null);
+ });
+});
+test('RISK scoped Undo: replacement recovery failure and an account race retain the current board and Undo frame',async()=>{
+ const source=await decisionRecoveryApp146(),target=await decisionRecoveryApp146('destination@example.com');target.ctx.window.CloudSync.ready=true;await target.ctx.cloudPushNow();await syncSettle(40);
+ target.ctx.confirm=()=>true;target.shim.document.getElementById('jsonBox').value=JSON.stringify(source.ctx.state);await target.ctx.onAction('import-json',{});
+ await target.ctx.persist();await target.ctx.cloudPushNow();await syncSettle(40);
+ const prior=JSON.stringify(target.ctx.state),depth=vm.runInContext('undoStack.length',target.ctx),cloud=target.h.doc.payload;
+ const write=target.storage.setItem;target.storage.setItem=(key,value)=>{if(key===LOCAL_BACKUPS_KEY)throw new Error('isolated mandatory recovery refusal');write(key,value);};
+ assert.equal(await target.ctx.onAction('undo',{}),false);assert.equal(JSON.stringify(target.ctx.state),prior);assert.equal(vm.runInContext('undoStack.length',target.ctx),depth);assert.equal(target.h.doc.payload,cloud);
+ target.storage.setItem=write;
+ const pending=target.ctx.onAction('undo',{});target.ctx.window.CloudSync.user='other@example.com';assert.equal(await pending,false);
+ assert.equal(JSON.stringify(target.ctx.state),prior,'an account change during recovery cannot authorize the captured replacement');assert.equal(vm.runInContext('undoStack.length',target.ctx),depth);
+ target.ctx.window.CloudSync.user='destination@example.com';assert.equal(await target.ctx.onAction('undo',{}),true,'retry retains the original local replacement frame');
+});
+
 // Last task WOOP exercises mounted handlers and real task history, not guessed pass marks.
 async function woopFixture(){
  const app=await loadApp({seed:971});const {ctx}=app;
@@ -93,7 +328,8 @@ test('RISK Last task WOOP: real stale-tab saves preserve newer title plan and de
  const reload=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(latest)}});assert.equal(reload.ctx.state.tasks.find(t=>t.id===id).woopPlan,null);assert.equal(reload.ctx.state.tasks.find(t=>t.id===id).title,'Newer peer title');
 });
 test('RISK Last task WOOP: cloud offline failed pull reconnect completion and Undo retain task-owned causal plan',async()=>{
- const app=await woopFixture();woopDislodgeTwice(app);const base=JSON.parse(app.ctx.cloudPayload()),h=makeSyncHarness({remote:base,rev:4}),id=app.task.id;
+ const app=await woopFixture();woopDislodgeTwice(app);const h=makeSyncHarness({remote:null,rev:0}),id=app.task.id;
+ app.ctx.window.CloudSync=h.factory();await app.ctx.cloudPull();await app.ctx.cloudPushNow();await syncSettle(60);const base=JSON.parse(JSON.stringify(app.ctx.state));
  const a=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(base)},cloudSyncFactory:h.factory}),b=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(base)},cloudSyncFactory:h.factory});
  await syncSettle(40);await a.ctx.cloudPull();await b.ctx.cloudPull();
  h.failPull=true;a.ctx.state.mode='work';a.ctx.state.chain=[id];a.ctx.onAction('woop-start',{dataset:{benchmark:id}});woopStep(a,'Offline outcome');woopStep(a,'Offline obstacle');woopStep(a,'If offline, then take a small step');await a.ctx.persist();
@@ -12413,6 +12649,45 @@ async function decisionRecoveryApp146(account='e@example.com'){
  return {...app,h,storage,event:JSON.parse(JSON.stringify(app.ctx.state.decisionEvents[0]))};
 }
 
+async function recordMixedDecisionActions146(app){
+ const {ctx,shim}=app,yesTask=ctx.addTask('Mixed Yes candidate');
+ ctx.renderScan();assert.equal(ctx.state.candidateId,yesTask.id,'the actual scanner offers the new Yes candidate');
+ const benchmark=ctx.state.chain.at(-1);assert.match(shim.document.getElementById('scan').innerHTML,/data-act="yes"/);
+ ctx.onAction('yes',{dataset:{candidate:yesTask.id,benchmark}});
+ const dotTask=ctx.addTask('Mixed editor Dot candidate');hydrateUnchangedEditorDraft(app,dotTask.id);
+ shim.document.getElementById('etTitle').value='Mixed compound title';ctx.onAction('dot-task',{dataset:{id:dotTask.id}});
+ const dot=ctx.state.decisionEvents.find(event=>event.kind==='comparison'&&event.action==='dot');assert.ok(dot);
+ const compound=ctx.state.decisionEvents.filter(event=>event.actionId===dot.actionId);assert.ok(compound.some(event=>event.kind==='current-choice'),'the actual editor Dot also retains its changed title');
+ await ctx.onAction('undo',{});assert.equal(ctx.state.tasks.find(task=>task.id===dotTask.id).title,'Mixed editor Dot candidate');
+ assert.deepEqual(Array.from(ctx.state.decisionEvents.find(event=>event.kind==='undo').targetEventIds).sort(),Array.from(compound,event=>event.id).sort(),'Undo targets the complete real editor/Dot gesture');
+ for(const id of [yesTask.id,benchmark]){assert.equal(ctx.state.chain.at(-1),id);ctx.onAction('dislodge',{dataset:{benchmark:id}});}
+ assert.equal(ctx.state.chain.length,0,'real Dislodge actions make the Start control available');
+ ctx.onAction('start-scan',{dataset:{mode:'halving'}});
+ assert.ok(ctx.state.decisionEvents.some(event=>event.kind==='current-choice'&&event.target?.type==='pass'&&event.target.property==='chain'),'actual Start records its paired pass root');
+ await ctx.onAction('undo',{});assert.equal(ctx.state.chain.length,0);assert.ok(ctx.state.decisionEvents.some(event=>event.kind==='undo'&&event.passBefore),'actual Start Undo retains exact prior-pass authority');
+ hydrateUnchangedEditorDraft(app,benchmark);shim.document.getElementById('etTitle').value='Mixed retained benchmark title';ctx.onAction('save-edit',{dataset:{id:benchmark}});
+ assert.equal(await ctx.persist(),true);assert.equal(ctx.decisionEvidenceIssue(ctx.state,'e@example.com'),null,'all new kinds coexist as coherent real-app authority');
+ return {yesTaskId:yesTask.id,dotTaskId:dotTask.id,benchmark};
+}
+async function decisionMixedActionsApp146(){
+ const app=await decisionRecoveryApp146();return {...app,mixed:await recordMixedDecisionActions146(app)};
+}
+
+test('RISK decision mixed rollout fixture: actual comparisons current choices Start and scoped Undo survive durable publication and reopen',async t=>{
+ const f=await decisionMixedActionsApp146(),{ctx}=f,events=JSON.stringify(ctx.state.decisionEvents),ratings=JSON.stringify(ctx.state.tasks.map(task=>[task.id,task.mu,task.sigma]));
+ t.after(()=>{ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',ctx);});
+ assert.deepEqual([...new Set(ctx.state.decisionEvents.map(event=>event.kind))].sort(),['comparison','current-choice','no','undo']);
+ assert.deepEqual([...new Set(ctx.state.decisionEvents.filter(event=>event.kind==='comparison').map(event=>event.action))].sort(),['dislodge','dot','yes']);
+ assert.equal(JSON.stringify(ctx.state.decisionEvents.find(event=>event.kind==='no')),JSON.stringify(f.event),'the original No stays immutable beside later action families');
+ assert.equal(ctx.state.tasks.find(task=>task.id===f.mixed.benchmark).title,'Mixed retained benchmark title');
+ ctx.window.CloudSync.ready=true;ctx.cloudPushNow();await syncSettle(80);assert.equal(ctx.state.syncDirty,false);assert.equal(JSON.stringify(f.h.remoteState().decisionEvents),events);
+ const reopened=await loadApp({seedStorage:{[SYNC_STORE_KEY]:f.storage.getItem(SYNC_STORE_KEY),[LOCAL_HEAD_KEY]:f.storage.getItem(LOCAL_HEAD_KEY)},cloudSyncFactory:f.h.factory});
+ t.after(()=>{reopened.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',reopened.ctx);});
+ await reopened.ctx.cloudPull();reopened.ctx.cloudPushNow();await syncSettle(60);
+ assert.equal(JSON.stringify(reopened.ctx.state.decisionEvents),events);assert.equal(JSON.stringify(reopened.ctx.state.tasks.map(task=>[task.id,task.mu,task.sigma])),ratings,'cold reopening never reapplies cancelled learning');
+ assert.equal(reopened.ctx.state.tasks.find(task=>task.id===f.mixed.benchmark).title,'Mixed retained benchmark title');assert.equal(reopened.shim.document.getElementById('syncBtn').textContent,'☁ synced');
+});
+
 test('RISK decision recovery: unknown cloud evidence holds adoption and publication without replacing the durable local decision',async t=>{
  const f=await decisionRecoveryApp146();
  t.after(()=>{f.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',f.ctx);});
@@ -13019,7 +13294,7 @@ test("adopting a newer remote over unsaved local edits says so, so the edits don
     cloudSyncFactory: h.factory,
   });
 
-  ctx.addTask("Typed into the stale tab", false);
+  const added=ctx.addTask("Typed into the stale tab", false);
   await ctx.cloudPull();
 
   const el = shim.elements.get("toast");
@@ -13029,7 +13304,10 @@ test("adopting a newer remote over unsaved local edits says so, so the edits don
   assert.doesNotMatch(el.textContent, /↺|undoes it/, "ordinary Undo must not promise a remote-board replacement");
 
   ctx.undo();
-  assert.deepEqual(ctx.state.chain, STALE_CHAIN, "undo really does take the adoption back");
+  assert.deepEqual(ctx.state.chain, CLOUD_CHAIN, "ordinary local Add Undo preserves the adopted peer chain");
+  assert.equal(ctx.state.tasks.some(task=>task.id===added.id),false,'Undo removes only the normal local Add');
+  for(const task of cloudState(now).tasks)assert.ok(ctx.state.tasks.some(row=>row.id===task.id),'all unrelated peer tasks remain');
+  assert.ok(ctx.readLocalBackups().some(row=>{try{return JSON.parse(row.payload).tasks.some(task=>task.id===added.id);}catch{return false;}}),'the displaced local board remains explicitly recoverable');
 });
 
 test("a silent adopt stays silent when there was nothing local to lose", async () => {
@@ -13878,7 +14156,7 @@ test("AUDIT H2: an imported export must not be overwritten by a revision it pred
    "This tab was out of date — loaded the newer copy. ↺ undoes it." The undo
    snapshot carries the pre-adoption syncRev, so pressing u puts the device
    behind the cloud again and the next push loses to it. */
-test("AUDIT H3: undoing a remote adoption must stick, as the toast promises", async () => {
+test("AUDIT H3: cloud adoption keeps recovery without creating ordinary remote-history Undo", async () => {
   const now = Date.now();
   const h = makeSyncHarness({ remote: cloudState(now), rev: 4 });
   const local = staleState(now); local.syncRev = 3;
@@ -13891,12 +14169,13 @@ test("AUDIT H3: undoing a remote adoption must stick, as the toast promises", as
   await ctx.cloudPull();
   assert.deepEqual(ctx.state.chain, CLOUD_CHAIN, "the newer revision is adopted, as designed");
 
-  ctx.undo();
-  assert.deepEqual(ctx.state.chain, STALE_CHAIN, "u takes it back");
+  assert.equal(ctx.undo(),false,'receiving a cloud board is not a local user action');
+  assert.deepEqual(ctx.state.chain, CLOUD_CHAIN, "ordinary Undo cannot replace peer progress with a prior adoption snapshot");
+  assert.ok(ctx.readLocalBackups().some(row=>{try{return JSON.stringify(JSON.parse(row.payload).chain)===JSON.stringify(STALE_CHAIN);}catch{return false;}}),'the displaced board remains available through explicit recovery');
 
   await syncSettle(PAST_DEBOUNCE);
-  assert.deepEqual(ctx.state.chain, STALE_CHAIN,
-    "and it must stay taken back — an undo the cloud silently reverses is not an undo");
+  assert.deepEqual(ctx.state.chain, CLOUD_CHAIN,
+    "an attempted ordinary Undo cannot republish the older board over current peer progress");
 });
 
 /* ---- H4: a cloud document BEHIND this device never converges ----
@@ -17426,8 +17705,8 @@ test('Consistency repair: remote adoption retains account isolation before switc
 });
 test('Consistency repair: import Undo restores the original chance order, including across repeated undos',async()=>{
  const {ctx,shim}=await loadApp();for(let i=0;i<5;i++)ctx.addTask('Original '+i);ctx.startScan('chance');ctx.state.snooze=100;
- const oldSeed=ctx.state.chance.seed,oldCandidate=ctx.state.candidateId;const backup=JSON.parse(ctx.cloudPayload());backup.chance.seed='imported-seed';backup.tasks[0].title='Imported';
- shim.document.getElementById('jsonBox').value=JSON.stringify(backup);ctx.onAction('import-json',{});ctx.undo();
+ const oldSeed=ctx.state.chance.seed,oldCandidate=ctx.state.candidateId;const backup=JSON.parse(ctx.cloudPayload());delete backup.decisionEvents;delete backup.decisionBaseline;backup.chance.seed='imported-seed';backup.tasks[0].title='Imported';
+ shim.document.getElementById('jsonBox').value=JSON.stringify(backup);await ctx.onAction('import-json',{});await ctx.undo();
  assert.equal(ctx.state.tasks[0].title,'Original 0');assert.equal(ctx.state.chance.seed,oldSeed);assert.equal(ctx.state.candidateId,oldCandidate);
  ctx.decide('no');ctx.newPass();const fresh=ctx.state.chance.seed;ctx.undo();ctx.undo();assert.equal(ctx.state.chance.seed,fresh,'explicit fresh pass remains a boundary across older undos');
 });
@@ -17464,8 +17743,8 @@ test('Consistency repair: detailed help distinguishes weighted ordering from the
 });
 test('Consistency repair: undoing an old backup import restores today\'s original chance pass',async()=>{
  const {ctx,shim}=await loadApp();for(let i=0;i<4;i++)ctx.addTask('Task '+i);ctx.startScan('chance');const original=ctx.state.chance.seed;
- const old=JSON.parse(ctx.cloudPayload());old.chance.seed='old-backup';old.chance.at=Date.now()-48*HOUR;old.passStartedAt=old.chance.at;
- shim.document.getElementById('jsonBox').value=JSON.stringify(old);ctx.onAction('import-json',{});ctx.undo();assert.equal(ctx.state.chance.seed,original);
+ const old=JSON.parse(ctx.cloudPayload());delete old.decisionEvents;delete old.decisionBaseline;old.chance.seed='old-backup';old.chance.at=Date.now()-48*HOUR;old.passStartedAt=old.chance.at;
+ shim.document.getElementById('jsonBox').value=JSON.stringify(old);await ctx.onAction('import-json',{});await ctx.undo();assert.equal(ctx.state.chance.seed,original);
 });
 test('Consistency repair: an in-flight pull cannot adopt the previous account under a new identity',async()=>{
  const {ctx,shim}=await loadApp();ctx.state.syncAccount='A';ctx.state.syncRev=1;let release;
@@ -20842,7 +21121,7 @@ test('Firestore rules: real pinned writer reads decision authority then holds it
  const floor=readReleasedClient(__dirname,SUPPORTED_RELEASE),candidate=decisionCandidate146();
  try{
   const old=await decisionBackend146(floor,env.authenticatedContext('owner').firestore(),F),next=await decisionBackend146(candidate,env.authenticatedContext('owner').firestore(),F);handles.push(old,next);
-  const f=await decisionRecoveryApp146();t.after(()=>{f.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',f.ctx);});
+  const f=await decisionMixedActionsApp146();t.after(()=>{f.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',f.ctx);});
   const plain=JSON.stringify(f.h.remoteState()),decided=f.ctx.cloudPayload();
   assert.equal((await old.CS.push(plain,1,0)).ok,true,'pinned writer seeds an ordinary board');
   assert.equal((await next.CS.pull()).payload,plain);
@@ -20857,7 +21136,10 @@ test('Firestore rules: real pinned writer reads decision authority then holds it
   const oldApp=await loadApp({appSource:extractAppScript(floor.html),seedStorage:{[SYNC_STORE_KEY]:plain,[LOCAL_HEAD_KEY]:plain},cloudSyncFactory:()=>old.CS});
   let updates=0;oldApp.ctx.window.checkForAppUpdate=async()=>{updates++;};
   t.after(()=>{old.CS.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',oldApp.ctx);});
-  await oldApp.ctx.cloudPull();oldApp.ctx.addTask('Legacy independent edit held for safe update');await oldApp.ctx.persist();oldApp.ctx.cloudPushNow();await syncSettle(180);
+  await oldApp.ctx.cloudPull();
+  assert.equal(JSON.stringify(oldApp.ctx.state.decisionEvents),JSON.stringify(JSON.parse(decided).decisionEvents),'the immutable historical app carries every comparison, choice and Undo fact exactly');
+  assert.equal(oldApp.ctx.state.tasks.find(task=>task.id==='bench').title,'Mixed retained benchmark title','the old reader opens the effective retained current choice');
+  oldApp.ctx.addTask('Legacy independent edit held for safe update');await oldApp.ctx.persist();oldApp.ctx.cloudPushNow();await syncSettle(180);
   assert.equal(old.CS.errorCode,'permission-denied','the real fixed historical manifest is denied');
   assert.equal(oldApp.ctx.state.syncDirty,true);assert.equal(oldApp.shim.document.getElementById('syncBtn').textContent,'☁ error');assert.ok(updates>=1,'historical app enters its established compatible-shell recovery');
   const before=await next.CS.pull();assert.equal(before.payload,exact.payload);assert.equal(before.rev,exact.rev);
@@ -20878,8 +21160,11 @@ test('Firestore rules: first decision against released rules stays exact and pen
   const plain=JSON.stringify(f.h.remoteState());assert.equal((await handle.CS.push(plain,1,0)).ok,true);
   const app=await loadApp({seedStorage:{[SYNC_STORE_KEY]:plain,[LOCAL_HEAD_KEY]:plain},cloudSyncFactory:()=>handle.CS});
   t.after(()=>{handle.CS.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',app.ctx);});
-  app.shim.window.CLOUD_PUSH_DELAY_MS=2;await app.ctx.cloudPull();app.ctx.renderScan();app.ctx.onAction('no',{dataset:{candidate:'candidate',benchmark:'bench'}});await app.ctx.persist();
+  app.shim.window.CLOUD_PUSH_DELAY_MS=2;await app.ctx.cloudPull();handle.CS.ready=false;app.ctx.renderScan();app.ctx.onAction('no',{dataset:{candidate:'candidate',benchmark:'bench'}});await recordMixedDecisionActions146(app);await app.ctx.persist();handle.CS.ready=true;
   const evidence=JSON.stringify(app.ctx.state.decisionEvents),ratings=JSON.stringify(app.ctx.state.tasks.map(task=>[task.id,task.mu,task.sigma]));
+  const outcomes=JSON.stringify({chain:app.ctx.state.chain,title:app.ctx.state.tasks.find(task=>task.id==='bench').title,passId:app.ctx.state.passId,scanMode:app.ctx.state.scanMode,chance:app.ctx.state.chance});
+  assert.deepEqual([...new Set(app.ctx.state.decisionEvents.map(event=>event.kind))].sort(),['comparison','current-choice','no','undo']);
+  assert.deepEqual([...new Set(app.ctx.state.decisionEvents.filter(event=>event.kind==='comparison').map(event=>event.action))].sort(),['dislodge','dot','yes']);
   app.ctx.cloudPushNow();await syncSettle(160);
   assert.equal(handle.CS.errorCode,'permission-denied');assert.equal(app.ctx.state.syncDirty,true);assert.equal(JSON.stringify(app.ctx.state.decisionEvents),evidence);
   assert.equal(JSON.stringify(JSON.parse(app.shim.localStorage.getItem(SYNC_STORE_KEY)).decisionEvents),evidence,'rejected first decision stays durable');
@@ -20889,6 +21174,8 @@ test('Firestore rules: first decision against released rules stays exact and pen
   const published=await handle.CS.pull();assert.equal(JSON.stringify(JSON.parse(published.payload).decisionEvents),evidence);
   assert.equal(JSON.stringify(app.ctx.state.tasks.map(task=>[task.id,task.mu,task.sigma])),ratings,'retry does not retrain the comparison');
   assert.equal(app.ctx.state.syncDirty,false);assert.equal(app.shim.document.getElementById('syncBtn').textContent,'☁ synced');
+  const cloud=JSON.parse(published.payload);
+  assert.equal(JSON.stringify({chain:cloud.chain,title:cloud.tasks.find(task=>task.id==='bench').title,passId:cloud.passId,scanMode:cloud.scanMode,chance:cloud.chance}),outcomes,'rules-first Retry preserves actual chosen fields and scoped Undo/pass outcomes as well as learning and raw facts');
  }finally{await handle.drain();await upgraded?.cleanup();await env.cleanup();}
 });
 
@@ -26154,15 +26441,16 @@ test('RISK neutral bootstrap: unknown evidence concurrent automatic placement co
 });
 
 test('RISK neutral bootstrap: offline reconnect real cloud glue retains neutral provenance through old copies and Undo',async()=>{
- const initial=await loadApp();const a=initial.ctx.addTask('Bootstrap'),b=initial.ctx.addTask('Other');a.createdAt=1;b.createdAt=2;initial.ctx.startScan();
- const base=JSON.parse(initial.ctx.cloudPayload());base.syncAccount='e@example.com';base.updatedAt=Date.now();base.syncRev=1;base.syncDirty=false;
- const cloud=makeSyncHarness({remote:base,rev:1}),left=await loadApp({seedStorage:{[STORE_KEY]:JSON.stringify(base)},cloudSyncFactory:cloud.factory}),right=await loadApp({seedStorage:{[STORE_KEY]:JSON.stringify(base)},cloudSyncFactory:cloud.factory});
+ const cloud=makeSyncHarness({remote:null,rev:0}),initial=await loadApp({cloudSyncFactory:cloud.factory});await initial.ctx.cloudPull();
+ const a=initial.ctx.addTask('Bootstrap'),b=initial.ctx.addTask('Other');a.createdAt=1;b.createdAt=2;initial.ctx.startScan();await initial.ctx.persist();await initial.ctx.cloudPushNow();await syncSettle(80);
+ const base=JSON.parse(JSON.stringify(initial.ctx.state));
+ const left=await loadApp({seedStorage:{[STORE_KEY]:JSON.stringify(base)},cloudSyncFactory:cloud.factory}),right=await loadApp({seedStorage:{[STORE_KEY]:JSON.stringify(base)},cloudSyncFactory:cloud.factory});
  for(const h of [left,right]){h.shim.window.CLOUD_PUSH_DELAY_MS=2;h.shim.window.CLOUD_RETRY_DELAY_MS=2;await h.ctx.cloudPull();}
  cloud.failPull=true;left.ctx.suspendCloudSync();left.ctx.state.candidateId=b.id;left.ctx.decide('no');await left.ctx.persist();assert.equal(left.ctx.state.tasks.find(t=>t.id===a.id).mu,25);
  cloud.failPull=false;left.ctx.resumeCloudSync();await syncSettle(100);await right.ctx.cloudPull();assert.equal(right.ctx.taskComparisonEligible(right.ctx.state.tasks.find(t=>t.id===a.id)),false);
  const old=cloud.remoteState();delete old.tasks.find(t=>t.id===a.id).comparisonOps;old.updatedAt=Date.now()+1;cloud.writeBehindBack(old);await left.ctx.cloudPull();await syncSettle(100);assert.equal(left.ctx.taskComparisonEligible(left.ctx.state.tasks.find(t=>t.id===a.id)),false,'newer missing-field copy retains local exclusion');
  left.ctx.dislodge();left.ctx.state.chain=[b.id];left.ctx.dotTask(a.id);const choiceUndoDepth=vm.runInContext('undoStack.length',left.ctx);await left.ctx.persist();left.ctx.cloudPushNow();await syncSettle(100);await right.ctx.cloudPull();assert.equal(right.ctx.taskComparisonEligible(right.ctx.state.tasks.find(t=>t.id===a.id)),true);
- const adoptionFrames=vm.runInContext('undoStack.length',left.ctx)-choiceUndoDepth;assert.ok(adoptionFrames>=0&&adoptionFrames<=3,'only bounded cloud-adoption frames can follow the choice');for(let i=0;i<adoptionFrames;i++)left.ctx.undo();left.ctx.undo();await left.ctx.persist();left.ctx.cloudPushNow();await syncSettle(100);await right.ctx.cloudPull();assert.equal(right.ctx.taskComparisonEligible(right.ctx.state.tasks.find(t=>t.id===a.id)),false);
+ const adoptionFrames=vm.runInContext('undoStack.length',left.ctx)-choiceUndoDepth;assert.equal(adoptionFrames,0,'cloud reception never adds an ordinary Undo frame');left.ctx.undo();assert.equal(left.ctx.taskComparisonEligible(left.ctx.state.tasks.find(t=>t.id===a.id)),false,'local Undo restores the neutral boundary before publication');await left.ctx.persist();left.ctx.cloudPushNow();await syncSettle(100);await right.ctx.cloudPull();assert.equal(right.ctx.taskComparisonEligible(right.ctx.state.tasks.find(t=>t.id===a.id)),false);
  const reload=await loadApp({seedStorage:{[STORE_KEY]:JSON.stringify(right.ctx.state)},cloudSyncFactory:cloud.factory});await reload.ctx.cloudPull();assert.equal(reload.ctx.taskComparisonEligible(reload.ctx.state.tasks.find(t=>t.id===a.id)),false);
 });
 
@@ -26176,7 +26464,7 @@ test('RISK neutral bootstrap: Settings backup Restore restores causal exclusion 
  ctx.dislodge();ctx.state.chain=[b.id];ctx.dotTask(a.id);await ctx.persist();const chosen=await ctx.saveDurableBackup('manual',JSON.stringify(ctx.state));assert.ok(chosen?.id);assert.equal(ctx.taskComparisonEligible(ctx.state.tasks.find(t=>t.id===a.id)),true);
  ctx.openSettings();assert.equal(await ctx.restoreDurableBackupById(neutral.id),true);assert.equal(ctx.taskComparisonEligible(ctx.state.tasks.find(t=>t.id===a.id)),false,'actual Settings Restore cannot silently promote automatic placement');
  ctx.openSettings();assert.equal(await ctx.restoreDurableBackupById(chosen.id),true);assert.equal(ctx.taskComparisonEligible(ctx.state.tasks.find(t=>t.id===a.id)),true,'restoring recorded explicit choice supersedes the newer neutral evidence');
- ctx.undo();assert.equal(ctx.taskComparisonEligible(ctx.state.tasks.find(t=>t.id===a.id)),false,'Undo restored explicit choice restores exclusion');await ctx.persist();ctx.deleteTask(a.id);await ctx.persist();ctx.openSettings();assert.equal(await ctx.restoreDurableBackupById(neutral.id),true);assert.equal(ctx.taskComparisonEligible(ctx.state.tasks.find(t=>t.id===a.id)),false,'restoring deleted task preserves its saved exclusion');
+ await ctx.undo();assert.equal(ctx.taskComparisonEligible(ctx.state.tasks.find(t=>t.id===a.id)),false,'Undo restored explicit choice restores exclusion');await ctx.persist();ctx.deleteTask(a.id);await ctx.persist();ctx.openSettings();assert.equal(await ctx.restoreDurableBackupById(neutral.id),true);assert.equal(ctx.taskComparisonEligible(ctx.state.tasks.find(t=>t.id===a.id)),false,'restoring deleted task preserves its saved exclusion');
 });
 
 test('RISK neutral bootstrap: restoring a deleted automatic task during pending saves keeps backup exclusion',async()=>{
@@ -27035,10 +27323,11 @@ test('RISK always binary context interactions: last-green and all-red clicks sta
 });
 
 test('RISK always binary No Context: visible green and red dispatch immediately on both surfaces with Undo and zero-context guard',async()=>{
+ const ordinaryState=board=>{const result={...board,updatedAt:0};delete result.decisionEvents;delete result.decisionBaseline;return JSON.stringify(result);};
  for(const scope of ['main','settings']){
-  const {ctx,shim}=await loadApp();for(const c of ctx.state.contexts)c.active=false;ctx.state.settings.excludeNoContext=false;const none=ctx.addTask('Private unassigned'),unknown=ctx.addTask('Private unknown',false,['deleted']),known=ctx.addTask('Private known',false,[ctx.state.contexts[0].id]);const saved=JSON.stringify({...ctx.state,updatedAt:0});
+  const {ctx,shim}=await loadApp();for(const c of ctx.state.contexts)c.active=false;ctx.state.settings.excludeNoContext=false;const none=ctx.addTask('Private unassigned'),unknown=ctx.addTask('Private unknown',false,['deleted']),known=ctx.addTask('Private known',false,[ctx.state.contexts[0].id]);const saved=ordinaryState(ctx.state);
   assert.equal(ctx.contextControlInfo(null).mode,'included');assert.equal(ctx.isEligible(none),true);assert.equal(ctx.isEligible(unknown),true);assert.equal(ctx.isEligible(known),false);
-  const button=makeFakeElement();button.dataset={ctxScope:scope,act:'toggle-no-context'};shim.document.activeElement=button;ctx.onAction('toggle-no-context',button);assert.equal(ctx.contextControlInfo(null).mode,'excluded');assert.equal(ctx.isEligible(none),false);assert.equal(ctx.isEligible(unknown),false);ctx.onAction('toggle-no-context',button);assert.equal(ctx.contextControlInfo(null).mode,'included');assert.equal(ctx.isEligible(none),true);ctx.undo();assert.equal(ctx.contextControlInfo(null).mode,'excluded');ctx.undo();assert.equal(JSON.stringify({...ctx.state,updatedAt:0}),saved);
+  const button=makeFakeElement();button.dataset={ctxScope:scope,act:'toggle-no-context'};shim.document.activeElement=button;ctx.onAction('toggle-no-context',button);assert.equal(ctx.contextControlInfo(null).mode,'excluded');assert.equal(ctx.isEligible(none),false);assert.equal(ctx.isEligible(unknown),false);ctx.onAction('toggle-no-context',button);assert.equal(ctx.contextControlInfo(null).mode,'included');assert.equal(ctx.isEligible(none),true);ctx.undo();assert.equal(ctx.contextControlInfo(null).mode,'excluded');ctx.undo();assert.equal(ordinaryState(ctx.state),saved);assert.equal(ctx.state.decisionEvents.filter(event=>event.kind==='undo').length,2,'both reversals retain their durable target evidence');
   ctx.state.contexts=[];ctx.state.settings.excludeNoContext=true;ctx.renderCtx();const before=JSON.stringify(ctx.state);ctx.onAction('toggle-no-context',button);assert.equal(JSON.stringify(ctx.state),before);assert.equal(ctx.isEligible(known),true);assert.match(shim.document.getElementById('ctxPanel').innerHTML,/toggle-ctx/);assert.match(shim.document.getElementById('ctxPanel').innerHTML,/add-ctx/);
  }
 });
@@ -28406,6 +28695,19 @@ test('RISK cloud current choices: context membership additions compose across ob
   phone.ctx.projectCurrentChoiceEvents(unattestedBoard);
   assert.deepEqual(JSON.parse(JSON.stringify(unattestedBoard.tasks.find(task=>task.id==='context-delta-target').ctx)),['ctx-peer'],
    'a missing exact cloud base remains conservative even when the before memberships match');
+
+  const staleChosen=h.remoteState();await phone.ctx.cloudPull();
+  phone.ctx.onAction('undo',{});
+  assert.deepEqual(Array.from(phone.ctx.state.tasks.find(task=>task.id==='context-delta-target').ctx),['ctx-peer'],
+   'ordinary local Undo reverses only the phone membership across different observed bases');
+  assert.equal(phone.ctx.state.tasks.find(task=>task.id==='revision-marker').title,'Advanced cloud revision','Undo retains the earlier unrelated local action');
+  const cancellation=phone.ctx.state.decisionEvents.find(event=>event.kind==='undo');assert.deepEqual(Array.from(cancellation.targetEventIds),[phoneChoice.id]);
+  await phone.ctx.persist();await phone.ctx.cloudPushNow();await syncSettle(40);
+  h.writeBehindBack(staleChosen);await phone.ctx.cloudPull();await phone.ctx.cloudPushNow();await syncSettle(40);
+  assert.deepEqual(h.remoteState().tasks.find(task=>task.id==='context-delta-target').ctx,['ctx-peer'],'stale original delivery cannot restore the cancelled phone delta');
+  const undoneRaw=JSON.stringify({...h.remoteState(),syncAccount:'e@example.com',syncRev:h.doc.rev,syncDirty:false});
+  const undoneReopen=await loadAppAtTime(at,{seedStorage:{[SYNC_STORE_KEY]:undoneRaw},cloudSyncFactory:h.factory});
+  await undoneReopen.ctx.cloudPull();assert.deepEqual(Array.from(undoneReopen.ctx.state.tasks.find(task=>task.id==='context-delta-target').ctx),['ctx-peer'],'cold reopen preserves the peer membership and phone cancellation');
  }finally{
   for(const app of [phone,peer])try{await app.shim.window.ScannerDeviceStore?.close?.();}catch{}
  }

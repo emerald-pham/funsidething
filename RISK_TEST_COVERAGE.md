@@ -1233,6 +1233,15 @@ Protect full bicycle and scooter silhouettes, fixed tire contacts, shared solar 
 
 Protect conditional decision-capability activation, ordinary pinned-client compatibility, exact unknown/foreign/colliding evidence holds, mandatory local saves, original action identity through uncertain acknowledgement and cold reopen, and account-bound late replies. Firestore rules consumers additionally execute the immutable historical backend and full application, activation CAS, historical safe-update holds, and rules-first rollout.
 
+## Scoped ordinary Undo (#145)
+
+- `RISK scoped Undo: local comparison cancellation keeps peer learning and survives stale cloud and reopen`
+- `RISK scoped Undo: compound editor Dot restores only local fields and context deltas after peer progress`
+- `RISK scoped Undo: bulk edit is one durable cancellation group and later peer choices stay effective`
+- `RISK scoped Undo: cancelled No cannot return from stale marks and context membership keeps the peer delta`
+
+Protect local gesture targeting through reconciliation, immutable grouped cancellation, frozen-baseline learning, exact prior property presence, later peer choices, context membership deltas, duplicate/stale delivery, durable cloud state and reopen. Explicit replacement and established domain cancellation remain separate.
+
 ## Decision inheritance and complete replay safety (#146)
 
 - `RISK decision capability recovery: sole baseline recovery activates the fence without rewriting evidence`
@@ -1247,6 +1256,12 @@ Protect conditional decision-capability activation, ordinary pinned-client compa
 
 Protect source validation before authority union; missing/cyclic ancestry, baseline recovery and extension conflicts; lossless explicit ownership inheritance and exact-fact attestation; mandatory source/replacement recovery in both stores; and safe update of sole pending legacy learning without invented comparisons.
 
+- `RISK scoped Undo: first guest sign-in keeps local cancellation authority and replays later signed learning`
+- `RISK scoped Undo: unsupported cancellation payloads hold exact local and cloud branches`
+- `RISK scoped Undo: completion evergreen work delete and postpone retain unrelated peer fields`
+- `RISK scoped Undo: cancelling Start restores the prior pass root and exact draw through stale delivery`
+- `RISK scoped Undo: Return cancellation restores the original hold time while peer task fields survive`
+
 ## Complete Start and chosen-field authority (#146)
 
 - `RISK decision recovery current-choice authority: strict editor semantics and effective chosen fields guard cloud adoption`
@@ -1260,6 +1275,9 @@ Preserve both sources when a supported Start group is incomplete/ambiguous or a 
 - `RISK decision recovery replacement scope: exact retired branches stay retired while new changed and unknown peer facts stay held`
 
 Durable exact displaced-baseline/fact receipts retire only explicitly replaced authority; new/changed/unknown peer facts stay protected. Reverse replacement Undo is the dependent #145 gate.
+
+- `RISK scoped Undo: explicit modern Import Restore and Reset reverse exact journal replacement after recovery`
+- `RISK scoped Undo: replacement recovery failure and an account race retain the current board and Undo frame`
 
 ## Independent decision release guidance (#147)
 
@@ -1288,3 +1306,12 @@ Validate sole recovery authority before the no-active-journal replacement shortc
 - `RISK decision recovery retired identity: changed same-ID retired editor facts cannot become fresh authority`
 
 Shared selected facts remain active through reversed cloud adoption; retired typed field values cannot resurrect; changed retired identities hold against exact witness bytes.
+
+- `RISK scoped Undo: inherited guest edit restores its before value through stale signed snapshots`
+- `RISK scoped Undo: inherited legacy-pass No cancellation survives stale marks without inventing a pass`
+
+## Mixed-client rollout across every decision family (#146/#147)
+
+- `RISK decision mixed rollout fixture: actual comparisons current choices Start and scoped Undo survive durable publication and reopen`
+
+The existing `Firestore rules: real pinned writer reads decision authority then holds its ordinary app edit without erasing it` and `Firestore rules: first decision against released rules stays exact and pending until rules-first rollout then retry` consumers now publish coherent actual-app No, Yes, editor Dot, Dislodge, current-choice, Start and scoped Undo evidence through the production Firebase adapter. Both rollout guards and immutable supported baseline remain protected. Exact emulator execution belongs to the final root candidate; the in-process fixture is not emulator proof.

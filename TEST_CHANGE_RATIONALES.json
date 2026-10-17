@@ -7743,5 +7743,220 @@
       "command": "node --test --test-reporter=spec --test-name-pattern='RISK cloud current choices: context membership additions compose across observed revisions' tests.js",
       "failure": "On 947c3bec1076a729257185142bf17da066bb441a, the full-app peer pull retained only ctx-peer after phone's ctx-phone choice. Raw /Users/emeraldpham/.codex/task-artifacts/decision-sync-141/144/context-delta-red-before-fix.txt includes distinct action IDs/base IDs and both exact before:{present:true,value:[]} records. The fixed consumer passes on integrated root checkpoint 98528c0."
     }
+  },
+  {
+    "testChangesSha256": "7f863bc4850d0401e51968b8a999a93ad70430615d11b02c91bb5ca52a255812",
+    "reason": "Implement approved #141/#145 ordinary action-scoped Undo using real two-device app consumers; preserve unrelated peer choices and immutable observations.",
+    "previousBehavior": "Cloud adoption added a snapshot Undo frame which reversed peer Dot while retaining local Yes, and bulk Save lacked durable per-task choice facts.",
+    "intendedBehavior": "Normal Undo cancels exactly one local gesture group against current reconciled board, replays retained learning once, and preserves peer fields through durable publication and reopen.",
+    "replacementTests": [
+      "RISK scoped Undo: local comparison cancellation keeps peer learning and survives stale cloud and reopen",
+      "RISK scoped Undo: compound editor Dot restores only local fields and context deltas after peer progress",
+      "RISK scoped Undo: bulk edit is one durable cancellation group and later peer choices stay effective",
+      "RISK scoped Undo: cancelled No cannot return from stale marks and context membership keeps the peer delta"
+    ],
+    "preservedCoverage": [
+      "Existing tests remain unchanged in this checkpoint; completion, evergreen, causal return, delete, postpone, prerequisites and explicit replacement consumers remain required.",
+      "The tests exercise real buttons, editor save plus Dot, bulk save and keyboard Undo; browser timing, live auth/rules, production and physical devices are not claimed."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='RISK scoped Undo' tests.js (vertical patterns run separately before each corresponding runtime repair)",
+      "failure": "Raw artifacts145/red-comparison.log 04:53:57UTC kept undo-local and lost undo-peer; red-compound-choice.log04:54:55 title stayed Local edited title; red-bulk.log04:56:42 expected3 facts got0; red-no-context.log04:57:13 stale no survived. Corresponding green logs captured after each repair. Later fixture corrections isolated absent due from a separate deliberate peer null edit and normalize cross-realm arrays; no infrastructure failure is counted as RED."
+    }
+  },
+  {
+    "testChangesSha256": "a1b40c20172e778d946ffea29fb0961c01b221fd3323f7f3a8e84ff0ad75dc66",
+    "reason": "Extend #145 to guest ownership inheritance, strict cancellation semantics, original pass/draw restoration and protected domain consumers; replace only the explicitly superseded cloud-adoption Undo contract.",
+    "previousBehavior": "Authenticated baseline embodied guest comparison despite an available normal Undo; unknown undo fields were accepted as known semantics; cancelling Start could restore its cancelled random draw and later stale original could reactivate its pass.",
+    "intendedBehavior": "Target cancellation reconstructs exact inherited source learning before later owner actions, validates exact causal gesture authority, restores original Start pass/draw only while relevant, and preserves later peer starts/completion and ordinary task safeguards.",
+    "replacementTests": [
+      "RISK scoped Undo: local comparison cancellation keeps peer learning and survives stale cloud and reopen",
+      "RISK scoped Undo: compound editor Dot restores only local fields and context deltas after peer progress",
+      "RISK scoped Undo: bulk edit is one durable cancellation group and later peer choices stay effective",
+      "RISK scoped Undo: cancelled No cannot return from stale marks and context membership keeps the peer delta",
+      "RISK scoped Undo: first guest sign-in keeps local cancellation authority and replays later signed learning",
+      "RISK scoped Undo: unsupported cancellation payloads hold exact local and cloud branches",
+      "RISK scoped Undo: completion evergreen work delete and postpone retain unrelated peer fields",
+      "RISK scoped Undo: cancelling Start restores the prior pass root and exact draw through stale delivery",
+      "RISK scoped Undo: Return cancellation restores the original hold time while peer task fields survive"
+    ],
+    "preservedCoverage": [
+      "All existing domain assertions remain. AUDIT H3 now asserts no arbitrary remote-history Undo plus retained explicit recovery, as approved by #141; actual local-action Undo replacement coverage is in scoped family.",
+      "Neutral-bootstrap setup now performs actual authenticated empty-cloud adoption before Start instead of stamping a signed account over guest facts. Every neutral/choice/Undo/reopen expectation remains; adoption-frame count strengthened to zero.",
+      "Completion, evergreen, work, delete, postpone and hold-expiry additions initially passed and are preservation coverage, not claimed as new preimplementation RED. Browser/live auth/rules/production remain unverified."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='RISK scoped Undo: first guest|RISK scoped Undo: unsupported cancellation|RISK scoped Undo: cancelling Start' tests.js; separate original vertical patterns",
+      "failure": "New exact outputs145/red-guest-undo.log04:59:46UTC expected25 got29.20558; red-cancellation-authority.log05:00:53 accepted arbitrary patch semantics as conflicting rather than unsupported; red-start-undo.log05:01:54 restored cancelled draw, next failing assertion showed stale Start pass/root revival. Corresponding green logs establish all14subcases passing. Prior adoption failure in145/adoption-contract-current.log documents superseded AUDIT H3 behavior before test update; first neutral fixture failure predates that correction. The initial four vertical REDs remain exact in145artifacts."
+    }
+  },
+  {
+    "testChangesSha256": "3bf04dbbccf65bd94e3b2c45e06dab31dc447150167151573f4f7dc871ab10c7",
+    "reason": "Complete action-scoped Undo and preserve deliberate modern Import/Restore/Reset with exact reverse replacement recovery; repair regressions exposed by the broad affected cohort without weakening domain assertions.",
+    "previousBehavior": "Snapshot Undo of a modern explicit replacement could be replaced again by its selected source journal. Reset mutated the previously retained Undo frame while rollback expected its exact bytes. Sync ordering of equivalent comparisonOps prevented inverse exclusion. Existing old-backup fixtures changed frozen draw fields while retaining contradictory modern fact metadata.",
+    "intendedBehavior": "Explicit replacement Undo first saves current/source recovery and installs a reverse exact receipt; failures/races preserve board and frame. Reset has its own authorized replacement receipt. Ordinary inverse recognizes an equivalent unordered comparison operation set while retaining peer operations. Legacy fixtures remain legacy and all expected original chance outcomes remain asserted.",
+    "replacementTests": [
+      "RISK scoped Undo: local comparison cancellation keeps peer learning and survives stale cloud and reopen",
+      "RISK scoped Undo: compound editor Dot restores only local fields and context deltas after peer progress",
+      "RISK scoped Undo: bulk edit is one durable cancellation group and later peer choices stay effective",
+      "RISK scoped Undo: cancelled No cannot return from stale marks and context membership keeps the peer delta",
+      "RISK scoped Undo: first guest sign-in keeps local cancellation authority and replays later signed learning",
+      "RISK scoped Undo: unsupported cancellation payloads hold exact local and cloud branches",
+      "RISK scoped Undo: completion evergreen work delete and postpone retain unrelated peer fields",
+      "RISK scoped Undo: cancelling Start restores the prior pass root and exact draw through stale delivery",
+      "RISK scoped Undo: Return cancellation restores the original hold time while peer task fields survive",
+      "RISK scoped Undo: explicit modern Import Restore and Reset reverse exact journal replacement after recovery",
+      "RISK scoped Undo: replacement recovery failure and an account race retain the current board and Undo frame"
+    ],
+    "preservedCoverage": [
+      "Every task, rating, chance seed, candidate, cooldown, history and recovery assertion is retained. Explicit replacement tests now await mandatory recovery completion before checking results. The two old-backup fixtures intentionally omit decisionEvents/decisionBaseline before editing their historical scalar snapshot; incoherent modern imports remain held by #146.",
+      "WOOP and neutral bootstrap fixtures now establish actual guest-to-empty-account or authenticated adoption before cloud publication, rather than placing unapproved guest facts directly in signed cloud. All prior visible plan, exclusion, completion, Undo and reload assertions remain.",
+      "No Context restores every ordinary field exactly and now separately asserts two immutable cancellation facts; only decisionEvents/decisionBaseline are excluded from the old byte-equality check because retaining reversal evidence is the approved behavior. Original assertions for eligibility and zero-context guard remain.",
+      "No production, browser timing, physical-device or deployment proof is claimed. Parent owns final guidance, shell fingerprints, independent review and full release validation."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='RISK scoped Undo: explicit modern' tests.js; node --test --test-reporter=spec --test-name-pattern='Undo|undo|Restore|restore|Import|import|Reset|reset|RISK cloud current choices|RISK comparison replay|RISK decision recovery' tests.js",
+      "failure": "Actual145/red-explicit-replacement-undo-behavior.log05:06:42UTC observed imported source journal instead of the prior destination journal after normal Undo. Earlier red-explicit-replacement-undo.log asserted a historically void return value and is setup-only, not behavioral RED. Exact145/affected-undo-replacement.log272pass/7fail/10skip preserved reset-frame-byte mutation and neutral-order failure before runtime repairs plus old async/ownership/legacy-fixture expectation mismatches. All26 focused scoped+affected repair cases subsequently passed in green-explicit-and-regressions.log; original vertical REDs remain retained."
+    }
+  },
+  {
+    "testChangesSha256": "bc2ea1975cf8eb3b4819db31576dc3237b4754a07fba8d2bdcdd0f3af59ac4bc",
+    "reason": "Complete action-scoped Undo and preserve deliberate modern Import/Restore/Reset with exact reverse replacement recovery; repair regressions exposed by the broad affected cohort without weakening domain assertions. Preserve actual benchmark reversal history after comparison replay.",
+    "previousBehavior": "Snapshot Undo of a modern explicit replacement could be replaced again by its selected source journal. Reset mutated the previously retained Undo frame while rollback expected its exact bytes. Sync ordering of equivalent comparisonOps prevented inverse exclusion. Existing old-backup fixtures changed frozen draw fields while retaining contradictory modern fact metadata.",
+    "intendedBehavior": "Explicit replacement Undo first saves current/source recovery and installs a reverse exact receipt; failures/races preserve board and frame. Reset has its own authorized replacement receipt. Ordinary inverse recognizes an equivalent unordered comparison operation set while retaining peer operations. Legacy fixtures remain legacy and all expected original chance outcomes remain asserted.",
+    "replacementTests": [
+      "RISK scoped Undo: local comparison cancellation keeps peer learning and survives stale cloud and reopen",
+      "RISK scoped Undo: compound editor Dot restores only local fields and context deltas after peer progress",
+      "RISK scoped Undo: bulk edit is one durable cancellation group and later peer choices stay effective",
+      "RISK scoped Undo: cancelled No cannot return from stale marks and context membership keeps the peer delta",
+      "RISK scoped Undo: first guest sign-in keeps local cancellation authority and replays later signed learning",
+      "RISK scoped Undo: unsupported cancellation payloads hold exact local and cloud branches",
+      "RISK scoped Undo: completion evergreen work delete and postpone retain unrelated peer fields",
+      "RISK scoped Undo: cancelling Start restores the prior pass root and exact draw through stale delivery",
+      "RISK scoped Undo: Return cancellation restores the original hold time while peer task fields survive",
+      "RISK scoped Undo: explicit modern Import Restore and Reset reverse exact journal replacement after recovery",
+      "RISK scoped Undo: replacement recovery failure and an account race retain the current board and Undo frame"
+    ],
+    "preservedCoverage": [
+      "Every task, rating, chance seed, candidate, cooldown, history and recovery assertion is retained. Explicit replacement tests now await mandatory recovery completion before checking results. The two old-backup fixtures intentionally omit decisionEvents/decisionBaseline before editing their historical scalar snapshot; incoherent modern imports remain held by #146.",
+      "WOOP and neutral bootstrap fixtures now establish actual guest-to-empty-account or authenticated adoption before cloud publication, rather than placing unapproved guest facts directly in signed cloud. All prior visible plan, exclusion, completion, Undo and reload assertions remain.",
+      "No Context restores every ordinary field exactly and now separately asserts two immutable cancellation facts; only decisionEvents/decisionBaseline are excluded from the old byte-equality check because retaining reversal evidence is the approved behavior. Original assertions for eligibility and zero-context guard remain.",
+      "No production, browser timing, physical-device or deployment proof is claimed. Parent owns final guidance, shell fingerprints, independent review and full release validation."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='RISK scoped Undo: explicit modern' tests.js; node --test --test-reporter=spec --test-name-pattern='Undo|undo|Restore|restore|Import|import|Reset|reset|RISK cloud current choices|RISK comparison replay|RISK decision recovery' tests.js; node --test --test-reporter=spec --test-name-pattern='RISK scoped Undo: local comparison' tests.js",
+      "failure": "Actual145/red-explicit-replacement-undo-behavior.log05:06:42UTC observed imported source journal instead of the prior destination journal after normal Undo. Earlier red-explicit-replacement-undo.log asserted a historically void return value and is setup-only, not behavioral RED. Exact145/affected-undo-replacement.log272pass/7fail/10skip preserved reset-frame-byte mutation and neutral-order failure before runtime repairs plus old async/ownership/legacy-fixture expectation mismatches. All26 focused scoped+affected repair cases subsequently passed in green-explicit-and-regressions.log; original vertical REDs remain retained. Additional actual05:11:28UTC red-comparison-history.log: shared benchmark had no undo observation after correct recomputation; capture all potentially replay-affected task metrics and attach cancellation.id. green-comparison-history.log passes42/42 scoped and rating-history cases. All other changed fixture contracts remain documented above."
+    }
+  },
+  {
+    "testChangesSha256": "766acc1cc21af1709fafdfc2de855912f152d3b2d9fd775259d62fa61673eb89",
+    "reason": "Complete action-scoped Undo and preserve deliberate modern Import/Restore/Reset with exact reverse replacement recovery; repair regressions exposed by the broad affected cohort without weakening domain assertions. Preserve actual benchmark reversal history after comparison replay. Final exact dependency-base fingerprint after preserving root guidance and #146 retirement fixes.",
+    "previousBehavior": "Snapshot Undo of a modern explicit replacement could be replaced again by its selected source journal. Reset mutated the previously retained Undo frame while rollback expected its exact bytes. Sync ordering of equivalent comparisonOps prevented inverse exclusion. Existing old-backup fixtures changed frozen draw fields while retaining contradictory modern fact metadata.",
+    "intendedBehavior": "Explicit replacement Undo first saves current/source recovery and installs a reverse exact receipt; failures/races preserve board and frame. Reset has its own authorized replacement receipt. Ordinary inverse recognizes an equivalent unordered comparison operation set while retaining peer operations. Legacy fixtures remain legacy and all expected original chance outcomes remain asserted.",
+    "replacementTests": [
+      "RISK scoped Undo: local comparison cancellation keeps peer learning and survives stale cloud and reopen",
+      "RISK scoped Undo: compound editor Dot restores only local fields and context deltas after peer progress",
+      "RISK scoped Undo: bulk edit is one durable cancellation group and later peer choices stay effective",
+      "RISK scoped Undo: cancelled No cannot return from stale marks and context membership keeps the peer delta",
+      "RISK scoped Undo: first guest sign-in keeps local cancellation authority and replays later signed learning",
+      "RISK scoped Undo: unsupported cancellation payloads hold exact local and cloud branches",
+      "RISK scoped Undo: completion evergreen work delete and postpone retain unrelated peer fields",
+      "RISK scoped Undo: cancelling Start restores the prior pass root and exact draw through stale delivery",
+      "RISK scoped Undo: Return cancellation restores the original hold time while peer task fields survive",
+      "RISK scoped Undo: explicit modern Import Restore and Reset reverse exact journal replacement after recovery",
+      "RISK scoped Undo: replacement recovery failure and an account race retain the current board and Undo frame"
+    ],
+    "preservedCoverage": [
+      "Every task, rating, chance seed, candidate, cooldown, history and recovery assertion is retained. Explicit replacement tests now await mandatory recovery completion before checking results. The two old-backup fixtures intentionally omit decisionEvents/decisionBaseline before editing their historical scalar snapshot; incoherent modern imports remain held by #146.",
+      "WOOP and neutral bootstrap fixtures now establish actual guest-to-empty-account or authenticated adoption before cloud publication, rather than placing unapproved guest facts directly in signed cloud. All prior visible plan, exclusion, completion, Undo and reload assertions remain.",
+      "No Context restores every ordinary field exactly and now separately asserts two immutable cancellation facts; only decisionEvents/decisionBaseline are excluded from the old byte-equality check because retaining reversal evidence is the approved behavior. Original assertions for eligibility and zero-context guard remain.",
+      "No production, browser timing, physical-device or deployment proof is claimed. Parent owns final guidance, shell fingerprints, independent review and full release validation."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='RISK scoped Undo: explicit modern' tests.js; node --test --test-reporter=spec --test-name-pattern='Undo|undo|Restore|restore|Import|import|Reset|reset|RISK cloud current choices|RISK comparison replay|RISK decision recovery' tests.js; node --test --test-reporter=spec --test-name-pattern='RISK scoped Undo: local comparison' tests.js",
+      "failure": "Actual145/red-explicit-replacement-undo-behavior.log05:06:42UTC observed imported source journal instead of the prior destination journal after normal Undo. Earlier red-explicit-replacement-undo.log asserted a historically void return value and is setup-only, not behavioral RED. Exact145/affected-undo-replacement.log272pass/7fail/10skip preserved reset-frame-byte mutation and neutral-order failure before runtime repairs plus old async/ownership/legacy-fixture expectation mismatches. All26 focused scoped+affected repair cases subsequently passed in green-explicit-and-regressions.log; original vertical REDs remain retained. Additional actual05:11:28UTC red-comparison-history.log: shared benchmark had no undo observation after correct recomputation; capture all potentially replay-affected task metrics and attach cancellation.id. green-comparison-history.log passes42/42 scoped and rating-history cases. All other changed fixture contracts remain documented above."
+    }
+  },
+  {
+    "testChangesSha256": "51abaa5991ef3edfed2f67b2af407b80b76879775295ebf65042d16a8db7ee9e",
+    "reason": "Complete action-scoped Undo and preserve deliberate modern Import/Restore/Reset with exact reverse replacement recovery; repair regressions exposed by the broad affected cohort without weakening domain assertions. Preserve actual benchmark reversal history after comparison replay. Final exact dependency-base fingerprint after preserving root guidance and #146 retirement fixes. Complete stale inherited-choice effects and bind retained metadata-free local Add Undo to its successful account adoption.",
+    "previousBehavior": "Snapshot Undo of a modern explicit replacement could be replaced again by its selected source journal. Reset mutated the previously retained Undo frame while rollback expected its exact bytes. Sync ordering of equivalent comparisonOps prevented inverse exclusion. Existing old-backup fixtures changed frozen draw fields while retaining contradictory modern fact metadata.",
+    "intendedBehavior": "Explicit replacement Undo first saves current/source recovery and installs a reverse exact receipt; failures/races preserve board and frame. Reset has its own authorized replacement receipt. Ordinary inverse recognizes an equivalent unordered comparison operation set while retaining peer operations. Legacy fixtures remain legacy and all expected original chance outcomes remain asserted.",
+    "replacementTests": [
+      "RISK scoped Undo: local comparison cancellation keeps peer learning and survives stale cloud and reopen",
+      "RISK scoped Undo: compound editor Dot restores only local fields and context deltas after peer progress",
+      "RISK scoped Undo: bulk edit is one durable cancellation group and later peer choices stay effective",
+      "RISK scoped Undo: cancelled No cannot return from stale marks and context membership keeps the peer delta",
+      "RISK scoped Undo: first guest sign-in keeps local cancellation authority and replays later signed learning",
+      "RISK scoped Undo: unsupported cancellation payloads hold exact local and cloud branches",
+      "RISK scoped Undo: completion evergreen work delete and postpone retain unrelated peer fields",
+      "RISK scoped Undo: cancelling Start restores the prior pass root and exact draw through stale delivery",
+      "RISK scoped Undo: Return cancellation restores the original hold time while peer task fields survive",
+      "RISK scoped Undo: explicit modern Import Restore and Reset reverse exact journal replacement after recovery",
+      "RISK scoped Undo: replacement recovery failure and an account race retain the current board and Undo frame"
+    ],
+    "preservedCoverage": [
+      "Every task, rating, chance seed, candidate, cooldown, history and recovery assertion is retained. Explicit replacement tests now await mandatory recovery completion before checking results. The two old-backup fixtures intentionally omit decisionEvents/decisionBaseline before editing their historical scalar snapshot; incoherent modern imports remain held by #146.",
+      "WOOP and neutral bootstrap fixtures now establish actual guest-to-empty-account or authenticated adoption before cloud publication, rather than placing unapproved guest facts directly in signed cloud. All prior visible plan, exclusion, completion, Undo and reload assertions remain.",
+      "No Context restores every ordinary field exactly and now separately asserts two immutable cancellation facts; only decisionEvents/decisionBaseline are excluded from the old byte-equality check because retaining reversal evidence is the approved behavior. Original assertions for eligibility and zero-context guard remain.",
+      "No production, browser timing, physical-device or deployment proof is claimed. Parent owns final guidance, shell fingerprints, independent review and full release validation.",
+      "Original unsaved-local-edit adoption test now asserts ordinary Add Undo removes only its local task, retains CLOUD_CHAIN and every peer task, and keeps exact displaced recovery; its prior STALE_CHAIN whole-adoption reversal is explicitly superseded by #141. Modern guest facts still require exact inheritance; only metadata-free legacy local frames are bound after a successful same-account adoption, never on foreign switches."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='RISK scoped Undo: explicit modern' tests.js; node --test --test-reporter=spec --test-name-pattern='Undo|undo|Restore|restore|Import|import|Reset|reset|RISK cloud current choices|RISK comparison replay|RISK decision recovery' tests.js; node --test --test-reporter=spec --test-name-pattern='RISK scoped Undo: local comparison' tests.js; node --test --test-reporter=spec --test-name-pattern='RISK scoped Undo: first guest|RISK scoped Undo: inherited guest edit|adopting a newer remote over unsaved local edits' tests.js",
+      "failure": "Actual145/red-explicit-replacement-undo-behavior.log05:06:42UTC observed imported source journal instead of the prior destination journal after normal Undo. Earlier red-explicit-replacement-undo.log asserted a historically void return value and is setup-only, not behavioral RED. Exact145/affected-undo-replacement.log272pass/7fail/10skip preserved reset-frame-byte mutation and neutral-order failure before runtime repairs plus old async/ownership/legacy-fixture expectation mismatches. All26 focused scoped+affected repair cases subsequently passed in green-explicit-and-regressions.log; original vertical REDs remain retained. Additional actual05:11:28UTC red-comparison-history.log: shared benchmark had no undo observation after correct recomputation; capture all potentially replay-affected task metrics and attach cancellation.id. green-comparison-history.log passes42/42 scoped and rating-history cases. All other changed fixture contracts remain documented above. Additional actual145/red-inherited-choice-stale.log05:14:20: stale signed guest board revived No and Guest edited title. red-inherited-new-task.log05:17:08: later-created authenticated task double-trained; restrict source reconstruction to exact sourceBaseline IDs. Original local Add blocked owner reversal: exact contemporaneous05:18:02 tool output preserved in145/red-local-add-adoption-tool-output.json, followed by11/11 owner/isolation GREEN. red-legacy-pass-undo.log was a fixture assumption failure (the existing No producer records a deterministic legacy-pass ID); corrected to assert that exact ID remains without changing runtime or claiming behavioral RED."
+    }
+  },
+  {
+    "testChangesSha256": "ecae345e483cd8d51cf3862b48bc525a5456d3188a44d3d0b44cbfc7eb25d033",
+    "reason": "Extend the approved mixed-client and rules-first acceptance from the initial No slice to all newly supported143/144/145decision families using actual app actions on the committed Undo source.",
+    "previousBehavior": "The real production-adapter/immutable-floor mixed writer test and released-rules-to-new-rules Retry test carried only a No-bearing board, leaving the147all-new-action acceptance unexercised.",
+    "intendedBehavior": "Retain the original No plus actual scanner Yes, compound editor/Dot and cancellation, Dislodge, paired Start and passBefore Undo, and an active editor choice in one coherent board. The old writer must read every exact fact then stay safely denied; the candidate under released rules must preserve the whole pending board and retry byte-exact evidence, effective choices/pass outcomes and ratings after rules-first rollout.",
+    "replacementTests": [
+      "RISK decision mixed rollout fixture: actual comparisons current choices Start and scoped Undo survive durable publication and reopen"
+    ],
+    "preservedCoverage": [
+      "All original mixed writer and rules-first assertions remain. CAS race, ordinary floor/new roundtrips, old full-app compatible-update hold, exact root payload/revision, focus retry bounds, sole legacy pending edit, old-rules rejection, exact durable pending stream, no unfenced fallback, unchanged learned ratings and final clean acknowledgement remain mandatory.",
+      "No runtime, rules, support pin, compatibility matrix, public copy, shell metadata or production data changes. Only tests and exact map/rationale records change.",
+      "The rules-first plain seed still comes from the existing plain harness ancestor; its real Firebase-backed app performs No plus all mixed actions offline before its first authority-bearing publication. No manually constructed event objects replace consumer behavior."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK decision mixed rollout fixture:|RISK scoped Undo:|RISK comparison replay:|RISK cloud current choices:|RISK cloud No recovery:' tests.js",
+      "failure": "Post-implementation acceptance extension, expected GREEN; no behavioral failure or preimplementation RED claimed and no runtime repair made. mixed-all-actions-01-fixture.log passes1/1; mixed-all-actions-02-focused.log passes50/50 zero skips on committed145sourcef594644. The two extended Firestore acceptance tests have NOT been executed in this subtask: no emulator allocation/launch. Root must run them on the final exact candidate; existing No-only emulator evidence is not claimed as all-action evidence."
+    }
+  },
+  {
+    "testChangesSha256": "27490b599d42e312028940b7ae970007a7cd094fe8e31faeb8d69c39e81f58cc",
+    "reason": "Complete action-scoped Undo and preserve deliberate modern Import/Restore/Reset with exact reverse replacement recovery; repair regressions exposed by the broad affected cohort without weakening domain assertions. Preserve actual benchmark reversal history after comparison replay. Final exact dependency-base fingerprint after preserving root guidance and #146 retirement fixes. Complete stale inherited-choice effects and bind retained metadata-free local Add Undo to its successful account adoption. Integrate original #144 exact-before context composition and original #146 all-action mixed-client test checkpoint, then verify targeted Undo across different observed bases.",
+    "previousBehavior": "Snapshot Undo of a modern explicit replacement could be replaced again by its selected source journal. Reset mutated the previously retained Undo frame while rollback expected its exact bytes. Sync ordering of equivalent comparisonOps prevented inverse exclusion. Existing old-backup fixtures changed frozen draw fields while retaining contradictory modern fact metadata.",
+    "intendedBehavior": "Explicit replacement Undo first saves current/source recovery and installs a reverse exact receipt; failures/races preserve board and frame. Reset has its own authorized replacement receipt. Ordinary inverse recognizes an equivalent unordered comparison operation set while retaining peer operations. Legacy fixtures remain legacy and all expected original chance outcomes remain asserted.",
+    "replacementTests": [
+      "RISK scoped Undo: local comparison cancellation keeps peer learning and survives stale cloud and reopen",
+      "RISK scoped Undo: compound editor Dot restores only local fields and context deltas after peer progress",
+      "RISK scoped Undo: bulk edit is one durable cancellation group and later peer choices stay effective",
+      "RISK scoped Undo: cancelled No cannot return from stale marks and context membership keeps the peer delta",
+      "RISK scoped Undo: first guest sign-in keeps local cancellation authority and replays later signed learning",
+      "RISK scoped Undo: unsupported cancellation payloads hold exact local and cloud branches",
+      "RISK scoped Undo: completion evergreen work delete and postpone retain unrelated peer fields",
+      "RISK scoped Undo: cancelling Start restores the prior pass root and exact draw through stale delivery",
+      "RISK scoped Undo: Return cancellation restores the original hold time while peer task fields survive",
+      "RISK scoped Undo: explicit modern Import Restore and Reset reverse exact journal replacement after recovery",
+      "RISK scoped Undo: replacement recovery failure and an account race retain the current board and Undo frame",
+      "RISK scoped Undo: inherited guest edit restores its before value through stale signed snapshots",
+      "RISK scoped Undo: inherited legacy-pass No cancellation survives stale marks without inventing a pass",
+      "RISK cloud current choices: context membership additions compose across observed revisions"
+    ],
+    "preservedCoverage": [
+      "Every task, rating, chance seed, candidate, cooldown, history and recovery assertion is retained. Explicit replacement tests now await mandatory recovery completion before checking results. The two old-backup fixtures intentionally omit decisionEvents/decisionBaseline before editing their historical scalar snapshot; incoherent modern imports remain held by #146.",
+      "WOOP and neutral bootstrap fixtures now establish actual guest-to-empty-account or authenticated adoption before cloud publication, rather than placing unapproved guest facts directly in signed cloud. All prior visible plan, exclusion, completion, Undo and reload assertions remain.",
+      "No Context restores every ordinary field exactly and now separately asserts two immutable cancellation facts; only decisionEvents/decisionBaseline are excluded from the old byte-equality check because retaining reversal evidence is the approved behavior. Original assertions for eligibility and zero-context guard remain.",
+      "No production, browser timing, physical-device or deployment proof is claimed. Parent owns final guidance, shell fingerprints, independent review and full release validation.",
+      "Original unsaved-local-edit adoption test now asserts ordinary Add Undo removes only its local task, retains CLOUD_CHAIN and every peer task, and keeps exact displaced recovery; its prior STALE_CHAIN whole-adoption reversal is explicitly superseded by #141. Modern guest facts still require exact inheritance; only metadata-free legacy local frames are bound after a successful same-account adoption, never on foreign switches.",
+      "The #144 context consumer retains every exact shared-before, differing revision, cloud and cold-reopen assertion plus mismatched-before and null-base conservative checks. Its added phone Undo, stale original, prior marker and cold-reopen assertions initially pass on the integrated repair and are follow-through coverage, not claimed as separate runtime RED. #146 all-action fixture/rules-floor tests are integrated unchanged from b185c2f."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='RISK scoped Undo: explicit modern' tests.js; node --test --test-reporter=spec --test-name-pattern='Undo|undo|Restore|restore|Import|import|Reset|reset|RISK cloud current choices|RISK comparison replay|RISK decision recovery' tests.js; node --test --test-reporter=spec --test-name-pattern='RISK scoped Undo: local comparison' tests.js; node --test --test-reporter=spec --test-name-pattern='RISK scoped Undo: first guest|RISK scoped Undo: inherited guest edit|adopting a newer remote over unsaved local edits' tests.js; node --test --test-reporter=spec --test-name-pattern='RISK cloud current choices: context membership additions compose across observed revisions' tests.js",
+      "failure": "Actual145/red-explicit-replacement-undo-behavior.log05:06:42UTC observed imported source journal instead of the prior destination journal after normal Undo. Earlier red-explicit-replacement-undo.log asserted a historically void return value and is setup-only, not behavioral RED. Exact145/affected-undo-replacement.log272pass/7fail/10skip preserved reset-frame-byte mutation and neutral-order failure before runtime repairs plus old async/ownership/legacy-fixture expectation mismatches. All26 focused scoped+affected repair cases subsequently passed in green-explicit-and-regressions.log; original vertical REDs remain retained. Additional actual05:11:28UTC red-comparison-history.log: shared benchmark had no undo observation after correct recomputation; capture all potentially replay-affected task metrics and attach cancellation.id. green-comparison-history.log passes42/42 scoped and rating-history cases. All other changed fixture contracts remain documented above. Additional actual145/red-inherited-choice-stale.log05:14:20: stale signed guest board revived No and Guest edited title. red-inherited-new-task.log05:17:08: later-created authenticated task double-trained; restrict source reconstruction to exact sourceBaseline IDs. Original local Add blocked owner reversal: exact contemporaneous05:18:02 tool output preserved in145/red-local-add-adoption-tool-output.json, followed by11/11 owner/isolation GREEN. red-legacy-pass-undo.log was a fixture assumption failure (the existing No producer records a deterministic legacy-pass ID); corrected to assert that exact ID remains without changing runtime or claiming behavioral RED. Original #144 owner observed meaningful same-before/different-base membership loss in144/context-delta-red.txt before its minimal predicate repair6ddeb670. Merged f7ea04a then145targeted-Undo follow-through passes in145/unequal-base-context-undo-green.log05:22:10. Original #146 all-action mixed-client fixture/compatibility extension is b185c2f; emulator qualification remains parent-owned and unexecuted here."
+    }
   }
 ]
