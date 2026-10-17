@@ -215,3 +215,17 @@ test('preflight reports the existing FAQ length failure before full regression',
   assert.doesNotMatch(output, /PREFLIGHT_FULL_SUITE_CHILD_SENTINEL/);
   assert.doesNotMatch(output, /test-first\/rationale validator/);
 });
+
+test('preflight launches each selected child once and launches none for help or invalid input', async t => {
+  const fixture = await createAppFixture(t, 'once');
+  for (const [args, expected] of [[['--base', fixture.base], 0], [['--help'], 0], [['--unknown'], 2], [['--base'], 2]]) {
+    const result = spawnSync(process.execPath, [preflight, ...args], { cwd: fixture.fixtureRoot, encoding: 'utf8', env: childEnvironment() });
+    const output = result.stdout + result.stderr;
+    assert.equal(result.status, expected, output);
+    const expectedChecks = args[0] === '--base' && args.length === 2 ? 1 : 0;
+    assert.equal((output.match(/^✔ Landscape location:/gm) ?? []).length, expectedChecks, 'copy check execution count');
+    assert.equal((output.match(/^✔ RISK Quick start content:/gm) ?? []).length, expectedChecks, 'FAQ check execution count');
+    assert.equal((output.match(/Test-first diff gate passed\./g) ?? []).length, expectedChecks, 'rationale validator execution count');
+    if (!expectedChecks) assert.doesNotMatch(output, /Preflight passed/);
+  }
+});

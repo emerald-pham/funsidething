@@ -459,6 +459,15 @@ async function executeRenderer(options, attemptDirectory, caseReportPath, auditC
     reportError = String(error?.message ?? error).slice(0, 1000);
   }
   const validReport = reportMatchesCase(report, options, auditCase);
+  // A detached Playwright browser is outside the renderer's POSIX group. After an
+  // interrupted/abnormal renderer, an empty group cannot attest that browser exited.
+  cleanup.processGroupStatus = cleanup.status;
+  const rendererCleanupErrors = report?.runtimeErrors?.filter(error => error.type === 'cleanup') ?? [];
+  if (cleanup.status === 'completed' && (!validReport || closeResult.signal || rendererCleanupErrors.length)) {
+    cleanup.status = 'unverified';
+    cleanup.verificationLimit = 'Renderer process-group shutdown was observed; detached browser cleanup remains unverified without an uninterrupted terminal renderer report and successful browser finalizer.';
+  }
+
   const integrityFailure = validReport && (report.metricsStatus === 'fail' || report.captureIntegrity === 'fail');
   const runnerChecks = validReport ? [...viewportCheck(report, auditCase), surfaceContractCheck(report)] : [];
   const modeValidation = validReport ? validateModeContext(report, auditCase) : { status: 'unverified', context: null, source: 'unavailable', required: null, reason: 'No valid renderer report was available to verify the browser context.' };
@@ -547,6 +556,7 @@ async function terminateOwnedRendererTree(child, closed, initialSignal) {
 
 function finalExitCode(manifest) {
   if (manifest.cases.some((auditCase) => auditCase.status === 'failed')) return 1;
+  if (!['completed', 'not-needed'].includes(manifest.cleanup.status)) return 2;
   if (manifest.runStatus === 'incomplete' || manifest.cases.some((auditCase) => auditCase.status === 'untested' || auditCase.status === 'planned' || auditCase.modeStatus === 'unverified' || auditCase.resultStatuses?.metricsStatus === 'unverified' || auditCase.resultStatuses?.captureIntegrity === 'unverified')) return 2;
   return 0;
 }
@@ -668,18 +678,42 @@ async function runSupported(options) {
       attempt.runnerChecks = [];
       attempt.modeStatus = 'unverified';
     }
+    if (attempt.cleanup.verificationLimit) {
+      attempt.coverageLimits ??= [];
+      attempt.coverageLimits.push(attempt.cleanup.verificationLimit);
+    }
+    auditCase.coverageLimits = accumulatedCoverageLimits(auditCase);
     auditCase.status = attempt.status === 'failed' ? 'failed' : 'completed';
     await saveManifest(options.outputDirectory, manifest);
     if (interruption.signal) break;
   }
 
-  manifest.runStatus = interruption.signal ? 'incomplete' : 'complete';
+  manifest.runStatus = interruption.signal || manifest.cases.some(auditCase => auditCase.status !== 'completed') ? 'incomplete' : 'complete';
   if (interruption.signal) {
     manifest.interruptedAt = new Date().toISOString();
     manifest.interruptionSignal = interruption.signal;
-  } else manifest.completedAt = new Date().toISOString();
+  } else {
+    manifest.finishedAt = new Date().toISOString();
+    if (manifest.runStatus === 'complete') manifest.completedAt = manifest.finishedAt;
+    else delete manifest.completedAt;
+  }
+  const unresolvedAttempts = manifest.cases.flatMap(auditCase => auditCase.attempts.flatMap(attempt => {
+    let status = attempt.cleanup?.status ?? 'unverified';
+    let reason;
+    // Older v1 reports declared group-only shutdown completed even without a
+    // browser finalizer. Preserve those bytes and qualify their aggregate proof.
+    if (status === 'completed' && (!attempt.caseReport || attempt.signal
+      || attempt.cleanup?.rendererReportedErrors?.length
+      || attempt.caseReport.runtimeErrors?.some(error => error.type === 'cleanup'))) {
+      status = 'unverified';
+      reason = 'Legacy or interrupted renderer-group completion lacks terminal browser-finalizer proof; original attempt retained.';
+    }
+    return status === 'completed' ? [] : [{ caseId: auditCase.id, attemptNumber: attempt.attemptNumber, status, ...(reason ? { reason } : {}) }];
+  }));
   manifest.cleanup = {
-    status: manifest.cases.filter((auditCase) => auditCase.attempts.length).every((auditCase) => auditCase.attempts.at(-1)?.cleanup?.status === 'completed') ? 'completed' : 'incomplete',
+    status: unresolvedAttempts.some(attempt => attempt.status === 'unverified') ? 'unverified' : unresolvedAttempts.length ? 'incomplete' : 'completed',
+    scope: 'all-recorded-attempts',
+    unresolvedAttempts,
     ownedResources: ['renderer child process trees'],
     externalResources: 'Caller-supplied app servers and allocation leases remain under their owners.',
   };

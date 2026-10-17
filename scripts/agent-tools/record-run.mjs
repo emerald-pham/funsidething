@@ -46,6 +46,35 @@ function sanitizeText(input, redaction, location = 'metadata') {
       return typeof replacement === 'function' ? replacement(...args) : replacement;
     });
   };
+  // Match JSON keys before the ordinary key/value forms, including JSON nested in code strings.
+  const quotedKey = /(?:\\*["'])((?:github[_-]?token|aws[_-]?secret[_-]?access[_-]?key|password|passwd|secret|token|api[_-]?(?:key|token)|authorization|cookie|access[_-]?(?:token|key)|client[_-]?secret|private[_-]?key))(?:\\*["'])\s*:\s*/gi;
+  const original = value;
+  let cursor = 0;
+  let sanitized = '';
+  for (const match of original.matchAll(quotedKey)) {
+    if (match.index < cursor) continue;
+    const start = match.index + match[0].length;
+    const opening = original.slice(start).match(/^(\\*)(["'])/);
+    let end = start;
+    if (opening) {
+      const quote = opening[2];
+      for (let index = start + opening[0].length; index < original.length; index += 1) {
+        if (original[index] !== quote) continue;
+        let slashCount = 0;
+        for (let back = index - 1; back >= start && original[back] === '\\'; back -= 1) slashCount += 1;
+        if (slashCount === opening[1].length) { end = index + 1; break; }
+      }
+      // An unterminated credential remains sensitive through the end of its field.
+      if (end === start) end = original.length;
+    } else {
+      end = start + (original.slice(start).match(/^[^\s,;}]+/)?.[0].length ?? 0);
+    }
+    sanitized += original.slice(cursor, start) + '[REDACTED]';
+    cursor = end;
+    redaction.count += 1;
+    redaction.locations[location] = (redaction.locations[location] ?? 0) + 1;
+  }
+  if (cursor) value = sanitized + original.slice(cursor);
   replace(/\b(?:gh[pousr]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,})\b/g, '[REDACTED]');
   replace(/\bBearer\s+[A-Za-z0-9._~+/-]{8,}=*/gi, 'Bearer [REDACTED]');
   replace(/(^|[^A-Za-z0-9])((?:github[_-]?token|aws[_-]?secret[_-]?access[_-]?key|password|passwd|secret|token|api[_-]?(?:key|token)|authorization|cookie|access[_-]?(?:token|key)|client[_-]?secret|private[_-]?key))(\s*(?:[:=]\s*|\s+))(?:\\(["'])(.*?)\\\4|(["'])(.*?)\6|[^\s,;]+)/gi, (_match, beforeKey, key, separator) => `${beforeKey}${key}${separator}[REDACTED]`);
@@ -85,7 +114,7 @@ async function gitIdentity(repo, redaction) {
     : { commit: null, identityError: sanitizeText(result.error || result.stderr.toString('utf8').trim() || 'git rev-parse failed', redaction, 'git.identityError') };
 }
 
-const sourceExtensions = new Set(['.c', '.cc', '.cpp', '.cjs', '.css', '.go', '.h', '.html', '.java', '.js', '.json', '.jsonc', '.jsx', '.kt', '.m', '.mjs', '.mm', '.py', '.rb', '.rs', '.sass', '.scss', '.sh', '.swift', '.ts', '.tsx', '.toml', '.vue', '.yaml', '.yml', '.zsh']);
+const sourceExtensions = new Set(['.c', '.cc', '.cpp', '.cjs', '.css', '.go', '.h', '.html', '.java', '.js', '.json', '.jsonc', '.jsx', '.kt', '.m', '.mjs', '.mm', '.py', '.rb', '.rs', '.sass', '.scss', '.sh', '.swift', '.ts', '.tsx', '.toml', '.vue', '.yaml', '.yml', '.zsh', '.rules', '.webmanifest']);
 const omittedFiles = new Set(['package-lock.json', 'pnpm-lock.yaml', 'yarn.lock', 'bun.lockb']);
 
 function isSourceOrTestFile(filePath) {
@@ -115,8 +144,8 @@ function parseStatus(statusOutput) {
             : compactStatus.includes('C') ? 'copied'
               : compactStatus.includes('T') ? 'type-changed'
                 : compactStatus.includes('M') ? 'modified' : compactStatus || 'unknown';
-    files.push({ filePath, status });
-    if (statusCode.includes('R') || statusCode.includes('C')) index += 1;
+    const previousPath = statusCode.includes('R') || statusCode.includes('C') ? parts[++index] : undefined;
+    files.push({ filePath, status, statusCode, ...(previousPath ? { previousPath } : {}) });
   }
   return files;
 }
@@ -146,70 +175,82 @@ function sanitizeCommandArguments(args, redaction) {
 }
 
 async function collectSourceTestState(repo, redaction) {
+  const scope = 'all-git-reported-nonignored-changes';
   const status = await runGit(repo, ['status', '--porcelain=v1', '--untracked-files=all', '-z']);
   if (status.code !== 0) {
     const message = status.error || status.stderr.toString('utf8').trim() || 'git status failed';
-    return { sourceTestFiles: [], sourceTestDiffSha256: sha256(''), captureError: sanitizeText(message, redaction, 'workingTree.captureError') };
+    return { sourceTestFiles: [], sourceTestDiffSha256: sha256(''), identity: { status: 'incomplete', scope }, captureError: sanitizeText(message, redaction, 'workingTree.captureError') };
   }
-  const changes = parseStatus(status.stdout).filter(({ filePath }) => isSourceOrTestFile(filePath));
   const sourceTestFiles = [];
-  for (const change of changes) {
-    const safePath = sanitizeText(change.filePath, redaction, 'workingTree.path');
-    if (shouldOmitContent(change.filePath)) {
-      sourceTestFiles.push({ path: safePath, status: change.status, contentOmitted: 'sensitive-filename' });
-      continue;
-    }
+  const identities = [];
+  let complete = true;
+  for (const change of parseStatus(status.stdout)) {
     let content = null;
     let contentKind = 'file';
     let contentOmitted;
     let contentError;
+    let actualBytesSha256;
+    const sensitiveName = shouldOmitContent(change.filePath) || shouldOmitContent(change.previousPath ?? '');
+    const display = isSourceOrTestFile(change.filePath) && !sensitiveName;
     try {
       const fullPath = path.join(repo, change.filePath);
       const info = await lstat(fullPath);
       if (info.isSymbolicLink()) {
         contentKind = 'symbolic-link';
-        content = sanitizeText(await readlink(fullPath), redaction, 'workingTree.symlinkTarget');
-      } else if (!info.isFile()) contentOmitted = 'non-regular-file';
+        const target = await readlink(fullPath, { encoding: 'buffer' });
+        actualBytesSha256 = sha256(target);
+        if (display) content = sanitizeText(target.toString('utf8'), redaction, 'workingTree.symlinkTarget');
+        else contentOmitted = 'opaque-only';
+      } else if (!info.isFile()) { contentOmitted = 'non-regular-file'; complete = false; }
       else {
         const bytes = await readFile(fullPath);
-        if (bytes.includes(0)) contentOmitted = 'binary-file';
+        actualBytesSha256 = sha256(bytes);
+        if (sensitiveName) contentOmitted = 'sensitive-filename';
+        else if (bytes.includes(0)) contentOmitted = 'binary-file';
+        else if (!display) contentOmitted = 'opaque-only';
         else content = sanitizeText(bytes.toString('utf8'), redaction, 'workingTree.content');
       }
     } catch (error) {
       if (error?.code === 'ENOENT') contentOmitted = 'deleted-file';
       else {
+        complete = false;
         contentOmitted = 'unreadable-file';
         contentError = sanitizeText(error instanceof Error ? error.message : String(error), redaction, 'workingTree.contentError');
       }
     }
-    const diffResult = change.status === 'untracked'
-      ? { code: 0, stdout: Buffer.alloc(0), stderr: Buffer.alloc(0) }
-      : await runGit(repo, ['diff', '--no-ext-diff', '--no-color', 'HEAD', '--', change.filePath]);
-    const diffText = diffResult.code === 0 ? sanitizeText(diffResult.stdout.toString('utf8'), redaction, 'workingTree.diff') : '';
-    const diffError = diffResult.code === 0 ? undefined : sanitizeText(diffResult.error || diffResult.stderr.toString('utf8').trim() || 'git diff failed', redaction, 'workingTree.diffError');
+    const empty = { code: 0, stdout: Buffer.alloc(0), stderr: Buffer.alloc(0) };
+    const paths = [change.filePath, ...(change.previousPath ? [change.previousPath] : [])];
+    const [diffResult, indexResult] = change.status === 'untracked' ? [empty, empty] : await Promise.all([
+      runGit(repo, ['diff', '--binary', '--no-ext-diff', '--no-color', 'HEAD', '--', ...paths]),
+      runGit(repo, ['diff', '--cached', '--binary', '--no-ext-diff', '--no-color', 'HEAD', '--', ...paths]),
+    ]);
+    const diffError = [diffResult, indexResult].find(result => result.code !== 0);
+    if (diffError) complete = false;
+    const identity = {
+      path: change.filePath, previousPath: change.previousPath, statusCode: change.statusCode,
+      contentKind, actualBytesSha256, contentOmitted,
+      actualDiffSha256: diffResult.code === 0 ? sha256(diffResult.stdout) : null,
+      indexDiffSha256: indexResult.code === 0 ? sha256(indexResult.stdout) : null,
+    };
+    identities.push(identity);
+    const binaryDiff = diffResult.stdout.includes(Buffer.from('GIT binary patch'));
+    const diffText = display && contentOmitted !== 'binary-file' && !binaryDiff && diffResult.code === 0
+      ? sanitizeText(diffResult.stdout.toString('utf8'), redaction, 'workingTree.diff') : '';
     sourceTestFiles.push({
-      path: safePath,
+      ...identity,
+      path: sanitizeText(change.filePath, redaction, 'workingTree.path'),
+      ...(change.previousPath ? { previousPath: sanitizeText(change.previousPath, redaction, 'workingTree.previousPath') } : {}),
       status: change.status,
-      contentKind,
       ...(contentError ? { contentError } : {}),
       ...(content === null ? { content: null, contentOmitted } : { content, sha256: sha256(content) }),
       ...(diffText ? { diff: diffText, diffSha256: sha256(diffText) } : {}),
-      ...(diffError ? { diffCaptureError: diffError } : {}),
+      ...(diffError ? { diffCaptureError: sanitizeText(diffError.error || diffError.stderr.toString('utf8').trim() || 'git diff failed', redaction, 'workingTree.diffError') } : {}),
     });
   }
-  const manifest = sourceTestFiles.map(({ path: filePath, status: fileStatus, contentKind, contentOmitted, contentError, sha256: contentSha, diffSha256, diffCaptureError }) => ({
-    path: filePath,
-    status: fileStatus,
-    contentKind,
-    contentOmitted,
-    contentError,
-    sha256: contentSha,
-    diffSha256,
-    diffCaptureError,
-  }));
   return {
     sourceTestFiles,
-    sourceTestDiffSha256: sha256(JSON.stringify(manifest)),
+    sourceTestDiffSha256: sha256(JSON.stringify(identities)),
+    identity: { status: complete ? 'complete' : 'incomplete', scope, exclusions: ['Git-ignored files', 'environment and external runtime state'], hashBasis: 'actual path, status, file or symlink bytes, HEAD diff and staged diff; no raw payloads persisted' },
   };
 }
 
@@ -317,11 +358,11 @@ function classifyExecution(result) {
   if (result.signal) return { outcome: 'interrupted', basis: `process-signal:${result.signal}` };
   if (result.exitCode === 0) return { outcome: 'passed', basis: 'exit-code:0' };
   const output = `${result.stdout}\n${result.stderr}`;
-  if (/\bAssertionError\b|\bassertion failed\b|\bnot ok\s+\d+\b|# fail\s+[1-9]\d*/i.test(output)) {
-    return { outcome: 'assertion-failure', basis: 'recognized-assertion-output' };
-  }
   if (/\bSyntaxError\b|ERR_MODULE_NOT_FOUND|Cannot find (?:module|package)|ModuleNotFoundError|ImportError|command not found|\bENOENT\b|\bEACCES\b/i.test(output)) {
     return { outcome: 'infrastructure-failure', basis: 'recognized-launch-syntax-or-import-output' };
+  }
+  if (/\bAssertionError\b|\bERR_ASSERTION\b|\bassertion failed\b/i.test(output)) {
+    return { outcome: 'assertion-failure', basis: 'recognized-assertion-output' };
   }
   return { outcome: 'nonzero-exit', basis: `exit-code:${result.exitCode}` };
 }
