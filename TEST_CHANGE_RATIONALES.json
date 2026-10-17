@@ -9650,5 +9650,38 @@
     },
     "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/resumed-20261017/faq-qualification-repair",
     "releaseStatus": "Local copy/fingerprint repair only. No broad suite, browser/emulator/server, push, CI, main merge or release by this owner. Parent /root owns affected exact-candidate review and final release validation."
+  },
+  {
+    "testChangesSha256": "c098e4fe13e1f86a928a8681cd9a6c00fce1d7509f8e71e303d3193ed59a40d6",
+    "comparison": "outgoingPushBeforeDelta",
+    "comparisonBase": "465c9566a3cb4b03abd67abbc5ec6119f31e7464",
+    "comparisonTip": "8b0ffda1e705b4d58c48efba4fa0cf559ad0b28c",
+    "reason": "Bind the exact cumulative protected-test delta from the existing published PR161 push-before465c956 tip to final8b0ffda. The current-main49f binding passed, but the actual outgoing branch gate had no matching fingerprint. This append-only release metadata repair adds the missing comparison without changing tests, product source, copy or hashes.",
+    "previousBehavior": "Final8b0ffda contained the accepted saved-view suite, released main PWA/tooling test unions and authorized F-1 availability qualification, with exact records for current main and selected prior bases. The published branch still pointed at465c956; its distinct cumulative protected-test fingerprint was absent, so that real outgoing gate failed before any push.",
+    "intendedBehavior": "Preserve all existing records and original source RED chronology while binding the exact outgoing465-to8b test changes. The gate can validate cumulative preservation of approved saved-view/device appearance, released scanner-gesture PWA safety, agent-tool cohort wiring and the reviewed conditional FAQ/release-note qualification. No functional implementation or new behavioral RED is introduced.",
+    "replacementTests": [
+      "RISK PWA updates: a scanner gesture commits its action before a downloaded worker reloads",
+      "RISK PWA updates: a gesture beginning during an update save holds and resumes reload",
+      "RISK PWA updates: cancelled and released gestures resume a pending replacement",
+      "RISK PWA updates: the extended FAQ and changelog explain gesture-safe reloads",
+      "RISK repository process: npm test fails when an agent-tool cohort assertion fails",
+      "RISK saved view guidance qualification: FAQ and current release note promise an appearance only when available"
+    ],
+    "updatedTests": [
+      "RISK saved view guidance: Quick start and Changelog describe this-device restoration and current dates"
+    ],
+    "preservedCoverage": [
+      "Accepted saved-view populated first appearance, inert bounded cache, local metadata/filter/list/position, account/privacy/data authority, current-date, concurrent peer/local edits and scoped Undo/durable reopen tests remain. The product implementation and tests are byte-identical8b0ffda in this metadata-only repair.",
+      "The cumulative diff retains released PWA actual pointerdown/No-handler/durable cold-reopen, post-save gesture, cancellation/release and guidance cases; its snippet fixture includes the required real scannerGestureActive global. Their original preimplementation and later sensitivity evidence remains correctly labelled in inherited records.",
+      "Released npm aggregate wiring and its deliberate failing-cohort process test remain exact; isolated tooling tests and all current guidance are unchanged. F-1 changes only two explicitly superseded unqualified copy expectations and adds direct FAQ/October17 availability subcases; every other existing assertion is preserved.",
+      "All prior rationale records remain exact and in order. New-main49f, direct8b, outgoing465 and relevant approved/original preserved-base validators plus focused preflight/process checks are run on this final metadata candidate. App/SW fingerprints remain exact8b; no refresh or source change is needed.",
+      "The actual failed outgoing metadata gate is not a product failure or behavioral RED. Original saved-view/geometry/settlement/PWA/tooling/F-1 RED chronology remains in its original records and artifact folders. Root-interrupted superseded0cc/8b full runs finalized143 are neither failures nor REDs; root owns renewed exact final full/native/reviews/CI/release."
+    ],
+    "redEvidence": {
+      "command": "Root actual check on8b: node scripts/test-first-gate.mjs 465c9566a3cb4b03abd67abbc5ec6119f31e7464, recorded with purpose later-baseline-sensitivity; resumed-20261017/outgoing-push-base-check.log and outgoing-push-base-check/2026-10-17T14-47-14-263Z-384b7aef-8886-4609-b988-7d807e6d32e4.json.",
+      "failure": "Observed metadata-only validator failure: Existing tests were changed or removed without an exact-diff rationale in TEST_CHANGE_RATIONALES.json. Recorder finalized nonzero-exit1, not an assertion-based functional RED. This missing outgoing comparison is the sole repair. All original functional REDs, including F-1 missing-qualification assertions before copy edits, remain preserved and are not replaced by this gate observation."
+    },
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/resumed-20261017/outgoing-base-metadata-repair",
+    "releaseStatus": "Local append-only rationale repair. No test/source/app/copy/hash changes, broad full suite, shared runtime, push, CI or release by this owner. Parent /root owns final release validation."
   }
 ]
