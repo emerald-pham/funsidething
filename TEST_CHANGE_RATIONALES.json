@@ -7678,7 +7678,24 @@
     }
   },
   {
-<<<<<<< HEAD
+    "testChangesSha256": "0a6f8c934a2c57478679539e41a2291ba9fc422d1c540fb382cafbbc71400c2d",
+    "reason": "Repair actual reversed replacement merge defects while enforcing immutable retired identity.",
+    "previousBehavior": "A receipt retired every destination row including facts shared with the chosen source, so reversed stale cloud adoption dropped the selected No. Retaining shared facts still let the retired scalar title resurrect. A changed retired editor row with the same ID was accepted as fresh coherent authority.",
+    "intendedBehavior": "Retire only exact destination facts absent from chosen source. On exact reversed receipt adoption restore only the retired typed fields/pass values from selected source before normal replay. Compare active identities against strict retired witnesses across sources; changed immutable facts hold before union.",
+    "replacementTests": [
+      "RISK decision recovery replacement overlap: selected shared facts survive a displaced cloud branch returning after Import",
+      "RISK decision recovery retired identity: changed same-ID retired editor facts cannot become fresh authority"
+    ],
+    "preservedCoverage": [
+      "All previous assertions remain unchanged; exact displaced baseline plus full destination recovery remain preserved.",
+      "New/unrecognized/unattested peer evidence still merges safely or holds; there is no retired-baseline-ID bypass. Same-account selected learning baseline remains intact. No Undo/frame semantics changed."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK decision recovery replacement overlap:|RISK decision recovery retired identity:' tests.js",
+      "failure": "146/69 observed selected No dropped to[]. Initial precision fix70 retained No but left retired title resurrection (11/12);71 observed changed retired editor identity accepted without hold.72 complete replacement precision GREEN16/16. Earlier complete affected cohort66 passes146/146, with final all-action145 integration still required."
+    }
+  },
+  {
     "testChangesSha256": "7f863bc4850d0401e51968b8a999a93ad70430615d11b02c91bb5ca52a255812",
     "reason": "Implement approved #141/#145 ordinary action-scoped Undo using real two-device app consumers; preserve unrelated peer choices and immutable observations.",
     "previousBehavior": "Cloud adoption added a snapshot Undo frame which reversed peer Dot while retaining local Yes, and bulk Save lacked durable per-task choice facts.",
@@ -7780,23 +7797,6 @@
     "redEvidence": {
       "command": "node --test --test-reporter=spec --test-name-pattern='RISK scoped Undo: explicit modern' tests.js; node --test --test-reporter=spec --test-name-pattern='Undo|undo|Restore|restore|Import|import|Reset|reset|RISK cloud current choices|RISK comparison replay|RISK decision recovery' tests.js; node --test --test-reporter=spec --test-name-pattern='RISK scoped Undo: local comparison' tests.js",
       "failure": "Actual145/red-explicit-replacement-undo-behavior.log05:06:42UTC observed imported source journal instead of the prior destination journal after normal Undo. Earlier red-explicit-replacement-undo.log asserted a historically void return value and is setup-only, not behavioral RED. Exact145/affected-undo-replacement.log272pass/7fail/10skip preserved reset-frame-byte mutation and neutral-order failure before runtime repairs plus old async/ownership/legacy-fixture expectation mismatches. All26 focused scoped+affected repair cases subsequently passed in green-explicit-and-regressions.log; original vertical REDs remain retained. Additional actual05:11:28UTC red-comparison-history.log: shared benchmark had no undo observation after correct recomputation; capture all potentially replay-affected task metrics and attach cancellation.id. green-comparison-history.log passes42/42 scoped and rating-history cases. All other changed fixture contracts remain documented above."
-=======
-    "testChangesSha256": "0a6f8c934a2c57478679539e41a2291ba9fc422d1c540fb382cafbbc71400c2d",
-    "reason": "Repair actual reversed replacement merge defects while enforcing immutable retired identity.",
-    "previousBehavior": "A receipt retired every destination row including facts shared with the chosen source, so reversed stale cloud adoption dropped the selected No. Retaining shared facts still let the retired scalar title resurrect. A changed retired editor row with the same ID was accepted as fresh coherent authority.",
-    "intendedBehavior": "Retire only exact destination facts absent from chosen source. On exact reversed receipt adoption restore only the retired typed fields/pass values from selected source before normal replay. Compare active identities against strict retired witnesses across sources; changed immutable facts hold before union.",
-    "replacementTests": [
-      "RISK decision recovery replacement overlap: selected shared facts survive a displaced cloud branch returning after Import",
-      "RISK decision recovery retired identity: changed same-ID retired editor facts cannot become fresh authority"
-    ],
-    "preservedCoverage": [
-      "All previous assertions remain unchanged; exact displaced baseline plus full destination recovery remain preserved.",
-      "New/unrecognized/unattested peer evidence still merges safely or holds; there is no retired-baseline-ID bypass. Same-account selected learning baseline remains intact. No Undo/frame semantics changed."
-    ],
-    "redEvidence": {
-      "command": "node --test --test-name-pattern='RISK decision recovery replacement overlap:|RISK decision recovery retired identity:' tests.js",
-      "failure": "146/69 observed selected No dropped to[]. Initial precision fix70 retained No but left retired title resurrection (11/12);71 observed changed retired editor identity accepted without hold.72 complete replacement precision GREEN16/16. Earlier complete affected cohort66 passes146/146, with final all-action145 integration still required."
->>>>>>> d68c7ba02c03803264c69299ade56027160ecc78
     }
   }
 ]
