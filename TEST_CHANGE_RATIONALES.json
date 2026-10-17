@@ -9784,5 +9784,39 @@
     "greenEvidence": "/Users/emeraldpham/.codex/task-artifacts/completion-precedence-168/170/runs/2026-10-17T21-04-33-937Z-dc50df9e-1bd9-4f67-9653-d93c334ab2d5.json (final focused lifecycle cohort after the single-first-member guard: 25 passed, 0 failed).",
     "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/completion-precedence-168/170",
     "releaseStatus": "Focused local issue 170 implementation and consumer validation only. No full suite, emulator, CI, push or release. Parent /root owns integration, final version/changelog/service-worker packaging and release validation."
+  },
+  {
+    "testChangesSha256": "023c57af0edce9e51e4e28b2e24d21ad1b6fdd70f1bbdd6ca9dea75c83556b58",
+    "comparison": "issue174Incremental",
+    "comparisonBase": "79f75103091d5f9ebb44bbbd703dd29135db2219",
+    "reason": "Prove completion membership survives each consumer boundary while ordinary saves, conditional cloud publication, account authority, interaction deferral, and independent saved-view state continue to work. The integrated runtime passed the five targeted behavior groups; the only observed RED was missing Retry guidance in the rendered extended FAQ, so no speculative runtime change was made.",
+    "previousBehavior": "Existing completion and recovery consumers covered individual lifecycle and error controls, but not completion authority through known-cloud pre-push, a delayed stale response and CAS retry, failed device persistence with a concurrent editor save, failed read plus uncertain acknowledgement and wake, one pending account switch, or the saved device view through deferred adoption. The extended FAQ offered Retry sync without saying how a lost cloud reply is verified.",
+    "intendedBehavior": "Ordinary adoption and known-cloud pre-push reconcile membership before rendering, durable save, or conditional publication; failed local writes hold cloud publication without replacing protected source or newer edits; failed reads and uncertain acknowledgements remain pending until exact cloud content is read; account A completion and learning stay isolated; editor drafts, scanner presses, saved filter and scroll, independent task fields, preference, and prerequisite retain their existing meaning through save and reopen. The FAQ says Retry sync checks the current saved cloud board after a lost reply. No runtime behavior change is claimed.",
+    "replacementTests": [
+      "RISK completion boundaries: delayed stale cloud adoption retains Done and concurrent task edit before exact retry acknowledgement",
+      "RISK completion boundaries: failed device save holds cloud publication and retry keeps an editor change made while saving",
+      "RISK completion boundaries: failed read stays pending and wake exactly acknowledges an uncertain completion publication",
+      "RISK completion boundaries: a pending account-A acknowledgement and its learning stay out of account B",
+      "RISK completion boundaries: a live editor and pressed scanner control defer stale adoption while the saved view and fields survive cold reopen",
+      "RISK completion boundaries FAQ: Retry explains an uncertain cloud acknowledgement"
+    ],
+    "preservedCoverage": [
+      "Existing #169 and #170 lifecycle facts, immutable Done and comparison identities, rating neutrality, History, Undo, Start/Dot causality and completion membership remain covered and unchanged.",
+      "The new complete-app consumers use isolated production IndexedDB, actual editor Done/Edit and scanner Dot/No actions, deterministic synthetic cloud revisions, observed intermediate scanner HTML and device-head writes, and exact conditional acknowledgement/readback content.",
+      "Existing account-read/save/acknowledgement, PWA safe-update gesture, saved-view integration, wake, and failed-save/read recovery controls remain in the focused cohort; no blanket actor/account matrix or new abstraction was added.",
+      "The Quick start FAQ stays within its existing 130-word answer limit. No final changelog, service-worker fingerprint, release receipt, compatibility check, CI, or live claim is part of this intermediate implementation handback."
+    ],
+    "redEvidence": {
+      "command": "/Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node scripts/agent-tools/record-run.mjs --repo $PWD --evidence-dir /Users/emeraldpham/.codex/task-artifacts/completion-precedence-168/174/runs --purpose preimplementation-red -- /Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node --test --test-name-pattern='RISK completion boundaries FAQ:' tests.js",
+      "failure": "The rendered FAQ RISK assertion failed before the copy edit because the save/sync answer offered Retry sync but did not explain that, after a lost reply, it checks the current saved cloud board before trying again. This is a genuine FAQ-copy RED. The five runtime consumer groups passed on unchanged 79f7510 before any runtime edit, so no product runtime RED or repair is claimed. A subsequent GREEN attempt had a mismatched expected phrase; its immutable record was corrected with record-run and the final FAQ plus consumer cohort passed."
+    },
+    "greenEvidence": "/Users/emeraldpham/.codex/task-artifacts/completion-precedence-168/174/runs/2026-10-17T21-22-58-374Z-103023cc-7fca-4a97-a468-42640f3cd737.json (final focused completion, #169/#170 lifecycle, failure/recovery, account, view, gesture, inventory and Quick start FAQ cohort: 31 top-level consumers, 47 passed, 0 failed).",
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/completion-precedence-168/174/runs",
+    "coverageChronology": {
+      "runtime": "Five complete-application runtime groups passed against integrated SHA 79f7510 before any runtime change. Added the direct known-cloud pre-push assertion; no product runtime RED or repair is claimed.",
+      "faq": "Rendered FAQ copy RED was recorded at 2026-10-17T21-20-02-765Z before index.html changed. The first post-copy green attempt expected an outdated phrase and failed only its assertion; the corrected expectation passed and references that attempt through record-run correction metadata.",
+      "fixtureCorrections": "Earlier exploratory fixture expectation failures remain as immutable records with explicit correction links. They concerned baseline latest-backup rotation, a missing explicit debounce flush, the actual independent Dot in the chain, account B's own acknowledged revision, and fake DOM modal detection; none is represented as a runtime RED."
+    },
+    "releaseStatus": "Issue 174 focused local consumer and FAQ work only; no runtime repair, full suite, browser, emulator, CI, push, release receipt or deployment verification. Parent /root owns integration and release."
   }
 ]
