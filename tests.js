@@ -7,6 +7,101 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 
+async function scopedUndoClients(){
+ const at=Date.parse('2026-10-17T15:00:00Z');
+ const initial=syncState({tasks:[syncTask('undo-base','Benchmark'),syncTask('undo-local','Local choice'),syncTask('undo-peer','Peer choice')],
+  chain:['undo-base'],candidateId:'undo-local',mode:'scan',scanMode:'descending',passId:'undo-pass',passStartedAt:at-60000,
+  syncRev:4,syncAccount:'e@example.com',syncDirty:false,settings:{horizonMin:60,thresholdPct:0,samples:250,cantMin:30,workedHours:8}});
+ const remote=JSON.parse(JSON.stringify(initial));for(const key of ['syncRev','syncAccount','syncDirty'])delete remote[key];
+ const h=makeSyncHarness({remote,rev:4,delayMs:1}),seedStorage={[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)};
+ const local=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:h.factory}),peer=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:h.factory});
+ await local.ctx.cloudPull();await peer.ctx.cloudPull();
+ local.ctx.window.CloudSync.ready=false;peer.ctx.window.CloudSync.ready=false;
+ return {local,peer,h,at,initial};
+}
+test('RISK scoped Undo: local comparison cancellation keeps peer learning and survives stale cloud and reopen',async()=>{
+ const {local,peer,h,at,initial}=await scopedUndoClients();
+ setFakeTime(local.ctx,at+100);local.ctx.onAction('yes',{dataset:{candidate:'undo-local',benchmark:'undo-base'}});
+ const original=JSON.parse(JSON.stringify(local.ctx.state.decisionEvents.find(e=>e.kind==='comparison')));
+ setFakeTime(peer.ctx,at+200);hydrateUnchangedEditorDraft(peer,'undo-peer');peer.ctx.onAction('dot-task',{dataset:{id:'undo-peer'}});
+ peer.ctx.window.CloudSync.ready=true;await peer.ctx.cloudPushNow();await syncSettle(40);
+ local.ctx.window.CloudSync.ready=true;await local.ctx.cloudPull();await syncSettle(50);
+ assert.deepEqual(Array.from(local.ctx.state.chain),['undo-base','undo-local','undo-peer']);
+ setFakeTime(local.ctx,at+300);local.ctx.onAction('undo',{});
+ assert.deepEqual(Array.from(local.ctx.state.chain),['undo-base','undo-peer'],'normal Undo targets the local comparison, preserving the peer Dot');
+ const expected=Object.fromEntries(initial.tasks.map(t=>[t.id,{mu:t.mu,sigma:t.sigma}]));loadEngine(145).updatePair(expected['undo-peer'],expected['undo-base']);
+ for(const task of local.ctx.state.tasks){assert.equal(task.mu,expected[task.id].mu);assert.equal(task.sigma,expected[task.id].sigma);}
+ const cancellation=local.ctx.state.decisionEvents.find(e=>e.kind==='undo');assert.ok(cancellation,'Undo retains explicit target cancellation evidence');
+ assert.deepEqual(Array.from(cancellation.targetEventIds),[original.id]);assert.equal(JSON.stringify(local.ctx.state.decisionEvents.find(e=>e.id===original.id)),JSON.stringify(original));
+ assert.ok(local.ctx.state.tasks.find(t=>t.id==='undo-local').ratingHistory.some(row=>row.kind==='yes'));
+ assert.equal(await local.ctx.persist(),true);await local.ctx.cloudPushNow();await syncSettle(50);
+ const final=h.remoteState();assert.deepEqual(final.chain,['undo-base','undo-peer']);assert.equal(final.decisionEvents.filter(e=>e.kind==='undo').length,1);
+ const stale=JSON.parse(JSON.stringify(final));stale.decisionEvents=stale.decisionEvents.filter(e=>e.kind!=='undo');stale.chain=['undo-base','undo-local','undo-peer'];
+ h.writeBehindBack(stale);await local.ctx.cloudPull();await local.ctx.cloudPushNow();await syncSettle(50);
+ assert.deepEqual(Array.from(local.ctx.state.chain),['undo-base','undo-peer'],'stale original delivery cannot reapply a cancelled comparison');
+ const raw=local.shim.localStorage.getItem(SYNC_STORE_KEY),reopened=await loadAppAtTime(at+400,{seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw},cloudSyncFactory:h.factory});
+ await reopened.ctx.cloudPull();assert.deepEqual(Array.from(reopened.ctx.state.chain),['undo-base','undo-peer']);
+ for(const task of reopened.ctx.state.tasks)assert.equal(task.mu,expected[task.id].mu);
+ assert.deepEqual(h.remoteState().chain,['undo-base','undo-peer']);
+});
+test('RISK scoped Undo: compound editor Dot restores only local fields and context deltas after peer progress',async()=>{
+ const {local,peer,h,at}=await scopedUndoClients();
+ // This older board deliberately has no due property; Undo must preserve absence.
+ delete local.ctx.state.tasks.find(t=>t.id==='undo-local').due;
+ setFakeTime(local.ctx,at+100);hydrateUnchangedEditorDraft(local,'undo-local');
+ local.shim.document.getElementById('etTitle').value='Local edited title';local.shim.document.getElementById('etDue').value='2026-10-30';
+ local.ctx.onAction('dot-task',{dataset:{id:'undo-local'}});
+ const targetRows=local.ctx.state.decisionEvents.filter(e=>e.kind==='comparison'||e.kind==='current-choice');
+ assert.equal(targetRows.filter(e=>e.kind==='comparison').length,1);assert.equal(new Set(targetRows.map(e=>e.actionId)).size,1,'editor save plus Dot remains one gesture');
+ await saveEditorChoice(peer,'undo-local',at+200,{url:'https://peer.test/'});
+ await saveEditorChoice(peer,'undo-peer',at+250,{title:'Peer independent title'});
+ peer.ctx.window.CloudSync.ready=true;await peer.ctx.cloudPushNow();await syncSettle(30);
+ local.ctx.window.CloudSync.ready=true;await local.ctx.cloudPull();await syncSettle(50);
+ setFakeTime(local.ctx,at+300);local.shim.document.dispatchEvent({type:'keydown',key:'z',repeat:false});
+ const task=local.ctx.state.tasks.find(t=>t.id==='undo-local');
+ assert.equal(task.title,'Local choice','one normal Undo reverses local editor fields');assert.equal(Object.hasOwn(task,'due'),false,'absent prior field remains absent');
+ assert.equal(task.url,'https://peer.test/','a peer edit to another property survives');assert.equal(local.ctx.state.tasks.find(t=>t.id==='undo-peer').title,'Peer independent title');
+ assert.deepEqual(Array.from(local.ctx.state.chain),['undo-base']);
+ await local.ctx.persist();await local.ctx.cloudPushNow();await syncSettle(40);
+ const cloud=h.remoteState();assert.equal(cloud.tasks.find(t=>t.id==='undo-local').title,'Local choice');assert.equal(Object.hasOwn(cloud.tasks.find(t=>t.id==='undo-local'),'due'),false);
+ assert.deepEqual(cloud.decisionEvents.find(e=>e.kind==='undo').targetEventIds.slice().sort(),Array.from(targetRows,e=>e.id).sort());
+ const final={...cloud,syncAccount:'e@example.com',syncRev:h.doc.rev,syncDirty:false};
+ const fresh=await loadAppAtTime(at+400,{seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(final)},cloudSyncFactory:h.factory});await fresh.ctx.cloudPull();
+ assert.equal(fresh.ctx.state.tasks.find(t=>t.id==='undo-local').title,'Local choice');assert.equal(fresh.ctx.state.tasks.find(t=>t.id==='undo-local').url,'https://peer.test/');
+});
+test('RISK scoped Undo: bulk edit is one durable cancellation group and later peer choices stay effective',async()=>{
+ const {local,peer,h,at}=await scopedUndoClients();
+ setFakeTime(local.ctx,at+100);local.ctx.state.listOpen=true;local.ctx.onAction('bulk-select-all');local.ctx.onAction('bulk-edit');
+ local.shim.document.getElementById('bulkApplyDue').checked=true;local.shim.document.getElementById('bulkDue').value='2026-11-01';local.ctx.onAction('bulk-save');
+ const rows=Array.from(local.ctx.state.decisionEvents||[]).filter(e=>e.kind==='current-choice'&&e.target.property==='due');
+ assert.equal(rows.length,3,'bulk save records one choice per changed task in one gesture');assert.equal(new Set(rows.map(e=>e.actionId)).size,1);
+ await saveEditorChoice(peer,'undo-local',at+200,{due:'2026-12-01',title:'Peer later title'});
+ peer.ctx.window.CloudSync.ready=true;await peer.ctx.cloudPushNow();await syncSettle(40);local.ctx.window.CloudSync.ready=true;await local.ctx.cloudPull();await syncSettle(40);
+ local.ctx.onAction('undo',{});await local.ctx.persist();await local.ctx.cloudPushNow();await syncSettle(40);
+ for(const task of h.remoteState().tasks){assert.equal(task.due,task.id==='undo-local'?'2026-12-01':null);}
+ assert.equal(h.remoteState().tasks.find(t=>t.id==='undo-local').title,'Peer later title');
+ assert.equal(h.remoteState().decisionEvents.filter(e=>e.kind==='undo').length,1);assert.equal(h.remoteState().decisionEvents.find(e=>e.kind==='undo').targetEventIds.length,3);
+});
+test('RISK scoped Undo: cancelled No cannot return from stale marks and context membership keeps the peer delta',async()=>{
+ const {local,peer,h,at}=await scopedUndoClients();
+ setFakeTime(local.ctx,at+100);local.ctx.onAction('no',{dataset:{candidate:'undo-local',benchmark:'undo-base'}});
+ const stale=JSON.parse(local.ctx.cloudPayload());local.ctx.onAction('undo',{});await local.ctx.persist();
+ local.ctx.window.CloudSync.ready=true;await local.ctx.cloudPushNow();await syncSettle(30);
+ assert.equal(local.ctx.state.considered['undo-local'],undefined);
+ h.writeBehindBack(stale);await local.ctx.cloudPull();await local.ctx.cloudPushNow();await syncSettle(40);
+ assert.equal(local.ctx.state.considered['undo-local'],undefined,'a stale No mark cannot outlive its durable cancellation');
+ const fresh={...h.remoteState(),syncAccount:'e@example.com',syncRev:h.doc.rev,syncDirty:false};fresh.considered['undo-local']='no';
+ const reopened=await loadAppAtTime(at+200,{seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(fresh)},cloudSyncFactory:h.factory});await reopened.ctx.cloudPull();
+ assert.equal(reopened.ctx.state.considered['undo-local'],undefined,'fresh projection removes cancelled temporary No effect');
+ const context=await scopedUndoClients(),a=context.local,b=context.peer;
+ for(const app of [a,b])app.ctx.state.contexts=[{id:'local-ctx',name:'Local',active:true},{id:'peer-ctx',name:'Peer',active:true}];
+ await saveEditorChoice(a,'undo-peer',at+300,{ctxIds:['local-ctx']});await saveEditorChoice(b,'undo-peer',at+400,{ctxIds:['peer-ctx']});
+ b.ctx.window.CloudSync.ready=true;await b.ctx.cloudPushNow();await syncSettle(30);a.ctx.window.CloudSync.ready=true;await a.ctx.cloudPull();await syncSettle(40);
+ assert.deepEqual(Array.from(a.ctx.state.tasks.find(t=>t.id==='undo-peer').ctx).sort(),['local-ctx','peer-ctx']);
+ a.ctx.onAction('undo',{});await a.ctx.persist();await a.ctx.cloudPushNow();await syncSettle(40);
+ assert.deepEqual(context.h.remoteState().tasks.find(t=>t.id==='undo-peer').ctx,['peer-ctx'],'Undo removes only the local context membership delta');
+});
+
 // Last task WOOP exercises mounted handlers and real task history, not guessed pass marks.
 async function woopFixture(){
  const app=await loadApp({seed:971});const {ctx}=app;

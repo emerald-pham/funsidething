@@ -1231,3 +1231,12 @@ Protect full bicycle and scooter silhouettes, fixed tire contacts, shared solar 
 - `RISK decision recovery account transition: pending No acknowledgement cannot enter another account and the exact prior board stays recoverable`
 
 Protect conditional decision-capability activation, ordinary pinned-client compatibility, exact unknown/foreign/colliding evidence holds, mandatory local saves, original action identity through uncertain acknowledgement and cold reopen, and account-bound late replies. Firestore rules consumers additionally execute the immutable historical backend and full application, activation CAS, historical safe-update holds, and rules-first rollout.
+
+## Scoped ordinary Undo (#145)
+
+- `RISK scoped Undo: local comparison cancellation keeps peer learning and survives stale cloud and reopen`
+- `RISK scoped Undo: compound editor Dot restores only local fields and context deltas after peer progress`
+- `RISK scoped Undo: bulk edit is one durable cancellation group and later peer choices stay effective`
+- `RISK scoped Undo: cancelled No cannot return from stale marks and context membership keeps the peer delta`
+
+Protect local gesture targeting through reconciliation, immutable grouped cancellation, frozen-baseline learning, exact prior property presence, later peer choices, context membership deltas, duplicate/stale delivery, durable cloud state and reopen. Explicit replacement and established domain cancellation remain separate.

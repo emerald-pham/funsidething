@@ -7491,5 +7491,25 @@
       "preimplementation": "Not applicable: this change corrects a timezone-dependent test fixture after behavior implementation; the actual UTC failure was observed before the fixture edit.",
       "postimplementation": "Pinning the existing timestamp before initial boot and cold reopen makes the preserved expiry/reconciliation scenario green in UTC and America/New_York without changing runtime code."
     }
+  },
+  {
+    "testChangesSha256": "7f863bc4850d0401e51968b8a999a93ad70430615d11b02c91bb5ca52a255812",
+    "reason": "Implement approved #141/#145 ordinary action-scoped Undo using real two-device app consumers; preserve unrelated peer choices and immutable observations.",
+    "previousBehavior": "Cloud adoption added a snapshot Undo frame which reversed peer Dot while retaining local Yes, and bulk Save lacked durable per-task choice facts.",
+    "intendedBehavior": "Normal Undo cancels exactly one local gesture group against current reconciled board, replays retained learning once, and preserves peer fields through durable publication and reopen.",
+    "replacementTests": [
+      "RISK scoped Undo: local comparison cancellation keeps peer learning and survives stale cloud and reopen",
+      "RISK scoped Undo: compound editor Dot restores only local fields and context deltas after peer progress",
+      "RISK scoped Undo: bulk edit is one durable cancellation group and later peer choices stay effective",
+      "RISK scoped Undo: cancelled No cannot return from stale marks and context membership keeps the peer delta"
+    ],
+    "preservedCoverage": [
+      "Existing tests remain unchanged in this checkpoint; completion, evergreen, causal return, delete, postpone, prerequisites and explicit replacement consumers remain required.",
+      "The tests exercise real buttons, editor save plus Dot, bulk save and keyboard Undo; browser timing, live auth/rules, production and physical devices are not claimed."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='RISK scoped Undo' tests.js (vertical patterns run separately before each corresponding runtime repair)",
+      "failure": "Raw artifacts145/red-comparison.log 04:53:57UTC kept undo-local and lost undo-peer; red-compound-choice.log04:54:55 title stayed Local edited title; red-bulk.log04:56:42 expected3 facts got0; red-no-context.log04:57:13 stale no survived. Corresponding green logs captured after each repair. Later fixture corrections isolated absent due from a separate deliberate peer null edit and normalize cross-realm arrays; no infrastructure failure is counted as RED."
+    }
   }
 ]
