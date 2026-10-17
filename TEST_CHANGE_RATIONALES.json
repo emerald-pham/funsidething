@@ -103,22 +103,6 @@
     }
   },
   {
-    "testChangesSha256": "15f301a282e98ed4420f65782f13a5adaadfc86ca8874baaea27cbd80e57dcad",
-    "reason": "Protect the inherited walker-profile source consumer after new shadow opacity branches exposed an ambiguous first-match selector; retain every existing assertion and risk contract.",
-    "previousBehavior": "Candidate1018009 introduced a matching shadow branch before paintGuest, so the historical consumer inspected opacity setup rather than travel-facing head paint and CI failed.",
-    "intendedBehavior": "Equivalent OR operand order leaves shadow behavior unchanged and the historical consumer selects the actual guest painter; the new discriminating selector regression protects that boundary.",
-    "preservedCoverage": [
-      "All existing tests remain byte-identical; original shadow geometry/opacity, walking direction, seeded schedules and task/storage behavior remain protected."
-    ],
-    "replacementTests": [
-      "RISK human profile selector: historical walker consumer still selects the actual guest painter"
-    ],
-    "redEvidence": {
-      "command": "node /tmp/shadow-audit-evidence/integration/selector-contract-red.mjs (actual new contract against immutable1018009 landscape bytes)",
-      "failure": "Observed AssertionError: historical walker consumer must select the actual guest painter rather than a shadow branch. CI original profile failure and local focused RED retained. Original five shadow RED chronology retained in previous records. New selector GREEN33pass0fail0skip; no new product behavior."
-    }
-  },
-  {
     "testChangesSha256": "7decc169714aadef7ecf19e1d39d248d79f3f0bf9495314d1105fec122dd5536",
     "reason": "Protect the inherited walker-profile source consumer after new shadow opacity branches exposed an ambiguous first-match selector; retain every existing assertion and risk contract.",
     "previousBehavior": "Candidate1018009 introduced a matching shadow branch before paintGuest, so the historical consumer inspected opacity setup rather than travel-facing head paint and CI failed.",
@@ -7493,6 +7477,30 @@
     }
   },
   {
+    "testChangesSha256": "218e8e8f7f740ffe5243d7c370feaaa4f5dd5775d0054a9017b6f819dfafed0d",
+    "reason": "Extend the integrated complete-app No recovery scenario to cover both cloud publication orders for both localStorage fallback and production IndexedDB. Keep this as a test-only acceptance expansion; no runtime code or behavior was changed.",
+    "previousBehavior": "The existing #142 consumer exercised only Mac-first publication: the phone made five No actions offline and closed, the Mac editor published its title, then the phone reopened and reconciled. It did not prove the reverse order where the reopened phone publishes the five No facts before the offline Mac edit reconnects.",
+    "intendedBehavior": "For both storage backends, exercise Mac-first and phone-first publication after the phone acts offline, durably saves, closes, and reopens. In phone-first, keep the Mac offline through the phone publication, then reconnect and reconcile Mac before the reopened phone pulls again. Preserve all No marks, full task/rating-history data, event IDs/times/account/base/pass, unchanged task/context fields, durable event bytes, the final five No plus one title-choice cloud union, and explicit pass expiry.",
+    "replacementTests": [
+      "RISK cloud No recovery: five scanner decisions survive offline durable reopen beside an independent peer edit"
+    ],
+    "preservedCoverage": [
+      "The original five real scanner No actions, exact effective ratings and observation histories, owner/base/pass/context evidence, cold device-store reopen, independent editor action, and explicit temporary-mark expiry assertions remain active.",
+      "Both publication orders end with one immutable row for each of five No actions and one separately identified Mac title choice, with unchanged unrelated task and context data."
+    ],
+    "redEvidence": {
+      "command": "Historical #142 behavioral RED: node --test --test-name-pattern='RISK cloud No recovery' tests.js; current acceptance expansion: node --test --test-name-pattern='RISK cloud No recovery|RISK cloud current choices|RISK comparison replay:' tests.js (also with TZ=UTC).",
+      "failure": "No new feature RED is claimed: this is a positive acceptance extension after implementation. The original #142 actual full-app RED remains documented in /Users/emeraldpham/.codex/task-artifacts/decision-sync-141/142/behavioral-red.md and behavioral-red.txt: both fallback and IndexedDB failed because a newer peer revision cleared the five deliberate No marks after offline save, close, and cold reopen. Against integrated tip 944e443, the extended No scenario passed 7/7 and the complete No/current-choice/comparison cohort passed 30/30 in default America/New_York and 30/30 in UTC. Exact outputs: /Users/emeraldpham/.codex/task-artifacts/decision-sync-141/147/two-publication-orders-green-default.log and two-publication-orders-green-utc.log. After merging integration checkpoint 919c139 (projection-coherence and recovery guards), the same focused cohort passed 30/30 in both zones; exact rerun logs are two-publication-orders-green-default.log and two-publication-orders-green-utc.log in /Users/emeraldpham/.codex/task-artifacts/decision-sync-141/147/."
+    },
+    "updatedTests": [
+      "RISK cloud No recovery: five scanner decisions survive offline durable reopen beside an independent peer edit"
+    ],
+    "coverageChronology": {
+      "preimplementation": "This additional publication order is not represented as a new preimplementation failure. The original No-loss behavioral RED remains preserved in the #142 artifacts and predates all runtime fixes.",
+      "postimplementation": "Against integrated tip 944e443, the extended No scenario passed 7/7 and the complete No/current-choice/comparison cohort passed 30/30 in default America/New_York and UTC. After merging integration checkpoint 919c139, the final focused cohort passed 30/30 in each zone again. Both Mac-first and phone-first flows pass through real app actions, storage reopen, cloud publication, reconciliation and explicit pass expiry in both backends; exact rerun logs are in /Users/emeraldpham/.codex/task-artifacts/decision-sync-141/147/."
+    }
+  },
+  {
     "testChangesSha256": "7ce91841a9b114dc15e0542412f42cbf91950b35f9eb913280864938a998478d",
     "reason": "Complete the approved recovery follow-through against integrated #143 by preserving proper source-validation holds, rejecting unprojectable authority, and adding the explicitly approved guest/Import/Restore ownership transition without rewriting original decisions.",
     "previousBehavior": "The #143 journal union turned malformed/foreign source rows into same-ID conflicts before the intended hold. Supported rows with missing ancestry, cycles or unusable baseline evidence could be acknowledged. Guest decisions blocked first sign-in; authorized foreign modern journals blocked Import/Restore. The immutable historical app could safe-reload a pending No and the upgraded app acknowledged scalar learning its decision projection could not reconstruct.",
@@ -7517,6 +7525,50 @@
     "redEvidence": {
       "command": "node --test --test-name-pattern='RISK decision recovery validation order:|RISK decision recovery projection:|RISK decision recovery guest sign-in:|RISK decision recovery explicit transfer:|RISK decision recovery compatible update:|RISK decision recovery legacy update:' tests.js; separate RISK decision capability recovery adapter run. Exact sequence in /Users/emeraldpham/.codex/task-artifacts/decision-sync-141/146/CHRONOLOGY.md logs27-50.",
       "failure": "Actual RED27/28 reproduced integrated shape/owner diagnostic corruption and source mutation. Moving sendPush validation alone left existing failures29 because persist had already unioned variants; predicate precedence + source gate GREEN30. RED31 observed unsafe adoption for five unprojectable formats; preserved collision diagnostic initially failed32 then GREEN33. RED34 sole baselineRecovery lacked capability, GREEN35. Guest first-sign-in RED36 and actual explicit Import/Restore RED39 stayed pending; parent-approved exact-fact inheritance repaired them (42/43). Secondary failures40/41 were fixture threshold/offered-candidate/debounce assumptions, corrected without weakening action assertions. Unsupported semantic safe-update check RED37 observed zero calls, GREEN38. Real pinned legacy safe Reload/Retry RED45/46 confirmed false acknowledged rev6; history provenance alone failed47 because floor did not append a history row, scalar coherence hold GREEN48. Mandatory recovery failures and exact-fact mutation/account switch were added preservation coverage, green43/49. Final affected cohort50 passes93/93 without skips."
+    }
+  },
+  {
+    "testChangesSha256": "56f17103ffcd1dea3890e36b422a09a35262584a55394565e037ccfccb6e23b8",
+    "reason": "Record the exact combined 944-based test rationale after merging the approved #146 safety checkpoint with the #142 two-publication-order acceptance extension. The individual #142 and #146 rationale records remain intact; this aggregate entry is required because the integration diff gate fingerprints all added tests together.",
+    "previousBehavior": "At base 944, the #142 complete-app recovery consumer exercised Mac-first publication only. The integrated #146 follow-through was absent: malformed and foreign evidence could lose its source-specific hold before union, supported but unprojectable authority could be acknowledged, and guest-first or consented cross-account recovery was not yet covered.",
+    "intendedBehavior": "Keep the original #142 offline save/cold reopen assertions and prove both Mac-first and phone-first publication with browser fallback and production IndexedDB, preserving all five No facts plus the independent title choice. At the merged recovery boundary, validate source authority before union, preserve safe holds for unsupported or unprojectable evidence, and cover guest-first and explicit Import/Restore inheritance without changing original event identity, time, owner, or learned evidence.",
+    "replacementTests": [
+      "RISK decision capability recovery: sole baseline recovery activates the fence without rewriting evidence",
+      "RISK cloud No recovery: five scanner decisions survive offline durable reopen beside an independent peer edit",
+      "RISK decision recovery compatible update: unsupported authority checks the safe app update path and Retry keeps exact work",
+      "RISK decision recovery guest sign-in: a saved guest No and later authenticated No retain original facts and learning",
+      "RISK decision recovery explicit transfer: consented cross-account Import and Restore preserve original facts and later learning",
+      "RISK decision recovery inheritance authority: changed attested facts stay held and ordinary account switches gain no consent",
+      "RISK decision recovery inheritance durability: failed replacement recovery keeps both boards and an explicit retry succeeds",
+      "RISK decision recovery legacy update: safe reload and Retry hold a sole unrepresented legacy comparison instead of acknowledging lost learning",
+      "RISK decision recovery projection: supported but unprojectable authority holds exact cloud and local branches",
+      "RISK decision recovery validation order: rejected local evidence stays exact before known-cloud union"
+    ],
+    "preservedCoverage": [
+      "The original #142 behavioral RED and action-level assertions remain documented; the new phone-first order is explicitly a post-implementation acceptance extension, not a fabricated preimplementation failure.",
+      "All #143 comparison replay and #144 choice consumers remain preserved with original IDs, times, learning, causal ordering, and current-field behavior.",
+      "#146 source validation, capability recovery, account-transfer inheritance, legacy pending work, exact retry, and revision/CAS preservation remain covered by their focused tests and original chronology.",
+      "The complete-app synthetic cloud and in-process store tests do not establish live authentication/rules, browser timing, production accounts, physical-device behavior, CI, deployment, or release."
+    ],
+    "redEvidence": {
+      "command": "Historical #142 RED: node --test --test-name-pattern='RISK cloud No recovery' tests.js; #146 failures are recorded in /Users/emeraldpham/.codex/task-artifacts/decision-sync-141/146/CHRONOLOGY.md. Current focused GREEN: node --test --test-name-pattern='RISK cloud No recovery|RISK cloud current choices|RISK comparison replay:' tests.js and TZ=UTC node --test --test-name-pattern='RISK cloud No recovery|RISK cloud current choices|RISK comparison replay:' tests.js.",
+      "failure": "The original #142 complete-app RED showed both fallback and IndexedDB lost deliberate offline No marks after a newer peer revision and cold reopen. #146 archived REDs reproduced authority rows being misclassified during union, unsupported or unprojectable evidence being adopted, guest sign-in being blocked, and consented Import/Restore being blocked; details and paired GREENs are in its chronology. No additional preimplementation RED is claimed for phone-first: it is a post-implementation acceptance extension. After merging 919c139, the targeted No/current-choice/comparison cohort passed 30/30 in default America/New_York and 30/30 in UTC; logs are /Users/emeraldpham/.codex/task-artifacts/decision-sync-141/147/two-publication-orders-green-default.log and two-publication-orders-green-utc.log."
+    },
+    "updatedTests": [
+      "RISK decision capability recovery: sole baseline recovery activates the fence without rewriting evidence",
+      "RISK cloud No recovery: five scanner decisions survive offline durable reopen beside an independent peer edit",
+      "RISK decision recovery compatible update: unsupported authority checks the safe app update path and Retry keeps exact work",
+      "RISK decision recovery guest sign-in: a saved guest No and later authenticated No retain original facts and learning",
+      "RISK decision recovery explicit transfer: consented cross-account Import and Restore preserve original facts and later learning",
+      "RISK decision recovery inheritance authority: changed attested facts stay held and ordinary account switches gain no consent",
+      "RISK decision recovery inheritance durability: failed replacement recovery keeps both boards and an explicit retry succeeds",
+      "RISK decision recovery legacy update: safe reload and Retry hold a sole unrepresented legacy comparison instead of acknowledging lost learning",
+      "RISK decision recovery projection: supported but unprojectable authority holds exact cloud and local branches",
+      "RISK decision recovery validation order: rejected local evidence stays exact before known-cloud union"
+    ],
+    "coverageChronology": {
+      "preimplementation": "This aggregate fingerprint combines previously implemented #143/#144/#146 behaviors with a positive #142 publication-order coverage extension. It is not presented as a new behavioral RED; the original No-loss and #146 failure sequences remain in ticket-specific logs.",
+      "postimplementation": "Against merged checkpoint 919c139, the No/current-choice/comparison cohort passed 30/30 in UTC and 30/30 in the default America/New_York timezone. The No consumer covers both publication orders, both local storage backends, offline save/close/reopen, exact final cloud union, preserved unrelated task/context state, and explicit pass expiry."
     }
   },
   {

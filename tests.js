@@ -11830,10 +11830,11 @@ function makeSyncHarness({ delayMs = 4, remote = null, failPull = false, rev = n
   return h;
 }
 
-test('RISK cloud No recovery: five scanner decisions survive offline durable reopen beside an independent peer edit',async t=>{ // Pin simulated time before boot and cold reopen.
+test('RISK cloud No recovery: five scanner decisions survive offline durable reopen beside an independent peer edit',async t=>{ // Pin simulated time and cover both publication orders.
  const {IDBFactory}=await import('fake-indexeddb');
  const at=Date.parse('2026-10-16T15:10:00.000Z'),passAt=at-60000;
- for(const backend of ['browser fallback','IndexedDB'])await t.test(backend,async()=>{
+ for(const publicationOrder of ['Mac first','Phone first'])await t.test(publicationOrder,async publicationTest=>{
+ for(const backend of ['browser fallback','IndexedDB'])await publicationTest.test(backend,async()=>{
   const initial=syncState({tasks:[
    Object.assign(syncTask('bench','Phone benchmark'),{mu:36,sigma:8,ctx:['c_shared']}),
    ...Array.from({length:5},(_,i)=>Object.assign(syncTask('phone-no-'+(i+1),'Phone No '+(i+1)),{ctx:['c_shared']})),
@@ -11891,6 +11892,9 @@ test('RISK cloud No recovery: five scanner decisions survive offline durable reo
    assert.deepEqual([...noEvents[0].observedActionIds],[],'the first No has no observed predecessor');
    for(let i=1;i<noEvents.length;i++)assert.deepEqual([...noEvents[i].observedActionIds],[noEvents[i-1].id],
     'each later No stores the bounded causal frontier, not a quadratic full history');
+   const noEventsSnapshot=JSON.stringify(JSON.parse(JSON.stringify(noEvents)));
+   const phoneTaskSnapshots=Object.fromEntries(phone.state.tasks.map(task=>[task.id,JSON.stringify(JSON.parse(JSON.stringify(task)))]));
+   const phoneContextsSnapshot=JSON.stringify(JSON.parse(JSON.stringify(phone.state.contexts)));
    assert.equal(await phone.persist(),true,'the offline device store accepts the complete local board');
    const offlineRaw=backend==='IndexedDB'
     ?(await phone.window.ScannerDeviceStore.readHead()).payload
@@ -11900,29 +11904,43 @@ test('RISK cloud No recovery: five scanner decisions survive offline durable reo
    assert.equal(offlineBoard.decisionBase?.account,'e@example.com','the exact-base owner survives durable save');
    assert.equal(offlineBoard.decisionBase?.revision,4,'the common cloud revision survives durable save');
    assert.ok(typeof offlineBoard.decisionBase?.payload==='string','the exact common payload survives durable save');
+   assert.equal(JSON.stringify(offlineBoard.decisionEvents),noEventsSnapshot,'the durable bytes preserve the exact five original No event rows');
    await closeStore({window:phone.window});
 
+   if(publicationOrder==='Phone first')mac.window.CloudSync.ready=false;
    assert.equal(await saveEditorChoice({ctx:mac,shim:macShim},'mac-edit',at+2000,{title:'Mac independent edit'}),true,
     'the independent peer edit uses the actual editor action with unchanged rendered context/reset controls');
+   phoneTaskSnapshots['mac-edit']=JSON.stringify(JSON.parse(JSON.stringify(mac.state.tasks.find(task=>task.id==='mac-edit'))));
    const macChoice=mac.state.decisionEvents.filter(event=>event?.kind==='current-choice');
    assert.equal(macChoice.length,1,'the hydrated Mac editor records only its deliberate title change');
    assert.deepEqual(JSON.parse(JSON.stringify(macChoice[0].target)),{type:'task',id:'mac-edit',property:'title'});
    assert.deepEqual(JSON.parse(JSON.stringify(macChoice[0].before)),{present:true,value:'Mac independent task'});
    assert.equal(macChoice[0].value,'Mac independent edit');
+   assert.equal(macChoice[0].at,at+2000,'the Mac title fact keeps its original action time');
+   assert.equal(macChoice[0].account,'e@example.com','the Mac title fact keeps its owning account');
+   assert.equal(macChoice[0].baseId,mac.state.decisionBase?.id,'the Mac title fact keeps its exact observed base');
+   assert.equal(macChoice[0].passId,'shared-pass-142','the Mac title fact keeps its observed pass identity');
+   assert.equal(macChoice[0].passAt,passAt,'the Mac title fact keeps the original pass time');
    assert.deepEqual(Array.from(mac.state.tasks.find(task=>task.id==='mac-edit').ctx),['c_shared'],'editor hydration preserves its unrelated context');
    assert.equal(mac.state.tasks.find(task=>task.id==='mac-edit').evergreenResetAtDay,true,'editor hydration preserves its checked reset control');
-   await mac.cloudPushNow();await syncSettle(30);
-   assert.equal(h.remoteState().tasks.find(task=>task.id==='mac-edit').title,'Mac independent edit');
-   assert.deepEqual(Array.from(h.remoteState().tasks.find(task=>task.id==='mac-edit').ctx),['c_shared']);
-   assert.equal(h.remoteState().tasks.find(task=>task.id==='mac-edit').evergreenResetAtDay,true);
-   const publishedEvents=h.remoteState().decisionEvents;
-   assert.equal(publishedEvents.filter(event=>event?.kind==='no').length,0,'offline No actions are not visible before the phone reconnects');
-   const publishedChoice=publishedEvents.filter(event=>event?.kind==='current-choice');
-   assert.equal(publishedChoice.length,1,'the independent editor action remains a separate current-choice record');
-   assert.equal(publishedChoice[0].id,macChoice[0].id,'the Mac title fact keeps its original event identity');
-   assert.deepEqual(JSON.parse(JSON.stringify(publishedChoice[0].target)),{type:'task',id:'mac-edit',property:'title'});
-   assert.equal(publishedEvents.length,1,'the first peer publication contains only its deliberate Mac title record');
-   assert.equal(h.doc.rev,5,'the independent Mac edit is a newer cloud publication');
+   if(publicationOrder==='Mac first'){
+    await mac.cloudPushNow();await syncSettle(30);
+    assert.equal(h.remoteState().tasks.find(task=>task.id==='mac-edit').title,'Mac independent edit');
+    assert.deepEqual(Array.from(h.remoteState().tasks.find(task=>task.id==='mac-edit').ctx),['c_shared']);
+    assert.equal(h.remoteState().tasks.find(task=>task.id==='mac-edit').evergreenResetAtDay,true);
+    const publishedEvents=h.remoteState().decisionEvents;
+    assert.equal(publishedEvents.filter(event=>event?.kind==='no').length,0,'offline No actions are not visible before the phone reconnects');
+    const publishedChoice=publishedEvents.filter(event=>event?.kind==='current-choice');
+    assert.equal(publishedChoice.length,1,'the independent editor action remains a separate current-choice record');
+    assert.equal(publishedChoice[0].id,macChoice[0].id,'the Mac title fact keeps its original event identity');
+    assert.deepEqual(JSON.parse(JSON.stringify(publishedChoice[0].target)),{type:'task',id:'mac-edit',property:'title'});
+    assert.equal(publishedEvents.length,1,'the first peer publication contains only its deliberate Mac title record');
+    assert.equal(h.doc.rev,5,'the independent Mac edit is a newer cloud publication');
+   }else{
+    assert.equal(h.remoteState().tasks.find(task=>task.id==='mac-edit').title,'Mac independent task','an offline Mac edit stays local before phone publication');
+    assert.equal(h.remoteState().decisionEvents?.length??0,0,'the offline Mac edit stays unpublished before phone publication');
+    assert.equal(h.doc.rev,4,'the offline Mac edit does not advance the shared cloud revision');
+   }
 
    const offlineCloudFactory=()=>{const cloud=h.factory();cloud.ready=false;return cloud;};
    const reloadOptions=backend==='IndexedDB'
@@ -11940,18 +11958,59 @@ test('RISK cloud No recovery: five scanner decisions survive offline durable reo
     assert.equal(reopened.state.tasks.find(task=>task.id===id).mu,mu,'the effective learned mean survives reconciliation');
     assert.equal(reopened.state.tasks.find(task=>task.id===id).sigma,sigma,'the effective learned uncertainty survives reconciliation');
    }
-   assert.equal(reopened.state.tasks.find(task=>task.id==='mac-edit').title,'Mac independent edit','the peer editor change is retained');
+   assert.equal(reopened.state.tasks.find(task=>task.id==='mac-edit').title,publicationOrder==='Mac first'?'Mac independent edit':'Mac independent task','phone observes exactly the choice events published before its reopen reconciliation');
    assert.deepEqual(Array.from(reopened.state.tasks.find(task=>task.id==='mac-edit').ctx),['c_shared'],'No replay preserves the peer task contexts');
    assert.equal(reopened.state.tasks.find(task=>task.id==='mac-edit').evergreenResetAtDay,true,'No replay preserves the rendered reset preference');
+   if(publicationOrder==='Phone first'){
+    assert.equal((await reopened.persist()),true,'the reopened phone durably saves its reconciled No records before publishing');
+    await reopened.cloudPushNow();await syncSettle(60);
+    const phoneFirstEvents=h.remoteState().decisionEvents||[];
+    assert.equal(phoneFirstEvents.filter(event=>event?.kind==='no').length,5,'phone-first cloud publication contains all five offline No facts');
+    assert.equal(phoneFirstEvents.filter(event=>event?.kind==='current-choice').length,0,'phone-first cloud publication precedes the offline Mac title fact');
+    assert.equal(h.remoteState().tasks.find(task=>task.id==='mac-edit').title,'Mac independent task');
+    assert.equal(h.doc.rev,5,'the reopened phone publishes the No decisions first');
+    mac.window.CloudSync.ready=true;
+    await mac.cloudPull();await syncSettle(60);
+    for(const id of acted)assert.equal(mac.state.considered[id],'no','the reconnected Mac adopts every phone No mark');
+    for(const [id,[mu,sigma]] of Object.entries(localRatings)){
+     assert.equal(mac.state.tasks.find(task=>task.id===id).mu,mu,'the reconnected Mac adopts the effective learned mean');
+     assert.equal(mac.state.tasks.find(task=>task.id===id).sigma,sigma,'the reconnected Mac adopts the effective learned uncertainty');
+    }
+    assert.equal(mac.state.tasks.find(task=>task.id==='mac-edit').title,'Mac independent edit','Mac retains its offline title choice while reconciling phone facts');
+    await mac.cloudPushNow();await syncSettle(60);
+    assert.equal(h.remoteState().tasks.find(task=>task.id==='mac-edit').title,'Mac independent edit');
+    assert.equal(h.doc.rev,6,'the reconnected Mac publishes the union at the next revision');
+    await reopened.cloudPull();await syncSettle(60);
+   }else{
+    assert.equal((await reopened.persist()),true);
+    await reopened.cloudPushNow();await syncSettle(60);
+   }
+   for(const id of acted)assert.equal(reopened.state.considered[id],'no','the final phone pull retains every No mark in either publication order');
+   for(const [id,[mu,sigma]] of Object.entries(localRatings)){
+    assert.equal(reopened.state.tasks.find(task=>task.id===id).mu,mu,'the final phone pull retains the effective learned mean');
+    assert.equal(reopened.state.tasks.find(task=>task.id===id).sigma,sigma,'the final phone pull retains the effective learned uncertainty');
+   }
+   assert.equal(reopened.state.tasks.find(task=>task.id==='mac-edit').title,'Mac independent edit','the final phone pull retains the Mac title fact');
+   for(const task of reopened.state.tasks){
+    const expected=JSON.parse(phoneTaskSnapshots[task.id]);
+    if(task.id==='mac-edit')expected.title='Mac independent edit';
+    assert.deepEqual(JSON.parse(JSON.stringify(task)),expected,`all other task data is retained for ${task.id}`);
+   }
+   assert.equal(JSON.stringify(JSON.parse(JSON.stringify(reopened.state.contexts))),phoneContextsSnapshot,'unrelated shared context data remains unchanged');
+   assert.equal(JSON.stringify(JSON.parse(JSON.stringify(h.remoteState().tasks.find(task=>task.id==='mac-edit').ctx))),JSON.stringify(['c_shared']));
    assert.equal(h.remoteState().tasks.find(task=>task.id==='mac-edit').title,'Mac independent edit');
-   assert.equal((await reopened.persist()),true);
-   await reopened.cloudPushNow();await syncSettle(60);
    assert.ok(h.remoteState().considered && acted.every(id=>h.remoteState().considered[id]==='no'),
     'the final cloud board contains all five No marks');
    const finalEvents=h.remoteState().decisionEvents;
    assert.equal(finalEvents.filter(event=>event?.kind==='no').length,5,'after phone reconnect and republish, the cloud retains exactly the five immutable No records');
    assert.equal(finalEvents.filter(event=>event?.kind==='current-choice').length,1,'the cloud retains the separate deliberate Mac title record');
    assert.equal(finalEvents.length,6,'no action or task edit was duplicated during reopen or retry');
+   assert.equal(JSON.stringify(JSON.parse(JSON.stringify(finalEvents.filter(event=>event?.kind==='no')))),noEventsSnapshot,'the final cloud keeps each original No event byte-for-byte');
+   const finalMacChoice=finalEvents.find(event=>event?.kind==='current-choice');
+   assert.equal(finalMacChoice?.id,macChoice[0].id,'the final cloud keeps the original Mac title event identity');
+   assert.deepEqual(JSON.parse(JSON.stringify(finalMacChoice)),JSON.parse(JSON.stringify(macChoice[0])),'the final cloud keeps the Mac title event time, base, pass, and prior-field evidence');
+   const sortedEvents=rows=>rows.map(row=>JSON.parse(JSON.stringify(row))).sort((a,b)=>a.id<b.id?-1:a.id>b.id?1:0);
+   assert.deepEqual(sortedEvents(reopened.state.decisionEvents),sortedEvents(finalEvents),'the fully reopened phone acknowledges the exact final cloud event union');
    assert.equal(Object.hasOwn(h.remoteState(),'decisionBase'),false,'the device-local decision base is excluded from cloud payloads');
    const learnedBeforePassReset=Object.fromEntries(acted.map(id=>[id,[reopened.state.tasks.find(task=>task.id===id).mu,reopened.state.tasks.find(task=>task.id===id).sigma]]));
    const retainedEvents=JSON.stringify(reopened.state.decisionEvents),oldPassId=reopened.state.passId;
@@ -11966,6 +12025,7 @@ test('RISK cloud No recovery: five scanner decisions survive offline durable reo
   }finally{
    await closeStore({window:phone.window});await closeStore({window:mac.window});
   }
+  });
  });
 });
 
