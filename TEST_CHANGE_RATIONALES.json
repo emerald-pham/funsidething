@@ -10438,7 +10438,7 @@
   {
     "comparison": "completion168ReleasedStartIncremental",
     "baseCommit": "de4bd614c2d1d8cd87bdcb6959bdfde5f3c59beb",
-    "testChangesSha256": "2a447c35747f412281a25eb37f679fd0f4b7461d3170a5f370f855e43206639a",
+    "testChangesSha256": "736071e5227ccc56934a764b60fc3528165bb2a5cf01c4555359959f497b405c",
     "reason": "Preserve actual normally published released Start returns by conservatively holding ambiguous eventless completion sources before checkpointing, adoption or publication. Extend the real immutable producer consumer across cloud, fallback, IndexedDB, startup, Import and Restore without removing existing assertions.",
     "previousBehavior": "The checkpoint invented a resolution for an old Start with no durable completion-observation witness, silently dropping its real returned member and acknowledging the changed cloud chain.",
     "intendedBehavior": "Ambiguous legacy Start/completion order explicitly holds exact local and cloud sources and newer drafts, without fabricated action chronology or rating replay. Modern observed returns, Undo and ordinary unambiguous legacy recovery remain supported.",
@@ -10456,10 +10456,19 @@
     "releasedStartEvidence": {
       "command": "node scripts/agent-tools/record-run.mjs --repo $PWD --evidence-dir /Users/emeraldpham/.codex/task-artifacts/completion-precedence-168/released-start-repair --purpose preimplementation-red -- node --test --test-name-pattern='^RISK legacy completion released Start:' tests.js",
       "failure": "At de4 runtime, actual immutable bd84 Start, Evergreen Done, rest expiry, actual offered Start and independent title Save normally acknowledge revision6 with chain [expiry-recurring]. Candidate mints a checkpoint, removes that member and acknowledges revision7. Real preimplementation recorder2026-10-17T23-01-45-479Z-8b3b471a-ffde-44c0-a977-580eac5630ac.json fails the preserved-return assertion before any runtime repair. This is genuine runtime RED, distinct from previous fixture-boundary diagnosis. Later source review finds no causal Done observation in the retained old journal; dates alone cannot establish chronology."
+    },
+    "offchainSourceRed": {
+      "record": "2026-10-17T23-06-47-563Z-b5787898-f6bf-45b0-b049-f7119624d21f.json",
+      "failure": "Actual immutable afterDoneRaw already excludes the completed member, but the first broad ambiguity predicate withheld its required startup checkpoint. This genuine narrowing RED precedes the source.chain-membership condition. Returned-source controls still held safely. Final predicate requires a retained possibly returned member; no clock inference is used."
+    },
+    "integrationEvidence": {
+      "commit": "dd4300a5d0d29529a1302920e86741201ad4d183",
+      "merge": "4649297",
+      "preserved": "Exact P0 predecessor-safe worker implementation, sessionUsed guards, original reproduction and replacement assertions/FAQ remain. Both original rationale records are retained. Conflicts resolved by retaining both risk inventories and player outcomes; fingerprints regenerated after preflight. Denied same-worker Chrome FAQ audit remains an independent release hold; this worker did not satisfy or bypass it."
     }
   },
   {
-    "testChangesSha256": "a4fb42b6db27e050df1ca7e54dab6fe9a2d4e38dd5fa5a6fd7152d6de6c10354",
+    "testChangesSha256": "170db5c31a1c1ca7cd9f2f34eecd36a7f6ac2c0476d4920d643da996df445b88",
     "reason": "Preserve actual normally published released Start returns by conservatively holding ambiguous eventless completion sources before checkpointing, adoption or publication. Extend the real immutable producer consumer across cloud, fallback, IndexedDB, startup, Import and Restore without removing existing assertions.",
     "previousBehavior": "The checkpoint invented a resolution for an old Start with no durable completion-observation witness, silently dropping its real returned member and acknowledging the changed cloud chain.",
     "intendedBehavior": "Ambiguous legacy Start/completion order explicitly holds exact local and cloud sources and newer drafts, without fabricated action chronology or rating replay. Modern observed returns, Undo and ordinary unambiguous legacy recovery remain supported.",
@@ -10557,6 +10566,153 @@
     "releasedStartEvidence": {
       "command": "node scripts/agent-tools/record-run.mjs --repo $PWD --evidence-dir /Users/emeraldpham/.codex/task-artifacts/completion-precedence-168/released-start-repair --purpose preimplementation-red -- node --test --test-name-pattern='^RISK legacy completion released Start:' tests.js",
       "failure": "At de4 runtime, actual immutable bd84 Start, Evergreen Done, rest expiry, actual offered Start and independent title Save normally acknowledge revision6 with chain [expiry-recurring]. Candidate mints a checkpoint, removes that member and acknowledges revision7. Real preimplementation recorder2026-10-17T23-01-45-479Z-8b3b471a-ffde-44c0-a977-580eac5630ac.json fails the preserved-return assertion before any runtime repair. This is genuine runtime RED, distinct from previous fixture-boundary diagnosis. Later source review finds no causal Done observation in the retained old journal; dates alone cannot establish chronology."
+    },
+    "offchainSourceRed": {
+      "record": "2026-10-17T23-06-47-563Z-b5787898-f6bf-45b0-b049-f7119624d21f.json",
+      "failure": "Actual immutable afterDoneRaw already excludes the completed member, but the first broad ambiguity predicate withheld its required startup checkpoint. This genuine narrowing RED precedes the source.chain-membership condition. Returned-source controls still held safely. Final predicate requires a retained possibly returned member; no clock inference is used."
+    },
+    "integrationEvidence": {
+      "commit": "dd4300a5d0d29529a1302920e86741201ad4d183",
+      "merge": "4649297",
+      "preserved": "Exact P0 predecessor-safe worker implementation, sessionUsed guards, original reproduction and replacement assertions/FAQ remain. Both original rationale records are retained. Conflicts resolved by retaining both risk inventories and player outcomes; fingerprints regenerated after preflight. Denied same-worker Chrome FAQ audit remains an independent release hold; this worker did not satisfy or bypass it."
+    }
+  },
+  {
+    "comparison": "completion168CombinedRepairsIncremental",
+    "baseCommit": "3b7f5ca582179e6811eb3c005a3f51bbf19035d5",
+    "testChangesSha256": "e572f260cbcb56f67b8f56782d7afcd4691c857758862c58080882fd2220542e",
+    "reason": "Preserve actual normally published released Start returns by conservatively holding ambiguous eventless completion sources before checkpointing, adoption or publication. Extend the real immutable producer consumer across cloud, fallback, IndexedDB, startup, Import and Restore without removing existing assertions.",
+    "previousBehavior": "The checkpoint invented a resolution for an old Start with no durable completion-observation witness, silently dropping its real returned member and acknowledging the changed cloud chain.",
+    "intendedBehavior": "Ambiguous legacy Start/completion order explicitly holds exact local and cloud sources and newer drafts, without fabricated action chronology or rating replay. Modern observed returns, Undo and ordinary unambiguous legacy recovery remain supported.",
+    "replacementTests": [
+      "RISK legacy completion released Start: normally acknowledged expired return is preserved or explicitly held before rewrite"
+    ],
+    "preservedCoverage": [
+      "All prior lifecycle, clock-skew, unaware Dot/Start, learning, deletion, explicit early return, replacement/Undo, source safety, account race and released-client hold assertions remain. No test or assertion is deleted or waived.",
+      "The previous two broad-run REDs and controlled fixture-boundary evidence remain recorded separately; this runtime RED is not attributed to those fixture failures."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo $PWD --evidence-dir /Users/emeraldpham/.codex/task-artifacts/completion-precedence-168/released-start-repair --purpose preimplementation-red -- node --test --test-name-pattern='^RISK legacy completion released Start:' tests.js",
+      "failure": "At de4 runtime, actual immutable bd84 Start, Evergreen Done, rest expiry, actual offered Start and independent title Save normally acknowledge revision6 with chain [expiry-recurring]. Candidate mints a checkpoint, removes that member and acknowledges revision7. Real preimplementation recorder2026-10-17T23-01-45-479Z-8b3b471a-ffde-44c0-a977-580eac5630ac.json fails the preserved-return assertion before any runtime repair. This is genuine runtime RED, distinct from previous fixture-boundary diagnosis. Later source review finds no causal Done observation in the retained old journal; dates alone cannot establish chronology."
+    },
+    "releasedStartEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo $PWD --evidence-dir /Users/emeraldpham/.codex/task-artifacts/completion-precedence-168/released-start-repair --purpose preimplementation-red -- node --test --test-name-pattern='^RISK legacy completion released Start:' tests.js",
+      "failure": "At de4 runtime, actual immutable bd84 Start, Evergreen Done, rest expiry, actual offered Start and independent title Save normally acknowledge revision6 with chain [expiry-recurring]. Candidate mints a checkpoint, removes that member and acknowledges revision7. Real preimplementation recorder2026-10-17T23-01-45-479Z-8b3b471a-ffde-44c0-a977-580eac5630ac.json fails the preserved-return assertion before any runtime repair. This is genuine runtime RED, distinct from previous fixture-boundary diagnosis. Later source review finds no causal Done observation in the retained old journal; dates alone cannot establish chronology."
+    },
+    "offchainSourceRed": {
+      "record": "2026-10-17T23-06-47-563Z-b5787898-f6bf-45b0-b049-f7119624d21f.json",
+      "failure": "Actual immutable afterDoneRaw already excludes the completed member, but the first broad ambiguity predicate withheld its required startup checkpoint. This genuine narrowing RED precedes the source.chain-membership condition. Returned-source controls still held safely. Final predicate requires a retained possibly returned member; no clock inference is used."
+    },
+    "integrationEvidence": {
+      "commit": "dd4300a5d0d29529a1302920e86741201ad4d183",
+      "merge": "4649297",
+      "preserved": "Exact P0 predecessor-safe worker implementation, sessionUsed guards, original reproduction and replacement assertions/FAQ remain. Both original rationale records are retained. Conflicts resolved by retaining both risk inventories and player outcomes; fingerprints regenerated after preflight. Denied same-worker Chrome FAQ audit remains an independent release hold; this worker did not satisfy or bypass it."
+    }
+  },
+  {
+    "testChangesSha256": "73fd5897879b64b663b8decd6e312f873ba91e74233fb04b49668ec8ddcef444",
+    "reason": "Preserve actual normally published released Start returns by conservatively holding ambiguous eventless completion sources before checkpointing, adoption or publication. Extend the real immutable producer consumer across cloud, fallback, IndexedDB, startup, Import and Restore without removing existing assertions.",
+    "previousBehavior": "The checkpoint invented a resolution for an old Start with no durable completion-observation witness, silently dropping its real returned member and acknowledging the changed cloud chain.",
+    "intendedBehavior": "Ambiguous legacy Start/completion order explicitly holds exact local and cloud sources and newer drafts, without fabricated action chronology or rating replay. Modern observed returns, Undo and ordinary unambiguous legacy recovery remain supported.",
+    "replacementTests": [
+      "RISK legacy completion released Start: normally acknowledged expired return is preserved or explicitly held before rewrite"
+    ],
+    "preservedCoverage": [
+      "All prior source, device-write, cloud payload, lifecycle fact, rating, learning, History, Undo, account, and chain-member assertions remain. The stale-source paint assertion is now non-vacuous because an actual independent title edit requires adoption.",
+      "The exact device and cloud publication checks remain; #175 replaces only fixed-delay readiness assumptions with the existing durable saved-view acknowledgement helper.",
+      "The selected inherited cohort remains 118 top-level tests and 199 tests including subtests, with 199 passed and zero failed or skipped; the copy expected-RED tests were deliberately excluded from that run and are verified separately.",
+      "The actual mounted FAQ and Changelog consumers, existing Quick start length check, Retry/Undo copy checks and unrelated help structure remain covered.",
+      "All existing passing source, device, fact, rating, Undo, account, title, cloud and FAQ assertions remain unchanged. The immutable bd84 producer performs actual Dot, editor Done, title Save and expired stale replay; no modern action rows are removed to simulate legacy data.",
+      "New consumer captures every scanner replacement and primary write, requires both literal backups before every overwrite, retains original facts/ratings/title and newer Add, then verifies exact acknowledged journal and cold reopen after closing the finished original.",
+      "Storage-boundary refusal, silent unverified head-copy write and races on either guarded key must stop immediate adoption/overwrite. Persistent faults hold publication and retain original facts/newer edit; removing the fault permits exact-source-safe retry and coherent ACK.",
+      "The existing #173 upgrade/replacement/retirement/inheritance and immutable released-shell consumers, #169/#170 completion lifecycle, #171 deletion, #172 Undo, corrected #175 replay/ACK fixtures and fallback backup/recovery contracts remain in the focused cohort. IndexedDB storage protocol and UI copy are unchanged.",
+      "Two existing consumers now await the actual asynchronous guarded Import/replacement Undo completion before making their unchanged assertions. This preserves deliberate reopening and zero deferral after replacement Undo; no Restore runtime behavior or assertions are weakened. Focused full-path diagnostics passed before any Restore runtime edit (none was needed).",
+      "Every original full-shell assertion remains, including actual immutable producer and released full HTML/backend, acknowledged checkpoint, unsupported-evidence hold, pending Add, safe-update request and exact unchanged payload/revision. The title now explicitly identifies the same-account precondition; this is the same consumer, not replacement with handcrafted unsupported data.",
+      "New preconditions assert actual producer owner, baseline/event owners, candidate supported evidence, an actual startup checkpoint, successful real persist, exact candidate/cloud payload, advanced acknowledged revision, matching candidate syncRev and exact durable journal. Dirty false alone is not accepted publication evidence.",
+      "Public real-backend push/pull wrappers record the immutable old shell actual stale CAS conflict and subsequent pull. The complete allocated rules cohort retains all other owner/rules/immutable-generation/capability and mixed-client assertions.",
+      "index.html, sw.js, cloud/device protocol and fingerprints remain byte-identical to3da524b. No runtime repair, capability/rules change, app hash refresh, assertion weakening, arbitrary delay, full suite or browser is included.",
+      "All original assertion text in the14 changed fixture blocks remains; added checks strengthen transport/knowledge/ACK non-vacuity. Actual editor Done, Dot, opposite No, Start, Undo, source replay, immutable facts/time/owners, learning/ratings/History, chain/render, production device-head and cold-reopen contracts remain. Two titles now explicitly identify observed completion and acknowledged return; the risk map matches.",
+      "Dot collects every before/after scanner row. Completion knowledge is set before returning a valid completion-bearing pull response to the application, also latches current and known-cloud evidence, and never resets. No known-completion paint is cleared, filtered by membership outcome, or excluded after observation; every app must produce checked postknowledge paint. A real open/close disclosure is rendered while delivery is held and normal saves continue.",
+      "A controlled real push contains both new return/Done IDs while local dirty/inFlight remains true and the remote has neither. Releasing transport must produce an exact coherent device/cloud acknowledgement via the existing helper before all original cloud assertions. There is no arbitrary delay bump or active autosave suppression.",
+      "The audit is limited to14 newly added #168 fixtures, listed in fixtureAudit. Existing deliberately pending/error/blocked-operation checks remain; older unrelated baseline tests are unchanged. Shared helper, runtime, rules, capability, FAQ/copy and app/SW fingerprint bytes are unchanged.",
+      "Original root3da and worker3b full-suite failures, passing isolated runs, failed diagnostic preparations and controlled transport records remain immutable. Controlled fixture classification does not establish the original personal incident root cause or claim a runtime repair. Parent owns the next full suite/CI/browser/release after this candidate freezes.",
+      "All prior lifecycle, clock-skew, unaware Dot/Start, learning, deletion, explicit early return, replacement/Undo, source safety, account race and released-client hold assertions remain. No test or assertion is deleted or waived.",
+      "The previous two broad-run REDs and controlled fixture-boundary evidence remain recorded separately; this runtime RED is not attributed to those fixture failures."
+    ],
+    "redEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo $PWD --evidence-dir /Users/emeraldpham/.codex/task-artifacts/completion-precedence-168/released-start-repair --purpose preimplementation-red -- node --test --test-name-pattern='^RISK legacy completion released Start:' tests.js",
+      "failure": "At de4 runtime, actual immutable bd84 Start, Evergreen Done, rest expiry, actual offered Start and independent title Save normally acknowledge revision6 with chain [expiry-recurring]. Candidate mints a checkpoint, removes that member and acknowledges revision7. Real preimplementation recorder2026-10-17T23-01-45-479Z-8b3b471a-ffde-44c0-a977-580eac5630ac.json fails the preserved-return assertion before any runtime repair. This is genuine runtime RED, distinct from previous fixture-boundary diagnosis. Later source review finds no causal Done observation in the retained old journal; dates alone cannot establish chronology."
+    },
+    "coverageChronology": {
+      "fixtureLifecycle": "The producer must prove exact guarded device bytes and complete acknowledgement before close; only a finished producer’s own app/cloud timers and device store are disposed before cold reopen. Active recovery autosave remains enabled.",
+      "renderedCopy": "The mounted FAQ and Changelog RED was recorded before index.html edits. The concise changelog outcome and FAQ wording preserve unrelated content and stay within the existing 130-word answer cap.",
+      "inheritedCohort": "The 199 passing cases are a selected inherited cohort, not a full-suite result. All original failed evidence remains unchanged; fixture corrections do not get relabeled as product REDs.",
+      "finalReviewRepair": "Original #169–#175 chronology above remains intact. Independent Spec reproduced the source loss at69f5; the new repository consumer RED was recorded before runtime repair. Subsequent safety coverage and its GREEN-stage failure are explicitly separate. Final worker receipt is review-repair/implementation.md.",
+      "realBackendRules": "The first actual rules execution occurred at3da524b and failed this account precondition, not runtime. Preserve that failure, the diagnostic reproduction, correction and final allocated actual-rules result. All prior169–175/review chronology above remains intact.",
+      "fixtureBoundaryRepair": "After clean3b rules/compatibility GREEN, two different broad runs failed before confirmed completion observation/publication. The existing tight two-consumer loop passed in isolation, then controlled external transport reproduced both assertions with explicit actual knowledge/ACK evidence. Parent accepted fixture-only classification. All original historical169–175, source-safety, account-precondition and withdrawn fixture chronology above remains unchanged; no new runtime defect is claimed."
+    },
+    "comparison": "completion168CombinedCommittedPreflightAggregate",
+    "comparisonBase": "bd84e5c0ccc7c6ebe065f42f18df34d89eeab14e",
+    "reviewRepairEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo $PWD --evidence-dir /Users/emeraldpham/.codex/task-artifacts/completion-precedence-168/review-repair/runs --purpose preimplementation-red -- node --test --test-name-pattern='^RISK legacy completion divergent sources:' tests.js",
+      "failure": "On clean69f5 before runtime repair, the actual immutable legacy producer supplied distinct guarded disk/head payloads. Production persist correctly retained one chain member and a newer open Add, but the exact incoming revived raw was absent from backups. All six captured primary writes lacked both exact source backups. Record2026-10-17T22-20-34-181Z-b9a18714-dbed-4bd3-af52-10555e7a0415.json retains the assertion failure. Follow-up safety coverage then exposed unverified backup-index retention before the narrow readback guard, record2026-10-17T22-21-35-003Z-db360f94-ce89-4223-b912-cb4ebe8cb686.json; that GREEN-stage record also contains overly strict post-cloud-retry expectations subsequently corrected without weakening original passing assertions."
+    },
+    "regressionRepairEvidence": {
+      "fullSuite": "/Users/emeraldpham/.codex/task-artifacts/completion-precedence-168/final-gates/2026-10-17T22-12-14-608Z-bd4ba324-1379-42a5-b7d7-b1df870b4894.json",
+      "focusedBeforeRepair": "/Users/emeraldpham/.codex/task-artifacts/completion-precedence-168/review-repair/runs/2026-10-17T22-24-05-038Z-6c579093-2e49-42e4-a6e6-524975a3d1ab.json",
+      "classification": "The five failures are two completion-boundary fixture mismatches (Import and replacement Undo assertions preceded their guarded async return) and three real protected-copy regressions after the #175 trim. All five existing assertions are preserved. Only awaited real operations and exact short FAQ phrases change; no synchronous safety bypass or Restore runtime repair.",
+      "awaitedOperationDiagnostic": "/Users/emeraldpham/.codex/task-artifacts/completion-precedence-168/review-repair/runs/2026-10-17T22-24-31-304Z-4db5c5ff-3e07-420e-8f79-745d8a08f996.json",
+      "copy": "Restored keeping unrelated decisions and opening Settings does not delete it while retaining the more-than-seven-days cue and <=130-word answer contract."
+    },
+    "awarenessFaqEvidence": {
+      "redLog": "/Users/emeraldpham/.codex/task-artifacts/completion-precedence-168/review-repair/awareness-faq-red.log",
+      "command": "node scripts/agent-tools/record-run.mjs --repo $PWD --evidence-dir /Users/emeraldpham/.codex/task-artifacts/completion-precedence-168/review-repair/runs --purpose preimplementation-red -- node --test --test-name-pattern='^RISK completion awareness FAQ:' tests.js",
+      "failure": "The mounted conflicting-choices answer lacked the explicit rule that an unaware device Dot cannot return completed work even with a later clock/upload, while its comparison still counts toward ratings. Recorded before modifying this answer; other review repairs were already in the draft.",
+      "greenLog": "/Users/emeraldpham/.codex/task-artifacts/completion-precedence-168/review-repair/awareness-faq-green.log",
+      "copy": "The conflict answer now states the lifecycle exception in plain task/chain language. The separate older-completion answer already says After seeing a completion and retains permitted eligible Dot/Yes/Start. Every answer stays <=130 words."
+    },
+    "greenEvidence": "/Users/emeraldpham/.codex/task-artifacts/completion-precedence-168/review-repair/runs/2026-10-17T22-26-16-587Z-6b82519e-6f97-4723-b9c4-8dd69fae7881.json (frozen source/test affected cohort:135 top-level/181 cases,181 passed,zero failed/skipped). After a one-word singular-backup grammar clarification and final fingerprint refresh, final source safety/FAQ/hash/#174 cohort review-repair/runs/2026-10-17T22-28-18-451Z-df0e7459-bd59-4058-a6ce-feeabab11321.json passes23/23. Final Undo answer130 words; conflict answer109; older-completion answer97.",
+    "validationLimits": "No final full suite, emulator/rules/compatibility, browser, CI, independent approval or release by this worker; parent owns those gates. Preserved changing-draft attempt22:25:14 had a live-file/module-loaded risk inventory mismatch and is not accepted final evidence. FAQ, test and runtime content froze before the181-case final cohort; only generated app/cache fingerprints changed afterward, then their final checks passed. The final one-word singular-backup grammar adjustment was followed by renewed preflight, final hash generation and the23-case packaged cohort; no runtime/test logic changed after the181-case run.",
+    "rulesFixtureRepairEvidence": {
+      "command": "Parent final rules record final-gates/2026-10-17T22-31-14-185Z-30537bdf-7c04-4b90-85f1-36cfed2b9afb.json; scoped actual diagnostic: node scripts/agent-tools/record-run.mjs --repo $PWD --evidence-dir /Users/emeraldpham/.codex/task-artifacts/completion-precedence-168/rules-repair --purpose preimplementation-red -- node /Users/emeraldpham/.codex/task-artifacts/completion-precedence-168/run-emulator-gate.mjs rules",
+      "failure": "Original rules gate10 cases:9 pass/1 fail/zero skips at the real acknowledged completion-boundary assertion, before old full-shell exercise. Scoped diagnostic record2026-10-17T22-32-31-294Z-f9a7b5ac-0550-437c-ba7a-ea49da9a8f31.json reproduces account mismatch: producer/baseline owner@example.test, authenticated/seed e@example.com, decision-account-mismatch, zero candidate/acknowledged checkpoints. This is a fixture precondition failure, not product runtime RED; the diagnostic test-only edit preceded fixture correction."
+    },
+    "rulesFixtureGreenEvidence": "/Users/emeraldpham/.codex/task-artifacts/completion-precedence-168/rules-repair/2026-10-17T22-34-09-960Z-f3d90352-b953-4b9c-a9bd-7dea1d0fe808.json (final owned-source full-shell test and complete allocated rules cohort:10 cases,10 pass,0 fail,0 skip; normal emulator shutdown/release). Earlier actual corrected-source10/10:2026-10-17T22-33-23-993Z-596d1e81-eb76-445f-8b8d-794fd558368a.json.",
+    "fixtureBoundaryEvidence": {
+      "command": "Original broad records: final-gates/2026-10-17T22-31-14-185Z-4ebd429b-d7a4-49fc-9f52-0517d824016c.json and final-gates-worker/2026-10-17T22-36-55-833Z-4d6b88d2-ff47-4060-854d-06d822184162.json. Fast controlled loop: node scripts/agent-tools/record-run.mjs --repo $PWD --evidence-dir /Users/emeraldpham/.codex/task-artifacts/completion-precedence-168/fixture-boundaries --purpose later-baseline-sensitivity -- node --test --test-name-pattern='^RISK completion lifecycle Dot: unseen Dot|^RISK scoped Undo recovery: Undo of an informed evergreen' tests.js",
+      "failure": "Root3da completion-first/+100 failed the original every-reconciliation-paint assertion; worker3b failed final nextReturn/laterCompletion remote-journal presence. Controlled record2026-10-17T22-49-38-836Z-6b03c973-5a8e-4cde-9025-480a3fb50899.json reproduces both original assertions: Dot rows2/3 have no current/delivered/known-cloud completion and precede delivery4, with zero bad known rows; held Undo publication remains local dirty/inFlight at rev13 with both pending IDs absent remotely, then release ACK14 contains both. These are observed fixture-boundary failures, not product runtime RED."
+    },
+    "fixtureAudit": {
+      "scope": "Only newly added168 consumers; older unrelated baseline tests are unchanged.",
+      "changedTests": [
+        "RISK legacy completion return: imported boundary survives replay while actual Dot Done Undo and exact cloud acknowledgement remain meaningful",
+        "RISK legacy completion inheritance: consented Import retains lifecycle authority independently of embodied learning",
+        "RISK legacy completion recovery safety: failed exact-source backup holds startup and guarded recovery without losing a newer edit",
+        "RISK legacy completion released shell: actual stale write conflicts then holds unknown authority and its pending edit for safe update",
+        "RISK legacy completion guest adoption: actual modern guest Done remains observable and Undoable after first empty-account sign-in",
+        "RISK scoped Undo recovery: a true Undo cancels only its compound Dot while peer completion and learning remain",
+        "RISK scoped Undo recovery: Undo of an informed evergreen return survives older source and permits an acknowledged later return",
+        "RISK deletion authority: real Delete defeats a stale saved and cloud Dot after log pruning while same-title Add stays usable",
+        "RISK deletion authority: Clear history retries and pruned stale delivery retain ordinary deletion and evergreen completion separately",
+        "RISK completion lifecycle Start: an observed new-pass root survives peer merge and IndexedDB reopen",
+        "RISK completion lifecycle Start: an unaware pass root cannot bypass completion in either publication order",
+        "RISK completion lifecycle Dot: unseen Dot and opposite No keep learning while observed completion owns membership",
+        "RISK completion lifecycle return: observed Dot and next Done survive stale delivery and IndexedDB reopen",
+        "RISK completion boundaries: failed read stays pending and wake exactly acknowledges an uncertain completion publication"
+      ],
+      "detailedEvidence": "/Users/emeraldpham/.codex/task-artifacts/completion-precedence-168/fixture-boundaries/changed-fixtures-final.json",
+      "knowledgeCapture": "The unaware Start, unseen Dot and observed-return/next-Done fixtures latch actual completion-bearing response delivery before application continuation and retain both before/after observations. Other changed sites replace fixed successful source/ACK waits with existing bounded coherent publication."
+    },
+    "fixtureBoundaryGreenEvidence": "/Users/emeraldpham/.codex/task-artifacts/completion-precedence-168/fixture-boundaries/2026-10-17T22-56-49-344Z-5dbcdf99-a421-44d8-a64f-30821ed60628.json (verified final scoped source cohort45 top-level/80 cases,80 pass,zero fail/skip). Earlier affected cohortscc4911cb and7d61f9f3 also80/80; the controlled two-consumer loop passes10/10 after correction.",
+    "baseCommit": "bd84e5c0ccc7c6ebe065f42f18df34d89eeab14e",
+    "releasedStartEvidence": {
+      "command": "node scripts/agent-tools/record-run.mjs --repo $PWD --evidence-dir /Users/emeraldpham/.codex/task-artifacts/completion-precedence-168/released-start-repair --purpose preimplementation-red -- node --test --test-name-pattern='^RISK legacy completion released Start:' tests.js",
+      "failure": "At de4 runtime, actual immutable bd84 Start, Evergreen Done, rest expiry, actual offered Start and independent title Save normally acknowledge revision6 with chain [expiry-recurring]. Candidate mints a checkpoint, removes that member and acknowledges revision7. Real preimplementation recorder2026-10-17T23-01-45-479Z-8b3b471a-ffde-44c0-a977-580eac5630ac.json fails the preserved-return assertion before any runtime repair. This is genuine runtime RED, distinct from previous fixture-boundary diagnosis. Later source review finds no causal Done observation in the retained old journal; dates alone cannot establish chronology."
+    },
+    "integrationEvidence": {
+      "commit": "dd4300a5d0d29529a1302920e86741201ad4d183",
+      "merge": "4649297",
+      "preserved": "Exact P0 predecessor-safe worker implementation, sessionUsed guards, original reproduction and replacement assertions/FAQ remain. Both original rationale records are retained. Conflicts resolved by retaining both risk inventories and player outcomes; fingerprints regenerated after preflight. Denied same-worker Chrome FAQ audit remains an independent release hold; this worker did not satisfy or bypass it."
     }
   }
 ]
