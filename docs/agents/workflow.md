@@ -8,7 +8,7 @@ claim a skill was read when it was not. Load only the skill relevant to the task
 
 ## Choose the next workflow
 
-| Task | Read from the installed skills directory | Completion boundary |
+| Task | Read next | Completion boundary |
 | --- | --- | --- |
 | Edit agent guidance | `productivity/writing-for-agents/SKILL.md` | Clear trigger pointers, one authority per rule, all existing requirements traced |
 | Build a bounded feature or fix | `engineering/implement/SKILL.md`, `engineering/tdd/SKILL.md`, its `tests.md` and `mocking.md` | Agreed behavior, observed behavioral RED, minimal implementation, GREEN, applicable review |
@@ -19,6 +19,7 @@ claim a skill was read when it was not. Load only the skill relevant to the task
 | Review changed code | `engineering/code-review/SKILL.md` | Pin base/candidate; report Standards and Spec separately; preserve independent review |
 | Write a PR | `engineering/pr/SKILL.md` | Concise scope, actual evidence, merge danger and unresolved gates |
 | Configure engineering skills | `engineering/setup-matt-pocock-skills/SKILL.md` | User decides tracker/labels; review concrete draft before setup writes |
+| Produce or manage agent evidence | [Agent evidence tools](agent-evidence.md) | Use the guide for the evidence task and keep each tool's coverage limits visible |
 
 Skill instructions operate within explicit user authorization and repository
 restrictions. A skill's recommendation to publish tickets, create labels, call

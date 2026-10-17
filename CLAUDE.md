@@ -13,6 +13,8 @@ Domain docs: single-context; see [domain rules](docs/agents/domain.md) before ex
 Before publishing or triaging issues/specs, read the
 [GitHub tracker](docs/agents/issue-tracker.md) and
 [triage labels](docs/agents/triage-labels.md).
+For command-line evidence collection, coordination, audits, or CI/PR automation,
+use [agent evidence tools](docs/agents/agent-evidence.md).
 
 ## Test-first and regression
 
