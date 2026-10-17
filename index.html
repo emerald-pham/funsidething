@@ -3249,6 +3249,8 @@ async function sendPush(){
       state.updatedAt=Date.now(); recomputeRanks(); render();
       toast("A missing task was kept before cloud sync.", 6000);
     }
+    const decisionIssue=decisionEvidenceIssue(state,pushAccount);
+    if(decisionIssue){cloudAdoptionHeld=true;reportCloudReconcileError(decisionIssue);return;}
     let payload = cloudPayload();
     if(payload === lastPushed) return;      // nothing actually changed
     // A cloud write is not allowed to outrun its device-local safety copy.
@@ -3384,6 +3386,43 @@ function bindDecisionBase(account,revision,payload){
   if(JSON.stringify(state.decisionBase)===JSON.stringify(next))return false;
   state.decisionBase=next;
   return true;
+}
+function conflictingDecisionEvidence(...boards){
+  const canonical=value=>Array.isArray(value)?value.map(canonical):value && typeof value==="object"
+    ? Object.fromEntries(Object.keys(value).sort().map(key=>[key,canonical(value[key])])) : value;
+  const identities=new Map();
+  for(const board of boards)for(const event of Array.isArray(board?.decisionEvents)?board.decisionEvents:[]){
+    if(typeof event?.id!=="string")continue;
+    const bytes=JSON.stringify(canonical(event));
+    if(identities.has(event.id) && identities.get(event.id)!==bytes)return true;
+    identities.set(event.id,bytes);
+  }
+  return false;
+}
+function supportedRecoveryNoEvent(event){
+  const text=value=>typeof value==="string" && !!value;
+  const ids=value=>Array.isArray(value) && value.every(text);
+  return !!event && typeof event==="object" && !Array.isArray(event) && event.v===1 && text(event.id)
+    && Number.isFinite(event.at) && event.at>=0 && (event.account===null || text(event.account))
+    && (event.baseId===null || text(event.baseId)) && text(event.passId)
+    && Number.isFinite(event.passAt) && event.passAt>=0 && text(event.scanMode) && ids(event.observedActionIds)
+    && event.kind==="no" && event.meaning==="benchmark-preferred" && text(event.candidateId) && text(event.benchmarkId)
+    && ids(event.chainIds) && ids(event.candidateContextIds) && ids(event.benchmarkContextIds);
+}
+function decisionEvidenceIssue(board,account){
+  if(conflictingDecisionEvidence(board))return "conflicting-decision-evidence";
+  if(Object.hasOwn(board,"decisionBaseline")){
+    const baseline=board.decisionBaseline;
+    if(typeof supportedDecisionBaseline!=="function" || !supportedDecisionBaseline(baseline))return "unsupported-decision-evidence";
+    if(baseline.account!==null && baseline.account!==account)return "decision-account-mismatch";
+  }
+  if(Object.hasOwn(board,"decisionEvents") && (!Array.isArray(board.decisionEvents) || board.decisionEvents.some(event=>
+    !(typeof supportedDecisionEvent==="function" ? supportedDecisionEvent(event) : supportedRecoveryNoEvent(event)))))return "unsupported-decision-evidence";
+  if(Object.hasOwn(board,"decisionEventsRecovery") && (!Array.isArray(board.decisionEventsRecovery) || board.decisionEventsRecovery.length))
+    return "unsupported-decision-evidence";
+  if(Array.isArray(board.decisionEvents) && board.decisionEvents.some(event=>event.account!==null && event.account!==account))
+    return "decision-account-mismatch";
+  return null;
 }
 function persistedDecisionAncestor(account,revision){
   const base=state?.decisionBase;
@@ -3542,6 +3581,13 @@ async function cloudPull(){
       return;
     }
     const switchedAccount = state.syncAccount != null && state.syncAccount !== acct;
+    const decisionIssue=(haveRemote && decisionEvidenceIssue(remoteState,acct)) || (!switchedAccount && decisionEvidenceIssue(state,acct));
+    // Unknown authority cannot be projected coherently. Keep both exact copies
+    // where they already live until a compatible app can understand them.
+    if(decisionIssue){reportCloudReconcileError(decisionIssue);return;}
+    if(!switchedAccount && haveRemote && conflictingDecisionEvidence(state,remoteState)){
+      reportCloudReconcileError("conflicting-decision-evidence");return;
+    }
     // A board whose exact payload is already confirmed in its old account's
     // cloud only needs the normal seven-day safety copy. Unsynced work must
     // survive until the user deliberately clears its recovery copy.
@@ -7966,7 +8012,7 @@ if(configured){
           tx.update(ref,{state:"sealed",sealedAt:F.serverTimestamp()});return {...current,state:"sealed"};
         });
       },
-      async publishGeneration(uid,id,{baseRev,updatedAt,stillCurrent}){
+      async publishGeneration(uid,id,{baseRev,updatedAt,stillCurrent,decisionCapability}){
         return F.runTransaction(db,async tx=>{
           const root=rootRef(uid),generation=generationRef(uid,id);
           const [rootSnapshot,generationSnapshot]=await Promise.all([tx.get(root),tx.get(generation)]);
@@ -7978,6 +8024,9 @@ if(configured){
           const next={schemaVersion:2,rev:revision+1,activeGeneration:id,
             previousGeneration:current?.schemaVersion===2?current.activeGeneration:null,
             updatedAt:Number.isFinite(updatedAt)?Math.trunc(updatedAt):Date.now(),serverUpdatedAt:F.serverTimestamp()};
+          // Once authority is published, fixed-manifest historical writers must
+          // take their established safe-update hold instead of erasing it.
+          if(decisionCapability===1||current?.decisionCapability===1)next.decisionCapability=1;
           tx.update(generation,{state:"published",publishedAt:F.serverTimestamp()});
           tx.set(root,next);return {ok:true,rev:next.rev};
         });

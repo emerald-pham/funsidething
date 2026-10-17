@@ -1201,3 +1201,18 @@ Protect warm crowd reuse, exact reordered and evicted gait reconstruction, aggre
 - `RISK wheeled shadow FAQ: guidance describes complete vehicle shade and body occlusion`
 
 Protect full bicycle and scooter silhouettes, fixed tire contacts, shared solar rays, one opacity mask, and mobile bodies above ground shadows.
+
+## Decision authority recovery and mixed-client rollout (#146)
+
+- `RISK decision capability adapter: first decision activates a sticky fence while plain legacy boards remain compatible`
+- `RISK decision capability baseline: sole unknown learned authority activates the fence without rewriting bytes`
+- `RISK decision recovery: unknown cloud evidence holds adoption and publication without replacing the durable local decision`
+- `RISK decision recovery baseline: unsupported sole learning baseline cannot replace a durable local action`
+- `RISK decision recovery identity: conflicting bytes for one acknowledged action hold both exact branches`
+- `RISK decision recovery shape: malformed known action evidence stays durable and cannot publish`
+- `RISK decision recovery ownership: foreign action evidence cannot be published under the current account`
+- `RISK decision recovery durability: failed local save holds publication and retry retains one original No`
+- `RISK decision recovery uncertain acknowledgement: committed No is read back after cold reopen without another comparison`
+- `RISK decision recovery account transition: pending No acknowledgement cannot enter another account and the exact prior board stays recoverable`
+
+Protect conditional decision-capability activation, ordinary pinned-client compatibility, exact unknown/foreign/colliding evidence holds, mandatory local saves, original action identity through uncertain acknowledgement and cold reopen, and account-bound late replies. Firestore rules consumers additionally execute the immutable historical backend and full application, activation CAS, historical safe-update holds, and rules-first rollout.

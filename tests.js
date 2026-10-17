@@ -2973,7 +2973,7 @@ function makeDomShim({ prefersDark = false, sharedStorage = null } = {}) {
 
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
-async function loadApp({ seed, cloudSyncFactory, prefersDark = false, noMatchMedia = false, seedStorage, sharedStorage, hostStorage, hostStorageDelayMs = 0, beforeStateReady, cryptoProvider = webcrypto, indexedDBProvider, deviceDbName, deviceOpenTimeoutMs, withSceneModules = false, sceneModulesAfterDomReady = false } = {}) {
+async function loadApp({ appSource=appSrc, seed, cloudSyncFactory, prefersDark = false, noMatchMedia = false, seedStorage, sharedStorage, hostStorage, hostStorageDelayMs = 0, beforeStateReady, cryptoProvider = webcrypto, indexedDBProvider, deviceDbName, deviceOpenTimeoutMs, withSceneModules = false, sceneModulesAfterDomReady = false } = {}) {
   const shim = makeDomShim({ prefersDark, sharedStorage });
   if (noMatchMedia) delete shim.window.matchMedia;   // old browser / bare JS host
   if (seedStorage) for (const [k, v] of Object.entries(seedStorage)) shim.localStorage.setItem(k, v);
@@ -3045,7 +3045,7 @@ async function loadApp({ seed, cloudSyncFactory, prefersDark = false, noMatchMed
   };
   if (withSceneModules && !sceneModulesAfterDomReady) installSceneModules()();
   if (sceneModulesAfterDomReady) shim.document.readyState = "loading";
-  vm.runInContext(appSrc, sandbox, { filename: "index.html#app" });
+  vm.runInContext(appSource, sandbox, { filename: "index.html#app" });
   beforeStateReady?.(sandbox, shim);
   if (sceneModulesAfterDomReady) {
     await flush(); // the inline boot script can resume before deferred modules execute
@@ -8146,7 +8146,7 @@ test("applyTheme: a host with no documentElement is a safe no-op", async () => {
     confirm: () => true, alert: () => {}, prompt: () => null,
   };
   vm.createContext(sandbox);
-  vm.runInContext(appSrc, sandbox, { filename: "index.html#app" });
+  vm.runInContext(appSource, sandbox, { filename: "index.html#app" });
   await flush();
   assert.doesNotThrow(() => sandbox.setTheme("dark"));
 });
@@ -9335,7 +9335,7 @@ test('CLOUD ACCOUNT: a transaction binds its document before auth can switch', (
   assert.match(push,/const pushUser\s*=\s*auth\.currentUser/);
   assert.match(push,/const pushUid\s*=\s*pushUser\.uid/);
   assert.match(html,/const rootRef=uid=>F\.doc\(db,"users",uid\)/);
-  assert.match(html,/publishGeneration\(uid,id,\{baseRev,updatedAt,stillCurrent\}\)/);
+  assert.match(html,/publishGeneration\(uid,id,\{baseRev,updatedAt,stillCurrent,decisionCapability\}\)/);
   assert.match(html,/if\(stillCurrent&&!stillCurrent\(\)\)return \{cancelled:true\}/,'the manifest transaction rechecks identity after its reads');
   assert.match(push,/stillCurrent:\(\)=>auth\.currentUser\?\.uid===pushUid&&operation===pushOperation/);
   assert.match(push,/auth\.currentUser\?\.uid\s*!==\s*pushUid/,'a late result from an earlier account cannot change current cloud status');
@@ -9403,6 +9403,30 @@ async function loadCloudBackendV2({rootData=null,batchFailureAt=Infinity,failure
   emitSnapshot(entry,data,{fromCache=false,hasPendingWrites=false}={}){entry.next({exists:()=>data!==null,data:()=>clone(data),metadata:{fromCache,hasPendingWrites}});},
   emitAuth(user){auth.currentUser=user;authListener?.(user);}};
 }
+
+test('RISK decision capability adapter: first decision activates a sticky fence while plain legacy boards remain compatible',async()=>{
+ const h=await loadCloudBackendV2({timeoutMs:5000});
+ const plain=JSON.stringify({tasks:[{id:'legacy',mu:31,sigma:5}],futureEvidence:{opaque:'keep'}});
+ assert.equal((await h.CS.push(plain,1,0)).ok,true);
+ assert.equal(Object.hasOwn(h.docs.get('users/owner'),'decisionCapability'),false,'ordinary boards retain the historical manifest');
+ const decision=JSON.stringify({...JSON.parse(plain),decisionEvents:[{v:1,id:'real-action',at:123,account:'owner@example.test',kind:'no'}]});
+ assert.equal((await h.CS.push(decision,2,1)).ok,true);
+ assert.equal(h.docs.get('users/owner').decisionCapability,1,'the first decision must atomically fence metadata-unaware writers');
+ assert.equal((await h.CS.pull()).payload,decision,'the fenced generation remains byte-exactly readable');
+ assert.equal((await h.CS.push(plain,3,2)).ok,true);
+ assert.equal(h.docs.get('users/owner').decisionCapability,1,'deliberate replacement cannot silently remove the writer capability');
+ const unknown=await loadCloudBackendV2({timeoutMs:5000});
+ assert.equal((await unknown.CS.push(JSON.stringify({tasks:[],decisionEvents:{v:99,opaque:'future'}}),1,0)).ok,true);
+ assert.equal(unknown.docs.get('users/owner').decisionCapability,1,'unknown decision evidence also needs the fence');
+});
+
+test('RISK decision capability baseline: sole unknown learned authority activates the fence without rewriting bytes',async()=>{
+ const h=await loadCloudBackendV2({timeoutMs:5000});
+ const payload=JSON.stringify({tasks:[{id:'legacy',mu:40,sigma:4}],decisionBaseline:{v:99,opaque:'sole inherited learning authority'}});
+ assert.equal((await h.CS.push(payload,1,0)).ok,true);
+ assert.equal(h.docs.get('users/owner').decisionCapability,1,'baseline authority requires protection even when the action stream is absent');
+ assert.equal((await h.CS.pull()).payload,payload,'unknown baseline bytes remain exact');
+});
 
 test('RISK CLOUD V2 ADAPTER: production migrates a legacy root to verified chunks and pulls the exact multi-megabyte board',async()=>{
  const legacy=JSON.stringify({tasks:[{id:'legacy'}]}),payload=cloudV2Payload('production');assert.ok(Buffer.byteLength(payload,'utf8')>1048576);
@@ -12246,6 +12270,131 @@ test('RISK comparison replay: compatible frozen learning survives different lega
   try{await fresh.ctx.cloudPull();await syncSettle(30);assert.deepEqual(Array.from(fresh.ctx.state.tasks,task=>[task.id,task.mu,task.sigma]),Array.from(cloud.tasks,task=>[task.id,task.mu,task.sigma]),'a fresh client replays every compatible-baseline action once');}
   finally{await close(fresh);}
  }finally{await close(phone);await close(mac);}
+});
+
+async function decisionRecoveryApp146(){
+ const initial=syncState({tasks:[Object.assign(syncTask('bench','Recovery benchmark'),{mu:35,sigma:7}),syncTask('candidate','Recovery candidate'),Object.assign(syncTask('peer','Peer task'),{done:true,completedAt:100})],chain:['bench'],candidateId:'candidate',considered:{},mode:'scan',scanMode:'descending',passStartedAt:Date.now(),passId:'recovery-pass-146',syncRev:4,syncAccount:'e@example.com',syncDirty:false});
+ const h=makeSyncHarness({remote:initial,rev:4,delayMs:1});
+ const storage=sharedScannerStorage({[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)});
+ const app=await loadApp({sharedStorage:storage,cloudSyncFactory:h.factory});
+ await app.ctx.cloudPull();await syncSettle(15);
+ app.ctx.window.CloudSync.ready=false;
+ app.ctx.renderScan();assert.match(app.shim.document.getElementById('scan').innerHTML,/data-act="no"/);
+ app.ctx.onAction('no',{dataset:{candidate:'candidate',benchmark:'bench'}});
+ assert.equal(await app.ctx.persist(),true);
+ assert.equal(app.ctx.state.decisionEvents.length,1);
+ return {...app,h,storage,event:JSON.parse(JSON.stringify(app.ctx.state.decisionEvents[0]))};
+}
+
+test('RISK decision recovery: unknown cloud evidence holds adoption and publication without replacing the durable local decision',async t=>{
+ const f=await decisionRecoveryApp146();
+ t.after(()=>{f.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',f.ctx);});
+ const saved=f.storage.getItem(SYNC_STORE_KEY),ratings=f.ctx.state.tasks.map(task=>[task.id,task.mu,task.sigma]);
+ const remote={...f.h.remoteState(),decisionEvents:{v:99,opaque:'sole future decision bytes'}};
+ f.h.writeBehindBack(remote);const cloud=f.h.doc.payload;
+ f.ctx.window.CloudSync.ready=true;await f.ctx.cloudPull();await syncSettle(30);
+ assert.equal(JSON.stringify(f.ctx.state.decisionEvents),JSON.stringify([f.event]),'unsupported evidence cannot replace the local action stream');
+ assert.equal(f.storage.getItem(SYNC_STORE_KEY),saved,'held adoption leaves the exact durable decision board intact');
+ assert.deepEqual(f.ctx.state.tasks.map(task=>[task.id,task.mu,task.sigma]),ratings,'unreplayable evidence cannot change effective learning');
+ f.ctx.cloudPushNow();await syncSettle(20);
+ assert.equal(f.h.doc.payload,cloud,'a held unsupported cloud board is never overwritten');
+ assert.equal(f.ctx.window.CloudSync.errorCode,'unsupported-decision-evidence');
+ assert.equal(f.shim.document.getElementById('syncBtn').textContent,'☁ error');
+});
+
+test('RISK decision recovery baseline: unsupported sole learning baseline cannot replace a durable local action',async t=>{
+ for(const baseline of [{v:99,opaque:'sole unsupported learned state'},{v:1,id:'invalid-baseline',account:'e@example.com',ratings:['unreadable rating'],includedActionIds:[],chainIds:[]}])await t.test('version '+baseline.v,async t=>{
+ const f=await decisionRecoveryApp146();
+ t.after(()=>{f.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',f.ctx);});
+ const saved=f.storage.getItem(SYNC_STORE_KEY);
+ f.h.writeBehindBack({...f.h.remoteState(),decisionBaseline:baseline});const cloud=f.h.doc.payload;
+ f.ctx.window.CloudSync.ready=true;await f.ctx.cloudPull();f.ctx.cloudPushNow();await syncSettle(40);
+ assert.equal(JSON.stringify(f.ctx.state.decisionEvents),JSON.stringify([f.event]),'unknown baseline cannot erase supported local decisions');
+ assert.equal(f.storage.getItem(SYNC_STORE_KEY),saved);assert.equal(f.h.doc.payload,cloud);
+ assert.equal(f.ctx.window.CloudSync.errorCode,'unsupported-decision-evidence');
+ });
+});
+
+test('RISK decision recovery identity: conflicting bytes for one acknowledged action hold both exact branches',async t=>{
+ const f=await decisionRecoveryApp146();
+ t.after(()=>{f.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',f.ctx);});
+ const saved=f.storage.getItem(SYNC_STORE_KEY),remote={...f.h.remoteState(),decisionEvents:[{...f.event,at:f.event.at+1}]};
+ f.h.writeBehindBack(remote);const cloud=f.h.doc.payload;
+ f.ctx.window.CloudSync.ready=true;await f.ctx.cloudPull();f.ctx.cloudPushNow();await syncSettle(40);
+ assert.equal(JSON.stringify(f.ctx.state.decisionEvents),JSON.stringify([f.event]),'one identity cannot be silently replaced with a different decision time');
+ assert.equal(f.storage.getItem(SYNC_STORE_KEY),saved);assert.equal(f.h.doc.payload,cloud);
+ assert.equal(f.ctx.window.CloudSync.errorCode,'conflicting-decision-evidence');
+});
+
+test('RISK decision recovery shape: malformed known action evidence stays durable and cannot publish',async t=>{
+ const f=await decisionRecoveryApp146();
+ t.after(()=>{f.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',f.ctx);});
+ f.ctx.state.decisionEvents[0].at=-1;await f.ctx.persist();
+ const saved=f.storage.getItem(SYNC_STORE_KEY),cloud=f.h.doc.payload;
+ f.ctx.window.CloudSync.ready=true;await f.ctx.cloudPull();f.ctx.cloudPushNow();await syncSettle(40);
+ assert.equal(f.h.doc.payload,cloud,'a known kind does not make malformed original-time authority publishable');
+ assert.equal(f.storage.getItem(SYNC_STORE_KEY),saved);assert.equal(f.ctx.window.CloudSync.errorCode,'unsupported-decision-evidence');
+});
+
+test('RISK decision recovery ownership: foreign action evidence cannot be published under the current account',async t=>{
+ const f=await decisionRecoveryApp146();
+ t.after(()=>{f.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',f.ctx);});
+ f.ctx.state.decisionEvents[0].account='another@example.com';await f.ctx.persist();
+ const saved=f.storage.getItem(SYNC_STORE_KEY),remote=f.h.doc.payload;
+ f.ctx.window.CloudSync.ready=true;await f.ctx.cloudPull();f.ctx.cloudPushNow();await syncSettle(50);
+ assert.equal(f.h.doc.payload,remote,'foreign-owned action evidence must never enter this account cloud');
+ assert.equal(f.storage.getItem(SYNC_STORE_KEY),saved,'foreign evidence remains byte-exact for recovery');
+ assert.equal(f.ctx.window.CloudSync.errorCode,'decision-account-mismatch');
+ assert.equal(f.shim.document.getElementById('syncBtn').textContent,'☁ error');
+});
+
+test('RISK decision recovery durability: failed local save holds publication and retry retains one original No',async t=>{
+ const f=await decisionRecoveryApp146();
+ t.after(()=>{f.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',f.ctx);});
+ const saved=f.storage.getItem(SYNC_STORE_KEY),remote=f.h.doc.payload,write=f.storage.setItem;
+ f.storage.setItem=(key,value)=>{if(key===SYNC_STORE_KEY||key===LOCAL_HEAD_KEY)throw Object.assign(Error('isolated quota'),{name:'QuotaExceededError'});return write(key,value);};
+ f.ctx.addTask('Unsaved later edit');f.ctx.window.CloudSync.ready=true;f.ctx.cloudPushNow();await syncSettle(60);
+ assert.equal(f.h.doc.payload,remote,'cloud cannot outrun mandatory local save');assert.equal(f.storage.getItem(SYNC_STORE_KEY),saved,'sole durable No remains intact');
+ assert.equal(JSON.stringify(f.ctx.state.decisionEvents),JSON.stringify([f.event]));assert.equal(f.ctx.state.syncDirty,true);
+ f.storage.setItem=write;assert.equal(await f.ctx.persist(),true);await f.ctx.onAction('sync-retry',{});f.ctx.cloudPushNow();await syncSettle(80);
+ assert.equal(JSON.stringify(f.h.remoteState().decisionEvents),JSON.stringify([f.event]));assert.ok(f.h.remoteState().tasks.some(task=>task.title==='Unsaved later edit'));
+ assert.equal(f.ctx.state.syncDirty,false);assert.equal(f.shim.document.getElementById('syncBtn').textContent,'☁ synced');
+});
+
+test('RISK decision recovery uncertain acknowledgement: committed No is read back after cold reopen without another comparison',async t=>{
+ const f=await decisionRecoveryApp146(),CS=f.ctx.window.CloudSync,basePush=CS.push;
+ t.after(()=>{CS.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',f.ctx);});
+ const ratings=JSON.stringify(f.ctx.state.tasks.map(task=>[task.id,task.mu,task.sigma]));
+ CS.push=async(...args)=>{await basePush(...args);CS.status='error';CS.errorStage='push';CS.errorCode='deadline-exceeded';return {error:true};};
+ CS.ready=true;f.ctx.cloudPushNow();await syncSettle(60);
+ assert.equal(f.ctx.state.syncDirty,true,'lost acknowledgement remains pending');assert.equal(f.shim.document.getElementById('syncBtn').textContent,'☁ error');
+ assert.equal(JSON.stringify(f.h.remoteState().decisionEvents),JSON.stringify([f.event]));
+ const raw=f.storage.getItem(SYNC_STORE_KEY);CS.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',f.ctx);
+ const reopened=await loadApp({seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw},beforeStateReady:context=>setFakeTime(context,JSON.parse(raw).presentedAt),cloudSyncFactory:f.h.factory});
+ t.after(()=>{reopened.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',reopened.ctx);});
+ await reopened.ctx.cloudPull();await syncSettle(50);
+ assert.equal(JSON.stringify(reopened.ctx.state.decisionEvents),JSON.stringify([f.event]),'identity and original time survive uncertain ACK and cold reopen');
+ assert.equal(JSON.stringify(reopened.ctx.state.tasks.map(task=>[task.id,task.mu,task.sigma])),ratings,'readback never retrains an already applied observation');
+ assert.equal(f.h.calls.filter(call=>call==='push').length,1,'exact readback acknowledges rather than blindly republishing');
+ assert.equal(reopened.ctx.state.syncDirty,false);assert.equal(reopened.ctx.state.syncRev,f.h.doc.rev);
+ assert.equal(reopened.shim.document.getElementById('syncBtn').textContent,'☁ synced');
+ assert.equal(JSON.stringify(JSON.parse(reopened.shim.localStorage.getItem(SYNC_STORE_KEY)).decisionEvents),JSON.stringify([f.event]));
+});
+
+test('RISK decision recovery account transition: pending No acknowledgement cannot enter another account and the exact prior board stays recoverable',async t=>{
+ const f=await decisionRecoveryApp146(),CS=f.ctx.window.CloudSync,basePull=CS.pull;let finish,pushes=0;
+ t.after(()=>{CS.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',f.ctx);});
+ CS.pull=async()=>CS.user==='e@example.com'?basePull():{empty:true};
+ CS.push=async()=>{pushes++;return new Promise(resolve=>{finish=resolve;});};
+ CS.ready=true;f.ctx.cloudPushNow();await syncSettle(30);assert.equal(pushes,1);
+ CS.user='other@example.com';f.shim.window.dispatchEvent({type:'cloudsync'});await f.ctx.cloudPull();
+ finish({ok:true,rev:99});await syncSettle(80);
+ assert.equal(f.ctx.state.syncAccount,'other@example.com');assert.equal(f.ctx.state.syncRev,0,'old acknowledgement cannot set new account revision');
+ assert.equal(f.ctx.state.tasks.length,0);assert.equal(f.ctx.state.decisionEvents,undefined);assert.equal(f.ctx.state.decisionBase,null);
+ assert.ok(f.ctx.readLocalBackups().some(row=>JSON.stringify(JSON.parse(row.payload).decisionEvents)===JSON.stringify([f.event])),'exact original account action stays in protected recovery');
+ const payload=JSON.parse(f.ctx.cloudPayload());assert.equal(Object.hasOwn(payload,'decisionBase'),false);assert.equal(Object.hasOwn(payload,'protectedBackupIds'),false);assert.equal(Object.hasOwn(payload,'decisionEvents'),false);
+ CS.user=null;f.shim.window.dispatchEvent({type:'cloudsync'});CS.user='other@example.com';f.shim.window.dispatchEvent({type:'cloudsync'});await f.ctx.cloudPull();
+ assert.equal(f.ctx.state.decisionEvents,undefined);assert.equal(pushes,1,'identity change cancels queued old-account publication');
 });
 
 test("LOGIC AUDIT: a malformed newer cloud payload cannot corrupt the local board", async () => {
@@ -20231,6 +20380,104 @@ test('RISK CLOUD V2: corrupt active data fails closed, manifest races retry, and
  const corrupt=await store.pull('owner');assert.equal(corrupt.error,true);assert.match(corrupt.code,/corrupt|hash/i);
  assert.notEqual(JSON.parse(adapter.generations.get('owner/'+newRoot.previousGeneration).chunks.get(0).text).tasks[0].id,undefined,
   'the previous generation stays available for explicit recovery but is never silently made current');
+});
+
+async function decisionBackend146(artifacts,db,F,uid='owner'){
+ const pending=new Set(),auth={currentUser:{uid,email:'e@example.com'}},events=[];
+ const host=value=>Array.isArray(value)?Array.from(value,host):value?.constructor?.name==='Object'?Object.fromEntries(Object.entries(value).map(([k,v])=>[k,host(v)])):value;
+ const writer=target=>new Proxy(target,{get(object,key){const value=object[key];return typeof value!=='function'?value:(...args)=>Reflect.apply(value,object,['set','update'].includes(key)?args.map(host):args);}});
+ const sdk={...F,getFirestore:()=>db,writeBatch:(...args)=>writer(F.writeBatch(...args))};
+ for(const key of ['getDoc','getDocs','runTransaction'])sdk[key]=(...args)=>{
+  if(key==='runTransaction'){const fn=args[1];args[1]=tx=>fn(writer(tx));}
+  const result=F[key](...args);pending.add(result);result.then(()=>pending.delete(result),()=>pending.delete(result));return result;
+ };
+ const window={FIREBASE_CONFIG:{apiKey:'emulator-only'},CLOUD_SYNC_TIMEOUT_MS:5000,dispatchEvent:event=>events.push(event)};
+ const A={getAuth:()=>auth,setPersistence:async()=>{},browserLocalPersistence:{},onAuthStateChanged:(_,fn)=>fn(auth.currentUser)};
+ const context=vm.createContext({window,crypto:webcrypto,TextEncoder,TextDecoder,structuredClone,console,setTimeout,clearTimeout,CustomEvent:class{},__modules:[{initializeApp:()=>({})},A,sdk]});
+ for(const [file,code] of [['device-store-v2.js',artifacts.storage],['cloud-store-v2.js',artifacts.cloud]])vm.runInContext(code,context,{filename:file});
+ window.ChainStorageV2=context.ChainStorageV2;window.ChainCloudV2=context.ChainCloudV2;
+ const module=artifacts.html.match(/<script type="module">([\s\S]*?)<\/script>/)[1].replace(/const \[appMod, A, F\] = await Promise\.all\(\[[\s\S]*?\]\);/,'const [appMod,A,F]=globalThis.__modules;');
+ await vm.runInContext(`(async()=>{${module}\n})()`,context);
+ assert.equal(window.CloudSync.ready,true);
+ return {CS:window.CloudSync,async drain(){for(let idle=0;idle<2;){if(pending.size){idle=0;await Promise.allSettled([...pending]);}else idle++;await flush();}}};
+}
+function decisionCandidate146(){return {html,cloud:fs.readFileSync(path.join(__dirname,'cloud-store-v2.js'),'utf8'),storage:fs.readFileSync(path.join(__dirname,'device-store-v2.js'),'utf8')};}
+
+test('Firestore rules: real pinned writer reads decision authority then holds its ordinary app edit without erasing it', {skip:!process.env.FIRESTORE_EMULATOR_HOST},async t=>{
+ const {SUPPORTED_RELEASE,readReleasedClient}=await import('./scripts/backward-compatibility.mjs');
+ const {initializeTestEnvironment}=await import('@firebase/rules-unit-testing'),F=await import('firebase/firestore');
+ const env=await initializeTestEnvironment({projectId:'demo-decision-mixed-146',firestore:{rules:fs.readFileSync(path.join(__dirname,'firestore.rules'),'utf8')}}),handles=[];
+ const floor=readReleasedClient(__dirname,SUPPORTED_RELEASE),candidate=decisionCandidate146();
+ try{
+  const old=await decisionBackend146(floor,env.authenticatedContext('owner').firestore(),F),next=await decisionBackend146(candidate,env.authenticatedContext('owner').firestore(),F);handles.push(old,next);
+  const f=await decisionRecoveryApp146();t.after(()=>{f.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',f.ctx);});
+  const plain=JSON.stringify(f.h.remoteState()),decided=f.ctx.cloudPayload();
+  assert.equal((await old.CS.push(plain,1,0)).ok,true,'pinned writer seeds an ordinary board');
+  assert.equal((await next.CS.pull()).payload,plain);
+  assert.equal((await next.CS.push(plain,2,1)).ok,true,'upgraded ordinary publication remains readable by floor');
+  assert.equal((await old.CS.pull()).payload,plain);
+  const [activated,competing]=await Promise.all([next.CS.push(decided,3,2),old.CS.push(plain,3,2)]);
+  assert.equal(Number(activated.ok===true)+Number(competing.ok===true),1,'CAS admits one activation-racing writer');
+  assert.ok(activated.conflict===true||competing.conflict===true||old.CS.errorCode==='permission-denied','activation races either conflict or safely fence the losing writer');
+  if(!activated.ok){const current=await next.CS.pull();assert.equal((await next.CS.push(decided,4,current.rev)).ok,true);}
+  const exact=await next.CS.pull();assert.equal(exact.payload,decided);
+  assert.equal((await old.CS.pull()).payload,decided,'pinned reader accepts additional root capability');
+  const oldApp=await loadApp({appSource:extractAppScript(floor.html),seedStorage:{[SYNC_STORE_KEY]:plain,[LOCAL_HEAD_KEY]:plain},cloudSyncFactory:()=>old.CS});
+  let updates=0;oldApp.ctx.window.checkForAppUpdate=async()=>{updates++;};
+  t.after(()=>{old.CS.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',oldApp.ctx);});
+  await oldApp.ctx.cloudPull();oldApp.ctx.addTask('Legacy independent edit held for safe update');await oldApp.ctx.persist();oldApp.ctx.cloudPushNow();await syncSettle(180);
+  assert.equal(old.CS.errorCode,'permission-denied','the real fixed historical manifest is denied');
+  assert.equal(oldApp.ctx.state.syncDirty,true);assert.equal(oldApp.shim.document.getElementById('syncBtn').textContent,'☁ error');assert.ok(updates>=1,'historical app enters its established compatible-shell recovery');
+  const before=await next.CS.pull();assert.equal(before.payload,exact.payload);assert.equal(before.rev,exact.rev);
+  oldApp.shim.window.dispatchEvent({type:'focus'});oldApp.ctx.cloudPushNow();await syncSettle(50);
+  const after=await next.CS.pull();assert.equal(after.payload,exact.payload);assert.equal(after.rev,exact.rev,'focus does not spin rejected writes');
+  assert.ok(oldApp.ctx.state.tasks.some(task=>task.title==='Legacy independent edit held for safe update'),'unpublished legacy edit stays recoverable');
+ }finally{await Promise.all(handles.map(handle=>handle.drain()));await env.cleanup();}
+});
+
+test('Firestore rules: first decision against released rules stays exact and pending until rules-first rollout then retry', {skip:!process.env.FIRESTORE_EMULATOR_HOST},async t=>{
+ const {SUPPORTED_RELEASE,readReleasedClient}=await import('./scripts/backward-compatibility.mjs');
+ const {initializeTestEnvironment}=await import('@firebase/rules-unit-testing'),F=await import('firebase/firestore');
+ const floor=readReleasedClient(__dirname,SUPPORTED_RELEASE),projectId='demo-decision-rollout-146';
+ const env=await initializeTestEnvironment({projectId,firestore:{rules:floor.rules}});let upgraded;
+ const handle=await decisionBackend146(decisionCandidate146(),env.authenticatedContext('owner').firestore(),F);
+ try{
+  const f=await decisionRecoveryApp146();t.after(()=>{f.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',f.ctx);});
+  const plain=JSON.stringify(f.h.remoteState());assert.equal((await handle.CS.push(plain,1,0)).ok,true);
+  const app=await loadApp({seedStorage:{[SYNC_STORE_KEY]:plain,[LOCAL_HEAD_KEY]:plain},cloudSyncFactory:()=>handle.CS});
+  t.after(()=>{handle.CS.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',app.ctx);});
+  app.shim.window.CLOUD_PUSH_DELAY_MS=2;await app.ctx.cloudPull();app.ctx.renderScan();app.ctx.onAction('no',{dataset:{candidate:'candidate',benchmark:'bench'}});await app.ctx.persist();
+  const evidence=JSON.stringify(app.ctx.state.decisionEvents),ratings=JSON.stringify(app.ctx.state.tasks.map(task=>[task.id,task.mu,task.sigma]));
+  app.ctx.cloudPushNow();await syncSettle(160);
+  assert.equal(handle.CS.errorCode,'permission-denied');assert.equal(app.ctx.state.syncDirty,true);assert.equal(JSON.stringify(app.ctx.state.decisionEvents),evidence);
+  assert.equal(JSON.stringify(JSON.parse(app.shim.localStorage.getItem(SYNC_STORE_KEY)).decisionEvents),evidence,'rejected first decision stays durable');
+  assert.equal((await handle.CS.pull()).payload,plain,'released rules never accept an unfenced fallback');
+  upgraded=await initializeTestEnvironment({projectId,firestore:{rules:fs.readFileSync(path.join(__dirname,'firestore.rules'),'utf8')}});
+  await app.ctx.onAction('sync-retry',{});await syncSettle(600);
+  const published=await handle.CS.pull();assert.equal(JSON.stringify(JSON.parse(published.payload).decisionEvents),evidence);
+  assert.equal(JSON.stringify(app.ctx.state.tasks.map(task=>[task.id,task.mu,task.sigma])),ratings,'retry does not retrain the comparison');
+  assert.equal(app.ctx.state.syncDirty,false);assert.equal(app.shim.document.getElementById('syncBtn').textContent,'☁ synced');
+ }finally{await handle.drain();await upgraded?.cleanup();await env.cleanup();}
+});
+
+test('Firestore rules: decision capability activates atomically and denies an omitting historical manifest', {skip:!process.env.FIRESTORE_EMULATOR_HOST},async()=>{
+ const {assertFails,assertSucceeds,initializeTestEnvironment}=await import('@firebase/rules-unit-testing');
+ const {doc,setDoc,getDoc,serverTimestamp}=await import('firebase/firestore');
+ const env=await initializeTestEnvironment({projectId:'demo-decision-capability-146',firestore:{rules:fs.readFileSync(path.join(__dirname,'firestore.rules'),'utf8')}});
+ try{
+  const db=env.authenticatedContext('owner').firestore(),root=doc(db,'users/owner');
+  await env.withSecurityRulesDisabled(async context=>{
+   for(const id of ['plain','decision','omission','retained'])await setDoc(doc(context.firestore(),'users/owner/generations/'+id),{schemaVersion:2,state:'sealed'});
+  });
+  const manifest=(rev,activeGeneration,previousGeneration,extra={})=>({schemaVersion:2,rev,activeGeneration,previousGeneration,updatedAt:rev,serverUpdatedAt:serverTimestamp(),...extra});
+  await assertSucceeds(setDoc(root,manifest(1,'plain',null)));
+  await assertSucceeds(setDoc(root,manifest(2,'decision','plain',{decisionCapability:1})));
+  assert.equal((await getDoc(root)).data().decisionCapability,1);
+  await assertFails(setDoc(root,manifest(3,'omission','decision')),'fixed-manifest historical publication must not remove acknowledged authority');
+  assert.equal((await getDoc(root)).data().activeGeneration,'decision','denied legacy publication leaves exact active authority');
+  await assertFails(setDoc(root,manifest(3,'omission','decision',{decisionCapability:2})));
+  await assertSucceeds(setDoc(root,manifest(3,'retained','decision',{decisionCapability:1})));
+ }finally{await env.cleanup();}
 });
 
 test('Firestore rules: v2 chunks are owner-only, immutable, sealed before publish, and old clients fail closed', {skip:!process.env.FIRESTORE_EMULATOR_HOST}, async()=>{
