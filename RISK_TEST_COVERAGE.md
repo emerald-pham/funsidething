@@ -711,6 +711,14 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK STALE TAB: rebasing never combines cached Chance data from different passes
 - RISK STALE TAB: a conflicting edit during awaited CAS repair retains its exact recovery bytes
 
+## Decision-preserving cloud learning
+- RISK comparison replay: independent Yes and Dot evidence survives either cloud publication order and a fresh client
+- RISK comparison replay: repeated same-pair Yes and No actions remain distinct and replay once by original action order
+- RISK comparison replay: first supported action freezes learned legacy ratings without replaying observational history
+- RISK comparison replay: deleting an opponent keeps its frozen rating available without resurrecting the task
+- RISK comparison replay: compatible new-task baseline extensions union without freezing branch-local posteriors
+- RISK comparison replay: compatible frozen learning survives different legacy pass-context baseline IDs
+
 - `RISK dependency picker search: Add and Edit input filtering preserves hidden selections and excludes completed ordinary choices` — native dependency filtering and retained saved links.
 
 - `RISK dependency picker input identity: search updates choices without replacing the focused search or its composition` — stable native input identity during filtering.

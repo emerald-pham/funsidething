@@ -7356,5 +7356,34 @@
       "preimplementation": "The actual peer-revision No-loss RED and absent action-evidence RED were captured before app runtime changes.",
       "postimplementation": "Focused test passes with both storage backends, exact action metadata, base persistence/cloud exclusion, and day-boundary projection expiry; the affected sync/storage cohort passes 11/11."
     }
+  },
+  {
+    "testChangesSha256": "4af9daa8c0da3f42c46b8c7af0c36c40130eec97486c9689878a04f86f8fa6fa",
+    "reason": "Exercise immutable comparison replay from an inherited learning baseline through real scanner/editor actions, offline device state, both publication orders, retries, deletions, and new branch-local tasks.",
+    "previousBehavior": "Independent Yes and Dot decisions lost a chain member after a cold offline reopen; same-pair decisions could keep history while losing learned effects; an unrelated opponent deletion or new task could destroy the baseline needed to replay surviving learning.",
+    "intendedBehavior": "Each distinct supported comparison trains once from a cloud-visible frozen baseline, retains its original ID/time/context, and survives publication-order changes, durable reopen, a fresh client, and deleted participants. Compatible baseline aliases differ only in temporary chain/pass context and do not suppress learning; unknown or conflicting evidence remains held for recovery.",
+    "replacementTests": [
+      "RISK comparison replay: independent Yes and Dot evidence survives either cloud publication order and a fresh client",
+      "RISK comparison replay: repeated same-pair Yes and No actions remain distinct and replay once by original action order",
+      "RISK comparison replay: first supported action freezes learned legacy ratings without replaying observational history",
+      "RISK comparison replay: deleting an opponent keeps its frozen rating available without resurrecting the task",
+      "RISK comparison replay: compatible new-task baseline extensions union without freezing branch-local posteriors",
+      "RISK comparison replay: compatible frozen learning survives different legacy pass-context baseline IDs"
+    ],
+    "preservedCoverage": [
+      "Legacy ratings and ratingHistory remain intact; the baseline is not rebuilt by guessing observations from history.",
+      "Distinct same-pair actions retain unique identities and action-time order while retries and duplicate pulls do not double-train.",
+      "Temporary pass marks expire through the established pass boundary while supported comparison learning remains permanent.",
+      "Deleted opponent ratings remain as non-task learning inputs, and compatible branch-local new-task rating starts union without freezing a branch posterior.",
+      "The shared synthetic cloud and isolated localStorage/IndexedDB stores do not replace live authentication, browser timing, Firestore rules, or physical-device verification owned by final integration."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='RISK comparison replay: independent Yes and Dot evidence' tests.js; node --test --test-reporter=spec --test-name-pattern='RISK comparison replay: compatible frozen learning survives different legacy pass-context baseline IDs' tests.js",
+      "failure": "At the unchanged #143 runtime baseline 4b930f31272fc3db61a5cdcad0b1ec0ec0ac4ad2, the full-app independent Yes/Dot test failed with final chain ['base','phone-choice'] instead of ['base','phone-choice','mac-choice']; output is /Users/emeraldpham/.codex/task-artifacts/decision-sync-141/143/red-independent-comparisons.log. Before the baseline-compatibility repair, two real scanner comparisons with compatible inherited ratings and embodied IDs but different valid legacy pass-context baseline IDs entered decisionBaselineRecovery; the full output is /Users/emeraldpham/.codex/task-artifacts/decision-sync-141/143/red-compatible-baseline.log. Corrected setup-filter and exact-ancestor fixture probes are explicitly documented as non-behavioral in RED.md."
+    },
+    "coverageChronology": {
+      "preimplementation": "The full-app independent Yes/Dot and compatible-baseline consumers recorded observed behavioral RED before their respective runtime repairs.",
+      "postimplementation": "All six comparison replay tests pass, including both storage backends, publication orders, durable offline reopen, fresh-client replay, permanent learning after pass reset, deleted-opponent ghost ratings, branch-local extensions, and compatible legacy baseline IDs."
+    }
   }
 ]

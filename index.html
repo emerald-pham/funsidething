@@ -2067,6 +2067,11 @@ function mergeUndeletedTasks(winner, other){
   winner.deletionLog=exactDeletionLogUnion(winner.deletionLog,other.deletionLog);
   if(beforeDeletionLog!==JSON.stringify(winner.deletionLog)) changed=true;
   pruneDeletionLog(winner);
+  const mergedDecisionEvidence=mergeDecisionBaseline(winner,other)|mergeDecisionEvents(winner,other);
+  if(mergedDecisionEvidence){
+    changed=true;
+    if(projectDecisionEvents(winner))changed=true;
+  }
   changed=projectLegacyPrerequisites(winner)||changed;
   return changed || beforeEvidence!==JSON.stringify(evidenceKeys.map(key=>winner[key] || {}));
 }
@@ -4562,15 +4567,20 @@ const taskActionOwnerBundle=(()=>{
     task.ctx=[...new Set([...(Array.isArray(draft.contextIds)?draft.contextIds:[]),...unavailableCtx])];
     return true;
   }
-  function executeTaskAction(action,id,draft=null,modeOnStart=null){
+  function executeTaskAction(action,id,draft=null,modeOnStart=null,gesture=null){
     const task=taskById(id);if(!task)return false;
     if(!["done","worked","dot","return"].includes(action))return false;
     if(action==="dot"&&!canDotTask(task)||action==="return"&&!canReturnAsCandidate(task))return false;
     const beforeEditBenchmark=action==="dot"?benchmark():null;
     const kind=action==="return"?"return":action;
+    const actionAt=gesture&&Number.isFinite(gesture.at)&&gesture.at>=0?gesture.at:Date.now();
+    const newPassId=action==="dot"&&chainStart()&&!gesture?uid():null;
+    const actionGesture=gesture&&typeof gesture==="object"?gesture:captureDecisionGesture(null,actionAt,
+      newPassId?{passId:newPassId,passAt:actionAt,chainIds:state.chain}:{});
     const observation=action==="dot"
       ?captureRatingObservation(kind,[task.id,...(beforeEditBenchmark?[beforeEditBenchmark.id]:[])])
       :captureRatingObservation(kind,[task.id]);
+    observation.at=actionAt;
     pushUndo();
     if(modeOnStart)state.mode=modeOnStart;
     const resting=action==="return"&&task.evergreen&&task.lastDoneAt&&Date.now()<evergreenUntil(task);
@@ -4604,13 +4614,16 @@ const taskActionOwnerBundle=(()=>{
       writeTaskComparison(task,false);
       // A deliberate Dot can choose an off-context or future-start task; only
       // the automatic first placement remains neutral in startScan().
-      if(chainStart()){state.passStartedAt=Date.now();state.passId=uid();}
+      if(chainStart()){state.passStartedAt=actionGesture.passAt;state.passId=actionGesture.passId;}
+      const decisionEvent=prepareComparisonDecisionEvent("dot",task,b,observation,actionGesture,
+        !!b&&taskComparisonEligible(task)&&taskComparisonEligible(b));
+      observation.id=decisionEvent.id;recordDecisionEvent(decisionEvent);
       state.chain.push(id);
       delete state.considered[id];delete state.cantAt[id];delete state.workedAt[id];
       if(state.candidateId===id)state.candidateId=null;
       state.interventionActive=false;
       if(b)updateTaskComparison(task,b);
-      recomputeRanks();finishRatingObservation(observation);commit(true,true);
+      projectDecisionEvents(state);recomputeRanks();finishRatingObservation(observation);commit(true,true);
       return true;
     }
     if(action==="return"){
@@ -4631,7 +4644,7 @@ const taskActionOwnerBundle=(()=>{
       closeModal();commit();return true;
     }
     if(!["done","worked","dot","return"].includes(action))return false;
-    const result=executeTaskAction(action,task.id,draft);
+    const result=executeTaskAction(action,task.id,draft,null,command.gesture||null);
     if(result==="saved-dot-unavailable")toast("Changes saved. This evergreen task is resting; use Return as candidate before Dot.");
     if(result)closeModal();
     return result;
@@ -4647,21 +4660,27 @@ const taskActionOwnerBundle=(()=>{
       const b=benchmark();
       if(!b&&(kind==="yes"||kind==="no"))return false;
       const observation=captureRatingObservation(kind,[candidate.id,...(b&&(kind==="yes"||kind==="no")?[b.id]:[])]);
-      const decisionEvent=kind==="no"?prepareNoDecisionEvent(candidate,b,observation):null;
+      const gesture=captureDecisionGesture(null,observation.at);
+      const decisionEvent=kind==="no"?prepareNoDecisionEvent(candidate,b,observation,gesture,
+        taskComparisonEligible(candidate)&&taskComparisonEligible(b))
+        :kind==="yes"?prepareComparisonDecisionEvent("yes",candidate,b,observation,gesture,false):null;
       pushUndo();recordDecisionTime();
-      if(decisionEvent){observation.id=decisionEvent.id;appendNoDecisionEvent(decisionEvent);}
       if(kind==="yes"){
         writeTaskComparison(candidate,false);
+        decisionEvent.ratingApplied=!!b&&taskComparisonEligible(candidate)&&taskComparisonEligible(b);
+        observation.id=decisionEvent.id;recordDecisionEvent(decisionEvent);
         if(b)updateTaskComparison(candidate,b);
         state.chain.push(candidate.id);
         delete state.considered[candidate.id];delete state.cantAt[candidate.id];delete state.workedAt[candidate.id];
       }else if(kind==="no"){
+        observation.id=decisionEvent.id;appendNoDecisionEvent(decisionEvent);
         if(b)updateTaskComparison(b,candidate);
         state.considered[candidate.id]="no";
       }else if(kind==="cant"){
         state.considered[candidate.id]="cant";state.cantAt[candidate.id]=Date.now();
       }else completeTask(candidate);
       state.candidateId=null;
+      if(decisionEvent)projectDecisionEvents(state);
       recomputeRanks();finishRatingObservation(observation);maybeIntervene();
       commit(true,kind==="yes"||kind==="cand-done");
       return true;
@@ -4679,11 +4698,14 @@ const taskActionOwnerBundle=(()=>{
       if(command.action==="worked")return executeTaskAction("worked",b.id);
       if(command.action==="dislodge"){
         const observation=captureRatingObservation("dislodge",[b.id]);
+        const gesture=captureDecisionGesture(null,observation.at);
         pushUndo();
         // Dislodge is a standalone negative signal; it never moves a reference task.
+        const decisionEvent=prepareComparisonDecisionEvent("dislodge",b,b,observation,gesture,true);
+        observation.id=decisionEvent.id;recordDecisionEvent(decisionEvent);
         updatePair({mu:PRIOR_MU,sigma:PRIOR_SIGMA},b);
-        recomputeRanks();state.chain.pop();state.considered[b.id]="dislodged";state.interventionActive=false;
-        finishRatingObservation(observation);commit();
+        state.chain.pop();state.considered[b.id]="dislodged";state.interventionActive=false;
+        projectDecisionEvents(state);recomputeRanks();finishRatingObservation(observation);commit();
         return true;
       }
       if(command.action==="cant"){
@@ -4697,7 +4719,7 @@ const taskActionOwnerBundle=(()=>{
       if(state.mode!=="scan"||state.interventionActive||state.candidateId!==id||!pool().some(t=>t.id===id))return false;
       return executeTaskAction("worked",id);
     }
-    if(command.type==="task")return executeTaskAction(command.action,command.taskId);
+    if(command.type==="task")return executeTaskAction(command.action,command.taskId,null,null,command.gesture||null);
     if(command.type==="editor")return executeEditorGesture(command);
     if(command.type==="overdue-woop-dot"){
       const task=taskById(command.taskId);if(!overdueWoopCandidate(task))return false;
@@ -5319,36 +5341,376 @@ function decisionActionFrontier(events){
     ? event.observedActionIds.filter(id=>typeof id==="string" && id) : []));
   return known.map(event=>event.id).filter(id=>!named.has(id)).sort();
 }
+function decisionId(value){return typeof value==="string"&&value.length>0&&value.length<=512&&!Object.hasOwn(Object.prototype,value);}
+function decisionIdList(value){return Array.isArray(value)&&value.every(decisionId)&&new Set(value).size===value.length;}
+function decisionRating(value){
+  return value&&typeof value==="object"&&!Array.isArray(value)&&decisionId(value.taskId)
+    &&Number.isFinite(value.mu)&&Math.abs(value.mu)<=RATING_MU_LIMIT
+    &&Number.isFinite(value.sigma)&&value.sigma>0&&value.sigma<=RATING_SIGMA_LIMIT;
+}
+function decisionBaselineLearningFacts(account,ratings,includedActionIds){
+  return [account,ratings.map(({taskId,mu,sigma})=>[taskId,mu,sigma]).sort(([a],[b])=>a<b?-1:a>b?1:0),[...includedActionIds].sort()];
+}
+function decisionBaselineIdentity(account,ratings,includedActionIds){
+  const fact=JSON.stringify(decisionBaselineLearningFacts(account,ratings,includedActionIds));
+  const digest=[0,1,2,3].map(index=>chanceHash("decision-learning-v2:"+index+":"+fact).toString(16).padStart(8,"0")).join("");
+  return "dlb2:"+digest;
+}
+function legacyDecisionBaselineIdentity(account,ratings,includedActionIds,chainIds,passId,passAt){
+  const frozen=[...decisionBaselineLearningFacts(account,ratings,includedActionIds),chainIds,passId,passAt];
+  const fact=JSON.stringify(frozen),digest=[0,1,2,3].map(index=>chanceHash("decision-learning-v1:"+index+":"+fact).toString(16).padStart(8,"0")).join("");
+  return "dlb1:"+digest;
+}
+function supportedDecisionBaseline(baseline,account=null){
+  if(!baseline||typeof baseline!=="object"||Array.isArray(baseline)||baseline.v!==1
+    ||!decisionId(baseline.id)||typeof baseline.account!=="string"||!baseline.account
+    ||account!==null&&baseline.account!==account
+    ||!(baseline.sourceBaseId===null||decisionId(baseline.sourceBaseId))
+    ||!(baseline.sourceRevision===null||Number.isSafeInteger(baseline.sourceRevision)&&baseline.sourceRevision>=0)
+    ||!decisionIdList(baseline.includedActionIds)||!Array.isArray(baseline.ratings)
+    ||!baseline.ratings.every(decisionRating)||new Set(baseline.ratings.map(row=>row.taskId)).size!==baseline.ratings.length
+    ||!Array.isArray(baseline.chainIds)||!baseline.chainIds.every(decisionId)
+    ||!(baseline.passId===null||decisionId(baseline.passId))||!Number.isFinite(baseline.passAt)
+    ||baseline.considered!==undefined&&(!baseline.considered||typeof baseline.considered!=="object"||Array.isArray(baseline.considered))
+    ||baseline.cantAt!==undefined&&(!baseline.cantAt||typeof baseline.cantAt!=="object"||Array.isArray(baseline.cantAt))
+    ||baseline.workedAt!==undefined&&(!baseline.workedAt||typeof baseline.workedAt!=="object"||Array.isArray(baseline.workedAt)))return false;
+  const extensions=baseline.ratingExtensions===undefined?[]:baseline.ratingExtensions;
+  if(!Array.isArray(extensions)||!extensions.every(row=>decisionRating(row)
+    &&(row.sourceBaseId===null||decisionId(row.sourceBaseId))
+    &&(row.sourceRevision===null||Number.isSafeInteger(row.sourceRevision)&&row.sourceRevision>=0)))return false;
+  const learningId=decisionBaselineIdentity(baseline.account,baseline.ratings,baseline.includedActionIds);
+  const legacyId=legacyDecisionBaselineIdentity(baseline.account,baseline.ratings,baseline.includedActionIds,baseline.chainIds,baseline.passId,baseline.passAt);
+  if(baseline.id!==learningId&&baseline.id!==legacyId)return false;
+  const aliases=baseline.compatibleBaselineIds===undefined?[]:baseline.compatibleBaselineIds;
+  if(!Array.isArray(aliases)||!aliases.every(alias=>alias&&typeof alias==="object"&&!Array.isArray(alias)
+    &&decisionId(alias.id)&&Array.isArray(alias.chainIds)&&alias.chainIds.every(decisionId)
+    &&(alias.passId===null||decisionId(alias.passId))&&Number.isFinite(alias.passAt)&&alias.passAt>=0
+    &&(alias.id===learningId||alias.id===legacyDecisionBaselineIdentity(baseline.account,baseline.ratings,baseline.includedActionIds,alias.chainIds,alias.passId,alias.passAt)))
+    ||new Set(aliases.map(alias=>alias.id)).size!==aliases.length)return false;
+  return true;
+}
+function supportedDecisionEvent(event){
+  if(!event||typeof event!=="object"||Array.isArray(event)||event.v!==1||!decisionId(event.id)
+    ||!Number.isFinite(event.at)||event.at<0||typeof event.account!=="string"||!event.account
+    ||!(event.baseId===null||decisionId(event.baseId))
+    ||!(event.baselineId===undefined||decisionId(event.baselineId))
+    ||!(event.actionId===undefined||decisionId(event.actionId))
+    ||!(event.passId===null||decisionId(event.passId))||!Number.isFinite(event.passAt)||event.passAt<0
+    ||!(["descending","chance","squared","halving"].includes(event.scanMode))
+    ||!Array.isArray(event.chainIds)||!event.chainIds.every(decisionId)
+    ||!decisionIdList(event.observedActionIds)||event.observedActionIds.includes(event.id))return false;
+  if(event.kind==="current-choice")return typeof supportedCurrentChoiceEvent==="function"&&supportedCurrentChoiceEvent(event);
+  if(event.kind==="no")return event.meaning==="benchmark-preferred"&&decisionId(event.candidateId)&&decisionId(event.benchmarkId)
+    &&event.candidateId!==event.benchmarkId&&Array.isArray(event.candidateContextIds)&&event.candidateContextIds.every(decisionId)
+    &&Array.isArray(event.benchmarkContextIds)&&event.benchmarkContextIds.every(decisionId)
+    &&(event.ratingApplied===undefined||typeof event.ratingApplied==="boolean"&&decisionId(event.baselineId));
+  if(event.kind!=="comparison"||!(["yes","dot","dislodge"].includes(event.action))||typeof event.ratingApplied!=="boolean"
+    ||!event.baselineId)return false;
+  if(event.action==="dislodge")return decisionId(event.taskId)&&event.winnerId===undefined&&event.loserId===undefined;
+  return decisionId(event.taskId)&&decisionId(event.winnerId)&&event.winnerId===event.taskId
+    &&(event.action==="dot"&&event.ratingApplied===false&&event.loserId===null
+      ||decisionId(event.loserId)&&event.loserId!==event.winnerId);
+}
+function decisionBaselineRecoveryRows(board){
+  const value=board?.decisionBaselineRecovery;
+  return value===undefined?[]:Array.isArray(value)?value:[{unrecognizedDecisionBaselineRecovery:value}];
+}
+function keepDecisionRecovery(board,key,value){
+  if(value===undefined)return false;
+  const before=JSON.stringify(board[key]);
+  const prior=Array.isArray(board[key])?board[key]:board[key]===undefined?[]:[{unrecognizedDecisionEvidence:board[key]}];
+  const row=JSON.parse(JSON.stringify(value));
+  if(!prior.some(existing=>JSON.stringify(existing)===JSON.stringify(row)))board[key]=[...prior,row];
+  return before!==JSON.stringify(board[key]);
+}
+function mergeDecisionEvents(target,source){
+  if(!target||!source)return false;
+  const before=JSON.stringify([target.decisionEvents,target.decisionEventsRecovery]);
+  if(source.decisionEvents!==undefined){
+    if(target.decisionEvents===undefined)target.decisionEvents=JSON.parse(JSON.stringify(source.decisionEvents));
+    else if(Array.isArray(target.decisionEvents)&&Array.isArray(source.decisionEvents)){
+      const seen=new Set(target.decisionEvents.map(row=>JSON.stringify(row)));
+      for(const row of source.decisionEvents){const key=JSON.stringify(row);if(!seen.has(key)){target.decisionEvents.push(JSON.parse(key));seen.add(key);}}
+    }else if(JSON.stringify(target.decisionEvents)!==JSON.stringify(source.decisionEvents))
+      keepDecisionRecovery(target,"decisionEventsRecovery",{unrecognizedDecisionEvents:source.decisionEvents});
+  }
+  for(const row of Array.isArray(source.decisionEventsRecovery)?source.decisionEventsRecovery:source.decisionEventsRecovery===undefined?[]:[{unrecognizedDecisionEventsRecovery:source.decisionEventsRecovery}])
+    keepDecisionRecovery(target,"decisionEventsRecovery",row);
+  return before!==JSON.stringify([target.decisionEvents,target.decisionEventsRecovery]);
+}
+function decisionBaselineCoreEqual(a,b){
+  if(!supportedDecisionBaseline(a)||!supportedDecisionBaseline(b))return false;
+  return JSON.stringify(decisionBaselineLearningFacts(a.account,a.ratings,a.includedActionIds))
+    ===JSON.stringify(decisionBaselineLearningFacts(b.account,b.ratings,b.includedActionIds));
+}
+function decisionBaselineAlias(baseline){
+  return {id:baseline.id,chainIds:baseline.chainIds.slice(),passId:baseline.passId,passAt:baseline.passAt};
+}
+function decisionBaselineAcceptsEvent(baseline,event){
+  return !!baseline&&!!event&&event.account===baseline.account
+    &&(event.baselineId===baseline.id
+      ||event.baselineId===legacyDecisionBaselineIdentity(baseline.account,baseline.ratings,baseline.includedActionIds,baseline.chainIds,baseline.passId,baseline.passAt)
+      ||(baseline.compatibleBaselineIds||[]).some(alias=>alias.id===event.baselineId));
+}
+function mergeDecisionBaseline(target,source){
+  if(!target||!source||source.decisionBaseline===undefined)return false;
+  const before=JSON.stringify([target.decisionBaseline,target.decisionBaselineRecovery]);
+  if(target.decisionBaseline===undefined){target.decisionBaseline=JSON.parse(JSON.stringify(source.decisionBaseline));}
+  else if(JSON.stringify(target.decisionBaseline)!==JSON.stringify(source.decisionBaseline)){
+    if(decisionBaselineCoreEqual(target.decisionBaseline,source.decisionBaseline)){
+      const winner=target.decisionBaseline,extensions=Array.isArray(winner.ratingExtensions)?winner.ratingExtensions.slice():[];
+      const incoming=Array.isArray(source.decisionBaseline.ratingExtensions)?source.decisionBaseline.ratingExtensions:[];
+      const byTask=new Map(extensions.map(row=>[row.taskId,row])),conflicts=[];
+      for(const row of incoming){
+        const prior=byTask.get(row.taskId);
+        if(!prior){extensions.push(JSON.parse(JSON.stringify(row)));byTask.set(row.taskId,row);}
+        else if(prior.mu!==row.mu||prior.sigma!==row.sigma)conflicts.push({taskId:row.taskId,ratings:[prior,row]});
+      }
+      if(extensions.length)winner.ratingExtensions=extensions;
+      const aliases=Array.isArray(winner.compatibleBaselineIds)?winner.compatibleBaselineIds.slice():[];
+      const addAlias=baseline=>{
+        if(baseline.id===winner.id||aliases.some(alias=>alias.id===baseline.id))return;
+        aliases.push(decisionBaselineAlias(baseline));
+      };
+      addAlias(source.decisionBaseline);
+      for(const alias of source.decisionBaseline.compatibleBaselineIds||[])
+        if(alias.id!==winner.id&&!aliases.some(row=>row.id===alias.id))aliases.push(JSON.parse(JSON.stringify(alias)));
+      if(aliases.length)winner.compatibleBaselineIds=aliases;
+      if(conflicts.length)keepDecisionRecovery(target,"decisionBaselineRecovery",{incompatibleRatingExtensions:conflicts});
+    }else keepDecisionRecovery(target,"decisionBaselineRecovery",source.decisionBaseline);
+  }
+  for(const row of decisionBaselineRecoveryRows(source))keepDecisionRecovery(target,"decisionBaselineRecovery",row);
+  return before!==JSON.stringify([target.decisionBaseline,target.decisionBaselineRecovery]);
+}
+function captureDecisionGesture(actionId=null,at=null,options={}){
+  const account=typeof state.syncAccount==="string"&&state.syncAccount?state.syncAccount
+    :typeof window.CloudSync?.user==="string"&&window.CloudSync.user?window.CloudSync.user:null;
+  const base=account&&validDecisionBase(state.decisionBase,account,state.syncRev)?state.decisionBase:null;
+  const gestureAt=Number.isFinite(at)&&at>=0?at:Date.now();
+  const passId=decisionId(options?.passId)?options.passId:currentDecisionPassId();
+  const passAt=Number.isFinite(options?.passAt)&&options.passAt>=0?options.passAt:Number.isFinite(state.passStartedAt)&&state.passStartedAt>=0?state.passStartedAt:0;
+  const gesture={actionId:decisionId(actionId)?actionId:uid(),at:gestureAt,account,
+    baseId:base?.id??null,passId,passAt,
+    scanMode:state.scanMode,chainIds:Array.isArray(options?.chainIds)?options.chainIds.slice():Array.isArray(state.chain)?state.chain.slice():[],observedActionIds:decisionActionFrontier(state.decisionEvents)};
+  Object.freeze(gesture.chainIds);Object.freeze(gesture.observedActionIds);return Object.freeze(gesture);
+}
+function baselineFromSource(board,event){
+  let source=board,base=null;
+  if(typeof event.account==="string"&&validDecisionBase(board.decisionBase,event.account,board.syncRev)){
+    base=board.decisionBase;
+    try{source=JSON.parse(base.payload);hydrateState(source);}catch{return null;}
+  }
+  const ratings=(source.tasks||[]).filter(task=>decisionId(task?.id)).map(task=>{
+    const rating=normalizeRating(task);return {taskId:task.id,mu:rating.mu,sigma:rating.sigma};
+  }).sort((a,b)=>a.taskId<b.taskId?-1:a.taskId>b.taskId?1:0);
+  const includedActionIds=[...new Set((Array.isArray(source.decisionEvents)?source.decisionEvents:[])
+    .filter(row=>supportedDecisionEvent(row)&&row.account===event.account&&["comparison","no"].includes(row.kind)&&row.ratingApplied===true)
+    .map(row=>row.id).filter(decisionId))].sort();
+  const chainIds=Array.isArray(source.chain)?source.chain.filter(decisionId):[];
+  const passId=decisionId(source.passId)?source.passId:null,passAt=Number.isFinite(source.passStartedAt)&&source.passStartedAt>=0?source.passStartedAt:0;
+  const baseline={v:1,account:event.account,sourceBaseId:base?.id??event.baseId??null,sourceRevision:base?.revision??(Number.isSafeInteger(source.syncRev)?source.syncRev:null),
+    includedActionIds,ratings,chainIds,passId,passAt,considered:{},cantAt:{},workedAt:{}};
+  for(const [id,value] of Object.entries(source.considered||{}))if(decisionId(id)&&typeof value==="string")baseline.considered[id]=value;
+  for(const [key,sourceKey] of [["cantAt","cantAt"],["workedAt","workedAt"]])for(const [id,value] of Object.entries(source[sourceKey]||{}))if(decisionId(id)&&Number.isFinite(value)&&value>0)baseline[key][id]=value;
+  baseline.id=decisionBaselineIdentity(baseline.account,baseline.ratings,baseline.includedActionIds);
+  return baseline;
+}
+function decisionBaselineRatings(baseline){
+  const values=new Map(),conflicts=new Set();
+  for(const row of [...baseline.ratings,...(baseline.ratingExtensions||[])]){
+    const prior=values.get(row.taskId);
+    if(prior&&(prior.mu!==row.mu||prior.sigma!==row.sigma)){conflicts.add(row.taskId);continue;}
+    values.set(row.taskId,{mu:row.mu,sigma:row.sigma});
+  }
+  for(const id of conflicts)values.delete(id);
+  return {values,conflicts};
+}
+function ensureDecisionBaseline(event,board=state){
+  if(!event||!board||typeof event.account!=="string"||!event.account)return null;
+  if(board.decisionEvents!==undefined&&!Array.isArray(board.decisionEvents))return null;
+  let baseline=board.decisionBaseline;
+  if(baseline===undefined){
+    let exactBase=null;
+    if(validDecisionBase(board.decisionBase,event.account,board.syncRev)){
+      try{const source=JSON.parse(board.decisionBase.payload);exactBase=source.decisionBaseline?source.decisionBaseline:null;}catch{}
+    }
+    if(exactBase!==null&&supportedDecisionBaseline(exactBase,event.account))baseline=JSON.parse(JSON.stringify(exactBase));
+    else baseline=baselineFromSource(board,event);
+    if(!baseline||!supportedDecisionBaseline(baseline,event.account))return null;
+    board.decisionBaseline=baseline;
+  }
+  if(!supportedDecisionBaseline(baseline,event.account)||decisionBaselineRecoveryRows(board).length)return null;
+  const known=decisionBaselineRatings(baseline),participants=[event.candidateId,event.benchmarkId,event.taskId,event.winnerId,event.loserId].filter(decisionId);
+  let extensions=Array.isArray(baseline.ratingExtensions)?baseline.ratingExtensions.slice():[];
+  for(const id of [...new Set(participants)]){
+    if(known.values.has(id)||known.conflicts.has(id))continue;
+    const task=(board.tasks||[]).find(row=>row.id===id);if(!task)return null;
+    const rows=Array.isArray(task.ratingHistory)?task.ratingHistory.filter(validRatingHistoryRow):[];
+    if(rows.some(row=>row.before&&(row.before.mu!==row.after.mu||row.before.sigma!==row.after.sigma)))return null;
+    const rating=normalizeRating(task),extension={taskId:id,mu:rating.mu,sigma:rating.sigma,
+      sourceBaseId:event.baseId??null,sourceRevision:Number.isSafeInteger(board.syncRev)?board.syncRev:null};
+    extensions.push(extension);known.values.set(id,{mu:extension.mu,sigma:extension.sigma});
+  }
+  if(extensions.length)baseline.ratingExtensions=extensions;
+  return baseline;
+}
+function appendDecisionEvent(event,board=state){
+  if(!event||!board||typeof event!=="object"||Array.isArray(event))return false;
+  if(board.decisionEvents!==undefined&&!Array.isArray(board.decisionEvents)){
+    keepDecisionRecovery(board,"decisionEventsRecovery",{unrecognizedDecisionEvents:board.decisionEvents});return false;
+  }
+  const rows=Array.isArray(board.decisionEvents)?board.decisionEvents:[];
+  const key=JSON.stringify(event);
+  if(rows.some(row=>JSON.stringify(row)===key))return false;
+  board.decisionEvents=[...rows,JSON.parse(key)];return true;
+}
+function decisionEventOrder(board,baseline){
+  const rows=Array.isArray(board?.decisionEvents)?board.decisionEvents:[],included=new Set(baseline.includedActionIds);
+  const allIds=new Set(rows.map(row=>row?.id).filter(decisionId)),byId=new Map(),ambiguous=new Set();
+  for(const row of rows){
+    if(!supportedDecisionEvent(row)||row.account!==baseline.account)continue;
+    const prior=byId.get(row.id);
+    if(prior&&JSON.stringify(prior)!==JSON.stringify(row)){ambiguous.add(row.id);byId.delete(row.id);}
+    else if(!ambiguous.has(row.id))byId.set(row.id,row);
+  }
+  const pending=new Map([...byId].filter(([id,row])=>!included.has(id)&&!ambiguous.has(id)));
+  const ordered=[],done=new Set(included),blocked=new Set(ambiguous);
+  while(pending.size){
+    let changed=false;
+    for(const [id,row] of pending){
+      if(row.observedActionIds.some(parent=>!done.has(parent)&&(!allIds.has(parent)||!byId.has(parent)||ambiguous.has(parent)))){
+        blocked.add(id);pending.delete(id);changed=true;
+      }
+    }
+    const ready=[...pending.values()].filter(row=>row.observedActionIds.every(parent=>done.has(parent)))
+      .sort((a,b)=>a.at-b.at||(a.id<b.id?-1:a.id>b.id?1:0));
+    if(ready.length){
+      for(const row of ready){pending.delete(row.id);ordered.push(row);done.add(row.id);}
+      changed=true;
+    }
+    if(!changed)break; // a cycle or a missing causal ancestor stays conserved, not guessed
+  }
+  return {events:ordered,blockedIds:new Set([...blocked,...pending.keys()])};
+}
+function decisionNoHistoryProvesRating(board,event,ratings){
+  if(event.kind!=="no"||event.ratingApplied!==undefined||!event.baseId)return false;
+  const baseline=board.decisionBaseline;if(event.baseId!==baseline.sourceBaseId)return false;
+  const candidate=ratings.get(event.candidateId),benchmark=ratings.get(event.benchmarkId);
+  if(!candidate||!benchmark)return false;
+  const rowFor=id=>(board.tasks||[]).find(task=>task.id===id)?.ratingHistory?.find(row=>row?.id===event.id&&row.kind==="no"&&validRatingHistoryRow(row)&&row.before);
+  const candidateRow=rowFor(event.candidateId),benchmarkRow=rowFor(event.benchmarkId);
+  return !!candidateRow&&!!benchmarkRow
+    &&candidate.mu===candidateRow.before.mu&&candidate.sigma===candidateRow.before.sigma
+    &&benchmark.mu===benchmarkRow.before.mu&&benchmark.sigma===benchmarkRow.before.sigma
+    &&candidateRow.after.mu!==candidateRow.before.mu&&benchmarkRow.after.mu!==benchmarkRow.before.mu;
+}
+function projectDecisionEvents(board=state){
+  const baseline=board?.decisionBaseline,account=board?.syncAccount||window.CloudSync?.user||null;
+  if(!supportedDecisionBaseline(baseline,account)||decisionBaselineRecoveryRows(board).length)return false;
+  const before=JSON.stringify([(board.tasks||[]).map(task=>[task.id,task.mu,task.sigma]),board.chain,board.considered,board.cantAt,board.workedAt,board.scanMode,board.settings?.scanMode]);
+  if(typeof projectDecisionPassBase==="function")projectDecisionPassBase(board);
+  const {values:ratings,conflicts}=decisionBaselineRatings(baseline);
+  const {events,blockedIds}=decisionEventOrder(board,baseline);
+  for(const row of baseline.ratings)ratings.set(row.taskId,{mu:row.mu,sigma:row.sigma});
+  // Every rating starts at the one frozen inherited value. Legacy ratingHistory
+  // remains visible evidence but is never reverse-engineered into comparisons.
+  for(const task of board.tasks||[]){const rating=ratings.get(task.id);if(rating){task.mu=rating.mu;task.sigma=rating.sigma;}}
+  const activePass=decisionId(board.passId)?board.passId:null,passEvents=events.filter(event=>event.passId===activePass);
+  for(const event of events){
+    if(!decisionBaselineAcceptsEvent(baseline,event)||event.ratingApplied!==true&&event.kind!=="no")continue;
+    const canTrain=event.kind==="comparison"&&event.ratingApplied===true
+      ||event.kind==="no"&&(event.ratingApplied===true||decisionNoHistoryProvesRating(board,event,ratings));
+    if(!canTrain||conflicts.size)continue;
+    if(event.kind==="comparison"&&event.action==="dislodge"){
+      const loser=ratings.get(event.taskId);if(loser)updatePair({mu:PRIOR_MU,sigma:PRIOR_SIGMA},loser);
+    }else if(event.kind==="no"){
+      const winner=ratings.get(event.benchmarkId),loser=ratings.get(event.candidateId);if(winner&&loser)updatePair(winner,loser);
+    }else if(event.kind==="comparison"&&event.action==="yes"){
+      const winner=ratings.get(event.winnerId),loser=ratings.get(event.loserId);if(winner&&loser)updatePair(winner,loser);
+    }else if(event.kind==="comparison"&&event.action==="dot"&&event.loserId){
+      const winner=ratings.get(event.winnerId),loser=ratings.get(event.loserId);if(winner&&loser)updatePair(winner,loser);
+    }
+  }
+  for(const task of board.tasks||[]){const rating=ratings.get(task.id);if(rating){task.mu=rating.mu;task.sigma=rating.sigma;}}
+  if(passEvents.length){
+    const start=passEvents[0].chainIds.filter(id=>board.tasks?.some(task=>task.id===id&&!task.done));
+    const chain=[...new Set(start)];
+    for(const event of passEvents){
+      const id=event.kind==="no"?null:event.kind==="comparison"&&event.action!=="dislodge"?event.taskId:null;
+      if(event.kind==="comparison"&&event.action==="dislodge"){
+        const index=chain.indexOf(event.taskId);if(index>=0)chain.splice(index,1);
+        continue;
+      }
+      if(!id||!board.tasks?.some(task=>task.id===id&&!task.done))continue;
+      if(event.action==="yes"||event.action==="dot"){
+        const prior=chain.indexOf(id);if(prior>=0)chain.splice(prior,1);chain.push(id);
+      }
+    }
+    board.chain=chain;
+  }
+  const disposition=new Map();
+  for(const event of passEvents){
+    const id=event.kind==="no"?event.candidateId:event.kind==="comparison"?event.taskId:null;
+    if(!id)continue;
+    if(event.kind==="no")disposition.set(id,"no");
+    else if(event.action==="dislodge")disposition.set(id,"dislodged");
+    else if(event.action==="yes"||event.action==="dot")disposition.set(id,"clear");
+  }
+  board.considered=board.considered&&typeof board.considered==="object"&&!Array.isArray(board.considered)?board.considered:{};
+  for(const [id,value] of disposition){
+    if(value==="clear"){delete board.considered[id];if(board.cantAt)delete board.cantAt[id];if(board.workedAt)delete board.workedAt[id];}
+    else board.considered[id]=value;
+  }
+  if(typeof projectCurrentChoiceEvents==="function")projectCurrentChoiceEvents(board);
+  recomputeProjectedDecisionRanks(board);
+  return before!==JSON.stringify([(board.tasks||[]).map(task=>[task.id,task.mu,task.sigma]),board.chain,board.considered,board.cantAt,board.workedAt,board.scanMode,board.settings?.scanMode]);
+}
+function recomputeProjectedDecisionRanks(board){
+  if(board===state)recomputeRanks();
+}
 function currentDecisionPassId(){
   if(typeof state.passId==="string" && state.passId)return state.passId;
   const started=Number.isFinite(state.passStartedAt)&&state.passStartedAt>=0?state.passStartedAt:0;
   return "legacy-pass-v1:"+started+":"+(typeof state.chain?.[0]==="string"?state.chain[0]:"none");
 }
-function prepareNoDecisionEvent(candidate,benchmarkTask,observation){
-  const account=typeof state.syncAccount==="string"&&state.syncAccount
-    ? state.syncAccount : typeof window.CloudSync?.user==="string"&&window.CloudSync.user ? window.CloudSync.user : null;
-  const base=account&&validDecisionBase(state.decisionBase,account,state.syncRev)?state.decisionBase:null;
-  return {v:1,id:uid(),at:observation.at,account,baseId:base?.id??null,kind:"no",meaning:"benchmark-preferred",
-    candidateId:candidate.id,benchmarkId:benchmarkTask.id,passId:currentDecisionPassId(),
-    passAt:Number.isFinite(state.passStartedAt)&&state.passStartedAt>=0?state.passStartedAt:0,
-    scanMode:state.scanMode,chainIds:Array.isArray(state.chain)?state.chain.slice():[],
+function decisionGestureFields(gesture,at){
+  const captured=gesture&&typeof gesture==="object"?gesture:captureDecisionGesture(null,at);
+  return {actionId:decisionId(captured.actionId)?captured.actionId:uid(),at:Number.isFinite(captured.at)&&captured.at>=0?captured.at:at,
+    account:typeof captured.account==="string"&&captured.account?captured.account:null,
+    baseId:decisionId(captured.baseId)?captured.baseId:null,passId:decisionId(captured.passId)?captured.passId:currentDecisionPassId(),
+    passAt:Number.isFinite(captured.passAt)&&captured.passAt>=0?captured.passAt:0,
+    scanMode:["descending","chance","squared","halving"].includes(captured.scanMode)?captured.scanMode:state.scanMode,
+    chainIds:Array.isArray(captured.chainIds)?captured.chainIds.filter(decisionId):[],
+    observedActionIds:decisionIdList(captured.observedActionIds)?captured.observedActionIds.slice():decisionActionFrontier(state.decisionEvents)};
+}
+function prepareNoDecisionEvent(candidate,benchmarkTask,observation,gesture=null,ratingApplied=false){
+  return {...decisionGestureFields(gesture,observation.at),v:1,id:uid(),kind:"no",meaning:"benchmark-preferred",ratingApplied,
+    candidateId:candidate.id,benchmarkId:benchmarkTask.id,
     candidateContextIds:Array.isArray(candidate.ctx)?candidate.ctx.filter(id=>typeof id==="string"):[],
-    benchmarkContextIds:Array.isArray(benchmarkTask.ctx)?benchmarkTask.ctx.filter(id=>typeof id==="string"):[],
-    observedActionIds:decisionActionFrontier(state.decisionEvents)};
+    benchmarkContextIds:Array.isArray(benchmarkTask.ctx)?benchmarkTask.ctx.filter(id=>typeof id==="string"):[]};
+}
+function prepareComparisonDecisionEvent(action,task,benchmarkTask,observation,gesture=null,ratingApplied=false){
+  const fields=decisionGestureFields(gesture,observation.at),taskContexts=Array.isArray(task?.ctx)?task.ctx.filter(id=>typeof id==="string"):[];
+  const benchmarkContexts=Array.isArray(benchmarkTask?.ctx)?benchmarkTask.ctx.filter(id=>typeof id==="string"):[];
+  const event={...fields,v:1,id:uid(),kind:"comparison",action,ratingApplied,taskId:task.id,
+    taskContextIds:taskContexts,benchmarkContextIds:benchmarkContexts};
+  if(action==="yes"){
+    event.candidateId=task.id;event.benchmarkId=benchmarkTask?.id||null;
+    event.candidateContextIds=taskContexts;event.winnerId=task.id;event.loserId=benchmarkTask.id;
+  }else if(action==="dot"){
+    event.benchmarkId=benchmarkTask?.id||null;event.winnerId=task.id;event.loserId=benchmarkTask?.id||null;
+  }else if(action==="dislodge")event.benchmarkId=task.id;
+  return event;
+}
+function recordDecisionEvent(event){
+  const baseline=ensureDecisionBaseline(event);
+  if(baseline)event.baselineId=baseline.id;
+  return appendDecisionEvent(event);
 }
 function appendNoDecisionEvent(event){
-  if(!event || !event.id)return;
+  if(!event||!event.id)return false;
   state.passId ||= event.passId;
-  if(Array.isArray(state.decisionEvents)){
-    if(!state.decisionEvents.some(existing=>existing?.id===event.id))state.decisionEvents=[...state.decisionEvents,event];
-    return;
-  }
-  if(state.decisionEvents!==undefined){
-    const recovery=Array.isArray(state.decisionEventsRecovery)?state.decisionEventsRecovery
-      : state.decisionEventsRecovery===undefined?[]:[{unrecognizedDecisionEventsRecovery:state.decisionEventsRecovery}];
-    state.decisionEventsRecovery=[...recovery,{unrecognizedDecisionEvents:JSON.parse(JSON.stringify(state.decisionEvents))}];
-  }
-  state.decisionEvents=[event];
+  return recordDecisionEvent(event);
 }
 function ratingMetricsChanged(a,b,oldBasis,basis){
   return ["mu","sigma","likelihood","eligible","fallback","n","samples"].some(key=>a[key]!==b[key])
