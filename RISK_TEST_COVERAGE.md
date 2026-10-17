@@ -697,6 +697,35 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 
 ## Stale-tab reconciliation
 
+- RISK cloud No recovery: five scanner decisions survive offline durable reopen beside an independent peer edit in Mac-first and phone-first cloud publication orders (action time is fixed before boot and cold reopen across timezone boundaries)
+- RISK cloud current choices: editor Save records original per-property action time
+- RISK cloud current choices: scan mode preference records an explicit timed choice
+- RISK cloud current choices: Resume scanning records an explicit active-pass mode change
+- RISK cloud current choices: explicit Start scanning mode records its new active pass
+- RISK cloud current choices: Save settings retains changed shared preferences as one action
+- RISK cloud current choices: immediate preference controls retain their action times
+- RISK cloud current choices: Start scanning pass root and frozen draw survive a fresh client reopen
+- RISK cloud current choices: Can’t and Return are timed, causally linked disposition actions
+- RISK cloud current choices: compatible edits on the same task retain each changed property
+- RISK cloud current choices: original decision time wins conflicts in either publication order
+- RISK cloud current choices: causal projector retains compatible task fields and context membership
+- RISK cloud current choices: context membership additions compose across observed revisions
+- RISK cloud shared preferences: later theme choice survives either publication order and cold reopen
+- RISK cloud shared preferences: date format survives an independent No in either publication order and cold reopen
+- RISK cloud shared preferences: one hourly quote edit survives an independent No without replacing other hours
+- RISK cloud shared preferences: scene time season and structured location survive an independent No
+- RISK cloud contexts: deleting a legacy context and targeted Undo restore its exact definition for a cold peer
+- RISK cloud contexts: create rename mode and task assignment survive an independent No in either order
+- RISK cloud contexts: independent new definitions materialize in either publication order
+- RISK cloud contexts: long names create rename delete and Undo retain the exact definition on a cold peer
+- RISK cloud contexts: unsupported prior rows hold rename mode and delete before Undo or cloud mutation
+- RISK current-choice projection: a complete creation group reconstructs its definition on a pristine board
+- RISK cloud current choices: a changed scene source is held before adoption or acknowledgement
+- RISK cloud current choices: typed preference authority survives a modern replacement Undo and stale delivery
+- RISK cloud current choices: causal action order beats skew and equal concurrent times use event identity
+- RISK cloud current choices: fresh pass projection installs the exact frozen mode draw
+- RISK cloud current choices: final outcome projection does not erase later pass comparisons
+- RISK cloud current choices: projected Can’t and Return preserve the original hold then clear it
 - RISK STALE TAB: CAS repair preserves newer fields and independent edits through an awaiting third action
 - RISK STALE TAB: browser rebase keeps disjoint fields but newer conflicts and deletions win
 - RISK STALE TAB: cloud adoption does not replace edits made while its safety backup awaits
@@ -709,6 +738,14 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK STALE TAB: recovery guidance explains independent edits conflicts and unobserved cloud bases
 - RISK STALE TAB: rebasing never combines cached Chance data from different passes
 - RISK STALE TAB: a conflicting edit during awaited CAS repair retains its exact recovery bytes
+
+## Decision-preserving cloud learning
+- RISK comparison replay: independent Yes and Dot evidence survives either cloud publication order and a fresh client
+- RISK comparison replay: repeated same-pair Yes and No actions remain distinct and replay once by original action order
+- RISK comparison replay: first supported action freezes learned legacy ratings without replaying observational history
+- RISK comparison replay: deleting an opponent keeps its frozen rating available without resurrecting the task
+- RISK comparison replay: compatible new-task baseline extensions union without freezing branch-local posteriors
+- RISK comparison replay: compatible frozen learning survives different legacy pass-context baseline IDs
 
 - `RISK dependency picker search: Add and Edit input filtering preserves hidden selections and excludes completed ordinary choices` — native dependency filtering and retained saved links.
 
@@ -1192,3 +1229,137 @@ Protect warm crowd reuse, exact reordered and evicted gait reconstruction, aggre
 - `RISK wheeled shadow FAQ: guidance describes complete vehicle shade and body occlusion`
 
 Protect full bicycle and scooter silhouettes, fixed tire contacts, shared solar rays, one opacity mask, and mobile bodies above ground shadows.
+
+## Decision authority recovery and mixed-client rollout (#146)
+
+- `RISK decision capability adapter: first decision activates a sticky fence while plain legacy boards remain compatible`
+- `RISK decision capability baseline: sole unknown learned authority activates the fence without rewriting bytes`
+- `RISK decision recovery: unknown cloud evidence holds adoption and publication without replacing the durable local decision`
+- `RISK decision recovery baseline: unsupported sole learning baseline cannot replace a durable local action`
+- `RISK decision recovery identity: conflicting bytes for one acknowledged action hold both exact branches`
+- `RISK decision recovery shape: malformed known action evidence stays durable and cannot publish`
+- `RISK decision recovery ownership: foreign action evidence cannot be published under the current account`
+- `RISK decision recovery durability: failed local save holds publication and retry retains one original No`
+- `RISK decision recovery uncertain acknowledgement: committed No is read back after cold reopen without another comparison`
+- `RISK decision recovery account transition: pending No acknowledgement cannot enter another account and the exact prior board stays recoverable`
+
+Protect conditional decision-capability activation, ordinary pinned-client compatibility, exact unknown/foreign/colliding evidence holds, mandatory local saves, original action identity through uncertain acknowledgement and cold reopen, and account-bound late replies. Firestore rules consumers additionally execute the immutable historical backend and full application, activation CAS, historical safe-update holds, and rules-first rollout.
+
+## Scoped ordinary Undo (#145)
+
+- `RISK scoped Undo: local comparison cancellation keeps peer learning and survives stale cloud and reopen`
+- `RISK scoped Undo: compound editor Dot restores only local fields and context deltas after peer progress`
+- `RISK scoped Undo: bulk edit is one durable cancellation group and later peer choices stay effective`
+- `RISK scoped Undo: cancelled No cannot return from stale marks and context membership keeps the peer delta`
+
+Protect local gesture targeting through reconciliation, immutable grouped cancellation, frozen-baseline learning, exact prior property presence, later peer choices, context membership deltas, duplicate/stale delivery, durable cloud state and reopen. Explicit replacement and established domain cancellation remain separate.
+
+## Decision inheritance and complete replay safety (#146)
+
+- `RISK decision capability recovery: sole baseline recovery activates the fence without rewriting evidence`
+- `RISK decision recovery compatible update: unsupported authority checks the safe app update path and Retry keeps exact work`
+- `RISK decision recovery guest sign-in: a saved guest No and later authenticated No retain original facts and learning`
+- `RISK decision recovery explicit transfer: consented cross-account Import and Restore preserve original facts and later learning`
+- `RISK decision recovery inheritance authority: changed attested facts stay held and ordinary account switches gain no consent`
+- `RISK decision recovery inheritance durability: failed replacement recovery keeps both boards and an explicit retry succeeds`
+- `RISK decision recovery legacy update: safe reload and Retry hold a sole unrepresented legacy comparison instead of acknowledging lost learning`
+- `RISK decision recovery projection: supported but unprojectable authority holds exact cloud and local branches`
+- `RISK decision recovery validation order: rejected local evidence stays exact before known-cloud union`
+
+Protect source validation before authority union; missing/cyclic ancestry, baseline recovery and extension conflicts; lossless explicit ownership inheritance and exact-fact attestation; mandatory source/replacement recovery in both stores; and safe update of sole pending legacy learning without invented comparisons.
+
+- `RISK scoped Undo: first guest sign-in keeps local cancellation authority and replays later signed learning`
+- `RISK scoped Undo: unsupported cancellation payloads hold exact local and cloud branches`
+- `RISK scoped Undo: completion evergreen work delete and postpone retain unrelated peer fields`
+- `RISK scoped Undo: cancelling Start restores the prior pass root and exact draw through stale delivery`
+- `RISK scoped Undo: Return cancellation restores the original hold time while peer task fields survive`
+
+## Complete Start and chosen-field authority (#146)
+
+- `RISK decision recovery current-choice authority: strict editor semantics and effective chosen fields guard cloud adoption`
+- `RISK decision recovery Start authority: incomplete or ambiguous real Start groups hold exact branches`
+
+Preserve both sources when a supported Start group is incomplete/ambiguous or a chosen field no longer matches its retained decision.
+
+## Deliberate exact decision replacement (#146)
+
+- `RISK decision recovery modern replacement: explicit transfer into an existing decision board keeps exact displaced authority recoverable`
+- `RISK decision recovery replacement scope: exact retired branches stay retired while new changed and unknown peer facts stay held`
+
+Durable exact displaced-baseline/fact receipts retire only explicitly replaced authority; new/changed/unknown peer facts stay protected. Reverse replacement Undo is the dependent #145 gate.
+
+- `RISK scoped Undo: explicit modern Import Restore and Reset reverse exact journal replacement after recovery`
+- `RISK scoped Undo: replacement recovery failure and an account race retain the current board and Undo frame`
+
+## Independent decision release guidance (#147)
+
+- `RISK independent decision guidance: rendered FAQ and Settings distinguish retained decisions targeted Undo and held evidence`
+- `RISK independent decision guidance: the actual bulk editor explains scoped reversal and original choice times`
+- `RISK independent decision guidance: actual adoption toast directs recovery without promising remote-board Undo`
+- `RISK independent decision guidance: the actual bulk result keeps confirmation and Undo meanings separate`
+
+The mounted FAQ and Settings explain durable offline decisions, narrow original-time conflicts, exact acknowledgement, preserved inherited ratings, safely held unrecorded legacy work, and ordinary targeted Undo. Shared appearance and context guidance covers independent changes and the separate non-Undo theme/scene boundary. Existing bulk form, conflict, readability and historical changelog protections remain.
+## Replacement source preservation (#146)
+
+- `RISK decision recovery same-account replacement: Import and Restore keep the selected modern learning baseline intact`
+- `RISK decision recovery replacement durability: failed selected-source recovery leaves a modern destination and input exact for retry`
+
+Same-account replacement retains the selected learning baseline; a failed mandatory selected-source recovery leaves the exact modern destination and input ready for retry.
+
+## Sole recovery replacement authority (#146)
+
+- `RISK decision recovery unknown destination: sole recovery authority blocks explicit journal replacement without changing either board`
+
+Validate sole recovery authority before the no-active-journal replacement shortcut; preserve exact destination, source input and cloud while held.
+
+## Precise shared-fact retirement (#146)
+
+- `RISK decision recovery replacement overlap: selected shared facts survive a displaced cloud branch returning after Import`
+- `RISK decision recovery retired identity: changed same-ID retired editor facts cannot become fresh authority`
+
+Shared selected facts remain active through reversed cloud adoption; retired typed field values cannot resurrect; changed retired identities hold against exact witness bytes.
+
+- `RISK scoped Undo: inherited guest edit restores its before value through stale signed snapshots`
+- `RISK scoped Undo: inherited legacy-pass No cancellation survives stale marks without inventing a pass`
+
+## Mixed-client rollout across every decision family (#146/#147)
+
+- `RISK decision mixed rollout fixture: actual comparisons current choices Pause Start and scoped Undo survive durable publication and reopen`
+
+The existing `Firestore rules: real pinned writer reads decision authority then holds its ordinary app edit without erasing it` and `Firestore rules: first decision against released rules stays exact and pending until rules-first rollout then retry` consumers now publish coherent actual-app No, Yes, editor Dot, Dislodge, current-choice, Start and scoped Undo evidence through the production Firebase adapter. The same producer fixture includes theme, date format, time/season scene fields and a created context definition, and checks their effective values after publication, cold reopen, the immutable historical read and rules-first Retry. Both rollout guards and immutable supported baseline remain protected. Exact emulator execution belongs to the final root candidate; the in-process fixture is not emulator proof.
+
+## Unknown compatible-baseline authority (#146)
+
+- `RISK decision recovery baseline metadata: unknown v1 authority stays exact instead of disappearing through compatible baseline adoption`
+
+A real newer-peer adoption must preserve and hold unknown version1 metadata at the baseline, frozen rating, existing extension and compatible alias boundaries. It cannot drop those fields and report Synced; known optional provenance/legacy/inheritance/replacement forms remain supported.
+
+## Exact replacement lineage and guest Reset inheritance (#146)
+
+- `RISK decision recovery retired comparison effects: exact stale returns cannot revive No Yes Dot or Dislodge after two replacements and peer progress`
+- `RISK decision recovery transitive replacement: a second plain Import recognizes exact retired learning and still holds malformed nested ownership`
+- `RISK decision recovery replacement idempotence: repeated actual Export Import retains one exact authority tree after durable recovery`
+- `RISK decision recovery guest Reset inheritance: replacement-only authority supports first signed No and the existing local Reset Undo`
+
+Exact comparison retirement clears only named effects, preserving later peer choices and learning. Validated nested replacement/inheritance receipts retain lossless wire witnesses; changed foreign witnesses hold. Reimporting the exact current authority completes recovery without duplicating its tree. Empty guest Reset authority adopts only through first-empty-account provenance, retains available Reset and earlier No Undo, and stops on failed recovery or an account race. Explicit replacement frames seal the installed result before asynchronous persistence, while ordinary adoption still seals the preceding gesture.
+
+- `RISK decision recovery selected legacy pass: exact retired comparisons cannot replace the imported pass draw root or No marks`
+
+A real explicit Import may select a plain supported legacy board with a different pass and no modern Start facts. Exact retired No/Yes/Dot/Dislodge returning as a higher revision preserves that selected pass ID, start, mode, frozen draw, root, candidate and marks, both before and after new peer editor/Dot learning. The correction copies only the coherent pass tuple when exact retired comparison evidence identifies the returning pass; other fields/learning still merge and supported active actions project normally.
+
+## Final decision review preservation (#141)
+
+- `RISK final decision review: offline context Undo restores retained membership across null and attested bases`
+- `RISK final decision review: later Resume beats older Pause in both publication orders and targeted Undo survives stale reopen`
+- `RISK final decision review: fresh Start then Pause remains paused through independent title and scoped Undo`
+- `RISK final decision review: contrary comparison current membership follows intent while both learning observations survive`
+- `RISK final decision review: mode authority respects observed causality and unsupported mode facts stay held`
+- `RISK final decision review: repeated manual Restore and Undo retain bounded exact lineage and peer progress`
+
+Compatibility context projection honors exact cancellation facts, including all-cancelled prior membership. Pause/Resume use strict pass-scoped work/scan choices with original time and observed ancestry, independent of weighting changes; Start maintenance stays subordinate to those choices. Contrary Yes/No current membership resolves without removing either learning observation or fabricating another comparison. Title-only retired branches receive the same exact selected-pass protection as comparison branches. Repeated real backup Restore/Undo deduplicates only selected-root receipts already archived exactly in the new displaced baseline, preserving exact lineage, stale recognition, peer fields and cold reopen with linear metadata growth. Unsupported authority remains held. The two native scene-time/layout fixture seeds use the supported timestamped motion preference; every existing native assertion stays unchanged and native execution remains parent-owned.
+
+Postimplementation mixed integration acceptance also carries a normal visible enabled Pause and its exact ordinary Undo, retaining the original immutable pass.mode fact and cancellation. Existing raw stream, effective cold state, old-reader and rules-first Retry assertions stay unchanged; final exact emulator execution remains root-owned.
+
+- `RISK intervention Continue authority: a visible scan reaffirmation competes with Pause and scoped Undo in either publication order`
+
+The actual intervention Yes records deliberate current-pass Scan intent even when already scanning. Both upload orders and both original-time directions preserve the correct opposing answer, original fact owner/time, existing snooze/intervention behavior, exact scoped Undo, unrelated peer title, stale delivery and cold reopen. The existing mode causal-skew and unsupported-fact hold consumers remain included; no fake weighting or Start event is created.

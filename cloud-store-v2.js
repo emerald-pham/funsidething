@@ -25,6 +25,12 @@
     if(!root.ChainStorageV2) throw new Error("Snapshot codec is required");
     if(!Number.isSafeInteger(batchSize)||batchSize<1||batchSize>400) throw new RangeError("Cloud batch size is invalid");
     const current=callback=>typeof callback!=="function"||callback();
+    const needsDecisionCapability=payload=>{
+      try{
+        const board=JSON.parse(payload);
+        return board&&typeof board==="object"&&["decisionEvents","decisionEventsRecovery","decisionBaseline","decisionBaselineRecovery"].some(key=>Object.hasOwn(board,key));
+      }catch{return false;}
+    };
 
     async function pull(uid,{stillCurrent}={}){
       if(!uid) return {error:true,code:"missing-account"};
@@ -110,7 +116,7 @@
         const sealed=["sealed","published"].includes(existing.state) ? existing : await adapter.sealGeneration(uid,generationId,header);
         if(!sealed||!["sealed","published"].includes(sealed.state)) return {error:true,code:"seal-failed",generationId};
         if(!current(stillCurrent)) return {cancelled:true,generationId};
-        const result=await adapter.publishGeneration(uid,generationId,{baseRev,updatedAt,hash:encoded.hash,stillCurrent});
+        const result=await adapter.publishGeneration(uid,generationId,{baseRev,updatedAt,hash:encoded.hash,stillCurrent,decisionCapability:needsDecisionCapability(payload)?1:undefined});
         if(!current(stillCurrent)) return {cancelled:true,generationId};
         return {...result,generationId};
       }catch(error){
