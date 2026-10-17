@@ -1,5 +1,30 @@
 [
   {
+    "testChangesSha256": "49202736fd447e265be561add6b964dcaa6be009115d1aa49014ac0f8e1b654a",
+    "reason": "The user elevated involuntary mid-work reloads to P0 and superseded the earlier after-gesture automatic-reload policy. Preserve an actually used document while update checks/downloads continue; close the reproduced blurred Add draft-loss gap without changing board or cloud formats.",
+    "previousBehavior": "A controlled worker controllerchange reloads a visible page as soon as an editor or scanner gesture ends. A typed Add draft that loses focus is not in the saved board and disappears after that replacement. Existing update gesture tests required immediate replacement after the click or cancellation.",
+    "intendedBehavior": "Quiet startup retains safe automatic activation and first-install/save/editor checks. Actual document input, pointer, keyboard, touch, accessible click or wheel activity retains the used document through update arrival and asynchronous saving. Normal task saving and cold reopening preserve committed decisions; downloaded code is available on normal reopening or deliberate reload.",
+    "replacementTests": [
+      "RISK PWA session updates: a blurred unfinished Add draft prevents automatic document replacement",
+      "RISK PWA session updates: keyboard scrolling and accessible clicks keep updates available without replacing used documents",
+      "RISK PWA updates: a scanner gesture commits durably without an automatic session reload",
+      "RISK PWA updates: a gesture beginning during an update save preserves the ongoing session",
+      "RISK PWA updates: cancelled and released gestures preserve the used session",
+      "RISK PWA updates: the extended FAQ and changelog explain uninterrupted used sessions"
+    ],
+    "preservedCoverage": [
+      "All earlier task-decision, single No effect and exact isolated durable cold-reopen assertions remain. Only the explicitly superseded after-gesture automatic-reload expectations change; no passing data-preservation contract is removed.",
+      "All quiet-startup, first-install, HTTP-cache bypass, update-check availability, editor deferral, asynchronous save, save failure, quota and state-change guards remain protected.",
+      "The new complete-app tests use the #150/#151 approved consumer seam, real document input/actions and isolated storage; no production account, personal board, new public hook, protocol or storage schema is introduced.",
+      "FAQ navigation and unrelated release history remain. Correctly mount the existing template contents in the fake DOM so the changelog assertion checks release notes rather than accidentally matching only the FAQ.",
+      "The Node fixture cannot establish actual browser paint or process crashes, the original white flash, Safari PWA behavior, physical devices or the unclassified 4-to-14-to-4 report. These remain separate evidence requirements."
+    ],
+    "redEvidence": {
+      "command": "Before runtime implementation: node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/Documents/Codex/2026-10-17/task/chain-reload-p0 --evidence-dir /tmp/chain-reload-p0-evidence --purpose preimplementation-red -- node --test --test-reporter=spec --test-name-pattern=\"RISK P0 update draft\" tests.js. Separate pre-copy RED: --test-name-pattern=\"RISK PWA updates: the extended FAQ\". Separate pre-packaging RED: --test-name-pattern=\"PWA cache contract: CACHE_NAME|Settings changelog: every app asset change\".",
+      "failure": "Actual data-risk preimplementation RED at 22:26:30 and narrowed 22:27:47/48: automatic update must not discard an unfinished Add draft after focus moves, 1 reload !== 0. Captured synthetic diagnostic reloads:1, visibleDraft:Private unfinished draft, coldDraft:empty, boardContainsDraft:false. Files /tmp/chain-reload-p0-evidence/2026-10-17T22-26-30-441Z-ab9013d7-0b8b-4234-a77a-5459c56d5ca0.json and 22-27-47-824Z-4c2e4dc2-377c-495a-9810-83afa7912639.json. First functional edit followed at22:28; its first GREEN attempt failed because the fake worker registration was after the input event; corrected the fixture to register before input as real page boot does. Actual GREEN22:29:19. Supplementary keyboard/scroll and superseded existing gesture expectations were added/updated AFTER that functional guard; their pristine-public-base failures at22:31:12 are later-baseline-sensitivity, not missing preimplementation chronology. That run failed all six affected assertions and restored candidate bytes with a SHA-256 equality check. FAQ quiet-startup wording RED22:30:36 before copy edits, GREEN22:30:59 after mounting real templates. Fingerprints RED22:31:35 before metadata regeneration, then focused18/18 GREEN. Full recorder records retain exact commands, diffs, source identity, output and chronology; no claim that this establishes the original crash cause."
+    }
+  },
+  {
     "testChangesSha256": "39c7e999620a61fcf45c1ec3d2c267653ca3c9366e9eed3dc81237fd6f2a5561",
     "reason": "Correct the reproduced continuous-daylight cutoff through existing solar, timeline and painter consumers, document the exclusion through real help rendering, and verify the installed shell receives and runs the corrected solar bytes. Existing assertions are retained; the offline module-delivery test is strengthened.",
     "previousBehavior": "At 65.8 N / 18.96 E on 2026-06-21 the Sun remains above the local-day horizon but the fixed 66 degree guard returns polarDay:false, dawn and show eligibility. The default-seed observer local day admits 18 fireworks and 2 festivals. Help omits the exclusion, and unchanged sw.js bytes would not cause browsers to install the new solar source.",

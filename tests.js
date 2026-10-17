@@ -18217,6 +18217,42 @@ function pwaUpdateHarness({controller=true,editing=false,saveOK=true,durable=fal
  vm.runInNewContext(source+';registerServiceWorker();',box);
  return {box,sw,wh,dh,sh,ready:async()=>{if(wh.load)await wh.load();await flush();},counts:()=>({updates,reloads,saves,options,toasts}),edit:v=>editing=v};
 }
+test('RISK PWA session updates: a blurred unfinished Add draft prevents automatic document replacement',async()=>{
+ const {ctx,shim}=await loadApp({seed:4710});
+ if(!ctx.state.addOpen)ctx.onAction('toggle-add',{});ctx.renderAddPanel();
+ assert.equal(await ctx.persist(),true,'the starting board is safely saved');
+ const handlers={},reloads=[];
+ ctx.navigator={serviceWorker:{controller:{},addEventListener:(type,fn)=>handlers[type]=fn,register:async()=>({update:async()=>{}})}};
+ shim.document.readyState='complete';shim.document.hidden=false;
+ shim.window.location={reload:()=>reloads.push('foreground document replaced')};
+ ctx.registerServiceWorker();await flush();
+ const input=shim.document.getElementById('addInput');input.id='addInput';input.matches=()=>true;
+ shim.document.activeElement=input;input.value='Private unfinished draft';
+ shim.document.dispatchEvent({type:'input',target:input});
+ await handlers.controllerchange();
+ assert.equal(reloads.length,0,'the existing focused-input guard protects the draft');
+ shim.document.activeElement=null;shim.document.dispatchEvent({type:'focusout',target:input});await flush();
+ assert.equal(input.value,'Private unfinished draft','blur does not mean that the user discarded the draft');
+ assert.equal(reloads.length,0,'an automatic update must not discard an unfinished Add draft after focus moves');
+ await ctx.onAction('add',{});
+ const raw=shim.localStorage.getItem(SYNC_STORE_KEY),cold=await loadApp({seedStorage:{[SYNC_STORE_KEY]:raw}});
+ assert.equal(cold.ctx.state.tasks.filter(task=>task.title==='Private unfinished draft').length,1,'the retained draft can be submitted and reopened exactly once');
+});
+test('RISK PWA session updates: keyboard scrolling and accessible clicks keep updates available without replacing used documents',async()=>{
+ for(const type of ['keydown','wheel','touchstart','click']){
+  const {ctx,shim}=await loadApp({seed:4711});ctx.addTask('Private session '+type);assert.equal(await ctx.persist(),true);
+  const handlers={},reloads=[];let checks=0;
+  ctx.navigator={serviceWorker:{controller:{},addEventListener:(event,fn)=>handlers[event]=fn,register:async()=>({update:async()=>{checks++;}})}};
+  shim.document.readyState='complete';shim.document.hidden=false;shim.window.location={reload:()=>reloads.push('page replaced')};
+  ctx.registerServiceWorker();await flush();
+  shim.document.dispatchEvent({type,key:'Shift',target:{matches:()=>false,closest:()=>null}});await flush();
+  await handlers.controllerchange();await ctx.window.checkForAppUpdate();
+  assert.equal(reloads.length,0,type+' preserves the open document between actions');
+  assert.ok(checks>=2,type+' does not prevent later worker checks or download');
+  const raw=shim.localStorage.getItem(SYNC_STORE_KEY),cold=await loadApp({seedStorage:{[SYNC_STORE_KEY]:raw}});
+  assert.equal(cold.ctx.state.tasks[0].title,'Private session '+type,'normal reopening retains the saved board');
+ }
+});
 test('PWA updates: check on launch, foreground and reconnect with HTTP cache bypass',async()=>{
  const h=pwaUpdateHarness();await h.ready();assert.equal(h.counts().options.updateViaCache,'none');
  assert.equal(h.counts().updates,1);await h.wh.focus();await h.wh.online();await h.dh.visibilitychange();
@@ -18277,7 +18313,7 @@ test('PWA updates: opening an edit during an asynchronous save defers reload aga
  const applying=h.sh.controllerchange();await flush();h.edit(true);release(true);await applying;
  assert.equal(h.counts().reloads,0,'new editing must be checked after the async save');
 });
-test('RISK PWA updates: a scanner gesture commits its action before a downloaded worker reloads',async()=>{
+test('RISK PWA updates: a scanner gesture commits durably without an automatic session reload',async()=>{
  const {IDBFactory}=await import('fake-indexeddb'),indexedDBProvider=new IDBFactory(),deviceDbName='private-pwa-update-gesture-'+Date.now()+'-'+Math.random();
  const {ctx,shim}=await loadApp({seed:4701,indexedDBProvider,deviceDbName});
  for(let i=0;i<8;i++)ctx.addTask('Private update gesture '+i);
@@ -18292,8 +18328,8 @@ test('RISK PWA updates: a scanner gesture commits its action before a downloaded
  assert.equal(reloads.length,0,'a ready worker cannot replace the page between pointerdown and the scanner click');
  const noButton={dataset:{act:'no'},disabled:false};
  shim.document.dispatchEvent({type:'click',detail:1,target:{closest:()=>noButton}});
- for(let attempt=0;attempt<100&&reloads.length===0;attempt++)await new Promise(resolve=>setTimeout(resolve,10));
- assert.equal(reloads.length,1,'the pending update resumes after the committed click');
+ await new Promise(resolve=>setTimeout(resolve,450));
+ assert.equal(reloads.length,0,'finishing a response does not end the active session');
  assert.equal(ctx.state.considered[candidateId],'no','the delegated scanner click commits the selected task decision');
  const committed=JSON.parse(JSON.stringify({marks:ctx.state.considered,tasks:ctx.state.tasks,chain:ctx.state.chain}));
  assert.equal(Object.values(committed.marks).filter(mark=>mark==='no').length,1);
@@ -18301,7 +18337,7 @@ test('RISK PWA updates: a scanner gesture commits its action before a downloaded
  assert.deepEqual(JSON.parse(JSON.stringify({marks:reopened.ctx.state.considered,tasks:reopened.ctx.state.tasks,chain:reopened.ctx.state.chain})),committed,
   'a cold full-app reopen retains the committed decision in the isolated durable store');
 });
-test('RISK PWA updates: a gesture beginning during an update save holds and resumes reload',async()=>{
+test('RISK PWA updates: a gesture beginning during an update save preserves the ongoing session',async()=>{
  const {IDBFactory}=await import('fake-indexeddb'),indexedDBProvider=new IDBFactory(),deviceDbName='private-pwa-update-async-gesture-'+Date.now()+'-'+Math.random();
  const {ctx,shim}=await loadApp({seed:4702,indexedDBProvider,deviceDbName});
  for(let i=0;i<8;i++)ctx.addTask('Private async update '+i);
@@ -18320,13 +18356,13 @@ test('RISK PWA updates: a gesture beginning during an update save holds and resu
  const noButton={dataset:{act:'no'},disabled:false};
  shim.document.dispatchEvent({type:'pointerup'});
  shim.document.dispatchEvent({type:'click',detail:1,target:{closest:()=>noButton}});
- for(let attempt=0;attempt<100&&reloads.length===0;attempt++)await new Promise(resolve=>setTimeout(resolve,10));
- assert.equal(reloads.length,1,'the update resumes after the real scanner click without another worker event');
+ await new Promise(resolve=>setTimeout(resolve,450));
+ assert.equal(reloads.length,0,'the downloaded update keeps the used document open after the real scanner click');
  assert.equal(ctx.state.considered[candidateId],'no','the click commits while the update is deferred');
  const reopened=await loadApp({indexedDBProvider,deviceDbName});
- assert.equal(reopened.ctx.state.considered[candidateId],'no','the resumed update reloads only after the action reaches durable storage');
+ assert.equal(reopened.ctx.state.considered[candidateId],'no','normal action saving reaches durable storage without replacing the used document');
 });
-test('RISK PWA updates: cancelled and released gestures resume a pending replacement',async()=>{
+test('RISK PWA updates: cancelled and released gestures preserve the used session',async()=>{
  for(const ending of ['pointercancel','pointerup']){
   const {ctx,shim}=await loadApp({seed:4703});ctx.addTask('Private cancelled gesture');ctx.startScan('descending');
   assert.equal(await ctx.persist(),true,'the cancellation fixture starts from a durable board');
@@ -18336,17 +18372,21 @@ test('RISK PWA updates: cancelled and released gestures resume a pending replace
   ctx.registerServiceWorker();await flush();shim.document.dispatchEvent({type:'pointerdown'});await handlers.controllerchange();
   assert.equal(reloads.length,0,ending+' must remain protected until its completion boundary');
   shim.document.dispatchEvent({type:ending});
-  for(let attempt=0;attempt<100&&reloads.length===0;attempt++)await new Promise(resolve=>setTimeout(resolve,10));
-  assert.equal(reloads.length,1,ending+' must release the deferred update without another worker event');
+  await new Promise(resolve=>setTimeout(resolve,400));
+  assert.equal(reloads.length,0,ending+' ends the gesture while retaining the ongoing session');
  }
 });
-test('RISK PWA updates: the extended FAQ and changelog explain gesture-safe reloads',async()=>{
- const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+test('RISK PWA updates: the extended FAQ and changelog explain uninterrupted used sessions',async()=>{
+ const {ctx,shim}=await loadApp();
+ for(const id of ['appChangelogCurrent','appChangelog'])shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];
+ ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
  const answer=help.split('<dt>How do I install or update the app?</dt><dd>')[1]?.split('</dd>')[0];assert.ok(answer,'the install/update FAQ remains in Quick start');
- assert.match(answer,/scanner touch/i,'the FAQ explains why an update can wait during a scanner gesture');
- assert.match(answer,/choose.*response.*save.*before.*reload/i,'the FAQ explains that the task response is saved before reload');
- assert.match(answer,/cancel.*touch.*gesture ends/i,'the FAQ explains how a cancelled gesture releases the update');
- assert.match(help,/scanner touch.*finish.*(?:saved|save).*update/i,'the changelog describes the shipped update behavior');
+ assert.match(answer,/checks for updates.*opens.*foreground/i,'normal update availability remains documented');
+ assert.match(answer,/quiet startup/i,'the FAQ distinguishes safe startup activation');
+ assert.match(answer,/typ.*touch.*scroll.*keyboard/i,'the FAQ explains what protects an open session');
+ assert.match(answer,/reopen.*deliberately reload/i,'the FAQ explains how to use a downloaded update');
+ assert.match(answer,/draft.*before closing/i,'unfinished drafts remain protected in the current page');
+ assert.match(help,/Downloaded app updates.*(?:open|session).*reopen/i,'the changelog describes the bounded interruption repair');
 });
 test('Scan preference: saving always chance changes the current scan, without changing ratings or marks',async()=>{
  const {ctx,shim}=await loadApp();for(let i=0;i<5;i++)ctx.addTask('task '+i);ctx.startScan();ctx.state.snooze=100;ctx.decide('no');
