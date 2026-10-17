@@ -13050,6 +13050,29 @@ test('RISK decision recovery retired comparison effects: exact stale returns can
  });
 });
 
+test('RISK decision recovery selected legacy pass: exact retired comparisons cannot replace the imported pass draw root or No marks',async t=>{
+ for(const action of ['no','yes','dot','dislodge'])await t.test(action,async t=>{
+  const {local,peer,h,initial,at}=await scopedUndoClients(),ctx=local.ctx;
+  for(const app of [local,peer])t.after(()=>{app.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',app.ctx);});
+  if(action==='no'||action==='yes')ctx.onAction(action,{dataset:{candidate:'undo-local',benchmark:'undo-base'}});
+  else if(action==='dot'){hydrateUnchangedEditorDraft(local,'undo-local');ctx.onAction('dot-task',{dataset:{id:'undo-local'}});}
+  else ctx.onAction('dislodge',{dataset:{benchmark:'undo-base'}});
+  await ctx.persist();ctx.window.CloudSync.ready=true;await ctx.cloudPushNow();await syncSettle(35);const displaced=JSON.parse(JSON.stringify(ctx.state));
+  // A plain saved board is a supported explicit selection: it need not invent
+  // modern Start facts to retain its different current pass and frozen draw.
+  const selected=JSON.parse(JSON.stringify(initial));Object.assign(selected,{chain:['undo-peer'],candidateId:null,mode:'scan',scanMode:'squared',passId:'selected-legacy-pass-Q',passStartedAt:at-5000,considered:{'undo-local':'no'},cantAt:{},workedAt:{},chance:{seed:'selected-Q-frozen-draw',at:at-5000,weights:{},opponents:selected.tasks.map(task=>({id:task.id,mu:task.mu,sigma:task.sigma}))}});selected.settings.scanMode='squared';
+  assert.equal(selected.decisionBaseline,undefined);assert.equal(selected.decisionEvents,undefined);local.shim.document.getElementById('jsonBox').value=JSON.stringify(selected);assert.equal(await ctx.onAction('import-json',{}),true);await ctx.persist();await ctx.cloudPushNow();await syncSettle(40);assert.equal(ctx.state.syncDirty,false);assert.equal(ctx.state.decisionEvents.length,0);
+  const pass=board=>JSON.stringify(['passId','passStartedAt','mode','scanMode','chance','chain','candidateId','interventionActive','considered','cantAt','workedAt'].map(key=>[key,board[key]]));
+  const chosen=pass(ctx.state),chosenRatings=JSON.stringify(ctx.state.tasks.map(task=>[task.id,task.mu,task.sigma]));assert.equal(ctx.state.passId,selected.passId);assert.deepEqual(Array.from(ctx.state.chain),['undo-peer']);assert.equal(ctx.state.considered['undo-local'],'no');assert.equal(ctx.state.chance.seed,selected.chance.seed);
+  h.writeBehindBack(displaced);await ctx.cloudPull();await ctx.cloudPushNow();await syncSettle(45);
+  assert.equal(pass(ctx.state),chosen,'the selected legacy pass is coherent authority even with no active modern Start or comparison facts');assert.equal(pass(h.remoteState()),chosen);assert.equal(JSON.stringify(ctx.state.tasks.map(task=>[task.id,task.mu,task.sigma])),chosenRatings);assert.equal(ctx.state.settings.scanMode,'squared');assert.equal(ctx.state.syncDirty,false);assert.equal(ctx.window.CloudSync.errorCode??null,null);
+  peer.ctx.window.CloudSync.ready=true;await peer.ctx.cloudPull();await saveEditorChoice(peer,'undo-base',at+500,{title:'Peer progress in selected pass'});hydrateUnchangedEditorDraft(peer,'undo-base');peer.ctx.onAction('dot-task',{dataset:{id:'undo-base'}});await peer.ctx.persist();await peer.ctx.cloudPushNow();await syncSettle(40);await ctx.cloudPull();await ctx.cloudPushNow();await syncSettle(35);
+  const activePass=pass(ctx.state),facts=JSON.stringify(ctx.state.decisionEvents),ratings=JSON.stringify(ctx.state.tasks.map(task=>[task.id,task.mu,task.sigma]));assert.deepEqual(Array.from(ctx.state.chain),['undo-peer','undo-base']);assert.ok(ctx.state.decisionEvents.some(event=>event.kind==='comparison'&&event.action==='dot'));
+  h.writeBehindBack(displaced);await ctx.cloudPull();await ctx.cloudPushNow();await syncSettle(45);
+  assert.equal(pass(ctx.state),activePass,'precise pass retirement preserves later peer progress in the selected pass');assert.equal(pass(h.remoteState()),activePass);assert.equal(ctx.state.settings.scanMode,'squared');assert.equal(ctx.state.tasks.find(task=>task.id==='undo-base').title,'Peer progress in selected pass');assert.equal(JSON.stringify(ctx.state.decisionEvents),facts);assert.equal(JSON.stringify(ctx.state.tasks.map(task=>[task.id,task.mu,task.sigma])),ratings);assert.equal(ctx.state.syncDirty,false);assert.equal(ctx.window.CloudSync.errorCode??null,null);
+ });
+});
+
 test('RISK decision recovery transitive replacement: a second plain Import recognizes exact retired learning and still holds malformed nested ownership',async t=>{
  const {local,peer,h,initial}=await scopedUndoClients(),ctx=local.ctx;
  for(const app of [local,peer])t.after(()=>{app.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',app.ctx);});

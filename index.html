@@ -3509,6 +3509,17 @@ function retiredDecisionEvent(baseline,event){
 function restoreRetiredDecisionFields(target,source){
   const receipts=replacementDecisionReceipts(source.decisionBaseline).filter(receipt=>canonicalDecisionFact(receipt.baseline)===canonicalDecisionFact(target.decisionBaseline));
   const copy=(to,from,key)=>{if(Object.hasOwn(from||{},key))to[key]=JSON.parse(JSON.stringify(from[key]));else delete to[key];};
+  // A plain imported board can deliberately select a different current pass
+  // without modern Start facts. An exact retired comparison from the returning
+  // pass cannot make its old root/draw current again. Keep this pass coherent;
+  // retained active peer facts still project normally after the evidence merge.
+  if(currentChoicePassId(target)!==currentChoicePassId(source)&&receipts.some(receipt=>receipt.facts.some(fact=>{
+    const event=JSON.parse(LZString.decompressFromUTF16(fact.witness));
+    return (event.kind==="no"||event.kind==="comparison")&&event.passId===currentChoicePassId(target);
+  }))){
+    for(const key of ["passId","passStartedAt","mode","scanMode","chance","chain","candidateId","interventionActive","considered","cantAt","workedAt"])copy(target,source,key);
+    target.settings||={};copy(target.settings,source.settings,"scanMode");
+  }
   for(const receipt of receipts)for(const fact of receipt.facts){
     const event=JSON.parse(LZString.decompressFromUTF16(fact.witness));
     if(event.kind==="no"||event.kind==="comparison"){

@@ -1342,3 +1342,7 @@ A real newer-peer adoption must preserve and hold unknown version1 metadata at t
 - `RISK decision recovery guest Reset inheritance: replacement-only authority supports first signed No and the existing local Reset Undo`
 
 Exact comparison retirement clears only named effects, preserving later peer choices and learning. Validated nested replacement/inheritance receipts retain lossless wire witnesses; changed foreign witnesses hold. Reimporting the exact current authority completes recovery without duplicating its tree. Empty guest Reset authority adopts only through first-empty-account provenance, retains available Reset and earlier No Undo, and stops on failed recovery or an account race. Explicit replacement frames seal the installed result before asynchronous persistence, while ordinary adoption still seals the preceding gesture.
+
+- `RISK decision recovery selected legacy pass: exact retired comparisons cannot replace the imported pass draw root or No marks`
+
+A real explicit Import may select a plain supported legacy board with a different pass and no modern Start facts. Exact retired No/Yes/Dot/Dislodge returning as a higher revision preserves that selected pass ID, start, mode, frozen draw, root, candidate and marks, both before and after new peer editor/Dot learning. The correction copies only the coherent pass tuple when exact retired comparison evidence identifies the returning pass; other fields/learning still merge and supported active actions project normally.
