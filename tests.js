@@ -28484,3 +28484,11 @@ test('RISK independent decision guidance: actual adoption toast directs recovery
  assert.match(text,/out of date/i);assert.match(text,/previous board.*Settings backups/i);
  assert.doesNotMatch(text,/↺|undoes it|Undo restores.*board/i,'ordinary Undo targets a local action, so the adoption notice must offer explicit recovery');
 });
+
+test('RISK independent decision guidance: the actual bulk result keeps confirmation and Undo meanings separate',async()=>{
+ const {ctx,shim}=await loadApp();ctx.closeModal();ctx.addTask('Isolated bulk result task');ctx.state.listOpen=true;
+ ctx.onAction('bulk-select-all');ctx.onAction('bulk-edit');shim.document.getElementById('bulkApplyDue').checked=true;shim.document.getElementById('bulkDue').value='2027-08-12';ctx.onAction('bulk-save');
+ const result=shim.document.getElementById('listBulkToolbar').innerHTML;
+ assert.match(result,/not a server save confirmation/);assert.match(result,/Undo reverses your last action and keeps unrelated progress/);
+ assert.doesNotMatch(result,/earlier whole board|Undo restores.*board/);
+});

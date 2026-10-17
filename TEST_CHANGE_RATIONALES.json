@@ -7710,5 +7710,21 @@
       "command": "node --test --test-name-pattern='RISK independent decision guidance: actual adoption toast' tests.js",
       "failure": "Actual app cloudPull notification failed by rendering the literal ↺ undoes it promise before the toast edit; raw147/toast-guidance-red.log. Direct consumer and existing guidance/adoption cohort then passed8/8 in147/toast-guidance-green.log against the pre-145 root; later #145 preserves the changed ordinary Undo behavior."
     }
+  },
+  {
+    "testChangesSha256": "026bc3439f78676863d434969871d8a15fc64b3a93c0044f0076686b46c324a1",
+    "reason": "The persistent bulk result retained another obsolete earlier-whole-board Undo warning; align this actual post-Save surface with approved ordinary scoped Undo.",
+    "previousBehavior": "Actual bulk Save displayed accurate local result counts but claimed recovery Undo restores an earlier whole board.",
+    "intendedBehavior": "Keep result counts separate from server confirmation and state that header Undo reverses the last local action while retaining unrelated progress.",
+    "replacementTests": [
+      "RISK independent decision guidance: the actual bulk result keeps confirmation and Undo meanings separate"
+    ],
+    "preservedCoverage": [
+      "Retain all current local match/change counts, late-result updates, recovery backup direction, account-switch result isolation, no separate batch Undo button, form rules and full unrelated guidance."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK independent decision guidance: the actual bulk result' tests.js",
+      "failure": "Actual post-Save listBulkToolbar output failed last-action Undo wording and contained the prior whole-board warning before source edit; raw147/bulk-result-guidance-red.log. Focused existing/new guidance and result consumers then pass147/bulk-result-guidance-green.log."
+    }
   }
 ]

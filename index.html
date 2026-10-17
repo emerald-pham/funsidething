@@ -7301,7 +7301,7 @@ function renderListFilters(view=allTasksView.read()){
 
 function bulkResultHTML(result){
   if(!result)return '';
-  return '<p class="kv" role="status">Bulk edit requested for '+result.requested+' tasks: '+result.matched+' currently match in this tab; '+result.changed+' have different values or are no longer open. This is not a server save confirmation; check the sync status. '+(result.changed?'Check Settings recovery backups for displaced values. ':'')+'After recovery, Undo restores an earlier whole board.</p>';
+  return '<p class="kv" role="status">Bulk edit requested for '+result.requested+' tasks: '+result.matched+' currently match in this tab; '+result.changed+' have different values or are no longer open. This is not a server save confirmation; check the sync status. '+(result.changed?'Check Settings recovery backups for displaced values. ':'')+'Header Undo reverses your last action and keeps unrelated progress.</p>';
 }
 function renderList(){
   const view=allTasksView.read();
