@@ -7659,5 +7659,22 @@
       "command": "node --test --test-name-pattern='RISK independent decision guidance: the actual bulk editor' tests.js",
       "failure": "Actual modal rendered the old newer-peer and whole-board Undo intro and failed the original-choice-time assertion before the intro edit; raw147/bulk-guidance-red.log. Both new guidance consumers and existing copy cohort then passed6/6 in147/bulk-guidance-green.log."
     }
+  },
+  {
+    "testChangesSha256": "a41ac4cd6ade3a0665c9d53ad8338debe9d554a2109badcd56865021185da98e",
+    "reason": "Close the observed sole-recovery authority shortcut in explicit replacement preparation.",
+    "previousBehavior": "A destination containing only decisionBaselineRecovery or decisionEventsRecovery returned from replacement preparation before semantic validation, allowing visible replacement of unsupported authority.",
+    "intendedBehavior": "Validate both sources before the empty-active-journal shortcut. Unknown destination recovery holds explicit Import with exact primary state, durable head, cloud and source input unchanged.",
+    "replacementTests": [
+      "RISK decision recovery unknown destination: sole recovery authority blocks explicit journal replacement without changing either board"
+    ],
+    "preservedCoverage": [
+      "All previous assertions remain unchanged. Replacement/inheritance/same-account/recovery focused cohort68 passes21/21 zero skips.",
+      "No Undo semantics changed; the earlier recorded reverse explicit replacement gate remains145-owned."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK decision recovery unknown destination:' tests.js",
+      "failure": "Actual app Import returned true for both sole decisionBaselineRecovery and decisionEventsRecovery formats in146/67-unknown-destination-red.log. Moving validation before shortcut gives GREEN68 (21/21 replacement-focused checks)."
+    }
   }
 ]
