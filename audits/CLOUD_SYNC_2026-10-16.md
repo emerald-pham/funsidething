@@ -55,9 +55,11 @@ comparison evidence and any incompatible current board choice have different
 roles. This supersedes the earlier proposal that matching answers count once
 or that opposite comparison answers make one observation replace the other.
 
-These product boundaries are recorded. The final shared-understanding check
-required by the invoked grilling skill remains pending; this is not runtime
-implementation authorization.
+These product boundaries are recorded. After resolving them, the user invoked
+the to-spec skill to advance to synthesis and publication on the configured
+tracker. That instruction supersedes the earlier pending discussion checkpoint;
+it does not request runtime implementation. The spec includes a focused check
+of the proposed consumer test boundary before publication.
 
 ## How the current system works
 
@@ -224,8 +226,8 @@ one snapshot was published later. Undo reverses its action rather than loading
 an entire prior board. A durable base by itself fixes the first finding but not
 the second; array union by itself would invent ordering and Undo semantics.
 
-Before implementation, confirm the recorded shared understanding and agree
-the consumer seams. The first regression should cover the user's five-plus-one
+Before implementation, use the synthesized spec and agreed consumer seams.
+The first regression should cover the user's five-plus-one
 branch example through actual actions, both publication orders, offline
 reopening, and an acknowledged final cloud board. Add the warm independent-Dot
 case, genuine current-state conflicts with delayed upload, two deliberate
