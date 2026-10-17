@@ -60,6 +60,53 @@ async function upgradedLegacyApp173(t,options={}){
  t.after(()=>closeLegacyApp173(app));app.shim.localStorage.setItem(SYNC_STORE_KEY,f.stale);app.shim.localStorage.setItem(LOCAL_HEAD_KEY,f.stale);if(!await app.ctx.persist())assert.equal(await app.ctx.persist(),true);
  return {...app,f,h};
 }
+test('RISK legacy completion startup copies: both literal divergent sources precede every upgrade write',async t=>{
+ const f=await legacyCompletionSource173(t),storage=sharedScannerStorage({[SYNC_STORE_KEY]:f.stale,[LOCAL_HEAD_KEY]:f.completed});
+ const writes=[],write=storage.setItem;let runtime;storage.setItem=(key,value)=>{if(key===SYNC_STORE_KEY||key===LOCAL_HEAD_KEY)writes.push({key,bothSafe:[f.stale,f.completed].every(source=>runtime.readLocalBackups().some(row=>row.payload===source))});return write(key,value);};
+ const app=await loadAppAtTime(f.at+3*3600000,{sharedStorage:storage,beforeStateReady(ctx){runtime=ctx;}});t.after(()=>closeLegacyApp173(app));
+ const backups=app.ctx.readLocalBackups();t.diagnostic(JSON.stringify({exactDisk:backups.some(row=>row.payload===f.stale),exactHead:backups.some(row=>row.payload===f.completed),headChanged:storage.getItem(LOCAL_HEAD_KEY)!==f.completed,chain:Array.from(app.ctx.state.chain)}));
+ assert.ok(backups.some(row=>row.payload===f.completed),'startup must preserve the literal guarded head before upgrade overwrites it');assert.ok(backups.some(row=>row.payload===f.stale));assert.ok(writes.length>0);assert.ok(writes.every(row=>row.bothSafe),'every actual startup primary write follows both verified literal copies');assert.deepEqual(Array.from(app.ctx.state.chain),[f.ids[1]]);
+});
+test('RISK legacy completion startup safety: refused unverified and raced copies retain both sources and newer drafts',async t=>{
+ const f=await legacyCompletionSource173(t);
+ for(const fault of ['copy-refused','head-copy-unverified','head-race','disk-race'])await t.test(fault,async t=>{
+  const storage=sharedScannerStorage({[SYNC_STORE_KEY]:f.stale,[LOCAL_HEAD_KEY]:f.completed}),write=storage.setItem,h=makeSyncHarness({remote:f.board,rev:4,delayMs:1}),primary=[],paints=[];let runtime,copies=0;
+  storage.setItem=(key,value)=>{
+   if(key===LOCAL_BACKUPS_KEY){copies++;if(fault==='copy-refused')throw Error('startup exact-copy refusal');if(fault==='head-copy-unverified'&&runtime.parseBackupIndex(value)?.some(row=>row.payload===f.completed))return;const result=write(key,value);if(fault.endsWith('-race'))write(fault==='head-race'?LOCAL_HEAD_KEY:SYNC_STORE_KEY,(fault==='head-race'?f.completed:f.stale)+'\n'.repeat(copies));return result;}
+   if(key===SYNC_STORE_KEY||key===LOCAL_HEAD_KEY)primary.push({key,value});return write(key,value);
+  };
+  const app=await loadAppAtTime(f.at+3*3600000,{sharedStorage:storage,cloudSyncFactory:()=>{const CS=h.factory();CS.ready=false;return CS;},beforeStateReady(ctx,shim){runtime=ctx;const scan=shim.document.getElementById('scan');let markup='';Object.defineProperty(scan,'innerHTML',{configurable:true,get:()=>markup,set(value){markup=value;if(ctx.state)paints.push(Array.from(ctx.state.chain));}});}});t.after(()=>closeLegacyApp173(app));
+  assert.deepEqual(primary,[],'failed startup safety cannot overwrite either literal key');assert.ok(paints.length>0);assert.ok(paints.every(chain=>!chain.includes(f.ids[0])));assert.ok(storage.getItem(SYNC_STORE_KEY).startsWith(f.stale));assert.ok(storage.getItem(LOCAL_HEAD_KEY).startsWith(f.completed));
+  const added=app.ctx.addTask('Newer draft held by startup '+fault),facts=JSON.stringify(app.ctx.state.decisionEvents),ratings=JSON.stringify(app.ctx.state.tasks.filter(row=>row.id!==added.id).map(row=>[row.id,row.mu,row.sigma]));assert.equal(await app.ctx.persist(),false);assert.ok(app.ctx.state.tasks.some(row=>row.id===added.id));const cloud=h.doc.payload;app.ctx.window.CloudSync.ready=true;await app.ctx.cloudPushNow();await syncSettle(25);assert.equal(h.doc.payload,cloud);assert.deepEqual(primary,[]);assert.equal(JSON.stringify(app.ctx.state.decisionEvents),facts);assert.equal(JSON.stringify(app.ctx.state.tasks.filter(row=>row.id!==added.id).map(row=>[row.id,row.mu,row.sigma])),ratings);
+  const retained=[storage.getItem(SYNC_STORE_KEY),storage.getItem(LOCAL_HEAD_KEY)];storage.setItem=write;if(!await app.ctx.persist())assert.equal(await app.ctx.persist(),true);for(const source of retained)assert.ok(app.ctx.readLocalBackups().some(row=>row.payload===source));assert.deepEqual(Array.from(app.ctx.state.chain),[f.ids[1]]);assert.ok(app.ctx.state.tasks.some(row=>row.id===added.id));await app.ctx.cloudPull();await app.ctx.cloudPushNow();await settleSavedViewPublication(app,h,'startup guarded retry '+fault);assert.deepEqual(h.remoteState().chain,[f.ids[1]]);assert.ok(h.remoteState().tasks.some(row=>row.id===added.id));
+ });
+});
+
+test('RISK legacy completion unknown inheritance: unsupported witnesses preserve a usable startup hold',async t=>{
+ const f=await legacyCompletionSource173(t),board=JSON.parse(f.revived);
+ board.decisionBaseline.inheritance=[{v:99,reason:'future-import',facts:[{id:'future-inheritance-fact',witness:'opaque future format'}]}];
+ const raw=JSON.stringify(board),h=makeSyncHarness({remote:f.board,rev:4,delayMs:1});let app;
+ await assert.doesNotReject(async()=>{app=await loadAppAtTime(f.at+3*3600000,{seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw},cloudSyncFactory:()=>{const CS=h.factory();CS.ready=false;return CS;}});},'an unsupported inherited format must hold safely instead of aborting startup');
+ if(app){t.after(()=>closeLegacyApp173(app));assert.equal(app.shim.localStorage.getItem(SYNC_STORE_KEY),raw);assert.equal(app.ctx.decisionEvidenceIssue(app.ctx.state,'e@example.com'),'unsupported-decision-evidence');app.ctx.openHelp();assert.match(app.shim.document.getElementById('modalRoot').innerHTML,/Quick start/);const input=app.shim.document.getElementById('addInput');input.value='Newer unfinished draft beside unknown source';const cloud=h.doc.payload;app.ctx.window.CloudSync.ready=true;await app.ctx.cloudPull();await app.ctx.cloudPushNow();assert.equal(app.ctx.window.CloudSync.errorCode,'unsupported-decision-evidence');assert.equal(h.doc.payload,cloud);assert.equal(app.shim.localStorage.getItem(SYNC_STORE_KEY),raw);assert.equal(app.shim.localStorage.getItem(LOCAL_HEAD_KEY),raw);assert.equal(input.value,'Newer unfinished draft beside unknown source');}
+ for(const receipt of [null,{v:1},{v:1,reason:'incomplete',facts:[{id:'missing-witness'}]}])await t.test('incomplete unknown receipt '+JSON.stringify(receipt),async t=>{
+  const unknown=JSON.parse(f.revived);unknown.decisionBaseline.inheritance=[receipt];const exact=JSON.stringify(unknown),held=await loadAppAtTime(f.at+3*3600000,{seedStorage:{[SYNC_STORE_KEY]:exact,[LOCAL_HEAD_KEY]:exact}});t.after(()=>closeLegacyApp173(held));assert.equal(held.ctx.decisionEvidenceIssue(held.ctx.state,'e@example.com'),'unsupported-decision-evidence');assert.equal(held.shim.localStorage.getItem(SYNC_STORE_KEY),exact);assert.equal(held.shim.localStorage.getItem(LOCAL_HEAD_KEY),exact);
+ });
+
+});
+
+test('RISK PWA changelog history: current safe updates do not rewrite the September 28 record',async t=>{
+ const app=await loadApp();t.after(()=>closeLegacyApp173(app));for(const id of ['appChangelogCurrent','appChangelog'])app.shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];app.ctx.openHelp();const help=app.shim.document.getElementById('modalRoot').innerHTML,section=date=>help.split('<h3>'+date+'</h3>')[1]?.split('<h3>')[0];
+ const earlier=spawnSync('git',['show','dd4300a5d0d29529a1302920e86741201ad4d183^:index.html'],{cwd:__dirname,encoding:'utf8'});assert.equal(earlier.status,0);const old=earlier.stdout.split('<h3>September 28, 2026</h3>')[1].split('<h3>')[0].match(/<li>Downloaded app updates.*?<\/li>/)[0];
+ assert.ok(section('September 28, 2026').includes(old),'the mounted September 28 release retains its original update behavior record');assert.doesNotMatch(section('September 28, 2026'),/including windows using the previous version|after all app windows and tabs close/);assert.match(section('October 17, 2026'),/including windows using the previous version/);assert.match(section('October 17, 2026'),/Ambiguous older Start returns stay protected while recovery waits/);
+});
+
+test('RISK legacy completion unknown inheritance control: the prior app safely boots identical unknown bytes',async t=>{
+ const f=await legacyCompletionSource173(t),board=JSON.parse(f.revived);board.decisionBaseline.inheritance=[{v:99,reason:'future-import',facts:[{id:'future-inheritance-fact',witness:'opaque future format'}]}];
+ const raw=JSON.stringify(board),old=spawnSync('git',['show','3da524b7302e4ebb75914b4d6893864a9ab57210:index.html'],{cwd:__dirname,encoding:'utf8'});assert.equal(old.status,0);
+ const app=await loadAppAtTime(f.at+3*3600000,{appSource:extractAppScript(old.stdout),seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw}});t.after(()=>closeLegacyApp173(app));
+ assert.equal(app.shim.localStorage.getItem(SYNC_STORE_KEY),raw);assert.equal(app.ctx.decisionEvidenceIssue(app.ctx.state,'e@example.com'),'unsupported-decision-evidence');
+});
+
 test('RISK legacy completion divergent sources: both literal guarded copies are safe before reconciliation writes',async t=>{
  const f=await legacyCompletionSource173(t),h=makeSyncHarness({remote:f.board,rev:4,delayMs:1}),app=await loadAppAtTime(f.at+3*3600000,{seedStorage:{[SYNC_STORE_KEY]:f.completed,[LOCAL_HEAD_KEY]:f.completed},cloudSyncFactory:()=>{const CS=h.factory();CS.ready=false;return CS;}});t.after(()=>closeLegacyApp173(app));
  const {ctx,shim}=app,added=ctx.addTask('Newer open edit during divergent recovery'),facts=JSON.stringify(ctx.state.decisionEvents),ratings=JSON.stringify(ctx.state.tasks.filter(row=>row.id!==added.id).map(row=>[row.id,row.mu,row.sigma]));

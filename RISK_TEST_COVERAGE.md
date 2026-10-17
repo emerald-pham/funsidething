@@ -1450,6 +1450,10 @@ Actual populated-editor ordinary Done, an offline Dot that an independent peer c
 - RISK legacy completion recovery safety: failed exact-source backup holds startup and guarded recovery without losing a newer edit
 - RISK legacy completion support floor: real eventless learned ratings upgrade without reconstructing comparison history
 - RISK legacy completion released shell: actual stale write conflicts then holds unknown authority and its pending edit for safe update
+- RISK legacy completion startup copies: both literal divergent sources precede every upgrade write
+- RISK legacy completion startup safety: refused unverified and raced copies retain both sources and newer drafts
+- RISK legacy completion unknown inheritance: unsupported witnesses preserve a usable startup hold
+- RISK legacy completion unknown inheritance control: the prior app safely boots identical unknown bytes
 - RISK legacy completion released Start: normally acknowledged expired return is preserved or explicitly held before rewrite
 - RISK legacy completion unknown evidence: malformed imported provenance holds exact local and cloud branches
 - RISK legacy completion proven restore: an actual released early Return and Dot cannot be fenced again by its stale completion
@@ -1465,6 +1469,8 @@ Actual populated-editor ordinary Done, an offline Dot that an independent peer c
 - `RISK legacy completion divergent safety: refused copies and either guarded-key race hold exact sources and newer edits`
 - `RISK completion awareness FAQ: unseen completion defeats later clock or upload while comparison ratings remain`
 ## P0 active app sessions
+
+- RISK PWA changelog history: current safe updates do not rewrite the September 28 record
 
 - RISK PWA session updates: a blurred unfinished Add draft prevents automatic document replacement
 - RISK PWA session updates: keyboard scrolling and accessible clicks keep updates available without replacing used documents
