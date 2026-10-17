@@ -7588,5 +7588,23 @@
       "command": "node --test --test-name-pattern='RISK decision recovery Start authority:|RISK decision recovery current-choice authority:' tests.js",
       "failure": "146/54-start-authority-red.log observed missing-root, missing-mode and duplicate-mode acceptance;146/57-choice-authority-red.log observed effective title overwrite acceptance. Runtime repair GREEN146/55 and58 (36/36 combined family)."
     }
+  },
+  {
+    "testChangesSha256": "67ade2b8e4a60791617611422e87a378a0b8f8a982ab79c20e094181c761ac7c",
+    "reason": "Implement the parent-approved exact authority replacement boundary without silently restoring displaced modern journals during Import/Restore.",
+    "previousBehavior": "Explicitly selected modern source journals were combined with incompatible displaced destination baselines, so authorized modern-target Import/Restore remained dirty and held.",
+    "intendedBehavior": "After exact source and destination recovery, a strict receipt attests the exact replaced baseline/facts and explicit gesture. Automatic merges retire only those exact facts; new, changed or unknown peer facts remain preserved/held. Same-account selected learning baseline remains valid. The dependent reverse replacement Undo is intentionally reserved to #145.",
+    "replacementTests": [
+      "RISK decision recovery modern replacement: explicit transfer into an existing decision board keeps exact displaced authority recoverable",
+      "RISK decision recovery replacement scope: exact retired branches stay retired while new changed and unknown peer facts stay held"
+    ],
+    "preservedCoverage": [
+      "Every existing assertion remains unchanged. New errorCode no-error assertion normalizes only undefined versus null after the original dirty-state RED was repaired.",
+      "Modern replacement-only scope passes8/8 (146/62). Broader61 evidence passes66/67 and preserves one known prior snapshot Undo regression for #145; unchanged prior runtime8c passes that gate (63). This bounded helper checkpoint is not full146 completion."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK decision recovery modern replacement:' tests.js",
+      "failure": "146/56-modern-replacement-red.log: actual consented Import and Restore into modern destination both stayed syncDirty:true. 146/60 reached no-error harness representation only after dirty-state fix. 146/62 confirms8/8. Required dependent prior snapshot Undo gate remains recorded in61 and must be repaired by #145 using reverse receipt; no assertions weakened."
+    }
   }
 ]
