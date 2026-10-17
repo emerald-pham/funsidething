@@ -1455,5 +1455,5 @@ Actual populated-editor ordinary Done, an offline Dot that an independent peer c
 - RISK legacy completion replacement: actual Import Restore Reset and their Undo retain retired checkpoint provenance
 - RISK legacy completion replacement safety: refused source recovery and account races leave Import Restore Reset and input exact
 - RISK legacy completion guest adoption: actual modern guest Done remains observable and Undoable after first empty-account sign-in
-- RISK legacy completion FAQ: imported completion boundaries explain exact recovery and permitted return without invented history
+- RISK legacy completion FAQ: older saved boards keep completed tasks out and explain safe return
 - RISK legacy completion inherited cancellation: an actual guest Done Undo stays reversed after authorized first sign-in
