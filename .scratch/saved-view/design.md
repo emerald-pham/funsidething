@@ -1,8 +1,8 @@
 # Saved view on reopen and refresh
 
-Status: ready for shared-understanding confirmation, October 16, 2026. Runtime
-behavior is unchanged. The explicitly invoked grill-with-docs workflow holds
-implementation until the user confirms shared understanding.
+Status: approved for implementation, October 16, 2026. The user confirmed the
+shared understanding with “sure” and explicitly invoked implement-spec.
+Implementation and release track [GitHub #140](https://github.com/emerald-pham/funsidething/issues/140).
 
 ## Problem
 
@@ -49,7 +49,7 @@ reproducing the reported visual transition rather than assuming its cause.
    boundaries.
 
 No additional preference questionnaire is needed for established behavior.
-The final shared-understanding confirmation is the remaining interview boundary.
+The shared-understanding confirmation is complete.
 
 ## Current implementation evidence
 
