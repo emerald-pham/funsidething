@@ -11771,6 +11771,122 @@ function makeSyncHarness({ delayMs = 4, remote = null, failPull = false, rev = n
   return h;
 }
 
+test('RISK cloud No recovery: five scanner decisions survive offline durable reopen beside an independent peer edit',async t=>{
+ const {IDBFactory}=await import('fake-indexeddb');
+ const at=Date.parse('2026-10-16T15:10:00.000Z'),passAt=at-60000;
+ for(const backend of ['browser fallback','IndexedDB'])await t.test(backend,async()=>{
+  const initial=syncState({tasks:[
+   Object.assign(syncTask('bench','Phone benchmark'),{mu:36,sigma:8,ctx:['c_shared']}),
+   ...Array.from({length:5},(_,i)=>Object.assign(syncTask('phone-no-'+(i+1),'Phone No '+(i+1)),{ctx:['c_shared']})),
+   Object.assign(syncTask('mac-edit','Mac independent task'),{done:true,completedAt:100,ctx:['c_shared']}),
+  ],contexts:[{id:'c_shared',name:'Shared context',active:true}],chain:['bench'],considered:{},candidateId:'phone-no-1',mode:'scan',scanMode:'descending',passStartedAt:passAt,passId:'shared-pass-142',syncRev:4,syncAccount:'e@example.com',syncDirty:false,
+   settings:{horizonMin:60,thresholdPct:0,samples:250,cantMin:30,workedHours:8,theme:'system'}});
+  const remote=JSON.parse(JSON.stringify(initial));
+  for(const key of ['syncRev','syncAccount','syncDirty','lastCloudServerAt','protectedBackupIds'])delete remote[key];
+  const h=makeSyncHarness({remote,rev:4,delayMs:1});
+  const indexedDB=backend==='IndexedDB'?new IDBFactory():null;
+  const names={phone:'cloud-no-142-phone-'+Date.now()+'-'+Math.random(),mac:'cloud-no-142-mac-'+Date.now()+'-'+Math.random()};
+  const seedStorage={[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)};
+  const appOptions=device=>backend==='IndexedDB'
+   ?{seedStorage,indexedDBProvider:indexedDB,deviceDbName:names[device]}
+   :{seedStorage};
+  const {ctx:phone,shim:phoneShim}=await loadApp({...appOptions('phone'),cloudSyncFactory:h.factory});
+  const {ctx:mac,shim:macShim}=await loadApp({...appOptions('mac'),cloudSyncFactory:h.factory});
+  const closeStore=async app=>{try{await app.window.ScannerDeviceStore?.close?.();}catch{}};
+  try{
+   await phone.cloudPull();await mac.cloudPull();await syncSettle(20);
+   assert.equal(phone.state.syncRev,4);assert.equal(mac.state.syncRev,4);
+   phone.window.CloudSync.ready=false; // retain the five real actions locally while the phone is offline
+   setFakeTime(phone,at);
+   const acted=[];
+   for(let i=0;i<5;i++){
+    phone.renderScan();
+    const markup=phoneShim.document.getElementById('scan').innerHTML;
+    assert.match(markup,/data-act="no"/,'the scanner must render the real No control');
+    const candidate=phone.state.candidateId,benchmark=phone.state.chain.at(-1);
+    assert.ok(candidate&&candidate!=='bench'&&benchmark==='bench');
+    phone.onAction('no',{dataset:{candidate,benchmark}});
+    acted.push(candidate);
+   }
+   assert.equal(new Set(acted).size,5,'each deliberate No compares a distinct candidate');
+   const localRatings=Object.fromEntries(phone.state.tasks.map(task=>[task.id,[task.mu,task.sigma]]));
+   assert.notDeepEqual(localRatings.bench,[initial.tasks[0].mu,initial.tasks[0].sigma],
+    'the five actual No actions changed the learned benchmark rating');
+   const localEvents=phone.state.decisionEvents;
+   assert.ok(Array.isArray(localEvents),'No actions create a durable cloud-visible event collection');
+   assert.equal(localEvents.length,5,'each No action has one durable cloud-visible decision event');
+   assert.equal(new Set(localEvents.map(event=>event.id)).size,5,'each action event has a stable unique identity');
+   assert.ok(localEvents.every(event=>event.v===1&&event.kind==='no'&&event.meaning==='benchmark-preferred'),
+    'the event records the supported No meaning');
+   assert.ok(localEvents.every(event=>event.account==='e@example.com'&&event.baseId===phone.state.decisionBase?.id),
+    'events bind to their owning account and exact observed cloud base');
+   assert.ok(localEvents.every(event=>event.at===at&&event.passAt===passAt&&event.passId==='shared-pass-142'),
+    'events retain original action time and pass identity');
+   assert.ok(localEvents.every(event=>event.scanMode==='descending'&&event.chainIds[0]==='bench'
+    &&event.benchmarkId==='bench'&&event.candidateContextIds.includes('c_shared')
+    &&event.benchmarkContextIds.includes('c_shared')),'events retain scan and comparison context');
+   assert.ok(localEvents.every(event=>phone.state.tasks.some(task=>task.ratingHistory?.some(row=>row.id===event.id&&row.kind==='no'))),
+    'the immutable action identity is shared by its observation record');
+   assert.deepEqual([...localEvents[0].observedActionIds],[],'the first decision has no observed predecessor');
+   for(let i=1;i<localEvents.length;i++)assert.deepEqual([...localEvents[i].observedActionIds],[localEvents[i-1].id],
+    'each later event stores the bounded causal frontier, not a quadratic full history');
+   assert.equal(await phone.persist(),true,'the offline device store accepts the complete local board');
+   const offlineRaw=backend==='IndexedDB'
+    ?(await phone.window.ScannerDeviceStore.readHead()).payload
+    :phoneShim.localStorage.getItem(SYNC_STORE_KEY);
+   assert.ok(offlineRaw,'the phone has a readable durable board before it closes');
+   const offlineBoard=JSON.parse(offlineRaw);
+   assert.equal(offlineBoard.decisionBase?.account,'e@example.com','the exact-base owner survives durable save');
+   assert.equal(offlineBoard.decisionBase?.revision,4,'the common cloud revision survives durable save');
+   assert.ok(typeof offlineBoard.decisionBase?.payload==='string','the exact common payload survives durable save');
+   await closeStore({window:phone.window});
+
+   mac.openEdit('mac-edit');fillEditPane(mac,macShim,{title:'Mac independent edit'});
+   mac.onAction('save-edit',{dataset:{id:'mac-edit'}});
+   assert.equal(await mac.persist(),true);
+   await mac.cloudPushNow();await syncSettle(30);
+   assert.equal(h.remoteState().tasks.find(task=>task.id==='mac-edit').title,'Mac independent edit');
+   assert.equal(h.doc.rev,5,'the independent Mac edit is a newer cloud publication');
+
+   const offlineCloudFactory=()=>{const cloud=h.factory();cloud.ready=false;return cloud;};
+   const reloadOptions=backend==='IndexedDB'
+    ?{indexedDBProvider:indexedDB,deviceDbName:names.phone}
+    :{seedStorage:{[SYNC_STORE_KEY]:offlineRaw,[LOCAL_HEAD_KEY]:offlineRaw}};
+   const {ctx:reopened,shim:reopenedShim}=await loadApp({...reloadOptions,cloudSyncFactory:offlineCloudFactory});
+   assert.deepEqual(acted.filter(id=>reopened.state.considered[id]==='no').sort(),acted.slice().sort(),
+    'the cold device-store reopen itself retains every No mark');
+   assert.equal(reopened.state.tasks.find(task=>task.id==='bench').mu,localRatings.bench[0],
+    'the cold reopen retains the actual learned benchmark value');
+   reopened.window.CloudSync.ready=true;
+   await reopened.cloudPull();await syncSettle(60);
+   for(const id of acted)assert.equal(reopened.state.considered[id],'no','a newer peer revision cannot clear a deliberate No mark');
+   for(const [id,[mu,sigma]] of Object.entries(localRatings)){
+    assert.equal(reopened.state.tasks.find(task=>task.id===id).mu,mu,'the effective learned mean survives reconciliation');
+    assert.equal(reopened.state.tasks.find(task=>task.id===id).sigma,sigma,'the effective learned uncertainty survives reconciliation');
+   }
+   assert.equal(reopened.state.tasks.find(task=>task.id==='mac-edit').title,'Mac independent edit','the peer editor change is retained');
+   assert.equal(h.remoteState().tasks.find(task=>task.id==='mac-edit').title,'Mac independent edit');
+   assert.equal((await reopened.persist()),true);
+   assert.ok(h.remoteState().considered && acted.every(id=>h.remoteState().considered[id]==='no'),
+    'the final cloud board contains all five No marks');
+   assert.equal(h.remoteState().decisionEvents.length,5,'the cloud retains all five immutable action records');
+   assert.equal(Object.hasOwn(h.remoteState(),'decisionBase'),false,'the device-local decision base is excluded from cloud payloads');
+   const learnedBeforePassReset=Object.fromEntries(acted.map(id=>[id,[reopened.state.tasks.find(task=>task.id===id).mu,reopened.state.tasks.find(task=>task.id===id).sigma]]));
+   const retainedEvents=JSON.stringify(reopened.state.decisionEvents),oldPassId=reopened.state.passId;
+   reopened.newPass(false,true);
+   assert.notEqual(reopened.state.passId,oldPassId,'the established day boundary starts a new pass identity');
+   assert.ok(acted.every(id=>reopened.state.considered[id]===undefined),'the established day boundary expires temporary No marks');
+   assert.equal(JSON.stringify(reopened.state.decisionEvents),retainedEvents,'pass reset keeps retained comparison evidence');
+   for(const [id,[mu,sigma]] of Object.entries(learnedBeforePassReset)){
+    assert.equal(reopened.state.tasks.find(task=>task.id===id).mu,mu,'pass expiry does not erase learned ratings');
+    assert.equal(reopened.state.tasks.find(task=>task.id===id).sigma,sigma,'pass expiry does not reset learned uncertainty');
+   }
+  }finally{
+   await closeStore({window:phone.window});await closeStore({window:mac.window});
+  }
+ });
+});
+
 test("LOGIC AUDIT: a malformed newer cloud payload cannot corrupt the local board", async () => {
   const now = Date.now();
   const local = staleState(now); local.syncRev = 2;

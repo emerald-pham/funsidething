@@ -1397,7 +1397,7 @@ function defaultState(){
     v:STATE_VERSION, tasks, contexts,
     chain: [], considered: {}, cantAt: {}, workedAt: {}, deletedTaskIds: {}, clearedHistoryIds: {}, restoredTaskIds:{}, restoredHistoryIds:{}, restoredTaskOps:{}, deletedAfterRestoreOps:{}, restoredHistoryOps:{}, clearedAfterRestoreOps:{}, deletionLog:[], candidateId: null, workLog: [],
     interventionActive:false, interventionP:0, snooze:0,
-    mode:"scan", scanMode:"descending", chance:null, decisionsMs:[], presentedAt:0, passStartedAt:0,
+    mode:"scan", scanMode:"descending", chance:null, decisionsMs:[], presentedAt:0, passStartedAt:0, passId:null,
     listOpen:false, ctxOpen:true, histOpen:false, addOpen:true, updatedAt:0, syncRev:0, syncDirty:false,
     protectedBackupIds:[],
     settings: Object.assign({}, DEFAULT_SETTINGS, {scene:defaultSceneSettings()})
@@ -2937,6 +2937,7 @@ refreshSyncErrorLog();
 let cloudTimer = null, lastPushed = "", pulling = false, cloudPushInFlight = false;
 let lastKnownCloudPayload = null; // the exact remote membership last read or acknowledged
 let lastKnownCloudAccount = null; // the account that membership was confirmed under
+let lastKnownCloudRevision = null; // the revision bound to that exact payload
 let reconciledAs = null;   // the account whose cloud copy this session has successfully READ
 let cloudAdoptionHeld = false; // a newer read could not be safely adopted; prior read cannot authorize writes
 let adoptedSafety = null; // one exact locally saved union and the stable snapshot it was built from
@@ -3284,7 +3285,9 @@ async function sendPush(){
         // replace the newer cloud membership with the older payload.
         if(res.rev < state.syncRev) return;
         state.syncRev = res.rev;
-        lastKnownCloudPayload = payload;lastKnownCloudAccount=pushAccount;
+        state.syncAccount = pushAccount;
+        bindDecisionBase(pushAccount,res.rev,payload);
+        lastKnownCloudPayload = payload;lastKnownCloudAccount=pushAccount;lastKnownCloudRevision=res.rev;
         // An edit made while this write was in flight is still unsynced.
         state.syncDirty = payload!==cloudPayload();
         if(!state.syncDirty)clearCloudRetry();
@@ -3338,7 +3341,7 @@ async function sendPush(){
 /* Device-only revision, account, unsynced-edit, and protected-recovery evidence
    never belongs in a shared list or export. In particular, syncing syncRev
    would make each device push immediately after adopting another's board. */
-const DEVICE_LOCAL_KEYS = ["syncRev", "syncAccount", "lastCloudServerAt", "syncDirty", "protectedBackupIds"];
+const DEVICE_LOCAL_KEYS = ["syncRev", "syncAccount", "lastCloudServerAt", "syncDirty", "protectedBackupIds", "decisionBase"];
 function serverTimeMs(value){
   const at=typeof value==="number" ? value : value?.toMillis?.();
   return Number.isFinite(at) ? at : null;
@@ -3352,6 +3355,37 @@ function cloudPayloadFor(board){
   return JSON.stringify(out);
 }
 function cloudPayload(){ return cloudPayloadFor(state); }
+function decisionBaseIdentity(account,revision,payload){
+  const fact=JSON.stringify([account,revision,payload]);
+  const digest=[0,1,2,3].map(index=>chanceHash("decision-base-v1:"+index+":"+fact).toString(16).padStart(8,"0")).join("");
+  return "db1:"+digest;
+}
+function validDecisionBase(base,account,revision){
+  if(!base || typeof base!=="object" || Array.isArray(base) || base.v!==1
+    || typeof base.account!=="string" || !base.account || !Number.isSafeInteger(base.revision) || base.revision<0
+    || typeof base.payload!=="string" || base.account!==account || base.revision!==revision
+    || base.id!==decisionBaseIdentity(base.account,base.revision,base.payload))return false;
+  try{const parsed=JSON.parse(base.payload);return !!parsed && !Array.isArray(parsed) && Array.isArray(parsed.tasks) && validSavedPayload(base.payload);}
+  catch{return false;}
+}
+function makeDecisionBase(account,revision,payload){
+  if(typeof account!=="string" || !account || !Number.isSafeInteger(revision) || revision<0
+    || typeof payload!=="string" || !validSavedPayload(payload))return null;
+  return {v:1,id:decisionBaseIdentity(account,revision,payload),account,revision,payload};
+}
+function bindDecisionBase(account,revision,payload){
+  const next=makeDecisionBase(account,revision,payload);
+  if(!next)return false;
+  if(JSON.stringify(state.decisionBase)===JSON.stringify(next))return false;
+  state.decisionBase=next;
+  return true;
+}
+function persistedDecisionAncestor(account,revision){
+  const base=state?.decisionBase;
+  if(!validDecisionBase(base,account,revision))return null;
+  const ancestor=JSON.parse(base.payload);hydrateState(ancestor);ancestor.syncAccount=account;ancestor.syncRev=revision;
+  return ancestor;
+}
 /* Swapping the whole state object — undo, Import JSON, Reset everything — must
    not swap this device's sync bookkeeping along with it.
 
@@ -3535,9 +3569,10 @@ async function cloudPull(){
     // heals the next cold open after an acknowledgement save hit quota.
     if(useLocal && haveRemote && !switchedAccount && rr!==null && rr!==localRev && remotePayload===cloudPayload()){
       const priorBoard=JSON.stringify(state);
-      const priorMarkers={reconciledAs,lastKnownCloudPayload,lastKnownCloudAccount,deferredCloudPull,lastPushed,pendingPush};
+      const priorMarkers={reconciledAs,lastKnownCloudPayload,lastKnownCloudAccount,lastKnownCloudRevision,deferredCloudPull,lastPushed,pendingPush};
       state.syncRev=rr;
       state.syncAccount=acct;
+      bindDecisionBase(acct,rr,remotePayload);
       state.syncDirty=remoteDeletionLogRepaired;
       releaseCloudRecoveryPins(await releasableCloudRecoveryIds(state.protectedBackupIds,remotePayload));
       const at=serverTimeMs(remote.serverUpdatedAt);
@@ -3547,12 +3582,13 @@ async function cloudPull(){
         if(JSON.stringify(state)===matchingSnapshot) state=JSON.parse(priorBoard);
         reconciledAs=priorMarkers.reconciledAs; lastKnownCloudPayload=priorMarkers.lastKnownCloudPayload;
         lastKnownCloudAccount=priorMarkers.lastKnownCloudAccount;
+        lastKnownCloudRevision=priorMarkers.lastKnownCloudRevision;
         deferredCloudPull=priorMarkers.deferredCloudPull; lastPushed=priorMarkers.lastPushed;
         pendingPush=priorMarkers.pendingPush; cloudAdoptionHeld=true;
         toast("Cloud copy held: the matching board's revision could not be saved on this device.", 7000);
         return;
       }
-      reconciledAs=acct; lastKnownCloudPayload=remotePayload;lastKnownCloudAccount=acct;
+      reconciledAs=acct; lastKnownCloudPayload=remotePayload;lastKnownCloudAccount=acct;lastKnownCloudRevision=rr;
       deferredCloudPull=false; cloudAdoptionHeld=false;
       state.syncDirty=remoteDeletionLogRepaired || remotePayload!==cloudPayload();
       pendingPush=state.syncDirty; lastPushed=remoteDeletionLogRepaired ? "" : remotePayload;
@@ -3584,12 +3620,13 @@ async function cloudPull(){
       toast("Cloud copy held: the previous board has no restorable local copy.", 7000);
       return;
     }
-    const priorMarkers = remoteWins ? {reconciledAs,lastKnownCloudPayload,lastKnownCloudAccount,deferredCloudPull,lastPushed,pendingPush,undoStack:undoStack.slice(),generation:chanceGeneration} : null;
+    const priorMarkers = remoteWins ? {reconciledAs,lastKnownCloudPayload,lastKnownCloudAccount,lastKnownCloudRevision,deferredCloudPull,lastPushed,pendingPush,undoStack:undoStack.slice(),generation:chanceGeneration} : null;
     cloudAdoptionHeld = false;
     deferredCloudPull = false;
     reconciledAs = window.CloudSync.user;
     lastKnownCloudPayload = haveRemote ? remotePayload : null;
     lastKnownCloudAccount = acct;
+    lastKnownCloudRevision = haveRemote ? rr : null;
     /* Whose document that revision counts.
 
        BUG FIX: nothing recorded which account a state belonged to, and a
@@ -3612,10 +3649,12 @@ async function cloudPull(){
     if(switchedAccount){
       undoStack=[]; // old-account frames cannot become new-account cloud writes
       state.syncRev = 0; delete state.lastCloudServerAt;
+      state.decisionBase=null;
     }
     state.syncAccount = acct;
     if(!haveRemote){                           // empty cloud
       state.syncRev = 0;                       // no document yet, so nothing is behind us
+      state.decisionBase=null;
       if(switchedAccount){
         /* This device is holding the previous account's list, and an empty
            document is not an invitation to upload it into someone else's
@@ -3674,10 +3713,11 @@ async function cloudPull(){
     // conservatively, with local task/history evidence merged and backed up.
     if(!remoteWins && rr===lr && remotePayload===cloudPayload()){
       const wasDirty=state.syncDirty!==false;
+      const baseChanged=bindDecisionBase(acct,rr??(Number.isSafeInteger(state.syncRev)?state.syncRev:0),remotePayload);
       state.syncDirty=remoteDeletionLogRepaired;
       if(remoteAt!==null && state.lastCloudServerAt!==remoteAt) state.lastCloudServerAt=remoteAt;
       const releasedRecovery=releaseCloudRecoveryPins(await releasableCloudRecoveryIds(state.protectedBackupIds,remotePayload));
-      if(wasDirty || remoteDeletionLogRepaired || releasedRecovery || JSON.stringify(state)!==lastPersistedRaw) await persist(true);
+      if(wasDirty || remoteDeletionLogRepaired || releasedRecovery || baseChanged || JSON.stringify(state)!==lastPersistedRaw) await persist(true);
       if(remoteDeletionLogRepaired){lastPushed="";pendingPush=true;}
       return;
     }
@@ -3689,6 +3729,7 @@ async function cloudPull(){
         reconciledAs=priorMarkers.reconciledAs;
         lastKnownCloudPayload=priorMarkers.lastKnownCloudPayload;
         lastKnownCloudAccount=priorMarkers.lastKnownCloudAccount;
+        lastKnownCloudRevision=priorMarkers.lastKnownCloudRevision;
         deferredCloudPull=priorMarkers.deferredCloudPull;
         lastPushed=priorMarkers.lastPushed;
         pendingPush=priorMarkers.pendingPush;
@@ -3704,8 +3745,10 @@ async function cloudPull(){
         hadLocalEdits = hadLocalEditsBeforeAdoption;
         // A newer document may be an old tab's partial board. Its revision
         // orders writes, not deletion intent; preserve IDs it did not delete.
-        const ancestor=!switchedAccount && priorMarkers.lastKnownCloudAccount===acct && validSavedPayload(priorMarkers.lastKnownCloudPayload)
+        const memoryAncestor=!switchedAccount && priorMarkers.lastKnownCloudAccount===acct
+          && priorMarkers.lastKnownCloudRevision===localRev && validSavedPayload(priorMarkers.lastKnownCloudPayload)
           ? JSON.parse(priorMarkers.lastKnownCloudPayload) : null;
+        const ancestor=memoryAncestor || (!switchedAccount && localRev!==null ? persistedDecisionAncestor(acct,localRev) : null);
         if(ancestor){hydrateState(ancestor);ancestor.syncAccount=acct;}
         st.syncAccount=acct;
         const recoveredFields=!switchedAccount && rebasePendingBoardFields(st,state,ancestor);
@@ -3730,6 +3773,7 @@ async function cloudPull(){
           reconciledAs=priorMarkers.reconciledAs;
           lastKnownCloudPayload=priorMarkers.lastKnownCloudPayload;
           lastKnownCloudAccount=priorMarkers.lastKnownCloudAccount;
+          lastKnownCloudRevision=priorMarkers.lastKnownCloudRevision;
           cloudAdoptionHeld=true;deferredCloudPull=true;return;
         }
         replaceState(st); // retain the device-local account binding as well as revision
@@ -3747,6 +3791,8 @@ async function cloudPull(){
         // Adopted wholesale, so this device is now based on the remote's
         // revision — not on whatever its own copy used to be based on.
         state.syncRev = rr !== null ? rr : 0;
+        if(haveRemote) bindDecisionBase(acct,state.syncRev,remotePayload);
+        else state.decisionBase=null;
         if(remoteAt!==null) state.lastCloudServerAt=remoteAt;
         /* persist(), not an inline localStorage write: loadState() prefers
            window.storage and only falls back to localStorage, so writing one
@@ -4429,6 +4475,7 @@ function startScan(mode){
     writeTaskComparison(t,true);
     state.chain.push(t.id);
     state.passStartedAt = Date.now();   // a fresh chain root is a fresh pass — start its stale-pass clock (a plain resume leaves t null and keeps the old time)
+    state.passId = uid();
   }
   commit(true, !!t);   // a dot syncs to the cloud right away
 }
@@ -4557,7 +4604,7 @@ const taskActionOwnerBundle=(()=>{
       writeTaskComparison(task,false);
       // A deliberate Dot can choose an off-context or future-start task; only
       // the automatic first placement remains neutral in startScan().
-      if(chainStart())state.passStartedAt=Date.now();
+      if(chainStart()){state.passStartedAt=Date.now();state.passId=uid();}
       state.chain.push(id);
       delete state.considered[id];delete state.cantAt[id];delete state.workedAt[id];
       if(state.candidateId===id)state.candidateId=null;
@@ -4600,7 +4647,9 @@ const taskActionOwnerBundle=(()=>{
       const b=benchmark();
       if(!b&&(kind==="yes"||kind==="no"))return false;
       const observation=captureRatingObservation(kind,[candidate.id,...(b&&(kind==="yes"||kind==="no")?[b.id]:[])]);
+      const decisionEvent=kind==="no"?prepareNoDecisionEvent(candidate,b,observation):null;
       pushUndo();recordDecisionTime();
+      if(decisionEvent){observation.id=decisionEvent.id;appendNoDecisionEvent(decisionEvent);}
       if(kind==="yes"){
         writeTaskComparison(candidate,false);
         if(b)updateTaskComparison(candidate,b);
@@ -4786,6 +4835,7 @@ function newPass(push, newDay){
   state.interventionActive = false;
   state.candidateId = null;
   state.passStartedAt = Date.now();   // this pass starts now — resets the stale-pass clock (see ensureCandidate())
+  state.passId = uid();
   if(push!==false) commit();
 }
 function clearCompleted(){ // completed tasks and logged worked-on/evergreen-done entries otherwise live forever
@@ -5059,7 +5109,7 @@ function addTask(title, dot, ctx, dates = {}, taskOptions = {}){
               mu:PRIOR_MU, sigma:PRIOR_SIGMA, done:false, createdAt:Date.now(), completedAt:null, lastDoneAt:null };
   normalizeTaskPrerequisites(t);writeTaskDependencyModes(t,taskOptions.dependencyModes);state.tasks.push(t);
   if(dot){
-    if(chainStart()){ state.passStartedAt = Date.now(); applyScanPreference(); }
+    if(chainStart()){ state.passStartedAt = Date.now(); state.passId = uid(); applyScanPreference(); }
     state.chain.push(t.id); state.interventionActive=false;
   }
   recomputeRanks();
@@ -5262,6 +5312,44 @@ function captureRatingObservation(kind,ids){
   const stats=chanceDisplayStats("chance"),basis=ratingObservationBasis(stats);
   return {kind,at:Date.now(),ids:[...new Set(ids)],basis,before:new Map(ids.map(id=>{const t=taskById(id);return [id,t?ratingObservationValues(t,stats):null];}))};
 }
+function decisionActionFrontier(events){
+  if(!Array.isArray(events))return [];
+  const known=events.filter(event=>event && event.v===1 && typeof event.id==="string" && event.id);
+  const named=new Set(known.flatMap(event=>Array.isArray(event.observedActionIds)
+    ? event.observedActionIds.filter(id=>typeof id==="string" && id) : []));
+  return known.map(event=>event.id).filter(id=>!named.has(id)).sort();
+}
+function currentDecisionPassId(){
+  if(typeof state.passId==="string" && state.passId)return state.passId;
+  const started=Number.isFinite(state.passStartedAt)&&state.passStartedAt>=0?state.passStartedAt:0;
+  return "legacy-pass-v1:"+started+":"+(typeof state.chain?.[0]==="string"?state.chain[0]:"none");
+}
+function prepareNoDecisionEvent(candidate,benchmarkTask,observation){
+  const account=typeof state.syncAccount==="string"&&state.syncAccount
+    ? state.syncAccount : typeof window.CloudSync?.user==="string"&&window.CloudSync.user ? window.CloudSync.user : null;
+  const base=account&&validDecisionBase(state.decisionBase,account,state.syncRev)?state.decisionBase:null;
+  return {v:1,id:uid(),at:observation.at,account,baseId:base?.id??null,kind:"no",meaning:"benchmark-preferred",
+    candidateId:candidate.id,benchmarkId:benchmarkTask.id,passId:currentDecisionPassId(),
+    passAt:Number.isFinite(state.passStartedAt)&&state.passStartedAt>=0?state.passStartedAt:0,
+    scanMode:state.scanMode,chainIds:Array.isArray(state.chain)?state.chain.slice():[],
+    candidateContextIds:Array.isArray(candidate.ctx)?candidate.ctx.filter(id=>typeof id==="string"):[],
+    benchmarkContextIds:Array.isArray(benchmarkTask.ctx)?benchmarkTask.ctx.filter(id=>typeof id==="string"):[],
+    observedActionIds:decisionActionFrontier(state.decisionEvents)};
+}
+function appendNoDecisionEvent(event){
+  if(!event || !event.id)return;
+  state.passId ||= event.passId;
+  if(Array.isArray(state.decisionEvents)){
+    if(!state.decisionEvents.some(existing=>existing?.id===event.id))state.decisionEvents=[...state.decisionEvents,event];
+    return;
+  }
+  if(state.decisionEvents!==undefined){
+    const recovery=Array.isArray(state.decisionEventsRecovery)?state.decisionEventsRecovery
+      : state.decisionEventsRecovery===undefined?[]:[{unrecognizedDecisionEventsRecovery:state.decisionEventsRecovery}];
+    state.decisionEventsRecovery=[...recovery,{unrecognizedDecisionEvents:JSON.parse(JSON.stringify(state.decisionEvents))}];
+  }
+  state.decisionEvents=[event];
+}
 function ratingMetricsChanged(a,b,oldBasis,basis){
   return ["mu","sigma","likelihood","eligible","fallback","n","samples"].some(key=>a[key]!==b[key])
     || oldBasis!==basis && a.topK!==b.topK;
@@ -5275,7 +5363,7 @@ function finishRatingObservation(event,snapshot=false){
     const rows=t.ratingHistory||[],last=rows.find(row=>row?.id===t.ratingHistoryHead&&validRatingHistoryRow(row)) || rows.filter(validRatingHistoryRow).at(-1);
     const changed=before&&ratingMetricsChanged(before,after,event.basis,basis);
     if(!changed && (!snapshot || last&&!ratingMetricsChanged(last.after,after,last.basis,basis)))continue;
-    id ||= uid();
+    id ||= event.id || uid();
     const rating=before&&(before.mu!==after.mu||before.sigma!==after.sigma);
     const row={v:1,id,at:event.at,seq:rows.reduce((n,r)=>Number.isSafeInteger(r?.seq)?Math.max(n,r.seq):n,0)+1,kind:event.kind,
       change:rating?"rating":last||changed?"relative":"observation",after,basis};

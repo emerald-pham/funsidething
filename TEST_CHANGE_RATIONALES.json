@@ -7329,5 +7329,32 @@
       "command": "Original exact commands and output: 01/implementation.md;02/implementation.md;03/action-owner-implementation.md;04 retained per-cohort logs;05/implementation.md;06/report.md;07/module-delivery-red.command.json and final-fingerprint-red.command.json under /private/tmp/chain-architecture-evidence-20261016. Final source gate: node scripts/test-first-gate.mjs 3d87c226519f878ddf4db7fbbdec9bf90376810d.",
       "failure": "Preservation cases were GREEN before implementation under approval.json. Deliberate duration/culling/finalization/draft/result mutants failed discriminating behavioral assertions and were reverted; they are sensitivity evidence, not feature RED. Actual prior-account selection leak RED at16:49:15UTC is in05/ownership-red.log; missing mounted FAQ and Changelog REDs at17:09:26 and17:10:27UTC are in06. Root fresh-installed actual worker fetch RED names /landscape-visits.js before its cache entry in07/module-delivery-red.log; GREEN2/2 follows. Final mechanical cache and changelog fingerprints failed2/2 before refresh in07/final-fingerprint-red.log. Cross-owner integration characterization passed1/1 before the final fingerprint edits in07/cross-owner-baseline-green.log. Failed fake-template/text-enlargement/unseeded-row-order fixtures and controlled mutants are retained separately and never represented as product RED. All integration replays identify when the original filter was unavailable rather than inventing it."
     }
+  },
+  {
+    "testChangesSha256": "0d347b81e7a6fbe4bd62fc5e728030eccc5f01bdb1bc27e237c9ecd3652401b8",
+    "reason": "Add a complete-app regression for five real scanner No decisions made offline on one device, a separate editor change on a second device, a durable close/reopen, and higher-revision reconciliation. Require the shared action identity, original context/time, exact persisted common base, and pass expiry to preserve existing learning semantics.",
+    "previousBehavior": "After a cold reopen, only the offline device store knew the observed common cloud board. A higher peer revision replaced No marks and the learned ratings, and no cloud-visible event identity or original action context existed to distinguish each comparison.",
+    "intendedBehavior": "Both localStorage fallback and production IndexedDB preserve five No marks and their effective ratings through offline save, close, reopen, and rebase over an independent peer edit. Immutable events retain unique IDs, original time, owner, exact base ID, scan/pass/task/context fields, and bounded causal frontiers; the device-only base survives locally but never enters cloud payloads. Scan-day reset expires temporary marks while the comparison evidence and learned ratings remain.",
+    "replacementTests": [
+      "RISK cloud No recovery: five scanner decisions survive offline durable reopen beside an independent peer edit"
+    ],
+    "preservedCoverage": [
+      "Every existing cloud revision, conditional publication, account isolation, failed-read, backup, device-store, and stale-tab contract remains in the full regression cohort.",
+      "The test drives actual scanner controls and the editor action owner in two app instances; it does not substitute direct state mutation or a helper-only merge assertion.",
+      "Both supported fallback storage and the production IndexedDB implementation use isolated local stores with a shared synthetic cloud, while the peer keeps its independent title edit.",
+      "Existing ratingHistory remains an observation record; learned values are preserved from the exact common base and no legacy history is replayed.",
+      "Publication safety, Firestore rules, server metadata, retry behavior, browser lifecycle, and live deployment remain separate gates owned by integration."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK cloud No recovery' tests.js",
+      "failure": "Before runtime changes, both full-app backends reproduced the peer-revision loss of a deliberate No mark (undefined !== no) after five actual offline No actions, durable save/close, peer editor publication at revision 5, and cold reopen. After strengthening assertions before runtime edits, the same command failed in both backends at the missing event collection. Full outputs: /Users/emeraldpham/.codex/task-artifacts/decision-sync-141/142/behavioral-red.txt and behavioral-red-evidence-contract.txt. Focused GREEN: sync-storage-focused-green.txt."
+    },
+    "updatedTests": [
+      "RISK cloud No recovery: five scanner decisions survive offline durable reopen beside an independent peer edit"
+    ],
+    "coverageChronology": {
+      "preimplementation": "The actual peer-revision No-loss RED and absent action-evidence RED were captured before app runtime changes.",
+      "postimplementation": "Focused test passes with both storage backends, exact action metadata, base persistence/cloud exclusion, and day-boundary projection expiry; the affected sync/storage cohort passes 11/11."
+    }
   }
 ]
