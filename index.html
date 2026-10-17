@@ -3589,24 +3589,11 @@ function persistedDecisionAncestor(account,revision){
   const ancestor=JSON.parse(base.payload);hydrateState(ancestor);ancestor.syncAccount=account;ancestor.syncRev=revision;
   return ancestor;
 }
-/* Swapping the whole state object — undo, Import JSON, Reset everything — must
-   not swap this device's sync bookkeeping along with it.
-
-   BUG FIX: syncRev lives inside state, so every wholesale replacement quietly
-   rewound the revision this device claimed to be based on: an undo snapshot
-   carries the rev from before the thing being undone, an export carries the
-   rev of whichever device made it, and defaultState() carries 0. The cloud was
-   then strictly ahead, the conditional write in CS.push() refused, cloudPull()
-   adopted the remote — and the deliberate replacement was silently undone a
-   couple of seconds after it appeared to work. Reset everything put every task
-   back. A pasted export vanished, which is the one thing SETUP.md offers as
-   the escape hatch when sync cannot merge. And the "↺ undoes it" toast shown
-   when a newer remote lands on your edits promised an undo the very next push
-   took straight back. None of it was announced, because the "out of date"
-   toast only fires on a session's FIRST reconcile.
-
-   Which revision this device has read is a fact about the device, not about
-   the content it happens to be holding, so it survives the swap. */
+/* Explicit replacement must preserve this device's account-bound publication
+   bookkeeping. Restoring content must not rewind the revision it actually read;
+   otherwise its next conditional write conflicts and can undo the deliberate
+   replacement. Ordinary action-scoped Undo follows the same device boundary.
+   The previous board stays in explicit recovery, not a remote-adoption frame. */
 function initializeReplacedScan(){
   // An old backup/cloud payload may need a fresh draw for today. That refresh
   // belongs to the replacement being undone, not to the prior local pass.
@@ -4049,7 +4036,7 @@ async function cloudPull(){
       // Swapping the board out from under someone mid-edit needs saying out
       // loud, or the edits they just made look like they simply vanished.
       if(switchedAccount) toast("Signed in as " + acct + " — the previous board is in Settings backups.");
-      else if(hadLocalEdits) toast("This tab was out of date \u2014 loaded the newer copy. The previous board is in Settings backups; \u21ba undoes it.", 7000);
+      else if(hadLocalEdits) toast("This tab was out of date \u2014 combined the saved changes. The previous board is in Settings backups.", 7000);
     }else{
       // Same revision, different content: even an old clean marker cannot
       // acknowledge this board. Preserve one retry budget until it is saved

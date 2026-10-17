@@ -7694,5 +7694,21 @@
       "command": "node --test --test-name-pattern='RISK decision recovery replacement overlap:|RISK decision recovery retired identity:' tests.js",
       "failure": "146/69 observed selected No dropped to[]. Initial precision fix70 retained No but left retired title resurrection (11/12);71 observed changed retired editor identity accepted without hold.72 complete replacement precision GREEN16/16. Earlier complete affected cohort66 passes146/146, with final all-action145 integration still required."
     }
+  },
+  {
+    "testChangesSha256": "4a1c079b044f033ebe54de1a2707198a003a156b276870c9e142a28e6bd5b68a",
+    "reason": "Remove an obsolete live cloud-adoption toast promise that header Undo restores the previous remote board; approved scoped Undo preserves independent peer progress.",
+    "previousBehavior": "The actual stale-tab adoption toast said the previous board is in Settings backups and ↺ undoes it; its old regression explicitly required that misleading promise.",
+    "intendedBehavior": "Keep the out-of-date notification and explicit recovery direction while making no whole-board Undo promise. Preserve ordinary local action reversal; #145 owns its separate behavioral assertion.",
+    "replacementTests": [
+      "RISK independent decision guidance: actual adoption toast directs recovery without promising remote-board Undo"
+    ],
+    "preservedCoverage": [
+      "Keep the actual cloud-pull notification trigger, exact prior-board recovery, silent clean adoption, separate account-switch notices and all unrelated FAQ/bulk guidance assertions. The original adoption test behavioral portion remains for #145 scoped Undo integration."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK independent decision guidance: actual adoption toast' tests.js",
+      "failure": "Actual app cloudPull notification failed by rendering the literal ↺ undoes it promise before the toast edit; raw147/toast-guidance-red.log. Direct consumer and existing guidance/adoption cohort then passed8/8 in147/toast-guidance-green.log against the pre-145 root; later #145 preserves the changed ordinary Undo behavior."
+    }
   }
 ]
