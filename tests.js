@@ -9428,6 +9428,14 @@ test('RISK decision capability baseline: sole unknown learned authority activate
  assert.equal((await h.CS.pull()).payload,payload,'unknown baseline bytes remain exact');
 });
 
+test('RISK decision capability recovery: sole baseline recovery activates the fence without rewriting evidence',async()=>{
+ const h=await loadCloudBackendV2({timeoutMs:5000});
+ const payload=JSON.stringify({tasks:[],decisionBaselineRecovery:{v:99,opaque:'sole inherited recovery bytes'}});
+ assert.equal((await h.CS.push(payload,1,0)).ok,true);
+ assert.equal(h.docs.get('users/owner').decisionCapability,1,'baseline recovery is authority even without an active baseline or stream');
+ assert.equal((await h.CS.pull()).payload,payload);
+});
+
 test('RISK CLOUD V2 ADAPTER: production migrates a legacy root to verified chunks and pulls the exact multi-megabyte board',async()=>{
  const legacy=JSON.stringify({tasks:[{id:'legacy'}]}),payload=cloudV2Payload('production');assert.ok(Buffer.byteLength(payload,'utf8')>1048576);
  const h=await loadCloudBackendV2({rootData:{payload:legacy,updatedAt:1,rev:4,serverUpdatedAt:1},timeoutMs:5000});
@@ -12392,7 +12400,7 @@ test('RISK comparison replay: compatible frozen learning survives different lega
 });
 
 async function decisionRecoveryApp146(){
- const initial=syncState({tasks:[Object.assign(syncTask('bench','Recovery benchmark'),{mu:35,sigma:7}),syncTask('candidate','Recovery candidate'),Object.assign(syncTask('peer','Peer task'),{done:true,completedAt:100})],chain:['bench'],candidateId:'candidate',considered:{},mode:'scan',scanMode:'descending',passStartedAt:Date.now(),passId:'recovery-pass-146',syncRev:4,syncAccount:'e@example.com',syncDirty:false});
+ const initial=syncState({tasks:[Object.assign(syncTask('bench','Recovery benchmark'),{mu:35,sigma:7}),syncTask('candidate','Recovery candidate'),Object.assign(syncTask('peer','Peer task'),{done:true,completedAt:100})],chain:['bench'],candidateId:'candidate',considered:{},mode:'scan',scanMode:'descending',passStartedAt:Date.now(),passId:'recovery-pass-146',settings:{thresholdPct:0,horizonMin:60,samples:250},syncRev:4,syncAccount:'e@example.com',syncDirty:false});
  const h=makeSyncHarness({remote:initial,rev:4,delayMs:1});
  const storage=sharedScannerStorage({[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)});
  const app=await loadApp({sharedStorage:storage,cloudSyncFactory:h.factory});
@@ -12443,6 +12451,165 @@ test('RISK decision recovery identity: conflicting bytes for one acknowledged ac
  assert.equal(JSON.stringify(f.ctx.state.decisionEvents),JSON.stringify([f.event]),'one identity cannot be silently replaced with a different decision time');
  assert.equal(f.storage.getItem(SYNC_STORE_KEY),saved);assert.equal(f.h.doc.payload,cloud);
  assert.equal(f.ctx.window.CloudSync.errorCode,'conflicting-decision-evidence');
+});
+
+test('RISK decision recovery compatible update: unsupported authority checks the safe app update path and Retry keeps exact work',async t=>{
+ const f=await decisionRecoveryApp146(),CS=f.ctx.window.CloudSync;let updates=0,reloads=0;
+ const pull=CS.pull;CS.pull=async()=>{const res=await pull();CS.status='ok';CS.errorCode=null;CS.errorStage=null;return res;};
+ t.after(()=>{CS.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',f.ctx);});
+ f.ctx.window.checkForAppUpdate=async()=>{updates++;};f.ctx.window.location={reload(){reloads++;}};
+ const local=JSON.stringify(f.ctx.state),saved=f.storage.getItem(SYNC_STORE_KEY);
+ f.h.writeBehindBack({...f.h.remoteState(),decisionEvents:{v:99,opaque:'future authority'}});const cloud=f.h.doc.payload;
+ CS.ready=true;await f.ctx.cloudPull();await syncSettle(20);
+ assert.equal(updates,1,'unsupported semantics must request the established compatible app update path');assert.equal(reloads,0,'a semantic hold does not force-refresh the app');
+ await f.ctx.onAction('sync-retry',{});await syncSettle(30);
+ assert.equal(JSON.stringify(f.ctx.state),local);assert.equal(f.storage.getItem(SYNC_STORE_KEY),saved);assert.equal(f.h.doc.payload,cloud);assert.equal(reloads,0);
+ f.h.writeBehindBack(JSON.parse(f.ctx.cloudPayload()));await f.ctx.onAction('sync-retry',{});await syncSettle(40);
+ assert.equal(JSON.stringify(f.ctx.state.decisionEvents),JSON.stringify([f.event]));assert.equal(CS.errorCode,null);assert.equal(f.ctx.state.syncDirty,false);
+});
+
+test('RISK decision recovery guest sign-in: a saved guest No and later authenticated No retain original facts and learning',async t=>{
+ const initial=syncState({tasks:[Object.assign(syncTask('bench','Guest benchmark'),{mu:35,sigma:7}),syncTask('guest','Guest candidate'),syncTask('signed','Signed-in candidate')],chain:['bench'],candidateId:'guest',considered:{},mode:'scan',scanMode:'descending',passStartedAt:Date.now(),passId:'guest-pass-146',settings:{thresholdPct:0,horizonMin:60,samples:250},syncRev:0,syncAccount:null,syncDirty:true});
+ const h=makeSyncHarness({remote:null,rev:0,delayMs:1}),storage=sharedScannerStorage({[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)});
+ const factory=()=>{const CS=h.factory();CS.user=null;return CS;};
+ const {ctx,shim}=await loadApp({sharedStorage:storage,cloudSyncFactory:factory}),CS=ctx.window.CloudSync;
+ t.after(()=>{CS.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',ctx);});
+ ctx.renderScan();assert.match(shim.document.getElementById('scan').innerHTML,/data-act="no"/);ctx.onAction('no',{dataset:{candidate:'guest',benchmark:'bench'}});assert.equal(await ctx.persist(),true);
+ const guest=JSON.stringify(ctx.state.decisionEvents[0]),guestRatings=JSON.stringify(ctx.state.tasks.map(task=>[task.id,task.mu,task.sigma]));
+ assert.equal(JSON.parse(guest).account,null,'a guest action retains its actual original owner');
+ CS.user='e@example.com';await ctx.cloudPull();ctx.cloudPushNow();await syncSettle(80);
+ assert.equal(ctx.state.syncDirty,false,'first sign-in can save the already-learned guest board without rewriting its action');
+ assert.equal(JSON.stringify(ctx.state.decisionEvents[0]),guest);assert.equal(JSON.stringify(ctx.state.tasks.map(task=>[task.id,task.mu,task.sigma])),guestRatings);
+ ctx.renderScan();const candidate=ctx.state.candidateId;assert.equal(candidate,'signed');ctx.onAction('no',{dataset:{candidate,benchmark:'bench'}});assert.equal(await ctx.persist(),true);
+ const signed=ctx.state.decisionEvents.find(event=>event.id!==JSON.parse(guest).id);assert.equal(signed.account,'e@example.com');
+ const finalRatings=JSON.stringify(ctx.state.tasks.map(task=>[task.id,task.mu,task.sigma]));assert.notEqual(finalRatings,guestRatings);
+ ctx.cloudPushNow();await syncSettle(80);assert.equal(ctx.state.syncDirty,false);assert.equal(JSON.stringify(h.remoteState().decisionEvents[0]),guest);
+ const reopened=await loadApp({seedStorage:{[SYNC_STORE_KEY]:storage.getItem(SYNC_STORE_KEY),[LOCAL_HEAD_KEY]:storage.getItem(LOCAL_HEAD_KEY)},cloudSyncFactory:h.factory});
+ t.after(()=>{reopened.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',reopened.ctx);});
+ await reopened.ctx.cloudPull();reopened.ctx.cloudPushNow();await syncSettle(60);assert.equal(JSON.stringify(reopened.ctx.state.tasks.map(task=>[task.id,task.mu,task.sigma])),finalRatings,'cold replay includes guest learning once plus the new authenticated observation');
+ assert.equal(reopened.ctx.state.decisionEvents.length,2);assert.equal(JSON.stringify(reopened.ctx.state.decisionEvents[0]),guest);assert.equal(reopened.shim.document.getElementById('syncBtn').textContent,'☁ synced');
+});
+
+test('RISK decision recovery explicit transfer: consented cross-account Import and Restore preserve original facts and later learning',async t=>{
+ for(const action of ['import','restore'])await t.test(action,async t=>{
+  const source=await decisionRecoveryApp146();
+  t.after(()=>{source.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',source.ctx);});
+  const sourceRaw=JSON.stringify(source.ctx.state),sourceEvents=JSON.stringify(source.ctx.state.decisionEvents),sourceRatings=JSON.stringify(source.ctx.state.tasks.map(task=>[task.id,task.mu,task.sigma]));
+  const initial=syncState({tasks:[syncTask('destination','Destination protected task')],syncRev:1,syncAccount:'destination@example.com',syncDirty:false});
+  const h=makeSyncHarness({remote:initial,rev:1,delayMs:1}),factory=()=>{const CS=h.factory();CS.user='destination@example.com';return CS;};
+  const app=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)},cloudSyncFactory:factory});
+  t.after(()=>{app.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',app.ctx);});
+  await app.ctx.cloudPull();const before=JSON.stringify(app.ctx.state);let consent=0;
+  app.ctx.confirm=message=>{assert.match(message,/belongs to .*e@example.com/);consent++;return true;};
+  if(action==='import'){app.shim.document.getElementById('jsonBox').value=sourceRaw;await app.ctx.onAction('import-json',{});}
+  else{const row=await app.ctx.saveDurableBackup('manual',sourceRaw);app.ctx.openSettings();assert.equal(await app.ctx.restoreDurableBackupById(row.id),true);assert.equal(consent,1);}
+  await app.ctx.persist();app.ctx.cloudPushNow();await syncSettle(80);
+  assert.equal(app.ctx.state.syncDirty,false,'explicitly authorized ownership transfer must not get stuck as a foreign journal');
+  assert.equal(JSON.stringify(app.ctx.state.decisionEvents),sourceEvents,'source event identities, times and owners remain exact');
+  assert.equal(JSON.stringify(app.ctx.state.tasks.filter(task=>task.id!=='destination').map(task=>[task.id,task.mu,task.sigma])),sourceRatings);
+  assert.ok(app.ctx.readLocalBackups().some(row=>row.payload===before),'the displaced destination board has exact durable recovery');
+  assert.equal(app.ctx.state.decisionBaseline.account,'destination@example.com');
+  app.ctx.addTask('New target-account comparison');app.ctx.renderScan();const offered=app.ctx.state.candidateId;assert.ok(offered,'normal scanner offers the authenticated comparison');app.ctx.onAction('no',{dataset:{candidate:offered,benchmark:'bench'}});await app.ctx.persist();
+  app.ctx.cloudPushNow();await syncSettle(60);assert.equal(app.ctx.state.syncDirty,false);assert.ok(h.remoteState().decisionEvents.some(event=>event.account==='destination@example.com'));
+ });
+});
+
+test('RISK decision recovery inheritance authority: changed attested facts stay held and ordinary account switches gain no consent',async t=>{
+ const source=await decisionRecoveryApp146();t.after(()=>{source.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',source.ctx);});
+ const raw=JSON.stringify(source.ctx.state),original=source.event,baseline=JSON.stringify(source.ctx.state.decisionBaseline);
+ const initial=syncState({tasks:[],syncRev:0,syncAccount:'target@example.com',syncDirty:false}),h=makeSyncHarness({remote:null,rev:0,delayMs:1});
+ const app=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)},cloudSyncFactory:()=>{const CS=h.factory();CS.user='target@example.com';return CS;}}),CS=app.ctx.window.CloudSync;
+ t.after(()=>{CS.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',app.ctx);});
+ await app.ctx.cloudPull();app.shim.document.getElementById('jsonBox').value=raw;await app.ctx.onAction('import-json',{});await app.ctx.persist();app.ctx.cloudPushNow();await syncSettle(70);
+ assert.equal(app.ctx.state.syncDirty,false);
+ const receipt=app.ctx.state.decisionBaseline.inheritance[0];assert.equal(receipt.reason,'explicit-import');assert.equal(JSON.stringify(receipt.sourceBaseline),baseline,'the original source baseline stays exact');
+ const witness=receipt.facts.find(fact=>fact.id===original.id);assert.deepEqual(JSON.parse(app.ctx.LZString.decompressFromUTF16(witness.witness)),original,'the lossless receipt attests the exact original semantic fact');
+ const cloud=h.doc.payload;CS.ready=false;app.ctx.state.decisionEvents[0].at+=1;await app.ctx.persist();const saved=app.shim.localStorage.getItem(SYNC_STORE_KEY);
+ CS.ready=true;await app.ctx.onAction('sync-retry',{});app.ctx.cloudPushNow();await syncSettle(40);
+ assert.equal(CS.errorCode,'decision-account-mismatch','consent does not permit changed foreign-owned facts');assert.equal(h.doc.payload,cloud);assert.equal(app.shim.localStorage.getItem(SYNC_STORE_KEY),saved);
+ const pull=CS.pull;CS.pull=async()=>CS.user==='another@example.com'?{empty:true}:pull();CS.user='another@example.com';app.shim.window.dispatchEvent({type:'cloudsync'});await app.ctx.cloudPull();await syncSettle(30);
+ assert.equal(app.ctx.state.syncAccount,'another@example.com');assert.equal(app.ctx.state.tasks.length,0);assert.equal(app.ctx.state.decisionEvents,undefined);assert.equal(app.ctx.state.decisionBaseline,undefined,'ordinary account transition cannot reuse explicit import consent');
+ assert.ok(app.ctx.readLocalBackups().some(row=>row.payload.includes('explicit-import')),'the previous account board remains recoverable');assert.equal(h.doc.payload,cloud);
+});
+
+test('RISK decision recovery inheritance durability: failed replacement recovery keeps both boards and an explicit retry succeeds',async t=>{
+ const {IDBFactory}=await import('fake-indexeddb');
+ for(const backend of ['browser fallback','IndexedDB'])await t.test(backend,async t=>{
+  const source=await decisionRecoveryApp146();t.after(()=>{source.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',source.ctx);});
+  const raw=JSON.stringify(source.ctx.state),initial=syncState({tasks:[syncTask('target','Target sole saved work')],syncRev:1,syncAccount:'target@example.com',syncDirty:false}),h=makeSyncHarness({remote:initial,rev:1,delayMs:1});
+  const app=await loadApp({seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)},...(backend==='IndexedDB'?{indexedDBProvider:new IDBFactory(),deviceDbName:'inheritance-failure-146-'+Date.now()+'-'+Math.random()}:{}),cloudSyncFactory:()=>{const CS=h.factory();CS.user='target@example.com';return CS;}});
+  t.after(async()=>{app.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',app.ctx);await app.ctx.window.ScannerDeviceStore?.close?.();});
+  await app.ctx.cloudPull();await syncSettle(20);const before=JSON.stringify(app.ctx.state),cloud=h.doc.payload,store=app.ctx.window.ScannerDeviceStore;
+  const durable=store?(await store.readHead()).payload:app.shim.localStorage.getItem(SYNC_STORE_KEY);
+  let restore;
+  if(store){const put=store.putBackup;store.putBackup=async()=>({error:true,code:'forced-recovery-failure'});restore=()=>{store.putBackup=put;};}
+  else{const write=app.shim.localStorage.setItem;app.shim.localStorage.setItem=(key,value)=>{if(key===LOCAL_BACKUPS_KEY)throw Object.assign(Error('isolated recovery quota'),{name:'QuotaExceededError'});return write(key,value);};restore=()=>{app.shim.localStorage.setItem=write;};}
+  app.shim.document.getElementById('jsonBox').value=raw;assert.equal(await app.ctx.onAction('import-json',{}),false);
+  assert.equal(JSON.stringify(app.ctx.state),before,'failed mandatory recovery cannot replace destination work');assert.equal(h.doc.payload,cloud);assert.equal(app.shim.document.getElementById('jsonBox').value,raw,'the source input is retained');
+  assert.equal(store?(await store.readHead()).payload:app.shim.localStorage.getItem(SYNC_STORE_KEY),durable);
+  restore();assert.equal(await app.ctx.onAction('import-json',{}),true);await app.ctx.persist();app.ctx.cloudPushNow();await syncSettle(70);
+  assert.equal(app.ctx.state.syncDirty,false);assert.equal(JSON.stringify(h.remoteState().decisionEvents),JSON.stringify(source.ctx.state.decisionEvents));
+  const backups=store?await store.listBackups():app.ctx.readLocalBackups();assert.ok(backups.some(row=>row.payload===before));assert.ok(backups.some(row=>row.payload===raw));
+ });
+});
+
+test('RISK decision recovery legacy update: safe reload and Retry hold a sole unrepresented legacy comparison instead of acknowledging lost learning',async t=>{
+ const {SUPPORTED_RELEASE,readReleasedClient}=await import('./scripts/backward-compatibility.mjs'),floor=readReleasedClient(__dirname,SUPPORTED_RELEASE);
+ const source=await decisionRecoveryApp146();t.after(()=>{source.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',source.ctx);});
+ source.h.writeBehindBack(JSON.parse(source.ctx.cloudPayload()));const cloud=source.h.doc.payload;
+ const seeded={...JSON.parse(cloud),syncRev:source.h.doc.rev,syncAccount:'e@example.com',syncDirty:false};
+ const factory=()=>{const CS=source.h.factory();CS.push=async()=>{CS.status='error';CS.errorStage='push';CS.errorCode='permission-denied';return {error:true};};return CS;};
+ const old=await loadApp({appSource:extractAppScript(floor.html),seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(seeded),[LOCAL_HEAD_KEY]:JSON.stringify(seeded)},cloudSyncFactory:factory});
+ t.after(()=>{old.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',old.ctx);});
+ await old.ctx.cloudPull();const before=old.ctx.state.tasks.find(task=>task.id==='bench').mu;
+ old.ctx.addTask('Legacy sole pending comparison');old.ctx.renderScan();const candidate=old.ctx.state.candidateId;assert.ok(candidate);
+ old.ctx.onAction('no',{dataset:{candidate,benchmark:'bench'}});await old.ctx.persist();const learned=old.ctx.state.tasks.find(task=>task.id==='bench').mu;assert.notEqual(learned,before);
+ old.ctx.cloudPushNow();await syncSettle(40);assert.equal(old.ctx.window.CloudSync.errorCode,'permission-denied');
+ let reloads=0;old.ctx.window.location={reload(){reloads++;}};await old.ctx.onAction('sync-reload',{});assert.equal(reloads,1,'historical safe reload first saves the exact unchanged pending board');
+ const pending=old.shim.localStorage.getItem(SYNC_STORE_KEY);assert.equal(JSON.parse(pending).tasks.find(task=>task.id==='bench').mu,learned);
+ const upgraded=await loadApp({seedStorage:{[SYNC_STORE_KEY]:pending,[LOCAL_HEAD_KEY]:pending},cloudSyncFactory:()=>{const CS=source.h.factory();CS.ready=false;return CS;}});
+ t.after(()=>{upgraded.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',upgraded.ctx);});
+ upgraded.ctx.window.CloudSync.ready=true;await upgraded.ctx.onAction('sync-retry',{});upgraded.ctx.cloudPushNow();await syncSettle(50);
+ assert.equal(upgraded.ctx.state.tasks.find(task=>task.id==='bench').mu,learned,'upgrade must retain the sole pending legacy comparison effect while held');
+ assert.equal(upgraded.ctx.window.CloudSync.errorCode,'unrepresented-legacy-learning');assert.equal(upgraded.shim.document.getElementById('syncBtn').textContent,'☁ error');assert.equal(source.h.doc.payload,cloud);
+ assert.ok(upgraded.shim.localStorage.getItem(SYNC_STORE_KEY)===pending || upgraded.ctx.readLocalBackups().some(row=>row.payload===pending),'exact pending legacy bytes remain durable');
+});
+
+test('RISK decision recovery projection: supported but unprojectable authority holds exact cloud and local branches',async t=>{
+ for(const kind of ['missing frontier','causal cycle','unrelated baseline','baseline recovery','conflicting extension'])await t.test(kind,async t=>{
+  const f=await decisionRecoveryApp146(),CS=f.ctx.window.CloudSync;
+  t.after(()=>{CS.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',f.ctx);});
+  const remote=JSON.parse(f.ctx.cloudPayload()),event={...f.event,id:'remote-146',at:f.event.at+1};
+  if(kind==='missing frontier'){event.observedActionIds=['absent-authority'];remote.decisionEvents.push(event);}
+  if(kind==='causal cycle'){event.observedActionIds=['cycle-146'];remote.decisionEvents.push(event,{...event,id:'cycle-146',observedActionIds:[event.id]});}
+  if(kind==='unrelated baseline'){event.baselineId='unrelated-learning-start';remote.decisionEvents.push(event);}
+  if(kind==='baseline recovery')remote.decisionBaselineRecovery=[{v:99,opaque:'sole future baseline recovery'}];
+  if(kind==='conflicting extension'){
+   const row=remote.decisionBaseline.ratings[0];
+   remote.decisionBaseline.ratingExtensions=[{...row,mu:row.mu+5,sourceBaseId:null,sourceRevision:4}];
+  }
+  const saved=f.storage.getItem(SYNC_STORE_KEY),local=JSON.stringify(f.ctx.state);
+  f.h.writeBehindBack(remote);const cloud=f.h.doc.payload;
+  CS.ready=true;await f.ctx.cloudPull();f.ctx.cloudPushNow();await syncSettle(40);
+  assert.equal(JSON.stringify(f.ctx.state),local,'unprojectable authority cannot replace the coherent current board');
+  assert.equal(f.storage.getItem(SYNC_STORE_KEY),saved,'the coherent durable board stays byte-exact');assert.equal(f.h.doc.payload,cloud,'the sole remote authority stays byte-exact');
+  assert.equal(CS.errorCode,'unprojectable-decision-evidence');assert.equal(f.shim.document.getElementById('syncBtn').textContent,'☁ error');
+ });
+});
+
+test('RISK decision recovery validation order: rejected local evidence stays exact before known-cloud union',async t=>{
+ for(const [field,value,code] of [['at',-1,'unsupported-decision-evidence'],['account','foreign@example.com','decision-account-mismatch']])await t.test(field,async t=>{
+  const f=await decisionRecoveryApp146(),CS=f.ctx.window.CloudSync;
+  t.after(()=>{CS.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',f.ctx);});
+  CS.ready=true;f.ctx.cloudPushNow();await syncSettle(70);
+  assert.equal(f.ctx.state.syncDirty,false,'first action is acknowledged before local evidence is damaged');
+  const cloud=f.h.doc.payload;CS.ready=false;f.ctx.state.decisionEvents[0][field]=value;await f.ctx.persist();
+  const local=JSON.stringify(f.ctx.state),saved=f.storage.getItem(SYNC_STORE_KEY);
+  CS.ready=true;f.ctx.cloudPushNow();await syncSettle(50);
+  assert.equal(JSON.stringify(f.ctx.state),local,'a rejected source must not be unioned or reprojected before validation');
+  assert.equal(f.storage.getItem(SYNC_STORE_KEY),saved);assert.equal(f.h.doc.payload,cloud);
+  assert.equal(CS.errorCode,code);assert.equal(f.shim.document.getElementById('syncBtn').textContent,'☁ error');
+ });
 });
 
 test('RISK decision recovery shape: malformed known action evidence stays durable and cannot publish',async t=>{
