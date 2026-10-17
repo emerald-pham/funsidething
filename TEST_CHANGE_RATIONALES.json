@@ -8156,5 +8156,31 @@
       "command": "node --test --test-reporter=spec --test-name-pattern='RISK decision recovery replacement idempotence:' tests.js",
       "failure": "Original runtime RED remains specialist-repair-02-integrated-red.log (duplicate authority tree); this follow-up makes no new preimplementation RED claim. Actual Export+Import passes1/1 in specialist-repair-16-export-control.log after the four scoped repairs and parent merge; final source remains the136/136 reconciled preservation source. The first follow-up diff-gate attempt rejected the unchanged heading as absent from added lines; the heading is now precise about actual Export and the map is updated, without changing an assertion."
     }
+  },
+  {
+    "testChangesSha256": "062a3b790f4cf240e88619bc8bb33d7d1dbd39843eae19bda4549012cceb81a3",
+    "reason": "Close the bounded context-definition gap with complete-group projection, unbounded established context names, and pre-mutation holds for unsupported prior rows. Keep the real two-client independent-create cohort as positive coverage because it already passed before runtime changes.",
+    "previousBehavior": "A complete real create group could not materialize a missing context in full projection because the projector searched the exists-only bucket for sibling name/mode facts. A newly added 120-character cap rejected existing producer inputs. Rename, mode and delete mutated unsupported future-format rows before event preparation discarded incomplete or invalid before evidence.",
+    "intendedBehavior": "Full projection recovers only name/mode facts from the deduplicated supported union with the same context ID, action ID and exact frozen envelope. Context names stay nonempty and trimmed with no new length limit. Rename, mode and delete validate the complete prior row before Undo or mutation and hold unsupported evidence unchanged. Long-name definitions and opaque supported prior fields survive actual delete, targeted Undo, peer sync and cold reopen.",
+    "replacementTests": [
+      "RISK cloud contexts: independent new definitions materialize in either publication order",
+      "RISK cloud contexts: long names create rename delete and Undo retain the exact definition on a cold peer",
+      "RISK cloud contexts: unsupported prior rows hold rename mode and delete before Undo or cloud mutation",
+      "RISK current-choice projection: a complete creation group reconstructs its definition on a pristine board"
+    ],
+    "updatedTests": [
+      "RISK cloud contexts: independent new definitions materialize in either publication order"
+    ],
+    "preservedCoverage": [
+      "The independent two-device settings-create and task-assignment flow remains actual publication-order, durable-cloud and cold-reopen coverage; it passed 3/3 on the unchanged application and is not represented as a RED.",
+      "The separate full-projector consumer uses a complete creation group captured from actual Settings Add and isolates the missing-definition projection boundary; incomplete or mismatched creation groups remain strictly guarded.",
+      "The long-name consumer uses real Settings Add, task editor Save, context rename change event, context mode control, delete, normal Undo, peer reconciliation and cold reopen; the exact context mode, task assignment and opaque JSON field remain asserted.",
+      "The unsupported-prior consumer begins with a saved unknown mode and opaque extension, then exercises real rename, mode and delete actions. Exact row, task assignment, event list, Undo depth, dirty flag and cloud payload remain unchanged under the existing hold.",
+      "Existing theme, date, hourly quote, scene, context, task-field, scoped Undo, modern replacement and source-coherence assertions remain intact; broad suite, browser/emulator, CI, deployment and release gates remain parent-owned."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='RISK current-choice projection: a complete creation group reconstructs its definition on a pristine board' tests.js; node --test --test-reporter=spec --test-name-pattern='RISK cloud contexts: long names create rename delete and Undo retain the exact definition on a cold peer' tests.js; node --test --test-reporter=spec --test-name-pattern='RISK cloud contexts: unsupported prior rows hold rename mode and delete before Undo or cloud mutation' tests.js",
+      "failure": "On the pre-repair `aad826205abb0fa3ad107c87e5e03c3919a67c40` source, the full projector returned no context where the actual create group required the exact definition (`context-create-projection-red-aad826.txt`). After that isolated projector repair, the real long-name Settings producer created the row but emitted only exists/mode, omitting name (`context-long-name-red-aad826.txt`). After name-support repair, all three actual unsupported-row actions changed the prior row or removed it before evidence could be recorded; the assertions observed rename, mode and delete separately (`context-unsupported-prior-red-aad826.txt`). The independent two-client publication-order test passed 3/3 before runtime edits (`context-independent-create-positive-aad826-before-runtime.txt`) and is positive acceptance. Two early long-name fixture failures and one wide-snapshot diagnostic failure are retained under `context-long-name-fixture-*` and `context-unsupported-prior-*fixture*`; they are not behavior REDs. The successive focused GREEN logs are `context-create-projection-green-aad826.txt`, `context-long-name-green-aad826.txt`, `context-unsupported-prior-green-aad826.txt`; the combined preference/context/source-hold/replacement cohort then passed 27/27 in both local timezone and UTC (`context-extension-combined-green-aad826.txt`, `context-extension-utc-green-aad826.txt`)."
+    }
   }
 ]

@@ -5582,6 +5582,7 @@ function createContextChoice(name){
 }
 function deleteContextChoice(id){
   const context=state.contexts.find(row=>row?.id===id);if(!context)return false;
+  if(!currentChoiceContextRowSupported(context,id)){reportCloudReconcileError("unprojectable-decision-evidence");return false;}
   const gesture=captureCurrentChoiceGesture(),choices=[{
     target:{type:"context",id,property:"exists"},value:false,after:{present:true},
     before:{present:true,value:JSON.parse(JSON.stringify(context))}
@@ -5598,6 +5599,7 @@ function deleteContextChoice(id){
 }
 function toggleContext(id){
   const c = state.contexts.find(c=>c.id===id); if(!c) return;
+  if(!currentChoiceContextRowSupported(c,id)){reportCloudReconcileError("unprojectable-decision-evidence");return;}
   const focus=document.activeElement,scope=focus?.dataset?.ctxScope;
   const refocus=focus?.dataset?.ctx===id;
   const gesture=captureCurrentChoiceGesture(),before=currentChoiceContextModeSnapshot(c);
@@ -6491,7 +6493,7 @@ function currentChoiceValueSupported(type,property,value,present=true,evidence=f
     (SCENE_SOLAR_PRESETS.has(value)||/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(value));
   if(type==="scene"&&property==="season")return value===null||SCENE_SEASONS.has(value);
   if(type==="context"&&property==="exists")return !evidence&&typeof value==="boolean";
-  if(type==="context"&&property==="name")return typeof value==="string"&&value.trim()===value&&!!value&&value.length<=120;
+  if(type==="context"&&property==="name")return typeof value==="string"&&value.trim()===value&&!!value;
   if(type==="context"&&property==="mode")return currentChoiceContextModeSupported(value);
   return false;
 }
@@ -6527,7 +6529,7 @@ function currentChoiceJsonSafe(value,depth=0,budget={left:1500}){
 }
 function currentChoiceContextRowSupported(value,id){
   if(!value||typeof value!=="object"||Array.isArray(value)||value.id!==id||typeof value.name!=="string"||
-      !value.name.trim()||value.name.trim()!==value.name||value.name.length>120||!currentChoiceJsonSafe(value))return false;
+      !value.name.trim()||value.name.trim()!==value.name||!currentChoiceJsonSafe(value))return false;
   return (!Object.hasOwn(value,"active")||typeof value.active==="boolean")&&
     (!Object.hasOwn(value,"excluded")||typeof value.excluded==="boolean");
 }
@@ -6724,7 +6726,8 @@ function projectCurrentChoiceContextExistence(board,events,byId,cancelled){
     }
     if(priorIndex<0){
       if(selected===null||selected===undefined||selected.before.present)continue;
-      const actionRows=rows.filter(row=>row.actionId===selected.actionId&&row.at===selected.at&&row.account===selected.account);
+      const actionRows=[...byId.values()].filter(row=>row.kind==="current-choice"&&row.target?.type==="context"
+        &&row.target.id===id&&row.actionId===selected.actionId&&currentChoiceStartEnvelopeMatches(selected,row));
       const name=actionRows.find(row=>row.target.property==="name"),mode=actionRows.find(row=>row.target.property==="mode");
       if(!name||!mode||!name.after.present||!mode.after.present)continue;
       const context={id,name:name.value};
@@ -8957,6 +8960,7 @@ document.addEventListener("change", e=>{
   if(el.matches("[data-ctx]")){ toggleContext(el.dataset.ctx); return; }
   if(el.matches("[data-mgrname]")){
     const c=state.contexts.find(c=>c.id===el.dataset.mgrname),name=el.value.trim();
+    if(c&&!currentChoiceContextRowSupported(c,c.id)){reportCloudReconcileError("unprojectable-decision-evidence");return;}
     if(c&&name&&c.name!==name){
       const gesture=captureCurrentChoiceGesture(),before=currentChoiceDescriptor(c,"name");
       pushUndo();c.name=name;

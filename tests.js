@@ -29121,6 +29121,173 @@ test('RISK cloud contexts: create rename mode and task assignment survive an ind
  });
 });
 
+test('RISK cloud contexts: independent new definitions materialize in either publication order',async t=>{
+ for(const first of ['left','right'])await t.test(`${first} creation publishes first`,async()=>{
+  const at=Date.parse('2026-10-17T20:30:00.000Z'),passAt=at-60000;
+  const initial=syncState({tasks:[Object.assign(syncTask('context-left-task','Left task'),{ctx:[]}),
+    Object.assign(syncTask('context-right-task','Right task'),{ctx:[]})],contexts:[],chain:[],candidateId:null,
+   passStartedAt:passAt,passId:'concurrent-context-pass',scanMode:'descending',syncRev:4,syncAccount:'e@example.com',syncDirty:false});
+  const remote=JSON.parse(JSON.stringify(initial));
+  for(const key of ['syncRev','syncAccount','syncDirty','lastCloudServerAt','protectedBackupIds'])delete remote[key];
+  const h=makeSyncHarness({remote,rev:4,delayMs:1}),seedStorage={[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)};
+  const left=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:h.factory}),right=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:h.factory});
+  let reopened;
+  try{
+   await left.ctx.cloudPull();await right.ctx.cloudPull();await syncSettle(20);
+   assert.equal(left.ctx.state.decisionBase?.id,right.ctx.state.decisionBase?.id,'both creators start from one saved cloud revision');
+   left.ctx.window.CloudSync.ready=false;right.ctx.window.CloudSync.ready=false;
+   const create=async(app,name,offset)=>{
+    setFakeTime(app.ctx,at+offset);app.ctx.openSettings();app.shim.document.getElementById('newCtxName').value=name;
+    app.ctx.onAction('add-ctx-named',{});
+    const row=app.ctx.state.contexts.find(context=>context.name===name);assert.ok(row,'actual Settings Add creates the local context');
+    assert.equal(await saveEditorChoice(app,name==='Left context'?'context-left-task':'context-right-task',at+offset+20,{ctxIds:[row.id]}),true,
+     'actual task editor assigns the new context');
+    const group=app.ctx.state.decisionEvents.filter(event=>event?.kind==='current-choice'&&event.target?.type==='context'&&event.target.id===row.id);
+    assert.deepEqual(JSON.parse(JSON.stringify(group.map(event=>event.target.property).sort())),['exists','mode','name']);
+    assert.equal(new Set(group.map(event=>event.actionId)).size,1,'one deliberate creation gesture carries the complete group');
+    return row.id;
+   };
+   const leftId=await create(left,'Left context',100),rightId=await create(right,'Right context',150);
+   const firstClient=first==='left'?left:right,secondClient=first==='left'?right:left;
+   firstClient.ctx.window.CloudSync.ready=true;await firstClient.ctx.cloudPushNow();await syncSettle(40);
+   assert.equal(secondClient.ctx.state.contexts.some(row=>row.id===(first==='left'?leftId:rightId)),false,
+    'the second creator remains a stale independent source before reading the first publication');
+   secondClient.ctx.window.CloudSync.ready=true;await secondClient.ctx.cloudPull();await syncSettle(40);
+   const expectedIds=[leftId,rightId].sort(),visibleIds=secondClient.ctx.state.contexts.map(row=>row.id).sort();
+   assert.deepEqual(JSON.parse(JSON.stringify(visibleIds)),expectedIds,
+    'fresh projection materializes both independently created rows from their complete event groups: '+JSON.stringify({visibleIds,expectedIds,
+     events:secondClient.ctx.state.decisionEvents.filter(event=>event?.kind==='current-choice'&&event.target?.type==='context')}));
+   assert.deepEqual(JSON.parse(JSON.stringify(secondClient.ctx.state.tasks.find(task=>task.id==='context-left-task').ctx)),[leftId]);
+   assert.deepEqual(JSON.parse(JSON.stringify(secondClient.ctx.state.tasks.find(task=>task.id==='context-right-task').ctx)),[rightId]);
+   await secondClient.ctx.cloudPushNow();await syncSettle(40);
+   const durable=h.remoteState();assert.deepEqual(durable.contexts.map(row=>row.id).sort(),expectedIds,'both definitions are in the acknowledged cloud board');
+   assert.deepEqual(durable.tasks.find(task=>task.id==='context-left-task').ctx,[leftId]);
+   assert.deepEqual(durable.tasks.find(task=>task.id==='context-right-task').ctx,[rightId]);
+   reopened=await loadAppAtTime(at+500,{seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(durable),[LOCAL_HEAD_KEY]:JSON.stringify(durable)},cloudSyncFactory:h.factory});
+   await reopened.ctx.cloudPull();await syncSettle(20);
+   assert.deepEqual(reopened.ctx.state.contexts.map(row=>row.id).sort(),expectedIds,'cold reopen retains both definitions');
+   assert.deepEqual(JSON.parse(JSON.stringify(reopened.ctx.state.tasks.find(task=>task.id==='context-left-task').ctx)),[leftId]);
+   assert.deepEqual(JSON.parse(JSON.stringify(reopened.ctx.state.tasks.find(task=>task.id==='context-right-task').ctx)),[rightId]);
+  }finally{
+   for(const app of [left,right,reopened])if(app)try{await app.shim.window.ScannerDeviceStore?.close?.();}catch{}
+  }
+ });
+});
+
+test('RISK cloud contexts: long names create rename delete and Undo retain the exact definition on a cold peer',async()=>{
+ const at=Date.parse('2026-10-17T21:00:00.000Z'),initialName='Long context '.repeat(10).trim(),renamed='Renamed context '.repeat(9).trim();
+ assert.ok(initialName.length>120&&renamed.length>120,'the established context producer accepts realistic long labels without a new limit');
+ const initial=syncState({tasks:[Object.assign(syncTask('long-context-task','Assigned task'),{ctx:[]})],contexts:[],chain:[],candidateId:null,
+  passStartedAt:at-60000,passId:'long-context-pass',scanMode:'descending',syncRev:4,syncAccount:'e@example.com',syncDirty:false});
+ const remote=JSON.parse(JSON.stringify(initial));
+ for(const key of ['syncRev','syncAccount','syncDirty','lastCloudServerAt','protectedBackupIds'])delete remote[key];
+ const h=makeSyncHarness({remote,rev:4,delayMs:1}),seedStorage={[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)};
+ const phone=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:h.factory}),peer=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:h.factory});
+ let reopened;
+ try{
+  await phone.ctx.cloudPull();await peer.ctx.cloudPull();
+  setFakeTime(phone.ctx,at+100);phone.ctx.openSettings();phone.shim.document.getElementById('newCtxName').value=initialName;
+  phone.ctx.onAction('add-ctx-named',{});
+  const context=phone.ctx.state.contexts.find(row=>row.name===initialName);assert.ok(context,
+   'the real Settings Add action creates the requested long context name: '+JSON.stringify({input:phone.shim.document.getElementById('newCtxName')?.value,
+    contexts:phone.ctx.state.contexts,toast:phone.shim.document.getElementById('toast')?.textContent,error:phone.ctx.window.CloudSync?.errorCode}));
+  const create=phone.ctx.state.decisionEvents.filter(event=>event?.kind==='current-choice'&&event.target?.type==='context'&&event.target.id===context.id);
+  assert.deepEqual(JSON.parse(JSON.stringify(create.map(event=>event.target.property).sort())),['exists','mode','name'],
+   'long-name creation retains a complete cloud-visible definition group');
+  assert.equal(await saveEditorChoice(phone,'long-context-task',at+150,{ctxIds:[context.id]}),true,'the real task editor assigns the context');
+  setFakeTime(phone.ctx,at+200);
+  const nameField=makeFakeElement();nameField.dataset={mgrname:context.id};nameField.value=renamed;
+  nameField.matches=selector=>selector==='[data-mgrname]';phone.shim.document.dispatchEvent({type:'change',target:nameField});
+  setFakeTime(phone.ctx,at+250);phone.ctx.onAction('cycle-context',{dataset:{id:context.id}});
+  const live=phone.ctx.state.contexts.find(row=>row.id===context.id);live.futureProjectionExtension={version:7,opaque:['keep','exactly']};
+  const prior=JSON.parse(JSON.stringify(live));
+  setFakeTime(phone.ctx,at+300);phone.ctx.onAction('del-ctx',{dataset:{id:context.id}});
+  const tombstone=phone.ctx.state.decisionEvents.find(event=>event?.kind==='current-choice'&&event.target?.type==='context'
+   &&event.target.id===context.id&&event.target.property==='exists'&&event.value===false);
+  assert.ok(tombstone,'deleting the long definition retains its bounded removal authority');
+  assert.deepEqual(JSON.parse(JSON.stringify(tombstone.before)),{present:true,value:prior},'the delete witness preserves long names, exact mode and opaque fields');
+  await phone.ctx.persist();await phone.ctx.cloudPushNow();await syncSettle(40);await peer.ctx.cloudPull();await syncSettle(30);
+  assert.equal(peer.ctx.state.contexts.some(row=>row.id===context.id),false,'the peer applies the deliberate deletion');
+  assert.deepEqual(JSON.parse(JSON.stringify(peer.ctx.state.tasks[0].ctx)),[],'the peer applies its grouped assignment removal');
+  setFakeTime(phone.ctx,at+400);phone.ctx.onAction('undo',{});await phone.ctx.persist();await phone.ctx.cloudPushNow();await syncSettle(40);
+  await peer.ctx.cloudPull();await syncSettle(30);
+  assert.deepEqual(JSON.parse(JSON.stringify(peer.ctx.state.contexts.find(row=>row.id===context.id))),prior,
+   'targeted Undo restores the exact long definition and opaque fields for the peer');
+  assert.deepEqual(JSON.parse(JSON.stringify(peer.ctx.state.tasks[0].ctx)),[context.id],'targeted Undo restores the context assignment');
+  const durable=h.remoteState();
+  reopened=await loadAppAtTime(at+500,{seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(durable),[LOCAL_HEAD_KEY]:JSON.stringify(durable)},cloudSyncFactory:h.factory});
+  await reopened.ctx.cloudPull();await syncSettle(20);
+  assert.deepEqual(JSON.parse(JSON.stringify(reopened.ctx.state.contexts.find(row=>row.id===context.id))),prior,
+   'cold reopen retains the long context name, mode and opaque fields');
+  assert.deepEqual(JSON.parse(JSON.stringify(reopened.ctx.state.tasks[0].ctx)),[context.id]);
+ }finally{
+  for(const app of [phone,peer,reopened])if(app)try{await app.shim.window.ScannerDeviceStore?.close?.();}catch{}
+ }
+});
+
+test('RISK cloud contexts: unsupported prior rows hold rename mode and delete before Undo or cloud mutation',async t=>{
+ const at=Date.parse('2026-10-17T21:15:00.000Z'),id='future-context-mode-v8';
+ const opaque={id,name:'Future mode context',active:'future-active-v8',futureProjectionExtension:{version:8,raw:['preserve','exactly']}};
+ for(const action of ['rename','mode','delete'])await t.test(action,async()=>{
+  const initial=syncState({tasks:[Object.assign(syncTask('future-context-task','Assigned task'),{ctx:[id]})],contexts:[JSON.parse(JSON.stringify(opaque))],
+   chain:[],candidateId:null,passStartedAt:at-60000,passId:'future-context-pass',scanMode:'descending',syncRev:4,syncAccount:'e@example.com',syncDirty:false});
+  const remote=JSON.parse(JSON.stringify(initial));
+  for(const key of ['syncRev','syncAccount','syncDirty','lastCloudServerAt','protectedBackupIds'])delete remote[key];
+  const h=makeSyncHarness({remote,rev:4,delayMs:1}),seedStorage={[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)};
+  const app=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:h.factory});
+  try{
+   await app.ctx.cloudPull();await syncSettle(20);
+   assert.deepEqual(JSON.parse(JSON.stringify(app.ctx.state.contexts.find(row=>row.id===id))),opaque,
+    'the saved unknown context row survives ordinary hydration unchanged');
+   const beforeRow=JSON.parse(JSON.stringify(app.ctx.state.contexts.find(row=>row.id===id)));
+   const beforeTaskContexts=JSON.parse(JSON.stringify(app.ctx.state.tasks[0].ctx)),events=JSON.stringify(app.ctx.state.decisionEvents||[]);
+   const dirty=app.ctx.state.syncDirty,undoDepth=vm.runInContext('undoStack.length',app.ctx),cloud=h.doc.payload;
+   if(action==='rename'){
+    app.ctx.openSettings();const field=makeFakeElement();field.dataset={mgrname:id};field.value='Renamed future context';
+    field.matches=selector=>selector==='[data-mgrname]';app.shim.document.dispatchEvent({type:'change',target:field});
+   }else if(action==='mode')app.ctx.onAction('cycle-context',{dataset:{id}});
+   else app.ctx.onAction('del-ctx',{dataset:{id}});
+   await syncSettle(25);
+   const afterRow=app.ctx.state.contexts.find(row=>row.id===id);
+   assert.equal(afterRow?JSON.stringify(afterRow):null,JSON.stringify(beforeRow),
+    'an unsupported prior row is held byte-for-byte before '+action+' can mutate it');
+   assert.deepEqual(JSON.parse(JSON.stringify(app.ctx.state.tasks[0].ctx)),beforeTaskContexts,'the unsupported context membership stays untouched');
+   assert.equal(vm.runInContext('undoStack.length',app.ctx),undoDepth,'an unrepresentable action adds no local Undo frame');
+   assert.equal(JSON.stringify(app.ctx.state.decisionEvents||[]),events,'no incomplete current-choice evidence is minted');
+   assert.equal(app.ctx.state.syncDirty,dirty,'a held action does not mark the board for publication');
+   assert.equal(h.doc.payload,cloud,'no cloud write can acknowledge the unrepresentable mutation');
+   assert.equal(h.calls.filter(call=>call==='push').length,0,'the unrepresentable action causes no cloud write');
+   assert.equal(app.ctx.window.CloudSync.errorCode,'unprojectable-decision-evidence','the existing safe hold is reported');
+  }finally{try{await app.shim.window.ScannerDeviceStore?.close?.();}catch{}}
+ });
+});
+
+test('RISK current-choice projection: a complete creation group reconstructs its definition on a pristine board',async()=>{
+ const at=Date.parse('2026-10-17T20:45:00.000Z');
+ const initial=syncState({tasks:[syncTask('context-projection-task','Task')],contexts:[],chain:[],candidateId:null,
+  passStartedAt:at-60000,passId:'context-projection-pass',scanMode:'descending',syncRev:4,syncAccount:'e@example.com',syncDirty:false});
+ const remote=JSON.parse(JSON.stringify(initial));
+ for(const key of ['syncRev','syncAccount','syncDirty','lastCloudServerAt','protectedBackupIds'])delete remote[key];
+ const h=makeSyncHarness({remote,rev:4,delayMs:1}),seedStorage={[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)};
+ const app=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:h.factory});
+ try{
+  await app.ctx.cloudPull();await syncSettle(20);
+  const pristine=JSON.parse(JSON.stringify(app.ctx.state));
+  app.ctx.openSettings();app.shim.document.getElementById('newCtxName').value='Projection context';
+  app.ctx.onAction('add-ctx-named',{});
+  const created=app.ctx.state.contexts.find(row=>row.name==='Projection context');assert.ok(created,'the real Settings Add action creates the context');
+  const rows=app.ctx.state.decisionEvents.filter(event=>event?.kind==='current-choice'&&event.target?.type==='context'&&event.target.id===created.id);
+  assert.deepEqual(JSON.parse(JSON.stringify(rows.map(event=>event.target.property).sort())),['exists','mode','name'],
+   'the captured creation action has its complete supported fact group');
+  pristine.decisionBaseline=JSON.parse(JSON.stringify(app.ctx.state.decisionBaseline));
+  pristine.decisionEvents=JSON.parse(JSON.stringify(rows));
+  pristine.syncAccount='e@example.com';
+  app.ctx.projectDecisionEvents(pristine);
+  assert.deepEqual(JSON.parse(JSON.stringify(pristine.contexts)),[{id:created.id,name:'Projection context',active:true}],
+   'full decision replay materializes the definition and exact initial mode from the complete creation group');
+ }finally{try{await app.shim.window.ScannerDeviceStore?.close?.();}catch{}}
+});
+
 test('RISK cloud current choices: a changed scene source is held before adoption or acknowledgement',async t=>{
  const at=Date.parse('2026-10-17T19:00:00.000Z'),passAt=at-60000;
  const initial=syncState({tasks:[syncTask('scene-hold-task','Scene hold')],chain:[],candidateId:null,passStartedAt:passAt,
