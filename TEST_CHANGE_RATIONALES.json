@@ -7741,7 +7741,7 @@
     ],
     "redEvidence": {
       "command": "node --test --test-reporter=spec --test-name-pattern='RISK cloud current choices: context membership additions compose across observed revisions' tests.js",
-      "failure": "On 947c3bec1076a729257185142bf17da066bb441a, the full-app peer pull retained only ctx-peer after phone's ctx-phone choice. Raw /Users/emeraldpham/.codex/task-artifacts/decision-sync-141/144/context-delta-red-before-fix.txt includes distinct action IDs/base IDs and both exact before:{present:true,value:[]} records. The fixed consumer passes on integrated root checkpoint e480c2c."
+      "failure": "On 947c3bec1076a729257185142bf17da066bb441a, the full-app peer pull retained only ctx-peer after phone's ctx-phone choice. Raw /Users/emeraldpham/.codex/task-artifacts/decision-sync-141/144/context-delta-red-before-fix.txt includes distinct action IDs/base IDs and both exact before:{present:true,value:[]} records. The fixed consumer passes on integrated root checkpoint 98528c0."
     }
   },
   {
@@ -8068,6 +8068,33 @@
     "redEvidence": {
       "command": "env TZ=UTC node --test --test-name-pattern=\"RISK Quick start content:|RISK bulk task editing: offline two-task\" tests.js",
       "failure": "bulk-quickstart-preliminary-red-0c.log records obsolete refresh wording and held manual unrepresented peer conflict.02-cross-realm-failure preserves a fixture-only host/VM array comparison error; Array.from fixes the assertion realm.03-0c.log passes2/2 with real current peer actions. This is fixture/copy coverage correction, not original runtime bug RED."
+    }
+  },
+  {
+    "testChangesSha256": "334de27cfc0e6ecb93e34c896b857edacb3bd4c30cdacdfffe98926db4df2a4e",
+    "reason": "Complete the approved #144 shared-preference and context-definition gap with strict typed producers, projection, source holds and replacement recovery consumers.",
+    "previousBehavior": "The real theme, date, hourly quote, scene and context controls had no typed current-choice authority, so independent cloud decisions could overwrite compatible values. Modern stale-source and replacement paths also lacked consumer coverage for these typed targets.",
+    "intendedBehavior": "Normal controls retain immutable typed action facts, compose compatible fields, and preserve context creation/deletion and exact mode presence. Unsupported changed scene sources hold before adoption; modern replacement Undo and stale delivery preserve the exact selected preference evidence.",
+    "replacementTests": [
+      "RISK cloud shared preferences: later theme choice survives either publication order and cold reopen",
+      "RISK cloud shared preferences: date format survives an independent No in either publication order and cold reopen",
+      "RISK cloud shared preferences: one hourly quote edit survives an independent No without replacing other hours",
+      "RISK cloud shared preferences: scene time season and structured location survive an independent No",
+      "RISK cloud contexts: deleting a legacy context and targeted Undo restore its exact definition for a cold peer",
+      "RISK cloud contexts: create rename mode and task assignment survive an independent No in either order",
+      "RISK cloud current choices: a changed scene source is held before adoption or acknowledgement",
+      "RISK cloud current choices: typed preference authority survives a modern replacement Undo and stale delivery"
+    ],
+    "preservedCoverage": [
+      "The theme and date tests retain both publication orders, original decision time, independent No evidence, visible settings and cold reopen. Hourly quotes preserve unrelated hour buckets; scene location/time/season remain separate actual control actions with structured location values.",
+      "Context creation groups existence, name and exact active/excluded field presence; rename, one-pair mode changes and task membership survive an independent No. Legacy deletion carries exact row evidence, targeted Undo restores unknown row fields, and a cold peer reconstructs the same row and membership.",
+      "The changed-scene consumer begins with actual time/season controls, then alters the cloud scene to an unsupported future shape. It asserts the visible local board, local persisted bytes and exact cloud payload remain unchanged under the hold. Its baseline failure occurred earlier at missing typed producer rows; no preimplementation hold-branch failure is claimed.",
+      "Modern replacement uses real No and theme actions, explicit Import, displaced-branch delivery, ordinary reverse-replacement Undo, stale selected-source delivery and cold reopen. Exact old and selected theme event identities remain separately checked.",
+      "Existing task-field, context-delta, disposition, comparison, scoped Undo, recovery, completion, deletion, postponement, prerequisite and explicit replacement assertions remain unchanged. This checkpoint makes no browser, live-auth, emulator, production or deployment claim."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='RISK cloud shared preferences|RISK cloud contexts:|a changed scene source is held|typed preference authority' tests.js",
+      "failure": "Before this extension, the real theme/date/hourly-quote/scene controls lost their independent choices in the retained 879 RED logs (shared-preferences-theme-red-879-final.log, shared-preferences-date-format-red-879-fixture-fixed.log, shared-preferences-hourly-quote-red-879.log, shared-preferences-scene-red-879.log); context deletion and create/mode failed in context-lifecycle-undo-red-879.log and context-create-name-mode-red-879.log. Against pre-extension app source 1c29374, the changed-scene consumer observed 0 instead of 2 typed producer rows (scene-source-hold-red-1c29374.txt), and modern replacement likewise observed 0 instead of 2 theme facts (modern-preference-replacement-red-1c29374.txt). The first scene-hold attempt was a fixture TypeError before the assertion and is retained as scene-source-hold-harness-misfire.txt, not counted as RED. The final candidate passes all 18 focused preference/context/source-hold/replacement cases in shared-choices-context-replacement-green.txt."
     }
   }
 ]
