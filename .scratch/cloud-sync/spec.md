@@ -81,13 +81,13 @@ cloud publication remain protected.
 
 ## Testing Decisions
 
-The proposed primary test seam is the existing complete-application consumer
+The approved primary test seam is the existing complete-application consumer
 harness: two independent app instances performing normal scanner, list, editor,
 and Undo actions, with isolated device stores and a shared synthetic cloud
 backend. Drive reconnect, revision notification, visibility, and reopening
 through their existing entry points. Assert the visible board and effective
 ratings, retained history, durable saved result, and exact final cloud content.
-The user will confirm this test boundary before publication of the spec.
+The user approved this test boundary before publication of the spec.
 
 This seam catches action-to-persistence-to-reconciliation regressions. It does
 not establish real browser event timing, live authentication, deployed rules,

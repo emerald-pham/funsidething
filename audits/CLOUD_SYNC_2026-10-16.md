@@ -58,8 +58,12 @@ or that opposite comparison answers make one observation replace the other.
 These product boundaries are recorded. After resolving them, the user invoked
 the to-spec skill to advance to synthesis and publication on the configured
 tracker. That instruction supersedes the earlier pending discussion checkpoint;
-it does not request runtime implementation. The spec includes a focused check
-of the proposed consumer test boundary before publication.
+it does not request runtime implementation. The user approved the proposed
+consumer test boundary and proceeded to ticket planning. The spec is published
+as [#141 — Preserve nonconflicting board decisions across cloud sync](https://github.com/emerald-pham/funsidething/issues/141),
+with the configured `ready-for-agent` label. Its saved body was verified against
+the local approved source. The six proposed child-ticket bodies and dependency
+graph await the breakdown review required by the to-tickets skill.
 
 ## How the current system works
 
@@ -251,5 +255,6 @@ browser allocations, and emulator allocations remain preserved. A concurrent
 saved-view task is adding its own glossary terms; later integration must keep
 both sets of vocabulary rather than replace that work.
 
-This document and the glossary are local audit/design work. No runtime fix,
-CI candidate, merge, or deployment is claimed.
+This document and the glossary are local audit/design work. The approved spec
+has been published to the configured tracker. No runtime fix, CI candidate,
+merge, or deployment is claimed.
