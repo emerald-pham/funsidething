@@ -4075,6 +4075,7 @@ document.addEventListener("visibilitychange", ()=>{if(document.hidden)suspendClo
 document.addEventListener("focusout", ()=>setTimeout(resumeDeferredCloudPull, 0));
 document.addEventListener("close", resumeDeferredCloudPull, true);
 function sealUndoFrame(){
+  // Freeze the local gesture before a later save/adoption can add peer effects.
   const frame=undoStack.at(-1);
   if(frame&&!frame.after)frame.after=JSON.stringify(state);
 }
@@ -4084,6 +4085,9 @@ function pushUndo(kind="ordinary"){
   if(undoStack.length > 30) undoStack.shift();
 }
 function scopedUndoState(frame){
+  // Reverse only the sealed local delta against the current board. Existing
+  // domain replacement writers below retain causal completion/delete evidence;
+  // comparison and typed-choice facts are reversed by their immutable IDs.
   const before=JSON.parse(frame.snapshot),after=JSON.parse(frame.after),next=JSON.parse(JSON.stringify(state));
   const equal=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
   const inverse=(target,prior,applied,skip=new Set())=>{
@@ -5031,8 +5035,10 @@ const taskActionOwnerBundle=(()=>{
       appendDecisionEvent(cancellation,next);
     }
     const inputs=t=>t&&[t.mu,t.sigma,t.done,t.ctx,t.startsAt,t.evergreen,t.evergreenHours,t.evergreenResetAtDay,t.lastDoneAt,taskPrerequisiteIds(t),t.dependencyModes];
-    const ids=next.tasks.filter(t=>JSON.stringify(inputs(t))!==JSON.stringify(inputs(taskById(t.id)))).map(t=>t.id);
+    const replayLearning=targets.some(event=>event.kind==="no"||event.kind==="comparison");
+    const ids=next.tasks.filter(t=>replayLearning||JSON.stringify(inputs(t))!==JSON.stringify(inputs(taskById(t.id)))).map(t=>t.id);
     const observation=captureRatingObservation("undo",ids);
+    if(cancellation)observation.id=cancellation.id;
     undoStack.pop();
     // Replacement preserves deletion evidence and immutable observations.
     markReplacementDeletes(next);

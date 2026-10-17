@@ -33,6 +33,7 @@ test('RISK scoped Undo: local comparison cancellation keeps peer learning and su
  assert.deepEqual(Array.from(local.ctx.state.chain),['undo-base','undo-peer'],'normal Undo targets the local comparison, preserving the peer Dot');
  const expected=Object.fromEntries(initial.tasks.map(t=>[t.id,{mu:t.mu,sigma:t.sigma}]));loadEngine(145).updatePair(expected['undo-peer'],expected['undo-base']);
  for(const task of local.ctx.state.tasks){assert.equal(task.mu,expected[task.id].mu);assert.equal(task.sigma,expected[task.id].sigma);}
+ assert.ok(local.ctx.state.tasks.find(t=>t.id==='undo-base').ratingHistory.some(row=>row.kind==='undo'),'the shared benchmark records its actual recomputed learning reversal');
  const cancellation=local.ctx.state.decisionEvents.find(e=>e.kind==='undo');assert.ok(cancellation,'Undo retains explicit target cancellation evidence');
  assert.deepEqual(Array.from(cancellation.targetEventIds),[original.id]);assert.equal(JSON.stringify(local.ctx.state.decisionEvents.find(e=>e.id===original.id)),JSON.stringify(original));
  assert.ok(local.ctx.state.tasks.find(t=>t.id==='undo-local').ratingHistory.some(row=>row.kind==='yes'));
