@@ -698,6 +698,21 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 ## Stale-tab reconciliation
 
 - RISK cloud No recovery: five scanner decisions survive offline durable reopen beside an independent peer edit
+- RISK cloud current choices: editor Save records original per-property action time
+- RISK cloud current choices: scan mode preference records an explicit timed choice
+- RISK cloud current choices: Resume scanning records an explicit active-pass mode change
+- RISK cloud current choices: explicit Start scanning mode records its new active pass
+- RISK cloud current choices: Save settings retains changed shared preferences as one action
+- RISK cloud current choices: immediate preference controls retain their action times
+- RISK cloud current choices: Start scanning pass root and frozen draw survive a fresh client reopen
+- RISK cloud current choices: Can’t and Return are timed, causally linked disposition actions
+- RISK cloud current choices: compatible edits on the same task retain each changed property
+- RISK cloud current choices: original decision time wins conflicts in either publication order
+- RISK cloud current choices: causal projector retains compatible task fields and context membership
+- RISK cloud current choices: causal action order beats skew and equal concurrent times use event identity
+- RISK cloud current choices: fresh pass projection installs the exact frozen mode draw
+- RISK cloud current choices: final outcome projection does not erase later pass comparisons
+- RISK cloud current choices: projected Can’t and Return preserve the original hold then clear it
 - RISK STALE TAB: CAS repair preserves newer fields and independent edits through an awaiting third action
 - RISK STALE TAB: browser rebase keeps disjoint fields but newer conflicts and deletions win
 - RISK STALE TAB: cloud adoption does not replace edits made while its safety backup awaits

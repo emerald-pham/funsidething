@@ -7419,5 +7419,49 @@
     "updatedTests": [
       "CLOUD ACCOUNT: a transaction binds its document before auth can switch"
     ]
+  },
+  {
+    "testChangesSha256": "eb5b89a3101024b6d60532c502db087d9f635b683e705b7186d1ebd51e9959d6",
+    "reason": "Implement GitHub #144 typed current-choice actions and projection through normal editor, scanner, settings, Start/Resume, disposition, sync, and fresh-client paths. Preserve the shared #142/#143 decision event and learning boundaries; correct comparison fixtures to hydrate the real unchanged editor draft and count actual comparison rows.",
+    "previousBehavior": "Real editor/task/settings actions changed local state without cloud-visible per-property intent, original action time, prior-field evidence, or shared gesture identity. Compatible fields and context changes could be lost, same-property outcomes depended on upload order rather than the action chronology, scanner mode draws and Start roots were not reconstructed on a fresh client, and disposition projection could lose the original hold expiry. The comparison fixture also emitted false edit rows because its DOM shim did not hydrate rendered checked controls.",
+    "intendedBehavior": "Each deliberate supported current-choice edit emits immutable typed property evidence in decisionEvents with stable row IDs, shared actionId for one gesture, original at/account/base/pass/context/causal frontier, and exact before presence/value plus after presence. Compatible fields and context membership compose; causal successors override clock skew; truly concurrent choices order by original at then stable ID; unknown chronology and unsupported target/value stay preserved without a guessed winner. Mode choices retain exact frozen chance draw, explicit Start retains the new pass root and identity without a synthetic comparison, and Can’t/Worked/Return retain or clear their original hold time. No-op maintenance, retry, and unchanged editor Save create no edit decisions.",
+    "replacementTests": [
+      "RISK cloud current choices: editor Save records original per-property action time",
+      "RISK cloud current choices: scan mode preference records an explicit timed choice",
+      "RISK cloud current choices: Resume scanning records an explicit active-pass mode change",
+      "RISK cloud current choices: explicit Start scanning mode records its new active pass",
+      "RISK cloud current choices: Save settings retains changed shared preferences as one action",
+      "RISK cloud current choices: immediate preference controls retain their action times",
+      "RISK cloud current choices: Start scanning pass root and frozen draw survive a fresh client reopen",
+      "RISK cloud current choices: Can’t and Return are timed, causally linked disposition actions",
+      "RISK cloud current choices: compatible edits on the same task retain each changed property",
+      "RISK cloud current choices: original decision time wins conflicts in either publication order",
+      "RISK cloud current choices: causal projector retains compatible task fields and context membership",
+      "RISK cloud current choices: causal action order beats skew and equal concurrent times use event identity",
+      "RISK cloud current choices: fresh pass projection installs the exact frozen mode draw",
+      "RISK cloud current choices: final outcome projection does not erase later pass comparisons",
+      "RISK cloud current choices: projected Can’t and Return preserve the original hold then clear it"
+    ],
+    "preservedCoverage": [
+      "Actions continue through the normal complete-app task editor, scanner, list and settings owners; no test directly calls the reducer to simulate a user choice.",
+      "The shared decisionEvents identity union, device-only decisionBase, frozen #143 learning baseline, No/Yes/Dot/Dislodge comparisons, rating participation/history, pass expiry, and exact cloud payload assertions remain protected.",
+      "Per-property validation cannot patch ratings, prerequisites, completion, deletion or arbitrary objects; existing completion/deletion/postpone/prerequisite eligibility remains authoritative.",
+      "A fresh client can project compatible edits, exact pass identity/root/mode/draw, candidate state, and original Can’t/Worked hold time without inferring chronology from persistence.",
+      "Corrected editor Dot fixtures retain explicit comparison counts, IDs, ratingApplied, baseline, history, and cloud assertions while proving that unchanged checked controls do not create edit facts.",
+      "The synthetic-cloud test seam does not establish browser timing, live Firebase/Auth/rules compatibility, ordinary production accounts, physical-device behavior, CI, deployment, or release."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='RISK cloud current choices' tests.js (focused consumer runs retained as individual raw logs)",
+      "failure": "Pre-runtime editor Save RED at 2026-10-17 03:55:46 UTC: editor-event-red.txt reports that the actual Save action produced no current-choice event. Subsequent action-time REDs are preserved in scan-mode-choice-red.txt, settings-save-red.txt, immediate-preferences-red.txt, resume-mode-red.txt, explicit-start-mode-red.txt, start-pass-red.txt, disposition-choice-red.txt and start-pass-reconciliation-red.txt. Reconciliation REDs current-choice-reconciliation-red.txt and current-choice-projector-red.txt show property loss and upload-order dependence. pass-mode-snapshot-red.txt caught recording only a string instead of the exact mode/draw; disposition-hold-value-red.txt caught dropping the original hold timestamp; pass-final-chain-red-behavior.txt at 2026-10-17 04:31:20 UTC caught the root replay erasing a later Dot. compatible-current-choice-red.txt at 04:34:49 UTC caught rejecting a valid null URL and is paired with its GREEN. After integration, comparison-replay-a80.txt was a fixture-only failure: comparison-row-debug.txt showed unchecked shim defaults inventing reset/context edits. The helper now hydrates the rendered unchanged draft; final tests preserve actual comparison assertions and explicitly reject invented edit facts. That corrected run is retrospective fixture repair, not preimplementation RED."
+    },
+    "updatedTests": [
+      "RISK comparison replay: independent Yes and Dot evidence survives either cloud publication order and a fresh client",
+      "RISK comparison replay: first supported action freezes learned legacy ratings without replaying observational history",
+      "RISK comparison replay: compatible new-task baseline extensions union without freezing branch-local posteriors"
+    ],
+    "coverageChronology": {
+      "preimplementation": "The editor action-evidence RED is captured against original base 4b930f31272fc3db61a5cdcad0b1ec0ec0ac4ad2. Additional action, projection, mode snapshot, disposition hold, and pass-chain REDs were captured before their respective runtime repairs; raw outputs and paired times are listed in /Users/emeraldpham/.codex/task-artifacts/decision-sync-141/144/CHRONOLOGY.md.",
+      "postimplementation": "Against integrated checkpoint a80e88eef66e4622d6af6027b66a176530a1d626, the current-choice cohort passed 17/17, corrected comparison replay passed 6/6, and the affected existing domain-preservation cohort passed 12/12. Full suite, compatibility, browser/visual, CI, live deployment and production proof remain with the parent."
+    }
   }
 ]
