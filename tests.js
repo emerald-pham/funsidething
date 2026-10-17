@@ -10788,6 +10788,303 @@ test('DELETION LOG: short February does not make the two-month window expire ear
   assert.ok(ctx.state.deletionLog.some(row=>row.taskId===edge.id));
 });
 
+test('RISK deletion authority: real Delete defeats a stale saved and cloud Dot after log pruning while same-title Add stays usable',async t=>{
+ const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),at=Date.parse('2026-10-17T16:00:00Z');
+ const initial=syncState({tasks:[syncTask('deleted-same-title','Same title'),syncTask('current-member','Keep current member')],
+  chain:['current-member'],candidateId:null,mode:'scan',scanMode:'descending',passStartedAt:at-60000,passId:'delete-authority-pass',
+  syncRev:1,syncAccount:'e@example.com',syncDirty:false,settings:{horizonMin:60,thresholdPct:0,samples:40,cantMin:30,workedHours:8}});
+ const initialRaw=JSON.stringify(initial),seedStorage={[SYNC_STORE_KEY]:initialRaw,[LOCAL_HEAD_KEY]:initialRaw};
+ // A closed earlier copy makes an actual title edit, Add, and Dot for the same identity.
+ const earlier=await loadAppAtTime(at,{seedStorage});
+ hydrateUnchangedEditorDraft(earlier,'deleted-same-title');
+ earlier.shim.document.getElementById('etTitle').value='Stale edit to deleted identity';
+ earlier.ctx.onAction('save-edit',{dataset:{id:'deleted-same-title'}});
+ hydrateUnchangedEditorDraft(earlier,'deleted-same-title');
+ assert.match(earlier.shim.document.getElementById('modalRoot').innerHTML,/data-act="dot-task" data-id="deleted-same-title"/);
+ earlier.ctx.onAction('dot-task',{dataset:{id:'deleted-same-title'}});
+ earlier.shim.document.getElementById('addInput').value='Unrelated stale addition';
+ await earlier.ctx.onAction('add',earlier.shim.document.getElementById('addButton'));
+ const staleAddition=earlier.ctx.state.tasks.find(row=>row.title==='Unrelated stale addition');
+ assert.ok(staleAddition,'the old copy has an independently added task to recover');
+ await earlier.ctx.persist();
+ const exactBrowserSource=JSON.stringify(earlier.ctx.state),exactCloudSource=JSON.parse(earlier.ctx.cloudPayload());
+ assert.ok(earlier.ctx.state.chain.includes('deleted-same-title'),'the exact older source contains the stale Dot');
+ assert.equal(earlier.ctx.state.tasks.find(row=>row.id==='deleted-same-title').title,'Stale edit to deleted identity');
+ earlier.ctx.suspendCloudSync();
+
+ const scanChain=html=>{
+  const ids=[...String(html).matchAll(/data-act="reveal" data-id="([^"]+)"/g)].map(match=>match[1]);
+  const benchmark=String(html).match(/data-act="bench-done" data-benchmark="([^"]+)"/);
+  if(benchmark)ids.push(benchmark[1]);
+  return ids;
+ };
+ for(const backend of ['browser fallback','IndexedDB'])await t.test(backend,async subtest=>{
+  const name=`delete-authority-${backend}-${Date.now()}-${Math.random()}`;
+  const remote=JSON.parse(initialRaw);for(const key of ['syncRev','syncAccount','syncDirty','lastCloudServerAt','protectedBackupIds','decisionBase'])delete remote[key];
+  const h=makeSyncHarness({remote,rev:1,delayMs:1});
+  const options=backend==='IndexedDB'?{indexedDBProvider:indexedDB,deviceDbName:name}:{};
+  const app=await loadAppAtTime(at+100,{seedStorage,cloudSyncFactory:h.factory,...options}),{ctx,shim}=app;
+  subtest.after(async()=>{ctx.suspendCloudSync();try{await ctx.window.ScannerDeviceStore?.close?.();}catch{}});
+  await ctx.cloudPull();await ctx.persist();ctx.window.CloudSync.ready=false;
+  shim.document.getElementById('addInput').value='Current-only task omitted by stale source';
+  await ctx.onAction('add',shim.document.getElementById('addButton'));
+  const currentOnly=ctx.state.tasks.find(row=>row.title==='Current-only task omitted by stale source');
+  assert.ok(currentOnly,'the current board has a task the older source has never seen');
+  hydrateUnchangedEditorDraft(app,'deleted-same-title');
+  assert.match(shim.document.getElementById('modalRoot').innerHTML,/data-act="delete-task" data-id="deleted-same-title"/);
+  ctx.onAction('delete-task',{dataset:{id:'deleted-same-title'}});await ctx.persist();
+  assert.equal(ctx.state.tasks.some(row=>row.id==='deleted-same-title'),false,'the actual Delete action removes only the selected identity');
+  assert.deepEqual(Array.from(ctx.state.chain),['current-member'],'the actual Delete action keeps unrelated current membership');
+
+  const scan=shim.document.getElementById('scan'),paints=[],durable=[];let markup=scan.innerHTML,phase='delete';
+  Object.defineProperty(scan,'innerHTML',{configurable:true,get:()=>markup,set(value){markup=value;paints.push({phase,chain:Array.from(ctx.state.chain),painted:scanChain(value)});}});
+  if(backend==='IndexedDB'){
+   const store=ctx.window.ScannerDeviceStore,commit=store.commitHead.bind(store);
+   store.commitHead=async options=>{const result=await commit(options);if(result?.ok)durable.push({phase,chain:JSON.parse(options.payload).chain});return result;};
+  }else{
+   const set=shim.localStorage.setItem.bind(shim.localStorage);
+   shim.localStorage.setItem=(key,value)=>{set(key,value);if(key===SYNC_STORE_KEY||key===LOCAL_HEAD_KEY){
+    try{durable.push({phase,chain:JSON.parse(value).chain});}catch{}
+   }};
+  }
+  setFakeTime(ctx,at+92*86400000);phase='injected-stale-source';
+  shim.localStorage.setItem(SYNC_STORE_KEY,exactBrowserSource);shim.localStorage.setItem(LOCAL_HEAD_KEY,exactBrowserSource);
+  assert.equal(shim.localStorage.getItem(SYNC_STORE_KEY),exactBrowserSource,'the older browser bytes remain the exact injected recovery source');
+  phase='aged-local-recovery';
+  const firstRecovery=await ctx.persist();
+  if(backend==='browser fallback'){
+   assert.equal(firstRecovery,false,'browser-copy reconciliation aborts this obsolete save attempt after repairing the exact pair');
+   assert.equal(ctx.state.deletedTaskIds['deleted-same-title'],true,'the repaired browser state is already live before retry');
+   assert.deepEqual(Array.from(ctx.state.chain),['current-member'],'the repaired browser state is already safe before retry');
+   assert.equal(await ctx.persist(),true,'a retry after the completed browser recovery durably saves the repaired board');
+  }else assert.equal(firstRecovery,true,'IndexedDB recovery and durable commit complete in the same call');
+  assert.equal(ctx.state.deletedTaskIds['deleted-same-title'],true,'compact deletion authority remains after the dated event is pruned');
+  assert.equal(ctx.state.deletionLog.some(row=>row.taskId==='deleted-same-title'),false,'the recovery date has pruned the two-month log entry');
+  assert.equal(ctx.state.tasks.some(row=>row.id==='deleted-same-title'),false,'a stale identity, edit, and Dot cannot undo recorded Delete');
+  assert.deepEqual(Array.from(ctx.state.chain),['current-member'],'local recovery does not renew the old Dot');
+  assert.equal(ctx.state.tasks.find(row=>row.id===staleAddition.id)?.title,'Unrelated stale addition','unrelated stale data remains recoverable');
+  assert.equal(ctx.state.tasks.find(row=>row.id===currentOnly.id)?.title,'Current-only task omitted by stale source','an omitted task is not treated as a deletion');
+  assert.ok(paints.some(row=>row.phase==='aged-local-recovery'),'the real scanner repaints at the local recovery boundary');
+  assert.ok(durable.some(row=>row.phase==='aged-local-recovery'),'the actual device store saves the repaired board before returning');
+  for(const row of paints.filter(entry=>entry.phase==='aged-local-recovery')){
+   assert.deepEqual(row.painted,row.chain,'painted scanner membership matches the live chain');
+   assert.ok(!row.painted.includes('deleted-same-title'),'no intermediate scanner paint shows the deleted identity');
+  }
+  for(const row of durable.filter(entry=>entry.phase==='aged-local-recovery'))assert.ok(!row.chain.includes('deleted-same-title'),'no intermediate durable board contains the deleted identity');
+
+  phase='aged-cloud-recovery';ctx.window.CloudSync.ready=true;h.writeBehindBack(exactCloudSource);
+  await ctx.cloudPull();
+  assert.equal(ctx.state.deletedTaskIds['deleted-same-title'],true,'stale cloud delivery retains the compact tombstone');
+  assert.equal(ctx.state.tasks.some(row=>row.id==='deleted-same-title'),false,'stale cloud presence, title, and Dot lose to the real Delete action');
+  assert.deepEqual(Array.from(ctx.state.chain),['current-member'],'cloud recovery does not renew the deleted Dot');
+  assert.equal(ctx.state.tasks.find(row=>row.id===currentOnly.id)?.title,'Current-only task omitted by stale source','stale cloud omission does not delete the current-only task');
+  await ctx.cloudPushNow();await syncSettle(35);
+  assert.equal(ctx.state.syncDirty,false,'the corrected publication receives an exact synthetic acknowledgement');
+  assert.equal(h.remoteState().tasks.some(row=>row.id==='deleted-same-title'),false,'the acknowledged cloud board omits the deleted identity');
+  assert.deepEqual(h.remoteState().chain,['current-member']);
+
+  ctx.window.CloudSync.ready=false;shim.document.getElementById('addInput').value='Same title';
+  await ctx.onAction('add',shim.document.getElementById('addButton'));
+  const replacement=ctx.state.tasks.find(row=>row.title==='Same title');
+  assert.ok(replacement,'a genuine same-title Add remains available');
+  assert.notEqual(replacement.id,'deleted-same-title','new title equality does not reuse deleted identity');
+  hydrateUnchangedEditorDraft(app,replacement.id);
+  assert.match(shim.document.getElementById('modalRoot').innerHTML,new RegExp('data-act="dot-task" data-id="'+replacement.id+'"'));
+  ctx.onAction('dot-task',{dataset:{id:replacement.id}});await ctx.persist();
+  assert.ok(ctx.state.chain.includes(replacement.id),'the distinct new task remains usable through the real Dot action');
+  ctx.window.CloudSync.ready=true;await ctx.cloudPushNow();await syncSettle(35);
+  assert.equal(h.remoteState().tasks.some(row=>row.id==='deleted-same-title'),false,'the final acknowledged board still excludes the deleted identity');
+  assert.ok(h.remoteState().tasks.some(row=>row.id===currentOnly.id),'the final board keeps the unrelated current-only task');
+  assert.ok(h.remoteState().tasks.some(row=>row.id===replacement.id),'the final board contains the usable new same-title identity');
+ });
+});
+
+test('RISK deletion authority: Clear history retries and pruned stale delivery retain ordinary deletion and evergreen completion separately',async t=>{
+ const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),at=Date.parse('2026-10-17T17:00:00Z');
+ const initial=syncState({tasks:[
+  Object.assign(syncTask('ordinary-cleared','Ordinary completed'),{mu:28,sigma:7,ratingHistory:[{id:'rating-ordinary',kind:'yes',at:at-3000}]}),
+  Object.assign(syncTask('evergreen-cleared','Evergreen completed'),{evergreen:true,evergreenHours:1,evergreenResetAtDay:false,mu:34,sigma:6,ratingHistory:[{id:'rating-evergreen',kind:'no',at:at-2000}]}),
+  syncTask('history-keep','Keep membership'),
+ ],chain:['ordinary-cleared','evergreen-cleared','history-keep'],candidateId:null,mode:'scan',scanMode:'descending',passStartedAt:at-60000,passId:'clear-authority-pass',
+  syncRev:1,syncAccount:'e@example.com',syncDirty:false,settings:{horizonMin:60,thresholdPct:0,samples:40,cantMin:30,workedHours:8}});
+ const initialRaw=JSON.stringify(initial),seedStorage={[SYNC_STORE_KEY]:initialRaw,[LOCAL_HEAD_KEY]:initialRaw};
+ const initialRemote=JSON.parse(initialRaw);for(const key of ['syncRev','syncAccount','syncDirty','lastCloudServerAt','protectedBackupIds','decisionBase'])delete initialRemote[key];
+ const ratings=initial.tasks.map(row=>[row.id,row.mu,row.sigma]);
+ const originalRatingHistory=new Map(initial.tasks.map(row=>[row.id,JSON.stringify(row.ratingHistory||[])]));
+ for(const backend of ['browser fallback','IndexedDB'])await t.test(backend,async subtest=>{
+  const name=`clear-authority-${backend}-${Date.now()}-${Math.random()}`,h=makeSyncHarness({remote:initialRemote,rev:1,delayMs:1});
+  const options=backend==='IndexedDB'?{indexedDBProvider:indexedDB,deviceDbName:name}:{};
+  const app=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:h.factory,...options}),{ctx,shim}=app;
+  subtest.after(async()=>{ctx.suspendCloudSync();try{await ctx.window.ScannerDeviceStore?.close?.();}catch{}});
+  await ctx.cloudPull();await ctx.persist();ctx.window.CloudSync.ready=false;
+  const beforeDoneCloud=JSON.parse(ctx.cloudPayload());
+  hydrateUnchangedEditorDraft(app,'ordinary-cleared');
+  assert.match(shim.document.getElementById('modalRoot').innerHTML,/data-act="done-task" data-id="ordinary-cleared"/);
+  ctx.onAction('done-task',{dataset:{id:'ordinary-cleared'}});await ctx.persist();
+  hydrateUnchangedEditorDraft(app,'evergreen-cleared');
+  assert.match(shim.document.getElementById('modalRoot').innerHTML,/data-act="done-task" data-id="evergreen-cleared"/);
+  ctx.onAction('done-task',{dataset:{id:'evergreen-cleared'}});await ctx.persist();
+  const clearedRows=ctx.state.workLog.map(row=>JSON.parse(JSON.stringify(row))),historyIds=clearedRows.map(row=>row.id);
+  const beforeClearSource=JSON.stringify(ctx.state),beforeClearCloud=JSON.parse(ctx.cloudPayload());
+  assert.equal(clearedRows.length,1,'the actual evergreen Done action adds one History row');
+  assert.equal(clearedRows[0].taskId,'evergreen-cleared');
+  assert.deepEqual(Array.from(ctx.state.tasks,row=>[row.id,row.mu,row.sigma]),ratings,'real completion does not change preference rating values');
+  for(const task of ctx.state.tasks){
+   const original=JSON.parse(originalRatingHistory.get(task.id));
+   for(const observation of original)assert.ok(task.ratingHistory?.some(saved=>JSON.stringify(saved)===JSON.stringify(observation)),task.id+': original rating observation remains exact');
+  }
+
+  ctx.onAction('toggle-hist',{});
+  assert.match(shim.document.getElementById('histPanel').innerHTML,/data-act="clear-done"/,'the actual History panel exposes Clear history');
+  ctx.onAction('clear-done',{dataset:{}});
+  vm.runInContext('if(saveTimer){clearTimeout(saveTimer);saveTimer=null;}',ctx);
+  assert.equal(ctx.state.tasks.some(row=>row.id==='ordinary-cleared'),false,'Clear history deletes only the ordinary completed task identity');
+  assert.ok(ctx.state.tasks.some(row=>row.id==='evergreen-cleared'),'Clear history retains the evergreen task');
+  assert.deepEqual(Array.from(ctx.state.workLog),[],'Clear history removes the intended evergreen session row');
+  assert.equal(ctx.state.deletedTaskIds['ordinary-cleared'],true,'ordinary completion receives durable deletion authority');
+  assert.equal(ctx.state.clearedHistoryIds[historyIds[0]],true,'the exact evergreen History row receives its own clearing intent');
+  assert.equal(ctx.state.deletedTaskIds['evergreen-cleared'],undefined,'clearing evergreen History is not a task deletion');
+  assert.equal(ctx.state.tasks.find(row=>row.id==='evergreen-cleared').lastDoneAt>0,true,'clearing History retains evergreen completion and rest');
+  assert.deepEqual(Array.from(ctx.state.tasks.filter(row=>row.id!=='ordinary-cleared'),row=>[row.id,row.mu,row.sigma]),initial.tasks.filter(row=>row.id!=='ordinary-cleared').map(row=>[row.id,row.mu,row.sigma]),'clearing History does not alter retained ratings');
+  const store=backend==='IndexedDB'?ctx.window.ScannerDeviceStore:null;
+  let failNext=true,failedWrites=0;
+  if(store){
+   const commit=store.commitHead.bind(store);
+   store.commitHead=async options=>{if(failNext){failNext=false;failedWrites++;return {error:true,code:'fixture-write-failure'};}return commit(options);};
+  }else{
+   const set=shim.localStorage.setItem.bind(shim.localStorage);
+   shim.localStorage.setItem=(key,value)=>{if(failNext&&key===LOCAL_HEAD_KEY){failNext=false;failedWrites++;throw Error('fixture write failure');}return set(key,value);};
+  }
+  assert.equal(await ctx.persist(),false,'the injected first device write fails and requests retry');
+  assert.equal(failedWrites,1,'the retry fixture records exactly one injected device-write failure');
+  assert.equal(ctx.state.deletedTaskIds['ordinary-cleared'],true,'failed persistence leaves ordinary deletion authority in memory');
+  assert.equal(ctx.state.clearedHistoryIds[historyIds[0]],true,'failed persistence leaves the exact row-clearing intent in memory');
+  assert.equal(await ctx.persist(),true,'retry durably stores the same clear intent');
+  const completionIds=ctx.state.decisionEvents.filter(event=>event.kind==='completion'&&['ordinary-cleared','evergreen-cleared'].includes(event.taskId)).map(event=>event.id).sort();
+  assert.equal(completionIds.length,2,'both original completion facts survive Clear history');
+  const evergreenDoneAt=ctx.state.tasks.find(row=>row.id==='evergreen-cleared').lastDoneAt;
+  setFakeTime(ctx,at+92*86400000);
+  assert.equal(ctx.isEligible(ctx.state.tasks.find(row=>row.id==='evergreen-cleared')),true,'the retained evergreen becomes eligible after its original rest expires');
+  // Reconcile the exact pre-clear saved source first; it contains ordinary Done and the History row.
+  shim.localStorage.setItem(SYNC_STORE_KEY,beforeClearSource);shim.localStorage.setItem(LOCAL_HEAD_KEY,beforeClearSource);
+  const localRecovery=await ctx.persist();
+  if(backend==='browser fallback'){
+   assert.equal(localRecovery,false,'fallback copy recovery aborts its obsolete write after completing reconciliation');
+   assert.equal(ctx.state.deletedTaskIds['ordinary-cleared'],true,'fallback recovery installs deletion authority before returning');
+   assert.deepEqual(Array.from(ctx.state.workLog),[],'fallback recovery clears the exact History row before returning');
+   assert.equal(await ctx.persist(),true,'the retry after fallback recovery durably saves the reconciled board');
+  }else assert.equal(localRecovery,true,'IndexedDB recovery and durable save complete in one call');
+  assert.equal(ctx.state.deletedTaskIds['ordinary-cleared'],true);
+  assert.equal(ctx.state.deletionLog.some(row=>row.taskId==='ordinary-cleared'),false,'the dated deletion log is pruned while its compact authority remains');
+  assert.equal(ctx.state.tasks.some(row=>row.id==='ordinary-cleared'),false,'pruned ordinary deletion authority still blocks stale presence');
+  assert.deepEqual(Array.from(ctx.state.workLog),[],'the exact stale evergreen row does not return after its log ages out');
+  assert.equal(ctx.state.clearedHistoryIds[historyIds[0]],true,'compact History clearing authority remains after pruning');
+  assert.ok(ctx.state.tasks.some(row=>row.id==='evergreen-cleared'),'stale ordinary-history recovery does not delete the evergreen task');
+  assert.equal(ctx.state.tasks.find(row=>row.id==='evergreen-cleared').lastDoneAt,evergreenDoneAt,'the original evergreen rest timestamp remains intact');
+  assert.equal(ctx.isEligible(ctx.state.tasks.find(row=>row.id==='evergreen-cleared')),true,'stale recovery does not reset established eligibility');
+  assert.equal(ctx.state.chain.includes('evergreen-cleared'),false,'an expired rest does not renew the prior chain membership');
+  assert.equal(JSON.stringify(Array.from(ctx.state.decisionEvents.filter(event=>event.kind==='completion'&&['ordinary-cleared','evergreen-cleared'].includes(event.taskId)),event=>event.id).sort()),JSON.stringify(completionIds),'completion facts remain the same original actions');
+  assert.deepEqual(Array.from(ctx.state.tasks.filter(row=>row.id!=='ordinary-cleared'),row=>[row.id,row.mu,row.sigma]),initial.tasks.filter(row=>row.id!=='ordinary-cleared').map(row=>[row.id,row.mu,row.sigma]),'local recovery preserves retained task ratings');
+  for(const task of ctx.state.tasks){
+   const original=JSON.parse(originalRatingHistory.get(task.id));
+   for(const observation of original)assert.ok(task.ratingHistory?.some(saved=>JSON.stringify(saved)===JSON.stringify(observation)),task.id+': local recovery preserves original rating observation');
+  }
+
+  ctx.window.CloudSync.ready=true;h.writeBehindBack(beforeClearCloud);await ctx.cloudPull();
+  assert.equal(ctx.state.tasks.some(row=>row.id==='ordinary-cleared'),false,'stale cloud completion cannot undo Clear history deletion');
+  assert.deepEqual(Array.from(ctx.state.workLog),[],'stale cloud History cannot undo exact-row clearing');
+  assert.equal(ctx.state.chain.includes('evergreen-cleared'),false,'stale cloud Dot cannot renew evergreen membership after rest expiry');
+  assert.equal(ctx.state.tasks.find(row=>row.id==='evergreen-cleared').lastDoneAt,evergreenDoneAt);
+  await ctx.cloudPushNow();await syncSettle(35);
+  assert.equal(ctx.state.syncDirty,false,'the corrected stale-cloud result receives exact synthetic acknowledgement');
+  assert.equal(h.remoteState().tasks.some(row=>row.id==='ordinary-cleared'),false);
+  assert.deepEqual(h.remoteState().workLog,[]);
+  assert.equal(h.remoteState().chain.includes('evergreen-cleared'),false);
+
+  // An even older exact source contains both pre-completion Dots and no removal facts.
+  h.writeBehindBack(beforeDoneCloud);await ctx.cloudPull();
+  assert.equal(ctx.state.tasks.some(row=>row.id==='ordinary-cleared'),false,'pre-completion cloud presence stays subordinate to deletion authority');
+  assert.deepEqual(Array.from(ctx.state.workLog),[],'pre-completion cloud state does not recreate cleared History');
+  assert.equal(ctx.state.chain.includes('evergreen-cleared'),false,'pre-completion Dot cannot renew expired membership');
+  assert.equal(ctx.state.tasks.find(row=>row.id==='evergreen-cleared').lastDoneAt,evergreenDoneAt);
+  await ctx.cloudPushNow();await syncSettle(35);
+  assert.equal(h.remoteState().tasks.some(row=>row.id==='ordinary-cleared'),false);
+  assert.deepEqual(h.remoteState().workLog,[]);
+  assert.equal(h.remoteState().chain.includes('evergreen-cleared'),false);
+  assert.equal(ctx.state.syncDirty,false);
+
+  const saved=store?(await store.readHead()).payload:shim.localStorage.getItem(SYNC_STORE_KEY);
+  assert.deepEqual(JSON.parse(saved).chain,Array.from(ctx.state.chain),'the final board is durable before cold reopen');
+  if(store)await store.close();
+  const reopenOptions=backend==='IndexedDB'?{indexedDBProvider:indexedDB,deviceDbName:name}:{seedStorage:{[SYNC_STORE_KEY]:saved,[LOCAL_HEAD_KEY]:saved}};
+  const reopened=await loadAppAtTime(at+92*86400000+1,reopenOptions);
+  subtest.after(async()=>{try{await reopened.ctx.window.ScannerDeviceStore?.close?.();}catch{}});
+  assert.equal(reopened.ctx.state.tasks.some(row=>row.id==='ordinary-cleared'),false,'cold reopen keeps the ordinary deleted identity absent');
+  assert.deepEqual(Array.from(reopened.ctx.state.workLog),[],'cold reopen retains cleared History');
+  assert.ok(reopened.ctx.state.tasks.some(row=>row.id==='evergreen-cleared'),'cold reopen retains the evergreen task');
+  assert.equal(reopened.ctx.state.tasks.find(row=>row.id==='evergreen-cleared').lastDoneAt,evergreenDoneAt);
+  assert.equal(reopened.ctx.state.chain.includes('evergreen-cleared'),false,'cold reopen never restores old membership');
+  assert.deepEqual(Array.from(reopened.ctx.state.tasks.filter(row=>row.id!=='ordinary-cleared'),row=>[row.id,row.mu,row.sigma]),initial.tasks.filter(row=>row.id!=='ordinary-cleared').map(row=>[row.id,row.mu,row.sigma]));
+ });
+});
+
+test('RISK deletion authority: Undo of Clear history restores only its task and History row with original completion facts',async t=>{
+ const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),at=Date.parse('2026-10-17T18:00:00Z');
+ const initial=syncState({tasks:[
+  Object.assign(syncTask('undo-ordinary','Ordinary completed'),{mu:29,sigma:8,ratingHistory:[{id:'undo-rating-ordinary',kind:'yes',at:at-3000}]}),
+  Object.assign(syncTask('undo-evergreen','Evergreen completed'),{evergreen:true,evergreenHours:1,evergreenResetAtDay:false,mu:36,sigma:7,ratingHistory:[{id:'undo-rating-evergreen',kind:'no',at:at-2000}]}),
+  syncTask('undo-unrelated','Unrelated task'),
+ ],chain:['undo-unrelated'],candidateId:null,mode:'scan',scanMode:'descending',passStartedAt:at-60000,passId:'clear-undo-pass',
+  syncRev:1,syncAccount:'e@example.com',syncDirty:false,settings:{horizonMin:60,thresholdPct:0,samples:40,cantMin:30,workedHours:8}});
+ const seedStorage={[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)};
+ for(const backend of ['browser fallback','IndexedDB'])await t.test(backend,async subtest=>{
+  const name=`clear-undo-authority-${backend}-${Date.now()}-${Math.random()}`;
+  const options=backend==='IndexedDB'?{indexedDBProvider:indexedDB,deviceDbName:name}:{};
+  const app=await loadAppAtTime(at,{seedStorage,...options}),{ctx,shim}=app;
+  subtest.after(async()=>{try{await ctx.window.ScannerDeviceStore?.close?.();}catch{}});
+  hydrateUnchangedEditorDraft(app,'undo-ordinary');
+  ctx.onAction('done-task',{dataset:{id:'undo-ordinary'}});await ctx.persist();
+  hydrateUnchangedEditorDraft(app,'undo-evergreen');
+  ctx.onAction('done-task',{dataset:{id:'undo-evergreen'}});await ctx.persist();
+  const originalHistory=JSON.parse(JSON.stringify(ctx.state.workLog[0]));
+  const originalCompletions=ctx.state.decisionEvents.filter(event=>event.kind==='completion'&&['undo-ordinary','undo-evergreen'].includes(event.taskId)).map(event=>JSON.parse(JSON.stringify(event)));
+  const originalEvergreenDoneAt=ctx.state.tasks.find(row=>row.id==='undo-evergreen').lastDoneAt;
+  const originalRatings=ctx.state.tasks.map(row=>[row.id,row.mu,row.sigma]);
+  assert.equal(originalCompletions.length,2,'actual Done actions produce two original completion facts');
+  assert.equal(ctx.state.workLog.length,1,'actual Evergreen Done produces the History row to clear');
+  ctx.onAction('toggle-hist',{});
+  assert.match(shim.document.getElementById('histPanel').innerHTML,/data-act="clear-done"/);
+  ctx.onAction('clear-done',{dataset:{}});
+  assert.equal(ctx.state.tasks.some(row=>row.id==='undo-ordinary'),false,'Clear history deletes the completed ordinary task');
+  assert.deepEqual(Array.from(ctx.state.workLog),[],'Clear history removes the exact Evergreen Done row');
+  assert.equal(await ctx.onAction('undo',{dataset:{}}),true,'the actual Undo action reverses Clear history');
+  assert.ok(ctx.state.tasks.some(row=>row.id==='undo-ordinary'&&row.done),'actual Undo restores the ordinary completed task');
+  assert.ok(ctx.state.tasks.some(row=>row.id==='undo-evergreen'),'actual Undo keeps the evergreen task');
+  assert.equal(JSON.stringify(ctx.state.workLog),JSON.stringify([originalHistory]),'actual Undo restores the exact original Evergreen History row');
+  assert.equal(ctx.state.tasks.find(row=>row.id==='undo-evergreen').lastDoneAt,originalEvergreenDoneAt,'Undo restores the original evergreen rest timestamp');
+  assert.deepEqual(Array.from(ctx.state.tasks,row=>[row.id,row.mu,row.sigma]).sort(([a],[b])=>a.localeCompare(b)),originalRatings.sort(([a],[b])=>a.localeCompare(b)),'Undo preserves all preference ratings');
+  assert.equal(JSON.stringify(ctx.state.decisionEvents.filter(event=>event.kind==='completion'&&['undo-ordinary','undo-evergreen'].includes(event.taskId))),JSON.stringify(originalCompletions),'Undo retains both immutable original completion facts');
+  assert.equal(await ctx.persist(),true,'the restored Clear history state is durable');
+  const store=backend==='IndexedDB'?ctx.window.ScannerDeviceStore:null;
+  const saved=store?(await store.readHead()).payload:shim.localStorage.getItem(SYNC_STORE_KEY);
+  if(store)await store.close();
+  const reopenOptions=backend==='IndexedDB'?options:{seedStorage:{[SYNC_STORE_KEY]:saved,[LOCAL_HEAD_KEY]:saved}};
+  const reopened=await loadAppAtTime(at+1,reopenOptions);
+  subtest.after(async()=>{try{await reopened.ctx.window.ScannerDeviceStore?.close?.();}catch{}});
+  assert.ok(reopened.ctx.state.tasks.some(row=>row.id==='undo-ordinary'&&row.done),'cold reopen does not reapply the undone deletion');
+  assert.equal(JSON.stringify(reopened.ctx.state.workLog),JSON.stringify([originalHistory]),'cold reopen retains the original History row');
+  assert.equal(JSON.stringify(reopened.ctx.state.decisionEvents.filter(event=>event.kind==='completion'&&['undo-ordinary','undo-evergreen'].includes(event.taskId))),JSON.stringify(originalCompletions),'cold reopen preserves the original completion facts');
+ });
+});
+
+test('RISK deletion authority FAQ: deletion identity and Clear history explain retained membership authority',async()=>{
+ const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ assert.ok(/older saved copy cannot restore a deleted task/i.test(help),'the FAQ explains stale-copy deletion authority');
+ assert.ok(/same title.*new task identity/i.test(help),'the FAQ explains same-title Add identity');
+ assert.ok(/clearing Evergreen Done history.*does not delete the task or reset its rest/i.test(help),'the FAQ distinguishes clearing a row from deleting the evergreen task');
+ assert.ok(/after the rest expires.*Dot or Yes/i.test(help),'the FAQ describes eligibility after retained rest');
+});
+
 test('ACCOUNT BOUNDARY: divergent ownerless v1 bytes are backed up but not merged into another account', async () => {
   const known=syncState({tasks:[syncTask('b','Account B')],syncAccount:'b@example.com'});
   const storage=sharedScannerStorage({[SYNC_STORE_KEY]:JSON.stringify(known)});

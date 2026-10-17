@@ -1404,3 +1404,12 @@ Preflight comparison coverage:
   exercises the public command with a real published local Git branch, a passing selected comparison and a missing outgoing rationale. It preserves the existing gate, focused copy checks, refs, HEAD, tracked files and configuration.
 
 The required npm test entry point surfaces a failing isolated agent-tool cohort with a nonzero result and its assertion output.
+
+## Deletion membership authority after log pruning (#171)
+
+- `RISK deletion authority: real Delete defeats a stale saved and cloud Dot after log pruning while same-title Add stays usable`
+- `RISK deletion authority: Clear history retries and pruned stale delivery retain ordinary deletion and evergreen completion separately`
+- `RISK deletion authority: Undo of Clear history restores only its task and History row with original completion facts`
+- `RISK deletion authority FAQ: deletion identity and Clear history explain retained membership authority`
+
+Actual editor Delete, Add, Done, Clear history, and Undo actions run through isolated browser-fallback and IndexedDB device stores. A stale saved source with a same-ID title edit and Dot is replayed after the dated log expires; the scanner DOM, repaired device head, synthetic cloud pull, exact acknowledgement, unrelated omitted task, separately added same-title identity, and cold reopened state are checked. Clear history retry and replay preserve the ordinary deletion tombstone, exact cleared History row, original completion facts, ratings, Evergreen task, rest timestamp, and post-rest eligibility. Undo restores the cleared task and exact History row without losing its original completion facts. Existing direct Delete/Undo cleanup, causal `DELETE INTENT`, and two-month `DELETION LOG` assertions remain in the focused cohort.

@@ -9724,5 +9724,31 @@
     },
     "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/completion-precedence-168/169",
     "releaseStatus": "Focused local issue 169 implementation and consumer validation only. Parent /root owns integration, exact-candidate broader review, final changelog/version/service-worker packaging, CI and release validation."
+  },
+  {
+    "testChangesSha256": "bda02d1d8e1be83d93ee48712e5632479e23aa5a9338cded9513469a5b95247b",
+    "comparison": "issue171Base",
+    "comparisonBase": "75d89b40ffccaf59ae8d5628665e9dfd44f61a90",
+    "reason": "A merged explicit task-deletion tombstone must also defeat a stale same-ID scanner Dot after aged-log local recovery and cloud reconciliation. The new complete-app consumer tests exercise the actual Delete and Clear history controls and keep identity deletion, task omission, History-row clearing, Evergreen rest and fresh same-title Add as separate outcomes.",
+    "previousBehavior": "mergeUndeletedTasks removed a tombstoned task and ignored its later stale presence, but left the same ID in the selected board's chain and other scanner marks. After local recovery or stale cloud pull the task was absent while its deleted identity reappeared as a scanner member. Existing tombstone coverage checked task/log state but did not drive the stale identity through scanner DOM and device/cloud consumers.",
+    "intendedBehavior": "An explicit merged deletion removes only that identity from the winning chain, candidate and per-task scan marks. Same-title Add receives a distinct usable ID; a task omitted by a stale source remains present. Actual Clear history keeps ordinary deletion and exact History-row authority after the dated log expires, while preserving original completion facts, ratings, Evergreen completion/rest and eligibility. Undo restores the exact task and History row without losing original completion lineage.",
+    "replacementTests": [
+      "RISK deletion authority: real Delete defeats a stale saved and cloud Dot after log pruning while same-title Add stays usable",
+      "RISK deletion authority: Clear history retries and pruned stale delivery retain ordinary deletion and evergreen completion separately",
+      "RISK deletion authority: Undo of Clear history restores only its task and History row with original completion facts",
+      "RISK deletion authority FAQ: deletion identity and Clear history explain retained membership authority"
+    ],
+    "preservedCoverage": [
+      "Existing deleteTask cleanup, persisted Delete Undo, causal DELETE INTENT, and two-month DELETION LOG assertions remain unchanged and are included in the focused 15-test verification cohort.",
+      "Real editor Delete, Add, Done, Clear history and Undo controls run through both isolated browser-fallback and IndexedDB stores. Tests inspect actual scanner paint, device persistence, stale cloud delivery, exact synthetic acknowledgements and cold reopen; the stale copy retains a useful unrelated task, while an independently added current-only task proves omission is not deletion.",
+      "Clear history retry preserves the ordinary tombstone and exact evergreen History-row tombstone after dated-log pruning; stale local/cloud/pre-completion sources cannot restore them. Original completion events, preference observations, ratings, Evergreen task, rest timestamp and post-rest eligibility survive, and the Clear Undo path restores the selected task/row with original completion facts."
+    ],
+    "redEvidence": {
+      "command": "Preimplementation behavior RED via scripts/agent-tools/record-run.mjs at /Users/emeraldpham/.codex/task-artifacts/completion-precedence-168/171/runs/2026-10-17T20-43-22-877Z-7a5969e9-e483-435f-a553-5a4fadd1bbba.json: node --test --test-reporter=spec --test-name-pattern='^RISK deletion authority: real Delete' tests.js. Separate FAQ copy RED at /Users/emeraldpham/.codex/task-artifacts/completion-precedence-168/171/runs/2026-10-17T20-45-04-737Z-350aab51-9a9c-4ecf-8e40-0bd9b86df9b1.json.",
+      "failure": "Both actual consumer subtests failed before the runtime edit: after the task was correctly absent and its tombstone remained, fallback local recovery and IndexedDB-backed stale-cloud recovery produced chain ['current-member','deleted-same-title'] instead of ['current-member']. This directly observed stale same-ID membership in the scanner authority path, not just missing representation. The separate FAQ assertion failed because the shipped Clear history answer did not explain stale-copy authority, same-title identity, or retained Evergreen rest."
+    },
+    "greenEvidence": "/Users/emeraldpham/.codex/task-artifacts/completion-precedence-168/171/runs/2026-10-17T20-48-33-314Z-81620c22-19a4-465e-a99f-409c7af7825f.json (focused 18-test Delete/Undo/Clear/History cohort, all passed)",
+    "evidenceDirectory": "/Users/emeraldpham/.codex/task-artifacts/completion-precedence-168/171",
+    "releaseStatus": "Focused local issue 171 implementation and consumer validation only. No shared browser/emulator, production, CI, push or release. Parent /root owns integration, final shell/changelog/fingerprints, broader review and release validation."
   }
 ]

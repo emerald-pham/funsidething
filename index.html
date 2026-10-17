@@ -2116,6 +2116,21 @@ function mergeUndeletedTasks(winner, other){
   winner.tasks=winner.tasks.filter(task=>!deleted[task.id]);
   for(const id of [...present.keys()]) if(deleted[id]) present.delete(id);
   let changed = winner.tasks.length!==beforeTasks;
+  // A stale board can bring back scan references without bringing back a task.
+  // Keep explicit deletion authoritative over those same-ID references too;
+  // missing membership without a tombstone is still not a deletion.
+  if(Array.isArray(winner.chain)){
+    const chain=winner.chain.filter(id=>!deleted[id]);
+    if(chain.length!==winner.chain.length){ winner.chain=chain; changed=true; }
+  }
+  if(deleted[winner.candidateId]){ winner.candidateId=null; changed=true; }
+  for(const key of ["considered","cantAt","workedAt"]){
+    const marks=winner[key];
+    if(!marks || typeof marks!=="object") continue;
+    for(const id of Object.keys(deleted)) if(deleted[id] && Object.hasOwn(marks,id)){
+      delete marks[id]; changed=true;
+    }
+  }
   for(const task of other.tasks){
     if(deleted[task.id]) continue;
     const current=present.get(task.id);
@@ -8372,7 +8387,7 @@ function openHelp(){
     + '<dt>What does Synced confirm?</dt><dd>The coherent board containing the retained decisions must be saved on this device and acknowledged by the server. A successful read or a History row alone does not confirm a saved action. Unsaved work, held adoption and failed or uncertain uploads remain pending or show an error until reconciliation and acknowledgement finish.</dd>'
     + '<dt>What happens to older boards and tabs?</dt><dd>Existing learned ratings and recorded history remain the starting baseline; missing old comparisons are not invented or trained again. Unknown evidence and recovery copies remain protected. Older tabs can be held from uploading when they cannot preserve saved decisions. The safe-update path protects unsaved work and unfinished drafts. A compatible update cannot reconstruct an older decision that was never recorded: that local copy stays protected and sync remains held. If a saved control is protected or disabled because its data is newer, use a compatible app before editing it.</dd>'
     + '<dt>Which settings save immediately?</dt><dd>Scan buttons, All Tasks display and sort, Date format, Last task WOOP, Show Postpone button, Patterned active indicators, and Keep the header visible while scrolling save as you change them. Context controls and scene dialogs save through their own actions. Horizon, Can’t sticks for, Worked on it sticks for, Postpone for, Interrupt below, MC samples, and Evergreen defaults apply through Save settings. Closing Settings discards unsaved numeric fields. Save settings is at the bottom; scroll the dialog to reach it. Fields wrap on narrow screens.</dd>'
-    + '<dt>What does Clear history remove?</dt><dd>After confirmation, Clear history removes ordinary completed tasks and logged Worked on it and Evergreen Done sessions. Open evergreen and unfinished tasks remain. Rating observations are separate from completion and work History. Undo can reverse the clear.</dd>'
+    + '<dt>What does Clear history remove?</dt><dd>After confirmation, Clear history removes ordinary completed tasks and logged Worked on it and Evergreen Done sessions. Open evergreen and unfinished tasks remain. An older saved copy cannot restore a deleted task, even after its dated log entry expires; adding the same title creates a new task identity. Rating observations are separate from completion and work History. Clearing Evergreen Done history does not delete the task or reset its rest; after the rest expires, it can return for Dot or Yes when eligible. Undo can reverse the clear.</dd>'
     + '<dt>How do backups and Restore work?</dt><dd>Daily local and manual backups stay on this device. Automatic backups cover today and the previous six local dates; older automatic entries are removed after a successful save, without Undo. Manual and protected recovery copies remain until you delete them. Restore first keeps a recovery copy of the current board, then restores the selected board while retaining later tasks without recorded deletion. Crossing signed-in accounts warns first. If saving fails or the board or account changes, Restore stops and keeps newer work open. Matching duplicate backups appear once; conflicting copies stay available for recovery.</dd>'
     + '<dt>What does Reset everything do?</dt><dd>Reset everything asks for a second confirmation and first saves an exact restorable copy locally. If the backup cannot save, or the board or account changes while it saves, reset stops and keeps newer work open. The recovery copy remains in Settings backups. Reset selects Squared Weighting, the existing reset default.</dd>'
     + '<dt>What can I do if a save or sync fails?</dt><dd>Keep the tab open if the latest edit could not save locally. Diagnostics download can view, copy, or download the current board, including unsaved edits. Device-save warnings name a stage and code. The cloud error button offers Retry sync, Reload app, and Sign out; reload waits for edits to save. Recent sync errors keeps safe timestamped codes for one hour, without task content or account details. Recorded errors describe failed attempts and can remain after a later successful sync. Interrupted cloud cleanup resumes without changing your current or previous synced board. Synced requires server acknowledgement of the latest save.</dd>'
