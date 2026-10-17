@@ -61,6 +61,9 @@ risk-selected regression cohort after the fix. Distinguish contemporaneous RED
 from retrospective base-versus-fixed validation; the latter does not establish
 test-first chronology. Treat the rationale as a review aid, not proof of chronology.
 
+For agent-tool command changes, use [agent evidence tools](agent-evidence.md) to
+select the focused and aggregate test entry points.
+
 Only pure prose, comments and nonfunctional housekeeping are exempt from a
 functional RED/GREEN loop. Configuration, dependencies and code deletion need
 the same test-first evidence whenever they change functionality. Keep focused
