@@ -3058,6 +3058,11 @@ function observeCloudIdentity(){
 function reportCloudReconcileError(code){
   const CS=window.CloudSync;
   if(!CS) return;
+  if(["unsupported-decision-evidence","unprojectable-decision-evidence","unrepresented-legacy-learning"].includes(code)){
+    // A newer semantic format needs the same safe-update checks as a denied
+    // older writer; the updater retains editor and mandatory-save guards.
+    try{Promise.resolve(window.checkForAppUpdate?.()).catch(()=>{});}catch(e){}
+  }
   if(typeof CS.reportError==="function") CS.reportError("reconcile",code);
   else{
     recordSyncError("reconcile",code);
@@ -3246,7 +3251,17 @@ async function sendPush(){
   cloudPushInFlight = true;
   const pushAccount = window.CloudSync.user;
   try{
-    if(validSavedPayload(lastKnownCloudPayload) && mergeUndeletedTasks(state, JSON.parse(lastKnownCloudPayload))){
+    const knownCloud=validSavedPayload(lastKnownCloudPayload)?JSON.parse(lastKnownCloudPayload):null;
+    // Validate each source before a union can turn malformed or foreign facts
+    // into a different same-identity conflict or alter the only local copy.
+    const sourceIssue=decisionEvidenceIssue(state,pushAccount,false) || (knownCloud && decisionEvidenceIssue(knownCloud,pushAccount,false));
+    if(sourceIssue){cloudAdoptionHeld=true;reportCloudReconcileError(sourceIssue);return;}
+    if(knownCloud && conflictingDecisionEvidence(state,knownCloud)){
+      cloudAdoptionHeld=true;reportCloudReconcileError("conflicting-decision-evidence");return;
+    }
+    const sourceProjectionIssue=decisionProjectionIssue(state) || (knownCloud && decisionProjectionIssue(knownCloud));
+    if(sourceProjectionIssue){cloudAdoptionHeld=true;reportCloudReconcileError(sourceProjectionIssue);return;}
+    if(knownCloud && mergeUndeletedTasks(state,knownCloud)){
       state.updatedAt=Date.now(); recomputeRanks(); render();
       toast("A missing task was kept before cloud sync.", 6000);
     }
@@ -3388,42 +3403,80 @@ function bindDecisionBase(account,revision,payload){
   state.decisionBase=next;
   return true;
 }
+function canonicalDecisionFact(value){
+  const canonical=item=>Array.isArray(item)?item.map(canonical):item && typeof item==="object"
+    ? Object.fromEntries(Object.keys(item).sort().map(key=>[key,canonical(item[key])])) : item;
+  return JSON.stringify(canonical(value));
+}
+function inheritedDecisionFacts(baseline){
+  return (Array.isArray(baseline?.inheritance)?baseline.inheritance:[]).flatMap(receipt=>receipt.facts||[]);
+}
+function attestedDecisionEvent(baseline,event){
+  const canonical=canonicalDecisionFact(event);
+  return inheritedDecisionFacts(baseline).some(fact=>fact.id===event.id && LZString.decompressFromUTF16(fact.witness)===canonical);
+}
 function conflictingDecisionEvidence(...boards){
-  const canonical=value=>Array.isArray(value)?value.map(canonical):value && typeof value==="object"
-    ? Object.fromEntries(Object.keys(value).sort().map(key=>[key,canonical(value[key])])) : value;
   const identities=new Map();
   for(const board of boards)for(const event of Array.isArray(board?.decisionEvents)?board.decisionEvents:[]){
     if(typeof event?.id!=="string")continue;
-    const bytes=JSON.stringify(canonical(event));
+    const bytes=canonicalDecisionFact(event);
     if(identities.has(event.id) && identities.get(event.id)!==bytes)return true;
     identities.set(event.id,bytes);
   }
   return false;
 }
-function supportedRecoveryNoEvent(event){
-  const text=value=>typeof value==="string" && !!value;
-  const ids=value=>Array.isArray(value) && value.every(text);
-  return !!event && typeof event==="object" && !Array.isArray(event) && event.v===1 && text(event.id)
-    && Number.isFinite(event.at) && event.at>=0 && (event.account===null || text(event.account))
-    && (event.baseId===null || text(event.baseId)) && text(event.passId)
-    && Number.isFinite(event.passAt) && event.passAt>=0 && text(event.scanMode) && ids(event.observedActionIds)
-    && event.kind==="no" && event.meaning==="benchmark-preferred" && text(event.candidateId) && text(event.benchmarkId)
-    && ids(event.chainIds) && ids(event.candidateContextIds) && ids(event.benchmarkContextIds);
+function decisionProjectionIssue(board,checkCoherence=true){
+  if(decisionBaselineRecoveryRows(board).length)return "unprojectable-decision-evidence";
+  const rows=Array.isArray(board?.decisionEvents)?board.decisionEvents:[],baseline=board?.decisionBaseline;
+  if(!rows.length && baseline===undefined)return null;
+  if(!supportedDecisionBaseline(baseline))return rows.length?"unprojectable-decision-evidence":null;
+  const ratings=decisionBaselineRatings(baseline);
+  if(ratings.conflicts.size || decisionEventOrder(board,baseline).blockedIds.size)return "unprojectable-decision-evidence";
+  const representedHistory=new Set([...(baseline.observedRatingHistoryIds||[]),...baseline.includedActionIds,...rows.map(event=>event?.id)]);
+  for(const task of board.tasks||[])for(const row of Array.isArray(task.ratingHistory)?task.ratingHistory:[]){
+    // This is a compatibility hold, never an attempt to reconstruct missing
+    // decisions from observational history or its possibly skewed timestamps.
+    if(validRatingHistoryRow(row) && row.before && ["no","yes","dot","dislodge"].includes(row.kind)
+      && (row.before.mu!==row.after.mu || row.before.sigma!==row.after.sigma) && !representedHistory.has(row.id))
+      return "unrepresented-legacy-learning";
+  }
+  const embodied=new Set(baseline.includedActionIds);
+  for(const event of rows){
+    if(!supportedDecisionEvent(event)||embodied.has(event.id)||attestedDecisionEvent(baseline,event))continue;
+    if(["no","comparison"].includes(event.kind)){
+      if(!decisionBaselineAcceptsEvent(baseline,event))return "unprojectable-decision-evidence";
+      if(event.ratingApplied===true){
+        const ids=event.kind==="no"?[event.candidateId,event.benchmarkId]
+          :event.action==="dislodge"?[event.taskId]:[event.winnerId,event.loserId];
+        if(ids.some(id=>!ratings.values.has(id)))return "unprojectable-decision-evidence";
+      }
+    }
+  }
+  if(checkCoherence){
+    const projected=JSON.parse(JSON.stringify(board));
+    projectDecisionEvents(projected);
+    const byId=new Map(projected.tasks.map(task=>[task.id,task]));
+    if((board.tasks||[]).some(task=>{
+      const expected=byId.get(task.id);
+      return expected && (task.mu!==expected.mu || task.sigma!==expected.sigma);
+    }))return "unrepresented-legacy-learning";
+  }
+  return null;
 }
-function decisionEvidenceIssue(board,account){
-  if(conflictingDecisionEvidence(board))return "conflicting-decision-evidence";
+function decisionEvidenceIssue(board,account,checkProjection=true){
   if(Object.hasOwn(board,"decisionBaseline")){
     const baseline=board.decisionBaseline;
-    if(typeof supportedDecisionBaseline!=="function" || !supportedDecisionBaseline(baseline))return "unsupported-decision-evidence";
+    if(!supportedDecisionBaseline(baseline))return "unsupported-decision-evidence";
     if(baseline.account!==null && baseline.account!==account)return "decision-account-mismatch";
   }
   if(Object.hasOwn(board,"decisionEvents") && (!Array.isArray(board.decisionEvents) || board.decisionEvents.some(event=>
-    !(typeof supportedDecisionEvent==="function" ? supportedDecisionEvent(event) : supportedRecoveryNoEvent(event)))))return "unsupported-decision-evidence";
+    !supportedDecisionEvent(event))))return "unsupported-decision-evidence";
   if(Object.hasOwn(board,"decisionEventsRecovery") && (!Array.isArray(board.decisionEventsRecovery) || board.decisionEventsRecovery.length))
     return "unsupported-decision-evidence";
-  if(Array.isArray(board.decisionEvents) && board.decisionEvents.some(event=>event.account!==null && event.account!==account))
+  if(Array.isArray(board.decisionEvents) && board.decisionEvents.some(event=>event.account!==account && !attestedDecisionEvent(board.decisionBaseline,event)))
     return "decision-account-mismatch";
-  return null;
+  if(conflictingDecisionEvidence(board))return "conflicting-decision-evidence";
+  return checkProjection?decisionProjectionIssue(board):null;
 }
 function persistedDecisionAncestor(account,revision){
   const base=state?.decisionBase;
@@ -3583,13 +3636,19 @@ async function cloudPull(){
       return;
     }
     const switchedAccount = state.syncAccount != null && state.syncAccount !== acct;
-    const decisionIssue=(haveRemote && decisionEvidenceIssue(remoteState,acct)) || (!switchedAccount && decisionEvidenceIssue(state,acct));
+    if(!haveRemote && !switchedAccount && state.syncAccount==null && Array.isArray(state.decisionEvents) && state.decisionEvents.length){
+      if(!await inheritDecisionAuthority(state,acct,"guest-first-empty-account"))return;
+      if(!cloudReady() || window.CloudSync.user!==acct)return;
+    }
+    const decisionIssue=(haveRemote && decisionEvidenceIssue(remoteState,acct,false)) || (!switchedAccount && decisionEvidenceIssue(state,acct,false));
     // Unknown authority cannot be projected coherently. Keep both exact copies
     // where they already live until a compatible app can understand them.
     if(decisionIssue){reportCloudReconcileError(decisionIssue);return;}
     if(!switchedAccount && haveRemote && conflictingDecisionEvidence(state,remoteState)){
       reportCloudReconcileError("conflicting-decision-evidence");return;
     }
+    const sourceProjectionIssue=(haveRemote && decisionProjectionIssue(remoteState)) || (!switchedAccount && decisionProjectionIssue(state));
+    if(sourceProjectionIssue){reportCloudReconcileError(sourceProjectionIssue);return;}
     // A board whose exact payload is already confirmed in its old account's
     // cloud only needs the normal seven-day safety copy. Unsynced work must
     // survive until the user deliberately clears its recovery copy.
@@ -3806,6 +3865,8 @@ async function cloudPull(){
         st.syncAccount=acct;
         const recoveredFields=!switchedAccount && rebasePendingBoardFields(st,state,ancestor);
         recoveredTasks = (!switchedAccount && mergeUndeletedTasks(st, state)) || recoveredFields;
+        const mergedDecisionIssue=decisionEvidenceIssue(st,acct);
+        if(mergedDecisionIssue){holdAdoption();reportCloudReconcileError(mergedDecisionIssue);return;}
         // Old boards predate synced scene settings. Preserve an existing
         // device choice through that one-time upgrade, but never carry one
         // account's coordinates into another account's document.
@@ -5511,13 +5572,36 @@ function legacyDecisionBaselineIdentity(account,ratings,includedActionIds,chainI
   const fact=JSON.stringify(frozen),digest=[0,1,2,3].map(index=>chanceHash("decision-learning-v1:"+index+":"+fact).toString(16).padStart(8,"0")).join("");
   return "dlb1:"+digest;
 }
+function supportedDecisionInheritance(receipt,account){
+  if(!receipt || typeof receipt!=="object" || Array.isArray(receipt) || receipt.v!==1
+    || Object.keys(receipt).some(key=>!["v","reason","sourceAccount","targetAccount","sourceBaseline","facts"].includes(key))
+    || !["guest-first-empty-account","explicit-import","explicit-restore"].includes(receipt.reason)
+    || typeof receipt.targetAccount!=="string" || !receipt.targetAccount || receipt.targetAccount!==account
+    || !(receipt.sourceAccount===null || typeof receipt.sourceAccount==="string" && receipt.sourceAccount)
+    || receipt.sourceAccount===receipt.targetAccount
+    || receipt.reason==="guest-first-empty-account" && receipt.sourceAccount!==null
+    || !Array.isArray(receipt.facts) || !receipt.facts.length
+    || new Set(receipt.facts.map(fact=>fact?.id)).size!==receipt.facts.length)return false;
+  if(receipt.sourceBaseline!==null && (!supportedDecisionBaseline(receipt.sourceBaseline)
+    || receipt.sourceBaseline.account!==receipt.sourceAccount))return false;
+  if(receipt.sourceBaseline===null && receipt.reason!=="guest-first-empty-account")return false;
+  return receipt.facts.every(fact=>{
+    if(!fact || typeof fact!=="object" || Array.isArray(fact) || Object.keys(fact).some(key=>!["id","witness"].includes(key))
+      || !decisionId(fact.id) || typeof fact.witness!=="string")return false;
+    try{
+      const canonical=LZString.decompressFromUTF16(fact.witness),event=JSON.parse(canonical);
+      return event.id===fact.id && supportedDecisionEvent(event) && canonicalDecisionFact(event)===canonical;
+    }catch{return false;}
+  });
+}
 function supportedDecisionBaseline(baseline,account=null){
   if(!baseline||typeof baseline!=="object"||Array.isArray(baseline)||baseline.v!==1
-    ||!decisionId(baseline.id)||typeof baseline.account!=="string"||!baseline.account
+    ||!decisionId(baseline.id)||!(baseline.account===null||typeof baseline.account==="string"&&baseline.account)
     ||account!==null&&baseline.account!==account
     ||!(baseline.sourceBaseId===null||decisionId(baseline.sourceBaseId))
     ||!(baseline.sourceRevision===null||Number.isSafeInteger(baseline.sourceRevision)&&baseline.sourceRevision>=0)
     ||!decisionIdList(baseline.includedActionIds)||!Array.isArray(baseline.ratings)
+    ||baseline.observedRatingHistoryIds!==undefined&&!decisionIdList(baseline.observedRatingHistoryIds)
     ||!baseline.ratings.every(decisionRating)||new Set(baseline.ratings.map(row=>row.taskId)).size!==baseline.ratings.length
     ||!Array.isArray(baseline.chainIds)||!baseline.chainIds.every(decisionId)
     ||!(baseline.passId===null||decisionId(baseline.passId))||!Number.isFinite(baseline.passAt)
@@ -5537,11 +5621,13 @@ function supportedDecisionBaseline(baseline,account=null){
     &&(alias.passId===null||decisionId(alias.passId))&&Number.isFinite(alias.passAt)&&alias.passAt>=0
     &&(alias.id===learningId||alias.id===legacyDecisionBaselineIdentity(baseline.account,baseline.ratings,baseline.includedActionIds,alias.chainIds,alias.passId,alias.passAt)))
     ||new Set(aliases.map(alias=>alias.id)).size!==aliases.length)return false;
+  if(baseline.inheritance!==undefined && (!Array.isArray(baseline.inheritance)
+    || !baseline.inheritance.every(receipt=>supportedDecisionInheritance(receipt,baseline.account))))return false;
   return true;
 }
 function supportedDecisionEvent(event){
   if(!event||typeof event!=="object"||Array.isArray(event)||event.v!==1||!decisionId(event.id)
-    ||!Number.isFinite(event.at)||event.at<0||typeof event.account!=="string"||!event.account
+    ||!Number.isFinite(event.at)||event.at<0||!(event.account===null||typeof event.account==="string"&&event.account)
     ||!(event.baseId===null||decisionId(event.baseId))
     ||!(event.baselineId===undefined||decisionId(event.baselineId))
     ||!(event.actionId===undefined||decisionId(event.actionId))
@@ -5648,6 +5734,12 @@ function mergeDecisionBaseline(target,source){
       for(const alias of source.decisionBaseline.compatibleBaselineIds||[])
         if(alias.id!==winner.id&&!aliases.some(row=>row.id===alias.id))aliases.push(JSON.parse(JSON.stringify(alias)));
       if(aliases.length)winner.compatibleBaselineIds=aliases;
+      const historyIds=[...new Set([...(winner.observedRatingHistoryIds||[]),...(source.decisionBaseline.observedRatingHistoryIds||[])])].sort();
+      if(historyIds.length)winner.observedRatingHistoryIds=historyIds;
+      const inheritance=Array.isArray(winner.inheritance)?winner.inheritance.slice():[];
+      for(const receipt of source.decisionBaseline.inheritance||[])
+        if(!inheritance.some(prior=>canonicalDecisionFact(prior)===canonicalDecisionFact(receipt)))inheritance.push(JSON.parse(JSON.stringify(receipt)));
+      if(inheritance.length)winner.inheritance=inheritance;
       if(conflicts.length)keepDecisionRecovery(target,"decisionBaselineRecovery",{incompatibleRatingExtensions:conflicts});
     }else keepDecisionRecovery(target,"decisionBaselineRecovery",source.decisionBaseline);
   }
@@ -5682,10 +5774,34 @@ function baselineFromSource(board,event){
   const passId=decisionId(source.passId)?source.passId:null,passAt=Number.isFinite(source.passStartedAt)&&source.passStartedAt>=0?source.passStartedAt:0;
   const baseline={v:1,account:event.account,sourceBaseId:base?.id??event.baseId??null,sourceRevision:base?.revision??(Number.isSafeInteger(source.syncRev)?source.syncRev:null),
     includedActionIds,ratings,chainIds,passId,passAt,considered:{},cantAt:{},workedAt:{}};
+  baseline.observedRatingHistoryIds=[...new Set((source.tasks||[]).flatMap(task=>Array.isArray(task.ratingHistory)?task.ratingHistory:[])
+    .filter(validRatingHistoryRow).map(row=>row.id))].sort();
   for(const [id,value] of Object.entries(source.considered||{}))if(decisionId(id)&&typeof value==="string")baseline.considered[id]=value;
   for(const [key,sourceKey] of [["cantAt","cantAt"],["workedAt","workedAt"]])for(const [id,value] of Object.entries(source[sourceKey]||{}))if(decisionId(id)&&Number.isFinite(value)&&value>0)baseline[key][id]=value;
   baseline.id=decisionBaselineIdentity(baseline.account,baseline.ratings,baseline.includedActionIds);
   return baseline;
+}
+async function inheritDecisionAuthority(board,targetAccount,reason,sourcePayload=null){
+  const rows=Array.isArray(board?.decisionEvents)?board.decisionEvents:[];
+  if(!rows.length)return true;
+  const sourceAccount=board.decisionBaseline?.account??board.syncAccount??null;
+  if(sourceAccount===targetAccount)return true;
+  const issue=decisionEvidenceIssue(board,sourceAccount);
+  if(issue){reportCloudReconcileError(issue);return false;}
+  const snapshot=JSON.stringify(board),backend=window.CloudSync,user=backend?.user||null;
+  const sourceBaseline=board.decisionBaseline===undefined?null:JSON.parse(JSON.stringify(board.decisionBaseline));
+  const saved=await saveDurableBackup("before-decision-inheritance",sourcePayload??snapshot);
+  if(!saved?.id || JSON.stringify(board)!==snapshot || window.CloudSync!==backend || (window.CloudSync?.user||null)!==user)return false;
+  const facts=rows.map(event=>({id:event.id,witness:LZString.compressToUTF16(canonicalDecisionFact(event))}));
+  const receipt={v:1,reason,sourceAccount,targetAccount,sourceBaseline,facts};
+  const baseline=baselineFromSource(board,{account:targetAccount,baseId:null});
+  baseline.includedActionIds=[...new Set([...(sourceBaseline?.includedActionIds||[]),...rows.filter(event=>
+    ["no","comparison"].includes(event.kind)&&event.ratingApplied===true).map(event=>event.id)])].sort();
+  baseline.id=decisionBaselineIdentity(targetAccount,baseline.ratings,baseline.includedActionIds);
+  baseline.inheritance=[receipt];
+  if(!supportedDecisionBaseline(baseline,targetAccount))return false;
+  board.decisionBaseline=baseline;
+  return true;
 }
 function decisionBaselineRatings(baseline){
   const values=new Map(),conflicts=new Set();
@@ -5698,7 +5814,7 @@ function decisionBaselineRatings(baseline){
   return {values,conflicts};
 }
 function ensureDecisionBaseline(event,board=state){
-  if(!event||!board||typeof event.account!=="string"||!event.account)return null;
+  if(!event||!board||!(event.account===null||typeof event.account==="string"&&event.account))return null;
   if(board.decisionEvents!==undefined&&!Array.isArray(board.decisionEvents))return null;
   let baseline=board.decisionBaseline;
   if(baseline===undefined){
@@ -5737,7 +5853,7 @@ function appendDecisionEvent(event,board=state){
   board.decisionEvents=[...rows,JSON.parse(key)];return true;
 }
 function decisionEventOrder(board,baseline){
-  const rows=Array.isArray(board?.decisionEvents)?board.decisionEvents:[],included=new Set(baseline.includedActionIds);
+  const rows=Array.isArray(board?.decisionEvents)?board.decisionEvents:[],included=new Set([...baseline.includedActionIds,...inheritedDecisionFacts(baseline).map(fact=>fact.id)]);
   const allIds=new Set(rows.map(row=>row?.id).filter(decisionId)),byId=new Map(),ambiguous=new Set();
   for(const row of rows){
     if(!supportedDecisionEvent(row)||row.account!==baseline.account)continue;
@@ -5777,8 +5893,8 @@ function decisionNoHistoryProvesRating(board,event,ratings){
     &&candidateRow.after.mu!==candidateRow.before.mu&&benchmarkRow.after.mu!==benchmarkRow.before.mu;
 }
 function projectDecisionEvents(board=state){
-  const baseline=board?.decisionBaseline,account=board?.syncAccount||window.CloudSync?.user||null;
-  if(!supportedDecisionBaseline(baseline,account)||decisionBaselineRecoveryRows(board).length)return false;
+  const baseline=board?.decisionBaseline,account=Object.hasOwn(board,"syncAccount")?board.syncAccount:baseline?.account??window.CloudSync?.user??null;
+  if(!supportedDecisionBaseline(baseline,account)||decisionProjectionIssue(board,false))return false;
   const before=JSON.stringify([(board.tasks||[]).map(task=>[task.id,task.mu,task.sigma]),board.chain,board.considered,board.cantAt,board.workedAt,board.scanMode,board.settings?.scanMode]);
   if(typeof projectDecisionPassBase==="function")projectDecisionPassBase(board);
   const {values:ratings,conflicts}=decisionBaselineRatings(baseline);
@@ -7743,6 +7859,19 @@ function openResetConfirmation(){
     +'<p class="kv">Before resetting, Chain Scanner will keep an exact restorable copy of the current board on this device. If that copy cannot be saved, nothing will be reset.</p>'
     +'<div class="mbtns"><button class="btn subtle" data-act="close-modal">Cancel</button><button class="btn danger" data-act="confirm-wipe">Confirm reset</button></div>');
 }
+function needsDecisionInheritance(board,account){
+  return typeof account==="string" && !!account && Array.isArray(board?.decisionEvents) && board.decisionEvents.length>0
+    && (board.decisionBaseline?.account??board.syncAccount??null)!==account;
+}
+async function importDecisionBoard(next,sourcePayload,box){
+  const prior=JSON.stringify(state),backend=window.CloudSync,account=state.syncAccount||(cloudReady()?backend.user:null);
+  const user=backend?.user||null,safety=await saveDurableBackup("before-import",prior);
+  const current=()=>JSON.stringify(state)===prior && window.CloudSync===backend && (window.CloudSync?.user||null)===user && box.value===sourcePayload;
+  if(!safety?.id || !current())return false;
+  if(!await inheritDecisionAuthority(next,account,"explicit-import",sourcePayload) || !current())return false;
+  markReplacementDeletes(next);pushUndo();replaceState(next);applyTheme();baseUpdatedAt=Date.now();
+  initializeReplacedScan();recomputeRanks();closeModal();commit();return true;
+}
 async function restoreDurableBackupById(id){
   const rows=readLocalBackups(),matches=rows.filter(row=>row?.id===id);
   const entry=matches.length&&matches.every(row=>readableBackupRow(row)&&row.payload===matches[0].payload)?matches[0]:null;
@@ -7764,6 +7893,10 @@ async function restoreDurableBackupById(id){
     // the captured board/account; never apply that old consent to newer work.
     if(JSON.stringify(state)!==currentBoard || window.CloudSync!==restoreBackend || (window.CloudSync?.user||null)!==restoreAccount){
       toast("Restore stopped: the board or signed-in account changed. Check the current board and try again.",7000);return false;
+    }
+    if(needsDecisionInheritance(next,destination)){
+      if(!await inheritDecisionAuthority(next,destination,"explicit-restore",entry.payload))return false;
+      if(JSON.stringify(state)!==currentBoard || window.CloudSync!==restoreBackend || (window.CloudSync?.user||null)!==restoreAccount)return false;
     }
     if(!deviceStorageAuthority)pendingRestoreSafetyIds.set(safetyCopy.id,currentBoard);
     next.restoredTaskIds||={};next.restoredTaskOps||={};
@@ -8055,6 +8188,8 @@ function onAction(act, el){
         // malformed task, the healthy board remains the live object and the
         // catch below can report the bad backup without damaging anything.
         dropRemovedFields(st); hydrateState(st);
+        const destination=state.syncAccount||(cloudReady()?window.CloudSync.user:null);
+        if(needsDecisionInheritance(st,destination))return importDecisionBoard(st,box.value,box);
         markReplacementDeletes(st); pushUndo("replacement"); replaceState(st); applyTheme();
         // Pasted in by hand, so it is authoritative as of now — not stale content
         // that cloudPull() should hold this device's writes back over.
