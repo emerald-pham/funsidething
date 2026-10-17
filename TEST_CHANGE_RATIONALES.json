@@ -8359,5 +8359,23 @@
       "command": "node --test --test-reporter=spec --test-name-pattern='RISK decision mixed rollout fixture:|RISK final decision review:|RISK test inventory:' tests.js",
       "failure": "This is explicitly postimplementation mixed integration acceptance, expected GREEN, not a new runtime RED. The underlying Pause/Resume consumer RED and source repair remain preserved in final-repair-01-all-red.log through e138 handoff. mixed-mode-01-focused.log passes18/18 with zero failures/skips, including actual extended fixture publication/cold reopen, both-order mode/context/contrary consumers, recovery growth and inventory. No emulator/browser/full-suite/CI/production claim."
     }
+  },
+  {
+    "testChangesSha256": "17b9cdccbd04fa8a714a54d638252522d17ae3555cccc12b7392bae8fd2847de",
+    "reason": "Retain the actual intervention Continue answer as original current-pass Scan intent even when it reaffirms the existing mode.",
+    "previousBehavior": "Both intervention answers were visible and enabled, but Continue at t200 created no mode fact because it left Scan unchanged. Earlier peer Pause at t100 therefore became the clean acknowledged mode in both upload orders; routing through the recorder alone would still discard the equal-before/after intent.",
+    "intendedBehavior": "Continue uses the canonical mode producer with a bounded force option for this deliberate reaffirmation only. Capture the existing original gesture/account/pass/frontier, explicitly choose Scan, retain intervention clearing and snooze12, and let normal current-choice conflict/cancellation resolve it. Other equal-value producer calls keep their prior no-op behavior.",
+    "replacementTests": [
+      "RISK intervention Continue authority: a visible scan reaffirmation competes with Pause and scoped Undo in either publication order"
+    ],
+    "preservedCoverage": [
+      "All prior five-review-finding and mixed-action assertions remain. The new actual intervention consumer verifies both controls visible/enabled, both upload orders, later Continue winning and earlier Continue losing by original time, exact fact owner/time/pass/action ID, Scan-before/Scan-after identity and one mode fact without weighting/Start/comparison fabrication.",
+      "Continue retains its existing local intervention=false and snooze12 behavior. Ordinary Undo targets its exact original fact, keeps peer Pause and independent title, and survives exact stale redelivery and cold reopen. Existing mode observed-causality/skew and unsupported-fact exact holds are included unchanged.",
+      "The existing Resume/Rescan extended FAQ now names Continue, Pause and Resume together with sync, Undo and unrelated edits; only its newer147 guidance assertion is correspondingly strengthened. Protected Quick start130-word constraint, all other copy, rules/support pin, protocol, shell metadata, native assertions and release gates remain unchanged."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-reporter=spec --test-name-pattern='RISK intervention Continue authority:' tests.js",
+      "failure": "146/continue-mode-01-red.log is owner actual consumer RED on clean5c4 BEFORE runtime edit: laterContinue200 vsPause100 ends clean work in both publication orders; earlyContinue50 negative cases retain work but expose missing deliberate intent.02-focused.log passes28/28 with existing mode causality/unknown hold, prior review consumers, mixed fixture, Start Undo and guidance/inventory.03-final-focused.log includes protected Quick start and additional single-fact/no-fake-weighting preservation. Extra immediate-event-count assertions are postimplementation strengthening, not separately claimed RED. Parent source-pinned preflight/browser reports remain untouched. No fullsuite/browser/emulator/CI/production claim; final metadata and exact release validation remain parent-owned."
+    }
   }
 ]

@@ -6390,8 +6390,8 @@ function currentChoiceDispositionSnapshot(id){
   if(kind==="worked"&&Number.isFinite(state.workedAt?.[id])&&state.workedAt[id]>0)value.at=state.workedAt[id];
   return {present:true,value};
 }
-function recordCurrentScannerMode(gesture,before){
-  if(before===state.mode)return;
+function recordCurrentScannerMode(gesture,before,force=false){
+  if(!force&&before===state.mode)return;
   appendCurrentChoiceEvents(prepareCurrentChoiceEvents([{
     target:{type:"pass",id:gesture.passId,property:"mode"},value:state.mode,
     after:{present:true},before:{present:true,value:before}}],gesture));
@@ -8107,7 +8107,7 @@ function openHelp(){
     + '<dt>How do I keep Undo within reach?</dt><dd>Enable Keep the header visible while scrolling in Settings → Scanning and recurrence. It is off by default and saves immediately. Freezing and unfreezing keep the same reserved top space. The header keeps its normal responsive size and updates the clearance when the window, text size or wrapping changes.</dd>'
     + '<dt>How do I install or update the app?</dt><dd>Install this app on your phone opens instructions for Safari on iPhone and Chrome on Android, or the browser’s install prompt when available. The installed app checks for updates when it opens or returns to the foreground. An update waits for unfinished edits and the latest board save before reloading. If a save fails, keep the tab open and use Diagnostics download to preserve the current board.</dd>'
     + '<dt>What do Horizon, Interrupt below, and MC samples change?</dt><dd>Horizon sets the comparison time span, 60 minutes by default. Interrupt below controls the nudge to stop when the estimated chance of finding a better task within one minute is below your percentage, 25% by default. Continue scanning or choose No — work the chain. MC samples controls rank estimates, 250 by default; more gives steadier estimates. Save settings applies these numeric fields.</dd>'
-    + '<dt>How do Resume and Rescan differ?</dt><dd>Resume continues the same pass without offering tasks already scanned. Pause and Resume sync as choices and support Undo while keeping unrelated task edits. Rescan skipped tasks clears No, Can’t, Worked on it, and Dislodged marks, including unexpired holds. A fresh pass refreshes the draw and clears No and Dislodged while retaining unexpired holds on the same day. The local 2 AM marker clears old scan marks for the new day. Evergreen Done follows its own interval and optional day reset. Completed sessions stay in History.</dd>'
+    + '<dt>How do Resume and Rescan differ?</dt><dd>Resume continues the same pass without offering tasks already scanned. Continue, Pause and Resume sync as choices and support Undo while keeping unrelated task edits. Rescan skipped tasks clears No, Can’t, Worked on it, and Dislodged marks, including unexpired holds. A fresh pass refreshes the draw and clears No and Dislodged while retaining unexpired holds on the same day. The local 2 AM marker clears old scan marks for the new day. Evergreen Done follows its own interval and optional day reset. Completed sessions stay in History.</dd>'
     + '</dl>'
     + '<h3>What the machinery does</h3>'
     + '<p class="kv">Comparisons help the app learn your preferences. The selected scan mode determines candidate order; ratings change immediately, while weighted modes keep their saved ordering until a fresh pass or the local 2 AM marker.</p>'
@@ -8585,7 +8585,11 @@ function onAction(act, el){
     case "woop-delete": deleteWoop(el.dataset); break;
     case "worked": TaskActionOwner.perform({type:"benchmark",action:"worked"}); break;
     case "reveal": revealTask(el.dataset.id); break;
-    case "continue-scan": pushUndo(); state.interventionActive=false; state.snooze=12; commit(); break;
+    case "continue-scan": {
+      const gesture=captureCurrentChoiceGesture(),before=state.mode;
+      // Answering Continue is deliberate Scan intent, including reaffirmation.
+      pushUndo();state.mode="scan";state.interventionActive=false;state.snooze=12;recordCurrentScannerMode(gesture,before,true);commit();break;
+    }
     case "start-working": {
       const gesture=captureCurrentChoiceGesture(),before=state.mode;
       pushUndo();state.interventionActive=false;state.mode="work";recordCurrentScannerMode(gesture,before);commit(true,true);break;
