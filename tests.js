@@ -12591,6 +12591,34 @@ test('RISK decision recovery replacement scope: exact retired branches stay reti
  });
 });
 
+test('RISK decision recovery same-account replacement: Import and Restore keep the selected modern learning baseline intact',async t=>{
+ for(const action of ['import','restore'])await t.test(action,async t=>{
+  const source=await decisionRecoveryApp146(),target=await decisionRecoveryApp146();
+  for(const app of [source,target])t.after(()=>{app.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',app.ctx);});
+  const CS=target.ctx.window.CloudSync;CS.ready=true;target.ctx.cloudPushNow();await syncSettle(45);
+  const raw=JSON.stringify(source.ctx.state),selected=JSON.stringify(source.ctx.state.decisionBaseline),events=JSON.stringify(source.ctx.state.decisionEvents);
+  if(action==='import'){target.shim.document.getElementById('jsonBox').value=raw;assert.equal(await target.ctx.onAction('import-json',{}),true);}
+  else{const row=await target.ctx.saveDurableBackup('manual',raw);target.ctx.confirm=()=>true;target.ctx.openSettings();assert.equal(await target.ctx.restoreDurableBackupById(row.id),true);}
+  await target.ctx.persist();target.ctx.cloudPushNow();await syncSettle(60);assert.equal(target.ctx.state.syncDirty,false);
+  const actual=JSON.parse(JSON.stringify(target.ctx.state.decisionBaseline));delete actual.replacement;
+  assert.equal(JSON.stringify(actual),selected,'same-account replacement must not freeze a new learning baseline or broaden inherited provenance');
+  assert.equal(JSON.stringify(target.ctx.state.decisionEvents),events);assert.equal(target.ctx.state.decisionBaseline.inheritance,undefined);
+ });
+});
+
+test('RISK decision recovery replacement durability: failed selected-source recovery leaves a modern destination and input exact for retry',async t=>{
+ const source=await decisionRecoveryApp146(),target=await decisionRecoveryApp146();
+ for(const app of [source,target])t.after(()=>{app.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',app.ctx);});
+ const CS=target.ctx.window.CloudSync;CS.ready=true;target.ctx.cloudPushNow();await syncSettle(50);
+ const prior=JSON.stringify(target.ctx.state),saved=target.storage.getItem(SYNC_STORE_KEY),cloud=target.h.doc.payload,raw=JSON.stringify(source.ctx.state);
+ const backup=target.ctx.saveDurableBackup;target.ctx.saveDurableBackup=async(kind,...args)=>kind==='decision-replacement-source'?null:backup(kind,...args);
+ target.shim.document.getElementById('jsonBox').value=raw;assert.equal(await target.ctx.onAction('import-json',{}),false);
+ assert.equal(JSON.stringify(target.ctx.state),prior);assert.equal(target.storage.getItem(SYNC_STORE_KEY),saved);assert.equal(target.h.doc.payload,cloud);assert.equal(target.shim.document.getElementById('jsonBox').value,raw);
+ target.ctx.saveDurableBackup=backup;assert.equal(await target.ctx.onAction('import-json',{}),true);await target.ctx.persist();target.ctx.cloudPushNow();await syncSettle(70);
+ assert.equal(target.ctx.state.syncDirty,false);assert.equal(JSON.stringify(target.ctx.state.decisionEvents),JSON.stringify(source.ctx.state.decisionEvents));
+ assert.ok(target.ctx.readLocalBackups().some(row=>row.payload===prior));assert.ok(target.ctx.readLocalBackups().some(row=>row.payload===raw));
+});
+
 test('RISK decision recovery inheritance authority: changed attested facts stay held and ordinary account switches gain no consent',async t=>{
  const source=await decisionRecoveryApp146();t.after(()=>{source.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',source.ctx);});
  const raw=JSON.stringify(source.ctx.state),original=source.event,baseline=JSON.stringify(source.ctx.state.decisionBaseline);

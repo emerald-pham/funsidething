@@ -7625,5 +7625,23 @@
       "command": "node --test --test-name-pattern='RISK independent decision guidance:' tests.js; raw147/guidance-red.log before runtime copy edit.",
       "failure": "The actual mounted offline FAQ failed the retained offline decisions through closing/reopening expectation. GREEN147/guidance-green.log then passed5/5 new and existing guidance cases. This is direct UI-copy RED; implementation behavior chronology remains in142-146."
     }
+  },
+  {
+    "testChangesSha256": "e529d4e9f55fdc4734a0d51995e874660023f9488cf5b24042d95627333fae37",
+    "reason": "Preserve approved same-account baseline behavior and the mandatory selected-source recovery boundary introduced by exact replacement receipts.",
+    "previousBehavior": "The new helper had modern cross-account proof, but same-account source baseline retention and failure specifically at selected-source recovery were not exercised by real consumers.",
+    "intendedBehavior": "Both Import and Restore retain the selected same-account learning baseline apart from its precise replacement receipt. A failed source recovery cannot install or publish the selection and retains exact destination/input for explicit retry.",
+    "replacementTests": [
+      "RISK decision recovery same-account replacement: Import and Restore keep the selected modern learning baseline intact",
+      "RISK decision recovery replacement durability: failed selected-source recovery leaves a modern destination and input exact for retry"
+    ],
+    "preservedCoverage": [
+      "No runtime changes or previous assertion changes in this follow-through. All new preservation checks pass without a preimplementation failure claim.",
+      "The prior required modern-target RED remains56; source recovery and exact baseline checks further constrain the approved repair. Focused146adapter/account/recovery/comparison/current-choice checks pass146/146 in66, zero skips; dependent explicit replacement Undo remains145-owned."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK decision recovery same-account replacement:|RISK decision recovery replacement durability:' tests.js",
+      "failure": "Preservation-only tests65 GREEN4/4 on the existing helper; no newly discovered runtime defect or preimplementation RED claimed. Exact selected-source recovery is fault-injected at the storage boundary, with assertions that primary state/cloud/input stay exact and explicit retry succeeds."
+    }
   }
 ]

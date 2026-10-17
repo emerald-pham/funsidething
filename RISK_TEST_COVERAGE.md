@@ -1265,3 +1265,9 @@ Durable exact displaced-baseline/fact receipts retire only explicitly replaced a
 - `RISK independent decision guidance: rendered FAQ and Settings distinguish retained decisions targeted Undo and held evidence`
 
 The mounted FAQ and Settings explain durable offline decisions, narrow original-time conflicts, exact acknowledgement, preserved inherited ratings, safely held unrecorded legacy work, and ordinary targeted Undo. Existing bulk form, conflict, readability and historical changelog protections remain.
+## Replacement source preservation (#146)
+
+- `RISK decision recovery same-account replacement: Import and Restore keep the selected modern learning baseline intact`
+- `RISK decision recovery replacement durability: failed selected-source recovery leaves a modern destination and input exact for retry`
+
+Same-account replacement retains the selected learning baseline; a failed mandatory selected-source recovery leaves the exact modern destination and input ready for retry.
