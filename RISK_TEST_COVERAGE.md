@@ -1012,6 +1012,13 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 - RISK bulk row selection: selected label replaces the existing rank slot and deselection restores its format
 - RISK bulk toolbar keyboard: rerender restores the focused toolbar action and row toggle
 - RISK All Tasks view ownership: account adoption clears prior selection while same-account Undo retains it
+- RISK saved view restoration: a reopened All Tasks list retains its local search tag filter and scroll position
+- RISK saved view restoration: the eligibility filter remains selected after reopening All Tasks
+- RISK saved view account boundary: an All Tasks filter is cleared when the signed-in account changes
+- RISK saved view fallback: corrupt or blocked local presentation storage leaves the saved board usable
+- RISK saved view startup: delayed local board reads do not expose an empty default shell
+- RISK saved view startup: delayed local reads do not call state renderers before board hydration
+- RISK saved view guidance: Quick start and Changelog describe this-device restoration and current dates
 - RISK bulk toolbar guidance: extended FAQ describes frozen controls and rank-slot selection
 - RISK repository process boundary: actual visual tests compare every changed control with neighboring controls and scrolled states
 

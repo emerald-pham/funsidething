@@ -8738,6 +8738,140 @@ test("list search: the query survives an unrelated re-render", async () => {
   assert.ok(!/Write the scene/.test(listHTML(shim)), "a repaint shouldn't silently drop the filter");
 });
 
+test('RISK saved view restoration: a reopened All Tasks list retains its local search tag filter and scroll position',async()=>{
+ const board=syncState({
+  contexts:[{id:'home',name:'Home',active:true},{id:'other',name:'Other',active:true}],
+  tasks:Array.from({length:45},(_,i)=>({...syncTask('saved-view-'+i,'Matching task '+i),ctx:[i<40?'home':'other']})),
+  listOpen:true,seenQuickStart:true
+ });
+ const storage=sharedScannerStorage({[SYNC_STORE_KEY]:JSON.stringify(board)});
+ const first=await loadApp({sharedStorage:storage}),{ctx,shim}=first;
+ const initialBoard=JSON.stringify(ctx.state);
+ const search=shim.document.getElementById('listSearch');search.id='listSearch';search.value='matching';
+ shim.document.dispatchEvent({type:'input',target:search});
+ ctx.onAction('list-tag',{dataset:{id:'c:home'}});
+ const body=shim.document.getElementById('listBody');body.id='listBody';body.scrollTop=420;
+ shim.document.dispatchEvent({type:'scroll',target:body});
+ shim.window.dispatchEvent({type:'pagehide'});
+ const savedView=JSON.parse(storage.getItem('fvp:chain-scanner:saved-view:v1')||'null');
+ assert.equal(savedView?.query,'matching','only compact presentation data is saved locally');
+ assert.equal(savedView?.scrollTop,420,'pagehide flushes the pending list position');
+ assert.equal(JSON.stringify(ctx.state),initialBoard,'filter and scroll changes must remain presentation-only');
+ const reopened=await loadApp({sharedStorage:storage}),restoredSearch=reopened.shim.document.getElementById('listSearch');
+ assert.equal(restoredSearch.value,'matching','reopening restores the All Tasks search input');
+ assert.equal(reopened.shim.document.getElementById('listCount').textContent,'(40 of 45)','reopening reapplies the context tag filter');
+ assert.match(reopened.shim.document.getElementById('listTagRow').innerHTML,/data-id="c:home"[^>]*aria-pressed="true"/,'the restored filter remains visibly selected');
+ assert.equal(reopened.shim.document.getElementById('listBody').scrollTop,420,'reopening restores the list position');
+ assert.equal(JSON.stringify(reopened.ctx.state),initialBoard,'saved-view restoration cannot alter the authoritative board');
+});
+
+test('RISK saved view account boundary: an All Tasks filter is cleared when the signed-in account changes',async()=>{
+ const board=syncState({syncAccount:'account-a',tasks:[syncTask('account-a-task','Matching private account A task')],listOpen:true,seenQuickStart:true});
+ const {ctx,shim}=await loadApp({sharedStorage:sharedScannerStorage({[SYNC_STORE_KEY]:JSON.stringify(board)})});
+ const search=shim.document.getElementById('listSearch');search.id='listSearch';search.value='private';shim.document.dispatchEvent({type:'input',target:search});
+ shim.window.CloudSync={user:'account-b'};ctx.render();
+ assert.equal(search.value,'','a private filter from the prior account must not remain in the new account view');
+ assert.equal(shim.document.getElementById('listCount').textContent,'(1)','the new account must not inherit the prior account filter');
+});
+
+test('RISK saved view restoration: the eligibility filter remains selected after reopening All Tasks',async()=>{
+ const board=syncState({tasks:[syncTask('eligibility-view','Eligibility view task')],listOpen:true,seenQuickStart:true});
+ const storage=sharedScannerStorage({[SYNC_STORE_KEY]:JSON.stringify(board)}),first=await loadApp({sharedStorage:storage});
+ first.ctx.onAction('list-eligibility',{dataset:{id:'ineligible'}});
+ assert.equal(first.shim.document.getElementById('listCount').textContent,'(0 of 1)');
+ first.shim.window.dispatchEvent({type:'pagehide'});
+ const reopened=await loadApp({sharedStorage:storage});
+ assert.equal(reopened.shim.document.getElementById('listCount').textContent,'(0 of 1)','the saved eligibility filter applies before the reopened list paints');
+ assert.match(reopened.shim.document.getElementById('listEligibilityRow').innerHTML,/data-id="ineligible" aria-pressed="true"/);
+});
+
+test('RISK saved view fallback: corrupt or blocked local presentation storage leaves the saved board usable',async()=>{
+ const board=syncState({tasks:[syncTask('view-fallback','Keep task')],listOpen:true,seenQuickStart:true}),payload=JSON.stringify(board);
+ const corrupt=await loadApp({sharedStorage:sharedScannerStorage({[SYNC_STORE_KEY]:payload,'fvp:chain-scanner:saved-view:v1':'{'})});
+ assert.equal(corrupt.ctx.state.tasks.length,1);assert.equal(corrupt.shim.document.getElementById('listSearch').value,'');
+ const values=new Map([[SYNC_STORE_KEY,payload]]),blocked={
+  getItem(key){if(key==='fvp:chain-scanner:saved-view:v1')throw new Error('local view reads are blocked');return values.has(key)?values.get(key):null;},
+  setItem(key,value){if(key==='fvp:chain-scanner:saved-view:v1')throw new Error('local view writes are blocked');values.set(key,String(value));},
+  removeItem(key){if(key==='fvp:chain-scanner:saved-view:v1')throw new Error('local view removal is blocked');values.delete(key);}
+ };
+ const unavailable=await loadApp({sharedStorage:blocked}),before=JSON.stringify(unavailable.ctx.state),search=unavailable.shim.document.getElementById('listSearch');
+ search.id='listSearch';search.value='keep';unavailable.shim.document.dispatchEvent({type:'input',target:search});
+ unavailable.shim.window.dispatchEvent({type:'pagehide'});
+ assert.equal(unavailable.shim.document.getElementById('listCount').textContent,'(1 of 1)');
+ assert.equal(JSON.stringify(unavailable.ctx.state),before,'presentation storage failures never block or edit the authoritative board');
+});
+
+test('RISK saved view guidance: Quick start and Changelog describe this-device restoration and current dates',async()=>{
+ const {ctx,shim}=await loadApp();for(const id of ['appChangelogCurrent','appChangelog'])shim.document.getElementById(id).innerHTML=html.match(new RegExp('<template id="'+id+'">([\\s\\S]*?)<\\/template>'))[1];ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+ const answer=help.split('<dt>What does All Tasks remember when I reopen?</dt><dd>')[1]?.split('</dd>')[0]||'';
+ assert.match(answer,/last All Tasks search or filter and your place in the list on this device/i);
+ assert.match(answer,/saved board first/i);assert.match(answer,/dates and eligibility use today/i);
+ const chapter=help.split('<details class="help-faq" data-help-changelog>')[1]?.split('</details>')[0]||'';
+ assert.match(chapter,/<h3>October 16, 2026<\/h3>[\s\S]*?<li>Opening or refreshing restores this device’s All Tasks filters and list position before the screen appears; newer cloud changes still sync in the background\.<\/li>/);
+});
+
+async function delayedLocalBoardBrowser(viewport={width:390,height:844},dispatchResizeDuringLoad=false){
+ const {chromium}=await import(process.env.PLAYWRIGHT_MODULE||process.env.LANDSCAPE_PLAYWRIGHT||'playwright');
+ const browser=await chromium.launch({headless:true,channel:process.env.LANDSCAPE_BROWSER_CHANNEL||'chrome'});
+ const context=await browser.newContext({viewport,serviceWorkers:'block'});
+ const board=syncState({
+  contexts:[{id:'home',name:'Home',active:true}],
+  tasks:Array.from({length:45},(_,i)=>({...syncTask('boot-'+i,'Saved boot task '+i),ctx:['home']})),
+  listOpen:true,seenQuickStart:true
+ });
+ const payload=JSON.stringify(board),delayMs=1000;
+ await context.addInitScript(({payload,delayMs})=>{
+  Object.defineProperty(window,'FIREBASE_CONFIG',{value:Object.freeze({}),writable:false,configurable:false});
+  localStorage.setItem('fvp:chain-scanner:landscape-motion',JSON.stringify({choice:'reduced',savedAt:Date.now()}));
+  window.__savedViewRead={started:false,settled:false};
+  window.storage={
+   async get(){window.__savedViewRead.started=true;await new Promise(resolve=>setTimeout(resolve,delayMs));window.__savedViewRead.settled=true;return {value:payload};},
+   async set(){}
+  };
+ },{payload,delayMs});
+ const origin=new URL(process.env.LANDSCAPE_BROWSER_URL).origin;
+ await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
+ const page=await context.newPage(),errors=[];
+ page.on('pageerror',error=>errors.push(error.message));
+ await page.goto(process.env.LANDSCAPE_BROWSER_URL,{waitUntil:'domcontentloaded'});
+ await page.waitForFunction(()=>window.__savedViewRead?.started===true);
+ if(dispatchResizeDuringLoad)await page.evaluate(()=>window.dispatchEvent(new Event('resize')));
+ const early=await page.evaluate(()=>({
+  storageSettled:window.__savedViewRead.settled,
+  shellVisibility:getComputedStyle(document.querySelector('.wrap')).visibility,
+  status:document.querySelector('#startupStatus')?.textContent.trim()||null,
+  rows:document.querySelectorAll('#listBody [data-row]').length,
+  listCount:document.querySelector('#listCount')?.textContent||''
+ }));
+ await page.waitForFunction(()=>document.querySelectorAll('#listBody [data-row]').length===45,{timeout:5000});
+ const ready=await page.evaluate(()=>({
+  shellVisibility:getComputedStyle(document.querySelector('.wrap')).visibility,
+  status:document.querySelector('#startupStatus')?.textContent.trim()||null,
+  rows:document.querySelectorAll('#listBody [data-row]').length,
+  listCount:document.querySelector('#listCount')?.textContent||'',
+  listOpen:!document.querySelector('#listBody').hidden
+ }));
+ return {browser,context,page,early,ready,errors};
+}
+
+test('RISK saved view startup: delayed local board reads do not expose an empty default shell',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const startup=await delayedLocalBoardBrowser();
+ try{
+  assert.equal(startup.early.storageSettled,false,'the local copy must still be loading when its first frame is inspected');
+  assert.equal(startup.early.shellVisibility,'hidden','the empty default shell is not visible while the saved board is loading');
+  assert.match(startup.early.status,/saved board/i,'a clear restore status explains the brief wait');
+  assert.equal(startup.ready.shellVisibility,'visible');
+  assert.equal(startup.ready.rows,45,'the first revealed board/list is the restored local copy');
+  assert.equal(startup.ready.listOpen,true);
+ }finally{await startup.browser.close();}
+});
+
+test('RISK saved view startup: delayed local reads do not call state renderers before board hydration',{skip:!process.env.LANDSCAPE_BROWSER_URL},async()=>{
+ const startup=await delayedLocalBoardBrowser({width:1366,height:900},true);
+ try{assert.deepEqual(startup.errors,[],'the application must not run board renderers against null state while the local copy loads');}
+ finally{await startup.browser.close();}
+});
+
 test("list search: the search box lives outside #listBody, so a repaint can't steal focus", () => {
   const wrap = html.match(/<section class="panel listwrap"[\s\S]*?<\/section>/);
   assert.ok(wrap, "the list panel should still be a .listwrap section");

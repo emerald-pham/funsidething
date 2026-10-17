@@ -7329,5 +7329,29 @@
       "command": "Original exact commands and output: 01/implementation.md;02/implementation.md;03/action-owner-implementation.md;04 retained per-cohort logs;05/implementation.md;06/report.md;07/module-delivery-red.command.json and final-fingerprint-red.command.json under /private/tmp/chain-architecture-evidence-20261016. Final source gate: node scripts/test-first-gate.mjs 3d87c226519f878ddf4db7fbbdec9bf90376810d.",
       "failure": "Preservation cases were GREEN before implementation under approval.json. Deliberate duration/culling/finalization/draft/result mutants failed discriminating behavioral assertions and were reverted; they are sensitivity evidence, not feature RED. Actual prior-account selection leak RED at16:49:15UTC is in05/ownership-red.log; missing mounted FAQ and Changelog REDs at17:09:26 and17:10:27UTC are in06. Root fresh-installed actual worker fetch RED names /landscape-visits.js before its cache entry in07/module-delivery-red.log; GREEN2/2 follows. Final mechanical cache and changelog fingerprints failed2/2 before refresh in07/final-fingerprint-red.log. Cross-owner integration characterization passed1/1 before the final fingerprint edits in07/cross-owner-baseline-green.log. Failed fake-template/text-enlargement/unseeded-row-order fixtures and controlled mutants are retained separately and never represented as product RED. All integration replays identify when the original filter was unavailable rather than inventing it."
     }
+  },
+  {
+    "testChangesSha256": "d6526edba8a2f0e16852c4e458e7292b553419bdcac7e59df4f1bdded3bce54d",
+    "reason": "Add consumer regressions for the approved saved All Tasks view and safe first paint after reproducing that reload lost the query/tag/eligibility/scroll, retained another account filter, exposed the default shell before local board hydration, and allowed a resize renderer to read null state.",
+    "previousBehavior": "All Tasks query and filters existed only in the active view, scroll restoration only covered re-renders in memory, and boot could display its empty shell while the local saved board was still loading.",
+    "intendedBehavior": "Reopen the last per-device All Tasks search, filters and list position against the durable local board; clear presentation state on account change; avoid painting the empty shell before local hydration; tolerate corrupt or blocked view storage without changing board authority.",
+    "replacementTests": [
+      "RISK saved view restoration: a reopened All Tasks list retains its local search tag filter and scroll position",
+      "RISK saved view account boundary: an All Tasks filter is cleared when the signed-in account changes",
+      "RISK saved view restoration: the eligibility filter remains selected after reopening All Tasks",
+      "RISK saved view fallback: corrupt or blocked local presentation storage leaves the saved board usable",
+      "RISK saved view guidance: Quick start and Changelog describe this-device restoration and current dates",
+      "RISK saved view startup: delayed local board reads do not expose an empty default shell",
+      "RISK saved view startup: delayed local reads do not call state renderers before board hydration"
+    ],
+    "preservedCoverage": [
+      "Authoritative saved-board bytes, ranking, cloud write paths and existing task/list behavior remain unchanged; only bounded presentation metadata is stored separately on this device.",
+      "Current-day eligibility and account boundaries are covered, with corrupt or unavailable presentation storage falling back to the existing saved board.",
+      "Existing theme boot, search, All Tasks owner and ordinary startup tests remain in the focused 24-test passing cohort."
+    ],
+    "redEvidence": {
+      "command": "LANDSCAPE_BROWSER_URL=http://127.0.0.1:8794/index.html LANDSCAPE_PLAYWRIGHT=/Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs LANDSCAPE_BROWSER_CHANNEL=chrome /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-name-pattern='RISK saved view' tests.js; additionally /Users/emeraldpham/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-name-pattern='RISK saved view restoration: the eligibility filter' tests.js",
+      "failure": "On the unchanged base a6cbbbaad70a4cb3a76dd53d25fa23fbc9c665f1 at 2026-10-17T02:47:58.917436Z, the actual browser consumer run failed 4/4: no local presentation record was saved, the prior account filter remained, the empty shell was visible before delayed local storage settled, and a resize raised Cannot read properties of null (reading settings). At 2026-10-17T02:48:42.412238Z the eligibility filter also reopened as (1) instead of (0 of 1). Full stdout is retained in /Users/emeraldpham/.codex/task-artifacts/saved-view-implementation-20261016/worker/baseline-red.log and eligibility-red.log; the independent missing-FAQ RED is in guidance-red.log."
+    }
   }
 ]
