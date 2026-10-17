@@ -279,9 +279,9 @@ async function runGit(args, cwd = process.cwd()) {
 
 async function readMainRef(cwd) {
   let lastError;
-  for (const ref of ['main', 'origin/main']) {
+  for (const [ref, fullRef] of [['main', 'refs/heads/main'], ['origin/main', 'refs/remotes/origin/main']]) {
     try {
-      return { ref, sha: await runGit(['rev-parse', '--verify', `${ref}^{commit}`], cwd) };
+      return { ref, fullRef, sha: await runGit(['rev-parse', '--verify', `${fullRef}^{commit}`], cwd) };
     } catch (error) {
       lastError = error;
     }
@@ -289,20 +289,72 @@ async function readMainRef(cwd) {
   throw new Error('Cannot resolve the main branch from main or origin/main.', { cause: lastError });
 }
 
-async function readGitStartState(cwd = process.cwd()) {
-  const [branchName, branchSha, main, repositoryRoot, repositoryIdentity] = await Promise.all([
+async function readSelectedBaseRef(cwd, selector) {
+  if (selector.trim() !== selector || !selector || selector.startsWith('-') || selector === 'HEAD') {
+    throw new Error('--base-ref must name an existing local or remote-tracking branch ref.');
+  }
+  let candidates;
+  if (selector.startsWith('refs/heads/') || selector.startsWith('refs/remotes/')) candidates = [selector];
+  else if (selector.startsWith('refs/')) throw new Error('--base-ref must name a local or remote-tracking branch ref.');
+  else candidates = [`refs/heads/${selector}`, ...(selector.includes('/') ? [`refs/remotes/${selector}`] : [])];
+
+  for (const ref of candidates) {
+    try {
+      await runGit(['check-ref-format', ref], cwd);
+    } catch (error) {
+      throw new Error(`Invalid --base-ref ${JSON.stringify(selector)}; expected a branch ref.`, { cause: error });
+    }
+  }
+  const refs = await runGit(['for-each-ref', '--format=%(refname)%09%(symref)', 'refs/heads', 'refs/remotes'], cwd);
+  const available = new Map(refs.split('\n').filter(Boolean).map((line) => {
+    const [ref, symbolicTarget = ''] = line.split('\t');
+    return [ref, symbolicTarget];
+  }));
+  const matches = candidates.filter((ref) => available.has(ref));
+  if (matches.length > 1) {
+    throw new Error(`Ambiguous --base-ref ${JSON.stringify(selector)}; use a fully qualified refs/heads/... or refs/remotes/... name.`);
+  }
+  if (matches.length === 0) {
+    throw new Error(`Cannot resolve --base-ref ${JSON.stringify(selector)} as an existing local or remote-tracking branch.`);
+  }
+  const ref = matches[0];
+  if (available.get(ref)) throw new Error(`Cannot use symbolic --base-ref ${JSON.stringify(selector)}; select an actual branch ref.`);
+  let localBranchName;
+  if (ref.startsWith('refs/heads/')) localBranchName = ref.slice('refs/heads/'.length);
+  else {
+    const remoteBranch = ref.slice('refs/remotes/'.length);
+    const separator = remoteBranch.indexOf('/');
+    if (separator < 1 || separator === remoteBranch.length - 1) {
+      throw new Error(`Cannot use --base-ref ${JSON.stringify(selector)}; expected a remote/branch tracking ref.`);
+    }
+    localBranchName = remoteBranch.slice(separator + 1);
+  }
+  const sha = await runGit(['rev-parse', '--verify', `${ref}^{commit}`], cwd);
+  return { ref, sha, localBranchName };
+}
+
+async function readGitStartState(cwd = process.cwd(), baseRefSelector) {
+  const [branchName, branchSha, repositoryRoot, repositoryIdentity] = await Promise.all([
     runGit(['rev-parse', '--abbrev-ref', 'HEAD'], cwd),
     runGit(['rev-parse', 'HEAD'], cwd),
-    readMainRef(cwd),
     runGit(['rev-parse', '--show-toplevel'], cwd),
     runGit(['rev-parse', '--path-format=absolute', '--git-common-dir'], cwd),
   ]);
   if (branchName === 'HEAD') throw new Error('coordination begin requires an attached branch.');
-  if (branchName === 'main') throw new Error('coordination begin refuses to register work directly on main.');
+  let main;
+  if (baseRefSelector === undefined) main = await readMainRef(cwd);
+  else main = await readMainRef(cwd).catch(() => undefined);
+  const selectedBase = baseRefSelector === undefined
+    ? { ref: main.fullRef, sha: main.sha, localBranchName: 'main' }
+    : await readSelectedBaseRef(cwd, baseRefSelector);
+  if (branchName === 'main' || branchName === selectedBase.localBranchName) {
+    throw new Error(`coordination begin refuses to register work directly on protected base branch ${branchName}.`);
+  }
   return {
     branchName,
     branchSha,
-    mainSha: main.sha,
+    mainSha: main?.sha,
+    selectedBase: { ref: selectedBase.ref, sha: selectedBase.sha },
     repositoryRoot: resolve(repositoryRoot),
     repositoryIdentity: resolve(repositoryIdentity),
   };
@@ -327,7 +379,7 @@ function pruneOrphanedConfigurations(state) {
 }
 
 async function begin(filePath, options) {
-  const start = await readGitStartState();
+  const start = await readGitStartState(process.cwd(), options['base-ref']);
   const worktreeRoot = await realpath(start.repositoryRoot);
   if (await realpath(process.cwd()) !== worktreeRoot) {
     throw new Error(`coordination begin requires the actual Git worktree root: ${worktreeRoot}.`);
@@ -366,7 +418,8 @@ async function begin(filePath, options) {
       status: 'active',
       branchName: start.branchName,
       startBranchSha: start.branchSha,
-      startMainSha: start.mainSha,
+      ...(start.mainSha ? { startMainSha: start.mainSha } : {}),
+      selectedBase: start.selectedBase,
       repositoryRoot: start.repositoryRoot,
       repositoryIdentity: start.repositoryIdentity,
       intent: text(options.intent, 'Unspecified coordination work.'),
@@ -426,7 +479,7 @@ async function park(filePath, options) {
     if (!entry) throw new Error(`No coordination entry found for ${options.id}.`);
     if (entry.status !== 'active') throw new Error(`Coordination entry ${entry.id} is already ${text(entry.status, 'historical')}.`);
     if (entry.worktree !== process.cwd()) throw new Error(`Cannot park coordination entry ${entry.id} from ${process.cwd()}; it belongs to ${entry.worktree}.`);
-    const current = await readGitStartState();
+    const current = await readGitStartState(process.cwd(), persistedBaseRef(entry));
     if (current.branchName !== entry.branchName || current.branchSha.toLowerCase() !== checkpoint) {
       throw new Error(`Cannot park coordination entry ${entry.id}: checkpoint or branch does not match the current checkout.`);
     }
@@ -460,7 +513,7 @@ async function resume(filePath, options) {
     if (entry.worktree !== process.cwd()) throw new Error(`Cannot resume coordination entry ${entry.id} from ${process.cwd()}; it belongs to ${entry.worktree}.`);
     const parked = objectRecord(entry.parked);
     const checkpoint = text(options['checkpoint-sha'], text(parked.checkpointSha)).toLowerCase();
-    const current = await readGitStartState();
+    const current = await readGitStartState(process.cwd(), persistedBaseRef(entry));
     if (current.branchName !== entry.branchName || current.branchSha.toLowerCase() !== checkpoint) {
       throw new Error(`Cannot resume coordination entry ${entry.id}: parked checkpoint does not match the current checkout.`);
     }
@@ -476,6 +529,11 @@ async function resume(filePath, options) {
     await writeState(filePath, state);
     return entry;
   });
+}
+
+function persistedBaseRef(entry) {
+  const selectedBase = objectRecord(entry?.selectedBase);
+  return typeof selectedBase.ref === 'string' && selectedBase.ref ? selectedBase.ref : undefined;
 }
 
 async function finish(filePath, options) {
