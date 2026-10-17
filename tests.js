@@ -859,7 +859,7 @@ test('RISK Settings hierarchy: moved Changelog leaves Save settings after every 
 
 test('RISK context and Settings FAQ: extended guidance explains cycle empty selections synthetic scope sync limitations and bottom save',async()=>{
  const {ctx,shim}=await loadApp();ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
- for(const pattern of [/Whenever contexts exist,.*green check.*red X/i,/Every assigned.*context.*active/i,/No context.*green.*unassigned/i,/cannot be assigned/i,/Refresh all devices/i,/Save settings.*bottom/i])assert.match(help,pattern);
+ for(const pattern of [/Whenever contexts exist,.*green check.*red X/i,/Every assigned.*context.*active/i,/No context.*green.*unassigned/i,/cannot be assigned/i,/safe-update path protects unsaved work and unfinished drafts/i,/Save settings.*bottom/i])assert.match(help,pattern);
  const current=html.match(/<template id="appChangelogCurrent">([\s\S]*?)<\/template>/)[1];for(const pattern of [/red X/i,/No context/i,/Changelog.*Settings/i,/Save settings.*bottom/i])assert.match(current,pattern);
 });
 

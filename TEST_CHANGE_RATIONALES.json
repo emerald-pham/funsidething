@@ -7975,5 +7975,23 @@
       "command": "node --test --test-name-pattern='RISK decision recovery baseline metadata:' tests.js",
       "failure": "146/baseline-metadata-01-red.log captures exact field loss in all four actual app consumer variants.02-red-facts.log confirms each ends errorCode:null, syncDirty:false, localHasFuture:false and cloudHasFuture:false. Seven-line strict field/provenance recognition repair gives03GREEN35/35;04full bounded recovery/comparison/Undo/No/mixed preservation95/95 zero skips. This is observed behavioral RED, not a hypothetical merge-only claim."
     }
+  },
+  {
+    "testChangesSha256": "5b4e6f3bd895d904bda454b3f4ca283e09aad9a5ba2eb78b7fc4228b86ccafb8",
+    "reason": "Align the existing extended-FAQ limitation assertion with approved automatic safe-update and draft-preservation behavior for #141.",
+    "previousBehavior": "The coverage asserted the exact instruction Refresh all devices even though automatic safe-update guidance now protects unfinished work.",
+    "intendedBehavior": "Keep all context cycle, eligibility, synthetic scope and bottom-Save coverage while asserting safe-update draft protection. New mounted #147 consumers separately cover held older decisions and unknown evidence.",
+    "replacementTests": [
+      "RISK context and Settings FAQ: extended guidance explains cycle empty selections synthetic scope sync limitations and bottom save",
+      "RISK independent decision guidance: rendered FAQ and Settings distinguish retained decisions targeted Undo and held evidence"
+    ],
+    "preservedCoverage": [
+      "The five other extended FAQ assertions and all changelog assertions remain intact.",
+      "No product behavior or safety assertion was removed; the replacement checks the current protected update guidance."
+    ],
+    "redEvidence": {
+      "command": "env TZ=UTC node --test --test-name-pattern=\"RISK context and Settings FAQ:\" tests.js",
+      "failure": "Actual mounted FAQ failed the obsolete /Refresh all devices/i assertion on8a56222. Raw147/faq-legacy-assert-red-8a.log; corrected assertion plus mounted guidance5/5GREEN in faq-legacy-assert-green-8a.log. This is an outdated assertion correction, not a new runtime bug RED."
+    }
   }
 ]
