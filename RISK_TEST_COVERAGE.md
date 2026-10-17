@@ -1303,3 +1303,9 @@ Validate sole recovery authority before the no-active-journal replacement shortc
 - `RISK decision recovery retired identity: changed same-ID retired editor facts cannot become fresh authority`
 
 Shared selected facts remain active through reversed cloud adoption; retired typed field values cannot resurrect; changed retired identities hold against exact witness bytes.
+
+## Mixed-client rollout across every decision family (#146/#147)
+
+- `RISK decision mixed rollout fixture: actual comparisons current choices Start and scoped Undo survive durable publication and reopen`
+
+The existing `Firestore rules: real pinned writer reads decision authority then holds its ordinary app edit without erasing it` and `Firestore rules: first decision against released rules stays exact and pending until rules-first rollout then retry` consumers now publish coherent actual-app No, Yes, editor Dot, Dislodge, current-choice, Start and scoped Undo evidence through the production Firebase adapter. Both rollout guards and immutable supported baseline remain protected. Exact emulator execution belongs to the final root candidate; the in-process fixture is not emulator proof.

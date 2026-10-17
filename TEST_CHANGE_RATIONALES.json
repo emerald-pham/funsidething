@@ -7827,5 +7827,23 @@
       "command": "node --test --test-reporter=spec --test-name-pattern='RISK scoped Undo: explicit modern' tests.js; node --test --test-reporter=spec --test-name-pattern='Undo|undo|Restore|restore|Import|import|Reset|reset|RISK cloud current choices|RISK comparison replay|RISK decision recovery' tests.js; node --test --test-reporter=spec --test-name-pattern='RISK scoped Undo: local comparison' tests.js",
       "failure": "Actual145/red-explicit-replacement-undo-behavior.log05:06:42UTC observed imported source journal instead of the prior destination journal after normal Undo. Earlier red-explicit-replacement-undo.log asserted a historically void return value and is setup-only, not behavioral RED. Exact145/affected-undo-replacement.log272pass/7fail/10skip preserved reset-frame-byte mutation and neutral-order failure before runtime repairs plus old async/ownership/legacy-fixture expectation mismatches. All26 focused scoped+affected repair cases subsequently passed in green-explicit-and-regressions.log; original vertical REDs remain retained. Additional actual05:11:28UTC red-comparison-history.log: shared benchmark had no undo observation after correct recomputation; capture all potentially replay-affected task metrics and attach cancellation.id. green-comparison-history.log passes42/42 scoped and rating-history cases. All other changed fixture contracts remain documented above."
     }
+  },
+  {
+    "testChangesSha256": "ecae345e483cd8d51cf3862b48bc525a5456d3188a44d3d0b44cbfc7eb25d033",
+    "reason": "Extend the approved mixed-client and rules-first acceptance from the initial No slice to all newly supported143/144/145decision families using actual app actions on the committed Undo source.",
+    "previousBehavior": "The real production-adapter/immutable-floor mixed writer test and released-rules-to-new-rules Retry test carried only a No-bearing board, leaving the147all-new-action acceptance unexercised.",
+    "intendedBehavior": "Retain the original No plus actual scanner Yes, compound editor/Dot and cancellation, Dislodge, paired Start and passBefore Undo, and an active editor choice in one coherent board. The old writer must read every exact fact then stay safely denied; the candidate under released rules must preserve the whole pending board and retry byte-exact evidence, effective choices/pass outcomes and ratings after rules-first rollout.",
+    "replacementTests": [
+      "RISK decision mixed rollout fixture: actual comparisons current choices Start and scoped Undo survive durable publication and reopen"
+    ],
+    "preservedCoverage": [
+      "All original mixed writer and rules-first assertions remain. CAS race, ordinary floor/new roundtrips, old full-app compatible-update hold, exact root payload/revision, focus retry bounds, sole legacy pending edit, old-rules rejection, exact durable pending stream, no unfenced fallback, unchanged learned ratings and final clean acknowledgement remain mandatory.",
+      "No runtime, rules, support pin, compatibility matrix, public copy, shell metadata or production data changes. Only tests and exact map/rationale records change.",
+      "The rules-first plain seed still comes from the existing plain harness ancestor; its real Firebase-backed app performs No plus all mixed actions offline before its first authority-bearing publication. No manually constructed event objects replace consumer behavior."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK decision mixed rollout fixture:|RISK scoped Undo:|RISK comparison replay:|RISK cloud current choices:|RISK cloud No recovery:' tests.js",
+      "failure": "Post-implementation acceptance extension, expected GREEN; no behavioral failure or preimplementation RED claimed and no runtime repair made. mixed-all-actions-01-fixture.log passes1/1; mixed-all-actions-02-focused.log passes50/50 zero skips on committed145sourcef594644. The two extended Firestore acceptance tests have NOT been executed in this subtask: no emulator allocation/launch. Root must run them on the final exact candidate; existing No-only emulator evidence is not claimed as all-action evidence."
+    }
   }
 ]
