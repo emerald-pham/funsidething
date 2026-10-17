@@ -3018,7 +3018,7 @@ function serviceWorkerHarness(worker, existingCacheNames = []) {
   return { handlers, cacheRecords, skipWaitingCalls: () => skipWaitingCalls, claimCalls: () => claimCalls };
 }
 
-test("PWA lifecycle: current shell installs and activation retires prior shell caches", async () => {
+test("PWA lifecycle: shell waits for prior clients and normal activation retires prior caches", async () => {
   const worker = serviceWorkerSource();
   const { cacheName, rawPaths } = appShellContract(worker);
   const harness = serviceWorkerHarness(worker, ["chain-scanner-shell-v1", "unrelated-cache"]);
@@ -3028,7 +3028,7 @@ test("PWA lifecycle: current shell installs and activation retires prior shell c
   await Promise.all(installWaits);
   assert.deepEqual(harness.cacheRecords.get(cacheName).added.map(request=>request.url), rawPaths,
     "install must precache the exact current app-shell path list");
-  assert.equal(harness.skipWaitingCalls(), 1, "install must activate the new worker immediately");
+  assert.equal(harness.skipWaitingCalls(), 0, "install must let the browser wait for already-open clients to close");
 
   const activateWaits = [];
   harness.handlers.activate({ waitUntil(promise) { activateWaits.push(promise); } });
@@ -18286,6 +18286,27 @@ test('RISK PWA session updates: real boot protects input while asynchronous boar
  assert.equal(reloads.length,0,'a pending update at startup cannot discard already entered text after restoration');
  assert.equal(shim.document.getElementById('addInput').value,'Private startup draft');
 });
+test('RISK PWA upgrade safety: candidate installation keeps a predecessor document and unfinished draft intact',async()=>{
+ const predecessor=spawnSync('git',['show','bd84e5c0ccc7c6ebe065f42f18df34d89eeab14e:index.html'],{cwd:__dirname,encoding:'utf8'});
+ assert.equal(predecessor.status,0,'the exact public predecessor remains available');
+ const handlers={},reloads=[],navigatorProvider={serviceWorker:{controller:{},addEventListener:(type,fn)=>handlers[type]=fn,register:async()=>({update:async()=>{}})}};
+ const {ctx,shim}=await loadApp({appSource:extractAppScript(predecessor.stdout),navigatorProvider});
+ shim.window.location={reload:()=>reloads.push('predecessor replaced')};shim.document.hidden=false;
+ const input=shim.document.getElementById('addInput');input.id='addInput';input.matches=()=>true;shim.document.activeElement=input;
+ input.value='Private predecessor draft';shim.document.dispatchEvent({type:'input',target:input});
+ shim.document.activeElement=null;shim.document.dispatchEvent({type:'focusout',target:input});await flush();
+ const oldCache='chain-scanner-shell-predecessor',worker=serviceWorkerHarness(serviceWorkerSource(),[oldCache]);
+ const waits=[];worker.handlers.install({waitUntil:promise=>waits.push(promise)});await Promise.all(waits);
+ if(worker.skipWaitingCalls()){
+  const activate=[];worker.handlers.activate({waitUntil:promise=>activate.push(promise)});await Promise.all(activate);
+  await handlers.controllerchange();
+ }
+ assert.equal(reloads.length,0,'installing the candidate must not force the old document through its old reload handler');
+ assert.equal(input.value,'Private predecessor draft','the active predecessor keeps its unfinished text');
+ assert.equal(worker.cacheRecords.has(oldCache),true,'the old shell remains available while its clients are open');
+ const {cacheName}=appShellContract(serviceWorkerSource());
+ assert.ok(worker.cacheRecords.get(cacheName).added.length>0,'the candidate still downloads the complete offline shell');
+});
 test('PWA updates: check on launch, foreground and reconnect with HTTP cache bypass',async()=>{
  const h=pwaUpdateHarness();await h.ready();assert.equal(h.counts().options.updateViaCache,'none');
  assert.equal(h.counts().updates,1);await h.wh.focus();await h.wh.online();await h.dh.visibilitychange();
@@ -18417,7 +18438,7 @@ test('RISK PWA updates: the extended FAQ and changelog explain uninterrupted use
  assert.match(answer,/checks for updates.*opens.*foreground/i,'normal update availability remains documented');
  assert.match(answer,/quiet startup/i,'the FAQ distinguishes safe startup activation');
  assert.match(answer,/typ.*touch.*scroll.*keyboard/i,'the FAQ explains what protects an open session');
- assert.match(answer,/reopen.*deliberately reload/i,'the FAQ explains how to use a downloaded update');
+ assert.match(answer,/all.*app windows.*tabs.*close.*reopen/i,'the FAQ accurately explains activation after predecessor clients close');
  assert.match(answer,/draft.*before closing/i,'unfinished drafts remain protected in the current page');
  assert.match(help,/Downloaded app updates.*(?:open|session).*reopen/i,'the changelog describes the bounded interruption repair');
 });

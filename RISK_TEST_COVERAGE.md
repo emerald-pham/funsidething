@@ -1409,3 +1409,7 @@ Issue #176/#177 supersedes the prior after-gesture automatic reload expectation.
 
 - RISK PWA session updates: scrolling during an awaited host save prevents document replacement
 - RISK PWA session updates: real boot protects input while asynchronous board restoration is pending
+
+- RISK PWA upgrade safety: candidate installation keeps a predecessor document and unfinished draft intact
+
+The candidate worker precaches while predecessor clients remain on their existing worker. Natural activation after all app clients close retains first-install claim and cache retirement. Actual predecessor upgrade browser evidence is separate from Node lifecycle coverage.

@@ -3,7 +3,7 @@
    same-origin additions to fill the cache as they are requested. */
 // The shell key is a fingerprint of every local asset in the addAll list.
 // Update it with any shell change so installed workers cannot serve stale UI.
-const CACHE_NAME = "chain-scanner-shell-241fb04b24beeaa03f89ec5a579d7a24a9d397d060dac0f6c08ab4c701244b65";
+const CACHE_NAME = "chain-scanner-shell-a14dc158ac8b42d580f6509c3089e2c13c0c19e2235fd1f32d5caf79c9aaa0c2";
 
 self.addEventListener("install", event => {
   event.waitUntil(
@@ -45,7 +45,9 @@ self.addEventListener("install", event => {
         "./vendor/HYG-LICENSE",
         "./vendor/CC-BY-SA-4.0.txt"
       ].map(path => new Request(path, {cache:"reload"}))))
-      .then(() => self.skipWaiting())
+    // Keep predecessor pages on their worker until all of its clients close.
+    // Their older controllerchange handler can otherwise discard an unfocused
+    // draft before the new page's session protection has a chance to run.
   );
 });
 
