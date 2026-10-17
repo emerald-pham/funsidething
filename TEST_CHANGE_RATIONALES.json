@@ -7608,6 +7608,25 @@
     }
   },
   {
+    "testChangesSha256": "1544e85723e2c1d5bf9518beb69f6cb43b4c73745c65c78a7f4ca946bbbc67ef",
+    "reason": "The approved #141 spec changes ordinary Undo and cross-device conflict outcomes; remove the old whole-board recovery guidance and test the actual mounted release guidance.",
+    "previousBehavior": "The mounted FAQ described offline edits without retained decisions, bulk recovery Undo restoring older peer fields, and Settings promising the newest revision wins the whole board.",
+    "intendedBehavior": "Guide users through retained independent decisions, original decision times, scoped ordinary Undo, exact local/server acknowledgement, frozen legacy ratings and safe held unrecorded older work. Keep explicit replacement safeguards and existing unrelated FAQ structure.",
+    "replacementTests": [
+      "RISK independent decision guidance: rendered FAQ and Settings distinguish retained decisions targeted Undo and held evidence",
+      "RISK bulk task editing: FAQ and editor qualify mixed Apply and later sync recovery limits",
+      "RISK bulk task guidance: bounded answers retain distinct selection property conflict Undo and result instructions"
+    ],
+    "preservedCoverage": [
+      "Keep mixed Apply, whole-batch pre-Save conflict detection, missing/completed task handling, unrelated fields, narrow/enlarged answer readability, result-vs-server distinction and unchanged historical release-note assertions.",
+      "All existing behavioral Undo tests remain owned by #145; this change updates copy-only assertions for the user-approved semantics and adds the actual Help/Settings consumer."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK independent decision guidance:' tests.js; raw147/guidance-red.log before runtime copy edit.",
+      "failure": "The actual mounted offline FAQ failed the retained offline decisions through closing/reopening expectation. GREEN147/guidance-green.log then passed5/5 new and existing guidance cases. This is direct UI-copy RED; implementation behavior chronology remains in142-146."
+    }
+  },
+  {
     "testChangesSha256": "e529d4e9f55fdc4734a0d51995e874660023f9488cf5b24042d95627333fae37",
     "reason": "Preserve approved same-account baseline behavior and the mandatory selected-source recovery boundary introduced by exact replacement receipts.",
     "previousBehavior": "The new helper had modern cross-account proof, but same-account source baseline retention and failure specifically at selected-source recovery were not exercised by real consumers.",
@@ -7623,6 +7642,22 @@
     "redEvidence": {
       "command": "node --test --test-name-pattern='RISK decision recovery same-account replacement:|RISK decision recovery replacement durability:' tests.js",
       "failure": "Preservation-only tests65 GREEN4/4 on the existing helper; no newly discovered runtime defect or preimplementation RED claimed. Exact selected-source recovery is fault-injected at the storage boundary, with assertions that primary state/cloud/input stay exact and explicit retry succeeds."
+    }
+  },
+  {
+    "testChangesSha256": "ef23d755cd11a39b4903c7c1f14db844de069cd893d78abc46f7c4b31eb0d880",
+    "reason": "The actual Bulk Edit intro retained the obsolete whole-board recovery Undo warning after the FAQ was corrected; the same approved spec applies to this control surface.",
+    "previousBehavior": "Opening Bulk Edit promised newer peer fields and said Undo after recovery restores an earlier board, contradicting scoped ordinary Undo and original-time conflicts.",
+    "intendedBehavior": "The actual modal describes compatible field combination, original decision times and batch-only Undo while retaining mixed Apply and explicit Clear instructions.",
+    "replacementTests": [
+      "RISK independent decision guidance: the actual bulk editor explains scoped reversal and original choice times"
+    ],
+    "preservedCoverage": [
+      "Keep every existing bulk task behavior and form control assertion, all mixed/unchecked Apply and explicit Clear rules, and narrow/enlarged FAQ copy constraints."
+    ],
+    "redEvidence": {
+      "command": "node --test --test-name-pattern='RISK independent decision guidance: the actual bulk editor' tests.js",
+      "failure": "Actual modal rendered the old newer-peer and whole-board Undo intro and failed the original-choice-time assertion before the intro edit; raw147/bulk-guidance-red.log. Both new guidance consumers and existing copy cohort then passed6/6 in147/bulk-guidance-green.log."
     }
   },
   {

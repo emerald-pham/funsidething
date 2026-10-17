@@ -1260,6 +1260,12 @@ Preserve both sources when a supported Start group is incomplete/ambiguous or a 
 
 Durable exact displaced-baseline/fact receipts retire only explicitly replaced authority; new/changed/unknown peer facts stay protected. Reverse replacement Undo is the dependent #145 gate.
 
+## Independent decision release guidance (#147)
+
+- `RISK independent decision guidance: rendered FAQ and Settings distinguish retained decisions targeted Undo and held evidence`
+- `RISK independent decision guidance: the actual bulk editor explains scoped reversal and original choice times`
+
+The mounted FAQ and Settings explain durable offline decisions, narrow original-time conflicts, exact acknowledgement, preserved inherited ratings, safely held unrecorded legacy work, and ordinary targeted Undo. Existing bulk form, conflict, readability and historical changelog protections remain.
 ## Replacement source preservation (#146)
 
 - `RISK decision recovery same-account replacement: Import and Restore keep the selected modern learning baseline intact`

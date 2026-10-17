@@ -26357,7 +26357,7 @@ test('RISK bulk task editing: failed browser pair save retains in-memory batch a
  shim.localStorage.setItem=write;assert.equal(await ctx.persist(),true);const saved=JSON.parse(shim.localStorage.getItem(SYNC_STORE_KEY));assert.equal(saved.tasks.length,2);assert.equal(saved.tasks.every(t=>t.due==='2027-12-01'),true);
 });
 test('RISK bulk task editing: FAQ and editor qualify mixed Apply and later sync recovery limits',async()=>{
- const {ctx,shim}=await loadApp();ctx.addTask('Private draft');ctx.openHelp();const faq=shim.document.getElementById('modalRoot').innerHTML;assert.match(faq,/conflicts detected before Save stop the whole batch/i);assert.match(faq,/later sync conflict.*newer peer values.*other selected tasks/i);assert.match(faq,/after recovery.*Undo.*earlier board/i);ctx.closeModal();ctx.state.listOpen=true;ctx.onAction('bulk-select-all');ctx.onAction('bulk-edit');assert.match(shim.document.getElementById('modalRoot').innerHTML,/mixed values stay unchanged until you check Apply/i);
+ const {ctx,shim}=await loadApp();ctx.addTask('Private draft');ctx.openHelp();const faq=shim.document.getElementById('modalRoot').innerHTML;assert.match(faq,/conflicts detected before Save stop the whole batch/i);assert.match(faq,/later sync conflict.*compatible changes to different fields/i);assert.match(faq,/One Undo reverses the batch.*keeping unrelated progress/i);assert.doesNotMatch(faq.split('<dt>How does Undo work after Bulk Edit?</dt><dd>')[1].split('</dd>')[0],/earlier board|older peer fields/i);ctx.closeModal();ctx.state.listOpen=true;ctx.onAction('bulk-select-all');ctx.onAction('bulk-edit');assert.match(shim.document.getElementById('modalRoot').innerHTML,/mixed values stay unchanged until you check Apply/i);
 });
 test('RISK bulk task editing: concurrent recovery keeps backups and existing board Undo boundary explicit',async()=>{
  const initial=await loadApp(),a=initial.ctx.addTask('Private A'),b=initial.ctx.addTask('Private B');await initial.ctx.persist();const raw=initial.shim.localStorage.getItem(SYNC_STORE_KEY),storage=sharedScannerStorage({[LOCAL_HEAD_KEY]:raw,[SYNC_STORE_KEY]:raw}),left=await loadApp({sharedStorage:storage}),right=await loadApp({sharedStorage:storage});
@@ -26511,7 +26511,7 @@ test('RISK bulk task guidance: bounded answers retain distinct selection propert
  const {ctx,shim}=await loadApp();ctx.openHelp();const faq=shim.document.getElementById('modalRoot').innerHTML,answers=[...faq.matchAll(/<dt>(.*?)<\/dt><dd>(.*?)<\/dd>/g)].filter(([,q])=>/several tasks together|Bulk Edit|selected tasks change|bulk result count/.test(q));
  assert.equal(answers.length,5,'bulk guidance separates controls, properties, conflicts, Undo and result meanings');
  for(const [,question,answer] of answers)assert.ok(answer.split(/\s+/).filter(Boolean).length<=130,question+' remains independently readable');
- const combined=answers.map(a=>a[2]).join(' ');for(const guidance of ['current filtered list','Apply separately','Clear explicitly','later sync conflict','first Undo may leave batch values','not server confirmation','disappear on reload'])assert.ok(combined.includes(guidance),'retain '+guidance);
+ const combined=answers.map(a=>a[2]).join(' ');for(const guidance of ['current filtered list','Apply separately','Clear explicitly','later sync conflict','One Undo reverses the batch','keeping unrelated progress','not server confirmation','disappear on reload'])assert.ok(combined.includes(guidance),'retain '+guidance);
 });
 
 test('RISK bulk task guidance: enlarged conflict answer uses breakable task status wording',async()=>{
@@ -28442,4 +28442,35 @@ test('RISK cloud current choices: projected Can’t and Return preserve the orig
  assert.equal(cleared.considered[candidate.id],undefined,'the observed Return clears the hold');
  assert.equal(cleared.cantAt[candidate.id],undefined,'the clear removes only the active hold timestamp');
  assert.ok(returned.observedActionIds.includes(cant.id),'Return retains its causal link to the exact hold');
+});
+
+test('RISK independent decision guidance: rendered FAQ and Settings distinguish retained decisions targeted Undo and held evidence',async()=>{
+ const {ctx,shim}=await loadApp();ctx.closeModal();ctx.openHelp();
+ const help=shim.document.getElementById('modalRoot').innerHTML;
+ const answers=new Map([...help.matchAll(/<dt>(.*?)<\/dt><dd>(.*?)<\/dd>/g)].map(row=>[row[1],row[2]]));
+ const answer=q=>{assert.ok(answers.has(q),'mounted FAQ includes '+q);return answers.get(q);};
+ assert.match(answer('Can I use the app offline or on another device?'),/offline decisions.*closing and reopening/i);
+ assert.match(answer('How are conflicting choices resolved?'),/original decision times/i);
+ assert.match(answer('How are conflicting choices resolved?'),/missing.*held|untrusted.*held/i);
+ assert.match(answer('What does Synced confirm?'),/saved on this device.*acknowledged by the server/i);
+ assert.match(answer('What happens to older boards and tabs?'),/ratings.*baseline/i);
+ assert.match(answer('What happens to older boards and tabs?'),/update.*cannot reconstruct|cannot reconstruct.*update/i);
+ assert.match(answer('Can I undo, restore, or remove a task?'),/keeping unrelated decisions/i);
+ assert.match(answer('How does Undo work after Bulk Edit?'),/One Undo reverses the batch.*keeping unrelated progress/i);
+ assert.doesNotMatch(answer('How does Undo work after Bulk Edit?'),/restore an earlier board|older peer fields|leave batch values in place/i);
+ shim.window.CloudSync={configured:true,ready:true,user:'guidance-fixture@example.invalid'};ctx.closeModal();ctx.openSettings();
+ const settings=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(settings,/Independent decisions combine/);
+ assert.match(settings,/conflicting current choices use when each choice was made/);
+ assert.doesNotMatch(settings,/newest revision wins/);
+});
+
+test('RISK independent decision guidance: the actual bulk editor explains scoped reversal and original choice times',async()=>{
+ const {ctx,shim}=await loadApp();ctx.closeModal();ctx.addTask('Isolated guidance task');ctx.state.listOpen=true;
+ ctx.onAction('bulk-select-all');ctx.onAction('bulk-edit');
+ const editor=shim.document.getElementById('modalRoot').innerHTML;
+ assert.match(editor,/conflicting choices use when they were made/i);
+ assert.match(editor,/Undo reverses this batch and keeps unrelated progress/i);
+ assert.doesNotMatch(editor,/Undo after recovery restores an earlier board|keep newer peer fields/i);
+ assert.match(editor,/Mixed values stay unchanged until you check Apply/);
 });
