@@ -158,7 +158,8 @@ const page = {
         if (selector === '#addButton') {
           if (!state.input.trim()) throw new Error('The app Add action received an empty synthetic task.');
           state.tasks.push(state.input);
-          state.input = '';
+          if (mode === 'delayed-add') setTimeout(() => { state.input = ''; }, 25);
+          else state.input = '';
         } else if (selector === '#themeBtn') {
           if (mode !== 'theme-mismatch') state.theme = state.theme === 'light' ? 'dark' : 'light';
         } else if (selector === 'button[aria-label="FAQs / Changelog"]') state.helpOpen = true;
@@ -184,7 +185,9 @@ const page = {
       state.metricTargets.set(name + ':' + index, Number(target));
     }
   },
-  async waitForTimeout() {},
+  async waitForTimeout(ms) {
+    if (mode === 'delayed-add') await new Promise((resolve) => setTimeout(resolve, ms));
+  },
   keyboard: {
     async press(key) {
       state.lastZoomKey = key;
@@ -275,6 +278,16 @@ function run({ root, runtimePath, name, mode = 'normal', theme = 'light', width 
 async function readCase(output) {
   return JSON.parse(await readFile(path.join(output, 'case.json'), 'utf8'));
 }
+
+test('capture waits for durable native Add acknowledgement before reusing the draft', async (t) => {
+  const fixture = await makeFixture(t);
+  const { result, output } = run({ ...fixture, name: 'delayed-add', mode: 'delayed-add' });
+  assert.equal(result.status, 0, `native Add may clear only after its durable save\n${result.stderr}`);
+  const report = await readCase(output);
+  assert.equal(report.isolation.syntheticBoard.taskCount, 2);
+  assert.equal(report.metricsStatus, 'pass');
+  assert.equal(report.captureIntegrity, 'pass');
+});
 
 test('no-op CSS enlargement is a real behavioral failure with observed measurements', async (t) => {
   const fixture = await makeFixture(t);
