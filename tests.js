@@ -112,7 +112,7 @@ test('RISK legacy completion return: imported boundary survives replay while act
  assert.deepEqual(Array.from(ctx.state.chain),[f.ids[1]]);assert.equal(ctx.state.decisionEvents.filter(e=>e.kind==='completion-boundary').length,1,'redelivered legacy bytes cannot mint fresh authority');assert.equal(JSON.stringify(ctx.state.tasks.map(row=>[row.id,row.mu,row.sigma])),ratings,'Undo reverses the new comparison while keeping learned legacy ratings');
  hydrateUnchangedEditorDraft(app,f.ids[0]);ctx.onAction('dot-task',{dataset:{id:f.ids[0]}});await ctx.persist();hydrateUnchangedEditorDraft(app,f.ids[0]);ctx.onAction('done-task',{dataset:{id:f.ids[0]}});await ctx.persist();assert.deepEqual(Array.from(ctx.state.chain),[f.ids[1]]);
  assert.equal(await ctx.onAction('undo',{}),true);await ctx.persist();t.diagnostic(JSON.stringify({stage:'later-Done-Undo',chain:ctx.state.chain,boundaries:ctx.state.decisionEvents.filter(e=>e.kind==='completion-boundary').length}));assert.ok(ctx.state.chain.includes(f.ids[0]),'Undo actual later Done restores the informed return');
- const exact=JSON.stringify(ctx.state.decisionEvents);ctx.window.CloudSync.ready=true;await ctx.cloudPull();await ctx.cloudPushNow();await syncSettle(40);assert.equal(ctx.state.syncDirty,false);assert.equal(JSON.stringify(h.remoteState().decisionEvents),exact);assert.ok(h.remoteState().chain.includes(f.ids[0]));
+ const exact=JSON.stringify(ctx.state.decisionEvents);ctx.window.CloudSync.ready=true;await ctx.cloudPull();await ctx.cloudPushNow();await settleSavedViewPublication(app,h,'RISK legacy completion return coherent publication 1');assert.equal(ctx.state.syncDirty,false);assert.equal(JSON.stringify(h.remoteState().decisionEvents),exact);assert.ok(h.remoteState().chain.includes(f.ids[0]));
  for(const event of JSON.parse(original))assert.equal(JSON.stringify(ctx.state.decisionEvents.find(e=>e.id===event.id)),JSON.stringify(event),'migration and later actions retain the immutable original facts');
  const raw=app.shim.localStorage.getItem(SYNC_STORE_KEY);await closeLegacyApp173(app);const cold=await loadAppAtTime(f.at+2*3600000+1,{seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw},cloudSyncFactory:h.factory});t.after(()=>closeLegacyApp173(cold));await cold.ctx.cloudPull();assert.ok(cold.ctx.state.chain.includes(f.ids[0]));assert.equal(JSON.stringify(cold.ctx.state.decisionEvents),exact);
 });
@@ -139,9 +139,9 @@ test('RISK legacy completion inheritance: consented Import retains lifecycle aut
  const app=await loadAppAtTime(f.at+2*3600000,{seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)},cloudSyncFactory:()=>{const CS=h.factory();CS.user=account;CS.ready=false;return CS;}});t.after(()=>closeLegacyApp173(app));
  hydrateUnchangedEditorDraft(app,f.ids[0]);app.ctx.onAction('dot-task',{dataset:{id:f.ids[0]}});await app.ctx.persist();const unaware=JSON.parse(app.ctx.cloudPayload());
  const raw=JSON.stringify(source.ctx.state);app.shim.document.getElementById('jsonBox').value=raw;assert.equal(await app.ctx.onAction('import-json',{}),true);await app.ctx.persist();assert.deepEqual(Array.from(app.ctx.state.chain),[f.ids[1]]);
- h.writeBehindBack(unaware);app.ctx.window.CloudSync.ready=true;await app.ctx.cloudPull();await app.ctx.cloudPushNow();await syncSettle(35);
+ h.writeBehindBack(unaware);app.ctx.window.CloudSync.ready=true;await app.ctx.cloudPull();await app.ctx.cloudPushNow();await settleSavedViewPublication(app,h,'RISK legacy completion inheritance coherent publication 1');
  assert.deepEqual(Array.from(app.ctx.state.chain),[f.ids[1]],'retired unaware destination Dot cannot defeat imported inherited completion');assert.equal(app.ctx.state.syncDirty,false);
- hydrateUnchangedEditorDraft(app,f.ids[0]);app.ctx.onAction('dot-task',{dataset:{id:f.ids[0]}});await app.ctx.persist();await app.ctx.cloudPushNow();await syncSettle(35);assert.ok(app.ctx.state.chain.includes(f.ids[0]));assert.equal(app.ctx.state.syncDirty,false);
+ hydrateUnchangedEditorDraft(app,f.ids[0]);app.ctx.onAction('dot-task',{dataset:{id:f.ids[0]}});await app.ctx.persist();await app.ctx.cloudPushNow();await settleSavedViewPublication(app,h,'RISK legacy completion inheritance coherent publication 2');assert.ok(app.ctx.state.chain.includes(f.ids[0]));assert.equal(app.ctx.state.syncDirty,false);
 });
 
 test('RISK legacy completion imported boundary: actual cross-account Import of a released revived board cannot paint old membership',async t=>{
@@ -159,7 +159,7 @@ test('RISK legacy completion recovery safety: failed exact-source backup holds s
  const h=makeSyncHarness({remote:f.board,rev:4,delayMs:1}),app=await loadAppAtTime(f.at+3*3600000,{sharedStorage:storage,cloudSyncFactory:()=>{const CS=h.factory();CS.ready=false;return CS;}});t.after(()=>closeLegacyApp173(app));
  assert.deepEqual(Array.from(app.ctx.state.chain),[f.ids[1]],'held source never paints its obsolete completed membership');assert.equal(await app.ctx.persist(),false);assert.equal(storage.getItem(SYNC_STORE_KEY),f.revived);assert.equal(storage.getItem(LOCAL_HEAD_KEY),f.revived);
  const added=app.ctx.addTask('New edit while upgrade waits');assert.equal(await app.ctx.persist(),false);app.ctx.window.CloudSync.ready=true;const cloud=h.doc.payload;await app.ctx.cloudPushNow();await syncSettle(25);assert.equal(h.doc.payload,cloud,'unsafe upgrade cannot publish ahead of source recovery');assert.ok(app.ctx.state.tasks.some(task=>task.id===added.id));
- storage.setItem=write;assert.equal(await app.ctx.persist(),true);assert.ok(app.ctx.readLocalBackups().some(row=>row.payload===f.revived));await app.ctx.cloudPull();await app.ctx.cloudPushNow();await syncSettle(30);assert.ok(app.ctx.state.tasks.some(task=>task.id===added.id));assert.equal(app.ctx.state.syncDirty,false);
+ storage.setItem=write;assert.equal(await app.ctx.persist(),true);assert.ok(app.ctx.readLocalBackups().some(row=>row.payload===f.revived));await app.ctx.cloudPull();await app.ctx.cloudPushNow();await settleSavedViewPublication(app,h,'RISK legacy completion recovery safety coherent publication 1');assert.ok(app.ctx.state.tasks.some(task=>task.id===added.id));assert.equal(app.ctx.state.syncDirty,false);
  const fresh=JSON.stringify(app.ctx.state);storage.setItem(SYNC_STORE_KEY,f.stale);storage.setItem(LOCAL_HEAD_KEY,f.stale);
  storage.setItem=(key,value)=>{if(key===LOCAL_BACKUPS_KEY)throw Error('isolated incoming backup refusal');return write(key,value);};assert.equal(await app.ctx.persist(),false);assert.equal(storage.getItem(SYNC_STORE_KEY),f.stale);assert.equal(storage.getItem(LOCAL_HEAD_KEY),f.stale);assert.equal(JSON.stringify(app.ctx.state),fresh);
  storage.setItem=write;if(!await app.ctx.persist())assert.equal(await app.ctx.persist(),true);assert.ok(app.ctx.readLocalBackups().some(row=>row.payload===f.stale));
@@ -173,7 +173,7 @@ test('RISK legacy completion support floor: real eventless learned ratings upgra
 test('RISK legacy completion released shell: actual stale write conflicts then holds unknown authority and its pending edit for safe update',async t=>{
  const f=await legacyCompletionSource173(t),h=makeSyncHarness({remote:f.board,rev:4,delayMs:1}),released=spawnSync('git',['show',LEGACY_COMPLETION_RELEASE+':index.html'],{cwd:__dirname,encoding:'utf8'});
  const old=await loadAppAtTime(f.at+2*3600000,{appSource:extractAppScript(released.stdout),seedStorage:{[SYNC_STORE_KEY]:f.completed,[LOCAL_HEAD_KEY]:f.completed},cloudSyncFactory:h.factory});t.after(()=>closeLegacyApp173(old));await old.ctx.cloudPull();old.ctx.window.CloudSync.ready=false;const added=old.ctx.addTask('Unpublished released-client edit');assert.equal(await old.ctx.persist(),true);const durable=old.shim.localStorage.getItem(SYNC_STORE_KEY);let updates=0;old.ctx.window.checkForAppUpdate=async()=>{updates++;};
- const next=await loadAppAtTime(f.at+2*3600000,{seedStorage:{[SYNC_STORE_KEY]:f.completed,[LOCAL_HEAD_KEY]:f.completed},cloudSyncFactory:()=>{const CS=h.factory();CS.ready=false;return CS;}});t.after(()=>closeLegacyApp173(next));await next.ctx.persist();next.ctx.window.CloudSync.ready=true;await next.ctx.cloudPull();await next.ctx.cloudPushNow();await syncSettle(40);assert.equal(next.ctx.state.syncDirty,false);const exact=h.doc.payload,rev=h.doc.rev;
+ const next=await loadAppAtTime(f.at+2*3600000,{seedStorage:{[SYNC_STORE_KEY]:f.completed,[LOCAL_HEAD_KEY]:f.completed},cloudSyncFactory:()=>{const CS=h.factory();CS.ready=false;return CS;}});t.after(()=>closeLegacyApp173(next));await next.ctx.persist();next.ctx.window.CloudSync.ready=true;await next.ctx.cloudPull();await next.ctx.cloudPushNow();await settleSavedViewPublication(next,h,'RISK legacy completion released shell coherent publication 1');assert.equal(next.ctx.state.syncDirty,false);const exact=h.doc.payload,rev=h.doc.rev;
  const conflicts=h.conflicts,callStart=h.calls.length;old.ctx.window.CloudSync.ready=true;await old.ctx.cloudPushNow();await syncSettle(60);assert.ok(h.conflicts>conflicts,'the immutable old full shell actually attempts a stale conditional write');assert.ok(h.calls.slice(callStart).includes('pull'),'conflict recovery actually pulls new authority');assert.equal(old.ctx.window.CloudSync.errorCode,'unsupported-decision-evidence');assert.ok(updates>0);assert.equal(old.ctx.state.syncDirty,true);assert.ok(old.ctx.state.tasks.some(task=>task.id===added.id));assert.equal(old.shim.localStorage.getItem(SYNC_STORE_KEY),durable);assert.equal(h.doc.payload,exact);assert.equal(h.doc.rev,rev,'old full-shell stale CAS and pull never acknowledge overwriting new authority');
  await old.ctx.onAction('sync-retry',{});await syncSettle(25);assert.equal(h.doc.payload,exact);assert.equal(old.ctx.state.syncDirty,true);
 });
@@ -217,7 +217,7 @@ test('RISK legacy completion replacement safety: refused source recovery and acc
 test('RISK legacy completion guest adoption: actual modern guest Done remains observable and Undoable after first empty-account sign-in',async t=>{
  const at=Date.parse('2026-10-17T15:00:00Z'),initial=syncState({tasks:[{...syncTask('guest-173','Guest task'),evergreen:true,evergreenHours:1,evergreenResetAtDay:false},syncTask('guest-173-next','Next')],chain:['guest-173-next'],candidateId:'guest-173',passId:'guest-173-pass',passStartedAt:at,syncAccount:null}),h=makeSyncHarness({remote:null,rev:0,delayMs:1});
  const app=await loadAppAtTime(at,{seedStorage:{[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)},cloudSyncFactory:()=>{const CS=h.factory();CS.user=null;return CS;}});t.after(()=>closeLegacyApp173(app));
- hydrateUnchangedEditorDraft(app,'guest-173');app.ctx.onAction('dot-task',{dataset:{id:'guest-173'}});hydrateUnchangedEditorDraft(app,'guest-173');app.ctx.onAction('done-task',{dataset:{id:'guest-173'}});await app.ctx.persist();const fact=JSON.stringify(app.ctx.state.decisionEvents.find(e=>e.kind==='completion'));app.ctx.window.CloudSync.user='e@example.com';await app.ctx.cloudPull();await app.ctx.cloudPushNow();await syncSettle(35);assert.equal(app.ctx.state.syncDirty,false);assert.deepEqual(Array.from(app.ctx.state.chain),['guest-173-next']);assert.equal(JSON.stringify(app.ctx.state.decisionEvents.find(e=>e.kind==='completion')),fact);
+ hydrateUnchangedEditorDraft(app,'guest-173');app.ctx.onAction('dot-task',{dataset:{id:'guest-173'}});hydrateUnchangedEditorDraft(app,'guest-173');app.ctx.onAction('done-task',{dataset:{id:'guest-173'}});await app.ctx.persist();const fact=JSON.stringify(app.ctx.state.decisionEvents.find(e=>e.kind==='completion'));app.ctx.window.CloudSync.user='e@example.com';await app.ctx.cloudPull();await app.ctx.cloudPushNow();await settleSavedViewPublication(app,h,'RISK legacy completion guest adoption coherent publication 1');assert.equal(app.ctx.state.syncDirty,false);assert.deepEqual(Array.from(app.ctx.state.chain),['guest-173-next']);assert.equal(JSON.stringify(app.ctx.state.decisionEvents.find(e=>e.kind==='completion')),fact);
  setFakeTime(app.ctx,at+2*3600000);hydrateUnchangedEditorDraft(app,'guest-173');app.ctx.onAction('dot-task',{dataset:{id:'guest-173'}});await app.ctx.persist();assert.ok(app.ctx.state.chain.includes('guest-173'));assert.equal(await app.ctx.onAction('undo',{}),true);await app.ctx.persist();assert.deepEqual(Array.from(app.ctx.state.chain),['guest-173-next'],'Undo of a current owner return exposes the still-live inherited completion');await app.ctx.cloudPushNow();await settleSavedViewPublication(app,h,'guest return Undo publication');t.diagnostic(JSON.stringify({stage:'guest-return-undo',error:app.ctx.window.CloudSync.errorCode,issue:app.ctx.decisionEvidenceIssue(app.ctx.state,'e@example.com'),dirty:app.ctx.state.syncDirty,events:app.ctx.state.decisionEvents.map(e=>({id:e.id,kind:e.kind,account:e.account,parents:e.observedActionIds}))}));assert.equal(app.ctx.state.syncDirty,false);
 });
 
@@ -681,8 +681,8 @@ test('RISK scoped Undo recovery: a true Undo cancels only its compound Dot while
  const no=JSON.parse(JSON.stringify(peer.ctx.state.decisionEvents.find(event=>event.kind==='no'&&event.candidateId===peerCandidateId)));
  assert.ok(completion&&!completion.observedActionIds.includes(dot.id),'the real peer Done is unaware of the still-offline Dot');
  assert.ok(completion?.observedActionIds.includes(no.id),'the peer Done observes its own unrelated comparison');
- await saveEditorChoice(peer,peerFieldId,at+350,{title:'Peer kept title'});peer.ctx.window.CloudSync.ready=true;await peer.ctx.cloudPushNow();await syncSettle(45);
- local.ctx.window.CloudSync.ready=true;await local.ctx.cloudPull();await syncSettle(30);
+ await saveEditorChoice(peer,peerFieldId,at+350,{title:'Peer kept title'});peer.ctx.window.CloudSync.ready=true;await peer.ctx.cloudPushNow();await settleSavedViewPublication(peer,h,'RISK scoped Undo recovery coherent publication 1');
+ local.ctx.window.CloudSync.ready=true;await local.ctx.cloudPull();await settleSavedViewPublication(local,h,'RISK scoped Undo recovery coherent publication 2');
  assert.equal(local.ctx.state.tasks.find(row=>row.id===targetId).lastDoneAt,at+300);
  assert.deepEqual(Array.from(local.ctx.state.chain),[referenceId],'the unaware peer completion defeats Dot membership without cancelling its valid learning');
  const expectedBeforeUndo=Object.fromEntries(initial.tasks.map(row=>[row.id,{mu:row.mu,sigma:row.sigma}])),beforeEngine=loadEngine(1450);
@@ -697,7 +697,7 @@ test('RISK scoped Undo recovery: a true Undo cancels only its compound Dot while
  store.commitHead=async options=>{const result=await originalCommit(options);if(result?.ok&&phase==='stale-cloud'){
   const board=JSON.parse(options.payload);writes.push({chain:board.chain.slice(),done:!!board.tasks.find(row=>row.id===targetId)?.done,events:board.decisionEvents.map(event=>event.id)});
  }return result;};
- phase='stale-cloud';h.writeBehindBack(staleDotSource);await local.ctx.cloudPull();await local.ctx.cloudPushNow();await syncSettle(45);
+ phase='stale-cloud';h.writeBehindBack(staleDotSource);await local.ctx.cloudPull();await local.ctx.cloudPushNow();await settleSavedViewPublication(local,h,'RISK scoped Undo recovery coherent publication 3');
  assert.deepEqual(Array.from(local.ctx.state.chain),[referenceId],'replaying the original unaware Dot before Undo does not restore completed membership');
  assert.ok(local.ctx.state.decisionEvents.some(event=>event.id===dot.id),'the losing Dot remains durable until its own actual Undo');
  for(const row of local.ctx.state.tasks){assert.equal(row.mu,expectedBeforeUndo[row.id].mu,`${row.id}: losing Dot and unrelated peer No each train once`);assert.equal(row.sigma,expectedBeforeUndo[row.id].sigma);}
@@ -713,8 +713,8 @@ test('RISK scoped Undo recovery: a true Undo cancels only its compound Dot while
  const expectedAfterUndo=Object.fromEntries(initial.tasks.map(row=>[row.id,{mu:row.mu,sigma:row.sigma}]));loadEngine(1450).updatePair(expectedAfterUndo[referenceId],expectedAfterUndo[peerCandidateId]);
  for(const row of local.ctx.state.tasks){assert.equal(row.mu,expectedAfterUndo[row.id].mu,`${row.id}: the valid Dot stops training only after its own Undo`);assert.equal(row.sigma,expectedAfterUndo[row.id].sigma);}
  assert.ok(local.ctx.state.decisionEvents.some(event=>event.id===completion.id)&&local.ctx.state.decisionEvents.some(event=>event.id===no.id));
- await local.ctx.persist();await local.ctx.cloudPushNow();await syncSettle(45);assert.equal(local.ctx.state.syncDirty,false);
- phase='stale-cloud';h.writeBehindBack(staleDotSource);await local.ctx.cloudPull();await local.ctx.cloudPushNow();await syncSettle(50);
+ await local.ctx.persist();await local.ctx.cloudPushNow();await settleSavedViewPublication(local,h,'RISK scoped Undo recovery coherent publication 4');assert.equal(local.ctx.state.syncDirty,false);
+ phase='stale-cloud';h.writeBehindBack(staleDotSource);await local.ctx.cloudPull();await local.ctx.cloudPushNow();await settleSavedViewPublication(local,h,'RISK scoped Undo recovery coherent publication 5');
  assert.ok(paints.length>0&&writes.length>0,'stale saved-cloud recovery reaches the actual scanner and production device store');
  assert.ok(paints.every(row=>!row.chain.includes(targetId)&&!row.visible.includes(targetId)),'every stale replay paint keeps the completed target out');
  assert.ok(writes.every(row=>!row.chain.includes(targetId)&&!row.done),'every durable stale replay write retains peer completion');
@@ -732,7 +732,7 @@ test('RISK scoped Undo recovery: a true Undo cancels only its compound Dot while
  cold.ctx.window.CloudSync.ready=true;await cold.ctx.cloudPull();assert.deepEqual(Array.from(cold.ctx.state.chain),[referenceId]);
  assert.deepEqual(Array.from(cold.ctx.state.tasks,row=>[row.id,row.mu,row.sigma]),Array.from(cloud.tasks,row=>[row.id,row.mu,row.sigma]));
 });
-test('RISK scoped Undo recovery: Undo of an informed evergreen return survives older source and permits a later return',async t=>{
+test('RISK scoped Undo recovery: Undo of an informed evergreen return survives older source and permits an acknowledged later return',async t=>{
  const {IDBFactory}=await import('fake-indexeddb'),at=Date.parse('2026-10-17T15:00:00Z'),indexedDB=new IDBFactory(),
   deviceDbName=`scoped-undo-return-${Date.now()}-${Math.random()}`,targetId='undo-return-target',referenceId='undo-return-reference',
   peerCandidateId='undo-return-peer-choice',peerFieldId='undo-return-peer-field';
@@ -751,7 +751,7 @@ test('RISK scoped Undo recovery: Undo of an informed evergreen return survives o
  const firstCompletion=JSON.parse(JSON.stringify(local.ctx.state.decisionEvents.find(event=>event.kind==='completion'&&event.taskId===targetId)));
  assert.ok(firstCompletion,'the real first Done creates immutable rest authority');assert.deepEqual(Array.from(local.ctx.state.chain),[referenceId]);
  const priorRun=local.ctx.state.tasks.find(row=>row.id===targetId).restoredRunOp;
- local.ctx.window.CloudSync.ready=true;await local.ctx.cloudPushNow();await syncSettle(40);const olderCompletionSource=JSON.parse(JSON.stringify(h.remoteState()));
+ local.ctx.window.CloudSync.ready=true;await local.ctx.cloudPushNow();await settleSavedViewPublication(local,h,'RISK scoped Undo recovery coherent publication 1');const olderCompletionSource=JSON.parse(JSON.stringify(h.remoteState()));
  local.ctx.window.CloudSync.ready=false;setFakeTime(local.ctx,at+2*3600000);local.ctx.ensureCandidate();await local.ctx.persist();
  assert.equal(local.ctx.isEligible(local.ctx.state.tasks.find(row=>row.id===targetId)),true,'the first evergreen rest expires');
  assert.deepEqual(Array.from(local.ctx.state.chain),[referenceId],'expiry alone never restores chain membership');
@@ -762,11 +762,11 @@ test('RISK scoped Undo recovery: Undo of an informed evergreen return survives o
  assert.ok(firstReturn?.observedActionIds.includes(firstCompletion.id),'the actual post-rest return observes the original Done');
  assert.ok(returnGroup.some(event=>event.kind==='current-choice'&&event.target.property==='title')&&returnGroup.some(event=>event.kind==='current-choice'&&event.target.property==='due'));
  assert.deepEqual(Array.from(local.ctx.state.chain),[referenceId,targetId]);
- local.ctx.window.CloudSync.ready=true;await local.ctx.cloudPushNow();await syncSettle(40);const staleReturnSource=JSON.parse(JSON.stringify(h.remoteState()));
+ local.ctx.window.CloudSync.ready=true;await local.ctx.cloudPushNow();await settleSavedViewPublication(local,h,'RISK scoped Undo recovery coherent publication 2');const staleReturnSource=JSON.parse(JSON.stringify(h.remoteState()));
  peer.ctx.window.CloudSync.ready=true;await peer.ctx.cloudPull();peer.ctx.state.candidateId=peerCandidateId;peer.ctx.renderScan();
  setFakeTime(peer.ctx,at+2*3600000+20);peer.ctx.onAction('yes',{dataset:{candidate:peerCandidateId,benchmark:referenceId}});
- await saveEditorChoice(peer,peerFieldId,at+2*3600000+25,{title:'Peer kept return title'});peer.ctx.window.CloudSync.ready=true;await peer.ctx.cloudPushNow();await syncSettle(45);
- local.ctx.window.CloudSync.ready=true;await local.ctx.cloudPull();await syncSettle(30);
+ await saveEditorChoice(peer,peerFieldId,at+2*3600000+25,{title:'Peer kept return title'});peer.ctx.window.CloudSync.ready=true;await peer.ctx.cloudPushNow();await settleSavedViewPublication(peer,h,'RISK scoped Undo recovery coherent publication 3');
+ local.ctx.window.CloudSync.ready=true;await local.ctx.cloudPull();await settleSavedViewPublication(local,h,'RISK scoped Undo recovery coherent publication 4');
  assert.deepEqual(Array.from(local.ctx.state.chain),[referenceId,targetId,peerCandidateId],'the permitted return and peer pass progress both survive before Undo');
  assert.equal(local.ctx.state.tasks.find(row=>row.id===peerFieldId).title,'Peer kept return title');
  const rated=(...events)=>{const values=Object.fromEntries(initial.tasks.map(row=>[row.id,{mu:row.mu,sigma:row.sigma}])),engine=loadEngine(1450);
@@ -784,7 +784,7 @@ test('RISK scoped Undo recovery: Undo of an informed evergreen return survives o
  store.commitHead=async options=>{const result=await commit(options);if(result?.ok&&phase!=='idle'){
   const board=JSON.parse(options.payload);writes.push({phase,chain:board.chain.slice(),events:board.decisionEvents.map(event=>event.id)});
  }return result;};
- phase='pre-undo-source';h.writeBehindBack(olderCompletionSource);await local.ctx.cloudPull();await local.ctx.cloudPushNow();await syncSettle(45);
+ phase='pre-undo-source';h.writeBehindBack(olderCompletionSource);await local.ctx.cloudPull();await local.ctx.cloudPushNow();await settleSavedViewPublication(local,h,'RISK scoped Undo recovery coherent publication 5');
  assert.deepEqual(Array.from(local.ctx.state.chain),[referenceId,targetId,peerCandidateId],'the older completion-only source cannot erase the informed return or peer pass progress before Undo');
  assert.ok(local.ctx.state.decisionEvents.some(event=>event.id===firstReturn.id));
  const completionBytes=JSON.stringify(local.ctx.state.decisionEvents.find(event=>event.id===firstCompletion.id));
@@ -801,9 +801,9 @@ test('RISK scoped Undo recovery: Undo of an informed evergreen return survives o
  for(const row of local.ctx.state.tasks){assert.equal(row.mu,expectedAfterUndo[row.id].mu,`${row.id}: true Undo removes only its own Dot learning`);assert.equal(row.sigma,expectedAfterUndo[row.id].sigma);}
  assert.equal(local.ctx.state.workLog.filter(row=>row.taskId===targetId&&row.kind==='evergreen-done').length,1,'Undo preserves the first evergreen History session');
  assert.ok(local.ctx.state.decisionEvents.some(event=>event.id===cancellation.id));
- await local.ctx.persist();await local.ctx.cloudPushNow();await syncSettle(45);assert.equal(local.ctx.state.syncDirty,false);
+ await local.ctx.persist();await local.ctx.cloudPushNow();await settleSavedViewPublication(local,h,'RISK scoped Undo recovery coherent publication 6');assert.equal(local.ctx.state.syncDirty,false);
  phase='post-undo-source';
- h.writeBehindBack(staleReturnSource);await local.ctx.cloudPull();await local.ctx.cloudPushNow();await syncSettle(50);
+ h.writeBehindBack(staleReturnSource);await local.ctx.cloudPull();await local.ctx.cloudPushNow();await settleSavedViewPublication(local,h,'RISK scoped Undo recovery coherent publication 7');
  assert.ok(paints.length>0&&writes.length>0,'older sources exercise the mounted scanner and production IndexedDB store');
  const preUndoPaints=paints.filter(row=>row.phase==='pre-undo-source'),undoPaints=paints.filter(row=>row.phase==='undo-action'),
   postUndoPaints=paints.filter(row=>row.phase==='post-undo-source'),preUndoWrites=writes.filter(row=>row.phase==='pre-undo-source'),
@@ -841,8 +841,14 @@ test('RISK scoped Undo recovery: Undo of an informed evergreen return survives o
  const laterCompletion=JSON.parse(JSON.stringify(cold.ctx.state.decisionEvents.filter(event=>event.kind==='completion'&&event.taskId===targetId).at(-1)));
  assert.ok(laterCompletion.id!==firstCompletion.id&&laterCompletion.observedActionIds.includes(nextReturn.id));assert.deepEqual(Array.from(cold.ctx.state.chain),[referenceId,peerCandidateId]);
  assert.equal(cold.ctx.state.workLog.filter(row=>row.taskId===targetId&&row.kind==='evergreen-done').length,2,'the next real Done creates its own later History session');
- cold.ctx.window.CloudSync.ready=true;await cold.ctx.cloudPushNow();await syncSettle(45);
+ const CS=cold.ctx.window.CloudSync,push=CS.push.bind(CS),traffic=[];let releasePublication,publicationStarted=false;
+ const publicationGate=new Promise(resolve=>{releasePublication=resolve;});CS.push=async(...args)=>{publicationStarted=true;traffic.push({stage:'pending',baseRev:args[2],eventIds:JSON.parse(args[0]).decisionEvents.map(event=>event.id),payloadHash:createHash('sha256').update(args[0]).digest('hex')});await publicationGate;const response=await push(...args);traffic.push({stage:'acknowledged',response});return response;};
+ // cloudPushNow starts asynchronous work; a pending transport is not an ACK.
+ try{cold.ctx.window.CloudSync.ready=true;await cold.ctx.cloudPushNow();const deadline=performance.now()+8000;while(!publicationStarted&&performance.now()<deadline)await syncSettle(25);assert.ok(publicationStarted);
+  assert.equal(cold.ctx.state.syncDirty,true,'an actually held publication remains pending');assert.ok(traffic[0].eventIds.includes(nextReturn.id)&&traffic[0].eventIds.includes(laterCompletion.id),'the pending real payload carries both new actions');assert.ok([nextReturn.id,laterCompletion.id].every(id=>!h.remoteState().decisionEvents.some(event=>event.id===id)),'the held server has not acknowledged either new action');}
+ finally{releasePublication();await settleSavedViewPublication(cold,h,'later informed return and Done publication');}
  assert.deepEqual(Array.from(h.remoteState().chain),[referenceId,peerCandidateId]);assert.ok(h.remoteState().decisionEvents.some(event=>event.id===nextReturn.id)&&h.remoteState().decisionEvents.some(event=>event.id===laterCompletion.id));
+
 });
 test('RISK scoped Undo: cancelling Start restores the prior pass root and exact draw through stale delivery',async()=>{
  const {local,peer,h,at}=await scopedUndoClients(initial=>{initial.chain=[];initial.candidateId=null;initial.mode='work';initial.chance=null;});
@@ -7261,7 +7267,7 @@ test("UI: benchmark's action row is full opacity in work mode (not greyed)", asy
   // In work mode, the action row should NOT have the disabled class (full opacity)
   const benchmarkSiderail = benchAction(scanHtml);
   assert.ok(benchmarkSiderail, "the benchmark should have its action row in work mode");
-  assert.ok(!/class="actionrow[^"]*disabled/.test(benchmarkSiderail), 
+  assert.ok(!/class="actionrow[^"]*disabled/.test(benchmarkSiderail),
     "the action row should NOT be greyed out in work mode — actions are relevant here");
 
   // benchmark's Done SHOULD have the d keyhint when no candidate is showing
@@ -9440,20 +9446,20 @@ test("UX: rescan button doesn't show when resume-scan is available", async () =>
   ctx.addTask("Task C", false);
   ctx.startScan('descending');  // dots Task A
   ctx.render();
-  
+
   // Skip a task (decide "no")
   ctx.onAction("no");  // Task B gets skipped
   ctx.render();
-  
+
   // Move to work mode
   ctx.onAction("start-working");
   ctx.render();
-  
+
   const scanHtml = shim.elements.get("scan").innerHTML;
-  
+
   // Resume scanning button should be present
   assert.match(scanHtml, /data-act="resume-scan"/, "resume-scan button should be present in work mode");
-  
+
   // Rescan button should NOT be present when resume-scan is available
   assert.ok(!scanHtml.includes('data-act="rescan"'), "rescan button should NOT appear when resume-scan is available");
 });
@@ -9466,13 +9472,13 @@ test("UX: resume-scan button is greyed during work mode if pool has eligible tas
   ctx.startScan('descending');  // dots Task A, mode stays "scan"
   ctx.onAction("start-working");  // switch to work mode
   ctx.render();
-  
+
   const scanHtml = shim.elements.get("scan").innerHTML;
-  
+
   // Find the resume-scan button's parent container
   const resumeMatch = scanHtml.match(/<button[^>]*data-act="resume-scan"[^>]*>Resume scanning<\/button>/);
   assert.ok(resumeMatch, "resume-scan button should exist when in work mode");
-  
+
   // Check if the button or its container has disabled/greyed styling
   // For now, verify button exists (we'll check CSS/opacity in next assertion)
   const noticeMatch = scanHtml.match(/<div class="notice"[^>]*>[\s\S]*?resume-scan[\s\S]*?<\/div>/);
@@ -9487,14 +9493,14 @@ test("UX: resume-scan button is full opacity once all eligible tasks are gone", 
   ctx.decide("yes");  // select Task B, dot it
   ctx.decide("yes");  // no more tasks
   ctx.render();
-  
+
   // Now we're in scan mode with no eligible tasks remaining
   const scanHtml = shim.elements.get("scan").innerHTML;
-  
+
   // Move to work mode
   ctx.onAction("start-working");
   ctx.render();
-  
+
   const scanHtml2 = shim.elements.get("scan").innerHTML;
   assert.ok(scanHtml2.includes('data-act="resume-scan"'), "resume-scan button should be present");
   // Button should be full opacity when no tasks remain
@@ -11475,7 +11481,7 @@ test('RISK deletion authority: real Delete defeats a stale saved and cloud Dot a
   assert.equal(ctx.state.tasks.some(row=>row.id==='deleted-same-title'),false,'stale cloud presence, title, and Dot lose to the real Delete action');
   assert.deepEqual(Array.from(ctx.state.chain),['current-member'],'cloud recovery does not renew the deleted Dot');
   assert.equal(ctx.state.tasks.find(row=>row.id===currentOnly.id)?.title,'Current-only task omitted by stale source','stale cloud omission does not delete the current-only task');
-  await ctx.cloudPushNow();await syncSettle(35);
+  await ctx.cloudPushNow();await settleSavedViewPublication(app,h,'RISK deletion authority coherent publication 1');
   assert.equal(ctx.state.syncDirty,false,'the corrected publication receives an exact synthetic acknowledgement');
   assert.equal(h.remoteState().tasks.some(row=>row.id==='deleted-same-title'),false,'the acknowledged cloud board omits the deleted identity');
   assert.deepEqual(h.remoteState().chain,['current-member']);
@@ -11489,7 +11495,7 @@ test('RISK deletion authority: real Delete defeats a stale saved and cloud Dot a
   assert.match(shim.document.getElementById('modalRoot').innerHTML,new RegExp('data-act="dot-task" data-id="'+replacement.id+'"'));
   ctx.onAction('dot-task',{dataset:{id:replacement.id}});await ctx.persist();
   assert.ok(ctx.state.chain.includes(replacement.id),'the distinct new task remains usable through the real Dot action');
-  ctx.window.CloudSync.ready=true;await ctx.cloudPushNow();await syncSettle(35);
+  ctx.window.CloudSync.ready=true;await ctx.cloudPushNow();await settleSavedViewPublication(app,h,'RISK deletion authority coherent publication 2');
   assert.equal(h.remoteState().tasks.some(row=>row.id==='deleted-same-title'),false,'the final acknowledged board still excludes the deleted identity');
   assert.ok(h.remoteState().tasks.some(row=>row.id===currentOnly.id),'the final board keeps the unrelated current-only task');
   assert.ok(h.remoteState().tasks.some(row=>row.id===replacement.id),'the final board contains the usable new same-title identity');
@@ -11592,7 +11598,7 @@ test('RISK deletion authority: Clear history retries and pruned stale delivery r
   assert.deepEqual(Array.from(ctx.state.workLog),[],'stale cloud History cannot undo exact-row clearing');
   assert.equal(ctx.state.chain.includes('evergreen-cleared'),false,'stale cloud Dot cannot renew evergreen membership after rest expiry');
   assert.equal(ctx.state.tasks.find(row=>row.id==='evergreen-cleared').lastDoneAt,evergreenDoneAt);
-  await ctx.cloudPushNow();await syncSettle(35);
+  await ctx.cloudPushNow();await settleSavedViewPublication(app,h,'RISK deletion authority coherent publication 1');
   assert.equal(ctx.state.syncDirty,false,'the corrected stale-cloud result receives exact synthetic acknowledgement');
   assert.equal(h.remoteState().tasks.some(row=>row.id==='ordinary-cleared'),false);
   assert.deepEqual(h.remoteState().workLog,[]);
@@ -11604,7 +11610,7 @@ test('RISK deletion authority: Clear history retries and pruned stale delivery r
   assert.deepEqual(Array.from(ctx.state.workLog),[],'pre-completion cloud state does not recreate cleared History');
   assert.equal(ctx.state.chain.includes('evergreen-cleared'),false,'pre-completion Dot cannot renew expired membership');
   assert.equal(ctx.state.tasks.find(row=>row.id==='evergreen-cleared').lastDoneAt,evergreenDoneAt);
-  await ctx.cloudPushNow();await syncSettle(35);
+  await ctx.cloudPushNow();await settleSavedViewPublication(app,h,'RISK deletion authority coherent publication 2');
   assert.equal(h.remoteState().tasks.some(row=>row.id==='ordinary-cleared'),false);
   assert.deepEqual(h.remoteState().workLog,[]);
   assert.equal(h.remoteState().chain.includes('evergreen-cleared'),false);
@@ -24200,7 +24206,7 @@ test('RISK completion lifecycle Start: an observed new-pass root survives peer m
  local.ctx.onAction('done-task',{dataset:{id:taskId}});await local.ctx.persist();
  const completion=JSON.parse(JSON.stringify(local.ctx.state.decisionEvents.find(event=>event.kind==='completion'&&event.taskId===taskId)));
  assert.ok(completion,'the local actual Done creates its lifecycle fact');
- local.ctx.window.CloudSync.ready=true;await local.ctx.cloudPushNow();await syncSettle(35);
+ local.ctx.window.CloudSync.ready=true;await local.ctx.cloudPushNow();await settleSavedViewPublication(local,h,'RISK completion lifecycle Start coherent publication 1');
  assert.deepEqual(h.remoteState().chain,[],'the cloud receives completion without a synthetic membership return');
  peer.ctx.window.CloudSync.ready=true;await peer.ctx.cloudPull();await syncSettle(20);
  setFakeTime(local.ctx,at+2*3600000);local.ctx.ensureCandidate();await local.ctx.persist();
@@ -24215,9 +24221,9 @@ test('RISK completion lifecycle Start: an observed new-pass root survives peer m
  assert.ok(root?.observedActionIds.includes(completion.id),'the actual new-pass root observes the prior completion');
  assert.deepEqual(Array.from(local.ctx.state.chain),[taskId],'the explicit informed Start adds the eligible first member');
  setFakeTime(peer.ctx,at+2*3600000+100);await saveEditorChoice(peer,otherId,at+2*3600000+100,{title:'Peer edit after completion'});
- peer.ctx.window.CloudSync.ready=true;await peer.ctx.cloudPushNow();await syncSettle(35);
+ peer.ctx.window.CloudSync.ready=true;await peer.ctx.cloudPushNow();await settleSavedViewPublication(peer,h,'RISK completion lifecycle Start coherent publication 2');
  assert.equal(h.remoteState().tasks.find(row=>row.id===otherId).title,'Peer edit after completion','the independent peer edit is acknowledged');
- local.ctx.window.CloudSync.ready=true;await local.ctx.cloudPull();await syncSettle(35);
+ local.ctx.window.CloudSync.ready=true;await local.ctx.cloudPull();await settleSavedViewPublication(local,h,'RISK completion lifecycle Start coherent publication 3');
  assert.deepEqual(Array.from(local.ctx.state.chain),[taskId],'reconciling a new peer fact preserves the observed bootstrap root');
  assert.equal(local.ctx.state.tasks.find(row=>row.id===otherId).title,'Peer edit after completion','reconciliation preserves the nonconflicting edit: '+JSON.stringify({localTitle:local.ctx.state.tasks.find(row=>row.id===otherId).title,
   localEvents:local.ctx.state.decisionEvents,cloudEvents:h.remoteState().decisionEvents,localDirty:local.ctx.state.syncDirty,localRev:local.ctx.state.syncRev,cloudRev:h.doc.rev,
@@ -24225,7 +24231,7 @@ test('RISK completion lifecycle Start: an observed new-pass root survives peer m
  assert.equal(JSON.stringify(local.ctx.state.decisionEvents.find(event=>event.id===completion.id)),JSON.stringify(completion),'the original completion remains byte-exact');
  assert.equal(JSON.stringify(local.ctx.state.decisionEvents.find(event=>event.id===root.id)),JSON.stringify(root),'the original Start action remains byte-exact');
  assert.equal(local.ctx.state.decisionEvents.filter(event=>event.kind==='comparison'&&event.taskId===taskId).length,0,'the neutral new-pass root adds no comparison learning');
- await local.ctx.persist();await local.ctx.cloudPushNow();await syncSettle(35);
+ await local.ctx.persist();await local.ctx.cloudPushNow();await settleSavedViewPublication(local,h,'RISK completion lifecycle Start coherent publication 4');
  assert.deepEqual(h.remoteState().chain,[taskId],'the acknowledged cloud retains the informed bootstrap membership');
  assert.equal(h.remoteState().decisionEvents.find(event=>event.id===completion.id)?.id,completion.id,'cloud retains the original Done identity');
  assert.equal(h.remoteState().decisionEvents.find(event=>event.id===root.id)?.id,root.id,'cloud retains the original Start identity');
@@ -24253,7 +24259,7 @@ test('RISK completion lifecycle Start: an unaware pass root cannot bypass comple
   const completion=JSON.parse(JSON.stringify(doneClient.ctx.state.decisionEvents.find(event=>event.kind==='completion'&&event.taskId===taskId)));
   assert.ok(completion,'a real remote Done records one immutable completion');
   if(first==='completion-first'){
-   doneClient.ctx.window.CloudSync.ready=true;await doneClient.ctx.cloudPushNow();await syncSettle(35);
+   doneClient.ctx.window.CloudSync.ready=true;await doneClient.ctx.cloudPushNow();await settleSavedViewPublication(doneClient,h,'RISK completion lifecycle Start coherent publication 1');
    assert.equal(h.remoteState().decisionEvents.some(event=>event.id===completion.id),true,'completion reaches the cloud before the unaware Start');
   }
   const startAt=at+startOffset;setFakeTime(unaware.ctx,startAt);unaware.ctx.ensureCandidate();await unaware.ctx.persist();
@@ -24264,30 +24270,30 @@ test('RISK completion lifecycle Start: an unaware pass root cannot bypass comple
   const root=JSON.parse(JSON.stringify(unaware.ctx.state.decisionEvents.find(event=>event.kind==='current-choice'&&event.target?.property==='chain'&&event.value?.[0]===taskId)));
   assert.ok(root,'the actual Start records a neutral pass root');assert.deepEqual(Array.from(root.observedActionIds),[],'the unaware root cannot claim a completion it has not seen');
   assert.deepEqual(Array.from(unaware.ctx.state.chain),[taskId],'the stale source temporarily bootstraps its eligible task');
-  const paints=[];
+  const paints=[],observations=[];
   for(const app of [doneClient,unaware]){
-   const scan=app.shim.document.getElementById('scan');let markup=scan.innerHTML,phase='idle';
-   Object.defineProperty(scan,'innerHTML',{configurable:true,get:()=>markup,set(value){markup=value;if(phase==='reconcile'){
+   const scan=app.shim.document.getElementById('scan'),CS=app.ctx.window.CloudSync,pull=CS.pull.bind(CS);let markup=scan.innerHTML,completionObserved=app.ctx.state.decisionEvents?.some(event=>event.id===completion.id)||false;
+   CS.pull=async(...args)=>{const response=await pull(...args);if(response.payload&&JSON.parse(response.payload).decisionEvents?.some(event=>event.id===completion.id))completionObserved=true;return response;};
+   Object.defineProperty(scan,'innerHTML',{configurable:true,get:()=>markup,set(value){markup=value;
     const painted=[...String(value).matchAll(/data-act="reveal" data-id="([^"]+)"/g)].map(match=>match[1]);
     const benchmark=String(value).match(/data-act="bench-done" data-benchmark="([^"]+)"/);if(benchmark)painted.push(benchmark[1]);
-    paints.push({chain:Array.from(app.ctx.state.chain),painted});
-   }}});
-   app.setReconcilePhase=next=>{phase=next;};
+    const row={completionObserved,chain:Array.from(app.ctx.state.chain),painted};observations.push(row);if(completionObserved)paints.push(row);
+   }});
   }
   if(first==='start-first'){
-   unaware.ctx.window.CloudSync.ready=true;await unaware.ctx.cloudPushNow();await syncSettle(35);
+   unaware.ctx.window.CloudSync.ready=true;await unaware.ctx.cloudPushNow();await settleSavedViewPublication(unaware,h,'RISK completion lifecycle Start coherent publication 2');
    assert.equal(h.remoteState().decisionEvents.some(event=>event.id===completion.id),false,'the new pass publishes first');
-   doneClient.ctx.window.CloudSync.ready=true;await doneClient.ctx.cloudPushNow();await syncSettle(35);
-   doneClient.setReconcilePhase('reconcile');await doneClient.ctx.cloudPull();await syncSettle(25);
-   await doneClient.ctx.cloudPushNow();await syncSettle(35);
+   doneClient.ctx.window.CloudSync.ready=true;await doneClient.ctx.cloudPushNow();await settleSavedViewPublication(doneClient,h,'RISK completion lifecycle Start coherent publication 3');
+   await doneClient.ctx.cloudPull();await syncSettle(25);
+   await doneClient.ctx.cloudPushNow();await settleSavedViewPublication(doneClient,h,'RISK completion lifecycle Start coherent publication 4');
   }else{
-   unaware.ctx.window.CloudSync.ready=true;await unaware.ctx.cloudPushNow();await syncSettle(35);
-   unaware.setReconcilePhase('reconcile');await unaware.ctx.cloudPull();await syncSettle(25);
-   await unaware.ctx.cloudPushNow();await syncSettle(35);
+   unaware.ctx.window.CloudSync.ready=true;await unaware.ctx.cloudPushNow();await settleSavedViewPublication(unaware,h,'RISK completion lifecycle Start coherent publication 5');
+   await unaware.ctx.cloudPull();await syncSettle(25);
+   await unaware.ctx.cloudPushNow();await settleSavedViewPublication(unaware,h,'RISK completion lifecycle Start coherent publication 6');
   }
-  doneClient.setReconcilePhase('reconcile');unaware.setReconcilePhase('reconcile');
-  await doneClient.ctx.cloudPull();await unaware.ctx.cloudPull();await syncSettle(35);
-  await doneClient.ctx.cloudPushNow();await unaware.ctx.cloudPushNow();await syncSettle(35);
+
+  await doneClient.ctx.cloudPull();await unaware.ctx.cloudPull();await settleSavedViewPublication(unaware,h,'RISK completion lifecycle Start coherent publication 7');
+  await doneClient.ctx.cloudPushNow();await unaware.ctx.cloudPushNow();await settleSavedViewPublication(unaware,h,'RISK completion lifecycle Start coherent publication 8');
   const cloud=h.remoteState();
   assert.deepEqual(Array.from(cloud.chain),[],'completion wins against the unobserved pass root regardless of upload order or clock');
   assert.equal(cloud.decisionEvents.filter(event=>event.kind==='completion'&&event.taskId===taskId).length,1,'the original Done fact remains singular');
@@ -24295,12 +24301,13 @@ test('RISK completion lifecycle Start: an unaware pass root cannot bypass comple
   assert.equal(JSON.stringify(cloud.decisionEvents.find(event=>event.id===root.id)),JSON.stringify(root),'the stale Start fact is retained exactly');
   assert.equal(cloud.decisionEvents.filter(event=>event.kind==='comparison'&&event.taskId===taskId).length,0,'neutral Start does not invent comparison learning');
   assert.deepEqual(Array.from(doneClient.ctx.state.chain),[]);assert.deepEqual(Array.from(unaware.ctx.state.chain),[]);
+  assert.equal(paints.length,observations.filter(row=>row.completionObserved).length,'every completion-known Start paint is checked');
   assert.ok(paints.length>0,'reconciliation drives scanner paints');
   assert.ok(paints.every(row=>!row.chain.includes(taskId)&&!row.painted.includes(taskId)),'no reconciliation paint may display the unobserved bootstrap');
  });
 });
 
-test('RISK completion lifecycle Dot: unseen Dot and opposite No keep learning while completion owns membership',async t=>{
+test('RISK completion lifecycle Dot: unseen Dot and opposite No keep learning while observed completion owns membership',async t=>{
  const {IDBFactory}=await import('fake-indexeddb');
  for(const first of ['dot-first','completion-first'])for(const dotOffset of [-100,100,200,2*3600000])await t.test(`${first}, Dot clock offset ${dotOffset}`,async t=>{
   const at=Date.parse('2026-10-17T15:00:00Z'),taskId=`unaware-dot-${first}-${dotOffset}`,benchmarkId='unaware-dot-reference';
@@ -24317,18 +24324,29 @@ test('RISK completion lifecycle Dot: unseen Dot and opposite No keep learning wh
   t.after(async()=>{for(const app of clients){app.ctx.window.CloudSync.user=null;vm.runInContext('clearTimeout(saveTimer);saveTimer=null;clearCloudRetry();clearTimeout(cloudTimer);cloudTimer=null;',app.ctx);await close(app);}});
   await doneClient.ctx.cloudPull();await dotClient.ctx.cloudPull();await noClient.ctx.cloudPull();
   for(const app of clients)app.ctx.window.CloudSync.ready=false;
-  const paints=[],deviceWrites=[];let dotPhase='action';
+  const paints=[],deviceWrites=[],observations=[],transport=[];let sequence=0,held=false,release;
+  const responseGate=new Promise(resolve=>{release=resolve;});t.after(()=>release());
+  // Receipt marks knowledge before application continuation; retain every paint
+  // on both sides, and never reset knowledge after a later source or render.
+  const knowledge=new WeakMap(),completionObserved=new WeakSet();
+  for(const app of clients){knowledge.set(app,new Set());const CS=app.ctx.window.CloudSync,pull=CS.pull.bind(CS);CS.pull=async(...args)=>{
+   const response=await pull(...args),incoming=response.payload?JSON.parse(response.payload):null,ids=(incoming?.decisionEvents||[]).filter(event=>event.kind==='completion'&&event.taskId===taskId).map(event=>event.id),client=app===dotClient?'dot':app===doneClient?'done':'no';
+   transport.push({sequence:++sequence,client,stage:'received',revision:response.rev,completionIds:ids});
+   if(app===dotClient&&first==='completion-first'&&dotOffset===100&&ids.length&&!held){held=true;await responseGate;}
+   for(const id of ids)knowledge.get(app).add(id);if(ids.length)completionObserved.add(app);transport.push({sequence:++sequence,client,stage:'delivered',revision:response.rev,completionIds:ids});return response;
+  };}
   for(const app of clients){
-   const scan=app.shim.document.getElementById('scan');let markup=scan.innerHTML,phase='idle';
-   Object.defineProperty(scan,'innerHTML',{configurable:true,get:()=>markup,set(value){markup=value;if(phase==='reconcile'){
+   const scan=app.shim.document.getElementById('scan');let markup=scan.innerHTML;
+   Object.defineProperty(scan,'innerHTML',{configurable:true,get:()=>markup,set(value){markup=value;
     const painted=[...String(value).matchAll(/data-act="reveal" data-id="([^"]+)"/g)].map(match=>match[1]);
     const benchmark=String(value).match(/data-act="bench-done" data-benchmark="([^"]+)"/);if(benchmark)painted.push(benchmark[1]);
-    paints.push({client:app===dotClient?'dot':app===doneClient?'done':'no',chain:Array.from(app.ctx.state.chain),painted});
-   }}});
-   app.setReconcilePhase=next=>{phase=next;if(app===dotClient)dotPhase=next;};
+    const currentCompletionIds=(app.ctx.state.decisionEvents||[]).filter(event=>event.kind==='completion'&&event.taskId===taskId).map(event=>event.id),row={sequence:++sequence,client:app===dotClient?'dot':app===doneClient?'done':'no',chain:Array.from(app.ctx.state.chain),painted,currentCompletionIds,deliveredCompletionIds:[...knowledge.get(app)],knownCloudCompletionIds:JSON.parse(vm.runInContext('JSON.stringify(JSON.parse(lastKnownCloudPayload||"null")?.decisionEvents||[])',app.ctx)).filter(event=>event.kind==='completion'&&event.taskId===taskId).map(event=>event.id)};
+    if(currentCompletionIds.length||row.knownCloudCompletionIds.length||row.deliveredCompletionIds.length)completionObserved.add(app);row.completionObserved=completionObserved.has(app);
+    observations.push(row);if(row.completionObserved)paints.push(row);
+   }});
   }
   const store=dotClient.ctx.window.ScannerDeviceStore,commit=store.commitHead.bind(store);
-  store.commitHead=async options=>{const result=await commit(options);if(result?.ok){const board=JSON.parse(options.payload);deviceWrites.push({phase:dotPhase,chain:board.chain,
+  store.commitHead=async options=>{const result=await commit(options);if(result?.ok){const board=JSON.parse(options.payload);deviceWrites.push({chain:board.chain,
    comparisons:board.decisionEvents?.filter(event=>event.kind==='comparison').length||0,
    completions:board.decisionEvents?.filter(event=>event.kind==='completion'&&event.taskId===taskId).length||0});}return result;};
   const finishDone=async()=>{
@@ -24360,7 +24378,14 @@ test('RISK completion lifecycle Dot: unseen Dot and opposite No keep learning wh
    return {fact:JSON.parse(JSON.stringify(fact)),themeFact,theme};
   };
   const publishAndRetry=async(app,stale=false)=>{
-   app.ctx.window.CloudSync.ready=true;app.setReconcilePhase(stale?'reconcile':'idle');await app.ctx.cloudPushNow();
+   app.ctx.window.CloudSync.ready=true;await app.ctx.cloudPushNow();
+   if(stale&&app===dotClient&&first==='completion-first'&&dotOffset===100){
+    try{const deadline=performance.now()+8000;while(!held&&performance.now()<deadline)await syncSettle(25);assert.ok(held,'the real completion-bearing pull is held before consumer delivery');
+     // Open and close the real disclosure while delivery waits. The saved view
+     // returns to its prior value, and normal saves remain enabled throughout.
+     assert.equal(knowledge.get(app).size,0);app.ctx.onAction('toggle-list',{});app.ctx.onAction('toggle-list',{});assert.ok(app.ctx.state.chain.includes(taskId),'an unaware app still has its own Dot before completion delivery');assert.ok(observations.slice(-2).every(row=>!row.completionObserved&&row.chain.includes(taskId)),'both actual disclosure paints occur before completion is delivered');
+    }finally{release();}
+   }
    await settleSavedViewPublication(app,h,`${app===doneClient?'Done':app===dotClient?'Dot':'No'} first publication`);
    if(stale){await app.ctx.cloudPull();await settleSavedViewPublication(app,h,`${app===doneClient?'Done':app===dotClient?'Dot':'No'} stale read`);await app.ctx.cloudPushNow();await settleSavedViewPublication(app,h,`${app===doneClient?'Done':app===dotClient?'Dot':'No'} retry publication`);}
   };
@@ -24375,7 +24400,6 @@ test('RISK completion lifecycle Dot: unseen Dot and opposite No keep learning wh
    dot=await finishDot();await publishAndRetry(dotClient,true);
   }
   ({fact:no,themeFact,theme}=await finishNo(completion));await publishAndRetry(noClient,true);
-  for(const app of clients)app.setReconcilePhase('reconcile');
   for(const app of clients){await app.ctx.cloudPull();await settleSavedViewPublication(app,h,'final stale read');await app.ctx.cloudPushNow();await settleSavedViewPublication(app,h,'final retry publication');}
   const cloud=h.remoteState(),facts=[completion,dot,no,themeFact],events=cloud.decisionEvents||[];
   assert.deepEqual(Array.from(cloud.chain),[benchmarkId],'completion defeats both an old or late-unaware Dot independent of revision and event time');
@@ -24399,6 +24423,10 @@ test('RISK completion lifecycle Dot: unseen Dot and opposite No keep learning wh
   assert.deepEqual(Array.from(doneClient.ctx.state.chain),[benchmarkId]);assert.deepEqual(Array.from(dotClient.ctx.state.chain),[benchmarkId]);
   assert.deepEqual(Array.from(noClient.ctx.state.chain),[benchmarkId]);
   assert.ok(paints.length>0,'stale cloud retries and pulls produce scanner paints');
+  for(const client of ['done','dot','no'])assert.ok(paints.some(row=>row.client===client),'every app produces a non-vacuous paint after completion knowledge');
+  assert.equal(paints.length,observations.filter(row=>row.completionObserved).length,'all known-completion paints are checked, including the first after response delivery');
+  if(first==='completion-first'&&dotOffset===100){const delivered=transport.find(row=>row.client==='dot'&&row.stage==='delivered'&&row.completionIds.length);assert.ok(delivered);assert.ok(observations.some(row=>row.client==='dot'&&row.sequence<delivered.sequence&&!row.completionObserved&&row.chain.includes(taskId)),'the controlled unaware source is genuinely rendered before its first completion-bearing response');}
+
   assert.ok(paints.every(row=>!row.chain.includes(taskId)&&!row.painted.includes(taskId)),'every captured reconciliation paint keeps the completed Dot out');
   const head=await dotClient.ctx.window.ScannerDeviceStore.readHead(),headBoard=JSON.parse(head.payload);
   assert.deepEqual(headBoard.chain,[benchmarkId],'the production IndexedDB head keeps completion over the unaware Dot');
@@ -24461,12 +24489,13 @@ test('RISK completion lifecycle return: observed Dot and next Done survive stale
  const apps=[informed,stale],close=async app=>{try{await app?.ctx?.window?.ScannerDeviceStore?.close?.();}catch{}};
  t.after(async()=>{for(const app of apps){app.ctx.window.CloudSync.user=null;vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer)',app.ctx);await close(app);}});
  await informed.ctx.cloudPull();await stale.ctx.cloudPull();informed.ctx.window.CloudSync.ready=false;stale.ctx.window.CloudSync.ready=false;
- const paints=[],deviceWrites=[],scan=stale.shim.document.getElementById('scan');let phase='offline',markup=scan.innerHTML;
- Object.defineProperty(scan,'innerHTML',{configurable:true,get:()=>markup,set(value){markup=value;if(phase==='reconcile'){
+ const paints=[],observations=[],deviceWrites=[],scan=stale.shim.document.getElementById('scan'),CS=stale.ctx.window.CloudSync,pull=CS.pull.bind(CS);let completionObserved=false,markup=scan.innerHTML;
+ CS.pull=async(...args)=>{const response=await pull(...args);if(response.payload&&JSON.parse(response.payload).decisionEvents?.some(event=>event.kind==='completion'&&event.taskId===taskId))completionObserved=true;return response;};
+ Object.defineProperty(scan,'innerHTML',{configurable:true,get:()=>markup,set(value){markup=value;
   const painted=[...String(value).matchAll(/data-act="reveal" data-id="([^"]+)"/g)].map(match=>match[1]);
   const benchmark=String(value).match(/data-act="bench-done" data-benchmark="([^"]+)"/);if(benchmark)painted.push(benchmark[1]);
-  paints.push({chain:Array.from(stale.ctx.state.chain),painted});
- }}});
+  const row={completionObserved,chain:Array.from(stale.ctx.state.chain),painted};observations.push(row);if(completionObserved)paints.push(row);
+ }});
  const store=stale.ctx.window.ScannerDeviceStore,commit=store.commitHead.bind(store);
  store.commitHead=async options=>{const result=await commit(options);if(result?.ok){const board=JSON.parse(options.payload);deviceWrites.push({chain:board.chain,
   completions:board.decisionEvents?.filter(event=>event.kind==='completion'&&event.taskId===taskId).length||0});}return result;};
@@ -24484,7 +24513,7 @@ test('RISK completion lifecycle return: observed Dot and next Done survive stale
  setFakeTime(informed.ctx,at+100);hydrateUnchangedEditorDraft(informed,taskId);informed.ctx.onAction('done-task',{dataset:{id:taskId}});await informed.ctx.persist();
  const firstDone=JSON.parse(JSON.stringify(informed.ctx.state.decisionEvents.find(event=>event.kind==='completion'&&event.taskId===taskId)));
  assert.ok(firstDone,'the informed device records the first actual Done');assert.deepEqual(Array.from(informed.ctx.state.chain),[benchmarkId]);
- informed.ctx.window.CloudSync.ready=true;await informed.ctx.cloudPushNow();await syncSettle(35);
+ informed.ctx.window.CloudSync.ready=true;await informed.ctx.cloudPushNow();await settleSavedViewPublication(informed,h,'RISK completion lifecycle return coherent publication 1');
  assert.ok(h.remoteState().decisionEvents.some(event=>event.id===firstDone.id),'the first completion reaches the cloud');
  assert.equal(h.remoteState().decisionEvents.some(event=>event.id===earlierDot.id),false,'the stale Dot remains an offline source');
  informed.ctx.window.CloudSync.ready=false;setFakeTime(informed.ctx,at+2*3600000);informed.ctx.ensureCandidate();await informed.ctx.persist();
@@ -24498,13 +24527,13 @@ test('RISK completion lifecycle return: observed Dot and next Done survive stale
  const secondDone=JSON.parse(JSON.stringify(informed.ctx.state.decisionEvents.filter(event=>event.kind==='completion'&&event.taskId===taskId).at(-1)));
  assert.ok(secondDone&&secondDone.id!==firstDone.id,'the later Done is a second lifecycle fact');assert.ok(secondDone.observedActionIds.includes(returned.id),'the later Done observes the permitted Dot return');
  assert.deepEqual(Array.from(informed.ctx.state.chain),[benchmarkId]);assert.equal(informed.ctx.state.workLog.filter(row=>row.taskId===taskId&&row.kind==='evergreen-done').length,2);
- informed.ctx.window.CloudSync.ready=true;await informed.ctx.cloudPushNow();await syncSettle(35);
+ informed.ctx.window.CloudSync.ready=true;await informed.ctx.cloudPushNow();await settleSavedViewPublication(informed,h,'RISK completion lifecycle return coherent publication 2');
  assert.deepEqual(Array.from(h.remoteState().chain),[benchmarkId],'the acknowledged later completion removes the permitted return');
  assert.ok(h.remoteState().decisionEvents.some(event=>event.id===returned.id)&&h.remoteState().decisionEvents.some(event=>event.id===secondDone.id));
  // The offline Dot, title and theme now collide with a newer remote revision.
- stale.ctx.window.CloudSync.ready=true;phase='reconcile';await stale.ctx.cloudPushNow();await syncSettle(60);
- await stale.ctx.cloudPull();await stale.ctx.cloudPushNow();await syncSettle(60);
- informed.ctx.window.CloudSync.ready=true;await informed.ctx.cloudPull();await syncSettle(40);await informed.ctx.cloudPushNow();await syncSettle(40);
+ stale.ctx.window.CloudSync.ready=true;await stale.ctx.cloudPushNow();await settleSavedViewPublication(stale,h,'RISK completion lifecycle return coherent publication 3');
+ await stale.ctx.cloudPull();await stale.ctx.cloudPushNow();await settleSavedViewPublication(stale,h,'RISK completion lifecycle return coherent publication 4');
+ informed.ctx.window.CloudSync.ready=true;await informed.ctx.cloudPull();await settleSavedViewPublication(informed,h,'RISK completion lifecycle return coherent publication 5');await informed.ctx.cloudPushNow();await settleSavedViewPublication(informed,h,'RISK completion lifecycle return coherent publication 6');
  const cloud=h.remoteState(),facts=[earlierDot,firstDone,returned,secondDone,themeFact,titleFact];
  assert.deepEqual(Array.from(cloud.chain),[benchmarkId],'stale Dot delivery cannot revive membership after the second Done');
  for(const fact of facts)assert.equal(JSON.stringify(cloud.decisionEvents.find(event=>event.id===fact.id)),JSON.stringify(fact),'the exact original action survives stale retry');
@@ -24521,6 +24550,8 @@ test('RISK completion lifecycle return: observed Dot and next Done survive stale
   const dotIds=[earlierDot.id,returned.id].sort(),history=(task.ratingHistory||[]).filter(row=>dotIds.includes(row.id)).map(row=>row.id).sort();
   assert.deepEqual(history,dotIds,`${id}: both exact Dot history identities remain visible`);
  }
+ assert.ok(observations.some(row=>!row.completionObserved&&row.chain.includes(taskId)),'the actual earlier offline Dot is rendered before completion knowledge');
+ assert.equal(paints.length,observations.filter(row=>row.completionObserved).length,'every completion-known later-Done paint is checked');
  assert.ok(paints.length>0,'the stale cloud retry paints its reconciled scanner');
  assert.ok(paints.every(row=>!row.chain.includes(taskId)&&!row.painted.includes(taskId)),'every reconciled scanner paint preserves the final completion fence');
  const head=JSON.parse((await store.readHead()).payload);assert.deepEqual(head.chain,[benchmarkId],'the production IndexedDB head retains the exact final membership');
@@ -24737,7 +24768,7 @@ test('RISK completion boundaries: failed read stays pending and wake exactly ack
  assert.equal(JSON.stringify(ctx.state.tasks.map(row=>[row.id,row.mu,row.sigma])),ratingsAfterActions,'an ambiguous write does not replay learning locally');
  const localHeadAfterUncertain=JSON.parse((await store.readHead()).payload);
  assert.equal(JSON.stringify(localHeadAfterUncertain.decisionEvents.filter(event=>event.id===comparison.id)),JSON.stringify([comparison]));
- shim.window.dispatchEvent({type:'pagehide'});shim.window.dispatchEvent({type:'pageshow',persisted:true});await syncSettle(60);
+ shim.window.dispatchEvent({type:'pagehide'});shim.window.dispatchEvent({type:'pageshow',persisted:true});await settleSavedViewPublication(app,h,'uncertain completion wake readback');
  assert.equal(ctx.state.syncDirty,false,'wake readback clears pending only after matching exact cloud content is proven');
  assert.equal(ctx.state.syncRev,h.doc.rev);
  assert.equal(pushes,1,'the matching wake read does not duplicate the conditional write');

@@ -501,7 +501,7 @@ The editor hook blocks app or enforcement edits while tests.js has no staged or 
 - RISK completion lifecycle Start: an explicit new pass bootstraps an eligible task after rest without a synthetic Dot
 - RISK completion lifecycle Start: an observed new-pass root survives peer merge and IndexedDB reopen
 - RISK completion lifecycle Start: an unaware pass root cannot bypass completion in either publication order
-- RISK completion lifecycle Dot: unseen Dot and opposite No keep learning while completion owns membership
+- RISK completion lifecycle Dot: unseen Dot and opposite No keep learning while observed completion owns membership
 - RISK completion lifecycle maintenance: the local day marker and Resume or Rescan do not renew a removed member
 - RISK completion lifecycle return: observed Dot and next Done survive stale delivery and IndexedDB reopen
 - RISK evergreen scan reconciliation: merged completion removes resting crumbs tails and candidates without losing evidence
@@ -1434,7 +1434,7 @@ Actual editor Delete, Add, Done, Clear history, and Undo actions run through iso
 
 - `RISK scoped Undo recovery: compound Done Undo survives older device and cloud replay after peer progress`
 - `RISK scoped Undo recovery: a true Undo cancels only its compound Dot while peer completion and learning remain`
-- `RISK scoped Undo recovery: Undo of an informed evergreen return survives older source and permits a later return`
+- `RISK scoped Undo recovery: Undo of an informed evergreen return survives older source and permits an acknowledged later return`
 - `RISK scoped Undo FAQ: whole Done Dot and Return actions survive stale-source recovery`
 
 Actual populated-editor ordinary Done, an offline Dot that an independent peer completion has not observed, and a post-rest informed evergreen return each receive one true action-scoped Undo after peer progress. The tests preserve whole editor/scanner action groups, immutable original event bytes and times, prior restore-run lineage, ordinary and evergreen History, independent comparison learning, peer fields and current pass members. Older device/cloud sources are delivered before and after Undo publication; every recovery, Undo and replay paint is checked against its expected membership, along with production IndexedDB heads, exact synthetic cloud state and cold reopen. After reopening, a new eligible return and its next Done remain meaningful. The separately recorded first phase-label failure is withdrawn as product evidence: its later paints were caused by the actual Undo action, and phase-separated source/Undo/replay assertions pass without runtime edits. The only valid preimplementation RED was the missing Quick start FAQ explanation; its behavior consumers were GREEN.
