@@ -375,6 +375,167 @@ test('begin rejects invalid and ambiguous refs without mutation and accepts full
   }
 });
 
+test('begin protects a selected tracking base when its configured remote name contains a slash', () => {
+  const fixture = mkdtempSync(join(tmpdir(), 'chain-coordination-slashed-remote-base-'));
+  try {
+    const ledgerPath = join(fixture, 'host-ledger.json');
+    const project = createProject(join(fixture, 'project'), 'work/team-upstream-base');
+    const remote = join(fixture, 'team-upstream.git');
+    git(fixture, 'init', '--bare', '--quiet', remote);
+    git(project, 'remote', 'add', 'team/upstream', remote);
+    git(project, 'branch', 'master', 'main');
+    git(project, 'push', '--quiet', 'team/upstream', 'master');
+    git(project, 'fetch', '--quiet', 'team/upstream');
+    const selectedSha = git(project, 'rev-parse', 'refs/remotes/team/upstream/master');
+
+    const foreignWorktree = join(fixture, 'foreign-owner');
+    const seededState = {
+      version: 1,
+      scope: 'codex-wide',
+      foreignLedgerMetadata: { keep: true },
+      entries: [{
+        id: 'foreign-owner', status: 'active', worktree: foreignWorktree,
+        branchName: 'feature/foreign', claims: ['foreign-claim'], resources: ['foreign-resource'],
+        unknownEntryMetadata: { keep: ['all', 'fields'] },
+      }],
+      reservations: [{ id: 'foreign-reservation', worktree: foreignWorktree, pid: process.pid, ports: [8080] }],
+      configurations: [{ id: 'foreign-configuration', worktree: foreignWorktree, slot: 4 }],
+    };
+    const originalContents = `${JSON.stringify(seededState, null, 2)}\n`;
+    writeFileSync(ledgerPath, originalContents);
+
+    git(project, 'checkout', '--quiet', 'master');
+    const protectedBase = command([
+      'begin', '--file', ledgerPath, '--work-type', 'tooling', '--intent', 'Reject direct tracking-base registration',
+      '--base-ref', 'team/upstream/master',
+    ], project);
+    assert.notEqual(protectedBase.status, 0, 'local master must stay protected when selected through a slash-named remote');
+    assert.match(protectedBase.stderr, /protected base branch master/i);
+    assert.equal(readFileSync(ledgerPath, 'utf8'), originalContents, 'rejection must preserve foreign and unknown ledger bytes');
+
+    git(project, 'checkout', '--quiet', 'work/team-upstream-base');
+    writeFileSync(join(project, 'task.md'), 'Task based on the slash-named remote tracking ref.\n');
+    git(project, 'add', 'task.md');
+    git(project, 'commit', '--quiet', '-m', 'add task change');
+    const branchSha = git(project, 'rev-parse', 'HEAD');
+    const registered = command([
+      'begin', '--file', ledgerPath, '--work-type', 'tooling', '--intent', 'Register attached task branch from tracking base',
+      '--base-ref', 'team/upstream/master',
+    ], project);
+    assert.equal(registered.status, 0, registered.stderr);
+    const entry = JSON.parse(registered.stdout);
+    assert.equal(entry.branchName, 'work/team-upstream-base');
+    assert.equal(entry.startBranchSha, branchSha);
+    assert.deepEqual(entry.selectedBase, { ref: 'refs/remotes/team/upstream/master', sha: selectedSha });
+    const state = JSON.parse(readFileSync(ledgerPath, 'utf8'));
+    assert.deepEqual(state.entries[0], seededState.entries[0], 'registering the task must retain the foreign entry');
+    assert.deepEqual(state.reservations, seededState.reservations);
+    assert.deepEqual(state.configurations, seededState.configurations);
+    assert.deepEqual(state.foreignLedgerMetadata, seededState.foreignLedgerMetadata);
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
+test('begin protects a slash-named local base through a custom slashed-remote fetch mapping', () => {
+  const fixture = mkdtempSync(join(tmpdir(), 'chain-coordination-slashed-custom-base-'));
+  try {
+    const ledgerPath = join(fixture, 'host-ledger.json');
+    const project = createProject(join(fixture, 'project'), 'work/team-upstream-custom');
+    const remote = join(fixture, 'team-upstream.git');
+    git(fixture, 'init', '--bare', '--quiet', remote);
+    git(project, 'remote', 'add', 'team/upstream', remote);
+    git(project, 'checkout', '--quiet', '-b', 'release/v1', 'main');
+    writeFileSync(join(project, 'base.md'), 'Slash-named custom base.\n');
+    git(project, 'add', 'base.md');
+    git(project, 'commit', '--quiet', '-m', 'advance release base');
+    git(project, 'push', '--quiet', 'team/upstream', 'release/v1');
+    git(project, 'config', '--replace-all', 'remote.team/upstream.fetch', '+refs/heads/release/v1:refs/remotes/team/upstream/custom-base');
+    git(project, 'fetch', '--quiet', 'team/upstream');
+    const selectedSha = git(project, 'rev-parse', 'refs/remotes/team/upstream/custom-base');
+
+    const foreignWorktree = join(fixture, 'foreign-owner');
+    const seededState = {
+      version: 1,
+      scope: 'codex-wide',
+      foreignMetadata: { untouched: true },
+      entries: [{ id: 'foreign-owner', status: 'active', worktree: foreignWorktree, retained: { owner: true } }],
+      reservations: [{ id: 'foreign-reservation', worktree: foreignWorktree, pid: process.pid, ports: [8123] }],
+      configurations: [{ id: 'foreign-configuration', worktree: foreignWorktree, slot: 5 }],
+    };
+    const originalContents = `${JSON.stringify(seededState, null, 2)}\n`;
+    writeFileSync(ledgerPath, originalContents);
+
+    const protectedBase = command([
+      'begin', '--file', ledgerPath, '--work-type', 'tooling', '--intent', 'Reject direct slash-named base registration',
+      '--base-ref', 'team/upstream/custom-base',
+    ], project);
+    assert.notEqual(protectedBase.status, 0, 'release/v1 must be protected through its configured custom tracking mapping');
+    assert.match(protectedBase.stderr, /protected base branch release\/v1/i);
+    assert.equal(readFileSync(ledgerPath, 'utf8'), originalContents, 'rejection must preserve unknown and foreign ledger bytes');
+
+    git(project, 'checkout', '--quiet', 'work/team-upstream-custom');
+    git(project, 'merge', '--quiet', '--ff-only', 'release/v1');
+    writeFileSync(join(project, 'task.md'), 'Task based on the slash-named custom tracking ref.\n');
+    git(project, 'add', 'task.md');
+    git(project, 'commit', '--quiet', '-m', 'add task change');
+    const branchSha = git(project, 'rev-parse', 'HEAD');
+    const registered = command([
+      'begin', '--file', ledgerPath, '--work-type', 'tooling', '--intent', 'Register attached slash-base task branch',
+      '--base-ref', 'team/upstream/custom-base',
+    ], project);
+    assert.equal(registered.status, 0, registered.stderr);
+    const entry = JSON.parse(registered.stdout);
+    assert.equal(entry.branchName, 'work/team-upstream-custom');
+    assert.equal(entry.startBranchSha, branchSha);
+    assert.deepEqual(entry.selectedBase, { ref: 'refs/remotes/team/upstream/custom-base', sha: selectedSha });
+    const state = JSON.parse(readFileSync(ledgerPath, 'utf8'));
+    assert.deepEqual(state.entries[0], seededState.entries[0]);
+    assert.deepEqual(state.reservations, seededState.reservations);
+    assert.deepEqual(state.configurations, seededState.configurations);
+    assert.deepEqual(state.foreignMetadata, seededState.foreignMetadata);
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
+test('begin rejects ambiguous configured mappings for a tracking base without ledger mutation', () => {
+  const fixture = mkdtempSync(join(tmpdir(), 'chain-coordination-ambiguous-base-mapping-'));
+  try {
+    const ledgerPath = join(fixture, 'host-ledger.json');
+    const project = createProject(join(fixture, 'project'), 'work/ambiguous-base-mapping');
+    const origin = addOrigin(project, fixture);
+    git(project, 'checkout', '--quiet', '-b', 'release/base', 'main');
+    git(project, 'push', '--quiet', origin, 'release/base');
+    git(project, 'checkout', '--quiet', '-b', 'alternate/base', 'main');
+    git(project, 'push', '--quiet', origin, 'alternate/base');
+    git(project, 'fetch', '--quiet', 'origin');
+    git(project, 'config', '--add', 'remote.origin.fetch', '+refs/heads/alternate/base:refs/remotes/origin/release/base');
+
+    const foreignWorktree = join(fixture, 'foreign-owner');
+    const seededState = {
+      version: 1,
+      scope: 'codex-wide',
+      unknownHeader: { preserve: true },
+      entries: [{ id: 'foreign-owner', status: 'active', worktree: foreignWorktree, extra: ['retain'] }],
+      reservations: [{ id: 'foreign-reservation', worktree: foreignWorktree, pid: process.pid }],
+      configurations: [{ id: 'foreign-configuration', worktree: foreignWorktree, slot: 6 }],
+    };
+    const originalContents = `${JSON.stringify(seededState, null, 2)}\n`;
+    writeFileSync(ledgerPath, originalContents);
+
+    const result = command([
+      'begin', '--file', ledgerPath, '--work-type', 'tooling', '--intent', 'Reject an ambiguous remote base mapping',
+      '--base-ref', 'origin/release/base',
+    ], project);
+    assert.notEqual(result.status, 0, 'an ambiguous tracking ref must not be guessed into a local protected branch');
+    assert.match(result.stderr, /ambiguous|mapping|cannot safely determine/i);
+    assert.equal(readFileSync(ledgerPath, 'utf8'), originalContents, 'ambiguous mapping rejection must not mutate foreign v1 bytes');
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
 test('begin protects main and the selected local base branch, including for origin/master', () => {
   const fixture = mkdtempSync(join(tmpdir(), 'chain-coordination-protected-base-'));
   try {

@@ -289,6 +289,92 @@ async function readMainRef(cwd) {
   throw new Error('Cannot resolve the main branch from main or origin/main.', { cause: lastError });
 }
 
+function parseRemoteFetchRefspec(value) {
+  if (value.startsWith('^')) {
+    const sourcePattern = value.slice(1);
+    if (!sourcePattern || sourcePattern.includes(':') || (sourcePattern.match(/\*/g) ?? []).length > 1) {
+      throw new Error('invalid negative fetch refspec');
+    }
+    return { negative: true, sourcePattern };
+  }
+  const refspec = value.startsWith('+') ? value.slice(1) : value;
+  const separator = refspec.indexOf(':');
+  if (separator < 0) return { negative: false, sourcePattern: refspec };
+  if (refspec.indexOf(':', separator + 1) >= 0) throw new Error('invalid fetch refspec');
+  const sourcePattern = refspec.slice(0, separator);
+  const destinationPattern = refspec.slice(separator + 1);
+  const sourceWildcards = (sourcePattern.match(/\*/g) ?? []).length;
+  const destinationWildcards = (destinationPattern.match(/\*/g) ?? []).length;
+  if (!sourcePattern || !destinationPattern || sourceWildcards > 1 || destinationWildcards > 1 || sourceWildcards !== destinationWildcards) {
+    throw new Error('invalid fetch refspec');
+  }
+  return { negative: false, sourcePattern, destinationPattern };
+}
+
+function refspecMatch(pattern, ref) {
+  const wildcard = pattern.indexOf('*');
+  if (wildcard < 0) return pattern === ref ? '' : undefined;
+  const prefix = pattern.slice(0, wildcard);
+  const suffix = pattern.slice(wildcard + 1);
+  if (!ref.startsWith(prefix) || !ref.endsWith(suffix) || ref.length < prefix.length + suffix.length) return undefined;
+  return ref.slice(prefix.length, ref.length - suffix.length);
+}
+
+async function localBranchForTrackingRef(cwd, ref, selector) {
+  let output = '';
+  try {
+    output = await runGit(['config', '--null', '--get-regexp', '^remote\\..*\\.fetch$'], cwd);
+  } catch (error) {
+    if (error?.code !== 1) {
+      throw new Error(`Cannot safely determine the local branch for remote-tracking --base-ref ${JSON.stringify(selector)}.`, { cause: error });
+    }
+  }
+
+  const remoteFetchSpecs = new Map();
+  for (const setting of output.split('\0').filter(Boolean)) {
+    const separator = setting.indexOf('\n');
+    if (separator < 0) throw new Error(`Cannot safely determine the local branch for remote-tracking --base-ref ${JSON.stringify(selector)}.`);
+    const key = setting.slice(0, separator);
+    const remote = key.match(/^remote\.(.*)\.fetch$/i)?.[1];
+    if (!remote) throw new Error(`Cannot safely determine the local branch for remote-tracking --base-ref ${JSON.stringify(selector)}.`);
+    const specs = remoteFetchSpecs.get(remote) ?? [];
+    specs.push(setting.slice(separator + 1));
+    remoteFetchSpecs.set(remote, specs);
+  }
+
+  const mappings = [];
+  for (const specs of remoteFetchSpecs.values()) {
+    const parsed = specs.map(parseRemoteFetchRefspec);
+    const exclusions = parsed.filter((spec) => spec.negative);
+    for (const spec of parsed) {
+      if (spec.negative || !spec.destinationPattern) continue;
+      const capture = refspecMatch(spec.destinationPattern, ref);
+      if (capture === undefined) continue;
+      const sourceRef = spec.sourcePattern.includes('*')
+        ? spec.sourcePattern.replace('*', capture)
+        : spec.sourcePattern;
+      if (exclusions.some((exclusion) => refspecMatch(exclusion.sourcePattern, sourceRef) !== undefined)) continue;
+      mappings.push(sourceRef);
+    }
+  }
+
+  if (mappings.length !== 1) {
+    const reason = mappings.length > 1 ? 'ambiguous configured fetch mappings' : 'no configured fetch mapping to a local branch';
+    throw new Error(`Cannot safely determine the local branch for remote-tracking --base-ref ${JSON.stringify(selector)}: ${reason}.`);
+  }
+  const branchPrefix = 'refs/heads/';
+  if (!mappings[0].startsWith(branchPrefix)) {
+    throw new Error(`Cannot safely determine the local branch for remote-tracking --base-ref ${JSON.stringify(selector)}: its fetch mapping does not name a local branch.`);
+  }
+  const localBranchName = mappings[0].slice(branchPrefix.length);
+  try {
+    await runGit(['check-ref-format', mappings[0]], cwd);
+  } catch (error) {
+    throw new Error(`Cannot safely determine the local branch for remote-tracking --base-ref ${JSON.stringify(selector)}: its fetch mapping names an invalid branch.`, { cause: error });
+  }
+  return localBranchName;
+}
+
 async function readSelectedBaseRef(cwd, selector) {
   if (selector.trim() !== selector || !selector || selector.startsWith('-') || selector === 'HEAD') {
     throw new Error('--base-ref must name an existing local or remote-tracking branch ref.');
@@ -321,14 +407,7 @@ async function readSelectedBaseRef(cwd, selector) {
   if (available.get(ref)) throw new Error(`Cannot use symbolic --base-ref ${JSON.stringify(selector)}; select an actual branch ref.`);
   let localBranchName;
   if (ref.startsWith('refs/heads/')) localBranchName = ref.slice('refs/heads/'.length);
-  else {
-    const remoteBranch = ref.slice('refs/remotes/'.length);
-    const separator = remoteBranch.indexOf('/');
-    if (separator < 1 || separator === remoteBranch.length - 1) {
-      throw new Error(`Cannot use --base-ref ${JSON.stringify(selector)}; expected a remote/branch tracking ref.`);
-    }
-    localBranchName = remoteBranch.slice(separator + 1);
-  }
+  else localBranchName = await localBranchForTrackingRef(cwd, ref, selector);
   const sha = await runGit(['rev-parse', '--verify', `${ref}^{commit}`], cwd);
   return { ref, sha, localBranchName };
 }
