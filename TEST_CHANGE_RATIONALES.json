@@ -12019,5 +12019,99 @@
     },
     "greenEvidence": "Recorded recovery cohort04c1b808 passed55/55; final copy/preview-wrap cohort318d78fe passed56/56 including unchanged Quick start brevity. Further exact candidate focused/preflight checks are recorded in task evidence. Root owns metadata refresh, final full/rules/compatibility/reviews/runtime/CI/deployment; no user-private incident or production recovery claim follows from these fixtures. Supersession cohort67f667fd passed4/4 including the actual partial IDB abort, held ordinary resume and new deliberate retry. Final repair source cohort048f5ef6 includes all recovery and brevity controls. Final source-focused cohort1f98fdb7 passed179/179 across recovery, actual historical consumers,185 Auth,186 concurrency, current choices, existing decision guards, cloud backups and RISK inventory, with zero skips; preflight21f221e4 passed existing copy/brevity and exact52d rationale gate. The634 exact diff gate and git diff --check also passed.",
     "testChangesSha256": "ca2dcebac6e9e0fb8a2e94f774d72f7ab48ab7e5f3af443357fa9d43736c4ae4"
+  },
+  {
+    "testChangesSha256": "be62040650313267bda34ab90d272da299537429a9c95b8b0264ce00d76d1ae6",
+    "reason": "Keep supported timed Can’t and Worked decisions coherent when their saved hold has expired, while preserving their immutable decision history and the existing fail-closed guards for premature, corrupt, and unrelated evidence.",
+    "previousBehavior": "After a native Can’t expiry cleared its live marker, the saved board still contained the supported decision event. An ordinary cloud pull replayed that event, found a mismatch, and rejected the exact-deadline source as unprojectable, preventing acknowledgement and durable convergence.",
+    "intendedBehavior": "After cloudPull finishes its asynchronous reads and hydration, compare source and event projection at one effective instant. Normalize only matching supported expired hold pairs on copies using each board’s own settings and the existing exact deadline rules; keep native expiry, original facts, learning, History, and unrelated guards unchanged.",
+    "replacementTests": [
+      "RISK timed-hold coherence: native Can’t expires at the exact deadline through IndexedDB and ordinary cloud pull",
+      "RISK timed-hold coherence: native Worked honors hours and local 2 AM ceilings across reopen and cloud pull",
+      "RISK timed-hold coherence: use each board’s Worked settings and keep orphan evidence fail-closed",
+      "RISK timed-hold coherence: extended FAQ and current Settings changelog explain retained expiry time"
+    ],
+    "preservedCoverage": [
+      "The original native Can’t and Worked event envelopes and their original action times remain immutable through focus expiry, device persistence, cloud acknowledgement, and reopen.",
+      "Can’t is tested one millisecond before and exactly at its deadline; the exact-after eligibility result and a separate newer active Can’t remain distinct.",
+      "Worked uses its configured hour deadline and the local 2 AM ceiling, including a hold that remains active before a future deadline.",
+      "Each saved board is evaluated with its own Worked setting; a peer-cleared source may be adopted only after its own shorter deadline has passed.",
+      "A prematurely cleared active Worked mark and an orphan Can’t timestamp remain fail-closed, with the exact local device head and cloud source retained.",
+      "Real scanner pool membership, Ratings, rating history, History workLog, opaque settings and board fields, durable IndexedDB heads, and exact acknowledged cloud payloads are asserted.",
+      "Existing current-choice, Can’t/Return, causal projection, unknown decision authority, CAS, storage, account, and recovery protections remain unchanged."
+    ],
+    "redEvidence": {
+      "command": "Raw preimplementation run on clean HEAD 52d4b2537bacbb60240ae7a53061224350ebd36f: TZ=America/New_York /Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node --test --test-name-pattern=\"RISK timed-hold coherence: native Can’t expires at the exact deadline\" tests.js. Exact captured command IDs: exec-c68c4c95-3132-4e1d-b140-ee2a87f74be3 and exec-dbb9d1ab-d476-4f07-a95e-ff9dc504f9c1; raw result is in /Users/emeraldpham/Documents/Codex/2026-10-17/task/chain-timed-hold-first-red-verification.json.",
+      "failure": "Before any functional source edit, the direct exact-deadline assertion saw CloudSync.errorCode = unprojectable-decision-evidence where undefined was expected; the first broader run later showed the ordinary pull could not durably acknowledge publication. The captured artifact identifies a clean source HEAD and full failing output. It explicitly labels its tests.js SHA-256 as a later post-RED snapshot, so no post-edit whole-file hash is claimed as a pre-edit test identity."
+    },
+    "coverageChronology": {
+      "preimplementation": "Only the native Can’t exact-deadline ordinary-cloud-pull case has contemporaneous functional RED evidence, observed on unchanged 52d before runtime edits. The original test filename/title and raw command IDs are preserved in the coordinator artifact.",
+      "postimplementation": "Worked hour/2 AM, board-owned settings, after-await straddling, active-before-deadline, peer premature-clear, orphan-map, post-expiry eligibility, and FAQ controls were added or completed after the functional repair. They are reported as current GREEN controls, not retroactive preimplementation REDs."
+    },
+    "greenEvidence": "The complete 9-assertion timed-hold cohort passed through record-run with evidence /Users/emeraldpham/.codex/task-artifacts/cant-expiry-coherence/implementation/test-runs/2026-10-18T12-44-27-895Z-d3f39e89-8679-426f-87e9-46efb9a2c64c.json. Selected existing current-choice, current-choice projection, and unsupported authority controls passed 27 assertions in record-run evidence /Users/emeraldpham/.codex/task-artifacts/cant-expiry-coherence/implementation/test-runs/2026-10-18T12-44-46-648Z-48a9cc7a-4483-40ec-9ca8-6cfa669fed0d.json. The exact named RISK inventory gate passed at /Users/emeraldpham/.codex/task-artifacts/cant-expiry-coherence/implementation/test-runs/2026-10-18T12-46-22-575Z-1f3f8de3-aaae-4765-9f47-2d292a482b1f.json. The existing pending-write reconciliation preservation test passed through record-run at /Users/emeraldpham/.codex/task-artifacts/cant-expiry-coherence/implementation/test-runs/2026-10-18T12-47-07-993Z-c1703cc3-ca69-442e-a3e6-bec3b5874e4d.json."
+  },
+  {
+    "reason": "Record the exact combined test diff after ancestry-preserving integration of issue194 with the already committed185/186/188 repairs. No functional test or runtime behavior is newly authored by this merger; all original scoped regression assertions and their actual chronology remain intact.",
+    "previousBehavior": "Released52d rejects a supported expired native timed hold as unprojectable. Earlier scoped changes separately exposed early Auth hydration warnings, superseded device commit warnings and unsafe publication of a prepared appearance choice before exact acknowledgement.",
+    "intendedBehavior": "Retain each independently implemented behavior: compare matching supported timed holds at one shared post-await instant, keep current Auth/storage controls and protect appearance consent until exact publication acknowledgement. Preserve all original evidence, saved data and separate unsupported-source guards.",
+    "replacementTests": [
+      "RISK timed-hold coherence: native Can’t expires at the exact deadline through IndexedDB and ordinary cloud pull",
+      "RISK timed-hold coherence: native Worked honors hours and local 2 AM ceilings across reopen and cloud pull",
+      "RISK timed-hold coherence: use each board’s Worked settings and keep orphan evidence fail-closed",
+      "RISK timed-hold coherence: extended FAQ and current Settings changelog explain retained expiry time"
+    ],
+    "preservedCoverage": [
+      "All477 premerge rationale objects and bytes through the last original object are retained verbatim; the exact incoming194 record is appended. Every historical component record and actual RED chronology remains separately inspectable.",
+      "Automatic tests.js integration retains existing185/186/188 assertions and the complete additive194 native Can’t/Worked exact-deadline, board-owned duration, post-await, orphan, premature-clear, eligibility and FAQ controls. Merger changes no test body or assertion.",
+      "194 runtime comparison changes merge automatically with earlier components; only append-only changelog/rationale conflicts and preexisting app/SW fingerprint selection are manually resolved. No new behavior conflict, protocol, import/Restore or foreign-source scope is added.",
+      "The existing477-record source includes original185/186/188 RED and later repair records.194 preimplementation native exact-deadline RED is independently preserved; its expanded Worked/settings/orphan controls remain explicitly postimplementation GREEN coverage.",
+      "Combined app/SW metadata is intentionally stale after integration. Final190 source-freeze packaging, independent affected review and full/runtime/compatibility/release validation remain root-owned; no coherent packaged release or new RED claim is made."
+    ],
+    "redEvidence": {
+      "command": "Raw preimplementation run on clean HEAD 52d4b2537bacbb60240ae7a53061224350ebd36f: TZ=America/New_York /Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node --test --test-name-pattern=\"RISK timed-hold coherence: native Can’t expires at the exact deadline\" tests.js. Exact captured command IDs: exec-c68c4c95-3132-4e1d-b140-ee2a87f74be3 and exec-dbb9d1ab-d476-4f07-a95e-ff9dc504f9c1; raw result is in /Users/emeraldpham/Documents/Codex/2026-10-17/task/chain-timed-hold-first-red-verification.json.",
+      "failure": "This aggregate is merge provenance, not a newly observed preimplementation RED. The original194 raw exec-c68c4c95/exec-dbb9d1ab on unchanged52d failed the exact-deadline assertion with unprojectable-decision-evidence before runtime repair; the source record explicitly limits its later test-file hash and postimplementation controls. Original185 RED0f05eac7 and186 REDc339384e,188 first14c05476 and repair REDs remain in their unchanged component records. No prior test is relabeled as a new merger RED."
+    },
+    "mergeProvenance": {
+      "combinedBefore": "729266cc4d25d1410299fc3e13b24d9152602427",
+      "incomingComponent": "3bb7f93fcb865989c58a8ba2e6a4c95251f68d50",
+      "mergeArtifact": "/Users/emeraldpham/.codex/task-artifacts/storage-races-184/integration/194-merge-start.json",
+      "resolutionArtifact": "/Users/emeraldpham/.codex/task-artifacts/storage-races-184/integration/194-conflict-resolutions.json",
+      "authorship": "No new test/runtime behavior at merge; exact aggregate fingerprints bind retained source. Precommit command-only gate records inspect old committed HEAD and do not validate the pending merge; final committed gates must run."
+    },
+    "comparison": "issue194AncestryPreservingCombinedMergeAgainst52d4b25",
+    "baseCommit": "52d4b2537bacbb60240ae7a53061224350ebd36f",
+    "testChangesSha256": "1659ba8abd46fac173b15fedb0365334658429a5a79b76bae0138cb0552ad29d"
+  },
+  {
+    "reason": "Record the exact combined test diff after ancestry-preserving integration of issue194 with the already committed185/186/188 repairs. No functional test or runtime behavior is newly authored by this merger; all original scoped regression assertions and their actual chronology remain intact.",
+    "previousBehavior": "Released52d rejects a supported expired native timed hold as unprojectable. Earlier scoped changes separately exposed early Auth hydration warnings, superseded device commit warnings and unsafe publication of a prepared appearance choice before exact acknowledgement.",
+    "intendedBehavior": "Retain each independently implemented behavior: compare matching supported timed holds at one shared post-await instant, keep current Auth/storage controls and protect appearance consent until exact publication acknowledgement. Preserve all original evidence, saved data and separate unsupported-source guards.",
+    "replacementTests": [
+      "RISK timed-hold coherence: native Can’t expires at the exact deadline through IndexedDB and ordinary cloud pull",
+      "RISK timed-hold coherence: native Worked honors hours and local 2 AM ceilings across reopen and cloud pull",
+      "RISK timed-hold coherence: use each board’s Worked settings and keep orphan evidence fail-closed",
+      "RISK timed-hold coherence: extended FAQ and current Settings changelog explain retained expiry time"
+    ],
+    "preservedCoverage": [
+      "All477 premerge rationale objects and bytes through the last original object are retained verbatim; the exact incoming194 record is appended. Every historical component record and actual RED chronology remains separately inspectable.",
+      "Automatic tests.js integration retains existing185/186/188 assertions and the complete additive194 native Can’t/Worked exact-deadline, board-owned duration, post-await, orphan, premature-clear, eligibility and FAQ controls. Merger changes no test body or assertion.",
+      "194 runtime comparison changes merge automatically with earlier components; only append-only changelog/rationale conflicts and preexisting app/SW fingerprint selection are manually resolved. No new behavior conflict, protocol, import/Restore or foreign-source scope is added.",
+      "The existing477-record source includes original185/186/188 RED and later repair records.194 preimplementation native exact-deadline RED is independently preserved; its expanded Worked/settings/orphan controls remain explicitly postimplementation GREEN coverage.",
+      "Combined app/SW metadata is intentionally stale after integration. Final190 source-freeze packaging, independent affected review and full/runtime/compatibility/release validation remain root-owned; no coherent packaged release or new RED claim is made."
+    ],
+    "redEvidence": {
+      "command": "Raw preimplementation run on clean HEAD 52d4b2537bacbb60240ae7a53061224350ebd36f: TZ=America/New_York /Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node --test --test-name-pattern=\"RISK timed-hold coherence: native Can’t expires at the exact deadline\" tests.js. Exact captured command IDs: exec-c68c4c95-3132-4e1d-b140-ee2a87f74be3 and exec-dbb9d1ab-d476-4f07-a95e-ff9dc504f9c1; raw result is in /Users/emeraldpham/Documents/Codex/2026-10-17/task/chain-timed-hold-first-red-verification.json.",
+      "failure": "This aggregate is merge provenance, not a newly observed preimplementation RED. The original194 raw exec-c68c4c95/exec-dbb9d1ab on unchanged52d failed the exact-deadline assertion with unprojectable-decision-evidence before runtime repair; the source record explicitly limits its later test-file hash and postimplementation controls. Original185 RED0f05eac7 and186 REDc339384e,188 first14c05476 and repair REDs remain in their unchanged component records. No prior test is relabeled as a new merger RED."
+    },
+    "mergeProvenance": {
+      "combinedBefore": "729266cc4d25d1410299fc3e13b24d9152602427",
+      "incomingComponent": "3bb7f93fcb865989c58a8ba2e6a4c95251f68d50",
+      "mergeArtifact": "/Users/emeraldpham/.codex/task-artifacts/storage-races-184/integration/194-merge-start.json",
+      "resolutionArtifact": "/Users/emeraldpham/.codex/task-artifacts/storage-races-184/integration/194-conflict-resolutions.json",
+      "authorship": "No new test/runtime behavior at merge; exact aggregate fingerprints bind retained source. Precommit command-only gate records inspect old committed HEAD and do not validate the pending merge; final committed gates must run."
+    },
+    "comparison": "issue194AncestryPreservingCombinedMergeAgainst729266c",
+    "baseCommit": "729266cc4d25d1410299fc3e13b24d9152602427",
+    "testChangesSha256": "d3f2c04004de62bdaea521b6a056d07dbe8b01a8398a047faea00038cc30b401"
   }
 ]
