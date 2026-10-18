@@ -14002,10 +14002,16 @@ test('RISK comparison replay: deleting an opponent keeps its frozen rating avail
   const h=makeSyncHarness({remote,rev:12,delayMs:1}),indexedDB=backend==='IndexedDB'?new IDBFactory():null;
   const names={phone:'decision-ghost-phone-'+Date.now()+'-'+Math.random(),mac:'decision-ghost-mac-'+Date.now()+'-'+Math.random()};
   const seedStorage={[SYNC_STORE_KEY]:JSON.stringify(initial),[LOCAL_HEAD_KEY]:JSON.stringify(initial)};
-  const options=device=>indexedDB?{seedStorage,indexedDBProvider:indexedDB,deviceDbName:names[device]}:{seedStorage};
-  const factory=()=>h.factory(),phone=await loadAppAtTime(at,{...options('phone'),cloudSyncFactory:factory}),mac=await loadAppAtTime(at,{...options('mac'),cloudSyncFactory:factory});
+  const startup=Object.fromEntries(['phone','mac'].map(device=>[device,{entered:deferredSyncFixture(),release:deferredSyncFixture(),calls:[]}]));
+  for(const control of Object.values(startup))t.after(control.release.resolve);
+  const options=device=>({...indexedDB?{seedStorage,indexedDBProvider:indexedDB,deviceDbName:names[device]}:{seedStorage},beforeStateReady:ctx=>{startup[device].calls=observeSyncFixtureCalls(ctx,'cloudPull');}});
+  const factory=device=>{const CS=h.factory();if(device!=='phone'&&device!=='mac')return CS;const pull=CS.pull.bind(CS);let first=true;CS.pull=async(...args)=>{if(first){first=false;startup[device].entered.resolve();await startup[device].release.promise;}return pull(...args);};return CS;};
+  const phone=await loadAppAtTime(at,{...options('phone'),cloudSyncFactory:()=>factory('phone')}),mac=await loadAppAtTime(at,{...options('mac'),cloudSyncFactory:()=>factory('mac')});
   const close=async app=>{app.ctx.suspendCloudSync();vm.runInContext('clearTimeout(saveTimer);clearTimeout(cloudTimer);clearCloudRetry();',app.ctx);try{await app.ctx.window.ScannerDeviceStore?.close?.();}catch{}};
   try{
+   const startupJobs=[phone.ctx.cloudPull(),mac.ctx.cloudPull()];
+   for(const [device,app] of [['phone',phone],['mac',mac]]){await startup[device].entered.promise;assert.ok(app.ctx.state,'state readiness alone can precede the real startup read');assert.equal(vm.runInContext('pulling',app.ctx),true);assert.equal(vm.runInContext('reconciledAs',app.ctx),null,'the held initial response has not established read authority');assert.ok(startup[device].calls.some(call=>!call.settled),'the actual initial read consumer is still pending');}
+   const initialConsumers=Object.values(startup).flatMap(control=>control.calls.filter(call=>!call.settled));for(const control of Object.values(startup))control.release.resolve();await Promise.all(initialConsumers.map(call=>call.promise));await Promise.all(startupJobs);
    await phone.ctx.cloudPull();await mac.ctx.cloudPull();assert.equal(await phone.ctx.persist(),true,'the startup phone head is device-acknowledged before the real action');assert.equal(await mac.ctx.persist(),true,'the startup Mac head is device-acknowledged before the real action');
    for(const app of [phone,mac])assert.equal(vm.runInContext('reconciledAs',app.ctx),'e@example.com','the initial authoritative read completed before either producer acts');
    setFakeTime(phone.ctx,Date.parse('2026-10-17T16:01:00Z'));phone.ctx.state.candidateId='choice';phone.ctx.renderScan();
@@ -32515,7 +32521,7 @@ test('RISK completion lifecycle fixtures: released Start informed Start and loca
 });
 
 
-test('RISK completion delivery fixtures: controlled pending and acknowledged boundaries execute all five consumers',()=>{
+test('RISK completion delivery fixtures: controlled startup pending and acknowledged boundaries execute all five consumers',()=>{
  const pattern='^RISK comparison replay: deleting an opponent|^RISK completion boundaries: failed read stays pending|^RISK completion boundaries: a pending account-A|^RISK completion boundaries: a live editor and pressed|^RISK live scan sync: evergreen Done Undo propagates';
  const env={...process.env,TZ:'UTC'};delete env.NODE_TEST_CONTEXT;
  const child=spawnSync(process.execPath,['--test','--test-name-pattern='+pattern,'tests.js'],{cwd:__dirname,env,encoding:'utf8',timeout:30000}),output=child.stdout+child.stderr;
