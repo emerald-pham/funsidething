@@ -1,11 +1,11 @@
 # Ticket 190 external archive format contract
 
-Status: proposed for the approved #190 implementation; current-board and archive remain separate products.
+Status: agreed for #190; current-board and archive remain separate products.
 
 ## Files
 
 - `chain-scanner-current-board.json` is the ordinary compatible board JSON produced by the existing `currentBoardExportPayload()` boundary. It contains the accepted board currently open in the tab, including accepted unsaved edits, and is the only export intended for the ordinary guarded board-import consumer.
-- `chain-scanner-recovery-archive.json` is a separate versioned preservation package. Its embedded `currentBoard` member is the same ordinary board object for reference; the archive itself is not an import file and has no automatic decoder, restore action, queue replay, or cloud publication path.
+- `chain-scanner-recovery-archive.json` is a separate versioned preservation package. Its embedded `currentBoard` member is the same ordinary board object for reference; the archive itself is not an ordinary board-import file. A future explicit guarded operation may use only this supported `currentBoard` member. It must never restore raw app sources, authority markers, pending operations or opaque archives, and it must never replay or publish them.
 
 ## Version 1 envelope
 
@@ -23,7 +23,8 @@ Status: proposed for the approved #190 implementation; current-board and archive
       "localStorage": {
         "fvp:chain-scanner:v1": { "status": "included" },
         "fvp:chain-scanner:protected:v1": { "status": "absent" },
-        "fvp:chain-scanner:daily-backups:v1": { "status": "included" }
+        "fvp:chain-scanner:daily-backups:v1": { "status": "included" },
+        "fvp:chain-scanner:device-store-v2": { "status": "included" }
       },
       "indexedDB": {
         "database": "chain-scanner-v2",
@@ -42,7 +43,8 @@ Status: proposed for the approved #190 implementation; current-board and archive
     "localStorage": [
       { "key": "fvp:chain-scanner:v1", "status": "present", "raw": "exact stored string" },
       { "key": "fvp:chain-scanner:protected:v1", "status": "absent" },
-      { "key": "fvp:chain-scanner:daily-backups:v1", "status": "present", "raw": "exact stored string" }
+      { "key": "fvp:chain-scanner:daily-backups:v1", "status": "present", "raw": "exact stored string" },
+      { "key": "fvp:chain-scanner:device-store-v2", "status": "present", "raw": "1" }
     ],
     "indexedDB": {
       "database": "chain-scanner-v2",
@@ -57,7 +59,7 @@ Status: proposed for the approved #190 implementation; current-board and archive
 }
 ```
 
-The example row counts and values are illustrative. Production output uses captured counts and values. Every allowlisted local key is listed whether present or absent. Present localStorage values are copied as exact strings without parsing or normalizing them. The app's device-authority marker is excluded because the captured board, protected-head and backup sources are sufficient to interpret the included source set.
+The example row counts and values are illustrative. Production output uses captured counts and values. Every allowlisted local key is listed whether present or absent. Present localStorage values are copied as exact strings without parsing or normalizing them. The device-authority marker is included as app-owned source evidence because it distinguishes authoritative IndexedDB from retained legacy bytes; archive capture or decoding never applies it to the active account or changes authority.
 
 ## Raw IndexedDB value encoding
 
@@ -72,7 +74,7 @@ Cycles, repeated references whose identity would be lost, or any other unsupport
 - A complete archive is emitted only after successful hydration of the accepted live board and a successful read of every existing app-owned source.
 - Capture never opens or creates IndexedDB. If the app has no already-open `chain-scanner-v2` handle, the archive action stops with an unavailable-source explanation.
 - The four IndexedDB stores are read together by the existing raw snapshot port. The archive does not call SDK auth/session APIs, enumerate storage, or inspect unrelated browser keys.
-- The fixed localStorage allowlist is the three keys shown above: board mirror, protected head and local backup index. Values are read before and after the asynchronous IndexedDB snapshot; the accepted current-board payload is also rechecked. Any change, read exception, request error, transaction error or abort stops capture with a source-specific retry message and emits no misleading file.
+- The fixed localStorage allowlist is the four keys shown above: board mirror, protected head, local backup index and device-authority marker. Values are read before and after the asynchronous IndexedDB snapshot; the accepted current-board payload is also rechecked. Any change, read exception, request error, transaction error or abort stops capture with a source-specific retry message and emits no misleading file.
 - An absent allowlisted localStorage key is an explicit manifest status, not a read failure. A corrupt but readable string or unknown app-owned IDB row remains included exactly as raw data.
 - A successful file has `manifest.status = "complete"`, exact per-source statuses/counts, and an empty `failures` list. Failed captures stop rather than writing an incomplete file without enough data to represent safely.
 - Neither file creation nor view/copy fallback writes, deletes, resets, persists, reconciles, changes device/cloud authority, signs in, or enqueues any operation.
