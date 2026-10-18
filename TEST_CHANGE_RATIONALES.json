@@ -1,5 +1,71 @@
 [
   {
+    "testChangesSha256": "ff966442bba5910742b21664b9d43ee2ebb4be5e28910273eb83e4bbbcba20a6",
+    "reason": "Implement admitted spec187/ticket188 at the actual native app recovery, real device persistence and real revision-conditional cloud adapter seams. Add coverage only; retain every existing test and assertion, including integrated185/186 regressions.",
+    "previousBehavior": "The real mixed-release original and minimized sources reached reconcile:unprojectable-decision-evidence. The visible sync dialog offered no actionable review. Same-value native theme selection made no fresh fact and ordinary backup Restore remained held.",
+    "intendedBehavior": "For a supported appearance-only disagreement, require deliberate unselected review and a fresh existing-protocol choice. Verify exact sources and pending metadata in durable backups, invalidate stale consent, hold failed or uncertain publication through cold reopen, and retire only the exact confirmed selection. Unknown, corrupt, foreign and nonappearance authority remains held.",
+    "replacementTests": [
+      "RISK held decision recovery: deliberate keep saved dark preserves exact sources and publishes a fresh choice",
+      "RISK held decision recovery: unreadable browser evidence and failed verified copies stop before changing the board",
+      "RISK held decision recovery: recorded light minimized empty-cloud and cloud-held sources require deliberate choices",
+      "RISK held decision recovery: native peer edits independent comparisons ratings and History survive the appearance choice",
+      "RISK held decision recovery: changed preview account local cloud and pending sources invalidate consent",
+      "RISK held decision recovery: a real conditional publication conflict preserves the peer and requires a fresh choice",
+      "RISK held decision recovery: unavailable reads local commit abort and failed uploads remain honest and retryable",
+      "RISK held decision recovery: unknown authority nonappearance incoherence and corrupt cloud stay held with safe diagnostics",
+      "RISK held decision recovery: cold reopen protects a pending choice from ordinary sync deletion and rotation",
+      "RISK held decision recovery: help and visible recovery explain deliberate appearance choices and protected limits",
+      "RISK held decision recovery: closing review during backup I O cancels consent before application",
+      "RISK held decision recovery: browser fallback verifies source backups and records an exact cloud acknowledgement",
+      "RISK held decision recovery: diagnostics identify only app origin fingerprint and safe source category",
+      "RISK held decision recovery: evidence and pending-choice archives cannot be restored as empty boards"
+    ],
+    "preservedCoverage": [
+      "All existing tests are byte-exact versus the integrated185/186 base. Native scanner decisions, Undo, comparison learning, account separation, storage/CAS safety and original backup Restore contracts remain protected.",
+      "New consumers use actual onAction, hydration, persistence, native editor/No actions, real IndexedDB with database-bound abort/read faults, the actual cloud adapter and conditional publication. No product error verdict is mocked. Browser fallback loads the real codec as production does.",
+      "Independent comparison IDs, rating/history rows, opaque board/task fields, original baseline/events, manual copies, exact device/cloud source bytes and actual account-bound pending generation metadata are asserted separately from the chosen appearance.",
+      "Local/cloud/account/pending races invalidate consent before apply. The real CAS race is injected after final read; settled reconnect and cold reopen preserve the durable pending-choice hold. Settings deletion/rotation and Restore of evidence-only archives cannot remove or misapply that hold; another account is not blanket blocked.",
+      "Chromium/WebKit, final rendered controls/fonts, full suite, rules, compatibility, exact-candidate review, CI and deployment remain release-owner gates. Isolated fixture GREEN does not identify or prove recovery of the actual user cached case."
+    ],
+    "redEvidence": {
+      "command": "TZ=UTC node scripts/agent-tools/record-run.mjs --repo \"$PWD\" --evidence-dir \"$TASK_EVIDENCE_DIR/test-runs\" --purpose preimplementation-red -- node --test --test-name-pattern=\"RISK held decision recovery:\" tests.js",
+      "failure": "Actual fresh preimplementation14c05476 (11:26:01Z, base945f1f2) fails the visible sync-dialog review assertion after real original-source reconcile error, before any app edit. Follow-up contemporaneous REDs: cf095970 source/readback safeguards;562a3b32 minimized accountless source;f68dd4a2 account consent;4fd9085a settled reconnect auto-publication;10bbc7da actual peer-preview/FAQ;4fa94f8c close during backup; e793f1a5 unknown appearance authority extension;6ee2e3a9 minimal origin/source diagnostic; c461ded7 evidence-only archive Restore. Earlier green-labeled attempts that failed stay preserved as such; no later comparison is called the first RED. Initial copied fault object made two network fault probes inert; correctedf68dd4a2 preserves their actual passing controls before account repair. Fallback d8431689/971ecb3d were missing-codec/test-reader fixture defects, repaired by loading the unchanged production codec and reading the selected persistence backend; not claimed as product RED. Final35 focused consumers pass b1a68037; integrated broader91-case pass a2edd111 precedes the final narrow origin/unknown/archive refinements. Original source-only REDs remain immutable; these records establish the new tracked consumer chronology. Final integrated cohort eea838b6 (11:46:30Z) passes124/124, zero skips, including185 hydration,186 overlaps, existing rejected-decision recovery controls and all35 new consumer cases. Root final-preflight d50cb327 (11:48:29Z) then found the new recovery FAQ answer exceeded the protected130-word limit. Split into three related concise questions without weakening any assertion or removing guidance; stale app/SW fingerprint RED47ed66b6 remains a separate packaging gate."
+    }
+  },
+  {
+    "testChangesSha256": "72a161e3a0bc139468da0e947dc74da2a87f61331d886da207aab543284cdef1",
+    "reason": "Implement admitted spec187/ticket188 at the actual native app recovery, real device persistence and real revision-conditional cloud adapter seams. Add coverage only; retain every existing test and assertion, including integrated185/186 regressions.",
+    "previousBehavior": "The real mixed-release original and minimized sources reached reconcile:unprojectable-decision-evidence. The visible sync dialog offered no actionable review. Same-value native theme selection made no fresh fact and ordinary backup Restore remained held.",
+    "intendedBehavior": "For a supported appearance-only disagreement, require deliberate unselected review and a fresh existing-protocol choice. Verify exact sources and pending metadata in durable backups, invalidate stale consent, hold failed or uncertain publication through cold reopen, and retire only the exact confirmed selection. Unknown, corrupt, foreign and nonappearance authority remains held.",
+    "replacementTests": [
+      "RISK held decision recovery: deliberate keep saved dark preserves exact sources and publishes a fresh choice",
+      "RISK held decision recovery: unreadable browser evidence and failed verified copies stop before changing the board",
+      "RISK held decision recovery: recorded light minimized empty-cloud and cloud-held sources require deliberate choices",
+      "RISK held decision recovery: native peer edits independent comparisons ratings and History survive the appearance choice",
+      "RISK held decision recovery: changed preview account local cloud and pending sources invalidate consent",
+      "RISK held decision recovery: a real conditional publication conflict preserves the peer and requires a fresh choice",
+      "RISK held decision recovery: unavailable reads local commit abort and failed uploads remain honest and retryable",
+      "RISK held decision recovery: unknown authority nonappearance incoherence and corrupt cloud stay held with safe diagnostics",
+      "RISK held decision recovery: cold reopen protects a pending choice from ordinary sync deletion and rotation",
+      "RISK held decision recovery: help and visible recovery explain deliberate appearance choices and protected limits",
+      "RISK held decision recovery: closing review during backup I O cancels consent before application",
+      "RISK held decision recovery: browser fallback verifies source backups and records an exact cloud acknowledgement",
+      "RISK held decision recovery: diagnostics identify only app origin fingerprint and safe source category",
+      "RISK held decision recovery: evidence and pending-choice archives cannot be restored as empty boards"
+    ],
+    "preservedCoverage": [
+      "All existing tests are byte-exact versus the integrated185/186 base. Native scanner decisions, Undo, comparison learning, account separation, storage/CAS safety and original backup Restore contracts remain protected.",
+      "New consumers use actual onAction, hydration, persistence, native editor/No actions, real IndexedDB with database-bound abort/read faults, the actual cloud adapter and conditional publication. No product error verdict is mocked. Browser fallback loads the real codec as production does.",
+      "Independent comparison IDs, rating/history rows, opaque board/task fields, original baseline/events, manual copies, exact device/cloud source bytes and actual account-bound pending generation metadata are asserted separately from the chosen appearance.",
+      "Local/cloud/account/pending races invalidate consent before apply. The real CAS race is injected after final read; settled reconnect and cold reopen preserve the durable pending-choice hold. Settings deletion/rotation and Restore of evidence-only archives cannot remove or misapply that hold; another account is not blanket blocked.",
+      "Chromium/WebKit, final rendered controls/fonts, full suite, rules, compatibility, exact-candidate review, CI and deployment remain release-owner gates. Isolated fixture GREEN does not identify or prove recovery of the actual user cached case."
+    ],
+    "redEvidence": {
+      "command": "TZ=UTC node scripts/agent-tools/record-run.mjs --repo \"$PWD\" --evidence-dir \"$TASK_EVIDENCE_DIR/test-runs\" --purpose preimplementation-red -- node --test --test-name-pattern=\"RISK held decision recovery:\" tests.js",
+      "failure": "Actual fresh preimplementation14c05476 (11:26:01Z, base945f1f2) fails the visible sync-dialog review assertion after real original-source reconcile error, before any app edit. Follow-up contemporaneous REDs: cf095970 source/readback safeguards;562a3b32 minimized accountless source;f68dd4a2 account consent;4fd9085a settled reconnect auto-publication;10bbc7da actual peer-preview/FAQ;4fa94f8c close during backup; e793f1a5 unknown appearance authority extension;6ee2e3a9 minimal origin/source diagnostic; c461ded7 evidence-only archive Restore. Earlier green-labeled attempts that failed stay preserved as such; no later comparison is called the first RED. Initial copied fault object made two network fault probes inert; correctedf68dd4a2 preserves their actual passing controls before account repair. Fallback d8431689/971ecb3d were missing-codec/test-reader fixture defects, repaired by loading the unchanged production codec and reading the selected persistence backend; not claimed as product RED. Final35 focused consumers pass b1a68037; integrated broader91-case pass a2edd111 precedes the final narrow origin/unknown/archive refinements. Original source-only REDs remain immutable; these records establish the new tracked consumer chronology. Final integrated cohort eea838b6 (11:46:30Z) passes124/124, zero skips, including185 hydration,186 overlaps, existing rejected-decision recovery controls and all35 new consumer cases. Root final-preflight d50cb327 (11:48:29Z) then found the new recovery FAQ answer exceeded the protected130-word limit. Split into three related concise questions without weakening any assertion or removing guidance; stale app/SW fingerprint RED47ed66b6 remains a separate packaging gate."
+    }
+  },
+  {
     "testChangesSha256": "e5ed184eef3b73bec12fa898a7eeb4287a26c3c7e1a8cc47a02240914ec1641e",
     "reason": "Add an actual native Add and ordinary background sendPush overlap regression for a transaction that commits before its separate verification read sees a later head. Add a real foreign-account current-head control and player-facing FAQ/changelog coverage without weakening existing save assertions.",
     "previousBehavior": "After the old background transaction committed, a newer native Add advanced the actual device head before the background caller's verification read. The old caller threw Device head verification failed and showed a device-store write-failed warning despite both saves succeeding.",
