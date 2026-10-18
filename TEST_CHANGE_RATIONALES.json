@@ -12132,5 +12132,47 @@
     "comparison": "issue194AncestryPreservingCombinedMergeAgainst729266c",
     "baseCommit": "729266cc4d25d1410299fc3e13b24d9152602427",
     "testChangesSha256": "d3f2c04004de62bdaea521b6a056d07dbe8b01a8398a047faea00038cc30b401"
+  },
+  {
+    "testChangesSha256": "0b6f2706a9ba25d9893c67f5169e9f0c1f8a9424ebe18578f3d81de73bcb318f",
+    "reason": "Complete ticket190's two Settings JSON exports over the agreed raw snapshot port, with a versioned recovery archive and explicit stop conditions for unsafe capture.",
+    "previousBehavior": "Settings lacked distinct manual current-board and recovery-archive actions, and the app-owned device-store handle had no raw all-store readonly snapshot. A board export alone did not preserve retained pending, protected, backup, or opaque sources.",
+    "intendedBehavior": "Export the accepted live board through the existing ordinary-board format and guarded import path. Export a separate chain-scanner.recovery-archive v1 containing exact allowlisted localStorage strings and all raw rows from the four existing IndexedDB stores in one readonly snapshot, with a source manifest and collision-free typed values. Stop without an archive file when hydration is unsafe, a read/transaction fails, sources change, or a value cannot be preserved exactly. Neither export persists, reconciles, changes authority, queues work, signs in, or writes to cloud.",
+    "replacementTests": [
+      "RISK MANUAL JSON EXPORT: the actual Settings actions download current board and recovery archive",
+      "RISK MANUAL JSON EXPORT: unreadable, unsupported and hydration-placeholder sources stop without a file",
+      "RISK DEVICE STORAGE V2: raw export snapshot preserves exact sources in one read-only capture"
+    ],
+    "preservedCoverage": [
+      "The actual Settings consumer verifies the distinct filenames and JSON content types, accepted unsaved board fields, exclusion of an unsubmitted DOM draft and unrelated synthetic auth storage, exact archive manifest and retained sources, and zero app/browser writes. The current-board file passes through the existing guarded import consumer; the recovery archive is separately decoded in an isolated fixture and rejected by ordinary import without changing the board.",
+      "Typed archive coverage preserves collision-like object fields and __proto__, nonfinite values and negative zero, undefined, BigInt, sparse arrays, valid and invalid Date, ArrayBuffer, DataView and typed-array offsets, Map and Set. Unsupported values, cycles, repeated references, changed local sources, readonly aborts, and an invalid hydration placeholder stop without a misleading file.",
+      "The additive raw device-store test keeps exact key/value pairing for meta, snapshots, backups, and opaque rows in one readonly transaction; it checks no implicit database open, no writes, and actual abort rejection. Existing diagnostics, backup/recovery, migration, CAS, pending-upload, and all unrelated RISK assertions remain retained."
+    ],
+    "redEvidence": {
+      "command": "Recorded preimplementation-red consumer record /Users/emeraldpham/.codex/task-artifacts/manual-json-export/phase2/red-green-runs/2026-10-18T13-01-10-876Z-c00d38ac-9ba2-458a-95d4-16910c8fbb3b.json ran node --test --test-name-pattern='RISK MANUAL JSON EXPORT' tests.js. The preimplementation raw-port record is /Users/emeraldpham/.codex/task-artifacts/manual-json-export/phase1/red-green-runs/2026-10-18T11-59-14-054Z-b4ff93b5-1628-47f2-9eaa-f725cf87d307.json.",
+      "failure": "The real Settings consumer failed with AssertionError because the separate Export recovery archive JSON control was absent; its failure fixture also found neither export control. The raw-port RED failed its intended first assertion because readRawExportSnapshot was undefined. These are genuine preimplementation records. Later typed-value, round-trip, FAQ, and failure-stop assertions in the final test source were not backfilled as preimplementation REDs; no assertion-level chronology beyond those records is claimed."
+    },
+    "greenEvidence": "Recorded post-merge runs: consumer 2026-10-18T13-09-07-315Z-d7b4a98d-b329-4667-a3c1-75f34415fb87.json passed 2/2 with zero skips; raw-port 2026-10-18T13-11-07-487Z-0b41fd18-2e4e-43f2-8de1-611258eb821d.json passed 1/1; existing no-device unsaved-board fallback 2026-10-18T13-11-13-637Z-bb5cc28a-c8d3-4352-b3d1-9ef41f98ec19.json passed 1/1. Parent also observed earlier raw unrecorded consumer GREEN exec-5acc860c-dcc4-4481-80c3-86d96a32309a, 2/2; this remains a process deviation and is not represented as a recorder-produced result. The inventory run 2026-10-18T13-13-41-751Z-9dbceab5-0893-4d17-8ca5-0cdd8699bd46.json passed 1/1 after adding the second export failure-path RISK case to the map. Focused preflight record 2026-10-18T13-14-11-159Z-95f9cd33-f6af-4bd4-8d18-fa9f23abc792.json passed both help/copy checks and the committed phase1 test-first/rationale gate; a separate uncommitted-worktree validator passed the final cc7-to-working-tree test diff."
+  },
+  {
+    "testChangesSha256": "417d442d20f4730660af5cd111f0756890e45f4a6a1aa77d803c1d4a22bf57f1",
+    "reason": "Keep the v1 archive's complete manifest truthful when app-owned structured-cloned sparse arrays have enumerable non-index own properties.",
+    "previousBehavior": "The array branch of the typed-value envelope recorded sparse-array items and holes but omitted enumerable named own properties retained by IndexedDB structured clone, allowing a complete recovery archive to lose unknown app data.",
+    "intendedBehavior": "Encode array items and holes together with a collision-safe list of enumerable named own properties. The isolated decoder restores __proto__, constructor, 01, and 4294967295 as data without changing array prototype, native elements, length, or holes. The read-only snapshot port and all export authority and mutation boundaries remain unchanged.",
+    "replacementTests": [
+      "RISK MANUAL JSON EXPORT: the actual Settings actions download current board and recovery archive"
+    ],
+    "preservedCoverage": [
+      "The actual Settings consumer still verifies current-board content, archive source completeness, accepted live edits, exclusion of DOM drafts and unrelated auth storage, zero writes, the guarded current-board import round trip, and archive rejection by ordinary import.",
+      "Sparse-array element values, explicit undefined, holes, and length remain exact while new checks preserve the unknown named property and dangerous or boundary-like names as own data properties.",
+      "The raw four-store readonly snapshot, pending and opaque data capture, abort and unsupported-value stops, source consistency checks, and all existing recovery protections are retained without changing the storage port."
+    ],
+    "redEvidence": {
+      "command": "Recorded preimplementation-red run /Users/emeraldpham/.codex/task-artifacts/manual-json-export/phase2/array-properties-review/owner-runs/2026-10-18T13-21-01-518Z-228e7cdf-3b3c-4388-921a-065967847c65.json used TZ=UTC node scripts/agent-tools/record-run.mjs --repo <ticket190 worktree> --evidence-dir /Users/emeraldpham/.codex/task-artifacts/manual-json-export/phase2/array-properties-review/owner-runs --purpose preimplementation-red -- node --test --test-name-pattern='RISK MANUAL JSON EXPORT: the actual Settings actions download current board and recovery archive' tests.js.",
+      "failure": "The actual Settings export consumer failed at the new array-property assertion: decoded.sparseFixture.futureArrayField was undefined instead of {retain:'unknown array metadata'} although the IndexedDB snapshot source held that enumerable own property and the archive manifest claimed complete. The run was an assertion failure with no infrastructure error, before any encoder change."
+    },
+    "greenEvidence": "The actual Settings consumer passed 1/1 through record-run at /Users/emeraldpham/.codex/task-artifacts/manual-json-export/phase2/array-properties-review/owner-runs/2026-10-18T13-22-16-866Z-29326ebb-5e01-4c65-8288-02c68c0c3751.json. The combined manual-export failure/control and raw readonly-port cohort passed 3/3 with zero skips at 2026-10-18T13-22-32-465Z-64907b9d-07c8-497f-809c-982a56b2101d.json; the exact RISK test-inventory check passed 1/1 at 2026-10-18T13-22-34-799Z-83a84f28-dc4a-411b-9123-450f27ee5a18.json.",
+    "comparison": "ticket190ArchiveArrayOwnProperties",
+    "baseCommit": "cc7c5943ab8d5fd2a953b8c41af95436878b0682"
   }
 ]

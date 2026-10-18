@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { createHash, webcrypto } from "node:crypto";
+import { inspect } from "node:util";
 import vm from "node:vm";
 import fs from "node:fs";
 import path from "node:path";
@@ -14014,19 +14015,74 @@ test('RISK RECOVERY EXPORT: an unsaved in-memory board remains copyable without 
   assert.match(download.blob.text,/Only in this open tab/);assert.doesNotMatch(download.blob.text,/device-only-recovery-id/);
 });
 
+function decodeManualArchiveTypedValue(node){
+  assert.ok(node&&typeof node.type==='string','each archived value has an explicit type tag');
+  switch(node.type){
+    case 'null':return null;
+    case 'boolean':case 'string':case 'number':return node.value;
+    case 'special-number':return node.value==='NaN'?NaN:node.value==='Infinity'?Infinity:node.value==='-Infinity'?-Infinity:-0;
+    case 'undefined':return undefined;
+    case 'bigint':return BigInt(node.value);
+    case 'date':return node.valid?new Date(node.value):new Date(NaN);
+    case 'object':{
+      const value={};
+      for(const [key,entry] of node.entries)Object.defineProperty(value,key,{value:decodeManualArchiveTypedValue(entry),enumerable:true,writable:true,configurable:true});
+      return value;
+    }
+    case 'array':{
+      const value=new Array(node.items.length);
+      node.items.forEach((entry,index)=>{if(entry.type!=='hole')value[index]=decodeManualArchiveTypedValue(entry);});
+      for(const [key,entry] of node.properties??[])Object.defineProperty(value,key,{value:decodeManualArchiveTypedValue(entry),enumerable:true,writable:true,configurable:true});
+      return value;
+    }
+    case 'array-buffer':return Uint8Array.from(Buffer.from(node.base64,'base64')).buffer;
+    case 'data-view':return new DataView(decodeManualArchiveTypedValue(node.buffer),node.byteOffset,node.byteLength);
+    case 'typed-array':{
+      const constructors={Int8Array,Uint8Array,Uint8ClampedArray,Int16Array,Uint16Array,Int32Array,Uint32Array,Float32Array,Float64Array,BigInt64Array,BigUint64Array};
+      const Constructor=constructors[node.constructor];assert.ok(Constructor,'the archived typed-array constructor is supported');
+      return new Constructor(decodeManualArchiveTypedValue(node.buffer),node.byteOffset,node.length);
+    }
+    case 'map':return new Map(node.entries.map(([key,value])=>[decodeManualArchiveTypedValue(key),decodeManualArchiveTypedValue(value)]));
+    case 'set':return new Set(node.items.map(decodeManualArchiveTypedValue));
+    default:assert.fail(`Unknown manual archive type ${node.type}`);
+  }
+}
+
 test('RISK MANUAL JSON EXPORT: the actual Settings actions download current board and recovery archive',async t=>{
-  const {IDBFactory}=await import('fake-indexeddb'),dbName='chain-scanner-manual-export-'+Date.now()+'-'+Math.random();
-  const storage=sharedScannerStorage(),app=await loadApp({sharedStorage:storage,indexedDBProvider:new IDBFactory(),deviceDbName:dbName});
+  const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),dbName='chain-scanner-manual-export-'+Date.now()+'-'+Math.random();
+  const storage=sharedScannerStorage();
+  storage.setItem('firebase:authUser:synthetic',JSON.stringify({accessToken:'synthetic-auth-token'}));
+  const app=await loadApp({sharedStorage:storage,indexedDBProvider:indexedDB,deviceDbName:dbName});
   const {ctx,shim}=app,store=ctx.window.ScannerDeviceStore,account='archive-owner@example.test';
   assert.ok(store,'the actual app opened its isolated device-store fixture');
   t.after(async()=>{await store.close();});
+  shim.localStorage.setItem('fvp:chain-scanner:device-store-v2','1');
   const accepted=ctx.addTask('Accepted unsaved manual-export task');
+  await ctx.persist();
   accepted.futureManualExportField={keep:'opaque-value',sequence:[1,'😀']};
   ctx.state.futureManualExportBoardField={keep:true};ctx.state.syncDirty=true;
+  const addDraft=shim.document.getElementById('addInput');if(addDraft)addDraft.value='Unsubmitted DOM draft must stay out of exports';
   await store.setPendingUpload(account,{generationId:'export-pending-generation-190',payloadHash:'a'.repeat(64),baseRev:7,updatedAt:1});
   const head=await store.readHead();
   await store.putBackup({expectedHash:head?.hash??null,backup:{id:'export-manual-backup-190',day:'2026-10-18',at:1,kind:'manual',payload:'{"futureBackupField":"keep"}'}});
-  const storedBefore=JSON.stringify({head:await store.readHead(),backups:await store.listBackups(),opaque:await store.listOpaqueArchives(),pending:await store.getPendingUpload(account)});
+  const dataViewBuffer=Uint8Array.from([11,22,33,44,55,66,77,88]).buffer,typedArrayBuffer=Uint8Array.from([91,92,93,94,95,96,97,98]).buffer;
+  const standaloneBuffer=Uint8Array.from([121,122,123]).buffer,sparseFixture=new Array(3);sparseFixture[1]=undefined;sparseFixture[2]='last';sparseFixture.futureArrayField={retain:'unknown array metadata'};
+  Object.defineProperty(sparseFixture,'__proto__',{value:{retain:'prototype-looking array key'},enumerable:true,writable:true,configurable:true});
+  Object.defineProperty(sparseFixture,'constructor',{value:{retain:'array constructor data'},enumerable:true,writable:true,configurable:true});
+  Object.defineProperty(sparseFixture,'01',{value:'leading-zero array property',enumerable:true,writable:true,configurable:true});
+  Object.defineProperty(sparseFixture,'4294967295',{value:'largest non-index array key',enumerable:true,writable:true,configurable:true});
+  const typedFixture={tagCollision:{type:'date',entries:[['x',{type:'string',value:'untouched'}]]},
+    finiteNumber:-12.5,specialNumbers:[NaN,Infinity,-Infinity,-0,undefined,9007199254740993n],sparseFixture,
+    validDate:new Date('2026-10-18T12:34:56.789Z'),invalidDate:new Date(NaN),
+    arrayBuffer:standaloneBuffer,dataView:new DataView(dataViewBuffer,2,4),typedView:new Uint16Array(typedArrayBuffer,2,2),
+    map:new Map([['k',{opaque:true}]]),set:new Set(['a','b'])};
+  Object.defineProperty(typedFixture,'__proto__',{value:{type:'object',entries:[['safe',true]]},enumerable:true,writable:true,configurable:true});
+  const fixtureDb=await new Promise((resolve,reject)=>{const request=indexedDB.open(dbName);request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});
+  await new Promise((resolve,reject)=>{const tx=fixtureDb.transaction(['opaque'],'readwrite');tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error||new Error('fixture write aborted'));tx.objectStore('opaque').put(typedFixture,'typed-export-fixture-190');});
+  fixtureDb.close();
+  const storedBefore=inspect({head:await store.readHead(),backups:await store.listBackups(),opaque:await store.listOpaqueArchives(),pending:await store.getPendingUpload(account)},{depth:null,sorted:true,maxArrayLength:null,maxStringLength:null});
+  const localStorageBefore=['fvp:chain-scanner:v1','fvp:chain-scanner:protected:v1','fvp:chain-scanner:daily-backups:v1','fvp:chain-scanner:device-store-v2']
+    .map(key=>{const raw=shim.localStorage.getItem(key);return raw===null?{key,status:'absent'}:{key,status:'present',raw};});
   const memoryBefore=JSON.stringify(ctx.state),deviceWrites=[],browserWrites=[];
   for(const name of ['migrateLegacy','commitHead','putBackup','updateBackupKind','deleteBackup','setPendingUpload','clearPendingUpload','setLegacyFingerprint']){
     const original=store[name];store[name]=(...args)=>{deviceWrites.push(name);return original(...args);};
@@ -14057,6 +14113,7 @@ test('RISK MANUAL JSON EXPORT: the actual Settings actions download current boar
   const board=JSON.parse(downloads[0].blob.text);
   assert.equal(board.tasks.find(task=>task.title==='Accepted unsaved manual-export task')?.futureManualExportField?.keep,'opaque-value');
   assert.deepEqual(board.futureManualExportBoardField,{keep:true});
+  assert.doesNotMatch(downloads[0].blob.text,/Unsubmitted DOM draft must stay out of exports/);
 
   await ctx.onAction(archiveControl[1],{});
   for(let attempt=0;attempt<100&&downloads.length<2;attempt++)await flush();
@@ -14064,17 +14121,122 @@ test('RISK MANUAL JSON EXPORT: the actual Settings actions download current boar
   assert.equal(downloads[1].name,'chain-scanner-recovery-archive.json');
   assert.equal(downloads[1].blob.type,'application/json');
   const archive=JSON.parse(downloads[1].blob.text);
-  assert.equal(archive.format,'chain-scanner-recovery-archive');
-  assert.equal(archive.schemaVersion,1);
-  assert.equal(archive.completeness.complete,true,'the isolated readable fixture is labelled complete');
+  assert.equal(archive.format,'chain-scanner.recovery-archive');
+  assert.equal(archive.formatVersion,1);
+  assert.equal(archive.manifest.status,'complete','the isolated readable fixture is labelled complete');
+  assert.equal(archive.manifest.sources.currentBoard.status,'included');
+  assert.deepEqual(archive.currentBoard,board,'the archive embeds the ordinary current-board object without changing its format');
+  for(const name of ['meta','snapshots','backups','opaque'])
+    assert.equal(archive.manifest.sources.indexedDB.stores[name].status,'included',`${name} source is represented in the manifest`);
+  assert.deepEqual(archive.manifest.sources.localStorage['fvp:chain-scanner:protected:v1'],{status:'absent'});
+  assert.equal(archive.manifest.sources.localStorage['fvp:chain-scanner:device-store-v2'].status,'included','the app-owned device authority marker is preserved as evidence');
+  const localSourceRows=archive.appSources.localStorage;
+  assert.deepEqual(localSourceRows.map(row=>row.key),['fvp:chain-scanner:v1','fvp:chain-scanner:protected:v1','fvp:chain-scanner:daily-backups:v1','fvp:chain-scanner:device-store-v2']);
+  assert.deepEqual(localSourceRows,localStorageBefore,'every present local source remains byte-for-byte unchanged');
+  assert.equal(localSourceRows.find(row=>row.key==='fvp:chain-scanner:device-store-v2').raw,'1','the exact authority marker value is retained');
+  assert.doesNotMatch(downloads[1].blob.text,/synthetic-auth-token|firebase:authUser/,'unrelated SDK auth storage is excluded');
   assert.match(JSON.stringify(archive),/export-pending-generation-190/);
   assert.match(JSON.stringify(archive),/export-manual-backup-190/);
   assert.match(JSON.stringify(archive),/Accepted unsaved manual-export task/);
+  const opaqueRow=archive.appSources.indexedDB.stores.opaque.find(row=>decodeManualArchiveTypedValue(row.key)==='typed-export-fixture-190');
+  assert.ok(opaqueRow,'the unknown app-owned opaque row is included');
+  const decoded=decodeManualArchiveTypedValue(opaqueRow.value);
+  assert.equal(decoded.tagCollision.type,'date');assert.equal(decoded.tagCollision.entries[0][1].value,'untouched','tag-like app fields cannot collide with the archive envelope');
+  assert.equal(Object.hasOwn(decoded,'__proto__'),true,'prototype-looking unknown object keys remain data');
+  assert.deepEqual(decoded.__proto__,{type:'object',entries:[['safe',true]]});
+  assert.ok(Number.isNaN(decoded.specialNumbers[0]));assert.equal(decoded.specialNumbers[1],Infinity);assert.equal(decoded.specialNumbers[2],-Infinity);
+  assert.ok(Object.is(decoded.specialNumbers[3],-0));assert.equal(decoded.specialNumbers[4],undefined);assert.equal(decoded.specialNumbers[5],9007199254740993n);
+  assert.equal(decoded.finiteNumber,-12.5);assert.equal(Object.hasOwn(decoded.sparseFixture,0),false);assert.equal(Object.hasOwn(decoded.sparseFixture,1),true);assert.equal(decoded.sparseFixture[1],undefined);assert.equal(decoded.sparseFixture[2],'last');assert.deepEqual(decoded.sparseFixture.futureArrayField,{retain:'unknown array metadata'},'complete archive preserves structured-cloned array own properties');
+  assert.equal(decoded.sparseFixture.length,3,'named array properties do not change the original length');
+  assert.equal(Object.getPrototypeOf(decoded.sparseFixture),Array.prototype,'prototype-looking array keys remain data without changing the array prototype');
+  assert.equal(Object.hasOwn(decoded.sparseFixture,'__proto__'),true);assert.deepEqual(decoded.sparseFixture.__proto__,{retain:'prototype-looking array key'});
+  assert.equal(Object.hasOwn(decoded.sparseFixture,'constructor'),true);assert.deepEqual(decoded.sparseFixture.constructor,{retain:'array constructor data'});
+  assert.equal(decoded.sparseFixture['01'],'leading-zero array property');assert.equal(decoded.sparseFixture['4294967295'],'largest non-index array key');
+  assert.equal(decoded.validDate.toISOString(),'2026-10-18T12:34:56.789Z');assert.ok(Number.isNaN(decoded.invalidDate.getTime()));
+  assert.deepEqual(Array.from(new Uint8Array(decoded.arrayBuffer)),[121,122,123]);
+  assert.deepEqual(Array.from(new Uint8Array(decoded.dataView.buffer)),[11,22,33,44,55,66,77,88]);assert.equal(decoded.dataView.byteOffset,2);assert.equal(decoded.dataView.byteLength,4);
+  assert.deepEqual(Array.from(new Uint8Array(decoded.typedView.buffer)),[91,92,93,94,95,96,97,98]);assert.equal(decoded.typedView.byteOffset,2);assert.equal(decoded.typedView.length,2);
+  assert.equal(decoded.map.get('k').opaque,true);assert.deepEqual(Array.from(decoded.set),['a','b']);
+
+  const originalGetId=shim.document.getElementById.bind(shim.document),selection={};
+  const currentTextArea=makeFakeElement();currentTextArea.focus=()=>{selection.currentFocus=true;};currentTextArea.select=()=>{selection.currentSelect=true;};
+  const archiveTextArea=makeFakeElement();archiveTextArea.focus=()=>{selection.archiveFocus=true;};archiveTextArea.select=()=>{selection.archiveSelect=true;};
+  ctx.URL={createObjectURL(){throw new Error('fixture download unavailable');},revokeObjectURL(){}};
+  await ctx.onAction(currentControl[1],{});assert.match(shim.document.getElementById('modalRoot').innerHTML,/currentBoardData/);
+  shim.document.getElementById=id=>id==='currentBoardData'?currentTextArea:id==='recoveryArchiveData'?archiveTextArea:originalGetId(id);
+  ctx.onAction('select-current-board',{});assert.equal(selection.currentFocus,true);assert.equal(selection.currentSelect,true);
+  await ctx.onAction(archiveControl[1],{});assert.match(shim.document.getElementById('modalRoot').innerHTML,/recoveryArchiveData/);
+  assert.match(shim.document.getElementById('modalRoot').innerHTML,/chain-scanner\.recovery-archive/);
+  ctx.onAction('select-recovery-archive',{});assert.equal(selection.archiveFocus,true);assert.equal(selection.archiveSelect,true);
+  ctx.URL={createObjectURL(blob){createdBlob=blob;return 'blob:manual-export-restored';},revokeObjectURL(){}};
+
+  const roundTrip=await loadApp({sharedStorage:sharedScannerStorage()}),jsonBox=makeFakeElement();
+  jsonBox.value=downloads[0].blob.text;
+  const originalGet=roundTrip.shim.document.getElementById.bind(roundTrip.shim.document);
+  roundTrip.shim.document.getElementById=id=>id==='jsonBox'?jsonBox:originalGet(id);
+  await roundTrip.ctx.onAction('import-json',{});
+  assert.equal(roundTrip.ctx.state.tasks.find(task=>task.title==='Accepted unsaved manual-export task')?.futureManualExportField?.keep,'opaque-value','ordinary board JSON round-trips through the existing guarded import consumer');
+  const roundTripBefore=JSON.stringify(roundTrip.ctx.state);jsonBox.value=downloads[1].blob.text;await roundTrip.ctx.onAction('import-json',{});
+  assert.equal(JSON.stringify(roundTrip.ctx.state),roundTripBefore,'the versioned archive is rejected by the ordinary board importer without changing the board');
+
+  ctx.openHelp();const help=shim.document.getElementById('modalRoot').innerHTML;
+  const exportFaq=help.match(/<dt>What do the two JSON exports contain\?<\/dt><dd>(.*?)<\/dd>/)?.[1];
+  assert.ok(exportFaq,'the extended FAQ explains both exports');
+  assert.ok(exportFaq.replace(/<[^>]+>/g,' ').split(/\s+/).filter(Boolean).length<=130,'the export FAQ keeps the existing answer word limit');
+  assert.match(exportFaq,/ordinary board data.*accepted edits that may not have saved/i);
+  assert.match(exportFaq,/not an ordinary board-import file.*pending work is never replayed/i);
+  assert.match(exportFaq,/If a source changes.*no archive file is made/i);
 
   assert.equal(JSON.stringify(ctx.state),memoryBefore,'export leaves the accepted in-memory board untouched');
   assert.deepEqual(deviceWrites,[],'export performs no device-store write');
   assert.deepEqual(browserWrites,[],'export performs no browser-storage write');
-  assert.equal(JSON.stringify({head:await store.readHead(),backups:await store.listBackups(),opaque:await store.listOpaqueArchives(),pending:await store.getPendingUpload(account)}),storedBefore,'export leaves every seeded device-store source unchanged');
+  assert.equal(inspect({head:await store.readHead(),backups:await store.listBackups(),opaque:await store.listOpaqueArchives(),pending:await store.getPendingUpload(account)},{depth:null,sorted:true,maxArrayLength:null,maxStringLength:null}),storedBefore,'export leaves every seeded device-store source unchanged');
+});
+
+test('RISK MANUAL JSON EXPORT: unreadable, unsupported and hydration-placeholder sources stop without a file',async t=>{
+  const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),dbName='chain-scanner-manual-export-failure-'+Date.now()+'-'+Math.random();
+  const storage=sharedScannerStorage();storage.setItem('fvp:chain-scanner:v1','{"tasks":[{"id":"broken","title":"corrupt"}');
+  const app=await loadApp({sharedStorage:storage,indexedDBProvider:indexedDB,deviceDbName:dbName}),{ctx,shim}=app;
+  const store=ctx.window.ScannerDeviceStore;assert.ok(store);t.after(async()=>{await store.close();});
+  const downloads=[],link=makeFakeElement();link.remove=()=>{};link.click=()=>downloads.push(link.download);
+  shim.document.createElement=tag=>tag==='a'?link:makeFakeElement();ctx.Blob=class ExportBlob{constructor(parts,options){this.text=parts.join('');this.type=options.type;}};ctx.URL={createObjectURL(){return 'blob:unexpected';},revokeObjectURL(){}};
+  ctx.openSettings();let settings=shim.document.getElementById('modalRoot').innerHTML;
+  const current=settings.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>\s*Export current board JSON\s*<\/button>/),archive=settings.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>\s*Export recovery archive JSON\s*<\/button>/);
+  assert.ok(current&&archive,'both Settings exports are available for the failure case');
+  await ctx.onAction(current[1],{});await ctx.onAction(archive[1],{});await flush();
+  assert.deepEqual(downloads,[],'a hydration placeholder never becomes a complete export');
+
+  const valid=await loadApp({sharedStorage:sharedScannerStorage(),indexedDBProvider:new IDBFactory(),deviceDbName:dbName+'-unsupported'});
+  const validStore=valid.ctx.window.ScannerDeviceStore;assert.ok(validStore);t.after(async()=>{await validStore.close();});
+  const shownErrors=[];valid.ctx.toast=message=>shownErrors.push(String(message));
+  const rawSnapshot=validStore.readRawExportSnapshot.bind(validStore);
+  validStore.readRawExportSnapshot=async()=>{const snapshot=await rawSnapshot();snapshot.stores.opaque.keys.push('unsupported-export-fixture-190');snapshot.stores.opaque.values.push(/unsupported/);return snapshot;};
+  const validDownloads=[],validLink=makeFakeElement();validLink.remove=()=>{};validLink.click=()=>validDownloads.push(validLink.download);
+  valid.shim.document.createElement=tag=>tag==='a'?validLink:makeFakeElement();valid.ctx.Blob=ctx.Blob;valid.ctx.URL=ctx.URL;valid.ctx.openSettings();
+  const validSettings=valid.shim.document.getElementById('modalRoot').innerHTML,validArchive=validSettings.match(/<button\b[^>]*data-act="([^"]+)"[^>]*>\s*Export recovery archive JSON\s*<\/button>/);
+  assert.ok(validArchive);await valid.ctx.onAction(validArchive[1],{});await flush();
+  assert.deepEqual(validDownloads,[],'a structured-clone type without a lossless representation stops the archive');
+  assert.ok(shownErrors.some(message=>/IndexedDB opaque key.*unsupported RegExp/i.test(message)),'the failure names its exact app-owned source and unsupported type');
+  const cycle={};cycle.self=cycle;
+  validStore.readRawExportSnapshot=async()=>{const snapshot=await rawSnapshot();snapshot.stores.opaque.keys.push('cycle-export-fixture-190');snapshot.stores.opaque.values.push(cycle);return snapshot;};
+  await valid.ctx.onAction(validArchive[1],{});await flush();
+  assert.deepEqual(validDownloads,[],'a cyclic raw source cannot become a falsely complete archive');
+  assert.ok(shownErrors.some(message=>/cycle-export-fixture-190.*repeated reference or cycle/i.test(message)),'the cycle report identifies its source');
+  const sharedNested={future:true},repeated={first:sharedNested,second:sharedNested};
+  validStore.readRawExportSnapshot=async()=>{const snapshot=await rawSnapshot();snapshot.stores.opaque.keys.push('repeated-export-fixture-190');snapshot.stores.opaque.values.push(repeated);return snapshot;};
+  await valid.ctx.onAction(validArchive[1],{});await flush();
+  assert.deepEqual(validDownloads,[],'repeated references that cannot be represented exactly stop the archive');
+  assert.ok(shownErrors.some(message=>/repeated-export-fixture-190.*repeated reference or cycle/i.test(message)),'the repeated-reference report identifies its source');
+  let releaseSnapshot,startedSnapshot;
+  const snapshotStarted=new Promise(resolve=>{startedSnapshot=resolve;});
+  validStore.readRawExportSnapshot=async()=>{startedSnapshot();await new Promise(resolve=>{releaseSnapshot=resolve;});return rawSnapshot();};
+  const raced=valid.ctx.onAction(validArchive[1],{});await snapshotStarted;
+  valid.shim.localStorage.setItem('fvp:chain-scanner:protected:v1','{"changedDuringExport":true}');releaseSnapshot();await raced;
+  assert.deepEqual(validDownloads,[],'a changed app-owned local source aborts the whole archive');
+  assert.ok(shownErrors.some(message=>/localStorage key fvp:chain-scanner:protected:v1 changed/i.test(message)),'a raced source is named for retry');
+  validStore.readRawExportSnapshot=async()=>{throw new Error('fixture readonly transaction aborted');};
+  await valid.ctx.onAction(validArchive[1],{});await flush();
+  assert.deepEqual(validDownloads,[],'an aborted readonly snapshot stops without a partial file');
 });
 
 test('RISK IMPORT RENDERING: restored identifiers cannot inject attributes or break task reveal',async()=>{
