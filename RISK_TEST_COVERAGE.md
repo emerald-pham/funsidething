@@ -86,6 +86,7 @@ The named-contract test in tests.js checks that every top-level test whose title
 - RISK CLOUD PAYLOAD: duplicated legacy Undo and backup Restore sources converge without losing their distinct facts
 - RISK CLOUD ADAPTER: malformed revisions fail closed before Firestore writes
 - RISK CLOUD DIAGNOSTICS: safe failure stage and code survive backend and UI boundaries
+- RISK CLOUD CONFORMANCE: controlled crypto delivery executes original adapter and diagnostic assertions while true deadlines remain bounded
 - RISK CLOUD RECOVERY: a durable ordinary save retries and clears its stale cloud error without reload
 - RISK CLOUD RECOVERY: Undo retries a failed write, while a failed retry and an account change stay errors
 - RISK CLOUD STARTUP: a repaired divergent browser pair resumes the initial cloud read without tapping the badge
@@ -259,10 +260,10 @@ The named-contract test in tests.js checks that every top-level test whose title
 
 - RISK PWA updates: an already durable board applies a downloaded worker without a redundant quota write
 - RISK PWA updates: an unsaved draft visibly defers reload while update checks continue
-- RISK PWA updates: a scanner gesture commits its action before a downloaded worker reloads
-- RISK PWA updates: a gesture beginning during an update save holds and resumes reload
-- RISK PWA updates: cancelled and released gestures resume a pending replacement
-- RISK PWA updates: the extended FAQ and changelog explain gesture-safe reloads
+- RISK PWA updates: a scanner gesture commits durably without an automatic session reload
+- RISK PWA updates: a gesture beginning during an update save preserves the ongoing session
+- RISK PWA updates: cancelled and released gestures preserve the used session
+- RISK PWA updates: the extended FAQ and changelog explain uninterrupted used sessions
 - RISK PWA module delivery: a fresh installed shell serves every production script while offline
 - RISK architecture checkpoint: editor Undo and bulk Undo preserve selection boundaries and immutable history through reload
 - RISK PWA updates: a host write in flight must finish before a reverted board reloads
@@ -485,12 +486,35 @@ The editor hook blocks app or enforcement edits while tests.js has no staged or 
 
 ## Evergreen remote completion and scanner membership
 
+- RISK completion lifecycle facts: editor candidate and benchmark Done preserve ordinary ratings and Undo
+- RISK legacy completion FAQ: older saved boards keep completed tasks out and explain safe return
+- RISK completion lifecycle Changelog: the mounted release notes describe older-board recovery in player language
+- RISK completion lifecycle recovery: saved device source cannot restore a 2→1 chain before scan refresh
+- RISK completion lifecycle return: an observed Dot returns after expiry and a later Done removes it again
+- RISK completion lifecycle FAQ: expired rest and saved-chain return match the shipped controls
+- RISK completion boundaries FAQ: Retry explains an uncertain cloud acknowledgement
+- RISK completion boundaries: delayed stale cloud adoption retains Done and concurrent task edit before exact retry acknowledgement
+- RISK completion boundaries: failed device save holds cloud publication and retry keeps an editor change made while saving
+- RISK completion boundaries: failed read stays pending and wake exactly acknowledges an uncertain completion publication
+- RISK completion boundaries: a pending account-A acknowledgement and its learning stay out of account B
+- RISK completion boundaries: a live editor and pressed scanner control defer stale adoption while the saved view and fields survive cold reopen
+- RISK completion lifecycle recovery: expired rest cannot restore 2→1 or 13→4 saved chains
+- RISK completion lifecycle Start: an explicit new pass bootstraps an eligible task after rest without a synthetic Dot
+- RISK completion lifecycle Start: an observed new-pass root survives peer merge and IndexedDB reopen
+- RISK completion lifecycle Start: an unaware pass root cannot bypass completion in either publication order
+- RISK completion lifecycle Dot: unseen Dot and opposite No keep learning while observed completion owns membership
+- RISK completion lifecycle maintenance: the local day marker and Resume or Rescan do not renew a removed member
+- RISK completion lifecycle fixtures: released Start informed Start and local maintenance execute in UTC and New York
+- RISK completion delivery fixtures: controlled startup pending and acknowledged boundaries execute all five consumers
+- RISK completion lifecycle return: observed Dot and next Done survive stale delivery and IndexedDB reopen
 - RISK evergreen scan reconciliation: merged completion removes resting crumbs tails and candidates without losing evidence
 - RISK evergreen scan reconciliation: a newer stale cloud chain cannot revive another browsers completed task
 - RISK evergreen scan reconciliation: held editor and pointer delay resting chain adoption then stale benchmark controls stay inert
 - RISK evergreen scan reconciliation: cooldown expiry day reset and explicit return preserve eligible and unrelated chain membership
 - RISK evergreen scan reconciliation: offline cold reload clears legacy resting dots and Undo retains completion history
 - RISK evergreen scan reconciliation: a delayed stale read and later revision converge without restoring completed membership
+
+Completion authority ends only after a deliberate return event observes every outstanding completion. A validated real new-pass root can provide that causal return after eligibility resumes; unaware roots, Dot/No comparison clocks, cloud revision order and local day maintenance cannot. The consumer matrices retain both opposite learning observations, exact original Done/return facts, independent title/theme choices, every reconciled scan paint and the production IndexedDB head through stale retry and reopen. This extends issue #169's recovery foundation without creating an ordinary Done, day reset, Resume or Rescan shortcut.
 
 ## Backup age, night shows, and legacy dependency compatibility
 
@@ -1399,3 +1423,72 @@ Preflight comparison coverage:
   exercises the public command with a real published local Git branch, a passing selected comparison and a missing outgoing rationale. It preserves the existing gate, focused copy checks, refs, HEAD, tracked files and configuration.
 
 The required npm test entry point surfaces a failing isolated agent-tool cohort with a nonzero result and its assertion output.
+
+## Deletion membership authority after log pruning (#171)
+
+- `RISK deletion authority: real Delete defeats a stale saved and cloud Dot after log pruning while same-title Add stays usable`
+- `RISK deletion authority: Clear history retries and pruned stale delivery retain ordinary deletion and evergreen completion separately`
+- `RISK deletion authority: Undo of Clear history restores only its task and History row with original completion facts`
+- `RISK deletion authority FAQ: deletion identity and Clear history explain retained membership authority`
+
+Actual editor Delete, Add, Done, Clear history, and Undo actions run through isolated browser-fallback and IndexedDB device stores. A stale saved source with a same-ID title edit and Dot is replayed after the dated log expires; the scanner DOM, repaired device head, synthetic cloud pull, exact acknowledgement, unrelated omitted task, separately added same-title identity, and cold reopened state are checked. Clear history retry and replay preserve the ordinary deletion tombstone, exact cleared History row, original completion facts, ratings, Evergreen task, rest timestamp, and post-rest eligibility. Undo restores the cleared task and exact History row without losing its original completion facts. Existing direct Delete/Undo cleanup, causal `DELETE INTENT`, and two-month `DELETION LOG` assertions remain in the focused cohort.
+
+## Scoped Undo after completion recovery (#172)
+
+- `RISK scoped Undo recovery: compound Done Undo survives older device and cloud replay after peer progress`
+- `RISK scoped Undo recovery: a true Undo cancels only its compound Dot while peer completion and learning remain`
+- `RISK scoped Undo recovery: Undo of an informed evergreen return survives older source and permits an acknowledged later return`
+- `RISK scoped Undo FAQ: whole Done Dot and Return actions survive stale-source recovery`
+
+Actual populated-editor ordinary Done, an offline Dot that an independent peer completion has not observed, and a post-rest informed evergreen return each receive one true action-scoped Undo after peer progress. The tests preserve whole editor/scanner action groups, immutable original event bytes and times, prior restore-run lineage, ordinary and evergreen History, independent comparison learning, peer fields and current pass members. Older device/cloud sources are delivered before and after Undo publication; every recovery, Undo and replay paint is checked against its expected membership, along with production IndexedDB heads, exact synthetic cloud state and cold reopen. After reopening, a new eligible return and its next Done remain meaningful. The separately recorded first phase-label failure is withdrawn as product evidence: its later paints were caused by the actual Undo action, and phase-separated source/Undo/replay assertions pass without runtime edits. The only valid preimplementation RED was the missing Quick start FAQ explanation; its behavior consumers were GREEN.
+
+## Legacy completion recovery checkpoints (#173)
+
+- RISK legacy completion recovery: immutable released Done stays offchain through expired device recovery and every save
+- RISK legacy completion return: imported boundary survives replay while actual Dot Done Undo and exact cloud acknowledgement remain meaningful
+- RISK legacy completion startup: an actually revived released board is coherent before first paint and permits an observed return
+- RISK legacy completion equal clocks: an independent eventless Done is not attested by another modern completion at the same time
+- RISK legacy completion inheritance: consented Import retains lifecycle authority independently of embodied learning
+- RISK legacy completion imported boundary: actual cross-account Import of a released revived board cannot paint old membership
+- RISK legacy completion recovery safety: failed exact-source backup holds startup and guarded recovery without losing a newer edit
+- RISK legacy completion support floor: real eventless learned ratings upgrade without reconstructing comparison history
+- RISK legacy completion released shell: actual stale write conflicts then holds unknown authority and its pending edit for safe update
+- RISK legacy completion startup acknowledgement: pending IndexedDB upgrade holds recovery until its actual save completes
+- RISK legacy completion startup copies: both literal divergent sources precede every upgrade write
+- RISK legacy completion startup safety: refused unverified and raced copies retain both sources and newer drafts
+- RISK legacy completion unknown inheritance: unsupported witnesses preserve a usable startup hold
+- RISK legacy completion unknown inheritance control: the prior app safely boots identical unknown bytes
+- RISK legacy completion released Start: normally acknowledged expired return is preserved or explicitly held before rewrite
+- RISK legacy completion unknown evidence: malformed imported provenance holds exact local and cloud branches
+- RISK legacy completion proven restore: an actual released early Return and Dot cannot be fenced again by its stale completion
+- RISK legacy completion replacement: actual Import Restore Reset and their Undo retain retired checkpoint provenance
+- RISK legacy completion replacement safety: refused source recovery and account races leave Import Restore Reset and input exact
+- RISK legacy completion guest adoption: actual modern guest Done remains observable and Undoable after first empty-account sign-in
+- RISK legacy completion FAQ: older saved boards keep completed tasks out and explain safe return
+- RISK legacy completion inherited cancellation: an actual guest Done Undo stays reversed after authorized first sign-in
+
+## Divergent fallback source preservation (final review repair)
+
+- `RISK legacy completion divergent sources: both literal guarded copies are safe before reconciliation writes`
+- `RISK legacy completion divergent safety: refused copies and either guarded-key race hold exact sources and newer edits`
+- `RISK completion awareness FAQ: unseen completion defeats later clock or upload while comparison ratings remain`
+## P0 active app sessions
+
+- RISK PWA changelog history: current safe updates do not rewrite the September 28 record
+
+- RISK PWA session updates: a blurred unfinished Add draft prevents automatic document replacement
+- RISK PWA session updates: keyboard scrolling and accessible clicks keep updates available without replacing used documents
+
+Issue #176/#177 supersedes the prior after-gesture automatic reload expectation. Quiet startup, first installation, failed saves, editor deferral, normal task saving, update downloads and cold board reopen remain protected. The synthetic controller-change reproduction does not establish the original reported browser crash cause.
+
+- RISK PWA session updates: scrolling during an awaited host save prevents document replacement
+- RISK PWA session updates: real boot protects input while asynchronous board restoration is pending
+
+- RISK PWA upgrade safety: candidate installation keeps a predecessor document and unfinished draft intact
+
+The candidate worker precaches while predecessor clients remain on their existing worker. Natural activation after all app clients close retains first-install claim and cache retirement. Actual predecessor upgrade browser evidence is separate from Node lifecycle coverage.
+
+## Device-save warning readability
+
+- RISK device save warning browser: actual held Add keeps every text line on contrasting toast paint and preserves short notices
+- RISK device save warning guidance: mounted help explains readable wrapped notices and recoverable device-save details
