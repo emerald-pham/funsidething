@@ -12174,5 +12174,33 @@
     "greenEvidence": "The actual Settings consumer passed 1/1 through record-run at /Users/emeraldpham/.codex/task-artifacts/manual-json-export/phase2/array-properties-review/owner-runs/2026-10-18T13-22-16-866Z-29326ebb-5e01-4c65-8288-02c68c0c3751.json. The combined manual-export failure/control and raw readonly-port cohort passed 3/3 with zero skips at 2026-10-18T13-22-32-465Z-64907b9d-07c8-497f-809c-982a56b2101d.json; the exact RISK test-inventory check passed 1/1 at 2026-10-18T13-22-34-799Z-83a84f28-dc4a-411b-9123-450f27ee5a18.json.",
     "comparison": "ticket190ArchiveArrayOwnProperties",
     "baseCommit": "cc7c5943ab8d5fd2a953b8c41af95436878b0682"
+  },
+  {
+    "testChangesSha256": "7c1cc7545a3314639a2debc062b4ee2a851af85b80ed74e3e7fa8dece857c5a2",
+    "reason": "Record the exact ticket190 candidate tests.js diff against 52d after ancestry-preserving integration of issues185, 186, 188, 194 and 190. This is aggregate provenance only: the component owners authored their own tests and no new behavior is claimed at integration.",
+    "previousBehavior": "At the 52d baseline, authentication could reconcile before the durable board opened, an overlapping device write could be reported as failed after it committed, held recovery consent could publish after a lost conditional write, supported expired timed holds could remain unprojectable, and Settings had no distinct read-only current-board and recovery-archive exports.",
+    "intendedBehavior": "Retain each scoped repair with its original guards and evidence: wait for durable hydration before reconciliation; report superseded commits against the verified head; require fresh consent after publication conflicts; project supported expired holds at the correct action-time boundary; and provide separate ordinary-board and versioned local-recovery JSON exports that stop honestly on unsafe capture. Export does not authenticate, reconcile, persist, requeue, or write cloud data.",
+    "replacementTests": [
+      "RISK AUTH HYDRATION: real Auth and native resume wait for the durable board, then reconcile once",
+      "RISK SCALABLE CONCURRENCY: overlapping native and background saves do not report a committed head as failed",
+      "RISK held decision recovery: a real conditional publication conflict preserves the peer and requires a fresh choice",
+      "RISK timed-hold coherence: native Can’t expires at the exact deadline through IndexedDB and ordinary cloud pull",
+      "RISK MANUAL JSON EXPORT: the actual Settings actions download current board and recovery archive",
+      "RISK DEVICE STORAGE V2: raw export snapshot preserves exact sources in one read-only capture"
+    ],
+    "preservedCoverage": [
+      "Issues185 and186 retain their recorded actual Auth/hydration, corrupt-head hold, overlapping-commit, account-switch, pending-draft, and storage-failure regressions; the combined acceptance records show those controls alongside the new issue188 cases.",
+      "Issue188 retains the original held-review and deliberate-choice cases, conditional publication and source-change guards, exact backups, safe diagnostics, cancellation, and separately bounded supported Restore behavior. No recovery archive, pending row, or authority marker becomes an automatic replay source.",
+      "Issue194 retains exact timed Can’t and Worked boundaries, each board’s own duration settings, reopen and cloud-pull behavior, and premature-clear, corrupt, orphan, and FAQ controls.",
+      "Issue190 retains the actual Settings consumer, distinct guarded current-board round trip and isolated recovery-archive decode, exact raw rows and allowlisted local keys including the device-authority marker, lossless supported types and array properties, read-only capture, and stop-on-read/abort/change/unsupported-value controls.",
+      "Existing tests and scoped evidence are retained verbatim. This record maps the combined comparison and does not claim each later-added assertion had its own preimplementation RED."
+    ],
+    "redEvidence": {
+      "command": "The exact aggregate 52d gate failure was captured by record-run at /Users/emeraldpham/.codex/task-artifacts/manual-json-export/phase2/root-packaging/owner-runs/2026-10-18T13-27-30-030Z-e199639e-f58b-40b3-a6e5-6f471e527e95.json. Component preimplementation commands and records are preserved in their existing rationale entries and handback artifacts.",
+      "failure": "The gate found no exact rationale fingerprint for the combined 52d-to-7e tests.js diff; it did not report a behavioral test failure. Original component RED chronology remains separate: issue185 and186 have recorded actual REDs; issue188 has its actual 945f1f2 preimplementation RED and later repair REDs; issue194 first exact-deadline RED was a raw run on unchanged 52d captured as exec-c68c4c95-3132-4e1d-b140-ee2a87f74be3 and exec-dbb9d1ab-d476-4f07-a95e-ff9dc504f9c1; issue190 recorded the original missing-Settings-controls and missing-port REDs. This aggregate does not backfill a new behavior RED or call later assertions preimplementation failures."
+    },
+    "greenEvidence": "Recorded current ticket190 focused consumer/failure/raw-port/inventory cohort passed 10/10 with zero skips at /Users/emeraldpham/.codex/task-artifacts/manual-json-export/phase2/root-packaging/owner-runs/2026-10-18T13-26-17-242Z-e8e1748b-eb90-492e-bfd5-cadeb900aef1.json. Recorded ticket190 consumer and port checks, including the no-device board fallback, remain in phase2/red-green-runs and array-properties-review/owner-runs. Issue194 original first RED and first GREEN were raw, unrecorded executions; its raw first GREEN has no recorder record and is not backfilled. Later recorded postimplementation 194 acceptance is preserved in /Users/emeraldpham/.codex/task-artifacts/storage-races-184/integration/194-final-checks/2026-10-18T13-03-26-342Z-b4231aa8-16cb-49d7-93a3-b8ddc11c0b1c.json (31/31). Issue190 parent-observed first consumer GREEN exec-5acc860c-dcc4-4481-80c3-86d96a32309a (2/2) was also raw and remains disclosed, not backfilled; the later recorded 2/2 consumer and 1/1 port checks are distinct evidence. Existing issue185/186/188 component GREEN records and issue194 combined cohorts remain in their own appended rationales and integration handback.",
+    "comparison": "issue190CandidateAgainst52d4b25",
+    "baseCommit": "52d4b2537bacbb60240ae7a53061224350ebd36f"
   }
 ]
