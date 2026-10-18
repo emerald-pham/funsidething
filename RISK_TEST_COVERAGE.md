@@ -1550,3 +1550,11 @@ The candidate worker precaches while predecessor clients remain on their existin
 - RISK held decision recovery: browser fallback verifies source backups and records an exact cloud acknowledgement
 - RISK held decision recovery: diagnostics identify only app origin fingerprint and safe source category
 - RISK held decision recovery: evidence and pending-choice archives cannot be restored as empty boards
+
+- RISK held decision recovery: supported released consumers cannot publish a prepared choice after conflict or uncertain acknowledgement
+- RISK held decision recovery: preview lists native peer task fields and displaced unknown paths with escaped values
+- RISK held decision recovery: native selected and enabled actions use established filled theme paint
+- RISK held decision recovery: rejected ordinary Restore leads through the visible error to deliberate recovery
+- RISK held decision recovery: confirmed publication revalidates changed sources before local apply
+- RISK held decision recovery: a newer durable or browser source during confirmed local commit stays current
+- RISK held decision recovery: new reviewed consent supersedes prior prepared publications only after exact ACK
