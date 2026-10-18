@@ -519,7 +519,7 @@ The editor hook blocks app or enforcement edits while tests.js has no staged or 
 - RISK completion delivery fixtures: controlled startup pending and acknowledged boundaries execute all five consumers
 - RISK completion lifecycle return: observed Dot and next Done survive stale delivery and IndexedDB reopen
 - RISK evergreen scan reconciliation: merged completion removes resting crumbs tails and candidates without losing evidence
-- RISK evergreen scan reconciliation: a newer stale cloud chain cannot revive another browsers completed task
+- RISK evergreen scan reconciliation: an acknowledged completion stays absent through newer stale cloud chains
 - RISK evergreen scan reconciliation: held editor and pointer delay resting chain adoption then stale benchmark controls stay inert
 - RISK evergreen scan reconciliation: cooldown expiry day reset and explicit return preserve eligible and unrelated chain membership
 - RISK evergreen scan reconciliation: offline cold reload clears legacy resting dots and Undo retains completion history

@@ -10038,7 +10038,7 @@ async function settleSavedViewPublication(app,h,stage){
  do{
   observed=JSON.parse(vm.runInContext('JSON.stringify({idle:!cloudPushInFlight&&!pulling&&!pendingPush&&!cloudResumePending,payload:cloudPayload(),raw:lastPersistedRaw,stateRaw:JSON.stringify(state),revision:state.syncRev,dirty:state.syncDirty})',app.ctx));
   if(observed.idle && !observed.dirty && observed.payload===h.doc?.payload && observed.revision===h.doc?.rev && observed.raw===observed.stateRaw){
-   stored=await vm.runInContext('deviceStorageAuthority?deviceStore.readHead().then(head=>head?.payload):Promise.resolve(localStorage.getItem(STORE_KEY))',app.ctx);
+   stored=await vm.runInContext('deviceStorageAuthority?deviceStore.readHead().then(head=>head?.payload):useLocal?Promise.resolve(localStorage.getItem(STORE_KEY)):window.storage.get(STORE_KEY).then(item=>item?.value)',app.ctx);
    if(stored===observed.stateRaw)return;
   }
   await syncSettle(25);
@@ -25822,13 +25822,18 @@ test('RISK evergreen scan reconciliation: merged completion removes resting crum
  }
 });
 
-test('RISK evergreen scan reconciliation: a newer stale cloud chain cannot revive another browsers completed task',async()=>{
+test('RISK evergreen scan reconciliation: an acknowledged completion stays absent through newer stale cloud chains',async()=>{
  for(const evergreen of [false,true])for(const hostStorage of [false,true]){
   const {a,b,h,notify,candidateId,benchId,nextId}=await liveScanSyncClients({evergreen,hostStorage});
   const stale=h.remoteState();stale.chain=[benchId,candidateId];stale.candidateId=nextId;
-  a.ctx.onAction('cand-done',{dataset:{candidate:candidateId,benchmark:benchId}});await syncSettle(100);
+  a.ctx.onAction('cand-done',{dataset:{candidate:candidateId,benchmark:benchId}});
+  await settleSavedViewPublication(a,h,'original scanner completion publication');
+  await settleSavedViewPublication(b,h,'original scanner completion delivery');
   const doneAt=b.ctx.state.tasks.find(t=>t.id===candidateId).lastDoneAt;assert.ok(doneAt,'the real completion reaches the other browser first');
-  stale.tasks.find(t=>t.id===nextId).title='Concurrent unrelated title';h.writeBehindBack(stale);notify();await syncSettle(150);
+  stale.tasks.find(t=>t.id===nextId).title='Concurrent unrelated title';h.writeBehindBack(stale);notify();
+  await settleSavedViewPublication(a,h,'stale scanner completion repair');
+  await settleSavedViewPublication(b,h,'peer scanner completion repair');
+  await settleSavedViewPublication(a,h,'final scanner completion acknowledgement');
   for(const client of [a,b]){
    assert.deepEqual([...client.ctx.state.chain],[benchId],'the accepted remote winner merges completion before repairing its stale chain');
    assert.equal(client.ctx.state.tasks.find(t=>t.id===candidateId).lastDoneAt,doneAt);assert.equal(client.ctx.isEligible(client.ctx.state.tasks.find(t=>t.id===candidateId)),false);
