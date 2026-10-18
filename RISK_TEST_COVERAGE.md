@@ -1051,6 +1051,7 @@ Resting completion cannot teach a discarded Dot, first Start uses current eligib
 
 - `RISK motion safety: explicit local choices expire after seven elapsed days and corrupt records fail closed`
 - `RISK motion safety: actual choice handler remembers selection while dismissal never writes consent`
+- `RISK motion safety: export clicks do not renew consent while actual choices still do`
 
 - `RISK motion safety accessibility: enlarged prompt fits the containing viewport and stacks intrinsic choice cards`
 

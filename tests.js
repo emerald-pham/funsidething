@@ -33230,6 +33230,46 @@ test('RISK pedestrian motion toggle consumer: real motion-choice handler restore
  assert.deepEqual(saved,['normal','reduced','normal']);assert.deepEqual(JSON.parse(JSON.stringify(results)),[['tail','current'],['current'],['tail','current']]);assert.equal(JSON.stringify(world),before);
 });
 
+test('RISK motion safety: export clicks do not renew consent while actual choices still do',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'landscape.js'),'utf8'),update=source.slice(source.indexOf('  function updateMotion('),source.indexOf('  function openMotion('));
+ const listenerStart=source.indexOf("  document.addEventListener('click',event=>{\n    const button=event.target.closest('[data-landscape-motion]"),listenerEnd=source.indexOf("  dialog.addEventListener('close'",listenerStart);
+ assert.ok(listenerStart>=0&&listenerEnd>listenerStart,'the real document click listener is present');
+ const listener=source.slice(listenerStart,listenerEnd),c=sceneTimeline(),motionKey='fvp:chain-scanner:landscape-motion',now=Date.parse('2026-10-18T15:00:00.000Z');
+ const originalRaw=JSON.stringify({choice:'normal',savedAt:now-1000}),values=new Map([[motionKey,originalRaw]]),storage={getItem:key=>values.get(key)??null,setItem:(key,value)=>values.set(key,String(value))};
+ const originalSave=c.LivingSky.saveMotion,saves=[];
+ const S={...c.LivingSky,saveMotion(target,value){saves.push(value);return originalSave(target,value,now);}};
+ const selectorMatches=(node,selector)=>{
+  const match=selector.match(/^\[data-([a-z-]+)(?:="([^"]*)")?\]$/);if(!match)return false;
+  const key=match[1].replace(/-([a-z])/g,(_,letter)=>letter.toUpperCase()),present=Object.hasOwn(node.dataset,key);
+  return match[2]===undefined?present:present&&String(node.dataset[key])===match[2];
+ };
+ const element=(tagName,dataset,parentElement)=>({tagName,dataset,parentElement,hasAttribute(name){const match=name.match(/^data-([a-z-]+)$/);return !!match&&Object.hasOwn(dataset,match[1].replace(/-([a-z])/g,(_,letter)=>letter.toUpperCase()));},closest(selector){const selectors=selector.split(',').map(value=>value.trim());for(let node=this;node;node=node.parentElement)if(selectors.some(value=>selectorMatches(node,value)))return node;return null;}});
+ const root=element('HTML',{landscapeMotion:'normal'},null),body=element('BODY',{},root),normalChoice=element('BUTTON',{landscapeMotion:'normal'},body),reducedChoice=element('BUTTON',{landscapeMotion:'reduced'},body);
+ const note={hidden:false},motionButton={textContent:''};let handler,starts=0,closes=0;
+ normalChoice.setAttribute=(name,value)=>{normalChoice[name]=value;};reducedChoice.setAttribute=(name,value)=>{reducedChoice[name]=value;};
+ const dialog={querySelectorAll:()=>[normalChoice,reducedChoice],close(){closes++;}};
+ const document={documentElement:root,getElementById:id=>id==='deviceMotionNote'?note:{},addEventListener(name,fn){if(name==='click')handler=fn;}};
+ Object.assign(c,{preference:'normal',reduced:false,mq:{matches:false},storage,S,motionButton,dialog,document,start(){starts++;}});
+ vm.runInContext(update+listener,c);
+ assert.equal(typeof handler,'function','the extracted production document listener is registered');
+ const click=node=>handler({target:node});
+ click(element('BUTTON',{act:'download-current-board'},body));
+ click(element('BUTTON',{act:'download-recovery-archive'},body));
+ click(element('A',{download:'chain-scanner-current-board.json'},body));
+ assert.equal(storage.getItem(motionKey),originalRaw,'Settings export actions and their programmatic download click leave the exact timed consent bytes and expiry unchanged');
+ assert.deepEqual(saves,[],'ordinary downloads do not renew motion consent');
+ assert.equal(starts,0,'ordinary downloads do not restart the landscape');
+ click(normalChoice);
+ assert.equal(saves.length,1,'choosing Normal records one explicit motion choice');
+ assert.equal(storage.getItem(motionKey),JSON.stringify({choice:'normal',savedAt:now}));
+ assert.equal(root.dataset.landscapeMotion,'normal');assert.equal(note.hidden,true);
+ click(reducedChoice);
+ assert.equal(saves.length,2,'choosing Reduced records one explicit motion choice');
+ assert.equal(storage.getItem(motionKey),JSON.stringify({choice:'reduced',savedAt:now}));
+ assert.equal(root.dataset.landscapeMotion,'reduced');assert.equal(note.hidden,true);
+ assert.equal(starts,2,'the two explicit choices each update motion');assert.equal(closes,2,'each explicit choice closes its prompt');
+});
+
 // Replay actual canvas transforms and paint bounds. Tracking-camera ground marks
 // are diagnostic ink; exclude only their documented gray color, not actor shapes.
 function paintedMotionWorldXs(frame){

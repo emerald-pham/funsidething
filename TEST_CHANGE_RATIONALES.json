@@ -12424,4 +12424,46 @@
       "The aggregate record preserves component evidence and chronology in earlier rationale objects; the issue196 consumer cohort passed 29/29 at 14-55-01-262Z, source/commit/cloud cancellation controls passed 3/3 at 14-56-52-548Z, generic backdrop/Escape cancellation passed 3/3 at 15-00-23-724Z, and risk inventory mapping passed at 15-01-56-523Z."
     ]
   }
+,
+{
+  "testChangesSha256": "930750e41056ff48899dfb72308c6fc7cfa32bc5b9c028bd152687b5421cd2c2",
+  "reason": "Add a real production-listener regression for ordinary export clicks bubbling to the document-root motion marker, while preserving explicit choice behavior.",
+  "previousBehavior": "The landscape document click listener can treat the html element motion-state marker as a clicked control when an ordinary Settings export or its programmatic download anchor bubbles to the root, renewing timed local motion consent.",
+  "intendedBehavior": "Current-board export, recovery-archive export, and their bubbled download clicks leave the exact saved consent record and expiry unchanged. Only the explicit Normal and Reduced motion controls save once and update the scene.",
+  "preservedCoverage": [
+    "Existing seven-day motion-consent expiry, corrupt-record fail-closed, dismissal, accessibility, resume, and real reduced-motion behavior assertions remain unchanged.",
+    "The new consumer registers and invokes the actual document click listener from landscape.js with ancestor-based closest semantics, observes exact stored consent bytes across both export actions and a programmatic anchor click, then verifies one save and scene update for each explicit choice.",
+    "The previously passing pedestrian motion-toggle consumer continues to prove retained visitor recipes and complete underway tails are restored without changing shared scene data."
+  ],
+  "redEvidence": {
+    "command": "TZ=UTC /Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/restore-backup-file-196/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/manual-json-export/native-motion-consent/owner-runs --purpose preimplementation-red -- /Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node --test --test-name-pattern='RISK motion safety: export clicks do not renew consent' tests.js",
+    "failure": "The real registered listener rewrote the consent from {\"choice\":\"normal\",\"savedAt\":1792335599000} to {\"choice\":\"normal\",\"savedAt\":1792335600000} after current-board export, recovery-archive export, and programmatic-anchor click. The assertion failed on unchanged product source at bf13b8eda2baa80875214e8a7e882a8d7f08d3bb; the test harness and modules loaded successfully. Recorded assertion-failure: /Users/emeraldpham/.codex/task-artifacts/manual-json-export/native-motion-consent/owner-runs/2026-10-18T15-23-10-929Z-e3567ed9-18e4-41a7-8dd9-a0a3c74b612f.json."
+  },
+  "replacementTests": [
+    "RISK motion safety: export clicks do not renew consent while actual choices still do"
+  ],
+  "comparison": "issue196 motion-consent export click regression against 52d origin main",
+  "baseCommit": "52d4b2537bacbb60240ae7a53061224350ebd36f"
+}
+,
+{
+  "testChangesSha256": "15dd5c4744334958120cd8310856ee29a9576b1250efaddc821227469de3bb7b",
+  "reason": "Record the exact issue196 motion-consent regression diff against its frozen implementation baseline as well as the integrated main comparison.",
+  "previousBehavior": "On the clean bf13b8 baseline, export button and bubbled download-anchor clicks can match the document-root motion marker and renew the saved seven-day consent timestamp.",
+  "intendedBehavior": "Only explicit Normal or Reduced motion controls renew the timed local choice; ordinary current-board and recovery-archive exports preserve the exact existing consent record.",
+  "preservedCoverage": [
+    "This base-specific rationale maps the single newly added motion-consent RISK consumer test; it does not replace or weaken existing landscape, PWA, export, or motion-safety assertions.",
+    "The test observes the real registered landscape.js click listener with ancestor closest semantics, exact local consent bytes, both Settings export actions, a programmatic download anchor, and explicit selection of either motion mode.",
+    "The actual preimplementation assertion failure is retained in the shared recorded run; this entry does not claim a second red execution or fabricate chronology."
+  ],
+  "redEvidence": {
+    "command": "TZ=UTC /Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node scripts/agent-tools/record-run.mjs --repo /Users/emeraldpham/.codex/worktrees/restore-backup-file-196/funsidething --evidence-dir /Users/emeraldpham/.codex/task-artifacts/manual-json-export/native-motion-consent/owner-runs --purpose preimplementation-red -- /Users/emeraldpham/.npm/_npx/52027bd8fc0022aa/node_modules/node/bin/node --test --test-name-pattern='RISK motion safety: export clicks do not renew consent' tests.js",
+    "failure": "The actual listener rewrote the valid saved choice at 1792335599000 to savedAt 1792335600000 after export actions; the test harness loaded and failed on the intended consent assertion before landscape.js was edited. This is the same recorded RED, not an additional run: /Users/emeraldpham/.codex/task-artifacts/manual-json-export/native-motion-consent/owner-runs/2026-10-18T15-23-10-929Z-e3567ed9-18e4-41a7-8dd9-a0a3c74b612f.json."
+  },
+  "replacementTests": [
+    "RISK motion safety: export clicks do not renew consent while actual choices still do"
+  ],
+  "comparison": "issue196 motion-consent export click regression against bf13 implementation baseline",
+  "baseCommit": "bf13b8eda2baa80875214e8a7e882a8d7f08d3bb"
+}
 ]
