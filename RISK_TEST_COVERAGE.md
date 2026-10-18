@@ -562,6 +562,8 @@ The editor hook blocks app or enforcement edits while tests.js has no staged or 
 - RISK completion boundaries: failed read stays pending and wake exactly acknowledges an uncertain completion publication
 - RISK completion boundaries: a pending account-A acknowledgement and its learning stay out of account B
 - RISK completion boundaries: a live editor and pressed scanner control defer stale adoption while the saved view and fields survive cold reopen
+- RISK completion convergence: native Done theme and editor Save finish after a conflicted recovery copy without an added trigger
+- RISK completion convergence: failed saves backup failures account changes suspension and drafts guard recovery wakeups
 - RISK completion lifecycle recovery: expired rest cannot restore 2→1 or 13→4 saved chains
 - RISK completion lifecycle Start: an explicit new pass bootstraps an eligible task after rest without a synthetic Dot
 - RISK completion lifecycle Start: an observed new-pass root survives peer merge and IndexedDB reopen
@@ -1618,3 +1620,9 @@ The candidate worker precaches while predecessor clients remain on their existin
 - RISK native installed-client delivery: reconcile-held
 - RISK repository process: installed-client native registration sensitivities fail closed
 - RISK native installed-client sensitivity: unsafe delivery and source loss are rejected
+
+## PR210 device-backup contention and causal fixture readiness
+
+A pure native Done/theme/editor Save overlap holds the successful response from the earlier real350ms save while stale-cloud adoption attempts its mandatory backup. Actual IndexedDB expected-head conflicts must resolve through a verified successful local save and one guarded reconciliation wakeup, with no added fixture persist, immediate push or focus event before acceptance. The exact editor fields, original facts, all recovery paints/writes, verified recovery row, account/head/cloud acknowledgement, pressed control and cold reopen remain checked. Failed native-save acknowledgements, quota and unavailable backups after a prior conflict, never-armed quota, changed account, page suspension and active drafts prevent unsafe automatic retry. Actual focusout alone resumes the draft-held control.
+
+The existing editor consumer still executes its original fixture persists and immediate publication, after observing all real native/deferred persistence producers; its required-five-consumer runtime title/selector/count/deadline remain unchanged. The evergreen-return Undo consumer retains completion-time phase labels and every-write assertions while awaiting actual prior/Undo native saves, including a delayed successful prior response. The form consumer delivers a real completion-bearing response into an active draft before natural focusout; a250ms resumed response remains pending until actual delivery and semantic acknowledgement. The Mac-first IndexedDB No-recovery matrix retains150ms real SDK publication latency and awaits the actual publication and device/account acknowledgement before original remote assertions. Other order/backend leaves and offline Phone expectations remain. These current CI-regression/causal controls do not rewrite the historical #172 product-RED chronology or establish the exact untraced CI schedule.

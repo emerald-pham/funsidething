@@ -1284,7 +1284,7 @@ test('RISK scoped Undo recovery: a true Undo cancels only its compound Dot while
  cold.ctx.window.CloudSync.ready=true;await cold.ctx.cloudPull();assert.deepEqual(Array.from(cold.ctx.state.chain),[referenceId]);
  assert.deepEqual(Array.from(cold.ctx.state.tasks,row=>[row.id,row.mu,row.sigma]),Array.from(cloud.tasks,row=>[row.id,row.mu,row.sigma]));
 });
-test('RISK scoped Undo recovery: Undo of an informed evergreen return survives older source and permits an acknowledged later return',async t=>{
+test('RISK scoped Undo recovery: Undo of an informed evergreen return survives older source and permits an acknowledged later return',{timeout:15000},async t=>{
  const {IDBFactory}=await import('fake-indexeddb'),at=Date.parse('2026-10-17T15:00:00Z'),indexedDB=new IDBFactory(),
   deviceDbName=`scoped-undo-return-${Date.now()}-${Math.random()}`,targetId='undo-return-target',referenceId='undo-return-reference',
   peerCandidateId='undo-return-peer-choice',peerFieldId='undo-return-peer-field';
@@ -1298,6 +1298,7 @@ test('RISK scoped Undo recovery: Undo of an informed evergreen return survives o
   peer=await loadAppAtTime(at,{seedStorage,cloudSyncFactory:h.factory}),fixtures=[local,peer];
  const closed=new WeakSet(),closeFixture=async app=>{if(!app||closed.has(app))return;closed.add(app);try{app.ctx.window.CloudSync.user=null;app.ctx.suspendCloudSync?.();vm.runInContext('clearCloudRetry();clearTimeout(cloudTimer);clearTimeout(saveTimer);',app.ctx);}catch{}try{await app.ctx.window.ScannerDeviceStore?.close?.();}catch{}};
  t.after(async()=>{for(const app of fixtures)await closeFixture(app);});
+ const nativeSaves=observeQueuedNativeSaves(local.ctx,t);
  await local.ctx.cloudPull();await peer.ctx.cloudPull();local.ctx.window.CloudSync.ready=false;peer.ctx.window.CloudSync.ready=false;
  setFakeTime(local.ctx,at+100);hydrateUnchangedEditorDraft(local,targetId);local.ctx.onAction('done-task',{dataset:{id:targetId}});await local.ctx.persist();
  const firstCompletion=JSON.parse(JSON.stringify(local.ctx.state.decisionEvents.find(event=>event.kind==='completion'&&event.taskId===targetId)));
@@ -1328,18 +1329,25 @@ test('RISK scoped Undo recovery: Undo of an informed evergreen return survives o
  const expectedBeforeUndo=rated(firstReturn,peerChoice);
  for(const row of local.ctx.state.tasks){assert.equal(row.mu,expectedBeforeUndo[row.id].mu,`${row.id}: both local return and peer Yes are learned before Undo`);assert.equal(row.sigma,expectedBeforeUndo[row.id].sigma);}
  const scan=local.shim.document.getElementById('scan'),store=local.ctx.window.ScannerDeviceStore,commit=store.commitHead.bind(store),paints=[],writes=[];
- let phase='idle',markup=scan.innerHTML;
+ let phase='idle',markup=scan.innerHTML,delayedNativeResponse=false;
  Object.defineProperty(scan,'innerHTML',{configurable:true,get:()=>markup,set(value){markup=value;if(phase!=='idle'){
   const visible=[...String(value).matchAll(/data-act="reveal" data-id="([^"]+)"/g)].map(match=>match[1]),bench=String(value).match(/data-act="bench-done" data-benchmark="([^"]+)"/);if(bench)visible.push(bench[1]);
   paints.push({phase,chain:Array.from(local.ctx.state.chain),visible});
  }}});
- store.commitHead=async options=>{const result=await commit(options);if(result?.ok&&phase!=='idle'){
+ store.commitHead=async options=>{const result=await commit(options);
+  // A real pre-Undo native producer may finish after the head already matches.
+  // Keep its successful delayed response in the phase that actually awaits it.
+  if(result?.ok&&nativeSaves.active()&&phase==='pre-undo-source'&&!delayedNativeResponse){delayedNativeResponse=true;await syncSettle(100);}
+  if(result?.ok&&phase!=='idle'){
   const board=JSON.parse(options.payload);writes.push({phase,chain:board.chain.slice(),events:board.decisionEvents.map(event=>event.id)});
  }return result;};
  phase='pre-undo-source';h.writeBehindBack(olderCompletionSource);await local.ctx.cloudPull();await local.ctx.cloudPushNow();await settleSavedViewPublication(local,h,'RISK scoped Undo recovery coherent publication 5');
  assert.deepEqual(Array.from(local.ctx.state.chain),[referenceId,targetId,peerCandidateId],'the older completion-only source cannot erase the informed return or peer pass progress before Undo');
  assert.ok(local.ctx.state.decisionEvents.some(event=>event.id===firstReturn.id));
  const completionBytes=JSON.stringify(local.ctx.state.decisionEvents.find(event=>event.id===firstCompletion.id));
+ const beforeUndoSaves=await nativeSaves.settle('pre-Undo native saves');
+ assert.equal(delayedNativeResponse,true,'the actual queued pre-Undo save exercises delayed successful device response delivery');
+ await settleSavedViewPublication(local,h,'pre-Undo native producer and durable acknowledgement');
  phase='undo-action';
  assert.equal(await local.ctx.onAction('undo',{}),true,'the real Undo targets the complete informed Dot/editor gesture');
  const cancellation=local.ctx.state.decisionEvents.find(event=>event.kind==='undo'&&event.targetEventIds.includes(firstReturn.id));
@@ -1353,6 +1361,11 @@ test('RISK scoped Undo recovery: Undo of an informed evergreen return survives o
  for(const row of local.ctx.state.tasks){assert.equal(row.mu,expectedAfterUndo[row.id].mu,`${row.id}: true Undo removes only its own Dot learning`);assert.equal(row.sigma,expectedAfterUndo[row.id].sigma);}
  assert.equal(local.ctx.state.workLog.filter(row=>row.taskId===targetId&&row.kind==='evergreen-done').length,1,'Undo preserves the first evergreen History session');
  assert.ok(local.ctx.state.decisionEvents.some(event=>event.id===cancellation.id));
+ const afterUndoSaves=await nativeSaves.settle('native Undo save');
+ assert.ok(afterUndoSaves.completed>beforeUndoSaves.completed&&afterUndoSaves.results.at(-1)===true,'the actual native Undo save completes before the redundant fixture persist');
+ await settleSavedViewPublication(local,h,'native Undo producer and durable acknowledgement');
+ const nativeUndoHead=JSON.parse((await store.readHead()).payload);
+ assert.ok(nativeUndoHead.decisionEvents.some(event=>event.id===cancellation.id)&&!nativeUndoHead.chain.includes(targetId),'the native Undo cancellation reaches the actual head before the extra fixture persist');
  await local.ctx.persist();await local.ctx.cloudPushNow();await settleSavedViewPublication(local,h,'RISK scoped Undo recovery coherent publication 6');assert.equal(local.ctx.state.syncDirty,false);
  phase='post-undo-source';
  h.writeBehindBack(staleReturnSource);await local.ctx.cloudPull();await local.ctx.cloudPushNow();await settleSavedViewPublication(local,h,'RISK scoped Undo recovery coherent publication 7');
@@ -10481,6 +10494,26 @@ function observeSyncFixtureCalls(ctx,name){
  ctx[name]=(...args)=>{const promise=original(...args),call={promise,settled:false};calls.push(call);Promise.resolve(promise).finally(()=>{call.settled=true;});return promise;};
  return calls;
 }
+function observeQueuedNativeSaves(ctx,t){
+ const schedule=ctx.setTimeout,cancel=ctx.clearTimeout,persist=ctx.persist,context=new AsyncLocalStorage(),jobs=new Map(),persists=[];
+ ctx.persist=(...args)=>{const promise=persist(...args),call={promise,settled:false};persists.push(call);Promise.resolve(promise).finally(()=>{call.settled=true;});return promise;};
+ ctx.setTimeout=(fn,ms,...args)=>{
+  if(ms!==350)return schedule(fn,ms,...args);
+  const job={waiting:true,finished:false};
+  const timer=schedule((...fired)=>context.run(true,()=>{job.waiting=false;const result=fn(...fired);Promise.resolve(result).then(value=>{job.finished=true;job.value=value;});return result;}),ms,...args);
+  jobs.set(timer,job);return timer;
+ };
+ ctx.clearTimeout=timer=>{const job=jobs.get(timer);if(job?.waiting){job.waiting=false;job.finished=true;job.cancelled=true;}return cancel(timer);};
+ t.after(()=>{ctx.setTimeout=schedule;ctx.clearTimeout=cancel;ctx.persist=persist;});
+ return {active:()=>context.getStore()===true,async settle(stage){
+  const deadline=performance.now()+8000;
+  while(performance.now()<deadline){
+   if([...jobs.values()].every(job=>job.finished)&&persists.every(call=>call.settled))return {completed:[...jobs.values()].filter(job=>!job.cancelled).length,results:[...jobs.values()].filter(job=>!job.cancelled).map(job=>job.value)};
+   await syncSettle(2);
+  }
+  assert.fail(stage+' still has an actual queued native save or persist producer');
+ }};
+}
 function holdNextSyncFixturePush(app){
  const CS=app.shim.window.CloudSync,push=CS.push.bind(CS),entered=deferredSyncFixture(),release=deferredSyncFixture(),returned=deferredSyncFixture();let first=true;
  CS.push=async(...args)=>{if(first){first=false;entered.resolve();await release.promise;}const result=await push(...args);returned.resolve(result);return result;};
@@ -15517,7 +15550,7 @@ function makeSyncHarness({ delayMs = 4, remote = null, failPull = false, rev = n
   return h;
 }
 
-test('RISK cloud No recovery: five scanner decisions survive offline durable reopen beside an independent peer edit',async t=>{ // Pin simulated time and cover both publication orders.
+test('RISK cloud No recovery: five scanner decisions survive offline durable reopen beside an independent peer edit',{timeout:15000},async t=>{ // Pin simulated time and cover both publication orders.
  const {IDBFactory}=await import('fake-indexeddb');
  const at=Date.parse('2026-10-16T15:10:00.000Z'),passAt=at-60000;
  for(const publicationOrder of ['Mac first','Phone first'])await t.test(publicationOrder,async publicationTest=>{
@@ -15594,6 +15627,12 @@ test('RISK cloud No recovery: five scanner decisions survive offline durable reo
    assert.equal(JSON.stringify(offlineBoard.decisionEvents),noEventsSnapshot,'the durable bytes preserve the exact five original No event rows');
    await closeStore({window:phone.window});
 
+   const publications=observeSyncFixtureCalls(mac,'sendPush');
+   if(publicationOrder==='Mac first'&&backend==='IndexedDB'){
+    const backend=mac.window.CloudSync,push=backend.push.bind(backend);
+    // Keep the real durable publication slower than the former30ms check.
+    backend.push=async(...args)=>{await syncSettle(150);return push(...args);};
+   }
    if(publicationOrder==='Phone first')mac.window.CloudSync.ready=false;
    assert.equal(await saveEditorChoice({ctx:mac,shim:macShim},'mac-edit',at+2000,{title:'Mac independent edit'}),true,
     'the independent peer edit uses the actual editor action with unchanged rendered context/reset controls');
@@ -15611,7 +15650,10 @@ test('RISK cloud No recovery: five scanner decisions survive offline durable reo
    assert.deepEqual(Array.from(mac.state.tasks.find(task=>task.id==='mac-edit').ctx),['c_shared'],'editor hydration preserves its unrelated context');
    assert.equal(mac.state.tasks.find(task=>task.id==='mac-edit').evergreenResetAtDay,true,'editor hydration preserves its checked reset control');
    if(publicationOrder==='Mac first'){
-    await mac.cloudPushNow();await syncSettle(30);
+    await mac.cloudPushNow();
+    assert.ok(publications.length>0,'the ordinary Mac publication runs through its actual async producer');
+    await Promise.all(publications.map(call=>call.promise));
+    await settleSavedViewPublication({ctx:mac,shim:macShim},h,'Mac-first actual publication and device/account acknowledgement');
     assert.equal(h.remoteState().tasks.find(task=>task.id==='mac-edit').title,'Mac independent edit');
     assert.deepEqual(Array.from(h.remoteState().tasks.find(task=>task.id==='mac-edit').ctx),['c_shared']);
     assert.equal(h.remoteState().tasks.find(task=>task.id==='mac-edit').evergreenResetAtDay,true);
@@ -27340,7 +27382,8 @@ test('RISK completion boundaries: a pending account-A acknowledgement and its le
  assert.ok(pushCount>=1,'only the captured account-A write was pending through the transition');
 });
 
-test("RISK completion boundaries: a live editor and pressed scanner control defer stale adoption while the saved view and fields survive cold reopen",async t=>{
+async function exerciseCompletionEditorBoundaries(t,nativeOnly=false){
+ const observerWatchdog=setTimeout(()=>{},15000);t.after(()=>clearTimeout(observerWatchdog));
  const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),at=Date.parse('2026-10-17T15:00:00Z'),
   doneId='boundary-editor-done',peerId='boundary-editor-peer',gateId='boundary-editor-gate',dependentId='boundary-editor-dependent',
   name=`completion-boundary-editor-${Date.now()}-${Math.random()}`;
@@ -27362,12 +27405,14 @@ test("RISK completion boundaries: a live editor and pressed scanner control defe
  const readStarted=new Promise(resolve=>{readStartedResolve=resolve;}),readGate=new Promise(resolve=>{releaseRead=resolve;});
  const closed=new WeakSet(),closeFixture=async fixture=>{if(!fixture||closed.has(fixture))return;closed.add(fixture);try{fixture.shim.window.CloudSync&&(fixture.shim.window.CloudSync.user=null);fixture.ctx.suspendCloudSync?.();vm.runInContext('clearTimeout(saveTimer);saveTimer=null;clearTimeout(cloudTimer);cloudTimer=null;clearCloudRetry();',fixture.ctx);}catch{}try{await fixture.shim.window.ScannerDeviceStore?.close?.();}catch{}};
  t.after(()=>closeFixture(app));
+ const nativeSaves=observeQueuedNativeSaves(ctx,t),oldEntered=deferredSyncFixture(),oldRelease=deferredSyncFixture();let heldOld=false,nativeSource=null;
+ t.after(()=>oldRelease.resolve());
  await ctx.__dataReady;await ctx.cloudPull();CS.ready=false;
  hydrateUnchangedEditorDraft(app,doneId);ctx.onAction('done-task',{dataset:{id:doneId}});
- assert.equal(await ctx.persist(),true,'the actual editor Done is durably saved before stale delivery');
+ if(!nativeOnly)assert.equal(await ctx.persist(),true,'the actual editor Done is durably saved before stale delivery');
  const completion=JSON.parse(JSON.stringify(ctx.state.decisionEvents.find(event=>event.kind==='completion'&&event.taskId===doneId)));
  assert.ok(completion,'the completion fact is bound to the real task response');
- setFakeTime(ctx,at+25);ctx.onAction('cycle-theme',{});assert.equal(await ctx.persist(),true,'the actual preference action has its own device save');
+ setFakeTime(ctx,at+25);ctx.onAction('cycle-theme',{});if(!nativeOnly)assert.equal(await ctx.persist(),true,'the actual preference action has its own device save');
  const theme=ctx.state.settings.theme,themeFact=JSON.parse(JSON.stringify(ctx.state.decisionEvents.find(event=>event.kind==='current-choice'&&event.target?.property==='theme')));
  assert.ok(themeFact,'the independent theme selection remains an immutable fact');
  ctx.onAction('toggle-list',{});const search=shim.document.getElementById('listSearch');search.id='listSearch';search.value='Independent peer';
@@ -27380,6 +27425,7 @@ test("RISK completion boundaries: a live editor and pressed scanner control defe
   // so the regression retains the observed slow-storage producer overlap.
   if(phase==='editor-save-and-deferred-adoption')await syncSettle(400);
   const result=await commit(options);
+  if(nativeOnly&&nativeSaves.active()&&phase==='completion-adoption'&&result?.ok&&!heldOld){heldOld=true;nativeSource=options.payload;oldEntered.resolve();await oldRelease.promise;}
   if(result?.ok)durable.push({phase,chain:JSON.parse(options.payload).chain,events:JSON.parse(options.payload).decisionEvents||[]});return result;
  };
  // A newer cloud revision still carries the membership from before this Done.
@@ -27397,6 +27443,7 @@ test("RISK completion boundaries: a live editor and pressed scanner control defe
  assert.equal(scan.innerHTML,scanBeforeEditorPull,'the scanner remains exactly as shown before the held read');
  assert.equal(ctx.state.tasks.find(row=>row.id===peerId).title,'Independent peer task','cloud content cannot replace the active editor under its draft');
  assert.equal(vm.runInContext('deferredCloudPull',ctx),true,'the cloud adoption waits for the editor close boundary');
+ if(nativeOnly){await oldEntered.promise;const pendingHead=await store.readHead();assert.equal(pendingHead.payload,nativeSource,'the held real native save already protects the original Done and theme before editor Save');}
  shim.document.querySelector=()=>null;
  phase='editor-save-and-deferred-adoption';
  const nativeSave=deferredSyncFixture(),schedule=ctx.setTimeout;
@@ -27408,8 +27455,15 @@ test("RISK completion boundaries: a live editor and pressed scanner control defe
  };
  try{ctx.onAction('save-edit',{dataset:{id:peerId}});}finally{ctx.setTimeout=schedule;}
  assert.equal(await nativeSave.promise,true,'the real queued editor Save completes a successful durable persist');
- ctx.cloudPushNow();await settleSavedViewPublication(app,h,'editor-deferred completion adoption');
- assert.equal(await ctx.persist(),true,'the redundant fixture save succeeds after native editor publication is durably acknowledged');phase='settled';
+ if(nativeOnly)oldRelease.resolve();
+ else{
+  // The extra immediate fixture push must not overtake earlier native or
+  // deferred persistence. Native-only coverage below adds no such barrier.
+  await nativeSaves.settle('editor native and deferred producers before the extra fixture push');ctx.cloudPushNow();
+ }
+ await settleSavedViewPublication(app,h,'editor-deferred completion adoption');
+ if(!nativeOnly)assert.equal(await ctx.persist(),true,'the redundant fixture save succeeds after native editor publication is durably acknowledged');phase='settled';
+ if(nativeOnly){const backups=await store.listBackups();assert.ok(backups.some(row=>{const board=JSON.parse(row.payload);return board.tasks?.some(task=>task.id===peerId&&task.title==='Editor draft during delayed recovery')&&board.decisionEvents?.some(event=>event.id===completion.id)&&board.decisionEvents?.some(event=>event.id===themeFact.id);}), 'automatic convergence retains a verified recovery copy of the native editor fields and original facts');}
  const cloud=h.remoteState(),savedTask=ctx.state.tasks.find(row=>row.id===peerId);
  assert.deepEqual([...ctx.state.chain],[peerId],'deferred adoption never paints the completed member back into the chain');
  assert.equal(savedTask.title,'Editor draft during delayed recovery');assert.equal(savedTask.due,'2026-11-02');
@@ -27481,7 +27535,55 @@ test("RISK completion boundaries: a live editor and pressed scanner control defe
  assert.equal(reopened.shim.document.getElementById('listBody').scrollTop,420);
  assert.ok(savedView.includes('Independent peer'),'the exact device-local filter survives the durable board reopen');
  t.after(()=>closeFixture(reopened));
+}
+
+test("RISK completion boundaries: a live editor and pressed scanner control defer stale adoption while the saved view and fields survive cold reopen",{timeout:15000},async t=>exerciseCompletionEditorBoundaries(t));
+test('RISK completion convergence: native Done theme and editor Save finish after a conflicted recovery copy without an added trigger',{timeout:15000},async t=>exerciseCompletionEditorBoundaries(t,true));
+
+test('RISK completion convergence: failed saves backup failures account changes suspension and drafts guard recovery wakeups',{timeout:15000},async t=>{
+ const {IDBFactory}=await import('fake-indexeddb');
+ for(const control of ['failed-save','quota-after-conflict','unavailable-after-conflict','quota-without-conflict','account','suspended','draft'])await t.test(control,async t=>{
+  const initial=syncState({tasks:[syncTask('wake-base','Saved task')],syncRev:4,syncAccount:'e@example.com',syncDirty:false,seenQuickStart:true}),remote=structuredClone(initial);
+  for(const key of ['syncRev','syncAccount','syncDirty'])delete remote[key];
+  const h=makeSyncHarness({remote,rev:4,delayMs:1}),raw=JSON.stringify(initial),app=await loadApp({seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw},indexedDBProvider:new IDBFactory(),deviceDbName:'native-recovery-guard-'+control+'-'+Math.random(),cloudSyncFactory:h.factory}),{ctx,shim}=app,backend=shim.window.CloudSync,store=shim.window.ScannerDeviceStore,
+   saves=observeQueuedNativeSaves(ctx,t),commit=store.commitHead.bind(store),put=store.putBackup.bind(store),entered=deferredSyncFixture(),release=deferredSyncFixture(),failedBackup=deferredSyncFixture(),watchdog=setTimeout(()=>{},12000);
+  let held=false,backupAttempts=0,conflicts=0;
+  t.after(async()=>{release.resolve();clearTimeout(watchdog);ctx.suspendCloudSync();vm.runInContext('clearTimeout(saveTimer);clearTimeout(cloudTimer);clearTimeout(liveCloudTimer);clearTimeout(deviceCloudBackupTimer);deviceCloudBackupTimer=null;pendingDeviceCloudBackup=null;clearCloudRetry()',ctx);await store.close();});
+  await ctx.cloudPull();assert.equal(await ctx.persist(),true,'the isolated guard fixture establishes its actual device head before fault injection');await saves.settle('native recovery guard startup');backend.ready=false;
+  shim.document.getElementById('addInput').value='Native task before '+control;ctx.onAction('add',shim.document.getElementById('addButton'));await saves.settle('native recovery guard task setup');
+  store.commitHead=async options=>{const result=await commit(options);if(saves.active()&&!held&&result?.ok){held=true;entered.resolve();await release.promise;if(control==='failed-save')return {error:true,code:'synthetic-lost-save-ack'};}return result;};
+  store.putBackup=async options=>{
+   if(!['before-cloud-local-edit','before-cloud-adoption'].includes(options.backup?.kind))return put(options);
+   backupAttempts++;
+   if(control==='quota-without-conflict'||conflicts>0&&['quota-after-conflict','unavailable-after-conflict'].includes(control)){
+    failedBackup.resolve();if(control==='unavailable-after-conflict')throw Error('synthetic-unavailable-backup');return {error:true,code:'quota-exhausted'};
+   }
+   const result=await put(options);if(result?.conflict)conflicts++;return result;
+  };
+  ctx.onAction('cycle-theme',{});await entered.promise;
+  const acceptedId=ctx.state.tasks.find(task=>task.title==='Native task before '+control).id;backend.ready=true;h.writeBehindBack(remote);await ctx.cloudPull();
+  assert.equal(backupAttempts,1,'the ordinary stale-source consumer really attempts its required backup');
+  assert.equal(conflicts,control==='quota-without-conflict'?0:1,'only an actual expected-head refusal can arm a local-save wakeup');
+  if(control==='account'){backend.user='other@example.test';shim.window.dispatchEvent({type:'cloudsync'});}
+  if(control==='suspended')shim.window.dispatchEvent({type:'pagehide'});
+  if(control==='draft')shim.document.activeElement={matches:selector=>selector.includes('input')};
+  const reads=h.calls.filter(call=>call==='pull').length;release.resolve();await saves.settle('guarded native save');await syncSettle(0);
+  if(['quota-after-conflict','unavailable-after-conflict'].includes(control)){
+   await failedBackup.promise;const attempts=backupAttempts;
+   backend.ready=false;shim.document.getElementById('addInput').value='Later native task after failed backup';ctx.onAction('add',shim.document.getElementById('addButton'));await saves.settle('later successful native save after permanent backup failure');await syncSettle(0);
+   assert.equal(backupAttempts,attempts,'a quota or unreadable backup after a conflict does not leave a retry marker for another successful native save');
+  }else assert.equal(h.calls.filter(call=>call==='pull').length,reads,'failed saves unavailable backup changed identity suspension and active drafts cannot authorize another read');
+  assert.ok(ctx.state.tasks.some(task=>task.id===acceptedId),'the accepted native task remains open throughout the hold');
+  assert.ok(JSON.parse((await store.readHead()).payload).tasks.some(task=>task.id===acceptedId),'the exact committed native task remains in the actual device head');
+  assert.equal(h.remoteState().tasks.some(task=>task.id===acceptedId),false,'no protected board is uploaded while its recovery authority is held');
+  if(control==='failed-save')assert.ok(ctx.deviceSaveIssue(),'an unacknowledged native save remains an actual device-save failure');
+  if(control==='draft'){
+   shim.document.activeElement=null;shim.document.dispatchEvent({type:'focusout'});await settleSavedViewPublication(app,h,'natural draft close after native recovery contention');
+   assert.ok(h.remoteState().tasks.some(task=>task.id===acceptedId),'only the real draft-close lifecycle resumes the protected native task');
+  }
+ });
 });
+
 
 test('RISK completion lifecycle recovery: expired rest cannot restore 2→1 or 13→4 saved chains',async t=>{
  const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),at=Date.parse('2026-10-17T15:00:00Z');
@@ -28119,13 +28221,34 @@ test('RISK live scan sync: revision hints wake canonical reads without trusting 
  assert.equal(Object.hasOwn(JSON.parse(b.ctx.cloudPayload()),'pendingCloudRevision'),false,'notification bookkeeping is device-only');
 });
 
-test('RISK live scan sync: a form draft defers live adoption then receives completion when editing ends',async()=>{
- const {a,b,candidateId,benchId}=await liveScanSyncClients();
- const editor={matches:selector=>selector.includes('input')};b.shim.document.activeElement=editor;
- a.ctx.onAction('cand-done',{dataset:{candidate:candidateId,benchmark:benchId}});a.ctx.cloudPushNow();await syncSettle(50);
+test('RISK live scan sync: a form draft defers live adoption then receives completion when editing ends',{timeout:10000},async t=>{
+ const {a,b,h,candidateId,benchId}=await liveScanSyncClients(),backend=b.shim.window.CloudSync,pull=backend.pull.bind(backend),calls=observeSyncFixtureCalls(b.ctx,'cloudPull'),
+  entered=deferredSyncFixture(),release=deferredSyncFixture(),resumed=deferredSyncFixture(),watchdog=setTimeout(()=>{},10000);
+ let first=true;
+ t.after(()=>{release.resolve();clearTimeout(watchdog);backend.pull=pull;for(const app of[a,b]){app.ctx.suspendCloudSync();vm.runInContext('clearTimeout(saveTimer);clearTimeout(cloudTimer);clearTimeout(liveCloudTimer);clearCloudRetry()',app.ctx);}});
+ await settleLiveModePublication(a,h,'form sender startup');await settleLiveModePublication(b,h,'form peer startup');
+ backend.pull=async(...args)=>{
+  const response=await pull(...args),consumer=calls.findLast(call=>!call.settled);
+  if(first){first=false;entered.resolve({response,consumer});await release.promise;}
+  else{resumed.resolve({response,consumer});await syncSettle(250);}
+  return response;
+ };
+ const editor={matches:selector=>selector.includes('input')};
+ a.ctx.onAction('cand-done',{dataset:{candidate:candidateId,benchmark:benchId}});a.ctx.cloudPushNow();
+ const initial=await entered.promise;assert.ok(initial.consumer,'the natural server hint starts an actual completion-bearing read');
+ const delivered=JSON.parse(initial.response.payload),completion=delivered.decisionEvents.find(event=>event.kind==='completion'&&event.taskId===candidateId);
+ assert.ok(completion&&delivered.tasks.find(task=>task.id===candidateId).done,'the held canonical response actually carries this completion');
+ // The draft opens while its real canonical response is in flight, before
+ // adoption. Its guarded consumer must finish without replacing the draft.
+ b.shim.document.activeElement=editor;release.resolve();await initial.consumer.promise;
  assert.equal(b.ctx.state.tasks.find(t=>t.id===candidateId).done,false,'the current DOM-only draft cannot be replaced');
- b.shim.document.activeElement=null;b.shim.document.dispatchEvent({type:'focusout'});await syncSettle(80);
+ assert.equal(vm.runInContext('deferredCloudPull',b.ctx),true,'the actual completion-bearing consumer reaches and defers at the active editor');
+ b.shim.document.activeElement=null;b.shim.document.dispatchEvent({type:'focusout'});
+ const drained=await resumed.promise;assert.ok(drained.consumer,'actual focusout naturally starts the deferred consumer without another focus or pull');
+ assert.equal(b.ctx.state.tasks.find(t=>t.id===candidateId).done,false,'a delayed natural focusout response remains pending before actual delivery');
+ await drained.consumer.promise;await settleLiveModePublication(a,h,'form completion sender');await settleLiveModePublication(b,h,'natural focusout completion and durable acknowledgement');
  assert.equal(b.ctx.state.tasks.find(t=>t.id===candidateId).done,true,'closing the edit drains the server revision without another focus');
+ assert.equal(JSON.stringify(b.ctx.state.decisionEvents.find(event=>event.id===completion.id)),JSON.stringify(completion),'the natural focusout delivery retains the exact completion fact');
 });
 
 test('RISK live scan sync: an in-progress click survives a remote pause and its completion is retained through the conflict',{timeout:10000},async t=>{
