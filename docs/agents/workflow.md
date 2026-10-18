@@ -16,6 +16,7 @@ claim a skill was read when it was not. Load only the skill relevant to the task
 | Resolve interface or module design | `engineering/codebase-design/SKILL.md` | Agreed public boundary and responsibilities before implementation |
 | Turn agreed discussion into a spec | `engineering/to-spec/SKILL.md` | Preserve agreed scope and seams; publish only to an explicitly authorized tracker |
 | Implement an existing spec/task graph | `engineering/implement-spec/SKILL.md` | Use only when the spec, tracker and task graph already exist and delegation is warranted |
+| Split an agreed spec into tickets | `engineering/to-tickets/SKILL.md` | Approved vertical slices, preserved parent and blocking edges |
 | Review changed code | `engineering/code-review/SKILL.md` | Pin base/candidate; report Standards and Spec separately; preserve independent review |
 | Write a PR | `engineering/pr/SKILL.md` | Concise scope, actual evidence, merge danger and unresolved gates |
 | Configure engineering skills | `engineering/setup-matt-pocock-skills/SKILL.md` | User decides tracker/labels; review concrete draft before setup writes |
@@ -84,6 +85,16 @@ never waives them. Keep functional, actual rendered and independent review
 requirements, including native/device and named-engine checks. Missing coverage
 remains a gap. Keep full CDP access and security permissions unchanged; changes
 require separate explicit authorization.
+
+## Spec delivery cycle
+
+For an agreed spec and ticket graph, run `/implement-spec`, complete the required
+checks and release gates, then run `/retro` for that session or checkpoint. Use
+`/to-tickets` for approved follow-ups when useful, then `/implement-spec` for the
+next graph. Use fresh focused agent contexts where supported, retaining existing
+ownership and coordination. Every functional slice keeps the required behavioral
+RED before implementation and GREEN afterward; a retrospective does not restore
+missing chronology.
 
 ## Finish and hand off
 
