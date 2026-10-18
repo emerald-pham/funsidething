@@ -250,6 +250,31 @@ test('RISK optional oldest start: FAQ and current Changelog explain opt out defa
  assert.match(current,/Settings.*choose the first dot yourself/);assert.match(current,/off by default/i);
 });
 
+test('RISK optional oldest start: Save settings alone persists the checkbox transition',async()=>{
+ const {ctx,shim}=await loadApp({seed:197});ctx.addTask('Save-only eligible task',false);ctx.openSettings();
+ assert.equal(ctx.state.settings.skipOldestFirstDot,false);
+ shim.document.getElementById('stSkipOldestFirstDot').checked=true;
+ ctx.onAction('save-settings',{});
+ assert.equal(ctx.state.settings.skipOldestFirstDot,true,'Save must read the checked draft even without an immediate change event');
+ ctx.onAction('start-scan',{dataset:{mode:'descending'}});assert.deepEqual(Array.from(ctx.state.chain),[]);assert.ok(ctx.state.candidateId);
+ assert.equal(await ctx.persist(),true);const raw=shim.localStorage.getItem(SYNC_STORE_KEY),reopened=await loadApp({seedStorage:{[SYNC_STORE_KEY]:raw,[LOCAL_HEAD_KEY]:raw}});
+ reopened.ctx.openSettings();assert.match(reopened.shim.document.getElementById('modalRoot').innerHTML,/id="stSkipOldestFirstDot" type="checkbox" checked/);
+});
+
+test('RISK optional oldest start: the visible Resume action keeps an empty paused pass and its saved draw',async()=>{
+ for(const mode of ['descending','chance','squared','halving']){
+  const {ctx,shim}=await loadApp({seed:198});
+  for(let n=0;n<4;n++)Object.assign(ctx.addTask('Paused candidate '+n,false),{id:'pause-'+n,createdAt:n+1,mu:25+n});
+  ctx.state.settings.skipOldestFirstDot=true;ctx.state.settings.scanMode=mode;ctx.onAction('start-scan',{dataset:{mode}});
+  const skipped=ctx.state.candidateId;ctx.onAction('no',{dataset:{candidate:skipped,benchmark:''}});
+  const chosen=ctx.state.candidateId;ctx.onAction('yes',{dataset:{candidate:chosen,benchmark:''}});ctx.onAction('start-working',{});ctx.onAction('worked',{dataset:{benchmark:chosen}});
+  assert.deepEqual(Array.from(ctx.state.chain),[]);assert.equal(ctx.state.mode,'work');
+  const before={passId:ctx.state.passId,draw:JSON.stringify(ctx.state.chance)},view=shim.document.getElementById('scan').innerHTML,action=view.match(/data-act="(start-scan|resume-scan)"/)?.[1];
+  assert.equal(action,'resume-scan','an already-started empty paused chain must offer Resume through its actual visible action');
+  ctx.onAction(action,{dataset:{mode}});assert.equal(ctx.state.passId,before.passId);assert.equal(JSON.stringify(ctx.state.chance),before.draw);assert.equal(ctx.state.considered[skipped],'no');assert.ok(ctx.state.candidateId);
+ }
+});
+
 test('RISK quiet reconciliation feedback: a peer edit beside an ordinary Dislodge saves without a success interruption',async t=>{
  const at=Date.parse('2026-10-18T03:00:00Z'),ids=['quiet-first','quiet-second'];
  const initial=syncState({tasks:ids.map((id,i)=>({...syncTask(id,'Quiet task '+(i+1)),createdAt:i+1})),mode:'work',scanMode:'descending',syncAccount:'e@example.com',syncRev:4,syncDirty:false,settings:{horizonMin:60,thresholdPct:0,samples:40,cantMin:30,workedHours:8,theme:'system'}});

@@ -12,6 +12,10 @@ The named-contract test in tests.js checks that every top-level test whose title
 
 ## Task state, eligibility, and scanner controls
 
+- RISK optional oldest start: the visible Resume action keeps an empty paused pass and its saved draw
+
+- RISK optional oldest start: Save settings alone persists the checkbox transition
+
 - RISK optional oldest start: enabled Start offers a candidate without dotting or learning
 - RISK optional oldest start: first Yes is unpaired and subsequent Yes learns normally
 - RISK optional oldest start: first No skips only this pass without pairwise learning and Undo restores it
