@@ -27340,7 +27340,7 @@ test('RISK completion boundaries: a pending account-A acknowledgement and its le
  assert.ok(pushCount>=1,'only the captured account-A write was pending through the transition');
 });
 
-test('RISK completion boundaries: slow native editor saves and pressed scanner controls defer stale adoption while the saved view and fields survive cold reopen',async t=>{
+test("RISK completion boundaries: a live editor and pressed scanner control defer stale adoption while the saved view and fields survive cold reopen",async t=>{
  const {IDBFactory}=await import('fake-indexeddb'),indexedDB=new IDBFactory(),at=Date.parse('2026-10-17T15:00:00Z'),
   doneId='boundary-editor-done',peerId='boundary-editor-peer',gateId='boundary-editor-gate',dependentId='boundary-editor-dependent',
   name=`completion-boundary-editor-${Date.now()}-${Math.random()}`;

@@ -12992,5 +12992,86 @@
     "baseCommit": "52d4b2537bacbb60240ae7a53061224350ebd36f",
     "testChangesSha256": "714020774fae18ef6c3a3a5353594425b483bc46072de905c4f76ff5085ef05c",
     "comparison": "Exact tests.js diff against 52d4b2537bacbb60240ae7a53061224350ebd36f. Cumulative binding only; all earlier exact case-level rationale bytes/chronologies are retained, not relabeled as one contemporaneousRED."
+  },
+  {
+    "reason": "Restore the existing completion-consumer registration name after unpublished E full run33430440 failed its unchanged required-five-consumer process gate: the slow-save title rename excluded the strengthened consumer from its established selector. This is a name-only registration repair, not new causal investigation or a product fix.",
+    "previousBehavior": "E retained and passed the real400ms/native-save/ACK consumer body, but its renamed title no longer matched the unchanged child pattern for the live-editor consumer. The original process gate actually ran four passing consumers and failed the required five count. E was never pushed and has no CI or receipt claim; its failed full outcome remains failed evidence. The earlier storage/native readiness REDs and successful controls retain their original chronology.",
+    "intendedBehavior": "Restore the exact original runtime case title and matching RISK-map row while keeping every strengthened body byte,400ms latency/native-save/ACK assertion, process selector, required count5, no-skip/failure guards,30s child timeout and8s publication waiter unchanged. Root approved double quotes around this same restored title literal so the already-updated named registration is visible to the existing validator against publishedD; this changes no runtime name/body and adds no dummy test or gate exception.",
+    "preservedCoverage": [
+      "Every test body and assertion remains byte-identical to E, including the slow native editor producer/publication repair, pressed scanner controls, fields/theme/facts/dependencies/views/paint/cold reopen and entire1129 fileRestore helper/regression region.",
+      "The real five-consumer child command, selector, count5, exit/no-failure/no-skip assertions, UTC environment and deadline are exactE. The guard is not weakened to accept four outcomes.",
+      "All510 historical rationale objects remain raw-byte-exact and ordered; all35 delivered assets/SW and product metadata remain exactC/D/E. No app, public copy, package, workflow or product/source behavior changes occur."
+    ],
+    "replacementTests": [
+      "RISK completion boundaries: a live editor and pressed scanner control defer stale adoption while the saved view and fields survive cold reopen"
+    ],
+    "redEvidence": {
+      "command": "TZ=UTC Node22 scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-name-pattern=\"^RISK completion delivery fixtures: controlled startup pending and acknowledged boundaries execute all five consumers$\" tests.js",
+      "failure": "On clean exactE,2abe822e-58b9-4147-a117-7587c5595417 observed four actual passing child outcomes with zero skips; the unchanged /# tests 5\\b/ assertion failed because the renamed editor consumer was omitted. This is genuine RED before this narrow registration repair, and postimplementation E regression history rather than an original product-feature RED. Root full33430440 is retained separately as FAILED_LOCAL_FULL_UNPUBLISHED.",
+      "record": "/Users/emeraldpham/.codex/task-artifacts/storage-races-184/ci/pr205/16c/consumer-registration-repair/runs/2026-10-18T21-10-04-653Z-2abe822e-58b9-4147-a117-7587c5595417.json",
+      "failedFullRecord": "/Users/emeraldpham/.codex/task-artifacts/storage-races-184/final-validation-runs/2026-10-18T20-58-47-665Z-33430440-7596-44e8-99bc-9d7be792a481.json"
+    },
+    "greenEvidence": {
+      "command": "TZ=UTC Node22 record-run --purpose green -- node --test --test-name-pattern=\"^(?:RISK completion boundaries:|RISK completion delivery fixtures:|RISK saved view decision integration:|RISK saved view account boundary:|RISK CLOUD ACCOUNT: signing out|RISK CLOUD STARTUP: a late write acknowledgement|RISK DEVICE STORAGE V2: migration|RISK BACKUP FILE RESTORE:|RISK test inventory:)\" tests.js",
+      "record": "/Users/emeraldpham/.codex/task-artifacts/storage-races-184/ci/pr205/16c/consumer-registration-repair/runs/2026-10-18T21-11-56-623Z-fa5e6bcf-a3f2-4cd1-b493-1323c8f53eef.json",
+      "result": "50 focused tests pass with zero failures/cancellations/skips. The unchanged process gate independently executes exactly five real child outcomes and enforces no failures/skips; the restored editor consumer also directly passes in this cohort. Initial focused gate925214e2 passed before the quote-only binding adjustment. No full suite/native/browser/CI or release pass is claimed."
+    },
+    "baseCommit": "1129d51dd2386a01dd912d94ff0480cbab858c93",
+    "testChangesSha256": "eff260b3ea8cdefd6a0200ff7722246f478ceaeae0945373fffdb331e73de9bd",
+    "comparison": "Exact tests.js diff against 1129d51dd2386a01dd912d94ff0480cbab858c93. PublishedD binding includes the previously evidenced E body repair plus this restored named registration; original body-repair RED/GREEN evidence remains in prior exact records."
+  },
+  {
+    "reason": "Restore the existing completion-consumer registration name after unpublished E full run33430440 failed its unchanged required-five-consumer process gate: the slow-save title rename excluded the strengthened consumer from its established selector. This is a name-only registration repair, not new causal investigation or a product fix.",
+    "previousBehavior": "E retained and passed the real400ms/native-save/ACK consumer body, but its renamed title no longer matched the unchanged child pattern for the live-editor consumer. The original process gate actually ran four passing consumers and failed the required five count. E was never pushed and has no CI or receipt claim; its failed full outcome remains failed evidence. The earlier storage/native readiness REDs and successful controls retain their original chronology.",
+    "intendedBehavior": "Restore the exact original runtime case title and matching RISK-map row while keeping every strengthened body byte,400ms latency/native-save/ACK assertion, process selector, required count5, no-skip/failure guards,30s child timeout and8s publication waiter unchanged. Root approved double quotes around this same restored title literal so the already-updated named registration is visible to the existing validator against publishedD; this changes no runtime name/body and adds no dummy test or gate exception.",
+    "preservedCoverage": [
+      "Every test body and assertion remains byte-identical to E, including the slow native editor producer/publication repair, pressed scanner controls, fields/theme/facts/dependencies/views/paint/cold reopen and entire1129 fileRestore helper/regression region.",
+      "The real five-consumer child command, selector, count5, exit/no-failure/no-skip assertions, UTC environment and deadline are exactE. The guard is not weakened to accept four outcomes.",
+      "All510 historical rationale objects remain raw-byte-exact and ordered; all35 delivered assets/SW and product metadata remain exactC/D/E. No app, public copy, package, workflow or product/source behavior changes occur."
+    ],
+    "replacementTests": [
+      "RISK completion boundaries: a live editor and pressed scanner control defer stale adoption while the saved view and fields survive cold reopen"
+    ],
+    "redEvidence": {
+      "command": "TZ=UTC Node22 scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-name-pattern=\"^RISK completion delivery fixtures: controlled startup pending and acknowledged boundaries execute all five consumers$\" tests.js",
+      "failure": "On clean exactE,2abe822e-58b9-4147-a117-7587c5595417 observed four actual passing child outcomes with zero skips; the unchanged /# tests 5\\b/ assertion failed because the renamed editor consumer was omitted. This is genuine RED before this narrow registration repair, and postimplementation E regression history rather than an original product-feature RED. Root full33430440 is retained separately as FAILED_LOCAL_FULL_UNPUBLISHED.",
+      "record": "/Users/emeraldpham/.codex/task-artifacts/storage-races-184/ci/pr205/16c/consumer-registration-repair/runs/2026-10-18T21-10-04-653Z-2abe822e-58b9-4147-a117-7587c5595417.json",
+      "failedFullRecord": "/Users/emeraldpham/.codex/task-artifacts/storage-races-184/final-validation-runs/2026-10-18T20-58-47-665Z-33430440-7596-44e8-99bc-9d7be792a481.json"
+    },
+    "greenEvidence": {
+      "command": "TZ=UTC Node22 record-run --purpose green -- node --test --test-name-pattern=\"^(?:RISK completion boundaries:|RISK completion delivery fixtures:|RISK saved view decision integration:|RISK saved view account boundary:|RISK CLOUD ACCOUNT: signing out|RISK CLOUD STARTUP: a late write acknowledgement|RISK DEVICE STORAGE V2: migration|RISK BACKUP FILE RESTORE:|RISK test inventory:)\" tests.js",
+      "record": "/Users/emeraldpham/.codex/task-artifacts/storage-races-184/ci/pr205/16c/consumer-registration-repair/runs/2026-10-18T21-11-56-623Z-fa5e6bcf-a3f2-4cd1-b493-1323c8f53eef.json",
+      "result": "50 focused tests pass with zero failures/cancellations/skips. The unchanged process gate independently executes exactly five real child outcomes and enforces no failures/skips; the restored editor consumer also directly passes in this cohort. Initial focused gate925214e2 passed before the quote-only binding adjustment. No full suite/native/browser/CI or release pass is claimed."
+    },
+    "baseCommit": "16cb23816381adde56f4ff7d6f699f902b9ff684",
+    "testChangesSha256": "32fa5052d2a59f49b4b5647a48cd9f43eb3ea7b7574b555c3e4a25cd0756aa8f",
+    "comparison": "Exact tests.js diff against 16cb23816381adde56f4ff7d6f699f902b9ff684. Direct parentE binding: only the restored runtime title and approved quote delimiters differ in tests.js."
+  },
+  {
+    "reason": "Restore the existing completion-consumer registration name after unpublished E full run33430440 failed its unchanged required-five-consumer process gate: the slow-save title rename excluded the strengthened consumer from its established selector. This is a name-only registration repair, not new causal investigation or a product fix.",
+    "previousBehavior": "E retained and passed the real400ms/native-save/ACK consumer body, but its renamed title no longer matched the unchanged child pattern for the live-editor consumer. The original process gate actually ran four passing consumers and failed the required five count. E was never pushed and has no CI or receipt claim; its failed full outcome remains failed evidence. The earlier storage/native readiness REDs and successful controls retain their original chronology.",
+    "intendedBehavior": "Restore the exact original runtime case title and matching RISK-map row while keeping every strengthened body byte,400ms latency/native-save/ACK assertion, process selector, required count5, no-skip/failure guards,30s child timeout and8s publication waiter unchanged. Root approved double quotes around this same restored title literal so the already-updated named registration is visible to the existing validator against publishedD; this changes no runtime name/body and adds no dummy test or gate exception.",
+    "preservedCoverage": [
+      "Every test body and assertion remains byte-identical to E, including the slow native editor producer/publication repair, pressed scanner controls, fields/theme/facts/dependencies/views/paint/cold reopen and entire1129 fileRestore helper/regression region.",
+      "The real five-consumer child command, selector, count5, exit/no-failure/no-skip assertions, UTC environment and deadline are exactE. The guard is not weakened to accept four outcomes.",
+      "All510 historical rationale objects remain raw-byte-exact and ordered; all35 delivered assets/SW and product metadata remain exactC/D/E. No app, public copy, package, workflow or product/source behavior changes occur."
+    ],
+    "replacementTests": [
+      "RISK completion boundaries: a live editor and pressed scanner control defer stale adoption while the saved view and fields survive cold reopen"
+    ],
+    "redEvidence": {
+      "command": "TZ=UTC Node22 scripts/agent-tools/record-run.mjs --purpose preimplementation-red -- node --test --test-name-pattern=\"^RISK completion delivery fixtures: controlled startup pending and acknowledged boundaries execute all five consumers$\" tests.js",
+      "failure": "On clean exactE,2abe822e-58b9-4147-a117-7587c5595417 observed four actual passing child outcomes with zero skips; the unchanged /# tests 5\\b/ assertion failed because the renamed editor consumer was omitted. This is genuine RED before this narrow registration repair, and postimplementation E regression history rather than an original product-feature RED. Root full33430440 is retained separately as FAILED_LOCAL_FULL_UNPUBLISHED.",
+      "record": "/Users/emeraldpham/.codex/task-artifacts/storage-races-184/ci/pr205/16c/consumer-registration-repair/runs/2026-10-18T21-10-04-653Z-2abe822e-58b9-4147-a117-7587c5595417.json",
+      "failedFullRecord": "/Users/emeraldpham/.codex/task-artifacts/storage-races-184/final-validation-runs/2026-10-18T20-58-47-665Z-33430440-7596-44e8-99bc-9d7be792a481.json"
+    },
+    "greenEvidence": {
+      "command": "TZ=UTC Node22 record-run --purpose green -- node --test --test-name-pattern=\"^(?:RISK completion boundaries:|RISK completion delivery fixtures:|RISK saved view decision integration:|RISK saved view account boundary:|RISK CLOUD ACCOUNT: signing out|RISK CLOUD STARTUP: a late write acknowledgement|RISK DEVICE STORAGE V2: migration|RISK BACKUP FILE RESTORE:|RISK test inventory:)\" tests.js",
+      "record": "/Users/emeraldpham/.codex/task-artifacts/storage-races-184/ci/pr205/16c/consumer-registration-repair/runs/2026-10-18T21-11-56-623Z-fa5e6bcf-a3f2-4cd1-b493-1323c8f53eef.json",
+      "result": "50 focused tests pass with zero failures/cancellations/skips. The unchanged process gate independently executes exactly five real child outcomes and enforces no failures/skips; the restored editor consumer also directly passes in this cohort. Initial focused gate925214e2 passed before the quote-only binding adjustment. No full suite/native/browser/CI or release pass is claimed."
+    },
+    "baseCommit": "52d4b2537bacbb60240ae7a53061224350ebd36f",
+    "testChangesSha256": "810f3144cc6c4d93902ed3f8cbace74f54bb1e4974536594595180e180169786",
+    "comparison": "Exact tests.js diff against 52d4b2537bacbb60240ae7a53061224350ebd36f. Cumulative binding; historical case-level records and chronology remain exact, not relabeled as one contemporaneous featureRED."
   }
 ]
